@@ -78,6 +78,7 @@ import           BlockApps.XAbiConverter
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json
 import           Blockchain.Data.TXOrigin
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Code
@@ -682,8 +683,7 @@ postUsersContractMethod' cacheNonce FunctionParameters{..} sign = do
     (cmId,xabi) <- maybe (throwIO err) (return . fmap contractdetailsXabi) =<<
       getContractDetailsAndMetadataId
         (ContractName contractName)
-        contractAddr
-        chainId
+        (Account contractAddr (unChainId <$> chainId))
     contract' <- case xAbiToContract xabi of
       Left e -> throwIO . AnError $ Text.pack e
       Right c -> return c
@@ -812,11 +812,11 @@ contractResult txHash mtxr cmId name = do
   let
     Just txResult = mtxr
     chainId = transactionResultChainId txResult
-    addressMaybe = do
+    accountMaybe = do
       str <- listToMaybe $
         Text.splitOn "," (Text.pack $ transactionResultContractsCreated txResult)
-      stringAddress $ Text.unpack str
-  case addressMaybe of
+      flip Account chainId <$> stringAddress (Text.unpack str)
+  case accountMaybe of
     Nothing -> case transactionResultMessage txResult of
       "Success!" -> do
         let mDelAddr = stringAddress . Text.unpack =<<
@@ -825,13 +825,13 @@ contractResult txHash mtxr cmId name = do
           Just _ -> lift $ throwIO $ UserError "Contract failed to upload, likely because the constructor threw"
           Nothing -> lift $ throwIO $ UserError "Transaction succeeded, but contract was neither created, nor destroyed"
       stratoMsg  -> lift $ throwIO $ UserError $ Text.pack stratoMsg
-    Just addr' -> do
+    Just acct -> do
       let cn = ContractName name
       mdetails <- use $ contractDetailsMap . at cn
       details <- case mdetails of
-        Just details' -> return details'{contractdetailsAddress = Just addr'}
+        Just details' -> return details'{contractdetailsAccount = Just acct}
         Nothing -> do
-          cds <- lift $ getContractDetailsByMetadataId cmId addr' (ChainId <$> chainId)
+          cds <- lift $ getContractDetailsByMetadataId cmId acct
           contractDetailsMap . at cn <?= cds
       return $ BlocTransactionResult Success txHash mtxr (Just $ Upload details)
 
@@ -890,6 +890,7 @@ getArgValues argsMap argNamesTypes = do
             Xabi.Bytes _ b         -> Right . SimpleType . TypeBytes $ fmap toInteger b
             Xabi.Bool              -> Right . SimpleType $ TypeBool
             Xabi.Address           -> Right . SimpleType $ TypeAddress
+            Xabi.Account           -> Right . SimpleType $ TypeAccount
             Xabi.Struct _ name     -> Right $ TypeStruct name
             Xabi.Enum _ name _     -> Right $ TypeEnum name
             Xabi.Array ety len ->
@@ -901,6 +902,7 @@ getArgValues argsMap argNamesTypes = do
                   Xabi.Bytes _ b         -> Right . SimpleType . TypeBytes $ fmap toInteger b
                   Xabi.Bool              -> Right . SimpleType $ TypeBool
                   Xabi.Address           -> Right . SimpleType $ TypeAddress
+                  Xabi.Account           -> Right . SimpleType $ TypeAccount
                   Xabi.Struct _ name     -> Right $ TypeStruct name
                   Xabi.Enum _ name _     -> Right $ TypeEnum name
                   Xabi.Array{}           -> Left "Arrays of arrays are not allowed as function arguments"

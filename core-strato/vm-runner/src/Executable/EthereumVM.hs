@@ -75,6 +75,7 @@ import           Blockchain.DB.StorageDB
 import qualified Blockchain.SolidVM                    as SolidVM
 import           Blockchain.Strato.Indexer.Kafka       (writeIndexEvents)
 import           Blockchain.Strato.Indexer.Model       (IndexEvent (..))
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Action
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256
@@ -92,11 +93,11 @@ ethereumVM = void . execContextM $ do
     $logInfoS "difficultyBomb" $ T.pack $ "Difficulty bomb is " ++ show flags_difficultyBomb -- remove me once we figure out how to print args at startup
 
     Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
-    (cpOffsetStart, EVMCheckpoint cpHash cpHead cpBBI cpMSR) <- getCheckpoint
-    $logInfoLS "ethereumVM/getCheckpoint" (cpHash, cpBBI, cpMSR)
+    (cpOffsetStart, EVMCheckpoint cpHash cpHead cpBBI cpSR) <- getCheckpoint
+    $logInfoLS "ethereumVM/getCheckpoint" (cpHash, cpBBI, cpSR)
 
     putContextBestBlockInfo cpBBI
-    mapM_ (Mod.put Proxy . BlockHashRoot) cpMSR
+    Mod.put Proxy $ BlockHashRoot cpSR
 
     Bagger.processNewBestBlock cpHash cpHead [] -- bootstrap Bagger with genesis block
 
@@ -118,7 +119,7 @@ ethereumVM = void . execContextM $ do
         let newOffset = cpOffset + fromIntegral (length seqEvents)
         baggerData <- uncurry EVMCheckpoint <$> Bagger.getCheckpointableState
         checkpointData <- baggerData <$> getContextBestBlockInfo
-        withChainroot <- checkpointData . Just . unBlockHashRoot <$> Mod.get Proxy
+        withChainroot <- checkpointData . unBlockHashRoot <$> Mod.get Proxy
         setCheckpoint newOffset withChainroot
 
 microtimeCutoff :: Microtime
@@ -182,7 +183,7 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
   let (cId, cInfo) = ogGenesisInfo
   $logInfoS "insertNewChains" $ T.pack $ "Inserting Chain ID: " ++ CL.yellow (format cId)
   $logDebugS "insertNewChains" $ T.pack $ "With ChainInfo: " ++ show cInfo
-  mGSR <- getGenesisStateRoot cId
+  mGSR <- getGenesisStateRoot $ Just cId
   case mGSR of
     Just gsr -> do
       $logInfoS "insertNewChains" $ T.pack $ "We already have a genesis state root for this chain. It's " ++ format gsr
@@ -190,12 +191,12 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
     Nothing -> do
       $logInfoS "insertNewChains" $ T.pack $ "This is a new chain!"
       let theVM = T.unpack $ fromMaybe "EVM" $ M.lookup "VM" $ chainMetadata (chainInfo cInfo)
-      sr' <- chainInfoToGenesisState theVM cInfo
+      sr' <- chainInfoToGenesisState theVM (Just cId) cInfo
       (sr, mAction) <-
         case theVM of
           "SolidVM" -> runChainConstructors cId cInfo
           _ -> return (sr', [])
-      Just (cId, cInfo, sr, mAction) <$ putChainGenesisInfo cId (unsafeCreateKeccak256FromWord256 0) sr
+      Just (cId, cInfo, sr, mAction) <$ putChainGenesisInfo (Just cId) (unsafeCreateKeccak256FromWord256 0) sr
 
 outputNewChains :: [(Word256, ChainInfo, MP.StateRoot, [Action])] -> ConduitT a VmOutEvent ContextM ()
 outputNewChains = traverse_ $ \(cId, cInfo, sr, actions) -> do
@@ -280,7 +281,7 @@ runChainConstructors cId cInfo = do
           hsh <- MaybeT $ pure $ case cp of
             SolidVMCode _ h -> Just h
             EVMCode h -> Just h
-            CodeAtAddress _ _ -> Nothing
+            CodeAtAccount _ _ -> Nothing
           (MaybeT $ pure $ M.lookup cp codeHashMap) <|>
             MaybeT (fmap (T.pack . BC.unpack . snd) <$> getCode hsh)
         pure $ Just (a,msrc)
@@ -312,14 +313,14 @@ runChainConstructors cId cInfo = do
             0
             (unsafeCreateKeccak256FromWord256 0))
          0 --callDepth
-         (Address 0) --receiveAddress
-         addr --codeAddress
-         (Address 0) --sender
+         (Account 0 $ Just cId) --receiveAddress
+         (Account addr $ Just cId) --codeAddress
+         (Account 0 $ Just cId) --sender
          0 --value
          1 --gasPrice
          ""
          1000000000000 --availableGas
-         (Address 0)
+         (Account 0 $ Just cId)
          (unsafeCreateKeccak256FromWord256 0)
          (Just cId)
          (Just $ M.fromList $
@@ -329,20 +330,21 @@ runChainConstructors cId cInfo = do
   flushMemStorageDB
   Mem.flushMemAddressStateDB
 
-  sr <- Mod.get (Proxy @MP.StateRoot)
+  sr <- A.lookupWithDefault (Proxy @MP.StateRoot) (Just cId)
   return (sr, actions)
 
 initializeCheckpointAndBlockSummary :: ( HasBlockSummaryDB m
                                        , Mod.Modifiable BlockHashRoot m
+                                       , Mod.Modifiable GenesisRoot m
                                        , (MP.StateRoot `A.Alters` MP.NodeData) m
                                        )
                                     => OutputBlock
                                     -> m EVMCheckpoint
 initializeCheckpointAndBlockSummary block = do
-  let evmc@(EVMCheckpoint sha _ _ _) = outputBlockToEvmCheckpoint block
+  let evmc@(EVMCheckpoint sha _ _ sr) = outputBlockToEvmCheckpoint block
   writeBlockSummary block
-  bootstrapChainDB sha
-  return evmc
+  (BlockHashRoot bhr) <- bootstrapChainDB sha [(Nothing, sr)]
+  return evmc{ctxChainDBStateRoot = bhr}
 
 outputBlockToEvmCheckpoint :: OutputBlock -> EVMCheckpoint
 outputBlockToEvmCheckpoint block =
@@ -353,7 +355,8 @@ outputBlockToEvmCheckpoint block =
       txL    = length txs
       uncL   = length (obBlockUncles block)
       cbbi   = ContextBestBlockInfo (sha, header, td, txL, uncL)
-   in EVMCheckpoint sha header cbbi Nothing
+      sr     = blockDataStateRoot header
+   in EVMCheckpoint sha header cbbi sr
 
 writeBlockSummary :: HasBlockSummaryDB m => OutputBlock -> m ()
 writeBlockSummary block =
@@ -423,7 +426,7 @@ sendOutEvents OutBatch{..} = do
     void . K.withKafkaRetry1s . produceUnminedBlocksM $
       outputBlockToBlock <$> toList outBlocks
   void . K.withKafkaRetry1s . writeIndexEvents $ toList outIndexEvents
-  for_ outToStateDiffs $ uncurry3 initializeChainDBs -- only needed to update Postgres with chain info for API calls
+  for_ outToStateDiffs $ uncurry3 (initializeChainDBs . Just) -- only needed to update Postgres with chain info for API calls
   traverse_ commitSqlDiffs outStateDiffs
   loopTimeit "flushLogEntries" $ do
     void . K.withKafkaRetry1s $ writeIndexEvents (LogDBEntry <$> toList outLogs)
@@ -436,11 +439,11 @@ sendOutEvents OutBatch{..} = do
     mapM_ (K.withKafkaRetry1s . writeIndexEvents) toWrite
   when (not flags_sqlDiff) $
     timeit "updateSQLBalanceAndNonce" (Just vmBlockInsertionMined) $
-      forM_ outASMs $ \(chainId, asm) -> do
+      forM_ outASMs $ \asm -> do
         updateSQLBalanceAndNonce $
-          [ ((theAddress, chainId),
+          [ (theAccount,
              (addressStateBalance asMod, addressStateNonce asMod))
-          | (theAddress, Mem.ASModification asMod) <- M.toList asm
+          | (theAccount, Mem.ASModification asMod) <- M.toList asm
           ]
 
 consumerGroup :: KP.ConsumerGroup

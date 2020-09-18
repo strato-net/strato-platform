@@ -97,7 +97,7 @@ showAccountInfo (ContractWithStorage (Address address) balance code storage) =
   where addressString = showHex address ""
         showCodeHash (EVMCode c) = showHex $ keccak256ToWord256 c
         showCodeHash (SolidVMCode _ c) = showHex $ keccak256ToWord256 c
-        showCodeHash (CodeAtAddress addr name) = const $ name ++ "@" ++ showHex addr ""
+        showCodeHash (CodeAtAccount acct name) = const $ name ++ "@" ++ show acct
 
 
 

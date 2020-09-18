@@ -39,6 +39,7 @@ import           BlockApps.XAbiConverter           (xAbiToContract)
 
 import           Blockchain.Data.ChainInfo
 import           Blockchain.TypeLits
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256
 import           Handlers.Chain
@@ -61,7 +62,7 @@ replaceMembers Struct{..} addrs m =
         Nothing -> m'
         Just (Left _, _) -> m
         Just (_, ty) -> case ty of
-          TypeArrayDynamic (SimpleType TypeAddress) -> m'
+          TypeArrayDynamic (SimpleType TypeAccount) -> m'
           _ -> m
 
 createChainInfo :: ChainInput -> Bloc (Maybe Int32, ChainInfo)
@@ -130,7 +131,7 @@ postChainInfo chainInput = do
   chainId <- blocStrato $ postChainClient chainInfo
   let isAsync = fromMaybe False $ chaininputAsync chainInput
   unless isAsync $ waitForChainInfo chainId
-  for_ mCmId $ \cmId -> insertContractInstance cmId governanceAddress (Just chainId)
+  for_ mCmId $ \cmId -> insertContractInstance cmId $ Account governanceAddress (Just $ unChainId chainId)
   return chainId
 
 postChainInfos :: [ChainInput] -> Bloc [ChainId]
@@ -141,7 +142,7 @@ postChainInfos chainInputs = do
       asyncChains = map snd . filter (not . fst) $ zip asyncInputs chainIds
   unless (null asyncChains) $ waitForChainInfos asyncChains
   let cmIdChains = catMaybes $ zipWith (liftA2 (,)) (map fst chainInfos) (map Just chainIds)
-  for_ cmIdChains $ \(cmId, chainId) -> insertContractInstance cmId governanceAddress (Just chainId)
+  for_ cmIdChains $ \(cmId, chainId) -> insertContractInstance cmId $ Account governanceAddress (Just $ unChainId chainId)
   return chainIds
 
 waitForChainInfo :: ChainId -> Bloc ()

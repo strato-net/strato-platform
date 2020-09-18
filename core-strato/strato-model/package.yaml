@@ -37,6 +37,7 @@ library:
     - containers
     - cpu
     - cryptonite
+    - data-default
     - deepseq
     - derive
     - ethereum-rlp

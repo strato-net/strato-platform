@@ -111,13 +111,13 @@ instance RLPEncodable CodePtr where
                                            , rlpEncode n
                                            , rlpEncode ch
                                            ]
-  rlpEncode (CodeAtAddress a n) = RLP.Array [RLP.String $ Char8.pack "AtAddress"
-                                           , rlpEncode a
-                                           , rlpEncode n
-                                           ]
+  rlpEncode (CodeAtAccount a n) = RLP.Array [RLP.String $ Char8.pack "AtAccount"
+                                            , rlpEncode a
+                                            , rlpEncode n
+                                            ]
 
   rlpDecode (RLP.Array [RLP.String "SolidVM", n, ch]) = SolidVMCode <$> rlpDecode n <*> rlpDecode ch
-  rlpDecode (RLP.Array [RLP.String "AtAddress", a, n]) = CodeAtAddress <$> rlpDecode a <*> rlpDecode n
+  rlpDecode (RLP.Array [RLP.String "AtAccount", a, n]) = CodeAtAccount <$> rlpDecode a <*> rlpDecode n
   rlpDecode ch = EVMCode <$> rlpDecode ch
 
 instance RLPEncodable Code where

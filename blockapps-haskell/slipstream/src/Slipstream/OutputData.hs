@@ -432,7 +432,7 @@ insertEventTableQuery ev =
         ,  wrapDoubleQuotes tableName
         , " VALUES "
         , "( DEFAULT,\n" -- id, set by Postgres
-        , wrapSingleQuotes $ tshow $ agContractAddress ev
+        , wrapSingleQuotes $ tshow $ agContractAccount ev
         , ",\n"
         , csv $ map wrapSingleQuotes $ agEventArgs ev
         ,  " )"

@@ -68,6 +68,7 @@ import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
 import qualified Blockchain.Strato.Indexer.IContext   as IContext
 import qualified Blockchain.Strato.Indexer.Kafka      as IdxKafka
 import qualified Blockchain.Strato.Indexer.Model      as IdxModel
+import qualified Blockchain.Strato.Model.Account      as Ac
 import qualified Blockchain.Strato.Model.Address      as Ad
 import           Blockchain.Strato.Model.Class
 import qualified Blockchain.Strato.RedisBlockDB       as RBDB
@@ -99,7 +100,7 @@ getGenesisBlockAndPopulateInitialMPs :: ( MonadIO m
                                         , HasStateDB m
                                         , HasStorageDB m
                                         , HasMemStorageDB m
-                                        , (Ad.Address `Alters` AddressState) m
+                                        , (Ac.Account `Alters` AddressState) m
                                         )
                                      => String
                                      -> [Ad.Address]
@@ -125,7 +126,7 @@ initializeGenesisBlock :: ( HasCodeDB m
                           , HasStorageDB m
                           , HasMemStorageDB m
                           , MonadLogger m
-                          , (Ad.Address `Alters` AddressState) m
+                          , (Ac.Account `Alters` AddressState) m
                           )
                        => String
                        -> [Ad.Address]
@@ -162,7 +163,7 @@ populateStorageDBs :: ( MonadLogger m
                       , HasCodeDB m
                       , HasStateDB m
                       , HasHashDB m
-                      , (Ad.Address `Alters` AddressState) m
+                      , (Ac.Account `Alters` AddressState) m
                       )
                    => (Keccak256 -> Maybe (Map Text Text))
                    -> Block 
@@ -170,7 +171,7 @@ populateStorageDBs :: ( MonadLogger m
                    -> m ()
 populateStorageDBs getMetadata genesisBlock genesisChainId = do
 
-    sr <- getStateRoot
+    sr <- getStateRoot genesisChainId
     res <- liftIO . runKafkaConfigured "strato-init" $ do
       assertTopicCreation
 
@@ -186,20 +187,21 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
       --For now, we are just clumsily filtering out any state changes for the Vitu vehicle manager,
       --since this contract has giant arrays that would choke strato
       --(yes, this temprary feature is hardcoded into the whole platform for one client)
-      let fullAddressState = rlpDecode . rlpDeserialize . rlpDecode $ value::AddressState
+      let acct = Ac.Account address genesisChainId
+          fullAddressState = rlpDecode . rlpDeserialize . rlpDecode $ value::AddressState
           filteredAddressState =
             if (address /= Ad.Address 0x7000000000000000000000000000000000000000)
             then fullAddressState
             else fullAddressState{addressStateContractRoot=MP.blankStateRoot}
-          fullAddrStates = [(address, fullAddressState)]
-          filteredAddrStates = [(address, filteredAddressState)]
+          fullAddrStates = [(acct, fullAddressState)]
+          filteredAddrStates = [(acct, filteredAddressState)]
           toAction a d = A.Action
             { A._actionBlockHash = blockHeaderHash $ blockHeader genesisBlock
             , A._actionBlockTimestamp = blockHeaderTimestamp $ blockHeader genesisBlock
             , A._actionBlockNumber = blockHeaderBlockNumber $ blockHeader genesisBlock
             , A._actionTransactionHash = unsafeCreateKeccak256FromWord256 $ fromMaybe 0 genesisChainId
             , A._actionTransactionChainId = genesisChainId
-            , A._actionTransactionSender = Ad.Address 0
+            , A._actionTransactionSender = Ac.Account (Ad.Address 0) genesisChainId
             , A._actionData = Map.singleton a $
                                 A.ActionData
                                   (EVMCode ch)
@@ -215,7 +217,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
                     case codeHash d of
                       EVMCode ch' -> ch'
                       SolidVMCode _ ch' -> ch'
-                      CodeAtAddress _ _ -> error "TODO: Encountered CodeAtAddress in genesis block"
+                      CodeAtAccount _ _ -> error "TODO: Encountered CodeAtAccount in genesis block"
           fromDiff :: Diff Word256 'Eventual -> Word256
           fromDiff (Value v) = v
           squashMap f = map (uncurry f) . Map.toList

@@ -21,6 +21,7 @@ import qualified BlockApps.Bloc22.API.UsersSpec     as Users
 import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Bloc22.Client
 import           BlockApps.Solidity.Xabi
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Nonce
@@ -126,7 +127,7 @@ setup = do
           _ -> error "result from call to 'sequence $ map resolveBlocTx unresolvedResults' was the incorrect format"
       let
         Just (Upload simpleStorageDetails) = blocTransactionData simpleStorageResult
-        Just sscAddr = contractdetailsAddress simpleStorageDetails
+        Just sscAddr = _accountAddress <$> contractdetailsAccount simpleStorageDetails
         config = testConfig
           { userAddress = addr1
           , toUserAddress = addr2

@@ -9,7 +9,6 @@ import           GHC.Generics
 
 import           Blockchain.DB.MemAddressStateDB
 
-import           Blockchain.Data.Address
 import           Blockchain.Data.ExecResults
 import qualified Blockchain.Data.TransactionDef     as TD
 import           Blockchain.Data.TransactionResultStatus
@@ -17,6 +16,7 @@ import           Blockchain.Data.TXOrigin
 import           Blockchain.Database.MerklePatricia (StateRoot (..))
 import           Blockchain.ExtWord
 import           Blockchain.Sequencer.Event         (OutputTx (..))
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Action
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256        hiding (hash)
@@ -26,9 +26,9 @@ import           Text.Format
 data TxRunResult = TxRunResult { trrTransaction :: OutputTx
                                , trrResult      :: Either TransactionFailureCause ExecResults
                                , trrTime        :: NominalDiffTime
-                               , trrBeforeMap   :: M.Map Address AddressStateModification
-                               , trrAfterMap    :: M.Map Address AddressStateModification
-                               , trrNewAddresses :: [Address]
+                               , trrBeforeMap   :: M.Map Account AddressStateModification
+                               , trrAfterMap    :: M.Map Account AddressStateModification
+                               , trrNewAddresses :: [Account]
                                } deriving (Show, Eq, Generic)
 
 -- When we use a cached TxRunResult, the blockHash does not account for consensus values added.
@@ -46,7 +46,7 @@ data TransactionFailureCause = TFInsufficientFunds Integer Integer OutputTx -- t
                              | TFBlockGasLimitExceeded Integer Integer OutputTx-- neededGas, actualGas
                              | TFNonceMismatch Integer Integer OutputTx -- expectedNonce, actualNonce
                              | TFChainIdMismatch (Maybe Word256) (Maybe Word256) OutputTx -- expectedChainId, actualChainId
-                             | TFCodeCollectionNotFound Address String OutputTx
+                             | TFCodeCollectionNotFound Account String OutputTx
                              deriving (Eq, Read, Show, Generic)
 
 instance NFData TransactionFailureCause
@@ -69,7 +69,7 @@ data TxRejection = WrongChainId   BaggerStage BaggerTxQueue OutputTx -- only pub
                  | BalanceTooLow  BaggerStage BaggerTxQueue Integer Integer OutputTx -- integers: needed balance, actual balance
                  | GasLimitTooLow BaggerStage BaggerTxQueue Integer OutputTx -- queue should probably only be Validation, integer is intrinsic gas
                  | LessLucrative  BaggerStage BaggerTxQueue OutputTx OutputTx -- newTx, oldTx
-                 | CodeNotFound   BaggerStage BaggerTxQueue Address String OutputTx
+                 | CodeNotFound   BaggerStage BaggerTxQueue Account String OutputTx
                  deriving (Eq, Read, Show)
 
 rejectedTx :: TxRejection -> OutputTx

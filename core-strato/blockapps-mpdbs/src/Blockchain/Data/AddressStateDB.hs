@@ -31,7 +31,7 @@ import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>))
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.ExtWord
-import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Util
@@ -91,24 +91,24 @@ instance RLPSerializable AddressState where
       }
   rlpDecode x = error $ "Missing case in rlpDecode for AddressState: " ++ show (pretty x)
 
-resolveCodePtr :: ((Address, Maybe Word256) `Alters` AddressState) m => CodePtr -> m (Maybe CodePtr)
-resolveCodePtr (CodeAtAddress addr _) = lookup Proxy (addr, (Nothing :: Maybe Word256)) >>= \case
+resolveCodePtr :: (Account `Alters` AddressState) m => CodePtr -> m (Maybe CodePtr)
+resolveCodePtr (CodeAtAccount acct _) = lookup Proxy acct >>= \case
   Nothing -> pure Nothing
   Just AddressState{..} -> resolveCodePtr addressStateCodeHash
 resolveCodePtr codePtr = pure $ Just codePtr
 
-codePtrToSHA :: ((Address, Maybe Word256) `Alters` AddressState) m => CodePtr -> m (Maybe Keccak256)
+codePtrToSHA :: (Account `Alters` AddressState) m => CodePtr -> m (Maybe Keccak256)
 codePtrToSHA = resolveCodePtr >=> \case
   Just (EVMCode hsh) -> pure $ Just hsh
   Just (SolidVMCode _ hsh) -> pure $ Just hsh
-  _ -> pure Nothing -- CodeAtAddress cannot happen here
+  _ -> pure Nothing -- CodeAtAccount cannot happen here
 
 resolvedCodePtrToSHA :: CodePtr -> Keccak256
 resolvedCodePtrToSHA (EVMCode hsh) = hsh
 resolvedCodePtrToSHA (SolidVMCode _ hsh) = hsh
 resolvedCodePtrToSHA _ = emptyHash
 
-codePtrToCodeKind :: ((Address, Maybe Word256) `Alters` AddressState) m => CodePtr -> m CodeKind
+codePtrToCodeKind :: (Account `Alters` AddressState) m => CodePtr -> m CodeKind
 codePtrToCodeKind = resolveCodePtr >=> \case
   Just (SolidVMCode _ _) -> pure SolidVM
   _ -> pure EVM -- TODO: should this return (Maybe CodeKind)?

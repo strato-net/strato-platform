@@ -33,6 +33,7 @@ import qualified Blockchain.Database.MerklePatricia          as MP
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.StateDB
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Util
@@ -46,9 +47,9 @@ import           Control.Monad                               (liftM)
 
 import qualified Data.NibbleString                           as N
 
-getAddressState :: HasStateDB m => Address -> m AddressState
-getAddressState address = do
-    sr <- getStateRoot
+getAddressState :: HasStateDB m => Account -> m AddressState
+getAddressState (Account address chainId) = do
+    sr <- getStateRoot chainId
     states <- MP.getKeyVal sr $ addressAsNibbleString address
 
     case states of
@@ -60,21 +61,21 @@ getAddressState address = do
         where b = blankAddressState
       Just s -> return $ (rlpDecode . rlpDeserialize . rlpDecode) s
 
-getAddressStateMaybe :: HasStateDB m => Address -> m (Maybe AddressState)
-getAddressStateMaybe address = do
-  sr <- getStateRoot
+getAddressStateMaybe :: HasStateDB m => Account -> m (Maybe AddressState)
+getAddressStateMaybe (Account address chainId) = do
+  sr <- getStateRoot chainId
   mState <- MP.getKeyVal sr $ addressAsNibbleString address
   return $ rlpDecode . rlpDeserialize . rlpDecode <$> mState
 
-getAllAddressStates::(HasHashDB m, HasStateDB m) => m [(Address, AddressState)]
-getAllAddressStates = do
-  sr <- getStateRoot
-  mapM convert =<<  MP.unsafeGetAllKeyVals sr
+getAllAddressStates::(HasHashDB m, HasStateDB m) => Maybe Word256 -> m [(Account, AddressState)]
+getAllAddressStates chainId = do
+  sr <- getStateRoot chainId
+  mapM convert =<< MP.unsafeGetAllKeyVals sr
   where
-    convert :: (HasHashDB m) => (N.NibbleString, RLPObject) -> m (Address, AddressState)
+    convert :: (HasHashDB m) => (N.NibbleString, RLPObject) -> m (Account, AddressState)
     convert (k, v) = do
       k' <- fmap (fromMaybe (error $ "missing key value in hash table: " ++ BC.unpack (B16.encode $ nibbleString2ByteString k))) $ getAddressFromHash k
-      return (k', rlpDecode . rlpDeserialize . rlpDecode $ v)
+      return ((Account k' chainId), rlpDecode . rlpDeserialize . rlpDecode $ v)
 
 getAddressFromHash::(HasHashDB m)=>N.NibbleString -> m (Maybe Address)
 getAddressFromHash =
@@ -86,21 +87,21 @@ getStorageKeyFromHash  = fmap (fmap bytesToWord256) . getRawStorageKeyFromHash
 getRawStorageKeyFromHash :: (HasHashDB m)=> N.NibbleString -> m (Maybe B.ByteString)
 getRawStorageKeyFromHash = fmap (fmap nibbleString2ByteString) . hashDBGet
 
-putAddressState :: (HasStateDB m, HasHashDB m) => Address -> AddressState -> m ()
-putAddressState address newState = do
+putAddressState :: (HasStateDB m, HasHashDB m) => Account -> AddressState -> m ()
+putAddressState (Account address chainId) newState = do
   hashDBPut addrNibbles
-  sr <- getStateRoot
+  sr <- getStateRoot chainId
   sr' <- MP.putKeyVal sr addrNibbles $ rlpEncode $ rlpSerialize $ rlpEncode newState
-  setStateDBStateRoot sr'
+  setStateDBStateRoot chainId sr'
   where addrNibbles = addressAsNibbleString address
 
-deleteAddressState :: HasStateDB m => Address -> m ()
-deleteAddressState address = do
-  sr <- getStateRoot
+deleteAddressState :: HasStateDB m => Account -> m ()
+deleteAddressState (Account address chainId) = do
+  sr <- getStateRoot chainId
   sr' <- MP.deleteKey sr (addressAsNibbleString address)
-  setStateDBStateRoot sr'
+  setStateDBStateRoot chainId sr'
 
-addressStateExists :: HasStateDB m => Address -> m Bool
-addressStateExists address = do
-  sr <- getStateRoot
+addressStateExists :: HasStateDB m => Account -> m Bool
+addressStateExists (Account address chainId) = do
+  sr <- getStateRoot chainId
   MP.keyExists sr (addressAsNibbleString address)

@@ -16,6 +16,7 @@ module Slipstream.GlobalsColdStorage
   , fakeHandle
   ) where
 
+import Control.Lens ((^.))
 import ClassyPrelude hiding (Handle)
 import Data.Binary hiding (get)
 import Database.Persist
@@ -27,6 +28,7 @@ import UnliftIO.Concurrent
 import UnliftIO.Resource
 
 import BlockApps.Solidity.Value
+import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 
@@ -49,16 +51,16 @@ ColdStorage
 -- The importance of a shared filter between all worker threads is
 -- to prevent a scenario where different cold storage handles have
 -- different opinions about the contents of the database.
-type AddrFilter = DBF.DelayedBloomFilter (Address, Maybe ChainId)
+type AcctFilter = DBF.DelayedBloomFilter Account
 
 {-# NOINLINE globalBloomFilter #-}
-globalBloomFilter :: TMVar AddrFilter
+globalBloomFilter :: TMVar AcctFilter
 globalBloomFilter = unsafePerformIO newEmptyTMVarIO
 
-readFilter :: STM AddrFilter
+readFilter :: STM AcctFilter
 readFilter = readTMVar globalBloomFilter
 
-setFilter :: AddrFilter -> STM ()
+setFilter :: AcctFilter -> STM ()
 setFilter = void . swapTMVar globalBloomFilter
 
 initFilter :: MonadIO m => Int -> m Bool
@@ -74,10 +76,10 @@ storageWorker q = forever $ do
 
 recordKeys :: MonadIO m => QueueElem -> m ()
 recordKeys SyncFlush = return ()
-recordKeys (PreStorageEntry a mc _) = do
+recordKeys (PreStorageEntry a _) = do
   depth <- atomically $ do
     f <- readFilter
-    setFilter $ DBF.insert (a, mc) f
+    setFilter $ DBF.insert a f
     return $! DBF.stackDepth f
   incNumBloomWrites
   recordStackDepth depth
@@ -86,8 +88,8 @@ recordKeys (PreStorageEntry a mc _) = do
 
 serialize :: QueueElem -> Maybe (Key ColdStorage, ColdStorage)
 serialize SyncFlush = Nothing
-serialize (PreStorageEntry a mc vs) =
-  let mci = MChainId mc
+serialize (PreStorageEntry (Account a mc) vs) =
+  let mci = MChainId $ ChainId <$> mc
   in Just (ColdStorageKey a mci, ColdStorage a mci . toStrict . encode $ vs)
 
 deserialize :: Maybe ColdStorage -> Either Text [(Text, Value)]
@@ -113,17 +115,17 @@ initStorage cacheSize = do
 
 -- | Check postgres for an entry about this account's values
 readStorage :: MonadUnliftIO m
-            => Handle -> Address -> Maybe ChainId -> m (Either Text [(Text, Value)])
-readStorage FakeHandle _ _ = recordStorageResult $! Left "fake handle"
-readStorage (Handle _ sql) addr mci = recordStorageResult =<< do
-  seen <- DBF.elem (addr, mci) <$> atomically readFilter
+            => Handle -> Account -> m (Either Text [(Text, Value)])
+readStorage FakeHandle _ = recordStorageResult $! Left "fake handle"
+readStorage (Handle _ sql) acct = recordStorageResult =<< do
+  seen <- DBF.elem acct <$> atomically readFilter
   if not seen
     then return . Left $ "unseen by bloom filter"
     else flip runReaderT sql
        . fmap deserialize
        . get
-       . ColdStorageKey addr
-       $ MChainId mci
+       . ColdStorageKey (acct ^. accountAddress)
+       $ MChainId (fmap ChainId $ acct ^. accountChainId)
 
 recordStorageResult :: (MonadIO m) => Either Text a -> m (Either Text a)
 recordStorageResult v = do
@@ -134,9 +136,9 @@ recordStorageResult v = do
 
 -- | Schedule the write of an accounts values. syncStorage can be used to check for completion
 --   of writes.
-asyncWriteToStorage :: MonadIO m => Handle -> Address -> Maybe ChainId -> [(Text, Value)] -> m ()
-asyncWriteToStorage FakeHandle _ _ _ = return ()
-asyncWriteToStorage (Handle q _) a mc vs = atomically . writeTQueue q $ PreStorageEntry a mc vs
+asyncWriteToStorage :: MonadIO m => Handle -> Account -> [(Text, Value)] -> m ()
+asyncWriteToStorage FakeHandle _ _ = return ()
+asyncWriteToStorage (Handle q _) a vs = atomically . writeTQueue q $ PreStorageEntry a vs
 
 -- | Block until all pending writes have been sent.
 syncStorage :: MonadIO m => Handle -> m ()

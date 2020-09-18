@@ -27,6 +27,7 @@ import           Test.QuickCheck.Instances()
 
 import           Blockchain.MiscJSON()
 import           Blockchain.SolidVM.Model
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord (Word256, bytesToWord256)
 import           Blockchain.Strato.Model.Event
@@ -40,8 +41,8 @@ instance FromJSON CallType where
 
 data CallData = CallData
   { _callDataType     :: CallType
-  , _callDataSender   :: Address
-  , _callDataOwner    :: Address
+  , _callDataSender   :: Account
+  , _callDataOwner    :: Account
   , _callDataGasPrice :: Integer
   , _callDataValue    :: Integer
   , _callDataInput    :: BSS.ShortByteString
@@ -74,8 +75,8 @@ instance FromJSON CallData where
 emptyCallData :: CallData
 emptyCallData = CallData
   { _callDataType     = Create
-  , _callDataSender   = Address 0
-  , _callDataOwner    = Address 0
+  , _callDataSender   = Account (Address 0) Nothing
+  , _callDataOwner    = Account (Address 0) Nothing
   , _callDataGasPrice = 0
   , _callDataValue    = 0
   , _callDataInput    = BSS.empty
@@ -155,8 +156,8 @@ data Action = Action
   , _actionBlockNumber        :: Integer
   , _actionTransactionHash    :: Keccak256
   , _actionTransactionChainId :: Maybe Word256
-  , _actionTransactionSender  :: Address
-  , _actionData               :: Map Address ActionData
+  , _actionTransactionSender  :: Account
+  , _actionData               :: Map Account ActionData
   , _actionMetadata           :: Maybe (Map Text Text)
   , _actionEvents             :: S.Seq Event
   } deriving (Eq, Show, Generic, NFData)

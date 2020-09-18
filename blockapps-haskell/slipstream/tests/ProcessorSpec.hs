@@ -9,7 +9,7 @@ import qualified Data.ByteString as B
 import Test.Hspec
 import Text.RawString.QQ
 
-import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Account
 import Slipstream.Processor
 
 messageToSplit :: B.ByteString
@@ -71,7 +71,7 @@ messageToSplit = [r|
   },
   "events" : 
          [ { "eventContractName" : "Vehicle",
-             "eventContractAddress" : "2e385b6a3aea46d4172df98617b5385c13b7100d",
+             "eventContractAccount" : "2e385b6a3aea46d4172df98617b5385c13b7100d",
              "eventName" : "Vehicle Event",
              "eventArgs" : ["x", "y"]
            }
@@ -85,5 +85,5 @@ spec = do
   it "can create multiple actions from a single message" $ do
     -- The ActionDatas have different codehashes, and so should be processed indepedently
     map fst (parseActions [messageToSplit]) `shouldBe`
-      [ (Address 0x95b0195a59bdb49db4c8ffacbd93dc67857fbe82, Nothing)
-      , (Address 0xeb6b5070bad6eb2efec046fb00179395ee308608, Nothing)]
+      [ (Account 0x95b0195a59bdb49db4c8ffacbd93dc67857fbe82 Nothing)
+      , (Account 0xeb6b5070bad6eb2efec046fb00179395ee308608 Nothing)]

@@ -38,7 +38,7 @@ data Type
 
 data SimpleType
   = TypeBool
-  | TypeAddress
+  | TypeAccount
   | TypeString
   | TypeInt { intSigned :: Bool
             , intSize   :: Maybe Integer
@@ -56,7 +56,7 @@ getTypeByteLength = \case
   TypeFunction{}        -> Nothing
   TypeStruct{}          -> Nothing
   TypeEnum{}            -> Nothing
-  TypeContract{}        -> getSimpleTypeByteLength TypeAddress
+  TypeContract{}        -> getSimpleTypeByteLength TypeAccount
 
 getSimpleTypeByteLength :: SimpleType -> Maybe Int
 getSimpleTypeByteLength = \case
@@ -71,7 +71,7 @@ formatSimpleType (TypeInt s (Just b)) = (if s then "" else "u") ++ "int" ++ (sho
 formatSimpleType (TypeBytes Nothing) = "bytes"
 formatSimpleType (TypeBytes (Just b)) = "bytes" ++ show b
 formatSimpleType TypeBool = "bool"
-formatSimpleType TypeAddress = "address"
+formatSimpleType TypeAccount = "address"
 formatSimpleType TypeString = "string"
 
 formatType::Type->String

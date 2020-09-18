@@ -23,7 +23,7 @@ import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB
 import           Blockchain.Output
-import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.ExtendedWord
 
 -- A thin layer around raw storage db for clients who expect to work on
@@ -37,10 +37,10 @@ type FullStorage m = ( HasMemAddressStateDB m
                      , HasMemStorageDB m
                      , HasStateDB m
                      , HasHashDB m
-                     , (Address `Alters` AddressState) m
+                     , (Account `Alters` AddressState) m
                      )
 
-toKey :: Address -> Word256 -> RawStorageKey
+toKey :: Account -> Word256 -> RawStorageKey
 toKey = curry $ fmap word256ToBytes
 
 toVal :: Word256 -> RawStorageValue
@@ -49,14 +49,14 @@ toVal = rlpSerialize  . rlpEncode
 fromVal :: RawStorageValue -> Word256
 fromVal = rlpDecode . rlpDeserialize
 
-putStorageKeyVal' :: HasStorageDB m => Address -> Word256 -> Word256 -> m ()
-putStorageKeyVal' addr key val = putRawStorageKeyVal' (toKey addr key) (toVal val)
+putStorageKeyVal' :: HasStorageDB m => Account -> Word256 -> Word256 -> m ()
+putStorageKeyVal' acct key val = putRawStorageKeyVal' (toKey acct key) (toVal val)
 
-getStorageKeyVal' :: HasStorageDB m => Address -> Word256 -> m Word256
-getStorageKeyVal' addr key = fromVal <$> getRawStorageKeyVal' (toKey addr key)
+getStorageKeyVal' :: HasStorageDB m => Account -> Word256 -> m Word256
+getStorageKeyVal' acct key = fromVal <$> getRawStorageKeyVal' (toKey acct key)
 
-getAllStorageKeyVals' :: FullStorage m => Address -> m [(MP.Key, Word256)]
-getAllStorageKeyVals' addr = map (second fromVal) <$> getAllRawStorageKeyVals' addr
+getAllStorageKeyVals' :: FullStorage m => Account -> m [(MP.Key, Word256)]
+getAllStorageKeyVals' acct = map (second fromVal) <$> getAllRawStorageKeyVals' acct
 
 flushMemStorageTxDBToBlockDB :: FullStorage m => m ()
 flushMemStorageTxDBToBlockDB = flushMemRawStorageTxDBToBlockDB

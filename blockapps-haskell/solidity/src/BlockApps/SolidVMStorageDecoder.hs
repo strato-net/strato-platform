@@ -70,6 +70,7 @@ valueToSolidityValue = \case
     ValueBool b -> Right . Just $ SolidityBool b
     ValueInt _ _ n -> fromShowable n
     ValueAddress a -> fromShowable a
+    ValueAccount a -> fromShowable a
     ValueString s -> fromText s
   ValueEnum _ ev _ -> fromText ev
   ValueArraySentinel{} -> Right Nothing
@@ -91,6 +92,7 @@ valueToSolidityValue = \case
         tshowIdx = \case
           ValueInt _ _ n -> Right . T.pack . show $ n
           ValueAddress a -> Right . T.pack . show $ a
+          ValueAccount a -> Right . T.pack . show $ a
           ValueString t -> Right t
           -- The collapse of bytes and str to a single types means that selecting an encoding
           -- for keys is not obvious. bytestrings may contain non UTF8 text, and at the same time
@@ -188,7 +190,7 @@ fromBasic = \case
   BBool b -> SimpleValue $ ValueBool b
   BInteger n -> SimpleValue $! valueInt n
   BString bs -> SimpleValue $! valueBytes bs
-  BAddress a -> SimpleValue $! ValueAddress a
+  BAccount a -> SimpleValue $! ValueAccount a
   BContract _ c -> ValueContract c
   BEnumVal tipe name num -> ValueEnum tipe name (fromIntegral num)
 
@@ -200,4 +202,4 @@ fromIndex = \case
   IBool b -> ValueBool b
   INum n -> valueInt n
   IText bs -> valueBytes bs
-  IAddress a -> ValueAddress a
+  IAccount a -> ValueAccount a

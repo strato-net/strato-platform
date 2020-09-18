@@ -9,11 +9,13 @@ module Slipstream.DelayedBloomFilter
   , stackDepth
   ) where
 
+import Control.Monad ((<=<))
 import qualified Data.BloomFilter as BF
 import qualified Data.BloomFilter.Hash as BF
 import qualified Data.BloomFilter.Easy as BF
 import Prelude hiding (elem)
 
+import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 
@@ -24,6 +26,10 @@ instance BF.Hashable ChainId where
 instance BF.Hashable Address where
   hashIO32 (Address n) = BF.hashIO32 (toInteger n)
   hashIO64 (Address n) = BF.hashIO64 (toInteger n)
+
+instance BF.Hashable Account where
+  hashIO32 (Account a c) = BF.hashIO32 (toInteger <$> c) <=< BF.hashIO32 a
+  hashIO64 (Account a c) = BF.hashIO64 (toInteger <$> c) <=< BF.hashIO64 a
 
 -- A Delayed Bloom Filter is a combination of a stack with a traditional
 -- bloom filter. The stack is used to buffer pending changes to the bloom filter for

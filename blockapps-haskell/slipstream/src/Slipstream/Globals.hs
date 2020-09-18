@@ -32,8 +32,7 @@ import           UnliftIO.IORef
 import           BlockApps.Logging
 import           BlockApps.Solidity.Value
 import           BlockApps.Solidity.Xabi     (ContractDetails(..), Xabi(..))
-import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.CodePtr
 
 import           Slipstream.Data.Globals
@@ -59,7 +58,7 @@ setContractABIs gref (SolidVMCode _ !codeHash) detailsMap = do
   globals@Globals{..} <- readIORef gref
   updateGlobals gref globals{contractABIs=HM.insert codeHash detailsMap contractABIs}
 setContractABIs _ (EVMCode _) _ = error "cannot use the contractABIs cache for EVM contracts"
-setContractABIs _ (CodeAtAddress _ _) _ = error "cannot use the contractABIs cache for CodeAtAddress contracts"
+setContractABIs _ (CodeAtAccount _ _) _ = error "cannot use the contractABIs cache for CodeAtAccount contracts"
 
 
 getContractABIs :: MonadIO m => IORef Globals -> CodePtr -> m (Maybe (M.Map Text (Int32, ContractDetails)))
@@ -67,7 +66,7 @@ getContractABIs gref (SolidVMCode _ !codeHash) = do
   abis <- contractABIs <$> readIORef gref
   return $ HM.lookup codeHash abis
 getContractABIs _ (EVMCode _) = error "cannot use the contractABIs cache for EVM contracts"
-getContractABIs _ (CodeAtAddress _ _) = error "cannot use the contractABIs cache for CodeAtAddress contracts"
+getContractABIs _ (CodeAtAccount _ _) = error "cannot use the contractABIs cache for CodeAtAccount contracts"
 
 setContractCreated :: MonadIO m => IORef Globals -> CodePtr -> m ()
 setContractCreated globalsIORef codeHash = do
@@ -152,27 +151,27 @@ removeFromFunctionHistoryList g k = do
   globals@Globals{..} <- readIORef g
   updateGlobals g globals{functionHistoryList=Set.delete k functionHistoryList}
 
-getContractState :: MonadIO m => IORef Globals -> Address -> Maybe ChainId -> m (Maybe [(Text,Value)])
-getContractState globalsIORef address chainId = do
+getContractState :: MonadIO m => IORef Globals -> Account -> m (Maybe [(Text,Value)])
+getContractState globalsIORef account = do
   g@Globals{..} <- readIORef globalsIORef
-  case LRU.lookup (address, chainId) contractStates of
+  case LRU.lookup account contractStates of
     (newCache, jv@Just{}) -> do
       recordCacheHit
       writeIORef globalsIORef g{contractStates = newCache }
       return jv
     (newCache, Nothing) -> do
       recordCacheMiss
-      mvs <- eitherToMaybe <$> liftIO (readStorage csHandle address chainId)
+      mvs <- eitherToMaybe <$> liftIO (readStorage csHandle account)
       forM_ mvs $ \vs ->
-        let newCache' = LRU.insert (address, chainId) vs newCache
+        let newCache' = LRU.insert account vs newCache
         in writeIORef globalsIORef g{contractStates = newCache' }
       return mvs
 
-setContractState :: MonadIO m => IORef Globals -> Address -> Maybe ChainId -> [(Text,Value)] -> m ()
-setContractState gref address chainId values = do
+setContractState :: MonadIO m => IORef Globals -> Account -> [(Text,Value)] -> m ()
+setContractState gref account values = do
   globals@Globals{..} <- readIORef gref
-  updateGlobals gref globals{contractStates = LRU.insert (address, chainId) values contractStates}
-  asyncWriteToStorage csHandle address chainId values
+  updateGlobals gref globals{contractStates = LRU.insert account values contractStates}
+  asyncWriteToStorage csHandle account values
 
 forceGlobalEval :: (MonadIO m) => IORef Globals -> m ()
 forceGlobalEval gref = liftIO $ modifyIORef' gref force

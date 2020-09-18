@@ -21,6 +21,7 @@ import Test.QuickCheck.Arbitrary
 import Test.QuickCheck.Gen
 
 -- import           BlockApps.Bloc22.API.Contracts
+import           Blockchain.Strato.Model.Account
 import           BlockApps.Bloc22.API.SpecUtils
 import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
@@ -326,7 +327,7 @@ createContractOnMulti src cn args config@TestConfig{..} = do
   result `shouldSatisfy` isJust . blocTransactionTxResult
   result `shouldSatisfy` isJust . blocTransactionData
   let (Upload details) = fromJust $ blocTransactionData result
-      caddr = fromJust $ contractdetailsAddress details
+      caddr = _accountAddress . fromJust $ contractdetailsAccount details
   return caddr
 
 callMethodLocal :: Text

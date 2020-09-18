@@ -9,6 +9,7 @@
 {-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
+{-# LANGUAGE UndecidableInstances  #-}
 
 
 module Blockchain.SolidVM.SM (
@@ -18,7 +19,7 @@ module Blockchain.SolidVM.SM (
   MonadSM,
   action,
   runSM,
-  getCurrentAddress,
+  getCurrentAccount,
   addCallInfo,
   popCallInfo,
   getLocal,
@@ -59,7 +60,6 @@ import qualified Data.Sequence as Q
 import qualified Data.Text as T
 import           Data.Text.Encoding(encodeUtf8,decodeUtf8)
 
-import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
@@ -69,6 +69,7 @@ import           Blockchain.DB.RawStorageDB
 import           Blockchain.ExtWord
 import           Blockchain.Output
 import           Blockchain.Strato.Model.Action
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Keccak256
@@ -90,7 +91,7 @@ import CodeCollection
 
 data CallInfo = CallInfo
   { currentFunctionName :: String
-  , currentAddress      :: Address
+  , currentAccount      :: Account
   , currentContract     :: Contract
   , codeCollection      :: CodeCollection
   , collectionHash      :: Keccak256
@@ -128,8 +129,7 @@ makeLenses ''SState
 
 type SM m = StateT SState m
 
-type MonadSM m = ( (Address `A.Alters` AddressState) m
-                 , ((Address, Maybe Word256) `A.Alters` AddressState) m
+type MonadSM m = ( (Account `A.Alters` AddressState) m
                  , (Keccak256 `A.Alters` DBCode) m
                  , HasRawStorageDB m
                  , HasMemAddressStateDB m
@@ -155,68 +155,43 @@ instance Monad m => HasMemRawStorageDB (SM m) where
   getMemRawStorageBlockDB    = gets $ _storageBlockMap . _ssMemDBs
   putMemRawStorageBlockMap m = modify $ ssMemDBs . storageBlockMap .~ m
 
-instance ( (MP.StateRoot `A.Alters` MP.NodeData) m
+instance ( (Maybe Word256 `A.Alters` MP.StateRoot) m
+         , (MP.StateRoot `A.Alters` MP.NodeData) m
          , (N.NibbleString `A.Alters` N.NibbleString) m
-         , Mod.Modifiable MP.StateRoot m
          ) => (RawStorageKey `A.Alters` RawStorageValue) (SM m) where
   lookup _ = genericLookupRawStorageDB
   insert _ = genericInsertRawStorageDB
   delete _ = genericDeleteRawStorageDB
   lookupWithDefault _ = genericLookupWithDefaultRawStorageDB
 
-instance Monad m => Mod.Modifiable MP.StateRoot (SM m) where
-  get _    = gets $ _stateRoot . _ssMemDBs
-  put _ sr = modify $ ssMemDBs . stateRoot .~ sr
-
-instance ( (MP.StateRoot `A.Alters` MP.NodeData) m
+instance ( (Maybe Word256 `A.Alters` MP.StateRoot) m
+         , (MP.StateRoot `A.Alters` MP.NodeData) m
          , (N.NibbleString `A.Alters` N.NibbleString) m
-         , Mod.Modifiable MP.StateRoot m
-         ) => (Address `A.Alters` AddressState) (SM m) where
+         ) => (Account `A.Alters` AddressState) (SM m) where
   lookup _ = getAddressStateMaybe
   insert _ = putAddressState
   delete _ = deleteAddressState
 
-instance ( (MP.StateRoot `A.Alters` MP.NodeData) m
-         , (N.NibbleString `A.Alters` N.NibbleString) m
-         , (Maybe Word256 `A.Alters` MP.StateRoot) m
-         , Mod.Modifiable MP.StateRoot m
-         ) => ((Address, Maybe Word256) `A.Alters` AddressState) (SM m) where
-  lookup _ (addr, cid) = do
-    mSR <- A.lookup (A.Proxy @MP.StateRoot) cid
+instance (Maybe Word256 `A.Alters` MP.StateRoot) m
+         => (Maybe Word256 `A.Alters` MP.StateRoot) (SM m) where
+  lookup p chainId = do
+    (CurrentBlockHash bh) <- Mod.get (Mod.Proxy @CurrentBlockHash)
+    mSR <- view (stateRoots . at (bh, chainId)) <$> Mod.get (Mod.Proxy @MemDBs)
     case mSR of
-      Nothing -> pure Nothing
-      Just sr -> do
-        flushMemAddressStateDB -- TODO: These flushes are needed so that reads won't be corrupted by cached address states
-                               --       , and so that modifications (put/delete) will be persisted.
-                               --       What we should do is change the MemAddressStateDB to be a Map (Address, Maybe Word256) AddressState instead
-                               --       , thus avoiding the need for these side effects
-        existingSR <- Mod.get (Mod.Proxy @MP.StateRoot)
-        Mod.put (Mod.Proxy @MP.StateRoot) sr
-        mAS <- getAddressStateMaybe addr
-        Mod.put (Mod.Proxy @MP.StateRoot) existingSR
-        pure mAS
-  insert _ (addr, cid) as = do
-    mSR <- A.lookup (A.Proxy @MP.StateRoot) cid
-    case mSR of
-      Nothing -> pure ()
-      Just sr -> do
-        flushMemAddressStateDB
-        existingSR <- Mod.get (Mod.Proxy @MP.StateRoot)
-        Mod.put (Mod.Proxy @MP.StateRoot) sr
-        putAddressState addr as
-        flushMemAddressStateDB
-        Mod.put (Mod.Proxy @MP.StateRoot) existingSR
-  delete _ (addr, cid) = do
-    mSR <- A.lookup (A.Proxy @MP.StateRoot) cid
-    case mSR of
-      Nothing -> pure ()
-      Just sr -> do
-        flushMemAddressStateDB
-        existingSR <- Mod.get (Mod.Proxy @MP.StateRoot)
-        Mod.put (Mod.Proxy @MP.StateRoot) sr
-        deleteAddressState addr
-        flushMemAddressStateDB
-        Mod.put (Mod.Proxy @MP.StateRoot) existingSR
+      Just sr -> pure $ Just sr
+      Nothing -> lift $ A.lookup p chainId
+  insert p chainId sr = do
+    (CurrentBlockHash bh) <- Mod.get (Mod.Proxy @CurrentBlockHash)
+    Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ stateRoots %= M.insert (bh, chainId) sr
+    lift $ A.insert p chainId sr
+  delete p chainId = do
+    (CurrentBlockHash bh) <- Mod.get (Mod.Proxy @CurrentBlockHash)
+    Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ stateRoots %= M.delete (bh, chainId)
+    lift $ A.delete p chainId
+
+instance Monad m => Mod.Modifiable CurrentBlockHash (SM m) where
+  get _    = fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0) . _currentBlock <$> Mod.get (Mod.Proxy @MemDBs)
+  put _ md = Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ currentBlock ?= md
 
 instance (MP.StateRoot `A.Alters` MP.NodeData) m => (MP.StateRoot `A.Alters` MP.NodeData) (SM m) where
   lookup p   = lift . A.lookup p
@@ -303,7 +278,7 @@ runSM maybeCode env f = do
 
 -- When calling a remote contract, the new `msg.sender` is the contract
 -- that the call is initiated from.
-pushSender :: MonadSM m => Address -> m a -> m a
+pushSender :: MonadSM m => Account -> m a -> m a
 pushSender newSender mv = do
   oldSender <- Mod.get (Mod.Proxy @Env.Sender)
   Mod.put (Mod.Proxy @Env.Sender) (Env.Sender newSender)
@@ -390,13 +365,13 @@ getVariableOfName name = do
       maybeStorageItem =
         -- TODO(tim): This might just be restricted to a field name
         if name `elem` M.keys (currentContract currentCallInfo^.storageDefs)
-        then Just . Constant . SReference $ AddressedPath
-                (currentAddress currentCallInfo)
+        then Just . Constant . SReference $ AccountPath
+                (currentAccount currentCallInfo)
                 (MS.singleton $ BC.pack name)
         else Nothing
 
       maybeThis :: Maybe Variable
-      maybeThis = toMaybe (name == "this") . t "this" . Constant . SAddress . currentAddress $ currentCallInfo
+      maybeThis = toMaybe (name == "this") . t "this" . Constant . SAccount . accountOnUnspecifiedChain $ currentAccount currentCallInfo
 
 
 
@@ -447,7 +422,7 @@ getTypeOfName s = getTypeOfName' s . codeCollection <$> getCurrentCallInfo
 
 
 addCallInfo :: MonadSM m
-            => Address
+            => Account
             -> Contract
             -> String
             -> Keccak256
@@ -458,7 +433,7 @@ addCallInfo a c fn hsh cc initialLocalVariables = do
   let newCallInfo =
         CallInfo {
           currentFunctionName=fn,
-          currentAddress=a,
+          currentAccount=a,
           currentContract=c,
           codeCollection=cc,
           collectionHash=hsh,
@@ -486,12 +461,12 @@ getCurrentContract = do
     (currentCallInfo:_) -> return $ currentContract currentCallInfo
     _ -> internalError "getCurrentContract called with an empty stack" ()
 
-getCurrentAddress :: MonadSM m => m Address
-getCurrentAddress = do
+getCurrentAccount :: MonadSM m => m Account
+getCurrentAccount = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
-    (currentCallInfo:_) -> return $ currentAddress currentCallInfo
-    _ -> internalError "getCurrentAddress called with an empty stack" ()
+    (currentCallInfo:_) -> return $ currentAccount currentCallInfo
+    _ -> internalError "getCurrentAccount called with an empty stack" ()
 
 
 getCurrentFunctionName :: MonadSM m => m String
@@ -529,7 +504,7 @@ getCurrentCodeCollection = do
 
 hintFromType :: MonadSM m => Xabi.Type -> m BasicType
 hintFromType = \case
- Xabi.Address{} -> return TAddress
+ Xabi.Account{} -> return TAccount
  Xabi.Bool{} -> return TBool
  Xabi.Bytes{} -> return TString
  Xabi.Int{} -> return TInteger
@@ -554,20 +529,20 @@ getXabiType' field callInfo = M.lookup (BC.unpack field)
                             . currentContract
                             $ callInfo
 
-getCallInfoForAddress :: Mod.Modifiable [CallInfo] m => Address -> m CallInfo
-getCallInfoForAddress addr = do
+getCallInfoForAccount :: Mod.Modifiable [CallInfo] m => Account -> m CallInfo
+getCallInfoForAccount acct = do
   -- This field might have been defined in e.g. a caller contract.
   -- We search from the top down for the home of this data
   stack <- Mod.get (Mod.Proxy @[CallInfo])
-  case filter ((== addr) . currentAddress) stack of
-    [] -> internalError "address not found in call stack" (addr, stack)
+  case filter ((== acct) . currentAccount) stack of
+    [] -> internalError "account not found in call stack" (acct, stack)
     (callInfo:_) -> return callInfo
 
-getXabiType :: Mod.Modifiable [CallInfo] m => Address -> B.ByteString -> m (Maybe Xabi.Type)
-getXabiType addr field = getXabiType' field <$> getCallInfoForAddress addr
+getXabiType :: Mod.Modifiable [CallInfo] m => Account -> B.ByteString -> m (Maybe Xabi.Type)
+getXabiType acct field = getXabiType' field <$> getCallInfoForAccount acct
 
-getXabiValueType :: MonadSM m => AddressedPath -> m Xabi.Type
-getXabiValueType (AddressedPath loc path) = do
+getXabiValueType :: MonadSM m => AccountPath -> m Xabi.Type
+getXabiValueType (AccountPath loc path) = do
   ccs' <- codeCollection <$> getCurrentCallInfo
   let field = MS.getField path
   mType <- getXabiType loc field
@@ -604,16 +579,16 @@ getXabiValueType (AddressedPath loc path) = do
           Xabi.Array{Xabi.entry=t'} -> loop ccs rs t'
           t -> todo "getXabiValueType/loopnext unsupported type" t
 
-getValueType :: MonadSM m => AddressedPath -> m BasicType
+getValueType :: MonadSM m => AccountPath -> m BasicType
 getValueType p = hintFromType =<< getXabiValueType p
 
-initializeAction :: Mod.Modifiable Action m => Address -> String -> Keccak256 -> m ()
-initializeAction addr name hsh = do
+initializeAction :: Mod.Modifiable Action m => Account -> String -> Keccak256 -> m ()
+initializeAction acct name hsh = do
   let newData = ActionData (SolidVMCode name hsh) SolidVM (ActionSolidVMDiff M.empty) []
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    actionData %= M.insertWith mergeActionData addr newData
+    actionData %= M.insertWith mergeActionData acct newData
 
-markDiffForAction :: Mod.Modifiable Action m => Address -> MS.StoragePath -> MS.BasicValue -> m ()
+markDiffForAction :: Mod.Modifiable Action m => Account -> MS.StoragePath -> MS.BasicValue -> m ()
 markDiffForAction owner key' val' = do
   let key = MS.unparsePath key'
       val = rlpSerialize $ rlpEncode val'

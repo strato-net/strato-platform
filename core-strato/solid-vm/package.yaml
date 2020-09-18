@@ -105,6 +105,7 @@ tests:
       - hspec
       - hspec-expectations-lifted
       - HUnit
+      - lens
       - merkle-patricia-db
       - parsec
       - raw-strings-qq

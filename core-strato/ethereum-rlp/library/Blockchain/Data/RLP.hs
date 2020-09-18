@@ -23,6 +23,7 @@ import qualified Data.ByteString.Char8              as BC
 import           Data.ByteString.Internal
 import qualified Data.Map                           as M
 import qualified Data.Text                          as T
+import           Data.Text.Encoding                 (decodeUtf8, encodeUtf8)
 import           Data.Word
 import           GHC.Generics
 import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>))
@@ -146,17 +147,18 @@ rlpSerialize = \case
 
 instance RLPSerializable Integer where
   rlpEncode 0             = RLPString B.empty
-  rlpEncode x | x < 0     = error "cannot encode negative numbers in RLP"
-  rlpEncode x | x < 128   = RLPScalar $ fromIntegral x
-  rlpEncode x             = RLPString $ B.pack $ integer2Bytes x
+  rlpEncode x | x > 0 && x < 128 = RLPScalar $ fromIntegral x
+  rlpEncode x | x >= 128  = RLPString $ B.pack $ integer2Bytes x
+  rlpEncode x             = RLPArray [rlpEncode $ negate x]
   rlpDecode (RLPScalar x) = fromIntegral x
   rlpDecode (RLPString s) = byteString2Integer s
+  rlpDecode (RLPArray [x]) = negate $ rlpDecode x
   rlpDecode (RLPArray _)  = error "rlpDecode called for Integer for array"
 
 instance {-# OVERLAPPING #-} RLPSerializable String where
-  rlpEncode s = rlpEncode $ BC.pack s
+  rlpEncode s = rlpEncode $ encodeUtf8 $ T.pack s
 
-  rlpDecode (RLPString s) = BC.unpack s
+  rlpDecode (RLPString s) = T.unpack $ decodeUtf8 s
   rlpDecode (RLPScalar n) = [w2c $ fromIntegral n]
   rlpDecode (RLPArray x) = error $ "Malformed RLP in call to rlpDecode for String: RLPObject is an array: " ++ show (pretty x)
 

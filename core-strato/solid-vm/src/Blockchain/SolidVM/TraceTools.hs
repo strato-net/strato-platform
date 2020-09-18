@@ -29,7 +29,7 @@ getFullStackTrace theCallStack = do
     forM theCallStack $ \slice -> do
       varString <- showVariables slice
   
-      return $ ("-----[variables for " ++ format (currentAddress slice) ++ "/" ++ currentFunctionName slice ++ "]----------------")
+      return $ ("-----[variables for " ++ format (currentAccount slice) ++ "/" ++ currentFunctionName slice ++ "]----------------")
         : varString
 
   return $ concat sliceStrings
