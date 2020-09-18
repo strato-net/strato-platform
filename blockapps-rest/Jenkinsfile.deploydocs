@@ -1,0 +1,57 @@
+pipeline {
+  agent { label 'dev-website' }
+  options { disableConcurrentBuilds() }
+  stages {
+      stage('Build') {
+        steps {
+          withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
+          usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
+            sh '''#!/bin/bash -le
+            set -x
+            rm -rf strato-platform
+            rm -rf ba-rest-jsdoc
+            mkdir ba-rest-jsdoc
+            git clone -b STRATO-1703_ba-rest-docs https://github.com/blockapps/strato-platform
+            cd strato-platform/blockapps-rest
+            npm run build:docs
+            cp -vr docs /home/blockapps/ba-rest-jsdoc
+            cd
+            ./rerun-nginx-proxy.sh
+            '''
+          }
+        }
+      }
+
+    stage('Deploy') {
+      agent { label 'dev-website' }
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER')]) {
+          sh '''#!/bin/bash -le
+            docker rmi -f repo.blockapps.net:5000/dev-website:previous || true
+            docker tag repo.blockapps.net:5000/dev-website:latest repo.blockapps.net:5000/dev-website:previous || true
+            docker login -u $DOCKER_USER -p $DOCKER_PASSWD repo.blockapps.net:5000
+            docker pull repo.blockapps.net:5000/dev-website
+            docker rm -f dev-website || true
+            docker run --name dev-website --restart=always -d -p 8080:80 repo.blockapps.net:5000/dev-website
+          '''
+        }
+      }
+    }
+  }
+
+  post {
+    success {
+        slackSend (
+        color: 'good',
+        message: "developers.blockapps.net rebuild success: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+        )
+    }
+
+    failure {
+      slackSend (
+        color: 'danger',
+        message: "developers.blockapps.net rebuild FAILURE: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+      )
+    }
+  }
+}
