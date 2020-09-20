@@ -13,7 +13,6 @@ import Control.DeepSeq
 import Control.Lens
 import Control.Monad
 import Control.Monad.Change.Alter
-import Control.Monad.IO.Class
 import Control.Monad.Trans.State
 import Control.Monad.Trans.Resource
 import qualified Data.ByteString as B
@@ -72,17 +71,9 @@ instance HasMemAddressStateDB StorM where
   putAddressStateBlockDBMap = assign abs
 
 instance (Account `Alters` AddressState) StorM where
-  lookup _ k = do
-    liftIO . putStrLn $ "Looking up address state: " ++ show k
-    v <- getAddressStateMaybe k
-    liftIO . putStrLn $ "Got address state: " ++ show k ++ ": " ++ show v
-    pure v
-  insert _ k v = do
-    liftIO . putStrLn $ "Inserting address state: " ++ show k ++ ": " ++ show v
-    putAddressState k v
-  delete _ k = do
-    liftIO . putStrLn $ "Deleting address state: " ++ show k
-    deleteAddressState k
+  lookup _ = getAddressStateMaybe
+  insert _ = putAddressState
+  delete _ = deleteAddressState
 
 instance (MP.StateRoot `Alters` MP.NodeData) StorM where
   lookup _ = MP.genericLookupDB $ use sdb
@@ -101,17 +92,9 @@ instance (RawStorageKey `Alters` RawStorageValue) StorM where
   lookupWithDefault _ = genericLookupWithDefaultRawStorageDB
 
 instance (Maybe Word256 `Alters` MP.StateRoot) StorM where
-  lookup _ k = do
-    liftIO . putStrLn $ "Looking up stateroot: " ++ show k
-    v <- use $ srm . at k
-    liftIO . putStrLn $ "Got stateroot: " ++ show k ++ ": " ++ show v
-    pure v
-  insert _ k v = do
-    liftIO . putStrLn $ "Inserting stateroot: " ++ show k ++ ": " ++ show v
-    srm . at k ?= v
-  delete _ k = do
-    liftIO . putStrLn $ "Deleting stateroot: " ++ show k
-    srm . at k .= Nothing
+  lookup _ k = use $ srm . at k
+  insert _ k v = srm . at k ?= v
+  delete _ k = srm . at k .= Nothing
 
 initialEnv :: IO (FilePath, CachedStorage)
 initialEnv = do
@@ -121,12 +104,12 @@ initialEnv = do
   s <- openDB "/state/"
   h <- HashDB <$> openDB "/hash/"
   let st = CS s h M.empty M.empty M.empty M.empty M.empty
-  fmap (tmpdir,) . runLoggingT . runResourceT $ execStateT MP.initializeBlank st
+  fmap (tmpdir,) . runLoggingTWithLevel LevelError . runResourceT $ execStateT MP.initializeBlank st
 
 runStorM :: StorM a -> IO a
 runStorM mv = bracket initialEnv
                        (removePathForcibly . fst)
-                       (runLoggingT . runResourceT . evalStateT mv . snd)
+                       (runLoggingTWithLevel LevelError . runResourceT . evalStateT mv . snd)
 
 getStorageKeyVal'' :: HasStorageDB m => Address -> Word256 -> m Word256
 getStorageKeyVal'' addr = getStorageKeyVal' (Account addr Nothing)
@@ -194,12 +177,7 @@ storageSpec = do
       flushMemStorageDB
       got <- addressStateContractRoot <$> lookupWithDefault Proxy (Account 0x1234 Nothing)
       want `shouldNotBe` got
-      let toKey = N.EvenNibbleString . keccak256ToByteString . hash . word256ToBytes
-      kvs <- getAllStorageKeyVals' (Account 0x1234 Nothing)
-      liftIO . putStrLn $ show kvs
-      kvs `shouldMatchList` [ (toKey 0x3, 0x44)
-                            ]
-      -- got `shouldBe` "E\RS\164\USe\177\214\249m\186\SI\248\136\\\215\137\172\231\135q\224;\178TWg\SUB\147n\134. "
+      got `shouldBe` "E\RS\164\USe\177\214\249m\186\SI\248\136\\\215\137\172\231\135q\224;\178TWg\SUB\147n\134. "
 
   describe "RawStorageDB" $ do
     it "should get its puts" . runStorM $ do

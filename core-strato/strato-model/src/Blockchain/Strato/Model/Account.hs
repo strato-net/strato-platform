@@ -26,14 +26,13 @@ module Blockchain.Strato.Model.Account
 
 import           Control.DeepSeq
 import           Control.Lens
-import           Control.Monad                        ((<=<))
+-- import           Control.Monad                        ((<=<))
 import qualified Data.Aeson                           as AS
 import           Data.Aeson.Types
 import qualified Data.Aeson.Encoding                  as Enc
 import           Data.Binary
 import           Data.Data
 import           Data.Hashable
-import           Data.Maybe                           (maybeToList)
 import           Data.Swagger                         hiding (Format, format, get, put)
 import qualified Data.Swagger                         as Sw
 import qualified Data.Text                            as T
@@ -52,7 +51,7 @@ import           Blockchain.Strato.Model.Address
 import qualified Data.RLP                             as RLP2
 import qualified Text.Colors       as CL
 import           Text.Format
-import           Text.Read (readEither, readMaybe)
+import           Text.Read (readMaybe)
 import           Text.ShortDescription
 
 
@@ -64,20 +63,25 @@ data Account = Account
 makeLenses ''Account
 
 instance RLPSerializable Account where
-  rlpEncode = rlpEncode . show
-  rlpDecode = read . rlpDecode
+  rlpEncode (Account a Nothing) = rlpEncode a
+  rlpEncode (Account a (Just cid)) = RLPArray [rlpEncode a, rlpEncode cid]
+  rlpDecode (RLPArray [a, cid]) = Account (rlpDecode a) (Just $ rlpDecode cid)
+  rlpDecode a = Account (rlpDecode a) Nothing
 
 instance Show Account where
   show (Account a Nothing) = printf "%040x" a
   show (Account a (Just cid)) = (printf "%040x" a) ++ ":" ++ (printf "%064x" (toInteger cid))
 
 instance Read Account where
-  readsPrec _ s = case T.split (==':') (T.pack s) of
-    [_] -> fmap (,"") . maybeToList $ flip Account Nothing <$> stringAddress s
-    [addr, cid] -> fmap (,"") . maybeToList $ Account
-      <$> (stringAddress $ T.unpack addr)
-      <*> (Just . fromInteger <$> readMaybe ("0x" ++ T.unpack cid))
-    _ -> []
+  readsPrec _ s = case splitAt 40 s of
+    (mAddr, mRem) -> case stringAddress mAddr of
+      Nothing -> []
+      Just addr -> case mRem of
+        (':':rem') -> case splitAt 64 rem' of
+          (mCid, mRem2) -> case fromInteger <$> readMaybe ("0x" ++ mCid) of
+            Nothing -> [(Account addr Nothing, mRem)]
+            Just cid -> [(Account addr (Just cid), mRem2)]
+        _ -> [(Account addr Nothing, mRem)]
 
 {-
  make into a string rather than an object
@@ -141,8 +145,10 @@ instance ToCapture (Capture "contractAccount" Account) where
   toCapture _ = DocCapture "contractAccount" "a STRATO account"
 
 instance RLP2.RLPEncodable Account where
-  rlpEncode = RLP2.rlpEncode . show
-  rlpDecode = readEither <=< RLP2.rlpDecode
+  rlpEncode (Account a Nothing) = RLP2.rlpEncode a
+  rlpEncode (Account a (Just cid)) = RLP2.Array [RLP2.rlpEncode a, RLP2.rlpEncode cid]
+  rlpDecode (RLP2.Array [a, cid]) = Account <$> (RLP2.rlpDecode a) <*> (Just <$> RLP2.rlpDecode cid)
+  rlpDecode a = flip Account Nothing <$> RLP2.rlpDecode a
 
 instance ToCapture (Capture "userAccount" Account) where
   toCapture _ = DocCapture "userAccount" "a STRATO account"
@@ -205,18 +211,25 @@ instance Show NamedAccount where
   show (NamedAccount a (ExplicitChain cid)) = (printf "%040x" a) ++ ":" ++ (printf "%064x" (toInteger cid))
 
 instance Read NamedAccount where
-  readsPrec _ s = case T.split (==':') (T.pack s) of
-    [_] -> fmap (,"") . maybeToList $ flip NamedAccount UnspecifiedChain <$> stringAddress s
-    [addr, cid] -> fmap (,"") . maybeToList $ NamedAccount
-      <$> (stringAddress $ T.unpack addr)
-      <*> (case cid of
-             "main" -> Just MainChain
-             _ -> ExplicitChain . fromInteger <$> readMaybe ("0x" ++ T.unpack cid))
-    _ -> []
+  readsPrec _ s = case splitAt 40 s of
+    (mAddr, mRem) -> case stringAddress mAddr of
+      Nothing -> []
+      Just addr -> case mRem of
+        (':':rem') -> case rem' of
+          ('m':'a':'i':'n':rem'') -> [(NamedAccount addr MainChain, rem'')]
+          _ -> case splitAt 64 rem' of
+            (mCid, mRem2) -> case fromInteger <$> readMaybe ("0x" ++ mCid) of
+              Nothing -> [(NamedAccount addr UnspecifiedChain, mRem)]
+              Just cid -> [(NamedAccount addr (ExplicitChain cid), mRem2)]
+        _ -> [(NamedAccount addr UnspecifiedChain, mRem)]
 
 instance RLPSerializable NamedAccount where
-  rlpEncode = rlpEncode . show
-  rlpDecode = read . rlpDecode
+  rlpEncode (NamedAccount a UnspecifiedChain) = rlpEncode a
+  rlpEncode (NamedAccount a MainChain) = RLPArray [rlpEncode a]
+  rlpEncode (NamedAccount a (ExplicitChain cid)) = RLPArray [rlpEncode a, rlpEncode cid]
+  rlpDecode (RLPArray [a, cid]) = NamedAccount (rlpDecode a) (ExplicitChain $ rlpDecode cid)
+  rlpDecode (RLPArray [a]) = NamedAccount (rlpDecode a) MainChain
+  rlpDecode a = NamedAccount (rlpDecode a) UnspecifiedChain
 
 {-
  make into a string rather than an object

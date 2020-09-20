@@ -43,6 +43,7 @@ import           Text.Printf
 
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
+import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Code
 import           Blockchain.Data.ExecResults
 import qualified Blockchain.Database.MerklePatricia   as MP
@@ -121,7 +122,7 @@ create _ _ _ blockData _ sender' origin' _ _ _ newAddress code txHash' chainId' 
   initCode <- case code of
     Code c -> pure c
     PtrToCode cp -> do
-      hsh <- codePtrToSHA cp
+      hsh <- codePtrToSHA chainId' cp
       fromMaybe "" . fmap snd . join <$> traverse getCode hsh
   
   fmap (either solidvmErrorResults id) . runSM (Just initCode) env' $ do
@@ -151,7 +152,7 @@ create' creator newAccount ch cc contractName' argExps = do
 
   -- Add Storage
 
-  addCallInfo newAccount contract' (contractName' ++ " constructor") ch cc M.empty
+  addCallInfo newAccount contract' (contractName' ++ " constructor") ch cc M.empty False
 
   popCallInfo
 
@@ -273,14 +274,14 @@ getCodeAndCollection address' = do
     else do
     codeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) address'
 
-    resolvedCodeHash <- resolveCodePtr codeHash
+    resolvedCodeHash <- resolveCodePtr (address' ^. accountChainId) codeHash
     (contractName', ch, cc) <-
       case resolvedCodeHash of
         Just (SolidVMCode cn ch') -> do
           cc' <- codeCollectionFromHash ch'
           return (cn, ch', cc')
         Just ch -> internalError "SolidVM for non-solidvm code" (format ch)
-        Nothing -> internalError "SolidVM for non-existent code" (format codeHash)
+        Nothing -> missingCodeCollection "SolidVM for non-existent code" (format codeHash)
 
 
     let !contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc^.contracts
@@ -349,6 +350,11 @@ argsToVals ctract fn args =
 
 callWrapper :: MonadSM m => Account -> Account -> Maybe String -> String -> Xabi.ArgList -> m (Maybe Value)
 callWrapper from to mContract functionName argExps = do
+  let fromChain = from ^. accountChainId
+      toChain = to ^. accountChainId
+  isAccessibleChain <- toChain `isAncestorChainOf` fromChain
+  unless isAccessibleChain $ inaccessibleChain "Inaccessible chain violation" $ "from: " ++ show from ++ ", to: " ++ show to
+
   (contract', hsh, cc) <- getCodeAndCollection to
   let contract = fromMaybe contract' $ mContract >>= \c -> M.lookup c $ _contracts cc
   initializeAction to (_contractName contract) hsh
@@ -362,7 +368,11 @@ callWrapper from to mContract functionName argExps = do
         case M.lookup functionName functionsIncludingConstructor of
           Just theFunction -> do
             args' <- argsToVals contract' theFunction argExps
-            let f' = (if from == to then id else pushSender from) $ runTheCall to contract functionName hsh cc theFunction args'
+            mCallInfo <- getCurrentCallInfoIfExists
+            let ro = case mCallInfo of
+                       Nothing -> False
+                       Just ci -> if fromChain == toChain then readOnly ci else True
+            let f' = (if from == to then id else pushSender from) $ runTheCall to contract functionName hsh cc theFunction args' ro
             return (f', args')
           _ -> do --Maybe the function is actually a getter
             case M.lookup functionName $ contract^.storageDefs of
@@ -1081,11 +1091,12 @@ expToVar' (Xabi.FunctionCall e args) = do
 
 
     Constant (SFunction funcName func) -> do
+      ro <- readOnly <$> getCurrentCallInfo
       contract' <- getCurrentContract
       address <- getCurrentAccount
       (hsh, cc) <- getCurrentCodeCollection
 
-      res <- runTheCall address contract' funcName hsh cc func argVals
+      res <- runTheCall address contract' funcName hsh cc func argVals ro
       return . Constant . fromMaybe SNULL $ res
 
     Constant (SStructDef structName) -> do
@@ -1199,6 +1210,13 @@ callBuiltin "string" vs _ = typeError "string cast" vs
 callBuiltin "address" [SInteger a] _ = return . SAccount . unspecifiedChain $ fromIntegral a
 callBuiltin "address" [a@SAccount{}] _ = return a
 callBuiltin "address" [SContract _ a] _ = return $ SAccount a
+callBuiltin "account" [SInteger a] _ = return . SAccount . unspecifiedChain $ fromIntegral a
+callBuiltin "account" [a@SAccount{}] _ = return a
+callBuiltin "account" [SContract _ a] _ = return $ SAccount a
+callBuiltin "account" [SInteger a, SInteger b] _ = return . SAccount $ explicitChain (fromIntegral a) (fromInteger b)
+callBuiltin "account" [SInteger a, SString "main"] _ = return . SAccount $ mainChain (fromIntegral a)
+callBuiltin "account" [SAccount a, SInteger b] _ = return . SAccount $ (namedAccountChainId .~ ExplicitChain (fromIntegral b)) a
+callBuiltin "account" [SAccount a, SString "main"] _ = return . SAccount $ (namedAccountChainId .~ MainChain) a
 callBuiltin "byte" [SInteger n] _ = return $ SInteger (n .&. 0xff)
 callBuiltin "byte"  vs _ = typeError "byte cast" vs
 callBuiltin "uint" args _ = return $ intBuiltin args
@@ -1310,7 +1328,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
           return (n, (t, var))
 
 
-  addCallInfo to contract' (contractName' ++ " constructer") hsh cc $ M.fromList zipped
+  addCallInfo to contract' (contractName' ++ " constructer") hsh cc (M.fromList zipped) False
 
 
   forM_ [(n, e) | (n, Xabi.VariableDecl _ _ (Just e)) <- M.toList $ contract'^.storageDefs] $ \(n, e) -> do
@@ -1369,8 +1387,9 @@ runTheCall :: MonadSM m
            -> CodeCollection
            -> Xabi.Func
            -> ValList
+           -> Bool
            -> m (Maybe Value)
-runTheCall address' contract' funcName hsh cc theFunction argVals = do
+runTheCall address' contract' funcName hsh cc theFunction argVals ro = do
   let returns = [(T.unpack n, (t, defaultValue contract' t)) | (Just n, Xabi.IndexedType _ t) <- Xabi.funcVals theFunction]
       args = case argVals of
         OrderedVals vs -> let argMeta = 
@@ -1401,7 +1420,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals = do
       newVar <- liftIO $ fmap Variable $ newIORef v
       return (n, (t, newVar))
 
-  addCallInfo address' contract' funcName hsh cc $ M.fromList localVars -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
+  addCallInfo address' contract' funcName hsh cc (M.fromList localVars) ro -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
 --  forM_ locals $ \(n, (_, v)) -> do
 --    liftIO $ putStrLn "need to initialize the storage 2"
 --    initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack n) v

@@ -139,7 +139,9 @@ setVal (STuple dstVector) (STuple srcVector) =
       srcItemVal <- getVar srcItemVar
       setVar dstItem srcItemVal
     
-setVal (SReference (AccountPath addr path)) src = do
+setVal dst@(SReference (AccountPath addr path)) src = do
+  ro <- readOnly <$> getCurrentCallInfo
+  when ro $ invalidWrite "Invalid write during read-only access" $ "src: " ++ show src ++ ", dst: " ++ show dst
   markDiffForAction addr path $ toBasic src
   putSolidStorageKeyVal' addr path $ toBasic src
 

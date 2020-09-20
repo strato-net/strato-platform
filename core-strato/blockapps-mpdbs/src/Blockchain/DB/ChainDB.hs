@@ -115,6 +115,14 @@ newtype BestBlockRoot = BestBlockRoot { unBestBlockRoot :: MP.StateRoot }
   deriving (Eq, Ord, Show, Generic)
   deriving newtype (Format, NFData)
 
+newtype GenesisData = GenesisData { unGenesisData :: (Keccak256, MP.StateRoot, Maybe Word256) }
+
+instance RLPSerializable GenesisData where
+  rlpEncode (GenesisData (cBlock, genSR, pChain)) = RLPArray [rlpEncode cBlock, rlpEncode genSR, rlpEncode pChain]
+  rlpDecode (RLPArray [cBlock, genSR]) = GenesisData (rlpDecode cBlock, rlpDecode genSR, Nothing) -- Needed for backwards compatibility
+  rlpDecode (RLPArray [cBlock, genSR, pChain]) = GenesisData (rlpDecode cBlock, rlpDecode genSR, rlpDecode pChain)
+  rlpDecode o = error ("Error in rlpDecode for GenesisData: bad RLPObject: " ++ show o)
+
 word256ToMPKey :: Maybe Word256 -> N.NibbleString
 word256ToMPKey Nothing    = N.EvenNibbleString ""
 word256ToMPKey (Just cid) = N.EvenNibbleString $ word256ToBytes cid
@@ -139,7 +147,7 @@ bootstrapChainDB :: ( Modifiable BlockHashRoot m
 bootstrapChainDB genesisHash startingStateRoots = do
   let zeroHash = unsafeCreateKeccak256FromWord256 0
   putChainBlockHashInfo genesisHash zeroHash MP.emptyTriePtr
-  for_ startingStateRoots $ \(cId, sr) -> putChainGenesisInfo cId zeroHash sr
+  for_ startingStateRoots $ \(cId, sr) -> putChainGenesisInfo cId zeroHash sr Nothing
   for_ startingStateRoots $ \(cId, sr) -> putChainStateRoot cId genesisHash sr
   get (Proxy @BlockHashRoot)
 
@@ -202,23 +210,23 @@ getGenesisStateRoot :: ( Modifiable GenesisRoot m
                        , (MP.StateRoot `Alters` MP.NodeData) m
                        )
                     => Maybe Word256 -> m (Maybe MP.StateRoot)
-getGenesisStateRoot = fmap (fmap snd) . getChainGenesisInfo
+getGenesisStateRoot = fmap (fmap (\(_,sr,_) -> sr)) . getChainGenesisInfo
 
 getChainGenesisInfo :: ( Modifiable GenesisRoot m
                        , (MP.StateRoot `Alters` MP.NodeData) m
                        )
-                    => Maybe Word256 -> m (Maybe (Keccak256, MP.StateRoot))
+                    => Maybe Word256 -> m (Maybe (Keccak256, MP.StateRoot, Maybe Word256))
 getChainGenesisInfo cid = do
   gr <- unGenesisRoot <$> get Proxy
-  getkv gr (word256ToMPKey cid)
+  fmap unGenesisData <$> getkv gr (word256ToMPKey cid)
 
 putChainGenesisInfo :: ( Modifiable GenesisRoot m
                        , (MP.StateRoot `Alters` MP.NodeData) m
                        )
-                    => Maybe Word256 -> Keccak256 -> MP.StateRoot -> m ()
-putChainGenesisInfo chainId creationBlock stateRoot = do
+                    => Maybe Word256 -> Keccak256 -> MP.StateRoot -> Maybe Word256 -> m ()
+putChainGenesisInfo chainId creationBlock stateRoot parent = do
   gr <- unGenesisRoot <$> get Proxy
-  newGenesisRoot <- putkv gr (word256ToMPKey chainId) (creationBlock, stateRoot)
+  newGenesisRoot <- putkv gr (word256ToMPKey chainId) $ GenesisData (creationBlock, stateRoot, parent)
   put Proxy $ GenesisRoot newGenesisRoot
 
 deleteChainGenesisInfo :: ( Modifiable GenesisRoot m
@@ -237,7 +245,7 @@ getChainStateRoot :: ( Modifiable BlockHashRoot m
                   => Maybe Word256 -> Keccak256 -> m (Maybe MP.StateRoot)
 getChainStateRoot chainId bh = do
   mGenStateRoot <- getChainGenesisInfo chainId
-  fmap join . for mGenStateRoot $ uncurry $ go bh
+  fmap join . for mGenStateRoot $ \(cb, gsr, _) -> go bh cb gsr
   where go bHash creationBlock genStateRoot = do
           mChainRoot <- getChainBlockHashInfo bHash
           fmap join . for mChainRoot $ \(parentHash, chainRoot) -> do

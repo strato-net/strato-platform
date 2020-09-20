@@ -6,29 +6,22 @@
 {-# LANGUAGE TypeOperators #-}
 
 module Blockchain.Strato.StateDiff.Database
-    ( sqlDiff
-    , commitSqlDiffs
+    ( commitSqlDiffs
     ) where
 
 import           Database.Persist                            hiding (Update, get)
 import qualified Database.Persist.Postgresql                 as SQL hiding (Update, get)
 
-import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.DataDefs
-import           Blockchain.Database.MerklePatricia.Internal
 import           Blockchain.Database.MerklePatricia.StateRoot (emptyTriePtr)
 import           Blockchain.DB.CodeDB
-import           Blockchain.DB.HashDB
 import           Blockchain.DB.SQLDB
-import           Blockchain.DB.StateDB
 import           Blockchain.ExtWord
 import           Blockchain.Strato.Model.Account
-import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.SolidVM.Model
 
 import           Control.Lens ((^.))
 import           Control.Monad
-import           Control.Monad.Change.Alter
 import           Control.Monad.IO.Class
 import qualified Data.ByteString                             as BS
 import           Data.Foldable                               (for_)
@@ -38,12 +31,6 @@ import           Data.Maybe
 import           Blockchain.Strato.StateDiff
 
 type SqlDbM m = SQL.SqlPersistT m
-
-sqlDiff :: (HasSQLDB m, HasCodeDB m, HasStateDB m, HasHashDB m, (Account `Alters` AddressState) m)=>
-           Maybe Word256 -> Integer -> Keccak256 -> StateRoot -> StateRoot -> m ()
-sqlDiff chainId blockNumber blockHash oldRoot newRoot = do
-  stateDiffs <- stateDiff chainId blockNumber blockHash oldRoot newRoot
-  commitSqlDiffs stateDiffs
 
 commitSqlDiffs :: HasSQLDB m => StateDiff -> m ()
 commitSqlDiffs StateDiff{blockNumber, createdAccounts, deletedAccounts, updatedAccounts} = do

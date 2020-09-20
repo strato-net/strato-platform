@@ -17,7 +17,6 @@ import qualified    Data.Aeson                           as Ae
 import qualified    Data.Aeson.Types                     as Ae
 import              Data.Binary
 import              Data.Data
-import              Data.DeriveTH
 import              Data.Hashable                        (Hashable)
 import qualified    Data.Swagger                         as S 
 import              Data.Swagger.Internal.Schema (named)
@@ -90,7 +89,8 @@ instance Ae.FromJSON CodePtr where
         return $ CodeAtAccount acct name
   parseJSON x = Ae.typeMismatch "CodePtr" x
 
-derive makeArbitrary ''CodePtr
+instance Arbitrary CodePtr where
+  arbitrary = oneof [EVMCode <$> arbitrary, SolidVMCode "Vehicle" <$> arbitrary, flip CodeAtAccount "Vehicle" <$> arbitrary]
 
 derivePersistField "CodePtr"
 

@@ -25,6 +25,7 @@ module Blockchain.SolidVM.SM (
   getLocal,
   setLocal,
   getCurrentCallInfo,
+  getCurrentCallInfoIfExists,
   getCurrentContract,
   getCurrentFunctionName,
   getCurrentCodeCollection,
@@ -61,6 +62,7 @@ import qualified Data.Text as T
 import           Data.Text.Encoding(encodeUtf8,decodeUtf8)
 
 import           Blockchain.Data.AddressStateDB
+import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.CodeDB
@@ -96,6 +98,7 @@ data CallInfo = CallInfo
   , codeCollection      :: CodeCollection
   , collectionHash      :: Keccak256
   , localVariables      :: Map String (Xabi.Type, Variable)
+  , readOnly            :: Bool
   } deriving (Show)
 
 {-
@@ -131,6 +134,7 @@ type SM m = StateT SState m
 
 type MonadSM m = ( (Account `A.Alters` AddressState) m
                  , (Keccak256 `A.Alters` DBCode) m
+                 , A.Selectable (Maybe Word256) ParentChainId m
                  , HasRawStorageDB m
                  , HasMemAddressStateDB m
                  , HasMemRawStorageDB m
@@ -192,6 +196,9 @@ instance (Maybe Word256 `A.Alters` MP.StateRoot) m
 instance Monad m => Mod.Modifiable CurrentBlockHash (SM m) where
   get _    = fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0) . _currentBlock <$> Mod.get (Mod.Proxy @MemDBs)
   put _ md = Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ currentBlock ?= md
+
+instance A.Selectable (Maybe Word256) ParentChainId m => A.Selectable (Maybe Word256) ParentChainId (SM m) where
+  select p = lift . A.select p
 
 instance (MP.StateRoot `A.Alters` MP.NodeData) m => (MP.StateRoot `A.Alters` MP.NodeData) (SM m) where
   lookup p   = lift . A.lookup p
@@ -330,7 +337,7 @@ getVariableOfName name = do
       maybeContractFunction = fmap (t "constant function" . Constant . SFunction name) $ M.lookup name $ currentContract currentCallInfo^.functions
 
       maybeBuiltinFunction :: Maybe Variable
-      maybeBuiltinFunction = toMaybe (name `elem` ["address", "uint", "int", "byte", "bytes"
+      maybeBuiltinFunction = toMaybe (name `elem` ["address", "account", "uint", "int", "byte", "bytes"
                                                   , "string", "keccak256"
                                                   , "require", "revert", "assert", "sha3"
                                                   , "sha256", "ecrecover", "addmod", "mulmod"
@@ -428,8 +435,9 @@ addCallInfo :: MonadSM m
             -> Keccak256
             -> CodeCollection
             -> Map String (Xabi.Type, Variable)
+            -> Bool
             -> m ()
-addCallInfo a c fn hsh cc initialLocalVariables = do
+addCallInfo a c fn hsh cc initialLocalVariables ro = do
   let newCallInfo =
         CallInfo {
           currentFunctionName=fn,
@@ -437,7 +445,8 @@ addCallInfo a c fn hsh cc initialLocalVariables = do
           currentContract=c,
           codeCollection=cc,
           collectionHash=hsh,
-          localVariables=initialLocalVariables
+          localVariables=initialLocalVariables,
+          readOnly=ro
         }
 
   Mod.modify_ (Mod.Proxy @[CallInfo]) $ pure . (newCallInfo:)
@@ -453,6 +462,9 @@ getCurrentCallInfo = do
   case cs of
     [] -> internalError "getCurrentCallInfo called with an empty stack" ()
     (currentCallInfo:_) -> return currentCallInfo
+
+getCurrentCallInfoIfExists :: MonadSM m => m (Maybe CallInfo)
+getCurrentCallInfoIfExists = listToMaybe <$> Mod.get (Mod.Proxy @[CallInfo])
 
 getCurrentContract :: MonadSM m => m Contract
 getCurrentContract = do

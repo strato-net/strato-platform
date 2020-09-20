@@ -270,6 +270,7 @@ initializeChainDBs :: ( MonadLogger m
                       , HasSQLDB m
                       , HasStateDB m
                       , (Account `A.Alters` AddressState) m
+                      , A.Selectable (Maybe Word256) ParentChainId m
                       )
                    => Maybe Ext.Word256
                    -> ChainInfo
@@ -294,7 +295,7 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) sRoot = do
          in (cHash, md)
       getMetadata mch = fmap (`Map.union` chainMetadata) $ flip Map.lookup metadatas =<< mch
       toAction a d = do
-        vm <- codePtrToCodeKind $ codeHash d
+        vm <- codePtrToCodeKind chainId $ codeHash d
         pure A.Action
           { A._actionBlockHash = creationBlock
           , A._actionBlockTimestamp = posixSecondsToUTCTime 0

@@ -100,6 +100,7 @@ import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.Block
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.BlockSummary
+import           Blockchain.Data.ChainInfo
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.BlockSummaryDB
 import           Blockchain.DB.ChainDB
@@ -184,6 +185,7 @@ type VMBase m = ( MonadIO m
                 , Mod.Modifiable BestBlockRoot m
                 , Mod.Modifiable CurrentBlockHash m
                 , HasMemAddressStateDB m
+                , A.Selectable (Maybe Word256) ParentChainId m
                 , (Maybe Word256 `A.Alters` MP.StateRoot) m
                 , (MP.StateRoot `A.Alters` MP.NodeData) m
                 , (Account `A.Alters` AddressState) m
@@ -368,6 +370,9 @@ instance (Maybe Word256 `A.Alters` MP.StateRoot) ContextM where
       Just (CurrentBlockHash bh) -> do
         modify $ memDBs . stateRoots %~ M.delete (bh, chainId)
         deleteChainStateRoot chainId bh
+
+instance A.Selectable (Maybe Word256) ParentChainId ContextM where
+  select _ chainId = fmap (\(_,_,p) -> ParentChainId p) <$> getChainGenesisInfo chainId
 
 instance (Keccak256 `A.Alters` DBCode) ContextM where
   lookup _ = genericLookupCodeDB $ getCodeDB

@@ -211,6 +211,7 @@ primaryExpression :: SolidityParser Expression
 primaryExpression = do
   (reserved "msg" >> return (Variable "msg"))
   <|> (reserved "address" >> return (Variable "address"))
+  <|> (reserved "account" >> return (Variable "account"))
   <|> (reserved "this" >> return (Variable "this"))
   <|> (reserved "block" >> return (Variable "block"))
   <|> (reserved "tx" >> return (Variable "tx"))

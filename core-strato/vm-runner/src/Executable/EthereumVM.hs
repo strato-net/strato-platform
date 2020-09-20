@@ -189,14 +189,19 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
       $logInfoS "insertNewChains" $ T.pack $ "We already have a genesis state root for this chain. It's " ++ format gsr
       return Nothing
     Nothing -> do
-      $logInfoS "insertNewChains" $ T.pack $ "This is a new chain!"
-      let theVM = T.unpack $ fromMaybe "EVM" $ M.lookup "VM" $ chainMetadata (chainInfo cInfo)
-      sr' <- chainInfoToGenesisState theVM (Just cId) cInfo
-      (sr, mAction) <-
-        case theVM of
-          "SolidVM" -> runChainConstructors cId cInfo
-          _ -> return (sr', [])
-      Just (cId, cInfo, sr, mAction) <$ putChainGenesisInfo (Just cId) (unsafeCreateKeccak256FromWord256 0) sr
+      mBB <- fmap fst <$> getChainBestBlock Nothing
+      let cBlock = creationBlock $ chainInfo cInfo
+          bHash = fromMaybe cBlock mBB
+          pChain = parentChain $ chainInfo cInfo
+      withCurrentBlockHash bHash $ do
+        $logInfoS "insertNewChains" $ T.pack $ "This is a new chain!"
+        let theVM = T.unpack $ fromMaybe "EVM" $ M.lookup "VM" $ chainMetadata (chainInfo cInfo)
+        sr' <- chainInfoToGenesisState theVM (Just cId) cInfo
+        (sr, mAction) <-
+          case theVM of
+            "SolidVM" -> runChainConstructors cId cInfo
+            _ -> return (sr', [])
+        Just (cId, cInfo, sr, mAction) <$ putChainGenesisInfo (Just cId) cBlock sr pChain
 
 outputNewChains :: [(Word256, ChainInfo, MP.StateRoot, [Action])] -> ConduitT a VmOutEvent ContextM ()
 outputNewChains = traverse_ $ \(cId, cInfo, sr, actions) -> do
@@ -275,7 +280,7 @@ runChainConstructors cId cInfo = do
       getCodeHash ci = SolidVMCode (T.unpack $ codeInfoName ci) (hash $ getSrcBS ci)
       codeHashMap = M.fromList . map (getCodeHash &&& codeInfoSource) $ codeInfo $ chainInfo cInfo
       resolveSrc a ch = do
-        mcp <- resolveCodePtr ch
+        mcp <- resolveCodePtr (Just cId) ch
         msrc <- runMaybeT $ do
           cp <- MaybeT $ pure mcp
           hsh <- MaybeT $ pure $ case cp of

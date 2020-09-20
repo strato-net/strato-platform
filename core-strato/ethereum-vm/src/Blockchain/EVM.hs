@@ -1091,7 +1091,7 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth sender ori
   initCode <- Code <$> case code of
     Code c -> pure c
     PtrToCode cp -> do
-      codeHash <- resolveCodePtr cp
+      codeHash <- resolveCodePtr chainId cp
       fromMaybe "" <$> traverse getEVMCode' codeHash
   let env =
         Environment{

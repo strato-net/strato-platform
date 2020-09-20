@@ -174,16 +174,17 @@ chainDiff chainId newBlockNum newBlockHash = do
     else do
       mSR <- liftA2 (<|>) (getChainStateRoot chainId bHash) (getGenesisStateRoot chainId)
       let sr = fromMaybe emptyTriePtr mSR
-      putChainBestBlock chainId newBlockHash newBlockNum
       Just <$> stateDiff chainId newBlockNum newBlockHash sr newSR
 
 stateDiff :: ( HasCodeDB m
              , HasHashDB m
+             , Modifiable BestBlockRoot m
              , (MP.StateRoot `Alters` MP.NodeData) m
              , (Account `Alters` AddressState) m
              ) 
           => Maybe Word256 -> Integer -> Keccak256 -> StateRoot -> StateRoot -> m StateDiff
 stateDiff chainId blockNumber blockHash oldRoot newRoot = do
+  putChainBestBlock chainId blockHash blockNumber
   diffs <- Diff.dbDiff oldRoot newRoot
   collectModes diffs $
     \createdAccounts deletedAccounts updatedAccounts ->
@@ -270,7 +271,7 @@ incrementalAccountState :: ( HasHashDB m
                            ) 
                         => AddressState -> AddressState -> m (AccountDiff 'Incremental)
 incrementalAccountState oldState newState = do
-  codeKind <- codePtrToCodeKind (addressStateCodeHash newState)
+  codeKind <- unsafeCodePtrToCodeKind (addressStateCodeHash newState)
   storage <- (incrementalStorage codeKind `on` addressStateContractRoot) oldState newState
   return AccountDiff{
     nonce = (diff `on` addressStateNonce) oldState newState,
@@ -337,7 +338,7 @@ lookupAddress (N.pack -> addrHash) = lookupInMPDB "address" getAddressFromHash a
 lookupCode :: (HasHashDB m, HasCodeDB m, (Account `Alters` AddressState) m) => CodePtr -> m (CodeKind, ByteString)
 lookupCode (EVMCode ch) = lookupInMPDB "contract code" getCode ch
 lookupCode (SolidVMCode _ ch) = lookupInMPDB "contract code" getCode ch
-lookupCode cp@(CodeAtAccount _ _) = maybe (pure (EVM, "")) lookupCode =<< resolveCodePtr cp
+lookupCode cp@(CodeAtAccount _ _) = maybe (pure (EVM, "")) lookupCode =<< unsafeResolveCodePtr cp
 
 lookupInMPDB :: (HasHashDB m, Format a) =>
                 String -> (a -> m (Maybe b)) -> a -> m b

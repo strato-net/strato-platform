@@ -588,7 +588,7 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAcct o@OutputT
   let owner = Account (transactionTo ut) (txChainId ut)
 
   codeHash <- lift $ addressStateCodeHash <$> A.lookupWithDefault (Proxy @AddressState) owner
-  resolvedCodeHash <- lift $ resolveCodePtr codeHash
+  resolvedCodeHash <- lift $ resolveCodePtr (owner ^. accountChainId) codeHash
 
   let eCall =
         case codeHash of
@@ -849,6 +849,7 @@ compactDiffs base (p:ps) = go (cost p) (promote base p) ps
 completeDiff :: ( MonadLogger m
                 , HasCodeDB m
                 , HasHashDB m
+                , Mod.Modifiable BestBlockRoot m
                 , (MP.StateRoot `A.Alters` MP.NodeData) m
                 , (Account `A.Alters` AddressState) m
                 )
