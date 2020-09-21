@@ -15,17 +15,19 @@ import              Control.DeepSeq
 import              Control.Lens                         ((?~), (&))
 import qualified    Data.Aeson                           as Ae
 import qualified    Data.Aeson.Types                     as Ae
+import              Data.Bifunctor                       (first)
 import              Data.Binary
 import              Data.Data
 import              Data.Hashable                        (Hashable)
 import qualified    Data.Swagger                         as S 
 import              Data.Swagger.Internal.Schema (named)
 import qualified    Data.Text                            as T
-import              Database.Persist.TH
+import              Database.Persist.Sql
 import              GHC.Generics
 import              Servant.API
 import              Test.QuickCheck
 import              Text.Format
+import              Text.Read (readEither)
 
 import              Blockchain.Data.RLP
 import              Blockchain.SolidVM.Model             (CodeKind(..))
@@ -92,7 +94,21 @@ instance Ae.FromJSON CodePtr where
 instance Arbitrary CodePtr where
   arbitrary = oneof [EVMCode <$> arbitrary, SolidVMCode "Vehicle" <$> arbitrary, flip CodeAtAccount "Vehicle" <$> arbitrary]
 
-derivePersistField "CodePtr"
+instance PersistField CodePtr where
+  toPersistValue cp@(EVMCode _) = PersistText . T.pack $ show cp
+  toPersistValue cp@(SolidVMCode _ _) = PersistText . T.pack $ show cp
+  toPersistValue (CodeAtAccount acct name) = PersistText . T.pack $ name ++ "@" ++ show acct
+  fromPersistValue (PersistText t) =
+    let s = T.unpack t
+     in case readEither s of
+          Right r -> Right r
+          Left _ -> case span (/= '@') s of
+            (name, '@':acct) -> first T.pack $ flip CodeAtAccount name <$> readEither acct
+            (_,_) -> Left $ "PersistField CodePtr: could not parse: " <> t
+  fromPersistValue x = Left $ T.pack $ "PersistField CodePtr: expected text: " ++ (show x)
+
+instance PersistFieldSql CodePtr where
+  sqlType _ = SqlString
 
 instance Format CodePtr where
   format (EVMCode ch) = format ch
