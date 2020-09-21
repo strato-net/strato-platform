@@ -28,24 +28,25 @@ import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.EthConf (lookupRedisBlockDBConfig, connStr)
+import           Blockchain.ExtWord
 import           Blockchain.Output
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
-import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Account
 
 
 data SetupDBs =
   SetupDBs {
     stateDB :: StateDB,
-    stateRoot :: IORef MP.StateRoot,
+    stateRoots :: IORef (M.Map (Maybe Word256) MP.StateRoot),
     hashDB  :: HashDB,
     codeDB  :: CodeDB,
     sqlDB   :: SQLDB,
     redisDB :: RBDB.RedisConnection,
-    localStorageTx :: IORef (M.Map (Address, B.ByteString) B.ByteString),
-    localStorageBlock :: IORef (M.Map (Address, B.ByteString) B.ByteString),
-    localAddressStateTx :: IORef (M.Map Address AddressStateModification),
-    localAddressStateBlock :: IORef (M.Map Address AddressStateModification)
+    localStorageTx :: IORef (M.Map (Account, B.ByteString) B.ByteString),
+    localStorageBlock :: IORef (M.Map (Account, B.ByteString) B.ByteString),
+    localAddressStateTx :: IORef (M.Map Account AddressStateModification),
+    localAddressStateBlock :: IORef (M.Map Account AddressStateModification)
     }
 
 type SetupDBM = ReaderT SetupDBs (ResourceT (LoggingT IO))
@@ -54,7 +55,7 @@ runSetupDBM :: SetupDBM a -> ResourceT (LoggingT IO) a
 runSetupDBM mv = do
   let open path = DB.open (".ethereumH" ++ path) DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
   sdb <- open stateDBPath
-  srRef <- liftIO . newIORef $ error "stateRoot used before defined"
+  srRef <- liftIO $ newIORef M.empty
   hdb <- HashDB <$> open hashDBPath
   cdb <- CodeDB <$> open codeDBPath
   [m1, m2] <- liftIO . replicateM 2 . newIORef $ M.empty
@@ -63,12 +64,10 @@ runSetupDBM mv = do
   redisConn <- RBDB.RedisConnection <$> liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
   runReaderT mv $ SetupDBs sdb srRef hdb cdb pool redisConn m1 m2 m3 m4
 
-
-instance Mod.Modifiable MP.StateRoot SetupDBM where
-  get _    = liftIO . readIORef =<< asks stateRoot
-  put _ sr = do
-    srRef <- asks stateRoot
-    liftIO $ atomicWriteIORef srRef sr
+instance (Maybe Word256 `A.Alters` MP.StateRoot) SetupDBM where
+  lookup _ k = fmap (M.lookup k) $ liftIO . readIORef =<< asks stateRoots
+  insert _ k v = liftIO . flip modifyIORef (M.insert k v) =<< asks stateRoots
+  delete _ k = liftIO . flip modifyIORef (M.delete k) =<< asks stateRoots
 
 instance (MP.StateRoot `A.Alters` MP.NodeData) SetupDBM where
   lookup _ = MP.genericLookupDB $ asks stateDB
@@ -100,7 +99,7 @@ instance HasMemAddressStateDB SetupDBM where
     lasbref <- asks localAddressStateBlock
     liftIO $ atomicWriteIORef lasbref theMap
 
-instance (Address `A.Alters` AddressState) SetupDBM where
+instance (Account `A.Alters` AddressState) SetupDBM where
   lookup _ = getAddressStateMaybe
   insert _ = putAddressState
   delete _ = deleteAddressState

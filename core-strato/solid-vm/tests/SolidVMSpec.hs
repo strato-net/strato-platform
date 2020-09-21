@@ -10,6 +10,7 @@ import Control.Concurrent
 import Control.Concurrent.Async
 import Control.DeepSeq
 import Control.Exception
+import Control.Lens ((^.))
 import Control.Monad
 import Blockchain.Output
 import Control.Monad.IO.Class
@@ -38,6 +39,7 @@ import Blockchain.DB.RawStorageDB
 import Blockchain.DB.SolidStorageDB
 import Blockchain.DB.StateDB
 import Blockchain.Strato.Model.Action
+import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
@@ -97,20 +99,20 @@ failedAssertion :: Selector HandledException
 failedAssertion (HE Assert) = True
 failedAssertion _           = False
 
-sender :: Address
-sender = 0xdeadbeef
+sender :: Account
+sender = Account 0xdeadbeef Nothing
 
-origin :: Address
-origin = 0x8341
+origin :: Account
+origin = Account 0x8341 Nothing
 
-uploadAddress :: Address
-uploadAddress = getNewAddress_unsafe sender 0
+uploadAddress :: Account
+uploadAddress = Account (getNewAddress_unsafe (sender ^. accountAddress) 0) Nothing
 
-secondAddress :: Address
-secondAddress = getNewAddress_unsafe sender 1
+secondAddress :: Account
+secondAddress = Account (getNewAddress_unsafe (sender ^. accountAddress) 1) Nothing
 
-recursiveAddr :: Address
-recursiveAddr = getNewAddress_unsafe uploadAddress 0
+recursiveAddr :: Account
+recursiveAddr = Account (getNewAddress_unsafe (uploadAddress ^. accountAddress) 0) Nothing
 
 devNull :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
 devNull _ _ _ _ = return ()
@@ -221,7 +223,7 @@ runCall funcName callArgs bs = do
   rethrowEx er2
   return $ erReturnVal er2
 
-call2 :: T.Text -> T.Text -> Address -> ContextM (Maybe SB.ShortByteString)
+call2 :: T.Text -> T.Text -> Account -> ContextM (Maybe SB.ShortByteString)
 call2 funcName callArgs contractAddress = do
   let isTest = error "TODO: isTest"
       isHomestead = error "TODO: isHomestead"
@@ -272,6 +274,21 @@ getFields = getAll . map (\t -> [Field t])
 
 getFields2 :: [BC.ByteString] -> ContextM [BasicValue]
 getFields2 = getAll2 . map (\t -> [Field t])
+
+bAddress :: Address -> BasicValue
+bAddress = BAccount . unspecifiedChain
+
+bContract :: T.Text -> Address -> BasicValue
+bContract t = BContract t . unspecifiedChain
+
+bContract' :: T.Text -> Account -> BasicValue
+bContract' t = BContract t . accountOnUnspecifiedChain
+
+bAccount :: Account -> BasicValue
+bAccount = BAccount . accountOnUnspecifiedChain
+
+iAddress :: Address -> IndexType
+iAddress = IAccount . unspecifiedChain
 
 spec :: Spec
 spec = do
@@ -392,7 +409,7 @@ spec = do
 
     it "can use addresses as map keys" . runTest $ do
       runFile "testdata/AddressMapping.sol"
-      getAll [[Field "perms", MapIndex (IAddress 0xdeadbeef)]] `shouldReturn` [BInteger 0xfff]
+      getAll [[Field "perms", MapIndex (iAddress 0xdeadbeef)]] `shouldReturn` [BInteger 0xfff]
 
     it "can hash correctly" . runTest $ do
       runFile "testdata/Keccak256.sol"
@@ -612,7 +629,7 @@ contract X {}
 contract qq {
   X x = X(0x999999);
 }|]
-      getAll [ [Field "x"] ] `shouldReturn` [BContract "X" 0x999999]
+      getAll [ [Field "x"] ] `shouldReturn` [bContract "X" 0x999999]
 
     it "should be able to return the time from the header" . runTest $ do
       runBS [r|
@@ -666,7 +683,7 @@ contract qq {
     getAll [ [ Field "ruleSets"
              , MapIndex $ IText "profileName"
              , MapIndex $ IText "ruleName"
-             , MapIndex $ IBool True ] ] `shouldReturn` [BContract "X" 0xdeadbeef]
+             , MapIndex $ IBool True ] ] `shouldReturn` [bContract "X" 0xdeadbeef]
 
   it "can default construct local arrays" . runTest $ do
     runBS [r|
@@ -852,7 +869,7 @@ contract qq {
     x = msg.sender;
   }
 }|]
-    getFields ["x"] `shouldReturn` [BAddress sender]
+    getFields ["x"] `shouldReturn` [bAccount sender]
 
   it "can read tx.origin" . runTest $ do
     runBS [r|
@@ -862,7 +879,7 @@ contract qq {
     x = tx.origin;
   }
 }|]
-    getFields ["x"] `shouldReturn` [BAddress origin]
+    getFields ["x"] `shouldReturn` [bAccount origin]
 
   it "can infer types" . runTest $ do
     runBS [r|
@@ -915,7 +932,7 @@ contract qq {
     target = _target;
   }
 }|]
-    getFields ["target"] `shouldReturn` [BAddress 0x6662346]
+    getFields ["target"] `shouldReturn` [bAddress 0x6662346]
 
   it "can create a reference to a map value" . runTest $ do
     runBS [r|
@@ -1076,7 +1093,7 @@ contract qq {
     x = X(0xdeadbeef);
   }
 }|]
-    getFields ["x"] `shouldReturn` [BContract "X" 0xdeadbeef]
+    getFields ["x"] `shouldReturn` [bContract "X" 0xdeadbeef]
 
   it "can call methods of superclasses" . runTest $ do
     runBS [r|
@@ -1129,7 +1146,7 @@ contract qq {
 contract qq {
   address a = 0xdeadbeef;
 }|]
-    getFields ["a"] `shouldReturn` [BAddress 0xdeadbeef]
+    getFields ["a"] `shouldReturn` [bAddress 0xdeadbeef]
 
   it "can pass arrays by reference to functions" . runTest $ do
     runBS [r|
@@ -1245,7 +1262,7 @@ contract qq {
     x = X(y);
   }
 }|]
-    getFields ["x"] `shouldReturn` [BContract "X" 0x7733624642]
+    getFields ["x"] `shouldReturn` [bContract "X" 0x7733624642]
 
   it "can cast int to int" . runTest $ do
     runBS [r|
@@ -1303,13 +1320,13 @@ contract qq {
   }
 }|]
     void $ runArgs "(0x0,99)" qq
-    getFields ["x", "num"] `shouldReturn` [BContract "qq" 0x0, BInteger 99]
+    getFields ["x", "num"] `shouldReturn` [bContract "qq" 0x0, BInteger 99]
 
     void $ runArgs (T.pack $ printf "(0x%s,400)" $ show uploadAddress) qq
-    getFields2 ["x", "num"] `shouldReturn` [BContract "qq" uploadAddress, BInteger 400]
+    getFields2 ["x", "num"] `shouldReturn` [bContract' "qq" uploadAddress, BInteger 400]
 
     call2 "a" "()" secondAddress `shouldReturn` Nothing
-    getFields2 ["x", "num"] `shouldReturn` [BContract "qq" uploadAddress, BInteger 100]
+    getFields2 ["x", "num"] `shouldReturn` [bContract' "qq" uploadAddress, BInteger 100]
 
   it "can locally return locals" . runTest $ do
     runBS [r|
@@ -1634,7 +1651,7 @@ contract qq {
     getFields ["s"] `shouldReturn` [BString "Will the real "]
 
   it "can return an address" . runTest $ do
-    let want' = fst . B16.decode . BC.pack $ showHex sender ""
+    let want' = fst . B16.decode . BC.pack $ showHex (sender ^. accountAddress) ""
         want = B.replicate (32 - B.length want') 0x0 <> want'
     runCall "a" "()" [r|
 contract qq {
@@ -1660,7 +1677,7 @@ contract X {}
 contract qq {
   X x;
 }|]
-    getFields ["x"] `shouldReturn` [BContract "X" 0x0]
+    getFields ["x"] `shouldReturn` [bContract "X" 0x0]
 
   it "will initialize fields of indirect constructions" . runTest $ do
     liftIO $ pendingWith "add static typing" --TODO- Jim
@@ -1677,8 +1694,8 @@ contract qq {
   }
 }|]
     [BContract "X" x] <- getFields ["x"]
-    getSolidStorageKeyVal' x (singleton "i") `shouldReturn` BInteger 0
-    getSolidStorageKeyVal' x (singleton "s") `shouldReturn` BString ""
+    getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "i") `shouldReturn` BInteger 0
+    getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "s") `shouldReturn` BString ""
 
   it "will create a sentinel for mappings" . runTest $ do
     liftIO $ pendingWith "deal with BMappingSentinel" --TODO- Jim
@@ -1708,7 +1725,7 @@ contract qq {
   function self() public {
     return qq(this);
   }
-}|] `shouldReturn` Just (SB.toShort . word256ToBytes $ coerce uploadAddress)
+}|] `shouldReturn` Just (SB.toShort . word256ToBytes $ coerce $ uploadAddress ^. accountAddress)
 
   it "merges actions for concurrent modifications" . runTest $ do
     xr <- runBS' [r|
@@ -1732,7 +1749,7 @@ contract qq {
     let diffs = fmap _actionDataStorageDiffs . _actionData <$> erAction xr
     diffs `shouldBe` Just (M.fromList
       [ (uploadAddress, ActionSolidVMDiff $ M.singleton ".s"
-            (rlpSerialize $ rlpEncode $ BContract "Sub" recursiveAddr))
+            (rlpSerialize $ rlpEncode $ bContract' "Sub" recursiveAddr))
       , (recursiveAddr, ActionSolidVMDiff $ M.fromList
           [ (".x", rlpSerialize $ rlpEncode $ BInteger 20)
           , (".y", rlpSerialize $ rlpEncode $ BInteger 80)
@@ -1872,7 +1889,7 @@ contract qq {
     resolved_origin = x.trampoline();
   }
 }|]
-    getFields ["resolved_origin"] `shouldReturn` [BAddress origin]
+    getFields ["resolved_origin"] `shouldReturn` [bAccount origin]
 
   it "sets the sender correctly" . runTest $ do
     runBS [r|
@@ -1898,7 +1915,7 @@ contract qq {
     }
 }|]
     getFields ["direct_set", "local_call", "remote_call"] `shouldReturn`
-      [BAddress sender, BAddress sender, BAddress uploadAddress]
+      [bAccount sender, bAccount sender, bAccount uploadAddress]
 
   it "can set owner from management contract" . runTest $ do
     runBS [r|
@@ -1916,9 +1933,9 @@ contract qq {
   }
 }|]
     -- qq should become the `owner` in X
-    getFields ["x"] `shouldReturn` [BContract "X" recursiveAddr]
+    getFields ["x"] `shouldReturn` [bContract' "X" recursiveAddr]
     getSolidStorageKeyVal' recursiveAddr (MS.singleton "owner") `shouldReturn`
-      BAddress uploadAddress
+      bAccount uploadAddress
 
 
   it "can cast from address" . runTest $ do
@@ -1929,7 +1946,7 @@ contract qq {
     a = address(74);
   }
 }|]
-    getFields ["a"] `shouldReturn` [BAddress 74]
+    getFields ["a"] `shouldReturn` [bAddress 74]
 
   it "can have a for loop with no fields" . runTest $ do
     liftIO $ pendingWith "re-fix loops"
@@ -2177,7 +2194,7 @@ contract qq {
     x = new X({_z: "ok", _y: 0x777777});
   }
 }|]
-    getFields ["x"] `shouldReturn` [BContract "X" recursiveAddr]
+    getFields ["x"] `shouldReturn` [bContract' "X" recursiveAddr]
     mapM (getSolidStorageKeyVal' recursiveAddr) [MS.singleton "y", MS.singleton "z"]
       `shouldReturn` [BInteger 0x777777, BString "ok"]
 
@@ -2570,7 +2587,7 @@ contract qq {
     (x,y,z) = f();
   }
 }|]
-    getFields ["x","y","z"] `shouldReturn` [BInteger 123, BString "456", BAddress 0x789]
+    getFields ["x","y","z"] `shouldReturn` [BInteger 123, BString "456", bAddress 0x789]
 
   it "catches division by zero error" $ (runTest (runBS [r|
 contract qq {

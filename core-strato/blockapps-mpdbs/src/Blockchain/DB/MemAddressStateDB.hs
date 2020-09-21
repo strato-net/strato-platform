@@ -26,6 +26,8 @@ import           Blockchain.Data.AddressStateDB
 import qualified Blockchain.DB.AddressStateDB   as DB
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.StateDB
+import           Blockchain.ExtWord
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Text.Format
 
@@ -43,37 +45,37 @@ formatAddressStateDBMap theMap = unlines $
      (M.toList theMap)
 
 class HasMemAddressStateDB m where
-  getAddressStateTxDBMap    :: m (M.Map Address AddressStateModification)
-  putAddressStateTxDBMap    :: M.Map Address AddressStateModification -> m ()
-  getAddressStateBlockDBMap :: m (M.Map Address AddressStateModification)
-  putAddressStateBlockDBMap :: M.Map Address AddressStateModification -> m ()
+  getAddressStateTxDBMap    :: m (M.Map Account AddressStateModification)
+  putAddressStateTxDBMap    :: M.Map Account AddressStateModification -> m ()
+  getAddressStateBlockDBMap :: m (M.Map Account AddressStateModification)
+  putAddressStateBlockDBMap :: M.Map Account AddressStateModification -> m ()
 
-getAddressState :: (Address `A.Alters` AddressState) m => Address -> m AddressState
-getAddressState address = fromMaybe blankAddressState <$> A.lookup A.Proxy address
+getAddressState :: (Account `A.Alters` AddressState) m => Account -> m AddressState
+getAddressState account = fromMaybe blankAddressState <$> A.lookup A.Proxy account
 
 getAddressStateMaybe :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m)
-                     => Address -> m (Maybe AddressState)
-getAddressStateMaybe address = do
+                     => Account -> m (Maybe AddressState)
+getAddressStateMaybe account = do
   theMap <- getAddressStateTxDBMap
-  case M.lookup address theMap of
+  case M.lookup account theMap of
     Just (ASModification addressState) -> return $ Just addressState
     Just ASDeleted                     -> return $ Just blankAddressState
     Nothing                            -> do
       theBMap <- getAddressStateBlockDBMap
-      case M.lookup address theBMap of
+      case M.lookup account theBMap of
         Just (ASModification addressState) -> return $ Just addressState
         Just ASDeleted                     -> return $ Just blankAddressState
-        Nothing                            -> DB.getAddressStateMaybe address
+        Nothing                            -> DB.getAddressStateMaybe account
 
 getAllAddressStates::(HasMemAddressStateDB m, HasHashDB m, HasStateDB m)=>
-                     m [(Address, AddressState)]
+                     Maybe Word256 -> m [(Account, AddressState)]
 getAllAddressStates = DB.getAllAddressStates
 
 putAddressState :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) =>
-                 Address -> AddressState -> m ()
-putAddressState address newState = do
+                 Account -> AddressState -> m ()
+putAddressState account newState = do
   theMap <- getAddressStateTxDBMap
-  putAddressStateTxDBMap (M.insert address (ASModification newState) theMap)
+  putAddressStateTxDBMap (M.insert account (ASModification newState) theMap)
 
 flushMemAddressStateTxToBlockDB :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) =>
                                 m ()
@@ -88,52 +90,28 @@ flushMemAddressStateDB::(HasMemAddressStateDB m, HasStateDB m, HasHashDB m)=>
 flushMemAddressStateDB = do
   flushMemAddressStateTxToBlockDB
   theMap <- getAddressStateBlockDBMap
-  forM_ (M.toList theMap) $ \(address, modification) -> do
+  forM_ (M.toList theMap) $ \(account, modification) -> do
                            case modification of
-                             ASModification addressState -> DB.putAddressState address addressState
-                             ASDeleted                   -> DB.deleteAddressState address
+                             ASModification addressState -> DB.putAddressState account addressState
+                             ASDeleted                   -> DB.deleteAddressState account
   putAddressStateBlockDBMap M.empty
 
 deleteAddressState :: (HasMemAddressStateDB m, HasStateDB m) =>
-                    Address -> m ()
-deleteAddressState address = do
+                    Account -> m ()
+deleteAddressState account = do
   theMap <- getAddressStateTxDBMap
-  putAddressStateTxDBMap (M.insert address ASDeleted theMap)
+  putAddressStateTxDBMap (M.insert account ASDeleted theMap)
 
 addressStateExists :: (HasMemAddressStateDB m, HasStateDB m) =>
-                    Address -> m Bool
-addressStateExists address = do
+                    Account -> m Bool
+addressStateExists account = do
   theMap <- getAddressStateTxDBMap
-  case M.lookup address theMap of
+  case M.lookup account theMap of
     Just (ASModification _) -> return True
     Just ASDeleted          -> return False
     Nothing                 -> do
       theBMap <- getAddressStateBlockDBMap
-      case M.lookup address theBMap of
+      case M.lookup account theBMap of
         Just (ASModification _) -> return True
         Just ASDeleted          -> return False
-        Nothing                 -> DB.addressStateExists address
-
-
---Dummy version of the functions useful for turning off caching in debug situations
-{-
-getAddressState::(HasMemAddressStateDB m, HasStateDB m, HasHashDB m)=>
-                 Address->m AddressState
-getAddressState address = DB.getAddressState address
-
-getAllAddressStates::(HasMemAddressStateDB m, HasHashDB m, HasStateDB m)=>
-                     m [(Address, AddressState)]
-getAllAddressStates = DB.getAllAddressStates
-
-putAddressState::(HasMemAddressStateDB m, HasStateDB m, HasHashDB m)=>
-                 Address->AddressState->m ()
-putAddressState address newState = DB.putAddressState address newState
-
-deleteAddressState::(HasMemAddressStateDB m, HasStateDB m)=>Address->
-                    m ()
-deleteAddressState address = DB.deleteAddressState address
-
-addressStateExists::(HasMemAddressStateDB m, HasStateDB m)=>Address->
-                    m Bool
-addressStateExists address = DB.addressStateExists address
--}
+        Nothing                 -> DB.addressStateExists account

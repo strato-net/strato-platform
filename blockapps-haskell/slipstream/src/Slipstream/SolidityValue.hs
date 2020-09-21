@@ -86,8 +86,10 @@ valueToSolidityValue' = \case
   SimpleValue (ValueString s) -> Just $ SolidityValueAsString s
   SimpleValue (ValueAddress (Address addr)) ->
    Just $ SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral addr::Integer)
-  ValueContract (Address addr) ->
-   Just $ SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral addr::Integer)
+  SimpleValue (ValueAccount acct) ->
+   Just $ SolidityValueAsString $ Text.pack $ show acct
+  ValueContract acct ->
+   Just $ SolidityValueAsString $ Text.pack $ show acct
   SimpleValue (ValueBytes _ bytes) -> Just $ SolidityValueAsString $ Text.pack $ BC.unpack bytes
   ValueEnum _ _ index              -> Just $ SolidityValueAsString $ Text.pack $ show index
   ValueFunction _ paramTypes returnTypes -> Just $

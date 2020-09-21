@@ -27,8 +27,7 @@ import           GHC.Generics
 
 import           Blockchain.Strato.Model.Action ( Action(..), ActionData(..), ActionDataDiff(..)
                                                 , CallType(..), CallData(..))
-import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Keccak256
@@ -38,9 +37,8 @@ data AggregateAction = AggregateAction
   , actionBlockTimestamp :: UTCTime
   , actionBlockNumber    :: Integer
   , actionTxHash         :: Keccak256
-  , actionTxChainId      :: Maybe ChainId
-  , actionTxSender       :: Address
-  , actionAddress        :: Address
+  , actionTxSender       :: Account
+  , actionAccount        :: Account
   , actionCodeHash       :: CodePtr
   , actionStorage        :: ActionDataDiff
   , actionType           :: CallType
@@ -51,16 +49,15 @@ data AggregateAction = AggregateAction
 
 flatten :: Action -> [AggregateAction]
 flatten Action{..} = flip map (M.toList _actionData) $
-  \(address, ActionData{..}) -> -- It's a Create because I said so
+  \(account, ActionData{..}) -> -- It's a Create because I said so
     let t = maybe Create _callDataType $ listToMaybe _actionDataCallData
      in AggregateAction
           { actionBlockHash      = _actionBlockHash
           , actionBlockTimestamp = _actionBlockTimestamp
           , actionBlockNumber    = _actionBlockNumber
           , actionTxHash         = _actionTransactionHash
-          , actionTxChainId      = ChainId <$> _actionTransactionChainId
           , actionTxSender       = _actionTransactionSender
-          , actionAddress        = address
+          , actionAccount        = account
           , actionCodeHash       = _actionDataCodeHash
           , actionStorage        = _actionDataStorageDiffs
           , actionType           = t
@@ -80,11 +77,11 @@ formatAction AggregateAction{..} = T.concat
   , ", transactionHash: "
   , tshow actionTxHash
   , ", "
-  , (case actionTxChainId of
+  , (case _accountChainId actionAccount of
        Nothing -> ""
        Just c -> T.concat ["in chain", tshow c])
-  , " with address: "
-  , tshow actionAddress
+  , " with account: "
+  , tshow (_accountAddress actionAccount)
   , " with "
   , tshow (case actionStorage of
       ActionEVMDiff m -> M.size m
@@ -99,7 +96,7 @@ formatAction AggregateAction{..} = T.concat
 
 data AggregateEvent = AggregateEvent
   { agContractName         :: Text
-  , agContractAddress      :: Address
+  , agContractAccount      :: Account
   , agEventName            :: Text
   , agEventArgs            :: [Text]
   } deriving (Show, Generic, NFData)
@@ -109,7 +106,7 @@ squash :: Action -> [AggregateEvent]
 squash Action{..} = flip map (toList _actionEvents)
   (\ev -> AggregateEvent
     { agContractName          = T.pack $ evContractName ev
-    , agContractAddress       = evContractAddress ev
+    , agContractAccount       = evContractAccount ev
     , agEventName             = T.pack $ evName ev
     , agEventArgs             = map T.pack (evArgs ev)
     }

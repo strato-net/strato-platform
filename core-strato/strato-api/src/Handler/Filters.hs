@@ -18,6 +18,7 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.ExtWord
 import           Blockchain.Util
 import           Blockchain.SolidVM.Model
+import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Keccak256
 
 import           Control.Monad
@@ -130,7 +131,7 @@ getAccFilter (accStateRef) ("maxnonce", v)   = accStateRef E.^. AddressStateRefN
 getAccFilter (accStateRef) ("address", v)    = accStateRef E.^. AddressStateRefAddress E.==. E.val (toAddr v)
 
 getAccFilter (accStateRef) ("code", v)       = accStateRef E.^. AddressStateRefCode E.==. E.val (toCode v)
-getAccFilter (accStateRef) ("codeHash", v)   = accStateRef E.^. AddressStateRefCodeHash E.==. E.val (toSHA v)
+getAccFilter (accStateRef) ("codeHash", v)   = accStateRef E.^. AddressStateRefCodeHash E.==. E.val (EVMCode $ toSHA v) -- strato-api is deprecated anyway, so I'm not too worried about this
 getAccFilter _             ("chainid", _)    = E.val True
 
 getAccFilter _             _                 = P.error ("no match in getAccFilter"::String)

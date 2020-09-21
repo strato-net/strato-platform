@@ -27,6 +27,7 @@ library:
     - format
     - hflags
     - hspec-expectations-lifted
+    - lens
     - merkle-patricia-db
     - monad-alter
     - mtl

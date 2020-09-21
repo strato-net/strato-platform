@@ -34,6 +34,7 @@ import qualified Data.ByteString.Char8              as BC
 import qualified Data.ByteString.Short              as BSS
 import           Data.Char
 import           Data.Data
+import           Data.Foldable                      (traverse_)
 import           Data.Function
 import           Data.Int
 import qualified Data.IntSet                        as I
@@ -65,6 +66,7 @@ import           Blockchain.DB.ModifyStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB
 import           Blockchain.ExtWord
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Util
 import           Blockchain.EVM.Code
@@ -123,7 +125,7 @@ logN n = do
   topics' <- sequence $ replicate n pop
 
   theData <- mLoadByteString offset theSize
-  addLog Log{address=owner, bloom=0, logData=theData, topics=topics'} -- TODO(dustin): Fix bloom filter
+  addLog Log{account=owner, bloom=0, logData=theData, topics=topics'} -- TODO(dustin): Fix bloom filter
 
 guardStorage :: EVMBase m => VMM m ()
 guardStorage = do
@@ -163,13 +165,13 @@ safe_rem x y = x `rem` y
 
 --For some strange reason, some ethereum tests (the VMTests) create an account when it doesn't
 --exist....  This is a hack to mimic this behavior.
-accountCreationHack :: EVMBase m => Address -> VMM m ()
-accountCreationHack address = do
-  exists <- isJust <$> A.lookup (A.Proxy @AddressState) address
+accountCreationHack :: EVMBase m => Account -> VMM m ()
+accountCreationHack account = do
+  exists <- isJust <$> A.lookup (A.Proxy @AddressState) account
   when (not exists) $ do
     vmState <- vmstateGet
     when (not $ isNothing $ debugCallCreates vmState) $
-      A.insert (A.Proxy @AddressState) address blankAddressState
+      A.insert (A.Proxy @AddressState) account blankAddressState
 
 
 
@@ -260,20 +262,21 @@ runOperation SHA3 = do
   let theHash = hash theData
   push $ keccak256ToWord256 theHash
 
-runOperation ADDRESS = pushEnvVar envOwner
+runOperation ADDRESS = pushEnvVar $ _accountAddress . envOwner
 
 runOperation BALANCE = do
   address <- pop
-  exists <- isJust <$> A.lookup (A.Proxy @AddressState) address
+  account <- Account address <$> getEnvVar envChainId
+  exists <- isJust <$> A.lookup (A.Proxy @AddressState) account
   if exists
     then push =<< addressStateBalance <$>
-      A.lookupWithDefault (A.Proxy @AddressState) address
+      A.lookupWithDefault (A.Proxy @AddressState) account
     else do
-      accountCreationHack address --needed hack to get the tests working
+      accountCreationHack account --needed hack to get the tests working
       push (0::Word256)
 
-runOperation ORIGIN = pushEnvVar envOrigin
-runOperation CALLER = pushEnvVar envSender
+runOperation ORIGIN = pushEnvVar $ _accountAddress . envOrigin
+runOperation CALLER = pushEnvVar $ _accountAddress . envSender
 runOperation CALLVALUE = pushEnvVar envValue
 
 runOperation CALLDATALOAD = do
@@ -302,7 +305,10 @@ runOperation CODECOPY = do
   memP <- pop
   codeP <- pop
   size <- pop
-  Code c <- getEnvVar envCode
+  code <- getEnvVar envCode
+  let c = case code of
+            Code c' -> c'
+            PtrToCode _ -> ""
 
   mStoreByteString memP $ safeTake size $ safeDrop codeP $ c
 
@@ -311,21 +317,23 @@ runOperation GASPRICE = pushEnvVar envGasPrice
 
 runOperation EXTCODESIZE = do
   address <- pop
-  accountCreationHack address --needed hack to get the tests working
+  account <- Account address <$> getEnvVar envChainId
+  accountCreationHack account --needed hack to get the tests working
   codeHash <- addressStateCodeHash <$>
-    A.lookupWithDefault (A.Proxy @AddressState) address
+    A.lookupWithDefault (A.Proxy @AddressState) account
   code <- getEVMCode' codeHash
   push $ (fromIntegral (B.length code)::Word256)
 
 runOperation EXTCODECOPY = do
   address <- pop
-  accountCreationHack address --needed hack to get the tests working
+  account <- Account address <$> getEnvVar envChainId
+  accountCreationHack account --needed hack to get the tests working
   memOffset <- pop
   codeOffset <- pop
   size <- pop
 
   codeHash <- addressStateCodeHash <$>
-    A.lookupWithDefault (A.Proxy @AddressState) address
+    A.lookupWithDefault (A.Proxy @AddressState) account
   code <- getEVMCode' codeHash
   mStoreByteString memOffset (safeTake size $ safeDrop codeOffset $ code)
 
@@ -344,8 +352,8 @@ runOperation RETURNDATACOPY = do
 runOperation BLOCKHASH = do
   number :: Word256 <- pop
 
-  currentBlock <- getEnvVar envBlockHeader
-  let currentBlockNumber = blockDataNumber currentBlock
+  curBlock <- getEnvVar envBlockHeader
+  let currentBlockNumber = blockDataNumber curBlock
 
   let inRange = not $ toInteger number >= currentBlockNumber ||
                 toInteger number < currentBlockNumber - 256
@@ -355,7 +363,7 @@ runOperation BLOCKHASH = do
   case (inRange, isRunningTests vmState) of
    (False, _) -> push (0::Word256)
    (True, False) -> do
-          maybeBlockHash <- getBlockHashWithNumber (fromIntegral number) (blockDataParentHash currentBlock)
+          maybeBlockHash <- getBlockHashWithNumber (fromIntegral number) (blockDataParentHash curBlock)
           case maybeBlockHash of
            Nothing           -> push (0::Word256)
            Just theBlockHash -> push theBlockHash
@@ -505,7 +513,7 @@ runOperation CREATE = do
         (nonce, balance) <- (addressStateNonce &&& addressStateBalance) <$>
           A.lookupWithDefault (A.Proxy @AddressState) owner
 
-        let newAddress = getNewAddress_unsafe owner nonce
+        let newAddress = getNewAddress_unsafe (owner ^. accountAddress) nonce
 
         if balance < fromIntegral value
           then return Nothing
@@ -518,16 +526,16 @@ runOperation CREATE = do
             ccGasLimit=gr,
             ccValue=fromIntegral value
             }
-          return $ Just newAddress
+          return . Just $ (accountAddress .~ newAddress) owner
 
   case result of
-    Just address -> push address
+    Just account -> push $ account ^. accountAddress
     Nothing       -> push (0::Word256)
 
 runOperation CALL = do
   gas' :: Word256 <- pop
   gas <- downcastGas gas'
-  to <- pop
+  to' <- pop
   value :: Word256 <- pop
   when (value /= 0) guardStorage
   inOffset <- pop
@@ -536,6 +544,7 @@ runOperation CALL = do
   outSize :: Word256 <- pop
 
   owner <- getEnvVar envOwner
+  let to = (accountAddress .~ to') owner
 
   inputData <- unsafeSliceByteString inOffset inSize
   _ <- unsafeSliceByteString outOffset outSize --needed to charge for memory
@@ -582,7 +591,7 @@ runOperation CALL = do
 runOperation CALLCODE = do
   gas' :: Word256 <- pop
   gas <- downcastGas gas'
-  to <- pop
+  to' <- pop
   value :: Word256 <- pop
   inOffset <- pop
   inSize <- pop
@@ -590,6 +599,7 @@ runOperation CALLCODE = do
   outSize :: Word256 <- pop
 
   owner <- getEnvVar envOwner
+  let to = (accountAddress .~ to') owner
 
   inputData <- unsafeSliceByteString inOffset inSize
   _ <- unsafeSliceByteString outOffset outSize --needed to charge for memory
@@ -655,13 +665,14 @@ runOperation DELEGATECALL = do
   if isHomestead
     then do
       gas :: Word256 <- pop
-      to <- pop
+      to' <- pop
       inOffset <- pop
       inSize <- pop
       outOffset <- pop
       outSize :: Word256 <- pop
 
       owner <- getEnvVar envOwner
+      let to = (accountAddress .~ to') owner
       sender <- getEnvVar envSender
 
       inputData <- unsafeSliceByteString inOffset inSize
@@ -723,8 +734,9 @@ runOperation INVALID = throwIO InvalidInstruction
 
 runOperation SUICIDE = do
   guardStorage
-  address <- pop
+  address' <- pop
   owner <- getEnvVar envOwner
+  let address = (accountAddress .~ address') owner
   A.adjustWithDefault_ (A.Proxy @AddressState) owner $ \addressState -> do
     let allFunds = addressStateBalance addressState
     pay' "transferring all funds upon suicide" owner address allFunds
@@ -783,16 +795,16 @@ opGasPriceAndRefund CALL = do
   to :: Word256 <- getStackItem 1
   val :: Word256 <- getStackItem 2
 
-  let toAddr = Address $ fromIntegral to
+  toAcct <- Account (Address $ fromIntegral to) <$> getEnvVar envChainId
 
-  toAccountExists <- isJust <$> A.lookup (A.Proxy @AddressState) toAddr
+  toAccountExists <- isJust <$> A.lookup (A.Proxy @AddressState) toAcct
 
   self <- getEnvVar envOwner -- if an account being created calls itself, the go client doesn't charge the gCALLNEWACCOUNT fee, so we need to check if that case is occurring here
 
   return $ (
     fromIntegral gas +
     fromIntegral gCALL +
-    (if toAccountExists || toAddr == self then 0 else fromIntegral gCALLNEWACCOUNT) +
+    (if toAccountExists || toAcct == self then 0 else fromIntegral gCALLNEWACCOUNT) +
 --                       (if toAccountExists || to < 5 then 0 else gCALLNEWACCOUNT) +
     (if val > 0 then fromIntegral gCALLVALUETRANSFER else 0),
     0)
@@ -940,7 +952,7 @@ runCodeSQLTrace !c = do
   memAfter <- getSizeInWords
   env <- vmstateGets environment
   vmTrace $ "EVM [ eth | " ++ show (callDepth vmState)
-                  ++ " | " ++ formatAddressWithoutColor (envOwner env)
+                  ++ " | " ++ show (envOwner env)
                   ++ " | #" ++ show c
                   ++ " | " ++ map toUpper (showHex pcAfter "") ++ " : " ++ formatOp op
                   ++ " | " ++ show gasAfter
@@ -1011,7 +1023,7 @@ runPrecompiled precompiled = do
 runVMM :: EVMBase m
        => Bool
        -> Bool
-       -> S.Set Address
+       -> S.Set Account
        -> Int
        -> Environment
        -> Gas
@@ -1043,7 +1055,7 @@ runVMM isRunningTests' isHomestead preExistingSuicideList cDepth env availableGa
         , erTrace              = theTrace vmState
         , erLogs               = []
         , erEvents             = []
-        , erNewContractAddress = Nothing
+        , erNewContractAccount = Nothing
         , erSuicideList        = suicideList vmState
         , erAction             = Just $ _action vmState
         , erException          = Just (Right e)
@@ -1051,7 +1063,7 @@ runVMM isRunningTests' isHomestead preExistingSuicideList cDepth env availableGa
         }
     Right _ -> do
       vmState'@VMState{..} <- readIORef vmStateRef
-      setStateDBStateRoot $ vmMemDBs ^. stateRoot
+      traverse_ (uncurry (setStateDBStateRoot . snd)) . M.toList $ vmMemDBs ^. stateRoots
       putMemRawStorageTxMap $ vmMemDBs ^. storageTxMap
       putAddressStateTxDBMap $ vmMemDBs ^. stateTxMap
       when flags_debug $ $logInfoS "runVMM/Right" "VM has finished running"
@@ -1060,22 +1072,27 @@ runVMM isRunningTests' isHomestead preExistingSuicideList cDepth env availableGa
 create :: EVMBase m
        => Bool
        -> Bool
-       -> S.Set Address
+       -> S.Set Account
        -> BlockData
        -> Int
-       -> Address
-       -> Address
+       -> Account
+       -> Account
        -> Integer
        -> Integer
        -> Gas
-       -> Address
+       -> Account
        -> Code
        -> Keccak256
        -> Maybe Word256
        -> Maybe (M.Map T.Text T.Text)
        -> m ExecResults
 create isRunningTests' isHomestead preExistingSuicideList b callDepth sender origin
-       value gasPrice availableGas newAddress initCode txHash chainId metadata = do
+       value gasPrice availableGas newAddress code txHash chainId metadata = do
+  initCode <- Code <$> case code of
+    Code c -> pure c
+    PtrToCode cp -> do
+      codeHash <- resolveCodePtr chainId cp
+      fromMaybe "" <$> traverse getEVMCode' codeHash
   let env =
         Environment{
           envGasPrice = gasPrice,
@@ -1127,7 +1144,7 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth sender ori
       -- Need to zero gas in the case of an exception.
       return execResults{erRemainingTxGas=0, erException=Just e}
     Nothing -> do
-      return execResults{erNewContractAddress=Just newAddress}
+      return execResults{erNewContractAccount=Just newAddress}
 
 create' :: EVMBase m => VMM m Code
 create' = do
@@ -1165,10 +1182,10 @@ create' = do
       return $ Code codeBytes
 
   where
-    assignCode :: EVMBase m => B.ByteString -> Address -> VMM m ()
-    assignCode codeBytes address = do
+    assignCode :: EVMBase m => B.ByteString -> Account -> VMM m ()
+    assignCode codeBytes account = do
       hsh <- addCode EVM codeBytes
-      A.adjustWithDefault_ (A.Proxy @AddressState) address $ \newAddressState ->
+      A.adjustWithDefault_ (A.Proxy @AddressState) account $ \newAddressState ->
         pure newAddressState{addressStateCodeHash=EVMCode hsh}
     assignDetails = do
       vmState <- vmstateGet
@@ -1188,23 +1205,23 @@ call :: EVMBase m
      => Bool
      -> Bool
      -> Bool
-     -> S.Set Address
+     -> S.Set Account
      -> BlockData
      -> Int
-     -> Address
-     -> Address
-     -> Address
+     -> Account
+     -> Account
+     -> Account
      -> Word256
      -> Word256
      -> B.ByteString
      -> Gas
-     -> Address
+     -> Account
      -> Keccak256
      -> Maybe Word256
      -> Maybe (M.Map T.Text T.Text)
      -> m ExecResults
 call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDepth receiveAddress
-     (Address codeAddress) sender value gasPrice theData availableGas origin txHash chainId metadata = do
+     codeAddress sender value gasPrice theData availableGas origin txHash chainId metadata = do
   let env code =
         Environment{
           envGasPrice=fromIntegral gasPrice,
@@ -1221,13 +1238,13 @@ call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDe
           envMetadata = metadata
           }
 
-  case getPrecompiledCode (fromIntegral codeAddress) of
+  case getPrecompiledCode (fromIntegral $ codeAddress ^. accountAddress) of
     Just pc ->
       runVMM isRunningTests' isHomestead preExistingSuicideList callDepth (env $ Code "") availableGas $
         callPrecompiled' noValueTransfer pc
     Nothing -> do
       codeHash <- addressStateCodeHash <$>
-        A.lookupWithDefault (A.Proxy @AddressState) (Address codeAddress)
+        A.lookupWithDefault (A.Proxy @AddressState) codeAddress
       code <- Code <$> getEVMCode' codeHash
       runVMM isRunningTests' isHomestead preExistingSuicideList callDepth (env code) availableGas $
         call' noValueTransfer
@@ -1301,9 +1318,8 @@ callPrecompiled' noValueTransfer precompiled = do
 
   return (fromMaybe B.empty $ returnVal vmState)
 
-create_debugWrapper :: EVMBase m => BlockData -> Address -> Word256 -> B.ByteString -> VMM m (Maybe Address)
+create_debugWrapper :: EVMBase m => BlockData -> Account -> Word256 -> B.ByteString -> VMM m (Maybe Account)
 create_debugWrapper block owner value initCodeBytes = do
-
   balance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy @AddressState) owner
 
   if fromIntegral value > balance
@@ -1347,7 +1363,7 @@ create_debugWrapper block owner value initCodeBytes = do
         Mod.put (Mod.Proxy @MemDBs) mdbs
         pure (ers, mdbs')
 
-      setStateDBStateRoot $ finalDBs ^. stateRoot
+      traverse_ (uncurry (setStateDBStateRoot . snd)) . M.toList $ finalDBs ^. stateRoots
       putMemRawStorageTxMap $ finalDBs ^. storageTxMap
       putAddressStateTxDBMap $ finalDBs ^. stateTxMap
       setGasRemaining $ fromIntegral $ erRemainingTxGas execResults
@@ -1365,8 +1381,8 @@ create_debugWrapper block owner value initCodeBytes = do
 
           return $ Just newAddress
 
-nestedRun_debugWrapper :: EVMBase m => Bool -> Gas -> Address -> Address -> Address -> Word256 -> B.ByteString -> VMM m (Int, Maybe BSS.ShortByteString)
-nestedRun_debugWrapper noValueTransfer gas receiveAddress (Address address) sender value inputData = do
+nestedRun_debugWrapper :: EVMBase m => Bool -> Gas -> Account -> Account -> Account -> Word256 -> B.ByteString -> VMM m (Int, Maybe BSS.ShortByteString)
+nestedRun_debugWrapper noValueTransfer gas receiveAddress owner sender value inputData = do
 
   currentCallDepth <- getCallDepth
 
@@ -1384,7 +1400,7 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress (Address address) send
                 (envBlockHeader env)
                 (currentCallDepth+1)
                 receiveAddress
-                (Address address)
+                owner
                 sender
                 value
                 (fromIntegral $ envGasPrice env)
@@ -1398,7 +1414,7 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress (Address address) send
     Mod.put (Mod.Proxy @MemDBs) mdbs
     pure (ers, mdbs')
 
-  setStateDBStateRoot $ finalDBs ^. stateRoot
+  traverse_ (uncurry (setStateDBStateRoot . snd)) . M.toList $ finalDBs ^. stateRoots
   putMemRawStorageTxMap $ finalDBs ^. storageTxMap
   putAddressStateTxDBMap $ finalDBs ^. stateTxMap
 
@@ -1441,7 +1457,7 @@ vmStateToExecResults vmState = do
       , erLogs               = logs vmState
       , erEvents             = []
       -- I think erNewContractAddress should be Nothing if there is an error
-      , erNewContractAddress = Nothing
+      , erNewContractAccount = Nothing
       , erSuicideList        = suicideList vmState
       , erAction             = Just $ _action vmState
       , erException          = Nothing

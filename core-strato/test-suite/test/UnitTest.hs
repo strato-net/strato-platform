@@ -7,7 +7,7 @@ import qualified Data.ByteString.Lazy.Char8 as C8
 import Text.InterpolatedString.Perl6
 import Test.Hspec
 
-import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Code
 
 import Blockchain.VM.TestDescriptions
@@ -78,7 +78,7 @@ spec = describe "Test Files" $ do
             let want = M.singleton "address0" Test {
                        callcreates = Just []
                      , env = Env
-                        { currentCoinbase =  0x2adc25665018aa1fe0e6bc666dac8fc2697ff9ba
+                        { currentCoinbase =  Account 0x2adc25665018aa1fe0e6bc666dac8fc2697ff9ba Nothing
                         , currentDifficulty =  "0x0100"
                         , currentGasLimit =  0x0f4240
                         , currentNumber =  "0x00"
@@ -88,23 +88,23 @@ spec = describe "Test Files" $ do
                     , out = RawData BS.empty
                     , remainingGas = Just 0x17487699db
                     , theInput = IExec Exec {
-                          address' = 0x0f572e5295c57f15886f9b263e2f6d2d6c7b5ec6
-                        , caller = 0xcd1722f3947def4cf144679da39c4c32bdc35681
+                          account' = Account 0x0f572e5295c57f15886f9b263e2f6d2d6c7b5ec6 Nothing
+                        , caller = Account 0xcd1722f3947def4cf144679da39c4c32bdc35681 Nothing
                         , code = Code . BS.pack $ [0x30, 0x60, 0x00, 0x55]
                         , data' = RawData BS.empty
                         , gas' = "0x174876e800"
                         , gasPrice' = "0x3b9aca00"
-                        , origin = 0xcd1722f3947def4cf144679da39c4c32bdc35681
+                        , origin = Account 0xcd1722f3947def4cf144679da39c4c32bdc35681 Nothing
                         , value' = "0x0de0b6b3a7640000"
                         }
-                    , pre = M.singleton 0x0f572e5295c57f15886f9b263e2f6d2d6c7b5ec6
+                    , pre = M.singleton (Account 0x0f572e5295c57f15886f9b263e2f6d2d6c7b5ec6 Nothing)
                         AddressState'
                           { balance' = 0x152d02c7e14af6800000
                           , contractCode' = Code .BS.pack $ [0x30, 0x60, 0x00, 0x55]
                           , nonce' = 0
                           , storage' = M.empty
                           }
-                    , post = M.singleton 0x0f572e5295c57f15886f9b263e2f6d2d6c7b5ec6
+                    , post = M.singleton (Account 0x0f572e5295c57f15886f9b263e2f6d2d6c7b5ec6 Nothing)
                         AddressState'
                           { balance' = 0x152d02c7e14af6800000
                           , contractCode' = Code . BS.pack $ [0x30, 0x60, 0x00, 0x55]
@@ -118,4 +118,4 @@ spec = describe "Test Files" $ do
          it "can parse vm test addresses" $ do
 
             eitherDecode (C8.pack "\"0x0f572e5295c57f15886f9b263e2f6d2d6c7b5ec6\"")
-              `shouldBe` Right (Address 0x0f572e5295c57f15886f9b263e2f6d2d6c7b5ec6)
+              `shouldBe` Right (Account 0x0f572e5295c57f15886f9b263e2f6d2d6c7b5ec6 Nothing)

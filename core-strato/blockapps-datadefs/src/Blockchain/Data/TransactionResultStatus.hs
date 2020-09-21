@@ -25,6 +25,7 @@ data TransactionFailureType = IncorrectChainId
                             | IntrinsicGasExceedsLimit
                             | TrumpedByMoreLucrative
                             | ExecutionFailure String
+                            | MissingCode
                             deriving (Eq, Read, Show, Generic, NFData)
 
 derivePersistField "TransactionResultStatus"

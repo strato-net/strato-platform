@@ -51,10 +51,10 @@
     "unix-time": "1.0.1"
   },
   "devDependencies": {
-    "@babel/core": "^7.8.3",
-    "@babel/plugin-proposal-object-rest-spread": "^7.8.3",
-    "@babel/preset-env": "^7.8.3",
-    "@babel/register": "^7.8.3",
+    "@babel/core": "^7.8.4",
+    "@babel/plugin-proposal-object-rest-spread": "^7.8.4",
+    "@babel/preset-env": "^7.8.4",
+    "@babel/register": "^7.8.4",
     "babel-preset-minify": "^0.5.1",
     "eslint": "^4.19.1",
     "eslint-config-airbnb": "^17.0.0",

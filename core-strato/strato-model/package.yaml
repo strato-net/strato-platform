@@ -37,6 +37,7 @@ library:
     - containers
     - cpu
     - cryptonite
+    - data-default
     - deepseq
     - derive
     - ethereum-rlp
@@ -48,6 +49,7 @@ library:
     - integer-gmp
     - lens
     - memory
+    - monad-alter
     - nibblestring
     - quickcheck-instances
     - path-pieces

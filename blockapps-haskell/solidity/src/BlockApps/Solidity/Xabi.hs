@@ -27,8 +27,8 @@ import           Test.QuickCheck.Instances    ()
 
 import qualified BlockApps.Solidity.Xabi.Def  as Xabi
 import qualified BlockApps.Solidity.Xabi.Type as Xabi hiding (Enum)
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Keccak256
 
@@ -324,38 +324,40 @@ instance ToSchema Using where
 
 data ContractDetails = ContractDetails
   { contractdetailsBin        :: Text
-  , contractdetailsAddress    :: Maybe Address
+  , contractdetailsAccount    :: Maybe Account
   , contractdetailsBinRuntime :: Text
   , contractdetailsCodeHash   :: CodePtr
   , contractdetailsName       :: Text
   , contractdetailsSrc        :: Text
   , contractdetailsXabi       :: Xabi
-  , contractdetailsChainId    :: Maybe ChainId
   } deriving (Show,Eq,Generic,NFData)
 
 instance ToJSON ContractDetails where
-  toJSON ContractDetails{..} = object
+  toJSON ContractDetails{..} = object $
     [ "bin" .= contractdetailsBin
-    , "address" .= contractdetailsAddress
+    , "address" .= fmap _accountAddress contractdetailsAccount
+    , "chainId" .= fmap _accountChainId contractdetailsAccount
     , "bin-runtime" .= contractdetailsBinRuntime
     , "codeHash" .= contractdetailsCodeHash
     , "name" .= contractdetailsName
     , "src" .= contractdetailsSrc
     , "xabi" .= contractdetailsXabi
-    , "chainId" .= contractdetailsChainId
     ]
 
 instance FromJSON ContractDetails where
   parseJSON = withObject "ContractDetails" $ \obj ->
     ContractDetails
       <$> obj .: "bin"
-      <*> obj .:? "address"
+      <*> (do
+        mAddr <- obj .:? "address"
+        case mAddr of
+          Nothing -> pure Nothing
+          Just addr -> Just . Account addr <$> (obj .:? "chainId"))
       <*> obj .: "bin-runtime"
       <*> obj .: "codeHash"
       <*> obj .: "name"
       <*> obj .: "src"
       <*> obj .: "xabi"
-      <*> obj .:? "chainId"
 
 instance ToSample ContractDetails where toSamples _ = noSamples
 
@@ -371,13 +373,12 @@ instance ToSchema ContractDetails where
       ex :: ContractDetails
       ex = ContractDetails
         { contractdetailsBin = "ContractBin"
-        , contractdetailsAddress = Just (Address 0xdeadbeef)
+        , contractdetailsAccount = Just $ Account (Address 0xdeadbeef) Nothing
         , contractdetailsBinRuntime = "ContractRuntime"
         , contractdetailsCodeHash = EVMCode $ unsafeCreateKeccak256FromWord256 0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365
         , contractdetailsName = "DetailsName"
         , contractdetailsSrc = "contract DetailsName { }"
         , contractdetailsXabi = sampleXabi
-        , contractdetailsChainId = Nothing
         }
 
 --------------------------------------------------------------------------------

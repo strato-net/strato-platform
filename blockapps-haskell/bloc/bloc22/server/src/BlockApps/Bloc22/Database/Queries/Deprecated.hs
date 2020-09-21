@@ -30,8 +30,7 @@ import           BlockApps.Bloc22.Monad
 import           BlockApps.Solidity.Xabi
 import qualified BlockApps.Solidity.Xabi.Def     as Xabi.Def
 import qualified BlockApps.Solidity.Xabi.Type    as Xabi
-import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.Account
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 
@@ -197,7 +196,7 @@ getXabiType typeId = do
     "Bool" ->
       return Xabi.Bool
     "Address" ->
-      return Xabi.Address
+      return Xabi.Account
     "Struct" -> do
       xttd' <- blocMaybe "Missing typedef in type Struct" xttd
       return $ Xabi.Struct xtby xttd'
@@ -260,9 +259,9 @@ getXabiTypeDefs metadataId = do
         "Invalid type def. Expected Struct or Enum, saw " <> ty
 
 getContractXabiDeprecated ::
-                   ContractName -> Address -> Maybe ChainId -> Bloc Xabi
-getContractXabiDeprecated (ContractName contractName) contractId chainId = do
-  mCmId <- getContractsMetaDataId contractName contractId chainId
+                   ContractName -> Account -> Bloc Xabi
+getContractXabiDeprecated (ContractName contractName) contractId = do
+  mCmId <- getContractsMetaDataId contractName contractId
   case mCmId of
     Nothing -> return xabiEmpty
     Just cmId -> getContractXabiFromMetaDataIdDeprecated cmId
