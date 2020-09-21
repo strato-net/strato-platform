@@ -670,6 +670,7 @@ getIndexType (AccountPath addr p) = do
          Xabi.Mapping{Xabi.key=Xabi.Int{}} -> MapIntIndex
          Xabi.Mapping{Xabi.key=Xabi.String{}} -> MapStringIndex
          Xabi.Mapping{Xabi.key=Xabi.Bytes{}} -> MapStringIndex
+         Xabi.Mapping{Xabi.key=Xabi.Address{}} -> MapAccountIndex
          Xabi.Mapping{Xabi.key=Xabi.Account{}} -> MapAccountIndex
          Xabi.Mapping{Xabi.key=Xabi.Bool{}} -> MapBoolIndex
          Xabi.Array{} -> ArrayIndex

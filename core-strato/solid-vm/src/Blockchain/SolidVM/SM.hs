@@ -516,6 +516,7 @@ getCurrentCodeCollection = do
 
 hintFromType :: MonadSM m => Xabi.Type -> m BasicType
 hintFromType = \case
+ Xabi.Address{} -> return TAccount
  Xabi.Account{} -> return TAccount
  Xabi.Bool{} -> return TBool
  Xabi.Bytes{} -> return TString

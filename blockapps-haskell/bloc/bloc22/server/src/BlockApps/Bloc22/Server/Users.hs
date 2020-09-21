@@ -48,6 +48,7 @@ import           Data.Traversable
 import           Database.PostgreSQL.Simple        (SqlError(..))
 import           Opaleye                           hiding (not, null, index, max)
 import           Text.Format
+import           Text.Read                         (readMaybe)
 import           System.Clock
 import           UnliftIO
 
@@ -811,15 +812,14 @@ contractResult :: Keccak256
 contractResult txHash mtxr cmId name = do
   let
     Just txResult = mtxr
-    chainId = transactionResultChainId txResult
     accountMaybe = do
       str <- listToMaybe $
         Text.splitOn "," (Text.pack $ transactionResultContractsCreated txResult)
-      flip Account chainId <$> stringAddress (Text.unpack str)
+      readMaybe (Text.unpack str)
   case accountMaybe of
     Nothing -> case transactionResultMessage txResult of
       "Success!" -> do
-        let mDelAddr = stringAddress . Text.unpack =<<
+        let mDelAddr = readMaybe @Account . Text.unpack =<<
               (listToMaybe . Text.splitOn "," . Text.pack $ transactionResultContractsDeleted txResult)
         case mDelAddr of
           Just _ -> lift $ throwIO $ UserError "Contract failed to upload, likely because the constructor threw"

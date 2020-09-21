@@ -274,10 +274,10 @@ initializeChainDBs :: ( MonadLogger m
                       )
                    => Maybe Ext.Word256
                    -> ChainInfo
-                   -> StateRoot
                    -> m ()
-initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) sRoot = do
-  genAddrStates <- getAllAddressStatesFromStateRoot chainId sRoot
+initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) = do
+  sRoot <- A.lookupWithDefault (A.Proxy @StateRoot) chainId
+  genAddrStates <- getAllAddressStates chainId
   accountDiffs <- mapM eventualAccountState . Map.fromList $ genAddrStates
   let diff = StateDiff {
       StateDiff.chainId   = chainId,

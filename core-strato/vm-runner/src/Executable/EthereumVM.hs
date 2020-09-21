@@ -178,7 +178,7 @@ handleVmEvents = awaitForever $ \InBatch{..} -> do
 insertNewChains :: (
                    )
                 => [OutputGenesis]
-                -> ContextM [(Word256, ChainInfo, MP.StateRoot, [Action])]
+                -> ContextM [(Word256, ChainInfo, Keccak256, [Action])]
 insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
   let (cId, cInfo) = ogGenesisInfo
   $logInfoS "insertNewChains" $ T.pack $ "Inserting Chain ID: " ++ CL.yellow (format cId)
@@ -201,12 +201,12 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
           case theVM of
             "SolidVM" -> runChainConstructors cId cInfo
             _ -> return (sr', [])
-        Just (cId, cInfo, sr, mAction) <$ putChainGenesisInfo (Just cId) cBlock sr pChain
+        Just (cId, cInfo, bHash, mAction) <$ putChainGenesisInfo (Just cId) cBlock sr pChain
 
-outputNewChains :: [(Word256, ChainInfo, MP.StateRoot, [Action])] -> ConduitT a VmOutEvent ContextM ()
-outputNewChains = traverse_ $ \(cId, cInfo, sr, actions) -> do
+outputNewChains :: [(Word256, ChainInfo, Keccak256, [Action])] -> ConduitT a VmOutEvent ContextM ()
+outputNewChains = traverse_ $ \(cId, cInfo, bHash, actions) -> do
   yield . OutIndexEvent $ NewChainInfo cId cInfo
-  yield $ OutToStateDiff cId cInfo sr
+  yield $ OutToStateDiff cId cInfo bHash
   for_ actions $ yield . OutAction
 
 processBlocks :: (VMBase m, Bagger.MonadBagger m, MonadMonitor m)
@@ -431,7 +431,8 @@ sendOutEvents OutBatch{..} = do
     void . K.withKafkaRetry1s . produceUnminedBlocksM $
       outputBlockToBlock <$> toList outBlocks
   void . K.withKafkaRetry1s . writeIndexEvents $ toList outIndexEvents
-  for_ outToStateDiffs $ uncurry3 (initializeChainDBs . Just) -- only needed to update Postgres with chain info for API calls
+  for_ outToStateDiffs $ \(cId, cInfo, bHash) ->
+    withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo
   traverse_ commitSqlDiffs outStateDiffs
   loopTimeit "flushLogEntries" $ do
     void . K.withKafkaRetry1s $ writeIndexEvents (LogDBEntry <$> toList outLogs)

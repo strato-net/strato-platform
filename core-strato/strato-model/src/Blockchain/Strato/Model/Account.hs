@@ -26,7 +26,6 @@ module Blockchain.Strato.Model.Account
 
 import           Control.DeepSeq
 import           Control.Lens
--- import           Control.Monad                        ((<=<))
 import qualified Data.Aeson                           as AS
 import           Data.Aeson.Types
 import qualified Data.Aeson.Encoding                  as Enc
@@ -36,7 +35,7 @@ import           Data.Hashable
 import           Data.Swagger                         hiding (Format, format, get, put)
 import qualified Data.Swagger                         as Sw
 import qualified Data.Text                            as T
-import           Database.Persist.Sql                 hiding (get)
+import           Database.Persist.TH
 import           GHC.Generics
 import           Network.Haskoin.Crypto               hiding (Address, Word160)
 import           Servant.API
@@ -73,7 +72,7 @@ instance Show Account where
   show (Account a (Just cid)) = (printf "%040x" a) ++ ":" ++ (printf "%064x" (toInteger cid))
 
 instance Read Account where
-  readsPrec _ s = case splitAt 40 s of
+  readsPrec _ s = case span (/= ':') s of
     (mAddr, mRem) -> case stringAddress mAddr of
       Nothing -> []
       Just addr -> case mRem of
@@ -116,16 +115,7 @@ fromJSONEither v = case AS.fromJSON v of
     AS.Error s -> Left (T.pack s)
     AS.Success a -> Right a
 
-instance PersistField Account where
-  toPersistValue = PersistText . T.pack . show
-  fromPersistValue (PersistText t) = fromJSONEither $ String t
-  fromPersistValue x = Left . T.pack $ "PersistField Account: expected PersistText: " ++ show x
-
-instance PersistFieldSql Account where
-  sqlType _ = SqlOther "text"
---  sqlType _ = SqlOther "varchar(64)"
-
-------------------------------------
+derivePersistField "Account"
 
 instance FromHttpApiData Account where
   parseQueryParam = fromJSONEither . String
@@ -211,7 +201,7 @@ instance Show NamedAccount where
   show (NamedAccount a (ExplicitChain cid)) = (printf "%040x" a) ++ ":" ++ (printf "%064x" (toInteger cid))
 
 instance Read NamedAccount where
-  readsPrec _ s = case splitAt 40 s of
+  readsPrec _ s = case span (/= ':') s of
     (mAddr, mRem) -> case stringAddress mAddr of
       Nothing -> []
       Just addr -> case mRem of
