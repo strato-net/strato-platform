@@ -22,6 +22,9 @@ start = defaultGenesisInfo
 emptySource :: T.Text
 emptySource = "contract x {}"
 
+emptySourceHash :: Keccak256
+emptySourceHash = unsafeCreateKeccak256FromWord256 0xc4295782f7f9af2134f7beb6b68eedcd32a5a44f8fbcc68d87e663d1d56b3d4f
+
 emptyContractB16 :: BS.ByteString
 emptyContractB16 = "60606040525b600080fd00a165627a7a723058209b97b86115f9dfccb5f10ab93044730e948264e405825b26dccd1605775663710029"
 
@@ -66,7 +69,7 @@ spec = do
 
     it "should insert 1 contract" $
       let input = defaultGenesisInfo
-          want = [ContractWithStorage sharedStart 0 (EVMCode emptyHash) []]
+          want = [ContractWithStorage sharedStart 0 (EVMCode emptySourceHash) []]
           got = insertContracts [[]] "x" emptySource emptyContractB16 sharedStart input
       in genesisInfoAccountInfo got `shouldBe` want
 
@@ -74,7 +77,7 @@ spec = do
       let total = 1000000 :: Int
           slots = replicate total []
           input = defaultGenesisInfo
-          want = map (\n -> ContractWithStorage (sharedStart + fromIntegral n) 0 (EVMCode emptyHash) [])  [0..total-1]
+          want = map (\n -> ContractWithStorage (sharedStart + fromIntegral n) 0 (EVMCode emptySourceHash) [])  [0..total-1]
           got = insertContracts slots "x" emptySource emptyContractB16 sharedStart input
       in genesisInfoAccountInfo got `shouldBe` want
 
