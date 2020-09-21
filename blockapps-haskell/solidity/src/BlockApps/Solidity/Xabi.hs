@@ -333,9 +333,10 @@ data ContractDetails = ContractDetails
   } deriving (Show,Eq,Generic,NFData)
 
 instance ToJSON ContractDetails where
-  toJSON ContractDetails{..} = object
+  toJSON ContractDetails{..} = object $
     [ "bin" .= contractdetailsBin
-    , "address" .= contractdetailsAccount
+    , "address" .= fmap _accountAddress contractdetailsAccount
+    , "chainId" .= fmap _accountChainId contractdetailsAccount
     , "bin-runtime" .= contractdetailsBinRuntime
     , "codeHash" .= contractdetailsCodeHash
     , "name" .= contractdetailsName
@@ -347,7 +348,11 @@ instance FromJSON ContractDetails where
   parseJSON = withObject "ContractDetails" $ \obj ->
     ContractDetails
       <$> obj .: "bin"
-      <*> (obj .:? "address")
+      <*> (do
+        mAddr <- obj .:? "address"
+        case mAddr of
+          Nothing -> pure Nothing
+          Just addr -> Just . Account addr <$> (obj .:? "chainId"))
       <*> obj .: "bin-runtime"
       <*> obj .: "codeHash"
       <*> obj .: "name"
