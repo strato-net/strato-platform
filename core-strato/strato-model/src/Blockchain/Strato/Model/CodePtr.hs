@@ -15,7 +15,7 @@ import              Control.DeepSeq
 import              Control.Lens                         ((?~), (&))
 import qualified    Data.Aeson                           as Ae
 import qualified    Data.Aeson.Types                     as Ae
-import              Data.Bifunctor                       (first)
+import              Data.Bifunctor                       (bimap, first)
 import              Data.Binary
 import              Data.Data
 import              Data.Hashable                        (Hashable)
@@ -104,7 +104,7 @@ instance PersistField CodePtr where
           Right r -> Right r
           Left _ -> case span (/= '@') s of
             (name, '@':acct) -> first T.pack $ flip CodeAtAccount name <$> readEither acct
-            (_,_) -> Left $ "PersistField CodePtr: could not parse: " <> t
+            (_,_) -> bimap T.pack EVMCode $ readEither s
   fromPersistValue x = Left $ T.pack $ "PersistField CodePtr: expected text: " ++ (show x)
 
 instance PersistFieldSql CodePtr where
