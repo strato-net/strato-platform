@@ -21,22 +21,6 @@ pipeline {
           }
         }
       }
-
-    stage('Deploy') {
-      agent { label 'dev-website' }
-      steps {
-        withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER')]) {
-          sh '''#!/bin/bash -le
-            docker rmi -f repo.blockapps.net:5000/dev-website:previous || true
-            docker tag repo.blockapps.net:5000/dev-website:latest repo.blockapps.net:5000/dev-website:previous || true
-            docker login -u $DOCKER_USER -p $DOCKER_PASSWD repo.blockapps.net:5000
-            docker pull repo.blockapps.net:5000/dev-website
-            docker rm -f dev-website || true
-            docker run --name dev-website --restart=always -d -p 8080:80 repo.blockapps.net:5000/dev-website
-          '''
-        }
-      }
-    }
   }
 
   post {
