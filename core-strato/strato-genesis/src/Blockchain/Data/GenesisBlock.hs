@@ -277,7 +277,7 @@ initializeChainDBs :: ( MonadLogger m
                    -> StateRoot
                    -> m ()
 initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) sRoot = do
-  genAddrStates <- getAllAddressStates chainId
+  genAddrStates <- getAllAddressStatesFromStateRoot chainId sRoot
   accountDiffs <- mapM eventualAccountState . Map.fromList $ genAddrStates
   let diff = StateDiff {
       StateDiff.chainId   = chainId,

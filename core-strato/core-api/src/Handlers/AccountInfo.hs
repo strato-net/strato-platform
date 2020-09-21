@@ -30,6 +30,7 @@ import           Numeric.Natural
 import           Servant
 import           Servant.Client
 --import           Servant.Swagger.Tags
+import           UnliftIO
 
 
 import           Blockchain.Data.Address
@@ -39,9 +40,10 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.CodePtr
 
-import           Settings
+import           Options
+
 import           SQLM
-import           UnliftIO
+
 {-
 -- TODO: Remove once https://github.com/nakaji-dayo/servant-swagger-tags/pull/1 is merged
 instance HasClient m api => HasClient m (Tags tags :> api) where
@@ -149,7 +151,7 @@ instance Selectable AccountsFilterParams [AddressStateRef] SQLM where
 
       E.where_ (foldl1 (E.||.) (map (foldl1 (E.&&.)) allCriteria))
 
-      E.limit $ appFetchLimit
+      E.limit $ fromIntegral flags_appFetchLimit
 
       E.orderBy [E.asc (accStateRef E.^. AddressStateRefAddress)]
       return accStateRef

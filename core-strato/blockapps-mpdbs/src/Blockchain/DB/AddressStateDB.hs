@@ -18,6 +18,7 @@ module Blockchain.DB.AddressStateDB (
   getAddressState,
   getAddressStateMaybe,
   getAllAddressStates,
+  getAllAddressStatesFromStateRoot,
   putAddressState,
   deleteAddressState,
   addressStateExists,
@@ -68,8 +69,10 @@ getAddressStateMaybe (Account address chainId) = do
   return $ rlpDecode . rlpDeserialize . rlpDecode <$> mState
 
 getAllAddressStates::(HasHashDB m, HasStateDB m) => Maybe Word256 -> m [(Account, AddressState)]
-getAllAddressStates chainId = do
-  sr <- getStateRoot chainId
+getAllAddressStates chainId = getAllAddressStatesFromStateRoot chainId =<< getStateRoot chainId
+
+getAllAddressStatesFromStateRoot :: (HasHashDB m, HasStateDB m) => Maybe Word256 -> MP.StateRoot -> m [(Account, AddressState)]
+getAllAddressStatesFromStateRoot chainId sr = do
   mapM convert =<< MP.unsafeGetAllKeyVals sr
   where
     convert :: (HasHashDB m) => (N.NibbleString, RLPObject) -> m (Account, AddressState)

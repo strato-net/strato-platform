@@ -25,7 +25,7 @@ simpleTypeExpression = try arrayType <|> simpleType <|> mappingType
 simpleType :: SolidityParser Xabitype.Type
 simpleType =
   simple "bool" Xabitype.Bool <|>
-  simple "address" Xabitype.Account <|>
+  simple "address" Xabitype.Address <|>
   simple "account" Xabitype.Account <|>
   simple "string" (Xabitype.String $ Just True) <|>
   bytes' <|>
