@@ -37,12 +37,14 @@ import           Blockchain.Data.Enode
 import           Blockchain.TypeLits
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.CodePtr
 
 --------------------------------------------------------------------------------
 -- | Routes and types
 --------------------------------------------------------------------------------
 data ChainInput  = ChainInput
   { chaininputSrc      :: Maybe Text
+  , chaininputCodePtr  :: Maybe CodePtr
   , chaininputContract :: Maybe Text
   , chaininputLabel    :: Text
   , chaininputBalances :: NamedMap "address" "balance" Address Integer
@@ -89,6 +91,7 @@ exampleEnode2 = Enode (OrgId "6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6
 exChainInput :: ChainInput
 exChainInput = ChainInput
     { chaininputSrc = Just exampleSrc
+    , chaininputCodePtr = Nothing
     , chaininputContract = Just "Governance"
     , chaininputLabel = "my chain"
     , chaininputBalances = map (NamedTuple @"address" @"balance") [

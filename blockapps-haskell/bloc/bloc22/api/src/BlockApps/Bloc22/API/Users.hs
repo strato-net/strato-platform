@@ -41,6 +41,7 @@ import           BlockApps.Strato.Types (Strung(..))
 import qualified BlockApps.Strato.Types as Deprecated
 
 import           Blockchain.Data.DataDefs
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.CodePtr
@@ -117,13 +118,12 @@ instance ToSample BlocTransactionData where
       }
     , Upload ContractDetails {
         contractdetailsBin        = "Contract Bin"
-      , contractdetailsAddress    = Just (Address 0xdeadbeef)
+      , contractdetailsAccount    = Just $ Account (Address 0xdeadbeef) Nothing
       , contractdetailsBinRuntime = "Contract Bin Runtime"
       , contractdetailsCodeHash   = EVMCode $ hash "Contract Code Hash"
       , contractdetailsName       = "Example"
       , contractdetailsSrc        = "contract Example { }"
       , contractdetailsXabi       = sampleXabi
-      , contractdetailsChainId    = Nothing
       }
     , Call [] -- probably make a better Call sample
     ]

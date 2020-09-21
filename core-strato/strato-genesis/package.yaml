@@ -29,6 +29,7 @@ library:
       - entropy
       - format
       - json-stream
+      - lens
       - monad-alter
       - scientific
       - split

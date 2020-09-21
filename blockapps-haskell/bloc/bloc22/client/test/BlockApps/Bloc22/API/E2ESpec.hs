@@ -30,6 +30,7 @@ import           BlockApps.Strato.Types
 
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Gas
 import qualified Blockchain.Strato.Model.Keccak256 as KECCAK256
@@ -125,7 +126,7 @@ spec =
       let
         Right result = postUsersContractEither
         Just (Upload contractDetails) = blocTransactionData result
-        Just (contractAddr) = contractdetailsAddress contractDetails
+        Just (contractAddr) = _accountAddress <$> contractdetailsAccount contractDetails
       -- get contract state
 
       contractStateEither <- runClientM
@@ -249,7 +250,7 @@ spec =
                         (ClientEnv mgr blocUrl Nothing)
                       )
             let Just (Upload contractDetails) = blocTransactionData result
-                Just (contractAddr) = contractdetailsAddress contractDetails
+                Just (contractAddr) = _accountAddress <$> contractdetailsAccount contractDetails
             return contractAddr
       let contractState ctName addr = fromEither =<<
                                       runClientM
@@ -331,7 +332,7 @@ spec =
       let
         Right result = postUsersContractEither
         Just (Upload contractDetails) = blocTransactionData result
-        Just (contractAddr) = contractdetailsAddress contractDetails
+        Just (contractAddr) = _accountAddress <$> contractdetailsAccount contractDetails
 
       -- get contract state
 
@@ -449,7 +450,7 @@ spec =
       let
         Right result = postUsersContractEither
         Just (Upload contractDetails) = blocTransactionData result
-        Just (contractAddr) = contractdetailsAddress contractDetails
+        Just (contractAddr) = _accountAddress <$> contractdetailsAccount contractDetails
 
       -- get contract state
 
@@ -616,10 +617,10 @@ spec =
         (postUsersContract userName userAddress Nothing True sameName2ContractRequest)
         (ClientEnv mgr blocUrl Nothing)
       Right sameName1Symbols <- runClientM
-        (getContractsSymbols "SameName" (fromJust $ contractdetailsAddress sameName1Details) Nothing)
+        (getContractsSymbols "SameName" (fromJust $ _accountAddress <$> contractdetailsAccount sameName1Details) Nothing)
         (ClientEnv mgr blocUrl Nothing)
       Right sameName2Symbols <- runClientM
-        (getContractsSymbols "SameName" (fromJust $ contractdetailsAddress sameName2Details) Nothing)
+        (getContractsSymbols "SameName" (fromJust $ _accountAddress <$> contractdetailsAccount sameName2Details) Nothing)
         (ClientEnv mgr blocUrl Nothing)
       sameName1Symbols `shouldBe` [SymbolName "myString"]
       sameName2Symbols `shouldBe` [SymbolName "myInt"]
@@ -661,7 +662,7 @@ spec =
       let
         Right result = postUsersContractEither
         Just (Upload contractDetails) = blocTransactionData result
-        Just (contractAddr) = contractdetailsAddress contractDetails
+        Just (contractAddr) = _accountAddress <$> contractdetailsAccount contractDetails
 
       -- get contract state
 
@@ -922,7 +923,7 @@ spec =
       let
         Right result = postUsersContractEither
         Just (Upload contractDetails) = blocTransactionData result
-        Just (contractAddr) = contractdetailsAddress contractDetails
+        Just (contractAddr) = _accountAddress <$> contractdetailsAccount contractDetails
 
       -- get contract state
 
@@ -1044,7 +1045,7 @@ spec =
       let
         Right result = postUsersContractEither
         Just (Upload contractDetails) = blocTransactionData result
-        Just (contractAddr) = contractdetailsAddress contractDetails
+        Just (contractAddr) = _accountAddress <$> contractdetailsAccount contractDetails
 
 
       -- -- call contract store value
@@ -1135,7 +1136,7 @@ spec =
       let
         Right result = postUsersContractEither
         Just (Upload contractDetails) = blocTransactionData result
-        Just (contractAddr) = contractdetailsAddress contractDetails
+        Just (contractAddr) = _accountAddress <$> contractdetailsAccount contractDetails
 
       -- call get value and verify
 
@@ -1231,7 +1232,7 @@ spec =
       let
         Right result = postUsersContractEither
         Just (Upload contractDetails) = blocTransactionData result
-        Just (iamAddr) = contractdetailsAddress contractDetails
+        Just (iamAddr) = _accountAddress <$> contractdetailsAccount contractDetails
         bobName = UserName "bob"
       postBobEither <- runClientM (postUsersUser bobName pw) (ClientEnv mgr blocUrl Nothing)
       postBobEither `shouldSatisfy` isRight
@@ -1310,7 +1311,7 @@ spec =
       let
         Right result = postUsersContractEither
         Just (Upload contractDetails) = blocTransactionData result
-        Just (contractAddr) = contractdetailsAddress contractDetails
+        Just (contractAddr) = _accountAddress <$> contractdetailsAccount contractDetails
 
       -- call get value and verify
 

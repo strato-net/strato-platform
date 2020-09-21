@@ -36,10 +36,10 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Keccak256 hiding (hash)
+import           Options
 
 import           SQLM
 
-import           Settings
 import           SortDirection
 import           UnliftIO
 
@@ -148,7 +148,7 @@ instance Selectable BlocksFilterParams [Block] SQLM where
             
             E.where_ (foldl1 (E.&&.) criteria)
 
-            E.limit $ appFetchLimit
+            E.limit $ fromIntegral flags_appFetchLimit
 
             E.distinctOnOrderBy [sortToOrderBy qbSortby $ bdRef E.^. BlockDataRefNumber] (return bdRef)
 

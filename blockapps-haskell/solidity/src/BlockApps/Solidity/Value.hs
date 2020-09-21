@@ -28,6 +28,7 @@ import           Text.Read
 import           BlockApps.Solidity.Type
 import           BlockApps.Solidity.TypeDefs
 
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 
@@ -52,7 +53,7 @@ data Value
   = SimpleValue SimpleValue
   | ValueArrayDynamic (I.IntMap Value) -- A sparse representation makes updates more efficient than O(n)
   | ValueArrayFixed Word [Value]
-  | ValueContract Address
+  | ValueContract NamedAccount
   | ValueEnum Text Text Word256
   | ValueFunction ByteString [(Text, Type)] [(Maybe Text, Type)]
   | ValueMapping (Map.Map SimpleValue Value)
@@ -63,6 +64,7 @@ data Value
 data SimpleValue
   = ValueBool Bool
   | ValueAddress Address
+  | ValueAccount NamedAccount
   | ValueString Text
   | ValueInt { intSigned :: Bool
              , intSize   :: Maybe Integer
@@ -78,10 +80,11 @@ zeroOf = \case
   SimpleValue sv -> SimpleValue $ case sv of
     ValueBool{} -> ValueBool False
     ValueAddress{} -> ValueAddress 0x0
+    ValueAccount{} -> ValueAccount $ unspecifiedChain 0x0
     ValueString{} -> ValueString ""
     ValueInt sign size _ -> ValueInt sign size 0
     ValueBytes size _ -> ValueBytes size ""
-  ValueContract{} -> ValueContract 0x0
+  ValueContract{} -> ValueContract $ unspecifiedChain 0x0
   ValueArrayDynamic{} -> ValueArrayDynamic I.empty
   ValueMapping{} -> ValueMapping Map.empty
   ValueStruct fs -> ValueStruct $ fmap zeroOf fs
@@ -97,6 +100,7 @@ bytesToSimpleValue bs = \case
                 then Just $ ValueBool True
                 else Just $ ValueBool False
   TypeAddress -> ValueAddress <$>  stringAddress (Text.unpack . Text.decodeUtf8 $ Base16.encode bs)
+  TypeAccount -> ValueAccount . unspecifiedChain <$>  stringAddress (Text.unpack . Text.decodeUtf8 $ Base16.encode bs)
   TypeString -> Just $ ValueString (Text.decodeUtf8 bs)
   TypeInt s b -> Just . ValueInt s b $ bytesToNum s b
   TypeBytes b -> Just $ ValueBytes b bs
@@ -235,7 +239,7 @@ valueToText = \case
   ValueMapping m ->
     let pairs = map (\(sv, v) -> simpleValueToText sv <> ": " <> valueToText v) $ Map.toList m
     in "{" <> Text.intercalate "," pairs <> "}"
-  ValueContract addr -> Text.pack $ formatAddressWithoutColor addr
+  ValueContract addr -> Text.pack $ show addr
   ValueEnum{}        -> error "ValueEnum to text"
   ValueFunction{}    -> error "ValueFunction to text"
   ValueStruct{}      -> error "ValueStruct to text"
@@ -245,6 +249,7 @@ simpleValueToText :: SimpleValue -> Text
 simpleValueToText sv = case sv of
   ValueBool tf -> if tf then "true" else "false"
   ValueAddress addr -> Text.pack $ "0x" ++ formatAddressWithoutColor addr
+  ValueAccount acct -> Text.pack $ "0x" ++ show acct
   ValueString tx -> Text.pack $ show tx
   ValueInt _ _ v -> Text.pack $ show v
   ValueBytes _ b -> Text.pack $ show . Base16.encode $ b
@@ -260,8 +265,8 @@ textToValue defs str = \case
       (Text.split (== ',') (Text.dropAround (\ c -> c == '[' || c == ']') str))
   TypeMapping{}  -> Left "textToValue TODO: TypeMapping not yet implemented"
   TypeFunction{} -> Left "textToValue TODO: TypeFunction not yet implemented"
-  TypeContract{} -> ValueContract <$> case stringAddress (Text.unpack str) of
-    Nothing -> Left $ "textToValue: could not decode as contract address: " <> str
+  TypeContract{} -> ValueContract <$> case readMaybe (Text.unpack str) of
+    Nothing -> Left $ "textToValue: could not decode as contract account: " <> str
     Just x -> return x
   TypeEnum name -> case defs of
     Nothing -> Left $ "Enum values cannot be parsed without type definitions" -- TODO(dustin): Pass in TypeDefs
@@ -282,6 +287,9 @@ textToSimpleValue str = \case
     _       -> Left $ "textToSimpleValue: could not decode TypeBool: " <> str
   TypeAddress -> ValueAddress <$> case stringAddress (Text.unpack str) of
     Nothing -> Left $ "textToSimpleValue: could not decode as address: " <> str
+    Just x -> return x
+  TypeAccount -> ValueAccount <$> case readMaybe (Text.unpack str) of
+    Nothing -> Left $ "textToSimpleValue: could not decode as account: " <> str
     Just x -> return x
   TypeString -> return $ ValueString str
   TypeInt s b -> ValueInt s b <$> readNum

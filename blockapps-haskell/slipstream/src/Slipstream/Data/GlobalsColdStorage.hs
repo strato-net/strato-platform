@@ -10,10 +10,10 @@ import Database.Persist.Sql
 import qualified Data.Aeson as Ae
 
 import BlockApps.Solidity.Value
-import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.ChainId
 
-data QueueElem = PreStorageEntry Address (Maybe ChainId) [(Text, Value)]
+data QueueElem = PreStorageEntry Account [(Text, Value)]
                | SyncFlush
 
 data Handle = Handle (TQueue QueueElem) SqlBackend

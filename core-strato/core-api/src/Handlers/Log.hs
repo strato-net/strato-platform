@@ -22,8 +22,8 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json          ()
 import           Blockchain.DB.SQLDB
 import           Blockchain.Strato.Model.Keccak256   hiding (hash)
+import           Options
 
-import           Settings
 import           SortDirection
 import           SQLM
 
@@ -55,7 +55,7 @@ instance Selectable LogsFilterParams [LogDB] SQLM where
                       Just $ E.val True -- added to keep the foldl1 from crashing
                     ]
       E.where_ (foldl1 (E.&&.) criteria)
-      E.limit $ appFetchLimit
+      E.limit $ fromIntegral flags_appFetchLimit
       -- E.orderBy [E.desc (lg E.^. LogDBId)]
       E.orderBy $ [(sortToOrderBy qlSortby) $ (lg E.^. LogDBId)]
       return lg

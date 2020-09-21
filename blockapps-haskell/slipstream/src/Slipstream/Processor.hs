@@ -18,6 +18,7 @@ module Slipstream.Processor
 
 import Control.Arrow ((&&&))
 import Control.Applicative
+import Control.Lens ((^.))
 import Control.Monad.Except
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.State.Strict hiding (state)
@@ -47,6 +48,7 @@ import Data.Text (Text)
 import Database.PostgreSQL.Typed (PGConnection)
 
 import Blockapps.Crossmon
+import Blockchain.Data.AddressStateDB
 
 import BlockApps.Bloc22.Database.Queries
 import BlockApps.Bloc22.Monad
@@ -62,9 +64,8 @@ import qualified BlockApps.SolidityVarReader as SVR
 import qualified BlockApps.SolidVMStorageDecoder as SolidVM
 
 import qualified Blockchain.Strato.Model.Action as BS
-import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.ChainId
-import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256
 
 
@@ -105,15 +106,11 @@ enterBloc2 env x = do
    Left e -> error $ show e
    Right v -> return v
 
-{-# NOINLINE emptyHash #-}
-emptyHash :: Keccak256
-emptyHash = hash B.empty
-
 matters :: AggregateAction -> Bool
 matters AggregateAction{..} = (actionType == Create || (not $ diffNull actionStorage))
-                           && (codePtrToSHA actionCodeHash /= emptyHash)
+                           && (resolvedCodePtrToSHA actionCodeHash /= emptyHash)
 
--- assumes all Actions in the list are for the same (Address, Maybe ChainId) pair
+-- assumes all Actions in the list are for the same Account
 combineActions :: [AggregateAction] -> AggregateAction
 combineActions [] = error "cannot combine 0 actions"
 combineActions (x:xs) = foldl' merge x xs
@@ -122,8 +119,8 @@ combineActions (x:xs) = foldl' merge x xs
                   , actionMetadata = (Map.union `on` actionMetadata) b a
                   }
 
-splitActions :: [AggregateAction] -> [((Address, Maybe ChainId), [AggregateAction])]
-splitActions = partitionWith (actionAddress &&& actionTxChainId)
+splitActions :: [AggregateAction] -> [(Account, [AggregateAction])]
+splitActions = partitionWith actionAccount
 
 functionDetailsFromContract :: Contract -> ByteString -> (Text, ([(Text, Type)],[(Maybe Text, Type)]))
 functionDetailsFromContract contract selector' =
@@ -182,7 +179,7 @@ processedContract :: ABIID
                   -> ProcessedContract
 processedContract ABIID{..} state AggregateAction{..} =
   ProcessedContract
-    { address = actionAddress
+    { address = actionAccount ^. accountAddress
     , codehash = actionCodeHash
     , abi = aiAbi
     , contractName = aiName
@@ -192,7 +189,7 @@ processedContract ABIID{..} state AggregateAction{..} =
     , blockTimestamp = actionBlockTimestamp
     , blockNumber = actionBlockNumber
     , transactionHash = actionTxHash
-    , transactionSender = actionTxSender
+    , transactionSender = actionTxSender ^. accountAddress
     , functionCallData = Nothing
     }
 
@@ -213,7 +210,7 @@ makeFunctionInserts xabi ABIID{..} state AggregateAction{..} =
               else f'
     recordMaxBlockNumber "slipstream_processor" actionBlockNumber
     pure $ ProcessedContract
-      { address = actionAddress
+      { address = actionAccount ^. accountAddress
       , codehash = actionCodeHash
       , abi = aiAbi
       , contractName = aiName
@@ -223,7 +220,7 @@ makeFunctionInserts xabi ABIID{..} state AggregateAction{..} =
       , blockTimestamp = actionBlockTimestamp
       , blockNumber = actionBlockNumber
       , transactionHash = actionTxHash
-      , transactionSender = actionTxSender
+      , transactionSender = actionTxSender ^. accountAddress
       , functionCallData = Just $ FunctionCallData
           { functioncalldataName = f
           , functioncalldataInput = i
@@ -320,22 +317,21 @@ adjustGlobals gref shouldCompile row details = do
 
 ensureContractInstance :: IORef Globals -> Int32 -> AggregateAction -> Bloc ()
 ensureContractInstance g cmId row = do
-  let addr = actionAddress row
-      chainId = actionTxChainId row
+  let acct = actionAccount row
       codePtr = actionCodeHash row
   instExists <- isInstanceCreated g codePtr
   if instExists then
     return ()
   else
-    insertContractInstance cmId addr chainId >> setInstanceCreated g codePtr
+    insertContractInstance cmId acct >> setInstanceCreated g codePtr
 
-readPreviousEVMState :: IORef Globals -> Address -> Maybe ChainId -> Contract -> Bloc [(Text, Value)]
-readPreviousEVMState gref addr chainId cont = do
+readPreviousEVMState :: IORef Globals -> Account -> Contract -> Bloc [(Text, Value)]
+readPreviousEVMState gref acct cont = do
   let default' = SVR.decodeValues 0 (typeDefs cont) (mainStruct cont) (const 0) 0
-  fromMaybe default' <$> getContractState gref addr chainId
+  fromMaybe default' <$> getContractState gref acct
 
-readPreviousSolidVMState :: IORef Globals -> Address -> Maybe ChainId -> Bloc [(Text, Value)]
-readPreviousSolidVMState gref addr chainId = fromMaybe [] <$> getContractState gref addr chainId
+readPreviousSolidVMState :: IORef Globals -> Account -> Bloc [(Text, Value)]
+readPreviousSolidVMState gref acct = fromMaybe [] <$> getContractState gref acct
 
 
 rowToInsert :: IORef Globals -> ABIID -> AggregateAction -> Contract -> [(Text, Value)]
@@ -344,7 +340,7 @@ rowToInsert gref abiid row cont oldState = do
   let newState = case actionStorage row of
                     BS.ActionEVMDiff mp -> SVR.decodeCacheValues cont (flip Map.lookup mp) oldState
                     BS.ActionSolidVMDiff mp -> SolidVM.decodeCacheValues mp oldState
-  setContractState gref (actionAddress row) (actionTxChainId row) newState
+  setContractState gref (actionAccount row) newState
   return $ processedContract abiid (Map.fromList $ newState) row
 
 rowToHistories :: IORef Globals -> ABIID -> AggregateAction -> [AggregateAction] -> Contract
@@ -392,7 +388,7 @@ createEvents details = do
 withSourceFirst :: (a, [AggregateAction]) -> Down Bool
 withSourceFirst = Down . any (Map.member "src" . actionMetadata) . snd
 
-parseActions :: [B.ByteString] -> [((Address, Maybe ChainId), [AggregateAction])]
+parseActions :: [B.ByteString] -> [(Account, [AggregateAction])]
 parseActions = sortOn withSourceFirst
              . splitActions
              . filter matters
@@ -418,7 +414,7 @@ processTheMessages env conn g messages = do
    n -> $logInfoS "processTheMessages" . T.pack $ show n ++ " messages have arrived"
 
   inserts <- enterBloc2 env $ do
-    forM changes $ \((addr,chainId),actions) -> do
+    forM changes $ \(acct,actions) -> do
       let row = combineActions actions
       mapM_ recordAction actions
       recordCombinedAction row
@@ -436,14 +432,14 @@ processTheMessages env conn g messages = do
               let abiid = ABIID
                     { aiAbi = xabiToText $ contractdetailsXabi details
                     , aiName = T.filter (/= '"') $ contractdetailsName details
-                    , aiChain = maybe "" (T.pack . chainIdString) $ actionTxChainId row
+                    , aiChain = maybe "" (T.pack . chainIdString . ChainId) $ (actionAccount row ^. accountChainId)
                     }
                   cont = either error id . xAbiToContract $ contractdetailsXabi details
               adjustGlobals g (Do Compile) row details
 
               ensureContractInstance g cmId row
 
-              oldState <- readPreviousEVMState g addr chainId cont
+              oldState <- readPreviousEVMState g acct cont
               indexContract <- rowToInsert g abiid row cont oldState
               (hs, fhs) <- rowToHistories g abiid row actions cont details oldState
               pure . Right $ BatchedInserts indexContract hs fhs []
@@ -456,13 +452,13 @@ processTheMessages env conn g messages = do
             Just (cmId, details) -> do
               let abi = xabiToText $ contractdetailsXabi details
                   name = T.filter (/= '"') $ contractdetailsName details
-                  abiid = ABIID abi name $ maybe "" (T.pack . chainIdString) $ actionTxChainId row
+                  abiid = ABIID abi name $ maybe "" (T.pack . chainIdString . ChainId) $ (actionAccount row ^. accountChainId)
                   cont = error "internal error: contract should be unused for solidvm"
 
               ensureContractInstance g cmId row
           
               adjustGlobals g (Don't Compile) row details
-              oldState <- readPreviousSolidVMState g addr chainId
+              oldState <- readPreviousSolidVMState g acct
               indexContract <- rowToInsert g abiid row cont oldState
               (hs, fhs) <- rowToHistories g abiid row actions cont details oldState
               eventTables <- createEvents details

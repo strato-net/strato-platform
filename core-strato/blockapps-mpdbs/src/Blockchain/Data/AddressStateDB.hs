@@ -1,4 +1,8 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeOperators #-}
 
 --TODO : Take this next line out
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -6,10 +10,19 @@
 module Blockchain.Data.AddressStateDB (
   AddressState(..),
   CodePtr(..),
-  blankAddressState
+  blankAddressState,
+  resolveCodePtr,
+  unsafeResolveCodePtr,
+  codePtrToSHA,
+  resolvedCodePtrToSHA,
+  codePtrToCodeKind,
+  unsafeCodePtrToCodeKind
 ) where
 
-
+import           Prelude hiding (lookup)
+import           Control.Lens                       ((^.))
+import           Control.Monad
+import           Control.Monad.Change.Alter
 import           Data.Default
 import           Data.Maybe                         (maybeToList)
 
@@ -18,9 +31,11 @@ import           GHC.Generics
 import           Numeric
 import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>))
 
+import           Blockchain.Data.ChainInfo          (ParentChainId, isAncestorChainOf)
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.ExtWord
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Util
@@ -80,3 +95,49 @@ instance RLPSerializable AddressState where
       }
   rlpDecode x = error $ "Missing case in rlpDecode for AddressState: " ++ show (pretty x)
 
+resolveCodePtr :: ( Selectable (Maybe Word256) ParentChainId m
+                  , (Account `Alters` AddressState) m
+                  )
+               => Maybe Word256 -> CodePtr -> m (Maybe CodePtr)
+resolveCodePtr chainId cp@(CodeAtAccount acct _) = do
+  isAccessibleChain <- (acct ^. accountChainId) `isAncestorChainOf` chainId
+  if isAccessibleChain
+    then unsafeResolveCodePtr cp
+    else pure Nothing
+resolveCodePtr _ cp = unsafeResolveCodePtr cp
+
+unsafeResolveCodePtr :: (Account `Alters` AddressState) m => CodePtr -> m (Maybe CodePtr)
+unsafeResolveCodePtr (CodeAtAccount acct name) = lookup Proxy acct >>= \case
+  Nothing -> pure Nothing
+  Just AddressState{..} -> unsafeResolveCodePtr addressStateCodeHash >>= \case
+    Just e@(EVMCode _) -> pure $ Just e
+    Just (SolidVMCode _ d) -> pure . Just $ SolidVMCode name d
+    _ -> pure Nothing
+unsafeResolveCodePtr codePtr = pure $ Just codePtr
+
+codePtrToSHA :: ( Selectable (Maybe Word256) ParentChainId m
+                , (Account `Alters` AddressState) m
+                )
+             => Maybe Word256 -> CodePtr -> m (Maybe Keccak256)
+codePtrToSHA chainId = resolveCodePtr chainId >=> \case
+  Just (EVMCode hsh) -> pure $ Just hsh
+  Just (SolidVMCode _ hsh) -> pure $ Just hsh
+  _ -> pure Nothing -- CodeAtAccount cannot happen here
+
+resolvedCodePtrToSHA :: CodePtr -> Keccak256
+resolvedCodePtrToSHA (EVMCode hsh) = hsh
+resolvedCodePtrToSHA (SolidVMCode _ hsh) = hsh
+resolvedCodePtrToSHA _ = emptyHash
+
+codePtrToCodeKind :: ( Selectable (Maybe Word256) ParentChainId m
+                     , (Account `Alters` AddressState) m
+                     )
+                  => Maybe Word256 -> CodePtr -> m CodeKind
+codePtrToCodeKind chainId = resolveCodePtr chainId >=> \case
+  Just (SolidVMCode _ _) -> pure SolidVM
+  _ -> pure EVM -- TODO: should this return (Maybe CodeKind)?
+
+unsafeCodePtrToCodeKind :: (Account `Alters` AddressState) m => CodePtr -> m CodeKind
+unsafeCodePtrToCodeKind = unsafeResolveCodePtr >=> \case
+  Just (SolidVMCode _ _) -> pure SolidVM
+  _ -> pure EVM -- TODO: should this return (Maybe CodeKind)?

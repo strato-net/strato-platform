@@ -128,6 +128,7 @@ instance Format Transaction where
       "hash: " ++ format (hash . rlpSerialize . rlpEncode $ t) ++ "\n")
     where
       codeToString (Code init')        = format init'
+      codeToString (PtrToCode codePtr) = "PtrToCode: " ++ format codePtr
 
 instance RLPSerializable Transaction where
   rlpDecode (RLPArray (n:gp:gl:toAddr:val:i:vVal:rVal:sVal:xs)) =

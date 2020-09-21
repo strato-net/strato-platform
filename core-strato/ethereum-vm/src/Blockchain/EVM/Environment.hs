@@ -4,10 +4,10 @@ import           Control.DeepSeq
 import qualified Data.ByteString            as B
 import           GHC.Generics
 
-import           Blockchain.Data.Address
 import           Blockchain.Data.Code
 import           Blockchain.Data.DataDefs
 import           Blockchain.ExtWord
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Keccak256
 import           Data.Map.Strict            (Map)
 import qualified Data.IntSet                as I
@@ -15,11 +15,11 @@ import           Data.Text                  (Text)
 
 data Environment =
     Environment {
-      envOwner       :: Address,
-      envOrigin      :: Address,
+      envOwner       :: Account,
+      envOrigin      :: Account,
       envGasPrice    :: Integer,
       envInputData   :: B.ByteString,
-      envSender      :: Address,
+      envSender      :: Account,
       envValue       :: Integer,
       envCode        :: Code,
       envJumpDests   :: I.IntSet,

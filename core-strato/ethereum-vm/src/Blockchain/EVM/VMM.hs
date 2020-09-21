@@ -51,12 +51,14 @@ module Blockchain.EVM.VMM (
   readRefund
   ) where
 
+import           Control.Lens                       hiding (from, to)
 import           Control.Monad
 import qualified Control.Monad.Change.Alter         as A
 import qualified Control.Monad.Change.Modify        as Mod
 import           Control.Monad.Reader
 import qualified Data.ByteString                    as B
 import           Data.IORef.Unboxed
+import qualified Data.Map.Strict                    as M
 import           Data.Maybe                         (fromMaybe)
 import qualified Data.NibbleString                  as N
 import qualified Data.Set                           as S
@@ -77,6 +79,7 @@ import qualified Blockchain.EVM.MutableStack as MS
 import           Blockchain.EVM.VMState
 import           Blockchain.ExtWord
 import           Blockchain.Output
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.VM.VMException
@@ -145,23 +148,41 @@ instance (N.NibbleString `A.Alters` N.NibbleString) m => (N.NibbleString `A.Alte
   insert p k = lift . A.insert p k
   delete p   = lift . A.delete p
 
-instance MonadIO m => Mod.Modifiable MP.StateRoot (VMM m) where
-  get _ = _stateRoot . vmMemDBs <$> Mod.get (Mod.Proxy @VMState)
-  put _ sr = Mod.modify_ (Mod.Proxy @VMState) $ \s ->
-      pure $ s{vmMemDBs=(vmMemDBs s){_stateRoot=sr}}
-
 instance ( MonadIO m
+         , (Maybe Word256 `A.Alters` MP.StateRoot) m
          , (MP.StateRoot `A.Alters` MP.NodeData) m
          , (N.NibbleString `A.Alters` N.NibbleString) m
-         ) => (Address `A.Alters` AddressState) (VMM m) where
+         ) => (Account `A.Alters` AddressState) (VMM m) where
   lookup _ = getAddressStateMaybe
   insert _ = putAddressState
   delete _ = deleteAddressState
+
+instance ( MonadIO m
+         , (Maybe Word256 `A.Alters` MP.StateRoot) m
+         ) => (Maybe Word256 `A.Alters` MP.StateRoot) (VMM m) where
+  lookup p chainId = do
+    (CurrentBlockHash bh) <- Mod.get (Mod.Proxy @CurrentBlockHash)
+    mSR <- view (stateRoots . at (bh, chainId)) <$> Mod.get (Mod.Proxy @MemDBs)
+    case mSR of
+      Just sr -> pure $ Just sr
+      Nothing -> lift $ A.lookup p chainId
+  insert p chainId sr = do
+    (CurrentBlockHash bh) <- Mod.get (Mod.Proxy @CurrentBlockHash)
+    Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ stateRoots %= M.insert (bh, chainId) sr
+    lift $ A.insert p chainId sr
+  delete p chainId = do
+    (CurrentBlockHash bh) <- Mod.get (Mod.Proxy @CurrentBlockHash)
+    Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ stateRoots %= M.delete (bh, chainId)
+    lift $ A.delete p chainId
 
 instance MonadIO m => Mod.Modifiable MemDBs (VMM m) where
   get _ = vmMemDBs <$> Mod.get (Mod.Proxy @VMState)
   put _ md = Mod.modify_ (Mod.Proxy @VMState) $ \s ->
       pure $ s{vmMemDBs=md}
+
+instance MonadIO m => Mod.Modifiable CurrentBlockHash (VMM m) where
+  get _    = fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0) . _currentBlock <$> Mod.get (Mod.Proxy @MemDBs)
+  put _ md = Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ currentBlock ?= md
 
 instance MonadIO m => HasMemRawStorageDB (VMM m) where
   getMemRawStorageTxDB = _storageTxMap . vmMemDBs <$> Mod.get (Mod.Proxy @VMState)
@@ -172,6 +193,7 @@ instance MonadIO m => HasMemRawStorageDB (VMM m) where
       pure $ s{vmMemDBs=(vmMemDBs s){_storageBlockMap=theMap}}
 
 instance ( MonadIO m
+         , (Maybe Word256 `A.Alters` MP.StateRoot) m
          , (MP.StateRoot `A.Alters` MP.NodeData) m
          , (N.NibbleString `A.Alters` N.NibbleString) m
          ) => (RawStorageKey `A.Alters` RawStorageValue) (VMM m) where
@@ -267,8 +289,8 @@ addDebugCallCreate callCreate = do
     Just x  -> put state'{debugCallCreates = Just (callCreate:x)}
     Nothing -> throwIO NonDebugCallCreate -- "You are trying to add a call create during a non-debug run"
 
-addSuicideList :: MonadIO m => Address -> VMM m ()
-addSuicideList address' = modify $ \st -> st{suicideList = address' `S.insert` suicideList st}
+addSuicideList :: MonadIO m => Account -> VMM m ()
+addSuicideList acct = modify $ \st -> st{suicideList = acct `S.insert` suicideList st}
 
 getEnvVar :: MonadIO m => (Environment -> a) -> VMM m a
 getEnvVar f = f <$> gets environment
@@ -332,7 +354,7 @@ addGas (Gas gas) = do
     then throwIO OutOfGasException
     else void . liftIO . atomicAddCounter gasref $ fromInteger gas
 
-pay' :: VMBase m => String -> Address -> Address -> Integer -> VMM m ()
+pay' :: VMBase m => String -> Account -> Account -> Integer -> VMM m ()
 pay' reason from to val = do
   success <- pay reason from to val
   unless success $ throwIO InsufficientFunds

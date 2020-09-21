@@ -1,6 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module SolidVM.Model.Storable where
 
+import           Control.Applicative ((<|>))
 import           Control.DeepSeq
 import           Control.Exception
 import           Data.Attoparsec.ByteString as Atto
@@ -10,6 +11,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Internal as BI
 import qualified Data.ByteString.Unsafe as BU
 import qualified Data.ByteString.Char8 as C8
+import qualified Data.ByteString.Base16 as B16
 import           Data.Char
 import           Data.Hashable
 import           Data.Scientific (isInteger, toBoundedInteger)
@@ -21,15 +23,17 @@ import           System.IO.Unsafe
 
 import           Blockchain.Data.RLP
 import           Blockchain.SolidVM.Model
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ExtendedWord
 import           Text.Format
 
 data BasicValue = BInteger !Integer
                 | BString !B.ByteString
                 | BBool !Bool
-                | BAddress !Address
+                | BAccount !NamedAccount
                 | BEnumVal !T.Text !T.Text !Word32
-                | BContract !T.Text !Address
+                | BContract !T.Text !NamedAccount
                   -- The sole purpose of this sentinel is to make slipstream reserve
                   -- a column for this mapping
                 | BMappingSentinel
@@ -42,7 +46,7 @@ instance Format BasicValue where
   format (BString s) = show s
   format (BBool True) = "true"
   format (BBool False) = "false"
-  format (BAddress a) = "address(" ++ show a ++ ")"
+  format (BAccount a) = "account(" ++ show a ++ ")"
   format (BEnumVal n1 n2 _) = T.unpack n1 ++ "." ++ T.unpack n2
   format (BContract n _) = "contract(" ++ T.unpack n ++ ")"
   format BMappingSentinel = "<MappingSentinel>"
@@ -51,7 +55,7 @@ instance Format BasicValue where
 data IndexType = INum Integer
                | IText B.ByteString
                | IBool Bool
-               | IAddress Address
+               | IAccount NamedAccount
                deriving (Eq, Show, Ord, Generic, Hashable, NFData)
 
 data StoragePathPiece = Field B.ByteString
@@ -147,7 +151,13 @@ parseMapIndex = do
     'a' -> do
       _ <- string "a:"
       eAddress <- addressFromHex <$> Atto.take 40
-      IAddress <$> either fail return eAddress
+      mColon <- peekWord8
+      mChain <- case w82c <$> mColon of
+        Just ':' -> do
+          _ <- string ":"
+          (MainChain <$ string "main") <|> (ExplicitChain . bytesToWord256 . fst . B16.decode <$> Atto.take 64) <?> "parseMapIndex"
+        _ -> pure UnspecifiedChain
+      IAccount <$> either fail (return . flip NamedAccount mChain) eAddress
     '"' -> do
        skip (== c2w8 '"')
        let ignoreEscapedQuotes False 0x22 = Nothing -- Unescaped quote
@@ -226,7 +236,7 @@ unparsePath (StoragePath ps) = B.concat . concatMap go $ ps
         go (MapIndex (IText t)) = ["<\"", escapeKey t, "\">"]
         go (MapIndex (IBool True)) = ["<true>"]
         go (MapIndex (IBool False)) = ["<false>"]
-        go (MapIndex (IAddress a)) = ["<a:", addressToHex a, ">"]
+        go (MapIndex (IAccount a)) = ["<a:", C8.pack $ show a, ">"]
 
 instance RLPSerializable BasicValue where
   rlpEncode = \case
@@ -234,7 +244,7 @@ instance RLPSerializable BasicValue where
     BInteger n -> RLPArray [RLPScalar 0, rlpEncode n]
     BString t -> RLPArray [RLPScalar 1, rlpEncode t]
     BBool b -> RLPArray [RLPScalar 2, rlpEncode b]
-    BAddress a -> RLPArray [RLPScalar 3, rlpEncode a]
+    BAccount a -> RLPArray [RLPScalar 3, rlpEncode a]
     BContract n a -> RLPArray [RLPScalar 4, rlpEncode n, rlpEncode a]
     BEnumVal a b c -> RLPArray [RLPScalar 5, rlpEncode a, rlpEncode b, rlpEncode c]
     BMappingSentinel -> RLPArray [RLPScalar 6]
@@ -243,7 +253,7 @@ instance RLPSerializable BasicValue where
       (0, [f]) -> BInteger $ rlpDecode f
       (1, [f]) -> BString $ rlpDecode f
       (2, [f]) -> BBool $ rlpDecode f
-      (3, [f]) -> BAddress $ rlpDecode f
+      (3, [f]) -> BAccount $ rlpDecode f
       (4, [f, a']) -> BContract (rlpDecode f) (rlpDecode a')
       (5, [f, s', c']) -> BEnumVal (rlpDecode f) (rlpDecode s') (rlpDecode c')
       (6, []) -> BMappingSentinel

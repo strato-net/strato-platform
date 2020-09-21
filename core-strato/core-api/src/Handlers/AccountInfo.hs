@@ -30,6 +30,7 @@ import           Numeric.Natural
 import           Servant
 import           Servant.Client
 --import           Servant.Swagger.Tags
+import           UnliftIO
 
 
 import           Blockchain.Data.Address
@@ -37,12 +38,12 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json
 import           Blockchain.DB.SQLDB
 import           Blockchain.Strato.Model.ChainId
-import           Blockchain.Strato.Model.Keccak256 hiding (hash)
+import           Blockchain.Strato.Model.CodePtr
 
+import           Options
 
-import           Settings
 import           SQLM
-import           UnliftIO
+
 {-
 -- TODO: Remove once https://github.com/nakaji-dayo/servant-swagger-tags/pull/1 is merged
 instance HasClient m api => HasClient m (Tags tags :> api) where
@@ -60,7 +61,7 @@ type API = -- Tags "section1" :> Summary "get user accounts" :> Description "Get
             :> QueryParam "maxnonce" Natural
             :> QueryParam "maxnumber" Natural
             :> QueryParam "code" Text
-            :> QueryParam "codeHash" Keccak256 -- TODO: Should be CodePtr
+            :> QueryParam "codeHash" CodePtr
             :> QueryParams "chainid" ChainId
             :> Get '[JSON] [AddressStateRef']
 
@@ -74,7 +75,7 @@ data AccountsFilterParams = AccountsFilterParams
   , qaMaxNonce   :: Maybe Natural
   , qaMaxNumber  :: Maybe Natural
   , qaCode       :: Maybe Text
-  , qaCodeHash   :: Maybe Keccak256
+  , qaCodeHash   :: Maybe CodePtr
   , qaChainId    :: [ChainId]
   } deriving (Eq, Ord, Show)
 
@@ -95,7 +96,7 @@ uncurryAccountsFilterParams :: ( Maybe Address
                               -> Maybe Natural
                               -> Maybe Natural
                               -> Maybe Text
-                              -> Maybe Keccak256
+                              -> Maybe CodePtr
                               -> [ChainId]
                               -> r
                                )
@@ -150,7 +151,7 @@ instance Selectable AccountsFilterParams [AddressStateRef] SQLM where
 
       E.where_ (foldl1 (E.||.) (map (foldl1 (E.&&.)) allCriteria))
 
-      E.limit $ appFetchLimit
+      E.limit $ fromIntegral flags_appFetchLimit
 
       E.orderBy [E.asc (accStateRef E.^. AddressStateRefAddress)]
       return accStateRef
@@ -158,7 +159,7 @@ instance Selectable AccountsFilterParams [AddressStateRef] SQLM where
 getAccount :: Selectable AccountsFilterParams [AddressStateRef] m
            => Maybe Address -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
               Maybe Natural -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
-              Maybe Text -> Maybe Keccak256 -> [ChainId] ->
+              Maybe Text -> Maybe CodePtr -> [ChainId] ->
               m [AddressStateRef']
 getAccount a b c d e f g h i j k
   = getAccount' (AccountsFilterParams a b c d e f g h i j k)

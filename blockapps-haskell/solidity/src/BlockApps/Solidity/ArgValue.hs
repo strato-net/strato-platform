@@ -71,7 +71,7 @@ argValueToValue defs theType argVal = case theType of
   TypeMapping{}  -> Left "argValueToValue TODO: TypeMapping not yet implemented"
   TypeFunction{} -> Left "argValueToValue TODO: TypeFunction not yet implemented"
   TypeContract{} -> case argVal of
-    ArgString str -> ValueContract <$> case stringAddress (Text.unpack str) of
+    ArgString str -> ValueContract <$> case readMaybe (Text.unpack str) of
       Nothing -> Left $ "argValueToValue: could not decode as contract address: " <> str
       Just x -> return x
     o -> Left . Text.pack $ "argValueToValue: Expected TypeContract to be a string, but got: " ++ show o
@@ -102,6 +102,11 @@ argValueToSimpleValue theType argVal = case theType of
       Nothing -> Left $ "argValueToSimpleValue: could not decode as address: " <> str
       Just x -> return x
     o -> Left . Text.pack $ "argValueToSimpleValue: Expected TypeAddress to be a string, but got " ++ show o
+  TypeAccount -> case argVal of
+    ArgString str -> ValueAccount <$> case readMaybe (Text.unpack str) of
+      Nothing -> Left $ "argValueToSimpleValue: could not decode as account: " <> str
+      Just x -> return x
+    o -> Left . Text.pack $ "argValueToSimpleValue: Expected TypeAccount to be a string, but got " ++ show o
   TypeString -> case argVal of
     ArgString str -> return $ ValueString str
     o -> Left . Text.pack $ "argValueToSimpleValue: Expected TypeString to be a string, but got " ++ show o
