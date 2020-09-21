@@ -12,6 +12,7 @@ pipeline {
             mkdir ba-rest-jsdoc
             git clone -b STRATO-1703_ba-rest-docs https://${GH_USER}:${GH_PASSWD}@github.com/blockapps/strato-platform
             cd strato-platform/blockapps-rest
+            npm i
             npm run build:docs
             cp -vr docs /home/blockapps/ba-rest-jsdoc
             cd
