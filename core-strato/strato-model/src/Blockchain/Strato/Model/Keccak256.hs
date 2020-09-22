@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedLists #-}

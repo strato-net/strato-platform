@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}

@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}

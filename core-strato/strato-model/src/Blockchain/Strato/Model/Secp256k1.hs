@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
