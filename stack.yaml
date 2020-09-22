@@ -103,7 +103,7 @@ extra-lib-dirs:
 - /usr/lib
 
 ghc-options:
-  "$locals": -Wall -Werror -fwarn-redundant-constraints -XDeriveAnyClass -XDeriveGeneric -XLambdaCase
+  "$locals": -Wall -Werror -fwarn-redundant-constraints -XDeriveAnyClass -XDeriveGeneric
   strato-api: -Wall -Werror -fno-warn-orphans
   strato-p2p: -Wall -Werror  -XMonoLocalBinds
   strato-conf: -Wall -Werror -fno-warn-inline-rule-shadowing

@@ -1,5 +1,6 @@
 {-# LANGUAGE
-      OverloadedStrings
+      LambdaCase
+    , OverloadedStrings
     , FlexibleContexts
     , TemplateHaskell
 #-}
