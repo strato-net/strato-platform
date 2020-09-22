@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE OverloadedLists       #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Blockchain.Strato.Model.ChainId (
