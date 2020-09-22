@@ -13,7 +13,7 @@ pipeline {
             git clone -b STRATO-1703_ba-rest-docs https://${GH_USER}:${GH_PASSWD}@github.com/blockapps/strato-platform
             cd strato-platform/blockapps-rest
             npm i
-            npm run build:docs
+            docker run -d -v ($pwd):/sources node:10 npm run build:docs
             cp -vr docs /home/blockapps/ba-rest-jsdoc
             cd
             ./rerun-nginx-proxy.sh
