@@ -2,6 +2,7 @@
 {-# OPTIONS -fno-warn-orphans         #-}
 {-# LANGUAGE DataKinds                #-}
 {-# LANGUAGE DeriveDataTypeable       #-}
+{-# LANGUAGE DeriveGeneric            #-}
 {-# LANGUAGE FlexibleContexts         #-}
 {-# LANGUAGE FlexibleInstances        #-}
 {-# LANGUAGE LambdaCase               #-}

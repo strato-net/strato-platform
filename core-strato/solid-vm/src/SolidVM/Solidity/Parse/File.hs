@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 -- |
 -- Module: File
 -- Description: Parses anything that can appear at the top level of

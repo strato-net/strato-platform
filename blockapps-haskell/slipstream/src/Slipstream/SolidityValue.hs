@@ -1,5 +1,6 @@
 {-# LANGUAGE
-      LambdaCase 
+      DeriveGeneric
+    , LambdaCase 
     , OverloadedStrings
     , RecordWildCards
     , QuasiQuotes

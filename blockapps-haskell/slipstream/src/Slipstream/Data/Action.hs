@@ -1,5 +1,6 @@
 {-# LANGUAGE
       DeriveAnyClass
+    , DeriveGeneric
     , OverloadedStrings
     , RecordWildCards
     , QuasiQuotes

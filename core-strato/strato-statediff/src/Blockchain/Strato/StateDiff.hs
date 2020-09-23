@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric          #-}
 {-# LANGUAGE TypeOperators          #-}
 {-# OPTIONS_GHC -fno-warn-orphans   #-}
 module Blockchain.Strato.StateDiff

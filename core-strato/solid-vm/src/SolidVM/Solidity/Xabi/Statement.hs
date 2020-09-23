@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 module SolidVM.Solidity.Xabi.Statement where
 
 import Control.DeepSeq

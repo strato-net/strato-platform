@@ -103,7 +103,7 @@ extra-lib-dirs:
 - /usr/lib
 
 ghc-options:
-  "$locals": -Wall -Werror -fwarn-redundant-constraints -XDeriveGeneric
+  "$locals": -Wall -Werror -fwarn-redundant-constraints
 
 docker:
   enable: true

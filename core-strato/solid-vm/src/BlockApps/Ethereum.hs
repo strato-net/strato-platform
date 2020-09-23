@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# OPTIONS_GHC -fno-warn-orphans  #-}
 
 -- {-# OPTIONS_GHC -fno-warn-unused-top-binds #-}

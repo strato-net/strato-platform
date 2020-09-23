@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 -- |
 -- Module: Declarations
 -- Description: Parsers for top-level Solidity declarations
