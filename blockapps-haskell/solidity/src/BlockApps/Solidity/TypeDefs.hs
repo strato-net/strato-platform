@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 -- {-# OPTIONS_GHC -fno-warn-orphans #-}
 module BlockApps.Solidity.TypeDefs where
 
