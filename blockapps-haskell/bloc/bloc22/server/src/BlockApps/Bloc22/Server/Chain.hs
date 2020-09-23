@@ -11,6 +11,7 @@
 module BlockApps.Bloc22.Server.Chain where
 
 import           Control.Applicative               (liftA2)
+import           Control.Lens                      ((?~), at)
 import           Control.Monad                     (when, unless)
 import           Crypto.Random.Entropy
 import qualified Data.ByteString.Base16            as B16
@@ -34,6 +35,7 @@ import           BlockApps.Solidity.Struct
 import           BlockApps.Solidity.Type
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Bloc22.Database.Queries
+import           BlockApps.Bloc22.Server.Users     (constructArgValuesAndSource)
 import           BlockApps.Bloc22.Server.Utils     (waitFor)
 import           BlockApps.XAbiConverter           (xAbiToContract)
 
@@ -76,19 +78,21 @@ createChainInfo (ChainInput msrc mCodePtr cname lbl balances chaininputArgs memb
     Nothing -> case mCodePtr of
       Just codePtr -> getContractDetailsByCodeHash codePtr
       Nothing -> fmap snd <$> getContractDetailsForContract theVM "" cname
-  (cAcctInfo, codeInfo) <- case mContract of
-      Nothing -> return ([],[])
+  (cAcctInfo, codeInfo, metaData) <- case mContract of
+      Nothing -> return ([],[], mmd)
       Just (_, ContractDetails{..}) -> do
           contract <- either (throwIO . UserError . Text.pack) return $ xAbiToContract contractdetailsXabi
           let argValues = replaceMembers
                             (mainStruct contract)
                             (nmap1' members)
                             chaininputArgs
-          storage <- fmap Map.toList . either (throwIO . UserError) return $ encodeValues
+          storage <- case theVM of
+            "EVM" -> fmap Map.toList . either (throwIO . UserError) return $ encodeValues
                        (typeDefs contract)
                        (mainStruct contract)
                        0
                        (Map.toList argValues)
+            _ -> pure []
           let balMap = Map.fromList $ map (unNamedTuple @"address" @"balance") balances
               govBal = fromMaybe 0 $ Map.lookup governanceAddress balMap
 
@@ -102,7 +106,13 @@ createChainInfo (ChainInput msrc mCodePtr cname lbl balances chaininputArgs memb
           let contractAcctInfo = ContractWithStorage governanceAddress govBal contractHash storage
               b' = fst . B16.decode $ encodeUtf8 b
               codeInfo' = maybeToList $ (\s -> CodeInfo b' s contractdetailsName) <$> msrc
-          return ([contractAcctInfo],codeInfo') -- Perhaps in the future, we can support multiple contracts
+          mmd' <- case theVM of
+              "SolidVM" -> do
+                let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi
+                (_, argsAsSource) <- constructArgValuesAndSource (Just argValues) xabiArgs
+                pure $ (id . at "args" ?~ argsAsSource) <$> mmd
+              _ -> pure mmd
+          return ([contractAcctInfo],codeInfo',mmd') -- Perhaps in the future, we can support multiple contracts
   nonce <- byteStringToWord256 <$> liftIO (getEntropy 32)
   let maybeNonContract a b | a == governanceAddress = Nothing
                            | otherwise = Just $ NonContract a b
@@ -116,7 +126,7 @@ createChainInfo (ChainInput msrc mCodePtr cname lbl balances chaininputArgs memb
                            Nothing
                            creationBlockHash
                            nonce
-                           (fromMaybe Map.empty mmd)
+                           (fromMaybe Map.empty metaData)
         )
         Nothing
   return (fst <$> mContract, chainInfo)
