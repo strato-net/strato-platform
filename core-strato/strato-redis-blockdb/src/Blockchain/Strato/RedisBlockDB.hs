@@ -559,7 +559,7 @@ insertBlock sha b = do
       void . addPrivateTransactions $
         map (txHash &&& ((fromJust . txAnchorChain) &&& id)) ptxs
       forM_ (partitionWith txAnchorChain ptxs) $ \(cId, ptxs') ->
-                         -- ^-- already filtered on (isJust . txChainId)
+                         --  ^-- already filtered on (isJust . txChainId)
         addChainTxsInBlock sha (fromJust cId) $ map txHash ptxs'
     res <- multiExec $ do
         void $ setnx (inNS' Headers) (toValue header')
