@@ -104,9 +104,6 @@ extra-lib-dirs:
 
 ghc-options:
   "$locals": -Wall -Werror -fwarn-redundant-constraints -XDeriveGeneric
-  strato-api: -Wall -Werror -fno-warn-orphans
-  strato-p2p: -Wall -Werror  -XMonoLocalBinds
-  strato-conf: -Wall -Werror -fno-warn-inline-rule-shadowing
   blockapps-haskoin: -Wall -Werror -fno-warn-overflowed-literals
 
 
