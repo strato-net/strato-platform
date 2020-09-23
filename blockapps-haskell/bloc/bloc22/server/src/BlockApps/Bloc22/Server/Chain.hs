@@ -71,15 +71,15 @@ createChainInfo :: ChainInput -> Bloc (Maybe Int32, ChainInfo)
 createChainInfo (ChainInput msrc mCodePtr cname lbl balances chaininputArgs members mmd _) = do
   when (null members) $ throwIO $ UserError "Private chains must include at least one member"
   when (sum (nmap2' balances) == 0) $ throwIO $ UserError "At least one account must have a non-zero balance"
-
-  let theVM = fromMaybe "EVM" $ Map.lookup "VM" =<< mmd
+  let md = fromMaybe Map.empty mmd
+      theVM = fromMaybe "EVM" $ Map.lookup "VM" md
   mContract <- case msrc of
     Just src -> fmap snd <$> getContractDetailsForContract theVM src cname
     Nothing -> case mCodePtr of
       Just codePtr -> getContractDetailsByCodeHash codePtr
       Nothing -> fmap snd <$> getContractDetailsForContract theVM "" cname
   (cAcctInfo, codeInfo, metaData) <- case mContract of
-      Nothing -> return ([],[], mmd)
+      Nothing -> return ([],[], md)
       Just (_, ContractDetails{..}) -> do
           contract <- either (throwIO . UserError . Text.pack) return $ xAbiToContract contractdetailsXabi
           let argValues = replaceMembers
@@ -106,13 +106,13 @@ createChainInfo (ChainInput msrc mCodePtr cname lbl balances chaininputArgs memb
           let contractAcctInfo = ContractWithStorage governanceAddress govBal contractHash storage
               b' = fst . B16.decode $ encodeUtf8 b
               codeInfo' = maybeToList $ (\s -> CodeInfo b' s contractdetailsName) <$> msrc
-          mmd' <- case theVM of
+          md' <- case theVM of
               "SolidVM" -> do
                 let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi
                 (_, argsAsSource) <- constructArgValuesAndSource (Just argValues) xabiArgs
-                pure $ (id . at "args" ?~ argsAsSource) <$> mmd
-              _ -> pure mmd
-          return ([contractAcctInfo],codeInfo',mmd') -- Perhaps in the future, we can support multiple contracts
+                pure $ (at "args" ?~ argsAsSource) md
+              _ -> pure md
+          return ([contractAcctInfo],codeInfo',md') -- Perhaps in the future, we can support multiple contracts
   nonce <- byteStringToWord256 <$> liftIO (getEntropy 32)
   let maybeNonContract a b | a == governanceAddress = Nothing
                            | otherwise = Just $ NonContract a b
@@ -126,7 +126,7 @@ createChainInfo (ChainInput msrc mCodePtr cname lbl balances chaininputArgs memb
                            Nothing
                            creationBlockHash
                            nonce
-                           (fromMaybe Map.empty metaData)
+                           metaData
         )
         Nothing
   return (fst <$> mContract, chainInfo)
