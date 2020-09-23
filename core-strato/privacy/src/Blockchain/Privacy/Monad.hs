@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass         #-}
 {-# LANGUAGE RecordWildCards        #-}
 {-# LANGUAGE StrictData             #-}
 {-# LANGUAGE TemplateHaskell        #-}

@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass #-}
 module Blockchain.VM.SolidException
   ( SolidException(..)
   , typeError

@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass #-}
 -- |
 -- Module: File
 -- Description: Parses anything that can appear at the top level of
