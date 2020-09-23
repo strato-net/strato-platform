@@ -330,7 +330,9 @@ runChainConstructors cId cInfo = do
          (unsafeCreateKeccak256FromWord256 0)
          (Just cId)
          (Just $ M.fromList $
-           [("args", "()"), ("funcName", "<constructor>")]
+           [ ("args", fromMaybe "()" (M.lookup "args" . chainMetadata $ chainInfo cInfo))
+           , ("funcName", "<constructor>")
+           ]
            ++ case ms of Nothing -> []; Just s -> [("src", s)])
 
   flushMemStorageDB
