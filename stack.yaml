@@ -104,9 +104,6 @@ extra-lib-dirs:
 
 ghc-options:
   "$locals": -Wall -Werror -fwarn-redundant-constraints -XDeriveGeneric
-  blockapps-haskoin: -Wall -Werror -fno-warn-overflowed-literals
-
-
 
 docker:
   enable: true
