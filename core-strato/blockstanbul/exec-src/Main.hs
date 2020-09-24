@@ -140,7 +140,7 @@ main = do
                     }
             url = printf "http://%s/blockstanbul/vote" nodeURL
         
-        putStrLn $ "\n\n\nsending the following request to " ++ nodeURL
+        putStrLn $ "\n\n\nsending the following request to " ++ nodeURL ++ ", HTTPS = " ++ show optHTTPS
         putStrLn $ show payload
         
         plainReq <- parseRequest url
@@ -150,7 +150,8 @@ main = do
             finalReq = if optHTTPS then setRequestSecure True bodyReq else bodyReq
         
         resp <- httpBS finalReq
-        putStrLn $ "\nresponse:\n" ++ show resp
+        putStrLn $ "\nresponse status: " ++ (show $ getResponseStatus resp)
+        putStrLn $ "response body: " ++ (show $ getResponseBody resp)
      
         go xs $ non + 1
     
