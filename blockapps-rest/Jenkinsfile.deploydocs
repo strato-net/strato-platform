@@ -7,15 +7,15 @@ pipeline {
           withCredentials([usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
             sh '''#!/bin/bash -le
             set -x
-            rm -rf strato-platform
-            rm -rf ba-rest-jsdoc
-            mkdir ba-rest-jsdoc
+            sudo rm -rf strato-platform
+            sudo rm -rf /home/blockapps/ba-rest-jsdoc
+            mkdir /home/blockapps/ba-rest-jsdoc
             git clone -b STRATO-1703_ba-rest-docs https://${GH_USER}:${GH_PASSWD}@github.com/blockapps/strato-platform
             cd strato-platform/blockapps-rest
             npm i
-            docker run -d -v ($pwd):/sources node:10 npm run build:docs
-            cp -vr docs /home/blockapps/ba-rest-jsdoc
-            cd
+            CONTAINER=$(docker run -d -v $(pwd):/sources node:10 bash -c "cd /sources && npm run build:docs")
+            sleep 5
+            docker cp ${CONTAINER}:/sources /home/blockapps/ba-rest-jsdoc
             ./rerun-nginx-proxy.sh
             '''
           }
