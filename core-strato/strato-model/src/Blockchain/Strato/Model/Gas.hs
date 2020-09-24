@@ -1,4 +1,7 @@
-{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Blockchain.Strato.Model.Gas where
 

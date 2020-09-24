@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 module Blockchain.EVM.Environment where
 
 import           Control.DeepSeq

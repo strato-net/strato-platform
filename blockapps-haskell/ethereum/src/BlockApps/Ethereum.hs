@@ -1,5 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans  #-}
 {-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DeriveAnyClass        #-}
+{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}

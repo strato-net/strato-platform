@@ -1,5 +1,7 @@
 {-# LANGUAGE
-      OverloadedStrings
+      DeriveGeneric
+    , LambdaCase 
+    , OverloadedStrings
     , RecordWildCards
     , QuasiQuotes
     , ScopedTypeVariables

@@ -5,6 +5,7 @@
 -- and the sequencer does not have to worry about long blocking reads from kafka
 -- preventing other events from being processed.
 {-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleContexts #-}

@@ -33,7 +33,7 @@ import           Text.Format
 
 data Capability = ETH Integer               -- | Base Ethereum P2P protocol
                 | IST Integer               -- | Istanbul/Blockstanbul/PBFT messages.
-                | UNKNOWNCAP String Integer -- | ¯\_(ツ)_/¯
+                | UNKNOWNCAP String Integer -- ¯\_(ツ)_/¯
                 deriving (Eq, Read, Show)
 
 name2Cap::Integer->String->Capability
