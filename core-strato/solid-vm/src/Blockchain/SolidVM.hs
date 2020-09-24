@@ -783,7 +783,7 @@ expToVar' (Xabi.Unitary "--" e) = do
   setVar var next
   return $ Constant next
 
-expToVar' (Xabi.Binary "+=" lhs rhs) = binopAssign (+) lhs rhs
+expToVar' (Xabi.Binary "+=" lhs rhs) = addAndAssign lhs rhs
 expToVar' (Xabi.Binary "-=" lhs rhs) = binopAssign (-) lhs rhs
 expToVar' (Xabi.Binary "*=" lhs rhs) = binopAssign (*) lhs rhs
 expToVar' (Xabi.Binary "/=" lhs rhs) = binopAssign mod lhs rhs
@@ -922,7 +922,7 @@ expToVar' x@(Xabi.IndexAccess parent (Just mIndex)) = do
 --    _ -> error $ "unknown case in expToVar' for IndexAccess: " ++ show var
 
 
-expToVar' (Xabi.Binary "+" expr1 expr2) = expToVarInteger expr1 (+) expr2 SInteger
+expToVar' (Xabi.Binary "+" expr1 expr2) = expToVarAdd expr1 expr2
 expToVar' (Xabi.Binary "-" expr1 expr2) = expToVarInteger expr1 (-) expr2 SInteger
 expToVar' (Xabi.Binary "*" expr1 expr2) = expToVarInteger expr1 (*) expr2 SInteger
 expToVar' ex@(Xabi.Binary "/" expr1 expr2) = do 
@@ -1178,12 +1178,33 @@ expToVar' x = todo "expToVar/unhandled" x
 
 --------------
 
+expToVarAdd :: MonadSM m => Xabi.Expression -> Xabi.Expression -> m Variable
+expToVarAdd expr1 expr2 = do
+  i1 <- getVar =<< expToVar expr1
+  i2 <- getVar =<< expToVar expr2
+  case (i1, i2) of
+    (SInteger a, SInteger b) -> return . Constant . SInteger $ a + b
+    (SString a, SString b) -> return . Constant . SString $ a ++ b
+    _ -> typeError "expToVarAdd" (i1, i2)
+
 expToVarInteger :: MonadSM m => Xabi.Expression -> (Integer->Integer->a) -> Xabi.Expression -> (a->Value) -> m Variable
 expToVarInteger expr1 o expr2 retType = do
   i1 <- getInt =<< expToVar expr1
   i2 <- getInt =<< expToVar expr2
   return . Constant . retType $ i1 `o` i2
 
+addAndAssign :: MonadSM m => Xabi.Expression -> Xabi.Expression -> m Variable
+addAndAssign lhs rhs = do
+  let readVal e = getVar =<< expToVar e
+  delta <- readVal rhs
+  curValue <- readVal lhs
+  varToAssign <- expToVar lhs
+  next <- case (curValue, delta) of
+    (SInteger c, SInteger d) -> pure . SInteger $ c + d
+    (SString c, SString d) -> pure . SString $ c ++ d
+    _ -> typeError "addAndAssign" (curValue, delta)
+  setVar varToAssign next
+  return $ Constant next
 
 binopAssign :: MonadSM m => (Integer -> Integer -> Integer) -> Xabi.Expression -> Xabi.Expression -> m Variable
 binopAssign oper lhs rhs = do
