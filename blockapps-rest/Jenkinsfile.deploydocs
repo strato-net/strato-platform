@@ -16,7 +16,7 @@ pipeline {
             CONTAINER=$(docker run -d -v $(pwd):/sources node:10 bash -c "cd /sources && npm run build:docs")
             sleep 5
             docker cp ${CONTAINER}:/sources /home/blockapps/ba-rest-jsdoc
-            ./rerun-nginx-proxy.sh
+            ./home/blockapps/rerun-nginx-proxy.sh
             '''
           }
         }
