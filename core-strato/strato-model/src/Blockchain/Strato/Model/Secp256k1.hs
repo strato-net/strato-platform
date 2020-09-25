@@ -1,7 +1,9 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
---{-# LANGUAGE DerivingStrategies #-}
+
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.Strato.Model.Secp256k1

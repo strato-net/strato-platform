@@ -12,6 +12,7 @@ import Data.List (sort)
 import qualified Data.HashMap.Strict as HM
 import qualified Data.IntMap as I
 import qualified Data.Map as M
+import Data.Text (Text)
 import Test.Hspec
 import Text.RawString.QQ
 
@@ -20,6 +21,7 @@ import BlockApps.Solidity.SolidityValue
 import BlockApps.Solidity.Value as V
 import BlockApps.Strato.Types
 import Blockchain.SolidVM.Model
+import Blockchain.Strato.Model.Account
 import SolidVM.Model.Storable
 
 forceParse :: B.ByteString -> StoragePath
@@ -44,7 +46,13 @@ bool :: Bool -> V.Value
 bool = SimpleValue . ValueBool
 
 address :: Address -> V.Value
-address = SimpleValue . ValueAddress
+address = SimpleValue . ValueAccount . unspecifiedChain
+
+bAccount :: Address -> BasicValue
+bAccount = BAccount . unspecifiedChain
+
+bContract :: Text -> Address -> BasicValue
+bContract t = BContract t . unspecifiedChain
 
 spec :: Spec
 spec = do
@@ -123,8 +131,8 @@ spec = do
     it "should be able to override an array sentinel" $ do
       let spine = HM.singleton "arr" . ValueArrayDynamic . I.singleton 3
           cache = spine $ ValueArraySentinel 3
-          want = spine $ ValueContract 0x888
-      replayDeltas [(forceParse ".arr[3]", BContract "ok" 0x888)] cache `shouldBe` Right want
+          want = spine $ ValueContract $ unspecifiedChain 0x888
+      replayDeltas [(forceParse ".arr[3]", bContract "ok" 0x888)] cache `shouldBe` Right want
 
   describe "Synthesis" $ do
     it "can synthesize nothing" $ do
@@ -174,7 +182,7 @@ spec = do
 
     it "can synthesize an array with length" $ do
       let input = [ (forceParse ".owners.length", BInteger 2)
-                  , (forceParse ".owners[0]", BAddress 0x88)
+                  , (forceParse ".owners[0]", bAccount 0x88)
                   ]
           want = HM.singleton "owners" . ValueArrayDynamic $ I.fromList
             [(0, address 0x88), (2, ValueArraySentinel 2)]
@@ -183,15 +191,15 @@ spec = do
 
   describe "Bloch decoding" $ do
     it "can decode addresses" $ do
-      let input = toInput (singleton "owner",  BAddress 0xdeadbeef)
+      let input = toInput (singleton "owner",  bAccount 0xdeadbeef)
       decodeSolidVMValues [input] `shouldBe`
         [("owner", SolidityValueAsString "00000000000000000000000000000000deadbeef")]
 
     it "can decode everything" $ do
       let input = map toInput
-                [ (singleton "addr", BAddress 0xdeadbeef)
+                [ (singleton "addr", bAccount 0xdeadbeef)
                 , (singleton "boolean", BBool True)
-                , (singleton "contract", BContract "X" 0x999)
+                , (singleton "contract", bContract "X" 0x999)
                 , (singleton "number", BInteger 77714314)
                 , (singleton "str", BString "Hello, World!")
                 , (singleton "enum_val", BEnumVal "E" "C" 23)
@@ -262,10 +270,10 @@ spec = do
   describe "Slipstream decoding" $ do
 
     it "can decode an address (with empty cache)" $ do
-      let input = toInputMap [(singleton "owner",  BAddress 0xdeadbeef)]
+      let input = toInputMap [(singleton "owner",  bAccount 0xdeadbeef)]
           got = decodeCacheValues input []
       got `shouldBe`
-        [("owner", SimpleValue $ ValueAddress 0xdeadbeef)]
+        [("owner", SimpleValue $ ValueAccount $ unspecifiedChain 0xdeadbeef)]
 
     it "can decode an empty mapping" $ do
       let input = toInputMap [(singleton "mp", BMappingSentinel)]
@@ -276,9 +284,9 @@ spec = do
                 [ -- We are currently filtering out arrays, maps from decodeCacheValues, since cirrus
                   -- should not handle these types...  the tests for arrays and maps also need to
                   -- be filtered out
-                  (singleton "addr", BAddress 0xdeadbeef)
+                  (singleton "addr", bAccount 0xdeadbeef)
                 , (singleton "boolean", BBool True)
-                , (singleton "contract", BContract "X" 0x999)
+                , (singleton "contract", bContract "X" 0x999)
                 , (singleton "number", BInteger 77714314)
                 , (singleton "str", BString "Hello, World!")
                 , (singleton "enum_val", BEnumVal "E" "C" 22)
@@ -300,7 +308,7 @@ spec = do
 --          , ("array_of_nums", ValueArrayDynamic . I.fromList $
 --               zip [1..] [ int 20, int 40, int 77, ValueArraySentinel 4])
           , ("boolean", bool True)
-          , ("contract", ValueContract 0x999)
+          , ("contract", ValueContract $ unspecifiedChain 0x999)
           , ("enum_val", ValueEnum "E" "C" 22)
           , ("number", int 77714314)
 --          , ("strukt", ValueStruct $ M.fromList
@@ -343,7 +351,7 @@ spec = do
         decodeCacheValues input cache `shouldBe` [("number", int 100)]
 
       it "can update addresses" $ do
-        let input = toInputMap [(singleton "address", BAddress 0xddba11)]
+        let input = toInputMap [(singleton "address", bAccount 0xddba11)]
             cache = [("address", address 0x21345)]
         decodeCacheValues input cache `shouldBe` [("address", address 0xddba11)]
 

@@ -1,4 +1,6 @@
 {-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE DeriveAnyClass    #-}
+{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
@@ -25,6 +27,7 @@ import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
 
 import           BlockApps.Ethereum
+import           Blockchain.Strato.Model.Account
 --import           SolidVM.Solidity.Parse.Expression
 import           SolidVM.Solidity.Xabi.Statement
 import qualified SolidVM.Solidity.Xabi.Def  as Xabi
@@ -262,13 +265,12 @@ instance ToSchema Using where
 
 data ContractDetails = ContractDetails
   { contractdetailsBin        :: Text
-  , contractdetailsAddress    :: Maybe Address
+  , contractdetailsAccount    :: Maybe Account
   , contractdetailsBinRuntime :: Text
   , contractdetailsCodeHash   :: Keccak256
   , contractdetailsName       :: Text
   , contractdetailsSrc        :: Text
   , contractdetailsXabi       :: Xabi
-  , contractdetailsChainId    :: Maybe ChainId
   } deriving (Show,Eq,Generic, NFData, Binary)
 
 instance ToSample ContractDetails where toSamples _ = noSamples

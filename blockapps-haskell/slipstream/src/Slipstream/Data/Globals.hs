@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Slipstream.Data.Globals where
 
@@ -12,8 +14,7 @@ import           GHC.Generics
 
 import           BlockApps.Solidity.Value
 import           BlockApps.Solidity.Xabi     (ContractDetails(..))
-import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Keccak256
 import           Slipstream.Data.GlobalsColdStorage (Handle)
@@ -31,6 +32,6 @@ data Globals = Globals { createdEvents :: S.Set (Text, Text) -- (contractName, e
                        , noIndexList :: S.Set CodePtr
                        , functionHistoryList :: S.Set CodePtr
                        , contractABIs :: HM.HashMap Keccak256 (M.Map Text (Int32, ContractDetails))
-                       , contractStates :: LRU (Address, Maybe ChainId) [(Text, Value)]
+                       , contractStates :: LRU Account [(Text, Value)]
                        , csHandle :: Handle
                        } deriving (Generic, NFData)

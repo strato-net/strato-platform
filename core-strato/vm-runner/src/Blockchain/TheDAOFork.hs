@@ -9,9 +9,10 @@ import           Control.Monad.Change.Alter
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.DB.HashDB
+import           Blockchain.Strato.Model.Account
 
-addresses::[Address]
-addresses = map Address
+addresses::[Account]
+addresses = map (flip Account Nothing)
   [
     0xd4fe7bc31cedb7bfb8a345f31e668033056b2728,
     0xb3fb0e5aba0e20e5c49d252dfd30e102b171a425,
@@ -131,7 +132,7 @@ addresses = map Address
     0x807640a13483f8ac783c557fcdf27be11ea4ac7a
   ]
 
-runTheDAOFork :: (Monad m, HasHashDB m, (Address `Alters` AddressState) m) => m ()
+runTheDAOFork :: (Monad m, HasHashDB m, (Account `Alters` AddressState) m) => m ()
 runTheDAOFork = do
   values <-
     forM addresses $ \a -> do
@@ -140,7 +141,7 @@ runTheDAOFork = do
         pure addressState{addressStateBalance=0}
       return balance
 
-  let recipAddr = Address 0xbf4ed7b27f1d666546e30d74d50d173d20bca754
+  let recipAddr = Account (Address 0xbf4ed7b27f1d666546e30d74d50d173d20bca754) Nothing
 
   adjustWithDefault_ Proxy recipAddr $ \recipAddressState ->
     pure recipAddressState{addressStateBalance=addressStateBalance recipAddressState + sum values}

@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -27,15 +28,15 @@ import           GHC.Generics              hiding (to)
 import qualified Network.Haskoin.Internals as Haskoin
 import           Numeric
 
-import           Blockchain.Data.Address
 import           Blockchain.Data.Code
 import           Blockchain.EVM.VMState
 import           Blockchain.Util
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Keccak256
 
 data Env =
   Env {
-    currentCoinbase   ::  Address,
+    currentCoinbase   ::  Account,
     currentDifficulty ::  String,
     currentGasLimit   ::  Integer,
     currentNumber     ::  String,
@@ -55,13 +56,13 @@ newtype RawData = RawData { theData  ::  B.ByteString } deriving (Show, Eq)
 
 data Exec =
   Exec {
-    address'  ::  Address,
-    caller    ::  Address,
+    account'  ::  Account,
+    caller    ::  Account,
     code      ::  Code,
     data'     ::  RawData,
     gas'      ::  String,
     gasPrice' ::  String,
-    origin    ::  Address,
+    origin    ::  Account,
     value'    ::  String
     } deriving (Generic, Show, Eq)
 
@@ -72,7 +73,7 @@ data Transaction' =
     tGasPrice'  ::  String,
     tNonce'     ::  String,
     tSecretKey' ::  Haskoin.PrvKey,
-    tTo'        ::  Maybe Address,
+    tTo'        ::  Maybe Account,
     tValue'     ::  String
     } deriving (Show, Eq)
 
@@ -86,8 +87,8 @@ data Test =
     theInput     ::  InputWrapper,
     remainingGas ::  Maybe Int,
     out          ::  RawData,
-    pre          ::  M.Map Address AddressState',
-    post         ::  M.Map Address AddressState'
+    pre          ::  M.Map Account AddressState',
+    post         ::  M.Map Account AddressState'
     } deriving (Generic, Show, Eq)
 
 type Tests = M.Map String Test
@@ -177,7 +178,7 @@ instance FromJSON Transaction' where
         let fixedTo =
               if T.null to'
               then Nothing
-              else Just $ Address $ fromIntegral $ sloppyParseHexNumber to'
+              else Just $ Account (fromIntegral $ sloppyParseHexNumber to') Nothing
         in Transaction' d gl gp n sk fixedTo v'
   parseJSON x = error $ "Wrong format when trying to parse Transaction' from JSON: " ++ show x
 

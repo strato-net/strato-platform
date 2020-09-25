@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -35,8 +36,8 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
 import           Blockchain.SolidVM.Model
 import           Blockchain.Strato.Model.ChainId
+import           Options
 
-import           Settings
 import           SQLM
 import           UnliftIO
 
@@ -140,7 +141,7 @@ instance Selectable StorageFilterParams [StorageAddress] SQLM where
 
             E.where_ (foldl1 (E.&&.) criteria2)
 
-            E.limit $ appFetchLimit
+            E.limit $ fromIntegral flags_appFetchLimit
 
             E.orderBy [E.asc (storage E.^. StorageKey)]
 

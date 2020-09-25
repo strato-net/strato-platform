@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -11,11 +12,9 @@ module Blockchain.Data.Json where
 import           Data.Aeson
 import           Data.Aeson.Types                     (Parser)
 import qualified Data.ByteString                      as B
-import qualified Data.ByteString.Base16               as B16
 import qualified Data.Map.Strict                      as M
 import           Data.Maybe
 import           Data.Swagger                         hiding (format)
-import qualified Data.Text.Encoding                   as T
 import           Data.Time.Calendar
 import           Data.Time.Clock
 import           Data.Word
@@ -54,7 +53,7 @@ instance ToJSON RawTransaction' where
           , "gasLimit" .= gl
           , "to" .= ta
           , "value" .= show val
-          , "codeOrData" .= T.decodeUtf8 (B16.encode cod)
+          , "codeOrData" .= cod
           , "r" .= showHex r ""
           , "s" .= showHex s ""
           , "v" .= showHex v ""
@@ -73,7 +72,7 @@ instance ToJSON RawTransaction' where
           , "gasPrice" .= gp
           , "gasLimit" .= gl
           , "value" .= show val
-          , "codeOrData" .= T.decodeUtf8 (B16.encode cod)
+          , "codeOrData" .= cod
           , "r" .= showHex r ""
           , "s" .= showHex s ""
           , "v" .= showHex v ""
@@ -99,7 +98,7 @@ instance FromJSON RawTransaction' where
       tgl <- t .:? "gasLimit" .!= 0
       tto <- t .:? "to"
       tval <- read <$> t .:? "value" .!= "0"
-      tcd <- fmap (fst .  B16.decode . T.encodeUtf8 ) (t .:? "codeOrData" .!= "")
+      tcd <- t .:? "codeOrData" .!= Code ""
       cid <- fmap (\(ChainId c) -> c) <$> (t .:? "chainId")
       (tr :: Integer) <- parseHexStr (t .: "r")
       (ts :: Integer) <- parseHexStr (t .: "s")
@@ -124,7 +123,7 @@ instance FromJSON RawTransaction' where
                  (tgl :: Integer)
                  (tto :: Maybe Address)
                  (tval :: Integer)
-                 (tcd :: B.ByteString)
+                 (tcd :: Code)
                  (fromMaybe 0 (cid :: Maybe Word256))
                  (tr :: Integer)
                  (ts :: Integer)
@@ -411,7 +410,10 @@ isAddr a = case a of
       Nothing -> False
 
 rawTransactionSemantics :: RawTransaction -> TransactionType
-rawTransactionSemantics (RawTransaction _ _ _ _ _ ta _ cod _ _ _ _ _ _ _ _) = work
+rawTransactionSemantics (RawTransaction _ _ _ _ _ ta _ code _ _ _ _ _ _ _ _) = work
      where work | (not (isAddr ta))  = Contract
                 | (isAddr ta) &&  ((B.length cod) > 0)        = FunctionCall
                 | otherwise = Transfer
+           cod = case code of
+                   Code c -> c
+                   _ -> ""

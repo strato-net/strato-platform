@@ -9,6 +9,7 @@ import Test.Hspec
 import BlockApps.Solidity.Storage
 import BlockApps.Solidity.Value
 import BlockApps.Solidity.Type
+import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 
 {-# ANN module ("HLint: ignore Redundant do" :: String) #-}
@@ -41,7 +42,7 @@ spec = do
         it "should convert 2 arg with type uint256, addresss" $ do
           let
             args = ValueArrayFixed 2
-                    [ SimpleValue (valueInt256 324124), SimpleValue (ValueAddress (Address 0xcd2a3d9f938e13cd947ec05abc7fe734df8dd826))]
+                    [ SimpleValue (valueInt256 324124), SimpleValue (ValueAccount $ unspecifiedChain (Address 0xcd2a3d9f938e13cd947ec05abc7fe734df8dd826))]
             (dataBytestring,_) = Base16.decode "000000000000000000000000000000000000000000000000000000000004f21c000000000000000000000000cd2a3d9f938e13cd947ec05abc7fe734df8dd826"
           toStorage args `shouldBe` dataBytestring
       it "should convert 1 arg with type uint" $ do
@@ -59,7 +60,7 @@ spec = do
       it "should convert 1 arg with type address" $ do
         let
           args = ValueArrayFixed 1
-                  [ SimpleValue (ValueAddress (Address 0xdeadbeef)) ]
+                  [ SimpleValue (ValueAccount $ unspecifiedChain (Address 0xdeadbeef)) ]
           (dataBytestring,_) = Base16.decode "00000000000000000000000000000000000000000000000000000000deadbeef"
         toStorage args `shouldBe` dataBytestring
       it "should convert 1 arg with type bytes" $ do
@@ -127,8 +128,8 @@ spec = do
 
         let
           args = ValueArrayFixed 5
-                  [ SimpleValue . ValueAddress . fromJust . stringAddress $ "fdb2eea0003ec6de4f8bc1fe63307b730d5b7e62"
-                  , SimpleValue . ValueAddress . fromJust . stringAddress $ "fdb2eea0003ec6de4f8bc1fe63307b730d5b7e62"
+                  [ SimpleValue . ValueAccount . unspecifiedChain . fromJust . stringAddress $ "fdb2eea0003ec6de4f8bc1fe63307b730d5b7e62"
+                  , SimpleValue . ValueAccount . unspecifiedChain . fromJust . stringAddress $ "fdb2eea0003ec6de4f8bc1fe63307b730d5b7e62"
                   , SimpleValue . ValueBytes (Just 32) . fst . Base16.decode $ "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"
                   , ValueArrayDynamic $ tosparse
                       [ SimpleValue . ValueBytes (Just 32) . fst . Base16.decode
@@ -168,7 +169,7 @@ spec = do
       dataBytestring `shouldBe` bytes'
     it "should decode and encode: address" $ do
       let
-        types = [ SimpleType TypeAddress ]
+        types = [ SimpleType TypeAccount ]
         (dataBytestring,_) = Base16.decode "00000000000000000000000000000000000000000000000000000000deadbeef"
         mBytes = toStorage . ValueArrayFixed 1 <$> bytestringToValues dataBytestring types
       mBytes `shouldSatisfy` isJust

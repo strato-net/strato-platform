@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS -fno-warn-orphans                                   #-}
@@ -22,18 +23,16 @@ data EVMCheckpoint = EVMCheckpoint {
     checkpointSHA    :: Keccak256,
     checkpointHead   :: DD.BlockData,
     ctxBestBlockInfo :: ContextBestBlockInfo,
-    ctxChainDBStateRoot :: Maybe MP.StateRoot
+    ctxChainDBStateRoot :: MP.StateRoot
 } deriving (Read, Show)
 
 instance RLPSerializable EVMCheckpoint where
     rlpDecode (RLPArray [sha, header, bbi]) =
-        EVMCheckpoint (rlpDecode sha) (rlpDecode header) (rlpDecode bbi) Nothing
+        EVMCheckpoint (rlpDecode sha) (rlpDecode header) (rlpDecode bbi) (MP.emptyTriePtr)
     rlpDecode (RLPArray [sha, header, bbi, sr]) =
-        EVMCheckpoint (rlpDecode sha) (rlpDecode header) (rlpDecode bbi) (Just $ rlpDecode sr)
+        EVMCheckpoint (rlpDecode sha) (rlpDecode header) (rlpDecode bbi) (rlpDecode sr)
     rlpDecode _ = error "unexpected RLP object"
-    rlpEncode (EVMCheckpoint sha header bbi Nothing) =
-        RLPArray [rlpEncode sha, rlpEncode header, rlpEncode bbi]
-    rlpEncode (EVMCheckpoint sha header bbi (Just sr)) =
+    rlpEncode (EVMCheckpoint sha header bbi sr) =
         RLPArray [rlpEncode sha, rlpEncode header, rlpEncode bbi, rlpEncode sr]
 
 instance RLPSerializable ContextBestBlockInfo where

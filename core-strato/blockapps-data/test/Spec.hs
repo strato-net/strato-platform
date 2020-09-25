@@ -27,9 +27,11 @@ import           Blockchain.Data.BlockHeader
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Enode
 import           Blockchain.Data.RLP
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Code
+import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Data.Json
@@ -73,6 +75,12 @@ main = hspecWith (configAddFilter predicate defaultConfig) $ do
   describe "Data round trips" $ do
     enodeRLP
     enodeJSON
+    accountRLP
+    accountJSON
+    codePtrRLP
+    codePtrJSON
+    codeRLP
+    codeJSON
     accountInfoRLP
     accountInfoJSON
     actionJSON
@@ -117,6 +125,36 @@ enodeJSON :: Spec
 enodeJSON = do
   it "should convert an Enode address to and from its JSON encoding" $ property $
     (\x -> jsonCheck (x :: Enode))
+
+accountRLP :: Spec
+accountRLP = do
+  it "should convert an Account to and from its RLP encoding" $ property $
+    (\x -> rlpCheck (x :: Account))
+
+accountJSON :: Spec
+accountJSON = do
+  it "should convert an Account to and from its JSON encoding" $ property $
+    (\x -> jsonCheck (x :: Account))
+
+codePtrRLP :: Spec
+codePtrRLP = do
+  it "should convert a CodePtr to and from its RLP encoding" $ property $
+    (\x -> rlpCheck (x :: CodePtr))
+
+codePtrJSON :: Spec
+codePtrJSON = do
+  it "should convert a CodePtr to and from its JSON encoding" $ property $
+    (\x -> jsonCheck (x :: CodePtr))
+
+codeRLP :: Spec
+codeRLP = do
+  it "should convert a Code to and from its RLP encoding" $ property $
+    (\x -> rlpCheck (x :: Code))
+
+codeJSON :: Spec
+codeJSON = do
+  it "should convert a Code to and from its JSON encoding" $ property $
+    (\x -> jsonCheck (x :: Code))
 
 accountInfoRLP :: Spec
 accountInfoRLP = do

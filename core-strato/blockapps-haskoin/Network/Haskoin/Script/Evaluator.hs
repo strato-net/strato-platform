@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+
 {-|
 
 Module providing Bitcoin script evaluation.  See

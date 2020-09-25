@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 module Blockchain.Bagger.Transactions where
 
 import           Control.DeepSeq
@@ -9,7 +10,6 @@ import           GHC.Generics
 
 import           Blockchain.DB.MemAddressStateDB
 
-import           Blockchain.Data.Address
 import           Blockchain.Data.ExecResults
 import qualified Blockchain.Data.TransactionDef     as TD
 import           Blockchain.Data.TransactionResultStatus
@@ -17,6 +17,7 @@ import           Blockchain.Data.TXOrigin
 import           Blockchain.Database.MerklePatricia (StateRoot (..))
 import           Blockchain.ExtWord
 import           Blockchain.Sequencer.Event         (OutputTx (..))
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Action
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256        hiding (hash)
@@ -26,9 +27,9 @@ import           Text.Format
 data TxRunResult = TxRunResult { trrTransaction :: OutputTx
                                , trrResult      :: Either TransactionFailureCause ExecResults
                                , trrTime        :: NominalDiffTime
-                               , trrBeforeMap   :: M.Map Address AddressStateModification
-                               , trrAfterMap    :: M.Map Address AddressStateModification
-                               , trrNewAddresses :: [Address]
+                               , trrBeforeMap   :: M.Map Account AddressStateModification
+                               , trrAfterMap    :: M.Map Account AddressStateModification
+                               , trrNewAddresses :: [Account]
                                } deriving (Show, Eq, Generic)
 
 -- When we use a cached TxRunResult, the blockHash does not account for consensus values added.
@@ -46,6 +47,7 @@ data TransactionFailureCause = TFInsufficientFunds Integer Integer OutputTx -- t
                              | TFBlockGasLimitExceeded Integer Integer OutputTx-- neededGas, actualGas
                              | TFNonceMismatch Integer Integer OutputTx -- expectedNonce, actualNonce
                              | TFChainIdMismatch (Maybe Word256) (Maybe Word256) OutputTx -- expectedChainId, actualChainId
+                             | TFCodeCollectionNotFound Account String OutputTx
                              deriving (Eq, Read, Show, Generic)
 
 instance NFData TransactionFailureCause
@@ -68,6 +70,7 @@ data TxRejection = WrongChainId   BaggerStage BaggerTxQueue OutputTx -- only pub
                  | BalanceTooLow  BaggerStage BaggerTxQueue Integer Integer OutputTx -- integers: needed balance, actual balance
                  | GasLimitTooLow BaggerStage BaggerTxQueue Integer OutputTx -- queue should probably only be Validation, integer is intrinsic gas
                  | LessLucrative  BaggerStage BaggerTxQueue OutputTx OutputTx -- newTx, oldTx
+                 | CodeNotFound   BaggerStage BaggerTxQueue Account String OutputTx
                  deriving (Eq, Read, Show)
 
 rejectedTx :: TxRejection -> OutputTx
@@ -76,6 +79,7 @@ rejectedTx (NonceTooLow _ _ _ t)     = t
 rejectedTx (BalanceTooLow _ _ _ _ t) = t
 rejectedTx (GasLimitTooLow _ _ _ t)  = t
 rejectedTx (LessLucrative _ _ _ t)   = t
+rejectedTx (CodeNotFound _ _ _ _ t)  = t
 
 data BaggerStage = Insertion | Validation | Promotion | Demotion | Execution deriving (Read, Eq, Show)
 
@@ -105,6 +109,11 @@ instance Format TxRejection where
             "LessLucrative at stage " ++ show stage ++ " in queue " ++ show queue ++
             "\n++++superior transaction:++++\n" ++ format superior ++
             "\n----inferior transaction:----\n" ++ format inferior
+    format (CodeNotFound stage queue address name o) =
+        "GasLimitTooLow at stage " ++ show stage ++ " in queue " ++ show queue ++
+        "\n\ttarget address " ++ format address ++
+        "\n\tcontract name " ++ name ++
+        "\n" ++ format o
 
 txRejectionToAPIFailureCause :: TxRejection -> TransactionResultStatus
 txRejectionToAPIFailureCause (WrongChainId   stage queue tx) =
@@ -117,6 +126,8 @@ txRejectionToAPIFailureCause (GasLimitTooLow stage queue needed tx) =
     Failure (show stage) (Just $ show queue) IntrinsicGasExceedsLimit (Just needed) (Just . TD.transactionGasLimit $ otBaseTx tx) Nothing
 txRejectionToAPIFailureCause (LessLucrative  stage queue newTx _) =
     Failure (show stage) (Just $ show queue) TrumpedByMoreLucrative Nothing Nothing (Just $ "trumped by " ++ formatKeccak256WithoutColor (otHash newTx))
+txRejectionToAPIFailureCause (CodeNotFound  stage queue address name _) =
+    Failure (show stage) (Just $ show queue) MissingCode Nothing Nothing (Just $ "code not found at address " ++ format address ++ " with name " ++ name)
 
 tfToBaggerTxRejection :: TransactionFailureCause -> TxRejection
 tfToBaggerTxRejection (TFInsufficientFunds cost balance tx) = BalanceTooLow Execution Queued cost balance tx
@@ -124,6 +135,7 @@ tfToBaggerTxRejection (TFIntrinsicGasExceedsTxLimit ig _ tx) = GasLimitTooLow Ex
 tfToBaggerTxRejection TFBlockGasLimitExceeded{} = error "please dont do that (call tfToBaggerTxRejection on a TFBlockGasLimitExceeded)"
 tfToBaggerTxRejection (TFNonceMismatch expected _ tx) = NonceTooLow Execution Queued expected tx
 tfToBaggerTxRejection (TFChainIdMismatch _ _ tx) = WrongChainId Validation Queued tx
+tfToBaggerTxRejection (TFCodeCollectionNotFound addr name tx) = CodeNotFound Validation Queued addr name tx
 
 instance Format TransactionFailureCause where
     format (TFInsufficientFunds cost bal _) = "Insufficient funds: cost " ++ show cost ++ " > balance " ++ show bal
@@ -131,3 +143,4 @@ instance Format TransactionFailureCause where
     format (TFBlockGasLimitExceeded txG blkG _) = "Block gas limit exceeded: needed " ++ show txG ++ " > available " ++ show blkG
     format (TFNonceMismatch expected actual _) = "Nonce mismatch: expecting " ++ show expected ++ ", actual " ++ show actual
     format (TFChainIdMismatch expected actual _) = "Chain ID mismatch: expecting " ++ TD.formatChainId expected ++ ", actual " ++ TD.formatChainId actual
+    format (TFCodeCollectionNotFound addr name _) = "Code collection not found at address " ++ format addr ++ " with name " ++ name

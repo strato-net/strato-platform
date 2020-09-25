@@ -28,6 +28,7 @@ library:
     - aeson
     - binary
     - blockapps-bloc22-server
+    - blockapps-mpdbs
     - blockapps-solidity
     - blockapps-util
     - bloomfilter

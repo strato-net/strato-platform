@@ -19,13 +19,14 @@ module Blockchain.Event
 
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
-import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.ExtWord
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Indexer.Model    (IndexEvent (..))
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Action
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.StateDiff
 import qualified Data.DList                         as DL
 import           Data.Map                           (Map)
@@ -59,23 +60,23 @@ insertInBatch e b = case e of
 data VmOutEvent = OutAction Action
                 | OutBlock OutputBlock
                 | OutIndexEvent IndexEvent
-                | OutToStateDiff Word256 ChainInfo MP.StateRoot
+                | OutToStateDiff Word256 ChainInfo Keccak256
                 | OutStateDiff StateDiff
                 | OutLog LogDB
                 | OutEvent EventDB
                 | OutTXR TransactionResult
-                | OutASM (Maybe Word256) (Map Address AddressStateModification)
+                | OutASM (Map Account AddressStateModification)
 
 data VmOutEventBatch = OutBatch
   { outActions      :: DL.DList Action
   , outBlocks       :: DL.DList OutputBlock
   , outIndexEvents  :: DL.DList IndexEvent
-  , outToStateDiffs :: DL.DList (Word256, ChainInfo, MP.StateRoot)
+  , outToStateDiffs :: DL.DList (Word256, ChainInfo, Keccak256)
   , outStateDiffs   :: DL.DList StateDiff
   , outLogs         :: DL.DList LogDB
   , outEvents       :: DL.DList EventDB
   , outTXRs         :: DL.DList TransactionResult
-  , outASMs         :: DL.DList (Maybe Word256, (Map Address AddressStateModification))
+  , outASMs         :: DL.DList (Map Account AddressStateModification)
   }
 
 newOutBatch :: VmOutEventBatch
@@ -99,5 +100,5 @@ insertOutBatch e b = case e of
   OutLog a             -> b{ outLogs = outLogs b `DL.snoc` a }
   OutEvent a           -> b{ outEvents = outEvents b `DL.snoc` a }
   OutTXR a             -> b{ outTXRs = outTXRs b `DL.snoc` a }
-  OutASM chainId a     -> b{ outASMs = outASMs b `DL.snoc` (chainId, a) }
+  OutASM a             -> b{ outASMs = outASMs b `DL.snoc` a }
 

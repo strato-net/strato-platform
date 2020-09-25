@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 module Redis where
 
 import Control.Monad.IO.Class

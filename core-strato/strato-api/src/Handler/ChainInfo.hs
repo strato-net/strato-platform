@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -83,8 +84,10 @@ processChainInfos chainInfos = forM (zip [0..] chainInfos) $ -- TODO(dustin): Us
           NonContract _ _ -> Nothing
           ContractNoStorage _ _ (EVMCode c) -> Just c
           ContractNoStorage _ _ (SolidVMCode _ c) -> Just c
+          ContractNoStorage _ _ (CodeAtAccount _ _) -> Nothing
           ContractWithStorage _ _ (EVMCode c) _ -> Just c
           ContractWithStorage _ _ (SolidVMCode _ c) _ -> Just c
+          ContractWithStorage _ _ (CodeAtAccount _ _) _ -> Nothing
         getCode CodeInfo{..} =
           case theVM of --For SolidVM, the source is the code
             "SolidVM" -> BC.pack $ T.unpack codeInfoSource

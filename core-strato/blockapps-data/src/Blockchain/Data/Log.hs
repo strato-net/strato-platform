@@ -1,8 +1,9 @@
+{-# LANGUAGE DeriveGeneric #-}
 module Blockchain.Data.Log (
   Log(..)
   ) where
 
-import           Blockchain.Data.Address
+import           Blockchain.Strato.Model.Account
 import           Control.DeepSeq
 import qualified Data.ByteString           as B
 import           GHC.Generics
@@ -10,7 +11,7 @@ import           Network.Haskoin.Internals (Word256, Word512)
 
 data Log =
   Log {
-    address :: Address,
+    account :: Account,
     bloom   :: Word512,
     logData :: B.ByteString,
     topics  :: [Word256]

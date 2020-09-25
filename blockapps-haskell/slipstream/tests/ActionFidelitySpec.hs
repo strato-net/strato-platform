@@ -7,7 +7,6 @@ import Data.Aeson.QQ
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import Data.Either
-import Data.Maybe (fromJust)
 import qualified Data.Map.Strict as M
 import Data.Time.Clock.POSIX
 import qualified Data.Sequence as S
@@ -15,11 +14,10 @@ import Test.QuickCheck
 import Test.Hspec
 
 import qualified Blockchain.Strato.Model.Action as BS
-import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.SolidVM.Model
 import qualified Slipstream.Data.Action as SS
 
 convert :: BS.Action -> Either String SS.Action -- 🤔
@@ -32,7 +30,7 @@ emptySolidVMData :: BS.ActionData
 emptySolidVMData = BS.ActionData (SolidVMCode "ContractName" $ unsafeCreateKeccak256FromWord256 0) SolidVM (BS.ActionSolidVMDiff M.empty) []
 
 emptyAction :: BS.Action
-emptyAction = BS.Action (unsafeCreateKeccak256FromWord256 0) (posixSecondsToUTCTime 0) 0 (unsafeCreateKeccak256FromWord256 0) Nothing 0x0 M.empty Nothing S.empty
+emptyAction = BS.Action (unsafeCreateKeccak256FromWord256 0) (posixSecondsToUTCTime 0) 0 (unsafeCreateKeccak256FromWord256 0) Nothing (Account 0x0 Nothing) M.empty Nothing S.empty
 
 spec :: Spec
 spec = describe "Action conversions" $ do
@@ -40,22 +38,22 @@ spec = describe "Action conversions" $ do
       convert emptyAction `shouldSatisfy` isRight
 
    it "should parse empty Word256 actions" $ do
-      convert emptyAction{BS._actionData=M.singleton 0x988 emptyEVMData}
+      convert emptyAction{BS._actionData=M.singleton (Account 0x988 Nothing) emptyEVMData}
           `shouldSatisfy` isRight
 
    it "should parse empty ByteString actions" $ do
-      convert emptyAction{BS._actionData=M.singleton 0x988 emptySolidVMData}
+      convert emptyAction{BS._actionData=M.singleton (Account 0x988 Nothing) emptySolidVMData}
           `shouldSatisfy` isRight
 
    it "should parse basic Word256 actions" $ do
     let diff = BS.ActionEVMDiff $ M.singleton 0xffffffffff 0xeeeeeeeeeeeeeee
         daytuh = emptyEVMData {BS._actionDataStorageDiffs = diff}
-    convert emptyAction{BS._actionData = M.singleton 0x988 daytuh} `shouldSatisfy` isRight
+    convert emptyAction{BS._actionData = M.singleton (Account 0x988 Nothing) daytuh} `shouldSatisfy` isRight
 
    it "should parse basic bytestring actions" $ do
     let diff = BS.ActionSolidVMDiff $ M.singleton (B.replicate 34 0x6b) (B.replicate 33 0x76)
         daytuh = emptySolidVMData {BS._actionDataStorageDiffs = diff}
-    convert emptyAction{BS._actionData = M.singleton 0x988 daytuh} `shouldSatisfy` isRight
+    convert emptyAction{BS._actionData = M.singleton (Account 0x988 Nothing) daytuh} `shouldSatisfy` isRight
 
    it "should convert bytestrings properly" $ do
      toJSON ("\x80\x60\x40" :: B.ByteString) `shouldBe` String "806040"
@@ -108,7 +106,7 @@ spec = describe "Action conversions" $ do
          },
          "events" : 
          [ { "eventContractName" : "Vehicle",
-             "eventContractAddress" : "2e385b6a3aea46d4172df98617b5385c13b7100d",
+             "eventContractAccount" : "2e385b6a3aea46d4172df98617b5385c13b7100d",
              "eventName" : "Vehicle Event",
              "eventArgs" : ["x", "y"]
            }
@@ -121,8 +119,8 @@ spec = describe "Action conversions" $ do
         , SS._actionBlockNumber = 9
         , SS._actionTransactionHash = forceHash "3d5069c6b8f6e3922f8a98bef4f23c2d73794403172c12d6915d51ad47a9e827"
         , SS._actionTransactionChainId = Nothing
-        , SS._actionTransactionSender = 0xc2191df3032cb8ee72e37ab6bbc4e83f92b9911c
-        , SS._actionData = M.singleton 0x2f6ff9d4a35c07f7b630fe1ce039bc45559b5fb6 $ SS.ActionData
+        , SS._actionTransactionSender = Account 0xc2191df3032cb8ee72e37ab6bbc4e83f92b9911c Nothing
+        , SS._actionData = M.singleton (Account 0x2f6ff9d4a35c07f7b630fe1ce039bc45559b5fb6 Nothing) $ SS.ActionData
           { SS._actionDataStorageDiffs = BS.ActionEVMDiff . M.fromList $
             [ (0, 0x5c703a07)
             , (1, 0x76696e5f305f300000000000000000000000000000000000000000000000000e)
@@ -135,8 +133,8 @@ spec = describe "Action conversions" $ do
           , SS._actionDataCodeKind = EVM
           , SS._actionDataCallData = [SS.CallData
             { SS._callDataType = SS.Create
-            , SS._callDataSender = 0xc2191df3032cb8ee72e37ab6bbc4e83f92b9911c
-            , SS._callDataOwner = 0x2f6ff9d4a35c07f7b630fe1ce039bc45559b5fb6
+            , SS._callDataSender = Account 0xc2191df3032cb8ee72e37ab6bbc4e83f92b9911c Nothing
+            , SS._callDataOwner = Account 0x2f6ff9d4a35c07f7b630fe1ce039bc45559b5fb6 Nothing
             , SS._callDataGasPrice = 1
             , SS._callDataValue = 0
             , SS._callDataInput = ""
@@ -144,5 +142,5 @@ spec = describe "Action conversions" $ do
             }]
           }
         , SS._actionMetadata = Just . M.fromList $ [("name", "Vehicle"), ("src", "contract Vehicle {}")]
-        , SS._actionEvents = S.singleton $ Event "Vehicle" (fromJust $ stringAddress "2e385b6a3aea46d4172df98617b5385c13b7100d") "Vehicle Event" ["x", "y"]
+        , SS._actionEvents = S.singleton $ Event "Vehicle" (Account 0x2e385b6a3aea46d4172df98617b5385c13b7100d Nothing) "Vehicle Event" ["x", "y"]
       })
