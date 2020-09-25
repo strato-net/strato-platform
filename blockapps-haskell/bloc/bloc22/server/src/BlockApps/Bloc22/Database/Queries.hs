@@ -615,7 +615,7 @@ getContractDetailsAndMetadataId (ContractName contractName) acct = do
 
 getContractDetailsByCodeHash :: CodePtr -> Bloc (Maybe (Int32, ContractDetails))
 getContractDetailsByCodeHash = \case
-  CodeAtAccount acct name -> fmap (fmap (\cd -> cd{contractdetailsName=Text.pack name})) <$> getContractDetailsAndMetadataIdByAccountOnly acct
+  CodeAtAccount acct name -> getContractDetailsAndMetadataId (ContractName $ Text.pack name) acct
   codeHash -> do
     mDetails <- fmap listToMaybe . blocQuery $ getContractsContractByCodeHashQuery codeHash
     for mDetails $ \(bin,binr,ch,_ :: ByteString,_ :: ByteString,name,src,cmId,xabi') -> do
