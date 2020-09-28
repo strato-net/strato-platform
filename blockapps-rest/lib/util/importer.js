@@ -1,5 +1,5 @@
-import fs from 'fs'
-import nodepath from 'path'
+import * as fs from 'fs'
+import * as nodepath from 'path'
 const cwd = nodepath.resolve(process.cwd());
 
 let nameStore = [];
@@ -110,7 +110,7 @@ function splitPath(fullname) {
   return path;
 }
 
-function combine(filename) {
+function combine(filename):Promise<string> {
   nameStore = [];
   return new Promise(function(resolve, reject) {
     const string = readFileLines(filename);

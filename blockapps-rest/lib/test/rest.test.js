@@ -1,4 +1,4 @@
-import RestStatus from "http-status-codes";
+import * as RestStatus from "http-status-codes";
 import rest from "../rest";
 import assert from "../util/assert";
 import util from "../util/util";

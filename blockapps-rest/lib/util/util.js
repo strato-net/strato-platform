@@ -1,4 +1,4 @@
-import path from 'path'
+import * as path from 'path'
 
 // odds
 const cwd = path.resolve(process.cwd())
@@ -60,7 +60,7 @@ function sha3(address) {
   throw new Error('sha3 not found')
 }
 
-function uid(prefix, digits = 6) {
+function uid(prefix?, digits = 6) {
   if (digits < 1) digits = 1
   if (digits > 16) digits = 16
   const random = Math.floor(Math.random() * (10 ** digits))
@@ -141,10 +141,10 @@ function timeout(ms) {
     console.log('setB', setB);
   }
   return setA.filter(function (memberA) {
-    return !setB.filter(function (memberB) {
+    return !(setB.filter(function (memberB) {
       // compare
       return comparator(memberA, memberB);
-    }).length > 0; // some items were found in setA that are not included in setB
+    }).length > 0); // some items were found in setA that are not included in setB
   });
 }
 

@@ -1,4 +1,4 @@
-import fs from 'fs'
+import * as fs from 'fs'
 import yaml from 'js-yaml';
 
 function get(filename) {
@@ -13,7 +13,7 @@ function getYaml(filename) {
 
 function getJson(filename, options) {
   const content = fs.readFileSync(filename, options)
-  return JSON.parse(content)
+  return JSON.parse(content.toString())
 }
 
 export default {

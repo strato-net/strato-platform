@@ -6,6 +6,27 @@ import getPem from "rsa-pem-from-mod-exp";
 import '@babel/polyfill';
 
 class OAuthUtil {
+  appTokenCookieName : any;
+  appTokenExpirationCookieName : any;
+  appTokenCookieMaxAge : any;
+  refreshTokenCookieName : any;
+  clientId : any;
+  clientSecret : any;
+  redirectUri : any;
+  openIdDiscoveryUrl : any;
+  logoutRedirectUri : any;
+  scope : any;
+  openIdConfig : any;
+  jwtAlgorithm : any;
+  issuer : any;
+  logOutUrl : any;
+  keys : any[];
+  tokenField : any;
+  serviceUsername : any;
+  servicePassword : any;
+  tokenHost : any;
+  oauth2 : any;
+
   constructor(oauthConfig) {
     this.appTokenCookieName = oauthConfig.appTokenCookieName;
     this.appTokenExpirationCookieName =
@@ -92,7 +113,7 @@ class OAuthUtil {
    * @param {String} state
    * @returns AuthorizationUri
    */
-  getSigninURL(state) {
+  getSigninURL(state?) {
     const authorizationUri = this.oauth2.authorizationCode.authorizeURL({
       redirect_uri: this.redirectUri,
       scope: this.scope,
@@ -170,7 +191,7 @@ class OAuthUtil {
    * @param {String} scope
    * @returns AccessTokenResponse
    */
-  async getAccessTokenByResourceOwnerCredential(username, password, scope) {
+  async getAccessTokenByResourceOwnerCredential(username, password, scope?) {
     const tokenConfig = {
       username: username || this.serviceUsername,
       password: password || this.servicePassword,

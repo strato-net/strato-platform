@@ -1,5 +1,5 @@
 import { BigNumber } from "bignumber.js";
-import RestStatus from "http-status-codes";
+import * as RestStatus from "http-status-codes";
 import api from "./api";
 import { TxResultStatus } from "./constants";
 import util from "./util/util";
