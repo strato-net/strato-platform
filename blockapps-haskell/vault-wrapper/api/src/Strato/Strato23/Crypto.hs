@@ -38,7 +38,6 @@ data KeyStore = KeyStore
   , keystoreAcctNonce     :: SecretBox.Nonce
   , keystoreAcctEncSecKey :: ByteString
   , keystoreAcctAddress   :: Address
-  , keystoreAcctPubKey    :: PublicKey
   } deriving (Eq, Show)
 
 decrypt
@@ -91,11 +90,9 @@ newKeyStore key = liftIO $ do
   acctSk <- liftIO newPrivateKey
   let encAcctSk = encrypt key acctNonce $ exportPrivateKey acctSk
       acctAddr = fromPrivateKey acctSk
-      acctPubKey = derivePublicKey acctSk
   return KeyStore
     { keystoreSalt = salt
     , keystoreAcctNonce = acctNonce
     , keystoreAcctEncSecKey = encAcctSk
     , keystoreAcctAddress = acctAddr
-    , keystoreAcctPubKey = acctPubKey
     }
