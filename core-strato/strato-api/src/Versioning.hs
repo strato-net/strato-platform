@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 --{-# LANGUAGE TypeHoles #-}
 {-# LANGUAGE StandaloneDeriving #-}
 

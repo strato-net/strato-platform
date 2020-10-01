@@ -2,6 +2,7 @@
       DataKinds
     , DeriveGeneric
     , FlexibleContexts
+    , LambdaCase
     , GeneralizedNewtypeDeriving
     , OverloadedStrings
     , QuasiQuotes

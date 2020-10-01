@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 module Blockchain.Data.Log (
   Log(..)
   ) where

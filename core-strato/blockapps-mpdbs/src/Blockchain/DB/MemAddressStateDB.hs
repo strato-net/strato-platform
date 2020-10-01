@@ -1,4 +1,5 @@
 {-# OPTIONS -fno-warn-redundant-constraints #-} -- todo fixme
+{-# LANGUAGE DeriveGeneric    #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeOperators    #-}
 module Blockchain.DB.MemAddressStateDB (
