@@ -93,6 +93,12 @@ spec = do
                  , ("var (a, b, , );", SimpleStatement $
                       VariableDefinition [VarDefEntry Nothing Nothing "a", VarDefEntry Nothing Nothing "b", BlankEntry, BlankEntry]
                       Nothing)
+                 , ("var x = [7, 3];", SimpleStatement $
+                      VariableDefinition [VarDefEntry Nothing Nothing "x"] $ Just $
+                      ArrayExpression $ map (\n -> NumberLiteral n Nothing) [7, 3])
+                 , ("var x = [];", SimpleStatement $
+                      VariableDefinition [VarDefEntry Nothing Nothing "x"] $ Just $
+                      ArrayExpression [])
                  ]
     forM_ scases $ \(input, want) -> do
         it ("can parse " ++ input) $ parseStatement input `shouldBe` Right want
