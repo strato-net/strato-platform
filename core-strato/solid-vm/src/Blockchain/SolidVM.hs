@@ -40,6 +40,7 @@ import qualified Data.Vector as V
 import           GHC.Exts
 import           Text.Parsec (runParser)
 import           Text.Printf
+import           Text.Read (readMaybe)
 
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
@@ -1228,17 +1229,27 @@ intBuiltin args = typeError "numeric cast - invalid args" args
 
 callBuiltin :: MonadSM m => String -> [Value] -> Maybe Value -> m Value
 callBuiltin "string" [SString s] _ = return $ SString s
+callBuiltin "string" [SAccount a] _ = return . SString $ show a
+callBuiltin "string" [SInteger i] _ = return . SString $ show i
 callBuiltin "string" vs _ = typeError "string cast" vs
 callBuiltin "address" [SInteger a] _ = return . SAccount . unspecifiedChain $ fromIntegral a
 callBuiltin "address" [a@SAccount{}] _ = return a
 callBuiltin "address" [SContract _ a] _ = return $ SAccount a
+callBuiltin "address" [ss@(SString s)] _ = maybe (typeError "address cast" ss)
+                                                 (return . SAccount . (namedAccountChainId .~ UnspecifiedChain))
+                                                 $ readMaybe s
+callBuiltin "address" vs _ = typeError "address cast" vs
 callBuiltin "account" [SInteger a] _ = return . SAccount . unspecifiedChain $ fromIntegral a
 callBuiltin "account" [a@SAccount{}] _ = return a
 callBuiltin "account" [SContract _ a] _ = return $ SAccount a
+callBuiltin "account" [ss@(SString s)] _ = maybe (typeError "account cast" ss)
+                                                 (return . SAccount)
+                                                 $ readMaybe s
 callBuiltin "account" [SInteger a, SInteger b] _ = return . SAccount $ explicitChain (fromIntegral a) (fromInteger b)
 callBuiltin "account" [SInteger a, SString "main"] _ = return . SAccount $ mainChain (fromIntegral a)
 callBuiltin "account" [SAccount a, SInteger b] _ = return . SAccount $ (namedAccountChainId .~ ExplicitChain (fromIntegral b)) a
 callBuiltin "account" [SAccount a, SString "main"] _ = return . SAccount $ (namedAccountChainId .~ MainChain) a
+callBuiltin "account" vs _ = typeError "account cast" vs
 callBuiltin "byte" [SInteger n] _ = return $ SInteger (n .&. 0xff)
 callBuiltin "byte"  vs _ = typeError "byte cast" vs
 callBuiltin "uint" args _ = return $ intBuiltin args
