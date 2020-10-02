@@ -2650,28 +2650,52 @@ contract qq {
 }|] `shouldReturn` Nothing
     getFields ["a"] `shouldReturn` [BString "Hello World!"]
 
-  it "can cast an accounts, addresses, and ints to string" . runTest $ do
+  it "can cast accounts and addresses to string" . runTest $ do
     runBS [r|
 contract qq {
   string ces;
   string cms;
   string cus;
   string ds;
-  string i;
   constructor() public {
     ces = string(account(0xdeadbeef, 0xfeedbeef));
     cms = string(account(0xdeadbeef, "main"));
     cus = string(account(0xdeadbeef));
     ds = string(address(0xdeadbeef));
-    i = string(1234567890);
   }
 }|]
-    getFields ["ces", "cms", "cus", "ds", "i"] `shouldReturn`
+    getFields ["ces", "cms", "cus", "ds"] `shouldReturn`
       [ BString "00000000000000000000000000000000deadbeef:00000000000000000000000000000000000000000000000000000000feedbeef"
       , BString "00000000000000000000000000000000deadbeef:main"
       , BString "00000000000000000000000000000000deadbeef"
       , BString "00000000000000000000000000000000deadbeef"
-      , BString "1234567890"
+      ]
+
+  it "can cast ints to string" . runTest $ do
+    runBS [r|
+contract qq {
+  string p;
+  constructor() public {
+    p = string(1234567890);
+  }
+}|]
+    getFields ["p"] `shouldReturn`
+      [ BString "1234567890"
+      ]
+
+  it "can cast bools to string" . runTest $ do
+    runBS [r|
+contract qq {
+  string t;
+  string f;
+  constructor() public {
+    t = string(true);
+    f = string(false);
+  }
+}|]
+    getFields ["t", "f"] `shouldReturn`
+      [ BString "true"
+      , BString "false"
       ]
 
   it "can cast strings to accounts and addresses" . runTest $ do
@@ -2699,5 +2723,23 @@ contract qq {
       , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain)
       , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain)
       , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain)
+      ]
+
+  it "can cast strings to bool" . runTest $ do
+    runBS [r|
+contract qq {
+  bool control;
+  bool t;
+  bool f;
+  constructor() public {
+    control = bool(true);
+    t = bool("true");
+    f = bool("false");
+  }
+}|]
+    getFields ["control", "t", "f"] `shouldReturn`
+      [ BBool True
+      , BBool True
+      , BBool False
       ]
 
