@@ -2629,3 +2629,74 @@ contract qq {
   }
 }|])) `shouldThrow` anyMissingTypeError
 
+  it "can concatenate strings" . runTest $ do
+    runCall "concat" "(\"Hello\",\" World!\")" [r|
+contract qq {
+  string c;
+  function concat(string a, string b) public {
+    c = a + b;
+  }
+}|] `shouldReturn` Nothing
+    getFields ["c"] `shouldReturn` [BString "Hello World!"]
+
+  it "can append to a string" . runTest $ do
+    runCall "append" "(\" World!\")" [r|
+contract qq {
+  string a = "Hello";
+  function append(string b) public {
+    a += b;
+  }
+}|] `shouldReturn` Nothing
+    getFields ["a"] `shouldReturn` [BString "Hello World!"]
+
+  it "can cast an accounts, addresses, and ints to string" . runTest $ do
+    runBS [r|
+contract qq {
+  string ces;
+  string cms;
+  string cus;
+  string ds;
+  string i;
+  constructor() public {
+    ces = string(account(0xdeadbeef, 0xfeedbeef));
+    cms = string(account(0xdeadbeef, "main"));
+    cus = string(account(0xdeadbeef));
+    ds = string(address(0xdeadbeef));
+    i = string(1234567890);
+  }
+}|]
+    getFields ["ces", "cms", "cus", "ds", "i"] `shouldReturn`
+      [ BString "00000000000000000000000000000000deadbeef:00000000000000000000000000000000000000000000000000000000feedbeef"
+      , BString "00000000000000000000000000000000deadbeef:main"
+      , BString "00000000000000000000000000000000deadbeef"
+      , BString "00000000000000000000000000000000deadbeef"
+      , BString "1234567890"
+      ]
+
+  it "can cast strings to accounts and addresses" . runTest $ do
+    runBS [r|
+contract qq {
+  account sce;
+  account scm;
+  account scu;
+  address sde;
+  address sdm;
+  address sdu;
+  constructor() public {
+    sce = account("deadbeef:feedbeef");
+    scm = account("deadbeef:main");
+    scu = account("deadbeef");
+    sde = address("deadbeef:feedbeef");
+    sdm = address("deadbeef:main");
+    sdu = address("deadbeef");
+  }
+}|]
+    getFields ["sce", "scm", "scu", "sde", "sdm", "sdu"] `shouldReturn`
+      [ BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xfeedbeef))
+      , BAccount (NamedAccount 0xdeadbeef MainChain)
+      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain)
+      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain)
+      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain)
+      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain)
+      ]
+
