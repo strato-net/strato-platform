@@ -20,6 +20,7 @@ import qualified Control.Monad.Change.Alter           as A
 import qualified Control.Monad.Change.Modify          as Mod
 import           Control.Monad.IO.Class
 import           Data.Bits
+import           Data.Bool                            (bool)
 import           Data.ByteString                      (ByteString)
 import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Base16               as B16
@@ -1231,6 +1232,7 @@ callBuiltin :: MonadSM m => String -> [Value] -> Maybe Value -> m Value
 callBuiltin "string" [SString s] _ = return $ SString s
 callBuiltin "string" [SAccount a] _ = return . SString $ show a
 callBuiltin "string" [SInteger i] _ = return . SString $ show i
+callBuiltin "string" [SBool b] _ = return . SString $ bool "false" "true" b
 callBuiltin "string" vs _ = typeError "string cast" vs
 callBuiltin "address" [SInteger a] _ = return . SAccount . unspecifiedChain $ fromIntegral a
 callBuiltin "address" [a@SAccount{}] _ = return a
@@ -1250,6 +1252,10 @@ callBuiltin "account" [SInteger a, SString "main"] _ = return . SAccount $ mainC
 callBuiltin "account" [SAccount a, SInteger b] _ = return . SAccount $ (namedAccountChainId .~ ExplicitChain (fromIntegral b)) a
 callBuiltin "account" [SAccount a, SString "main"] _ = return . SAccount $ (namedAccountChainId .~ MainChain) a
 callBuiltin "account" vs _ = typeError "account cast" vs
+callBuiltin "bool" [SBool b] _ = return $ SBool b
+callBuiltin "bool" [SString "true"] _ = return $ SBool True
+callBuiltin "bool" [SString "false"] _ = return $ SBool False
+callBuiltin "bool" vs _ = typeError "bool cast" vs
 callBuiltin "byte" [SInteger n] _ = return $ SInteger (n .&. 0xff)
 callBuiltin "byte"  vs _ = typeError "byte cast" vs
 callBuiltin "uint" args _ = return $ intBuiltin args
