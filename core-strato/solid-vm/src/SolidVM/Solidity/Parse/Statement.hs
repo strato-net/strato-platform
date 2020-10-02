@@ -171,7 +171,7 @@ tuple = do
 
 array :: SolidityParser Expression
 array = do
-  exps <- brackets $ commaSep1 expression
+  exps <- brackets $ commaSep expression
   return $ ArrayExpression exps
 
 
@@ -244,7 +244,7 @@ literal = asum
         , StringLiteral <$> stringLiteral
         , reserved "false" >> return (BoolLiteral False)
         , reserved "true" >> return (BoolLiteral True)
-        , ArrayExpression <$> brackets (commaSep1 literal)
+        , ArrayExpression <$> brackets (commaSep literal)
         ]
 
 inlineAssembly :: SolidityParser Statement
