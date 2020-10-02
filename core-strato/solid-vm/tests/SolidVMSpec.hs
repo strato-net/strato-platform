@@ -2629,3 +2629,116 @@ contract qq {
   }
 }|])) `shouldThrow` anyMissingTypeError
 
+  it "can concatenate strings" . runTest $ do
+    runCall "concat" "(\"Hello\",\" World!\")" [r|
+contract qq {
+  string c;
+  function concat(string a, string b) public {
+    c = a + b;
+  }
+}|] `shouldReturn` Nothing
+    getFields ["c"] `shouldReturn` [BString "Hello World!"]
+
+  it "can append to a string" . runTest $ do
+    runCall "append" "(\" World!\")" [r|
+contract qq {
+  string a = "Hello";
+  function append(string b) public {
+    a += b;
+  }
+}|] `shouldReturn` Nothing
+    getFields ["a"] `shouldReturn` [BString "Hello World!"]
+
+  it "can cast accounts and addresses to string" . runTest $ do
+    runBS [r|
+contract qq {
+  string ces;
+  string cms;
+  string cus;
+  string ds;
+  constructor() public {
+    ces = string(account(0xdeadbeef, 0xfeedbeef));
+    cms = string(account(0xdeadbeef, "main"));
+    cus = string(account(0xdeadbeef));
+    ds = string(address(0xdeadbeef));
+  }
+}|]
+    getFields ["ces", "cms", "cus", "ds"] `shouldReturn`
+      [ BString "00000000000000000000000000000000deadbeef:00000000000000000000000000000000000000000000000000000000feedbeef"
+      , BString "00000000000000000000000000000000deadbeef:main"
+      , BString "00000000000000000000000000000000deadbeef"
+      , BString "00000000000000000000000000000000deadbeef"
+      ]
+
+  it "can cast ints to string" . runTest $ do
+    runBS [r|
+contract qq {
+  string p;
+  constructor() public {
+    p = string(1234567890);
+  }
+}|]
+    getFields ["p"] `shouldReturn`
+      [ BString "1234567890"
+      ]
+
+  it "can cast bools to string" . runTest $ do
+    runBS [r|
+contract qq {
+  string t;
+  string f;
+  constructor() public {
+    t = string(true);
+    f = string(false);
+  }
+}|]
+    getFields ["t", "f"] `shouldReturn`
+      [ BString "true"
+      , BString "false"
+      ]
+
+  it "can cast strings to accounts and addresses" . runTest $ do
+    runBS [r|
+contract qq {
+  account sce;
+  account scm;
+  account scu;
+  address sde;
+  address sdm;
+  address sdu;
+  constructor() public {
+    sce = account("deadbeef:feedbeef");
+    scm = account("deadbeef:main");
+    scu = account("deadbeef");
+    sde = address("deadbeef:feedbeef");
+    sdm = address("deadbeef:main");
+    sdu = address("deadbeef");
+  }
+}|]
+    getFields ["sce", "scm", "scu", "sde", "sdm", "sdu"] `shouldReturn`
+      [ BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xfeedbeef))
+      , BAccount (NamedAccount 0xdeadbeef MainChain)
+      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain)
+      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain)
+      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain)
+      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain)
+      ]
+
+  it "can cast strings to bool" . runTest $ do
+    runBS [r|
+contract qq {
+  bool control;
+  bool t;
+  bool f;
+  constructor() public {
+    control = bool(true);
+    t = bool("true");
+    f = bool("false");
+  }
+}|]
+    getFields ["control", "t", "f"] `shouldReturn`
+      [ BBool True
+      , BBool True
+      , BBool False
+      ]
+
