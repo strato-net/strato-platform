@@ -46,25 +46,13 @@ runEthServer :: (MonadIO m, MonadLogger m, MonadUnliftIO m)
              -> Int
              -> m ()
 runEthServer wireMessagesRef listenPort = do
-  cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
-  void . runContextM cfg $ do
-    uSink <- asks configUnseqSink
-    ethServer listenPort uSink
-
-ethServer :: ( MonadP2P m
-             , MonadReader Config m
-             , A.Selectable String PPeer m
-             , ((T.Text, Int) `A.Alters` ActivityState) m
-             )
-          => Int -> ([IngestEvent] -> m ()) -> m ()
-ethServer listenPort uSink = do
   let settings = setAfterBind setSocketCloseOnExec $ serverSettings listenPort "*"
+  cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
   runGeneralTCPServer settings $ \app ->
-    let pSource = appSource app
-        pSink = appSink app
-        sSource = seqEventNotificationSource $ contextKafkaState initContext
-        sAddr = appSockAddr app
-     in ethServerHandler pSource pSink sSource uSink sAddr
+      runContextM cfg $ do
+        let sSource = seqEventNotificationSource $ contextKafkaState initContext
+        uSink <- asks configUnseqSink
+        ethServerHandler (appSource app) (appSink app) sSource uSink (appSockAddr app)
 
 ethServerHandler :: ( MonadP2P m
                     , MonadReader Config m
