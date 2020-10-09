@@ -86,7 +86,7 @@ mkEthP2PEventSource peerSource seqEventSource peerStr inCtx = do
   recvWatchdog <- mkWatchdog tid $ fromIntegral flags_connectionTimeout
   merged <- mergeSourcesByForce (
     [ peerSource
-        .| ethDecrypt inCtx
+--        .| ethDecrypt inCtx
         .| CL.iterM (recordTraffic Inbound)
         .| bytesToMessages
         .| CL.iterM (displayMessage Inbound peerStr)
@@ -94,7 +94,7 @@ mkEthP2PEventSource peerSource seqEventSource peerStr inCtx = do
         .| CL.iterM (const $ petWatchdog recvWatchdog)
     , seqEventSource
         .| CL.map NewSeqEvent
---    , canarySource .| CL.map absurd
+    , canarySource .| CL.map absurd
     , timerSource
     ]) 4096 -- 🙏
   return $ merged
