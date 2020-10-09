@@ -8,6 +8,9 @@
 {-# LANGUAGE TypeApplications     #-}
 {-# LANGUAGE TypeOperators        #-}
 
+{-# OPTIONS -fno-warn-unused-imports #-}  -- TODO- We need to formally remove the watchdog, then
+{-# OPTIONS -fno-warn-unused-matches #-}  --       we can remove these "no-warn" options
+
 module Blockchain.CommunicationConduit
     ( handleMsgServerConduit
     , handleMsgClientConduit
@@ -91,7 +94,7 @@ mkEthP2PEventSource peerSource seqEventSource peerStr inCtx = do
         .| CL.iterM (const $ petWatchdog recvWatchdog)
     , seqEventSource
         .| CL.map NewSeqEvent
-    , canarySource .| CL.map absurd
+--    , canarySource .| CL.map absurd
     , timerSource
     ]) 4096 -- 🙏
   return $ merged
