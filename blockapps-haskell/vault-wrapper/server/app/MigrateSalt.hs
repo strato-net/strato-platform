@@ -1,0 +1,90 @@
+{-# LANGUAGE Arrows              #-}
+{-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE QuasiQuotes         #-}
+
+import           Control.Arrow
+import qualified Crypto.Saltine.Core.SecretBox      as SB
+import qualified Data.ByteString                    as B
+import           Data.Int                           (Int32)
+import           Data.Maybe
+import qualified Data.Text                          as T
+import           Database.PostgreSQL.Simple         hiding (Query)
+import           Database.PostgreSQL.Simple.SqlQQ
+import           Opaleye
+
+
+import           Blockchain.Strato.Model.Secp256k1
+import qualified Strato.Strato23.Crypto             as VC
+import           Strato.Strato23.Database.Queries   as VQ
+import           Strato.Strato23.Database.Tables
+import qualified Strato.Strato23.Server.Password    as VP
+import           HFlags
+import           Options
+
+
+
+-- usage: migrate-salt --pw=<vault_password>
+
+
+getUsersQuery :: Connection -> IO [(Int32, B.ByteString, SB.Nonce, B.ByteString)] 
+getUsersQuery conn = runQuery conn $ proc () -> do
+  (userId, _, salt, nonce, _, encKey, _, _) <- queryTable usersTable -< ()
+  returnA -< (userId, salt, nonce, encKey)
+
+
+main :: IO ()
+main = do
+  _ <- $initHFlags "migrate-salt"
+
+  let usageMsg = "the purpose of this script is to reencrypt keys from a STRATO version <6.0 that were \
+                  \ encrypted with unique user salts, this time using the global password salt. If some of \
+                  \ the keys in the vault were already encryped using the global password salt (i.e. keys \
+                  \ created after the upgrade), it will skip those (i.e. it will fail to decrypt them using \ 
+                  \ their user salts). \
+                  \ Usage: migrate-salt --pw=<vault_password> "
+  putStrLn usageMsg
+  
+  let dbConnectInfo = ConnectInfo { connectHost     = "postgres"
+                                  , connectPort     = 5432
+                                  , connectUser     = "postgres"
+                                  , connectPassword = "api"
+                                  , connectDatabase = "oauth"
+                                  }
+  conn <- connect dbConnectInfo
+  let pw = VC.textPassword $ T.pack flags_pw
+  
+  -- create the Secretbox.key from the pw and salt/nonce/ciphertext in messages table
+  (mMsgLst :: [(B.ByteString, SB.Nonce, B.ByteString)]) <- runQuery conn VQ.getMessageQuery
+  pwKey <- case mMsgLst of
+    [] -> error "message table is empty, so the password must not be set. Aborting..."
+    [(msgSalt, msgNonce, ciphertext)] -> do
+      let key = VP.getKeyFromPasswordAndSalt pw msgSalt
+      case VC.decrypt key msgNonce ciphertext of
+        Just msg | msg == VP.superSecretVaultWrapperMessage -> pure key
+        _ -> error "couldn't decrypt the secret message, probably you entered the wrong vault password"
+    _ -> error "multiple rows in message table, something is not right"
+ 
+
+  -- query all users id, salt, nonce, and the encrypted key
+  allUsers <- getUsersQuery conn
+  putStrLn $ "\nok, I'll update " ++ (show $ length allUsers) ++ " rows"
+
+  -- decrypt a user's privkey using the salt,nonce in the table.
+  -- then, reencrypt with the global password Secretbox.key and the original user nonce
+  let reencrypt :: Int32 -> B.ByteString -> SB.Nonce -> B.ByteString -> Maybe (B.ByteString, B.ByteString, Int32)
+      reencrypt i salt nonce encKey = do
+          let sbKey = VP.getKeyFromPasswordAndSalt pw salt
+          decKey <- VC.decryptSecKey sbKey nonce encKey
+          let newEncKey = VC.encrypt pwKey nonce (exportPrivateKey decKey)
+          pure (newEncKey, newEncKey, i)
+ 
+  -- update all the rows with the new encrypted keys
+  let idsAndNewEncKeys = catMaybes $ map (\(i, s, n, k) -> reencrypt i s n k) allUsers
+  rowsChanged <- executeMany conn [sql|
+      UPDATE users SET enc_sec_key = ?, enc_sec_prv_key = ?, salt = '' 
+      WHERE id = ?
+  |] idsAndNewEncKeys
+  
+  putStrLn $ "ok, done. I updated " ++ (show rowsChanged) ++ " rows"

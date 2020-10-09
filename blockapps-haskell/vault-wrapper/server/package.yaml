@@ -104,6 +104,19 @@ executables:
       - strato-model
       - text
 
+  migrate-salt:
+    source-dirs: app
+    main: MigrateSalt.hs
+    other-modules: [Options]
+    dependencies:
+      - blockapps-vault-wrapper-server
+      - bytestring
+      - hflags
+      - opaleye
+      - saltine
+      - strato-model
+      - text
+
 tests:
   vault-wrapper-spec:
     source-dirs: test/
