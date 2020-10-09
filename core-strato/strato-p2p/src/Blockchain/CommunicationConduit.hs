@@ -27,7 +27,6 @@ import           Conduit
 import qualified Data.Conduit.Binary                   as CB
 import           Data.Conduit.Combinators              (yieldMany)
 import qualified Data.Conduit.List                     as CL
-import           Data.Conduit.TMChan
 import           Data.Conduit.TQueue
 import           Data.List.Split
 import           Data.Maybe
@@ -48,6 +47,7 @@ import           Blockchain.Data.Wire                  as W
 import           Blockchain.Display
 import           Blockchain.Event
 import           Blockchain.EventException
+import           Blockchain.ExtMergeSources
 import           Blockchain.Frame
 import           Blockchain.Metrics
 import           Blockchain.Options
@@ -81,7 +81,7 @@ mkEthP2PEventSource peerSource seqEventSource peerStr inCtx = do
   canarySource <- mkCanarySource
   tid <- myThreadId
   recvWatchdog <- mkWatchdog tid $ fromIntegral flags_connectionTimeout
-  merged <- mergeSources (
+  merged <- mergeSourcesByForce (
     [ peerSource
         .| ethDecrypt inCtx
         .| CL.iterM (recordTraffic Inbound)
