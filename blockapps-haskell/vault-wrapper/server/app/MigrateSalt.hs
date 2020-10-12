@@ -5,15 +5,14 @@
 {-# LANGUAGE QuasiQuotes         #-}
 
 import           Control.Arrow
+import           Control.Lens.Combinators
 import qualified Crypto.Saltine.Core.SecretBox      as SB
 import qualified Data.ByteString                    as B
 import           Data.Int                           (Int32)
 import           Data.Maybe
 import qualified Data.Text                          as T
 import           Database.PostgreSQL.Simple         hiding (Query)
-import           Database.PostgreSQL.Simple.SqlQQ
-import           Opaleye
-
+import           Opaleye                            hiding (sum)
 
 import           Blockchain.Strato.Model.Secp256k1
 import qualified Strato.Strato23.Crypto             as VC
@@ -27,6 +26,12 @@ import           Options
 
 -- usage: migrate-salt --pw=<vault_password>
 
+-- the purpose of this script is to reencrypt keys from a STRATO version <6.0 that were
+--        encrypted with unique user salts, this time using the global password salt. If some of
+--        the keys in the vault were already encryped using the global password salt (i.e. keys 
+--        created after the upgrade), it will skip those (i.e. it will fail to decrypt them using 
+--        their user salts). 
+
 
 getUsersQuery :: Connection -> IO [(Int32, B.ByteString, SB.Nonce, B.ByteString)] 
 getUsersQuery conn = runQuery conn $ proc () -> do
@@ -38,12 +43,7 @@ main :: IO ()
 main = do
   _ <- $initHFlags "migrate-salt"
 
-  let usageMsg = "the purpose of this script is to reencrypt keys from a STRATO version <6.0 that were \
-                  \ encrypted with unique user salts, this time using the global password salt. If some of \
-                  \ the keys in the vault were already encryped using the global password salt (i.e. keys \
-                  \ created after the upgrade), it will skip those (i.e. it will fail to decrypt them using \ 
-                  \ their user salts). \
-                  \ Usage: migrate-salt --pw=<vault_password> "
+  let usageMsg = "Usage: migrate-salt --pw=<vault_password>"
   putStrLn usageMsg
   
   let dbConnectInfo = ConnectInfo { connectHost     = "postgres"
@@ -69,22 +69,27 @@ main = do
 
   -- query all users id, salt, nonce, and the encrypted key
   allUsers <- getUsersQuery conn
-  putStrLn $ "\nok, I'll update " ++ (show $ length allUsers) ++ " rows"
 
-  -- decrypt a user's privkey using the salt,nonce in the table.
+  -- decrypt the privkey using the salt,nonce in the table.
   -- then, reencrypt with the global password Secretbox.key and the original user nonce
-  let reencrypt :: Int32 -> B.ByteString -> SB.Nonce -> B.ByteString -> Maybe (B.ByteString, B.ByteString, Int32)
+  let reencrypt :: Int32 -> B.ByteString -> SB.Nonce -> B.ByteString -> Maybe (B.ByteString, Int32)
       reencrypt i salt nonce encKey = do
           let sbKey = VP.getKeyFromPasswordAndSalt pw salt
           decKey <- VC.decryptSecKey sbKey nonce encKey
           let newEncKey = VC.encrypt pwKey nonce (exportPrivateKey decKey)
-          pure (newEncKey, newEncKey, i)
+          pure (newEncKey, i)
  
-  -- update all the rows with the new encrypted keys
   let idsAndNewEncKeys = catMaybes $ map (\(i, s, n, k) -> reencrypt i s n k) allUsers
-  rowsChanged <- executeMany conn [sql|
-      UPDATE users SET enc_sec_key = ?, enc_sec_prv_key = ?, salt = '' 
-      WHERE id = ?
-  |] idsAndNewEncKeys
   
-  putStrLn $ "ok, done. I updated " ++ (show rowsChanged) ++ " rows"
+  putStrLn $ "\nFound " ++ (show $ length allUsers) ++ " keys"
+  putStrLn $ (show $ length idsAndNewEncKeys) ++ " of those keys can be reencrypted"
+
+  -- update all the rows with the new encrypted keys
+  rowsChanged <- return . sum =<< mapM (\(newKey, rowId) -> runUpdate_ conn $ Update
+                                   { uTable = usersTable
+                                   , uUpdateWith = updateEasy (set _6 (constant newKey))
+                                   , uWhere = views _1 (.== constant rowId)
+                                   , uReturning = rCount
+                                   }) idsAndNewEncKeys
+
+  putStrLn $ "ok, done. I updated " ++ (show rowsChanged) ++ " keys"

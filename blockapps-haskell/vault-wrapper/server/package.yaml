@@ -112,6 +112,7 @@ executables:
       - blockapps-vault-wrapper-server
       - bytestring
       - hflags
+      - lens
       - opaleye
       - saltine
       - strato-model
