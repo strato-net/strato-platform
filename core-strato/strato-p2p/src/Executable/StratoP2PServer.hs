@@ -48,7 +48,7 @@ runEthServer wireMessagesRef listenPort = do
   let settings = setAfterBind setSocketCloseOnExec $ serverSettings listenPort "*"
   cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
   runGeneralTCPServer settings $ \app ->
-      runContextM cfg $ do
+      runContextM cfg $ do    -- Note- the monad has to run here, inside the server connection, because ResourceT should be cleaned up per connection
         let sSource = seqEventNotificationSource $ contextKafkaState initContext
         uSink <- asks configUnseqSink
         ethServerHandler (appSource app) (appSink app) sSource uSink (appSockAddr app)
