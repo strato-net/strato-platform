@@ -83,8 +83,10 @@ tests:
       - ethereum-encryption
       - ethereum-rlp
       - integer-gmp
+      - persistent
       - secp256k1-haskell
       - strato-model
+      - text
       - hspec
       - QuickCheck
 
