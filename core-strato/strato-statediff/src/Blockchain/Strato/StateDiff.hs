@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric          #-}
 {-# LANGUAGE TypeOperators          #-}
 {-# OPTIONS_GHC -fno-warn-orphans   #-}
 module Blockchain.Strato.StateDiff
@@ -134,7 +135,7 @@ instance Detailed AccountDiff where
       }
 
 instance {-# OVERLAPPABLE #-} (Num a) => Detailed (Diff a) where
-  incrementalToEventual Delete{} = Value 0 -- ^ Ethereum-specific default value
+  incrementalToEventual Delete{} = Value 0 --  ^ Ethereum-specific default value
   incrementalToEventual x        = Value $ newValue x
 
 instance Detailed (Diff String) where

@@ -2,6 +2,7 @@
 {-# OPTIONS_GHC -fno-warn-missing-methods #-}
 
 {-# LANGUAGE DataKinds                    #-}
+{-# LANGUAGE DeriveGeneric                #-}
 {-# LANGUAGE FlexibleInstances            #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving   #-}
 {-# LANGUAGE MultiParamTypeClasses        #-}

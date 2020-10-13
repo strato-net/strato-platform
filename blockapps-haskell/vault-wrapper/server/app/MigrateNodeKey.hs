@@ -56,12 +56,10 @@ main = do
          
           let encAcctSk = VC.encrypt key acctNonce $ exportPrivateKey pkey
               acctAddr = fromPrivateKey pkey
-              acctPubKey = derivePublicKey pkey
               keystore = VC.KeyStore { VC.keystoreSalt = acctSalt -- this is not used anymore
                                      , VC.keystoreAcctNonce = acctNonce
                                      , VC.keystoreAcctEncSecKey = encAcctSk
                                      , VC.keystoreAcctAddress = acctAddr
-                                     , VC.keystoreAcctPubKey = acctPubKey
                                      }
   
           success <- VQ.postUserKeyQuery (T.pack "nodekey") keystore conn

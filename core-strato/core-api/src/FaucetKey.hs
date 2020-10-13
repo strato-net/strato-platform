@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 
 module FaucetKey (
   getFaucetKey
