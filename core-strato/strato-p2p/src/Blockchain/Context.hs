@@ -3,6 +3,7 @@
 {-# LANGUAGE DeriveFunctor         #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE PolyKinds             #-}
@@ -22,6 +23,8 @@ module Blockchain.Context
     , Stacks(..)
     , MonadP2P
     , TcpPortNumber(..)
+    , Inbound(..)
+    , Outbound(..)
     , Context(..)
     , Config(..)
     , ContextM
@@ -53,19 +56,23 @@ module Blockchain.Context
 
 import           Conduit
 import           Control.Applicative
+import           Control.Concurrent
 import           Control.Lens                          hiding (Context)
 import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
 import           Blockchain.Output
 import           Control.Monad.Reader
 import           Data.Default
+import           Data.Foldable                         (toList)
 import qualified Data.Map.Strict                       as M
 import           Data.Maybe
 import           Data.Proxy
+import qualified Data.Set.Ordered                      as S
 import qualified Data.Text                             as T
 import           Data.Time.Clock
 import           GHC.Exts                              (Constraint)
 
+import           Blockchain.Blockstanbul               (WireMessage)
 import           Blockchain.Data.Address
 import           Blockchain.Data.Block
 import           Blockchain.Data.ChainInfo
@@ -82,6 +89,7 @@ import qualified Blockchain.Sequencer.Kafka            as SK
 
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Stream.VMEvent             ( HasVMEventsSink(..)
                                                        , VMEvent(..)
                                                        , fetchLastVMEvents
@@ -96,6 +104,10 @@ import qualified Database.Redis                        as Redis
 import qualified Network.Kafka                         as K
 import qualified Blockchain.MilenaTools                as K
 import           Blockchain.Util                       (toMaybe)
+import           Network.HTTP.Client                    (newManager, defaultManagerSettings)
+import           Servant.Client
+import qualified Strato.Strato23.API                   as VC
+import qualified Strato.Strato23.Client                as VC
 
 import           UnliftIO
 
@@ -123,6 +135,9 @@ class Stacks a m where
 
 newtype TcpPortNumber = TcpPortNumber { unTcpPortNumber :: Int }
 
+newtype Inbound a = Inbound { unInbound :: a }
+newtype Outbound a = Outbound { unOutbound :: a }
+
 data Config = Config
   { configSQLDB              :: SQLDB
   , configRedisBlockDB       :: RBDB.RedisConnection
@@ -130,7 +145,9 @@ data Config = Config
   , configVmEventsSink       :: forall m . (MonadIO m, MonadLogger m, Mod.Modifiable K.KafkaState m) => [VMEvent] -> m ()
   , configConnectionTimeout  :: ConnectionTimeout
   , configMaxReturnedHeaders :: MaxReturnedHeaders
+  , configVaultClient        :: ClientEnv
   , configContext            :: IORef Context
+  , configBlockstanbulWireMessages :: IORef (S.OSet Keccak256)
   }
 
 newtype ActionTimestamp = ActionTimestamp { unActionTimestamp :: Maybe UTCTime }
@@ -153,6 +170,7 @@ data Context = Context
   , remainingBlockHeaders :: RemainingBlockHeaders
   , actionTimestamp       :: ActionTimestamp
   , _blockstanbulPeerAddr :: PeerAddress
+  , _outboundWireMessages :: S.OSet (T.Text, Keccak256)
   }
 
 makeLenses ''Context
@@ -232,6 +250,34 @@ instance MonadIO m => (Keccak256 `A.Alters` OutputBlock) (ReaderT Config m) wher
                . RBDB.withRedisBlockDB . RBDB.getBlocks
   insertMany _ = void . RBDB.withRedisBlockDB . RBDB.insertBlocks
   deleteMany _ = void . RBDB.withRedisBlockDB . RBDB.deleteBlocks
+
+instance MonadIO m => (Keccak256 `A.Alters` (Proxy (Inbound WireMessage))) (ReaderT Config m) where
+  lookup _  k = do
+    wms <- readIORef =<< asks configBlockstanbulWireMessages
+    let b = S.member k wms
+    pure $ if b then Just (Proxy @(Inbound WireMessage)) else Nothing
+  insert _ k _ = asks configBlockstanbulWireMessages >>= flip atomicModifyIORef' (\wms ->
+    let s = S.size wms
+        wms' = if s >= flags_wireMessageCacheSize then S.delete (head $ toList wms) wms else wms
+        wms'' = wms' S.>| k
+     in (wms'', ()))
+  delete _ k = asks configBlockstanbulWireMessages >>= flip atomicModifyIORef' (\wms ->
+    let wms' = S.delete k wms
+     in (wms', ()))
+
+instance MonadIO m => ((T.Text, Keccak256) `A.Alters` (Proxy (Outbound WireMessage))) (ReaderT Config m) where
+  lookup _  k = do
+    wms <- _outboundWireMessages <$> Mod.get (Mod.Proxy @Context)
+    let b = S.member k wms
+    pure $ if b then Just (Proxy @(Outbound WireMessage)) else Nothing
+  insert _ k _ = Mod.modifyStatefully_ (Mod.Proxy @Context) $ do
+    wms <- use outboundWireMessages
+    let s = S.size wms
+        wms' = if s >= flags_wireMessageCacheSize then S.delete (head $ toList wms) wms else wms
+        wms'' = wms' S.>| k
+    assign outboundWireMessages wms''
+  delete _ k = Mod.modifyStatefully_ (Mod.Proxy @Context) $
+    outboundWireMessages %= S.delete k
 
 instance ( MonadIO m
          , MonadUnliftIO m
@@ -313,11 +359,40 @@ instance MonadUnliftIO m => A.Selectable String PPeer (ReaderT Config m) where
 
     where actions = SQL.selectList [ PPeerIp SQL.==. T.pack ip ] []
 
+
+instance (MonadIO m, Monad m, MonadLogger m) => HasVault (ReaderT Config m) where
+  sign bs = do
+    vc <- asks configVaultClient 
+    $logInfoS "HasVault" "Calling vault-wrapper for a signature"
+    waitOnVault $ liftIO $ runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash bs)) vc
+  
+  getPub = do
+    vc <- asks configVaultClient 
+    $logInfoS "HasVault" "Calling vault-wrapper to get the node's public key"
+    fmap VC.unPubKey $ waitOnVault $ liftIO $ runClientM (VC.getKey (T.pack "nodekey") Nothing) vc
+  
+  getShared pub = do
+    vc <- asks configVaultClient 
+    $logInfoS "HasVault" "Calling vault-wrapper to get a shared key"
+    waitOnVault $ liftIO $ runClientM (VC.getSharedKey "nodekey" pub) vc
+
+
+waitOnVault :: (MonadLogger m, MonadIO m, Show a) => m (Either a b) -> m b
+waitOnVault action = do
+  res <- action
+  case res of
+    Left err -> do
+      $logErrorS "HasVault" . T.pack $ "Got an error from vault-wrapper: " ++ show err
+      liftIO $ threadDelay 2000000
+      waitOnVault action
+    Right val -> return val
+
 type MonadP2P m = ( MonadIO m
                   , MonadLogger m
                   , MonadResource m
                   , MonadUnliftIO m
                   , Stacks Block m
+                  , HasVault m
                   , All '[Mod.Accessible, Mod.Modifiable]
                       '[ ActionTimestamp
                        , [BlockData]
@@ -346,6 +421,8 @@ type MonadP2P m = ( MonadIO m
                   , All2 '[A.Alters]
                       '[ '(Keccak256, BlockData)
                        , '(Keccak256, OutputBlock)
+                       , '(Keccak256, Proxy (Inbound WireMessage))
+                       , '((T.Text, Keccak256), Proxy (Outbound WireMessage))
                        ] m
                   )
 
@@ -381,10 +458,15 @@ runContextM r = void . runResourceT . flip runReaderT r
 initConfig :: ( MonadLogger m
               , MonadUnliftIO m
               )
-           => Int -> m Config
-initConfig maxHeaders = do
+           => IORef (S.OSet Keccak256) -> Int -> m Config
+initConfig wireMessagesRef maxHeaders = do
   dbs <- openDBs
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
+  vaultClient <- do
+    mgr <- liftIO $ newManager defaultManagerSettings
+    url <- liftIO $ parseBaseUrl flags_vaultWrapperUrl
+    return $ ClientEnv mgr url Nothing
+
   initState <- newIORef initContext
   return $ Config
     { configSQLDB = sqlDB' dbs
@@ -393,7 +475,9 @@ initConfig maxHeaders = do
     , configVmEventsSink = void . produceVMEventsM
     , configConnectionTimeout = ConnectionTimeout flags_connectionTimeout
     , configMaxReturnedHeaders = MaxReturnedHeaders maxHeaders
+    , configVaultClient = vaultClient
     , configContext = initState
+    , configBlockstanbulWireMessages = wireMessagesRef
     }
 
 initContext :: Context
@@ -404,6 +488,7 @@ initContext = Context
   , remainingBlockHeaders = RemainingBlockHeaders []
   , vmTrace=[]
   , _blockstanbulPeerAddr = PeerAddress Nothing
+  , _outboundWireMessages = S.empty
   }
 
 

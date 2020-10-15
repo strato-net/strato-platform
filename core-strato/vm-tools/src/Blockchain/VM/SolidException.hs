@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 module Blockchain.VM.SolidException
   ( SolidException(..)
   , typeError
@@ -18,6 +20,9 @@ module Blockchain.VM.SolidException
   , unknownVariable
   , unknownStatement
   , divideByZero
+  , missingCodeCollection
+  , inaccessibleChain
+  , invalidWrite
   ) where
 
 import Control.DeepSeq
@@ -44,6 +49,9 @@ data SolidException = TypeError String String
                     | UnknownVariable String String
                     | UnknownStatement String String
                     | DivideByZero String 
+                    | MissingCodeCollection String String
+                    | InaccessibleChain String String
+                    | InvalidWrite String String
                     deriving (Eq, Exception, Generic, NFData)
 
 instance Show SolidException where
@@ -65,6 +73,9 @@ instance Show SolidException where
   show (UnknownVariable a b) = printf "unknown variable: %s: %s" a b
   show (UnknownStatement a b) = printf "unknown statement: %s: %s" a b
   show (DivideByZero a) = printf "divide by zero error: %s" a
+  show (MissingCodeCollection a b) = printf "missing code collection: %s: %s" a b
+  show (InaccessibleChain a b) = printf "inaccessible chain: %s: %s" a b
+  show (InvalidWrite a b) = printf "invalid write: %s: %s" a b
 
 toThrower :: (Show v) => (String -> String -> SolidException) -> String -> v -> a
 toThrower cont msg = throw . cont msg . show
@@ -122,3 +133,12 @@ unknownStatement = toThrower UnknownStatement
 
 divideByZero :: (Show v) => v -> a
 divideByZero x = throw $ DivideByZero (show x)
+
+missingCodeCollection :: (Show v) => String -> v -> a
+missingCodeCollection = toThrower MissingCodeCollection
+
+inaccessibleChain :: (Show v) => String -> v -> a
+inaccessibleChain = toThrower InaccessibleChain
+
+invalidWrite :: (Show v) => String -> v -> a
+invalidWrite = toThrower InvalidWrite

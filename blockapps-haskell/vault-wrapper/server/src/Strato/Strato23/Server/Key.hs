@@ -4,31 +4,44 @@
 
 module Strato.Strato23.Server.Key where
 
-import           Data.Maybe                       (fromMaybe, isJust)
+import           Data.ByteString (ByteString)
+import           Data.Maybe                       (fromMaybe)
 import           Data.Text                        (Text)
+
 import           Strato.Strato23.API
 import           Strato.Strato23.Crypto
 import           Strato.Strato23.Monad
 import           Strato.Strato23.Database.Queries
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Secp256k1
 
 
 getKey :: Text -> Maybe Text -> VaultM AddressAndKey
-getKey headerUserName queryParamUserName = withPassword $ \pw -> do
+getKey headerUserName queryParamUserName = withSecretKey $ \key -> do
   let userName = fromMaybe headerUserName queryParamUserName
-  (salt, nonce, encKey, addr, pub) <- toUserError ("User " <> userName <> " doesn't exist")
+  (_ :: ByteString, nonce, encKey, _ :: Address) <- toUserError ("User " <> userName <> " doesn't exist")
                                . vaultQuery1 $ getUserKeyQuery userName
-  if isJust queryParamUserName          -- decrypt and derive the address if query param
-    then return $ AddressAndKey addr pub -- not specified, to guarantee correctness
-    else case decryptSecKey pw salt nonce encKey of
-      Nothing -> vaultWrapperError IncorrectPasswordError
-      Just pKey -> return $ AddressAndKey (deriveAddress pKey) pub
+  case decryptSecKey key nonce encKey of
+    Nothing -> vaultWrapperError IncorrectPasswordError
+    Just pKey -> return $ AddressAndKey (fromPrivateKey pKey) (derivePublicKey pKey)
 
 postKey :: Text -> VaultM AddressAndKey
-postKey userName = withPassword $ \pw -> do
-  keyStore@KeyStore{..} <- newKeyStore pw
+postKey userName = withSecretKey $ \key -> do
+  keyStore@KeyStore{..} <- newKeyStore key
   created <- vaultModify $ postUserKeyQuery userName keyStore
   if not created
     then vaultWrapperError $ UserError ("User " <> userName <> " already exists")
-    else case decryptSecKey pw keystoreSalt keystoreAcctNonce keystoreAcctEncSecKey of
+    else case decryptSecKey key keystoreAcctNonce keystoreAcctEncSecKey of
       Nothing -> vaultWrapperError IncorrectPasswordError
-      Just pKey -> return $ AddressAndKey (deriveAddress pKey) keystoreAcctPubKey
+      Just pKey -> return $ AddressAndKey (fromPrivateKey pKey) (derivePublicKey pKey)
+
+
+-- Get an ECDH shared secret from the user's private key and a supplied public key
+getSharedKey :: Text -> PublicKey -> VaultM SharedKey
+getSharedKey userName otherPub = withSecretKey $ \key -> do
+  (_ :: ByteString, nonce, encKey, (_ :: Address)) <- 
+                          toUserError ("User " <> userName <> " doesn't exist")
+                          . vaultQuery1 $ getUserKeyQuery userName
+  case decryptSecKey key nonce encKey of
+    Nothing -> vaultWrapperError IncorrectPasswordError
+    Just pKey -> return $ deriveSharedKey pKey otherPub

@@ -21,8 +21,8 @@ import           Blockchain.Data.Json
 import           Blockchain.DB.SQLDB
 import           Blockchain.ExtWord
 import           Blockchain.Strato.Model.ChainId
+import           Options
 
-import           Settings
 import           SQLM
 
 type API = 
@@ -49,7 +49,7 @@ instance GetLastTransactions SQLM where
         E.on (b E.^. BlockDataRefId E.==. btx E.^. BlockTransactionBlockDataRefId)
         E.on (btx E.^. BlockTransactionTransaction E.==. rawTX E.^. RawTransactionId)
         E.where_ (rawTX E.^. RawTransactionChainId E.==. E.val (fromMaybe 0 $ fmap chainIdToWord256 mChainId))
-        E.limit $ max 1 $ min (fromIntegral num :: Int64) appFetchLimit
+        E.limit $ max 1 $ min (fromIntegral num :: Int64) $ fromIntegral flags_appFetchLimit
         E.orderBy [E.desc $ b E.^. BlockDataRefId]
         return rawTX
     where chainIdToWord256 :: ChainId -> Word256

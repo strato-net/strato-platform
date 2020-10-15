@@ -12,7 +12,7 @@ import           Blockchain.Output
 import           Control.Concurrent     (threadDelay)
 import qualified Control.Monad.Change.Modify as Mod
 import           Control.Monad.IO.Class      (MonadIO, liftIO)
-import           Control.Monad.Except        (ExceptT (..), runExceptT)
+import           Control.Monad.Except        (ExceptT (..), runExceptT, throwError)
 import           Control.Monad.Trans.State
 import qualified Data.Text                   as T
 import           Network.Kafka
@@ -47,7 +47,10 @@ commitSingleOffset groupName topic partition offset ofsMetadata = do
     
   case ret of 
     (OffsetCommitResp [(_, [(_, err)])]) -> do
-      return $ if err /= NoError then Left err else Right ()
+      case err of
+        NoError -> pure $ Right ()
+        RequestTimedOut -> throwError $ KafkaFailedToFetchGroupCoordinator RequestTimedOut
+        _ -> pure $ Left err
       
     _ -> error "unexpected response from commitOffset in call to commitSingleOffset"
 

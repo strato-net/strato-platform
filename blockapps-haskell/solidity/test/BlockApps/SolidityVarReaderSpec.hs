@@ -16,14 +16,15 @@ import BlockApps.Solidity.TypeDefs
 import BlockApps.Solidity.Value
 import BlockApps.SolidityVarReader (decodeCacheValues, structSort)
 
+import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 
 addr :: Address -> Value
-addr = SimpleValue . ValueAddress
+addr = SimpleValue . ValueAccount . unspecifiedChain
 
 
 structFromFields :: [T.Text] -> Struct
-structFromFields ts = Struct (OM.fromList [(t, (Left t, SimpleType TypeAddress)) | t <- ts])
+structFromFields ts = Struct (OM.fromList [(t, (Left t, SimpleType TypeAccount)) | t <- ts])
                     . fromIntegral $ length ts
 
 spec :: Spec

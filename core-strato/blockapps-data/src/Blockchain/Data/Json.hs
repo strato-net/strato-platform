@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -11,11 +12,9 @@ module Blockchain.Data.Json where
 import           Data.Aeson
 import           Data.Aeson.Types                     (Parser)
 import qualified Data.ByteString                      as B
-import qualified Data.ByteString.Base16               as B16
 import qualified Data.Map.Strict                      as M
 import           Data.Maybe
 import           Data.Swagger                         hiding (format)
-import qualified Data.Text.Encoding                   as T
 import           Data.Time.Calendar
 import           Data.Time.Clock
 import           Data.Word
@@ -54,7 +53,7 @@ instance ToJSON RawTransaction' where
           , "gasLimit" .= gl
           , "to" .= ta
           , "value" .= show val
-          , "codeOrData" .= T.decodeUtf8 (B16.encode cod)
+          , "codeOrData" .= cod
           , "r" .= showHex r ""
           , "s" .= showHex s ""
           , "v" .= showHex v ""
@@ -73,7 +72,7 @@ instance ToJSON RawTransaction' where
           , "gasPrice" .= gp
           , "gasLimit" .= gl
           , "value" .= show val
-          , "codeOrData" .= T.decodeUtf8 (B16.encode cod)
+          , "codeOrData" .= cod
           , "r" .= showHex r ""
           , "s" .= showHex s ""
           , "v" .= showHex v ""
@@ -99,7 +98,7 @@ instance FromJSON RawTransaction' where
       tgl <- t .:? "gasLimit" .!= 0
       tto <- t .:? "to"
       tval <- read <$> t .:? "value" .!= "0"
-      tcd <- fmap (fst .  B16.decode . T.encodeUtf8 ) (t .:? "codeOrData" .!= "")
+      tcd <- t .:? "codeOrData" .!= Code ""
       cid <- fmap (\(ChainId c) -> c) <$> (t .:? "chainId")
       (tr :: Integer) <- parseHexStr (t .: "r")
       (ts :: Integer) <- parseHexStr (t .: "s")
@@ -124,7 +123,7 @@ instance FromJSON RawTransaction' where
                  (tgl :: Integer)
                  (tto :: Maybe Address)
                  (tval :: Integer)
-                 (tcd :: B.ByteString)
+                 (tcd :: Code)
                  (fromMaybe 0 (cid :: Maybe Word256))
                  (tr :: Integer)
                  (ts :: Integer)
@@ -150,7 +149,7 @@ data Transaction' = Transaction' Transaction deriving (Eq, Show)
 instance ToJSON Transaction' where
     toJSON (Transaction' tx@(MessageTX tnon tgp tgl (Address tto) tval td tcid tr ts tv md)) =
         object $ ["kind" .= ("Transaction" :: String),
-                  "from" .= ((uncurry showHex) $ ((fromMaybe (Address 0) (whoSignedThisTransaction tx)),"")),
+                  "from" .= fromMaybe (Address 0) (whoSignedThisTransaction tx),
                   "nonce" .= tnon,
                   "gasPrice" .= tgp,
                   "gasLimit" .= tgl,
@@ -166,7 +165,7 @@ instance ToJSON Transaction' where
                  ++ (("metadata" .=) <$> maybeToList md)
     toJSON (Transaction' tx@(ContractCreationTX tnon tgp tgl tval tcode tcid tr ts tv md)) =
         object $ ["kind" .= ("Transaction" :: String),
-                  "from" .= ((uncurry showHex) $ ((fromMaybe (Address 0) (whoSignedThisTransaction tx)),"")),
+                  "from" .= fromMaybe (Address 0) (whoSignedThisTransaction tx),
                   "nonce" .= tnon,
                   "gasPrice" .= tgp,
                   "gasLimit" .= tgl,
@@ -270,8 +269,8 @@ bPrimeToB (Block' x _) = x
 data BlockData' = BlockData' BlockData deriving (Eq, Show)
 
 instance ToJSON BlockData' where
-      toJSON (BlockData' (BlockData ph uh (Address a) sr tr rr _ d num gl gu ts ed non mh)) =
-        object ["kind" .= ("BlockData" :: String), "parentHash" .= ph, "unclesHash" .= uh, "coinbase" .= (showHex a ""), "stateRoot" .= sr,
+      toJSON (BlockData' (BlockData ph uh a sr tr rr _ d num gl gu ts ed non mh)) =
+        object ["kind" .= ("BlockData" :: String), "parentHash" .= ph, "unclesHash" .= uh, "coinbase" .= a, "stateRoot" .= sr,
         "transactionsRoot" .= tr, "receiptsRoot" .= rr, "difficulty" .= d, "number" .= num,
         "gasLimit" .= gl, "gasUsed" .= gu, "timestamp" .= ts, "extraData" .= ed, "nonce" .= non,
         "mixHash" .= mh]
@@ -313,8 +312,8 @@ bdPrimeToBd (BlockData' bd) = bd
 data BlockDataRef' = BlockDataRef' BlockDataRef deriving (Eq, Show)
 
 instance ToJSON BlockDataRef' where
-      toJSON (BlockDataRef' (BlockDataRef ph uh (Address a) sr tr rr _ d num gl gu ts ed non mh h uncles pow isConf td)) =
-        object ["parentHash" .= ph, "unclesHash" .= uh, "coinbase" .= (showHex a ""), "stateRoot" .= sr,
+      toJSON (BlockDataRef' (BlockDataRef ph uh a sr tr rr _ d num gl gu ts ed non mh h uncles pow isConf td)) =
+        object ["parentHash" .= ph, "unclesHash" .= uh, "coinbase" .= a, "stateRoot" .= sr,
         "transactionsRoot" .= tr, "receiptsRoot" .= rr, "difficulty" .= d, "number" .= num,
         "gasLimit" .= gl, "gasUsed" .= gu, "timestamp" .= ts, "extraData" .= ed, "nonce" .= non,
         "mixHash" .= mh, "hash" .= h, "uncles" .= map bdToBdPrime uncles, "powVerified" .= pow, "isConfirmed" .= isConf, "totalDifficulty" .= td]
@@ -331,9 +330,9 @@ instance ToSchema AddressStateRef' where
     NamedSchema (Just "AddresStateRef'") mempty
 
 instance ToJSON AddressStateRef' where
-    toJSON (AddressStateRef' (AddressStateRef (Address x) n b cr c ch cid bNum) next) =
+    toJSON (AddressStateRef' (AddressStateRef addr n b cr c ch cid bNum) next) =
         object $ ["next" .= next, "kind" .= ("AddressStateRef" :: String),
-                  "address" .= (showHex x ""), "nonce" .= n, "balance" .= show b,
+                  "address" .= addr, "nonce" .= n, "balance" .= show b,
                   "contractRoot" .= cr, "code" .= c, "codeHash" .= ch,
                   "latestBlockNum" .= bNum]
                   ++ (("chainId" .=) <$> (if cid == 0 then [] else [cid]))
@@ -361,7 +360,7 @@ showHexSimple t = showHex t ""
 instance ToJSON LogDB where
     toJSON (LogDB bh th
                   chainId
-                  (Address x)
+                  x
                   maybeTopic1
                   maybeTopic2
                   maybeTopic3
@@ -370,7 +369,7 @@ instance ToJSON LogDB where
                   bloomW512) =
         object $ ["hash" .= th,
                 "blockHash" .= bh,
-                "address" .= (showHex x ""),
+                "address" .= x,
                 "topic1" .= (maybe "" showHexSimple maybeTopic1 :: String),
                 "topic2" .= (maybe "" showHexSimple maybeTopic2 :: String),
                 "topic3" .= (maybe "" showHexSimple maybeTopic3 :: String),
@@ -411,7 +410,10 @@ isAddr a = case a of
       Nothing -> False
 
 rawTransactionSemantics :: RawTransaction -> TransactionType
-rawTransactionSemantics (RawTransaction _ _ _ _ _ ta _ cod _ _ _ _ _ _ _ _) = work
+rawTransactionSemantics (RawTransaction _ _ _ _ _ ta _ code _ _ _ _ _ _ _ _) = work
      where work | (not (isAddr ta))  = Contract
                 | (isAddr ta) &&  ((B.length cod) > 0)        = FunctionCall
                 | otherwise = Transfer
+           cod = case code of
+                   Code c -> c
+                   _ -> ""

@@ -34,6 +34,7 @@ import           Blockchain.Blockstanbul.BenchmarkLib (makeBlock, makeBlockWithT
 import           Blockchain.Blockstanbul.EventLoop
 import qualified Blockchain.Blockstanbul.HTTPAdmin as API
 import           Blockchain.Blockstanbul.Messages hiding (round)
+import           Blockchain.Blockstanbul.StateMachine
 import           Blockchain.Data.Address
 import           Blockchain.Data.Block
 import           Blockchain.Data.BlockDB
@@ -54,9 +55,10 @@ import           Blockchain.Sequencer.OrderValidator
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.Keccak256         as Keccak256
+import           Blockchain.Strato.Model.Secp256k1
 import qualified Data.ByteString.Char8               as C8
 import qualified Data.Set                            as S
-import qualified Network.Haskoin.Crypto     as HK
+import qualified Network.Haskoin.Crypto     as HK    -- TODO: get rid of this
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.RequestLogger
 import           Network.Wai.Middleware.Prometheus
@@ -73,6 +75,9 @@ import           System.Directory                    (createDirectoryIfMissing, 
 
 import           Text.Format
 
+
+
+
 fromLeft :: a -> Either a b -> a
 fromLeft _ (Left a) = a
 fromLeft a _ = a
@@ -82,6 +87,11 @@ stripTransactionsAndUncles b = b { ibReceiptTransactions = [], ibBlockUncles = [
 
 dedupWindow :: Int
 dedupWindow = 100
+
+-- NOTE: this is (and must be) the same as "testPriv" from Monad.hs....used by the 
+-- HasVault instance so we can make Blockstanbul message signatures without a vault client
+myPriv :: PrivateKey
+myPriv = fromMaybe (error "could not import private key") (importPrivateKey (fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"))
 
 runTestM :: SequencerM a -> IO ()
 runTestM m = do
@@ -101,6 +111,7 @@ runPBFTTestMWithGenesis m = do
   gb <- makeGenesisBlock
   let hsh = blockHash . ingestBlockToBlock $ gb
   void $ withTemporaryDepBlockDB True gb (m hsh)
+
 
 withTemporaryDepBlockDB :: Bool -> IngestBlock -> SequencerM a -> IO a
 withTemporaryDepBlockDB pbft genesisBlock m = do
@@ -127,13 +138,12 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
                                , cablePackage = pkg
                                , maxUsPerIter = 200
                                , maxEventsPerIter = 10
+                               , vaultClient = Nothing
                                }
-        bytes = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAN6tvu8"
-        pkey = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
-        myAddr = prvKey2Address pkey
+        myAddr = fromPrivateKey myPriv
         vals = [myAddr]
         auSenders = [myAddr]
-        ctx = newContext (Checkpoint (View 0 0) M.empty vals auSenders) pkey
+        ctx = newContext (Checkpoint (View 0 0) M.empty vals auSenders) myAddr
         mCtx = if pbft then Just ctx else Nothing
         hsh = blockHash . ingestBlockToBlock $ genesisBlock
         difficulty = blockHeaderDifficulty . ibBlockData $ genesisBlock
@@ -154,6 +164,18 @@ feedBackOutputsToInput = map rebox
           rebox x = error $ "why are we testing against " ++ show x
           unboxTx (OutputTx origin _ _ _ base) = IngestTx origin base
           unboxBlockTx (OutputTx _ _ _ _ base) = base
+
+mkBlk :: Keccak256 -> Integer -> SequencerM (Block)
+mkBlk parent num = do
+  ctx <- fromMaybe (error "context required for PBFT") <$> getBlockstanbulContext
+  let blk0 = makeBlock 2 1
+      blk1 = Block (blockBlockData blk0){blockDataParentHash = parent} (blockReceiptTransactions blk0) (blockBlockUncles blk0)
+      blk2 = addValidators (_validators ctx) blk1{
+                 blockBlockData = (blockBlockData blk1){blockDataNumber = num}}
+  pseal <- proposerSeal blk2
+  let blk3 = addProposerSeal pseal blk2
+  cseal <- commitmentSeal (blockHash blk3)
+  return $ addCommitmentSeals [cseal] blk3
 
 spec :: Spec
 spec = do
@@ -240,12 +262,10 @@ spec = do
           Nothing ->
             expectationFailure "BlockstanbulContext required"
           Just bct -> do
-            let bytes = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAN6tvu8"
-                pvk = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
-                addr = prvKey2Address pvk
+            let addr = fromPrivateKey myPriv
                 (testAddr :: Address) = 0x3263b65db202c4c2227a7e2a53b6b1f37b2edd0b
-                esign = signBenfInfo pvk (testAddr, True, 1)
-                esignStr = (C8.unpack . B16.encode) $ rlpSerialize (rlpEncode esign)
+            esign <- signBenfInfo (testAddr, True, 1)
+            let esignStr = (C8.unpack . B16.encode) $ rlpSerialize (rlpEncode esign)
                 vote = API.CandidateReceived{API.sender=addr
                                            , API.signature=esignStr
                                            , API.recipient=testAddr
@@ -261,8 +281,8 @@ spec = do
             voteList `shouldMatchList` [vote]
             b1 <- runBatch $ checkForVotes voteList
             _toVm b1 `shouldContain` [VmVoteToMake { voteRecipient = testAddr, voteVotingDir = True, voteSender = addr}]
-            let esign' = signBenfInfo pvk (testAddr, False, 1)
-                esignStr' = (C8.unpack . B16.encode) $ rlpSerialize (rlpEncode esign')
+            esign' <- signBenfInfo (testAddr, False, 1)
+            let esignStr' = (C8.unpack . B16.encode) $ rlpSerialize (rlpEncode esign')
                 vote' = API.CandidateReceived{API.sender=addr
                                             , API.signature=esignStr'
                                             , API.recipient=testAddr
@@ -334,10 +354,10 @@ spec = do
             blk1 = Block (blockBlockData blk0){blockDataParentHash = h} (blockReceiptTransactions blk0) (blockBlockUncles blk0)
             blk2 = addValidators (_validators ctx) blk1{
                       blockBlockData = (blockBlockData blk1){blockDataNumber = 1}}
-            pseal = proposerSeal blk2 (_prvkey ctx)
-            blk3 = addProposerSeal pseal blk2
-            cseal = commitmentSeal (blockHash blk3) (_prvkey ctx)
-            blk4 = addCommitmentSeals [cseal] blk3
+        pseal <- proposerSeal blk2
+        let blk3 = addProposerSeal pseal blk2
+        cseal <- commitmentSeal (blockHash blk3)
+        let blk4 = addCommitmentSeals [cseal] blk3
             iev = IEBlock . blockToIngestBlock TO.Morphism $ blk4
         putBlockstanbulContext ctx
         BatchSeqEvent{..} <- runBatch $ checkForUnseq [iev]
@@ -349,19 +369,14 @@ spec = do
 
       it "should sequence blocks out of order in blockstanbul" . runPBFTTestMWithGenesis $ \h -> do
         ctx <- fromMaybe (error "context required for PBFT") <$> getBlockstanbulContext
-        let mkBlk parent num = let blk0 = makeBlock 2 1
-                                   blk1 = Block (blockBlockData blk0){blockDataParentHash = parent} (blockReceiptTransactions blk0) (blockBlockUncles blk0)
-                                   blk2 = addValidators (_validators ctx) blk1{
-                                             blockBlockData = (blockBlockData blk1){blockDataNumber = num}}
-                                   pseal = proposerSeal blk2 (_prvkey ctx)
-                                   blk3 = addProposerSeal pseal blk2
-                                   cseal = commitmentSeal (blockHash blk3) (_prvkey ctx)
-                                in addCommitmentSeals [cseal] blk3
-            ieBlk = IEBlock . blockToIngestBlock TO.Morphism
-            mkBlkChn 0 _ _ = []
-            mkBlkChn n p i = let b = mkBlk p i
-                              in b : mkBlkChn (n - 1) (blockHash b) (i + 1)
-            blkChn = mkBlkChn (5 :: Int) h 1
+        let ieBlk = IEBlock . blockToIngestBlock TO.Morphism
+            mkBlkChn :: Int -> Keccak256 -> Integer -> SequencerM [Block]
+            mkBlkChn 0 _ _ = return []
+            mkBlkChn n p i = do 
+              b <- mkBlk p i
+              rst <- mkBlkChn (n - 1) (blockHash b) (i + 1)
+              return $ b : rst
+        blkChn <- mkBlkChn (5 :: Int) h 1
         putBlockstanbulContext ctx
         BatchSeqEvent{..} <- runBatch . checkForUnseq $ ieBlk <$> reverse blkChn
         _toP2p `shouldBe` []

@@ -6,6 +6,7 @@ set -x
 declare -i RESULT=0
 TESTS=(
   blockapps-data
+  ethereum-encryption
   ethereum-discovery
   ethereum-vm
   merkle-patricia-db

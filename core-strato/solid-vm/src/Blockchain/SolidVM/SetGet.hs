@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
@@ -12,7 +13,7 @@ module Blockchain.SolidVM.SetGet (
 
   getInt,
   getBool,
-  getAddress,
+  getAccount,
   getString,
 {-
   getSolid,
@@ -38,7 +39,7 @@ import           Blockchain.DB.SolidStorageDB
 import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.SM
 import           Blockchain.SolidVM.Value
-import           Blockchain.Strato.Model.Address (formatAddressWithoutColor)
+import           Blockchain.Strato.Model.Account
 import qualified SolidVM.Model.Storable as MS
 import qualified SolidVM.Solidity.Xabi.Type as Xabi
 import           Text.Format
@@ -68,8 +69,8 @@ fromBasic = \case
   MS.BInteger i -> SInteger i
   MS.BString s -> SString . BC.unpack $ s
   MS.BBool b -> SBool b
-  MS.BAddress a -> SAddress a
-  MS.BContract n a -> SContract (T.unpack n) (fromIntegral a)
+  MS.BAccount a -> SAccount a
+  MS.BContract n a -> SContract (T.unpack n) a
   MS.BEnumVal k v num -> SEnumVal (T.unpack k) (T.unpack v) num
   MS.BMappingSentinel -> SMappingSentinel
   MS.BDefault -> internalError "fromBasic: should never decode" MS.BDefault
@@ -79,8 +80,8 @@ findDefault = \case
   TInteger -> SInteger 0
   TString -> SString ""
   TBool -> SBool False
-  TAddress -> SAddress 0x0
-  TContract n -> SContract n 0x0
+  TAccount -> SAccount $ unspecifiedChain 0x0
+  TContract n -> SContract n $ unspecifiedChain 0x0
   TEnumVal n -> SEnumVal n (todo "findDefault/enumval" n) 0x0
   TStruct n fs -> todo "findDefault/struct" (n, fs)
   TComplex -> todo "finddefault/complex" TComplex
@@ -91,8 +92,8 @@ toBasic = \case
   SInteger i -> MS.BInteger i
   SString s -> MS.BString (BC.pack s)
   SBool b -> MS.BBool b
-  SAddress a -> MS.BAddress a
-  SContract n a -> MS.BContract (T.pack n) (fromIntegral a)
+  SAccount a -> MS.BAccount a
+  SContract n a -> MS.BContract (T.pack n) a
   SEnumVal k t num -> MS.BEnumVal (T.pack k) (T.pack t) num
   SMappingSentinel -> MS.BMappingSentinel
   x -> typeError "non basic solidity type cannot be stored atomically: " (show x)
@@ -139,7 +140,9 @@ setVal (STuple dstVector) (STuple srcVector) =
       srcItemVal <- getVar srcItemVar
       setVar dstItem srcItemVal
     
-setVal (SReference (AddressedPath addr path)) src = do
+setVal dst@(SReference (AccountPath addr path)) src = do
+  ro <- readOnly <$> getCurrentCallInfo
+  when ro $ invalidWrite "Invalid write during read-only access" $ "src: " ++ show src ++ ", dst: " ++ show dst
   markDiffForAction addr path $ toBasic src
   putSolidStorageKeyVal' addr path $ toBasic src
 
@@ -165,8 +168,8 @@ getBool p = do
     _ -> typeError "getBool" (p, v)
 -}
 
-getAddress :: MonadSM m => Variable -> m Value
-getAddress = getVar
+getAccount :: MonadSM m => Variable -> m Value
+getAccount = getVar
 
 
 getString :: MonadSM m => Variable -> m Value
@@ -183,7 +186,7 @@ weakGetVar (Variable v) = liftIO $ readIORef v
 
 getVar :: MonadSM m => Variable -> m Value
 --getVar x | trace ("getVar called: " ++ show x) $  False = undefined
-getVar (Constant (SReference addressedPath@(AddressedPath addr key))) = do
+getVar (Constant (SReference addressedPath@(AccountPath addr key))) = do
   theValue <- getSolidStorageKeyVal' addr key
   case theValue of
     MS.BDefault -> do
@@ -218,7 +221,7 @@ getBool p = do
     _ -> typeError "getBool" (p, v)
 
 deleteVar :: MonadSM m => Variable -> m ()
-deleteVar (Constant (SReference a@(AddressedPath addr path))) = do
+deleteVar (Constant (SReference a@(AccountPath addr path))) = do
   xType <- getXabiValueType a
   case xType of
     Xabi.Array{} -> do
@@ -270,7 +273,7 @@ showSM (SString v) = return v
 showSM (SBool v) = return $ show v
 showSM (SEnumVal enumName valName num) = return
     $ printf "%s.%s (= %x)" enumName valName num
-showSM (SAddress a) = return $ formatAddressWithoutColor a
+showSM (SAccount a) = return $ show a
 showSM (STuple v) = do
   vals <- mapM getVar (V.toList v)
   strings <- forM vals showSM

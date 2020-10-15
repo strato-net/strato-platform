@@ -15,12 +15,14 @@ import           Text.Format
 
 getOperationAt::Code->CodePointer->(Operation, CodePointer)
 getOperationAt (Code bytes) p        = opCode2Op bytes p
+getOperationAt _ _ = error "getOperationAt: called with PtrToCode"
 
 showCode::CodePointer->Code->String
 showCode _ (Code bytes) | B.null bytes = ""
 showCode lineNumber c@(Code rom) = showHex lineNumber "" ++ " " ++ format (B.pack $ op2OpCode op) ++ " " ++ show (pretty op) ++ "\n" ++  showCode (lineNumber + nextP) (Code (safeIntDrop nextP rom))
         where
           (op, nextP) = getOperationAt c 0
+showCode _ (PtrToCode _) = error "showCode: called with PtrToCode"
 
 formatCode::Code->String
 formatCode = showCode 0
@@ -36,9 +38,11 @@ getValidJUMPDESTs (Code bytes) = I.fromAscList $ go 0
                     0x5b -> x : go (x+1)
                     op | 0x60 <= op && op <= 0x7f -> go (x + 2 + fromIntegral op - 0x60)
                        | otherwise -> go (x+1)
+getValidJUMPDESTs (PtrToCode _) = error "getValidJUMPDESTs: called with PtrToCode"
 
 codeLength::Code->CodePointer
 codeLength (Code bytes) = B.length bytes
+codeLength (PtrToCode _) = error "codeLength: called with PtrToCode"
 
 compile::[Operation]->Code
 compile x = Code bytes

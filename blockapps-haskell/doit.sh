@@ -54,6 +54,7 @@ vaultWrapperHost="${vaultWrapperHost}"
 --nonceCounterTimeout=\$nonceCounterTimeout="${nonceCounterTimeout}"
 --sourceCacheTimeout=\$sourceCacheTimeout="${sourceCacheTimeout}"
 --txQueueSize=\$txQueueSize="${txQueueSize}"
+--gasOn="${gasOn}"
 "
 
 locale-gen "en_US.UTF-8"
@@ -125,7 +126,7 @@ runBackgroundProcess blockapps-strato-server >> /logs/strato-server 2>&1
 
 runBackgroundProcess blockapps-bloc --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
            --stratourl="$stratoRoot" --vaultwrapperurl="$vaultWrapperRoot" --minLogLevel="${blocMinLogLevel}" \
-           --nonceCounterTimeout="$nonceCounterTimeout" --sourceCacheTimeout="$sourceCacheTimeout" --txQueueSize="$txQueueSize" \
+           --nonceCounterTimeout="$nonceCounterTimeout" --sourceCacheTimeout="$sourceCacheTimeout" --txQueueSize="$txQueueSize" --gasOn="$gasOn" \
            +RTS -N1 &>> /logs/bloc
 
 until curl localhost:8000 &> /dev/null; do

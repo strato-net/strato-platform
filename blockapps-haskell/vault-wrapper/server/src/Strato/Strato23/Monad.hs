@@ -1,6 +1,8 @@
+{-# LANGUAGE DeriveAnyClass             #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ImplicitParams             #-}
+{-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE RecordWildCards            #-}
@@ -13,6 +15,7 @@ module Strato.Strato23.Monad where
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.Except
+import qualified Crypto.Saltine.Core.SecretBox     as SecretBox
 import qualified Data.ByteString.Lazy            as LB
 import           Data.Cache
 import           Data.Foldable
@@ -59,7 +62,7 @@ vaultWrapperError err = do
 data VaultWrapperEnv = VaultWrapperEnv
   { httpManager         :: Manager
   , dbPool              :: Pool Connection
-  , superSecretPassword :: IORef (Maybe Text)
+  , superSecretKey      :: IORef (Maybe SecretBox.Key)
   , keyStoreCache       :: Cache Text KeyStore
   }
 
@@ -168,13 +171,13 @@ enterVaultWrapper env x = Handler $ do
                      "Please contact your network administrator to have this problem fixed."
                    ]}
 
-withPassword :: (Password -> VaultM a) -> VaultM a
-withPassword f = do
-  pwioref <- asks superSecretPassword
-  password <- readIORef pwioref
-  case password of
+withSecretKey :: (SecretBox.Key -> VaultM a) -> VaultM a
+withSecretKey f = do
+  pwioref <- asks superSecretKey
+  key <- readIORef pwioref
+  case key of
     Nothing -> vaultWrapperError NoPasswordError
-    Just pw -> f (textPassword pw)
+    Just k -> f k
 
 formatTopLocation::[(String, SrcLoc)]->String
 formatTopLocation [] = "[-]"

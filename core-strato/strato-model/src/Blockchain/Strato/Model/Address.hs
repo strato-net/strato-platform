@@ -1,13 +1,16 @@
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE OverloadedLists       #-}
+{-# LANGUAGE OverloadedLists            #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE QuasiQuotes                #-}
 {-# LANGUAGE TemplateHaskell            #-}
 
 module Blockchain.Strato.Model.Address
     ( Address(..),
+      fromPrivateKey, fromPublicKey,
       prvKey2Address, pubKey2Address,
       formatAddressWithoutColor,
       stringAddress,
@@ -36,8 +39,8 @@ import qualified Data.Swagger                         as Sw
 import qualified Data.Text                            as T
 import           Database.Persist.Sql                 hiding (get)
 import           GHC.Generics
-import           Network.Haskoin.Crypto               hiding (Address, Word160)
-import           Network.Haskoin.Internals            hiding (Address, Word160)
+import qualified Network.Haskoin.Crypto               as Deprecated 
+import qualified Network.Haskoin.Internals            as Deprecated 
 import           Numeric
 import           Servant.API
 import           Servant.Docs
@@ -53,6 +56,7 @@ import           Web.PathPieces
 import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.ExtendedWord (Word160, word160ToBytes)
 import qualified Blockchain.Strato.Model.Keccak256    as SHA (hash, keccak256ToWord256)
+import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.Util
 import qualified Data.NibbleString                    as N
 import qualified Data.RLP                             as RLP2
@@ -77,21 +81,33 @@ instance Show Address where
 instance PrintfArg Address where
   formatArg (Address word) = formatArg word
 
-prvKey2Address :: PrvKey -> Address
+
+-- first byte of serialized pubkey is metdata, so we drop it
+fromPrivateKey :: PrivateKey -> Address
+fromPrivateKey =
+  Address . fromIntegral . SHA.keccak256ToWord256 . SHA.hash . B.drop 1 . exportPublicKey False . derivePublicKey 
+
+
+fromPublicKey :: PublicKey -> Address
+fromPublicKey = Address . fromIntegral . SHA.keccak256ToWord256 . SHA.hash . B.drop 1 . exportPublicKey False
+ 
+
+-- below are the deprecated Haskoin key->address functions
+prvKey2Address :: Deprecated.PrvKey -> Address
 prvKey2Address prvKey =
   Address $ fromIntegral $ SHA.keccak256ToWord256 $ SHA.hash $ BL.toStrict $ encode x `BL.append` encode y
   where
-    point = pubKeyPoint $ derivePubKey prvKey
-    x = fromMaybe (error "getX failed in prvKey2Address") $ getX point
-    y = fromMaybe (error "getY failed in prvKey2Address") $ getY point
+    point = Deprecated.pubKeyPoint $ Deprecated.derivePubKey prvKey
+    x = fromMaybe (error "getX failed in prvKey2Address") $ Deprecated.getX point
+    y = fromMaybe (error "getY failed in prvKey2Address") $ Deprecated.getY point
 
-pubKey2Address :: PubKey -> Address
+pubKey2Address :: Deprecated.PubKey -> Address
 pubKey2Address pubKey =
   Address $ fromIntegral $ SHA.keccak256ToWord256 $ SHA.hash $ BL.toStrict $ encode x `BL.append` encode y
   where
-    x = fromMaybe (error "getX failed in prvKey2Address") $ getX point
-    y = fromMaybe (error "getY failed in prvKey2Address") $ getY point
-    point = pubKeyPoint pubKey
+    x = fromMaybe (error "getX failed in prvKey2Address") $ Deprecated.getX point
+    y = fromMaybe (error "getY failed in prvKey2Address") $ Deprecated.getY point
+    point = Deprecated.pubKeyPoint pubKey
 
 {-
  Was necessary to make Address a primary key - which we no longer do (but rather index on the address field).
@@ -141,7 +157,7 @@ instance Binary Address where
 
 instance PersistField Address where
   toPersistValue = PersistText . T.pack . formatAddressWithoutColor
-  fromPersistValue (PersistText t) = maybeToEither "could not decode address"
+  fromPersistValue (PersistText t) = Deprecated.maybeToEither "could not decode address"
                                    . stringAddress
                                    . T.unpack $ t
   fromPersistValue x = Left . T.pack $ "PersistField Address: expected PersistText: " ++ show x
@@ -248,7 +264,7 @@ addressFromHex :: B.ByteString -> Either String Address
 addressFromHex hex = case B16.decode hex of
                      (h, "") -> case decodeOrFail (BL.fromStrict h) of
                                   Right (_, _, a) -> return a
-                                  Left (_, _, msg) -> Left $ "cannot decode address: " ++ msg
+                                  Left (_, _, mesg) -> Left $ "cannot decode address: " ++ mesg
                      (_, _) -> Left $ "invalid hex address: " ++ show hex
 
 instance Arbitrary Address where

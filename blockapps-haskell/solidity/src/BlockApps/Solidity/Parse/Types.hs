@@ -23,6 +23,7 @@ simpleType :: SolidityParser Xabitype.Type
 simpleType =
   simple "bool" Xabitype.Bool <|>
   simple "address" Xabitype.Address <|>
+  simple "account" Xabitype.Account <|>
   simple "string" (Xabitype.String $ Just True) <|>
   bytes' <|>
   intSuffixed "uint"  (Xabitype.Int (Just False)) <|>

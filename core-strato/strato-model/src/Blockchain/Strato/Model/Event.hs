@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric        #-}
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE OverloadedStrings    #-}
 {-# LANGUAGE RecordWildCards      #-}
@@ -13,15 +14,15 @@ import           GHC.Generics
 import           Data.Aeson
 import           Data.DeriveTH
 import           Test.QuickCheck
+import           Test.QuickCheck.Instances()
 
-import           Blockchain.MiscArbitrary()
 import           Blockchain.MiscJSON()
-import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Account
 
 data Event =
   Event {
     evContractName    :: String,
-    evContractAddress :: Address,
+    evContractAccount :: Account,
     evName            :: String,
     evArgs            :: [String] -- TODO: probably should use Solidity values here?
     } deriving (Eq, Read, Show, Generic)
@@ -30,7 +31,7 @@ data Event =
 instance ToJSON Event where
   toJSON Event{..} = object
     [ "eventContractName" .= evContractName
-    , "eventContractAddress" .= evContractAddress
+    , "eventContractAccount" .= evContractAccount
     , "eventName"         .= evName
     , "eventArgs"         .= evArgs
     ]
@@ -38,7 +39,7 @@ instance ToJSON Event where
 instance FromJSON Event where
   parseJSON (Object o) = Event
     <$> (o .: "eventContractName")
-    <*> (o .: "eventContractAddress")
+    <*> (o .: "eventContractAccount")
     <*> (o .: "eventName")
     <*> (o .: "eventArgs")
   parseJSON o = error $ "parseJSON Event: Expected object, got:" ++ show o

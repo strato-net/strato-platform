@@ -1,5 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans  #-}
 {-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DeriveAnyClass        #-}
+{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -60,6 +62,7 @@ import           Text.Read.Lex
 
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Gas
@@ -110,10 +113,21 @@ instance RLPEncodable CodePtr where
                                            , rlpEncode n
                                            , rlpEncode ch
                                            ]
+  rlpEncode (CodeAtAccount a n) = RLP.Array [RLP.String $ Char8.pack "AtAccount"
+                                            , rlpEncode a
+                                            , rlpEncode n
+                                            ]
 
   rlpDecode (RLP.Array [RLP.String "SolidVM", n, ch]) = SolidVMCode <$> rlpDecode n <*> rlpDecode ch
+  rlpDecode (RLP.Array [RLP.String "AtAccount", a, n]) = CodeAtAccount <$> rlpDecode a <*> rlpDecode n
   rlpDecode ch = EVMCode <$> rlpDecode ch
 
+instance RLPEncodable Code where
+  rlpEncode (Code cb) = rlpEncode cb
+  rlpEncode (PtrToCode cp) = RLP.Array [rlpEncode cp]
+
+  rlpDecode (RLP.Array [x]) = PtrToCode <$> rlpDecode x
+  rlpDecode x = Code <$> rlpDecode x
 --------------------------------------------------------------------------------
 
 
@@ -130,7 +144,7 @@ data Transaction = Transaction
   , transactionGasLimit   :: Gas
   , transactionTo         :: Maybe Address
   , transactionValue      :: Wei
-  , transactionInitOrData :: ByteString
+  , transactionInitOrData :: Code
   , transactionChainId    :: Maybe ChainId
   , transactionV          :: Word8
   , transactionR          :: Word256
@@ -190,7 +204,7 @@ data UnsignedTransaction = UnsignedTransaction
   , unsignedTransactionGasLimit   :: Gas
   , unsignedTransactionTo         :: Maybe Address
   , unsignedTransactionValue      :: Wei
-  , unsignedTransactionInitOrData :: ByteString
+  , unsignedTransactionInitOrData :: Code
   , unsignedTransactionChainId    :: Maybe ChainId
   } deriving (Eq,Show,Generic)
 

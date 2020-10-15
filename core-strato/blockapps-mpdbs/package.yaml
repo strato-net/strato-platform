@@ -23,6 +23,7 @@ library:
   - ansi-wl-pprint
   - base16-bytestring
   - binary
+  - blockapps-data
   - blockapps-util
   - bytestring
   - containers
@@ -31,6 +32,7 @@ library:
   - ethereum-rlp
   - fastMP
   - format
+  - lens
   - leveldb-haskell
   - merkle-patricia-db
   - monad-alter
@@ -65,4 +67,5 @@ tests:
       - transformers
       - unix
       - unliftio
+      - vm-tools
     ghc-options: -Wall -Werror -threaded -rtsopts -with-rtsopts=-N

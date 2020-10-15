@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass             #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ImplicitParams             #-}
@@ -90,6 +91,7 @@ data BlocEnv = BlocEnv
   , dbPool             :: Pool Connection
   , deployMode         :: DeployMode
   , stateFetchLimit    :: Integer
+  , gasOn              :: Bool
   , globalNonceCounter :: Cache (Address, Maybe ChainId) Nonce
   , globalSourceCache  :: Cache (Text, Text) (Map Text (Int32, ContractDetails))
   , txTBQueue          :: TBQueue (Maybe Text, Maybe ChainId, Bool, PostBlocTransactionRequest)

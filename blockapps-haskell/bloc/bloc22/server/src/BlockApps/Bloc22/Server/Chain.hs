@@ -11,6 +11,7 @@
 module BlockApps.Bloc22.Server.Chain where
 
 import           Control.Applicative               (liftA2)
+import           Control.Lens                      ((?~), at)
 import           Control.Monad                     (when, unless)
 import           Crypto.Random.Entropy
 import qualified Data.ByteString.Base16            as B16
@@ -18,7 +19,7 @@ import           Data.Foldable                     (for_)
 import           Data.Int                          (Int32)
 import qualified Data.Map.Ordered                  as OMap
 import qualified Data.Map.Strict                   as Map
-import           Data.Maybe                        (catMaybes, fromJust, fromMaybe)
+import           Data.Maybe                        (catMaybes, fromJust, fromMaybe, maybeToList)
 import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
 import           Data.Text.Encoding                (encodeUtf8)
@@ -34,11 +35,13 @@ import           BlockApps.Solidity.Struct
 import           BlockApps.Solidity.Type
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Bloc22.Database.Queries
+import           BlockApps.Bloc22.Server.Users     (constructArgValuesAndSource)
 import           BlockApps.Bloc22.Server.Utils     (waitFor)
 import           BlockApps.XAbiConverter           (xAbiToContract)
 
 import           Blockchain.Data.ChainInfo
 import           Blockchain.TypeLits
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256
 import           Handlers.Chain
@@ -61,44 +64,55 @@ replaceMembers Struct{..} addrs m =
         Nothing -> m'
         Just (Left _, _) -> m
         Just (_, ty) -> case ty of
-          TypeArrayDynamic (SimpleType TypeAddress) -> m'
+          TypeArrayDynamic (SimpleType TypeAccount) -> m'
           _ -> m
 
 createChainInfo :: ChainInput -> Bloc (Maybe Int32, ChainInfo)
-createChainInfo (ChainInput msrc cname lbl balances chaininputArgs members mmd _) = do
+createChainInfo (ChainInput msrc mCodePtr cname lbl balances chaininputArgs members mmd _) = do
   when (null members) $ throwIO $ UserError "Private chains must include at least one member"
   when (sum (nmap2' balances) == 0) $ throwIO $ UserError "At least one account must have a non-zero balance"
-
-  let src = fromMaybe "" msrc
-  let theVM = fromMaybe "EVM" $ Map.lookup "VM" =<< mmd
-  mContract <- fmap snd <$> getContractDetailsForContract theVM src cname
-  (cAcctInfo, codeInfo) <- case mContract of
-      Nothing -> return ([],[])
+  let md = fromMaybe Map.empty mmd
+      theVM = fromMaybe "EVM" $ Map.lookup "VM" md
+  mContract <- case msrc of
+    Just src -> fmap snd <$> getContractDetailsForContract theVM src cname
+    Nothing -> case mCodePtr of
+      Just codePtr -> getContractDetailsByCodeHash codePtr
+      Nothing -> fmap snd <$> getContractDetailsForContract theVM "" cname
+  (cAcctInfo, codeInfo, metaData) <- case mContract of
+      Nothing -> return ([],[], md)
       Just (_, ContractDetails{..}) -> do
           contract <- either (throwIO . UserError . Text.pack) return $ xAbiToContract contractdetailsXabi
           let argValues = replaceMembers
                             (mainStruct contract)
                             (nmap1' members)
                             chaininputArgs
-          storage <- fmap Map.toList . either (throwIO . UserError) return $ encodeValues
+          storage <- case theVM of
+            "EVM" -> fmap Map.toList . either (throwIO . UserError) return $ encodeValues
                        (typeDefs contract)
                        (mainStruct contract)
                        0
                        (Map.toList argValues)
+            _ -> pure []
           let balMap = Map.fromList $ map (unNamedTuple @"address" @"balance") balances
               govBal = fromMaybe 0 $ Map.lookup governanceAddress balMap
 
-          (contractHash, b, s) <-
+          (contractHash, b) <-
             case theVM of
-              "EVM" -> return (contractdetailsCodeHash, contractdetailsBinRuntime, src)
+              "EVM" -> return (fromMaybe contractdetailsCodeHash mCodePtr, contractdetailsBinRuntime)
               "SolidVM" -> do
-                return (contractdetailsCodeHash, "", src)
+                return (fromMaybe contractdetailsCodeHash mCodePtr, "")
               _ -> throwIO . UserError . Text.pack $ "Unknown VM: " ++ show theVM
 
           let contractAcctInfo = ContractWithStorage governanceAddress govBal contractHash storage
               b' = fst . B16.decode $ encodeUtf8 b
-              codeInfo' = CodeInfo b' s contractdetailsName
-          return ([contractAcctInfo],[codeInfo']) -- Perhaps in the future, we can support multiple contracts
+              codeInfo' = maybeToList $ (\s -> CodeInfo b' s contractdetailsName) <$> msrc
+          md' <- case theVM of
+              "SolidVM" -> do
+                let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi
+                (_, argsAsSource) <- constructArgValuesAndSource (Just argValues) xabiArgs
+                pure $ (at "args" ?~ argsAsSource) md
+              _ -> pure md
+          return ([contractAcctInfo],codeInfo',md') -- Perhaps in the future, we can support multiple contracts
   nonce <- byteStringToWord256 <$> liftIO (getEntropy 32)
   let maybeNonContract a b | a == governanceAddress = Nothing
                            | otherwise = Just $ NonContract a b
@@ -112,7 +126,7 @@ createChainInfo (ChainInput msrc cname lbl balances chaininputArgs members mmd _
                            Nothing
                            creationBlockHash
                            nonce
-                           (fromMaybe Map.empty mmd)
+                           metaData
         )
         Nothing
   return (fst <$> mContract, chainInfo)
@@ -127,7 +141,7 @@ postChainInfo chainInput = do
   chainId <- blocStrato $ postChainClient chainInfo
   let isAsync = fromMaybe False $ chaininputAsync chainInput
   unless isAsync $ waitForChainInfo chainId
-  for_ mCmId $ \cmId -> insertContractInstance cmId governanceAddress (Just chainId)
+  for_ mCmId $ \cmId -> insertContractInstance cmId $ Account governanceAddress (Just $ unChainId chainId)
   return chainId
 
 postChainInfos :: [ChainInput] -> Bloc [ChainId]
@@ -138,7 +152,7 @@ postChainInfos chainInputs = do
       asyncChains = map snd . filter (not . fst) $ zip asyncInputs chainIds
   unless (null asyncChains) $ waitForChainInfos asyncChains
   let cmIdChains = catMaybes $ zipWith (liftA2 (,)) (map fst chainInfos) (map Just chainIds)
-  for_ cmIdChains $ \(cmId, chainId) -> insertContractInstance cmId governanceAddress (Just chainId)
+  for_ cmIdChains $ \(cmId, chainId) -> insertContractInstance cmId $ Account governanceAddress (Just $ unChainId chainId)
   return chainIds
 
 waitForChainInfo :: ChainId -> Bloc ()

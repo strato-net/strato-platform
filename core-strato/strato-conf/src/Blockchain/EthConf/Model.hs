@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 {-# OPTIONS -fno-warn-deprecations #-}
@@ -5,10 +7,6 @@
 module Blockchain.EthConf.Model where
 -- These are the aspects EthConf that don't require unsafePerformIO
 
-import           Blockchain.ECIES
-import           Crypto.PubKey.ECC.DH
-import           Crypto.Random
-import           Data.Bifunctor
 import qualified Data.ByteString            as B
 import qualified Data.ByteString.Char8      as C8
 import           Data.Swagger               hiding (port, host)
@@ -17,7 +15,6 @@ import           Data.Yaml
 import qualified Database.PostgreSQL.Simple as PS (ConnectInfo(..), postgreSQLConnectionString)
 import qualified Database.Redis             as Redis
 import           GHC.Generics
-import           Numeric
 
 postgreSQLConnectionString :: SqlConf -> B.ByteString
 postgreSQLConnectionString sqlc =
@@ -43,7 +40,6 @@ redisConnection r =
 data EthConf =
     EthConf {
         ethUniqueId        :: EthUniqueId,
-        privKey            :: PrivKey,
         sqlConfig          :: SqlConf,
         redisBlockDBConfig :: RedisBlockDBConf,
         kafkaConfig        :: KafkaConf,
@@ -113,23 +109,3 @@ data BlockConf =
         blockTime          :: Integer,
         minBlockDifficulty :: Integer
     } deriving (Show, Eq, Generic, FromJSON, ToJSON)
-
-newtype PrivKey = PrivKey { unPrivKey :: PrivateNumber } deriving (Eq, Generic)
-
-instance Read PrivKey where
-  readsPrec _ s = map (first PrivKey) $ readHex s
-
-instance Show PrivKey where
-  show = flip showHex "" . unPrivKey
-
-instance ToJSON PrivKey where
-  toJSON = toJSON . show
-
-instance FromJSON PrivKey where
-  parseJSON v = read <$> parseJSON v
-
-generatePrivKey :: IO PrivKey
-generatePrivKey = do
-  entropyPool <- createEntropyPool
-  let g = cprgCreate entropyPool :: SystemRNG
-  return . PrivKey . fst $ generatePrivate g theCurve

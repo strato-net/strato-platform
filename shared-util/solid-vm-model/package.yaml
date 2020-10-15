@@ -11,6 +11,7 @@ library:
   source-dirs: src/
   dependencies:
   - attoparsec
+  - base16-bytestring
   - binary
   - bytestring
   - deepseq
@@ -31,6 +32,7 @@ tests:
       - ethereum-rlp
       - hspec
       - solid-vm-model
+      - strato-model
       - unliftio
 
 benchmarks:

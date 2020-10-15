@@ -1,5 +1,9 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -11,6 +15,7 @@ module Blockchain.Strato.Model.Keccak256 (
   formatKeccak256WithoutColor,
   hash,
   rlpHash,
+  emptyHash,
   keccak256FromHex,
   keccak256ToByteString,
   keccak256ToHex,
@@ -154,6 +159,9 @@ rlpHash = hash . rlpSerialize . rlpEncode
 hash :: BC.ByteString -> Keccak256
 hash = Keccak256 . fastKeccak256
 
+{-# NOINLINE emptyHash #-}
+emptyHash :: Keccak256
+emptyHash = hash ""
 
 instance Format Keccak256 where
   format = CL.yellow . formatKeccak256WithoutColor

@@ -2,24 +2,31 @@
 {-# OPTIONS -fno-warn-orphans         #-}
 {-# LANGUAGE DataKinds                #-}
 {-# LANGUAGE DeriveDataTypeable       #-}
+{-# LANGUAGE DeriveGeneric            #-}
+{-# LANGUAGE FlexibleContexts         #-}
 {-# LANGUAGE FlexibleInstances        #-}
+{-# LANGUAGE LambdaCase               #-}
 {-# LANGUAGE OverloadedStrings        #-}
 {-# LANGUAGE RecordWildCards          #-}
 {-# LANGUAGE ScopedTypeVariables      #-}
 {-# LANGUAGE StrictData               #-}
 {-# LANGUAGE TypeApplications         #-}
+{-# LANGUAGE TypeOperators            #-}
 
 module Blockchain.Data.ChainInfo
-  ( ChainInfo (..)
+  ( ParentChainId(..)
+  , ChainInfo (..)
   , UnsignedChainInfo(..)
   , ChainSignature(..)
   , AccountInfo (..)
   , CodeInfo (..)
+  , isAncestorChainOf
   , accountExtractor
   ) where
 
 
 import           Control.Applicative               (many)
+import qualified Control.Monad.Change.Alter        as A
 
 import           Blockchain.ExtWord
 import           Blockchain.Data.Enode
@@ -49,6 +56,8 @@ import           Numeric                              (showHex)
 import           Text.Format
 
 import qualified Text.Colors                          as CL
+
+newtype ParentChainId = ParentChainId { unParentChainId :: Maybe Word256 }
 
 data CodeInfo = CodeInfo
   { codeInfoCode   :: B.ByteString
@@ -343,6 +352,14 @@ instance RLPSerializable ChainInfo where
       (rlpDecode . RLPArray $ take 8 xs)
       (rlpDecode $ xs !! 8)
   rlpDecode o = error $ "rlpDecode ChainInfo: Expected 9 element RLPArray, got " ++ show o
+
+isAncestorChainOf :: A.Selectable (Maybe Word256) ParentChainId m => Maybe Word256 -> Maybe Word256 -> m Bool
+isAncestorChainOf Nothing  _       = pure True
+isAncestorChainOf (Just _) Nothing = pure False
+isAncestorChainOf (Just ancestor) (Just descendent) | ancestor == descendent = pure True
+isAncestorChainOf ancestor descendent = A.select (A.Proxy @ParentChainId) descendent >>= \case
+  Nothing -> pure False
+  Just (ParentChainId parent) -> ancestor `isAncestorChainOf` parent
 
 accountExtractor :: JS.Parser [AccountInfo]
 accountExtractor = many ("accountInfo" JS..: JS.arrayOf acctInfo)

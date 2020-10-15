@@ -2,21 +2,20 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS -fno-warn-orphans    #-}
+
 module Main where
 
 import           Control.Exception
 import           Control.Monad
-import qualified Data.Aeson                 as Ae
 import qualified Data.ByteString.Char8      as C8
-import qualified Data.ByteString.Base64     as B64
 import           Data.ByteString.Base16     as B16
-import qualified Data.ByteString.Lazy       as BL
-import           Data.Either.Extra
 import           Data.Foldable (foldlM)
-import           Data.Maybe
-import qualified Network.Haskoin.Crypto     as HK
-import           Network.HTTP
-import           Network.HTTP.Auth
+import           Data.List.Split            (splitOn)
+import qualified Data.Text                  as T
+import           Network.HTTP.Client        (newManager, defaultManagerSettings)
+import           Network.HTTP.Simple
 import           System.Console.GetOpt
 import           System.Environment
 import           System.Exit
@@ -26,29 +25,45 @@ import           Blockchain.Blockstanbul.Authentication
 import           Blockchain.Blockstanbul.HTTPAdmin
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Data.RLP
+import           Blockchain.Strato.Model.Secp256k1
+
+import           Servant.Client
+import qualified Strato.Strato23.API        as VC
+import qualified Strato.Strato23.Client     as VC
+
+
+instance HasVault IO where
+  sign bs = do
+    mgr <- newManager defaultManagerSettings
+    url <- parseBaseUrl "http://vault-wrapper:8000/strato/v2.3"
+    eSig <- runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash bs)) (ClientEnv mgr url Nothing)
+    case eSig of
+      Left err -> die $ "failed to get message signature from the admin node's vault: " ++ show err
+      Right sig -> return sig
+
+  getPub = error "called getPub, but we shouldn't ever do that in blockstanbul-vote"
+  getShared _ = error "called getShared, but we shouldn't ever do that in blockstanbul-vote"
 
 data Options = Options
   { optRemove    :: Bool
+  , optHTTPS     :: Bool
   , optRecipient :: Address
-  , optNode      :: String
+  , optNodes     :: [String]
   , optNonce     :: Int
-  , optUsername  :: String
-  , optPassword  :: String
   } deriving Show
 
 defaultOptions :: Options
 defaultOptions  = Options
   { optRemove    = False
+  , optHTTPS     = False
   , optRecipient = throw $ userError "Give me a recipient address."
-  , optNode      = throw $ userError "Give me a node."
+  , optNodes     = throw $ userError "Give me the node(s) to whom I'll send the vote."
   , optNonce     = throw $ userError "Give me a non-negative int for your nonce."
-  , optUsername  = throw $ userError "Give me the username of the node."
-  , optPassword  = throw $ userError "Give me the password of the node."
   }
 
 options :: [OptDescr (Options -> IO Options)]
 options =
-   [Option ['n'] ["nonce"]
+  [Option ['n'] ["nonce"]
       (ReqArg
        (\ nc opts -> do
             let nonc = read nc :: Int
@@ -66,26 +81,20 @@ options =
              Nothing -> ioError . userError . printf "invalid address: %s" $ show strAddr
        ) "Address")
     "REQUIRED; The beneficiary address."
-  , Option ['d'] ["node"]
+  , Option ['d'] ["nodes"]
       (ReqArg
-       (\ nd opts -> return opts { optNode=nd }
-       ) "Node IP Address")
-    "REQUIRED; The node server IP address."
+       (\ nd opts -> return opts { optNodes=(splitOn "," nd) }
+       ) "Nodes IP Addresses")
+    "REQUIRED; The IP address(es) of the current voting node(s)."
   , Option ['e'] ["remove"]
       (NoArg
        (\ opts -> return opts { optRemove = True}))
       "The voting direction"
-  , Option ['u'] ["username"]
-      (ReqArg
-       (\ username opts -> return opts { optUsername = username}
-       ) "Node Username")
-    "REQUIRED; The strato username of the running pbft node."
-  , Option ['p'] ["password"]
-      (ReqArg
-       (\ pw opts -> return opts { optPassword = pw}
-       ) "Node password")
-      "REQUIRED; The strato password of the running pbft node."
-   ]
+  , Option ['h'] ["https"]
+      (NoArg
+       (\ opts -> return opts { optHTTPS = True}))
+      "Whether to use HTTPS"
+ ]
 
 helpMessage :: String
 helpMessage = usageInfo header options
@@ -98,45 +107,52 @@ parseArgs = do
     ([], _, errs) -> ioError (userError (concat errs ++ helpMessage))
     (opts, _, _) -> foldlM (flip id) defaultOptions opts
 
-main :: IO()
+
+main :: IO ()
 main = do
   Options{..} <- parseArgs
-  skey <- fromMaybe (error "NODEKEY not set") <$> lookupEnv "NODEKEY"
-  let bytes = fromRight (error "Invalid base64 NODEKEY") . B64.decode . C8.pack $ skey
-      pkey = fromMaybe (error "Invalid NODEKEY") . HK.decodePrvKey HK.makePrvKey $ bytes
-      optSender = prvKey2Address pkey
-  putStrLn $ "Sender: " ++ show optSender
-  let esign = signBenfInfo pkey (optRecipient, not optRemove, optNonce)
-  putStrLn $ "Signature: " ++ show esign
-  let esignStr = C8.unpack
-               . B16.encode
-               . rlpSerialize
-               . rlpEncode $ esign
-  putStrLn $ "esignStr: " ++ show esignStr
-  let payload = CandidateReceived
-              { sender = optSender
-              , signature = esignStr
-              , recipient = optRecipient
-              , votingdir = not optRemove
-              , nonce = optNonce
-              }
-      body = C8.unpack $ BL.toStrict $ Ae.encode payload
-  putStrLn $ "struct: " ++ show payload
-
-  putStrLn $ "body: " ++ body
-  let url = printf "http://%s/blockstanbul/vote" optNode
-  putStrLn $ "url: " ++ url
-  let req' = postRequestWithBody url "application/json" body
-      auth = AuthBasic (error "realm unused")
-                       optUsername
-                       optPassword
-                       (error "uri unused")
-      authStr = withAuthority auth req'
-      req = insertHeaders [mkHeader HdrAuthorization authStr] req'
-  putStrLn $ "request: " ++ show req
-  eResp <- simpleHTTP req
-  case eResp of
-    Left err -> die $ "connection error: " ++ show err
-    Right resp -> do
-      print resp
-      putStrLn $ rspBody resp
+  mgr <- newManager defaultManagerSettings
+  vaultUrl <- parseBaseUrl "http://vault-wrapper:8000/strato/v2.3"
+  optSender <- do 
+    eAdAndKey <- runClientM (VC.getKey (T.pack "nodekey") Nothing) (ClientEnv mgr vaultUrl Nothing)
+    case eAdAndKey of
+      Left err -> die $ "failed to get address from the admin node's vault: " ++ show err
+      Right adAndKey -> return $ VC.unAddress adAndKey
+  
+  putStrLn $ "Sender (admin node) address: " ++ show optSender
+  putStrLn $ "Starting nonce: " ++ show optNonce
+  printf $ "\nSending the vote to the following nodes: " ++ show optNodes
+ 
+  let go [] _ = return ()
+      go (nodeURL:xs) non = do
+        esign <- signBenfInfo (optRecipient, not optRemove, non)
+        
+        let esignStr = C8.unpack
+                     . B16.encode
+                     . rlpSerialize
+                     . rlpEncode $ esign
+            payload = CandidateReceived
+                    { sender = optSender
+                    , signature = esignStr
+                    , recipient = optRecipient
+                    , votingdir = not optRemove
+                    , nonce = non
+                    }
+            url = printf "http://%s/blockstanbul/vote" nodeURL
+        
+        putStrLn $ "\n\n\nsending the following request to " ++ nodeURL ++ ", HTTPS = " ++ show optHTTPS
+        putStrLn $ show payload
+        
+        plainReq <- parseRequest url
+        let postReq = setRequestMethod (C8.pack "POST") plainReq
+            authReq = setRequestBasicAuth (C8.pack "admin") (C8.pack "admin") postReq
+            bodyReq = setRequestBodyJSON payload authReq
+            finalReq = if optHTTPS then setRequestSecure True bodyReq else bodyReq
+        
+        resp <- httpBS finalReq
+        putStrLn $ "\nresponse status: " ++ (show $ getResponseStatus resp)
+        putStrLn $ "response body: " ++ (show $ getResponseBody resp)
+     
+        go xs $ non + 1
+    
+  go optNodes optNonce   
