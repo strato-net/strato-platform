@@ -1,9 +1,14 @@
 
 interface Options {
   config: {
-    nodes:{url:string}[]
+    nodes:{url:string}[],
+    apiDebug:boolean,
   },
-  node?:number
+  node?:number,
+  headers?:any,
+  params?:any,
+  getFullResponse?:any,
+  logger?:Console
 }
 
 export { Options };

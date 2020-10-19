@@ -187,7 +187,7 @@ async function post(url, endpoint, _body, options) {
   return ax.post(url, endpoint, body, options);
 }
 
-async function get(host, endpoint, options = {}) {
+async function get(host, endpoint, options:Options) {
   return ax.get(host, endpoint, options);
 }
 

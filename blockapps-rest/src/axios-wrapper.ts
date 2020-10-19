@@ -1,6 +1,7 @@
 import axios, { AxiosRequestConfig } from 'axios'
 import * as queryString from 'query-string'
 const { stringify} = require('flatted/cjs');
+import { Options } from "./options";
 
 
 axios.defaults.headers.post['Content-Type'] = 'application/json'
@@ -16,7 +17,7 @@ function toJson(string) {
   }
 }
 
-async function get(host, endpoint, options:any = {}) {
+async function get(host, endpoint, options:Options) {
   const logger = options.logger || (options.config.apiDebug? console : nullLogger)
   const url = host + endpoint
   const request:AxiosRequestConfig = {
@@ -41,7 +42,7 @@ async function get(host, endpoint, options:any = {}) {
   }
 }
 
-async function post(host, endpoint, body, options) {
+async function post(host, endpoint, body, options:Options) {
   const logger = options.logger || (options.config.apiDebug? console : nullLogger)
   const url = host + endpoint
   const request:AxiosRequestConfig = {
@@ -129,7 +130,7 @@ function errorFormatter(err) {
   return stringify(err)
 }
 
-async function postue(host, endpoint, data, _options) {
+async function postue(host, endpoint, data, _options:Options) {
   const options = Object.assign({}, _options)
   options.headers = Object.assign({}, options.headers, urlencodedHeaders)
   return post(host, endpoint, queryString.stringify(data), options)
