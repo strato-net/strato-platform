@@ -10,6 +10,7 @@ import {
   setAuthHeaders
 } from "./util/api.util";
 import { TxPayloadType } from "./constants";
+import { Options } from "./options";
 
 async function getUsers(args, options) {
   const url = getNodeUrl(options);
@@ -213,7 +214,7 @@ async function send(user, sendTx, options) {
   return sendTransactions(user, body, options);
 }
 
-async function getKey(user, options) {
+async function getKey(user, options:Options) {
   const url = getNodeUrl(options);
   const endpoint = constructEndpoint(Endpoint.KEY, options);
   return get(url, endpoint, setAuthHeaders(user, options));

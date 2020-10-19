@@ -2,6 +2,7 @@ import * as RestStatus from "http-status-codes";
 import * as queryString from "query-string";
 import ax from "../axios-wrapper";
 import { RestError } from "./rest.util";
+import { Options } from "../options";
 
 const blocUrl = "/bloc/v2.2";
 const strato12Url = "/strato-api/eth/v1.2";
@@ -159,7 +160,7 @@ function setAuthHeaders(user, _options) {
 /*
   get the url for the node by node id#
  */
-function getNodeUrl(options) {
+function getNodeUrl(options:Options) {
   const nodeId = options.node || 0;
   const nodeObject = options.config.nodes[nodeId];
   return nodeObject.url;

@@ -6,6 +6,7 @@ import util from "./util/util";
 import { constructMetadata, setAuthHeaders } from "./util/api.util";
 import { RestError, response } from "./util/rest.util";
 import jwt from "jsonwebtoken";
+import { Options } from "./options";
 
 // =====================================================================
 //   util
@@ -84,12 +85,12 @@ async function getUsers(args, options) {
   return users;
 }
 
-async function getUser(args, options) {
+async function getUser(args, options:Options) {
   const [address] = await api.getUser(args, options);
   return address;
 }
 
-async function createUser(args, options) {
+async function createUser(args, options:Options) {
   const address = await createOrGetKey(args, options);
   const user = Object.assign({}, args, { address });
   return user;
@@ -191,7 +192,7 @@ async function createKey(user, options) {
   return response.address;
 }
 
-async function createOrGetKey(user, options) {
+async function createOrGetKey(user, options:Options) {
   try {
     const response = await api.getKey(user, options);
 
