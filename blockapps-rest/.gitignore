@@ -41,7 +41,7 @@ jspm_packages
 *.iml
 
 # Build
-lib/build
+lib
 dist
 
 .vscode
