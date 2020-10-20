@@ -32,7 +32,7 @@ const Endpoint = {
   EXT_LIST: `${externalStorageUrl}/list`,
 };
 
-function constructEndpoint(endpointTemplate, options = {}, params = {}) {
+function constructEndpoint(endpointTemplate, options:Options, params = {}) {
   // expand template
   const endpoint = Object.getOwnPropertyNames(params).reduce((acc, key) => {
     return acc.replace(`:${key}`, encodeURIComponent(params[key]));
@@ -45,7 +45,7 @@ function constructEndpoint(endpointTemplate, options = {}, params = {}) {
   return `${endpoint}${query}`;
 }
 
-function constructQuerySearch(options) {
+function constructQuerySearch(options:Options) {
   if (options === undefined) {
     return "";
   }
@@ -75,7 +75,7 @@ function constructQuerySearch(options) {
   }
 }
 
-function constructQuery(options) {
+function constructQuery(options:Options) {
   if (options === undefined) {
     return "";
   }
@@ -149,7 +149,7 @@ function constructMetadata(options:any, contractName) {
   return metadata;
 }
 
-function setAuthHeaders(user, _options) {
+function setAuthHeaders(user, _options:Options) {
   const options = Object.assign({}, _options);
   options.headers = Object.assign({}, _options.headers, {
     Authorization: `Bearer ${user.token}`
@@ -166,7 +166,7 @@ function getNodeUrl(options:Options) {
   return nodeObject.url;
 }
 
-async function post(url, endpoint, _body, options) {
+async function post(url, endpoint, _body, options:Options) {
   function createBody(_body, options) {
     // array
     if (Array.isArray(_body)) return _body;
@@ -191,7 +191,7 @@ async function get(host, endpoint, options:Options) {
   return ax.get(host, endpoint, options);
 }
 
-async function postue(host, endpoint, data, options) {
+async function postue(host, endpoint, data, options:Options) {
   // TODO - @samrit do we need txParams here
   return ax.postue(host, endpoint, data, options);
 }

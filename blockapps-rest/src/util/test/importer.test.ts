@@ -3,13 +3,14 @@ import importer from "../importer";
 import rest from "../../rest";
 import util from "../util";
 import factory from "../../test/factory";
+import { Options } from "../../options";
 
 const config = factory.getTestConfig();
 const fixtures = `${util.cwd}/lib/util/test/fixtures/`;
 
 describe("imports", () => {
   let admin;
-  const options = { config };
+  const options:Options = { config };
 
   before(async () => {
     const userArgs = { token: process.env.USER_TOKEN };

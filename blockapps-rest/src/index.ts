@@ -5,5 +5,6 @@ import fsUtil from './util/fsUtil'
 import importer from './util/importer'
 import oauthUtil from './util/oauth.util'
 import assert from './util/assert';
+import { Options } from "./options"
 
-export { rest, util, parser, fsUtil, importer, oauthUtil, assert }
+export { rest, util, parser, fsUtil, importer, oauthUtil, assert, Options }

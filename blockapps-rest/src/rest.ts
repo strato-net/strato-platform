@@ -44,11 +44,11 @@ function assertTxResultList(txResultList) {
   return txResultList;
 }
 
-async function resolveResult(user, pendingTxResult, options) {
+async function resolveResult(user, pendingTxResult, options:Options) {
   return (await resolveResults(user, [pendingTxResult], options))[0];
 }
 
-async function resolveResults(user, pendingResults, _options = {}) {
+async function resolveResults(user, pendingResults, _options:Options) {
   const options = Object.assign({ isAsync: true }, _options);
 
   // wait until there are no more PENDING results
@@ -64,7 +64,7 @@ async function resolveResults(user, pendingResults, _options = {}) {
 //   account details
 // =====================================================================
 
-async function getAccounts(user, options) {
+async function getAccounts(user, options:Options) {
   try {
     return await api.getAccounts(user, options);
   } catch(err) {
@@ -80,7 +80,7 @@ async function getAccounts(user, options) {
 //   user
 // =====================================================================
 
-async function getUsers(args, options) {
+async function getUsers(args, options:Options) {
   const users = await api.getUsers(args, options);
   return users;
 }
@@ -96,7 +96,7 @@ async function createUser(args, options:Options) {
   return user;
 }
 
-async function fill(user, options) {
+async function fill(user, options:Options) {
   const txResult = await api.fill(user, options);
   return assertTxResult(txResult);
 }
@@ -105,7 +105,7 @@ async function fill(user, options) {
 //   compile contracts
 // =====================================================================
 
-async function compileContracts(user, contract, options) {
+async function compileContracts(user, contract, options:Options) {
   try {
     return await api.compileContracts(user, contract, options);
   } catch (err) {
@@ -121,7 +121,7 @@ async function compileContracts(user, contract, options) {
 //   contract
 // =====================================================================
 
-async function createContract(user, contract, options) {
+async function createContract(user, contract, options:Options) {
   const [pendingTxResult] = await api.createContract(user, contract, options);
   return createContractResolve(user, pendingTxResult, options);
 }
@@ -148,7 +148,7 @@ async function createContractResolve(user, pendingTxResult, options) {
 //   contract list
 // =====================================================================
 
-async function createContractList(user, contract, options) {
+async function createContractList(user, contract, options:Options) {
   const pendingTxResult = await api.createContractList(
     user,
     contract,
@@ -157,7 +157,7 @@ async function createContractList(user, contract, options) {
   return createContractListResolve(user, pendingTxResult, options);
 }
 
-async function createContractListResolve(user, pendingTxResultList, options) {
+async function createContractListResolve(user, pendingTxResultList, options:Options) {
   // throw if FAILURE
   assertTxResultList(pendingTxResultList); // @samrit what if 1 result failed ?
   // async - do not resolve
@@ -182,12 +182,12 @@ async function createContractListResolve(user, pendingTxResultList, options) {
 //   key
 // =====================================================================
 
-async function getKey(user, options) {
+async function getKey(user, options:Options) {
   const response = await api.getKey(user, options);
   return response.address;
 }
 
-async function createKey(user, options) {
+async function createKey(user, options:Options) {
   const response = await api.createKey(user, options);
   return response.address;
 }
@@ -212,19 +212,19 @@ async function createOrGetKey(user, options:Options) {
 //   state
 // =====================================================================
 
-async function getBlocResults(user, hashes, options) {
+async function getBlocResults(user, hashes, options:Options) {
   return api.blocResults(user, hashes, options);
 }
 
-async function getState(user, contract, options) {
+async function getState(user, contract, options:Options) {
   return api.getState(user, contract, options);
 }
 
-async function getBatchStates(user, contracts, options) {
+async function getBatchStates(user, contracts, options:Options) {
   return api.getBatchStates(user, contracts, options);
 }
 
-async function getArray(user, contract, name, options) {
+async function getArray(user, contract, name, options:Options) {
   const MAX_SEGMENT_SIZE = 100;
   options.stateQuery = { name, length: true };
   const state = await getState(user, contract, options);
@@ -246,12 +246,12 @@ async function getArray(user, contract, name, options) {
 //   call
 // =====================================================================
 
-async function call(user, callArgs, options) {
+async function call(user, callArgs, options:Options) {
   const [pendingTxResult] = await api.call(user, callArgs, options);
   return callResolve(user, pendingTxResult, options);
 }
 
-async function callResolve(user, pendingTxResult, options) {
+async function callResolve(user, pendingTxResult, options:Options) {
   // throw if FAILURE
   assertTxResult(pendingTxResult);
   // async - do not resolve
@@ -270,12 +270,12 @@ async function callResolve(user, pendingTxResult, options) {
 //   call list
 // =====================================================================
 
-async function callList(user, callListArgs, options) {
+async function callList(user, callListArgs, options:Options) {
   const pendingTxResultList = await api.callList(user, callListArgs, options);
   return callListResolve(user, pendingTxResultList, options);
 }
 
-async function callListResolve(user, pendingTxResultList, options) {
+async function callListResolve(user, pendingTxResultList, options:Options) {
   // throw if FAILURE
   assertTxResultList(pendingTxResultList); // @samrit what if 1 result failed ?
   // async - do not resolve
@@ -300,7 +300,7 @@ async function callListResolve(user, pendingTxResultList, options) {
 //   send
 // =====================================================================
 
-async function send(user, sendTx, options) {
+async function send(user, sendTx, options:Options) {
   const [pendingTxResult] = await api.send(user, sendTx, options);
 
   if (options.isAsync) {
@@ -311,7 +311,7 @@ async function send(user, sendTx, options) {
   return resolvedResult.data.contents;
 }
 
-async function sendMany(user, sendTxs, options) {
+async function sendMany(user, sendTxs, options:Options) {
   const pendingTxResults = await api.sendTransactions(
     user,
     {
@@ -332,7 +332,7 @@ async function sendMany(user, sendTxs, options) {
 //   search
 // =====================================================================
 
-async function search(user, contract, options) {
+async function search(user, contract, options:Options) {
   try {
     const results = await api.search(user, contract, options);
     return results;
@@ -344,7 +344,7 @@ async function search(user, contract, options) {
   }
 }
 
-async function searchUntil(user, contract, predicate, options) {
+async function searchUntil(user, contract, predicate, options:Options) {
   const action = async o => {
     return search(user, contract, o);
   };
@@ -353,7 +353,7 @@ async function searchUntil(user, contract, predicate, options) {
   return results;
 }
 
-async function searchWithContentRange(user, contract, options) {
+async function searchWithContentRange(user, contract, options:Options) {
   try {
     const results = await api.searchWithContentRange(user, contract, options);
     return results;
@@ -365,7 +365,7 @@ async function searchWithContentRange(user, contract, options) {
   }
 }
 
-async function searchWithContentRangeUntil(user, contract, predicate, options) {
+async function searchWithContentRangeUntil(user, contract, predicate, options:Options) {
   const action = async o => {
     return searchWithContentRange(user, contract, o);
   };
@@ -378,17 +378,17 @@ async function searchWithContentRangeUntil(user, contract, predicate, options) {
 //   Chains
 // =====================================================================
 
-async function getChain(user, chainId, options) {
+async function getChain(user, chainId, options:Options) {
   const results = await api.getChains([chainId], setAuthHeaders(user, options));
   return results && results.length > 0 ? results[0] : {};
 }
 
-async function getChains(user, chainIds, options) {
+async function getChains(user, chainIds, options:Options) {
   const results = await api.getChains(chainIds, setAuthHeaders(user, options));
   return results;
 }
 
-async function createChain(user, chain, contract, options) {
+async function createChain(user, chain, contract, options:Options) {
   const result = await api.createChain(
     {
       ...chain,
@@ -400,7 +400,7 @@ async function createChain(user, chain, contract, options) {
   return result;
 }
 
-async function createChains(user, chains, options) {
+async function createChains(user, chains, options:Options) {
   const result = await api.createChains(chains, setAuthHeaders(user, options));
   return result;
 }
@@ -409,7 +409,7 @@ async function createChains(user, chains, options) {
 //   External Storage
 // =====================================================================
 
-async function uploadExtStorage(user, args, options) {
+async function uploadExtStorage(user, args, options:Options) {
   const result = await api.uploadExtStorage(
     args,
     setAuthHeaders(user, options)
@@ -417,7 +417,7 @@ async function uploadExtStorage(user, args, options) {
   return result;
 }
 
-async function attestExtStorage(user, args, options) {
+async function attestExtStorage(user, args, options:Options) {
   const result = await api.attestExtStorage(
     args,
     setAuthHeaders(user, options)
@@ -425,7 +425,7 @@ async function attestExtStorage(user, args, options) {
   return result;
 }
 
-async function verifyExtStorage(user, contract, options) {
+async function verifyExtStorage(user, contract, options:Options) {
   const result = await api.verifyExtStorage(
     user,
     contract,
@@ -434,7 +434,7 @@ async function verifyExtStorage(user, contract, options) {
   return result;
 }
 
-async function downloadExtStorage(user, contract, options) {
+async function downloadExtStorage(user, contract, options:Options) {
   const result = await api.downloadExtStorage(
     user,
     contract,
@@ -443,7 +443,7 @@ async function downloadExtStorage(user, contract, options) {
   return result;
 }
 
-async function listExtStorage(user, args, options) {
+async function listExtStorage(user, args, options:Options) {
   const result = await api.listExtStorage(
     user,
     args,
@@ -456,7 +456,7 @@ async function listExtStorage(user, args, options) {
 //   OAuth
 // =====================================================================
 
-async function pingOauth(user, options) {
+async function pingOauth(user, options:Options) {
   const response = await api.pingOauth(user, options);
   return response;
 }
@@ -466,7 +466,7 @@ async function pingOauth(user, options) {
 //   Common patterns used in applications
 // =====================================================================
 
-async function waitForAddress(user, contract, _options) {
+async function waitForAddress(user, contract, _options:Options) {
   const options = Object.assign(
     {
       query: {

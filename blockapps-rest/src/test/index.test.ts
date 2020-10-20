@@ -6,6 +6,7 @@ import assert from "../util/assert";
 import util from "../util/util";
 import fsUtil from "../util/fsUtil";
 import factory from "./factory";
+import { Options } from "../options"
 
 if (!process.env.USER_TOKEN) {
   const loadEnv = dotenv.config();
@@ -19,7 +20,7 @@ const fixtures = factory.getTestFixtures();
 describe("contracts", function() {
   this.timeout(config.timeout);
   let admin;
-  const options:any = { config };
+  const options:Options = { config };
 
   before(async () => {
     const userArgs = { token: process.env.USER_TOKEN };
@@ -101,7 +102,7 @@ describe("contracts", function() {
 describe("state", function() {
   this.timeout(config.timeout);
   let admin;
-  const options:any = { config };
+  const options:Options = { config };
 
   before(async () => {
     const userArgs = { token: process.env.USER_TOKEN };
@@ -197,7 +198,7 @@ describe("state", function() {
 describe("call", function() {
   this.timeout(config.timeout);
   let admin;
-  const options:any = { config };
+  const options:Options = { config };
   const var1 = 1234;
   const var2 = 5678;
 
@@ -206,7 +207,7 @@ describe("call", function() {
     admin = await factory.createAdmin(userArgs, options);
   });
 
-  async function createContract(uid, admin, constructorArgs, options) {
+  async function createContract(uid, admin, constructorArgs, options:Options) {
     const filename = `${fixtures}/CallMethod.sol`;
     const contractArgs = await factory.createContractFromFile(
       filename,
@@ -278,7 +279,7 @@ describe("call", function() {
 
 describe("auth user", function() {
   this.timeout(config.timeout);
-  const options:any = { config };
+  const options:Options = { config };
   const user = { token: process.env.USER_TOKEN };
 
   it("getKey", async () => {
@@ -333,7 +334,7 @@ describe("auth user", function() {
 describe("history", function() {
   this.timeout(config.timeout);
   let admin;
-  const options:any = { config };
+  const options:Options = { config };
 
   before(async () => {
     const userArgs = { token: process.env.USER_TOKEN };
@@ -349,7 +350,7 @@ describe("history", function() {
         uid: Math.floor(Math.random() * 100)
       }
     };
-    const historyOptions = {
+    const historyOptions:Options = {
       ...options,
       history: ["Event", "Ticket", "Transaction"]
     };

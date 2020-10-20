@@ -3,6 +3,7 @@ import util from "../util/util";
 import fsUtil from "../util/fsUtil";
 import assert from "../util/assert";
 import BigNumber from "bignumber.js";
+import { Options } from "../options"
 
 import ip from "ip";
 
@@ -33,7 +34,7 @@ function getTestFixtures() {
 /*
   users
  */
-async function createAdmin(_args, options) {
+async function createAdmin(_args, options:Options) {
   return rest.createUser(_args, options);
 }
 
