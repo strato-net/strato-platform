@@ -4,7 +4,7 @@ import fsUtil from "../util/fsUtil";
 import assert from "../util/assert";
 import BigNumber from "bignumber.js";
 
-import ip from "ip";
+import * as ip from "ip";
 
 const config = getTestConfig();
 const { publicKey, port } = config.nodes[0];

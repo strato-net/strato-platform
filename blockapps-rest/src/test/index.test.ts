@@ -1,6 +1,6 @@
 import * as RestStatus from "http-status-codes";
 import BigNumber from "bignumber.js";
-import dotenv from "dotenv";
+import * as dotenv from "dotenv";
 import rest from "../rest";
 import assert from "../util/assert";
 import util from "../util/util";
