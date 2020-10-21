@@ -1,8 +1,8 @@
-import jwt from "jsonwebtoken";
-import simpleOauth from "simple-oauth2";
-import unixTime from "unix-time";
+import * as jwt from "jsonwebtoken";
+import * as simpleOauth from "simple-oauth2";
+import * as unixTime from "unix-time";
 import request from "sync-request";
-import getPem from "rsa-pem-from-mod-exp";
+import * as getPem from "rsa-pem-from-mod-exp";
 import '@babel/polyfill';
 
 class OAuthUtil {

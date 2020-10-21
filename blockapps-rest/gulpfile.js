@@ -18,7 +18,9 @@ function compile() {
     var tsResult = tsProject.src().pipe(tsProject());
     return merge([
 	tsResult.js.pipe(dest("lib")),
-	tsResult.dts.pipe(dest("lib"))
+	tsResult.dts.pipe(dest("lib")),
+	src('./src/test/fixtures/**/*').pipe(dest('./lib/test/fixtures')),
+	src('./src/util/test/fixtures/**/*').pipe(dest('./lib/util/test/fixtures'))
     ]);
 }
 

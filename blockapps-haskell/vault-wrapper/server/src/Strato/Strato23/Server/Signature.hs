@@ -21,17 +21,17 @@ postSignature :: Text -> MsgHash -> VaultM Signature
 postSignature userName (MsgHash msgBS) = do
   cache <- asks keyStoreCache
   cachedPk <- liftIO $ Cache.lookup cache userName
-  (_,nonce,pKey,_,_) <- case cachedPk of
-    Just (KeyStore a b c d e) -> pure (a,b,c,d,e)
+  (_,nonce,pKey,_) <- case cachedPk of
+    Just (KeyStore a b c d) -> pure (a,b,c,d)
     Nothing -> do
       mpk <- vaultTransaction
            . vaultQueryMaybe
            $ getUserKeyQuery userName
-      (a,b,c,d,e) <- case mpk of
+      (a,b,c,d) <- case mpk of
         Just pk -> return pk
         Nothing -> vaultWrapperError $ UserError ("User " <> userName <> " doesn't exist")
-      liftIO . Cache.insert cache userName $ KeyStore a b c d e
-      pure (a,b,c,d,e)
+      liftIO . Cache.insert cache userName $ KeyStore a b c d
+      pure (a,b,c,d)
   withSecretKey $ \key -> case decryptSecKey key nonce pKey of
     Nothing -> vaultWrapperError IncorrectPasswordError
     Just prvKey 

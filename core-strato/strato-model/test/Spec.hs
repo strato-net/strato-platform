@@ -16,9 +16,12 @@ import qualified Data.ByteString.Base16             as B16
 import qualified Data.ByteString.Char8              as C8
 import qualified Data.ByteString.Short              as BSS
 import           Data.Maybe
+import qualified Data.Text                          as T
 import           Data.Word ()
+import           Database.Persist.Sql
 import           GHC.Exts
 import           GHC.Integer.GMP.Internals
+import           Numeric                            (showHex)
 import           Test.Hspec
 import           Test.QuickCheck
 
@@ -125,6 +128,16 @@ spec = do
 
     it "round trips correctly" $ property $ \(ptr::CodePtr) -> do
       Ae.eitherDecode (Ae.encode ptr) `shouldBe` Right ptr
+
+    it "can read a legacy code hash PersistValue" $ property $ \(w :: Word256) -> do
+      (fromPersistValue . PersistText . T.pack $ showHex w "")
+        `shouldBe` Right (EVMCode $ unsafeCreateKeccak256FromWord256 w)
+
+    it "can read the legacy empty code hash PersistValue" $ do
+      let codeHashStr = "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
+          codeHashWord = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
+      (fromPersistValue $ PersistText codeHashStr)
+        `shouldBe` Right (EVMCode $ unsafeCreateKeccak256FromWord256 codeHashWord)
 
   describe "secp256k1 operations (using secp256k1-haskell)" $ do
     let mPrv = importPrivateKey $ fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"
