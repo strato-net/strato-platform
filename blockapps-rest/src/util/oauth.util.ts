@@ -1,4 +1,4 @@
-import jwt from "jsonwebtoken";
+import * as jwt from "jsonwebtoken";
 import * as simpleOauth from "simple-oauth2";
 import unixTime from "unix-time";
 import request from "sync-request";
