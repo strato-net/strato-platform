@@ -1,5 +1,5 @@
 import jwt from "jsonwebtoken";
-import simpleOauth from "simple-oauth2";
+import * as simpleOauth from "simple-oauth2";
 import unixTime from "unix-time";
 import request from "sync-request";
 import getPem from "rsa-pem-from-mod-exp";
