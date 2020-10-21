@@ -104,7 +104,9 @@ instance PersistField CodePtr where
           Right r -> Right r
           Left _ -> case span (/= '@') s of
             (name, '@':acct) -> first T.pack $ flip CodeAtAccount name <$> readEither acct
-            (_,_) -> bimap T.pack EVMCode $ readEither s
+            (_,_) -> bimap T.pack
+                           (EVMCode . unsafeCreateKeccak256FromWord256)
+                           $ readEither ("0x" ++ s) -- the node has been upgraded and contains legacy code hashes
   fromPersistValue x = Left $ T.pack $ "PersistField CodePtr: expected text: " ++ (show x)
 
 instance PersistFieldSql CodePtr where

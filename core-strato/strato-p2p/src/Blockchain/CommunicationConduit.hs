@@ -8,6 +8,9 @@
 {-# LANGUAGE TypeApplications     #-}
 {-# LANGUAGE TypeOperators        #-}
 
+{-# OPTIONS -fno-warn-unused-imports #-}  -- TODO- We need to formally remove the watchdog, then
+{-# OPTIONS -fno-warn-unused-matches #-}  --       we can remove these "no-warn" options
+
 module Blockchain.CommunicationConduit
     ( handleMsgServerConduit
     , handleMsgClientConduit
@@ -59,6 +62,8 @@ import           Blockchain.TimerSource
 import           Blockchain.Util
 import           Blockchain.Watchdog
 
+
+
 ethVersion :: Int
 ethVersion = 62
 {-# INLINE ethVersion #-}
@@ -77,8 +82,8 @@ mkEthP2PEventSource :: ( MonadResource m
                     -> m (ConduitM () Event m ())
 mkEthP2PEventSource peerSource seqEventSource peerStr inCtx = do
   canarySource <- mkCanarySource
-  tid <- myThreadId
-  recvWatchdog <- mkWatchdog tid $ fromIntegral flags_connectionTimeout
+--  tid <- myThreadId
+--  recvWatchdog <- mkWatchdog tid $ fromIntegral flags_connectionTimeout
   merged <- mergeSourcesByForce (
     [ peerSource
         .| ethDecrypt inCtx
@@ -86,7 +91,7 @@ mkEthP2PEventSource peerSource seqEventSource peerStr inCtx = do
         .| bytesToMessages
         .| CL.iterM (displayMessage Inbound peerStr)
         .| CL.map MsgEvt
-        .| CL.iterM (const $ petWatchdog recvWatchdog)
+--        .| CL.iterM (const $ petWatchdog recvWatchdog)
     , seqEventSource
         .| CL.map NewSeqEvent
     , canarySource .| CL.map absurd

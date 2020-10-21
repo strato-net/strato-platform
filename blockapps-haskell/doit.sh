@@ -89,16 +89,21 @@ done
 
 PSQL_CONNECTION_PARAMS="-h ${postgres_host} -p ${postgres_port} -U ${postgres_user}"
 # Check if this container was initialized before
-if [ ! -f initialized ]; then
+if [ ! -f _container_initialized ]; then
+  # Check if need to wipe slipstream ("cirrus") db (NOT REQUIRED if in-place update with containers re-created and all volumes intact; REQUIRED in case of re-sync after --drop-chains)
+  if [ ! -f /volume_data/_volume_initialized ]; then
     # drop slipstream db if already exists
     PGPASSWORD=${postgres_password} dropdb ${PSQL_CONNECTION_PARAMS} --if-exists ${postgres_slipstream_db}
     # Create the database for slipstream
     PGPASSWORD=${postgres_password} createdb ${PSQL_CONNECTION_PARAMS} ${postgres_slipstream_db}
-    # Create logs directory
-    mkdir /logs
-    # Create the 'initialized' sentinel file
-    date '+%Y-%m-%d %H:%M:%S' > initialized
-
+    # Make sure the volume dir exists
+    mkdir -p /volume_data
+    date '+%Y-%m-%d %H:%M:%S' >  /volume_data/_volume_initialized
+  fi
+  # Create logs directory
+  mkdir /logs
+  # Create the '_container_initialized' sentinel file
+  date '+%Y-%m-%d %H:%M:%S' > _container_initialized
 fi
 
 function runBackgroundProcess {
