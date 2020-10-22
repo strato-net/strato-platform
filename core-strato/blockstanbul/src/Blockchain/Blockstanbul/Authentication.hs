@@ -24,11 +24,11 @@ import Blockchain.Blockstanbul.Messages
 import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.Blockstanbul.StateMachine
 import Blockchain.Data.Block
-import Blockchain.Data.BlockDB(blockHash)
 import Blockchain.Data.ArbitraryInstances()
 import Blockchain.Data.DataDefs
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Class (blockHash)
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1

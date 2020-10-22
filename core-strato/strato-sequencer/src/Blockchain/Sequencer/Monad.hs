@@ -49,6 +49,7 @@ module Blockchain.Sequencer.Monad
   , seenTransactionDB
   , dbeRegistry
   , blockHashRegistry
+  , emittedBlockRegistry
   , txHashRegistry
   , chainHashRegistry
   , chainIdRegistry
@@ -123,6 +124,7 @@ data SequencerContext = SequencerContext
   , _seenTransactionDB   :: !SeenTransactionDB
   , _dbeRegistry         :: !(Map Keccak256 DependentBlockEntry)
   , _blockHashRegistry   :: !(Map Keccak256 (Modification OutputBlock))
+  , _emittedBlockRegistry :: !(Map Keccak256 (Modification EmittedBlock))
   , _txHashRegistry      :: !(Map Keccak256 (Modification OutputTx))
   , _chainHashRegistry   :: !(Map Keccak256 (Modification ChainHashEntry))
   , _chainIdRegistry     :: !(Map Word256 (Modification ChainIdEntry))
@@ -207,6 +209,10 @@ instance HasNamespace OutputBlock where
   type NSKey OutputBlock = Keccak256
   namespace _ = "bh:"
 
+instance HasNamespace EmittedBlock where
+  type NSKey EmittedBlock = Keccak256
+  namespace _ = "eb:"
+
 instance HasNamespace OutputTx where
   type NSKey OutputTx = Keccak256
   namespace _ = "th:"
@@ -284,6 +290,17 @@ instance (Keccak256 `A.Alters` OutputBlock) SequencerM where
     genericDeleteSequencer blockHashRegistry p k
     sz <- M.size <$> use blockHashRegistry
     liftIO $ withLabel blockHashRegistrySize "block_hash_registry" (flip setGauge (fromIntegral sz))
+
+instance (Keccak256 `A.Alters` EmittedBlock) SequencerM where
+  lookup = genericLookupSequencer emittedBlockRegistry
+  insert p k v = do
+    genericInsertSequencer emittedBlockRegistry p k v
+    sz <- M.size <$> use emittedBlockRegistry
+    liftIO $ withLabel emittedBlockRegistrySize "emitted_block_registry" (flip setGauge (fromIntegral sz))
+  delete p k = do
+    genericDeleteSequencer emittedBlockRegistry p k
+    sz <- M.size <$> use emittedBlockRegistry
+    liftIO $ withLabel emittedBlockRegistrySize "emitted_block_registry" (flip setGauge (fromIntegral sz))
 
 instance (Keccak256 `A.Alters` OutputTx) SequencerM where
   lookup = genericLookupSequencer txHashRegistry
@@ -423,6 +440,7 @@ runSequencerM c mbc m = do
             , _seenTransactionDB   = mkSeenTxDB stxSize
             , _dbeRegistry         = M.empty
             , _blockHashRegistry   = M.empty
+            , _emittedBlockRegistry = M.singleton zeroHash $ Modification alreadyEmittedBlock
             , _txHashRegistry      = M.empty
             , _chainHashRegistry   = M.empty
             , _chainIdRegistry     = M.empty

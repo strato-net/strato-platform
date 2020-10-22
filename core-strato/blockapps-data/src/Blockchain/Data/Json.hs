@@ -26,6 +26,7 @@ import           Blockchain.Data.Code
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
+import           Blockchain.Strato.Model.Class        (blockHeaderHash)
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.ExtendedWord (Word256)
 import           Blockchain.Strato.Model.Keccak256
@@ -226,10 +227,11 @@ instance ToSchema Block' where
     NamedSchema (Just "Block'") mempty
 
 instance ToJSON Block' where
-      toJSON (Block' (Block bd rt bu) next) =
+      toJSON (Block' (Block bd rt bu bh) next) =
         object ["next" .= next, "kind" .= ("Block" :: String), "blockData" .= bdToBdPrime bd,
          "receiptTransactions" .= map tToTPrime rt,
-         "blockUncles" .= map bdToBdPrime bu]
+         "blockUncles" .= map bdToBdPrime bu,
+         "blockHash" .= bh]
 
 blockDataRefToBlock::BlockDataRef->[Transaction]->Block
 blockDataRefToBlock bdr txs = Block{
@@ -252,7 +254,8 @@ blockDataRefToBlock bdr txs = Block{
        blockDataMixHash = blockDataRefMixHash bdr
        },
   blockReceiptTransactions = txs,
-  blockBlockUncles = blockDataRefBlockUncles bdr
+  blockBlockUncles = blockDataRefBlockUncles bdr,
+  blockBlockHash = blockDataRefHash bdr
   }
 
 
@@ -294,13 +297,14 @@ instance FromJSON BlockData' where
       )
 
 instance FromJSON Block' where
-    parseJSON = withObject "Block'" $ \v -> (Block'
-      <$> (Block
-        <$> (bdPrimeToBd <$> (v .: "blockData"))
-        <*> (map tPrimeToT <$> (v .: "receiptTransactions"))
-        <*> (map bdPrimeToBd <$> (v .: "blockUncles")))
-      <*> (v .: "next")
-      )
+    parseJSON = withObject "Block'" $ \v -> do
+      bData <- bdPrimeToBd <$> v .: "blockData"
+      bTxs <- map tPrimeToT <$> (v .: "receiptTransactions")
+      bUncles <- map bdPrimeToBd <$> (v .: "blockUncles")
+      mBHash <- v .:? "blockHash"
+      let bHash = fromMaybe (blockHeaderHash bData) mBHash
+      next <- v .: "next"
+      pure $ Block' (Block bData bTxs bUncles bHash) next
 
 bdToBdPrime :: BlockData -> BlockData'
 bdToBdPrime = BlockData'

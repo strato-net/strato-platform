@@ -30,8 +30,7 @@ import           Blockchain.Strato.Model.StateRoot
 
 testBlock :: Block
 testBlock =
-  Block {
-    blockBlockData = BlockData {
+  let bData = BlockData {
       blockDataParentHash = unsafeCreateKeccak256FromWord256 0x0,
       blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347,
       blockDataCoinbase = Address 0x0,
@@ -47,10 +46,8 @@ testBlock =
       blockDataExtraData = "",
       blockDataNonce = 0,
       blockDataMixHash = blockstanbulMixHash
-    },
-    blockReceiptTransactions = [],
-    blockBlockUncles = []
-  }
+      }
+   in mkBlock bData [] []
 
 testValidators :: [Address]
 testValidators = [Address 0x101, Address 0xaaa]

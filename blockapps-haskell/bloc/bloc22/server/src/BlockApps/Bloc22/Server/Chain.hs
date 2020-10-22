@@ -18,7 +18,7 @@ import           Data.Foldable                     (for_)
 import           Data.Int                          (Int32)
 import qualified Data.Map.Ordered                  as OMap
 import qualified Data.Map.Strict                   as Map
-import           Data.Maybe                        (catMaybes, fromJust, fromMaybe, maybeToList)
+import           Data.Maybe                        (catMaybes, fromMaybe, maybeToList)
 import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
 import           Data.Text.Encoding                (encodeUtf8)
@@ -37,11 +37,14 @@ import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Server.Utils     (waitFor)
 import           BlockApps.XAbiConverter           (xAbiToContract)
 
+import           Blockchain.Data.Block
 import           Blockchain.Data.ChainInfo
+import           Blockchain.Data.Json
 import           Blockchain.TypeLits
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256
+import           Handlers.BlkLast
 import           Handlers.Chain
 
 import           UnliftIO
@@ -65,8 +68,8 @@ replaceMembers Struct{..} addrs m =
           TypeArrayDynamic (SimpleType TypeAccount) -> m'
           _ -> m
 
-createChainInfo :: ChainInput -> Bloc (Maybe Int32, ChainInfo)
-createChainInfo (ChainInput msrc mCodePtr cname lbl balances chaininputArgs members mmd _) = do
+createChainInfo :: Keccak256 -> ChainInput -> Bloc (Maybe Int32, ChainInfo)
+createChainInfo creationBlockHash (ChainInput msrc mCodePtr cname lbl balances chaininputArgs members mmd _) = do
   when (null members) $ throwIO $ UserError "Private chains must include at least one member"
   when (sum (nmap2' balances) == 0) $ throwIO $ UserError "At least one account must have a non-zero balance"
 
@@ -121,13 +124,16 @@ createChainInfo (ChainInput msrc mCodePtr cname lbl balances chaininputArgs memb
         Nothing
   return (fst <$> mContract, chainInfo)
 
-creationBlockHash :: Keccak256
-creationBlockHash = fromJust $
-  stringKeccak256 "0000000000000000000000000000000000000000000000000000000000000000"
+withLastBlockHash :: (Keccak256 -> Bloc a) -> Bloc a
+withLastBlockHash f = do
+  blks <- blocStrato $ getBlkLastClient 1
+  case blks of
+    [(Block' blk _)] -> f $ blockBlockHash blk
+    _ -> throwIO . UserError $ Text.pack "STRATO has not been initialized yet"
 
 postChainInfo :: ChainInput -> Bloc ChainId
-postChainInfo chainInput = do
-  (mCmId, chainInfo) <- createChainInfo chainInput
+postChainInfo chainInput = withLastBlockHash $ \bHash -> do
+  (mCmId, chainInfo) <- createChainInfo bHash chainInput
   chainId <- blocStrato $ postChainClient chainInfo
   let isAsync = fromMaybe False $ chaininputAsync chainInput
   unless isAsync $ waitForChainInfo chainId
@@ -135,8 +141,8 @@ postChainInfo chainInput = do
   return chainId
 
 postChainInfos :: [ChainInput] -> Bloc [ChainId]
-postChainInfos chainInputs = do
-  chainInfos <- traverse createChainInfo chainInputs
+postChainInfos chainInputs = withLastBlockHash $ \bHash -> do
+  chainInfos <- traverse (createChainInfo bHash) chainInputs
   chainIds <- blocStrato . postChainsClient $ map snd chainInfos
   let asyncInputs = fromMaybe False . chaininputAsync <$> chainInputs
       asyncChains = map snd . filter (not . fst) $ zip asyncInputs chainIds

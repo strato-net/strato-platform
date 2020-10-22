@@ -14,13 +14,14 @@ import           Data.Time.Clock.POSIX
 
 import           System.IO.Unsafe                   (unsafePerformIO)
 
-import           Blockchain.Data.BlockDB
+import           Blockchain.Data.Block
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Enode
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
 import           Blockchain.Database.MerklePatricia
+import           Blockchain.Strato.Model.Class      (blockHeaderHash)
 import           Blockchain.Util
 
 import qualified Network.Haskoin.Crypto             as H
@@ -94,6 +95,7 @@ instance Arbitrary Block where
         return Block { blockBlockData            = bData
                      , blockBlockUncles          = bUncles
                      , blockReceiptTransactions  = bTransactions
+                     , blockBlockHash            = blockHeaderHash bData
                      }
 
 instance Arbitrary Transaction where

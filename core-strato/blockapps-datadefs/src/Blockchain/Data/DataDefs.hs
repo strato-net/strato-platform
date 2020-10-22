@@ -16,6 +16,7 @@
 module Blockchain.Data.DataDefs where
 
 import           Control.DeepSeq
+import           Control.Lens
 import           Control.Lens.TH                         (makeLensesFor)
 import           Control.Monad.Trans.Class (lift)
 
@@ -26,16 +27,22 @@ import           Database.Persist.TH
 
 import qualified Data.Binary                             as BIN
 import qualified Data.ByteString                         as BS
+import qualified Data.ByteString.Base16                  as B16
+import qualified Data.ByteString.Char8                   as BC
 import qualified Data.ByteString.Short                   as BSS
 import           Data.Data
-import           Data.Swagger
+import           Data.Swagger                            hiding (Format, format)
 import           Data.Text                               (Text)
 import           Data.Time
 import           Data.Time.Clock.POSIX
 import           Data.Word
 import           GHC.Generics
+import           Numeric
+import           Text.Format
+import           Text.PrettyPrint.ANSI.Leijen            hiding ((<$>))
 
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.CodePtr
@@ -44,6 +51,7 @@ import           Blockchain.Strato.Model.StateRoot
 import           Blockchain.SolidVM.Model
 
 import           Blockchain.Data.PersistTypes            ()
+import           Blockchain.Data.RLP
 import           Blockchain.Data.TransactionResultStatus
 import           Blockchain.Data.TXOrigin
 import           Blockchain.MiscJSON                     ()
@@ -122,3 +130,102 @@ instance ToSchema LogDB where
 instance ToSchema TransactionResult where
   declareNamedSchema _ = return $
     NamedSchema (Just "TransactionResult") mempty
+
+instance Pretty BS.ByteString where
+  pretty = blue . text . BC.unpack . B16.encode
+
+instance RLPSerializable BlockData where
+  rlpDecode (RLPArray [v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15]) =
+    BlockData {
+      blockDataParentHash = rlpDecode v1,
+      blockDataUnclesHash = rlpDecode v2,
+      blockDataCoinbase = rlpDecode v3,
+      blockDataStateRoot = rlpDecode v4,
+      blockDataTransactionsRoot = rlpDecode v5,
+      blockDataReceiptsRoot = rlpDecode v6,
+      blockDataLogBloom = rlpDecode v7,
+      blockDataDifficulty = rlpDecode v8,
+      blockDataNumber = rlpDecode v9,
+      blockDataGasLimit = rlpDecode v10,
+      blockDataGasUsed = rlpDecode v11,
+      blockDataTimestamp = posixSecondsToUTCTime $ fromInteger $ rlpDecode v12,
+      blockDataExtraData = rlpDecode v13,
+      blockDataMixHash = rlpDecode v14,
+      blockDataNonce = bytesToWord64 $ BS.unpack $ rlpDecode v15
+      }
+  rlpDecode (RLPArray arr) = error ("Error in rlpDecode for Block: wrong number of items, expected 15, got " ++ show (length arr) ++ ", arr = " ++ show (pretty arr))
+  rlpDecode x = error ("rlp2BlockData called on non block object: " ++ show x)
+
+
+  rlpEncode bd =
+    RLPArray [
+      rlpEncode $ blockDataParentHash bd,
+      rlpEncode $ blockDataUnclesHash bd,
+      rlpEncode $ blockDataCoinbase bd,
+      rlpEncode $ blockDataStateRoot bd,
+      rlpEncode $ blockDataTransactionsRoot bd,
+      rlpEncode $ blockDataReceiptsRoot bd,
+      rlpEncode $ blockDataLogBloom bd,
+      rlpEncode $ blockDataDifficulty bd,
+      rlpEncode $ blockDataNumber bd,
+      rlpEncode $ blockDataGasLimit bd,
+      rlpEncode $ blockDataGasUsed bd,
+      rlpEncode (round $ utcTimeToPOSIXSeconds $ blockDataTimestamp bd::Integer),
+      rlpEncode $ blockDataExtraData bd,
+      rlpEncode $ blockDataMixHash bd,
+      rlpEncode $ BS.pack $ word64ToBytes $ blockDataNonce bd
+      ]
+
+
+instance Format BlockData where
+  format b =
+    "parentHash: " ++ format (blockDataParentHash b) ++ "\n" ++
+    "unclesHash: " ++ format (blockDataUnclesHash b) ++
+    (if blockDataUnclesHash b == hash (BS.pack [0xc0]) then " (the empty array)\n" else "\n") ++
+    "coinbase: " ++ show (pretty $ blockDataCoinbase b) ++ "\n" ++
+    "stateRoot: " ++ format (blockDataStateRoot b) ++ "\n" ++
+    "transactionsRoot: " ++ format (blockDataTransactionsRoot b) ++ "\n" ++
+    "receiptsRoot: " ++ format (blockDataReceiptsRoot b) ++ "\n" ++
+    "difficulty: " ++ show (blockDataDifficulty b) ++ "\n" ++
+    "gasLimit: " ++ show (blockDataGasLimit b) ++ "\n" ++
+    "gasUsed: " ++ show (blockDataGasUsed b) ++ "\n" ++
+    "timestamp: " ++ show (blockDataTimestamp b) ++ "\n" ++
+    "extraData: " ++ show (pretty $ blockDataExtraData b) ++ "\n" ++
+    "nonce: " ++ showHex (blockDataNonce b) "" ++ "\n"
+
+instance BlockHeaderLike BlockData where
+    blockHeaderBlockNumber      = blockDataNumber
+    blockHeaderParentHash       = blockDataParentHash
+    blockHeaderOmmersHash       = blockDataUnclesHash
+    blockHeaderBeneficiary      = blockDataCoinbase
+    blockHeaderStateRoot        = unboxStateRoot . blockDataStateRoot
+    blockHeaderTransactionsRoot = unboxStateRoot . blockDataTransactionsRoot
+    blockHeaderReceiptsRoot     = unboxStateRoot . blockDataReceiptsRoot
+    blockHeaderLogsBloom        = blockDataLogBloom
+    blockHeaderGasLimit         = blockDataGasLimit
+    blockHeaderGasUsed          = blockDataGasUsed
+    blockHeaderDifficulty       = blockDataDifficulty
+    blockHeaderNonce            = blockDataNonce
+    blockHeaderExtraData        = blockDataExtraData
+    blockHeaderTimestamp        = blockDataTimestamp
+    blockHeaderMixHash          = blockDataMixHash
+
+    blockHeaderModifyExtra      = over extraDataLens
+
+    morphBlockHeader h2 =
+        BlockData { blockDataNumber           = blockHeaderBlockNumber h2
+                  , blockDataParentHash       = blockHeaderParentHash h2
+                  , blockDataUnclesHash       = blockHeaderOmmersHash h2
+                  , blockDataCoinbase         = blockHeaderBeneficiary h2
+                  , blockDataStateRoot        = StateRoot $ blockHeaderStateRoot h2
+                  , blockDataTransactionsRoot = StateRoot $ blockHeaderTransactionsRoot h2
+                  , blockDataReceiptsRoot     = StateRoot $ blockHeaderReceiptsRoot h2
+                  , blockDataLogBloom         = blockHeaderLogsBloom h2
+                  , blockDataGasLimit         = blockHeaderGasLimit h2
+                  , blockDataGasUsed          = blockHeaderGasUsed h2
+                  , blockDataDifficulty       = blockHeaderDifficulty h2
+                  , blockDataNonce            = blockHeaderNonce h2
+                  , blockDataExtraData        = blockHeaderExtraData h2
+                  , blockDataTimestamp        = blockHeaderTimestamp h2
+                  , blockDataMixHash          = blockHeaderMixHash h2
+                  }

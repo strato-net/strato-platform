@@ -23,8 +23,8 @@ import           Text.PrettyPrint.ANSI.Leijen   hiding ((<$>))
 import           UnliftIO.Concurrent
 import           UnliftIO.STM
 
-import           Blockchain.Data.BlockDB
-import           Blockchain.Data.DataDefs       ()
+import           Blockchain.Data.Block
+import           Blockchain.Data.DataDefs
 import qualified Blockchain.Data.TXOrigin       as TO
 import           Blockchain.KafkaTopics
 import           Blockchain.Mining
@@ -37,6 +37,7 @@ import           Blockchain.Sequencer.Kafka
 import           Blockchain.Stream.Raw          (setDefaultKafkaState)
 import           Blockchain.Stream.UnminedBlock
 import           Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Strato.Model.Class
 import           Executable.AditM
 import           Text.Format
 

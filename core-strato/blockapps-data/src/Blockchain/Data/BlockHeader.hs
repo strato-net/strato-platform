@@ -5,7 +5,8 @@ module Blockchain.Data.BlockHeader (
   blockToBlockHeader,
   blockToBody,
   extraData2TxsLen,
-  txsLen2ExtraData
+  txsLen2ExtraData,
+  createBlockFromHeaderAndBody
   ) where
 
 import           Control.Monad
@@ -169,3 +170,10 @@ extraData2TxsLen ed = guard (B.length ed >= 32) >> result
         result = case len of
           0 -> Nothing
           x -> Just (fromInteger x :: Int)
+
+createBlockFromHeaderAndBody::BlockHeader->([Transaction], [BlockHeader])->Block
+createBlockFromHeaderAndBody header (transactions, uncles) =
+  mkBlock (headerToBlockData header) transactions (map headerToBlockData uncles)
+  where
+    headerToBlockData (BlockHeader ph oh b sr tr rr lb d number' gl gu ts ed mh nonce') =
+      BlockData ph oh b sr tr rr lb d number' gl gu ts ed nonce' mh

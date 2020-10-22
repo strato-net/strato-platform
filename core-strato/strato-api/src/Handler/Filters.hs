@@ -282,7 +282,7 @@ extraFilter ("index", _) v' = ("index", v')
 extraFilter (a,b) _'        = (a,b)
 
 getBlockNum :: Block -> Integer
-getBlockNum (Block (BlockData _ _ (Address _) _ _ _ _ _ num _ _ _ _ _ _) _ _) = num
+getBlockNum (Block (BlockData _ _ (Address _) _ _ _ _ _ num _ _ _ _ _ _) _ _ _) = num
 
 getTxNum :: RawTransaction -> Int
 getTxNum (RawTransaction _ (Address _) _ _ _ _ _ _ _ _ _ _ _ bn _ _) = bn
