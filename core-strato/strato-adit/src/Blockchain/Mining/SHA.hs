@@ -8,8 +8,8 @@ import           Data.Time.Clock.POSIX
 import           Debug.Trace
 import           System.Random
 
-import           Blockchain.Data.BlockDB
-import           Blockchain.Data.DataDefs ()
+import           Blockchain.Data.Block
+import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RLP
 import           Blockchain.Util
 

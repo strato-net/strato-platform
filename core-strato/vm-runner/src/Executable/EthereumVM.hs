@@ -129,7 +129,6 @@ microtimeCutoff = secondsToMicrotime flags_mempoolLivenessCutoff
 
 handleVmEvents :: ConduitT VmInEventBatch VmOutEvent ContextM ()
 handleVmEvents = awaitForever $ \InBatch{..} -> do
-  outputNewChains =<< lift (insertNewChains newChains)
   lift $ do
     mapM_ (uncurry3 queuePendingVote) votesToMake
     mapM_ runJsonRpcCommand rpcCommands
@@ -137,6 +136,8 @@ handleVmEvents = awaitForever $ \InBatch{..} -> do
 
   numPoolable <- uncurry (*>) . (yieldMany *** pure) =<< lift (processTransactions txPairs)
   processBlocks blocks
+  outputNewChains =<< lift (insertNewChains newChains) -- needs to happen after running blocks,
+                                                       -- in case one of the chains references one of the latest blocks
 
   mNewBlock <- lift $ do
     contextModify $ blockRequested ||~ createBlock
@@ -190,10 +191,17 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
       $logInfoS "insertNewChains" $ T.pack $ "We already have a genesis state root for this chain. It's " ++ format gsr
       return Nothing
     Nothing -> do
-      mBB <- fmap fst <$> getChainBestBlock Nothing
       let cBlock = creationBlock $ chainInfo cInfo
-          bHash = fromMaybe cBlock mBB
           pChain = parentChain $ chainInfo cInfo
+      bHash' <- getChainCreationBlock cBlock pChain
+      bHash <- if bHash' /= zeroHash
+                 then pure bHash'
+                 else do
+                   mBB <- getChainGenesisInfo Nothing
+                   case mBB of
+                     Just (bb, _, _) -> pure bb
+                     Nothing -> error "insertNewChains: could not find non-zero block hash to run from. Chain DB not bootstrapped correctly"
+
       withCurrentBlockHash bHash $ do
         $logInfoS "insertNewChains" $ T.pack $ "This is a new chain!"
         let theVM = T.unpack $ fromMaybe "EVM" $ M.lookup "VM" $ chainMetadata (chainInfo cInfo)

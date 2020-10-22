@@ -8,9 +8,9 @@ import           Control.Monad.State        hiding (runState)
 
 import qualified Data.Map.Strict            as Map
 
-import           Blockchain.Data.BlockDB    (blockHeaderHash)
 import           Blockchain.Data.DataDefs
 import qualified Blockchain.Sequencer.Event as SE
+import           Blockchain.Strato.Model.Class (blockHeaderHash)
 import           Blockchain.Strato.Model.Keccak256
 
 import           Blockchain.Util            (tab)

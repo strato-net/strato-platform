@@ -33,7 +33,7 @@ import qualified Blockchain.Bagger.BaggerState      as B
 import           Blockchain.Bagger.Transactions
 import           Blockchain.Data.Address
 import qualified Blockchain.Data.AddressStateDB     as DD
-import qualified Blockchain.Data.BlockDB            as BDB
+import           Blockchain.Data.Block
 import qualified Blockchain.Data.DataDefs           as DD
 import           Blockchain.Data.BlockHeader        (txsLen2ExtraData)
 import qualified Blockchain.Data.TransactionDef     as TD
@@ -61,7 +61,7 @@ class VMBase m => MonadBagger m where
     isBlockstanbul     :: m Bool
     getBaggerState     :: m B.BaggerState
     peekPendingVote    :: m (Address, Word64)
-    clearPendingVote   :: BDB.Block -> m ()
+    clearPendingVote   :: Block -> m ()
     putBaggerState     :: B.BaggerState -> m ()
     runFromStateRoot   :: Integer -> DD.BlockData -> [OutputTx] -> m (Either RunAttemptError (StateRoot, [TxRunResult], Integer))
     rewardCoinbases    :: Address -> [DD.BlockData] -> Integer -> m StateRoot -- miner coinbase -> known uncles -> this block number -> stateRoot
@@ -412,7 +412,7 @@ buildFromMiningCache = do
     let parentDiff   = DD.blockDataDifficulty parentHeader
     let parentTS     = DD.blockDataTimestamp parentHeader
     let time         = B.startTimestamp cache
-    let nextDiff     = BDB.nextDifficulty flags_difficultyBomb flags_testnet parentNum parentDiff parentTS time
+    let nextDiff     = nextDifficulty flags_difficultyBomb flags_testnet parentNum parentDiff parentTS time
     let nextBlockData = buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT coinbaseAddr nonce
     recordMaxBlockNumber "bagger_build" . DD.blockDataNumber $ nextBlockData
     rewardedBlockData <- buildRewardedBlockHeader nextBlockData uncles
@@ -442,7 +442,7 @@ buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT co
     let parentDiff = DD.blockDataDifficulty parentHeader
         parentNum  = DD.blockDataNumber parentHeader
         parentTS   = DD.blockDataTimestamp parentHeader
-        nextDiff   = BDB.nextDifficulty flags_difficultyBomb flags_testnet parentNum parentDiff parentTS time
+        nextDiff   = nextDifficulty flags_difficultyBomb flags_testnet parentNum parentDiff parentTS time
         in DD.BlockData { DD.blockDataParentHash       = parentHash
                         , DD.blockDataUnclesHash       = V.ommersVerificationValue uncles
                         -- TODO: when `isPBFT`, coinbase and nonce should be set from a queue of pending votes

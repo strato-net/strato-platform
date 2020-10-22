@@ -29,8 +29,10 @@ import           Control.Monad.IO.Class                    (liftIO)
 import           Data.ByteString.Char8                     (pack)
 import           Data.ByteString.Base16                    as B16
 import           Data.Foldable
+import qualified Data.Map.Strict                           as M
 import           Data.Maybe
 import           Data.Proxy
+import qualified Data.Set                                  as S
 import qualified Data.Text                                 as T
 import           Data.Time.Clock
 import           Prometheus                                as P
@@ -38,7 +40,6 @@ import           Text.Printf
 
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin         as API
-import           Blockchain.ExtWord
 import           Blockchain.Privacy
 import           Blockchain.Sequencer.CablePackage
 import           Blockchain.Sequencer.DB.DependentBlockDB
@@ -51,12 +52,14 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Metrics
 import           Blockchain.Sequencer.Monad
 
-import qualified Blockchain.Data.BlockDB                   as BDB
+import qualified Blockchain.Data.Block                     as BDB
+import           Blockchain.Data.ChainInfo                 (chainInfo, creationBlock)
+import qualified Blockchain.Data.DataDefs                  as BDB
 import qualified Blockchain.Data.TransactionDef            as TD
 import qualified Blockchain.Data.TXOrigin                  as TO
 import qualified Blockchain.Data.RLP                       as RL
 
-import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.Class             as BDB
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 
@@ -260,7 +263,7 @@ blockstanbulSend :: ( MonadLogger m
                  -> ConduitT a SeqEvent m ()
 blockstanbulSend = mapM_ $ \ie -> do
   ses <- runConduit $ blockstanbulSend' ie
-                   .| hydrateAndEmit Nothing
+                   .| hydrateAndEmit
                    .| sinkList
   yieldMany ses
 
@@ -451,7 +454,7 @@ runBlockWithConsensus sb = do
   ses <- runConduit
     ( yield sb
    .| runConsensus
-   .| hydrateAndEmit Nothing
+   .| hydrateAndEmit
    .| sinkList
     )
   yieldMany ses
@@ -507,13 +510,25 @@ hydrateAndEmit :: ( MonadLogger m
                   , MonadMonitor m
                   , HasFullPrivacy m
                   )
-               => Maybe Word256
-               -> ConduitT SeqEvent SeqEvent m ()
-hydrateAndEmit chainId = awaitForever $ \case
+               => ConduitT SeqEvent SeqEvent m ()
+hydrateAndEmit = awaitForever $ \case
   ToVm (VmBlock ob) -> do
-    when (isNothing chainId) . yield . ToVm $ VmBlock ob
-    ob' <- lift $ hydratePrivateHashes chainId ob
+    let logF = logFF "hydrateAndEmit"
+    yield . ToVm $ VmBlock ob
+    let obHash = blockHash ob
+        orig = obOrigin ob
+    logF $ "Emitting block " ++ format obHash
+    chainsToEmit <- fmap _dependentChains . A.repsert (A.Proxy @EmittedBlock) obHash $ \case
+      Nothing -> pure $ EmittedBlock True S.empty
+      Just (EmittedBlock _ chains) -> pure $ EmittedBlock True chains
+    logF $ "Emitting block " ++ format obHash ++ ". Chains to emit: " ++ show (format <$> S.toList chainsToEmit)
+    ob' <- lift $ hydratePrivateHashes Nothing ob
     for_ ob' $ yield . ToVm . VmBlock
+    -- do this after yielding the current block's hydrated txs, so that things are kept in order
+    emittedChains <- lift . A.lookupMany (A.Proxy @ChainIdEntry) $ S.toList chainsToEmit
+    -- use ob's origin because we don't hold on to chain's original origin
+    transformGenesis . map (\(cId, entry) -> IngestGenesis orig (cId, _chainIdInfo entry)) $ M.toList emittedChains
+    lift . A.adjustStatefully_ (A.Proxy @EmittedBlock) obHash $ dependentChains %= (S.\\ M.keysSet emittedChains)
   oe -> yield oe
 
 transformBlocks :: ( MonadLogger m
@@ -547,9 +562,15 @@ transformGenesis chains = forM_ chains $ \ig -> do
     True -> logF "We've seen this chain before. Not emitting to VM"
     False -> do
       logF "We haven't seen this chain before. Inserting into SeenChainDB and emitting to VM, P2P"
-      yield . ToVm $ VmGenesis og
-      yield . ToP2p $ P2pGenesis og
-      yieldMany . map (ToVm . VmBlock) =<< insertNewChainInfo chainId cInfo
+      logF $ "Checking emission status of block " ++ format (creationBlock $ chainInfo cInfo)
+      ready <- fmap _emitted . lift . A.repsert (A.Proxy @EmittedBlock) (creationBlock $ chainInfo cInfo) $ \case
+        Nothing -> pure $ EmittedBlock False (S.singleton chainId)
+        Just (EmittedBlock emitted' depChains) -> pure $ EmittedBlock emitted' (S.insert chainId depChains)
+      logF $ "Emission status of block " ++ format (creationBlock $ chainInfo cInfo) ++ ": " ++ show ready
+      when ready $ do
+        yield . ToVm $ VmGenesis og
+        yield . ToP2p $ P2pGenesis og
+        yieldMany . map (ToVm . VmBlock) =<< insertNewChainInfo chainId cInfo
 
 splitEvents :: ( MonadLogger m
                , MonadMonitor m

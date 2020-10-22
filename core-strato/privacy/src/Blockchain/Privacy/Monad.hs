@@ -74,6 +74,26 @@ instance Format BlockInfo where
 instance Ord BlockInfo where
   compare = compare `on` _bordering
 
+data EmittedBlock = EmittedBlock
+  { _emitted :: Bool
+  , _dependentChains :: S.Set Word256
+  } deriving (Eq, Show, Generic, Binary)
+makeLenses ''EmittedBlock
+
+alreadyEmittedBlock :: EmittedBlock
+alreadyEmittedBlock = EmittedBlock True S.empty
+
+instance ToJSON EmittedBlock where
+instance FromJSON EmittedBlock where
+
+instance Format EmittedBlock where
+  format EmittedBlock{..} = unlines
+    [ "EmittedBlock"
+    , "---------"
+    , tab $ "Emitted:          " ++ show _emitted
+    , tab $ "Dependent chains: " ++ show _dependentChains
+    ]
+
 data ChainHashEntry = ChainHashEntry
   { _used         :: Bool
   , _onChainId    :: Maybe Word256

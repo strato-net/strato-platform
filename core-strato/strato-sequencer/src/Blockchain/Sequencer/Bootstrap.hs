@@ -6,11 +6,13 @@ import qualified Data.ByteString.Char8 as C8
 
 import           Blockchain.Constants
 import           Blockchain.Data.Address
-import           Blockchain.Data.BlockDB
+import           Blockchain.Data.Block
+import           Blockchain.Data.DataDefs
 import           Blockchain.EthConf as EC
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Data.Transaction as TX
 import           Blockchain.Output
+import           Blockchain.Strato.Model.Class
 import qualified Network.Kafka.Protocol as KP
 
 import           Blockchain.Sequencer.CablePackage

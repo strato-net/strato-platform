@@ -20,6 +20,7 @@ import qualified Data.Text.Lazy             as TL
 import qualified Yesod.Test                 as YT
 
 import           Blockchain.Data.ArbitraryInstances ()
+import           Blockchain.Data.Block
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json

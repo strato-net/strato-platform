@@ -23,6 +23,7 @@ module Blockchain.DB.ChainDB
   , getChainGenesisInfo
   , putChainGenesisInfo
   , deleteChainGenesisInfo
+  , getChainCreationBlock
   , getChainBestBlock
   , putChainBestBlock
   , deleteChainBestBlock
@@ -43,7 +44,7 @@ import           Blockchain.Data.RLP
 
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
-import           Blockchain.Strato.Model.Keccak256          (Keccak256, keccak256ToByteString, unsafeCreateKeccak256FromWord256)
+import           Blockchain.Strato.Model.Keccak256    (Keccak256, keccak256ToByteString, zeroHash)
 
 import           GHC.Generics
 import           Text.Format
@@ -147,7 +148,6 @@ bootstrapChainDB :: ( Modifiable BlockHashRoot m
                     )
                  => Keccak256 -> [(Maybe Word256, MP.StateRoot)] -> m BlockHashRoot
 bootstrapChainDB genesisHash startingStateRoots = do
-  let zeroHash = unsafeCreateKeccak256FromWord256 0
   putChainBlockHashInfo genesisHash zeroHash MP.emptyTriePtr
   for_ startingStateRoots $ \(cId, sr) -> putChainGenesisInfo cId zeroHash sr Nothing
   for_ startingStateRoots $ \(cId, sr) -> putChainStateRoot cId genesisHash sr
@@ -239,6 +239,19 @@ deleteChainGenesisInfo chainId = do
   gr <- unGenesisRoot <$> get Proxy
   newGenesisRoot <- MP.deleteKey gr (word256ToMPKey chainId)
   put Proxy $ GenesisRoot newGenesisRoot
+
+getChainCreationBlock :: ( Modifiable GenesisRoot m
+                         , (MP.StateRoot `Alters` MP.NodeData) m
+                         )
+                      => Keccak256 -> Maybe Word256 -> m Keccak256
+getChainCreationBlock cBlock pChain =
+  if cBlock /= zeroHash
+    then pure cBlock
+    else do
+      mParentDetails <- getChainGenesisInfo pChain
+      case mParentDetails of
+        Nothing -> pure zeroHash
+        Just (pBlock, _, pParent) -> getChainCreationBlock pBlock pParent
 
 getChainStateRoot :: ( Modifiable BlockHashRoot m
                      , Modifiable GenesisRoot m

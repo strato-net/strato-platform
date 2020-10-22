@@ -48,7 +48,7 @@ addBlocksFromFile fileName = do
       resps <- runKafkaConfigured "queryStrato" $ do
         assertTopicCreation
         writeUnseqEvents $
-          map (\(Block bd txs us) ->
+          map (\(Block bd txs us _) ->
              IEBlock (IngestBlock (TXO.PeerString "") bd txs us)) bs
       mapM_ print resps
 

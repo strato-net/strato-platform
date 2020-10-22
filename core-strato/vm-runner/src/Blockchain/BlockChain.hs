@@ -53,7 +53,6 @@ import           UnliftIO.IORef
 import           Blockchain.Constants
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
-import           Blockchain.Data.BlockDB
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.Code
 import           Blockchain.Data.DataDefs
