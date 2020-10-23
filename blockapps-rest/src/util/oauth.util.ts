@@ -1,5 +1,6 @@
 import * as jwt from "jsonwebtoken";
 import * as simpleOauth from "simple-oauth2";
+import { OAuthClient, AccessToken } from "simple-oauth2";
 import * as unixTime from "unix-time";
 import request from "sync-request";
 import * as getPem from "rsa-pem-from-mod-exp";
@@ -40,7 +41,7 @@ class OAuthUtil {
   serviceUsername : any;
   servicePassword : any;
   tokenHost : any;
-  oauth2 : any;
+  oauth2 : OAuthClient<"client_id">;
 
   constructor(oauthConfig:OAuthConfig) {
     this.appTokenCookieName = oauthConfig.appTokenCookieName;
@@ -174,7 +175,7 @@ class OAuthUtil {
       scope: scope || this.scope
     };
 
-    let accessTokenResponse;
+    let accessTokenResponse:AccessToken;
     if (clientId && clientSecret) {
       const credentials = {
         client: {
@@ -195,7 +196,7 @@ class OAuthUtil {
       const result = await this.oauth2.clientCredentials.getToken(tokenConfig);
       accessTokenResponse = this.oauth2.accessToken.create(result);
     }
-    return accessTokenResponse;
+    return {token: accessTokenResponse.token.access_token};
   }
 
   /**
