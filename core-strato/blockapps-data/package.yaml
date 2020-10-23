@@ -84,11 +84,13 @@ tests:
       - aeson-diff
       - base16-bytestring
       - blockapps-data
+      - blockapps-datadefs
       - blockapps-haskoin
       - bytestring
       - containers
       - ethereum-rlp
       - hspec
+      - persistent
       - secp256k1-haskell
       - strato-model
       - text

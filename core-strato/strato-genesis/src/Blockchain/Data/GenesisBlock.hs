@@ -263,8 +263,7 @@ genesisInfoToGenesisBlock gi gn as = do
     return (sourceInfo, Block {
         blockBlockData = bData,
         blockReceiptTransactions = [],
-        blockBlockUncles         = [],
-        blockBlockHash = rlpHash bData
+        blockBlockUncles         = []
     })
 
 initializeChainDBs :: ( MonadLogger m

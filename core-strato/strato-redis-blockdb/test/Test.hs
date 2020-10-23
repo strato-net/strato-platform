@@ -19,7 +19,7 @@ import qualified Test.HUnit                                as HUnit
 import           Test.QuickCheck
 
 import           Blockchain.Data.ArbitraryInstances        ()
-import           Blockchain.Data.Block                     (mkBlock)
+import           Blockchain.Data.Block                     (Block(..))
 import           Blockchain.Data.DataDefs
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Class
@@ -318,7 +318,7 @@ specTest = around (withConn 1) $ do
       chain <- extendChain 10 [g]
       canon <- runRedis conn $ do
         void $ RDB.forceBestBlockInfo (blockHeaderHash g) (blockDataNumber g) 0
-        forM_ chain $ RDB.putBlock . (\b -> morphBlock $ mkBlock b [] [])
+        forM_ chain $ RDB.putBlock . (\b -> morphBlock $ Block b [] [])
         _ <- putBestBlockInfo (last chain)
         let maxN = (+1) . fromIntegral . blockDataNumber . last $ chain
         canonical <- RDB.getCanonicalHeaderChain 0 maxN :: Redis [(Keccak256, BlockData)]
@@ -429,8 +429,8 @@ callCommonAncestor old new =
 insertAndUpdateChain :: BlockData -> [BlockData] -> [BlockData] -> Redis [(Keccak256, BlockData)]
 insertAndUpdateChain g oldChain newChain = do
         void $ RDB.forceBestBlockInfo (blockHeaderHash g) (blockDataNumber g) 0
-        forM_ oldChain $ RDB.putBlock . (\b -> morphBlock $ mkBlock b [] [])
-        forM_ newChain $ RDB.putBlock . (\b -> morphBlock $ mkBlock b [] [])
+        forM_ oldChain $ RDB.putBlock . (\b -> morphBlock $ Block b [] [])
+        forM_ newChain $ RDB.putBlock . (\b -> morphBlock $ Block b [] [])
         forM_ oldChain $ \b -> set (RDB.inNamespace Canonical $ blockDataNumber b) (toValue $ blockHeaderHash b)
         value <- callCommonAncestor oldChain newChain
         let (mods, dels) = either (error "wrong format in call to callCommonAncestor") id value
