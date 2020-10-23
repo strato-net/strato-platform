@@ -71,6 +71,7 @@ import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.ModifyStateDB
 import           Blockchain.DB.RawStorageDB
+import           Blockchain.DB.StateDB                   (setStateDBStateRoot)
 import           Blockchain.DB.StorageDB
 import           Blockchain.EVM.Code
 import qualified Blockchain.EVM                          as EVM
@@ -330,6 +331,7 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
     bSum <- setParentStateRoot b
     when (False && blockDataNumber bd == 1920000) runTheDAOFork -- TODO: Only run this if connected to Ethereum publicnet (i.e. never)
 
+    setStateDBStateRoot Nothing $ bSumStateRoot bSum
     addBlockTransactions True b
 
     postRewardSR <- lift $ Bagger.rewardCoinbases (blockDataCoinbase bd) uncles (blockDataNumber bd)
