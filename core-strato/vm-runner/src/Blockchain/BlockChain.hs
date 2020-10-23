@@ -71,7 +71,6 @@ import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.ModifyStateDB
 import           Blockchain.DB.RawStorageDB
-import           Blockchain.DB.StateDB                   (setStateDBStateRoot)
 import           Blockchain.DB.StorageDB
 import           Blockchain.EVM.Code
 import qualified Blockchain.EVM                          as EVM
@@ -331,10 +330,7 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
     bSum <- setParentStateRoot b
     when (False && blockDataNumber bd == 1920000) runTheDAOFork -- TODO: Only run this if connected to Ethereum publicnet (i.e. never)
 
-    setStateDBStateRoot Nothing $ bSumStateRoot bSum
     addBlockTransactions True b
-
-    postRewardSR <- lift $ Bagger.rewardCoinbases (blockDataCoinbase bd) uncles (blockDataNumber bd)
 
     -- If there are no transactions in th
     -- TODO: this should be handled more officially,
@@ -342,6 +338,7 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
     let skipCheck = (not $ null otxs)
                  && (isNothing . listToMaybe $ filter (isNothing . txChainId) otxs)
     unless skipCheck $ do
+      postRewardSR <- lift $ Bagger.rewardCoinbases (blockDataCoinbase bd) uncles (blockDataNumber bd)
       when (blockDataStateRoot (obBlockData b) /= postRewardSR) $ do
         $logInfoS "addBlock/mined" . T.pack $ "newStateRoot: " ++ format postRewardSR
         error $ "stateRoot mismatch!!  New stateRoot doesn't match block stateRoot: " ++ format (blockDataStateRoot $ obBlockData b)
