@@ -10,7 +10,7 @@ import {
   setAuthHeaders
 } from "./util/api.util";
 import { TxPayloadType } from "./constants";
-import { Options, StratoUser, OAuthUser, BlockChainUser } from "./types";
+import { Options, StratoUser, OAuthUser, BlockChainUser, Contract } from "./types";
 /*
 async function getUsers(ouser:OAuthUser, options:Options) {
   const url = getNodeUrl(options);
@@ -50,7 +50,7 @@ async function fill(user, options:Options) {
   return postue(url, endpoint, body, setAuthHeaders(user, options));
 }
 
-function getCreateArgs(contract, options:Options) {
+function getCreateArgs(contract:Contract, options:Options) {
   const src = options.config.VM === 'EVM' ? {} : { src: contract.source };
 
   const payload = {
@@ -77,7 +77,7 @@ async function compileContracts(user:OAuthUser, contracts, options:Options) {
   return post(url, endpoint, body, setAuthHeaders(user, options));
 }
 
-async function createContract(user, contract, options:Options) {
+async function createContract(user, contract:Contract, options:Options) {
   const tx = getCreateArgs(contract, options);
   const body = {
     txs: [tx]
@@ -86,7 +86,7 @@ async function createContract(user, contract, options:Options) {
   return pendingTxResult;
 }
 
-async function createContractList(user, contracts, options:Options) {
+async function createContractList(user, contracts:Contract[], options:Options) {
   const txs = contracts.map(contract => getCreateArgs(contract, options));
   const body = {
     txs

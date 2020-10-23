@@ -41,5 +41,12 @@ interface OAuthUser {
   token:string
 }
 
+interface Contract {
+  source:string,
+  name:string,
+  args:any,
+  chainid?:any,
+  txParams?:any
+}
 
-export { Options, StratoUser, OAuthUser, BlockChainUser };
+export { Options, StratoUser, OAuthUser, BlockChainUser, Contract };
