@@ -3,7 +3,7 @@ import importer from "../importer";
 import rest from "../../rest";
 import util from "../util";
 import factory from "../../test/factory";
-import { Options } from "../../options";
+import { Options } from "../../types";
 
 const config = factory.getTestConfig();
 const fixtures = `${util.cwd}/lib/util/test/fixtures/`;

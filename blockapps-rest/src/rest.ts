@@ -6,7 +6,7 @@ import util from "./util/util";
 import { constructMetadata, setAuthHeaders } from "./util/api.util";
 import { RestError, response } from "./util/rest.util";
 import jwt from "jsonwebtoken";
-import { Options } from "./options";
+import { Options, StratoUser, OAuthUser } from "./types";
 
 // =====================================================================
 //   util
@@ -79,7 +79,7 @@ async function getAccounts(user, options:Options) {
 // =====================================================================
 //   user
 // =====================================================================
-
+/*
 async function getUsers(args, options:Options) {
   const users = await api.getUsers(args, options);
   return users;
@@ -89,10 +89,10 @@ async function getUser(args, options:Options) {
   const [address] = await api.getUser(args, options);
   return address;
 }
-
-async function createUser(args, options:Options) {
-  const address = await createOrGetKey(args, options);
-  const user = Object.assign({}, args, { address });
+*/
+async function createUser(ouser:OAuthUser, options:Options) {
+  const address = await createOrGetKey(ouser, options);
+  const user = Object.assign({}, ouser, { address });
   return user;
 }
 
@@ -194,18 +194,26 @@ async function createKey(user, options:Options) {
 
 async function createOrGetKey(user, options:Options) {
   try {
-    const response = await api.getKey(user, options);
+    const getKeyResponse = await api.getKey(user, options);
 
-    const balance = await api.getBalance({ ...user, ...response }, options);
+    const balance = await api.getBalance(user, getKeyResponse, options);
     if (balance.isEqualTo(0)) {
-      await fill({ ...user, ...response }, { isAsync: false, ...options });
+      await fill({ ...user, ...getKeyResponse }, { isAsync: false, ...options });
     }
-    return response.address;
-  } catch (err) {
-    const response = await api.createKey(user, options);
-    await fill({ ...user, ...response }, { isAsync: false, ...options });
-    return response.address;
+
+    if (getKeyResponse.address) return getKeyResponse.address;
   }
+  catch(e) {
+  
+    if (e.response && e.response.status==400) { //user doesn't already exist, create user
+      const createKeyResponse = await api.createKey(user, options);
+      await fill({ ...user, ...createKeyResponse }, { isAsync: false, ...options });
+      return createKeyResponse.address;
+    }
+
+    throw e;
+  }
+
 }
 
 // =====================================================================
@@ -490,8 +498,8 @@ async function waitForAddress(user, contract, _options:Options) {
 
 export default {
   getAccounts,
-  getUsers,
-  getUser,
+//  getUsers,
+//  getUser,
   createUser,
   compileContracts,
   createContract,

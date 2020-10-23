@@ -5,6 +5,6 @@ import fsUtil from './util/fsUtil'
 import importer from './util/importer'
 import oauthUtil from './util/oauth.util'
 import assert from './util/assert';
-import { Options } from "./options"
+import { Options, StratoUser, OAuthUser } from "./types"
 
-export { rest, util, parser, fsUtil, importer, oauthUtil, assert, Options }
+export { rest, util, parser, fsUtil, importer, oauthUtil, assert, StratoUser, OAuthUser, Options }

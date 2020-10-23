@@ -3,7 +3,7 @@ import util from "../util/util";
 import fsUtil from "../util/fsUtil";
 import assert from "../util/assert";
 import BigNumber from "bignumber.js";
-import { Options } from "../options"
+import { Options } from "../types"
 
 import * as ip from "ip";
 

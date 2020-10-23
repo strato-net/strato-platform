@@ -6,7 +6,7 @@ import assert from "../util/assert";
 import util from "../util/util";
 import fsUtil from "../util/fsUtil";
 import factory from "./factory";
-import { Options } from "../options"
+import { Options } from "../types"
 
 if (!process.env.USER_TOKEN) {
   const loadEnv = dotenv.config();

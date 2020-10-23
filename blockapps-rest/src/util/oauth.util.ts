@@ -4,6 +4,21 @@ import * as unixTime from "unix-time";
 import request from "sync-request";
 import * as getPem from "rsa-pem-from-mod-exp";
 import '@babel/polyfill';
+import { OAuthUser } from "../types";
+
+interface OAuthConfig {
+  appTokenCookieName:any,
+  appTokenCookieMaxAge:any,
+  clientId:any,
+  clientSecret:any,
+  logoutRedirectUri:any,
+  openIdDiscoveryUrl:any,
+  redirectUri:any,
+  scope:any,
+  serviceUsername?:any,
+  servicePassword?:any,
+  tokenField?:any,
+  }
 
 class OAuthUtil {
   appTokenCookieName : any;
@@ -27,7 +42,7 @@ class OAuthUtil {
   tokenHost : any;
   oauth2 : any;
 
-  constructor(oauthConfig) {
+  constructor(oauthConfig:OAuthConfig) {
     this.appTokenCookieName = oauthConfig.appTokenCookieName;
     this.appTokenExpirationCookieName =
       oauthConfig.appTokenCookieName + "_expiry";
@@ -81,7 +96,7 @@ class OAuthUtil {
    * @param oauthConfig
    * @returns o an instance of the OAuthUtil
    */
-  static init(oauthConfig) {
+  static init(oauthConfig:OAuthConfig) {
     try {
       const o = new OAuthUtil(oauthConfig);
       o.getOpenIdConfig();
@@ -154,7 +169,7 @@ class OAuthUtil {
     clientId = undefined,
     clientSecret = undefined,
     scope = undefined
-  ) {
+  ):Promise<OAuthUser> {
     const tokenConfig = {
       scope: scope || this.scope
     };
@@ -391,3 +406,5 @@ class OAuthUtil {
 }
 
 export default OAuthUtil;
+
+export { OAuthConfig }

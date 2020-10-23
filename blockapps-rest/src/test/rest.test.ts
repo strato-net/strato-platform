@@ -4,7 +4,7 @@ import assert from "../util/assert";
 import util from "../util/util";
 import factory from "./factory";
 import { TxResultStatus } from "../constants";
-import { Options } from "../options";
+import { Options } from "../types";
 
 import dotenv from "dotenv";
 

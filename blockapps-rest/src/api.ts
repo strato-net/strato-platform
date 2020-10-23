@@ -10,35 +10,35 @@ import {
   setAuthHeaders
 } from "./util/api.util";
 import { TxPayloadType } from "./constants";
-import { Options } from "./options";
-
-async function getUsers(args, options:Options) {
+import { Options, StratoUser, OAuthUser, BlockChainUser } from "./types";
+/*
+async function getUsers(ouser:OAuthUser, options:Options) {
   const url = getNodeUrl(options);
   const endpoint = constructEndpoint(Endpoint.USERS, options);
-  return get(url, endpoint, setAuthHeaders(args, options));
+  return get(url, endpoint, setAuthHeaders(ouser, options));
 }
 
-async function getUser(args, options:Options) {
+async function getUser(ouser:OAuthUser, options:Options) {
   const url = getNodeUrl(options);
   const urlParams = {
-    username: args.username
+    username: ouser.username
   };
   const endpoint = constructEndpoint(Endpoint.USER, options, urlParams);
-  return get(url, endpoint, setAuthHeaders(args, options));
+  return get(url, endpoint, setAuthHeaders(ouser, options));
 }
 
-async function createUser(args, options:Options) {
+async function createUser(user:StratoUser, options:Options) {
   const url = getNodeUrl(options);
   const data = {
-    password: args.password
+    password: user.password
   };
   const urlParams = {
-    username: args.username
+    username: user.username
   };
   const endpoint = constructEndpoint(Endpoint.USER, options, urlParams);
   return postue(url, endpoint, data, options);
 }
-
+*/
 async function fill(user, options:Options) {
   const body = {};
   const url = getNodeUrl(options);
@@ -69,7 +69,7 @@ function getCreateArgs(contract, options:Options) {
   return tx;
 }
 
-async function compileContracts(user, contracts, options:Options) {
+async function compileContracts(user:OAuthUser, contracts, options:Options) {
   const body = contracts.map(contract => ({ contractName: contract.name, source: contract.source }));
 
   const url = getNodeUrl(options);
@@ -95,25 +95,27 @@ async function createContractList(user, contracts, options:Options) {
   return pendingTxResultList;
 }
 
-async function blocResults(user, hashes, options:Options) {
+async function blocResults(user:OAuthUser, hashes, options:Options) {
   // TODO untested code
   const url = getNodeUrl(options);
   const endpoint = constructEndpoint(Endpoint.TXRESULTS, options);
   return post(url, endpoint, hashes, setAuthHeaders(user, options));
 }
 
-async function getAccounts(user, options:Options) {
+async function getAccounts(user:OAuthUser, options:Options) {
   const url = getNodeUrl(options);
   const endpoint = constructEndpoint(Endpoint.ACCOUNT, options);
   return get(url, endpoint, setAuthHeaders(user, options));
 }
 
-async function getBalance(user, options:Options) {
-  let address = user.address;
-  if (!address) {
+async function getBalance(user:OAuthUser, bcuser:BlockChainUser | null, options:Options) {
+  let address;
+  if (!bcuser) {
     const response = await getKey(user, options);
     address = response.address;
   }
+  else address = bcuser.address;
+  
   const accounts = await getAccounts(user, {
     ...options,
     // this endpoint does not accept the resolve flag
@@ -129,7 +131,7 @@ async function getBalance(user, options:Options) {
   return new BigNumber(accounts[0].balance);
 }
 
-async function getState(user, contract, options:Options) {
+async function getState(user:OAuthUser, contract, options:Options) {
   const url = getNodeUrl(options);
   const urlParams = {
     name: contract.name,
@@ -139,7 +141,7 @@ async function getState(user, contract, options:Options) {
   return get(url, endpoint, setAuthHeaders(user, options));
 }
 
-async function getBatchStates(user, stateArgs, options:Options) {
+async function getBatchStates(user:OAuthUser, stateArgs, options:Options) {
   const url = getNodeUrl(options);
   const endpoint = constructEndpoint(Endpoint.STATES, options);
   const body = stateArgs ? stateArgs : [];
@@ -184,7 +186,7 @@ async function callList(user, callListArgs, options:Options) {
   return pendingTxResultList;
 }
 
-async function sendTransactions(user, body, options:Options) {
+async function sendTransactions(user:OAuthUser, body, options:Options) {
   const url = getNodeUrl(options);
   const { cacheNonce, ...sendOptions } = options;
 
@@ -214,20 +216,20 @@ async function send(user, sendTx, options:Options) {
   return sendTransactions(user, body, options);
 }
 
-async function getKey(user, options:Options) {
+async function getKey(user:OAuthUser, options:Options):Promise<BlockChainUser | null> {
   const url = getNodeUrl(options);
   const endpoint = constructEndpoint(Endpoint.KEY, options);
   return get(url, endpoint, setAuthHeaders(user, options));
 }
 
-async function createKey(user, options:Options) {
+async function createKey(user:OAuthUser, options:Options) {
   const url = getNodeUrl(options);
   const endpoint = constructEndpoint(Endpoint.KEY, options);
   const body = {};
   return post(url, endpoint, body, setAuthHeaders(user, options));
 }
 
-async function search(user, contract, options:Options) {
+async function search(user:OAuthUser, contract, options:Options) {
   const url = getNodeUrl(options);
   const urlParams = {
     name: contract.name
@@ -236,7 +238,7 @@ async function search(user, contract, options:Options) {
   return get(url, endpoint, setAuthHeaders(user, options));
 }
 
-async function searchWithContentRange(user, contract, options:Options) {
+async function searchWithContentRange(user:OAuthUser, contract, options:Options) {
   const url = getNodeUrl(options);
   const urlParams = {
       name: contract.name
@@ -291,7 +293,7 @@ async function attestExtStorage(body, options:Options) {
   return await post(url, endpoint, body, options);
 }
 
-async function verifyExtStorage(user, contract, options:Options) {
+async function verifyExtStorage(user:OAuthUser, contract, options:Options) {
   const url = getNodeUrl(options);
   const params = {
     contractAddress: contract.address
@@ -300,7 +302,7 @@ async function verifyExtStorage(user, contract, options:Options) {
   return get(url, endpoint, setAuthHeaders(user, options));
 }
 
-async function downloadExtStorage(user, contract, options:Options) {
+async function downloadExtStorage(user:OAuthUser, contract, options:Options) {
   const url = getNodeUrl(options);
   const params = {
     contractAddress: contract.address
@@ -309,7 +311,7 @@ async function downloadExtStorage(user, contract, options:Options) {
   return get(url, endpoint, setAuthHeaders(user, options));
 }
 
-async function listExtStorage(user, args, options:Options) {
+async function listExtStorage(user:OAuthUser, args, options:Options) {
   const url = getNodeUrl(options);
   const { limit, offset } = args;
   const params = {
@@ -320,7 +322,7 @@ async function listExtStorage(user, args, options:Options) {
   return get(url, endpoint, setAuthHeaders(user, options));
 }
 
-async function pingOauth(user, options:Options){
+async function pingOauth(user:OAuthUser, options:Options){
   const url = getNodeUrl(options)
   const endpoint = constructEndpoint(Endpoint.KEY, options)
   const result = await get(url, endpoint, setAuthHeaders(user, options))
@@ -330,9 +332,9 @@ async function pingOauth(user, options:Options){
 export default {
   getAccounts,
   getBalance,
-  getUsers,
-  getUser,
-  createUser,
+//  getUsers,
+//  getUser,
+//  createUser,
   getCreateArgs,
   compileContracts,
   createContract,

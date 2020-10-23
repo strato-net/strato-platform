@@ -2,7 +2,7 @@ import * as RestStatus from "http-status-codes";
 import * as queryString from "query-string";
 import ax from "../axios-wrapper";
 import { RestError } from "./rest.util";
-import { Options } from "../options";
+import { Options, OAuthUser } from "../types";
 
 const blocUrl = "/bloc/v2.2";
 const strato12Url = "/strato-api/eth/v1.2";

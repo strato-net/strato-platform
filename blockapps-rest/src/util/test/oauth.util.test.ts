@@ -3,7 +3,7 @@ import oauthUtil from '../oauth.util'
 import fsUtil from '../fsUtil'
 import util from '../util'
 import { assert } from 'chai'
-import { Options } from '../../options';
+import { Options } from '../../types';
 
 const loadEnv = dotenv.config()
 assert.isUndefined(loadEnv.error)
