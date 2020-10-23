@@ -37,6 +37,7 @@ import           Control.Monad.Change.Modify
 import           Data.Foldable                        (for_)
 import           Data.Maybe                           (fromMaybe, isNothing)
 import qualified Data.NibbleString                    as N
+import qualified Data.Set                             as S
 import           Data.Traversable                     (for)
 
 import qualified Blockchain.Database.MerklePatricia   as MP
@@ -149,7 +150,7 @@ bootstrapChainDB :: ( Modifiable BlockHashRoot m
                  => Keccak256 -> [(Maybe Word256, MP.StateRoot)] -> m BlockHashRoot
 bootstrapChainDB genesisHash startingStateRoots = do
   putChainBlockHashInfo genesisHash zeroHash MP.emptyTriePtr
-  for_ startingStateRoots $ \(cId, sr) -> putChainGenesisInfo cId zeroHash sr Nothing
+  for_ startingStateRoots $ \(cId, sr) -> putChainGenesisInfo cId genesisHash sr Nothing
   for_ startingStateRoots $ \(cId, sr) -> putChainStateRoot cId genesisHash sr
   get (Proxy @BlockHashRoot)
 
@@ -244,14 +245,16 @@ getChainCreationBlock :: ( Modifiable GenesisRoot m
                          , (MP.StateRoot `Alters` MP.NodeData) m
                          )
                       => Keccak256 -> Maybe Word256 -> m Keccak256
-getChainCreationBlock cBlock pChain =
-  if cBlock /= zeroHash
-    then pure cBlock
-    else do
-      mParentDetails <- getChainGenesisInfo pChain
-      case mParentDetails of
-        Nothing -> pure zeroHash
-        Just (pBlock, _, pParent) -> getChainCreationBlock pBlock pParent
+getChainCreationBlock = go S.empty
+  where
+    go seenChains cBlock pChain =
+      if cBlock /= zeroHash || pChain `S.member` seenChains
+        then pure cBlock
+        else do
+          mParentDetails <- getChainGenesisInfo pChain
+          case mParentDetails of
+            Nothing -> pure cBlock
+            Just (pBlock, _, pParent) -> go (pParent `S.insert` seenChains) pBlock pParent
 
 getChainStateRoot :: ( Modifiable BlockHashRoot m
                      , Modifiable GenesisRoot m

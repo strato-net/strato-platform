@@ -134,10 +134,10 @@ handleVmEvents = awaitForever $ \InBatch{..} -> do
     mapM_ runJsonRpcCommand rpcCommands
     recordSeqEventCount bLen tLen
 
-  numPoolable <- uncurry (*>) . (yieldMany *** pure) =<< lift (processTransactions txPairs)
   processBlocks blocks
   outputNewChains =<< lift (insertNewChains newChains) -- needs to happen after running blocks,
                                                        -- in case one of the chains references one of the latest blocks
+  numPoolable <- uncurry (*>) . (yieldMany *** pure) =<< lift (processTransactions txPairs)
 
   mNewBlock <- lift $ do
     contextModify $ blockRequested ||~ createBlock
