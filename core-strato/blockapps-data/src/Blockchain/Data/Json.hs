@@ -227,11 +227,11 @@ instance ToSchema Block' where
     NamedSchema (Just "Block'") mempty
 
 instance ToJSON Block' where
-      toJSON (Block' (Block bd rt bu bh) next) =
+      toJSON (Block' (Block bd rt bu) next) =
         object ["next" .= next, "kind" .= ("Block" :: String), "blockData" .= bdToBdPrime bd,
          "receiptTransactions" .= map tToTPrime rt,
          "blockUncles" .= map bdToBdPrime bu,
-         "blockHash" .= bh]
+         "blockHash" .= blockHeaderHash bd]
 
 blockDataRefToBlock::BlockDataRef->[Transaction]->Block
 blockDataRefToBlock bdr txs = Block{
@@ -254,8 +254,7 @@ blockDataRefToBlock bdr txs = Block{
        blockDataMixHash = blockDataRefMixHash bdr
        },
   blockReceiptTransactions = txs,
-  blockBlockUncles = blockDataRefBlockUncles bdr,
-  blockBlockHash = blockDataRefHash bdr
+  blockBlockUncles = blockDataRefBlockUncles bdr
   }
 
 
@@ -301,10 +300,8 @@ instance FromJSON Block' where
       bData <- bdPrimeToBd <$> v .: "blockData"
       bTxs <- map tPrimeToT <$> (v .: "receiptTransactions")
       bUncles <- map bdPrimeToBd <$> (v .: "blockUncles")
-      mBHash <- v .:? "blockHash"
-      let bHash = fromMaybe (blockHeaderHash bData) mBHash
       next <- v .: "next"
-      pure $ Block' (Block bData bTxs bUncles bHash) next
+      pure $ Block' (Block bData bTxs bUncles) next
 
 bdToBdPrime :: BlockData -> BlockData'
 bdToBdPrime = BlockData'

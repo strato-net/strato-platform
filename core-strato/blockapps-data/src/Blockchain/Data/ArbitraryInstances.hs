@@ -21,7 +21,6 @@ import           Blockchain.Data.Enode
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
 import           Blockchain.Database.MerklePatricia
-import           Blockchain.Strato.Model.Class      (blockHeaderHash)
 import           Blockchain.Util
 
 import qualified Network.Haskoin.Crypto             as H
@@ -92,11 +91,7 @@ instance Arbitrary Block where
         bTransactions <- vectorOf txCount arbitrary
         bUncles       <- vectorOf uncleCount arbitrary
 
-        return Block { blockBlockData            = bData
-                     , blockBlockUncles          = bUncles
-                     , blockReceiptTransactions  = bTransactions
-                     , blockBlockHash            = blockHeaderHash bData
-                     }
+        return $ Block bData bTransactions bUncles
 
 instance Arbitrary Transaction where
     arbitrary = do

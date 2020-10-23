@@ -47,7 +47,7 @@ testBlock =
       blockDataNonce = 0,
       blockDataMixHash = blockstanbulMixHash
       }
-   in mkBlock bData [] []
+   in Block bData [] []
 
 testValidators :: [Address]
 testValidators = [Address 0x101, Address 0xaaa]

@@ -192,7 +192,7 @@ runTest test = do
         blockDataNonce = 0, --error "nonce not set",
         blockDataMixHash=unsafeCreateKeccak256FromWord256 0 --error "mixHash not set"
         }
-  let block = mkBlock bData [] []
+  let block = Block bData [] []
 
   (result, retVal, gasRemaining, _, returnedCallCreates, _) <-
     case theInput test of

@@ -37,12 +37,12 @@ import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Server.Utils     (waitFor)
 import           BlockApps.XAbiConverter           (xAbiToContract)
 
-import           Blockchain.Data.Block
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Json
 import           Blockchain.TypeLits
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Class     (blockHash)
 import           Blockchain.Strato.Model.Keccak256
 import           Handlers.BlkLast
 import           Handlers.Chain
@@ -128,7 +128,7 @@ withLastBlockHash :: (Keccak256 -> Bloc a) -> Bloc a
 withLastBlockHash f = do
   blks <- blocStrato $ getBlkLastClient 1
   case blks of
-    [(Block' blk _)] -> f $ blockBlockHash blk
+    (Block' blk _):_ -> f $ blockHash blk
     _ -> throwIO . UserError $ Text.pack "STRATO has not been initialized yet"
 
 postChainInfo :: ChainInput -> Bloc ChainId

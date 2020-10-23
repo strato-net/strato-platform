@@ -169,8 +169,8 @@ mkBlk :: Keccak256 -> Integer -> SequencerM Block
 mkBlk parent num = do
   ctx <- fromMaybe (error "context required for PBFT") <$> getBlockstanbulContext
   let blk0 = makeBlock 2 1
-      blk1 = mkBlock (blockBlockData blk0){blockDataParentHash = parent} (blockReceiptTransactions blk0) (blockBlockUncles blk0)
-      blk2 = mkBlock' $ addValidators (_validators ctx) blk1{
+      blk1 = Block (blockBlockData blk0){blockDataParentHash = parent} (blockReceiptTransactions blk0) (blockBlockUncles blk0)
+      blk2 = addValidators (_validators ctx) blk1{
                  blockBlockData = (blockBlockData blk1){blockDataNumber = num}}
   pseal <- proposerSeal blk2
   let blk3 = addProposerSeal pseal blk2
@@ -337,9 +337,9 @@ spec = do
 
       it "should forward new blocks to blockstanbul" . runPBFTTestMWithGenesis $ \h -> do
         let b' = makeBlock 1 1
-            b = mkBlock (blockBlockData b'){ blockDataParentHash = h
-                                           , blockDataNumber = 1
-                                           }
+            b = Block (blockBlockData b'){ blockDataParentHash = h
+                                         , blockDataNumber = 1
+                                         }
                       (blockReceiptTransactions b')
                       (blockBlockUncles b')
             iev = IEBlock . blockToIngestBlock TO.Morphism $ b
@@ -351,8 +351,8 @@ spec = do
       it "should replay old blocks in blockstanbul" . runPBFTTestMWithGenesis $ \h -> do
         ctx <- fromMaybe (error "context required for PBFT") <$> getBlockstanbulContext
         let blk0 = makeBlock 2 1
-            blk1 = mkBlock (blockBlockData blk0){blockDataParentHash = h} (blockReceiptTransactions blk0) (blockBlockUncles blk0)
-            blk2 = mkBlock' $ addValidators (_validators ctx) blk1{
+            blk1 = Block (blockBlockData blk0){blockDataParentHash = h} (blockReceiptTransactions blk0) (blockBlockUncles blk0)
+            blk2 = addValidators (_validators ctx) blk1{
                       blockBlockData = (blockBlockData blk1){blockDataNumber = 1}}
         pseal <- proposerSeal blk2
         let blk3 = addProposerSeal pseal blk2
@@ -421,16 +421,16 @@ spec = do
       let hashTx2 = PrivateHashTX (txHash tx2) chainHash2
 
       let b1' = makeBlockWithTransactions [hashTx1]
-          blk1' h = mkBlock (blockBlockData b1'){ blockDataParentHash = h
-                                                , blockDataNumber = 1
-                                                }
+          blk1' h = Block (blockBlockData b1'){ blockDataParentHash = h
+                                              , blockDataNumber = 1
+                                              }
                       (blockReceiptTransactions b1')
                       (blockBlockUncles b1')
           iev1' = IEBlock . blockToIngestBlock TO.Morphism . blk1'
           b2' = makeBlockWithTransactions [hashTx1, hashTx2]
-          blk2' h = mkBlock (blockBlockData b2'){ blockDataParentHash = h
-                                                , blockDataNumber = 1
-                                                }
+          blk2' h = Block (blockBlockData b2'){ blockDataParentHash = h
+                                              , blockDataNumber = 1
+                                              }
                       (blockReceiptTransactions b2')
                       (blockBlockUncles b2')
           iev2' = IEBlock . blockToIngestBlock TO.Morphism . blk2'

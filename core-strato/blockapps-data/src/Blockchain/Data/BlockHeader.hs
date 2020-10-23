@@ -173,7 +173,7 @@ extraData2TxsLen ed = guard (B.length ed >= 32) >> result
 
 createBlockFromHeaderAndBody::BlockHeader->([Transaction], [BlockHeader])->Block
 createBlockFromHeaderAndBody header (transactions, uncles) =
-  mkBlock (headerToBlockData header) transactions (map headerToBlockData uncles)
+  Block (headerToBlockData header) transactions (map headerToBlockData uncles)
   where
     headerToBlockData (BlockHeader ph oh b sr tr rr lb d number' gl gu ts ed mh nonce') =
       BlockData ph oh b sr tr rr lb d number' gl gu ts ed nonce' mh

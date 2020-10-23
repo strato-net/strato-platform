@@ -262,7 +262,7 @@ blockToIngestBlock origin BDB.Block{BDB.blockBlockData=bd,BDB.blockReceiptTransa
     IngestBlock{ibOrigin = origin, ibBlockData = bd, ibReceiptTransactions = txs, ibBlockUncles = us}
 
 ingestBlockToBlock :: IngestBlock -> BDB.Block
-ingestBlockToBlock IngestBlock{ibBlockData=bd, ibReceiptTransactions = txs, ibBlockUncles = us} = BDB.mkBlock bd txs us
+ingestBlockToBlock IngestBlock{ibBlockData=bd, ibReceiptTransactions = txs, ibBlockUncles = us} = BDB.Block bd txs us
 
 ingestBlockToSequencedBlock :: Monad m => (Keccak256 -> m (Maybe Word256)) -> IngestBlock -> m (Maybe SequencedBlock)
 ingestBlockToSequencedBlock f ib = do
@@ -287,7 +287,7 @@ sequencedBlockToOutputBlock sb totalDifficulty = OutputBlock { obOrigin         
                                                              }
 
 sequencedBlockToBlock :: SequencedBlock -> BDB.Block
-sequencedBlockToBlock sb = BDB.mkBlock (sbBlockData sb) (map otBaseTx $ sbReceiptTransactions sb) (sbBlockUncles sb)
+sequencedBlockToBlock sb = BDB.Block (sbBlockData sb) (map otBaseTx $ sbReceiptTransactions sb) (sbBlockUncles sb)
 
 sequencedBlockShortName :: SequencedBlock -> String
 sequencedBlockShortName SequencedBlock{sbBlockData=d, sbHash=theHash} =
@@ -373,7 +373,7 @@ outputBlockHash :: OutputBlock -> Keccak256
 outputBlockHash = blockHeaderHash . obBlockData
 
 outputBlockToBlock :: OutputBlock -> BDB.Block
-outputBlockToBlock OutputBlock{obBlockData=bd,obReceiptTransactions=txs,obBlockUncles=us}= BDB.mkBlock bd (otBaseTx <$> txs) us
+outputBlockToBlock OutputBlock{obBlockData=bd,obReceiptTransactions=txs,obBlockUncles=us}= BDB.Block bd (otBaseTx <$> txs) us
 
 quarryBlockToOutputBlock :: Monad m => (Keccak256 -> m (Maybe Word256)) -> BDB.Block -> m OutputBlock
 quarryBlockToOutputBlock f BDB.Block{BDB.blockBlockData=bd,BDB.blockReceiptTransactions=txs,BDB.blockBlockUncles=us} = do

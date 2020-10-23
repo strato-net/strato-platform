@@ -14,8 +14,6 @@ module Blockchain.Data.Block
   , setBlockNo
   , nextDifficulty
   , homesteadNextDifficulty
-  , mkBlock
-  , mkBlock'
   ) where
 
 
@@ -45,8 +43,7 @@ data Block =
   Block{
     blockBlockData::BlockData,
     blockReceiptTransactions::[Transaction],
-    blockBlockUncles::[BlockData],
-    blockBlockHash :: Keccak256
+    blockBlockUncles::[BlockData]
     } deriving (Eq, Read, Show, Generic, Binary, NFData, Data)
 
 makeLensesFor [("blockBlockData", "blockDataLens")] ''Block
@@ -55,7 +52,7 @@ extraLens :: Lens' Block BS.ByteString
 extraLens = blockDataLens . extraDataLens
 
 setBlockNo :: Integer -> Block -> Block
-setBlockNo n blk = mkBlock' blk{blockBlockData = (blockBlockData blk){blockDataNumber = n}}
+setBlockNo n blk = blk{blockBlockData = (blockBlockData blk){blockDataNumber = n}}
 
 instance Format Block where
   format b@Block{blockBlockData=bd, blockReceiptTransactions=receipts, blockBlockUncles=uncles} =
@@ -70,22 +67,20 @@ instance Format Block where
           else tab ("Uncles:" ++ tab ("\n" ++ intercalate "\n    " (format <$> uncles)))))
 
 instance RLPSerializable Block where
-  rlpDecode (RLPArray [bd, RLPArray transactionReceipts, RLPArray uncles, bh]) =
-    Block (rlpDecode bd) (rlpDecode <$> transactionReceipts) (rlpDecode <$> uncles) (rlpDecode bh)
   rlpDecode (RLPArray [bd, RLPArray transactionReceipts, RLPArray uncles]) =
-    Block (rlpDecode bd) (rlpDecode <$> transactionReceipts) (rlpDecode <$> uncles) (hash $ rlpDecode bd)
+    Block (rlpDecode bd) (rlpDecode <$> transactionReceipts) (rlpDecode <$> uncles)
   rlpDecode (RLPArray arr) = error ("rlpDecode for Block called on object with wrong amount of data, length arr = " ++ show arr)
   rlpDecode x = error ("rlpDecode for Block called on non block object: " ++ show x)
 
-  rlpEncode Block{blockBlockData=bd, blockReceiptTransactions=receipts, blockBlockUncles=uncles, blockBlockHash=h} =
-    RLPArray [rlpEncode bd, RLPArray (rlpEncode <$> receipts), RLPArray $ rlpEncode <$> uncles, rlpEncode h]
+  rlpEncode Block{blockBlockData=bd, blockReceiptTransactions=receipts, blockBlockUncles=uncles} =
+    RLPArray [rlpEncode bd, RLPArray (rlpEncode <$> receipts), RLPArray $ rlpEncode <$> uncles]
 
 instance BlockLike BlockData Transaction Block where
     blockHeader       = blockBlockData
     blockTransactions = blockReceiptTransactions
     blockUncleHeaders = blockBlockUncles
 
-    buildBlock bd txs us = mkBlock bd txs us
+    buildBlock bd txs us = Block bd txs us
 
 -- if useDiffBomb is False then the expAdjustment is not added.
 nextDifficulty::Bool->Bool->Integer->Difficulty->UTCTime->UTCTime->Difficulty
@@ -116,12 +111,6 @@ homesteadNextDifficulty useDiffBomb _useTestnet parentNumber oldDifficulty oldTi
         if periodCount > 1
         then 2^(periodCount - 2)
         else 0
-
-mkBlock :: BlockData -> [Transaction] -> [BlockData] -> Block
-mkBlock bData bTxs bUncles = Block bData bTxs bUncles (blockHeaderHash bData)
-
-mkBlock' :: Block -> Block
-mkBlock' b = b{blockBlockHash = blockHash b}
 
 data BestBlock = BestBlock
   { bestBlockHash            :: Keccak256
