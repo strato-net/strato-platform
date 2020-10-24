@@ -20,7 +20,7 @@ interface Options {
 interface Config {
   nodes:Node[],
   apiDebug:boolean,
-  VM:string
+  VM?:string
 }  
 
 interface Node {
@@ -41,7 +41,7 @@ interface OAuthUser {
   token:string
 }
 
-interface Contract {
+interface ContractDefinition {
   source:string,
   name:string,
   args:any,
@@ -49,4 +49,9 @@ interface Contract {
   txParams?:any
 }
 
-export { Options, StratoUser, OAuthUser, BlockChainUser, Contract };
+interface Contract {
+  name: string
+  address: number
+}
+
+export { Options, Config, StratoUser, OAuthUser, BlockChainUser, Contract, ContractDefinition };

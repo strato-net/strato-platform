@@ -6,7 +6,7 @@ import util from "./util/util";
 import { constructMetadata, setAuthHeaders } from "./util/api.util";
 import { RestError, response } from "./util/rest.util";
 import jwt from "jsonwebtoken";
-import { Options, StratoUser, OAuthUser, Contract } from "./types";
+import { Options, StratoUser, OAuthUser, Contract, ContractDefinition } from "./types";
 
 // =====================================================================
 //   util
@@ -121,12 +121,12 @@ async function compileContracts(user, contract, options:Options) {
 //   contract
 // =====================================================================
 
-async function createContract(user, contract:Contract, options:Options) {
+async function createContract(user:OAuthUser, contract:ContractDefinition, options:Options):Promise<Contract> {
   const [pendingTxResult] = await api.createContract(user, contract, options);
   return createContractResolve(user, pendingTxResult, options);
 }
 
-async function createContractResolve(user, pendingTxResult, options) {
+async function createContractResolve(user:OAuthUser, pendingTxResult, options:Options):Promise<Contract> {
   // throw if FAILURE
   assertTxResult(pendingTxResult);
   // async - do not resolve
@@ -224,7 +224,7 @@ async function getBlocResults(user, hashes, options:Options) {
   return api.blocResults(user, hashes, options);
 }
 
-async function getState(user, contract, options:Options) {
+async function getState(user:OAuthUser, contract:Contract, options:Options) {
   return api.getState(user, contract, options);
 }
 
