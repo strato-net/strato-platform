@@ -133,9 +133,7 @@ handleVmEvents = awaitForever $ \InBatch{..} -> do
     mapM_ runJsonRpcCommand rpcCommands
     recordSeqEventCount bLen tLen
 
-  processBlocks blocks
-  outputNewChains =<< lift (insertNewChains newChains) -- needs to happen after running blocks,
-                                                       -- in case one of the chains references one of the latest blocks
+  processBlocksAndNewChains blocksAndNewChains
   numPoolable <- uncurry (*>) . (yieldMany *** pure) =<< lift (processTransactions txPairs)
 
   mNewBlock <- lift $ do
@@ -175,6 +173,26 @@ handleVmEvents = awaitForever $ \InBatch{..} -> do
   -- todo: is this the best place to put this?
   lift $ do
     loopTimeit "compactContextM" $ compactContextM
+
+spanLeft :: [Either a b] -> ([a], [Either a b])
+spanLeft (Left x:xs') = let (ys,zs) = spanLeft xs' in (x:ys,zs)
+spanLeft xs = ([], xs)
+
+spanRight :: [Either a b] -> ([b], [Either a b])
+spanRight (Right x:xs') = let (ys,zs) = spanRight xs' in (x:ys,zs)
+spanRight xs = ([], xs)
+
+groupEithers :: [Either a b] -> [Either [a] [b]]
+groupEithers [] = []
+groupEithers (Left x:xs) = let (ys,zs) = spanLeft xs in Left (x:ys) : groupEithers zs
+groupEithers (Right x:xs) = let (ys,zs) = spanRight xs in Right (x:ys) : groupEithers zs
+
+processBlocksAndNewChains :: [Either OutputGenesis OutputBlock] -> ConduitT a VmOutEvent ContextM ()
+processBlocksAndNewChains blocksAndChains = do
+  let grouped = groupEithers blocksAndChains
+  for_ grouped $ \case
+    Left newChains -> outputNewChains =<< lift (insertNewChains newChains)
+    Right blocks -> processBlocks blocks
 
 insertNewChains :: (
                    )
