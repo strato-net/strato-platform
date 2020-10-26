@@ -14,7 +14,9 @@ import           Test.QuickCheck
 -- import qualified Text.PrettyPrint.ANSI.Leijen as L
 
 import           Blockchain.Data.ArbitraryInstances ()
-import           Blockchain.Data.BlockDB
+import           Blockchain.Data.Block
+import           Blockchain.Data.DataDefs
+import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256
 
 ------------------------------------------------------------------------------

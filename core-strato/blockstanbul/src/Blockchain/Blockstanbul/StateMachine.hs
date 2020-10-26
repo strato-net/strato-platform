@@ -24,7 +24,7 @@ import           Text.Format
 import           Blockchain.Blockstanbul.Messages
 import           Blockchain.Data.Address
 import           Blockchain.Data.Block
-import           Blockchain.Data.BlockDB
+import           Blockchain.Data.DataDefs
 import           Blockchain.Output
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1

@@ -133,6 +133,7 @@ tests:
       - blockapps-data
       - blockapps-datadefs
       - blockapps-haskoin
+      - blockapps-privacy
       - blockapps-util
       - blockstanbul
       - bytestring

@@ -53,9 +53,9 @@ import           UnliftIO
 import           Blockchain.Strato.Model.Action
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
-import           Blockchain.Data.BlockDB
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.Code
+import           Blockchain.Data.DataDefs
 import           Blockchain.Data.ExecResults
 import           Blockchain.Data.Log
 import qualified Blockchain.Database.MerklePatricia as MP

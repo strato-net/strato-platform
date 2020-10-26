@@ -37,6 +37,7 @@ import           Blockchain.Blockstanbul.StateMachine
 import           Blockchain.Context                    hiding (actionTimestamp, blockHeaders, remainingBlockHeaders)
 import           Blockchain.Data.ArbitraryInstances()
 import           Blockchain.Data.Block                 hiding (bestBlockNumber)
+import           Blockchain.Data.BlockDB()
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Control
 import qualified Blockchain.Data.DataDefs              as DataDefs
@@ -59,7 +60,7 @@ import           Blockchain.Sequencer.Monad
 
 import qualified Blockchain.Strato.Discovery.Data.Peer as DataPeer
 import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.Keccak256           (Keccak256, unsafeCreateKeccak256FromWord256)
+import           Blockchain.Strato.Model.Keccak256     (Keccak256, zeroHash)
 import           Blockchain.Strato.Model.Secp256k1
 
 import           Executable.StratoP2PClient
@@ -238,6 +239,11 @@ instance MonadIO m => (Keccak256 `A.Alters` OutputBlock) (MonadTest m) where
   insert = genericTestInsert $ sequencerContext . blockHashRegistry
   delete = genericTestDelete $ sequencerContext . blockHashRegistry
 
+instance MonadIO m => (Keccak256 `A.Alters` EmittedBlock) (MonadTest m) where
+  lookup = genericTestLookup $ sequencerContext . emittedBlockRegistry
+  insert = genericTestInsert $ sequencerContext . emittedBlockRegistry
+  delete = genericTestDelete $ sequencerContext . emittedBlockRegistry
+
 instance MonadIO m => (Keccak256 `A.Alters` OutputTx) (MonadTest m) where
   lookup = genericTestLookup $ sequencerContext . txHashRegistry
   insert = genericTestInsert $ sequencerContext . txHashRegistry
@@ -348,6 +354,7 @@ newSequencerContext bc = do
       , _seenTransactionDB   = mkSeenTxDB 1024
       , _dbeRegistry         = M.empty
       , _blockHashRegistry   = M.empty
+      , _emittedBlockRegistry = M.singleton zeroHash $ Modification alreadyEmittedBlock
       , _txHashRegistry      = M.empty
       , _chainHashRegistry   = M.empty
       , _chainIdRegistry     = M.empty
@@ -372,8 +379,8 @@ testContext wireMessagesRef prv ctx = TestContext
   , _peerAddr              = PeerAddress Nothing
   , _prvKey                = prv
   , _shaBlockDataMap       = M.empty
-  , _worldBestBlock        = WorldBestBlock (BestBlock (unsafeCreateKeccak256FromWord256 0) (-1) 0)
-  , _bestBlock             = BestBlock (unsafeCreateKeccak256FromWord256 0) (-1) 0
+  , _worldBestBlock        = WorldBestBlock (BestBlock zeroHash (-1) 0)
+  , _bestBlock             = BestBlock zeroHash (-1) 0
   , _canonicalBlockDataMap = M.empty
   , _ipAddressIpChainsMap  = M.empty
   , _orgIdChainsMap        = M.empty
@@ -381,7 +388,7 @@ testContext wireMessagesRef prv ctx = TestContext
   , _chainMembersMap       = M.empty
   , _chainInfoMap          = M.empty
   , _privateTxMap          = M.empty
-  , _genesisBlockHash      = GenesisBlockHash (unsafeCreateKeccak256FromWord256 0)
+  , _genesisBlockHash      = GenesisBlockHash zeroHash
   , _bestBlockNumber       = BestBlockNumber 0
   , _stringPPeerMap        = M.empty
   , _pbftMessages          = wireMessagesRef

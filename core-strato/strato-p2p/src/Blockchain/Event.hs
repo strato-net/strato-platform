@@ -50,10 +50,10 @@ import           UnliftIO.Exception
 import           Blockchain.Blockstanbul               (blockstanbulSender, WireMessage)
 import           Blockchain.Context
 import           Blockchain.Data.Block
-import           Blockchain.Data.BlockDB
 import           Blockchain.Data.BlockHeader
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Control               (P2PCNC(..))
+import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Enode
 import           Blockchain.Data.PubKey
 import           Blockchain.Data.Transaction

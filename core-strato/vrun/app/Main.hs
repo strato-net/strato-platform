@@ -19,8 +19,8 @@ import           Prometheus
 
 import           Blockchain.BlockChain
 import           Blockchain.Data.AddressStateDB
-import           Blockchain.Data.BlockDB
 import           Blockchain.Data.Code
+import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Transaction
 import qualified Blockchain.Data.TXOrigin                    as TO
 import qualified Blockchain.Database.MerklePatricia      as MP

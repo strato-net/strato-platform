@@ -39,6 +39,7 @@ library:
     - seqevents
     - stm
     - strato-conf
+    - strato-model
     - text
     - time
     - unliftio

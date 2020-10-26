@@ -12,6 +12,7 @@ module Blockchain.Strato.Model.Keccak256 (
   hash,
   rlpHash,
   emptyHash,
+  zeroHash,
   keccak256FromHex,
   keccak256ToByteString,
   keccak256ToHex,
@@ -158,6 +159,10 @@ hash = Keccak256 . fastKeccak256
 {-# NOINLINE emptyHash #-}
 emptyHash :: Keccak256
 emptyHash = hash ""
+
+{-# NOINLINE zeroHash #-}
+zeroHash :: Keccak256
+zeroHash = unsafeCreateKeccak256FromWord256 0
 
 instance Format Keccak256 where
   format = CL.yellow . formatKeccak256WithoutColor

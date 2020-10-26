@@ -12,8 +12,9 @@ import qualified Control.Monad.Change.Alter                  as A
 
 import           Blockchain.Constants
 import           Blockchain.Data.AddressStateDB
-import           Blockchain.Data.BlockDB
+import           Blockchain.Data.Block
 import           Blockchain.Data.BlockSummary
+import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RLP
 import           Blockchain.Data.Transaction
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
