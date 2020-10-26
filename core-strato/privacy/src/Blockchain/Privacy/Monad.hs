@@ -17,6 +17,7 @@ import           Data.Binary
 import           Data.Default
 import           Data.Foldable                 (toList)
 import           Data.Function                 (on)
+import qualified Data.Map.Strict               as M
 import qualified Data.Sequence                 as Q
 import           Data.Set                      (Set)
 import qualified Data.Set                      as S
@@ -74,12 +75,12 @@ instance Ord BlockInfo where
 
 data EmittedBlock = EmittedBlock
   { _emitted :: Bool
-  , _dependentChains :: S.Set Word256
+  , _dependentChains :: M.Map Word256 ChainInfo
   } deriving (Eq, Show, Generic, Binary)
 makeLenses ''EmittedBlock
 
 alreadyEmittedBlock :: EmittedBlock
-alreadyEmittedBlock = EmittedBlock True S.empty
+alreadyEmittedBlock = EmittedBlock True M.empty
 
 instance ToJSON EmittedBlock where
 instance FromJSON EmittedBlock where
