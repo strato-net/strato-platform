@@ -9,7 +9,7 @@ module Blockchain.Verification (
 import           Prelude.Unicode
 
 
-import           Blockchain.Data.BlockDB
+import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RLP
 import           Blockchain.Data.Transaction
 import qualified Blockchain.Database.MerklePatricia             as MP

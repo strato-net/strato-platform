@@ -44,9 +44,9 @@ import           Text.Printf
 import           Text.Read (readMaybe)
 
 import           Blockchain.Data.AddressStateDB
-import           Blockchain.Data.BlockDB
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Code
+import           Blockchain.Data.DataDefs
 import           Blockchain.Data.ExecResults
 import qualified Blockchain.Database.MerklePatricia   as MP
 import           Blockchain.DB.CodeDB
