@@ -32,7 +32,6 @@ import           Data.Foldable
 import qualified Data.Map.Strict                           as M
 import           Data.Maybe
 import           Data.Proxy
-import qualified Data.Set                                  as S
 import qualified Data.Text                                 as T
 import           Data.Time.Clock
 import           Prometheus                                as P
@@ -519,16 +518,14 @@ hydrateAndEmit = awaitForever $ \case
         orig = obOrigin ob
     logF $ "Emitting block " ++ format obHash
     chainsToEmit <- fmap _dependentChains . A.repsert (A.Proxy @EmittedBlock) obHash $ \case
-      Nothing -> pure $ EmittedBlock True S.empty
+      Nothing -> pure $ EmittedBlock True M.empty
       Just (EmittedBlock _ chains) -> pure $ EmittedBlock True chains
-    logF $ "Emitting block " ++ format obHash ++ ". Chains to emit: " ++ show (format <$> S.toList chainsToEmit)
+    logF $ "Emitting block " ++ format obHash ++ ". Chains to emit: " ++ show (format <$> M.keys chainsToEmit)
     ob' <- lift $ hydratePrivateHashes Nothing ob
     for_ ob' $ yield . ToVm . VmBlock
-    -- do this after yielding the current block's hydrated txs, so that things are kept in order
-    emittedChains <- lift . A.lookupMany (A.Proxy @ChainIdEntry) $ S.toList chainsToEmit
     -- use ob's origin because we don't hold on to chain's original origin
-    transformGenesis . map (\(cId, entry) -> IngestGenesis orig (cId, _chainIdInfo entry)) $ M.toList emittedChains
-    lift . A.adjustStatefully_ (A.Proxy @EmittedBlock) obHash $ dependentChains %= (S.\\ M.keysSet emittedChains)
+    transformGenesis . map (\(cId, info) -> IngestGenesis orig (cId, info)) $ M.toList chainsToEmit
+    lift . A.adjustStatefully_ (A.Proxy @EmittedBlock) obHash $ dependentChains .= M.empty
   oe -> yield oe
 
 transformBlocks :: ( MonadLogger m
@@ -564,8 +561,8 @@ transformGenesis chains = forM_ chains $ \ig -> do
       logF "We haven't seen this chain before. Inserting into SeenChainDB and emitting to VM, P2P"
       logF $ "Checking emission status of block " ++ format (creationBlock $ chainInfo cInfo)
       ready <- fmap _emitted . lift . A.repsert (A.Proxy @EmittedBlock) (creationBlock $ chainInfo cInfo) $ \case
-        Nothing -> pure $ EmittedBlock False (S.singleton chainId)
-        Just (EmittedBlock emitted' depChains) -> pure $ EmittedBlock emitted' (S.insert chainId depChains)
+        Nothing -> pure $ EmittedBlock False (M.singleton chainId cInfo)
+        Just (EmittedBlock emitted' depChains) -> pure $ EmittedBlock emitted' (M.insert chainId cInfo depChains)
       logF $ "Emission status of block " ++ format (creationBlock $ chainInfo cInfo) ++ ": " ++ show ready
       when ready $ do
         yield . ToVm $ VmGenesis og

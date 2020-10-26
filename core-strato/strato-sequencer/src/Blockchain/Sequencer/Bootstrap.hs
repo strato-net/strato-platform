@@ -1,7 +1,9 @@
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE TypeApplications #-}
 module Blockchain.Sequencer.Bootstrap (bootstrapSequencer) where
 
 import           ClassyPrelude (atomically, newTMChan, newTQueue, fromMaybe)
+import qualified Control.Monad.Change.Alter as A
 import qualified Data.ByteString.Char8 as C8
 
 import           Blockchain.Constants
@@ -12,6 +14,7 @@ import           Blockchain.EthConf as EC
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Data.Transaction as TX
 import           Blockchain.Output
+import           Blockchain.Privacy.Monad
 import           Blockchain.Strato.Model.Class
 import qualified Network.Kafka.Protocol as KP
 
@@ -81,6 +84,7 @@ bootstrapSequencer Block{blockBlockData = bd,
             }
       runLoggingT . runSequencerM dummySequencerCfg Nothing $ do
         bootstrapGenesisBlock hash difficulty
+        A.insert (A.Proxy @EmittedBlock) hash alreadyEmittedBlock
         flushLdbBatchOps
   initKafka :: CablePackage -> IO ()
   initKafka pkg = do

@@ -23,6 +23,7 @@ import           Control.Concurrent.STM.TQueue
 import           Control.Concurrent.STM.TBQueue
 import           Control.Exception                   (finally)
 import           Control.Monad
+import qualified Control.Monad.Change.Alter          as A
 import qualified Control.Monad.Change.Modify         as Mod
 import           Control.Monad.IO.Class              (liftIO)
 import           Control.Concurrent.Async             as Async
@@ -44,6 +45,7 @@ import           Blockchain.Data.Transaction         (createChainMessageTX)
 import           Blockchain.Data.TransactionDef
 import qualified Blockchain.Data.TXOrigin as TO
 import           Blockchain.Output
+import           Blockchain.Privacy.Monad
 import           Blockchain.Sequencer
 import           Blockchain.Sequencer.CablePackage
 import           Blockchain.Sequencer.ChainHelpers
@@ -147,7 +149,9 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
         mCtx = if pbft then Just ctx else Nothing
         hsh = blockHash . ingestBlockToBlock $ genesisBlock
         difficulty = blockHeaderDifficulty . ibBlockData $ genesisBlock
-        boot = bootstrapGenesisBlock hsh difficulty
+        boot = do
+          bootstrapGenesisBlock hsh difficulty
+          A.insert (A.Proxy @EmittedBlock) hsh alreadyEmittedBlock
     fromLeft (error "webserver completed") <$>
       race (runNoLoggingT (runSequencerM cfg mCtx (boot >> m)))
            ( run testWebserverPort
@@ -395,30 +399,26 @@ spec = do
         evs `shouldMatchList` [TimerFire 987]
 
     describe "Private Chains" $ do
+      let getChainInfo lbl = ChainInfo
+                                 (UnsignedChainInfo lbl [] [] M.empty Nothing (unsafeCreateKeccak256FromWord256 0) 0 M.empty)
+                                 Nothing
+          getChainIdAndDetails cInfo =
+            let chainId = Keccak256.rlpHash cInfo
+             in (chainId, IEGenesis (IngestGenesis TO.Morphism (keccak256ToWord256 chainId, cInfo)))
+          getChainTx chainId = do
+            tx <- runIO . HK.withSource HK.devURandom $ do
+              pk <- HK.genPrvKey
+              createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just $ keccak256ToWord256 chainId) Nothing pk
+            let hashTx = PrivateHashTX (txHash tx) chainId
+            pure (hashTx, tx)
 
       -- chain 1
-      let cInfo1 = ChainInfo
-                    (UnsignedChainInfo "my test chain 1" [] [] M.empty Nothing (unsafeCreateKeccak256FromWord256 0) 0 M.empty)
-                    Nothing
-          chainId1 = Keccak256.rlpHash cInfo1
-          chainHash1 = Keccak256.rlpHash cInfo1
-          chainDetails1 = IEGenesis (IngestGenesis TO.Morphism (keccak256ToWord256 chainId1, cInfo1))
-      tx1 <- runIO . HK.withSource HK.devURandom $ do
-        pk <- HK.genPrvKey
-        createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just $ keccak256ToWord256 chainId1) Nothing pk
-      let hashTx1 = PrivateHashTX (txHash tx1) chainHash1
+      let (chainId1, chainDetails1) = getChainIdAndDetails $ getChainInfo "my test chain 1"
+      (hashTx1, tx1) <- getChainTx chainId1
 
       -- chain 2
-      let cInfo2 = ChainInfo
-                    (UnsignedChainInfo "my test chain 2" [] [] M.empty Nothing (unsafeCreateKeccak256FromWord256 0) 0 M.empty)
-                    Nothing
-          chainId2 = Keccak256.rlpHash cInfo2
-          chainHash2 = Keccak256.rlpHash cInfo2
-          chainDetails2 = IEGenesis (IngestGenesis TO.Morphism (keccak256ToWord256 chainId2, cInfo2))
-      tx2 <- runIO . HK.withSource HK.devURandom $ do
-        pk <- HK.genPrvKey
-        createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just $ keccak256ToWord256 chainId2) Nothing pk
-      let hashTx2 = PrivateHashTX (txHash tx2) chainHash2
+      let (chainId2, chainDetails2) = getChainIdAndDetails $ getChainInfo "my test chain 2"
+      (hashTx2, tx2) <- getChainTx chainId2
 
       let b1' = makeBlockWithTransactions [hashTx1]
           blk1' h = Block (blockBlockData b1'){ blockDataParentHash = h
@@ -547,3 +547,53 @@ spec = do
         b3 <- runBatch $ checkForUnseq [ietx tx1]
         let obs'' = [b | VmBlock b <- _toVm b3]
         map (map txType . obReceiptTransactions) obs'' `shouldBe` [[Message]]
+
+      it "should emit chain info when creation block has already been emitted" . runPBFTTestMWithGenesis $ \h -> do
+        let cInfo' = getChainInfo "emittable"
+            ucInfo = chainInfo cInfo'
+            cInfo = cInfo'{chainInfo = ucInfo{creationBlock = h}}
+        let chainDetails = snd . getChainIdAndDetails $ cInfo
+            IEGenesis ig = chainDetails
+            og = ingestGenesisToOutputGenesis ig
+        b1 <- runBatch $ do
+          checkForUnseq [chainDetails]
+        let ogs = [og' | VmGenesis og' <- _toVm b1]
+        ogs `shouldBe` [og]
+
+      it "should withhold emitting chain info when creation block has not been emitted" . runPBFTTestMWithGenesis $ \_ -> do
+        let cInfo' = getChainInfo "unemittable"
+            ucInfo = chainInfo cInfo'
+            cInfo = cInfo'{chainInfo = ucInfo{creationBlock = unsafeCreateKeccak256FromWord256 0xdeadbeef}}
+        let chainDetails = snd . getChainIdAndDetails $ cInfo
+        b1 <- runBatch $ do
+          checkForUnseq [chainDetails]
+        let ogs = [og' | VmGenesis og' <- _toVm b1]
+        ogs `shouldBe` []
+
+      it "should withhold chain info until creation block has been emitted" . runPBFTTestMWithGenesis $ \h -> do
+        blk <- mkBlk h 1
+        let iblk = blockToIngestBlock TO.Morphism blk
+            ieblk = IEBlock iblk
+            blkHash = blockHash blk
+            cInfo' = getChainInfo "delayed emittable"
+            ucInfo = chainInfo cInfo'
+            cInfo = cInfo'{chainInfo = ucInfo{creationBlock = blkHash}}
+            chainDetails = snd . getChainIdAndDetails $ cInfo
+            IEGenesis ig = chainDetails
+            OutputGenesis _ og = ingestGenesisToOutputGenesis ig
+        b1 <- runBatch $ do
+          checkForUnseq [chainDetails]
+        let ogs = [og' | VmGenesis og' <- _toVm b1]
+        ogs `shouldBe` []
+        b2 <- runBatch $ do
+          checkForUnseq [ieblk]
+        let zipped = zip [(0::Int)..] $ _toVm b2
+        let obs = [(i, ob) | (i, VmBlock ob) <- zipped]
+        length obs `shouldBe` 1
+        let [(i, ob)] = obs
+        obBlockData ob `shouldBe` ibBlockData iblk
+        let ogs2 = [(j, og') | (j, VmGenesis (OutputGenesis _ og')) <- zipped]
+        length ogs2 `shouldBe` 1
+        let [(j, og2)] = ogs2
+        og2 `shouldBe` og
+        i `shouldSatisfy` (< j)
