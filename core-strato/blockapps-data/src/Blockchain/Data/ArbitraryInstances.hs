@@ -14,7 +14,7 @@ import           Data.Time.Clock.POSIX
 
 import           System.IO.Unsafe                   (unsafePerformIO)
 
-import           Blockchain.Data.BlockDB
+import           Blockchain.Data.Block
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Enode
@@ -91,10 +91,7 @@ instance Arbitrary Block where
         bTransactions <- vectorOf txCount arbitrary
         bUncles       <- vectorOf uncleCount arbitrary
 
-        return Block { blockBlockData            = bData
-                     , blockBlockUncles          = bUncles
-                     , blockReceiptTransactions  = bTransactions
-                     }
+        return $ Block bData bTransactions bUncles
 
 instance Arbitrary Transaction where
     arbitrary = do
