@@ -6,7 +6,7 @@ import assert from "../util/assert";
 import util from "../util/util";
 import fsUtil from "../util/fsUtil";
 import factory from "./factory";
-import { Options } from "../types"
+import { Options, Contract, TransactionResultHash } from "../types"
 
 if (!process.env.USER_TOKEN) {
   const loadEnv = dotenv.config();
@@ -31,7 +31,7 @@ describe("contracts", function() {
     const uid = util.uid();
     const contractArgs = factory.createContractArgs(uid);
     const asyncOptions = { config, isAsync: true };
-    const pendingTxResult = await rest.createContract(
+    const pendingTxResult = <TransactionResultHash> await rest.createContract(
       admin,
       contractArgs,
       asyncOptions
@@ -44,7 +44,7 @@ describe("contracts", function() {
   it("create contract", async () => {
     const uid = util.uid();
     const contractArgs = factory.createContractArgs(uid);
-    const contract = await rest.createContract(admin, contractArgs, options);
+    const contract = <Contract>await rest.createContract(admin, contractArgs, options);
     assert.equal(contract.name, contractArgs.name, "name");
     assert.isOk(util.isAddress(contract.address), "address");
   });
@@ -53,7 +53,7 @@ describe("contracts", function() {
     const uid = util.uid();
     const contractArgs = factory.createContractArgs(uid);
     options.isDetailed = true;
-    const contract = await rest.createContract(admin, contractArgs, options);
+    const contract = <Contract>await rest.createContract(admin, contractArgs, options);
     assert.equal(contract.name, contractArgs.name, "name");
     assert.isOk(util.isAddress(contract.address), "address");
     assert.isDefined(contract.src, "src");
@@ -81,7 +81,7 @@ describe("contracts", function() {
       uid,
       constructorArgs
     );
-    const contract = await rest.createContract(admin, contractArgs, options);
+    const contract = <Contract>await rest.createContract(admin, contractArgs, options);
     assert.equal(contract.name, contractArgs.name, "name");
     assert.isOk(util.isAddress(contract.address), "address");
   });
@@ -117,7 +117,7 @@ describe("state", function() {
       constructorArgs
     );
     const contract = await rest.createContract(admin, contractArgs, options);
-    const state = await rest.getState(admin, contract, options);
+    const state = await rest.getState(admin, contract as Contract, options);
     assert.equal(state.var_uint, constructorArgs.arg_uint);
   });
 
@@ -147,19 +147,19 @@ describe("state", function() {
     const contract = await rest.createContract(admin, contractArgs, options);
     {
       options.stateQuery = { name };
-      const state = await rest.getState(admin, contract, options);
+      const state = await rest.getState(admin, contract as Contract, options);
       assert.isDefined(state[options.stateQuery.name]);
       assert.equal(state.array.length, MAX_SEGMENT_SIZE);
     }
     {
       options.stateQuery = { name, length: true };
-      const state = await rest.getState(admin, contract, options);
+      const state = await rest.getState(admin, contract as Contract, options);
       assert.isDefined(state[options.stateQuery.name]);
       assert.equal(state.array, SIZE, "array size");
     }
     {
       options.stateQuery = { name, length: true };
-      const state = await rest.getState(admin, contract, options);
+      const state = await rest.getState(admin, contract as Contract, options);
       const length = state[options.stateQuery.name];
       const all = [];
       for (let segment = 0; segment < length / MAX_SEGMENT_SIZE; segment++) {
@@ -168,7 +168,7 @@ describe("state", function() {
           offset: segment * MAX_SEGMENT_SIZE,
           count: MAX_SEGMENT_SIZE
         };
-        const state = await rest.getState(admin, contract, options);
+        const state = await rest.getState(admin, contract as Contract, options);
         all.push(...state[options.stateQuery.name]);
       }
       assert.equal(all.length, length, "array size");
@@ -188,7 +188,7 @@ describe("state", function() {
       constructorArgs
     );
     const contract = await rest.createContract(admin, contractArgs, options);
-    const result = await rest.getArray(admin, contract, name, options);
+    const result = await rest.getArray(admin, contract as Contract, name, options);
     assert.equal(result.length, SIZE, "array size");
     const mismatch = result.filter((entry, index) => entry != index);
     assert.equal(mismatch.length, 0, "no mismatches");
@@ -355,7 +355,7 @@ describe("history", function() {
       history: ["Event", "Ticket", "Transaction"]
     };
 
-    const contract = await rest.createContract(
+    const contract = <Contract> await rest.createContract(
       admin,
       contractArgs,
       historyOptions

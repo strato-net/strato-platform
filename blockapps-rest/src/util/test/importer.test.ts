@@ -3,7 +3,7 @@ import importer from "../importer";
 import rest from "../../rest";
 import util from "../util";
 import factory from "../../test/factory";
-import { Options } from "../../types";
+import { Options, Contract } from "../../types";
 
 const config = factory.getTestConfig();
 const fixtures = `${util.cwd}/lib/util/test/fixtures/`;
@@ -33,7 +33,7 @@ describe("imports", () => {
     const name = `Main`;
     const args = util.usc({ size: 10 });
     const contractArgs = { name, source, args };
-    const contract = await rest.createContract(admin, contractArgs, options);
+    const contract = <Contract> await rest.createContract(admin, contractArgs, options);
     const state = await rest.getState(admin, contract, options);
     assert.isDefined(state.AA, "A");
     assert.isDefined(state.BB, "B");

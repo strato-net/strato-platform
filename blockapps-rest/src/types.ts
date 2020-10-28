@@ -50,8 +50,16 @@ interface ContractDefinition {
 }
 
 interface Contract {
-  name: string
-  address: number
+  name: string,
+  address: number,
+  src?:string,
+  bin?:any,
+  codeHash?:any,
+  chainId?:any
 }
 
-export { Options, Config, StratoUser, OAuthUser, BlockChainUser, Contract, ContractDefinition };
+interface TransactionResultHash {
+  hash:any
+}
+
+export { Options, Config, StratoUser, OAuthUser, BlockChainUser, Contract, ContractDefinition, TransactionResultHash };
