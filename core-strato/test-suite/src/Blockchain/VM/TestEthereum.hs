@@ -37,8 +37,9 @@ import           Test.Hspec.Expectations.Lifted
 
 import           Blockchain.BlockChain
 import           Blockchain.Data.AddressStateDB
-import           Blockchain.Data.BlockDB
+import           Blockchain.Data.Block
 import           Blockchain.Data.Code
+import           Blockchain.Data.DataDefs                    (BlockData(..))
 import           Blockchain.Data.ExecResults
 import           Blockchain.Data.RLP
 import           Blockchain.Data.Transaction
@@ -173,29 +174,25 @@ runTest test = do
 
   beforeAddressStates <- addressStates
 
-  let block =
-        Block {
-          blockBlockData = BlockData {
-             blockDataParentHash = fromMaybe (unsafeCreateKeccak256FromWord256 0x0) . previousHash . env $ test,
-             blockDataNumber = read . currentNumber . env $ test,
-             blockDataCoinbase = _accountAddress . currentCoinbase . env $ test,
-             blockDataDifficulty = read . currentDifficulty . env $ test,
-             blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0, --error "unclesHash not set",
-             blockDataStateRoot = StateRoot "", -- error "bStateRoot not set",
-             blockDataTransactionsRoot = StateRoot "", -- error "transactionsRoot not set",
-             blockDataReceiptsRoot = StateRoot "", -- error "receiptsRoot not set", -- StateRoot ""
-             blockDataLogBloom = "", --error "logBloom not set",
-             blockDataGasLimit = currentGasLimit . env $ test,
-             blockDataGasUsed = 0, --error "gasUsed not set",
-             blockDataTimestamp = currentTimestamp . env $ test,
-             --timestamp = posixSecondsToUTCTime . fromInteger . read . currentTimestamp . env $ test,
-             blockDataExtraData = "", --error "extraData not set",
-             blockDataNonce = 0, --error "nonce not set",
-             blockDataMixHash=unsafeCreateKeccak256FromWord256 0 --error "mixHash not set"
-             },
-          blockReceiptTransactions = [], --error "receiptTransactions not set",
-          blockBlockUncles = [] --error "blockUncles not set"
-          }
+  let bData = BlockData {
+        blockDataParentHash = fromMaybe (unsafeCreateKeccak256FromWord256 0x0) . previousHash . env $ test,
+        blockDataNumber = read . currentNumber . env $ test,
+        blockDataCoinbase = _accountAddress . currentCoinbase . env $ test,
+        blockDataDifficulty = read . currentDifficulty . env $ test,
+        blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0, --error "unclesHash not set",
+        blockDataStateRoot = StateRoot "", -- error "bStateRoot not set",
+        blockDataTransactionsRoot = StateRoot "", -- error "transactionsRoot not set",
+        blockDataReceiptsRoot = StateRoot "", -- error "receiptsRoot not set", -- StateRoot ""
+        blockDataLogBloom = "", --error "logBloom not set",
+        blockDataGasLimit = currentGasLimit . env $ test,
+        blockDataGasUsed = 0, --error "gasUsed not set",
+        blockDataTimestamp = currentTimestamp . env $ test,
+        --timestamp = posixSecondsToUTCTime . fromInteger . read . currentTimestamp . env $ test,
+        blockDataExtraData = "", --error "extraData not set",
+        blockDataNonce = 0, --error "nonce not set",
+        blockDataMixHash=unsafeCreateKeccak256FromWord256 0 --error "mixHash not set"
+        }
+  let block = Block bData [] []
 
   (result, retVal, gasRemaining, _, returnedCallCreates, _) <-
     case theInput test of

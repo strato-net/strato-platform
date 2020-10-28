@@ -19,7 +19,6 @@ import           Blockchain.MilenaTools
 import           Network.Kafka.Protocol
 
 import           Blockchain.Data.Block              (BestBlock(..), Private(..))
-import           Blockchain.Data.BlockDB
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Enode              (ChainMembers(..))
 import           Blockchain.EthConf                 (lookupConsumerGroup)

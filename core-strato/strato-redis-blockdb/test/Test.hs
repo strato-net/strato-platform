@@ -19,7 +19,8 @@ import qualified Test.HUnit                                as HUnit
 import           Test.QuickCheck
 
 import           Blockchain.Data.ArbitraryInstances        ()
-import           Blockchain.Data.BlockDB
+import           Blockchain.Data.Block                     (Block(..))
+import           Blockchain.Data.DataDefs
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256

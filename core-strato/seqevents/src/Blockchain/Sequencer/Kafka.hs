@@ -25,7 +25,7 @@ import           Control.Monad.Change.Modify (Accessible(..), Proxy(..))
 import           Data.Binary                (Binary, decode, encode)
 
 import qualified Blockchain.Blockstanbul as PBFT
-import           Blockchain.Data.BlockDB
+import           Blockchain.Data.Block
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Transaction
 import qualified Blockchain.Data.TXOrigin              as Origin

@@ -129,14 +129,13 @@ microtimeCutoff = secondsToMicrotime flags_mempoolLivenessCutoff
 
 handleVmEvents :: ConduitT VmInEventBatch VmOutEvent ContextM ()
 handleVmEvents = awaitForever $ \InBatch{..} -> do
-  outputNewChains =<< lift (insertNewChains newChains)
   lift $ do
     mapM_ (uncurry3 queuePendingVote) votesToMake
     mapM_ runJsonRpcCommand rpcCommands
     recordSeqEventCount bLen tLen
 
   numPoolable <- uncurry (*>) . (yieldMany *** pure) =<< lift (processTransactions txPairs)
-  processBlocks blocks
+  processBlocksAndNewChains blocksAndNewChains
 
   mNewBlock <- lift $ do
     contextModify $ blockRequested ||~ createBlock
@@ -176,6 +175,26 @@ handleVmEvents = awaitForever $ \InBatch{..} -> do
   lift $ do
     loopTimeit "compactContextM" $ compactContextM
 
+spanLeft :: [Either a b] -> ([a], [Either a b])
+spanLeft (Left x:xs') = let (ys,zs) = spanLeft xs' in (x:ys,zs)
+spanLeft xs = ([], xs)
+
+spanRight :: [Either a b] -> ([b], [Either a b])
+spanRight (Right x:xs') = let (ys,zs) = spanRight xs' in (x:ys,zs)
+spanRight xs = ([], xs)
+
+groupEithers :: [Either a b] -> [Either [a] [b]]
+groupEithers [] = []
+groupEithers (Left x:xs) = let (ys,zs) = spanLeft xs in Left (x:ys) : groupEithers zs
+groupEithers (Right x:xs) = let (ys,zs) = spanRight xs in Right (x:ys) : groupEithers zs
+
+processBlocksAndNewChains :: [Either OutputGenesis OutputBlock] -> ConduitT a VmOutEvent ContextM ()
+processBlocksAndNewChains blocksAndChains = do
+  let grouped = groupEithers blocksAndChains
+  for_ grouped $ \case
+    Left newChains -> outputNewChains =<< lift (insertNewChains newChains)
+    Right blocks -> processBlocks blocks
+
 insertNewChains :: (
                    )
                 => [OutputGenesis]
@@ -190,10 +209,17 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
       $logInfoS "insertNewChains" $ T.pack $ "We already have a genesis state root for this chain. It's " ++ format gsr
       return Nothing
     Nothing -> do
-      mBB <- fmap fst <$> getChainBestBlock Nothing
       let cBlock = creationBlock $ chainInfo cInfo
-          bHash = fromMaybe cBlock mBB
           pChain = parentChain $ chainInfo cInfo
+      bHash' <- getChainCreationBlock cBlock pChain
+      bHash <- if bHash' /= zeroHash
+                 then pure bHash'
+                 else do
+                   mBB <- getChainGenesisInfo Nothing
+                   case mBB of
+                     Just (bb, _, _) -> pure bb
+                     Nothing -> error "insertNewChains: could not find non-zero block hash to run from. Chain DB not bootstrapped correctly"
+
       withCurrentBlockHash bHash $ do
         $logInfoS "insertNewChains" $ T.pack $ "This is a new chain!"
         let theVM = T.unpack $ fromMaybe "EVM" $ M.lookup "VM" $ chainMetadata (chainInfo cInfo)

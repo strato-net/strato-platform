@@ -26,12 +26,13 @@ import Blockapps.Crossmon
 
 import Blockchain.Data.Address
 import Blockchain.Data.Block
-import Blockchain.Data.BlockDB
+import Blockchain.Data.DataDefs
 import Blockchain.Blockstanbul.Authentication
 import qualified Blockchain.Blockstanbul.HTTPAdmin as HA
 import Blockchain.Blockstanbul.Messages
 import Blockchain.Blockstanbul.Metrics
 import Blockchain.Blockstanbul.Voting
+import Blockchain.Strato.Model.Class (blockHash)
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
 import qualified Network.Haskoin.Crypto as HK
