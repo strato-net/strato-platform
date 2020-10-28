@@ -54,6 +54,7 @@ executables:
       - bytestring
       - http-client
       - http-conduit
+      - http-types
       - ethereum-rlp
       - extra
       - servant-client
