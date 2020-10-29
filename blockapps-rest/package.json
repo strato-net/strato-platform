@@ -5,6 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "node_modules/.bin/gulp",
+    "build:docs": "node_modules/.bin/gulp generateDocs",
     "test": "yarn test:lib && yarn test:util",
     "test:lib": "mocha --require=@babel/register lib/test/*.test.js -b",
     "test:util": "mocha --require=@babel/register lib/util/test/*.test.js -b",
@@ -42,6 +43,7 @@
     "open": "^6.0.0",
     "query-string": "^6.2.0",
     "rsa-pem-from-mod-exp": "^0.8.4",
+    "sha3": "^2.1.3",
     "simple-oauth2": "2.2.1",
     "sol-merger": "^0.1.3",
     "solidity-parser-antlr": "^0.4.1",
@@ -66,6 +68,7 @@
     "gulp-clean": "^0.4.0",
     "gulp-cli": "^2.0.1",
     "gulp-sourcemaps": "^2.6.5",
+    "jsdoc": "^3.6.4",
     "mocha": "^6.0.2"
   }
 }
