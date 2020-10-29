@@ -317,6 +317,7 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
         Nothing -> $logDebugS "addBlock" $ T.pack $ "Could not locate old chain root. Using emptyTriePtr"
         Just cr -> $logDebugS "addBlock" $ T.pack $ "Old chain root: " ++ format cr
 
+    mcr <- getChainRoot $ blockHash b
     putBlockHeaderInChainDB bd
 
     when flags_debug $ do
@@ -332,13 +333,17 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
 
     addBlockTransactions True b
 
+    postRewardSR <-
+      if isNothing mcr
+        then lift $ Bagger.rewardCoinbases (blockDataCoinbase bd) uncles (blockDataNumber bd)
+        else A.lookupWithDefault (Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
+
     -- If there are no transactions in th
     -- TODO: this should be handled more officially,
     -- e.g. adding a chainId to the block
     let skipCheck = (not $ null otxs)
                  && (isNothing . listToMaybe $ filter (isNothing . txChainId) otxs)
     unless skipCheck $ do
-      postRewardSR <- lift $ Bagger.rewardCoinbases (blockDataCoinbase bd) uncles (blockDataNumber bd)
       when (blockDataStateRoot (obBlockData b) /= postRewardSR) $ do
         $logInfoS "addBlock/mined" . T.pack $ "newStateRoot: " ++ format postRewardSR
         error $ "stateRoot mismatch!!  New stateRoot doesn't match block stateRoot: " ++ format (blockDataStateRoot $ obBlockData b)
