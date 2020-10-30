@@ -34,6 +34,7 @@ interface StratoUser {
 }
 
 interface BlockChainUser {
+  token:string,
   address:string
 }
 

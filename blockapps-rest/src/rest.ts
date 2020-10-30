@@ -6,7 +6,7 @@ import util from "./util/util";
 import { constructMetadata, setAuthHeaders } from "./util/api.util";
 import { RestError, response } from "./util/rest.util";
 import jwt from "jsonwebtoken";
-import { Options, StratoUser, OAuthUser, Contract, ContractDefinition, TransactionResultHash } from "./types";
+import { Options, StratoUser, OAuthUser, BlockChainUser, Contract, ContractDefinition, TransactionResultHash } from "./types";
 
 // =====================================================================
 //   util
@@ -90,10 +90,9 @@ async function getUser(args, options:Options) {
   return address;
 }
 */
-async function createUser(ouser:OAuthUser, options:Options) {
+async function createUser(ouser:OAuthUser, options:Options):Promise<BlockChainUser> {
   const address = await createOrGetKey(ouser, options);
-  const user = Object.assign({}, ouser, { address });
-  return user;
+  return Object.assign({}, ouser, { address });
 }
 
 async function fill(user, options:Options) {
@@ -121,7 +120,7 @@ async function compileContracts(user, contract, options:Options) {
 //   contract
 // =====================================================================
 
-async function createContract(user:OAuthUser, contract:ContractDefinition, options:Options):Promise<Contract | TransactionResultHash> {
+async function createContract(user:BlockChainUser, contract:ContractDefinition, options:Options):Promise<Contract | TransactionResultHash> {
   const [pendingTxResult] = await api.createContract(user, contract, options);
   return createContractResolve(user, pendingTxResult, options);
 }
