@@ -4,7 +4,7 @@
   "description": "platform tests",
   "scripts": {
     "test": "npm run test:blockhash && npm run test:e2e && npm run test:dataTypes && npm run test:load && npm run test:load10k && npm run test:loadecho && npm run test:solidvm && npm run test:upload && npm run test:upload10k && npm run test:loadFF && npm run test:truchainz && npm run test:multicontract && npm run test:uploadOrder && npm run test:slipstream",
-    "test:blockhash": "mocha e2e/blockhash.test.js",
+    "test:blockhash": "mocha -r ts-node/register e2e/blockhash.test.ts",
     "test:e2e": "mocha e2e/compile.test.js && mocha e2e/createUser.test.js && mocha e2e/import.constructor.test.js && mocha e2e/import.test.js",
     "test:dataTypes": "mocha regressions/address.test.js && mocha regressions/bool.test.js && mocha regressions/bytes.test.js && mocha regressions/enum.test.js && mocha regressions/string.test.js && mocha regressions/uint.test.js && mocha regressions/negative.test.js",
     "test:load": "mocha load/stratoLoad.test.js --batchCount 20 --batchSize 20 && mocha load/stratoLoadFactory.test.js --batchCount 20 --batchSize 20",
@@ -21,7 +21,9 @@
     "test:slipstream": "mocha e2e/slipstream.test.js"
   },
   "dependencies": {
-    "blockapps-rest": "git://github.com/blockapps/blockapps-rest.git#6fe2bc46dadb5e5af1a6027ddf5fb52492fa2c4f",
+    "@types/mocha": "^8.0.3",
+    "@types/node": "^14.14.6",
+    "blockapps-rest": "../blockapps-rest",
     "chai": "^4.0.2",
     "co": "^4.6.0",
     "co-mocha": "^1.2.0",
@@ -30,6 +32,7 @@
     "mocha": "^3.4.2",
     "moment": "^2.22.2",
     "request": "^2.88.0",
-    "request-promise": "4.2.2"
+    "request-promise": "4.2.2",
+    "ts-node": "^9.0.0"
   }
 }
