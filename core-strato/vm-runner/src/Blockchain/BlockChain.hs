@@ -145,6 +145,7 @@ instance Bagger.MonadBagger ContextM where
     putBaggerState s = contextModify $ baggerState .~ s
 
     runFromStateRoot remainingGas theBlockHeader txs = do
+        A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256) (blockDataStateRoot theBlockHeader)
         (TxMiningResult res ranTxs unranTxs newGas) <-
           timeit "mineTransactions bagger" (Just vmBlockInsertionMined)
           $ mineTransactions' theBlockHeader remainingGas DL.empty txs
