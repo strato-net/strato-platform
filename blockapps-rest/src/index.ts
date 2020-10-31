@@ -6,6 +6,7 @@ import importer from './util/importer'
 import oauthUtil from './util/oauth.util'
 import assert from './util/assert';
 import { Options, Config, StratoUser, OAuthUser, BlockChainUser, Contract } from "./types"
+import * as constants from "./constants";
 
 export {
   rest,
@@ -20,5 +21,6 @@ export {
   BlockChainUser,
   Options,
   Config,
-  Contract
+  Contract,
+  constants
 }
