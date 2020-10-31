@@ -64,7 +64,7 @@ async function resolveResults(user, pendingResults, _options:Options) {
 //   account details
 // =====================================================================
 
-async function getAccounts(user, options:Options) {
+async function getAccounts(user:OAuthUser, options:Options) {
   try {
     return await api.getAccounts(user, options);
   } catch(err) {
@@ -496,6 +496,7 @@ async function waitForAddress(user, contract, _options:Options) {
 }
 
 export default {
+  fill,
   getAccounts,
 //  getUsers,
 //  getUser,
