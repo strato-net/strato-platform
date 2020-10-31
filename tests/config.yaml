@@ -1,4 +1,6 @@
 apiDebug: false
+timeout: 600000
+contractsPath: ./contracts/
 
 # WARNING - extra strict syntax
 # DO NOT change the nodes order
