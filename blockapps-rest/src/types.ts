@@ -20,7 +20,9 @@ interface Options {
 interface Config {
   nodes:Node[],
   apiDebug:boolean,
-  VM?:string
+  VM?:string,
+  timeout?:number,
+  contractsPath?:string
 }  
 
 interface Node {
