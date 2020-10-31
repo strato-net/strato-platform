@@ -12,12 +12,14 @@ contract Random {
 }
 `;
 
-var options:Options = {config: fsUtil.getYaml("config.yaml")};
+var config:Config = fsUtil.getYaml("config.yaml");
+
+let options:Options = {config};
 
 describe('Using blockhash', function () {
   it('should upload a contract that uses blockhash', async () => {
 
-    const oauth:oauthUtil = oauthUtil.init(options.config.nodes[0].oauth);
+    const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
 
     let ouser:OAuthUser = await oauth.getAccessTokenByClientSecret();
 
@@ -27,5 +29,5 @@ describe('Using blockhash', function () {
     const state = await rest.getState(admin, contract, options);
     console.log(`Random state: ${JSON.stringify(state, null, 2)}`);
     assert.notEqual(state.value, 0, "Variable value did not match expected state");
-  }).timeout(10000);
+  }).timeout(config.timeout);
 });
