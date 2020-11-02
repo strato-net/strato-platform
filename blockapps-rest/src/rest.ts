@@ -6,7 +6,16 @@ import util from "./util/util";
 import { constructMetadata, setAuthHeaders } from "./util/api.util";
 import { RestError, response } from "./util/rest.util";
 import jwt from "jsonwebtoken";
-import { Options, StratoUser, OAuthUser, BlockChainUser, Contract, ContractDefinition, TransactionResultHash } from "./types";
+import {
+  Options,
+  StratoUser,
+  OAuthUser,
+  BlockChainUser,
+  Contract,
+  ContractDefinition,
+  TransactionResultHash,
+  CallArgs
+} from "./types";
 
 // =====================================================================
 //   util
@@ -253,7 +262,7 @@ async function getArray(user, contract, name, options:Options) {
 //   call
 // =====================================================================
 
-async function call(user, callArgs, options:Options) {
+async function call(user:BlockChainUser, callArgs:CallArgs, options:Options) {
   const [pendingTxResult] = await api.call(user, callArgs, options);
   return callResolve(user, pendingTxResult, options);
 }
@@ -339,7 +348,7 @@ async function sendMany(user, sendTxs, options:Options) {
 //   search
 // =====================================================================
 
-async function search(user, contract, options:Options) {
+async function search(user:OAuthUser, contract:Contract, options:Options) {
   try {
     const results = await api.search(user, contract, options);
     return results;
@@ -351,7 +360,7 @@ async function search(user, contract, options:Options) {
   }
 }
 
-async function searchUntil(user, contract, predicate, options:Options) {
+async function searchUntil(user:OAuthUser, contract:Contract, predicate, options:Options) {
   const action = async o => {
     return search(user, contract, o);
   };
@@ -360,7 +369,7 @@ async function searchUntil(user, contract, predicate, options:Options) {
   return results;
 }
 
-async function searchWithContentRange(user, contract, options:Options) {
+async function searchWithContentRange(user:OAuthUser, contract:Contract, options:Options) {
   try {
     const results = await api.searchWithContentRange(user, contract, options);
     return results;
@@ -372,7 +381,7 @@ async function searchWithContentRange(user, contract, options:Options) {
   }
 }
 
-async function searchWithContentRangeUntil(user, contract, predicate, options:Options) {
+async function searchWithContentRangeUntil(user:OAuthUser, contract:Contract, predicate, options:Options) {
   const action = async o => {
     return searchWithContentRange(user, contract, o);
   };

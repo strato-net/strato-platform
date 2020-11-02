@@ -10,7 +10,15 @@ import {
   setAuthHeaders
 } from "./util/api.util";
 import { TxPayloadType } from "./constants";
-import { Options, StratoUser, OAuthUser, BlockChainUser, ContractDefinition } from "./types";
+import {
+  Options,
+  StratoUser,
+  OAuthUser,
+  BlockChainUser,
+  Contract,
+  ContractDefinition,
+  CallArgs
+} from "./types";
 /*
 async function getUsers(ouser:OAuthUser, options:Options) {
   const url = getNodeUrl(options);
@@ -168,7 +176,7 @@ function getCallArgs(callMethodArgs, options:Options) {
   return tx;
 }
 
-async function call(user, callMethodArgs, options:Options) {
+async function call(user:BlockChainUser, callMethodArgs:CallArgs, options:Options) {
   const tx = getCallArgs(callMethodArgs, options);
   const body = {
     txs: [tx]
@@ -229,7 +237,7 @@ async function createKey(user:OAuthUser, options:Options) {
   return post(url, endpoint, body, setAuthHeaders(user, options));
 }
 
-async function search(user:OAuthUser, contract, options:Options) {
+async function search(user:OAuthUser, contract:Contract, options:Options) {
   const url = getNodeUrl(options);
   const urlParams = {
     name: contract.name

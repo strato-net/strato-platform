@@ -54,7 +54,7 @@ interface ContractDefinition {
 
 interface Contract {
   name: string,
-  address: number,
+  address?: number,
   src?:string,
   bin?:any,
   codeHash?:any,
@@ -65,4 +65,20 @@ interface TransactionResultHash {
   hash:any
 }
 
-export { Options, Config, StratoUser, OAuthUser, BlockChainUser, Contract, ContractDefinition, TransactionResultHash };
+interface CallArgs {
+  contract: Contract,
+  method: any,
+  args: any
+}
+
+export {
+  Options,
+  Config,
+  StratoUser,
+  OAuthUser,
+  BlockChainUser,
+  Contract,
+  ContractDefinition,
+  TransactionResultHash,
+  CallArgs
+};
