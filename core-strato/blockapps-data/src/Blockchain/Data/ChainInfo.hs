@@ -242,7 +242,7 @@ data UnsignedChainInfo = UnsignedChainInfo
   , creationBlock  :: Keccak256
   , chainNonce     :: Word256
   , chainMetadata  :: (M.Map T.Text T.Text)
-  } deriving (Eq, Show, GHCG.Generic, Data)
+  } deriving (Eq, GHCG.Generic, Data)
 
 
 
@@ -266,19 +266,22 @@ instance ToSchema ChainInfo where
 --    NamedSchema (Just "ChainInfo")
 --      ( mempty )
 
-instance Format UnsignedChainInfo where
-  format UnsignedChainInfo{..} = unlines
+instance Show UnsignedChainInfo where
+  show UnsignedChainInfo{..} = unlines
     [ "UnsignedChainInfo"
     , "-----------------"
     , tab $ "Label:          " ++ show chainLabel
     , tab $ "Account info:   " ++ format accountInfo
-    , tab $ "Code info:      " ++ format codeInfo
+    , tab $ "Code info:      " ++ show (codeInfoName <$> codeInfo)
     , tab $ "Members:        " ++ show members
     , tab $ "Parent chain:   " ++ CL.yellow (format parentChain)
     , tab $ "Creation block: " ++ format creationBlock
     , tab $ "Nonce:          " ++ CL.yellow (format chainNonce)
-    , tab $ "Metadata:       " ++ show chainMetadata
+    , tab $ "Metadata:       " ++ show (M.keys chainMetadata)
     ]
+
+instance Format UnsignedChainInfo where
+  format = show
 
 data ChainInfo = ChainInfo
   { chainInfo      :: UnsignedChainInfo
