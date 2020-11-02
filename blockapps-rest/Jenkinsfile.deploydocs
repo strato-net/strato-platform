@@ -10,7 +10,7 @@ pipeline {
             sudo rm -rf strato-platform
             sudo rm -rf /home/blockapps/ba-rest-jsdoc
             mkdir /home/blockapps/ba-rest-jsdoc
-            git clone -b STRATO-1703_ba-rest-docs https://${GH_USER}:${GH_PASSWD}@github.com/blockapps/strato-platform
+            git clone https://${GH_USER}:${GH_PASSWD}@github.com/blockapps/strato-platform
             cd strato-platform/blockapps-rest
             npm i
             CONTAINER=$(docker run -d -v $(pwd):/sources node:10 bash -c "cd /sources && npm run build:docs")
