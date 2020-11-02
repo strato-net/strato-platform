@@ -1,4 +1,15 @@
-import { OAuthUser, BlockChainUser, Options, Contract, Config, rest, util, fsUtil, oauthUtil, assert } from 'blockapps-rest';
+import {
+  OAuthUser,
+  BlockChainUser,
+  Options,
+  Contract,
+  Config,
+  rest,
+  util,
+  fsUtil,
+  oauthUtil,
+  assert
+  } from 'blockapps-rest';
 
 const source = `
 pragma solidity ^0.4.24;
@@ -12,8 +23,7 @@ contract Random {
 }
 `;
 
-var config:Config = fsUtil.getYaml("config.yaml");
-
+let config:Config = fsUtil.getYaml("config.yaml");
 let options:Options = {config};
 
 describe('Using blockhash', function () {
