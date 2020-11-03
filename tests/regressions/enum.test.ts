@@ -1,12 +1,27 @@
-const ba = require('blockapps-rest');
-require('co-mocha');
-const rest = ba.rest;
-const common = ba.common;
-const util = common.util;
-const config = common.config;
-const assert = common.assert;
-const BigNumber = common.BigNumber;
-const path = require('path');
+import * as path from 'path';
+
+import {
+  OAuthUser,
+  BlockChainUser,
+  Options,
+  Contract,
+  Config,
+  rest,
+  util,
+  fsUtil,
+  oauthUtil,
+  assert,
+  constants,
+  importer
+  } from 'blockapps-rest';
+
+import BigNumber from "bignumber.js";
+import * as chai from "chai";
+chai.should();
+chai.use(require('chai-bignumber')());
+
+let config:Config = fsUtil.getYaml("config.yaml");
+let options:Options = {config};
 
 const adminName = util.uid('Admin');
 const adminPassword = '1234';
@@ -22,90 +37,92 @@ describe('enum data type: positive case:', function () {
   var adminUser;
   var contract;
 
-  before(function* () {
-    adminUser = yield rest.createUser(adminName, adminPassword);
-    contract = yield rest.uploadContract(adminUser, contractName, contractFilename, constructorArgs);
+  before(async() => {
+    const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
+    let ouser:OAuthUser = await oauth.getAccessTokenByClientSecret();
+    adminUser = await rest.createUser(ouser, options);
+    contract = await rest.createContract(adminUser, {name: contractName, source: await importer.combine(contractFilename), args: constructorArgs}, options);
   });
 
-  it('should upload the storage contract with constructor arguments', function* () {
-    const state = yield rest.getState(contract);
+  it('should upload the storage contract with constructor arguments', async() => {
+    const state = await rest.getState(adminUser, contract, options);
     state.storedData = state.storedData;
     assert.equal(state.storedData, constructorArgs._storedData, 'storedData');
     assert.equal(state.storedDatum.length, 0, 'storedDatum');
   });
 
-  it('get() returns (enum)', function* () {
+  it('get() returns (enum)', async() => {
     const methodName = 'get';
-    const returnsArray = yield rest.callMethod(adminUser, contract, methodName);
+    const returnsArray = await rest.call(adminUser, {contract: contract, method: methodName, args: {}}, options);
     const result = returnsArray[0];
     assert.equal(constructorArgs._storedData, result, 'enum returned from get()');
   });
 
-  it('set (enum)', function* () {
+  it('set (enum)', async() => {
     const methodName = 'set';
     const args = {value: ErrorCodes.EXISTS};
-    const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
-    const state = yield rest.getState(contract);
+    const returnsArray = await rest.call(adminUser, {contract: contract, method: methodName, args}, options);
+    const state = await rest.getState(adminUser, contract, options);
     state.storedData = state.storedData;
     assert.equal(state.storedData, args.value, 'enum returned from get()');
   });
 
-  it('set (enum) string', function* () {
+  it('set (enum) string', async() => {
     const methodName = 'set';
     const args = {value: ErrorCodes.EXISTS};
-    const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
-    const state = yield rest.getState(contract);
+    const returnsArray = await rest.call(adminUser, {contract: contract, method: methodName, args}, options);
+    const state = await rest.getState(adminUser, contract, options);
     assert.equal(state.storedData, args.value, 'enum returned from get()');
   });
 
-  it('setArray (enum[]) / getArray() returns (enum[])', function* () {
+  it('setArray (enum[]) / getArray() returns (enum[])', async() => {
     // set array
     const methodName = 'setArray';
     const args = {values: [ErrorCodes.SUCCESS, ErrorCodes.ERROR, ErrorCodes.EXISTS]};
-    yield rest.callMethod(adminUser, contract, methodName, args);
-    const state = yield rest.getState(contract);
+    await rest.call(adminUser, {contract: contract, method: methodName, args}, options);
+    const state = await rest.getState(adminUser, contract, options);
     const storedDatum = parseIntArray(state.storedDatum);
     assert.deepEqual(storedDatum, args.values, 'after calling setArray (enum[])');
     // get array
-    const returnsArray = yield rest.callMethod(adminUser, contract, 'getArray');
+    const returnsArray = await rest.call(adminUser, {contract: contract, method: 'getArray', args: {}}, options);
     const result = parseIntArray(returnsArray[0]);
     assert.deepEqual(result, args.values, 'after calling getArray()');
   });
 
-  it('getTuple(enum, enum, enum) returns (enum, enum, enum)', function* () {
+  it('getTuple(enum, enum, enum) returns (enum, enum, enum)', async() => {
     const methodName = 'getTuple';
     const args = {v1: ErrorCodes.SUCCESS, v2: ErrorCodes.ERROR, v3: ErrorCodes.NOT_FOUND};
-    const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
+    const returnsArray = await rest.call(adminUser, {contract: contract, method: methodName, args}, options);
     const result = parseIntArray(returnsArray);
     assert.deepEqual(result, [args.v1, args.v2, args.v3], 'enum,enum,enum returned from getTuple()');
   });
 
-  it('setStruct(enum value, enum[] values) return (enum, enum[])', function* () {
+  it('setStruct(enum value, enum[] values) return (enum, enum[])', async() => {
     // function setStruct(enum value, enum[] values) returns (enum, enum[])
     const methodName = 'setStruct';
     const args = {value: ErrorCodes.INSUFFICIENT_BALANCE, values: [ErrorCodes.SUCCESS, ErrorCodes.ERROR, ErrorCodes.NOT_FOUND]};
-    const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
+    const returnsArray = await rest.call(adminUser, {contract: contract, method: methodName, args}, options);
     // check the returned tuple
     assert.equal(returnsArray[0], args.value);
     assert.deepEqual(parseIntArray(returnsArray[1]), args.values);
     // check the struct state
-    const state = yield rest.getState(contract);
+    const state = await rest.getState(adminUser, contract, options);
     const value = state.storedStruct.value;
     const values = parseIntArray(state.storedStruct.values);
     assert.equal(value, args.value);
     assert.deepEqual(values, args.values);
   });
 
-  it('setStructArray(enum value, enum[] values)', function* () {
+  it('setStructArray(enum value, enum[] values)', async() => {
     // function setStructArray(enum value, enum[] values)
     const methodName = 'setStructArray';
     const args = {
       value: ErrorCodes.INSUFFICIENT_BALANCE,
       values: [ErrorCodes.SUCCESS, ErrorCodes.ERROR, ErrorCodes.NOT_FOUND],
       count: 3 };
-    yield rest.callMethod(adminUser, contract, methodName, args);
+    await rest.call(adminUser, {contract: contract, method: methodName, args}, options);
     // check the struct state
-    const state = yield rest.getState(contract);
+    const state = await rest.getState(adminUser, contract, options);
     assert.equal(state.storedStructs.length, args.count, 'count');
     state.storedStructs.map(function(storedStruct) {
       const value = storedStruct.value;
@@ -115,16 +132,16 @@ describe('enum data type: positive case:', function () {
     })
   });
 
-  it('setMapping(enum value, enum key)', function* () {
+  it('setMapping(enum value, enum key)', async() => {
     // function setMapping(enum value, enum key) returns (enum value)
     const methodName = 'setMapping';
     const args = {value: ErrorCodes.EXISTS, key: 666};
-    const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
+    const returnsArray = await rest.call(adminUser, {contract: contract, method: methodName, args}, options);
     const result = parseInt(returnsArray[0]);
     assert.equal(result, args.value);
   });
 
-  it('call method with value', function*() {
+  it('call method with value', async() => {
     const methodName = 'get';
     const methodArgs = {};
     const setMethodName = 'set';
@@ -132,13 +149,14 @@ describe('enum data type: positive case:', function () {
     const etherToSend = 0;
 
     //Call method with value
-    yield rest.callMethod(adminUser, contract, setMethodName, setMethodArgs);
-    const resultWithValue = yield rest.callMethod(adminUser, contract, methodName, methodArgs, etherToSend);
+    await rest.call(adminUser, {contract: contract, method: setMethodName, args: setMethodArgs}, options);
+    const resultWithValue = await rest.call(adminUser, {contract: contract, method: methodName, args: methodArgs, value: new BigNumber(etherToSend)}, options);
     assert.equal(resultWithValue[0], constructorArgs._storedData, "method call with value should execute");
 
-    const contractBalance = yield rest.getBalance(contract.address);
-    const expectedBalance = (new BigNumber(etherToSend)).mul(common.constants.ETHER);
-    assert.isOk(expectedBalance.equals(contractBalance), "contract balance should equal value from method call");
+    const accounts = await rest.getAccounts(adminUser, {...options, params: {address: contract.address}})
+    const contractBalance = accounts[0].balance;
+    const expectedBalance = (new BigNumber(etherToSend)).multipliedBy(constants.ETHER);
+    assert.isOk(expectedBalance.isEqualTo(contractBalance), "contract balance should equal value from method call");
   });
 });
 
@@ -148,20 +166,22 @@ describe.skip('enum data type: illegal values:', function () {
   var adminUser;
   var contract;
 
-  before(function* () {
-    adminUser = yield rest.createUser(adminName, adminPassword);
-    contract = yield rest.uploadContract(adminUser, contractName, contractFilename, constructorArgs);
+  before(async() => {
+    const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
+    let ouser:OAuthUser = await oauth.getAccessTokenByClientSecret();  
+    adminUser = await rest.createUser(ouser, options);
+    contract = await rest.createContract(adminUser, {name: contractName, source: await importer.combine(contractFilename), args: constructorArgs}, options);
   });
 
   const illegalValue = [ -1, '-1', 12, '12', 'zzz'];
   const expectedStatus = 400;
 
   illegalValue.map(function(illegalValue) {
-    it.skip(`constructor args: '${typeof illegalValue} ${illegalValue}'`, function* () {
+    it.skip(`constructor args: '${typeof illegalValue} ${illegalValue}'`, async() => {
       // upload with bad agrs
       const args = {_storedData: illegalValue};
       try {
-        yield rest.uploadContract(adminUser, contractName, contractFilename, args);
+        await rest.createContract(adminUser, {name: contractName, source: await importer.combine(contractFilename), args: args}, options);
       } catch(httpError) {
         // expected to throw
         assert.equal(httpError.status, expectedStatus, 'illegal value http status');
@@ -173,11 +193,11 @@ describe.skip('enum data type: illegal values:', function () {
   });
 
   illegalValue.map(function(illegalValue) {
-    it.skip(`set (enum) illegal value: '${typeof illegalValue} ${illegalValue}'`, function* () {
+    it.skip(`set (enum) illegal value: '${typeof illegalValue} ${illegalValue}'`, async() => {
       const methodName = 'set';
       const args = {value: illegalValue};
       try {
-        const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
+        const returnsArray = await rest.call(adminUser, {contract: contract, method: methodName, args}, options);
       } catch(httpError) {
         // expected to throw
         assert.equal(httpError.status, expectedStatus, 'illegal value http status');
@@ -189,12 +209,12 @@ describe.skip('enum data type: illegal values:', function () {
   });
 
   illegalValue.map(function(illegalValue) {
-    it.skip(`setArray (enum[]) / getArray() returns (enum[]): illegal value: '${typeof illegalValue} ${illegalValue}'`, function* () {
+    it.skip(`setArray (enum[]) / getArray() returns (enum[]): illegal value: '${typeof illegalValue} ${illegalValue}'`, async() => {
       // set array
       const methodName = 'setArray';
       const args = {values: [illegalValue, illegalValue, illegalValue]};
       try {
-        const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
+        const returnsArray = await rest.call(adminUser, {contract: contract, method: methodName, args}, options);
       } catch(httpError) {
         // expected to throw
         assert.equal(httpError.status, expectedStatus, 'illegal value http status');
