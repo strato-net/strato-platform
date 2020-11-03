@@ -24,15 +24,14 @@ let options:Options={config}
 let ouser:OAuthUser;
 
 describe("Create User", function() {
-
+  this.timeout(config.timeout);
+  
   before(async () => {
     const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
     ouser = await oauth.getAccessTokenByClientSecret();
   });
 
   it('should create a new user and get an address', async () => {
-    this.timeout(config.timeout);
-    
     // create user
     const user:BlockChainUser = await rest.createUser(ouser, options);
     
@@ -42,7 +41,6 @@ describe("Create User", function() {
   });
 
   it('should fill from faucet - no resolve', async () => {
-    this.timeout(config.timeout);
     // create user
     const user:BlockChainUser = await rest.createUser(ouser, options);
     // fill
@@ -53,7 +51,6 @@ describe("Create User", function() {
   });
 
   it('should fill from faucet - with resolve', async () => {
-    this.timeout(config.timeout);
     // create user
     const user:BlockChainUser = await rest.createUser(ouser, options);
     // fill
@@ -64,7 +61,6 @@ describe("Create User", function() {
   });
 
   it('should fill from faucet - with resolve', async () => {
-    this.timeout(config.timeout);
     // create user
     const user:BlockChainUser = await rest.createUser(ouser, options);
     // fill
@@ -85,7 +81,6 @@ describe("Create User", function() {
 describe("Create User - sync (resolve)", function() {
 
   it('should create a new user and get an address', async () => {
-    this.timeout(config.timeout);
     const uid = util.uid();
     const username = 'User' + uid;
     // create user
