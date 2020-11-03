@@ -5,7 +5,7 @@
   "scripts": {
     "test": "npm run test:blockhash && npm run test:e2e && npm run test:dataTypes && npm run test:load && npm run test:load10k && npm run test:loadecho && npm run test:solidvm && npm run test:upload && npm run test:upload10k && npm run test:loadFF && npm run test:truchainz && npm run test:multicontract && npm run test:uploadOrder && npm run test:slipstream",
     "test:blockhash": "mocha -r ts-node/register e2e/blockhash.test.ts",
-    "test:e2e": "mocha -r ts-node/register e2e/compile.test.ts && mocha -r ts-node/register e2e/createUser.test.ts && mocha -r ts-node/register e2e/import.constructor.test.ts && mocha -r ts-node/register e2e/import.test.ts",
+    "test:e2e": "mocha -r ts-node/register e2e/createUser.test.ts && mocha -r ts-node/register e2e/import.constructor.test.ts && mocha -r ts-node/register e2e/import.test.ts",
     "test:dataTypes": "mocha -r ts-node/register regressions/address.test.ts && mocha regressions/bool.test.js && mocha regressions/bytes.test.js && mocha regressions/enum.test.js && mocha regressions/string.test.js && mocha regressions/uint.test.js && mocha regressions/negative.test.js",
     "test:load": "mocha load/stratoLoad.test.js --batchCount 20 --batchSize 20 && mocha load/stratoLoadFactory.test.js --batchCount 20 --batchSize 20",
     "test:load10k": "mocha load/stratoLoad.test.js --batchCount 100 --batchSize 100",
