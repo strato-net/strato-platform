@@ -32,8 +32,6 @@ describe('ImportAndUpload with Constructor - smoke', function() {
   before(async() => {
     const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
     let ouser:OAuthUser = await oauth.getAccessTokenByClientSecret();
-    
-    const uid = util.uid();
     alice = await rest.createUser(ouser, options);
   });
 
