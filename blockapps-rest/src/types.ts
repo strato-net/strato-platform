@@ -1,6 +1,8 @@
 
 import { OAuthConfig } from "./util/oauth.util";
 
+import BigNumber from "bignumber.js";
+
 interface Options {
   config: Config,
   node?:number,
@@ -68,7 +70,8 @@ interface TransactionResultHash {
 interface CallArgs {
   contract: Contract,
   method: any,
-  args: any
+  args: any,
+  value?:BigNumber
 }
 
 export {
