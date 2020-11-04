@@ -423,6 +423,7 @@ prunePrivacyDBs = do
   prune txHashRegistry
   prune chainHashRegistry
   prune chainIdRegistry
+  prune emittedBlockRegistry
   where prune r = modify' $ r .~ M.empty
 
 runSequencerM :: SequencerConfig -> Maybe BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
