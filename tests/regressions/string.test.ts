@@ -26,9 +26,6 @@ let options:Options = {config};
 describe('string data type', function () {
   this.timeout(config.timeout);
 
-  const adminName = util.uid('Admin');
-  const adminPassword = '1234';
-
   const contractName = "DataTypeString";
   const contractFilename = path.join(config.contractsPath, "DataTypeString.sol");
   const constructorArgs = {_storedData: 'test'};
