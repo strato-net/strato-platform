@@ -22,7 +22,7 @@ interface Options {
 interface Config {
   nodes:Node[],
   apiDebug:boolean,
-  VM?:string,
+  VM?:"SolidVM" | "EVM",
   timeout?:number,
   contractsPath?:string
 }  

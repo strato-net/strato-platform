@@ -94,7 +94,7 @@ async function createContract(user, contract:ContractDefinition, options:Options
   return pendingTxResult;
 }
 
-async function createContractList(user, contracts:ContractDefinition[], options:Options) {
+async function createContractList(user:BlockChainUser, contracts:ContractDefinition[], options:Options) {
   const txs = contracts.map(contract => getCreateArgs(contract, options));
   const body = {
     txs

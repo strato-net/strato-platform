@@ -306,6 +306,7 @@ describe("rest_7", function () {
       });
       assert.equal(parseInt(result), var1 * var2, "call results");
     });
+    /* Commenting this test out, since typescript forbids this error from occurring
     // bad VM
     it("call - option VM - BAD_REQUEST", async () => {
       const callArgs = factory.createCallArgs(contract, method, { var2 });
@@ -320,6 +321,7 @@ describe("rest_7", function () {
         /BAD_VM/
       );
     });
+    */
   });
 
   describe("send", function () {

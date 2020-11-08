@@ -5,7 +5,7 @@ import fsUtil from './util/fsUtil'
 import importer from './util/importer'
 import oauthUtil from './util/oauth.util'
 import assert from './util/assert';
-import { Options, Config, StratoUser, OAuthUser, BlockChainUser, Contract, CallArgs } from "./types"
+import { Options, Config, StratoUser, OAuthUser, BlockChainUser, Contract, ContractDefinition, CallArgs } from "./types"
 import * as constants from "./constants";
 
 export {
@@ -22,6 +22,7 @@ export {
   Options,
   Config,
   Contract,
+  ContractDefinition,
   constants,
   CallArgs
 }

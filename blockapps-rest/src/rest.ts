@@ -156,10 +156,10 @@ async function createContractResolve(user:OAuthUser, pendingTxResult, options:Op
 //   contract list
 // =====================================================================
 
-async function createContractList(user, contract, options:Options) {
+async function createContractList(user:BlockChainUser, contracts:ContractDefinition[], options:Options) {
   const pendingTxResult = await api.createContractList(
     user,
-    contract,
+    contracts,
     options
   );
   return createContractListResolve(user, pendingTxResult, options);
