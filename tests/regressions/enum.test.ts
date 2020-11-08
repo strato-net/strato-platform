@@ -12,7 +12,8 @@ import {
   oauthUtil,
   assert,
   constants,
-  importer
+  importer,
+  parser
   } from 'blockapps-rest';
 
 import BigNumber from "bignumber.js";
@@ -23,9 +24,7 @@ chai.use(require('chai-bignumber')());
 let config:Config = fsUtil.getYaml("config.yaml");
 let options:Options = {config};
 
-const adminName = util.uid('Admin');
-const adminPassword = '1234';
-const ErrorCodes = rest.getEnums(path.join(config.contractsPath, '/DataTypeErrorCodes.sol')).ErrorCodes;
+const ErrorCodes = parser.parseEnum(fsUtil.get(path.join(config.contractsPath, '/DataTypeErrorCodes.sol')));
 
 const contractName = "DataTypeEnum";
 const contractFilename = path.join(config.contractsPath, "DataTypeEnum.sol");
