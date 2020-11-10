@@ -156,7 +156,7 @@ async function getBatchStates(user:OAuthUser, stateArgs, options:Options) {
   return post(url, endpoint, body, setAuthHeaders(user, options));
 }
 
-function getCallArgs(callMethodArgs, options:Options) {
+function getCallArgs(callMethodArgs:CallArgs, options:Options) {
   const { contract, method, args, value, chainid, txParams } = callMethodArgs;
   const valueFixed = value instanceof BigNumber ? value.toFixed(0) : value;
   const payload = {
@@ -185,7 +185,7 @@ async function call(user:BlockChainUser, callMethodArgs:CallArgs, options:Option
   return pendingTxResult;
 }
 
-async function callList(user, callListArgs, options:Options) {
+async function callList(user:BlockChainUser, callListArgs:CallArgs[], options:Options) {
   const txs = callListArgs.map(callArgs => getCallArgs(callArgs, options));
   const body = {
     txs

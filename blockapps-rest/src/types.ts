@@ -69,9 +69,11 @@ interface TransactionResultHash {
 
 interface CallArgs {
   contract: Contract,
-  method: any,
+  method: string,
   args: any,
-  value?:BigNumber
+  value?:BigNumber,
+  chainid?:any,
+  txParams?:any
 }
 
 export {

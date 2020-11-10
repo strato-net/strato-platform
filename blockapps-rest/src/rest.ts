@@ -286,12 +286,12 @@ async function callResolve(user, pendingTxResult, options:Options) {
 //   call list
 // =====================================================================
 
-async function callList(user, callListArgs, options:Options) {
+async function callList(user:BlockChainUser, callListArgs:CallArgs[], options:Options) {
   const pendingTxResultList = await api.callList(user, callListArgs, options);
   return callListResolve(user, pendingTxResultList, options);
 }
 
-async function callListResolve(user, pendingTxResultList, options:Options) {
+async function callListResolve(user:BlockChainUser, pendingTxResultList, options:Options) {
   // throw if FAILURE
   assertTxResultList(pendingTxResultList); // @samrit what if 1 result failed ?
   // async - do not resolve
