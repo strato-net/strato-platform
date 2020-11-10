@@ -416,7 +416,9 @@ waitOnVault action = do
     Right val -> do 
       $logInfoS "HasVault" "Got a signature from vault" 
       return val
-  
+
+initialEmittedBlockCache :: Map Keccak256 (Modification EmittedBlock)
+initialEmittedBlockCache = M.singleton zeroHash $ Modification alreadyEmittedBlock
 
 prunePrivacyDBs :: SequencerM ()
 prunePrivacyDBs = do
@@ -424,8 +426,9 @@ prunePrivacyDBs = do
   prune txHashRegistry
   prune chainHashRegistry
   prune chainIdRegistry
-  prune emittedBlockRegistry
-  where prune r = modify' $ r .~ M.empty
+  setTo initialEmittedBlockCache emittedBlockRegistry
+  where prune = setTo M.empty
+        setTo s r = modify' $ r .~ s
 
 runSequencerM :: SequencerConfig -> Maybe BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
 runSequencerM c mbc m = do
@@ -442,7 +445,7 @@ runSequencerM c mbc m = do
             , _seenTransactionDB   = mkSeenTxDB stxSize
             , _dbeRegistry         = M.empty
             , _blockHashRegistry   = M.empty
-            , _emittedBlockRegistry = M.singleton zeroHash $ Modification alreadyEmittedBlock
+            , _emittedBlockRegistry = initialEmittedBlockCache
             , _txHashRegistry      = M.empty
             , _chainHashRegistry   = M.empty
             , _chainIdRegistry     = M.empty
