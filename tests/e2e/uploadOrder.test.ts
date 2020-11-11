@@ -1,11 +1,30 @@
 "use strict";
-const ba = require('blockapps-rest');
-const co = require('co');
-const config = ba.common.config;
-const rest = ba.rest6;
-const assert = ba.common.assert;
-const util = ba.common.util;
-const BigNumber = ba.common.BigNumber;
+import * as path from "path";
+
+import {
+  OAuthUser,
+  BlockChainUser,
+  Options,
+  Config,
+  rest,
+  util,
+  fsUtil,
+  oauthUtil,
+  assert,
+  constants,
+  ContractDefinition,
+  CallArgs,
+  SendTx
+  } from 'blockapps-rest';
+
+import BigNumber from "bignumber.js";
+import * as chai from "chai";
+chai.should();
+chai.use(require('chai-bignumber')());
+
+let config:Config=fsUtil.getYaml("config.yaml");
+let options:Options={config}
+
 config.apiDebug=true;
 const nonceOrder = `
 contract NonceOrder {
@@ -31,26 +50,25 @@ contract NonceOrder {
 }
 `;
 
-async function createNewUser(fill) {
-  const username = 'NonceOrder_User_' + util.uid();
-  const password = '23456';
-  const user = await co.wrap(rest.createUser)(username, password, true);
-  if (fill) {
-    await co.wrap(rest.fill)(user, true);
-  }
+async function createNewUser(username:string) {
+  const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
+  const token = await oauth.getAccessTokenByResourceOwnerCredential(username, "1234", "strato-devel");
+  const ouser = {token: token.token.access_token};
+  const user = await rest.createUser(ouser, options);
   return user;
 }
 
 
 async function upload() {
-  const user = await createNewUser(true);
+  const user = await createNewUser("user1");
   const args = {_a: 0, _b: 0};
-  console.log(`User ${user.name}@${user.address} uploading a NonceOrder`);
-  return [user, await co.wrap(rest.uploadContractString)(user, 'NonceOrder', nonceOrder, args)];
+  console.log(`User ${user.address} uploading a NonceOrder`);
+  return [user, await rest.createContract(user, {name: 'NonceOrder', source: nonceOrder, args}, options)];
 }
 
 async function send(user, address, xs) {
-  let { nonce } = await co.wrap(rest.getNonce)(user);
+  let result = await rest.getAccounts(user, {...options, params: {address: user.address}})
+  let nonce = result[0].nonce;
   nonce += xs.length;
   // Set nonces in reverse list order
   const txs = xs.map(x => {
@@ -62,17 +80,17 @@ async function send(user, address, xs) {
       txParams: { nonce }
     }});
   console.log(`Txs: ${JSON.stringify(txs, null, 2)}`);
-  return await co.wrap(rest.sendList)(user, txs);
+  return await rest.sendMany(user, txs, options);
 }
 
 async function sendNoNonces(user, address, xs) {
-  const txs = xs.map(x => {
+  const txs:SendTx[] = xs.map(x => {
     return {
       toAddress: address,
       value: x
     }});
   console.log(`Txs: ${JSON.stringify(txs, null, 2)}`);
-  return await co.wrap(rest.sendList)(user, txs);
+  return await rest.sendMany(user, txs, options);
 }
 
 async function create(user, nonce, contract, xs) {
@@ -81,81 +99,95 @@ async function create(user, nonce, contract, xs) {
   const txs = xs.map(x => {
     nonce--;
     console.log(`nonce is ${nonce}`);
-    return {
-      contractName: contract,
-      value: 0,
+    let ret:ContractDefinition = {
+      name: contract,
+      source: nonceOrder,
       txParams: { nonce },
       args: {_a: x, _b: nonce}
-    }});
+    }
+    return ret;
+    });
   console.log(`Txs: ${JSON.stringify(txs, null, 2)}`);
-  return await co.wrap(rest.uploadContractList)(user, txs);
+  return await rest.createContractList(user, txs, {config: {...config, 'VM': 'SolidVM'}});
 }
 
-async function createNoNonces(user, contract, xs) {
+async function createNoNonces(user, contract:string, xs) {
   const txs = xs.map(x => {
-    return {
-      contractName: contract,
-      value: 0,
+    let ret:ContractDefinition = {
+      name: contract,
+      source: nonceOrder,
       args: {_a: x, _b: x}
-    }});
+    }
+    return ret;
+    });
   console.log(`Txs: ${JSON.stringify(txs, null, 2)}`);
-  return await co.wrap(rest.uploadContractList)(user, txs);
+  return await rest.createContractList(user, txs, {config: {...config, 'VM': 'SolidVM'}});
 }
 
 async function set(user, contract, xs) {
-  let { nonce } = await co.wrap(rest.getNonce)(user);
+  let result = await rest.getAccounts(user, {...options, params: {address: user.address}})
+  let nonce = result[0].nonce;
   nonce += xs.length;
   // Set nonces in reverse list order
   const txs = xs.map(x => {
     nonce--;
     console.log(`nonce is ${nonce}`);
-    return {
-      contractName: contract.name,
-      contractAddress: contract.address,
-      methodName: 'set',
-      value: 0,
+    let ret:CallArgs = {
+      contract,
+      method: 'set',
+      value: new BigNumber(0),
       args: {'_x': x},
       txParams: { nonce }
-    }});
+    }
+    return ret;
+    });
   console.log(`Txs: ${JSON.stringify(txs, null, 2)}`);
-  return await co.wrap(rest.callList)(user, txs);
+  return await rest.callList(user, txs, options);
 }
 
 async function setNoNonces(user, contract, xs) {
   const txs = xs.map(x => {
-    return {
-      contractName: contract.name,
-      contractAddress: contract.address,
-      methodName: 'set',
-      value: 0,
+    let ret:CallArgs = {
+      contract,
+      method: 'set',
+      value: new BigNumber(0),
       args: {'_x': x}
-    }});
+    }
+    return ret;
+    });
   console.log(`Txs: ${JSON.stringify(txs, null, 2)}`);
-  return await co.wrap(rest.callList)(user, txs);
+  return await rest.callList(user, txs, options);
 }
 
 async function get(user, contract) {
-  return await co.wrap(rest.callMethod)(user, contract, "get");
+  return await rest.call(user, {contract, method: "get", args: {}}, options);
+}
+
+async function getBalance(user:OAuthUser, address:string) {
+  let result = await rest.getAccounts(user, {...options, params: {address}})
+  return result[0].balance;
 }
 
 describe('Nonce upload orders', async () => {
 
   it ('will respect the nonce provided on each send tx', async () => {
-    const user = await createNewUser(true);
+    const user = await createNewUser("user1");
     console.log(`Setting 300, then 4`);
-    const user2 = await createNewUser(false);
+    const user2 = await createNewUser("user2");
+    const balance1 = await getBalance(user, user2.address);
     await send(user, user2.address, [4, 300]);
-    const result = await co.wrap(rest.getBalance)(user2.address);
-    assert.deepEqual(result, new BigNumber(304));
+    const balance2 = await getBalance(user, user2.address);
+    assert.deepEqual(new BigNumber(balance2).minus(balance1), new BigNumber(304));
   }).timeout(config.timeout);
-
+  
   it ("won't collide nonces when none are provided for send txs", async () => {
-    const user = await createNewUser(true);
+    const user = await createNewUser("user1");
     console.log(`Setting 4, then 300`);
-    const user2 = await createNewUser(false);
+    const user2 = await createNewUser("user2");
+    const balance1 = await getBalance(user, user2.address);
     await sendNoNonces(user, user2.address, [4, 300]);
-    const result = await co.wrap(rest.getBalance)(user2.address);
-    assert.deepEqual(result, new BigNumber(304));
+    const balance2 = await getBalance(user, user2.address);
+    assert.deepEqual(new BigNumber(balance2).minus(balance1), new BigNumber(304));
   }).timeout(config.timeout);
 
   it ('will respect the nonce provided on each method tx', async () => {
@@ -177,9 +209,10 @@ describe('Nonce upload orders', async () => {
   }).timeout(config.timeout);
 
   it ('will respect the nonce provided on each contract tx', async () => {
-    const user = await createNewUser(true);
+    const user = await createNewUser("user1");
     console.log(`Setting 300, then 4`);
-    const { nonce } = await co.wrap(rest.getNonce)(user);
+    let result = await rest.getAccounts(user, {...options, params: {address: user.address}})
+    let nonce = result[0].nonce;
     const contracts = await create(user, nonce, 'NonceOrder', [4, 300]);
     console.log(`Checking our work`);
     let results = await get(user, contracts[0]);
@@ -189,7 +222,7 @@ describe('Nonce upload orders', async () => {
   }).timeout(config.timeout);
 
   it ("won't collide nonces when none are provided for contract txs", async () => {
-    const user = await createNewUser(true);
+    const user = await createNewUser("user1");
     console.log(`Setting 4, then 300`);
     const contracts = await createNoNonces(user, 'NonceOrder', [4, 300]);
     console.log(`Checking our work`);
@@ -198,4 +231,5 @@ describe('Nonce upload orders', async () => {
     results = await get(user, contracts[1]);
     assert.deepEqual(results, ["300", "300"]);
   }).timeout(config.timeout);
+
 })
