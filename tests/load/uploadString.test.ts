@@ -37,7 +37,7 @@ describe('LOAD TEST: Upload from string', function() {
   before(async() => {
     console.log(`Creating admin user and contract`);
     const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
-    const ouser = await oauth.getAccessTokenByClientSecret();
+    const ouser = await oauth.getAccessTokenByResourceOwnerCredential("user1", "1234", "strato-devel");
     admin = await rest.createUser(ouser, options);
     console.log(admin);
   });
