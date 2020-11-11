@@ -9,14 +9,15 @@ interface Options {
   headers?:any,
   params?:any,
   getFullResponse?:boolean,
-  cacheNonce?:any,
+  cacheNonce?:boolean,
   isAsync?: boolean,
   isDetailed?: boolean,
   stateQuery?: any,
   query?: any,
   logger?:Console,
   chainIds?:any,
-  history?:any
+  history?:any,
+  doNotResolve?:boolean
 }
 
 interface Config {
@@ -30,6 +31,21 @@ interface Config {
 interface Node {
   url:string,
   oauth:OAuthConfig
+}
+
+interface Member {
+}
+
+interface Balance {
+}
+
+interface Chain {
+  label:string,
+  src:string,
+  args:any,
+  members:Member[],
+  balances:Balance[],
+  contractName?:string
 }
 
 interface StratoUser {
@@ -56,11 +72,17 @@ interface ContractDefinition {
 
 interface Contract {
   name: string,
-  address?: number,
+  address?: string,
   src?:string,
   bin?:any,
   codeHash?:any,
   chainId?:any
+}
+
+interface SendTx {
+  toAddress:string,
+  value:number,
+  chainId?:string
 }
 
 interface TransactionResultHash {
@@ -85,5 +107,9 @@ export {
   Contract,
   ContractDefinition,
   TransactionResultHash,
-  CallArgs
+  CallArgs,
+  Member,
+  Balance,
+  Chain,
+  SendTx
 };

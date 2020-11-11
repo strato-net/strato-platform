@@ -125,7 +125,7 @@ describe("state", function() {
     const uid = util.uid();
     await assert.restStatus(
       async () => {
-        return rest.getState(admin, { name: uid, address: 0 }, options);
+        return rest.getState(admin, { name: uid, address: "0" }, options);
       },
       RestStatus.BAD_REQUEST,
       /Couldn't find/

@@ -17,7 +17,8 @@ import {
   BlockChainUser,
   Contract,
   ContractDefinition,
-  CallArgs
+  CallArgs,
+  SendTx
 } from "./types";
 /*
 async function getUsers(ouser:OAuthUser, options:Options) {
@@ -208,7 +209,7 @@ async function sendTransactions(user:OAuthUser, body, options:Options) {
   return post(url, endpoint, body, setAuthHeaders(user, sendOptions));
 }
 
-function getSendArgs(sendTx, options:Options) {
+function getSendArgs(sendTx:SendTx, options:Options) {
   const tx = {
     payload: sendTx,
     type: TxPayloadType.TRANSFER
@@ -216,7 +217,7 @@ function getSendArgs(sendTx, options:Options) {
   return tx;
 }
 
-async function send(user, sendTx, options:Options) {
+async function send(user, sendTx:SendTx, options:Options) {
   const tx = getSendArgs(sendTx, options);
   const body = {
     txs: [tx]

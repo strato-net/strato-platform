@@ -14,7 +14,9 @@ import {
   Contract,
   ContractDefinition,
   TransactionResultHash,
-  CallArgs
+  CallArgs,
+  Chain,
+  SendTx
 } from "./types";
 
 // =====================================================================
@@ -228,7 +230,7 @@ async function createOrGetKey(user, options:Options) {
 //   state
 // =====================================================================
 
-async function getBlocResults(user, hashes, options:Options) {
+async function getBlocResults(user:OAuthUser, hashes:string[], options:Options) {
   return api.blocResults(user, hashes, options);
 }
 
@@ -316,7 +318,7 @@ async function callListResolve(user:BlockChainUser, pendingTxResultList, options
 //   send
 // =====================================================================
 
-async function send(user, sendTx, options:Options) {
+async function send(user, sendTx:SendTx, options:Options) {
   const [pendingTxResult] = await api.send(user, sendTx, options);
 
   if (options.isAsync) {
@@ -327,7 +329,7 @@ async function send(user, sendTx, options:Options) {
   return resolvedResult.data.contents;
 }
 
-async function sendMany(user, sendTxs, options:Options) {
+async function sendMany(user, sendTxs:SendTx[], options:Options) {
   const pendingTxResults = await api.sendTransactions(
     user,
     {
@@ -394,17 +396,17 @@ async function searchWithContentRangeUntil(user:OAuthUser, contract:Contract, pr
 //   Chains
 // =====================================================================
 
-async function getChain(user, chainId, options:Options) {
+async function getChain(user:OAuthUser, chainId:string, options:Options) {
   const results = await api.getChains([chainId], setAuthHeaders(user, options));
   return results && results.length > 0 ? results[0] : {};
 }
 
-async function getChains(user, chainIds, options:Options) {
+async function getChains(user:OAuthUser, chainIds:string[], options:Options) {
   const results = await api.getChains(chainIds, setAuthHeaders(user, options));
   return results;
 }
 
-async function createChain(user, chain, contract, options:Options) {
+async function createChain(user:OAuthUser, chain:Chain, contract:Contract, options:Options) {
   const result = await api.createChain(
     {
       ...chain,
@@ -513,6 +515,7 @@ export default {
   compileContracts,
   createContract,
   createContractList,
+  getBlocResults,
   getState,
   getBatchStates,
   getArray,

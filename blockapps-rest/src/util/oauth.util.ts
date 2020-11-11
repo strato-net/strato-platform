@@ -207,7 +207,7 @@ class OAuthUtil {
    * @param {String} scope
    * @returns AccessTokenResponse
    */
-  async getAccessTokenByResourceOwnerCredential(username, password, scope?) {
+  async getAccessTokenByResourceOwnerCredential(username, password, scope?):Promise<OAuthUser> {
     const tokenConfig = {
       username: username || this.serviceUsername,
       password: password || this.servicePassword,
@@ -217,7 +217,7 @@ class OAuthUtil {
     const result = await this.oauth2.ownerPassword.getToken(tokenConfig);
     const accessTokenResponse = this.oauth2.accessToken.create(result);
 
-    return accessTokenResponse;
+    return {token: accessTokenResponse.token.access_token};
   }
 
   /** Verify JWT signature - to verify the requests to middleware that are not forwarded to STRATO to be verified on it's side

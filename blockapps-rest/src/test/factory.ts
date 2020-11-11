@@ -3,7 +3,7 @@ import util from "../util/util";
 import fsUtil from "../util/fsUtil";
 import assert from "../util/assert";
 import BigNumber from "bignumber.js";
-import { Options } from "../types"
+import { Chain, Options, SendTx } from "../types"
 
 import * as ip from "ip";
 
@@ -91,7 +91,7 @@ async function createContractFromFile(filename, uid, constructorArgs = {}) {
   return { name, source, args: util.usc(constructorArgs) }; // TODO flow contractArgs object
 }
 
-function createSendTxArgs(toAddress, value = 10) {
+function createSendTxArgs(toAddress, value = 10):SendTx {
   return { value, toAddress };
 }
 
@@ -133,7 +133,7 @@ const createChainArgs = (uid, members) => {
     return { address: address, balance };
   });
 
-  const chain = {
+  const chain:Chain = {
     label: `airline-${uid}`,
     src: `contract ${contractName} { }`,
     args: {},
