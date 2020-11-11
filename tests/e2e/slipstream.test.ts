@@ -1,26 +1,40 @@
 "use strict";
 
-const chai = require('chai');
-const assert = chai.assert;
-const co = require('co');
-require('co-mocha');
+import {
+  OAuthUser,
+  BlockChainUser,
+  Options,
+  Config,
+  Contract,
+  rest,
+  util,
+  fsUtil,
+  oauthUtil,
+  assert,
+  constants
+  } from 'blockapps-rest';
 
-const ba = require('blockapps-rest');
-const config = ba.common.config;
-const rest = ba.rest6;
-const util = ba.common.util;
+import BigNumber from "bignumber.js";
+import * as chai from "chai";
+chai.should();
+chai.use(require('chai-bignumber')());
+
+
+
+let config:Config=fsUtil.getYaml("config.yaml");
+let options:Options={config}
 
 config.apiDebug = true;
 
-async function upload(name, source, options={}) {
-  const username = `SlipstreamTester_${util.uid()}`;
-  const password = "2345";
-  const user = await co.wrap(rest.createUser)(username, password);
-  await co.wrap(rest.fill)(user, true);
-  console.log(`User ${user.name}@${user.address} uploading a ${name}`);
+async function upload(name:string, source:string, options:Options):Promise<[BlockChainUser, Contract]> {
+  const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
+  const ouser = await oauth.getAccessTokenByClientSecret();
+  const user = await rest.createUser(ouser, options);
+//  await rest.fill(user, true);
+  console.log(`User ${user.address} uploading a ${name}`);
   console.log(`Source is ${source}`);
   options.doNotResolve = false;
-  const contract = await co.wrap(rest.uploadContractString)(user, name, source, {}, options=options);
+  const contract = <Contract> await rest.createContract(user, {name, source, args: {}}, options);
   return [user, contract];
 }
 
@@ -34,9 +48,9 @@ contract StringArray {
 `;
 
   it("can index string arrays", async () => {
-    const [user, contract] = await upload("StringArray", stringArray);
-    const index = await co.wrap(rest.waitQuery)(
-      `${contract.name}?address=eq.${contract.address}`, 1);
+    const [user, contract] = await upload("StringArray", stringArray, options);
+    const index = await rest.search(user, contract,
+    	  {...options, query: {address: `eq.${contract.address}`}});
     console.log(`Index returned ${JSON.stringify(index, null, 2)}`);
     assert.equal(index[0].address, contract.address, "address");
     assert.deepEqual(index[0].xs, ["first", "second", "third"], "xs");
@@ -56,10 +70,10 @@ contract Y {
 }
 `;
   it("can index contracts recursively constructed", async () => {
-    const [user, contract] = await upload("Y", newContract);
-    const indexY = await co.wrap(rest.waitQuery)("Y", 1);
+    const [user, contract] = await upload("Y", newContract, options);
+    const indexY = await rest.search(user, {...contract, name: "Y"}, options);
     assert.equal(indexY.length, 1, JSON.stringify(indexY, null, 2));
-    const indexX = await co.wrap(rest.waitQuery)("X", 1);
+    const indexX = await rest.search(user, {...contract, name: "X"}, options);
     console.log(`indexX returned ${JSON.stringify(indexX, null, 2)}`);
     assert.equal(indexX[0].z, "7624", "z");
   }).timeout(config.timeout);
@@ -74,17 +88,17 @@ contract Z {
 }
 `;
   it("Will index updates to a contract", async () => {
-    const [user, contract] = await upload("Z", Counter);
-    let indexZ = await co.wrap(rest.waitQuery)("Z", 1);
+    const [user, contract] = await upload("Z", Counter, options);
+    let indexZ = await rest.search(user, {...contract, name: "Z"}, options);
     assert.equal(indexZ.length, 1, JSON.stringify(indexZ, null, 2));
     console.log(`Initial index: ${JSON.stringify(indexZ, null, 2)}`);
-    let res = await co.wrap(rest.callMethod)(user, contract, "incr");
+    let res = await rest.call(user, {contract, method: "incr", args: {}}, options);
     console.log(`Incr result 1: ${JSON.stringify(res, null, 2)}`);
-    indexZ = await co.wrap(rest.waitQuery)("Z?count=eq.1", 1);
+    indexZ = await rest.search(user, {...contract, name: "Z"}, {...options, query: {count: "eq.1"}});
     console.log(`Second index: ${JSON.stringify(indexZ, null, 2)}`);
-    res = await co.wrap(rest.callMethod)(user, contract, "incr");
+    res = await rest.call(user, {contract, method: "incr", args: {}}, options);
     console.log(`Incr result 2: ${JSON.stringify(res, null, 2)}`);
-    indexZ = await co.wrap(rest.waitQuery)("Z?count=eq.2", 1);
+    indexZ = await rest.search(user, {...contract, name: "Z"}, {...options, query: {count: "eq.2"}});
     console.log(`Last index: ${JSON.stringify(indexZ, null, 2)}`);
   }).timeout(config.timeout);
 
@@ -99,28 +113,28 @@ contract EventTest {
 
   it("Will create and insert into tables for valid solidity events", async () => {
     // MUST USE SOLIDVM - EVM does not know about events
-    let options = {'VM' : 'SolidVM', 'doNotResolve' : false};
+    let options = {'VM' : 'SolidVM', 'doNotResolve' : false, config};
 
     // multiple inserts with a single contract instance
     const [user,contract] = await upload("EventTest", eventsContract, options);
     let magic = 97;
-    let res = await co.wrap(rest.callMethod)(user, contract, "emitTest", {magic}, options);
-    res = await co.wrap(rest.waitQuery)("EventTest.SlipstreamTest?magic=eq.97", 1);
+    let res = await rest.call(user, {contract, method: "emitTest", args: {magic}}, options);
+    res = await rest.search(user, {...contract, name: "SlipstreamTest"}, {...options, query: {magic: "eq.97"}});
     magic = 98;
-    res = await co.wrap(rest.callMethod)(user, contract, "emitTest", {magic}, options);
-    res = await co.wrap(rest.waitQuery)("EventTest.SlipstreamTest?magic=eq.98", 1);
+    res = await rest.call(user, {contract, method: "emitTest", args: {magic}}, options);
+    res = await rest.search(user, {...contract, name: "SlipstreamTest"}, {...options, query: {magic: "eq.98"}});
     magic = 99;
-    res = await co.wrap(rest.callMethod)(user, contract, "emitTest", {magic}, options);
-    res = await co.wrap(rest.waitQuery)("EventTest.SlipstreamTest?magic=eq.99", 1);
+    res = await rest.call(user, {contract, method: "emitTest", args: {magic}}, options);
+    res = await rest.search(user, {...contract, name: "SlipstreamTest"}, {...options, query: {magic: "eq.99"}});
    
     // insert with a different instance of the same contract (same table)
     const [user2,contract2] = await upload("EventTest", eventsContract, options);
     magic = 97;
-    res = await co.wrap(rest.callMethod)(user2, contract2, "emitTest", {magic}, options);
-    res = await co.wrap(rest.waitQuery)("EventTest.SlipstreamTest?magic=eq.97", 2);
+    res = await rest.call(user2, {contract: contract2, method: "emitTest", args: {magic}}, options);
+    res = await rest.search(user, {...contract, name: "SlipstreamTest"}, {...options, query: {magic: "eq.97"}});
     magic = 900;
-    res = await co.wrap(rest.callMethod)(user2, contract2, "emitTest", {magic}, options);
-    res = await co.wrap(rest.waitQuery)("EventTest.SlipstreamTest?magic=eq.900", 1);
+    res = await rest.call(user2, {contract: contract2, method: "emitTest", args: {magic}}, options);
+    res = await rest.search(user, {...contract, name: "SlipstreamTest"}, {...options, query: {magic: "eq.900"}});
   }).timeout(config.timeout);
 
 
