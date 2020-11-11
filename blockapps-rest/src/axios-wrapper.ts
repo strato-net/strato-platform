@@ -37,7 +37,7 @@ async function get(host, endpoint, options:Options) {
   } catch (err) {
     logger.debug('### axios GET error')
     logger.debug(errorFormatter(err))
-    throw err
+    throw errorFormatter(err)
   }
 }
 
@@ -61,7 +61,7 @@ async function post(host, endpoint, body, options:Options) {
   } catch (err) {
     logger.debug('### axios POST error')
     logger.error(errorFormatter(err))
-    throw err
+    throw errorFormatter(err)
   }
 }
 
