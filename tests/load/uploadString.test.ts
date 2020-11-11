@@ -1,22 +1,31 @@
-const ba = require('blockapps-rest');
-const co = require('co');
-require('co-mocha');
-const rest = ba.rest;
-const common = ba.common;
-const api = common.api;
-const config = common.config;
-const util = common.util;
-const assert = common.assert;
-const nodes = config.nodes;
-const moment = require('moment');
-const constants = common.constants;
-const path = require('path');
+import * as path from "path";
+import * as moment from "moment";
+
+import {
+  OAuthUser,
+  BlockChainUser,
+  Options,
+  Config,
+  Contract,
+  rest,
+  util,
+  fsUtil,
+  oauthUtil,
+  assert,
+  constants,
+  importer
+  } from 'blockapps-rest';
+
+import BigNumber from "bignumber.js";
+import * as chai from "chai";
+chai.should();
+chai.use(require('chai-bignumber')());
+
+let config:Config=fsUtil.getYaml("config.yaml");
+let options:Options={config}
 
 const titleManagerJs = require(`./titleManager`);
 const contractName = 'Title';
-
-const adminName = util.uid('Admin');
-const adminPassword = '1234';
 
 describe('LOAD TEST: Upload from string', function() {
   this.timeout(999999 * 1000);
@@ -25,24 +34,26 @@ describe('LOAD TEST: Upload from string', function() {
   const batchSize = util.getArgInt('--batchSize', 3);
   const batchCount = util.getArgInt('--batchCount', 1);
 
-  before(function * () {
+  before(async() => {
     console.log(`Creating admin user and contract`);
-    admin = yield rest.createUser(adminName, adminPassword);
+    const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
+    const ouser = await oauth.getAccessTokenByClientSecret();
+    admin = await rest.createUser(ouser, options);
     console.log(admin);
   });
 
-  it.skip(`Upload simple - search test:`, function * () {
+  it.skip(`Upload simple - search test:`, async() => {
     const uid = util.uid();
     const contractName = 'TitleMo';
     const contractFilename = path.join(config.contractsPath, "TitleMo.sol");
 
     const args = {_vin: 'Vin_' + uid };
-    const contract = yield rest.uploadContract(admin, contractName, contractFilename, args);
-    const state = yield rest.getState(contract);
-    const results = rest.query(`${contractName}?address=eq.${contract.address}`);
+    const contract = <Contract> await rest.createContract(admin, {name: contractName, source: contractFilename, args}, options);
+    const state = await rest.getState(admin, contract, options);
+    const results = rest.search(admin, {...contract, name: contractName}, {...options, query: {address: `eq.${contract.address}`}});
   });
 
-  it.only(`Stack Depth 1:`, function * () {
+  it.only(`Stack Depth 1:`, async() => {
     const uid = util.uid();
     const contractName = 'StackDepth';
     const contractFilename = path.join(config.contractsPath, "StackDepth.sol");
@@ -69,23 +80,23 @@ describe('LOAD TEST: Upload from string', function() {
       _u8: 1008,
       _u9: 1009,
     };
-    const contract = yield rest.uploadContract(admin, contractName, contractFilename, args);
-    const state = yield rest.getState(contract);
-    const results = rest.query(`${contractName}?address=eq.${contract.address}`);
+    const contract = <Contract> await rest.createContract(admin, {name: contractName, source: await importer.combine(contractFilename), args}, options);
+    const state = await rest.getState(admin, contract, options);
+    const results = await rest.search(admin, {...contract, name: contractName}, {...options, query: {address: `eq.${contract.address}`}});
   });
 
-  it.skip(`Upload simple - from string:`, function * () {
+  it.skip(`Upload simple - from string:`, async() => {
     const uid = util.uid();
     const contractName = 'TitleCA';
-    const contractString = getContractString(20);
+    const contractString = getContractString(contractName, 20);
 
     const args = {_vin: 'Vin_' + uid };
-    const contract = yield rest.uploadContractString(admin, contractName, contractString, args);
-    const state = yield rest.getState(contract);
-    const results = rest.query(`${contractName}?address=eq.${contract.address}`);
+    const contract = <Contract> await rest.createContract(admin, {name: contractName, source: contractString, args}, options);
+    const state = await rest.getState(admin, contract, options);
+    const results = rest.search(admin, {...contract, name: contractName}, {...options, query: {address: `eq.${contract.address}`}});
   });
 
-  it.skip(`Upload simple - from string: Batch size: ${batchSize}, Batch count ${batchCount}`, function * () {
+  it.skip(`Upload simple - from string: Batch size: ${batchSize}, Batch count ${batchCount}`, async() => {
     const uid = util.uid();
     const contractName = 'TitleCA';
     const contractString = getContractString(contractName, batchSize);
@@ -94,7 +105,7 @@ describe('LOAD TEST: Upload from string', function() {
     const startTime = moment();
     for (var i = 0; i < batchCount; i++) {
       console.log(`Batch: ${i}`);
-      const contract = yield rest.uploadContractString(admin, contractName, contractString, args);
+      const contract = <Contract> await rest.createContract(admin, {name: contractName, source: contractString, args}, options);
     }
     const endTime = moment();
     const seconds = endTime.diff(startTime, 'seconds');
@@ -102,7 +113,7 @@ describe('LOAD TEST: Upload from string', function() {
     console.log(`Total:  seconds: ${seconds},  TPS ${batchCount/seconds}, 1 TX: ${seconds/batchCount} seconds `);
   });
 
-  it.skip(`Upload simple - from string: Batch size: ${batchSize}, Batch count ${batchCount}`, function * () {
+  it.skip(`Upload simple - from string: Batch size: ${batchSize}, Batch count ${batchCount}`, async() => {
     const uid = util.uid();
     const contractName = 'TitleCA';
     const contractString = getContractString(contractName, batchSize);
@@ -113,15 +124,15 @@ describe('LOAD TEST: Upload from string', function() {
     for (var i = 0; i < batchCount; i++) {
       console.log(`Batch: ${i}`);
       const args = {_vin: 'Vin_' + uid + '_' + i};
-      const hash = yield rest.uploadContractString(admin, contractName, contractString, args, doNotResolve);
+      const hash = await rest.createContract(admin, {name: contractName, source: contractString, args}, {...options, doNotResolve});
       hashes.push(hash);
     }
     // wait for the hashes to resolve
-    yield waitResults(hashes);
+    await waitResults(admin, hashes);
     printTiming(startTime, batchCount, batchSize);
   });
 
-  it(`Upload from string: with NONCE:  Batch size: ${batchSize}, Batch count ${batchCount}`, function * () {
+  it(`Upload from string: with NONCE:  Batch size: ${batchSize}, Batch count ${batchCount}`, async() => {
     const uid = util.uid();
     const contractName = 'TitleXXX';
     const contractString = getContractString(contractName, batchSize);
@@ -129,7 +140,7 @@ describe('LOAD TEST: Upload from string', function() {
     const startTime = moment();
 
     console.log({batchSize, batchCount});
-    const nonce = yield getNonce(admin);
+    const nonce = await getNonce(admin);
     console.log('Starting nonce', nonce);
 
     const doNotResolve = true;
@@ -138,15 +149,15 @@ describe('LOAD TEST: Upload from string', function() {
       console.log(`Batch: ${i}`);
       const args = {_vin: 'Vin_' + uid + '_' + i};
       const txParams = {nonce: nonce+i};
-      const hash = yield rest.uploadContractString(admin, contractName, contractString, args, doNotResolve, txParams);
+      const hash = await rest.createContract(admin, {name: contractName, source: contractString, args, txParams}, {...options, doNotResolve});
       hashes.push(hash);
     }
     // wait for the hashes to resolve
-    yield waitResults(hashes);
+    await waitResults(admin, hashes);
     printTiming(startTime, batchCount, batchSize);
   });
 
-  it(`Upload from json array: with NONCE:  Batch size: ${batchSize}, Batch count ${batchCount}`, function * () {
+  it(`Upload from json array: with NONCE:  Batch size: ${batchSize}, Batch count ${batchCount}`, async() => {
     const uid = util.uid();
     const titlesJsonArray = createTitlesJsonArray(batchSize, batchCount);
     console.log('titlesJsonArray', titlesJsonArray);
@@ -154,7 +165,7 @@ describe('LOAD TEST: Upload from string', function() {
     const startTime = moment();
 
     console.log({batchSize, batchCount});
-    const nonce = yield getNonce(admin);
+    const nonce = await getNonce(admin);
     console.log('Starting nonce', nonce);
 
     const doNotResolve = true;
@@ -168,11 +179,11 @@ describe('LOAD TEST: Upload from string', function() {
 
       const args = {vin: titleJson.vin};
       const txParams = {nonce: nonce+i};
-      const hash = yield rest.uploadContractString(admin, contractName, contractString, util.usc(args), doNotResolve, txParams);
+      const hash = await rest.createContract(admin, {name: contractName, source: contractString, args: util.usc(args), txParams}, {...options, doNotResolve});
       hashes.push(hash);
     }
     // wait for the hashes to resolve
-    yield waitResults(hashes);
+    await waitResults(admin, hashes);
     printTiming(startTime, batchCount, batchSize);
   });
 });
@@ -192,7 +203,7 @@ function createTitlesJsonArray(fields, count) {
   return jsonArray;
 }
 
-function getTemplate() {
+function getTemplate():string {
   const template = '\n'+
   'contract TitleMT { \n' +
   '  uint public amount; \n'+
@@ -208,9 +219,9 @@ function getTemplate() {
 }
 
 function createContractStringFromJson(contractName, titlesJson) {
-  var template = getTemplate();
+  var template:string = getTemplate();
   template = template.replace(new RegExp('_contractName_', 'g'), contractName);
-  for (field in titlesJson.data) {
+  for (let field in titlesJson.data) {
     // console.log(field, titlesJson.data[field]);
     template = template.replace(` ${field};`, ` ${field} = ${titlesJson.data[field]};`);
   }
@@ -224,26 +235,26 @@ function printTiming(startTime, batchCount, batchSize) {
   console.log(`Total:  seconds: ${seconds},  TPS ${batchCount/seconds}, 1 TX: ${seconds/batchCount} seconds `);
 }
 
-function* waitResults(hashes) {
+async function waitResults(admin, hashes) {
   const getBlockResultPromises = [];
-  hashes.map(hash => {
+  hashes.map(async hash => {
     const resolve = true;
-    const promise = api.bloc.result(hash, resolve);
+    const promise = await rest.getBlocResults(admin, hash, options);
     getBlockResultPromises.push(promise);
   });
-  const results = yield getBlockResultPromises;
+  const results = await getBlockResultPromises;
   results.map(result => {
     assert.equal(result.status, 'Success', 'no success for ' +result.hash);
   });
 }
 
-function* getNonce(admin) {
-  const accounts = yield rest.getAccount(admin.address);
+async function getNonce(admin) {
+  const accounts = await rest.getAccounts(admin, {...options, params: {address: admin.address}});
   const nonce = accounts[0].nonce;
   return nonce;
 }
 
-function* sleep(milli) {
+async function sleep(milli) {
   return new Promise(function(resolve, reject) {
     setTimeout(function() {
       resolve();
@@ -251,7 +262,7 @@ function* sleep(milli) {
   });
 }
 
-function getContractString(contractName, count) {
+function getContractString(contractName:string, count:number) {
   const template = ''+
 'contract $contractName$ {'+
 '  string public vin;'+

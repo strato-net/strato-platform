@@ -1,71 +1,86 @@
-const ba = require('blockapps-rest');
-const rest = ba.rest;
-const util = ba.common.util;
-const config = ba.common.config;
-const path = require('path');
+import * as path from "path";
+
+import {
+  OAuthUser,
+  BlockChainUser,
+  Options,
+  Config,
+  Contract,
+  rest,
+  util,
+  fsUtil,
+  oauthUtil,
+  assert,
+  constants,
+  importer,
+  parser
+  } from 'blockapps-rest';
+
 const titleJs = require('./title')
 
-const ErrorCodes = rest.getEnums(path.join(config.contractsPath, "ErrorCodes.sol")).ErrorCodes;
+let config:Config=fsUtil.getYaml("config.yaml");
+let options:Options={config}
+
+const ErrorCodes = parser.parseEnum(fsUtil.get(path.join(config.contractsPath, 'ErrorCodes.sol')));
 const contractName = 'TitleManager';
 const contractFilename = path.join(config.contractsPath, 'TitleManager.sol');
 
-function* uploadContract(admin) {
+async function uploadContract(admin) {
   // NOTE: in production, the contract is created and owned by the AdminInterface
   // for testing purposes the creator is the admin user
   const args = {_creator: admin.address};
-  const contract = yield rest.uploadContract(admin, contractName, contractFilename, args);
-  yield compileSearch(contract.codeHash);
+  const contract = <Contract> await rest.createContract(admin, {name: contractName, source: await importer.combine(contractFilename), args}, options);
+  await compileSearch(admin, contract.codeHash);
   contract.src = 'removed';
   return bind(admin, contract);
 }
 
 function bind(admin, contract) {
-  contract.getState = function*() {
-    return yield rest.getState(contract);
+  contract.getState = async function() {
+    return await rest.getState(admin, contract, options);
   }
-  contract.createTitleAsync = function*(args) {
-    return yield createTitleAsync(admin, contract, args);
+  contract.createTitleAsync = async function(args) {
+    return await createTitleAsync(admin, contract, args);
   }
-  contract.createTitle = function*(args) {
-    return yield createTitle(admin, contract, args);
+  contract.createTitle = async function(args) {
+    return await createTitle(admin, contract, args);
   }
-  contract.exists = function*(vin) {
-    return yield exists(admin, contract, vin);
+  contract.exists = async function(vin) {
+    return await exists(admin, contract, vin);
   }
   return contract;
 }
 
-function* compileSearch(codeHash) {
-  rest.verbose('compileSearch', contractName);
+async function compileSearch(user, codeHash) {
+  console.log('compileSearch:' + contractName);
 
-  if (yield rest.isSearchable(codeHash)) {
-    return;
-  }
+//  if (await rest.isSearchable(codeHash)) {
+//    return;
+//  }
 
   // compile dependencies
-  yield titleJs.compileSearch();
+  await titleJs.compileSearch();
   {
     const contractName = 'TitleMo';
-    const contractFilename = `${config.libPath}/contracts/TitleMo.sol`;
-    const searchable = [contractName];
-    yield rest.compileSearch(searchable, contractName, contractFilename);
+    const contractFilename = `${config.contractsPath}/TitleMo.sol`;
+    await rest.createContract(user, {name: contractName, source: await importer.combine(contractFilename), args: {}}, options);
   }
 
   const searchable = [contractName];
-  yield rest.compileSearch(searchable, contractName, contractFilename);
+  await rest.createContract(user, {name: contractName, source: await importer.combine(contractFilename), args: {}}, options);
 }
 
 // throws: ErrorCodes
 // returns: new title address
-function* createTitleAsync(admin, contract, args) {
-  rest.verbose('createTitle', args);
+async function createTitleAsync(admin, contract, args) {
+  console.log('createTitle: ' + args);
   // function createTitle(string _vin) returns (ErrorCodes, address) {
   const method = 'createTitle';
 
-  const result = yield rest.callMethod(admin, contract, method, args);
+  const result = await rest.call(admin, {contract, method, args}, options);
   const errorCode = parseInt(result[0]);
   if (errorCode != ErrorCodes.SUCCESS) {
-    throw new Error(errorCode);
+    throw new Error("" + errorCode);
   }
   // TODO test if valid address
   return result[1];
@@ -74,29 +89,29 @@ function* createTitleAsync(admin, contract, args) {
 // blocks until title appears in search
 // throws: ErrorCodes
 // returns: new title as returned form search
-function* createTitle(admin, contract, args) {
-  rest.verbose('createTitle', args);
+async function createTitle(admin, contract, args) {
+  console.log('createTitle: ' + args);
   // function createTitle(string _vin) returns (ErrorCodes, address) {
-  const address = yield createTitleAsync(admin, contract, args);
-  const title = yield titleJs.waitForAddress(address);
+  const address = await createTitleAsync(admin, contract, args);
+  const title = await titleJs.waitForAddress(address);
   return title;
 }
 
-function* exists(admin, contract, vin) {
-  rest.verbose('exists', vin);
+async function exists(admin, contract, vin) {
+  console.log('exists: ' + vin);
   // function exists(string vin) returns (bool) {
   const method = 'exists';
   const args = {
     vin: vin,
   };
-  const result = yield rest.callMethod(admin, contract, method, args);
+  const result = await rest.call(admin, {contract, method, args}, options);
   const exists = (result[0] === true);
   return exists;
 }
 
-function* getByVin(vin) {
+async function getByVin(vin) {
   console.log('titleManagerJs', 'getByVin', vin);
-  return yield titleJs.getByVin(vin);
+  return await titleJs.getByVin(vin);
 }
 
 module.exports = {
