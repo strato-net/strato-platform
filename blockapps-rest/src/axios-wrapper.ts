@@ -36,8 +36,8 @@ async function get(host, endpoint, options:Options) {
     return options.getFullResponse ? response : response.data
   } catch (err) {
     logger.debug('### axios GET error')
-    logger.debug(errorFormatter(err))
-    throw errorFormatter(err)
+    console.error(errorFormatter(err))
+    throw err
   }
 }
 
@@ -60,8 +60,8 @@ async function post(host, endpoint, body, options:Options) {
     return options.getFullResponse ? response : response.data
   } catch (err) {
     logger.debug('### axios POST error')
-    logger.error(errorFormatter(err))
-    throw errorFormatter(err)
+    console.error(errorFormatter(err))
+    throw err
   }
 }
 
