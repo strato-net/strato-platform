@@ -1,19 +1,32 @@
 "use strict";
-const ba = require('blockapps-rest');
-const co = require('co');
-require('co-mocha');
+import * as path from "path";
 
-const rest = ba.rest;
-const common = ba.common;
-const util = common.util;
-const BigNumber = common.BigNumber;
-const config = common.config;
-const password = '1234';
+import {
+  OAuthUser,
+  BlockChainUser,
+  Options,
+  Config,
+  rest,
+  util,
+  fsUtil,
+  oauthUtil,
+  assert,
+  constants
+  } from 'blockapps-rest';
+
+import BigNumber from "bignumber.js";
+import * as chai from "chai";
+chai.should();
+chai.use(require('chai-bignumber')());
+
+let config:Config=fsUtil.getYaml("config.yaml");
+let options:Options={config}
+
 config.apiDebug=true;
 
 // Honestly, past this size bloc can't receive all connections.
 const SIZE=10
-const transactions = [...Array(SIZE).keys()].map(i => {
+const transactions = Array.from(Array(SIZE).keys()).map(i => {
   const name = `ScatterUpload_${i}`
   return { nonce: i, name: name, src: `contract ${name} \{\}` }
 })
@@ -27,22 +40,25 @@ describe("Concurrent uploads", function() {
   it('should create multiple contracts and see them all in cirrus', async function () {
     this.timeout(config.timeout);
     const user_name= 'multi_contract' + util.uid();
-    const user = await co.wrap(rest.createUser)(user_name, password, false);
+    const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
+    const ouser = await oauth.getAccessTokenByClientSecret();
+    const user = await rest.createUser(ouser, options);
     let balance = new BigNumber(0);
     while (balance.isZero()) {
       await sleep(500);
-      balance = await co.wrap(rest.getBalance)(user.address);
+      let result = await rest.getAccounts(user, {...options, params: {address: user.address}})
+      balance = new BigNumber(result[0].balance);
     }
     console.log(`Balance of ${user_name} is ${balance}`)
     console.log("Beginning to upload contracts");
-    const upload = co.wrap(rest.uploadContractString)
+    const upload = rest.createContract
     const promises = transactions.map(tx =>
-      upload(user, tx.name, tx.src, undefined, undefined, {nonce: tx.nonce}));
+      upload(user, {name: tx.name, source: tx.src, args: {}}, {...options, cacheNonce: true}));
     let allResults = await Promise.all(promises);
     console.log(allResults);
-    const query = co.wrap(rest.queryUntil)
+    const query = rest.searchUntil
     const qromises = transactions.map(tx =>
-      query(tx.name, results => results.length > 0));
+      query(user, {name: tx.name}, results => results.length > 0, options));
     let allQueries = await Promise.all(qromises);
     console.log(allQueries);
   });
