@@ -1,15 +1,30 @@
-const ba = require('blockapps-rest');
-require('co-mocha');
+import * as path from "path";
 
-const rest = ba.rest;
-const common = ba.common;
-const api = common.api;
-const util = common.util;
-const BigNumber = common.BigNumber;
-const constants = common.constants;
-const assert = common.assert;
-const config = common.config;
-const password = '1234';
+import {
+  OAuthUser,
+  BlockChainUser,
+  Options,
+  Config,
+  Contract,
+  rest,
+  util,
+  fsUtil,
+  oauthUtil,
+  assert,
+  constants
+  } from 'blockapps-rest';
+
+import BigNumber from "bignumber.js";
+import * as chai from "chai";
+chai.should();
+chai.use(require('chai-bignumber')());
+
+let config:Config=fsUtil.getYaml("config.yaml");
+let options:Options={config}
+
+let oauth:oauthUtil;
+let ouser1:OAuthUser;
+let ouser2:OAuthUser;
 
 const label = 'My chain label';
 const src = 'contract Governance { uint constant TEN = 10; }';
@@ -30,16 +45,18 @@ const balances = [
            }];
 
 describe("Create Chain", function() {
+  this.timeout(config.timeout);
+  
+  before(async () => {
+    oauth = oauthUtil.init(config.nodes[0].oauth);
+    ouser1 = await oauth.getAccessTokenByResourceOwnerCredential("user1", "1234", "strato-devel");
+    ouser2 = await oauth.getAccessTokenByResourceOwnerCredential("user2", "1234", "strato-devel");
+  });
 
-  it('should create 100 new chains', function* () {
-    this.timeout(config.timeout);
-    const uid = util.uid();
-    const alicename = 'Alice' + uid;
-    const bobname = 'Bob' + uid;
+  it('should create 100 new chains', async() => {
     // create user
-    const isAsync = true;
-    const alice = yield rest.createUser(alicename, password, isAsync);
-    const bob   = yield rest.createUser(bobname, password, isAsync);
+    const alice = await rest.createUser(ouser1, options);
+    const bob = await rest.createUser(ouser2, options);
     assert.isDefined(alice, "should exist");
     assert.isDefined(alice.address, "should be defined");
     assert.notEqual(alice.address, 0, "should be a nonzero address");
@@ -54,7 +71,7 @@ describe("Create Chain", function() {
                  ,{address: bob.address, enode: members[1].enode}
 		 ];
     for(var i = 0; i < 100; i++) {
-    const chainId = yield rest.createChain(label, mems, bals, src, args);
+    const chainId = await rest.createChain(ouser1, {label, members: mems, balances: bals, src, args}, {name: "Governance"}, options);
     console.log('###CHAINID###',chainId);
     assert.isDefined(chainId, "should exist");
     assert.notEqual(chainId, '', "should be a nonzero address");
@@ -62,15 +79,11 @@ describe("Create Chain", function() {
 
   });
 
-  it('should create a new chain and query the chain details', function* () {
+  it('should create a new chain and query the chain details', async() => {
     this.timeout(config.timeout);
-    const uid = util.uid();
-    const alicename = 'Alice' + uid;
-    const bobname = 'Bob' + uid;
     // create user
-    const isAsync = true;
-    const alice = yield rest.createUser(alicename, password, isAsync);
-    const bob   = yield rest.createUser(bobname, password, isAsync);
+    const alice = await rest.createUser(ouser1, options);
+    const bob   = await rest.createUser(ouser2, options);
     assert.isDefined(alice, "should exist");
     assert.isDefined(alice.address, "should be defined");
     assert.notEqual(alice.address, 0, "should be a nonzero address");
@@ -84,41 +97,37 @@ describe("Create Chain", function() {
     const mems = [{address: alice.address, enode: members[0].enode}
                  ,{address: bob.address, enode: members[1].enode}
 		 ];
-    const chainId = yield rest.createChain(label, mems, bals, src, args);
+    const chainId = await rest.createChain(alice, {label, members: mems, balances: bals, src, args}, {name: "Governance"}, options);
     console.log('###CHAINID###',chainId);
     assert.isDefined(chainId, "should exist");
     assert.notEqual(chainId, '', "should be a nonzero address");
 
-    yield promiseTimeout(1000);
+    await promiseTimeout(1000);
 
-    const chainInfo = yield rest.getChainInfo(chainId);
+    const chainInfo = await rest.getChain(alice, chainId, options);
     console.log('###CHAININFO###',chainInfo);
     assert.isDefined(chainInfo, "should exist");
-    assert.deepEqual(label, chainInfo.label, "chain labels should be identical");
+    assert.deepEqual(label, chainInfo.info.label, "chain labels should be identical");
 
     const chainAddress = '0000000000000000000000000000000000000100';
 
     // Despite not running the constructor, bloch will at least
     // return the constants and functions.
-    const state = yield api.bloc.state('Governance', chainAddress, chainId);
+    const state = await rest.getState(alice, {name: 'Governance', address: chainAddress, chainId}, options);
     assert.hasAnyKeys(state, ['TEN']);
 
     for(var i=0; i < 10; i++) {
-      const txResult = yield rest.send(alice, bob, 123456, false, null, chainId);
+      const txResult = await rest.send(alice, {toAddress: bob.address, value: 123456, chainId}, options);
       console.log('### TRANSACTION RESULT ###', txResult);
     }
 
   });
 
-  it('should not create a new chain when members list is empty', function* () {
+  it('should not create a new chain when members list is empty', async() => {
     this.timeout(config.timeout);
-    const uid = util.uid();
-    const alicename = 'Alice' + uid;
-    const bobname = 'Bob' + uid;
     // create user
-    const isAsync = true;
-    const alice = yield rest.createUser(alicename, password, isAsync);
-    const bob   = yield rest.createUser(bobname, password, isAsync);
+    const alice = await rest.createUser(ouser1, options);
+    const bob   = await rest.createUser(ouser2, options);
     const bals = [{ address: alice.address, balance: 1000000000000000000000}
                   ,{ address: bob.address, balance: 0}
                  ];
@@ -131,22 +140,18 @@ describe("Create Chain", function() {
 
     let chainId;
     try {
-      chainId = yield rest.createChain(label, [], bals, src, args);
+      chainId = await rest.createChain(alice, {label, members: [], balances: bals, src, args}, {name: "Governance"}, options);
     } catch(e) {
-      assert.equal(e.status,400, `fails with ${e.statusText}`);
+      assert.equal(e.response.status,400, `fails with ${e.statusText}`);
     }
     assert.isUndefined(chainId, "chainId not defined");
   });
 
-  it('should not create a new chain when balances are empty', function* () {
+  it('should not create a new chain when balances are empty', async() => {
     this.timeout(config.timeout);
-    const uid = util.uid();
-    const alicename = 'Alice' + uid;
-    const bobname = 'Bob' + uid;
     // create user
-    const isAsync = true;
-    const alice = yield rest.createUser(alicename, password, isAsync);
-    const bob   = yield rest.createUser(bobname, password, isAsync);
+    const alice = await rest.createUser(ouser1, options);
+    const bob   = await rest.createUser(ouser2, options);
     const mems = [{address: alice.address, enode: members[0].enode}
                   ,{address: bob.address, enode: members[1].enode}
 		             ];
@@ -159,22 +164,18 @@ describe("Create Chain", function() {
 
     let chainId;
     try {
-      chainId = yield rest.createChain(label, mems, [], src, balances);
+      chainId = await rest.createChain(alice, {label, members: mems, src, balances: [], args: {}}, {name: "Governance"}, options);
     } catch(e) {
-      assert.equal(e.status,400, `fails with ${e.statusText}`);
+      assert.equal(e.response.status,400, `fails with ${e.statusText}`);
     }
     assert.isUndefined(chainId, "chainId not defined");
   });
 
-  it('should create a new chain when contract source is empty', function* () {
+  it('should create a new chain when contract source is empty', async() => {
     this.timeout(config.timeout);
-    const uid = util.uid();
-    const alicename = 'Alice' + uid;
-    const bobname = 'Bob' + uid;
     // create user
-    const isAsync = true;
-    const alice = yield rest.createUser(alicename, password, isAsync);
-    const bob   = yield rest.createUser(bobname, password, isAsync);
+    const alice = await rest.createUser(ouser1, options);
+    const bob   = await rest.createUser(ouser2, options);
     const bals = [{ address: alice.address, balance: 1000000000000000000000}
                   ,{ address: bob.address, balance: 0}
                  ];
@@ -188,25 +189,21 @@ describe("Create Chain", function() {
     assert.isDefined(bob.address, "should be defined");
     assert.notEqual(bob.address, 0, "should be a nonzero address");
 
-    const chainId = yield rest.createChain(label, mems, bals, "", args);
+    const chainId = await rest.createChain(alice, {label, members: mems, balances: bals, src: "", args}, <Contract>{}, options);
     assert.isDefined(chainId, "should exist");
 
-    yield promiseTimeout(1000);
+    await promiseTimeout(1000);
 
-    const chainInfo = yield rest.getChainInfo(chainId);
+    const chainInfo = await rest.getChain(ouser1, chainId, options);
     console.log('###CHAININFO###',chainInfo);
     assert.isDefined(chainInfo, "should exist");
   });
 
-  it('should not create a new chain when all accounts have 0 balance', function* () {
+  it('should not create a new chain when all accounts have 0 balance', async() => {
     this.timeout(config.timeout);
-    const uid = util.uid();
-    const alicename = 'Alice' + uid;
-    const bobname = 'Bob' + uid;
     // create user
-    const isAsync = true;
-    const alice = yield rest.createUser(alicename, password, isAsync);
-    const bob   = yield rest.createUser(bobname, password, isAsync);
+    const alice = await rest.createUser(ouser1, options);
+    const bob   = await rest.createUser(ouser2, options);
     assert.isDefined(alice, "should exist");
     assert.isDefined(alice.address, "should be defined");
     assert.notEqual(alice.address, 0, "should be a nonzero address");
@@ -222,9 +219,9 @@ describe("Create Chain", function() {
                  ];
     let chainId;
     try {
-      chainId = yield rest.createChain(label, mems, bals, src, args);
+      chainId = await rest.createChain(alice, {label, members: mems, balances: bals, src, args}, {name: "Governance"}, options);
     } catch(e) {
-      assert.equal(e.status,400, `fails with ${e.statusText}`);
+      assert.equal(e.response.status,400, `fails with ${e.statusText}`);
     }
     assert.isUndefined(chainId, "chainId not defined");
   });
