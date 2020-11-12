@@ -75,7 +75,6 @@ describe('Strato Load Test', function() {
       console.log("doggy1");
       const results = await rest.callList(admin, 
         txs.slice(batchSize * i, batchSize * i + batchSize), {...options, isAsync: true, cacheNonce: true});
-      console.log("doggy2");
       const blocEndTime = moment();
       blocTime += blocEndTime.diff(blocStartTime, 'seconds');
       console.log(`Received ${results.length} receipts`);
