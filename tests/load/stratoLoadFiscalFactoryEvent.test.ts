@@ -1,24 +1,36 @@
 'use strict'
 
-const ba = require('blockapps-rest');
-const BigNumber = require('bignumber.js');
-const co = require('co');
-require('co-mocha');
-const rest = ba.rest;
-const common = ba.common;
-const config = common.config;
-const util = common.util;
-const api = common.api;
-const moment = require('moment');
-const path = require('path');
+import * as path from "path";
+import * as moment from "moment";
 
-const adminName = util.uid('Admin');
-const adminPassword = '1234';
+import {
+  OAuthUser,
+  BlockChainUser,
+  Options,
+  Config,
+  rest,
+  util,
+  fsUtil,
+  oauthUtil,
+  assert,
+  constants,
+  CallArgs,
+  importer,
+  Contract
+  } from 'blockapps-rest';
+
+import BigNumber from "bignumber.js";
+import * as chai from "chai";
+chai.should();
+chai.use(require('chai-bignumber')());
+
+let config:Config=fsUtil.getYaml("config.yaml");
+let options:Options={config}
 
 const contractName = 'FiscalFactoryEvent';
 const contractFilename = path.join(config.contractsPath,"FiscalFactoryEvent.sol");
 
-let txs = [];
+let txs:CallArgs[] = [];
 let txResults = [];
 
 describe('Strato Load Test', function() {
@@ -32,47 +44,47 @@ describe('Strato Load Test', function() {
   const batchCount = util.getArgInt('--batchCount', 1);
   const batchDelay = util.getArgInt('--batchDelay', 0);
 
-  before(function * () {
+  before(async() => {
     console.log(`Creating admin user and contract`);
-    admin = yield rest.createUser(adminName, adminPassword);
+    const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
+    const ouser = await oauth.getAccessTokenByResourceOwnerCredential("user1", "1234", "strato-devel");
+    admin = await rest.createUser(ouser, options);
     console.log(`User: ${admin.name} @ ${admin.address}`);
     let balance = new BigNumber(0);
-    while (balance.isZero()) {
-      yield promiseTimeout(500);
-      balance = yield rest.getBalance(admin.address);
-      console.log(`Balance is: ${balance}`);
-    }
-//    yield rest.compileSearch([contractName], contractName, contractFilename);
+//    while (balance.isZero()) {
+//      await promiseTimeout(500);
+//      const result = await rest.getAccounts(admin, {...options, params: {address: admin.address}});
+//      balance = result[0].balance;
+//      console.log(`Balance is: ${balance}`);
+//    }
+//    await rest.compileSearch([contractName], contractName, contractFilename);
     const args = { admin: admin.address, initialOriginator: admin.address }
-    const contract = yield rest.uploadContract(admin, contractName, contractFilename, args);
+    const contract = <Contract> await rest.createContract(admin, {name: contractName, source: await importer.combine(contractFilename), args}, {...options, isAsync: false, config: {...options.config, VM: "SolidVM"}});
     contractAddress = contract.address;
   });
 
-  it('Upload contracts', function * () {
+  it('Upload contracts', async() => {
     const startTime = moment();
     let blocTime = 0;
     for(let i = 0; i < batchCount; i++) {
       console.log(`Creating ${batchSize} transactions for count ${i}`);
       factory_createCallList(contractAddress, batchSize, i, batchCopies);
       const blocStartTime = moment();
-      const results = yield api.bloc.callList({
-        password: adminPassword,
-        txs: txs.slice(batchSize * i, batchSize * i + batchSize),
-        resolve: false
-      }, admin.name, admin.address, false);
+      const results = await rest.callList(admin, 
+        txs.slice(batchSize * i, batchSize * i + batchSize), {...options, isAsync: true, cacheNonce: true});
       const blocEndTime = moment();
       blocTime += blocEndTime.diff(blocStartTime, 'seconds');
       console.log(`Received ${results.length} receipts`);
       txResults = txResults.concat(results);
       if(batchDelay > 100) {
-        yield promiseTimeout(batchDelay);
+        await promiseTimeout(batchDelay);
       }
     }
 
     const lastHash = txResults[txResults.length -1].hash;
 
     console.log(`Waiting on address '${admin.address}' to reach nonce ${batchSize*batchCount + 1}`);
-    yield waitResult(admin.address, batchSize, batchCount);
+    await waitResult(admin, admin.address, batchSize, batchCount);
 
     const endTime = moment();
     const seconds = endTime.diff(startTime, 'seconds');
@@ -83,13 +95,13 @@ describe('Strato Load Test', function() {
 
 });
 
-function * waitResult(address, batchSize, batchCount) {
+async function waitResult(user, address, batchSize, batchCount) {
   let nonce = 0;
   while(nonce < batchSize*batchCount + 1) {
-    yield promiseTimeout(500);
+    await promiseTimeout(500);
     try {
       console.log(`Current Nonce is: ${nonce}`)
-      let result = yield api.strato.account(address);
+      let result = await rest.getAccounts(user, {...options, params: {address}});
       console.log(`Result: ${JSON.stringify(result)}`);
       nonce = result[0].nonce;
     } catch (e) {
@@ -115,9 +127,8 @@ function factory_createCallList(contractAddress, batchSize, batchIndex, batchCop
   for (let i = 0; i < batchSize; i++) {
     if (batchCopies <= 1) {
       txs.push({
-        contractAddress: contractAddress,
-        contractName: 'FiscalFactoryEvent',
-        methodName: 'createFiscal',
+        contract: {address: contractAddress, name: 'FiscalFactoryEvent'},
+        method: 'createFiscal',
         args: {
             src_countryCode: `src_countryCode_${batchIndex}_${i}`
           , src_currencyCode: `src_currencyCode_${batchIndex}_${i}`
@@ -144,14 +155,12 @@ function factory_createCallList(contractAddress, batchSize, batchIndex, batchCop
           gasPrice: 1,
           nonce: (batchSize * batchIndex) + i + 1
         },
-        value: 0,
-		metadata: {"VM": "SolidVM"},
+        value: new BigNumber(0)
       });
     } else {
       txs.push({
-        contractAddress: contractAddress,
-        contractName: 'FiscalFactoryEvent',
-        methodName: 'generateFiscal',
+        contract: {address: contractAddress, name: 'FiscalFactoryEvent'},
+        method: 'generateFiscal',
         args: {
             src_countryCode: `src_countryCode_${batchIndex}_${i}`
           , src_currencyCode: `src_currencyCode_${batchIndex}_${i}`
@@ -179,8 +188,7 @@ function factory_createCallList(contractAddress, batchSize, batchIndex, batchCop
           gasPrice: 1,
           nonce: (batchSize * batchIndex) + i + 1
         },
-		metadata: {"VM": "SolidVM"},
-        value: 0,
+        value: new BigNumber(0)
       });
     }
   }
