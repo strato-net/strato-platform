@@ -493,7 +493,7 @@ async function compileContracts(user, contracts, options) {
  * object with the transaction. Final result can be obtained by using the `resolveResult` call. If `options.async` is not
  * set (default), this call returns a contract with the `name` and `address` values populated
  */
-async function createContract(user, contracts, options) {
+async function createContract(user, contract, options) {
   const [pendingTxResult] = await api.createContract(user, contract, options);
   return createContractResolve(user, pendingTxResult, options);
 }
@@ -564,7 +564,7 @@ async function createContractResolve(user, pendingTxResult, options) {
  * not set (default), this call returns a list of contracts with the `name` and `address` values populated
  */
 async function createContractList(user, contracts, options) {
-  const pendingTxResult = await api.createContractList(user, contract, options);
+  const pendingTxResult = await api.createContractList(user, contracts, options);
   return createContractListResolve(user, pendingTxResult, options);
 }
 
