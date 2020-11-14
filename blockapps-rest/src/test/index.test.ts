@@ -1,6 +1,6 @@
-import RestStatus from "http-status-codes";
+import * as RestStatus from "http-status-codes";
 import BigNumber from "bignumber.js";
-import dotenv from "dotenv";
+import * as dotenv from "dotenv";
 import rest from "../rest";
 import assert from "../util/assert";
 import util from "../util/util";
@@ -19,7 +19,7 @@ const fixtures = factory.getTestFixtures();
 describe("contracts", function() {
   this.timeout(config.timeout);
   let admin;
-  const options = { config };
+  const options:any = { config };
 
   before(async () => {
     const userArgs = { token: process.env.USER_TOKEN };
@@ -101,7 +101,7 @@ describe("contracts", function() {
 describe("state", function() {
   this.timeout(config.timeout);
   let admin;
-  const options = { config };
+  const options:any = { config };
 
   before(async () => {
     const userArgs = { token: process.env.USER_TOKEN };
@@ -197,7 +197,7 @@ describe("state", function() {
 describe("call", function() {
   this.timeout(config.timeout);
   let admin;
-  const options = { config };
+  const options:any = { config };
   const var1 = 1234;
   const var2 = 5678;
 
@@ -244,7 +244,7 @@ describe("call", function() {
       contract,
       method,
       methodArgs,
-      value
+      new BigNumber(value)
     );
     const [result] = await rest.call(admin, callArgs, options);
     const expected = constructorArgs.var1 * methodArgs.var2;
@@ -278,7 +278,7 @@ describe("call", function() {
 
 describe("auth user", function() {
   this.timeout(config.timeout);
-  const options = { config };
+  const options:any = { config };
   const user = { token: process.env.USER_TOKEN };
 
   it("getKey", async () => {
@@ -333,7 +333,7 @@ describe("auth user", function() {
 describe("history", function() {
   this.timeout(config.timeout);
   let admin;
-  const options = { config };
+  const options:any = { config };
 
   before(async () => {
     const userArgs = { token: process.env.USER_TOKEN };

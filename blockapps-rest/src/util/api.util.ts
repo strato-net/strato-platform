@@ -1,5 +1,5 @@
-import RestStatus from "http-status-codes";
-import queryString from "query-string";
+import * as RestStatus from "http-status-codes";
+import * as queryString from "query-string";
 import ax from "../axios-wrapper";
 import { RestError } from "./rest.util";
 
@@ -89,8 +89,15 @@ function constructQuery(options) {
   return query;
 }
 
-function constructMetadata(options, contractName) {
-  const metadata = {};
+/**
+ * This function constructes metadata that can be used to control the history and index flags
+ * @method{constructMetadata}
+ * @param{Object} options flags for history and indexing
+ * @param{String} contractName
+ * @returns{()} metadata
+ */
+function constructMetadata(options:any, contractName) {
+  const metadata:any = {};
   if (options === {}) return metadata;
 
   // history flag (default: off)
@@ -105,7 +112,7 @@ function constructMetadata(options, contractName) {
         options.history.indexOf(metadata.history) >= 0
           ? options.history.join(",")
           : `${metadata.history},${options.history.join(",")}`;
-    } else if (typeof options.history === String) {
+    } else if (typeof options.history === 'string') {
       metadata.history =
         metadata.history.length === 0 ||
         options.history.indexOf(metadata.history) >= 0

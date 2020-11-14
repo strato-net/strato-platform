@@ -1,4 +1,4 @@
-import parser from 'solidity-parser-antlr'
+import * as parser from 'solidity-parser-antlr'
 
 /**
  * This is the solidityParser interface
@@ -28,7 +28,8 @@ import parser from 'solidity-parser-antlr'
  */
 
 function parse(input) {
-  return parser.parse(input)
+  const opts = {};
+  return parser.parse(input, opts)
 }
 
 /**
@@ -72,7 +73,7 @@ function parse(input) {
 
 function parseEnum(input) {
   const parsed = parse(input)
-  const { members } = parsed.children[0].subNodes[0]
+  const { members } = (parsed as any).children[0].subNodes[0]
   const myEnum = members.filter(member => member.type === 'EnumValue').reduce((acc, member, index) => {
     acc[member.name] = index
     acc[index] = member.name
@@ -100,9 +101,9 @@ function parseEnum(input) {
  * @return {Object}
  */
 
-function parseFields(input, prefix) {
+function parseFields(input, prefix?) {
   const graph = parse(input)
-  const contract = graph.children.filter(child => child.type === 'ContractDefinition')[0]
+  const contract = (graph as any).children.filter(child => child.type === 'ContractDefinition')[0]
   const stateVariableDeclarations = contract.subNodes.filter(child => child.type === 'StateVariableDeclaration')
 
   const result = stateVariableDeclarations.reduce((acc, stateVariable) => {

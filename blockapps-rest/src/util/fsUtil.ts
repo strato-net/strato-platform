@@ -1,5 +1,5 @@
-import fs from 'fs'
-import yaml from 'js-yaml';
+import * as fs from 'fs'
+import * as yaml from 'js-yaml';
 
 /**
  * This is the fsUtil interface
@@ -70,7 +70,7 @@ function getYaml(filename) {
 
 function getJson(filename, options) {
   const content = fs.readFileSync(filename, options)
-  return JSON.parse(content)
+  return JSON.parse(content.toString())
 }
 
 export default {

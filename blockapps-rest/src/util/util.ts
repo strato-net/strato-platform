@@ -1,4 +1,4 @@
-import path from 'path'
+import * as path from 'path'
 import { Keccak } from 'sha3'
 
 /**
@@ -58,7 +58,7 @@ function isHash(hash) {
 function isChecksumAddress(_address) {
   // Check each case
   const address = _address.replace('0x', '')
-  const addressHash = Keccak(256);
+  const addressHash = new Keccak(256);
   addressHash.update(address.toLowerCase());
   addressHash.digest('hex');
   for (let i = 0; i < 40; i++) {
@@ -94,7 +94,7 @@ function iuid() {
  * @param digits Optional. The number of digits of the unique id to be generated. Defaults to 6.
  * @return {Int}
  */
-function uid(prefix, digits = 6) {
+function uid(prefix?, digits = 6) {
   if (digits < 1) digits = 1
   if (digits > 16) digits = 16
   const random = Math.floor(Math.random() * (10 ** digits))
@@ -249,10 +249,10 @@ function timeout(ms) {
     console.log('setB', setB);
   }
   return setA.filter(function (memberA) {
-    return !setB.filter(function (memberB) {
+    return !(setB.filter(function (memberB) {
       // compare
       return comparator(memberA, memberB);
-    }).length > 0; // some items were found in setA that are not included in setB
+    }).length > 0); // some items were found in setA that are not included in setB
   });
 }
 
