@@ -1,0 +1,42 @@
+pipeline {
+  agent { label 'dev-website' }
+  options { disableConcurrentBuilds() }
+  stages {
+      stage('Build') {
+        steps {
+          withCredentials([usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
+            sh '''#!/bin/bash -le
+            set -x
+            sudo rm -rf strato-platform
+            sudo rm -rf /home/blockapps/ba-rest-jsdoc
+            mkdir /home/blockapps/ba-rest-jsdoc
+            git clone https://${GH_USER}:${GH_PASSWD}@github.com/blockapps/strato-platform
+            cd strato-platform/blockapps-rest
+            npm i
+            CONTAINER=$(docker run -d -v $(pwd):/sources node:10 bash -c "cd /sources && npm run build:docs")
+            sleep 5
+            docker cp ${CONTAINER}:/sources /home/blockapps/ba-rest-jsdoc
+            cd
+            ./rerun-nginx-proxy.sh
+            '''
+          }
+        }
+      }
+  }
+
+  post {
+    success {
+        slackSend (
+        color: 'good',
+        message: "developers.blockapps.net rebuild success: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+        )
+    }
+
+    failure {
+      slackSend (
+        color: 'danger',
+        message: "developers.blockapps.net rebuild FAILURE: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+      )
+    }
+  }
+}

@@ -20,21 +20,7 @@ import {
   CallArgs,
   SendTx
 } from "./types";
-/*
-async function getUsers(ouser:OAuthUser, options:Options) {
-  const url = getNodeUrl(options);
-  const endpoint = constructEndpoint(Endpoint.USERS, options);
-  return get(url, endpoint, setAuthHeaders(ouser, options));
-}
 
-async function getUser(ouser:OAuthUser, options:Options) {
-  const url = getNodeUrl(options);
-  const urlParams = {
-    username: ouser.username
-  };
-  const endpoint = constructEndpoint(Endpoint.USER, options, urlParams);
-  return get(url, endpoint, setAuthHeaders(ouser, options));
-}
 
 async function createUser(user:StratoUser, options:Options) {
   const url = getNodeUrl(options);
@@ -47,12 +33,11 @@ async function createUser(user:StratoUser, options:Options) {
   const endpoint = constructEndpoint(Endpoint.USER, options, urlParams);
   return postue(url, endpoint, data, options);
 }
-*/
+
 async function fill(user, options:Options) {
   const body = {};
   const url = getNodeUrl(options);
   const urlParams = {
-    username: user.username,
     address: user.address
   };
   const endpoint = constructEndpoint(Endpoint.FILL, options, urlParams);
@@ -60,7 +45,7 @@ async function fill(user, options:Options) {
 }
 
 function getCreateArgs(contract:ContractDefinition, options:Options) {
-  const src = options.config.VM === 'EVM' ? {} : { src: contract.source };
+  const src = options.config.VM === "EVM" ? {} : { src: contract.source };
 
   const payload = {
     ...src,
@@ -68,18 +53,21 @@ function getCreateArgs(contract:ContractDefinition, options:Options) {
     args: contract.args,
     chainid: contract.chainid,
     txParams: contract.txParams,
-    metadata: constructMetadata(options, contract.name),
+    metadata: constructMetadata(options, contract.name)
   };
 
   const tx = {
     payload,
-    type: TxPayloadType.CONTRACT,
+    type: TxPayloadType.CONTRACT
   };
   return tx;
 }
 
-async function compileContracts(user:OAuthUser, contracts, options:Options) {
-  const body = contracts.map(contract => ({ contractName: contract.name, source: contract.source }));
+async function compileContracts(user:OAuthUser, contracts:ContractDefinition[], options:Options) {
+  const body = contracts.map(contract => ({
+    contractName: contract.name,
+    source: contract.source
+  }));
 
   const url = getNodeUrl(options);
   const endpoint = constructEndpoint(Endpoint.COMPILE, options);
@@ -150,29 +138,23 @@ async function getState(user:OAuthUser, contract, options:Options) {
   return get(url, endpoint, setAuthHeaders(user, options));
 }
 
-async function getBatchStates(user:OAuthUser, stateArgs, options:Options) {
-  const url = getNodeUrl(options);
-  const endpoint = constructEndpoint(Endpoint.STATES, options);
-  const body = stateArgs ? stateArgs : [];
-  return post(url, endpoint, body, setAuthHeaders(user, options));
-}
 
 function getCallArgs(callMethodArgs:CallArgs, options:Options) {
   const { contract, method, args, value, chainid, txParams } = callMethodArgs;
   const valueFixed = value instanceof BigNumber ? value.toFixed(0) : value;
   const payload = {
-      contractName: contract.name,
-      contractAddress: contract.address,
-      chainid,
-      value: valueFixed,
-      method,
-      args,
-      txParams,
-      metadata: constructMetadata(options, contract.name)
+    contractName: contract.name,
+    contractAddress: contract.address,
+    chainid,
+    value: valueFixed,
+    method,
+    args,
+    txParams,
+    metadata: constructMetadata(options, contract.name)
   };
   const tx = {
-      payload,
-      type: TxPayloadType.FUNCTION
+    payload,
+    type: TxPayloadType.FUNCTION
   };
   return tx;
 }
@@ -250,20 +232,28 @@ async function search(user:OAuthUser, contract:Contract, options:Options) {
 async function searchWithContentRange(user:OAuthUser, contract, options:Options) {
   const url = getNodeUrl(options);
   const urlParams = {
-      name: contract.name
+    name: contract.name
   };
   const endpoint = constructEndpoint(Endpoint.SEARCH, options, urlParams);
-  const headersWithCount = { ...options.headers, Prefer: 'count=exact' };
-  const optionsWithCount = { ...options, headers: headersWithCount, getFullResponse: true };
-  const { data, headers } = await get(url, endpoint, setAuthHeaders(user, optionsWithCount));
-  const contentRangeStr = headers['content-range'];
-  const [range, countStr] = contentRangeStr.split('/');
+  const headersWithCount = { ...options.headers, Prefer: "count=exact" };
+  const optionsWithCount = {
+    ...options,
+    headers: headersWithCount,
+    getFullResponse: true
+  };
+  const { data, headers } = await get(
+    url,
+    endpoint,
+    setAuthHeaders(user, optionsWithCount)
+  );
+  const contentRangeStr = headers["content-range"];
+  const [range, countStr] = contentRangeStr.split("/");
   const count = parseInt(countStr, 10);
   if (range === "*") {
     const contentRange = { count };
     return { data, contentRange };
   }
-  const [start, end] = range.split('-').map((s) => parseInt(s, 10));
+  const [start, end] = range.split("-").map(s => parseInt(s, 10));
   const contentRange = { start, end, count };
   return { data, contentRange };
 }
@@ -285,9 +275,9 @@ async function createChain(body, options:Options) {
 }
 
 async function createChains(body, options:Options) {
-    const url = getNodeUrl(options);
-    const endpoint = constructEndpoint(Endpoint.CHAINS, options);
-    return await post(url, endpoint, body, options);
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.CHAINS, options);
+  return await post(url, endpoint, body, options);
 }
 
 async function uploadExtStorage(body, options:Options) {
@@ -331,19 +321,17 @@ async function listExtStorage(user:OAuthUser, args, options:Options) {
   return get(url, endpoint, setAuthHeaders(user, options));
 }
 
-async function pingOauth(user:OAuthUser, options:Options){
-  const url = getNodeUrl(options)
-  const endpoint = constructEndpoint(Endpoint.KEY, options)
-  const result = await get(url, endpoint, setAuthHeaders(user, options))
-  return result.status
+async function pingOauth(user:OAuthUser, options:Options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.KEY, options);
+  const result = await get(url, endpoint, setAuthHeaders(user, options));
+  return result.status;
 }
 
 export default {
   getAccounts,
   getBalance,
-//  getUsers,
-//  getUser,
-//  createUser,
+  createUser,
   getCreateArgs,
   compileContracts,
   createContract,
@@ -351,7 +339,6 @@ export default {
   fill,
   blocResults,
   getState,
-  getBatchStates,
   getCallArgs,
   call,
   callList,
@@ -370,5 +357,5 @@ export default {
   verifyExtStorage,
   downloadExtStorage,
   listExtStorage,
-  pingOauth,
-}
+  pingOauth
+};

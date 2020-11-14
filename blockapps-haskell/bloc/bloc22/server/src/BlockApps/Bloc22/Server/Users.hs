@@ -184,24 +184,28 @@ waitForBalance addr = waitFor "no user account found" go
           return . not $ null accts
 
 postUsersFill :: UserName  -> Address -> Bool -> Bloc BlocTransactionResult
-postUsersFill _ addr resolve = blocTransaction $ do
-  when resolve ($logInfoS "postUsersFill" "Waiting for faucet transaction to be mined")
-  hashes <- blocStrato $ postFaucetClient addr
-  void . blocModify $ \conn -> runInsertMany conn hashNameTable [
-    ( Nothing
-    , constant h
-    , constant (0 :: Int32)
-    , constant (0 :: Int32)
-    , constant (Text.decodeUtf8 . BL.toStrict $ Aeson.encode Deprecated.defaultPostTx{Deprecated.posttransactionTo = Just addr})
-    ) | h <- hashes]
-  result <- getBlocTransactionResult' hashes resolve
-  when (resolve && Success == blocTransactionStatus result) $ do
-    waitForBalance addr
-  $logInfoLS "postUsersFill/resolve" resolve
-  $logInfoLS "postUsersFill/result" result
-  when (Failure == blocTransactionStatus result) $
-    throwIO $ UnavailableError "faucet transaction failed; please try again"
-  return result
+postUsersFill _ addr resolve = do
+  shouldPost <- asks gasOn
+  if shouldPost
+    then blocTransaction $ do
+      when resolve ($logInfoS "postUsersFill" "Waiting for faucet transaction to be mined")
+      hashes <- blocStrato $ postFaucetClient addr
+      void . blocModify $ \conn -> runInsertMany conn hashNameTable [
+        ( Nothing
+        , constant h
+        , constant (0 :: Int32)
+        , constant (0 :: Int32)
+        , constant (Text.decodeUtf8 . BL.toStrict $ Aeson.encode Deprecated.defaultPostTx{Deprecated.posttransactionTo = Just addr})
+        ) | h <- hashes]
+      result <- getBlocTransactionResult' hashes resolve
+      when (resolve && Success == blocTransactionStatus result) $ do
+        waitForBalance addr
+      $logInfoLS "postUsersFill/resolve" resolve
+      $logInfoLS "postUsersFill/result" result
+      when (Failure == blocTransactionStatus result) $
+        throwIO $ UnavailableError "faucet transaction failed; please try again"
+      return result
+    else pure $ BlocTransactionResult Success zeroHash Nothing Nothing
 
 postUsersSend :: UserName -> Address -> Maybe ChainId -> Bool -> PostSendParameters -> Bloc BlocTransactionResult
 postUsersSend userName addr chainId resolve

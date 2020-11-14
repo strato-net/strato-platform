@@ -1,8 +1,9 @@
-const { dest, series, src } = require('gulp');
+const { dest, series, src, task } = require("gulp");
 const ts = require("gulp-typescript");
-const babel = require('gulp-babel');
-const gulpClean = require('gulp-clean');
-const sourcemaps = require('gulp-sourcemaps');
+const babel = require("gulp-babel");
+const gulpClean = require("gulp-clean");
+const sourcemaps = require("gulp-sourcemaps");
+const exec = require("child_process").exec;
 const merge = require("merge-stream");
 
 function clean() {
@@ -38,9 +39,20 @@ function generate() {
     ]);
 }
 
+function generateDocs(cb) {
+  exec(
+    "rm -rf docs && node_modules/.bin/jsdoc -c jsdoc-conf.json -d docs",
+    (err, stdout) => {
+      console.log(stdout);
+      cb(err);
+    }
+  );
+}
+
 
 exports.clean = clean;
 exports.compile = compile;
 exports.generate = generate;
 exports.build = series(compile, generate);
-exports.default = series(clean, compile, generate);
+exports.generateDocs = generateDocs;
+exports.default = series(clean, compile, generate, generateDocs);

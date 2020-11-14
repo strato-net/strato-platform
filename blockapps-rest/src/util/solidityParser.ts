@@ -1,9 +1,75 @@
 import * as parser from 'solidity-parser-antlr'
 
+/**
+ * This is the solidityParser interface
+ * @module solidityParser
+ */
+
+/**
+ * Parses a string Solidity Contract
+ * @example
+ * const input = `
+ *  contract test {
+ *  uint256 a;
+ *  function f() {}
+ * }`
+ * const parsed = solidityParser.parse(input)
+ * // Returns
+ * // { type: 'SourceUnit',
+ * //  children:
+ * //   [ { type: 'ContractDefinition',
+ * //      name: 'test',
+ * //      baseContracts: [],
+ * //      subNodes: [Array],
+ * //      kind: 'contract' } ] }
+ * @method parse
+ * @param {String} input the Contract string
+ * @return {Object}
+ */
+
 function parse(input) {
   const opts = {};
   return parser.parse(input, opts)
 }
+
+/**
+ * Parses enums found in a string Solidity contract
+ * @example
+ * const input = `
+ * contract ErrorCodes {
+ *      enum ErrorCodes {
+ *          NULL,
+ *          SUCCESS,
+ *          ERROR,
+ *          NOT_FOUND,
+ *          EXISTS,
+ *          RECURSIVE,
+ *          INSUFFICIENT_BALANCE,
+ *          UNAUTHORIZED
+ *      }
+ *  }`
+ *  const parsed = parseEnum(input);
+ * // Returns
+ * // { '0': 'NULL',
+ * //  '1': 'SUCCESS',
+ * //  '2': 'ERROR',
+ * //  '3': 'NOT_FOUND',
+ * //  '4': 'EXISTS',
+ * //  '5': 'RECURSIVE',
+ * //  '6': 'INSUFFICIENT_BALANCE',
+ * //  '7': 'UNAUTHORIZED',
+ * //  NULL: 0,
+ * //  SUCCESS: 1,
+ * //  ERROR: 2,
+ * //  NOT_FOUND: 3,
+ * //  EXISTS: 4,
+ * //  RECURSIVE: 5,
+ * //  INSUFFICIENT_BALANCE: 6,
+ * //  UNAUTHORIZED: 7 }
+ * @method parseEnum
+ * @param {String} input the Contract string with Enums
+ * @return {Object}
+ */
 
 function parseEnum(input) {
   const parsed = parse(input)
@@ -16,6 +82,24 @@ function parseEnum(input) {
 
   return myEnum
 }
+
+/**
+ * Parses fields found in a string Solidity contract
+ * @example
+ * const input = `
+ *    contract test {
+ *        uint256 a;
+ *        uint256 b = 1234;
+ *        string c = 'ABCD';
+ *        function f() {}
+ *    }`
+ *  const parsed = parseFields(input);
+ * // Returns
+ * // { '1234': 'b', b: '1234', c: 'ABCD', ABCD: 'c' }
+ * @method parseFields
+ * @param {String} input the Contract string with Fields
+ * @return {Object}
+ */
 
 function parseFields(input, prefix?) {
   const graph = parse(input)

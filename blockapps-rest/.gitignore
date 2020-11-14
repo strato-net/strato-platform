@@ -43,6 +43,7 @@ jspm_packages
 # Build
 lib
 dist
+docs
 
 .vscode
 
@@ -51,3 +52,6 @@ dist
 package-lock.json
 
 config.yaml
+
+# OS files
+**/.DS_Store
