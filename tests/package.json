@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "description": "platform tests",
   "scripts": {
-    "test": "npm run test:blockhash && npm run test:e2e && npm run test:dataTypes && npm run test:load && npm run test:load10k && npm run test:loadecho && npm run test:solidvm && npm run test:upload && npm run test:upload10k && npm run test:loadFF && npm run test:truchainz && npm run test:multicontract && npm run test:uploadOrder && npm run test:slipstream",
+    "test": "npm run test:blockhash && npm run test:e2e && npm run test:dataTypes && npm run test:load && npm run test:load10k && npm run test:solidvm && npm run test:upload && npm run test:upload10k && npm run test:loadFF && npm run test:truchainz && npm run test:multicontract && npm run test:uploadOrder && npm run test:slipstream",
     "test:blockhash": "mocha -r ts-node/register e2e/blockhash.test.ts",
     "test:e2e": "mocha -r ts-node/register e2e/createUser.test.ts && mocha -r ts-node/register e2e/import.constructor.test.ts && mocha -r ts-node/register e2e/import.test.ts",
     "test:dataTypes": "mocha -r ts-node/register regressions/address.test.ts && mocha -r ts-node/register regressions/bool.test.ts && mocha -r ts-node/register regressions/bytes.test.ts && mocha -r ts-node/register regressions/enum.test.ts && mocha -r ts-node/register regressions/string.test.ts && mocha -r ts-node/register regressions/uint.test.ts && mocha -r ts-node/register regressions/negative.test.ts",
@@ -11,7 +11,7 @@
     "test:load10k": "mocha -r ts-node/register load/stratoLoad.test.ts --batchCount 100 --batchSize 100",
     "test:loadecho": "mocha -r ts-node/register load/stratoLoadEcho.test.ts --batchCount 20 --batchSize 20 --config config/localhost.config.yaml",
     "test:solidvm": "mocha -r ts-node/register e2e/solidvm.test.ts",
-    "test:upload": "mocha -r ts-node/register load/uploadString.test.ts --batchCount 10 --batchSize 10 && mocha load/uploadUniqueAddresses.test.ts --batchCount 10 --batchSize 10",
+    "test:upload": "mocha -r ts-node/register load/uploadString.test.ts --batchCount 10 --batchSize 10 && mocha -r ts-node/register load/uploadUniqueAddresses.test.ts --batchCount 10 --batchSize 10",
     "test:upload10k": "mocha -r ts-node/register load/uploadString.test.ts --batchCount 100 --batchSize 100",
     "test:loadFF": "mocha -r ts-node/register load/stratoLoadFiscalFactory.test.ts --batchCount 100 --batchSize 100",
     "test:loadFFEvents": "mocha -r ts-node/register load/stratoLoadFiscalFactoryEvent.test.ts --batchCount 100 --batchSize 100",
@@ -35,6 +35,7 @@
     "moment": "^2.22.2",
     "request": "^2.88.0",
     "request-promise": "4.2.2",
-    "ts-node": "^9.0.0"
+    "ts-node": "^9.0.0",
+    "typescript": "^4.0.5"
   }
 }
