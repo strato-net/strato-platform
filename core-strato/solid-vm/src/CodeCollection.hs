@@ -7,9 +7,7 @@
 
 module CodeCollection where
 
-import Control.DeepSeq
 import Control.Lens
-import Data.Binary
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Maybe
@@ -36,14 +34,14 @@ data Contract =
     _events :: Map T.Text Xabi.Event,
     _functions :: Map String Func,
     _constructor :: Maybe Func
-  } deriving (Show, Read, Generic, NFData, Binary)
+  } deriving (Show, Generic)
 
 makeLenses ''Contract
 
 data CodeCollection =
   CodeCollection {
     _contracts :: Map String Contract
-  } deriving (Show, Read, Generic, NFData, Binary)
+  } deriving (Show, Generic)
 
 makeLenses ''CodeCollection
 
@@ -107,27 +105,27 @@ toUnionMaker f cc c =
       parentMaps = map (toUnionMaker f cc) parents'
   in M.unions $ f c : parentMaps
 
-statementCrawler :: Xabi.Statement -> [T.Text]
+statementCrawler :: Xabi.StatementF a -> [T.Text]
 statementCrawler = \case
   Xabi.AssemblyStatement{} -> ["AssemblyStatement"]
-  Xabi.Block -> ["Block"]
-  Xabi.Break -> ["Break"]
-  Xabi.Continue -> ["Continue"]
-  Xabi.Throw -> ["Throw"]
-  Xabi.EmitStatement _ evts ->  "EmitStatement":concatMap (expressionCrawler . snd) evts
-  Xabi.SimpleStatement st -> simpleStatementCrawler st
-  Xabi.Return mExpr -> "Return":maybe [] expressionCrawler mExpr
-  Xabi.DoWhileStatement blk test -> "DoWhileStatement"
-                             :statementCrawler blk
+  Xabi.Block _ -> ["Block"]
+  Xabi.Break _ -> ["Break"]
+  Xabi.Continue _ -> ["Continue"]
+  Xabi.Throw _ -> ["Throw"]
+  Xabi.EmitStatement _ evts _ ->  "EmitStatement":concatMap (expressionCrawler . snd) evts
+  Xabi.SimpleStatement st _ -> simpleStatementCrawler st
+  Xabi.Return mExpr _ -> "Return":maybe [] expressionCrawler mExpr
+  Xabi.DoWhileStatement blk test _ -> "DoWhileStatement"
+                             :(concatMap statementCrawler blk)
                             ++ expressionCrawler test
-  Xabi.WhileStatement expr blk -> "WhileStatement"
+  Xabi.WhileStatement expr blk _ -> "WhileStatement"
                            :expressionCrawler expr
                           ++ concatMap statementCrawler blk
-  Xabi.IfStatement expr thn els -> "IfStatement"
+  Xabi.IfStatement expr thn els _ -> "IfStatement"
                             :expressionCrawler expr
                            ++ concatMap statementCrawler thn
                            ++ maybe [] (concatMap statementCrawler) els
-  Xabi.ForStatement mInit mTest mInc blk -> "ForStatement"
+  Xabi.ForStatement mInit mTest mInc blk _ -> "ForStatement"
                                      : maybe [] simpleStatementCrawler mInit
                                     ++ maybe [] expressionCrawler mTest
                                     ++ maybe [] expressionCrawler mInc

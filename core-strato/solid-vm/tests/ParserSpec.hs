@@ -101,7 +101,7 @@ spec = do
                       ArrayExpression [])
                  ]
     forM_ scases $ \(input, want) -> do
-        it ("can parse " ++ input) $ parseStatement input `shouldBe` Right want
+        it ("can parse " ++ input) $ parseStatement input `shouldBe` Right (want $ initialPos "")
 
     let fcases = ["assembly {}", "assembly { dst := mload(src) }", "assembly { dst := add(src, 32) }"]
     forM_ fcases $ \input -> do
