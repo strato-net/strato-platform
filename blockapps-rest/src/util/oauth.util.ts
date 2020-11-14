@@ -3,7 +3,10 @@ import * as simpleOauth from "simple-oauth2";
 import * as unixTime from "unix-time";
 import request from "sync-request";
 import * as getPem from "rsa-pem-from-mod-exp";
-import '@babel/polyfill';
+import "@babel/polyfill";
+
+
+/** Class representing the OAuth util. */
 
 class OAuthUtil {
   appTokenCookieName : any;
@@ -52,10 +55,11 @@ class OAuthUtil {
     const url_split = this.openIdDiscoveryUrl.split("/");
     this.tokenHost = url_split[0] + "//" + url_split[2];
   }
+
   /**
    * This function calls openIdConfigUrl to get openIdConfig and it also fetches
    * any public keys that maybe used to sign tokens
-   * @returns {()}
+   * @method{getOpenIdConfig}
    */
   getOpenIdConfig() {
     try {
@@ -78,6 +82,7 @@ class OAuthUtil {
 
   /**
    * This function creates a new instance of OauthUtil and populates the relevant fields
+   * @method{init}
    * @param oauthConfig
    * @returns o an instance of the OAuthUtil
    */
@@ -222,9 +227,7 @@ class OAuthUtil {
           let pemKey = "";
           // azure
           if (key.x5c) {
-            pemKey = `-----BEGIN CERTIFICATE-----\n${
-              key.x5c[0]
-            }\n-----END CERTIFICATE-----`;
+            pemKey = `-----BEGIN CERTIFICATE-----\n${key.x5c[0]}\n-----END CERTIFICATE-----`;
           }
           // keycloak
           if (key.n && key.e) {
@@ -284,6 +287,7 @@ class OAuthUtil {
 
   /**
    * Validate the express.js API request against the tokens validity, refresh access token seamlessly for user if needed
+   * @method{validateAndGetNewToken}
    * @param req
    * @param res
    * @returns {Promise<*>}
@@ -367,6 +371,7 @@ class OAuthUtil {
 
   /**
    * Get the name of the cookie storing access token
+   * @method{getCookieNameAccessToken}
    * @returns(String) access token cookie name
    */
   getCookieNameAccessToken() {
@@ -375,6 +380,7 @@ class OAuthUtil {
 
   /**
    * Get the name of the cookie storing access token expire date
+   * @method{getCookieNameAccessTokenExpiry}
    * @returns(String) access token expire date cookie name
    */
   getCookieNameAccessTokenExpiry() {
@@ -383,6 +389,7 @@ class OAuthUtil {
 
   /**
    * Get the name of the cookie storing refresh token
+   * @method{getCookieNameRefreshToken}
    * @returns(String) refresh token cookie name
    */
   getCookieNameRefreshToken() {

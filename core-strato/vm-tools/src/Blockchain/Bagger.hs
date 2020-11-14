@@ -41,6 +41,7 @@ import qualified Blockchain.Data.TXOrigin           as TO
 import           Blockchain.DB.ChainDB
 import           Blockchain.Database.MerklePatricia (StateRoot (..))
 import qualified Blockchain.EthConf                 as Conf
+import           Blockchain.ExtWord
 import           Blockchain.Sequencer.Event         (OutputBlock (..), OutputTx (..))
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Class
@@ -98,8 +99,7 @@ class VMBase m => MonadBagger m where
           promoteExecutables
 
     processNewBestBlock :: Keccak256 -> DD.BlockData -> [Keccak256] -> m ()
-    processNewBestBlock bh bd txShas = withCurrentBlockHash bh $ do
-        putBlockHeaderInChainDB bd
+    processNewBestBlock bh bd txShas = do
         $logDebugS "Bagger.processNewBestBlock" . T.pack $ "called with " ++ show (length txShas) ++ " txs"
         state <- getBaggerState
         -- This will be rounded in RLPEncode, but just for consistency.
@@ -121,9 +121,10 @@ class VMBase m => MonadBagger m where
                                            , B.startTimestamp        = time
                                            }
         putBaggerState $ state { B.seen = S.empty, B.miningCache = newMiningCache }
-        demoteUnexecutables
-        promoteExecutables
         migrateBlockHeader bd baggerBlockHash
+        withBagger $ do
+          demoteUnexecutables
+          promoteExecutables
 
     makeNewBlock :: m OutputBlock
     makeNewBlock = do
@@ -465,7 +466,9 @@ buildRewardedBlockHeader :: MonadBagger m => DD.BlockData -> [DD.BlockData] -> m
 buildRewardedBlockHeader bd uncles = do
   $logInfoS "Bagger.buildRewardedBlockHeader" . T.pack $ "Baggin' with difficultyBomb = " ++ show flags_difficultyBomb
   $logInfoS "Bagger.buildRewardedBlockHeader" . T.pack $ "pre-reward :: (" ++ format (DD.blockDataStateRoot bd) ++ ")"
+  oldSR <- A.lookupWithDefault (A.Proxy @StateRoot) (Nothing :: Maybe Word256)
   rewardedStateRoot <- rewardCoinbases (DD.blockDataCoinbase bd) uncles (DD.blockDataNumber bd)
+  A.insert (A.Proxy @StateRoot) (Nothing :: Maybe Word256) oldSR
   $logInfoS "Bagger.buildRewardedBlockHeader" . T.pack $ "post-reward :: (" ++ format rewardedStateRoot ++ ")"
   return bd{DD.blockDataStateRoot = rewardedStateRoot}
 

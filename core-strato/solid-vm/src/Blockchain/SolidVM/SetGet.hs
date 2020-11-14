@@ -232,6 +232,8 @@ deleteVar (Constant (SReference a@(AccountPath addr path))) = do
         let elemPath = a `apSnoc` MS.ArrayIndex i
         deleteVar . Constant $ SReference elemPath
     _ -> do -- TODO: handle other types
+      ro <- readOnly <$> getCurrentCallInfo
+      when ro $ invalidWrite "Invalid delete during read-only access" $ "addr: " ++ show addr ++ ", path: " ++ show path
       markDiffForAction addr path $ MS.BDefault
       putSolidStorageKeyVal' addr path $ MS.BDefault
 

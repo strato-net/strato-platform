@@ -16,6 +16,7 @@ import           Data.List.Split            (splitOn)
 import qualified Data.Text                  as T
 import           Network.HTTP.Client        (newManager, defaultManagerSettings)
 import           Network.HTTP.Simple
+import           Network.HTTP.Types.Status
 import           System.Console.GetOpt
 import           System.Environment
 import           System.Exit
@@ -41,8 +42,8 @@ instance HasVault IO where
       Left err -> die $ "failed to get message signature from the admin node's vault: " ++ show err
       Right sig -> return sig
 
-  getPub = error "called getPub, but we shouldn't ever do that in blockstanbul-vote"
-  getShared _ = error "called getShared, but we shouldn't ever do that in blockstanbul-vote"
+  getPub = die "called getPub, but we shouldn't ever do that in blockstanbul-vote"
+  getShared _ = die "called getShared, but we shouldn't ever do that in blockstanbul-vote"
 
 data Options = Options
   { optRemove    :: Bool
@@ -152,7 +153,9 @@ main = do
         resp <- httpBS finalReq
         putStrLn $ "\nresponse status: " ++ (show $ getResponseStatus resp)
         putStrLn $ "response body: " ++ (show $ getResponseBody resp)
-     
-        go xs $ non + 1
+
+        case (statusCode $ getResponseStatus resp) of
+          200 -> go xs $ non + 1
+          _ -> die "vote failed. Terminating..."
     
   go optNodes optNonce   
