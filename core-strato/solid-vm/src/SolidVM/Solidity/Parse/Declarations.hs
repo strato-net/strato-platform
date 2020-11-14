@@ -8,8 +8,6 @@
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 module SolidVM.Solidity.Parse.Declarations where
 
-import           Control.DeepSeq
-
 import           Data.List
 import qualified Data.Map as Map
 import           Data.Maybe
@@ -38,7 +36,7 @@ import           Blockchain.VM.SolidException
 
 data SourceUnit = Pragma Identifier String
                 | NamedXabi Text.Text (Xabi, [Text.Text])
-                deriving (Eq, Show, Read, Generic, NFData)
+                deriving (Eq, Show, Generic)
 
 
 -- | Parses an entire Solidity contract
