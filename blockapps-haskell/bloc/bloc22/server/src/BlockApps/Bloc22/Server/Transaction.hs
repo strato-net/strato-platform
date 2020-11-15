@@ -92,7 +92,7 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
       addr <- case mAddr of
         Nothing -> fmap unAddress . blocVaultWrapper $ getKey userName Nothing
         Just addr' -> return addr'
-      let getSrc p = contractpayloadSrc p <|> join (liftA2 Map.lookup (contractpayloadContract p) msrcs)
+      let getSrc p = Map.union (contractpayloadSrc p) (fromMaybe Map.empty msrcs)
       fmap join . forM (partitionWith transactionType txs') $ \(ttype, txs) -> case ttype of
         TRANSFER -> case txs of
           [] -> return []
@@ -122,7 +122,7 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
             let md = contractpayloadMetadata p
                 bcp = ContractParameters
                         addr
-                        (fromMaybe "" $ getSrc p)
+                        (getSrc p)
                         (contractpayloadContract p)
                         (contractpayloadArgs p)
                         (contractpayloadValue p)

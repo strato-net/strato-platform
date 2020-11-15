@@ -314,7 +314,7 @@ createContractOnMulti src cn args config@TestConfig{..} = do
   _ <- fromEither =<< runClientM (postUsersFill userName addr True) blocclient
   let
     postUsersContractRequest = PostUsersContractRequest
-      { postuserscontractrequestSrc = src
+      { postuserscontractrequestSrc = Map.singleton "" src
       , postuserscontractrequestPassword = pw
       , postuserscontractrequestContract = Just cn
       , postuserscontractrequestArgs = args
