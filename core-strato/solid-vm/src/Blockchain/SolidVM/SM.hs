@@ -18,6 +18,8 @@ module Blockchain.SolidVM.SM (
   SState(..),
   SM,
   MonadSM,
+  HasDebugger,
+  breakpoint,
   action,
   runSM,
   getCurrentAccount,
@@ -44,6 +46,7 @@ module Blockchain.SolidVM.SM (
 
 import           Control.Applicative ((<|>))
 import           Control.Lens hiding (Context)
+import           Control.Monad (when)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import           Control.Monad.IO.Class
@@ -59,6 +62,7 @@ import qualified Data.Map as M
 import           Data.Maybe
 import qualified Data.NibbleString as N
 import qualified Data.Sequence as Q
+import qualified Data.Set as S
 import qualified Data.Text as T
 import           Data.Text.Encoding(encodeUtf8,decodeUtf8)
 
@@ -133,6 +137,10 @@ makeLenses ''SState
 
 type SM m = StateT SState m
 
+class HasDebugger m where
+  isBreakpoint :: Xabi.SourcePos -> m Bool
+  handleBreakpoint :: Xabi.SourcePos -> [CallInfo] -> m ()
+
 type MonadSM m = ( (Account `A.Alters` AddressState) m
                  , (Keccak256 `A.Alters` DBCode) m
                  , A.Selectable (Maybe Word256) ParentChainId m
@@ -140,13 +148,60 @@ type MonadSM m = ( (Account `A.Alters` AddressState) m
                  , HasMemAddressStateDB m
                  , HasMemRawStorageDB m
                  , Mod.Accessible Env.Environment m
+                 , Mod.Accessible DebugSettings m
                  , Mod.Modifiable MemDBs m
                  , Mod.Modifiable Env.Sender m
                  , Mod.Modifiable [CallInfo] m
                  , Mod.Modifiable Action m
                  , Mod.Modifiable (Q.Seq Event) m
+                 , HasDebugger m
                  , MonadIO m --todo: remove
+                 , MonadLogger m
                  )
+
+breakpoint :: MonadSM m => Xabi.SourcePos -> m ()
+breakpoint pos = do
+  isBreak <- isBreakpoint pos
+  when isBreak $ do
+    cStack <- Mod.get (Mod.Proxy @[CallInfo])
+    $logInfoS "breakpoint" . T.pack $ "Paused on breakpoint: " ++ show pos
+    handleBreakpoint pos cStack
+    $logInfoS "breakpoint" . T.pack $ "Resuming from breakpoint: " ++ show pos
+
+instance (Monad m, Mod.Accessible DebugSettings m) => Mod.Accessible DebugSettings (SM m) where
+  access p = lift $ Mod.access p
+
+instance (MonadIO m, Mod.Accessible DebugSettings m) => HasDebugger (SM m) where
+  isBreakpoint pos = do
+    debugSettings <- Mod.access (Mod.Proxy @DebugSettings)
+    case debugSettings of
+      DebuggingDisabled -> pure False
+      DebugSettings{..} -> do
+        let bPoint = Breakpoint (Xabi.sourceName pos)
+                                (Xabi.sourceLine pos)
+                                (Xabi.sourceColumn pos)
+        atomically $ do
+          isRunning <- readTVar running
+          if isRunning
+            then S.member bPoint <$> readTVar breakpoints
+            else pure True
+  handleBreakpoint pos cStack = do
+    debugSettings <- Mod.access (Mod.Proxy @DebugSettings)
+    case debugSettings of
+      DebuggingDisabled -> pure ()
+      DebugSettings{..} -> do
+        let bPoint = Breakpoint (Xabi.sourceName pos)
+                                (Xabi.sourceLine pos)
+                                (Xabi.sourceColumn pos)
+            cStack' = map currentFunctionName cStack
+        atomically $ do
+          writeTVar running False
+          writeTVar current $ Just (bPoint, cStack')
+        atomically $ do
+          isRunning <- readTVar running
+          if isRunning
+            then pure ()
+            else retrySTM
 
 instance Monad m => HasMemAddressStateDB (SM m) where
   getAddressStateTxDBMap      = gets $ _stateTxMap . _ssMemDBs

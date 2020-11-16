@@ -88,8 +88,8 @@ import           Blockchain.Util
 import qualified Text.Colors                           as CL
 import           Text.Format                           (format)
 
-ethereumVM :: LoggingT IO ()
-ethereumVM = void . execContextM $ do
+ethereumVM :: DebugSettings -> LoggingT IO ()
+ethereumVM d = void . execContextM d $ do
 
     $logInfoS "difficultyBomb" $ T.pack $ "Difficulty bomb is " ++ show flags_difficultyBomb -- remove me once we figure out how to print args at startup
 

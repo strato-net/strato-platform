@@ -36,6 +36,7 @@ library:
     - Executable.EVMFlags
   ghc-options: -Wall -O2
   dependencies:
+    - aeson
     - ansi-wl-pprint
     - binary
     - blockapps-mpdbs

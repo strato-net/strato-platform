@@ -18,6 +18,9 @@
 module Blockchain.VMContext
     ( CurrentBlockHash(..)
     , withCurrentBlockHash
+    , Breakpoint(..)
+    , DebugSettings(..)
+    , newDebugSettings
     , VMBase
     , ContextDBs(..)
     , MemDBs(..)
@@ -75,12 +78,14 @@ import           Control.Monad.IO.Class
 import           Blockchain.Output
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Resource
+import qualified Data.Aeson                         as Aeson
 import qualified Data.ByteString                    as B
 import           Data.Default                       (def)
 import qualified Data.Map                           as M
 import           Data.Maybe                         (fromMaybe)
 import qualified Data.NibbleString                  as N
 import qualified Data.Sequence                      as Q
+import qualified Data.Set                           as S
 import           Data.Word
 import qualified Data.Text                          as T
 import           Data.Traversable                   (for)
@@ -135,6 +140,33 @@ instance NFData RBDB.RedisConnection where
 data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo (Keccak256, BlockData, Integer, Int, Int)
     deriving (Eq, Read, Show, Generic, NFData)
 
+data Breakpoint = Breakpoint
+  { breakpointFile   :: String
+  , breakpointLine   :: Int
+  , breakpointColumn :: Int
+  } deriving (Eq, Ord, Show, Generic, NFData, Aeson.ToJSON, Aeson.FromJSON)
+
+data DebugSettings = DebuggingDisabled
+                   | DebugSettings {
+                     running :: TVar Bool
+                   , breakpoints :: TVar (S.Set Breakpoint)
+                   , current :: TVar (Maybe (Breakpoint, [String]))
+                   , exceptionBreakpoints :: TVar Bool
+                   , functionBreakpoints :: TVar Bool
+                   } deriving (Eq, Generic)
+
+instance NFData DebugSettings where
+  rnf DebuggingDisabled = ()
+  rnf DebugSettings{}   = ()
+
+newDebugSettings :: STM DebugSettings
+newDebugSettings = DebugSettings
+               <$> (newTVar True)
+               <*> (newTVar S.empty)
+               <*> (newTVar Nothing)
+               <*> (newTVar False)
+               <*> (newTVar False)
+
 data ContextDBs = ContextDBs
   { _stateDB        :: MP.StateDB
   , _hashDB         :: HashDB
@@ -143,6 +175,7 @@ data ContextDBs = ContextDBs
   , _kafkaState     :: IORef K.KafkaState
   , _redisPool      :: RBDB.RedisConnection
   , _sqldb          :: SQLDB
+  , _debugSettings  :: DebugSettings
   } deriving (Generic, NFData)
 makeLenses ''ContextDBs
 
@@ -178,6 +211,7 @@ type ContextM = ReaderT Context (ResourceT (LoggingT IO))
 type VMBase m = ( MonadIO m
                 , MonadUnliftIO m
                 , MonadLogger m
+                , Mod.Accessible DebugSettings m
                 , Mod.Modifiable ContextState m
                 , Mod.Accessible ContextState m
                 , Mod.Modifiable MemDBs m
@@ -282,6 +316,9 @@ instance Mod.Modifiable ContextState ContextM where
 
 instance Mod.Accessible Context ContextM where
   access _ = ask
+
+instance Mod.Accessible DebugSettings ContextM where
+  access _ = view (dbs . debugSettings) <$> ask
 
 instance Mod.Accessible ContextState ContextM where
   access _ = get
@@ -456,6 +493,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
             , _kafkaState     = initialKafkaState
             , _redisPool      = RBDB.RedisConnection rPool
             , _sqldb          = SQLDB conn
+            , _debugSettings  = DebuggingDisabled
             }
 
       let cmemDBs = MemDBs
@@ -488,9 +526,11 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
       cstate' <- readIORef cstate
       return (a, cstate')
 
-runContextM :: (MonadIO m, MonadUnliftIO m, MonadLogger m) =>
-                ReaderT Context (ResourceT m) a -> m (a, ContextState)
-runContextM f = do
+runContextM :: (MonadIO m, MonadUnliftIO m, MonadLogger m)
+            => DebugSettings
+            -> ReaderT Context (ResourceT m) a
+            -> m (a, ContextState)
+runContextM dSettings f = do
     liftIO $ createDirectoryIfMissing False $ dbDir "h"
     runResourceT $ do
       conn <- createPostgresqlPool connStr 20
@@ -515,6 +555,7 @@ runContextM f = do
             , _kafkaState     = kafkaStateRef
             , _redisPool      = RBDB.RedisConnection rPool
             , _sqldb          = conn
+            , _debugSettings  = dSettings
             }
 
       let cmemDBs = MemDBs
@@ -545,11 +586,17 @@ runContextM f = do
       return (a, cstate')
 
 
-evalContextM :: (MonadIO m, MonadUnliftIO m, MonadLogger m) => ReaderT Context (ResourceT m) a -> m a
-evalContextM f = fst <$> runContextM f
+evalContextM :: (MonadIO m, MonadUnliftIO m, MonadLogger m)
+             => DebugSettings
+             -> ReaderT Context (ResourceT m) a
+             -> m a
+evalContextM d f = fst <$> runContextM d f
 
-execContextM :: (MonadIO m, MonadUnliftIO m, MonadLogger m) => ReaderT Context (ResourceT m) a -> m ContextState
-execContextM f = snd <$> runContextM f
+execContextM :: (MonadIO m, MonadUnliftIO m, MonadLogger m)
+             => DebugSettings
+             -> ReaderT Context (ResourceT m) a
+             -> m ContextState
+execContextM d f = snd <$> runContextM d f
 
 incrementNonce :: (Account `A.Alters` AddressState) f => Account -> f ()
 incrementNonce account = A.adjustWithDefault_ Mod.Proxy account $ \addressState ->

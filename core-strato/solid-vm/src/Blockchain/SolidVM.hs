@@ -38,7 +38,7 @@ import qualified Data.Text.Encoding                   as TE
 import           Data.Time.Clock.POSIX
 import           Data.Traversable
 import qualified Data.Vector as V
-import           GHC.Exts
+import           GHC.Exts                             hiding (breakpoint)
 import           Text.Parsec (runParser)
 import           Text.Printf
 import           Text.Read (readMaybe)
@@ -269,7 +269,7 @@ getCodeAndCollection address' = do
   callStack' <- Mod.get (Mod.Proxy @[CallInfo])
   let maybeAddress =
         case callStack' of
-          (current:_) -> Just $ currentAccount current
+          (current':_) -> Just $ currentAccount current'
           _ -> Nothing
 
   onTraced $ liftIO $ putStrLn $ "----------------- caller address: " ++ fromMaybe "Nothing" (fmap format maybeAddress)
@@ -432,6 +432,7 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.PlusPlus e)))
 
 -- Assignment to an index into an array or mapping
 runStatement st@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" dst@(Xabi.IndexAccess parent (Just indExp)) src)) pos) = do
+  breakpoint pos
   srcVar <- expToVar src
   srcVal <- getVar srcVar
 
@@ -460,10 +461,13 @@ runStatement st@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "="
       return Nothing
 
 
-runStatement st@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" (Xabi.IndexAccess _ Nothing) _)) _) = missingField "index value cannot be empty" (unparseStatement st)
+runStatement st@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" (Xabi.IndexAccess _ Nothing) _)) pos) = do
+  breakpoint pos
+  missingField "index value cannot be empty" (unparseStatement st)
 
 
 runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" dst src)) pos) = do
+  breakpoint pos
   srcVal <- getVar =<< expToVar src
   dstVar <- expToVar dst
 
@@ -511,11 +515,13 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" ds
               logAssigningVariable value'
               setVar v1 $ coerceType ctract ty value'
 -}
-runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e) _) = do
+runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e) pos) = do
+  breakpoint pos
   _ <- getVar =<< expToVar e
   return Nothing -- just throw away the return value
 
 runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition entries maybeExpression) pos) = do
+  breakpoint pos
   let !maybeLoc = case entries of
                       [e] -> Xabi.vardefLocation e
                       es -> if any ((== Just Xabi.Storage) . Xabi.vardefLocation) es
@@ -564,6 +570,7 @@ runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition entries maybeExpre
   return Nothing
 
 runStatement (Xabi.IfStatement condition code' maybeElseCode pos) = do
+  breakpoint pos
   conditionResult <- getBool =<< expToVar condition
   
   onTraced $ do
@@ -578,7 +585,7 @@ runStatement (Xabi.IfStatement condition code' maybeElseCode pos) = do
       Nothing -> return Nothing
 
 runStatement (Xabi.WhileStatement condition code pos) = do
-  
+  breakpoint pos
      
   while (getBool =<< expToVar condition) $ do
       onTraced $ withSrcPos pos $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
@@ -588,6 +595,7 @@ runStatement (Xabi.WhileStatement condition code pos) = do
       -- TODO: this can loop infinitely
 
 runStatement (Xabi.DoWhileStatement code condition pos) = do
+  breakpoint pos
   doWhile (getBool =<< expToVar condition) $ do
       onTraced $ withSrcPos pos $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
       result <- runStatements code
@@ -597,6 +605,7 @@ runStatement (Xabi.DoWhileStatement code condition pos) = do
 
 --TODO- all the variables declared in an `if` or `for` code block need to be deleted when the block is finished....
 runStatement (Xabi.ForStatement maybeInitStatement maybeConditionExp maybeLoopExp code pos) = do
+  breakpoint pos
   _ <-
     case maybeInitStatement of
       Just initStatement -> runStatement $ Xabi.SimpleStatement initStatement pos
@@ -620,7 +629,8 @@ runStatement (Xabi.ForStatement maybeInitStatement maybeConditionExp maybeLoopEx
       _ <- getVar =<< expToVar loopExp
       return result
 
-runStatement (Xabi.Return maybeExpression _) = do
+runStatement (Xabi.Return maybeExpression pos) = do
+  breakpoint pos
   case maybeExpression of
     Just e -> do
       ql <- expToVar e
@@ -629,7 +639,8 @@ runStatement (Xabi.Return maybeExpression _) = do
 --      fmap Just $ getVar =<< expToVar e
     Nothing -> return $ Just SNULL
 
-runStatement (Xabi.AssemblyStatement (Xabi.MloadAdd32 dst src) _) = do
+runStatement (Xabi.AssemblyStatement (Xabi.MloadAdd32 dst src) pos) = do
+  breakpoint pos
   srcVar <- expToVar $ Xabi.Variable $ T.unpack src;
   dstVar <- expToVar $ Xabi.Variable $ T.unpack dst;
 
@@ -637,7 +648,8 @@ runStatement (Xabi.AssemblyStatement (Xabi.MloadAdd32 dst src) _) = do
   setVar dstVar =<< getString srcVar
   return Nothing
 
-runStatement st@(Xabi.EmitStatement eventName exptups _) = do
+runStatement st@(Xabi.EmitStatement eventName exptups pos) = do
+  breakpoint pos
   exps <- mapM (expToVar . snd) exptups
   expVals <- mapM getVar exps
   expStrs <- mapM showSM expVals

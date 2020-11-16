@@ -61,11 +61,16 @@ executables:
     source-dirs: exec_src
     main: Main.hs
     dependencies:
+      - aeson
       - async
       - blockapps-init
       - blockapps-util
+      - containers
       - hflags
+      - servant-server
+      - solid-vm
       - strato-conf
+      - unliftio
       - vm-runner
       - vm-tools
       - wai-middleware-prometheus
