@@ -66,6 +66,8 @@ executables:
       - base
       - blockapps-bloc22-server
       - blockapps-init
+      - cache
+      - clock
       - hflags
       - http-client
       - milena
