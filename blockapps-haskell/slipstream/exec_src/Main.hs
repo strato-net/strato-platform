@@ -65,6 +65,7 @@ createBlocEnv = liftIO $ do
                  , gasOn = error "gasOn being accessed in Slipstream"
                  , globalNonceCounter = error "globalNonceCounter being accessed in Slipstream"
                  , globalSourceCache = error "globalSourceCache being accessed in Slipstream"
+                 , globalCodePtrCache = error "globalCodePtrCache being accessed in Slipstream"
                  , txTBQueue = error "txTBQueue being accessed by in Slipstream"
                  }
 
