@@ -77,6 +77,7 @@ main = do
   vaultWrapperUrl <- parseBaseUrl flags_vaultwrapperurl
   nonceCache <- newCache . Just $ TimeSpec (fromIntegral flags_nonceCounterTimeout) 0
   sourceCache <- newCache . Just $ TimeSpec (fromIntegral flags_sourceCacheTimeout) 0
+  codePtrCache <- newCache . Just $ TimeSpec (fromIntegral flags_sourceCacheTimeout) 0
   tbqueue <- newTBQueueIO $ fromIntegral flags_txQueueSize
   let mode = if flags_publicmode then Bloc22.Public else Bloc22.Enterprise
   let blocEnv = Bloc22.BlocEnv stratoUrl
@@ -88,6 +89,7 @@ main = do
                                flags_gasOn
                                nonceCache
                                sourceCache
+                               codePtrCache
                                tbqueue
   putStrLn $ "Using Strato URL: " ++ showBaseUrl stratoUrl
   void $ Bloc22.runBlocToIO blocEnv Bloc22.runBlocMigrations
