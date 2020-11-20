@@ -52,9 +52,8 @@ contract NonceOrder {
 
 async function createNewUser(username:string) {
   const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
-  const token = await oauth.getAccessTokenByResourceOwnerCredential(username, "1234", "strato-devel");
-  const ouser = {token: token.token.access_token};
-  const user = await rest.createUser(ouser, options);
+  const ouser:OAuthUser = await oauth.getAccessTokenByResourceOwnerCredential(username, "1234", "strato-devel");
+  const user:BlockChainUser = await rest.createUser(ouser, options);
   return user;
 }
 
