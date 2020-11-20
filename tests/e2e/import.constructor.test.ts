@@ -15,7 +15,7 @@ import {
   } from 'blockapps-rest';
 
 let config:Config = fsUtil.getYaml("config.yaml");
-let options:Options = {config};
+let options:Options = {config: {...config, VM: "SolidVM"}};
 
 // ---------------------------------------------------
 //   test suites
