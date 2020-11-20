@@ -25,7 +25,7 @@ chai.use(require('chai-bignumber')());
 let config:Config=fsUtil.getYaml("config.yaml");
 let options:Options={config}
 
-config.apiDebug=true;
+//config.apiDebug=true;
 const nonceOrder = `
 contract NonceOrder {
     uint a = 0;
