@@ -225,8 +225,6 @@ describe("Create Chain", function() {
 
 function promiseTimeout(timeout) {
   return new Promise(function(resolve, reject) {
-    setTimeout(function() {
-      resolve();
-    }, timeout);
+    setTimeout(resolve, timeout);
   });
 }
