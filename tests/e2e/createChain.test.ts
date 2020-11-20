@@ -80,7 +80,6 @@ describe("Create Chain", function() {
   });
 
   it('should create a new chain and query the chain details', async() => {
-    this.timeout(config.timeout);
     // create user
     const alice = await rest.createUser(ouser1, options);
     const bob   = await rest.createUser(ouser2, options);
@@ -124,7 +123,6 @@ describe("Create Chain", function() {
   });
 
   it('should not create a new chain when members list is empty', async() => {
-    this.timeout(config.timeout);
     // create user
     const alice = await rest.createUser(ouser1, options);
     const bob   = await rest.createUser(ouser2, options);
@@ -148,7 +146,6 @@ describe("Create Chain", function() {
   });
 
   it('should not create a new chain when balances are empty', async() => {
-    this.timeout(config.timeout);
     // create user
     const alice = await rest.createUser(ouser1, options);
     const bob   = await rest.createUser(ouser2, options);
@@ -172,7 +169,6 @@ describe("Create Chain", function() {
   });
 
   it('should create a new chain when contract source is empty', async() => {
-    this.timeout(config.timeout);
     // create user
     const alice = await rest.createUser(ouser1, options);
     const bob   = await rest.createUser(ouser2, options);
@@ -200,7 +196,6 @@ describe("Create Chain", function() {
   });
 
   it('should not create a new chain when all accounts have 0 balance', async() => {
-    this.timeout(config.timeout);
     // create user
     const alice = await rest.createUser(ouser1, options);
     const bob   = await rest.createUser(ouser2, options);
