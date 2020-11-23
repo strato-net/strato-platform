@@ -11,7 +11,8 @@ import {
   fsUtil,
   oauthUtil,
   assert,
-  constants
+  constants,
+  AccessToken
   } from 'blockapps-rest';
 
 import BigNumber from "bignumber.js";
@@ -49,8 +50,10 @@ describe("Create Chain", function() {
   
   before(async () => {
     oauth = oauthUtil.init(config.nodes[0].oauth);
-    ouser1 = await oauth.getAccessTokenByResourceOwnerCredential("user1", "1234", "strato-devel");
-    ouser2 = await oauth.getAccessTokenByResourceOwnerCredential("user2", "1234", "strato-devel");
+    const accessToken1:AccessToken = await oauth.getAccessTokenByResourceOwnerCredential("user1", "1234", "strato-devel");
+    ouser1 = {token: accessToken1.token.access_token};
+    const accessToken2:AccessToken = await oauth.getAccessTokenByResourceOwnerCredential("user2", "1234", "strato-devel");
+    ouser2 = {token: accessToken2.token.access_token};
   });
 
   it('should create 100 new chains', async() => {

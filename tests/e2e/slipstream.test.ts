@@ -11,7 +11,8 @@ import {
   fsUtil,
   oauthUtil,
   assert,
-  constants
+  constants,
+  AccessToken
   } from 'blockapps-rest';
 
 import BigNumber from "bignumber.js";
@@ -28,7 +29,8 @@ config.apiDebug = true;
 
 async function upload(name:string, source:string, options:Options):Promise<[BlockChainUser, Contract]> {
   const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
-  const ouser = await oauth.getAccessTokenByClientSecret();
+  const accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
+  const ouser:OAuthUser = {token: accessToken.token.access_token};
   const user = await rest.createUser(ouser, options);
 //  await rest.fill(user, true);
   console.log(`User ${user.address} uploading a ${name}`);

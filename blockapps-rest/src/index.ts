@@ -4,6 +4,7 @@ import parser from "./util/solidityParser";
 import fsUtil from "./util/fsUtil";
 import importer from "./util/importer";
 import oauthUtil from "./util/oauth.util";
+import {AccessToken} from "./util/oauth.util";
 import assert from "./util/assert";
 import { Options, Config, StratoUser, OAuthUser, BlockChainUser, Contract, ContractDefinition, CallArgs, SendTx } from "./types";
 import * as constants from "./constants";
@@ -25,5 +26,6 @@ export {
   ContractDefinition,
   constants,
   CallArgs,
-  SendTx
+  SendTx,
+  AccessToken
 };

@@ -10,7 +10,8 @@ import {
   util,
   fsUtil,
   oauthUtil,
-  assert
+  assert,
+  AccessToken
   } from 'blockapps-rest';
 
 let config:Config = fsUtil.getYaml("config.yaml");
@@ -106,7 +107,8 @@ describe('Solid VM: Contract uploads', async () => {
 
   before(async () => {
     const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
-    let ouser:OAuthUser = await oauth.getAccessTokenByClientSecret();
+    const accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
+    const ouser:OAuthUser = {token: accessToken.token.access_token};
     user = await rest.createUser(ouser, options);
   });
 

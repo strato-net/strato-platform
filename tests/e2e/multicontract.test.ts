@@ -11,7 +11,8 @@ import {
   fsUtil,
   oauthUtil,
   assert,
-  constants
+  constants,
+  AccessToken
   } from 'blockapps-rest';
 
 import BigNumber from "bignumber.js";
@@ -41,7 +42,8 @@ describe("Concurrent uploads", function() {
     this.timeout(config.timeout);
     const user_name= 'multi_contract' + util.uid();
     const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
-    const ouser = await oauth.getAccessTokenByClientSecret();
+    let accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
+    let ouser:OAuthUser = {token: accessToken.token.access_token};
     const user = await rest.createUser(ouser, options);
     let balance = new BigNumber(0);
     while (balance.isZero()) {

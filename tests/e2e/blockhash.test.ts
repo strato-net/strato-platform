@@ -8,7 +8,8 @@ import {
   util,
   fsUtil,
   oauthUtil,
-  assert
+  assert,
+  AccessToken
   } from 'blockapps-rest';
 
 const source = `
@@ -31,7 +32,8 @@ describe('Using blockhash', function () {
 
     const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
 
-    let ouser:OAuthUser = await oauth.getAccessTokenByClientSecret();
+    let accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
+    const ouser:OAuthUser = {token: accessToken.token.access_token};
 
     const admin:BlockChainUser = await rest.createUser(ouser, options);
 

@@ -174,7 +174,7 @@ class OAuthUtil {
     clientId = undefined,
     clientSecret = undefined,
     scope = undefined
-  ):Promise<OAuthUser> {
+  ):Promise<AccessToken> {
     const tokenConfig = {
       scope: scope || this.scope
     };
@@ -200,7 +200,7 @@ class OAuthUtil {
       const result = await this.oauth2.clientCredentials.getToken(tokenConfig);
       accessTokenResponse = this.oauth2.accessToken.create(result);
     }
-    return {token: accessTokenResponse.token.access_token};
+    return accessTokenResponse;
   }
 
   /**
@@ -211,7 +211,7 @@ class OAuthUtil {
    * @param {String} scope
    * @returns AccessTokenResponse
    */
-  async getAccessTokenByResourceOwnerCredential(username, password, scope?):Promise<OAuthUser> {
+  async getAccessTokenByResourceOwnerCredential(username, password, scope?):Promise<AccessToken> {
     const tokenConfig = {
       username: username || this.serviceUsername,
       password: password || this.servicePassword,
@@ -221,7 +221,7 @@ class OAuthUtil {
     const result = await this.oauth2.ownerPassword.getToken(tokenConfig);
     const accessTokenResponse = this.oauth2.accessToken.create(result);
 
-    return {token: accessTokenResponse.token.access_token};
+    return accessTokenResponse;
   }
 
   /** Verify JWT signature - to verify the requests to middleware that are not forwarded to STRATO to be verified on it's side
@@ -414,4 +414,4 @@ class OAuthUtil {
 
 export default OAuthUtil;
 
-export { OAuthConfig }
+export { OAuthConfig, AccessToken };
