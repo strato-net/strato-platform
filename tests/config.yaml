@@ -1,6 +1,5 @@
 apiDebug: false
 password: "1234"
-VM: SolidVM
 timeout: 600000
 contractsPath: ./contracts/
 
