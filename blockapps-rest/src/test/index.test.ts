@@ -15,7 +15,10 @@ if (!process.env.USER_TOKEN) {
   assert.isUndefined(loadEnv.error);
 }
 
+
 const config = factory.getTestConfig();
+
+const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
 
 const fixtures = factory.getTestFixtures();
 
@@ -109,7 +112,8 @@ describe("state", function() {
   const options:Options = { config };
 
   before(async () => {
-    const userArgs = { token: process.env.USER_TOKEN };
+    let accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
+    const userArgs = { token: accessToken.token.access_token };
     admin = await factory.createAdmin(userArgs, options);
   });
 
@@ -207,7 +211,8 @@ describe("call", function() {
   const var2 = 5678;
 
   before(async () => {
-    const userArgs = { token: process.env.USER_TOKEN };
+    let accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
+    const userArgs = { token: accessToken.token.access_token };
     admin = await factory.createAdmin(userArgs, options);
   });
 
@@ -284,7 +289,14 @@ describe("call", function() {
 describe("auth user", function() {
   this.timeout(config.timeout);
   const options:Options = { config };
-  const user = { token: process.env.USER_TOKEN };
+
+  let user:OAuthUser;
+
+  before(async () => {
+    const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
+    let accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
+    user = { token: accessToken.token.access_token };
+  });
 
   it("getKey", async () => {
     const address = await rest.getKey(user, options);
@@ -326,8 +338,9 @@ describe("auth user", function() {
   });
 
   it("createOrGetKey", async () => {
+    let accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
     const address = await rest.createOrGetKey(
-      { token: process.env.USER_TOKEN },
+      { token: accessToken.token.access_token },
       options
     );
     const isValidAddress = util.isAddress(address);
@@ -341,7 +354,8 @@ describe("history", function() {
   const options:Options = { config };
 
   before(async () => {
-    const userArgs = { token: process.env.USER_TOKEN };
+    let accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
+    const userArgs = { token: accessToken.token.access_token };
     admin = await factory.createAdmin(userArgs, options);
   });
 

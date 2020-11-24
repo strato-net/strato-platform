@@ -4,7 +4,9 @@ import assert from "../util/assert";
 import util from "../util/util";
 import factory from "./factory";
 import { TxResultStatus } from "../constants";
-import { Options } from "../types";
+import { Options, OAuthUser } from "../types";
+import oauthUtil from "../util/oauth.util";
+import { AccessToken } from "../util/oauth.util";
 
 import dotenv from "dotenv";
 
@@ -22,7 +24,9 @@ describe("rest_7", function () {
   const options:Options = { config };
 
   before(async () => {
-    const userArgs = { token: process.env.USER_TOKEN };
+    const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
+    let accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
+    const userArgs:OAuthUser = {token: accessToken.token.access_token};
     admin = await factory.createAdmin(userArgs, options);
   });
 
@@ -416,7 +420,9 @@ describe("search until", function () {
   let admin, contract;
 
   before(async () => {
-    const userArgs = { token: process.env.USER_TOKEN };
+    const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
+    let accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
+    const userArgs:OAuthUser = {token: accessToken.token.access_token};
     admin = await factory.createAdmin(userArgs, options);
   });
 
@@ -487,7 +493,9 @@ describe("search query", function () {
   let admin;
 
   before(async () => {
-    const userArgs = { token: process.env.USER_TOKEN };
+    const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
+    let accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
+    const userArgs:OAuthUser = {token: accessToken.token.access_token};
     admin = await factory.createAdmin(userArgs, options);
   });
 
@@ -735,7 +743,9 @@ describe("chain", function () {
   }
 
   before(async () => {
-    const userArgs = { token: process.env.USER_TOKEN };
+    const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
+    let accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
+    const userArgs:OAuthUser = {token: accessToken.token.access_token};
     admin = await factory.createAdmin(userArgs, options);
   });
 
