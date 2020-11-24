@@ -6,7 +6,9 @@ import assert from "../util/assert";
 import util from "../util/util";
 import fsUtil from "../util/fsUtil";
 import factory from "./factory";
-import { Options, Contract, TransactionResultHash } from "../types"
+import { Options, Contract, TransactionResultHash, OAuthUser } from "../types";
+import oauthUtil from "../util/oauth.util";
+import { AccessToken } from "../util/oauth.util";
 
 if (!process.env.USER_TOKEN) {
   const loadEnv = dotenv.config();
@@ -25,7 +27,7 @@ describe("contracts", function() {
   before(async () => {
     const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
     let accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
-    const userArgs = { token: accessToken };
+    const userArgs:OAuthUser = { token: accessToken.token.access_token };
     admin = await factory.createAdmin(userArgs, options);
   });
 
