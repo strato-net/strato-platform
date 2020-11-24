@@ -23,7 +23,9 @@ describe("contracts", function() {
   const options:Options = { config };
 
   before(async () => {
-    const userArgs = { token: process.env.USER_TOKEN };
+    const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
+    let accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
+    const userArgs = { token: accessToken };
     admin = await factory.createAdmin(userArgs, options);
   });
 
