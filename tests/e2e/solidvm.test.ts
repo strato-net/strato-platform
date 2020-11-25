@@ -103,8 +103,9 @@ async function index(contract:Contract) {
   return await rest.search(user, contract, {...options, query: {address: `eq.${contract.address}`}});
 }
 
-describe('Solid VM: Contract uploads', async () => {
-
+describe('Solid VM: Contract uploads', function() {
+  this.timeout(config.timeout);
+  
   before(async () => {
     const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
     const accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
@@ -132,12 +133,13 @@ describe('Solid VM: Contract uploads', async () => {
     const gotIndex = await index(contract);
     assert.equal(gotIndex[0].address, contract.address);
     assert.equal(gotIndex[0].count, 5);
-  }).timeout(config.timeout);
+  });
 
   it ('does not drop columns', async () => {
     const contract = await upload('SolidVM', 'PartialModify', partialModify);
     console.log(`Contract is ${JSON.stringify(contract)}`);
-  
+
+    await sleep(2000);
     const index1 = await rest.search(user, contract,
       {...options, query: {address: `eq.${contract.address}`}});
     console.log(`First index response is: ${JSON.stringify(index1)}`);
@@ -147,16 +149,18 @@ describe('Solid VM: Contract uploads', async () => {
 
     await doubleY(user, contract, 'SolidVM');
 
+    await sleep(2000);
     const index2 = await rest.search(user, contract,
       {...options, query: {address: `eq.${contract.address}`, y: "eq.144"}});
     assert.equal(index2[0].address, contract.address);
     assert.equal(index2[0].x, 83);
     assert.equal(index2[0].y, 144);
-  }).timeout(config.timeout);
+  });
 
   it ('merges concurrent deltas', async () => {
     const contract = await upload('SolidVM', 'Deployer', deployAndModify);
 
+    await sleep(2000);
     const deployIndex = await rest.search(user, contract,
       {...options, query: {address: `eq.${contract.address}`}});
      console.log(`Index response is: ${JSON.stringify(deployIndex)}`);
@@ -166,17 +170,18 @@ describe('Solid VM: Contract uploads', async () => {
     assert.equal(modifyIndex[0].address, pm);
     assert.equal(modifyIndex[0].y, 144, "has y");
     assert.equal(modifyIndex[0].x, 83, "has x");
-  }).timeout(config.timeout);
+  });
 
   it ('Indexes enums numerically', async () => {
     const contract = await upload('SolidVM', 'EnumContract', enumContract);
 
+    await sleep(2000);
     const index = await rest.search(user, contract,
       {...options, query: {address: `eq.${contract.address}`}});
     console.log(`Index returned: ${JSON.stringify(index, null, 2)}`);
     assert.equal(index[0].address, contract.address);
     assert.equal(index[0].e, 2);
-  }).timeout(config.timeout);
+  });
 
   it ('Can encode strings as return values', async () => {
     const contract = await upload('SolidVM', 'StringReturns', stringsContract);
@@ -199,5 +204,10 @@ describe('Solid VM: Contract uploads', async () => {
     assert.equal(mixedTup[3], "STRATO");
    
 
-  }).timeout(config.timeout);
+  });
 })
+
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
