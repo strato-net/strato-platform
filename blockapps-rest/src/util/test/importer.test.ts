@@ -3,12 +3,12 @@ import importer from "../importer";
 import rest from "../../rest";
 import util from "../util";
 import factory from "../../test/factory";
-import { Options, Contract } from "../../types";
+import { Options, Contract, Config } from "../../types";
 
-const config = factory.getTestConfig();
+const config:Config = <Config>factory.getTestConfig();
 const fixtures = `${util.cwd}/lib/util/test/fixtures/`;
 
-describe("imports", () => {
+describe("imports", function() {
   this.timeout(config.timeout);
   let admin;
   const options:Options = { config };
