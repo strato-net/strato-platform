@@ -9,6 +9,7 @@ const config = factory.getTestConfig();
 const fixtures = `${util.cwd}/lib/util/test/fixtures/`;
 
 describe("imports", () => {
+  this.timeout(config.timeout);
   let admin;
   const options:Options = { config };
 
