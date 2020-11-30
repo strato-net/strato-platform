@@ -24,7 +24,7 @@ import           Crypto.Util                          (i2bs_unsized)
 import qualified Data.ByteString.Char8                as BC
 import qualified Data.ByteString.Lazy.Char8           as BLC
 import qualified Data.Map                             as Map
-import           Data.Maybe                           (catMaybes)
+import           Data.Maybe                           (catMaybes, fromMaybe)
 import           Data.List.Split                      (chunksOf)
 import qualified Data.Text                            as T
 import           Data.Time.Clock.POSIX
@@ -35,8 +35,9 @@ import           Blockchain.Database.MerklePatricia
 
 import qualified Blockchain.Strato.Model.Action               as A
 import           Blockchain.Data.AddressStateDB
-import           Blockchain.Data.BlockDB
+import           Blockchain.Data.Block
 import           Blockchain.Data.ChainInfo
+import           Blockchain.Data.DataDefs
 import           Blockchain.Data.GenesisInfo
 import           Blockchain.DB.AddressStateDB
 import           Blockchain.DB.CodeDB
@@ -46,6 +47,7 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.EthConf                   (runKafkaConfigured)
+import           Blockchain.ExtWord
 import           Blockchain.Output
 import           Blockchain.Strato.Model.Keccak256
 
@@ -54,13 +56,17 @@ import qualified Blockchain.Strato.StateDiff          as StateDiff (StateDiff (c
 import           Blockchain.Strato.StateDiff.Database
 import           Blockchain.Strato.StateDiff.Kafka    (writeActionJSONToKafka, filterResponse)
 
+import           Blockchain.Strato.Model.Account
 import qualified Blockchain.Strato.Model.Address      as Ad
 import qualified Blockchain.Strato.Model.ExtendedWord as Ext
 
 import           Text.Format
 
-initializeBlankStateDB :: (Modifiable StateRoot m, (StateRoot `A.Alters` NodeData) m) => m ()
-initializeBlankStateDB = initializeBlank >> setStateDBStateRoot emptyTriePtr
+initializeBlankStateDB :: ( (Maybe Word256 `A.Alters` StateRoot) m
+                          , (StateRoot `A.Alters` NodeData) m
+                          )
+                       => Maybe Word256 -> m ()
+initializeBlankStateDB chainId = initializeBlank >> setStateDBStateRoot chainId emptyTriePtr
 
 putStorageTrie :: ( MonadLogger m
                   , HasHashDB m
@@ -68,11 +74,11 @@ putStorageTrie :: ( MonadLogger m
                   , HasStateDB m
                   , HasStorageDB m
                   , HasMemStorageDB m
-                  , (Ad.Address `A.Alters` AddressState) m
+                  , (Account `A.Alters` AddressState) m
                   ) =>
-                  Ad.Address -> [(Ext.Word256, Ext.Word256)] -> m ()
-putStorageTrie address slots = do
-    mapM_ (uncurry $ putStorageKeyVal' address) slots
+                  Account -> [(Ext.Word256, Ext.Word256)] -> m ()
+putStorageTrie account slots = do
+    mapM_ (uncurry $ putStorageKeyVal' account) slots
     flushMemStorageDB
     Mem.flushMemAddressStateDB
 
@@ -82,22 +88,24 @@ putAccount :: ( MonadLogger m
               , HasStateDB m
               , HasStorageDB m
               , HasMemStorageDB m
-              , (Ad.Address `A.Alters` AddressState) m
+              , (Account `A.Alters` AddressState) m
               )
-           => AccountInfo
+           => Maybe Word256 
+           -> AccountInfo
            -> m ()
-putAccount acc = case acc of
+putAccount chainId acc = case acc of
   NonContract address balance' ->
-    A.insert A.Proxy address blankAddressState{addressStateBalance=balance'}
+    A.insert A.Proxy (Account address chainId) blankAddressState{addressStateBalance=balance'}
   ContractNoStorage address balance' codeHash' -> do
-    A.insert A.Proxy address blankAddressState{ addressStateBalance=balance'
+    A.insert A.Proxy (Account address chainId) blankAddressState{ addressStateBalance=balance'
                                               , addressStateCodeHash=codeHash'
                                               }
   ContractWithStorage address balance' codeHash' slots -> do
-    A.insert A.Proxy address blankAddressState{ addressStateBalance=balance'
-                                              , addressStateCodeHash=codeHash'
-                                              }
-    putStorageTrie address slots
+    let acct = Account address chainId
+    A.insert A.Proxy acct blankAddressState{ addressStateBalance=balance'
+                                           , addressStateCodeHash=codeHash'
+                                           }
+    putStorageTrie acct slots
 
 initializeStateDB :: ( MonadLogger m
                      , HasHashDB m
@@ -105,13 +113,14 @@ initializeStateDB :: ( MonadLogger m
                      , HasStateDB m
                      , HasStorageDB m
                      , HasMemStorageDB m
-                     , (Ad.Address `A.Alters` AddressState) m
+                     , (Account `A.Alters` AddressState) m
                      )
-                  => [AccountInfo]
+                  => Maybe Word256
+                  -> [AccountInfo]
                   -> m ()
-initializeStateDB addressInfo = do
-    initializeBlankStateDB
-    mapM_ putAccount addressInfo
+initializeStateDB chainId addressInfo = do
+    initializeBlankStateDB chainId
+    mapM_ (putAccount chainId) addressInfo
     Mem.flushMemAddressStateDB
 
 initializeStateDBAndAccountInfos :: ( MonadLogger m
@@ -119,16 +128,17 @@ initializeStateDBAndAccountInfos :: ( MonadLogger m
                                     , Mem.HasMemAddressStateDB m
                                     , HasStorageDB m
                                     , HasMemStorageDB m
-                                    , Modifiable StateRoot m
-                                    , (Ad.Address `A.Alters` AddressState) m
+                                    , (Maybe Word256 `A.Alters` StateRoot) m
+                                    , (Account `A.Alters` AddressState) m
                                     , (StateRoot `A.Alters` NodeData) m
                                     , MonadIO m
                                     )
-                                 => [AccountInfo]
+                                 => Maybe Word256
+                                 -> [AccountInfo]
                                  -> String
                                  -> m ()
-initializeStateDBAndAccountInfos addressInfo genesisBlockName = do
-    initializeStateDB addressInfo
+initializeStateDBAndAccountInfos chainId addressInfo genesisBlockName = do
+    initializeStateDB chainId addressInfo
 
     let accountInfoFilename = genesisBlockName ++ "AccountInfo"
 
@@ -144,18 +154,18 @@ initializeStateDBAndAccountInfos addressInfo genesisBlockName = do
         case words $ BLC.unpack theLine of
          [] -> return ()
          ["s", a, k, v]  -> do
-           let address = Ad.Address $ parseHex a
-           putStorageKeyVal' address (parseHex k) (parseHex v)
+           let account = Account (Ad.Address $ parseHex a) chainId
+           putStorageKeyVal' account (parseHex k) (parseHex v)
          ["a", a, b]  -> do
-           let address = Ad.Address $ parseHex a
+           let account = Account (Ad.Address $ parseHex a) chainId
            $logInfoS "initializeStateDBAndAccountInfos" . T.pack $
-             "adding account: " ++ format address
-           A.insert A.Proxy address blankAddressState{addressStateBalance= read b}
+             "adding account: " ++ format account
+           A.insert A.Proxy account blankAddressState{addressStateBalance= read b}
          ["a", a, b, c]  -> do
-           let address = Ad.Address $ parseHex a
+           let account = Account (Ad.Address $ parseHex a) chainId
            $logInfoS "initializeStateDBAndAccountInfos" . T.pack $
-             "adding account: " ++ format address
-           A.insert A.Proxy address blankAddressState{addressStateBalance=read b,  addressStateCodeHash=EVMCode $ unsafeCreateKeccak256FromWord256 $ parseHex c}
+             "adding account: " ++ format account
+           A.insert A.Proxy account blankAddressState{addressStateBalance=read b,  addressStateCodeHash=EVMCode $ unsafeCreateKeccak256FromWord256 $ parseHex c}
          _ -> error $ "wrong format for accountInfo, line is: " ++ BLC.unpack theLine
 
       $logInfoS "initializeStateDBAndAccountInfos" . T.pack $
@@ -165,7 +175,7 @@ initializeStateDBAndAccountInfos addressInfo genesisBlockName = do
 
     forM_ addressInfo $ \account -> do
       $logInfoS "initializeStateDBAndAccountInfos" . T.pack $ show account
-      putAccount account
+      putAccount chainId account
     Mem.flushMemAddressStateDB
 
 
@@ -189,14 +199,14 @@ chainInfoToGenesisState :: ( MonadLogger m
                            , HasStateDB m
                            , HasStorageDB m
                            , HasMemStorageDB m
-                           , (Ad.Address `A.Alters` AddressState) m
+                           , (Account `A.Alters` AddressState) m
                            ) =>
-                           String -> ChainInfo -> m StateRoot
-chainInfoToGenesisState vmType ci = do
+                           String -> Maybe Word256 -> ChainInfo -> m StateRoot
+chainInfoToGenesisState vmType chainId ci = do
     initializeCodeDB vmType (codeInfo $ chainInfo ci)
     
-    initializeStateDB (accountInfo $ chainInfo ci)
-    get (Proxy @StateRoot)
+    initializeStateDB chainId (accountInfo $ chainInfo ci)
+    A.lookupWithDefault (Proxy @StateRoot) chainId
 
 zipSourceInfo :: [AccountInfo] -> [CodeInfo] -> [(AccountInfo, CodeInfo)]
 zipSourceInfo accounts codes =
@@ -206,9 +216,11 @@ zipSourceInfo accounts codes =
       findCodeFor (NonContract _ _) = Nothing
       findCodeFor acc@(ContractNoStorage _ _ (EVMCode hsh)) = (acc,) <$> Map.lookup hsh codeMap
       findCodeFor acc@(ContractNoStorage _ _ (SolidVMCode _ hsh)) = (acc,) <$> Map.lookup hsh codeMap
+      findCodeFor (ContractNoStorage _ _ (CodeAtAccount _ _)) = Nothing -- this is only for the main chain genesis block, so we'll stipulate that it cannot contain references by address
       findCodeFor acc@(ContractWithStorage _ _ (EVMCode hsh) _) = (acc,) <$> Map.lookup hsh codeMap
       findCodeFor acc@(ContractWithStorage _ _ (SolidVMCode _ hsh) _) = (acc,) <$> Map.lookup hsh codeMap
-  in catMaybes . map findCodeFor $ accounts
+      findCodeFor (ContractWithStorage _ _ (CodeAtAccount _ _) _) = Nothing
+  in catMaybes $ map findCodeFor accounts
 
 genesisInfoToGenesisBlock :: ( MonadLogger m
                              , HasCodeDB m
@@ -217,7 +229,7 @@ genesisInfoToGenesisBlock :: ( MonadLogger m
                              , HasStateDB m
                              , HasStorageDB m
                              , HasMemStorageDB m
-                             , (Ad.Address `A.Alters` AddressState) m
+                             , (Account `A.Alters` AddressState) m
                              , MonadIO m
                              )
                           => GenesisInfo
@@ -228,11 +240,10 @@ genesisInfoToGenesisBlock gi gn as = do
     let codes = genesisInfoCodeInfo gi
     let accounts = genesisInfoAccountInfo gi
     initializeCodeDB "EVM" codes
-    initializeStateDBAndAccountInfos accounts gn
-    sr <- get (Proxy @StateRoot)
+    initializeStateDBAndAccountInfos (Nothing :: Maybe Word256) accounts gn
+    sr <- A.lookupWithDefault (Proxy @StateRoot) (Nothing :: Maybe Word256)
     let sourceInfo = zipSourceInfo (accounts ++ as) codes
-    return (sourceInfo, Block {
-        blockBlockData = BlockData {
+        bData = BlockData {
             blockDataParentHash = genesisInfoParentHash gi,
             blockDataUnclesHash = genesisInfoUnclesHash gi,
             blockDataCoinbase = genesisInfoCoinbase gi,
@@ -248,7 +259,9 @@ genesisInfoToGenesisBlock gi gn as = do
             blockDataExtraData = i2bs_unsized $ genesisInfoExtraData gi,
             blockDataMixHash = genesisInfoMixHash gi,
             blockDataNonce = genesisInfoNonce gi
-        },
+          }
+    return (sourceInfo, Block {
+        blockBlockData = bData,
         blockReceiptTransactions = [],
         blockBlockUncles         = []
     })
@@ -258,19 +271,18 @@ initializeChainDBs :: ( MonadLogger m
                       , HasHashDB m
                       , HasSQLDB m
                       , HasStateDB m
+                      , (Account `A.Alters` AddressState) m
+                      , A.Selectable (Maybe Word256) ParentChainId m
                       )
-                   => Ext.Word256
+                   => Maybe Ext.Word256
                    -> ChainInfo
-                   -> StateRoot
                    -> m ()
-initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) sRoot = do
-  existingSR <- get (Proxy @StateRoot)
-  put (Proxy @StateRoot) sRoot
-  genAddrStates <- getAllAddressStates
-  put (Proxy @StateRoot) existingSR
+initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) = do
+  sRoot <- A.lookupWithDefault (A.Proxy @StateRoot) chainId
+  genAddrStates <- getAllAddressStates chainId
   accountDiffs <- mapM eventualAccountState . Map.fromList $ genAddrStates
   let diff = StateDiff {
-      StateDiff.chainId   = Just chainId,
+      StateDiff.chainId   = chainId,
       blockNumber         = 0,
       StateDiff.blockHash = unsafeCreateKeccak256FromWord256 0,
       StateDiff.stateRoot = sRoot,
@@ -286,36 +298,36 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) sRoot = do
                                        Nothing -> []
                                        Just n -> [("name", n)]
          in (cHash, md)
-      getMetadata = fmap (`Map.union` chainMetadata) . flip Map.lookup metadatas
-      toAction a d = A.Action
-        { A._actionBlockHash = creationBlock
-        , A._actionBlockTimestamp = posixSecondsToUTCTime 0
-        , A._actionBlockNumber = 0
-        , A._actionTransactionHash = unsafeCreateKeccak256FromWord256 chainId
-        , A._actionTransactionChainId = Just chainId
-        , A._actionTransactionSender = Ad.Address 0
-        , A._actionData = Map.singleton a $
-                           A.ActionData
-                             (codeHash d)
-                             vmType
-                             (case storage d of
-                                EVMDiff m -> A.ActionEVMDiff $ Map.map fromDiff m
-                                SolidVMDiff m -> A.ActionSolidVMDiff $ Map.map fromDiff m)
-                             [A.emptyCallData]
-        , A._actionMetadata = getMetadata ch
-        , A._actionEvents = S.empty
-        }
+      getMetadata mch = fmap (`Map.union` chainMetadata) $ flip Map.lookup metadatas =<< mch
+      toAction a d = do
+        vm <- codePtrToCodeKind chainId $ codeHash d
+        pure A.Action
+          { A._actionBlockHash = creationBlock
+          , A._actionBlockTimestamp = posixSecondsToUTCTime 0
+          , A._actionBlockNumber = 0
+          , A._actionTransactionHash = unsafeCreateKeccak256FromWord256 $ fromMaybe 0 chainId
+          , A._actionTransactionChainId = chainId
+          , A._actionTransactionSender = Account (Ad.Address 0) chainId
+          , A._actionData = Map.singleton a $
+                             A.ActionData
+                               (codeHash d)
+                               vm
+                               (case storage d of
+                                  EVMDiff m -> A.ActionEVMDiff $ Map.map fromDiff m
+                                  SolidVMDiff m -> A.ActionSolidVMDiff $ Map.map fromDiff m)
+                               [A.emptyCallData]
+          , A._actionMetadata = getMetadata ch
+          , A._actionEvents = S.empty
+          }
         where
              ch =
                case codeHash d of
-                 EVMCode ch' -> ch'
-                 SolidVMCode _ ch' -> ch'
-             vmType = case codeHash d of
-                 EVMCode _ -> EVM
-                 SolidVMCode _ _ -> SolidVM
+                 EVMCode ch' -> Just ch'
+                 SolidVMCode _ ch' -> Just ch'
+                 CodeAtAccount _ _ -> Nothing
       fromDiff (Value v) = v
-      squashMap f = map (uncurry f) . Map.toList
-      actions = squashMap toAction accountDiffs
+      squashMap f = traverse (uncurry f) . Map.toList
+  actions <- squashMap toAction accountDiffs
   mErr <- liftIO . runKafkaConfigured "strato-genesis" $ writeActionJSONToKafka actions
   case filterResponse <$> mErr of
     Right [] -> return ()

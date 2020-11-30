@@ -1,5 +1,6 @@
 {-# LANGUAGE ConstraintKinds   #-}
 {-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
@@ -51,6 +52,7 @@ import qualified Text.Colors                   as CL
 import           Text.Format
 
 type HasPrivacyRegistries m = ( (Keccak256 `Alters` OutputBlock) m
+                              , (Keccak256 `Alters` EmittedBlock) m
                               , (Keccak256 `Alters` OutputTx) m
                               , (Keccak256 `Alters` ChainHashEntry) m
                               , (Word256 `Alters` ChainIdEntry) m

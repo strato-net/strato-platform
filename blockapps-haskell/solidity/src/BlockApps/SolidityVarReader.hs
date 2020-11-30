@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
@@ -54,6 +55,7 @@ import           BlockApps.Solidity.TypeDefs
 import           BlockApps.Solidity.Value
 import           BlockApps.Storage                (Storage, Cache)
 import qualified BlockApps.Storage                as Storage
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
@@ -71,8 +73,10 @@ valueToSolidityValue = \case
   SimpleValue (ValueString s) -> SolidityValueAsString s
   SimpleValue (ValueAddress (Address addr)) ->
    SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral addr::Integer)
-  ValueContract (Address addr) ->
-   SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral addr::Integer)
+  SimpleValue (ValueAccount acct) ->
+   SolidityValueAsString $ Text.pack $ show acct
+  ValueContract acct ->
+   SolidityValueAsString $ Text.pack $ show acct
   ValueArrayFixed _ values -> SolidityArray $ map valueToSolidityValue values
   ValueArrayDynamic values -> SolidityArray $ map valueToSolidityValue $ unsparse values
   SimpleValue (ValueBytes _ bytes) ->
@@ -216,11 +220,18 @@ decodeCacheValue' typeDefs'@TypeDefs{..} cache position@Storage.Position{..} val
       SimpleValue (ValueInt _ _ addr) -> SimpleValue . ValueAddress . Address $ fromIntegral addr
       a@(SimpleValue (ValueAddress _)) -> a
       o -> error $ "decodeCacheValue': Expected ValueInt or ValueAddress, but got: " ++ show o
+  SimpleType TypeAccount ->
+    let
+      v = decodeCacheValue' typeDefs' cache position value $ SimpleType $ TypeInt False (Just 20)
+     in case v of
+      SimpleValue (ValueInt _ _ addr) -> SimpleValue . ValueAccount . unspecifiedChain $ fromIntegral addr
+      a@(SimpleValue (ValueAccount _)) -> a
+      o -> error $ "decodeCacheValue': Expected ValueInt or ValueAccount, but got: " ++ show o
   TypeContract _ ->
     let
       v = decodeCacheValue' typeDefs' cache position value $ SimpleType $ TypeInt False (Just 20)
      in case v of
-      SimpleValue (ValueInt _ _ addr) -> ValueContract . Address $ fromIntegral addr
+      SimpleValue (ValueInt _ _ addr) -> ValueContract . unspecifiedChain $ fromIntegral addr
       c@(ValueContract _) -> c
       o -> error $ "decodeCacheValue': Expected ValueInt or ValueContract, but got: " ++ show o
   SimpleType (TypeBytes (Just n)) -> decodeCacheByteString cache offset byte (fromInteger n) value
@@ -389,9 +400,14 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
       SimpleValue (ValueInt _ _ addr) = decodeValue' typeDefs' storage ofs cnt len position $ SimpleType $ TypeInt False (Just 20)
     in
       SimpleValue . ValueAddress . Address $ fromIntegral addr
+  SimpleType TypeAccount ->
+    let
+      SimpleValue (ValueInt _ _ addr) = decodeValue' typeDefs' storage ofs cnt len position $ SimpleType $ TypeInt False (Just 20)
+    in
+      SimpleValue . ValueAccount . unspecifiedChain $ fromIntegral addr
   TypeContract _ ->
     let
-      SimpleValue (ValueAddress addr) = decodeValue' typeDefs' storage ofs cnt len position $ SimpleType TypeAddress
+      SimpleValue (ValueAccount addr) = decodeValue' typeDefs' storage ofs cnt len position $ SimpleType TypeAccount
     in
       ValueContract addr
   SimpleType (TypeBytes (Just n)) -> decodeByteString storage offset byte $ fromInteger n
@@ -543,7 +559,8 @@ encodeValue' typeDefs'@TypeDefs{..} position@Storage.Position{..} ty = \case
   SimpleValue (ValueBool v) -> encodeInt offset byte ((if v then 1 else 0) :: Word8)
   SimpleValue (ValueInt _ _ v) -> encodeInt offset byte v
   SimpleValue (ValueAddress (Address a)) -> encodeValue' typeDefs' position ty . SimpleValue $ ValueInt False (Just 20) $ toInteger a
-  ValueContract (Address a) -> encodeValue' typeDefs' position ty . SimpleValue $ ValueInt False (Just 20) $ toInteger a
+  SimpleValue (ValueAccount (NamedAccount a _)) -> encodeValue' typeDefs' position ty . SimpleValue $ ValueInt False (Just 20) $ toInteger a
+  ValueContract (NamedAccount a _) -> encodeValue' typeDefs' position ty . SimpleValue $ ValueInt False (Just 20) $ toInteger a
   SimpleValue (ValueBytes (Just n) v) -> encodeByteString offset byte (fromInteger n) v
   SimpleValue (ValueBytes Nothing v) -> [(offset, byteStringToWord256 v)]
 

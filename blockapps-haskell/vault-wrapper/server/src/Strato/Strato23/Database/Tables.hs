@@ -23,7 +23,6 @@ usersTable :: Table
   , Column PGBytea
   , Column PGBytea
   , Column PGBytea
-  , Column PGBytea
   )
   ( Column PGInt4
   , Column PGText
@@ -32,9 +31,8 @@ usersTable :: Table
   , Column PGBytea
   , Column PGBytea
   , Column PGBytea
-  , Column PGBytea
   )
-usersTable = Table "users" $ p8
+usersTable = Table "users" $ p7
   ( optional "id"
   , required "x_user_unique_name"
   , required "salt"
@@ -42,7 +40,6 @@ usersTable = Table "users" $ p8
   , required "enc_sec_key"
   , required "enc_sec_prv_key"
   , required "address"
-  , required "pub_key"
   )
 
 messageTable :: Table

@@ -5,6 +5,7 @@ import Test.Hspec
 import UnliftIO.Exception
 
 import Blockchain.Data.RLP
+import Blockchain.Strato.Model.Account
 import SolidVM.Model.Storable
 
 main :: IO ()
@@ -40,7 +41,12 @@ spec = do
       parsePath ".hashmap<true>" `shouldBe` toAns [Field "hashmap", MapIndex (IBool True)]
       parsePath ".hashmap<false>" `shouldBe` toAns [Field "hashmap", MapIndex (IBool False)]
       parsePath ".hashmap<a:ca35b7d915458ef540ade6068dfe2f44e8fa733c>" `shouldBe`
-        toAns [Field "hashmap", MapIndex (IAddress 0xca35b7d915458ef540ade6068dfe2f44e8fa733c)]
+        toAns [Field "hashmap", MapIndex (IAccount $ unspecifiedChain 0xca35b7d915458ef540ade6068dfe2f44e8fa733c)]
+      parsePath ".hashmap<a:ca35b7d915458ef540ade6068dfe2f44e8fa733c:main>" `shouldBe`
+        toAns [Field "hashmap", MapIndex (IAccount $ mainChain 0xca35b7d915458ef540ade6068dfe2f44e8fa733c)]
+      parsePath ".hashmap<a:ca35b7d915458ef540ade6068dfe2f44e8fa733c:ca35b7d915458ef540ade6068dfe2f44e8fa733cca35b7d915458ef540ade606>" `shouldBe`
+        toAns [Field "hashmap", MapIndex (IAccount $ explicitChain 0xca35b7d915458ef540ade6068dfe2f44e8fa733c
+                                                                   0xca35b7d915458ef540ade6068dfe2f44e8fa733cca35b7d915458ef540ade606)]
 
     it "should fail on badly formed paths" $ do
       let checkFail = (`shouldSatisfy` isLeft) . parsePath
@@ -62,8 +68,13 @@ spec = do
       unparse [Field "extra"] `shouldBe` ".extra"
       unparse [MapIndex (IBool True)] `shouldBe` "<true>"
       unparse [MapIndex (IBool False)] `shouldBe` "<false>"
-      unparse [MapIndex (IAddress 1024)] `shouldBe`
+      unparse [MapIndex (IAccount $ unspecifiedChain 1024)] `shouldBe`
         "<a:0000000000000000000000000000000000000400>"
+      unparse [MapIndex (IAccount $ mainChain 0xca35b7d915458ef540ade6068dfe2f44e8fa733c)] `shouldBe`
+        "<a:ca35b7d915458ef540ade6068dfe2f44e8fa733c:main>"
+      unparse [MapIndex (IAccount $ explicitChain 0xca35b7d915458ef540ade6068dfe2f44e8fa733c
+                                                  0xca35b7d915458ef540ade6068dfe2f44e8fa733cca35b7d915458ef540ade606)] `shouldBe`
+        "<a:ca35b7d915458ef540ade6068dfe2f44e8fa733c:ca35b7d915458ef540ade6068dfe2f44e8fa733cca35b7d915458ef540ade606>"
 
     it "should allow unbounded map indices" $ do
       parsePath (B.concat ["<1", B.replicate 100 0x30, ">"])
@@ -84,8 +95,12 @@ spec = do
       let examples = [ BInteger 3399293429
                      , BString "This is text"
                      , BBool True
-                     , BAddress 0x23421421421341232341bbbb
-                     , BContract "Wings!" 0xdeadbeef
+                     , BAccount $ unspecifiedChain 0x23421421421341232341bbbb
+                     , BAccount $ mainChain 0x23421421421341232341bbbb
+                     , BAccount $ explicitChain 0x23421421421341232341bbbb 0xdeadbeefd00d
+                     , BContract "Wings!" (unspecifiedChain 0xdeadbeef)
+                     , BContract "Wings!" (mainChain 0xdeadbeef)
+                     , BContract "Wings!" (explicitChain 0xdeadbeef 0x1234567890)
                      , BEnumVal "type" "num" 4
                      ]
       forM_ examples $ \bv ->  rlpDecode (rlpEncode bv) `shouldBe` bv

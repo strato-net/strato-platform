@@ -46,15 +46,15 @@ executables:
     main: Main.hs
     other-modules: []
     dependencies:
-      - aeson
       - blockapps-vault-wrapper-api
       - blockapps-vault-wrapper-client
       - blockstanbul
       - base16-bytestring
       - base64-bytestring
       - bytestring
-      - HTTP
       - http-client
+      - http-conduit
+      - http-types
       - ethereum-rlp
       - extra
       - servant-client

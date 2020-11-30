@@ -2,22 +2,21 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS -fno-warn-orphans    #-}
 
 module Main where
 
 import           Control.Exception
 import           Control.Monad
-import qualified Data.Aeson                 as Ae
 import qualified Data.ByteString.Char8      as C8
 import           Data.ByteString.Base16     as B16
-import qualified Data.ByteString.Lazy       as BL
 import           Data.Foldable (foldlM)
 import           Data.List.Split            (splitOn)
 import qualified Data.Text                  as T
-import           Network.HTTP
 import           Network.HTTP.Client        (newManager, defaultManagerSettings)
-import           Network.HTTP.Auth
+import           Network.HTTP.Simple
+import           Network.HTTP.Types.Status
 import           System.Console.GetOpt
 import           System.Environment
 import           System.Exit
@@ -43,11 +42,12 @@ instance HasVault IO where
       Left err -> die $ "failed to get message signature from the admin node's vault: " ++ show err
       Right sig -> return sig
 
-  getPub = error "called getPub, but we shouldn't ever do that in blockstanbul-vote"
-  getShared _ = error "called getShared, but we shouldn't ever do that in blockstanbul-vote"
+  getPub = die "called getPub, but we shouldn't ever do that in blockstanbul-vote"
+  getShared _ = die "called getShared, but we shouldn't ever do that in blockstanbul-vote"
 
 data Options = Options
   { optRemove    :: Bool
+  , optHTTPS     :: Bool
   , optRecipient :: Address
   , optNodes     :: [String]
   , optNonce     :: Int
@@ -56,6 +56,7 @@ data Options = Options
 defaultOptions :: Options
 defaultOptions  = Options
   { optRemove    = False
+  , optHTTPS     = False
   , optRecipient = throw $ userError "Give me a recipient address."
   , optNodes     = throw $ userError "Give me the node(s) to whom I'll send the vote."
   , optNonce     = throw $ userError "Give me a non-negative int for your nonce."
@@ -90,7 +91,11 @@ options =
       (NoArg
        (\ opts -> return opts { optRemove = True}))
       "The voting direction"
-  ]
+  , Option ['h'] ["https"]
+      (NoArg
+       (\ opts -> return opts { optHTTPS = True}))
+      "Whether to use HTTPS"
+ ]
 
 helpMessage :: String
 helpMessage = usageInfo header options
@@ -127,32 +132,30 @@ main = do
                      . B16.encode
                      . rlpSerialize
                      . rlpEncode $ esign
-        let payload = CandidateReceived
+            payload = CandidateReceived
                     { sender = optSender
                     , signature = esignStr
                     , recipient = optRecipient
                     , votingdir = not optRemove
                     , nonce = non
                     }
-            body = C8.unpack $ BL.toStrict $ Ae.encode payload
-        let url = printf "http://%s/blockstanbul/vote" nodeURL
-        putStrLn $ "Sending to url: " ++ url
-        putStrLn $ "\n\nRequest body: " ++ body
-        let req' = postRequestWithBody url "application/json" body
-            auth = AuthBasic (error "realm unused")
-                             "admin" -- I hope we can just hardcode this
-                             "admin"
-                             (error "uri unused")
-            authStr = withAuthority auth req'
-            req = insertHeaders [mkHeader HdrAuthorization authStr] req'
+            url = printf "http://%s/blockstanbul/vote" nodeURL
+        
+        putStrLn $ "\n\n\nsending the following request to " ++ nodeURL ++ ", HTTPS = " ++ show optHTTPS
+        putStrLn $ show payload
+        
+        plainReq <- parseRequest url
+        let postReq = setRequestMethod (C8.pack "POST") plainReq
+            authReq = setRequestBasicAuth (C8.pack "admin") (C8.pack "admin") postReq
+            bodyReq = setRequestBodyJSON payload authReq
+            finalReq = if optHTTPS then setRequestSecure True bodyReq else bodyReq
+        
+        resp <- httpBS finalReq
+        putStrLn $ "\nresponse status: " ++ (show $ getResponseStatus resp)
+        putStrLn $ "response body: " ++ (show $ getResponseBody resp)
 
-        eResp <- simpleHTTP req
-        case eResp of
-          Left err -> die $ "connection error: " ++ show err
-          Right resp -> do
-            print resp
-            putStrLn $ "response: " ++ rspBody resp
-    
-        go xs $ non + 1
+        case (statusCode $ getResponseStatus resp) of
+          200 -> go xs $ non + 1
+          _ -> die "vote failed. Terminating..."
     
   go optNodes optNonce   

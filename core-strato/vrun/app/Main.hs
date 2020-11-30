@@ -19,14 +19,15 @@ import           Prometheus
 
 import           Blockchain.BlockChain
 import           Blockchain.Data.AddressStateDB
-import           Blockchain.Data.BlockDB
 import           Blockchain.Data.Code
+import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Transaction
 import qualified Blockchain.Data.TXOrigin                    as TO
 import qualified Blockchain.Database.MerklePatricia      as MP
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.StateDB
 import           Blockchain.Sequencer.Event
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.VMContext
@@ -79,9 +80,9 @@ main = do
 
   (result, _) <- runLoggingT $ runTestContextM $ do
     MP.initializeBlank
-    setStateDBStateRoot MP.emptyTriePtr
+    setStateDBStateRoot Nothing MP.emptyTriePtr
 
-    let addr = Address 0xcf03dd0a894ef79cb5b601a43c4b25e3ae4c67ed
+    let addr = Account 0xcf03dd0a894ef79cb5b601a43c4b25e3ae4c67ed Nothing
     putAddressState addr AddressState{
       addressStateNonce=0,
         addressStateBalance=10000000000000000000000000000000000000000,

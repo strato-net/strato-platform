@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveAnyClass         #-}
+{-# LANGUAGE DeriveGeneric          #-}
 {-# LANGUAGE RecordWildCards        #-}
 {-# LANGUAGE StrictData             #-}
 {-# LANGUAGE TemplateHaskell        #-}
@@ -17,6 +19,7 @@ import           Data.Binary
 import           Data.Default
 import           Data.Foldable                 (toList)
 import           Data.Function                 (on)
+import qualified Data.Map.Strict               as M
 import qualified Data.Sequence                 as Q
 import           Data.Set                      (Set)
 import qualified Data.Set                      as S
@@ -71,6 +74,26 @@ instance Format BlockInfo where
 
 instance Ord BlockInfo where
   compare = compare `on` _bordering
+
+data EmittedBlock = EmittedBlock
+  { _emitted :: Bool
+  , _dependentChains :: M.Map Word256 ChainInfo
+  } deriving (Eq, Show, Generic, Binary)
+makeLenses ''EmittedBlock
+
+alreadyEmittedBlock :: EmittedBlock
+alreadyEmittedBlock = EmittedBlock True M.empty
+
+instance ToJSON EmittedBlock where
+instance FromJSON EmittedBlock where
+
+instance Format EmittedBlock where
+  format EmittedBlock{..} = unlines
+    [ "EmittedBlock"
+    , "---------"
+    , tab $ "Emitted:          " ++ show _emitted
+    , tab $ "Dependent chains: " ++ show _dependentChains
+    ]
 
 data ChainHashEntry = ChainHashEntry
   { _used         :: Bool

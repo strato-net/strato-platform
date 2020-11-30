@@ -37,6 +37,7 @@ library:
     - containers
     - cpu
     - cryptonite
+    - data-default
     - deepseq
     - derive
     - ethereum-rlp
@@ -48,6 +49,7 @@ library:
     - integer-gmp
     - lens
     - memory
+    - monad-alter
     - nibblestring
     - quickcheck-instances
     - path-pieces
@@ -81,8 +83,10 @@ tests:
       - ethereum-encryption
       - ethereum-rlp
       - integer-gmp
+      - persistent
       - secp256k1-haskell
       - strato-model
+      - text
       - hspec
       - QuickCheck
 

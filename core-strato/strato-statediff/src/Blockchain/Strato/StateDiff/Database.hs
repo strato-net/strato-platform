@@ -3,28 +3,24 @@
 {-# LANGUAGE NamedFieldPuns   #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies     #-}
+{-# LANGUAGE TypeOperators #-}
 
 module Blockchain.Strato.StateDiff.Database
-    ( sqlDiff
-    , commitSqlDiffs
+    ( commitSqlDiffs
     ) where
 
 import           Database.Persist                            hiding (Update, get)
 import qualified Database.Persist.Postgresql                 as SQL hiding (Update, get)
 
-import           Blockchain.Data.Address
-import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.DataDefs
-import           Blockchain.Database.MerklePatricia.Internal
 import           Blockchain.Database.MerklePatricia.StateRoot (emptyTriePtr)
 import           Blockchain.DB.CodeDB
-import           Blockchain.DB.HashDB
 import           Blockchain.DB.SQLDB
-import           Blockchain.DB.StateDB
 import           Blockchain.ExtWord
-import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Account
 import           Blockchain.SolidVM.Model
 
+import           Control.Lens ((^.))
 import           Control.Monad
 import           Control.Monad.IO.Class
 import qualified Data.ByteString                             as BS
@@ -36,30 +32,22 @@ import           Blockchain.Strato.StateDiff
 
 type SqlDbM m = SQL.SqlPersistT m
 
-sqlDiff :: (HasSQLDB m, HasCodeDB m, HasStateDB m, HasHashDB m)=>
-           Maybe Word256 -> Integer -> Keccak256 -> StateRoot -> StateRoot -> m ()
-sqlDiff chainId blockNumber blockHash oldRoot newRoot = do
-  stateDiffs <- stateDiff chainId blockNumber blockHash oldRoot newRoot
-  commitSqlDiffs stateDiffs
-
 commitSqlDiffs :: HasSQLDB m => StateDiff -> m ()
-commitSqlDiffs StateDiff{chainId, blockNumber, createdAccounts, deletedAccounts, updatedAccounts} = do
+commitSqlDiffs StateDiff{blockNumber, createdAccounts, deletedAccounts, updatedAccounts} = do
   sqlQuery $ do
-    createAccount chainId blockNumber $ Map.toList createdAccounts
-    sequence_ $ Map.mapWithKey (const . deleteAccount chainId) deletedAccounts
-    sequence_ $ Map.mapWithKey (updateAccount chainId blockNumber) updatedAccounts
+    createAccount blockNumber $ Map.toList createdAccounts
+    sequence_ $ Map.mapWithKey (const . deleteAccount) deletedAccounts
+    sequence_ $ Map.mapWithKey (updateAccount blockNumber) updatedAccounts
 
 createAccount :: MonadIO m =>
-                 Maybe Word256 -> Integer -> [(Address, AccountDiff 'Eventual)] -> SQL.SqlPersistT m ()
-createAccount chainId blockNumber addressDiffs = do
-  newAccounts <- forM addressDiffs $ \addressDiff -> do
-    let (address, diff) = addressDiff
-    return $ addrRef address diff
+                 Integer -> [(Account, AccountDiff 'Eventual)] -> SQL.SqlPersistT m ()
+createAccount blockNumber accountDiffs = do
+  let newAccounts = map (uncurry addrRef) accountDiffs
   addrIDs <- SQL.insertMany newAccounts
 
   newStorage <-
-    forM (zip addressDiffs addrIDs) $ \(addressDiff, addrID) -> do
-      let (_, diff) = addressDiff
+    forM (zip accountDiffs addrIDs) $ \(accountDiff, addrID) -> do
+      let (_, diff) = accountDiff
       case storage diff of
         EVMDiff m -> return [Storage addrID EVM (word256ToHexStorage k) (word256ToHexStorage v)
                             | (k, Value v) <- Map.toList m]
@@ -68,23 +56,20 @@ createAccount chainId blockNumber addressDiffs = do
   SQL.insertMany_ $ concat newStorage
 
   where
-    addrRef address diff = AddressStateRef{
-      addressStateRefAddress = address,
-      addressStateRefNonce = getField (theError address "nonce") $ nonce diff,
-      addressStateRefBalance = getField (theError address "balance") $ balance diff,
-      addressStateRefContractRoot = getField (theError address "contractRoot") $ contractRoot diff,
-      addressStateRefCode = getField (theError address "code") $ code diff,
-      addressStateRefCodeHash =
-          case codeHash diff of
-            SolidVMCode _ ch -> ch
-            EVMCode ch -> ch,
+    addrRef account diff = AddressStateRef{
+      addressStateRefAddress = account ^. accountAddress,
+      addressStateRefNonce = getField (theError account "nonce") $ nonce diff,
+      addressStateRefBalance = getField (theError account "balance") $ balance diff,
+      addressStateRefContractRoot = getField (theError account "contractRoot") $ contractRoot diff,
+      addressStateRefCode = getField (theError account "code") $ code diff,
+      addressStateRefCodeHash = codeHash diff,
       addressStateRefLatestBlockDataRefNumber = blockNumber,
-      addressStateRefChainId = fromMaybe 0 chainId
+      addressStateRefChainId = fromMaybe 0 $ account ^. accountChainId
       }
-    theError :: Address -> String -> a
-    theError address name = error $
+    theError :: Account -> String -> a
+    theError account name = error $
       "Missing field '" ++ name ++
-      "' in contract creation diff for address " ++ formatAddressWithoutColor address
+      "' in contract creation diff for account " ++ show account
 
 getField :: a -> Maybe (Diff a 'Eventual) -> a
 getField def field =
@@ -92,17 +77,17 @@ getField def field =
     Just (Value x) -> x
     Nothing        -> def
 
-deleteAccount :: MonadIO m => Maybe Word256 -> Address -> SQL.SqlPersistT m ()
-deleteAccount chainId address = do
-  mAddrID <- getAddressStateSQL chainId address
+deleteAccount :: MonadIO m => Account -> SQL.SqlPersistT m ()
+deleteAccount account = do
+  mAddrID <- getAddressStateSQL account
   for_ mAddrID $ \addrID -> do
     SQL.deleteWhere [ StorageAddressStateRefId SQL.==. addrID ]
     SQL.delete addrID
 
 updateAccount :: MonadIO m =>
-                 Maybe Word256 -> Integer -> Address -> AccountDiff 'Incremental -> SQL.SqlPersistT m ()
-updateAccount chainId blockNumber address diff = do
-  mAddrID <- getAddressStateSQL chainId address
+                 Integer -> Account -> AccountDiff 'Incremental -> SQL.SqlPersistT m ()
+updateAccount blockNumber account diff = do
+  mAddrID <- getAddressStateSQL account
   case mAddrID of
     Nothing ->
       let eDiff = incrementalToEventual diff
@@ -115,7 +100,7 @@ updateAccount chainId blockNumber address diff = do
                          , contractRoot = contractRoot'
                          , code = code'
                          }
-       in createAccount chainId blockNumber [(address, eDiff')]
+       in createAccount blockNumber [(account, eDiff')]
     Just addrID -> do
       SQL.update addrID $
         setField nonce AddressStateRefNonce $
@@ -166,10 +151,9 @@ commitSolidStorage addrID key v =
             Just storageID -> SQL.update storageID [ StorageValue =. newValue' ]
 
 getAddressStateSQL :: MonadIO m
-                   => Maybe Word256
-                   -> Address
+                   => Account
                    -> SqlDbM m (Maybe (SQL.Key AddressStateRef))
-getAddressStateSQL chainId addr' = do
+getAddressStateSQL (Account addr' chainId) = do
   addrIDs <- SQL.selectKeysList
               [ AddressStateRefAddress SQL.==. addr' , AddressStateRefChainId SQL.==. fromMaybe 0 chainId ] [ LimitTo 1 ]
   return $ listToMaybe addrIDs

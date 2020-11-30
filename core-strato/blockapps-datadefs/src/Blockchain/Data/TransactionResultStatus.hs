@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveAnyClass    #-}
+{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
@@ -25,6 +27,7 @@ data TransactionFailureType = IncorrectChainId
                             | IntrinsicGasExceedsLimit
                             | TrumpedByMoreLucrative
                             | ExecutionFailure String
+                            | MissingCode
                             deriving (Eq, Read, Show, Generic, NFData)
 
 derivePersistField "TransactionResultStatus"

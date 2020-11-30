@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE RecordWildCards #-}
 module BlockApps.Solidity.Contract where
 
@@ -32,6 +34,7 @@ getPositionAndSize _ p (SimpleType (TypeInt _ (Just b))) = (getNextAvailablePosi
 getPositionAndSize _ p (SimpleType (TypeInt _ Nothing))= (getNextAvailablePosition p 32, 32)
 
 getPositionAndSize _ p (SimpleType TypeAddress)=(getNextAvailablePosition p 20, 20)
+getPositionAndSize _ p (SimpleType TypeAccount)=(getNextAvailablePosition p 20, 20)
 getPositionAndSize _ p (SimpleType (TypeBytes (Just b))) = (getNextAvailablePosition p b, fromInteger b)
 getPositionAndSize _ p (SimpleType (TypeBytes Nothing)) = (getNextAvailablePosition p 32, 32)
 getPositionAndSize _ p (SimpleType TypeString) = (getNextAvailablePosition p 32, 32)

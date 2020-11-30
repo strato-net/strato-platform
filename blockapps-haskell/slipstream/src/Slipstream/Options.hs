@@ -23,3 +23,4 @@ defineFlag "globalsStateCount" (1024 :: Int) "The maximum number of states to ke
                                              \ overflow is stored in postgres."
 
 defineFlag "kafkaMaxBytes" (1024 * 1024 * 32 :: Int) "Number of bytes to read in each batch from kafka"
+defineFlag "sourceCacheTimeout" (60::Integer) "The number of seconds nonces are held in the global source code cache"

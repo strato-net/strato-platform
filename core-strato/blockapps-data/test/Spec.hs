@@ -17,6 +17,7 @@ import           Data.Maybe                      (isNothing, fromMaybe)
 import qualified Data.Text                       as T
 import qualified Data.Text.Encoding              as T
 import qualified Data.Vector                     as V
+import           Database.Persist.Sql
 import           Data.Word
 import           Test.Hspec
 import           Test.Hspec.Runner
@@ -25,11 +26,14 @@ import           Blockchain.Data.Address
 import           Blockchain.Data.ArbitraryInstances()
 import           Blockchain.Data.BlockHeader
 import           Blockchain.Data.ChainInfo
+import           Blockchain.Data.DataDefs        (BlockData)
 import           Blockchain.Data.Enode
 import           Blockchain.Data.RLP
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Code
+import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Data.Json
@@ -73,6 +77,12 @@ main = hspecWith (configAddFilter predicate defaultConfig) $ do
   describe "Data round trips" $ do
     enodeRLP
     enodeJSON
+    accountRLP
+    accountJSON
+    codePtrRLP
+    codePtrJSON
+    codeRLP
+    codeJSON
     accountInfoRLP
     accountInfoJSON
     actionJSON
@@ -87,6 +97,7 @@ main = hspecWith (configAddFilter predicate defaultConfig) $ do
     addressTesting
     rawtxRoundTrip
     blockDataRoundTrip
+    blockDataRoundTripPersist
     txRoundTrip
     matchingHash
     blockRoundTrip
@@ -117,6 +128,36 @@ enodeJSON :: Spec
 enodeJSON = do
   it "should convert an Enode address to and from its JSON encoding" $ property $
     (\x -> jsonCheck (x :: Enode))
+
+accountRLP :: Spec
+accountRLP = do
+  it "should convert an Account to and from its RLP encoding" $ property $
+    (\x -> rlpCheck (x :: Account))
+
+accountJSON :: Spec
+accountJSON = do
+  it "should convert an Account to and from its JSON encoding" $ property $
+    (\x -> jsonCheck (x :: Account))
+
+codePtrRLP :: Spec
+codePtrRLP = do
+  it "should convert a CodePtr to and from its RLP encoding" $ property $
+    (\x -> rlpCheck (x :: CodePtr))
+
+codePtrJSON :: Spec
+codePtrJSON = do
+  it "should convert a CodePtr to and from its JSON encoding" $ property $
+    (\x -> jsonCheck (x :: CodePtr))
+
+codeRLP :: Spec
+codeRLP = do
+  it "should convert a Code to and from its RLP encoding" $ property $
+    (\x -> rlpCheck (x :: Code))
+
+codeJSON :: Spec
+codeJSON = do
+  it "should convert a Code to and from its JSON encoding" $ property $
+    (\x -> jsonCheck (x :: Code))
 
 accountInfoRLP :: Spec
 accountInfoRLP = do
@@ -237,6 +278,11 @@ blockDataRoundTrip  = it "preserves blockdata in json -> hs -> json" $ do
     let input = C8.pack rawInput
     let block = Ae.eitherDecode input :: Either String [BlockData']
     compareJSON input block
+
+blockDataRoundTripPersist :: Spec
+blockDataRoundTripPersist = it "can roundtrip BlockData to/from PersistValue" $ property $ \(bd :: BlockData) -> do
+  (fromPersistValue $ toPersistValue bd)
+    `shouldBe` Right bd
 
 txRoundTrip :: Spec
 txRoundTrip  = it "preserves transactions in json -> hs -> json" $ do

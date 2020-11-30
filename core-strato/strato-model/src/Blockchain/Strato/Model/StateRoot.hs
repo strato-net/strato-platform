@@ -1,4 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
 
@@ -17,6 +19,7 @@ import qualified Data.ByteString        as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8  as BC
 import           Data.Data
+import           Data.Default
 import           Data.String
 
 import           Blockchain.Data.RLP
@@ -53,6 +56,9 @@ instance Binary StateRoot where
 instance RLPSerializable StateRoot where
     rlpEncode (StateRoot x) = rlpEncode x
     rlpDecode x = StateRoot $ rlpDecode x
+
+instance Default StateRoot where
+  def = emptyTriePtr
 
 -- | The stateRoot of the empty database.
 emptyTriePtr::StateRoot

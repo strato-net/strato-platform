@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -27,11 +29,11 @@ import qualified Data.Sequence                as Seq
 import           GHC.Generics
 
 import           Blockchain.Strato.Model.Action
-import           Blockchain.Data.Address
 import           Blockchain.Data.Log
 import           Blockchain.EVM.Environment
 import qualified Blockchain.EVM.MutableStack as MS
 import           Blockchain.ExtWord
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.VMContext
@@ -62,7 +64,7 @@ newMemory = do
 data DebugCallCreate =
   DebugCallCreate {
     ccData        :: B.ByteString,
-    ccDestination :: Maybe Address,
+    ccDestination :: Maybe Account,
     ccGasLimit    :: Gas,
     ccValue       :: Integer
     } deriving (Show, Eq, Generic, NFData)
@@ -79,7 +81,7 @@ data VMState =
     callDepth        :: Int,
     refund           :: Counter,
 
-    suicideList      :: S.Set Address,
+    suicideList      :: S.Set Account,
     done             :: Bool,
     returnVal        :: Maybe B.ByteString,
 

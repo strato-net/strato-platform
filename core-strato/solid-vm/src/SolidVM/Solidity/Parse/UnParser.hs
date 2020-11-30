@@ -99,6 +99,7 @@ unparseVarType (Int Nothing Nothing) = "uint"
 unparseVarType (Bool) = "bool"
 unparseVarType (String _) = "string"
 unparseVarType (Address) = "address"
+unparseVarType (Account) = "account"
 unparseVarType (Bytes (Just True) _ ) = "bytes"
 unparseVarType (Bytes Nothing (Just bytes) ) = "bytes" <> (show bytes)
 unparseVarType (Label str) = str

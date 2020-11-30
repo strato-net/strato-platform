@@ -11,6 +11,7 @@ module Blockchain.VM.TestEthereum
     , noLog
     ) where
 
+import           Control.Lens ((^.))
 import           Control.Monad
 import qualified Control.Monad.Change.Alter                  as A
 import           Control.Monad.IO.Class
@@ -35,10 +36,10 @@ import           Text.PrettyPrint.ANSI.Leijen                hiding ((<$>), (</>
 import           Test.Hspec.Expectations.Lifted
 
 import           Blockchain.BlockChain
-import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
-import           Blockchain.Data.BlockDB
+import           Blockchain.Data.Block
 import           Blockchain.Data.Code
+import           Blockchain.Data.DataDefs                    (BlockData(..))
 import           Blockchain.Data.ExecResults
 import           Blockchain.Data.RLP
 import           Blockchain.Data.Transaction
@@ -56,6 +57,7 @@ import           Blockchain.EVM.VMM (readGasRemaining)
 import           Blockchain.EVM.VMState
 import           Blockchain.ExtWord
 import           Blockchain.Sequencer.Event
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Util
 import           Blockchain.VMContext
@@ -72,8 +74,8 @@ import           UnliftIO
 defineFlag "debugEnabled" False "enable debugging"
 defineFlag "debugEnabled2" False "enable debugging"
 
-populateAndConvertAddressState :: Maybe Word256 -> Address -> AddressState' -> ContextM AddressState
-populateAndConvertAddressState cid owner addressState' = do
+populateAndConvertAddressState :: Account -> AddressState' -> ContextM AddressState
+populateAndConvertAddressState owner addressState' = do
   hsh <- addCode EVM . codeBytes . contractCode' $ addressState'
 
   forM_ (M.toList $ storage' addressState') $
@@ -87,7 +89,7 @@ populateAndConvertAddressState cid owner addressState' = do
       (balance' addressState')
       (addressStateContractRoot addressState)
       (EVMCode hsh)
-      cid
+      (owner ^. accountChainId)
 
 showHexInt::Integer->String
 showHexInt x
@@ -97,7 +99,7 @@ showHexInt x
         else "0x")
        ++ xHex
 
-getDataAndRevertAddressState::Address->AddressState->ContextM AddressState'
+getDataAndRevertAddressState :: Account -> AddressState -> ContextM AddressState'
 getDataAndRevertAddressState _ addressState = do
   theCode <- getEVMCode $
              case addressStateCodeHash addressState of
@@ -134,18 +136,21 @@ showHash val =
    Nothing -> showHexInt val ++ "[#ed]"
    Just x  -> show x
 
-showInfo::(Address,AddressState')->String
-showInfo (key,AddressState'{nonce'=n, balance'=b, storage'=s, contractCode'=Code c}) =
-    show (pretty key) ++ "[#ed]" ++ "(" ++ show n ++ "): " ++ show b ++
+showInfo :: (Account, AddressState') -> String
+showInfo (key,AddressState'{nonce'=n, balance'=b, storage'=s, contractCode'=co}) =
+  let c = case co of
+            Code c' -> c'
+            PtrToCode _ -> ""
+   in show key ++ "[#ed]" ++ "(" ++ show n ++ "): " ++ show b ++
          (if M.null s
           then ""
           else (", " ++) . show . M.toList . M.map showHexInt . M.mapKeys showHash $ s
          ) ++
          (if B.null c then "" else ", CODE:[" ++ C.blue (format c) ++ "]")
 
-addressStates::ContextM [(Address, AddressState')]
+addressStates :: ContextM [(Account, AddressState')]
 addressStates = do
-  addrStates <- getAllAddressStates
+  addrStates <- getAllAddressStates Nothing
   let addrs = map fst addrStates
       states = map snd addrStates
   states' <- zipWithM getDataAndRevertAddressState addrs states
@@ -158,41 +163,36 @@ runTest :: Test-> ContextM ()
 runTest test = do
   when flags_debugEnabled $
     liftIO . print $ test
-  let cid = Nothing
 
   MP.initializeBlank
-  setStateDBStateRoot emptyTriePtr
+  setStateDBStateRoot Nothing emptyTriePtr
 
   forM_ (M.toList $ pre test) $
-    \(addr, s) -> do
-      state' <- populateAndConvertAddressState cid addr s
-      putAddressState addr state'
+    \(acct, s) -> do
+      state' <- populateAndConvertAddressState acct s
+      putAddressState acct state'
 
   beforeAddressStates <- addressStates
 
-  let block =
-        Block {
-          blockBlockData = BlockData {
-             blockDataParentHash = fromMaybe (unsafeCreateKeccak256FromWord256 0x0) . previousHash . env $ test,
-             blockDataNumber = read . currentNumber . env $ test,
-             blockDataCoinbase = currentCoinbase . env $ test,
-             blockDataDifficulty = read . currentDifficulty . env $ test,
-             blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0, --error "unclesHash not set",
-             blockDataStateRoot = StateRoot "", -- error "bStateRoot not set",
-             blockDataTransactionsRoot = StateRoot "", -- error "transactionsRoot not set",
-             blockDataReceiptsRoot = StateRoot "", -- error "receiptsRoot not set", -- StateRoot ""
-             blockDataLogBloom = "", --error "logBloom not set",
-             blockDataGasLimit = currentGasLimit . env $ test,
-             blockDataGasUsed = 0, --error "gasUsed not set",
-             blockDataTimestamp = currentTimestamp . env $ test,
-             --timestamp = posixSecondsToUTCTime . fromInteger . read . currentTimestamp . env $ test,
-             blockDataExtraData = "", --error "extraData not set",
-             blockDataNonce = 0, --error "nonce not set",
-             blockDataMixHash=unsafeCreateKeccak256FromWord256 0 --error "mixHash not set"
-             },
-          blockReceiptTransactions = [], --error "receiptTransactions not set",
-          blockBlockUncles = [] --error "blockUncles not set"
-          }
+  let bData = BlockData {
+        blockDataParentHash = fromMaybe (unsafeCreateKeccak256FromWord256 0x0) . previousHash . env $ test,
+        blockDataNumber = read . currentNumber . env $ test,
+        blockDataCoinbase = _accountAddress . currentCoinbase . env $ test,
+        blockDataDifficulty = read . currentDifficulty . env $ test,
+        blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0, --error "unclesHash not set",
+        blockDataStateRoot = StateRoot "", -- error "bStateRoot not set",
+        blockDataTransactionsRoot = StateRoot "", -- error "transactionsRoot not set",
+        blockDataReceiptsRoot = StateRoot "", -- error "receiptsRoot not set", -- StateRoot ""
+        blockDataLogBloom = "", --error "logBloom not set",
+        blockDataGasLimit = currentGasLimit . env $ test,
+        blockDataGasUsed = 0, --error "gasUsed not set",
+        blockDataTimestamp = currentTimestamp . env $ test,
+        --timestamp = posixSecondsToUTCTime . fromInteger . read . currentTimestamp . env $ test,
+        blockDataExtraData = "", --error "extraData not set",
+        blockDataNonce = 0, --error "nonce not set",
+        blockDataMixHash=unsafeCreateKeccak256FromWord256 0 --error "mixHash not set"
+        }
+  let block = Block bData [] []
 
   (result, retVal, gasRemaining, _, returnedCallCreates, _) <-
     case theInput test of
@@ -202,7 +202,7 @@ runTest test = do
               Environment{
                 envGasPrice = getNumber $ gasPrice' exec,
                 envBlockHeader = blockBlockData block,
-                envOwner = address' exec,
+                envOwner = account' exec,
                 envOrigin = origin exec,
                 envInputData = theData $ data' exec,
                 envSender = caller exec,
@@ -260,7 +260,7 @@ runTest test = do
                     (getNumber $ tNonce' transaction)
                     (getNumber $ tGasPrice' transaction)
                     (getNumber $ tGasLimit' transaction)
-                    a
+                    (a ^. accountAddress)
                     (getNumber $ tValue' transaction)
                     (theData $ tData' transaction)
                     Nothing

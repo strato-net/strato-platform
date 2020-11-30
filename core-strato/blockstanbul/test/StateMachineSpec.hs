@@ -28,7 +28,7 @@ import           Prelude                    hiding (round, sequence)
 
 import Blockchain.Data.ArbitraryInstances()
 import Blockchain.Data.Block
-import Blockchain.Data.BlockDB
+import Blockchain.Data.DataDefs
 import Blockchain.Blockstanbul.Authentication
 import Blockchain.Blockstanbul.BenchmarkLib
 import Blockchain.Blockstanbul.EventLoop
@@ -36,6 +36,7 @@ import qualified Blockchain.Blockstanbul.HTTPAdmin as HA
 import Blockchain.Blockstanbul.Messages
 import Blockchain.Blockstanbul.StateMachine
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
 
@@ -299,7 +300,7 @@ spec = parallel $ do
         use prepared `shouldReturn` M.fromList [(a1, di), (a2, di), (a3, di)]
 
     it "only sends one commit message" $ property $ \sig as blk ->
-      runTest $ do
+      (S.size (S.fromList as) == length as) ==> runTest $ do
         (curView, di) <- setupRound blk as
         let input = map (\a -> IMsg (MsgAuth a sig) $ Prepare  curView di) as
         got <- sendMessages input

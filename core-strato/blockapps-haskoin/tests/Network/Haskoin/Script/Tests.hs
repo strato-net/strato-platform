@@ -1,3 +1,4 @@
+{-# OPTIONS -fno-warn-overflowed-literals #-}
 module Network.Haskoin.Script.Tests
 ( tests
 , execScriptIO

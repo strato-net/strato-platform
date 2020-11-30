@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
@@ -21,13 +22,13 @@ import           Network.Kafka
 import           Blockchain.MilenaTools
 import           Network.Kafka.Protocol
 
-import           Blockchain.Data.BlockDB
 import           Blockchain.Data.ChainInfo
 import           Blockchain.EthConf                 (lookupConsumerGroup)
 import           Blockchain.ExtWord
 import           Blockchain.Strato.Indexer.IContext
 import           Blockchain.Strato.Indexer.Kafka
 import           Blockchain.Strato.Indexer.Model
+import           Blockchain.Strato.Model.Class      (blockHash)
 import           Blockchain.Strato.Model.Keccak256
 
 import           Blockchain.Sequencer.Event

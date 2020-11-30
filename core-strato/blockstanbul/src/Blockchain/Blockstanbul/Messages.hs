@@ -1,4 +1,7 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -26,8 +29,10 @@ import qualified Blockchain.Blockstanbul.HTTPAdmin as HA
 import Blockchain.Data.RLP
 import Blockchain.Data.Address
 import Blockchain.Data.ArbitraryInstances ()
-import Blockchain.Data.BlockDB
+import Blockchain.Data.Block
+import Blockchain.Data.DataDefs
 import Blockchain.Output
+import Blockchain.Strato.Model.Class (blockHash)
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Secp256k1

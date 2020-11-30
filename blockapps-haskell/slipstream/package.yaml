@@ -28,6 +28,7 @@ library:
     - aeson
     - binary
     - blockapps-bloc22-server
+    - blockapps-mpdbs
     - blockapps-solidity
     - blockapps-util
     - bloomfilter
@@ -65,6 +66,8 @@ executables:
       - base
       - blockapps-bloc22-server
       - blockapps-init
+      - cache
+      - clock
       - hflags
       - http-client
       - milena

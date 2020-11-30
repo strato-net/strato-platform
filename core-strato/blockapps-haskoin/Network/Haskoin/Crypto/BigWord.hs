@@ -1,4 +1,6 @@
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
 module Network.Haskoin.Crypto.BigWord
 (
 -- Useful type aliases

@@ -1,4 +1,6 @@
 {-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE DeriveAnyClass        #-}
+{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE TemplateHaskell       #-}
@@ -14,7 +16,9 @@
 {-# OPTIONS -fno-warn-deprecations #-}
 
 module Blockchain.VMContext
-    ( VMBase
+    ( CurrentBlockHash(..)
+    , withCurrentBlockHash
+    , VMBase
     , ContextDBs(..)
     , MemDBs(..)
     , ContextState(..)
@@ -32,7 +36,8 @@ module Blockchain.VMContext
     , stateBlockMap
     , storageTxMap
     , storageBlockMap
-    , stateRoot
+    , stateRoots
+    , currentBlock
     , memDBs
     , baggerState
     , bestBlockInfo
@@ -95,8 +100,9 @@ import           Blockchain.Constants
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.Block
-import           Blockchain.Data.BlockDB
 import           Blockchain.Data.BlockSummary
+import           Blockchain.Data.ChainInfo
+import           Blockchain.Data.DataDefs
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.BlockSummaryDB
 import           Blockchain.DB.ChainDB
@@ -108,6 +114,8 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.EthConf
+import           Blockchain.ExtWord
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models
@@ -117,6 +125,9 @@ import           Blockchain.VMOptions
 import           Executable.EVMFlags
 
 import           UnliftIO
+
+newtype CurrentBlockHash = CurrentBlockHash { unCurrentBlockHash :: Keccak256 }
+  deriving (Generic, NFData, Show)
 
 instance NFData RBDB.RedisConnection where
   rnf (RBDB.RedisConnection c) = c `seq` ()
@@ -136,11 +147,12 @@ data ContextDBs = ContextDBs
 makeLenses ''ContextDBs
 
 data MemDBs = MemDBs
-  { _stateTxMap      :: M.Map Address AddressStateModification
-  , _stateBlockMap   :: M.Map Address AddressStateModification
-  , _storageTxMap    :: M.Map (Address, B.ByteString) B.ByteString
-  , _storageBlockMap :: M.Map (Address, B.ByteString) B.ByteString
-  , _stateRoot       :: MP.StateRoot
+  { _stateTxMap      :: M.Map Account AddressStateModification
+  , _stateBlockMap   :: M.Map Account AddressStateModification
+  , _storageTxMap    :: M.Map (Account, B.ByteString) B.ByteString
+  , _storageBlockMap :: M.Map (Account, B.ByteString) B.ByteString
+  , _stateRoots      :: M.Map (Keccak256, Maybe Word256) MP.StateRoot
+  , _currentBlock    :: Maybe CurrentBlockHash
   } deriving (Generic, NFData, Show)
 makeLenses ''MemDBs
 
@@ -170,13 +182,15 @@ type VMBase m = ( MonadIO m
                 , Mod.Accessible ContextState m
                 , Mod.Modifiable MemDBs m
                 , Mod.Accessible MemDBs m
-                , Mod.Modifiable MP.StateRoot m
                 , Mod.Modifiable BlockHashRoot m
                 , Mod.Modifiable GenesisRoot m
                 , Mod.Modifiable BestBlockRoot m
+                , Mod.Modifiable CurrentBlockHash m
                 , HasMemAddressStateDB m
+                , A.Selectable (Maybe Word256) ParentChainId m
+                , (Maybe Word256 `A.Alters` MP.StateRoot) m
                 , (MP.StateRoot `A.Alters` MP.NodeData) m
-                , (Address `A.Alters` AddressState) m
+                , (Account `A.Alters` AddressState) m
                 , (Keccak256 `A.Alters` DBCode) m
                 , (N.NibbleString `A.Alters` N.NibbleString) m
                 , HasMemRawStorageDB m
@@ -184,6 +198,28 @@ type VMBase m = ( MonadIO m
                 , (Keccak256 `A.Alters` BlockSummary) m
                 , Mod.Accessible (Maybe WorldBestBlock) m
                 )
+
+withCurrentBlockHash :: ( MonadLogger m
+                        , Mod.Modifiable MemDBs m
+                        , Mod.Modifiable CurrentBlockHash m
+                        , HasMemAddressStateDB m
+                        , (Maybe Word256 `A.Alters` MP.StateRoot) m
+                        , (MP.StateRoot `A.Alters` MP.NodeData) m
+                        , (Account `A.Alters` AddressState) m
+                        , (N.NibbleString `A.Alters` N.NibbleString) m
+                        , HasMemRawStorageDB m
+                        , (RawStorageKey `A.Alters` RawStorageValue) m
+                        )
+                     => Keccak256 -> m a -> m a
+withCurrentBlockHash bh f = do
+  cbh <- Mod.get (Mod.Proxy @CurrentBlockHash)
+  Mod.put (Mod.Proxy @CurrentBlockHash) (CurrentBlockHash bh)
+  a <- f
+  flushMemStorageDB
+  flushMemAddressStateDB
+  Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ stateRoots .= M.empty
+  Mod.put (Mod.Proxy @CurrentBlockHash) cbh
+  pure a
 
 getStateDB :: ContextM DB.DB
 getStateDB = fmap MP.unStateDB . view $ dbs . stateDB
@@ -250,10 +286,6 @@ instance Mod.Accessible Context ContextM where
 instance Mod.Accessible ContextState ContextM where
   access _ = get
 
-instance Mod.Modifiable MP.StateRoot ContextM where
-  get _    = gets . view $ memDBs . stateRoot
-  put _ sr = modify $ memDBs . stateRoot .~ sr
-
 instance Mod.Accessible MemDBs ContextM where
   access _ = gets $ view memDBs
 
@@ -298,6 +330,10 @@ instance Mod.Modifiable K.KafkaState ContextM where
   get _    = readIORef =<< view (dbs . kafkaState)
   put _ ks = view (dbs . kafkaState) >>= flip writeIORef ks
 
+instance Mod.Modifiable CurrentBlockHash ContextM where
+  get _    = fmap (fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0)) . gets $ view $ memDBs . currentBlock
+  put _ bh = modify $ memDBs . currentBlock ?~ bh
+
 instance HasMemAddressStateDB ContextM where
   getAddressStateTxDBMap = gets $ view $ memDBs . stateTxMap
   putAddressStateTxDBMap theMap = modify $ memDBs . stateTxMap .~ theMap
@@ -309,10 +345,36 @@ instance (MP.StateRoot `A.Alters` MP.NodeData) ContextM where
   insert _ = MP.genericInsertDB $ getStateDB
   delete _ = MP.genericDeleteDB $ getStateDB
 
-instance (Address `A.Alters` AddressState) ContextM where
+instance (Account `A.Alters` AddressState) ContextM where
   lookup _ = getAddressStateMaybe
   insert _ = putAddressState
   delete _ = deleteAddressState
+
+instance (Maybe Word256 `A.Alters` MP.StateRoot) ContextM where
+  lookup _ chainId = do
+    mBH <- gets $ view $ memDBs . currentBlock
+    fmap join . for mBH $ \(CurrentBlockHash bh) -> do
+      mSR <- gets $ view $ memDBs . stateRoots . at (bh, chainId)
+      case mSR of
+        Just sr -> pure $ Just sr
+        Nothing -> getChainStateRoot chainId bh
+  insert _ chainId sr = do
+    mBH <- gets $ view $ memDBs . currentBlock
+    case mBH of
+      Nothing -> pure ()
+      Just (CurrentBlockHash bh) -> do
+        modify $ memDBs . stateRoots %~ M.insert (bh, chainId) sr
+        putChainStateRoot chainId bh sr
+  delete _ chainId = do
+    mBH <- gets $ view $ memDBs . currentBlock
+    case mBH of
+      Nothing -> pure ()
+      Just (CurrentBlockHash bh) -> do
+        modify $ memDBs . stateRoots %~ M.delete (bh, chainId)
+        deleteChainStateRoot chainId bh
+
+instance A.Selectable (Maybe Word256) ParentChainId ContextM where
+  select _ chainId = fmap (\(_,_,p) -> ParentChainId p) <$> getChainGenesisInfo chainId
 
 instance (Keccak256 `A.Alters` DBCode) ContextM where
   lookup _ = genericLookupCodeDB $ getCodeDB
@@ -401,7 +463,8 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
             , _stateBlockMap   = M.empty
             , _storageTxMap    = M.empty
             , _storageBlockMap = M.empty
-            , _stateRoot       = error "must set stateroot for test context"
+            , _stateRoots      = M.empty
+            , _currentBlock    = Nothing
             }
 
       cstate <- newIORef $ ContextState
@@ -420,7 +483,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
             }
       a <- flip runReaderT ctx $ do
         MP.initializeBlank
-        setStateDBStateRoot MP.emptyTriePtr
+        setStateDBStateRoot Nothing MP.emptyTriePtr
         f
       cstate' <- readIORef cstate
       return (a, cstate')
@@ -459,7 +522,8 @@ runContextM f = do
             , _stateBlockMap   = M.empty
             , _storageTxMap    = M.empty
             , _storageBlockMap = M.empty
-            , _stateRoot       = MP.emptyTriePtr
+            , _stateRoots      = M.empty
+            , _currentBlock    = Nothing
             }
 
       cstate <- newIORef $ ContextState
@@ -487,22 +551,22 @@ evalContextM f = fst <$> runContextM f
 execContextM :: (MonadIO m, MonadUnliftIO m, MonadLogger m) => ReaderT Context (ResourceT m) a -> m ContextState
 execContextM f = snd <$> runContextM f
 
-incrementNonce :: (Address `A.Alters` AddressState) f => Address -> f ()
-incrementNonce address = A.adjustWithDefault_ Mod.Proxy address $ \addressState ->
+incrementNonce :: (Account `A.Alters` AddressState) f => Account -> f ()
+incrementNonce account = A.adjustWithDefault_ Mod.Proxy account $ \addressState ->
   pure addressState{ addressStateNonce = addressStateNonce addressState + 1 }
 
-getNewAddress :: (MonadIO m, (Address `A.Alters` AddressState) m) => Address -> m Address
-getNewAddress address = do
-  nonce <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy address
-  when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ show (pretty address) ++ ", nonce=" ++ show nonce
-  let newAddress = getNewAddress_unsafe address nonce
-  incrementNonce address
-  return newAddress
+getNewAddress :: (MonadIO m, (Account `A.Alters` AddressState) m) => Account -> m Account
+getNewAddress account = do
+  nonce <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy account
+  when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ show (pretty account) ++ ", nonce=" ++ show nonce
+  let newAddress = getNewAddress_unsafe (account ^. accountAddress) nonce
+  incrementNonce account
+  return $ (accountAddress .~ newAddress) account
 
-purgeStorageMap :: HasMemStorageDB m => Address -> m ()
-purgeStorageMap address = do
+purgeStorageMap :: HasMemStorageDB m => Account -> m ()
+purgeStorageMap account = do
   storageMap <- getMemRawStorageTxDB
-  putMemRawStorageTxMap $ M.filterWithKey (const . (/= address) . fst) storageMap
+  putMemRawStorageTxMap $ M.filterWithKey (const . (/= account) . fst) storageMap
 
 getContextBestBlockInfo :: (Functor m, Mod.Accessible ContextState m) => m ContextBestBlockInfo
 getContextBestBlockInfo = _bestBlockInfo <$> Mod.access Mod.Proxy

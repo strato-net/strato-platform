@@ -1,4 +1,5 @@
 {-# LANGUAGE Arrows              #-}
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE Rank2Types          #-}
 {-# LANGUAGE RecordWildCards     #-}
@@ -48,6 +49,7 @@ import           Data.Traversable
 import           Database.PostgreSQL.Simple        (SqlError(..))
 import           Opaleye                           hiding (not, null, index, max)
 import           Text.Format
+import           Text.Read                         (readMaybe)
 import           System.Clock
 import           UnliftIO
 
@@ -78,8 +80,10 @@ import           BlockApps.XAbiConverter
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json
 import           Blockchain.Data.TXOrigin
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Keccak256
@@ -94,7 +98,7 @@ data TransactionHeader = TransactionHeader
   , transactionheaderFromAddr :: Address
   , transactionheaderTxParams :: TxParams
   , transactionheaderValue    :: Wei
-  , transactionheaderCode     :: ByteString
+  , transactionheaderCode     :: Code
   , transactionheaderChainId  :: Maybe ChainId
   }
 
@@ -180,24 +184,28 @@ waitForBalance addr = waitFor "no user account found" go
           return . not $ null accts
 
 postUsersFill :: UserName  -> Address -> Bool -> Bloc BlocTransactionResult
-postUsersFill _ addr resolve = blocTransaction $ do
-  when resolve ($logInfoS "postUsersFill" "Waiting for faucet transaction to be mined")
-  hashes <- blocStrato $ postFaucetClient addr
-  void . blocModify $ \conn -> runInsertMany conn hashNameTable [
-    ( Nothing
-    , constant h
-    , constant (0 :: Int32)
-    , constant (0 :: Int32)
-    , constant (Text.decodeUtf8 . BL.toStrict $ Aeson.encode Deprecated.defaultPostTx{Deprecated.posttransactionTo = Just addr})
-    ) | h <- hashes]
-  result <- getBlocTransactionResult' hashes resolve
-  when (resolve && Success == blocTransactionStatus result) $ do
-    waitForBalance addr
-  $logInfoLS "postUsersFill/resolve" resolve
-  $logInfoLS "postUsersFill/result" result
-  when (Failure == blocTransactionStatus result) $
-    throwIO $ UnavailableError "faucet transaction failed; please try again"
-  return result
+postUsersFill _ addr resolve = do
+  shouldPost <- asks gasOn
+  if shouldPost
+    then blocTransaction $ do
+      when resolve ($logInfoS "postUsersFill" "Waiting for faucet transaction to be mined")
+      hashes <- blocStrato $ postFaucetClient addr
+      void . blocModify $ \conn -> runInsertMany conn hashNameTable [
+        ( Nothing
+        , constant h
+        , constant (0 :: Int32)
+        , constant (0 :: Int32)
+        , constant (Text.decodeUtf8 . BL.toStrict $ Aeson.encode Deprecated.defaultPostTx{Deprecated.posttransactionTo = Just addr})
+        ) | h <- hashes]
+      result <- getBlocTransactionResult' hashes resolve
+      when (resolve && Success == blocTransactionStatus result) $ do
+        waitForBalance addr
+      $logInfoLS "postUsersFill/resolve" resolve
+      $logInfoLS "postUsersFill/result" result
+      when (Failure == blocTransactionStatus result) $
+        throwIO $ UnavailableError "faucet transaction failed; please try again"
+      return result
+    else pure $ BlocTransactionResult Success zeroHash Nothing Nothing
 
 postUsersSend :: UserName -> Address -> Maybe ChainId -> Bool -> PostSendParameters -> Bloc BlocTransactionResult
 postUsersSend userName addr chainId resolve
@@ -222,7 +230,7 @@ postUsersSend' cacheNonce TransferParameters{..} sign = do
         fromAddress
         params
         (Wei (fromIntegral $ unStrung value))
-        ByteString.empty
+        (Code ByteString.empty)
         chainId
     txHash <- blocStrato $ postTx tx
     void . blocModify $ \conn -> runInsertMany conn hashNameTable [
@@ -275,7 +283,7 @@ postUsersContractEVM' cacheNonce ContractParameters{..} sign = blocTransaction $
       fromAddr
       params
       (Wei (fromIntegral (maybe 0 unStrung value)))
-      (bin <> argsBin)
+      (Code $ bin <> argsBin)
       chainId
   $logDebugLS "postUsersContractEVM'/tx" tx
   txHash <- blocStrato $ postTx tx
@@ -309,7 +317,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} sign = blocTransacti
       fromAddr
       params
       (Wei (fromIntegral (maybe 0 unStrung value)))
-      (BC.pack $ Text.unpack src)
+      (Code . BC.pack $ Text.unpack src)
       chainId
   $logDebugLS "postUsersContractSolidVM'/tx" tx
   txHash <- blocStrato $ postTx tx
@@ -380,7 +388,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} sign = do
             fromAddr
             (fromMaybe emptyTxParams params)
             (Wei (maybe 0 fromIntegral $ fmap unStrung value))
-            (BC.pack $ Text.unpack src)
+            (Code . BC.pack $ Text.unpack src)
             cid
       return ((name,cmId),tx)
   let
@@ -437,7 +445,7 @@ postUsersUploadListEVM' cacheNonce ContractListParameters{..} sign = do
             fromAddr
             (fromMaybe emptyTxParams params)
             (Wei (maybe 0 fromIntegral $ fmap unStrung value))
-            (bin <> argsBin)
+            (Code $ bin <> argsBin)
             cid
       return ((name,cmId),tx)
   let
@@ -475,7 +483,7 @@ postUsersSendList' cacheNonce TransferListParameters{..} sign = do
               fromAddr
               (fromMaybe emptyTxParams params)
               (Wei $ fromIntegral value)
-              (ByteString.empty)
+              (Code ByteString.empty)
               cid
         signAndPrepare sign fromAddr md header
     ) txsWithParams
@@ -618,7 +626,7 @@ postUsersContractMethodList' cacheNonce FunctionListParameters{..} sign = do
               fromAddr
               (fromMaybe emptyTxParams _methodcallTxParams)
               (Wei (fromIntegral $ unStrung methodcallValue))
-              (sel <> argsBin)
+              (Code $ sel <> argsBin)
               _methodcallChainid
           -- resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
           return (tx,mapKey,methodcallMethodName)
@@ -681,8 +689,7 @@ postUsersContractMethod' cacheNonce FunctionParameters{..} sign = do
     (cmId,xabi) <- maybe (throwIO err) (return . fmap contractdetailsXabi) =<<
       getContractDetailsAndMetadataId
         (ContractName contractName)
-        contractAddr
-        chainId
+        (Account contractAddr (unChainId <$> chainId))
     contract' <- case xAbiToContract xabi of
       Left e -> throwIO . AnError $ Text.pack e
       Right c -> return c
@@ -707,7 +714,7 @@ postUsersContractMethod' cacheNonce FunctionParameters{..} sign = do
         fromAddr
         params
         (Wei (maybe 0 (fromIntegral . unStrung) value))
-        ((sel::ByteString) <> (argsBin::ByteString))
+        (Code $ (sel::ByteString) <> (argsBin::ByteString))
         chainId
     $logDebugLS "postUsersContractMethod'/tx" tx
     txHash <- blocStrato $ postTx tx
@@ -810,27 +817,26 @@ contractResult :: Keccak256
 contractResult txHash mtxr cmId name = do
   let
     Just txResult = mtxr
-    chainId = transactionResultChainId txResult
-    addressMaybe = do
+    accountMaybe = do
       str <- listToMaybe $
         Text.splitOn "," (Text.pack $ transactionResultContractsCreated txResult)
-      stringAddress $ Text.unpack str
-  case addressMaybe of
+      readMaybe (Text.unpack str)
+  case accountMaybe of
     Nothing -> case transactionResultMessage txResult of
       "Success!" -> do
-        let mDelAddr = stringAddress . Text.unpack =<<
+        let mDelAddr = readMaybe @Account . Text.unpack =<<
               (listToMaybe . Text.splitOn "," . Text.pack $ transactionResultContractsDeleted txResult)
         case mDelAddr of
           Just _ -> lift $ throwIO $ UserError "Contract failed to upload, likely because the constructor threw"
           Nothing -> lift $ throwIO $ UserError "Transaction succeeded, but contract was neither created, nor destroyed"
       stratoMsg  -> lift $ throwIO $ UserError $ Text.pack stratoMsg
-    Just addr' -> do
+    Just acct -> do
       let cn = ContractName name
       mdetails <- use $ contractDetailsMap . at cn
       details <- case mdetails of
-        Just details' -> return details'{contractdetailsAddress = Just addr'}
+        Just details' -> return details'{contractdetailsAccount = Just acct}
         Nothing -> do
-          cds <- lift $ getContractDetailsByMetadataId cmId addr' (ChainId <$> chainId)
+          cds <- lift $ getContractDetailsByMetadataId cmId acct
           contractDetailsMap . at cn <?= cds
       return $ BlocTransactionResult Success txHash mtxr (Just $ Upload details)
 
@@ -889,6 +895,7 @@ getArgValues argsMap argNamesTypes = do
             Xabi.Bytes _ b         -> Right . SimpleType . TypeBytes $ fmap toInteger b
             Xabi.Bool              -> Right . SimpleType $ TypeBool
             Xabi.Address           -> Right . SimpleType $ TypeAddress
+            Xabi.Account           -> Right . SimpleType $ TypeAccount
             Xabi.Struct _ name     -> Right $ TypeStruct name
             Xabi.Enum _ name _     -> Right $ TypeEnum name
             Xabi.Array ety len ->
@@ -900,6 +907,7 @@ getArgValues argsMap argNamesTypes = do
                   Xabi.Bytes _ b         -> Right . SimpleType . TypeBytes $ fmap toInteger b
                   Xabi.Bool              -> Right . SimpleType $ TypeBool
                   Xabi.Address           -> Right . SimpleType $ TypeAddress
+                  Xabi.Account           -> Right . SimpleType $ TypeAccount
                   Xabi.Struct _ name     -> Right $ TypeStruct name
                   Xabi.Enum _ name _     -> Right $ TypeEnum name
                   Xabi.Array{}           -> Left "Arrays of arrays are not allowed as function arguments"

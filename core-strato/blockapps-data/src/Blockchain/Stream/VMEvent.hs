@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
@@ -31,7 +32,8 @@ import           Network.Kafka
 import           Network.Kafka.Producer
 import           Network.Kafka.Protocol      hiding (Key)
 
-import           Blockchain.Data.BlockDB
+import           Blockchain.Data.DataDefs
+import           Blockchain.Data.Block
 import           Blockchain.Data.RLP
 import           Blockchain.EthConf
 import           Blockchain.KafkaTopics

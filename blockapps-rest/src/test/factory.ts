@@ -2,8 +2,9 @@ import rest from "../rest";
 import util from "../util/util";
 import fsUtil from "../util/fsUtil";
 import assert from "../util/assert";
+import BigNumber from "bignumber.js";
 
-import ip from "ip";
+import * as ip from "ip";
 
 const config = getTestConfig();
 const { publicKey, port } = config.nodes[0];
@@ -38,8 +39,8 @@ async function createAdmin(_args, options) {
 
 function createCompileContractsArgs(count) {
   const uid = util.uid();
-  const contracts = [...Array(count).keys()].map(index => {
-    const contractUid = uid * 1000 + index;
+  const contracts = Array.from(Array(count).keys()).map(index => {
+    const contractUid = parseInt(uid) * 1000 + index;
     const contractName = `TestContract_${contractUid}`;
     const source = `contract ${contractName} { }`;
 
@@ -57,8 +58,8 @@ function createContractArgs(uid, args = {}) {
 
 function createContractListArgs(count, args = {}) {
   const uid = util.uid();
-  const contracts = [...Array(count).keys()].map(index => {
-    const contractUid = uid * 1000 + index;
+  const contracts = Array.from(Array(count).keys()).map(index => {
+    const contractUid = parseInt(uid) * 1000 + index;
     return createContractArgs(contractUid, args);
   });
   return contracts;
@@ -103,7 +104,7 @@ function createSendTxArgsArr(toAddress, value = 10, count = 2) {
   return sendTxs;
 }
 
-function createCallArgs(contract, method, args = {}, value = 0) {
+function createCallArgs(contract, method, args = {}, value:BigNumber = new BigNumber(0)) {
   return {
     contract,
     method,

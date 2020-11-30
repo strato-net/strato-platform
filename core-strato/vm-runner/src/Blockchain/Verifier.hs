@@ -11,10 +11,10 @@ import           Control.Monad
 import qualified Control.Monad.Change.Alter                  as A
 
 import           Blockchain.Constants
-import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
-import           Blockchain.Data.BlockDB
+import           Blockchain.Data.Block
 import           Blockchain.Data.BlockSummary
+import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RLP
 import           Blockchain.Data.Transaction
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
@@ -24,6 +24,8 @@ import           Blockchain.Mining.Instant
 import           Blockchain.Mining.Normal
 import           Blockchain.Mining.SHA
 import           Blockchain.Sequencer.Event
+import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Util
 import           Blockchain.Verification
@@ -123,7 +125,7 @@ checkValidity isHomestead parentBSum b = do
                     transactionsTrie = 0,
 -}
 
-isNonceValid :: (Address `A.Alters` AddressState) f => OutputTx -> f Bool
+isNonceValid :: (Account `A.Alters` AddressState) f => OutputTx -> f Bool
 isNonceValid OutputTx{otBaseTx=base, otSigner=txAddr} =
-  let txNonce = transactionNonce base
-   in (== txNonce) . addressStateNonce <$> A.lookupWithDefault A.Proxy txAddr
+  let tNonce = transactionNonce base
+   in (== tNonce) . addressStateNonce <$> A.lookupWithDefault A.Proxy (Account txAddr (txChainId base))

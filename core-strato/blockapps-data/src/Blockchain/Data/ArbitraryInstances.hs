@@ -5,23 +5,22 @@ module Blockchain.Data.ArbitraryInstances where
 import           Data.DeriveTH
 import           Data.Maybe                         (fromJust, isJust)
 import           Test.QuickCheck
-import           Test.QuickCheck.Instances.Text()
+import           Test.QuickCheck.Instances()
 
 import           Data.ByteString.Arbitrary
 import qualified Data.ByteString                    as B
 import qualified Data.Text                          as T
+import           Data.Time.Clock.POSIX
 
 import           System.IO.Unsafe                   (unsafePerformIO)
 
-import           Blockchain.Data.BlockDB
+import           Blockchain.Data.Block
 import           Blockchain.Data.ChainInfo
-import           Blockchain.Data.Code
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Enode
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
 import           Blockchain.Database.MerklePatricia
-import           Blockchain.MiscArbitrary()
 import           Blockchain.Util
 
 import qualified Network.Haskoin.Crypto             as H
@@ -61,7 +60,7 @@ instance Arbitrary BlockData where
         number           <- unboxPI <$> arbitrary
         gasLimit         <- unboxPI <$> arbitrary
         gasUsed          <- unboxPI <$> arbitrary `suchThat` (<= PositiveInteger gasLimit)
-        timestamp        <- arbitrary
+        timestamp        <- posixSecondsToUTCTime . fromInteger . unboxPI <$> arbitrary
         -- TODO(tim): Rather than making an artificial dependent type, guard Block against
         -- rogue long bytestrings.
         extraData        <- B.take 32 <$> arbitrary
@@ -92,10 +91,7 @@ instance Arbitrary Block where
         bTransactions <- vectorOf txCount arbitrary
         bUncles       <- vectorOf uncleCount arbitrary
 
-        return Block { blockBlockData            = bData
-                     , blockBlockUncles          = bUncles
-                     , blockReceiptTransactions  = bTransactions
-                     }
+        return $ Block bData bTransactions bUncles
 
 instance Arbitrary Transaction where
     arbitrary = do
@@ -132,9 +128,6 @@ instance Arbitrary RawTransaction where
                                 <*> arbitrary
                                 <*> arbitrary
                                 <*> arbitrary
-
-instance Arbitrary Code where
-  arbitrary = Code <$> arbitrary
 
 instance Arbitrary StateRoot where
     arbitrary = StateRoot <$> fastRandBs 32

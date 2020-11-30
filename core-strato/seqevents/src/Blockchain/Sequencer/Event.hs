@@ -1,5 +1,8 @@
+{-# LANGUAGE DeriveAnyClass        #-}
 {-# LANGUAGE DeriveDataTypeable    #-}
+{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
 module Blockchain.Sequencer.Event where
@@ -15,8 +18,7 @@ import           Data.DeriveTH
 import           Test.QuickCheck
 
 import qualified Blockchain.Data.Address                   as A
-import           Blockchain.Data.Block                     (Block)
-import qualified Blockchain.Data.BlockDB                   as BDB
+import qualified Blockchain.Data.Block                     as BDB
 import qualified Blockchain.Data.DataDefs                  as DD
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Enode
@@ -258,17 +260,16 @@ data OutputGenesis = OutputGenesis { ogOrigin          :: TO.TXOrigin
 ingestGenesisToOutputGenesis :: IngestGenesis -> OutputGenesis
 ingestGenesisToOutputGenesis (IngestGenesis o g) = OutputGenesis o g
 
-blockToIngestBlock :: TO.TXOrigin -> Block -> IngestBlock
+blockToIngestBlock :: TO.TXOrigin -> BDB.Block -> IngestBlock
 blockToIngestBlock origin BDB.Block{BDB.blockBlockData=bd,BDB.blockReceiptTransactions=txs,BDB.blockBlockUncles=us} =
     IngestBlock{ibOrigin = origin, ibBlockData = bd, ibReceiptTransactions = txs, ibBlockUncles = us}
 
 ingestBlockToBlock :: IngestBlock -> BDB.Block
-ingestBlockToBlock IngestBlock{ibBlockData=bd, ibReceiptTransactions = txs, ibBlockUncles = us} =
-    BDB.Block{BDB.blockBlockData = bd, BDB.blockReceiptTransactions = txs, BDB.blockBlockUncles = us}
+ingestBlockToBlock IngestBlock{ibBlockData=bd, ibReceiptTransactions = txs, ibBlockUncles = us} = BDB.Block bd txs us
 
 ingestBlockToSequencedBlock :: Monad m => (Keccak256 -> m (Maybe Word256)) -> IngestBlock -> m (Maybe SequencedBlock)
 ingestBlockToSequencedBlock f ib = do
-  let theHash = (BDB.blockHeaderHash . ibBlockData $ ib)
+  let theHash = (blockHeaderHash . ibBlockData $ ib)
   otxs <- traverse (wrapIngestBlockTransaction f theHash) $ ibReceiptTransactions ib
   return $ case sequence otxs of
     Nothing -> Nothing
@@ -288,12 +289,8 @@ sequencedBlockToOutputBlock sb totalDifficulty = OutputBlock { obOrigin         
                                                              , obBlockUncles         = sbBlockUncles sb
                                                              }
 
-sequencedBlockToBlock :: SequencedBlock -> Block
-sequencedBlockToBlock sb = BDB.Block
-                         { BDB.blockBlockData = sbBlockData sb
-                         , BDB.blockReceiptTransactions = map otBaseTx $ sbReceiptTransactions sb
-                         , BDB.blockBlockUncles = sbBlockUncles sb
-                         }
+sequencedBlockToBlock :: SequencedBlock -> BDB.Block
+sequencedBlockToBlock sb = BDB.Block (sbBlockData sb) (map otBaseTx $ sbReceiptTransactions sb) (sbBlockUncles sb)
 
 sequencedBlockShortName :: SequencedBlock -> String
 sequencedBlockShortName SequencedBlock{sbBlockData=d, sbHash=theHash} =
@@ -361,7 +358,7 @@ parentHashBS :: SequencedBlock -> BS.ByteString
 parentHashBS = B.toStrict . encode . DD.blockDataParentHash . sbBlockData
 
 ingestBlockHash :: IngestBlock -> Keccak256
-ingestBlockHash = BDB.blockHeaderHash . ibBlockData
+ingestBlockHash = blockHeaderHash . ibBlockData
 
 ingestBlockHashBS :: IngestBlock -> BS.ByteString
 ingestBlockHashBS = B.toStrict . encode . ingestBlockHash
@@ -376,11 +373,10 @@ sequencedBlockDifficulty :: SequencedBlock -> Integer
 sequencedBlockDifficulty = DD.blockDataDifficulty . sbBlockData
 
 outputBlockHash :: OutputBlock -> Keccak256
-outputBlockHash = BDB.blockHeaderHash . obBlockData
+outputBlockHash = blockHeaderHash . obBlockData
 
-outputBlockToBlock :: OutputBlock -> Block
-outputBlockToBlock OutputBlock{obBlockData=bd,obReceiptTransactions=txs,obBlockUncles=us}=
-    BDB.Block{BDB.blockBlockData = bd, BDB.blockReceiptTransactions=otBaseTx <$> txs, BDB.blockBlockUncles=us}
+outputBlockToBlock :: OutputBlock -> BDB.Block
+outputBlockToBlock OutputBlock{obBlockData=bd,obReceiptTransactions=txs,obBlockUncles=us}= BDB.Block bd (otBaseTx <$> txs) us
 
 quarryBlockToOutputBlock :: Monad m => (Keccak256 -> m (Maybe Word256)) -> BDB.Block -> m OutputBlock
 quarryBlockToOutputBlock f BDB.Block{BDB.blockBlockData=bd,BDB.blockReceiptTransactions=txs,BDB.blockBlockUncles=us} = do
@@ -437,7 +433,7 @@ instance Format IngestBlock where
                          , ibReceiptTransactions = receipts
                          , ibBlockUncles         = uncles
                          } =
-        CL.blue ("Block #" ++ show (BDB.blockDataNumber bd)) ++ " (via " ++ format origin ++ ") " ++
+        CL.blue ("Block #" ++ show (DD.blockDataNumber bd)) ++ " (via " ++ format origin ++ ") " ++
         tab (format (ingestBlockHash b) ++ "\n" ++
              format bd ++
              (if null receipts
@@ -454,7 +450,7 @@ instance Format OutputBlock where
                          , obReceiptTransactions = receipts
                          , obBlockUncles         = uncles
                          } =
-        CL.blue ("OutputBlock #" ++ show (BDB.blockDataNumber bd) ++ "; total diff " ++ show totDiff) ++ " (via " ++ format origin ++ ") " ++
+        CL.blue ("OutputBlock #" ++ show (DD.blockDataNumber bd) ++ "; total diff " ++ show totDiff) ++ " (via " ++ format origin ++ ") " ++
         tab (format (outputBlockHash b) ++ "\n" ++
              format bd ++
              (if null receipts
@@ -511,8 +507,8 @@ instance TransactionLike OutputTx where
                          }
 
 instance RLPSerializable OutputBlock where
-    rlpEncode = rlpEncode . (morphBlock :: OutputBlock -> Block)
-    rlpDecode = morphBlock . (rlpDecode :: RLPObject -> Block)
+    rlpEncode = rlpEncode . (morphBlock :: OutputBlock -> BDB.Block)
+    rlpDecode = morphBlock . (rlpDecode :: RLPObject -> BDB.Block)
 
 instance BlockLike DD.BlockData OutputTx OutputBlock where
     blockHeader       = obBlockData

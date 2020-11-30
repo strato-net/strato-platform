@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -11,11 +12,9 @@ module Blockchain.Data.Json where
 import           Data.Aeson
 import           Data.Aeson.Types                     (Parser)
 import qualified Data.ByteString                      as B
-import qualified Data.ByteString.Base16               as B16
 import qualified Data.Map.Strict                      as M
 import           Data.Maybe
 import           Data.Swagger                         hiding (format)
-import qualified Data.Text.Encoding                   as T
 import           Data.Time.Calendar
 import           Data.Time.Clock
 import           Data.Word
@@ -28,6 +27,7 @@ import           Blockchain.Data.Code
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
+import           Blockchain.Strato.Model.Class        (blockHeaderHash)
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.ExtendedWord (Word256)
 import           Blockchain.Strato.Model.Keccak256
@@ -54,7 +54,7 @@ instance ToJSON RawTransaction' where
           , "gasLimit" .= gl
           , "to" .= ta
           , "value" .= show val
-          , "codeOrData" .= T.decodeUtf8 (B16.encode cod)
+          , "codeOrData" .= cod
           , "r" .= showHex r ""
           , "s" .= showHex s ""
           , "v" .= showHex v ""
@@ -73,7 +73,7 @@ instance ToJSON RawTransaction' where
           , "gasPrice" .= gp
           , "gasLimit" .= gl
           , "value" .= show val
-          , "codeOrData" .= T.decodeUtf8 (B16.encode cod)
+          , "codeOrData" .= cod
           , "r" .= showHex r ""
           , "s" .= showHex s ""
           , "v" .= showHex v ""
@@ -99,7 +99,7 @@ instance FromJSON RawTransaction' where
       tgl <- t .:? "gasLimit" .!= 0
       tto <- t .:? "to"
       tval <- read <$> t .:? "value" .!= "0"
-      tcd <- fmap (fst .  B16.decode . T.encodeUtf8 ) (t .:? "codeOrData" .!= "")
+      tcd <- t .:? "codeOrData" .!= Code ""
       cid <- fmap (\(ChainId c) -> c) <$> (t .:? "chainId")
       (tr :: Integer) <- parseHexStr (t .: "r")
       (ts :: Integer) <- parseHexStr (t .: "s")
@@ -124,7 +124,7 @@ instance FromJSON RawTransaction' where
                  (tgl :: Integer)
                  (tto :: Maybe Address)
                  (tval :: Integer)
-                 (tcd :: B.ByteString)
+                 (tcd :: Code)
                  (fromMaybe 0 (cid :: Maybe Word256))
                  (tr :: Integer)
                  (ts :: Integer)
@@ -231,7 +231,8 @@ instance ToJSON Block' where
       toJSON (Block' (Block bd rt bu) next) =
         object ["next" .= next, "kind" .= ("Block" :: String), "blockData" .= bdToBdPrime bd,
          "receiptTransactions" .= map tToTPrime rt,
-         "blockUncles" .= map bdToBdPrime bu]
+         "blockUncles" .= map bdToBdPrime bu,
+         "blockHash" .= blockHeaderHash bd]
 
 blockDataRefToBlock::BlockDataRef->[Transaction]->Block
 blockDataRefToBlock bdr txs = Block{
@@ -296,13 +297,12 @@ instance FromJSON BlockData' where
       )
 
 instance FromJSON Block' where
-    parseJSON = withObject "Block'" $ \v -> (Block'
-      <$> (Block
-        <$> (bdPrimeToBd <$> (v .: "blockData"))
-        <*> (map tPrimeToT <$> (v .: "receiptTransactions"))
-        <*> (map bdPrimeToBd <$> (v .: "blockUncles")))
-      <*> (v .: "next")
-      )
+    parseJSON = withObject "Block'" $ \v -> do
+      bData <- bdPrimeToBd <$> v .: "blockData"
+      bTxs <- map tPrimeToT <$> (v .: "receiptTransactions")
+      bUncles <- map bdPrimeToBd <$> (v .: "blockUncles")
+      next <- v .: "next"
+      pure $ Block' (Block bData bTxs bUncles) next
 
 bdToBdPrime :: BlockData -> BlockData'
 bdToBdPrime = BlockData'
@@ -411,7 +411,10 @@ isAddr a = case a of
       Nothing -> False
 
 rawTransactionSemantics :: RawTransaction -> TransactionType
-rawTransactionSemantics (RawTransaction _ _ _ _ _ ta _ cod _ _ _ _ _ _ _ _) = work
+rawTransactionSemantics (RawTransaction _ _ _ _ _ ta _ code _ _ _ _ _ _ _ _) = work
      where work | (not (isAddr ta))  = Contract
                 | (isAddr ta) &&  ((B.length cod) > 0)        = FunctionCall
                 | otherwise = Transfer
+           cod = case code of
+                   Code c -> c
+                   _ -> ""

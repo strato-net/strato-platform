@@ -17,6 +17,7 @@ import Text.RawString.QQ
 
 import BlockApps.Logging
 import qualified BlockApps.Solidity.Value as V
+import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256 (hash)
@@ -27,7 +28,7 @@ import Slipstream.OutputData
 import Slipstream.SolidityValue
 
 addr :: Address -> V.Value
-addr = V.SimpleValue . V.ValueAddress
+addr = V.SimpleValue . V.ValueAccount . unspecifiedChain
 
 bool :: Bool -> V.Value
 bool = V.SimpleValue . V.ValueBool
@@ -327,7 +328,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
           contractData = M.fromList
             [ ("addr", addr 0xdeadbeef)
             , ("boolean", bool True)
-            , ("contract", V.ValueContract 0x999)
+            , ("contract", V.ValueContract $ unspecifiedChain 0x999)
             , ("number", int 77714314)
             , ("str", bytes "Hello, World!")
             , ("enum_val", V.ValueEnum "E" "C" 0x234)
@@ -472,7 +473,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
                                     , ("keyMap", V.ValueMapping $ M.fromList [
                                           (V.valueBytes "4517546854860", int 1)])
                                     , ("keys", V.ValueArraySentinel 1)
-                                    , ("owner", V.SimpleValue $ V.ValueAddress
+                                    , ("owner", V.SimpleValue $ V.ValueAccount $ unspecifiedChain
                                                   0xf5c1df0fd1015bb6ed5c966ad58a0f66af59b130)
                                     , ("values", V.ValueArrayDynamic . I.singleton 1
                                                   . V.ValueArraySentinel $ 1)

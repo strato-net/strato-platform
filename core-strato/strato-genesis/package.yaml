@@ -20,6 +20,8 @@ library:
       - aeson-casing
       - base16-bytestring
       - binary
+      - blockapps-data
+      - blockapps-datadefs
       - blockapps-haskoin
       - blockapps-mpdbs
       - blockapps-util
@@ -29,6 +31,7 @@ library:
       - entropy
       - format
       - json-stream
+      - lens
       - monad-alter
       - scientific
       - split
@@ -39,7 +42,6 @@ library:
       - vector
 
       - aeson
-      - blockapps-data
       - bytestring
       - merkle-patricia-db
       - strato-model

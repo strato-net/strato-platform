@@ -1,5 +1,8 @@
+{-# LANGUAGE DeriveAnyClass     #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor      #-}
+{-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 module Blockchain.Data.Block
   ( Block(..)
@@ -10,6 +13,8 @@ module Blockchain.Data.Block
   , blockDataLens
   , extraLens
   , setBlockNo
+  , nextDifficulty
+  , homesteadNextDifficulty
   ) where
 
 
@@ -17,13 +22,23 @@ import Control.DeepSeq
 import Control.Lens
 import Control.Lens.TH (makeLensesFor)
 import Data.Binary
+import Data.Bits
 import qualified Data.ByteString as BS
 import Data.Data
+import Data.List
+import Data.Time.Clock
+import Data.Time.Clock.POSIX
 import GHC.Generics
+import qualified Text.Colors as CL
+import Text.Format
 
+import Blockchain.Constants
 import Blockchain.Data.DataDefs
+import Blockchain.Data.RLP
 import Blockchain.Data.Transaction
+import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Util
 
 data Block =
   Block{
@@ -39,6 +54,64 @@ extraLens = blockDataLens . extraDataLens
 
 setBlockNo :: Integer -> Block -> Block
 setBlockNo n blk = blk{blockBlockData = (blockBlockData blk){blockDataNumber = n}}
+
+instance Format Block where
+  format b@Block{blockBlockData=bd, blockReceiptTransactions=receipts, blockBlockUncles=uncles} =
+    CL.blue ("Block #" ++ show (blockDataNumber bd)) ++ " " ++
+    tab (format (blockHash b) ++ "\n" ++
+         format bd ++
+         (if null receipts
+          then "        (no transactions)\n"
+          else tab (intercalate "\n    " (format <$> receipts))) ++
+         (if null uncles
+          then "        (no uncles)"
+          else tab ("Uncles:" ++ tab ("\n" ++ intercalate "\n    " (format <$> uncles)))))
+
+instance RLPSerializable Block where
+  rlpDecode (RLPArray [bd, RLPArray transactionReceipts, RLPArray uncles]) =
+    Block (rlpDecode bd) (rlpDecode <$> transactionReceipts) (rlpDecode <$> uncles)
+  rlpDecode (RLPArray arr) = error ("rlpDecode for Block called on object with wrong amount of data, length arr = " ++ show arr)
+  rlpDecode x = error ("rlpDecode for Block called on non block object: " ++ show x)
+
+  rlpEncode Block{blockBlockData=bd, blockReceiptTransactions=receipts, blockBlockUncles=uncles} =
+    RLPArray [rlpEncode bd, RLPArray (rlpEncode <$> receipts), RLPArray $ rlpEncode <$> uncles]
+
+instance BlockLike BlockData Transaction Block where
+    blockHeader       = blockBlockData
+    blockTransactions = blockReceiptTransactions
+    blockUncleHeaders = blockBlockUncles
+
+    buildBlock bd txs us = Block bd txs us
+
+-- if useDiffBomb is False then the expAdjustment is not added.
+nextDifficulty::Bool->Bool->Integer->Difficulty->UTCTime->UTCTime->Difficulty
+nextDifficulty useDiffBomb useTestnet parentNumber oldDifficulty oldTime newTime =
+  max nextDiff' minimumDifficulty + if not useDiffBomb then 0 else expAdjustment
+    where
+      nextDiff' =
+          if round (utcTimeToPOSIXSeconds newTime) >=
+                 (round (utcTimeToPOSIXSeconds oldTime) + difficultyDurationLimit useTestnet::Integer)
+          then oldDifficulty - oldDifficulty `shiftR` difficultyAdjustment
+          else oldDifficulty + oldDifficulty `shiftR` difficultyAdjustment
+      periodCount = (parentNumber+1) `quot` difficultyExpDiffPeriod
+      expAdjustment =
+        if periodCount > 1
+        then 2^(periodCount - 2)
+        else 0
+
+-- if useDiffBomb is False then the expAdjustment is not added
+homesteadNextDifficulty::Bool->Bool->Integer->Difficulty->UTCTime->UTCTime->Difficulty
+homesteadNextDifficulty useDiffBomb _useTestnet parentNumber oldDifficulty oldTime newTime =
+  max nextDiff' minimumDifficulty + if not useDiffBomb then 0 else expAdjustment
+    where
+      block_timestamp = round (utcTimeToPOSIXSeconds newTime)::Integer
+      parent_timestamp = round (utcTimeToPOSIXSeconds oldTime)::Integer
+      nextDiff' = oldDifficulty + oldDifficulty `quot` 2048 * max (1 - (block_timestamp - parent_timestamp) `quot` 10) (-99)
+      periodCount = (parentNumber+1) `quot` difficultyExpDiffPeriod
+      expAdjustment =
+        if periodCount > 1
+        then 2^(periodCount - 2)
+        else 0
 
 data BestBlock = BestBlock
   { bestBlockHash            :: Keccak256

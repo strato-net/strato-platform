@@ -13,8 +13,8 @@ describe('solidity parser', () => {
         function f() {}
     }`
       const parsed = solidityParser.parse(input)
-      assert.equal(parsed.children.length, 1)
-      const contract = parsed.children[0]
+      assert.equal((parsed as any).children.length, 1)
+      const contract = (parsed as any).children[0]
       assert.equal(contract.name, 'test')
     })
 

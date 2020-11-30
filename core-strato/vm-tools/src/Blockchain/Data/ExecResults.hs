@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Blockchain.Data.ExecResults
@@ -12,12 +13,12 @@ import qualified Data.ByteString.Short   as BSS
 import qualified Data.Set                as S
 import           GHC.Generics
 
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Event
 
 import           Blockchain.VM.SolidException
 import           Blockchain.VM.VMException
 import           Blockchain.Strato.Model.Action
-import           Blockchain.Data.Address
 import           Blockchain.Data.Log
 import           Blockchain.Data.Transaction
 import           Blockchain.SolidVM.Model
@@ -31,8 +32,8 @@ data ExecResults =
     erTrace              :: [String],
     erLogs               :: [Log],
     erEvents             :: [Event],
-    erNewContractAddress :: Maybe Address,
-    erSuicideList        :: S.Set Address,
+    erNewContractAccount :: Maybe Account,
+    erSuicideList        :: S.Set Account,
     erAction             :: Maybe Action,
     erException          :: Maybe (Either SolidException VMException),
     erKind               :: CodeKind
@@ -65,7 +66,7 @@ errorResults ck remainingGas e =
     , erTrace=[]
     , erLogs=[]
     , erEvents=[]
-    , erNewContractAddress=Nothing
+    , erNewContractAccount=Nothing
     , erSuicideList = S.empty
     , erAction = Nothing
     , erException = Just e
