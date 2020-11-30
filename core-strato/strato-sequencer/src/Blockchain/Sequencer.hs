@@ -52,7 +52,7 @@ import           Blockchain.Sequencer.Metrics
 import           Blockchain.Sequencer.Monad
 
 import qualified Blockchain.Data.Block                     as BDB
-import           Blockchain.Data.ChainInfo                 (chainInfo, creationBlock)
+import           Blockchain.Data.ChainInfo                 (chainInfo, creationBlock, parentChain)
 import qualified Blockchain.Data.DataDefs                  as BDB
 import qualified Blockchain.Data.TransactionDef            as TD
 import qualified Blockchain.Data.TXOrigin                  as TO
@@ -560,12 +560,14 @@ transformGenesis chains = forM_ chains $ \ig -> do
     False -> do
       logF "We haven't seen this chain before. Inserting into SeenChainDB and emitting to VM, P2P"
       logF $ "Checking emission status of block " ++ format (creationBlock $ chainInfo cInfo)
-      ready <- fmap _emitted . lift . A.repsert (A.Proxy @EmittedBlock) (creationBlock $ chainInfo cInfo) $ \case
+      seenCreationBlock <- fmap _emitted . lift . A.repsert (A.Proxy @EmittedBlock) (creationBlock $ chainInfo cInfo) $ \case
         Nothing -> pure $ EmittedBlock False (M.singleton chainId cInfo)
         Just (EmittedBlock emitted' depChains) | emitted' -> pure $ EmittedBlock emitted' M.empty
                                                | otherwise -> pure $ EmittedBlock emitted' (M.insert chainId cInfo depChains)
-      logF $ "Emission status of block " ++ format (creationBlock $ chainInfo cInfo) ++ ": " ++ show ready
-      when ready $ do
+      logF $ "Emission status of block " ++ format (creationBlock $ chainInfo cInfo) ++ ": " ++ show seenCreationBlock
+      seenParentChains <- hasAllAncestorChains . parentChain $ chainInfo cInfo
+      logF $ "hasAllAncestorChains: " ++ show seenParentChains
+      when (seenCreationBlock && seenParentChains) $ do
         yield . ToVm $ VmGenesis og
         yield . ToP2p $ P2pGenesis og
         yieldMany . map (ToVm . VmBlock) =<< insertNewChainInfo chainId cInfo

@@ -21,6 +21,7 @@ module Blockchain.Privacy.Event
   , checkIfIsMissingTX
   , runPrivateHashTX
   , runBlocks
+  , hasAllAncestorChains
   , hydratePrivateHashes
   , insertNewChainInfo
   , isPrivateHashTX
@@ -267,6 +268,15 @@ runBlocks chainId = go
               adjustStatefully_ (Proxy @ChainIdEntry) chainId $
                 blocksToRun %= S.delete b0
               (b:) <$> go
+
+hasAllAncestorChains :: (Word256 `Alters` ChainIdEntry) m
+                     => Maybe Word256 -> m Bool
+hasAllAncestorChains = go
+  where
+    go Nothing = pure True
+    go (Just chainId) = do
+      mmParent <- fmap (parentChain . chainInfo . _chainIdInfo) <$> lookup (Proxy @ChainIdEntry) chainId
+      maybe (pure False) go mmParent
 
 accumT :: Monad m => s -> [a] -> (s -> a -> m (b,s)) -> m ([b],s)
 accumT s [] _ = pure ([],s)
