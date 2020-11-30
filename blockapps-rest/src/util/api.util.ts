@@ -1,5 +1,5 @@
-import RestStatus from "http-status-codes";
-import queryString from "query-string";
+import * as RestStatus from "http-status-codes";
+import * as queryString from "query-string";
 import ax from "../axios-wrapper";
 import { RestError } from "./rest.util";
 
@@ -11,11 +11,9 @@ const externalStorageUrl = "/apex-api/bloc/file";
 
 const Endpoint = {
   ACCOUNT: `${strato12Url}/account`,
-  USERS: `${blocUrl}/users`,
   USER: `${blocUrl}/users/:username`,
-  FILL: `${blocUrl}/users/:username/:address/fill`,
+  FILL: `${blocUrl}/users/user/:address/fill`,
   STATE: `${blocUrl}/contracts/:name/:address/state`,
-  STATES: `${blocUrl}/contracts/states`,
   TXRESULTS: `${blocUrl}/transactions/results`,
   SEND: `${strato23Url}/transaction`,
   SEND_PARALLEL: `${strato23Url}/transaction/parallel`,
@@ -28,7 +26,7 @@ const Endpoint = {
   EXT_ATTEST: `${externalStorageUrl}/attest`,
   EXT_VERIFY: `${externalStorageUrl}/verify`,
   EXT_DOWNLOAD: `${externalStorageUrl}/download`,
-  EXT_LIST: `${externalStorageUrl}/list`,
+  EXT_LIST: `${externalStorageUrl}/list`
 };
 
 function constructEndpoint(endpointTemplate, options = {}, params = {}) {
@@ -50,7 +48,11 @@ function constructQuerySearch(options) {
   }
 
   const chainIds = options.chainIds;
-  if (chainIds !== undefined && chainIds.length !== undefined && chainIds.length > 0) {
+  if (
+    chainIds !== undefined &&
+    chainIds.length !== undefined &&
+    chainIds.length > 0
+  ) {
     if (chainIds.length == 1) {
       const queryObject = Object.assign(
         { chainId: `eq.${chainIds[0]}` },
@@ -66,7 +68,6 @@ function constructQuerySearch(options) {
       );
       const query = `?${queryString.stringify(queryObject)}`;
       return query;
-
     }
   } else {
     const query = `?${queryString.stringify(options.query)}`;
@@ -95,8 +96,8 @@ function constructQuery(options) {
  * @param{String} contractName
  * @returns{()} metadata
  */
-function constructMetadata(options, contractName) {
-  const metadata = {};
+function constructMetadata(options:any, contractName) {
+  const metadata:any = {};
   if (options === {}) return metadata;
 
   // history flag (default: off)
@@ -111,7 +112,7 @@ function constructMetadata(options, contractName) {
         options.history.indexOf(metadata.history) >= 0
           ? options.history.join(",")
           : `${metadata.history},${options.history.join(",")}`;
-    } else if (typeof options.history === String) {
+    } else if (typeof options.history === 'string') {
       metadata.history =
         metadata.history.length === 0 ||
         options.history.indexOf(metadata.history) >= 0

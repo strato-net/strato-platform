@@ -1,12 +1,12 @@
-import commander from "commander";
-import fs from "fs";
+import * as commander from "commander";
+import * as fs from "fs";
 import fsUtil from "./fsUtil";
 import oauthUtil from "./oauth.util";
 import tcpPortUsed from "tcp-port-used";
-import http from "http";
-import https from "https";
-import qs from "query-string";
-import url from "url";
+import * as http from "http";
+import * as https from "https";
+import * as qs from "query-string";
+import * as url from "url";
 const { stringify } = require("flatted/cjs");
 const envPath = ".env";
 const envfile = require("envfile");
@@ -65,10 +65,7 @@ pBMYLinJZN+jM/Xddr18fL0obdkk5Q==
 -----END CERTIFICATE-----`;
 
 if (!fs.existsSync(envPath)) {
-  fs.appendFileSync(envPath, "", function(err) {
-    if (err) throw err;
-    console.log(".env file is created successfully.");
-  });
+  fs.appendFileSync(envPath, "");
 }
 
 envConfig = envfile.parseFileSync(envPath);

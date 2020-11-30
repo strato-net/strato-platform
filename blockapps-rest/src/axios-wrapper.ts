@@ -1,5 +1,5 @@
-import axios from 'axios'
-import queryString from 'query-string'
+import axios, { AxiosRequestConfig } from 'axios'
+import * as queryString from 'query-string'
 const { stringify} = require('flatted/cjs');
 
 
@@ -16,10 +16,10 @@ function toJson(string) {
   }
 }
 
-async function get(host, endpoint, options = {}) {
+async function get(host, endpoint, options:any = {}) {
   const logger = options.logger || (options.config.apiDebug? console : nullLogger)
   const url = host + endpoint
-  const request = {
+  const request:AxiosRequestConfig = {
     method: 'GET',
     url,
     headers: options.headers || null,
@@ -44,7 +44,7 @@ async function get(host, endpoint, options = {}) {
 async function post(host, endpoint, body, options) {
   const logger = options.logger || (options.config.apiDebug? console : nullLogger)
   const url = host + endpoint
-  const request = {
+  const request:AxiosRequestConfig = {
     url,
     method: 'POST',
     headers: options.headers || null,

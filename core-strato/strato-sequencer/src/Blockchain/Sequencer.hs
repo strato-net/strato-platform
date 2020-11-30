@@ -567,7 +567,8 @@ transformGenesis chains = forM_ chains $ \ig -> do
       logF $ "Checking emission status of block " ++ format (creationBlock $ chainInfo cInfo)
       ready <- fmap _emitted . lift . A.repsert (A.Proxy @EmittedBlock) (creationBlock $ chainInfo cInfo) $ \case
         Nothing -> pure $ EmittedBlock False (M.singleton chainId cInfo)
-        Just (EmittedBlock emitted' depChains) -> pure $ EmittedBlock emitted' (M.insert chainId cInfo depChains)
+        Just (EmittedBlock emitted' depChains) | emitted' -> pure $ EmittedBlock emitted' M.empty
+                                               | otherwise -> pure $ EmittedBlock emitted' (M.insert chainId cInfo depChains)
       logF $ "Emission status of block " ++ format (creationBlock $ chainInfo cInfo) ++ ": " ++ show ready
       when ready $ do
         yield . ToVm $ VmGenesis og
