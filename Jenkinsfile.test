@@ -69,7 +69,7 @@ pipeline {
             export EXT_STORAGE_S3_BUCKET=strato-external-storage-test
             export EXT_STORAGE_S3_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
             export EXT_STORAGE_S3_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-            ./strato.sh -m 1 --single
+            ./strato -m 1 --single
             docker ps
             # Few quick tests
             check_availability() {
@@ -106,11 +106,11 @@ pipeline {
             ]) {
               archiveArtifacts artifacts: "strato-worktree/docker-compose.yml"
               sh '''#!/bin/bash -le
-              set -x
-              docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
-              cd strato-worktree
-              docker-compose --log-level ERROR -f docker-compose.push.yml push 2>&1
-            '''
+                set -x
+                docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
+                cd strato-worktree
+                docker-compose --log-level ERROR -f docker-compose.push.yml push 2>&1
+              '''
             }
           },
             
@@ -125,20 +125,20 @@ pipeline {
 
           'Core Strato tests': {
             sh '''#!/bin/bash -le
-            set -x
-            echo "Running core-strato unit tests"
-            cd strato-worktree/core-strato
-            ./run_unit_tests.sh
-          '''
+              set -x
+              echo "Running core-strato unit tests"
+              cd strato-worktree/core-strato
+              ./run_unit_tests.sh
+            '''
           },
 
           'Bloch tests': {
             sh '''#!/bin/bash -le
-            set -x
-            echo 'Running BlockApps Haskell tests'
-            cd strato-worktree/blockapps-haskell
-            ./run_unit_tests.sh
-          '''
+              set -x
+              echo 'Running BlockApps Haskell tests'
+              cd strato-worktree/blockapps-haskell
+              ./run_unit_tests.sh
+            '''
           },
             
           'Track And Trace': {
@@ -192,10 +192,10 @@ pipeline {
 
           'Shared tests': {
             sh '''#!/bin/bash -le
-                set -x
-                cd strato-worktree
-                stack test ./shared-util/
-              '''
+              set -x
+              cd strato-worktree
+              stack test ./shared-util/
+            '''
           },
 
           'SMD tests': {
@@ -244,7 +244,7 @@ pipeline {
             dir ('strato-worktree/tests') {
               sh 'rm -rf node_modules'
               sh 'npm install'
-              sh 'echo "TODO (nikita): this will fail on oauth, need a fix in test" && npm run test:blockhash' 
+              sh 'npm run test:blockhash' 
               sh 'npm run test:truchainz'
               sh 'npm run test:multicontract'
               sh 'npm run test:slipstream'

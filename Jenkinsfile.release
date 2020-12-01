@@ -79,7 +79,7 @@ pipeline {
             export EXT_STORAGE_S3_BUCKET=strato-external-storage-test
             export EXT_STORAGE_S3_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
             export EXT_STORAGE_S3_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-            ./strato.sh -m 1 --single
+            ./strato -m 1 --single
             docker ps
             # Few quick tests
             check_availability() {
@@ -193,11 +193,11 @@ pipeline {
 
             'BA-Rest Tests': {
               sh '''#!/bin/bash -le
-              set -x
-              echo "Running ba-rest E2E tests"
-              cd strato-worktree/blockapps-rest
-              DOCKER_HOST=172.17.0.1 # on "Docker for Mac" use "docker.for.mac.localhost" special reserved ip instead
-              docker build -f Dockerfile.test --build-arg host=${DOCKER_HOST} --no-cache .
+                set -x
+                echo "Running ba-rest E2E tests"
+                cd strato-worktree/blockapps-rest
+                DOCKER_HOST=172.17.0.1 # on "Docker for Mac" use "docker.for.mac.localhost" special reserved ip instead
+                docker build -f Dockerfile.test --build-arg host=${DOCKER_HOST} --no-cache .
               '''
             },
         )
