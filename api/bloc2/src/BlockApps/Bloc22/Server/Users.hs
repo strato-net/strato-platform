@@ -17,7 +17,8 @@ module BlockApps.Bloc22.Server.Users (
   getBatchBlocTransactionResult',
   getBlocTransactionResult',
   postUsersFill,
-  forStateT
+  forStateT,
+  constructArgValuesAndSource
   ) where
 
 import           Control.Concurrent
@@ -28,20 +29,25 @@ import           Control.Monad.Except
 import           Control.Monad.Trans.State.Lazy
 import qualified Data.Aeson                        as Aeson
 import           Data.ByteString                   (ByteString)
+import qualified Data.ByteString                   as ByteString
 import qualified Data.ByteString.Lazy              as BL
 import qualified Data.ByteString.Base16            as Base16
 import           Data.ByteString.Short             (fromShort)
 import           Data.Either
+import           Data.Foldable
 import           Data.Int                          (Int32)
 import           Data.List                         (sortOn)
+import           Data.Map.Strict                   (Map)
 import qualified Data.Map.Strict                   as Map
 import           Data.Maybe
+import           Data.Set                          (isSubsetOf)
 import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
 import qualified Data.Text.Encoding                as Text
 import           Data.Traversable
 import           Opaleye                           hiding (not, null, index, max)
 import           Text.Format
+import           Text.Read                         (readMaybe)
 import           UnliftIO
 
 import           BlockApps.Bloc22.API.Users
@@ -51,8 +57,10 @@ import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Monad
 import           BlockApps.Bloc22.Server.Utils
 import           BlockApps.Logging
+import           BlockApps.Solidity.ArgValue
 import           BlockApps.Solidity.Contract()
 import           BlockApps.Solidity.SolidityValue
+import           BlockApps.Solidity.Storage
 import           BlockApps.Solidity.Type
 import           BlockApps.Solidity.Value
 import           BlockApps.Solidity.Xabi
@@ -61,8 +69,8 @@ import           BlockApps.SolidityVarReader
 import qualified BlockApps.Strato.Types            as Deprecated
 import           BlockApps.XAbiConverter
 import           Blockchain.Data.DataDefs
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Keccak256
 import           Control.Monad.Composable.BlocSQL
 import           Control.Monad.Composable.CoreAPI
@@ -188,27 +196,26 @@ contractResult :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
 contractResult txHash mtxr cmId name = do
   let
     Just txResult = mtxr
-    chainId = transactionResultChainId txResult
-    addressMaybe = do
+    accountMaybe = do
       str <- listToMaybe $
         Text.splitOn "," (Text.pack $ transactionResultContractsCreated txResult)
-      stringAddress $ Text.unpack str
-  case addressMaybe of
+      readMaybe (Text.unpack str)
+  case accountMaybe of
     Nothing -> case transactionResultMessage txResult of
       "Success!" -> do
-        let mDelAddr = stringAddress . Text.unpack =<<
+        let mDelAddr = readMaybe @Account . Text.unpack =<<
               (listToMaybe . Text.splitOn "," . Text.pack $ transactionResultContractsDeleted txResult)
         case mDelAddr of
           Just _ -> lift $ throwIO $ UserError "Contract failed to upload, likely because the constructor threw"
           Nothing -> lift $ throwIO $ UserError "Transaction succeeded, but contract was neither created, nor destroyed"
       stratoMsg  -> lift $ throwIO $ UserError $ Text.pack stratoMsg
-    Just addr' -> do
+    Just acct -> do
       let cn = ContractName name
       mdetails <- use $ contractDetailsMap . at cn
       details <- case mdetails of
-        Just details' -> return details'{contractdetailsAddress = Just addr'}
+        Just details' -> return details'{contractdetailsAccount = Just acct}
         Nothing -> do
-          cds <- lift $ getContractDetailsByMetadataId cmId addr' (ChainId <$> chainId)
+          cds <- lift $ getContractDetailsByMetadataId cmId acct
           contractDetailsMap . at cn <?= cds
       return $ BlocTransactionResult Success txHash mtxr (Just $ Upload details)
 
@@ -259,30 +266,30 @@ convertResultResToVals byteResp responseTypes =
 
 ---------------------------------
 
-postUsersFill :: (HasCoreAPI m, HasBlocSQL m, MonadLogger m, HasSQL m) =>
+postUsersFill :: (HasCoreAPI m, HasBlocSQL m, MonadLogger m, HasSQL m, HasBlocEnv m) =>
                  UserName  -> Address -> Bool -> m BlocTransactionResult
-postUsersFill _ addr resolve = blocTransaction $ f addr resolve
-
-f :: (MonadIO m, MonadLogger m, HasSQL m, HasBlocSQL m, HasCoreAPI m) =>
-     Address -> Bool -> m BlocTransactionResult
-f addr resolve = do
-  when resolve ($logInfoS "postUsersFill" "Waiting for faucet transaction to be mined")
-  hashes <- blocStrato $ postFaucetClient addr
-  void . blocModify $ \conn -> runInsertMany conn hashNameTable [
-    ( Nothing
-    , constant h
-    , constant (0 :: Int32)
-    , constant (0 :: Int32)
-    , constant (Text.decodeUtf8 . BL.toStrict $ Aeson.encode Deprecated.defaultPostTx{Deprecated.posttransactionTo = Just addr})
-    ) | h <- hashes]
-  result <- getBlocTransactionResult' hashes resolve
-  when (resolve && Success == blocTransactionStatus result) $ do
-    waitForBalance addr
-  $logInfoLS "postUsersFill/resolve" resolve
-  $logInfoLS "postUsersFill/result" result
-  when (Failure == blocTransactionStatus result) $
-    throwIO $ UnavailableError "faucet transaction failed; please try again"
-  return result
+postUsersFill _ addr resolve = do
+  shouldPost <- fmap gasOn getBlocEnv
+  if shouldPost
+    then blocTransaction $ do
+      when resolve ($logInfoS "postUsersFill" "Waiting for faucet transaction to be mined")
+      hashes <- blocStrato $ postFaucetClient addr
+      void . blocModify $ \conn -> runInsertMany conn hashNameTable [
+        ( Nothing
+        , constant h
+        , constant (0 :: Int32)
+        , constant (0 :: Int32)
+        , constant (Text.decodeUtf8 . BL.toStrict $ Aeson.encode Deprecated.defaultPostTx{Deprecated.posttransactionTo = Just addr})
+        ) | h <- hashes]
+      result <- getBlocTransactionResult' hashes resolve
+      when (resolve && Success == blocTransactionStatus result) $ do
+        waitForBalance addr
+      $logInfoLS "postUsersFill/resolve" resolve
+      $logInfoLS "postUsersFill/result" result
+      when (Failure == blocTransactionStatus result) $
+        throwIO $ UnavailableError "faucet transaction failed; please try again"
+      return result
+    else pure $ BlocTransactionResult Success zeroHash Nothing Nothing
 
 waitForBalance :: (MonadIO m, MonadLogger m,  HasCoreAPI m) => Address -> m ()
 waitForBalance addr = waitFor "no user account found" go
@@ -293,3 +300,73 @@ waitForBalance addr = waitFor "no user account found" go
           $logInfoLS "waitForBalance/req" params
           $logInfoLS "waitForBalance/resp" accts
           return . not $ null accts
+
+constructArgValuesAndSource :: (MonadIO m, MonadLogger m) =>
+                               Maybe (Map Text ArgValue) -> Map Text Xabi.IndexedType -> m (ByteString, Text)
+constructArgValuesAndSource args argNamesTypes = do
+    case args of
+      Nothing ->
+        if Map.null argNamesTypes
+          then return (ByteString.empty, "()")
+          else throwIO (UserError "no arguments provided to function.")
+      Just argsMap -> do
+        vals <- getArgValues argsMap argNamesTypes
+        let valsAsText = map valueToText vals
+        return $
+          (
+            toStorage (ValueArrayFixed (fromIntegral (length vals)) vals),
+            "(" <> Text.intercalate "," valsAsText <> ")"
+          )
+
+getArgValues :: (MonadIO m, MonadLogger m) =>
+                Map Text ArgValue -> Map Text Xabi.IndexedType -> m [Value]
+getArgValues argsMap argNamesTypes = do
+    let
+      determineValue :: (MonadIO m, MonadLogger m) =>
+                        ArgValue -> Xabi.IndexedType -> m (Int32, Value)
+      determineValue argVal (Xabi.IndexedType ix xabiType) =
+        let
+          typeM = case xabiType of
+            Xabi.Int (Just True) b -> Right . SimpleType . TypeInt True $ fmap toInteger b
+            Xabi.Int _           b -> Right . SimpleType . TypeInt False $ fmap toInteger b
+            Xabi.String _          -> Right . SimpleType $ TypeString
+            Xabi.Bytes _ b         -> Right . SimpleType . TypeBytes $ fmap toInteger b
+            Xabi.Bool              -> Right . SimpleType $ TypeBool
+            Xabi.Address           -> Right . SimpleType $ TypeAddress
+            Xabi.Account           -> Right . SimpleType $ TypeAccount
+            Xabi.Struct _ name     -> Right $ TypeStruct name
+            Xabi.Enum _ name _     -> Right $ TypeEnum name
+            Xabi.Array ety len ->
+              let
+                ettyty = case ety of
+                  Xabi.Int (Just True) b -> Right . SimpleType . TypeInt True $ fmap toInteger b
+                  Xabi.Int _           b -> Right . SimpleType . TypeInt False $ fmap toInteger b
+                  Xabi.String _          -> Right . SimpleType $ TypeString
+                  Xabi.Bytes _ b         -> Right . SimpleType . TypeBytes $ fmap toInteger b
+                  Xabi.Bool              -> Right . SimpleType $ TypeBool
+                  Xabi.Address           -> Right . SimpleType $ TypeAddress
+                  Xabi.Account           -> Right . SimpleType $ TypeAccount
+                  Xabi.Struct _ name     -> Right $ TypeStruct name
+                  Xabi.Enum _ name _     -> Right $ TypeEnum name
+                  Xabi.Array{}           -> Left "Arrays of arrays are not allowed as function arguments"
+                  Xabi.Contract name     -> Right $ TypeContract name
+                  Xabi.Mapping{}         -> Left "Arrays of mappings are not allowed as function arguments"
+                  Xabi.Label{}           -> Right $ SimpleType typeUInt
+              in case len of
+                   Just l                -> TypeArrayFixed l <$> ettyty
+                   Nothing               -> TypeArrayDynamic <$> ettyty
+            Xabi.Contract name           -> Right $ TypeContract name
+            Xabi.Mapping _ _ _           -> Left "Mappings are not allowed as function arguments"
+            Xabi.Label _                 -> Right $ SimpleType typeUInt -- since Enums are converted to Ints
+        in do
+          ty <- either (blocError . UserError) return typeM
+          either (blocError . UserError) (return . (ix,)) (argValueToValue Nothing ty argVal)
+    argsVals <-
+      if not (Map.keysSet argNamesTypes `isSubsetOf` Map.keysSet argsMap)
+      then do
+        let
+          argNames1 = "(" <> Text.intercalate ", " (Map.keys argNamesTypes) <> ")"
+          argNames2 = "(" <> Text.intercalate ", " (Map.keys argsMap) <> ")"
+        throwIO (UserError ("argument names don't match: " <> argNames1 <> " " <> argNames2))
+      else sequence $ Map.intersectionWith determineValue argsMap argNamesTypes
+    return $ map snd (sortOn fst (toList argsVals))

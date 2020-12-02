@@ -29,11 +29,8 @@ module Handlers.Chain
 import           Control.Monad
 import           Control.Monad.Change.Alter
 import           Control.Monad.IO.Class
-import qualified Data.ByteString.Char8          as BC
 import           Conduit
 import qualified Data.Map                       as M
-import           Data.Maybe
-import qualified Data.Set                       as S
 import           Data.Swagger
 import qualified Data.Text                      as T
 import           Servant
@@ -47,7 +44,6 @@ import           Blockchain.Output
 import           Blockchain.Sequencer.Event     (IngestEvent (IEGenesis), IngestGenesis (..))
 import           Blockchain.Sequencer.Kafka     (writeUnseqEvents)
 import           Blockchain.Strato.Model.ChainId
-import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.TypeLits
 import           Control.Monad.Composable.SQL
@@ -127,25 +123,10 @@ emitKafkaTransactions = loop id
 
 processChainInfos :: [ChainInfo] -> Either (Int, String) [ChainId]
 processChainInfos chainInfos = forM (zip [0..] chainInfos) $ -- TODO(dustin): Use post-incrementing state
-  \(i, gen@(ChainInfo (UnsignedChainInfo _ acin cdin mb _ _ _ mmd) _)) -> do
+  \(i, gen@(ChainInfo (UnsignedChainInfo _ acin _ mb _ _ _ _) _)) -> do
     -- add more checks?
     when (length acin == 0) $ Left (i,"account info is empty")
     when (M.size mb == 0) $ Left (i, "member list is empty")
-    let theVM = fromMaybe "EVM" $ M.lookup "VM" mmd
-        accountCodeHashes = S.fromList . flip mapMaybe acin $ \case
-          NonContract _ _ -> Nothing
-          ContractNoStorage _ _ (EVMCode c) -> Just c
-          ContractNoStorage _ _ (SolidVMCode _ c) -> Just c
-          ContractWithStorage _ _ (EVMCode c) _ -> Just c
-          ContractWithStorage _ _ (SolidVMCode _ c) _ -> Just c
-        getCode CodeInfo{..} =
-          case theVM of --For SolidVM, the source is the code
-            "SolidVM" -> BC.pack $ T.unpack codeInfoSource
-            _ -> codeInfoCode
-        codeCodeHashes = S.fromList . flip map cdin $ hash . getCode
-    case accountCodeHashes S.\\ codeCodeHashes of
-      s | s /= S.empty -> Left (i, "Each contract code hash in accountInfo must match a corresponding code hash in codeInfo.")
-        | otherwise -> do
-          let cid = rlpHash gen
-          return . ChainId $ keccak256ToWord256 cid
+    let cid = rlpHash gen
+    return . ChainId $ keccak256ToWord256 cid
 

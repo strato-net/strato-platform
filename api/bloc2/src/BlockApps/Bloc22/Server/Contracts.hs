@@ -36,6 +36,7 @@ import           BlockApps.SolidityVarReader
 import           BlockApps.SolidVMStorageDecoder
 import           BlockApps.Storage               as S
 import           BlockApps.XAbiConverter
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.CodePtr
@@ -82,7 +83,7 @@ getContractsContract name addr chainId =
               , " on chain "
               , maybe "Main" (Text.pack . show) chainId
               ]
-   in maybe (throwIO err) return =<< getContractDetails name addr chainId
+   in maybe (throwIO err) return =<< getContractDetails name (Account addr $ unChainId <$> chainId)
 
 translateStorageMap :: [StorageAddress] -> S.Storage
 translateStorageMap storage' =
@@ -110,7 +111,7 @@ getContractsState contract@(ContractName contractName) address chainId mName mCo
               , " with ID "
               , Text.pack $ show address
               ]
-  details <- fmap snd $ maybe (throwIO err) return =<< getContractDetailsAndMetadataId contract address chainId
+  details <- fmap snd $ maybe (throwIO err) return =<< getContractDetailsAndMetadataId contract (Account address $ unChainId <$> chainId)
   let eitherErrorOrContract' = xAbiToContract $ contractdetailsXabi details
   contract' <- either (throwIO . UserError . Text.pack) return eitherErrorOrContract'
 
@@ -200,7 +201,7 @@ getContractsDetails contractAddress chainId = do
               , " on chain "
               , maybe "Main" (Text.pack . show) chainId
               ]
-  mdetails <- getContractDetailsByAddressOnly contractAddress chainId
+  mdetails <- getContractDetailsByAddressOnly $ Account contractAddress $ unChainId <$> chainId
   maybe (throwIO err) (return . completeContractDetailXabi) mdetails
 
 getContractsFunctions :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
@@ -214,7 +215,7 @@ getContractsFunctions contractName contractId chainId = blocTransaction $ do
               , " on chain "
               , maybe "Main" (Text.pack . show) chainId
               ]
-  mXabi <- getContractXabi contractName contractId chainId
+  mXabi <- getContractXabi contractName (Account contractId $ unChainId <$> chainId)
   maybe (throwIO err) (return . map FunctionName . Map.keys . xabiFuncs) mXabi
 
 getContractsSymbols :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
@@ -228,7 +229,7 @@ getContractsSymbols contractName contractId chainId = blocTransaction $ do
               , " on chain "
               , maybe "Main" (Text.pack . show) chainId
               ]
-  mXabi <- getContractXabi contractName contractId chainId
+  mXabi <- getContractXabi contractName (Account contractId $ unChainId <$> chainId)
   maybe (throwIO err) (return . map SymbolName . Map.keys . xabiVars) mXabi
 
 getContractsEnum :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
@@ -243,7 +244,7 @@ getContractsEnum contractName contractId (EnumName enumName) chainId = do
               , maybe "Main" (Text.pack . show) chainId
               ]
   blocTransaction $ do
-    mXabi <- getContractXabi contractName contractId chainId
+    mXabi <- getContractXabi contractName (Account contractId $ unChainId <$> chainId)
     flip (maybe (throwIO err)) mXabi $ \xabi ->
       let enums = concat [names | (n, Enum names _) <- Map.toList (xabiTypes xabi), n == enumName]
       in return $ map EnumValue enums
@@ -264,7 +265,7 @@ getContractsStateMapping contract@(ContractName contractName) address (SymbolNam
               , "with ID "
               , Text.pack $ show address
               ]
-  details <- fmap snd $ maybe (throwIO err) return =<< getContractDetailsAndMetadataId contract address chainId
+  details <- fmap snd $ maybe (throwIO err) return =<< getContractDetailsAndMetadataId contract (Account address $ unChainId <$> chainId)
   let eitherErrorOrContract = xAbiToContract $ contractdetailsXabi details
 
   contract' <- either (throwIO . UserError . Text.pack) return eitherErrorOrContract
@@ -313,7 +314,8 @@ postContractsCompile = blocTransaction . fmap concat . traverse compileOneContra
             case ptr of
               EVMCode hsh -> return $ PostCompileResponse (contractdetailsName details) hsh
               SolidVMCode name hsh -> return $ PostCompileResponse (Text.pack name) hsh
-
+              CodeAtAccount _ _ -> throwIO . AnError $ "sourceToContractDetails somehow returned CodeAtAccount"
+              
 postContractsXabi :: MonadIO m =>
                      PostXabiRequest -> m PostXabiResponse
 postContractsXabi PostXabiRequest{..} =

@@ -143,6 +143,7 @@ hoistCoreServer = hoistServer (Proxy :: Proxy FullAPI) (convertErrors runM) full
           sourceCacheTimeout=60
           txQueueSize=4096
       nonceCache <- Cache.newCache . Just $ TimeSpec nonceCounterTimeout 0
+      codePtrCache <- Cache.newCache . Just $ TimeSpec sourceCacheTimeout 0
       sourceCache <- Cache.newCache . Just $ TimeSpec sourceCacheTimeout 0
       tbqueue <- newTBQueueIO txQueueSize
       runLoggingT .
@@ -151,6 +152,7 @@ hoistCoreServer = hoistServer (Proxy :: Proxy FullAPI) (convertErrors runM) full
                             gasOn = False,
                             stateFetchLimit = stateFetchLimit',
                             globalNonceCounter = nonceCache,
+                            globalCodePtrCache = codePtrCache,
                             globalSourceCache = sourceCache,
                             txTBQueue = tbqueue
                             } .

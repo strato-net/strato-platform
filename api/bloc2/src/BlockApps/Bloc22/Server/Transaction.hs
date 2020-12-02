@@ -55,13 +55,13 @@ import           UnliftIO
 
 import           BlockApps.Bloc22.API.Chain
 import           BlockApps.Bloc22.API.Transaction
-import           BlockApps.Bloc22.API.Users
+import           BlockApps.Bloc22.API.Users        
 import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Database.Tables
 import           BlockApps.Bloc22.Monad
 import           BlockApps.Bloc22.Server.Chain
-import           BlockApps.Bloc22.Server.Users
+import           BlockApps.Bloc22.Server.Users     hiding (constructArgValuesAndSource)
 import           BlockApps.Bloc22.Server.Utils
 import           BlockApps.Ethereum
 import           BlockApps.Logging
@@ -74,12 +74,14 @@ import           BlockApps.Solidity.Type
 import           BlockApps.Solidity.Value
 import           BlockApps.Solidity.Xabi
 import qualified BlockApps.Solidity.Xabi.Type      as Xabi
-import           BlockApps.Strato.Types            hiding (Transaction (..))
+import           BlockApps.Strato.Types            hiding (Account, Transaction (..))
 import           BlockApps.XAbiConverter
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json
 import           Blockchain.Data.TXOrigin
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address  hiding (unAddress)
+import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.ExtendedWord   (Word256, bytesToWord256)
 import           Blockchain.Strato.Model.Gas
@@ -302,7 +304,7 @@ data TransactionHeader = TransactionHeader
   , transactionheaderFromAddr :: Address
   , transactionheaderTxParams :: TxParams
   , transactionheaderValue    :: Wei
-  , transactionheaderCode     :: ByteString
+  , transactionheaderCode     :: Code
   , transactionheaderChainId  :: Maybe ChainId
   }
 
@@ -318,7 +320,7 @@ postUsersSend' cacheNonce TransferParameters{..} userName = do
         fromAddress
         params
         (Wei (fromIntegral $ unStrung value))
-        ByteString.empty
+        (Code ByteString.empty)
         chainId
     txHash <- postTransaction tx
     void . blocModify $ \conn -> runInsertMany conn hashNameTable [
@@ -352,7 +354,7 @@ postUsersContractEVM' cacheNonce ContractParameters{..} userName = blocTransacti
       fromAddr
       params
       (Wei (fromIntegral (maybe 0 unStrung value)))
-      (bin <> argsBin)
+      (Code $ bin <> argsBin)
       chainId
   $logDebugLS "postUsersContractEVM'/tx" tx
   txHash <- postTransaction tx
@@ -388,7 +390,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} userName = blocTrans
       fromAddr
       params
       (Wei (fromIntegral (maybe 0 unStrung value)))
-      (BC.pack $ Text.unpack src)
+      (Code . BC.pack $ Text.unpack src)
       chainId
   $logDebugLS "postUsersContractSolidVM'/tx" tx
   txHash <- postTransaction tx
@@ -444,7 +446,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} userName = do
             fromAddr
             (fromMaybe emptyTxParams params)
             (Wei (maybe 0 fromIntegral $ fmap unStrung value))
-            (BC.pack $ Text.unpack src)
+            (Code . BC.pack $ Text.unpack src)
             cid
       return ((name,cmId),tx)
   let
@@ -503,7 +505,7 @@ postUsersUploadListEVM' cacheNonce ContractListParameters{..} userName = do
             fromAddr
             (fromMaybe emptyTxParams params)
             (Wei (maybe 0 fromIntegral $ fmap unStrung value))
-            (bin <> argsBin)
+            (Code $ bin <> argsBin)
             cid
       return ((name,cmId),tx)
   let
@@ -533,7 +535,7 @@ postUsersSendList' cacheNonce TransferListParameters{..} userName = do
               fromAddr
               (fromMaybe emptyTxParams params)
               (Wei $ fromIntegral value)
-              (ByteString.empty)
+              (Code ByteString.empty)
               cid
         signAndPrepare userName fromAddr md header
     ) txsWithParams
@@ -591,7 +593,7 @@ postUsersContractMethodList' cacheNonce FunctionListParameters{..} userName = do
               fromAddr
               (fromMaybe emptyTxParams _methodcallTxParams)
               (Wei (fromIntegral $ unStrung methodcallValue))
-              (sel <> argsBin)
+              (Code $ sel <> argsBin)
               _methodcallChainid
           -- resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
           return (tx,mapKey,methodcallMethodName)
@@ -625,8 +627,7 @@ postUsersContractMethod' cacheNonce FunctionParameters{..} userName = do
     (cmId,xabi) <- maybe (throwIO err) (return . fmap contractdetailsXabi) =<<
       getContractDetailsAndMetadataId
         (ContractName contractName)
-        contractAddr
-        chainId
+        (Account contractAddr (unChainId <$> chainId))
     contract' <- case xAbiToContract xabi of
       Left e -> throwIO . AnError $ Text.pack e
       Right c -> return c
@@ -651,7 +652,7 @@ postUsersContractMethod' cacheNonce FunctionParameters{..} userName = do
         fromAddr
         params
         (Wei (maybe 0 (fromIntegral . unStrung) value))
-        ((sel::ByteString) <> (argsBin::ByteString))
+        (Code $ (sel::ByteString) <> (argsBin::ByteString))
         chainId
     $logDebugLS "postUsersContractMethod'/tx" tx
     txHash <- postTransaction tx
@@ -875,6 +876,7 @@ getArgValues argsMap argNamesTypes = do
             Xabi.Bytes _ b         -> Right . SimpleType . TypeBytes $ fmap toInteger b
             Xabi.Bool              -> Right . SimpleType $ TypeBool
             Xabi.Address           -> Right . SimpleType $ TypeAddress
+            Xabi.Account           -> Right . SimpleType $ TypeAccount
             Xabi.Struct _ name     -> Right $ TypeStruct name
             Xabi.Enum _ name _     -> Right $ TypeEnum name
             Xabi.Array ety len ->
@@ -886,6 +888,7 @@ getArgValues argsMap argNamesTypes = do
                   Xabi.Bytes _ b         -> Right . SimpleType . TypeBytes $ fmap toInteger b
                   Xabi.Bool              -> Right . SimpleType $ TypeBool
                   Xabi.Address           -> Right . SimpleType $ TypeAddress
+                  Xabi.Account           -> Right . SimpleType $ TypeAccount
                   Xabi.Struct _ name     -> Right $ TypeStruct name
                   Xabi.Enum _ name _     -> Right $ TypeEnum name
                   Xabi.Array{}           -> Left "Arrays of arrays are not allowed as function arguments"
