@@ -1,20 +1,27 @@
-const ba = require('blockapps-rest');
-const co = require('co');
-require('co-mocha');
-const rest = ba.rest;
-const common = ba.common;
-const api = common.api;
-const config = common.config;
-const util = common.util;
-const assert = common.assert;
-const nodes = config.nodes;
-const moment = require('moment');
-const constants = common.constants;
-const path = require('path');
+import * as path from "path";
 
+import {
+  OAuthUser,
+  BlockChainUser,
+  Options,
+  Config,
+  rest,
+  util,
+  fsUtil,
+  oauthUtil,
+  assert,
+  constants,
+  ContractDefinition,
+  importer
+  } from 'blockapps-rest';
 
-const adminName = util.uid('Admin');
-const adminPassword = '1234';
+import BigNumber from "bignumber.js";
+import * as chai from "chai";
+chai.should();
+chai.use(require('chai-bignumber')());
+
+let config:Config=fsUtil.getYaml("config.yaml");
+let options:Options={config}
 
 const contractName = 'Vehicle';
 const contractFilename = path.join(config.contractsPath, "Vehicle.sol");
@@ -25,24 +32,26 @@ describe('Unique addresses', function () {
   let admin;
   const batchSize = util.getArgInt('--batchSize', 1);
 
-  before(function * () {
+  before(async() => {
     console.log(`Creating admin user and contract`);
-    admin = yield rest.createUser(adminName, adminPassword);
-    yield rest.compileSearch([contractName], contractName, contractFilename);
+    const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
+    const ouser = await oauth.getAccessTokenByResourceOwnerCredential("user1", "1234", "strato-devel");
+    admin = await rest.createUser(ouser, options);
+//    await rest.createContract(admin, {name: contractName, source: await importer.combine(contractFilename), args: {}}, options);
   });
 
-  it('should upload a list of contracts and receive a list of unique addresses', function * () {
-    const txs = factory_createUploadList(batchSize);
+  it('should upload a list of contracts and receive a list of unique addresses', async() => {
+    const txs = await factory_createUploadList(batchSize);
 
     const doNotResolve = true;
-    const uploadReceipts = yield rest_uploadContractList(admin, txs, doNotResolve);
+    const uploadReceipts = await rest_uploadContractList(admin, txs, doNotResolve);
     // wait for the hashes to resolve
-    const uploadResults = yield waitResults(uploadReceipts);
+    const uploadResults = await waitResults(admin, uploadReceipts);
     const uploadAddresses = [];
 
     for (let result of uploadResults.data) {
       let found = false;
-      for (address of uploadAddresses) {
+      for (let address of uploadAddresses) {
         if (result.address == address) {
           found = true;
           break;
@@ -58,12 +67,13 @@ describe('Unique addresses', function () {
   });
 });
 
-function factory_createUploadList(batchSize) {
-  const txs = [];
+async function factory_createUploadList(batchSize) {
+  const txs:ContractDefinition[] = [];
   for (var i = 0; i < batchSize; i++) {
     // function Vehicle(string _vin, string _s0, string _s1, string _s2, string _s3) public
     txs.push({
-      contractName: contractName,
+      name: contractName,
+      source: await importer.combine(contractFilename),
       args: {
         _vin: `vin_${i}`,
         _s0: `s0_${i}`,
@@ -77,12 +87,12 @@ function factory_createUploadList(batchSize) {
 }
 
 
-function* waitResults(uploadReceipts) {
+async function waitResults(admin, uploadReceipts) {
   // create a promise for each hash - process in parallel
   // WARNING - NodeJS might break on too many promises in parallel
   console.log('Resolving Upload receipts');
   const hashes = uploadReceipts.map((r) => {return r.hash;});
-  const txResults = yield resolveTxs(hashes);
+  const txResults = await resolveTxs(admin, hashes);
   console.log('Resolved Upload receipts');
   //console.log('txResults', txResults); // process.exit();
   const errors = [];
@@ -103,22 +113,18 @@ function* waitResults(uploadReceipts) {
   return {errors: errors, data: data};
 }
 
-function*  rest_uploadContractList(user, txs, doNotResolve, node){
+async function  rest_uploadContractList(user, txs, doNotResolve, node?){
   const resolve = doNotResolve ? false : true;
   //verbose('uploadContractList', {user, txs, resolve, node})
-  const results = yield api.bloc.uploadList({
-      password: user.password,
-      contracts: txs,
-      resolve: resolve
-    }, user.name, user.address, resolve, node)
-    .catch(function(e) {
-      throw (e instanceof Error) ? e : new HttpError(e);
-    });
+  const results = await rest.createContractList(user, txs, {...options, config: {...options.config, VM: "SolidVM"}});
+//    .catch(function(e) {
+//      throw (e instanceof Error) ? e : new HttpError(e);
+//    });
 
   if(resolve) {
     results.map(function(result){
-      if(result.status === constants.FAILURE) {
-        throw new HttpError400(result.txResult.msg);
+      if(result.status === constants.TxResultStatus.FAILURE) {
+        throw result.txResult.msg; // new HttpError400(result.txResult.msg);
       }
     });
     return results.map(function(r){return r.data.contents;});
@@ -134,9 +140,9 @@ function promiseTimeout(timeout) {
   });
 }
 
-function * resolveTxs(hashes) {
+async function resolveTxs(user, hashes:string[]) {
   const resolve = true;
-  const txResults = yield api.bloc.results(hashes, resolve).catch(function(err) {
+  const txResults = await rest.getBlocResults(user, hashes, options).catch(function(err) {
         return {status: err.status};
       });
   return txResults;

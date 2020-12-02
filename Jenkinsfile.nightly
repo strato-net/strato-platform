@@ -33,20 +33,25 @@ pipeline {
     }
 
     stage('Deploy') {
+
       steps {
         withCredentials([
             usernamePassword(credentialsId: 'aws-s3-test-bucket-access-user', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID')
         ]) {
           sh '''#!/bin/bash -le
             set -x
-            rm -rf strato-getting-started
-            git clone https://github.com/blockapps/strato-getting-started
-            cp strato-worktree/docker-compose.yml strato-getting-started/
             cd strato-getting-started
+
+            docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes
+
             export NODE_HOST=$(</host)
             export genesis=smokeTest
             export BLOC_DEBUG=true
             export SLIPSTREAM_OPTIONAL=false
+            export OAUTH_ENABLED=true
+            export OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration
+            export OAUTH_CLIENT_ID=dev
+            export OAUTH_CLIENT_SECRET=d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f
             export PASSWORD=123
             export EXT_STORAGE_S3_BUCKET=strato-external-storage-test
             export EXT_STORAGE_S3_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
@@ -79,7 +84,7 @@ pipeline {
       }
     }
 
-    stage('Test & Push images') {
+    stage('Test and Push Images') {
       steps {
         parallel (
           'Push images': {
@@ -95,7 +100,7 @@ pipeline {
               '''
             }
           },
-
+            
           'Apex tests': {
             sh '''#!/bin/bash -le
               set -x
@@ -122,136 +127,7 @@ pipeline {
               ./run_unit_tests.sh
             '''
           },
-
-          'Shared tests': {
-            dir('strato-worktree/') {
-              sh 'stack test ./shared-util/'
-            }
-          },
-
-          'SMD tests': {
-            sh '''#!/bin/bash -le
-              set -x
-              echo 'Running SMD tests'
-              cd strato-worktree/smd-ui
-              docker build -f Dockerfile.test .
-            '''
-          },
-
-          'Integration tests' : {
-            dir ('strato-worktree/tests') {
-              sh 'rm -rf node_modules'
-              sh 'npm install'
-              sh 'npm run test:blockhash'
-              sh 'npm run test:truchainz'
-              sh 'npm run test:multicontract'
-              sh 'npm run test:slipstream'
-              sh 'npm run test:solidvm'
-              sh 'npm run test:uploadOrder'
-              // -- additional tests:
-              //sh 'npm run test:e2e'
-              //sh 'npm run test:dataTypes'
-              //sh 'npm run test:load'
-              //sh 'npm run test:load10k'
-              //sh 'npm run test:loadecho'
-              //sh 'npm run test:upload'
-              //sh 'npm run test:upload10k'
-              //sh 'npm run test:loadFF' // SolidVM only
-              //sh 'npm run test:uploadOrder'
-            }
-            dir ('strato-worktree/core-strato/strato-init') {
-              sh './check_genesis_ingestion.sh'
-            }
-          },
-
-          'STRATO API Tests': {
-            withCredentials([
-               usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')
-            ]) {
-                sh '''#!/bin/bash -le
-                  set -x
-                  rm -rf strato-api-tests
-                  git clone -b master https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git
-                  cd strato-api-tests
-                  docker build --tag strato-api-tests .
-                  docker run -e STRATO_NODE_URL=http://172.17.0.1:80 -e OAUTH_ENABLED=false -e DEBUG_LOG=false strato-api-tests
-                '''
-              }
-          },
-        )
-      }
-    }
-
-    stage('Redeploy with OAuth') {
-
-      steps {
-        withCredentials([
-            usernamePassword(credentialsId: 'aws-s3-test-bucket-access-user', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID')
-        ]) {
-          sh '''#!/bin/bash -le
-            set -x
-            cd strato-getting-started
-            rm -rf strato_logs*
-            ./fetchlogs --as-dir
-            rm -rf strato_pipeline_logs
-            mkdir strato_pipeline_logs
-            mv strato_logs strato_logs_nonoauth
-            mv strato_logs_nonoauth strato_pipeline_logs/
-
-            docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes
-
-            export NODE_HOST=$(</host)
-            export genesis=smokeTest
-            export BLOC_DEBUG=true
-            export SLIPSTREAM_OPTIONAL=false
-            export OAUTH_ENABLED=true
-            export OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration
-            export OAUTH_CLIENT_ID=dev
-            export OAUTH_CLIENT_SECRET=d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f
-            export PASSWORD=123
-            export EXT_STORAGE_S3_BUCKET=strato-external-storage-test
-            export EXT_STORAGE_S3_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-            export EXT_STORAGE_S3_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-            ./strato.sh -m 1 --single
-            docker ps
-            # Few quick tests
-            check_availability() {
-              counter=0
-              until curl --silent --fail --location ${NODE_HOST}/health | jq .healthInfo.isHealthy | grep true
-              do
-                if [[ "$counter" -gt 120 ]]; then
-                  echo "STRATO node took longer than 2 minutes to initialize! aborting."
-                  exit 73
-                fi
-                echo "waiting for STRATO health endpoint to be available through nginx"
-                counter=$((counter+1))
-                sleep 1
-              done
-              echo "STRATO health endpoint is available through nginx - node is running"
-            }
-            check_availability
-            echo "Restarting docker containers to simulate computer restart..."
-            docker-compose -p strato --log-level ERROR stop
-            docker-compose -p strato --log-level ERROR start
-            PASSWORD=${PASSWORD} ./strato --set-password
-            check_availability
-          '''
-        }
-      }
-    }
-
-    stage('Test with OAuth Node') {
-      steps {
-        parallel (
-          'Apex tests': {
-            sh '''#!/bin/bash -le
-              set -x
-              echo "Running apex unit tests"
-              APEX_CONTAINER=$(docker ps --format '{{.Names}}' | grep apex_1)
-              docker exec -t -e NODE_ENV=test "$APEX_CONTAINER" ./run-tests.sh
-            '''
-          },
-
+            
           'Track And Trace': {
             withEnv([
                 "ADMIN_TOKEN=eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJWY0N4SEpnUjFOdnJ4UWR5QXhQcEI5VEowM205SVRDdWt0b1JfTENVSE1VIn0.eyJqdGkiOiI1ZWE2NTBkNi1lMTM2LTQ5YjEtYTEzYi01MzY5MDM5MDdiNDEiLCJleHAiOjIwMjM5NzQxNDAsIm5iZiI6MCwiaWF0IjoxNTkxOTc0MTQwLCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvc3RyYXRvLWRldmVsIiwiYXVkIjoiYWNjb3VudCIsInN1YiI6IjBjYWFlM2RmLWQ2ZWUtNDkxZC04ODYyLTJlY2ZmM2Y2YTI0MyIsInR5cCI6IkJlYXJlciIsImF6cCI6ImRldi1pbmZpbml0ZSIsImF1dGhfdGltZSI6MTU5MTk3NDE0MCwic2Vzc2lvbl9zdGF0ZSI6IjI3MjEyNjBhLWU1ODItNGJiOS04N2I5LTc0YWQ3YWI5MmMzNyIsImFjciI6IjEiLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsib2ZmbGluZV9hY2Nlc3MiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sInNjb3BlIjoib3BlbmlkIGVtYWlsIHByb2ZpbGUiLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwicHJlZmVycmVkX3VzZXJuYW1lIjoiYWRtaW5pc3RyYXRvckB0dC5hcHAiLCJlbWFpbCI6ImFkbWluaXN0cmF0b3JAdHQuYXBwIn0.s-0MRMAEsG532YLM1k6GaXr3RKFUFpB13vR0WuYP8R1je2cP83hvE7Ll-N8hHbyAy8lumfEgSS6NXVIBCRrm0DEqX-XICOIEEkE6d6H-BPXqKZhfFV_HItfVWbWPDRHsCwvTI2ZAR8rgt19Dd8tWNOUVT_demsi20XYj8H2HuMo9vNMT7AN2wl1qRQPHffEppBrtPAx-PSauQpHm51xPgJSJMJPVhaVMWoM1tL91Ef6TOldZS8y89hReRaxeSZJP9kQWtIMLYe41AWcIKzrteOMBhPwa5e8PFfcDFJjvT6N_ASDtPldsxlNGrceMb0JVMwqmbcoetoE5_lMNKzGTkw",
@@ -317,7 +193,7 @@ pipeline {
               docker build -f Dockerfile.test .
             '''
           },
-
+            
           'STRATO API Tests': {
             withCredentials([
               usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')
@@ -343,12 +219,40 @@ pipeline {
 
           'BA-Rest Tests': {
             sh '''#!/bin/bash -le
-            set -x
-            echo "Running ba-rest E2E tests"
-            cd strato-worktree/blockapps-rest
-            DOCKER_HOST=172.17.0.1 # on "Docker for Mac" use "docker.for.mac.localhost" special reserved ip instead
-            docker build -f Dockerfile.test --build-arg host=${DOCKER_HOST} --no-cache .
+              set -x
+              echo "Running ba-rest E2E tests"
+              cd strato-worktree/blockapps-rest
+              cp .oauth-test-config lib/test/fixtures/config.yaml
+              cp .oauth-test-config lib/util/test/fixtures/config.yaml
+              DOCKER_HOST=172.17.0.1 # on "Docker for Mac" use "docker.for.mac.localhost" special reserved ip instead
+              docker build -f Dockerfile.test --build-arg host=${DOCKER_HOST} --no-cache .
             '''
+          },
+
+          'Integration tests' : {
+            dir ('strato-worktree/tests') {
+              sh 'rm -rf node_modules'
+              sh 'npm install'
+              sh 'npm run test:blockhash'
+              sh 'npm run test:truchainz'
+              sh 'npm run test:multicontract'
+              sh 'npm run test:slipstream'
+              sh 'npm run test:solidvm'
+              sh 'npm run test:uploadOrder'
+              // -- additional tests:
+              //sh 'npm run test:e2e'
+              //sh 'npm run test:dataTypes'
+              //sh 'npm run test:load'
+              //sh 'npm run test:load10k'
+              //sh 'npm run test:loadecho'
+              //sh 'npm run test:upload'
+              //sh 'npm run test:upload10k'
+              //sh 'npm run test:loadFF' // SolidVM only
+              //sh 'npm run test:uploadOrder'
+            }
+            dir ('strato-worktree/core-strato/strato-init') {
+              sh './check_genesis_ingestion.sh'
+            }
           },
         )
       }
@@ -360,9 +264,7 @@ pipeline {
       dir ('strato-getting-started') {
         sh 'rm -rf strato_logs*'
         sh './fetchlogs --as-dir'
-        sh 'mv strato_logs strato_logs_oauth'
-        sh 'mv strato_logs_oauth strato_pipeline_logs/'
-        archiveArtifacts artifacts: 'strato_pipeline_logs/**', fingerprint: true
+        archiveArtifacts artifacts: 'strato_logs', fingerprint: true
       }
     }
 

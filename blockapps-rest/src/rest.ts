@@ -6,6 +6,18 @@ import util from "./util/util";
 import { constructMetadata, setAuthHeaders } from "./util/api.util";
 import { RestError, response } from "./util/rest.util";
 import jwt from "jsonwebtoken";
+import {
+  Options,
+  StratoUser,
+  OAuthUser,
+  BlockChainUser,
+  Contract,
+  ContractDefinition,
+  TransactionResultHash,
+  CallArgs,
+  Chain,
+  SendTx
+} from "./types";
 
 /**
  * This is the main blockapps-rest interface.
@@ -283,10 +295,9 @@ function assertTxResultList(txResultList) {
  * @param {module:rest~Options} options This identifies the options and configurations for this call
  * @returns {module:rest~TxResultWrapper}
  */
-async function resolveResult(user, pendingTxResult, options) {
+async function resolveResult(user, pendingTxResult, options:Options) {
   return (await resolveResults(user, [pendingTxResult], options))[0];
 }
-
 
 /**
  * @static
@@ -345,7 +356,7 @@ async function resolveResult(user, pendingTxResult, options) {
  * @param {module:rest~Options} options This identifies the options and configurations for this call
  * @returns {module:rest~TxResultWrapper[]}
  */
-async function resolveResults(user, pendingResults, _options = {}) {
+async function resolveResults(user, pendingResults, _options:Options) {
   const options = Object.assign({ isAsync: true }, _options);
 
   // wait until there are no more PENDING results
@@ -387,7 +398,7 @@ async function resolveResults(user, pendingResults, _options = {}) {
  * @param {module:rest~Options} options This identifies the options and configurations for this call
  * @returns {module:rest~Account[]} A list of account details
  */
-async function getAccounts(user, options) {
+async function getAccounts(user:OAuthUser, options:Options) {
   try {
     return await api.getAccounts(user, { ...options, isAsync: true });
   } catch (err) {
@@ -418,13 +429,12 @@ async function getAccounts(user, options) {
  * @param {module:rest~Options} options This identifies the options and configurations for this call
  * @returns {module:rest~User}
  */
-async function createUser(args, options) {
-  const address = await createOrGetKey(args, options);
-  const user = Object.assign({}, args, { address });
-  return user;
+async function createUser(ouser:OAuthUser, options:Options):Promise<BlockChainUser> {
+  const address = await createOrGetKey(ouser, options);
+  return Object.assign({}, ouser, { address });
 }
 
-async function fill(user, options) {
+async function fill(user, options:Options) {
   const txResult = await api.fill(user, options);
   return assertTxResult(txResult);
 }
@@ -454,7 +464,7 @@ async function fill(user, options) {
  * @param {module:rest~Options} options This identifies the options and configurations for this call
  * @returns {module:rest~Contract[]} Returns a list of contracts with the `name` and `codeHash` values populated
  */
-async function compileContracts(user, contracts, options) {
+async function compileContracts(user, contracts, options:Options) {
   try {
     return await api.compileContracts(user, contracts, options);
   } catch (err) {
@@ -493,12 +503,12 @@ async function compileContracts(user, contracts, options) {
  * object with the transaction. Final result can be obtained by using the `resolveResult` call. If `options.async` is not
  * set (default), this call returns a contract with the `name` and `address` values populated
  */
-async function createContract(user, contract, options) {
+async function createContract(user:BlockChainUser, contract:ContractDefinition, options:Options):Promise<Contract | TransactionResultHash> {
   const [pendingTxResult] = await api.createContract(user, contract, options);
   return createContractResolve(user, pendingTxResult, options);
 }
 
-async function createContractResolve(user, pendingTxResult, options) {
+async function createContractResolve(user:OAuthUser, pendingTxResult, options:Options):Promise<Contract | TransactionResultHash> {
   // throw if FAILURE
   assertTxResult(pendingTxResult);
   // async - do not resolve
@@ -563,12 +573,12 @@ async function createContractResolve(user, pendingTxResult, options) {
  * transaction result objects. Final results can be obtained by using the `resolveResults` call. If `options.async` is
  * not set (default), this call returns a list of contracts with the `name` and `address` values populated
  */
-async function createContractList(user, contracts, options) {
+async function createContractList(user:BlockChainUser, contracts:ContractDefinition[], options:Options) {
   const pendingTxResult = await api.createContractList(user, contracts, options);
   return createContractListResolve(user, pendingTxResult, options);
 }
 
-async function createContractListResolve(user, pendingTxResultList, options) {
+async function createContractListResolve(user, pendingTxResultList, options:Options) {
   // throw if FAILURE
   assertTxResultList(pendingTxResultList); // @samrit what if 1 result failed ?
   // async - do not resolve
@@ -614,7 +624,7 @@ async function createContractListResolve(user, pendingTxResultList, options) {
  * @param {module:rest~Options} options This identifies the options and configurations for this call.
  * @returns {String}
  */
-async function getKey(user, options) {
+async function getKey(user, options:Options) {
   const response = await api.getKey(user, options);
   return response.address;
 }
@@ -642,7 +652,7 @@ async function getKey(user, options) {
  * @param {module:rest~Options} options This identifies the options and configurations for this call.
  * @returns {String} The address corresponding to the key pair for this user
  */
-async function createKey(user, options) {
+async function createKey(user, options:Options) {
   const response = await api.createKey(user, options);
   return response.address;
 }
@@ -669,27 +679,35 @@ async function createKey(user, options) {
  * @param {module:rest~Options} options This identifies the options and configurations for this call.
  * @returns {String} The address corresponding to the key pair for this user
  */
-async function createOrGetKey(user, options) {
+async function createOrGetKey(user, options:Options) {
   try {
-    const response = await api.getKey(user, options);
+    const getKeyResponse = await api.getKey(user, options);
 
-    const balance = await api.getBalance({ ...user, ...response }, options);
+    const balance = await api.getBalance(user, getKeyResponse, options);
     if (balance.isEqualTo(0)) {
-      await fill({ ...user, ...response }, { isAsync: false, ...options });
+      await fill({ ...user, ...getKeyResponse }, { isAsync: false, ...options });
     }
-    return response.address;
-  } catch (err) {
-    const response = await api.createKey(user, options);
-    await fill({ ...user, ...response }, { isAsync: false, ...options });
-    return response.address;
+
+    if (getKeyResponse.address) return getKeyResponse.address;
   }
+  catch(e) {
+  
+    if (e.response && e.response.status==400) { //user doesn't already exist, create user
+      const createKeyResponse = await api.createKey(user, options);
+      await fill({ ...user, ...createKeyResponse }, { isAsync: false, ...options });
+      return createKeyResponse.address;
+    }
+
+    throw e;
+  }
+
 }
 
 // =====================================================================
 //   state
 // =====================================================================
 
-async function getBlocResults(user, hashes, options) {
+async function getBlocResults(user:OAuthUser, hashes:string[], options:Options) {
   return api.blocResults(user, hashes, options);
 }
 
@@ -729,7 +747,7 @@ async function getBlocResults(user, hashes, options) {
  * @param {module:rest~Options} options This identifies the options and configurations for this call
  * @returns {Object} Returns an object with all accessible functions and state variables in this smart contract
  */
-async function getState(user, contract, options) {
+async function getState(user:OAuthUser, contract:Contract, options:Options) {
   return api.getState(user, contract, options);
 }
 
@@ -768,7 +786,7 @@ async function getState(user, contract, options) {
  * @param {module:rest~Options} options This identifies the options and configurations for this call
  * @returns {Array} Returns an array of values corresponding to the onchain state of the array variable named in the call
  */
-async function getArray(user, contract, name, options) {
+async function getArray(user, contract, name, options:Options) {
   const MAX_SEGMENT_SIZE = 100;
   options.stateQuery = { name, length: true };
   const state = await getState(user, contract, options);
@@ -834,12 +852,12 @@ async function getArray(user, contract, name, options) {
  * call to get the final results. If the `options.isAsync` is not set (default), it returns the result of the call as an
  * array.
  */
-async function call(user, callArgs, options) {
+async function call(user:BlockChainUser, callArgs:CallArgs, options:Options) {
   const [pendingTxResult] = await api.call(user, callArgs, options);
   return callResolve(user, pendingTxResult, options);
 }
 
-async function callResolve(user, pendingTxResult, options) {
+async function callResolve(user, pendingTxResult, options:Options) {
   // throw if FAILURE
   assertTxResult(pendingTxResult);
   // async - do not resolve
@@ -903,12 +921,12 @@ async function callResolve(user, pendingTxResult, options) {
  * results of transaction execution as a 2 dimensional array.
  */
 
-async function callList(user, callListArgs, options) {
+async function callList(user:BlockChainUser, callListArgs:CallArgs[], options:Options) {
   const pendingTxResultList = await api.callList(user, callListArgs, options);
   return callListResolve(user, pendingTxResultList, options);
 }
 
-async function callListResolve(user, pendingTxResultList, options) {
+async function callListResolve(user:BlockChainUser, pendingTxResultList, options:Options) {
   // throw if FAILURE
   assertTxResultList(pendingTxResultList); // @samrit what if 1 result failed ?
   // async - do not resolve
@@ -973,7 +991,7 @@ async function callListResolve(user, pendingTxResultList, options) {
  * @returns {module:rest~TxResultWrapper} If `options.async` is set, only the hashes are populated, otherwise all the
  * field are populated
  */
-async function send(user, sendTx, options) {
+async function send(user, sendTx:SendTx, options:Options) {
   const [pendingTxResult] = await api.send(user, sendTx, options);
 
   if (options.isAsync) {
@@ -1024,7 +1042,7 @@ async function send(user, sendTx, options) {
  * @returns {module:rest~TxResultWrapper[]} If `options.async` is set, only the hashes are populated, otherwise all the
  * field are populated
  */
-async function sendMany(user, sendTxs, options) {
+async function sendMany(user, sendTxs:SendTx[], options:Options) {
   const pendingTxResults = await api.sendTransactions(
     user,
     {
@@ -1080,7 +1098,7 @@ async function sendMany(user, sendTxs, options) {
  * field are populated
  */
 
-async function search(user, contract, options) {
+async function search(user:OAuthUser, contract:Contract, options:Options) {
   try {
     const results = await api.search(user, contract, options);
     return results;
@@ -1126,7 +1144,7 @@ async function search(user, contract, options) {
  * field are populated
  */
 
-async function searchUntil(user, contract, predicate, options) {
+async function searchUntil(user:OAuthUser, contract:Contract, predicate, options:Options) {
   const action = async o => {
     return search(user, contract, o);
   };
@@ -1168,7 +1186,7 @@ async function searchUntil(user, contract, predicate, options) {
  * field are populated
  */
 
-async function searchWithContentRange(user, contract, options) {
+async function searchWithContentRange(user:OAuthUser, contract:Contract, options:Options) {
   try {
     const results = await api.searchWithContentRange(user, contract, options);
     return results;
@@ -1255,7 +1273,7 @@ async function searchWithContentRange(user, contract, options) {
  * field are populated
  */
 
-async function searchWithContentRangeUntil(user, contract, predicate, options) {
+async function searchWithContentRangeUntil(user:OAuthUser, contract:Contract, predicate, options:Options) {
   const action = async o => {
     return searchWithContentRange(user, contract, o);
   };
@@ -1294,7 +1312,7 @@ async function searchWithContentRangeUntil(user, contract, predicate, options) {
  * @returns {module:rest~ChainInfo} Info about requested chain
  */
 
-async function getChain(user, chainId, options) {
+async function getChain(user:OAuthUser, chainId:string, options:Options) {
   const results = await api.getChains([chainId], setAuthHeaders(user, options));
   return results && results.length > 0 ? results[0] : {};
 }
@@ -1327,7 +1345,7 @@ async function getChain(user, chainId, options) {
  * @returns {module:rest~ChainInfo[]} Info about requested chain(s)
  */
 
-async function getChains(user, chainIds, options) {
+async function getChains(user:OAuthUser, chainIds:string[], options:Options) {
   const results = await api.getChains(chainIds, setAuthHeaders(user, options));
   return results;
 }
@@ -1370,7 +1388,7 @@ async function getChains(user, chainIds, options) {
  * @returns {module:rest~ChainHash} Hash of the newly created chain
  */
 
-async function createChain(user, chain, contract, options) {
+async function createChain(user:OAuthUser, chain:Chain, contract:Contract, options:Options) {
   const result = await api.createChain(
     {
       ...chain,
@@ -1382,7 +1400,7 @@ async function createChain(user, chain, contract, options) {
   return result;
 }
 
-async function createChains(user, chains, options) {
+async function createChains(user, chains, options:Options) {
   const result = await api.createChains(chains, setAuthHeaders(user, options));
   return result;
 }
@@ -1391,7 +1409,7 @@ async function createChains(user, chains, options) {
 //   External Storage
 // =====================================================================
 
-async function uploadExtStorage(user, args, options) {
+async function uploadExtStorage(user, args, options:Options) {
   const result = await api.uploadExtStorage(
     args,
     setAuthHeaders(user, options)
@@ -1399,7 +1417,7 @@ async function uploadExtStorage(user, args, options) {
   return result;
 }
 
-async function attestExtStorage(user, args, options) {
+async function attestExtStorage(user, args, options:Options) {
   const result = await api.attestExtStorage(
     args,
     setAuthHeaders(user, options)
@@ -1407,17 +1425,17 @@ async function attestExtStorage(user, args, options) {
   return result;
 }
 
-async function verifyExtStorage(user, contract, options) {
+async function verifyExtStorage(user, contract, options:Options) {
   const result = await api.verifyExtStorage(user, contract, options);
   return result;
 }
 
-async function downloadExtStorage(user, contract, options) {
+async function downloadExtStorage(user, contract, options:Options) {
   const result = await api.downloadExtStorage(user, contract, options);
   return result;
 }
 
-async function listExtStorage(user, args, options) {
+async function listExtStorage(user, args, options:Options) {
   const result = await api.listExtStorage(user, args, options);
   return result;
 }
@@ -1446,7 +1464,7 @@ async function listExtStorage(user, args, options) {
  * @returns {String}
  */
 
-async function pingOauth(user, options) {
+async function pingOauth(user, options:Options) {
   const response = await api.pingOauth(user, options);
   return response;
 }
@@ -1486,7 +1504,7 @@ async function pingOauth(user, options) {
  * @returns {Object} Returns an object with information including the address, given a contract
  */
 
-async function waitForAddress(user, contract, _options) {
+async function waitForAddress(user, contract, _options:Options) {
   const options = Object.assign(
     {
       query: {
@@ -1509,11 +1527,13 @@ async function waitForAddress(user, contract, _options) {
 }
 
 export default {
+  fill,
   getAccounts,
   createUser,
   compileContracts,
   createContract,
   createContractList,
+  getBlocResults,
   getState,
   getArray,
   call,

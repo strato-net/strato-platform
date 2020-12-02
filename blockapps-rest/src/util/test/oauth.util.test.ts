@@ -3,6 +3,7 @@ import oauthUtil from '../oauth.util'
 import fsUtil from '../fsUtil'
 import util from '../util'
 import { assert } from 'chai'
+import { Options } from '../../types';
 
 const loadEnv = dotenv.config()
 assert.isUndefined(loadEnv.error)
@@ -15,7 +16,7 @@ describe('OAuth Util', function() {
   this.timeout(config.timeout)
 
   let oauthUtilInstance
-  const options = { config, logger }
+  const options:Options = { config, logger }
 
   before(() => {
     assert.isArray(config.nodes, 'config.nodes should be an array')
