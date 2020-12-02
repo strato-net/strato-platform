@@ -1,7 +1,7 @@
 import axios, { AxiosRequestConfig } from 'axios'
 import * as queryString from 'query-string'
 const { stringify} = require('flatted/cjs');
-
+import { Options } from "./types";
 
 axios.defaults.headers.post['Content-Type'] = 'application/json'
 
@@ -16,7 +16,7 @@ function toJson(string) {
   }
 }
 
-async function get(host, endpoint, options:any = {}) {
+async function get(host, endpoint, options:Options) {
   const logger = options.logger || (options.config.apiDebug? console : nullLogger)
   const url = host + endpoint
   const request:AxiosRequestConfig = {
@@ -31,17 +31,17 @@ async function get(host, endpoint, options:any = {}) {
     logger.debug(requestFormatter(request))
     const response = await axios(request)
     logger.debug('### axios GET response')
+    if (typeof(response.data) !== 'object') throw new Error("Call to Strato API did not return a JSON object:\n" + response.data);
     logger.debug(responseFormatter(response))
     return options.getFullResponse ? response : response.data
   } catch (err) {
-    logger.error(errorFormatter(err))
     logger.debug('### axios GET error')
-    logger.debug(errorFormatter(err))
+    console.error(errorFormatter(err))
     throw err
   }
 }
 
-async function post(host, endpoint, body, options) {
+async function post(host, endpoint, body, options:Options) {
   const logger = options.logger || (options.config.apiDebug? console : nullLogger)
   const url = host + endpoint
   const request:AxiosRequestConfig = {
@@ -60,7 +60,7 @@ async function post(host, endpoint, body, options) {
     return options.getFullResponse ? response : response.data
   } catch (err) {
     logger.debug('### axios POST error')
-    logger.error(errorFormatter(err))
+    console.error(errorFormatter(err))
     throw err
   }
 }
@@ -115,21 +115,13 @@ function responseFormatter(response) {
 }
 
 function errorFormatter(err) {
-  // system error
-  if (err.syscall) return err.message
-  // rest error
-  if (err.response) {
-    const errResponse = {
-      ...err.response,
-      request: undefined,
-    }
-   return JSON.stringify(errResponse, null, 2)
-  }
-  // other
-  return stringify(err)
+  // If the error comes from the REST server, we should include the server's error description
+  if (err.response) return err.toString() + ": " + err.response.data;
+  
+  return err.toString();
 }
 
-async function postue(host, endpoint, data, _options) {
+async function postue(host, endpoint, data, _options:Options) {
   const options = Object.assign({}, _options)
   options.headers = Object.assign({}, options.headers, urlencodedHeaders)
   return post(host, endpoint, queryString.stringify(data), options)

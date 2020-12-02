@@ -1,10 +1,25 @@
 import * as jwt from "jsonwebtoken";
 import * as simpleOauth from "simple-oauth2";
+import { OAuthClient, AccessToken } from "simple-oauth2";
 import * as unixTime from "unix-time";
 import request from "sync-request";
 import * as getPem from "rsa-pem-from-mod-exp";
 import "@babel/polyfill";
+import { OAuthUser } from "../types";
 
+interface OAuthConfig {
+  appTokenCookieName:any,
+  appTokenCookieMaxAge:any,
+  clientId:any,
+  clientSecret:any,
+  logoutRedirectUri:any,
+  openIdDiscoveryUrl:any,
+  redirectUri:any,
+  scope:any,
+  serviceUsername?:any,
+  servicePassword?:any,
+  tokenField?:any,
+  }
 
 /** Class representing the OAuth util. */
 
@@ -28,9 +43,9 @@ class OAuthUtil {
   serviceUsername : any;
   servicePassword : any;
   tokenHost : any;
-  oauth2 : any;
+  oauth2 : OAuthClient<"client_id">;
 
-  constructor(oauthConfig) {
+  constructor(oauthConfig:OAuthConfig) {
     this.appTokenCookieName = oauthConfig.appTokenCookieName;
     this.appTokenExpirationCookieName =
       oauthConfig.appTokenCookieName + "_expiry";
@@ -86,7 +101,7 @@ class OAuthUtil {
    * @param oauthConfig
    * @returns o an instance of the OAuthUtil
    */
-  static init(oauthConfig) {
+  static init(oauthConfig:OAuthConfig) {
     try {
       const o = new OAuthUtil(oauthConfig);
       o.getOpenIdConfig();
@@ -159,12 +174,12 @@ class OAuthUtil {
     clientId = undefined,
     clientSecret = undefined,
     scope = undefined
-  ) {
+  ):Promise<AccessToken> {
     const tokenConfig = {
       scope: scope || this.scope
     };
 
-    let accessTokenResponse;
+    let accessTokenResponse:AccessToken;
     if (clientId && clientSecret) {
       const credentials = {
         client: {
@@ -196,7 +211,7 @@ class OAuthUtil {
    * @param {String} scope
    * @returns AccessTokenResponse
    */
-  async getAccessTokenByResourceOwnerCredential(username, password, scope?) {
+  async getAccessTokenByResourceOwnerCredential(username, password, scope?):Promise<AccessToken> {
     const tokenConfig = {
       username: username || this.serviceUsername,
       password: password || this.servicePassword,
@@ -398,3 +413,5 @@ class OAuthUtil {
 }
 
 export default OAuthUtil;
+
+export { OAuthConfig, AccessToken };
