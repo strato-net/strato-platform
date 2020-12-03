@@ -29,7 +29,6 @@ import           System.Exit
 import           System.FilePath
 import           Turtle (chmod, roo, fromText)
 
-import           Blockchain.APIFiles
 import           Blockchain.Constants
 import           Blockchain.Data.Blockchain         as Blockchain
 import qualified Blockchain.Data.DataDefs           as DataDefs
@@ -136,8 +135,6 @@ oneTimeSetup genesisBlockName = do
      {- CONFIG: create database and write default config files, including strato-api -}
 
       ethconf <- genEthConf
-      inflateDir stratoAPICerts
-      inflateDir stratoAPIConfigDir
 
       encodeFile (".ethereumH" </> "ethconf.yaml") ethconf
       makeReadOnly $ ".ethereumH" </> "ethconf.yaml"
