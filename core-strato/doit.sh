@@ -149,11 +149,11 @@ function newnode {
                          --gasOn=$gasOn +RTS "${vmRunnerRTSOPTs:-}" -N1 &>> logs/vm-runner
 
   if [ "${USE_OLD_STRATO_API}" = true ]; then
-      echo "Starting strato-api2"
-      runBackgroundProcess strato-api2 >> logs/strato-api2 2>&1      
-  else
       echo "Starting core-api"
       runBackgroundProcess core-api --appFetchLimit=${appFetchLimit:-100} >> logs/core-api 2>&1
+  else
+      echo "Starting strato-api2"
+      runBackgroundProcess strato-api2 >> logs/strato-api2 2>&1
   fi
   
   echo "Configuring log rotation..."
