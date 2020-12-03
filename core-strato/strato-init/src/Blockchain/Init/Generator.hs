@@ -20,7 +20,6 @@ import System.Exit
 import UnliftIO.Directory
 import UnliftIO.IO
 
-import Blockchain.APIFiles
 import Blockchain.Data.ChainInfo
 import Blockchain.Data.GenesisInfo
 import Blockchain.Init.Protocol
@@ -62,8 +61,6 @@ mkAll genesisBlockName = do
                     then Just $ filter (not . null) flags_stratoBootnode
                     else Nothing
   addEvent $ PeerList bootnodes
-
-  addEvent $ ApiConfig $ stratoAPICerts ++ stratoAPIConfigDir
 
   let decodedFaucets = fromMaybe [] . Ae.decodeStrict . C8.pack $ flags_extraFaucets
       genesisFileName = genesisBlockName ++ "Genesis.json"

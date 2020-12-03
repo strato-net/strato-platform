@@ -148,18 +148,18 @@ function newnode {
                          "${tbFlag}" "${breFlag}" "${sebFlag}" "${sechFlag}" "${svdFlag}" "${ctrFlag}" \
                          --gasOn=$gasOn +RTS "${vmRunnerRTSOPTs:-}" -N1 &>> logs/vm-runner
 
-  if [ "${USE_STRATO_API}" = true ]; then
-      tbFlag="--blockstanbul=${blockstanbul}"
-      echo "Starting strato-api"
-      HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 \
-	  runBackgroundProcess strato-api +RTS -N1 >> logs/strato-api 2>&1
+  if [ "${USE_OLD_STRATO_API}" = true ]; then # placeholder for when the new strato-api is ready
+      echo "Starting core-api"
+      runBackgroundProcess core-api --appFetchLimit=${appFetchLimit:-100} >> logs/core-api 2>&1
   else
+      
+      # this is a placeholder for the new strato-api that hasn't been released yet
+      # for now, this will also start core-api
+      
       echo "Starting core-api"
       runBackgroundProcess core-api --appFetchLimit=${appFetchLimit:-100} >> logs/core-api 2>&1
   fi
-  
-
-
+      
   echo "Configuring log rotation..."
   runBackgroundProcess logRotation
 
