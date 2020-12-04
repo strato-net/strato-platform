@@ -53,6 +53,9 @@ pipeline {
         ]) {
           sh '''#!/bin/bash -le
             set -x
+            rm -rf strato-getting-started
+            git clone https://github.com/blockapps/strato-getting-started
+            cp strato-worktree/docker-compose.yml strato-getting-started/
             cd strato-getting-started
 
             docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes
