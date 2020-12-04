@@ -175,7 +175,7 @@ main = do
 
   --print theDoc
   blockappsInit "core-api"
-  run 3001 $ app theDoc
+  run 3000 $ app theDoc
 
 app :: Swagger -> Application
 app theDoc = 
