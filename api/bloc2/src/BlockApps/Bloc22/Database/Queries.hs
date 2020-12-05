@@ -60,6 +60,7 @@ import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Keccak256
 
 import           Control.Monad.Composable.BlocSQL
+import           SQLM
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 

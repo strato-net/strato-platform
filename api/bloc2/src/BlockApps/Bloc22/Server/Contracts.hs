@@ -45,6 +45,7 @@ import           Control.Monad.Composable.BlocSQL
 import           Control.Monad.Composable.CoreAPI
 import           Handlers.Storage
 import qualified MaybeNamed
+import           SQLM
 
 hexStorageToWord256 :: HexStorage -> Word256
 hexStorageToWord256 (HexStorage bs) = bytesToWord256 bs

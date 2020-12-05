@@ -25,9 +25,9 @@ import           Data.Map.Strict
 import qualified Data.Aeson                 as Aeson
 import qualified Data.ByteString.Lazy       as BL
 import qualified Data.Text.Encoding         as Text
+import           SQLM
 
 import BlockApps.Solidity.Parse.ParserTypes
-import BlockApps.Bloc22.Monad
 
 
 -- Query parameters allowed:

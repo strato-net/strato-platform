@@ -32,6 +32,7 @@ library:
   - format
   - hflags
   - http-api-data
+  - http-types
   - lens
   - monad-alter
   - monad-logger
@@ -50,4 +51,5 @@ library:
   - text
   - transformers
   - unliftio
+  - unordered-containers
 

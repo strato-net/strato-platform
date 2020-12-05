@@ -77,6 +77,7 @@ import           Control.Monad.Composable.CoreAPI
 import           Control.Monad.Composable.SQL
 import           Handlers.AccountInfo
 import           Handlers.Faucet
+import           SQLM
 
 data TRD = TRD -- transaction resolution data
   { trdStatus :: BlocTransactionStatus

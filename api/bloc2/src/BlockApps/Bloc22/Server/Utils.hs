@@ -25,10 +25,11 @@ import qualified Data.Map.Strict                  as M
 import           Data.Maybe
 import qualified Data.Text                        as Text
 import qualified Data.Text.Encoding               as Text
+import           UnliftIO
+
 
 import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
-import           BlockApps.Bloc22.Monad
 
 import           Blockchain.Data.DataDefs
 import           Blockchain.Strato.Model.Keccak256
@@ -36,8 +37,8 @@ import           Blockchain.Strato.Model.Keccak256
 import           Control.Monad.Composable.SQL
 
 import           Handlers.BatchTransactionResult
+import           SQLM
 
-import           UnliftIO
 
 toMaybe :: Eq a => a -> a -> Maybe a
 toMaybe a b = if a == b then Nothing else Just b

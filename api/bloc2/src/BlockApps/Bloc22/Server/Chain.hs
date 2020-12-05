@@ -54,7 +54,8 @@ import           Control.Monad.Composable.CoreAPI
 import           Control.Monad.Composable.SQL
 import           Handlers.BlkLast
 import           Handlers.Chain
- 
+import           SQLM
+
 import           UnliftIO
 
 import qualified Handlers.Chain as CORE
