@@ -75,7 +75,7 @@ createBlocEnv = liftIO $ do
 connectToCirrus :: MonadIO m => m PGConnection
 connectToCirrus = liftIO $ pgConnect cirrusInfo
 
-main::IO ()
+main :: IO ()
 main = do
   _ <- $initHFlags "Setup Slipstream Variables"
   blockappsInit "slipstream_main"
