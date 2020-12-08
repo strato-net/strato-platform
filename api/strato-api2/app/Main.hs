@@ -129,33 +129,18 @@ instance (Monad m, Accessible a m, MonadTrans t) => Accessible a (t m) where
   access p = lift (access p)
 
 
-hoistCoreServer :: Server FullAPI
-hoistCoreServer = hoistServer (Proxy :: Proxy FullAPI) (convertErrors runM) fullServer
+hoistCoreServer :: BlocEnv -> Server FullAPI
+hoistCoreServer env = hoistServer (Proxy :: Proxy FullAPI) (convertErrors runM) fullServer
   where
     convertErrors r x = Handler $ do
       y <- liftIO . try . r $ x `catch` handleRuntimeError `catch` handleApiError
       case y of
         Right a -> pure a
         Left e -> throwE $ apiErrorToServantErr e
-    runM f = do
-      let stateFetchLimit'=100
-          nonceCounterTimeout=10
-          sourceCacheTimeout=60
-          txQueueSize=4096
-      nonceCache <- Cache.newCache . Just $ TimeSpec nonceCounterTimeout 0
-      codePtrCache <- Cache.newCache . Just $ TimeSpec sourceCacheTimeout 0
-      sourceCache <- Cache.newCache . Just $ TimeSpec sourceCacheTimeout 0
-      tbqueue <- newTBQueueIO txQueueSize
+    runM f =
       runLoggingT .
         runSQLM .
-        flip runReaderT BlocEnv{
-                            gasOn = False,
-                            stateFetchLimit = stateFetchLimit',
-                            globalNonceCounter = nonceCache,
-                            globalCodePtrCache = codePtrCache,
-                            globalSourceCache = sourceCache,
-                            txTBQueue = tbqueue
-                            } .
+        flip runReaderT env .
         runBlocSQLM "postgres" 5432 "postgres" "api" .
         runVaultM "http://vault-wrapper:8000/strato/v2.3" .
         runCoreAPIM "http://strato:3000/eth/v1.2" $ f
@@ -175,17 +160,37 @@ main = do
 
   --print theDoc
   blockappsInit "core-api"
-  run 3000 $ app theDoc
 
-app :: Swagger -> Application
-app theDoc = 
+  let stateFetchLimit'=100
+      nonceCounterTimeout=10
+      sourceCacheTimeout=60
+      txQueueSize=4096
+      
+  nonceCache <- Cache.newCache . Just $ TimeSpec nonceCounterTimeout 0
+  codePtrCache <- Cache.newCache . Just $ TimeSpec sourceCacheTimeout 0
+  sourceCache <- Cache.newCache . Just $ TimeSpec sourceCacheTimeout 0
+  tbqueue <- newTBQueueIO txQueueSize
+  
+  let env =
+        BlocEnv{
+          gasOn = False,
+          stateFetchLimit = stateFetchLimit',
+          globalNonceCounter = nonceCache,
+          globalCodePtrCache = codePtrCache,
+          globalSourceCache = sourceCache,
+          txTBQueue = tbqueue
+          }
+  run 3000 $ app env theDoc
+
+app :: BlocEnv -> Swagger -> Application
+app env theDoc = 
   prometheus def{prometheusInstrumentApp = False}
   $ instrumentApp "core-api"
   $ logStdoutDev
   $ cors (const $ Just simpleCorsResourcePolicy{corsRequestHeaders=["Content-Type"]})
 --  $ serve (Proxy :: Proxy (CoreAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $ (coreServer pool :<|> swaggerSchemaUIServer theDoc)
   $ serve (Proxy :: Proxy (FullAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json" :<|> Raw))
-  $ hoistCoreServer :<|> swaggerSchemaUIServer theDoc :<|> Tagged serveCustom404
+  $ hoistCoreServer env :<|> swaggerSchemaUIServer theDoc :<|> Tagged serveCustom404
 
 
 
