@@ -44,6 +44,7 @@ import           BlockApps.Bloc22.Monad          -- hiding (handleRuntimeError)
 import           BlockApps.Bloc22.Server
 import           BlockApps.Init
 
+import           Control.Monad.Composable.BlocSQL
 import           Control.Monad.Composable.CoreAPI hiding (httpManager)
 import           Control.Monad.Composable.SQL    hiding (SQLM)
 import           Control.Monad.Composable.Vault  hiding (httpManager)
@@ -72,7 +73,6 @@ import           SQLM
 import           UnliftIO                        hiding (Handler)
 
 import           Control.Monad.Change.Modify
-import           Control.Monad.Composable.BlocSQL
 
 type CoreAPI =
   "eth" :> "v1.2" :>
@@ -130,8 +130,8 @@ instance (Monad m, Accessible a m, MonadTrans t) => Accessible a (t m) where
   access p = lift (access p)
 
 
-hoistCoreServer :: BlocEnv -> Server FullAPI
-hoistCoreServer env = hoistServer (Proxy :: Proxy FullAPI) (convertErrors runM) fullServer
+hoistCoreServer :: BlocEnv -> SQLEnv -> BlocSQLEnv -> Server FullAPI
+hoistCoreServer blocEnv sqlEnv blocSQLEnv = hoistServer (Proxy :: Proxy FullAPI) (convertErrors runM) fullServer
   where
     convertErrors r x = Handler $ do
       y <- liftIO . try . r $ x `catch` handleRuntimeError `catch` handleApiError
@@ -140,9 +140,9 @@ hoistCoreServer env = hoistServer (Proxy :: Proxy FullAPI) (convertErrors runM) 
         Left e -> throwE $ apiErrorToServantErr e
     runM f =
       runLoggingT .
-        runSQLM .
-        flip runReaderT env .
-        runBlocSQLM "postgres" 5432 "postgres" "api" .
+        runSQLMUsingEnv sqlEnv .
+        flip runReaderT blocEnv .
+        runBlocSQLMUsingEnv blocSQLEnv .
         runVaultM "http://vault-wrapper:8000/strato/v2.3" .
         runCoreAPIM "http://strato:3000/eth/v1.2" $ f
 
@@ -171,6 +171,9 @@ main = do
   codePtrCache <- Cache.newCache . Just $ TimeSpec sourceCacheTimeout 0
   sourceCache <- Cache.newCache . Just $ TimeSpec sourceCacheTimeout 0
   tbqueue <- newTBQueueIO txQueueSize
+
+  sqlEnv <- createSQLEnv
+  blocSQLEnv <- createBlocSQLEnv "postgres" 5432 "postgres" "api"
   
   let env =
         BlocEnv{
@@ -181,17 +184,17 @@ main = do
           globalSourceCache = sourceCache,
           txTBQueue = tbqueue
           }
-  run 3000 $ app env theDoc
+  run 3000 $ app env sqlEnv blocSQLEnv theDoc
 
-app :: BlocEnv -> Swagger -> Application
-app env theDoc = 
+app :: BlocEnv -> SQLEnv -> BlocSQLEnv -> Swagger -> Application
+app blocEnv sqlEnv blocSQLEnv theDoc = 
   prometheus def{prometheusInstrumentApp = False}
   $ instrumentApp "core-api"
   $ logStdoutDev
   $ cors (const $ Just simpleCorsResourcePolicy{corsRequestHeaders=["Content-Type"]})
 --  $ serve (Proxy :: Proxy (CoreAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $ (coreServer pool :<|> swaggerSchemaUIServer theDoc)
   $ serve (Proxy :: Proxy (FullAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json" :<|> Raw))
-  $ hoistCoreServer env :<|> swaggerSchemaUIServer theDoc :<|> Tagged serveCustom404
+  $ hoistCoreServer blocEnv sqlEnv blocSQLEnv :<|> swaggerSchemaUIServer theDoc :<|> Tagged serveCustom404
 
 
 

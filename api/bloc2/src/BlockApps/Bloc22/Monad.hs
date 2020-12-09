@@ -110,7 +110,7 @@ blocQuery :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y, Has
              Query x -> m [y]
 blocQuery q = do
   traverse_ (logInfoCS callStack . Text.pack) (showSql q)
-  BlocSQLData pool <- access Proxy
+  BlocSQLEnv pool <- access Proxy
   withResource pool $ liftIO . flip runQuery q
 
 blocQueryMaybe
@@ -137,7 +137,7 @@ blocModify :: (HasCallStack, MonadIO m, HasBlocSQL m, MonadLogger m) =>
               (Connection -> IO x) -> m x
 blocModify modify = do
   logInfoCS callStack "Updating the database"
-  BlocSQLData pool <- access Proxy
+  BlocSQLEnv pool <- access Proxy
   withResource pool (liftIO . modify)
 
 blocModify1 :: (HasCallStack, MonadIO m, HasBlocSQL m, MonadLogger m) =>
@@ -153,7 +153,7 @@ blocModify1 modify = do
 blocTransaction :: HasBlocSQL m =>
                    m x -> m x
 blocTransaction bloc = do
-  BlocSQLData pool <- access Proxy
+  BlocSQLEnv pool <- access Proxy
   withResource pool (\conn -> liftBaseOp_ (withTransaction conn) bloc)
 
 blocStrato :: (MonadIO m, MonadLogger m, HasCoreAPI m, HasCallStack) =>

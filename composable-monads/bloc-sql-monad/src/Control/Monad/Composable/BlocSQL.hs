@@ -13,15 +13,18 @@ import           Database.PostgreSQL.Simple
 
 import           Control.Monad.Change.Modify
 
-newtype BlocSQLData = BlocSQLData (Pool Connection) deriving (Show)
+type BlocSQLM = ReaderT BlocSQLEnv
 
-type BlocSQLM = ReaderT BlocSQLData
+type HasBlocSQL m = (Accessible BlocSQLEnv m, MonadBaseControl IO m)
 
-type HasBlocSQL m = (Accessible BlocSQLData m, MonadBaseControl IO m)
+data BlocSQLEnv =
+  BlocSQLEnv {
+    pool :: Pool Connection
+  }
 
-runBlocSQLM :: MonadIO m => String -> Word16 -> String -> String -> BlocSQLM m a -> m a
-runBlocSQLM host port user password f = do
-
+createBlocSQLEnv :: MonadIO m =>
+                    String -> Word16 -> String -> String -> m BlocSQLEnv
+createBlocSQLEnv host port user password = do 
   let dbConnectInfo =
         ConnectInfo {
             connectHost = host
@@ -30,15 +33,12 @@ runBlocSQLM host port user password f = do
           , connectPassword = password
           , connectDatabase = "bloc22"
           }
-                      
---  dbCreateConn <- connect dbConnectInfo
 
---  doesNotExist22 <- null <$>
---    (query_ dbCreateConn dbExistsQuery22 :: IO [Only Int])
---  when doesNotExist22 $ void $ execute_ dbCreateConn Bloc22.createDatabase
+  fmap BlocSQLEnv $ liftIO $ createPool (connect dbConnectInfo) close 5 3 5
 
---  close dbCreateConn
+runBlocSQLMUsingEnv :: BlocSQLEnv -> BlocSQLM m a -> m a
+runBlocSQLMUsingEnv env f = runReaderT f env
 
-  pool <- liftIO $ createPool (connect dbConnectInfo) close 5 3 5
-  runReaderT f $ BlocSQLData pool
-
+runBlocSQLM :: MonadIO m => String -> Word16 -> String -> String -> BlocSQLM m a -> m a
+runBlocSQLM host port user password f = 
+  flip runBlocSQLMUsingEnv f =<< createBlocSQLEnv host port user password
