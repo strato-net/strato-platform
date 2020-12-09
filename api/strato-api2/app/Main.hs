@@ -67,6 +67,7 @@ import qualified Handlers.TransactionResult      as TransactionResult
 import qualified Handlers.TxLast                 as TxLast
 import qualified Handlers.UUID                   as UUID
 import qualified Handlers.Version                as Version
+import           Options
 import           SQLM
 import           UnliftIO                        hiding (Handler)
 
@@ -173,7 +174,7 @@ main = do
   
   let env =
         BlocEnv{
-          gasOn = False,
+          gasOn = flags_gasOn,
           stateFetchLimit = stateFetchLimit',
           globalNonceCounter = nonceCache,
           globalCodePtrCache = codePtrCache,

@@ -153,7 +153,7 @@ function newnode {
       runBackgroundProcess core-api --appFetchLimit=${appFetchLimit:-100} >> logs/core-api 2>&1
   else
       echo "Starting strato-api2"
-      runBackgroundProcess strato-api2 >> logs/strato-api2 2>&1
+      runBackgroundProcess strato-api2 --gasOn=$gasOn >> logs/strato-api2 2>&1
   fi
   
   echo "Configuring log rotation..."
@@ -264,6 +264,10 @@ function doInit {
       tail -f /dev/null
     fi
   fi
+
+  #we need to create the private key for the faucet
+  mkdir config
+  echo -en '\x01\x01\x00\x00\x00\x00\x00\x00\x00\x20\x81\xa2\x9e\x1d\x87\x01\x18\x37\x50\x91\x07\x81\xa3\xb3\xdb\xaf\x0a\xd4\x66\xfa\x6a\x11\x0f\x74\x12\xe2\xf4\x23\xa4\x85\xd8\x1d' > config/priv
 }
 
 # Find all logs greater than 10M, then copy and truncate
