@@ -193,18 +193,23 @@ app blocEnv sqlEnv blocSQLEnv theDoc =
   $ logStdoutDev
   $ cors (const $ Just simpleCorsResourcePolicy{corsRequestHeaders=["Content-Type"]})
 --  $ serve (Proxy :: Proxy (CoreAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $ (coreServer pool :<|> swaggerSchemaUIServer theDoc)
-  $ serve (Proxy :: Proxy (FullAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json" :<|> Raw))
-  $ hoistCoreServer blocEnv sqlEnv blocSQLEnv :<|> swaggerSchemaUIServer theDoc :<|> Tagged serveCustom404
+  $ addPathsTo404
+  $ serve (Proxy :: Proxy (FullAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json"))
+  $ hoistCoreServer blocEnv sqlEnv blocSQLEnv :<|> swaggerSchemaUIServer theDoc
 
 
 
-serveCustom404 :: Application
-serveCustom404 x respond =
-  respond $ responseLBS notFound404 [("Content-Type", "text/plain")] $ BLC.pack
-  $ "There is no content at: " ++ show (rawPathInfo x)
-  ++ "\nHere are the available routes:" ++ tab ("\n" ++ unlines allPaths) ++ "\n"
-  where
-    allPaths = H.keys $ _swaggerPaths $ toSwagger (Proxy :: Proxy FullAPI)
+addPathsTo404 :: Middleware
+addPathsTo404 baseApp req respond =
+  baseApp req $ \response -> do
+    if responseStatus response /= status404
+    then respond response
+    else 
+      respond $ responseLBS notFound404 [("Content-Type", "text/plain")] $ BLC.pack
+        $ "There is no content at: " ++ show (rawPathInfo req)
+        ++ "\nHere are the available routes:" ++ tab ("\n" ++ unlines allPaths) ++ "\n"
+      where
+        allPaths = H.keys $ _swaggerPaths $ toSwagger (Proxy :: Proxy FullAPI)
 
 
 ----------
