@@ -132,6 +132,7 @@ services:
     #    - stateDiffTopic=${stateDiffTopic}
     - stratoHost=strato:3000
     - txQueueSize=${txQueueSize:-4096}
+    - USE_OLD_STRATO_API=${USE_OLD_STRATO_API}
     - vaultWrapperHost=vault-wrapper:8000
     - zookeeper_conn=zookeeper
     build: .
@@ -330,6 +331,7 @@ services:
     - sslCertFileType=${sslCertFileType}
     - STRATO_GS_MODE=${STRATO_GS_MODE}
     - uiPassword=${uiPassword}
+    - USE_OLD_STRATO_API=${USE_OLD_STRATO_API}
     build: .
     image: ${NGINX_IMAGE:-<REPO_URL>nginx:<VERSION>}
     ports:
