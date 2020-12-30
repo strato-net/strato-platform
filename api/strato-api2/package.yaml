@@ -37,6 +37,7 @@ executables:
     - monad-control
     - monad-logger
     - mtl
+    - postgresql-simple
     - servant-multipart
     - servant-swagger
     - servant-swagger-ui

@@ -15,7 +15,6 @@ module Main where
 
 import           Blockchain.Output
 import           Control.Lens.Operators
-import           Control.Monad.Reader            (MonadTrans, lift)
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Reader
 import           Data.Aeson
@@ -68,11 +67,12 @@ import qualified Handlers.TransactionResult      as TransactionResult
 import qualified Handlers.TxLast                 as TxLast
 import qualified Handlers.UUID                   as UUID
 import qualified Handlers.Version                as Version
+import           Init                            as Bloc
 import           Options
+import           SelectAccessible                ()
 import           SQLM
 import           UnliftIO                        hiding (Handler)
 
-import           Control.Monad.Change.Modify
 
 type CoreAPI =
   "eth" :> "v1.2" :>
@@ -123,12 +123,6 @@ fullServer = coreServer :<|> bloc
 
 ----------------
 
-instance {-# OVERLAPPING #-} (Monad m) => Accessible a (ReaderT a m) where
-  access _ = ask
-
-instance (Monad m, Accessible a m, MonadTrans t) => Accessible a (t m) where
-  access p = lift (access p)
-
 
 hoistCoreServer :: BlocEnv -> SQLEnv -> BlocSQLEnv -> Server FullAPI
 hoistCoreServer blocEnv sqlEnv blocSQLEnv = hoistServer (Proxy :: Proxy FullAPI) (convertErrors runM) fullServer
@@ -152,6 +146,9 @@ fullAPI = Proxy
 main :: IO ()
 main = do
   _ <- $initHFlags "Core API"
+
+  Bloc.init
+  
   let theDoc = toSwagger (Proxy :: Proxy FullAPI)
                & info.title .~ "Strato API"
                & info.description ?~
