@@ -15,7 +15,7 @@ const neededJobs = {
   "vm_main": "vm-runner",
   "seq_main": "strato-sequencer",
   "blockapps-vault-wrapper-server": "vault-wrapper",
-  "blockapps-bloc": "bloc",
+//  "blockapps-bloc": "bloc",  // This will soon be deprecated, so there is no need to keep it in the health check
   "core-api": "core-api"
 }
 
