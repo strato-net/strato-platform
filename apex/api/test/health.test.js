@@ -58,7 +58,7 @@ describe('Tests - Node-level Health Check', function () {
     assert.equal(Math.abs(currentStat.dataValues.lastFailureTimestamp - currentStat.dataValues.latestCheckTimestamp) < config.healthCheck.requestTimeout, true, 'Last Failure Timestamp')
 
   })
-
+/* 
   it('HealthStat update - FAILURE - Data not recent', async function () {
     let testObj = prometheusCorrectResponse;
     const currentTime = Date.now();
@@ -79,7 +79,7 @@ describe('Tests - Node-level Health Check', function () {
       assert.equal(elem.dataValues.HealthStatus, false, `${elem.dataValues.processName} Status`);
     })
   })
-
+*/
   it('HealthStat update - SUCCESS', async function () {
     let testObj = prometheusCorrectResponse;
     const currentTime = Date.now();
