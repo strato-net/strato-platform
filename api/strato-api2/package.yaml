@@ -2,48 +2,45 @@ name:                strato-api2
 
 dependencies:
 - base
-- persistent
-- persistent-postgresql
-- servant-server
-- strato-conf
+- bloc-sql-monad
+- bloc2
+- blockapps-util
+- hflags
+- monad-alter
+- mtl
+- postgresql-simple
+- transformers
 
 executables:
   strato-api2:
     main:                Main.hs
     source-dirs:         app
+    other-modules:
+    - Options
+    - SelectAccessible
     ghc-options:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
     - aeson
-    - bloc-sql-monad
-    - bloc2
     - bloc2api
-    - blockapps-data
     - blockapps-init
-    - blockapps-util
     - bytestring
     - cache
     - clock
     - core-api-monad
     - core-api2
     - format
-    - hflags
     - http-types
     - insert-ordered-containers
     - lens
-    - monad-alter
-    - monad-control
-    - monad-logger
-    - mtl
-    - postgresql-simple
     - servant-multipart
+    - servant-server
     - servant-swagger
     - servant-swagger-ui
     - sql-monad
     - swagger2
-    - transformers
     - unliftio
     - vault-monad
     - wai
@@ -51,3 +48,13 @@ executables:
     - wai-extra
     - wai-middleware-prometheus
     - warp
+
+  strato-api-init:
+    main:                StratoAPIInit.hs
+    source-dirs:         app
+    other-modules:
+    - SelectAccessible
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N

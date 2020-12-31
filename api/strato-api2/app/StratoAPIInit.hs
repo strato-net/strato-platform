@@ -7,19 +7,22 @@
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TypeOperators     #-}
 
-module Init where
+module Main where
 
-import           Blockchain.Output
 import           Control.Monad
 import           Database.PostgreSQL.Simple
+import           HFlags
 
 import qualified BlockApps.Bloc22.Database.Create        as Bloc22
 import qualified BlockApps.Bloc22.Database.Migration     as Bloc22
+import           Blockchain.Output
 import           Control.Monad.Composable.BlocSQL
 import           SelectAccessible                        ()
 
-init :: IO ()
-init = do
+main :: IO ()
+main = do
+  _ <- $initHFlags "Core API"
+
   let dbConnectInfo = ConnectInfo { connectHost = "postgres"
                                  , connectPort = 5432
                                  , connectUser = "postgres"

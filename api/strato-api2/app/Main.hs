@@ -67,7 +67,6 @@ import qualified Handlers.TransactionResult      as TransactionResult
 import qualified Handlers.TxLast                 as TxLast
 import qualified Handlers.UUID                   as UUID
 import qualified Handlers.Version                as Version
-import           Init                            as Bloc
 import           Options
 import           SelectAccessible                ()
 import           SQLM
@@ -147,8 +146,6 @@ main :: IO ()
 main = do
   _ <- $initHFlags "Core API"
 
-  Bloc.init
-  
   let theDoc = toSwagger (Proxy :: Proxy FullAPI)
                & info.title .~ "Strato API"
                & info.description ?~
