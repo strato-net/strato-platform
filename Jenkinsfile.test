@@ -57,9 +57,6 @@ pipeline {
             git clone https://github.com/blockapps/strato-getting-started
             cp strato-worktree/docker-compose.yml strato-getting-started/
             cd strato-getting-started
-
-            docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes
-
             export NODE_HOST=$(</host)
             export genesis=smokeTest
             export BLOC_DEBUG=true

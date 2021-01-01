@@ -220,21 +220,12 @@ function cleanupDB {
 function doInit {
   blockTime=${blockTime:-13}
   minBlockDifficulty=${minBlockDifficulty:-131072}
-
-  if [[ -n "${validators}" ]]; then
-    # Keep active discovery until all other validators are peers
-    echo "Overriding minAvailablePeers with number of consensus peers"
-    actualMinPeers=$( echo "${validators}" | tr -cd , | wc -c )
-  else
-    actualMinPeers=$numMinPeers
-  fi
-  # TODO: in very large validator pools, do we want this ^^^ ?
   
   args="--pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
         --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
         --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
         --addBootnodes=$addBootnodes $stratoBootnode --vaultWrapperUrl=$vaultWrapperRoot \
-        --blockTime=$blockTime --minPeers=$actualMinPeers --minBlockDifficulty=$minBlockDifficulty \
+        --blockTime=$blockTime --minPeers=$numMinPeers --minBlockDifficulty=$minBlockDifficulty \
         --generateKey=$generateKey --extraFaucets=$extraFaucets"
 
   if ${splitinit:-false} ; then
