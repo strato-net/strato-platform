@@ -1,4 +1,4 @@
-name:                strato-api2
+name:                strato-api
 
 dependencies:
 - base
@@ -12,7 +12,7 @@ dependencies:
 - transformers
 
 executables:
-  strato-api2:
+  strato-api:
     main:                Main.hs
     source-dirs:         app
     other-modules:

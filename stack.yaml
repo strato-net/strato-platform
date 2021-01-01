@@ -2,7 +2,7 @@ packages:
 - api/bloc2
 - api/bloc2api
 - api/core-api2
-- api/strato-api2
+- api/strato-api
 - composable-monads/bloc-sql-monad
 - composable-monads/core-api-monad
 - composable-monads/sql-monad
