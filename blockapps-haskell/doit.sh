@@ -137,18 +137,15 @@ then
            --stratourl="$stratoRoot" --vaultwrapperurl="$vaultWrapperRoot" --minLogLevel="${blocMinLogLevel}" \
            --nonceCounterTimeout="$nonceCounterTimeout" --sourceCacheTimeout="$sourceCacheTimeout" --txQueueSize="$txQueueSize" --gasOn="$gasOn" \
            +RTS -N1 &>> /logs/bloc
-else
-    echo "running new strato api, bloc will not be started"
-fi
     
-if [ "$USE_OLD_STRATO_API" == "true" ]
-then
     until curl localhost:8000 &> /dev/null; do
 	echo "Slipstream is waiting for bloc to come up..."
 	sleep 1;
     done
-fi #nothing to do if using new strato api, we have already verified that strato api is up above
-
+else
+    echo "running new strato api, bloc will not be started"
+fi
+    
 echo "Bloc is up - running slipstream now..."
 
 SLIPSTREAM_CMD="slipstream --pghost=${postgres_host} --pgport=${postgres_port} \
