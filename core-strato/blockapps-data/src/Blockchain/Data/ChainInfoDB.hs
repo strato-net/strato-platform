@@ -99,7 +99,7 @@ getChainInfo (ChainId chainId) = do
                          in CodeInfo
                               codeInfoRefEvmByteCode
                               (T.pack codeInfoRefContractCode)
-                              (T.pack codeInfoRefContractName)
+                              (fmap T.pack codeInfoRefContractName)
                 md = \metadata ->
                         let ChainMetadataRef{..} = entityVal metadata
                          in (T.pack chainMetadataRefKey, T.pack chainMetadataRefValue)
@@ -149,7 +149,7 @@ putChainInfo (ChainId chainId) (ChainInfo UnsignedChainInfo{..} csig) = do
             ContractNoStorage a i h -> AccountInfoRef chid a i (Just h) Nothing
             ContractWithStorage a i h tup -> AccountInfoRef chid a i (Just h) (Just tup)
         parseCInfo ch (CodeInfo bc cc cn)  =
-          CodeInfoRef ch bc (T.unpack cc) (T.unpack cn)
+          CodeInfoRef ch bc (T.unpack cc) (fmap T.unpack cn)
         parseMember chi (ad, en) =
           ChainMemberRef chi (showEnode en) ad
         parseMetadata chi (k, v) =

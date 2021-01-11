@@ -1,4 +1,12 @@
 packages:
+- api/bloc2
+- api/bloc2api
+- api/core-api2
+- api/strato-api
+- composable-monads/bloc-sql-monad
+- composable-monads/core-api-monad
+- composable-monads/sql-monad
+- composable-monads/vault-monad
 - blockapps-haskell/bloc/bloc22/api
 - blockapps-haskell/bloc/bloc22/client
 - blockapps-haskell/bloc/bloc22/server

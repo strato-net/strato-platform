@@ -1,0 +1,15 @@
+name:                bloc-sql-monad
+version:             0.1.0.0
+
+dependencies:
+- base >= 4.7 && < 5
+
+library:
+  source-dirs: src
+  dependencies:
+  - monad-alter
+  - monad-control
+  - mtl
+  - persistent
+  - postgresql-simple
+  - resource-pool

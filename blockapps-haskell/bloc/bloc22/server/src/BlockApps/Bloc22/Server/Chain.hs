@@ -108,7 +108,7 @@ createChainInfo creationBlockHash (ChainInput msrc mCodePtr cname lbl balances c
 
           let contractAcctInfo = ContractWithStorage governanceAddress govBal contractHash storage
               b' = fst . B16.decode $ encodeUtf8 b
-              codeInfo' = maybeToList $ (\s -> CodeInfo b' s contractdetailsName) <$> msrc
+              codeInfo' = maybeToList $ (\s -> CodeInfo b' s $ Just contractdetailsName) <$> msrc
           md' <- case theVM of
               "SolidVM" -> do
                 let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi

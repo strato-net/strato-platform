@@ -171,4 +171,4 @@ insertContracts slotss name src code start gi =
       addrs = map (start+) [0..]
       addrsAndSlots = zip addrs slotss
   in gi {genesisInfoAccountInfo = initialAccounts ++ map mkContract addrsAndSlots,
-         genesisInfoCodeInfo = initialCode ++ [CodeInfo decoded src name]}
+         genesisInfoCodeInfo = initialCode ++ [CodeInfo decoded src $ Just name]}

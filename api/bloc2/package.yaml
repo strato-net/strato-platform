@@ -1,0 +1,90 @@
+name: bloc2
+version: 0.1.0.0
+synopsis: Bloc microservice
+description: Bloc microservice
+category: Web
+build-type: Simple
+
+
+dependencies:
+  - base
+  - blockapps-solidity
+  - containers
+  - text
+
+library:
+  source-dirs: src/
+  ghc-options: -Wall -Werror -fsimpl-tick-factor=15000
+  dependencies:
+    - aeson
+    - base16-bytestring
+    - bloc-sql-monad
+    - bloc2api
+    - blockapps-data
+    - blockapps-datadefs
+    - blockapps-ethereum
+    - blockapps-strato-api
+    - blockapps-strato-client
+    - blockapps-util
+    - blockapps-vault-wrapper-api
+    - blockapps-vault-wrapper-client
+    - bytestring
+    - cache
+    - classy-prelude
+    - clock
+    - common-log
+    - conduit
+    - core-api-monad
+    - core-api2
+    - cryptonite
+    - directory
+    - extra
+    - filepath
+    - format
+    - hashable
+    - haskoin-shim
+    - http-client
+    - http-types
+    - insert-ordered-containers
+    - lens
+    - memory
+    - monad-alter
+    - monad-control
+    - monad-logger
+    - mtl
+    - opaleye
+    - ordered-containers
+    - postgresql-simple
+    - process
+    - product-profunctors
+    - profunctors
+    - relapse
+    - resource-pool
+    - saltine
+    - secp256k1-haskell
+    - servant
+    - servant-client
+    - servant-server
+    - servant-swagger
+    - sql-monad
+    - stm-conduit
+    - strato-model
+    - swagger2
+    - temporary
+    - time
+    - transformers
+    - unliftio
+    - unliftio-core
+    - unordered-containers
+    - vault-monad
+    - vector
+
+tests:
+  blockapps-bloc22-server-test:
+    source-dirs: test/
+    main: Spec.hs
+    ghc-options: -Wall -Werror
+    dependencies:
+      - bloc2
+      - hspec
+      - parsec

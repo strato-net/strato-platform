@@ -154,7 +154,11 @@ initializeGenesisBlock genesisBlockName extraFaucets = do
     $logInfoS "initgen" "best block info inserted"
     liftIO $ bootstrapIndexer obGB
     $logInfoS "initgen" "indexer has been bootstrapped"
-    let rewrite (_, CodeInfo bin src name) = (hash bin, Map.fromList [("src", src),("name",name)])
+    let rewrite (_, CodeInfo bin src name) = (hash bin, Map.fromList $
+                                                        [("src", src)] ++
+                                                        case name of
+                                                          Nothing -> []
+                                                          Just n -> [("name",n)])
         metadatas = Map.fromList . map rewrite $ srcInfo
         findMetadata = flip Map.lookup metadatas
     populateStorageDBs findMetadata genesisBlock genesisChainId

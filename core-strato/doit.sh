@@ -148,18 +148,14 @@ function newnode {
                          "${tbFlag}" "${breFlag}" "${sebFlag}" "${sechFlag}" "${svdFlag}" "${ctrFlag}" \
                          --gasOn=$gasOn +RTS "${vmRunnerRTSOPTs:-}" -N1 &>> logs/vm-runner
 
-  if [ "${USE_OLD_STRATO_API}" = true ]; then # placeholder for when the new strato-api is ready
+  if [ "${USE_OLD_STRATO_API}" = true ]; then
       echo "Starting core-api"
       runBackgroundProcess core-api --appFetchLimit=${appFetchLimit:-100} >> logs/core-api 2>&1
   else
-      
-      # this is a placeholder for the new strato-api that hasn't been released yet
-      # for now, this will also start core-api
-      
-      echo "Starting core-api"
-      runBackgroundProcess core-api --appFetchLimit=${appFetchLimit:-100} >> logs/core-api 2>&1
+      echo "Starting strato-api"
+      runBackgroundProcess strato-api --gasOn=$gasOn >> logs/strato-api 2>&1
   fi
-      
+  
   echo "Configuring log rotation..."
   runBackgroundProcess logRotation
 
@@ -259,6 +255,16 @@ function doInit {
       tail -f /dev/null
     fi
   fi
+
+  if [ "${USE_OLD_STRATO_API}" != "true" ]; then
+      echo "initializing bloc database"
+      strato-api-init
+  fi
+
+  
+  #we need to create the private key for the faucet
+  mkdir config
+  echo -en '\x01\x01\x00\x00\x00\x00\x00\x00\x00\x20\x81\xa2\x9e\x1d\x87\x01\x18\x37\x50\x91\x07\x81\xa3\xb3\xdb\xaf\x0a\xd4\x66\xfa\x6a\x11\x0f\x74\x12\xe2\xf4\x23\xa4\x85\xd8\x1d' > config/priv
 }
 
 # Find all logs greater than 10M, then copy and truncate
