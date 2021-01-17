@@ -98,7 +98,7 @@ data CallInfo = CallInfo
   , currentContract     :: Contract
   , codeCollection      :: CodeCollection
   , collectionHash      :: Keccak256
-  , localVariables      :: Map String (Xabi.Type, Variable)
+  , localVariables      :: Map String (Xabi.Type, Variable Value)
   , readOnly            :: Bool
   } deriving (Show)
 
@@ -322,7 +322,7 @@ toMaybe True x = Just x
 toMaybe False _ = Nothing
 
 
-getVariableOfName :: MonadSM m => String -> m Variable
+getVariableOfName :: MonadSM m => String -> m (Variable Value)
 getVariableOfName name = do
   cStack <- Mod.get (Mod.Proxy @[CallInfo])
   let currentCallInfo =
@@ -334,10 +334,10 @@ getVariableOfName name = do
 
   let maybeLocalValue = fmap snd $ M.lookup name vars
 
-  let maybeContractFunction :: Maybe Variable
+  let maybeContractFunction :: Maybe (Variable Value)
       maybeContractFunction = fmap (t "constant function" . Constant . SFunction name) $ M.lookup name $ currentContract currentCallInfo^.functions
 
-      maybeBuiltinFunction :: Maybe Variable
+      maybeBuiltinFunction :: Maybe (Variable Value)
       maybeBuiltinFunction = toMaybe (name `elem` ["address", "account", "uint", "int", "bool", "byte", "bytes"
                                                   , "string", "keccak256"
                                                   , "require", "revert", "assert", "sha3"
@@ -345,15 +345,15 @@ getVariableOfName name = do
                                                   , "selfdestruct", "suicide", "bytes32ToString"]) $
         t "builtin function" $ Constant $ SBuiltinFunction name Nothing
 
-      maybeBuiltinVariable :: Maybe Variable
+      maybeBuiltinVariable :: Maybe (Variable Value)
       maybeBuiltinVariable = toMaybe (name `elem` ["msg", "block", "tx", "super", "now"]) $
         t "builtin variable" $ Constant $ SBuiltinVariable name
 
-      maybeEnum :: Maybe Variable
+      maybeEnum :: Maybe (Variable Value)
       maybeEnum = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.enums)) $
         t "enum" $ Constant $ SEnum name
 
-      maybeConstant :: Maybe Variable
+      maybeConstant :: Maybe (Variable Value)
       maybeConstant = fmap (t "constant constant" . Constant) $ do
         let ctract = currentContract currentCallInfo
         Xabi.ConstantDecl{..} <- M.lookup name $ ctract ^. constants
@@ -361,15 +361,15 @@ getVariableOfName name = do
                                             Xabi.NumberLiteral x _ -> SInteger x
                                             x -> todo "constant initial val" x
 
-      maybeStructDef :: Maybe Variable
+      maybeStructDef :: Maybe (Variable Value)
       maybeStructDef = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.structs)) $
         t "struct def" $ Constant $ SStructDef name
 
-      maybeContract :: Maybe Variable
+      maybeContract :: Maybe (Variable Value)
       maybeContract = toMaybe (name `elem` M.keys (codeCollection currentCallInfo^.contracts)) $
         t "contract" $ Constant $ SContractDef name
 
-      maybeStorageItem :: Maybe Variable
+      maybeStorageItem :: Maybe (Variable Value)
       maybeStorageItem =
         -- TODO(tim): This might just be restricted to a field name
         if name `elem` M.keys (currentContract currentCallInfo^.storageDefs)
@@ -378,7 +378,7 @@ getVariableOfName name = do
                 (MS.singleton $ BC.pack name)
         else Nothing
 
-      maybeThis :: Maybe Variable
+      maybeThis :: Maybe (Variable Value)
       maybeThis = toMaybe (name == "this") . t "this" . Constant . SAccount . accountOnUnspecifiedChain $ currentAccount currentCallInfo
 
 
@@ -435,7 +435,7 @@ addCallInfo :: MonadSM m
             -> String
             -> Keccak256
             -> CodeCollection
-            -> Map String (Xabi.Type, Variable)
+            -> Map String (Xabi.Type, (Variable Value))
             -> Bool
             -> m ()
 addCallInfo a c fn hsh cc initialLocalVariables ro = do
@@ -490,12 +490,12 @@ getCurrentFunctionName = do
     _ -> internalError "getCurrentFunctionName called with an empty stack" ()
 
 
-getLocal :: MonadSM m => String -> m (Maybe Variable)
+getLocal :: MonadSM m => String -> m (Maybe (Variable Value))
 getLocal name = do
   currentCallInfo <- getCurrentCallInfo
   return $ fmap snd $ M.lookup name $ localVariables currentCallInfo
 
-setLocal :: MonadSM m => String -> Variable -> m ()
+setLocal :: MonadSM m => String -> Variable Value -> m ()
 setLocal name val = do
   stack <- Mod.get (Mod.Proxy @[CallInfo])
   let (info, rest) = case stack of

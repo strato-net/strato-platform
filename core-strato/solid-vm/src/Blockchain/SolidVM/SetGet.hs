@@ -98,7 +98,7 @@ toBasic = \case
   SMappingSentinel -> MS.BMappingSentinel
   x -> typeError "non basic solidity type cannot be stored atomically: " (show x)
 
-setVar :: MonadSM m => Variable -> Value -> m ()
+setVar :: MonadSM m => Variable Value -> Value -> m ()
 setVar (Constant dst) src = setVal dst src
 setVar (Variable var) val = liftIO $ writeIORef var val
 
@@ -153,14 +153,14 @@ setVal dst src = typeError "unknown case called in setVal:" ("src = " ++ show sr
 {-
 
 
-getInt :: Variable -> SM Integer
+getInt :: Variable Value -> SM Integer
 getInt p = do
   v <- getVar' (Just TInteger) p
   case v of
     SInteger s -> return s
     _ -> typeError "getInt" (p, v)
 
-getBool :: Variable -> SM Bool
+getBool :: Variable Value -> SM Bool
 getBool p = do
   v <- getVar' (Just TBool) p
   case v of
@@ -168,23 +168,23 @@ getBool p = do
     _ -> typeError "getBool" (p, v)
 -}
 
-getAccount :: MonadSM m => Variable -> m Value
+getAccount :: MonadSM m => Variable Value -> m Value
 getAccount = getVar
 
 
-getString :: MonadSM m => Variable -> m Value
+getString :: MonadSM m => Variable Value -> m Value
 getString = getVar
 
 {-
-getContract :: String -> Variable -> SM Value
+getContract :: String -> Variable Value -> SM Value
 getContract contractName = getVar' (Just $ TContract contractName)
 -}
 
-weakGetVar :: MonadIO m => Variable -> m Value
+weakGetVar :: MonadIO m => Variable Value -> m Value
 weakGetVar (Constant c) = return c
 weakGetVar (Variable v) = liftIO $ readIORef v
 
-getVar :: MonadSM m => Variable -> m Value
+getVar :: MonadSM m => Variable Value -> m Value
 --getVar x | trace ("getVar called: " ++ show x) $  False = undefined
 getVar (Constant (SReference addressedPath@(AccountPath addr key))) = do
   theValue <- getSolidStorageKeyVal' addr key
@@ -206,21 +206,21 @@ getVar (Constant v) = return v
 getVar (Variable v) = liftIO $ readIORef v
 
 
-getInt :: MonadSM m => Variable -> m Integer
+getInt :: MonadSM m => Variable Value -> m Integer
 getInt p = do
   v <- getVar p
   case v of
     SInteger s -> return s
     _ -> typeError "getInt" (p, v)
 
-getBool :: MonadSM m => Variable -> m Bool
+getBool :: MonadSM m => Variable Value -> m Bool
 getBool p = do
   v <- getVar p
   case v of
     SBool b -> return b
     _ -> typeError "getBool" (p, v)
 
-deleteVar :: MonadSM m => Variable -> m ()
+deleteVar :: MonadSM m => Variable Value -> m ()
 deleteVar (Constant (SReference a@(AccountPath addr path))) = do
   xType <- getXabiValueType a
   case xType of
@@ -241,7 +241,7 @@ deleteVar v = todo "deleteVar not yet supported for local variables" $ show v
 
 
 {-
-getVar' :: Maybe BasicType -> Variable -> SM Value
+getVar' :: Maybe BasicType -> Variable Value -> SM Value
 getVar' mTypeHint var = do
   val <- weakGetVar var
   case val of

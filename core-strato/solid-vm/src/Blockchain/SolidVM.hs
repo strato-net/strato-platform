@@ -734,12 +734,12 @@ expToPath (Xabi.MemberAccess parent field) = do
 
 expToPath x = todo "expToPath/unhandled" x
 
-expToVar :: MonadSM m => Xabi.Expression -> m Variable
+expToVar :: MonadSM m => Xabi.Expression -> m (Variable Value)
 expToVar x = do
   v <- expToVar' x
   return v
 
-expToVar' :: MonadSM m => Xabi.Expression -> m Variable
+expToVar' :: MonadSM m => Xabi.Expression -> m (Variable Value)
 expToVar' (Xabi.NumberLiteral v Nothing) = return . Constant $ SInteger v
 expToVar' (Xabi.StringLiteral s) = return $ Constant $ SString s
 expToVar' (Xabi.BoolLiteral b) = return $ Constant $ SBool b
@@ -1182,7 +1182,7 @@ expToVar' x = todo "expToVar/unhandled" x
 
 --------------
 
-expToVarAdd :: MonadSM m => Xabi.Expression -> Xabi.Expression -> m Variable
+expToVarAdd :: MonadSM m => Xabi.Expression -> Xabi.Expression -> m (Variable Value)
 expToVarAdd expr1 expr2 = do
   i1 <- getVar =<< expToVar expr1
   i2 <- getVar =<< expToVar expr2
@@ -1191,13 +1191,13 @@ expToVarAdd expr1 expr2 = do
     (SString a, SString b) -> return . Constant . SString $ a ++ b
     _ -> typeError "expToVarAdd" (i1, i2)
 
-expToVarInteger :: MonadSM m => Xabi.Expression -> (Integer->Integer->a) -> Xabi.Expression -> (a->Value) -> m Variable
+expToVarInteger :: MonadSM m => Xabi.Expression -> (Integer->Integer->a) -> Xabi.Expression -> (a->Value) -> m (Variable Value)
 expToVarInteger expr1 o expr2 retType = do
   i1 <- getInt =<< expToVar expr1
   i2 <- getInt =<< expToVar expr2
   return . Constant . retType $ i1 `o` i2
 
-addAndAssign :: MonadSM m => Xabi.Expression -> Xabi.Expression -> m Variable
+addAndAssign :: MonadSM m => Xabi.Expression -> Xabi.Expression -> m (Variable Value)
 addAndAssign lhs rhs = do
   let readVal e = getVar =<< expToVar e
   delta <- readVal rhs
@@ -1210,7 +1210,7 @@ addAndAssign lhs rhs = do
   setVar varToAssign next
   return $ Constant next
 
-binopAssign :: MonadSM m => (Integer -> Integer -> Integer) -> Xabi.Expression -> Xabi.Expression -> m Variable
+binopAssign :: MonadSM m => (Integer -> Integer -> Integer) -> Xabi.Expression -> Xabi.Expression -> m (Variable Value)
 binopAssign oper lhs rhs = do
   let readInt e = getInt =<< expToVar e
   delta <- readInt rhs

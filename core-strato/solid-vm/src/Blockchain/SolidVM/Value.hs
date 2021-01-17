@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -65,10 +66,10 @@ apSnoc (AccountPath loc path) piece = AccountPath loc $! path `MS.snoc` piece
 instance Show AccountPath where
   show (AccountPath a p) = printf "%s//%s" (show a) (show p)
 
-data Variable = Variable (IORef Value)
-  | Constant Value
+data Variable a = Variable (IORef a)
+  | Constant a
 
-instance Show Variable where
+instance Show a => Show (Variable a) where
   show (Variable _) = "<variable>"
   show (Constant v) = "Constant: " ++ show v
 
@@ -84,10 +85,10 @@ data Value =
   | SEnum String
   | SEnumVal String String Word32
   | SStructDef String
-  | SStruct String (Map String Variable)
-  | STuple (Vector Variable)
-  | SArray Xabi.Type (Vector Variable)
-  | SMap Xabi.Type (Map Value Variable)
+  | SStruct String (Map String (Variable Value))
+  | STuple (Vector (Variable Value))
+  | SArray Xabi.Type (Vector (Variable Value))
+  | SMap Xabi.Type (Map Value (Variable Value))
   | SFunction String Xabi.Func
   | SBuiltinFunction String (Maybe Value)
   | SBuiltinVariable String
@@ -183,7 +184,7 @@ valEquals ct lhs rhs = case (lhs, rhs) of
 
 
 
-createVar :: MonadIO m => Value -> m Variable
+createVar :: MonadIO m => Value -> m (Variable Value)
 createVar val = liftIO $ fmap Variable $ newIORef val
 
 
