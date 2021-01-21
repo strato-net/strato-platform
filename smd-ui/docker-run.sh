@@ -3,7 +3,10 @@ set -e
 set -x
 
 SINGLE_NODE=${SINGLE_NODE:-false}
-STRATO_GS_MODE=${STRATO_GS_MODE:-0}
+# Forcefully disabling mixpanel calls by hardcoding STRATO_GS_MODE=1 here. 
+# TODO: All mixpanel and STRATO_GS_MODE mentions are obsolete and to be removed
+#STRATO_GS_MODE=${STRATO_GS_MODE:-1}
+STRATO_GS_MODE=1
 ssl=${ssl:-false}
 
 sed -i "s|__NODE_HOST__|$NODE_HOST|g" build/index.html
