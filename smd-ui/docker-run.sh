@@ -3,7 +3,10 @@ set -e
 set -x
 
 SINGLE_NODE=${SINGLE_NODE:-false}
-STRATO_GS_MODE=${STRATO_GS_MODE:-0}
+# Forcefully disabling mixpanel calls by hardcoding STRATO_GS_MODE=1 here. 
+# TODO: All mixpanel and STRATO_GS_MODE mentions are obsolete and to be removed
+#STRATO_GS_MODE=${STRATO_GS_MODE:-1}
+STRATO_GS_MODE=1
 ssl=${ssl:-false}
 
 sed -i "s|__NODE_HOST__|$NODE_HOST|g" build/index.html
@@ -33,4 +36,4 @@ if [ "$STRATO_GS_MODE" = "3" ]; then
   curl http://api.mixpanel.com/track/?data=ewogICAgImV2ZW50IjogInNtZF9jb250YWluZXJfc3RhcnRlZF9hd3MiLAogICAgInByb3BlcnRpZXMiOiB7CiAgICAgICAgInRva2VuIjogImRhZjE3MWU5MDMwYWJiM2UzMDJkZjlkNzhiNmIxYWEwIgogICAgfQp9&ip=1
 fi
 
-serve -l 3002 build
+NO_UPDATE_CHECK=1 serve -l 3002 build
