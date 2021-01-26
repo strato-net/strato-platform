@@ -146,7 +146,7 @@ instance Arbitrary CodeInfo where
   arbitrary = CodeInfo
       <$> arbitrary
       <*> (T.pack <$> arbitrary)
-      <*> (T.pack <$> arbitrary)
+      <*> (fmap T.pack <$> arbitrary)
 
 instance Arbitrary AccountInfo where
   arbitrary = NonContract

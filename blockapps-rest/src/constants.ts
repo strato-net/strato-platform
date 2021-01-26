@@ -71,8 +71,8 @@ export const TxPayloadType = {
   TRANSFER: "TRANSFER"
 };
 
-export const TxResultStatus = {
-  PENDING: "Pending",
-  SUCCESS: "Success",
-  FAILURE: "Failure"
+export enum TxResultStatus {
+  PENDING = "Pending",
+  SUCCESS = "Success",
+  FAILURE = "Failure"
 };

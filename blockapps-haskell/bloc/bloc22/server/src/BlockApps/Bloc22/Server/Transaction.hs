@@ -139,14 +139,21 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
             fmap ((:[]) . BlocTxResult) $ poster cacheNonce bcp (callSignature userName)
           xs -> do
             ps <- mapM fromContract xs
+            uploadListContract <-
+                forM ps $ \p@(ContractPayload _ maybeC a v x cid m) -> do
+                  c <- case maybeC of
+                         Nothing -> throwIO $ UserError $ Text.pack $ "missing contract source"
+                         Just c' -> return c'
+                  return $
+                    UploadListContract c
+                                       (getSrc p)
+                                       (fromMaybe Map.empty a)
+                                       (mergeTxParams x txParams)
+                                       v cid m
+            
             let bclp = ContractListParameters
                         addr
-                        (map (\p@(ContractPayload _ c a v x cid m) ->
-                                UploadListContract (fromJust c)
-                                                   (getSrc p)
-                                                   (fromMaybe Map.empty a)
-                                                   (mergeTxParams x txParams)
-                                                   v cid m) ps)
+                        uploadListContract
                         chainId
                         resolve
                 md = contractpayloadMetadata $ head ps --Determine VM option by the metadata of the first tx in list

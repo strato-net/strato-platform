@@ -16,6 +16,7 @@ import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Resource
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import Data.Cache
 import Database.Persist.Postgresql
 import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Typed
@@ -26,6 +27,7 @@ import Network.Kafka hiding (runKafka)
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Prometheus
 import Servant.Client (parseBaseUrl)
+import System.Clock
 import System.Exit
 import Text.Printf
 import Text.RawString.QQ
@@ -56,6 +58,7 @@ createBlocEnv = liftIO $ do
   vaultwrapperUrl <- parseBaseUrl flags_vaultwrapperurl
   mgr <- newManager defaultManagerSettings
   pool <- createPool (connect dbConnectInfo) close 5 3 5
+  codePtrCache <- newCache . Just $ TimeSpec (fromIntegral flags_sourceCacheTimeout) 0
   return BlocEnv { urlStrato = stratoUrl
                  , urlVaultWrapper = vaultwrapperUrl
                  , httpManager = mgr
@@ -65,13 +68,14 @@ createBlocEnv = liftIO $ do
                  , gasOn = error "gasOn being accessed in Slipstream"
                  , globalNonceCounter = error "globalNonceCounter being accessed in Slipstream"
                  , globalSourceCache = error "globalSourceCache being accessed in Slipstream"
+                 , globalCodePtrCache = codePtrCache
                  , txTBQueue = error "txTBQueue being accessed by in Slipstream"
                  }
 
 connectToCirrus :: MonadIO m => m PGConnection
 connectToCirrus = liftIO $ pgConnect cirrusInfo
 
-main::IO ()
+main :: IO ()
 main = do
   _ <- $initHFlags "Setup Slipstream Variables"
   blockappsInit "slipstream_main"

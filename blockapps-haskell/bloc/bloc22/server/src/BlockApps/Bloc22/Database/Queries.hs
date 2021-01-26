@@ -616,21 +616,37 @@ getContractDetailsAndMetadataId (ContractName contractName) acct = do
         for tuple' $ detailsWith (Just acct)
 
 getContractDetailsByCodeHash :: CodePtr -> Bloc (Maybe (Int32, ContractDetails))
-getContractDetailsByCodeHash = \case
-  CodeAtAccount acct name -> getContractDetailsAndMetadataId (ContractName $ Text.pack name) acct
-  codeHash -> do
-    mDetails <- fmap listToMaybe . blocQuery $ getContractsContractByCodeHashQuery codeHash
-    for mDetails $ \(bin,binr,ch,_ :: ByteString,_ :: ByteString,name,src,cmId,xabi') -> do
-      xabi <- deserializeXabi xabi'
-      return (cmId, ContractDetails
-        { contractdetailsBin = Text.decodeUtf8 bin
-        , contractdetailsAccount = Nothing
-        , contractdetailsBinRuntime = Text.decodeUtf8 binr
-        , contractdetailsCodeHash = ch
-        , contractdetailsName = name
-        , contractdetailsSrc = src
-        , contractdetailsXabi = xabi
-        })
+getContractDetailsByCodeHash codePtr = do
+  srcCache <- asks globalCodePtrCache
+  now <- liftIO $ getTime Monotonic
+  let later = (now +) <$> Cache.defaultExpiration srcCache
+  mCachedDetails <- atomically $ do
+    Cache.purgeExpiredSTM srcCache now -- todo: this should probably go somewhere else, like a worker thread,
+                                       --       but we need this to prevent the cache growing unboundedly
+    r <- Cache.lookupSTM True codePtr srcCache now
+    for_ r $ \v -> Cache.insertSTM codePtr v srcCache later -- refresh to timestamp of this item
+    pure r
+
+  case mCachedDetails of
+    Just cachedDetails -> pure $ Just cachedDetails
+    Nothing -> do
+      mIdAndDetails <- case codePtr of
+        CodeAtAccount acct name -> getContractDetailsAndMetadataId (ContractName $ Text.pack name) acct
+        codeHash -> do
+          mDetails <- fmap listToMaybe . blocQuery $ getContractsContractByCodeHashQuery codeHash
+          for mDetails $ \(bin,binr,ch,_ :: ByteString,_ :: ByteString,name,src,cmId,xabi') -> do
+            xabi <- deserializeXabi xabi'
+            return (cmId, ContractDetails
+              { contractdetailsBin = Text.decodeUtf8 bin
+              , contractdetailsAccount = Nothing
+              , contractdetailsBinRuntime = Text.decodeUtf8 binr
+              , contractdetailsCodeHash = ch
+              , contractdetailsName = name
+              , contractdetailsSrc = src
+              , contractdetailsXabi = xabi
+              })
+      liftIO . for_ mIdAndDetails $ Cache.insert srcCache codePtr
+      pure mIdAndDetails
 
 {- |
 WITH contract_id AS (

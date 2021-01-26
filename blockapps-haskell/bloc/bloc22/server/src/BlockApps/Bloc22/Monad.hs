@@ -45,6 +45,7 @@ import           BlockApps.Logging
 import           BlockApps.Solidity.Xabi
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Nonce
 
 data Should a = Don't a | Do a
@@ -94,6 +95,7 @@ data BlocEnv = BlocEnv
   , gasOn              :: Bool
   , globalNonceCounter :: Cache (Address, Maybe ChainId) Nonce
   , globalSourceCache  :: Cache (Text, Text) (Map Text (Int32, ContractDetails))
+  , globalCodePtrCache :: Cache CodePtr (Int32, ContractDetails)
   , txTBQueue          :: TBQueue (Maybe Text, Maybe ChainId, Bool, PostBlocTransactionRequest)
   }
 
