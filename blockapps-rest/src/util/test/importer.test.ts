@@ -11,7 +11,7 @@ const fixtures = `${util.cwd}/lib/util/test/fixtures/`;
 describe("imports", function() {
   this.timeout(config.timeout);
   let admin;
-  const options:Options = { config };
+  const options:Options = { config, cacheNonce?:true };
 
   before(async () => {
     const userArgs = { token: process.env.USER_TOKEN };
