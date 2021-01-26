@@ -7,11 +7,12 @@ import { Options, Contract, Config } from "../../types";
 
 const config:Config = <Config>factory.getTestConfig();
 const fixtures = `${util.cwd}/lib/util/test/fixtures/`;
+const cacheOptions = `cacheNonce?: true`;
 
 describe("imports", function() {
   this.timeout(config.timeout);
   let admin;
-  const options:Options = { config, cacheNonce?:true };
+  const options:Options = { config, cacheOptions };
 
   before(async () => {
     const userArgs = { token: process.env.USER_TOKEN };
