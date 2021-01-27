@@ -24,7 +24,7 @@ chai.should();
 chai.use(require('chai-bignumber')());
 
 let config:Config=fsUtil.getYaml("config.yaml");
-let options:Options={config}
+let options:Options={config, cacheNonce: true}
 
 //config.apiDebug=true;
 const nonceOrder = `
@@ -64,7 +64,7 @@ async function upload() {
   const user = await createNewUser("user1");
   const args = {_a: 0, _b: 0};
   console.log(`User ${user.address} uploading a NonceOrder`);
-  return [user, await rest.createContract(user, {name: 'NonceOrder', source: nonceOrder, args}, options, cacheNonce: true)];
+  return [user, await rest.createContract(user, {name: 'NonceOrder', source: nonceOrder, args}, options)];
 }
 
 async function send(user, address, xs) {
