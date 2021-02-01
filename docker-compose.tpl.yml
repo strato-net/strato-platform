@@ -68,7 +68,7 @@ services:
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432
     - postgres_user=postgres
-    - postgrestHost=postgrest:3001
+    - postgrestHost=postrest:3001
     - PROD_DEV_MODE=${PROD_DEV_MODE:-false}
     - prometheusHost=prometheus:9090
     - SINGLE_NODE=${SINGLE_NODE}
@@ -205,6 +205,7 @@ services:
     - connectionTimeout=${connectionTimeout}
     - debugFail=${debugFail}
     - debugSolidVM=${debugSolidVM}
+    - wsDebug=${wsDebug}
     - evmDebugMode=${evmDebugMode}
     - evmTraceMode=${evmTraceMode}
     - extraFaucets=${extraFaucets}

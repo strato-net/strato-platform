@@ -20,6 +20,7 @@ module Blockchain.VMOptions (
   flags_miner,
   flags_gasOn,
   flags_debugSolidVM,
+  flags_wsDebug,
   flags_debugPort,
   ) where
 
@@ -51,4 +52,5 @@ defineFlag "cacheTransactionResults" True "Keep transaction results in an LRU ca
 defineEQFlag "miner" [| Instant :: MinerType |] "MINER" "What mining algorithm"
 defineFlag "gasOn" (True::Bool) "Whether to charge for transactions or not"
 defineFlag "debugSolidVM" (False::Bool) "Whether to run a debugging session for SolidVM"
+defineFlag "wsDebug" (False::Bool) "Whether to run a debugging session using WebSockets instead of a REST API"
 defineFlag "debugPort" (8051::Int) "Port for running debugger session"

@@ -70,11 +70,14 @@ executables:
       - servant-server
       - solid-vm
       - strato-conf
+      - text
+      - transformers
       - unliftio
       - vm-runner
       - vm-tools
       - wai-middleware-prometheus
       - warp
+      - websockets
     ghc-options: -Wall -O2 -threaded -rtsopts -fprof-auto
 
 tests:
