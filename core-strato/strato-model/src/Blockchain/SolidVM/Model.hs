@@ -25,6 +25,7 @@ import              Control.Lens.Operators
 import Data.Swagger
 
 import Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
+import qualified LabeledError
 
 newtype HexStorage = HexStorage B.ByteString
                    deriving (Eq, Ord, Show, Read, Generic)
@@ -64,7 +65,8 @@ instance ToJSON CodeKind where
   toJSON = String . T.pack . show
 
 instance FromJSON CodeKind where
-  parseJSON (String t) = return . read . T.unpack $ t
+  parseJSON (String t) = return . LabeledError.read "FromJSON/CodeKind" . T.unpack $ t
   parseJSON x = typeMismatch "CodeKind" x
 
 derive makeArbitrary ''CodeKind
+

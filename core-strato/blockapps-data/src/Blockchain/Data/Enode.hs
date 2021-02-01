@@ -44,6 +44,7 @@ import           Blockchain.Data.RLP
 import           Blockchain.ExtWord
 import           Blockchain.Strato.Model.Keccak256
 
+import qualified LabeledError
 
 newtype IPAddress = IPv4 HostAddress deriving (Show, Read, Eq, Ord, GHCG.Generic, NFData, Binary, Data)
 
@@ -111,8 +112,8 @@ readIP input =
       (b1, temp3) = break (=='.') s1
       b0 = dropWhile (=='.') temp3
 
-      addy = ((read b0) + (((read b1) .&. 0xff) `shiftL` 8) + (((read b2) .&. 0xff) `shiftL` 16) +
-        (((read b3) .&. 0xff) `shiftL` 24))
+      addy = ((LabeledError.read "Enode/readIP1" b0) + (((LabeledError.read "Enode/readIP2" b1) .&. 0xff) `shiftL` 8) + (((LabeledError.read "Enode/readIP3" b2) .&. 0xff) `shiftL` 16) +
+        (((LabeledError.read "Enode/readIP3" b3) .&. 0xff) `shiftL` 24))
   in (IPv4 addy)
 
 showEnode :: Enode -> String
@@ -139,10 +140,10 @@ readEnodeOrFail input =
   case matchRegex (mkRegex "^enode://([0-9a-f]{128})@([^:]+)\\:([0-9]+)(\\?discport=([0-9]+))?$") input of
     Nothing -> Left $ "enode is in the wrong format: " ++ input
     Just [pubkey, ip, port, _, discport] ->
-      Right $ Enode (OrgId . fst $ B16.decode (C8.pack pubkey)) (readIP ip) (read port) $
+      Right $ Enode (OrgId . fst $ B16.decode (C8.pack pubkey)) (readIP ip) (LabeledError.read "Enode/readEnodeOrFail" port) $
                     case discport of
                       "" -> Nothing
-                      _ -> Just $ read discport
+                      _ -> Just $ LabeledError.read "Enode/readEnodeOrFail" discport
     _ -> error "internal error in 'readEnodeOrFail': regex returned with wrong number of matches"
 
 instance PersistFieldSql Enode where

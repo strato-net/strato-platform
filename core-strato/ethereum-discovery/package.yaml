@@ -42,6 +42,7 @@ library:
     - format
     - hflags
     - http-client
+    - labeled-error
     - monad-alter
     - mtl
     - network-uri

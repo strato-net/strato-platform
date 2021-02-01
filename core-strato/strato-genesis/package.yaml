@@ -31,6 +31,7 @@ library:
       - entropy
       - format
       - json-stream
+      - labeled-error
       - lens
       - monad-alter
       - scientific
