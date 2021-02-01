@@ -12,9 +12,10 @@ import qualified Database.Persist.Sql        as SQL
 import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
 import           Blockchain.Strato.Model.Keccak256
+import qualified LabeledError
 
 getGenesisHash :: HasSQLDB m => m Keccak256
-getGenesisHash = sqlQuery $ read . extraValue <$> SQL.getJust (ExtraKey "genesisHash")
+getGenesisHash = sqlQuery $ LabeledError.read "Extra/getGenesisHash" . extraValue <$> SQL.getJust (ExtraKey "genesisHash")
 
 putGenesisHash :: HasSQLDB m => Keccak256 -> m ()
 putGenesisHash hash' = void . sqlQuery $ SQL.upsert (Extra "genesisHash" $ show hash') []

@@ -61,6 +61,7 @@ packages:
 - shared-util/cross-monitoring/
 - shared-util/format
 - shared-util/haskoin-shim/
+- shared-util/labeled-error/
 - shared-util/solid-vm-model/
 - clockwork
 - logserver
