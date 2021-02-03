@@ -191,14 +191,14 @@ describe('Nonce upload orders', async () => {
     assert.deepEqual(new BigNumber(balance2).minus(balance1), new BigNumber(304));
   }).timeout(config.timeout);
 
-//   it ('will respect the nonce provided on each method tx', async () => {
-//     const [user, contract] = await upload();
-//     console.log(`Setting 300, then 4`);
-//     await set(user, contract, [4, 300]);
-//     console.log(`Checking our work`);
-//     const results = await get(user, contract);
-//     assert.deepEqual(results, ["300", "4"]);
-//   }).timeout(config.timeout);
+  it ('will respect the nonce provided on each method tx', async () => {
+    const [user, contract] = await upload();
+    console.log(`Setting 300, then 4`);
+    await set(user, contract, [4, 300]);
+    console.log(`Checking our work`);
+    const results = await get(user, contract);
+    assert.deepEqual(results, ["300", "4"]);
+  }).timeout(config.timeout);
 
   it ("won't collide nonces when none are provided for method txs", async () => {
     const [user, contract] = await upload();
