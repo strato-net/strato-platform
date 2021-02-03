@@ -249,7 +249,7 @@ pipeline {
               //sh 'npm run test:blockhash' 
               //sh 'npm run test:truchainz'
               //sh 'npm run test:multicontract'
-              //sh 'npm run test:slipstream'
+              sh 'npm run test:slipstream'
               sh 'npm run test:solidvm'
               sh 'npm run test:uploadOrder'
               // -- additional tests:
