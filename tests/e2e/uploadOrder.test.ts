@@ -171,15 +171,15 @@ async function getBalance(user:OAuthUser, address:string) {
 
 describe('Nonce upload orders', async () => {
 
-//   it ('will respect the nonce provided on each send tx', async () => {
-//     const user = await createNewUser("user1");
-//     console.log(`Setting 300, then 4`);
-//     const user2 = await createNewUser("user2");
-//     const balance1 = await getBalance(user, user2.address);
-//     await send(user, user2.address, [4, 300]);
-//     const balance2 = await getBalance(user, user2.address);
-//     assert.deepEqual(new BigNumber(balance2).minus(balance1), new BigNumber(304));
-//   }).timeout(config.timeout);
+  it ('will respect the nonce provided on each send tx', async () => {
+    const user = await createNewUser("user1");
+    console.log(`Setting 300, then 4`);
+    const user2 = await createNewUser("user2");
+    const balance1 = await getBalance(user, user2.address);
+    await send(user, user2.address, [4, 300]);
+    const balance2 = await getBalance(user, user2.address);
+    assert.deepEqual(new BigNumber(balance2).minus(balance1), new BigNumber(304));
+  }).timeout(config.timeout);
   
   it ("won't collide nonces when none are provided for send txs", async () => {
     const user = await createNewUser("user1");
