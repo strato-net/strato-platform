@@ -2,8 +2,12 @@
 
 module Blockchain.Options where
 
+import qualified Data.ByteString.Char8    as BC
+
 import           Blockchain.Participation (ParticipationMode(..))
 import           HFlags
+
+import           Blockchain.Strato.Model.ExtendedWord
 
 data P2PClientMode = SingleThreaded | MultiThreaded
         deriving (Eq, Ord, Read, Show)
@@ -14,6 +18,7 @@ defineFlag "a:address" ("127.0.0.1" :: String) "Connect to server at address"
 defineFlag "l:listen" (30303 :: Int) "Listen on port"
 defineFlag "testnet" False "connect to testnet"
 defineFlag "sqlPeers" False "Choose peers from the SQL DB, not the config file"
+defineFlag "network" (""::String) "Choose a network to join"
 defineFlag "networkID" (-1::Int) "set a custom network ID for the client"
 defineFlag "syncBacktrackNumber" (10::Integer) "block number to go back when syncing"
 defineFlag "debugFail" True "Fail on errors we're not supposed to reach. If false, just log insteand and go on"
@@ -37,9 +42,12 @@ defineEQFlag "privateChainAuthorizationMode" [| FlexibleAuth :: AuthorizationMod
 defineEQFlag "participationMode" [| Full :: ParticipationMode |] "PARTICIPATIONMODE"
   "Whether to send all mesages to peers (Full), no messages to peers (None), or everything except PBFT (NoConsensus)"
 
-computeNetworkID :: Int
-computeNetworkID = if flags_networkID == -1
-                      then if flags_testnet
-                             then 0
-                             else 1
-                      else flags_networkID
+computeNetworkID :: Integer
+computeNetworkID =
+  case (flags_network, flags_networkID) of
+    ("", -1) ->
+      if flags_testnet
+      then 0
+      else 1
+    (network, -1) -> fromIntegral $ bytesToWord256 $ BC.pack network
+    (_, _) -> toInteger flags_networkID

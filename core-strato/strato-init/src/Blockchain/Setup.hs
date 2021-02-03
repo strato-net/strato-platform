@@ -39,6 +39,7 @@ import           Blockchain.Init.EthConf
 import           Blockchain.Init.Monad
 import           Blockchain.Init.Options
 import           Blockchain.KafkaTopics
+import qualified Blockchain.Network                 as Net
 import           Blockchain.Output
 import           Blockchain.Strato.Model.Address
 
@@ -115,11 +116,13 @@ oneTimeSetup genesisBlockName = do
   if dirExists
     then die ".ethereumH exists, unsafe to run setup"
     else do
-      let bootnodes = case (flags_addBootnodes, flags_stratoBootnode) of
-                     (False, _)      -> Nothing
-                     (True, [])      -> Just []
-                     (True, [""])    -> Just []
-                     (True, ipAddrs) -> Just ipAddrs
+      bootnodes <- case (flags_addBootnodes, flags_stratoBootnode, flags_network) of
+                     (False, _, _)      -> return Nothing
+                     (True, [], "")      -> return $ Just []
+                     (True, [""], "")    -> return $ Just []
+                     (True, [], network)      -> fmap (fmap $ map Net.webAddress) $ Net.getParams network
+                     (True, [""], network)    -> fmap (fmap $ map Net.webAddress) $ Net.getParams network
+                     (True, ipAddrs, _) -> return $ Just ipAddrs
       liftIO $ putStrLn $ CL.red ">>>> Bootnodes: " ++ show bootnodes
 
      {- CONFIG create default config files -}

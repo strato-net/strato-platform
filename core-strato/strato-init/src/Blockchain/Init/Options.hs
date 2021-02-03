@@ -12,6 +12,7 @@ defineFlag "K:kafkahost" (""  ::  String) "Kafka hostname"
 defineFlag "vaultWrapperUrl" ("http://vault-wrapper:8000/strato/v2.3" :: String) "Vault-Wrapper URL"
 defineFlag "z:zkhost" ("localhost"  ::  String) "Zookeeper hostname"
 defineFlag "z:lazyblocks" (False  ::  Bool) "Don't mine empty blocks"
+defineFlag "network" ("" :: String) "The network that strato will join"
 defineFlag "addBootnodes" True "Adds bootnodes to the peer DB at setup time.  If set to false, the peer will not be able to initiate a connection to the network by itself (this option is useful if you want to set up a peer to itself be a bootnode in a private network)"
 defineCustomFlag "stratoBootnode" [| []  ::  [String] |] "STRING_LIST"
      [| \s -> if any (==',') s then splitWhen (==',') s else [s] |]

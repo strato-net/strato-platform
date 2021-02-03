@@ -21,6 +21,7 @@ import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin
 import           Blockchain.Strato.Model.Address
 import qualified Blockchain.EthConf         as EC
+import qualified Blockchain.Network         as Net
 import           Blockchain.Output
 import           Blockchain.Sequencer
 import           Blockchain.Sequencer.Gregor
@@ -56,6 +57,7 @@ main = do
   s <- $initHFlags "Block/Txn sequencer for the Haskell EVM"
   exportFlagsAsMetrics
   putStrLn $ "strato-sequencer ignoring unknown flags: " ++ show s
+  putStrLn $ "strato-sequencer network: " ++ show flags_network
   putStrLn $ "strato-sequencer validators: " ++ show flags_validators
   putStrLn $ "strato-sequencer authorized beneficiary senders: " ++ show flags_blockstanbul_admins
   putStrLn $ "strato-sequencer isAdmin: " ++ show flags_isAdmin
@@ -85,9 +87,14 @@ main = do
   
   putStrLn . ("NODEKEY address: " ++) . formatAddressWithoutColor $ selfAddress
   addSelfAsMetric selfAddress
- 
+
+  maybeNetworkParams <- Net.getParams flags_network
   let eValidators = Ae.eitherDecodeStrict (C8.pack flags_validators) :: Either String [Address]
-      !validators' = fromRight (error "invalid validators") eValidators
+      !validators' =
+        case (maybeNetworkParams, eValidators) of
+          (Just networkParams, Right []) -> map Net.ethAddress networkParams
+          (_, Right v) -> v
+          (_, Left e) -> error $ "invalid validators: " ++ e
       eAuthSenders = Ae.eitherDecodeStrict (C8.pack flags_blockstanbul_admins) :: Either String [Address]
       !authSenders' = fromRight (error "invalid admins") eAuthSenders
  
