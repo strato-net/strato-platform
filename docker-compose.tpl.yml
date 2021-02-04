@@ -223,6 +223,7 @@ services:
     - mineBlocks=${mineBlocks:-true}
     - miningAlgorithm=${miningAlgorithm}
     - miningThreads=${miningThreads}
+    - network=${network}
     - networkID=${networkID}
     - numMinPeers=${numMinPeers}
     - postgres_host=postgres

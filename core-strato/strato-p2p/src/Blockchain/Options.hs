@@ -2,12 +2,11 @@
 
 module Blockchain.Options where
 
-import qualified Data.ByteString.Char8    as BC
-
-import           Blockchain.Participation (ParticipationMode(..))
+import           Data.ByteString.Internal
 import           HFlags
 
-import           Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.Participation (ParticipationMode(..))
+import           Blockchain.Strato.Model.Util
 
 data P2PClientMode = SingleThreaded | MultiThreaded
         deriving (Eq, Ord, Read, Show)
@@ -49,5 +48,5 @@ computeNetworkID =
       if flags_testnet
       then 0
       else 1
-    (network, -1) -> fromIntegral $ bytesToWord256 $ BC.pack network
+    (network, -1) -> bytes2Integer $ map c2w network
     (_, _) -> toInteger flags_networkID

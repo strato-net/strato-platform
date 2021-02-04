@@ -57,6 +57,9 @@ function newnode {
   if [ -n "${wireMessageCacheSize}" ]; then
     cacheFlag="--wireMessageCacheSize=${wireMessageCacheSize}"
   fi
+  if [ -n "${network}" ]; then
+    networkFlag="--network=${network}"
+  fi
 
   echo "Starting strato-p2p"
   runBackgroundProcess strato-p2p \
@@ -72,6 +75,7 @@ function newnode {
      ${pcamFlag} \
      ${pmFlag} \
      ${cacheFlag} \
+     ${networkFlag} \
      &>> logs/strato-p2p
 
   evmMinLogLevel=LevelInfo
@@ -113,6 +117,7 @@ function newnode {
   runBackgroundProcess strato-sequencer \
     "${bpFlag}" "${rpFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" "${vsFlag}" \
     "${baFlag}" "${scFlag}" "${adFlag}" "${rtFlag}" --minLogLevel=$seqMinLogLevel \
+    "${networkFlag}" \
     "${vwFlag}" +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
 
   echo "Starting strato-api-indexer"
@@ -220,13 +225,16 @@ function cleanupDB {
 function doInit {
   blockTime=${blockTime:-13}
   minBlockDifficulty=${minBlockDifficulty:-131072}
-  
+  if [ -n "${network}" ]; then
+    networkFlag="--network=${network}"
+  fi
+
   args="--pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
         --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
         --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
         --addBootnodes=$addBootnodes $stratoBootnode --vaultWrapperUrl=$vaultWrapperRoot \
         --blockTime=$blockTime --minPeers=$numMinPeers --minBlockDifficulty=$minBlockDifficulty \
-        --generateKey=$generateKey --extraFaucets=$extraFaucets"
+        --generateKey=$generateKey --extraFaucets=$extraFaucets ${networkFlag}"
 
   if ${splitinit:-false} ; then
     #TODO(https://blockapps.atlassian.net/browse/STRATO-1421): Populate strato-init-events with from-restore from S3
@@ -314,7 +322,12 @@ setEnv genesis gettingStarted
 setEnv miningAlgorithm Instant
 setEnv maxTxsPerBlock 500
 
-setEnv networkID 6
+if [ -z $network ]
+then
+    setEnv networkID 6
+else
+    setEnv networkID -1
+fi
 setEnv genesisBlock ""
 setEnv bootnode ""
 setEnv maxReturnedHeaders 1000
@@ -339,6 +352,7 @@ setEnv evmTraceMode false
 
 stratoBootnode=${bootnode:+--stratoBootnode=$bootnode}
 [[ -n $bootnode ]] && addBootnodes=true
+[[ -n $network ]] && addBootnodes=true
 
 mkdir -p /var/lib/strato
 cd /var/lib/strato

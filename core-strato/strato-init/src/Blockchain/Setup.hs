@@ -116,13 +116,11 @@ oneTimeSetup genesisBlockName = do
   if dirExists
     then die ".ethereumH exists, unsafe to run setup"
     else do
-      bootnodes <- case (flags_addBootnodes, flags_stratoBootnode, flags_network) of
-                     (False, _, _)      -> return Nothing
-                     (True, [], "")      -> return $ Just []
-                     (True, [""], "")    -> return $ Just []
-                     (True, [], network)      -> fmap (fmap $ map Net.webAddress) $ Net.getParams network
-                     (True, [""], network)    -> fmap (fmap $ map Net.webAddress) $ Net.getParams network
-                     (True, ipAddrs, _) -> return $ Just ipAddrs
+      bootnodes <- case (flags_addBootnodes, filter (not . null) flags_stratoBootnode) of
+                     (False, _)               -> return Nothing
+                     (True, [])               -> fmap (fmap $ map Net.webAddress) $ Net.getParams flags_network
+                     (True, stratoBootnodes') -> return $ Just stratoBootnodes'
+                     
       liftIO $ putStrLn $ CL.red ">>>> Bootnodes: " ++ show bootnodes
 
      {- CONFIG create default config files -}
