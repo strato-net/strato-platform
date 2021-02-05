@@ -264,7 +264,7 @@ pipeline {
               //sh 'npm run test:uploadOrder'
             }
             dir ('strato-worktree/core-strato/strato-init') {
-              //sh './check_genesis_ingestion.sh'
+              sh './check_genesis_ingestion.sh'
             }
           },
         )
