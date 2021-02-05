@@ -106,9 +106,9 @@ main = do
                  if flags_isRootNode then do
                    unless (length validators' == 0) . putStrLn
                       $ "WARNING: You have given me a validators list and you are telling me that this node \
-                        \ is the root node. I'll add this node's address to the validator list \
+                        \ is the root node. I'll ignore the validator list \
                         \ you gave me, but this is likely a configuration error on your part."
-                   return $ selfAddress : validators'
+                   return [selfAddress]
                  else do
                    when (length validators' == 0) . putStrLn
                       $ "WARNING: You have given me an empty validators list, but this node is not the root \
