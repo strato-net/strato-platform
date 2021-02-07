@@ -1,9 +1,13 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeSynonymInstances  #-}
 
 module Blockchain.SolidVM.SetGet (
   setVar,
@@ -21,28 +25,34 @@ module Blockchain.SolidVM.SetGet (
   deleteVar,
 
   
-  showSM
+  showSM,
+  breakpoint
   ) where
 
 import           Control.Monad
+import qualified Control.Monad.Change.Modify as Mod
 import           Control.Monad.IO.Class
 import qualified Data.ByteString.Char8 as BC
 import           Data.Foldable (for_)
-import           Data.IORef
 import           Data.List
 import qualified Data.Map as M
+import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Vector as V
 import           Text.Printf
 
 import           Blockchain.DB.SolidStorageDB
+import           Blockchain.Output
 import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.SM
 import           Blockchain.SolidVM.Value
 import           Blockchain.Strato.Model.Account
+import           Blockchain.VMContext
 import qualified SolidVM.Model.Storable as MS
+import qualified SolidVM.Solidity.Xabi.Statement as Xabi
 import qualified SolidVM.Solidity.Xabi.Type as Xabi
 import           Text.Format
+import           UnliftIO
 
 --import Debug.Trace
 
@@ -308,3 +318,62 @@ showSM (SContract name address) = do
 showSM (SReference apt) = return $ "<reference to " ++ show apt ++ ">"
 showSM (SBuiltinVariable x) = return $ "<built-in " ++ show x ++ ">"
 showSM x = todo "showSM called for unsupported value: " x
+
+breakpoint :: MonadSM m => Xabi.SourcePos -> m ()
+breakpoint pos = do
+  isBreak <- isBreakpoint pos
+  when isBreak $ do
+    cStack <- Mod.get (Mod.Proxy @[CallInfo])
+    $logInfoS "breakpoint" . T.pack $ "Paused on breakpoint: " ++ show pos
+    handleBreakpoint pos cStack
+    $logInfoS "breakpoint" . T.pack $ "Resuming from breakpoint: " ++ show pos
+
+localVariableMap :: MonadSM m => [CallInfo] -> m (M.Map T.Text T.Text)
+localVariableMap [] = pure M.empty
+localVariableMap (ci:_) = fmap M.fromList $ do
+  forM (M.toList $ localVariables ci) $ \(name, (_, var)) -> do
+    val <- getVar var
+    valueString <- showSM val
+    pure (T.pack name, T.pack valueString)
+
+isBreakpoint :: MonadSM m => Xabi.SourcePos -> m Bool
+isBreakpoint pos = do
+  debugSettings <- Mod.access (Mod.Proxy @DebugSettings)
+  case debugSettings of
+    DebuggingDisabled -> pure False
+    DebugSettings{..} -> do
+      let bPoint = Breakpoint (Xabi.sourceName pos)
+                              (Xabi.sourceLine pos)
+                              (Xabi.sourceColumn pos)
+      atomically $ do
+        currentOperation <- readTVar operation
+        if currentOperation == Run
+          then do
+            bPoints <- readTVar breakpoints
+            if S.member bPoint bPoints
+              then writeTVar operation Pause >> pure True
+              else pure False
+          else pure True
+
+handleBreakpoint :: MonadSM m => Xabi.SourcePos -> [CallInfo] -> m ()
+handleBreakpoint pos cStack = do
+  debugSettings <- Mod.access (Mod.Proxy @DebugSettings)
+  case debugSettings of
+    DebuggingDisabled -> pure ()
+    DebugSettings{..} -> do
+      let bPoint = Breakpoint (Xabi.sourceName pos)
+                              (Xabi.sourceLine pos)
+                              (Xabi.sourceColumn pos)
+          cStack' = map (T.pack . currentFunctionName) cStack
+      vars <- localVariableMap cStack
+      atomically . writeTVar current $ Just (bPoint, cStack', vars)
+      atomically $ do
+        currentOperation <- readTVar operation
+        case currentOperation of
+          Run -> pure ()
+          Pause -> retrySTM
+          StepIn -> writeTVar operation Pause
+          StepOver n -> writeTVar operation (InStepOver n)
+          InStepOver n -> when (length cStack' <= n) retrySTM
+          StepOut n -> writeTVar operation (InStepOut n)
+          InStepOut n -> when (length cStack' < n) retrySTM

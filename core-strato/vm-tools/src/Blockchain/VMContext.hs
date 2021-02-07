@@ -20,6 +20,7 @@ module Blockchain.VMContext
     , withCurrentBlockHash
     , Breakpoint(..)
     , DebugSettings(..)
+    , DebugOperation(..)
     , newDebugSettings
     , VMBase
     , ContextDBs(..)
@@ -146,11 +147,20 @@ data Breakpoint = Breakpoint
   , breakpointColumn :: Int
   } deriving (Eq, Ord, Show, Generic, NFData, Aeson.ToJSON, Aeson.FromJSON)
 
+data DebugOperation = Run
+                    | Pause
+                    | StepIn
+                    | StepOver {-# UNPACK #-} !Int
+                    | InStepOver {-# UNPACK #-} !Int
+                    | StepOut {-# UNPACK #-} !Int
+                    | InStepOut {-# UNPACK #-} !Int
+                    deriving (Eq, Ord, Show, Generic, NFData, Aeson.ToJSON, Aeson.FromJSON)
+
 data DebugSettings = DebuggingDisabled
                    | DebugSettings {
-                     running :: TVar Bool
+                     operation :: TVar DebugOperation
                    , breakpoints :: TVar (S.Set Breakpoint)
-                   , current :: TVar (Maybe (Breakpoint, [String]))
+                   , current :: TVar (Maybe (Breakpoint, [T.Text], M.Map T.Text T.Text))
                    , exceptionBreakpoints :: TVar Bool
                    , functionBreakpoints :: TVar Bool
                    } deriving (Eq, Generic)
@@ -161,7 +171,7 @@ instance NFData DebugSettings where
 
 newDebugSettings :: STM DebugSettings
 newDebugSettings = DebugSettings
-               <$> (newTVar True)
+               <$> (newTVar Run)
                <*> (newTVar S.empty)
                <*> (newTVar Nothing)
                <*> (newTVar False)

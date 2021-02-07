@@ -26,6 +26,7 @@ import Servant
 import Control.Exception hiding (Handler)
 import Control.Monad.IO.Class
 import Data.Aeson
+import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
 import UnliftIO.STM
@@ -36,77 +37,126 @@ import qualified Network.WebSockets as WS
 data DebuggerStatus = Running
                     | Paused {
                       breakpoint :: Breakpoint
-                    , callstack :: [String]
+                    , callstack :: [T.Text]
+                    , variables :: M.Map T.Text T.Text
                     } deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON)
 
 status :: MonadIO m => DebugSettings -> m DebuggerStatus
 status dSettings = case dSettings of
   DebuggingDisabled -> pure Running
   DebugSettings{..} -> do
-    ~(isRunning, mCurrent) <- atomically $ (,) <$> readTVar running <*> readTVar current
-    if isRunning
+    ~(currentOperation, mCurrent) <- atomically $ (,) <$> readTVar operation <*> readTVar current
+    if currentOperation == Run
       then pure Running
       else case mCurrent of
         Nothing -> pure Running
-        Just (b, cs) -> pure $ Paused b cs
+        Just (b, cs, vs) -> pure $ Paused b cs vs
 
 pause :: MonadIO m => DebugSettings -> m DebuggerStatus
 pause dSettings = case dSettings of
   DebuggingDisabled -> pure Running
   DebugSettings{..} -> do
     mCurrent <- atomically $ do
-      writeTVar running False
+      writeTVar operation Pause
       readTVar current
     case mCurrent of
       Nothing -> pure Running
-      Just (b, cs) -> pure $ Paused b cs
+      Just (b, cs, vs) -> pure $ Paused b cs vs
 
 resume :: MonadIO m => DebugSettings -> m DebuggerStatus
 resume dSettings = case dSettings of
   DebuggingDisabled -> pure Running
   DebugSettings{..} -> do
     atomically $ do
-      writeTVar running True
+      writeTVar operation Run
       writeTVar current Nothing
     pure Running
 
-addBreakpoint :: MonadIO m => Breakpoint -> DebugSettings -> m DebuggerStatus
-addBreakpoint bPoint dSettings = case dSettings of
+stepIn :: MonadIO m => DebugSettings -> m DebuggerStatus
+stepIn dSettings = case dSettings of
   DebuggingDisabled -> pure Running
   DebugSettings{..} -> do
-    ~(isRunning, mCurrent) <- atomically $ do
-      modifyTVar breakpoints $ S.insert bPoint
-      (,) <$> readTVar running <*> readTVar current
-    if isRunning
-      then pure Running
-      else case mCurrent of
-        Nothing -> pure Running
-        Just (b, cs) -> pure $ Paused b cs
+    mCurrent <- atomically $ do
+      writeTVar operation StepIn
+      readTVar current
+    case mCurrent of
+      Nothing -> pure Running
+      Just (b, cs, vs) -> pure $ Paused b cs vs
 
-removeBreakpoint :: MonadIO m => Breakpoint -> DebugSettings -> m DebuggerStatus
-removeBreakpoint bPoint dSettings = case dSettings of
+stepOver :: MonadIO m => DebugSettings -> m DebuggerStatus
+stepOver dSettings = case dSettings of
   DebuggingDisabled -> pure Running
   DebugSettings{..} -> do
-    ~(isRunning, mCurrent) <- atomically $ do
-      modifyTVar breakpoints $ S.delete bPoint
-      (,) <$> readTVar running <*> readTVar current
-    if isRunning
+    mCurrent <- atomically $ do
+      mCurrent <- readTVar current
+      case mCurrent of
+        Nothing -> writeTVar operation Run
+        Just (_, cStack, _) -> writeTVar operation (StepOver $ length cStack)
+      pure mCurrent
+    case mCurrent of
+      Nothing -> pure Running
+      Just (b, cs, vs) -> pure $ Paused b cs vs
+
+stepOut :: MonadIO m => DebugSettings -> m DebuggerStatus
+stepOut dSettings = case dSettings of
+  DebuggingDisabled -> pure Running
+  DebugSettings{..} -> do
+    mCurrent <- atomically $ do
+      mCurrent <- readTVar current
+      case mCurrent of
+        Nothing -> writeTVar operation Run
+        Just (_, cStack, _) -> writeTVar operation (StepOut $ length cStack)
+      pure mCurrent
+    case mCurrent of
+      Nothing -> pure Running
+      Just (b, cs, vs) -> pure $ Paused b cs vs
+
+getBreakpoints :: MonadIO m => DebugSettings -> m [Breakpoint]
+getBreakpoints dSettings = case dSettings of
+  DebuggingDisabled -> pure []
+  DebugSettings{..} -> fmap S.toList . atomically $ readTVar breakpoints
+
+addBreakpoints :: MonadIO m => [Breakpoint] -> DebugSettings -> m DebuggerStatus
+addBreakpoints bPoints dSettings = case dSettings of
+  DebuggingDisabled -> pure Running
+  DebugSettings{..} -> do
+    ~(currentOperation, mCurrent) <- atomically $ do
+      modifyTVar breakpoints $ \bps -> foldr S.insert bps bPoints
+      (,) <$> readTVar operation <*> readTVar current
+    if currentOperation == Run
       then pure Running
       else case mCurrent of
         Nothing -> pure Running
-        Just (b, cs) -> pure $ Paused b cs
+        Just (b, cs, vs) -> pure $ Paused b cs vs
+
+removeBreakpoints :: MonadIO m => [Breakpoint] -> DebugSettings -> m DebuggerStatus
+removeBreakpoints bPoints dSettings = case dSettings of
+  DebuggingDisabled -> pure Running
+  DebugSettings{..} -> do
+    ~(currentOperation, mCurrent) <- atomically $ do
+      modifyTVar breakpoints $ \bps -> case bPoints of
+        [] -> S.empty
+        bPoints' -> foldr S.delete bps bPoints'
+      (,) <$> readTVar operation <*> readTVar current
+    if currentOperation == Run
+      then pure Running
+      else case mCurrent of
+        Nothing -> pure Running
+        Just (b, cs, vs) -> pure $ Paused b cs vs
 
 type RestDebuggerAPI = GetStatus
                   :<|> PutPause
                   :<|> PutResume
-                  :<|> PutBreakpoint
-                  :<|> DeleteBreakpoint
+                  :<|> GetBreakpoints
+                  :<|> PutBreakpoints
+                  :<|> DeleteBreakpoints
 
 type GetStatus = "status" :> Get '[JSON] DebuggerStatus
 type PutPause = "pause" :> Put '[JSON] DebuggerStatus
 type PutResume = "resume" :> Put '[JSON] DebuggerStatus
-type PutBreakpoint = "breakpoint" :> ReqBody '[JSON] Breakpoint :> Put '[JSON] DebuggerStatus
-type DeleteBreakpoint = "breakpoint" :> ReqBody '[JSON] Breakpoint :> Delete '[JSON] DebuggerStatus
+type GetBreakpoints = "breakpoints" :> Get '[JSON] [Breakpoint]
+type PutBreakpoints = "breakpoints" :> ReqBody '[JSON] [Breakpoint] :> Put '[JSON] DebuggerStatus
+type DeleteBreakpoints = "breakpoints" :> ReqBody '[JSON] [Breakpoint] :> Delete '[JSON] DebuggerStatus
 
 restDebuggerAPI :: Proxy RestDebuggerAPI
 restDebuggerAPI = Proxy
@@ -120,31 +170,36 @@ putPause = pause
 putResume :: DebugSettings -> Handler DebuggerStatus
 putResume = resume
 
-putBreakpoint :: DebugSettings -> Breakpoint -> Handler DebuggerStatus
-putBreakpoint = flip addBreakpoint
+getBreakpointsHandler :: DebugSettings -> Handler [Breakpoint]
+getBreakpointsHandler = getBreakpoints
 
-deleteBreakpoint :: DebugSettings -> Breakpoint -> Handler DebuggerStatus
-deleteBreakpoint = flip removeBreakpoint
+putBreakpoints :: DebugSettings -> [Breakpoint] -> Handler DebuggerStatus
+putBreakpoints = flip addBreakpoints
+
+deleteBreakpoints :: DebugSettings -> [Breakpoint] -> Handler DebuggerStatus
+deleteBreakpoints = flip removeBreakpoints
 
 restDebuggerServer :: DebugSettings -> Server RestDebuggerAPI
 restDebuggerServer dSettings =
        getStatus dSettings
   :<|> putPause dSettings
   :<|> putResume dSettings
-  :<|> putBreakpoint dSettings
-  :<|> deleteBreakpoint dSettings
+  :<|> getBreakpointsHandler dSettings
+  :<|> putBreakpoints dSettings
+  :<|> deleteBreakpoints dSettings
 
 restDebugger :: DebugSettings -> Application
 restDebugger dSettings = serve restDebuggerAPI (restDebuggerServer dSettings)
 
-data WSDebuggerInput = Status
-                     | Pause
-                     | Resume
-                     | AddBreakpoint Breakpoint
-                     | RemoveBreakpoint Breakpoint
-                     | StepIn
-                     | StepOver
-                     | StepOut
+data WSDebuggerInput = WSStatus
+                     | WSPause
+                     | WSResume
+                     | WSGetBreakpoints
+                     | WSAddBreakpoints [Breakpoint]
+                     | WSRemoveBreakpoints [Breakpoint]
+                     | WSStepIn
+                     | WSStepOver
+                     | WSStepOut
                      deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
 wsDebugger :: DebugSettings -> IO ()
@@ -171,17 +226,17 @@ wsDebuggerServer inUse dSettings pending = do
         where
           disconnect = atomically $ writeTVar inUse False
 
-wsDebuggerController :: MonadIO m => WSDebuggerInput -> DebugSettings -> m DebuggerStatus
+wsDebuggerController :: MonadIO m => WSDebuggerInput -> DebugSettings -> m (Either [Breakpoint] DebuggerStatus)
 wsDebuggerController = \case
-  Status -> status
-  Pause -> pause
-  Resume -> resume
-  AddBreakpoint b -> addBreakpoint b
-  RemoveBreakpoint b -> removeBreakpoint b
-  -- TODO
-  StepIn -> status
-  StepOver -> status
-  StepOut -> status
+  WSStatus -> fmap Right . status
+  WSPause -> fmap Right . pause
+  WSResume -> fmap Right . resume
+  WSGetBreakpoints -> fmap Left . getBreakpoints
+  WSAddBreakpoints b -> fmap Right . addBreakpoints b
+  WSRemoveBreakpoints b -> fmap Right . removeBreakpoints b
+  WSStepIn -> fmap Right . stepIn
+  WSStepOver -> fmap Right . stepOver
+  WSStepOut -> fmap Right . stepOut
 
 talk :: WS.Connection -> DebugSettings -> IO ()
 talk conn dSettings = forever $ do
@@ -190,7 +245,7 @@ talk conn dSettings = forever $ do
     Left e -> broadcast e conn
     Right r -> do
       dStatus <- wsDebuggerController r dSettings
-      WS.sendBinaryData conn $ encode dStatus
+      WS.sendBinaryData conn $ either encode encode dStatus
 
 broadcast :: String -> WS.Connection -> IO ()
 broadcast message conn = do
