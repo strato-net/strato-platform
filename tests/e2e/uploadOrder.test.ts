@@ -24,7 +24,7 @@ chai.should();
 chai.use(require('chai-bignumber')());
 
 let config:Config=fsUtil.getYaml("config.yaml");
-let options:Options={config}
+let options:Options={config, cacheNonce: true}
 
 //config.apiDebug=true;
 const nonceOrder = `
