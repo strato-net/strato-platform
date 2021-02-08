@@ -40,9 +40,10 @@ packages:
 - core-strato/vrun/
 - core-strato/seqevents/
 - core-strato/solid-vm/
-- core-strato/strato-genesis/
 - core-strato/strato-adit/
+- core-strato/strato-genesis/
 - core-strato/strato-index/
+- core-strato/strato-networks/
 - core-strato/strato-sequencer/
 - core-strato/ethereum-jsonrpc/
 - core-strato/strato-model/
