@@ -21,8 +21,8 @@ getParams "blockappsnet" = return $ Just
   [
     NetworkParams {
       ethAddress = Address 0x7d102f0afa763557acd0b5332f375013db2a760a,
---      webAddress = "54.243.143.176"
-      webAddress = "engineering.stratoid.blockapps.net"
+      webAddress = "54.243.143.176"
+--      webAddress = "engineering.stratoid.blockapps.net"
       }
   ]
 getParams _ = return Nothing
