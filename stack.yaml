@@ -116,4 +116,13 @@ docker:
   run-args: ["--ulimit=nofile=60000"]
 
 nix:
-  enable: false
+  packages:
+  - zlib.dev
+  - zlib.out
+  - lzma.dev
+  - lzma.out
+  - leveldb
+  - postgresql
+  - pkg-config
+  - libsodium
+  - (pkgs.secp256k1.override { enableECDH = true; })

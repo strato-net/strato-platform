@@ -54,6 +54,21 @@ Stack commands (like `stack build`, `stack test` etc.) can only be used once the
 This is a part of main build process described in this readme but you can also build it manually by running
 ```make build_buildbase``` in `core-strato/` and `blockapps-haskell/` directories (for core-strato and bloc accordingly)
 
+### Build only the Haskell modules with Nix/NixOS for VSCode IDE support
+With Nix/NixOS it is easy to build only the Haskell modules. This is particularly useful for enabling [the IDE features in Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=haskell.haskell). The following process has worked with Stack v2.5.1.1 and Hpack v0.34.3.
+1. We cannot build with Nix and Docker at the same time, so in stack.yaml disable Docker. To do this change the following
+    ```
+    docker:
+      enable: true
+    ```
+    to
+    ```
+    docker:
+      enable: false
+    ```
+2. With Nix run `stack build --nix`, or on NixOS simply run `stack build`.
+3. Enjoy IDE features of the [Haskell extension](https://marketplace.visualstudio.com/items?itemName=haskell.haskell) for Visual Studio.
+
 ### Building the list of 3rd party dependencies and their licenses
 
 #### NodeJS apps
