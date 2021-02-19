@@ -9,13 +9,17 @@ module Handlers.Peers (
 import           Control.Monad.IO.Class
 import           Data.Aeson
 import           Servant                                 hiding (ServerError)
+import           Servant.Swagger.Tags
 
 import           Blockchain.Strato.Discovery.Data.Peer
 
 import           SQLM
 import           UnliftIO
 
-type API = "peers" :> Get '[JSON] Value
+type API = Tags "Strato"
+           :> Summary "View connected peers."
+--           :> Description ""
+           :> "peers" :> Get '[JSON] Value
 
 server :: MonadIO m => ServerT API m
 server = getPeers

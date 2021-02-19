@@ -9,10 +9,14 @@ module Handlers.UUID (
   ) where
 
 import           Servant
+import           Servant.Swagger.Tags
 
 import           Blockchain.EthConf
 
-type API = "uuid" :> Get '[JSON] EthUniqueId
+type API = Tags "Strato"
+           :> Summary "A UUID for the version of Strato being used."
+--           :> Description "" :>
+           :> "uuid" :> Get '[JSON] EthUniqueId
 
 server :: Applicative m => ServerT API m
 server = getUUID

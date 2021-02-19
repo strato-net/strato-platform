@@ -17,6 +17,7 @@ import           Data.List
 import           Data.Maybe
 import qualified Database.Esqueleto            as E
 import           Servant
+import           Servant.Swagger.Tags
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.DataDefs
@@ -29,12 +30,13 @@ import           Control.Monad.Composable.SQL
 import           Settings
 import           SortDirection
 
-type API = 
-  "log" :> QueryParam "address" Address
-        :> QueryParam "hash" Keccak256
-        :> QueryParam "sortby" Sortby
-        :> Get '[JSON] [LogDB]
-
+type API = Tags "Contracts"
+           :> Summary "List events embedded in the blockchain."
+--           :> Description "Records are contracts based on code in an already existing DApp.  Records can be on the main chain or private."
+           :> "log" :> QueryParam "address" Address
+                    :> QueryParam "hash" Keccak256
+                    :> QueryParam "sortby" Sortby
+                    :> Get '[JSON] [LogDB]
 
 server :: HasSQL m => ServerT API m
 server = getLog

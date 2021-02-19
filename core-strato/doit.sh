@@ -160,7 +160,12 @@ function newnode {
       echo "Starting strato-api"
       runBackgroundProcess strato-api --gasOn=$gasOn >> logs/strato-api 2>&1
   fi
-  
+
+  if [ "${START_EXPERIMENTAL_STRATO_API}" = true ]; then
+      echo "Starting strato-api2"
+      runBackgroundProcess strato-api2 --gasOn=$gasOn >> logs/strato-api2 2>&1
+  fi
+
   echo "Configuring log rotation..."
   runBackgroundProcess logRotation
 

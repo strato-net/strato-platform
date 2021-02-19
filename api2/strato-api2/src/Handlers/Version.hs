@@ -12,9 +12,14 @@ module Handlers.Version (
 import           Data.Aeson
 import           GHC.Generics
 import           Servant
+import           Servant.Swagger.Tags
+
 import           Versioning
 
-type API = "version" :> Get '[JSON] Value
+type API = Tags "Strato"
+           :> Summary "The Version of this Strato Peer."
+--           :> Description ""
+           :> "version" :> Get '[JSON] Value
 
 server :: Applicative m => ServerT API m
 server = getVersion

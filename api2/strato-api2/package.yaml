@@ -37,6 +37,7 @@ library:
     - QuickCheck
     - servant-client
     - seqevents
+    - servant-swagger-tags
     - strato-conf
     - strato-model
     - template-haskell

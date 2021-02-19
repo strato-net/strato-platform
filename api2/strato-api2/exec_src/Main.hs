@@ -51,14 +51,14 @@ api = Proxy
 
 main :: IO ()
 main = do
-  _ <- $initHFlags "Core API"
+  _ <- $initHFlags "STRATO API"
 
   let theDoc = toSwagger (Proxy :: Proxy API)
-               & info.title .~ "Strato API"
+               & info.title .~ "STRATO API"
                & info.description ?~
-               "This is the great Strato API, which let's \
+               "This is the great STRATO API, which let's \
                \ you query the blockchain."
-               & info.version .~ "1.2"
+               & info.version .~ "2.0"
 
   --print theDoc
   blockappsInit "core-api"
