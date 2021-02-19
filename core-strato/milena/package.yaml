@@ -10,7 +10,6 @@ author: Tyler Holien
 maintainer: Adam Flott <adam@adamflott.com>
 copyright: 2014, Tyler Holien
 license: BSD3
-github: adamflott/milena.git
 tested-with: GHC==7.10.3 GHC==8.0.1
 stability: alpha
 

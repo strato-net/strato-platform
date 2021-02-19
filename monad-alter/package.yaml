@@ -1,6 +1,5 @@
 name:                monad-alter
 version:             0.1.0.0
-github:              "githubuser/monad-alter"
 license:             BSD3
 author:              "Author name here"
 maintainer:          "example@example.com"
