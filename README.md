@@ -54,6 +54,20 @@ Stack commands (like `stack build`, `stack test` etc.) can only be used once the
 This is a part of main build process described in this readme but you can also build it manually by running
 ```make build_buildbase``` in `core-strato/` and `blockapps-haskell/` directories (for core-strato and bloc accordingly)
 
+### Build Haskell only with Nix/NixOS
+Building the Haskell only with Nix/NixOS is useful for enabling (haskell-language-server)[https://github.com/haskell/haskell-language-server] to work properly. Useful if you are trying to use IDE extensions in Visual Studio Code.
+1. In stack.yaml disable docker. To do this change the following
+    ```
+    docker:
+      enable: true
+    ```
+    to
+    ```
+    docker:
+      enable: false
+    ```
+2. With Nix run `stack build --nix`, or on NixOS simply run `stack build`.
+
 ### Building the list of 3rd party dependencies and their licenses
 
 #### NodeJS apps
