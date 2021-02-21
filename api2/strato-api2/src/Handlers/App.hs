@@ -11,7 +11,7 @@
 {-# OPTIONS -fno-warn-unused-top-binds #-}
 {-# OPTIONS -fno-warn-redundant-constraints #-}
 
-module Handlers.DApp (
+module Handlers.App (
   API,
   server
   ) where
@@ -28,43 +28,43 @@ import           Servant.Swagger.Tags
 import           Blockchain.Data.Json                ()
 import           Handlers.Record                     (RecordLocation(..))
 
-newtype DAppPackage =
-  DAppPackage String
+newtype AppPackage =
+  AppPackage String
   deriving (Generic)
 
-instance ToSchema DAppPackage where
-instance FromJSON DAppPackage where
+instance ToSchema AppPackage where
+instance FromJSON AppPackage where
   
-data DAppInfo =
-  DAppInfo {
+data AppInfo =
+  AppInfo {
     name :: String
-    } deriving (Generic)
+  } deriving (Generic)
 
-instance ToSchema DAppInfo where
-instance ToJSON DAppInfo where
+instance ToSchema AppInfo where
+instance ToJSON AppInfo where
   
 
 type API = Tags "Contracts"
-           :> Summary "Get list of DApps"
-           :> Description "DApps are named contract bundles deployed by all participants on the network."
-           :> "dapp" :> Get '[JSON] [DAppInfo]
+           :> Summary "Get list of Apps"
+           :> Description "Apps are named contract bundles deployed by all participants on the network."
+           :> "app" :> Get '[JSON] [AppInfo]
            
            :<|> Tags "Contracts"
-           :> Summary "Upload a new DApp"
-           :> Description "DApps bundles are uploaded as a single zip file."
-           :> "dapp" :> ReqBody '[JSON] DAppPackage :> Post '[JSON] RecordLocation
+           :> Summary "Upload a new App"
+           :> Description "Apps bundles are uploaded as a single zip file."
+           :> "app" :> ReqBody '[JSON] AppPackage :> Post '[JSON] RecordLocation
 
 server :: Monad m =>
           ServerT API m
-server = getDApp :<|>  postDApp
+server = getApp :<|>  postApp
 
 ---------------------
 
-getDApp :: Monad m =>
-           m [DAppInfo]
-getDApp = error "'GET /dapp' not implemented"
+getApp :: Monad m =>
+           m [AppInfo]
+getApp = error "'GET /app' not implemented"
 
-postDApp :: Monad m =>
-            DAppPackage -> m RecordLocation
-postDApp _ = error "'POST /dapp' not implemented"
+postApp :: Monad m =>
+            AppPackage -> m RecordLocation
+postApp _ = error "'POST /app' not implemented"
 

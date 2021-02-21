@@ -18,7 +18,7 @@ import qualified Handlers.UUID                   as UUID
 import qualified Handlers.Version                as Version
 
 import qualified Handlers.Cert                    as Cert
-import qualified Handlers.DApp                    as DApp
+import qualified Handlers.App                     as App
 import qualified Handlers.Record                  as Record
 
 
@@ -27,7 +27,7 @@ type API =
   (
 --    Account.API
     Cert.API
-    :<|> DApp.API
+    :<|> App.API
     :<|> Record.API
     
 
@@ -42,7 +42,7 @@ type API =
 server :: (MonadLogger m, HasSQL m) => ServerT API m
 server = --Account.server
   Cert.server
-  :<|> DApp.server
+  :<|> App.server
   :<|> Record.server
 
 
