@@ -84,6 +84,7 @@ executables:
       - stm-chans
       - strato-conf
       - strato-model
+      - strato-networks
       - strato-sequencer
       - text
       - wai-middleware-prometheus

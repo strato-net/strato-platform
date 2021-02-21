@@ -36,6 +36,7 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Keccak256 hiding (hash)
+import qualified LabeledError
 import           Options
 
 import           SQLM
@@ -205,4 +206,4 @@ blockQueryParams = [ "txaddress",
                      "chainid"]
 
 toBlockDataRefId :: Text -> Key BlockDataRef
-toBlockDataRefId = toSqlKey . read . T.unpack
+toBlockDataRefId = toSqlKey . LabeledError.read "Block/toBlockDataRefId" . T.unpack

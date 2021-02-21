@@ -33,6 +33,8 @@ import           Blockchain.Strato.Model.ExtendedWord (Word256)
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Util                      (toMaybe)
 
+import qualified LabeledError
+
 jsonBlk :: (ToJSON a, Monad m) => a -> m Value
 jsonBlk = return . toJSON
 
@@ -98,7 +100,7 @@ instance FromJSON RawTransaction' where
       tgp <- t .:? "gasPrice" .!= 0
       tgl <- t .:? "gasLimit" .!= 0
       tto <- t .:? "to"
-      tval <- read <$> t .:? "value" .!= "0"
+      tval <- LabeledError.read "FromJSON/RawTransaction'" <$> t .:? "value" .!= "0"
       tcd <- t .:? "codeOrData" .!= Code ""
       cid <- fmap (\(ChainId c) -> c) <$> (t .:? "chainId")
       (tr :: Integer) <- parseHexStr (t .: "r")
@@ -346,7 +348,7 @@ instance FromJSON AddressStateRef' where
         else asrToAsrPrime' <$>
               (AddressStateRef . Address . fst . head . readHex <$> s .: "address"
                 <*> s .: "nonce"
-                <*> (read <$> (s .: "balance"))
+                <*> (LabeledError.read "FromJSON/AddressRef'" <$> (s .: "balance"))
                 <*> s .: "contractRoot"
                 <*> s .: "code"
                 <*> s .: "codeHash"

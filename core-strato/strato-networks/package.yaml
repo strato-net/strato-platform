@@ -1,0 +1,8 @@
+name:                strato-networks
+
+dependencies:
+- base >= 4.7 && < 5
+- strato-model
+
+library:
+  source-dirs: src

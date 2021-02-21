@@ -5,7 +5,7 @@ ARG STRATO_VERSION
 ENV STRATO_VERSION=${STRATO_VERSION}
 
 RUN mkdir -p /usr/src/app && \
-    npm install -g serve@7.1.1
+    npm install -g serve@11.3.2
 
 WORKDIR /usr/src/app
 

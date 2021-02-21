@@ -354,7 +354,7 @@ const run = async function() {
           commander.password
         );
         if (commander.env) {
-          envConfig[commander.env] = ropcToken.token.access_token;
+          envConfig[commander.env] = ropcToken.token;
           const envContent = envfile.stringifySync(envConfig);
           fs.writeFileSync(envPath, envContent);
           console.log(".env file was saved!");

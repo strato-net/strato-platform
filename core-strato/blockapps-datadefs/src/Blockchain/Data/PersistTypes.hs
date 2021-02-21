@@ -18,6 +18,7 @@ import           Numeric
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.StateRoot
 import           Blockchain.SolidVM.Model
+import qualified LabeledError
 
 derivePersistField "Integer"
 derivePersistField "Point"
@@ -41,7 +42,7 @@ instance PersistFieldSql Integer where
 
 instance PersistField CodeKind where
   toPersistValue = PersistText . T.pack . show
-  fromPersistValue (PersistText t) = Right . read . T.unpack $ t
+  fromPersistValue (PersistText t) = Right . LabeledError.read "PersistField/CodeKind" . T.unpack $ t
   fromPersistValue x = Left . T.pack $ "PersistField CodeKind: expected int: " ++ show x
 
 instance PersistFieldSql CodeKind where

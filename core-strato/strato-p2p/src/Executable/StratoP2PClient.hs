@@ -94,7 +94,8 @@ runPeer wireMessagesRef peer _ _ = do
       let pSource = appSource app
           pSink = appSink app
           sSource = seqEventNotificationSource $ contextKafkaState initContext
-          pStr = show $ appSockAddr app
+          pStr = pPeerString peer -- display string will show up as dns name
+          --pStr = show $ appSockAddr app -- display string will show up as IP address
       uSink <- asks configUnseqSink
       attempt :: Maybe SomeException <- withActivePeer peer $ do
         initState <- newIORef initContext

@@ -47,6 +47,7 @@ library:
     - hashable
     - http-api-data
     - integer-gmp
+    - labeled-error
     - lens
     - memory
     - monad-alter

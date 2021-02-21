@@ -62,6 +62,7 @@ library:
   - strato-genesis
   - strato-index
   - strato-model
+  - strato-networks
   - strato-redis-blockdb
   - strato-sequencer
   - strato-statediff
