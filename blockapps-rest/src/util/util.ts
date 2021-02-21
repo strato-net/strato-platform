@@ -143,12 +143,8 @@ function getArgInt(argName, defaultValue) {
   return intValue;
 }
 
-async function sleep(milli) {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve()
-    }, milli)
-  })
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 /**

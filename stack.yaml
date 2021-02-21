@@ -1,4 +1,12 @@
 packages:
+- api/bloc2
+- api/bloc2api
+- api/core-api2
+- api/strato-api
+- composable-monads/bloc-sql-monad
+- composable-monads/core-api-monad
+- composable-monads/sql-monad
+- composable-monads/vault-monad
 - blockapps-haskell/bloc/bloc22/api
 - blockapps-haskell/bloc/bloc22/client
 - blockapps-haskell/bloc/bloc22/server
@@ -28,14 +36,14 @@ packages:
 - core-strato/vm-tools/
 - core-strato/ethereum-vm/
 - core-strato/blockapps-util/
-- core-strato/strato-api/
 - core-strato/blockapps-tools/
 - core-strato/vrun/
 - core-strato/seqevents/
 - core-strato/solid-vm/
-- core-strato/strato-genesis/
 - core-strato/strato-adit/
+- core-strato/strato-genesis/
 - core-strato/strato-index/
+- core-strato/strato-networks/
 - core-strato/strato-sequencer/
 - core-strato/ethereum-jsonrpc/
 - core-strato/strato-model/
@@ -54,6 +62,7 @@ packages:
 - shared-util/cross-monitoring/
 - shared-util/format
 - shared-util/haskoin-shim/
+- shared-util/labeled-error/
 - shared-util/solid-vm-model/
 - clockwork
 - logserver
@@ -70,14 +79,9 @@ extra-deps:
 - nibblestring-0.0.3@sha256:aaf68a1c89cff51b628d4825d9e4caab2f8bbdf767a36ef05090b4d719cf295b,1660
 - normaldistribution-1.1.0.3@sha256:2615b784c4112cbf6ffa0e2b55b76790290a9b9dff18a05d8c89aa374b213477,2160
 - pbkdf-1.1.1.1@sha256:8d464cca917d723c65fe1a9f03e3b441e3f1bdbe4b72bf0f4e24a1e80ccfa326,2070
-#- postgresql-typed-0.6.1.0@sha256:d1b69f1aac9d29cd0ae7dbf616a3a77cbdc367f3bc3ac79938bde5a752b1e63d,4866
-- secp256k1-haskell-0.2.0
-  #- secp256k1-haskell-0.2.0@sha256:142c43f1d8612b351d0b3b96d13eb437ffbb728adf0aaac58d57cada9a14adee,2342
+- secp256k1-haskell-0.2.0@sha256:142c43f1d8612b351d0b3b96d13eb437ffbb728adf0aaac58d57cada9a14adee,2342
 - semver-range-0.2.8@sha256:44918080c220cf67b6e7c8ad16f01f3cfe1ac69d4f72e528e84d566348bb23c3,1941
-#- servant-aeson-specs-0.6.2.0@sha256:c2139f729695c18186394aeb50adceb5ba4b8adb3986626659f2210979bf5f99,2185
-#- servant-multipart-0.11.4
 - servant-options-0.1.0.0@sha256:39f50166a68006250e79370372f553ca476f14d06d93fa0c401050253aeba803,914
-#- servant-swagger-tags-0.1.0.0@sha256:ffd61b869e56a7543f0641fe017647cf05fb57a76cb2d2acd045fc47bfbafb07,1079
 - wai-middleware-prometheus-1.0.0@sha256:1625792914fb2139f005685be8ce519111451cfb854816e430fbf54af46238b4,1314
 - haskell-src-exts-1.20.3@sha256:83ae523bbec907a42c043de1f5bbf4c1554e7c3b898af07bb1ce6e80eaa282ec,4589
 - servant-aeson-specs-0.6.2.0@sha256:c2139f729695c18186394aeb50adceb5ba4b8adb3986626659f2210979bf5f99,2185

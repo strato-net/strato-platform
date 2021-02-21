@@ -43,6 +43,7 @@ library:
   - format
   - http-api-data
   - json-stream
+  - labeled-error
   - lens
   - merkle-patricia-db
   - milena
@@ -53,6 +54,7 @@ library:
   - persistent-postgresql
   - persistent-template
   - quickcheck-instances
+  - regex-compat
   - resourcet
   - secp256k1-haskell # remove
   - strato-conf

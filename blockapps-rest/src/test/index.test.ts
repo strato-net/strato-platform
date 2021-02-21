@@ -6,23 +6,31 @@ import assert from "../util/assert";
 import util from "../util/util";
 import fsUtil from "../util/fsUtil";
 import factory from "./factory";
+import { Options, Contract, TransactionResultHash, OAuthUser } from "../types";
+import oauthUtil from "../util/oauth.util";
+import { AccessToken } from "../util/oauth.util";
 
 if (!process.env.USER_TOKEN) {
   const loadEnv = dotenv.config();
   assert.isUndefined(loadEnv.error);
 }
 
+
 const config = factory.getTestConfig();
+
+const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
 
 const fixtures = factory.getTestFixtures();
 
 describe("contracts", function() {
   this.timeout(config.timeout);
   let admin;
-  const options:any = { config };
+  const options:Options = { config };
 
   before(async () => {
-    const userArgs = { token: process.env.USER_TOKEN };
+    const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
+    let accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
+    const userArgs:OAuthUser = { token: accessToken.token.access_token };
     admin = await factory.createAdmin(userArgs, options);
   });
 
@@ -30,7 +38,7 @@ describe("contracts", function() {
     const uid = util.uid();
     const contractArgs = factory.createContractArgs(uid);
     const asyncOptions = { config, isAsync: true };
-    const pendingTxResult = await rest.createContract(
+    const pendingTxResult = <TransactionResultHash> await rest.createContract(
       admin,
       contractArgs,
       asyncOptions
@@ -43,7 +51,7 @@ describe("contracts", function() {
   it("create contract", async () => {
     const uid = util.uid();
     const contractArgs = factory.createContractArgs(uid);
-    const contract = await rest.createContract(admin, contractArgs, options);
+    const contract = <Contract>await rest.createContract(admin, contractArgs, options);
     assert.equal(contract.name, contractArgs.name, "name");
     assert.isOk(util.isAddress(contract.address), "address");
   });
@@ -52,7 +60,7 @@ describe("contracts", function() {
     const uid = util.uid();
     const contractArgs = factory.createContractArgs(uid);
     options.isDetailed = true;
-    const contract = await rest.createContract(admin, contractArgs, options);
+    const contract = <Contract>await rest.createContract(admin, contractArgs, options);
     assert.equal(contract.name, contractArgs.name, "name");
     assert.isOk(util.isAddress(contract.address), "address");
     assert.isDefined(contract.src, "src");
@@ -80,7 +88,7 @@ describe("contracts", function() {
       uid,
       constructorArgs
     );
-    const contract = await rest.createContract(admin, contractArgs, options);
+    const contract = <Contract>await rest.createContract(admin, contractArgs, options);
     assert.equal(contract.name, contractArgs.name, "name");
     assert.isOk(util.isAddress(contract.address), "address");
   });
@@ -101,10 +109,11 @@ describe("contracts", function() {
 describe("state", function() {
   this.timeout(config.timeout);
   let admin;
-  const options:any = { config };
+  const options:Options = { config };
 
   before(async () => {
-    const userArgs = { token: process.env.USER_TOKEN };
+    let accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
+    const userArgs = { token: accessToken.token.access_token };
     admin = await factory.createAdmin(userArgs, options);
   });
 
@@ -116,7 +125,7 @@ describe("state", function() {
       constructorArgs
     );
     const contract = await rest.createContract(admin, contractArgs, options);
-    const state = await rest.getState(admin, contract, options);
+    const state = await rest.getState(admin, contract as Contract, options);
     assert.equal(state.var_uint, constructorArgs.arg_uint);
   });
 
@@ -124,7 +133,7 @@ describe("state", function() {
     const uid = util.uid();
     await assert.restStatus(
       async () => {
-        return rest.getState(admin, { name: uid, address: 0 }, options);
+        return rest.getState(admin, { name: uid, address: "0" }, options);
       },
       RestStatus.BAD_REQUEST,
       /Couldn't find/
@@ -146,19 +155,19 @@ describe("state", function() {
     const contract = await rest.createContract(admin, contractArgs, options);
     {
       options.stateQuery = { name };
-      const state = await rest.getState(admin, contract, options);
+      const state = await rest.getState(admin, contract as Contract, options);
       assert.isDefined(state[options.stateQuery.name]);
       assert.equal(state.array.length, MAX_SEGMENT_SIZE);
     }
     {
       options.stateQuery = { name, length: true };
-      const state = await rest.getState(admin, contract, options);
+      const state = await rest.getState(admin, contract as Contract, options);
       assert.isDefined(state[options.stateQuery.name]);
       assert.equal(state.array, SIZE, "array size");
     }
     {
       options.stateQuery = { name, length: true };
-      const state = await rest.getState(admin, contract, options);
+      const state = await rest.getState(admin, contract as Contract, options);
       const length = state[options.stateQuery.name];
       const all = [];
       for (let segment = 0; segment < length / MAX_SEGMENT_SIZE; segment++) {
@@ -167,7 +176,7 @@ describe("state", function() {
           offset: segment * MAX_SEGMENT_SIZE,
           count: MAX_SEGMENT_SIZE
         };
-        const state = await rest.getState(admin, contract, options);
+        const state = await rest.getState(admin, contract as Contract, options);
         all.push(...state[options.stateQuery.name]);
       }
       assert.equal(all.length, length, "array size");
@@ -187,7 +196,7 @@ describe("state", function() {
       constructorArgs
     );
     const contract = await rest.createContract(admin, contractArgs, options);
-    const result = await rest.getArray(admin, contract, name, options);
+    const result = await rest.getArray(admin, contract as Contract, name, options);
     assert.equal(result.length, SIZE, "array size");
     const mismatch = result.filter((entry, index) => entry != index);
     assert.equal(mismatch.length, 0, "no mismatches");
@@ -197,16 +206,17 @@ describe("state", function() {
 describe("call", function() {
   this.timeout(config.timeout);
   let admin;
-  const options:any = { config };
+  const options:Options = { config };
   const var1 = 1234;
   const var2 = 5678;
 
   before(async () => {
-    const userArgs = { token: process.env.USER_TOKEN };
+    let accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
+    const userArgs = { token: accessToken.token.access_token };
     admin = await factory.createAdmin(userArgs, options);
   });
 
-  async function createContract(uid, admin, constructorArgs, options) {
+  async function createContract(uid, admin, constructorArgs, options:Options) {
     const filename = `${fixtures}/CallMethod.sol`;
     const contractArgs = await factory.createContractFromFile(
       filename,
@@ -278,8 +288,15 @@ describe("call", function() {
 
 describe("auth user", function() {
   this.timeout(config.timeout);
-  const options:any = { config };
-  const user = { token: process.env.USER_TOKEN };
+  const options:Options = { config };
+
+  let user:OAuthUser;
+
+  before(async () => {
+    const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
+    let accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
+    user = { token: accessToken.token.access_token };
+  });
 
   it("getKey", async () => {
     const address = await rest.getKey(user, options);
@@ -321,8 +338,9 @@ describe("auth user", function() {
   });
 
   it("createOrGetKey", async () => {
+    let accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
     const address = await rest.createOrGetKey(
-      { token: process.env.USER_TOKEN },
+      { token: accessToken.token.access_token },
       options
     );
     const isValidAddress = util.isAddress(address);
@@ -333,10 +351,11 @@ describe("auth user", function() {
 describe("history", function() {
   this.timeout(config.timeout);
   let admin;
-  const options:any = { config };
+  const options:Options = { config };
 
   before(async () => {
-    const userArgs = { token: process.env.USER_TOKEN };
+    let accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
+    const userArgs = { token: accessToken.token.access_token };
     admin = await factory.createAdmin(userArgs, options);
   });
 
@@ -349,12 +368,12 @@ describe("history", function() {
         uid: Math.floor(Math.random() * 100)
       }
     };
-    const historyOptions = {
+    const historyOptions:Options = {
       ...options,
       history: ["Event", "Ticket", "Transaction"]
     };
 
-    const contract = await rest.createContract(
+    const contract = <Contract> await rest.createContract(
       admin,
       contractArgs,
       historyOptions

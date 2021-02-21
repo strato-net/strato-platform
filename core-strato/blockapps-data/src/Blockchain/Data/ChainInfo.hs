@@ -62,7 +62,7 @@ newtype ParentChainId = ParentChainId { unParentChainId :: Maybe Word256 }
 data CodeInfo = CodeInfo
   { codeInfoCode   :: B.ByteString
   , codeInfoSource :: T.Text
-  , codeInfoName   :: T.Text
+  , codeInfoName   :: Maybe T.Text
   } deriving (Show, Read, Eq, GHCG.Generic, Data)
 
 instance Format CodeInfo where
@@ -98,9 +98,12 @@ instance ToJSON CodeInfo where
     ]
 
 instance RLPSerializable CodeInfo where
-  rlpEncode (CodeInfo a b c) =
+  rlpEncode (CodeInfo a b Nothing) =
+    RLPArray [rlpEncode a, rlpEncode $ encodeUtf8 b]
+  rlpEncode (CodeInfo a b (Just c)) =
     RLPArray [rlpEncode a, rlpEncode $ encodeUtf8 b, rlpEncode $ encodeUtf8 c]
-  rlpDecode (RLPArray [a,b,c]) = CodeInfo (rlpDecode a) (decodeUtf8 $ rlpDecode b) (decodeUtf8 $ rlpDecode c)
+  rlpDecode (RLPArray [a,b]) = CodeInfo (rlpDecode a) (decodeUtf8 $ rlpDecode b) Nothing
+  rlpDecode (RLPArray [a,b,c]) = CodeInfo (rlpDecode a) (decodeUtf8 $ rlpDecode b) (Just $ decodeUtf8 $ rlpDecode c)
   rlpDecode _ = error ("Error in rlpDecode for CodeInfo: bad RLPObject")
 
 data AccountInfo = NonContract Address Integer

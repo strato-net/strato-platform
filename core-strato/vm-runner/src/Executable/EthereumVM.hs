@@ -305,7 +305,7 @@ runChainConstructors cId cInfo = do
   -- some of these variables in the future.
 
   let getSrcBS = BC.pack . T.unpack . codeInfoSource
-      getCodeHash ci = SolidVMCode (T.unpack $ codeInfoName ci) (hash $ getSrcBS ci)
+      getCodeHash ci = hash $ getSrcBS ci
       codeHashMap = M.fromList . map (getCodeHash &&& codeInfoSource) $ codeInfo $ chainInfo cInfo
       resolveSrc a ch = do
         mcp <- resolveCodePtr (Just cId) ch
@@ -315,7 +315,7 @@ runChainConstructors cId cInfo = do
             SolidVMCode _ h -> Just h
             EVMCode h -> Just h
             CodeAtAccount _ _ -> Nothing
-          (MaybeT $ pure $ M.lookup cp codeHashMap) <|>
+          (MaybeT $ pure $ M.lookup hsh codeHashMap) <|>
             MaybeT (fmap (T.pack . BC.unpack . snd) <$> getCode hsh)
         pure $ Just (a,msrc)
 

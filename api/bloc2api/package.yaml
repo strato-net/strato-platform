@@ -1,0 +1,53 @@
+name: bloc2api
+version: 0.1.0.0
+synopsis: Bloc microservice
+description: Bloc microservice
+category: Web
+build-type: Simple
+
+ghc-options: -Wall -Werror
+
+dependencies:
+  - base
+  - aeson
+
+
+
+library:
+  source-dirs: src/
+  dependencies:
+  - QuickCheck
+  - aeson-casing
+  - base16-bytestring
+  - base64-bytestring
+  - blockapps-data
+  - blockapps-datadefs
+  - blockapps-ethereum
+  - blockapps-solidity
+  - blockapps-strato-api
+  - blockapps-util
+  - bytestring
+  - containers
+  - cryptonite
+  - generic-random
+  - gitrev
+  - haskoin-shim
+  - http-api-data
+  - lens
+  - quickcheck-instances
+  - saltine
+  - servant
+  - servant-docs
+  - servant-mock
+  - servant-server
+  - strato-model
+  - swagger2
+  - text
+
+tests:
+  api-test:
+    source-dirs: test/
+    main: APISpec.hs
+    dependencies:
+      - blockapps-bloc22-api
+      - hspec

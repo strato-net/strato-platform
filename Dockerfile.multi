@@ -51,9 +51,8 @@ ENTRYPOINT ["/strato/doit.sh"]
 FROM built as bloc
 COPY ./bloc /bloc
 EXPOSE 8000 8002
-HEALTHCHECK --interval=5s --timeout=1s --start-period=20s \
-  CMD curl --silent --output /dev/null --fail localhost:8000/bloc/v2.2 && \
-        pgrep slipstream && \
+HEALTHCHECK --interval=5s --timeout=1s --start-period=20s \ 
+  CMD pgrep slipstream && \
         curl --silent --output /dev/null --fail localhost:8002/swagger.json || \
         exit 1
 ENTRYPOINT ["/bloc/doit.sh"]

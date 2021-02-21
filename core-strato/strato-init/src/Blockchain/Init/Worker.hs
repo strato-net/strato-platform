@@ -37,7 +37,6 @@ import Text.Printf
 import Turtle (chmod, roo, fromText)
 
 import BlockApps.Logging
-import Blockchain.APIFiles (inflateDir)
 import qualified Blockchain.Data.Blockchain as Blockchain
 import qualified Blockchain.Data.DataDefs as DataDefs
 import Blockchain.DB.CodeDB
@@ -144,8 +143,6 @@ process pathRoot off = (>> return off) . \case
       waitForMetas
     whenLeft res $ \err ->
       die $ printf "error connecting to kafka (%s): %s" (show $ EC.kafkaConfig UEC.ethConf) (show err)
-  ApiConfig filePairs -> liftIO $ inflateDir filePairs
-
   GenesisBlock gb -> liftIO $ do
     let blockFile = pathRoot ++ "Genesis.json"
     Ae.encodeFile blockFile gb
