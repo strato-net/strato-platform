@@ -30,12 +30,12 @@ module Blockchain.DB.ChainDB
   ) where
 
 import           Control.DeepSeq
-import           Control.Monad                        (join, when)
+import           Control.Monad                        (join)
 import           Control.Monad.Change.Alter           hiding (lookup)
 import           Control.Monad.Change.Modify
 
 import           Data.Foldable                        (for_)
-import           Data.Maybe                           (fromMaybe, isNothing)
+import           Data.Maybe                           (fromMaybe)
 import qualified Data.NibbleString                    as N
 import qualified Data.Set                             as S
 import           Data.Traversable                     (for)
@@ -168,10 +168,8 @@ putBlockHashInChainDB :: ( Modifiable BlockHashRoot m
                          , (MP.StateRoot `Alters` MP.NodeData) m
                          )
                       => Keccak256 -> Keccak256 -> m ()
-putBlockHashInChainDB p h = do
-  mExistingChainRoot <- getChainRoot h     -- if we've seen this block before,
-  when (isNothing mExistingChainRoot) $ do -- its chain root will already exist
-    putChainBlockHashInfo h p =<< fromMaybe MP.emptyTriePtr <$> getChainRoot p
+putBlockHashInChainDB p h =
+  putChainBlockHashInfo h p =<< fromMaybe MP.emptyTriePtr <$> getChainRoot p
 
 migrateBlockHeader :: ( BlockHeaderLike h
                       , Modifiable BlockHashRoot m

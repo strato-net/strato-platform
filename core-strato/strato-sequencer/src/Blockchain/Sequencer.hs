@@ -81,6 +81,9 @@ instance (k `A.Alters` v) m => (k `A.Alters` v) (ConduitT i o m) where
   insert p k = lift . A.insert p k
   delete p   = lift . A.delete p
 
+instance (Monad m, A.Selectable k v m) => A.Selectable k v (ConduitT i o m) where
+  select p = lift . A.select p
+
 instance HasBlockstanbulContext m => HasBlockstanbulContext (ConduitT i o m) where
   getBlockstanbulContext = lift getBlockstanbulContext
   putBlockstanbulContext = lift . putBlockstanbulContext
@@ -513,7 +516,6 @@ hydrateAndEmit :: ( MonadLogger m
 hydrateAndEmit = awaitForever $ \case
   ToVm (VmBlock ob) -> do
     let logF = logFF "hydrateAndEmit"
-    yield . ToVm $ VmBlock ob
     let obHash = blockHash ob
         orig = obOrigin ob
     logF $ "Emitting block " ++ format obHash
@@ -522,7 +524,10 @@ hydrateAndEmit = awaitForever $ \case
       Just (EmittedBlock _ chains) -> pure $ EmittedBlock True chains
     logF $ "Emitting block " ++ format obHash ++ ". Chains to emit: " ++ show (format <$> M.keys chainsToEmit)
     ob' <- lift $ hydratePrivateHashes Nothing ob
-    for_ ob' $ yield . ToVm . VmBlock
+    case ob' of
+      Nothing -> $logErrorS "hydrateAndEmit" . T.pack $
+        "hydratePrivateHashes didn't return a block for the main chain. This probably means there is a bug in the platform"
+      Just ob'' -> yield . ToVm $ VmBlock ob''
     -- use ob's origin because we don't hold on to chain's original origin
     transformGenesis . map (\(cId, info) -> IngestGenesis orig (cId, info)) $ M.toList chainsToEmit
     lift . A.adjustStatefully_ (A.Proxy @EmittedBlock) obHash $ dependentChains .= M.empty
