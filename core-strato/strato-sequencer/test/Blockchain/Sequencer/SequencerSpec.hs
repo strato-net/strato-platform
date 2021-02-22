@@ -474,7 +474,7 @@ spec = do
         let bs = [b | P2pBlockstanbul (WireMessage _ (Preprepare _ b)) <- _toP2p]
         map (map txType . blockReceiptTransactions) bs `shouldBe` [[PrivateHash]]
         let obs = [b | VmBlock b <- _toVm]
-        map (map txType . obReceiptTransactions) obs `shouldBe` [[PrivateHash],[Message]]
+        map (map txType . obReceiptTransactions) obs `shouldBe` [[Message]]
 
       it "should run Blockstanbul with delayed private transactions" . runPBFTTestMWithGenesis $ \h -> do
         let iev = iev1' h
@@ -500,7 +500,7 @@ spec = do
         map (map txType . blockReceiptTransactions) bs `shouldBe` [[PrivateHash, PrivateHash]]
         let obs = [b | VmBlock b <- _toVm]
         map (map txType . obReceiptTransactions) obs `shouldBe`
-          [[PrivateHash,PrivateHash],[Message,Message]]
+          [[Message,Message]]
 
       it "should split up block when chain infos are delayed" . runPBFTTestMWithGenesis $ \h -> do
         let iev = iev2' h
@@ -514,7 +514,7 @@ spec = do
         map (map txType . obReceiptTransactions) obs `shouldBe` [[PrivateHash,PrivateHash]]
         b2 <- runBatch $ checkForUnseq [chainDetails1, chainDetails2]
         let obs' = [b | VmBlock b <- _toVm b2]
-        map (map txType . obReceiptTransactions) obs' `shouldBe` [[Message],[Message]]
+        map (map txType . obReceiptTransactions) obs' `shouldBe` [[Message, PrivateHash],[Message, Message]]
 
       it "should split up block when chain infos are staggered" . runPBFTTestMWithGenesis $ \h -> do
         let iev = iev2' h
@@ -526,10 +526,10 @@ spec = do
         map (map txType . obReceiptTransactions) obs `shouldBe` [[PrivateHash,PrivateHash]]
         b2 <- runBatch $ checkForUnseq [chainDetails1]
         let obs' = [b | VmBlock b <- _toVm b2]
-        map (map txType . obReceiptTransactions) obs' `shouldBe` [[Message]]
+        map (map txType . obReceiptTransactions) obs' `shouldBe` [[Message, PrivateHash]]
         b3 <- runBatch $ checkForUnseq [chainDetails2]
         let obs'' = [b | VmBlock b <- _toVm b3]
-        map (map txType . obReceiptTransactions) obs'' `shouldBe` [[Message]]
+        map (map txType . obReceiptTransactions) obs'' `shouldBe` [[Message, Message]]
 
       it "should re-run blocks when chain info is delayed" . runPBFTTestMWithGenesis $ \h -> do
         let iev = iev1' h
