@@ -21,12 +21,15 @@ module Blockchain.Data.ChainInfo
   , AccountInfo (..)
   , CodeInfo (..)
   , isAncestorChainOf
+  , getAncestorChains
+  , getNthAncestorChain
   , accountExtractor
   ) where
 
 
 import           Control.Applicative               (many)
 import qualified Control.Monad.Change.Alter        as A
+import           Control.Monad                     (join)
 
 import           Blockchain.ExtWord
 import           Blockchain.Data.Enode
@@ -45,6 +48,7 @@ import qualified Data.ByteString.Char8                as C8
 import           Data.Data
 import qualified Data.JsonStream.Parser               as JS
 import qualified Data.Map.Strict                      as M
+import           Data.Maybe                           (listToMaybe)
 import           Data.Swagger                         hiding (Format, format)
 import qualified Data.Text                            as T
 import           Data.Text.Encoding                   (encodeUtf8, decodeUtf8)
@@ -366,6 +370,15 @@ isAncestorChainOf (Just ancestor) (Just descendent) | ancestor == descendent = p
 isAncestorChainOf ancestor descendent = A.select (A.Proxy @ParentChainId) descendent >>= \case
   Nothing -> pure False
   Just (ParentChainId parent) -> ancestor `isAncestorChainOf` parent
+
+getAncestorChains :: A.Selectable (Maybe Word256) ParentChainId m => Maybe Word256 -> m [Maybe Word256]
+getAncestorChains Nothing  = pure [] -- needed in case we somehow have an entry for `Nothing` in the db
+getAncestorChains descendent = A.select (A.Proxy @ParentChainId) descendent >>= \case
+  Nothing -> pure [descendent]
+  Just (ParentChainId parent) -> (descendent:) <$> getAncestorChains parent
+
+getNthAncestorChain :: A.Selectable (Maybe Word256) ParentChainId m => Int -> Maybe Word256 -> m (Maybe Word256)
+getNthAncestorChain n = fmap (join . listToMaybe . drop n) . getAncestorChains
 
 accountExtractor :: JS.Parser [AccountInfo]
 accountExtractor = many ("accountInfo" JS..: JS.arrayOf acctInfo)
