@@ -5,6 +5,7 @@ import           Control.Monad.Loops
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString              as B
 import           Data.Default
+import           Data.Maybe
 import qualified Database.LevelDB             as DB
 
 ldbForEach :: FilePath -> (B.ByteString -> B.ByteString -> IO ()) -> IO ()
@@ -13,8 +14,8 @@ ldbForEach dbDir f = runResourceT $ do
     i <- DB.iterOpen db def
     DB.iterFirst i
     whileM_ (DB.iterValid i) $ do
-      Just key <- DB.iterKey i
-      Just val <- DB.iterValue i
+      key <- fromMaybe B.empty <$> DB.iterKey i
+      val <- fromMaybe B.empty <$> DB.iterValue i
       liftIO $ f key val
       DB.iterNext i
       return ()

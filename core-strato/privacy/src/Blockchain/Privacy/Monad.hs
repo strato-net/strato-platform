@@ -77,7 +77,7 @@ instance Ord BlockInfo where
 
 data EmittedBlock = EmittedBlock
   { _emitted :: Bool
-  , _dependentChains :: M.Map Word256 ChainInfo
+  , _blockDependentChains :: M.Map Word256 ChainInfo
   } deriving (Eq, Show, Generic, Binary)
 makeLenses ''EmittedBlock
 
@@ -92,7 +92,7 @@ instance Format EmittedBlock where
     [ "EmittedBlock"
     , "---------"
     , tab $ "Emitted:          " ++ show _emitted
-    , tab $ "Dependent chains: " ++ show _dependentChains
+    , tab $ "Dependent chains: " ++ show _blockDependentChains
     ]
 
 data ChainHashEntry = ChainHashEntry
@@ -130,9 +130,10 @@ chainHashEntryInBlock :: BlockInfo -> ChainHashEntry
 chainHashEntryInBlock bInfo = ChainHashEntry True Nothing (S.singleton bInfo)
 
 data ChainIdEntry = ChainIdEntry
-  { _chainIdInfo :: ChainInfo
+  { _chainIdInfo :: Maybe ChainInfo
   , _chainHashes :: CircularBuffer Keccak256
   , _blocksToRun :: Set BlockInfo
+  , _chainDependentChains :: M.Map Word256 ChainInfo
   } deriving (Show, Generic, Binary)
 makeLenses ''ChainIdEntry
 
@@ -140,7 +141,7 @@ instance ToJSON ChainIdEntry where
 instance FromJSON ChainIdEntry where
 
 chainIdEntry :: ChainInfo -> ChainIdEntry
-chainIdEntry cInfo = ChainIdEntry cInfo emptyCircularBuffer S.empty
+chainIdEntry cInfo = ChainIdEntry (Just cInfo) emptyCircularBuffer S.empty M.empty
 
 instance Format ChainIdEntry where
   format ChainIdEntry{..} = unlines

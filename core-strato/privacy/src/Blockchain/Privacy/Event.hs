@@ -41,7 +41,7 @@ import           Control.Lens
 import           Control.Monad
 import           Control.Monad.Change.Alter
 import           Data.Bool                     (bool)
-import           Data.Foldable                 (foldrM)
+import           Data.Foldable                 (foldrM, for_)
 import           Data.Maybe
 import qualified Data.Set                      as S
 import qualified Data.Sequence                 as Q
@@ -70,7 +70,7 @@ logFF :: MonadLogger m => Text -> String -> m ()
 logFF str = $logInfoS str . T.pack
 
 lookupSeenChain :: (Word256 `Alters` ChainIdEntry) m => Word256 -> m Bool
-lookupSeenChain chainId = isJust <$> lookup (Proxy @ChainIdEntry) chainId
+lookupSeenChain chainId = isJust . join . fmap _chainIdInfo <$> lookup (Proxy @ChainIdEntry) chainId
 
 insertTransaction :: (MonadLogger m, (Keccak256 `Alters` OutputTx) m) => OutputTx -> m ()
 insertTransaction otx = do
@@ -206,7 +206,7 @@ getNewChainHash chainId = do
   case Q.viewl q of
     Q.EmptyL -> do
       logFF "getNewChainHash" $ "Empty chain buffer for chainId " ++ CL.yellow (format chainId)
-      fmap (generateInitialChainHash . _chainIdInfo) <$> lookup (Proxy @ChainIdEntry) chainId
+      join . fmap (fmap generateInitialChainHash . _chainIdInfo) <$> lookup (Proxy @ChainIdEntry) chainId
     (h Q.:< q') -> do
       adjustStatefully_ (Proxy @ChainIdEntry) chainId $
         chainHashes .= CircularBuffer cap (sz - 1) q'
@@ -250,6 +250,10 @@ runPrivateHashTX tHash cHash = do
   useChainHash cHash
   checkIfIsMissingTX tHash cHash
 
+getAllBlocksToRun :: (Word256 `Alters` ChainIdEntry) m
+                  => Word256 -> m (S.Set BlockInfo)
+getAllBlocksToRun = fmap S.unions . traverseAncestorChains (fmap (maybe S.empty _blocksToRun) . lookup (Proxy @ChainIdEntry))
+
 runBlocks :: ( MonadLogger m
              , MonadMonitor m
              , HasFullPrivacy m
@@ -258,7 +262,7 @@ runBlocks :: ( MonadLogger m
 runBlocks chainId = go
   where
     go = do
-      btr <- maybe S.empty _blocksToRun <$> lookup (Proxy @ChainIdEntry) chainId
+      btr <- getAllBlocksToRun chainId
       if S.null btr
         then return []
         else do
@@ -268,7 +272,8 @@ runBlocks chainId = go
             mHydrated <- hydratePrivateHashes (Just chainId) block
             for mHydrated $ \b -> do
               logFF "Privacy/runBlocks" $ "blocksToRun deleting " ++ format b0
-              adjustStatefully_ (Proxy @ChainIdEntry) chainId $
+              let chainIds = S.toList . (S.\\ (S.singleton Nothing)) . S.fromList $ txChainId <$> obReceiptTransactions b
+              for_ chainIds $ \(Just cId) -> forAncestorChains cId . flip (adjustStatefully_ (Proxy @ChainIdEntry)) $
                 blocksToRun %= S.delete b0
               (b:) <$> go
 
@@ -278,8 +283,22 @@ hasAllAncestorChains = go
   where
     go Nothing = pure True
     go (Just chainId) = do
-      mmParent <- fmap (parentChain . chainInfo . _chainIdInfo) <$> lookup (Proxy @ChainIdEntry) chainId
+      mmParent <- join . fmap (fmap (parentChain . chainInfo) . _chainIdInfo) <$> lookup (Proxy @ChainIdEntry) chainId
       maybe (pure False) go mmParent
+
+traverseAncestorChains :: (Word256 `Alters` ChainIdEntry) m
+                       => (Word256 -> m a) -> Word256 -> m [a]
+traverseAncestorChains action cId = go (Just cId)
+  where
+    go Nothing = pure []
+    go (Just chainId) = do
+      a <- action chainId
+      mmParent <- join . join . fmap (fmap (parentChain . chainInfo) . _chainIdInfo) <$> lookup (Proxy @ChainIdEntry) chainId
+      (a:) <$> go mmParent
+
+forAncestorChains :: (Word256 `Alters` ChainIdEntry) m
+                  => Word256 -> (Word256 -> m a) -> m [a]
+forAncestorChains = flip traverseAncestorChains
 
 accumT :: Monad m => s -> [a] -> (s -> a -> m (b,s)) -> m ([b],s)
 accumT s [] _ = pure ([],s)
@@ -337,14 +356,15 @@ hydratePrivateHashes chainF b = do
                   notHydrating "we don't have the info for its chain"
                   return (tx, st)
                 Just ChainIdEntry{..} -> do
-                  if not (S.null _blocksToRun || (_bhash $ S.elemAt 0 _blocksToRun) == bHash)
+                  allBlocksToRun <- getAllBlocksToRun cId
+                  if not (S.null allBlocksToRun || (_bhash $ S.elemAt 0 allBlocksToRun) == bHash)
                     then do
                       notHydrating "this is not the chain's next block to run"
-                      logF $ "If blocksToRun is null: " ++ show (S.null _blocksToRun) ++ " Next block to run is: "++ format (_bhash $ S.elemAt 0 _blocksToRun)
-                      logF $ "All the blocksToRun: " ++ show _blocksToRun
+                      logF $ "If blocksToRun is null: " ++ show (S.null allBlocksToRun) ++ " Next block to run is: "++ format (_bhash $ S.elemAt 0 allBlocksToRun)
+                      logF $ "All the blocksToRun: " ++ show allBlocksToRun
                       logF $ "bHash of this tx: " ++ show bHash
-                      adjustStatefully_ (Proxy @ChainIdEntry) cId $
-                        when (isNothing chainF) $
+                      when (isNothing chainF) . void . forAncestorChains cId $ \ancestorChainId -> do
+                        adjustStatefully_ (Proxy @ChainIdEntry) ancestorChainId $
                           --logF $ "blocksToRun inserting " ++ format bHash
                           blocksToRun %= S.insert (BlockInfo bHash (blockOrdering b))
                       return (tx, (dts,S.insert chainId cs))
@@ -352,8 +372,8 @@ hydratePrivateHashes chainF b = do
                       lookup (Proxy @OutputTx) tHash >>= \case
                         Nothing -> do
                           notHydrating "we don't have this transaction's body"
-                          adjustStatefully_ (Proxy @ChainIdEntry) cId $ do
-                            when (isNothing chainF) $
+                          when (isNothing chainF) . void . forAncestorChains cId $ \ancestorChainId -> do
+                            adjustStatefully_ (Proxy @ChainIdEntry) ancestorChainId $ do
                               -- logF $ "blocksToRun inserting " ++ format bHash
                               blocksToRun %= S.insert (BlockInfo bHash (blockOrdering b))
                           return (tx, (tHash:dts, S.insert chainId cs))
@@ -407,7 +427,7 @@ insertNewChainInfo :: ( MonadLogger m
                    -> m [OutputBlock]
 insertNewChainInfo chainId cInfo = do
   let cHash = generateInitialChainHash cInfo
-  repsert_ Proxy chainId $ return . maybe (chainIdEntry cInfo) (chainIdInfo .~ cInfo)
+  repsert_ Proxy chainId $ return . maybe (chainIdEntry cInfo) (chainIdInfo .~ Just cInfo)
   withLabel chainMetrics "seen_chains" incCounter
   let bHash = creationBlock $ chainInfo cInfo
   bInfo <- BlockInfo bHash . maybe 0 blockOrdering <$> lookup (Proxy @OutputBlock) bHash

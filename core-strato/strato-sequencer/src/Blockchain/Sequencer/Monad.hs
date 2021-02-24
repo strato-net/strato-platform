@@ -353,7 +353,7 @@ instance (Keccak256 `A.Alters` DependentBlockEntry) SequencerM where
 instance A.Selectable (Maybe Word256) ParentChainId SequencerM where
   select _ = \case
     Nothing -> pure . Just $ ParentChainId Nothing
-    Just cId -> fmap (ParentChainId . parentChain . chainInfo . _chainIdInfo) <$> A.lookup (A.Proxy @ChainIdEntry) cId
+    Just cId -> join . fmap (fmap (ParentChainId . parentChain . chainInfo) . _chainIdInfo) <$> A.lookup (A.Proxy @ChainIdEntry) cId
 
 instance Mod.Modifiable SeenTransactionDB SequencerM where
   get _ = use seenTransactionDB
