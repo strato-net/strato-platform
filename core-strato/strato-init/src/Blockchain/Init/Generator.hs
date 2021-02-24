@@ -25,6 +25,7 @@ import Blockchain.Data.GenesisInfo
 import Blockchain.Init.Protocol
 import Blockchain.Init.EthConf
 import Blockchain.Init.Options
+import qualified Blockchain.Network as Net
 import Blockchain.Strato.Model.Address
 
 import Network.Kafka (KafkaAddress, mkKafkaState, runKafka, updateMetadata, KafkaState, KafkaClientError, stateTopicMetadata)
@@ -57,9 +58,12 @@ mkAll genesisBlockName = do
 
   addEvent $ TopicList [(t, t) | t <- ["unminedblock", "statediff", "seq_vm_events", "seq_p2p_events"
                                       , "unseqevents", "jsonrpcresponse", "indexevents", "block"]]
-  let bootnodes = if flags_addBootnodes
-                    then Just $ filter (not . null) flags_stratoBootnode
-                    else Nothing
+    
+  bootnodes <- case (flags_addBootnodes, flags_stratoBootnode) of
+                 (False, _) -> return Nothing
+                 (True, []) -> liftIO $ fmap (fmap $ map Net.webAddress) $ Net.getParams flags_network
+                 (True, _)  -> return $ Just flags_stratoBootnode
+                         
   addEvent $ PeerList bootnodes
 
   let decodedFaucets = fromMaybe [] . Ae.decodeStrict . C8.pack $ flags_extraFaucets

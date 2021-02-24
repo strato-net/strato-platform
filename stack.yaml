@@ -40,9 +40,10 @@ packages:
 - core-strato/vrun/
 - core-strato/seqevents/
 - core-strato/solid-vm/
-- core-strato/strato-genesis/
 - core-strato/strato-adit/
+- core-strato/strato-genesis/
 - core-strato/strato-index/
+- core-strato/strato-networks/
 - core-strato/strato-sequencer/
 - core-strato/ethereum-jsonrpc/
 - core-strato/strato-model/
@@ -61,6 +62,7 @@ packages:
 - shared-util/cross-monitoring/
 - shared-util/format
 - shared-util/haskoin-shim/
+- shared-util/labeled-error/
 - shared-util/solid-vm-model/
 - clockwork
 - logserver
@@ -112,3 +114,6 @@ docker:
   image: "strato-buildbase:lts-14.27"
   set-user: true
   run-args: ["--ulimit=nofile=60000"]
+
+nix:
+  enable: false

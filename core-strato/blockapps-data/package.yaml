@@ -43,6 +43,7 @@ library:
   - format
   - http-api-data
   - json-stream
+  - labeled-error
   - lens
   - merkle-patricia-db
   - milena
