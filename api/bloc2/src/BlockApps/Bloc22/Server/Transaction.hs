@@ -78,6 +78,7 @@ import           BlockApps.Strato.Types            hiding (Account, Transaction 
 import           BlockApps.XAbiConverter
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json
+import qualified Blockchain.Data.RLP               as EthRLP
 import           Blockchain.Data.TXOrigin
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address  hiding (unAddress)
@@ -160,7 +161,7 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
       addr <- case mAddr of
         Nothing -> fmap unAddress . blocVaultWrapper $ getKey userName Nothing
         Just addr' -> return addr'
-      let getSrc p = contractpayloadSrc p <|> join (liftA2 Map.lookup (contractpayloadContract p) msrcs)
+      let getSrc p = Map.union (contractpayloadSrc p) (fromMaybe Map.empty msrcs)
       fmap join . forM (partitionWith transactionType txs') $ \(ttype, txs) -> case ttype of
         TRANSFER -> case txs of
           [] -> return []
@@ -190,7 +191,7 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
             let md = contractpayloadMetadata p
                 bcp = ContractParameters
                         addr
-                        (fromMaybe "" $ getSrc p)
+                        (getSrc p)
                         (contractpayloadContract p)
                         (contractpayloadArgs p)
                         (contractpayloadValue p)
@@ -337,15 +338,16 @@ postUsersContractEVM' :: (MonadLogger m,
                           HasBlocEnv m, HasBlocSQL m, HasCoreAPI m, HasVault m, HasSQL m) =>
                          Should CacheNonce -> ContractParameters -> Text -> m BlocTransactionResult
 postUsersContractEVM' cacheNonce ContractParameters{..} userName = blocTransaction $ do
+  let srcText = Text.intercalate "\n" $ Map.elems src
   params <- getAccountTxParams cacheNonce fromAddr chainId txParams
   --TODO: check what happens with mismatching args
   $logInfoLS "postUsersContractEVM'/args" args
-  (cName,(cmId,ContractDetails{..})) <- getContractDetailsForContract "EVM" src contract >>= \case
+  (cName,(cmId,ContractDetails{..})) <- getContractDetailsForContract "EVM" srcText contract >>= \case
     Nothing -> throwIO $ UserError "You need to supply at least one contract in the source"
     Just x -> pure x
   let
     (bin,leftOver) = Base16.decode $ Text.encodeUtf8 contractdetailsBin
-    metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("src", src),("name", cName)]
+    metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("src", srcText),("name", cName)]
   unless (ByteString.null leftOver) $ throwIO $ AnError "Couldn't decode binary"
   let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi
   argsBin <- constructArgValues args xabiArgs
@@ -376,7 +378,10 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} userName = blocTrans
   params <- getAccountTxParams cacheNonce fromAddr chainId txParams
   --We might be able to get rid of the metadata for SolidVM, but that will require a change in the API, and needs to be discussed
   $logInfoLS "postUsersContractSolidVM'/args" args
-  (cName,(cmId,ContractDetails{..})) <- getContractDetailsForContract "SolidVM" src contract >>= \case
+  let encodedSrc = case Map.toList src of
+        [("", wholeSrc)] -> BC.pack $ Text.unpack wholeSrc
+        _ -> EthRLP.rlpSerialize $ EthRLP.rlpEncode src
+  (cName,(cmId,ContractDetails{..})) <- getContractDetailsForContract "SolidVM" (Text.pack $ BC.unpack encodedSrc) contract >>= \case
     Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
     Just x -> pure x
 
@@ -391,7 +396,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} userName = blocTrans
       fromAddr
       params
       (Wei (fromIntegral (maybe 0 unStrung value)))
-      (Code . BC.pack $ Text.unpack src)
+      (Code encodedSrc)
       chainId
   $logDebugLS "postUsersContractSolidVM'/tx" tx
   txHash <- postTransaction tx
@@ -412,14 +417,18 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} userName = do
   let contracts' = map (uploadlistcontractChainid %~ (<|> chainId)) contracts
   txsWithParams <- genNonces cacheNonce fromAddr uploadlistcontractChainid uploadlistcontractTxParams contracts'
   namesCmIdsTxs <- forStateT Map.empty txsWithParams $
-    \(UploadListContract name mSrc args params value cid md) -> do
-      (src, cmId, xabi) <- case mSrc of
-        Just src -> do
-          (cmId', cd) <- fmap snd . lift $ getContractDetailsForContract "SolidVM" src (Just name) >>= \case
+    \(UploadListContract name srcs args params value cid md) -> do
+      let encodedSrc = case Map.toList srcs of
+            [("", wholeSrc)] -> wholeSrc
+            _ -> Text.pack . BC.unpack . EthRLP.rlpSerialize $ EthRLP.rlpEncode srcs
+      (src, cmId, xabi) <-
+       if not (Map.null srcs)
+        then do
+          (cmId', cd) <- fmap snd . lift $ getContractDetailsForContract "SolidVM" encodedSrc (Just name) >>= \case
             Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
             Just x -> pure x
-          at name <?= (src, cmId', contractdetailsXabi cd)
-        Nothing -> do
+          at name <?= (encodedSrc, cmId', contractdetailsXabi cd)
+         else do
           mtuple <- use $ at name
           case mtuple of
             Just (src, cmId', x) -> return (src, cmId', x)
@@ -481,7 +490,7 @@ postUsersUploadListEVM' cacheNonce ContractListParameters{..} userName = do
   txsWithParams <- genNonces cacheNonce fromAddr uploadlistcontractChainid uploadlistcontractTxParams contracts'
   namesCmIdsTxs <- forStateT Map.empty txsWithParams $
     \(UploadListContract name mSrc args params value cid md) -> do
-      when (isJust mSrc) . lift . throwIO $ UserError evmUploadListError
+      when (not $ Map.null mSrc) . lift . throwIO $ UserError evmUploadListError
       mtuple <- use $ at name
       (bin, src, cmId, xabi) <- case mtuple of
         Just (b, src, cmId', x) -> return (b, src, cmId', x)

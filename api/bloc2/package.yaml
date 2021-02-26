@@ -38,6 +38,7 @@ library:
     - core-api2
     - cryptonite
     - directory
+    - ethereum-rlp
     - extra
     - filepath
     - format
