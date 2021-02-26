@@ -101,7 +101,7 @@ spec = do
                       ArrayExpression [], 0)
                  ]
     forM_ scases $ \(input, want, offset) -> do
-        it ("can parse " ++ input) $ parseStatement input `shouldBe` Right (want $ newPos "" 1 (1+offset))
+        it ("can parse " ++ input) $ parseStatement input `shouldBe` Right (want $ initialPos "" `incSourceColumn` offset)
 
     let fcases = ["assembly {}", "assembly { dst := mload(src) }", "assembly { dst := add(src, 32) }"]
     forM_ fcases $ \input -> do
