@@ -21,11 +21,11 @@ describe("imports", function() {
   it("combines", async () => {
     const filename = `${fixtures}/importer/Main.sol`;
     const source = await importer.combine(filename);
-    assert.isAbove(source.indexOf("contract Main"), 0);
-    assert.isAbove(source.indexOf("contract A"), 0);
-    assert.isAbove(source.indexOf("contract B"), 0);
-    assert.isAbove(source.indexOf("contract C"), 0);
-    assert.isAbove(source.indexOf("contract D"), 0);
+    assert.isAbove(source['Main.sol'].indexOf("contract Main"), 0);
+    assert.isAbove(source['A.sol'].indexOf("contract A"), 0);
+    assert.isAbove(source['B.sol'].indexOf("contract B"), 0);
+    assert.isAbove(source['C.sol'].indexOf("contract C"), 0);
+    assert.isAbove(source['D.sol'].indexOf("contract D"), 0);
   });
 
   it("combines and uploads", async () => {
