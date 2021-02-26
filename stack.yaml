@@ -3,6 +3,7 @@ packages:
 - api/bloc2api
 - api/core-api2
 - api/strato-api
+- api2/strato-api2
 - composable-monads/bloc-sql-monad
 - composable-monads/core-api-monad
 - composable-monads/sql-monad
@@ -85,7 +86,7 @@ extra-deps:
 - wai-middleware-prometheus-1.0.0@sha256:1625792914fb2139f005685be8ce519111451cfb854816e430fbf54af46238b4,1314
 - haskell-src-exts-1.20.3@sha256:83ae523bbec907a42c043de1f5bbf4c1554e7c3b898af07bb1ce6e80eaa282ec,4589
 - servant-aeson-specs-0.6.2.0@sha256:c2139f729695c18186394aeb50adceb5ba4b8adb3986626659f2210979bf5f99,2185
-
+- servant-swagger-tags-0.1.0.1@sha256:2d743e9ad1cfcca537acc99e0b97e0e4feda3b5c842937dbf5895261e3105bf1,1094
 
 
 #- git: https://github.com/blockapps/milena
