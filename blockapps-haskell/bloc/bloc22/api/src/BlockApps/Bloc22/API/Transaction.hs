@@ -210,8 +210,8 @@ instance FromJSON ContractPayload where
                          Just (String s) -> pure $ Map.singleton "" s
                          Just (Object _) -> o .: "src"
                          _ -> pure Map.empty)
-                     <*> (o .: "contract")
-                     <*> (o .: "args")
+                     <*> (o .:? "contract")
+                     <*> (o .:? "args")
                      <*> (o .:? "value")
                      <*> (o .:? "txParams")
                      <*> (o .:? "chainid")
