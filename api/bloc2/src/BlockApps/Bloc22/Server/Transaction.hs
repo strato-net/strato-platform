@@ -342,6 +342,7 @@ postUsersContractEVM' cacheNonce ContractParameters{..} userName = blocTransacti
   params <- getAccountTxParams cacheNonce fromAddr chainId txParams
   --TODO: check what happens with mismatching args
   $logInfoLS "postUsersContractEVM'/args" args
+  $logInfoLS "postUsersContractEVM'/srcText" srcText
   (cName,(cmId,ContractDetails{..})) <- getContractDetailsForContract "EVM" srcText contract >>= \case
     Nothing -> throwIO $ UserError "You need to supply at least one contract in the source"
     Just x -> pure x
