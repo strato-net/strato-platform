@@ -62,6 +62,7 @@ library:
   - transformers
   - unliftio
   - unordered-containers
+  - utf8-string
   - vector
   - vm-tools
 

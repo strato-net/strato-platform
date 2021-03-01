@@ -21,6 +21,7 @@ library:
   - scientific
   - strato-model
   - text
+  - utf8-string
 
 tests:
   storage-test:

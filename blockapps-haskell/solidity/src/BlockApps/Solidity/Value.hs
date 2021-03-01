@@ -253,7 +253,7 @@ simpleValueToText sv = case sv of
   ValueBool tf -> if tf then "true" else "false"
   ValueAddress addr -> Text.pack $ "0x" ++ formatAddressWithoutColor addr
   ValueAccount acct -> Text.pack $ "0x" ++ show acct
-  ValueString tx -> Text.pack $ show tx
+  ValueString tx -> tx -- '"' `Text.cons` tx `Text.snoc` '"'
   ValueInt _ _ v -> Text.pack $ show v
   ValueBytes _ b -> Text.pack $ show . Base16.encode $ b
 

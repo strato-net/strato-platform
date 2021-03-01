@@ -31,7 +31,6 @@ import           Data.Bits
 import           Data.ByteString                  (ByteString)
 import qualified Data.ByteString                  as ByteString
 import qualified Data.ByteString.Base16           as B16
-import qualified Data.ByteString.Char8            as BC
 import qualified Data.IntMap                      as I
 import           Data.List
 import           Data.Map.Strict                  (Map)
@@ -80,7 +79,7 @@ valueToSolidityValue = \case
   ValueArrayFixed _ values -> SolidityArray $ map valueToSolidityValue values
   ValueArrayDynamic values -> SolidityArray $ map valueToSolidityValue $ unsparse values
   SimpleValue (ValueBytes _ bytes) ->
-   SolidityValueAsString $ Text.pack $ BC.unpack $ B16.encode bytes
+   SolidityValueAsString $ Text.decodeUtf8 bytes
   ValueEnum _ _ index              -> SolidityValueAsString $ Text.pack $ show index
   -- TODO(tim): What if declaration order is needed here?
   ValueStruct namedItems -> SolidityObject . Map.toList $ fmap valueToSolidityValue namedItems

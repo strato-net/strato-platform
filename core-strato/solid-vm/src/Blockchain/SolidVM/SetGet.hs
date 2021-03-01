@@ -27,6 +27,7 @@ module Blockchain.SolidVM.SetGet (
 import           Control.Monad
 import           Control.Monad.IO.Class
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.UTF8  as UTF8
 import           Data.Foldable (for_)
 import           Data.IORef
 import           Data.List
@@ -67,7 +68,7 @@ getSolid loc key = case loc of
 fromBasic :: MS.BasicValue -> Value
 fromBasic = \case
   MS.BInteger i -> SInteger i
-  MS.BString s -> SString . BC.unpack $ s
+  MS.BString s -> SString . UTF8.toString $ s
   MS.BBool b -> SBool b
   MS.BAccount a -> SAccount a
   MS.BContract n a -> SContract (T.unpack n) a
@@ -90,7 +91,7 @@ findDefault = \case
 toBasic :: Value -> MS.BasicValue
 toBasic = \case
   SInteger i -> MS.BInteger i
-  SString s -> MS.BString (BC.pack s)
+  SString s -> MS.BString (UTF8.fromString s)
   SBool b -> MS.BBool b
   SAccount a -> MS.BAccount a
   SContract n a -> MS.BContract (T.pack n) a
