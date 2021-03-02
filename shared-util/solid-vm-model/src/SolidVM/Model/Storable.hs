@@ -47,7 +47,7 @@ data BasicValue = BInteger !Integer
 
 instance Format BasicValue where
   format (BInteger i) = show i
-  format (BString s) = UTF8.toString s
+  format (BString s) = ('"':) . (++"\"") $ UTF8.toString s
   format (BBool True) = "true"
   format (BBool False) = "false"
   format (BAccount a) = "account(" ++ show a ++ ")"
