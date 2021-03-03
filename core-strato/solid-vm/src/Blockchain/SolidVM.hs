@@ -867,7 +867,7 @@ expToVar' x@(Xabi.MemberAccess expr name) = do
             return . Constant . SInteger . fromIntegral $ length $ getInnerString val
           _ -> return . Constant . SReference . apSnoc apt $ MS.Field "length"
 
-      (SReference p, itemName) -> return . Constant . SReference $ apSnoc p $ MS.Field $ BC.pack itemName  --
+      (SReference p, itemName) -> return . Constant . SReference $ apSnoc p $ MS.Field $ BC.pack itemName
       _ -> typeError "illegal member access" $ unparseExpression x
 {-
     Variable vref -> do
@@ -1378,7 +1378,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
     setVar (Constant (SReference (AccountPath to $ MS.StoragePath [MS.Field $ BC.pack n]))) =<< getVar v
 
   forM_ [n | (n, Xabi.VariableDecl _ _ Nothing) <- M.toList $ contract'^.storageDefs] $ \n -> do
-    markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack n]) MS.BDefault --- pack?
+    markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack n]) MS.BDefault
 
   forM_ (reverse $ contract'^.parents) $ \parent -> do
     let args = Xabi.OrderedArgs
@@ -1520,7 +1520,7 @@ encodeForReturn (SContract _ a) = return . word256ToBytes . fromIntegral $ a ^. 
 encodeForReturn (SBool b) = return . word256ToBytes . fromIntegral . fromEnum $ b
 
 -- if it's just a single string, harcode offset as 32 and append strLen + str
-encodeForReturn (SString s) = do ---wtf is this?
+encodeForReturn (SString s) = do
   let offset = word256ToBytes $ fromIntegral (32 :: Int)
       encodedLength = word256ToBytes $ fromIntegral (B.length stringBytes)
       retStr = offset `B.append` (encodedLength `B.append` stringBytes)
@@ -1557,7 +1557,7 @@ encodeForReturn (STuple items) = do
     headerLen = (V.length items) * 32
     buildEncoding :: MonadSM m => (ByteString, ByteString) -> Value -> m (ByteString, ByteString)
     buildEncoding (headers, strings) val = case val of
-      SString s -> do -- why is this complicated
+      SString s -> do
         let offset = word256ToBytes $ fromIntegral (headerLen + (B.length strings))
             encStr = TE.encodeUtf8 $ T.pack s
             encStrLen = word256ToBytes $ fromIntegral (B.length encStr)
