@@ -24,7 +24,7 @@ import qualified Data.Aeson                        as Aeson
 import           Data.ByteString                   (ByteString)
 import qualified Data.ByteString                   as ByteString
 import qualified Data.ByteString.Base16            as Base16
-import qualified Data.ByteString.Char8             as BC
+import qualified Data.ByteString.UTF8              as UTF8
 import qualified Data.ByteString.Lazy              as BL
 import qualified Data.ByteString.Short             as BSS
 import qualified Data.Cache                        as Cache
@@ -391,7 +391,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} userName = blocTrans
       fromAddr
       params
       (Wei (fromIntegral (maybe 0 unStrung value)))
-      (Code . BC.pack $ Text.unpack src)
+      (Code . UTF8.fromString $ Text.unpack src)
       chainId
   $logDebugLS "postUsersContractSolidVM'/tx" tx
   txHash <- postTransaction tx
@@ -447,7 +447,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} userName = do
             fromAddr
             (fromMaybe emptyTxParams params)
             (Wei (maybe 0 fromIntegral $ fmap unStrung value))
-            (Code . BC.pack $ Text.unpack src)
+            (Code . UTF8.fromString $ Text.unpack src)
             cid
       return ((name,cmId),tx)
   let

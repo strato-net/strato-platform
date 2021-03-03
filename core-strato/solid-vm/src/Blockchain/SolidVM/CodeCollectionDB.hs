@@ -4,7 +4,7 @@ module Blockchain.SolidVM.CodeCollectionDB (codeCollectionFromSource, codeCollec
 import           Control.Exception
 import           Control.Monad.IO.Class
 import qualified Data.ByteString                      as B
-import qualified Data.ByteString.Char8                as BC
+import qualified Data.ByteString.UTF8                 as UTF8
 import           Data.IORef
 import           Data.Map                             (Map)
 import qualified Data.Map                             as M
@@ -28,7 +28,7 @@ unsafeCodeMapIORef = unsafePerformIO $ newIORef M.empty
 
 compileSource :: B.ByteString -> CodeCollection
 compileSource initCode =
-  let maybeFile = runParser solidityFile "" "" $ BC.unpack initCode
+  let maybeFile = runParser solidityFile "" "" $ UTF8.toString initCode
       file = either (parseError "compileSource") id maybeFile
 
       namedContracts = [(T.unpack name, xabiToContract (T.unpack name) (map T.unpack parents') xabi)
