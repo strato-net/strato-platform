@@ -243,6 +243,7 @@ services:
     - seqMaxUsPerIter=${seqMaxUsPerIter}
     - seqRTSOPTs=${seqRTSOPTs}
     - splitinit=true
+    - START_EXPERIMENTAL_STRATO_API=${START_EXPERIMENTAL_STRATO_API}
     - svmTrace=${svmTrace}
     - sqlDiff=${sqlDiff}
     - svmDev=${svmDev}

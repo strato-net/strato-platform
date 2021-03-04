@@ -203,19 +203,20 @@ instance ToJSON FunctionPayload where
   toJSON = genericToJSON (aesonPrefix camelCase)
 
 instance FromJSON ContractPayload where
-  parseJSON (Object o) = ContractPayload
-                     <$> (do
-                       msrc <- o .:? "src"
-                       case msrc of
-                         Just (String s) -> pure $ Map.singleton "" s
-                         Just (Object _) -> o .: "src"
-                         _ -> pure Map.empty)
-                     <*> (o .: "contract")
-                     <*> (o .: "args")
-                     <*> (o .:? "value")
-                     <*> (o .:? "txParams")
-                     <*> (o .:? "chainid")
-                     <*> (o .:? "metadata")
+  parseJSON (Object o) =
+    ContractPayload
+      <$> (do
+        msrc <- o .:? "src"
+        case msrc of
+          Just (String s) -> pure $ Map.singleton "" s
+          Just (Object _) -> o .: "src"
+          _ -> pure Map.empty)
+      <*> (o .:? "contract")
+      <*> (o .:? "args")
+      <*> (o .:? "value")
+      <*> (o .:? "txParams")
+      <*> (o .:? "chainid")
+      <*> (o .:? "metadata")
   parseJSON o = fail $ "parseJSON ContractPayload: Expected Object, got " ++ show o
 instance FromJSON TransferPayload where
   parseJSON = genericParseJSON (aesonPrefix camelCase)

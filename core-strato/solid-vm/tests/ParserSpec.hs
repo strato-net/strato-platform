@@ -73,35 +73,35 @@ spec = do
 
   describe "Statement parsing" $ do
     let parseStatement = runParser statement "" ""
-        scases = [ ("x++;", SimpleStatement $ ExpressionStatement $ PlusPlus $ Variable "x")
+        scases = [ ("x++;", SimpleStatement $ ExpressionStatement $ PlusPlus $ Variable "x", 0)
                  , ("assembly { dst := mload(add(src, 32)) }",
-                      AssemblyStatement $ MloadAdd32 "dst" "src")
+                      AssemblyStatement $ MloadAdd32 "dst" "src", 9)
                  , ("Nom storage nom = ns[10];", SimpleStatement $
                       VariableDefinition [VarDefEntry (Just $ Label "Nom") (Just Storage) "nom"] $ Just $
-                      IndexAccess (Variable "ns") (Just $ NumberLiteral 10 Nothing))
+                      IndexAccess (Variable "ns") (Just $ NumberLiteral 10 Nothing), 0)
                  , ("var (x, y) = (7, 3);", SimpleStatement $
                       VariableDefinition [VarDefEntry Nothing Nothing "x",
                                           VarDefEntry Nothing Nothing "y"] $ Just $
-                      TupleExpression $ map (\n -> Just (NumberLiteral n Nothing)) [7, 3])
+                      TupleExpression $ map (\n -> Just (NumberLiteral n Nothing)) [7, 3], 0)
                  , ("(z, w) = (q, r);", SimpleStatement $ ExpressionStatement
                       $ Binary "=" (TupleExpression $ map (Just . Variable) ["z", "w"])
-                                   (TupleExpression $ map (Just . Variable) ["q", "r"]))
+                                   (TupleExpression $ map (Just . Variable) ["q", "r"]), 0)
                  , ("(z, ) = (q, r);", SimpleStatement $ ExpressionStatement
                       $ Binary "=" (TupleExpression $ [Just $ Variable "z", Nothing])
-                                   (TupleExpression $ map (Just . Variable) ["q", "r"]))
-                 , ("eq = ne;", SimpleStatement $ ExpressionStatement $ Binary "=" (Variable "eq") (Variable "ne"))
+                                   (TupleExpression $ map (Just . Variable) ["q", "r"]), 0)
+                 , ("eq = ne;", SimpleStatement $ ExpressionStatement $ Binary "=" (Variable "eq") (Variable "ne"), 0)
                  , ("var (a, b, , );", SimpleStatement $
                       VariableDefinition [VarDefEntry Nothing Nothing "a", VarDefEntry Nothing Nothing "b", BlankEntry, BlankEntry]
-                      Nothing)
+                      Nothing, 0)
                  , ("var x = [7, 3];", SimpleStatement $
                       VariableDefinition [VarDefEntry Nothing Nothing "x"] $ Just $
-                      ArrayExpression $ map (\n -> NumberLiteral n Nothing) [7, 3])
+                      ArrayExpression $ map (\n -> NumberLiteral n Nothing) [7, 3], 0)
                  , ("var x = [];", SimpleStatement $
                       VariableDefinition [VarDefEntry Nothing Nothing "x"] $ Just $
-                      ArrayExpression [])
+                      ArrayExpression [], 0)
                  ]
-    forM_ scases $ \(input, want) -> do
-        it ("can parse " ++ input) $ parseStatement input `shouldBe` Right (want $ initialPos "")
+    forM_ scases $ \(input, want, offset) -> do
+        it ("can parse " ++ input) $ parseStatement input `shouldBe` Right (want $ initialPos "" `incSourceColumn` offset)
 
     let fcases = ["assembly {}", "assembly { dst := mload(src) }", "assembly { dst := add(src, 32) }"]
     forM_ fcases $ \input -> do

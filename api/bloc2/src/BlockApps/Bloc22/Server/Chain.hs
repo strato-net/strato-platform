@@ -81,7 +81,7 @@ replaceMembers Struct{..} addrs m =
 
 createChainInfo :: (MonadIO m, MonadLogger m, HasBlocSQL m, HasBlocEnv m) =>
                    Keccak256 -> ChainInput -> m (Maybe Int32, ChainInfo)
-createChainInfo creationBlockHash (ChainInput msrc mCodePtr cname lbl balances chaininputArgs members mmd _) = do
+createChainInfo creationBlockHash (ChainInput msrc mCodePtr cname lbl balances chaininputArgs members pChain mmd _) = do
   when (null members) $ throwIO $ UserError "Private chains must include at least one member"
   when (sum (nmap2' balances) == 0) $ throwIO $ UserError "At least one account must have a non-zero balance"
 
@@ -138,7 +138,7 @@ createChainInfo creationBlockHash (ChainInput msrc mCodePtr cname lbl balances c
                            acctInfo
                            codeInfo
                            (Map.fromList $ unNamedTuple @"address" @"enode" <$> members)
-                           Nothing
+                           pChain
                            creationBlockHash
                            nonce
                            metaData

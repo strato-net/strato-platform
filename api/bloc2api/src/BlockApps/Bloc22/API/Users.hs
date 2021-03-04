@@ -348,19 +348,20 @@ instance ToJSON PostUsersContractRequest where
     ]
 
 instance FromJSON PostUsersContractRequest where
-  parseJSON (Object o) = PostUsersContractRequest
-                     <$> (do
-                       msrc <- o .:? "src"
-                       case msrc of
-                         Just (String s) -> pure $ Map.singleton "" s
-                         Just (Object _) -> o .: "src"
-                         _ -> pure Map.empty)
-                     <*> (o .: "password")
-                     <*> (o .:? "contract")
-                     <*> (o .:? "args")
-                     <*> (o .:? "txParams")
-                     <*> (o .:? "value")
-                     <*> (o .:? "metadata")
+  parseJSON (Object o) =
+    PostUsersContractRequest
+      <$> (do
+        msrc <- o .:? "src"
+        case msrc of
+          Just (String s) -> pure $ Map.singleton "" s
+          Just (Object _) -> o .: "src"
+          _ -> pure Map.empty)
+      <*> (o .: "password")
+      <*> (o .:? "contract")
+      <*> (o .:? "args")
+      <*> (o .:? "txParams")
+      <*> (o .:? "value")
+      <*> (o .:? "metadata")
   parseJSON o = fail $ "parseJSON PostUsersContractRequest: Expected Object, got " ++ show o
 
 instance ToSample PostUsersContractRequest where
@@ -490,19 +491,20 @@ instance ToJSON UploadListContract where
     ]
 
 instance FromJSON UploadListContract where
-  parseJSON (Object o) = UploadListContract
-                     <$> (o .: "contractName")
-                     <*> (do
-                       msrc <- o .:? "src"
-                       case msrc of
-                         Just (String s) -> pure $ Map.singleton "" s
-                         Just (Object _) -> o .: "src"
-                         _ -> pure Map.empty)
-                     <*> (o .: "args")
-                     <*> (o .:? "txParams")
-                     <*> (o .:? "value")
-                     <*> (o .:? "chainid")
-                     <*> (o .:? "metadata")
+  parseJSON (Object o) =
+    UploadListContract
+      <$> (o .: "contractName")
+      <*> (do
+        msrc <- o .:? "src"
+        case msrc of
+          Just (String s) -> pure $ Map.singleton "" s
+          Just (Object _) -> o .: "src"
+          _ -> pure Map.empty)
+      <*> (o .: "args")
+      <*> (o .:? "txParams")
+      <*> (o .:? "value")
+      <*> (o .:? "chainid")
+      <*> (o .:? "metadata")
   parseJSON o = fail $ "parseJSON UploadListContract: Expected Object, got " ++ show o
 
 instance ToSchema UploadListContract where
