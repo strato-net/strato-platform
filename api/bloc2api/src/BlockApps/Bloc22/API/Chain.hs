@@ -35,6 +35,7 @@ import           BlockApps.Solidity.ArgValue
 
 import           Blockchain.Data.ArbitraryInstances ()
 import           Blockchain.Data.Enode
+import           Blockchain.ExtWord
 import           Blockchain.TypeLits
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
@@ -51,6 +52,7 @@ data ChainInput  = ChainInput
   , chaininputBalances :: NamedMap "address" "balance" Address Integer
   , chaininputArgs     :: Map Text ArgValue
   , chaininputMembers  :: NamedMap "address" "enode" Address Enode
+  , chaininputParentChain :: Maybe Word256
   , chaininputMetadata :: Maybe (Map Text Text)
   , chaininputAsync    :: Maybe Bool
   } deriving (Eq, Show, Generic)
@@ -107,6 +109,7 @@ exChainInput = ChainInput
          (Address 0x5815b9975001135697b5739956b9a6c87f1c575c, exampleEnode1)
        , (Address 0x93fdd1d21502c4f87295771253f5b71d897d911c, exampleEnode2)
        ]
+    , chaininputParentChain = Nothing
     , chaininputMetadata = Just $ Map.fromList [("history","Governance")]
     , chaininputAsync = Nothing
     }

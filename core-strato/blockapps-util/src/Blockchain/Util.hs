@@ -31,6 +31,15 @@ partitionWith :: Ord k => (a -> k) -> [a] -> [(k, [a])]
 partitionWith f = M.toList . foldr builder M.empty
   where builder a = M.alter (Just . (a:) . fromMaybe []) (f a)
 
+splitWith :: Eq k => (a -> k) -> [a] -> [(k, [a])]
+splitWith f = foldr agg []
+  where agg a [] = [(f a, [a])]
+        agg a kas@((k, as):kas') =
+          let fa = f a
+           in if fa == k
+                then (k, a:as):kas'
+                else (fa, [a]):kas
+
 showHex4 :: Word256 -> String
 showHex4 i = replicate (4 - length rawOutput) '0' ++ rawOutput
     where rawOutput = showHex i ""
