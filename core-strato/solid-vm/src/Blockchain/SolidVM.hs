@@ -1,7 +1,9 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
@@ -39,7 +41,7 @@ import           Data.Time.Clock.POSIX
 import           Data.Traversable
 import qualified Data.Vector as V
 import           GHC.Exts                             hiding (breakpoint)
-import           Text.Parsec (runParser)
+import           Text.Parsec (ParseError, runParser)
 import           Text.Printf
 import           Text.Read (readMaybe)
 
@@ -52,6 +54,7 @@ import qualified Blockchain.Database.MerklePatricia   as MP
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.ModifyStateDB          (pay)
 import           Blockchain.ExtWord
+import           Blockchain.Output
 import qualified Blockchain.SolidVM.Builtins          as Builtins
 import           Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.SolidVM.Environment       as Env
@@ -1649,3 +1652,89 @@ encodeForReturn (STuple items) = do
 
 encodeForReturn x = todo "can't encode this return type" x
 
+
+
+breakpoint :: MonadSM m => Xabi.SourcePos -> m ()
+breakpoint pos = do
+  isBreak <- isBreakpoint pos
+  when isBreak $ do
+    cStack <- Mod.get (Mod.Proxy @[CallInfo])
+    $logInfoS "breakpoint" . T.pack $ "Paused on breakpoint: " ++ show pos
+    handleBreakpoint pos cStack
+    $logInfoS "breakpoint" . T.pack $ "Resuming from breakpoint: " ++ show pos
+
+localVariableMap :: MonadSM m => [CallInfo] -> m (M.Map T.Text T.Text)
+localVariableMap [] = pure M.empty
+localVariableMap (ci:_) = fmap M.fromList $ do
+  forM (M.toList $ localVariables ci) $ \(name, (_, var)) -> do
+    val <- getVar var
+    valueString <- showSM val
+    pure (T.pack name, T.pack valueString)
+
+bpLoc :: Xabi.SourcePos -> BreakpointLoc
+bpLoc pos = BreakpointLoc (T.pack $ Xabi.sourceName pos)
+                          (Xabi.sourceLine pos)
+                          (Xabi.sourceColumn pos)
+
+runExpr :: MonadSM m => T.Text -> m (Either ParseError Value)
+runExpr exprText =
+  let eExpr = runParser expression "" "" (T.unpack exprText)
+   in traverse (getVar <=< expToVar) eExpr
+
+breakpointMatches :: MonadSM m => Xabi.SourcePos -> Breakpoint -> m Bool
+breakpointMatches pos = \case
+  UnconditionalBP loc -> pure $ matchesLoc loc
+  ConditionalBP loc exprText -> if not (matchesLoc loc)
+    then pure False
+    else runCond exprText
+  DataBP exprText -> runCond exprText
+  FunctionBP _ -> pure False -- TODO
+  where matchesLoc loc = bpLoc pos == loc
+        runCond exprText = do
+          val <- runExpr exprText
+          case val of
+            Right (SBool v) -> pure v
+            _ -> pure False
+
+isBreakpoint :: MonadSM m => Xabi.SourcePos -> m Bool
+isBreakpoint pos = do
+  debugSettings <- Mod.access (Mod.Proxy @DebugSettings)
+  case debugSettings of
+    DebuggingDisabled -> pure False
+    DebugSettings{..} -> do
+      currentOperation <- atomically $ readTVar operation
+      if currentOperation == Run
+        then do
+          bPoints <- fmap S.toList . atomically $ readTVar breakpoints
+          matchedBP <- or <$> traverse (breakpointMatches pos) bPoints
+          if matchedBP
+            then atomically $ writeTVar operation Pause >> pure True
+            else pure False
+        else pure True
+
+handleBreakpoint :: MonadSM m => Xabi.SourcePos -> [CallInfo] -> m ()
+handleBreakpoint pos cStack = do
+  debugSettings <- Mod.access (Mod.Proxy @DebugSettings)
+  case debugSettings of
+    DebuggingDisabled -> pure ()
+    DebugSettings{..} -> do
+      let bPoint = BreakpointLoc (T.pack $ Xabi.sourceName pos)
+                                 (Xabi.sourceLine pos)
+                                 (Xabi.sourceColumn pos)
+          cStack' = map (T.pack . currentFunctionName) cStack
+      vars <- localVariableMap cStack
+      watchExprs <- fmap S.toList . atomically $ readTVar watchExpressions
+      watchVals <- traverse runExpr watchExprs
+      watchVals' <- traverse (fmap T.pack . either (pure . show) showSM) watchVals
+      let watchValsMap = M.fromList $ zip watchExprs watchVals'
+      atomically $ do
+        writeTVar current . Just $ DebugState bPoint cStack' vars watchValsMap
+        currentOperation <- readTVar operation
+        case currentOperation of
+          Run -> pure ()
+          Pause -> retrySTM
+          StepIn -> writeTVar operation Pause
+          StepOver n -> writeTVar operation (InStepOver n)
+          InStepOver n -> when (length cStack' <= n) retrySTM
+          StepOut n -> writeTVar operation (InStepOut n)
+          InStepOut n -> when (length cStack' < n) retrySTM

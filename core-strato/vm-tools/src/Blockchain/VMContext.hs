@@ -19,7 +19,9 @@ module Blockchain.VMContext
     ( CurrentBlockHash(..)
     , withCurrentBlockHash
     , Breakpoint(..)
+    , BreakpointLoc(..)
     , DebugSettings(..)
+    , DebugState(..)
     , DebugOperation(..)
     , newDebugSettings
     , VMBase
@@ -141,8 +143,14 @@ instance NFData RBDB.RedisConnection where
 data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo (Keccak256, BlockData, Integer, Int, Int)
     deriving (Eq, Read, Show, Generic, NFData)
 
-data Breakpoint = Breakpoint
-  { breakpointFile   :: String
+data Breakpoint = UnconditionalBP BreakpointLoc
+                | ConditionalBP BreakpointLoc T.Text -- TODO: should be Expression
+                | DataBP T.Text -- TODO: should be Expression
+                | FunctionBP T.Text -- function name
+                deriving (Eq, Ord, Show, Generic, NFData, Aeson.ToJSON, Aeson.FromJSON)
+
+data BreakpointLoc = BreakpointLoc
+  { breakpointFile   :: T.Text
   , breakpointLine   :: Int
   , breakpointColumn :: Int
   } deriving (Eq, Ord, Show, Generic, NFData, Aeson.ToJSON, Aeson.FromJSON)
@@ -156,13 +164,21 @@ data DebugOperation = Run
                     | InStepOut {-# UNPACK #-} !Int
                     deriving (Eq, Ord, Show, Generic, NFData, Aeson.ToJSON, Aeson.FromJSON)
 
+data DebugState = DebugState
+  { debugStateBreakpoint :: BreakpointLoc
+  , debugStateCallStack  :: [T.Text]
+  , debugStateVariables  :: M.Map T.Text T.Text
+  , debugStateWatches    :: M.Map T.Text T.Text
+  } deriving (Eq, Ord, Show, Generic, NFData, Aeson.ToJSON, Aeson.FromJSON)
+
 data DebugSettings = DebuggingDisabled
                    | DebugSettings {
                      operation :: TVar DebugOperation
                    , breakpoints :: TVar (S.Set Breakpoint)
-                   , current :: TVar (Maybe (Breakpoint, [T.Text], M.Map T.Text T.Text))
+                   , current :: TVar (Maybe DebugState)
                    , exceptionBreakpoints :: TVar Bool
                    , functionBreakpoints :: TVar Bool
+                   , watchExpressions :: TVar (S.Set T.Text)
                    } deriving (Eq, Generic)
 
 instance NFData DebugSettings where
@@ -176,6 +192,7 @@ newDebugSettings = DebugSettings
                <*> (newTVar Nothing)
                <*> (newTVar False)
                <*> (newTVar False)
+               <*> (newTVar S.empty)
 
 data ContextDBs = ContextDBs
   { _stateDB        :: MP.StateDB

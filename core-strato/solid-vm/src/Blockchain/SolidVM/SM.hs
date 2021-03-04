@@ -22,7 +22,9 @@ module Blockchain.SolidVM.SM (
   runSM,
   getCurrentAccount,
   addCallInfo,
+  dupCallInfo,
   popCallInfo,
+  withTempCallInfo,
   getLocal,
   setLocal,
   getCurrentCallInfo,
@@ -457,10 +459,22 @@ addCallInfo a c fn hsh cc initialLocalVariables ro = do
 
   Mod.modify_ (Mod.Proxy @[CallInfo]) $ pure . (newCallInfo:)
 
+dupCallInfo :: MonadSM m => m ()
+dupCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
+  [] -> internalError "dupCallInfo was called on an already empty stack" ()
+  (ci:rest) -> pure $ ci:ci:rest
+
 popCallInfo :: MonadSM m => m ()
 popCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
   [] -> internalError "popCallInfo was called on an already empty stack" ()
   (_:rest) -> pure rest
+
+withTempCallInfo :: MonadSM m => m a -> m a
+withTempCallInfo f = do
+  dupCallInfo
+  result <- f
+  popCallInfo
+  pure result
 
 getCurrentCallInfo :: MonadSM m => m CallInfo
 getCurrentCallInfo = do

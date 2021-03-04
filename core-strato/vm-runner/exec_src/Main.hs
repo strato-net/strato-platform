@@ -26,7 +26,6 @@ import Servant
 import Control.Exception hiding (Handler)
 import Control.Monad.IO.Class
 import Data.Aeson
-import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
 import UnliftIO.STM
@@ -35,11 +34,8 @@ import Blockchain.VMOptions
 import qualified Network.WebSockets as WS
 
 data DebuggerStatus = Running
-                    | Paused {
-                      breakpoint :: Breakpoint
-                    , callstack :: [T.Text]
-                    , variables :: M.Map T.Text T.Text
-                    } deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON)
+                    | Paused DebugState
+                    deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON)
 
 status :: MonadIO m => DebugSettings -> m DebuggerStatus
 status dSettings = case dSettings of
@@ -50,7 +46,7 @@ status dSettings = case dSettings of
       then pure Running
       else case mCurrent of
         Nothing -> pure Running
-        Just (b, cs, vs) -> pure $ Paused b cs vs
+        Just dbgst -> pure $ Paused dbgst
 
 pause :: MonadIO m => DebugSettings -> m DebuggerStatus
 pause dSettings = case dSettings of
@@ -61,7 +57,7 @@ pause dSettings = case dSettings of
       readTVar current
     case mCurrent of
       Nothing -> pure Running
-      Just (b, cs, vs) -> pure $ Paused b cs vs
+      Just dbgst -> pure $ Paused dbgst
 
 resume :: MonadIO m => DebugSettings -> m DebuggerStatus
 resume dSettings = case dSettings of
@@ -81,7 +77,7 @@ stepIn dSettings = case dSettings of
       readTVar current
     case mCurrent of
       Nothing -> pure Running
-      Just (b, cs, vs) -> pure $ Paused b cs vs
+      Just dbgst -> pure $ Paused dbgst
 
 stepOver :: MonadIO m => DebugSettings -> m DebuggerStatus
 stepOver dSettings = case dSettings of
@@ -91,11 +87,11 @@ stepOver dSettings = case dSettings of
       mCurrent <- readTVar current
       case mCurrent of
         Nothing -> writeTVar operation Run
-        Just (_, cStack, _) -> writeTVar operation (StepOver $ length cStack)
+        Just (DebugState _ cStack _ _) -> writeTVar operation (StepOver $ length cStack)
       pure mCurrent
     case mCurrent of
       Nothing -> pure Running
-      Just (b, cs, vs) -> pure $ Paused b cs vs
+      Just dbgst-> pure $ Paused dbgst
 
 stepOut :: MonadIO m => DebugSettings -> m DebuggerStatus
 stepOut dSettings = case dSettings of
@@ -105,11 +101,11 @@ stepOut dSettings = case dSettings of
       mCurrent <- readTVar current
       case mCurrent of
         Nothing -> writeTVar operation Run
-        Just (_, cStack, _) -> writeTVar operation (StepOut $ length cStack)
+        Just (DebugState _ cStack _ _) -> writeTVar operation (StepOut $ length cStack)
       pure mCurrent
     case mCurrent of
       Nothing -> pure Running
-      Just (b, cs, vs) -> pure $ Paused b cs vs
+      Just dbgst -> pure $ Paused dbgst
 
 getBreakpoints :: MonadIO m => DebugSettings -> m [Breakpoint]
 getBreakpoints dSettings = case dSettings of
@@ -127,7 +123,7 @@ addBreakpoints bPoints dSettings = case dSettings of
       then pure Running
       else case mCurrent of
         Nothing -> pure Running
-        Just (b, cs, vs) -> pure $ Paused b cs vs
+        Just dbgst -> pure $ Paused dbgst
 
 removeBreakpoints :: MonadIO m => [Breakpoint] -> DebugSettings -> m DebuggerStatus
 removeBreakpoints bPoints dSettings = case dSettings of
@@ -142,7 +138,7 @@ removeBreakpoints bPoints dSettings = case dSettings of
       then pure Running
       else case mCurrent of
         Nothing -> pure Running
-        Just (b, cs, vs) -> pure $ Paused b cs vs
+        Just dbgst -> pure $ Paused dbgst
 
 type RestDebuggerAPI = GetStatus
                   :<|> PutPause
