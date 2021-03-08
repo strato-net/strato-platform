@@ -157,10 +157,14 @@ readEnode input =
   
 readEnodeOrFail :: String -> Either String Enode
 readEnodeOrFail input =
-  case matchRegex (mkRegex "^enode://([0-9a-f]{128})@([^:]+)\\:([0-9]+)(\\?discport=([0-9]+))?$") input of
+  case matchRegex (mkRegex "^enode://([0-9a-f]+)@([^:]+)\\:([0-9]+)(\\?discport=([0-9]+))?$") input of
     Nothing -> Left $ "enode is in the wrong format: " ++ input
-    Just [pubkey, ip, port, _, discport] -> do
-      let ~(oId, rest) = B16.decode $ C8.pack pubkey
+    Just [pubkey', ip, port, _, discport] -> do
+      let publen = length pubkey'
+          pubkey = if publen >= 128
+                     then pubkey'
+                     else replicate (128 - publen) '0' <> pubkey'
+          ~(oId, rest) = B16.decode $ C8.pack pubkey
       orgId <- if B.null rest
         then pure $ OrgId oId
         else fail $ "Failed on parsing OrdId: " ++ pubkey
