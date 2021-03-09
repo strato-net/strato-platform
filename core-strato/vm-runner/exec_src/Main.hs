@@ -41,71 +41,57 @@ status :: MonadIO m => DebugSettings -> m DebuggerStatus
 status dSettings = case dSettings of
   DebuggingDisabled -> pure Running
   DebugSettings{..} -> do
-    ~(currentOperation, mCurrent) <- atomically $ (,) <$> readTVar operation <*> readTVar current
-    if currentOperation == Run
-      then pure Running
-      else case mCurrent of
-        Nothing -> pure Running
-        Just dbgst -> pure $ Paused dbgst
+    mCurrent <- atomically $ readTVar current
+    case mCurrent of
+      Nothing -> pure Running
+      Just dbgst -> pure $ Paused dbgst
 
 pause :: MonadIO m => DebugSettings -> m DebuggerStatus
 pause dSettings = case dSettings of
   DebuggingDisabled -> pure Running
   DebugSettings{..} -> do
-    mCurrent <- atomically $ do
+    void . atomically $ do
       writeTVar operation Pause
       readTVar current
-    case mCurrent of
-      Nothing -> pure Running
-      Just dbgst -> pure $ Paused dbgst
+    status dSettings
 
 resume :: MonadIO m => DebugSettings -> m DebuggerStatus
 resume dSettings = case dSettings of
   DebuggingDisabled -> pure Running
   DebugSettings{..} -> do
-    atomically $ do
+    void . atomically $ do
       writeTVar operation Run
       writeTVar current Nothing
-    pure Running
+    status dSettings
 
 stepIn :: MonadIO m => DebugSettings -> m DebuggerStatus
 stepIn dSettings = case dSettings of
   DebuggingDisabled -> pure Running
   DebugSettings{..} -> do
-    mCurrent <- atomically $ do
-      writeTVar operation StepIn
-      readTVar current
-    case mCurrent of
-      Nothing -> pure Running
-      Just dbgst -> pure $ Paused dbgst
+    void . atomically $ writeTVar operation StepIn
+    status dSettings
 
 stepOver :: MonadIO m => DebugSettings -> m DebuggerStatus
 stepOver dSettings = case dSettings of
   DebuggingDisabled -> pure Running
   DebugSettings{..} -> do
-    mCurrent <- atomically $ do
+    void . atomically $ do
       mCurrent <- readTVar current
       case mCurrent of
         Nothing -> writeTVar operation Run
         Just (DebugState _ cStack _ _) -> writeTVar operation (StepOver $ length cStack)
-      pure mCurrent
-    case mCurrent of
-      Nothing -> pure Running
-      Just dbgst-> pure $ Paused dbgst
+    status dSettings
 
 stepOut :: MonadIO m => DebugSettings -> m DebuggerStatus
 stepOut dSettings = case dSettings of
   DebuggingDisabled -> pure Running
   DebugSettings{..} -> do
-    mCurrent <- atomically $ do
+    void . atomically $ do
       mCurrent <- readTVar current
       case mCurrent of
         Nothing -> writeTVar operation Run
         Just (DebugState _ cStack _ _) -> writeTVar operation (StepOut $ length cStack)
-      pure mCurrent
-    case mCurrent of
-      Nothing -> pure Running
-      Just dbgst -> pure $ Paused dbgst
+    status dSettings
 
 getBreakpoints :: MonadIO m => DebugSettings -> m [Breakpoint]
 getBreakpoints dSettings = case dSettings of
@@ -116,29 +102,37 @@ addBreakpoints :: MonadIO m => [Breakpoint] -> DebugSettings -> m DebuggerStatus
 addBreakpoints bPoints dSettings = case dSettings of
   DebuggingDisabled -> pure Running
   DebugSettings{..} -> do
-    ~(currentOperation, mCurrent) <- atomically $ do
+    void . atomically $ do
       modifyTVar breakpoints $ \bps -> foldr S.insert bps bPoints
-      (,) <$> readTVar operation <*> readTVar current
-    if currentOperation == Run
-      then pure Running
-      else case mCurrent of
-        Nothing -> pure Running
-        Just dbgst -> pure $ Paused dbgst
+    status dSettings
 
 removeBreakpoints :: MonadIO m => [Breakpoint] -> DebugSettings -> m DebuggerStatus
 removeBreakpoints bPoints dSettings = case dSettings of
   DebuggingDisabled -> pure Running
   DebugSettings{..} -> do
-    ~(currentOperation, mCurrent) <- atomically $ do
+    void . atomically $ do
       modifyTVar breakpoints $ \bps -> case bPoints of
         [] -> S.empty
         bPoints' -> foldr S.delete bps bPoints'
-      (,) <$> readTVar operation <*> readTVar current
-    if currentOperation == Run
-      then pure Running
-      else case mCurrent of
-        Nothing -> pure Running
-        Just dbgst -> pure $ Paused dbgst
+    status dSettings
+
+addWatches :: MonadIO m => [T.Text] -> DebugSettings -> m DebuggerStatus
+addWatches watches dSettings = case dSettings of
+  DebuggingDisabled -> pure Running
+  DebugSettings{..} -> do
+    void . atomically $ do
+      modifyTVar watchExpressions $ \wes -> foldr S.insert wes watches
+    status dSettings
+
+removeWatches :: MonadIO m => [T.Text] -> DebugSettings -> m DebuggerStatus
+removeWatches watches dSettings = case dSettings of
+  DebuggingDisabled -> pure Running
+  DebugSettings{..} -> do
+    void . atomically $ do
+      modifyTVar watchExpressions $ \wes -> case watches of
+        [] -> S.empty
+        watches' -> foldr S.delete wes watches'
+    status dSettings
 
 type RestDebuggerAPI = GetStatus
                   :<|> PutPause
@@ -193,9 +187,13 @@ data WSDebuggerInput = WSStatus
                      | WSGetBreakpoints
                      | WSAddBreakpoints [Breakpoint]
                      | WSRemoveBreakpoints [Breakpoint]
+                     | WSClearBreakpoints
                      | WSStepIn
                      | WSStepOver
                      | WSStepOut
+                     | WSAddWatches [T.Text]
+                     | WSRemoveWatches [T.Text]
+                     | WSClearWatches
                      deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
 wsDebugger :: DebugSettings -> IO ()
@@ -230,9 +228,13 @@ wsDebuggerController = \case
   WSGetBreakpoints -> fmap Left . getBreakpoints
   WSAddBreakpoints b -> fmap Right . addBreakpoints b
   WSRemoveBreakpoints b -> fmap Right . removeBreakpoints b
+  WSClearBreakpoints -> fmap Right . removeBreakpoints []
   WSStepIn -> fmap Right . stepIn
   WSStepOver -> fmap Right . stepOver
   WSStepOut -> fmap Right . stepOut
+  WSAddWatches w -> fmap Right . addWatches w
+  WSRemoveWatches w -> fmap Right . removeWatches w
+  WSClearWatches -> fmap Right . removeWatches []
 
 talk :: WS.Connection -> DebugSettings -> IO ()
 talk conn dSettings = forever $ do

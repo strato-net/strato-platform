@@ -1727,8 +1727,15 @@ handleBreakpoint pos cStack = do
       watchVals <- traverse runExpr watchExprs
       watchVals' <- traverse (fmap T.pack . either (pure . show) showSM) watchVals
       let watchValsMap = M.fromList $ zip watchExprs watchVals'
+      acct <- getCurrentAccount
+      ~(contract, _, _) <- getCodeAndCollection acct
+      let stateVars = map T.pack . M.keys $ contract ^. storageDefs
+      easdf <- traverse runExpr stateVars
+      asdfs <- fmap (map T.pack) . traverse (either (pure . show) showSM) $ easdf
+      let stateVals = M.fromList $ zip stateVars asdfs
+          vars' = stateVals <> vars
+      void . atomically . writeTVar current . Just $ DebugState bPoint cStack' vars' watchValsMap
       atomically $ do
-        writeTVar current . Just $ DebugState bPoint cStack' vars watchValsMap
         currentOperation <- readTVar operation
         case currentOperation of
           Run -> pure ()
