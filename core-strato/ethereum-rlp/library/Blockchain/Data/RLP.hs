@@ -22,7 +22,6 @@ import           Data.Bits
 import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Base16             as B16
 import qualified Data.ByteString.Char8              as BC
-import qualified Data.ByteString.UTF8               as UTF8
 import           Data.ByteString.Internal
 import qualified Data.Map                           as M
 import qualified Data.Text                          as T
@@ -157,9 +156,9 @@ instance RLPSerializable Integer where
   rlpDecode (RLPArray _)  = error "rlpDecode called for Integer for array"
 
 instance {-# OVERLAPPING #-} RLPSerializable String where
-  rlpEncode s = rlpEncode $ UTF8.fromString s
+  rlpEncode s = rlpEncode $ BC.pack s
 
-  rlpDecode (RLPString s) = UTF8.toString s
+  rlpDecode (RLPString s) = BC.unpack s
   rlpDecode (RLPScalar n) = [w2c $ fromIntegral n]
   rlpDecode (RLPArray x) = error $ "Malformed RLP in call to rlpDecode for String: RLPObject is an array: " ++ show (pretty x)
 

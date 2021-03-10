@@ -68,7 +68,7 @@ getSolid loc key = case loc of
 fromBasic :: MS.BasicValue -> Value
 fromBasic = \case
   MS.BInteger i -> SInteger i
-  MS.BString s -> SString . UTF8.toString $ s
+  MS.BString s -> SString . BC.unpack $ s
   MS.BBool b -> SBool b
   MS.BAccount a -> SAccount a
   MS.BContract n a -> SContract (T.unpack n) a
@@ -91,7 +91,7 @@ findDefault = \case
 toBasic :: Value -> MS.BasicValue
 toBasic = \case
   SInteger i -> MS.BInteger i
-  SString s -> MS.BString (UTF8.fromString s)
+  SString s -> MS.BString (BC.pack s)
   SBool b -> MS.BBool b
   SAccount a -> MS.BAccount a
   SContract n a -> MS.BContract (T.pack n) a
@@ -141,11 +141,20 @@ setVal (STuple dstVector) (STuple srcVector) =
       srcItemVal <- getVar srcItemVar
       setVar dstItem srcItemVal
     
-setVal dst@(SReference (AccountPath addr path)) src = do
+setVal dst@(SReference addressedPath@(AccountPath addr path)) src = do
   ro <- readOnly <$> getCurrentCallInfo
   when ro $ invalidWrite "Invalid write during read-only access" $ "src: " ++ show src ++ ", dst: " ++ show dst
-  markDiffForAction addr path $ toBasic src
-  putSolidStorageKeyVal' addr path $ toBasic src
+  t <- getXabiValueType addressedPath   -- IMPORTANT: t is not evaulated until it is used
+  let basicSrc = case src of
+                        SString s ->
+                            case t of   -- t is evaluated here because Haskell is lazy
+                                        -- We ONLY want to evaluate it if we know src is a SString because
+                                        -- in some non-SString cases getXabiValueType will throw an exception
+                                Xabi.String{} -> MS.BString . UTF8.fromString $ s 
+                                _             -> toBasic src
+                        _         -> toBasic src
+  markDiffForAction addr path basicSrc
+  putSolidStorageKeyVal' addr path basicSrc
 
 
 setVal dst src = typeError "unknown case called in setVal:" ("src = " ++ show src ++ ", dst = " ++ show dst)
@@ -202,6 +211,11 @@ getVar (Constant (SReference addressedPath@(AccountPath addr key))) = do
         TStruct _ _ -> return $ SReference addressedPath
         TComplex -> return $ SReference addressedPath
         _ -> return $ findDefault typeHint
+    MS.BString bs -> do
+        t <- getXabiValueType addressedPath
+        case t of
+                Xabi.String{} -> return . SString $ UTF8.toString bs
+                _             -> return $ fromBasic theValue
     _ -> return $ fromBasic theValue
 getVar (Constant v) = return v
 getVar (Variable v) = liftIO $ readIORef v

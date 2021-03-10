@@ -116,6 +116,7 @@ tests:
       - text
       - time
       - vm-tools
+      - utf8-string
 
 benchmarks:
     codebench:

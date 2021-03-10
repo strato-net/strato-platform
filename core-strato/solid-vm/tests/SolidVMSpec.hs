@@ -19,6 +19,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Short as SB
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Base16 as B16
+import qualified Data.ByteString.UTF8   as UTF8
 import Data.Coerce
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -127,15 +128,15 @@ runTest f = do
     Right{} -> return ()
 
 runFile :: FilePath -> ContextM ()
-runFile fp = void $ runBS =<< liftIO (B.readFile fp)
+runFile fp = void $ runBS =<< liftIO (readFile fp)
 
 runFileArgs :: T.Text -> FilePath -> ContextM ()
-runFileArgs args fp = void $ runArgs args =<< liftIO (B.readFile fp)
+runFileArgs args fp = void $ runArgs args =<< liftIO (readFile fp)
 
-runBS :: B.ByteString -> ContextM ()
+runBS :: String -> ContextM ()
 runBS = void . runBS'
 
-runBS' ::B.ByteString -> ContextM ExecResults
+runBS' ::String -> ContextM ExecResults
 runBS' = runArgs "()"
 
 rethrowEx :: ExecResults -> ContextM ()
@@ -143,9 +144,9 @@ rethrowEx ExecResults{erException=Just ex} = either (liftIO . throwIO . HE) (voi
 rethrowEx _ = return ()
 
 
-runArgs :: T.Text -> B.ByteString -> ContextM ExecResults
+runArgs :: T.Text -> String -> ContextM ExecResults
 runArgs args bs = do
-  let code = Code bs
+  let code = Code $ UTF8.fromString bs
       isTest = error "TODO: isTest"
       isHomestead = error "TODO: isHomestead"
       suicides = error "TODO: suicides"
@@ -179,9 +180,9 @@ runArgs args bs = do
   return er
 
 
-runCall :: T.Text -> T.Text -> B.ByteString -> ContextM (Maybe SB.ShortByteString)
+runCall :: T.Text -> T.Text -> String -> ContextM (Maybe SB.ShortByteString)
 runCall funcName callArgs bs = do
-  let code = Code bs
+  let code = Code $ UTF8.fromString bs
       isTest = error "TODO: isTest"
       isHomestead = error "TODO: isHomestead"
       suicides = error "TODO: suicides"
@@ -1843,6 +1844,23 @@ contract qq {
   }
 }|] `shouldReturn` Nothing
     getFields ["st"] `shouldReturn` [BString "deadbeef00000000000000000000000000000000000000000000000000000000"]
+
+  it "can accept Unicode string arguments" . runTest $ do
+    runCall "set" "(\"4.11 g CO₂ / t · nm\")" [r|
+contract qq {
+  string st;
+  function set(string _st) public {
+    st = _st;
+  }
+}|] `shouldReturn` Nothing
+    getFields ["st"] `shouldReturn` [BString (UTF8.fromString "4.11 g CO₂ / t · nm")]
+
+  it "can encode Unicode strings in Solidtiy source" . runTest $ do
+    runBS [r|
+contract qq {
+  string st = "4.11 g CO₂ / t · nm";
+}|]
+    getFields ["st"] `shouldReturn` [BString (UTF8.fromString "4.11 g CO₂ / t · nm")]
 
   it "can accept bytes32 arguments" . runTest $ do
     runCall "set" "(\"deadbeef00000000000000000000000000000000000000000000000000000000\")" [r|
