@@ -73,6 +73,12 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
     sed -i 's/<SSL_CERT_FILE_TYPE>/'"$sslCertFileType"'/g' /tmp/nginx.conf
   fi
 
+  if [ "$USE_OLD_STRATO_API" == true ]; then
+    sed -i '/#TEMPLATE_MARK_NEW_STRATO_API/d' /tmp/nginx.conf
+  else
+    sed -i '/#TEMPLATE_MARK_OLD_STRATO_API/d' /tmp/nginx.conf
+  fi
+
   # Remove tracking lines if running in mode 1
   if [ "$STRATO_GS_MODE" = 1 ] ; then
     sed -i '/#TEMPLATE_MARK_TRACK/d' /tmp/nginx.conf

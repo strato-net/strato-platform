@@ -21,12 +21,15 @@ module Blockchain.Data.ChainInfo
   , AccountInfo (..)
   , CodeInfo (..)
   , isAncestorChainOf
+  , getAncestorChains
+  , getNthAncestorChain
   , accountExtractor
   ) where
 
 
 import           Control.Applicative               (many)
 import qualified Control.Monad.Change.Alter        as A
+import           Control.Monad                     (join)
 
 import           Blockchain.ExtWord
 import           Blockchain.Data.Enode
@@ -45,6 +48,7 @@ import qualified Data.ByteString.Char8                as C8
 import           Data.Data
 import qualified Data.JsonStream.Parser               as JS
 import qualified Data.Map.Strict                      as M
+import           Data.Maybe                           (listToMaybe)
 import           Data.Swagger                         hiding (Format, format)
 import qualified Data.Text                            as T
 import           Data.Text.Encoding                   (encodeUtf8, decodeUtf8)
@@ -62,7 +66,7 @@ newtype ParentChainId = ParentChainId { unParentChainId :: Maybe Word256 }
 data CodeInfo = CodeInfo
   { codeInfoCode   :: B.ByteString
   , codeInfoSource :: T.Text
-  , codeInfoName   :: T.Text
+  , codeInfoName   :: Maybe T.Text
   } deriving (Show, Read, Eq, GHCG.Generic, Data)
 
 instance Format CodeInfo where
@@ -98,9 +102,12 @@ instance ToJSON CodeInfo where
     ]
 
 instance RLPSerializable CodeInfo where
-  rlpEncode (CodeInfo a b c) =
+  rlpEncode (CodeInfo a b Nothing) =
+    RLPArray [rlpEncode a, rlpEncode $ encodeUtf8 b]
+  rlpEncode (CodeInfo a b (Just c)) =
     RLPArray [rlpEncode a, rlpEncode $ encodeUtf8 b, rlpEncode $ encodeUtf8 c]
-  rlpDecode (RLPArray [a,b,c]) = CodeInfo (rlpDecode a) (decodeUtf8 $ rlpDecode b) (decodeUtf8 $ rlpDecode c)
+  rlpDecode (RLPArray [a,b]) = CodeInfo (rlpDecode a) (decodeUtf8 $ rlpDecode b) Nothing
+  rlpDecode (RLPArray [a,b,c]) = CodeInfo (rlpDecode a) (decodeUtf8 $ rlpDecode b) (Just $ decodeUtf8 $ rlpDecode c)
   rlpDecode _ = error ("Error in rlpDecode for CodeInfo: bad RLPObject")
 
 data AccountInfo = NonContract Address Integer
@@ -242,7 +249,7 @@ data UnsignedChainInfo = UnsignedChainInfo
   , creationBlock  :: Keccak256
   , chainNonce     :: Word256
   , chainMetadata  :: (M.Map T.Text T.Text)
-  } deriving (Eq, Show, GHCG.Generic, Data)
+  } deriving (Eq, GHCG.Generic, Data)
 
 
 
@@ -266,19 +273,22 @@ instance ToSchema ChainInfo where
 --    NamedSchema (Just "ChainInfo")
 --      ( mempty )
 
-instance Format UnsignedChainInfo where
-  format UnsignedChainInfo{..} = unlines
+instance Show UnsignedChainInfo where
+  show UnsignedChainInfo{..} = unlines
     [ "UnsignedChainInfo"
     , "-----------------"
     , tab $ "Label:          " ++ show chainLabel
     , tab $ "Account info:   " ++ format accountInfo
-    , tab $ "Code info:      " ++ format codeInfo
+    , tab $ "Code info:      " ++ show (codeInfoName <$> codeInfo)
     , tab $ "Members:        " ++ show members
     , tab $ "Parent chain:   " ++ CL.yellow (format parentChain)
     , tab $ "Creation block: " ++ format creationBlock
     , tab $ "Nonce:          " ++ CL.yellow (format chainNonce)
-    , tab $ "Metadata:       " ++ show chainMetadata
+    , tab $ "Metadata:       " ++ show (M.keys chainMetadata)
     ]
+
+instance Format UnsignedChainInfo where
+  format = show
 
 data ChainInfo = ChainInfo
   { chainInfo      :: UnsignedChainInfo
@@ -360,6 +370,15 @@ isAncestorChainOf (Just ancestor) (Just descendent) | ancestor == descendent = p
 isAncestorChainOf ancestor descendent = A.select (A.Proxy @ParentChainId) descendent >>= \case
   Nothing -> pure False
   Just (ParentChainId parent) -> ancestor `isAncestorChainOf` parent
+
+getAncestorChains :: A.Selectable (Maybe Word256) ParentChainId m => Maybe Word256 -> m [Maybe Word256]
+getAncestorChains Nothing  = pure [] -- needed in case we somehow have an entry for `Nothing` in the db
+getAncestorChains descendent = A.select (A.Proxy @ParentChainId) descendent >>= \case
+  Nothing -> pure [descendent]
+  Just (ParentChainId parent) -> (descendent:) <$> getAncestorChains parent
+
+getNthAncestorChain :: A.Selectable (Maybe Word256) ParentChainId m => Int -> Maybe Word256 -> m (Maybe Word256)
+getNthAncestorChain n = fmap (join . listToMaybe . drop n) . getAncestorChains
 
 accountExtractor :: JS.Parser [AccountInfo]
 accountExtractor = many ("accountInfo" JS..: JS.arrayOf acctInfo)

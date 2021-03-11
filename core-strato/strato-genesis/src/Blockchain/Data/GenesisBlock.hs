@@ -35,8 +35,9 @@ import           Blockchain.Database.MerklePatricia
 
 import qualified Blockchain.Strato.Model.Action               as A
 import           Blockchain.Data.AddressStateDB
-import           Blockchain.Data.BlockDB
+import           Blockchain.Data.Block
 import           Blockchain.Data.ChainInfo
+import           Blockchain.Data.DataDefs
 import           Blockchain.Data.GenesisInfo
 import           Blockchain.DB.AddressStateDB
 import           Blockchain.DB.CodeDB
@@ -242,8 +243,7 @@ genesisInfoToGenesisBlock gi gn as = do
     initializeStateDBAndAccountInfos (Nothing :: Maybe Word256) accounts gn
     sr <- A.lookupWithDefault (Proxy @StateRoot) (Nothing :: Maybe Word256)
     let sourceInfo = zipSourceInfo (accounts ++ as) codes
-    return (sourceInfo, Block {
-        blockBlockData = BlockData {
+        bData = BlockData {
             blockDataParentHash = genesisInfoParentHash gi,
             blockDataUnclesHash = genesisInfoUnclesHash gi,
             blockDataCoinbase = genesisInfoCoinbase gi,
@@ -259,7 +259,9 @@ genesisInfoToGenesisBlock gi gn as = do
             blockDataExtraData = i2bs_unsized $ genesisInfoExtraData gi,
             blockDataMixHash = genesisInfoMixHash gi,
             blockDataNonce = genesisInfoNonce gi
-        },
+          }
+    return (sourceInfo, Block {
+        blockBlockData = bData,
         blockReceiptTransactions = [],
         blockBlockUncles         = []
     })
@@ -291,7 +293,10 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) = do
   commitSqlDiffs diff
   let metadatas = Map.fromList $ flip map codeInfo $ \ci ->
         let cHash = hash $ codeInfoCode ci
-            md    = Map.fromList [("src",codeInfoSource ci),("name",codeInfoName ci)]
+            md    = Map.fromList $ [("src",codeInfoSource ci)] ++
+                                   case codeInfoName ci of
+                                       Nothing -> []
+                                       Just n -> [("name", n)]
          in (cHash, md)
       getMetadata mch = fmap (`Map.union` chainMetadata) $ flip Map.lookup metadatas =<< mch
       toAction a d = do

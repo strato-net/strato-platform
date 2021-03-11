@@ -32,13 +32,12 @@ textPassword = Password . Text.encodeUtf8
 
 instance Show SecretBox.Nonce where
   show = show . Saltine.encode
-
+ 
 data KeyStore = KeyStore
-  { keystoreSalt          :: ByteString
+  { keystoreSalt          :: ByteString     -- deprecated, since we use the password salt now
   , keystoreAcctNonce     :: SecretBox.Nonce
   , keystoreAcctEncSecKey :: ByteString
   , keystoreAcctAddress   :: Address
-  , keystoreAcctPubKey    :: PublicKey
   } deriving (Eq, Show)
 
 decrypt
@@ -91,11 +90,9 @@ newKeyStore key = liftIO $ do
   acctSk <- liftIO newPrivateKey
   let encAcctSk = encrypt key acctNonce $ exportPrivateKey acctSk
       acctAddr = fromPrivateKey acctSk
-      acctPubKey = derivePublicKey acctSk
   return KeyStore
-    { keystoreSalt = salt
+    { keystoreSalt = salt -- Don't forget, this is unused now
     , keystoreAcctNonce = acctNonce
     , keystoreAcctEncSecKey = encAcctSk
     , keystoreAcctAddress = acctAddr
-    , keystoreAcctPubKey = acctPubKey
     }

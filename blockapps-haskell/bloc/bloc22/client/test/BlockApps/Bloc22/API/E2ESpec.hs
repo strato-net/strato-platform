@@ -108,7 +108,7 @@ spec =
         Right addr1 = postUsersEither1
         params1 = accountsFilterParams {qaAddress = Just addr1}
         postUsersContractRequest = PostUsersContractRequest
-          { postuserscontractrequestSrc = simpleStorageSrc
+          { postuserscontractrequestSrc = Map.singleton "" simpleStorageSrc
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just simpleStorageContractName
           , postuserscontractrequestArgs = Nothing
@@ -229,7 +229,7 @@ spec =
       let createContract fName ctName args un addr = do
             src <- readSolFile fName
             let postUsersContractRequest = PostUsersContractRequest
-                  { postuserscontractrequestSrc = src
+                  { postuserscontractrequestSrc = Map.singleton "" src
                   , postuserscontractrequestPassword = pw
                   , postuserscontractrequestContract = Just $ Text.pack ctName
                   , postuserscontractrequestArgs = args
@@ -313,7 +313,7 @@ spec =
         params1 = accountsFilterParams {qaAddress = Just addr1}
         simpleStorageAddressContractName = "SimpleStorageAddress"
         postUsersContractRequest = PostUsersContractRequest
-          { postuserscontractrequestSrc = simpleStorageAddressSrc
+          { postuserscontractrequestSrc = Map.singleton "" simpleStorageAddressSrc
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just simpleStorageAddressContractName
           , postuserscontractrequestArgs = Nothing
@@ -427,7 +427,7 @@ spec =
           simpleStorageBytes32ArraySrc
           Nothing
         postUsersContractRequest = PostUsersContractRequest
-          { postuserscontractrequestSrc = simpleStorageBytes32ArraySrc
+          { postuserscontractrequestSrc = Map.singleton "" simpleStorageBytes32ArraySrc
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just simpleStorageBytes32ArrayContractName
           , postuserscontractrequestArgs = Nothing
@@ -569,7 +569,7 @@ spec =
           simpleStorageBytes32ArraySrc
           Nothing
         postUsersContractRequest = PostUsersContractRequest
-          { postuserscontractrequestSrc = simpleStorageBytes32ArraySrc
+          { postuserscontractrequestSrc = Map.singleton "" simpleStorageBytes32ArraySrc
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just simpleStorageBytes32ArrayContractName
           , postuserscontractrequestArgs = Just storeArgs
@@ -593,7 +593,7 @@ spec =
       sameName2Src <- readSolFile "SameName2.sol"
       let
         sameName1ContractRequest = PostUsersContractRequest
-          { postuserscontractrequestSrc = sameName1Src
+          { postuserscontractrequestSrc = Map.singleton "" sameName1Src
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just "SameName"
           , postuserscontractrequestArgs = Nothing
@@ -602,7 +602,7 @@ spec =
           , postuserscontractrequestMetadata = Nothing
           }
         sameName2ContractRequest = PostUsersContractRequest
-          { postuserscontractrequestSrc = sameName2Src
+          { postuserscontractrequestSrc = Map.singleton "" sameName2Src
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just "SameName"
           , postuserscontractrequestArgs = Nothing
@@ -643,7 +643,7 @@ spec =
         Right addr1 = postUsersEither1
         params1 = accountsFilterParams {qaAddress = Just addr1}
         postUsersContractRequest = PostUsersContractRequest
-          { postuserscontractrequestSrc = simpleConstructorSrc
+          { postuserscontractrequestSrc = Map.singleton "" simpleConstructorSrc
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just simpleConstructorName
           , postuserscontractrequestArgs = Just $ Map.singleton "x" (ArgInt 3)
@@ -704,7 +704,7 @@ spec =
         Right addr1 = postUsersEither1
         params1 = accountsFilterParams {qaAddress = Just addr1}
         postUsersContractRequest = PostUsersContractRequest
-          { postuserscontractrequestSrc = simpleConstructorSrc
+          { postuserscontractrequestSrc = Map.singleton "" simpleConstructorSrc
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just testArrayStatName
           , postuserscontractrequestArgs = Just $ Map.singleton "x" (ArgArray (Vector.fromList [ArgInt 3,ArgInt 2,ArgInt 3]))
@@ -742,7 +742,7 @@ spec =
         Right addr1 = postUsersEither1
         params1 = accountsFilterParams {qaAddress = Just addr1}
         postUsersContractRequest = PostUsersContractRequest
-          { postuserscontractrequestSrc = simpleConstructorSrc
+          { postuserscontractrequestSrc = Map.singleton "" simpleConstructorSrc
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just testArrayStatName
           , postuserscontractrequestArgs = Just $ Map.singleton "x" (ArgArray (Vector.fromList (fmap ArgInt [1,2,3,4,5,6,7,8])))
@@ -779,7 +779,7 @@ spec =
         Right addr1 = postUsersEither1
         params1 = accountsFilterParams {qaAddress = Just addr1}
         postUsersContractRequest = PostUsersContractRequest
-          { postuserscontractrequestSrc = simpleConstructorSrc
+          { postuserscontractrequestSrc = Map.singleton "" simpleConstructorSrc
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just testArrayStatName
           , postuserscontractrequestArgs = Just . Map.singleton "x" $ ArgString "416c6c207468617420697320676f6c6420646f6573206e6f7420676c69747465722c204e6f7420616c6c2074686f73652077686f2077616e64657220617265206c6f73743b20546865206f6c642074686174206973207374726f6e6720646f6573206e6f74207769746865722c204465657020726f6f747320617265206e6f742072656163686564206279207468652066726f73742e2046726f6d2074686520617368657320612066697265207368616c6c20626520776f6b656e2c2041206c696768742066726f6d2074686520736861646f7773207368616c6c20737072696e673b2052656e65776564207368616c6c2062652074686520626c6164652074686174207761732062726f6b656e2c205468652063726f776e6c65737320616761696e207368616c6c206265206b696e672e"
@@ -816,7 +816,7 @@ spec =
         Right addr1 = postUsersEither1
         params1 = accountsFilterParams {qaAddress = Just addr1}
         postUsersContractRequest = PostUsersContractRequest
-          { postuserscontractrequestSrc = simpleConstructorSrc
+          { postuserscontractrequestSrc = Map.singleton "" simpleConstructorSrc
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just testArrayStatName
           , postuserscontractrequestArgs = Just $ Map.fromList
@@ -858,7 +858,7 @@ spec =
         Right addr1 = postUsersEither1
         params1 = accountsFilterParams {qaAddress = Just addr1}
         postUsersContractRequest = PostUsersContractRequest
-          { postuserscontractrequestSrc = simpleConstructorSrc
+          { postuserscontractrequestSrc = Map.singleton "" simpleConstructorSrc
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just testArrayStatName
           , postuserscontractrequestArgs = Just $ Map.fromList
@@ -903,7 +903,7 @@ spec =
         params1 = accountsFilterParams {qaAddress = Just addr1}
         simpleTupleContractName = "SimpleTuple"
         postUsersContractRequest = PostUsersContractRequest
-          { postuserscontractrequestSrc = simpleTupleSrc
+          { postuserscontractrequestSrc = Map.singleton "" simpleTupleSrc
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just simpleTupleContractName
           , postuserscontractrequestArgs = Nothing
@@ -1025,7 +1025,7 @@ spec =
         params1 = accountsFilterParams {qaAddress = Just addr1}
         testContractName' = "Bytes32Test"
         postUsersContractRequest = PostUsersContractRequest
-          { postuserscontractrequestSrc = testSrc'
+          { postuserscontractrequestSrc = Map.singleton "" testSrc'
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just testContractName'
           , postuserscontractrequestArgs = Just [("b", ArgString "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89")]
@@ -1116,7 +1116,7 @@ spec =
         params1 = accountsFilterParams {qaAddress = Just addr1}
         testContractName' = "StorageDepolyer"
         postUsersContractRequest = PostUsersContractRequest
-          { postuserscontractrequestSrc = testSrc'
+          { postuserscontractrequestSrc = Map.singleton "" testSrc'
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just testContractName'
           , postuserscontractrequestArgs = Nothing
@@ -1211,7 +1211,7 @@ spec =
           iamBlob
           Nothing
         postUsersContractRequest = PostUsersContractRequest
-          { postuserscontractrequestSrc = iamBlob
+          { postuserscontractrequestSrc = Map.singleton "" iamBlob
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just iamName
           , postuserscontractrequestArgs = Nothing
@@ -1290,7 +1290,7 @@ spec =
         arghash = ArgString $ Text.decodeUtf8 $ Base16.encode hash
         argcontents = ArgString "foo"
         postUsersContractRequest = PostUsersContractRequest
-          { postuserscontractrequestSrc = returnTupleSrc
+          { postuserscontractrequestSrc = Map.singleton "" returnTupleSrc
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just testContractName'
           , postuserscontractrequestArgs = Just $ Map.fromList

@@ -92,7 +92,7 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
       addr <- case mAddr of
         Nothing -> fmap unAddress . blocVaultWrapper $ getKey userName Nothing
         Just addr' -> return addr'
-      let getSrc p = contractpayloadSrc p <|> join (liftA2 Map.lookup (contractpayloadContract p) msrcs)
+      let getSrc p = Map.union (contractpayloadSrc p) (fromMaybe Map.empty msrcs)
       fmap join . forM (partitionWith transactionType txs') $ \(ttype, txs) -> case ttype of
         TRANSFER -> case txs of
           [] -> return []
@@ -122,7 +122,7 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
             let md = contractpayloadMetadata p
                 bcp = ContractParameters
                         addr
-                        (fromMaybe "" $ getSrc p)
+                        (getSrc p)
                         (contractpayloadContract p)
                         (contractpayloadArgs p)
                         (contractpayloadValue p)
@@ -139,14 +139,21 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
             fmap ((:[]) . BlocTxResult) $ poster cacheNonce bcp (callSignature userName)
           xs -> do
             ps <- mapM fromContract xs
+            uploadListContract <-
+                forM ps $ \p@(ContractPayload _ maybeC a v x cid m) -> do
+                  c <- case maybeC of
+                         Nothing -> throwIO $ UserError $ Text.pack $ "missing contract source"
+                         Just c' -> return c'
+                  return $
+                    UploadListContract c
+                                       (getSrc p)
+                                       (fromMaybe Map.empty a)
+                                       (mergeTxParams x txParams)
+                                       v cid m
+            
             let bclp = ContractListParameters
                         addr
-                        (map (\p@(ContractPayload _ c a v x cid m) ->
-                                UploadListContract (fromJust c)
-                                                   (getSrc p)
-                                                   (fromMaybe Map.empty a)
-                                                   (mergeTxParams x txParams)
-                                                   v cid m) ps)
+                        uploadListContract
                         chainId
                         resolve
                 md = contractpayloadMetadata $ head ps --Determine VM option by the metadata of the first tx in list

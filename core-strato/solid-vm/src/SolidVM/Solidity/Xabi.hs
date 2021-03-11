@@ -7,13 +7,11 @@
 
 module SolidVM.Solidity.Xabi where
 
-import           Control.DeepSeq
 import           Control.Lens                 (mapped, (&), (?~))
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (camelCase, dropFPrefix)
 import           Data.Aeson.Types
-import           Data.Binary
 import qualified Data.HashMap.Strict          as Hash
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as Map
@@ -36,7 +34,7 @@ import qualified SolidVM.Solidity.Xabi.VarDef  as Xabi
 
 data XabiKind = ContractKind
               | InterfaceKind
-              | LibraryKind deriving (Eq, Show, Read, Generic, NFData, Binary)
+              | LibraryKind deriving (Eq, Show, Generic)
 
 instance ToJSON XabiKind where
 instance FromJSON XabiKind where
@@ -59,7 +57,7 @@ data Xabi = Xabi
   , xabiEvents    :: Map Text Event
   , xabiKind      :: XabiKind
   , xabiUsing     :: Map Text Using
-  } deriving (Eq,Show,Read,Generic,NFData,Binary)
+  } deriving (Eq,Show,Generic)
 {-
 sampleXabi :: Xabi
 sampleXabi = Xabi
@@ -95,7 +93,7 @@ xabiEmpty :: Xabi
 xabiEmpty = Xabi Map.empty Map.empty Map.empty Map.empty Map.empty Map.empty Map.empty ContractKind Map.empty
 --------------------------------------------------------------------------------
 
-data StateMutability = Pure | Constant | View | Payable deriving (Eq, Ord, Show, Read, Generic, NFData,Binary)
+data StateMutability = Pure | Constant | View | Payable deriving (Eq, Ord, Show, Generic)
 
 tShow :: StateMutability -> Text
 tShow Pure = "pure"
@@ -140,21 +138,21 @@ data Func = Func
   , funcVisibility :: Maybe Visibility
   , funcConstructorCalls :: Map String [Expression]
   , funcModifiers :: Maybe [String]
-  } deriving (Eq,Show,Read,Generic,NFData,Binary)
+  } deriving (Eq,Show,Generic)
 
 data VariableDecl =
   VariableDecl {
   varType :: Xabi.Type,
   varIsPublic :: Bool,
   varInitialVal :: Maybe Expression
-  } deriving (Show, Read, Eq,Generic,NFData, Binary)
+  } deriving (Show, Eq,Generic)
 
 data ConstantDecl =
   ConstantDecl {
   constType :: Xabi.Type,
   constIsPublic :: Bool,
   constInitialVal :: Expression
-  } deriving (Show, Read, Eq, Generic, NFData, Binary)
+  } deriving (Show, Eq, Generic)
 
 funcPayable :: Func -> Bool
 funcPayable Func{funcStateMutability = Just Payable} = True
@@ -180,7 +178,7 @@ data Visibility = Private
                 | Public
                 | Internal
                 | External
-  deriving (Eq,Show,Read,Generic, NFData, Binary)
+  deriving (Eq,Show,Generic)
 
 instance ToJSON Visibility
 instance FromJSON Visibility
@@ -199,7 +197,7 @@ data Modifier = Modifier
   , modifierSelector :: Text
   , modifierVals     :: Map Text Xabi.IndexedType
   , modifierContents :: Maybe Text
-  } deriving (Eq,Show,Read,Generic, NFData, Binary)
+  } deriving (Eq,Show,Generic)
 
 instance ToJSON Modifier where
   toJSON = genericToJSON (aesonPrefix camelCase)
@@ -226,7 +224,7 @@ instance ToSchema Modifier where
 data Event = Event { eventAnonymous :: Bool
                    , eventLogs :: [(Text, Xabi.IndexedType)]
                    }
-              deriving (Eq,Show,Read,Generic, NFData, Binary)
+              deriving (Eq,Show,Generic)
 
 instance ToJSON Event where
   toJSON e = object [
@@ -242,7 +240,7 @@ instance FromJSON Event where
 
 instance Arbitrary Event where arbitrary = GR.genericArbitrary GR.uniform
 
-newtype Using = Using String deriving (Eq,Show,Read,Generic, NFData, Binary)
+newtype Using = Using String deriving (Eq,Show,Generic)
 
 instance ToJSON Using where
   toJSON (Using dec) = String . Text.pack $ dec
@@ -271,7 +269,7 @@ data ContractDetails = ContractDetails
   , contractdetailsName       :: Text
   , contractdetailsSrc        :: Text
   , contractdetailsXabi       :: Xabi
-  } deriving (Show,Eq,Generic, NFData, Binary)
+  } deriving (Show,Eq,Generic)
 
 instance ToSample ContractDetails where toSamples _ = noSamples
 

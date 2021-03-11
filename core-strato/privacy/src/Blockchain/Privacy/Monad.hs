@@ -19,6 +19,7 @@ import           Data.Binary
 import           Data.Default
 import           Data.Foldable                 (toList)
 import           Data.Function                 (on)
+import qualified Data.Map.Strict               as M
 import qualified Data.Sequence                 as Q
 import           Data.Set                      (Set)
 import qualified Data.Set                      as S
@@ -74,6 +75,26 @@ instance Format BlockInfo where
 instance Ord BlockInfo where
   compare = compare `on` _bordering
 
+data EmittedBlock = EmittedBlock
+  { _emitted :: Bool
+  , _blockDependentChains :: M.Map Word256 ChainInfo
+  } deriving (Eq, Show, Generic, Binary)
+makeLenses ''EmittedBlock
+
+alreadyEmittedBlock :: EmittedBlock
+alreadyEmittedBlock = EmittedBlock True M.empty
+
+instance ToJSON EmittedBlock where
+instance FromJSON EmittedBlock where
+
+instance Format EmittedBlock where
+  format EmittedBlock{..} = unlines
+    [ "EmittedBlock"
+    , "---------"
+    , tab $ "Emitted:          " ++ show _emitted
+    , tab $ "Dependent chains: " ++ show _blockDependentChains
+    ]
+
 data ChainHashEntry = ChainHashEntry
   { _used         :: Bool
   , _onChainId    :: Maybe Word256
@@ -109,9 +130,10 @@ chainHashEntryInBlock :: BlockInfo -> ChainHashEntry
 chainHashEntryInBlock bInfo = ChainHashEntry True Nothing (S.singleton bInfo)
 
 data ChainIdEntry = ChainIdEntry
-  { _chainIdInfo :: ChainInfo
+  { _chainIdInfo :: Maybe ChainInfo
   , _chainHashes :: CircularBuffer Keccak256
   , _blocksToRun :: Set BlockInfo
+  , _chainDependentChains :: M.Map Word256 ChainInfo
   } deriving (Show, Generic, Binary)
 makeLenses ''ChainIdEntry
 
@@ -119,7 +141,7 @@ instance ToJSON ChainIdEntry where
 instance FromJSON ChainIdEntry where
 
 chainIdEntry :: ChainInfo -> ChainIdEntry
-chainIdEntry cInfo = ChainIdEntry cInfo emptyCircularBuffer S.empty
+chainIdEntry cInfo = ChainIdEntry (Just cInfo) emptyCircularBuffer S.empty M.empty
 
 instance Format ChainIdEntry where
   format ChainIdEntry{..} = unlines

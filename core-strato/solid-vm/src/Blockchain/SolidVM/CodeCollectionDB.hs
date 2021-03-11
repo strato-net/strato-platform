@@ -12,6 +12,7 @@ import qualified Data.Text                            as T
 import           System.IO.Unsafe
 import           Text.Parsec                          (runParser)
 
+import           Blockchain.Data.RLP                  (rlpDecode, rlpDeserializeMaybe)
 import           Blockchain.DB.CodeDB
 import           Blockchain.SolidVM.Exception         hiding (assert)
 import           Blockchain.SolidVM.Metrics
@@ -26,16 +27,18 @@ import           CodeCollection
 unsafeCodeMapIORef :: IORef (Map Keccak256 CodeCollection)
 unsafeCodeMapIORef = unsafePerformIO $ newIORef M.empty
 
-compileSource :: B.ByteString -> CodeCollection
-compileSource initCode =
-  let maybeFile = runParser solidityFile "" "" $ BC.unpack initCode
-      file = either (parseError "compileSource") id maybeFile
+compileSource :: Map String String -> CodeCollection
+compileSource initCodeMap =
+  let getNamedContracts fileName src =
+        let maybeFile = runParser solidityFile "" fileName $ src
+            file = either (parseError "compileSource") id maybeFile
 
-      namedContracts = [(T.unpack name, xabiToContract (T.unpack name) (map T.unpack parents') xabi)
-                       | NamedXabi name (xabi, parents') <- unsourceUnits file]
-  in applyInheritance
+         in [(T.unpack name, xabiToContract (T.unpack name) (map T.unpack parents') xabi)
+            | NamedXabi name (xabi, parents') <- unsourceUnits file]
+      allContracts = concat . map (uncurry getNamedContracts) $ M.toList initCodeMap
+   in applyInheritance
         $ CodeCollection {
-            _contracts=M.fromList namedContracts
+            _contracts=M.fromList allContracts
           }
 
 codeCollectionFromSource :: (MonadIO m, HasCodeDB m) => B.ByteString -> m (Keccak256, CodeCollection)
@@ -49,7 +52,11 @@ codeCollectionFromSource initCode = do
     Nothing -> do
       recordCacheEvent StorageWrite
       hsh' <- addCode SolidVM initCode
-      let cc = compileSource initCode
+      -- TODO: I think this should be in the code DB, but I'm leaving it here for now
+      let initMap = case rlpDeserializeMaybe initCode of
+            Just m -> rlpDecode m
+            Nothing -> M.singleton "" (BC.unpack initCode)
+      let cc = compileSource initMap
       let codeMap' = M.insert hsh cc codeMap
       recordCacheSize $ M.size codeMap'
       liftIO $ writeIORef unsafeCodeMapIORef codeMap'
@@ -67,7 +74,10 @@ codeCollectionFromHash hsh = do
       mCode <- getCode hsh
       case mCode of
         Just (_, initCode) -> do
-          let cc = compileSource initCode
+          let initMap = case rlpDeserializeMaybe initCode of
+                Just m -> rlpDecode m
+                Nothing -> M.singleton "" (BC.unpack initCode)
+          let cc = compileSource initMap
               codeMap' = M.insert hsh cc codeMap
           recordCacheSize $ M.size codeMap'
           liftIO $ writeIORef unsafeCodeMapIORef codeMap'

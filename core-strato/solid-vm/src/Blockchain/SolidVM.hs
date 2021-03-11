@@ -20,6 +20,7 @@ import qualified Control.Monad.Change.Alter           as A
 import qualified Control.Monad.Change.Modify          as Mod
 import           Control.Monad.IO.Class
 import           Data.Bits
+import           Data.Bool                            (bool)
 import           Data.ByteString                      (ByteString)
 import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Base16               as B16
@@ -40,11 +41,12 @@ import qualified Data.Vector as V
 import           GHC.Exts
 import           Text.Parsec (runParser)
 import           Text.Printf
+import           Text.Read (readMaybe)
 
 import           Blockchain.Data.AddressStateDB
-import           Blockchain.Data.BlockDB
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Code
+import           Blockchain.Data.DataDefs
 import           Blockchain.Data.ExecResults
 import qualified Blockchain.Database.MerklePatricia   as MP
 import           Blockchain.DB.CodeDB
@@ -88,6 +90,12 @@ type SolidVMBase m = VMBase m
 onTraced :: Monad m => m () -> m ()
 onTraced = when flags_svmTrace
 
+withSrcPos :: MonadIO m => Xabi.SourcePos -> String -> m ()
+withSrcPos pos str = liftIO . putStrLn $ concat 
+  [ show pos
+  , ": "
+  , str
+  ]
 
 create :: SolidVMBase m
        => Bool
@@ -423,13 +431,13 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.PlusPlus e)))
 
 
 -- Assignment to an index into an array or mapping
-runStatement st@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" dst@(Xabi.IndexAccess parent (Just indExp)) src))) = do
+runStatement st@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" dst@(Xabi.IndexAccess parent (Just indExp)) src)) pos) = do
   srcVar <- expToVar src
   srcVal <- getVar srcVar
 
   onTraced $ do
     valString <- showSM srcVal
-    liftIO $ putStrLn $ "    Setting: " ++ unparseExpression dst ++ " = " ++ valString
+    withSrcPos pos $ "    Setting: " ++ unparseExpression dst ++ " = " ++ valString
 
   pVar <- expToVar parent
   pVal <- weakGetVar pVar
@@ -452,10 +460,10 @@ runStatement st@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "="
       return Nothing
 
 
-runStatement st@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" (Xabi.IndexAccess _ Nothing) _))) = missingField "index value cannot be empty" (unparseStatement st)
+runStatement st@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" (Xabi.IndexAccess _ Nothing) _)) _) = missingField "index value cannot be empty" (unparseStatement st)
 
 
-runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" dst src))) = do
+runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" dst src)) pos) = do
   srcVal <- getVar =<< expToVar src
   dstVar <- expToVar dst
 
@@ -463,7 +471,7 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" ds
   
   onTraced $ do
     valString <- showSM srcVal
-    liftIO $ putStrLn $ "    Setting: " ++ unparseExpression dst ++ " = " ++ valString
+    withSrcPos pos $ "    Setting: " ++ unparseExpression dst ++ " = " ++ valString
               
   return Nothing
 
@@ -503,11 +511,11 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" ds
               logAssigningVariable value'
               setVar v1 $ coerceType ctract ty value'
 -}
-runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e)) = do
+runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e) _) = do
   _ <- getVar =<< expToVar e
   return Nothing -- just throw away the return value
 
-runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition entries maybeExpression)) = do
+runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition entries maybeExpression) pos) = do
   let !maybeLoc = case entries of
                       [e] -> Xabi.vardefLocation e
                       es -> if any ((== Just Xabi.Storage) . Xabi.vardefLocation) es
@@ -535,9 +543,9 @@ runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition entries maybeExpre
     let toName :: Xabi.VarDefEntry -> String
         toName Xabi.BlankEntry = ""
         toName vde = Xabi.vardefName vde
-    liftIO $ printf "             creating and setting variables: (%s)\n" $
+    withSrcPos pos $ printf "             creating and setting variables: (%s)\n" $
         intercalate ", " (map toName entries)
-    liftIO $ printf "             to: %s\n" valueString
+    withSrcPos pos $ printf "             to: %s\n" valueString
   let ensureType :: Maybe Xabi.Type -> Xabi.Type
       ensureType = fromMaybe (todo "type inference not implemented" s)
 
@@ -555,13 +563,13 @@ runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition entries maybeExpre
 
   return Nothing
 
-runStatement (Xabi.IfStatement condition code' maybeElseCode) = do
+runStatement (Xabi.IfStatement condition code' maybeElseCode pos) = do
   conditionResult <- getBool =<< expToVar condition
   
   onTraced $ do
     if conditionResult
-      then liftIO $ putStrLn "       if condition succeeded, running internal code"
-      else liftIO $ putStrLn "       if condition failed, skipping internal code"
+      then withSrcPos pos $ "       if condition succeeded, running internal code"
+      else withSrcPos pos $ "       if condition failed, skipping internal code"
     
   if conditionResult
     then runStatements code'
@@ -569,21 +577,29 @@ runStatement (Xabi.IfStatement condition code' maybeElseCode) = do
       Just elseCode -> runStatements elseCode
       Nothing -> return Nothing
 
-runStatement (Xabi.WhileStatement condition code) = do
+runStatement (Xabi.WhileStatement condition code pos) = do
   
      
   while (getBool =<< expToVar condition) $ do
-      onTraced $ liftIO $ putStrLn $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
+      onTraced $ withSrcPos pos $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
+      result <- runStatements code
+      return result
+
+      -- TODO: this can loop infinitely
+
+runStatement (Xabi.DoWhileStatement code condition pos) = do
+  doWhile (getBool =<< expToVar condition) $ do
+      onTraced $ withSrcPos pos $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
       result <- runStatements code
       return result
 
       -- TODO: this can loop infinitely
 
 --TODO- all the variables declared in an `if` or `for` code block need to be deleted when the block is finished....
-runStatement (Xabi.ForStatement maybeInitStatement maybeConditionExp maybeLoopExp code) = do
+runStatement (Xabi.ForStatement maybeInitStatement maybeConditionExp maybeLoopExp code pos) = do
   _ <-
     case maybeInitStatement of
-      Just initStatement -> runStatement $ Xabi.SimpleStatement initStatement
+      Just initStatement -> runStatement $ Xabi.SimpleStatement initStatement pos
       _ -> return Nothing
 
   let conditionExp =
@@ -599,12 +615,12 @@ runStatement (Xabi.ForStatement maybeInitStatement maybeConditionExp maybeLoopEx
   let condition = getBool =<< expToVar conditionExp
 
   while condition $ do
-      onTraced $ liftIO $ putStrLn $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
+      onTraced $ withSrcPos pos $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
       result <- runStatements code
       _ <- getVar =<< expToVar loopExp
       return result
 
-runStatement (Xabi.Return maybeExpression) = do
+runStatement (Xabi.Return maybeExpression _) = do
   case maybeExpression of
     Just e -> do
       ql <- expToVar e
@@ -613,7 +629,7 @@ runStatement (Xabi.Return maybeExpression) = do
 --      fmap Just $ getVar =<< expToVar e
     Nothing -> return $ Just SNULL
 
-runStatement (Xabi.AssemblyStatement (Xabi.MloadAdd32 dst src)) = do
+runStatement (Xabi.AssemblyStatement (Xabi.MloadAdd32 dst src) _) = do
   srcVar <- expToVar $ Xabi.Variable $ T.unpack src;
   dstVar <- expToVar $ Xabi.Variable $ T.unpack dst;
 
@@ -621,7 +637,7 @@ runStatement (Xabi.AssemblyStatement (Xabi.MloadAdd32 dst src)) = do
   setVar dstVar =<< getString srcVar
   return Nothing
 
-runStatement st@(Xabi.EmitStatement eventName exptups) = do
+runStatement st@(Xabi.EmitStatement eventName exptups _) = do
   exps <- mapM (expToVar . snd) exptups
   expVals <- mapM getVar exps
   expStrs <- mapM showSM expVals
@@ -656,6 +672,18 @@ while condition code = do
         Nothing -> while condition code
         _ -> return result
     else return Nothing
+
+doWhile :: MonadSM m => m Bool -> m (Maybe Value) -> m (Maybe Value)
+doWhile condition code = do
+  result <- code
+  case result of
+    Nothing -> do
+      c <- condition
+      onTraced $ liftIO $ putStrLn $ C.red $ "^^^^^^^^^^^^^^^^^^^^ loopy condition: " ++ show c
+      if c
+        then doWhile condition code
+        else return Nothing
+    _ -> return result
 
 getIndexType :: MonadSM m => AccountPath -> m IndexType
 getIndexType (AccountPath addr p) = do
@@ -783,7 +811,7 @@ expToVar' (Xabi.Unitary "--" e) = do
   setVar var next
   return $ Constant next
 
-expToVar' (Xabi.Binary "+=" lhs rhs) = binopAssign (+) lhs rhs
+expToVar' (Xabi.Binary "+=" lhs rhs) = addAndAssign lhs rhs
 expToVar' (Xabi.Binary "-=" lhs rhs) = binopAssign (-) lhs rhs
 expToVar' (Xabi.Binary "*=" lhs rhs) = binopAssign (*) lhs rhs
 expToVar' (Xabi.Binary "/=" lhs rhs) = binopAssign mod lhs rhs
@@ -922,7 +950,7 @@ expToVar' x@(Xabi.IndexAccess parent (Just mIndex)) = do
 --    _ -> error $ "unknown case in expToVar' for IndexAccess: " ++ show var
 
 
-expToVar' (Xabi.Binary "+" expr1 expr2) = expToVarInteger expr1 (+) expr2 SInteger
+expToVar' (Xabi.Binary "+" expr1 expr2) = expToVarAdd expr1 expr2
 expToVar' (Xabi.Binary "-" expr1 expr2) = expToVarInteger expr1 (-) expr2 SInteger
 expToVar' (Xabi.Binary "*" expr1 expr2) = expToVarInteger expr1 (*) expr2 SInteger
 expToVar' ex@(Xabi.Binary "/" expr1 expr2) = do 
@@ -1050,6 +1078,8 @@ expToVar' x@(Xabi.FunctionCall (Xabi.NewExpression (Xabi.Array{})) Xabi.NamedArg
   typeError "cannot create new array with named arguments" x
 
 expToVar' (Xabi.FunctionCall (Xabi.NewExpression (Xabi.Label contractName')) args) = do
+  ro <- readOnly <$> getCurrentCallInfo
+  when ro $ invalidWrite "Invalid contract creation during read-only access" $ "contractName: " ++ show contractName' ++ ", args: " ++ show args
   creator <- getCurrentAccount
   (hsh, cc) <- getCurrentCodeCollection
   newAddress <- getNewAddress creator
@@ -1178,12 +1208,33 @@ expToVar' x = todo "expToVar/unhandled" x
 
 --------------
 
+expToVarAdd :: MonadSM m => Xabi.Expression -> Xabi.Expression -> m Variable
+expToVarAdd expr1 expr2 = do
+  i1 <- getVar =<< expToVar expr1
+  i2 <- getVar =<< expToVar expr2
+  case (i1, i2) of
+    (SInteger a, SInteger b) -> return . Constant . SInteger $ a + b
+    (SString a, SString b) -> return . Constant . SString $ a ++ b
+    _ -> typeError "expToVarAdd" (i1, i2)
+
 expToVarInteger :: MonadSM m => Xabi.Expression -> (Integer->Integer->a) -> Xabi.Expression -> (a->Value) -> m Variable
 expToVarInteger expr1 o expr2 retType = do
   i1 <- getInt =<< expToVar expr1
   i2 <- getInt =<< expToVar expr2
   return . Constant . retType $ i1 `o` i2
 
+addAndAssign :: MonadSM m => Xabi.Expression -> Xabi.Expression -> m Variable
+addAndAssign lhs rhs = do
+  let readVal e = getVar =<< expToVar e
+  delta <- readVal rhs
+  curValue <- readVal lhs
+  varToAssign <- expToVar lhs
+  next <- case (curValue, delta) of
+    (SInteger c, SInteger d) -> pure . SInteger $ c + d
+    (SString c, SString d) -> pure . SString $ c ++ d
+    _ -> typeError "addAndAssign" (curValue, delta)
+  setVar varToAssign next
+  return $ Constant next
 
 binopAssign :: MonadSM m => (Integer -> Integer -> Integer) -> Xabi.Expression -> Xabi.Expression -> m Variable
 binopAssign oper lhs rhs = do
@@ -1207,17 +1258,74 @@ intBuiltin args = typeError "numeric cast - invalid args" args
 
 callBuiltin :: MonadSM m => String -> [Value] -> Maybe Value -> m Value
 callBuiltin "string" [SString s] _ = return $ SString s
+callBuiltin "string" [SAccount a] _ = return . SString $ show a
+callBuiltin "string" [SInteger i] _ = return . SString $ show i
+callBuiltin "string" [SBool b] _ = return . SString $ bool "false" "true" b
 callBuiltin "string" vs _ = typeError "string cast" vs
 callBuiltin "address" [SInteger a] _ = return . SAccount . unspecifiedChain $ fromIntegral a
 callBuiltin "address" [a@SAccount{}] _ = return a
 callBuiltin "address" [SContract _ a] _ = return $ SAccount a
+callBuiltin "address" [ss@(SString s)] _ = maybe (typeError "address cast" ss)
+                                                 (return . SAccount . (namedAccountChainId .~ UnspecifiedChain))
+                                                 $ readMaybe s
+callBuiltin "address" vs _ = typeError "address cast" vs
 callBuiltin "account" [SInteger a] _ = return . SAccount . unspecifiedChain $ fromIntegral a
 callBuiltin "account" [a@SAccount{}] _ = return a
 callBuiltin "account" [SContract _ a] _ = return $ SAccount a
+callBuiltin "account" [ss@(SString s)] _ = maybe (typeError "account cast" ss)
+                                                 (return . SAccount)
+                                                 $ readMaybe s
 callBuiltin "account" [SInteger a, SInteger b] _ = return . SAccount $ explicitChain (fromIntegral a) (fromInteger b)
 callBuiltin "account" [SInteger a, SString "main"] _ = return . SAccount $ mainChain (fromIntegral a)
+callBuiltin "account" [SInteger a, SString "parent"] _ = do
+  cInfo <- Mod.get (Mod.Proxy @[CallInfo])
+  let currentChainId = maybe Nothing (_accountChainId . currentAccount) $ listToMaybe cInfo
+  pChain <- getNthAncestorChain 1 currentChainId
+  case pChain of
+    Nothing -> return . SAccount $ mainChain (fromIntegral a)
+    Just b -> return . SAccount $ explicitChain (fromIntegral a) b
+callBuiltin "account" [SInteger a, SString "grandparent"] _ = do
+  cInfo <- Mod.get (Mod.Proxy @[CallInfo])
+  let currentChainId = maybe Nothing (_accountChainId . currentAccount) $ listToMaybe cInfo
+  gpChain <- getNthAncestorChain 2 currentChainId
+  case gpChain of
+    Nothing -> return . SAccount $ mainChain (fromIntegral a)
+    Just b -> return . SAccount $ explicitChain (fromIntegral a) b
+callBuiltin "account" [SInteger a, SString "ancestor", SInteger n] _ = do
+  cInfo <- Mod.get (Mod.Proxy @[CallInfo])
+  let currentChainId = maybe Nothing (_accountChainId . currentAccount) $ listToMaybe cInfo
+  ancestorChain <- getNthAncestorChain (fromIntegral n) currentChainId
+  case ancestorChain of
+    Nothing -> return . SAccount $ mainChain (fromIntegral a)
+    Just b -> return . SAccount $ explicitChain (fromIntegral a) b
 callBuiltin "account" [SAccount a, SInteger b] _ = return . SAccount $ (namedAccountChainId .~ ExplicitChain (fromIntegral b)) a
 callBuiltin "account" [SAccount a, SString "main"] _ = return . SAccount $ (namedAccountChainId .~ MainChain) a
+callBuiltin "account" [SAccount a, SString "parent"] _ = do
+  cInfo <- Mod.get (Mod.Proxy @[CallInfo])
+  let currentChainId = maybe Nothing (_accountChainId . currentAccount) $ listToMaybe cInfo
+  pChain <- getNthAncestorChain 1 currentChainId
+  case pChain of
+    Nothing -> return . SAccount $ (namedAccountChainId .~ MainChain) a
+    Just b -> return . SAccount $ (namedAccountChainId .~ ExplicitChain b) a
+callBuiltin "account" [SAccount a, SString "grandparent"] _ = do
+  cInfo <- Mod.get (Mod.Proxy @[CallInfo])
+  let currentChainId = maybe Nothing (_accountChainId . currentAccount) $ listToMaybe cInfo
+  gpChain <- getNthAncestorChain 2 currentChainId
+  case gpChain of
+    Nothing -> return . SAccount $ (namedAccountChainId .~ MainChain) a
+    Just b -> return . SAccount $ (namedAccountChainId .~ ExplicitChain b) a
+callBuiltin "account" [SAccount a, SString "ancestor", SInteger n] _ = do
+  cInfo <- Mod.get (Mod.Proxy @[CallInfo])
+  let currentChainId = maybe Nothing (_accountChainId . currentAccount) $ listToMaybe cInfo
+  ancestorChain <- getNthAncestorChain (fromIntegral n) currentChainId
+  case ancestorChain of
+    Nothing -> return . SAccount $ (namedAccountChainId .~ MainChain) a
+    Just b -> return . SAccount $ (namedAccountChainId .~ ExplicitChain b) a
+callBuiltin "account" vs _ = typeError "account cast" vs
+callBuiltin "bool" [SBool b] _ = return $ SBool b
+callBuiltin "bool" [SString "true"] _ = return $ SBool True
+callBuiltin "bool" [SString "false"] _ = return $ SBool False
+callBuiltin "bool" vs _ = typeError "bool cast" vs
 callBuiltin "byte" [SInteger n] _ = return $ SInteger (n .&. 0xff)
 callBuiltin "byte"  vs _ = typeError "byte cast" vs
 callBuiltin "uint" args _ = return $ intBuiltin args

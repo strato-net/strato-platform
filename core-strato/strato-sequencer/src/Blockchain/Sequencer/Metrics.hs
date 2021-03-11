@@ -109,6 +109,13 @@ blockHashRegistrySize = unsafeRegister
             . gauge
             $ Info "block_hash_registry" "Size count for private chain block hash registry"
 
+{-# NOINLINE emittedBlockRegistrySize #-}
+emittedBlockRegistrySize :: Vector Text Gauge
+emittedBlockRegistrySize = unsafeRegister
+            . vector "emitted_block_registry"
+            . gauge
+            $ Info "emitted_block_registry" "Size count for emitted block registry"
+
 {-# NOINLINE txHashRegistrySize #-}
 txHashRegistrySize :: Vector Text Gauge
 txHashRegistrySize = unsafeRegister

@@ -32,6 +32,8 @@ import           Blockchain.MiscJSON          ()
 import           Blockchain.Strato.Discovery.Metrics
 import           Blockchain.Strato.Model.Keccak256
 
+import qualified LabeledError
+
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 PPeer
     pubkey Point Maybe
@@ -112,7 +114,7 @@ parseHostname :: URIAuth -> String
 parseHostname uriAuth = filter (\ch -> ch /= '[' && ch /= ']') (URI.uriRegName uriAuth)
 
 parsePort :: URIAuth -> Int
-parsePort uriAuth = read $ filter (/= ':') (URI.uriPort uriAuth)
+parsePort uriAuth = LabeledError.read "Peer/parsePort" $ filter (/= ':') (URI.uriPort uriAuth)
 
 
 getAvailablePeers::IO (Either SomeException [PPeer])

@@ -11,7 +11,6 @@ module Blockchain.Init.Protocol
 
 import Control.Monad.IO.Class
 import qualified Data.Aeson as Ae
-import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C8
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text as T
@@ -37,7 +36,6 @@ data EventInit = EthConf EthConf
                -- embedded file, a file on a volume, or a file otherwise generated
                -- at the launch of the container.
                | GenesisAccounts T.Text
-               | ApiConfig [(FilePath, B.ByteString)]
                | InitComplete
                deriving (Show, Eq, Generic, Ae.ToJSON, Ae.FromJSON)
 

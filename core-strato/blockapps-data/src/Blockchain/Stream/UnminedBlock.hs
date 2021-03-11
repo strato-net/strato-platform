@@ -12,7 +12,7 @@ import           Network.Kafka
 import           Network.Kafka.Producer
 import           Network.Kafka.Protocol  hiding (Key)
 
-import           Blockchain.Data.BlockDB
+import           Blockchain.Data.Block
 import           Blockchain.Data.RLP
 import           Blockchain.Stream.Raw
 

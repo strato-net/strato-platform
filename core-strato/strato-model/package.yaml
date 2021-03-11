@@ -47,6 +47,7 @@ library:
     - hashable
     - http-api-data
     - integer-gmp
+    - labeled-error
     - lens
     - memory
     - monad-alter
@@ -83,8 +84,10 @@ tests:
       - ethereum-encryption
       - ethereum-rlp
       - integer-gmp
+      - persistent
       - secp256k1-haskell
       - strato-model
+      - text
       - hspec
       - QuickCheck
 

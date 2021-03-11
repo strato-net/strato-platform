@@ -84,6 +84,7 @@ executables:
       - stm-chans
       - strato-conf
       - strato-model
+      - strato-networks
       - strato-sequencer
       - text
       - wai-middleware-prometheus
@@ -133,6 +134,7 @@ tests:
       - blockapps-data
       - blockapps-datadefs
       - blockapps-haskoin
+      - blockapps-privacy
       - blockapps-util
       - blockstanbul
       - bytestring

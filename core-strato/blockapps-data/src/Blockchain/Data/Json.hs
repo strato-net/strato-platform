@@ -27,10 +27,13 @@ import           Blockchain.Data.Code
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
+import           Blockchain.Strato.Model.Class        (blockHeaderHash)
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.ExtendedWord (Word256)
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Util                      (toMaybe)
+
+import qualified LabeledError
 
 jsonBlk :: (ToJSON a, Monad m) => a -> m Value
 jsonBlk = return . toJSON
@@ -97,7 +100,7 @@ instance FromJSON RawTransaction' where
       tgp <- t .:? "gasPrice" .!= 0
       tgl <- t .:? "gasLimit" .!= 0
       tto <- t .:? "to"
-      tval <- read <$> t .:? "value" .!= "0"
+      tval <- LabeledError.read "FromJSON/RawTransaction'" <$> t .:? "value" .!= "0"
       tcd <- t .:? "codeOrData" .!= Code ""
       cid <- fmap (\(ChainId c) -> c) <$> (t .:? "chainId")
       (tr :: Integer) <- parseHexStr (t .: "r")
@@ -230,7 +233,8 @@ instance ToJSON Block' where
       toJSON (Block' (Block bd rt bu) next) =
         object ["next" .= next, "kind" .= ("Block" :: String), "blockData" .= bdToBdPrime bd,
          "receiptTransactions" .= map tToTPrime rt,
-         "blockUncles" .= map bdToBdPrime bu]
+         "blockUncles" .= map bdToBdPrime bu,
+         "blockHash" .= blockHeaderHash bd]
 
 blockDataRefToBlock::BlockDataRef->[Transaction]->Block
 blockDataRefToBlock bdr txs = Block{
@@ -295,13 +299,12 @@ instance FromJSON BlockData' where
       )
 
 instance FromJSON Block' where
-    parseJSON = withObject "Block'" $ \v -> (Block'
-      <$> (Block
-        <$> (bdPrimeToBd <$> (v .: "blockData"))
-        <*> (map tPrimeToT <$> (v .: "receiptTransactions"))
-        <*> (map bdPrimeToBd <$> (v .: "blockUncles")))
-      <*> (v .: "next")
-      )
+    parseJSON = withObject "Block'" $ \v -> do
+      bData <- bdPrimeToBd <$> v .: "blockData"
+      bTxs <- map tPrimeToT <$> (v .: "receiptTransactions")
+      bUncles <- map bdPrimeToBd <$> (v .: "blockUncles")
+      next <- v .: "next"
+      pure $ Block' (Block bData bTxs bUncles) next
 
 bdToBdPrime :: BlockData -> BlockData'
 bdToBdPrime = BlockData'
@@ -345,7 +348,7 @@ instance FromJSON AddressStateRef' where
         else asrToAsrPrime' <$>
               (AddressStateRef . Address . fst . head . readHex <$> s .: "address"
                 <*> s .: "nonce"
-                <*> (read <$> (s .: "balance"))
+                <*> (LabeledError.read "FromJSON/AddressRef'" <$> (s .: "balance"))
                 <*> s .: "contractRoot"
                 <*> s .: "code"
                 <*> s .: "codeHash"

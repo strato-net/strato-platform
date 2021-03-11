@@ -26,6 +26,7 @@ defineFlag "kafkaaddress" ("" :: String) "Alternate kafka instance to connect to
 -- blockstanbul related flags
 -- TODO(tim): We may need to specify a starting view, or catch up from the network
 defineFlag "blockstanbul" (False :: Bool) "Whether to run blockstanbul"
+defineFlag "network" ("" :: String) "The network that strato will join"
 defineFlag "validators" ("[]" :: String) "JSON encoded addresses of validators"
 defineFlag "blockstanbul_block_period_ms" (1000 :: Int) "Minimum delay between block creations"
 defineFlag "blockstanbul_round_period_s" (10 :: Int)

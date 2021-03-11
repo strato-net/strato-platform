@@ -34,26 +34,25 @@ import           Data.Map                           (Map)
 type VmInEvent = VmEvent
 
 data VmInEventBatch = InBatch
-  { newChains   :: [OutputGenesis]
-  , votesToMake :: [(Address, Bool, Address)]
-  , rpcCommands :: [JsonRpcCommand]
-  , txPairs     :: [(Timestamp, OutputTx)]
-  , tLen        :: {-# UNPACK #-} !Int
-  , blocks      :: [OutputBlock]
-  , bLen        :: {-# UNPACK #-} !Int
-  , createBlock :: !Bool
+  { votesToMake        :: [(Address, Bool, Address)]
+  , rpcCommands        :: [JsonRpcCommand]
+  , txPairs            :: [(Timestamp, OutputTx)]
+  , tLen               :: {-# UNPACK #-} !Int
+  , blocksAndNewChains :: [Either OutputGenesis OutputBlock]
+  , bLen               :: {-# UNPACK #-} !Int
+  , createBlock        :: !Bool
   }
 
 newInBatch :: VmInEventBatch
-newInBatch = InBatch [] [] [] [] 0 [] 0 False
+newInBatch = InBatch [] [] [] 0 [] 0 False
 
 insertInBatch :: VmInEvent -> VmInEventBatch -> VmInEventBatch
 insertInBatch e b = case e of
-  VmGenesis og -> b{ newChains = og:newChains b}
+  VmGenesis og -> b{ blocksAndNewChains = (Left og):blocksAndNewChains b}
   VmVoteToMake r d s -> b{ votesToMake = (r,d,s):votesToMake b}
   VmJsonRpcCommand j -> b{ rpcCommands = j:rpcCommands b}
   VmTx ts t -> b{ txPairs = (ts,t):txPairs b, tLen = tLen b + 1}
-  VmBlock ob -> b{ blocks = ob:blocks b, bLen = bLen b + 1}
+  VmBlock ob -> b{ blocksAndNewChains = (Right ob):blocksAndNewChains b, bLen = bLen b + 1}
   VmCreateBlockCommand -> b{ createBlock = True }
   _ -> b
 

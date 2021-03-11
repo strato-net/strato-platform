@@ -50,6 +50,7 @@ module Blockchain.Sequencer.Monad
   , seenTransactionDB
   , dbeRegistry
   , blockHashRegistry
+  , emittedBlockRegistry
   , txHashRegistry
   , chainHashRegistry
   , chainIdRegistry
@@ -94,6 +95,7 @@ import qualified Database.LevelDB                          as LDB
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin
 import           Blockchain.Constants
+import           Blockchain.Data.ChainInfo
 import           Blockchain.ExtWord                        (Word256)
 import           Blockchain.Output
 import           Blockchain.Privacy
@@ -124,6 +126,7 @@ data SequencerContext = SequencerContext
   , _seenTransactionDB   :: !SeenTransactionDB
   , _dbeRegistry         :: !(Map Keccak256 DependentBlockEntry)
   , _blockHashRegistry   :: !(Map Keccak256 (Modification OutputBlock))
+  , _emittedBlockRegistry :: !(Map Keccak256 (Modification EmittedBlock))
   , _txHashRegistry      :: !(Map Keccak256 (Modification OutputTx))
   , _chainHashRegistry   :: !(Map Keccak256 (Modification ChainHashEntry))
   , _chainIdRegistry     :: !(Map Word256 (Modification ChainIdEntry))
@@ -208,6 +211,10 @@ instance HasNamespace OutputBlock where
   type NSKey OutputBlock = Keccak256
   namespace _ = "bh:"
 
+instance HasNamespace EmittedBlock where
+  type NSKey EmittedBlock = Keccak256
+  namespace _ = "eb:"
+
 instance HasNamespace OutputTx where
   type NSKey OutputTx = Keccak256
   namespace _ = "th:"
@@ -286,6 +293,17 @@ instance (Keccak256 `A.Alters` OutputBlock) SequencerM where
     sz <- M.size <$> use blockHashRegistry
     liftIO $ withLabel blockHashRegistrySize "block_hash_registry" (flip setGauge (fromIntegral sz))
 
+instance (Keccak256 `A.Alters` EmittedBlock) SequencerM where
+  lookup = genericLookupSequencer emittedBlockRegistry
+  insert p k v = do
+    genericInsertSequencer emittedBlockRegistry p k v
+    sz <- M.size <$> use emittedBlockRegistry
+    liftIO $ withLabel emittedBlockRegistrySize "emitted_block_registry" (flip setGauge (fromIntegral sz))
+  delete p k = do
+    genericDeleteSequencer emittedBlockRegistry p k
+    sz <- M.size <$> use emittedBlockRegistry
+    liftIO $ withLabel emittedBlockRegistrySize "emitted_block_registry" (flip setGauge (fromIntegral sz))
+
 instance (Keccak256 `A.Alters` OutputTx) SequencerM where
   lookup = genericLookupSequencer txHashRegistry
   insert p k v = do
@@ -331,6 +349,11 @@ instance (Keccak256 `A.Alters` DependentBlockEntry) SequencerM where
   delete _ k = do
     modify' $ dbeRegistry . at k .~ Nothing
     addLdbBatchOps . (:[]) $ genericBatchDeleteDependentBlockDB k
+
+instance A.Selectable (Maybe Word256) ParentChainId SequencerM where
+  select _ = \case
+    Nothing -> pure . Just $ ParentChainId Nothing
+    Just cId -> join . fmap (fmap (ParentChainId . parentChain . chainInfo) . _chainIdInfo) <$> A.lookup (A.Proxy @ChainIdEntry) cId
 
 instance Mod.Modifiable SeenTransactionDB SequencerM where
   get _ = use seenTransactionDB
@@ -399,7 +422,9 @@ waitOnVault action = do
     Right val -> do 
       $logInfoS "HasVault" "Got a signature from vault" 
       return val
-  
+
+initialEmittedBlockCache :: Map Keccak256 (Modification EmittedBlock)
+initialEmittedBlockCache = M.singleton zeroHash $ Modification alreadyEmittedBlock
 
 prunePrivacyDBs :: SequencerM ()
 prunePrivacyDBs = do
@@ -407,7 +432,9 @@ prunePrivacyDBs = do
   prune txHashRegistry
   prune chainHashRegistry
   prune chainIdRegistry
-  where prune r = modify' $ r .~ M.empty
+  setTo initialEmittedBlockCache emittedBlockRegistry
+  where prune = setTo M.empty
+        setTo s r = modify' $ r .~ s
 
 runSequencerM :: SequencerConfig -> Maybe BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
 runSequencerM c mbc m = do
@@ -424,6 +451,7 @@ runSequencerM c mbc m = do
             , _seenTransactionDB   = mkSeenTxDB stxSize
             , _dbeRegistry         = M.empty
             , _blockHashRegistry   = M.empty
+            , _emittedBlockRegistry = initialEmittedBlockCache
             , _txHashRegistry      = M.empty
             , _chainHashRegistry   = M.empty
             , _chainIdRegistry     = M.empty

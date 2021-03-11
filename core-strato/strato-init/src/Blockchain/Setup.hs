@@ -29,7 +29,6 @@ import           System.Exit
 import           System.FilePath
 import           Turtle (chmod, roo, fromText)
 
-import           Blockchain.APIFiles
 import           Blockchain.Constants
 import           Blockchain.Data.Blockchain         as Blockchain
 import qualified Blockchain.Data.DataDefs           as DataDefs
@@ -40,6 +39,7 @@ import           Blockchain.Init.EthConf
 import           Blockchain.Init.Monad
 import           Blockchain.Init.Options
 import           Blockchain.KafkaTopics
+import qualified Blockchain.Network                 as Net
 import           Blockchain.Output
 import           Blockchain.Strato.Model.Address
 
@@ -116,11 +116,11 @@ oneTimeSetup genesisBlockName = do
   if dirExists
     then die ".ethereumH exists, unsafe to run setup"
     else do
-      let bootnodes = case (flags_addBootnodes, flags_stratoBootnode) of
-                     (False, _)      -> Nothing
-                     (True, [])      -> Just []
-                     (True, [""])    -> Just []
-                     (True, ipAddrs) -> Just ipAddrs
+      bootnodes <- case (flags_addBootnodes, filter (not . null) flags_stratoBootnode) of
+                     (False, _)               -> return Nothing
+                     (True, [])               -> fmap (fmap $ map Net.webAddress) $ Net.getParams flags_network
+                     (True, stratoBootnodes') -> return $ Just stratoBootnodes'
+                     
       liftIO $ putStrLn $ CL.red ">>>> Bootnodes: " ++ show bootnodes
 
      {- CONFIG create default config files -}
@@ -136,8 +136,6 @@ oneTimeSetup genesisBlockName = do
      {- CONFIG: create database and write default config files, including strato-api -}
 
       ethconf <- genEthConf
-      inflateDir stratoAPICerts
-      inflateDir stratoAPIConfigDir
 
       encodeFile (".ethereumH" </> "ethconf.yaml") ethconf
       makeReadOnly $ ".ethereumH" </> "ethconf.yaml"

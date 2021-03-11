@@ -8,6 +8,9 @@
 {-# LANGUAGE TypeApplications     #-}
 {-# LANGUAGE TypeOperators        #-}
 
+{-# OPTIONS -fno-warn-unused-imports #-}  -- TODO- We need to formally remove the watchdog, then
+{-# OPTIONS -fno-warn-unused-matches #-}  --       we can remove these "no-warn" options
+
 module Blockchain.CommunicationConduit
     ( handleMsgServerConduit
     , handleMsgClientConduit
@@ -59,6 +62,8 @@ import           Blockchain.TimerSource
 import           Blockchain.Util
 import           Blockchain.Watchdog
 
+
+
 ethVersion :: Int
 ethVersion = 62
 {-# INLINE ethVersion #-}
@@ -77,8 +82,8 @@ mkEthP2PEventSource :: ( MonadResource m
                     -> m (ConduitM () Event m ())
 mkEthP2PEventSource peerSource seqEventSource peerStr inCtx = do
   canarySource <- mkCanarySource
-  tid <- myThreadId
-  recvWatchdog <- mkWatchdog tid $ fromIntegral flags_connectionTimeout
+--  tid <- myThreadId
+--  recvWatchdog <- mkWatchdog tid $ fromIntegral flags_connectionTimeout
   merged <- mergeSourcesByForce (
     [ peerSource
         .| ethDecrypt inCtx
@@ -86,7 +91,7 @@ mkEthP2PEventSource peerSource seqEventSource peerStr inCtx = do
         .| bytesToMessages
         .| CL.iterM (displayMessage Inbound peerStr)
         .| CL.map MsgEvt
-        .| CL.iterM (const $ petWatchdog recvWatchdog)
+--        .| CL.iterM (const $ petWatchdog recvWatchdog)
     , seqEventSource
         .| CL.map NewSeqEvent
     , canarySource .| CL.map absurd
@@ -163,9 +168,10 @@ handleMsgClientConduit myId peer = do
               })
         other -> assertHandshake other
     awaitMsg >>= \case
-        Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash} -> do
+        Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash, networkID=networkID'} -> do
                 (GenesisBlockHash genHash) <- lift $ Mod.access (Mod.Proxy @GenesisBlockHash)
                 when (peerGH /= genHash) $ throwIO WrongGenesisBlock
+                when (networkID' /= computeNetworkID) $ error "networkID mismatch"
                 -- we set to 0 cause we dont necessarily know the number yet
                 lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
                 (BestBlockNumber lastBlockNumber) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
@@ -196,11 +202,12 @@ handleMsgServerConduit myPubkey peer = do
             yield $ Right helloMsg'
         other -> assertHandshake $ other
     awaitMsg >>= \case
-        Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash} -> do
+        Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash, networkID=networkID'} -> do
             $logInfoS "serverHandshake/Status{}" "received status"
             yield =<< lift (Mod.get (Mod.Proxy @BestBlock) >>= \(BestBlock bHash _ tdiff) -> do
               (GenesisBlockHash genHash) <- Mod.access (Mod.Proxy @GenesisBlockHash)
               when (genHash /= peerGH) $ error "peer has a different genesis block than we do!"
+              when (networkID' /= computeNetworkID) $ error "networkID mismatch"
               -- we set to 0 cause we dont necessarily know the number yet
               Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
               return $ Right Status {

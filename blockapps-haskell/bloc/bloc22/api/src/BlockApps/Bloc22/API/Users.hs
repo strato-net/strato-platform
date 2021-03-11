@@ -8,6 +8,7 @@
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE OverloadedLists            #-}
 {-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeOperators              #-}
@@ -323,7 +324,7 @@ type PostUsersContract = "users"
   :> Post '[JSON] BlocTransactionResult
 
 data PostUsersContractRequest = PostUsersContractRequest
-  { postuserscontractrequestSrc      :: Text
+  { postuserscontractrequestSrc      :: Map Text Text
   , postuserscontractrequestPassword :: Password
   , postuserscontractrequestContract :: Maybe Text
   , postuserscontractrequestArgs     :: Maybe (Map Text ArgValue)
@@ -335,14 +336,35 @@ data PostUsersContractRequest = PostUsersContractRequest
 instance Arbitrary PostUsersContractRequest where arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToJSON PostUsersContractRequest where
-  toJSON = genericToJSON (aesonPrefix camelCase){omitNothingFields = True}
+  toJSON PostUsersContractRequest{..} = object
+    [ "src" .= postuserscontractrequestSrc
+    , "password" .= postuserscontractrequestPassword
+    , "contract" .= postuserscontractrequestContract
+    , "args" .= postuserscontractrequestArgs
+    , "txParams" .= postuserscontractrequestTxParams
+    , "value" .= postuserscontractrequestValue
+    , "metadata" .= postuserscontractrequestMetadata
+    ]
 
 instance FromJSON PostUsersContractRequest where
-  parseJSON = genericParseJSON (aesonPrefix camelCase){omitNothingFields = True}
+  parseJSON (Object o) = PostUsersContractRequest
+                     <$> (do
+                       msrc <- o .:? "src"
+                       case msrc of
+                         Just (String s) -> pure $ Map.singleton "" s
+                         Just (Object _) -> o .: "src"
+                         _ -> pure Map.empty)
+                     <*> (o .: "password")
+                     <*> (o .:? "contract")
+                     <*> (o .:? "args")
+                     <*> (o .:? "txParams")
+                     <*> (o .:? "value")
+                     <*> (o .:? "metadata")
+  parseJSON o = fail $ "parseJSON PostUsersContractRequest: Expected Object, got " ++ show o
 
 instance ToSample PostUsersContractRequest where
   toSamples _ = singleSample PostUsersContractRequest
-    { postuserscontractrequestSrc =
+    { postuserscontractrequestSrc = Map.singleton "SimpleStorage.sol"
       "contract SimpleStorage { uint storedData; function set(uint x) \
       \{ storedData = x; } function get() returns (uint retVal) \
       \{ return storedData; } }"
@@ -359,6 +381,7 @@ instance ToSchema PostUsersContractRequest where
     textSchema <- declareSchemaRef (Proxy :: Proxy Text)
     pwSchema <- declareSchemaRef (Proxy :: Proxy Password)
     contractNameSchema <- declareSchemaRef (Proxy :: Proxy (Maybe Text))
+    srcSchema <- declareSchemaRef (Proxy :: Proxy (Map Text Text))
     argsSchema <- declareSchemaRef (Proxy :: Proxy (Maybe (Map Text ArgValue)))
     txParamsSchema <- declareSchemaRef (Proxy :: Proxy (Maybe TxParams))
     metadataSchema <- declareSchemaRef (Proxy :: Proxy (Maybe (Map Text Text)))
@@ -366,7 +389,7 @@ instance ToSchema PostUsersContractRequest where
       ( mempty
         & type_ ?~ SwaggerObject
         & properties .~
-            [ ("src", textSchema & mapped.description ?~ "Solidity source code")
+            [ ("src", srcSchema & mapped.description ?~ "Solidity source code")
             , ("password", pwSchema)
             , ("contract", contractNameSchema & mapped.description ?~ "Contract name")
             , ("args", argsSchema)
@@ -379,7 +402,7 @@ instance ToSchema PostUsersContractRequest where
                       ]
         & description ?~ "Post Users Contract Request"
         & example ?~ toJSON PostUsersContractRequest
-            { postuserscontractrequestSrc =
+            { postuserscontractrequestSrc = Map.singleton "SimpleStorage.sol"
               "contract SimpleStorage { uint storedData; function set(uint x) \
               \{ storedData = x; } function get() returns (uint retVal) \
               \{ return storedData; } }"
@@ -394,7 +417,7 @@ instance ToSchema PostUsersContractRequest where
 
 data ContractParameters = ContractParameters
   { fromAddr :: Address
-  , src      :: Text
+  , src      :: Map Text Text
   , contract :: Maybe Text
   , args     :: Maybe (Map Text ArgValue)
   , value    :: Maybe (Strung Natural)
@@ -440,7 +463,7 @@ instance ToSchema UploadListRequest where
       exContract1 :: UploadListContract
       exContract1 = UploadListContract
         { uploadlistcontractContractName = "AccountsContract"
-        , uploadlistcontractSrc = Nothing
+        , uploadlistcontractSrc  = Map.empty
         , uploadlistcontractArgs = Map.fromList [("accountType", ArgString "Checking"), ("balance",ArgInt 10)]
         , _uploadlistcontractTxParams = Nothing
         , uploadlistcontractValue = Nothing
@@ -452,7 +475,7 @@ instance ToSchema UploadListRequest where
 
 data UploadListContract = UploadListContract
   { uploadlistcontractContractName :: Text
-  , uploadlistcontractSrc          :: Maybe Text
+  , uploadlistcontractSrc          :: Map Text Text
   , uploadlistcontractArgs         :: Map Text ArgValue
   , _uploadlistcontractTxParams    :: Maybe TxParams
   , uploadlistcontractValue        :: Maybe (Strung Natural)
@@ -464,10 +487,31 @@ makeLenses ''UploadListContract
 instance Arbitrary UploadListContract where arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToJSON UploadListContract where
-  toJSON = genericToJSON (aesonPrefix camelCase){omitNothingFields = True}
+  toJSON UploadListContract{..} = object
+    [ "contractName" .= uploadlistcontractContractName
+    , "src" .= uploadlistcontractSrc
+    , "args" .= uploadlistcontractArgs
+    , "txParams" .= _uploadlistcontractTxParams
+    , "value" .= uploadlistcontractValue
+    , "chainid" .= _uploadlistcontractChainid
+    , "metadata" .= uploadlistcontractMetadata
+    ]
 
 instance FromJSON UploadListContract where
-  parseJSON = genericParseJSON (aesonPrefix camelCase){omitNothingFields = True}
+  parseJSON (Object o) = UploadListContract
+                     <$> (o .: "contractName")
+                     <*> (do
+                       msrc <- o .:? "src"
+                       case msrc of
+                         Just (String s) -> pure $ Map.singleton "" s
+                         Just (Object _) -> o .: "src"
+                         _ -> pure Map.empty)
+                     <*> (o .: "args")
+                     <*> (o .:? "txParams")
+                     <*> (o .:? "value")
+                     <*> (o .:? "chainid")
+                     <*> (o .:? "metadata")
+  parseJSON o = fail $ "parseJSON UploadListContract: Expected Object, got " ++ show o
 
 instance ToSchema UploadListContract where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
@@ -477,7 +521,7 @@ instance ToSchema UploadListContract where
       ex :: UploadListContract
       ex = UploadListContract
         { uploadlistcontractContractName = "SampleContract"
-        , uploadlistcontractSrc = Nothing
+        , uploadlistcontractSrc = Map.empty
         , uploadlistcontractArgs = Map.fromList [("user", ArgString "Bob"), ("age",ArgInt 1)]
         , _uploadlistcontractTxParams = Just $ TxParams (Just $ Gas 123) (Just $ Wei 345) Nothing
         , uploadlistcontractValue = Nothing

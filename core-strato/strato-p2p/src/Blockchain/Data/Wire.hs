@@ -19,7 +19,7 @@ import           Data.Word
 import           Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 
 import qualified Blockchain.Blockstanbul      as PBFT
-import           Blockchain.Data.BlockDB
+import           Blockchain.Data.Block        (Block)
 import           Blockchain.Data.BlockHeader
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.PubKey       ()
@@ -157,7 +157,7 @@ data Message =
   Pong |
 
   --ethereum wire protocol
-  Status { protocolVersion::Int, networkID::Int, totalDifficulty::Integer, latestHash::Keccak256, genesisHash:: Keccak256 } |
+  Status { protocolVersion::Int, networkID::Integer, totalDifficulty::Integer, latestHash::Keccak256, genesisHash:: Keccak256 } |
   NewBlockHashes [(Keccak256, Int)] |
   Transactions [Transaction] |
   GetBlockHeaders {block::BlockHashOrNumber, maxHeaders::Int, skip::Int, direction::Direction} |

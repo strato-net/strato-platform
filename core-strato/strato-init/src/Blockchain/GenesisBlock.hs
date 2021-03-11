@@ -30,7 +30,9 @@ import           System.Directory
 
 import qualified Blockchain.Strato.Model.Action               as A
 import           Blockchain.Data.AddressStateDB
+import           Blockchain.Data.Block
 import           Blockchain.Data.BlockDB
+import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Extra
 import           Blockchain.Data.GenesisBlock
 import           Blockchain.Data.GenesisInfo
@@ -152,7 +154,11 @@ initializeGenesisBlock genesisBlockName extraFaucets = do
     $logInfoS "initgen" "best block info inserted"
     liftIO $ bootstrapIndexer obGB
     $logInfoS "initgen" "indexer has been bootstrapped"
-    let rewrite (_, CodeInfo bin src name) = (hash bin, Map.fromList [("src", src),("name",name)])
+    let rewrite (_, CodeInfo bin src name) = (hash bin, Map.fromList $
+                                                        [("src", src)] ++
+                                                        case name of
+                                                          Nothing -> []
+                                                          Just n -> [("name",n)])
         metadatas = Map.fromList . map rewrite $ srcInfo
         findMetadata = flip Map.lookup metadatas
     populateStorageDBs findMetadata genesisBlock genesisChainId

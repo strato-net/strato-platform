@@ -33,7 +33,7 @@ import qualified Blockchain.Bagger.BaggerState      as B
 import           Blockchain.Bagger.Transactions
 import           Blockchain.Data.Address
 import qualified Blockchain.Data.AddressStateDB     as DD
-import qualified Blockchain.Data.BlockDB            as BDB
+import           Blockchain.Data.Block
 import qualified Blockchain.Data.DataDefs           as DD
 import           Blockchain.Data.BlockHeader        (txsLen2ExtraData)
 import qualified Blockchain.Data.TransactionDef     as TD
@@ -41,6 +41,7 @@ import qualified Blockchain.Data.TXOrigin           as TO
 import           Blockchain.DB.ChainDB
 import           Blockchain.Database.MerklePatricia (StateRoot (..))
 import qualified Blockchain.EthConf                 as Conf
+import           Blockchain.ExtWord
 import           Blockchain.Sequencer.Event         (OutputBlock (..), OutputTx (..))
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Class
@@ -61,7 +62,7 @@ class VMBase m => MonadBagger m where
     isBlockstanbul     :: m Bool
     getBaggerState     :: m B.BaggerState
     peekPendingVote    :: m (Address, Word64)
-    clearPendingVote   :: BDB.Block -> m ()
+    clearPendingVote   :: Block -> m ()
     putBaggerState     :: B.BaggerState -> m ()
     runFromStateRoot   :: Integer -> DD.BlockData -> [OutputTx] -> m (Either RunAttemptError (StateRoot, [TxRunResult], Integer))
     rewardCoinbases    :: Address -> [DD.BlockData] -> Integer -> m StateRoot -- miner coinbase -> known uncles -> this block number -> stateRoot
@@ -98,8 +99,7 @@ class VMBase m => MonadBagger m where
           promoteExecutables
 
     processNewBestBlock :: Keccak256 -> DD.BlockData -> [Keccak256] -> m ()
-    processNewBestBlock bh bd txShas = withCurrentBlockHash bh $ do
-        putBlockHeaderInChainDB bd
+    processNewBestBlock bh bd txShas = do
         $logDebugS "Bagger.processNewBestBlock" . T.pack $ "called with " ++ show (length txShas) ++ " txs"
         state <- getBaggerState
         -- This will be rounded in RLPEncode, but just for consistency.
@@ -121,9 +121,10 @@ class VMBase m => MonadBagger m where
                                            , B.startTimestamp        = time
                                            }
         putBaggerState $ state { B.seen = S.empty, B.miningCache = newMiningCache }
-        demoteUnexecutables
-        promoteExecutables
         migrateBlockHeader bd baggerBlockHash
+        withBagger $ do
+          demoteUnexecutables
+          promoteExecutables
 
     makeNewBlock :: m OutputBlock
     makeNewBlock = do
@@ -412,7 +413,7 @@ buildFromMiningCache = do
     let parentDiff   = DD.blockDataDifficulty parentHeader
     let parentTS     = DD.blockDataTimestamp parentHeader
     let time         = B.startTimestamp cache
-    let nextDiff     = BDB.nextDifficulty flags_difficultyBomb flags_testnet parentNum parentDiff parentTS time
+    let nextDiff     = nextDifficulty flags_difficultyBomb flags_testnet parentNum parentDiff parentTS time
     let nextBlockData = buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT coinbaseAddr nonce
     recordMaxBlockNumber "bagger_build" . DD.blockDataNumber $ nextBlockData
     rewardedBlockData <- buildRewardedBlockHeader nextBlockData uncles
@@ -442,7 +443,7 @@ buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT co
     let parentDiff = DD.blockDataDifficulty parentHeader
         parentNum  = DD.blockDataNumber parentHeader
         parentTS   = DD.blockDataTimestamp parentHeader
-        nextDiff   = BDB.nextDifficulty flags_difficultyBomb flags_testnet parentNum parentDiff parentTS time
+        nextDiff   = nextDifficulty flags_difficultyBomb flags_testnet parentNum parentDiff parentTS time
         in DD.BlockData { DD.blockDataParentHash       = parentHash
                         , DD.blockDataUnclesHash       = V.ommersVerificationValue uncles
                         -- TODO: when `isPBFT`, coinbase and nonce should be set from a queue of pending votes
@@ -465,7 +466,9 @@ buildRewardedBlockHeader :: MonadBagger m => DD.BlockData -> [DD.BlockData] -> m
 buildRewardedBlockHeader bd uncles = do
   $logInfoS "Bagger.buildRewardedBlockHeader" . T.pack $ "Baggin' with difficultyBomb = " ++ show flags_difficultyBomb
   $logInfoS "Bagger.buildRewardedBlockHeader" . T.pack $ "pre-reward :: (" ++ format (DD.blockDataStateRoot bd) ++ ")"
+  oldSR <- A.lookupWithDefault (A.Proxy @StateRoot) (Nothing :: Maybe Word256)
   rewardedStateRoot <- rewardCoinbases (DD.blockDataCoinbase bd) uncles (DD.blockDataNumber bd)
+  A.insert (A.Proxy @StateRoot) (Nothing :: Maybe Word256) oldSR
   $logInfoS "Bagger.buildRewardedBlockHeader" . T.pack $ "post-reward :: (" ++ format rewardedStateRoot ++ ")"
   return bd{DD.blockDataStateRoot = rewardedStateRoot}
 

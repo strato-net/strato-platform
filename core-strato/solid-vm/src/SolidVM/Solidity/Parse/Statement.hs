@@ -25,19 +25,20 @@ statement = do
   ifStatement
   <|> whileStatement
   <|> forStatement
-  <|> (reserved "return" >> Return <$> optionMaybe expression <* semi)
+  <|> (getPosition >>= \p -> reserved "return" >> flip Return p <$> optionMaybe expression <* semi)
   <|> (do
+          p <- getPosition
           reserved "emit"
           ident <- identifier
           exps <- parens $ commaSep expression
           _ <- semi
-          return $ EmitStatement ident $ map ((,) Nothing) exps
+          return $ EmitStatement ident (map ((,) Nothing) exps) p
       )
-  <|> try (SimpleStatement <$> variableDefinitionStatement <* semi)
-  <|> (reserved "continue" >> return Continue <* semi)
-  <|> (reserved "break" >> return Break <* semi)
+  <|> try (getPosition >>= \p -> flip SimpleStatement p <$> variableDefinitionStatement <* semi)
+  <|> (getPosition >>= \p -> reserved "continue" >> return (Continue p) <* semi)
+  <|> (getPosition >>= \p -> reserved "break" >> return (Break p) <* semi)
   <|> (reserved "assembly" >> inlineAssembly)
-  <|> (SimpleStatement . ExpressionStatement <$> expression <* semi)
+  <|> (getPosition >>= \p -> flip SimpleStatement p . ExpressionStatement <$> expression <* semi)
 
 
 
@@ -50,21 +51,24 @@ Statement = IfStatement | WhileStatement | ForStatement | Block | InlineAssembly
 
 ifStatement :: SolidityParser Statement
 ifStatement = do
+  p <- getPosition
   reserved "if"
   e <- parens expression
   s <- fmap (:[]) statement <|> statements
   elseStatement <- optionMaybe (reserved "else" >> (fmap (:[]) statement <|> statements))
-  return $ IfStatement e s elseStatement
+  return $ IfStatement e s elseStatement p
 
 whileStatement :: SolidityParser Statement
 whileStatement = do
+  p <- getPosition
   reserved "while"
   e <- parens expression
   s <- fmap (:[]) statement <|> statements
-  return $ WhileStatement e s
+  return $ WhileStatement e s p
 
 forStatement :: SolidityParser Statement
 forStatement = do
+  p <- getPosition
   reserved "for"
   (v1, v2, v3) <- parens $ do
     v1 <- optionMaybe (try variableDefinitionStatement <|> fmap ExpressionStatement expression)
@@ -74,7 +78,7 @@ forStatement = do
     v3 <- optionMaybe expression
     return (v1, v2, v3)
   s <- statements
-  return $ ForStatement v1 v2 v3 s
+  return $ ForStatement v1 v2 v3 s p
 
 
 
@@ -171,7 +175,7 @@ tuple = do
 
 array :: SolidityParser Expression
 array = do
-  exps <- brackets $ commaSep1 expression
+  exps <- brackets $ commaSep expression
   return $ ArrayExpression exps
 
 
@@ -212,6 +216,7 @@ primaryExpression = do
   (reserved "msg" >> return (Variable "msg"))
   <|> (reserved "address" >> return (Variable "address"))
   <|> (reserved "account" >> return (Variable "account"))
+  <|> (reserved "bool" >> return (Variable "bool"))
   <|> (reserved "this" >> return (Variable "this"))
   <|> (reserved "block" >> return (Variable "block"))
   <|> (reserved "tx" >> return (Variable "tx"))
@@ -244,11 +249,11 @@ literal = asum
         , StringLiteral <$> stringLiteral
         , reserved "false" >> return (BoolLiteral False)
         , reserved "true" >> return (BoolLiteral True)
-        , ArrayExpression <$> brackets (commaSep1 literal)
+        , ArrayExpression <$> brackets (commaSep literal)
         ]
 
 inlineAssembly :: SolidityParser Statement
-inlineAssembly = fmap AssemblyStatement . braces $ do
+inlineAssembly = getPosition >>= \p -> fmap (flip AssemblyStatement p) . braces $ do
   let match = void . lexeme . string
   dst <- identifier
   match ":="
