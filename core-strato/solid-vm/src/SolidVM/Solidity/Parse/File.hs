@@ -12,7 +12,6 @@ module SolidVM.Solidity.Parse.File where
 
 import           Prelude                               hiding (lookup)
 
-import           Control.DeepSeq
 import           Control.Monad
 import           Data.Either.Extra
 import           Data.Maybe
@@ -30,7 +29,7 @@ import           SolidVM.Solidity.Parse.Pragmas
 
 newtype File = File {
   unsourceUnits :: [SourceUnit]
-} deriving (Show, Read, Generic, NFData)
+} deriving (Show, Generic)
 
 solidityFile :: SolidityParser File
 solidityFile = do

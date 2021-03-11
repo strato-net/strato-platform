@@ -95,6 +95,7 @@ import qualified Database.LevelDB                          as LDB
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin
 import           Blockchain.Constants
+import           Blockchain.Data.ChainInfo
 import           Blockchain.ExtWord                        (Word256)
 import           Blockchain.Output
 import           Blockchain.Privacy
@@ -348,6 +349,11 @@ instance (Keccak256 `A.Alters` DependentBlockEntry) SequencerM where
   delete _ k = do
     modify' $ dbeRegistry . at k .~ Nothing
     addLdbBatchOps . (:[]) $ genericBatchDeleteDependentBlockDB k
+
+instance A.Selectable (Maybe Word256) ParentChainId SequencerM where
+  select _ = \case
+    Nothing -> pure . Just $ ParentChainId Nothing
+    Just cId -> join . fmap (fmap (ParentChainId . parentChain . chainInfo) . _chainIdInfo) <$> A.lookup (A.Proxy @ChainIdEntry) cId
 
 instance Mod.Modifiable SeenTransactionDB SequencerM where
   get _ = use seenTransactionDB

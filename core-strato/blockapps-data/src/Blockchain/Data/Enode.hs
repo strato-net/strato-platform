@@ -89,7 +89,7 @@ instance FromJSON Enode where
     case readEnodeOrFail $ T.unpack str of
       Left e -> fail e
       Right val -> return val
-  parseJSON x = error $ "could not parse JSON for Enode: " ++ show x
+  parseJSON x = fail $ "could not parse JSON for Enode: " ++ show x
 
 instance ToJSON Enode where
   toJSON enode = String (T.pack $ showEnode enode)
@@ -116,6 +116,26 @@ readIP input =
         (((LabeledError.read "Enode/readIP3" b3) .&. 0xff) `shiftL` 24))
   in (IPv4 addy)
 
+readEitherIP :: String -> Either String IPAddress
+readEitherIP input =
+  let (b3,temp) = break (=='.') input
+      s0 = dropWhile (=='.') temp
+      (b2, temp2) = break (=='.') s0
+      s1 = dropWhile (=='.') temp2
+      (b1, temp3) = break (=='.') s1
+      b0 = dropWhile (=='.') temp3
+      msg i = "Enode/readIP" ++ i ++ ": IP addresses must be in valid IPv4 form"
+      addy = do
+        b0' <- LabeledError.readEither (msg "0") b0
+        b1' <- LabeledError.readEither (msg "1") b1
+        b2' <- LabeledError.readEither (msg "2") b2
+        b3' <- LabeledError.readEither (msg "3") b3
+        pure $ b0'
+           + ((b1' .&. 0xff) `shiftL` 8)
+           + ((b2' .&. 0xff) `shiftL` 16)
+           + ((b3' .&. 0xff) `shiftL` 24)
+  in IPv4 <$> addy
+
 showEnode :: Enode -> String
 showEnode (Enode (OrgId pk) ip tp up) =
     "enode://" ++
@@ -137,13 +157,23 @@ readEnode input =
   
 readEnodeOrFail :: String -> Either String Enode
 readEnodeOrFail input =
-  case matchRegex (mkRegex "^enode://([0-9a-f]{128})@([^:]+)\\:([0-9]+)(\\?discport=([0-9]+))?$") input of
+  case matchRegex (mkRegex "^enode://([0-9a-f]+)@([^:]+)\\:([0-9]+)(\\?discport=([0-9]+))?$") input of
     Nothing -> Left $ "enode is in the wrong format: " ++ input
-    Just [pubkey, ip, port, _, discport] ->
-      Right $ Enode (OrgId . fst $ B16.decode (C8.pack pubkey)) (readIP ip) (LabeledError.read "Enode/readEnodeOrFail" port) $
-                    case discport of
-                      "" -> Nothing
-                      _ -> Just $ LabeledError.read "Enode/readEnodeOrFail" discport
+    Just [pubkey', ip, port, _, discport] -> do
+      let publen = length pubkey'
+          pubkey = if publen >= 128
+                     then pubkey'
+                     else replicate (128 - publen) '0' <> pubkey'
+          ~(oId, rest) = B16.decode $ C8.pack pubkey
+      orgId <- if B.null rest
+        then pure $ OrgId oId
+        else fail $ "Failed on parsing OrdId: " ++ pubkey
+      ipAddr <- readEitherIP ip
+      tcp <- LabeledError.readEither "Enode/readEnodeOrFail" port
+      udp <- case discport of
+        "" -> pure Nothing
+        _ -> Just <$> LabeledError.readEither "Enode/readEnodeOrFail" discport
+      pure $ Enode orgId ipAddr tcp udp
     _ -> error "internal error in 'readEnodeOrFail': regex returned with wrong number of matches"
 
 instance PersistFieldSql Enode where

@@ -44,6 +44,7 @@ library:
     - cryptonite
     - directory
     - extra
+    - ethereum-rlp
     - filepath
     - format
     - haskoin-shim

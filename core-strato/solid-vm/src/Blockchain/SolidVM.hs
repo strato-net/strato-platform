@@ -91,6 +91,12 @@ type SolidVMBase m = VMBase m
 onTraced :: Monad m => m () -> m ()
 onTraced = when flags_svmTrace
 
+withSrcPos :: MonadIO m => Xabi.SourcePos -> String -> m ()
+withSrcPos pos str = liftIO . putStrLn $ concat 
+  [ show pos
+  , ": "
+  , str
+  ]
 
 create :: SolidVMBase m
        => Bool
@@ -426,13 +432,13 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.PlusPlus e)))
 
 
 -- Assignment to an index into an array or mapping
-runStatement st@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" dst@(Xabi.IndexAccess parent (Just indExp)) src))) = do
+runStatement st@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" dst@(Xabi.IndexAccess parent (Just indExp)) src)) pos) = do
   srcVar <- expToVar src
   srcVal <- getVar srcVar
 
   onTraced $ do
     valString <- showSM srcVal
-    liftIO $ putStrLn $ "    Setting: " ++ unparseExpression dst ++ " = " ++ valString
+    withSrcPos pos $ "    Setting: " ++ unparseExpression dst ++ " = " ++ valString
 
   pVar <- expToVar parent
   pVal <- weakGetVar pVar
@@ -455,10 +461,10 @@ runStatement st@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "="
       return Nothing
 
 
-runStatement st@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" (Xabi.IndexAccess _ Nothing) _))) = missingField "index value cannot be empty" (unparseStatement st)
+runStatement st@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" (Xabi.IndexAccess _ Nothing) _)) _) = missingField "index value cannot be empty" (unparseStatement st)
 
 
-runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" dst src))) = do
+runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" dst src)) pos) = do
   srcVal <- getVar =<< expToVar src
   dstVar <- expToVar dst
 
@@ -466,7 +472,7 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" ds
   
   onTraced $ do
     valString <- showSM srcVal
-    liftIO $ putStrLn $ "    Setting: " ++ unparseExpression dst ++ " = " ++ valString
+    withSrcPos pos $ "    Setting: " ++ unparseExpression dst ++ " = " ++ valString
               
   return Nothing
 
@@ -506,11 +512,11 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" ds
               logAssigningVariable value'
               setVar v1 $ coerceType ctract ty value'
 -}
-runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e)) = do
+runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e) _) = do
   _ <- getVar =<< expToVar e
   return Nothing -- just throw away the return value
 
-runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition entries maybeExpression)) = do
+runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition entries maybeExpression) pos) = do
   let !maybeLoc = case entries of
                       [e] -> Xabi.vardefLocation e
                       es -> if any ((== Just Xabi.Storage) . Xabi.vardefLocation) es
@@ -538,9 +544,9 @@ runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition entries maybeExpre
     let toName :: Xabi.VarDefEntry -> String
         toName Xabi.BlankEntry = ""
         toName vde = Xabi.vardefName vde
-    liftIO $ printf "             creating and setting variables: (%s)\n" $
+    withSrcPos pos $ printf "             creating and setting variables: (%s)\n" $
         intercalate ", " (map toName entries)
-    liftIO $ printf "             to: %s\n" valueString
+    withSrcPos pos $ printf "             to: %s\n" valueString
   let ensureType :: Maybe Xabi.Type -> Xabi.Type
       ensureType = fromMaybe (todo "type inference not implemented" s)
 
@@ -558,13 +564,13 @@ runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition entries maybeExpre
 
   return Nothing
 
-runStatement (Xabi.IfStatement condition code' maybeElseCode) = do
+runStatement (Xabi.IfStatement condition code' maybeElseCode pos) = do
   conditionResult <- getBool =<< expToVar condition
   
   onTraced $ do
     if conditionResult
-      then liftIO $ putStrLn "       if condition succeeded, running internal code"
-      else liftIO $ putStrLn "       if condition failed, skipping internal code"
+      then withSrcPos pos $ "       if condition succeeded, running internal code"
+      else withSrcPos pos $ "       if condition failed, skipping internal code"
     
   if conditionResult
     then runStatements code'
@@ -572,21 +578,29 @@ runStatement (Xabi.IfStatement condition code' maybeElseCode) = do
       Just elseCode -> runStatements elseCode
       Nothing -> return Nothing
 
-runStatement (Xabi.WhileStatement condition code) = do
+runStatement (Xabi.WhileStatement condition code pos) = do
   
      
   while (getBool =<< expToVar condition) $ do
-      onTraced $ liftIO $ putStrLn $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
+      onTraced $ withSrcPos pos $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
+      result <- runStatements code
+      return result
+
+      -- TODO: this can loop infinitely
+
+runStatement (Xabi.DoWhileStatement code condition pos) = do
+  doWhile (getBool =<< expToVar condition) $ do
+      onTraced $ withSrcPos pos $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
       result <- runStatements code
       return result
 
       -- TODO: this can loop infinitely
 
 --TODO- all the variables declared in an `if` or `for` code block need to be deleted when the block is finished....
-runStatement (Xabi.ForStatement maybeInitStatement maybeConditionExp maybeLoopExp code) = do
+runStatement (Xabi.ForStatement maybeInitStatement maybeConditionExp maybeLoopExp code pos) = do
   _ <-
     case maybeInitStatement of
-      Just initStatement -> runStatement $ Xabi.SimpleStatement initStatement
+      Just initStatement -> runStatement $ Xabi.SimpleStatement initStatement pos
       _ -> return Nothing
 
   let conditionExp =
@@ -602,12 +616,12 @@ runStatement (Xabi.ForStatement maybeInitStatement maybeConditionExp maybeLoopEx
   let condition = getBool =<< expToVar conditionExp
 
   while condition $ do
-      onTraced $ liftIO $ putStrLn $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
+      onTraced $ withSrcPos pos $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
       result <- runStatements code
       _ <- getVar =<< expToVar loopExp
       return result
 
-runStatement (Xabi.Return maybeExpression) = do
+runStatement (Xabi.Return maybeExpression _) = do
   case maybeExpression of
     Just e -> do
       ql <- expToVar e
@@ -616,7 +630,7 @@ runStatement (Xabi.Return maybeExpression) = do
 --      fmap Just $ getVar =<< expToVar e
     Nothing -> return $ Just SNULL
 
-runStatement (Xabi.AssemblyStatement (Xabi.MloadAdd32 dst src)) = do
+runStatement (Xabi.AssemblyStatement (Xabi.MloadAdd32 dst src) _) = do
   srcVar <- expToVar $ Xabi.Variable $ T.unpack src;
   dstVar <- expToVar $ Xabi.Variable $ T.unpack dst;
 
@@ -624,7 +638,7 @@ runStatement (Xabi.AssemblyStatement (Xabi.MloadAdd32 dst src)) = do
   setVar dstVar =<< getString srcVar
   return Nothing
 
-runStatement st@(Xabi.EmitStatement eventName exptups) = do
+runStatement st@(Xabi.EmitStatement eventName exptups _) = do
   exps <- mapM (expToVar . snd) exptups
   expVals <- mapM getVar exps
   expStrs <- mapM showSM expVals
@@ -659,6 +673,18 @@ while condition code = do
         Nothing -> while condition code
         _ -> return result
     else return Nothing
+
+doWhile :: MonadSM m => m Bool -> m (Maybe Value) -> m (Maybe Value)
+doWhile condition code = do
+  result <- code
+  case result of
+    Nothing -> do
+      c <- condition
+      onTraced $ liftIO $ putStrLn $ C.red $ "^^^^^^^^^^^^^^^^^^^^ loopy condition: " ++ show c
+      if c
+        then doWhile condition code
+        else return Nothing
+    _ -> return result
 
 getIndexType :: MonadSM m => AccountPath -> m IndexType
 getIndexType (AccountPath addr p) = do
@@ -1252,8 +1278,50 @@ callBuiltin "account" [ss@(SString s)] _ = maybe (typeError "account cast" ss)
                                                  $ readMaybe s
 callBuiltin "account" [SInteger a, SInteger b] _ = return . SAccount $ explicitChain (fromIntegral a) (fromInteger b)
 callBuiltin "account" [SInteger a, SString "main"] _ = return . SAccount $ mainChain (fromIntegral a)
+callBuiltin "account" [SInteger a, SString "parent"] _ = do
+  cInfo <- Mod.get (Mod.Proxy @[CallInfo])
+  let currentChainId = maybe Nothing (_accountChainId . currentAccount) $ listToMaybe cInfo
+  pChain <- getNthAncestorChain 1 currentChainId
+  case pChain of
+    Nothing -> return . SAccount $ mainChain (fromIntegral a)
+    Just b -> return . SAccount $ explicitChain (fromIntegral a) b
+callBuiltin "account" [SInteger a, SString "grandparent"] _ = do
+  cInfo <- Mod.get (Mod.Proxy @[CallInfo])
+  let currentChainId = maybe Nothing (_accountChainId . currentAccount) $ listToMaybe cInfo
+  gpChain <- getNthAncestorChain 2 currentChainId
+  case gpChain of
+    Nothing -> return . SAccount $ mainChain (fromIntegral a)
+    Just b -> return . SAccount $ explicitChain (fromIntegral a) b
+callBuiltin "account" [SInteger a, SString "ancestor", SInteger n] _ = do
+  cInfo <- Mod.get (Mod.Proxy @[CallInfo])
+  let currentChainId = maybe Nothing (_accountChainId . currentAccount) $ listToMaybe cInfo
+  ancestorChain <- getNthAncestorChain (fromIntegral n) currentChainId
+  case ancestorChain of
+    Nothing -> return . SAccount $ mainChain (fromIntegral a)
+    Just b -> return . SAccount $ explicitChain (fromIntegral a) b
 callBuiltin "account" [SAccount a, SInteger b] _ = return . SAccount $ (namedAccountChainId .~ ExplicitChain (fromIntegral b)) a
 callBuiltin "account" [SAccount a, SString "main"] _ = return . SAccount $ (namedAccountChainId .~ MainChain) a
+callBuiltin "account" [SAccount a, SString "parent"] _ = do
+  cInfo <- Mod.get (Mod.Proxy @[CallInfo])
+  let currentChainId = maybe Nothing (_accountChainId . currentAccount) $ listToMaybe cInfo
+  pChain <- getNthAncestorChain 1 currentChainId
+  case pChain of
+    Nothing -> return . SAccount $ (namedAccountChainId .~ MainChain) a
+    Just b -> return . SAccount $ (namedAccountChainId .~ ExplicitChain b) a
+callBuiltin "account" [SAccount a, SString "grandparent"] _ = do
+  cInfo <- Mod.get (Mod.Proxy @[CallInfo])
+  let currentChainId = maybe Nothing (_accountChainId . currentAccount) $ listToMaybe cInfo
+  gpChain <- getNthAncestorChain 2 currentChainId
+  case gpChain of
+    Nothing -> return . SAccount $ (namedAccountChainId .~ MainChain) a
+    Just b -> return . SAccount $ (namedAccountChainId .~ ExplicitChain b) a
+callBuiltin "account" [SAccount a, SString "ancestor", SInteger n] _ = do
+  cInfo <- Mod.get (Mod.Proxy @[CallInfo])
+  let currentChainId = maybe Nothing (_accountChainId . currentAccount) $ listToMaybe cInfo
+  ancestorChain <- getNthAncestorChain (fromIntegral n) currentChainId
+  case ancestorChain of
+    Nothing -> return . SAccount $ (namedAccountChainId .~ MainChain) a
+    Just b -> return . SAccount $ (namedAccountChainId .~ ExplicitChain b) a
 callBuiltin "account" vs _ = typeError "account cast" vs
 callBuiltin "bool" [SBool b] _ = return $ SBool b
 callBuiltin "bool" [SString "true"] _ = return $ SBool True

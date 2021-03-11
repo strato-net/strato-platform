@@ -265,6 +265,11 @@ instance MonadIO m => (Keccak256 `A.Alters` DBDB.DependentBlockEntry) (MonadTest
   insert _ k v = sequencerContext . dbeRegistry . at k ?= v
   delete _ k = sequencerContext . dbeRegistry . at k .= Nothing
 
+instance MonadIO m => A.Selectable (Maybe Word256) ParentChainId (MonadTest m) where
+  select _ = \case
+    Nothing -> pure . Just $ ParentChainId Nothing
+    Just cId -> join . fmap (fmap (ParentChainId . parentChain . chainInfo) . _chainIdInfo) <$> A.lookup (A.Proxy @ChainIdEntry) cId
+
 instance MonadIO m => Mod.Modifiable SeenTransactionDB (MonadTest m) where
   get _ = use $ sequencerContext . seenTransactionDB
   put _ = assign $ sequencerContext . seenTransactionDB
