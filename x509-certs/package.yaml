@@ -23,6 +23,7 @@ library:
   - aeson
   - asn1-encoding
   - asn1-types
+  - base16-bytestring
   - bytestring
   - cereal
   - containers
@@ -42,6 +43,17 @@ library:
 #  - x509-util
 
 
+executables:
+  x509-tool:
+    source-dirs: exec_src/
+    main: X509Tool.hs
+    dependencies:
+      - aeson
+      - bytestring
+      - cryptonite
+      - secp256k1-haskell
+      - x509-certs
+
 tests:
   x509-test:
     main: Spec.hs
@@ -52,7 +64,5 @@ tests:
       - cryptonite
       - ethereum-rlp
       - secp256k1-haskell
-      - x509
-      - x509-validation
       - hspec
       - QuickCheck

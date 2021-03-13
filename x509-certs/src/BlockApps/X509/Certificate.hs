@@ -1,6 +1,6 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeSynonymInstances #-}
--- {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings #-}
 -- {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -14,15 +14,15 @@ module BlockApps.X509.Certificate (
   bsToCert,
   makeCert,
   makeSignedCert,
-  newPriv,
+  fromASN1CS -- I'd rather not
  ) where
 
 
 
 
 import           Blockchain.Data.RLP
+import           BlockApps.X509.Keys
 
-import           Crypto.PubKey.ECC.Types
 import           Crypto.Random.Entropy
 import           Crypto.Hash
 import qualified Crypto.Hash.Algorithms         as CH
@@ -31,9 +31,12 @@ import qualified Crypto.Secp256k1               as SEC
 import           Data.Aeson
 import           Data.ASN1.OID
 import           Data.ASN1.Types.String
+import           Data.Bits
 import qualified Data.ByteArray                 as BA
 import qualified Data.ByteString                as B
 import qualified Data.ByteString.Char8          as C8
+import qualified Data.ByteString.Base16         as B16
+import           Data.Either
 import           Data.Maybe
 import           Data.PEM
 import qualified Data.Text                      as T
@@ -41,15 +44,9 @@ import           Data.X509
 
 import           Time.Types
 import           Time.System
-import           System.Random
 
 
 
--- TODO: super temporary it's not even funny
-newPriv :: IO (SEC.SecKey)
-newPriv = do
-  ent <- getEntropy 32
-  return $ fromMaybe (error "could not create private key") (SEC.secKey ent)
 
 
 -----------------------------------------------------------------------------------------------
@@ -57,12 +54,12 @@ newPriv = do
 -----------------------------------------------------------------------------------------------
 
 
-
 data Issuer = Issuer
   {
     issCommonName :: String
   , issCountry    :: String
   , issOrg        :: String
+  , issUnit       :: String
   , issPriv       :: SEC.SecKey
   } deriving (Show, Eq)
 
@@ -78,18 +75,40 @@ data Subject = Subject
 
 
 
+instance ToJSON Subject where
+  toJSON (Subject cn c o ou pub) = 
+    object [ "commonName"       .= cn
+           , "country"          .= c
+           , "organization"     .= o
+           , "organizationUnit" .= ou
+           , "pubKey"           .= enc pub
+           ]
+     where enc = String . T.pack . C8.unpack . B16.encode . SEC.exportPubKey False  
+
+-- TODO: country and unit should be optional?
+instance FromJSON Subject where
+  parseJSON (Object obj) = do
+    cn  <- obj .: "commonName"
+    c   <- obj .: "country"
+    o   <- obj .: "organization"
+    ou  <- obj .: "organizationUnit"
+    pub <- obj .: "pubKey"
+    return $ Subject cn c o ou (dec pub)
+      where dec p = fromMaybe (error "could not decode pubkey") (SEC.importPubKey $ fst $ B16.decode $ C8.pack $ T.unpack p)
+  parseJSON x = error $ "could not decode JSON subject info: " ++ show x
+
+
 instance RLPSerializable SignedCertificate where
   rlpEncode = RLPString . certToBytes
   
-  rlpDecode (RLPString str) = bsToCert str
+  rlpDecode (RLPString str) = fromRight (error "failed to rlpDecode cert") $ bsToCert str
   rlpDecode x = error $ "rlpDecode for SignedCertificate failed: expected RLPString, got " ++ show x
-
 
 instance ToJSON SignedCertificate where
   toJSON = String . T.pack . C8.unpack . certToBytes
 
 instance FromJSON SignedCertificate where
-  parseJSON (String str) = return $ bsToCert $ C8.pack $ T.unpack str
+  parseJSON (String str) = return $ fromRight (error "failed to JSON parse cert") $ bsToCert $ C8.pack $ T.unpack str
   parseJSON x = error $ "parseJSON for SignedCertificate expects a String, but was given " ++ show x
 
 
@@ -110,15 +129,15 @@ certToPem cert = PEM
   }
 
 
-bsToCert :: B.ByteString -> SignedCertificate
+bsToCert :: B.ByteString -> Either String SignedCertificate
 bsToCert bs =
   case (pemParseBS bs) of
-    Left str -> error str
-    Right [] -> error "nothing parsed...but no errors?"
+    Left str -> Left str
+    Right [] -> Left "nothing parsed...but no errors?"
     Right (pem:_) -> 
       case (decodeSignedCertificate $ pemContent pem) of
-        Left str -> error str
-        Right cert -> cert
+        Left str -> Left str
+        Right cert -> Right cert
 
 
 
@@ -136,7 +155,11 @@ signCert priv cert = objectToSignedExactF (ecdsaWithSHA256 $ priv) cert
 
 makeCert :: Issuer -> Subject -> IO (Certificate)
 makeCert iss sub = do
-  serial <- (randomRIO (10000000, 99999999)) -- TODO: might we have repeat serials?
+--  serial <- (randomRIO (10000000, 99999999)) -- TODO: might we have repeat serials?
+  serial' <- getEntropy 16
+  let fromBytes = B.foldl' (\a b -> a `shiftL` 8 .|. fromIntegral b) 0
+      serial = fromBytes serial'
+
   validity <- getValidity
   
 
@@ -172,12 +195,12 @@ ecdsaWithSHA256 prv mesg' = do
 toASN1CS :: String -> ASN1CharacterString
 toASN1CS = asn1CharacterString UTF8
 
-{-
+
 fromASN1CS :: ASN1CharacterString -> String
 fromASN1CS cs = 
   let errstr = "failed to decode ASN1CharacterString: " ++ show cs
   in fromMaybe (error errstr) (asn1CharacterToString cs)
--}
+
 
 getIssuerDN :: Issuer -> DistinguishedName
 getIssuerDN iss = 
@@ -211,7 +234,4 @@ getCertPub :: Subject -> PubKey
 getCertPub = serializeAndWrap . subPub
 
 
-serializeAndWrap :: SEC.PubKey -> PubKey
-serializeAndWrap pub =
-  let serialPoint = SerializedPoint $ SEC.exportPubKey False pub
-  in PubKeyEC $ PubKeyEC_Named SEC_p256k1 serialPoint
+

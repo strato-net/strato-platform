@@ -1,13 +1,10 @@
 
 
-import           Crypto.Random.Entropy
 import           Crypto.PubKey.ECC.Types
 import qualified Crypto.Secp256k1       as S
---import qualified Data.ByteString        as B
 import           Data.Coerce
 import           Data.Maybe
 
-import           Data.X509.Validation
 
 import           BlockApps.X509
 import           Blockchain.Data.RLP
@@ -15,22 +12,16 @@ import           Test.Hspec
 
 
 
--- TODO: ideally, we have helpers wrapping the original x509 modules 
---        so that we dont need to use them directly
 main :: IO ()
 main = hspec spec
 
-makePriv :: IO (S.SecKey)
-makePriv = do
-  ent <- getEntropy 32
-  return $ fromMaybe (error "could not create private key") (S.secKey ent)
 
 spec :: Spec
 spec = do
   describe "x509 certificates" $ do 
-    priv <- runIO makePriv 
+    priv <- runIO newPriv 
     let pub = S.derivePubKey priv
-        iss = Issuer "5" "0" "9" priv
+        iss = Issuer "x" "5" "0" "9" priv
         sub = Subject "x" "5" "0" "9" (S.derivePubKey priv)
 
     it "certificate pubkey matches original pubkey" $ do
@@ -46,7 +37,7 @@ spec = do
       
     it "can do PEM encoding roundtrips" $ do
       cert <- makeSignedCert iss sub
-      cert `shouldBe` bsToCert (certToBytes cert)
+      Right cert `shouldBe` bsToCert (certToBytes cert)
     it "can do RLP encoding roundtrips" $ do
       cert <- makeSignedCert iss sub
       let rlp = rlpEncode cert
@@ -58,7 +49,7 @@ spec = do
       sigVerification `shouldBe` SignaturePass
     it "can reject invalid signatures" $ do
       cert <- makeSignedCert iss sub
-      fakePriv <- makePriv
+      fakePriv <- newPriv
       let fakeSerialPub = SerializedPoint $ S.exportPubKey False (S.derivePubKey fakePriv)
           fakePub = PubKeyEC $ PubKeyEC_Named SEC_p256k1 fakeSerialPub
           sigVerification = verifySignedSignature cert fakePub
