@@ -114,3 +114,4 @@ main = do
   -- generate and write cert
   cert <- makeSignedCert issuer optSubjectInfo
   B.writeFile "outputCert.pem" $ certToBytes $ cert
+  putStrLn "Done. Cert was written to outputCert.pem"

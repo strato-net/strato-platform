@@ -4,7 +4,6 @@
 -- {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 
 module BlockApps.X509.Certificate (
