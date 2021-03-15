@@ -842,6 +842,9 @@ expToVar' x@(Xabi.MemberAccess expr name) = do
         return $ Constant $ SEnumVal enumName name num
       (SBuiltinVariable "msg", "sender") -> (Constant . SAccount . accountToNamedAccount chainId . Env.sender) <$> getEnv
       (SBuiltinVariable "tx", "origin") -> (Constant . SAccount . accountToNamedAccount chainId . Env.origin) <$> getEnv
+      (SBuiltinVariable "tx", "username") -> undefined
+      (SBuiltinVariable "tx", "organization") -> undefined
+      (SBuiltinVariable "tx", "group") -> undefined
       (SStruct _ theMap, fieldName) -> case M.lookup fieldName theMap of
           Nothing -> missingField "struct member access" fieldName
           Just v -> return v
@@ -1340,6 +1343,8 @@ callBuiltin "require" (SBool cond :msg) Nothing = do
     (m:_) -> require cond (Just $ show m)
   return SNULL
 callBuiltin "assert" [SBool cond] Nothing = SNULL <$ assert cond
+callBuiltin "getUserCert" [SAccount a] _ = return $ undefined
+callBuiltin "parseCert" [SString cert] = return $ undefined
 callBuiltin x _ _ = unknownFunction "callBuiltin" x
 
 
