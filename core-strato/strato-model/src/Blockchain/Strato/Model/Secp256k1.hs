@@ -112,6 +112,14 @@ instance Arbitrary PrivateKey where
     return $ fromMaybe (error "could not generate arbitrary private key") (importPrivateKey $ B.pack k)
 
 
+instance ToJSON PrivateKey where
+  toJSON = String . T.pack . C8.unpack . B16.encode . exportPrivateKey
+
+instance FromJSON PrivateKey where
+  parseJSON (String str) = return $ fromMaybe (err) $ importPrivateKey $ fst $ B16.decode $ C8.pack $ T.unpack str
+    where err = error $ "parseJSON for PrivateKey failed to read " ++ T.unpack str
+  parseJSON x = error $ "parseJSON for PrivateKey: expected string, got " ++ show x
+
 instance ToJSON PublicKey where
   toJSON = String . T.pack . C8.unpack . B16.encode . exportPublicKey False
 

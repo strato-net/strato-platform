@@ -44,14 +44,25 @@ library:
 
 
 executables:
-  x509-tool:
+  x509-generator:
     source-dirs: exec_src/
-    main: X509Tool.hs
+    main: X509CertGenerator.hs
+    other-modules: []
     dependencies:
       - aeson
       - bytestring
       - cryptonite
       - secp256k1-haskell
+      - x509-certs
+  
+  x509-keygen:
+    source-dirs: exec_src/
+    main: X509Keygen.hs
+    other-modules: []
+    dependencies:
+      - aeson
+      - bytestring
+      - strato-model
       - x509-certs
 
 tests:

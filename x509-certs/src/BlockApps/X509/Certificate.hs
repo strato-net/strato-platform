@@ -8,6 +8,7 @@
 
 
 module BlockApps.X509.Certificate (
+  X509Certificate(..),
   Issuer(..),
   Subject(..),
   certToBytes, 
@@ -54,6 +55,10 @@ import           Time.System
 -----------------------------------------------------------------------------------------------
 
 
+
+newtype X509Certificate = X509Certificate SignedCertificate deriving (Show, Eq)
+
+
 data Issuer = Issuer
   {
     issCommonName :: String
@@ -98,16 +103,16 @@ instance FromJSON Subject where
   parseJSON x = error $ "could not decode JSON subject info: " ++ show x
 
 
-instance RLPSerializable SignedCertificate where
+instance RLPSerializable X509Certificate where
   rlpEncode = RLPString . certToBytes
   
   rlpDecode (RLPString str) = fromRight (error "failed to rlpDecode cert") $ bsToCert str
   rlpDecode x = error $ "rlpDecode for SignedCertificate failed: expected RLPString, got " ++ show x
 
-instance ToJSON SignedCertificate where
+instance ToJSON X509Certificate where
   toJSON = String . T.pack . C8.unpack . certToBytes
 
-instance FromJSON SignedCertificate where
+instance FromJSON X509Certificate where
   parseJSON (String str) = return $ fromRight (error "failed to JSON parse cert") $ bsToCert $ C8.pack $ T.unpack str
   parseJSON x = error $ "parseJSON for SignedCertificate expects a String, but was given " ++ show x
 
@@ -118,18 +123,18 @@ instance FromJSON SignedCertificate where
 ----------------------------------------------------------------------------------------------
 
 
-certToBytes :: SignedCertificate -> B.ByteString
+certToBytes :: X509Certificate -> B.ByteString
 certToBytes = pemWriteBS . certToPem
 
-certToPem :: SignedCertificate -> PEM
-certToPem cert = PEM 
+certToPem :: X509Certificate -> PEM
+certToPem (X509Certificate cert) = PEM 
   { pemName = "CERTIFICATE"
   , pemHeader = []
   , pemContent = encodeSignedObject cert
   }
 
 
-bsToCert :: B.ByteString -> Either String SignedCertificate
+bsToCert :: B.ByteString -> Either String X509Certificate
 bsToCert bs =
   case (pemParseBS bs) of
     Left str -> Left str
@@ -137,7 +142,7 @@ bsToCert bs =
     Right (pem:_) -> 
       case (decodeSignedCertificate $ pemContent pem) of
         Left str -> Left str
-        Right cert -> Right cert
+        Right cert -> Right $ X509Certificate cert
 
 
 
@@ -147,8 +152,8 @@ bsToCert bs =
 
 
 
-makeSignedCert :: Issuer -> Subject -> IO (SignedCertificate)
-makeSignedCert iss sub = makeCert iss sub >>= signCert (issPriv iss)
+makeSignedCert :: Issuer -> Subject -> IO (X509Certificate)
+makeSignedCert iss sub = makeCert iss sub >>= signCert (issPriv iss) >>= return . X509Certificate
 
 signCert :: SEC.SecKey -> Certificate -> IO (SignedCertificate)
 signCert priv cert = objectToSignedExactF (ecdsaWithSHA256 $ priv) cert
@@ -208,6 +213,7 @@ getIssuerDN iss =
   [ (getObjectID DnCommonName, toASN1CS $ issCommonName iss)
   , (getObjectID DnCountry, toASN1CS $ issCountry iss)
   , (getObjectID DnOrganization, toASN1CS $ issOrg iss)
+  , (getObjectID DnOrganizationUnit, toASN1CS $ issUnit iss)
   ]
 
  

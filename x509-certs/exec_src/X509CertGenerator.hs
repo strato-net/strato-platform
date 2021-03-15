@@ -24,7 +24,7 @@ import           BlockApps.X509
 --------------------------------------------------------------------------------------------
 
 data Options = Options 
-  { optIssuerCert    :: Maybe SignedCertificate
+  { optIssuerCert    :: Maybe X509Certificate
   , optSubjectInfo   :: Subject
   , optKey           :: SEC.SecKey
   } deriving Show
@@ -99,7 +99,7 @@ main = do
           , issUnit       = subUnit optSubjectInfo
           , issPriv       = optKey
           }
-        Just cert -> do 
+        Just (X509Certificate cert) -> do 
           let rawIssuerCert = getCertificate cert
               dn = certIssuerDN rawIssuerCert
               getStr el = fromASN1CS $ fromMaybe (error "could not getDnElement") $ getDnElement el dn

@@ -45,12 +45,12 @@ spec = do
       rlpEncode cert `shouldBe` rlp
     it "can verify cert signatures" $ do
       cert <- makeSignedCert iss sub
-      let sigVerification = verifySignedSignature cert (certPubKey $ getCertificate cert)
+      let sigVerification = verifySignedSignature (coerce cert) (certPubKey $ getCertificate $ coerce cert)
       sigVerification `shouldBe` SignaturePass
     it "can reject invalid signatures" $ do
       cert <- makeSignedCert iss sub
       fakePriv <- newPriv
       let fakeSerialPub = SerializedPoint $ S.exportPubKey False (S.derivePubKey fakePriv)
           fakePub = PubKeyEC $ PubKeyEC_Named SEC_p256k1 fakeSerialPub
-          sigVerification = verifySignedSignature cert fakePub
+          sigVerification = verifySignedSignature (coerce cert) fakePub
       sigVerification `shouldBe` SignatureFailed SignatureInvalid
