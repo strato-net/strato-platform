@@ -6,6 +6,7 @@ import           Blockchain.Strato.Model.Secp256k1
 
 import           Data.Aeson
 import qualified Data.ByteString                         as B
+import qualified Data.ByteString.Char8                   as C8
 import qualified Data.ByteString.Lazy                    as BL
 import           Data.Coerce
 
@@ -35,11 +36,12 @@ main = do
         }
 
   let keyDataBS = encode keyData
+      privBS = privToBytes $ coerce priv
   putStrLn "writing keydata to keydata.json"
-  putStrLn $ show keyDataBS
-  BL.writeFile "keydata.json" keyDataBS
+  putStrLn "writing encoded private key to priv.pem"
+  putStrLn $ C8.unpack $ BL.toStrict keyDataBS
   
-  let privBS = privToBytes $ coerce priv
+  BL.writeFile "keydata.json" keyDataBS
   B.writeFile "priv.pem" privBS
 
   
