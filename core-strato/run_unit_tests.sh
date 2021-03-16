@@ -24,6 +24,7 @@ TESTS=(
   strato-sequencer
   vm-runner
   vm-tools
+  x509-certs
 )
 
 BENCHES=(
