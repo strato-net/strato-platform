@@ -372,7 +372,7 @@ callWrapper from to mContract functionName argExps = do
           Nothing -> contract^.functions
           Just c -> M.insert "<constructor>" c $ contract^.functions
 
-  (f, args) <- -- maybe add the X509 stuff here?
+  (f, args) <-
         case M.lookup functionName functionsIncludingConstructor of
           Just theFunction -> do
             args' <- argsToVals contract' theFunction argExps
@@ -1534,7 +1534,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro = do
 --    liftIO $ putStrLn "need to initialize the storage 2"
 --    initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack n) v
   let !commands = fromMaybe (missingField "function call: function has been declared but not defined" funcName) $ Xabi.funcContents theFunction
-  val <- runStatements commands -- intercept here?s
+  val <- runStatements commands
 
   let findNamedReturns = do
         case returns of

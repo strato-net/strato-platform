@@ -9,11 +9,16 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.DB.X509CertDB (
+  X509Certificate,
+  certToBytes,
+  bsToCert,
   X509CertDB(..),
   HasX509CertDB,
   genericLookupX509CertDB,
   genericInsertX509CertDB,
-  genericDeleteX509CertDB
+  genericDeleteX509CertDB,
+  x509CertDBPut,
+  x509CertDBGet
   ) where
 
 

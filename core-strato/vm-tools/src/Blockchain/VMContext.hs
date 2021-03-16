@@ -28,6 +28,7 @@ module Blockchain.VMContext
     , stateDB
     , hashDB
     , codeDB
+    , x509CertDB
     , blockSummaryDB
     , kafkaState
     , redisPool
@@ -387,7 +388,7 @@ instance (Keccak256 `A.Alters` DBCode) ContextM where
   insert _ = genericInsertCodeDB $ getCodeDB
   delete _ = genericDeleteCodeDB $ getCodeDB
 
-instance HasX509CertDB ContextM where
+instance (Address `A.Alters` X509Certificate) ContextM where
   lookup _ = genericLookupX509CertDB $ getX509CertDB
   insert _ = genericInsertX509CertDB $ getX509CertDB
   delete _ = genericDeleteX509CertDB $ getX509CertDB
@@ -515,7 +516,7 @@ runContextM f = do
       sdb <- DB.open (dbDir "h" ++ stateDBPath) ldbOptions
       hdb <- DB.open (dbDir "h" ++ hashDBPath)  ldbOptions
       cdb <- DB.open (dbDir "h" ++ codeDBPath)  ldbOptions
-      x509db <- DB.open (dbDir "h" ++ blockSummaryCacheDBPath) ldbOptions
+      x509db <- DB.open (dbDir "h" ++ x509CertDBPath) ldbOptions
       blksumdb <- DB.open (dbDir "h" ++ blockSummaryCacheDBPath) ldbOptions
       rPool <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
       kafkaStateRef <- newIORef $ mkConfiguredKafkaState "ethereum-vm"
