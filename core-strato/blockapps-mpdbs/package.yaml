@@ -30,6 +30,7 @@ library:
   - data-default
   - deepseq
   - ethereum-rlp
+  - extra
   - fastMP
   - format
   - lens
@@ -42,6 +43,7 @@ library:
   - solid-vm-model
   - strato-model
   - transformers
+  - x509-certs
 
 tests:
   blockapps-mpdbs-test:
