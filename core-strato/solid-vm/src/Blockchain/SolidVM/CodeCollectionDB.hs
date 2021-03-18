@@ -4,7 +4,7 @@ module Blockchain.SolidVM.CodeCollectionDB (codeCollectionFromSource, codeCollec
 import           Control.Exception
 import           Control.Monad.IO.Class
 import qualified Data.ByteString                      as B
-import qualified Data.ByteString.Char8                as BC
+import qualified Data.ByteString.UTF8                 as UTF8
 import           Data.IORef
 import           Data.Map                             (Map)
 import qualified Data.Map                             as M
@@ -55,7 +55,7 @@ codeCollectionFromSource initCode = do
       -- TODO: I think this should be in the code DB, but I'm leaving it here for now
       let initMap = case rlpDeserializeMaybe initCode of
             Just m -> rlpDecode m
-            Nothing -> M.singleton "" (BC.unpack initCode)
+            Nothing -> M.singleton "" (UTF8.toString initCode)
       let cc = compileSource initMap
       let codeMap' = M.insert hsh cc codeMap
       recordCacheSize $ M.size codeMap'
@@ -76,7 +76,7 @@ codeCollectionFromHash hsh = do
         Just (_, initCode) -> do
           let initMap = case rlpDeserializeMaybe initCode of
                 Just m -> rlpDecode m
-                Nothing -> M.singleton "" (BC.unpack initCode)
+                Nothing -> M.singleton "" (UTF8.toString initCode)
           let cc = compileSource initMap
               codeMap' = M.insert hsh cc codeMap
           recordCacheSize $ M.size codeMap'

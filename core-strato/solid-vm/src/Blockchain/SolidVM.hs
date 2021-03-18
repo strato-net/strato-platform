@@ -26,6 +26,7 @@ import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Base16               as B16
 import qualified Data.ByteString.Char8                as BC
 import qualified Data.ByteString.Short                as BSS
+import qualified Data.ByteString.UTF8                 as UTF8
 import           Data.List
 import qualified Data.Map                             as M
 import qualified Data.Map.Merge.Lazy                  as M
@@ -746,7 +747,7 @@ expToPath x@(Xabi.IndexAccess parent mIndex) = do
     MapStringIndex -> do
       idx <- getString idxVar
       return $ case idx of
-        SString s -> MS.MapIndex $ MS.IText $ BC.pack s
+        SString s -> MS.MapIndex $ MS.IText $ UTF8.fromString s
         _ -> typeError "invalid map of strings index" idx
     ArrayIndex -> do
       n <- getInt idxVar

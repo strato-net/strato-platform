@@ -12,7 +12,6 @@ import           Data.Bits
 import qualified Data.ByteString                              as B
 import qualified Data.ByteString.Base16                       as B16
 import qualified Data.ByteString.Char8                        as BC
-import           Data.ByteString.Internal
 import qualified Data.NibbleString                            as N
 import           Numeric
 import           Text.PrettyPrint.ANSI.Leijen                 hiding ((<$>))
@@ -81,7 +80,7 @@ instance RLPSerializable NodeData where
       encodeVal Nothing  = rlpEncode (0::Integer)
       encodeVal (Just x) = x
   rlpEncode (ShortcutNodeData {nextNibbleString=s, nextVal=val}) =
-    RLPArray[rlpEncode $ BC.unpack $ termNibbleString2String terminator s, encodeVal val]
+    RLPArray[rlpEncode $ termNibbleString2String terminator s, encodeVal val]
     where
       terminator =
         case val of
@@ -97,11 +96,11 @@ instance RLPSerializable NodeData where
   rlpDecode (RLPArray [a, val])
       | terminator = ShortcutNodeData s $ Right val
       | B.length (rlpSerialize val) >= 32 =
-          ShortcutNodeData s (Left $ PtrRef $ StateRoot (BC.pack $ rlpDecode val))
+          ShortcutNodeData s (Left $ PtrRef $ StateRoot $ rlpDecode val)
       | otherwise =
           ShortcutNodeData s (Left $ SmallRef $ rlpSerialize val)
     where
-      (terminator, s) = string2TermNibbleString $ rlpDecode a
+      (terminator, s) = byteString2TermNibbleString . rlpDecode $ a
   rlpDecode (RLPArray x) | length x == 17 =
     FullNodeData (getPtr <$> childPointers) val
     where
@@ -119,18 +118,16 @@ instance RLPSerializable NodeData where
 
 
 
-
-
-string2TermNibbleString::String->(Bool, N.NibbleString)
-string2TermNibbleString [] = error "string2TermNibbleString called with empty String"
-string2TermNibbleString (c:rest) =
-  (terminator, s)
-  where
-    w = c2w c
-    (flags, extraNibble) = if w > 0xF then (w `shiftR` 4, 0xF .&. w) else (w, 0)
-    terminator = flags `shiftR` 1 == 1
-    oddLength = flags .&. 1 == 1
-    s = if oddLength then N.OddNibbleString extraNibble (BC.pack rest) else N.EvenNibbleString (BC.pack rest)
+byteString2TermNibbleString :: B.ByteString -> (Bool, N.NibbleString)
+byteString2TermNibbleString bs | B.null bs   = error "string2TermNibbleString called with empty String"
+                               | otherwise = (terminator, ns)
+    where
+        w = B.head bs
+        rest = B.tail bs
+        (flags, extraNibble) = if w > 0xF then (w `shiftR` 4, 0xF .&. w) else (w, 0)
+        terminator = flags `shiftR` 1 == 1
+        oddLength = flags .&. 1 == 1
+        ns = if oddLength then N.OddNibbleString extraNibble rest else N.EvenNibbleString rest
 
 termNibbleString2String::Bool->N.NibbleString->B.ByteString
 termNibbleString2String terminator s =

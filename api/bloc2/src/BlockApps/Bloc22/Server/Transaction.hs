@@ -24,7 +24,7 @@ import qualified Data.Aeson                        as Aeson
 import           Data.ByteString                   (ByteString)
 import qualified Data.ByteString                   as ByteString
 import qualified Data.ByteString.Base16            as Base16
-import qualified Data.ByteString.Char8             as BC
+import qualified Data.ByteString.UTF8              as UTF8
 import qualified Data.ByteString.Lazy              as BL
 import qualified Data.ByteString.Short             as BSS
 import qualified Data.Cache                        as Cache
@@ -380,9 +380,10 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} userName = blocTrans
   --We might be able to get rid of the metadata for SolidVM, but that will require a change in the API, and needs to be discussed
   $logInfoLS "postUsersContractSolidVM'/args" args
   let encodedSrc = case Map.toList src of
-        [("", wholeSrc)] -> BC.pack $ Text.unpack wholeSrc
-        _ -> EthRLP.rlpSerialize $ EthRLP.rlpEncode src
-  (cName,(cmId,ContractDetails{..})) <- getContractDetailsForContract "SolidVM" (Text.pack $ BC.unpack encodedSrc) contract >>= \case
+        []               -> Text.empty
+        [("", wholeSrc)] -> wholeSrc
+        _ -> Text.decodeUtf8 . EthRLP.rlpSerialize $ EthRLP.rlpEncode src
+  (cName,(cmId,ContractDetails{..})) <- getContractDetailsForContract "SolidVM" encodedSrc contract >>= \case
     Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
     Just x -> pure x
 
@@ -397,7 +398,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} userName = blocTrans
       fromAddr
       params
       (Wei (fromIntegral (maybe 0 unStrung value)))
-      (Code encodedSrc)
+      (Code . Text.encodeUtf8 $ encodedSrc)
       chainId
   $logDebugLS "postUsersContractSolidVM'/tx" tx
   txHash <- postTransaction tx
@@ -421,7 +422,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} userName = do
     \(UploadListContract name srcs args params value cid md) -> do
       let encodedSrc = case Map.toList srcs of
             [("", wholeSrc)] -> wholeSrc
-            _ -> Text.pack . BC.unpack . EthRLP.rlpSerialize $ EthRLP.rlpEncode srcs
+            _ -> Text.decodeUtf8 . EthRLP.rlpSerialize $ EthRLP.rlpEncode srcs
       (src, cmId, xabi) <-
        if not (Map.null srcs)
         then do
@@ -457,7 +458,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} userName = do
             fromAddr
             (fromMaybe emptyTxParams params)
             (Wei (maybe 0 fromIntegral $ fmap unStrung value))
-            (Code . BC.pack $ Text.unpack src)
+            (Code . UTF8.fromString $ Text.unpack src)
             cid
       return ((name,cmId),tx)
   let
