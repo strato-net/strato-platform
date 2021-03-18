@@ -63,8 +63,10 @@ options =
       (ReqArg
        (\k opts -> do
           pkeyBS <- B.readFile k
-          let pkey = bsToPriv pkeyBS
-          return opts{optKey = pkey}
+          let ePkey = bsToPriv pkeyBS
+          case ePkey of
+            Left err -> error err
+            Right pkey -> return opts{optKey = pkey}
        ) "SecKey")
     "The .pem filepath of the private key with which to sign the certificate"
   ]

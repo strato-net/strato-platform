@@ -38,15 +38,17 @@ instance ASN1Object SEC.SecKey where
       : xs 
     )
 
-  fromASN1 [] = error "tried to decode an empty ASN1 object?"
+  fromASN1 [] = fail "tried to decode an empty ASN1 object?"
   fromASN1 ( Start Sequence 
         : IntVal 1 
         : OctetString str 
         : Start (Container Context 0) 
         : OID [1,3,132,0,10]
         : End (Container Context 0) 
-        : End Sequence : xs ) = Right ((fromMaybe (error "could not asn1decode privkey") (SEC.secKey str)), xs) 
-  fromASN1 _ = error "no ASN1 decoding for this kind of EC private key"
+        : End Sequence : xs ) = case (SEC.secKey str) of
+                                  Nothing -> fail "could not asn1decode privkey"
+                                  Just pk -> Right (pk, xs) 
+  fromASN1 _ = fail "no ASN1 decoding for this kind of EC private key"
 
 
 
@@ -72,18 +74,6 @@ privToPem priv = PEM
   , pemContent = encodeASN1' DER $ toASN1 priv [] 
   }
 
-{-
-privToInteger :: SEC.SecKey -> Integer
-privToInteger = 
-  let fromBytes = B.foldl' (\a b -> a `shiftL` 8 .|. fromIntegral b) 0
-  in fromBytes . SEC.getSecKey
-
-integerToPriv :: Integer -> SEC.SecKey
-integerToPriv i = fromMaybe (error "could not import private key") (SEC.secKey $ intToBytes i) 
-
-intToBytes :: Integer -> B.ByteString
-intToBytes x = map (fromIntegral . (x `shiftR`)) [256-8, 256-16..0]
--}
 
 pubToBytes :: SEC.PubKey -> B.ByteString
 pubToBytes = pemWriteBS . pubToPem
@@ -96,30 +86,30 @@ pubToPem pub = PEM
   }
 
 
-
-bsToPriv :: B.ByteString -> SEC.SecKey
+-- TODO:  maybe make custom exception types for the Left
+bsToPriv :: B.ByteString -> Either String SEC.SecKey
 bsToPriv bs =
   case (pemParseBS bs) of
-    Left str -> error str
-    Right [] -> error "nothing parsed...but no errors?"
+    Left str -> Left str
+    Right [] -> Left "valid PEM file, but no content"
     Right (pem:_) -> 
       case (decodeASN1' DER $ pemContent pem) of
-        Left err -> error (show err)
+        Left err -> Left (show err)
         Right asn -> case fromASN1 asn of
-          Left str' -> error str'
-          Right (priv, _) -> priv
+          Left str' -> Left str'
+          Right (priv, _) -> Right priv
 
-bsToPub :: B.ByteString -> SEC.PubKey
+bsToPub :: B.ByteString -> Either String SEC.PubKey
 bsToPub bs = 
   case (pemParseBS bs) of
-    Left str -> error str
-    Right [] -> error "nothing parsed....but no errors?"
+    Left str -> Left str
+    Right [] -> Left "valid PEM file, but no content"
     Right (pem:_) ->
       case (decodeASN1' DER $ pemContent pem) of
-        Left err -> error (show err)
+        Left err -> Left (show err)
         Right asn -> case fromASN1 asn of
-          Left str -> error str
-          Right (pub, _) -> fromMaybe (error "could not parse pubkey") (unserializeAndUnwrap pub)
+          Left str -> Left str
+          Right (pub, _) -> Right $ fromMaybe (error "could not unserialize key") $ unserializeAndUnwrap pub
 
 
 serializeAndWrap :: SEC.PubKey -> PubKey
