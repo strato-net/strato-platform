@@ -67,6 +67,7 @@ packages:
 - shared-util/solid-vm-model/
 - clockwork
 - logserver
+- x509-certs/
 
 extra-deps:
 - Crypto-4.2.5.1@sha256:52275a055f4adf7c488260fb9fae60d03679632e64d3c8fc69d8b5951e8129cc,3688
