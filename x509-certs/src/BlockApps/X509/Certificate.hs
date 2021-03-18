@@ -161,7 +161,6 @@ signCert priv cert = objectToSignedExactF (ecdsaWithSHA256 $ priv) cert
 
 makeCert :: Issuer -> Subject -> IO (Certificate)
 makeCert iss sub = do
---  serial <- (randomRIO (10000000, 99999999)) -- TODO: might we have repeat serials?
   serial' <- getEntropy 16
   let fromBytes = B.foldl' (\a b -> a `shiftL` 8 .|. fromIntegral b) 0
       serial = fromBytes serial'
