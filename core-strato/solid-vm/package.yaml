@@ -65,6 +65,7 @@ library:
   - utf8-string
   - vector
   - vm-tools
+  - x509-certs
 
 
 executables:

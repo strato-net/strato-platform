@@ -27,6 +27,7 @@ import qualified Data.ByteString.Base16               as B16
 import qualified Data.ByteString.Char8                as BC
 import qualified Data.ByteString.Short                as BSS
 import qualified Data.ByteString.UTF8                 as UTF8
+import           Data.Either.Extra                    (eitherToMaybe)
 import           Data.List
 import qualified Data.Map                             as M
 import qualified Data.Map.Merge.Lazy                  as M
@@ -52,6 +53,7 @@ import           Blockchain.Data.ExecResults
 import qualified Blockchain.Database.MerklePatricia   as MP
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.ModifyStateDB          (pay)
+import           Blockchain.DB.X509CertDB
 import           Blockchain.ExtWord
 import qualified Blockchain.SolidVM.Builtins          as Builtins
 import           Blockchain.SolidVM.CodeCollectionDB
@@ -843,9 +845,15 @@ expToVar' x@(Xabi.MemberAccess expr name) = do
         return $ Constant $ SEnumVal enumName name num
       (SBuiltinVariable "msg", "sender") -> (Constant . SAccount . accountToNamedAccount chainId . Env.sender) <$> getEnv
       (SBuiltinVariable "tx", "origin") -> (Constant . SAccount . accountToNamedAccount chainId . Env.origin) <$> getEnv
-      (SBuiltinVariable "tx", "username") -> undefined
-      (SBuiltinVariable "tx", "organization") -> undefined
-      (SBuiltinVariable "tx", "group") -> undefined
+      (SBuiltinVariable "tx", "username") -> do env' <- getEnv
+                                                maybeCert <- x509CertDBGet (Env.origin env' ^. accountAddress)
+                                                return . Constant . SString . fromMaybe "" $ getCertCommonName =<< maybeCert
+      (SBuiltinVariable "tx", "organization") -> do env' <- getEnv
+                                                    maybeCert <- x509CertDBGet (Env.origin env' ^. accountAddress)
+                                                    return . Constant . SString . fromMaybe "" $ getCertOrganization =<< maybeCert
+      (SBuiltinVariable "tx", "group") -> do env' <- getEnv
+                                             maybeCert <- x509CertDBGet (Env.origin env' ^. accountAddress)
+                                             return . Constant . SString . fromMaybe "" $ getCertGroup =<< maybeCert
       (SStruct _ theMap, fieldName) -> case M.lookup fieldName theMap of
           Nothing -> missingField "struct member access" fieldName
           Just v -> return v
@@ -1344,8 +1352,33 @@ callBuiltin "require" (SBool cond :msg) Nothing = do
     (m:_) -> require cond (Just $ show m)
   return SNULL
 callBuiltin "assert" [SBool cond] Nothing = SNULL <$ assert cond
-callBuiltin "getUserCert" [SAccount a] _ = return $ undefined
-callBuiltin "parseCert" [SString cert] = return $ undefined
+callBuiltin "createCertificate" [SAccount a, SString cert] _ = do  -- should store the parsed mapping
+    let address = a ^. namedAccountAddress
+        ex509Cert = bsToCert . BC.pack $ cert
+    case ex509Cert of
+        Left _         -> undefined
+        Right x509Cert -> do x509CertDBPut address x509Cert
+                             return SNULL
+callBuiltin "getUserCert" [SAccount a] _ = do    -- return parsed mapping instead
+    maybeCert <- x509CertDBGet (a ^. namedAccountAddress)
+    return $ fromMaybe (SString "") $ SString . BC.unpack . certToBytes <$> maybeCert
+callBuiltin "parseCert" [SString cert] _ = return $ SMap stringToString (fromMaybe emptyCertMap $ fmap certMap subject)
+    where subject = getCertSubject =<< (eitherToMaybe . bsToCert . BC.pack $ cert)
+          certMap sub = M.fromList [ (SString "commonName", Constant . SString $ subCommonName sub) -- TODO: Fails
+                             , (SString "country", Constant . SString $ subCountry sub) 
+                             , (SString "organization", Constant . SString $ subOrg sub) 
+                             , (SString "group", Constant . SString $ subUnit sub) 
+                             , (SString "publicKey", Constant . SString $ BC.unpack $ pubToBytes $ subPub sub) 
+                             ]
+          emptyCertMap = M.fromList [ (SString "commonName", Constant . SString $ "")
+                             , (SString "country", Constant . SString $ "") 
+                             , (SString "organization", Constant . SString $ "") 
+                             , (SString "group", Constant . SString $ "") 
+                             , (SString "publicKey", Constant . SString $ "") 
+                             ]
+          stringToString = Xabi.Mapping { Xabi.dynamic = Nothing
+                                        , Xabi.key = Xabi.String Nothing
+                                        , Xabi.value = Xabi.String Nothing }
 callBuiltin x _ _ = unknownFunction "callBuiltin" x
 
 

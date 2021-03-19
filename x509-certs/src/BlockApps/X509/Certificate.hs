@@ -14,7 +14,12 @@ module BlockApps.X509.Certificate (
   bsToCert,
   makeCert,
   makeSignedCert,
-  fromASN1CS -- I'd rather not
+  fromASN1CS, -- I'd rather not
+  getCertCommonName,
+  getCertOrganization,
+  getCertGroup,
+  getCertSubject,
+--   getCertIssuer
  ) where
 
 
@@ -238,3 +243,26 @@ getValidity = do
 
 getCertPub :: Subject -> PubKey
 getCertPub = serializeAndWrap . subPub
+
+
+getCertCommonName :: X509Certificate -> Maybe String
+getCertCommonName (X509Certificate cert) = fmap fromASN1CS . getDnElement DnCommonName . certSubjectDN $ getCertificate cert
+
+getCertOrganization :: X509Certificate -> Maybe String
+getCertOrganization (X509Certificate cert) = fmap fromASN1CS . getDnElement DnOrganization . certSubjectDN $ getCertificate cert
+
+getCertGroup :: X509Certificate -> Maybe String
+getCertGroup (X509Certificate cert) = fmap fromASN1CS . getDnElement DnOrganizationUnit . certSubjectDN $ getCertificate cert
+
+getCertSubject :: X509Certificate -> Maybe Subject
+getCertSubject (X509Certificate cert) =
+    let pubKey = unserializeAndUnwrap . certPubKey $ getCertificate cert
+    in case pubKey of
+        Nothing -> Nothing
+        Just key -> Just Subject { subCommonName = extractDn DnCommonName
+                                 , subCountry    = extractDn DnCountry
+                                 , subOrg        = extractDn DnOrganization
+                                 , subUnit       = extractDn DnOrganizationUnit
+                                 , subPub        = key }
+    where extractDn :: DnElement -> String
+          extractDn dn = fromMaybe "" . fmap fromASN1CS . getDnElement dn . certSubjectDN $ getCertificate cert    

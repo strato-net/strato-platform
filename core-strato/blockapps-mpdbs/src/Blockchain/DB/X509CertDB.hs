@@ -10,15 +10,21 @@
 
 module Blockchain.DB.X509CertDB (
   X509Certificate,
+  Subject(..),
   certToBytes,
   bsToCert,
+  getCertSubject,
+  pubToBytes,
   X509CertDB(..),
   HasX509CertDB,
   genericLookupX509CertDB,
   genericInsertX509CertDB,
   genericDeleteX509CertDB,
   x509CertDBPut,
-  x509CertDBGet
+  x509CertDBGet,
+  getCertCommonName,
+  getCertOrganization,
+  getCertGroup
   ) where
 
 
@@ -34,7 +40,7 @@ import qualified Database.LevelDB                   as DB
 import           Prelude                            hiding (lookup)
 
 import           Blockchain.Strato.Model.Address
-import           BlockApps.X509 (X509Certificate, certToBytes, bsToCert)
+import           BlockApps.X509
 
 newtype X509CertDB = X509CertDB { unX509CertDB :: DB.DB }
 
