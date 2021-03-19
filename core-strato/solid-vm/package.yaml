@@ -62,6 +62,7 @@ library:
   - transformers
   - unliftio
   - unordered-containers
+  - utf8-string
   - vector
   - vm-tools
 
@@ -115,6 +116,7 @@ tests:
       - text
       - time
       - vm-tools
+      - utf8-string
 
 benchmarks:
     codebench:

@@ -17,6 +17,7 @@ dependencies:
   - blockapps-solidity
   - containers
   - text
+  - utf8-string
 
 library:
   source-dirs: src/
@@ -77,6 +78,7 @@ library:
     - unliftio
     - unordered-containers
     - vector
+    - utf8-string
 
 tests:
   blockapps-bloc22-server-test:

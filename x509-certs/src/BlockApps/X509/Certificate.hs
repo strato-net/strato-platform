@@ -96,10 +96,12 @@ instance FromJSON Subject where
     c   <- obj .: "country"
     o   <- obj .: "organization"
     ou  <- obj .: "organizationUnit"
-    pub <- obj .: "pubKey"
-    return $ Subject cn c o ou (dec pub)
-      where dec p = fromMaybe (error "could not decode pubkey") (SEC.importPubKey $ fst $ B16.decode $ C8.pack $ T.unpack p)
-  parseJSON x = error $ "could not decode JSON subject info: " ++ show x
+    pub' <- obj .: "pubKey"
+    let mPub = SEC.importPubKey $ fst $ B16.decode $ C8.pack $ T.unpack pub'
+    case mPub of
+      Nothing -> fail "could not decode pubkey in Subject parseJSON"
+      Just pub -> return $ Subject cn c o ou pub
+  parseJSON x = fail $ "could not decode JSON subject info: " ++ show x
 
 
 instance RLPSerializable X509Certificate where
@@ -112,8 +114,8 @@ instance ToJSON X509Certificate where
   toJSON = String . T.pack . C8.unpack . certToBytes
 
 instance FromJSON X509Certificate where
-  parseJSON (String str) = return $ fromRight (error "failed to JSON parse cert") $ bsToCert $ C8.pack $ T.unpack str
-  parseJSON x = error $ "parseJSON for SignedCertificate expects a String, but was given " ++ show x
+  parseJSON (String str) = either (fail "failed to JSON parse cert") pure $ bsToCert $ C8.pack $ T.unpack str
+  parseJSON x = fail $ "parseJSON for SignedCertificate expects a String, but was given " ++ show x
 
 
 
@@ -159,7 +161,6 @@ signCert priv cert = objectToSignedExactF (ecdsaWithSHA256 $ priv) cert
 
 makeCert :: Issuer -> Subject -> IO (Certificate)
 makeCert iss sub = do
---  serial <- (randomRIO (10000000, 99999999)) -- TODO: might we have repeat serials?
   serial' <- getEntropy 16
   let fromBytes = B.foldl' (\a b -> a `shiftL` 8 .|. fromIntegral b) 0
       serial = fromBytes serial'
@@ -237,6 +238,3 @@ getValidity = do
 
 getCertPub :: Subject -> PubKey
 getCertPub = serializeAndWrap . subPub
-
-
-

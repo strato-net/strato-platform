@@ -79,7 +79,7 @@ class CodeEditor extends Component {
       };
       reader.onabort = () => toasts.show({ message: 'file reading was aborted' })
       reader.onerror = () => toasts.show({ message: 'file reading has failed' })
-      reader.readAsBinaryString(file);
+      reader.readAsText(file);
     });
   }
 

@@ -53,6 +53,7 @@ import           Data.Bifunctor (first)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.UTF8  as UTF8
 --import           Data.IORef
 import           Data.Map (Map)
 import qualified Data.Map as M
@@ -314,7 +315,7 @@ startingAction maybeCode env' = Action
   , _actionMetadata           =
       case maybeCode of
         Just theCode ->
-          Just $ M.insert "src" (T.pack $ BC.unpack theCode) $ fromMaybe M.empty $ Env.metadata env'
+          Just $ M.insert "src" (T.pack $ UTF8.toString theCode) $ fromMaybe M.empty $ Env.metadata env'
         Nothing -> Env.metadata env'
   , _actionEvents             = Q.empty
   }
