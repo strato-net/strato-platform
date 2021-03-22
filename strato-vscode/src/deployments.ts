@@ -4,7 +4,7 @@ import { rest } from 'blockapps-rest';
 import { getApplicationUser } from './auth';
 import getConfig from './load.config';
 
-export class DeploysProvider implements vscode.TreeDataProvider<Deployment> {
+export class DeploymentsProvider implements vscode.TreeDataProvider<Deployment> {
   constructor() {}
 
   getTreeItem(element: Deployment): vscode.TreeItem {

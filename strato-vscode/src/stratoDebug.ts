@@ -5,14 +5,13 @@
 import {
 	Logger, logger,
 	LoggingDebugSession,
-	InitializedEvent, TerminatedEvent, StoppedEvent, BreakpointEvent, OutputEvent,
+	InitializedEvent, StoppedEvent, OutputEvent,
 	ProgressStartEvent, ProgressUpdateEvent, ProgressEndEvent, InvalidatedEvent,
 	Thread, StackFrame, Scope, Source, Handles, Breakpoint
 } from 'vscode-debugadapter';
 import * as vscode from 'vscode';
 import { DebugProtocol } from 'vscode-debugprotocol';
 import { basename } from 'path';
-import { MockRuntime, IMockBreakpoint, FileAccessor } from './mockRuntime';
 import { Subject } from 'await-notify';
 import * as WebSocket from 'ws';
 import { rest } from 'blockapps-rest';
@@ -24,9 +23,9 @@ function timeout(ms: number) {
 }
 
 /**
- * This interface describes the mock-debug specific launch attributes
+ * This interface describes the strato-debug specific launch attributes
  * (which are not part of the Debug Adapter Protocol).
- * The schema for these attributes lives in the package.json of the mock-debug extension.
+ * The schema for these attributes lives in the package.json of the strato-debug extension.
  * The interface should always match this schema.
  */
 interface ILaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
@@ -40,13 +39,10 @@ interface ILaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
 	noDebug?: boolean;
 }
 
-export class MockDebugSession extends LoggingDebugSession {
+export class StratoDebugSession extends LoggingDebugSession {
 
 	// we don't support multiple threads, so we can use a hardcoded ID for the default thread
 	private static threadID = 1;
-
-	// a Mock runtime (or debugger)
-	private _runtime: MockRuntime;
 
 	private _variableHandles = new Handles<string>();
 
@@ -73,8 +69,8 @@ export class MockDebugSession extends LoggingDebugSession {
 	 * Creates a new debug adapter that is used for one debug session.
 	 * We configure the default implementation of a debug adapter here.
 	 */
-	public constructor(fileAccessor: FileAccessor) {
-		super("mock-debug.txt");
+	public constructor() {
+		super("strato-debug.txt");
         this._ws.on('message', (bytes) => {
            const message = JSON.parse(bytes.toString('utf-8'));
 		   if(message.tag === 'WSOStatus') {
@@ -87,11 +83,11 @@ export class MockDebugSession extends LoggingDebugSession {
 			   }
 			   if (!oldStatus) {
 				   if (this._status) {
-			           this.sendEvent(new StoppedEvent('pause', MockDebugSession.threadID));
+			           this.sendEvent(new StoppedEvent('pause', StratoDebugSession.threadID));
 				   }
 			   } else {
 				   if (this._status) {
-			           this.sendEvent(new StoppedEvent('step', MockDebugSession.threadID));
+			           this.sendEvent(new StoppedEvent('step', StratoDebugSession.threadID));
 				   }
 			   }
 		   }
@@ -99,51 +95,6 @@ export class MockDebugSession extends LoggingDebugSession {
         });
 		this.setDebuggerLinesStartAt1(true);
 		this.setDebuggerColumnsStartAt1(true);
-
-		this._runtime = new MockRuntime(fileAccessor);
-
-		// setup event handlers
-		this._runtime.on('stopOnEntry', () => {
-			this.sendEvent(new StoppedEvent('entry', MockDebugSession.threadID));
-		});
-		this._runtime.on('stopOnPause', () => {
-			this.sendEvent(new StoppedEvent('pause', MockDebugSession.threadID));
-		});
-		this._runtime.on('stopOnStep', () => {
-			this.sendEvent(new StoppedEvent('step', MockDebugSession.threadID));
-		});
-		this._runtime.on('stopOnBreakpoint', () => {
-			this.sendEvent(new StoppedEvent('breakpoint', MockDebugSession.threadID));
-		});
-		this._runtime.on('stopOnDataBreakpoint', () => {
-			this.sendEvent(new StoppedEvent('data breakpoint', MockDebugSession.threadID));
-		});
-		this._runtime.on('stopOnException', (exception) => {
-			if (exception) {
-				this.sendEvent(new StoppedEvent(`exception(${exception})`, MockDebugSession.threadID));
-			} else {
-				this.sendEvent(new StoppedEvent('exception', MockDebugSession.threadID));
-			}
-		});
-		this._runtime.on('breakpointValidated', (bp: IMockBreakpoint) => {
-			this.sendEvent(new BreakpointEvent('changed', { verified: bp.verified, id: bp.id } as DebugProtocol.Breakpoint));
-		});
-		this._runtime.on('output', (text, filePath, line, column) => {
-			const e: DebugProtocol.OutputEvent = new OutputEvent(`${text}\n`);
-
-			if (text === 'start' || text === 'startCollapsed' || text === 'end') {
-				e.body.group = text;
-				e.body.output = `group-${text}\n`;
-			}
-
-			e.body.source = this.createSource(filePath);
-			e.body.line = this.convertDebuggerLineToClient(line);
-			e.body.column = this.convertDebuggerColumnToClient(column);
-			this.sendEvent(e);
-		});
-		this._runtime.on('end', () => {
-			this.sendEvent(new TerminatedEvent());
-		});
 	}
 
 	/**
@@ -242,9 +193,6 @@ export class MockDebugSession extends LoggingDebugSession {
 		// wait until configuration has finished (and configurationDoneRequest has been called)
 		await this._configurationDone.wait(1000);
 
-		// start the program in the runtime
-		await this._runtime.start(args.program, !!args.stopOnEntry, !!args.noDebug);
-
 		this.sendResponse(response);
 	}
 
@@ -309,14 +257,14 @@ export class MockDebugSession extends LoggingDebugSession {
 	protected breakpointLocationsRequest(response: DebugProtocol.BreakpointLocationsResponse, args: DebugProtocol.BreakpointLocationsArguments, request?: DebugProtocol.Request): void {
 
 		if (args.source.path) {
-			const bps = this._runtime.getBreakpoints(args.source.path, this.convertClientLineToDebugger(args.line));
+			// const bps = this._runtime.getBreakpoints(args.source.path, this.convertClientLineToDebugger(args.line));
 			response.body = {
-				breakpoints: bps.map(col => {
-					return {
-						line: args.line,
-						column: this.convertDebuggerColumnToClient(col)
-					};
-				})
+				breakpoints: [] //bps.map(col => {
+					// return {
+					// 	line: args.line,
+					// 	column: this.convertDebuggerColumnToClient(col)
+					// };
+				    //})
 			};
 		} else {
 			response.body = {
@@ -350,8 +298,6 @@ export class MockDebugSession extends LoggingDebugSession {
 			}
 		}
 
-		this._runtime.setExceptionsFilters(namedException, otherExceptions);
-
 		this.sendResponse(response);
 	}
 
@@ -374,7 +320,7 @@ export class MockDebugSession extends LoggingDebugSession {
 		// runtime supports no threads so just return a default thread.
 		response.body = {
 			threads: [
-				new Thread(MockDebugSession.threadID, "thread 1")
+				new Thread(StratoDebugSession.threadID, "thread 1")
 			]
 		};
 		this.sendResponse(response);
@@ -458,11 +404,10 @@ export class MockDebugSession extends LoggingDebugSession {
 	}
 
 	protected stepInTargetsRequest(response: DebugProtocol.StepInTargetsResponse, args: DebugProtocol.StepInTargetsArguments) {
-		const targets = this._runtime.getStepInTargets(args.frameId);
 		response.body = {
-			targets: targets.map(t => {
-				return { id: t.id, label: t.label };
-			})
+			targets: [] //targets.map(t => {
+			// 	return { id: t.id, label: t.label };
+			// })
 		};
 		this.sendResponse(response);
 	}
@@ -484,39 +429,6 @@ export class MockDebugSession extends LoggingDebugSession {
 	protected async evaluateRequest(response: DebugProtocol.EvaluateResponse, args: DebugProtocol.EvaluateArguments): Promise<void> {
 
 		let reply: string | undefined = undefined;
-
-		if (args.context === 'repl') {
-			// 'evaluate' supports to create and delete breakpoints from the 'repl':
-			const matches = /new +([0-9]+)/.exec(args.expression);
-			if (matches && matches.length === 2) {
-				const mbp = await this._runtime.setBreakPoint(this._runtime.sourceFile, this.convertClientLineToDebugger(parseInt(matches[1])));
-				const bp = new Breakpoint(mbp.verified, this.convertDebuggerLineToClient(mbp.line), undefined, this.createSource(this._runtime.sourceFile)) as DebugProtocol.Breakpoint;
-				bp.id= mbp.id;
-				this.sendEvent(new BreakpointEvent('new', bp));
-				reply = `breakpoint created`;
-			} else {
-				const matches = /del +([0-9]+)/.exec(args.expression);
-				if (matches && matches.length === 2) {
-					const mbp = this._runtime.clearBreakPoint(this._runtime.sourceFile, this.convertClientLineToDebugger(parseInt(matches[1])));
-					if (mbp) {
-						const bp = new Breakpoint(false) as DebugProtocol.Breakpoint;
-						bp.id= mbp.id;
-						this.sendEvent(new BreakpointEvent('removed', bp));
-						reply = `breakpoint deleted`;
-					}
-				} else {
-					const matches = /progress/.exec(args.expression);
-					if (matches && matches.length === 1) {
-						if (this._reportProgress) {
-							reply = `progress started`;
-							this.progressSequence();
-						} else {
-							reply = `frontend doesn't support progress (capability 'supportsProgressReporting' not set)`;
-						}
-					}
-				}
-			}
-		}
 
 		response.body = {
 			result: reply ? reply : `evaluate(context: '${args.context}', '${args.expression}')`,
@@ -580,16 +492,13 @@ export class MockDebugSession extends LoggingDebugSession {
 
 	protected setDataBreakpointsRequest(response: DebugProtocol.SetDataBreakpointsResponse, args: DebugProtocol.SetDataBreakpointsArguments): void {
 
-		// clear all data breakpoints
-		this._runtime.clearAllDataBreakpoints();
-
 		response.body = {
 			breakpoints: []
 		};
 
 		for (const dbp of args.breakpoints) {
 			// assume that id is the "address" to break on
-			const ok = this._runtime.setDataBreakpoint(dbp.dataId);
+			const ok = true // this._runtime.setDataBreakpoint(dbp.dataId);
 			response.body.breakpoints.push({
 				verified: ok
 			});
@@ -669,6 +578,6 @@ export class MockDebugSession extends LoggingDebugSession {
 	}
 
 	private createSource(filePath: string): Source {
-		return new Source(basename(filePath), this.convertDebuggerPathToClient(filePath), undefined, undefined, 'mock-adapter-data');
+		return new Source(basename(filePath), this.convertDebuggerPathToClient(filePath), undefined, undefined, 'strato-adapter-data');
 	}
 }

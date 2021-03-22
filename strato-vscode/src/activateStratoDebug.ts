@@ -6,10 +6,9 @@
 
 import * as vscode from 'vscode';
 import { WorkspaceFolder, DebugConfiguration, ProviderResult, CancellationToken } from 'vscode';
-import { MockDebugSession } from './mockDebug';
-import { FileAccessor } from './mockRuntime';
+import { StratoDebugSession } from './stratoDebug';
 
-export function activateMockDebug(context: vscode.ExtensionContext) {
+export function activateStratoDebug(context: vscode.ExtensionContext) {
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('extension.strato-debug.debugEditorContents', (resource: vscode.Uri) => {
@@ -29,7 +28,7 @@ export function activateMockDebug(context: vscode.ExtensionContext) {
 	);
 
 	// register a configuration provider for 'strato' debug type
-	const provider = new MockConfigurationProvider();
+	const provider = new StratoConfigurationProvider();
 	context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider('strato', provider));
 
 	// register a dynamic configuration provider for 'strato' debug type
@@ -62,7 +61,7 @@ export function activateMockDebug(context: vscode.ExtensionContext) {
 	*/
 }
 
-class MockConfigurationProvider implements vscode.DebugConfigurationProvider {
+class StratoConfigurationProvider implements vscode.DebugConfigurationProvider {
 
 	/**
 	 * Massage a debug configuration just before a debug session is being launched,
@@ -84,29 +83,9 @@ class MockConfigurationProvider implements vscode.DebugConfigurationProvider {
 	}
 }
 
-export const workspaceFileAccessor: FileAccessor = {
-	async readFile(path: string) {
-		try {
-			const uri = vscode.Uri.file(path);
-			const bytes = await vscode.workspace.fs.readFile(uri);
-			const contents = Buffer.from(bytes).toString('utf8');
-			return contents;
-		} catch(e) {
-			try {
-				const uri = vscode.Uri.parse(path);
-				const bytes = await vscode.workspace.fs.readFile(uri);
-				const contents = Buffer.from(bytes).toString('utf8');
-				return contents;
-			} catch (e) {
-				return `cannot read '${path}'`;
-			}
-		}
-	}
-};
-
 class InlineDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory {
 
 	createDebugAdapterDescriptor(_session: vscode.DebugSession): ProviderResult<vscode.DebugAdapterDescriptor> {
-		return new vscode.DebugAdapterInlineImplementation(new MockDebugSession(workspaceFileAccessor));
+		return new vscode.DebugAdapterInlineImplementation(new StratoDebugSession());
 	}
 }
