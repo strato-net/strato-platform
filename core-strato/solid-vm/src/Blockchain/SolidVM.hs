@@ -1355,13 +1355,13 @@ callBuiltin "require" (SBool cond :msg) Nothing = do
     (m:_) -> require cond (Just $ show m)
   return SNULL
 callBuiltin "assert" [SBool cond] Nothing = SNULL <$ assert cond
-callBuiltin "createCertificate" [SAccount a, SString cert] _ = do  -- should store the parsed mapping
+callBuiltin "createCertificate" [SAccount a, SString cert] _ = do
     let ex509Cert = bsToCert . BC.pack $ cert
     case ex509Cert of
-        Left _         -> undefined
+        Left _         -> return SNULL
         Right x509Cert -> do x509CertDBPut (namedAccountToAccount Nothing a) x509Cert
                              return SNULL
-callBuiltin "getUserCert" [SAccount a] _ = do    -- return parsed mapping instead
+callBuiltin "getUserCert" [SAccount a] _ = do
     maybeCert <- x509CertDBGet (namedAccountToAccount Nothing a)
     return $ SMap stringToString (fromMaybe emptyCertMap $ fmap certMap $ subject =<< maybeCert)
     where subject cert = fmap (cert,) $ getCertSubject cert
