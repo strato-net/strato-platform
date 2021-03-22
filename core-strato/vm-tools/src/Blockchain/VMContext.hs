@@ -388,7 +388,7 @@ instance (Keccak256 `A.Alters` DBCode) ContextM where
   insert _ = genericInsertCodeDB $ getCodeDB
   delete _ = genericDeleteCodeDB $ getCodeDB
 
-instance (Address `A.Alters` X509Certificate) ContextM where
+instance (Account `A.Alters` X509Certificate) ContextM where
   lookup _ = genericLookupX509CertDB $ getX509CertDB
   insert _ = genericInsertX509CertDB $ getX509CertDB
   delete _ = genericDeleteX509CertDB $ getX509CertDB

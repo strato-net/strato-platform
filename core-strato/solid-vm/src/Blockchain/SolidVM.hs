@@ -846,13 +846,13 @@ expToVar' x@(Xabi.MemberAccess expr name) = do
       (SBuiltinVariable "msg", "sender") -> (Constant . SAccount . accountToNamedAccount chainId . Env.sender) <$> getEnv
       (SBuiltinVariable "tx", "origin") -> (Constant . SAccount . accountToNamedAccount chainId . Env.origin) <$> getEnv
       (SBuiltinVariable "tx", "username") -> do env' <- getEnv
-                                                maybeCert <- x509CertDBGet (Env.origin env' ^. accountAddress)
+                                                maybeCert <- x509CertDBGet $ Env.origin env'
                                                 return . Constant . SString . fromMaybe "" $ getCertCommonName =<< maybeCert
       (SBuiltinVariable "tx", "organization") -> do env' <- getEnv
-                                                    maybeCert <- x509CertDBGet (Env.origin env' ^. accountAddress)
+                                                    maybeCert <- x509CertDBGet $ Env.origin env'
                                                     return . Constant . SString . fromMaybe "" $ getCertOrganization =<< maybeCert
       (SBuiltinVariable "tx", "group") -> do env' <- getEnv
-                                             maybeCert <- x509CertDBGet (Env.origin env' ^. accountAddress)
+                                             maybeCert <- x509CertDBGet $ Env.origin env'
                                              return . Constant . SString . fromMaybe "" $ getCertGroup =<< maybeCert
       (SStruct _ theMap, fieldName) -> case M.lookup fieldName theMap of
           Nothing -> missingField "struct member access" fieldName
@@ -1356,14 +1356,13 @@ callBuiltin "require" (SBool cond :msg) Nothing = do
   return SNULL
 callBuiltin "assert" [SBool cond] Nothing = SNULL <$ assert cond
 callBuiltin "createCertificate" [SAccount a, SString cert] _ = do  -- should store the parsed mapping
-    let address = a ^. namedAccountAddress
-        ex509Cert = bsToCert . BC.pack $ cert
+    let ex509Cert = bsToCert . BC.pack $ cert
     case ex509Cert of
         Left _         -> undefined
-        Right x509Cert -> do x509CertDBPut address x509Cert
+        Right x509Cert -> do x509CertDBPut (namedAccountToAccount Nothing a) x509Cert
                              return SNULL
 callBuiltin "getUserCert" [SAccount a] _ = do    -- return parsed mapping instead
-    maybeCert <- x509CertDBGet (a ^. namedAccountAddress)
+    maybeCert <- x509CertDBGet (namedAccountToAccount Nothing a)
     return $ SMap stringToString (fromMaybe emptyCertMap $ fmap certMap $ subject =<< maybeCert)
     where subject cert = fmap (cert,) $ getCertSubject cert
           certMap (cert,sub) = M.fromList [ (SString "commonName", Constant . SString $ subCommonName sub) -- TODO: Fails
