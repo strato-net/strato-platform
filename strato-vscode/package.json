@@ -257,7 +257,7 @@
 		"test": "node ./out/test/runTest.js"
 	},
 	"dependencies": {
-		"blockapps-rest": "../../strato/blockapps-rest",
+		"blockapps-rest": "../blockapps-rest",
 		"js-yaml": "^4.0.0",
 		"await-notify": "1.0.1",
 		"vscode-debugadapter": "^1.43.0",
