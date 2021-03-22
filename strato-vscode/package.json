@@ -1,0 +1,283 @@
+{
+	"name": "strato-vscode",
+	"displayName": "STRATO",
+	"description": "VSCode Integration for BlockApps STRATO",
+	"version": "0.0.1",
+	"engines": {
+		"vscode": "^1.53.0"
+	},
+	"categories": [
+		"Other"
+	],
+	"activationEvents": [
+		"onDebugDynamicConfigurations:strato",
+		"onLanguage:solidity",
+		"onCommand:strato-vscode.createProject",
+		"onCommand:strato-vscode.deployProject",
+		"onCommand:strato-vscode.runServer",
+		"onCommand:strato-vscode.testServer",
+		"onCommand:strato-vscode.runUI",
+		"onCommand:strato-vscode.testUI",
+		"onView:project-management",
+		"onView:deployments",
+		"onView:nodes",
+		"onCommand:extension.strato-debug.debugEditorContents"
+	],
+	"main": "./out/extension.js",
+	"contributes": {
+		"breakpoints": [
+			{
+				"language": "javascript"
+			},
+			{
+				"language": "javascriptreact"
+			},
+			{
+				"language": "solidity"
+			}
+		],
+		"configuration": {
+			"title": "STRATO",
+			"properties": {
+				"strato-vscode.createProjectCommand": {
+					"type": "string",
+					"default": "git clone https://github.com/blockapps/track-and-trace $1; cd $1; cd server; yarn install; yarn build"
+				},
+				"strato-vscode.deployProjectCommand": {
+					"type": "string",
+					"default": "pushd beanstalk-server; yarn install; yarn build; touch .env; yarn deploy; popd"
+				},
+				"strato-vscode.runServerCommand": {
+					"type": "string",
+					"default": "pushd beanstalk-server; yarn install; yarn build; touch .env; MOCK_INT_SERVER=true yarn start:prod; popd"
+				},
+				"strato-vscode.testServerCommand": {
+					"type": "string",
+					"default": "pushd beanstalk-server; yarn install; yarn build; touch .env; yarn test; popd"
+				},
+				"strato-vscode.runUICommand": {
+					"type": "string",
+					"default": "pushd ui; yarn install; yarn build; touch .env; yarn start; popd"
+				},
+				"strato-vscode.testUICommand": {
+					"type": "string",
+					"default": "pushd ui; yarn install; yarn build; touch .env; yarn test; popd"
+				},
+				"strato-vscode.configPath": {
+					"type": "string",
+					"default": "server"
+				},
+				"blame.dateFormat": {
+					"type": "string",
+					"default": "mm/dd/yy"
+				},
+				"blame.format": {
+					"type": "string",
+					"default": "abc"
+				},
+				"blame.heatMap.enabled": {
+					"type": "boolean",
+					"default": false
+				},
+				"blame.heatMap.location": {
+					"type": "string",
+					"default": "New York"
+				}
+			}
+		},
+		"configurationDefaults": {
+			"[solidity]": {
+				"editor.wordWrap": "off"
+			}
+		},
+		"commands": [
+			{
+				"command": "strato-vscode.createProject",
+				"title": "Create STRATO Project"
+			},
+			{
+				"command": "strato-vscode.deployProject",
+				"title": "Deploy STRATO Project"
+			},
+			{
+				"command": "strato-vscode.runServer",
+				"title": "Run STRATO Project Server"
+			},
+			{
+				"command": "strato-vscode.testServer",
+				"title": "Test STRATO Project Server"
+			},
+			{
+				"command": "strato-vscode.runUI",
+				"title": "Run STRATO Project UI"
+			},
+			{
+				"command": "strato-vscode.testUI",
+				"title": "Test STRATO Project UI"
+			},
+			{
+				"command": "deployments.refreshEntry",
+				"title": "Refresh",
+				"icon": {
+					"light": "resources/light/refresh.svg",
+					"dark": "resources/dark/refresh.svg"
+				}
+			},
+			{
+				"command": "nodes.refreshEntry",
+				"title": "Refresh",
+				"icon": {
+					"light": "resources/light/refresh.svg",
+					"dark": "resources/dark/refresh.svg"
+				}
+			},
+            {
+				"command": "extension.strato-debug.debugEditorContents",
+				"title": "Debug SolidVM",
+				"category": "Debug SolidVM",
+				"enablement": "!inDebugMode",
+				"icon": "$(debug-alt)"
+			}
+		],
+		"debuggers": [
+			{
+			  "type": "strato",
+			  "label": "Debug SolidVM",
+			  "program": "./out/debugAdapter.js",
+			  "runtime": "node",
+			  "configurationAttributes": {
+				"launch": {
+				  "properties": {
+					"trace": {
+					  "type": "boolean",
+					  "description": "Enable logging of the Debug Adapter Protocol.",
+					  "default": true
+					}
+				  }
+				}
+			  },
+			  "initialConfigurations": [
+				{
+				  "type": "strato",
+				  "request": "launch",
+				  "name": "Debug SolidVM"
+				}
+			  ],
+			  "configurationSnippets": [
+				{
+				  "label": "Debug SolidVM",
+				  "description": "A new configuration for debugging SolidVM smart contracts.",
+				  "body": {
+					"type": "strato",
+					"request": "launch",
+					"name": "Debug SolidVM"
+				  }
+				}
+			  ]
+			}
+		],
+		"grammars": [
+			{
+				"language": "solidity",
+				"scopeName": "source.solidity",
+				"path": "./syntaxes/solidity.json"
+			}
+		],
+		"languages": [
+			{
+				"id": "solidity",
+				"extensions": [
+					".sol"
+				],
+				"aliases": [
+					"Solidity",
+					"sol"
+				],
+				"configuration": "./solidity-configuration.json"
+			}
+		],
+		"menus": {
+			"editor/title": [
+			  {
+				"command": "extension.strato-debug.debugEditorContents",
+				"when": "resourceLangId == solidity",
+				"group": "1_run@20"
+			  }
+			],
+			"commandPalette": [
+			  {
+				  "command": "extension.strato-debug.debugEditorContents",
+				  "when": "resourceLangId == solidity"
+			  }
+			],
+			"view/title": [
+                {
+                    "command": "deployments.refreshEntry",
+                    "when": "view == deployments",
+                    "group": "navigation"
+                }
+            ]
+		},
+		"viewsContainers": {
+			"activitybar": [
+				{
+					"id": "strato-project",
+					"title": "STRATO Project Manager",
+					"icon": "resources/balogo-gray.svg"
+				}
+			]
+		},
+		"views": {
+			"strato-project": [
+				{
+					"id": "project-management",
+					"name": "Project Management"
+				},
+				{
+					"id": "nodes",
+					"name": "Nodes"
+				},
+				{
+					"id": "deployments",
+					"name": "Deployments"
+				},
+				{
+					"id": "contracts",
+					"name": "Contracts"
+				}
+			]
+		}
+	},
+	"scripts": {
+		"vscode:prepublish": "yarn run compile",
+		"compile": "tsc -p ./",
+		"watch": "tsc -watch -p ./",
+		"pretest": "yarn run compile && yarn run lint",
+		"lint": "eslint src --ext ts",
+		"test": "node ./out/test/runTest.js"
+	},
+	"dependencies": {
+		"blockapps-rest": "../../strato/blockapps-rest",
+		"js-yaml": "^4.0.0",
+		"await-notify": "1.0.1",
+		"vscode-debugadapter": "^1.43.0",
+		"ws": "^7.4.2"
+	},
+	"devDependencies": {
+		"@types/chai": "^4.2.15",
+		"@types/glob": "^7.1.3",
+		"@types/js-yaml": "^4.0.0",
+		"@types/mocha": "^8.0.4",
+		"@types/node": "^12.20.6",
+		"@types/node-fetch": "^2.5.8",
+		"@types/vscode": "^1.53.0",
+		"@types/ws": "^7.4.0",
+		"@typescript-eslint/eslint-plugin": "^4.14.1",
+		"@typescript-eslint/parser": "^4.14.1",
+		"eslint": "^7.19.0",
+		"glob": "^7.1.6",
+		"mocha": "^8.2.1",
+		"typescript": "^4.1.3",
+		"vscode-test": "^1.5.0"
+	}
+}
