@@ -88,8 +88,6 @@ import           UnliftIO                             hiding (assert)
 
 import           CodeCollection
 
-import Debug.Trace
-
 type SolidVMBase m = VMBase m
 
 onTraced :: Monad m => m () -> m ()
@@ -959,7 +957,7 @@ expToVar' x@(Xabi.IndexAccess parent (Just mIndex)) = do
             indexOutOfBounds ("index value was " ++ (show i) ++ ", but the array length was " ++ (show $ length theVector)) $ unparseExpression x 
           else
             return $ theVector V.! fromIntegral i
-        (SMap _ theMap, SString i) -> do maybe (indexOutOfBounds ("index value was " ++ (show i) ++ ", but the valid indexes were " ++ (show $ M.keys theMap)) $ unparseExpression x)
+        (SMap _ theMap, _) -> do maybe (indexOutOfBounds ("index value was " ++ (show theIndex) ++ ", but the valid indexes were " ++ (show $ M.keys theMap)) $ unparseExpression x)
                                                return
                                                (theMap M.!? theIndex)
         (SReference _, _) -> Constant . SReference <$> expToPath x
@@ -1366,7 +1364,25 @@ callBuiltin "createCertificate" [SAccount a, SString cert] _ = do  -- should sto
                              return SNULL
 callBuiltin "getUserCert" [SAccount a] _ = do    -- return parsed mapping instead
     maybeCert <- x509CertDBGet (a ^. namedAccountAddress)
-    return $ fromMaybe (SString "") $ SString . BC.unpack . certToBytes <$> maybeCert
+    return $ SMap stringToString (fromMaybe emptyCertMap $ fmap certMap $ subject =<< maybeCert)
+    where subject cert = fmap (cert,) $ getCertSubject cert
+          certMap (cert,sub) = M.fromList [ (SString "commonName", Constant . SString $ subCommonName sub) -- TODO: Fails
+                             , (SString "country", Constant . SString $ subCountry sub) 
+                             , (SString "organization", Constant . SString $ subOrg sub) 
+                             , (SString "group", Constant . SString $ subUnit sub) 
+                             , (SString "publicKey", Constant . SString $ BC.unpack $ pubToBytes $ subPub sub) 
+                             , (SString "certString", Constant . SString . BC.unpack $ certToBytes cert)
+                             ]
+          emptyCertMap = M.fromList [ (SString "commonName", Constant . SString $ "")
+                             , (SString "country", Constant . SString $ "") 
+                             , (SString "organization", Constant . SString $ "") 
+                             , (SString "group", Constant . SString $ "") 
+                             , (SString "publicKey", Constant . SString $ "") 
+                             , (SString "certString", Constant . SString $ "")
+                             ]
+          stringToString = Xabi.Mapping { Xabi.dynamic = Nothing
+                                        , Xabi.key = Xabi.String Nothing
+                                        , Xabi.value = Xabi.String Nothing }
 callBuiltin "parseCert" [SString cert] _ = return $ SMap stringToString (fromMaybe emptyCertMap $ fmap certMap subject)
     where subject = getCertSubject =<< (eitherToMaybe . bsToCert . BC.pack $ cert)
           certMap sub = M.fromList [ (SString "commonName", Constant . SString $ subCommonName sub) -- TODO: Fails
@@ -1374,12 +1390,14 @@ callBuiltin "parseCert" [SString cert] _ = return $ SMap stringToString (fromMay
                              , (SString "organization", Constant . SString $ subOrg sub) 
                              , (SString "group", Constant . SString $ subUnit sub) 
                              , (SString "publicKey", Constant . SString $ BC.unpack $ pubToBytes $ subPub sub) 
+                             , (SString "certString", Constant . SString $ cert)
                              ]
           emptyCertMap = M.fromList [ (SString "commonName", Constant . SString $ "")
                              , (SString "country", Constant . SString $ "") 
                              , (SString "organization", Constant . SString $ "") 
                              , (SString "group", Constant . SString $ "") 
                              , (SString "publicKey", Constant . SString $ "") 
+                             , (SString "certString", Constant . SString $ "")
                              ]
           stringToString = Xabi.Mapping { Xabi.dynamic = Nothing
                                         , Xabi.key = Xabi.String Nothing
