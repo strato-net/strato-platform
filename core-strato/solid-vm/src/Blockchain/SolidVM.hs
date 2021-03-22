@@ -88,6 +88,8 @@ import           UnliftIO                             hiding (assert)
 
 import           CodeCollection
 
+import Debug.Trace
+
 type SolidVMBase m = VMBase m
 
 onTraced :: Monad m => m () -> m ()
@@ -957,6 +959,9 @@ expToVar' x@(Xabi.IndexAccess parent (Just mIndex)) = do
             indexOutOfBounds ("index value was " ++ (show i) ++ ", but the array length was " ++ (show $ length theVector)) $ unparseExpression x 
           else
             return $ theVector V.! fromIntegral i
+        (SMap _ theMap, SString i) -> do maybe (indexOutOfBounds ("index value was " ++ (show i) ++ ", but the valid indexes were " ++ (show $ M.keys theMap)) $ unparseExpression x)
+                                               return
+                                               (theMap M.!? theIndex)
         (SReference _, _) -> Constant . SReference <$> expToPath x
         _ -> typeError "unsupported types for index access" $ unparseExpression x
 --    _ -> error $ "unknown case in expToVar' for IndexAccess: " ++ show var
