@@ -1658,9 +1658,8 @@ breakpoint :: MonadSM m => Xabi.SourcePos -> m ()
 breakpoint pos = do
   isBreak <- isBreakpoint pos
   when isBreak $ do
-    cStack <- Mod.get (Mod.Proxy @[CallInfo])
     $logInfoS "breakpoint" . T.pack $ "Paused on breakpoint: " ++ show pos
-    handleBreakpoint pos cStack
+    handleBreakpoint pos
     $logInfoS "breakpoint" . T.pack $ "Resuming from breakpoint: " ++ show pos
 
 localVariableMap :: MonadSM m => [CallInfo] -> m (M.Map T.Text T.Text)
@@ -1689,7 +1688,11 @@ breakpointMatches pos = \case
     else runCond exprText
   DataBP exprText -> runCond exprText
   FunctionBP _ -> pure False -- TODO
-  where matchesLoc loc = bpLoc pos == loc
+  where matchesLoc loc = let bp = bpLoc pos
+                             eqOn f a b = f a == f b
+                             fMatch = eqOn breakpointFile bp loc
+                             lMatch = eqOn breakpointLine bp loc
+                          in fMatch && lMatch
         runCond exprText = do
           val <- runExpr exprText
           case val of
@@ -1702,26 +1705,34 @@ isBreakpoint pos = do
   case debugSettings of
     DebuggingDisabled -> pure False
     DebugSettings{..} -> do
+      Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
+        [] -> pure []
+        (x:xs) -> pure $ x{currentSourcePos = Just pos}:xs
       currentOperation <- atomically $ readTVar operation
       if currentOperation == Run
         then do
           bPoints <- fmap S.toList . atomically $ readTVar breakpoints
           matchedBP <- or <$> traverse (breakpointMatches pos) bPoints
           if matchedBP
-            then atomically $ writeTVar operation Pause >> pure True
+            then atomically $ do
+              writeTVar changed True
+              writeTVar operation Pause
+              pure True
             else pure False
         else pure True
 
-handleBreakpoint :: MonadSM m => Xabi.SourcePos -> [CallInfo] -> m ()
-handleBreakpoint pos cStack = do
+handleBreakpoint :: MonadSM m => Xabi.SourcePos -> m ()
+handleBreakpoint pos = do
   debugSettings <- Mod.access (Mod.Proxy @DebugSettings)
   case debugSettings of
     DebuggingDisabled -> pure ()
     DebugSettings{..} -> do
-      let bPoint = BreakpointLoc (T.pack $ Xabi.sourceName pos)
-                                 (Xabi.sourceLine pos)
-                                 (Xabi.sourceColumn pos)
-          cStack' = map (T.pack . currentFunctionName) cStack
+      cStack <- Mod.get (Mod.Proxy @[CallInfo])
+      let loc p = BreakpointLoc (T.pack $ Xabi.sourceName p)
+                                (Xabi.sourceLine p)
+                                (Xabi.sourceColumn p)
+          bPoint = loc pos
+          cStack' = loc . fromMaybe (Xabi.initialPos "") . currentSourcePos <$> cStack
       vars <- localVariableMap cStack
       watchExprs <- fmap S.toList . atomically $ readTVar watchExpressions
       watchVals <- traverse runExpr watchExprs

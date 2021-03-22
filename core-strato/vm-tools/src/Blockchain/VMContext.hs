@@ -166,7 +166,7 @@ data DebugOperation = Run
 
 data DebugState = DebugState
   { debugStateBreakpoint :: BreakpointLoc
-  , debugStateCallStack  :: [T.Text]
+  , debugStateCallStack  :: [BreakpointLoc]
   , debugStateVariables  :: M.Map T.Text T.Text
   , debugStateWatches    :: M.Map T.Text T.Text
   } deriving (Eq, Ord, Show, Generic, NFData, Aeson.ToJSON, Aeson.FromJSON)
@@ -176,6 +176,7 @@ data DebugSettings = DebuggingDisabled
                      operation :: TVar DebugOperation
                    , breakpoints :: TVar (S.Set Breakpoint)
                    , current :: TVar (Maybe DebugState)
+                   , changed :: TVar Bool
                    , exceptionBreakpoints :: TVar Bool
                    , functionBreakpoints :: TVar Bool
                    , watchExpressions :: TVar (S.Set T.Text)
@@ -190,6 +191,7 @@ newDebugSettings = DebugSettings
                <$> (newTVar Run)
                <*> (newTVar S.empty)
                <*> (newTVar Nothing)
+               <*> (newTVar False)
                <*> (newTVar False)
                <*> (newTVar False)
                <*> (newTVar S.empty)

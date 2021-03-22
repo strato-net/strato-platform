@@ -102,6 +102,7 @@ data CallInfo = CallInfo
   , collectionHash      :: Keccak256
   , localVariables      :: Map String (Xabi.Type, Variable)
   , readOnly            :: Bool
+  , currentSourcePos    :: Maybe Xabi.SourcePos
   } deriving (Show)
 
 {-
@@ -454,7 +455,8 @@ addCallInfo a c fn hsh cc initialLocalVariables ro = do
           codeCollection=cc,
           collectionHash=hsh,
           localVariables=initialLocalVariables,
-          readOnly=ro
+          readOnly=ro,
+          currentSourcePos=Nothing
         }
 
   Mod.modify_ (Mod.Proxy @[CallInfo]) $ pure . (newCallInfo:)

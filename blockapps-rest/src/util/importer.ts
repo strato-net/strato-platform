@@ -65,8 +65,7 @@ function readFileLinesToObject(initialFileMap, fullname) {
       return { fileMap, buffer: newBuffer }
     }
   }, {fileMap: initialFileMap, buffer: ''});
-  const shortName = getShortName(fullname)
-  return { ...fileMap, [shortName]: buffer }
+  return { ...fileMap, [fullname]: buffer }
 }
 
 /**
@@ -200,11 +199,11 @@ function combine(filename, toObject):Promise<string> {
   nameStore = [];
   return new Promise(function(resolve, reject) {
     let string = ''
-    if (toObject) {
+    //if (toObject) {
       string = readFileLinesToObject({}, filename);
-    } else {
-      string = readFileLinesToString(filename);
-    }
+    //} else {
+    //  string = readFileLinesToString(filename);
+    //}
     resolve(string);
   });
 }
