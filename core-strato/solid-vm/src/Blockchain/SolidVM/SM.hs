@@ -351,7 +351,7 @@ getVariableOfName name = do
                                                   , "require", "revert", "assert", "sha3"
                                                   , "sha256", "ecrecover", "addmod", "mulmod"
                                                   , "selfdestruct", "suicide", "bytes32ToString"
-                                                  , "createCertificate", "getUserCert", "parseCert"]) $
+                                                  , "registerCert", "getUserCert", "parseCert"]) $
         t "builtin function" $ Constant $ SBuiltinFunction name Nothing
 
       maybeBuiltinVariable :: Maybe Variable

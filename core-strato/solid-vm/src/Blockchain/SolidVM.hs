@@ -1355,7 +1355,7 @@ callBuiltin "require" (SBool cond :msg) Nothing = do
     (m:_) -> require cond (Just $ show m)
   return SNULL
 callBuiltin "assert" [SBool cond] Nothing = SNULL <$ assert cond
-callBuiltin "createCertificate" [SAccount a, SString cert] _ = do
+callBuiltin "registerCert" [SAccount a, SString cert] _ = do
     let ex509Cert = bsToCert . BC.pack $ cert
     case ex509Cert of
         Left _         -> return SNULL
