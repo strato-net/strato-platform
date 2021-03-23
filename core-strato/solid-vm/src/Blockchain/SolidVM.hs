@@ -847,13 +847,13 @@ expToVar' x@(Xabi.MemberAccess expr name) = do
       (SBuiltinVariable "tx", "origin") -> (Constant . SAccount . accountToNamedAccount chainId . Env.origin) <$> getEnv
       (SBuiltinVariable "tx", "username") -> do env' <- getEnv
                                                 maybeCert <- x509CertDBGet $ Env.origin env'
-                                                return . Constant . SString . fromMaybe "" $ getCertCommonName =<< maybeCert
+                                                return . Constant . SString . fromMaybe "" . fmap subCommonName $ getCertSubject =<< maybeCert
       (SBuiltinVariable "tx", "organization") -> do env' <- getEnv
                                                     maybeCert <- x509CertDBGet $ Env.origin env'
-                                                    return . Constant . SString . fromMaybe "" $ getCertOrganization =<< maybeCert
+                                                    return . Constant . SString . fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
       (SBuiltinVariable "tx", "group") -> do env' <- getEnv
                                              maybeCert <- x509CertDBGet $ Env.origin env'
-                                             return . Constant . SString . fromMaybe "" $ getCertGroup =<< maybeCert
+                                             return . Constant . SString . fromMaybe "" . fmap subUnit $ getCertSubject =<< maybeCert
       (SStruct _ theMap, fieldName) -> case M.lookup fieldName theMap of
           Nothing -> missingField "struct member access" fieldName
           Just v -> return v
@@ -1363,47 +1363,34 @@ callBuiltin "createCertificate" [SAccount a, SString cert] _ = do
                              return SNULL
 callBuiltin "getUserCert" [SAccount a] _ = do
     maybeCert <- x509CertDBGet (namedAccountToAccount Nothing a)
-    return $ SMap stringToString (fromMaybe emptyCertMap $ fmap certMap $ subject =<< maybeCert)
-    where subject cert = fmap (cert,) $ getCertSubject cert
-          certMap (cert,sub) = M.fromList [ (SString "commonName", Constant . SString $ subCommonName sub) -- TODO: Fails
-                             , (SString "country", Constant . SString $ subCountry sub) 
-                             , (SString "organization", Constant . SString $ subOrg sub) 
-                             , (SString "group", Constant . SString $ subUnit sub) 
-                             , (SString "publicKey", Constant . SString $ BC.unpack $ pubToBytes $ subPub sub) 
-                             , (SString "certString", Constant . SString . BC.unpack $ certToBytes cert)
-                             ]
-          emptyCertMap = M.fromList [ (SString "commonName", Constant . SString $ "")
-                             , (SString "country", Constant . SString $ "") 
-                             , (SString "organization", Constant . SString $ "") 
-                             , (SString "group", Constant . SString $ "") 
-                             , (SString "publicKey", Constant . SString $ "") 
-                             , (SString "certString", Constant . SString $ "")
-                             ]
-          stringToString = Xabi.Mapping { Xabi.dynamic = Nothing
-                                        , Xabi.key = Xabi.String Nothing
-                                        , Xabi.value = Xabi.String Nothing }
-callBuiltin "parseCert" [SString cert] _ = return $ SMap stringToString (fromMaybe emptyCertMap $ fmap certMap subject)
-    where subject = getCertSubject =<< (eitherToMaybe . bsToCert . BC.pack $ cert)
-          certMap sub = M.fromList [ (SString "commonName", Constant . SString $ subCommonName sub) -- TODO: Fails
-                             , (SString "country", Constant . SString $ subCountry sub) 
-                             , (SString "organization", Constant . SString $ subOrg sub) 
-                             , (SString "group", Constant . SString $ subUnit sub) 
-                             , (SString "publicKey", Constant . SString $ BC.unpack $ pubToBytes $ subPub sub) 
-                             , (SString "certString", Constant . SString $ cert)
-                             ]
-          emptyCertMap = M.fromList [ (SString "commonName", Constant . SString $ "")
-                             , (SString "country", Constant . SString $ "") 
-                             , (SString "organization", Constant . SString $ "") 
-                             , (SString "group", Constant . SString $ "") 
-                             , (SString "publicKey", Constant . SString $ "") 
-                             , (SString "certString", Constant . SString $ "")
-                             ]
-          stringToString = Xabi.Mapping { Xabi.dynamic = Nothing
-                                        , Xabi.key = Xabi.String Nothing
-                                        , Xabi.value = Xabi.String Nothing }
+    return $ certificateMap (fmap (BC.unpack . certToBytes) maybeCert)
+callBuiltin "parseCert" [SString cert] _ = return $ certificateMap (Just cert)
 callBuiltin x _ _ = unknownFunction "callBuiltin" x
 
 
+
+certificateMap :: Maybe String -> Value
+certificateMap maybeCert = case maybeCert of
+    Nothing -> SMap stringToString emptyCertMap
+    Just cert -> SMap stringToString (fromMaybe emptyCertMap $ fmap (certMap cert) (subject cert))
+    where subject cert = getCertSubject =<< (eitherToMaybe . bsToCert . BC.pack $ cert)
+          certMap cert sub = M.fromList [ (SString "commonName", Constant . SString $ subCommonName sub)
+                                   , (SString "country", Constant . SString $ subCountry sub) 
+                                   , (SString "organization", Constant . SString $ subOrg sub) 
+                                   , (SString "group", Constant . SString $ subUnit sub) 
+                                   , (SString "publicKey", Constant . SString $ BC.unpack $ pubToBytes $ subPub sub) 
+                                   , (SString "certString", Constant . SString $ cert)
+                                   ]
+          emptyCertMap = M.fromList [ (SString "commonName", Constant . SString $ "")
+                             , (SString "country", Constant . SString $ "") 
+                             , (SString "organization", Constant . SString $ "") 
+                             , (SString "group", Constant . SString $ "") 
+                             , (SString "publicKey", Constant . SString $ "") 
+                             , (SString "certString", Constant . SString $ "")
+                             ]
+          stringToString = Xabi.Mapping { Xabi.dynamic = Nothing
+                                        , Xabi.key = Xabi.String Nothing
+                                        , Xabi.value = Xabi.String Nothing }
 {-
 data Func = Func
   { funcArgs :: Map Text Xabi.IndexedType

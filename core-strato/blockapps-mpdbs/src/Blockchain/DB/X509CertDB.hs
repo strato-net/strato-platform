@@ -9,22 +9,19 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.DB.X509CertDB (
-  X509Certificate,
-  Subject(..),
-  certToBytes,
-  bsToCert,
-  getCertSubject,
-  pubToBytes,
-  X509CertDB(..),
-  HasX509CertDB,
-  genericLookupX509CertDB,
-  genericInsertX509CertDB,
-  genericDeleteX509CertDB,
-  x509CertDBPut,
-  x509CertDBGet,
-  getCertCommonName,
-  getCertOrganization,
-  getCertGroup
+    X509Certificate(..)
+  , Subject(..)
+  , certToBytes
+  , bsToCert
+  , getCertSubject
+  , pubToBytes
+  , X509CertDB(..)
+  , HasX509CertDB
+  , genericLookupX509CertDB
+  , genericInsertX509CertDB
+  , genericDeleteX509CertDB
+  , x509CertDBPut
+  , x509CertDBGet
   ) where
 
 
@@ -64,7 +61,9 @@ genericDeleteX509CertDB f account = do
   db <- unX509CertDB <$> f
   DB.delete db def (BC.pack $ show account)
 
--- instance MonadIO m => HasX509CertDB (ReaderT X509CertDB m)
+-- GHC bug? Why can't we use the line below to create this instance, even with all the
+-- extensions enabled for it?
+-- instance MonadIO m => HasX509CertDB (ReaderT X509CertDB m) where
 instance MonadIO m => (Account `Alters` X509Certificate) (ReaderT X509CertDB m) where
   lookup _ = genericLookupX509CertDB ask
   insert _ = genericInsertX509CertDB ask

@@ -15,11 +15,7 @@ module BlockApps.X509.Certificate (
   makeCert,
   makeSignedCert,
   fromASN1CS, -- I'd rather not
-  getCertCommonName,
-  getCertOrganization,
-  getCertGroup,
-  getCertSubject,
---   getCertIssuer
+  getCertSubject
  ) where
 
 
@@ -244,15 +240,6 @@ getValidity = do
 getCertPub :: Subject -> PubKey
 getCertPub = serializeAndWrap . subPub
 
-
-getCertCommonName :: X509Certificate -> Maybe String
-getCertCommonName (X509Certificate cert) = fmap fromASN1CS . getDnElement DnCommonName . certSubjectDN $ getCertificate cert
-
-getCertOrganization :: X509Certificate -> Maybe String
-getCertOrganization (X509Certificate cert) = fmap fromASN1CS . getDnElement DnOrganization . certSubjectDN $ getCertificate cert
-
-getCertGroup :: X509Certificate -> Maybe String
-getCertGroup (X509Certificate cert) = fmap fromASN1CS . getDnElement DnOrganizationUnit . certSubjectDN $ getCertificate cert
 
 getCertSubject :: X509Certificate -> Maybe Subject
 getCertSubject (X509Certificate cert) =
