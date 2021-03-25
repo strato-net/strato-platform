@@ -204,8 +204,8 @@ services:
     - cacheTransactionResults=${cacheTransactionResults}
     - connectionTimeout=${connectionTimeout}
     - debugFail=${debugFail}
-    - debugSolidVM=${debugSolidVM}
-    - wsDebug=${wsDebug}
+    - debugSolidVM=${debugSolidVM:-false}
+    - wsDebug=${wsDebug:-false}
     - evmDebugMode=${evmDebugMode}
     - evmTraceMode=${evmTraceMode}
     - extraFaucets=${extraFaucets}
