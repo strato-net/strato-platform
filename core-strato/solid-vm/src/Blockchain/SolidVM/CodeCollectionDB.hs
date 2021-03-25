@@ -3,16 +3,17 @@ module Blockchain.SolidVM.CodeCollectionDB (codeCollectionFromSource, codeCollec
 
 import           Control.Exception
 import           Control.Monad.IO.Class
+import qualified Data.Aeson                           as Aeson
 import qualified Data.ByteString                      as B
-import qualified Data.ByteString.Char8                as BC
+import qualified Data.ByteString.Lazy                 as BL
 import           Data.IORef
 import           Data.Map                             (Map)
 import qualified Data.Map                             as M
 import qualified Data.Text                            as T
+import           Data.Text.Encoding                   (decodeUtf8)
 import           System.IO.Unsafe
 import           Text.Parsec                          (runParser)
 
-import           Blockchain.Data.RLP                  (rlpDecode, rlpDeserializeMaybe)
 import           Blockchain.DB.CodeDB
 import           Blockchain.SolidVM.Exception         hiding (assert)
 import           Blockchain.SolidVM.Metrics
@@ -27,10 +28,10 @@ import           CodeCollection
 unsafeCodeMapIORef :: IORef (Map Keccak256 CodeCollection)
 unsafeCodeMapIORef = unsafePerformIO $ newIORef M.empty
 
-compileSource :: Map String String -> CodeCollection
+compileSource :: Map T.Text T.Text -> CodeCollection
 compileSource initCodeMap =
   let getNamedContracts fileName src =
-        let maybeFile = runParser solidityFile "" fileName $ src
+        let maybeFile = runParser solidityFile "" (T.unpack fileName) $ T.unpack src
             file = either (parseError "compileSource") id maybeFile
 
          in [(T.unpack name, xabiToContract (T.unpack name) (map T.unpack parents') xabi)
@@ -53,9 +54,9 @@ codeCollectionFromSource initCode = do
       recordCacheEvent StorageWrite
       hsh' <- addCode SolidVM initCode
       -- TODO: I think this should be in the code DB, but I'm leaving it here for now
-      let initMap = case rlpDeserializeMaybe initCode of
-            Just m -> rlpDecode m
-            Nothing -> M.singleton "" (BC.unpack initCode)
+      let initMap = case Aeson.decode $ BL.fromStrict initCode of
+            Just m -> m
+            Nothing -> M.singleton T.empty (decodeUtf8 initCode)
       let cc = compileSource initMap
       let codeMap' = M.insert hsh cc codeMap
       recordCacheSize $ M.size codeMap'
@@ -74,9 +75,9 @@ codeCollectionFromHash hsh = do
       mCode <- getCode hsh
       case mCode of
         Just (_, initCode) -> do
-          let initMap = case rlpDeserializeMaybe initCode of
-                Just m -> rlpDecode m
-                Nothing -> M.singleton "" (BC.unpack initCode)
+          let initMap = case Aeson.decode $ BL.fromStrict initCode of
+                Just m -> m
+                Nothing -> M.singleton T.empty (decodeUtf8 initCode)
           let cc = compileSource initMap
               codeMap' = M.insert hsh cc codeMap
           recordCacheSize $ M.size codeMap'

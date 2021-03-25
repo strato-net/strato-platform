@@ -54,7 +54,6 @@ import           BlockApps.SolidityVarReader     (byteStringToWord256, word256To
 import           BlockApps.Solidity.Parse.Parser
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Types hiding (Account(..))
-import qualified Blockchain.Data.RLP as EthRLP
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.CodePtr
@@ -959,10 +958,13 @@ compileContract source = do
 createMetadataNoCompile :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
                            Text -> m (Map Text (Int32, ContractDetails))
 createMetadataNoCompile source = do
-  let source' = case EthRLP.rlpDeserializeMaybe (Char8.pack $ Text.unpack source) of
-        Just m -> Text.intercalate "\n" $ Map.elems ((EthRLP.rlpDecode m) :: Map Text Text)
-        Nothing -> source
-  let eVerXabis = parseXabi "-" $ Text.unpack source'
+  let srcBS = fromStrict $ Text.encodeUtf8 source
+      source' = case decode srcBS of
+        Just (m :: Map Text Text) -> Text.intercalate "\n" $ Map.elems m
+        Nothing -> case decode srcBS of
+          Just (l :: [(Text, Text)]) -> Text.intercalate "\n" $ map snd l
+          Nothing -> source
+      eVerXabis = parseXabi "-" $ Text.unpack source'
   xabis <- case eVerXabis of
     Left err -> blocError . UserError . Text.pack $ err
     Right (_, xs) -> return $ Map.fromList xs

@@ -152,7 +152,7 @@ instance FromJSON BlocTransactionPayload where
   parseJSON o = error $ "fromJSON BlocTransactionPayload: Expected Object, but got " ++ show o
 
 data ContractPayload = ContractPayload
-  { contractpayloadSrc      :: Map Text Text
+  { contractpayloadSrc      :: [(Text, Text)]
   , contractpayloadContract :: Maybe Text
   , contractpayloadArgs     :: Maybe (Map Text ArgValue)
   , contractpayloadValue    :: Maybe (Strung Natural)
@@ -207,9 +207,10 @@ instance FromJSON ContractPayload where
                      <$> (do
                        msrc <- o .:? "src"
                        case msrc of
-                         Just (String s) -> pure $ Map.singleton "" s
-                         Just (Object _) -> o .: "src"
-                         _ -> pure Map.empty)
+                         Just (String s) -> pure $ [("", s)]
+                         Just (Object _) -> fmap Map.toList (o .: "src")
+                         Just (Array _) -> o .: "src"
+                         _ -> pure [])
                      <*> (o .:? "contract")
                      <*> (o .:? "args")
                      <*> (o .:? "value")
@@ -230,7 +231,7 @@ instance ToSchema BlocTransactionPayload where
     where
       ex :: BlocTransactionPayload
       ex = BlocContract $ ContractPayload
-        { contractpayloadSrc      = Map.singleton "SimpleStorage.sol" "contract SimpleStorage { uint x; function SimpleStorage(uint _x) { x = _x; } function set(uint _x) { x = _x; } }"
+        { contractpayloadSrc      = [("SimpleStorage.sol", "contract SimpleStorage { uint x; function SimpleStorage(uint _x) { x = _x; } function set(uint _x) { x = _x; } }")]
         , contractpayloadContract = Nothing
         , contractpayloadArgs     = Just $ Map.fromList [("_x", ArgInt 1)]
         , contractpayloadValue    = Nothing
@@ -247,7 +248,7 @@ instance ToSchema ContractPayload where
     where
       ex :: ContractPayload
       ex = ContractPayload
-        { contractpayloadSrc      = Map.singleton "SimpleStorage.sol" "contract SimpleStorage { uint x; function SimpleStorage(uint _x) { x = _x; } function set(uint _x) { x = _x; } }"
+        { contractpayloadSrc      = [("SimpleStorage.sol", "contract SimpleStorage { uint x; function SimpleStorage(uint _x) { x = _x; } function set(uint _x) { x = _x; } }")]
         , contractpayloadContract = Nothing
         , contractpayloadArgs     = Just $ Map.fromList [("_x", ArgInt 1)]
         , contractpayloadValue    = Nothing

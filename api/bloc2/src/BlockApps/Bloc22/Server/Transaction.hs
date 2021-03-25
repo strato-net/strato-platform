@@ -24,7 +24,6 @@ import qualified Data.Aeson                        as Aeson
 import           Data.ByteString                   (ByteString)
 import qualified Data.ByteString                   as ByteString
 import qualified Data.ByteString.Base16            as Base16
-import qualified Data.ByteString.Char8             as BC
 import qualified Data.ByteString.Lazy              as BL
 import qualified Data.ByteString.Short             as BSS
 import qualified Data.Cache                        as Cache
@@ -78,7 +77,6 @@ import           BlockApps.Strato.Types            hiding (Account, Transaction 
 import           BlockApps.XAbiConverter
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json
-import qualified Blockchain.Data.RLP               as EthRLP
 import           Blockchain.Data.TXOrigin
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address  hiding (unAddress)
@@ -161,7 +159,7 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
       addr <- case mAddr of
         Nothing -> fmap unAddress . blocVaultWrapper $ getKey userName Nothing
         Just addr' -> return addr'
-      let getSrc p = Map.union (contractpayloadSrc p) (fromMaybe Map.empty msrcs)
+      let getSrc p = maybe [] Map.toList msrcs ++ contractpayloadSrc p
       fmap join . forM (partitionWith transactionType txs') $ \(ttype, txs) -> case ttype of
         TRANSFER -> case txs of
           [] -> return []
@@ -338,7 +336,7 @@ postUsersContractEVM' :: (MonadLogger m,
                           HasBlocEnv m, HasBlocSQL m, HasCoreAPI m, HasVault m, HasSQL m) =>
                          Should CacheNonce -> ContractParameters -> Text -> m BlocTransactionResult
 postUsersContractEVM' cacheNonce ContractParameters{..} userName = blocTransaction $ do
-  let srcText = Text.intercalate "\n" $ Map.elems src
+  let srcText = Text.intercalate "\n" $ map snd src
   params <- getAccountTxParams cacheNonce fromAddr chainId txParams
   --TODO: check what happens with mismatching args
   $logInfoLS "postUsersContractEVM'/args" args
@@ -378,10 +376,10 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} userName = blocTrans
   params <- getAccountTxParams cacheNonce fromAddr chainId txParams
   --We might be able to get rid of the metadata for SolidVM, but that will require a change in the API, and needs to be discussed
   $logInfoLS "postUsersContractSolidVM'/args" args
-  let encodedSrc = case Map.toList src of
-        [("", wholeSrc)] -> BC.pack $ Text.unpack wholeSrc
-        _ -> EthRLP.rlpSerialize $ EthRLP.rlpEncode src
-  (cName,(cmId,ContractDetails{..})) <- getContractDetailsForContract "SolidVM" (Text.pack $ BC.unpack encodedSrc) contract >>= \case
+  let encodedSrc = case src of
+        [("", wholeSrc)] -> wholeSrc
+        _ -> Text.decodeUtf8 . BL.toStrict . Aeson.encode $ Map.fromList src
+  (cName,(cmId,ContractDetails{..})) <- getContractDetailsForContract "SolidVM" encodedSrc contract >>= \case
     Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
     Just x -> pure x
 
@@ -396,7 +394,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} userName = blocTrans
       fromAddr
       params
       (Wei (fromIntegral (maybe 0 unStrung value)))
-      (Code encodedSrc)
+      (Code $ Text.encodeUtf8 encodedSrc)
       chainId
   $logDebugLS "postUsersContractSolidVM'/tx" tx
   txHash <- postTransaction tx
@@ -418,11 +416,11 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} userName = do
   txsWithParams <- genNonces cacheNonce fromAddr uploadlistcontractChainid uploadlistcontractTxParams contracts'
   namesCmIdsTxs <- forStateT Map.empty txsWithParams $
     \(UploadListContract name srcs args params value cid md) -> do
-      let encodedSrc = case Map.toList srcs of
+      let encodedSrc = case srcs of
             [("", wholeSrc)] -> wholeSrc
-            _ -> Text.pack . BC.unpack . EthRLP.rlpSerialize $ EthRLP.rlpEncode srcs
+            _ -> Text.decodeUtf8 . BL.toStrict . Aeson.encode $ Map.fromList srcs
       (src, cmId, xabi) <-
-       if not (Map.null srcs)
+       if not (null srcs)
         then do
           (cmId', cd) <- fmap snd . lift $ getContractDetailsForContract "SolidVM" encodedSrc (Just name) >>= \case
             Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
@@ -456,7 +454,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} userName = do
             fromAddr
             (fromMaybe emptyTxParams params)
             (Wei (maybe 0 fromIntegral $ fmap unStrung value))
-            (Code . BC.pack $ Text.unpack src)
+            (Code $ Text.encodeUtf8 src)
             cid
       return ((name,cmId),tx)
   let
@@ -490,7 +488,7 @@ postUsersUploadListEVM' cacheNonce ContractListParameters{..} userName = do
   txsWithParams <- genNonces cacheNonce fromAddr uploadlistcontractChainid uploadlistcontractTxParams contracts'
   namesCmIdsTxs <- forStateT Map.empty txsWithParams $
     \(UploadListContract name mSrc args params value cid md) -> do
-      when (not $ Map.null mSrc) . lift . throwIO $ UserError evmUploadListError
+      when (not $ null mSrc) . lift . throwIO $ UserError evmUploadListError
       mtuple <- use $ at name
       (bin, src, cmId, xabi) <- case mtuple of
         Just (b, src, cmId', x) -> return (b, src, cmId', x)
