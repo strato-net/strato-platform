@@ -268,7 +268,7 @@ postUsersContractEVM' cacheNonce ContractParameters{..} sign = blocTransaction $
   params <- getAccountTxParams cacheNonce fromAddr chainId txParams
   --TODO: check what happens with mismatching args
   $logInfoLS "postUsersContractEVM'/args" args
-  (cName,(cmId,ContractDetails{..})) <- getContractDetailsForContract "EVM" srcText contract >>= \case
+  (cName,(cmId,ContractDetails{..})) <- getContractDetailsForContract "EVM" src contract >>= \case
     Nothing -> throwIO $ UserError "You need to supply at least one contract in the source"
     Just x -> pure x
   let
@@ -305,7 +305,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} sign = blocTransacti
   let encodedSrc = case src of
         [("", wholeSrc)] -> wholeSrc
         _ -> Text.decodeUtf8 . BL.toStrict . Aeson.encode $ Map.fromList src
-  (cName,(cmId,ContractDetails{..})) <- getContractDetailsForContract "SolidVM" encodedSrc contract >>= \case
+  (cName,(cmId,ContractDetails{..})) <- getContractDetailsForContract "SolidVM" src contract >>= \case
     Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
     Just x -> pure x
 
@@ -363,7 +363,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} sign = do
       (src, cmId, xabi) <-
        if not (null srcs)
         then do
-          (cmId', cd) <- fmap snd . lift $ getContractDetailsForContract "SolidVM" encodedSrc (Just name) >>= \case
+          (cmId', cd) <- fmap snd . lift $ getContractDetailsForContract "SolidVM" srcs (Just name) >>= \case
             Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
             Just x -> pure x
           at name <?= (encodedSrc, cmId', contractdetailsXabi cd)

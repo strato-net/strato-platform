@@ -76,11 +76,33 @@ type PostBlocTransaction = "transaction"
   :> ReqBody '[JSON] PostBlocTransactionRequest
   :> Post '[JSON] [BlocChainOrTransactionResult]
 
+newtype SourceMap = SourceMap { unSourceMap :: [(Text, Text)] }
+                  deriving (Eq, Show, Generic)
+
+instance ToJSON SourceMap where
+  toJSON = toJSON . unSourceMap
+
+instance FromJSON SourceMap where
+  parseJSON (String s) = pure . SourceMap $ [("", s)]
+  parseJSON o@(Object _) = SourceMap . Map.toList <$> parseJSON o
+  parseJSON a@(Array _) = SourceMap <$> parseJSON a
+  parseJSON o = fail $ "parseJSON SourceMap: Expected String, Object, or Array, got " ++ show o
+
+instance Arbitrary SourceMap where
+  arbitrary = SourceMap <$> arbitrary
+
+instance ToSchema SourceMap where
+  declareNamedSchema _ = return $ NamedSchema (Just "SourceMap")
+    ( mempty
+      & type_ ?~ SwaggerString
+      & example ?~ toJSON (SourceMap [("SimpleStorage.sol", "contract SimpleStorage { }")])
+      & description ?~ "SourceMap" )
+
 data PostBlocTransactionRequest = PostBlocTransactionRequest
   { postbloctransactionrequestAddress  :: Maybe Address
   , postbloctransactionrequestTxs      :: [BlocTransactionPayload]
   , postbloctransactionrequestTxParams :: Maybe TxParams
-  , postbloctransactionrequestSrcs     :: Maybe (Map Text Text)
+  , postbloctransactionrequestSrcs     :: Maybe (Map Text SourceMap) 
   } deriving (Eq, Show, Generic)
 
 instance Arbitrary PostBlocTransactionRequest where
@@ -149,7 +171,7 @@ instance FromJSON BlocTransactionPayload where
       CONTRACT -> BlocContract <$> (o .: "payload")
       FUNCTION -> BlocFunction <$> (o .: "payload")
       GENESIS  -> BlocGenesis  <$> (o .: "payload")
-  parseJSON o = error $ "fromJSON BlocTransactionPayload: Expected Object, but got " ++ show o
+  parseJSON o = fail $ "fromJSON BlocTransactionPayload: Expected Object, but got " ++ show o
 
 data ContractPayload = ContractPayload
   { contractpayloadSrc      :: [(Text, Text)]
@@ -302,7 +324,6 @@ instance ToJSON BlocChainOrTransactionResult where
 instance FromJSON BlocChainOrTransactionResult where
   parseJSON o = (BlocTxResult <$> parseJSON o)
             <|> (BlocChainResult <$> parseJSON o)
-            <|> pure (error $ "fromJSON BlocChainOrTransactionResult: Expected Object or hex-encoded string, but got " ++ show o)
 
 instance Arbitrary BlocChainOrTransactionResult where
   arbitrary = GR.genericArbitrary GR.uniform

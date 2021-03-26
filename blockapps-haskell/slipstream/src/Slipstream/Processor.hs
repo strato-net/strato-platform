@@ -253,11 +253,11 @@ getSolidVMDetailsForRow g row = runMaybeT
         
         checkMetadata = do
           $logInfoS "getDetailsForRow" . T.pack $ "checking metadata for contract details"
-          (lookupT "src" $ actionMetadata row) >>= parseAndSet
+          (lookupT "src" $ actionMetadata row) >>= lift . deserializeSrc >>= parseAndSet
         
 
         -- parse source code, add all of details to cache, return the one we need
-        parseAndSet :: Text -> MaybeT Bloc (Int32, ContractDetails)
+        parseAndSet :: [(Text, Text)] -> MaybeT Bloc (Int32, ContractDetails)
         parseAndSet src = do
           detailsMap <- lift $ sourceToContractDetails (Don't Compile) src
           setContractABIs g codePtr detailsMap
@@ -273,7 +273,8 @@ getEVMDetailsForRow row = liftM2 (<|>)
   (getContractDetailsByCodeHash $ actionCodeHash row)
   (runMaybeT $ do
     let md = actionMetadata row
-    src <- lookupT "src" md
+    src' <- lookupT "src" md
+    src <- lift $ deserializeSrc src'
     name <- lookupT "name" md
     detailsMap <- lift $ sourceToContractDetails (Do Compile) src
     lookupT name detailsMap)

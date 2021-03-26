@@ -76,11 +76,33 @@ type PostBlocTransaction = "transaction"
   :> ReqBody '[JSON] PostBlocTransactionRequest
   :> Post '[JSON] [BlocChainOrTransactionResult]
 
+newtype SourceMap = SourceMap { unSourceMap :: [(Text, Text)] }
+                  deriving (Eq, Show, Generic)
+
+instance ToJSON SourceMap where
+  toJSON = toJSON . unSourceMap
+
+instance FromJSON SourceMap where
+  parseJSON (String s) = pure . SourceMap $ [("", s)]
+  parseJSON o@(Object _) = SourceMap . Map.toList <$> parseJSON o
+  parseJSON a@(Array _) = SourceMap <$> parseJSON a
+  parseJSON o = fail $ "parseJSON SourceMap: Expected String, Object, or Array, got " ++ show o
+
+instance Arbitrary SourceMap where
+  arbitrary = SourceMap <$> arbitrary
+
+instance ToSchema SourceMap where
+  declareNamedSchema _ = return $ NamedSchema (Just "SourceMap")
+    ( mempty
+      & type_ ?~ SwaggerString
+      & example ?~ toJSON (SourceMap [("SimpleStorage.sol", "contract SimpleStorage { }")])
+      & description ?~ "SourceMap" )
+
 data PostBlocTransactionRequest = PostBlocTransactionRequest
   { postbloctransactionrequestAddress  :: Maybe Address
   , postbloctransactionrequestTxs      :: [BlocTransactionPayload]
   , postbloctransactionrequestTxParams :: Maybe TxParams
-  , postbloctransactionrequestSrcs     :: Maybe (Map Text Text)
+  , postbloctransactionrequestSrcs     :: Maybe (Map Text SourceMap) 
   } deriving (Eq, Show, Generic)
 
 instance Arbitrary PostBlocTransactionRequest where

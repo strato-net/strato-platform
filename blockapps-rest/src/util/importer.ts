@@ -10,7 +10,6 @@ let nameStore = [];
  */
 
 function getImportsTree(fullname) {
-  // console.log('getImportsTree', fullname);
   let importFullnames = [];
   isImported(fullname);
   let array = fs.readFileSync(fullname).toString().split('\n');
@@ -18,10 +17,8 @@ function getImportsTree(fullname) {
   for (let i = 0; i < array.length; i++) {
     let line = array[i];
     if (line.startsWith('import')) {
-      // console.log('getImportsTree', 'line', line);
       let importName = getImportName(line);
       let importFullname = parentPath + nodepath.sep + importName;
-      // console.log('getImportsTree', 'importFullname', importFullname);
       if (isImported(importFullname)) continue;
       importFullnames.push(importFullname);
       importFullnames = importFullnames.concat(getImportsTree(importFullname));
@@ -36,7 +33,6 @@ function getImportsTree(fullname) {
 // import "filename";
 function getImportName(line) {
   let importName = line.split('"').slice(-2, -1)[0];
-  // console.log('importName', importName);
   return importName;
 }
 
@@ -50,7 +46,6 @@ function getImportName(line) {
  */
 
 function readFileLinesToObject(initialFileMap, fullname) {
-  console.log(`readFileLinesToObject: Importing ${fullname}`)
   const array = fs.readFileSync(fullname).toString().split('\n');
   isImported(fullname);
   const { fileMap, buffer } = array.reduce((obj, line) => {
@@ -78,7 +73,6 @@ function readFileLinesToObject(initialFileMap, fullname) {
  */
 
 function readFileLinesToArray(initialFileArray, fullname) {
-  console.log(`readFileLinesToArray: Importing ${fullname}`)
   const array = fs.readFileSync(fullname).toString().split('\n');
   isImported(fullname);
   const { fileArray, buffer } = array.reduce((obj, line) => {
@@ -247,7 +241,7 @@ function splitPath(fullname) {
   return path;
 }
 
-function combine(filename, toObject):Promise<string> {
+function combine(filename, toObject):Promise<any> {
   nameStore = [];
   return new Promise(function(resolve, reject) {
     let string = ''

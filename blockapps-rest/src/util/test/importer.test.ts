@@ -21,11 +21,15 @@ describe("imports", function() {
   it("combines to string", async () => {
     const filename = `${fixtures}/importer/Main.sol`;
     const source = await importer.combine(filename, false);
-    assert.isAbove(source.indexOf("contract Main"), 0);
-    assert.isAbove(source.indexOf("contract A"), 0);
-    assert.isAbove(source.indexOf("contract B"), 0);
-    assert.isAbove(source.indexOf("contract C"), 0);
-    assert.isAbove(source.indexOf("contract D"), 0);
+    assert.equal(source.length, 5, "should have an array with all 5 files");
+    const sourceMap = source.reduce((obj, el) => {
+      return { ...obj, [el[0]]: el[1] }
+    }, {});
+    assert.isAbove(sourceMap['Main.sol'].indexOf("contract Main"), 0);
+    assert.isAbove(sourceMap['A.sol'].indexOf("contract A"), 0);
+    assert.isAbove(sourceMap['B.sol'].indexOf("contract B"), 0);
+    assert.isAbove(sourceMap['C.sol'].indexOf("contract C"), 0);
+    assert.isAbove(sourceMap['D.sol'].indexOf("contract D"), 0);
   });
 
   it("combines to object", async () => {

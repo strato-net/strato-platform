@@ -125,7 +125,7 @@ instance ToSample BlocTransactionData where
       , contractdetailsBinRuntime = "Contract Bin Runtime"
       , contractdetailsCodeHash   = EVMCode $ hash "Contract Code Hash"
       , contractdetailsName       = "Example"
-      , contractdetailsSrc        = "contract Example { }"
+      , contractdetailsSrc        = [("Example.sol", "contract Example { }")]
       , contractdetailsXabi       = sampleXabi
       }
     , Call [] -- probably make a better Call sample

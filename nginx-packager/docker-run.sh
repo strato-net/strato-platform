@@ -16,6 +16,8 @@ OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
 OAUTH_JWT_USERNAME_PROPERTY=${OAUTH_JWT_USERNAME_PROPERTY:-email}
 OAUTH_SCOPE=${OAUTH_SCOPE:-openid email profile}
 OAUTH_STRATO42_FALLBACK=${OAUTH_STRATO42_FALLBACK:-false}
+DEBUG_SOLIDVM=${debugSolidVM:-false}
+WS_DEBUG_SOLIDVM=${wsDebug:-false}
 
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
@@ -63,6 +65,14 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
 
   if [ "$OAUTH_STRATO42_FALLBACK" = true ]; then
     sed -i '/#TEMPLATE_MARK_OAUTH_STRATO_43_AND_ABOVE/d' /tmp/nginx.conf
+  fi
+
+  if [ "$DEBUG_SOLIDVM" = true ]; then
+    sed -i '/#TEMPLATE_MARK_DEBUG/d' /tmp/nginx.conf
+  fi
+
+  if [ "$WS_DEBUG_SOLIDVM" = true ]; then
+    sed -i '/#TEMPLATE_MARK_WS_DEBUG/d' /tmp/nginx.conf
   fi
 
   # Remove SSL lines if deployment is not SSL-enabled
