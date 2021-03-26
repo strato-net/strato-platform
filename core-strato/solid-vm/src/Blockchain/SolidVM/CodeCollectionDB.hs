@@ -56,7 +56,9 @@ codeCollectionFromSource initCode = do
       -- TODO: I think this should be in the code DB, but I'm leaving it here for now
       let initMap = case Aeson.decode $ BL.fromStrict initCode of
             Just m -> m
-            Nothing -> M.singleton T.empty (decodeUtf8 initCode)
+            Nothing -> case Aeson.decode $ BL.fromStrict initCode of
+              Just l -> M.fromList l
+              Nothing -> M.singleton T.empty (decodeUtf8 initCode)
       let cc = compileSource initMap
       let codeMap' = M.insert hsh cc codeMap
       recordCacheSize $ M.size codeMap'
@@ -77,7 +79,9 @@ codeCollectionFromHash hsh = do
         Just (_, initCode) -> do
           let initMap = case Aeson.decode $ BL.fromStrict initCode of
                 Just m -> m
-                Nothing -> M.singleton T.empty (decodeUtf8 initCode)
+                Nothing -> case Aeson.decode $ BL.fromStrict initCode of
+                  Just l -> M.fromList l
+                  Nothing -> M.singleton T.empty (decodeUtf8 initCode)
           let cc = compileSource initMap
               codeMap' = M.insert hsh cc codeMap
           recordCacheSize $ M.size codeMap'

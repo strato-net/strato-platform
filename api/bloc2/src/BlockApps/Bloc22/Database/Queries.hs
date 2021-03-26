@@ -886,7 +886,7 @@ getContractDetailsForContract theVM src mContract = do
   idsAndDetails <- case mCachedDetails of
     Just cachedDetails -> pure cachedDetails
     Nothing -> do
-      details <- if null src
+      details <- if Prelude.sum (Text.length . snd <$> src) == 0
                    then return Map.empty
                    else sourceToContractDetails shouldCompile src
       liftIO $ Cache.insert srcCache cacheKey details
