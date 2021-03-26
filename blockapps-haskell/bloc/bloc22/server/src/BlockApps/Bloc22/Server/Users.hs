@@ -264,7 +264,6 @@ postUsersContract userName addr chainId resolve
 
 postUsersContractEVM' :: Should CacheNonce -> ContractParameters -> Signer -> Bloc BlocTransactionResult
 postUsersContractEVM' cacheNonce ContractParameters{..} sign = blocTransaction $ do
-  let srcText = Text.intercalate "\n" $ map snd src
   params <- getAccountTxParams cacheNonce fromAddr chainId txParams
   --TODO: check what happens with mismatching args
   $logInfoLS "postUsersContractEVM'/args" args
@@ -273,7 +272,7 @@ postUsersContractEVM' cacheNonce ContractParameters{..} sign = blocTransaction $
     Just x -> pure x
   let
     (bin,leftOver) = Base16.decode $ Text.encodeUtf8 contractdetailsBin
-    metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("src", srcText),("name", cName)]
+    metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("src", serializeSrc contractdetailsSrc),("name", cName)]
   unless (ByteString.null leftOver) $ throwIO $ AnError "Couldn't decode binary"
   let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi
   argsBin <- constructArgValues args xabiArgs
@@ -302,9 +301,6 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} sign = blocTransacti
   params <- getAccountTxParams cacheNonce fromAddr chainId txParams
   --We might be able to get rid of the metadata for SolidVM, but that will require a change in the API, and needs to be discussed
   $logInfoLS "postUsersContractSolidVM'/args" args
-  let encodedSrc = case src of
-        [("", wholeSrc)] -> wholeSrc
-        _ -> Text.decodeUtf8 . BL.toStrict . Aeson.encode $ Map.fromList src
   (cName,(cmId,ContractDetails{..})) <- getContractDetailsForContract "SolidVM" src contract >>= \case
     Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
     Just x -> pure x
@@ -320,7 +316,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} sign = blocTransacti
       fromAddr
       params
       (Wei (fromIntegral (maybe 0 unStrung value)))
-      (Code $ Text.encodeUtf8 encodedSrc)
+      (Code $ Text.encodeUtf8 $ serializeSrc contractdetailsSrc)
       chainId
   $logDebugLS "postUsersContractSolidVM'/tx" tx
   txHash <- blocStrato $ postTx tx
@@ -357,16 +353,13 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} sign = do
   txsWithParams <- genNonces cacheNonce fromAddr uploadlistcontractChainid uploadlistcontractTxParams contracts'
   namesCmIdsTxs <- forStateT Map.empty txsWithParams $
     \(UploadListContract name srcs args params value cid md) -> do
-      let encodedSrc = case srcs of
-            [("", wholeSrc)] -> wholeSrc
-            _ -> Text.decodeUtf8 . BL.toStrict . Aeson.encode $ Map.fromList srcs
       (src, cmId, xabi) <-
        if not (null srcs)
         then do
           (cmId', cd) <- fmap snd . lift $ getContractDetailsForContract "SolidVM" srcs (Just name) >>= \case
             Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
             Just x -> pure x
-          at name <?= (encodedSrc, cmId', contractdetailsXabi cd)
+          at name <?= (contractdetailsSrc cd, cmId', contractdetailsXabi cd)
         else do
           mtuple <- use $ at name
           case mtuple of
@@ -382,8 +375,9 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} sign = do
                   , "Please try supplying the contracts' source code and try again. "
                   , "If you continue to receive this error message, please contact your administrator."
                   ]
-                Just (src,(cmId' :: Int32),x') -> do
+                Just (src',(cmId' :: Int32),x') -> do
                   x <- lift $ deserializeXabi x'
+                  src <- lift $ deserializeSrc src'
                   at name <?= (src, cmId', x)
       let xabiArgs = maybe Map.empty funcArgs $ xabiConstr xabi
       (_, argsAsSource) <- lift $ constructArgValuesAndSource (Just args) xabiArgs
@@ -395,7 +389,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} sign = do
             fromAddr
             (fromMaybe emptyTxParams params)
             (Wei (maybe 0 fromIntegral $ fmap unStrung value))
-            (Code $ Text.encodeUtf8 src)
+            (Code $ Text.encodeUtf8 $ serializeSrc src)
             cid
       return ((name,cmId),tx)
   let
@@ -438,14 +432,15 @@ postUsersUploadListEVM' cacheNonce ContractListParameters{..} sign = do
           case mContract of
             Nothing -> throwIO $ UserError evmUploadListError
             Just (_,SolidVMCode _ _,_,_,_) -> throwIO $ UserError evmContractSolidVMError
-            Just (b16,_,src,(cmId' :: Int32),x') -> do
+            Just (b16,_,src',(cmId' :: Int32),x') -> do
               let (b, leftOver) = Base16.decode b16
               unless (ByteString.null leftOver) $ throwIO $ AnError "Couldn't decode binary"
               x <- lift $ deserializeXabi x'
+              src <- lift $ deserializeSrc src'
               at name <?= (b, src, cmId', x)
       let xabiArgs = maybe Map.empty funcArgs $ xabiConstr xabi
       argsBin <- lift $ constructArgValues (Just args) xabiArgs
-      let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("src",src),("name",name)]
+      let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("src", serializeSrc src),("name",name)]
       tx <- lift . signAndPrepare sign fromAddr metadata' $
           TransactionHeader
             Nothing

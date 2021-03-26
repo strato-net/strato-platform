@@ -574,7 +574,8 @@ decodeXabiJSON xabi' = case decode (fromStrict xabi') of
   Just x -> return x
 
 serializeSrc :: [(Text, Text)] -> Text
-serializeSrc = Text.decodeUtf8 . toStrict . encode
+serializeSrc [(name, src)] | Text.null name = src
+serializeSrc src = Text.decodeUtf8 . toStrict $ encode src
 
 deserializeSrc :: MonadIO m => Text -> m [(Text, Text)]
 deserializeSrc = decodeSrcJSON

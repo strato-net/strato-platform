@@ -10,7 +10,7 @@ import           Data.IORef
 import           Data.Map                             (Map)
 import qualified Data.Map                             as M
 import qualified Data.Text                            as T
-import           Data.Text.Encoding                   (decodeUtf8)
+import           Data.Text.Encoding                   (decodeUtf8, encodeUtf8)
 import           System.IO.Unsafe
 import           Text.Parsec                          (runParser)
 
@@ -44,7 +44,16 @@ compileSource initCodeMap =
 
 codeCollectionFromSource :: (MonadIO m, HasCodeDB m) => B.ByteString -> m (Keccak256, CodeCollection)
 codeCollectionFromSource initCode = do
-  let hsh = hash initCode
+  let initList = case Aeson.decode $ BL.fromStrict initCode of
+        Just l -> l
+        Nothing -> case Aeson.decode $ BL.fromStrict initCode of
+          Just m -> M.toList m
+          Nothing -> [(T.empty, decodeUtf8 initCode)] -- for backwards compatibility
+      initMap = M.fromList initList
+      canonicalInitCode = case initList of
+        [(t, src)] | T.null t -> encodeUtf8 src -- for backwards compatibility
+        _ -> BL.toStrict $ Aeson.encode initList
+      hsh = hash canonicalInitCode
   codeMap <- liftIO $ readIORef unsafeCodeMapIORef
   case M.lookup hsh codeMap of
     Just cc -> do
@@ -52,13 +61,7 @@ codeCollectionFromSource initCode = do
       return (hsh, cc)
     Nothing -> do
       recordCacheEvent StorageWrite
-      hsh' <- addCode SolidVM initCode
-      -- TODO: I think this should be in the code DB, but I'm leaving it here for now
-      let initMap = case Aeson.decode $ BL.fromStrict initCode of
-            Just m -> m
-            Nothing -> case Aeson.decode $ BL.fromStrict initCode of
-              Just l -> M.fromList l
-              Nothing -> M.singleton T.empty (decodeUtf8 initCode)
+      hsh' <- addCode SolidVM canonicalInitCode
       let cc = compileSource initMap
       let codeMap' = M.insert hsh cc codeMap
       recordCacheSize $ M.size codeMap'
