@@ -60,7 +60,7 @@ function readFileLinesToObject(initialFileMap, fullname) {
       return { fileMap, buffer: newBuffer }
     }
   }, {fileMap: initialFileMap, buffer: ''});
-  return { ...fileMap, [fullname]: buffer }
+  return { ...fileMap, [getShortName(fullname)]: buffer }
 }
 
 /**
@@ -87,7 +87,7 @@ function readFileLinesToArray(initialFileArray, fullname) {
       return { fileArray, buffer: newBuffer }
     }
   }, {fileArray: initialFileArray, buffer: ''});
-  return [...fileArray, [fullname, buffer]]
+  return [...fileArray, [getShortName(fullname), buffer]]
 }
 
 /**
