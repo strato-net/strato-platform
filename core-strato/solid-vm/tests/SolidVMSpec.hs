@@ -2761,3 +2761,75 @@ contract qq {
       , BBool False
       ]
 
+  it "can parse an X509 certificate" . runTest $ do
+    runBS [r|
+contract qq {
+
+    string myNewCertificate = "-----BEGIN CERTIFICATE-----\nMIIBiDCCAS2gAwIBAgIQCgO76hC29iXEFXJNco5ekjAMBggqhkjOPQQDAgUAMEYx\nDDAKBgNVBAMMA2RhbjEMMAoGA1UEBgwDVVNBMRIwEAYDVQQKDAlibG9ja2FwcHMx\nFDASBgNVBAsMC2VuZ2luZWVyaW5nMB4XDTIxMDMxODE1NDgwN1oXDTIyMDMxODE1\nNDgwN1owRjEMMAoGA1UEAwwDZGFuMQwwCgYDVQQGDANVU0ExEjAQBgNVBAoMCWJs\nb2NrYXBwczEUMBIGA1UECwwLZW5naW5lZXJpbmcwVjAQBgcqhkjOPQIBBgUrgQQA\nCgNCAAQY4p67l1IIEUdVC7L+rUDwF5Nv30bze0NV5y8ced7qwp+YFk3UAiOGkcYo\n7ba8F92rd0yf9AGpvZN1H3Dda8xdMAwGCCqGSM49BAMCBQADRwAwRAIgbKXO8tZ5\noPhBusPQFkNEQDnLO/MRru4KjtCpPnVb5sACIE0TwBJ7yeIGuPc/8G50/858Pf3a\n0t1hHbhYnJarPkNA\n-----END CERTIFICATE-----";
+
+    string myCommonName   = "";
+    string myCountry      = "";
+    string myOrganization = "";
+    string myGroup        = "";
+    string myPublicKey    = "";
+
+    constructor() {
+        myCommonName   = parseCert(myNewCertificate)["commonName"];
+        myCountry      = parseCert(myNewCertificate)["country"];
+        myOrganization = parseCert(myNewCertificate)["organization"];
+        myGroup        = parseCert(myNewCertificate)["group"];
+        myPublicKey    = parseCert(myNewCertificate)["publicKey"];
+    }
+}|]
+    getFields ["myCommonName", "myCountry", "myOrganization", "myGroup", "myPublicKey"] `shouldReturn`
+      [ BString "dan"
+      , BString "USA"
+      , BString "blockapps"
+      , BString "engineering"
+      , BString "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEGOKeu5dSCBFHVQuy/q1A8BeTb99G83tD\nVecvHHne6sKfmBZN1AIjhpHGKO22vBfdq3dMn/QBqb2TdR9w3WvMXQ==\n-----END PUBLIC KEY-----\n"
+      ]
+
+  it "can post a X509 certificate and grab cert fields" . runTest $ do
+    runBS [r|
+contract qq {
+    account myAccount = account(tx.origin, "main");
+    
+    string myNewCertificate = "-----BEGIN CERTIFICATE-----\nMIIBiDCCAS2gAwIBAgIQCgO76hC29iXEFXJNco5ekjAMBggqhkjOPQQDAgUAMEYx\nDDAKBgNVBAMMA2RhbjEMMAoGA1UEBgwDVVNBMRIwEAYDVQQKDAlibG9ja2FwcHMx\nFDASBgNVBAsMC2VuZ2luZWVyaW5nMB4XDTIxMDMxODE1NDgwN1oXDTIyMDMxODE1\nNDgwN1owRjEMMAoGA1UEAwwDZGFuMQwwCgYDVQQGDANVU0ExEjAQBgNVBAoMCWJs\nb2NrYXBwczEUMBIGA1UECwwLZW5naW5lZXJpbmcwVjAQBgcqhkjOPQIBBgUrgQQA\nCgNCAAQY4p67l1IIEUdVC7L+rUDwF5Nv30bze0NV5y8ced7qwp+YFk3UAiOGkcYo\n7ba8F92rd0yf9AGpvZN1H3Dda8xdMAwGCCqGSM49BAMCBQADRwAwRAIgbKXO8tZ5\noPhBusPQFkNEQDnLO/MRru4KjtCpPnVb5sACIE0TwBJ7yeIGuPc/8G50/858Pf3a\n0t1hHbhYnJarPkNA\n-----END CERTIFICATE-----";
+
+    string myUsername          = "";
+    string myOrganization      = "";
+    string myGroup             = "";
+    
+    string myCommonName   = "";
+    string myCountry      = "";
+    string myOrganization = "";
+    string myGroup        = "";
+    string myPublicKey    = "";
+    string myCertificate  = "";
+
+    constructor() {
+        registerCert(myAccount, myNewCertificate); 
+
+        myUsername     = tx.username;
+        myOrganization = tx.organization;
+        myGroup        = tx.group;
+        
+        myCommonName   = getUserCert(myAccount)["commonName"];
+        myCountry      = getUserCert(myAccount)["country"];
+        myOrganization = getUserCert(myAccount)["organization"];
+        myGroup        = getUserCert(myAccount)["group"];
+        myPublicKey    = getUserCert(myAccount)["publicKey"];
+        myCertificate  = getUserCert(myAccount)["certString"];
+    }
+}|]
+    getFields ["myUsername", "myOrganization", "myGroup", "myCommonName", "myCountry", "myOrganization", "myGroup", "myPublicKey", "myCertificate"] `shouldReturn`
+      [ BString "dan"
+      , BString "blockapps"
+      , BString "engineering"
+      , BString "dan"
+      , BString "USA"
+      , BString "blockapps"
+      , BString "engineering"
+      , BString "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEGOKeu5dSCBFHVQuy/q1A8BeTb99G83tD\nVecvHHne6sKfmBZN1AIjhpHGKO22vBfdq3dMn/QBqb2TdR9w3WvMXQ==\n-----END PUBLIC KEY-----\n"
+      , BString "-----BEGIN CERTIFICATE-----\nMIIBiDCCAS2gAwIBAgIQCgO76hC29iXEFXJNco5ekjAMBggqhkjOPQQDAgUAMEYx\nDDAKBgNVBAMMA2RhbjEMMAoGA1UEBgwDVVNBMRIwEAYDVQQKDAlibG9ja2FwcHMx\nFDASBgNVBAsMC2VuZ2luZWVyaW5nMB4XDTIxMDMxODE1NDgwN1oXDTIyMDMxODE1\nNDgwN1owRjEMMAoGA1UEAwwDZGFuMQwwCgYDVQQGDANVU0ExEjAQBgNVBAoMCWJs\nb2NrYXBwczEUMBIGA1UECwwLZW5naW5lZXJpbmcwVjAQBgcqhkjOPQIBBgUrgQQA\nCgNCAAQY4p67l1IIEUdVC7L+rUDwF5Nv30bze0NV5y8ced7qwp+YFk3UAiOGkcYo\n7ba8F92rd0yf9AGpvZN1H3Dda8xdMAwGCCqGSM49BAMCBQADRwAwRAIgbKXO8tZ5\noPhBusPQFkNEQDnLO/MRru4KjtCpPnVb5sACIE0TwBJ7yeIGuPc/8G50/858Pf3a\n0t1hHbhYnJarPkNA\n-----END CERTIFICATE-----\n"
+      ]

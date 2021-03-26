@@ -61,6 +61,9 @@ hashDBPath="/hash/"
 codeDBPath::String
 codeDBPath="/code/"
 
+x509CertDBPath::String
+x509CertDBPath="/x509Cert/"
+
 sequencerDependentBlockDBPath :: String
 sequencerDependentBlockDBPath = "/sequencer_dependent_blocks/"
 

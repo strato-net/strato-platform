@@ -14,7 +14,8 @@ module BlockApps.X509.Certificate (
   bsToCert,
   makeCert,
   makeSignedCert,
-  fromASN1CS -- I'd rather not
+  fromASN1CS, -- I'd rather not
+  getCertSubject
  ) where
 
 
@@ -238,3 +239,17 @@ getValidity = do
 
 getCertPub :: Subject -> PubKey
 getCertPub = serializeAndWrap . subPub
+
+
+getCertSubject :: X509Certificate -> Maybe Subject
+getCertSubject (X509Certificate cert) =
+    let pubKey = unserializeAndUnwrap . certPubKey $ getCertificate cert
+    in case pubKey of
+        Nothing -> Nothing
+        Just key -> Just Subject { subCommonName = extractDn DnCommonName
+                                 , subCountry    = extractDn DnCountry
+                                 , subOrg        = extractDn DnOrganization
+                                 , subUnit       = extractDn DnOrganizationUnit
+                                 , subPub        = key }
+    where extractDn :: DnElement -> String
+          extractDn dn = fromMaybe "" . fmap fromASN1CS . getDnElement dn . certSubjectDN $ getCertificate cert    

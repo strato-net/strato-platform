@@ -70,6 +70,7 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
+import           Blockchain.DB.X509CertDB
 import           Blockchain.ExtWord
 import           Blockchain.Output
 import           Blockchain.Strato.Model.Action
@@ -136,6 +137,7 @@ type SM m = StateT SState m
 
 type MonadSM m = ( (Account `A.Alters` AddressState) m
                  , (Keccak256 `A.Alters` DBCode) m
+                 , HasX509CertDB m
                  , A.Selectable (Maybe Word256) ParentChainId m
                  , HasRawStorageDB m
                  , HasMemAddressStateDB m
@@ -208,6 +210,11 @@ instance (MP.StateRoot `A.Alters` MP.NodeData) m => (MP.StateRoot `A.Alters` MP.
   delete p   = lift . A.delete p
 
 instance (Keccak256 `A.Alters` DBCode) m => (Keccak256 `A.Alters` DBCode) (SM m) where
+  lookup p   = lift . A.lookup p
+  insert p k = lift . A.insert p k
+  delete p   = lift . A.delete p
+
+instance (Account `A.Alters` X509Certificate) m => (Account `A.Alters` X509Certificate) (SM m) where
   lookup p   = lift . A.lookup p
   insert p k = lift . A.insert p k
   delete p   = lift . A.delete p
@@ -343,7 +350,8 @@ getVariableOfName name = do
                                                   , "string", "keccak256"
                                                   , "require", "revert", "assert", "sha3"
                                                   , "sha256", "ecrecover", "addmod", "mulmod"
-                                                  , "selfdestruct", "suicide", "bytes32ToString"]) $
+                                                  , "selfdestruct", "suicide", "bytes32ToString"
+                                                  , "registerCert", "getUserCert", "parseCert"]) $
         t "builtin function" $ Constant $ SBuiltinFunction name Nothing
 
       maybeBuiltinVariable :: Maybe Variable

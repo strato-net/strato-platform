@@ -27,6 +27,7 @@ import qualified Data.ByteString.Base16               as B16
 import qualified Data.ByteString.Char8                as BC
 import qualified Data.ByteString.Short                as BSS
 import qualified Data.ByteString.UTF8                 as UTF8
+import           Data.Either.Extra                    (eitherToMaybe)
 import           Data.List
 import qualified Data.Map                             as M
 import qualified Data.Map.Merge.Lazy                  as M
@@ -52,6 +53,7 @@ import           Blockchain.Data.ExecResults
 import qualified Blockchain.Database.MerklePatricia   as MP
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.ModifyStateDB          (pay)
+import           Blockchain.DB.X509CertDB
 import           Blockchain.ExtWord
 import qualified Blockchain.SolidVM.Builtins          as Builtins
 import           Blockchain.SolidVM.CodeCollectionDB
@@ -843,6 +845,15 @@ expToVar' x@(Xabi.MemberAccess expr name) = do
         return $ Constant $ SEnumVal enumName name num
       (SBuiltinVariable "msg", "sender") -> (Constant . SAccount . accountToNamedAccount chainId . Env.sender) <$> getEnv
       (SBuiltinVariable "tx", "origin") -> (Constant . SAccount . accountToNamedAccount chainId . Env.origin) <$> getEnv
+      (SBuiltinVariable "tx", "username") -> do env' <- getEnv
+                                                maybeCert <- x509CertDBGet $ Env.origin env'
+                                                return . Constant . SString . fromMaybe "" . fmap subCommonName $ getCertSubject =<< maybeCert
+      (SBuiltinVariable "tx", "organization") -> do env' <- getEnv
+                                                    maybeCert <- x509CertDBGet $ Env.origin env'
+                                                    return . Constant . SString . fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
+      (SBuiltinVariable "tx", "group") -> do env' <- getEnv
+                                             maybeCert <- x509CertDBGet $ Env.origin env'
+                                             return . Constant . SString . fromMaybe "" . fmap subUnit $ getCertSubject =<< maybeCert
       (SStruct _ theMap, fieldName) -> case M.lookup fieldName theMap of
           Nothing -> missingField "struct member access" fieldName
           Just v -> return v
@@ -946,6 +957,9 @@ expToVar' x@(Xabi.IndexAccess parent (Just mIndex)) = do
             indexOutOfBounds ("index value was " ++ (show i) ++ ", but the array length was " ++ (show $ length theVector)) $ unparseExpression x 
           else
             return $ theVector V.! fromIntegral i
+        (SMap _ theMap, _) -> do maybe (indexOutOfBounds ("index value was " ++ (show theIndex) ++ ", but the valid indexes were " ++ (show $ M.keys theMap)) $ unparseExpression x)
+                                               return
+                                               (theMap M.!? theIndex)
         (SReference _, _) -> Constant . SReference <$> expToPath x
         _ -> typeError "unsupported types for index access" $ unparseExpression x
 --    _ -> error $ "unknown case in expToVar' for IndexAccess: " ++ show var
@@ -1341,9 +1355,42 @@ callBuiltin "require" (SBool cond :msg) Nothing = do
     (m:_) -> require cond (Just $ show m)
   return SNULL
 callBuiltin "assert" [SBool cond] Nothing = SNULL <$ assert cond
+callBuiltin "registerCert" [SAccount a, SString cert] _ = do
+    let ex509Cert = bsToCert . BC.pack $ cert
+    case ex509Cert of
+        Left _         -> return SNULL
+        Right x509Cert -> do x509CertDBPut (namedAccountToAccount Nothing a) x509Cert
+                             return SNULL
+callBuiltin "getUserCert" [SAccount a] _ = do
+    maybeCert <- x509CertDBGet (namedAccountToAccount Nothing a)
+    return $ certificateMap (fmap (BC.unpack . certToBytes) maybeCert)
+callBuiltin "parseCert" [SString cert] _ = return $ certificateMap (Just cert)
 callBuiltin x _ _ = unknownFunction "callBuiltin" x
 
 
+
+certificateMap :: Maybe String -> Value
+certificateMap maybeCert = case maybeCert of
+    Nothing -> SMap stringToString emptyCertMap
+    Just cert -> SMap stringToString (fromMaybe emptyCertMap $ fmap (certMap cert) (subject cert))
+    where subject cert = getCertSubject =<< (eitherToMaybe . bsToCert . BC.pack $ cert)
+          certMap cert sub = M.fromList [ (SString "commonName", Constant . SString $ subCommonName sub)
+                                   , (SString "country", Constant . SString $ subCountry sub) 
+                                   , (SString "organization", Constant . SString $ subOrg sub) 
+                                   , (SString "group", Constant . SString $ subUnit sub) 
+                                   , (SString "publicKey", Constant . SString $ BC.unpack $ pubToBytes $ subPub sub) 
+                                   , (SString "certString", Constant . SString $ cert)
+                                   ]
+          emptyCertMap = M.fromList [ (SString "commonName", Constant . SString $ "")
+                             , (SString "country", Constant . SString $ "") 
+                             , (SString "organization", Constant . SString $ "") 
+                             , (SString "group", Constant . SString $ "") 
+                             , (SString "publicKey", Constant . SString $ "") 
+                             , (SString "certString", Constant . SString $ "")
+                             ]
+          stringToString = Xabi.Mapping { Xabi.dynamic = Nothing
+                                        , Xabi.key = Xabi.String Nothing
+                                        , Xabi.value = Xabi.String Nothing }
 {-
 data Func = Func
   { funcArgs :: Map Text Xabi.IndexedType

@@ -22,6 +22,7 @@ import           Blockchain.Constants
 import           Blockchain.Data.AddressStateDB
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.CodeDB
+import           Blockchain.DB.X509CertDB
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
@@ -41,6 +42,7 @@ data SetupDBs =
     stateRoots :: IORef (M.Map (Maybe Word256) MP.StateRoot),
     hashDB  :: HashDB,
     codeDB  :: CodeDB,
+    x509DB  :: X509CertDB,
     sqlDB   :: SQLDB,
     redisDB :: RBDB.RedisConnection,
     localStorageTx :: IORef (M.Map (Account, B.ByteString) B.ByteString),
@@ -58,11 +60,12 @@ runSetupDBM mv = do
   srRef <- liftIO $ newIORef M.empty
   hdb <- HashDB <$> open hashDBPath
   cdb <- CodeDB <$> open codeDBPath
+  xdb <- X509CertDB <$> open x509CertDBPath
   [m1, m2] <- liftIO . replicateM 2 . newIORef $ M.empty
   [m3, m4] <- liftIO . replicateM 2 . newIORef $ M.empty
   pool <- createPostgresqlPool connStr 20
   redisConn <- RBDB.RedisConnection <$> liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
-  runReaderT mv $ SetupDBs sdb srRef hdb cdb pool redisConn m1 m2 m3 m4
+  runReaderT mv $ SetupDBs sdb srRef hdb cdb xdb pool redisConn m1 m2 m3 m4
 
 instance (Maybe Word256 `A.Alters` MP.StateRoot) SetupDBM where
   lookup _ k = fmap (M.lookup k) $ liftIO . readIORef =<< asks stateRoots
@@ -108,6 +111,11 @@ instance (Keccak256 `A.Alters` DBCode) SetupDBM where
   lookup _ = genericLookupCodeDB $ asks codeDB
   insert _ = genericInsertCodeDB $ asks codeDB
   delete _ = genericDeleteCodeDB $ asks codeDB
+
+instance (Account `A.Alters` X509Certificate) SetupDBM where
+  lookup _ = genericLookupX509CertDB $ asks x509DB
+  insert _ = genericInsertX509CertDB $ asks x509DB
+  delete _ = genericDeleteX509CertDB $ asks x509DB
 
 instance (N.NibbleString `A.Alters` N.NibbleString) SetupDBM where
   lookup _ = genericLookupHashDB $ asks hashDB
