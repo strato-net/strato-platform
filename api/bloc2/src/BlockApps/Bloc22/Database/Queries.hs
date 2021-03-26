@@ -898,7 +898,7 @@ getContractDetailsForContract theVM src mContract = do
         [x] -> Just <$> checkCodeHash x
         _ -> throwIO $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data"
     Just contract -> do
-      x <- let srcStr = Text.intercalate "\n" $ map snd src
+      x <- let srcStr = serializeSrc src
             in blocMaybe ("Could not find global contract metadataId for " <> contract <> " in source " <> srcStr)  (Map.lookup contract idsAndDetails)
       Just <$> checkCodeHash (contract, x)
   where checkCodeHash x@(_,(_,cd)) = case contractdetailsCodeHash cd of
@@ -917,7 +917,7 @@ getContractDetailsForContract theVM src mContract = do
 sourceToContractDetails :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
                            Should Compile -> [(Text, Text)] -> m (Map Text (Int32, ContractDetails))
 sourceToContractDetails shouldCompile sourceList = do
-  let source = Text.intercalate "\n" $ map snd sourceList
+  let source = serializeSrc sourceList
       createContractDetails =
         case shouldCompile of
           Do Compile -> compileContract
@@ -980,6 +980,7 @@ createMetadataNoCompile :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
                            [(Text, Text)] -> m (Map Text (Int32, ContractDetails))
 createMetadataNoCompile sourceList = do
   let source = Text.intercalate "\n" $ map snd sourceList
+      encodedSrc = serializeSrc sourceList
       eVerXabis = parseXabi "-" $ Text.unpack source
   xabis <- case eVerXabis of
     Left err -> blocError . UserError . Text.pack $ err
@@ -990,7 +991,7 @@ createMetadataNoCompile sourceList = do
         { contractdetailsBin = source
         , contractdetailsAccount = Nothing
         , contractdetailsBinRuntime = contrName `Text.append` source
-        , contractdetailsCodeHash = SolidVMCode (Text.unpack contrName) $ hash (Char8.pack $ Text.unpack source)
+        , contractdetailsCodeHash = SolidVMCode (Text.unpack contrName) $ hash (Text.encodeUtf8 encodedSrc)
         , contractdetailsName = contrName
         , contractdetailsSrc = sourceList
         , contractdetailsXabi = xabi
