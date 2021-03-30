@@ -1,7 +1,7 @@
 
+import           Blockchain.Strato.Model.Secp256k1
 
 import           Crypto.PubKey.ECC.Types
-import qualified Crypto.Secp256k1       as S
 import           Data.Coerce
 import           Data.Maybe
 
@@ -19,10 +19,10 @@ main = hspec spec
 spec :: Spec
 spec = do
   describe "x509 certificates" $ do 
-    priv <- runIO newPriv 
-    let pub = S.derivePubKey priv
+    priv <- runIO newPrivateKey
+    let pub = derivePublicKey priv
         iss = Issuer "x" "5" "0" "9" priv
-        sub = Subject "x" "5" "0" "9" (S.derivePubKey priv)
+        sub = Subject "x" "5" "0" "9" pub
 
     it "certificate pubkey matches original pubkey" $ do
       cert <- makeCert iss sub
@@ -30,8 +30,8 @@ spec = do
           certPubSerialPoint = case certPub of
             PubKeyEC (PubKeyEC_Named SEC_p256k1 serialPoint) -> serialPoint
             _ -> error "wrong pubkey type in cert, should be secp256k1 named"
-          exPub = PubKeyEC_Named SEC_p256k1 (SerializedPoint $ S.exportPubKey False pub)
-          inPub = fromMaybe (error "could not import pubkey from cert") (S.importPubKey (coerce certPubSerialPoint)) 
+          exPub = PubKeyEC_Named SEC_p256k1 (SerializedPoint $ exportPublicKey False pub)
+          inPub = fromMaybe (error "could not import pubkey from cert") (importPublicKey (coerce certPubSerialPoint)) 
       certPub `shouldBe` PubKeyEC exPub
       inPub `shouldBe` pub
       
@@ -49,8 +49,8 @@ spec = do
       sigVerification `shouldBe` SignaturePass
     it "can reject invalid signatures" $ do
       cert <- makeSignedCert iss sub
-      fakePriv <- newPriv
-      let fakeSerialPub = SerializedPoint $ S.exportPubKey False (S.derivePubKey fakePriv)
+      fakePriv <- newPrivateKey
+      let fakeSerialPub = SerializedPoint $ exportPublicKey False (derivePublicKey fakePriv)
           fakePub = PubKeyEC $ PubKeyEC_Named SEC_p256k1 fakeSerialPub
           sigVerification = verifySignedSignature (coerce cert) fakePub
       sigVerification `shouldBe` SignatureFailed SignatureInvalid

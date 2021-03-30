@@ -75,6 +75,6 @@ tests:
       - bytestring
       - cryptonite
       - ethereum-rlp
-      - secp256k1-haskell
       - hspec
+      - strato-model
       - QuickCheck
