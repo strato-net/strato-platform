@@ -1,50 +1,89 @@
-// const request = require('request');
-RouteParser = require('route-parser');
+const winston = require('winston-color');
 
-const appConfig = require('../config/app.config');
-// const apiPatterns = require('../config/api-patterns');
+const config = require('../config/app.config');
+const models = require('../models');
 
-/*
-const generateMixpanelUrl = function(event) {
-  const data = new Buffer(JSON.stringify(
-    {
-      "event": event,
-      "properties": {
-        "token": appConfig.mixpanel.token,
-      }
+
+class ApiCallCounter {
+  
+  constructor() {
+    this.resetCounters()
+  }
+  
+  resetCounters() {
+    this.reads = 0
+    this.writes = 0
+  }
+
+  incrementReads() {
+    this.reads += 1
+  }
+
+  incrementWrites() {
+    this.writes += 1
+  }
+
+  async saveToDbAndReset() {
+    // We could use the Redis as external mem cache but we have plans to get rid of it soonish
+    const dbData = await models.ApiCallCount.findOne({
+      order: [['createdAt', 'DESC']],
+    })
+    await models.ApiCallCount.create({
+      apiReads: this.reads,
+      apiReadsTotal: dbData ? (dbData.apiReadsTotal + this.reads) : this.reads,
+      apiWrites: this.writes,
+      apiWritesTotal: dbData ? (dbData.apiWritesTotal + this.writes) : this.writes,
+    });
+    this.resetCounters()
+    winston.info('Api call counters were saved to db and reset')
+  }
+
+  // Uncomment if needed (e.g. for get stats endpoint or smth), otherwise reading from db where needed.
+  // // Could be static until "fix me" is fixed but 'static' is not supported by nodejs 8.15 currently used as Apex base image, implemented in EcmaScript 6
+  // async getTotalCountsFromDb() {
+  //   const [dbData] = await models.ApiCallCount.findOne({
+  //     order: [['createdAt', 'DESC']],
+  //   })
+  //   // to_do: find the way to maintain the singleton ApiCallCounter object among the expressjs and the daemon nodejs processes to fetch reads and writes from object
+  //   // return {
+  //   //   reads: this.reads + (dbData ? dbData.apiReadsTotal : 0),
+  //   //   writes: this.writes + (dbData ? dbData.apiWritesTotal : 0),
+  //   //   timestamp: new Date.now()
+  //   // }
+  //   return {
+  //     reads: dbData ? dbData.apiReadsTotal : 0,
+  //     writes: dbData ? dbData.apiWritesTotal : 0,
+  //     timestamp: new Date.now()
+  //   }
+  // }
+}
+
+const counter = new ApiCallCounter();
+
+(async () => {
+  if (process.env.STATS_ENABLED === "true") {
+    setInterval(async () => {
+      await counter.saveToDbAndReset()
+    }, config.statistics.apiCallCounterDbSaveTimer);
+  }
+})();
+
+
+async function apiCounter(req, res) {
+  res.status(200).send();
+  if (
+      process.env['STATS_ENABLED'] === "true" &&
+      !['OPTIONS', 'TRACE'].includes(req.headers['x-original-method'])
+  ) {
+    if (['GET', 'HEAD'].includes(req.headers['x-original-method'])) {
+      counter.incrementReads()
+    } else {
+      counter.incrementWrites()
     }
-  )).toString('base64');
-  return `http://api.mixpanel.com/track/?data=${data}&ip=1`;
-};
-*/
+  }
+}
 
 module.exports = {
-  _track: function (req, res) {
-    res.status(200).send();
-
-    // TODO: Obsolete, to be removed along with the other mixpanel mode configurations in apex config, STRATO docker-compose and strato-getting-started
-    /*
-    if (process.env['STRATO_GS_MODE'] === "1") return;
-
-    // req.headers['x-original-method'] has "GET" or "POST";
-    // req.headers['x-original-uri'] has "/bloc/v2.2/users" or whatever else is possible;
-    // req.headers['x-real-ip'] should have end-user's IP (but has 172.18.0.1 because of a known docker issue https://github.com/moby/moby/issues/15086)
-
-
-    // Pattern matching for api endpoints to prevent user path params from breaking the event grouping in mixpanel
-    // E.g. `/cirrus/search/User?address=eq.c609a49b27188de4331cz94ef6d1125d80bd68e5` -> `/cirrus/search/:contract(?query)`
-    const apiEndpoint = req.headers['x-original-uri']
-      ? apiPatterns.find(pattern => !!(new RouteParser(pattern + '(/)')).match(req.headers['x-original-uri']))
-      : req.headers['x-original-uri'];
-
-    const eventName = (req.headers['x-original-method'] || apiEndpoint)
-      ? `${req.headers['x-original-method']} ${apiEndpoint}`
-      : 'unknown endpoint';
-
-    // Not using mixpanel node library since it has ip=0 hardcoded and there's no way to track the ip.
-    request(generateMixpanelUrl(eventName), function(err, r, b) {
-      if (err) console.warn('error while trying to send track request to mixpanel: ', err)
-    })
-    */
-  }
+  apiCounter,
+  counter
 };

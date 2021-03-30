@@ -84,7 +84,11 @@ router.get('/bloc/file/list', checkExtStorageEnabled, fileController.list);
 router.get('/status', healthHandler.nodeStatus);
 router.get('/health', healthHandler.healthStatus);
 router.get('/_ping', healthHandler.ping);
-router.get('/_track', trackHandler._track);
+
+// Stats
+if (process.env.STATS_ENABLED === "true") {
+  router.get('/_api_counter', trackHandler.apiCounter)
+}
 
 
 function isOAuth() {

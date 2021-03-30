@@ -24,6 +24,8 @@
         EXT_STORAGE_S3_BUCKET=<AWS_BUCKET_NAME> \
         EXT_STORAGE_S3_ACCESS_KEY_ID=<AWS_KEY_ID> \
         EXT_STORAGE_S3_SECRET_ACCESS_KEY=<AWS_SECRET_ACCESS_KEY> \
+        NODE_HOST=localhost:8080 \ # not called, just used as node unique id \
+        STRATO_VERSION=6.0.3 \
         npm run start:dev
    ```
     (this is the list of vars passed to apex docker container in docker-compose.yml + the vars added with set-aux-env-vars.sh in prod / tests)
@@ -46,6 +48,8 @@
         EXT_STORAGE_S3_BUCKET=<AWS_BUCKET_NAME> \
         EXT_STORAGE_S3_ACCESS_KEY_ID=<AWS_KEY_ID> \
         EXT_STORAGE_S3_SECRET_ACCESS_KEY=<AWS_SECRET_ACCESS_KEY> \
+        NODE_HOST=localhost:8080 \ # not called, just used as node unique id \
+        STRATO_VERSION=6.0.3 \
         ./run-tests.sh`
    ```
    (this is the list of vars passed to apex docker container in docker-compose.yml)

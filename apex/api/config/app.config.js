@@ -28,7 +28,6 @@ module.exports = {
     accessKeyId: process.env.EXT_STORAGE_S3_ACCESS_KEY_ID,
     secretAccessKey: process.env.EXT_STORAGE_S3_SECRET_ACCESS_KEY
   },
-  signup: 'https://signup.blockapps.net',
   SMD_MODE: process.env['SMD_MODE'] || 'enterprise',
   webSockets: {
     dbPollFrequency: 1 * 1000
@@ -38,9 +37,19 @@ module.exports = {
     pollFrequency: 15 * 1000,
     pollTimeoutsForUnhealthy: 3, // number of timed out polls in a row to consider node unhealthy
     cleanFrequency: 5 * 60 * 1000, //clean db every 5 mins
-    retention_hours: 1 * 24,
+    retentionHours: 1 * 24,
     stallCheckProgressWindow: 10 * 60 * 1000,
     memoryUsageBound: 20, // Alert when available space / total space < 20%
     diskUsageBound: 20,
-  }
+  },
+  statistics: {
+    apiCallCounterDbSaveTimer: 60 * 1000,
+    apiCallCounterRetentionHours: 7 * 24,
+    blockappsStatServerUrl:
+        process.env.STATS_DEBUG_CUSTOM_SERVER_URL ||
+        // we don't want the debug deployments to call BlockApps StatServer
+        (process.env.NODE_ENV === 'production' ? 'https://statserver.blockapps.net' : 'set-STATS_DEBUG_CUSTOM_SERVER_URL-env-var-for-debug-mode'),
+    blockappsStatServerApiPath: '/api/6.0.3',
+    collectSubmitUTCTimeOfDay: {hours: 4, minutes: 0} // UTC time; there is an additional random delay of up to 4 minutes being added in code
+  },
 };
