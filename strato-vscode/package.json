@@ -41,19 +41,19 @@
 			"properties": {
 				"strato-vscode.createProjectCommand": {
 					"type": "string",
-					"default": "git clone https://github.com/blockapps/track-and-trace $1; cd $1; cd server; yarn install; yarn build"
+					"default": "git clone https://github.com/blockapps/track-and-trace $1; cd $1; cd server; yarn install; yarn build; cd ../ui; yarn install; yarn build; cd .."
 				},
 				"strato-vscode.deployProjectCommand": {
 					"type": "string",
-					"default": "pushd beanstalk-server; yarn install; yarn build; touch .env; yarn deploy; popd"
+					"default": "pushd server; yarn install; yarn build; touch .env; yarn deploy; popd"
 				},
 				"strato-vscode.runServerCommand": {
 					"type": "string",
-					"default": "pushd beanstalk-server; yarn install; yarn build; touch .env; MOCK_INT_SERVER=true yarn start:prod; popd"
+					"default": "pushd server; yarn install; yarn build; touch .env; MOCK_INT_SERVER=true yarn start:prod; popd"
 				},
 				"strato-vscode.testServerCommand": {
 					"type": "string",
-					"default": "pushd beanstalk-server; yarn install; yarn build; touch .env; yarn test; popd"
+					"default": "pushd server; yarn install; yarn build; touch .env; yarn test; popd"
 				},
 				"strato-vscode.runUICommand": {
 					"type": "string",

@@ -17,11 +17,18 @@ export function activate(context: vscode.ExtensionContext) {
 	// Now provide the implementation of the command with registerCommand
 	// The commandId parameter must match the command field in package.json
 	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.createProject', async () => {
-		const mProjectName = await vscode.window.showInputBox({
-			placeHolder: "Enter the directory in which the STRATO project will reside",
-			value: "new-strato-project"
-		});
-		const projectName = mProjectName || ''
+		const options: vscode.OpenDialogOptions = {
+			canSelectMany: false,
+			openLabel: 'Select',
+			canSelectFiles: false,
+			canSelectFolders: true
+		};
+	   
+	   const folderUri = await vscode.window.showOpenDialog(options);
+		if (folderUri && folderUri[0]) {
+		  console.log('Selected folder: ' + folderUri[0].fsPath);
+		}
+		const projectName = (folderUri || [])[0].fsPath || '';
 		const workspaceFolderUri = vscode.Uri.parse(projectName);
         const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.createProjectCommand') || '';
 		const cmdStr = cmd.replace(/\$1/g, workspaceFolderUri.path);
