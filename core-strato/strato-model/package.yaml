@@ -29,6 +29,7 @@ library:
     - QuickCheck
     - aeson
     - ansi-wl-pprint
+    - asn1-types
     - base16-bytestring
     - binary
     - bytestring-arbitrary

@@ -37,6 +37,7 @@ library:
   - time
   - transformers
   - secp256k1-haskell
+  - strato-model
   - x509
   - x509-validation
 #  - x509-store
@@ -52,7 +53,7 @@ executables:
       - aeson
       - bytestring
       - cryptonite
-      - secp256k1-haskell
+      - strato-model
       - x509-certs
   
   x509-keygen:

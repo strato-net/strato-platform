@@ -2,14 +2,16 @@
 {-# LANGUAGE BangPatterns    #-}
 {-# LANGUAGE RecordWildCards #-}
 
-import           Control.Exception
-import qualified Crypto.Secp256k1           as SEC
 
-import qualified Data.Aeson                 as Ae
-import qualified Data.ByteString            as B
-import qualified Data.ByteString.Char8      as C8
+import           Blockchain.Strato.Model.Secp256k1
+
+import           Control.Exception
+
+import qualified Data.Aeson                         as Ae
+import qualified Data.ByteString                    as B
+import qualified Data.ByteString.Char8              as C8
 import           Data.Either
-import           Data.Foldable              (foldlM)
+import           Data.Foldable                      (foldlM)
 import           Data.Maybe
 import           System.Console.GetOpt
 import           System.Environment
@@ -26,7 +28,7 @@ import           BlockApps.X509
 data Options = Options 
   { optIssuerCert    :: Maybe X509Certificate
   , optSubjectInfo   :: Subject
-  , optKey           :: SEC.SecKey
+  , optKey           :: PrivateKey
   } deriving Show
 
 defaultOptions :: Options

@@ -22,21 +22,21 @@ module BlockApps.X509.Certificate (
 
 
 import           Blockchain.Data.RLP
+import           Blockchain.Strato.Model.Secp256k1
 import           BlockApps.X509.Keys
 
 import           Crypto.Random.Entropy
 import           Crypto.Hash
-import qualified Crypto.Hash.Algorithms         as CH
-import qualified Crypto.Secp256k1               as SEC
+import qualified Crypto.Hash.Algorithms             as CH
+import qualified Crypto.Secp256k1                   as SEC
 
 import           Data.Aeson
 import           Data.ASN1.OID
 import           Data.ASN1.Types.String
 import           Data.Bits
-import qualified Data.ByteArray                 as BA
-import qualified Data.ByteString                as B
-import qualified Data.ByteString.Char8          as C8
-import qualified Data.ByteString.Base16         as B16
+import qualified Data.ByteArray                     as BA
+import qualified Data.ByteString                    as B
+import qualified Data.ByteString.Char8              as C8
 import           Data.Either
 import           Data.Maybe
 import           Data.PEM
@@ -65,7 +65,7 @@ data Issuer = Issuer
   , issCountry    :: String
   , issOrg        :: String
   , issUnit       :: String
-  , issPriv       :: SEC.SecKey
+  , issPriv       :: PrivateKey
   } deriving (Show, Eq)
 
 
@@ -75,7 +75,7 @@ data Subject = Subject
   , subCountry    :: String
   , subOrg        :: String
   , subUnit       :: String
-  , subPub        :: SEC.PubKey
+  , subPub        :: PublicKey
   } deriving (Show, Eq)
 
 
@@ -86,9 +86,8 @@ instance ToJSON Subject where
            , "country"          .= c
            , "organization"     .= o
            , "organizationUnit" .= ou
-           , "pubKey"           .= enc pub
+           , "pubKey"           .= pub
            ]
-     where enc = String . T.pack . C8.unpack . B16.encode . SEC.exportPubKey False  
 
 -- TODO: country and unit should be optional?
 instance FromJSON Subject where
@@ -97,11 +96,9 @@ instance FromJSON Subject where
     c   <- obj .: "country"
     o   <- obj .: "organization"
     ou  <- obj .: "organizationUnit"
-    pub' <- obj .: "pubKey"
-    let mPub = SEC.importPubKey $ fst $ B16.decode $ C8.pack $ T.unpack pub'
-    case mPub of
-      Nothing -> fail "could not decode pubkey in Subject parseJSON"
-      Just pub -> return $ Subject cn c o ou pub
+    pub <- obj .: "pubKey"
+    return $ Subject cn c o ou pub
+  
   parseJSON x = fail $ "could not decode JSON subject info: " ++ show x
 
 
@@ -157,7 +154,7 @@ bsToCert bs =
 makeSignedCert :: Issuer -> Subject -> IO (X509Certificate)
 makeSignedCert iss sub = makeCert iss sub >>= signCert (issPriv iss) >>= return . X509Certificate
 
-signCert :: SEC.SecKey -> Certificate -> IO (SignedCertificate)
+signCert :: PrivateKey -> Certificate -> IO (SignedCertificate)
 signCert priv cert = objectToSignedExactF (ecdsaWithSHA256 $ priv) cert
 
 makeCert :: Issuer -> Subject -> IO (Certificate)
@@ -189,8 +186,8 @@ makeCert iss sub = do
 --
 -- yea, I wish we could use Keccak256. Data.X509 hasn't caught up yet. Maybe I'll
 -- make a PR for it
-ecdsaWithSHA256 :: SEC.SecKey -> B.ByteString -> IO (B.ByteString, SignatureALG)
-ecdsaWithSHA256 prv mesg' = do
+ecdsaWithSHA256 :: PrivateKey -> B.ByteString -> IO (B.ByteString, SignatureALG)
+ecdsaWithSHA256 (PrivateKey prv) mesg' = do
   let mesgBS = B.pack $ BA.unpack $ hashWith CH.SHA256 mesg'
       mesg = fromMaybe (error "msg hash was not 32 bytes") (SEC.msg mesgBS)
       sig = SEC.signMsg prv mesg
