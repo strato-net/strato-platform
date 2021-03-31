@@ -14,8 +14,8 @@
 3. ```
     OAUTH_ENABLED=true \ # if STRATO is OAUTH_ENABLED=true \
         stratoRoot=http://localhost:3333/eth/v1.2 \
-        blocHttpHost=http://strato:8888 \
-        blocRoot=http://localhost:333/bloc/v2.2 \
+        blocHttpHost=http://localhost:3333 \
+        blocRoot=http://localhost:3333/bloc/v2.2 \
         postgres_port=15433 \
         vaultWrapperHttpHost=http://localhost:8484 \
         postgrestHttpHost=http://localhost:3434 \
@@ -41,7 +41,7 @@
         stratoHost=localhost:3333 \
         vaultWrapperHost=localhost:8484 \
         postgrestHost=localhost:3434 \
-        posgtres_port=15433 \
+        postgres_port=15433 \
         prometheusHost=localhost:9090 \
         EXT_STORAGE_S3_BUCKET=<AWS_BUCKET_NAME> \
         EXT_STORAGE_S3_ACCESS_KEY_ID=<AWS_KEY_ID> \
