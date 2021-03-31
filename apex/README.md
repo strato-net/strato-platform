@@ -4,10 +4,9 @@
 1. Run strato-getting-started single node locally with ports proxied (by changing docker-compose.yml):
     1. postgres (15433:5432)
     2. strato (3333:3000)
-    3. bloc (8888:8000)
-    4. vault-wrapper (8484:8000)
-    5. postgrest (note the extra T) (3434:3001)
-    6. prometheus (9090:9090)
+    3. vault-wrapper (8484:8000)
+    4. postgrest (note the extra T) (3434:3001)
+    5. prometheus (9090:9090)
 2. cd `apex/api`
 
 ### Run Apex server locally (development mode):
@@ -15,10 +14,10 @@
 3. ```
     OAUTH_ENABLED=true \ # if STRATO is OAUTH_ENABLED=true \
         stratoRoot=http://localhost:3333/eth/v1.2 \
-        blocRoot=http://localhost:8888/bloc/v2.2 \
+        blocHttpHost=http://strato:8888 \
+        blocRoot=http://localhost:333/bloc/v2.2 \
         postgres_port=15433 \
         vaultWrapperHttpHost=http://localhost:8484 \
-        blocHttpHost=http://localhost:8888 \
         postgrestHttpHost=http://localhost:3434 \
         prometheusHost=localhost:9090 \
         EXT_STORAGE_S3_BUCKET=<AWS_BUCKET_NAME> \
@@ -40,7 +39,6 @@
     NODE_ENV=development \
         OAUTH_ENABLED=true \ # if STRATO is OAUTH_ENABLED=true
         stratoHost=localhost:3333 \
-        blocHost=localhost:8888 \
         vaultWrapperHost=localhost:8484 \
         postgrestHost=localhost:3434 \
         posgtres_port=15433 \
