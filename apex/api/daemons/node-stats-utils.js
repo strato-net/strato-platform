@@ -85,7 +85,7 @@ class StatsDaemon {
           }
         },
       }),
-      models.ApiCallCount.sum('apiReads', {
+      models.ApiCallCount.sum('apiWrites', {
         where: {
           createdAt: {
             [Op.gt]: new Date(new Date() - secondsSinceLastStat * 1000 - config.statistics.apiCallCounterDbSaveTimer)
