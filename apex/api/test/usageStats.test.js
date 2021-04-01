@@ -32,7 +32,7 @@ describe('Tests - Usage statistics', async function () {
       order: [['createdAt', 'DESC']],
     })
     //stat == null OR model obj here
-    const stat1Id = stat1 ? stat1.id : -1
+    const stat1Id = stat1 ? stat1.id : 0
     await statsDaemon.collectStats()
     const stat2 = await models.UsageStat.findOne({
       order: [['createdAt', 'DESC']],
@@ -117,7 +117,7 @@ describe('Tests - Usage statistics', async function () {
       where: {submitted: false},
       order: [['id', 'ASC']], // it's default but wanted it to be explicit
     })
-    assert.equal(unsubmittedStats1.length, unsubmittedStats2.length, 'Number of unsubmitted stats should not change if statserver couldn\'t be reached')
+    assert.equal(unsubmittedStats1.length, unsubmittedStats2.length, 'Number of unsubmitted stats should not change if statserver couldn not be reached')
   })
   
   
@@ -207,6 +207,7 @@ describe('Tests - Usage statistics', async function () {
     })
     assert.isAbove(unsubmittedStats1.length, 0, 'At least one stat should be unsubmitted right after one stat was just created')
 
+    process.env.STATS_SUBMIT_CONTRACT_TYPES_ENABLED=true
     await statsDaemon.submitStats()
     const unsubmittedStats2 = await models.UsageStat.findAll({
       where: {submitted: false},

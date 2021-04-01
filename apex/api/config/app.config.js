@@ -46,9 +46,9 @@ module.exports = {
     apiCallCounterDbSaveTimer: 60 * 1000,
     apiCallCounterRetentionHours: 7 * 24,
     blockappsStatServerUrl:
-        process.env.STATS_DEBUG_CUSTOM_SERVER_URL ||
-        // we don't want the debug deployments to call BlockApps StatServer
-        (process.env.NODE_ENV === 'production' ? 'https://statserver.blockapps.net' : 'set-STATS_DEBUG_CUSTOM_SERVER_URL-env-var-for-debug-mode'),
+        process.env.STATS_DEBUG_CUSTOM_SERVER_URL 
+            ? process.env.STATS_DEBUG_CUSTOM_SERVER_URL
+            : (process.env.NODE_ENV === 'production' ? 'https://statserver.blockapps.net' : 'https://mocked.blockapps.stat.server'),
     blockappsStatServerApiPath: '/api/6.0.3',
     collectSubmitUTCTimeOfDay: {hours: 4, minutes: 0} // UTC time; there is an additional random delay of up to 4 minutes being added in code
   },
