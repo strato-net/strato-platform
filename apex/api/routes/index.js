@@ -5,7 +5,7 @@ const router = express.Router();
 const oAuthController = require('../controllers/oAuth');
 const dappController = require('../controllers/dapp');
 const healthHandler = require('../controllers/health');
-const trackHandler = require('../controllers/track');
+const apiCounterHandler = require('../controllers/apiCounter');
 const appConfig = require(`${process.cwd()}/config/app.config`);
 const oAuth = require(`${process.cwd()}/lib/oAuth/oAuth`);
 const RestStatus = require(`${process.cwd()}/lib/rest-utils/rest-constants`);
@@ -87,7 +87,7 @@ router.get('/_ping', healthHandler.ping);
 
 // Stats
 if (process.env.STATS_ENABLED === "true") {
-  router.get('/_api_counter', trackHandler.apiCounter)
+  router.get('/_api_counter', apiCounterHandler.apiCounterRouteController)
 }
 
 

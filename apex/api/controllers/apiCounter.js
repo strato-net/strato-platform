@@ -69,7 +69,7 @@ const counter = new ApiCallCounter();
 })();
 
 
-async function apiCounter(req, res) {
+async function apiCounterRouteController(req, res) {
   res.status(200).send();
   if (
       process.env['STATS_ENABLED'] === "true" &&
@@ -84,6 +84,7 @@ async function apiCounter(req, res) {
 }
 
 module.exports = {
-  apiCounter,
+  ApiCallCounter,
+  apiCounterRouteController,
   counter
 };

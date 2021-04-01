@@ -34,12 +34,16 @@ if (process.env.STATS_ENABLED === "true") {
                   date.getUTCHours() === config.statistics.collectSubmitUTCTimeOfDay.hours &&
                   date.getUTCMinutes() === config.statistics.collectSubmitUTCTimeOfDay.hours
               ) ||
-              lastStat && (new Date() - lastStat.timestamp > 24 * 60 * 60 * 1000)
+              lastStat && (new Date() - lastStat.timestamp > 24 * 60 * 60 * 1000) ||
+              ['test', 'development'].includes(process.env.NODE_ENV)
+
           ) {
             await collectAndSubmit()
           }
         },
-        60 * 1000 // 1 minute 
+        ['test', 'development'].includes(process.env.NODE_ENV) 
+            ? 5 * 1000 // every 5sec in dev and for tests
+            : 60 * 1000 // every 1 minute in prod
     );
   })();
 } else {

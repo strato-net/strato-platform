@@ -173,7 +173,7 @@ class StatsDaemon {
         } catch (e) {
           const errorText = e.message ? e.message : `${e.status}: ${e.statusText}`
           winston.warn(`Unable to reach the BlockApps Stat Server. Attempt: ${totalCount - count + 1}/${totalCount}. Error: ${errorText}`)
-          await new Promise(r => setTimeout(r, 5000));
+          await new Promise(r => setTimeout(r, ['test', 'development'].includes(process.env.NODE_ENV) ? 50 : 5000));
           return await tryNTimes(postPromise, count - 1, totalCount, [errorText, ...errors])
         }
       } else {
