@@ -10,7 +10,6 @@ let nameStore = [];
  */
 
 function getImportsTree(fullname) {
-  // console.log('getImportsTree', fullname);
   let importFullnames = [];
   isImported(fullname);
   let array = fs.readFileSync(fullname).toString().split('\n');
@@ -18,10 +17,8 @@ function getImportsTree(fullname) {
   for (let i = 0; i < array.length; i++) {
     let line = array[i];
     if (line.startsWith('import')) {
-      // console.log('getImportsTree', 'line', line);
       let importName = getImportName(line);
       let importFullname = parentPath + nodepath.sep + importName;
-      // console.log('getImportsTree', 'importFullname', importFullname);
       if (isImported(importFullname)) continue;
       importFullnames.push(importFullname);
       importFullnames = importFullnames.concat(getImportsTree(importFullname));
@@ -36,7 +33,6 @@ function getImportsTree(fullname) {
 // import "filename";
 function getImportName(line) {
   let importName = line.split('"').slice(-2, -1)[0];
-  // console.log('importName', importName);
   return importName;
 }
 
@@ -50,7 +46,6 @@ function getImportName(line) {
  */
 
 function readFileLinesToObject(initialFileMap, fullname) {
-  console.log(`readFileLinesToObject: Importing ${fullname}`)
   const array = fs.readFileSync(fullname).toString().split('\n');
   isImported(fullname);
   const { fileMap, buffer } = array.reduce((obj, line) => {
@@ -65,8 +60,34 @@ function readFileLinesToObject(initialFileMap, fullname) {
       return { fileMap, buffer: newBuffer }
     }
   }, {fileMap: initialFileMap, buffer: ''});
-  const shortName = getShortName(fullname)
-  return { ...fileMap, [shortName]: buffer }
+  return { ...fileMap, [getShortName(fullname)]: buffer }
+}
+
+/**
+ * readFileLinesToArray() reads a root file and parse all imports recursively into a JSON array
+ *
+ * @method readFileLinesToArray
+ * @param {Array} initial import array
+ * @param {String} input name of file to be read
+ * @return {Array}
+ */
+
+function readFileLinesToArray(initialFileArray, fullname) {
+  const array = fs.readFileSync(fullname).toString().split('\n');
+  isImported(fullname);
+  const { fileArray, buffer } = array.reduce((obj, line) => {
+    const { fileArray, buffer } = obj;
+    if (line.startsWith('import')) {
+      const newBuffer = buffer + '//' + line + '\n';
+      const newFileArray = importFileToArray(fileArray, fullname, line);
+      return { fileArray: newFileArray, buffer: newBuffer }
+    } else {
+      const fixedLine = line.replace('\r', ' '); // Windows fix
+      const newBuffer = buffer + fixedLine + '\n';
+      return { fileArray, buffer: newBuffer }
+    }
+  }, {fileArray: initialFileArray, buffer: ''});
+  return [...fileArray, [getShortName(fullname), buffer]]
 }
 
 /**
@@ -78,7 +99,6 @@ function readFileLinesToObject(initialFileMap, fullname) {
  */
 
 function readFileLinesToString(fullname) {
-  console.log(`readFileLinesToString: Importing ${fullname}`)
   let buffer = '';
   isImported(fullname);
   //buffer += '// --- start: ' + fullname + '\n';
@@ -128,9 +148,34 @@ function importFileToObject(fileMap, fullname, line) {
 }
 
 /**
+ * importFileToArray() reconstruct the import file path, and read it, unless it was already imported
+ *
+ * @method importFile
+ * @param {Array} fileArray the initial import map
+ * @param {String} fullname name of file
+ * @param {String} line the import line command
+ * @return {Array}
+ */
+
+function importFileToArray(fileArray, fullname, line) {
+  let importName = line.replace(/import[\s]+/i, '').replace(/\"/gi, '').replace(';', '');
+  importName = importName.replace('\r', '');  // Windows fix
+  if (isImported(importName)) {
+    return fileArray;
+  }
+  // if import name starts with '/' - read relative to project root -LS
+  if (importName.indexOf('/') == 0) {
+    return readFileLinesToArray(fileArray, nodepath.join(cwd, importName));
+  }
+  let parentPath = splitPath(fullname);
+  return readFileLinesToArray(fileArray, nodepath.join(parentPath, importName));
+}
+
+/**
  * importFileToString() reconstruct the import file path, and read it, unless it was already imported
  *
  * @method importFile
+ * @param {Object} fileMap the initial import map
  * @param {String} fullname name of file
  * @param {String} line the import line command
  * @return {String}
@@ -196,14 +241,14 @@ function splitPath(fullname) {
   return path;
 }
 
-function combine(filename, toObject):Promise<string> {
+function combine(filename, toObject):Promise<any> {
   nameStore = [];
   return new Promise(function(resolve, reject) {
     let string = ''
     if (toObject) {
       string = readFileLinesToObject({}, filename);
     } else {
-      string = readFileLinesToString(filename);
+      string = readFileLinesToArray([], filename);
     }
     resolve(string);
   });
