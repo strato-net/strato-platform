@@ -16,6 +16,7 @@ library:
   source-dirs: src/
   exposed-modules:
     - Debugger
+    - Debugger.Options
   ghc-options: -Wall -O2
   dependencies:
   - QuickCheck

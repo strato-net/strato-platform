@@ -7,6 +7,7 @@
 import           Control.Monad
 import           Control.Concurrent.Async             as Async
 import           Debugger
+import           Debugger.Options() -- HFlags
 import           Network.Wai.Middleware.Prometheus
 import           Network.Wai.Handler.Warp
 import           HFlags
