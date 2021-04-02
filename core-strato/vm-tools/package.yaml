@@ -36,12 +36,14 @@ library:
     - Executable.EVMFlags
   ghc-options: -Wall -O2
   dependencies:
+    - aeson
     - ansi-wl-pprint
     - binary
     - blockapps-mpdbs
     - bytestring
     - cross-monitoring
     - data-default
+    - debugger
     - deepseq
     - directory
     - dlist
