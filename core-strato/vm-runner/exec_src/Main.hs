@@ -1,7 +1,3 @@
-{-# LANGUAGE DataKinds         #-} -- DEBUGGING
-{-# LANGUAGE LambdaCase        #-} -- DEBUGGING
-{-# LANGUAGE RecordWildCards   #-} -- DEBUGGING
-{-# LANGUAGE TypeOperators     #-} -- DEBUGGING
 {-# LANGUAGE DeriveAnyClass    #-}
 {-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE FlexibleContexts  #-}

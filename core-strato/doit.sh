@@ -149,8 +149,8 @@ function newnode {
   runBackgroundProcess vm-runner --useSyncMode=$useSyncMode --miner=$miningAlgorithm --maxTxsPerBlock=$maxTxsPerBlock \
                          --diffPublish=$diffPublish --sqlDiff=$sqlDiff --svmTrace=$svmTrace --createTransactionResults=true \
                          --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb \
-                         --debugEnabled="${vmDebug:-}" --wsDebug="${wsDebug:-}" \
-                         --debugPort="${debugPort:-}" --debugWSPort="${debugWSPort:-}" \
+                         --debugEnabled="${vmDebug:-false}" --wsDebug="${wsDebug:-false}" \
+                         --debugPort="${debugPort:-8051}" --debugWSPort="${debugWSPort:-8052}" \
                          --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$evmMinLogLevel \
                          "${tbFlag}" "${breFlag}" "${sebFlag}" "${sechFlag}" "${svdFlag}" "${ctrFlag}" \
                          --gasOn=$gasOn +RTS "${vmRunnerRTSOPTs:-}" -N1 &>> logs/vm-runner
