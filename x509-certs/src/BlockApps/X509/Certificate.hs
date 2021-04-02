@@ -211,12 +211,12 @@ fromASN1CS cs =
 
 getIssuerDN :: Issuer -> DistinguishedName
 getIssuerDN iss = 
-  let mList = 
+  let mList =
         [ (getObjectID DnCommonName, Just $ issCommonName iss)
         , (getObjectID DnOrganization, Just $ issOrg iss)
         , (getObjectID DnOrganizationUnit, issUnit iss)
         , (getObjectID DnCountry, issCountry iss)
-        
+        ]
   in DistinguishedName $ map (fmap toASN1CS) . catMaybes $ sequence <$> mList 
  
 getSubjectDN :: Subject -> DistinguishedName
