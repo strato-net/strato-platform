@@ -63,6 +63,7 @@ import qualified Data.NibbleString as N
 import qualified Data.Sequence as Q
 import qualified Data.Text as T
 import           Data.Text.Encoding(encodeUtf8,decodeUtf8)
+import           Debugger
 
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.ChainInfo
@@ -143,18 +144,15 @@ type MonadSM m = ( (Account `A.Alters` AddressState) m
                  , HasMemAddressStateDB m
                  , HasMemRawStorageDB m
                  , Mod.Accessible Env.Environment m
-                 , Mod.Accessible DebugSettings m
                  , Mod.Modifiable MemDBs m
                  , Mod.Modifiable Env.Sender m
                  , Mod.Modifiable [CallInfo] m
                  , Mod.Modifiable Action m
                  , Mod.Modifiable (Q.Seq Event) m
+                 , Mod.Modifiable (Maybe DebugSettings) m
                  , MonadIO m --todo: remove
                  , MonadLogger m
                  )
-
-instance (Monad m, Mod.Accessible DebugSettings m) => Mod.Accessible DebugSettings (SM m) where
-  access p = lift $ Mod.access p
 
 instance Monad m => HasMemAddressStateDB (SM m) where
   getAddressStateTxDBMap      = gets $ _stateTxMap . _ssMemDBs
@@ -226,6 +224,11 @@ instance (N.NibbleString `A.Alters` N.NibbleString) m => (N.NibbleString `A.Alte
 
 instance Monad m => Mod.Accessible Env.Environment (SM m) where
   access _ = gets env
+
+instance (Monad m, Mod.Modifiable (Maybe DebugSettings) m)
+  => Mod.Modifiable (Maybe DebugSettings) (SM m) where
+  get _ = lift $ Mod.get (Mod.Proxy @(Maybe DebugSettings))
+  put _ = lift . Mod.put (Mod.Proxy @(Maybe DebugSettings))
 
 instance Monad m => Mod.Modifiable Env.Sender (SM m) where
   get _ = Env.Sender . Env.sender <$> gets env

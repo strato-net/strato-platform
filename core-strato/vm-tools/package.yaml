@@ -43,6 +43,7 @@ library:
     - bytestring
     - cross-monitoring
     - data-default
+    - debugger
     - deepseq
     - directory
     - dlist

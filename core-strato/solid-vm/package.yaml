@@ -40,6 +40,7 @@ library:
   - bytestring
   - containers
   - cryptonite
+  - debugger
   - deepseq
   - ethereum-rlp
   - extra

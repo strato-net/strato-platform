@@ -148,7 +148,9 @@ function newnode {
   echo "Starting vm-runner"
   runBackgroundProcess vm-runner --useSyncMode=$useSyncMode --miner=$miningAlgorithm --maxTxsPerBlock=$maxTxsPerBlock \
                          --diffPublish=$diffPublish --sqlDiff=$sqlDiff --svmTrace=$svmTrace --createTransactionResults=true \
-                         --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb --debugSolidVM="${debugSolidVM:-}" --wsDebug="${wsDebug:-}" \
+                         --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb \
+                         --debugEnabled="${vmDebug:-}" --wsDebug="${wsDebug:-}" \
+                         --debugPort="${debugPort:-}" --debugWSPort="${debugWSPort:-}" \
                          --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$evmMinLogLevel \
                          "${tbFlag}" "${breFlag}" "${sebFlag}" "${sechFlag}" "${svdFlag}" "${ctrFlag}" \
                          --gasOn=$gasOn +RTS "${vmRunnerRTSOPTs:-}" -N1 &>> logs/vm-runner

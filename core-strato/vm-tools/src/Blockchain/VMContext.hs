@@ -18,12 +18,6 @@
 module Blockchain.VMContext
     ( CurrentBlockHash(..)
     , withCurrentBlockHash
-    , Breakpoint(..)
-    , BreakpointLoc(..)
-    , DebugSettings(..)
-    , DebugState(..)
-    , DebugOperation(..)
-    , newDebugSettings
     , VMBase
     , ContextDBs(..)
     , MemDBs(..)
@@ -81,20 +75,19 @@ import           Control.Monad.IO.Class
 import           Blockchain.Output
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Resource
-import qualified Data.Aeson                         as Aeson
 import qualified Data.ByteString                    as B
 import           Data.Default                       (def)
 import qualified Data.Map                           as M
 import           Data.Maybe                         (fromMaybe)
 import qualified Data.NibbleString                  as N
 import qualified Data.Sequence                      as Q
-import qualified Data.Set                           as S
 import           Data.Word
 import qualified Data.Text                          as T
 import           Data.Traversable                   (for)
 import qualified Database.LevelDB                   as DB
 import qualified Database.Persist.Sqlite            as Lite
 import qualified Database.Redis                     as Redis
+import           Debugger
 import           GHC.Generics
 import qualified Network.Kafka                      as K
 import qualified Network.Kafka.Protocol             as K
@@ -143,59 +136,6 @@ instance NFData RBDB.RedisConnection where
 data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo (Keccak256, BlockData, Integer, Int, Int)
     deriving (Eq, Read, Show, Generic, NFData)
 
-data Breakpoint = UnconditionalBP BreakpointLoc
-                | ConditionalBP BreakpointLoc T.Text -- TODO: should be Expression
-                | DataBP T.Text -- TODO: should be Expression
-                | FunctionBP T.Text -- function name
-                deriving (Eq, Ord, Show, Generic, NFData, Aeson.ToJSON, Aeson.FromJSON)
-
-data BreakpointLoc = BreakpointLoc
-  { breakpointFile   :: T.Text
-  , breakpointLine   :: Int
-  , breakpointColumn :: Int
-  } deriving (Eq, Ord, Show, Generic, NFData, Aeson.ToJSON, Aeson.FromJSON)
-
-data DebugOperation = Run
-                    | Pause
-                    | StepIn
-                    | StepOver {-# UNPACK #-} !Int
-                    | InStepOver {-# UNPACK #-} !Int
-                    | StepOut {-# UNPACK #-} !Int
-                    | InStepOut {-# UNPACK #-} !Int
-                    deriving (Eq, Ord, Show, Generic, NFData, Aeson.ToJSON, Aeson.FromJSON)
-
-data DebugState = DebugState
-  { debugStateBreakpoint :: BreakpointLoc
-  , debugStateCallStack  :: [BreakpointLoc]
-  , debugStateVariables  :: M.Map T.Text T.Text
-  , debugStateWatches    :: M.Map T.Text T.Text
-  } deriving (Eq, Ord, Show, Generic, NFData, Aeson.ToJSON, Aeson.FromJSON)
-
-data DebugSettings = DebuggingDisabled
-                   | DebugSettings {
-                     operation :: TVar DebugOperation
-                   , breakpoints :: TVar (S.Set Breakpoint)
-                   , current :: TVar (Maybe DebugState)
-                   , changed :: TVar Bool
-                   , exceptionBreakpoints :: TVar Bool
-                   , functionBreakpoints :: TVar Bool
-                   , watchExpressions :: TVar (S.Set T.Text)
-                   } deriving (Eq, Generic)
-
-instance NFData DebugSettings where
-  rnf DebuggingDisabled = ()
-  rnf DebugSettings{}   = ()
-
-newDebugSettings :: STM DebugSettings
-newDebugSettings = DebugSettings
-               <$> (newTVar Run)
-               <*> (newTVar S.empty)
-               <*> (newTVar Nothing)
-               <*> (newTVar False)
-               <*> (newTVar False)
-               <*> (newTVar False)
-               <*> (newTVar S.empty)
-
 data ContextDBs = ContextDBs
   { _stateDB        :: MP.StateDB
   , _hashDB         :: HashDB
@@ -204,7 +144,6 @@ data ContextDBs = ContextDBs
   , _kafkaState     :: IORef K.KafkaState
   , _redisPool      :: RBDB.RedisConnection
   , _sqldb          :: SQLDB
-  , _debugSettings  :: DebugSettings
   } deriving (Generic, NFData)
 makeLenses ''ContextDBs
 
@@ -226,6 +165,7 @@ data ContextState = ContextState
   , _blockRequested    :: Bool
   , _coinbaseQueue     :: Q.Seq ((Address,Word64), Address)
   , _txRunResultsCache :: TRC.Cache
+  , _debugSettings     :: Maybe DebugSettings
   } deriving (Generic, NFData)
 makeLenses ''ContextState
 
@@ -240,7 +180,7 @@ type ContextM = ReaderT Context (ResourceT (LoggingT IO))
 type VMBase m = ( MonadIO m
                 , MonadUnliftIO m
                 , MonadLogger m
-                , Mod.Accessible DebugSettings m
+                , Mod.Modifiable (Maybe DebugSettings) m
                 , Mod.Modifiable ContextState m
                 , Mod.Accessible ContextState m
                 , Mod.Modifiable MemDBs m
@@ -346,8 +286,9 @@ instance Mod.Modifiable ContextState ContextM where
 instance Mod.Accessible Context ContextM where
   access _ = ask
 
-instance Mod.Accessible DebugSettings ContextM where
-  access _ = view (dbs . debugSettings) <$> ask
+instance Mod.Modifiable (Maybe DebugSettings) ContextM where
+  get _    = gets $ view debugSettings
+  put _ ds = modify $ debugSettings .~ ds
 
 instance Mod.Accessible ContextState ContextM where
   access _ = get
@@ -522,7 +463,6 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
             , _kafkaState     = initialKafkaState
             , _redisPool      = RBDB.RedisConnection rPool
             , _sqldb          = SQLDB conn
-            , _debugSettings  = DebuggingDisabled
             }
 
       let cmemDBs = MemDBs
@@ -542,6 +482,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
             , _blockRequested    = False
             , _coinbaseQueue     = Q.empty
             , _txRunResultsCache = cache
+            , _debugSettings     = Nothing
             }
 
       let ctx = Context
@@ -556,7 +497,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
       return (a, cstate')
 
 runContextM :: (MonadIO m, MonadUnliftIO m, MonadLogger m)
-            => DebugSettings
+            => Maybe DebugSettings
             -> ReaderT Context (ResourceT m) a
             -> m (a, ContextState)
 runContextM dSettings f = do
@@ -584,7 +525,6 @@ runContextM dSettings f = do
             , _kafkaState     = kafkaStateRef
             , _redisPool      = RBDB.RedisConnection rPool
             , _sqldb          = conn
-            , _debugSettings  = dSettings
             }
 
       let cmemDBs = MemDBs
@@ -604,6 +544,7 @@ runContextM dSettings f = do
             , _blockRequested    = False
             , _coinbaseQueue     = Q.empty
             , _txRunResultsCache = cache
+            , _debugSettings     = dSettings
             }
 
       let ctx = Context
@@ -616,13 +557,13 @@ runContextM dSettings f = do
 
 
 evalContextM :: (MonadIO m, MonadUnliftIO m, MonadLogger m)
-             => DebugSettings
+             => Maybe DebugSettings
              -> ReaderT Context (ResourceT m) a
              -> m a
 evalContextM d f = fst <$> runContextM d f
 
 execContextM :: (MonadIO m, MonadUnliftIO m, MonadLogger m)
-             => DebugSettings
+             => Maybe DebugSettings
              -> ReaderT Context (ResourceT m) a
              -> m ContextState
 execContextM d f = snd <$> runContextM d f

@@ -1,7 +1,9 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -9,6 +11,9 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.SolidVM
   ( SolidVMBase
@@ -40,6 +45,7 @@ import qualified Data.Text.Encoding                   as TE
 import           Data.Time.Clock.POSIX
 import           Data.Traversable
 import qualified Data.Vector as V
+import           Debugger
 import           GHC.Exts                             hiding (breakpoint)
 import           Text.Parsec (ParseError, runParser)
 import           Text.Printf
@@ -54,7 +60,6 @@ import qualified Blockchain.Database.MerklePatricia   as MP
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.ModifyStateDB          (pay)
 import           Blockchain.ExtWord
-import           Blockchain.Output
 import qualified Blockchain.SolidVM.Builtins          as Builtins
 import           Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.SolidVM.Environment       as Env
@@ -99,6 +104,50 @@ withSrcPos pos str = liftIO . putStrLn $ concat
   , ": "
   , str
   ]
+
+-- TODO: I'm putting all of these instances related to debugging here,
+--       but they should really go in SM.hs
+--       However, the functions needed to run `variableSet` and `runExpr`,
+--       which are critical for debugging, are defined in SetGet.hs and
+--       SolidVM.hs. I think this suggests a reorganization of the
+--       solid-vm package should be done, but I don't want to interfere
+--       with it too much just to get the debugger working.
+
+variableSet :: MonadSM m => m VariableSet
+variableSet = do
+  cis <- Mod.get (Mod.Proxy @[CallInfo])
+  let textSet = S.fromList . map T.pack . M.keys
+      varNames = case cis of
+        [] -> S.empty
+        (ci:_) -> textSet $ localVariables ci
+      locals = M.singleton "Local Variables" varNames
+  acct <- getCurrentAccount
+  ~(contract, _, _) <- getCodeAndCollection acct
+  let stateVars = textSet $ contract ^. storageDefs
+      globals = M.singleton "State Variables" stateVars
+  pure . VariableSet $ locals <> globals
+
+instance MonadSM m => Mod.Accessible VariableSet m where
+  access _ = variableSet
+
+instance MonadSM m => Mod.Accessible [SourcePos] m where
+  access _ = do
+    cis <- Mod.get (Mod.Proxy @[CallInfo])
+    pure $ fromMaybe (initialPos "") . currentSourcePos <$> cis
+
+runExpr :: MonadSM m => T.Text -> m (Either ParseError T.Text)
+runExpr exprText = withoutDebugging $ do
+  let eExpr = runParser expression "" "" (T.unpack exprText)
+  withoutDebugging $ traverse (pure . T.pack <=< showSM <=< getVar <=< expToVar) eExpr
+
+solidVMBreakpoint :: MonadSM m => SourcePos -> m ()
+solidVMBreakpoint pos = do
+  Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
+    [] -> pure []
+    (ci:cis) -> pure $ ci{currentSourcePos = Just pos}:cis
+  breakpoint runExpr
+
+-- end debugger-related code
 
 create :: SolidVMBase m
        => Bool
@@ -435,7 +484,7 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.PlusPlus e)))
 
 -- Assignment to an index into an array or mapping
 runStatement st@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" dst@(Xabi.IndexAccess parent (Just indExp)) src)) pos) = do
-  breakpoint pos
+  solidVMBreakpoint pos
   srcVar <- expToVar src
   srcVal <- getVar srcVar
 
@@ -465,12 +514,12 @@ runStatement st@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "="
 
 
 runStatement st@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" (Xabi.IndexAccess _ Nothing) _)) pos) = do
-  breakpoint pos
+  solidVMBreakpoint pos
   missingField "index value cannot be empty" (unparseStatement st)
 
 
 runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" dst src)) pos) = do
-  breakpoint pos
+  solidVMBreakpoint pos
   srcVal <- getVar =<< expToVar src
   dstVar <- expToVar dst
 
@@ -519,12 +568,12 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" ds
               setVar v1 $ coerceType ctract ty value'
 -}
 runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e) pos) = do
-  breakpoint pos
+  solidVMBreakpoint pos
   _ <- getVar =<< expToVar e
   return Nothing -- just throw away the return value
 
 runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition entries maybeExpression) pos) = do
-  breakpoint pos
+  solidVMBreakpoint pos
   let !maybeLoc = case entries of
                       [e] -> Xabi.vardefLocation e
                       es -> if any ((== Just Xabi.Storage) . Xabi.vardefLocation) es
@@ -573,7 +622,7 @@ runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition entries maybeExpre
   return Nothing
 
 runStatement (Xabi.IfStatement condition code' maybeElseCode pos) = do
-  breakpoint pos
+  solidVMBreakpoint pos
   conditionResult <- getBool =<< expToVar condition
   
   onTraced $ do
@@ -588,7 +637,7 @@ runStatement (Xabi.IfStatement condition code' maybeElseCode pos) = do
       Nothing -> return Nothing
 
 runStatement (Xabi.WhileStatement condition code pos) = do
-  breakpoint pos
+  solidVMBreakpoint pos
      
   while (getBool =<< expToVar condition) $ do
       onTraced $ withSrcPos pos $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
@@ -598,7 +647,7 @@ runStatement (Xabi.WhileStatement condition code pos) = do
       -- TODO: this can loop infinitely
 
 runStatement (Xabi.DoWhileStatement code condition pos) = do
-  breakpoint pos
+  solidVMBreakpoint pos
   doWhile (getBool =<< expToVar condition) $ do
       onTraced $ withSrcPos pos $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
       result <- runStatements code
@@ -608,7 +657,7 @@ runStatement (Xabi.DoWhileStatement code condition pos) = do
 
 --TODO- all the variables declared in an `if` or `for` code block need to be deleted when the block is finished....
 runStatement (Xabi.ForStatement maybeInitStatement maybeConditionExp maybeLoopExp code pos) = do
-  breakpoint pos
+  solidVMBreakpoint pos
   _ <-
     case maybeInitStatement of
       Just initStatement -> runStatement $ Xabi.SimpleStatement initStatement pos
@@ -633,7 +682,7 @@ runStatement (Xabi.ForStatement maybeInitStatement maybeConditionExp maybeLoopEx
       return result
 
 runStatement (Xabi.Return maybeExpression pos) = do
-  breakpoint pos
+  solidVMBreakpoint pos
   case maybeExpression of
     Just e -> do
       ql <- expToVar e
@@ -643,7 +692,7 @@ runStatement (Xabi.Return maybeExpression pos) = do
     Nothing -> return $ Just SNULL
 
 runStatement (Xabi.AssemblyStatement (Xabi.MloadAdd32 dst src) pos) = do
-  breakpoint pos
+  solidVMBreakpoint pos
   srcVar <- expToVar $ Xabi.Variable $ T.unpack src;
   dstVar <- expToVar $ Xabi.Variable $ T.unpack dst;
 
@@ -652,7 +701,7 @@ runStatement (Xabi.AssemblyStatement (Xabi.MloadAdd32 dst src) pos) = do
   return Nothing
 
 runStatement st@(Xabi.EmitStatement eventName exptups pos) = do
-  breakpoint pos
+  solidVMBreakpoint pos
   exps <- mapM (expToVar . snd) exptups
   expVals <- mapM getVar exps
   expStrs <- mapM showSM expVals
@@ -1651,108 +1700,3 @@ encodeForReturn (STuple items) = do
         return (headers `B.append` bs, strings)
 
 encodeForReturn x = todo "can't encode this return type" x
-
-
-
-breakpoint :: MonadSM m => Xabi.SourcePos -> m ()
-breakpoint pos = do
-  isBreak <- isBreakpoint pos
-  when isBreak $ do
-    $logInfoS "breakpoint" . T.pack $ "Paused on breakpoint: " ++ show pos
-    handleBreakpoint pos
-    $logInfoS "breakpoint" . T.pack $ "Resuming from breakpoint: " ++ show pos
-
-localVariableMap :: MonadSM m => [CallInfo] -> m (M.Map T.Text T.Text)
-localVariableMap [] = pure M.empty
-localVariableMap (ci:_) = fmap M.fromList $ do
-  forM (M.toList $ localVariables ci) $ \(name, (_, var)) -> do
-    val <- getVar var
-    valueString <- showSM val
-    pure (T.pack name, T.pack valueString)
-
-bpLoc :: Xabi.SourcePos -> BreakpointLoc
-bpLoc pos = BreakpointLoc (T.pack $ Xabi.sourceName pos)
-                          (Xabi.sourceLine pos)
-                          (Xabi.sourceColumn pos)
-
-runExpr :: MonadSM m => T.Text -> m (Either ParseError Value)
-runExpr exprText =
-  let eExpr = runParser expression "" "" (T.unpack exprText)
-   in traverse (getVar <=< expToVar) eExpr
-
-breakpointMatches :: MonadSM m => Xabi.SourcePos -> Breakpoint -> m Bool
-breakpointMatches pos = \case
-  UnconditionalBP loc -> pure $ matchesLoc loc
-  ConditionalBP loc exprText -> if not (matchesLoc loc)
-    then pure False
-    else runCond exprText
-  DataBP exprText -> runCond exprText
-  FunctionBP _ -> pure False -- TODO
-  where matchesLoc loc = let bp = bpLoc pos
-                             eqOn f a b = f a == f b
-                             fMatch = eqOn breakpointFile bp loc
-                             lMatch = eqOn breakpointLine bp loc
-                          in fMatch && lMatch
-        runCond exprText = do
-          val <- runExpr exprText
-          case val of
-            Right (SBool v) -> pure v
-            _ -> pure False
-
-isBreakpoint :: MonadSM m => Xabi.SourcePos -> m Bool
-isBreakpoint pos = do
-  debugSettings <- Mod.access (Mod.Proxy @DebugSettings)
-  case debugSettings of
-    DebuggingDisabled -> pure False
-    DebugSettings{..} -> do
-      Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
-        [] -> pure []
-        (x:xs) -> pure $ x{currentSourcePos = Just pos}:xs
-      currentOperation <- atomically $ readTVar operation
-      if currentOperation == Run
-        then do
-          bPoints <- fmap S.toList . atomically $ readTVar breakpoints
-          matchedBP <- or <$> traverse (breakpointMatches pos) bPoints
-          if matchedBP
-            then atomically $ do
-              writeTVar changed True
-              writeTVar operation Pause
-              pure True
-            else pure False
-        else pure True
-
-handleBreakpoint :: MonadSM m => Xabi.SourcePos -> m ()
-handleBreakpoint pos = do
-  debugSettings <- Mod.access (Mod.Proxy @DebugSettings)
-  case debugSettings of
-    DebuggingDisabled -> pure ()
-    DebugSettings{..} -> do
-      cStack <- Mod.get (Mod.Proxy @[CallInfo])
-      let loc p = BreakpointLoc (T.pack $ Xabi.sourceName p)
-                                (Xabi.sourceLine p)
-                                (Xabi.sourceColumn p)
-          bPoint = loc pos
-          cStack' = loc . fromMaybe (Xabi.initialPos "") . currentSourcePos <$> cStack
-      vars <- localVariableMap cStack
-      watchExprs <- fmap S.toList . atomically $ readTVar watchExpressions
-      watchVals <- traverse runExpr watchExprs
-      watchVals' <- traverse (fmap T.pack . either (pure . show) showSM) watchVals
-      let watchValsMap = M.fromList $ zip watchExprs watchVals'
-      acct <- getCurrentAccount
-      ~(contract, _, _) <- getCodeAndCollection acct
-      let stateVars = map T.pack . M.keys $ contract ^. storageDefs
-      easdf <- traverse runExpr stateVars
-      asdfs <- fmap (map T.pack) . traverse (either (pure . show) showSM) $ easdf
-      let stateVals = M.fromList $ zip stateVars asdfs
-          vars' = stateVals <> vars
-      void . atomically . writeTVar current . Just $ DebugState bPoint cStack' vars' watchValsMap
-      atomically $ do
-        currentOperation <- readTVar operation
-        case currentOperation of
-          Run -> pure ()
-          Pause -> retrySTM
-          StepIn -> writeTVar operation Pause
-          StepOver n -> writeTVar operation (InStepOver n)
-          InStepOver n -> when (length cStack' <= n) retrySTM
-          StepOut n -> writeTVar operation (InStepOut n)
-          InStepOut n -> when (length cStack' < n) retrySTM

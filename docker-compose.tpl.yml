@@ -204,8 +204,8 @@ services:
     - cacheTransactionResults=${cacheTransactionResults}
     - connectionTimeout=${connectionTimeout}
     - debugFail=${debugFail}
-    - debugSolidVM=${debugSolidVM:-false}
-    - wsDebug=${wsDebug:-false}
+    - debugPort=${debugPort:-8051}
+    - debugWSPort=${debugWSPort:-8052}
     - evmDebugMode=${evmDebugMode}
     - evmTraceMode=${evmTraceMode}
     - extraFaucets=${extraFaucets}
@@ -251,8 +251,10 @@ services:
     - useSyncMode=${useSyncMode}
     - validators=${validators}
     - vaultWrapperHost=${vaultWrapperHost:-vault-wrapper:8000}
+    - vmDebug=${vmDebug:-false}
     - vmRunnerRTSOPTs=${vmRunnerRTSOPTs}
     - wireMessageCacheSize=${wireMessageCacheSize}
+    - wsDebug=${wsDebug:-false}
     - zkHost=zookeeper
     build: .
     image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>}
@@ -320,8 +322,8 @@ services:
     - authBasic=${authBasic}
     - blockstanbul=${blockstanbul}
     - blockTime=${blockTime}
-    - debugSolidVM=${debugSolidVM:-false}
-    - wsDebug=${wsDebug:-false}
+    - debugPort=${debugPort:-8051}
+    - debugWSPort=${debugWSPort:-8052}
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
     - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
     - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
@@ -338,6 +340,7 @@ services:
     - STRATO_GS_MODE=${STRATO_GS_MODE}
     - uiPassword=${uiPassword}
     - USE_OLD_STRATO_API=${USE_OLD_STRATO_API}
+    - vmDebug=${vmDebug:-false}
     build: .
     image: ${NGINX_IMAGE:-<REPO_URL>nginx:<VERSION>}
     ports:

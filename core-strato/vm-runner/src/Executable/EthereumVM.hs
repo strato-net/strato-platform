@@ -34,6 +34,7 @@ import           Data.Maybe                            (catMaybes, isNothing, fr
 import qualified Data.Set                              as S
 import           Data.Time.Clock.POSIX
 import           Data.Traversable                      (for)
+import           Debugger
 import qualified Network.Kafka.Protocol                as KP
 import           Prometheus
 import           Text.Printf
@@ -88,7 +89,7 @@ import           Blockchain.Util
 import qualified Text.Colors                           as CL
 import           Text.Format                           (format)
 
-ethereumVM :: DebugSettings -> LoggingT IO ()
+ethereumVM :: Maybe DebugSettings -> LoggingT IO ()
 ethereumVM d = void . execContextM d $ do
 
     $logInfoS "difficultyBomb" $ T.pack $ "Difficulty bomb is " ++ show flags_difficultyBomb -- remove me once we figure out how to print args at startup
