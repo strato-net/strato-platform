@@ -304,7 +304,7 @@ postContractsCompile = blocTransaction . fmap concat . traverse compileOneContra
       let shouldCompile = case Text.toLower <$> postcompilerequestVm of
             Just "solidvm" -> Don't Compile
             _ -> Do Compile
-      idsAndDetails <- sourceToContractDetails shouldCompile postcompilerequestSource
+      idsAndDetails <- sourceToContractDetails shouldCompile [("",postcompilerequestSource)]
       for (toList idsAndDetails) $ \ (_,details) -> do
         let eBlockappsjsXabi = uncurry completeXabi $ (contractdetailsName &&& contractdetailsXabi) details
         case eBlockappsjsXabi of

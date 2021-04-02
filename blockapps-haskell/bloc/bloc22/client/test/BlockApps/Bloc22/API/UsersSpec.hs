@@ -92,7 +92,7 @@ spec = do
       threadDelay delay
       let
         postUsersContractRequest = PostUsersContractRequest
-          { postuserscontractrequestSrc = Map.singleton "" simpleStorageSrc
+          { postuserscontractrequestSrc = [("", simpleStorageSrc)]
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just simpleStorageContractName
           , postuserscontractrequestArgs = Nothing
@@ -116,7 +116,7 @@ spec = do
         uploadListContracts =
           [ UploadListContract
             { uploadlistcontractContractName = simpleStorageContractName
-            , uploadlistcontractSrc = Map.empty
+            , uploadlistcontractSrc = []
             , uploadlistcontractArgs = Map.empty
             , _uploadlistcontractTxParams = testTxParams
             , uploadlistcontractValue = Nothing

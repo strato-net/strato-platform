@@ -45,7 +45,7 @@ import           Blockchain.Strato.Model.CodePtr
 -- | Routes and types
 --------------------------------------------------------------------------------
 data ChainInput  = ChainInput
-  { chaininputSrc      :: Maybe Text
+  { chaininputSrc      :: [(Text, Text)]
   , chaininputCodePtr  :: Maybe CodePtr
   , chaininputContract :: Maybe Text
   , chaininputLabel    :: Text
@@ -71,7 +71,25 @@ instance Arbitrary ChainInput where
   arbitrary = GR.genericArbitrary GR.uniform
 
 instance FromJSON ChainInput where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
+  parseJSON (Object o) =
+    ChainInput
+      <$> (do
+        msrc <- o .:? "src"
+        case msrc of
+          Just (String s) -> pure $ [("", s)]
+          Just (Object _) -> fmap Map.toList (o .: "src")
+          Just (Array _) -> o .: "src"
+          _ -> pure [])
+      <*> (o .:? "codePtr")
+      <*> (o .:? "contract")
+      <*> (o .: "label")
+      <*> (o .: "balances")
+      <*> (o .: "args")
+      <*> (o .: "members")
+      <*> (o .:? "parentChain")
+      <*> (o .:? "metadata")
+      <*> (o .:? "async")
+  parseJSON o = fail $ "parseJSON ChainInput: Expected Object, got " ++ show o
 
 instance ToJSON ChainInput where
   toJSON = genericToJSON (aesonPrefix camelCase)
@@ -93,7 +111,7 @@ exampleEnode2 = Enode (OrgId "6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6
 
 exChainInput :: ChainInput
 exChainInput = ChainInput
-    { chaininputSrc = Just exampleSrc
+    { chaininputSrc = [("", exampleSrc)]
     , chaininputCodePtr = Nothing
     , chaininputContract = Just "Governance"
     , chaininputLabel = "my chain"
