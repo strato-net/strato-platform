@@ -54,6 +54,7 @@ executables:
       - bytestring
       - cryptonite
       - strato-model
+      - transformers
       - x509-certs
   
   x509-keygen:
@@ -77,4 +78,5 @@ tests:
       - ethereum-rlp
       - hspec
       - strato-model
+      - transformers
       - QuickCheck
