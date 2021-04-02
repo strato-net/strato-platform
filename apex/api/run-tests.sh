@@ -2,10 +2,9 @@
 set -o
 set -e
 
-if [[ -z $blocHost || -z $stratoHost || -z $vaultWrapperHost || -z $postgrestHost || -z $prometheusHost || -z $EXT_STORAGE_S3_BUCKET || -z $EXT_STORAGE_S3_ACCESS_KEY_ID || -z $EXT_STORAGE_S3_SECRET_ACCESS_KEY ]]; then
+if [[ -z $stratoHost || -z $vaultWrapperHost || -z $postgrestHost || -z $prometheusHost || -z $EXT_STORAGE_S3_BUCKET || -z $EXT_STORAGE_S3_ACCESS_KEY_ID || -z $EXT_STORAGE_S3_SECRET_ACCESS_KEY ]]; then
   echo "ERROR: One of the required variables is not set or empty. See README.md for details.
 Vars required to run tests: 
-- blocHost, 
 - postgrestHost,
 - prometheusHost,
 - stratoHost,

@@ -4,7 +4,7 @@ import { extAbi, error, selectedTabContent, codeEditor, sourceCodeUndefinedImpor
 
 describe('CodeEditor: index', () => {
   let files
-  const readAsBinaryString = jest.fn();
+  const readAsText = jest.fn();
 
   beforeAll(() => {
     localStorage.clear();
@@ -19,7 +19,7 @@ describe('CodeEditor: index', () => {
     const expectedFinalState = { fileContents: fileContents };
     const file = new Blob([fileContents], { type: 'text/plain' });
     const addEventListener = jest.fn((_, evtHandler) => { evtHandler(); });
-    const dummyFileReader = { addEventListener, readAsBinaryString, result: fileContents };
+    const dummyFileReader = { addEventListener, readAsText, result: fileContents };
     window.FileReader = jest.fn(() => dummyFileReader);
   });
 
@@ -107,7 +107,7 @@ describe('CodeEditor: index', () => {
     );
     const dropzone = wrapper.find('Dropzone')
     dropzone.simulate('drop', files)
-    expect(readAsBinaryString).toHaveBeenCalled()
+    expect(readAsText).toHaveBeenCalled()
 
   });
 
@@ -128,7 +128,7 @@ describe('CodeEditor: index', () => {
     files[0]['name'] = 'pqr.txt'
     const dropzone = wrapper.find('Dropzone')
     dropzone.simulate('drop', files)
-    expect(readAsBinaryString).toHaveBeenCalled()
+    expect(readAsText).toHaveBeenCalled()
   });
 
   test('multiple file drop', () => {
@@ -152,7 +152,7 @@ describe('CodeEditor: index', () => {
     })
     const dropzone = wrapper.find('Dropzone')
     dropzone.simulate('drop', files)
-    expect(readAsBinaryString).toHaveBeenCalled()
+    expect(readAsText).toHaveBeenCalled()
   });
 
   test('local storage', () => {

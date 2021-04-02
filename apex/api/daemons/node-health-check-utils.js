@@ -70,7 +70,7 @@ function getPrometheusMetrics() {
 async function checkIfGlobalPasswordSet() {
   const options = {
     method: 'GET',
-    url: `http://${process.env['vaultWrapperHost']}/strato/v2.3/verify-password`,
+    url: `${process.env['vaultWrapperHttpHost']}/strato/v2.3/verify-password`,
     followRedirects: false,
     timeout: config.healthCheck.requestTimeout - 100,
     json: true,

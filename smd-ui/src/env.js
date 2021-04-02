@@ -27,7 +27,6 @@ export const env = {
   STRATO_DOC_URL: `${http_protocol}://${node_host}${strato_doc_uri}`,
   SOCKET_SERVER: `${ws_protocol}://${node_host}/`,
   POLLING_FREQUENCY: window.POLLING_FREQUENCY && window.POLLING_FREQUENCY !== '__POLLING_FREQUENCY__' ? window.POLLING_FREQUENCY : 5 * 1000,
-  STRATO_GS_MODE: window.STRATO_GS_MODE && window.STRATO_GS_MODE !== '__STRATO_GS_MODE__' ? window.STRATO_GS_MODE : '0',
   SINGLE_NODE: window.SINGLE_NODE && window.SINGLE_NODE !== '__SINGLE_NODE__' ? window.SINGLE_NODE : 'false',
   EXT_STORAGE_ENABLED: window.EXT_STORAGE_S3_BUCKET && window.EXT_STORAGE_S3_BUCKET !== '__EXT_STORAGE_S3_BUCKET__' ? 'true' : (process.env.REACT_APP_EXT_STORAGE_ENABLED ? process.env.REACT_APP_EXT_STORAGE_ENABLED : 'false'),
   STRATO_VERSION: window.STRATO_VERSION && window.STRATO_VERSION !== '__STRATO_VERSION__' ? window.STRATO_VERSION : 'N/A',

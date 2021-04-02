@@ -5,7 +5,7 @@ const rp = require('request-promise');
 const config = require('../config/app.config');
 
 module.exports = {
-  ping: function (req, res) {
+  ping: async function (req, res) {
     res.status(200).send('pong');
   },
 

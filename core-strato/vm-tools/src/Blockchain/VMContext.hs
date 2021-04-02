@@ -28,6 +28,7 @@ module Blockchain.VMContext
     , stateDB
     , hashDB
     , codeDB
+    , x509CertDB
     , blockSummaryDB
     , kafkaState
     , redisPool
@@ -114,6 +115,7 @@ import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
+import           Blockchain.DB.X509CertDB
 import           Blockchain.EthConf
 import           Blockchain.ExtWord
 import           Blockchain.Strato.Model.Account
@@ -140,6 +142,7 @@ data ContextDBs = ContextDBs
   { _stateDB        :: MP.StateDB
   , _hashDB         :: HashDB
   , _codeDB         :: CodeDB
+  , _x509CertDB     :: X509CertDB
   , _blockSummaryDB :: BlockSummaryDB
   , _kafkaState     :: IORef K.KafkaState
   , _redisPool      :: RBDB.RedisConnection
@@ -195,6 +198,7 @@ type VMBase m = ( MonadIO m
                 , (MP.StateRoot `A.Alters` MP.NodeData) m
                 , (Account `A.Alters` AddressState) m
                 , (Keccak256 `A.Alters` DBCode) m
+                , HasX509CertDB m
                 , (N.NibbleString `A.Alters` N.NibbleString) m
                 , HasMemRawStorageDB m
                 , (RawStorageKey `A.Alters` RawStorageValue) m
@@ -232,6 +236,9 @@ getHashDB = view $ dbs . hashDB
 
 getCodeDB :: ContextM CodeDB
 getCodeDB = view $ dbs . codeDB
+
+getX509CertDB :: ContextM X509CertDB
+getX509CertDB = view $ dbs . x509CertDB
 
 getBlockSummaryDB :: ContextM BlockSummaryDB
 getBlockSummaryDB = view $ dbs . blockSummaryDB
@@ -388,6 +395,11 @@ instance (Keccak256 `A.Alters` DBCode) ContextM where
   insert _ = genericInsertCodeDB $ getCodeDB
   delete _ = genericDeleteCodeDB $ getCodeDB
 
+instance (Account `A.Alters` X509Certificate) ContextM where
+  lookup _ = genericLookupX509CertDB $ getX509CertDB
+  insert _ = genericInsertX509CertDB $ getX509CertDB
+  delete _ = genericDeleteX509CertDB $ getX509CertDB
+
 instance (N.NibbleString `A.Alters` N.NibbleString) ContextM where
   lookup _ = genericLookupHashDB $ getHashDB
   insert _ = genericInsertHashDB $ getHashDB
@@ -444,6 +456,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
       sdb <- openDB stateDBPath
       hdb <- openDB hashDBPath
       cdb <- openDB codeDBPath
+      x509db <- openDB x509CertDBPath
       blksumdb <- openDB blockSummaryCacheDBPath
       rPool <- liftIO . Redis.connect $ Redis.defaultConnectInfo {
         Redis.connectHost = "localhost",
@@ -459,6 +472,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
             { _stateDB        = MP.StateDB sdb
             , _hashDB         = HashDB hdb
             , _codeDB         = CodeDB cdb
+            , _x509CertDB     = X509CertDB x509db
             , _blockSummaryDB = BlockSummaryDB blksumdb
             , _kafkaState     = initialKafkaState
             , _redisPool      = RBDB.RedisConnection rPool
@@ -512,6 +526,7 @@ runContextM dSettings f = do
       sdb <- DB.open (dbDir "h" ++ stateDBPath) ldbOptions
       hdb <- DB.open (dbDir "h" ++ hashDBPath)  ldbOptions
       cdb <- DB.open (dbDir "h" ++ codeDBPath)  ldbOptions
+      x509db <- DB.open (dbDir "h" ++ x509CertDBPath) ldbOptions
       blksumdb <- DB.open (dbDir "h" ++ blockSummaryCacheDBPath) ldbOptions
       rPool <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
       kafkaStateRef <- newIORef $ mkConfiguredKafkaState "ethereum-vm"
@@ -521,6 +536,7 @@ runContextM dSettings f = do
             { _stateDB        = MP.StateDB sdb
             , _hashDB         = HashDB hdb
             , _codeDB         = CodeDB cdb
+            , _x509CertDB     = X509CertDB x509db
             , _blockSummaryDB = BlockSummaryDB blksumdb
             , _kafkaState     = kafkaStateRef
             , _redisPool      = RBDB.RedisConnection rPool

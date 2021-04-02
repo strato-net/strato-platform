@@ -1,8 +1,7 @@
 import mixpanel from 'mixpanel-browser';
 
-import { env } from '../env';
-
-const disabled = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test' || env.STRATO_GS_MODE === '1';
+//TODO: take away the mixpanel code entirely
+const disabled = true //process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
 
 const mixpanelWrapper = {
   init: function(id) {

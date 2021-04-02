@@ -17,6 +17,7 @@ OAUTH_JWT_USERNAME_PROPERTY=${OAUTH_JWT_USERNAME_PROPERTY:-email}
 OAUTH_SCOPE=${OAUTH_SCOPE:-openid email profile}
 OAUTH_STRATO42_FALLBACK=${OAUTH_STRATO42_FALLBACK:-false}
 VM_DEBUG=${vmDebug:-false}
+STATS_ENABLED=${STATS_ENABLED:-true}
 
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
@@ -84,9 +85,9 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
     sed -i '/#TEMPLATE_MARK_OLD_STRATO_API/d' /tmp/nginx.conf
   fi
 
-  # Remove tracking lines if running in mode 1
-  if [ "$STRATO_GS_MODE" = 1 ] ; then
-    sed -i '/#TEMPLATE_MARK_TRACK/d' /tmp/nginx.conf
+  # Remove Stats lines if running in STATS_ENABLED=false
+  if [ "$STATS_ENABLED" != true ] ; then
+    sed -i '/#TEMPLATE_MARK_STATS_ENABLED/d' /tmp/nginx.conf
   fi
 
   if [ "$blockstanbul" != true ]; then

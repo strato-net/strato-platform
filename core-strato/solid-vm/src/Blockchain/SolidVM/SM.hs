@@ -55,6 +55,7 @@ import           Data.Bifunctor (first)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.UTF8  as UTF8
 --import           Data.IORef
 import           Data.Map (Map)
 import qualified Data.Map as M
@@ -72,6 +73,7 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
+import           Blockchain.DB.X509CertDB
 import           Blockchain.ExtWord
 import           Blockchain.Output
 import           Blockchain.Strato.Model.Action
@@ -139,6 +141,7 @@ type SM m = StateT SState m
 
 type MonadSM m = ( (Account `A.Alters` AddressState) m
                  , (Keccak256 `A.Alters` DBCode) m
+                 , HasX509CertDB m
                  , A.Selectable (Maybe Word256) ParentChainId m
                  , HasRawStorageDB m
                  , HasMemAddressStateDB m
@@ -213,6 +216,11 @@ instance (MP.StateRoot `A.Alters` MP.NodeData) m => (MP.StateRoot `A.Alters` MP.
   delete p   = lift . A.delete p
 
 instance (Keccak256 `A.Alters` DBCode) m => (Keccak256 `A.Alters` DBCode) (SM m) where
+  lookup p   = lift . A.lookup p
+  insert p k = lift . A.insert p k
+  delete p   = lift . A.delete p
+
+instance (Account `A.Alters` X509Certificate) m => (Account `A.Alters` X509Certificate) (SM m) where
   lookup p   = lift . A.lookup p
   insert p k = lift . A.insert p k
   delete p   = lift . A.delete p
@@ -317,7 +325,7 @@ startingAction maybeCode env' = Action
   , _actionMetadata           =
       case maybeCode of
         Just theCode ->
-          Just $ M.insert "src" (T.pack $ BC.unpack theCode) $ fromMaybe M.empty $ Env.metadata env'
+          Just $ M.insert "src" (T.pack $ UTF8.toString theCode) $ fromMaybe M.empty $ Env.metadata env'
         Nothing -> Env.metadata env'
   , _actionEvents             = Q.empty
   }
@@ -353,7 +361,8 @@ getVariableOfName name = do
                                                   , "string", "keccak256"
                                                   , "require", "revert", "assert", "sha3"
                                                   , "sha256", "ecrecover", "addmod", "mulmod"
-                                                  , "selfdestruct", "suicide", "bytes32ToString"]) $
+                                                  , "selfdestruct", "suicide", "bytes32ToString"
+                                                  , "registerCert", "getUserCert", "parseCert"]) $
         t "builtin function" $ Constant $ SBuiltinFunction name Nothing
 
       maybeBuiltinVariable :: Maybe Variable

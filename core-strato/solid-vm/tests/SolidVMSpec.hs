@@ -19,6 +19,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Short as SB
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Base16 as B16
+import qualified Data.ByteString.UTF8   as UTF8
 import Data.Coerce
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -127,15 +128,15 @@ runTest f = do
     Right{} -> return ()
 
 runFile :: FilePath -> ContextM ()
-runFile fp = void $ runBS =<< liftIO (B.readFile fp)
+runFile fp = void $ runBS =<< liftIO (readFile fp)
 
 runFileArgs :: T.Text -> FilePath -> ContextM ()
-runFileArgs args fp = void $ runArgs args =<< liftIO (B.readFile fp)
+runFileArgs args fp = void $ runArgs args =<< liftIO (readFile fp)
 
-runBS :: B.ByteString -> ContextM ()
+runBS :: String -> ContextM ()
 runBS = void . runBS'
 
-runBS' ::B.ByteString -> ContextM ExecResults
+runBS' ::String -> ContextM ExecResults
 runBS' = runArgs "()"
 
 rethrowEx :: ExecResults -> ContextM ()
@@ -143,9 +144,9 @@ rethrowEx ExecResults{erException=Just ex} = either (liftIO . throwIO . HE) (voi
 rethrowEx _ = return ()
 
 
-runArgs :: T.Text -> B.ByteString -> ContextM ExecResults
+runArgs :: T.Text -> String -> ContextM ExecResults
 runArgs args bs = do
-  let code = Code bs
+  let code = Code $ UTF8.fromString bs
       isTest = error "TODO: isTest"
       isHomestead = error "TODO: isHomestead"
       suicides = error "TODO: suicides"
@@ -179,9 +180,9 @@ runArgs args bs = do
   return er
 
 
-runCall :: T.Text -> T.Text -> B.ByteString -> ContextM (Maybe SB.ShortByteString)
+runCall :: T.Text -> T.Text -> String -> ContextM (Maybe SB.ShortByteString)
 runCall funcName callArgs bs = do
-  let code = Code bs
+  let code = Code $ UTF8.fromString bs
       isTest = error "TODO: isTest"
       isHomestead = error "TODO: isHomestead"
       suicides = error "TODO: suicides"
@@ -1844,6 +1845,23 @@ contract qq {
 }|] `shouldReturn` Nothing
     getFields ["st"] `shouldReturn` [BString "deadbeef00000000000000000000000000000000000000000000000000000000"]
 
+  it "can accept Unicode string arguments" . runTest $ do
+    runCall "set" "(\"4.11 g CO₂ / t · nm\")" [r|
+contract qq {
+  string st;
+  function set(string _st) public {
+    st = _st;
+  }
+}|] `shouldReturn` Nothing
+    getFields ["st"] `shouldReturn` [BString (UTF8.fromString "4.11 g CO₂ / t · nm")]
+
+  it "can encode Unicode strings in Solidtiy source" . runTest $ do
+    runBS [r|
+contract qq {
+  string st = "4.11 g CO₂ / t · nm";
+}|]
+    getFields ["st"] `shouldReturn` [BString (UTF8.fromString "4.11 g CO₂ / t · nm")]
+
   it "can accept bytes32 arguments" . runTest $ do
     runCall "set" "(\"deadbeef00000000000000000000000000000000000000000000000000000000\")" [r|
 contract qq {
@@ -2743,3 +2761,75 @@ contract qq {
       , BBool False
       ]
 
+  it "can parse an X509 certificate" . runTest $ do
+    runBS [r|
+contract qq {
+
+    string myNewCertificate = "-----BEGIN CERTIFICATE-----\nMIIBiDCCAS2gAwIBAgIQCgO76hC29iXEFXJNco5ekjAMBggqhkjOPQQDAgUAMEYx\nDDAKBgNVBAMMA2RhbjEMMAoGA1UEBgwDVVNBMRIwEAYDVQQKDAlibG9ja2FwcHMx\nFDASBgNVBAsMC2VuZ2luZWVyaW5nMB4XDTIxMDMxODE1NDgwN1oXDTIyMDMxODE1\nNDgwN1owRjEMMAoGA1UEAwwDZGFuMQwwCgYDVQQGDANVU0ExEjAQBgNVBAoMCWJs\nb2NrYXBwczEUMBIGA1UECwwLZW5naW5lZXJpbmcwVjAQBgcqhkjOPQIBBgUrgQQA\nCgNCAAQY4p67l1IIEUdVC7L+rUDwF5Nv30bze0NV5y8ced7qwp+YFk3UAiOGkcYo\n7ba8F92rd0yf9AGpvZN1H3Dda8xdMAwGCCqGSM49BAMCBQADRwAwRAIgbKXO8tZ5\noPhBusPQFkNEQDnLO/MRru4KjtCpPnVb5sACIE0TwBJ7yeIGuPc/8G50/858Pf3a\n0t1hHbhYnJarPkNA\n-----END CERTIFICATE-----";
+
+    string myCommonName   = "";
+    string myCountry      = "";
+    string myOrganization = "";
+    string myGroup        = "";
+    string myPublicKey    = "";
+
+    constructor() {
+        myCommonName   = parseCert(myNewCertificate)["commonName"];
+        myCountry      = parseCert(myNewCertificate)["country"];
+        myOrganization = parseCert(myNewCertificate)["organization"];
+        myGroup        = parseCert(myNewCertificate)["group"];
+        myPublicKey    = parseCert(myNewCertificate)["publicKey"];
+    }
+}|]
+    getFields ["myCommonName", "myCountry", "myOrganization", "myGroup", "myPublicKey"] `shouldReturn`
+      [ BString "dan"
+      , BString "USA"
+      , BString "blockapps"
+      , BString "engineering"
+      , BString "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEGOKeu5dSCBFHVQuy/q1A8BeTb99G83tD\nVecvHHne6sKfmBZN1AIjhpHGKO22vBfdq3dMn/QBqb2TdR9w3WvMXQ==\n-----END PUBLIC KEY-----\n"
+      ]
+
+  it "can post a X509 certificate and grab cert fields" . runTest $ do
+    runBS [r|
+contract qq {
+    account myAccount = account(tx.origin, "main");
+    
+    string myNewCertificate = "-----BEGIN CERTIFICATE-----\nMIIBiDCCAS2gAwIBAgIQCgO76hC29iXEFXJNco5ekjAMBggqhkjOPQQDAgUAMEYx\nDDAKBgNVBAMMA2RhbjEMMAoGA1UEBgwDVVNBMRIwEAYDVQQKDAlibG9ja2FwcHMx\nFDASBgNVBAsMC2VuZ2luZWVyaW5nMB4XDTIxMDMxODE1NDgwN1oXDTIyMDMxODE1\nNDgwN1owRjEMMAoGA1UEAwwDZGFuMQwwCgYDVQQGDANVU0ExEjAQBgNVBAoMCWJs\nb2NrYXBwczEUMBIGA1UECwwLZW5naW5lZXJpbmcwVjAQBgcqhkjOPQIBBgUrgQQA\nCgNCAAQY4p67l1IIEUdVC7L+rUDwF5Nv30bze0NV5y8ced7qwp+YFk3UAiOGkcYo\n7ba8F92rd0yf9AGpvZN1H3Dda8xdMAwGCCqGSM49BAMCBQADRwAwRAIgbKXO8tZ5\noPhBusPQFkNEQDnLO/MRru4KjtCpPnVb5sACIE0TwBJ7yeIGuPc/8G50/858Pf3a\n0t1hHbhYnJarPkNA\n-----END CERTIFICATE-----";
+
+    string myUsername          = "";
+    string myOrganization      = "";
+    string myGroup             = "";
+    
+    string myCommonName   = "";
+    string myCountry      = "";
+    string myOrganization = "";
+    string myGroup        = "";
+    string myPublicKey    = "";
+    string myCertificate  = "";
+
+    constructor() {
+        registerCert(myAccount, myNewCertificate); 
+
+        myUsername     = tx.username;
+        myOrganization = tx.organization;
+        myGroup        = tx.group;
+        
+        myCommonName   = getUserCert(myAccount)["commonName"];
+        myCountry      = getUserCert(myAccount)["country"];
+        myOrganization = getUserCert(myAccount)["organization"];
+        myGroup        = getUserCert(myAccount)["group"];
+        myPublicKey    = getUserCert(myAccount)["publicKey"];
+        myCertificate  = getUserCert(myAccount)["certString"];
+    }
+}|]
+    getFields ["myUsername", "myOrganization", "myGroup", "myCommonName", "myCountry", "myOrganization", "myGroup", "myPublicKey", "myCertificate"] `shouldReturn`
+      [ BString "dan"
+      , BString "blockapps"
+      , BString "engineering"
+      , BString "dan"
+      , BString "USA"
+      , BString "blockapps"
+      , BString "engineering"
+      , BString "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEGOKeu5dSCBFHVQuy/q1A8BeTb99G83tD\nVecvHHne6sKfmBZN1AIjhpHGKO22vBfdq3dMn/QBqb2TdR9w3WvMXQ==\n-----END PUBLIC KEY-----\n"
+      , BString "-----BEGIN CERTIFICATE-----\nMIIBiDCCAS2gAwIBAgIQCgO76hC29iXEFXJNco5ekjAMBggqhkjOPQQDAgUAMEYx\nDDAKBgNVBAMMA2RhbjEMMAoGA1UEBgwDVVNBMRIwEAYDVQQKDAlibG9ja2FwcHMx\nFDASBgNVBAsMC2VuZ2luZWVyaW5nMB4XDTIxMDMxODE1NDgwN1oXDTIyMDMxODE1\nNDgwN1owRjEMMAoGA1UEAwwDZGFuMQwwCgYDVQQGDANVU0ExEjAQBgNVBAoMCWJs\nb2NrYXBwczEUMBIGA1UECwwLZW5naW5lZXJpbmcwVjAQBgcqhkjOPQIBBgUrgQQA\nCgNCAAQY4p67l1IIEUdVC7L+rUDwF5Nv30bze0NV5y8ced7qwp+YFk3UAiOGkcYo\n7ba8F92rd0yf9AGpvZN1H3Dda8xdMAwGCCqGSM49BAMCBQADRwAwRAIgbKXO8tZ5\noPhBusPQFkNEQDnLO/MRru4KjtCpPnVb5sACIE0TwBJ7yeIGuPc/8G50/858Pf3a\n0t1hHbhYnJarPkNA\n-----END CERTIFICATE-----\n"
+      ]
