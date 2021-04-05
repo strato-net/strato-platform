@@ -357,10 +357,10 @@ setEnv diffPublish true
 setEnv evmDebugMode false
 setEnv evmTraceMode false
 
-setEnv vmDebug=${vmDebug:-false}
-setEnv wsDebug=${wsDebug:-false}
-setEnv debugPort=${debugPort:-8051}
-setEnv debugWSPort=${debugWSPort:-8052}
+setEnv vmDebug ${vmDebug:-false}
+setEnv wsDebug ${wsDebug:-false}
+setEnv debugPort ${debugPort:-8051}
+setEnv debugWSPort ${debugWSPort:-8052}
 
 stratoBootnode=${bootnode:+--stratoBootnode=$bootnode}
 [[ -n $bootnode ]] && addBootnodes=true
