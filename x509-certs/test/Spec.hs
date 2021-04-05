@@ -8,6 +8,7 @@ import           BlockApps.X509
 
 import           Control.Monad.Trans.Reader
 import           Crypto.PubKey.ECC.Types
+import qualified Data.Aeson                           as Ae
 import           Data.Coerce
 import           Data.Maybe
 
@@ -47,7 +48,10 @@ spec = do
           inPub = fromMaybe (error "could not import pubkey from cert") (importPublicKey (coerce certPubSerialPoint)) 
       certPub `shouldBe` PubKeyEC exPub
       inPub `shouldBe` pub
-      
+    it "can do JSON encoding roundtrips" $ do
+      cert <- flip runReaderT priv $ makeSignedCert iss sub
+      Ae.decode (Ae.encode sub) `shouldBe` Just sub
+      Ae.decode (Ae.encode cert) `shouldBe` Just cert 
     it "can do PEM encoding roundtrips" $ do
       cert <- flip runReaderT priv $ makeSignedCert iss sub
       Right cert `shouldBe` bsToCert (certToBytes cert)

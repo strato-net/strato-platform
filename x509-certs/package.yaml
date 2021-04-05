@@ -73,6 +73,7 @@ tests:
     source-dirs: test/
     dependencies:
       - x509-certs
+      - aeson
       - bytestring
       - cryptonite
       - ethereum-rlp

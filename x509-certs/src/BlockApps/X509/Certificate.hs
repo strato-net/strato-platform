@@ -81,7 +81,7 @@ data Subject = Subject
 
 
 instance ToJSON Subject where
-  toJSON (Subject cn c o ou pub) = 
+  toJSON (Subject cn o ou c pub) = 
     object [ "commonName"       .= cn
            , "organization"     .= o
            , "organizationUnit" .= ou
