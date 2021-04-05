@@ -17,6 +17,8 @@ OAUTH_JWT_USERNAME_PROPERTY=${OAUTH_JWT_USERNAME_PROPERTY:-email}
 OAUTH_SCOPE=${OAUTH_SCOPE:-openid email profile}
 OAUTH_STRATO42_FALLBACK=${OAUTH_STRATO42_FALLBACK:-false}
 VM_DEBUG=${vmDebug:-false}
+debugPort=${debugPort:-8051}
+debugWSPort=${debugWSPort:-8052}
 STATS_ENABLED=${STATS_ENABLED:-true}
 
 # If container is running for the first time - generate config:
