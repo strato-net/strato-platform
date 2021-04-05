@@ -1,5 +1,6 @@
 {
 	"name": "strato-vscode",
+        "publisher": "BlockApps, Inc.",
 	"displayName": "STRATO",
 	"description": "VSCode Integration for BlockApps STRATO",
 	"version": "0.0.1",
