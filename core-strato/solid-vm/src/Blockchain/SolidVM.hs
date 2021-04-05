@@ -853,7 +853,7 @@ expToVar' x@(Xabi.MemberAccess expr name) = do
                                                     return . Constant . SString . fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
       (SBuiltinVariable "tx", "group") -> do env' <- getEnv
                                              maybeCert <- x509CertDBGet $ Env.origin env'
-                                             return . Constant . SString . fromMaybe "" . fmap subUnit $ getCertSubject =<< maybeCert
+                                             return . Constant . SString . fromMaybe "" $ subUnit =<< getCertSubject =<< maybeCert
       (SStruct _ theMap, fieldName) -> case M.lookup fieldName theMap of
           Nothing -> missingField "struct member access" fieldName
           Just v -> return v
@@ -1375,9 +1375,9 @@ certificateMap maybeCert = case maybeCert of
     Just cert -> SMap stringToString (fromMaybe emptyCertMap $ fmap (certMap cert) (subject cert))
     where subject cert = getCertSubject =<< (eitherToMaybe . bsToCert . BC.pack $ cert)
           certMap cert sub = M.fromList [ (SString "commonName", Constant . SString $ subCommonName sub)
-                                   , (SString "country", Constant . SString $ subCountry sub) 
+                                   , (SString "country", Constant . SString $ fromMaybe "" $ subCountry sub) 
                                    , (SString "organization", Constant . SString $ subOrg sub) 
-                                   , (SString "group", Constant . SString $ subUnit sub) 
+                                   , (SString "group", Constant . SString $ fromMaybe "" $ subUnit sub) 
                                    , (SString "publicKey", Constant . SString $ BC.unpack $ pubToBytes $ subPub sub) 
                                    , (SString "certString", Constant . SString $ cert)
                                    ]
