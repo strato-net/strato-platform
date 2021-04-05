@@ -9,6 +9,7 @@ import qualified Data.ByteString.Lazy                 as BL
 import           Data.IORef
 import           Data.Map                             (Map)
 import qualified Data.Map                             as M
+import           Data.Text                            (Text)
 import qualified Data.Text                            as T
 import           Data.Text.Encoding                   (decodeUtf8, encodeUtf8)
 import           System.IO.Unsafe
@@ -80,9 +81,9 @@ codeCollectionFromHash hsh = do
       mCode <- getCode hsh
       case mCode of
         Just (_, initCode) -> do
-          let initMap = case Aeson.decode $ BL.fromStrict initCode of
+          let initMap = case Aeson.decode $ BL.fromStrict initCode :: Maybe (Map Text Text) of
                 Just m -> m
-                Nothing -> case Aeson.decode $ BL.fromStrict initCode of
+                Nothing -> case Aeson.decode $ BL.fromStrict initCode :: Maybe [(Text, Text)] of
                   Just l -> M.fromList l
                   Nothing -> M.singleton T.empty (decodeUtf8 initCode)
           let cc = compileSource initMap

@@ -333,7 +333,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} sign = blocTransacti
 postUsersUploadList :: UserName -> Address -> Maybe ChainId -> Bool -> UploadListRequest -> Bloc [BlocTransactionResult]
 postUsersUploadList userName addr chainId resolve (UploadListRequest pw contracts msrcs _resolve) = do
   sk <- getAccountSecKey userName pw addr
-  let getSrc c = maybe [] Map.toList msrcs ++ uploadlistcontractSrc c 
+  let getSrc c = maybe [] Map.toList msrcs <> uploadlistcontractSrc c
       setSrc c = c{uploadlistcontractSrc = getSrc c}
       bclp = ContractListParameters
                addr

@@ -581,8 +581,8 @@ deserializeSrc :: MonadIO m => Text -> m [(Text, Text)]
 deserializeSrc = decodeSrcJSON
 
 decodeSrcJSON :: MonadIO m => Text -> m [(Text, Text)]
-decodeSrcJSON src' = case decode (fromStrict $ Text.encodeUtf8 src') of
-  Nothing -> case decode (fromStrict $ Text.encodeUtf8 src') of
+decodeSrcJSON src' = case decode (fromStrict $ Text.encodeUtf8 src') :: Maybe [(Text, Text)] of
+  Nothing -> case decode (fromStrict $ Text.encodeUtf8 src') :: Maybe (Map Text Text) of
     Nothing -> pure $ [("", src')]
     Just m -> pure $ Map.toList m
   Just x -> return x
@@ -873,7 +873,7 @@ getContractDetailsForContract theVM src mContract = do
   idsAndDetails <- case mCachedDetails of
     Just cachedDetails -> pure cachedDetails
     Nothing -> do
-      details <- if Prelude.sum (Text.length . snd <$> src) == 0
+      details <- if any (/= 0) (Text.length . snd <$> src)
                    then return Map.empty
                    else sourceToContractDetails shouldCompile src
       liftIO $ Cache.insert srcCache cacheKey details

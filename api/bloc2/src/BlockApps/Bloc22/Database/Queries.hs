@@ -586,8 +586,8 @@ deserializeSrc :: MonadIO m => Text -> m [(Text, Text)]
 deserializeSrc = decodeSrcJSON
 
 decodeSrcJSON :: MonadIO m => Text -> m [(Text, Text)]
-decodeSrcJSON src' = case decode (fromStrict $ Text.encodeUtf8 src') of
-  Nothing -> case decode (fromStrict $ Text.encodeUtf8 src') of
+decodeSrcJSON src' = case decode (fromStrict $ Text.encodeUtf8 src') :: Maybe [(Text, Text)] of
+  Nothing -> case decode (fromStrict $ Text.encodeUtf8 src') :: Maybe (Map Text Text) of
     Nothing -> pure $ [("", src')]
     Just m -> pure $ Map.toList m
   Just x -> return x
@@ -887,7 +887,7 @@ getContractDetailsForContract theVM src mContract = do
   idsAndDetails <- case mCachedDetails of
     Just cachedDetails -> pure cachedDetails
     Nothing -> do
-      details <- if Prelude.sum (Text.length . snd <$> src) == 0
+      details <- if any (/= 0) (Text.length . snd <$> src)
                    then return Map.empty
                    else sourceToContractDetails shouldCompile src
       liftIO $ Cache.insert srcCache cacheKey details
@@ -943,7 +943,7 @@ sourceToContractDetails shouldCompile sourceList = do
 compileContract :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
                    [(Text, Text)] -> m (Map Text (Int32, ContractDetails))
 compileContract sourceList = do
-  let source = Text.intercalate "\n" $ map snd sourceList
+  let source = Text.intercalate "\n" $ snd <$> sourceList
       eVerXabis = parseXabi "-" $ Text.unpack source
   (ver, xabis) <- case eVerXabis of
     Left err -> blocError . UserError . Text.pack $ err
@@ -980,7 +980,7 @@ compileContract sourceList = do
 createMetadataNoCompile :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
                            [(Text, Text)] -> m (Map Text (Int32, ContractDetails))
 createMetadataNoCompile sourceList = do
-  let source = Text.intercalate "\n" $ map snd sourceList
+  let source = Text.intercalate "\n" $ snd <$> sourceList
       encodedSrc = serializeSrc sourceList
       eVerXabis = parseXabi "-" $ Text.unpack source
   xabis <- case eVerXabis of
