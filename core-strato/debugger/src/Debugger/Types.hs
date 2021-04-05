@@ -3,6 +3,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -12,6 +13,7 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Debugger.Types
@@ -25,7 +27,10 @@ module Debugger.Types
   , WatchMap(..)
   , DebugState(..)
   , DebuggerStatus(..)
-  , DebugSettings(..)
+  , DebugSettingsF(..)
+  , DebugSettings
+  , DebugSettingsI
+  , emptyDebugSettings
   , newDebugSettings
   , Debuggable
   , Evaluator
@@ -41,6 +46,7 @@ import           Control.Monad
 import qualified Control.Monad.Change.Modify          as Mod
 import           Control.Monad.IO.Class
 import           Data.Aeson                           as Aeson
+import           Data.Functor.Identity
 import           Data.Map.Strict                      (Map)
 import qualified Data.Map.Strict                      as M
 import           Data.Set                             (Set)
@@ -145,28 +151,45 @@ instance Arbitrary DebuggerStatus where
       1 -> pure Running
       _ -> Paused <$> arbitrary
 
-data DebugSettings = DebugSettings {
-                     operation :: TVar DebugOperation
-                   , breakpoints :: TVar (Set Breakpoint)
-                   , current :: TVar (Maybe DebugState)
-                   , changed :: TVar Bool
-                   , exceptionBreakpoints :: TVar Bool
-                   , functionBreakpoints :: TVar Bool
-                   , watchExpressions :: TVar (Set Text)
-                   } deriving (Eq, Generic)
+data DebugSettingsF f = DebugSettings {
+                        operation :: f DebugOperation
+                      , breakpoints :: f (Set Breakpoint)
+                      , current :: f (Maybe DebugState)
+                      , changed :: f Bool
+                      , exceptionBreakpoints :: f Bool
+                      , functionBreakpoints :: f Bool
+                      , watchExpressions :: f (Set Text)
+                      } deriving (Generic)
+
+type DebugSettings = DebugSettingsF TVar
+type DebugSettingsI = DebugSettingsF Identity
 
 instance NFData DebugSettings where
   rnf d@DebugSettings{..} = d `seq` ()
 
+emptyDebugSettings :: DebugSettingsI
+emptyDebugSettings =
+  DebugSettings
+    (Identity Run)
+    (Identity S.empty)
+    (Identity Nothing)
+    (Identity False)
+    (Identity False)
+    (Identity False)
+    (Identity S.empty)
+
 newDebugSettings :: STM DebugSettings
-newDebugSettings = DebugSettings
-               <$> (newTVar Run)
-               <*> (newTVar S.empty)
-               <*> (newTVar Nothing)
-               <*> (newTVar False)
-               <*> (newTVar False)
-               <*> (newTVar False)
-               <*> (newTVar S.empty)
+newDebugSettings =
+  let DebugSettings{..} = emptyDebugSettings
+      tvar = newTVar . runIdentity
+   in DebugSettings
+        <$> (tvar operation)
+        <*> (tvar breakpoints)
+        <*> (tvar current)
+        <*> (tvar changed)
+        <*> (tvar exceptionBreakpoints)
+        <*> (tvar functionBreakpoints)
+        <*> (tvar watchExpressions)
 
 type Debuggable m =
   ( MonadIO m
