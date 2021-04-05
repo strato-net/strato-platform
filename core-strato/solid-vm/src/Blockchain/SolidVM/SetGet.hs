@@ -1,13 +1,9 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeSynonymInstances  #-}
 
 module Blockchain.SolidVM.SetGet (
   setVar,
@@ -47,7 +43,6 @@ import           Blockchain.Strato.Model.Account
 import qualified SolidVM.Model.Storable as MS
 import qualified SolidVM.Solidity.Xabi.Type as Xabi
 import           Text.Format
-import           UnliftIO
 
 --import Debug.Trace
 

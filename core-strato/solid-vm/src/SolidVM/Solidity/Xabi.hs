@@ -267,7 +267,7 @@ data ContractDetails = ContractDetails
   , contractdetailsBinRuntime :: Text
   , contractdetailsCodeHash   :: Keccak256
   , contractdetailsName       :: Text
-  , contractdetailsSrc        :: [(Text, Text)]
+  , contractdetailsSrc        :: Text
   , contractdetailsXabi       :: Xabi
   } deriving (Show,Eq,Generic)
 
