@@ -29,6 +29,7 @@ import           Control.Monad.IO.Class
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.UTF8  as UTF8
 import           Data.Foldable (for_)
+import           Data.IORef
 import           Data.List
 import qualified Data.Map as M
 import qualified Data.Text as T
