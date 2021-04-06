@@ -874,8 +874,8 @@ getContractDetailsForContract theVM src mContract = do
     Just cachedDetails -> pure cachedDetails
     Nothing -> do
       details <- if any (/= 0) (Text.length . snd <$> src)
-                   then return Map.empty
-                   else sourceToContractDetails shouldCompile src
+                   then sourceToContractDetails shouldCompile src
+                   else return Map.empty
       liftIO $ Cache.insert srcCache cacheKey details
       pure details
   case mContract of
