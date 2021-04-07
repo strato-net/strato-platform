@@ -122,33 +122,65 @@ contract EventTest {
 
   it("Will create and insert into tables for valid solidity events", async () => {
     // MUST USE SOLIDVM - EVM does not know about events
-    let options = {'VM' : 'SolidVM', 'doNotResolve' : false, config};
+    let vmOptions = {config};
+    vmOptions.config.VM = 'SolidVM'; 
+
 
     // multiple inserts with a single contract instance
-    const [user,contract] = await upload("EventTest", eventsContract, options);
+    const [user,contract] = await upload("EventTest", eventsContract, vmOptions);
     let magic = 97;
-    let res = await rest.call(user, {contract, method: "emitTest", args: {magic}}, options);
+    let res = await rest.call(user, {contract, method: "emitTest", args: {magic}}, vmOptions);
     await sleep(2000);
-    res = await rest.search(user, {...contract, name: "SlipstreamTest"}, {...options, query: {magic: "eq.97"}});
+    res = await rest.search(user, {...contract, name: "EventTest.SlipstreamTest"}, {...vmOptions, query: {magic: "eq.97"}});
+    assert.equal(res[0].magic, magic);
     magic = 98;
-    res = await rest.call(user, {contract, method: "emitTest", args: {magic}}, options);
+    res = await rest.call(user, {contract, method: "emitTest", args: {magic}}, vmOptions);
     await sleep(2000);
-    res = await rest.search(user, {...contract, name: "SlipstreamTest"}, {...options, query: {magic: "eq.98"}});
+    res = await rest.search(user, {...contract, name: "EventTest.SlipstreamTest"}, {...vmOptions, query: {magic: "eq.98"}});
+    assert.equal(res[0].magic, magic)
     magic = 99;
-    res = await rest.call(user, {contract, method: "emitTest", args: {magic}}, options);
+    res = await rest.call(user, {contract, method: "emitTest", args: {magic}}, vmOptions);
     await sleep(2000);
-    res = await rest.search(user, {...contract, name: "SlipstreamTest"}, {...options, query: {magic: "eq.99"}});
+    res = await rest.search(user, {...contract, name: "EventTest.SlipstreamTest"}, {...vmOptions, query: {magic: "eq.99"}});
    
+    assert.equal(res[0].magic, magic)
+    
+    
     // insert with a different instance of the same contract (same table)
-    const [user2,contract2] = await upload("EventTest", eventsContract, options);
+    const [user2,contract2] = await upload("EventTest", eventsContract, vmOptions);
     magic = 97;
-    res = await rest.call(user2, {contract: contract2, method: "emitTest", args: {magic}}, options);
+    res = await rest.call(user2, {contract: contract2, method: "emitTest", args: {magic}}, vmOptions);
     await sleep(2000);
-    res = await rest.search(user, {...contract, name: "SlipstreamTest"}, {...options, query: {magic: "eq.97"}});
+    res = await rest.search(user, {...contract, name: "EventTest.SlipstreamTest"}, {...vmOptions, query: {magic: "eq.97"}});
+    assert.equal(res[0].magic, magic)
     magic = 900;
-    res = await rest.call(user2, {contract: contract2, method: "emitTest", args: {magic}}, options);
+    res = await rest.call(user2, {contract: contract2, method: "emitTest", args: {magic}}, vmOptions);
     await sleep(2000);
-    res = await rest.search(user, {...contract, name: "SlipstreamTest"}, {...options, query: {magic: "eq.900"}});
+    res = await rest.search(user, {...contract, name: "EventTest.SlipstreamTest"}, {...vmOptions, query: {magic: "eq.900"}});
+    assert.equal(res[0].magic, magic)
+  });
+
+const keywordEventsContract = `
+contract KeywordEventTest {
+  event Keywords (uint from, uint to);
+  function emitKeyword (uint from, uint to) {
+    emit Keywords(from, to);
+  }
+}`;
+
+  it("Will create and insert into event tables using escaped SQL keywords", async () => {
+    // MUST USE SOLIDVM - EVM does not know about events
+    let vmOptions = {config};
+    vmOptions.config.VM = 'SolidVM'; 
+
+    // multiple inserts with a single contract instance
+    const [user,contract] = await upload("KeywordEventTest", keywordEventsContract, vmOptions);
+    let from = 1, to = 2;
+    let res = await rest.call(user, {contract, method: "emitKeyword", args: {from, to}}, vmOptions);
+    await sleep(2000);
+    res = await rest.search(user, {...contract, name: "KeywordEventTest.Keywords"}, {...vmOptions, query: {from: "eq.1"}});
+    assert.equal(res[0].from, from);
+    assert.equal(res[0].to, to);
   });
 
 
