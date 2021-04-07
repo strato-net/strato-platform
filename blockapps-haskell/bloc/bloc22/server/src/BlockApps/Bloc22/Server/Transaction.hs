@@ -92,7 +92,13 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
       addr <- case mAddr of
         Nothing -> fmap unAddress . blocVaultWrapper $ getKey userName Nothing
         Just addr' -> return addr'
-      let getSrc p = Map.union (contractpayloadSrc p) (fromMaybe Map.empty msrcs)
+      let src' :: ContractPayload -> Maybe [(Text, Text)]
+          src' p = case contractpayloadSrc p of
+                   [] -> Nothing
+                   ys -> Just ys
+          srcMap :: ContractPayload -> Maybe [(Text, Text)]
+          srcMap p = fmap unSourceMap . join $ liftA2 Map.lookup (contractpayloadContract p) msrcs
+          getSrc p = fromMaybe [] $ src' p <|> srcMap p
       fmap join . forM (partitionWith transactionType txs') $ \(ttype, txs) -> case ttype of
         TRANSFER -> case txs of
           [] -> return []
@@ -193,7 +199,13 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
           [] -> return []
           xs -> do
             chainInputs <- traverse fromGenesis xs
-            let hydrate p = p{ chaininputSrc = chaininputSrc p <|> join (liftA2 Map.lookup (chaininputContract p) msrcs) }
+            let chainInputSrc :: ChainInput -> Maybe [(Text, Text)]
+                chainInputSrc p = case chaininputSrc p of
+                               [] -> Nothing
+                               ys -> Just ys
+                chainInputSrcMap :: ChainInput -> Maybe [(Text, Text)]
+                chainInputSrcMap p = fmap unSourceMap . join $ liftA2 Map.lookup (chaininputContract p) msrcs
+                hydrate p = p{ chaininputSrc = fromMaybe [] $ chainInputSrc p <|> chainInputSrcMap p }
             fmap (fmap BlocChainResult) . postChainInfos $ hydrate <$> chainInputs
   where fromTransfer = \case
           BlocTransfer t -> return t

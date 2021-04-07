@@ -41,6 +41,30 @@ async function get(host, endpoint, options:Options) {
   }
 }
 
+async function put(host, endpoint, body, options:Options) {
+  const logger = options.logger || (options.config.apiDebug? console : nullLogger)
+  const url = host + endpoint
+  const request:AxiosRequestConfig = {
+    url,
+    method: 'PUT',
+    headers: options.headers || null,
+    data: body,
+    transformResponse: [toJson],
+  }
+  try {
+    logger.debug('### axios PUT')
+    logger.debug(requestFormatter(request))
+    const response = await axios(request)
+    logger.debug('### axios PUT response')
+    logger.debug(responseFormatter(response))
+    return options.getFullResponse ? response : response.data
+  } catch (err) {
+    logger.debug('### axios PUT error')
+    console.error(errorFormatter(err))
+    throw err
+  }
+}
+
 async function post(host, endpoint, body, options:Options) {
   const logger = options.logger || (options.config.apiDebug? console : nullLogger)
   const url = host + endpoint
@@ -60,6 +84,30 @@ async function post(host, endpoint, body, options:Options) {
     return options.getFullResponse ? response : response.data
   } catch (err) {
     logger.debug('### axios POST error')
+    console.error(errorFormatter(err))
+    throw err
+  }
+}
+
+async function httpDelete(host, endpoint, body, options:Options) {
+  const logger = options.logger || (options.config.apiDebug? console : nullLogger)
+  const url = host + endpoint
+  const request:AxiosRequestConfig = {
+    url,
+    method: 'DELETE',
+    headers: options.headers || null,
+    data: body,
+    transformResponse: [toJson],
+  }
+  try {
+    logger.debug('### axios DELETE')
+    logger.debug(requestFormatter(request))
+    const response = await axios(request)
+    logger.debug('### axios DELETE response')
+    logger.debug(responseFormatter(response))
+    return options.getFullResponse ? response : response.data
+  } catch (err) {
+    logger.debug('### axios DELETE error')
     console.error(errorFormatter(err))
     throw err
   }
@@ -121,14 +169,30 @@ function errorFormatter(err) {
   return err.toString();
 }
 
+async function putue(host, endpoint, data, _options:Options) {
+  const options = Object.assign({}, _options)
+  options.headers = Object.assign({}, options.headers, urlencodedHeaders)
+  return put(host, endpoint, queryString.stringify(data), options)
+}
+
 async function postue(host, endpoint, data, _options:Options) {
   const options = Object.assign({}, _options)
   options.headers = Object.assign({}, options.headers, urlencodedHeaders)
   return post(host, endpoint, queryString.stringify(data), options)
 }
 
+async function httpDeleteue(host, endpoint, data, _options:Options) {
+  const options = Object.assign({}, _options)
+  options.headers = Object.assign({}, options.headers, urlencodedHeaders)
+  return httpDelete(host, endpoint, queryString.stringify(data), options)
+}
+
 export default {
   get,
+  put,
+  putue,
   post,
   postue,
+  httpDelete,
+  httpDeleteue,
 }

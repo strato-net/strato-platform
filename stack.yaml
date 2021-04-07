@@ -29,6 +29,7 @@ packages:
 - core-strato/blockapps-data/
 - core-strato/blockapps-datadefs/
 - core-strato/blockapps-mpdbs/
+- core-strato/debugger/
 - core-strato/fast-keccak256/
 - core-strato/strato-init/
 - core-strato/ethereum-discovery/

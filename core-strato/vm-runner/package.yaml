@@ -29,6 +29,7 @@ library:
   - conduit
   - containers
   - cross-monitoring
+  - debugger
   - dlist
   - ethereum-rlp
   - ethereum-vm
@@ -61,15 +62,24 @@ executables:
     source-dirs: exec_src
     main: Main.hs
     dependencies:
+      - aeson
       - async
       - blockapps-init
       - blockapps-util
+      - containers
+      - debugger
       - hflags
+      - servant-server
+      - solid-vm
       - strato-conf
+      - text
+      - transformers
+      - unliftio
       - vm-runner
       - vm-tools
       - wai-middleware-prometheus
       - warp
+      - websockets
     ghc-options: -Wall -O2 -threaded -rtsopts -fprof-auto
 
 tests:

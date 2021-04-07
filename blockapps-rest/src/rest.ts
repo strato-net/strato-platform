@@ -410,6 +410,17 @@ async function getAccounts(user:OAuthUser, options:Options) {
   }
 }
 
+async function getVersion(user:OAuthUser, options:Options) {
+  try {
+    return await api.getVersion(user, { ...options, isAsync: true });
+  } catch (err) {
+    throw new RestError(
+      RestStatus.BAD_REQUEST,
+      err.response.statusText || err.response || err,
+      err.response.data || err.response || err
+    );
+  }
+}
 // =====================================================================
 //   user
 // =====================================================================
@@ -1470,6 +1481,95 @@ async function pingOauth(user, options:Options) {
 }
 
 // =====================================================================
+//  Debugging
+// =====================================================================
+
+async function debugStatus(user:OAuthUser, options:Options) {
+  const response = await api.debugStatus(user, options);
+  return response;
+}
+
+async function debugPause(user:OAuthUser, options:Options) {
+  const response = await api.debugPause(user, options);
+  return response;
+}
+
+async function debugResume(user:OAuthUser, options:Options) {
+  const response = await api.debugResume(user, options);
+  return response;
+}
+
+async function debugGetBreakpoints(user:OAuthUser, options:Options) {
+  const response = await api.debugGetBreakpoints(user, options);
+  return response;
+}
+
+async function debugPutBreakpoints(user:OAuthUser, args, options:Options) {
+  const response = await api.debugPutBreakpoints(user, args, options);
+  return response;
+}
+
+async function debugDeleteBreakpoints(user:OAuthUser, args, options:Options) {
+  const response = await api.debugDeleteBreakpoints(user, args, options);
+  return response;
+}
+
+async function debugClearBreakpoints(user:OAuthUser, options:Options) {
+  const response = await api.debugClearBreakpoints(user, options);
+  return response;
+}
+
+async function debugClearBreakpointsPath(user:OAuthUser, path:string, options:Options) {
+  const response = await api.debugClearBreakpointsPath(user, path, options);
+  return response;
+}
+
+async function debugStepIn(user:OAuthUser, options:Options) {
+  const response = await api.debugStepIn(user, options);
+  return response;
+}
+
+async function debugStepOver(user:OAuthUser, options:Options) {
+  const response = await api.debugStepOver(user, options);
+  return response;
+}
+
+async function debugStepOut(user:OAuthUser, options:Options) {
+  const response = await api.debugStepOut(user, options);
+  return response;
+}
+
+async function debugGetStackTrace(user:OAuthUser, options:Options) {
+  const response = await api.debugGetStackTrace(user, options);
+  return response;
+}
+
+async function debugGetVariables(user:OAuthUser, options:Options) {
+  const response = await api.debugGetVariables(user, options);
+  return response;
+}
+
+async function debugGetWatches(user:OAuthUser, options:Options) {
+  const response = await api.debugGetWatches(user, options);
+  return response;
+}
+
+async function debugPutWatches(user:OAuthUser, args, options:Options) {
+  const response = await api.debugPutWatches(user, args, options);
+  return response;
+}
+
+async function debugDeleteWatches(user:OAuthUser, args, options:Options) {
+  const response = await api.debugDeleteWatches(user, args, options);
+  return response;
+}
+
+async function debugClearWatches(user:OAuthUser, options:Options) {
+  const response = await api.debugClearWatches(user, options);
+  return response;
+}
+
+// =====================================================================
 //   Common patterns used in applications
 // =====================================================================
 
@@ -1529,6 +1629,7 @@ async function waitForAddress(user, contract, _options:Options) {
 export default {
   fill,
   getAccounts,
+  getVersion,
   createUser,
   compileContracts,
   createContract,
@@ -1566,6 +1667,24 @@ export default {
   listExtStorage,
   //
   pingOauth,
+  //
+  debugStatus,
+  debugPause,
+  debugResume,
+  debugGetBreakpoints,
+  debugPutBreakpoints,
+  debugDeleteBreakpoints,
+  debugClearBreakpoints,
+  debugClearBreakpointsPath,
+  debugStepIn,
+  debugStepOver,
+  debugStepOut,
+  debugGetStackTrace,
+  debugGetVariables,
+  debugGetWatches,
+  debugPutWatches,
+  debugDeleteWatches,
+  debugClearWatches,
   //
   RestError,
   response,
