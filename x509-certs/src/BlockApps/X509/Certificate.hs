@@ -14,29 +14,30 @@ module BlockApps.X509.Certificate (
   bsToCert,
   makeCert,
   makeSignedCert,
-  fromASN1CS, -- I'd rather not
-  getCertSubject
+  getCertSubject,
+  getCertIssuer
  ) where
 
 
 
 
 import           Blockchain.Data.RLP
+import           Blockchain.Strato.Model.Secp256k1
 import           BlockApps.X509.Keys
 
+import           Control.Monad.IO.Class
 import           Crypto.Random.Entropy
 import           Crypto.Hash
-import qualified Crypto.Hash.Algorithms         as CH
-import qualified Crypto.Secp256k1               as SEC
+import qualified Crypto.Hash.Algorithms             as CH
+import qualified Crypto.Secp256k1                   as SEC
 
 import           Data.Aeson
 import           Data.ASN1.OID
 import           Data.ASN1.Types.String
 import           Data.Bits
-import qualified Data.ByteArray                 as BA
-import qualified Data.ByteString                as B
-import qualified Data.ByteString.Char8          as C8
-import qualified Data.ByteString.Base16         as B16
+import qualified Data.ByteArray                     as BA
+import qualified Data.ByteString                    as B
+import qualified Data.ByteString.Char8              as C8
 import           Data.Either
 import           Data.Maybe
 import           Data.PEM
@@ -62,46 +63,41 @@ newtype X509Certificate = X509Certificate SignedCertificate deriving (Show, Eq)
 data Issuer = Issuer
   {
     issCommonName :: String
-  , issCountry    :: String
   , issOrg        :: String
-  , issUnit       :: String
-  , issPriv       :: SEC.SecKey
+  , issUnit       :: Maybe String
+  , issCountry    :: Maybe String
   } deriving (Show, Eq)
 
 
 data Subject = Subject
   {
     subCommonName :: String
-  , subCountry    :: String
   , subOrg        :: String
-  , subUnit       :: String
-  , subPub        :: SEC.PubKey
+  , subUnit       :: Maybe String
+  , subCountry    :: Maybe String
+  , subPub        :: PublicKey
   } deriving (Show, Eq)
 
 
 
 instance ToJSON Subject where
-  toJSON (Subject cn c o ou pub) = 
+  toJSON (Subject cn o ou c pub) = 
     object [ "commonName"       .= cn
-           , "country"          .= c
            , "organization"     .= o
            , "organizationUnit" .= ou
-           , "pubKey"           .= enc pub
+           , "country"          .= c
+           , "pubKey"           .= pub
            ]
-     where enc = String . T.pack . C8.unpack . B16.encode . SEC.exportPubKey False  
 
--- TODO: country and unit should be optional?
 instance FromJSON Subject where
   parseJSON (Object obj) = do
     cn  <- obj .: "commonName"
-    c   <- obj .: "country"
     o   <- obj .: "organization"
-    ou  <- obj .: "organizationUnit"
-    pub' <- obj .: "pubKey"
-    let mPub = SEC.importPubKey $ fst $ B16.decode $ C8.pack $ T.unpack pub'
-    case mPub of
-      Nothing -> fail "could not decode pubkey in Subject parseJSON"
-      Just pub -> return $ Subject cn c o ou pub
+    ou  <- obj .:? "organizationUnit"
+    c   <- obj .:? "country"
+    pub <- obj .: "pubKey"
+    return $ Subject cn o ou c pub
+  
   parseJSON x = fail $ "could not decode JSON subject info: " ++ show x
 
 
@@ -154,19 +150,19 @@ bsToCert bs =
 
 
 
-makeSignedCert :: Issuer -> Subject -> IO (X509Certificate)
-makeSignedCert iss sub = makeCert iss sub >>= signCert (issPriv iss) >>= return . X509Certificate
+makeSignedCert :: (MonadIO m, HasVault m) => Issuer -> Subject -> m (X509Certificate)
+makeSignedCert iss sub = makeCert iss sub >>= signCert >>= return . X509Certificate
 
-signCert :: SEC.SecKey -> Certificate -> IO (SignedCertificate)
-signCert priv cert = objectToSignedExactF (ecdsaWithSHA256 $ priv) cert
+signCert :: (MonadIO m, HasVault m) => Certificate -> m (SignedCertificate)
+signCert cert = objectToSignedExactF (ecdsaWithSHA256) cert
 
-makeCert :: Issuer -> Subject -> IO (Certificate)
+makeCert :: MonadIO m => Issuer -> Subject -> m (Certificate)
 makeCert iss sub = do
-  serial' <- getEntropy 16
+  serial' <- liftIO $ getEntropy 16
   let fromBytes = B.foldl' (\a b -> a `shiftL` 8 .|. fromIntegral b) 0
       serial = fromBytes serial'
 
-  validity <- getValidity
+  validity <- liftIO getValidity
   
 
   return Certificate {
@@ -189,11 +185,16 @@ makeCert iss sub = do
 --
 -- yea, I wish we could use Keccak256. Data.X509 hasn't caught up yet. Maybe I'll
 -- make a PR for it
-ecdsaWithSHA256 :: SEC.SecKey -> B.ByteString -> IO (B.ByteString, SignatureALG)
-ecdsaWithSHA256 prv mesg' = do
+ecdsaWithSHA256 :: (MonadIO m, HasVault m) => B.ByteString -> m (B.ByteString, SignatureALG)
+ecdsaWithSHA256 mesg' = do
   let mesgBS = B.pack $ BA.unpack $ hashWith CH.SHA256 mesg'
-      mesg = fromMaybe (error "msg hash was not 32 bytes") (SEC.msg mesgBS)
-      sig = SEC.signMsg prv mesg
+  Signature (SEC.CompactRecSig s r v) <- sign mesgBS
+  
+  -- I too hate that we have to do this r,s swap....but strato-model swaps it because Ethereum
+  -- swaps it, and cert validation will fail if we leave them swapped here, so we swap it back
+  let sig'' = SEC.CompactRecSig r s v 
+      sig' = fromMaybe (error "could not read a sig we just made") (SEC.importCompactRecSig sig'')
+      sig = SEC.convertRecSig sig' -- drop the 'v'
   return (SEC.exportSig sig, SignatureALG HashSHA256 PubKeyALG_EC)
 
 
@@ -210,23 +211,23 @@ fromASN1CS cs =
 
 getIssuerDN :: Issuer -> DistinguishedName
 getIssuerDN iss = 
-  DistinguishedName 
-  [ (getObjectID DnCommonName, toASN1CS $ issCommonName iss)
-  , (getObjectID DnCountry, toASN1CS $ issCountry iss)
-  , (getObjectID DnOrganization, toASN1CS $ issOrg iss)
-  , (getObjectID DnOrganizationUnit, toASN1CS $ issUnit iss)
-  ]
-
+  let mList =
+        [ (getObjectID DnCommonName, Just $ issCommonName iss)
+        , (getObjectID DnOrganization, Just $ issOrg iss)
+        , (getObjectID DnOrganizationUnit, issUnit iss)
+        , (getObjectID DnCountry, issCountry iss)
+        ]
+  in DistinguishedName $ map (fmap toASN1CS) . catMaybes $ sequence <$> mList 
  
 getSubjectDN :: Subject -> DistinguishedName
-getSubjectDN sub = 
-  DistinguishedName
-  [ (getObjectID DnCommonName, toASN1CS $ subCommonName sub)
-  , (getObjectID DnCountry, toASN1CS $ subCountry sub)
-  , (getObjectID DnOrganization, toASN1CS $ subOrg sub)
-  , (getObjectID DnOrganizationUnit, toASN1CS $ subUnit sub)
-  ]
-
+getSubjectDN sub =
+  let mList =   
+        [ (getObjectID DnCommonName, Just $ subCommonName sub)
+        , (getObjectID DnOrganization, Just $ subOrg sub)
+        , (getObjectID DnOrganizationUnit, subUnit sub)
+        , (getObjectID DnCountry, subCountry sub)
+        ]
+  in DistinguishedName $ map (fmap toASN1CS) . catMaybes $ sequence <$> mList 
 
 getValidity :: IO (DateTime, DateTime)
 getValidity = do
@@ -241,15 +242,29 @@ getCertPub :: Subject -> PubKey
 getCertPub = serializeAndWrap . subPub
 
 
+-- without cn and org, subject and issuer are invalid, but the other fields can be Nothing
 getCertSubject :: X509Certificate -> Maybe Subject
-getCertSubject (X509Certificate cert) =
-    let pubKey = unserializeAndUnwrap . certPubKey $ getCertificate cert
-    in case pubKey of
-        Nothing -> Nothing
-        Just key -> Just Subject { subCommonName = extractDn DnCommonName
-                                 , subCountry    = extractDn DnCountry
-                                 , subOrg        = extractDn DnOrganization
-                                 , subUnit       = extractDn DnOrganizationUnit
-                                 , subPub        = key }
-    where extractDn :: DnElement -> String
-          extractDn dn = fromMaybe "" . fmap fromASN1CS . getDnElement dn . certSubjectDN $ getCertificate cert    
+getCertSubject (X509Certificate cert) = do
+  pubKey <- unserializeAndUnwrap . certPubKey $ getCertificate cert
+  cn     <- extractDn DnCommonName
+  org    <- extractDn DnOrganization
+  return $ Subject { subCommonName = cn
+                   , subOrg        = org
+                   , subUnit       = extractDn DnOrganizationUnit
+                   , subCountry    = extractDn DnCountry
+                   , subPub        = pubKey 
+                   }
+  where extractDn :: DnElement -> Maybe String
+        extractDn dn = fmap fromASN1CS . getDnElement dn . certSubjectDN $ getCertificate cert   
+
+getCertIssuer :: X509Certificate -> Maybe Issuer
+getCertIssuer (X509Certificate cert) = do
+  cn     <- extractDn DnCommonName
+  org    <- extractDn DnOrganization
+  return $ Issuer { issCommonName = cn
+                  , issOrg        = org
+                  , issUnit       = extractDn DnOrganizationUnit 
+                  , issCountry    = extractDn DnCountry
+                  }
+  where extractDn :: DnElement -> Maybe String
+        extractDn dn = fmap fromASN1CS . getDnElement dn . certSubjectDN $ getCertificate cert    
