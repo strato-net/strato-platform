@@ -34,7 +34,8 @@ newtype SourceMap = SourceMap { unSourceMap :: [(Text, Text)] }
                   deriving (Eq, Show, Generic, Data, Hashable, Semigroup, Monoid)
 
 instance ToJSON SourceMap where
-  toJSON = toJSON . unSourceMap
+  toJSON (SourceMap [("", src)]) = toJSON src
+  toJSON (SourceMap src)         = toJSON src
 
 instance FromJSON SourceMap where
   parseJSON (String s) = pure $ unnamedSource s
