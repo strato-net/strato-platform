@@ -22,6 +22,7 @@ import Test.QuickCheck.Gen
 
 -- import           BlockApps.Bloc22.API.Contracts
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.SourceMap
 import           BlockApps.Bloc22.API.SpecUtils
 import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
@@ -314,7 +315,7 @@ createContractOnMulti src cn args config@TestConfig{..} = do
   _ <- fromEither =<< runClientM (postUsersFill userName addr True) blocclient
   let
     postUsersContractRequest = PostUsersContractRequest
-      { postuserscontractrequestSrc = [("", src)]
+      { postuserscontractrequestSrc = unnamedSource src
       , postuserscontractrequestPassword = pw
       , postuserscontractrequestContract = Just cn
       , postuserscontractrequestArgs = args

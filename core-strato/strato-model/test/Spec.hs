@@ -31,6 +31,7 @@ import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1  as SEC 
+import           Blockchain.Strato.Model.SourceMap
 import           Network.Haskoin.Internals          (BigWord(..))
 
 -- all the different crypto modules to compare to ours
@@ -266,3 +267,9 @@ spec = do
   
         crShared1 `shouldBe` (HK.getBigWordInteger $ bytesToWord256 ecShared1) 
         crShared2 `shouldBe` (HK.getBigWordInteger $ bytesToWord256 ecShared2) 
+
+  describe "SourceMap" $ do
+    let rt :: SourceMap -> Either String SourceMap
+        rt = Ae.eitherDecode . Ae.encode
+    it "round trips correctly" $ property $ \(src::SourceMap) -> do
+      rt src `shouldBe` Right src

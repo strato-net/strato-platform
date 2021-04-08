@@ -19,6 +19,7 @@ import           BlockApps.Bloc22.API
 import           BlockApps.Bloc22.Client
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256  hiding (hash)
+import           Blockchain.Strato.Model.SourceMap
 
 
 data TestConfig = TestConfig
@@ -42,10 +43,10 @@ data TestConfig = TestConfig
   , twoContractsContractAddress  :: Address
   , testTxParams                 :: Maybe TxParams
   , testTxParamsLowNonce         :: Maybe TxParams
-  , simpleStorageSrc             :: Text
-  , testSrc                      :: Text
-  , simpleMappingSrc             :: Text
-  , twoContractsSrc              :: Text
+  , simpleStorageSrc             :: SourceMap
+  , testSrc                      :: SourceMap
+  , simpleMappingSrc             :: SourceMap
+  , twoContractsSrc              :: SourceMap
   , delay                        :: Int --microsecond
   } deriving (Generic)
 

@@ -20,6 +20,7 @@ import           Data.Aeson                         hiding (Success)
 import           Data.Aeson.Casing
 import           Data.Map                           (Map)
 import qualified Data.Map                           as Map
+import           Data.Maybe
 import           Data.Text                          (Text)
 import qualified Generic.Random                     as GR
 import           GHC.Generics
@@ -38,6 +39,7 @@ import           BlockApps.Strato.Types
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Nonce
+import           Blockchain.Strato.Model.SourceMap
 import           Blockchain.Strato.Model.Wei
 
 --------------------------------------------------------------------------------
@@ -75,28 +77,6 @@ type PostBlocTransaction = "transaction"
   :> QueryFlag "resolve"
   :> ReqBody '[JSON] PostBlocTransactionRequest
   :> Post '[JSON] [BlocChainOrTransactionResult]
-
-newtype SourceMap = SourceMap { unSourceMap :: [(Text, Text)] }
-                  deriving (Eq, Show, Generic)
-
-instance ToJSON SourceMap where
-  toJSON = toJSON . unSourceMap
-
-instance FromJSON SourceMap where
-  parseJSON (String s) = pure . SourceMap $ [("", s)]
-  parseJSON o@(Object _) = SourceMap . Map.toList <$> parseJSON o
-  parseJSON a@(Array _) = SourceMap <$> parseJSON a
-  parseJSON o = fail $ "parseJSON SourceMap: Expected String, Object, or Array, got " ++ show o
-
-instance Arbitrary SourceMap where
-  arbitrary = SourceMap <$> arbitrary
-
-instance ToSchema SourceMap where
-  declareNamedSchema _ = return $ NamedSchema (Just "SourceMap")
-    ( mempty
-      & type_ ?~ SwaggerString
-      & example ?~ toJSON (SourceMap [("SimpleStorage.sol", "contract SimpleStorage { }")])
-      & description ?~ "SourceMap" )
 
 data PostBlocTransactionRequest = PostBlocTransactionRequest
   { postbloctransactionrequestAddress  :: Maybe Address
@@ -174,7 +154,7 @@ instance FromJSON BlocTransactionPayload where
   parseJSON o = fail $ "fromJSON BlocTransactionPayload: Expected Object, but got " ++ show o
 
 data ContractPayload = ContractPayload
-  { contractpayloadSrc      :: [(Text, Text)]
+  { contractpayloadSrc      :: SourceMap
   , contractpayloadContract :: Maybe Text
   , contractpayloadArgs     :: Maybe (Map Text ArgValue)
   , contractpayloadValue    :: Maybe (Strung Natural)
@@ -227,13 +207,7 @@ instance ToJSON FunctionPayload where
 instance FromJSON ContractPayload where
   parseJSON (Object o) =
     ContractPayload
-      <$> (do
-        msrc <- o .:? "src"
-        case msrc of
-          Just (String s) -> pure $ [("", s)]
-          Just (Object _) -> fmap Map.toList (o .: "src")
-          Just (Array _) -> o .: "src"
-          _ -> pure [])
+      <$> (fromMaybe mempty <$> o .:? "src")
       <*> (o .:? "contract")
       <*> (o .:? "args")
       <*> (o .:? "value")
@@ -254,7 +228,7 @@ instance ToSchema BlocTransactionPayload where
     where
       ex :: BlocTransactionPayload
       ex = BlocContract $ ContractPayload
-        { contractpayloadSrc      = [("SimpleStorage.sol", "contract SimpleStorage { uint x; function SimpleStorage(uint _x) { x = _x; } function set(uint _x) { x = _x; } }")]
+        { contractpayloadSrc      = namedSource "SimpleStorage.sol" "contract SimpleStorage { uint x; function SimpleStorage(uint _x) { x = _x; } function set(uint _x) { x = _x; } }"
         , contractpayloadContract = Nothing
         , contractpayloadArgs     = Just $ Map.fromList [("_x", ArgInt 1)]
         , contractpayloadValue    = Nothing
@@ -271,7 +245,7 @@ instance ToSchema ContractPayload where
     where
       ex :: ContractPayload
       ex = ContractPayload
-        { contractpayloadSrc      = [("SimpleStorage.sol", "contract SimpleStorage { uint x; function SimpleStorage(uint _x) { x = _x; } function set(uint _x) { x = _x; } }")]
+        { contractpayloadSrc      = namedSource "SimpleStorage.sol" "contract SimpleStorage { uint x; function SimpleStorage(uint _x) { x = _x; } function set(uint _x) { x = _x; } }"
         , contractpayloadContract = Nothing
         , contractpayloadArgs     = Just $ Map.fromList [("_x", ArgInt 1)]
         , contractpayloadValue    = Nothing
