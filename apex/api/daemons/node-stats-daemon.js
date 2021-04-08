@@ -27,7 +27,7 @@ if (process.env.STATS_ENABLED === "true") {
           const date = new Date()
           const lastStat = await models.UsageStat.findOne({
             order: [['createdAt', 'DESC']],
-            attributes: ['createdAt', 'timestamp']
+            attributes: ['timestamp']
           })
           if (
               (
