@@ -32,7 +32,7 @@ if (process.env.STATS_ENABLED === "true") {
           if (
               (
                   date.getUTCHours() === config.statistics.collectSubmitUTCTimeOfDay.hours &&
-                  date.getUTCMinutes() === config.statistics.collectSubmitUTCTimeOfDay.hours
+                  date.getUTCMinutes() === config.statistics.collectSubmitUTCTimeOfDay.minutes
               ) ||
               lastStat && (new Date() - lastStat.timestamp > 24 * 60 * 60 * 1000) ||
               ['test', 'development'].includes(process.env.NODE_ENV)
