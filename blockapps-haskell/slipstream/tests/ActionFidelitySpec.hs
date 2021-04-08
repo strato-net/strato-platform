@@ -93,7 +93,8 @@ spec = describe "Action conversions" $ do
                  "type": "Create"
                }
              ],
-             "codeHash": "86bc2e2a375e6ea377ae90026248f472fbeaa1354ef4424f568d01f3a48ab5b9"
+             "codeHash": "86bc2e2a375e6ea377ae90026248f472fbeaa1354ef4424f568d01f3a48ab5b9",
+             "organization": ""
            }
          },
          "sender": "c2191df3032cb8ee72e37ab6bbc4e83f92b9911c",
@@ -107,6 +108,7 @@ spec = describe "Action conversions" $ do
          },
          "events" : 
          [ { "eventContractName" : "Vehicle",
+             "eventContractOrganization": "",
              "eventContractAccount" : "2e385b6a3aea46d4172df98617b5385c13b7100d",
              "eventName" : "Vehicle Event",
              "eventArgs" : ["x", "y"]
@@ -131,7 +133,7 @@ spec = describe "Action conversions" $ do
             , (5, 0x73335f305f30000000000000000000000000000000000000000000000000000c)
             ]
           , SS._actionDataCodeHash = convertFromSlipCodePtr $ EVMCode $ forceHash "86bc2e2a375e6ea377ae90026248f472fbeaa1354ef4424f568d01f3a48ab5b9"
-          , SS._actionDataOrganization = "Montana"
+          , SS._actionDataOrganization = ""
           , SS._actionDataCodeKind = EVM
           , SS._actionDataCallData = [SS.CallData
             { SS._callDataType = SS.Create
@@ -144,5 +146,5 @@ spec = describe "Action conversions" $ do
             }]
           }
         , SS._actionMetadata = Just . M.fromList $ [("name", "Vehicle"), ("src", "contract Vehicle {}")]
-        , SS._actionEvents = S.singleton $ Event "Montana" "Vehicle" (Account 0x2e385b6a3aea46d4172df98617b5385c13b7100d Nothing) "Vehicle Event" ["x", "y"]
+        , SS._actionEvents = S.singleton $ Event "" "Vehicle" (Account 0x2e385b6a3aea46d4172df98617b5385c13b7100d Nothing) "Vehicle Event" ["x", "y"]
       })
