@@ -26,6 +26,7 @@ import           Test.QuickCheck.Instances    ()
 
 import           BlockApps.Ethereum
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.SourceMap
 --import           SolidVM.Solidity.Parse.Expression
 import           SolidVM.Solidity.Xabi.Statement
 import qualified SolidVM.Solidity.Xabi.Def  as Xabi
@@ -267,7 +268,7 @@ data ContractDetails = ContractDetails
   , contractdetailsBinRuntime :: Text
   , contractdetailsCodeHash   :: Keccak256
   , contractdetailsName       :: Text
-  , contractdetailsSrc        :: [(Text, Text)]
+  , contractdetailsSrc        :: SourceMap
   , contractdetailsXabi       :: Xabi
   } deriving (Show,Eq,Generic)
 

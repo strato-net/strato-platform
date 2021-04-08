@@ -58,6 +58,7 @@ import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.SourceMap
 
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
@@ -573,33 +574,18 @@ decodeXabiJSON xabi' = case decode (fromStrict xabi') of
   Nothing -> throwIO $ DBError "Corrupted Xabi stored in database"
   Just x -> return x
 
-serializeSrc :: [(Text, Text)] -> Text
-serializeSrc [(name, src)] | Text.null name = src
-serializeSrc src = Text.decodeUtf8 . toStrict $ encode src
-
-deserializeSrc :: MonadIO m => Text -> m [(Text, Text)]
-deserializeSrc = decodeSrcJSON
-
-decodeSrcJSON :: MonadIO m => Text -> m [(Text, Text)]
-decodeSrcJSON src' = case decode (fromStrict $ Text.encodeUtf8 src') :: Maybe [(Text, Text)] of
-  Nothing -> case decode (fromStrict $ Text.encodeUtf8 src') :: Maybe (Map Text Text) of
-    Nothing -> pure $ [("", src')]
-    Just m -> pure $ Map.toList m
-  Just x -> return x
-
 getContractDetailsByMetadataId :: Int32 -> Account -> Bloc ContractDetails
 getContractDetailsByMetadataId cmId acct = do
-  (bin,binRuntime,codeHash,_ :: ByteString,_ :: Keccak256,name,src',_ :: Int32,xabi') <-
+  (bin,binRuntime,codeHash,_ :: ByteString,_ :: Keccak256,name,src,_ :: Int32,xabi') <-
     blocQuery1 "getContractDetailsByMetadataId" $ contractByMetadataId cmId
   xabi <- deserializeXabi xabi'
-  src <- deserializeSrc src'
   return ContractDetails
     { contractdetailsBin = Text.decodeUtf8 bin
     , contractdetailsAccount = Just acct
     , contractdetailsBinRuntime = Text.decodeUtf8 binRuntime
     , contractdetailsCodeHash = codeHash
     , contractdetailsName = name
-    , contractdetailsSrc = src
+    , contractdetailsSrc = deserializeSourceMap src
     , contractdetailsXabi = xabi
     }
 
@@ -609,16 +595,15 @@ getContractDetails name = fmap (fmap snd) . getContractDetailsAndMetadataId name
 getContractDetailsAndMetadataId :: ContractName -> Account -> Bloc (Maybe (Int32, ContractDetails))
 getContractDetailsAndMetadataId (ContractName contractName) acct = do
     let
-      detailsWith detailsAcct (bin,binRuntime,codeHash,_ :: ByteString,name,src',cmId,xabi') = do
+      detailsWith detailsAcct (bin,binRuntime,codeHash,_ :: ByteString,name,src,cmId,xabi') = do
         xabi <- deserializeXabi xabi'
-        src <- deserializeSrc src'
         return (cmId, ContractDetails
           { contractdetailsBin = Text.decodeUtf8 bin
           , contractdetailsAccount = detailsAcct
           , contractdetailsBinRuntime = Text.decodeUtf8 binRuntime
           , contractdetailsCodeHash = codeHash
           , contractdetailsName = name
-          , contractdetailsSrc = src
+          , contractdetailsSrc = deserializeSourceMap src
           , contractdetailsXabi = xabi
           })
     tuple <- fmap listToMaybe . blocQuery $
@@ -649,16 +634,15 @@ getContractDetailsByCodeHash codePtr = do
         CodeAtAccount acct name -> getContractDetailsAndMetadataId (ContractName $ Text.pack name) acct
         codeHash -> do
           mDetails <- fmap listToMaybe . blocQuery $ getContractsContractByCodeHashQuery codeHash
-          for mDetails $ \(bin,binr,ch,_ :: ByteString,_ :: ByteString,name,src',cmId,xabi') -> do
+          for mDetails $ \(bin,binr,ch,_ :: ByteString,_ :: ByteString,name,src,cmId,xabi') -> do
             xabi <- deserializeXabi xabi'
-            src <- deserializeSrc src'
             return (cmId, ContractDetails
               { contractdetailsBin = Text.decodeUtf8 bin
               , contractdetailsAccount = Nothing
               , contractdetailsBinRuntime = Text.decodeUtf8 binr
               , contractdetailsCodeHash = ch
               , contractdetailsName = name
-              , contractdetailsSrc = src
+              , contractdetailsSrc = deserializeSourceMap src
               , contractdetailsXabi = xabi
               })
       liftIO . for_ mIdAndDetails $ Cache.insert srcCache codePtr
@@ -700,10 +684,10 @@ createContractBatchQuery names = do
   return $ Map.union newCids cidMap
 
 insertContractSourceQuery
-  :: [(Text, Text)]
+  :: SourceMap
   -> Bloc (Int32, Keccak256)
 insertContractSourceQuery src' = do
-  let src = serializeSrc src'
+  let src = serializeSourceMap src'
       srcHash = (hash $ Text.encodeUtf8 src)
   blocModify1 $ \ conn ->
     runInsertManyReturning conn contractsSourceTable [
@@ -856,7 +840,7 @@ evmContractSolidVMError = Text.concat
   , "If you are intending to use EVM, please modify your contracts and try again."
   ]
 
-getContractDetailsForContract :: Text -> [(Text, Text)] -> Maybe Text -> Bloc (Maybe (Text, (Int32, ContractDetails)))
+getContractDetailsForContract :: Text -> SourceMap -> Maybe Text -> Bloc (Maybe (Text, (Int32, ContractDetails)))
 getContractDetailsForContract theVM src mContract = do
   let shouldCompile = if theVM == "EVM" then Do Compile else Don't Compile
       cacheKey = (theVM, src)
@@ -873,7 +857,7 @@ getContractDetailsForContract theVM src mContract = do
   idsAndDetails <- case mCachedDetails of
     Just cachedDetails -> pure cachedDetails
     Nothing -> do
-      details <- if any (/= 0) (Text.length . snd <$> src)
+      details <- if hasAnyNonEmptySources src
                    then sourceToContractDetails shouldCompile src
                    else return Map.empty
       liftIO $ Cache.insert srcCache cacheKey details
@@ -885,7 +869,7 @@ getContractDetailsForContract theVM src mContract = do
         [x] -> Just <$> checkCodeHash x
         _ -> throwIO $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data"
     Just contract -> do
-      x <- let src' = serializeSrc src
+      x <- let src' = serializeSourceMap src
             in blocMaybe ("Could not find global contract metadataId for " <> contract <> " in source " <> src')  (Map.lookup contract idsAndDetails)
       Just <$> checkCodeHash (contract, x)
   where checkCodeHash x@(_,(_,cd)) = case contractdetailsCodeHash cd of
@@ -899,9 +883,9 @@ getContractDetailsForContract theVM src mContract = do
               Nothing -> throwIO . UserError . Text.pack $ "Could not find contract details for " ++ name ++ " at address " ++ format acct
               Just cmIdDetails -> pure (Text.pack name, cmIdDetails)
 
-sourceToContractDetails :: Should Compile -> [(Text, Text)] -> Bloc (Map Text (Int32, ContractDetails))
+sourceToContractDetails :: Should Compile -> SourceMap -> Bloc (Map Text (Int32, ContractDetails))
 sourceToContractDetails shouldCompile sourceList = do
-  let source = serializeSrc sourceList
+  let source = serializeSourceMap sourceList
       createContractDetails =
         case shouldCompile of
           Do Compile -> compileContract
@@ -910,22 +894,21 @@ sourceToContractDetails shouldCompile sourceList = do
   if null details
     then createContractDetails sourceList
     else fmap Map.fromList . forM details $
-      \(bin,binr,ch,_ :: ByteString,_ :: ByteString,name,src',cmId,xabi') -> do
+      \(bin,binr,ch,_ :: ByteString,_ :: ByteString,name,src,cmId,xabi') -> do
         xabi <- deserializeXabi xabi'
-        src <- deserializeSrc src'
         return (name,(cmId, ContractDetails
           { contractdetailsBin = Text.decodeUtf8 bin
           , contractdetailsAccount = Nothing
           , contractdetailsBinRuntime = Text.decodeUtf8 binr
           , contractdetailsCodeHash = ch
           , contractdetailsName = name
-          , contractdetailsSrc = src
+          , contractdetailsSrc = deserializeSourceMap src
           , contractdetailsXabi = xabi
           }))
 
-compileContract :: [(Text, Text)] -> Bloc (Map Text (Int32, ContractDetails))
+compileContract :: SourceMap -> Bloc (Map Text (Int32, ContractDetails))
 compileContract sourceList = do
-  let source = Text.intercalate "\n" $ map snd sourceList
+  let source = sourceBlob sourceList
       eVerXabis = parseXabi "-" $ Text.unpack source
   (ver, xabis) <- case eVerXabis of
     Left err -> blocError . UserError . Text.pack $ err
@@ -959,10 +942,10 @@ compileContract sourceList = do
   return . Map.fromList $ map ((contractdetailsName . snd) &&& id) cmIdDetails
 
 -- SolidVM only
-createMetadataNoCompile :: [(Text, Text)] -> Bloc (Map Text (Int32, ContractDetails))
+createMetadataNoCompile :: SourceMap -> Bloc (Map Text (Int32, ContractDetails))
 createMetadataNoCompile sourceList = do
-  let source = Text.intercalate "\n" $ map snd sourceList
-      encodedSrc = serializeSrc sourceList
+  let source = sourceBlob sourceList
+      encodedSrc = serializeSourceMap sourceList
       eVerXabis = parseXabi "-" $ Text.unpack source
   xabis <- case eVerXabis of
     Left err -> blocError . UserError . Text.pack $ err

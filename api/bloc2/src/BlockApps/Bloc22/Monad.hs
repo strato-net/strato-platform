@@ -61,6 +61,7 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Nonce
+import           Blockchain.Strato.Model.SourceMap
 
 import           Control.Monad.Change.Modify        hiding (modify)
 import           Control.Monad.Composable.BlocSQL
@@ -83,7 +84,7 @@ data BlocEnv = BlocEnv
   { stateFetchLimit    :: Integer
   , gasOn              :: Bool
   , globalNonceCounter :: Cache (Address, Maybe ChainId) Nonce
-  , globalSourceCache  :: Cache (Text, [(Text, Text)]) (Map Text (Int32, ContractDetails))
+  , globalSourceCache  :: Cache (Text, SourceMap) (Map Text (Int32, ContractDetails))
   , globalCodePtrCache :: Cache CodePtr (Int32, ContractDetails)
   , txTBQueue          :: TBQueue (Maybe Text, Maybe ChainId, Bool, PostBlocTransactionRequest)
   }

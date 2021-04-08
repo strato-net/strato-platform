@@ -78,11 +78,12 @@ createChainInfo creationBlockHash (ChainInput src mCodePtr cname lbl balances ch
   when (sum (nmap2' balances) == 0) $ throwIO $ UserError "At least one account must have a non-zero balance"
   let md = fromMaybe Map.empty mmd
       theVM = fromMaybe "EVM" $ Map.lookup "VM" md
-  mContract <- case src of
-    (_:_) -> fmap snd <$> getContractDetailsForContract theVM src cname
-    _ -> case mCodePtr of
-      Just codePtr -> getContractDetailsByCodeHash codePtr
-      Nothing -> fmap snd <$> getContractDetailsForContract theVM [] cname
+  mContract <-
+    if src /= mempty
+      then fmap snd <$> getContractDetailsForContract theVM src cname
+      else case mCodePtr of
+        Just codePtr -> getContractDetailsByCodeHash codePtr
+        Nothing -> fmap snd <$> getContractDetailsForContract theVM mempty cname
   (cAcctInfo, codeInfo, metaData) <- case mContract of
       Nothing -> return ([],[], md)
       Just (_, ContractDetails{..}) -> do
