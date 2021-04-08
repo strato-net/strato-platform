@@ -21,6 +21,7 @@ import           Blockchain.Strato.Model.Account
 
 data Event =
   Event {
+    evContractOrganization :: String,
     evContractName    :: String,
     evContractAccount :: Account,
     evName            :: String,
@@ -30,7 +31,8 @@ data Event =
 
 instance ToJSON Event where
   toJSON Event{..} = object
-    [ "eventContractName" .= evContractName
+    [ "eventContractOrganization" .= evContractOrganization
+    , "eventContractName" .= evContractName
     , "eventContractAccount" .= evContractAccount
     , "eventName"         .= evName
     , "eventArgs"         .= evArgs
@@ -38,7 +40,8 @@ instance ToJSON Event where
 
 instance FromJSON Event where
   parseJSON (Object o) = Event
-    <$> (o .: "eventContractName")
+    <$> (o .: "eventContractOrganization")
+    <*> (o .: "eventContractName")
     <*> (o .: "eventContractAccount")
     <*> (o .: "eventName")
     <*> (o .: "eventArgs")

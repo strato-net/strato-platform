@@ -118,6 +118,7 @@ parseDiffSolidVM x = typeMismatch "ActionSolidVMDiff" x
 
 data ActionData = ActionData
   { _actionDataCodeHash     :: CodePtr
+  , _actionDataOrganization :: Text
   , _actionDataCodeKind     :: CodeKind
   , _actionDataStorageDiffs :: ActionDataDiff
   , _actionDataCallData     :: [CallData]
@@ -131,11 +132,12 @@ mergeActionData newData oldData =
           (ActionSolidVMDiff n, ActionSolidVMDiff o) -> ActionSolidVMDiff $ n <> o
           _ -> error "mismatched action kinds at the same address"
       calls = ((++) `on` _actionDataCallData) oldData newData
-   in ActionData (_actionDataCodeHash oldData) (_actionDataCodeKind oldData) diffs calls
+   in ActionData (_actionDataCodeHash oldData) (_actionDataOrganization newData) (_actionDataCodeKind oldData) diffs calls
 
 instance ToJSON ActionData where
   toJSON ActionData{..} = object
     [ "codeHash" .= _actionDataCodeHash
+    , "organization" .= _actionDataOrganization
     , "diff"     .= _actionDataStorageDiffs
     , "data"     .= _actionDataCallData
     , "codeKind" .= _actionDataCodeKind
@@ -144,12 +146,13 @@ instance ToJSON ActionData where
 instance FromJSON ActionData where
   parseJSON (Object o) = do
     ch <- o .: "codeHash"
+    og <- o .: "organization"
     ck <- o .:? "codeKind" .!= EVM
     df <- (case ck of
       EVM -> explicitParseField parseDiffEVM
       SolidVM -> explicitParseField parseDiffSolidVM) o "diff"
     dt <- o .: "data"
-    return $ ActionData ch ck df dt
+    return $ ActionData ch og ck df dt
   parseJSON o = error $ "parseJSON ActionData: Expected object, got: " ++ show o
 
 data Action = Action

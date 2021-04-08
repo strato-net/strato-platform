@@ -37,7 +37,8 @@ module Blockchain.SolidVM.SM (
   getXabiValueType,
   getValueType,
   pushSender,
-  initializeAction,
+  initializeActionCreate,
+  initializeActionCall,
   markDiffForAction,
   addEvent
   ) where
@@ -605,9 +606,21 @@ getXabiValueType (AccountPath loc path) = do
 getValueType :: MonadSM m => AccountPath -> m BasicType
 getValueType p = hintFromType =<< getXabiValueType p
 
-initializeAction :: Mod.Modifiable Action m => Account -> String -> Keccak256 -> m ()
-initializeAction acct name hsh = do
-  let newData = ActionData (SolidVMCode name hsh) SolidVM (ActionSolidVMDiff M.empty) []
+initializeActionCreate :: MonadSM m => Account -> String -> Keccak256 -> m ()
+initializeActionCreate acct name hsh = do
+  env' <- getEnv
+  maybeCert <- x509CertDBGet $ Env.origin env'
+  let organization = T.pack $ fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
+  let newData = ActionData (SolidVMCode name hsh) organization SolidVM (ActionSolidVMDiff M.empty) []
+  x509CertDBPut acct `mapM_` maybeCert
+  Mod.modifyStatefully_ (Mod.Proxy @Action) $
+    actionData %= M.insertWith mergeActionData acct newData
+
+initializeActionCall :: MonadSM m => Account -> String -> Keccak256 -> m ()
+initializeActionCall acct name hsh = do
+  maybeCert <- x509CertDBGet acct
+  let organization = T.pack $ fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
+  let newData = ActionData (SolidVMCode name hsh) organization SolidVM (ActionSolidVMDiff M.empty) []
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     actionData %= M.insertWith mergeActionData acct newData
 

@@ -49,7 +49,6 @@ import Data.Text (Text)
 import Database.PostgreSQL.Typed (PGConnection)
 
 import Blockapps.Crossmon
-import Blockchain.Data.AddressStateDB
 
 import BlockApps.Bloc22.Database.Queries
 import BlockApps.Bloc22.Monad
@@ -183,6 +182,7 @@ processedContract ABIID{..} state AggregateAction{..} =
     { address = actionAccount ^. accountAddress
     , codehash = actionCodeHash
     , abi = aiAbi
+    , organization = actionOrganization
     , contractName = aiName
     , chain = aiChain
     , contractData = state
@@ -214,6 +214,7 @@ makeFunctionInserts xabi ABIID{..} state AggregateAction{..} =
       { address = actionAccount ^. accountAddress
       , codehash = actionCodeHash
       , abi = aiAbi
+      , organization = actionOrganization
       , contractName = aiName
       , chain = aiChain
       , contractData = state
@@ -249,7 +250,7 @@ getSolidVMDetailsForRow g row = runMaybeT
         
         checkBloc = do
           $logInfoS "getDetailsForRow" . T.pack $ "checking bloc database for contract details"
-          (MaybeT $ getContractDetailsByCodeHash codePtr) >>= (parseAndSet . contractdetailsSrc . snd)
+          (MaybeT $ getContractDetailsByCodeHash (convertFromSlipCodePtr codePtr)) >>= (parseAndSet . contractdetailsSrc . snd)
         
         checkMetadata = do
           $logInfoS "getDetailsForRow" . T.pack $ "checking metadata for contract details"
@@ -263,14 +264,14 @@ getSolidVMDetailsForRow g row = runMaybeT
           setContractABIs g codePtr detailsMap
           lookupT (T.pack name) detailsMap
           
-        codePtr@(SolidVMCode name _) = actionCodeHash row
+        codePtr@(SolidVMCode name _ _) = actionCodeHash row
 
 
 
 -- For now, EVM details are not cached, because the cache links all the contracts in a source blob by source hash, and we only have source hashes for SolidVM code pointers. 
 getEVMDetailsForRow :: AggregateAction -> Bloc (Maybe (Int32, ContractDetails))
 getEVMDetailsForRow row = liftM2 (<|>)
-  (getContractDetailsByCodeHash $ actionCodeHash row)
+  (getContractDetailsByCodeHash $ convertFromSlipCodePtr $ actionCodeHash row)
   (runMaybeT $ do
     let md = actionMetadata row
     src <- lookupT "src" md
@@ -292,7 +293,7 @@ adjustGlobals gref shouldCompile row details = do
         let contracts = filter (not . T.null) $ T.splitOn "," v
         forM_ contracts $ \c -> do
           (_, details') <- lookupT c m
-          let codePtr = contractdetailsCodeHash details'
+          let codePtr = convertToSlipCodePtr (contractdetailsCodeHash details') (actionOrganization row)
           $logInfoS "adjustGlobals" . T.pack $ "Adding to globals for " ++ T.unpack k ++ ": " ++ show codePtr
           lift $ f gref codePtr
 
@@ -370,15 +371,16 @@ rowToHistories gref abiid row actions cont details oldState = do
 
 -- Parses xabi event declarations to create a table,
 -- ignoring indexes and anonymous flag
-createEvents :: ContractDetails -> Bloc [EventTable]
-createEvents details = do
+createEvents :: ContractDetails -> Text -> Bloc [EventTable]
+createEvents details org = do
   let events = xabiEvents $ contractdetailsXabi details
   return $ map makeEvent $ Map.toList events
   where
     makeEvent :: (Text, Event) -> EventTable 
     makeEvent (name, event) = 
       EventTable
-      { eventContractName = contractdetailsName details
+      { eventOrganization = org
+      , eventContractName = contractdetailsName details
       , eventName = name
       , eventFields = map fst $ eventLogs event
       }
@@ -462,7 +464,7 @@ processTheMessages env conn g messages = do
               oldState <- readPreviousSolidVMState g acct
               indexContract <- rowToInsert g abiid row cont oldState
               (hs, fhs) <- rowToHistories g abiid row actions cont details oldState
-              eventTables <- createEvents details
+              eventTables <- createEvents details (actionOrganization row)
               pure . Right $ BatchedInserts indexContract hs fhs eventTables
 
 

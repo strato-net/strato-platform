@@ -30,9 +30,10 @@ import           GHC.Generics
 import           Blockchain.Strato.Model.Action ( Action(..), ActionData(..), ActionDataDiff(..)
                                                 , CallType(..), CallData(..))
 import           Blockchain.Strato.Model.Account
-import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Keccak256
+
+import           Slipstream.Data.Globals
 
 data AggregateAction = AggregateAction
   { actionBlockHash      :: Keccak256
@@ -40,6 +41,7 @@ data AggregateAction = AggregateAction
   , actionBlockNumber    :: Integer
   , actionTxHash         :: Keccak256
   , actionTxSender       :: Account
+  , actionOrganization   :: Text
   , actionAccount        :: Account
   , actionCodeHash       :: CodePtr
   , actionStorage        :: ActionDataDiff
@@ -59,8 +61,9 @@ flatten Action{..} = flip map (M.toList _actionData) $
           , actionBlockNumber    = _actionBlockNumber
           , actionTxHash         = _actionTransactionHash
           , actionTxSender       = _actionTransactionSender
+          , actionOrganization   = _actionDataOrganization
           , actionAccount        = account
-          , actionCodeHash       = _actionDataCodeHash
+          , actionCodeHash       = convertToSlipCodePtr _actionDataCodeHash _actionDataOrganization
           , actionStorage        = _actionDataStorageDiffs
           , actionType           = t
           , actionCallData       = _actionDataCallData
@@ -97,7 +100,8 @@ formatAction AggregateAction{..} = T.concat
 
 
 data AggregateEvent = AggregateEvent
-  { agContractName         :: Text
+  { agOrganization         :: Text
+  , agContractName         :: Text
   , agContractAccount      :: Account
   , agEventName            :: Text
   , agEventArgs            :: [Text]
@@ -107,7 +111,8 @@ data AggregateEvent = AggregateEvent
 squash :: Action -> [AggregateEvent]
 squash Action{..} = flip map (toList _actionEvents)
   (\ev -> AggregateEvent
-    { agContractName          = T.pack $ evContractName ev
+    { agOrganization          = T.pack $ evContractOrganization ev
+    , agContractName          = T.pack $ evContractName ev
     , agContractAccount       = evContractAccount ev
     , agEventName             = T.pack $ evName ev
     , agEventArgs             = map T.pack (evArgs ev)

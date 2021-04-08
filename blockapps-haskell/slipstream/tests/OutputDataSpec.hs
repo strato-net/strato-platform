@@ -19,7 +19,6 @@ import BlockApps.Logging
 import qualified BlockApps.Solidity.Value as V
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256 (hash)
 import Slipstream.Events
 import Slipstream.Globals
@@ -53,6 +52,7 @@ spec = do
             address = testAdd,
             codehash = EVMCode $ hash "<CODEHASH>",
             abi = "<ABI>",
+            organization = "dojmt.gov",
             contractName = "Vehicle",
             chain = "<CHAIN>",
             blockHash = hash "<BLOCKHASH>",
@@ -129,6 +129,7 @@ spec = do
              address = testAdd,
              codehash = cHash,
              abi = "<ABI>",
+             organization = "dojmt.gov",
              contractName = "Vehicle",
              chain = "<CHAIN>",
              blockHash = hash "<BLOCKHASH>",
@@ -242,6 +243,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
             address = testAdd,
             codehash = EVMCode $ hash "<CODEHASH>",
             abi = "<ABI>",
+            organization = "dojmt.gov",
             contractName = "\"Vehicle''",
             chain = "<CHAIN>",
             blockHash = hash "<BLOCKHASH>",
@@ -315,8 +317,9 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     let testAdd = Address 0x98eaddede
         input = [ProcessedContract {
           address = testAdd,
-          codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
+          codehash = SolidVMCode "SwissArmy" "MyOrg" $ hash "<CODEHASH>",
           abi = "<ABI>",
+          organization = "MyOrg",
           contractName = "SwissArmy",
           chain = "<CHAIN>",
           blockHash = hash "<BLOCKHASH>",
@@ -434,8 +437,9 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     let testAdd = Address 0x22222222
         input = [ProcessedContract {
           address = testAdd,
-          codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
+          codehash = SolidVMCode "SwissArmy" "MyOrg" $ hash "<CODEHASH>",
           abi = "<ABI>",
+          organization = "MyOrg",
           contractName = "SwissArmy",
           chain = "<CHAIN>",
           blockHash = hash "<BLOCKHASH>",
@@ -459,8 +463,9 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     let testAdd = Address 0x22222222
         input = [ProcessedContract {
           address = testAdd,
-          codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
+          codehash = SolidVMCode "SwissArmy" "MyOrg" $ hash "<CODEHASH>",
           abi = "<ABI>",
+          organization = "MyOrg",
           contractName = "SwissArmy",
           chain = "<CHAIN>",
           blockHash = hash "<BLOCKHASH>",

@@ -150,7 +150,7 @@ create _ _ _ blockData _ sender' origin' _ _ _ newAddress code txHash' chainId' 
 
 create' :: MonadSM m => Account -> Account -> Keccak256 -> CodeCollection -> String -> Xabi.ArgList -> m ExecResults
 create' creator newAccount ch cc contractName' argExps = do
-  initializeAction newAccount contractName' ch
+  initializeActionCreate newAccount contractName' ch
 
   A.adjustWithDefault_ (A.Proxy @AddressState) newAccount $ \newAddressState ->
     pure newAddressState{ addressStateContractRoot = MP.emptyTriePtr
@@ -368,7 +368,7 @@ callWrapper from to mContract functionName argExps = do
 
   (contract', hsh, cc) <- getCodeAndCollection to
   let contract = fromMaybe contract' $ mContract >>= \c -> M.lookup c $ _contracts cc
-  initializeAction to (_contractName contract) hsh
+  initializeActionCall to (_contractName contract) hsh
 
   let functionsIncludingConstructor =
         case contract^.constructor of
@@ -658,7 +658,9 @@ runStatement st@(Xabi.EmitStatement eventName exptups _) = do
       if (length exptups) /= (length $ Xabi.eventLogs ev) then 
         invalidArguments "arguments to statement are inconsistent with those declared" (unparseStatement st)
       else do
-        addEvent $ Event (_contractName curCnct) (currentAccount curInfo) eventName expStrs
+        maybeCert <- x509CertDBGet $ currentAccount curInfo
+        let organization = fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
+        addEvent $ Event organization (_contractName curCnct) (currentAccount curInfo) eventName expStrs
         return Nothing
 
 

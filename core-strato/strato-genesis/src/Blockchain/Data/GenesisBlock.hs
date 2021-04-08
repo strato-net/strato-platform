@@ -311,6 +311,7 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) = do
           , A._actionData = Map.singleton a $
                              A.ActionData
                                (codeHash d)
+                               ""
                                vm
                                (case storage d of
                                   EVMDiff m -> A.ActionEVMDiff $ Map.map fromDiff m
