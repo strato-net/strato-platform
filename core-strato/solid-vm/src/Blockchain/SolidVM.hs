@@ -1,12 +1,19 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.SolidVM
   ( SolidVMBase
@@ -40,8 +47,9 @@ import qualified Data.Text.Encoding                   as TE
 import           Data.Time.Clock.POSIX
 import           Data.Traversable
 import qualified Data.Vector as V
-import           GHC.Exts
-import           Text.Parsec (runParser)
+import           Debugger
+import           GHC.Exts                             hiding (breakpoint)
+import           Text.Parsec (ParseError, runParser)
 import           Text.Printf
 import           Text.Read (readMaybe)
 
@@ -99,6 +107,50 @@ withSrcPos pos str = liftIO . putStrLn $ concat
   , ": "
   , str
   ]
+
+-- TODO: I'm putting all of these instances related to debugging here,
+--       but they should really go in SM.hs
+--       However, the functions needed to run `variableSet` and `runExpr`,
+--       which are critical for debugging, are defined in SetGet.hs and
+--       SolidVM.hs. I think this suggests a reorganization of the
+--       solid-vm package should be done, but I don't want to interfere
+--       with it too much just to get the debugger working.
+
+variableSet :: MonadSM m => m VariableSet
+variableSet = do
+  cis <- Mod.get (Mod.Proxy @[CallInfo])
+  let textSet = S.fromList . map T.pack . M.keys
+      varNames = case cis of
+        [] -> S.empty
+        (ci:_) -> textSet $ localVariables ci
+      locals = M.singleton "Local Variables" varNames
+  acct <- getCurrentAccount
+  ~(contract, _, _) <- getCodeAndCollection acct
+  let stateVars = textSet $ contract ^. storageDefs
+      globals = M.singleton "State Variables" stateVars
+  pure . VariableSet $ locals <> globals
+
+instance MonadSM m => Mod.Accessible VariableSet m where
+  access _ = variableSet
+
+instance MonadSM m => Mod.Accessible [SourcePos] m where
+  access _ = do
+    cis <- Mod.get (Mod.Proxy @[CallInfo])
+    pure $ fromMaybe (initialPos "") . currentSourcePos <$> cis
+
+runExpr :: MonadSM m => T.Text -> m (Either ParseError T.Text)
+runExpr exprText = withoutDebugging $ do
+  let eExpr = runParser expression "" "" (T.unpack exprText)
+  withoutDebugging $ traverse (pure . T.pack <=< showSM <=< getVar <=< expToVar) eExpr
+
+solidVMBreakpoint :: MonadSM m => SourcePos -> m ()
+solidVMBreakpoint pos = do
+  Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
+    [] -> pure []
+    (ci:cis) -> pure $ ci{currentSourcePos = Just pos}:cis
+  breakpoint runExpr
+
+-- end debugger-related code
 
 create :: SolidVMBase m
        => Bool
@@ -272,7 +324,7 @@ getCodeAndCollection address' = do
   callStack' <- Mod.get (Mod.Proxy @[CallInfo])
   let maybeAddress =
         case callStack' of
-          (current:_) -> Just $ currentAccount current
+          (current':_) -> Just $ currentAccount current'
           _ -> Nothing
 
   onTraced $ liftIO $ putStrLn $ "----------------- caller address: " ++ fromMaybe "Nothing" (fmap format maybeAddress)
@@ -435,6 +487,7 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.PlusPlus e)))
 
 -- Assignment to an index into an array or mapping
 runStatement st@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" dst@(Xabi.IndexAccess parent (Just indExp)) src)) pos) = do
+  solidVMBreakpoint pos
   srcVar <- expToVar src
   srcVal <- getVar srcVar
 
@@ -463,10 +516,13 @@ runStatement st@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "="
       return Nothing
 
 
-runStatement st@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" (Xabi.IndexAccess _ Nothing) _)) _) = missingField "index value cannot be empty" (unparseStatement st)
+runStatement st@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" (Xabi.IndexAccess _ Nothing) _)) pos) = do
+  solidVMBreakpoint pos
+  missingField "index value cannot be empty" (unparseStatement st)
 
 
 runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" dst src)) pos) = do
+  solidVMBreakpoint pos
   srcVal <- getVar =<< expToVar src
   dstVar <- expToVar dst
 
@@ -514,11 +570,13 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" ds
               logAssigningVariable value'
               setVar v1 $ coerceType ctract ty value'
 -}
-runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e) _) = do
+runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e) pos) = do
+  solidVMBreakpoint pos
   _ <- getVar =<< expToVar e
   return Nothing -- just throw away the return value
 
 runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition entries maybeExpression) pos) = do
+  solidVMBreakpoint pos
   let !maybeLoc = case entries of
                       [e] -> Xabi.vardefLocation e
                       es -> if any ((== Just Xabi.Storage) . Xabi.vardefLocation) es
@@ -567,6 +625,7 @@ runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition entries maybeExpre
   return Nothing
 
 runStatement (Xabi.IfStatement condition code' maybeElseCode pos) = do
+  solidVMBreakpoint pos
   conditionResult <- getBool =<< expToVar condition
   
   onTraced $ do
@@ -581,7 +640,7 @@ runStatement (Xabi.IfStatement condition code' maybeElseCode pos) = do
       Nothing -> return Nothing
 
 runStatement (Xabi.WhileStatement condition code pos) = do
-  
+  solidVMBreakpoint pos
      
   while (getBool =<< expToVar condition) $ do
       onTraced $ withSrcPos pos $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
@@ -591,6 +650,7 @@ runStatement (Xabi.WhileStatement condition code pos) = do
       -- TODO: this can loop infinitely
 
 runStatement (Xabi.DoWhileStatement code condition pos) = do
+  solidVMBreakpoint pos
   doWhile (getBool =<< expToVar condition) $ do
       onTraced $ withSrcPos pos $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
       result <- runStatements code
@@ -600,6 +660,7 @@ runStatement (Xabi.DoWhileStatement code condition pos) = do
 
 --TODO- all the variables declared in an `if` or `for` code block need to be deleted when the block is finished....
 runStatement (Xabi.ForStatement maybeInitStatement maybeConditionExp maybeLoopExp code pos) = do
+  solidVMBreakpoint pos
   _ <-
     case maybeInitStatement of
       Just initStatement -> runStatement $ Xabi.SimpleStatement initStatement pos
@@ -623,7 +684,8 @@ runStatement (Xabi.ForStatement maybeInitStatement maybeConditionExp maybeLoopEx
       _ <- getVar =<< expToVar loopExp
       return result
 
-runStatement (Xabi.Return maybeExpression _) = do
+runStatement (Xabi.Return maybeExpression pos) = do
+  solidVMBreakpoint pos
   case maybeExpression of
     Just e -> do
       ql <- expToVar e
@@ -632,7 +694,8 @@ runStatement (Xabi.Return maybeExpression _) = do
 --      fmap Just $ getVar =<< expToVar e
     Nothing -> return $ Just SNULL
 
-runStatement (Xabi.AssemblyStatement (Xabi.MloadAdd32 dst src) _) = do
+runStatement (Xabi.AssemblyStatement (Xabi.MloadAdd32 dst src) pos) = do
+  solidVMBreakpoint pos
   srcVar <- expToVar $ Xabi.Variable $ T.unpack src;
   dstVar <- expToVar $ Xabi.Variable $ T.unpack dst;
 
@@ -640,7 +703,8 @@ runStatement (Xabi.AssemblyStatement (Xabi.MloadAdd32 dst src) _) = do
   setVar dstVar =<< getString srcVar
   return Nothing
 
-runStatement st@(Xabi.EmitStatement eventName exptups _) = do
+runStatement st@(Xabi.EmitStatement eventName exptups pos) = do
+  solidVMBreakpoint pos
   exps <- mapM (expToVar . snd) exptups
   expVals <- mapM getVar exps
   expStrs <- mapM showSM expVals
@@ -855,7 +919,7 @@ expToVar' x@(Xabi.MemberAccess expr name) = do
                                                     return . Constant . SString . fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
       (SBuiltinVariable "tx", "group") -> do env' <- getEnv
                                              maybeCert <- x509CertDBGet $ Env.origin env'
-                                             return . Constant . SString . fromMaybe "" . fmap subUnit $ getCertSubject =<< maybeCert
+                                             return . Constant . SString . fromMaybe "" $ subUnit =<< getCertSubject =<< maybeCert
       (SStruct _ theMap, fieldName) -> case M.lookup fieldName theMap of
           Nothing -> missingField "struct member access" fieldName
           Just v -> return v
@@ -1377,9 +1441,9 @@ certificateMap maybeCert = case maybeCert of
     Just cert -> SMap stringToString (fromMaybe emptyCertMap $ fmap (certMap cert) (subject cert))
     where subject cert = getCertSubject =<< (eitherToMaybe . bsToCert . BC.pack $ cert)
           certMap cert sub = M.fromList [ (SString "commonName", Constant . SString $ subCommonName sub)
-                                   , (SString "country", Constant . SString $ subCountry sub) 
+                                   , (SString "country", Constant . SString $ fromMaybe "" $ subCountry sub) 
                                    , (SString "organization", Constant . SString $ subOrg sub) 
-                                   , (SString "group", Constant . SString $ subUnit sub) 
+                                   , (SString "group", Constant . SString $ fromMaybe "" $ subUnit sub) 
                                    , (SString "publicKey", Constant . SString $ BC.unpack $ pubToBytes $ subPub sub) 
                                    , (SString "certString", Constant . SString $ cert)
                                    ]
@@ -1686,4 +1750,3 @@ encodeForReturn (STuple items) = do
         return (headers `B.append` bs, strings)
 
 encodeForReturn x = todo "can't encode this return type" x
-

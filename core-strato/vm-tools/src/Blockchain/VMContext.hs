@@ -88,6 +88,7 @@ import           Data.Traversable                   (for)
 import qualified Database.LevelDB                   as DB
 import qualified Database.Persist.Sqlite            as Lite
 import qualified Database.Redis                     as Redis
+import           Debugger
 import           GHC.Generics
 import qualified Network.Kafka                      as K
 import qualified Network.Kafka.Protocol             as K
@@ -167,6 +168,7 @@ data ContextState = ContextState
   , _blockRequested    :: Bool
   , _coinbaseQueue     :: Q.Seq ((Address,Word64), Address)
   , _txRunResultsCache :: TRC.Cache
+  , _debugSettings     :: Maybe DebugSettings
   } deriving (Generic, NFData)
 makeLenses ''ContextState
 
@@ -181,6 +183,7 @@ type ContextM = ReaderT Context (ResourceT (LoggingT IO))
 type VMBase m = ( MonadIO m
                 , MonadUnliftIO m
                 , MonadLogger m
+                , Mod.Modifiable (Maybe DebugSettings) m
                 , Mod.Modifiable ContextState m
                 , Mod.Accessible ContextState m
                 , Mod.Modifiable MemDBs m
@@ -289,6 +292,10 @@ instance Mod.Modifiable ContextState ContextM where
 
 instance Mod.Accessible Context ContextM where
   access _ = ask
+
+instance Mod.Modifiable (Maybe DebugSettings) ContextM where
+  get _    = gets $ view debugSettings
+  put _ ds = modify $ debugSettings .~ ds
 
 instance Mod.Accessible ContextState ContextM where
   access _ = get
@@ -489,6 +496,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
             , _blockRequested    = False
             , _coinbaseQueue     = Q.empty
             , _txRunResultsCache = cache
+            , _debugSettings     = Nothing
             }
 
       let ctx = Context
@@ -502,9 +510,11 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
       cstate' <- readIORef cstate
       return (a, cstate')
 
-runContextM :: (MonadIO m, MonadUnliftIO m, MonadLogger m) =>
-                ReaderT Context (ResourceT m) a -> m (a, ContextState)
-runContextM f = do
+runContextM :: (MonadIO m, MonadUnliftIO m, MonadLogger m)
+            => Maybe DebugSettings
+            -> ReaderT Context (ResourceT m) a
+            -> m (a, ContextState)
+runContextM dSettings f = do
     liftIO $ createDirectoryIfMissing False $ dbDir "h"
     runResourceT $ do
       conn <- createPostgresqlPool connStr 20
@@ -550,6 +560,7 @@ runContextM f = do
             , _blockRequested    = False
             , _coinbaseQueue     = Q.empty
             , _txRunResultsCache = cache
+            , _debugSettings     = dSettings
             }
 
       let ctx = Context
@@ -561,11 +572,17 @@ runContextM f = do
       return (a, cstate')
 
 
-evalContextM :: (MonadIO m, MonadUnliftIO m, MonadLogger m) => ReaderT Context (ResourceT m) a -> m a
-evalContextM f = fst <$> runContextM f
+evalContextM :: (MonadIO m, MonadUnliftIO m, MonadLogger m)
+             => Maybe DebugSettings
+             -> ReaderT Context (ResourceT m) a
+             -> m a
+evalContextM d f = fst <$> runContextM d f
 
-execContextM :: (MonadIO m, MonadUnliftIO m, MonadLogger m) => ReaderT Context (ResourceT m) a -> m ContextState
-execContextM f = snd <$> runContextM f
+execContextM :: (MonadIO m, MonadUnliftIO m, MonadLogger m)
+             => Maybe DebugSettings
+             -> ReaderT Context (ResourceT m) a
+             -> m ContextState
+execContextM d f = snd <$> runContextM d f
 
 incrementNonce :: (Account `A.Alters` AddressState) f => Account -> f ()
 incrementNonce account = A.adjustWithDefault_ Mod.Proxy account $ \addressState ->

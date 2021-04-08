@@ -22,7 +22,9 @@ module Blockchain.SolidVM.SM (
   runSM,
   getCurrentAccount,
   addCallInfo,
+  dupCallInfo,
   popCallInfo,
+  withTempCallInfo,
   getLocal,
   setLocal,
   getCurrentCallInfo,
@@ -63,6 +65,7 @@ import qualified Data.NibbleString as N
 import qualified Data.Sequence as Q
 import qualified Data.Text as T
 import           Data.Text.Encoding(encodeUtf8,decodeUtf8)
+import           Debugger
 
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.ChainInfo
@@ -103,6 +106,7 @@ data CallInfo = CallInfo
   , collectionHash      :: Keccak256
   , localVariables      :: Map String (Xabi.Type, Variable)
   , readOnly            :: Bool
+  , currentSourcePos    :: Maybe Xabi.SourcePos
   } deriving (Show)
 
 {-
@@ -149,7 +153,9 @@ type MonadSM m = ( (Account `A.Alters` AddressState) m
                  , Mod.Modifiable [CallInfo] m
                  , Mod.Modifiable Action m
                  , Mod.Modifiable (Q.Seq Event) m
+                 , Mod.Modifiable (Maybe DebugSettings) m
                  , MonadIO m --todo: remove
+                 , MonadLogger m
                  )
 
 instance Monad m => HasMemAddressStateDB (SM m) where
@@ -227,6 +233,11 @@ instance (N.NibbleString `A.Alters` N.NibbleString) m => (N.NibbleString `A.Alte
 
 instance Monad m => Mod.Accessible Env.Environment (SM m) where
   access _ = gets env
+
+instance (Monad m, Mod.Modifiable (Maybe DebugSettings) m)
+  => Mod.Modifiable (Maybe DebugSettings) (SM m) where
+  get _ = lift $ Mod.get (Mod.Proxy @(Maybe DebugSettings))
+  put _ = lift . Mod.put (Mod.Proxy @(Maybe DebugSettings))
 
 instance Monad m => Mod.Modifiable Env.Sender (SM m) where
   get _ = Env.Sender . Env.sender <$> gets env
@@ -457,15 +468,28 @@ addCallInfo a c fn hsh cc initialLocalVariables ro = do
           codeCollection=cc,
           collectionHash=hsh,
           localVariables=initialLocalVariables,
-          readOnly=ro
+          readOnly=ro,
+          currentSourcePos=Nothing
         }
 
   Mod.modify_ (Mod.Proxy @[CallInfo]) $ pure . (newCallInfo:)
+
+dupCallInfo :: MonadSM m => m ()
+dupCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
+  [] -> internalError "dupCallInfo was called on an already empty stack" ()
+  (ci:rest) -> pure $ ci:ci:rest
 
 popCallInfo :: MonadSM m => m ()
 popCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
   [] -> internalError "popCallInfo was called on an already empty stack" ()
   (_:rest) -> pure rest
+
+withTempCallInfo :: MonadSM m => m a -> m a
+withTempCallInfo f = do
+  dupCallInfo
+  result <- f
+  popCallInfo
+  pure result
 
 getCurrentCallInfo :: MonadSM m => m CallInfo
 getCurrentCallInfo = do

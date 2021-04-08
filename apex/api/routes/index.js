@@ -5,7 +5,7 @@ const router = express.Router();
 const oAuthController = require('../controllers/oAuth');
 const dappController = require('../controllers/dapp');
 const healthHandler = require('../controllers/health');
-const trackHandler = require('../controllers/track');
+const apiCounterHandler = require('../controllers/apiCounter');
 const appConfig = require(`${process.cwd()}/config/app.config`);
 const oAuth = require(`${process.cwd()}/lib/oAuth/oAuth`);
 const RestStatus = require(`${process.cwd()}/lib/rest-utils/rest-constants`);
@@ -84,7 +84,11 @@ router.get('/bloc/file/list', checkExtStorageEnabled, fileController.list);
 router.get('/status', healthHandler.nodeStatus);
 router.get('/health', healthHandler.healthStatus);
 router.get('/_ping', healthHandler.ping);
-router.get('/_track', trackHandler._track);
+
+// Stats
+if (process.env.STATS_ENABLED === "true") {
+  router.get('/_api_counter', apiCounterHandler.apiCounterRouteController)
+}
 
 
 function isOAuth() {

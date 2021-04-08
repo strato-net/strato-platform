@@ -405,7 +405,7 @@ createEventTableQuery ev =
       tableName = T.concat [org, (eventContractName ev),  ".", (eventName ev)]
   in T.concat   
       [ "CREATE TABLE IF NOT EXISTS " , wrapDoubleQuotes tableName , " ("
-        , csv $ ["id SERIAL NOT NULL", "address text"] ++ (map (\t -> T.concat [t, " text"]) $ eventFields ev)
+        , csv $ ["id SERIAL NOT NULL", "address text"] ++ (map (\t -> T.concat [wrapDoubleQuotes t, " text"]) $ eventFields ev) 
         , ");"]
 
 -- Inserts rows for all event emissions into their respective tables

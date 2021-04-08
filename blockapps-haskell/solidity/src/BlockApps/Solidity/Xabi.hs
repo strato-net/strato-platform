@@ -330,7 +330,7 @@ data ContractDetails = ContractDetails
   , contractdetailsBinRuntime :: Text
   , contractdetailsCodeHash   :: CodePtr
   , contractdetailsName       :: Text
-  , contractdetailsSrc        :: Text
+  , contractdetailsSrc        :: [(Text, Text)]
   , contractdetailsXabi       :: Xabi
   } deriving (Show,Eq,Generic,NFData)
 
@@ -358,7 +358,13 @@ instance FromJSON ContractDetails where
       <*> obj .: "bin-runtime"
       <*> obj .: "codeHash"
       <*> obj .: "name"
-      <*> obj .: "src"
+      <*> (do
+        msrc <- obj .:? "src"
+        case msrc of
+          Just (String s) -> pure $ [("", s)]
+          Just (Object _) -> fmap Map.toList (obj .: "src")
+          Just (Array _) -> obj .: "src"
+          _ -> pure [])
       <*> obj .: "xabi"
 
 instance ToSample ContractDetails where toSamples _ = noSamples
@@ -379,7 +385,7 @@ instance ToSchema ContractDetails where
         , contractdetailsBinRuntime = "ContractRuntime"
         , contractdetailsCodeHash = EVMCode $ unsafeCreateKeccak256FromWord256 0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365
         , contractdetailsName = "DetailsName"
-        , contractdetailsSrc = "contract DetailsName { }"
+        , contractdetailsSrc = [("DetailsName.sol", "contract DetailsName { }")]
         , contractdetailsXabi = sampleXabi
         }
 

@@ -1,21 +1,39 @@
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE BangPatterns    #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE BangPatterns          #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE RecordWildCards       #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeSynonymInstances  #-}
+{-# OPTIONS -fno-warn-orphans      #-}
+
+
+import           Blockchain.Strato.Model.Secp256k1
 
 import           Control.Exception
-import qualified Crypto.Secp256k1           as SEC
+import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Reader
 
-import qualified Data.Aeson                 as Ae
-import qualified Data.ByteString            as B
-import qualified Data.ByteString.Char8      as C8
+import qualified Data.Aeson                         as Ae
+import qualified Data.ByteString                    as B
+import qualified Data.ByteString.Char8              as C8
 import           Data.Either
-import           Data.Foldable              (foldlM)
+import           Data.Foldable                      (foldlM)
 import           Data.Maybe
 import           System.Console.GetOpt
 import           System.Environment
 
 
 import           BlockApps.X509 
+
+
+
+
+-- a simple ReaderT to keep the private key
+type CertGenM = ReaderT PrivateKey IO
+
+instance HasVault CertGenM where
+  getPub = error "we never call getPub with this tool"
+  getShared _ = error "we never call getShared with this tool"
+  sign bs = ask >>= return . flip signMsg bs 
 
 
 
@@ -26,7 +44,7 @@ import           BlockApps.X509
 data Options = Options 
   { optIssuerCert    :: Maybe X509Certificate
   , optSubjectInfo   :: Subject
-  , optKey           :: SEC.SecKey
+  , optKey           :: PrivateKey
   } deriving Show
 
 defaultOptions :: Options
@@ -99,21 +117,12 @@ main = do
           , issCountry    = subCountry optSubjectInfo
           , issOrg        = subOrg optSubjectInfo
           , issUnit       = subUnit optSubjectInfo
-          , issPriv       = optKey
           }
-        Just (X509Certificate cert) -> do 
-          let rawIssuerCert = getCertificate cert
-              dn = certIssuerDN rawIssuerCert
-              getStr el = fromASN1CS $ fromMaybe (error "could not getDnElement") $ getDnElement el dn
-          Issuer 
-            { issCommonName = getStr DnCommonName 
-            , issCountry    = getStr DnCountry
-            , issOrg        = getStr DnOrganization
-            , issUnit       = getStr DnOrganizationUnit
-            , issPriv       = optKey
-            }
-
+        Just cert -> 
+          fromMaybe (error "missing commonName or orgName in issuer cert") (getCertIssuer cert)
+  
   -- generate and write cert
-  cert <- makeSignedCert issuer optSubjectInfo
-  B.writeFile "outputCert.pem" $ certToBytes $ cert
-  putStrLn "Done. Cert was written to outputCert.pem"
+  flip runReaderT optKey $ do
+    cert <- makeSignedCert issuer optSubjectInfo
+    liftIO $ B.writeFile "outputCert.pem" $ certToBytes $ cert
+    liftIO $ putStrLn "Done. Cert was written to outputCert.pem"

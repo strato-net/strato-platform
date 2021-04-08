@@ -18,14 +18,19 @@ describe("imports", function() {
     admin = await factory.createAdmin(userArgs, options);
   });
 
-  it("combines to string", async () => {
+  it("combines to array", async () => {
     const filename = `${fixtures}/importer/Main.sol`;
     const source = await importer.combine(filename, false);
-    assert.isAbove(source.indexOf("contract Main"), 0);
-    assert.isAbove(source.indexOf("contract A"), 0);
-    assert.isAbove(source.indexOf("contract B"), 0);
-    assert.isAbove(source.indexOf("contract C"), 0);
-    assert.isAbove(source.indexOf("contract D"), 0);
+    assert.equal(source.length, 5, "should have an array with all 5 files");
+    let src = ''
+    for (let i = 0; i < source.length; i++) {
+      src += source[i][1];
+    }
+    assert.isAbove(src.indexOf("contract Main"), 0);
+    assert.isAbove(src.indexOf("contract A"), 0);
+    assert.isAbove(src.indexOf("contract B"), 0);
+    assert.isAbove(src.indexOf("contract C"), 0);
+    assert.isAbove(src.indexOf("contract D"), 0);
   });
 
   it("combines to object", async () => {
@@ -38,7 +43,7 @@ describe("imports", function() {
     assert.isAbove(source['D.sol'].indexOf("contract D"), 0);
   });
 
-  it("combines to string and uploads", async () => {
+  it("combines to array and uploads", async () => {
     const filename = `${fixtures}/importer/Main.sol`;
     const source = await importer.combine(filename, false);
     const name = `Main`;
