@@ -100,6 +100,10 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
     sed -i '/#TEMPLATE_MARK_LOGS/d' /tmp/nginx.conf
   fi
 
+  if [ "$START_EXPERIMENTAL_STRATO_API" != true ]; then
+    sed -i '/#TEMPLATE_MARK_EXPERIMENTAL_STRATO_API/d' /tmp/nginx.conf
+  fi
+
   # Set the Bloc API timeout
   BLOC_TIMEOUT=$((blockTime * BLOCK_TIME_MULTIPLIER_FOR_TIMEOUT))
   if [ ${BLOC_TIMEOUT} -lt ${MIN_TIMEOUT_BLOCKCHAIN_ENDPOINTS} ]
