@@ -75,6 +75,7 @@ executables:
       - wai-extra
       - wai-middleware-prometheus
       - warp
+    ghc-options: -threaded
       
   migrate-keys:
     source-dirs: app
