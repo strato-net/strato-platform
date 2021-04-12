@@ -338,6 +338,7 @@ services:
     - SERVE_LOGS=${SERVE_LOGS}
     - ssl=${ssl}
     - sslCertFileType=${sslCertFileType}
+    - START_EXPERIMENTAL_STRATO_API=${START_EXPERIMENTAL_STRATO_API}
     - STATS_ENABLED=${STATS_ENABLED}
     - uiPassword=${uiPassword}
     - USE_OLD_STRATO_API=${USE_OLD_STRATO_API}

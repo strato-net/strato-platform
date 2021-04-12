@@ -50,7 +50,6 @@ import           GHC.Stack
 import           Opaleye
 import           Servant
 import           Servant.Client
-import           Text.Printf
 
 import           UnliftIO                           hiding (Handler(..))
 
@@ -68,18 +67,14 @@ import           Control.Monad.Composable.BlocSQL
 import           Control.Monad.Composable.CoreAPI   hiding (httpManager)
 import           Control.Monad.Composable.Vault     hiding (httpManager)
 
+import           SQLM
+
 data Should a = Don't a | Do a
 data Compile = Compile
 data CacheNonce = CacheNonce
 
 type HasBlocEnv m = Accessible BlocEnv m
   
-blocError :: (HasCallStack, MonadIO m, MonadLogger m) => BlocError -> m y
-blocError err = do
-    logErrorCS callStack . Text.pack $
-      printf "err: %s\nCallstack:%s" (show err) (prettyCallStack callStack)
-    throwIO err
-
 data BlocEnv = BlocEnv
   { stateFetchLimit    :: Integer
   , gasOn              :: Bool
@@ -88,21 +83,6 @@ data BlocEnv = BlocEnv
   , globalCodePtrCache :: Cache CodePtr (Int32, ContractDetails)
   , txTBQueue          :: TBQueue (Maybe Text, Maybe ChainId, Bool, PostBlocTransactionRequest)
   }
-
-data BlocError
-  = StratoError ClientError
-  | CirrusError ServerError
-  | VaultWrapperError ClientError
-  | DBError Text
-  | UserError Text
-  | CouldNotFind Text
-  | AnError Text
-  | Unimplemented Text
-  | AlreadyExists Text
-  | RuntimeError SomeException
-  | UnavailableError Text
-  | InternalError Text
-  deriving (Show, Exception)
 
 --------------------------------------------------------------------------------
 
