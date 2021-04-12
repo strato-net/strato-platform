@@ -59,7 +59,8 @@ export class StratoDebugSession extends LoggingDebugSession {
 	private _showHex = false;
 	private _useInvalidatedEvent = false;
 
-    private _ws = new WebSocket("ws://localhost:8080/ws-debug/")
+	private _initialized = false;
+    private _ws;
 	private _status = undefined;
 	private _user;
     private _options;
@@ -71,6 +72,22 @@ export class StratoDebugSession extends LoggingDebugSession {
 	 */
 	public constructor() {
 		super("strato-debug.txt");
+		this.setDebuggerLinesStartAt1(true);
+		this.setDebuggerColumnsStartAt1(true);
+	}
+
+	public async initialize() {
+		this._initialized = true;
+		const { user, options } = await this.getUserAndOptionsInternal()
+		const { config } = options
+		const { nodes } = config
+		var token = user.token;
+        var wsOptions = {
+            headers: {
+                "Authorization" : "Bearer " + token
+            }
+        };
+        this._ws = new WebSocket(`${nodes[0].url}/vm-debug-ws/`, wsOptions);
         this._ws.on('message', (bytes) => {
            const message = JSON.parse(bytes.toString('utf-8'));
 		   if(message.tag === 'WSOStatus') {
@@ -93,8 +110,6 @@ export class StratoDebugSession extends LoggingDebugSession {
 		   }
            console.log(`From websocket: ${message}`)
         });
-		this.setDebuggerLinesStartAt1(true);
-		this.setDebuggerColumnsStartAt1(true);
 	}
 
 	/**
@@ -163,7 +178,7 @@ export class StratoDebugSession extends LoggingDebugSession {
 		this.sendEvent(new InitializedEvent());
 	}
 
-	protected async getUserAndOptions(): Promise<any> {
+	private async getUserAndOptionsInternal(): Promise<any> {
 		if (!this._user) {
 		    this._user = await getApplicationUser()
 		}
@@ -172,6 +187,13 @@ export class StratoDebugSession extends LoggingDebugSession {
             this._options = { config };
 		}
 		return { user: this._user, options: this._options }
+	}
+
+	protected async getUserAndOptions(): Promise<any> {
+		if (!this._initialized) {
+			await this.initialize();
+		}
+        return this.getUserAndOptionsInternal();
 	}
 
 	/**
@@ -222,9 +244,9 @@ export class StratoDebugSession extends LoggingDebugSession {
 		const bps = clientLines.map((l) => ({
 			tag: "UnconditionalBP",
 			contents: {
-				breakpointFile: file,
-				breakpointLine: l,
-				breakpointColumn: 1
+				name: file,
+				line: l,
+				column: 1
 			}
 		}))
 
@@ -341,9 +363,9 @@ export class StratoDebugSession extends LoggingDebugSession {
 		const stackFrames: StackFrame[] = []
 		for (let i = 0; i < stk.length; i++) {
 			const f = stk[i];
-			const source = await this.createSourceFromFilename(f.breakpointFile)
-			const sf = new StackFrame(i, f.breakpointFile, source, this.convertDebuggerLineToClient(f.breakpointLine));
-			sf.column = this.convertDebuggerColumnToClient(f.breakpointColumn);
+			const source = await this.createSourceFromFilename(f.name)
+			const sf = new StackFrame(i, f.name, source, this.convertDebuggerLineToClient(f.line));
+			sf.column = this.convertDebuggerColumnToClient(f.column);
 			stackFrames.push(sf);
 		}
 		response.body = {

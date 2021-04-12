@@ -9,7 +9,7 @@ const strato12Url = "/strato-api/eth/v1.2";
 const strato23Url = "/strato/v2.3";
 const cirrusUrl = "/cirrus/search";
 const externalStorageUrl = "/apex-api/bloc/file";
-const debugUrl = "/debug";
+const debugUrl = "/vm-debug";
 
 const Endpoint = {
   ACCOUNT: `${strato12Url}/account`,
