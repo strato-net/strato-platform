@@ -7,6 +7,7 @@
     3. vault-wrapper (8484:8000)
     4. postgrest (note the extra T) (3434:3001)
     5. prometheus (9090:9090)
+    6. bloc (8888:8000) (!only if using USE_OLD_STRATO_API=true)
 2. cd `apex/api`
 
 ### Run Apex server locally (development mode):
@@ -14,8 +15,14 @@
 3. ```
     OAUTH_ENABLED=true \ # if STRATO is OAUTH_ENABLED=true \
         stratoRoot=http://localhost:3333/eth/v1.2 \
+   
         blocHttpHost=http://localhost:3333 \
         blocRoot=http://localhost:3333/bloc/v2.2 \
+            or for USE_OLD_STRATO_API=true:
+        blocHttpHost=http://localhost:8888 \
+        blocRoot=http://localhost:8888/bloc/v2.2 \
+        
+   
         postgres_port=15433 \
         vaultWrapperHttpHost=http://localhost:8484 \
         postgrestHttpHost=http://localhost:3434 \
@@ -39,6 +46,11 @@
     NODE_ENV=development \
         OAUTH_ENABLED=true \ # if STRATO is OAUTH_ENABLED=true
         stratoHost=localhost:3333 \
+   
+        blocHost=localhost:3333 \
+            or for USE_OLD_STRATO_API=true:
+        blocHost=localhost:8888 \
+   
         vaultWrapperHost=localhost:8484 \
         postgrestHost=localhost:3434 \
         postgres_port=15433 \
