@@ -1335,6 +1335,15 @@ intBuiltin [SString hex] =
     _ -> typeError "numeric cast - not a hex string" hex
 intBuiltin args = typeError "numeric cast - invalid args" args
 
+castToAncestor :: MonadSM m => NamedAccount -> Integer -> m Value
+castToAncestor a n = do
+  cInfo <- Mod.get (Mod.Proxy @[CallInfo])
+  let currentChainId = maybe Nothing (_accountChainId . currentAccount) $ listToMaybe cInfo
+  pChain <- getNthAncestorChain (fromIntegral n) currentChainId
+  case pChain of
+    Nothing -> return . SAccount $ (namedAccountChainId .~ MainChain) a
+    Just b -> return . SAccount $ (namedAccountChainId .~ ExplicitChain b) a
+
 callBuiltin :: MonadSM m => String -> [Value] -> Maybe Value -> m Value
 callBuiltin "string" [SString s] _ = return $ SString s
 callBuiltin "string" [SAccount a] _ = return . SString $ show a
@@ -1356,50 +1365,16 @@ callBuiltin "account" [ss@(SString s)] _ = maybe (typeError "account cast" ss)
                                                  $ readMaybe s
 callBuiltin "account" [SInteger a, SInteger b] _ = return . SAccount $ explicitChain (fromIntegral a) (fromInteger b)
 callBuiltin "account" [SInteger a, SString "main"] _ = return . SAccount $ mainChain (fromIntegral a)
-callBuiltin "account" [SInteger a, SString "parent"] _ = do
-  cInfo <- Mod.get (Mod.Proxy @[CallInfo])
-  let currentChainId = maybe Nothing (_accountChainId . currentAccount) $ listToMaybe cInfo
-  pChain <- getNthAncestorChain 1 currentChainId
-  case pChain of
-    Nothing -> return . SAccount $ mainChain (fromIntegral a)
-    Just b -> return . SAccount $ explicitChain (fromIntegral a) b
-callBuiltin "account" [SInteger a, SString "grandparent"] _ = do
-  cInfo <- Mod.get (Mod.Proxy @[CallInfo])
-  let currentChainId = maybe Nothing (_accountChainId . currentAccount) $ listToMaybe cInfo
-  gpChain <- getNthAncestorChain 2 currentChainId
-  case gpChain of
-    Nothing -> return . SAccount $ mainChain (fromIntegral a)
-    Just b -> return . SAccount $ explicitChain (fromIntegral a) b
-callBuiltin "account" [SInteger a, SString "ancestor", SInteger n] _ = do
-  cInfo <- Mod.get (Mod.Proxy @[CallInfo])
-  let currentChainId = maybe Nothing (_accountChainId . currentAccount) $ listToMaybe cInfo
-  ancestorChain <- getNthAncestorChain (fromIntegral n) currentChainId
-  case ancestorChain of
-    Nothing -> return . SAccount $ mainChain (fromIntegral a)
-    Just b -> return . SAccount $ explicitChain (fromIntegral a) b
+callBuiltin "account" [SInteger a, SString "self"] _                 = unspecifiedChain (fromIntegral a) `castToAncestor` 0
+callBuiltin "account" [SInteger a, SString "parent"] _               = unspecifiedChain (fromIntegral a) `castToAncestor` 1
+callBuiltin "account" [SInteger a, SString "grandparent"] _          = unspecifiedChain (fromIntegral a) `castToAncestor` 2
+callBuiltin "account" [SInteger a, SString "ancestor", SInteger n] _ = unspecifiedChain (fromIntegral a) `castToAncestor` n
 callBuiltin "account" [SAccount a, SInteger b] _ = return . SAccount $ (namedAccountChainId .~ ExplicitChain (fromIntegral b)) a
 callBuiltin "account" [SAccount a, SString "main"] _ = return . SAccount $ (namedAccountChainId .~ MainChain) a
-callBuiltin "account" [SAccount a, SString "parent"] _ = do
-  cInfo <- Mod.get (Mod.Proxy @[CallInfo])
-  let currentChainId = maybe Nothing (_accountChainId . currentAccount) $ listToMaybe cInfo
-  pChain <- getNthAncestorChain 1 currentChainId
-  case pChain of
-    Nothing -> return . SAccount $ (namedAccountChainId .~ MainChain) a
-    Just b -> return . SAccount $ (namedAccountChainId .~ ExplicitChain b) a
-callBuiltin "account" [SAccount a, SString "grandparent"] _ = do
-  cInfo <- Mod.get (Mod.Proxy @[CallInfo])
-  let currentChainId = maybe Nothing (_accountChainId . currentAccount) $ listToMaybe cInfo
-  gpChain <- getNthAncestorChain 2 currentChainId
-  case gpChain of
-    Nothing -> return . SAccount $ (namedAccountChainId .~ MainChain) a
-    Just b -> return . SAccount $ (namedAccountChainId .~ ExplicitChain b) a
-callBuiltin "account" [SAccount a, SString "ancestor", SInteger n] _ = do
-  cInfo <- Mod.get (Mod.Proxy @[CallInfo])
-  let currentChainId = maybe Nothing (_accountChainId . currentAccount) $ listToMaybe cInfo
-  ancestorChain <- getNthAncestorChain (fromIntegral n) currentChainId
-  case ancestorChain of
-    Nothing -> return . SAccount $ (namedAccountChainId .~ MainChain) a
-    Just b -> return . SAccount $ (namedAccountChainId .~ ExplicitChain b) a
+callBuiltin "account" [SAccount a, SString "self"] _                 = a `castToAncestor` 0
+callBuiltin "account" [SAccount a, SString "parent"] _               = a `castToAncestor` 1
+callBuiltin "account" [SAccount a, SString "grandparent"] _          = a `castToAncestor` 2
+callBuiltin "account" [SAccount a, SString "ancestor", SInteger n] _ = a `castToAncestor` n
 callBuiltin "account" vs _ = typeError "account cast" vs
 callBuiltin "bool" [SBool b] _ = return $ SBool b
 callBuiltin "bool" [SString "true"] _ = return $ SBool True
