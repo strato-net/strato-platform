@@ -1151,7 +1151,7 @@ create' :: EVMBase m => VMM m Code
 create' = do
 
   owner <- getEnvVar envOwner
-  vmstateModify $ action . actionData %~ M.insert owner (ActionData (EVMCode $ unsafeCreateKeccak256FromWord256 0) "" EVM (ActionEVMDiff M.empty) [])
+  vmstateModify $ action . actionData %~ M.insert owner (ActionData (EVMCode $ unsafeCreateKeccak256FromWord256 0) "" "" EVM (ActionEVMDiff M.empty) [])
 
   runCodeFromStart
 
@@ -1259,7 +1259,7 @@ call' noValueTransfer = do
   let ch = case cp of
         EVMCode x -> x
         _ -> error "internal error- the EVM was called for non-evm code"
-  vmstateModify $ action . actionData %~ M.insert receiveAddress (ActionData (EVMCode ch) "" EVM (ActionEVMDiff M.empty) [])
+  vmstateModify $ action . actionData %~ M.insert receiveAddress (ActionData (EVMCode ch) "" "" EVM (ActionEVMDiff M.empty) [])
 
   --TODO- Deal with this return value
   unless noValueTransfer $ do
@@ -1294,7 +1294,7 @@ callPrecompiled' noValueTransfer precompiled = do
   value <- getEnvVar envValue
   receiveAddress <- getEnvVar envOwner
   sender <- getEnvVar envSender
-  vmstateModify $ action . actionData %~ M.insert receiveAddress (ActionData (EVMCode (unsafeCreateKeccak256FromWord256 0)) "" EVM (ActionEVMDiff M.empty) [])
+  vmstateModify $ action . actionData %~ M.insert receiveAddress (ActionData (EVMCode (unsafeCreateKeccak256FromWord256 0)) "" "" EVM (ActionEVMDiff M.empty) [])
 
   --TODO- Deal with this return value
   unless noValueTransfer $ do

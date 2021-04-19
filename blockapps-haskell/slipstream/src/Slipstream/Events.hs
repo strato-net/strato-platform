@@ -32,6 +32,7 @@ data ProcessedContract = ProcessedContract
   , codehash          :: CodePtr
   , abi               :: Text
   , organization      :: Text
+  , application       :: Text
   , contractName      :: Text
   , chain             :: Text
   , blockHash         :: Keccak256
@@ -45,6 +46,7 @@ data ProcessedContract = ProcessedContract
 
 data EventTable = EventTable
   { eventOrganization :: Text
+  , eventApplication  :: Text
   , eventContractName :: Text
   , eventName         :: Text
   , eventFields       :: [Text]

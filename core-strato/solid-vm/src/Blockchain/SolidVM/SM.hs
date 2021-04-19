@@ -88,6 +88,7 @@ import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.Value
 import           Blockchain.VMContext
 import           Blockchain.VMOptions
+import           Blockchain.DB.StateDB
 
 import qualified SolidVM.Model.Storable as MS
 import qualified SolidVM.Solidity.Xabi as Xabi
@@ -142,6 +143,7 @@ makeLenses ''SState
 type SM m = StateT SState m
 
 type MonadSM m = ( (Account `A.Alters` AddressState) m
+                 , HasStateDB m
                  , (Keccak256 `A.Alters` DBCode) m
                  , HasX509CertDB m
                  , A.Selectable (Maybe Word256) ParentChainId m
@@ -631,21 +633,20 @@ getXabiValueType (AccountPath loc path) = do
 getValueType :: MonadSM m => AccountPath -> m BasicType
 getValueType p = hintFromType =<< getXabiValueType p
 
-initializeActionCreate :: MonadSM m => Account -> String -> Keccak256 -> m ()
-initializeActionCreate acct name hsh = do
-  env' <- getEnv
-  maybeCert <- x509CertDBGet $ Env.origin env'
+initializeActionCreate :: MonadSM m => Account -> Account -> String -> String -> Keccak256 -> m ()
+initializeActionCreate creator acct name prt hsh = do
+  maybeCert <- x509CertDBGet $ _accountAddress creator
   let organization = T.pack $ fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
-  let newData = ActionData (SolidVMCode name hsh) organization SolidVM (ActionSolidVMDiff M.empty) []
-  x509CertDBPut acct `mapM_` maybeCert
+  let newData = ActionData (SolidVMCode name hsh) organization (T.pack prt) SolidVM (ActionSolidVMDiff M.empty) []
+  x509CertDBPut (_accountAddress acct) `mapM_` maybeCert
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     actionData %= M.insertWith mergeActionData acct newData
 
-initializeActionCall :: MonadSM m => Account -> String -> Keccak256 -> m ()
-initializeActionCall acct name hsh = do
-  maybeCert <- x509CertDBGet acct
+initializeActionCall :: MonadSM m => Account -> String -> String -> Keccak256 -> m ()
+initializeActionCall acct name prt hsh = do
+  maybeCert <- x509CertDBGet (_accountAddress acct)
   let organization = T.pack $ fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
-  let newData = ActionData (SolidVMCode name hsh) organization SolidVM (ActionSolidVMDiff M.empty) []
+  let newData = ActionData (SolidVMCode name hsh) organization (T.pack prt) SolidVM (ActionSolidVMDiff M.empty) []
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     actionData %= M.insertWith mergeActionData acct newData
 

@@ -183,6 +183,7 @@ processedContract ABIID{..} state AggregateAction{..} =
     , codehash = actionCodeHash
     , abi = aiAbi
     , organization = actionOrganization
+    , application  = actionApplication
     , contractName = aiName
     , chain = aiChain
     , contractData = state
@@ -215,6 +216,7 @@ makeFunctionInserts xabi ABIID{..} state AggregateAction{..} =
       , codehash = actionCodeHash
       , abi = aiAbi
       , organization = actionOrganization
+      , application  = actionApplication
       , contractName = aiName
       , chain = aiChain
       , contractData = state
@@ -372,8 +374,8 @@ rowToHistories gref abiid row actions cont details oldState = do
 
 -- Parses xabi event declarations to create a table,
 -- ignoring indexes and anonymous flag
-createEvents :: ContractDetails -> Text -> Bloc [EventTable]
-createEvents details org = do
+createEvents :: ContractDetails -> Text -> Text -> Bloc [EventTable]
+createEvents details org app = do
   let events = xabiEvents $ contractdetailsXabi details
   return $ map makeEvent $ Map.toList events
   where
@@ -381,6 +383,7 @@ createEvents details org = do
     makeEvent (name, event) = 
       EventTable
       { eventOrganization = org
+      , eventApplication  = app
       , eventContractName = contractdetailsName details
       , eventName = name
       , eventFields = map fst $ eventLogs event
@@ -465,7 +468,7 @@ processTheMessages env conn g messages = do
               oldState <- readPreviousSolidVMState g acct
               indexContract <- rowToInsert g abiid row cont oldState
               (hs, fhs) <- rowToHistories g abiid row actions cont details oldState
-              eventTables <- createEvents details (actionOrganization row)
+              eventTables <- createEvents details (actionOrganization row) (actionApplication row)
               pure . Right $ BatchedInserts indexContract hs fhs eventTables
 
 

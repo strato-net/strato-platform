@@ -62,6 +62,7 @@ import qualified Blockchain.Database.MerklePatricia   as MP
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.ModifyStateDB          (pay)
 import           Blockchain.DB.X509CertDB
+import           Blockchain.DB.AddressStateDB
 import           Blockchain.ExtWord
 import qualified Blockchain.SolidVM.Builtins          as Builtins
 import           Blockchain.SolidVM.CodeCollectionDB
@@ -202,7 +203,16 @@ create _ _ _ blockData _ sender' origin' _ _ _ newAddress code txHash' chainId' 
 
 create' :: MonadSM m => Account -> Account -> Keccak256 -> CodeCollection -> String -> Xabi.ArgList -> m ExecResults
 create' creator newAccount ch cc contractName' argExps = do
-  initializeActionCreate newAccount contractName' ch
+  mAddressState <- getAddressStateMaybe creator
+  let mParentCodePtr = case mAddressState of
+        Just cp -> resolveCodePtrParent Nothing $ addressStateCodeHash cp
+        Nothing -> pure Nothing
+  mParentCodePtr' <- mParentCodePtr
+  let thePtr = case mParentCodePtr' of
+                    Just (SolidVMCode name _) -> Just name
+                    _                         -> Nothing
+      parentName' = fromMaybe "" thePtr
+  initializeActionCreate creator newAccount contractName' parentName' ch
 
   A.adjustWithDefault_ (A.Proxy @AddressState) newAccount $ \newAddressState ->
     pure newAddressState{ addressStateContractRoot = MP.emptyTriePtr
@@ -419,8 +429,23 @@ callWrapper from to mContract functionName argExps = do
   unless isAccessibleChain $ inaccessibleChain "Inaccessible chain violation" $ "from: " ++ show from ++ ", to: " ++ show to
 
   (contract', hsh, cc) <- getCodeAndCollection to
+  mAddressState <- getAddressStateMaybe to
+  let mParentCodePtr = case mAddressState of
+        Just cp -> resolveCodePtrParent Nothing $ addressStateCodeHash cp
+        Nothing -> pure Nothing
+      mOtherTo = case mAddressState of
+        Just cp -> case addressStateCodeHash cp of
+                        CodeAtAccount a _ -> pure $ Just a 
+                        _                -> pure Nothing
+        Nothing -> pure Nothing
+  mParentCodePtr' <- mParentCodePtr
+  mOtherTo' <- mOtherTo
+  let thePtr = case mParentCodePtr' of
+                    Just (SolidVMCode name _) -> Just name
+                    _                         -> Nothing
+      parentName' = fromMaybe "" thePtr
   let contract = fromMaybe contract' $ mContract >>= \c -> M.lookup c $ _contracts cc
-  initializeActionCall to (_contractName contract) hsh
+  initializeActionCall (fromMaybe to mOtherTo') (_contractName contract) parentName' hsh
 
   let functionsIncludingConstructor =
         case contract^.constructor of
@@ -724,7 +749,16 @@ runStatement st@(Xabi.EmitStatement eventName exptups pos) = do
       else do
         maybeCert <- x509CertDBGet $ _accountAddress $ currentAccount curInfo
         let organization = fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
-        addEvent $ Event organization (_contractName curCnct) (currentAccount curInfo) eventName expStrs
+        mAddressState <- getAddressStateMaybe $ currentAccount curInfo
+        let mParentCodePtr = case mAddressState of
+                Just cp -> resolveCodePtrParent Nothing $ addressStateCodeHash cp
+                Nothing -> pure Nothing
+        mParentCodePtr' <- mParentCodePtr
+        let thePtr = case mParentCodePtr' of
+                Just (SolidVMCode name _) -> Just name
+                _                         -> Nothing
+            parentName' = fromMaybe "" thePtr
+        addEvent $ Event organization parentName' (_contractName curCnct) (currentAccount curInfo) eventName expStrs
         return Nothing
 
 

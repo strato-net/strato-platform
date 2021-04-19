@@ -213,6 +213,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
                                 A.ActionData
                                   (EVMCode ch)
                                   ""
+                                  ""
                                   EVM
                                   (case storage d of
                                     EVMDiff m -> A.ActionEVMDiff $ Map.map fromDiff m

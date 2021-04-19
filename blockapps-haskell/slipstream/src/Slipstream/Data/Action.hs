@@ -42,6 +42,7 @@ data AggregateAction = AggregateAction
   , actionTxHash         :: Keccak256
   , actionTxSender       :: Account
   , actionOrganization   :: Text
+  , actionApplication    :: Text
   , actionAccount        :: Account
   , actionCodeHash       :: CodePtr
   , actionStorage        :: ActionDataDiff
@@ -62,6 +63,7 @@ flatten Action{..} = flip map (M.toList _actionData) $
           , actionTxHash         = _actionTransactionHash
           , actionTxSender       = _actionTransactionSender
           , actionOrganization   = _actionDataOrganization
+          , actionApplication    = _actionDataApplication
           , actionAccount        = account
           , actionCodeHash       = convertToSlipCodePtr _actionDataCodeHash _actionDataOrganization
           , actionStorage        = _actionDataStorageDiffs
@@ -101,6 +103,7 @@ formatAction AggregateAction{..} = T.concat
 
 data AggregateEvent = AggregateEvent
   { agOrganization         :: Text
+  , agApplication          :: Text
   , agContractName         :: Text
   , agContractAccount      :: Account
   , agEventName            :: Text
@@ -112,6 +115,7 @@ squash :: Action -> [AggregateEvent]
 squash Action{..} = flip map (toList _actionEvents)
   (\ev -> AggregateEvent
     { agOrganization          = T.pack $ evContractOrganization ev
+    , agApplication           = T.pack $ evContractApplication ev
     , agContractName          = T.pack $ evContractName ev
     , agContractAccount       = evContractAccount ev
     , agEventName             = T.pack $ evName ev
