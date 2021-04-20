@@ -410,6 +410,30 @@ async function getAccounts(user:OAuthUser, options:Options) {
   }
 }
 
+async function getHealth(user:OAuthUser, options:Options) {
+  try {
+    return await api.getHealth(user, { ...options, isAsync: true });
+  } catch (err) {
+    throw new RestError(
+      RestStatus.BAD_REQUEST,
+      err.response.statusText || err.response || err,
+      err.response.data || err.response || err
+    );
+  }
+}
+
+async function getStatus(user:OAuthUser, options:Options) {
+  try {
+    return await api.getStatus(user, { ...options, isAsync: true });
+  } catch (err) {
+    throw new RestError(
+      RestStatus.BAD_REQUEST,
+      err.response.statusText || err.response || err,
+      err.response.data || err.response || err
+    );
+  }
+}
+
 async function getVersion(user:OAuthUser, options:Options) {
   try {
     return await api.getVersion(user, { ...options, isAsync: true });
@@ -1629,6 +1653,8 @@ async function waitForAddress(user, contract, _options:Options) {
 export default {
   fill,
   getAccounts,
+  getHealth,
+  getStatus,
   getVersion,
   createUser,
   compileContracts,

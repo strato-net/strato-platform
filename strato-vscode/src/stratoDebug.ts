@@ -144,6 +144,9 @@ export class StratoDebugSession extends LoggingDebugSession {
 		// make VS Code send cancelRequests
 		response.body.supportsCancelRequest = true;
 
+		// make VS Code send terminateRequests
+		response.body.supportsTerminateRequest = true;
+
 		// make VS Code send the breakpointLocations request
 		response.body.supportsBreakpointLocationsRequest = true;
 
@@ -459,37 +462,6 @@ export class StratoDebugSession extends LoggingDebugSession {
 		this.sendResponse(response);
 	}
 
-	private async progressSequence() {
-
-		const ID = '' + this._progressId++;
-
-		await timeout(100);
-
-		const title = this._isProgressCancellable ? 'Cancellable operation' : 'Long running operation';
-		const startEvent: DebugProtocol.ProgressStartEvent = new ProgressStartEvent(ID, title);
-		startEvent.body.cancellable = this._isProgressCancellable;
-		this._isProgressCancellable = !this._isProgressCancellable;
-		this.sendEvent(startEvent);
-		this.sendEvent(new OutputEvent(`start progress: ${ID}\n`));
-
-		let endMessage = 'progress ended';
-
-		for (let i = 0; i < 100; i++) {
-			await timeout(500);
-			this.sendEvent(new ProgressUpdateEvent(ID, `progress: ${i}`));
-			if (this._cancelledProgressId === ID) {
-				endMessage = 'progress cancelled';
-				this._cancelledProgressId = undefined;
-				this.sendEvent(new OutputEvent(`cancel progress: ${ID}\n`));
-				break;
-			}
-		}
-		this.sendEvent(new ProgressEndEvent(ID, endMessage));
-		this.sendEvent(new OutputEvent(`end progress: ${ID}\n`));
-
-		this._cancelledProgressId = undefined;
-	}
-
 	protected dataBreakpointInfoRequest(response: DebugProtocol.DataBreakpointInfoResponse, args: DebugProtocol.DataBreakpointInfoArguments): void {
 
 		response.body = {
@@ -568,6 +540,11 @@ export class StratoDebugSession extends LoggingDebugSession {
 		if (args.progressId) {
 			this._cancelledProgressId= args.progressId;
 		}
+	}
+
+	protected terminateRequest(response: DebugProtocol.TerminateResponse, args: DebugProtocol.TerminateArguments) {
+		this._ws.close();
+		this.sendResponse(response);
 	}
 
 	protected customRequest(command: string, response: DebugProtocol.Response, args: any) {
