@@ -260,7 +260,7 @@ spec = do
               let num20 = length $ filter (==20) xs'
                   num30 = length $ filter (==30) xs'
                   num45 = length $ filter (==45) xs'
-              if num20 == 1 && num30 == 1 && num45 == 2
+              if num20 >= 1 && num30 >= 1 && num45 >= 2
                 then pure xs'
                 else waitForIt (n+1) xs'
         local (\cfg -> cfg{blockstanbulRoundPeriod = RoundPeriod 0.00005}) $
