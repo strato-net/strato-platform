@@ -261,8 +261,8 @@ spec = do
                   num30 = length $ filter (==30) xs'
                   num45 = length $ filter (==45) xs'
               if num20 == 1 && num30 == 1 && num45 == 2
-                then waitForIt (n+1) xs'
-                else pure xs'
+                then pure xs'
+                else waitForIt (n+1) xs'
         local (\cfg -> cfg{blockstanbulRoundPeriod = RoundPeriod 0.00005}) $
           mapM_ createNewTimer input
         out <- waitForIt (0 :: Int) []
