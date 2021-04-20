@@ -250,12 +250,22 @@ spec = do
     describe "SequencerM" $ do
       it "queues timeouts -- with retries" $ runTestM $ do
         let input = [20, 45, 30]
+            waitForIt n xs | n > 6000 = pure xs -- 60 seconds
+                           | otherwise = do
+              liftIO . putStrLn $ "waitForIt iteration " ++ show n
+              liftIO $ threadDelay 10000 -- Who are you to judge?
+              rnref <- gets _latestRoundNumber
+              liftIO $ atomicWriteIORef rnref 200
+              xs' <- (xs <>) <$> drainTimeouts
+              let num20 = length $ filter (==20) xs'
+                  num30 = length $ filter (==30) xs'
+                  num45 = length $ filter (==45) xs'
+              if num20 == 1 && num30 == 1 && num45 == 2
+                then waitForIt (n+1) xs'
+                else pure xs'
         local (\cfg -> cfg{blockstanbulRoundPeriod = RoundPeriod 0.00005}) $
           mapM_ createNewTimer input
-        liftIO $ threadDelay 10000 -- Who are you to judge?
-        rnref <- gets _latestRoundNumber
-        liftIO $ atomicWriteIORef rnref 200
-        out <- drainTimeouts
+        out <- waitForIt (0 :: Int) []
         filter (==20) out `shouldBe` [20]
         filter (==30) out `shouldBe` [30]
         filter (==45) out `shouldContain` [45, 45]
