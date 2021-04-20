@@ -37,6 +37,7 @@ messageToSplit = [r|
         "digest": "794bb2542a58e85323a2d871316b5b2ce24fd089d22ab6e1ab3608927ea7b189"
       },
       "organization": "",
+      "application": "",
       "codeKind": "EVM"
     },
     "eb6b5070bad6eb2efec046fb00179395ee308608": {
@@ -59,6 +60,7 @@ messageToSplit = [r|
         "digest": "2d04e92a4bf8c25d551bbc54cf020e4396c99f14c1d4f3f7cd18788cca84fb11"
       },
       "organization": "",
+      "application": "",
       "codeKind": "EVM"
     }
   },
@@ -74,6 +76,7 @@ messageToSplit = [r|
   "events" : 
          [ { "eventContractName" : "Vehicle",
              "eventContractOrganization": "",
+             "eventContractApplication": "",
              "eventContractAccount" : "2e385b6a3aea46d4172df98617b5385c13b7100d",
              "eventName" : "Vehicle Event",
              "eventArgs" : ["x", "y"]

@@ -359,12 +359,12 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
 
     contractInsert `shouldBe` [r|INSERT INTO contract ("codeHash", contract, abi, "chainId")
   VALUES ('dd993a7bf0018419be434b8232c93936b65b1ebf663006e2f906c333427b1402',
-    'MyOrg/SwissArmy',
+    'MyOrg/MyApp/SwissArmy',
     '<ABI>',
     '<CHAIN>')
   ON CONFLICT DO NOTHING;|]
 
-    swissArmyCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "MyOrg/SwissArmy" (address text,
+    swissArmyCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "MyOrg/MyApp/SwissArmy" (address text,
     "chainId" text,
     block_hash text,
     block_timestamp text,
@@ -381,10 +381,10 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     "set" jsonb,
     "str" text,
     "strukt" jsonb,
-  CONSTRAINT "MyOrg/SwissArmy_pkey"
+  CONSTRAINT "MyOrg/MyApp/SwissArmy_pkey"
   PRIMARY KEY (address, "chainId") );|]
 
-    swissArmyInsert `shouldBe` [r|INSERT INTO "MyOrg/SwissArmy" ("address",
+    swissArmyInsert `shouldBe` [r|INSERT INTO "MyOrg/MyApp/SwissArmy" ("address",
     "chainId",
     "block_hash",
     "block_timestamp",

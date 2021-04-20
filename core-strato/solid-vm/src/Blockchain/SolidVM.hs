@@ -749,16 +749,7 @@ runStatement st@(Xabi.EmitStatement eventName exptups pos) = do
       else do
         maybeCert <- x509CertDBGet $ _accountAddress $ currentAccount curInfo
         let organization = fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
-        mAddressState <- getAddressStateMaybe $ currentAccount curInfo
-        let mParentCodePtr = case mAddressState of
-                Just cp -> resolveCodePtrParent Nothing $ addressStateCodeHash cp
-                Nothing -> pure Nothing
-        mParentCodePtr' <- mParentCodePtr
-        let thePtr = case mParentCodePtr' of
-                Just (SolidVMCode name _) -> Just name
-                _                         -> Nothing
-            parentName' = fromMaybe "" thePtr
-        addEvent $ Event organization parentName' (_contractName curCnct) (currentAccount curInfo) eventName expStrs
+        addEvent $ Event organization "" (_contractName curCnct) (currentAccount curInfo) eventName expStrs
         return Nothing
 
 

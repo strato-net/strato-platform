@@ -94,7 +94,8 @@ spec = describe "Action conversions" $ do
                }
              ],
              "codeHash": "86bc2e2a375e6ea377ae90026248f472fbeaa1354ef4424f568d01f3a48ab5b9",
-             "organization": ""
+             "organization": "",
+             "application": ""
            }
          },
          "sender": "c2191df3032cb8ee72e37ab6bbc4e83f92b9911c",
@@ -109,6 +110,7 @@ spec = describe "Action conversions" $ do
          "events" : 
          [ { "eventContractName" : "Vehicle",
              "eventContractOrganization": "",
+             "eventContractApplication": "",
              "eventContractAccount" : "2e385b6a3aea46d4172df98617b5385c13b7100d",
              "eventName" : "Vehicle Event",
              "eventArgs" : ["x", "y"]
