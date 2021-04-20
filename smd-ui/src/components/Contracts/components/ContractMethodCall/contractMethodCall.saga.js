@@ -41,14 +41,14 @@ export function getArgs(contractName, contractAddress, symbol, chainid) {
 
 export function postMethodCall(payload) {
   const isModeOauth = isOauthEnabled();
-  const options = isModeOauth ? { query: { resolve: true, chainid: payload.chainid } } :
+  const options = isModeOauth ? { query: { resolve: true, chainid: payload.chainId } } :
     {
       params: {
         username: payload.username,
         userAddress: payload.userAddress,
         contractName: payload.contractName,
         contractAddress: payload.contractAddress
-      }, query: { resolve: true, chainid: payload.chainid }
+      }, query: { resolve: true, chainid: payload.chainId }
     };
 
   const prefix = isModeOauth ? env.STRATO_URL_V23 : env.BLOC_URL;
