@@ -338,8 +338,8 @@ getContractsAddressesQuery :: Maybe ChainId -> Query
   , Column PGTimestamptz
   , Column PGBytea
   )
-getContractsAddressesQuery chainId = proc () -> do
-  (_,name,_,addr,timestamp,_,_,_,_,cid,_) <- limit 100 $ contractsJoinTable -< ()
+getContractsAddressesQuery chainId = limit 100 $ proc () -> do
+  (_,name,_,addr,timestamp,_,_,_,_,cid,_) <- contractsJoinTable -< ()
   restrict -< cid .== constant chainId
   returnA -< (name,addr,timestamp,cid)
 
