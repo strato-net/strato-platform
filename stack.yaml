@@ -116,6 +116,7 @@ docker:
   run-args: ["--ulimit=nofile=60000"]
 
 nix:
+  path: [nixpkgs=channel:nixos-20.03]
   packages:
   - zlib.dev
   - zlib.out
