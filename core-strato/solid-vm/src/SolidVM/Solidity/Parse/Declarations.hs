@@ -11,6 +11,7 @@ module SolidVM.Solidity.Parse.Declarations where
 import           Data.List
 import qualified Data.Map as Map
 import           Data.Maybe
+import           Data.Either
 import           Data.Text                            (Text)
 import qualified Data.Text                            as Text
 
@@ -53,9 +54,10 @@ solidityContract = do
       name <- intercalate "." <$> sepBy1 identifier dot
       consArgs <- option "" parensCode
       return (name, consArgs)
-  declarations <-
+  declarations' <-
     braces (many solidityDeclaration)
-
+  -- add a declaration here!
+  let declarations = creatorStatementTopLevel : declarations'
   let allFunctions = Map.fromList [ (Text.pack n, f) | (n, FuncDeclaration f) <- declarations]
   let ctorList = [(Text.pack n, c) | (n, ConstructorDeclaration c) <- declarations]
   let events = [(Text.pack n, e) | (n, EventDeclaration e) <- declarations]
@@ -81,6 +83,11 @@ solidityContract = do
            },
         map (Text.pack . fst) baseConstrs
       )
+
+
+-- Adds the following to the constructor
+creatorStatementTopLevel :: (String, Declaration)
+creatorStatementTopLevel =  fromRight (error "Compile error") $ runParser variableDeclaration "" "" "string creator = tx.organization;"
 
 --  where -- constants = byMutability True (repeat 0)
 
@@ -235,10 +242,16 @@ functionDeclaration = do
                   (reserved "constructor" >> getContractName)
   cName <- getContractName
   xabi <- functionXabi
-  let tipe = if cName == functionName
-                then ConstructorDeclaration
-                else FuncDeclaration
-  return (functionName, tipe xabi)
+  if cName == functionName
+    then return (functionName, ConstructorDeclaration $ modifyContents xabi creatorStatement)
+    else return (functionName, FuncDeclaration xabi)
+
+-- Adds the following to the constructor
+creatorStatement :: Statement
+creatorStatement = fromRight (error "Compile error") $ runParser statement "" "" "creator = tx.organization;"
+
+modifyContents :: Xabi.Func -> Statement -> Xabi.Func
+modifyContents (Xabi.Func a b c contents d e f ) stmt = Xabi.Func a b c (Just $ maybe [stmt] (\x -> stmt : x ++ [stmt]) contents) d e f
 
 functionXabi :: SolidityParser Xabi.Func
 functionXabi = do
