@@ -72,6 +72,7 @@ import           Blockchain.SolidVM.SetGet
 import           Blockchain.SolidVM.TraceTools
 import           Blockchain.SolidVM.Value
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Action
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Event
@@ -910,13 +911,13 @@ expToVar' x@(Xabi.MemberAccess expr name) = do
       (SBuiltinVariable "msg", "sender") -> (Constant . SAccount . accountToNamedAccount chainId . Env.sender) <$> getEnv
       (SBuiltinVariable "tx", "origin") -> (Constant . SAccount . accountToNamedAccount chainId . Env.origin) <$> getEnv
       (SBuiltinVariable "tx", "username") -> do env' <- getEnv
-                                                maybeCert <- x509CertDBGet $ Env.origin env'
+                                                maybeCert <- x509CertDBGet $ _accountAddress $ Env.origin env'
                                                 return . Constant . SString . fromMaybe "" . fmap subCommonName $ getCertSubject =<< maybeCert
       (SBuiltinVariable "tx", "organization") -> do env' <- getEnv
-                                                    maybeCert <- x509CertDBGet $ Env.origin env'
+                                                    maybeCert <- x509CertDBGet $ _accountAddress $ Env.origin env'
                                                     return . Constant . SString . fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
       (SBuiltinVariable "tx", "group") -> do env' <- getEnv
-                                             maybeCert <- x509CertDBGet $ Env.origin env'
+                                             maybeCert <- x509CertDBGet $ _accountAddress $ Env.origin env'
                                              return . Constant . SString . fromMaybe "" $ subUnit =<< getCertSubject =<< maybeCert
       (SStruct _ theMap, fieldName) -> case M.lookup fieldName theMap of
           Nothing -> missingField "struct member access" fieldName
@@ -1398,10 +1399,10 @@ callBuiltin "registerCert" [SAccount a, SString cert] _ = do
     let ex509Cert = bsToCert . BC.pack $ cert
     case ex509Cert of
         Left _         -> return SNULL
-        Right x509Cert -> do x509CertDBPut (namedAccountToAccount Nothing a) x509Cert
+        Right x509Cert -> do x509CertDBPut (_accountAddress $ namedAccountToAccount Nothing a) x509Cert
                              return SNULL
 callBuiltin "getUserCert" [SAccount a] _ = do
-    maybeCert <- x509CertDBGet (namedAccountToAccount Nothing a)
+    maybeCert <- x509CertDBGet $ _accountAddress $ (namedAccountToAccount Nothing a)
     return $ certificateMap (fmap (BC.unpack . certToBytes) maybeCert)
 callBuiltin "parseCert" [SString cert] _ = return $ certificateMap (Just cert)
 callBuiltin x _ _ = unknownFunction "callBuiltin" x
