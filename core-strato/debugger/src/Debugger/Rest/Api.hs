@@ -33,6 +33,7 @@ type RestDebuggerAPI = GetStatus
                   :<|> GetWatches
                   :<|> PutWatches
                   :<|> DeleteWatches
+                  :<|> PostEvals
 
 type GetStatus = "status" :> Get '[JSON] DebuggerStatus
 type PutPause = "pause" :> Put '[JSON] DebuggerStatus
@@ -49,6 +50,7 @@ type GetVariables = "variables" :> Get '[JSON] (M.Map T.Text (M.Map T.Text T.Tex
 type GetWatches = "watches" :> Get '[JSON] (M.Map T.Text T.Text)
 type PutWatches = "watches" :> ReqBody '[JSON] [T.Text] :> Put '[JSON] DebuggerStatus
 type DeleteWatches = "watches" :> ReqBody '[JSON] [T.Text] :> Delete '[JSON] DebuggerStatus
+type PostEvals = "eval" :> ReqBody '[JSON] [T.Text] :> Post '[JSON] [T.Text]
 
 restDebuggerAPI :: Proxy RestDebuggerAPI
 restDebuggerAPI = Proxy

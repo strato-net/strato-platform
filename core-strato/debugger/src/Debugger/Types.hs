@@ -34,6 +34,8 @@ module Debugger.Types
   , newDebugSettings
   , Debuggable
   , Evaluator
+  , EvaluationRequest
+  , EvaluationResponse
   , withoutDebugging
   , breakpoint
   , breakpointMatches
@@ -46,6 +48,7 @@ import           Control.Monad
 import qualified Control.Monad.Change.Modify          as Mod
 import           Control.Monad.IO.Class
 import           Data.Aeson                           as Aeson
+import           Data.Foldable                        (for_)
 import           Data.Functor.Identity
 import           Data.Map.Strict                      (Map)
 import qualified Data.Map.Strict                      as M
@@ -89,37 +92,35 @@ data Breakpoint = UnconditionalBP SourcePos
                 | ConditionalBP SourcePos Text -- TODO: should be Expression
                 | DataBP Text -- TODO: should be Expression
                 | FunctionBP Text -- function name
+                | HitcountBP SourcePos
                 deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
 
 instance Arbitrary Breakpoint where
   arbitrary = do
-    (i :: Int) <- choose (0,3)
+    (i :: Int) <- choose (0,4)
     case i of
       1 -> ConditionalBP <$> arbitrary <*> arbitrary
       2 -> DataBP <$> arbitrary
       3 -> FunctionBP <$> arbitrary
+      4 -> HitcountBP <$> arbitrary
       _ -> UnconditionalBP <$> arbitrary
 
 data DebugOperation = Run
                     | Pause
                     | StepIn
-                    | StepOver {-# UNPACK #-} !Int
-                    | InStepOver {-# UNPACK #-} !Int
-                    | StepOut {-# UNPACK #-} !Int
-                    | InStepOut {-# UNPACK #-} !Int
+                    | StepOver
+                    | StepOut
                     deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
 
 instance Arbitrary DebugOperation where
   arbitrary = do
-    (i :: Int) <- choose (0,6)
+    (i :: Int) <- choose (0,4)
     case i of
       1 -> pure Run
       2 -> pure Pause
       3 -> pure StepIn
-      4 -> StepOver <$> arbitrary
-      5 -> InStepOver <$> arbitrary
-      6 -> StepOut <$> arbitrary
-      _ -> InStepOut <$> arbitrary
+      4 -> pure StepOver
+      _ -> pure StepOut
 
 newtype VariableSet = VariableSet (Map Text (Set Text))
 newtype VariableMap = VariableMap (Map Text (Map Text Text))
@@ -142,27 +143,33 @@ instance Arbitrary DebugState where
 
 data DebuggerStatus = Running
                     | Paused DebugState
+                    | Stepping !Int
                     deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON)
 
 instance Arbitrary DebuggerStatus where
   arbitrary = do
-    (i :: Int) <- choose (0,1)
+    (i :: Int) <- choose (0,2)
     case i of
       1 -> pure Running
+      2 -> Stepping <$> arbitrary
       _ -> Paused <$> arbitrary
 
-data DebugSettingsF f = DebugSettings {
-                        operation :: f DebugOperation
-                      , breakpoints :: f (Set Breakpoint)
-                      , current :: f (Maybe DebugState)
-                      , changed :: f Bool
-                      , exceptionBreakpoints :: f Bool
-                      , functionBreakpoints :: f Bool
-                      , watchExpressions :: f (Set Text)
-                      } deriving (Generic)
+type EvaluationRequest = Text
+type EvaluationResponse = Text
 
-type DebugSettings = DebugSettingsF TVar
-type DebugSettingsI = DebugSettingsF Identity
+data DebugSettingsF tvar tchan tmvar = DebugSettings
+  { operation :: tmvar DebugOperation
+  , requests :: tchan (tmvar EvaluationRequest, tmvar EvaluationResponse) -- request and response
+  , breakpoints :: tvar (Set Breakpoint)
+  , current :: tvar DebuggerStatus
+  , exceptionBreakpoints :: tvar Bool
+  , functionBreakpoints :: tvar Bool
+  , watchExpressions :: tvar (Set Text)
+  , ping :: tmvar ()
+  } deriving (Generic)
+
+type DebugSettings = DebugSettingsF TVar TChan TMVar
+type DebugSettingsI = DebugSettingsF Identity [] Maybe
 
 instance NFData DebugSettings where
   rnf d@DebugSettings{..} = d `seq` ()
@@ -170,26 +177,28 @@ instance NFData DebugSettings where
 emptyDebugSettings :: DebugSettingsI
 emptyDebugSettings =
   DebugSettings
-    (Identity Run)
+    Nothing
+    []
     (Identity S.empty)
-    (Identity Nothing)
-    (Identity False)
+    (Identity Running)
     (Identity False)
     (Identity False)
     (Identity S.empty)
+    Nothing
 
 newDebugSettings :: STM DebugSettings
 newDebugSettings =
   let DebugSettings{..} = emptyDebugSettings
       tvar = newTVar . runIdentity
    in DebugSettings
-        <$> (tvar operation)
+        <$> newEmptyTMVar
+        <*> newTChan
         <*> (tvar breakpoints)
         <*> (tvar current)
-        <*> (tvar changed)
         <*> (tvar exceptionBreakpoints)
         <*> (tvar functionBreakpoints)
         <*> (tvar watchExpressions)
+        <*> newEmptyTMVar
 
 type Debuggable m =
   ( MonadIO m
@@ -224,6 +233,7 @@ breakpointMatches :: Debuggable m
                   -> m Bool
 breakpointMatches eval pos = \case
   UnconditionalBP loc -> pure $ matchesLoc loc
+  HitcountBP loc -> pure $ matchesLoc loc
   ConditionalBP loc exprText -> if not (matchesLoc loc)
     then pure False
     else runCond exprText
@@ -234,7 +244,7 @@ breakpointMatches eval pos = \case
                              lMatch = eqOn sourceLine pos loc
                           in fMatch && lMatch
         runCond exprText = do
-          val <- eval exprText
+          val <- withoutDebugging $ eval exprText
           case val of
             Right "True" -> pure True
             Right "true" -> pure True
@@ -249,16 +259,13 @@ isBreakpoint eval pos = do
   case debugSettings of
     Nothing -> pure False
     Just DebugSettings{..} -> do
-      currentOperation <- atomically $ readTVar operation
-      if currentOperation == Run
+      state <- atomically $ readTVar current
+      if state == Running
         then do
           bPoints <- fmap S.toList . atomically $ readTVar breakpoints
           matchedBP <- or <$> traverse (breakpointMatches eval pos) bPoints
           if matchedBP
-            then atomically $ do
-              writeTVar changed True
-              writeTVar operation Pause
-              pure True
+            then pure True
             else pure False
         else pure True
 
@@ -270,21 +277,41 @@ handleBreakpoint eval pos = do
   debugSettings <- Mod.get (Mod.Proxy @(Maybe DebugSettings))
   case debugSettings of
     Nothing -> pure ()
-    Just DebugSettings{..} -> do
+    Just ds -> do
+      void . atomically $ tryPutTMVar (ping ds) ()
+      loop ds
+  where
+    loop d@DebugSettings{..} = do
+      evalLoop d
+      stateAndOp <- atomically $ (,) <$> readTVar current <*> tryTakeTMVar operation
+      case stateAndOp of
+        (_, Just Run) -> void . atomically $ writeTVar current Running
+        (_, Just Pause) -> doPause d >> loop d
+        (Paused _, Nothing) -> loop d
+        (Paused _, Just StepOver) -> do
+          n <- length <$> Mod.access (Mod.Proxy @[SourcePos])
+          void . atomically . writeTVar current . Stepping $ n + 1
+        (Paused _, Just StepOut) -> do
+          n <- length <$> Mod.access (Mod.Proxy @[SourcePos])
+          void . atomically . writeTVar current $ Stepping n
+        (Stepping n, _) -> do
+          cStack <- Mod.access (Mod.Proxy @[SourcePos])
+          unless (length cStack >= n) $ doPause d >> loop d
+        _ -> pure ()
+    evalLoop d@DebugSettings{..} = do
+      mReq <- atomically $ tryReadTChan requests
+      for_ mReq $ \(req, res) -> do
+        mExpr <- atomically $ tryTakeTMVar req
+        for_ mExpr $ \expr -> do
+          resp <- fmap (either (T.pack . show) id) . withoutDebugging $ eval expr
+          atomically $ putTMVar res resp
+        evalLoop d
+
+    doPause DebugSettings{..} = do
       cStack <- Mod.access (Mod.Proxy @[SourcePos])
       watchExprs <- fmap S.toList . atomically $ readTVar watchExpressions
       watchVals <- traverse (fmap (either (T.pack . show) id) . withoutDebugging . eval) watchExprs
       let watchValsMap = M.fromList $ zip watchExprs watchVals
       VariableSet varSet <- Mod.access (Mod.Proxy @VariableSet)
       varMap <- for varSet $ traverse (fmap (either (T.pack . show) id) . withoutDebugging . eval) . M.fromSet id
-      void . atomically . writeTVar current . Just $ DebugState pos cStack varMap watchValsMap
-      atomically $ do
-        currentOperation <- readTVar operation
-        case currentOperation of
-          Run -> pure ()
-          Pause -> retrySTM
-          StepIn -> writeTVar operation Pause
-          StepOver n -> writeTVar operation (InStepOver n)
-          InStepOver n -> when (length cStack <= n) retrySTM
-          StepOut n -> writeTVar operation (InStepOut n)
-          InStepOut n -> when (length cStack < n) retrySTM
+      void . atomically . writeTVar current . Paused $ DebugState pos cStack varMap watchValsMap

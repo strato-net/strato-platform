@@ -66,23 +66,17 @@ wsDebuggerController = \case
   WSIRemoveWatches w -> fmap (const Nothing) . removeWatches w
   WSIClearWatches -> fmap (const Nothing) . removeWatches []
   where f g m = case m of
-          Running -> Nothing
           Paused dbgst -> Just $ g dbgst
+          _ -> Nothing
 
 wsUpdateThread :: WS.Connection -> DebugSettings -> IO ()
-wsUpdateThread conn DebugSettings{..} = do
-  cur <- readTVarIO current
-  go cur
-  where go cur = do
-          newCur <- atomically $ do
-            cur' <- readTVar current
-            if cur == cur'
-              then retrySTM
-              else pure cur'
-          WS.sendBinaryData conn . encode . WSOStatus $ case newCur of
-            Nothing -> Running
-            Just ds -> Paused ds
-          go newCur
+wsUpdateThread conn DebugSettings{..} = go
+  where go = do
+          cur <- atomically $ do
+            _ <- takeTMVar ping
+            readTVar current
+          WS.sendBinaryData conn . encode $ WSOStatus cur
+          go
 
 -- it's ok to spawn an update thread per connection, since we're currently only supporting one WS connection at a time
 talk :: WS.Connection -> DebugSettings -> IO ()

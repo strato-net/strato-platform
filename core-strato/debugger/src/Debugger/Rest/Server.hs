@@ -11,8 +11,10 @@
 module Debugger.Rest.Server where
 
 import           Control.Monad
-import qualified Data.Map.Strict   as M
-import qualified Data.Text         as T
+import           Control.Monad.IO.Class
+import qualified Data.Map.Strict        as M
+import           Data.Maybe             (fromMaybe)
+import qualified Data.Text              as T
 import           Debugger.Rest.Api
 import           Debugger.Server
 import           Debugger.Types
@@ -50,24 +52,27 @@ postStepOut = stepOut
 
 getStackTrace :: DebugSettings -> Handler [SourcePos]
 getStackTrace = status >=> \case
-  Running -> pure []
   Paused DebugState{..} -> pure debugStateCallStack
+  _ -> pure []
 
 getVariables :: DebugSettings -> Handler (M.Map T.Text (M.Map T.Text T.Text))
 getVariables = status >=> \case
-  Running -> pure M.empty
   Paused DebugState{..} -> pure debugStateVariables
+  _ -> pure M.empty
 
 getWatches :: DebugSettings -> Handler (M.Map T.Text T.Text)
 getWatches = status >=> \case
-  Running -> pure M.empty
   Paused DebugState{..} -> pure debugStateWatches
+  _ -> pure M.empty
 
 putWatches :: DebugSettings -> [T.Text] -> Handler DebuggerStatus
 putWatches = flip addWatches
 
 deleteWatches :: DebugSettings -> [T.Text] -> Handler DebuggerStatus
 deleteWatches = flip removeWatches
+
+postEvals :: DebugSettings -> [T.Text] -> Handler [T.Text]
+postEvals d ts = fmap (fromMaybe "") <$> liftIO (evaluateExpressions ts d)
 
 restDebuggerServer :: DebugSettings -> Server RestDebuggerAPI
 restDebuggerServer dSettings =
@@ -86,6 +91,7 @@ restDebuggerServer dSettings =
   :<|> getWatches dSettings
   :<|> putWatches dSettings
   :<|> deleteWatches dSettings
+  :<|> postEvals dSettings
 
 restDebugger :: DebugSettings -> Application
 restDebugger dSettings = serve restDebuggerAPI (restDebuggerServer dSettings)
