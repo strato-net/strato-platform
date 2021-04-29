@@ -52,6 +52,7 @@ function getCreateArgs(contract:ContractDefinition, options:Options) {
   const payload = {
     ...src,
     contract: contract.name,
+    codePtr: contract.codePtr,
     args: contract.args,
     chainid: contract.chainid,
     txParams: contract.txParams,
