@@ -417,6 +417,7 @@ instance ToSchema PostUsersContractRequest where
 data ContractParameters = ContractParameters
   { fromAddr :: Address
   , src      :: SourceMap
+  , codePtr  :: Maybe CodePtr
   , contract :: Maybe Text
   , args     :: Maybe (Map Text ArgValue)
   , value    :: Maybe (Strung Natural)
@@ -454,6 +455,7 @@ instance ToSchema UploadListRequest where
       exContract1 = UploadListContract
         { uploadlistcontractContractName = "AccountsContract"
         , uploadlistcontractSrc = mempty
+        , uploadlistcontractCodePtr = Nothing
         , uploadlistcontractArgs = Map.fromList [("accountType", ArgString "Checking"), ("balance",ArgInt 10)]
         , _uploadlistcontractTxParams = Nothing
         , uploadlistcontractValue = Nothing
@@ -466,6 +468,7 @@ instance ToSchema UploadListRequest where
 data UploadListContract = UploadListContract
   { uploadlistcontractContractName :: Text
   , uploadlistcontractSrc          :: SourceMap
+  , uploadlistcontractCodePtr      :: Maybe CodePtr
   , uploadlistcontractArgs         :: Map Text ArgValue
   , _uploadlistcontractTxParams    :: Maybe TxParams
   , uploadlistcontractValue        :: Maybe (Strung Natural)
@@ -480,6 +483,7 @@ instance ToJSON UploadListContract where
   toJSON UploadListContract{..} = object
     [ "contractName" .= uploadlistcontractContractName
     , "src" .= uploadlistcontractSrc
+    , "codePtr" .= uploadlistcontractCodePtr
     , "args" .= uploadlistcontractArgs
     , "txParams" .= _uploadlistcontractTxParams
     , "value" .= uploadlistcontractValue
@@ -492,6 +496,7 @@ instance FromJSON UploadListContract where
     UploadListContract
       <$> (o .: "contractName")
       <*> (fromMaybe mempty <$> o .:? "src")
+      <*> (o .:? "codePtr")
       <*> (o .: "args")
       <*> (o .:? "txParams")
       <*> (o .:? "value")
@@ -508,6 +513,7 @@ instance ToSchema UploadListContract where
       ex = UploadListContract
         { uploadlistcontractContractName = "SampleContract"
         , uploadlistcontractSrc = mempty
+        , uploadlistcontractCodePtr = Nothing
         , uploadlistcontractArgs = Map.fromList [("user", ArgString "Bob"), ("age",ArgInt 1)]
         , _uploadlistcontractTxParams = Just $ TxParams (Just $ Gas 123) (Just $ Wei 345) Nothing
         , uploadlistcontractValue = Nothing

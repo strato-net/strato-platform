@@ -36,6 +36,7 @@ import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Solidity.ArgValue
 import           BlockApps.Strato.Types
 
+import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Nonce
@@ -155,6 +156,7 @@ instance FromJSON BlocTransactionPayload where
 
 data ContractPayload = ContractPayload
   { contractpayloadSrc      :: SourceMap
+  , contractpayloadCodePtr  :: Maybe CodePtr
   , contractpayloadContract :: Maybe Text
   , contractpayloadArgs     :: Maybe (Map Text ArgValue)
   , contractpayloadValue    :: Maybe (Strung Natural)
@@ -192,6 +194,7 @@ instance Arbitrary FunctionPayload where
 instance ToJSON ContractPayload where
   toJSON ContractPayload{..} = object
     [ "contract" .= contractpayloadContract
+    , "codePtr" .= contractpayloadCodePtr
     , "src" .= contractpayloadSrc
     , "args" .= contractpayloadArgs
     , "value" .= contractpayloadValue
@@ -207,6 +210,7 @@ instance ToJSON FunctionPayload where
 instance FromJSON ContractPayload where
   parseJSON (Object o) = ContractPayload
                      <$> (fromMaybe mempty <$> o .:? "src")
+                     <*> (o .:? "codePtr")
                      <*> (o .:? "contract")
                      <*> (o .:? "args")
                      <*> (o .:? "value")
@@ -228,6 +232,7 @@ instance ToSchema BlocTransactionPayload where
       ex :: BlocTransactionPayload
       ex = BlocContract $ ContractPayload
         { contractpayloadSrc      = namedSource "SimpleStorage.sol" "contract SimpleStorage { uint x; function SimpleStorage(uint _x) { x = _x; } function set(uint _x) { x = _x; } }"
+        , contractpayloadCodePtr  = Nothing
         , contractpayloadContract = Nothing
         , contractpayloadArgs     = Just $ Map.fromList [("_x", ArgInt 1)]
         , contractpayloadValue    = Nothing
@@ -245,6 +250,7 @@ instance ToSchema ContractPayload where
       ex :: ContractPayload
       ex = ContractPayload
         { contractpayloadSrc      = namedSource "SimpleStorage.sol" "contract SimpleStorage { uint x; function SimpleStorage(uint _x) { x = _x; } function set(uint _x) { x = _x; } }"
+        , contractpayloadCodePtr  = Nothing
         , contractpayloadContract = Nothing
         , contractpayloadArgs     = Just $ Map.fromList [("_x", ArgInt 1)]
         , contractpayloadValue    = Nothing
