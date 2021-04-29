@@ -207,7 +207,7 @@ type Debuggable m =
   , Mod.Accessible VariableSet m
   )
 
-type Evaluator m = Text -> m (Either ParseError Text)
+type Evaluator m = Text -> m Text
 
 withoutDebugging :: Debuggable m => m a -> m a
 withoutDebugging f = do
@@ -246,8 +246,8 @@ breakpointMatches eval pos = \case
         runCond exprText = do
           val <- withoutDebugging $ eval exprText
           case val of
-            Right "True" -> pure True
-            Right "true" -> pure True
+            "True" -> pure True
+            "true" -> pure True
             _ -> pure False
 
 isBreakpoint :: Debuggable m
@@ -275,43 +275,38 @@ handleBreakpoint :: Debuggable m
                  -> m ()
 handleBreakpoint eval pos = do
   debugSettings <- Mod.get (Mod.Proxy @(Maybe DebugSettings))
-  case debugSettings of
-    Nothing -> pure ()
-    Just ds -> do
-      void . atomically $ tryPutTMVar (ping ds) ()
-      loop ds
+  for_ debugSettings $ loop True
   where
-    loop d@DebugSettings{..} = do
-      evalLoop d
+    loop sendPing d@DebugSettings{..} = do
+      evalLoop
       stateAndOp <- atomically $ (,) <$> readTVar current <*> tryTakeTMVar operation
       case stateAndOp of
         (_, Just Run) -> void . atomically $ writeTVar current Running
-        (_, Just Pause) -> doPause d >> loop d
-        (Paused _, Nothing) -> loop d
-        (Paused _, Just StepOver) -> do
-          n <- length <$> Mod.access (Mod.Proxy @[SourcePos])
-          void . atomically . writeTVar current . Stepping $ n + 1
-        (Paused _, Just StepOut) -> do
-          n <- length <$> Mod.access (Mod.Proxy @[SourcePos])
-          void . atomically . writeTVar current $ Stepping n
+        (_, Just StepIn) -> step 2
+        (_, Just StepOver) -> step 1
+        (_, Just StepOut) -> step 0
         (Stepping n, _) -> do
           cStack <- Mod.access (Mod.Proxy @[SourcePos])
-          unless (length cStack >= n) $ doPause d >> loop d
-        _ -> pure ()
-    evalLoop d@DebugSettings{..} = do
-      mReq <- atomically $ tryReadTChan requests
-      for_ mReq $ \(req, res) -> do
-        mExpr <- atomically $ tryTakeTMVar req
-        for_ mExpr $ \expr -> do
-          resp <- fmap (either (T.pack . show) id) . withoutDebugging $ eval expr
-          atomically $ putTMVar res resp
-        evalLoop d
+          unless (length cStack >= n) $ doPause >> loop False d
+        _ -> doPause >> loop False d
+      where step k = do
+              n <- length <$> Mod.access (Mod.Proxy @[SourcePos])
+              void . atomically . writeTVar current . Stepping $ n + k
+            evalLoop = do
+              mReq <- atomically $ tryReadTChan requests
+              for_ mReq $ \(req, res) -> do
+                mExpr <- atomically $ tryTakeTMVar req
+                for_ mExpr $ \expr -> do
+                  resp <- withoutDebugging $ eval expr
+                  atomically $ putTMVar res resp
+                evalLoop
 
-    doPause DebugSettings{..} = do
-      cStack <- Mod.access (Mod.Proxy @[SourcePos])
-      watchExprs <- fmap S.toList . atomically $ readTVar watchExpressions
-      watchVals <- traverse (fmap (either (T.pack . show) id) . withoutDebugging . eval) watchExprs
-      let watchValsMap = M.fromList $ zip watchExprs watchVals
-      VariableSet varSet <- Mod.access (Mod.Proxy @VariableSet)
-      varMap <- for varSet $ traverse (fmap (either (T.pack . show) id) . withoutDebugging . eval) . M.fromSet id
-      void . atomically . writeTVar current . Paused $ DebugState pos cStack varMap watchValsMap
+            doPause = do
+              cStack <- Mod.access (Mod.Proxy @[SourcePos])
+              watchExprs <- fmap S.toList . atomically $ readTVar watchExpressions
+              watchVals <- traverse (withoutDebugging . eval) watchExprs
+              let watchValsMap = M.fromList $ zip watchExprs watchVals
+              VariableSet varSet <- Mod.access (Mod.Proxy @VariableSet)
+              varMap <- for varSet $ traverse (withoutDebugging . eval) . M.fromSet id
+              void . atomically . writeTVar current . Paused $ DebugState pos cStack varMap watchValsMap
+              when sendPing . void . atomically $ tryPutTMVar ping ()

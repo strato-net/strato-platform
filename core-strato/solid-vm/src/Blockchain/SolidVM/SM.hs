@@ -46,6 +46,7 @@ module Blockchain.SolidVM.SM (
 
 import           Control.Applicative ((<|>))
 import           Control.Lens hiding (Context)
+import           Control.Monad.Catch (MonadCatch)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import           Control.Monad.IO.Class
@@ -154,6 +155,7 @@ type MonadSM m = ( (Account `A.Alters` AddressState) m
                  , Mod.Modifiable (Q.Seq Event) m
                  , Mod.Modifiable (Maybe DebugSettings) m
                  , MonadIO m --todo: remove
+                 , MonadCatch m
                  , MonadLogger m
                  )
 

@@ -70,6 +70,7 @@ module Blockchain.VMContext
 
 import           Control.DeepSeq
 import           Control.Lens                       hiding (Context(..))
+import           Control.Monad.Catch                (MonadCatch)
 import qualified Control.Monad.Change.Alter         as A
 import qualified Control.Monad.Change.Modify        as Mod
 import           Control.Monad.IO.Class
@@ -181,6 +182,7 @@ makeLenses ''Context
 type ContextM = ReaderT Context (ResourceT (LoggingT IO))
 
 type VMBase m = ( MonadIO m
+                , MonadCatch m
                 , MonadUnliftIO m
                 , MonadLogger m
                 , Mod.Modifiable (Maybe DebugSettings) m

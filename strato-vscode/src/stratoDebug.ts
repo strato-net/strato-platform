@@ -132,7 +132,7 @@ export class StratoDebugSession extends LoggingDebugSession {
 		response.body.supportsConfigurationDoneRequest = true;
 
 		// make VS Code use 'evaluate' when hovering over source
-		response.body.supportsEvaluateForHovers = false;
+		response.body.supportsEvaluateForHovers = true;
 
 		// make VS Code support data breakpoints
 		response.body.supportsDataBreakpoints = true;
@@ -359,7 +359,7 @@ export class StratoDebugSession extends LoggingDebugSession {
 		const endFrame = startFrame + maxLevels;
 		const { user, options } = await this.getUserAndOptions();
 		// wait until configuration has finished (and configurationDoneRequest has been called)
-		await this._configurationDone.wait(1000);
+		// await this._configurationDone.wait(1000);
 
         const stk = await rest.debugGetStackTrace(user, options)
 
@@ -396,7 +396,7 @@ export class StratoDebugSession extends LoggingDebugSession {
 
 		const variables: DebugProtocol.Variable[] = [];
 		// wait until configuration has finished (and configurationDoneRequest has been called)
-		await this._configurationDone.wait(1000);
+		// await this._configurationDone.wait(1000);
 		const { user, options } = await this.getUserAndOptions();
         const res = await rest.debugGetVariables(user, options)
 		Object.entries(res).forEach((entry) => {
@@ -452,15 +452,19 @@ export class StratoDebugSession extends LoggingDebugSession {
 	}
 
 	protected async evaluateRequest(response: DebugProtocol.EvaluateResponse, args: DebugProtocol.EvaluateArguments): Promise<void> {
-
-		let reply: string | undefined = undefined;
-
-		response.body = {
-			result: reply ? reply : `evaluate(context: '${args.context}', '${args.expression}')`,
-			variablesReference: 0
-		};
-		this.sendResponse(response);
-	}
+      const { expression } = args
+      const { user, options } = await this.getUserAndOptions();
+      try {
+        const res = await rest.debugPostEval(user, [expression], options)
+        response.body = {
+          result: res[0] || '',
+          variablesReference: 0
+        };
+        this.sendResponse(response);
+      } catch (e) {
+        console.log(e);
+      }
+    }
 
 	protected dataBreakpointInfoRequest(response: DebugProtocol.DataBreakpointInfoResponse, args: DebugProtocol.DataBreakpointInfoArguments): void {
 

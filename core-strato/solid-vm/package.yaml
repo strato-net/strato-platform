@@ -43,6 +43,7 @@ library:
   - debugger
   - deepseq
   - ethereum-rlp
+  - exceptions
   - extra
   - format
   - generic-random

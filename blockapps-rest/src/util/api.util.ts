@@ -43,7 +43,8 @@ const Endpoint = {
   DEBUG_STEP_OUT: `${debugUrl}/step-out`,
   DEBUG_STACK_TRACE: `${debugUrl}/stack-trace`,
   DEBUG_VARIABLES: `${debugUrl}/variables`,
-  DEBUG_WATCHES: `${debugUrl}/watches`
+  DEBUG_WATCHES: `${debugUrl}/watches`,
+  DEBUG_EVAL: `${debugUrl}/eval`
 };
 
 function constructEndpoint(endpointTemplate, options:Options, params = {}) {
