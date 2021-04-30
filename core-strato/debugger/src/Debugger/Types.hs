@@ -158,7 +158,7 @@ type EvaluationRequest = Text
 type EvaluationResponse = Either Text Text
 
 data DebugSettingsF tvar tchan tmvar = DebugSettings
-  { operation :: tmvar DebugOperation
+  { operation :: tchan DebugOperation
   , requests :: tchan (tmvar EvaluationRequest, tmvar EvaluationResponse) -- request and response
   , breakpoints :: tvar (Set Breakpoint)
   , current :: tvar DebuggerStatus
@@ -177,7 +177,7 @@ instance NFData DebugSettings where
 emptyDebugSettings :: DebugSettingsI
 emptyDebugSettings =
   DebugSettings
-    Nothing
+    []
     []
     (Identity S.empty)
     (Identity Running)
@@ -191,7 +191,7 @@ newDebugSettings =
   let DebugSettings{..} = emptyDebugSettings
       tvar = newTVar . runIdentity
    in DebugSettings
-        <$> newEmptyTMVar
+        <$> newTChan
         <*> newTChan
         <*> (tvar breakpoints)
         <*> (tvar current)
@@ -279,7 +279,7 @@ handleBreakpoint eval pos = do
   where
     loop sendPing d@DebugSettings{..} = do
       evalLoop
-      stateAndOp <- atomically $ (,) <$> readTVar current <*> tryTakeTMVar operation
+      stateAndOp <- atomically $ (,) <$> readTVar current <*> tryReadTChan operation
       case stateAndOp of
         (_, Just Run) -> void . atomically $ writeTVar current Running
         (_, Just StepIn) -> step 2

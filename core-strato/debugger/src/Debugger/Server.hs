@@ -27,27 +27,27 @@ status DebugSettings{..} = atomically $ readTVar current
 
 pause :: MonadIO m => DebugSettings -> m DebuggerStatus
 pause dSettings@DebugSettings{..} = do
-  void . atomically $ forcePutTMVar operation Pause
+  void . atomically $ writeTChan operation Pause
   status dSettings
 
 resume :: MonadIO m => DebugSettings -> m DebuggerStatus
 resume dSettings@DebugSettings{..} = do
-  void . atomically $ forcePutTMVar operation Run
+  void . atomically $ writeTChan operation Run
   status dSettings
 
 stepIn :: MonadIO m => DebugSettings -> m DebuggerStatus
 stepIn dSettings@DebugSettings{..} = do
-  void . atomically $ forcePutTMVar operation StepIn
+  void . atomically $ writeTChan operation StepIn
   status dSettings
 
 stepOver :: MonadIO m => DebugSettings -> m DebuggerStatus
 stepOver dSettings@DebugSettings{..} = do
-  void . atomically $ forcePutTMVar operation StepOver
+  void . atomically $ writeTChan operation StepOver
   status dSettings
 
 stepOut :: MonadIO m => DebugSettings -> m DebuggerStatus
 stepOut dSettings@DebugSettings{..} = do
-  void . atomically $ forcePutTMVar operation StepOut
+  void . atomically $ writeTChan operation StepOut
   status dSettings
 
 getBreakpoints :: MonadIO m => DebugSettings -> m [Breakpoint]

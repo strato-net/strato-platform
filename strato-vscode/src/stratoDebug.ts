@@ -394,8 +394,6 @@ export class StratoDebugSession extends LoggingDebugSession {
 
 	protected async variablesRequest(response: DebugProtocol.VariablesResponse, args: DebugProtocol.VariablesArguments, request?: DebugProtocol.Request) {
 
-		console.log(`args: ${JSON.stringify(args)}`)
-		console.log(`request: ${JSON.stringify(request || {})}`)
 		const variables: DebugProtocol.Variable[] = [];
 		// wait until configuration has finished (and configurationDoneRequest has been called)
 		// await this._configurationDone.wait(1000);
