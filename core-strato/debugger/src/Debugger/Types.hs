@@ -207,7 +207,7 @@ type Debuggable m =
   , Mod.Accessible VariableSet m
   )
 
-type Evaluator m = Text -> m (Either Text Text)
+type Evaluator m = EvaluationRequest -> m EvaluationResponse
 
 withoutDebugging :: Debuggable m => m a -> m a
 withoutDebugging f = do
