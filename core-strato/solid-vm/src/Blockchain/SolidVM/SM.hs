@@ -475,19 +475,19 @@ addCallInfo a c fn hsh cc initialLocalVariables ro = do
 
   Mod.modify_ (Mod.Proxy @[CallInfo]) $ pure . (newCallInfo:)
 
-dupCallInfo :: MonadSM m => m ()
-dupCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
+dupCallInfo :: MonadSM m => Bool -> m ()
+dupCallInfo ro = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
   [] -> internalError "dupCallInfo was called on an already empty stack" ()
-  (ci:rest) -> pure $ ci:ci:rest
+  (ci:rest) -> pure $ ci{readOnly=ro}:ci:rest
 
 popCallInfo :: MonadSM m => m ()
 popCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
   [] -> internalError "popCallInfo was called on an already empty stack" ()
   (_:rest) -> pure rest
 
-withTempCallInfo :: MonadSM m => m a -> m a
-withTempCallInfo f = do
-  dupCallInfo
+withTempCallInfo :: MonadSM m => Bool -> m a -> m a
+withTempCallInfo ro f = do
+  dupCallInfo ro
   result <- f
   popCallInfo
   pure result

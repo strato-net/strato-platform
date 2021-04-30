@@ -141,8 +141,8 @@ instance MonadSM m => Mod.Accessible [SourcePos] m where
     cis <- Mod.get (Mod.Proxy @[CallInfo])
     pure $ fromMaybe (initialPos "") . currentSourcePos <$> cis
 
-runExpr :: MonadSM m => T.Text -> m (Either T.Text T.Text)
-runExpr exprText = withoutDebugging $ do
+runExpr :: MonadSM m => EvaluationRequest -> m EvaluationResponse
+runExpr exprText = withoutDebugging . withTempCallInfo True $ do -- TODO: allow write access once we figure out how to discard changes
   let eExpr = runParser expression "" "" (T.unpack exprText)
   case eExpr of
     Left pe -> pure . Left . T.pack $ show pe
