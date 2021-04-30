@@ -28,6 +28,7 @@ import qualified Control.Monad.Change.Alter           as A
 import qualified Control.Monad.Change.Modify          as Mod
 import           Control.Monad.IO.Class
 import qualified Control.Monad.Catch                  as EUnsafe
+import           Data.Bifunctor                       (bimap)
 import           Data.Bits
 import           Data.Bool                            (bool)
 import           Data.ByteString                      (ByteString)
@@ -140,11 +141,11 @@ instance MonadSM m => Mod.Accessible [SourcePos] m where
     cis <- Mod.get (Mod.Proxy @[CallInfo])
     pure $ fromMaybe (initialPos "") . currentSourcePos <$> cis
 
-runExpr :: MonadSM m => T.Text -> m T.Text
+runExpr :: MonadSM m => T.Text -> m (Either T.Text T.Text)
 runExpr exprText = withoutDebugging $ do
   let eExpr = runParser expression "" "" (T.unpack exprText)
   case eExpr of
-    Left pe -> pure . T.pack $ show pe
+    Left pe -> pure . Left . T.pack $ show pe
     Right expr -> do
       eRes <- EUnsafe.try $ do
         var <- expToVar expr
@@ -153,7 +154,7 @@ runExpr exprText = withoutDebugging $ do
         case (force str) of -- stupid code to get lazy exceptions to be thrown within the try block
           [] -> pure []
           xs -> pure xs
-      pure . T.pack . either showSolidException id $ eRes
+      pure $ bimap (T.pack . showSolidException) T.pack eRes
 
 solidVMBreakpoint :: MonadSM m => SourcePos -> m ()
 solidVMBreakpoint pos = do

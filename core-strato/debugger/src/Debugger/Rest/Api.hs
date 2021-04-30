@@ -46,11 +46,11 @@ type PostStepIn = "step-in" :> Post '[JSON] DebuggerStatus
 type PostStepOver = "step-over" :> Post '[JSON] DebuggerStatus
 type PostStepOut = "step-out" :> Post '[JSON] DebuggerStatus
 type GetStackTrace = "stack-trace" :> Get '[JSON] [SourcePos]
-type GetVariables = "variables" :> Get '[JSON] (M.Map T.Text (M.Map T.Text T.Text))
-type GetWatches = "watches" :> Get '[JSON] (M.Map T.Text T.Text)
-type PutWatches = "watches" :> ReqBody '[JSON] [T.Text] :> Put '[JSON] DebuggerStatus
-type DeleteWatches = "watches" :> ReqBody '[JSON] [T.Text] :> Delete '[JSON] DebuggerStatus
-type PostEvals = "eval" :> ReqBody '[JSON] [T.Text] :> Post '[JSON] [T.Text]
+type GetVariables = "variables" :> Get '[JSON] (M.Map T.Text (M.Map T.Text EvaluationResponse))
+type GetWatches = "watches" :> Get '[JSON] (M.Map EvaluationRequest EvaluationResponse)
+type PutWatches = "watches" :> ReqBody '[JSON] [EvaluationRequest] :> Put '[JSON] DebuggerStatus
+type DeleteWatches = "watches" :> ReqBody '[JSON] [EvaluationRequest] :> Delete '[JSON] DebuggerStatus
+type PostEvals = "eval" :> ReqBody '[JSON] [EvaluationRequest] :> Post '[JSON] [EvaluationResponse]
 
 restDebuggerAPI :: Proxy RestDebuggerAPI
 restDebuggerAPI = Proxy

@@ -55,12 +55,12 @@ getStackTrace = status >=> \case
   Paused DebugState{..} -> pure debugStateCallStack
   _ -> pure []
 
-getVariables :: DebugSettings -> Handler (M.Map T.Text (M.Map T.Text T.Text))
+getVariables :: DebugSettings -> Handler (M.Map T.Text (M.Map T.Text EvaluationResponse))
 getVariables = status >=> \case
   Paused DebugState{..} -> pure debugStateVariables
   _ -> pure M.empty
 
-getWatches :: DebugSettings -> Handler (M.Map T.Text T.Text)
+getWatches :: DebugSettings -> Handler (M.Map T.Text EvaluationResponse)
 getWatches = status >=> \case
   Paused DebugState{..} -> pure debugStateWatches
   _ -> pure M.empty
@@ -71,8 +71,8 @@ putWatches = flip addWatches
 deleteWatches :: DebugSettings -> [T.Text] -> Handler DebuggerStatus
 deleteWatches = flip removeWatches
 
-postEvals :: DebugSettings -> [T.Text] -> Handler [T.Text]
-postEvals d ts = fmap (fromMaybe "") <$> liftIO (evaluateExpressions ts d)
+postEvals :: DebugSettings -> [EvaluationRequest] -> Handler [EvaluationResponse]
+postEvals d ts = fmap (fromMaybe $ Left "") <$> liftIO (evaluateExpressions ts d)
 
 restDebuggerServer :: DebugSettings -> Server RestDebuggerAPI
 restDebuggerServer dSettings =

@@ -123,15 +123,15 @@ instance Arbitrary DebugOperation where
       _ -> pure StepOut
 
 newtype VariableSet = VariableSet (Map Text (Set Text))
-newtype VariableMap = VariableMap (Map Text (Map Text Text))
+newtype VariableMap = VariableMap (Map Text (Map Text EvaluationResponse))
 newtype WatchSet = WatchSet (Set Text)
-newtype WatchMap = WatchMap (Map Text Text)
+newtype WatchMap = WatchMap (Map Text EvaluationResponse)
 
 data DebugState = DebugState
   { debugStateBreakpoint :: SourcePos
   , debugStateCallStack  :: [SourcePos]
-  , debugStateVariables  :: (Map Text (Map Text Text))
-  , debugStateWatches    :: (Map Text Text)
+  , debugStateVariables  :: (Map Text (Map Text EvaluationResponse))
+  , debugStateWatches    :: (Map Text EvaluationResponse)
   } deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
 
 instance Arbitrary DebugState where
@@ -155,7 +155,7 @@ instance Arbitrary DebuggerStatus where
       _ -> Paused <$> arbitrary
 
 type EvaluationRequest = Text
-type EvaluationResponse = Text
+type EvaluationResponse = Either Text Text
 
 data DebugSettingsF tvar tchan tmvar = DebugSettings
   { operation :: tmvar DebugOperation
@@ -207,7 +207,7 @@ type Debuggable m =
   , Mod.Accessible VariableSet m
   )
 
-type Evaluator m = Text -> m Text
+type Evaluator m = Text -> m (Either Text Text)
 
 withoutDebugging :: Debuggable m => m a -> m a
 withoutDebugging f = do
@@ -246,8 +246,8 @@ breakpointMatches eval pos = \case
         runCond exprText = do
           val <- withoutDebugging $ eval exprText
           case val of
-            "True" -> pure True
-            "true" -> pure True
+            Right "True" -> pure True
+            Right "true" -> pure True
             _ -> pure False
 
 isBreakpoint :: Debuggable m

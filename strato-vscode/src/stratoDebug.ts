@@ -385,8 +385,8 @@ export class StratoDebugSession extends LoggingDebugSession {
 
 		response.body = {
 			scopes: [
-			   new Scope("Local", this._variableHandles.create("local"), false),
-			// new Scope("Global", this._variableHandles.create("global"), true)
+			   new Scope("Local Variables", this._variableHandles.create("local"), false),
+			   new Scope("State Variables", this._variableHandles.create("state"), true)
 			]
 		};
 		this.sendResponse(response);
@@ -394,18 +394,31 @@ export class StratoDebugSession extends LoggingDebugSession {
 
 	protected async variablesRequest(response: DebugProtocol.VariablesResponse, args: DebugProtocol.VariablesArguments, request?: DebugProtocol.Request) {
 
+		console.log(`args: ${JSON.stringify(args)}`)
+		console.log(`request: ${JSON.stringify(request || {})}`)
 		const variables: DebugProtocol.Variable[] = [];
 		// wait until configuration has finished (and configurationDoneRequest has been called)
 		// await this._configurationDone.wait(1000);
 		const { user, options } = await this.getUserAndOptions();
-        const res = await rest.debugGetVariables(user, options)
-		Object.entries(res).forEach((entry) => {
-			variables.push({
-				name: entry[0],
-				type: "string",
-				value: `${entry[1]}`,
-				variablesReference: 0
-			})
+        const ress = await rest.debugGetVariables(user, options)
+		// TODO: Find out how to use the scopes to organize the variables
+		const id = this._variableHandles.get(args.variablesReference);
+		let res = {}
+		if (id === 'local') {
+		  res = {...ress['Local Variables']}
+		} else if (id === 'state') {
+		  res = {...ress['State Variables']}
+		}
+		Object.entries(res).forEach((entry:any) => {
+			const { Right: val } = entry[1] || {}
+			if (val) {
+			  variables.push({
+			  	name: entry[0],
+			  	type: "string",
+			  	value: `${val}`,
+			  	variablesReference: 0
+			  })
+		    }
 		})
 
 		response.body = {
@@ -452,15 +465,27 @@ export class StratoDebugSession extends LoggingDebugSession {
 	}
 
 	protected async evaluateRequest(response: DebugProtocol.EvaluateResponse, args: DebugProtocol.EvaluateArguments): Promise<void> {
-      const { expression } = args
+      const { context, expression } = args
       const { user, options } = await this.getUserAndOptions();
       try {
-        const res = await rest.debugPostEval(user, [expression], options)
-        response.body = {
-          result: res[0] || '',
-          variablesReference: 0
-        };
-        this.sendResponse(response);
+        const ress = await rest.debugPostEval(user, [expression], options)
+		const res = (ress || [])[0] || {Left: ''}
+		if (res.Right) {
+          response.body = {
+            result: res.Right,
+            variablesReference: 0
+          };
+          this.sendResponse(response);
+		} else {
+          const msg = res.Left || '';
+		  if (context === 'watch') {
+            response.body = {
+              result: msg,
+              variablesReference: 0
+            };
+            this.sendResponse(response);
+		  }
+		}
       } catch (e) {
         console.log(e);
       }
