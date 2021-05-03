@@ -1,16 +1,12 @@
 #!/usr/bin/env bash
 set -e
-#stratoURL=https://test5.ci.blockapps.net
+
 if [ $1 == "true" ] #If script is to be executed on test network...
 then
-  #stratoURL=http://vnc-test3.blockapps.net:8080
-  #keycloakURL=https://vnc-test3.blockapps.net
-  stratoURL=http://vnc-test3.blockapps.net:8080
+  stratoURL=[TEST_NODE]
 elif [ $2 == "true" ] #If script is to be executed on production network...
 then 
-  #stratoURL=http://vnc-test2.blockapps.net:8080
-  #keycloakURL=https://vnc-test2.blockapps.net
-  stratoURL=http://vnc-test2.blockapps.net:8080
+  stratoURL=[PROD_NODE]
 fi
 keycloakURL=$(echo $stratoURL | sed 's/http/&s/')
 keycloakURL=${keycloakURL%:*}
@@ -45,21 +41,3 @@ for file in ./contracts/*; do
     curl -v -X POST "$stratoURL/strato/v2.3/transaction/parallel?resolve=true" -H "accept: application/json;charset=utf-8" -H "Authorization: Bearer $token" -H "Content-Type: application/json;charset=utf-8" -d "$uploadrequest"
   fi
 done
-#arrPayloads=$(IFS=,; echo "{${arrPayloads[*]}"| sed s/./[\/1| sed s/.$/]\/)
-# sub the {} for []
-#| sed 's/ *$//g'}")
-#arrSources=$(IFS=,; echo "{${arrSources[*]}"| sed s/.//1| sed s/.$//)
-#printf '%s ' "${arrContracts[*]}"
-#printf '%s ' "${arrPayloads[*]}"
-#printf '%s ' "${arrSources[*]}"
-#build the upload request
-#uploadrequest="{\"txs\":$arrPayloads,\"txParams\":{\"gasLimit\":10000000000,\"gasPrice\":1},\"srcs\":$arrSources"
-#printf "$uploadrequest"
-#curl -v -X POST "$stratoURL/strato/v2.3/transaction/parallel" -H "accept: application/json;charset=utf-8" -H "Authorization: Bearer $token" -H "Content-Type: application/json;charset=utf-8" -d "$uploadrequest"
-# Debugging: test the generic curl of the parallel endpoint (generic data)
-#curl -v -X POST "$stratoURL/strato/v2.3/transaction/parallel" -H "accept: application/json;charset=utf-8" -H "Authorization: Bearer $token" -H "Content-Type: application/json;charset=utf-8" -d "{\"txs\":[{\"payload\":{\"contract\":\"SimpleStorage\",\"args\":{},\"metadata\":{\"history\":\"\",\"index\":\"\",\"VM\":\"SolidVM\"}},\"type\":\"CONTRACT\"}],\"txParams\":{\"gasLimit\":10000000000,\"gasPrice\":1},\"srcs\":{\"SimpleStorage\":\"contract SimpleStorage {uint storedData; function SimpleStorage() {storedData = 1;} function set(uint x) {storedData = x;} function get() constant returns (uint) {return storedData;}}\"}}"
-# Debugging: test a curl of the users endpoint
-#curl -X GET "$stratoURL/strato/v2.3/users" -H "accept: application/json;charset=utf-8" -H "Authorization: Bearer $token"
-
-# Get the list of contracts in the network
-#curl -X GET "$stratoURL/cirrus/search/contract" -H "accept: application/json;charset=utf-8" -H "Range-Unit: items" -H "Authorization: Bearer $token"
