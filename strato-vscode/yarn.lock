@@ -471,7 +471,7 @@ binary@~0.3.0:
     buffers "~0.1.1"
     chainsaw "~0.1.0"
 
-blockapps-rest@../blockapps-rest:
+blockapps-rest@../../strato/blockapps-rest:
   version "8.0.0"
   dependencies:
     "@babel/polyfill" "^7.8.3"
