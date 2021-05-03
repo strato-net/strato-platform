@@ -5,12 +5,12 @@ if [ $1 == "true" ] #If script is to be executed on test network...
 then
   #stratoURL=http://vnc-test3.blockapps.net:8080
   #keycloakURL=https://vnc-test3.blockapps.net
-  stratoURL=[TEST_NODE]
+  stratoURL=http://vnc-test3.blockapps.net:8080
 elif [ $2 == "true" ] #If script is to be executed on production network...
 then 
   #stratoURL=http://vnc-test2.blockapps.net:8080
   #keycloakURL=https://vnc-test2.blockapps.net
-  stratoURL=[PROD_NODE]
+  stratoURL=http://vnc-test2.blockapps.net:8080
 fi
 keycloakURL=$(echo $stratoURL | sed 's/http/&s/')
 keycloakURL=${keycloakURL%:*}
