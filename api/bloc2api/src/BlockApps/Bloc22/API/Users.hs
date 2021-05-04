@@ -54,6 +54,7 @@ import           Data.Aeson.Casing
 import qualified Data.ByteString.Lazy               as ByteString.Lazy
 import           Data.Map                           (Map)
 import qualified Data.Map                           as Map
+import           Data.Maybe
 import           Data.Proxy
 import           Data.Text                          (Text)
 import qualified Data.Text.Encoding                 as Text
@@ -82,6 +83,7 @@ import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Nonce
+import           Blockchain.Strato.Model.SourceMap
 import           Blockchain.Strato.Model.Wei
 
 --------------------------------------------------------------------------------
@@ -156,7 +158,7 @@ instance ToSample BlocTransactionData where
       , contractdetailsBinRuntime = "Contract Bin Runtime"
       , contractdetailsCodeHash   = EVMCode $ hash "Contract Code Hash"
       , contractdetailsName       = "Example"
-      , contractdetailsSrc        = [("Example.sol", "contract Example { }")]
+      , contractdetailsSrc        = namedSource "Example.sol" "contract Example { }"
       , contractdetailsXabi       = sampleXabi
       }
     , Call [] -- probably make a better Call sample
@@ -325,7 +327,7 @@ data TransferParameters = TransferParameters
 --------------------------------------------------------------------------------
 
 data PostUsersContractRequest = PostUsersContractRequest
-  { postuserscontractrequestSrc      :: [(Text, Text)]
+  { postuserscontractrequestSrc      :: SourceMap
   , postuserscontractrequestPassword :: Password
   , postuserscontractrequestContract :: Maybe Text
   , postuserscontractrequestArgs     :: Maybe (Map Text ArgValue)
@@ -350,13 +352,7 @@ instance ToJSON PostUsersContractRequest where
 instance FromJSON PostUsersContractRequest where
   parseJSON (Object o) =
     PostUsersContractRequest
-      <$> (do
-        msrc <- o .:? "src"
-        case msrc of
-          Just (String s) -> pure $ [("", s)]
-          Just (Object _) -> fmap Map.toList (o .: "src")
-          Just (Array _) -> o .: "src"
-          _ -> pure [])
+      <$> (fromMaybe mempty <$> o .:? "src")
       <*> (o .: "password")
       <*> (o .:? "contract")
       <*> (o .:? "args")
@@ -367,10 +363,10 @@ instance FromJSON PostUsersContractRequest where
 
 instance ToSample PostUsersContractRequest where
   toSamples _ = singleSample PostUsersContractRequest
-    { postuserscontractrequestSrc = [("SimpleStorage.sol",
+    { postuserscontractrequestSrc = namedSource "SimpleStorage.sol"
       "contract SimpleStorage { uint storedData; function set(uint x) \
       \{ storedData = x; } function get() returns (uint retVal) \
-      \{ return storedData; } }")]
+      \{ return storedData; } }"
     , postuserscontractrequestPassword = "securePassword"
     , postuserscontractrequestContract = Just "SimpleStorage"
     , postuserscontractrequestArgs = Nothing
@@ -405,10 +401,10 @@ instance ToSchema PostUsersContractRequest where
                       ]
         & description ?~ "Post Users Contract Request"
         & example ?~ toJSON PostUsersContractRequest
-            { postuserscontractrequestSrc = [("SimpleStorage.sol",
+            { postuserscontractrequestSrc = namedSource "SimpleStorage.sol"
               "contract SimpleStorage { uint storedData; function set(uint x) \
               \{ storedData = x; } function get() returns (uint retVal) \
-              \{ return storedData; } }")]
+              \{ return storedData; } }"
             , postuserscontractrequestPassword = "securePassword"
             , postuserscontractrequestContract = Just "SimpleStorage"
             , postuserscontractrequestArgs = Nothing
@@ -420,7 +416,8 @@ instance ToSchema PostUsersContractRequest where
 
 data ContractParameters = ContractParameters
   { fromAddr :: Address
-  , src      :: [(Text, Text)] -- need to use list to preserve ordering for EVM
+  , src      :: SourceMap
+  , codePtr  :: Maybe CodePtr
   , contract :: Maybe Text
   , args     :: Maybe (Map Text ArgValue)
   , value    :: Maybe (Strung Natural)
@@ -434,7 +431,7 @@ data ContractParameters = ContractParameters
 data UploadListRequest = UploadListRequest
   { uploadlistPassword  :: Password
   , uploadlistContracts :: [UploadListContract]
-  , uploadlistSrcs      :: Maybe (Map Text Text)
+  , uploadlistSrcs      :: Maybe (Map Text SourceMap)
   , uploadlistResolve   :: Bool
   } deriving (Eq,Show,Generic)
 
@@ -457,7 +454,8 @@ instance ToSchema UploadListRequest where
       exContract1 :: UploadListContract
       exContract1 = UploadListContract
         { uploadlistcontractContractName = "AccountsContract"
-        , uploadlistcontractSrc = []
+        , uploadlistcontractSrc = mempty
+        , uploadlistcontractCodePtr = Nothing
         , uploadlistcontractArgs = Map.fromList [("accountType", ArgString "Checking"), ("balance",ArgInt 10)]
         , _uploadlistcontractTxParams = Nothing
         , uploadlistcontractValue = Nothing
@@ -469,7 +467,8 @@ instance ToSchema UploadListRequest where
 
 data UploadListContract = UploadListContract
   { uploadlistcontractContractName :: Text
-  , uploadlistcontractSrc          :: [(Text, Text)] -- need to use list to preserve ordering for EVM
+  , uploadlistcontractSrc          :: SourceMap
+  , uploadlistcontractCodePtr      :: Maybe CodePtr
   , uploadlistcontractArgs         :: Map Text ArgValue
   , _uploadlistcontractTxParams    :: Maybe TxParams
   , uploadlistcontractValue        :: Maybe (Strung Natural)
@@ -484,6 +483,7 @@ instance ToJSON UploadListContract where
   toJSON UploadListContract{..} = object
     [ "contractName" .= uploadlistcontractContractName
     , "src" .= uploadlistcontractSrc
+    , "codePtr" .= uploadlistcontractCodePtr
     , "args" .= uploadlistcontractArgs
     , "txParams" .= _uploadlistcontractTxParams
     , "value" .= uploadlistcontractValue
@@ -495,13 +495,8 @@ instance FromJSON UploadListContract where
   parseJSON (Object o) =
     UploadListContract
       <$> (o .: "contractName")
-      <*> (do
-        msrc <- o .:? "src"
-        case msrc of
-          Just (String s) -> pure $ [("", s)]
-          Just (Object _) -> fmap Map.toList (o .: "src")
-          Just (Array _) -> o .: "src"
-          _ -> pure [])
+      <*> (fromMaybe mempty <$> o .:? "src")
+      <*> (o .:? "codePtr")
       <*> (o .: "args")
       <*> (o .:? "txParams")
       <*> (o .:? "value")
@@ -517,7 +512,8 @@ instance ToSchema UploadListContract where
       ex :: UploadListContract
       ex = UploadListContract
         { uploadlistcontractContractName = "SampleContract"
-        , uploadlistcontractSrc = []
+        , uploadlistcontractSrc = mempty
+        , uploadlistcontractCodePtr = Nothing
         , uploadlistcontractArgs = Map.fromList [("user", ArgString "Bob"), ("age",ArgInt 1)]
         , _uploadlistcontractTxParams = Just $ TxParams (Just $ Gas 123) (Just $ Wei 345) Nothing
         , uploadlistcontractValue = Nothing

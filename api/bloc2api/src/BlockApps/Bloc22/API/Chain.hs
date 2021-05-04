@@ -40,12 +40,13 @@ import           Blockchain.TypeLits
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.CodePtr
+import           Blockchain.Strato.Model.SourceMap
 
 --------------------------------------------------------------------------------
 -- | Routes and types
 --------------------------------------------------------------------------------
 data ChainInput  = ChainInput
-  { chaininputSrc      :: [(Text, Text)]
+  { chaininputSrc      :: SourceMap
   , chaininputCodePtr  :: Maybe CodePtr
   , chaininputContract :: Maybe Text
   , chaininputLabel    :: Text
@@ -73,13 +74,7 @@ instance Arbitrary ChainInput where
 instance FromJSON ChainInput where
   parseJSON (Object o) =
     ChainInput
-      <$> (do
-        msrc <- o .:? "src"
-        case msrc of
-          Just (String s) -> pure $ [("", s)]
-          Just (Object _) -> fmap Map.toList (o .: "src")
-          Just (Array _) -> o .: "src"
-          _ -> pure [])
+      <$> (fromMaybe mempty <$> o .:? "src")
       <*> (o .:? "codePtr")
       <*> (o .:? "contract")
       <*> (o .: "label")
@@ -111,7 +106,7 @@ exampleEnode2 = Enode (OrgId "6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6
 
 exChainInput :: ChainInput
 exChainInput = ChainInput
-    { chaininputSrc = [("", exampleSrc)]
+    { chaininputSrc = unnamedSource exampleSrc
     , chaininputCodePtr = Nothing
     , chaininputContract = Just "Governance"
     , chaininputLabel = "my chain"

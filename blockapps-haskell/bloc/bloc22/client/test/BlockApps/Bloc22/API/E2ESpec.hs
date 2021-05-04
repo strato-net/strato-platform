@@ -6,6 +6,7 @@
 module BlockApps.Bloc22.API.E2ESpec where
 
 
+import           Control.Arrow                    ((&&&))
 import           Control.Concurrent
 import qualified Data.ByteString.Base16           as Base16
 import qualified Data.ByteString.Char8            as Char8
@@ -34,10 +35,14 @@ import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Gas
 import qualified Blockchain.Strato.Model.Keccak256 as KECCAK256
+import           Blockchain.Strato.Model.SourceMap
 import           Blockchain.Strato.Model.Wei
 import           Handlers.AccountInfo
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
+
+readFileToSourceMap :: Text.Text -> IO SourceMap
+readFileToSourceMap = uncurry fmap . (namedSource &&& readSolFile . Text.unpack)
 
 spec :: SpecWith TestConfig
 spec =
@@ -108,13 +113,13 @@ spec =
         Right addr1 = postUsersEither1
         params1 = accountsFilterParams {qaAddress = Just addr1}
         postUsersContractRequest = PostUsersContractRequest
-          { postuserscontractrequestSrc = [("", simpleStorageSrc)]
+          { postuserscontractrequestSrc = simpleStorageSrc
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just simpleStorageContractName
           , postuserscontractrequestArgs = Nothing
           , postuserscontractrequestTxParams = testTxParams
           , postuserscontractrequestValue = Just $ Strung 0
-          , postuserscontractrequestMetadata = Just $ Map.fromList [("src",simpleStorageSrc),("name", simpleStorageContractName)]
+          , postuserscontractrequestMetadata = Just $ Map.fromList [("src", serializeSourceMap simpleStorageSrc),("name", simpleStorageContractName)]
           }
       eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl Nothing)
       eAccts1 `shouldSatisfy` isRight
@@ -227,15 +232,15 @@ spec =
                       (ClientEnv mgr stratoUrl Nothing)
             eAccts `shouldSatisfy` isRight
       let createContract fName ctName args un addr = do
-            src <- readSolFile fName
+            src <- readFileToSourceMap fName
             let postUsersContractRequest = PostUsersContractRequest
-                  { postuserscontractrequestSrc = [("", src)]
+                  { postuserscontractrequestSrc = src
                   , postuserscontractrequestPassword = pw
                   , postuserscontractrequestContract = Just $ Text.pack ctName
                   , postuserscontractrequestArgs = args
                   , postuserscontractrequestTxParams = testTxParams
                   , postuserscontractrequestValue = Just $ Strung 0
-                  , postuserscontractrequestMetadata = Just $ Map.fromList [("src",src),("name",Text.pack ctName)]
+                  , postuserscontractrequestMetadata = Just $ Map.fromList [("src", serializeSourceMap src),("name",Text.pack ctName)]
                   }
             let clientMethod = postUsersContract
                                un
@@ -306,20 +311,20 @@ spec =
         Right address = postUsersEither1
       postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl Nothing)
       postUsersFillEither `shouldSatisfy` isRight
-      simpleStorageAddressSrc <- readSolFile "SimpleStorageAddress.sol"
+      simpleStorageAddressSrc <- readFileToSourceMap "SimpleStorageAddress.sol"
       threadDelay 4000000
       let
         Right addr1 = postUsersEither1
         params1 = accountsFilterParams {qaAddress = Just addr1}
         simpleStorageAddressContractName = "SimpleStorageAddress"
         postUsersContractRequest = PostUsersContractRequest
-          { postuserscontractrequestSrc = [("", simpleStorageAddressSrc)]
+          { postuserscontractrequestSrc = simpleStorageAddressSrc
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just simpleStorageAddressContractName
           , postuserscontractrequestArgs = Nothing
           , postuserscontractrequestTxParams = testTxParams
           , postuserscontractrequestValue = Just $ Strung 0
-          , postuserscontractrequestMetadata = Just $ Map.fromList [("src",simpleStorageAddressSrc),("name",simpleStorageAddressContractName)]
+          , postuserscontractrequestMetadata = Just $ Map.fromList [("src", serializeSourceMap simpleStorageAddressSrc),("name",simpleStorageAddressContractName)]
           }
       eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl Nothing)
       eAccts1 `shouldSatisfy` isRight
@@ -416,7 +421,7 @@ spec =
         Right address = postUsersEither1
       postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl Nothing)
       postUsersFillEither `shouldSatisfy` isRight
-      simpleStorageBytes32ArraySrc <- readSolFile "SimpleStorageBytes32Array.sol"
+      simpleStorageBytes32ArraySrc <- readFileToSourceMap "SimpleStorageBytes32Array.sol"
       threadDelay 4000000
       let
         Right addr1 = postUsersEither1
@@ -427,14 +432,14 @@ spec =
           simpleStorageBytes32ArraySrc
           Nothing
         postUsersContractRequest = PostUsersContractRequest
-          { postuserscontractrequestSrc = [("", simpleStorageBytes32ArraySrc)]
+          { postuserscontractrequestSrc = simpleStorageBytes32ArraySrc
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just simpleStorageBytes32ArrayContractName
           , postuserscontractrequestArgs = Nothing
           , postuserscontractrequestTxParams = testTxParams
           , postuserscontractrequestValue = Just $ Strung 0
           , postuserscontractrequestMetadata = Just $ Map.fromList
-              [("src",simpleStorageBytes32ArraySrc)
+              [("src", serializeSourceMap simpleStorageBytes32ArraySrc)
               ,("name",simpleStorageBytes32ArrayContractName)
               ]
           }
@@ -544,7 +549,7 @@ spec =
         Right address = postUsersEither1
       postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl Nothing)
       postUsersFillEither `shouldSatisfy` isRight
-      simpleStorageBytes32ArraySrc <- readSolFile "BytesComboTest.sol"
+      simpleStorageBytes32ArraySrc <- readFileToSourceMap "BytesComboTest.sol"
       threadDelay 4000000
       let
         Right addr1 = postUsersEither1
@@ -569,13 +574,13 @@ spec =
           simpleStorageBytes32ArraySrc
           Nothing
         postUsersContractRequest = PostUsersContractRequest
-          { postuserscontractrequestSrc = [("", simpleStorageBytes32ArraySrc)]
+          { postuserscontractrequestSrc = simpleStorageBytes32ArraySrc
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just simpleStorageBytes32ArrayContractName
           , postuserscontractrequestArgs = Just storeArgs
           , postuserscontractrequestTxParams = testTxParams
           , postuserscontractrequestValue = Just $ Strung 0
-          , postuserscontractrequestMetadata = Just $ Map.fromList [("src", simpleStorageBytes32ArraySrc),("name",simpleStorageBytes32ArrayContractName)]
+          , postuserscontractrequestMetadata = Just $ Map.fromList [("src", serializeSourceMap simpleStorageBytes32ArraySrc),("name",simpleStorageBytes32ArrayContractName)]
           }
       _ <- runClientM (postContractsCompile [postCompileRequest]) (ClientEnv mgr blocUrl Nothing)
       eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl Nothing)
@@ -589,11 +594,11 @@ spec =
 
     it "should disambiguate contracts with the same name using address" $ \ testConfig@TestConfig {..} -> do
       pendingWith "Not yet supported for metadata compile"
-      sameName1Src <- readSolFile "SameName1.sol"
-      sameName2Src <- readSolFile "SameName2.sol"
+      sameName1Src <- readFileToSourceMap "SameName1.sol"
+      sameName2Src <- readFileToSourceMap "SameName2.sol"
       let
         sameName1ContractRequest = PostUsersContractRequest
-          { postuserscontractrequestSrc = [("", sameName1Src)]
+          { postuserscontractrequestSrc = sameName1Src
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just "SameName"
           , postuserscontractrequestArgs = Nothing
@@ -602,7 +607,7 @@ spec =
           , postuserscontractrequestMetadata = Nothing
           }
         sameName2ContractRequest = PostUsersContractRequest
-          { postuserscontractrequestSrc = [("", sameName2Src)]
+          { postuserscontractrequestSrc = sameName2Src
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just "SameName"
           , postuserscontractrequestArgs = Nothing
@@ -631,7 +636,7 @@ spec =
           userName1 = UserName "blockapps1"
 
           simpleConstructorName = "SimpleConstructor"
-      simpleConstructorSrc <- readSolFile "SimpleConstructor.sol"
+      simpleConstructorSrc <- readFileToSourceMap "SimpleConstructor.sol"
       postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl Nothing)
       postUsersEither1 `shouldSatisfy` isRight
       let
@@ -643,14 +648,14 @@ spec =
         Right addr1 = postUsersEither1
         params1 = accountsFilterParams {qaAddress = Just addr1}
         postUsersContractRequest = PostUsersContractRequest
-          { postuserscontractrequestSrc = [("", simpleConstructorSrc)]
+          { postuserscontractrequestSrc = simpleConstructorSrc
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just simpleConstructorName
           , postuserscontractrequestArgs = Just $ Map.singleton "x" (ArgInt 3)
           , postuserscontractrequestTxParams = testTxParams
           , postuserscontractrequestValue = Just $ Strung 0
           , postuserscontractrequestMetadata = Just $ Map.fromList
-              [("src", simpleConstructorSrc),("name",simpleConstructorName)]
+              [("src", serializeSourceMap simpleConstructorSrc),("name",simpleConstructorName)]
           }
       eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl Nothing)
       eAccts1 `shouldSatisfy` isRight
@@ -692,7 +697,7 @@ spec =
           userName1 = UserName "blockapps1"
 
           testArrayStatName = "TestArrayStatCons"
-      simpleConstructorSrc <- readSolFile "ConstructorTest.sol"
+      simpleConstructorSrc <- readFileToSourceMap "ConstructorTest.sol"
       postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl Nothing)
       postUsersEither1 `shouldSatisfy` isRight
       let
@@ -704,14 +709,14 @@ spec =
         Right addr1 = postUsersEither1
         params1 = accountsFilterParams {qaAddress = Just addr1}
         postUsersContractRequest = PostUsersContractRequest
-          { postuserscontractrequestSrc = [("", simpleConstructorSrc)]
+          { postuserscontractrequestSrc = simpleConstructorSrc
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just testArrayStatName
           , postuserscontractrequestArgs = Just $ Map.singleton "x" (ArgArray (Vector.fromList [ArgInt 3,ArgInt 2,ArgInt 3]))
           , postuserscontractrequestTxParams = testTxParams
           , postuserscontractrequestValue = Just $ Strung 0
           , postuserscontractrequestMetadata = Just $ Map.fromList
-              [("src", simpleConstructorSrc),("name", testArrayStatName)]
+              [("src", serializeSourceMap simpleConstructorSrc),("name", testArrayStatName)]
           }
       eAccts1 <- runClientM
         (getAccountsFilter params1)
@@ -730,7 +735,7 @@ spec =
           userName1 = UserName "blockapps1"
 
           testArrayStatName = "TestArrayDynCons"
-      simpleConstructorSrc <- readSolFile "ConstructorTest.sol"
+      simpleConstructorSrc <- readFileToSourceMap "ConstructorTest.sol"
       postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl Nothing)
       postUsersEither1 `shouldSatisfy` isRight
       let
@@ -742,14 +747,14 @@ spec =
         Right addr1 = postUsersEither1
         params1 = accountsFilterParams {qaAddress = Just addr1}
         postUsersContractRequest = PostUsersContractRequest
-          { postuserscontractrequestSrc = [("", simpleConstructorSrc)]
+          { postuserscontractrequestSrc = simpleConstructorSrc
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just testArrayStatName
           , postuserscontractrequestArgs = Just $ Map.singleton "x" (ArgArray (Vector.fromList (fmap ArgInt [1,2,3,4,5,6,7,8])))
           , postuserscontractrequestTxParams = testTxParams
           , postuserscontractrequestValue = Just $ Strung 0
           , postuserscontractrequestMetadata = Just $ Map.fromList
-              [("src", simpleConstructorSrc),("name", testArrayStatName)]
+              [("src", serializeSourceMap simpleConstructorSrc),("name", testArrayStatName)]
           }
       eAccts1 <- runClientM
         (getAccountsFilter params1)
@@ -767,7 +772,7 @@ spec =
           userName1 = UserName "blockapps1"
 
           testArrayStatName = "TestBytesDynCons"
-      simpleConstructorSrc <- readSolFile "ConstructorTest.sol"
+      simpleConstructorSrc <- readFileToSourceMap "ConstructorTest.sol"
       postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl Nothing)
       postUsersEither1 `shouldSatisfy` isRight
       let
@@ -779,14 +784,14 @@ spec =
         Right addr1 = postUsersEither1
         params1 = accountsFilterParams {qaAddress = Just addr1}
         postUsersContractRequest = PostUsersContractRequest
-          { postuserscontractrequestSrc = [("", simpleConstructorSrc)]
+          { postuserscontractrequestSrc = simpleConstructorSrc
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just testArrayStatName
           , postuserscontractrequestArgs = Just . Map.singleton "x" $ ArgString "416c6c207468617420697320676f6c6420646f6573206e6f7420676c69747465722c204e6f7420616c6c2074686f73652077686f2077616e64657220617265206c6f73743b20546865206f6c642074686174206973207374726f6e6720646f6573206e6f74207769746865722c204465657020726f6f747320617265206e6f742072656163686564206279207468652066726f73742e2046726f6d2074686520617368657320612066697265207368616c6c20626520776f6b656e2c2041206c696768742066726f6d2074686520736861646f7773207368616c6c20737072696e673b2052656e65776564207368616c6c2062652074686520626c6164652074686174207761732062726f6b656e2c205468652063726f776e6c65737320616761696e207368616c6c206265206b696e672e"
           , postuserscontractrequestTxParams = testTxParams
           , postuserscontractrequestValue = Just $ Strung 0
           , postuserscontractrequestMetadata = Just $ Map.fromList
-              [("src", simpleConstructorSrc),("name", testArrayStatName)]
+              [("src", serializeSourceMap simpleConstructorSrc),("name", testArrayStatName)]
           }
       eAccts1 <- runClientM
         (getAccountsFilter params1)
@@ -804,7 +809,7 @@ spec =
           userName1 = UserName "blockapps1"
 
           testArrayStatName = "TestAddressBytesCons"
-      simpleConstructorSrc <- readSolFile "ConstructorTest.sol"
+      simpleConstructorSrc <- readFileToSourceMap "ConstructorTest.sol"
       postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl Nothing)
       postUsersEither1 `shouldSatisfy` isRight
       let
@@ -816,7 +821,7 @@ spec =
         Right addr1 = postUsersEither1
         params1 = accountsFilterParams {qaAddress = Just addr1}
         postUsersContractRequest = PostUsersContractRequest
-          { postuserscontractrequestSrc = [("", simpleConstructorSrc)]
+          { postuserscontractrequestSrc = simpleConstructorSrc
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just testArrayStatName
           , postuserscontractrequestArgs = Just $ Map.fromList
@@ -827,7 +832,7 @@ spec =
           , postuserscontractrequestTxParams = testTxParams
           , postuserscontractrequestValue = Just $ Strung 0
           , postuserscontractrequestMetadata = Just $ Map.fromList
-              [("src", simpleConstructorSrc),("name", testArrayStatName)]
+              [("src", serializeSourceMap simpleConstructorSrc),("name", testArrayStatName)]
           }
       eAccts1 <- runClientM
         (getAccountsFilter params1)
@@ -845,7 +850,7 @@ spec =
           userName1 = UserName "blockapps1"
 
           testArrayStatName = "TestLessComplexCons"
-      simpleConstructorSrc <- readSolFile "ConstructorTest.sol"
+      simpleConstructorSrc <- readFileToSourceMap "ConstructorTest.sol"
       postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl Nothing)
       postUsersEither1 `shouldSatisfy` isRight
       let
@@ -858,7 +863,7 @@ spec =
         Right addr1 = postUsersEither1
         params1 = accountsFilterParams {qaAddress = Just addr1}
         postUsersContractRequest = PostUsersContractRequest
-          { postuserscontractrequestSrc = [("", simpleConstructorSrc)]
+          { postuserscontractrequestSrc = simpleConstructorSrc
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just testArrayStatName
           , postuserscontractrequestArgs = Just $ Map.fromList
@@ -873,7 +878,7 @@ spec =
           , postuserscontractrequestTxParams = txParamsComplex
           , postuserscontractrequestValue = Just $ Strung 0
           , postuserscontractrequestMetadata = Just $ Map.fromList
-              [("src", simpleConstructorSrc),("name", testArrayStatName)]
+              [("src", serializeSourceMap simpleConstructorSrc),("name", testArrayStatName)]
           }
       eAccts1 <- runClientM
         (getAccountsFilter params1)
@@ -896,21 +901,21 @@ spec =
         Right address = postUsersEither1
       postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl Nothing)
       postUsersFillEither `shouldSatisfy` isRight
-      simpleTupleSrc <- readSolFile "SimpleTuple.sol"
+      simpleTupleSrc <- readFileToSourceMap "SimpleTuple.sol"
       threadDelay 4000000
       let
         Right addr1 = postUsersEither1
         params1 = accountsFilterParams {qaAddress = Just addr1}
         simpleTupleContractName = "SimpleTuple"
         postUsersContractRequest = PostUsersContractRequest
-          { postuserscontractrequestSrc = [("", simpleTupleSrc)]
+          { postuserscontractrequestSrc = simpleTupleSrc
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just simpleTupleContractName
           , postuserscontractrequestArgs = Nothing
           , postuserscontractrequestTxParams = testTxParams
           , postuserscontractrequestValue = Just $ Strung 0
           , postuserscontractrequestMetadata = Just $ Map.fromList
-              [("src", simpleTupleSrc),("name", simpleTupleContractName)]
+              [("src", serializeSourceMap simpleTupleSrc),("name", simpleTupleContractName)]
           }
       eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl Nothing)
       eAccts1 `shouldSatisfy` isRight
@@ -1018,21 +1023,21 @@ spec =
         Right address = postUsersEither1
       postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl Nothing)
       postUsersFillEither `shouldSatisfy` isRight
-      testSrc' <- readSolFile "Bytes32Test.sol"
+      testSrc' <- readFileToSourceMap "Bytes32Test.sol"
       threadDelay 4000000
       let
         Right addr1 = postUsersEither1
         params1 = accountsFilterParams {qaAddress = Just addr1}
         testContractName' = "Bytes32Test"
         postUsersContractRequest = PostUsersContractRequest
-          { postuserscontractrequestSrc = [("", testSrc')]
+          { postuserscontractrequestSrc = testSrc'
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just testContractName'
           , postuserscontractrequestArgs = Just [("b", ArgString "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89")]
           , postuserscontractrequestTxParams = testTxParams
           , postuserscontractrequestValue = Just $ Strung 0
           , postuserscontractrequestMetadata = Just $ Map.fromList
-              [("src", testSrc'),("name", testContractName')]
+              [("src", serializeSourceMap testSrc'),("name", testContractName')]
           }
       eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl Nothing)
       eAccts1 `shouldSatisfy` isRight
@@ -1109,21 +1114,21 @@ spec =
         Right address = postUsersEither1
       postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl Nothing)
       postUsersFillEither `shouldSatisfy` isRight
-      testSrc' <- readSolFile "StorageBlob.sol"
+      testSrc' <- readFileToSourceMap "StorageBlob.sol"
       threadDelay 4000000
       let
         Right addr1 = postUsersEither1
         params1 = accountsFilterParams {qaAddress = Just addr1}
         testContractName' = "StorageDepolyer"
         postUsersContractRequest = PostUsersContractRequest
-          { postuserscontractrequestSrc = [("", testSrc')]
+          { postuserscontractrequestSrc = testSrc'
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just testContractName'
           , postuserscontractrequestArgs = Nothing
           , postuserscontractrequestTxParams = testTxParams
           , postuserscontractrequestValue = Just $ Strung 0
           , postuserscontractrequestMetadata = Just $ Map.fromList
-              [("src", testSrc'),("name", testContractName')]
+              [("src", serializeSourceMap testSrc'),("name", testContractName')]
           }
       eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl Nothing)
       eAccts1 `shouldSatisfy` isRight
@@ -1200,7 +1205,7 @@ spec =
         Right addressIAM = postIAMEither
       postUsersFillEitherIAM <- runClientM (postUsersFill iamUsername addressIAM True) (ClientEnv mgr blocUrl Nothing)
       postUsersFillEitherIAM `shouldSatisfy` isRight
-      iamBlob <- readSolFile "BadgerIam.sol"
+      iamBlob <- readFileToSourceMap "BadgerIam.sol"
       threadDelay 4000000
       let
         Right iamUserAddr = postIAMEither
@@ -1211,14 +1216,14 @@ spec =
           iamBlob
           Nothing
         postUsersContractRequest = PostUsersContractRequest
-          { postuserscontractrequestSrc = [("", iamBlob)]
+          { postuserscontractrequestSrc = iamBlob
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just iamName
           , postuserscontractrequestArgs = Nothing
           , postuserscontractrequestTxParams = testTxParams
           , postuserscontractrequestValue = Just $ Strung 0
           , postuserscontractrequestMetadata = Just $ Map.fromList
-              [("src", iamBlob),("name", iamName)]
+              [("src", serializeSourceMap iamBlob),("name", iamName)]
           }
       _ <- runClientM (postContractsCompile [postCompileRequest]) (ClientEnv mgr blocUrl Nothing)
       eAccts2 <- runClientM (getAccountsFilter paramsIAM) (ClientEnv mgr stratoUrl Nothing)
@@ -1281,7 +1286,7 @@ spec =
         Right address = postUsersEither1
       postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl Nothing)
       postUsersFillEither `shouldSatisfy` isRight
-      returnTupleSrc <- readSolFile "ReturnTuple.sol"
+      returnTupleSrc <- readFileToSourceMap "ReturnTuple.sol"
       let
         Right addr1 = postUsersEither1
         params1 = accountsFilterParams {qaAddress = Just addr1}
@@ -1290,7 +1295,7 @@ spec =
         arghash = ArgString $ Text.decodeUtf8 $ Base16.encode hash
         argcontents = ArgString "foo"
         postUsersContractRequest = PostUsersContractRequest
-          { postuserscontractrequestSrc = [("", returnTupleSrc)]
+          { postuserscontractrequestSrc = returnTupleSrc
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just testContractName'
           , postuserscontractrequestArgs = Just $ Map.fromList
@@ -1298,7 +1303,7 @@ spec =
           , postuserscontractrequestTxParams = testTxParams
           , postuserscontractrequestValue = Just $ Strung 0
           , postuserscontractrequestMetadata = Just $ Map.fromList
-              [("src", returnTupleSrc),("name", testContractName')]
+              [("src", serializeSourceMap returnTupleSrc),("name", testContractName')]
           }
       eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl Nothing)
       eAccts1 `shouldSatisfy` isRight

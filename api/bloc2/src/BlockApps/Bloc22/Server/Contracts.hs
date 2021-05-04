@@ -51,8 +51,8 @@ hexStorageToWord256 :: HexStorage -> Word256
 hexStorageToWord256 (HexStorage bs) = bytesToWord256 bs
 
 getContracts :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
-                Maybe ChainId -> m GetContractsResponse
-getContracts chainId = blocTransaction $ do
+                Maybe Integer -> Maybe Integer -> Maybe ChainId -> m GetContractsResponse
+getContracts mOffset mLimit chainId = blocTransaction $ do
   let
     -- current bloc returns milliseconds
     -- TODO: get those extra 3 significant figures of accuracy
@@ -61,9 +61,9 @@ getContracts chainId = blocTransaction $ do
     addressesToMap = foldr'
       (\ (key,addr,utc,cid) -> Map.insertWith (++) key [addressToVal addr utc cid])
       Map.empty
-  -- Take only 100 entries as a short-term solution to prevent from crashing.
-  -- See also: https://blockapps.atlassian.net/browse/STRATO-1714
-  contractsAddresses <- blocQuery $ getContractsAddressesQuery chainId
+    offset = fromInteger $ fromMaybe 0 mOffset
+    limit = fromInteger $ fromMaybe 100 mLimit -- TODO: Make the 100 configurable?
+  contractsAddresses <- blocQuery $ getContractsAddressesQuery offset limit chainId
   let reducedResponseMap = addressesToMap contractsAddresses
   return . GetContractsResponse $ reducedResponseMap
 
@@ -304,7 +304,7 @@ postContractsCompile = blocTransaction . fmap concat . traverse compileOneContra
       let shouldCompile = case Text.toLower <$> postcompilerequestVm of
             Just "solidvm" -> Don't Compile
             _ -> Do Compile
-      idsAndDetails <- sourceToContractDetails shouldCompile [("",postcompilerequestSource)]
+      idsAndDetails <- sourceToContractDetails shouldCompile postcompilerequestSource
       for (toList idsAndDetails) $ \ (_,details) -> do
         let eBlockappsjsXabi = uncurry completeXabi $ (contractdetailsName &&& contractdetailsXabi) details
         case eBlockappsjsXabi of

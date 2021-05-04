@@ -87,6 +87,7 @@ import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Nonce
+import           Blockchain.Strato.Model.SourceMap
 import           Blockchain.Strato.Model.Wei
 import           Handlers.AccountInfo
 import           Handlers.Faucet
@@ -248,6 +249,7 @@ postUsersContract userName addr chainId resolve
   let bcp = ContractParameters
               addr
               src
+              Nothing
               maybeContract
               args
               value
@@ -272,7 +274,7 @@ postUsersContractEVM' cacheNonce ContractParameters{..} sign = blocTransaction $
     Just x -> pure x
   let
     (bin,leftOver) = Base16.decode $ Text.encodeUtf8 contractdetailsBin
-    metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("src", serializeSrc contractdetailsSrc),("name", cName)]
+    metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("src", serializeSourceMap contractdetailsSrc),("name", cName)]
   unless (ByteString.null leftOver) $ throwIO $ AnError "Couldn't decode binary"
   let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi
   argsBin <- constructArgValues args xabiArgs
@@ -301,9 +303,14 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} sign = blocTransacti
   params <- getAccountTxParams cacheNonce fromAddr chainId txParams
   --We might be able to get rid of the metadata for SolidVM, but that will require a change in the API, and needs to be discussed
   $logInfoLS "postUsersContractSolidVM'/args" args
-  (cName,(cmId,ContractDetails{..})) <- getContractDetailsForContract "SolidVM" src contract >>= \case
-    Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
-    Just x -> pure x
+  (cName,(cmId,ContractDetails{..})) <- case codePtr of 
+    Nothing-> getContractDetailsForContract "SolidVM" src contract >>= \case
+      Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
+      Just x -> pure x
+    Just cptr@(CodeAtAccount _ cn) -> getContractDetailsByCodeHash cptr >>= \case
+      Nothing -> throwIO $ UserError "No contract found for this codePtr in contract creation"
+      Just x -> pure (Text.pack cn, x)
+    _ -> throwIO $ UserError "Invalid CodePtr in contract creation"
 
   let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi
   (_, argsAsSource) <- constructArgValuesAndSource args xabiArgs
@@ -316,7 +323,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} sign = blocTransacti
       fromAddr
       params
       (Wei (fromIntegral (maybe 0 unStrung value)))
-      (Code $ Text.encodeUtf8 $ serializeSrc contractdetailsSrc)
+      (Code $ Text.encodeUtf8 $ serializeSourceMap contractdetailsSrc)
       chainId
   $logDebugLS "postUsersContractSolidVM'/tx" tx
   txHash <- blocStrato $ postTx tx
@@ -333,7 +340,10 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} sign = blocTransacti
 postUsersUploadList :: UserName -> Address -> Maybe ChainId -> Bool -> UploadListRequest -> Bloc [BlocTransactionResult]
 postUsersUploadList userName addr chainId resolve (UploadListRequest pw contracts msrcs _resolve) = do
   sk <- getAccountSecKey userName pw addr
-  let getSrc c = maybe [] Map.toList msrcs <> uploadlistcontractSrc c
+  let srcMap p = Map.lookup (uploadlistcontractContractName p) =<< msrcs
+      getSrc c = if uploadlistcontractSrc c == mempty
+                   then fromMaybe mempty $ srcMap c
+                   else uploadlistcontractSrc c
       setSrc c = c{uploadlistcontractSrc = getSrc c}
       bclp = ContractListParameters
                addr
@@ -352,33 +362,38 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} sign = do
   let contracts' = map (uploadlistcontractChainid %~ (<|> chainId)) contracts
   txsWithParams <- genNonces cacheNonce fromAddr uploadlistcontractChainid uploadlistcontractTxParams contracts'
   namesCmIdsTxs <- forStateT Map.empty txsWithParams $
-    \(UploadListContract name srcs args params value cid md) -> do
+    \(UploadListContract name srcs mCodePtr args params value cid md) -> do
       (src, cmId, xabi) <-
-       if not (null srcs)
-        then do
-          (cmId', cd) <- fmap snd . lift $ getContractDetailsForContract "SolidVM" srcs (Just name) >>= \case
-            Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
-            Just x -> pure x
-          at name <?= (contractdetailsSrc cd, cmId', contractdetailsXabi cd)
-        else do
-          mtuple <- use $ at name
-          case mtuple of
-            Just (src, cmId', x) -> return (src, cmId', x)
-            Nothing -> do
-              mContract <- lift . blocQueryMaybe $ proc () -> do
-                (_,_,_,_,_,src,cmId',x'') <- getContractsContractLatestQuery name -< ()
-                returnA -< (src,cmId',x'')
-              case mContract of
-                Nothing -> throwIO . UserError $ Text.concat
-                  [ "Upload List (SolidVM): When deploying multiple contract creation transactions, "
-                  , "the contracts' source code must be supplied when using SolidVM. "
-                  , "Please try supplying the contracts' source code and try again. "
-                  , "If you continue to receive this error message, please contact your administrator."
-                  ]
-                Just (src',(cmId' :: Int32),x') -> do
-                  x <- lift $ deserializeXabi x'
-                  src <- lift $ deserializeSrc src'
-                  at name <?= (src, cmId', x)
+       case mCodePtr of
+        Just ptr@(CodeAtAccount _ _) -> lift $ getContractDetailsByCodeHash ptr >>= \case
+          Nothing -> throwIO $ UserError "No contract found for this codePtr in contract creation"
+          Just (cId, details) -> pure (contractdetailsSrc details, cId, contractdetailsXabi details)
+        Just _ -> throwIO $ UserError "Invalid CodePtr in contract creation"
+        Nothing -> do
+          if srcs /= mempty
+           then do
+             (cmId', cd) <- fmap snd . lift $ getContractDetailsForContract "SolidVM" srcs (Just name) >>= \case
+               Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
+               Just x -> pure x
+             at name <?= (contractdetailsSrc cd, cmId', contractdetailsXabi cd)
+           else do
+             mtuple <- use $ at name
+             case mtuple of
+               Just (src, cmId', x) -> return (src, cmId', x)
+               Nothing -> do
+                 mContract <- lift . blocQueryMaybe $ proc () -> do
+                   (_,_,_,_,_,src,cmId',x'') <- getContractsContractLatestQuery name -< ()
+                   returnA -< (src,cmId',x'')
+                 case mContract of
+                   Nothing -> throwIO . UserError $ Text.concat
+                     [ "Upload List (SolidVM): When deploying multiple contract creation transactions, "
+                     , "the contracts' source code must be supplied when using SolidVM. "
+                     , "Please try supplying the contracts' source code and try again. "
+                     , "If you continue to receive this error message, please contact your administrator."
+                     ]
+                   Just (src,(cmId' :: Int32),x') -> do
+                     x <- lift $ deserializeXabi x'
+                     at name <?= (deserializeSourceMap src, cmId', x)
       let xabiArgs = maybe Map.empty funcArgs $ xabiConstr xabi
       (_, argsAsSource) <- lift $ constructArgValuesAndSource (Just args) xabiArgs
 
@@ -389,7 +404,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} sign = do
             fromAddr
             (fromMaybe emptyTxParams params)
             (Wei (maybe 0 fromIntegral $ fmap unStrung value))
-            (Code $ Text.encodeUtf8 $ serializeSrc src)
+            (Code $ Text.encodeUtf8 $ serializeSourceMap src)
             cid
       return ((name,cmId),tx)
   let
@@ -420,8 +435,8 @@ postUsersUploadListEVM' cacheNonce ContractListParameters{..} sign = do
   let contracts' = map (uploadlistcontractChainid %~ (<|> chainId)) contracts
   txsWithParams <- genNonces cacheNonce fromAddr uploadlistcontractChainid uploadlistcontractTxParams contracts'
   namesCmIdsTxs <- forStateT Map.empty txsWithParams $
-    \(UploadListContract name mSrc args params value cid md) -> do
-      when (not $ null mSrc) . lift . throwIO $ UserError evmUploadListError
+    \(UploadListContract name mSrc _ args params value cid md) -> do
+      when (mSrc /= mempty) . lift . throwIO $ UserError evmUploadListError
       mtuple <- use $ at name
       (bin, src, cmId, xabi) <- case mtuple of
         Just (b, src, cmId', x) -> return (b, src, cmId', x)
@@ -432,15 +447,14 @@ postUsersUploadListEVM' cacheNonce ContractListParameters{..} sign = do
           case mContract of
             Nothing -> throwIO $ UserError evmUploadListError
             Just (_,SolidVMCode _ _,_,_,_) -> throwIO $ UserError evmContractSolidVMError
-            Just (b16,_,src',(cmId' :: Int32),x') -> do
+            Just (b16,_,src,(cmId' :: Int32),x') -> do
               let (b, leftOver) = Base16.decode b16
               unless (ByteString.null leftOver) $ throwIO $ AnError "Couldn't decode binary"
               x <- lift $ deserializeXabi x'
-              src <- lift $ deserializeSrc src'
-              at name <?= (b, src, cmId', x)
+              at name <?= (b, deserializeSourceMap src, cmId', x)
       let xabiArgs = maybe Map.empty funcArgs $ xabiConstr xabi
       argsBin <- lift $ constructArgValues (Just args) xabiArgs
-      let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("src", serializeSrc src),("name",name)]
+      let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("src", serializeSourceMap src),("name",name)]
       tx <- lift . signAndPrepare sign fromAddr metadata' $
           TransactionHeader
             Nothing

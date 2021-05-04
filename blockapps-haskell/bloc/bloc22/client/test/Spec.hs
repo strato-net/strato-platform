@@ -59,10 +59,10 @@ setup = do
 
   mgr' <- newManager defaultManagerSettings{managerResponseTimeout=responseTimeoutMicro 60000000}
 
-  simpleStorageSource <- readSolFile "SimpleStorage.sol"
-  testSource <- readSolFile "Test.sol"
-  simpleMappingSource <- readSolFile "SimpleMapping.sol"
-  twoContractsSource <- readSolFile "TwoContracts.sol"
+  simpleStorageSource <- readFileToSourceMap "SimpleStorage.sol"
+  testSource <- readFileToSourceMap "Test.sol"
+  simpleMappingSource <- readFileToSourceMap "SimpleMapping.sol"
+  twoContractsSource <- readFileToSourceMap "TwoContracts.sol"
   putStrLn $ "Using Strato URL: " ++ showBaseUrl strato
   putStrLn $ "Using Bloc URL: " ++ showBaseUrl bloc
   let
@@ -100,7 +100,8 @@ setup = do
     -- postUsersContractRequest1 = PostUsersContractRequest simpleStorage pw
     uploadListContract1 = UploadListContract
       { uploadlistcontractContractName = simpleStorageContractName testConfig
-      , uploadlistcontractSrc = []
+      , uploadlistcontractSrc = mempty
+      , uploadlistcontractCodePtr = Nothing
       , uploadlistcontractArgs = Map.empty
       , _uploadlistcontractTxParams = testTxParams testConfig
       , uploadlistcontractValue = Nothing

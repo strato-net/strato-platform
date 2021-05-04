@@ -36,6 +36,7 @@ import           BlockApps.Solidity.Contract()
 import           BlockApps.Strato.Types                 hiding (Transaction (..))
 import           Blockchain.Strato.Model.ExtendedWord   (Word256, bytesToWord256)
 import           Blockchain.Strato.Model.Secp256k1
+import           Blockchain.Strato.Model.SourceMap
 import           Strato.Strato23.Client
 import           Strato.Strato23.API.Types
 
@@ -92,13 +93,13 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
       addr <- case mAddr of
         Nothing -> fmap unAddress . blocVaultWrapper $ getKey userName Nothing
         Just addr' -> return addr'
-      let src' :: ContractPayload -> Maybe [(Text, Text)]
-          src' p = case contractpayloadSrc p of
-                   [] -> Nothing
-                   ys -> Just ys
-          srcMap :: ContractPayload -> Maybe [(Text, Text)]
-          srcMap p = fmap unSourceMap . join $ liftA2 Map.lookup (contractpayloadContract p) msrcs
-          getSrc p = fromMaybe [] $ src' p <|> srcMap p
+      let src' :: ContractPayload -> Maybe SourceMap
+          src' p = if contractpayloadSrc p == mempty
+                     then Nothing
+                     else Just $ contractpayloadSrc p
+          srcMap :: ContractPayload -> Maybe SourceMap
+          srcMap p = join $ liftA2 Map.lookup (contractpayloadContract p) msrcs
+          getSrc p = fromMaybe mempty $ src' p <|> srcMap p
       fmap join . forM (partitionWith transactionType txs') $ \(ttype, txs) -> case ttype of
         TRANSFER -> case txs of
           [] -> return []
@@ -129,6 +130,7 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
                 bcp = ContractParameters
                         addr
                         (getSrc p)
+                        (contractpayloadCodePtr p)
                         (contractpayloadContract p)
                         (contractpayloadArgs p)
                         (contractpayloadValue p)
@@ -146,13 +148,14 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
           xs -> do
             ps <- mapM fromContract xs
             uploadListContract <-
-                forM ps $ \p@(ContractPayload _ maybeC a v x cid m) -> do
+                forM ps $ \p@(ContractPayload _ maybeCodePtr maybeC a v x cid m) -> do
                   c <- case maybeC of
                          Nothing -> throwIO $ UserError $ Text.pack $ "missing contract source"
                          Just c' -> return c'
                   return $
                     UploadListContract c
                                        (getSrc p)
+                                       (maybeCodePtr)
                                        (fromMaybe Map.empty a)
                                        (mergeTxParams x txParams)
                                        v cid m
@@ -199,13 +202,13 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
           [] -> return []
           xs -> do
             chainInputs <- traverse fromGenesis xs
-            let chainInputSrc :: ChainInput -> Maybe [(Text, Text)]
-                chainInputSrc p = case chaininputSrc p of
-                               [] -> Nothing
-                               ys -> Just ys
-                chainInputSrcMap :: ChainInput -> Maybe [(Text, Text)]
-                chainInputSrcMap p = fmap unSourceMap . join $ liftA2 Map.lookup (chaininputContract p) msrcs
-                hydrate p = p{ chaininputSrc = fromMaybe [] $ chainInputSrc p <|> chainInputSrcMap p }
+            let chainInputSrc :: ChainInput -> Maybe SourceMap
+                chainInputSrc p = if chaininputSrc p == mempty
+                                    then Nothing
+                                    else Just $ chaininputSrc p
+                chainInputSrcMap :: ChainInput -> Maybe SourceMap
+                chainInputSrcMap p = join $ liftA2 Map.lookup (chaininputContract p) msrcs
+                hydrate p = p{ chaininputSrc = fromMaybe mempty $ chainInputSrc p <|> chainInputSrcMap p }
             fmap (fmap BlocChainResult) . postChainInfos $ hydrate <$> chainInputs
   where fromTransfer = \case
           BlocTransfer t -> return t

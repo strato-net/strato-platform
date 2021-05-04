@@ -90,11 +90,11 @@ createChainInfo creationBlockHash (ChainInput src mCodePtr cname lbl balances ch
   let md = fromMaybe Map.empty mmd
       theVM = fromMaybe "EVM" $ Map.lookup "VM" md
   mContract <-
-    if not $ null src
+    if src /= mempty
       then fmap snd <$> getContractDetailsForContract theVM src cname
       else case mCodePtr of
         Just codePtr -> getContractDetailsByCodeHash codePtr
-        Nothing -> fmap snd <$> getContractDetailsForContract theVM [] cname
+        Nothing -> fmap snd <$> getContractDetailsForContract theVM mempty cname
   (cAcctInfo, codeInfo, metaData) <- case mContract of
       Nothing -> return ([],[], md)
       Just (_, ContractDetails{..}) -> do
