@@ -46,6 +46,7 @@ module Blockchain.SolidVM.SM (
 
 import           Control.Applicative ((<|>))
 import           Control.Lens hiding (Context)
+import           Control.Monad.Catch (MonadCatch)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import           Control.Monad.IO.Class
@@ -154,6 +155,7 @@ type MonadSM m = ( (Account `A.Alters` AddressState) m
                  , Mod.Modifiable (Q.Seq Event) m
                  , Mod.Modifiable (Maybe DebugSettings) m
                  , MonadIO m --todo: remove
+                 , MonadCatch m
                  , MonadLogger m
                  )
 
@@ -473,19 +475,19 @@ addCallInfo a c fn hsh cc initialLocalVariables ro = do
 
   Mod.modify_ (Mod.Proxy @[CallInfo]) $ pure . (newCallInfo:)
 
-dupCallInfo :: MonadSM m => m ()
-dupCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
+dupCallInfo :: MonadSM m => Bool -> m ()
+dupCallInfo ro = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
   [] -> internalError "dupCallInfo was called on an already empty stack" ()
-  (ci:rest) -> pure $ ci:ci:rest
+  (ci:rest) -> pure $ ci{readOnly=ro}:ci:rest
 
 popCallInfo :: MonadSM m => m ()
 popCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
   [] -> internalError "popCallInfo was called on an already empty stack" ()
   (_:rest) -> pure rest
 
-withTempCallInfo :: MonadSM m => m a -> m a
-withTempCallInfo f = do
-  dupCallInfo
+withTempCallInfo :: MonadSM m => Bool -> m a -> m a
+withTempCallInfo ro f = do
+  dupCallInfo ro
   result <- f
   popCallInfo
   pure result

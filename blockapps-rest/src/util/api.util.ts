@@ -4,6 +4,7 @@ import ax from "../axios-wrapper";
 import { RestError } from "./rest.util";
 import { Options, OAuthUser } from "../types";
 
+const apexUrl = "/apex-api";
 const blocUrl = "/bloc/v2.2";
 const strato12Url = "/strato-api/eth/v1.2";
 const strato23Url = "/strato/v2.3";
@@ -12,6 +13,8 @@ const externalStorageUrl = "/apex-api/bloc/file";
 const debugUrl = "/vm-debug";
 
 const Endpoint = {
+  HEALTH: `/health`,
+  STATUS: `${apexUrl}/status`,
   ACCOUNT: `${strato12Url}/account`,
   VERSION: `${strato12Url}/version`,
   USER: `${blocUrl}/users/:username`,
@@ -40,7 +43,8 @@ const Endpoint = {
   DEBUG_STEP_OUT: `${debugUrl}/step-out`,
   DEBUG_STACK_TRACE: `${debugUrl}/stack-trace`,
   DEBUG_VARIABLES: `${debugUrl}/variables`,
-  DEBUG_WATCHES: `${debugUrl}/watches`
+  DEBUG_WATCHES: `${debugUrl}/watches`,
+  DEBUG_EVAL: `${debugUrl}/eval`
 };
 
 function constructEndpoint(endpointTemplate, options:Options, params = {}) {

@@ -11,13 +11,13 @@ export class NodesProvider implements vscode.TreeDataProvider<Node> {
     return element;
   }
 
-  getChildren(element?: Node): Thenable<Node[]> {
+  async getChildren(element?: Node): Promise<Node[]> {
     if (element) {
-        return this.getNodeVersion(element).then((node) => {
-          const entries = Object.entries(node)
-          const items = entries.map((e) => new Node({label: `${e[0]}`, tooltip: `${e[1]}`, description: `${e[1]}`}, vscode.TreeItemCollapsibleState.None))
-          return items;
-        });
+      const node = await this.getNodeVersion(element);
+      if (!node) return []
+      const entries = Object.entries(node)
+      const items = entries.map((e) => new Node({label: `${e[0]}`, tooltip: `${JSON.stringify(e[1])}`, description: `${JSON.stringify(e[1])}`}, vscode.TreeItemCollapsibleState.None))
+      return items;
     } else {
       return this.getNodes();
     }
@@ -28,9 +28,9 @@ export class NodesProvider implements vscode.TreeDataProvider<Node> {
     const options = { config };
     try {
       const results:any[] = []
-      const user = await getApplicationUser()
-      const  { monostrato } = await rest.getVersion(user, options)
-      return monostrato;
+      const user = await getApplicationUser(node.id)
+      const res = await rest.getStatus(user, { ...options, node: node.id })
+      return res;
     } catch(e) {
       console.log(e)
       return undefined
@@ -40,7 +40,15 @@ export class NodesProvider implements vscode.TreeDataProvider<Node> {
   async getNodesInternal(): Promise<any[]> {
     const config = getConfig() || {}
     const nodes = config.nodes || []
-    return nodes
+    const filledNodes = await Promise.all(nodes.map(async (element) => {
+      try {
+        const node = await this.getNodeVersion(element);
+        return { ...element, ...node };
+      } catch {
+        return element
+      }
+    }));
+    return filledNodes
   }
 
   /**
@@ -50,9 +58,12 @@ export class NodesProvider implements vscode.TreeDataProvider<Node> {
     const nodes = await this.getNodesInternal();
 
     const toDep = (dep: any): Node => {
+      const connected = dep && dep.healthInfo
+      const prefix = connected ? (connected.isHealthy ? '✅ ' : '❌ ') : '📴 ';
+      const prefixedLabel = `${prefix}${dep.label}`;
       return new Node(
-        {tooltip: dep.url, description: dep.url, ...dep},
-        vscode.TreeItemCollapsibleState.Collapsed
+        { ...dep, label: prefixedLabel, tooltip: dep.url, description: dep.url },
+        connected ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None
       );
     };
 
@@ -75,12 +86,14 @@ export class NodesProvider implements vscode.TreeDataProvider<Node> {
 
 class Node extends vscode.TreeItem {
   _node: any;
+  id: any;
   constructor(
     public readonly node: any,
     public readonly collapsibleState: vscode.TreeItemCollapsibleState
   ) {
     super(node.label, collapsibleState);
     this._node = node;
+    this.id = node.id;
     this.tooltip = node.tooltip;
     this.description = node.description;
   }
