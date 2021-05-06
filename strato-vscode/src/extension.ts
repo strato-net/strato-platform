@@ -29,11 +29,6 @@ export function activate(context: vscode.ExtensionContext) {
 			placeHolder: 'E.g. http://production-node.blockapps.net:8080',
 			prompt: 'URL to STRATO Production Node'
 		});
-		// console.log(process.cwd());
-		// console.log(__dirname);
-		// const uploadScript = fs.readFileSync('testupload.sh', 'utf8');
-		// console.log('here is the uploadedscript', uploadScript);
-		// const updatedScript = uploadScript.replace(/\[TEST_NODE\]/g, input || '');
 
 		const options: vscode.OpenDialogOptions = {
 			canSelectMany: false,
@@ -60,19 +55,19 @@ export function activate(context: vscode.ExtensionContext) {
 		terminal.show()
 		terminal.sendText(cmdStr, true)
 		const numFolders = (vscode.workspace.workspaceFolders || []).length;
-		console.log('here is workspacefolderuri', workspaceFolderUri);
         vscode.workspace.updateWorkspaceFolders(0, numFolders, { uri: workspaceFolderUri });
+		
 		fs.readFile(process.cwd()+'/resources/testupload.sh', 'utf8', function(err,data) {
 			if (err) {
 				return console.log(err);
 			}
 			let result = data.replace(/\[TEST_NODE\]/g, testInput || '[TEST_NODE]')
-							 .replace(/\[PROD_NODE\]/g, prodInput || '[PROD_NODE');
+							 .replace(/\[PROD_NODE\]/g, prodInput || '[PROD_NODE]');
 
-			fs.writeFile(process.cwd()+'/resources/testupload.sh', result, 'utf8', function(err){
-				if (err) return console.log(err);
-			})
-			fs.writeFile(workspaceFolderUri.path+'/testupload1.sh', result, 'utf8', function(err){
+			// fs.writeFile(process.cwd()+'/resources/testupload.sh', result, 'utf8', function(err){
+			// 	if (err) return console.log(err);
+			// })
+			fs.writeFile(workspaceFolderUri.path+'/testupload.sh', result, 'utf8', function(err){
 				if (err) return console.log(err);
 			})
 		})
