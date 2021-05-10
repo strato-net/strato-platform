@@ -2,7 +2,9 @@ ARG STACK_RESOLVER
 
 FROM fpco/stack-build:${STACK_RESOLVER}
 
-RUN apt-get update && \
+# apt-key adv line is the fix for `The repository 'https://packages.confluent.io/deb/5.2 stable InRelease' is not signed.` error (started happening 05/06/2021)
+RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 8B1DA6120C2BF624 && \ 
+    apt-get update && \
     apt-get -y --allow-unauthenticated install autoconf libtool libblas-dev liblapack-dev libsodium-dev jq vim && \
     apt-get autoremove && \
     rm -rf /var/lib/apt/lists/* && \
