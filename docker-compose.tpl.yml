@@ -258,6 +258,7 @@ services:
     - wireMessageCacheSize=${wireMessageCacheSize}
     - wsDebug=${wsDebug}
     - zkHost=zookeeper
+    - EVM_COMPATIBLE=${EVM_COMPATIBLE}
     build: .
     image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>}
     ports:
