@@ -209,14 +209,19 @@ create' creator newAccount ch cc contractName' argExps = do
         Nothing -> pure Nothing
   mParentCodePtr' <- mParentCodePtr
   let thePtr = case mParentCodePtr' of
+                    Just s@(SolidVMCode _ _)  -> pure $ Just s
+                    Just acc@(CodeAtAccount _ _) -> resolveCodePtrParent Nothing acc
+                    _  -> pure Nothing
+  thePtr' <- thePtr
+  let thePtr'' = case thePtr' of
                     Just (SolidVMCode name _) -> Just name
                     _                         -> Nothing
-      parentName' = fromMaybe "" thePtr
+      parentName' = fromMaybe "" thePtr''
   initializeActionCreate creator newAccount contractName' parentName' ch
 
   A.adjustWithDefault_ (A.Proxy @AddressState) newAccount $ \newAddressState ->
     pure newAddressState{ addressStateContractRoot = MP.emptyTriePtr
-                        , addressStateCodeHash = SolidVMCode contractName' ch
+                        , addressStateCodeHash = if (contractName' /= parentName' && not (null parentName')) then CodeAtAccount creator contractName' else SolidVMCode contractName' ch
                         }
 
   onTraced $ liftIO $ putStrLn $ C.red $ "Creating Contract: " ++ show newAccount ++ " of type " ++ contractName'
@@ -353,6 +358,13 @@ getCodeAndCollection address' = do
         Just (SolidVMCode cn ch') -> do
           cc' <- codeCollectionFromHash ch'
           return (cn, ch', cc')
+        Just cp'@(CodeAtAccount _ _) -> do
+            cp <- resolveCodePtr Nothing cp'
+            case cp of
+                Just (SolidVMCode cn ch') -> do
+                    cc' <- codeCollectionFromHash ch'
+                    return (cn, ch', cc')
+                _ -> error "this is our error!"
         Just ch -> internalError "SolidVM for non-solidvm code" (format ch)
         Nothing -> missingCodeCollection "SolidVM for non-existent code" (format codeHash)
 
@@ -435,11 +447,17 @@ callWrapper from to mContract functionName argExps = do
         Nothing -> pure Nothing
   mParentCodePtr' <- mParentCodePtr
   let thePtr = case mParentCodePtr' of
+                    Just s@(SolidVMCode _ _)  -> pure $ Just s
+                    Just acc@(CodeAtAccount _ _) -> resolveCodePtrParent Nothing acc
+                    _  -> pure Nothing
+  thePtr' <- thePtr
+  let thePtr'' = case thePtr' of
                     Just (SolidVMCode name _) -> Just name
                     _                         -> Nothing
-      parentName' = fromMaybe "" thePtr
+      parentName' = fromMaybe "" thePtr''
   let contract = fromMaybe contract' $ mContract >>= \c -> M.lookup c $ _contracts cc
-  initializeActionCall to (_contractName contract) parentName' hsh
+      parentName'' = if parentName' == (_contractName contract) then "" else parentName'
+  initializeActionCall to (_contractName contract) parentName'' hsh
 
   let functionsIncludingConstructor =
         case contract^.constructor of

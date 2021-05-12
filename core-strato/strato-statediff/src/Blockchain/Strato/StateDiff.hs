@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveGeneric          #-}
 {-# LANGUAGE TypeOperators          #-}
+{-# LANGUAGE TypeApplications       #-}
 {-# OPTIONS_GHC -fno-warn-orphans   #-}
 module Blockchain.Strato.StateDiff
     ( StateDiff(..)
@@ -30,7 +31,8 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 
 import           Control.Applicative
-import           Control.Monad.Change
+import           Control.Monad.Change                        (Alters)
+import           Control.Monad.Change                        as A
 import           Data.ByteString                             (ByteString)
 import qualified Data.ByteString                             as B
 import           Data.Function
@@ -179,15 +181,17 @@ chainDiff chainId newBlockNum newBlockHash = do
 
 stateDiff :: ( HasCodeDB m
              , HasHashDB m
+             , HasStateDB m
              , Modifiable BestBlockRoot m
-             , (MP.StateRoot `Alters` MP.NodeData) m
              , (Account `Alters` AddressState) m
              ) 
           => Maybe Word256 -> Integer -> Keccak256 -> StateRoot -> StateRoot -> m StateDiff
 stateDiff chainId blockNumber blockHash oldRoot newRoot = do
   putChainBestBlock chainId blockHash blockNumber
   diffs <- Diff.dbDiff oldRoot newRoot
-  collectModes diffs $
+  mOldSR <- A.lookup (A.Proxy @MP.StateRoot) chainId
+  A.insert (A.Proxy @MP.StateRoot) chainId newRoot
+  diff <- collectModes diffs $
     \createdAccounts deletedAccounts updatedAccounts ->
       StateDiff
         chainId
@@ -197,7 +201,8 @@ stateDiff chainId blockNumber blockHash oldRoot newRoot = do
         createdAccounts
         deletedAccounts
         updatedAccounts
-
+  A.alter_ (A.Proxy @MP.StateRoot) chainId $ pure . const mOldSR
+  pure diff
   where
     collectModes diffs f = do
       (c, d, u) <- coll [] [] [] diffs
