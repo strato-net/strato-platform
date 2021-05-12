@@ -433,19 +433,13 @@ callWrapper from to mContract functionName argExps = do
   let mParentCodePtr = case mAddressState of
         Just cp -> resolveCodePtrParent Nothing $ addressStateCodeHash cp
         Nothing -> pure Nothing
-      mOtherTo = case mAddressState of
-        Just cp -> case addressStateCodeHash cp of
-                        CodeAtAccount a _ -> pure $ Just a 
-                        _                -> pure Nothing
-        Nothing -> pure Nothing
   mParentCodePtr' <- mParentCodePtr
-  mOtherTo' <- mOtherTo
   let thePtr = case mParentCodePtr' of
                     Just (SolidVMCode name _) -> Just name
                     _                         -> Nothing
       parentName' = fromMaybe "" thePtr
   let contract = fromMaybe contract' $ mContract >>= \c -> M.lookup c $ _contracts cc
-  initializeActionCall (fromMaybe to mOtherTo') (_contractName contract) parentName' hsh
+  initializeActionCall to (_contractName contract) parentName' hsh
 
   let functionsIncludingConstructor =
         case contract^.constructor of
