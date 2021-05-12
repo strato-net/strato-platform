@@ -743,7 +743,12 @@ runStatement st@(Xabi.EmitStatement eventName exptups pos) = do
       else do
         maybeCert <- x509CertDBGet $ _accountAddress $ currentAccount curInfo
         let organization = fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
-        addEvent $ Event organization "" (_contractName curCnct) (currentAccount curInfo) eventName expStrs
+        myAction <- Mod.get (Mod.Proxy @Action)
+        let actionData' = M.lookup (currentAccount curInfo) (_actionData myAction)
+            appName = case actionData' of
+                            Just aD -> _actionDataApplication aD 
+                            Nothing -> ""
+        addEvent $ Event organization (T.unpack appName) (_contractName curCnct) (currentAccount curInfo) eventName expStrs
         return Nothing
 
 
