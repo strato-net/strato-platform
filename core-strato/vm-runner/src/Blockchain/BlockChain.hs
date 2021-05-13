@@ -819,7 +819,6 @@ completeDiff :: ( MonadLogger m
                 , (MP.StateRoot `A.Alters` MP.NodeData) m
                 , (Account `A.Alters` AddressState) m
                 , (Maybe Word256 `A.Alters` MP.StateRoot) m
-                -- , (N.NibbleString `A.Alters` N.NibbleString) m
                 , HasMemRawStorageDB m
                 , (RawStorageKey `A.Alters` RawStorageValue) m
                 )
