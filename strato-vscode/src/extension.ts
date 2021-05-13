@@ -1,6 +1,7 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
+import * as fs from 'fs';
 import { DeploymentsProvider } from './deployments';
 import { NodesProvider } from './nodes';
 import { ProjectActionProvider } from './project';
@@ -17,13 +18,25 @@ export function activate(context: vscode.ExtensionContext) {
 	// Now provide the implementation of the command with registerCommand
 	// The commandId parameter must match the command field in package.json
 	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.createProject', async () => {
+		const testInput = await vscode.window.showInputBox({
+			ignoreFocusOut: true,
+			placeHolder: 'E.g. http://test-node.blockapps.net:8080',
+			prompt: 'URL to STRATO Test Node'
+		});
+
+		const prodInput = await vscode.window.showInputBox({
+			ignoreFocusOut: true,
+			placeHolder: 'E.g. http://production-node.blockapps.net:8080',
+			prompt: 'URL to STRATO Production Node'
+		});
+
 		const options: vscode.OpenDialogOptions = {
 			canSelectMany: false,
 			openLabel: 'Select',
 			canSelectFiles: false,
 			canSelectFolders: true
 		};
-	   
+
 	   const folderUri = await vscode.window.showOpenDialog(options);
 		if (folderUri && folderUri[0]) {
 		  console.log('Selected folder: ' + folderUri[0].fsPath);
@@ -43,6 +56,21 @@ export function activate(context: vscode.ExtensionContext) {
 		terminal.sendText(cmdStr, true)
 		const numFolders = (vscode.workspace.workspaceFolders || []).length;
         vscode.workspace.updateWorkspaceFolders(0, numFolders, { uri: workspaceFolderUri });
+		
+		fs.readFile(process.cwd()+'/resources/testupload.sh', 'utf8', function(err,data) {
+			if (err) {
+				return console.log(err);
+			}
+			let result = data.replace(/\[TEST_NODE\]/g, testInput || '[TEST_NODE]')
+							 .replace(/\[PROD_NODE\]/g, prodInput || '[PROD_NODE]');
+
+			// fs.writeFile(process.cwd()+'/resources/testupload.sh', result, 'utf8', function(err){
+			// 	if (err) return console.log(err);
+			// })
+			fs.writeFile(workspaceFolderUri.path+'/testupload.sh', result, 'utf8', function(err){
+				if (err) return console.log(err);
+			})
+		})
 	}));
 	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.deployProject', () => {
         const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.deployProjectCommand') || '';
@@ -52,7 +80,6 @@ export function activate(context: vscode.ExtensionContext) {
 		    terminal.show()
 		    terminal.sendText(cmd, true)
 		}
-        vscode.commands.executeCommand('deployments.refreshEntry');
 	}));
 	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.runServer', () => {
         const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.runServerCommand') || '';

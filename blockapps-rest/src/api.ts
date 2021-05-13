@@ -109,6 +109,18 @@ async function getAccounts(user:OAuthUser, options:Options) {
   return get(url, endpoint, setAuthHeaders(user, options));
 }
 
+
+async function getHealth(user:OAuthUser, options:Options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.HEALTH, options);
+  return get(url, endpoint, setAuthHeaders(user, options));
+}
+async function getStatus(user:OAuthUser, options:Options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.STATUS, options);
+  return get(url, endpoint, setAuthHeaders(user, options));
+}
+
 async function getVersion(user:OAuthUser, options:Options) {
   const url = getNodeUrl(options);
   const endpoint = constructEndpoint(Endpoint.VERSION, options);
@@ -440,8 +452,16 @@ async function debugClearWatches(user:OAuthUser, options:Options) {
   return httpDelete(url, endpoint, [], setAuthHeaders(user, options));
 }
 
+async function debugPostEval(user:OAuthUser, args, options:Options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.DEBUG_EVAL, options);
+  return post(url, endpoint, args, setAuthHeaders(user, options));
+}
+
 export default {
   getAccounts,
+  getHealth,
+  getStatus,
   getVersion,
   getBalance,
   createUser,
@@ -487,5 +507,6 @@ export default {
   debugGetWatches,
   debugPutWatches,
   debugDeleteWatches,
-  debugClearWatches
+  debugClearWatches,
+  debugPostEval
 };

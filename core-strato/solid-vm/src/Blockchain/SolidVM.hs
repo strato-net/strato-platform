@@ -21,11 +21,14 @@ module Blockchain.SolidVM
   , create
   ) where
 
+import           Control.DeepSeq                      (force)
 import           Control.Lens hiding (assign, from, to, Context)
 import           Control.Monad
 import qualified Control.Monad.Change.Alter           as A
 import qualified Control.Monad.Change.Modify          as Mod
 import           Control.Monad.IO.Class
+import qualified Control.Monad.Catch                  as EUnsafe
+import           Data.Bifunctor                       (bimap)
 import           Data.Bits
 import           Data.Bool                            (bool)
 import           Data.ByteString                      (ByteString)
@@ -49,7 +52,7 @@ import           Data.Traversable
 import qualified Data.Vector as V
 import           Debugger
 import           GHC.Exts                             hiding (breakpoint)
-import           Text.Parsec (ParseError, runParser)
+import           Text.Parsec                          (runParser)
 import           Text.Printf
 import           Text.Read (readMaybe)
 
@@ -139,10 +142,20 @@ instance MonadSM m => Mod.Accessible [SourcePos] m where
     cis <- Mod.get (Mod.Proxy @[CallInfo])
     pure $ fromMaybe (initialPos "") . currentSourcePos <$> cis
 
-runExpr :: MonadSM m => T.Text -> m (Either ParseError T.Text)
-runExpr exprText = withoutDebugging $ do
+runExpr :: MonadSM m => EvaluationRequest -> m EvaluationResponse
+runExpr exprText = withoutDebugging . withTempCallInfo True $ do -- TODO: allow write access once we figure out how to discard changes
   let eExpr = runParser expression "" "" (T.unpack exprText)
-  withoutDebugging $ traverse (pure . T.pack <=< showSM <=< getVar <=< expToVar) eExpr
+  case eExpr of
+    Left pe -> pure . Left . T.pack $ show pe
+    Right expr -> do
+      eRes <- EUnsafe.try $ do
+        var <- expToVar expr
+        val <- getVar var
+        str <- showSM val
+        case (force str) of -- stupid code to get lazy exceptions to be thrown within the try block
+          [] -> pure []
+          xs -> pure xs
+      pure $ bimap (T.pack . showSolidException) T.pack eRes
 
 solidVMBreakpoint :: MonadSM m => SourcePos -> m ()
 solidVMBreakpoint pos = do

@@ -410,6 +410,30 @@ async function getAccounts(user:OAuthUser, options:Options) {
   }
 }
 
+async function getHealth(user:OAuthUser, options:Options) {
+  try {
+    return await api.getHealth(user, { ...options, isAsync: true });
+  } catch (err) {
+    throw new RestError(
+      RestStatus.BAD_REQUEST,
+      err.response.statusText || err.response || err,
+      err.response.data || err.response || err
+    );
+  }
+}
+
+async function getStatus(user:OAuthUser, options:Options) {
+  try {
+    return await api.getStatus(user, { ...options, isAsync: true });
+  } catch (err) {
+    throw new RestError(
+      RestStatus.BAD_REQUEST,
+      err.response.statusText || err.response || err,
+      err.response.data || err.response || err
+    );
+  }
+}
+
 async function getVersion(user:OAuthUser, options:Options) {
   try {
     return await api.getVersion(user, { ...options, isAsync: true });
@@ -1569,6 +1593,11 @@ async function debugClearWatches(user:OAuthUser, options:Options) {
   return response;
 }
 
+async function debugPostEval(user:OAuthUser, args, options:Options) {
+  const response = await api.debugPostEval(user, args, options);
+  return response;
+}
+
 // =====================================================================
 //   Common patterns used in applications
 // =====================================================================
@@ -1629,6 +1658,8 @@ async function waitForAddress(user, contract, _options:Options) {
 export default {
   fill,
   getAccounts,
+  getHealth,
+  getStatus,
   getVersion,
   createUser,
   compileContracts,
@@ -1685,6 +1716,7 @@ export default {
   debugPutWatches,
   debugDeleteWatches,
   debugClearWatches,
+  debugPostEval,
   //
   RestError,
   response,
