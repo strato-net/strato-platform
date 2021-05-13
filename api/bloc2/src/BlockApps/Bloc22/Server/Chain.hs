@@ -164,12 +164,16 @@ postChainInfo :: (MonadIO m, MonadLogger m, HasBlocSQL m,
                   HasBlocEnv m, HasSQL m, HasCoreAPI m) =>
                  ChainInput -> m ChainId
 postChainInfo chainInput = withLastBlockHash $ \bHash -> do
-  (mCmId, chainInfo') <- createChainInfo bHash chainInput
-  chainId <- CORE.postChain chainInfo'
-  let isAsync = fromMaybe False $ chaininputAsync chainInput
-  unless isAsync $ waitForChainInfo chainId
-  for_ mCmId $ \cmId -> insertContractInstance cmId $ Account governanceAddress (Just $ unChainId chainId)
-  return chainId
+  evmCompatibleOn <- fmap evmCompatible getBlocEnv
+  if evmCompatibleOn
+      then throwIO $ UserError $ Text.pack "Error: EVM Compatibility flag is On. Private chains cannot be used."
+  else do
+      (mCmId, chainInfo') <- createChainInfo bHash chainInput
+      chainId <- CORE.postChain chainInfo'
+      let isAsync = fromMaybe False $ chaininputAsync chainInput
+      unless isAsync $ waitForChainInfo chainId
+      for_ mCmId $ \cmId -> insertContractInstance cmId $ Account governanceAddress (Just $ unChainId chainId)
+      return chainId
 
 postChainInfos :: (MonadIO m, MonadLogger m, HasBlocSQL m,
                    HasSQL m, HasBlocEnv m, HasCoreAPI m) =>
