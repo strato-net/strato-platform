@@ -1,5 +1,5 @@
 module Debugger
-  ( module Debugger.Executable
+  ( module Debugger.Init
   , module Debugger.Rest
   , module Debugger.Server
   , module Debugger.Types
@@ -10,7 +10,7 @@ module Debugger
   , flags_debugWSPort
   ) where
 
-import Debugger.Executable
+import Debugger.Init
 import Debugger.Options
 import Debugger.Rest
 import Debugger.Server

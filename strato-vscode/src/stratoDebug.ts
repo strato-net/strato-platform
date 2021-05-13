@@ -59,7 +59,8 @@ export class StratoDebugSession extends LoggingDebugSession {
 	private _showHex = false;
 	private _useInvalidatedEvent = false;
 
-    private _ws = new WebSocket("ws://localhost:8080/ws-debug/")
+	private _initialized = false;
+    private _ws;
 	private _status = undefined;
 	private _user;
     private _options;
@@ -71,6 +72,22 @@ export class StratoDebugSession extends LoggingDebugSession {
 	 */
 	public constructor() {
 		super("strato-debug.txt");
+		this.setDebuggerLinesStartAt1(true);
+		this.setDebuggerColumnsStartAt1(true);
+	}
+
+	public async initialize() {
+		this._initialized = true;
+		const { user, options } = await this.getUserAndOptionsInternal()
+		const { config } = options
+		const { nodes } = config
+		var token = user.token;
+        var wsOptions = {
+            headers: {
+                "Authorization" : "Bearer " + token
+            }
+        };
+        this._ws = new WebSocket(`${nodes[0].url}/vm-debug-ws/`, wsOptions);
         this._ws.on('message', (bytes) => {
            const message = JSON.parse(bytes.toString('utf-8'));
 		   if(message.tag === 'WSOStatus') {
@@ -93,8 +110,6 @@ export class StratoDebugSession extends LoggingDebugSession {
 		   }
            console.log(`From websocket: ${message}`)
         });
-		this.setDebuggerLinesStartAt1(true);
-		this.setDebuggerColumnsStartAt1(true);
 	}
 
 	/**
@@ -117,7 +132,7 @@ export class StratoDebugSession extends LoggingDebugSession {
 		response.body.supportsConfigurationDoneRequest = true;
 
 		// make VS Code use 'evaluate' when hovering over source
-		response.body.supportsEvaluateForHovers = false;
+		response.body.supportsEvaluateForHovers = true;
 
 		// make VS Code support data breakpoints
 		response.body.supportsDataBreakpoints = true;
@@ -128,6 +143,9 @@ export class StratoDebugSession extends LoggingDebugSession {
 
 		// make VS Code send cancelRequests
 		response.body.supportsCancelRequest = true;
+
+		// make VS Code send terminateRequests
+		response.body.supportsTerminateRequest = true;
 
 		// make VS Code send the breakpointLocations request
 		response.body.supportsBreakpointLocationsRequest = true;
@@ -163,7 +181,7 @@ export class StratoDebugSession extends LoggingDebugSession {
 		this.sendEvent(new InitializedEvent());
 	}
 
-	protected async getUserAndOptions(): Promise<any> {
+	private async getUserAndOptionsInternal(): Promise<any> {
 		if (!this._user) {
 		    this._user = await getApplicationUser()
 		}
@@ -172,6 +190,13 @@ export class StratoDebugSession extends LoggingDebugSession {
             this._options = { config };
 		}
 		return { user: this._user, options: this._options }
+	}
+
+	protected async getUserAndOptions(): Promise<any> {
+		if (!this._initialized) {
+			await this.initialize();
+		}
+        return this.getUserAndOptionsInternal();
 	}
 
 	/**
@@ -222,9 +247,9 @@ export class StratoDebugSession extends LoggingDebugSession {
 		const bps = clientLines.map((l) => ({
 			tag: "UnconditionalBP",
 			contents: {
-				breakpointFile: file,
-				breakpointLine: l,
-				breakpointColumn: 1
+				name: file,
+				line: l,
+				column: 1
 			}
 		}))
 
@@ -334,16 +359,16 @@ export class StratoDebugSession extends LoggingDebugSession {
 		const endFrame = startFrame + maxLevels;
 		const { user, options } = await this.getUserAndOptions();
 		// wait until configuration has finished (and configurationDoneRequest has been called)
-		await this._configurationDone.wait(1000);
+		// await this._configurationDone.wait(1000);
 
         const stk = await rest.debugGetStackTrace(user, options)
 
 		const stackFrames: StackFrame[] = []
 		for (let i = 0; i < stk.length; i++) {
 			const f = stk[i];
-			const source = await this.createSourceFromFilename(f.breakpointFile)
-			const sf = new StackFrame(i, f.breakpointFile, source, this.convertDebuggerLineToClient(f.breakpointLine));
-			sf.column = this.convertDebuggerColumnToClient(f.breakpointColumn);
+			const source = await this.createSourceFromFilename(f.name)
+			const sf = new StackFrame(i, f.name, source, this.convertDebuggerLineToClient(f.line));
+			sf.column = this.convertDebuggerColumnToClient(f.column);
 			stackFrames.push(sf);
 		}
 		response.body = {
@@ -360,8 +385,8 @@ export class StratoDebugSession extends LoggingDebugSession {
 
 		response.body = {
 			scopes: [
-			   new Scope("Local", this._variableHandles.create("local"), false),
-			// new Scope("Global", this._variableHandles.create("global"), true)
+			   new Scope("Local Variables", this._variableHandles.create("local"), false),
+			   new Scope("State Variables", this._variableHandles.create("state"), true)
 			]
 		};
 		this.sendResponse(response);
@@ -371,16 +396,27 @@ export class StratoDebugSession extends LoggingDebugSession {
 
 		const variables: DebugProtocol.Variable[] = [];
 		// wait until configuration has finished (and configurationDoneRequest has been called)
-		await this._configurationDone.wait(1000);
+		// await this._configurationDone.wait(1000);
 		const { user, options } = await this.getUserAndOptions();
-        const res = await rest.debugGetVariables(user, options)
-		Object.entries(res).forEach((entry) => {
-			variables.push({
-				name: entry[0],
-				type: "string",
-				value: `${entry[1]}`,
-				variablesReference: 0
-			})
+        const ress = await rest.debugGetVariables(user, options)
+		// TODO: Find out how to use the scopes to organize the variables
+		const id = this._variableHandles.get(args.variablesReference);
+		let res = {}
+		if (id === 'local') {
+		  res = {...ress['Local Variables']}
+		} else if (id === 'state') {
+		  res = {...ress['State Variables']}
+		}
+		Object.entries(res).forEach((entry:any) => {
+			const { Right: val } = entry[1] || {}
+			if (val) {
+			  variables.push({
+			  	name: entry[0],
+			  	type: "string",
+			  	value: `${val}`,
+			  	variablesReference: 0
+			  })
+		    }
 		})
 
 		response.body = {
@@ -427,46 +463,31 @@ export class StratoDebugSession extends LoggingDebugSession {
 	}
 
 	protected async evaluateRequest(response: DebugProtocol.EvaluateResponse, args: DebugProtocol.EvaluateArguments): Promise<void> {
-
-		let reply: string | undefined = undefined;
-
-		response.body = {
-			result: reply ? reply : `evaluate(context: '${args.context}', '${args.expression}')`,
-			variablesReference: 0
-		};
-		this.sendResponse(response);
-	}
-
-	private async progressSequence() {
-
-		const ID = '' + this._progressId++;
-
-		await timeout(100);
-
-		const title = this._isProgressCancellable ? 'Cancellable operation' : 'Long running operation';
-		const startEvent: DebugProtocol.ProgressStartEvent = new ProgressStartEvent(ID, title);
-		startEvent.body.cancellable = this._isProgressCancellable;
-		this._isProgressCancellable = !this._isProgressCancellable;
-		this.sendEvent(startEvent);
-		this.sendEvent(new OutputEvent(`start progress: ${ID}\n`));
-
-		let endMessage = 'progress ended';
-
-		for (let i = 0; i < 100; i++) {
-			await timeout(500);
-			this.sendEvent(new ProgressUpdateEvent(ID, `progress: ${i}`));
-			if (this._cancelledProgressId === ID) {
-				endMessage = 'progress cancelled';
-				this._cancelledProgressId = undefined;
-				this.sendEvent(new OutputEvent(`cancel progress: ${ID}\n`));
-				break;
-			}
+      const { context, expression } = args
+      const { user, options } = await this.getUserAndOptions();
+      try {
+        const ress = await rest.debugPostEval(user, [expression], options)
+		const res = (ress || [])[0] || {Left: ''}
+		if (res.Right) {
+          response.body = {
+            result: res.Right,
+            variablesReference: 0
+          };
+          this.sendResponse(response);
+		} else {
+          const msg = res.Left || '';
+		  if (context === 'watch') {
+            response.body = {
+              result: msg,
+              variablesReference: 0
+            };
+            this.sendResponse(response);
+		  }
 		}
-		this.sendEvent(new ProgressEndEvent(ID, endMessage));
-		this.sendEvent(new OutputEvent(`end progress: ${ID}\n`));
-
-		this._cancelledProgressId = undefined;
-	}
+      } catch (e) {
+        console.log(e);
+      }
+    }
 
 	protected dataBreakpointInfoRequest(response: DebugProtocol.DataBreakpointInfoResponse, args: DebugProtocol.DataBreakpointInfoArguments): void {
 
@@ -546,6 +567,11 @@ export class StratoDebugSession extends LoggingDebugSession {
 		if (args.progressId) {
 			this._cancelledProgressId= args.progressId;
 		}
+	}
+
+	protected terminateRequest(response: DebugProtocol.TerminateResponse, args: DebugProtocol.TerminateArguments) {
+		this._ws.close();
+		this.sendResponse(response);
 	}
 
 	protected customRequest(command: string, response: DebugProtocol.Response, args: any) {

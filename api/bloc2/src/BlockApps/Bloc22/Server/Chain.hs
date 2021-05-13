@@ -16,9 +16,7 @@ import           Control.Applicative               (liftA2)
 import           Control.Lens                      ((?~), at)
 import           Control.Monad                     (when, unless)
 import           Crypto.Random.Entropy
-import qualified Data.Aeson                        as Aeson
 import qualified Data.ByteString.Base16            as B16
-import qualified Data.ByteString.Lazy              as BL
 import           Data.Foldable                     (for_)
 import           Data.Int                          (Int32)
 import qualified Data.Map.Ordered                  as OMap
@@ -26,7 +24,7 @@ import qualified Data.Map.Strict                   as Map
 import           Data.Maybe                        (catMaybes, fromMaybe)
 import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
-import           Data.Text.Encoding                (decodeUtf8, encodeUtf8)
+import           Data.Text.Encoding                (encodeUtf8)
 import qualified Data.Vector                       as V
 
 import           BlockApps.Bloc22.API.Chain
@@ -50,6 +48,7 @@ import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class     (blockHash)
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.SourceMap (serializeSourceMap)
 import           Control.Monad.Change.Alter
 import           Control.Monad.Composable.BlocSQL
 import           Control.Monad.Composable.CoreAPI
@@ -90,11 +89,11 @@ createChainInfo creationBlockHash (ChainInput src mCodePtr cname lbl balances ch
   let md = fromMaybe Map.empty mmd
       theVM = fromMaybe "EVM" $ Map.lookup "VM" md
   mContract <-
-    if not $ null src
+    if src /= mempty
       then fmap snd <$> getContractDetailsForContract theVM src cname
       else case mCodePtr of
         Just codePtr -> getContractDetailsByCodeHash codePtr
-        Nothing -> fmap snd <$> getContractDetailsForContract theVM [] cname
+        Nothing -> fmap snd <$> getContractDetailsForContract theVM mempty cname
   (cAcctInfo, codeInfo, metaData) <- case mContract of
       Nothing -> return ([],[], md)
       Just (_, ContractDetails{..}) -> do
@@ -122,7 +121,7 @@ createChainInfo creationBlockHash (ChainInput src mCodePtr cname lbl balances ch
 
           let contractAcctInfo = ContractWithStorage governanceAddress govBal contractHash storage
               b' = fst . B16.decode $ encodeUtf8 b
-              jsrc = decodeUtf8 . BL.toStrict $ Aeson.encode src
+              jsrc = serializeSourceMap src
               codeInfo' = [CodeInfo b' jsrc $ Just contractdetailsName]
           md' <- case theVM of
               "SolidVM" -> do

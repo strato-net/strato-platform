@@ -5,7 +5,7 @@
 	"description": "VSCode Integration for BlockApps STRATO",
 	"version": "0.0.1",
 	"engines": {
-		"vscode": "^1.53.0"
+		"vscode": "^1.52.1"
 	},
 	"categories": [
 		"Other"
@@ -27,12 +27,6 @@
 	"main": "./out/extension.js",
 	"contributes": {
 		"breakpoints": [
-			{
-				"language": "javascript"
-			},
-			{
-				"language": "javascriptreact"
-			},
 			{
 				"language": "solidity"
 			}
@@ -119,18 +113,12 @@
 			{
 				"command": "deployments.refreshEntry",
 				"title": "Refresh",
-				"icon": {
-					"light": "resources/light/refresh.svg",
-					"dark": "resources/dark/refresh.svg"
-				}
+				"icon": "$(refresh)"
 			},
 			{
 				"command": "nodes.refreshEntry",
 				"title": "Refresh",
-				"icon": {
-					"light": "resources/light/refresh.svg",
-					"dark": "resources/dark/refresh.svg"
-				}
+				"icon": "$(refresh)"
 			},
             {
 				"command": "extension.strato-debug.debugEditorContents",
@@ -215,6 +203,11 @@
                 {
                     "command": "deployments.refreshEntry",
                     "when": "view == deployments",
+                    "group": "navigation"
+                },
+                {
+                    "command": "nodes.refreshEntry",
+                    "when": "view == nodes",
                     "group": "navigation"
                 }
             ]

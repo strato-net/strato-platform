@@ -35,6 +35,7 @@ import           BlockApps.Solidity.Xabi
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.SourceMap
 
 --------------------------------------------------------------------------------
 -- | Routes and types
@@ -334,7 +335,7 @@ type PostContractsCompile = "contracts"
 
 data PostCompileRequest = PostCompileRequest
   { postcompilerequestContractName :: Maybe Text
-  , postcompilerequestSource       :: Text
+  , postcompilerequestSource       :: SourceMap
   , postcompilerequestVm           :: Maybe Text
   } deriving (Eq,Show,Generic)
 
@@ -357,7 +358,7 @@ instance ToSchema PostCompileRequest where
       ex :: PostCompileRequest
       ex = PostCompileRequest
         { postcompilerequestContractName = Just "MySampleContract"
-        , postcompilerequestSource = "contract MySampleContract { ...} "
+        , postcompilerequestSource = unnamedSource "contract MySampleContract { ...} "
         , postcompilerequestVm = Just "SolidVM"
         }
 
