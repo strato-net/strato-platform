@@ -247,8 +247,8 @@ insertHistoryTable globalsIORef contracts@(x:_) = do
 
 insertContractTableQuery :: ProcessedContract -> Text
 insertContractTableQuery ProcessedContract{..} =
-  let org = if T.null organization then "" else organization <> "/"
-      app = if T.null application  then "" else application <> "/"
+  let org = if T.null organization then "" else organization <> ":"
+      app = if T.null application  then "" else application <> ":"
       conVals = wrapAndEscape . map escapeQuotes $
         [ T.pack $ keccak256ToHex $ resolvedCodePtrToSHA codehash
         , org <> app <> contractName
@@ -263,8 +263,8 @@ insertContractTableQuery ProcessedContract{..} =
 
 createIndexTableQuery :: ProcessedContract -> Text
 createIndexTableQuery contract =
-  let org = if T.null (organization contract) then "" else organization contract <> "/"
-      app = if T.null (application contract)  then "" else application contract <> "/"
+  let org = if T.null (organization contract) then "" else organization contract <> ":"
+      app = if T.null (application contract)  then "" else application contract <> ":"
       tableName = escapeQuotes $ org <> app <> contractName contract
       list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData contract
    in T.concat
@@ -279,8 +279,8 @@ createIndexTableQuery contract =
 
 createHistoryTableQuery :: ProcessedContract -> Text
 createHistoryTableQuery contract =
-  let org = if T.null (organization contract) then "" else organization contract <> "/"
-      app = if T.null (application contract)  then "" else application contract <> "/"
+  let org = if T.null (organization contract) then "" else organization contract <> ":"
+      app = if T.null (application contract)  then "" else application contract <> ":"
       tableName = escapeQuotes $ org <> app <> contractName contract
       toHistory = (<>) "history@"
       historyName = toHistory tableName
@@ -296,8 +296,8 @@ createHistoryTableQuery contract =
 
 addHistoryUnique :: ProcessedContract -> Text
 addHistoryUnique contract =
-  let org = if T.null (organization contract) then "" else organization contract <> "/"
-      app = if T.null (application contract)  then "" else application contract <> "/"
+  let org = if T.null (organization contract) then "" else organization contract <> ":"
+      app = if T.null (application contract)  then "" else application contract <> ":"
       historyName = ("history@" <>) . escapeQuotes $ org <> app <> contractName contract
       indexName = "index_" <> historyName
   in  "CREATE UNIQUE INDEX IF NOT EXISTS " <> wrapDoubleQuotes indexName <>
@@ -307,8 +307,8 @@ addHistoryUnique contract =
 insertIndexTableQuery :: [ProcessedContract] -> Text
 insertIndexTableQuery [] = error "insertIndexTableQuery: unhandled empty list"
 insertIndexTableQuery contracts@(x:_) =
-  let org = if T.null (organization x) then "" else organization x <> "/"
-      app = if T.null (application x)  then "" else application x <> "/"
+  let org = if T.null (organization x) then "" else organization x <> ":"
+      app = if T.null (application x)  then "" else application x <> ":"
       tableName = escapeQuotes $ org <> app <> contractName x
       list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData x
       keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
@@ -351,8 +351,8 @@ insertIndexTableQuery contracts@(x:_) =
 insertHistoryTableQuery :: [ProcessedContract] -> Text
 insertHistoryTableQuery [] = error "insertHistoryTableQuery: unhandled empty list"
 insertHistoryTableQuery contracts@(x:_) =
-  let org = if T.null (organization x) then "" else organization x <> "/"
-      app = if T.null (application x)  then "" else application x <> "/"
+  let org = if T.null (organization x) then "" else organization x <> ":"
+      app = if T.null (application x)  then "" else application x <> ":"
       tableName = escapeQuotes $ org <> app <> contractName x
       toHistory = (<>) "history@"
       historyName = toHistory tableName
@@ -407,8 +407,8 @@ createEventTable globalsIORef ev = do
 
 createEventTableQuery :: EventTable -> Text
 createEventTableQuery ev =
-  let org = if T.null (eventOrganization ev) then "" else eventOrganization ev <> "/"
-      app = if T.null (eventApplication ev)  then "" else eventApplication ev <> "/"
+  let org = if T.null (eventOrganization ev) then "" else eventOrganization ev <> ":"
+      app = if T.null (eventApplication ev)  then "" else eventApplication ev <> ":"
       tableName = T.concat [org, app, (eventContractName ev),  ".", (eventName ev)]
   in T.concat   
       [ "CREATE TABLE IF NOT EXISTS " , wrapDoubleQuotes tableName , " ("
@@ -439,8 +439,8 @@ insertEventTable globalsIORef ev = do
 
 insertEventTableQuery :: AggregateEvent -> Text
 insertEventTableQuery ev = 
- let org = if T.null (agOrganization ev) then "" else agOrganization ev <> "/"
-     app = if T.null (agApplication ev)  then "" else agApplication ev <> "/"
+ let org = if T.null (agOrganization ev) then "" else agOrganization ev <> ":"
+     app = if T.null (agApplication ev)  then "" else agApplication ev <> ":"
      tableName = T.concat [org, app, (agContractName ev), ".", (agEventName ev)]
  in T.concat
         [ "INSERT INTO "
