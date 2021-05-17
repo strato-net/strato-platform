@@ -15,19 +15,20 @@ import Test.Hspec
 
 import qualified Blockchain.Strato.Model.Action as BS
 import Blockchain.Strato.Model.Account
-import Blockchain.Strato.Model.CodePtr
+import Blockchain.Strato.Model.CodePtr ( CodeKind(EVM, SolidVM) )
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Keccak256
 import qualified Slipstream.Data.Action as SS
+import Slipstream.Data.Globals
 
 convert :: BS.Action -> Either String SS.Action -- 🤔
 convert = eitherDecode . encode
 
 emptyEVMData :: BS.ActionData
-emptyEVMData = BS.ActionData (EVMCode $ unsafeCreateKeccak256FromWord256 0) EVM (BS.ActionEVMDiff M.empty) []
+emptyEVMData = BS.ActionData (convertFromSlipCodePtr $ EVMCode $ unsafeCreateKeccak256FromWord256 0) "" "" EVM (BS.ActionEVMDiff M.empty) []
 
 emptySolidVMData :: BS.ActionData
-emptySolidVMData = BS.ActionData (SolidVMCode "ContractName" $ unsafeCreateKeccak256FromWord256 0) SolidVM (BS.ActionSolidVMDiff M.empty) []
+emptySolidVMData = BS.ActionData (convertFromSlipCodePtr $ SolidVMCode "ContractName" "" $ unsafeCreateKeccak256FromWord256 0) "" "" SolidVM (BS.ActionSolidVMDiff M.empty) []
 
 emptyAction :: BS.Action
 emptyAction = BS.Action (unsafeCreateKeccak256FromWord256 0) (posixSecondsToUTCTime 0) 0 (unsafeCreateKeccak256FromWord256 0) Nothing (Account 0x0 Nothing) M.empty Nothing S.empty
@@ -92,7 +93,9 @@ spec = describe "Action conversions" $ do
                  "type": "Create"
                }
              ],
-             "codeHash": "86bc2e2a375e6ea377ae90026248f472fbeaa1354ef4424f568d01f3a48ab5b9"
+             "codeHash": "86bc2e2a375e6ea377ae90026248f472fbeaa1354ef4424f568d01f3a48ab5b9",
+             "organization": "",
+             "application": ""
            }
          },
          "sender": "c2191df3032cb8ee72e37ab6bbc4e83f92b9911c",
@@ -106,6 +109,8 @@ spec = describe "Action conversions" $ do
          },
          "events" : 
          [ { "eventContractName" : "Vehicle",
+             "eventContractOrganization": "",
+             "eventContractApplication": "",
              "eventContractAccount" : "2e385b6a3aea46d4172df98617b5385c13b7100d",
              "eventName" : "Vehicle Event",
              "eventArgs" : ["x", "y"]
@@ -129,7 +134,9 @@ spec = describe "Action conversions" $ do
             , (4, 0x73325f305f30000000000000000000000000000000000000000000000000000c)
             , (5, 0x73335f305f30000000000000000000000000000000000000000000000000000c)
             ]
-          , SS._actionDataCodeHash = EVMCode $ forceHash "86bc2e2a375e6ea377ae90026248f472fbeaa1354ef4424f568d01f3a48ab5b9"
+          , SS._actionDataCodeHash = convertFromSlipCodePtr $ EVMCode $ forceHash "86bc2e2a375e6ea377ae90026248f472fbeaa1354ef4424f568d01f3a48ab5b9"
+          , SS._actionDataOrganization = ""
+          , SS._actionDataApplication = ""
           , SS._actionDataCodeKind = EVM
           , SS._actionDataCallData = [SS.CallData
             { SS._callDataType = SS.Create
@@ -142,5 +149,5 @@ spec = describe "Action conversions" $ do
             }]
           }
         , SS._actionMetadata = Just . M.fromList $ [("name", "Vehicle"), ("src", "contract Vehicle {}")]
-        , SS._actionEvents = S.singleton $ Event "Vehicle" (Account 0x2e385b6a3aea46d4172df98617b5385c13b7100d Nothing) "Vehicle Event" ["x", "y"]
+        , SS._actionEvents = S.singleton $ Event "" "" "Vehicle" (Account 0x2e385b6a3aea46d4172df98617b5385c13b7100d Nothing) "Vehicle Event" ["x", "y"]
       })

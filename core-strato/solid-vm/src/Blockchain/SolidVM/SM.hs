@@ -39,13 +39,15 @@ module Blockchain.SolidVM.SM (
   getXabiValueType,
   getValueType,
   pushSender,
-  initializeAction,
+  initializeActionCreate,
+  initializeActionCall,
   markDiffForAction,
   addEvent
   ) where
 
 import           Control.Applicative ((<|>))
 import           Control.Lens hiding (Context)
+import           Control.Monad.Catch (MonadCatch)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import           Control.Monad.IO.Class
@@ -87,6 +89,7 @@ import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.Value
 import           Blockchain.VMContext
 import           Blockchain.VMOptions
+import           Blockchain.DB.StateDB
 
 import qualified SolidVM.Model.Storable as MS
 import qualified SolidVM.Solidity.Xabi as Xabi
@@ -141,6 +144,7 @@ makeLenses ''SState
 type SM m = StateT SState m
 
 type MonadSM m = ( (Account `A.Alters` AddressState) m
+                 , HasStateDB m
                  , (Keccak256 `A.Alters` DBCode) m
                  , HasX509CertDB m
                  , A.Selectable (Maybe Word256) ParentChainId m
@@ -155,6 +159,7 @@ type MonadSM m = ( (Account `A.Alters` AddressState) m
                  , Mod.Modifiable (Q.Seq Event) m
                  , Mod.Modifiable (Maybe DebugSettings) m
                  , MonadIO m --todo: remove
+                 , MonadCatch m
                  , MonadLogger m
                  )
 
@@ -474,19 +479,19 @@ addCallInfo a c fn hsh cc initialLocalVariables ro = do
 
   Mod.modify_ (Mod.Proxy @[CallInfo]) $ pure . (newCallInfo:)
 
-dupCallInfo :: MonadSM m => m ()
-dupCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
+dupCallInfo :: MonadSM m => Bool -> m ()
+dupCallInfo ro = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
   [] -> internalError "dupCallInfo was called on an already empty stack" ()
-  (ci:rest) -> pure $ ci:ci:rest
+  (ci:rest) -> pure $ ci{readOnly=ro}:ci:rest
 
 popCallInfo :: MonadSM m => m ()
 popCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
   [] -> internalError "popCallInfo was called on an already empty stack" ()
   (_:rest) -> pure rest
 
-withTempCallInfo :: MonadSM m => m a -> m a
-withTempCallInfo f = do
-  dupCallInfo
+withTempCallInfo :: MonadSM m => Bool -> m a -> m a
+withTempCallInfo ro f = do
+  dupCallInfo ro
   result <- f
   popCallInfo
   pure result
@@ -630,9 +635,20 @@ getXabiValueType (AccountPath loc path) = do
 getValueType :: MonadSM m => AccountPath -> m BasicType
 getValueType p = hintFromType =<< getXabiValueType p
 
-initializeAction :: Mod.Modifiable Action m => Account -> String -> Keccak256 -> m ()
-initializeAction acct name hsh = do
-  let newData = ActionData (SolidVMCode name hsh) SolidVM (ActionSolidVMDiff M.empty) []
+initializeActionCreate :: MonadSM m => Account -> Account -> String -> String -> Keccak256 -> m ()
+initializeActionCreate creator acct name prt hsh = do
+  maybeCert <- x509CertDBGet $ _accountAddress creator
+  let organization = T.pack $ fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
+  let newData = ActionData (SolidVMCode name hsh) organization (T.pack prt) SolidVM (ActionSolidVMDiff M.empty) []
+  x509CertDBPut (_accountAddress acct) `mapM_` maybeCert
+  Mod.modifyStatefully_ (Mod.Proxy @Action) $
+    actionData %= M.insertWith mergeActionData acct newData
+
+initializeActionCall :: MonadSM m => Account -> String -> String -> Keccak256 -> m ()
+initializeActionCall acct name prt hsh = do
+  maybeCert <- x509CertDBGet (_accountAddress acct)
+  let organization = T.pack $ fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
+  let newData = ActionData (SolidVMCode name hsh) organization (T.pack prt) SolidVM (ActionSolidVMDiff M.empty) []
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     actionData %= M.insertWith mergeActionData acct newData
 

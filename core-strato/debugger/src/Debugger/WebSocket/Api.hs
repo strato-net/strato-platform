@@ -30,14 +30,14 @@ data WSDebuggerInput = WSIStatus
                      | WSIGetStackTrace
                      | WSIGetVariables
                      | WSIGetWatches
-                     | WSIAddWatches [T.Text]
-                     | WSIRemoveWatches [T.Text]
+                     | WSIAddWatches [EvaluationRequest]
+                     | WSIRemoveWatches [EvaluationRequest]
                      | WSIClearWatches
                      deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
 data WSDebuggerOutput = WSOStatus DebuggerStatus
                       | WSOStackTrace [SourcePos]
-                      | WSOVariables (M.Map T.Text (M.Map T.Text T.Text))
-                      | WSOWatches (M.Map T.Text T.Text)
+                      | WSOVariables (M.Map T.Text (M.Map T.Text EvaluationResponse))
+                      | WSOWatches (M.Map EvaluationRequest EvaluationResponse)
                       | WSOBreakpoints [Breakpoint]
                       deriving (Eq, Show, Generic, ToJSON, FromJSON)

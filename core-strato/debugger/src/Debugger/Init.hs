@@ -8,7 +8,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 
-module Debugger.Executable
+module Debugger.Init
   ( initializeDebugger
   ) where
 

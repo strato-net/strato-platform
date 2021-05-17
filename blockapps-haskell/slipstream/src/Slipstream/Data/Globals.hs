@@ -15,10 +15,9 @@ import           GHC.Generics
 import           BlockApps.Solidity.Value
 import           BlockApps.Solidity.Xabi     (ContractDetails(..))
 import           Blockchain.Strato.Model.Account
-import           Blockchain.Strato.Model.CodePtr
+import qualified Blockchain.Strato.Model.CodePtr as CP
 import           Blockchain.Strato.Model.Keccak256
 import           Slipstream.Data.GlobalsColdStorage (Handle)
-
 
 
 instance NFData (LRU key val) where
@@ -35,3 +34,25 @@ data Globals = Globals { createdEvents :: S.Set (Text, Text) -- (contractName, e
                        , contractStates :: LRU Account [(Text, Value)]
                        , csHandle :: Handle
                        } deriving (Generic, NFData)
+
+
+-- Redefined CodePtr to include a contracts organization for SolidVM
+data CodePtr = EVMCode Keccak256
+             | SolidVMCode String Text Keccak256
+             | CodeAtAccount Account String
+             deriving (Show, Read, Eq, Ord, Generic, NFData)
+
+convertToSlipCodePtr :: CP.CodePtr -> Text -> CodePtr
+convertToSlipCodePtr (CP.EVMCode kec)           _  = EVMCode kec
+convertToSlipCodePtr (CP.SolidVMCode name hsh) org = SolidVMCode name org hsh
+convertToSlipCodePtr (CP.CodeAtAccount acc s)   _  = CodeAtAccount acc s
+
+convertFromSlipCodePtr :: CodePtr -> CP.CodePtr
+convertFromSlipCodePtr (EVMCode kec)          = CP.EVMCode kec
+convertFromSlipCodePtr (SolidVMCode name _ hsh) = CP.SolidVMCode name hsh
+convertFromSlipCodePtr (CodeAtAccount acc s)  = CP.CodeAtAccount acc s
+
+resolvedCodePtrToSHA :: CodePtr -> Keccak256
+resolvedCodePtrToSHA (EVMCode hsh) = hsh
+resolvedCodePtrToSHA (SolidVMCode _ _ hsh) = hsh
+resolvedCodePtrToSHA _ = emptyHash

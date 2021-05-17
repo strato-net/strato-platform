@@ -812,12 +812,18 @@ compactDiffs base (p:ps) = go (cost p) (promote base p) ps
 completeDiff :: ( MonadLogger m
                 , HasCodeDB m
                 , HasHashDB m
+                , Mod.Modifiable MemDBs m
+                , Mod.Modifiable CurrentBlockHash m
                 , Mod.Modifiable BestBlockRoot m
+                , HasMemAddressStateDB m
                 , (MP.StateRoot `A.Alters` MP.NodeData) m
                 , (Account `A.Alters` AddressState) m
+                , (Maybe Word256 `A.Alters` MP.StateRoot) m
+                , HasMemRawStorageDB m
+                , (RawStorageKey `A.Alters` RawStorageValue) m
                 )
              => ToDiff -> m SD.StateDiff
-completeDiff (src, dst, hsh, num) = do
+completeDiff (src, dst, hsh, num) = withCurrentBlockHash hsh $ do
   $logInfoS "calculateAndEmitStateDiffs" . T.pack $
       "Calculating StateDiff from: " ++ format src ++ "\nto: " ++ format dst
   SD.stateDiff Nothing num hsh src dst

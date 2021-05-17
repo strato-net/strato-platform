@@ -21,11 +21,14 @@ module Blockchain.SolidVM
   , create
   ) where
 
+import           Control.DeepSeq                      (force)
 import           Control.Lens hiding (assign, from, to, Context)
 import           Control.Monad
 import qualified Control.Monad.Change.Alter           as A
 import qualified Control.Monad.Change.Modify          as Mod
 import           Control.Monad.IO.Class
+import qualified Control.Monad.Catch                  as EUnsafe
+import           Data.Bifunctor                       (bimap)
 import           Data.Bits
 import           Data.Bool                            (bool)
 import           Data.ByteString                      (ByteString)
@@ -49,7 +52,7 @@ import           Data.Traversable
 import qualified Data.Vector as V
 import           Debugger
 import           GHC.Exts                             hiding (breakpoint)
-import           Text.Parsec (ParseError, runParser)
+import           Text.Parsec                          (runParser)
 import           Text.Printf
 import           Text.Read (readMaybe)
 
@@ -62,6 +65,7 @@ import qualified Blockchain.Database.MerklePatricia   as MP
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.ModifyStateDB          (pay)
 import           Blockchain.DB.X509CertDB
+import           Blockchain.DB.AddressStateDB
 import           Blockchain.ExtWord
 import qualified Blockchain.SolidVM.Builtins          as Builtins
 import           Blockchain.SolidVM.CodeCollectionDB
@@ -139,10 +143,20 @@ instance MonadSM m => Mod.Accessible [SourcePos] m where
     cis <- Mod.get (Mod.Proxy @[CallInfo])
     pure $ fromMaybe (initialPos "") . currentSourcePos <$> cis
 
-runExpr :: MonadSM m => T.Text -> m (Either ParseError T.Text)
-runExpr exprText = withoutDebugging $ do
+runExpr :: MonadSM m => EvaluationRequest -> m EvaluationResponse
+runExpr exprText = withoutDebugging . withTempCallInfo True $ do -- TODO: allow write access once we figure out how to discard changes
   let eExpr = runParser expression "" "" (T.unpack exprText)
-  withoutDebugging $ traverse (pure . T.pack <=< showSM <=< getVar <=< expToVar) eExpr
+  case eExpr of
+    Left pe -> pure . Left . T.pack $ show pe
+    Right expr -> do
+      eRes <- EUnsafe.try $ do
+        var <- expToVar expr
+        val <- getVar var
+        str <- showSM val
+        case (force str) of -- stupid code to get lazy exceptions to be thrown within the try block
+          [] -> pure []
+          xs -> pure xs
+      pure $ bimap (T.pack . showSolidException) T.pack eRes
 
 solidVMBreakpoint :: MonadSM m => SourcePos -> m ()
 solidVMBreakpoint pos = do
@@ -203,11 +217,25 @@ create _ _ _ blockData _ sender' origin' _ _ _ newAddress code txHash' chainId' 
 
 create' :: MonadSM m => Account -> Account -> Keccak256 -> CodeCollection -> String -> Xabi.ArgList -> m ExecResults
 create' creator newAccount ch cc contractName' argExps = do
-  initializeAction newAccount contractName' ch
+  mAddressState <- getAddressStateMaybe creator
+  let mParentCodePtr = case mAddressState of
+        Just cp -> resolveCodePtrParent Nothing $ addressStateCodeHash cp
+        Nothing -> pure Nothing
+  mParentCodePtr' <- mParentCodePtr
+  let thePtr = case mParentCodePtr' of
+                    Just s@(SolidVMCode _ _)  -> pure $ Just s
+                    Just acc@(CodeAtAccount _ _) -> resolveCodePtrParent Nothing acc
+                    _  -> pure Nothing
+  thePtr' <- thePtr
+  let thePtr'' = case thePtr' of
+                    Just (SolidVMCode name _) -> Just name
+                    _                         -> Nothing
+      parentName' = fromMaybe "" thePtr''
+  initializeActionCreate creator newAccount contractName' parentName' ch
 
   A.adjustWithDefault_ (A.Proxy @AddressState) newAccount $ \newAddressState ->
     pure newAddressState{ addressStateContractRoot = MP.emptyTriePtr
-                        , addressStateCodeHash = SolidVMCode contractName' ch
+                        , addressStateCodeHash = if (contractName' /= parentName' && not (null parentName')) then CodeAtAccount creator contractName' else SolidVMCode contractName' ch
                         }
 
   onTraced $ liftIO $ putStrLn $ C.red $ "Creating Contract: " ++ show newAccount ++ " of type " ++ contractName'
@@ -344,6 +372,13 @@ getCodeAndCollection address' = do
         Just (SolidVMCode cn ch') -> do
           cc' <- codeCollectionFromHash ch'
           return (cn, ch', cc')
+        Just cp'@(CodeAtAccount _ _) -> do
+            cp <- resolveCodePtr Nothing cp'
+            case cp of
+                Just (SolidVMCode cn ch') -> do
+                    cc' <- codeCollectionFromHash ch'
+                    return (cn, ch', cc')
+                _ -> error "this is our error!"
         Just ch -> internalError "SolidVM for non-solidvm code" (format ch)
         Nothing -> missingCodeCollection "SolidVM for non-existent code" (format codeHash)
 
@@ -420,8 +455,23 @@ callWrapper from to mContract functionName argExps = do
   unless isAccessibleChain $ inaccessibleChain "Inaccessible chain violation" $ "from: " ++ show from ++ ", to: " ++ show to
 
   (contract', hsh, cc) <- getCodeAndCollection to
+  mAddressState <- getAddressStateMaybe to
+  let mParentCodePtr = case mAddressState of
+        Just cp -> resolveCodePtrParent Nothing $ addressStateCodeHash cp
+        Nothing -> pure Nothing
+  mParentCodePtr' <- mParentCodePtr
+  let thePtr = case mParentCodePtr' of
+                    Just s@(SolidVMCode _ _)  -> pure $ Just s
+                    Just acc@(CodeAtAccount _ _) -> resolveCodePtrParent Nothing acc
+                    _  -> pure Nothing
+  thePtr' <- thePtr
+  let thePtr'' = case thePtr' of
+                    Just (SolidVMCode name _) -> Just name
+                    _                         -> Nothing
+      parentName' = fromMaybe "" thePtr''
   let contract = fromMaybe contract' $ mContract >>= \c -> M.lookup c $ _contracts cc
-  initializeAction to (_contractName contract) hsh
+      parentName'' = if parentName' == (_contractName contract) then "" else parentName'
+  initializeActionCall to (_contractName contract) parentName'' hsh
 
   let functionsIncludingConstructor =
         case contract^.constructor of
@@ -723,7 +773,14 @@ runStatement st@(Xabi.EmitStatement eventName exptups pos) = do
       if (length exptups) /= (length $ Xabi.eventLogs ev) then 
         invalidArguments "arguments to statement are inconsistent with those declared" (unparseStatement st)
       else do
-        addEvent $ Event (_contractName curCnct) (currentAccount curInfo) eventName expStrs
+        maybeCert <- x509CertDBGet $ _accountAddress $ currentAccount curInfo
+        let organization = fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
+        myAction <- Mod.get (Mod.Proxy @Action)
+        let actionData' = M.lookup (currentAccount curInfo) (_actionData myAction)
+            appName = case actionData' of
+                            Just aD -> _actionDataApplication aD 
+                            Nothing -> ""
+        addEvent $ Event organization (T.unpack appName) (_contractName curCnct) (currentAccount curInfo) eventName expStrs
         return Nothing
 
 
@@ -1402,7 +1459,7 @@ callBuiltin "registerCert" [SAccount a, SString cert] _ = do
         Right x509Cert -> do x509CertDBPut (_accountAddress $ namedAccountToAccount Nothing a) x509Cert
                              return SNULL
 callBuiltin "getUserCert" [SAccount a] _ = do
-    maybeCert <- x509CertDBGet $ _accountAddress $ (namedAccountToAccount Nothing a)
+    maybeCert <- x509CertDBGet $ _accountAddress (namedAccountToAccount Nothing a)
     return $ certificateMap (fmap (BC.unpack . certToBytes) maybeCert)
 callBuiltin "parseCert" [SString cert] _ = return $ certificateMap (Just cert)
 callBuiltin x _ _ = unknownFunction "callBuiltin" x

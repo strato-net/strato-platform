@@ -13,9 +13,9 @@ import           Data.Time
 
 import qualified BlockApps.Solidity.Value as V
 import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Keccak256
 import           Slipstream.SolidityValue
+import           Slipstream.Data.Globals
 
 type StateRoot = Text
 
@@ -31,6 +31,8 @@ data ProcessedContract = ProcessedContract
   { address           :: Address
   , codehash          :: CodePtr
   , abi               :: Text
+  , organization      :: Text
+  , application       :: Text
   , contractName      :: Text
   , chain             :: Text
   , blockHash         :: Keccak256
@@ -43,7 +45,9 @@ data ProcessedContract = ProcessedContract
   } deriving (Show)
 
 data EventTable = EventTable
-  { eventContractName :: Text
+  { eventOrganization :: Text
+  , eventApplication  :: Text
+  , eventContractName :: Text
   , eventName         :: Text
   , eventFields       :: [Text]
   } deriving (Show)
