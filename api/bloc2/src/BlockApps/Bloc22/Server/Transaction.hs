@@ -410,7 +410,10 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} userName = blocTrans
       fromAddr
       params
       (Wei (fromIntegral (maybe 0 unStrung value)))
-      (Code $ Text.encodeUtf8 $ serializeSourceMap contractdetailsSrc)
+      (case codePtr of 
+        Nothing -> Code $ Text.encodeUtf8 $ serializeSourceMap contractdetailsSrc
+        Just cp -> PtrToCode cp
+      )
       chainId
   $logDebugLS "postUsersContractSolidVM'/tx" tx
   txHash <- postTransaction tx

@@ -196,11 +196,17 @@ create _ _ _ blockData _ sender' origin' _ _ _ newAddress code txHash' chainId' 
         Env.metadata=metadata
       }
 
+  liftIO $ putStrLn $ "DANDANDANDANDANDANDAN --  the code we got in create was: "++ show code
+
+
   initCode <- case code of
     Code c -> pure c
     PtrToCode cp -> do
       hsh <- codePtrToSHA chainId' cp
       fromMaybe "" . fmap snd . join <$> traverse getCode hsh
+  
+  liftIO $ putStrLn $ "DANDANDANDANDANDANDAN --  the RESOLVED code is: "++ show initCode
+  
   
   fmap (either solidvmErrorResults id) . runSM (Just initCode) env' $ do
     let maybeContractName = M.lookup "name" =<< metadata
