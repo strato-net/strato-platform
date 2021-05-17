@@ -40,7 +40,7 @@ To run react dev server locally with all features enabled go through the steps:
       rewrite_by_lua_file  lua/openid.lua;
       proxy_set_header Accept-Encoding "";
       proxy_pass http://172.17.0.1:3000/;                        # !!ON MAC USE `http://docker.for.mac.localhost:3000/` instead
-    };
+    }
     ```
     and add the new location block (note the difference between linux and mac):
     ```
