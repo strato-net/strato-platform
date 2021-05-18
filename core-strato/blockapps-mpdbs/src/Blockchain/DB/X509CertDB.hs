@@ -17,6 +17,7 @@ module Blockchain.DB.X509CertDB (
   , pubToBytes
   , X509CertDB(..)
   , HasX509CertDB
+  , flushX509ToLevelDB
   , genericLookupX509CertDB
   , genericInsertX509CertDB
   , genericDeleteX509CertDB
@@ -27,10 +28,12 @@ module Blockchain.DB.X509CertDB (
 
 import           Control.DeepSeq
 import           Control.Monad.Change.Alter
+import qualified Control.Monad.Change.Modify       as Mod
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Reader
 import           Data.Default
 import           Data.Either.Extra (eitherToMaybe)
+import           Data.Map                           (Map, empty)
 import qualified Database.LevelDB                   as DB
 import           Prelude                            hiding (lookup)
 
@@ -59,6 +62,12 @@ genericDeleteX509CertDB :: MonadIO m => m X509CertDB -> Address -> m ()
 genericDeleteX509CertDB f address = do
   db <- unX509CertDB <$> f
   DB.delete db def (addressToHex address)
+
+flushX509ToLevelDB :: (Mod.Modifiable (Map Address X509Certificate) m, HasX509CertDB m) => m ()
+flushX509ToLevelDB = do
+    x509s <- Mod.get (Proxy @(Map Address X509Certificate))
+    insertMany (Proxy @X509Certificate) x509s
+    Mod.put (Mod.Proxy @(Map Address X509Certificate)) empty
 
 -- GHC bug? Why can't we use the line below to create this instance, even with all the
 -- extensions enabled for it?

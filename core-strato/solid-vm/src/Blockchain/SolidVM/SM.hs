@@ -136,6 +136,7 @@ data SState = SState
   { env             :: Env.Environment
   , callStack       :: [CallInfo]
   , ssEvents        :: Q.Seq Event
+  , _ssNewX509Certs  :: M.Map Address X509Certificate
   , _ssMemDBs       :: MemDBs
   , _action         :: Action
   }
@@ -152,6 +153,7 @@ type MonadSM m = ( (Account `A.Alters` AddressState) m
                  , HasMemAddressStateDB m
                  , HasMemRawStorageDB m
                  , Mod.Accessible Env.Environment m
+                 , Mod.Modifiable (M.Map Address X509Certificate) m
                  , Mod.Modifiable MemDBs m
                  , Mod.Modifiable Env.Sender m
                  , Mod.Modifiable [CallInfo] m
@@ -256,6 +258,10 @@ instance Monad m => Mod.Modifiable MemDBs (SM m) where
   get _    = gets $ _ssMemDBs
   put _ md = modify $ ssMemDBs .~ md
 
+instance Monad m => Mod.Modifiable (M.Map Address X509Certificate) (SM m) where
+  get _ = use ssNewX509Certs
+  put _ = assign ssNewX509Certs
+
 instance Monad m => Mod.Modifiable Action (SM m) where
   get _ = use action
   put _ = assign action
@@ -286,6 +292,7 @@ runSM maybeCode env f = do
         env = env,
         callStack = [],
         ssEvents = Q.empty,
+        _ssNewX509Certs = M.empty,
         _ssMemDBs = csMemDBs,
         _action = startingAction maybeCode env
         }
