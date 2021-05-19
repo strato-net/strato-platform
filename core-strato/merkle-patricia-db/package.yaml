@@ -9,7 +9,6 @@ category:      Data Structures
 license: Apache-2.0
 description:
     The modified Merkle Patricia DB described in the Ethereum Yellowpaper
-github: blockapps/strato-platform/strato-platform/merkle-patricia-db
 
 dependencies:
   - base

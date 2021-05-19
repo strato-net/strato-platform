@@ -2,7 +2,6 @@ name: blockapps-ethereum
 version: 0.1.0.0
 synopsis: Ethereum datatypes
 description: Ethereum datatypes
-github: blockapps/strato-platform/blockapps-haskell/blockapps-ethereum
 license: BSD3
 license-file: LICENSE
 author: Eitan Chatav
@@ -46,4 +45,3 @@ tests:
       - blockapps-ethereum
       - clock
       - hspec
-

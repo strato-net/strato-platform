@@ -155,124 +155,126 @@ postBlocTransaction' :: (MonadLogger m,
                      -> m [BlocChainOrTransactionResult]
 postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRequest mAddr txs' txParams msrcs) = do
   evmCompatibleOn <- fmap evmCompatible getBlocEnv
-  gasFlagOn <- fmap gasOn getBlocEnv
-  if evmCompatibleOn && ((!gasFlagOn || Map.lookup "VM" =<< md) == Just "SolidVM")
-      then throwIO $ UserError $ Text.pack "Error: EVM Compatibility flag is On. SolidVM cannot be used."
-  else do
-      case mUserName of
-        Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-UNIQUE-NAME in the header"
-        Just userName -> do
-          addr <- case mAddr of
-            Nothing -> fmap unAddress . blocVaultWrapper $ getKey userName Nothing
-            Just addr' -> return addr'
-          let src' :: ContractPayload -> Maybe SourceMap
-              src' p = if contractpayloadSrc p == mempty
-                         then Nothing
-                         else Just $ contractpayloadSrc p
-              srcMap :: ContractPayload -> Maybe SourceMap
-              srcMap p = join $ liftA2 Map.lookup (contractpayloadContract p) msrcs
-              getSrc p = fromMaybe mempty $ src' p <|> srcMap p
-          fmap join . forM (partitionWith transactionType txs') $ \(ttype, txs) -> case ttype of
-            TRANSFER -> case txs of
-              [] -> return []
-              [x] -> do
-                p <- fromTransfer x
-                let btp = TransferParameters
-                            addr
-                            (transferpayloadToAddress p)
-                            (transferpayloadValue p)
-                            (mergeTxParams (transferpayloadTxParams p) txParams)
-                            (transferpayloadMetadata p)
-                            (transferpayloadChainid p <|> chainId)
-                            resolve
-                fmap ((:[]) . BlocTxResult) $ postUsersSend' cacheNonce btp userName
-              xs -> do
-                p <- mapM fromTransfer xs
-                let btlp = TransferListParameters
-                            addr
-                            (map (\(TransferPayload t v x c m) -> SendTransaction t v (mergeTxParams x txParams) c m) p)
-                            chainId
-                            resolve
-                fmap BlocTxResult <$> postUsersSendList' cacheNonce btlp userName
-            CONTRACT -> case txs of
-              [] -> return []
-              [x] -> do
-                p <- fromContract x
-                let md = contractpayloadMetadata p
-                    bcp = ContractParameters
-                            addr
-                            (getSrc p)
-                            (contractpayloadContract p)
-                            (contractpayloadArgs p)
-                            (contractpayloadValue p)
-                            (mergeTxParams (contractpayloadTxParams p) txParams)
-                            (contractpayloadMetadata p)
-                            (contractpayloadChainid p <|> chainId)
-                            resolve
-                    poster = case Map.lookup "VM" =<< md of
-                                Nothing -> postUsersContractEVM'
-                                Just "EVM" -> postUsersContractEVM'
-                                Just "SolidVM" -> postUsersContractSolidVM'
-                                Just vm -> \_ _ _ -> throwIO $ UserError $ Text.pack
-                                                   $ "Invalid value for VM choice: " ++ show vm
+  case mUserName of
+    Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-UNIQUE-NAME in the header"
+    Just userName -> do
+      addr <- case mAddr of
+        Nothing -> fmap unAddress . blocVaultWrapper $ getKey userName Nothing
+        Just addr' -> return addr'
+      let src' :: ContractPayload -> Maybe SourceMap
+          src' p = if contractpayloadSrc p == mempty
+                     then Nothing
+                     else Just $ contractpayloadSrc p
+          srcMap :: ContractPayload -> Maybe SourceMap
+          srcMap p = join $ liftA2 Map.lookup (contractpayloadContract p) msrcs
+          getSrc p = fromMaybe mempty $ src' p <|> srcMap p
+      fmap join . forM (partitionWith transactionType txs') $ \(ttype, txs) -> case ttype of
+        TRANSFER -> case txs of
+          [] -> return []
+          [x] -> do
+            p <- fromTransfer x
+            let btp = TransferParameters
+                        addr
+                        (transferpayloadToAddress p)
+                        (transferpayloadValue p)
+                        (mergeTxParams (transferpayloadTxParams p) txParams)
+                        (transferpayloadMetadata p)
+                        (transferpayloadChainid p <|> chainId)
+                        resolve
+            fmap ((:[]) . BlocTxResult) $ postUsersSend' cacheNonce btp userName
+          xs -> do
+            p <- mapM fromTransfer xs
+            let btlp = TransferListParameters
+                        addr
+                        (map (\(TransferPayload t v x c m) -> SendTransaction t v (mergeTxParams x txParams) c m) p)
+                        chainId
+                        resolve
+            fmap BlocTxResult <$> postUsersSendList' cacheNonce btlp userName
+        CONTRACT -> case txs of
+          [] -> return []
+          [x] -> do
+            p <- fromContract x
+            let md = contractpayloadMetadata p
+                bcp = ContractParameters
+                        addr
+                        (getSrc p)
+                        (contractpayloadContract p)
+                        (contractpayloadArgs p)
+                        (contractpayloadValue p)
+                        (mergeTxParams (contractpayloadTxParams p) txParams)
+                        (contractpayloadMetadata p)
+                        (contractpayloadChainid p <|> chainId)
+                        resolve
+                poster = case Map.lookup "VM" =<< md of
+                            Nothing -> postUsersContractEVM'
+                            Just "EVM" -> postUsersContractEVM'
+                            Just "SolidVM" -> postUsersContractSolidVM'
+                            Just vm -> \_ _ _ -> throwIO $ UserError $ Text.pack
+                                               $ "Invalid value for VM choice: " ++ show vm
+            if evmCompatibleOn && (Map.lookup "VM" =<< md) == Just "SolidVM"
+                then throwIO $ UserError $ Text.pack "Error: EVM Compatibility flag is On. SolidVM cannot be used."
+            else do
                 fmap ((:[]) . BlocTxResult) $ poster cacheNonce bcp userName
-              xs -> do
-                ps <- mapM fromContract xs
-                let bclp = ContractListParameters
-                            addr
-                            (map (\p@(ContractPayload _ c a v x cid m) ->
-                                    UploadListContract (fromJust c)
-                                                       (getSrc p)
-                                                       (fromMaybe Map.empty a)
-                                                       (mergeTxParams x txParams)
-                                                       v cid m) ps)
-                            chainId
-                            resolve
-                    md = contractpayloadMetadata $ head ps --Determine VM option by the metadata of the first tx in list
-                    poster = case Map.lookup "VM" =<< md of
-                      Nothing -> postUsersUploadListEVM'
-                      Just "EVM" -> postUsersUploadListEVM'
-                      Just "SolidVM" -> postUsersUploadListSolidVM'
-                      Just vm -> \_ _ _ -> throwIO $ UserError $ Text.pack
-                                         $ "Invalid value for VM choice: " ++ show vm
-                fmap BlocTxResult <$> poster cacheNonce bclp userName
-            FUNCTION -> case txs of
-              [] -> return []
-              [x] -> do
-                p <- fromFunction x
-                let bfp = FunctionParameters
-                            addr
-                            ((\(ContractName c) -> c) $ functionpayloadContractName p)
-                            (functionpayloadContractAddress p)
-                            (functionpayloadMethod p)
-                            (functionpayloadArgs p)
-                            (functionpayloadValue p)
-                            (mergeTxParams (functionpayloadTxParams p) txParams)
-                            (functionpayloadMetadata p)
-                            (functionpayloadChainid p <|> chainId)
-                            resolve
-                fmap ((:[]) . BlocTxResult) $ postUsersContractMethod' cacheNonce bfp userName
-              xs -> do
-                p <- mapM fromFunction xs
-                let bflp = FunctionListParameters
-                            addr
-                            (map (\(FunctionPayload (ContractName n) a m r v x c md) ->
-                                    MethodCall n a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md) p)
-                            chainId
-                            resolve
-                fmap BlocTxResult <$> postUsersContractMethodList' cacheNonce bflp userName
-            GENESIS -> case txs of
-              [] -> return []
-              xs -> do
-                chainInputs <- traverse fromGenesis xs
-                let chainInputSrc :: ChainInput -> Maybe SourceMap
-                    chainInputSrc p = if chaininputSrc p == mempty
-                                        then Nothing
-                                        else Just $ chaininputSrc p
-                    chainInputSrcMap :: ChainInput -> Maybe SourceMap
-                    chainInputSrcMap p = join $ liftA2 Map.lookup (chaininputContract p) msrcs
-                    hydrate p = p{ chaininputSrc = fromMaybe mempty $ chainInputSrc p <|> chainInputSrcMap p }
-                fmap (fmap BlocChainResult) . postChainInfos $ hydrate <$> chainInputs
+          xs -> do
+            ps <- mapM fromContract xs
+            let bclp = ContractListParameters
+                        addr
+                        (map (\p@(ContractPayload _ c a v x cid m) ->
+                                UploadListContract (fromJust c)
+                                                   (getSrc p)
+                                                   (fromMaybe Map.empty a)
+                                                   (mergeTxParams x txParams)
+                                                   v cid m) ps)
+                        chainId
+                        resolve
+                md = contractpayloadMetadata $ head ps --Determine VM option by the metadata of the first tx in list
+                poster = case Map.lookup "VM" =<< md of
+                  Nothing -> postUsersUploadListEVM'
+                  Just "EVM" -> postUsersUploadListEVM'
+                  Just "SolidVM" -> postUsersUploadListSolidVM'
+                  Just vm -> \_ _ _ -> throwIO $ UserError $ Text.pack
+                                     $ "Invalid value for VM choice: " ++ show vm
+            if evmCompatibleOn && (Map.lookup "VM" =<< md) == Just "SolidVM"
+              then throwIO $ UserError $ Text.pack "Error: EVM Compatibility flag is On. SolidVM cannot be used."
+            else do
+              fmap BlocTxResult <$> poster cacheNonce bclp userName
+        FUNCTION -> case txs of
+          [] -> return []
+          [x] -> do
+            p <- fromFunction x
+            let bfp = FunctionParameters
+                        addr
+                        ((\(ContractName c) -> c) $ functionpayloadContractName p)
+                        (functionpayloadContractAddress p)
+                        (functionpayloadMethod p)
+                        (functionpayloadArgs p)
+                        (functionpayloadValue p)
+                        (mergeTxParams (functionpayloadTxParams p) txParams)
+                        (functionpayloadMetadata p)
+                        (functionpayloadChainid p <|> chainId)
+                        resolve
+            fmap ((:[]) . BlocTxResult) $ postUsersContractMethod' cacheNonce bfp userName
+          xs -> do
+            p <- mapM fromFunction xs
+            let bflp = FunctionListParameters
+                        addr
+                        (map (\(FunctionPayload (ContractName n) a m r v x c md) ->
+                                MethodCall n a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md) p)
+                        chainId
+                        resolve
+            fmap BlocTxResult <$> postUsersContractMethodList' cacheNonce bflp userName
+        GENESIS -> case txs of
+          [] -> return []
+          xs -> do
+            chainInputs <- traverse fromGenesis xs
+            let chainInputSrc :: ChainInput -> Maybe SourceMap
+                chainInputSrc p = if chaininputSrc p == mempty
+                                    then Nothing
+                                    else Just $ chaininputSrc p
+                chainInputSrcMap :: ChainInput -> Maybe SourceMap
+                chainInputSrcMap p = join $ liftA2 Map.lookup (chaininputContract p) msrcs
+                hydrate p = p{ chaininputSrc = fromMaybe mempty $ chainInputSrc p <|> chainInputSrcMap p }
+            fmap (fmap BlocChainResult) . postChainInfos $ hydrate <$> chainInputs
   where fromTransfer = \case
           BlocTransfer t -> return t
           _ -> throwIO $ UserError "Could not decode transfer arguments from body"

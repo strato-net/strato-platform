@@ -22,7 +22,6 @@ main :: IO ()
 main = do
   blockappsInit "vm_main"
   void $ $initHFlags "Ethereum VM"
-  putStrLn $ show flags_evmCompatible
   mDebugger <- initializeDebugger
   let metricsRunner = run 8000 metricsApp
       debugSettings = fst <$> mDebugger

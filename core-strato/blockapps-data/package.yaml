@@ -8,7 +8,6 @@ synopsis: A Haskell version of an Ethereum client
 category: Data Structures
 license: Apache-2.0
 description: The client described in the Ethereum Yellowpaper
-github: blockapps/strato-platform/core-strato/blockapps-data
 
 dependencies:
   - base
