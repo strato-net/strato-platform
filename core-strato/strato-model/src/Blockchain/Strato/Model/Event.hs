@@ -12,7 +12,6 @@ module Blockchain.Strato.Model.Event(
 import           Control.DeepSeq
 import           GHC.Generics
 import           Data.Aeson
-import           Data.DeriveTH
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances()
 
@@ -45,4 +44,5 @@ instance FromJSON Event where
   parseJSON o = error $ "parseJSON Event: Expected object, got:" ++ show o
 
 instance NFData Event
-derive makeArbitrary ''Event
+instance Arbitrary Event where
+    arbitrary = applyArbitrary4 Event

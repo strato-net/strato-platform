@@ -16,7 +16,6 @@ library:
     - bytestring
     - conduit
     - deepseq
-    - derive
     - ethereum-rlp
     - format
     - lens

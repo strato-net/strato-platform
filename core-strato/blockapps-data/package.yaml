@@ -34,7 +34,6 @@ library:
   - containers
   - data-default
   - deepseq
-  - derive
   - esqueleto
   - ethereum-encryption
   - ethereum-rlp

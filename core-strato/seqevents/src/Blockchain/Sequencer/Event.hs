@@ -14,7 +14,6 @@ import           Data.Binary
 import           Data.Data
 import           Data.List                                 (intercalate)
 import           Data.Maybe                                (fromJust, isNothing)
-import           Data.DeriveTH
 import           Test.QuickCheck
 
 import qualified Blockchain.Data.Address                   as A
@@ -518,17 +517,44 @@ instance BlockLike DD.BlockData OutputTx OutputBlock where
     blockOrdering = DD.blockDataNumber . obBlockData
     buildBlock = OutputBlock TO.Morphism 0
 
-derive makeArbitrary ''AnchorChain
-derive makeArbitrary ''IngestEvent
-derive makeArbitrary ''IngestTx
-derive makeArbitrary ''IngestBlock
-derive makeArbitrary ''IngestGenesis
-derive makeArbitrary ''SequencedBlock
-derive makeArbitrary ''P2pEvent
-derive makeArbitrary ''VmEvent
-derive makeArbitrary ''OutputTx
-derive makeArbitrary ''OutputBlock
-derive makeArbitrary ''OutputGenesis
+instance Arbitrary AnchorChain where
+    arbitrary = oneof [pure Public, pure UnknownPrivate, KnownPrivate <$> arbitrary, AnchoredPrivate <$> arbitrary]
+
+instance Arbitrary IngestEvent where
+    arbitrary = oneof [ applyArbitrary2 IETx, IEBlock <$> arbitrary, IEGenesis <$> arbitrary
+                      , applyArbitrary3 IENewChainMember, IEBlockstanbul <$> arbitrary
+                      , IEForcedConfigChange <$> arbitrary]
+
+instance Arbitrary IngestTx where
+    arbitrary = applyArbitrary2 IngestTx
+
+instance Arbitrary IngestBlock where
+    arbitrary = applyArbitrary4 IngestBlock
+
+instance Arbitrary IngestGenesis where
+    arbitrary = applyArbitrary2 IngestGenesis
+
+instance Arbitrary SequencedBlock where
+    arbitrary = SequencedBlock <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
+
+instance Arbitrary P2pEvent where
+    arbitrary = oneof [ P2pTx <$> arbitrary, P2pBlock <$> arbitrary, P2pGenesis <$> arbitrary
+                      , P2pGetChain <$> arbitrary, P2pGetTx <$> arbitrary, applyArbitrary3 P2pNewChainMember
+                      , P2pBlockstanbul <$> arbitrary, applyArbitrary3 P2pAskForBlocks, applyArbitrary3 P2pPushBlocks]
+
+instance Arbitrary VmEvent where
+    arbitrary = oneof [ applyArbitrary2 VmTx, VmBlock <$> arbitrary, VmGenesis <$> arbitrary
+                      , VmJsonRpcCommand <$> arbitrary, pure VmCreateBlockCommand, applyArbitrary3 VmVoteToMake
+                      , VmPrivateTx <$> arbitrary]
+
+instance Arbitrary OutputTx where
+    arbitrary = OutputTx <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
+
+instance Arbitrary OutputBlock where
+    arbitrary = OutputBlock <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
+
+instance Arbitrary OutputGenesis where
+    arbitrary = applyArbitrary2 OutputGenesis
 
 instance ToJSON OutputBlock' where
 instance FromJSON OutputBlock' where

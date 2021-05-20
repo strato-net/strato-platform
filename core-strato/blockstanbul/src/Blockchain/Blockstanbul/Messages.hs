@@ -18,7 +18,6 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as LB
 import Data.Data
 import Data.Default
-import Data.DeriveTH
 import qualified Data.Map as M
 import Data.Text
 import GHC.Generics
@@ -101,11 +100,20 @@ instance Format ForcedConfigChange where
 blockstanbulSender :: WireMessage -> Address
 blockstanbulSender (WireMessage a _) = sender a
 
-derive makeArbitrary ''MsgAuth
-derive makeArbitrary ''View
-derive makeArbitrary ''TrustedMessage
-derive makeArbitrary ''WireMessage
-derive makeArbitrary ''ForcedConfigChange
+instance Arbitrary MsgAuth where
+    arbitrary = applyArbitrary2 MsgAuth
+
+instance Arbitrary View where
+    arbitrary = applyArbitrary2 View
+
+instance Arbitrary TrustedMessage where
+    arbitrary = oneof [applyArbitrary2 Preprepare, applyArbitrary2 Prepare, applyArbitrary3 Commit, RoundChange <$> arbitrary]
+
+instance Arbitrary WireMessage where
+    arbitrary = applyArbitrary2 WireMessage
+
+instance Arbitrary ForcedConfigChange where
+    arbitrary = ForcedRound <$> arbitrary
 
 instance Format WireMessage where
   format (WireMessage (MsgAuth s _) msg) = format msg ++ " " ++ format s
@@ -305,7 +313,8 @@ data Checkpoint = Checkpoint
 instance Default Checkpoint where
   def = Checkpoint (View 0 0) M.empty [] []
 
-derive makeArbitrary ''Checkpoint
+instance Arbitrary Checkpoint where
+    arbitrary = applyArbitrary4 Checkpoint
 
 -- JSON was chosen to allow manual inspection and override during outages
 encodeCheckpoint :: Checkpoint -> B.ByteString

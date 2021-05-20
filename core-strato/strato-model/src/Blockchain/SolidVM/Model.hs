@@ -11,7 +11,6 @@ import Data.Aeson.Types
 import Data.Binary
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
-import Data.DeriveTH
 import Data.Swagger.Schema
 import Data.Swagger.Internal.Schema (named)
 import qualified Data.Text as T
@@ -68,5 +67,5 @@ instance FromJSON CodeKind where
   parseJSON (String t) = return . LabeledError.read "FromJSON/CodeKind" . T.unpack $ t
   parseJSON x = typeMismatch "CodeKind" x
 
-derive makeArbitrary ''CodeKind
-
+instance Arbitrary CodeKind where
+    arbitrary = elements [EVM, SolidVM]

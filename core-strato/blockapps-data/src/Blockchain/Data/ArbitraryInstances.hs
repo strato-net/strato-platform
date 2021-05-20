@@ -2,7 +2,6 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Blockchain.Data.ArbitraryInstances where
 
-import           Data.DeriveTH
 import           Data.Maybe                         (fromJust, isJust)
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances()
@@ -39,7 +38,9 @@ data HaskoinPrvKey = HaskoinPrvKey H.PrvKey
 unboxPK :: HaskoinPrvKey -> H.PrvKey
 unboxPK (HaskoinPrvKey pk) = pk
 
-derive makeArbitrary ''TXOrigin
+instance Arbitrary TXOrigin where
+    arbitrary = oneof [ pure Direct, pure API, pure Quarry, BlockHash <$> arbitrary
+                      , PeerString <$> arbitrary, pure Morphism, pure Blockstanbul]
 
 instance Arbitrary PositiveInteger where
     arbitrary = PositiveInteger . abs <$> arbitrary
@@ -153,6 +154,12 @@ instance Arbitrary AccountInfo where
       <$> arbitrary
       <*> arbitrary `suchThat` (>=0)
 
-derive makeArbitrary ''ChainSignature
-derive makeArbitrary ''UnsignedChainInfo
-derive makeArbitrary ''ChainInfo
+instance Arbitrary ChainSignature where
+    arbitrary = applyArbitrary3 ChainSignature
+
+instance Arbitrary UnsignedChainInfo where
+    arbitrary = UnsignedChainInfo <$> arbitrary <*> arbitrary <*> arbitrary 
+                    <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
+
+instance Arbitrary ChainInfo where
+    arbitrary = applyArbitrary2 ChainInfo

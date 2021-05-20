@@ -9,12 +9,11 @@
 module Blockchain.Strato.Model.Action where
 
 import           Control.DeepSeq
-import           Control.Lens                 hiding ((.=))
+import           Control.Lens                 hiding ((.=), elements)
 import           Control.Monad                (liftM2)
 import           Data.Aeson
 import           Data.Aeson.Types
 import qualified Data.ByteString              as B
-import           Data.DeriveTH
 import qualified Data.ByteString.Short        as BSS
 import           Data.Function                (on)
 import qualified Data.HashMap.Strict          as HM
@@ -36,7 +35,7 @@ import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Keccak256
 
-data CallType = Create | Delete | Update deriving (Eq, Show, Generic, NFData)
+data CallType = Create | Delete | Update deriving (Eq, Show, Enum, Bounded, Generic, NFData)
 
 instance ToJSON CallType where
 instance FromJSON CallType where
@@ -191,8 +190,18 @@ instance FromJSON Action where
     <*> (o .: "events")
   parseJSON o = error $ "parseJSON Action: Expected object, got: " ++ show o
 
-derive makeArbitrary ''CallType
-derive makeArbitrary ''CallData
-derive makeArbitrary ''ActionDataDiff
-derive makeArbitrary ''ActionData
-derive makeArbitrary ''Action
+instance Arbitrary CallType where
+    arbitrary = elements [Create, Delete, Update]
+
+instance Arbitrary CallData where
+    arbitrary = CallData <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
+
+instance Arbitrary ActionDataDiff where
+    arbitrary = oneof [ActionEVMDiff <$> arbitrary, ActionSolidVMDiff <$> arbitrary]
+
+instance Arbitrary ActionData where
+    arbitrary = applyArbitrary4 ActionData
+
+instance Arbitrary Action where 
+    arbitrary = Action <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
+                       <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
