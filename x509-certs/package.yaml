@@ -28,6 +28,7 @@ library:
   - cereal
   - containers
   - cryptonite
+  - deepseq
   - ethereum-rlp
   - hourglass
   - memory
