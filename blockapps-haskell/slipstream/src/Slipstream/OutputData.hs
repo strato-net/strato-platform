@@ -19,7 +19,6 @@ import qualified Data.ByteString.Lazy            as BL
 import qualified Data.Map                        as Map
 import           Data.Maybe                      (fromMaybe, catMaybes)
 import           Data.Monoid                     ((<>))
-import qualified Data.Set                        as Set
 import           Data.Text                       (Text)
 import qualified Data.Text                       as T
 import           Data.Text.Encoding              (decodeUtf8, encodeUtf8)
@@ -92,7 +91,7 @@ escapeDoubleQuotes = T.replace "\"" "\\\""
 escapeQuotes :: Text -> Text
 escapeQuotes = escapeSingleQuotes . escapeDoubleQuotes
 
-tableColumns :: [(Text, SolidityValue)] -> [Text]
+tableColumns :: [(Text, SolidityValue)] -> TableColumns
 tableColumns = map go
   where go (x,y) = let z = wrapDoubleQuotes $ escapeQuotes x
                    in T.concat [z, " ", typeText y]
@@ -136,7 +135,7 @@ outputData conn c = runConduit $ c
                               .| iterMC ($logDebugS "outputData")
                               .| mapM_C (dbInsert conn)
 
-baseColumns :: [Text]
+baseColumns :: TableColumns
 baseColumns = [ "address"
               , "chainId"
               , "block_hash"
@@ -146,8 +145,25 @@ baseColumns = [ "address"
               , "transaction_sender"
               ]
 
-baseTableColumns :: [Text]
+baseTableColumns :: TableColumns
 baseTableColumns = baseColumns ++ ["transaction_function_name"]
+
+
+
+tableNameToText :: TableName -> Text
+tableNameToText (IndexTableName o a c) = 
+  let org = if T.null o then "" else o <> ":"
+      app = if T.null a then "" else a <> ":"
+  in wrapDoubleQuotes $ escapeQuotes org <> app <> c
+tableNameToText (HistoryTableName o a c) = 
+  let org = if T.null o then "" else o <> ":"
+      app = if T.null a then "" else a <> ":"
+  in wrapDoubleQuotes $ escapeQuotes "history@" <> org <> app <> c
+tableNameToText (EventTableName o a c e) = 
+  let org = if T.null o then "" else o <> ":"
+      app = if T.null a then "" else a <> ":"
+      contractAndEvent = c <> "." <> e
+  in wrapDoubleQuotes $ escapeQuotes org <> app <> contractAndEvent
 
 createInserts :: OutputM m
               => IORef Globals
@@ -161,79 +177,131 @@ createInserts globalsIORef contracts = do
     insertIndexTable globalsIORef contracts
     insertHistoryTable globalsIORef contracts
 
-createInsertIndexTable
+createExpandInsertIndexTable
   :: OutputM m
   => IORef Globals
   -> [ProcessedContract]
   -> ConduitM () Text m ()
-createInsertIndexTable g cs = do
+createExpandInsertIndexTable g cs = do
   unless (null cs) $ do
     let c = head cs
     createIndexTable g c
+    expandIndexTable g cs
     insertIndexTable g cs
 
-createInsertHistoryTable
+createExpandInsertHistoryTable
   :: OutputM m
   => IORef Globals
   -> [ProcessedContract]
   -> ConduitM () Text m ()
-createInsertHistoryTable g cs = do
+createExpandInsertHistoryTable g cs = do
   unless (null cs) $ do
     let c = head cs
     createHistoryTable g c
+    expandHistoryTable g cs
     insertHistoryTable g cs
-
-createInsertFunctionHistoryTable
-  :: IORef Globals
-  -> [ProcessedContract]
-  -> ConduitM () Text m ()
-createInsertFunctionHistoryTable _ cs = do
-  unless (null cs) $ do
-    -- TODO: implement function history
-    -- let c = head cs
-    -- createFunctionHistoryTable g c
-    -- insertFunctionHistoryTable g cs
-    pure ()
 
 createIndexTable :: OutputM m
                  => IORef Globals
                  -> ProcessedContract
                  -> ConduitM () Text m ()
 createIndexTable globalsIORef contract = do
-  globals <- readIORef globalsIORef
-  let hashVal = codehash contract
-      contractAlreadyCreated = hashVal `Set.member` createdContracts globals
+  let tableName = IndexTableName (organization contract) (application contract) (contractName contract)
+  contractAlreadyCreated <- isTableCreated globalsIORef tableName
 
   --When contract hasn't been written to "contract" table and indexing table doesn't exist
-  $logDebugLS "createIndexTable/contractAlreadyCreated" (hashVal, contractAlreadyCreated)
+  $logDebugLS "createIndexTable/contractAlreadyCreated" (tableName, contractAlreadyCreated)
   unless contractAlreadyCreated $ do
     incNumTables
     yield $ insertContractTableQuery contract
     yield $ createIndexTableQuery contract
-    setContractCreated globalsIORef hashVal
+    let list = tableColumns $ Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData contract
+    setTableCreated globalsIORef tableName list
 
 createHistoryTable :: OutputM m
                    => IORef Globals
                    -> ProcessedContract
                    -> ConduitM () Text m ()
 createHistoryTable globalsIORef contract = do
-  let hashVal = codehash contract
-  history <- isHistoric globalsIORef hashVal
-  when history $ do
+  let tableName = HistoryTableName (organization contract) (application contract) (contractName contract)
+  history <- isHistoric globalsIORef tableName
+  tableExists <- isTableCreated globalsIORef tableName
+  when (history && not tableExists) $ do
     incNumHistoryTables
     yield $ createHistoryTableQuery contract
     yield $ addHistoryUnique contract
+    let list = tableColumns $ Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData contract
+    setTableCreated globalsIORef tableName list
 
-      
+
+
+-- Runs ALTER TABLE <name> [ADD COLUMN <column>] for any new fields added to a contract definition   
+expandIndexTable :: OutputM m
+                 => IORef Globals
+                 -> [ProcessedContract]
+                 -> ConduitM () Text m ()
+expandIndexTable _ [] = return ()
+expandIndexTable globalsIORef lst@(x:_) = do
+  let tableName = IndexTableName (organization x) (application x) (contractName x)
+  expandTable globalsIORef lst tableName
+
+expandHistoryTable :: OutputM m
+                 => IORef Globals
+                 -> [ProcessedContract]
+                 -> ConduitM () Text m ()
+expandHistoryTable _ [] = return ()
+expandHistoryTable globalsIORef lst@(x:_) = do
+  let tableName = HistoryTableName (organization x) (application x) (contractName x)
+  expandTable globalsIORef lst tableName
+
+expandTable :: OutputM m
+            => IORef Globals
+            -> [ProcessedContract]
+            -> TableName
+            -> ConduitM () Text m ()
+expandTable _ [] _ = return ()
+expandTable globalsIORef (x:xs) tableName = do
+  columns <- getTableColumns globalsIORef tableName
+  case columns of
+    Nothing -> do
+      $logErrorLS "expandTable" $ T.concat 
+          [ "Table " 
+          , (tableNameToText tableName)
+          , " does not exist, but we are trying to expand it?"
+          ]
+      expandTable globalsIORef xs tableName
+    Just cols -> do
+      let list = tableColumns $ Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData x
+          extras = filter (not . flip elem cols) list
+      unless (null extras) $ do
+        $logInfoS "expandTable" . T.pack $ "We just got new fields for a contract that already has a table!"
+        $logInfoS "expandTable" $ T.concat
+            [ "Adding columns to "
+            , (tableNameToText tableName)
+            , " for the following new fields: "
+            , T.intercalate ", " extras
+            ]
+        setTableCreated globalsIORef tableName $ cols ++ extras
+        yield $ expandTableQuery tableName extras
+      expandTable globalsIORef xs tableName
+
+expandTableQuery :: TableName ->  TableColumns -> Text
+expandTableQuery tableName cols = T.concat
+  [ "ALTER TABLE "
+  , tableNameToText tableName
+   , " ADD COLUMN " 
+  , T.intercalate ", ADD COLUMN " cols
+  , ";"
+  ]
+
+
 insertIndexTable :: OutputM m
                  => IORef Globals
                  -> [ProcessedContract]
                  -> ConduitM () Text m ()
 insertIndexTable _ [] = error "insertIndexTable: unhandled empty list"
-insertIndexTable globalsIORef contracts@(x:_) = do
-  let hashVal = codehash x
-  index <- shouldIndex globalsIORef hashVal
-  when index . yield $ insertIndexTableQuery contracts
+insertIndexTable _ contracts = do
+  yield $ insertIndexTableQuery contracts
 
 insertHistoryTable :: OutputM m
                    => IORef Globals
@@ -241,8 +309,8 @@ insertHistoryTable :: OutputM m
                    -> ConduitM () Text m ()
 insertHistoryTable _ [] = error "insertHistoryTable: unhandled empty list"
 insertHistoryTable globalsIORef contracts@(x:_) = do
-  let hashVal = codehash x
-  history <- isHistoric globalsIORef hashVal
+  let tableName = HistoryTableName (organization x) (application x) (contractName x)
+  history <- isHistoric globalsIORef tableName
   when history . yield $ insertHistoryTableQuery contracts
 
 insertContractTableQuery :: ProcessedContract -> Text
@@ -263,6 +331,7 @@ insertContractTableQuery ProcessedContract{..} =
 
 createIndexTableQuery :: ProcessedContract -> Text
 createIndexTableQuery contract =
+  -- because we need to add the _pkey to tableName before wrapDoubleQuotes, we don't use tableNameToText
   let org = if T.null (organization contract) then "" else organization contract <> ":"
       app = if T.null (application contract)  then "" else application contract <> ":"
       tableName = escapeQuotes $ org <> app <> contractName contract
@@ -279,14 +348,10 @@ createIndexTableQuery contract =
 
 createHistoryTableQuery :: ProcessedContract -> Text
 createHistoryTableQuery contract =
-  let org = if T.null (organization contract) then "" else organization contract <> ":"
-      app = if T.null (application contract)  then "" else application contract <> ":"
-      tableName = escapeQuotes $ org <> app <> contractName contract
-      toHistory = (<>) "history@"
-      historyName = toHistory tableName
+  let tableName = HistoryTableName (organization contract) (application contract) (contractName contract)
       list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData contract
    in T.concat
-        [ "CREATE TABLE IF NOT EXISTS ", wrapDoubleQuotes historyName, " ("
+        [ "CREATE TABLE IF NOT EXISTS ", tableNameToText tableName, " ("
         , csv $ ["address text NOT NULL", "\"chainId\" text NOT NULL", "block_hash text NOT NULL", "block_timestamp text",
                  "block_number text", "transaction_hash text NOT NULL", "transaction_sender text",
                  "transaction_function_name text"]
@@ -307,9 +372,7 @@ addHistoryUnique contract =
 insertIndexTableQuery :: [ProcessedContract] -> Text
 insertIndexTableQuery [] = error "insertIndexTableQuery: unhandled empty list"
 insertIndexTableQuery contracts@(x:_) =
-  let org = if T.null (organization x) then "" else organization x <> ":"
-      app = if T.null (application x)  then "" else application x <> ":"
-      tableName = escapeQuotes $ org <> app <> contractName x
+  let tableName = IndexTableName (organization x) (application x) (contractName x)
       list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData x
       keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
       transactionFuncName = fromMaybe "" . fmap functioncalldataName . functionCallData
@@ -328,7 +391,7 @@ insertIndexTableQuery contracts@(x:_) =
       inserts = csv vals
    in T.concat
         [ "INSERT INTO "
-        , wrapDoubleQuotes tableName
+        , tableNameToText tableName
         , " "
         , keySt
         , "\n  VALUES "
@@ -351,11 +414,7 @@ insertIndexTableQuery contracts@(x:_) =
 insertHistoryTableQuery :: [ProcessedContract] -> Text
 insertHistoryTableQuery [] = error "insertHistoryTableQuery: unhandled empty list"
 insertHistoryTableQuery contracts@(x:_) =
-  let org = if T.null (organization x) then "" else organization x <> ":"
-      app = if T.null (application x)  then "" else application x <> ":"
-      tableName = escapeQuotes $ org <> app <> contractName x
-      toHistory = (<>) "history@"
-      historyName = toHistory tableName
+  let tableName = HistoryTableName (organization x) (application x) (contractName x)
       list = Map.toList . Map.map valueToSolidityValue . Map.filter isFunction $ contractData x
       keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
       transactionFuncName = fromMaybe "" . fmap functioncalldataName . functionCallData
@@ -374,7 +433,7 @@ insertHistoryTableQuery contracts@(x:_) =
       inserts = csv vals
    in T.concat $
         [ "INSERT INTO "
-        , wrapDoubleQuotes historyName
+        , tableNameToText tableName
         , " "
         , keySt
         , "\n  VALUES "
@@ -396,13 +455,14 @@ createEventTable :: OutputM m
                  -> EventTable
                  -> m (Maybe Text)
 createEventTable globalsIORef ev = do
-  globals <- readIORef globalsIORef
-  let eventTuple = (eventContractName ev, eventName ev)
-      eventAlreadyCreated = eventTuple `Set.member` createdEvents globals
+  let eventTable = EventTableName (eventOrganization ev) (eventApplication ev) (eventContractName ev) (eventName ev)
+  eventAlreadyCreated <- isTableCreated globalsIORef eventTable
   if eventAlreadyCreated then 
     return Nothing
   else do
-    setEventCreated globalsIORef eventTuple 
+    setTableCreated globalsIORef eventTable $ eventFields ev
+    let query = createEventTableQuery ev
+    $logInfoS "DAN" . T.pack $ "the event creation query: " ++ show query
     return (Just $ createEventTableQuery ev) 
 
 createEventTableQuery :: EventTable -> Text
@@ -431,10 +491,12 @@ insertEventTable :: OutputM m
                  -> AggregateEvent
                  -> m (Maybe Text)
 insertEventTable globalsIORef ev = do
-  globals <- readIORef globalsIORef
-  let eventTuple = (agContractName ev, agEventName ev)
-      eventExists = eventTuple `Set.member` createdEvents globals
-  if eventExists then return (Just $ insertEventTableQuery ev)
+  let eventTable = EventTableName (agOrganization ev) (agApplication ev) (agContractName ev) (agEventName ev)
+  eventExists <- isTableCreated globalsIORef eventTable
+  if eventExists then do 
+    let query = insertEventTableQuery ev
+    $logInfoS "DAN" . T.pack $ "the event creation query: " ++ show query
+    return (Just $ insertEventTableQuery ev)
   else return Nothing
 
 insertEventTableQuery :: AggregateEvent -> Text
