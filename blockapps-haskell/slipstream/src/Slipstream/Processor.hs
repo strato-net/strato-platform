@@ -26,10 +26,10 @@ import Control.Monad.Trans.State.Strict hiding (state)
 import Control.Monad.Trans.Class (lift)
 import qualified Data.Aeson as JSON
 import Data.Bifunctor (second)
-import Data.ByteString (ByteString)
+--import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
-import qualified Data.ByteString.Short as SB
+--import qualified Data.ByteString.Short as SB
 --import Data.Conduit
 -- import qualified Data.ByteString.Char8 as C8
 import Data.Either (lefts, rights)
@@ -39,7 +39,7 @@ import Data.Function
 import Data.Int (Int32)
 import Data.IORef
 import Data.List (foldl', sortOn)
-import qualified Data.Map.Ordered as OMap
+--import qualified Data.Map.Ordered as OMap
 import qualified Data.Map as Map
 import Data.Monoid ((<>))
 import Data.Maybe
@@ -48,15 +48,15 @@ import qualified Data.Text as T
 import Data.Text (Text)
 import Database.PostgreSQL.Typed (PGConnection)
 
-import Blockapps.Crossmon
+--import Blockapps.Crossmon
 
 import BlockApps.Bloc22.Database.Queries
 import BlockApps.Bloc22.Monad
 import BlockApps.Bloc22.Server.Utils
 import BlockApps.Logging
 import BlockApps.Solidity.Contract
-import BlockApps.Solidity.Type
-import BlockApps.Solidity.Struct
+--import BlockApps.Solidity.Type
+--import BlockApps.Solidity.Struct
 import BlockApps.Solidity.Value
 import BlockApps.Solidity.Xabi
 import BlockApps.XAbiConverter
@@ -75,7 +75,7 @@ import Slipstream.Events
 import Slipstream.Globals
 import Slipstream.Metrics
 import Slipstream.OutputData
-import Slipstream.SolidityValue
+--import Slipstream.SolidityValue
 
 diffNull :: BS.ActionDataDiff -> Bool
 diffNull (BS.ActionEVMDiff m) = Map.null m
@@ -89,7 +89,6 @@ mergeDiffs lhs rhs = error $ "Invalid diff combination: " ++ show (lhs, rhs)
 data BatchedInserts = BatchedInserts
   { indexInsert     :: ProcessedContract
   , historyInserts  :: [ProcessedContract]
-  , functionInserts :: [ProcessedContract]
   , eventCreations  :: [EventTable]
   } deriving (Show)
 
@@ -122,7 +121,7 @@ combineActions (x:xs) = foldl' merge x xs
 
 splitActions :: [AggregateAction] -> [(Account, [AggregateAction])]
 splitActions = partitionWith actionAccount
-
+{-
 functionDetailsFromContract :: Contract -> ByteString -> (Text, ([(Text, Type)],[(Maybe Text, Type)]))
 functionDetailsFromContract contract selector' =
   let selector = B.take 4 selector'
@@ -168,6 +167,7 @@ getFunctionCallValues xabi input' output' =
                ([0..] :: [Integer])
                (typemap output' otypes)
    in (fname,imap,omap)
+-}
 
 data ABIID = ABIID { aiAbi :: Text
                    , aiName :: Text
@@ -195,7 +195,7 @@ processedContract ABIID{..} state AggregateAction{..} =
     , transactionSender = actionTxSender ^. accountAddress
     , functionCallData = Nothing
     }
-
+{-
 makeFunctionInserts :: Xabi
                     -> ABIID
                     -> Map.Map Text Value
@@ -232,6 +232,8 @@ makeFunctionInserts xabi ABIID{..} state AggregateAction{..} =
           , functioncalldataOutput = o
           }
       }
+
+-}
 
 lookupT :: (Monad m, Ord k) => k -> Map.Map k v -> MaybeT m v
 lookupT k = MaybeT . return . Map.lookup k
@@ -291,6 +293,7 @@ adjustGlobals :: IORef Globals
               -> ContractDetails
               -> Bloc ()
 adjustGlobals gref shouldCompile row details = do
+  -- TODO: because this uses HistoryTableName directly - this won't work if we add other (non-history) globals
   let go m (k,f) = runMaybeT $ do
         v <- lookupT k $ actionMetadata row
         let contracts = filter (not . T.null) $ T.splitOn "," v
@@ -298,8 +301,7 @@ adjustGlobals gref shouldCompile row details = do
           (_, details') <- lookupT c m
           let codePtr = convertToSlipCodePtr (contractdetailsCodeHash details') (actionOrganization row)
           $logInfoS "adjustGlobals" . T.pack $ "Adding to globals for " ++ T.unpack k ++ ": " ++ show codePtr
-          lift $ f gref codePtr
-
+          lift $ f gref $ HistoryTableName (actionOrganization row) (actionApplication row) (contractdetailsName details')
  
 
   -- if we pass Don't Compile, we assume it's SolidVMCode, and use details from cache
@@ -314,10 +316,6 @@ adjustGlobals gref shouldCompile row details = do
   -- TODO: ideally we check if these flags are in the metadata BEFORE we get the detailsMap
   mapM_ (go detailsMap) $ [("history", addToHistoryList)
                           ,("nohistory", removeFromHistoryList)
-                          ,("noindex", addToNoIndexList)
-                          ,("index", removeFromNoIndexList)
-                          ,("functionhistory", addToFunctionHistoryList)
-                          ,("nofunctionhistory", removeFromFunctionHistoryList)
                           ]
 
 ensureContractInstance :: IORef Globals -> Int32 -> AggregateAction -> Bloc ()
@@ -349,10 +347,10 @@ rowToInsert gref abiid row cont oldState = do
   return $ processedContract abiid (Map.fromList $ newState) row
 
 rowToHistories :: IORef Globals -> ABIID -> AggregateAction -> [AggregateAction] -> Contract
-               -> ContractDetails -> [(Text, Value)]
+               -> [(Text, Value)]
                -> Bloc ([ProcessedContract], [ProcessedContract])
-rowToHistories gref abiid row actions cont details oldState = do
-  hist <- isHistoric gref $ actionCodeHash row
+rowToHistories gref abiid row actions cont oldState = do
+  hist <- isHistoric gref $ HistoryTableName (actionOrganization row) (actionApplication row) (aiName abiid)
   second join . unzip <$> if not hist
     then pure []
     else flip evalStateT oldState . forM actions $ \hRow -> do
@@ -361,14 +359,7 @@ rowToHistories gref abiid row actions cont details oldState = do
                   BS.ActionSolidVMDiff mp -> SolidVM.decodeCacheValues mp
       newMap <- gets Map.fromList
       let hInsert = processedContract abiid newMap hRow
-      functionHist <- isFunctionHistoric gref $ actionCodeHash hRow
-      fInserts <- if not functionHist
-                    then pure []
-                    else lift $ makeFunctionInserts
-                                  (contractdetailsXabi details)
-                                  abiid
-                                  newMap
-                                  hRow
+      fInserts <- pure [] -- TODO: remove the fInserts altogether
       pure (hInsert, fInserts)
 
 
@@ -448,8 +439,8 @@ processTheMessages env conn g messages = do
 
               oldState <- readPreviousEVMState g acct cont
               indexContract <- rowToInsert g abiid row cont oldState
-              (hs, fhs) <- rowToHistories g abiid row actions cont details oldState
-              pure . Right $ BatchedInserts indexContract hs fhs []
+              (hs, _) <- rowToHistories g abiid row actions cont oldState
+              pure . Right $ BatchedInserts indexContract hs []
         BS.ActionSolidVMDiff{} -> do
           mName <- getSolidVMDetailsForRow g row
           case mName of
@@ -467,13 +458,14 @@ processTheMessages env conn g messages = do
               adjustGlobals g (Don't Compile) row details
               oldState <- readPreviousSolidVMState g acct
               indexContract <- rowToInsert g abiid row cont oldState
-              (hs, fhs) <- rowToHistories g abiid row actions cont details oldState
+              (hs, _) <- rowToHistories g abiid row actions cont oldState
               eventTables <- createEvents details (actionOrganization row) (actionApplication row)
-              pure . Right $ BatchedInserts indexContract hs fhs eventTables
+              pure . Right $ BatchedInserts indexContract hs eventTables
 
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
 
+  -- TODO: might need to group inserts by TableName
   let insertsByCodeHash = map snd
                         -- SolidVM contracts can have the same codehash and be different:
                         -- the codehash is just a sourcehash.
@@ -481,9 +473,8 @@ processTheMessages env conn g messages = do
                         $ rights inserts
   forM_ (rights inserts) $ $logDebugLS "processTheMessages/toInsert"
   forM_ insertsByCodeHash $ \ins -> do
-    outputData conn . createInsertIndexTable g $ map indexInsert ins
-    outputData conn . createInsertHistoryTable g $ concatMap historyInserts ins
-    outputData conn . createInsertFunctionHistoryTable g $ concatMap functionInserts ins
+    outputData conn . createExpandInsertIndexTable g $ map indexInsert ins
+    outputData conn . createExpandInsertHistoryTable g $ concatMap historyInserts ins
     when (length (concatMap eventCreations ins) > 0) $
       outputData conn . createEventTables g $ concatMap eventCreations ins
   

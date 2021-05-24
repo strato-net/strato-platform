@@ -39,7 +39,7 @@ import           Slipstream.GlobalsColdStorage
 import           Slipstream.Metrics
 
 newGlobals :: MonadIO m => Handle -> m (IORef Globals)
-newGlobals = newIORef . Globals Set.empty Set.empty Set.empty Set.empty Set.empty Set.empty HM.empty (LRU.newLRU (Just 1024))
+newGlobals = newIORef . Globals M.empty Set.empty Set.empty HM.empty (LRU.newLRU (Just 1024))
 
 updateGlobals :: MonadIO m => IORef Globals -> Globals -> m ()
 updateGlobals gref g = do
@@ -67,17 +67,23 @@ getContractABIs gref (SolidVMCode _ _ !codeHash) = do
 getContractABIs _ (EVMCode _) = error "cannot use the contractABIs cache for EVM contracts"
 getContractABIs _ (CodeAtAccount _ _) = error "cannot use the contractABIs cache for CodeAtAccount contracts"
 
-setContractCreated :: MonadIO m => IORef Globals -> CodePtr -> m ()
-setContractCreated globalsIORef codeHash = do
+setTableCreated :: MonadIO m => IORef Globals -> TableName -> TableColumns -> m ()
+setTableCreated globalsIORef tableName tableColumns = do
   globals@Globals{..} <- readIORef globalsIORef
-  updateGlobals globalsIORef globals{createdContracts=Set.insert codeHash createdContracts}
+  updateGlobals globalsIORef globals{createdTables=M.insert tableName tableColumns createdTables}
 
-isContractCreated :: MonadIO m => IORef Globals -> CodePtr -> m Bool
-isContractCreated globalsIORef codeHash = do
+isTableCreated :: MonadIO m => IORef Globals -> TableName -> m Bool
+isTableCreated globalsIORef tableName = do
   Globals{..} <- readIORef globalsIORef
-  return $ codeHash `Set.member` createdContracts
+  return $ tableName `M.member` createdTables
 
--- Hopefully temporary, just to remove extra calls to bloc in ensureContractInstance
+getTableColumns :: MonadIO m => IORef Globals -> TableName -> m (Maybe TableColumns)
+getTableColumns globalsIORef tableName = do
+  Globals{..} <- readIORef globalsIORef
+  return $ M.lookup tableName createdTables
+
+-- this "instance" is actually whether there is row in the blo22 contractsSourceTable for a given codeHash
+-- caching the record of its existence in that table prevents an extra call to bloc to make sure it's there
 setInstanceCreated :: MonadIO m => IORef Globals -> CodePtr -> m ()
 setInstanceCreated globalsIORef codeHash = do
   globals@Globals{..} <- readIORef globalsIORef
@@ -89,66 +95,26 @@ isInstanceCreated globalsIORef codeHash = do
   return $ codeHash `Set.member` createdInstances
 
 
-setEventCreated :: MonadIO m => IORef Globals -> (Text, Text) -> m ()
-setEventCreated globalsIORef evTup = do
-  globals@Globals{..} <- readIORef globalsIORef
-  updateGlobals globalsIORef globals{createdEvents=Set.insert evTup createdEvents}
-
-isHistoric :: (MonadLogger m, MonadIO m) => IORef Globals -> CodePtr -> m Bool
+isHistoric :: (MonadLogger m, MonadIO m) => IORef Globals -> TableName -> m Bool
 isHistoric globalsIORef name = do
   Globals{..} <- readIORef globalsIORef
   $logInfoS "isHistoric" . T.pack $ "Checking history status of " ++ show name
   $logInfoS "isHistoric" . T.pack $ "History list: " ++ show historyList
   return $ name `Set.member` historyList
 
-isFunctionHistoric :: MonadIO m => IORef Globals -> CodePtr -> m Bool
-isFunctionHistoric globalsIORef name = do
-  Globals{..} <- readIORef globalsIORef
-  return $ name `Set.member` functionHistoryList
-
-getHistoryList :: MonadIO m => IORef Globals -> m (Set CodePtr)
+getHistoryList :: MonadIO m => IORef Globals -> m (Set TableName)
 getHistoryList = fmap historyList . readIORef
 
-getFunctionHistoryList :: MonadIO m => IORef Globals -> m (Set CodePtr)
-getFunctionHistoryList = fmap functionHistoryList . readIORef
-
-addToHistoryList :: MonadIO m => IORef Globals -> CodePtr -> m ()
-addToHistoryList g k = do
+addToHistoryList :: MonadIO m => IORef Globals -> TableName -> m ()
+addToHistoryList g tableName = do
   globals@Globals{..} <- readIORef g
-  updateGlobals g globals{historyList=Set.insert k historyList}
+  updateGlobals g globals{historyList=Set.insert tableName historyList}
 
-removeFromHistoryList :: MonadIO m => IORef Globals -> CodePtr -> m ()
-removeFromHistoryList g k = do
+removeFromHistoryList :: MonadIO m => IORef Globals -> TableName -> m ()
+removeFromHistoryList g tableName = do
   globals@Globals{..} <- readIORef g
-  updateGlobals g globals{historyList=Set.delete k historyList}
+  updateGlobals g globals{historyList=Set.delete tableName historyList}
 
-shouldIndex :: MonadIO m => IORef Globals -> CodePtr -> m Bool
-shouldIndex globalsIORef name = do
-  Globals{..} <- readIORef globalsIORef
-  return . not $ name `Set.member` noIndexList
-
-getNoIndexList :: MonadIO m => IORef Globals -> m (Set CodePtr)
-getNoIndexList = fmap noIndexList . readIORef
-
-addToNoIndexList :: MonadIO m => IORef Globals -> CodePtr -> m ()
-addToNoIndexList g k = do
-  globals@Globals{..} <- readIORef g
-  updateGlobals g globals{noIndexList=Set.insert k noIndexList}
-
-removeFromNoIndexList :: MonadIO m => IORef Globals -> CodePtr -> m ()
-removeFromNoIndexList g k = do
-  globals@Globals{..} <- readIORef g
-  updateGlobals g globals{noIndexList=Set.delete k noIndexList}
-
-addToFunctionHistoryList :: MonadIO m => IORef Globals -> CodePtr -> m ()
-addToFunctionHistoryList g k = do
-  globals@Globals{..} <- readIORef g
-  updateGlobals g globals{functionHistoryList=Set.insert k functionHistoryList}
-
-removeFromFunctionHistoryList :: MonadIO m => IORef Globals -> CodePtr -> m ()
-removeFromFunctionHistoryList g k = do
-  globals@Globals{..} <- readIORef g
-  updateGlobals g globals{functionHistoryList=Set.delete k functionHistoryList}
 
 getContractState :: MonadIO m => IORef Globals -> Account -> m (Maybe [(Text,Value)])
 getContractState globalsIORef account = do

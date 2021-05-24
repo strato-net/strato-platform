@@ -49,5 +49,7 @@ data EventTable = EventTable
   , eventApplication  :: Text
   , eventContractName :: Text
   , eventName         :: Text
-  , eventFields       :: [Text]
+  , eventFields       :: TableColumns
   } deriving (Show)
+
+
