@@ -130,7 +130,6 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
                 bcp = ContractParameters
                         addr
                         (getSrc p)
-                        (contractpayloadCodePtr p)
                         (contractpayloadContract p)
                         (contractpayloadArgs p)
                         (contractpayloadValue p)
@@ -148,14 +147,13 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
           xs -> do
             ps <- mapM fromContract xs
             uploadListContract <-
-                forM ps $ \p@(ContractPayload _ maybeCodePtr maybeC a v x cid m) -> do
+                forM ps $ \p@(ContractPayload _ maybeC a v x cid m) -> do
                   c <- case maybeC of
                          Nothing -> throwIO $ UserError $ Text.pack $ "missing contract source"
                          Just c' -> return c'
                   return $
                     UploadListContract c
                                        (getSrc p)
-                                       (maybeCodePtr)
                                        (fromMaybe Map.empty a)
                                        (mergeTxParams x txParams)
                                        v cid m

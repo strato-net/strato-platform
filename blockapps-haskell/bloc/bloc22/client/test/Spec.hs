@@ -101,7 +101,6 @@ setup = do
     uploadListContract1 = UploadListContract
       { uploadlistcontractContractName = simpleStorageContractName testConfig
       , uploadlistcontractSrc = mempty
-      , uploadlistcontractCodePtr = Nothing
       , uploadlistcontractArgs = Map.empty
       , _uploadlistcontractTxParams = testTxParams testConfig
       , uploadlistcontractValue = Nothing
