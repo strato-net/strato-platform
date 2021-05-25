@@ -117,6 +117,5 @@ export {
   Member,
   Balance,
   Chain,
-  SendTx,
-  CodePtr
+  SendTx
 };

@@ -20,8 +20,7 @@ import {
   Contract,
   ContractDefinition,
   CallArgs,
-  SendTx,
-  CodePtr
+  SendTx
 } from "./types";
 
 
