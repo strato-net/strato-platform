@@ -107,7 +107,7 @@ data AggregateEvent = AggregateEvent
   , agContractName         :: Text
   , agContractAccount      :: Account
   , agEventName            :: Text
-  , agEventArgs            :: [Text]
+  , agEventArgs            :: [(Text, Text)]
   } deriving (Show, Generic, NFData)
 
 
@@ -119,7 +119,7 @@ squash Action{..} = flip map (toList _actionEvents)
     , agContractName          = T.pack $ evContractName ev
     , agContractAccount       = evContractAccount ev
     , agEventName             = T.pack $ evName ev
-    , agEventArgs             = map T.pack (evArgs ev)
+    , agEventArgs             = map (\(x,y) -> (T.pack x, T.pack y)) $ evArgs ev
     }
   )
  

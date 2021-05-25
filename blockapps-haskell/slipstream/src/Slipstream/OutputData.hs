@@ -243,7 +243,7 @@ expandIndexTable :: OutputM m
 expandIndexTable _ [] = return ()
 expandIndexTable globalsIORef lst@(x:_) = do
   let tableName = IndexTableName (organization x) (application x) (contractName x)
-  expandTable globalsIORef lst tableName
+  expandContractTable globalsIORef lst tableName
 
 expandHistoryTable :: OutputM m
                  => IORef Globals
@@ -252,15 +252,15 @@ expandHistoryTable :: OutputM m
 expandHistoryTable _ [] = return ()
 expandHistoryTable globalsIORef lst@(x:_) = do
   let tableName = HistoryTableName (organization x) (application x) (contractName x)
-  expandTable globalsIORef lst tableName
+  expandContractTable globalsIORef lst tableName
 
-expandTable :: OutputM m
-            => IORef Globals
-            -> [ProcessedContract]
-            -> TableName
-            -> ConduitM () Text m ()
-expandTable _ [] _ = return ()
-expandTable globalsIORef (x:xs) tableName = do
+expandContractTable :: OutputM m
+                    => IORef Globals
+                    -> [ProcessedContract]
+                    -> TableName
+                    -> ConduitM () Text m ()
+expandContractTable _ [] _ = return ()
+expandContractTable globalsIORef (x:xs) tableName = do
   columns <- getTableColumns globalsIORef tableName
   case columns of
     Nothing -> do
@@ -269,7 +269,7 @@ expandTable globalsIORef (x:xs) tableName = do
           , (tableNameToText tableName)
           , " does not exist, but we are trying to expand it?"
           ]
-      expandTable globalsIORef xs tableName
+      expandContractTable globalsIORef xs tableName
     Just cols -> do
       let list = tableColumns $ Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData x
           extras = filter (not . flip elem cols) list
@@ -283,7 +283,7 @@ expandTable globalsIORef (x:xs) tableName = do
             ]
         setTableCreated globalsIORef tableName $ cols ++ extras
         yield $ expandTableQuery tableName extras
-      expandTable globalsIORef xs tableName
+      expandContractTable globalsIORef xs tableName
 
 expandTableQuery :: TableName ->  TableColumns -> Text
 expandTableQuery tableName cols = T.concat
@@ -300,8 +300,7 @@ insertIndexTable :: OutputM m
                  -> [ProcessedContract]
                  -> ConduitM () Text m ()
 insertIndexTable _ [] = error "insertIndexTable: unhandled empty list"
-insertIndexTable _ contracts = do
-  yield $ insertIndexTableQuery contracts
+insertIndexTable _ contracts = yield $ insertIndexTableQuery contracts
 
 insertHistoryTable :: OutputM m
                    => IORef Globals
@@ -441,6 +440,8 @@ insertHistoryTableQuery contracts@(x:_) =
         , "\n  ON CONFLICT DO NOTHING;"
         ]
 
+
+
 -- Creates tables for all event declarations, stores table name in
 -- globals{createdEvents}
 createEventTables :: OutputM m
@@ -461,24 +462,65 @@ createEventTable globalsIORef ev = do
     return Nothing
   else do
     setTableCreated globalsIORef eventTable $ eventFields ev
-    let query = createEventTableQuery ev
-    $logInfoS "DAN" . T.pack $ "the event creation query: " ++ show query
     return (Just $ createEventTableQuery ev) 
 
 createEventTableQuery :: EventTable -> Text
 createEventTableQuery ev =
-  let org = if T.null (eventOrganization ev) then "" else eventOrganization ev <> ":"
-      app = if T.null (eventApplication ev)  then "" else eventApplication ev <> ":"
-      tableName = T.concat [org, app, (eventContractName ev),  ".", (eventName ev)]
+  let tableName = EventTableName (eventOrganization ev) (eventApplication ev) (eventContractName ev) (eventName ev)
+      cols = csv $ ["id SERIAL NOT NULL", "address text"] ++ 
+                (map (\t -> T.concat [wrapDoubleQuotes t, " text"]) $ eventFields ev) 
   in T.concat   
-      [ "CREATE TABLE IF NOT EXISTS " , wrapDoubleQuotes tableName , " ("
-        , csv $ ["id SERIAL NOT NULL", "address text"] ++ (map (\t -> T.concat [wrapDoubleQuotes t, " text"]) $ eventFields ev) 
-        , ");"]
+      [ "CREATE TABLE IF NOT EXISTS " 
+      , tableNameToText tableName
+      ," ("
+      , cols
+      , ");"
+      ]
 
--- Inserts rows for all event emissions into their respective tables
+-- Inserts rows for all event emissions into their respective tables, expands tables if necessary
 --   Though this function checks that the tables exist before
 --   generating the insert query, the VM should prevent undeclared
 --   events from being emitted (it should also do an argument check)
+insertExpandEventTables :: OutputM m
+                        => IORef Globals
+                        -> [AggregateEvent]
+                        -> ConduitM () Text m ()
+insertExpandEventTables _ [] = return ()
+insertExpandEventTables globalsIORef events = do
+  expandEventTables globalsIORef events
+  insertEventTables globalsIORef events
+
+expandEventTables :: OutputM m
+                  => IORef Globals
+                  -> [AggregateEvent]
+                  -> ConduitM () Text m ()
+expandEventTables _ [] = return ()
+expandEventTables globalsIORef (x:xs) = do
+  let tableName = EventTableName (agOrganization x) (agApplication x) (agContractName x) (agEventName x)
+  columns <- getTableColumns globalsIORef tableName
+  case columns of
+    Nothing -> do
+      $logErrorLS "expandEventTable" $ T.concat 
+          [ "Table " 
+          , (tableNameToText tableName)
+          , " does not exist, but we are trying to expand it?"
+          ]
+      expandEventTables globalsIORef xs
+    Just cols -> do
+      let extras = filter (not . flip elem cols) (map fst $ agEventArgs x)
+      unless (null extras) $ do
+        $logInfoS "expandEventTable" . T.pack $ "We just got new fields for a contract that already has a table!"
+        $logInfoS "expandEventTable" $ T.concat
+            [ "Adding columns to "
+            , (tableNameToText tableName)
+            , " for the following new fields: "
+            , T.intercalate ", " extras
+            ]
+        setTableCreated globalsIORef tableName $ cols ++ extras
+        let extrasWithType = map (\t -> T.concat [wrapDoubleQuotes t, " text"]) extras
+        yield $ expandTableQuery tableName extrasWithType
+      expandEventTables globalsIORef xs
+
 insertEventTables :: OutputM m
                   => IORef Globals
                   -> [AggregateEvent]
@@ -495,23 +537,25 @@ insertEventTable globalsIORef ev = do
   eventExists <- isTableCreated globalsIORef eventTable
   if eventExists then do 
     let query = insertEventTableQuery ev
-    $logInfoS "DAN" . T.pack $ "the event creation query: " ++ show query
+    $logInfoS "DAN" . T.pack $ "the event insertion query: " ++ show query
     return (Just $ insertEventTableQuery ev)
   else return Nothing
 
 insertEventTableQuery :: AggregateEvent -> Text
 insertEventTableQuery ev = 
- let org = if T.null (agOrganization ev) then "" else agOrganization ev <> ":"
-     app = if T.null (agApplication ev)  then "" else agApplication ev <> ":"
-     tableName = T.concat [org, app, (agContractName ev), ".", (agEventName ev)]
+ let tableName = EventTableName (agOrganization ev) (agApplication ev) (agContractName ev) (agEventName ev)
+     cols = wrapAndEscapeDouble . map escapeQuotes $ ["id", "address"] ++ (map fst $ agEventArgs ev)
+     vals = csv $ map (wrapSingleQuotes . snd) $ agEventArgs ev
  in T.concat
         [ "INSERT INTO "
-        ,  wrapDoubleQuotes tableName
+        , tableNameToText tableName
+        , " "
+        , cols
         , " VALUES "
         , "( DEFAULT,\n" -- id, set by Postgres
         , wrapSingleQuotes $ tshow $ agContractAccount ev
         , ",\n"
-        , csv $ map wrapSingleQuotes $ agEventArgs ev
-        ,  " )"
-        , "\n  ON CONFLICT DO NOTHING;"
+        , vals
+        ,  " );"
+        , "\n"--  ON CONFLICT DO NOTHING;"
         ]

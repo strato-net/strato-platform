@@ -146,7 +146,7 @@ spec = do
                   ("hash", V.SimpleValue $ V.ValueString "Owner_hash_181999847806006")]]
             }]
       g <- newGlobals fakeHandle
-      addToHistoryList g cHash
+      addToHistoryList g (HistoryTableName "" "" "Vehicle")
       [contractInsert, vehicleCreate, historyCreate, historyIndex, vehicleInsert, historyInsert]
         <- runLoggingT . runConduit $ createInserts g input .| sinkList
 
@@ -492,7 +492,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
           }]
     g <- newGlobals fakeHandle
 
-    cs <- runLoggingT . runConduit $ createInsertIndexTable g input .| sinkList
+    cs <- runLoggingT . runConduit $ createExpandInsertIndexTable g input .| sinkList
     cs `shouldNotBe` []
 
   it "can use solidvm without application nor organization" $ do
