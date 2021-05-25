@@ -154,16 +154,16 @@ tableNameToText :: TableName -> Text
 tableNameToText (IndexTableName o a c) = 
   let org = if T.null o then "" else o <> ":"
       app = if T.null a then "" else a <> ":"
-  in wrapDoubleQuotes $ escapeQuotes org <> app <> c
+  in wrapDoubleQuotes $ escapeQuotes $ org <> app <> c
 tableNameToText (HistoryTableName o a c) = 
   let org = if T.null o then "" else o <> ":"
       app = if T.null a then "" else a <> ":"
-  in wrapDoubleQuotes $ escapeQuotes "history@" <> org <> app <> c
+  in wrapDoubleQuotes $ escapeQuotes $ "history@" <> org <> app <> c
 tableNameToText (EventTableName o a c e) = 
   let org = if T.null o then "" else o <> ":"
       app = if T.null a then "" else a <> ":"
       contractAndEvent = c <> "." <> e
-  in wrapDoubleQuotes $ escapeQuotes org <> app <> contractAndEvent
+  in wrapDoubleQuotes $ escapeQuotes $ org <> app <> contractAndEvent
 
 createInserts :: OutputM m
               => IORef Globals

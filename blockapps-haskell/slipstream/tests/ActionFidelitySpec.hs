@@ -108,12 +108,12 @@ spec = describe "Action conversions" $ do
            "src": "contract Vehicle {}"
          },
          "events" : 
-         [ { "eventContractName" : "Vehicle",
-             "eventContractOrganization": "BlockApps2",
+         [ { "eventContractOrganization": "BlockApps2",
              "eventContractApplication": "LogisticsEngine2",
+             "eventContractName" : "Vehicle",
              "eventContractAccount" : "2e385b6a3aea46d4172df98617b5385c13b7100d",
              "eventName" : "Vehicle Event",
-             "eventArgs" : ["x", "y"]
+             "eventArgs" : [["field", "value"], ["anotherField", "anotherValue"]]
            }
          ]
        }|]
@@ -149,5 +149,6 @@ spec = describe "Action conversions" $ do
             }]
           }
         , SS._actionMetadata = Just . M.fromList $ [("name", "Vehicle"), ("src", "contract Vehicle {}")]
-        , SS._actionEvents = S.singleton $ Event "" "" "Vehicle" (Account 0x2e385b6a3aea46d4172df98617b5385c13b7100d Nothing) "Vehicle Event" [("x", "10")]
+        , SS._actionEvents = S.singleton $ Event "BlockApps2" "LogisticsEngine2" "Vehicle" (Account 0x2e385b6a3aea46d4172df98617b5385c13b7100d Nothing) "Vehicle Event" [("field", "value"), ("anotherField", "anotherValue")]
+         
       })
