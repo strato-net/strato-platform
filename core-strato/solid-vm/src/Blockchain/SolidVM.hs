@@ -759,6 +759,7 @@ runStatement st@(Xabi.EmitStatement eventName exptups pos) = do
   expVals <- mapM getVar exps
   expStrs <- mapM showSM expVals
 
+
   -- checks that the event is declared and that the number of args match
   --   DOES NOT check consistency of arg types
   curInfo <- getCurrentCallInfo
@@ -772,6 +773,7 @@ runStatement st@(Xabi.EmitStatement eventName exptups pos) = do
       if (length exptups) /= (length $ Xabi.eventLogs ev) then 
         invalidArguments "arguments to statement are inconsistent with those declared" (unparseStatement st)
       else do
+        -- lookup the org and app for this contract
         maybeCert <- x509CertDBGet $ _accountAddress $ currentAccount curInfo
         let organization = fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
         myAction <- Mod.get (Mod.Proxy @Action)
@@ -779,7 +781,10 @@ runStatement st@(Xabi.EmitStatement eventName exptups pos) = do
             appName = case actionData' of
                             Just aD -> _actionDataApplication aD 
                             Nothing -> ""
-        addEvent $ Event organization (T.unpack appName) (_contractName curCnct) (currentAccount curInfo) eventName expStrs
+        
+        -- pair up field names with values one-by-one (no type checking tho, lol)
+        let pairs = zip (map (T.unpack . fst) $ Xabi.eventLogs ev) expStrs
+        addEvent $ Event organization (T.unpack appName) (_contractName curCnct) (currentAccount curInfo) eventName pairs
         return Nothing
 
 

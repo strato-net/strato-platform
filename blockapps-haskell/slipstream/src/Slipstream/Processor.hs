@@ -479,6 +479,6 @@ processTheMessages env conn g messages = do
       outputData conn . createEventTables g $ concatMap eventCreations ins
   
   when (length events > 0) $ 
-    outputData conn $ insertEventTables g events
+    outputData conn $ insertExpandEventTables g events
   flushPendingWrites g
   
