@@ -65,15 +65,9 @@ interface OAuthUser {
 interface ContractDefinition {
   source:string,
   name:string,
-  codePtr:CodePtr,
   args:any,
   chainid?:any,
   txParams?:any
-}
-
-interface CodePtr {
-  account:string,
-  name:string
 }
 
 interface Contract {
