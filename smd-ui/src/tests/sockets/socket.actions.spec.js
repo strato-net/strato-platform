@@ -14,7 +14,7 @@ import {
   GET_PEERS,
   GET_COINBASE,
   BLOCKS_FREQUENCY,
-  GET_NODE_UPTINE,
+  GET_NODE_UPTIME,
   GET_HEALTH
 } from '../../sockets/rooms';
 
@@ -72,7 +72,7 @@ describe('Socket: action', () => {
 
 
     test('uptime', () => {
-      expect(subscribeRoom(GET_NODE_UPTINE)).toMatchSnapshot();
+      expect(subscribeRoom(GET_NODE_UPTIME)).toMatchSnapshot();
     });
   })
 
@@ -129,7 +129,7 @@ describe('Socket: action', () => {
 
 
     test('uptime', () => {
-      expect(unSubscribeRoom(GET_NODE_UPTINE)).toMatchSnapshot();
+      expect(unSubscribeRoom(GET_NODE_UPTIME)).toMatchSnapshot();
     });
 
 
