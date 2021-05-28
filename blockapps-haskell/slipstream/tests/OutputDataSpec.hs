@@ -494,3 +494,124 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
 
     cs <- runLoggingT . runConduit $ createInsertIndexTable g input .| sinkList
     cs `shouldNotBe` []
+
+  it "can use solidvm without application nor organization" $ do
+    let testAdd = Address 0x98eaddede
+        input = [ProcessedContract {
+          address = testAdd,
+          codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- $ hash "<CODEHASH>",
+          abi = "<ABI>",
+          organization = "",
+          application = "",
+          contractName = "SwissArmy",
+          chain = "<CHAIN>",
+          blockHash = hash "<BLOCKHASH>",
+          blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
+          blockNumber = 123,
+          transactionHash = hash "<TRANSACTIONHASH>",
+          transactionSender = testAdd,
+          functionCallData = Nothing,
+          contractData = M.fromList
+            [ ("addr", addr 0xdeadbeef)
+            , ("boolean", bool True)
+            , ("contract", V.ValueContract $ unspecifiedChain 0x999)
+            , ("number", int 77714314)
+            , ("str", bytes "Hello, World!")
+            , ("enum_val", V.ValueEnum "E" "C" 0x234)
+            , ("array_nums", V.ValueArrayDynamic . I.fromList
+                $ zip [1..] [int 20, int 40, int 77, V.ValueArraySentinel 5])
+            , ("strukt", V.ValueStruct $ M.fromList
+                [ ("first_field", int 887)
+                , ("second_field", bytes "CLOROX DISINFECTING WIPES")
+                ])
+            , ("set", V.ValueMapping $ M.fromList
+                [ (V.valueInt 22, bool True)
+                , (V.valueInt 23, bool True)
+                , (V.valueInt 46, bool True)
+                ])
+            ]
+          }]
+
+    g <- newGlobals fakeHandle
+    [contractInsert, swissArmyCreate, swissArmyInsert] <-
+        runLoggingT . runConduit $ createInserts g input .| sinkList
+
+    contractInsert `shouldBe` [r|INSERT INTO contract ("codeHash", contract, abi, "chainId")
+  VALUES ('c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470',
+    'SwissArmy',
+    '<ABI>',
+    '<CHAIN>')
+  ON CONFLICT DO NOTHING;|]
+
+    swissArmyCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy" (address text,
+    "chainId" text,
+    block_hash text,
+    block_timestamp text,
+    block_number text,
+    transaction_hash text,
+    transaction_sender text,
+    transaction_function_name text,
+    "addr" text,
+    "array_nums" jsonb,
+    "boolean" bool,
+    "contract" text,
+    "enum_val" text,
+    "number" bigint,
+    "set" jsonb,
+    "str" text,
+    "strukt" jsonb,
+  CONSTRAINT "SwissArmy_pkey"
+  PRIMARY KEY (address, "chainId") );|]
+
+    swissArmyInsert `shouldBe` [r|INSERT INTO "SwissArmy" ("address",
+    "chainId",
+    "block_hash",
+    "block_timestamp",
+    "block_number",
+    "transaction_hash",
+    "transaction_sender",
+    "transaction_function_name",
+    "addr",
+    "array_nums",
+    "boolean",
+    "contract",
+    "enum_val",
+    "number",
+    "set",
+    "str",
+    "strukt")
+  VALUES ('000000000000000000000000000000098eaddede',
+    '<CHAIN>',
+    '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
+    '2018-09-16 18:28:52.607875 UTC',
+    '123',
+    '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
+    '000000000000000000000000000000098eaddede',
+    '',
+    '00000000000000000000000000000000deadbeef',
+    '["0","20","40","77","0"]',
+    'True',
+    '0000000000000000000000000000000000000999',
+    '564',
+    '77714314',
+    '[["22",true],["23",true],["46",true]]',
+    'Hello, World!',
+    '[["first_field","887"],["second_field","CLOROX DISINFECTING WIPES"]]')
+  ON CONFLICT (address, "chainId") DO UPDATE SET
+    address = excluded.address,
+    "chainId" = excluded."chainId",
+    block_hash = excluded.block_hash,
+    block_timestamp = excluded.block_timestamp,
+    block_number = excluded.block_number,
+    transaction_hash = excluded.transaction_hash,
+    transaction_sender = excluded.transaction_sender,
+    transaction_function_name = excluded.transaction_function_name,
+    "addr" = excluded."addr",
+    "array_nums" = excluded."array_nums",
+    "boolean" = excluded."boolean",
+    "contract" = excluded."contract",
+    "enum_val" = excluded."enum_val",
+    "number" = excluded."number",
+    "set" = excluded."set",
+    "str" = excluded."str",
+    "strukt" = excluded."strukt";|]
