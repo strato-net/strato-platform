@@ -256,9 +256,25 @@ create' creator newAccount ch cc contractName' argExps x509s = do
 
   onTraced $ liftIO $ putStrLn $ C.red $ "Done Creating Contract: " ++ show newAccount ++ " of type " ++ contractName'
 
-  finalAct <- Mod.get (Mod.Proxy @Action)
   finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
   x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
+
+
+  -- make sure the org is updated
+  maybeCertLevelDB <- x509CertDBGet $ _accountAddress creator
+  let maybeCertBlockDB = M.lookup (_accountAddress creator) x509s'
+      maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
+      org = T.pack . fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
+
+  Mod.modifyStatefully_ (Mod.Proxy @Action) $
+    actionData %= M.adjust (actionDataOrganization .~ org) newAccount
+
+  case maybeCert of
+      Just c  -> Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.insert (_accountAddress newAccount) c x509s'
+      Nothing -> pure ()
+
+  x509s'' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
+  finalAct <- Mod.get (Mod.Proxy @Action)
 
   return ExecResults {
     erRemainingTxGas = 0, --Just use up all the allocated gas for now....
@@ -272,7 +288,7 @@ create' creator newAccount ch cc contractName' argExps x509s = do
     erAction = Just finalAct,
     erException = Nothing,
     erKind = SolidVM,
-    erNewX509Certs = x509s'
+    erNewX509Certs = x509s''
     }
 
 {-

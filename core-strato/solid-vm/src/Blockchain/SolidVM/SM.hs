@@ -647,7 +647,6 @@ initializeActionCreate creator acct name prt hsh = do
   maybeCert <- x509CertDBGet $ _accountAddress creator
   let organization = T.pack $ fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
   let newData = ActionData (SolidVMCode name hsh) organization (T.pack prt) SolidVM (ActionSolidVMDiff M.empty) []
-  x509CertDBPut (_accountAddress acct) `mapM_` maybeCert
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     actionData %= M.insertWith mergeActionData acct newData
 

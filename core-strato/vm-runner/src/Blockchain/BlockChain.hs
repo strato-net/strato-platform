@@ -150,7 +150,6 @@ instance Bagger.MonadBagger ContextM where
           $ mineTransactions' theBlockHeader remainingGas DL.empty txs
         timeit "flushMemStorageDB bagger" (Just vmBlockInsertionMined) flushMemStorageDB
         timeit "flushMemAddressStateDB bagger" (Just vmBlockInsertionMined) flushMemAddressStateDB
-        timeit "flushX509ToLevelDB bagger" (Just vmBlockInsertionMined) flushX509ToLevelDB
         newStateRoot <- A.lookupWithDefault (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
         let recoverable f = Left (RecoverableFailure (tfToBaggerTxRejection f) ranTxs unranTxs newStateRoot newGas)
         return $ case res of -- currently only get GasLimit errors out of mineTransactions'
@@ -170,7 +169,6 @@ instance Bagger.MonadBagger ContextM where
             return ()
         flushMemStorageDB
         flushMemAddressStateDB
-        flushX509ToLevelDB
         A.lookupWithDefault (Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
 
     -- todo batch insert results
