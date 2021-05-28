@@ -12,10 +12,19 @@ vaultWrapperRoot=http://${vaultWrapperHost}/strato/v2.3
 
 function newnode {
 
-  if [[ ! -d .ethereumH ]] ; then
-    mkdir logs
-    cleanupDB
-    doInit
+  if [[ ! -f .initialized ]] ; then
+    # if node is being updated from the earlier version that did not have `.initialized` flag implemented (pre-7.0):
+    if [[ -d .ethereumH && -d config && ! -f .initNotFinished ]]; then
+      touch .initialized
+      sleep 10
+    else
+      touch .initNotFinished
+      mkdir logs
+      cleanupDB
+      doInit
+      touch .initialized
+      rm .initNotFinished
+    fi
   else
     sleep 10
   fi
