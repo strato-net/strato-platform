@@ -20,7 +20,6 @@ module BlockApps.X509.Certificate (
 
 
 
-import           Control.DeepSeq
 import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.Secp256k1
 import           BlockApps.X509.Keys
