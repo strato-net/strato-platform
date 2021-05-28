@@ -46,24 +46,12 @@ class AccountDetail extends Component {
           </thead>
           <tbody>
             <tr>
-              <td><strong>Contract Root</strong></td>
-              <td><HexText value={account ? account.contractRoot : ''} classes="smd-pad-2" /></td>
-            </tr>
-            <tr>
-              <td><strong>Kind</strong></td>
-              <td>{account ? account.kind : ''}</td>
-            </tr>
-            <tr>
               <td><strong>Balance</strong></td>
               <td>{account ? `${account.balance} wei` : ''}</td>
             </tr>
             <tr>
               <td><strong>Latest Block Number</strong></td>
               <td>{account ? account.latestBlockNum : ''}</td>
-            </tr>
-            <tr>
-              <td><strong>Code Hash</strong></td>
-              <td><HexText value={account ? account.codeHash : ''} classes="smd-pad-2" /></td>
             </tr>
             <tr>
               <td><strong>Nonce</strong></td>

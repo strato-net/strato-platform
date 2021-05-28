@@ -47,6 +47,10 @@ class OauthAccounts extends Component {
       .forEach(function (user, index) {
         const position = index + 1;
 
+        if (user.username === 'nodekey') {
+          return
+        }
+        
         let userClasseName = '';
         if (this.state.selected === position) {
           userClasseName = ' selected';

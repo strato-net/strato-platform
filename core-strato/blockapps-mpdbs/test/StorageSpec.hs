@@ -10,9 +10,9 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE TypeApplications #-}
 module StorageSpec (storageSpec) where
 
-import Control.DeepSeq
 import Control.Lens
 import Control.Monad
 import Control.Monad.Change.Alter
@@ -32,6 +32,7 @@ import Test.Hspec (Spec, describe, it)
 import Test.Hspec.Expectations.Lifted
 import UnliftIO.Exception
 
+import Blockchain.Data.ChainInfo
 import Blockchain.Data.AddressStateDB
 import Blockchain.DB.HashDB
 import Blockchain.DB.MemAddressStateDB
@@ -59,10 +60,19 @@ data CachedStorage = CS
   , _abs :: AMap
   , _srm :: M.Map (Maybe Word256) MP.StateRoot
   , _x50 :: M.Map Address X509Certificate
-  } deriving (Generic, NFData)
+  , _parentChainMap :: M.Map (Maybe Word256) ParentChainId
+  } deriving (Generic)
 makeLenses ''CachedStorage
 
 type StorM = StateT CachedStorage (ResourceT (LoggingT IO))
+
+instance (Maybe Word256 `Alters` ParentChainId) StorM where
+  lookup _ k    = use $ parentChainMap . at k
+  insert _ k v  = parentChainMap . at k ?= v
+  delete _ k    = parentChainMap . at k .= Nothing
+
+instance Selectable (Maybe Word256) ParentChainId StorM where
+  select = lookup
 
 instance HasMemRawStorageDB StorM where
   getMemRawStorageTxDB = use stx
@@ -114,7 +124,7 @@ initialEnv = do
       openDB b = DBB.open (tmpdir ++ b) ldbOptions
   s <- openDB "/state/"
   h <- HashDB <$> openDB "/hash/"
-  let st = CS s h M.empty M.empty M.empty M.empty M.empty M.empty
+  let st = CS s h M.empty M.empty M.empty M.empty M.empty M.empty M.empty
   fmap (tmpdir,) . runLoggingTWithLevel LevelError . runResourceT $ execStateT MP.initializeBlank st
 
 runStorM :: StorM a -> IO a
@@ -220,3 +230,70 @@ storageSpec = do
       insert Proxy address x509Cert'
       value <- lookup Proxy address
       value `shouldNotBe` Just x509Cert
+
+  describe "resolveCodePtr" $ do
+    it "should resolve direct code pointers" . runStorM $ do
+      let chainRelationships = [(Just (0 :: Word256), ParentChainId $ Nothing)]
+      insertMany (Proxy @ParentChainId) $ M.fromList chainRelationships
+      let accts = [Account 0xabc (Just 0)
+                  , Account 0xdef (Just 0)]
+      let codePtrs = [SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0x123
+                      , EVMCode $ unsafeCreateKeccak256FromWord256 0x456]
+      insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState{addressStateCodeHash = cp}) codePtrs
+      resolveCodePtr (Just 0) (codePtrs !! 0) `shouldReturn` Just (codePtrs !! 0)
+      resolveCodePtr (Just 0) (codePtrs !! 1) `shouldReturn` Just (codePtrs !! 1)
+    it "should resolve an ancestor code pointer" . runStorM $ do
+      let chainRelationships = [ (Just (0 :: Word256), ParentChainId $ Nothing)
+                                ,(Just (1 :: Word256), ParentChainId $ Just 0)
+                                ]
+      insertMany (Proxy @ParentChainId) $ M.fromList chainRelationships
+      let accts = [ Account 0xabc (Just 0)
+                  , Account 0xdef (Just 1)
+                  ]
+      let codePtrs = [ SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0x123
+                      , CodeAtAccount (accts !! 0) "Ptr_0"
+                      ]
+      insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState{addressStateCodeHash = cp}) codePtrs
+      resolveCodePtr (Just 1) (codePtrs !! 1) `shouldReturn` Just (SolidVMCode "Ptr_0" $ unsafeCreateKeccak256FromWord256 0x123)
+    it "should resolve child-chain code pointers to Nothing" . runStorM $ do
+      let chainRelationships = [ (Just (0 :: Word256), ParentChainId $ Nothing)
+                                ,(Just (1 :: Word256), ParentChainId $ Just 0)
+                                ]
+      insertMany (Proxy @ParentChainId) $ M.fromList chainRelationships
+      let accts = [ Account 0xabc (Just 0)
+                  , Account 0xdef (Just 1)
+                  ]
+      let codePtrs = [CodeAtAccount (accts !! 1) "Ptr_0"
+                      , SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0x123
+                      ]
+      insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState{addressStateCodeHash = cp}) codePtrs
+      resolveCodePtr (Just 0) (codePtrs !! 0) `shouldReturn` Nothing
+    it "should resolve sibling-chain code pointers to Nothing" . runStorM $ do
+      let chainRelationships = [ (Just (0 :: Word256), ParentChainId $ Nothing)
+                                , (Just (1 :: Word256), ParentChainId $ Just 0)
+                                , (Just (2 :: Word256), ParentChainId $ Just 0)
+                                ]
+      insertMany (Proxy @ParentChainId) $ M.fromList chainRelationships
+      let accts = [ Account 0xabc (Just 1)
+                  , Account 0xdef (Just 2)
+                  ]
+      let codePtrs = [ SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0x123
+                      , CodeAtAccount (accts !! 0) "Ptr_0"
+                      ]
+      insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState{addressStateCodeHash = cp}) codePtrs
+      resolveCodePtr (Just 2) (codePtrs !! 1) `shouldReturn` Nothing
+    it "should resolve two-level (pointer to parent, parent to child) code pointer indirection to Nothing" . runStorM $ do
+      let chainRelationships = [ (Just (0 :: Word256), ParentChainId $ Nothing)
+                               , (Just (1 :: Word256), ParentChainId $ Just 0)
+                               , (Just (2 :: Word256), ParentChainId $ Just 0)
+                               ]
+      insertMany (Proxy @ParentChainId) $ M.fromList chainRelationships
+      let accts = [ Account 0xabc (Just 1)
+                  , Account 0xdef (Just 0)
+                  , Account 0xfff (Just 2)
+                  ]
+      let codePtrs = [SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0x123
+                      , CodeAtAccount (accts !! 0) "Ptr_0"
+                      , CodeAtAccount (accts !! 1) "Ptr_1"]
+      insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState{addressStateCodeHash = cp}) codePtrs
+      resolveCodePtr (Just 2) (codePtrs !! 2) `shouldReturn` Nothing
