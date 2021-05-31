@@ -15,7 +15,7 @@ module Blockchain.Database.MerklePatricia.Map (
 import           Prelude                                     hiding (map)
 
 import           Control.Monad
-import           Control.Monad.Change.Alter
+import           Control.Monad.FT
 import qualified Data.NibbleString                           as N
 
 import           Blockchain.Data.RLP

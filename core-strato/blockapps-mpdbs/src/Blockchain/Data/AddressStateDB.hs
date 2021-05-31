@@ -23,7 +23,7 @@ module Blockchain.Data.AddressStateDB (
 import           Prelude hiding (lookup)
 import           Control.Lens                       ((^.))
 import           Control.Monad
-import           Control.Monad.Change.Alter
+import           Control.Monad.FT
 import           Data.Default
 import           Data.Maybe                         (maybeToList)
 
@@ -99,12 +99,12 @@ instance RLPSerializable AddressState where
     resolveCodePtr fails when there is a circular reference of code pointers on the same chain
     possible solution is to have a helper function that keeps track of all previously visited codepointers and termiantes if it visits the same one twice (aka cycle detection)
 --}
-resolveCodePtr :: ( Selectable (Maybe Word256) ParentChainId m
-                  , (Account `Alters` AddressState) m
+resolveCodePtr :: ( (Maybe Word256 `Selects` ParentChainId) m
+                  , (Account `Selects` AddressState) m
                   )
                => Maybe Word256 -> CodePtr -> m (Maybe CodePtr)
 resolveCodePtr chainId (CodeAtAccount acct name) = do
-  lookup Proxy acct >>= \case
+  select acct >>= \case
     Nothing -> pure Nothing
     Just AddressState{..} -> do
       let codeAccountChainId = (acct ^. accountChainId)
@@ -119,8 +119,8 @@ resolveCodePtr chainId (CodeAtAccount acct name) = do
 -- for solidVM/EVM code
 resolveCodePtr _ cp = pure $ Just cp
 
-unsafeResolveCodePtr :: (Account `Alters` AddressState) m => CodePtr -> m (Maybe CodePtr)
-unsafeResolveCodePtr (CodeAtAccount acct name) = lookup Proxy acct >>= \case
+unsafeResolveCodePtr :: (Account `Selects` AddressState) m => CodePtr -> m (Maybe CodePtr)
+unsafeResolveCodePtr (CodeAtAccount acct name) = select acct >>= \case
   Nothing -> pure Nothing
   Just AddressState{..} -> unsafeResolveCodePtr addressStateCodeHash >>= \case
     Just e@(EVMCode _) -> pure $ Just e
@@ -128,8 +128,8 @@ unsafeResolveCodePtr (CodeAtAccount acct name) = lookup Proxy acct >>= \case
     _ -> pure Nothing
 unsafeResolveCodePtr codePtr = pure $ Just codePtr
 
-codePtrToSHA :: ( Selectable (Maybe Word256) ParentChainId m
-                , (Account `Alters` AddressState) m
+codePtrToSHA :: ( (Maybe Word256 `Selects` ParentChainId) m
+                , (Account `Selects` AddressState) m
                 )
              => Maybe Word256 -> CodePtr -> m (Maybe Keccak256)
 codePtrToSHA chainId = resolveCodePtr chainId >=> \case
@@ -142,15 +142,15 @@ resolvedCodePtrToSHA (EVMCode hsh) = hsh
 resolvedCodePtrToSHA (SolidVMCode _ hsh) = hsh
 resolvedCodePtrToSHA _ = emptyHash
 
-codePtrToCodeKind :: ( Selectable (Maybe Word256) ParentChainId m
-                     , (Account `Alters` AddressState) m
+codePtrToCodeKind :: ( (Maybe Word256 `Selects` ParentChainId) m
+                     , (Account `Selects` AddressState) m
                      )
                   => Maybe Word256 -> CodePtr -> m CodeKind
 codePtrToCodeKind chainId = resolveCodePtr chainId >=> \case
   Just (SolidVMCode _ _) -> pure SolidVM
   _ -> pure EVM -- TODO: should this return (Maybe CodeKind)?
 
-unsafeCodePtrToCodeKind :: (Account `Alters` AddressState) m => CodePtr -> m CodeKind
+unsafeCodePtrToCodeKind :: (Account `Selects` AddressState) m => CodePtr -> m CodeKind
 unsafeCodePtrToCodeKind = unsafeResolveCodePtr >=> \case
   Just (SolidVMCode _ _) -> pure SolidVM
   _ -> pure EVM -- TODO: should this return (Maybe CodeKind)?

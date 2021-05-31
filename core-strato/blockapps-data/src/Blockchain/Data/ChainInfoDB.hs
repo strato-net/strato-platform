@@ -110,7 +110,7 @@ getChainInfo (ChainId chainId) = do
                                 (fromInteger chainSignatureRefS)
                                 chainSignatureRefV
 
-getChainInfos :: HasSQLDB m => [ChainId] -> m (NamedMap "id" "info" ChainId ChainInfo)
+getChainInfos :: HasSQLDB m => [ChainId] -> m [(ChainId, Maybe ChainInfo)]
 getChainInfos chainIds = do
   cids <- case chainIds of
               [] -> do
@@ -122,10 +122,7 @@ getChainInfos chainIds = do
                           cs -> return $ map (ChainId . chainInfoRefChainId . E.entityVal) cs
               cIds -> return cIds
   chainInfos <- mapM getChainInfo cids
-  let cInfos = sequence $ filter isJust chainInfos
-  case cInfos of
-      Nothing -> return []
-      Just cis -> return cis
+  pure . zip chainIds $ fmap (snd . unNamedTuple) <$> chainInfos
 
 putChainInfo :: HasSQLDB m => ChainId -> ChainInfo -> m (Key ChainInfoRef)
 putChainInfo (ChainId chainId) (ChainInfo UnsignedChainInfo{..} csig) = do

@@ -13,7 +13,7 @@ module Handlers.TransactionResult
   , server
   ) where
 
-import           Control.Monad.Change.Alter
+import           Control.Monad.FT
 import           Data.Maybe
 import qualified Database.Esqueleto          as E
 import           Servant
@@ -36,13 +36,13 @@ server = getTransactionResult
 
 ---------------------------
 
-instance Selectable Keccak256 [TransactionResult] SQLM where
-  select _ txHash = fmap (Just . map E.entityVal) . sqlQuery $ E.select $
+instance Selectable [TransactionResult] Keccak256 SQLM where
+  select txHash = fmap (Just . map E.entityVal) . sqlQuery $ E.select $
     E.from $ \(txr) -> do
     let matchHash = (txr E.^. TransactionResultTransactionHash) E.==. (E.val txHash)
     E.where_ matchHash
     return txr
 
-getTransactionResult :: Selectable Keccak256 [TransactionResult] m => Keccak256 -> m [TransactionResult]
-getTransactionResult txHash = fromMaybe [] <$> select (Proxy @[TransactionResult]) txHash
+getTransactionResult :: (Keccak256 `Selects` [TransactionResult]) m => Keccak256 -> m [TransactionResult]
+getTransactionResult txHash = fromMaybe [] <$> select txHash
 

@@ -48,7 +48,6 @@ import           Database.PostgreSQL.Simple         (Connection,
                                                      withTransaction)
 import           GHC.Stack
 import           Opaleye
-import           Servant
 import           Servant.Client
 
 import           UnliftIO                           hiding (Handler(..))
@@ -62,7 +61,7 @@ import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Nonce
 import           Blockchain.Strato.Model.SourceMap
 
-import           Control.Monad.Change.Modify        hiding (modify)
+import           Control.Monad.FT.Get
 import           Control.Monad.Composable.BlocSQL
 import           Control.Monad.Composable.CoreAPI   hiding (httpManager)
 import           Control.Monad.Composable.Vault     hiding (httpManager)
@@ -73,7 +72,7 @@ data Should a = Don't a | Do a
 data Compile = Compile
 data CacheNonce = CacheNonce
 
-type HasBlocEnv m = Accessible BlocEnv m
+type HasBlocEnv m = Gettable BlocEnv m
   
 data BlocEnv = BlocEnv
   { stateFetchLimit    :: Integer
@@ -91,7 +90,7 @@ blocQuery :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y, Has
              Query x -> m [y]
 blocQuery q = do
   traverse_ (logInfoCS callStack . Text.pack) (showSql q)
-  BlocSQLEnv pool <- access Proxy
+  BlocSQLEnv pool <- get
   withResource pool $ liftIO . flip runQuery q
 
 blocQueryMaybe
@@ -118,7 +117,7 @@ blocModify :: (HasCallStack, MonadIO m, HasBlocSQL m, MonadLogger m) =>
               (Connection -> IO x) -> m x
 blocModify modify = do
   logInfoCS callStack "Updating the database"
-  BlocSQLEnv pool <- access Proxy
+  BlocSQLEnv pool <- get
   withResource pool (liftIO . modify)
 
 blocModify1 :: (HasCallStack, MonadIO m, HasBlocSQL m, MonadLogger m) =>
@@ -134,14 +133,14 @@ blocModify1 modify = do
 blocTransaction :: HasBlocSQL m =>
                    m x -> m x
 blocTransaction bloc = do
-  BlocSQLEnv pool <- access Proxy
+  BlocSQLEnv pool <- get
   withResource pool (\conn -> liftBaseOp_ (withTransaction conn) bloc)
 
 blocStrato :: (MonadIO m, MonadLogger m, HasCoreAPI m, HasCallStack) =>
               ClientM x -> m x
 blocStrato client' = do
   logInfoCS callStack "Querying Strato"
-  CoreAPIData url mgr <- access Proxy
+  CoreAPIData url mgr <- get
   resultEither <-
     liftIO $ runClientM client' (ClientEnv mgr url Nothing)
   either (blocError . StratoError) return resultEither
@@ -150,7 +149,7 @@ blocVaultWrapper :: (MonadIO m, MonadLogger m, HasVault m, HasCallStack) =>
                     ClientM x -> m x
 blocVaultWrapper client' = do
   logInfoCS callStack "Querying Vault Wrapper"
-  VaultData url mgr <- access Proxy
+  VaultData url mgr <- get
   resultEither <-
     liftIO $ runClientM client' (ClientEnv mgr url Nothing)
   either (blocError . VaultWrapperError) return resultEither
@@ -159,4 +158,4 @@ blocMaybe :: MonadIO m => Text -> Maybe x -> m x
 blocMaybe msg = maybe (throwIO (CouldNotFind msg)) return
 
 getBlocEnv :: HasBlocEnv m => m BlocEnv
-getBlocEnv = access Proxy
+getBlocEnv = get

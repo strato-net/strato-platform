@@ -8,8 +8,10 @@
 module Executable.AditM where
 
 import           Blockchain.Output
-import qualified Control.Monad.Change.Modify  as Mod
-import           Control.Monad.State
+import           Control.Monad                (when)
+import           Control.Monad.FT
+import           Control.Monad.IO.Class       (liftIO)
+import qualified Control.Monad.State          as StateT
 import           Control.Monad.Trans.Resource
 import           Control.Lens
 import qualified Data.Set as S
@@ -40,13 +42,15 @@ recordException = do
   when (presentExceptions > exceptionMaxCount) $
     error "AditM reached exceptionMaxCount"
 
-type AditM = StateT AditState (ResourceT (LoggingT IO))
+type AditM = StateT.StateT AditState (ResourceT (LoggingT IO))
 
-instance Mod.Modifiable KafkaState AditM where
-  get _   = gets aditKafkaState
-  put _ k = get >>= \c -> put c{aditKafkaState = k}
+instance Gettable KafkaState AditM where
+  get   = StateT.gets aditKafkaState
+instance Puttable KafkaState AditM where
+  put k = StateT.modify $ \c -> c{aditKafkaState = k}
+instance Modifiable KafkaState AditM where
 
 runAditT :: AditM a -> LoggingT IO a
 runAditT m = do
     let initKafkaState = mkConfiguredKafkaState "strato-adit"
-    runResourceT $ evalStateT m (AditState initKafkaState S.empty)
+    runResourceT $ StateT.evalStateT m (AditState initKafkaState S.empty)

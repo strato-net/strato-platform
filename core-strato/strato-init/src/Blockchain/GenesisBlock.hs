@@ -13,8 +13,7 @@ module Blockchain.GenesisBlock (
 
 import           Control.Monad
 import           Blockchain.Output
-import           Control.Monad.Change.Alter                   (Alters)
-import           Control.Monad.Change.Modify                  (Accessible)
+import           Control.Monad.FT                             hiding (exists)
 import           Control.Monad.IO.Class
 import qualified Data.ByteString.Base16                       as B16
 import qualified Data.ByteString.Char8                        as C8
@@ -123,7 +122,7 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets = do
 initializeGenesisBlock :: ( HasCodeDB m
                           , HasHashDB m
                           , Mem.HasMemAddressStateDB m
-                          , Accessible RBDB.RedisConnection m
+                          , Gettable RBDB.RedisConnection m
                           , HasSQLDB m
                           , HasStateDB m
                           , HasStorageDB m

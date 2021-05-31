@@ -8,7 +8,7 @@ module BatchMerge (
   ) where
 
 import           Control.Monad
-import qualified Control.Monad.Change.Alter as A
+import           Control.Monad.FT
 import           Control.Monad.Loops
 import           Data.Maybe
 import qualified Data.NibbleString as N
@@ -23,7 +23,7 @@ import FastMP
 import KV
 import ReverseOrderedKVs
 
-putManyKeyVal :: (MonadLogger m, (MP.StateRoot `A.Alters` MP.NodeData) m)
+putManyKeyVal :: (MonadLogger m, (MP.StateRoot `Alters` MP.NodeData) m)
               => MP.StateRoot -> [(MP.Key, MP.Val)] -> m MP.StateRoot
 putManyKeyVal sr listOfInserts = do
   let listOfInserts' = map (\(k, v) -> (MP.keyToSafeKey k, v)) listOfInserts
@@ -38,7 +38,7 @@ putManyKeyVal sr listOfInserts = do
     MP.PtrRef sr' -> return sr'
     MP.SmallRef v -> do -- The whole trie is too small to fit in a level db key, just create a stateroot from the full data....
       let newSR = MP.StateRoot $ keccak256ToByteString $ hash v
-      A.insert (A.Proxy @MP.NodeData) newSR finalNd
+      insert @MP.NodeData newSR finalNd
       return newSR
 
 splitKeysByPrefix :: [Maybe N.Nibble] -> [KV] -> [[KV]]
@@ -50,7 +50,7 @@ splitKeysByPrefix (firstChar:remainingPrefix) kvs =
        Just _ -> map (\(KV k v) -> (KV (tail k) v)) matched:splitKeysByPrefix remainingPrefix remaining
        Nothing -> matched:splitKeysByPrefix remainingPrefix remaining
 
-putManyKeyVal_nodeData :: (MonadLogger m, (MP.StateRoot `A.Alters` MP.NodeData) m)
+putManyKeyVal_nodeData :: (MonadLogger m, (MP.StateRoot `Alters` MP.NodeData) m)
                        => MP.NodeData -> ReverseOrderedKVs -> m MP.NodeData
 putManyKeyVal_nodeData (MP.FullNodeData choices val) listOfInserts = do
   let kvsSplitByFirstNibble = splitKeysByPrefix (map Just [15,14..0] ++ [Nothing]) $ getTheKVs listOfInserts

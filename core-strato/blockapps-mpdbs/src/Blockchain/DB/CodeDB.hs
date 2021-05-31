@@ -27,7 +27,7 @@ module Blockchain.DB.CodeDB (
 
 
 import           Control.DeepSeq
-import           Control.Monad.Change.Alter
+import           Control.Monad.FT
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Reader
 import           Data.Bifunctor                     (first)
@@ -76,10 +76,13 @@ genericDeleteCodeDB f codeHash = do
   db <- unCodeDB <$> f
   DB.delete db def (shaToKey codeHash)
 
-instance MonadIO m => (Keccak256 `Alters` DBCode) (ReaderT CodeDB m) where
-  lookup _ = genericLookupCodeDB ask
-  insert _ = genericInsertCodeDB ask
-  delete _ = genericDeleteCodeDB ask
+instance MonadIO m => Selectable DBCode Keccak256 (ReaderT CodeDB m) where
+  select = genericLookupCodeDB ask
+instance MonadIO m => Insertable DBCode Keccak256 (ReaderT CodeDB m) where
+  insert = genericInsertCodeDB ask
+instance MonadIO m => Deletable  DBCode Keccak256 (ReaderT CodeDB m) where
+  delete = genericDeleteCodeDB ask
+instance MonadIO m => Alterable  DBCode Keccak256 (ReaderT CodeDB m) where
 
 toWord8 :: CodeKind -> Word8
 toWord8 = fromIntegral . fromEnum
@@ -102,8 +105,8 @@ getCodeKind hsh = maybe (error $ "no codekind found for " ++ show hsh) fst <$> g
 codeDBPut :: HasCodeDB m => CodeKind -> B.ByteString -> m Keccak256
 codeDBPut kind code = do
   let hsh = hash code
-  insert Proxy hsh (kind,code)
+  insert hsh (kind,code)
   return hsh
 
 codeDBGet :: HasCodeDB m => Keccak256 -> m (Maybe DBCode)
-codeDBGet = lookup Proxy
+codeDBGet = select

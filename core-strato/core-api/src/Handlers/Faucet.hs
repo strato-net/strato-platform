@@ -20,7 +20,7 @@ module Handlers.Faucet
   ) where
 
 import           Control.Monad
-import           Control.Monad.Change.Alter
+import           Control.Monad.FT
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class
 import qualified Data.ByteString                       as B
@@ -96,7 +96,7 @@ appFaucetNonce = unsafePerformIO (newIORef 0)
 
 ---------------
 
-postFaucet :: (MonadIO m, MonadLogger m, Selectable Address Integer m)
+postFaucet :: (MonadIO m, MonadLogger m, (Address `Selects` Integer) m)
            => Address -> ConduitT a IngestEvent m [Keccak256]
 postFaucet target = do
   key <- liftIO $ fmap (fromMaybe $ error "missing faucet key") getFaucetKey
@@ -112,7 +112,7 @@ postFaucet target = do
       yield . IETx ts $ IngestTx API tx
       pure $ txHash tx
 
-postFaucetMultipart :: (MonadIO m, MonadLogger m, Selectable Address Integer m)
+postFaucetMultipart :: (MonadIO m, MonadLogger m, (Address `Selects` Integer) m)
                     => MultipartData Mem -> ConduitT a IngestEvent m [Keccak256]
 postFaucetMultipart multipartData = do
   case lookupInput "address" multipartData of
@@ -129,7 +129,7 @@ toAddr v =
     _ -> Left $ "Can't convert text to Address: " ++ show v
 
 
-postDataFaucet :: (MonadIO m, Selectable Address Integer m) 
+postDataFaucet :: (MonadIO m, (Address `Selects` Integer) m) 
                => Maybe Int -> Maybe Int -> ConduitT a IngestEvent m [Keccak256]
 postDataFaucet mSize mCountOf = do
   key <- liftIO $ fmap (fromMaybe $ error "missing faucet key") getFaucetKey
@@ -159,15 +159,15 @@ acquireNewMaxNonce minNonce = do
         in (next, next)
   liftIO $ atomicModifyIORef' appFaucetNonce findNext
 
-instance Selectable Address Integer SQLM where
-  select _ addr = fmap (fmap (addressStateRefNonce . E.entityVal) . listToMaybe) . sqlQuery $ E.select $
+instance Selectable Integer Address SQLM where
+  select addr = fmap (fmap (addressStateRefNonce . E.entityVal) . listToMaybe) . sqlQuery $ E.select $
     E.from $ \accStateRef -> do
     E.where_ ((accStateRef E.^. AddressStateRefChainId) E.==. E.val 0
         E.&&. accStateRef E.^. AddressStateRefAddress E.==. E.val addr)
     return accStateRef
 
-lookupNonce :: Selectable Address Integer m => Address -> m Integer
-lookupNonce addr' = fromMaybe 0 <$> select (Proxy @Integer)  addr'
+lookupNonce :: (Address `Selects` Integer) m => Address -> m Integer
+lookupNonce addr' = fromMaybe 0 <$> select addr'
 
 emitKafkaTransactions :: (MonadIO m, MonadLogger m) => ConduitT IngestEvent Void m ()
 emitKafkaTransactions = loop id

@@ -28,14 +28,12 @@ module Blockchain.Database.MerklePatricia.Internal (
 
 
 import           Control.Monad                                ((<=<))
-import           Control.Monad.Change.Alter                   (Alters)
-import qualified Control.Monad.Change.Alter                   as A
+import           Control.Monad.FT
 import qualified Data.ByteString                              as B
 import           Data.Function
-import           Data.List
+import           Data.List                                    hiding (insert)
 import           Data.Maybe
 import qualified Data.NibbleString                            as N
-import           Data.Proxy
 
 import           Blockchain.Data.RLP
 import           Blockchain.Database.MerklePatricia.MPDB
@@ -51,7 +49,7 @@ unsafePutKeyVal sr key val = do
   dbPutNodeData <- putKV_NodeData key val dbNodeData
   putNodeData dbPutNodeData
 
-unsafeGetKeyVals :: (StateRoot `Alters` NodeData) m
+unsafeGetKeyVals :: (StateRoot `Selects` NodeData) m
                  => StateRoot -> Key -> m [(Key, Val)]
 unsafeGetKeyVals sr = getKeyVals_NodeRef $ PtrRef sr
 
@@ -133,7 +131,7 @@ putKV_NodeData key1 val1 (ShortcutNodeData key2 val2)
 
 -----
 
-getKeyVals_NodeData :: (StateRoot `Alters` NodeData) m
+getKeyVals_NodeData :: (StateRoot `Selects` NodeData) m
                     => NodeData -> Key -> m [(Key, Val)]
 
 getKeyVals_NodeData EmptyNodeData _ = return []
@@ -196,7 +194,7 @@ deleteKey_NodeData key1 nd@(ShortcutNodeData key2 (Left ref))
 putKV_NodeRef :: (StateRoot `Alters` NodeData) m => Key -> Val -> NodeRef -> m NodeRef
 putKV_NodeRef key val = nodeData2NodeRef <=< putKV_NodeData key val <=< getNodeData
 
-getKeyVals_NodeRef :: (StateRoot `Alters` NodeData) m => NodeRef -> Key -> m [(Key, Val)]
+getKeyVals_NodeRef :: (StateRoot `Selects` NodeData) m => NodeRef -> Key -> m [(Key, Val)]
 getKeyVals_NodeRef ref key = do
   nodeData <- getNodeData ref
   getKeyVals_NodeData nodeData key
@@ -208,17 +206,17 @@ deleteKey_NodeRef key = nodeData2NodeRef <=< deleteKey_NodeData key <=< getNodeD
 
 -----
 
-getNodeData :: (StateRoot `Alters` NodeData) m => NodeRef -> m NodeData
+getNodeData :: (StateRoot `Selects` NodeData) m => NodeRef -> m NodeData
 getNodeData (SmallRef x) = pure $ rlpDecode $ rlpDeserialize x
 getNodeData (PtrRef sr) =
   fromMaybe (error $ "Missing StateRoot in call to getNodeData: " ++ format sr) <$>
-  A.lookup Proxy sr
+  select sr
 
-putNodeData :: (StateRoot `Alters` NodeData) m => NodeData -> m StateRoot
+putNodeData :: (StateRoot `Inserts` NodeData) m => NodeData -> m StateRoot
 putNodeData nd = do
   let bytes = rlpSerialize $ rlpEncode nd
       ptr = StateRoot $ keccak256ToByteString $ hash bytes
-  A.insert Proxy ptr nd
+  insert ptr nd
   return ptr
 
 -----
@@ -254,7 +252,7 @@ newShortcut :: (StateRoot `Alters` NodeData) m => Key -> Either NodeRef Val -> m
 newShortcut "" (Left ref) = return ref
 newShortcut key val      = nodeData2NodeRef $ ShortcutNodeData key val
 
-nodeData2NodeRef :: (StateRoot `Alters` NodeData) m => NodeData -> m NodeRef
+nodeData2NodeRef :: (StateRoot `Inserts` NodeData) m => NodeData -> m NodeRef
 nodeData2NodeRef nodeData =
   case rlpSerialize $ rlpEncode nodeData of
     bytes | B.length bytes < 32 -> return $ SmallRef bytes

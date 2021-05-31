@@ -21,8 +21,7 @@ import           Control.Concurrent.STM.TQueue
 import           Control.Concurrent.STM.TBQueue
 import           Blockchain.Output
 import           Control.Lens
-import qualified Control.Monad.Change.Alter                as A
-import qualified Control.Monad.Change.Modify               as Mod
+import           Control.Monad.FT
 import           Control.Monad.Reader
 import           Control.Monad.IO.Class                    (liftIO)
 
@@ -30,8 +29,6 @@ import           Data.ByteString.Char8                     (pack)
 import           Data.ByteString.Base16                    as B16
 import           Data.Foldable
 import qualified Data.Map.Strict                           as M
-import           Data.Maybe
-import           Data.Proxy
 import qualified Data.Set                                  as S
 import qualified Data.Text                                 as T
 import           Data.Time.Clock
@@ -70,20 +67,19 @@ import           Text.Format
 instance MonadMonitor m => MonadMonitor (ConduitT i o m) where
   doIO = lift . doIO
 
-instance Mod.Modifiable r m => Mod.Modifiable r (ConduitT i o m) where
-  get = lift . Mod.get
-  put p = lift . Mod.put p
+instance Gettable r m => Gettable r (ConduitT i o m) where
+  get = lift get
+instance Puttable r m => Puttable r (ConduitT i o m) where
+  put = lift . put
+instance Modifiable r m => Modifiable r (ConduitT i o m) where
 
-instance (Monad m, Mod.Accessible r m) => Mod.Accessible r (ConduitT i o m) where
-  access = lift . Mod.access
-
-instance (k `A.Alters` v) m => (k `A.Alters` v) (ConduitT i o m) where
-  lookup p   = lift . A.lookup p
-  insert p k = lift . A.insert p k
-  delete p   = lift . A.delete p
-
-instance (Monad m, A.Selectable k v m) => A.Selectable k v (ConduitT i o m) where
-  select p = lift . A.select p
+instance Selectable v k m => Selectable v k (ConduitT i o m) where
+  select   = lift . select
+instance Insertable v k m => Insertable v k (ConduitT i o m) where
+  insert k = lift . insert k
+instance Deletable  v k m => Deletable  v k (ConduitT i o m) where
+  delete   = lift . delete @v
+instance Alterable  v k m => Alterable  v k (ConduitT i o m) where
 
 instance HasBlockstanbulContext m => HasBlockstanbulContext (ConduitT i o m) where
   getBlockstanbulContext = lift getBlockstanbulContext
@@ -128,8 +124,8 @@ type MonadSequencer m =
   , MonadMonitor m
   , MonadBlockstanbul m
   , HasFullPrivacy m
-  , (Keccak256 `A.Alters` DependentBlockEntry) m
-  , (Keccak256 `A.Alters` ()) m
+  , (Keccak256 `Alters` DependentBlockEntry) m
+  , (Keccak256 `Alters` ()) m
   , HasVault m
   )
 
@@ -150,8 +146,8 @@ oneSequencerIter :: SealedConduitT () SeqLoopEvent SequencerM () -> SequencerM (
 oneSequencerIter src = timeAction seqLoopTiming $ do
   (src', events) <- readEventsInBufferedWindow src
   BatchSeqEvent{..} <- runSequencerBatch events
-  chainIds <- unGetChainsDB <$> Mod.get (Mod.Proxy @GetChainsDB)
-  txHashes <- unGetTransactionsDB <$> Mod.get (Mod.Proxy @GetTransactionsDB)
+  chainIds <- unGetChainsDB <$> get @GetChainsDB
+  txHashes <- unGetTransactionsDB <$> get @GetTransactionsDB
   let chainIdsList = toList chainIds
       txHashesList = toList txHashes
       getChains = if null chainIdsList then [] else [P2pGetChain chainIdsList]
@@ -213,7 +209,7 @@ checkForVotes :: ( MonadLogger m
                  , MonadMonitor m
                  , MonadBlockstanbul m
                  , HasFullPrivacy m
-                 , (Keccak256 `A.Alters` DependentBlockEntry) m
+                 , (Keccak256 `Alters` DependentBlockEntry) m
                  )
               => [CandidateReceived]
               -> ConduitT a SeqEvent m ()
@@ -235,7 +231,7 @@ checkForTimeouts :: ( MonadLogger m
                     , MonadMonitor m
                     , MonadBlockstanbul m
                     , HasFullPrivacy m
-                    , (Keccak256 `A.Alters` DependentBlockEntry) m
+                    , (Keccak256 `Alters` DependentBlockEntry) m
                     )
                  => [RoundNumber]
                  -> ConduitT a SeqEvent m ()
@@ -260,7 +256,7 @@ blockstanbulSend :: ( MonadLogger m
                     , MonadMonitor m
                     , MonadBlockstanbul m
                     , HasFullPrivacy m
-                    , (Keccak256 `A.Alters` DependentBlockEntry) m
+                    , (Keccak256 `Alters` DependentBlockEntry) m
                     )
                  => [InEvent]
                  -> ConduitT a SeqEvent m ()
@@ -272,8 +268,8 @@ blockstanbulSend = mapM_ $ \ie -> do
 
 blockstanbulSend' :: ( MonadLogger m
                      , MonadBlockstanbul m
-                     , (Keccak256 `A.Alters` ChainHashEntry) m
-                     , (Keccak256 `A.Alters` DependentBlockEntry) m
+                     , (Keccak256 `Alters` ChainHashEntry) m
+                     , (Keccak256 `Alters` DependentBlockEntry) m
                      )
                   => InEvent
                   -> ConduitT a SeqEvent m ()
@@ -288,7 +284,7 @@ blockstanbulSend' msg = do
         [b] -> sendAllMessages [CommitResult . Right . blockHash $ b]
         bs -> error $ "can send at most 1 block at a time: " ++ show bs
   mapM_ createNewTimer [rn | ResetTimer rn <- resp]
-  rch <- Mod.access (Mod.Proxy @(TQueue VoteResult))
+  rch <- get @(TQueue VoteResult)
   atomically $ mapM_ (writeTQueue rch) [r | VoteResponse r <- resp]
   $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ format (map blockHash blocks)
   let getSequencedBlock = ingestBlockToSequencedBlock lookupChainIdFromChainHash
@@ -306,7 +302,7 @@ blockstanbulSend' msg = do
 
   unless (null blocks) $ do
     let tLast = blockHeaderTimestamp . BDB.blockBlockData . head $ blocks
-    dt <- unBlockPeriod <$> Mod.access (Mod.Proxy @BlockPeriod)
+    dt <- unBlockPeriod <$> get @BlockPeriod
     let tNext = addUTCTime dt tLast
     now <- liftIO getCurrentTime
     when (now < tNext) $
@@ -327,8 +323,8 @@ privateWitnessableHash tHash cHash =
 
 transformPrivateHashTXs :: ( MonadLogger m
                            , HasPrivateHashDB m
-                           , (Keccak256 `A.Alters` ChainHashEntry) m
-                           , (Keccak256 `A.Alters` ()) m
+                           , (Keccak256 `Alters` ChainHashEntry) m
+                           , (Keccak256 `Alters` ()) m
                            )
                         => [(Timestamp, IngestTx)]
                         -> ConduitT a SeqEvent m ()
@@ -346,7 +342,7 @@ transformPrivateHashTXs pairs = forM_ pairs $ \(ts, t@(IngestTx _ (TD.PrivateHas
 transformFullTransactions :: ( MonadLogger m
                              , MonadMonitor m
                              , HasFullPrivacy m
-                             , (Keccak256 `A.Alters` ()) m
+                             , (Keccak256 `Alters` ()) m
                              )
                           => [(Timestamp, IngestTx)]
                           -> ConduitT a SeqEvent m ()
@@ -385,7 +381,7 @@ transformFullTransactions pairs = do
         yieldMany $ (ToVm . VmPrivateTx . snd) <$> ptxs -- we want to get these transactions into the
                                                         -- P2P indexer ASAP so we can return them to
                                                         -- peers requesting them
-        mcInfo <- join . fmap _chainIdInfo <$> A.lookup (Proxy :: Proxy ChainIdEntry) chainId
+        mcInfo <- join . fmap _chainIdInfo <$> select @ChainIdEntry chainId
         case mcInfo of
           Nothing -> do
             logF . concat $
@@ -436,7 +432,7 @@ transformFullTransactions pairs = do
 transformTransactions :: ( MonadLogger m
                          , MonadMonitor m
                          , HasFullPrivacy m
-                         , (Keccak256 `A.Alters` ()) m
+                         , (Keccak256 `Alters` ()) m
                          )
                       => [(Timestamp, IngestTx)]
                       -> ConduitT a SeqEvent m ()
@@ -449,7 +445,7 @@ runBlockWithConsensus :: ( MonadLogger m
                          , MonadMonitor m
                          , MonadBlockstanbul m
                          , HasFullPrivacy m
-                         , (Keccak256 `A.Alters` DependentBlockEntry) m
+                         , (Keccak256 `Alters` DependentBlockEntry) m
                          )
                       => SequencedBlock
                       -> ConduitT a SeqEvent m ()
@@ -464,7 +460,7 @@ runBlockWithConsensus sb = do
 
 expandBlock :: ( MonadLogger m
                , MonadMonitor m
-               , (Keccak256 `A.Alters` DependentBlockEntry) m
+               , (Keccak256 `Alters` DependentBlockEntry) m
                )
             => SequencedBlock
             -> m [OutputBlock]
@@ -489,8 +485,8 @@ expandBlock sb = do
 runConsensus :: ( MonadLogger m
                 , MonadMonitor m
                 , MonadBlockstanbul m
-                , (Keccak256 `A.Alters` ChainHashEntry) m
-                , (Keccak256 `A.Alters` DependentBlockEntry) m
+                , (Keccak256 `Alters` ChainHashEntry) m
+                , (Keccak256 `Alters` DependentBlockEntry) m
                 )
              => ConduitT SequencedBlock SeqEvent m ()
 runConsensus = awaitForever $ \sb -> do
@@ -520,9 +516,9 @@ hydrateAndEmit = awaitForever $ \case
     let obHash = blockHash ob
         orig = obOrigin ob
     logF $ "Emitting block " ++ format obHash
-    chainsToEmit <- fmap _blockDependentChains . A.repsert (A.Proxy @EmittedBlock) obHash $ \case
-      Nothing -> pure $ EmittedBlock True M.empty
-      Just (EmittedBlock _ chains) -> pure $ EmittedBlock True chains
+    chainsToEmit <- fmap _blockDependentChains . repsertPure @EmittedBlock obHash $ \case
+      Nothing -> EmittedBlock True M.empty
+      Just (EmittedBlock _ chains) -> EmittedBlock True chains
     logF $ "Emitting block " ++ format obHash ++ ". Chains to emit: " ++ show (format <$> M.keys chainsToEmit)
     ob' <- lift $ hydratePrivateHashes Nothing ob
     case ob' of
@@ -531,14 +527,14 @@ hydrateAndEmit = awaitForever $ \case
       Just ob'' -> yield . ToVm $ VmBlock ob''
     -- use ob's origin because we don't hold on to chain's original origin
     transformGenesis . map (\(cId, info) -> IngestGenesis orig (cId, info)) $ M.toList chainsToEmit
-    lift . A.adjustStatefully_ (A.Proxy @EmittedBlock) obHash $ blockDependentChains .= M.empty
+    lift . adjustStatefully_ @EmittedBlock obHash $ blockDependentChains .= M.empty
   oe -> yield oe
 
 transformBlocks :: ( MonadLogger m
                    , MonadMonitor m
                    , MonadBlockstanbul m
                    , HasFullPrivacy m
-                   , (Keccak256 `A.Alters` DependentBlockEntry) m
+                   , (Keccak256 `Alters` DependentBlockEntry) m
                    )
                 => [IngestBlock]
                 -> ConduitT a SeqEvent m ()
@@ -564,16 +560,16 @@ transformGenesis chains = forM_ chains $ \ig -> do
   lookupSeenChain chainId >>= \case
     True -> do
       logF "We've seen this chain before. Not emitting to VM"
-      chainsToEmit <- maybe [] (M.toList . _chainDependentChains) <$> A.lookup (A.Proxy @ChainIdEntry) chainId
+      chainsToEmit <- maybe [] (M.toList . _chainDependentChains) <$> select @ChainIdEntry chainId
       transformGenesis $ map (\ci -> ig{igGenesisInfo = ci}) chainsToEmit
-      lift . A.adjustStatefully_ (A.Proxy @ChainIdEntry) chainId $ chainDependentChains .= M.empty
+      lift . adjustStatefully_ @ChainIdEntry chainId $ chainDependentChains .= M.empty
     False -> do
       logF "We haven't seen this chain before. Inserting into SeenChainDB and emitting to VM, P2P"
       logF $ "Checking emission status of block " ++ format (creationBlock $ chainInfo cInfo)
-      seenCreationBlock <- fmap _emitted . lift . A.repsert (A.Proxy @EmittedBlock) (creationBlock $ chainInfo cInfo) $ \case
-        Nothing -> pure $ EmittedBlock False (M.singleton chainId cInfo)
-        Just (EmittedBlock emitted' depChains) | emitted' -> pure $ EmittedBlock emitted' M.empty
-                                               | otherwise -> pure $ EmittedBlock emitted' (M.insert chainId cInfo depChains)
+      seenCreationBlock <- fmap _emitted . lift . repsertPure @EmittedBlock (creationBlock $ chainInfo cInfo) $ \case
+        Nothing -> EmittedBlock False (M.singleton chainId cInfo)
+        Just (EmittedBlock emitted' depChains) | emitted' -> EmittedBlock emitted' M.empty
+                                               | otherwise -> EmittedBlock emitted' (M.insert chainId cInfo depChains)
       logF $ "Emission status of block " ++ format (creationBlock $ chainInfo cInfo) ++ ": " ++ show seenCreationBlock
       let parentChainId = parentChain $ chainInfo cInfo
       seenParentChains <- hasAllAncestorChains parentChainId
@@ -583,25 +579,25 @@ transformGenesis chains = forM_ chains $ \ig -> do
           yield . ToVm $ VmGenesis og
           yield . ToP2p $ P2pGenesis og
           yieldMany . map (ToVm . VmBlock) =<< insertNewChainInfo chainId cInfo
-          chainsToEmit <- maybe [] (M.toList . _chainDependentChains) <$> A.lookup (A.Proxy @ChainIdEntry) chainId
+          chainsToEmit <- maybe [] (M.toList . _chainDependentChains) <$> select @ChainIdEntry chainId
           transformGenesis $ map (\ci -> ig{igGenesisInfo = ci}) chainsToEmit
-          lift . A.adjustStatefully_ (A.Proxy @ChainIdEntry) chainId $ chainDependentChains .= M.empty
+          lift . adjustStatefully_ @ChainIdEntry chainId $ chainDependentChains .= M.empty
         else case parentChainId of
           Nothing -> $logErrorS "transformGenesis" . T.pack $ concat
             [ "The database claims to be missing parent chain info for chain "
             , format chainId
             , ", but its parent chain is the main chain. This probably means there is a bug in the platform."
             ]
-          Just pChain -> A.repsert_ (A.Proxy @ChainIdEntry) pChain $ \case
-               Nothing -> pure $ ChainIdEntry Nothing emptyCircularBuffer S.empty $ M.singleton chainId cInfo
-               Just cie@ChainIdEntry{..} -> pure $ cie & chainDependentChains %~ M.insert chainId cInfo
+          Just pChain -> repsertPure_ @ChainIdEntry pChain $ \case
+               Nothing -> ChainIdEntry Nothing emptyCircularBuffer S.empty $ M.singleton chainId cInfo
+               Just cie@ChainIdEntry{..} -> cie & chainDependentChains %~ M.insert chainId cInfo
 
 splitEvents :: ( MonadLogger m
                , MonadMonitor m
                , MonadBlockstanbul m
                , HasFullPrivacy m
-               , (Keccak256 `A.Alters` DependentBlockEntry) m
-               , (Keccak256 `A.Alters` ()) m
+               , (Keccak256 `Alters` DependentBlockEntry) m
+               , (Keccak256 `Alters` ()) m
                )
             => [IngestEvent]
             -> ConduitT a SeqEvent m ()

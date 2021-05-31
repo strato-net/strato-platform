@@ -34,7 +34,7 @@ import           Blockchain.Strato.Model.ExtendedWord
 
 import           Control.Applicative
 import           Control.Monad                               (when)
-import           Control.Monad.Change
+import           Control.Monad.FT
 import           Data.ByteString                             (ByteString)
 import qualified Data.ByteString                             as B
 import           Data.Function

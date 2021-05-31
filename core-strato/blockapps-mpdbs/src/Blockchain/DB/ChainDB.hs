@@ -31,8 +31,7 @@ module Blockchain.DB.ChainDB
 
 import           Control.DeepSeq
 import           Control.Monad                        (join)
-import           Control.Monad.Change.Alter           hiding (lookup)
-import           Control.Monad.Change.Modify
+import           Control.Monad.FT
 
 import           Data.Foldable                        (for_)
 import           Data.Maybe                           (fromMaybe)
@@ -132,7 +131,7 @@ word256ToMPKey Nothing    = N.EvenNibbleString ""
 word256ToMPKey (Just cid) = N.EvenNibbleString $ word256ToBytes cid
 
 getkv :: ( RLPSerializable a
-         , (MP.StateRoot `Alters` MP.NodeData) m
+         , (MP.StateRoot `Selects` MP.NodeData) m
          )
       => MP.StateRoot -> N.NibbleString -> m (Maybe a)
 getkv sr = fmap (fmap rlpDecode) . MP.getKeyVal sr
@@ -152,7 +151,7 @@ bootstrapChainDB genesisHash startingStateRoots = do
   putChainBlockHashInfo genesisHash zeroHash MP.emptyTriePtr
   for_ startingStateRoots $ \(cId, sr) -> putChainGenesisInfo cId genesisHash sr Nothing
   for_ startingStateRoots $ \(cId, sr) -> putChainStateRoot cId genesisHash sr
-  get (Proxy @BlockHashRoot)
+  get @BlockHashRoot
 
 putBlockHeaderInChainDB :: ( BlockHeaderLike h
                            , Modifiable BlockHashRoot m
@@ -195,7 +194,7 @@ getChainBlockHashInfo :: ( Modifiable BlockHashRoot m
                          )
                       => Keccak256 -> m (Maybe (Keccak256, MP.StateRoot))
 getChainBlockHashInfo h = do
-  bhr <- unBlockHashRoot <$> get Proxy
+  bhr <- unBlockHashRoot <$> get
   getkv bhr (N.EvenNibbleString $ keccak256ToByteString h)
 
 putChainBlockHashInfo :: ( Modifiable BlockHashRoot m
@@ -203,9 +202,9 @@ putChainBlockHashInfo :: ( Modifiable BlockHashRoot m
                          )
                       => Keccak256 -> Keccak256 -> MP.StateRoot -> m ()
 putChainBlockHashInfo h parentHash sr = do
-  bhr <- unBlockHashRoot <$> get Proxy
+  bhr <- unBlockHashRoot <$> get
   newBlockHashRoot <- putkv bhr (N.EvenNibbleString $ keccak256ToByteString h) (parentHash, sr)
-  put Proxy $ BlockHashRoot newBlockHashRoot
+  put $ BlockHashRoot newBlockHashRoot
 
 getGenesisStateRoot :: ( Modifiable GenesisRoot m
                        , (MP.StateRoot `Alters` MP.NodeData) m
@@ -218,7 +217,7 @@ getChainGenesisInfo :: ( Modifiable GenesisRoot m
                        )
                     => Maybe Word256 -> m (Maybe (Keccak256, MP.StateRoot, Maybe Word256))
 getChainGenesisInfo cid = do
-  gr <- unGenesisRoot <$> get Proxy
+  gr <- unGenesisRoot <$> get
   fmap unGenesisData <$> getkv gr (word256ToMPKey cid)
 
 putChainGenesisInfo :: ( Modifiable GenesisRoot m
@@ -226,18 +225,18 @@ putChainGenesisInfo :: ( Modifiable GenesisRoot m
                        )
                     => Maybe Word256 -> Keccak256 -> MP.StateRoot -> Maybe Word256 -> m ()
 putChainGenesisInfo chainId creationBlock stateRoot parent = do
-  gr <- unGenesisRoot <$> get Proxy
+  gr <- unGenesisRoot <$> get
   newGenesisRoot <- putkv gr (word256ToMPKey chainId) $ GenesisData (creationBlock, stateRoot, parent)
-  put Proxy $ GenesisRoot newGenesisRoot
+  put $ GenesisRoot newGenesisRoot
 
 deleteChainGenesisInfo :: ( Modifiable GenesisRoot m
                           , (MP.StateRoot `Alters` MP.NodeData) m
                           )
                        => Maybe Word256 -> m ()
 deleteChainGenesisInfo chainId = do
-  gr <- unGenesisRoot <$> get Proxy
+  gr <- unGenesisRoot <$> get
   newGenesisRoot <- MP.deleteKey gr (word256ToMPKey chainId)
-  put Proxy $ GenesisRoot newGenesisRoot
+  put $ GenesisRoot newGenesisRoot
 
 getChainCreationBlock :: ( Modifiable GenesisRoot m
                          , (MP.StateRoot `Alters` MP.NodeData) m
@@ -305,7 +304,7 @@ getChainBestBlock :: ( Modifiable BestBlockRoot m
                      )
                   => Maybe Word256 -> m (Maybe (Keccak256, Integer))
 getChainBestBlock chainId = do
-  bbr <- unBestBlockRoot <$> get Proxy
+  bbr <- unBestBlockRoot <$> get
   getkv bbr (word256ToMPKey chainId)
 
 putChainBestBlock :: ( Modifiable BestBlockRoot m
@@ -313,15 +312,15 @@ putChainBestBlock :: ( Modifiable BestBlockRoot m
                      )
                   => Maybe Word256 -> Keccak256 -> Integer -> m ()
 putChainBestBlock chainId bHash ordering = do
-  bbr <- unBestBlockRoot <$> get Proxy
+  bbr <- unBestBlockRoot <$> get
   newBestBlockRoot <- putkv bbr (word256ToMPKey chainId) (bHash, ordering)
-  put Proxy $ BestBlockRoot newBestBlockRoot
+  put $ BestBlockRoot newBestBlockRoot
 
 deleteChainBestBlock :: ( Modifiable BestBlockRoot m
                         , (MP.StateRoot `Alters` MP.NodeData) m
                         )
                      => Maybe Word256 -> m ()
 deleteChainBestBlock chainId = do
-  bbr <- unBestBlockRoot <$> get Proxy
+  bbr <- unBestBlockRoot <$> get
   newBestBlockRoot <- MP.deleteKey bbr (word256ToMPKey chainId)
-  put Proxy $ BestBlockRoot newBestBlockRoot
+  put $ BestBlockRoot newBestBlockRoot

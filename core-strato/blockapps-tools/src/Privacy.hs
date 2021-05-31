@@ -10,14 +10,13 @@
 module Privacy where
 
 import           Control.Monad
-import           Control.Monad.Change.Modify     (Accessible(..))
-import           Control.Monad.IO.Class
+import           Control.Monad.FT
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Resource
 
 import           Data.Aeson                      hiding (encode)
 import qualified Data.Aeson                      as Ae (encode)
-import           Data.Binary
+import           Data.Binary                     (Binary)
 import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Lazy            as BL
 import           Data.Data
@@ -84,15 +83,14 @@ newCollector s c = Collector s c []
 
 getSomeKeysInNamespace :: ( HasNamespace a
                           , Binary (NSKey a)
-                          , Accessible DB.DB m
-                          , MonadIO m
+                          , Gettable DB.DB m
                           , MonadResource m
                           )
                        => Proxy a -> Int -> Int -> m [NSKey a]
 getSomeKeysInNamespace p' start' count' | start' <= 0 = return []
                                         | count' <= 0 = return []
                                         | otherwise = do
-  db <- access Proxy
+  db <- get
   i <- DB.iterOpen db def
   DB.iterLast i
   valid <- DB.iterValid i
@@ -102,7 +100,6 @@ getSomeKeysInNamespace p' start' count' | start' <= 0 = return []
   where
     getKeysInNamespace' :: ( HasNamespace a
                            , Binary (NSKey a)
-                           , MonadIO m
                            , MonadResource m
                            )
                         => Proxy a -> DB.Iterator -> Collector (NSKey a) -> m [NSKey a]
@@ -125,7 +122,7 @@ getSomeKeysInNamespace p' start' count' | start' <= 0 = return []
 getAllKeysInNamespace :: ( HasNamespace a
                          , Binary (NSKey a)
                          , MonadResource m
-                         , Accessible DB.DB m
+                         , Gettable DB.DB m
                          )
                       => Proxy a -> m [NSKey a]
 getAllKeysInNamespace p = getSomeKeysInNamespace p 0 maxBound
@@ -159,8 +156,8 @@ handleDelete p k = "Done" <$ doit (deleteInLDB p k)
 --nsKeyFromJSON :: (HasNamespace a, FromJSON (NSKey a)) => Proxy a -> String -> Either String (NSKey a)
 --nsKeyFromJSON p str = case fromJSON str
 
-instance Accessible DB.DB (ReaderT DB.DB (ResourceT IO)) where
-  access _ = ask
+instance Gettable DB.DB (ReaderT DB.DB (ResourceT IO)) where
+  get = ask
 
 doit :: ReaderT DB.DB (ResourceT IO) a -> IO a
 doit f = DB.runResourceT $ do

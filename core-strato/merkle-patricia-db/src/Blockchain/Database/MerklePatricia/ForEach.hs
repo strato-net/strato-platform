@@ -4,7 +4,7 @@
 module Blockchain.Database.MerklePatricia.ForEach where
 
 import           Control.Monad
-import           Control.Monad.Change.Alter
+import           Control.Monad.FT
 import           Data.NibbleString (NibbleString)
 import qualified Data.NibbleString                            as N
 

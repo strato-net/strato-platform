@@ -13,7 +13,7 @@ module Handlers.BatchTransactionResult
   , server
   ) where
 
-import           Control.Monad.Change.Alter
+import           Control.Monad.FT
 import qualified Data.Map.Strict     as M
 import qualified Database.Esqueleto  as E
 import           Servant
@@ -37,9 +37,9 @@ batchTransactionResultClient = client (Proxy @API)
 server :: ServerT API SQLM
 server = postBatchTransactionResult
 
-instance Selectable Keccak256 [TransactionResult] SQLM where
-  selectMany _ []     = throwIO $ MissingParameterError "missing parameter: hashes"
-  selectMany _ hashes = do
+instance Selectable [TransactionResult] Keccak256 SQLM where
+  selectMany []     = throwIO $ MissingParameterError "missing parameter: hashes"
+  selectMany hashes = do
     txrs <- sqlQuery . E.select . E.from $ \txr -> do
       let matchHashes = (txr E.^. TransactionResultTransactionHash) `E.in_` E.valList hashes
       E.where_ matchHashes
@@ -50,9 +50,7 @@ instance Selectable Keccak256 [TransactionResult] SQLM where
         theFold m v = mmUpsert (transactionResultTransactionHash v) v m
         baseMap = foldl (\m k -> M.insert k [] m) M.empty hashes
         grouped = foldl theFold baseMap (E.entityVal <$> txrs)
-    return grouped
+    pure . zip hashes $ flip M.lookup grouped <$> hashes
 
-postBatchTransactionResult :: Selectable Keccak256 [TransactionResult] m => [Keccak256] -> m (M.Map Keccak256 [TransactionResult])
-postBatchTransactionResult = selectMany (Proxy @[TransactionResult])
-
-
+postBatchTransactionResult :: (Keccak256 `Selects` [TransactionResult]) m => [Keccak256] -> m (M.Map Keccak256 [TransactionResult])
+postBatchTransactionResult ks = M.fromList . catMaybes . map sequence <$> selectMany ks

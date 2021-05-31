@@ -16,7 +16,7 @@ module Blockchain.DB.HashDB (
 
 import           Control.Arrow                               ((&&&))
 import           Control.DeepSeq
-import           Control.Monad.Change.Alter
+import           Control.Monad.FT
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Reader
 import           Data.Default
@@ -51,13 +51,16 @@ genericDeleteHashDB f key = do
   db <- unHashDB <$> f
   DB.delete db def (nibbleString2ByteString key)
 
-instance MonadIO m => (N.NibbleString `Alters` N.NibbleString) (ReaderT HashDB m) where
-  lookup _ = genericLookupHashDB ask
-  insert _ = genericInsertHashDB ask
-  delete _ = genericDeleteHashDB ask
+instance MonadIO m => Selectable N.NibbleString N.NibbleString (ReaderT HashDB m) where
+  select = genericLookupHashDB ask
+instance MonadIO m => Insertable N.NibbleString N.NibbleString (ReaderT HashDB m) where
+  insert = genericInsertHashDB ask
+instance MonadIO m => Deletable  N.NibbleString N.NibbleString (ReaderT HashDB m) where
+  delete = genericDeleteHashDB ask
+instance MonadIO m => Alterable  N.NibbleString N.NibbleString (ReaderT HashDB m) where
 
 hashDBPut :: HasHashDB m => N.NibbleString -> m ()
-hashDBPut = uncurry (insert (Proxy @N.NibbleString)) . (MP.keyToSafeKey &&& id)
+hashDBPut = uncurry insert . (MP.keyToSafeKey &&& id)
 
 hashDBGet :: HasHashDB m => N.NibbleString -> m (Maybe N.NibbleString)
-hashDBGet = lookup (Proxy @N.NibbleString)
+hashDBGet = select

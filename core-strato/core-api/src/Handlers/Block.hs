@@ -16,7 +16,7 @@ module Handlers.Block
   ) where
 
 import           Control.Arrow               ((&&&), (***))
-import           Control.Monad.Change.Alter
+import           Control.Monad.FT
 import           Data.List
 import qualified Data.Map                    as Map
 import           Data.Maybe
@@ -110,10 +110,10 @@ server = getBlockInfo
 
 ---------------------
 
-instance Selectable BlocksFilterParams [Block] SQLM where
-  select _ b@BlocksFilterParams{..} | b == blocksFilterParams{qbSortby = qbSortby} =
+instance Selectable [Block] BlocksFilterParams SQLM where
+  select b@BlocksFilterParams{..} | b == blocksFilterParams{qbSortby = qbSortby} =
     throwIO . NoFilterError $ "Need one of: " ++ intercalate ", " (map T.unpack blockQueryParams)
-                                    | otherwise = do
+                                  | otherwise = do
     blks <- fmap (map (E.entityKey &&& E.entityVal)) . sqlQuery $
       E.select $
       E.from $ \(bdRef `E.LeftOuterJoin` btx `E.FullOuterJoin` rawTX `E.LeftOuterJoin` accStateRef) -> do
@@ -171,7 +171,7 @@ instance Selectable BlocksFilterParams [Block] SQLM where
 
     return . Just $ map (uncurry blockDataRefToBlock) modBlocks
 
-getBlockInfo :: Selectable BlocksFilterParams [Block] m =>
+getBlockInfo :: (BlocksFilterParams `Selects` [Block]) m =>
   Maybe Address -> Maybe Address -> Maybe Address -> Maybe Text ->
   Maybe Keccak256 -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
   Maybe Natural -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
@@ -181,8 +181,8 @@ getBlockInfo :: Selectable BlocksFilterParams [Block] m =>
 getBlockInfo a b c d e f g h i j k l m n o p q r s t =
   getBlockInfo' (BlocksFilterParams a b c d e f g h i j k l m n o p q r s t)
 
-getBlockInfo' :: Selectable BlocksFilterParams [Block] m => BlocksFilterParams -> m [Block']
-getBlockInfo' b = map (flip Block' "") . fromMaybe [] <$> select (Proxy @[Block]) b
+getBlockInfo' :: (BlocksFilterParams `Selects` [Block]) m => BlocksFilterParams -> m [Block']
+getBlockInfo' b = map (flip Block' "") . fromMaybe [] <$> select b
 
 blockQueryParams:: [Text]
 blockQueryParams = [ "txaddress",

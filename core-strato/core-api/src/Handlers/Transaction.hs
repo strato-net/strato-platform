@@ -23,7 +23,7 @@ module Handlers.Transaction
   ) where
 
 import           Control.DeepSeq
-import           Control.Monad.Change.Alter
+import           Control.Monad.FT
 import           Control.Monad.IO.Class
 import           Data.Aeson
 import           Data.Conduit
@@ -136,11 +136,11 @@ data NamedChainId = UnnamedChainIds [ChainId]
                   | MainChain
                   | AllChains
 
-instance Selectable TxsFilterParams [RawTransaction] SQLM where
-  select _ t@TxsFilterParams{..} | t == txsFilterParams { qtChainId = qtChainId
-                                                        , qtChainIds = qtChainIds
-                                                        , qtSortby = qtSortby
-                                                        } =
+instance Selectable [RawTransaction] TxsFilterParams SQLM where
+  select t@TxsFilterParams{..} | t == txsFilterParams { qtChainId = qtChainId
+                                                      , qtChainIds = qtChainIds
+                                                      , qtSortby = qtSortby
+                                                      } =
     throwIO . NoFilterError $ "Need one of: " ++ intercalate ", " transactionQueryParams
                                  | otherwise = do
     chainids <-
@@ -246,7 +246,7 @@ postTransactionList raws = do
       case a of String _ -> True
                 _        -> False
 
-getTransaction :: Selectable TxsFilterParams [RawTransaction] m
+getTransaction :: (TxsFilterParams `Selects` [RawTransaction]) m
                => Maybe Address -> Maybe Address -> Maybe Address -> Maybe Keccak256
                -> Maybe Natural -> Maybe Natural -> Maybe Natural -> Maybe Natural
                -> Maybe Natural -> Maybe Natural -> Maybe Natural -> Maybe Natural
@@ -255,9 +255,9 @@ getTransaction :: Selectable TxsFilterParams [RawTransaction] m
 getTransaction a b c d e f g h i j k l m n o p q =
   getTransaction' (TxsFilterParams a b c d e f g h i j k l m n o p q)
 
-getTransaction' :: Selectable TxsFilterParams [RawTransaction] m
+getTransaction' :: (TxsFilterParams `Selects` [RawTransaction]) m
                 => TxsFilterParams -> m [RawTransaction']
-getTransaction' a = map rtToRtPrime . zip (repeat "") . fromMaybe [] <$> select (Proxy @[RawTransaction]) a
+getTransaction' a = map rtToRtPrime . zip (repeat "") . fromMaybe [] <$> select a
 
 transactionQueryParams:: [String]
 transactionQueryParams = [ "address",

@@ -4,7 +4,7 @@
 module Blockchain.TheDAOFork where
 
 import           Control.Monad
-import           Control.Monad.Change.Alter
+import           Control.Monad.FT
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
@@ -136,12 +136,12 @@ runTheDAOFork :: (Monad m, HasHashDB m, (Account `Alters` AddressState) m) => m 
 runTheDAOFork = do
   values <-
     forM addresses $ \a -> do
-      balance <- addressStateBalance <$> lookupWithDefault Proxy a
-      adjustWithDefault_ Proxy a $ \addressState ->
+      balance <- addressStateBalance <$> selectWithDefault a
+      adjustWithDefault_ a $ \addressState ->
         pure addressState{addressStateBalance=0}
       return balance
 
   let recipAddr = Account (Address 0xbf4ed7b27f1d666546e30d74d50d173d20bca754) Nothing
 
-  adjustWithDefault_ Proxy recipAddr $ \recipAddressState ->
+  adjustWithDefault_ recipAddr $ \recipAddressState ->
     pure recipAddressState{addressStateBalance=addressStateBalance recipAddressState + sum values}

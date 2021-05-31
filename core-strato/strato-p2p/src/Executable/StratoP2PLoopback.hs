@@ -6,9 +6,9 @@ module Executable.StratoP2PLoopback (stratoP2PLoopback) where
 
 import Conduit
 import Control.Monad
-import qualified Control.Monad.Change.Alter            as A
-import qualified Control.Monad.Change.Modify           as Mod
+import Control.Monad.FT
 import Data.IORef
+import Data.Proxy
 import qualified Data.Set.Ordered as S
 import qualified Data.Text as T
 import qualified Network.Kafka                         as K
@@ -39,18 +39,18 @@ stratoP2PLoopback wireMessagesRef = do
   $logInfoS "stratoP2PLoopback" "Reflecting PBFT back to unseq since 2019"
   cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
   void . runContextM cfg $ do
-    ks <- Mod.get (Mod.Proxy @K.KafkaState)
+    ks <- get @K.KafkaState
     let toWireMessage = \case
           P2pBlockstanbul wm -> do
             let msgHash = rlpHash wm
-            msgExists <- A.exists (A.Proxy @(A.Proxy (Inbound WireMessage))) msgHash
+            msgExists <- exists @(Proxy (Inbound WireMessage)) msgHash
             if msgExists
               then do
                 $logInfoS "stratoP2PLoopback/P2pBlockstanbul" . T.pack $ "Already seen inbound wire message " ++ format msgHash ++ ". Not forwarding to Sequencer."
                 pure Nothing
               else do
                 $logInfoS "stratoP2PLoopback/P2pBlockstanbul" . T.pack $ "First time seeing inbound wire message " ++ format msgHash ++ ". Forwarding to Sequencer."
-                A.insert (A.Proxy @(A.Proxy (Inbound WireMessage))) msgHash A.Proxy
+                insert @(Proxy (Inbound WireMessage)) msgHash Proxy
                 pure $ Just wm
           _ -> pure Nothing
 

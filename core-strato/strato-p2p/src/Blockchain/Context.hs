@@ -58,8 +58,7 @@ import           Conduit
 import           Control.Applicative
 import           Control.Concurrent
 import           Control.Lens                          hiding (Context)
-import qualified Control.Monad.Change.Alter            as A
-import qualified Control.Monad.Change.Modify           as Mod
+import           Control.Monad.FT
 import           Blockchain.Output
 import           Control.Monad.Reader
 import           Data.Default
@@ -129,8 +128,16 @@ type family All2 (ks :: [* -> * -> (* -> *) -> Constraint]) (ts :: [(*,*)]) (m :
   All2 (k ': '[]) ts m = All2' k ts m
   All2 (k ': ks) ts m = (All2' k ts m, All2 ks ts m)
 
+type family FlipAll2' (k :: * -> * -> (* -> *) -> Constraint) (ts :: [(*,*)]) (m :: * -> *) :: Constraint where
+  FlipAll2' k ('(t1, t2) : '[]) m = k t2 t1 m
+  FlipAll2' k ('(t1, t2) ': ts) m = (k t2 t1 m, FlipAll2' k ts m)
+
+type family FlipAll2 (ks :: [* -> * -> (* -> *) -> Constraint]) (ts :: [(*,*)]) (m :: * -> *) :: Constraint where
+  FlipAll2 (k ': '[]) ts m = FlipAll2' k ts m
+  FlipAll2 (k ': ks) ts m = (FlipAll2' k ts m, FlipAll2 ks ts m)
+
 class Stacks a m where
-  takeStack :: Proxy a -> Int -> m [a]
+  takeStack :: Int -> m [a]
   pushStack :: [a] -> m ()
 
 newtype TcpPortNumber = TcpPortNumber { unTcpPortNumber :: Int }
@@ -141,8 +148,8 @@ newtype Outbound a = Outbound { unOutbound :: a }
 data Config = Config
   { configSQLDB              :: SQLDB
   , configRedisBlockDB       :: RBDB.RedisConnection
-  , configUnseqSink          :: forall m . (MonadIO m, MonadLogger m, Mod.Modifiable K.KafkaState m) => [IngestEvent] -> m ()
-  , configVmEventsSink       :: forall m . (MonadIO m, MonadLogger m, Mod.Modifiable K.KafkaState m) => [VMEvent] -> m ()
+  , configUnseqSink          :: forall m . (MonadIO m, MonadLogger m, Modifiable K.KafkaState m) => [IngestEvent] -> m ()
+  , configVmEventsSink       :: forall m . (MonadIO m, MonadLogger m, Modifiable K.KafkaState m) => [VMEvent] -> m ()
   , configConnectionTimeout  :: ConnectionTimeout
   , configMaxReturnedHeaders :: MaxReturnedHeaders
   , configVaultClient        :: ClientEnv
@@ -180,190 +187,198 @@ newtype BestBlockNumber = BestBlockNumber { unBestBlockNumber :: Integer }
 
 type ContextM = ReaderT Config (ResourceT (LoggingT IO))
 
-instance MonadIO m => (Keccak256 `A.Alters` BlockData) (ReaderT Config m) where
-  lookup _     = RBDB.withRedisBlockDB . RBDB.getHeader
-  insert _ k v = void . RBDB.withRedisBlockDB $ RBDB.insertHeader k v
-  delete _     = void . RBDB.withRedisBlockDB . RBDB.deleteHeader
-  lookupMany _ = fmap (M.fromList . catMaybes . map sequenceA)
-               . RBDB.withRedisBlockDB . RBDB.getHeaders
-  insertMany _ = void . RBDB.withRedisBlockDB . RBDB.insertHeaders
-  deleteMany _ = void . RBDB.withRedisBlockDB . RBDB.deleteHeaders
+instance MonadIO m => Selectable BlockData Keccak256 (ReaderT Config m) where
+  select     = RBDB.withRedisBlockDB . RBDB.getHeader
+  selectMany = RBDB.withRedisBlockDB . RBDB.getHeaders
+instance MonadIO m => Insertable BlockData Keccak256 (ReaderT Config m) where
+  insert k v = void . RBDB.withRedisBlockDB $ RBDB.insertHeader k v
+  insertMany = void . RBDB.withRedisBlockDB . RBDB.insertHeaders . M.fromList
+instance MonadIO m => Deletable  BlockData Keccak256 (ReaderT Config m) where
+  delete     = void . RBDB.withRedisBlockDB . RBDB.deleteHeader
+  deleteMany = void . RBDB.withRedisBlockDB . RBDB.deleteHeaders
+instance MonadIO m => Alterable  BlockData Keccak256 (ReaderT Config m) where
 
-instance (MonadIO m, MonadLogger m) => Mod.Modifiable WorldBestBlock (ReaderT Config m) where
-  get _ = RBDB.withRedisBlockDB RBDB.getWorldBestBlockInfo <&> \case
+instance MonadIO m => Gettable WorldBestBlock (ReaderT Config m) where
+  get = RBDB.withRedisBlockDB RBDB.getWorldBestBlockInfo <&> \case
     Nothing -> WorldBestBlock $ BestBlock (unsafeCreateKeccak256FromWord256 0) (-1) 0
     Just (RedisBestBlock s n d) -> WorldBestBlock $ BestBlock s n d
-  put _ (WorldBestBlock (BestBlock s n d)) =
+instance (MonadIO m, MonadLogger m) => Puttable WorldBestBlock (ReaderT Config m) where
+  put (WorldBestBlock (BestBlock s n d)) =
     RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo s n d) >>= \case
       Left  _ -> $logInfoS "ContextM.put WorldBestBlock" $ T.pack "Failed to update WorldBestBlockInfo"
       Right False -> $logInfoS "ContextM.put WorldBestBlock" $ T.pack "NewBlock is not better than existing WorldBestBlock"
       Right True  -> return ()
+instance (MonadIO m, MonadLogger m) => Modifiable WorldBestBlock (ReaderT Config m) where
 
-instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestBlock (ReaderT Config m) where
-  get _ = RBDB.withRedisBlockDB RBDB.getBestBlockInfo <&> \case
+instance MonadIO m => Gettable BestBlock (ReaderT Config m) where
+  get = RBDB.withRedisBlockDB RBDB.getBestBlockInfo <&> \case
     Nothing -> BestBlock (unsafeCreateKeccak256FromWord256 0) (-1) 0
     Just (RedisBestBlock s n d) -> BestBlock s n d
-  put _ (BestBlock s n d) =
+instance (MonadIO m, MonadLogger m) => Puttable BestBlock (ReaderT Config m) where
+  put (BestBlock s n d) =
     RBDB.withRedisBlockDB (RBDB.putBestBlockInfo s n d) >>= \case
       Left  _ -> $logInfoS "ContextM.put BestBlock" $ T.pack "Failed to update BestBlock"
       Right _ -> return ()
+instance (MonadIO m, MonadLogger m) => Modifiable BestBlock (ReaderT Config m) where
 
-instance MonadIO m => A.Selectable Integer (Canonical BlockData) (ReaderT Config m) where
-  select _ i = fmap (fmap Canonical) . RBDB.withRedisBlockDB $ RBDB.getCanonicalHeader i
+instance MonadIO m => Selectable (Canonical BlockData) Integer (ReaderT Config m) where
+  select i = fmap (fmap Canonical) . RBDB.withRedisBlockDB $ RBDB.getCanonicalHeader i
 
-instance MonadIO m => A.Selectable IPAddress IPChains (ReaderT Config m) where
-  select p ip = A.selectWithDefault p ip <&> toMaybe def
-  selectWithDefault _ = fmap IPChains
-                      . RBDB.withRedisBlockDB
-                      . RBDB.getIPChains
+instance MonadIO m => Selectable IPChains IPAddress (ReaderT Config m) where
+  select = fmap (toMaybe def . IPChains)
+         . RBDB.withRedisBlockDB
+         . RBDB.getIPChains
 
-instance MonadIO m => A.Selectable OrgId OrgIdChains (ReaderT Config m) where
-  select p ip = A.selectWithDefault p ip <&> toMaybe def
-  selectWithDefault _ = fmap OrgIdChains
-                      . RBDB.withRedisBlockDB
-                      . RBDB.getOrgIdChains
-                      . unOrgId
+instance MonadIO m => Selectable OrgIdChains OrgId (ReaderT Config m) where
+  select = fmap (toMaybe def . OrgIdChains)
+         . RBDB.withRedisBlockDB
+         . RBDB.getOrgIdChains
+         . unOrgId
 
-instance MonadIO m => A.Selectable Keccak256 ChainTxsInBlock (ReaderT Config m) where
-  select p sha = A.selectWithDefault p sha <&> toMaybe def
-  selectWithDefault _ = fmap ChainTxsInBlock
-                      . RBDB.withRedisBlockDB
-                      . RBDB.getChainTxsInBlock
+instance MonadIO m => Selectable ChainTxsInBlock Keccak256 (ReaderT Config m) where
+  select = fmap (toMaybe def . ChainTxsInBlock)
+         . RBDB.withRedisBlockDB
+         . RBDB.getChainTxsInBlock
 
-instance MonadIO m => A.Selectable (Maybe Word256) ParentChainId (ReaderT Config m) where
-  selectWithDefault p sha = A.select p sha <&> fromMaybe (ParentChainId Nothing)
-  select _ Nothing = pure . Just $ ParentChainId Nothing
-  select _ (Just cId) = do
+instance MonadIO m => Selectable ParentChainId (Maybe Word256) (ReaderT Config m) where
+  select Nothing = pure . Just $ ParentChainId Nothing
+  select (Just cId) = do
     mCInfo <- RBDB.withRedisBlockDB $ RBDB.getChainInfo cId
     pure $ mCInfo <&> ParentChainId . parentChain . chainInfo
 
-instance MonadIO m => A.Selectable Word256 ChainMembers (ReaderT Config m) where
-  select p cid = A.selectWithDefault p cid <&> toMaybe def
-  selectWithDefault _ cid = do
+instance MonadIO m => Selectable ChainMembers Word256 (ReaderT Config m) where
+  select cid = do
     ancestors <- map fromJust . filter isJust <$> getAncestorChains (Just cid)
     allChainMembers <- traverse (RBDB.withRedisBlockDB . RBDB.getChainMembers) ancestors
     case allChainMembers of
-      [] -> pure $ ChainMembers M.empty
-      _ -> pure . ChainMembers $ foldr1 M.intersection allChainMembers
+      [] -> pure . Just $ ChainMembers M.empty
+      _ -> pure . Just . ChainMembers $ foldr1 M.intersection allChainMembers
 
-instance MonadIO m => A.Selectable Word256 ChainInfo (ReaderT Config m) where
-  select _ = RBDB.withRedisBlockDB . RBDB.getChainInfo
+instance MonadIO m => Selectable ChainInfo Word256 (ReaderT Config m) where
+  select = RBDB.withRedisBlockDB . RBDB.getChainInfo
 
-instance MonadIO m => A.Selectable Keccak256 (Private (Word256, OutputTx)) (ReaderT Config m) where
-  select _ = fmap (fmap Private) . RBDB.withRedisBlockDB . RBDB.getPrivateTransactions
+instance MonadIO m => Selectable (Private (Word256, OutputTx)) Keccak256 (ReaderT Config m) where
+  select = fmap (fmap Private) . RBDB.withRedisBlockDB . RBDB.getPrivateTransactions
 
-instance MonadIO m => (Keccak256 `A.Alters` OutputBlock) (ReaderT Config m) where
-  lookup _     = RBDB.withRedisBlockDB . RBDB.getBlock
-  insert _ k v = void . RBDB.withRedisBlockDB $ RBDB.insertBlock k v
-  delete _     = void . RBDB.withRedisBlockDB . RBDB.deleteBlock
-  lookupMany _ = fmap (M.fromList . catMaybes . map sequenceA)
-               . RBDB.withRedisBlockDB . RBDB.getBlocks
-  insertMany _ = void . RBDB.withRedisBlockDB . RBDB.insertBlocks
-  deleteMany _ = void . RBDB.withRedisBlockDB . RBDB.deleteBlocks
+instance MonadIO m => Selectable OutputBlock Keccak256 (ReaderT Config m) where
+  select     = RBDB.withRedisBlockDB . RBDB.getBlock
+  selectMany = RBDB.withRedisBlockDB . RBDB.getBlocks
+instance MonadIO m => Insertable OutputBlock Keccak256 (ReaderT Config m) where
+  insert k v = void . RBDB.withRedisBlockDB $ RBDB.insertBlock k v
+  insertMany = void . RBDB.withRedisBlockDB . RBDB.insertBlocks . M.fromList
+instance MonadIO m => Deletable  OutputBlock Keccak256 (ReaderT Config m) where
+  delete     = void . RBDB.withRedisBlockDB . RBDB.deleteBlock
+  deleteMany = void . RBDB.withRedisBlockDB . RBDB.deleteBlocks
+instance MonadIO m => Alterable  OutputBlock Keccak256 (ReaderT Config m) where
 
-instance MonadIO m => (Keccak256 `A.Alters` (Proxy (Inbound WireMessage))) (ReaderT Config m) where
-  lookup _  k = do
+instance MonadIO m => Selectable (Proxy (Inbound WireMessage)) Keccak256 (ReaderT Config m) where
+  select k = do
     wms <- readIORef =<< asks configBlockstanbulWireMessages
     let b = S.member k wms
     pure $ if b then Just (Proxy @(Inbound WireMessage)) else Nothing
-  insert _ k _ = asks configBlockstanbulWireMessages >>= flip atomicModifyIORef' (\wms ->
+instance MonadIO m => Insertable (Proxy (Inbound WireMessage)) Keccak256 (ReaderT Config m) where
+  insert k _ = asks configBlockstanbulWireMessages >>= flip atomicModifyIORef' (\wms ->
     let s = S.size wms
         wms' = if s >= flags_wireMessageCacheSize then S.delete (head $ toList wms) wms else wms
         wms'' = wms' S.>| k
      in (wms'', ()))
-  delete _ k = asks configBlockstanbulWireMessages >>= flip atomicModifyIORef' (\wms ->
+instance MonadIO m => Deletable  (Proxy (Inbound WireMessage)) Keccak256 (ReaderT Config m) where
+  delete k = asks configBlockstanbulWireMessages >>= flip atomicModifyIORef' (\wms ->
     let wms' = S.delete k wms
      in (wms', ()))
+instance MonadIO m => Alterable  (Proxy (Inbound WireMessage)) Keccak256 (ReaderT Config m) where
 
-instance MonadIO m => ((T.Text, Keccak256) `A.Alters` (Proxy (Outbound WireMessage))) (ReaderT Config m) where
-  lookup _  k = do
-    wms <- _outboundWireMessages <$> Mod.get (Mod.Proxy @Context)
+instance MonadIO m => Selectable (Proxy (Outbound WireMessage)) (T.Text, Keccak256) (ReaderT Config m) where
+  select k = do
+    wms <- _outboundWireMessages <$> get @Context
     let b = S.member k wms
     pure $ if b then Just (Proxy @(Outbound WireMessage)) else Nothing
-  insert _ k _ = Mod.modifyStatefully_ (Mod.Proxy @Context) $ do
+instance MonadIO m => Insertable (Proxy (Outbound WireMessage)) (T.Text, Keccak256) (ReaderT Config m) where
+  insert k _ = modifyStatefully_ @Context $ do
     wms <- use outboundWireMessages
     let s = S.size wms
         wms' = if s >= flags_wireMessageCacheSize then S.delete (head $ toList wms) wms else wms
         wms'' = wms' S.>| k
     assign outboundWireMessages wms''
-  delete _ k = Mod.modifyStatefully_ (Mod.Proxy @Context) $
+instance MonadIO m => Deletable  (Proxy (Outbound WireMessage)) (T.Text, Keccak256) (ReaderT Config m) where
+  delete k = modifyStatefully_ @Context $
     outboundWireMessages %= S.delete k
+instance MonadIO m => Alterable  (Proxy (Outbound WireMessage)) (T.Text, Keccak256) (ReaderT Config m) where
 
 instance ( MonadIO m
          , MonadUnliftIO m
-         ) => Mod.Accessible GenesisBlockHash (ReaderT Config m) where
-  access _ = GenesisBlockHash <$> getGenesisBlockHash
+         ) => Gettable GenesisBlockHash (ReaderT Config m) where
+  get = GenesisBlockHash <$> getGenesisBlockHash
 
-instance MonadIO m => Mod.Accessible BestBlockNumber (ReaderT Config m) where
-  access _ = BestBlockNumber <$> liftIO getBestKafkaBlockNumber
+instance MonadIO m => Gettable BestBlockNumber (ReaderT Config m) where
+  get = BestBlockNumber <$> liftIO getBestKafkaBlockNumber
 
-instance MonadIO m => Mod.Modifiable Context (ReaderT Config m) where
-  get _   = readIORef =<< asks configContext
-  put _ c = asks configContext >>= flip atomicModifyIORef' (const (c, ()))
+-- TODO: Add an instance of modifyReturningPure that utilizes the atomicModifyIORef'
+instance MonadIO m => Gettable Context (ReaderT Config m) where
+  get   = readIORef =<< asks configContext
+instance MonadIO m => Puttable Context (ReaderT Config m) where
+  put c = asks configContext >>= flip atomicModifyIORef' (const (c, ()))
+instance MonadIO m => Modifiable Context (ReaderT Config m) where
 
-instance MonadIO m => Mod.Modifiable K.KafkaState (ReaderT Config m) where
-  get _   = contextKafkaState <$> Mod.get (Proxy @Context)
-  put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c{contextKafkaState = k},()))
+instance MonadIO m => Gettable K.KafkaState (ReaderT Config m) where
+  get   = contextKafkaState <$> get @Context
+instance MonadIO m => Puttable K.KafkaState (ReaderT Config m) where
+  put k = asks configContext >>= flip atomicModifyIORef' (\c -> (c{contextKafkaState = k},()))
+instance MonadIO m => Modifiable K.KafkaState (ReaderT Config m) where
 
-instance MonadIO m => Mod.Modifiable ActionTimestamp (ReaderT Config m) where
-  get _   = actionTimestamp <$> Mod.get (Proxy @Context)
-  put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c{actionTimestamp = k},()))
+instance MonadIO m => Gettable ActionTimestamp (ReaderT Config m) where
+  get   = actionTimestamp <$> get @Context
+instance MonadIO m => Puttable ActionTimestamp (ReaderT Config m) where
+  put k = asks configContext >>= flip atomicModifyIORef' (\c -> (c{actionTimestamp = k},()))
+instance MonadIO m => Modifiable ActionTimestamp (ReaderT Config m) where
 
-instance MonadIO m => Mod.Accessible ActionTimestamp (ReaderT Config m) where
-  access _ = Mod.get (Proxy @ActionTimestamp)
+instance MonadIO m => Gettable [BlockData] (ReaderT Config m) where
+  get   = blockHeaders <$> get @Context
+instance MonadIO m => Puttable [BlockData] (ReaderT Config m) where
+  put k = asks configContext >>= flip atomicModifyIORef' (\c -> (c{blockHeaders = k},()))
+instance MonadIO m => Modifiable [BlockData] (ReaderT Config m) where
 
-instance MonadIO m => Mod.Modifiable [BlockData] (ReaderT Config m) where
-  get _   = blockHeaders <$> Mod.get (Proxy @Context)
-  put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c{blockHeaders = k},()))
+instance MonadIO m => Gettable RemainingBlockHeaders (ReaderT Config m) where
+  get   = remainingBlockHeaders <$> get @Context
+instance MonadIO m => Puttable RemainingBlockHeaders (ReaderT Config m) where
+  put k = asks configContext >>= flip atomicModifyIORef' (\c -> (c{remainingBlockHeaders = k},()))
+instance MonadIO m => Modifiable RemainingBlockHeaders (ReaderT Config m) where
 
-instance MonadIO m => Mod.Accessible [BlockData] (ReaderT Config m) where
-  access _ = Mod.get (Proxy @[BlockData])
+instance MonadIO m => Gettable MaxReturnedHeaders (ReaderT Config m) where
+  get = asks configMaxReturnedHeaders
 
-instance MonadIO m => Mod.Modifiable RemainingBlockHeaders (ReaderT Config m) where
-  get _   = remainingBlockHeaders <$> Mod.get (Proxy @Context)
-  put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c{remainingBlockHeaders = k},()))
+instance MonadIO m => Gettable PeerAddress (ReaderT Config m) where
+  get   = _blockstanbulPeerAddr <$> get @Context
+instance MonadIO m => Puttable PeerAddress (ReaderT Config m) where
+  put k = asks configContext >>= flip atomicModifyIORef' (\c -> (c{_blockstanbulPeerAddr = k},()))
+instance MonadIO m => Modifiable PeerAddress (ReaderT Config m) where
 
-instance MonadIO m => Mod.Accessible RemainingBlockHeaders (ReaderT Config m) where
-  access _ = Mod.get (Proxy @RemainingBlockHeaders)
+instance MonadIO m => Gettable ConnectionTimeout (ReaderT Config m) where
+  get = asks configConnectionTimeout
 
-instance MonadIO m => Mod.Accessible MaxReturnedHeaders (ReaderT Config m) where
-  access _ = asks configMaxReturnedHeaders
+instance MonadIO m => Gettable RBDB.RedisConnection (ReaderT Config m) where
+  get = asks configRedisBlockDB
 
-instance MonadIO m => Mod.Modifiable PeerAddress (ReaderT Config m) where
-  get _   = _blockstanbulPeerAddr <$> Mod.get (Proxy @Context)
-  put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c{_blockstanbulPeerAddr = k},()))
+instance MonadIO m => Gettable SQLDB (ReaderT Config m) where
+  get = asks configSQLDB
 
-instance MonadIO m => Mod.Accessible PeerAddress (ReaderT Config m) where
-  access _ = Mod.get (Proxy @PeerAddress)
+instance MonadIO m => Insertable ActivityState (T.Text, Int) (ReaderT Config m) where
+  insert k = void . liftIO . setPeerActiveState (fst k) (snd k)
 
-instance MonadIO m => Mod.Accessible ConnectionTimeout (ReaderT Config m) where
-  access _ = asks configConnectionTimeout
-
-instance MonadIO m => Mod.Accessible RBDB.RedisConnection (ReaderT Config m) where
-  access _ = asks configRedisBlockDB
-
-instance MonadIO m => Mod.Accessible SQLDB (ReaderT Config m) where
-  access _ = asks configSQLDB
-
-instance MonadIO m => ((T.Text, Int) `A.Alters` ActivityState) (ReaderT Config m) where
-  lookup _ _ = error "lookup ActivityState undefined for ContextM"
-  insert _ k = void . liftIO . setPeerActiveState (fst k) (snd k)
-  delete _ _ = error "lookup ActivityState undefined for ContextM"
-
-instance (MonadIO m, MonadLogger m) => Mod.Accessible (SK.UnseqSink (ReaderT Config m)) (ReaderT Config m) where
-  access _ = asks configUnseqSink
+instance (MonadIO m, MonadLogger m) => Gettable (SK.UnseqSink (ReaderT Config m)) (ReaderT Config m) where
+  get = asks configUnseqSink
 
 instance (MonadIO m, MonadLogger m) => HasVMEventsSink (ReaderT Config m) where
   getVMEventsSink = asks configVmEventsSink
 
 instance (MonadIO m, MonadLogger m) => Stacks Block (ReaderT Config m) where
-  takeStack _ n = do
+  takeStack n = do
     vmEvents <- liftIO . fetchLastVMEvents $ fromIntegral n
     pure [b | ChainBlock b <- vmEvents]
   pushStack b = getVMEventsSink >>= \sink -> sink (ChainBlock <$> b)
 
-instance MonadUnliftIO m => A.Selectable String PPeer (ReaderT Config m) where
-  select _ ip = sqlQuery actions >>= \case
+instance MonadUnliftIO m => Selectable PPeer String (ReaderT Config m) where
+  select ip = sqlQuery actions >>= \case
         [] -> return Nothing
         lst -> return . Just . SQL.entityVal $ head lst
 
@@ -403,23 +418,21 @@ type MonadP2P m = ( MonadIO m
                   , MonadUnliftIO m
                   , Stacks Block m
                   , HasVault m
-                  , All '[Mod.Accessible, Mod.Modifiable]
-                      '[ ActionTimestamp
-                       , [BlockData]
-                       , RemainingBlockHeaders
-                       , PeerAddress
-                       ] m
-                  , All '[Mod.Accessible]
+                  , All '[Gettable]
                       '[ MaxReturnedHeaders
                        , ConnectionTimeout
                        , GenesisBlockHash
                        , BestBlockNumber
                        ] m
-                  , All '[Mod.Modifiable]
-                      '[ BestBlock
+                  , All '[Modifiable]
+                      '[ ActionTimestamp
+                       , [BlockData]
+                       , RemainingBlockHeaders
+                       , PeerAddress
+                       , BestBlock
                        , WorldBestBlock
                        ] m
-                  , All2 '[A.Selectable]
+                  , FlipAll2 '[Selectable]
                       '[ '(Integer, Canonical BlockData)
                        , '(IPAddress, IPChains)
                        , '(OrgId, OrgIdChains)
@@ -428,7 +441,7 @@ type MonadP2P m = ( MonadIO m
                        , '(Word256, ChainInfo)
                        , '(Keccak256, Private (Word256, OutputTx))
                        ] m
-                  , All2 '[A.Alters]
+                  , FlipAll2 '[Alterable]
                       '[ '(Keccak256, BlockData)
                        , '(Keccak256, OutputBlock)
                        , '(Keccak256, Proxy (Inbound WireMessage))
@@ -436,28 +449,28 @@ type MonadP2P m = ( MonadIO m
                        ] m
                   )
 
-getBlockHeaders :: Mod.Accessible [BlockData] m => m [BlockData]
-getBlockHeaders = Mod.access (Proxy @[BlockData])
+getBlockHeaders :: Gettable [BlockData] m => m [BlockData]
+getBlockHeaders = get
 
-putBlockHeaders :: Mod.Modifiable [BlockData] m => [BlockData]-> m ()
-putBlockHeaders = Mod.put (Proxy @[BlockData])
+putBlockHeaders :: Puttable [BlockData] m => [BlockData]-> m ()
+putBlockHeaders = put
 
-getRemainingBHeaders :: (Functor m, Mod.Accessible RemainingBlockHeaders m) => m [BlockData]
-getRemainingBHeaders = unRemainingBlockHeaders <$> Mod.access (Proxy @RemainingBlockHeaders)
+getRemainingBHeaders :: Gettable RemainingBlockHeaders m => m [BlockData]
+getRemainingBHeaders = unRemainingBlockHeaders <$> get
 
-putRemainingBHeaders :: Mod.Modifiable RemainingBlockHeaders m => [BlockData]-> m ()
-putRemainingBHeaders = Mod.put (Proxy @RemainingBlockHeaders) . RemainingBlockHeaders
+putRemainingBHeaders :: Puttable RemainingBlockHeaders m => [BlockData]-> m ()
+putRemainingBHeaders = put . RemainingBlockHeaders
 
-stampActionTimestamp :: (MonadIO m, Mod.Modifiable ActionTimestamp m) => m ()
+stampActionTimestamp :: (MonadIO m, Puttable ActionTimestamp m) => m ()
 stampActionTimestamp = do
   ts <- liftIO getCurrentTime
-  Mod.put (Proxy @ActionTimestamp) . ActionTimestamp $ Just ts
+  put . ActionTimestamp $ Just ts
 
-getActionTimestamp :: Mod.Accessible ActionTimestamp m => m ActionTimestamp
-getActionTimestamp = Mod.access (Proxy @ActionTimestamp)
+getActionTimestamp :: Gettable ActionTimestamp m => m ActionTimestamp
+getActionTimestamp = get
 
-clearActionTimestamp :: Mod.Modifiable ActionTimestamp m => m ()
-clearActionTimestamp = Mod.put (Proxy @ActionTimestamp) emptyActionTimestamp
+clearActionTimestamp :: Puttable ActionTimestamp m => m ()
+clearActionTimestamp = put emptyActionTimestamp
 
 runContextM :: MonadUnliftIO m
             => r
@@ -502,23 +515,23 @@ initContext = Context
   }
 
 
-getPeerByIP :: A.Selectable String PPeer m
+getPeerByIP :: (String `Selects` PPeer) m
             => String
             -> m (Maybe PPeer)
-getPeerByIP = A.select (Proxy @PPeer)
+getPeerByIP = select
 
-setPeerAddrIfUnset :: Mod.Modifiable PeerAddress m => Address -> m ()
-setPeerAddrIfUnset addr = Mod.modify_ (Proxy @PeerAddress) $ pure . withPeerAddress (<|> Just addr)
+setPeerAddrIfUnset :: Modifiable PeerAddress m => Address -> m ()
+setPeerAddrIfUnset addr = modifyPure_ $ withPeerAddress (<|> Just addr)
 
-shouldSendToPeer :: (Functor m, Mod.Accessible PeerAddress m) => Address -> m Bool
-shouldSendToPeer addr = maybe True zeroOrArg . unPeerAddress <$> Mod.access (Proxy @PeerAddress)
+shouldSendToPeer :: Gettable PeerAddress m => Address -> m Bool
+shouldSendToPeer addr = maybe True zeroOrArg . unPeerAddress <$> get
         -- 0x0 is for a broadcast sync message.
   where zeroOrArg addr' = addr' == 0x0 || addr' == addr
 
 withActivePeer :: ( MonadUnliftIO m
-                  , ((T.Text, Int) `A.Alters` ActivityState) m
+                  , ((T.Text, Int) `Inserts` ActivityState) m
                   )
                => PPeer -> m a -> m a
 withActivePeer p = bracket a b . const
-  where a   = A.insert (Proxy @ActivityState) (pPeerIp p, pPeerTcpPort p) Active
-        b _ = A.insert (Proxy @ActivityState) (pPeerIp p, pPeerTcpPort p) Inactive
+  where a   = insert (pPeerIp p, pPeerTcpPort p) Active
+        b _ = insert (pPeerIp p, pPeerTcpPort p) Inactive

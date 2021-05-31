@@ -10,7 +10,7 @@
 module Blockchain.Bagger where
 
 import           Control.Arrow                      ((&&&))
-import qualified Control.Monad.Change.Alter         as A
+import           Control.Monad.FT
 import           Control.Monad.Extra
 import           Control.Monad.IO.Class
 import           Blockchain.Output
@@ -378,7 +378,7 @@ removeFromSeen t = updateBaggerState (B.removeFromSeen t)
 getAddressNonceAndBalance :: MonadBagger m => Address -> m (Integer, Integer)
 getAddressNonceAndBalance addr = do 
   (nonce, balance) <- (DD.addressStateNonce &&& DD.addressStateBalance) <$>
-      A.lookupWithDefault (A.Proxy @DD.AddressState) (Account addr Nothing)
+      selectWithDefault @DD.AddressState (Account addr Nothing)
   if flags_gasOn then 
     return (nonce, balance) 
   else 
@@ -466,9 +466,9 @@ buildRewardedBlockHeader :: MonadBagger m => DD.BlockData -> [DD.BlockData] -> m
 buildRewardedBlockHeader bd uncles = do
   $logInfoS "Bagger.buildRewardedBlockHeader" . T.pack $ "Baggin' with difficultyBomb = " ++ show flags_difficultyBomb
   $logInfoS "Bagger.buildRewardedBlockHeader" . T.pack $ "pre-reward :: (" ++ format (DD.blockDataStateRoot bd) ++ ")"
-  oldSR <- A.lookupWithDefault (A.Proxy @StateRoot) (Nothing :: Maybe Word256)
+  oldSR <- selectWithDefault @StateRoot (Nothing :: Maybe Word256)
   rewardedStateRoot <- rewardCoinbases (DD.blockDataCoinbase bd) uncles (DD.blockDataNumber bd)
-  A.insert (A.Proxy @StateRoot) (Nothing :: Maybe Word256) oldSR
+  insert @StateRoot (Nothing :: Maybe Word256) oldSR
   $logInfoS "Bagger.buildRewardedBlockHeader" . T.pack $ "post-reward :: (" ++ format rewardedStateRoot ++ ")"
   return bd{DD.blockDataStateRoot = rewardedStateRoot}
 

@@ -16,8 +16,7 @@ import           Control.Applicative                   ((<|>))
 import           Control.Arrow                         ((&&&), (***))
 import           Control.Lens                          hiding (Context)
 import           Control.Monad
-import qualified Control.Monad.Change.Alter            as A
-import qualified Control.Monad.Change.Modify           as Mod
+import           Control.Monad.FT
 import           Control.Monad.Trans.Maybe
 import qualified Blockchain.Database.MerklePatricia    as MP
 import           Blockchain.Output
@@ -27,10 +26,9 @@ import           Data.Conduit.List                     (fold)
 import           Data.Foldable                         hiding (fold)
 import           Data.List
 import           Data.List.Split                       (chunksOf)
-import           Data.Proxy
 import qualified Data.Text                             as T
 import qualified Data.Map                              as M
-import           Data.Maybe                            (catMaybes, isNothing, fromMaybe)
+import           Data.Maybe                            (isNothing, fromMaybe)
 import qualified Data.Set                              as S
 import           Data.Time.Clock.POSIX
 import           Data.Traversable                      (for)
@@ -99,7 +97,7 @@ ethereumVM d = void . execContextM d $ do
     $logInfoLS "ethereumVM/getCheckpoint" (cpHash, cpBBI, cpSR)
 
     putContextBestBlockInfo cpBBI
-    Mod.put Proxy $ BlockHashRoot cpSR
+    put $ BlockHashRoot cpSR
 
     Bagger.processNewBestBlock cpHash cpHead [] -- bootstrap Bagger with genesis block
 
@@ -121,7 +119,7 @@ ethereumVM d = void . execContextM d $ do
         let newOffset = cpOffset + fromIntegral (length seqEvents)
         baggerData <- uncurry EVMCheckpoint <$> Bagger.getCheckpointableState
         checkpointData <- baggerData <$> getContextBestBlockInfo
-        withChainroot <- checkpointData . unBlockHashRoot <$> Mod.get Proxy
+        withChainroot <- checkpointData . unBlockHashRoot <$> get
         setCheckpoint newOffset withChainroot
 
 microtimeCutoff :: Microtime
@@ -249,7 +247,7 @@ processBlocks blocks = do
 processBlockSummaries :: ( MonadIO m
                          , MonadLogger m
                          , HasBlockSummaryDB m
-                         , Mod.Modifiable ContextState m
+                         , Modifiable ContextState m
                          )
                       => [OutputBlock]
                       -> m ()
@@ -366,13 +364,13 @@ runChainConstructors cId cInfo = do
   flushMemStorageDB
   Mem.flushMemAddressStateDB
 
-  sr <- A.lookupWithDefault (Proxy @MP.StateRoot) (Just cId)
+  sr <- selectWithDefault @MP.StateRoot (Just cId)
   return (sr, actions)
 
 initializeCheckpointAndBlockSummary :: ( HasBlockSummaryDB m
-                                       , Mod.Modifiable BlockHashRoot m
-                                       , Mod.Modifiable GenesisRoot m
-                                       , (MP.StateRoot `A.Alters` MP.NodeData) m
+                                       , Modifiable BlockHashRoot m
+                                       , Modifiable GenesisRoot m
+                                       , (MP.StateRoot `Alters` MP.NodeData) m
                                        )
                                     => OutputBlock
                                     -> m EVMCheckpoint
@@ -404,14 +402,14 @@ writeBlockSummary block =
         putBSum sha (blockHeaderToBSum header td txCnt)
 
 shouldProcessNewTransactions :: ( MonadLogger m
-                                , Mod.Accessible (Maybe WorldBestBlock) m
+                                , Gettable (Maybe WorldBestBlock) m
                                 , HasBlockSummaryDB m
                                 )
                              => m Bool -- todo: probably shouldn't do it by number, but tdiff.
 shouldProcessNewTransactions =
   if flags_useSyncMode
     then do
-      worldBestBlock <- fmap unWorldBestBlock <$> Mod.access (Mod.Proxy @(Maybe WorldBestBlock))
+      worldBestBlock <- fmap unWorldBestBlock <$> get @(Maybe WorldBestBlock)
       case worldBestBlock of
         Nothing -> do
           $logInfoS "shouldProcessNewTransactions" "got Nothing from worldBestBlockInfo, playing it safe and not mining Txs"

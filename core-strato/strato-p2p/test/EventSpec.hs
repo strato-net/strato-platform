@@ -14,8 +14,7 @@ module EventSpec where
 import           Conduit
 import           Control.Concurrent.STM.TMChan
 import           Control.Lens                          hiding (Context)
-import qualified Control.Monad.Change.Alter            as A
-import qualified Control.Monad.Change.Modify           as Mod
+import           Control.Monad.FT
 import           Control.Monad.Reader
 import           Control.Monad.State
 import qualified Data.ByteString                       as B
@@ -27,6 +26,7 @@ import           Data.Default                          (def)
 import           Data.Foldable                         (for_, toList)
 import           Data.Map.Strict                       (Map)
 import qualified Data.Map.Strict                       as M
+import           Data.Proxy
 import qualified Data.Set.Ordered                      as S
 import qualified Data.Sequence                         as Q
 import           Data.Text (Text)
@@ -115,96 +115,103 @@ instance {-# OVERLAPPING #-} MonadIO m => MonadState TestContext (MonadTest m) w
     where swap ~(a,b) = (b,a)
 
 instance MonadIO m => Stacks Block (MonadTest m) where
-  takeStack _ n = take n <$> use blocks
-  pushStack bs  = do
+  takeStack n  = take n <$> use blocks
+  pushStack bs = do
     let maxNum = maximum $ DataDefs.blockDataNumber . blockBlockData <$> bs
     bestBlockNumber %= (\(BestBlockNumber n) -> BestBlockNumber $ max maxNum n)
     blocks %= (bs ++)
 
-instance MonadIO m => (Keccak256 `A.Alters` DataDefs.BlockData) (MonadTest m) where
-  lookup _ k   = M.lookup k <$> use shaBlockDataMap
-  insert _ k v = shaBlockDataMap %= M.insert k v
-  delete _ k   = shaBlockDataMap %= M.delete k
+instance MonadIO m => Selectable DataDefs.BlockData Keccak256 (MonadTest m) where
+  select k   = M.lookup k <$> use shaBlockDataMap
+instance MonadIO m => Insertable DataDefs.BlockData Keccak256 (MonadTest m) where
+  insert k v = shaBlockDataMap %= M.insert k v
+instance MonadIO m => Deletable DataDefs.BlockData Keccak256 (MonadTest m) where
+  delete k   = shaBlockDataMap %= M.delete k
+instance MonadIO m => Alterable DataDefs.BlockData Keccak256 (MonadTest m) where
 
-instance MonadIO m => Mod.Modifiable WorldBestBlock (MonadTest m) where
-  get _ = use worldBestBlock
-  put _ = assign worldBestBlock
+instance MonadIO m => Gettable WorldBestBlock (MonadTest m) where
+  get = use worldBestBlock
+instance MonadIO m => Puttable WorldBestBlock (MonadTest m) where
+  put = assign worldBestBlock
+instance MonadIO m => Modifiable WorldBestBlock (MonadTest m) where
 
-instance MonadIO m => Mod.Modifiable BestBlock (MonadTest m) where
-  get _ = use bestBlock
-  put _ = assign bestBlock
+instance MonadIO m => Gettable BestBlock (MonadTest m) where
+  get = use bestBlock
+instance MonadIO m => Puttable BestBlock (MonadTest m) where
+  put = assign bestBlock
+instance MonadIO m => Modifiable BestBlock (MonadTest m) where
 
-instance MonadIO m => A.Selectable Integer (Canonical DataDefs.BlockData) (MonadTest m) where
-  select _ i = M.lookup i <$> use canonicalBlockDataMap
+instance MonadIO m => Selectable (Canonical DataDefs.BlockData) Integer (MonadTest m) where
+  select i = M.lookup i <$> use canonicalBlockDataMap
 
-instance MonadIO m => A.Selectable IPAddress IPChains (MonadTest m) where
-  select _ ip = M.lookup ip <$> use ipAddressIpChainsMap
+instance MonadIO m => Selectable IPChains IPAddress (MonadTest m) where
+  select ip = M.lookup ip <$> use ipAddressIpChainsMap
 
-instance MonadIO m => A.Selectable OrgId OrgIdChains (MonadTest m) where
-  select _ ip = M.lookup ip <$> use orgIdChainsMap
+instance MonadIO m => Selectable OrgIdChains OrgId (MonadTest m) where
+  select ip = M.lookup ip <$> use orgIdChainsMap
 
-instance MonadIO m => A.Selectable Keccak256 ChainTxsInBlock (MonadTest m) where
-  select _ sha = M.lookup sha <$> use shaChainTxsInBlockMap
+instance MonadIO m => Selectable ChainTxsInBlock Keccak256 (MonadTest m) where
+  select sha = M.lookup sha <$> use shaChainTxsInBlockMap
 
-instance MonadIO m => A.Selectable Word256 ChainMembers (MonadTest m) where
-  select _ cid = M.lookup cid <$> use chainMembersMap
+instance MonadIO m => Selectable ChainMembers Word256 (MonadTest m) where
+  select cid = M.lookup cid <$> use chainMembersMap
 
-instance MonadIO m => A.Selectable Word256 ChainInfo (MonadTest m) where
-  select _ cid = M.lookup cid <$> use chainInfoMap
+instance MonadIO m => Selectable ChainInfo Word256 (MonadTest m) where
+  select cid = M.lookup cid <$> use chainInfoMap
 
-instance MonadIO m => A.Selectable Keccak256 (Private (Word256, OutputTx)) (MonadTest m) where
-  select _ tx = M.lookup tx <$> use privateTxMap
+instance MonadIO m => Selectable (Private (Word256, OutputTx)) Keccak256 (MonadTest m) where
+  select tx = M.lookup tx <$> use privateTxMap
 
-instance MonadIO m => Mod.Accessible GenesisBlockHash (MonadTest m) where
-  access _ = use genesisBlockHash
+instance MonadIO m => Gettable GenesisBlockHash (MonadTest m) where
+  get = use genesisBlockHash
 
-instance MonadIO m => Mod.Accessible BestBlockNumber (MonadTest m) where
-  access _ = use bestBlockNumber
+instance MonadIO m => Gettable BestBlockNumber (MonadTest m) where
+  get = use bestBlockNumber
 
-instance MonadIO m => Mod.Modifiable ActionTimestamp (MonadTest m) where
-  get _ = use actionTimestamp
-  put _ = assign actionTimestamp
+instance MonadIO m => Gettable ActionTimestamp (MonadTest m) where
+  get = use actionTimestamp
+instance MonadIO m => Puttable ActionTimestamp (MonadTest m) where
+  put = assign actionTimestamp
+instance MonadIO m => Modifiable ActionTimestamp (MonadTest m) where
 
-instance MonadIO m => Mod.Accessible ActionTimestamp (MonadTest m) where
-  access _ = Mod.get (Mod.Proxy @ActionTimestamp)
+instance MonadIO m => Gettable [DataDefs.BlockData] (MonadTest m) where
+  get = use blockHeaders
+instance MonadIO m => Puttable [DataDefs.BlockData] (MonadTest m) where
+  put = assign blockHeaders
+instance MonadIO m => Modifiable [DataDefs.BlockData] (MonadTest m) where
 
-instance MonadIO m => Mod.Modifiable [DataDefs.BlockData] (MonadTest m) where
-  get _ = use blockHeaders
-  put _ = assign blockHeaders
+instance MonadIO m => Gettable RemainingBlockHeaders (MonadTest m) where
+  get = use remainingBlockHeaders
+instance MonadIO m => Puttable RemainingBlockHeaders (MonadTest m) where
+  put = assign remainingBlockHeaders
+instance MonadIO m => Modifiable RemainingBlockHeaders (MonadTest m) where
 
-instance MonadIO m => Mod.Accessible [DataDefs.BlockData] (MonadTest m) where
-  access _ = Mod.get (Mod.Proxy @[DataDefs.BlockData])
+instance MonadIO m => Gettable MaxReturnedHeaders (MonadTest m) where
+  get = use maxReturnedHeaders
 
-instance MonadIO m => Mod.Modifiable RemainingBlockHeaders (MonadTest m) where
-  get _ = use remainingBlockHeaders
-  put _ = assign remainingBlockHeaders
+instance MonadIO m => Gettable PeerAddress (MonadTest m) where
+  get = use peerAddr
+instance MonadIO m => Puttable PeerAddress (MonadTest m) where
+  put = assign peerAddr
+instance MonadIO m => Modifiable PeerAddress (MonadTest m) where
 
-instance MonadIO m => Mod.Accessible RemainingBlockHeaders (MonadTest m) where
-  access _ = Mod.get (Mod.Proxy @RemainingBlockHeaders)
+instance MonadIO m => Gettable ConnectionTimeout (MonadTest m) where
+  get = use connectionTimeout
 
-instance MonadIO m => Mod.Accessible MaxReturnedHeaders (MonadTest m) where
-  access _ = use maxReturnedHeaders
+instance MonadIO m => Selectable DataPeer.PPeer String (MonadTest m) where
+  select tx = M.lookup tx <$> use stringPPeerMap
 
-instance MonadIO m => Mod.Modifiable PeerAddress (MonadTest m) where
-  get _ = use peerAddr
-  put _ = assign peerAddr
+instance MonadIO m => Gettable GetChainsDB (MonadTest m) where
+  get = use $ sequencerContext . getChainsDB
+instance MonadIO m => Puttable GetChainsDB (MonadTest m) where
+  put = assign $ sequencerContext . getChainsDB
+instance MonadIO m => Modifiable GetChainsDB (MonadTest m) where
 
-instance MonadIO m => Mod.Accessible PeerAddress (MonadTest m) where
-  access _ = Mod.get (Mod.Proxy @PeerAddress)
-
-instance MonadIO m => Mod.Accessible ConnectionTimeout (MonadTest m) where
-  access _ = use connectionTimeout
-
-instance MonadIO m => A.Selectable String DataPeer.PPeer (MonadTest m) where
-  select _ tx = M.lookup tx <$> use stringPPeerMap
-
-instance MonadIO m => Mod.Modifiable GetChainsDB (MonadTest m) where
-  get _ = use $ sequencerContext . getChainsDB
-  put _ = assign $ sequencerContext . getChainsDB
-
-instance MonadIO m => Mod.Modifiable GetTransactionsDB (MonadTest m) where
-  get _ = use $ sequencerContext . getTransactionsDB
-  put _ = assign $ sequencerContext . getTransactionsDB
+instance MonadIO m => Gettable GetTransactionsDB (MonadTest m) where
+  get = use $ sequencerContext . getTransactionsDB
+instance MonadIO m => Puttable GetTransactionsDB (MonadTest m) where
+  put = assign $ sequencerContext . getTransactionsDB
+instance MonadIO m => Modifiable GetTransactionsDB (MonadTest m) where
 
 instance MonadIO m => HasPrivateHashDB (MonadTest m) where
   requestChain = insertGetChainsDB
@@ -213,92 +220,112 @@ instance MonadIO m => HasPrivateHashDB (MonadTest m) where
 
 genericTestLookup :: (MonadState s m, Ord k)
                   => Lens' s (Map k (Modification a))
-                  -> Mod.Proxy a
                   -> k
                   -> m (Maybe a)
-genericTestLookup registry _ k = use (registry . at k) >>= \case
+genericTestLookup registry k = use (registry . at k) >>= \case
   Just (Modification a) -> pure $ Just a
   _ -> pure Nothing
 
 genericTestInsert :: (MonadState s m, Ord k)
                   => Lens' s (Map k (Modification a))
-                  -> Mod.Proxy a
                   -> k
                   -> a
                   -> m ()
-genericTestInsert registry _ k a = registry . at k ?= Modification a
+genericTestInsert registry k a = registry . at k ?= Modification a
 
 genericTestDelete :: (MonadState s m, Ord k)
                   => Lens' s (Map k (Modification a))
-                  -> Mod.Proxy a
                   -> k
                   -> m ()
-genericTestDelete registry _ k = registry . at k ?= Deletion
+genericTestDelete registry k = registry . at k ?= Deletion
 
-instance MonadIO m => (Keccak256 `A.Alters` OutputBlock) (MonadTest m) where
-  lookup = genericTestLookup $ sequencerContext . blockHashRegistry
+instance MonadIO m => Selectable OutputBlock Keccak256 (MonadTest m) where
+  select = genericTestLookup $ sequencerContext . blockHashRegistry
+instance MonadIO m => Insertable OutputBlock Keccak256 (MonadTest m) where
   insert = genericTestInsert $ sequencerContext . blockHashRegistry
+instance MonadIO m => Deletable  OutputBlock Keccak256 (MonadTest m) where
   delete = genericTestDelete $ sequencerContext . blockHashRegistry
+instance MonadIO m => Alterable  OutputBlock Keccak256 (MonadTest m) where
 
-instance MonadIO m => (Keccak256 `A.Alters` EmittedBlock) (MonadTest m) where
-  lookup = genericTestLookup $ sequencerContext . emittedBlockRegistry
+instance MonadIO m => Selectable EmittedBlock Keccak256 (MonadTest m) where
+  select = genericTestLookup $ sequencerContext . emittedBlockRegistry
+instance MonadIO m => Insertable EmittedBlock Keccak256 (MonadTest m) where
   insert = genericTestInsert $ sequencerContext . emittedBlockRegistry
+instance MonadIO m => Deletable  EmittedBlock Keccak256 (MonadTest m) where
   delete = genericTestDelete $ sequencerContext . emittedBlockRegistry
+instance MonadIO m => Alterable  EmittedBlock Keccak256 (MonadTest m) where
 
-instance MonadIO m => (Keccak256 `A.Alters` OutputTx) (MonadTest m) where
-  lookup = genericTestLookup $ sequencerContext . txHashRegistry
+instance MonadIO m => Selectable OutputTx Keccak256 (MonadTest m) where
+  select = genericTestLookup $ sequencerContext . txHashRegistry
+instance MonadIO m => Insertable OutputTx Keccak256 (MonadTest m) where
   insert = genericTestInsert $ sequencerContext . txHashRegistry
+instance MonadIO m => Deletable  OutputTx Keccak256 (MonadTest m) where
   delete = genericTestDelete $ sequencerContext . txHashRegistry
+instance MonadIO m => Alterable  OutputTx Keccak256 (MonadTest m) where
 
-instance MonadIO m => (Keccak256 `A.Alters` ChainHashEntry) (MonadTest m) where
-  lookup = genericTestLookup $ sequencerContext . chainHashRegistry
+instance MonadIO m => Selectable ChainHashEntry Keccak256 (MonadTest m) where
+  select = genericTestLookup $ sequencerContext . chainHashRegistry
+instance MonadIO m => Insertable ChainHashEntry Keccak256 (MonadTest m) where
   insert = genericTestInsert $ sequencerContext . chainHashRegistry
+instance MonadIO m => Deletable  ChainHashEntry Keccak256 (MonadTest m) where
   delete = genericTestDelete $ sequencerContext . chainHashRegistry
+instance MonadIO m => Alterable  ChainHashEntry Keccak256 (MonadTest m) where
 
-instance MonadIO m => (Word256 `A.Alters` ChainIdEntry) (MonadTest m) where
-  lookup = genericTestLookup $ sequencerContext . chainIdRegistry
+instance MonadIO m => Selectable ChainIdEntry Word256 (MonadTest m) where
+  select = genericTestLookup $ sequencerContext . chainIdRegistry
+instance MonadIO m => Insertable ChainIdEntry Word256 (MonadTest m) where
   insert = genericTestInsert $ sequencerContext . chainIdRegistry
+instance MonadIO m => Deletable  ChainIdEntry Word256 (MonadTest m) where
   delete = genericTestDelete $ sequencerContext . chainIdRegistry
+instance MonadIO m => Alterable  ChainIdEntry Word256 (MonadTest m) where
 
-instance MonadIO m => (Keccak256 `A.Alters` DBDB.DependentBlockEntry) (MonadTest m) where
-  lookup _ k = use $ sequencerContext . dbeRegistry . at k
-  insert _ k v = sequencerContext . dbeRegistry . at k ?= v
-  delete _ k = sequencerContext . dbeRegistry . at k .= Nothing
+instance MonadIO m => Selectable DBDB.DependentBlockEntry Keccak256 (MonadTest m) where
+  select k = use $ sequencerContext . dbeRegistry . at k
+instance MonadIO m => Insertable DBDB.DependentBlockEntry Keccak256 (MonadTest m) where
+  insert k v = sequencerContext . dbeRegistry . at k ?= v
+instance MonadIO m => Deletable  DBDB.DependentBlockEntry Keccak256 (MonadTest m) where
+  delete k = sequencerContext . dbeRegistry . at k .= Nothing
+instance MonadIO m => Alterable  DBDB.DependentBlockEntry Keccak256 (MonadTest m) where
 
-instance MonadIO m => A.Selectable (Maybe Word256) ParentChainId (MonadTest m) where
-  select _ = \case
+instance MonadIO m => Selectable ParentChainId (Maybe Word256) (MonadTest m) where
+  select = \case
     Nothing -> pure . Just $ ParentChainId Nothing
-    Just cId -> join . fmap (fmap (ParentChainId . parentChain . chainInfo) . _chainIdInfo) <$> A.lookup (A.Proxy @ChainIdEntry) cId
+    Just cId -> join . fmap (fmap (ParentChainId . parentChain . chainInfo) . _chainIdInfo) <$> select @ChainIdEntry cId
 
-instance MonadIO m => Mod.Modifiable SeenTransactionDB (MonadTest m) where
-  get _ = use $ sequencerContext . seenTransactionDB
-  put _ = assign $ sequencerContext . seenTransactionDB
+instance MonadIO m => Gettable SeenTransactionDB (MonadTest m) where
+  get = use $ sequencerContext . seenTransactionDB
+instance MonadIO m => Puttable SeenTransactionDB (MonadTest m) where
+  put = assign $ sequencerContext . seenTransactionDB
+instance MonadIO m => Modifiable SeenTransactionDB (MonadTest m) where
 
-instance MonadIO m => Mod.Accessible (IORef RoundNumber) (MonadTest m) where
-  access _ = use $ sequencerContext . latestRoundNumber
+instance MonadIO m => Gettable (IORef RoundNumber) (MonadTest m) where
+  get = use $ sequencerContext . latestRoundNumber
 
-instance MonadIO m => Mod.Accessible (TMChan RoundNumber) (MonadTest m) where
-  access _ = pure (error "MonadTest: Accessing (TMChan RoundNumber)")
+instance MonadIO m => Gettable (TMChan RoundNumber) (MonadTest m) where
+  get = pure (error "MonadTest: Accessing (TMChan RoundNumber)")
 
-instance MonadIO m => Mod.Accessible BlockPeriod (MonadTest m) where
-  access _ = pure (error "MonadTest: Accessing BlockPeriod")
+instance MonadIO m => Gettable BlockPeriod (MonadTest m) where
+  get = pure (error "MonadTest: Accessing BlockPeriod")
 
-instance MonadIO m => Mod.Accessible RoundPeriod (MonadTest m) where
-  access _ = pure (error "MonadTest: Accessing RoundPeriod")
+instance MonadIO m => Gettable RoundPeriod (MonadTest m) where
+  get = pure (error "MonadTest: Accessing RoundPeriod")
 
-instance MonadIO m => Mod.Accessible (TQueue CandidateReceived) (MonadTest m) where
-  access _ = pure (error "MonadTest: Accessing (TQueue CandidateReceived)")
+instance MonadIO m => Gettable (TQueue CandidateReceived) (MonadTest m) where
+  get = pure (error "MonadTest: Accessing (TQueue CandidateReceived)")
 
-instance MonadIO m => Mod.Accessible (TQueue VoteResult) (MonadTest m) where
-  access _ = pure (error "MonadTest: Accessing (TQueue VoteResult)")
+instance MonadIO m => Gettable (TQueue VoteResult) (MonadTest m) where
+  get = pure (error "MonadTest: Accessing (TQueue VoteResult)")
 
-instance MonadIO m => Mod.Accessible View (MonadTest m) where
-  access _ = currentView
+instance MonadIO m => Gettable View (MonadTest m) where
+  get = currentView
 
-instance MonadIO m => (Keccak256 `A.Alters` ()) (MonadTest m) where
-  lookup _ = genericLookupSeenTransactionDB
-  insert _ = genericInsertSeenTransactionDB
-  delete _ = genericDeleteSeenTransactionDB
+instance MonadIO m => Selectable () Keccak256 (MonadTest m) where
+  select = genericLookupSeenTransactionDB
+instance MonadIO m => Insertable () Keccak256 (MonadTest m) where
+  insert = genericInsertSeenTransactionDB
+instance MonadIO m => Deletable () Keccak256 (MonadTest m) where
+  delete = genericDeleteSeenTransactionDB
+instance MonadIO m => Alterable () Keccak256 (MonadTest m) where
 
 instance MonadIO m => HasBlockstanbulContext (MonadTest m) where
   getBlockstanbulContext = use $ sequencerContext . blockstanbulContext
@@ -317,28 +344,34 @@ instance MonadIO m => HasVault (MonadTest m) where
     pk <- use prvKey
     return $ deriveSharedKey pk pub
 
-instance MonadIO m => (Keccak256 `A.Alters` (A.Proxy (Inbound WireMessage))) (MonadTest m) where
-  lookup _  k = do
+instance MonadIO m => Selectable (Proxy (Inbound WireMessage)) Keccak256 (MonadTest m) where
+  select k = do
     wms <- readIORef =<< use pbftMessages
-    pure $ if S.member k wms then Just (A.Proxy @(Inbound WireMessage)) else Nothing
-  insert _ k _ = use pbftMessages >>= flip atomicModifyIORef' (\wms ->
+    pure $ if S.member k wms then Just (Proxy @(Inbound WireMessage)) else Nothing
+instance MonadIO m => Insertable (Proxy (Inbound WireMessage)) Keccak256 (MonadTest m) where
+  insert k _ = use pbftMessages >>= flip atomicModifyIORef' (\wms ->
     let s = S.size wms
         wms' = if s >= 2000 then S.delete (head $ toList wms) wms else wms
         wms'' = wms' S.>| k
      in (wms'', ()))
-  delete _ k = use pbftMessages >>= flip atomicModifyIORef' (\wms -> (S.delete k wms, ()))
+instance MonadIO m => Deletable (Proxy (Inbound WireMessage)) Keccak256 (MonadTest m) where
+  delete k = use pbftMessages >>= flip atomicModifyIORef' (\wms -> (S.delete k wms, ()))
+instance MonadIO m => Alterable (Proxy (Inbound WireMessage)) Keccak256 (MonadTest m) where
 
-instance MonadIO m => ((Text, Keccak256) `A.Alters` (A.Proxy (Outbound WireMessage))) (MonadTest m) where
-  lookup _  k = do
+instance MonadIO m => Selectable (Proxy (Outbound WireMessage)) (Text, Keccak256) (MonadTest m) where
+  select k = do
     wms <- use outboundPbftMessages
-    pure $ if S.member k wms then Just (A.Proxy @(Outbound WireMessage)) else Nothing
-  insert _ k _ = do
+    pure $ if S.member k wms then Just (Proxy @(Outbound WireMessage)) else Nothing
+instance MonadIO m => Insertable (Proxy (Outbound WireMessage)) (Text, Keccak256) (MonadTest m) where
+  insert k _ = do
     wms <- use outboundPbftMessages
     let s = S.size wms
         wms' = if s >= 2000 then S.delete (head $ toList wms) wms else wms
         wms'' = wms' S.>| k
     assign outboundPbftMessages wms''
-  delete _ k = outboundPbftMessages %= S.delete k
+instance MonadIO m => Deletable (Proxy (Outbound WireMessage)) (Text, Keccak256) (MonadTest m) where
+  delete k = outboundPbftMessages %= S.delete k
+instance MonadIO m => Alterable (Proxy (Outbound WireMessage)) (Text, Keccak256) (MonadTest m) where
 
 startingCheckpoint :: [Address] -> Checkpoint
 startingCheckpoint as = def{checkpointValidators = as}

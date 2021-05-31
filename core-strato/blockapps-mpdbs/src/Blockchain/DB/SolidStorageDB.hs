@@ -13,7 +13,7 @@ module Blockchain.DB.SolidStorageDB (
   FullSolidStorage
   ) where
 
-import           Control.Monad.Change.Alter                  (Alters)
+import           Control.Monad.FT                            (Alters)
 import           Data.Bifunctor                              (second)
 
 import           Blockchain.Data.AddressStateDB

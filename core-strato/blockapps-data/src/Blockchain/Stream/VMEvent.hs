@@ -23,7 +23,7 @@ module Blockchain.Stream.VMEvent (
 ) where
 
 import           Conduit
-import           Control.Monad.Change.Modify (Modifiable)
+import           Control.Monad.FT            (Modifiable)
 import           Control.Monad.State
 import qualified Data.ByteString             as B
 import qualified Data.ByteString.Lazy        as BL

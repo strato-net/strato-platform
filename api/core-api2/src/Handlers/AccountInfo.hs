@@ -18,7 +18,7 @@ module Handlers.AccountInfo
   , server
   ) where
 
-import           Control.Monad.Change.Alter
+import           Control.Monad.FT
 import           Data.ByteString.Base16      as B16
 import qualified Data.ByteString.Char8       as BC
 import           Data.List
@@ -115,10 +115,10 @@ server = getAccount
 data NamedChainId = UnnamedChainIds [ChainId]
                   | MainChain
   
-instance HasSQL m => Selectable AccountsFilterParams [AddressStateRef] m where
-  select _ a@AccountsFilterParams{..} | a == accountsFilterParams =
+instance HasSQL m => Selectable [AddressStateRef] AccountsFilterParams m where
+  select a@AccountsFilterParams{..} | a == accountsFilterParams =
     throwIO . NoFilterError $ "Need one of: " ++ intercalate ", " accountQueryParams
-                                      | otherwise = do
+                                    | otherwise = do
     chainid <- case qaChainId of
       [] -> pure MainChain
       cids -> pure $ UnnamedChainIds cids
@@ -156,7 +156,7 @@ instance HasSQL m => Selectable AccountsFilterParams [AddressStateRef] m where
       E.orderBy [E.asc (accStateRef E.^. AddressStateRefAddress)]
       return accStateRef
 
-getAccount :: Selectable AccountsFilterParams [AddressStateRef] m
+getAccount :: (AccountsFilterParams `Selects` [AddressStateRef]) m
            => Maybe Address -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
               Maybe Natural -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
               Maybe Text -> Maybe CodePtr -> [ChainId] ->
@@ -164,9 +164,9 @@ getAccount :: Selectable AccountsFilterParams [AddressStateRef] m
 getAccount a b c d e f g h i j k
   = getAccount' (AccountsFilterParams a b c d e f g h i j k)
     
-getAccount' :: Selectable AccountsFilterParams [AddressStateRef] m => AccountsFilterParams -> m [AddressStateRef']
+getAccount' :: (AccountsFilterParams `Selects` [AddressStateRef]) m => AccountsFilterParams -> m [AddressStateRef']
 getAccount' a = do
-  addrs <- fromMaybe [] <$> select (Proxy @[AddressStateRef]) a
+  addrs <- fromMaybe [] <$> select a
   return . map asrToAsrPrime $ zip (repeat "") addrs
 
 accountQueryParams:: [String]

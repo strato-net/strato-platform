@@ -10,8 +10,7 @@ import           Blockchain.Sequencer.DB.Witnessable
 import           Blockchain.Strato.Model.Keccak256
 import           Control.Applicative
 import           Control.Lens
-import           Control.Monad.Change.Alter
-import           Control.Monad.Change.Modify
+import           Control.Monad.FT
 import qualified Data.Sequence                as Q
 import qualified Data.Set                     as S
 import           Prelude                      hiding (and, or, not, lookup)
@@ -43,25 +42,25 @@ mkSeenTxDB dbSize = SeenTransactionDB
   }
 
 genericLookupSeenTransactionDB :: Modifiable SeenTransactionDB m => Keccak256 -> m (Maybe ())
-genericLookupSeenTransactionDB sha = fromBool . S.member sha . _seen <$> get Proxy
+genericLookupSeenTransactionDB sha = fromBool . S.member sha . _seen <$> get
 
 genericInsertSeenTransactionDB :: Modifiable SeenTransactionDB m => Keccak256 -> () -> m ()
-genericInsertSeenTransactionDB sha = const $ modify_ Proxy $ pure . witnessTransactionHash' sha
+genericInsertSeenTransactionDB sha = const $ modifyPure_ $ witnessTransactionHash' sha
 
 genericDeleteSeenTransactionDB :: Modifiable SeenTransactionDB m => Keccak256 -> m ()
-genericDeleteSeenTransactionDB sha = modify_ Proxy $ pure . (seen %~ S.delete sha)
+genericDeleteSeenTransactionDB sha = modifyPure_ $ (seen %~ S.delete sha)
 
 wasTransactionHashWitnessed :: HasSeenTransactionDB m => Keccak256 -> m Bool
-wasTransactionHashWitnessed = fmap toBool . lookup Proxy
+wasTransactionHashWitnessed = fmap toBool . select
 
 wasTransactionWitnessed :: (Witnessable t, HasSeenTransactionDB m) => t -> m Bool
-wasTransactionWitnessed = fmap toBool . lookup Proxy . witnessableHash
+wasTransactionWitnessed = fmap toBool . select . witnessableHash
 
 witnessTransaction :: (Witnessable t, HasSeenTransactionDB m) => t -> m ()
-witnessTransaction t = insert Proxy (witnessableHash t) ()
+witnessTransaction t = insert (witnessableHash t) ()
 
 witnessTransactionHash :: HasSeenTransactionDB m => Keccak256 -> m ()
-witnessTransactionHash sha = insert Proxy sha ()
+witnessTransactionHash sha = insert sha ()
 
 witnessTransactionHash' :: Keccak256 -> SeenTransactionDB -> SeenTransactionDB
 witnessTransactionHash' sha stxdb =

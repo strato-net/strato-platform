@@ -7,7 +7,7 @@ import           Blockchain.Database.MerklePatricia.Internal
 import           Blockchain.Database.MerklePatricia.NodeData
 
 import           Control.Monad
-import           Control.Monad.Change.Alter
+import           Control.Monad.FT
 import           Data.Function
 import qualified Data.NibbleString                           as N
 

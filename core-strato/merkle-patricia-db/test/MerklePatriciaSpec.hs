@@ -13,7 +13,7 @@ import           Blockchain.Database.MerklePatricia.Internal
 import           Blockchain.Database.MerklePatricia.InternalMem
 import           Blockchain.Database.MerklePatriciaMem
 import           Blockchain.Util
-import           Control.Monad.Change.Alter
+import           Control.Monad.FT
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Resource
 import qualified Data.NibbleString                              as N

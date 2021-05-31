@@ -32,7 +32,7 @@ module Blockchain.Database.MerklePatricia (
   initializeBlank, blankStateRoot
   ) where
 
-import           Control.Monad.Change.Alter
+import           Control.Monad.FT
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Reader
 import qualified Data.ByteString                             as B
@@ -62,10 +62,13 @@ genericDeleteDB f (StateRoot sr) = do
   db <- f
   DB.delete db def sr
 
-instance MonadIO m => (StateRoot `Alters` NodeData) (ReaderT DB.DB m) where
-  lookup _ = genericLookupDB ask
-  insert _ = genericInsertDB ask
-  delete _ = genericDeleteDB ask
+instance MonadIO m => Selectable NodeData StateRoot (ReaderT DB.DB m) where
+  select = genericLookupDB ask
+instance MonadIO m => Insertable NodeData StateRoot (ReaderT DB.DB m) where
+  insert = genericInsertDB ask
+instance MonadIO m => Deletable  NodeData StateRoot (ReaderT DB.DB m) where
+  delete = genericDeleteDB ask
+instance MonadIO m => Alterable  NodeData StateRoot (ReaderT DB.DB m) where
 
 -- | Adds a new key/value pair.
 putKeyVal :: (StateRoot `Alters` NodeData) m
@@ -76,7 +79,7 @@ putKeyVal :: (StateRoot `Alters` NodeData) m
 putKeyVal sr = unsafePutKeyVal sr . keyToSafeKey
 
 -- | Retrieves all key/value pairs whose key starts with the given parameter.
-getKeyVal :: (StateRoot `Alters` NodeData) m
+getKeyVal :: (StateRoot `Selects` NodeData) m
           => StateRoot -- ^ Object containing the current stateRoot.
           -> Key -- ^ Key of the data to be inserted.
           -> m (Maybe Val) -- ^ The requested value.
@@ -108,4 +111,4 @@ initializeBlank :: (StateRoot `Alters` NodeData) m
                 => m ()
 initializeBlank =
     let bytes = rlpSerialize $ rlpEncode EmptyNodeData
-    in insert Proxy (StateRoot (keccak256ToByteString $ hash bytes)) EmptyNodeData
+    in insert (StateRoot (keccak256ToByteString $ hash bytes)) EmptyNodeData

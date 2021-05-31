@@ -29,8 +29,8 @@ import           Control.Concurrent.Async.Lifted (race_)
 import           Control.Concurrent.Extra (Lock, withLock, newLock)
 import           Control.Concurrent.STM (orElse, flushTQueue)
 import           Control.Lens               hiding (op)
-import qualified Control.Monad.Change.Modify as Mod
-import           Control.Monad.State
+import           Control.Monad.FT
+import           Control.Monad.State as StateT
 import           Control.Monad.Trans.Resource
 import           Data.Default
 import           Data.Foldable (for_)
@@ -94,9 +94,11 @@ runGregorM' ctx = runLoggingT
                 . runResourceT
                 . flip evalStateT ctx
 
-instance Mod.Modifiable K.KafkaState GregorM where
-  get _ = use gregorKafkaState
-  put _ = assign gregorKafkaState
+instance Gettable K.KafkaState GregorM where
+  get = use gregorKafkaState
+instance Puttable K.KafkaState GregorM where
+  put = assign gregorKafkaState
+instance Modifiable K.KafkaState GregorM where
 
 getKafkaConsumerGroup :: GregorM KP.ConsumerGroup
 getKafkaConsumerGroup = use gregorConsumerGroup
@@ -241,7 +243,7 @@ unseqEventsLock = unsafePerformIO newLock
 
 updateOffset_locked :: KP.Offset -> GregorM ()
 updateOffset_locked off = do
-  ctx <- get
+  ctx <- StateT.get
   -- This is unsafe in that the state changes made in the runGregorM' will be discarded.
   -- For now, only the KafkaState would be mutated and that is okay.
   liftIO . withLock unseqEventsLock . runGregorM' ctx $ do
@@ -250,7 +252,7 @@ updateOffset_locked off = do
 
 updateMetadata_locked :: KP.Metadata -> GregorM ()
 updateMetadata_locked meta = do
-  ctx <- get
+  ctx <- StateT.get
   -- This is unsafe in that the state changes made in the runGregorM' will be discarded.
   -- For now, only the KafkaState would be mutated and that is okay.
   liftIO . withLock unseqEventsLock . runGregorM' ctx $ do

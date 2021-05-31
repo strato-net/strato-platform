@@ -53,8 +53,7 @@ module Blockchain.EVM.VMM (
 
 import           Control.Lens                       hiding (from, to)
 import           Control.Monad
-import qualified Control.Monad.Change.Alter         as A
-import qualified Control.Monad.Change.Modify        as Mod
+import           Control.Monad.FT
 import           Control.Monad.Reader
 import qualified Data.ByteString                    as B
 import           Data.IORef.Unboxed
@@ -91,31 +90,15 @@ type VMM m = ReaderT (IORef VMState) m
 
 type MonadEVM m = ( MonadIO m
                   , MonadLogger m
-                  , Mod.Modifiable VMState m
+                  , Modifiable VMState m
                   )
-
-get :: MonadIO m => VMM m VMState
-get = readIORef =<< ask
-{-# INLINE get #-}
-
-gets :: MonadIO m => (VMState -> a) -> VMM m a
-gets f = f <$> get
-{-# INLINE gets #-}
-
-put :: MonadIO m => VMState -> VMM m ()
-put c = ask >>= \i -> atomicWriteIORef i c
-{-# INLINE put #-}
-
-modify :: MonadIO m => (VMState -> VMState) -> VMM m ()
-modify f = ask >>= \i -> atomicModifyIORef i (\a -> (f a, ()))
-{-# INLINE modify #-}
 
 vmstateGet :: MonadIO m => VMM m VMState
 vmstateGet = readIORef =<< ask
 {-# INLINE vmstateGet #-}
 
 vmstateGets :: MonadIO m => (VMState -> a) -> VMM m a
-vmstateGets f = f <$> get
+vmstateGets f = f <$> vmstateGet
 {-# INLINE vmstateGets #-}
 
 vmstatePut :: MonadIO m => VMState -> VMM m ()
@@ -126,91 +109,148 @@ vmstateModify :: MonadIO m => (VMState -> VMState) -> VMM m ()
 vmstateModify f = ask >>= \i -> atomicModifyIORef i (\a -> (f a, ()))
 {-# INLINE vmstateModify #-}
 
-instance MonadIO m => Mod.Modifiable VMState (VMM m) where
-  get _   = readIORef =<< ask
-  put _ v = flip writeIORef v =<< ask
+instance MonadIO m => Gettable VMState (VMM m) where
+  get = vmstateGet
+instance MonadIO m => Puttable VMState (VMM m) where
+  put = vmstatePut
+instance MonadIO m => Modifiable VMState (VMM m) where
+  modifyPure_ = vmstateModify
 
 instance MonadIO m => HasMemAddressStateDB (VMM m) where
-  getAddressStateTxDBMap = _stateTxMap . vmMemDBs <$> Mod.get (Mod.Proxy @VMState)
-  putAddressStateTxDBMap theMap = Mod.modify_ (Mod.Proxy @VMState) $ \s ->
-      pure $ s{vmMemDBs=(vmMemDBs s){_stateTxMap=theMap}}
-  getAddressStateBlockDBMap = _stateBlockMap . vmMemDBs <$> Mod.get (Mod.Proxy @VMState)
-  putAddressStateBlockDBMap theMap = Mod.modify_ (Mod.Proxy @VMState) $ \s ->
-      pure $ s{vmMemDBs=(vmMemDBs s){_stateBlockMap=theMap}}
+  getAddressStateTxDBMap = _stateTxMap . vmMemDBs <$> get @VMState
+  putAddressStateTxDBMap theMap = modifyPure_ @VMState $ \s ->
+      s{vmMemDBs=(vmMemDBs s){_stateTxMap=theMap}}
+  getAddressStateBlockDBMap = _stateBlockMap . vmMemDBs <$> get @VMState
+  putAddressStateBlockDBMap theMap = modifyPure_ @VMState $ \s ->
+      s{vmMemDBs=(vmMemDBs s){_stateBlockMap=theMap}}
 
-instance (MP.StateRoot `A.Alters` MP.NodeData) m => (MP.StateRoot `A.Alters` MP.NodeData) (VMM m) where
-  lookup p   = lift . A.lookup p
-  insert p k = lift . A.insert p k
-  delete p   = lift . A.delete p
+instance Selectable MP.NodeData MP.StateRoot m => Selectable MP.NodeData MP.StateRoot (VMM m) where
+  select   = lift . select
+instance Insertable MP.NodeData MP.StateRoot m => Insertable MP.NodeData MP.StateRoot (VMM m) where
+  insert k = lift . insert k
+instance Deletable  MP.NodeData MP.StateRoot m => Deletable  MP.NodeData MP.StateRoot (VMM m) where
+  delete   = lift . delete @MP.NodeData
+instance Alterable  MP.NodeData MP.StateRoot m => Alterable  MP.NodeData MP.StateRoot (VMM m) where
 
-instance (N.NibbleString `A.Alters` N.NibbleString) m => (N.NibbleString `A.Alters` N.NibbleString) (VMM m) where
-  lookup p   = lift . A.lookup p
-  insert p k = lift . A.insert p k
-  delete p   = lift . A.delete p
-
-instance ( MonadIO m
-         , (Maybe Word256 `A.Alters` MP.StateRoot) m
-         , (MP.StateRoot `A.Alters` MP.NodeData) m
-         , (N.NibbleString `A.Alters` N.NibbleString) m
-         ) => (Account `A.Alters` AddressState) (VMM m) where
-  lookup _ = getAddressStateMaybe
-  insert _ = putAddressState
-  delete _ = deleteAddressState
+instance Selectable N.NibbleString N.NibbleString m => Selectable N.NibbleString N.NibbleString (VMM m) where
+  select   = lift . select
+instance Insertable N.NibbleString N.NibbleString m => Insertable N.NibbleString N.NibbleString (VMM m) where
+  insert k = lift . insert k
+instance Deletable  N.NibbleString N.NibbleString m => Deletable  N.NibbleString N.NibbleString (VMM m) where
+  delete   = lift . delete @N.NibbleString
+instance Alterable  N.NibbleString N.NibbleString m => Alterable  N.NibbleString N.NibbleString (VMM m) where
 
 instance ( MonadIO m
-         , (Maybe Word256 `A.Alters` MP.StateRoot) m
-         ) => (Maybe Word256 `A.Alters` MP.StateRoot) (VMM m) where
-  lookup p chainId = do
-    (CurrentBlockHash bh) <- Mod.get (Mod.Proxy @CurrentBlockHash)
-    mSR <- view (stateRoots . at (bh, chainId)) <$> Mod.get (Mod.Proxy @MemDBs)
+         , Alterable MP.StateRoot (Maybe Word256) m
+         , Alterable MP.NodeData MP.StateRoot m
+         , Alterable N.NibbleString N.NibbleString m
+         ) => Selectable AddressState Account (VMM m) where
+  select = getAddressStateMaybe
+instance ( MonadIO m
+         , Alterable MP.StateRoot (Maybe Word256) m
+         , Alterable MP.NodeData MP.StateRoot m
+         , Alterable N.NibbleString N.NibbleString m
+         ) => Insertable AddressState Account (VMM m) where
+  insert = putAddressState
+instance ( MonadIO m
+         , Alterable MP.StateRoot (Maybe Word256) m
+         , Alterable MP.NodeData MP.StateRoot m
+         , Alterable N.NibbleString N.NibbleString m
+         ) => Deletable AddressState Account (VMM m) where
+  delete = deleteAddressState
+instance ( MonadIO m
+         , Alterable MP.StateRoot (Maybe Word256) m
+         , Alterable MP.NodeData MP.StateRoot m
+         , Alterable N.NibbleString N.NibbleString m
+         ) => Alterable AddressState Account (VMM m) where
+
+instance ( MonadIO m
+         , Selectable MP.StateRoot (Maybe Word256) m
+         ) => Selectable MP.StateRoot (Maybe Word256) (VMM m) where
+  select chainId = do
+    (CurrentBlockHash bh) <- get @CurrentBlockHash
+    mSR <- view (stateRoots . at (bh, chainId)) <$> get @MemDBs
     case mSR of
       Just sr -> pure $ Just sr
-      Nothing -> lift $ A.lookup p chainId
-  insert p chainId sr = do
-    (CurrentBlockHash bh) <- Mod.get (Mod.Proxy @CurrentBlockHash)
-    Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ stateRoots %= M.insert (bh, chainId) sr
-    lift $ A.insert p chainId sr
-  delete p chainId = do
-    (CurrentBlockHash bh) <- Mod.get (Mod.Proxy @CurrentBlockHash)
-    Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ stateRoots %= M.delete (bh, chainId)
-    lift $ A.delete p chainId
+      Nothing -> lift $ select chainId
+instance ( MonadIO m
+         , Insertable MP.StateRoot (Maybe Word256) m
+         ) => Insertable MP.StateRoot (Maybe Word256) (VMM m) where
+  insert chainId sr = do
+    (CurrentBlockHash bh) <- get @CurrentBlockHash
+    modifyStatefully_ @MemDBs $ stateRoots %= M.insert (bh, chainId) sr
+    lift $ insert chainId sr
+instance ( MonadIO m
+         , Deletable MP.StateRoot (Maybe Word256) m
+         ) => Deletable MP.StateRoot (Maybe Word256) (VMM m) where
+  delete chainId = do
+    (CurrentBlockHash bh) <- get @CurrentBlockHash
+    modifyStatefully_ @MemDBs $ stateRoots %= M.delete (bh, chainId)
+    lift $ delete @MP.StateRoot chainId
+instance ( MonadIO m
+         , Alterable MP.StateRoot (Maybe Word256) m
+         ) => Alterable MP.StateRoot (Maybe Word256) (VMM m) where
 
-instance MonadIO m => Mod.Modifiable MemDBs (VMM m) where
-  get _ = vmMemDBs <$> Mod.get (Mod.Proxy @VMState)
-  put _ md = Mod.modify_ (Mod.Proxy @VMState) $ \s ->
-      pure $ s{vmMemDBs=md}
+instance MonadIO m => Gettable MemDBs (VMM m) where
+  get    = vmMemDBs <$> get @VMState
+instance MonadIO m => Puttable MemDBs (VMM m) where
+  put md = modifyPure_ @VMState $ \s -> s{vmMemDBs=md}
+instance MonadIO m => Modifiable MemDBs (VMM m) where
 
-instance MonadIO m => Mod.Modifiable CurrentBlockHash (VMM m) where
-  get _    = fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0) . _currentBlock <$> Mod.get (Mod.Proxy @MemDBs)
-  put _ md = Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ currentBlock ?= md
+instance MonadIO m => Gettable CurrentBlockHash (VMM m) where
+  get    = fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0) . _currentBlock <$> get @MemDBs
+instance MonadIO m => Puttable CurrentBlockHash (VMM m) where
+  put md = modifyStatefully_ @MemDBs $ currentBlock ?= md
+instance MonadIO m => Modifiable CurrentBlockHash (VMM m) where
 
 instance MonadIO m => HasMemRawStorageDB (VMM m) where
-  getMemRawStorageTxDB = _storageTxMap . vmMemDBs <$> Mod.get (Mod.Proxy @VMState)
-  putMemRawStorageTxMap theMap = Mod.modify_ (Mod.Proxy @VMState) $ \s ->
-      pure $ s{vmMemDBs=(vmMemDBs s){_storageTxMap=theMap}}
-  getMemRawStorageBlockDB = _storageBlockMap . vmMemDBs <$> Mod.get (Mod.Proxy @VMState)
-  putMemRawStorageBlockMap theMap = Mod.modify_ (Mod.Proxy @VMState) $ \s ->
-      pure $ s{vmMemDBs=(vmMemDBs s){_storageBlockMap=theMap}}
+  getMemRawStorageTxDB = _storageTxMap . vmMemDBs <$> get @VMState
+  putMemRawStorageTxMap theMap = modifyPure_ @VMState $ \s ->
+      s{vmMemDBs=(vmMemDBs s){_storageTxMap=theMap}}
+  getMemRawStorageBlockDB = _storageBlockMap . vmMemDBs <$> get @VMState
+  putMemRawStorageBlockMap theMap = modifyPure_ @VMState $ \s ->
+      s{vmMemDBs=(vmMemDBs s){_storageBlockMap=theMap}}
 
 instance ( MonadIO m
-         , (Maybe Word256 `A.Alters` MP.StateRoot) m
-         , (MP.StateRoot `A.Alters` MP.NodeData) m
-         , (N.NibbleString `A.Alters` N.NibbleString) m
-         ) => (RawStorageKey `A.Alters` RawStorageValue) (VMM m) where
-  lookup _ = genericLookupRawStorageDB
-  insert _ = genericInsertRawStorageDB
-  delete _ = genericDeleteRawStorageDB
-  lookupWithDefault _ = genericLookupWithDefaultRawStorageDB
+         , Alterable MP.StateRoot (Maybe Word256) m
+         , Alterable MP.NodeData MP.StateRoot m
+         , Alterable N.NibbleString N.NibbleString m
+         ) => Selectable RawStorageValue RawStorageKey (VMM m) where
+  select             = genericLookupRawStorageDB
+  selectWithFallback = genericLookupWithFallbackRawStorageDB
+instance ( MonadIO m
+         , Alterable MP.StateRoot (Maybe Word256) m
+         , Alterable MP.NodeData MP.StateRoot m
+         , Alterable N.NibbleString N.NibbleString m
+         ) => Insertable RawStorageValue RawStorageKey (VMM m) where
+  insert = genericInsertRawStorageDB
+instance ( MonadIO m
+         , Alterable MP.StateRoot (Maybe Word256) m
+         , Alterable MP.NodeData MP.StateRoot m
+         , Alterable N.NibbleString N.NibbleString m
+         ) => Deletable RawStorageValue RawStorageKey (VMM m) where
+  delete = genericDeleteRawStorageDB
+instance ( MonadIO m
+         , Alterable MP.StateRoot (Maybe Word256) m
+         , Alterable MP.NodeData MP.StateRoot m
+         , Alterable N.NibbleString N.NibbleString m
+         ) => Alterable RawStorageValue RawStorageKey (VMM m) where
 
-instance (Keccak256 `A.Alters` DBCode) m => (Keccak256 `A.Alters` DBCode) (VMM m) where
-  lookup p   = lift . A.lookup p
-  insert p k = lift . A.insert p k
-  delete p   = lift . A.delete p
+instance Selectable DBCode Keccak256 m => Selectable DBCode Keccak256 (VMM m) where
+  select   = lift . select
+instance Insertable DBCode Keccak256 m => Insertable DBCode Keccak256 (VMM m) where
+  insert k = lift . insert k
+instance Deletable  DBCode Keccak256 m => Deletable  DBCode Keccak256 (VMM m) where
+  delete   = lift . delete @DBCode
+instance Alterable  DBCode Keccak256 m => Alterable  DBCode Keccak256 (VMM m) where
 
-instance (Keccak256 `A.Alters` BlockSummary) m => (Keccak256 `A.Alters` BlockSummary) (VMM m) where
-  lookup p   = lift . A.lookup p
-  insert p k = lift . A.insert p k
-  delete p   = lift . A.delete p
+instance Selectable BlockSummary Keccak256 m => Selectable BlockSummary Keccak256 (VMM m) where
+  select   = lift . select
+instance Insertable BlockSummary Keccak256 m => Insertable BlockSummary Keccak256 (VMM m) where
+  insert k = lift . insert k
+instance Deletable  BlockSummary Keccak256 m => Deletable  BlockSummary Keccak256 (VMM m) where
+  delete   = lift . delete @BlockSummary
+instance Alterable  BlockSummary Keccak256 m => Alterable  BlockSummary Keccak256 (VMM m) where
 
 class Word256Storable a where
   fromWord256::Word256->a
@@ -242,7 +282,7 @@ instance Word256Storable Gas where
 
 pop :: (MonadIO m, Word256Storable a) => VMM m a
 pop = fromWord256 <$> do
-  stack' <- gets stack
+  stack' <- vmstateGets stack
   v <- liftIO $ MS.pop stack'
   case v of
     Nothing -> throwIO StackTooSmallException
@@ -250,15 +290,15 @@ pop = fromWord256 <$> do
 
 localState :: MonadIO m => (VMState -> VMState) -> VMM m a -> VMM m a
 localState f mv = do
-  state' <- get
-  put . f $ state'
+  state' <- vmstateGet
+  vmstatePut . f $ state'
   x <- mv
-  put state'
+  vmstatePut state'
   return x
 
 getStackItem :: (MonadIO m, Word256Storable a) => Int -> VMM m a
 getStackItem i = fromWord256 <$> do
-  stack' <- gets stack
+  stack' <- vmstateGets stack
   mVal <- liftIO $ MS.get stack' i
   case mVal of
     Nothing -> throwIO StackTooSmallException
@@ -266,81 +306,81 @@ getStackItem i = fromWord256 <$> do
 
 push :: (MonadIO m, Word256Storable a) => a -> VMM m ()
 push val = do
-  stack' <- gets stack
+  stack' <- vmstateGets stack
   unlessM (liftIO . MS.push stack' . toWord256 $ val) $
     throwIO StackTooLarge
 
 swapn :: MonadIO m => Int -> VMM m ()
 swapn n = do
-  stack' <- gets stack
+  stack' <- vmstateGets stack
   unlessM (liftIO $ MS.swap stack' $ n-1) $
     throwIO StackTooSmallException
 
 dupn :: MonadIO m => Int -> VMM m ()
 dupn n = do
-  stack' <- gets stack
+  stack' <- vmstateGets stack
   unlessM (liftIO $ MS.dup stack' $ n-1) $
     throwIO StackTooSmallException
 
 addDebugCallCreate :: MonadIO m => DebugCallCreate -> VMM m ()
 addDebugCallCreate callCreate = do
-  state' <- get
+  state' <- vmstateGet
   case debugCallCreates state' of
-    Just x  -> put state'{debugCallCreates = Just (callCreate:x)}
+    Just x  -> vmstatePut state'{debugCallCreates = Just (callCreate:x)}
     Nothing -> throwIO NonDebugCallCreate -- "You are trying to add a call create during a non-debug run"
 
 addSuicideList :: MonadIO m => Account -> VMM m ()
-addSuicideList acct = modify $ \st -> st{suicideList = acct `S.insert` suicideList st}
+addSuicideList acct = vmstateModify $ \st -> st{suicideList = acct `S.insert` suicideList st}
 
 getEnvVar :: MonadIO m => (Environment -> a) -> VMM m a
-getEnvVar f = f <$> gets environment
+getEnvVar f = f <$> vmstateGets environment
 
 addLog :: MonadIO m => Log -> VMM m ()
-addLog newLog = modify $ \st -> st{logs=newLog:logs st}
+addLog newLog = vmstateModify $ \st -> st{logs=newLog:logs st}
 
 setPC :: MonadIO m => Int -> VMM m ()
 setPC !p = do
-  pcref <- gets pc
+  pcref <- vmstateGets pc
   liftIO $ writeIORefU pcref p
 
 incrementPC :: MonadIO m => Int -> VMM m ()
 incrementPC p = do
-  pcref <- gets pc
+  pcref <- vmstateGets pc
   void . liftIO $ atomicAddCounter pcref p
 
 addToRefund :: MonadIO m => Gas -> VMM m ()
 addToRefund (Gas val) = do
-  refundref <- gets refund
+  refundref <- vmstateGets refund
   void . liftIO . atomicAddCounter refundref $ fromInteger val
 
 clearRefund :: MonadIO m => VMM m ()
 clearRefund = do
-  refundref <- gets refund
+  refundref <- vmstateGets refund
   liftIO $ writeIORefU refundref 0
 
 getCallDepth :: MonadIO m => VMM m Int
-getCallDepth = gets callDepth
+getCallDepth = vmstateGets callDepth
 
 getGasRemaining :: MonadIO m => VMM m Gas
-getGasRemaining = readGasRemaining =<< get
+getGasRemaining = readGasRemaining =<< vmstateGet
 
 getReturnVal :: MonadIO m => VMM m B.ByteString
-getReturnVal = gets $ fromMaybe B.empty . returnVal
+getReturnVal = vmstateGets $ fromMaybe B.empty . returnVal
 
 setDone :: MonadIO m => Bool -> VMM m ()
-setDone done' = modify $ \st -> st{done=done'}
+setDone done' = vmstateModify $ \st -> st{done=done'}
 
 setReturnVal :: MonadIO m => Maybe B.ByteString -> VMM m ()
-setReturnVal returnVal' = modify $ \st -> st{returnVal=returnVal'}
+setReturnVal returnVal' = vmstateModify $ \st -> st{returnVal=returnVal'}
 
 setGasRemaining :: MonadIO m => Gas -> VMM m ()
 setGasRemaining (Gas gasRemaining') = do
-  gasref <- gets vmGasRemaining
+  gasref <- vmstateGets vmGasRemaining
   liftIO . writeIORefU gasref $ fromInteger gasRemaining'
 
 useGas :: MonadIO m => Gas -> VMM m ()
 useGas (Gas gas) = do
-  gasref <- gets vmGasRemaining
+  gasref <- vmstateGets vmGasRemaining
   g <- liftIO . atomicSubCounter gasref $ fromInteger gas
   when (g < 0) $ do
     liftIO $ writeIORefU gasref 0
@@ -348,7 +388,7 @@ useGas (Gas gas) = do
 
 addGas :: MonadIO m => Gas -> VMM m ()
 addGas (Gas gas) = do
-  gasref <- gets vmGasRemaining
+  gasref <- vmstateGets vmGasRemaining
   currentGas <- fmap toInteger . liftIO $ readIORefU gasref
   if currentGas + fromInteger gas < 0
     then throwIO OutOfGasException
@@ -375,7 +415,7 @@ putStorageKeyVal key val = do
   putStorageKeyVal' owner key val
 
 vmTrace :: MonadIO m => String -> VMM m ()
-vmTrace msg = modify $ \st -> st{theTrace=msg:theTrace st}
+vmTrace msg = vmstateModify $ \st -> st{theTrace=msg:theTrace st}
 
 downcastGas :: MonadIO m => Word256 -> VMM m Gas
 downcastGas g = if g > fromIntegral (maxBound :: Int)

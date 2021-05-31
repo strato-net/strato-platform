@@ -11,7 +11,7 @@ import           Prelude hiding (lookup)
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.ExtWord
 import           Control.DeepSeq
-import           Control.Monad.Change
+import           Control.Monad.FT
 import qualified Database.LevelDB                   as DB
 
 type StateDB = DB.DB
@@ -24,7 +24,7 @@ type HasStateDB m = ( (MP.StateRoot `Alters` MP.NodeData) m
                     )
 
 getStateRoot :: HasStateDB m => Maybe Word256 -> m MP.StateRoot
-getStateRoot = lookupWithDefault (Proxy @MP.StateRoot)
+getStateRoot = selectWithDefault @MP.StateRoot
 
 setStateDBStateRoot :: HasStateDB m => Maybe Word256 -> MP.StateRoot -> m ()
-setStateDBStateRoot cid = insert (Proxy @MP.StateRoot) cid
+setStateDBStateRoot cid = insert @MP.StateRoot cid

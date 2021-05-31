@@ -2,7 +2,7 @@
 {-# LANGUAGE TypeOperators    #-}
 
 --import Control.Monad.IO.Class
-import Control.Monad.Change.Alter
+import Control.Monad.FT
 import Control.Monad.Trans.Reader
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC

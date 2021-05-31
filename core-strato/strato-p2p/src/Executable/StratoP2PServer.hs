@@ -18,7 +18,7 @@ import           Blockchain.Context
 import           Blockchain.RLPx
 import           Conduit
 import           Control.Monad
-import qualified Control.Monad.Change.Alter            as A
+import           Control.Monad.FT
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString                       as B
@@ -56,8 +56,8 @@ runEthServer wireMessagesRef listenPort = do
 
 ethServerHandler :: ( MonadP2P m
                     , MonadReader Config m
-                    , A.Selectable String PPeer m
-                    , ((T.Text, Int) `A.Alters` ActivityState) m
+                    , (String `Selects` PPeer) m
+                    , ((T.Text, Int) `Inserts` ActivityState) m
                     )
                  => ConduitM () B.ByteString m ()
                  -> ConduitM B.ByteString Void m ()

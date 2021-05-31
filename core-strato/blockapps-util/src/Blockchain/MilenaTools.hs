@@ -10,7 +10,7 @@ module Blockchain.MilenaTools where
 
 import           Blockchain.Output
 import           Control.Concurrent     (threadDelay)
-import qualified Control.Monad.Change.Modify as Mod
+import           Control.Monad.FT            as FT
 import           Control.Monad.IO.Class      (MonadIO, liftIO)
 import           Control.Monad.Except        (ExceptT (..), runExceptT, throwError)
 import           Control.Monad.Trans.State
@@ -56,9 +56,9 @@ commitSingleOffset groupName topic partition offset ofsMetadata = do
 
 
 
-withKafkaRetry :: (MonadIO m, MonadLogger m, Mod.Modifiable KafkaState m) => Int -> StateT KafkaState (ExceptT KafkaClientError IO) a -> m a
+withKafkaRetry :: (MonadIO m, MonadLogger m, Modifiable KafkaState m) => Int -> StateT KafkaState (ExceptT KafkaClientError IO) a -> m a
 withKafkaRetry t k = do
-  s <- Mod.get (Mod.Proxy @KafkaState)
+  s <- FT.get
   let go = do
         r <- liftIO . runExceptT $ runStateT k s
         case r of
@@ -67,8 +67,8 @@ withKafkaRetry t k = do
             $logErrorS "withKafkaRetry" . T.pack $ show e
             (liftIO $ threadDelay (1000*t)) >> go
   (a, newS) <- go
-  Mod.put (Mod.Proxy @KafkaState) newS
+  FT.put newS
   return a
 
-withKafkaRetry1s :: (MonadIO m, MonadLogger m, Mod.Modifiable KafkaState m) => StateT KafkaState (ExceptT KafkaClientError IO) a -> m a
+withKafkaRetry1s :: (MonadIO m, MonadLogger m, Modifiable KafkaState m) => StateT KafkaState (ExceptT KafkaClientError IO) a -> m a
 withKafkaRetry1s = withKafkaRetry 1000

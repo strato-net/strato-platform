@@ -22,7 +22,7 @@ module Handlers.Chain
   ) where
 
 import           Control.Monad
-import           Control.Monad.Change.Alter
+import           Control.Monad.FT
 import           Control.Monad.IO.Class
 -- import qualified Data.ByteString.Char8          as BC
 import           Conduit
@@ -69,12 +69,12 @@ instance ToSchema (NamedTuple "id" "info" ChainId ChainInfo) where
   declareNamedSchema _ = return $
     NamedSchema (Just "NamedTuple of Word256 and ChainInfo") mempty
 
-instance Selectable ChainId ChainInfo SQLM where
-  selectMany _ = fmap (M.fromList . map (unNamedTuple @"id" @"info")) . getChainInfos
-  select     _ = fmap (fmap (snd . unNamedTuple @"id" @"info")) . getChainInfo
+instance Selectable ChainInfo ChainId SQLM where
+  selectMany = getChainInfos
+  select     = fmap (fmap (snd . unNamedTuple @"id" @"info")) . getChainInfo
 
-getChain :: Selectable ChainId ChainInfo m => [ChainId] -> m (NamedMap "id" "info" ChainId ChainInfo)
-getChain = fmap (map (NamedTuple @"id" @"info") . M.toList) . selectMany (Proxy @ChainInfo)
+getChain :: (ChainId `Selects` ChainInfo) m => [ChainId] -> m (NamedMap "id" "info" ChainId ChainInfo)
+getChain = fmap (map (NamedTuple @"id" @"info") . catMaybes . map sequence) . selectMany
     
 postChain :: (MonadIO m, MonadLogger m) => ChainInfo -> ConduitT a IngestEvent m ChainId
 postChain ci = do

@@ -8,7 +8,7 @@ module Blockchain.Verifier (
   ) where
 
 import           Control.Monad
-import qualified Control.Monad.Change.Alter                  as A
+import           Control.Monad.FT
 
 import           Blockchain.Constants
 import           Blockchain.Data.AddressStateDB
@@ -72,7 +72,7 @@ checkParentChildValidity isHomestead OutputBlock{obBlockData=c} parentBSum = do
 verifier::Miner
 verifier = (if (flags_miner == Normal) then normalMiner else if(flags_miner == Instant) then instantMiner else shaMiner)
 
-addAllKVs :: (RLPSerializable obj, (MP.StateRoot `A.Alters` MP.NodeData) m)
+addAllKVs :: (RLPSerializable obj, (MP.StateRoot `Alters` MP.NodeData) m)
           => MP.StateRoot -> [(Integer, obj)] -> m MP.StateRoot
 addAllKVs x [] = return x
 addAllKVs sr (x:rest) = do
@@ -125,7 +125,7 @@ checkValidity isHomestead parentBSum b = do
                     transactionsTrie = 0,
 -}
 
-isNonceValid :: (Account `A.Alters` AddressState) f => OutputTx -> f Bool
+isNonceValid :: (Account `Alters` AddressState) f => OutputTx -> f Bool
 isNonceValid OutputTx{otBaseTx=base, otSigner=txAddr} =
   let tNonce = transactionNonce base
-   in (== tNonce) . addressStateNonce <$> A.lookupWithDefault A.Proxy (Account txAddr (txChainId base))
+   in (== tNonce) . addressStateNonce <$> selectWithDefault (Account txAddr (txChainId base))

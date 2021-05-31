@@ -20,7 +20,7 @@ module Handlers.Storage
   ) where
 
 import           Control.Arrow               ((***))
-import           Control.Monad.Change.Alter
+import           Control.Monad.FT
 import           Data.Aeson
 import           Data.Maybe
 import           Data.Swagger            hiding (name)
@@ -99,8 +99,8 @@ instance ToSchema StorageAddress
 storage2StorageAddress :: Storage -> Address -> StorageAddress
 storage2StorageAddress stor addr = (StorageAddress (storageKey stor) (storageValue stor) (storageKind stor) addr)
 
-instance Selectable StorageFilterParams [StorageAddress] SQLM where
-  select _ StorageFilterParams{..} = do
+instance Selectable [StorageAddress] StorageFilterParams SQLM where
+  select StorageFilterParams{..} = do
     chainids <-
       case (qsChainId, qsChainIds) of
         (Nothing, v) -> case v of
@@ -153,13 +153,13 @@ data NamedChainId = UnnamedChainIds [ChainId]
                   | MainChain
                   | AllChains
 
-getStorage :: Selectable StorageFilterParams [StorageAddress] m
+getStorage :: (StorageFilterParams `Selects` [StorageAddress]) m
            => Maybe HexStorage -> Maybe HexStorage -> Maybe HexStorage -> Maybe HexStorage ->
               Maybe HexStorage -> Maybe HexStorage -> Maybe Address ->
               Maybe (MaybeNamed ChainId) -> [ChainId] -> m [StorageAddress]
 getStorage a b c d e f g h i =
   getStorage' (StorageFilterParams a b c d e f g h i)
 
-getStorage' :: Selectable StorageFilterParams [StorageAddress] m 
+getStorage' :: (StorageFilterParams `Selects` [StorageAddress]) m 
             => StorageFilterParams -> m [StorageAddress]
-getStorage' a = fromMaybe [] <$> select (Proxy @[StorageAddress]) a 
+getStorage' a = fromMaybe [] <$> select a 

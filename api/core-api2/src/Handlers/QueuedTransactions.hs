@@ -12,8 +12,8 @@ module Handlers.QueuedTransactions (
   server
   ) where
 
-import           Control.Monad.Change.Modify
-import           Database.Persist.Postgresql
+import           Control.Monad.FT
+import           Database.Persist.Postgresql hiding (get)
 import           Servant
 
 import           Blockchain.Data.DataDefs
@@ -31,13 +31,13 @@ server = getQueuedTransactions
 
 ---------------------
 
-instance HasSQL m => Accessible [RawTransaction] m where
-  access _ = fmap (map entityVal) . sqlQuery $
+instance HasSQL m => Gettable [RawTransaction] m where
+  get = fmap (map entityVal) . sqlQuery $
     selectList [ RawTransactionBlockNumber ==. (-1) ]
                [ LimitTo (fromIntegral $ appFetchLimit :: Int)
                , Desc RawTransactionNonce
                ]
 
-getQueuedTransactions :: (Functor m, Accessible [RawTransaction] m) => m [RawTransaction']
-getQueuedTransactions = map rtToRtPrime' <$> access (Proxy @[RawTransaction])
+getQueuedTransactions :: Gettable [RawTransaction] m => m [RawTransaction']
+getQueuedTransactions = map rtToRtPrime' <$> get
 

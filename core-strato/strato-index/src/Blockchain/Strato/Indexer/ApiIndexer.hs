@@ -13,10 +13,9 @@ module Blockchain.Strato.Indexer.ApiIndexer
 
 import           Control.Arrow                      ((&&&))
 import           Control.Monad
-import qualified Control.Monad.Change.Alter         as A
+import           Control.Monad.FT
 import           Blockchain.Output
 import qualified Data.ByteString.Char8              as S8
-import qualified Data.Map.Strict                    as M
 import qualified Data.Text                          as T
 import           Network.Kafka
 import           Blockchain.MilenaTools
@@ -44,9 +43,9 @@ apiIndexer =  runIContextM "strato-api-indexer" $ do
     setKafkaCheckpoint nextOffset'
 
 indexAPI :: ( MonadLogger m
-            , (Keccak256 `A.Alters` API OutputTx) m
-            , (Word256 `A.Alters` API ChainInfo) m
-            , (Keccak256 `A.Alters` API OutputBlock) m
+            , (Keccak256 `Inserts` API OutputTx) m
+            , (Word256 `Inserts` API ChainInfo) m
+            , (Keccak256 `Inserts` API OutputBlock) m
             )
          => [IndexEvent] -> m ()
 indexAPI idxEvents = do
@@ -55,13 +54,13 @@ indexAPI idxEvents = do
       blocks = [b | RanBlock b <- idxEvents]
       insertCount = length blocks
 
-  A.insertMany (A.Proxy @(API OutputTx)) . M.fromList $ (otHash &&& API) <$> txs
-  A.insertMany (A.Proxy @(API ChainInfo)) . M.fromList $ fmap API <$> chainInfos
+  insertMany @(API OutputTx) $ (otHash &&& API) <$> txs
+  insertMany @(API ChainInfo) $ fmap API <$> chainInfos
 
   $logInfoS "apiIndexer" . T.pack $ show insertCount ++ " of them are blocks"
   when (insertCount > 0) $ do
     $logInfoS "apiIndexer" . T.pack $ "  (inserting " ++ show insertCount ++ " output blocks)"
-    A.insertMany (A.Proxy @(API OutputBlock)) . M.fromList $ (blockHash &&& API) <$> blocks
+    insertMany @(API OutputBlock) $ (blockHash &&& API) <$> blocks
 
 kafkaClientIds :: (KafkaClientId, ConsumerGroup)
 kafkaClientIds = ("strato-api-indexer", lookupConsumerGroup "strato-api-indexer")

@@ -23,7 +23,7 @@ import           Blockchain.Output
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Model.Secp256k1
 import           Control.Concurrent                    (threadDelay)
-import           Control.Monad.Change.Modify           (Accessible(..))
+import           Control.Monad.FT
 import           Control.Monad.IO.Class
 import           Control.Monad.Reader
 import           Control.Monad.IO.Unlift
@@ -40,8 +40,8 @@ data ContextLite =
               , vaultClient :: ClientEnv
               }
 
-instance Monad m => Accessible SQLDB (ReaderT ContextLite m) where
-  access _ = asks liteSQLDB
+instance Monad m => Gettable SQLDB (ReaderT ContextLite m) where
+  get = asks liteSQLDB
 
 instance (Monad m, MonadIO m, MonadLogger m) => HasVault (ReaderT ContextLite m) where
   sign msg = do

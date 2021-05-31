@@ -17,7 +17,7 @@ module Blockchain.DB.MemAddressStateDB (
 ) where
 
 import           Control.Monad
-import qualified Control.Monad.Change.Alter     as A
+import           Control.Monad.FT
 import           Control.DeepSeq
 import           Data.Maybe
 import qualified Data.Map                       as M
@@ -51,8 +51,8 @@ class HasMemAddressStateDB m where
   getAddressStateBlockDBMap :: m (M.Map Account AddressStateModification)
   putAddressStateBlockDBMap :: M.Map Account AddressStateModification -> m ()
 
-getAddressState :: (Account `A.Alters` AddressState) m => Account -> m AddressState
-getAddressState account = fromMaybe blankAddressState <$> A.lookup A.Proxy account
+getAddressState :: (Account `Alters` AddressState) m => Account -> m AddressState
+getAddressState account = fromMaybe blankAddressState <$> select account
 
 getAddressStateMaybe :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m)
                      => Account -> m (Maybe AddressState)

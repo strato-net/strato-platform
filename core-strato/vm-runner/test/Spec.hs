@@ -10,7 +10,7 @@ import qualified Test.Hspec.Expectations.Lifted as L
 import           Test.Hspec.Runner
 import           HFlags
 import           Control.Monad
-import qualified Control.Monad.Change.Alter as A
+import           Control.Monad.FT
 import           Control.Monad.IO.Class
 import qualified Data.ByteString         as B
 import qualified Data.ByteString.Base16  as B16
@@ -82,7 +82,7 @@ spec = do
                     (unsafeCreateKeccak256FromWord256 0)
                     Nothing
                     Nothing
-        addressState <- A.lookupWithDefault A.Proxy newAddress
+        addressState <- selectWithDefault newAddress
         addressState `L.shouldBe` AddressState
            { addressStateNonce = 0
            , addressStateBalance = 0

@@ -49,7 +49,7 @@ import           Blockchain.Util                       (partitionWith)
 
 import           Control.Arrow                         ((&&&), (***), second)
 import           Control.Concurrent                    (threadDelay)
-import           Control.Monad.Change.Modify           hiding (get)
+import qualified Control.Monad.FT                      as FT
 import           Control.Monad
 import           Control.Monad.Trans
 import qualified Data.ByteString.Char8                 as S8
@@ -57,7 +57,7 @@ import           Data.Foldable                         (foldl')
 import           Data.Functor                          ((<&>))
 import           Data.Functor.Compose
 import qualified Data.Map.Strict                       as M
-import           Data.Maybe                            (catMaybes, fromJust, fromMaybe, isJust, isNothing)
+import           Data.Maybe                            (fromJust, fromMaybe, isJust, isNothing)
 import qualified Data.Set                              as S
 import qualified Data.Text                             as T
 import           Database.Redis
@@ -75,11 +75,11 @@ zipMapM f = mapM (\x -> (,) x <$> f x)
 liftLog :: LoggingT m a -> m a
 liftLog = runLoggingT
 
-withRedisBlockDB :: (MonadIO m, Accessible RedisConnection m)
+withRedisBlockDB :: (MonadIO m, FT.Gettable RedisConnection m)
                  => Redis a
                  -> m a
 withRedisBlockDB m = do
-    db <- unRedisConnection <$> access (Proxy @RedisConnection)
+    db <- unRedisConnection <$> FT.get
     liftIO $ runRedis db m
 
 inNamespace :: RedisDBKeyable k
@@ -434,7 +434,7 @@ getCanonicalChain :: Integer
                   -> Redis [Keccak256]
 getCanonicalChain start limit = do
     let chain = forM (take (limit) [start..]) getCanonical
-    catMaybes <$> chain
+    FT.catMaybes <$> chain
 
 getZippedCanonicalChain :: (Keccak256 -> Redis (Maybe t))
                         -> Integer

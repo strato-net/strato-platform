@@ -12,9 +12,9 @@ module Handlers.Stats (
   server
   ) where
 
-import           Control.Monad.Change.Modify
+import           Control.Monad.FT
 import           Data.Aeson
-import           Data.Swagger
+import           Data.Swagger                  hiding (get)
 import qualified Database.Esqueleto            as E
 import           Servant
 
@@ -59,19 +59,19 @@ server = getStatTx :<|> getStatDiff
 
 ---------------------
 
-instance Accessible TotalDifficulty SQLM where
-  access _ = TotalDifficulty . blockDataRefTotalDifficulty <$> getBestBlock
+instance Gettable TotalDifficulty SQLM where
+  get = TotalDifficulty . blockDataRefTotalDifficulty <$> getBestBlock
 
-instance Accessible TransactionCount SQLM where
-  access _ = do
+instance Gettable TransactionCount SQLM where
+  get = do
     tx <- sqlQuery $ E.select $ E.from $ \(_ :: E.SqlExpr (E.Entity RawTransaction)) -> return E.countRows
     return .TransactionCount $ myval (tx :: [E.Value Integer])
     where
       myval ((E.Value v):_) = v
       myval _               = 0
 
-getStatDiff :: Accessible TotalDifficulty m => m TotalDifficulty
-getStatDiff = access (Proxy @TotalDifficulty)
+getStatDiff :: Gettable TotalDifficulty m => m TotalDifficulty
+getStatDiff = get
 
-getStatTx :: Accessible TransactionCount m => m TransactionCount
-getStatTx = access (Proxy @TransactionCount)
+getStatTx :: Gettable TransactionCount m => m TransactionCount
+getStatTx = get

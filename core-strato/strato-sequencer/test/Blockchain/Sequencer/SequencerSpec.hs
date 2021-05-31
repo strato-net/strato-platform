@@ -23,12 +23,11 @@ import           Control.Concurrent.STM.TQueue
 import           Control.Concurrent.STM.TBQueue
 import           Control.Exception                   (finally)
 import           Control.Monad
-import qualified Control.Monad.Change.Alter          as A
-import qualified Control.Monad.Change.Modify         as Mod
+import           Control.Monad.FT                    as FT
 import           Control.Monad.IO.Class              (liftIO)
-import           Control.Concurrent.Async             as Async
+import           Control.Concurrent.Async            as Async
 import           Control.Monad.Reader
-import           Control.Monad.State.Class
+import           Control.Monad.State.Class           as StateT
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.Authentication
 import           Blockchain.Blockstanbul.BenchmarkLib (makeBlock, makeBlockWithTransactions)
@@ -151,7 +150,7 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
         difficulty = blockHeaderDifficulty . ibBlockData $ genesisBlock
         boot = do
           bootstrapGenesisBlock hsh difficulty
-          A.insert (A.Proxy @EmittedBlock) hsh alreadyEmittedBlock
+          insert @EmittedBlock hsh alreadyEmittedBlock
     fromLeft (error "webserver completed") <$>
       race (runNoLoggingT (runSequencerM cfg mCtx (boot >> m)))
            ( run testWebserverPort
@@ -254,7 +253,7 @@ spec = do
                            | otherwise = do
               liftIO . putStrLn $ "waitForIt iteration " ++ show n
               liftIO $ threadDelay 10000 -- Who are you to judge?
-              rnref <- gets _latestRoundNumber
+              rnref <- StateT.gets _latestRoundNumber
               liftIO $ atomicWriteIORef rnref 200
               xs' <- (xs <>) <$> drainTimeouts
               let num20 = length $ filter (==20) xs'
@@ -673,7 +672,7 @@ spec = do
         b2 <- runBatch $ checkForUnseq [chainDetails1]
         let obs' = [b | VmBlock b <- _toVm b2]
         obs' `shouldBe` []
-        txHashes <- unGetTransactionsDB <$> Mod.get (Mod.Proxy @GetTransactionsDB)
+        txHashes <- unGetTransactionsDB <$> FT.get @GetTransactionsDB
         txHashes `shouldBe` S.singleton (txHash tx1)
         b3 <- runBatch $ checkForUnseq [ietx tx1]
         let obs'' = [b | VmBlock b <- _toVm b3]

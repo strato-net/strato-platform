@@ -8,7 +8,7 @@
 module Blockchain.Sequencer.DB.DependentBlockDB where
 
 import           Control.Monad                (join)
-import           Control.Monad.Change.Alter
+import           Control.Monad.FT
 import           Control.Monad.IO.Class
 import           Data.Binary
 
@@ -68,23 +68,23 @@ genericDeleteDependentBlockDB k = do
 genericBatchDeleteDependentBlockDB :: Binary k => k -> LDB.BatchOp
 genericBatchDeleteDependentBlockDB k = LDB.Del (B.toStrict $ encode k)
 
-bootstrapGenesisBlock :: (Keccak256 `Alters` DependentBlockEntry) m => Keccak256 -> Integer -> m ()
-bootstrapGenesisBlock hash' = insert Proxy hash' . Emitted
+bootstrapGenesisBlock :: (Keccak256 `Inserts` DependentBlockEntry) m => Keccak256 -> Integer -> m ()
+bootstrapGenesisBlock hash' = insert hash' . Emitted
 
 appendDependentBlock :: (Keccak256 `Alters` DependentBlockEntry) m => SequencedBlock -> m ()
 appendDependentBlock b = --do
   let parentHash = blockDataParentHash $ sbBlockData b
-   in lookup Proxy parentHash >>= \case
+   in select parentHash >>= \case
         Just (Emitted _) -> return ()
         Just (DependentBlocks existingDeps) | b `elem` existingDeps -> return ()
-        Nothing -> insert Proxy parentHash $ DependentBlocks [b]
+        Nothing -> insert parentHash $ DependentBlocks [b]
         Just (DependentBlocks existingDeps) ->
-          insert Proxy parentHash $ DependentBlocks (b : existingDeps)
+          insert parentHash $ DependentBlocks (b : existingDeps)
 
-existingParent :: (Keccak256 `Alters` DependentBlockEntry) m => SequencedBlock -> m (Maybe DependentBlockEntry)
-existingParent = lookup Proxy . blockDataParentHash . sbBlockData
+existingParent :: (Keccak256 `Selects` DependentBlockEntry) m => SequencedBlock -> m (Maybe DependentBlockEntry)
+existingParent = select . blockDataParentHash . sbBlockData
 
-readyToEmit :: (Keccak256 `Alters` DependentBlockEntry) m => SequencedBlock -> m Bool
+readyToEmit :: (Keccak256 `Selects` DependentBlockEntry) m => SequencedBlock -> m Bool
 readyToEmit b = do
   ep <- existingParent b
   case ep of
@@ -97,16 +97,16 @@ enqueueIfParentNotEmitted b = existingParent b >>= \case
       return $ ReadyToEmit totalDifficulty'
   Just (DependentBlocks existingDeps) | b `elem` existingDeps -> return NotReadyToEmit -- case of duplicate seen
   Just (DependentBlocks existingDeps) -> do
-    insert Proxy (blockDataParentHash $ sbBlockData b) $ DependentBlocks (b:existingDeps)
+    insert (blockDataParentHash $ sbBlockData b) $ DependentBlocks (b:existingDeps)
     return NotReadyToEmit
   Nothing -> do
-    insert Proxy (blockDataParentHash $ sbBlockData b) $ DependentBlocks [b]
+    insert (blockDataParentHash $ sbBlockData b) $ DependentBlocks [b]
     return NotReadyToEmit
 
 insertEmitted :: (Keccak256 `Alters` DependentBlockEntry) m => SequencedBlock -> m (Maybe OutputBlock)
 insertEmitted b = existingParent b >>= \case
   Just (Emitted t) -> do
-    insert Proxy (sbHash b) . Emitted $ totalDifficulty' t
+    insert (sbHash b) . Emitted $ totalDifficulty' t
     return . Just $ theBlock t
   _ -> return Nothing
   where totalDifficulty' t = t + sequencedBlockDifficulty b
@@ -116,13 +116,13 @@ buildEmissionChain :: (Keccak256 `Alters` DependentBlockEntry) m
                    => SequencedBlock
                    -> Integer
                    -> m [OutputBlock]
-buildEmissionChain b lastTotalDifficulty = lookup Proxy (sbHash b) >>= \case
+buildEmissionChain b lastTotalDifficulty = select (sbHash b) >>= \case
   Nothing -> do
-    insert Proxy (sbHash b) $ Emitted totalDifficulty'
+    insert (sbHash b) $ Emitted totalDifficulty'
     return [theBlock]
   Just (Emitted _) -> return []
   Just (DependentBlocks blocks') -> do
-    insert Proxy (sbHash b) $ Emitted totalDifficulty'
+    insert (sbHash b) $ Emitted totalDifficulty'
     subChains <- sequence $ flip buildEmissionChain totalDifficulty' <$> blocks'
     return $ theBlock : join subChains
   where totalDifficulty' = lastTotalDifficulty + sequencedBlockDifficulty b

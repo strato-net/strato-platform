@@ -3,7 +3,7 @@
 module Blockchain.Sequencer.Bootstrap (bootstrapSequencer) where
 
 import           ClassyPrelude (atomically, newTMChan, newTQueue, fromMaybe)
-import qualified Control.Monad.Change.Alter as A
+import           Control.Monad.FT
 import qualified Data.ByteString.Char8 as C8
 
 import           Blockchain.Constants
@@ -84,7 +84,7 @@ bootstrapSequencer Block{blockBlockData = bd,
             }
       runLoggingT . runSequencerM dummySequencerCfg Nothing $ do
         bootstrapGenesisBlock hash difficulty
-        A.insert (A.Proxy @EmittedBlock) hash alreadyEmittedBlock
+        insert @EmittedBlock hash alreadyEmittedBlock
         flushLdbBatchOps
   initKafka :: CablePackage -> IO ()
   initKafka pkg = do

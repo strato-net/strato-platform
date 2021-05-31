@@ -26,7 +26,7 @@ module Blockchain.DB.X509CertDB (
 
 
 import           Control.DeepSeq
-import           Control.Monad.Change.Alter
+import           Control.Monad.FT
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Reader
 import qualified Data.ByteString.Char8              as BC
@@ -64,13 +64,16 @@ genericDeleteX509CertDB f account = do
 -- GHC bug? Why can't we use the line below to create this instance, even with all the
 -- extensions enabled for it?
 -- instance MonadIO m => HasX509CertDB (ReaderT X509CertDB m) where
-instance MonadIO m => (Account `Alters` X509Certificate) (ReaderT X509CertDB m) where
-  lookup _ = genericLookupX509CertDB ask
-  insert _ = genericInsertX509CertDB ask
-  delete _ = genericDeleteX509CertDB ask
+instance MonadIO m => Selectable X509Certificate Account (ReaderT X509CertDB m) where
+  select = genericLookupX509CertDB ask
+instance MonadIO m => Insertable X509Certificate Account (ReaderT X509CertDB m) where
+  insert = genericInsertX509CertDB ask
+instance MonadIO m => Deletable  X509Certificate Account (ReaderT X509CertDB m) where
+  delete = genericDeleteX509CertDB ask
+instance MonadIO m => Alterable  X509Certificate Account (ReaderT X509CertDB m) where
 
 x509CertDBPut :: HasX509CertDB m => Account -> X509Certificate -> m ()
-x509CertDBPut = insert Proxy
+x509CertDBPut = insert
 
 x509CertDBGet :: HasX509CertDB m => Account -> m (Maybe X509Certificate)
-x509CertDBGet = lookup Proxy
+x509CertDBGet = select

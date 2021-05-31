@@ -24,8 +24,7 @@ module Blockchain.SolidVM
 import           Control.DeepSeq                      (force)
 import           Control.Lens hiding (assign, from, to, Context)
 import           Control.Monad
-import qualified Control.Monad.Change.Alter           as A
-import qualified Control.Monad.Change.Modify          as Mod
+import           Control.Monad.FT
 import           Control.Monad.IO.Class
 import qualified Control.Monad.Catch                  as EUnsafe
 import           Data.Bifunctor                       (bimap)
@@ -121,7 +120,7 @@ withSrcPos pos str = liftIO . putStrLn $ concat
 
 variableSet :: MonadSM m => m VariableSet
 variableSet = do
-  cis <- Mod.get (Mod.Proxy @[CallInfo])
+  cis <- get @[CallInfo]
   let textSet = S.fromList . map T.pack . M.keys
       varNames = case cis of
         [] -> S.empty
@@ -133,12 +132,12 @@ variableSet = do
       globals = M.singleton "State Variables" stateVars
   pure . VariableSet $ locals <> globals
 
-instance MonadSM m => Mod.Accessible VariableSet m where
-  access _ = variableSet
+instance MonadSM m => Gettable VariableSet m where
+  get = variableSet
 
-instance MonadSM m => Mod.Accessible [SourcePos] m where
-  access _ = do
-    cis <- Mod.get (Mod.Proxy @[CallInfo])
+instance MonadSM m => Gettable [SourcePos] m where
+  get = do
+    cis <- get @[CallInfo]
     pure $ fromMaybe (initialPos "") . currentSourcePos <$> cis
 
 runExpr :: MonadSM m => EvaluationRequest -> m EvaluationResponse
@@ -158,9 +157,9 @@ runExpr exprText = withoutDebugging . withTempCallInfo True $ do -- TODO: allow 
 
 solidVMBreakpoint :: MonadSM m => SourcePos -> m ()
 solidVMBreakpoint pos = do
-  Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
-    [] -> pure []
-    (ci:cis) -> pure $ ci{currentSourcePos = Just pos}:cis
+  modifyPure_ @[CallInfo] $ \case
+    [] -> []
+    (ci:cis) -> ci{currentSourcePos = Just pos}:cis
   breakpoint runExpr
 
 -- end debugger-related code
@@ -217,7 +216,7 @@ create' :: MonadSM m => Account -> Account -> Keccak256 -> CodeCollection -> Str
 create' creator newAccount ch cc contractName' argExps = do
   initializeAction newAccount contractName' ch
 
-  A.adjustWithDefault_ (A.Proxy @AddressState) newAccount $ \newAddressState ->
+  adjustWithDefault_ @AddressState newAccount $ \newAddressState ->
     pure newAddressState{ addressStateContractRoot = MP.emptyTriePtr
                         , addressStateCodeHash = SolidVMCode contractName' ch
                         }
@@ -237,8 +236,8 @@ create' creator newAccount ch cc contractName' argExps = do
 
   onTraced $ liftIO $ putStrLn $ C.red $ "Done Creating Contract: " ++ show newAccount ++ " of type " ++ contractName'
 
-  finalAct <- Mod.get (Mod.Proxy @Action)
-  finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
+  finalAct <- get @Action
+  finalEvs <- get @(Q.Seq Event)
 
   return ExecResults {
     erRemainingTxGas = 0, --Just use up all the allocated gas for now....
@@ -314,8 +313,8 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
 
     returnVal <- mapM encodeForReturn =<< callWrapper sender' codeAddress Nothing funcName args
 
-    finalAct <- Mod.get (Mod.Proxy @Action)
-    finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
+    finalAct <- get @Action
+    finalEvs <- get @(Q.Seq Event)
 
     return $ ExecResults {
       erRemainingTxGas = 0, --Just use up all the allocated gas for now....
@@ -334,7 +333,7 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
 
 getCodeAndCollection :: MonadSM m => Account -> m (Contract, Keccak256, CodeCollection)
 getCodeAndCollection address' = do
-  callStack' <- Mod.get (Mod.Proxy @[CallInfo])
+  callStack' <- get @[CallInfo]
   let maybeAddress =
         case callStack' of
           (current':_) -> Just $ currentAccount current'
@@ -348,7 +347,7 @@ getCodeAndCollection address' = do
     (hsh, cc') <- getCurrentCodeCollection
     return (c', hsh, cc')
     else do
-    codeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) address'
+    codeHash <- addressStateCodeHash <$> selectWithDefault @AddressState address'
 
     resolvedCodeHash <- resolveCodePtr (address' ^. accountChainId) codeHash
     (contractName', ch, cc) <-
@@ -1350,7 +1349,7 @@ intBuiltin args = typeError "numeric cast - invalid args" args
 
 castToAncestor :: MonadSM m => NamedAccount -> Integer -> m Value
 castToAncestor a n = do
-  cInfo <- Mod.get (Mod.Proxy @[CallInfo])
+  cInfo <- get @[CallInfo]
   let currentChainId = maybe Nothing (_accountChainId . currentAccount) $ listToMaybe cInfo
   pChain <- getNthAncestorChain (fromIntegral n) currentChainId
   case pChain of
@@ -1576,11 +1575,11 @@ addLocalVariable :: MonadSM m => Xabi.Type -> String -> Value -> m ()
 addLocalVariable theType name value = do
 --  initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack name) value
   newVariable <- liftIO $ fmap Variable $ newIORef value
-  cs <- Mod.get (Mod.Proxy @[CallInfo])
+  cs <- get @[CallInfo]
   case cs of
     [] -> internalError "addLocalVariable called with an empty stack" (name, value)
     (currentSlice:rest) ->
-      Mod.put (Mod.Proxy @[CallInfo]) $
+      put @[CallInfo] $
         currentSlice
           { localVariables = M.insert name (theType, newVariable) $
               localVariables currentSlice

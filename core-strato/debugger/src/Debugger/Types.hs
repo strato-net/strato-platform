@@ -45,7 +45,7 @@ module Debugger.Types
 
 import           Control.DeepSeq
 import           Control.Monad
-import qualified Control.Monad.Change.Modify          as Mod
+import           Control.Monad.FT
 import           Control.Monad.IO.Class
 import           Data.Aeson                           as Aeson
 import           Data.Foldable                        (for_)
@@ -202,24 +202,24 @@ newDebugSettings =
 
 type Debuggable m =
   ( MonadIO m
-  , Mod.Modifiable (Maybe DebugSettings) m
-  , Mod.Accessible [SourcePos] m
-  , Mod.Accessible VariableSet m
+  , Modifiable (Maybe DebugSettings) m
+  , Gettable [SourcePos] m
+  , Gettable VariableSet m
   )
 
 type Evaluator m = EvaluationRequest -> m EvaluationResponse
 
 withoutDebugging :: Debuggable m => m a -> m a
 withoutDebugging f = do
-  dSettings <- Mod.get (Mod.Proxy @(Maybe DebugSettings))
-  Mod.put (Mod.Proxy @(Maybe DebugSettings)) Nothing
+  dSettings <- get @(Maybe DebugSettings)
+  put @(Maybe DebugSettings) Nothing
   a <- f
-  Mod.put (Mod.Proxy @(Maybe DebugSettings)) dSettings
+  put @(Maybe DebugSettings) dSettings
   pure a
 
 breakpoint :: Debuggable m => Evaluator m -> m ()
 breakpoint eval = do
-  poss <- Mod.access (Mod.Proxy @[SourcePos])
+  poss <- get @[SourcePos]
   case poss of
     [] -> pure ()
     (pos:_) -> do
@@ -255,7 +255,7 @@ isBreakpoint :: Debuggable m
              -> SourcePos
              -> m Bool
 isBreakpoint eval pos = do
-  debugSettings <- Mod.get (Mod.Proxy @(Maybe DebugSettings))
+  debugSettings <- get @(Maybe DebugSettings)
   case debugSettings of
     Nothing -> pure False
     Just DebugSettings{..} -> do
@@ -274,7 +274,7 @@ handleBreakpoint :: Debuggable m
                  -> SourcePos
                  -> m ()
 handleBreakpoint eval pos = do
-  debugSettings <- Mod.get (Mod.Proxy @(Maybe DebugSettings))
+  debugSettings <- get @(Maybe DebugSettings)
   for_ debugSettings $ loop True
   where
     loop sendPing d@DebugSettings{..} = do
@@ -286,11 +286,11 @@ handleBreakpoint eval pos = do
         (_, Just StepOver) -> step 1
         (_, Just StepOut) -> step 0
         (Stepping n, _) -> do
-          cStack <- Mod.access (Mod.Proxy @[SourcePos])
+          cStack <- get @[SourcePos]
           unless (length cStack >= n) $ doPause >> loop False d
         _ -> doPause >> loop False d
       where step k = do
-              n <- length <$> Mod.access (Mod.Proxy @[SourcePos])
+              n <- length <$> get @[SourcePos]
               void . atomically . writeTVar current . Stepping $ n + k
             evalLoop = do
               mReq <- atomically $ tryReadTChan requests
@@ -302,11 +302,11 @@ handleBreakpoint eval pos = do
                 evalLoop
 
             doPause = do
-              cStack <- Mod.access (Mod.Proxy @[SourcePos])
+              cStack <- get @[SourcePos]
               watchExprs <- fmap S.toList . atomically $ readTVar watchExpressions
               watchVals <- traverse (withoutDebugging . eval) watchExprs
               let watchValsMap = M.fromList $ zip watchExprs watchVals
-              VariableSet varSet <- Mod.access (Mod.Proxy @VariableSet)
+              VariableSet varSet <- get @VariableSet
               varMap <- for varSet $ traverse (withoutDebugging . eval) . M.fromSet id
               void . atomically . writeTVar current . Paused $ DebugState pos cStack varMap watchValsMap
               when sendPing . void . atomically $ tryPutTMVar ping ()

@@ -7,7 +7,7 @@ module Control.Monad.Composable.CoreAPI where
 
 import           Control.Monad.Reader
 
-import           Control.Monad.Change.Modify
+import           Control.Monad.FT
 
 import           Network.HTTP.Client
 
@@ -21,7 +21,7 @@ data CoreAPIData =
 
 type CoreAPIM = ReaderT CoreAPIData
 
-type HasCoreAPI m = Accessible CoreAPIData m
+type HasCoreAPI m = Gettable CoreAPIData m
 
 runCoreAPIM :: MonadIO m => String -> CoreAPIM m a -> m a
 runCoreAPIM urlString f = do

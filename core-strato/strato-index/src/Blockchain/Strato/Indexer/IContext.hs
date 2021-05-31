@@ -20,17 +20,14 @@ module Blockchain.Strato.Indexer.IContext
     ) where
 
 import           Control.Arrow                   ((&&&))
-import           Control.Exception
 import           Control.Monad                   (void)
-import qualified Control.Monad.Change.Alter      as A
-import qualified Control.Monad.Change.Modify     as Mod
+import           Control.Monad.FT
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class       (lift)
 import           Blockchain.Output
 import           Control.Monad.Trans.Resource
 import           Control.Monad.Trans.Reader
-import           Control.Monad.Trans.State
-import qualified Data.Map.Strict                 as M
+import           Control.Monad.Trans.State       as StateT
 import qualified Data.Text                       as T
 
 import           Blockchain.Data.Block           (BestBlock(..), Private(..))
@@ -68,78 +65,60 @@ data IContext = IContext
 type IConfigM = ReaderT IConfig (ResourceT (LoggingT IO))
 type IContextM = StateT IContext IConfigM
 
-instance Mod.Accessible SQLDB IConfigM where
-  access _ = asks contextSQLDB
+instance Gettable SQLDB IConfigM where
+  get = asks contextSQLDB
 
-instance Mod.Modifiable KafkaState IContextM where
-  get _   = gets contextKafkaState
-  put _ k = get >>= \c -> put c{contextKafkaState = k}
+instance Gettable KafkaState IContextM where
+  get   = StateT.gets contextKafkaState
+instance Puttable KafkaState IContextM where
+  put k = StateT.modify $ \c -> c{contextKafkaState = k}
+instance Modifiable KafkaState IContextM where
 
-instance Mod.Accessible RBDB.RedisConnection IContextM where
-  access _ = contextRedisBlockDB <$> get
+instance Gettable RBDB.RedisConnection IContextM where
+  get = contextRedisBlockDB <$> StateT.get
 
-data IndexerException = Lookup String String String
-                      | Delete String String String
-                      deriving (Eq, Show, Exception)
+instance Insertable (API OutputTx) Keccak256 IContextM where
+  insert _ (API OutputTx{..}) = void . lift $ insertTX Log otOrigin Nothing [otBaseTx]
 
-instance (Keccak256 `A.Alters` API OutputTx) IContextM where
-  lookup _ _                    = liftIO . throwIO $ Lookup "API" "Keccak256" "OutputTx"
-  delete _ _                    = liftIO . throwIO $ Delete "API" "Keccak256" "OutputTx"
-  insert _ _ (API OutputTx{..}) = void . lift $ insertTX Log otOrigin Nothing [otBaseTx]
+instance Insertable (API ChainInfo) Word256 IContextM where
+  insert cId (API cInfo) = void . lift $ putChainInfo (ChainId cId) cInfo
 
-instance (Word256 `A.Alters` API ChainInfo) IContextM where
-  lookup _ _               = liftIO . throwIO $ Lookup "API" "Word256" "ChainInfo"
-  delete _ _               = liftIO . throwIO $ Delete "API" "Word256" "ChainInfo"
-  insert _ cId (API cInfo) = void . lift $ putChainInfo (ChainId cId) cInfo
+instance Insertable (API OutputBlock) Keccak256 IContextM where
+  insert     _ (API ob) = void . lift $ putBlocks [(outputBlockToBlock ob, obTotalDifficulty ob)] False
+  insertMany            = void
+                        . lift
+                        . flip putBlocks False
+                        . map ((outputBlockToBlock &&& obTotalDifficulty) . unAPI)
+                        . map snd
 
-instance (Keccak256 `A.Alters` API OutputBlock) IContextM where
-  lookup     _ _          = liftIO . throwIO $ Lookup "API" "Keccak256" "OutputBlock"
-  delete     _ _          = liftIO . throwIO $ Delete "API" "Keccak256" "OutputBlock"
-  insert     _ _ (API ob) = void . lift $ putBlocks [(outputBlockToBlock ob, obTotalDifficulty ob)] False
-  insertMany _            = void
-                          . lift
-                          . flip putBlocks False
-                          . map ((outputBlockToBlock &&& obTotalDifficulty) . unAPI)
-                          . M.elems
+instance Insertable (P2P (Private (Word256, OutputTx))) Keccak256 IContextM where
+  insert   k v = insertMany [(k,v)]
+  insertMany   = void
+               . RBDB.withRedisBlockDB
+               . RBDB.addPrivateTransactions
+               . map (fmap $ unPrivate . unP2P)
 
-instance (Keccak256 `A.Alters` P2P (Private (Word256, OutputTx))) IContextM where
-  lookup     _ _ = liftIO . throwIO $ Lookup "P2P" "Keccak256" "Private (Word256, OutputTx)"
-  delete     _ _ = liftIO . throwIO $ Delete "P2P" "Keccak256" "Private (Word256, OutputTx)"
-  insert   p k v = A.insertMany p $ M.fromList [(k,v)]
-  insertMany _   = void
-                 . RBDB.withRedisBlockDB
-                 . RBDB.addPrivateTransactions
-                 . map (fmap $ unPrivate . unP2P)
-                 . M.toList
+instance Insertable (P2P OutputBlock) Keccak256 IContextM where
+  insert _ = void
+           . RBDB.withRedisBlockDB
+           . RBDB.putBlock
+           . unP2P
 
-instance (Keccak256 `A.Alters` P2P OutputBlock) IContextM where
-  lookup _ _ = liftIO . throwIO $ Lookup "P2P" "Keccak256" "OutputBlock"
-  delete _ _ = liftIO . throwIO $ Delete "P2P" "Keccak256" "OutputBlock"
-  insert _ _ = void
+instance Puttable (P2P BestBlock) IContextM where
+  put (P2P (BestBlock s n d)) = void . RBDB.withRedisBlockDB $ RBDB.putBestBlockInfo s n d
+
+instance Insertable (P2P ChainInfo) Word256 IContextM where
+  insert cId = void
              . RBDB.withRedisBlockDB
-             . RBDB.putBlock
+             . RBDB.putChainInfo cId
              . unP2P
 
-instance Mod.Modifiable (P2P BestBlock) IContextM where
-  get _                         = liftIO . throwIO $ Lookup "P2P" "()" "BestBlock"
-  put _ (P2P (BestBlock s n d)) = void . RBDB.withRedisBlockDB $ RBDB.putBestBlockInfo s n d
-
-instance (Word256 `A.Alters` P2P ChainInfo) IContextM where
-  lookup _ _   = liftIO . throwIO $ Lookup "P2P" "Word256" "ChainInfo"
-  delete _ _   = liftIO . throwIO $ Delete "P2P" "Word256" "ChainInfo"
-  insert _ cId = void
-               . RBDB.withRedisBlockDB
-               . RBDB.putChainInfo cId
-               . unP2P
-
-instance (Word256 `A.Alters` P2P ChainMembers) IContextM where
-  lookup _ _   = liftIO . throwIO $ Lookup "P2P" "Word256" "ChainMembers"
-  delete _ _   = liftIO . throwIO $ Delete "P2P" "Word256" "ChainMembers"
-  insert _ cId = void
-               . RBDB.withRedisBlockDB
-               . RBDB.putChainMembers cId
-               . unChainMembers
-               . unP2P
+instance Insertable (P2P ChainMembers) Word256 IContextM where
+  insert cId = void
+             . RBDB.withRedisBlockDB
+             . RBDB.putChainMembers cId
+             . unChainMembers
+             . unP2P
 
 pgPoolSize :: Int
 pgPoolSize = 20

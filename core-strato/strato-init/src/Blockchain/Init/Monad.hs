@@ -6,8 +6,7 @@
 module Blockchain.Init.Monad where
 
 import           Control.Monad
-import qualified Control.Monad.Change.Alter         as A
-import qualified Control.Monad.Change.Modify        as Mod
+import           Control.Monad.FT
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Resource
@@ -67,15 +66,21 @@ runSetupDBM mv = do
   redisConn <- RBDB.RedisConnection <$> liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
   runReaderT mv $ SetupDBs sdb srRef hdb cdb xdb pool redisConn m1 m2 m3 m4
 
-instance (Maybe Word256 `A.Alters` MP.StateRoot) SetupDBM where
-  lookup _ k = fmap (M.lookup k) $ liftIO . readIORef =<< asks stateRoots
-  insert _ k v = liftIO . flip modifyIORef (M.insert k v) =<< asks stateRoots
-  delete _ k = liftIO . flip modifyIORef (M.delete k) =<< asks stateRoots
+instance Selectable MP.StateRoot (Maybe Word256) SetupDBM where
+  select k = fmap (M.lookup k) $ liftIO . readIORef =<< asks stateRoots
+instance Insertable MP.StateRoot (Maybe Word256) SetupDBM where
+  insert k v = liftIO . flip modifyIORef (M.insert k v) =<< asks stateRoots
+instance Deletable  MP.StateRoot (Maybe Word256) SetupDBM where
+  delete k = liftIO . flip modifyIORef (M.delete k) =<< asks stateRoots
+instance Alterable  MP.StateRoot (Maybe Word256) SetupDBM where
 
-instance (MP.StateRoot `A.Alters` MP.NodeData) SetupDBM where
-  lookup _ = MP.genericLookupDB $ asks stateDB
-  insert _ = MP.genericInsertDB $ asks stateDB
-  delete _ = MP.genericDeleteDB $ asks stateDB
+instance Selectable MP.NodeData MP.StateRoot SetupDBM where
+  select = MP.genericLookupDB $ asks stateDB
+instance Insertable MP.NodeData MP.StateRoot SetupDBM where
+  insert = MP.genericInsertDB $ asks stateDB
+instance Deletable  MP.NodeData MP.StateRoot SetupDBM where
+  delete = MP.genericDeleteDB $ asks stateDB
+instance Alterable  MP.NodeData MP.StateRoot SetupDBM where
 
 instance HasMemRawStorageDB SetupDBM where
   getMemRawStorageTxDB = liftIO . readIORef .localStorageTx =<< ask
@@ -87,10 +92,13 @@ instance HasMemRawStorageDB SetupDBM where
     lsbref <- asks localStorageBlock
     liftIO $ atomicWriteIORef lsbref theMap
 
-instance (RawStorageKey `A.Alters` RawStorageValue) SetupDBM where
-  lookup _ = genericLookupRawStorageDB
-  insert _ = genericInsertRawStorageDB
-  delete _ = genericDeleteRawStorageDB
+instance Selectable RawStorageValue RawStorageKey SetupDBM where
+  select = genericLookupRawStorageDB
+instance Insertable RawStorageValue RawStorageKey SetupDBM where
+  insert = genericInsertRawStorageDB
+instance Deletable  RawStorageValue RawStorageKey SetupDBM where
+  delete = genericDeleteRawStorageDB
+instance Alterable  RawStorageValue RawStorageKey SetupDBM where
 
 instance HasMemAddressStateDB SetupDBM where
   getAddressStateTxDBMap = liftIO . readIORef =<< asks localAddressStateTx
@@ -102,28 +110,40 @@ instance HasMemAddressStateDB SetupDBM where
     lasbref <- asks localAddressStateBlock
     liftIO $ atomicWriteIORef lasbref theMap
 
-instance (Account `A.Alters` AddressState) SetupDBM where
-  lookup _ = getAddressStateMaybe
-  insert _ = putAddressState
-  delete _ = deleteAddressState
+instance Selectable AddressState Account SetupDBM where
+  select = getAddressStateMaybe
+instance Insertable AddressState Account SetupDBM where
+  insert = putAddressState
+instance Deletable  AddressState Account SetupDBM where
+  delete = deleteAddressState
+instance Alterable  AddressState Account SetupDBM where
 
-instance (Keccak256 `A.Alters` DBCode) SetupDBM where
-  lookup _ = genericLookupCodeDB $ asks codeDB
-  insert _ = genericInsertCodeDB $ asks codeDB
-  delete _ = genericDeleteCodeDB $ asks codeDB
+instance Selectable DBCode Keccak256 SetupDBM where
+  select = genericLookupCodeDB $ asks codeDB
+instance Insertable DBCode Keccak256 SetupDBM where
+  insert = genericInsertCodeDB $ asks codeDB
+instance Deletable  DBCode Keccak256 SetupDBM where
+  delete = genericDeleteCodeDB $ asks codeDB
+instance Alterable  DBCode Keccak256 SetupDBM where
 
-instance (Account `A.Alters` X509Certificate) SetupDBM where
-  lookup _ = genericLookupX509CertDB $ asks x509DB
-  insert _ = genericInsertX509CertDB $ asks x509DB
-  delete _ = genericDeleteX509CertDB $ asks x509DB
+instance Selectable X509Certificate Account SetupDBM where
+  select = genericLookupX509CertDB $ asks x509DB
+instance Insertable X509Certificate Account SetupDBM where
+  insert = genericInsertX509CertDB $ asks x509DB
+instance Deletable  X509Certificate Account SetupDBM where
+  delete = genericDeleteX509CertDB $ asks x509DB
+instance Alterable  X509Certificate Account SetupDBM where
 
-instance (N.NibbleString `A.Alters` N.NibbleString) SetupDBM where
-  lookup _ = genericLookupHashDB $ asks hashDB
-  insert _ = genericInsertHashDB $ asks hashDB
-  delete _ = genericDeleteHashDB $ asks hashDB
+instance Selectable N.NibbleString N.NibbleString SetupDBM where
+  select = genericLookupHashDB $ asks hashDB
+instance Insertable N.NibbleString N.NibbleString SetupDBM where
+  insert = genericInsertHashDB $ asks hashDB
+instance Deletable  N.NibbleString N.NibbleString SetupDBM where
+  delete = genericDeleteHashDB $ asks hashDB
+instance Alterable  N.NibbleString N.NibbleString SetupDBM where
 
-instance Mod.Accessible SQLDB SetupDBM where
-  access _ = asks sqlDB
+instance Gettable SQLDB SetupDBM where
+  get = asks sqlDB
 
-instance Mod.Accessible RBDB.RedisConnection SetupDBM where
-  access _ = asks redisDB
+instance Gettable RBDB.RedisConnection SetupDBM where
+  get = asks redisDB

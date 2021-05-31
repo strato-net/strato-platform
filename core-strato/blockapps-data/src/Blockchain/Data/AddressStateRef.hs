@@ -6,7 +6,7 @@
 module Blockchain.Data.AddressStateRef where
 
 import           Control.Monad
-import           Control.Monad.Change.Modify        (Accessible(..), Proxy(..))
+import           Control.Monad.FT
 import           Data.Maybe
 import qualified Database.Persist.Postgresql        as SQL hiding (Update, get)
 
@@ -20,7 +20,7 @@ import           Blockchain.Strato.Model.Keccak256
 updateSQLBalanceAndNonce :: HasSQLDB m =>
                             [(Account, (Integer, Integer))] -> m ()
 updateSQLBalanceAndNonce vals = do
-  pool <- unSQLDB <$> access (Proxy @SQLDB)
+  pool <- unSQLDB <$> get
   flip SQL.runSqlPool pool $ do
     forM_ vals $ \((Account a c), (v, n)) -> do
       let asr =

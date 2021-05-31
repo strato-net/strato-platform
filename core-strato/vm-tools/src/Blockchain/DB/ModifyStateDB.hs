@@ -10,24 +10,24 @@ module Blockchain.DB.ModifyStateDB (
 ) where
 
 import           Control.Monad                   (void)
-import qualified Control.Monad.Change.Alter      as A
+import           Control.Monad.FT
 
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Strato.Model.Account
 
-addToBalance :: (Monad m, (Account `A.Alters` AddressState) m) =>
+addToBalance :: (Monad m, (Account `Alters` AddressState) m) =>
               Account -> Integer -> m Bool
 addToBalance account val = do
-  A.lookupWithDefault (A.Proxy @AddressState) account >>= \addressState ->
+  selectWithDefault account >>= \addressState ->
     let newVal = addressStateBalance addressState + val
      in if newVal < 0
           then return False
-          else True <$ A.insert A.Proxy account addressState{addressStateBalance = newVal}
+          else True <$ insert account addressState{addressStateBalance = newVal}
 
-pay :: (Monad m, (Account `A.Alters` AddressState) m)
+pay :: (Monad m, (Account `Alters` AddressState) m)
     => String -> Account -> Account -> Integer -> m Bool
 pay _description fromAddr toAddr val = do
-  balance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy :: A.Proxy AddressState) fromAddr
+  balance <- addressStateBalance <$> selectWithDefault fromAddr
   if balance < val
     then return False
     else do

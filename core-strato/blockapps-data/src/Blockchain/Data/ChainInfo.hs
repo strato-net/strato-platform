@@ -28,7 +28,7 @@ module Blockchain.Data.ChainInfo
 
 
 import           Control.Applicative               (many)
-import qualified Control.Monad.Change.Alter        as A
+import           Control.Monad.FT
 import           Control.Monad                     (join)
 
 import           Blockchain.ExtWord
@@ -363,21 +363,21 @@ instance RLPSerializable ChainInfo where
       (rlpDecode $ xs !! 8)
   rlpDecode o = error $ "rlpDecode ChainInfo: Expected 9 element RLPArray, got " ++ show o
 
-isAncestorChainOf :: A.Selectable (Maybe Word256) ParentChainId m => Maybe Word256 -> Maybe Word256 -> m Bool
+isAncestorChainOf :: (Maybe Word256 `Selects` ParentChainId) m => Maybe Word256 -> Maybe Word256 -> m Bool
 isAncestorChainOf Nothing  _       = pure True
 isAncestorChainOf (Just _) Nothing = pure False
 isAncestorChainOf (Just ancestor) (Just descendent) | ancestor == descendent = pure True
-isAncestorChainOf ancestor descendent = A.select (A.Proxy @ParentChainId) descendent >>= \case
+isAncestorChainOf ancestor descendent = select descendent >>= \case
   Nothing -> pure False
   Just (ParentChainId parent) -> ancestor `isAncestorChainOf` parent
 
-getAncestorChains :: A.Selectable (Maybe Word256) ParentChainId m => Maybe Word256 -> m [Maybe Word256]
+getAncestorChains :: (Maybe Word256 `Selects` ParentChainId) m => Maybe Word256 -> m [Maybe Word256]
 getAncestorChains Nothing  = pure [] -- needed in case we somehow have an entry for `Nothing` in the db
-getAncestorChains descendent = A.select (A.Proxy @ParentChainId) descendent >>= \case
+getAncestorChains descendent = select descendent >>= \case
   Nothing -> pure [descendent]
   Just (ParentChainId parent) -> (descendent:) <$> getAncestorChains parent
 
-getNthAncestorChain :: A.Selectable (Maybe Word256) ParentChainId m => Int -> Maybe Word256 -> m (Maybe Word256)
+getNthAncestorChain :: (Maybe Word256 `Selects` ParentChainId) m => Int -> Maybe Word256 -> m (Maybe Word256)
 getNthAncestorChain n = fmap (join . listToMaybe . drop n) . getAncestorChains
 
 accountExtractor :: JS.Parser [AccountInfo]

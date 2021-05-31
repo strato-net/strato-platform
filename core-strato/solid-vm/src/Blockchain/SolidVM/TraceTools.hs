@@ -4,7 +4,7 @@
 module Blockchain.SolidVM.TraceTools where
 
 import           Control.Monad
-import           Control.Monad.Change.Modify
+import           Control.Monad.FT
 import           Control.Monad.IO.Class
 import qualified Data.Map                       as M
 
@@ -36,6 +36,6 @@ getFullStackTrace theCallStack = do
   
 printFullStackTrace :: MonadSM m => m ()
 printFullStackTrace = do
-  theCallStack <- get (Proxy @[CallInfo])
+  theCallStack <- get @[CallInfo]
   fullStackTrace <- getFullStackTrace theCallStack
   liftIO $ putStrLn $ grayBox $ concat $ map (wrap 150) fullStackTrace

@@ -19,14 +19,27 @@ extra-source-files:
 # common to point users to the README.md file.
 description:         Please see the README on GitHub at <https://github.com/githubuser/monad-alter#readme>
 
+dependencies:
+- base >= 4.7 && < 5
+- comonad
+- containers
+- data-default
+- lens
+- mtl
+- transformers
+
 library:
   source-dirs: src
   ghc-options:
   - -Werror
-  dependencies:
-    - base
-    - comonad
-    - containers
-    - data-default
-    - lens
-    - transformers
+
+tests:
+  monad-alter-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - monad-alter

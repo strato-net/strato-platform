@@ -11,7 +11,7 @@ module Handlers.Log (
   server
   ) where
 
-import           Control.Monad.Change.Alter
+import           Control.Monad.FT
 import           Data.List
 import           Data.Maybe
 import qualified Database.Esqueleto            as E
@@ -45,8 +45,8 @@ data LogsFilterParams = LogsFilterParams
   , qlSortby  :: Maybe Sortby
   } deriving (Eq, Ord, Show)
 
-instance Selectable LogsFilterParams [LogDB] SQLM where
-  select _ LogsFilterParams{..} =
+instance Selectable [LogDB] LogsFilterParams SQLM where
+  select LogsFilterParams{..} =
     fmap (Just . nub . map E.entityVal) . sqlQuery $ E.select $ E.from $ \lg -> do
       let criteria = catMaybes
                     [
@@ -60,5 +60,5 @@ instance Selectable LogsFilterParams [LogDB] SQLM where
       E.orderBy $ [(sortToOrderBy qlSortby) $ (lg E.^. LogDBId)]
       return lg
 
-getLog :: Selectable LogsFilterParams [LogDB] m => Maybe Address -> Maybe Keccak256 -> Maybe Sortby -> m [LogDB]
-getLog a b c = fromMaybe [] <$> select (Proxy @[LogDB]) (LogsFilterParams a b c)
+getLog :: (LogsFilterParams `Selects` [LogDB]) m => Maybe Address -> Maybe Keccak256 -> Maybe Sortby -> m [LogDB]
+getLog a b c = fromMaybe [] <$> select (LogsFilterParams a b c)

@@ -11,11 +11,11 @@ import           Data.Pool
 import           Data.Word
 import           Database.PostgreSQL.Simple
 
-import           Control.Monad.Change.Modify
+import           Control.Monad.FT
 
 type BlocSQLM = ReaderT BlocSQLEnv
 
-type HasBlocSQL m = (Accessible BlocSQLEnv m, MonadBaseControl IO m)
+type HasBlocSQL m = (Gettable BlocSQLEnv m, MonadBaseControl IO m)
 
 data BlocSQLEnv =
   BlocSQLEnv {

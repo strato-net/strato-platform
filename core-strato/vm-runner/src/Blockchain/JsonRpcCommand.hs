@@ -10,7 +10,7 @@ module Blockchain.JsonRpcCommand (
 
 import           Prelude                         hiding (id)
 import           Control.Monad                   ((<=<))
-import qualified Control.Monad.Change.Alter      as A
+import           Control.Monad.FT
 import           Control.Monad.IO.Class
 import           Data.Binary
 import qualified Data.ByteString                 as B
@@ -52,7 +52,7 @@ runJsonRpcCommand :: ( MonadLogger m
                      , HasStateDB m
                      , HasCodeDB m
                      , HasStorageDB m
-                     , (Account `A.Alters` AddressState) m
+                     , (Account `Alters` AddressState) m
                      )
                   => JsonRpcCommand -> m ()
 runJsonRpcCommand = liftIO . uncurry produceResponse
@@ -62,7 +62,7 @@ runJsonRpcCommand' :: ( MonadLogger m
                       , HasStateDB m
                       , HasCodeDB m
                       , HasStorageDB m
-                      , (Account `A.Alters` AddressState) m
+                      , (Account `Alters` AddressState) m
                       )
                    => m BlockDataRef
                    -> JsonRpcCommand
@@ -72,7 +72,7 @@ runJsonRpcCommand' mBestBlock c@JRCGetBalance{jrcAddress=address, jrcId=id} = do
   bestBlock <- mBestBlock
   setStateDBStateRoot Nothing $ blockDataRefStateRoot bestBlock
   response <- show . addressStateBalance <$>
-    A.lookupWithDefault (A.Proxy @AddressState) (Account address Nothing)
+    selectWithDefault @AddressState (Account address Nothing)
   $logInfoS "runJsonRpcCommand'.JRCGetBalance" $ T.pack response
   return (id, BC.pack response)
 
@@ -81,7 +81,7 @@ runJsonRpcCommand' mBestBlock c@JRCGetCode{jrcAddress=address, jrcId=id} = do
   bestBlock <- mBestBlock
   setStateDBStateRoot Nothing $ blockDataRefStateRoot bestBlock
   codeHash <- addressStateCodeHash <$>
-    A.lookupWithDefault (A.Proxy @AddressState) (Account address Nothing)
+    selectWithDefault @AddressState (Account address Nothing)
   code <- getEVMCode $
                case codeHash of
                  EVMCode ch -> ch
@@ -93,7 +93,7 @@ runJsonRpcCommand' mBestBlock c@JRCGetTransactionCount{jrcAddress=address, jrcId
   bestBlock <- mBestBlock
   setStateDBStateRoot Nothing $ blockDataRefStateRoot bestBlock
   response <- show . addressStateNonce <$>
-    A.lookupWithDefault (A.Proxy @AddressState) (Account address Nothing)
+    selectWithDefault @AddressState (Account address Nothing)
   $logInfoS "runJsonRpcCommand'.JRCGetTransactionCount" $ T.pack response
   return (id, BC.pack response)
 

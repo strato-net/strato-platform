@@ -16,7 +16,7 @@ module Blockchain.DB.BlockSummaryDB (
 
 
 import           Control.DeepSeq
-import qualified Control.Monad.Change.Alter   as A
+import           Control.Monad.FT
 import           Control.Monad.IO.Class
 import           Data.Binary
 import qualified Data.ByteString.Lazy         as BL
@@ -34,7 +34,7 @@ newtype BlockSummaryDB = BlockSummaryDB { unBlockSummaryDB :: LDB.DB }
 instance NFData BlockSummaryDB where
   rnf (BlockSummaryDB db) = db `seq` ()
 
-type HasBlockSummaryDB m = (Keccak256 `A.Alters` BlockSummary) m
+type HasBlockSummaryDB m = (Keccak256 `Alters` BlockSummary) m
 
 genericLookupBlockSummaryDB :: MonadIO m => m BlockSummaryDB -> Keccak256 -> m (Maybe BlockSummary)
 genericLookupBlockSummaryDB f blockHash = do
@@ -54,10 +54,10 @@ genericDeleteBlockSummaryDB f blockHash = do
 getBSum :: HasBlockSummaryDB m => Keccak256 -> m BlockSummary
 getBSum blockHash =
   fromMaybe (error $ "missing value in block summary DB: " ++ format blockHash) <$>
-    A.lookup (A.Proxy @BlockSummary) blockHash
+    select blockHash
 
 putBSum :: HasBlockSummaryDB m => Keccak256 -> BlockSummary -> m ()
-putBSum = A.insert (A.Proxy @BlockSummary)
+putBSum = insert
 
 hasBSum :: HasBlockSummaryDB m => Keccak256 -> m Bool
-hasBSum blockHash = isJust <$> A.lookup (A.Proxy @BlockSummary) blockHash
+hasBSum = exists @BlockSummary

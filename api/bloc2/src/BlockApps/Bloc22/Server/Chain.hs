@@ -21,7 +21,7 @@ import           Data.Foldable                     (for_)
 import           Data.Int                          (Int32)
 import qualified Data.Map.Ordered                  as OMap
 import qualified Data.Map.Strict                   as Map
-import           Data.Maybe                        (catMaybes, fromMaybe)
+import           Data.Maybe                        (fromMaybe)
 import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
 import           Data.Text.Encoding                (encodeUtf8)
@@ -49,7 +49,7 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class     (blockHash)
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.SourceMap (serializeSourceMap)
-import           Control.Monad.Change.Alter
+import           Control.Monad.FT
 import           Control.Monad.Composable.BlocSQL
 import           Control.Monad.Composable.CoreAPI
 import           Control.Monad.Composable.SQL
@@ -183,16 +183,16 @@ postChainInfos chainInputs = withLastBlockHash $ \bHash -> do
   for_ cmIdChains $ \(cmId, chainId) -> insertContractInstance cmId $ Account governanceAddress (Just $ unChainId chainId)
   return chainIds
 
-waitForChainInfo :: (MonadLogger m, Selectable ChainId ChainInfo m,
+waitForChainInfo :: (MonadLogger m, Selectable ChainInfo ChainId m,
                      HasSQL m) =>
                     ChainId -> m ()
 waitForChainInfo chainId = waitForChainInfos [chainId]
 
-waitForChainInfos :: (MonadLogger m, Selectable ChainId ChainInfo m,
+waitForChainInfos :: (MonadLogger m, Selectable ChainInfo ChainId m,
                       HasSQL m) =>
                      [ChainId] -> m ()
 waitForChainInfos chainIds = waitFor "failed to retrieve chain info" go
-  where go :: (MonadLogger m, Selectable ChainId ChainInfo m) => m Bool
+  where go :: (MonadLogger m, Selectable ChainInfo ChainId m) => m Bool
         go = do
           infos <- getChainInfo chainIds
           $logInfoLS "waitForChainInfo/req" chainIds
@@ -200,7 +200,7 @@ waitForChainInfos chainIds = waitFor "failed to retrieve chain info" go
           return $ length infos == length chainIds
 
 
-getChainInfo :: (Selectable ChainId ChainInfo m) =>
+getChainInfo :: (Selectable ChainInfo ChainId m) =>
                 [ChainId] -> m [ChainIdChainOutput]
 getChainInfo chainIds = do
   chainIdChainInfos <- getChain chainIds

@@ -15,7 +15,7 @@ module Blockchain.DB.SQLDB
   ) where
 
 import           Control.DeepSeq
-import           Control.Monad.Change.Modify  (Accessible(..), Proxy(..))
+import           Control.Monad.FT
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
 import           Blockchain.Output            (MonadLogger, runNoLoggingT)
@@ -34,10 +34,10 @@ newtype SQLDB = SQLDB { unSQLDB :: SQL.ConnectionPool }
 instance NFData SQLDB where
   rnf (SQLDB db) = db `seq` ()
 
-type HasSQLDB m = (MonadIO m, MonadUnliftIO m, Accessible SQLDB m)
+type HasSQLDB m = (MonadIO m, MonadUnliftIO m, Gettable SQLDB m)
 
 sqlQuery :: HasSQLDB m => SQL.SqlPersistT (ResourceT m) a -> m a
-sqlQuery q = runResourceT . SQL.runSqlPool q . unSQLDB =<< access Proxy
+sqlQuery q = runResourceT . SQL.runSqlPool q . unSQLDB =<< get
 
 runSqlPool :: MonadUnliftIO m => SQL.SqlPersistT (ResourceT m) a -> SQLDB -> m a
 runSqlPool q = runResourceT . SQL.runSqlPool q . unSQLDB

@@ -7,7 +7,7 @@ module Control.Monad.Composable.Vault where
 
 import           Control.Monad.Reader
 
-import           Control.Monad.Change.Modify
+import           Control.Monad.FT
 
 import           Network.HTTP.Client
 
@@ -21,7 +21,7 @@ data VaultData =
 
 type VaultM = ReaderT VaultData
 
-type HasVault m = Accessible VaultData m
+type HasVault m = Gettable VaultData m
 
 runVaultM :: MonadIO m => String -> VaultM m a -> m a
 runVaultM url f = do

@@ -6,7 +6,7 @@
 module Blockchain.Sequencer.DB.GetTransactionsDB where
 
 import           Blockchain.Strato.Model.Keccak256
-import           Control.Monad.Change.Modify
+import           Control.Monad.FT
 import qualified Data.Set                     as S
 
 newtype GetTransactionsDB = GetTransactionsDB { unGetTransactionsDB :: S.Set Keccak256 }
@@ -17,8 +17,8 @@ emptyGetTransactionsDB :: GetTransactionsDB
 emptyGetTransactionsDB = GetTransactionsDB S.empty
 
 insertGetTransactionsDB :: HasGetTransactionsDB m => Keccak256 -> m ()
-insertGetTransactionsDB chainId = modify_ Proxy $
-  pure . GetTransactionsDB . S.insert chainId . unGetTransactionsDB
+insertGetTransactionsDB chainId = modifyPure_ $
+  GetTransactionsDB . S.insert chainId . unGetTransactionsDB
 
 clearGetTransactionsDB :: HasGetTransactionsDB m => m ()
-clearGetTransactionsDB = put (Proxy @GetTransactionsDB) emptyGetTransactionsDB
+clearGetTransactionsDB = put emptyGetTransactionsDB

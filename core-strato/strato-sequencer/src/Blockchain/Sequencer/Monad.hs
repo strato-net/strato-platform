@@ -70,8 +70,7 @@ import           Control.Concurrent.AlarmClock
 import           Control.Concurrent.STM.TMChan
 import           Control.Lens
 import           Control.Monad                             (join)
-import qualified Control.Monad.Change.Alter                as A
-import qualified Control.Monad.Change.Modify               as Mod
+import           Control.Monad.FT                          as FT
 import           Control.Monad.Reader
 import           Control.Monad.State
 
@@ -87,6 +86,7 @@ import           Data.IORef
 import           Data.Map                                  (Map)
 import qualified Data.Map                                  as M
 import           Data.Maybe
+import           Data.Proxy
 import qualified Data.Sequence                             as Q
 import qualified Data.Text                                 as T
 import           Data.Time.Clock
@@ -141,11 +141,11 @@ makeLenses ''SequencerContext
 
 type MonadBlockstanbul m = ( MonadIO m
                            , HasBlockstanbulContext m
-                           , Mod.Accessible (IORef RoundNumber) m
-                           , Mod.Accessible (TMChan RoundNumber) m
-                           , Mod.Accessible BlockPeriod m
-                           , Mod.Accessible RoundPeriod m
-                           , Mod.Accessible (TQueue VoteResult) m
+                           , Gettable (IORef RoundNumber) m
+                           , Gettable (TMChan RoundNumber) m
+                           , Gettable BlockPeriod m
+                           , Gettable RoundPeriod m
+                           , Gettable (TQueue VoteResult) m
                            , HasVault m
                            )
 
@@ -175,34 +175,38 @@ instance HasDependentBlockDB SequencerM where
   getWriteOptions     = LDB.WriteOptions . syncWrites <$> ask
   getReadOptions      = return LDB.defaultReadOptions
 
-instance Mod.Modifiable GetChainsDB SequencerM where
-  get _ = use getChainsDB
-  put _ g = modify' $ getChainsDB .~ g
+instance Gettable GetChainsDB SequencerM where
+  get = use getChainsDB
+instance Puttable GetChainsDB SequencerM where
+  put g = modify' $ getChainsDB .~ g
+instance Modifiable GetChainsDB SequencerM where
 
-instance Mod.Modifiable GetTransactionsDB SequencerM where
-  get _ = use getTransactionsDB
-  put _ g = modify' $ getTransactionsDB .~ g
+instance Gettable GetTransactionsDB SequencerM where
+  get   = use getTransactionsDB
+instance Puttable GetTransactionsDB SequencerM where
+  put g = modify' $ getTransactionsDB .~ g
+instance Modifiable GetTransactionsDB SequencerM where
 
 instance HasPrivateHashDB SequencerM where
   requestChain = insertGetChainsDB
   requestTransaction = insertGetTransactionsDB
 
-instance Mod.Accessible LDB.DB SequencerM where
-  access _ = use dependentBlockDB
+instance Gettable LDB.DB SequencerM where
+  get = use dependentBlockDB
 
 class HasNamespace a where
   type NSKey a
-  namespace :: Mod.Proxy a -> BL.ByteString
+  namespace :: Proxy a -> BL.ByteString
 
-  namespaced :: Mod.Proxy a -> NSKey a -> B.ByteString
-  default namespaced :: Binary (NSKey a) => Mod.Proxy a -> NSKey a -> B.ByteString
+  namespaced :: Proxy a -> NSKey a -> B.ByteString
+  default namespaced :: Binary (NSKey a) => Proxy a -> NSKey a -> B.ByteString
   namespaced p = BL.toStrict . BL.append (namespace p) . encode
 
-isInNamespace :: HasNamespace a => Mod.Proxy a -> BL.ByteString -> Bool
+isInNamespace :: HasNamespace a => Proxy a -> BL.ByteString -> Bool
 isInNamespace = BL.isPrefixOf . namespace
 
 fromNamespace :: (HasNamespace a, Binary (NSKey a))
-              => Mod.Proxy a -> BL.ByteString -> Maybe (NSKey a)
+              => Proxy a -> BL.ByteString -> Maybe (NSKey a)
 fromNamespace p bs = if isInNamespace p bs
   then Just . decode $ BL.drop (BL.length (namespace p)) bs
   else Nothing
@@ -227,31 +231,31 @@ instance HasNamespace ChainIdEntry where
   type NSKey ChainIdEntry = Word256
   namespace _ = "ci:"
 
-lookupInLDB :: (Binary a, HasNamespace a, MonadIO m, Mod.Accessible LDB.DB m)
-            => Mod.Proxy a -> NSKey a -> m (Maybe a)
-lookupInLDB p k = Mod.access Mod.Proxy >>= \db ->
+lookupInLDB :: (Binary a, HasNamespace a, MonadIO m, Gettable LDB.DB m)
+            => Proxy a -> NSKey a -> m (Maybe a)
+lookupInLDB p k = FT.get >>= \db ->
   fmap (decode . BL.fromStrict) <$> LDB.get db LDB.defaultReadOptions (namespaced p k)
 
-insertInLDB :: (Binary a, HasNamespace a, MonadIO m, Mod.Accessible LDB.DB m)
-            => Mod.Proxy a -> NSKey a -> a -> m ()
-insertInLDB p k v = Mod.access Mod.Proxy >>= \db ->
+insertInLDB :: (Binary a, HasNamespace a, MonadIO m, Gettable LDB.DB m)
+            => Proxy a -> NSKey a -> a -> m ()
+insertInLDB p k v = FT.get >>= \db ->
   LDB.put db LDB.defaultWriteOptions (namespaced p k) (BL.toStrict $ encode v)
 
-batchInsertInLDB :: (Binary a, HasNamespace a) => Mod.Proxy a -> NSKey a -> a -> LDB.BatchOp
+batchInsertInLDB :: (Binary a, HasNamespace a) => Proxy a -> NSKey a -> a -> LDB.BatchOp
 batchInsertInLDB p k v = LDB.Put (namespaced p k) (BL.toStrict $ encode v)
 
-deleteInLDB :: (HasNamespace a, MonadIO m, Mod.Accessible LDB.DB m)
-            => Mod.Proxy a -> NSKey a -> m ()
-deleteInLDB p k = Mod.access Mod.Proxy >>= \db ->
+deleteInLDB :: (HasNamespace a, MonadIO m, Gettable LDB.DB m)
+            => Proxy a -> NSKey a -> m ()
+deleteInLDB p k = FT.get >>= \db ->
   LDB.delete db LDB.defaultWriteOptions (namespaced p k)
 
 batchDeleteInLDB :: HasNamespace a
-                 => Mod.Proxy a -> NSKey a -> LDB.BatchOp
+                 => Proxy a -> NSKey a -> LDB.BatchOp
 batchDeleteInLDB p k = LDB.Del (namespaced p k)
 
 genericLookupSequencer :: (Ord (NSKey a), Binary a, HasNamespace a)
                        => Lens' SequencerContext (Map (NSKey a) (Modification a))
-                       -> Mod.Proxy a
+                       -> Proxy a
                        -> NSKey a
                        -> SequencerM (Maybe a)
 genericLookupSequencer registry p k = use (registry . at k) >>= \case
@@ -265,7 +269,7 @@ genericLookupSequencer registry p k = use (registry . at k) >>= \case
 
 genericInsertSequencer :: (Ord (NSKey a), Binary a, HasNamespace a)
                        => Lens' SequencerContext (Map (NSKey a) (Modification a))
-                       -> Mod.Proxy a
+                       -> Proxy a
                        -> NSKey a
                        -> a
                        -> SequencerM ()
@@ -275,119 +279,144 @@ genericInsertSequencer registry p k a = do
 
 genericDeleteSequencer :: (Ord (NSKey a), HasNamespace a)
                        => Lens' SequencerContext (Map (NSKey a) (Modification a))
-                       -> Mod.Proxy a
+                       -> Proxy a
                        -> NSKey a
                        -> SequencerM ()
 genericDeleteSequencer registry p k = do
   modify' $ registry . at k ?~ Deletion
   addLdbBatchOps . (:[]) $ batchDeleteInLDB p k
 
-instance (Keccak256 `A.Alters` OutputBlock) SequencerM where
-  lookup = genericLookupSequencer blockHashRegistry
-  insert p k v = do
-    genericInsertSequencer blockHashRegistry p k v
+instance Selectable OutputBlock Keccak256 SequencerM where
+  select = genericLookupSequencer blockHashRegistry Proxy
+instance Insertable OutputBlock Keccak256 SequencerM where
+  insert k v = do
+    genericInsertSequencer blockHashRegistry Proxy k v
     sz <- M.size <$> use blockHashRegistry
     liftIO $ withLabel blockHashRegistrySize "block_hash_registry" (flip setGauge (fromIntegral sz))
-  delete p k = do
-    genericDeleteSequencer blockHashRegistry p k
+instance Deletable  OutputBlock Keccak256 SequencerM where
+  delete k = do
+    genericDeleteSequencer blockHashRegistry Proxy k
     sz <- M.size <$> use blockHashRegistry
     liftIO $ withLabel blockHashRegistrySize "block_hash_registry" (flip setGauge (fromIntegral sz))
+instance Alterable  OutputBlock Keccak256 SequencerM where
 
-instance (Keccak256 `A.Alters` EmittedBlock) SequencerM where
-  lookup = genericLookupSequencer emittedBlockRegistry
-  insert p k v = do
-    genericInsertSequencer emittedBlockRegistry p k v
+instance Selectable EmittedBlock Keccak256 SequencerM where
+  select = genericLookupSequencer emittedBlockRegistry Proxy
+instance Insertable EmittedBlock Keccak256 SequencerM where
+  insert k v = do
+    genericInsertSequencer emittedBlockRegistry Proxy k v
     sz <- M.size <$> use emittedBlockRegistry
     liftIO $ withLabel emittedBlockRegistrySize "emitted_block_registry" (flip setGauge (fromIntegral sz))
-  delete p k = do
-    genericDeleteSequencer emittedBlockRegistry p k
+instance Deletable  EmittedBlock Keccak256 SequencerM where
+  delete k = do
+    genericDeleteSequencer emittedBlockRegistry Proxy k
     sz <- M.size <$> use emittedBlockRegistry
     liftIO $ withLabel emittedBlockRegistrySize "emitted_block_registry" (flip setGauge (fromIntegral sz))
+instance Alterable  EmittedBlock Keccak256 SequencerM where
 
-instance (Keccak256 `A.Alters` OutputTx) SequencerM where
-  lookup = genericLookupSequencer txHashRegistry
-  insert p k v = do
-    genericInsertSequencer txHashRegistry p k v
+instance Selectable OutputTx Keccak256 SequencerM where
+  select = genericLookupSequencer txHashRegistry Proxy
+instance Insertable OutputTx Keccak256 SequencerM where
+  insert k v = do
+    genericInsertSequencer txHashRegistry Proxy k v
     sz <- M.size <$> use txHashRegistry
     liftIO $ withLabel txHashRegistrySize "tx_hash_registry" (flip setGauge (fromIntegral sz))
-  delete p k = do
-    genericDeleteSequencer txHashRegistry p k
+instance Deletable  OutputTx Keccak256 SequencerM where
+  delete k = do
+    genericDeleteSequencer txHashRegistry Proxy k
     sz <- M.size <$> use txHashRegistry
     liftIO $ withLabel txHashRegistrySize "tx_hash_registry" (flip setGauge (fromIntegral sz))
+instance Alterable  OutputTx Keccak256 SequencerM where
 
-instance (Keccak256 `A.Alters` ChainHashEntry) SequencerM where
-  lookup = genericLookupSequencer chainHashRegistry
-  insert p k v = do
-    genericInsertSequencer chainHashRegistry p k v
+instance Selectable ChainHashEntry Keccak256 SequencerM where
+  select = genericLookupSequencer chainHashRegistry Proxy
+instance Insertable ChainHashEntry Keccak256 SequencerM where
+  insert k v = do
+    genericInsertSequencer chainHashRegistry Proxy k v
     sz <- M.size <$> use chainHashRegistry
     liftIO $ withLabel chainHashRegistrySize "chain_hash_registry" (flip setGauge (fromIntegral sz))
-  delete p k = do
-    genericDeleteSequencer chainHashRegistry p k
+instance Deletable  ChainHashEntry Keccak256 SequencerM where
+  delete k = do
+    genericDeleteSequencer chainHashRegistry Proxy k
     sz <- M.size <$> use chainHashRegistry
     liftIO $ withLabel chainHashRegistrySize "chain_hash_registry" (flip setGauge (fromIntegral sz))
+instance Alterable  ChainHashEntry Keccak256 SequencerM where
 
-instance (Word256 `A.Alters` ChainIdEntry) SequencerM where
-  lookup = genericLookupSequencer chainIdRegistry
-  insert p k v = do
-    genericInsertSequencer chainIdRegistry p k v
+instance Selectable ChainIdEntry Word256 SequencerM where
+  select = genericLookupSequencer chainIdRegistry Proxy
+instance Insertable ChainIdEntry Word256 SequencerM where
+  insert k v = do
+    genericInsertSequencer chainIdRegistry Proxy k v
     sz <- M.size <$> use chainIdRegistry
     liftIO $ withLabel chainIdRegistrySize "chain_id_registry" (flip setGauge (fromIntegral sz))
-  delete p k = do
-    genericDeleteSequencer chainIdRegistry p k
+instance Deletable  ChainIdEntry Word256 SequencerM where
+  delete k = do
+    genericDeleteSequencer chainIdRegistry Proxy k
     sz <- M.size <$> use chainIdRegistry
     liftIO $ withLabel chainIdRegistrySize "chain_id_registry" (flip setGauge (fromIntegral sz))
+instance Alterable  ChainIdEntry Word256 SequencerM where
 
-instance (Keccak256 `A.Alters` DependentBlockEntry) SequencerM where
-  lookup _ k = do
+instance Selectable DependentBlockEntry Keccak256 SequencerM where
+  select k = do
     mv <- use $ dbeRegistry . at k
     case mv of
       Just v -> return $ Just v
       Nothing -> genericLookupDependentBlockDB k
-  insert _ k v = do
+instance Insertable DependentBlockEntry Keccak256 SequencerM where
+  insert k v = do
     modify' $ dbeRegistry . at k ?~ v
     addLdbBatchOps . (:[]) $ genericBatchInsertDependentBlockDB k v
-  delete _ k = do
+instance Deletable  DependentBlockEntry Keccak256 SequencerM where
+  delete k = do
     modify' $ dbeRegistry . at k .~ Nothing
     addLdbBatchOps . (:[]) $ genericBatchDeleteDependentBlockDB k
+instance Alterable  DependentBlockEntry Keccak256 SequencerM where
 
-instance A.Selectable (Maybe Word256) ParentChainId SequencerM where
-  select _ = \case
+instance Selectable ParentChainId (Maybe Word256) SequencerM where
+  select = \case
     Nothing -> pure . Just $ ParentChainId Nothing
-    Just cId -> join . fmap (fmap (ParentChainId . parentChain . chainInfo) . _chainIdInfo) <$> A.lookup (A.Proxy @ChainIdEntry) cId
+    Just cId -> join . fmap (fmap (ParentChainId . parentChain . chainInfo) . _chainIdInfo) <$> select @ChainIdEntry cId
 
-instance Mod.Modifiable SeenTransactionDB SequencerM where
-  get _ = use seenTransactionDB
-  put _ = modify' . (.~) seenTransactionDB
+instance Gettable SeenTransactionDB SequencerM where
+  get = use seenTransactionDB
+instance Puttable SeenTransactionDB SequencerM where
+  put = modify' . (.~) seenTransactionDB
+instance Modifiable SeenTransactionDB SequencerM where
 
-instance Mod.Modifiable (Q.Seq LDB.BatchOp) SequencerM where
-  get _ = use ldbBatchOps
-  put _ = modify' . (.~) ldbBatchOps
+instance Gettable (Q.Seq LDB.BatchOp) SequencerM where
+  get = use ldbBatchOps
+instance Puttable (Q.Seq LDB.BatchOp) SequencerM where
+  put = modify' . (.~) ldbBatchOps
+instance Modifiable (Q.Seq LDB.BatchOp) SequencerM where
 
-instance Mod.Accessible (IORef RoundNumber) SequencerM where
-  access _ = use latestRoundNumber
+instance Gettable (IORef RoundNumber) SequencerM where
+  get = use latestRoundNumber
 
-instance Mod.Accessible (TMChan RoundNumber) SequencerM where
-  access _ = asks blockstanbulTimeouts
+instance Gettable (TMChan RoundNumber) SequencerM where
+  get = asks blockstanbulTimeouts
 
-instance Mod.Accessible BlockPeriod SequencerM where
-  access _ = asks blockstanbulBlockPeriod
+instance Gettable BlockPeriod SequencerM where
+  get = asks blockstanbulBlockPeriod
 
-instance Mod.Accessible RoundPeriod SequencerM where
-  access _ = asks blockstanbulRoundPeriod
+instance Gettable RoundPeriod SequencerM where
+  get = asks blockstanbulRoundPeriod
 
-instance Mod.Accessible (TQueue CandidateReceived) SequencerM where
-  access _ = asks blockstanbulBeneficiary
+instance Gettable (TQueue CandidateReceived) SequencerM where
+  get = asks blockstanbulBeneficiary
 
-instance Mod.Accessible (TQueue VoteResult) SequencerM where
-  access _ = asks blockstanbulVoteResps
+instance Gettable (TQueue VoteResult) SequencerM where
+  get = asks blockstanbulVoteResps
 
-instance Mod.Accessible View SequencerM where
-  access _ = currentView
+instance Gettable View SequencerM where
+  get = currentView
 
-instance (Keccak256 `A.Alters` ()) SequencerM where
-  lookup _ = genericLookupSeenTransactionDB
-  insert _ = genericInsertSeenTransactionDB
-  delete _ = genericDeleteSeenTransactionDB
+instance Selectable () Keccak256 SequencerM where
+  select = genericLookupSeenTransactionDB
+instance Insertable () Keccak256 SequencerM where
+  insert = genericInsertSeenTransactionDB
+instance Deletable  () Keccak256 SequencerM where
+  delete = genericDeleteSeenTransactionDB
+instance Alterable  () Keccak256 SequencerM where
 
 instance HasBlockstanbulContext SequencerM where
   getBlockstanbulContext = use blockstanbulContext
@@ -471,21 +500,21 @@ clearDBERegistry :: SequencerM ()
 clearDBERegistry = modify' $ dbeRegistry .~ M.empty
 
 createFirstTimer :: ( MonadBlockstanbul m
-                    , Mod.Accessible View m
+                    , Gettable View m
                     )
                  => m ()
 createFirstTimer = do
-  v <- Mod.access (Mod.Proxy @View)
+  v <- FT.get
   createNewTimer . _round $ v
 
 createNewTimer :: MonadBlockstanbul m
                => RoundNumber
                -> m ()
 createNewTimer rn = do
-  rnref <- Mod.access (Mod.Proxy @(IORef RoundNumber))
+  rnref <- FT.get @(IORef RoundNumber)
   liftIO $ atomicModifyIORef' rnref (\x -> (max rn x, ()))
-  ch <- Mod.access (Mod.Proxy @(TMChan RoundNumber))
-  dt <- unRoundPeriod <$> Mod.access (Mod.Proxy @(RoundPeriod))
+  ch <- FT.get @(TMChan RoundNumber)
+  dt <- unRoundPeriod <$> FT.get @(RoundPeriod)
   let act :: AlarmClock UTCTime -> IO ()
       act this' = do
         atomically $ writeTMChan ch rn
@@ -513,8 +542,8 @@ drainTimeouts = join $ asks (atomically . drainTMChan . blockstanbulTimeouts)
 drainVotes :: SequencerM [CandidateReceived]
 drainVotes = atomically . flushTQueue =<< asks blockstanbulBeneficiary
 
-clearLdbBatchOps :: Mod.Modifiable (Q.Seq LDB.BatchOp) m => m ()
-clearLdbBatchOps = Mod.put (Mod.Proxy @(Q.Seq LDB.BatchOp)) Q.empty
+clearLdbBatchOps :: Puttable (Q.Seq LDB.BatchOp) m => m ()
+clearLdbBatchOps = FT.put @(Q.Seq LDB.BatchOp) Q.empty
 
 flushLdbBatchOps :: SequencerM ()
 flushLdbBatchOps = do
@@ -525,9 +554,9 @@ flushLdbBatchOps = do
   $logInfoS "flushLdbBatchOps" "Applied pending LDB writes"
   clearLdbBatchOps
 
-addLdbBatchOps :: Mod.Modifiable (Q.Seq LDB.BatchOp) m => [LDB.BatchOp] -> m ()
-addLdbBatchOps ops = Mod.modify_ (Mod.Proxy @(Q.Seq LDB.BatchOp)) $ \existingOps ->
-  pure $ foldl' (Q.|>) existingOps ops
+addLdbBatchOps :: Modifiable (Q.Seq LDB.BatchOp) m => [LDB.BatchOp] -> m ()
+addLdbBatchOps ops = modifyPure_ @(Q.Seq LDB.BatchOp) $ \existingOps ->
+  foldl' (Q.|>) existingOps ops
 
 fuseChannels ::SequencerM (ConduitM () SeqLoopEvent SequencerM ())
 fuseChannels = do

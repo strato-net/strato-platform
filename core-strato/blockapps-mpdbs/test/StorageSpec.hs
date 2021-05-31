@@ -14,7 +14,7 @@ module StorageSpec (storageSpec) where
 
 import Control.Lens
 import Control.Monad
-import Control.Monad.Change.Alter
+import Control.Monad.FT
 import Control.Monad.Trans.State
 import Control.Monad.Trans.Resource
 import qualified Data.ByteString as B
@@ -62,13 +62,13 @@ makeLenses ''CachedStorage
 
 type StorM = StateT CachedStorage (ResourceT (LoggingT IO))
 
-instance (Maybe Word256 `Alters` ParentChainId) StorM where
-  lookup _ k    = use $ parentChainMap . at k
-  insert _ k v  = parentChainMap . at k ?= v
-  delete _ k    = parentChainMap . at k .= Nothing
-
-instance Selectable (Maybe Word256) ParentChainId StorM where
-  select = lookup
+instance Selectable ParentChainId (Maybe Word256) StorM where
+  select k    = use $ parentChainMap . at k
+instance Insertable ParentChainId (Maybe Word256) StorM where
+  insert k v  = parentChainMap . at k ?= v
+instance Deletable  ParentChainId (Maybe Word256) StorM where
+  delete k    = parentChainMap . at k .= Nothing
+instance Alterable  ParentChainId (Maybe Word256) StorM where
 
 instance HasMemRawStorageDB StorM where
   getMemRawStorageTxDB = use stx
@@ -82,31 +82,46 @@ instance HasMemAddressStateDB StorM where
   getAddressStateBlockDBMap = use abs
   putAddressStateBlockDBMap = assign abs
 
-instance (Account `Alters` AddressState) StorM where
-  lookup _ = getAddressStateMaybe
-  insert _ = putAddressState
-  delete _ = deleteAddressState
+instance Selectable AddressState Account StorM where
+  select = getAddressStateMaybe
+instance Insertable AddressState Account StorM where
+  insert = putAddressState
+instance Deletable  AddressState Account StorM where
+  delete = deleteAddressState
+instance Alterable  AddressState Account StorM where
 
-instance (MP.StateRoot `Alters` MP.NodeData) StorM where
-  lookup _ = MP.genericLookupDB $ use sdb
-  insert _ = MP.genericInsertDB $ use sdb
-  delete _ = MP.genericDeleteDB $ use sdb
+instance Selectable MP.NodeData MP.StateRoot StorM where
+  select = MP.genericLookupDB $ use sdb
+instance Insertable MP.NodeData MP.StateRoot StorM where
+  insert = MP.genericInsertDB $ use sdb
+instance Deletable  MP.NodeData MP.StateRoot StorM where
+  delete = MP.genericDeleteDB $ use sdb
+instance Alterable  MP.NodeData MP.StateRoot StorM where
 
-instance (N.NibbleString `Alters` N.NibbleString) StorM where
-  lookup _ = genericLookupHashDB $ use hdb
-  insert _ = genericInsertHashDB $ use hdb
-  delete _ = genericDeleteHashDB $ use hdb
+instance Selectable N.NibbleString N.NibbleString StorM where
+  select = genericLookupHashDB $ use hdb
+instance Insertable N.NibbleString N.NibbleString StorM where
+  insert = genericInsertHashDB $ use hdb
+instance Deletable  N.NibbleString N.NibbleString StorM where
+  delete = genericDeleteHashDB $ use hdb
+instance Alterable  N.NibbleString N.NibbleString StorM where
 
-instance (RawStorageKey `Alters` RawStorageValue) StorM where
-  lookup _ = genericLookupRawStorageDB
-  insert _ = genericInsertRawStorageDB
-  delete _ = genericDeleteRawStorageDB
-  lookupWithDefault _ = genericLookupWithDefaultRawStorageDB
+instance Selectable RawStorageValue RawStorageKey StorM where
+  select = genericLookupRawStorageDB
+  selectWithFallback = genericLookupWithFallbackRawStorageDB
+instance Insertable RawStorageValue RawStorageKey StorM where
+  insert = genericInsertRawStorageDB
+instance Deletable  RawStorageValue RawStorageKey StorM where
+  delete = genericDeleteRawStorageDB
+instance Alterable  RawStorageValue RawStorageKey StorM where
 
-instance (Maybe Word256 `Alters` MP.StateRoot) StorM where
-  lookup _ k = use $ srm . at k
-  insert _ k v = srm . at k ?= v
-  delete _ k = srm . at k .= Nothing
+instance Selectable MP.StateRoot (Maybe Word256) StorM where
+  select k = use $ srm . at k
+instance Insertable MP.StateRoot (Maybe Word256) StorM where
+  insert k v = srm . at k ?= v
+instance Deletable  MP.StateRoot (Maybe Word256) StorM where
+  delete k = srm . at k .= Nothing
+instance Alterable  MP.StateRoot (Maybe Word256) StorM where
 
 initialEnv :: IO (FilePath, CachedStorage)
 initialEnv = do
@@ -175,19 +190,19 @@ storageSpec = do
                             ]
 
     it "put 0 should not change the state root" . runStorM $ do
-      want <- addressStateContractRoot <$> lookupWithDefault Proxy (Account 0x1234 Nothing)
+      want <- addressStateContractRoot <$> selectWithDefault (Account 0x1234 Nothing)
       want `shouldBe` "V\232\US\ETB\ESC\204U\166\255\131E\230\146\192\248n[H\224\ESC\153l\173\192\SOHb/\181\227c\180!"
       putStorageKeyVal'' 0x1234 0x3 0x0
       flushMemStorageDB
-      got <- addressStateContractRoot <$> lookupWithDefault Proxy (Account 0x1234 Nothing)
+      got <- addressStateContractRoot <$> selectWithDefault (Account 0x1234 Nothing)
       want `shouldBe` got
 
 
     it "put 1 should change the state root" . runStorM $ do
-      want <- addressStateContractRoot <$> lookupWithDefault Proxy (Account 0x1234 Nothing)
+      want <- addressStateContractRoot <$> selectWithDefault (Account 0x1234 Nothing)
       putStorageKeyVal'' 0x1234 0x3 0x44
       flushMemStorageDB
-      got <- addressStateContractRoot <$> lookupWithDefault Proxy (Account 0x1234 Nothing)
+      got <- addressStateContractRoot <$> selectWithDefault (Account 0x1234 Nothing)
       want `shouldNotBe` got
       got `shouldBe` "E\RS\164\USe\177\214\249m\186\SI\248\136\\\215\137\172\231\135q\224;\178TWg\SUB\147n\134. "
 
@@ -208,60 +223,60 @@ storageSpec = do
   describe "resolveCodePtr" $ do
     it "should resolve direct code pointers" . runStorM $ do
       let chainRelationships = [(Just (0 :: Word256), ParentChainId $ Nothing)]
-      insertMany (Proxy @ParentChainId) $ M.fromList chainRelationships
+      insertMany @ParentChainId chainRelationships
       let accts = [Account 0xabc (Just 0)
                   , Account 0xdef (Just 0)]
       let codePtrs = [SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0x123
                       , EVMCode $ unsafeCreateKeccak256FromWord256 0x456]
-      insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState{addressStateCodeHash = cp}) codePtrs
+      insertMany @AddressState $ zip accts $ map (\cp -> blankAddressState{addressStateCodeHash = cp}) codePtrs
       resolveCodePtr (Just 0) (codePtrs !! 0) `shouldReturn` Just (codePtrs !! 0)
       resolveCodePtr (Just 0) (codePtrs !! 1) `shouldReturn` Just (codePtrs !! 1)
     it "should resolve an ancestor code pointer" . runStorM $ do
       let chainRelationships = [ (Just (0 :: Word256), ParentChainId $ Nothing)
                                 ,(Just (1 :: Word256), ParentChainId $ Just 0)
                                 ]
-      insertMany (Proxy @ParentChainId) $ M.fromList chainRelationships
+      insertMany @ParentChainId chainRelationships
       let accts = [ Account 0xabc (Just 0)
                   , Account 0xdef (Just 1)
                   ]
       let codePtrs = [ SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0x123
                       , CodeAtAccount (accts !! 0) "Ptr_0"
                       ]
-      insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState{addressStateCodeHash = cp}) codePtrs
+      insertMany @AddressState $ zip accts $ map (\cp -> blankAddressState{addressStateCodeHash = cp}) codePtrs
       resolveCodePtr (Just 1) (codePtrs !! 1) `shouldReturn` Just (SolidVMCode "Ptr_0" $ unsafeCreateKeccak256FromWord256 0x123)
     it "should resolve child-chain code pointers to Nothing" . runStorM $ do
       let chainRelationships = [ (Just (0 :: Word256), ParentChainId $ Nothing)
                                 ,(Just (1 :: Word256), ParentChainId $ Just 0)
                                 ]
-      insertMany (Proxy @ParentChainId) $ M.fromList chainRelationships
+      insertMany @ParentChainId chainRelationships
       let accts = [ Account 0xabc (Just 0)
                   , Account 0xdef (Just 1)
                   ]
       let codePtrs = [CodeAtAccount (accts !! 1) "Ptr_0"
                       , SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0x123
                       ]
-      insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState{addressStateCodeHash = cp}) codePtrs
+      insertMany @AddressState $ zip accts $ map (\cp -> blankAddressState{addressStateCodeHash = cp}) codePtrs
       resolveCodePtr (Just 0) (codePtrs !! 0) `shouldReturn` Nothing
     it "should resolve sibling-chain code pointers to Nothing" . runStorM $ do
       let chainRelationships = [ (Just (0 :: Word256), ParentChainId $ Nothing)
                                 , (Just (1 :: Word256), ParentChainId $ Just 0)
                                 , (Just (2 :: Word256), ParentChainId $ Just 0)
                                 ]
-      insertMany (Proxy @ParentChainId) $ M.fromList chainRelationships
+      insertMany @ParentChainId chainRelationships
       let accts = [ Account 0xabc (Just 1)
                   , Account 0xdef (Just 2)
                   ]
       let codePtrs = [ SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0x123
                       , CodeAtAccount (accts !! 0) "Ptr_0"
                       ]
-      insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState{addressStateCodeHash = cp}) codePtrs
+      insertMany @AddressState $ zip accts $ map (\cp -> blankAddressState{addressStateCodeHash = cp}) codePtrs
       resolveCodePtr (Just 2) (codePtrs !! 1) `shouldReturn` Nothing
     it "should resolve two-level (pointer to parent, parent to child) code pointer indirection to Nothing" . runStorM $ do
       let chainRelationships = [ (Just (0 :: Word256), ParentChainId $ Nothing)
                                , (Just (1 :: Word256), ParentChainId $ Just 0)
                                , (Just (2 :: Word256), ParentChainId $ Just 0)
                                ]
-      insertMany (Proxy @ParentChainId) $ M.fromList chainRelationships
+      insertMany @ParentChainId chainRelationships
       let accts = [ Account 0xabc (Just 1)
                   , Account 0xdef (Just 0)
                   , Account 0xfff (Just 2)
@@ -269,5 +284,5 @@ storageSpec = do
       let codePtrs = [SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0x123
                       , CodeAtAccount (accts !! 0) "Ptr_0"
                       , CodeAtAccount (accts !! 1) "Ptr_1"]
-      insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState{addressStateCodeHash = cp}) codePtrs
+      insertMany @AddressState $ zip accts $ map (\cp -> blankAddressState{addressStateCodeHash = cp}) codePtrs
       resolveCodePtr (Just 2) (codePtrs !! 2) `shouldReturn` Nothing

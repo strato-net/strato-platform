@@ -13,7 +13,7 @@ module Blockchain.VM.TestEthereum
 
 import           Control.Lens ((^.))
 import           Control.Monad
-import qualified Control.Monad.Change.Alter                  as A
+import           Control.Monad.FT
 import           Control.Monad.IO.Class
 import           Blockchain.Output
 import           Control.Monad.Reader
@@ -81,7 +81,7 @@ populateAndConvertAddressState owner addressState' = do
   forM_ (M.toList $ storage' addressState') $
     \(key, val) -> putStorageKeyVal' owner (fromIntegral key) (fromIntegral val)
 
-  addressState <- A.lookupWithDefault (A.Proxy @AddressState) owner
+  addressState <- selectWithDefault @AddressState owner
 
   return $
     AddressState

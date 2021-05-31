@@ -18,9 +18,9 @@ module Blockchain.CommunicationConduit
     , mkEthP2PEventConduit
     ) where
 
-import qualified Control.Monad.Change.Modify           as Mod
+import           Control.Monad                         (forever, void, when)
+import           Control.Monad.FT
 import           Control.Monad.IO.Unlift
-import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import           Crypto.Types.PubKey.ECC
 import           Data.Bits                             (shiftL)
@@ -157,8 +157,8 @@ handleMsgClientConduit myId peer = do
     $logDebugS "handleMsgClientConduit" $ T.pack $ "about to parse message"
     awaitMsg >>= \case
         Just Hello{} ->
-            yield =<< lift (Mod.get (Mod.Proxy @BestBlock) >>= \(BestBlock bHash _ tdiff) -> do
-              (GenesisBlockHash genHash) <- Mod.access (Mod.Proxy @GenesisBlockHash)
+            yield =<< lift (get @BestBlock >>= \(BestBlock bHash _ tdiff) -> do
+              (GenesisBlockHash genHash) <- get @GenesisBlockHash
               return $ Right Status {
                 protocolVersion = fromIntegral ethVersion,
                 networkID       = computeNetworkID,
@@ -169,13 +169,13 @@ handleMsgClientConduit myId peer = do
         other -> assertHandshake other
     awaitMsg >>= \case
         Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash, networkID=networkID'} -> do
-                (GenesisBlockHash genHash) <- lift $ Mod.access (Mod.Proxy @GenesisBlockHash)
+                (GenesisBlockHash genHash) <- lift $ get @GenesisBlockHash
                 when (peerGH /= genHash) $ throwIO WrongGenesisBlock
                 when (networkID' /= computeNetworkID) $ error "networkID mismatch"
                 -- we set to 0 cause we dont necessarily know the number yet
-                lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
-                (BestBlockNumber lastBlockNumber) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
-                mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
+                lift . put @WorldBestBlock . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
+                (BestBlockNumber lastBlockNumber) <- lift $ get @BestBlockNumber
+                mrh <- lift $ unMaxReturnedHeaders <$> get @MaxReturnedHeaders
                 yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
                 yield . Right $ GetChainDetails []
                 handleGetChainDetails peer S.empty
@@ -204,12 +204,12 @@ handleMsgServerConduit myPubkey peer = do
     awaitMsg >>= \case
         Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash, networkID=networkID'} -> do
             $logInfoS "serverHandshake/Status{}" "received status"
-            yield =<< lift (Mod.get (Mod.Proxy @BestBlock) >>= \(BestBlock bHash _ tdiff) -> do
-              (GenesisBlockHash genHash) <- Mod.access (Mod.Proxy @GenesisBlockHash)
+            yield =<< lift (get @BestBlock >>= \(BestBlock bHash _ tdiff) -> do
+              (GenesisBlockHash genHash) <- get @GenesisBlockHash
               when (genHash /= peerGH) $ error "peer has a different genesis block than we do!"
               when (networkID' /= computeNetworkID) $ error "networkID mismatch"
               -- we set to 0 cause we dont necessarily know the number yet
-              Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
+              put @WorldBestBlock . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
               return $ Right Status {
                   protocolVersion = fromIntegral ethVersion,
                   networkID = computeNetworkID,

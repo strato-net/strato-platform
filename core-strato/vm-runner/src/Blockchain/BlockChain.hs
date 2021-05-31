@@ -5,6 +5,7 @@
 {-# LANGUAGE NamedFieldPuns        #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeOperators         #-}
@@ -27,8 +28,7 @@ import           Conduit
 import           Control.Arrow                           ((&&&))
 import           Control.Lens.Operators
 import           Control.Monad
-import qualified Control.Monad.Change.Alter              as A
-import qualified Control.Monad.Change.Modify             as Mod
+import           Control.Monad.FT
 import qualified Control.Monad.State                     as State
 import           Control.Monad.Trans.Except
 import           Data.Bifunctor                          (bimap)
@@ -37,10 +37,9 @@ import qualified Data.ByteString.Short                   as BSS
 import qualified Data.DList                              as DL
 import           Data.Either.Extra
 import           Data.Foldable                           (traverse_)
-import           Data.List
+import           Data.List                               hiding (insert, delete)
 import qualified Data.Map                                as M
 import           Data.Maybe
-import           Data.Proxy
 import qualified Data.Set                                as S
 import qualified Data.Text                               as T
 import           Data.Time.Clock
@@ -104,23 +103,19 @@ import           Text.Format
 import           Text.ShortDescription
 import           Text.Tools
 
-instance (Monad m, Mod.Accessible a m) => Mod.Accessible a (ConduitT i o m) where
-  access = lift . Mod.access
+instance Gettable a m => Gettable a (ConduitT i o m) where
+  get = lift get
+instance Puttable a m => Puttable a (ConduitT i o m) where
+  put = lift . put
+instance Modifiable a m => Modifiable a (ConduitT i o m) where
 
-instance Mod.Modifiable a m => Mod.Modifiable a (ConduitT i o m) where
-  get   = lift . Mod.get
-  put p = lift . Mod.put p
-
-instance A.Selectable k v m => A.Selectable k v (ConduitT i o m) where
-  select            p k  = lift $ A.select p k
-  selectMany        p ks = lift $ A.selectMany p ks
-  selectWithDefault p k  = lift $ A.selectWithDefault p k
-
-instance (k `A.Alters` v) m => (k `A.Alters` v) (ConduitT i o m) where
-  lookup p k   = lift $ A.lookup p k
-  insert p k v = lift $ A.insert p k v
-  delete p k   = lift $ A.delete p k
-  lookupWithDefault p k = lift $ A.lookupWithDefault p k
+instance Selectable v k m => Selectable v k (ConduitT i o m) where
+  select k   = lift $ select k
+instance Insertable v k m => Insertable v k (ConduitT i o m) where
+  insert k v = lift $ insert k v
+instance Deletable  v k m => Deletable  v k (ConduitT i o m) where
+  delete k   = lift $ delete @v k
+instance Alterable  v k m => Alterable  v k (ConduitT i o m) where
 
 instance (Monad m, HasMemAddressStateDB m) => HasMemAddressStateDB (ConduitT i o m) where
   getAddressStateTxDBMap    = lift getAddressStateTxDBMap
@@ -143,13 +138,13 @@ instance Bagger.MonadBagger ContextM where
     putBaggerState s = contextModify $ baggerState .~ s
 
     runFromStateRoot remainingGas theBlockHeader txs = do
-        A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256) (blockDataStateRoot theBlockHeader)
+        insert @MP.StateRoot (Nothing :: Maybe Word256) (blockDataStateRoot theBlockHeader)
         (TxMiningResult res ranTxs unranTxs newGas) <-
           timeit "mineTransactions bagger" (Just vmBlockInsertionMined)
           $ mineTransactions' theBlockHeader remainingGas DL.empty txs
         timeit "flushMemStorageDB bagger" (Just vmBlockInsertionMined) flushMemStorageDB
         timeit "flushMemAddressStateDB bagger" (Just vmBlockInsertionMined) flushMemAddressStateDB
-        newStateRoot <- A.lookupWithDefault (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
+        newStateRoot <- selectWithDefault @MP.StateRoot (Nothing :: Maybe Word256)
         let recoverable f = Left (RecoverableFailure (tfToBaggerTxRejection f) ranTxs unranTxs newStateRoot newGas)
         return $ case res of -- currently only get GasLimit errors out of mineTransactions'
             Nothing -> Right (newStateRoot, ranTxs, newGas)
@@ -168,7 +163,7 @@ instance Bagger.MonadBagger ContextM where
             return ()
         flushMemStorageDB
         flushMemAddressStateDB
-        A.lookupWithDefault (Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
+        selectWithDefault @MP.StateRoot (Nothing :: Maybe Word256)
 
     -- todo batch insert results
     txsDroppedCallback rejections bestBlockShas = forM_ rejections $ \rejection -> do
@@ -309,7 +304,7 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
       ++ ", " ++ show (length otxs)
       ++ "TXs)."
     when flags_debug $ do
-      bhr <- Mod.get (Proxy @BlockHashRoot)
+      bhr <- get @BlockHashRoot
       $logDebugS "addBlock" $ T.pack $ "Old blockhash root: " ++ format bhr
       mcr <- getChainRoot $ blockHash b
       case mcr of
@@ -319,7 +314,7 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
     putBlockHeaderInChainDB bd
 
     when flags_debug $ do
-      bhr' <- Mod.get (Proxy @BlockHashRoot)
+      bhr' <- get @BlockHashRoot
       $logDebugS "addBlock" $ T.pack $ "New blockhash root after inserting header: " ++ format bhr'
       mcr' <- getChainRoot $ blockHash b
       case mcr' of
@@ -343,7 +338,7 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
         Just  _ -> lift $ P.incCounter vmBlocksInvalid -- error err -- todo: i dont think we ACTUALLY need to error here
 
     when flags_debug $ do
-      bhr'' <- Mod.get (Proxy @BlockHashRoot)
+      bhr'' <- get @BlockHashRoot
       $logDebugS "addBlock" $ T.pack $ "New blockhash root after running block: " ++ format bhr''
       mcr'' <- getChainRoot $ blockHash b
       case mcr'' of
@@ -456,7 +451,7 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=b
     
     (acctBalance, acctNonce) <- lift $
       (addressStateBalance &&& addressStateNonce) <$>
-        A.lookupWithDefault (Proxy @AddressState) tAcct
+        selectWithDefault @AddressState tAcct
    
     when (chainId /= txChainId bt) $ throwE $ TFChainIdMismatch chainId (txChainId bt) t
     when (txCost > acctBalance) $ throwE $ TFInsufficientFunds txCost acctBalance t
@@ -492,14 +487,14 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=b
                     when flags_debug $ $logDebugS "addTx" . T.pack $ "Removing accounts in suicideList: " ++ intercalate ", " (show . pretty <$> S.toList (erSuicideList execResults))
                     forM_ (S.toList $ erSuicideList execResults) $ \address' -> do
                         lift $ purgeStorageMap address'
-                        lift $ A.delete (Proxy @AddressState) address'
+                        lift $ delete @AddressState address'
                     lift $ P.incCounter vmTxsSuccessful
             return execResults
         else do
             s1 <- lift $ addToBalance coinbaseAcct (fromIntegral intrinsicGas' * transactionGasPrice bt)
             unless s1 $ error "addToBalance failed even after a check in addTransaction"
             balance <- lift $ addressStateBalance <$>
-              A.lookupWithDefault (Proxy @AddressState) tAcct
+              selectWithDefault @AddressState tAcct
             $logInfoS "addTransaction/success=false" . T.pack $ "Insufficient funds to run the VM: need " ++ show (availableGas*transactionGasPrice bt) ++ ", have " ++ show balance
             return $
               evmErrorResults (transactionGasLimit bt) Blockchain.VM.VMException.InsufficientFunds
@@ -525,7 +520,7 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAcct OutputTx{
                          return $ evmErrorResults (toInteger ag) (UnsupportedVM vmName)
 
   --TODO- The new address state should be created in the VM itself....  Currently the EVM doesn't do this (and could be cleaned up by doing so), SolidVM does do this.  I will calculate this value here, but then ignore the value in SolidVM (and recalculate it there).  Eventually this should be moved into the EVM also
-  nonce <- lift $ addressStateNonce <$> A.lookupWithDefault (Proxy @AddressState) tAcct
+  nonce <- lift $ addressStateNonce <$> selectWithDefault @AddressState tAcct
   let newAddress = getNewAddress_unsafe (tAcct ^. accountAddress) (nonce-1) --nonce has already been incremented, so subtract 1 here to get the proper value (this is directly specified in the yellowpaper)
       newAccount = Account newAddress (txChainId ut)
 
@@ -550,7 +545,7 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAcct o@OutputT
 
   let owner = Account (transactionTo ut) (txChainId ut)
 
-  codeHash <- lift $ addressStateCodeHash <$> A.lookupWithDefault (Proxy @AddressState) owner
+  codeHash <- lift $ addressStateCodeHash <$> selectWithDefault @AddressState owner
   resolvedCodeHash <- lift $ resolveCodePtr (owner ^. accountChainId) codeHash
 
   let eCall =
@@ -812,9 +807,9 @@ compactDiffs base (p:ps) = go (cost p) (promote base p) ps
 completeDiff :: ( MonadLogger m
                 , HasCodeDB m
                 , HasHashDB m
-                , Mod.Modifiable BestBlockRoot m
-                , (MP.StateRoot `A.Alters` MP.NodeData) m
-                , (Account `A.Alters` AddressState) m
+                , Modifiable BestBlockRoot m
+                , (MP.StateRoot `Alters` MP.NodeData) m
+                , (Account `Alters` AddressState) m
                 )
              => ToDiff -> m SD.StateDiff
 completeDiff (src, dst, hsh, num) = do

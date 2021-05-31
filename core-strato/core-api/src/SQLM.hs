@@ -13,7 +13,7 @@ module SQLM where
 
 import           Blockchain.DB.SQLDB
 import           Blockchain.Output
-import qualified Control.Monad.Change.Modify as Mod
+import           Control.Monad.FT
 import           Control.Monad.Trans.Reader
 import qualified Data.ByteString.Lazy.Char8  as BLC
 import qualified Data.Text                   as T
@@ -24,8 +24,8 @@ import           UnliftIO
 
 type SQLM = ReaderT SQLDB (LoggingT IO)
 
-instance Mod.Accessible SQLDB SQLM where
-  access _ = ask
+instance Gettable SQLDB SQLM where
+  get = ask
 
 runSQLM :: ConnectionPool -> SQLM a -> IO a
 runSQLM pool = runLoggingT . flip runReaderT (SQLDB pool)

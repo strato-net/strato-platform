@@ -15,7 +15,7 @@ module Blockchain.DB.RawStorageDB
   , genericLookupRawStorageDB
   , genericInsertRawStorageDB
   , genericDeleteRawStorageDB
-  , genericLookupWithDefaultRawStorageDB
+  , genericLookupWithFallbackRawStorageDB
   , putRawStorageKeyVal'
   , getRawStorageKeyVal'
   , getAllRawStorageKeyVals'
@@ -24,13 +24,13 @@ module Blockchain.DB.RawStorageDB
   ) where
 
 import           Control.Arrow                               ((***))
-import qualified Control.Monad.Change.Alter                  as A
+import           Control.Monad.FT
 import           Control.Monad.Loops
 import           Control.Monad.State
 import           Data.ByteString                             (ByteString)
 import           Data.Default
 import           Data.Foldable                               (for_)
-import           Data.List
+import           Data.List                                   hiding (insert)
 import           Data.Map                                    (Map)
 import qualified Data.Map                                    as M
 import           Data.Traversable                            (for)
@@ -53,7 +53,7 @@ instance Default ByteString where
 
 type RawStorageKey = (Account, ByteString)
 type RawStorageValue = ByteString
-type HasRawStorageDB m = (RawStorageKey `A.Alters` RawStorageValue) m
+type HasRawStorageDB m = (RawStorageKey `Alters` RawStorageValue) m
 
 class Monad m => HasMemRawStorageDB m where
   getMemRawStorageTxDB     :: m (M.Map RawStorageKey RawStorageValue)
@@ -66,7 +66,7 @@ type FullRawStorage m = ( HasMemAddressStateDB m
                         , HasMemRawStorageDB m
                         , HasStateDB m
                         , HasHashDB m
-                        , (Account `A.Alters` AddressState) m
+                        , (Account `Alters` AddressState) m
                         )
 
 putRawStorageKeyVal' :: HasRawStorageDB m => RawStorageKey -> RawStorageValue -> m ()
@@ -81,14 +81,14 @@ getAllRawStorageKeyVals' = getAllRawStorageKeyValsMC
 --The following are the memory cache versions of the functions
 
 putRawStorageKeyValMC :: HasRawStorageDB m => RawStorageKey -> RawStorageValue -> m ()
-putRawStorageKeyValMC = A.insert (A.Proxy @RawStorageValue)
+putRawStorageKeyValMC = insert
 
 getRawStorageKeyValMC :: HasRawStorageDB m => RawStorageKey -> m RawStorageValue
-getRawStorageKeyValMC key = A.lookupWithDefault (A.Proxy @RawStorageValue) key
+getRawStorageKeyValMC key = selectWithDefault key
 
 genericLookupRawStorageDB :: ( HasMemRawStorageDB m
-                             , (Account `A.Alters` AddressState) m
-                             , (MP.StateRoot `A.Alters` MP.NodeData) m
+                             , (Account `Alters` AddressState) m
+                             , (MP.StateRoot `Alters` MP.NodeData) m
                              )
                           => RawStorageKey
                           -> m (Maybe RawStorageValue)
@@ -106,14 +106,15 @@ genericLookupRawStorageDB key = do
          for_ mVal $ \v -> putMemRawStorageTxMap $ M.insert key v theMap
          return mVal
 
-genericLookupWithDefaultRawStorageDB
+genericLookupWithFallbackRawStorageDB
   :: ( HasMemRawStorageDB m
-     , (Account `A.Alters` AddressState) m
-     , (MP.StateRoot `A.Alters` MP.NodeData) m
+     , (Account `Alters` AddressState) m
+     , (MP.StateRoot `Alters` MP.NodeData) m
      )
-  => RawStorageKey
+  => RawStorageValue
+  -> RawStorageKey
   -> m RawStorageValue
-genericLookupWithDefaultRawStorageDB key = do
+genericLookupWithFallbackRawStorageDB fallback key = do
   theMap <- getMemRawStorageTxDB
   case M.lookup key theMap of
    Just val -> return val
@@ -122,7 +123,7 @@ genericLookupWithDefaultRawStorageDB key = do
      case M.lookup key theBMap of
        Just val' -> return val'
        Nothing -> do
-         v <- getRawStorageKeyValDB key
+         v <- getRawStorageKeyValDB fallback key
          --put in the TX cache for fast future lookups
          putMemRawStorageTxMap $ M.insert key v theMap
          return v
@@ -189,7 +190,7 @@ putAllRawStorageKeyValForAddress owner rawChanges = do
       (allDeletes, allInserts) = partition ((== blankValRLP) . snd) changes
       deleteKeys = map fst allDeletes
 
-  addressState <- A.lookupWithDefault A.Proxy owner
+  addressState <- selectWithDefault owner
   let sr = addressStateContractRoot addressState
 
   for_ allInserts $ hashDBPut . fst
@@ -201,41 +202,41 @@ putAllRawStorageKeyValForAddress owner rawChanges = do
 
   sr'' <- deleteManyKeyVal sr' deleteKeys
 
-  A.insert A.Proxy owner addressState{addressStateContractRoot=sr''}
+  insert owner addressState{addressStateContractRoot=sr''}
 
 
-deleteManyKeyVal :: (MP.StateRoot `A.Alters` MP.NodeData) m => MP.StateRoot -> [MP.Key] -> m MP.StateRoot
+deleteManyKeyVal :: (MP.StateRoot `Alters` MP.NodeData) m => MP.StateRoot -> [MP.Key] -> m MP.StateRoot
 deleteManyKeyVal sr listOfDeletes =
   concatM (map (flip deleteRawStorageKeyValDB) listOfDeletes) sr
 
-putManyKeyValSlow :: (MP.StateRoot `A.Alters` MP.NodeData) m => MP.StateRoot -> [(MP.Key, MP.Val)] -> m MP.StateRoot
+putManyKeyValSlow :: (MP.StateRoot `Alters` MP.NodeData) m => MP.StateRoot -> [(MP.Key, MP.Val)] -> m MP.StateRoot
 putManyKeyValSlow sr listOfInserts =
   concatM (map (flip putRawStorageKeyValDB) listOfInserts) sr
 
-putRawStorageKeyValDB :: (MP.StateRoot `A.Alters` MP.NodeData) m => MP.StateRoot -> (MP.Key, MP.Val) -> m MP.StateRoot
+putRawStorageKeyValDB :: (MP.StateRoot `Alters` MP.NodeData) m => MP.StateRoot -> (MP.Key, MP.Val) -> m MP.StateRoot
 putRawStorageKeyValDB sr (key, val) = MP.putKeyVal sr key val
 
-deleteRawStorageKeyValDB :: (MP.StateRoot `A.Alters` MP.NodeData) m => MP.StateRoot -> MP.Key -> m MP.StateRoot
+deleteRawStorageKeyValDB :: (MP.StateRoot `Alters` MP.NodeData) m => MP.StateRoot -> MP.Key -> m MP.StateRoot
 deleteRawStorageKeyValDB sr key = MP.deleteKey sr key
 
-getRawStorageKeyValDBMaybe :: ( (Account `A.Alters` AddressState) m
-                              , (MP.StateRoot `A.Alters` MP.NodeData) m
+getRawStorageKeyValDBMaybe :: ( (Account `Alters` AddressState) m
+                              , (MP.StateRoot `Alters` MP.NodeData) m
                               )
                            => RawStorageKey -> m (Maybe RawStorageValue)
 getRawStorageKeyValDBMaybe (owner, key) = do
-  mContractRoot <- fmap addressStateContractRoot <$> A.lookup (A.Proxy @AddressState) owner
+  mContractRoot <- fmap addressStateContractRoot <$> select @AddressState owner
   fmap (fmap rlpDecode . join) . for mContractRoot $ \cr -> MP.getKeyVal cr (N.EvenNibbleString key)
 
-getRawStorageKeyValDB :: ( (Account `A.Alters` AddressState) m
-                         , (MP.StateRoot `A.Alters` MP.NodeData) m
+getRawStorageKeyValDB :: ( (Account `Alters` AddressState) m
+                         , (MP.StateRoot `Alters` MP.NodeData) m
                          )
-                      => RawStorageKey -> m RawStorageValue
-getRawStorageKeyValDB (owner, key) = do
-  contractRoot <- addressStateContractRoot <$> A.lookupWithDefault (A.Proxy @AddressState) owner
-  maybe def rlpDecode <$> MP.getKeyVal contractRoot (N.EvenNibbleString key)
+                      => RawStorageValue -> RawStorageKey -> m RawStorageValue
+getRawStorageKeyValDB fallback (owner, key) = do
+  contractRoot <- addressStateContractRoot <$> selectWithDefault @AddressState owner
+  maybe fallback rlpDecode <$> MP.getKeyVal contractRoot (N.EvenNibbleString key)
 
 getAllRawStorageKeyValsDB :: FullRawStorage m => Account -> m [(MP.Key, RawStorageValue)]
 getAllRawStorageKeyValsDB owner = do
-  contractRoot <- addressStateContractRoot <$> A.lookupWithDefault (A.Proxy @AddressState) owner
+  contractRoot <- addressStateContractRoot <$> selectWithDefault @AddressState owner
   kvs <- MP.unsafeGetAllKeyVals contractRoot
   return $ map (fmap rlpDecode) kvs

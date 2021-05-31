@@ -71,8 +71,8 @@ module Blockchain.VMContext
 import           Control.DeepSeq
 import           Control.Lens                       hiding (Context(..))
 import           Control.Monad.Catch                (MonadCatch)
-import qualified Control.Monad.Change.Alter         as A
-import qualified Control.Monad.Change.Modify        as Mod
+import           Control.Monad.FT                   hiding (get, gets, modify, modify_, put)
+import qualified Control.Monad.FT                   as FT
 import           Control.Monad.IO.Class
 import           Blockchain.Output
 import           Control.Monad.Reader
@@ -185,49 +185,47 @@ type VMBase m = ( MonadIO m
                 , MonadCatch m
                 , MonadUnliftIO m
                 , MonadLogger m
-                , Mod.Modifiable (Maybe DebugSettings) m
-                , Mod.Modifiable ContextState m
-                , Mod.Accessible ContextState m
-                , Mod.Modifiable MemDBs m
-                , Mod.Accessible MemDBs m
-                , Mod.Modifiable BlockHashRoot m
-                , Mod.Modifiable GenesisRoot m
-                , Mod.Modifiable BestBlockRoot m
-                , Mod.Modifiable CurrentBlockHash m
+                , Modifiable (Maybe DebugSettings) m
+                , Modifiable ContextState m
+                , Modifiable MemDBs m
+                , Modifiable BlockHashRoot m
+                , Modifiable GenesisRoot m
+                , Modifiable BestBlockRoot m
+                , Modifiable CurrentBlockHash m
                 , HasMemAddressStateDB m
-                , A.Selectable (Maybe Word256) ParentChainId m
-                , (Maybe Word256 `A.Alters` MP.StateRoot) m
-                , (MP.StateRoot `A.Alters` MP.NodeData) m
-                , (Account `A.Alters` AddressState) m
-                , (Keccak256 `A.Alters` DBCode) m
+                , (Maybe Word256 `Selects` ParentChainId) m
+                , (Maybe Word256 `Alters` MP.StateRoot) m
+                , (MP.StateRoot `Alters` MP.NodeData) m
+                , (Account `Alters` AddressState) m
+                , (Keccak256 `Alters` DBCode) m
                 , HasX509CertDB m
-                , (N.NibbleString `A.Alters` N.NibbleString) m
+                , (N.NibbleString `Alters` N.NibbleString) m
                 , HasMemRawStorageDB m
-                , (RawStorageKey `A.Alters` RawStorageValue) m
-                , (Keccak256 `A.Alters` BlockSummary) m
-                , Mod.Accessible (Maybe WorldBestBlock) m
+                , (RawStorageKey `Alters` RawStorageValue) m
+                , (Keccak256 `Alters` BlockSummary) m
+                , Gettable (Maybe WorldBestBlock) m
                 )
 
 withCurrentBlockHash :: ( MonadLogger m
-                        , Mod.Modifiable MemDBs m
-                        , Mod.Modifiable CurrentBlockHash m
+                        , Modifiable MemDBs m
+                        , Modifiable CurrentBlockHash m
                         , HasMemAddressStateDB m
-                        , (Maybe Word256 `A.Alters` MP.StateRoot) m
-                        , (MP.StateRoot `A.Alters` MP.NodeData) m
-                        , (Account `A.Alters` AddressState) m
-                        , (N.NibbleString `A.Alters` N.NibbleString) m
+                        , (Maybe Word256 `Alters` MP.StateRoot) m
+                        , (MP.StateRoot `Alters` MP.NodeData) m
+                        , (Account `Alters` AddressState) m
+                        , (N.NibbleString `Alters` N.NibbleString) m
                         , HasMemRawStorageDB m
-                        , (RawStorageKey `A.Alters` RawStorageValue) m
+                        , (RawStorageKey `Alters` RawStorageValue) m
                         )
                      => Keccak256 -> m a -> m a
 withCurrentBlockHash bh f = do
-  cbh <- Mod.get (Mod.Proxy @CurrentBlockHash)
-  Mod.put (Mod.Proxy @CurrentBlockHash) (CurrentBlockHash bh)
+  cbh <- FT.get @CurrentBlockHash
+  FT.put @CurrentBlockHash (CurrentBlockHash bh)
   a <- f
   flushMemStorageDB
   flushMemAddressStateDB
-  Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ stateRoots .= M.empty
-  Mod.put (Mod.Proxy @CurrentBlockHash) cbh
+  modifyStatefully_ @MemDBs $ stateRoots .= M.empty
+  FT.put @CurrentBlockHash cbh
   pure a
 
 getStateDB :: ContextM DB.DB
@@ -288,26 +286,26 @@ contextModify' = modify'
 instance Show Context where
   show = const "<context>"
 
-instance Mod.Modifiable ContextState ContextM where
-  get _ = get
-  put _ = put
+instance Gettable ContextState ContextM where
+  get = get
+instance Puttable ContextState ContextM where
+  put = put
+instance Modifiable ContextState ContextM where
 
-instance Mod.Accessible Context ContextM where
-  access _ = ask
+instance Gettable Context ContextM where
+  get = ask
 
-instance Mod.Modifiable (Maybe DebugSettings) ContextM where
-  get _    = gets $ view debugSettings
-  put _ ds = modify $ debugSettings .~ ds
+instance Gettable (Maybe DebugSettings) ContextM where
+  get    = gets $ view debugSettings
+instance Puttable (Maybe DebugSettings) ContextM where
+  put ds = modify $ debugSettings .~ ds
+instance Modifiable (Maybe DebugSettings) ContextM where
 
-instance Mod.Accessible ContextState ContextM where
-  access _ = get
-
-instance Mod.Accessible MemDBs ContextM where
-  access _ = gets $ view memDBs
-
-instance Mod.Modifiable MemDBs ContextM where
-  get _    = gets $ view memDBs
-  put _ md = modify $ memDBs .~ md
+instance Gettable MemDBs ContextM where
+  get    = gets $ view memDBs
+instance Puttable MemDBs ContextM where
+  put md = modify $ memDBs .~ md
+instance Modifiable MemDBs ContextM where
 
 vmBlockHashRootKey :: B.ByteString
 vmBlockHashRootKey = "block_hash_root"
@@ -318,37 +316,47 @@ vmGenesisRootKey = "genesis_root"
 vmBestBlockRootKey :: B.ByteString
 vmBestBlockRootKey = "best_block_root"
 
-instance Mod.Modifiable BlockHashRoot ContextM where
-  get _ = do
+instance Gettable BlockHashRoot ContextM where
+  get = do
     db <- getStateDB
     BlockHashRoot . maybe MP.emptyTriePtr MP.StateRoot <$> DB.get db def vmBlockHashRootKey
-  put _ (BlockHashRoot (MP.StateRoot sr)) = do
+instance Puttable BlockHashRoot ContextM where
+  put (BlockHashRoot (MP.StateRoot sr)) = do
     db <- getStateDB
     DB.put db def vmBlockHashRootKey sr
+instance Modifiable BlockHashRoot ContextM where
 
-instance Mod.Modifiable GenesisRoot ContextM where
-  get _ = do
+instance Gettable GenesisRoot ContextM where
+  get = do
     db <- getStateDB
     GenesisRoot . maybe MP.emptyTriePtr MP.StateRoot <$> DB.get db def vmGenesisRootKey
-  put _ (GenesisRoot (MP.StateRoot sr)) = do
+instance Puttable GenesisRoot ContextM where
+  put (GenesisRoot (MP.StateRoot sr)) = do
     db <- getStateDB
     DB.put db def vmGenesisRootKey sr
+instance Modifiable GenesisRoot ContextM where
 
-instance Mod.Modifiable BestBlockRoot ContextM where
-  get _ = do
+instance Gettable BestBlockRoot ContextM where
+  get = do
     db <- getStateDB
     BestBlockRoot . maybe MP.emptyTriePtr MP.StateRoot <$> DB.get db def vmBestBlockRootKey
-  put _ (BestBlockRoot (MP.StateRoot sr)) = do
+instance Puttable BestBlockRoot ContextM where
+  put (BestBlockRoot (MP.StateRoot sr)) = do
     db <- getStateDB
     DB.put db def vmBestBlockRootKey sr
+instance Modifiable BestBlockRoot ContextM where
 
-instance Mod.Modifiable K.KafkaState ContextM where
-  get _    = readIORef =<< view (dbs . kafkaState)
-  put _ ks = view (dbs . kafkaState) >>= flip writeIORef ks
+instance Gettable K.KafkaState ContextM where
+  get    = readIORef =<< view (dbs . kafkaState)
+instance Puttable K.KafkaState ContextM where
+  put ks = view (dbs . kafkaState) >>= flip writeIORef ks
+instance Modifiable K.KafkaState ContextM where
 
-instance Mod.Modifiable CurrentBlockHash ContextM where
-  get _    = fmap (fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0)) . gets $ view $ memDBs . currentBlock
-  put _ bh = modify $ memDBs . currentBlock ?~ bh
+instance Gettable CurrentBlockHash ContextM where
+  get    = fmap (fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0)) . gets $ view $ memDBs . currentBlock
+instance Puttable CurrentBlockHash ContextM where
+  put bh = modify $ memDBs . currentBlock ?~ bh
+instance Modifiable CurrentBlockHash ContextM where
 
 instance HasMemAddressStateDB ContextM where
   getAddressStateTxDBMap = gets $ view $ memDBs . stateTxMap
@@ -356,56 +364,74 @@ instance HasMemAddressStateDB ContextM where
   getAddressStateBlockDBMap = gets $ view $ memDBs . stateBlockMap
   putAddressStateBlockDBMap theMap = modify $ memDBs . stateBlockMap .~ theMap
 
-instance (MP.StateRoot `A.Alters` MP.NodeData) ContextM where
-  lookup _ = MP.genericLookupDB $ getStateDB
-  insert _ = MP.genericInsertDB $ getStateDB
-  delete _ = MP.genericDeleteDB $ getStateDB
+instance Selectable MP.NodeData MP.StateRoot ContextM where
+  select = MP.genericLookupDB $ getStateDB
+instance Insertable MP.NodeData MP.StateRoot ContextM where
+  insert = MP.genericInsertDB $ getStateDB
+instance Deletable  MP.NodeData MP.StateRoot ContextM where
+  delete = MP.genericDeleteDB $ getStateDB
+instance Alterable  MP.NodeData MP.StateRoot ContextM where
 
-instance (Account `A.Alters` AddressState) ContextM where
-  lookup _ = getAddressStateMaybe
-  insert _ = putAddressState
-  delete _ = deleteAddressState
+instance Selectable AddressState Account ContextM where
+  select = getAddressStateMaybe
+instance Insertable AddressState Account ContextM where
+  insert = putAddressState
+instance Deletable  AddressState Account ContextM where
+  delete = deleteAddressState
+instance Alterable  AddressState Account ContextM where
 
-instance (Maybe Word256 `A.Alters` MP.StateRoot) ContextM where
-  lookup _ chainId = do
+instance Selectable MP.StateRoot (Maybe Word256) ContextM where
+  select chainId = do
     mBH <- gets $ view $ memDBs . currentBlock
     fmap join . for mBH $ \(CurrentBlockHash bh) -> do
       mSR <- gets $ view $ memDBs . stateRoots . at (bh, chainId)
       case mSR of
         Just sr -> pure $ Just sr
         Nothing -> getChainStateRoot chainId bh
-  insert _ chainId sr = do
+instance Insertable MP.StateRoot (Maybe Word256) ContextM where
+  insert chainId sr = do
     mBH <- gets $ view $ memDBs . currentBlock
     case mBH of
       Nothing -> pure ()
       Just (CurrentBlockHash bh) -> do
         modify $ memDBs . stateRoots %~ M.insert (bh, chainId) sr
         putChainStateRoot chainId bh sr
-  delete _ chainId = do
+instance Deletable  MP.StateRoot (Maybe Word256) ContextM where
+  delete chainId = do
     mBH <- gets $ view $ memDBs . currentBlock
     case mBH of
       Nothing -> pure ()
       Just (CurrentBlockHash bh) -> do
         modify $ memDBs . stateRoots %~ M.delete (bh, chainId)
         deleteChainStateRoot chainId bh
+instance Alterable  MP.StateRoot (Maybe Word256) ContextM where
 
-instance A.Selectable (Maybe Word256) ParentChainId ContextM where
-  select _ chainId = fmap (\(_,_,p) -> ParentChainId p) <$> getChainGenesisInfo chainId
+instance Selectable ParentChainId (Maybe Word256) ContextM where
+  select chainId = fmap (\(_,_,p) -> ParentChainId p) <$> getChainGenesisInfo chainId
 
-instance (Keccak256 `A.Alters` DBCode) ContextM where
-  lookup _ = genericLookupCodeDB $ getCodeDB
-  insert _ = genericInsertCodeDB $ getCodeDB
-  delete _ = genericDeleteCodeDB $ getCodeDB
+instance Selectable DBCode Keccak256 ContextM where
+  select = genericLookupCodeDB $ getCodeDB
+instance Insertable DBCode Keccak256 ContextM where
+  insert = genericInsertCodeDB $ getCodeDB
+instance Deletable  DBCode Keccak256 ContextM where
+  delete = genericDeleteCodeDB $ getCodeDB
+instance Alterable  DBCode Keccak256 ContextM where
 
-instance (Account `A.Alters` X509Certificate) ContextM where
-  lookup _ = genericLookupX509CertDB $ getX509CertDB
-  insert _ = genericInsertX509CertDB $ getX509CertDB
-  delete _ = genericDeleteX509CertDB $ getX509CertDB
+instance Selectable X509Certificate Account ContextM where
+  select = genericLookupX509CertDB $ getX509CertDB
+instance Insertable X509Certificate Account ContextM where
+  insert = genericInsertX509CertDB $ getX509CertDB
+instance Deletable  X509Certificate Account ContextM where
+  delete = genericDeleteX509CertDB $ getX509CertDB
+instance Alterable  X509Certificate Account ContextM where
 
-instance (N.NibbleString `A.Alters` N.NibbleString) ContextM where
-  lookup _ = genericLookupHashDB $ getHashDB
-  insert _ = genericInsertHashDB $ getHashDB
-  delete _ = genericDeleteHashDB $ getHashDB
+instance Selectable N.NibbleString N.NibbleString ContextM where
+  select = genericLookupHashDB $ getHashDB
+instance Insertable N.NibbleString N.NibbleString ContextM where
+  insert = genericInsertHashDB $ getHashDB
+instance Deletable  N.NibbleString N.NibbleString ContextM where
+  delete = genericDeleteHashDB $ getHashDB
+instance Alterable  N.NibbleString N.NibbleString ContextM where
 
 instance HasMemRawStorageDB ContextM where
   getMemRawStorageTxDB = gets $ view $ memDBs . storageTxMap
@@ -413,25 +439,31 @@ instance HasMemRawStorageDB ContextM where
   getMemRawStorageBlockDB = gets $ view $ memDBs . storageBlockMap
   putMemRawStorageBlockMap theMap = modify $ memDBs . storageBlockMap .~ theMap
 
-instance (RawStorageKey `A.Alters` RawStorageValue) ContextM where
-  lookup _ = genericLookupRawStorageDB
-  insert _ = genericInsertRawStorageDB
-  delete _ = genericDeleteRawStorageDB
-  lookupWithDefault _ = genericLookupWithDefaultRawStorageDB
+instance Selectable RawStorageValue RawStorageKey ContextM where
+  select = genericLookupRawStorageDB
+  selectWithFallback = genericLookupWithFallbackRawStorageDB
+instance Insertable RawStorageValue RawStorageKey ContextM where
+  insert = genericInsertRawStorageDB
+instance Deletable  RawStorageValue RawStorageKey ContextM where
+  delete = genericDeleteRawStorageDB
+instance Alterable  RawStorageValue RawStorageKey ContextM where
 
-instance (Keccak256 `A.Alters` BlockSummary) ContextM where
-  lookup _ = genericLookupBlockSummaryDB $ getBlockSummaryDB
-  insert _ = genericInsertBlockSummaryDB $ getBlockSummaryDB
-  delete _ = genericDeleteBlockSummaryDB $ getBlockSummaryDB
+instance Selectable BlockSummary Keccak256 ContextM where
+  select = genericLookupBlockSummaryDB $ getBlockSummaryDB
+instance Insertable BlockSummary Keccak256 ContextM where
+  insert = genericInsertBlockSummaryDB $ getBlockSummaryDB
+instance Deletable  BlockSummary Keccak256 ContextM where
+  delete = genericDeleteBlockSummaryDB $ getBlockSummaryDB
+instance Alterable  BlockSummary Keccak256 ContextM where
 
-instance MonadReader Context m => Mod.Accessible SQLDB m where
-  access _ = view $ dbs . sqldb
+instance (Monad m, MonadReader Context m) => Gettable SQLDB m where
+  get = view $ dbs . sqldb
 
-instance Mod.Accessible RBDB.RedisConnection ContextM where
-  access _ = view $ dbs . redisPool
+instance Gettable RBDB.RedisConnection ContextM where
+  get = view $ dbs . redisPool
 
-instance Mod.Accessible (Maybe WorldBestBlock) ContextM where
-  access _ = do
+instance Gettable (Maybe WorldBestBlock) ContextM where
+  get = do
     mRBB <- RBDB.withRedisBlockDB RBDB.getWorldBestBlockInfo
     for mRBB $ \(RedisBestBlock sha num diff) ->
       return . WorldBestBlock $ BestBlock sha num diff
@@ -586,13 +618,13 @@ execContextM :: (MonadIO m, MonadUnliftIO m, MonadLogger m)
              -> m ContextState
 execContextM d f = snd <$> runContextM d f
 
-incrementNonce :: (Account `A.Alters` AddressState) f => Account -> f ()
-incrementNonce account = A.adjustWithDefault_ Mod.Proxy account $ \addressState ->
+incrementNonce :: (Account `Alters` AddressState) f => Account -> f ()
+incrementNonce account = adjustWithDefault_ account $ \addressState ->
   pure addressState{ addressStateNonce = addressStateNonce addressState + 1 }
 
-getNewAddress :: (MonadIO m, (Account `A.Alters` AddressState) m) => Account -> m Account
+getNewAddress :: (MonadIO m, (Account `Alters` AddressState) m) => Account -> m Account
 getNewAddress account = do
-  nonce <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy account
+  nonce <- addressStateNonce <$> selectWithDefault account
   when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ show (pretty account) ++ ", nonce=" ++ show nonce
   let newAddress = getNewAddress_unsafe (account ^. accountAddress) nonce
   incrementNonce account
@@ -603,14 +635,14 @@ purgeStorageMap account = do
   storageMap <- getMemRawStorageTxDB
   putMemRawStorageTxMap $ M.filterWithKey (const . (/= account) . fst) storageMap
 
-getContextBestBlockInfo :: (Functor m, Mod.Accessible ContextState m) => m ContextBestBlockInfo
-getContextBestBlockInfo = _bestBlockInfo <$> Mod.access Mod.Proxy
+getContextBestBlockInfo :: Gettable ContextState m => m ContextBestBlockInfo
+getContextBestBlockInfo = _bestBlockInfo <$> FT.get
 
-putContextBestBlockInfo :: Mod.Modifiable ContextState m => ContextBestBlockInfo -> m ()
-putContextBestBlockInfo new = Mod.modifyStatefully_ Mod.Proxy $ assign bestBlockInfo new
+putContextBestBlockInfo :: Modifiable ContextState m => ContextBestBlockInfo -> m ()
+putContextBestBlockInfo new = modifyStatefully_ $ assign bestBlockInfo new
 
 queuePendingVote :: ( MonadLogger m
-                    , Mod.Modifiable ContextState m
+                    , Modifiable ContextState m
                     )
                  => Address -> Bool -> Address -> m ()
 queuePendingVote a r s = do
@@ -619,16 +651,16 @@ queuePendingVote a r s = do
         False -> 0
       newVote = ((a, nonce), s)
   $logInfoLS "queuePendingVote" newVote
-  Mod.modifyStatefully_ (Mod.Proxy @ContextState) $ coinbaseQueue %= (newVote Q.<|)
+  modifyStatefully_ @ContextState $ coinbaseQueue %= (newVote Q.<|)
 
 -- (Coinbase, Nonce) to be applied on a constructed block
 -- When no pending votes are available, supplies the default coinbase (0x0)
 peekPendingVote :: ( MonadLogger m
-                   , Mod.Accessible ContextState m
+                   , Gettable ContextState m
                    )
                 => m (Address, Word64)
 peekPendingVote = do
-  ctx <- Mod.access (Mod.Proxy @ContextState)
+  ctx <- FT.get @ContextState
   case Q.viewl $ _coinbaseQueue ctx of
     Q.EmptyL -> return (0,0)
     ( v Q.:< _) -> do
@@ -638,10 +670,10 @@ peekPendingVote = do
 -- If the Block was sent out by us and contains our vote,
 -- mark the vote as committed and remove it from the queue.
 clearPendingVote :: ( MonadLogger m
-                    , Mod.Modifiable ContextState m
+                    , Modifiable ContextState m
                     )
                  => Block -> m ()
-clearPendingVote b = Mod.modifyStatefully_ (Mod.Proxy @ContextState) $ do
+clearPendingVote b = modifyStatefully_ @ContextState $ do
   let bd = blockBlockData b
       currentBlockData = (blockDataCoinbase bd, blockDataNonce bd)
       sender = fromMaybe 0x0 $ Auth.verifyProposerSeal b =<< Auth.getProposerSeal b
