@@ -183,16 +183,18 @@ postChainInfos chainInputs = withLastBlockHash $ \bHash -> do
   for_ cmIdChains $ \(cmId, chainId) -> insertContractInstance cmId $ Account governanceAddress (Just $ unChainId chainId)
   return chainIds
 
-waitForChainInfo :: (MonadLogger m, Selectable ChainInfo ChainId m,
+type ChainMap = NamedMap "id" "info" ChainId ChainInfo
+
+waitForChainInfo :: (MonadLogger m, Selectable ChainMap [ChainId] m,
                      HasSQL m) =>
                     ChainId -> m ()
 waitForChainInfo chainId = waitForChainInfos [chainId]
 
-waitForChainInfos :: (MonadLogger m, Selectable ChainInfo ChainId m,
+waitForChainInfos :: (MonadLogger m, Selectable ChainMap [ChainId] m,
                       HasSQL m) =>
                      [ChainId] -> m ()
 waitForChainInfos chainIds = waitFor "failed to retrieve chain info" go
-  where go :: (MonadLogger m, Selectable ChainInfo ChainId m) => m Bool
+  where go :: (MonadLogger m, Selectable ChainMap [ChainId] m) => m Bool
         go = do
           infos <- getChainInfo chainIds
           $logInfoLS "waitForChainInfo/req" chainIds
@@ -200,7 +202,7 @@ waitForChainInfos chainIds = waitFor "failed to retrieve chain info" go
           return $ length infos == length chainIds
 
 
-getChainInfo :: (Selectable ChainInfo ChainId m) =>
+getChainInfo :: (Selectable ChainMap [ChainId] m) =>
                 [ChainId] -> m [ChainIdChainOutput]
 getChainInfo chainIds = do
   chainIdChainInfos <- getChain chainIds

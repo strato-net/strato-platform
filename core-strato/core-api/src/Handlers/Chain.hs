@@ -27,7 +27,7 @@ import           Control.Monad.IO.Class
 -- import qualified Data.ByteString.Char8          as BC
 import           Conduit
 import qualified Data.Map                       as M
--- import           Data.Maybe
+import           Data.Maybe                     (fromMaybe)
 -- import qualified Data.Set                       as S
 import           Data.Swagger
 import qualified Data.Text                      as T
@@ -69,12 +69,14 @@ instance ToSchema (NamedTuple "id" "info" ChainId ChainInfo) where
   declareNamedSchema _ = return $
     NamedSchema (Just "NamedTuple of Word256 and ChainInfo") mempty
 
-instance Selectable ChainInfo ChainId SQLM where
-  selectMany = getChainInfos
-  select     = fmap (fmap (snd . unNamedTuple @"id" @"info")) . getChainInfo
+-- since we retrieve all available ChainInfos when given an empty list, this
+-- cannot be Selectable ChainInfo ChainId m.
+instance Selectable (NamedMap "id" "info" ChainId ChainInfo) [ChainId] SQLM where
+  select = fmap Just . getChainInfos
 
-getChain :: (ChainId `Selects` ChainInfo) m => [ChainId] -> m (NamedMap "id" "info" ChainId ChainInfo)
-getChain = fmap (map (NamedTuple @"id" @"info") . catMaybes . map sequence) . selectMany
+getChain :: ([ChainId] `Selects` NamedMap "id" "info" ChainId ChainInfo) m
+         => [ChainId] -> m (NamedMap "id" "info" ChainId ChainInfo)
+getChain = fmap (fromMaybe []) . select
     
 postChain :: (MonadIO m, MonadLogger m) => ChainInfo -> ConduitT a IngestEvent m ChainId
 postChain ci = do
