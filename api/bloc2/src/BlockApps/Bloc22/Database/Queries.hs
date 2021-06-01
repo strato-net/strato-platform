@@ -334,14 +334,14 @@ JOIN contracts_metadata CM
 JOIN contracts_instance CI
   ON CI.contract_metadata_id = CM.id;
 -}
-getContractsAddressesQuery :: Maybe ChainId -> Query
+getContractsAddressesQuery :: Int -> Int -> Maybe ChainId -> Query
   ( Column PGText
   , Column PGBytea
   , Column PGTimestamptz
   , Column PGBytea
   )
-getContractsAddressesQuery chainId = proc () -> do
-  (_,name,_,addr,timestamp,_,_,_,_,cid,_) <- limit 100 $ contractsJoinTable -< ()
+getContractsAddressesQuery o l chainId = limit l . offset o $ proc () -> do
+  (_,name,_,addr,timestamp,_,_,_,_,cid,_) <- contractsJoinTable -< ()
   restrict -< cid .== constant chainId
   returnA -< (name,addr,timestamp,cid)
 

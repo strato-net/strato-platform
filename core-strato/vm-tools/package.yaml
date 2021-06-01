@@ -13,6 +13,7 @@ dependencies:
   - blockapps-util
   - blockstanbul
   - containers
+  - exceptions
   - hflags
   - strato-conf
   - strato-model

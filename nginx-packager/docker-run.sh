@@ -72,6 +72,8 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   if [ "$VM_DEBUG" != true ]; then
     sed -i '/#TEMPLATE_MARK_DEBUG/d' /tmp/nginx.conf
   fi
+  sed -i 's/<DEBUG_PORT_PLACEHOLDER>/'"$debugPort"'/g' /tmp/nginx.conf
+  sed -i 's/<WS_DEBUG_PORT_PLACEHOLDER>/'"$debugWSPort"'/g' /tmp/nginx.conf
 
   # Remove SSL lines if deployment is not SSL-enabled
   # Set SSL cert file type if SSL-enabled
@@ -98,6 +100,10 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
 
   if [ "$SERVE_LOGS" != true ]; then
     sed -i '/#TEMPLATE_MARK_LOGS/d' /tmp/nginx.conf
+  fi
+
+  if [ "$START_EXPERIMENTAL_STRATO_API" != true ]; then
+    sed -i '/#TEMPLATE_MARK_EXPERIMENTAL_STRATO_API/d' /tmp/nginx.conf
   fi
 
   # Set the Bloc API timeout

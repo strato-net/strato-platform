@@ -81,7 +81,6 @@ export function activate(context: vscode.ExtensionContext) {
 		    terminal.show()
 		    terminal.sendText(cmd, true)
 		}
-        vscode.commands.executeCommand('deployments.refreshEntry');
 	}));
 	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.runServer', () => {
         const cmd: string = vscode.workspace.getConfiguration().get('strato-vscode.runServerCommand') || '';

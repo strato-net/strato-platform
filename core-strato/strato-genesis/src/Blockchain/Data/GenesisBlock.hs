@@ -21,12 +21,12 @@ import qualified Control.Monad.Change.Alter           as A
 import           Control.Monad.Change.Modify
 import           Control.Monad.IO.Class
 import           Crypto.Util                          (i2bs_unsized)
-import qualified Data.ByteString.Char8                as BC
 import qualified Data.ByteString.Lazy.Char8           as BLC
 import qualified Data.Map                             as Map
 import           Data.Maybe                           (catMaybes, fromMaybe)
 import           Data.List.Split                      (chunksOf)
 import qualified Data.Text                            as T
+import qualified Data.Text.Encoding                   as T
 import           Data.Time.Clock.POSIX
 import qualified Data.Sequence                        as S
 import           Numeric
@@ -189,7 +189,7 @@ initializeCodeDB :: HasCodeDB m => String -> [CodeInfo] -> m ()
 initializeCodeDB "EVM" x = do
   mapM_ (addCode EVM . (\(CodeInfo bin _ _) -> bin)) x
 initializeCodeDB "SolidVM" x = do
-  mapM_ (addCode SolidVM . (\(CodeInfo _ src _) -> BC.pack $ T.unpack src)) x
+  mapM_ (addCode SolidVM . (\(CodeInfo _ src _) -> T.encodeUtf8 src)) x
 initializeCodeDB invalidType _ = error $ "error, bad VM type: " ++ invalidType
 
 chainInfoToGenesisState :: ( MonadLogger m

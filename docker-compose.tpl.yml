@@ -57,6 +57,7 @@ services:
     - postgrest
     - strato
     environment:
+    - blocHost=${blocHost:-strato:3000}
     - EXT_STORAGE_S3_BUCKET=${EXT_STORAGE_S3_BUCKET}
     - EXT_STORAGE_S3_ACCESS_KEY_ID=${EXT_STORAGE_S3_ACCESS_KEY_ID}
     - EXT_STORAGE_S3_SECRET_ACCESS_KEY=${EXT_STORAGE_S3_SECRET_ACCESS_KEY}
@@ -338,6 +339,7 @@ services:
     - SERVE_LOGS=${SERVE_LOGS}
     - ssl=${ssl}
     - sslCertFileType=${sslCertFileType}
+    - START_EXPERIMENTAL_STRATO_API=${START_EXPERIMENTAL_STRATO_API}
     - STATS_ENABLED=${STATS_ENABLED}
     - uiPassword=${uiPassword}
     - USE_OLD_STRATO_API=${USE_OLD_STRATO_API}
