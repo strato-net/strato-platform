@@ -6,7 +6,6 @@ import { DeploymentsProvider } from './deployments';
 import { NodesProvider } from './nodes';
 import { ProjectActionProvider } from './project';
 import { activateStratoDebug } from './activateStratoDebug';
-import { SSL_OP_EPHEMERAL_RSA } from 'constants';
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
