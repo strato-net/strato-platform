@@ -16,6 +16,8 @@ const compileUrl = env.BLOC_URL + "/contracts/xabi";
 const blocCompileUrl = env.BLOC_URL + "/contracts/compile";
 
 export function tokenizeSource(source) {
+  let body = "src=" + encodeURIComponent(source)
+  console.log(body)
   return fetch(
     compileUrl,
     {
@@ -24,8 +26,7 @@ export function tokenizeSource(source) {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded"
       },
-      body:
-      "src=" + encodeURIComponent(source)
+      body 
     })
     .then(function (res) {
       if (res.ok) {
@@ -41,8 +42,8 @@ export function tokenizeSource(source) {
     });
 }
 
-export function compileSource(contractName, source) {
-
+export function compileSource(contractName, source, codeType) {
+  console.log(source)
   const searchable = [];
   return fetch(blocCompileUrl, {
     method: 'POST',
@@ -55,7 +56,8 @@ export function compileSource(contractName, source) {
       {
         "contractName": contractName,
         "source": source,
-        "searchable": searchable
+        "searchable": searchable,
+        "vm" : codeType
       }
     ])
   })
@@ -73,14 +75,14 @@ export function compileSource(contractName, source) {
   });
 }
 
-export function* compileCodeFromEditor(action) {
+export function* compileCodeFromEditor(codeAction) {
   try {
     let response
-    response = yield call(tokenizeSource, action.code);
+    response = yield call(tokenizeSource, codeAction.code);
     if (response) {
       let contracts = response.src && Object.keys(response.src);
       const contractName = contracts && contracts[0]
-      yield call(compileSource, contractName, action.code);
+      yield call(compileSource, contractName, codeAction.code, codeAction.codeType);
     }
     yield put(compileCodeFromEditorSuccess(response));
   }
