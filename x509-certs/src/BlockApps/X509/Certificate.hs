@@ -60,7 +60,7 @@ import           Time.System
 newtype X509Certificate = X509Certificate SignedCertificate deriving (Show, Eq)
 
 instance NFData X509Certificate where
-    rnf = const ()
+    rnf (X509Certificate cert) = cert `seq` ()
 
 data Issuer = Issuer
   {

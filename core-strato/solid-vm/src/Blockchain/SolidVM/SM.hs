@@ -644,16 +644,24 @@ getValueType p = hintFromType =<< getXabiValueType p
 
 initializeActionCreate :: MonadSM m => Account -> Account -> String -> String -> Keccak256 -> m ()
 initializeActionCreate creator acct name prt hsh = do
-  maybeCert <- x509CertDBGet $ _accountAddress creator
-  let organization = T.pack $ fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
+  let address = _accountAddress creator
+  x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
+  maybeCertLevelDB <- x509CertDBGet address
+  let maybeCertBlockDB = M.lookup address x509s
+      maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
+      organization = T.pack $ fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
   let newData = ActionData (SolidVMCode name hsh) organization (T.pack prt) SolidVM (ActionSolidVMDiff M.empty) []
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     actionData %= M.insertWith mergeActionData acct newData
 
 initializeActionCall :: MonadSM m => Account -> String -> String -> Keccak256 -> m ()
 initializeActionCall acct name prt hsh = do
-  maybeCert <- x509CertDBGet (_accountAddress acct)
-  let organization = T.pack $ fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
+  let address = _accountAddress acct
+  x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
+  maybeCertLevelDB <- x509CertDBGet address
+  let maybeCertBlockDB = M.lookup address x509s
+      maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
+      organization = T.pack $ fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
   let newData = ActionData (SolidVMCode name hsh) organization (T.pack prt) SolidVM (ActionSolidVMDiff M.empty) []
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     actionData %= M.insertWith mergeActionData acct newData

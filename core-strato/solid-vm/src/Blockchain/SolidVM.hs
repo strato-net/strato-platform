@@ -25,10 +25,12 @@ import           Control.DeepSeq                      (force)
 import           Control.Lens hiding (assign, from, to, Context)
 import           Control.Applicative
 import           Control.Monad
+import           Control.Monad.Extra                  (fromMaybeM)
 import qualified Control.Monad.Change.Alter           as A
 import qualified Control.Monad.Change.Modify          as Mod
 import           Control.Monad.IO.Class
 import qualified Control.Monad.Catch                  as EUnsafe
+import           Control.Monad.Trans.Maybe
 import           Data.Bifunctor                       (bimap)
 import           Data.Bits
 import           Data.Bool                            (bool)
@@ -220,25 +222,20 @@ create _ _ _ blockData _ sender' origin' _ _ _ newAddress code txHash' chainId' 
 create' :: MonadSM m => Account -> Account -> Keccak256 -> CodeCollection -> String -> Xabi.ArgList -> M.Map Address X509Certificate -> m ExecResults
 create' creator newAccount ch cc contractName' argExps x509s = do
   Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ x509s
-  mAddressState <- getAddressStateMaybe creator
-  let mParentCodePtr = case mAddressState of
-        Just cp -> resolveCodePtrParent Nothing $ addressStateCodeHash cp
-        Nothing -> pure Nothing
-  mParentCodePtr' <- mParentCodePtr
-  let thePtr = case mParentCodePtr' of
-                    Just s@(SolidVMCode _ _)  -> pure $ Just s
-                    Just acc@(CodeAtAccount _ _) -> resolveCodePtrParent Nothing acc
-                    _  -> pure Nothing
-  thePtr' <- thePtr
-  let thePtr'' = case thePtr' of
-                    Just (SolidVMCode name _) -> Just name
-                    _                         -> Nothing
-      parentName' = fromMaybe "" thePtr''
-  initializeActionCreate creator newAccount contractName' parentName' ch
+  parentName <- fromMaybeM (return "") $ runMaybeT 
+     $   pure creator                                               -- Creator's address
+     >>= MaybeT . getAddressStateMaybe                              -- Address's state
+     >>= pure  .  addressStateCodeHash                              -- state's codehash/CodePtr
+     >>= MaybeT . resolveCodePtrParent (creator ^. accountChainId)  -- CodePtr's parent
+     >>= (\case     
+            SolidVMCode name _ -> pure name                         -- Name of the parent
+            _                  -> pure "")
+
+  initializeActionCreate creator newAccount contractName' parentName ch
 
   A.adjustWithDefault_ (A.Proxy @AddressState) newAccount $ \newAddressState ->
     pure newAddressState{ addressStateContractRoot = MP.emptyTriePtr
-                        , addressStateCodeHash = if (contractName' /= parentName' && not (null parentName')) then CodeAtAccount creator contractName' else SolidVMCode contractName' ch
+                        , addressStateCodeHash = if (contractName' /= parentName && not (null parentName)) then CodeAtAccount creator contractName' else SolidVMCode contractName' ch
                         }
 
   onTraced $ liftIO $ putStrLn $ C.red $ "Creating Contract: " ++ show newAccount ++ " of type " ++ contractName'
@@ -395,13 +392,6 @@ getCodeAndCollection address' = do
         Just (SolidVMCode cn ch') -> do
           cc' <- codeCollectionFromHash ch'
           return (cn, ch', cc')
-        Just cp'@(CodeAtAccount _ _) -> do
-            cp <- resolveCodePtr Nothing cp'
-            case cp of
-                Just (SolidVMCode cn ch') -> do
-                    cc' <- codeCollectionFromHash ch'
-                    return (cn, ch', cc')
-                _ -> error "this is our error!"
         Just ch -> internalError "SolidVM for non-solidvm code" (format ch)
         Nothing -> missingCodeCollection "SolidVM for non-existent code" (format codeHash)
 
@@ -478,23 +468,18 @@ callWrapper from to mContract functionName argExps = do
   unless isAccessibleChain $ inaccessibleChain "Inaccessible chain violation" $ "from: " ++ show from ++ ", to: " ++ show to
 
   (contract', hsh, cc) <- getCodeAndCollection to
-  mAddressState <- getAddressStateMaybe to
-  let mParentCodePtr = case mAddressState of
-        Just cp -> resolveCodePtrParent Nothing $ addressStateCodeHash cp
-        Nothing -> pure Nothing
-  mParentCodePtr' <- mParentCodePtr
-  let thePtr = case mParentCodePtr' of
-                    Just s@(SolidVMCode _ _)  -> pure $ Just s
-                    Just acc@(CodeAtAccount _ _) -> resolveCodePtrParent Nothing acc
-                    _  -> pure Nothing
-  thePtr' <- thePtr
-  let thePtr'' = case thePtr' of
-                    Just (SolidVMCode name _) -> Just name
-                    _                         -> Nothing
-      parentName' = fromMaybe "" thePtr''
+  parentName <- fromMaybeM (return "") $ runMaybeT 
+     $   pure to                                                -- Contract's address
+     >>= MaybeT . getAddressStateMaybe                          -- Address's state
+     >>= pure  .  addressStateCodeHash                          -- state's codehash/CodePtr
+     >>= MaybeT . resolveCodePtrParent (to ^. accountChainId)   -- CodePtr's parent
+     >>= (\case     
+            SolidVMCode name _ -> pure name                     -- Name of the parent
+            _                  -> pure "")
+
   let contract = fromMaybe contract' $ mContract >>= \c -> M.lookup c $ _contracts cc
-      parentName'' = if parentName' == (_contractName contract) then "" else parentName'
-  initializeActionCall to (_contractName contract) parentName'' hsh
+      parentName' = if parentName == (_contractName contract) then "" else parentName
+  initializeActionCall to (_contractName contract) parentName' hsh
 
   let functionsIncludingConstructor =
         case contract^.constructor of
@@ -796,14 +781,22 @@ runStatement st@(Xabi.EmitStatement eventName exptups pos) = do
       if (length exptups) /= (length $ Xabi.eventLogs ev) then 
         invalidArguments "arguments to statement are inconsistent with those declared" (unparseStatement st)
       else do
-        maybeCert <- x509CertDBGet $ _accountAddress $ currentAccount curInfo
-        let organization = fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
-        myAction <- Mod.get (Mod.Proxy @Action)
-        let actionData' = M.lookup (currentAccount curInfo) (_actionData myAction)
-            appName = case actionData' of
-                            Just aD -> _actionDataApplication aD 
-                            Nothing -> ""
-        addEvent $ Event organization (T.unpack appName) (_contractName curCnct) (currentAccount curInfo) eventName expStrs
+        let account = currentAccount curInfo
+            address = _accountAddress account
+        x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
+        maybeCertLevelDB <- x509CertDBGet address
+        let maybeCertBlockDB = M.lookup address x509s
+            maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
+            organization = fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
+        parentName <- fromMaybeM (return "") $ runMaybeT 
+            $   pure account
+            >>= MaybeT . getAddressStateMaybe
+            >>= pure  .  addressStateCodeHash
+            >>= MaybeT . resolveCodePtrParent (account ^. accountChainId)
+            >>= (\case     
+                    SolidVMCode name _ | name /= (_contractName curCnct) -> pure name
+                    _                                                    -> pure "")
+        addEvent $ Event organization parentName (_contractName curCnct) account eventName expStrs
         return Nothing
 
 
@@ -1494,8 +1487,8 @@ callBuiltin "registerCert" [SAccount a, SString cert] _ = do
                              return SNULL
 callBuiltin "getUserCert" [SAccount a] _ = do
     x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-    maybeCertLevelDB <- x509CertDBGet $ _accountAddress $ (namedAccountToAccount Nothing a)
-    let maybeCertBlockDB = M.lookup (_accountAddress $ namedAccountToAccount Nothing a) x509s
+    maybeCertLevelDB <- x509CertDBGet $ _namedAccountAddress a
+    let maybeCertBlockDB = M.lookup (_namedAccountAddress a) x509s
         maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
     return $ certificateMap (fmap (BC.unpack . certToBytes) maybeCert)
 callBuiltin "parseCert" [SString cert] _ = return $ certificateMap (Just cert)
