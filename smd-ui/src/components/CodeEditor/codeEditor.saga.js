@@ -16,15 +16,14 @@ const compileUrl = env.BLOC_URL + "/contracts/xabi";
 const blocCompileUrl = env.BLOC_URL + "/contracts/compile";
 
 export function tokenizeSource(source) {
-  let body = "src=" + encodeURIComponent(source)
-  console.log(body)
+  let body = JSON.stringify({src : source});
   return fetch(
     compileUrl,
     {
       method: 'POST',
       credentials: "include",
       headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
+        "Content-Type": "application/json"
       },
       body 
     })
