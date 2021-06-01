@@ -30,10 +30,10 @@ import           GHC.Generics
 import           Blockchain.Strato.Model.Action ( Action(..), ActionData(..), ActionDataDiff(..)
                                                 , CallType(..), CallData(..))
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Keccak256
 
-import           Slipstream.Data.Globals
 
 data AggregateAction = AggregateAction
   { actionBlockHash      :: Keccak256
@@ -65,7 +65,7 @@ flatten Action{..} = flip map (M.toList _actionData) $
           , actionOrganization   = _actionDataOrganization
           , actionApplication    = _actionDataApplication
           , actionAccount        = account
-          , actionCodeHash       = convertToSlipCodePtr _actionDataCodeHash _actionDataOrganization
+          , actionCodeHash       = _actionDataCodeHash
           , actionStorage        = _actionDataStorageDiffs
           , actionType           = t
           , actionCallData       = _actionDataCallData

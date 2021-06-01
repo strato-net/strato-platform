@@ -63,6 +63,7 @@ import BlockApps.XAbiConverter
 import qualified BlockApps.SolidityVarReader as SVR
 import qualified BlockApps.SolidVMStorageDecoder as SolidVM
 
+import Blockchain.Data.AddressStateDB
 import qualified Blockchain.Strato.Model.Action as BS
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.ChainId
@@ -255,7 +256,7 @@ getSolidVMDetailsForRow g row = runMaybeT
         
         checkBloc = do
           $logInfoS "getDetailsForRow" . T.pack $ "checking bloc database for contract details"
-          (MaybeT $ getContractDetailsByCodeHash (convertFromSlipCodePtr codePtr)) >>= (parseAndSet . contractdetailsSrc . snd)
+          (MaybeT $ getContractDetailsByCodeHash codePtr) >>= (parseAndSet . contractdetailsSrc . snd)
         
         checkMetadata = do
           $logInfoS "getDetailsForRow" . T.pack $ "checking metadata for contract details"
@@ -269,14 +270,14 @@ getSolidVMDetailsForRow g row = runMaybeT
           setContractABIs g codePtr detailsMap
           lookupT (T.pack name) detailsMap
           
-        codePtr@(SolidVMCode name _ _) = actionCodeHash row
+        codePtr@(SolidVMCode name _) = actionCodeHash row
 
 
 
 -- For now, EVM details are not cached, because the cache links all the contracts in a source blob by source hash, and we only have source hashes for SolidVM code pointers. 
 getEVMDetailsForRow :: AggregateAction -> Bloc (Maybe (Int32, ContractDetails))
 getEVMDetailsForRow row = liftM2 (<|>)
-  (getContractDetailsByCodeHash $ convertFromSlipCodePtr $ actionCodeHash row)
+  (getContractDetailsByCodeHash $ actionCodeHash row)
   (runMaybeT $ do
     let md = actionMetadata row
     src <- lookupT "src" md
@@ -299,7 +300,7 @@ adjustGlobals gref shouldCompile row details = do
         let contracts = filter (not . T.null) $ T.splitOn "," v
         forM_ contracts $ \c -> do
           (_, details') <- lookupT c m
-          let codePtr = convertToSlipCodePtr (contractdetailsCodeHash details') (actionOrganization row)
+          let codePtr = contractdetailsCodeHash details'
           $logInfoS "adjustGlobals" . T.pack $ "Adding to globals for " ++ T.unpack k ++ ": " ++ show codePtr
           lift $ f gref $ HistoryTableName (actionOrganization row) (actionApplication row) (contractdetailsName details')
  

@@ -33,6 +33,7 @@ import           BlockApps.Logging
 import           BlockApps.Solidity.Value
 import           BlockApps.Solidity.Xabi     (ContractDetails(..), Xabi(..))
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.CodePtr
 
 import           Slipstream.Data.Globals
 import           Slipstream.GlobalsColdStorage
@@ -53,7 +54,7 @@ xabiToText = T.replace "\'" "\'\'"
            . JSON.encode
 
 setContractABIs :: MonadIO m => IORef Globals -> CodePtr -> M.Map Text (Int32, ContractDetails) -> m ()
-setContractABIs gref (SolidVMCode _ _ !codeHash) detailsMap = do 
+setContractABIs gref (SolidVMCode _ !codeHash) detailsMap = do 
   globals@Globals{..} <- readIORef gref
   updateGlobals gref globals{contractABIs=HM.insert codeHash detailsMap contractABIs}
 setContractABIs _ (EVMCode _) _ = error "cannot use the contractABIs cache for EVM contracts"
@@ -61,7 +62,7 @@ setContractABIs _ (CodeAtAccount _ _) _ = error "cannot use the contractABIs cac
 
 
 getContractABIs :: MonadIO m => IORef Globals -> CodePtr -> m (Maybe (M.Map Text (Int32, ContractDetails)))
-getContractABIs gref (SolidVMCode _ _ !codeHash) = do
+getContractABIs gref (SolidVMCode _ !codeHash) = do
   abis <- contractABIs <$> readIORef gref
   return $ HM.lookup codeHash abis
 getContractABIs _ (EVMCode _) = error "cannot use the contractABIs cache for EVM contracts"

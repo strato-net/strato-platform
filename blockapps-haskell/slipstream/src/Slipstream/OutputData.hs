@@ -30,6 +30,7 @@ import           UnliftIO.IORef
 import           UnliftIO.Exception              (handle, SomeException)
 
 import           BlockApps.Logging
+import           Blockchain.Data.AddressStateDB
 import           Blockchain.Strato.Model.Keccak256
 
 import Slipstream.Data.Action

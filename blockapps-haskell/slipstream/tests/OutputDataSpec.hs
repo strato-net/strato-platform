@@ -19,6 +19,7 @@ import BlockApps.Logging
 import qualified BlockApps.Solidity.Value as V
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256 (hash)
 import Slipstream.Events
 import Slipstream.Globals
@@ -320,7 +321,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     let testAdd = Address 0x98eaddede
         input = [ProcessedContract {
           address = testAdd,
-          codehash = SolidVMCode "SwissArmy" "MyOrg" $ hash "<CODEHASH>",
+          codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
           abi = "<ABI>",
           organization = "MyOrg",
           application = "MyApp",
@@ -441,7 +442,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     let testAdd = Address 0x22222222
         input = [ProcessedContract {
           address = testAdd,
-          codehash = SolidVMCode "SwissArmy" "MyOrg" $ hash "<CODEHASH>",
+          codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
           abi = "<ABI>",
           organization = "MyOrg",
           application = "MyApp",
@@ -468,7 +469,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     let testAdd = Address 0x22222222
         input = [ProcessedContract {
           address = testAdd,
-          codehash = SolidVMCode "SwissArmy" "MyOrg" $ hash "<CODEHASH>",
+          codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
           abi = "<ABI>",
           organization = "MyOrg",
           application = "MyApp",
