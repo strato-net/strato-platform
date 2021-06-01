@@ -1,6 +1,6 @@
 import React from "react";
 export function sec2Date(sec){
-    if (sec === 0){
+    if (sec === undefined || sec <= 0 ){
         return <div></div>;
     }
     let seconds = sec;
