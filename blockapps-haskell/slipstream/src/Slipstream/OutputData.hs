@@ -152,19 +152,22 @@ baseTableColumns = baseColumns ++ ["transaction_function_name"]
 
 
 tableNameToText :: TableName -> Text
-tableNameToText (IndexTableName o a c) = 
-  let org = if T.null o then "" else o <> ":"
-      app = if T.null a then "" else a <> ":"
-  in wrapDoubleQuotes $ escapeQuotes $ org <> app <> c
+tableNameToText (IndexTableName o a c) =
+  let prefix = if T.null o && T.null a
+                 then ""
+                 else T.concat [o, ":", a, ":"]
+  in wrapDoubleQuotes $ escapeQuotes $ prefix <> c
 tableNameToText (HistoryTableName o a c) = 
-  let org = if T.null o then "" else o <> ":"
-      app = if T.null a then "" else a <> ":"
-  in wrapDoubleQuotes $ escapeQuotes $ "history@" <> org <> app <> c
+ let prefix = if T.null o && T.null a
+                then ""
+                else T.concat [o, ":", a, ":"]
+  in wrapDoubleQuotes $ escapeQuotes $ "history@" <> prefix <> c
 tableNameToText (EventTableName o a c e) = 
-  let org = if T.null o then "" else o <> ":"
-      app = if T.null a then "" else a <> ":"
-      contractAndEvent = c <> "." <> e
-  in wrapDoubleQuotes $ escapeQuotes $ org <> app <> contractAndEvent
+ let prefix = if T.null o && T.null a
+                then ""
+                else T.concat [o, ":", a, ":"]
+     contractAndEvent = c <> "." <> e
+  in wrapDoubleQuotes $ escapeQuotes $ prefix <> contractAndEvent
 
 createInserts :: OutputM m
               => IORef Globals
@@ -536,10 +539,7 @@ insertEventTable :: OutputM m
 insertEventTable globalsIORef ev = do
   let eventTable = EventTableName (agOrganization ev) (agApplication ev) (agContractName ev) (agEventName ev)
   eventExists <- isTableCreated globalsIORef eventTable
-  if eventExists then do 
-    let query = insertEventTableQuery ev
-    $logInfoS "DAN" . T.pack $ "the event insertion query: " ++ show query
-    return (Just $ insertEventTableQuery ev)
+  if eventExists then return (Just $ insertEventTableQuery ev)
   else return Nothing
 
 insertEventTableQuery :: AggregateEvent -> Text
