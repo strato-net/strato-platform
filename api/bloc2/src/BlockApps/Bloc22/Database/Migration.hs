@@ -38,6 +38,8 @@ runBlocMigrations = do
   $logInfoS "runBlocMigrations" . T.pack $ "Running MigrationQuery: Create tables"
   void . blocModify $ \conn -> execute_ conn createTables
 
+             
+{-
   
   $logInfoS "runBlocMigrations" . T.pack $ "Running MigrationQuery: Insert schema version"
   void . blocModify $ \conn -> execute_ conn insertSchemaVersion
@@ -83,8 +85,6 @@ runBlocMigrations = do
   
   $logInfoS "runBlocMigrations" . T.pack $ "Running MigrationQuery: Alter hash name data column"
   void . blocModify $ \conn -> execute_ conn alterDataColumn
-             
-{-
 
   
   forM_ (drop dbSchemaVersion migrations) $ \(name, migration) -> case migration of
@@ -100,7 +100,7 @@ runBlocMigrations = do
             (\e@SqlError{..} -> putStrLn "Error suppressed: " >> print e >> return 0)
           Throw -> execute_ conn q
   updateMigrationNumber
--}
+
 {-
 updateMigrationNumber :: MonadIO m => m ()
 updateMigrationNumber = void . blocModify $ \conn -> execute conn updateSchemaVersion (Only $ length migrations)
@@ -183,3 +183,4 @@ migrateCodeHashToCodePtr = do
 
 alterDataColumn :: Query
 alterDataColumn = [sql| ALTER TABLE IF EXISTS hash_name ALTER COLUMN data_string TYPE text; |]
+-}
