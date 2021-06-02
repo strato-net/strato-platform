@@ -153,20 +153,26 @@ baseTableColumns = baseColumns ++ ["transaction_function_name"]
 
 tableNameToText :: TableName -> Text
 tableNameToText (IndexTableName o a c) =
-  let prefix = if T.null o && T.null a
+  let prefix = if T.null o
                  then ""
-                 else T.concat [o, ":", a, ":"]
+                 else if T.null a
+                   then o <> ":"
+                   else o <> ":" <> a <> ":"
   in wrapDoubleQuotes $ escapeQuotes $ prefix <> c
 tableNameToText (HistoryTableName o a c) = 
- let prefix = if T.null o && T.null a
-                then ""
-                else T.concat [o, ":", a, ":"]
+  let prefix = if T.null o
+                 then ""
+                 else if T.null a
+                   then o <> ":"
+                   else o <> ":" <> a <> ":"
   in wrapDoubleQuotes $ escapeQuotes $ "history@" <> prefix <> c
 tableNameToText (EventTableName o a c e) = 
- let prefix = if T.null o && T.null a
-                then ""
-                else T.concat [o, ":", a, ":"]
-     contractAndEvent = c <> "." <> e
+  let prefix = if T.null o
+                 then ""
+                 else if T.null a
+                   then o <> ":"
+                   else o <> ":" <> a <> ":"
+      contractAndEvent = c <> "." <> e
   in wrapDoubleQuotes $ escapeQuotes $ prefix <> contractAndEvent
 
 createInserts :: OutputM m
