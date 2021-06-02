@@ -150,6 +150,9 @@ baseTableColumns :: TableColumns
 baseTableColumns = baseColumns ++ ["transaction_function_name"]
 
 
+-- sometimes we need the unwrapped tablename
+tableNameToDoubleQuoteText :: TableName -> Text
+tableNameToDoubleQuoteText = wrapDoubleQuotes . tableNameToText
 
 tableNameToText :: TableName -> Text
 tableNameToText (IndexTableName o a c) =
@@ -158,14 +161,14 @@ tableNameToText (IndexTableName o a c) =
                  else if T.null a
                    then o <> ":"
                    else o <> ":" <> a <> ":"
-  in wrapDoubleQuotes $ escapeQuotes $ prefix <> c
+  in escapeQuotes $ prefix <> c
 tableNameToText (HistoryTableName o a c) = 
   let prefix = if T.null o
                  then ""
                  else if T.null a
                    then o <> ":"
                    else o <> ":" <> a <> ":"
-  in wrapDoubleQuotes $ escapeQuotes $ "history@" <> prefix <> c
+  in escapeQuotes $ "history@" <> prefix <> c
 tableNameToText (EventTableName o a c e) = 
   let prefix = if T.null o
                  then ""
@@ -173,7 +176,7 @@ tableNameToText (EventTableName o a c e) =
                    then o <> ":"
                    else o <> ":" <> a <> ":"
       contractAndEvent = c <> "." <> e
-  in wrapDoubleQuotes $ escapeQuotes $ prefix <> contractAndEvent
+  in escapeQuotes $ prefix <> contractAndEvent
 
 createInserts :: OutputM m
               => IORef Globals
@@ -298,7 +301,7 @@ expandContractTable globalsIORef (x:xs) tableName = do
 expandTableQuery :: TableName ->  TableColumns -> Text
 expandTableQuery tableName cols = T.concat
   [ "ALTER TABLE "
-  , tableNameToText tableName
+  , tableNameToDoubleQuoteText tableName
    , " ADD COLUMN " 
   , T.intercalate ", ADD COLUMN " cols
   , ";"
@@ -324,11 +327,10 @@ insertHistoryTable globalsIORef contracts@(x:_) = do
 
 insertContractTableQuery :: ProcessedContract -> Text
 insertContractTableQuery ProcessedContract{..} =
-  let org = if T.null organization then "" else organization <> ":"
-      app = if T.null application  then "" else application <> ":"
+  let tableName = IndexTableName organization application contractName
       conVals = wrapAndEscape . map escapeQuotes $
         [ T.pack $ keccak256ToHex $ resolvedCodePtrToSHA codehash
-        , org <> app <> contractName
+        , tableNameToText tableName
         , abi
         , chain
         ]
@@ -340,18 +342,15 @@ insertContractTableQuery ProcessedContract{..} =
 
 createIndexTableQuery :: ProcessedContract -> Text
 createIndexTableQuery contract =
-  -- because we need to add the _pkey to tableName before wrapDoubleQuotes, we don't use tableNameToText
-  let org = if T.null (organization contract) then "" else organization contract <> ":"
-      app = if T.null (application contract)  then "" else application contract <> ":"
-      tableName = escapeQuotes $ org <> app <> contractName contract
+  let tableName = IndexTableName (organization contract) (application contract) (contractName contract)
       list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData contract
    in T.concat
-        [ "CREATE TABLE IF NOT EXISTS " , wrapDoubleQuotes tableName , " ("
+        [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
         , csv $ ["address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
                "block_number text", "transaction_hash text", "transaction_sender text",
                "transaction_function_name text"] ++ tableColumns list
         , ",\n  CONSTRAINT "
-        , wrapDoubleQuotes (tableName <> "_pkey")
+        , wrapDoubleQuotes ((tableNameToText tableName) <> "_pkey")
         , "\n  PRIMARY KEY (address, \"chainId\") );"
         ]
 
@@ -360,7 +359,7 @@ createHistoryTableQuery contract =
   let tableName = HistoryTableName (organization contract) (application contract) (contractName contract)
       list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData contract
    in T.concat
-        [ "CREATE TABLE IF NOT EXISTS ", tableNameToText tableName, " ("
+        [ "CREATE TABLE IF NOT EXISTS ", tableNameToDoubleQuoteText tableName, " ("
         , csv $ ["address text NOT NULL", "\"chainId\" text NOT NULL", "block_hash text NOT NULL", "block_timestamp text",
                  "block_number text", "transaction_hash text NOT NULL", "transaction_sender text",
                  "transaction_function_name text"]
@@ -370,13 +369,12 @@ createHistoryTableQuery contract =
 
 addHistoryUnique :: ProcessedContract -> Text
 addHistoryUnique contract =
-  let org = if T.null (organization contract) then "" else organization contract <> ":"
-      app = if T.null (application contract)  then "" else application contract <> ":"
-      historyName = ("history@" <>) . escapeQuotes $ org <> app <> contractName contract
-      indexName = "index_" <> historyName
+  let historyName' = HistoryTableName (organization contract) (application contract) (contractName contract)
+      historyName = tableNameToDoubleQuoteText historyName'
+      indexName = "index_" <> (tableNameToText historyName')
   in  "CREATE UNIQUE INDEX IF NOT EXISTS " <> wrapDoubleQuotes indexName <>
-      "\n  ON " <> wrapDoubleQuotes historyName <> " (address, \"chainId\", block_hash, transaction_hash);\n" <>
-      "ALTER TABLE " <> wrapDoubleQuotes historyName <> " ADD PRIMARY KEY USING INDEX " <> wrapDoubleQuotes indexName <> ";"
+      "\n  ON " <> historyName <> " (address, \"chainId\", block_hash, transaction_hash);\n" <>
+      "ALTER TABLE " <> historyName <> " ADD PRIMARY KEY USING INDEX " <> wrapDoubleQuotes indexName <> ";"
 
 insertIndexTableQuery :: [ProcessedContract] -> Text
 insertIndexTableQuery [] = error "insertIndexTableQuery: unhandled empty list"
@@ -400,7 +398,7 @@ insertIndexTableQuery contracts@(x:_) =
       inserts = csv vals
    in T.concat
         [ "INSERT INTO "
-        , tableNameToText tableName
+        , tableNameToDoubleQuoteText tableName
         , " "
         , keySt
         , "\n  VALUES "
@@ -442,7 +440,7 @@ insertHistoryTableQuery contracts@(x:_) =
       inserts = csv vals
    in T.concat $
         [ "INSERT INTO "
-        , tableNameToText tableName
+        , tableNameToDoubleQuoteText tableName
         , " "
         , keySt
         , "\n  VALUES "
@@ -481,7 +479,7 @@ createEventTableQuery ev =
                 (map (\t -> T.concat [wrapDoubleQuotes t, " text"]) $ eventFields ev) 
   in T.concat   
       [ "CREATE TABLE IF NOT EXISTS " 
-      , tableNameToText tableName
+      , tableNameToDoubleQuoteText tableName
       ," ("
       , cols
       , ");"
@@ -555,7 +553,7 @@ insertEventTableQuery ev =
      vals = csv $ map (wrapSingleQuotes . snd) $ agEventArgs ev
  in T.concat
         [ "INSERT INTO "
-        , tableNameToText tableName
+        , tableNameToDoubleQuoteText tableName
         , " "
         , cols
         , " VALUES "
