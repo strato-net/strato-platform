@@ -4,6 +4,7 @@
   "homepage": "/dashboard/",
   "dependencies": {
     "@blueprintjs/core": "^1.22.0",
+    "@blueprintjs/select": "^3.16.3",
     "@blueprintjs/table": "^1.19.0",
     "bignumber.js": "4.0.2",
     "bootstrap": "3.3.7",

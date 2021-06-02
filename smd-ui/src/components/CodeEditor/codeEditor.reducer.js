@@ -30,6 +30,9 @@ const initialState = {
 };
 
 const formatCompilationErrors = function (error) {
+  if (typeof error !== "string") {
+    return "Failed to connect to the Strato compiler."
+  }
   if (error.indexOf('\n') === -1) {
     const jsonErr = JSON.parse(error);
     return jsonErr.replace(/\n/g, "\n");
