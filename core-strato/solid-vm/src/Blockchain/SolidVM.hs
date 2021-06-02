@@ -768,6 +768,7 @@ runStatement st@(Xabi.EmitStatement eventName exptups pos) = do
   expVals <- mapM getVar exps
   expStrs <- mapM showSM expVals
 
+
   -- checks that the event is declared and that the number of args match
   --   DOES NOT check consistency of arg types
   curInfo <- getCurrentCallInfo
@@ -788,6 +789,7 @@ runStatement st@(Xabi.EmitStatement eventName exptups pos) = do
         let maybeCertBlockDB = M.lookup address x509s
             maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
             organization = fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
+         
         parentName <- fromMaybeM (return "") $ runMaybeT 
             $   pure account
             >>= MaybeT . getAddressStateMaybe
@@ -796,7 +798,11 @@ runStatement st@(Xabi.EmitStatement eventName exptups pos) = do
             >>= (\case     
                     SolidVMCode name _ | name /= (_contractName curCnct) -> pure name
                     _                                                    -> pure "")
-        addEvent $ Event organization parentName (_contractName curCnct) account eventName expStrs
+        
+        -- pair up field names with values one-by-one (no type checking tho, lol)
+        let pairs = zip (map (T.unpack . fst) $ Xabi.eventLogs ev) expStrs
+        
+        addEvent $ Event organization parentName (_contractName curCnct) account eventName pairs
         return Nothing
 
 

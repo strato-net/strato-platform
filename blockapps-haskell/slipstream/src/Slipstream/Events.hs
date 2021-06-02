@@ -13,6 +13,7 @@ import           Data.Time
 
 import qualified BlockApps.Solidity.Value as V
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Keccak256
 import           Slipstream.SolidityValue
 import           Slipstream.Data.Globals
@@ -49,5 +50,7 @@ data EventTable = EventTable
   , eventApplication  :: Text
   , eventContractName :: Text
   , eventName         :: Text
-  , eventFields       :: [Text]
+  , eventFields       :: TableColumns
   } deriving (Show)
+
+

@@ -30,10 +30,10 @@ import           GHC.Generics
 import           Blockchain.Strato.Model.Action ( Action(..), ActionData(..), ActionDataDiff(..)
                                                 , CallType(..), CallData(..))
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Keccak256
 
-import           Slipstream.Data.Globals
 
 data AggregateAction = AggregateAction
   { actionBlockHash      :: Keccak256
@@ -65,7 +65,7 @@ flatten Action{..} = flip map (M.toList _actionData) $
           , actionOrganization   = _actionDataOrganization
           , actionApplication    = _actionDataApplication
           , actionAccount        = account
-          , actionCodeHash       = convertToSlipCodePtr _actionDataCodeHash _actionDataOrganization
+          , actionCodeHash       = _actionDataCodeHash
           , actionStorage        = _actionDataStorageDiffs
           , actionType           = t
           , actionCallData       = _actionDataCallData
@@ -107,7 +107,7 @@ data AggregateEvent = AggregateEvent
   , agContractName         :: Text
   , agContractAccount      :: Account
   , agEventName            :: Text
-  , agEventArgs            :: [Text]
+  , agEventArgs            :: [(Text, Text)]
   } deriving (Show, Generic, NFData)
 
 
@@ -119,7 +119,7 @@ squash Action{..} = flip map (toList _actionEvents)
     , agContractName          = T.pack $ evContractName ev
     , agContractAccount       = evContractAccount ev
     , agEventName             = T.pack $ evName ev
-    , agEventArgs             = map T.pack (evArgs ev)
+    , agEventArgs             = map (\(x,y) -> (T.pack x, T.pack y)) $ evArgs ev
     }
   )
  

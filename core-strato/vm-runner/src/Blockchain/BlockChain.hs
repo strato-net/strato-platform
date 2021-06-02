@@ -668,7 +668,7 @@ outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otB
         afterDeletes = S.fromList [ x | (x, ASDeleted) <-  M.toList afterMap ]
         ranBlockHash = hashFunction b
         mkLogEntry Log{..} = LogDB ranBlockHash theHash chainId (account ^. accountAddress) (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
-        mkEventEntry Event{..} = EventDB chainId evName evArgs
+        mkEventEntry Event{..} = EventDB chainId evName $ map snd evArgs -- drop the field names, only slipstream needs them
         (!response, theTrace', theLogs, theEvents) =
           case result of
             Left _ -> (BSS.empty, [], [], []) --TODO keep the trace when the run fails

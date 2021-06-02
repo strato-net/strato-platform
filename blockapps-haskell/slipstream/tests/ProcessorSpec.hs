@@ -79,7 +79,7 @@ messageToSplit = [r|
              "eventContractApplication": "",
              "eventContractAccount" : "2e385b6a3aea46d4172df98617b5385c13b7100d",
              "eventName" : "Vehicle Event",
-             "eventArgs" : ["x", "y"]
+             "eventArgs" : [["field", "value"], ["anotherField", "anotherValue"]]
            }
          ]
 }
@@ -154,7 +154,7 @@ messageToSplit2 = [r|
              "eventContractApplication": "OutOfSpace3",
              "eventContractAccount" : "2e385b6a3aea46d4172df98617b5385c13b7100d",
              "eventName" : "Vehicle Event",
-             "eventArgs" : ["x", "y"]
+             "eventArgs" : [["field", "value"], ["anotherField", "anotherValue"]]
            }
          ]
 }
