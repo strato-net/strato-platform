@@ -664,6 +664,7 @@ Object {
 
 exports[`ContractQuery: reducer set initial state 1`] = `
 Object {
+  "contractAddress": null,
   "error": null,
   "queryResults": null,
   "queryString": "",
