@@ -1061,6 +1061,7 @@ runVMM isRunningTests' isHomestead preExistingSuicideList cDepth env availableGa
         , erAction             = Just $ _action vmState
         , erException          = Just (Right e)
         , erKind               = EVM
+        , erNewX509Certs       = M.empty
         }
     Right _ -> do
       vmState'@VMState{..} <- readIORef vmStateRef
@@ -1463,6 +1464,7 @@ vmStateToExecResults vmState = do
       , erAction             = Just $ _action vmState
       , erException          = Nothing
       , erKind               = EVM
+      , erNewX509Certs       = M.empty
       }
 
 getEVMCode' :: HasCodeDB m => CodePtr -> m BC.ByteString

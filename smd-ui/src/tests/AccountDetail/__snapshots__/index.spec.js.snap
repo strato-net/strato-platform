@@ -78,24 +78,6 @@ exports[`Account: index renders correctly (Oauth)  with empty values 1`] = `
       <tr>
         <td>
           <strong>
-            Contract Root
-          </strong>
-        </td>
-        <td>
-          <HexText value={[undefined]} classes=\\"smd-pad-2\\" />
-        </td>
-      </tr>
-      <tr>
-        <td>
-          <strong>
-            Kind
-          </strong>
-        </td>
-        <td />
-      </tr>
-      <tr>
-        <td>
-          <strong>
             Balance
           </strong>
         </td>
@@ -110,16 +92,6 @@ exports[`Account: index renders correctly (Oauth)  with empty values 1`] = `
           </strong>
         </td>
         <td />
-      </tr>
-      <tr>
-        <td>
-          <strong>
-            Code Hash
-          </strong>
-        </td>
-        <td>
-          <HexText value={[undefined]} classes=\\"smd-pad-2\\" />
-        </td>
       </tr>
       <tr>
         <td>
@@ -164,26 +136,6 @@ exports[`Account: index renders correctly (Oauth)  with values 1`] = `
       <tr>
         <td>
           <strong>
-            Contract Root
-          </strong>
-        </td>
-        <td>
-          <HexText value=\\"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421\\" classes=\\"smd-pad-2\\" />
-        </td>
-      </tr>
-      <tr>
-        <td>
-          <strong>
-            Kind
-          </strong>
-        </td>
-        <td>
-          AddressStateRef
-        </td>
-      </tr>
-      <tr>
-        <td>
-          <strong>
             Balance
           </strong>
         </td>
@@ -199,16 +151,6 @@ exports[`Account: index renders correctly (Oauth)  with values 1`] = `
         </td>
         <td>
           26
-        </td>
-      </tr>
-      <tr>
-        <td>
-          <strong>
-            Code Hash
-          </strong>
-        </td>
-        <td>
-          <HexText value=\\"c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470\\" classes=\\"smd-pad-2\\" />
         </td>
       </tr>
       <tr>
@@ -256,24 +198,6 @@ exports[`Account: index renders correctly (non-oauth) with empty values 1`] = `
       <tr>
         <td>
           <strong>
-            Contract Root
-          </strong>
-        </td>
-        <td>
-          <HexText value={[undefined]} classes=\\"smd-pad-2\\" />
-        </td>
-      </tr>
-      <tr>
-        <td>
-          <strong>
-            Kind
-          </strong>
-        </td>
-        <td />
-      </tr>
-      <tr>
-        <td>
-          <strong>
             Balance
           </strong>
         </td>
@@ -288,16 +212,6 @@ exports[`Account: index renders correctly (non-oauth) with empty values 1`] = `
           </strong>
         </td>
         <td />
-      </tr>
-      <tr>
-        <td>
-          <strong>
-            Code Hash
-          </strong>
-        </td>
-        <td>
-          <HexText value={[undefined]} classes=\\"smd-pad-2\\" />
-        </td>
       </tr>
       <tr>
         <td>
@@ -342,26 +256,6 @@ exports[`Account: index renders correctly (non-oauth) with values 1`] = `
       <tr>
         <td>
           <strong>
-            Contract Root
-          </strong>
-        </td>
-        <td>
-          <HexText value=\\"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421\\" classes=\\"smd-pad-2\\" />
-        </td>
-      </tr>
-      <tr>
-        <td>
-          <strong>
-            Kind
-          </strong>
-        </td>
-        <td>
-          AddressStateRef
-        </td>
-      </tr>
-      <tr>
-        <td>
-          <strong>
             Balance
           </strong>
         </td>
@@ -377,16 +271,6 @@ exports[`Account: index renders correctly (non-oauth) with values 1`] = `
         </td>
         <td>
           26
-        </td>
-      </tr>
-      <tr>
-        <td>
-          <strong>
-            Code Hash
-          </strong>
-        </td>
-        <td>
-          <HexText value=\\"c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470\\" classes=\\"smd-pad-2\\" />
         </td>
       </tr>
       <tr>
