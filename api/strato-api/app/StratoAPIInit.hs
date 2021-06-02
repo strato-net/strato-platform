@@ -14,7 +14,7 @@ import           Database.PostgreSQL.Simple
 import           HFlags
 
 import qualified BlockApps.Bloc22.Database.Create        as Bloc22
-import qualified BlockApps.Bloc22.Database.Migration     as Bloc22
+-- import qualified BlockApps.Bloc22.Database.Migration     as Bloc22
 import           Blockchain.Output
 import           Control.Monad.Composable.BlocSQL
 import           SelectAccessible                        ()
@@ -37,9 +37,9 @@ main = do
 
   close dbCreateConn
 
-  runLoggingT .
-    runBlocSQLM "postgres" 5432 "postgres" "api" $
-    Bloc22.runBlocMigrations
+  -- runLoggingT .
+  --   runBlocSQLM "postgres" 5432 "postgres" "api" $
+  --   Bloc22.runBlocMigrations
 
   return ()
 
