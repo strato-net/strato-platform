@@ -39,6 +39,7 @@ library:
     - core-api2
     - cryptonite
     - directory
+    - esqueleto
     - ethereum-rlp
     - extra
     - filepath
