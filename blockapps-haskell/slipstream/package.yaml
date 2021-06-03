@@ -49,6 +49,7 @@ library:
     - persistent-template
     - postgresql-typed
     - prometheus-client
+    - QuickCheck
     - retry
     - scientific
     - strato-model

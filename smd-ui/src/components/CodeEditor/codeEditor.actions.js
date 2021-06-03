@@ -18,10 +18,11 @@ export const changeCreateActionState = function (value, sourceCode, index) {
   }
 }
 
-export const compileCodeFromEditor = function (code) {
+export const compileCodeFromEditor = function (code, codeType) {
   return {
     type: CODE_EDITOR_COMPILE_REQUEST,
-    code: code
+    code, 
+    codeType
   }
 }
 

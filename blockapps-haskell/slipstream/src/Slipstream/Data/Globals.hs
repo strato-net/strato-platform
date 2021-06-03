@@ -20,18 +20,37 @@ import           Blockchain.Strato.Model.Keccak256
 import           Slipstream.Data.GlobalsColdStorage (Handle)
 
 
-
 instance NFData (LRU key val) where
   rnf = (`seq` ()) -- LRU is already pretty strict
 
+instance NFData (TableName) where
+  rnf = (`seq` ())
 
-data Globals = Globals { createdEvents :: S.Set (Text, Text) -- (contractName, eventName)
-                       , createdContracts :: S.Set CodePtr -- list of contacts with a table
-                       , createdInstances :: S.Set CodePtr -- probably redundant, but for now :)
-                       , historyList :: S.Set CodePtr
-                       , noIndexList :: S.Set CodePtr
-                       , functionHistoryList :: S.Set CodePtr
+
+data Globals = Globals { createdTables :: M.Map TableName TableColumns
+                       , historyList :: S.Set TableName
+                       , createdInstances :: S.Set CodePtr -- lets us avoid an extra bloc call
                        , contractABIs :: HM.HashMap Keccak256 (M.Map Text (Int32, ContractDetails))
                        , contractStates :: LRU Account [(Text, Value)]
                        , csHandle :: Handle
                        } deriving (Generic, NFData)
+
+data TableName = 
+    IndexTableName
+      { itOrganization :: Text
+      , itApplication  :: Text
+      , itContractName :: Text
+      }
+  | HistoryTableName -- technically the same as index, but logically different
+      { htOrganization :: Text
+      , htApplication  :: Text
+      , htContractName :: Text
+      }
+  | EventTableName
+      { etOrganization :: Text
+      , etApplication  :: Text
+      , etContractName :: Text
+      , etEventName    :: Text
+      } deriving (Show, Eq, Ord)
+
+type TableColumns = [Text]

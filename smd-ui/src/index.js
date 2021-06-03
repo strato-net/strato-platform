@@ -55,7 +55,7 @@ import {
   watchFetchArgs
 } from './components/Contracts/components/ContractMethodCall/contractMethodCall.saga';
 import watchExecuteQuery from './components/QueryEngine/queryEngine.saga';
-import { watchQueryCirrus, watchQueryCirrusVars } from './components/ContractQuery/contractQuery.saga';
+import { watchQueryCirrus, watchQueryCirrusVars} from './components/ContractQuery/contractQuery.saga';
 import watchSendTokens from './components/Accounts/components/SendTokens/sendTokens.saga';
 import watchCreateBlocUser from './components/CreateBlocUser/createBlocUser.saga';
 import watchFetchUpload from './components/ExternalStorage/externalStorage.saga';

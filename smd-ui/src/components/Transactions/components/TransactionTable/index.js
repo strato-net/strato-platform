@@ -17,10 +17,6 @@ class TransactionTable extends Component {
     this.props.executeQuery(RESOURCE_TYPES.transaction, this.props.query, this.props.selectedChain);
   }
 
-  componentWillUnmount() {
-    this.props.clearQuery();
-  }
-
   componentWillReceiveProps(newProps) {
     if (newProps.query !== this.props.query) {
       newProps.executeQuery(RESOURCE_TYPES.transaction, newProps.query, newProps.selectedChain);

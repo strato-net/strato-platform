@@ -1,14 +1,17 @@
 import {
   CLEAR_QUERY_STRING,
+  QUERY_CIRRUS_ADDRESS_SUCCESS,
   QUERY_CIRRUS_SUCCESS,
   QUERY_CIRRUS_FAILURE,
   QUERY_CIRRUS_VARS_SUCCESS,
+  QUERY_CIRRUS_VARS_FAILURE,
   ADD_QUERY_FILTER,
   REMOVE_QUERY_FILTER
 } from './contractQuery.actions';
 import { generateQueryString } from '../../lib/postgrestUtils'
 
 const initialState = {
+  contractAddress : null,
   queryString: '',
   queryResults: null,
   tags: [],
@@ -32,6 +35,11 @@ const reducer = function(state = initialState, action) {
         tags: [],
         queryString: ''
       }
+    case QUERY_CIRRUS_ADDRESS_SUCCESS:
+      return {
+        ...state,
+        contractAddress : action.contractAddress
+      }
     case QUERY_CIRRUS_SUCCESS:
       return {
         ...state,
@@ -46,6 +54,11 @@ const reducer = function(state = initialState, action) {
       return {
         ...state,
         vars: action.vars
+      }
+    case QUERY_CIRRUS_VARS_FAILURE:
+      return {
+        ...state,
+        error: action.error
       }
     case ADD_QUERY_FILTER:
       const aTags = [
