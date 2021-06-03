@@ -214,7 +214,31 @@ storageSpec = do
     it "should be able to flush" . runStorM $ do
       putSolidStorageKeyVal' (Account 0x342 Nothing) (MS.singleton "x") (MS.BBool True)
       flushMemSolidStorageDB
+
+    let solidIdTest msg bv = it ("put " <> msg <> " in SolidStorage should not change the state root") . runStorM $ do
+          want <- addressStateContractRoot <$> lookupWithDefault Proxy (Account 0x1234 Nothing)
+          want `shouldBe` "V\232\US\ETB\ESC\204U\166\255\131E\230\146\192\248n[H\224\ESC\153l\173\192\SOHb/\181\227c\180!"
+          putSolidStorageKeyVal' (Account 0x1234 Nothing) (MS.fromList [MS.Field "x", MS.ArrayIndex 99]) bv
+          flushMemStorageDB
+          got <- addressStateContractRoot <$> lookupWithDefault Proxy (Account 0x1234 Nothing)
+          want `shouldBe` got
     
+    solidIdTest "0"               (MS.BInteger 0)
+    solidIdTest "empty string"    (MS.BString "")
+    solidIdTest "False"           (MS.BBool False)
+    solidIdTest "zero account"    (MS.BAccount $ unspecifiedChain 0)
+    solidIdTest "zero enum value" (MS.BEnumVal "myEnum" "myEnumKey" 0)
+    solidIdTest "zero contract"   (MS.BContract "MyContractName" $ unspecifiedChain 0)
+    solidIdTest "BDefault"        (MS.BDefault)
+
+    it "put 1 in SolidStorage should change the state root" . runStorM $ do
+      want <- addressStateContractRoot <$> lookupWithDefault Proxy (Account 0x1234 Nothing)
+      putSolidStorageKeyVal' (Account 0x1234 Nothing) (MS.fromList [MS.Field "x", MS.ArrayIndex 99]) (MS.BInteger 1)
+      flushMemStorageDB
+      got <- addressStateContractRoot <$> lookupWithDefault Proxy (Account 0x1234 Nothing)
+      want `shouldNotBe` got
+      got `shouldBe` "\223\231^\"\234'\233\249\208*D\163\210\237\147\ETXq\202\EM\208\195\140\223\&7J\SI\201\250\&9\165\177\141"
+
   describe "X509 Certificates" $ do
     it "should get its puts" . runStorM $ do
       let address = 0x888 :: Address
