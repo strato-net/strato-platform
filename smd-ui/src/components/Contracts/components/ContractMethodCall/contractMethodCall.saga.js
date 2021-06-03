@@ -114,7 +114,8 @@ export function* fetchArgs(action) {
   try {
     const response = yield call(getArgs, action.name, action.address, action.symbol, action.chainId);
     const args = response.xabi.funcs[action.symbol].args;
-    yield put(methodCallFetchArgsSuccess(action.key, args));
+    const isPayable = response.xabi.funcs[action.symbol].payable;
+    yield put(methodCallFetchArgsSuccess(action.key, args, isPayable));
   }
   catch (err) {
     yield put(methodCallFetchArgsFailure(action.key, err));

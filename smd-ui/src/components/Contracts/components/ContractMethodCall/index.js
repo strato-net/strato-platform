@@ -186,7 +186,7 @@ class ContractMethodCall extends Component {
     const handleSubmit = this.props.handleSubmit;
     const isModeOauth = isOauthEnabled();
 
-    if (this.props.modal.args && Object.getOwnPropertyNames(this.props.modal.args).length > 0) {
+    if (this.props.modal.args && Object.getOwnPropertyNames(this.props.modal.args).length > 0 && this.props.modal.isPayable) {
       const args = Object.getOwnPropertyNames(this.props.modal.args);
       const self = this;
       args.forEach(function (arg, i) {
