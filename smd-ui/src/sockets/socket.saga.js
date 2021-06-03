@@ -20,7 +20,7 @@ import {
   GET_PEERS,
   GET_COINBASE,
   GET_HEALTH,
-  GET_NODE_UPTINE,
+  GET_NODE_UPTIME,
   GET_SYSTEM_INFO
 } from './rooms';
 import {
@@ -82,7 +82,7 @@ export function subscribe() {
     registerActions(emit, GET_PEERS, preloadPeers, updatePeers)
     registerActions(emit, GET_COINBASE, preloadCoinbase, updateCoinbase)
     registerActions(emit, GET_HEALTH, preloadHealth, updateHealth)
-    registerActions(emit, GET_NODE_UPTINE, preloadNodeUptime, updateNodeUptime)
+    registerActions(emit, GET_NODE_UPTIME, preloadNodeUptime, updateNodeUptime)
     registerActions(emit, GET_SYSTEM_INFO, preloadSystemInfo, updateSystemInfo)
     socket.on('disconnect', e => {
       // TODO: handle

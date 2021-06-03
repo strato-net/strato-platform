@@ -45,6 +45,7 @@ Object {
 exports[`CodeEditor: action compile code request 1`] = `
 Object {
   "code": "code",
+  "codeType": undefined,
   "type": "CODE_EDITOR_COMPILE_REQUEST",
 }
 `;

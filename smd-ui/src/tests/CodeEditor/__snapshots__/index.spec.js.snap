@@ -105,13 +105,57 @@ ShallowWrapper {
             </h3>
           </div>
           <div
-            className="col-md-8 text-right"
+            className="text-right"
           >
-            <Blueprint.Button
-              className="pt-intent-primary"
-              onClick={[Function]}
-              text="Compile"
-            />
+            <Blueprint.Popover
+              arrowSize={30}
+              className="h-align"
+              content={
+                <div>
+                  <Blueprint.Button
+                    className="pt-intent-primary smd-margin-8"
+                    onClick={[Function]}
+                    text="SolidVM"
+                  />
+                  <Blueprint.Button
+                    className="pt-intent-primary smd-margin-8"
+                    onClick={[Function]}
+                    text="EVM"
+                  />
+                </div>
+              }
+              defaultIsOpen={false}
+              hoverCloseDelay={300}
+              hoverOpenDelay={150}
+              inheritDarkTheme={true}
+              inline={false}
+              interactionKind={0}
+              isDisabled={false}
+              isModal={false}
+              openOnTargetFocus={true}
+              popoverClassName=""
+              position={7}
+              rootElementTag="span"
+              transitionDuration={300}
+              useSmartArrowPositioning={true}
+              useSmartPositioning={false}
+            >
+              <Blueprint.Button
+                className="pt-intent-primary smd-margin-8"
+                disabled={false}
+                text="Compile"
+              >
+                <Blueprint.Icon
+                  iconName="caret-down"
+                  style={
+                    Object {
+                      "margin": 0,
+                      "padding": 0,
+                    }
+                  }
+                />
+              </Blueprint.Button>
+            </Blueprint.Popover>
             <withRouter(Connect(ReduxForm))
               contractNameFromEditor="Cloner"
               enableCreateContract={false}
@@ -332,13 +376,57 @@ ShallowWrapper {
               </h3>
             </div>,
             <div
-              className="col-md-8 text-right"
+              className="text-right"
             >
-              <Blueprint.Button
-                className="pt-intent-primary"
-                onClick={[Function]}
-                text="Compile"
-              />
+              <Blueprint.Popover
+                arrowSize={30}
+                className="h-align"
+                content={
+                  <div>
+                    <Blueprint.Button
+                      className="pt-intent-primary smd-margin-8"
+                      onClick={[Function]}
+                      text="SolidVM"
+                    />
+                    <Blueprint.Button
+                      className="pt-intent-primary smd-margin-8"
+                      onClick={[Function]}
+                      text="EVM"
+                    />
+                  </div>
+                }
+                defaultIsOpen={false}
+                hoverCloseDelay={300}
+                hoverOpenDelay={150}
+                inheritDarkTheme={true}
+                inline={false}
+                interactionKind={0}
+                isDisabled={false}
+                isModal={false}
+                openOnTargetFocus={true}
+                popoverClassName=""
+                position={7}
+                rootElementTag="span"
+                transitionDuration={300}
+                useSmartArrowPositioning={true}
+                useSmartPositioning={false}
+              >
+                <Blueprint.Button
+                  className="pt-intent-primary smd-margin-8"
+                  disabled={false}
+                  text="Compile"
+                >
+                  <Blueprint.Icon
+                    iconName="caret-down"
+                    style={
+                      Object {
+                        "margin": 0,
+                        "padding": 0,
+                      }
+                    }
+                  />
+                </Blueprint.Button>
+              </Blueprint.Popover>
               <withRouter(Connect(ReduxForm))
                 contractNameFromEditor="Cloner"
                 enableCreateContract={false}
@@ -382,11 +470,55 @@ ShallowWrapper {
             "nodeType": "host",
             "props": Object {
               "children": Array [
-                <Blueprint.Button
-                  className="pt-intent-primary"
-                  onClick={[Function]}
-                  text="Compile"
-                />,
+                <Blueprint.Popover
+                  arrowSize={30}
+                  className="h-align"
+                  content={
+                    <div>
+                      <Blueprint.Button
+                        className="pt-intent-primary smd-margin-8"
+                        onClick={[Function]}
+                        text="SolidVM"
+                      />
+                      <Blueprint.Button
+                        className="pt-intent-primary smd-margin-8"
+                        onClick={[Function]}
+                        text="EVM"
+                      />
+                    </div>
+                  }
+                  defaultIsOpen={false}
+                  hoverCloseDelay={300}
+                  hoverOpenDelay={150}
+                  inheritDarkTheme={true}
+                  inline={false}
+                  interactionKind={0}
+                  isDisabled={false}
+                  isModal={false}
+                  openOnTargetFocus={true}
+                  popoverClassName=""
+                  position={7}
+                  rootElementTag="span"
+                  transitionDuration={300}
+                  useSmartArrowPositioning={true}
+                  useSmartPositioning={false}
+                >
+                  <Blueprint.Button
+                    className="pt-intent-primary smd-margin-8"
+                    disabled={false}
+                    text="Compile"
+                  >
+                    <Blueprint.Icon
+                      iconName="caret-down"
+                      style={
+                        Object {
+                          "margin": 0,
+                          "padding": 0,
+                        }
+                      }
+                    />
+                  </Blueprint.Button>
+                </Blueprint.Popover>,
                 <withRouter(Connect(ReduxForm))
                   contractNameFromEditor="Cloner"
                   enableCreateContract={false}
@@ -395,7 +527,7 @@ ShallowWrapper {
                   textFromEditor="contract Cloner {↵Sheep[] public clones;↵string public sheepDNA = \\"ccc\\";↵↵function cloneSheep(string name) returns (address)↵{ Sheep sheep = new Sheep(name, sheepDNA); clones.push(sheep); return sheep }↵↵}↵↵contract Sheep {↵string public name;↵string public dna;↵↵function Sheep(string _name, string _dna)↵{ name = _name; dna = _dna; }↵↵function geneticallyModify(string _dna)↵{ dna = _dna; }↵↵}"
                 />,
               ],
-              "className": "col-md-8 text-right",
+              "className": "text-right",
             },
             "ref": null,
             "rendered": Array [
@@ -404,12 +536,88 @@ ShallowWrapper {
                 "key": undefined,
                 "nodeType": "class",
                 "props": Object {
-                  "className": "pt-intent-primary",
-                  "onClick": [Function],
-                  "text": "Compile",
+                  "arrowSize": 30,
+                  "children": <Blueprint.Button
+                    className="pt-intent-primary smd-margin-8"
+                    disabled={false}
+                    text="Compile"
+                  >
+                    <Blueprint.Icon
+                      iconName="caret-down"
+                      style={
+                        Object {
+                          "margin": 0,
+                          "padding": 0,
+                        }
+                      }
+                    />
+                  </Blueprint.Button>,
+                  "className": "h-align",
+                  "content": <div>
+                    <Blueprint.Button
+                      className="pt-intent-primary smd-margin-8"
+                      onClick={[Function]}
+                      text="SolidVM"
+                    />
+                    <Blueprint.Button
+                      className="pt-intent-primary smd-margin-8"
+                      onClick={[Function]}
+                      text="EVM"
+                    />
+                  </div>,
+                  "defaultIsOpen": false,
+                  "hoverCloseDelay": 300,
+                  "hoverOpenDelay": 150,
+                  "inheritDarkTheme": true,
+                  "inline": false,
+                  "interactionKind": 0,
+                  "isDisabled": false,
+                  "isModal": false,
+                  "openOnTargetFocus": true,
+                  "popoverClassName": "",
+                  "position": 7,
+                  "rootElementTag": "span",
+                  "transitionDuration": 300,
+                  "useSmartArrowPositioning": true,
+                  "useSmartPositioning": false,
                 },
                 "ref": null,
-                "rendered": null,
+                "rendered": Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "class",
+                  "props": Object {
+                    "children": <Blueprint.Icon
+                      iconName="caret-down"
+                      style={
+                        Object {
+                          "margin": 0,
+                          "padding": 0,
+                        }
+                      }
+                    />,
+                    "className": "pt-intent-primary smd-margin-8",
+                    "disabled": false,
+                    "text": "Compile",
+                  },
+                  "ref": null,
+                  "rendered": Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "class",
+                    "props": Object {
+                      "iconName": "caret-down",
+                      "style": Object {
+                        "margin": 0,
+                        "padding": 0,
+                      },
+                    },
+                    "ref": null,
+                    "rendered": null,
+                    "type": [Function],
+                  },
+                  "type": [Function],
+                },
                 "type": [Function],
               },
               Object {
@@ -1259,13 +1467,57 @@ ShallowWrapper {
               </h3>
             </div>
             <div
-              className="col-md-8 text-right"
+              className="text-right"
             >
-              <Blueprint.Button
-                className="pt-intent-primary"
-                onClick={[Function]}
-                text="Compile"
-              />
+              <Blueprint.Popover
+                arrowSize={30}
+                className="h-align"
+                content={
+                  <div>
+                    <Blueprint.Button
+                      className="pt-intent-primary smd-margin-8"
+                      onClick={[Function]}
+                      text="SolidVM"
+                    />
+                    <Blueprint.Button
+                      className="pt-intent-primary smd-margin-8"
+                      onClick={[Function]}
+                      text="EVM"
+                    />
+                  </div>
+                }
+                defaultIsOpen={false}
+                hoverCloseDelay={300}
+                hoverOpenDelay={150}
+                inheritDarkTheme={true}
+                inline={false}
+                interactionKind={0}
+                isDisabled={false}
+                isModal={false}
+                openOnTargetFocus={true}
+                popoverClassName=""
+                position={7}
+                rootElementTag="span"
+                transitionDuration={300}
+                useSmartArrowPositioning={true}
+                useSmartPositioning={false}
+              >
+                <Blueprint.Button
+                  className="pt-intent-primary smd-margin-8"
+                  disabled={false}
+                  text="Compile"
+                >
+                  <Blueprint.Icon
+                    iconName="caret-down"
+                    style={
+                      Object {
+                        "margin": 0,
+                        "padding": 0,
+                      }
+                    }
+                  />
+                </Blueprint.Button>
+              </Blueprint.Popover>
               <withRouter(Connect(ReduxForm))
                 contractNameFromEditor="Cloner"
                 enableCreateContract={false}
@@ -1486,13 +1738,57 @@ ShallowWrapper {
                 </h3>
               </div>,
               <div
-                className="col-md-8 text-right"
+                className="text-right"
               >
-                <Blueprint.Button
-                  className="pt-intent-primary"
-                  onClick={[Function]}
-                  text="Compile"
-                />
+                <Blueprint.Popover
+                  arrowSize={30}
+                  className="h-align"
+                  content={
+                    <div>
+                      <Blueprint.Button
+                        className="pt-intent-primary smd-margin-8"
+                        onClick={[Function]}
+                        text="SolidVM"
+                      />
+                      <Blueprint.Button
+                        className="pt-intent-primary smd-margin-8"
+                        onClick={[Function]}
+                        text="EVM"
+                      />
+                    </div>
+                  }
+                  defaultIsOpen={false}
+                  hoverCloseDelay={300}
+                  hoverOpenDelay={150}
+                  inheritDarkTheme={true}
+                  inline={false}
+                  interactionKind={0}
+                  isDisabled={false}
+                  isModal={false}
+                  openOnTargetFocus={true}
+                  popoverClassName=""
+                  position={7}
+                  rootElementTag="span"
+                  transitionDuration={300}
+                  useSmartArrowPositioning={true}
+                  useSmartPositioning={false}
+                >
+                  <Blueprint.Button
+                    className="pt-intent-primary smd-margin-8"
+                    disabled={false}
+                    text="Compile"
+                  >
+                    <Blueprint.Icon
+                      iconName="caret-down"
+                      style={
+                        Object {
+                          "margin": 0,
+                          "padding": 0,
+                        }
+                      }
+                    />
+                  </Blueprint.Button>
+                </Blueprint.Popover>
                 <withRouter(Connect(ReduxForm))
                   contractNameFromEditor="Cloner"
                   enableCreateContract={false}
@@ -1536,11 +1832,55 @@ ShallowWrapper {
               "nodeType": "host",
               "props": Object {
                 "children": Array [
-                  <Blueprint.Button
-                    className="pt-intent-primary"
-                    onClick={[Function]}
-                    text="Compile"
-                  />,
+                  <Blueprint.Popover
+                    arrowSize={30}
+                    className="h-align"
+                    content={
+                      <div>
+                        <Blueprint.Button
+                          className="pt-intent-primary smd-margin-8"
+                          onClick={[Function]}
+                          text="SolidVM"
+                        />
+                        <Blueprint.Button
+                          className="pt-intent-primary smd-margin-8"
+                          onClick={[Function]}
+                          text="EVM"
+                        />
+                      </div>
+                    }
+                    defaultIsOpen={false}
+                    hoverCloseDelay={300}
+                    hoverOpenDelay={150}
+                    inheritDarkTheme={true}
+                    inline={false}
+                    interactionKind={0}
+                    isDisabled={false}
+                    isModal={false}
+                    openOnTargetFocus={true}
+                    popoverClassName=""
+                    position={7}
+                    rootElementTag="span"
+                    transitionDuration={300}
+                    useSmartArrowPositioning={true}
+                    useSmartPositioning={false}
+                  >
+                    <Blueprint.Button
+                      className="pt-intent-primary smd-margin-8"
+                      disabled={false}
+                      text="Compile"
+                    >
+                      <Blueprint.Icon
+                        iconName="caret-down"
+                        style={
+                          Object {
+                            "margin": 0,
+                            "padding": 0,
+                          }
+                        }
+                      />
+                    </Blueprint.Button>
+                  </Blueprint.Popover>,
                   <withRouter(Connect(ReduxForm))
                     contractNameFromEditor="Cloner"
                     enableCreateContract={false}
@@ -1549,7 +1889,7 @@ ShallowWrapper {
                     textFromEditor="contract Cloner {↵Sheep[] public clones;↵string public sheepDNA = \\"ccc\\";↵↵function cloneSheep(string name) returns (address)↵{ Sheep sheep = new Sheep(name, sheepDNA); clones.push(sheep); return sheep }↵↵}↵↵contract Sheep {↵string public name;↵string public dna;↵↵function Sheep(string _name, string _dna)↵{ name = _name; dna = _dna; }↵↵function geneticallyModify(string _dna)↵{ dna = _dna; }↵↵}"
                   />,
                 ],
-                "className": "col-md-8 text-right",
+                "className": "text-right",
               },
               "ref": null,
               "rendered": Array [
@@ -1558,12 +1898,88 @@ ShallowWrapper {
                   "key": undefined,
                   "nodeType": "class",
                   "props": Object {
-                    "className": "pt-intent-primary",
-                    "onClick": [Function],
-                    "text": "Compile",
+                    "arrowSize": 30,
+                    "children": <Blueprint.Button
+                      className="pt-intent-primary smd-margin-8"
+                      disabled={false}
+                      text="Compile"
+                    >
+                      <Blueprint.Icon
+                        iconName="caret-down"
+                        style={
+                          Object {
+                            "margin": 0,
+                            "padding": 0,
+                          }
+                        }
+                      />
+                    </Blueprint.Button>,
+                    "className": "h-align",
+                    "content": <div>
+                      <Blueprint.Button
+                        className="pt-intent-primary smd-margin-8"
+                        onClick={[Function]}
+                        text="SolidVM"
+                      />
+                      <Blueprint.Button
+                        className="pt-intent-primary smd-margin-8"
+                        onClick={[Function]}
+                        text="EVM"
+                      />
+                    </div>,
+                    "defaultIsOpen": false,
+                    "hoverCloseDelay": 300,
+                    "hoverOpenDelay": 150,
+                    "inheritDarkTheme": true,
+                    "inline": false,
+                    "interactionKind": 0,
+                    "isDisabled": false,
+                    "isModal": false,
+                    "openOnTargetFocus": true,
+                    "popoverClassName": "",
+                    "position": 7,
+                    "rootElementTag": "span",
+                    "transitionDuration": 300,
+                    "useSmartArrowPositioning": true,
+                    "useSmartPositioning": false,
                   },
                   "ref": null,
-                  "rendered": null,
+                  "rendered": Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "class",
+                    "props": Object {
+                      "children": <Blueprint.Icon
+                        iconName="caret-down"
+                        style={
+                          Object {
+                            "margin": 0,
+                            "padding": 0,
+                          }
+                        }
+                      />,
+                      "className": "pt-intent-primary smd-margin-8",
+                      "disabled": false,
+                      "text": "Compile",
+                    },
+                    "ref": null,
+                    "rendered": Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "class",
+                      "props": Object {
+                        "iconName": "caret-down",
+                        "style": Object {
+                          "margin": 0,
+                          "padding": 0,
+                        },
+                      },
+                      "ref": null,
+                      "rendered": null,
+                      "type": [Function],
+                    },
+                    "type": [Function],
+                  },
                   "type": [Function],
                 },
                 Object {

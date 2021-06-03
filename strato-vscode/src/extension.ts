@@ -56,7 +56,7 @@ export function activate(context: vscode.ExtensionContext) {
 		terminal.sendText(cmdStr, true)
 		const numFolders = (vscode.workspace.workspaceFolders || []).length;
         vscode.workspace.updateWorkspaceFolders(0, numFolders, { uri: workspaceFolderUri });
-		
+		await sleep(500);
 		fs.readFile(process.cwd()+'/resources/testupload.sh', 'utf8', function(err,data) {
 			if (err) {
 				return console.log(err);
@@ -143,5 +143,8 @@ export function activate(context: vscode.ExtensionContext) {
     activateStratoDebug(context);
 }
 
+async function sleep(ms: number){
+	return new Promise(resolve => setTimeout(resolve, ms));
+}
 // this method is called when your extension is deactivated
 export function deactivate() {}

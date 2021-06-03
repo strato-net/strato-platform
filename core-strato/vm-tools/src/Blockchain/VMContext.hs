@@ -170,6 +170,7 @@ data ContextState = ContextState
   , _coinbaseQueue     :: Q.Seq ((Address,Word64), Address)
   , _txRunResultsCache :: TRC.Cache
   , _debugSettings     :: Maybe DebugSettings
+  , _newX509Certs      :: M.Map Address X509Certificate
   } deriving (Generic, NFData)
 makeLenses ''ContextState
 
@@ -201,6 +202,7 @@ type VMBase m = ( MonadIO m
                 , (Account `A.Alters` AddressState) m
                 , (Keccak256 `A.Alters` DBCode) m
                 , HasX509CertDB m
+                , Mod.Modifiable (M.Map Address X509Certificate) m
                 , (N.NibbleString `A.Alters` N.NibbleString) m
                 , HasMemRawStorageDB m
                 , (RawStorageKey `A.Alters` RawStorageValue) m
@@ -397,10 +399,14 @@ instance (Keccak256 `A.Alters` DBCode) ContextM where
   insert _ = genericInsertCodeDB $ getCodeDB
   delete _ = genericDeleteCodeDB $ getCodeDB
 
-instance (Account `A.Alters` X509Certificate) ContextM where
+instance (Address `A.Alters` X509Certificate) ContextM where
   lookup _ = genericLookupX509CertDB $ getX509CertDB
   insert _ = genericInsertX509CertDB $ getX509CertDB
   delete _ = genericDeleteX509CertDB $ getX509CertDB
+
+instance Mod.Modifiable (M.Map Address X509Certificate) ContextM where
+    get _ = contextGets (^. newX509Certs) 
+    put _ newM = contextModify (set newX509Certs newM)
 
 instance (N.NibbleString `A.Alters` N.NibbleString) ContextM where
   lookup _ = genericLookupHashDB $ getHashDB
@@ -499,6 +505,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
             , _coinbaseQueue     = Q.empty
             , _txRunResultsCache = cache
             , _debugSettings     = Nothing
+            , _newX509Certs      = M.empty
             }
 
       let ctx = Context
@@ -563,6 +570,7 @@ runContextM dSettings f = do
             , _coinbaseQueue     = Q.empty
             , _txRunResultsCache = cache
             , _debugSettings     = dSettings
+            , _newX509Certs      = M.empty
             }
 
       let ctx = Context

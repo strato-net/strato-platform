@@ -14,6 +14,7 @@ module Blockchain.Data.AddressStateDB (
   blankAddressState,
   resolveCodePtr,
   unsafeResolveCodePtr,
+  resolveCodePtrParent,
   codePtrToSHA,
   resolvedCodePtrToSHA,
   codePtrToCodeKind,
@@ -127,6 +128,26 @@ unsafeResolveCodePtr (CodeAtAccount acct name) = lookup Proxy acct >>= \case
     Just (SolidVMCode _ d) -> pure . Just $ SolidVMCode name d
     _ -> pure Nothing
 unsafeResolveCodePtr codePtr = pure $ Just codePtr
+
+resolveCodePtrParent :: ( Selectable (Maybe Word256) ParentChainId m
+                        , (Account `Alters` AddressState) m
+                        )
+                        => Maybe Word256 -> CodePtr -> m (Maybe CodePtr)
+resolveCodePtrParent chainId cp@(CodeAtAccount acct _) = do
+  isAccessibleChain <- (acct ^. accountChainId) `isAncestorChainOf` chainId
+  if isAccessibleChain
+    then unsafeResolveCodePtrParent cp
+    else pure Nothing
+resolveCodePtrParent _ cp = unsafeResolveCodePtrParent cp
+
+unsafeResolveCodePtrParent :: (Account `Alters` AddressState) m => CodePtr -> m (Maybe CodePtr)
+unsafeResolveCodePtrParent (CodeAtAccount acct _) = lookup Proxy acct >>= \case
+  Nothing -> pure Nothing
+  Just AddressState{..} -> unsafeResolveCodePtrParent addressStateCodeHash >>= \case
+    Just e@(EVMCode _) -> pure $ Just e
+    Just (SolidVMCode name' d) -> pure . Just $ SolidVMCode name' d
+    _ -> pure Nothing
+unsafeResolveCodePtrParent codePtr = pure $ Just codePtr
 
 codePtrToSHA :: ( Selectable (Maybe Word256) ParentChainId m
                 , (Account `Alters` AddressState) m
