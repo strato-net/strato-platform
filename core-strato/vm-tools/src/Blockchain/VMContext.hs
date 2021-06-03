@@ -158,6 +158,7 @@ data MemDBs = MemDBs
   , _storageBlockMap :: M.Map (Account, B.ByteString) B.ByteString
   , _stateRoots      :: M.Map (Keccak256, Maybe Word256) MP.StateRoot
   , _currentBlock    :: Maybe CurrentBlockHash
+  , _newX509Certs    :: X509CertMap
   } deriving (Generic, NFData, Show)
 makeLenses ''MemDBs
 
@@ -170,7 +171,6 @@ data ContextState = ContextState
   , _coinbaseQueue     :: Q.Seq ((Address,Word64), Address)
   , _txRunResultsCache :: TRC.Cache
   , _debugSettings     :: Maybe DebugSettings
-  , _newX509Certs      :: M.Map Address X509Certificate
   } deriving (Generic, NFData)
 makeLenses ''ContextState
 
@@ -202,7 +202,6 @@ type VMBase m = ( MonadIO m
                 , (Account `A.Alters` AddressState) m
                 , (Keccak256 `A.Alters` DBCode) m
                 , HasX509CertDB m
-                , Mod.Modifiable (M.Map Address X509Certificate) m
                 , (N.NibbleString `A.Alters` N.NibbleString) m
                 , HasMemRawStorageDB m
                 , (RawStorageKey `A.Alters` RawStorageValue) m
@@ -243,6 +242,9 @@ getCodeDB = view $ dbs . codeDB
 
 getX509CertDB :: ContextM X509CertDB
 getX509CertDB = view $ dbs . x509CertDB
+
+getX509CertMap :: ContextM X509CertMap
+getX509CertMap = gets $ _newX509Certs . _memDBs
 
 getBlockSummaryDB :: ContextM BlockSummaryDB
 getBlockSummaryDB = view $ dbs . blockSummaryDB
@@ -400,13 +402,19 @@ instance (Keccak256 `A.Alters` DBCode) ContextM where
   delete _ = genericDeleteCodeDB $ getCodeDB
 
 instance (Address `A.Alters` X509Certificate) ContextM where
-  lookup _ = genericLookupX509CertDB $ getX509CertDB
-  insert _ = genericInsertX509CertDB $ getX509CertDB
-  delete _ = genericDeleteX509CertDB $ getX509CertDB
+  lookup _ = genericLookupX509CertDB' getX509CertDB getX509CertMap
+  insert _ k v = do certMap <- getX509CertMap
+                    modify $ memDBs . newX509Certs .~ (genericInsertX509CertDB certMap k v)
+  delete _ k = do certMap <- getX509CertMap
+                  modify $ memDBs . newX509Certs .~ (genericDeleteX509CertDB certMap k)
 
-instance Mod.Modifiable (M.Map Address X509Certificate) ContextM where
-    get _ = contextGets (^. newX509Certs) 
-    put _ newM = contextModify (set newX509Certs newM)
+instance (Address `Flushable` X509Certificate) ContextM where
+    flush _ _ = do
+        certDb <- getX509CertDB
+        certMap <- getX509CertMap
+        genericFlushX509 certDb certMap
+        modify $ memDBs . newX509Certs .~ M.empty
+
 
 instance (N.NibbleString `A.Alters` N.NibbleString) ContextM where
   lookup _ = genericLookupHashDB $ getHashDB
@@ -494,6 +502,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
             , _storageBlockMap = M.empty
             , _stateRoots      = M.empty
             , _currentBlock    = Nothing
+            , _newX509Certs    = M.empty
             }
 
       cstate <- newIORef $ ContextState
@@ -505,7 +514,6 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
             , _coinbaseQueue     = Q.empty
             , _txRunResultsCache = cache
             , _debugSettings     = Nothing
-            , _newX509Certs      = M.empty
             }
 
       let ctx = Context
@@ -559,6 +567,7 @@ runContextM dSettings f = do
             , _storageBlockMap = M.empty
             , _stateRoots      = M.empty
             , _currentBlock    = Nothing
+            , _newX509Certs    = M.empty
             }
 
       cstate <- newIORef $ ContextState
@@ -570,7 +579,6 @@ runContextM dSettings f = do
             , _coinbaseQueue     = Q.empty
             , _txRunResultsCache = cache
             , _debugSettings     = dSettings
-            , _newX509Certs      = M.empty
             }
 
       let ctx = Context

@@ -23,7 +23,6 @@ module Blockchain.SolidVM
 
 import           Control.DeepSeq                      (force)
 import           Control.Lens hiding (assign, from, to, Context)
-import           Control.Applicative
 import           Control.Monad
 import           Control.Monad.Extra                  (fromMaybeM)
 import qualified Control.Monad.Change.Alter           as A
@@ -79,7 +78,6 @@ import           Blockchain.SolidVM.SetGet
 import           Blockchain.SolidVM.TraceTools
 import           Blockchain.SolidVM.Value
 import           Blockchain.Strato.Model.Account
-import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Action
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Event
@@ -190,7 +188,6 @@ create :: SolidVMBase m
 --create isRunningTests' isHomestead preExistingSuicideList b callDepth sender origin
 --       value gasPrice availableGas newAddress initCode txHash chainId metadata =
 create _ _ _ blockData _ sender' origin' _ _ _ newAddress code txHash' chainId' metadata = do
-  x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
   recordCreate
   let env' = Env.Environment {
         Env.blockHeader = blockData,
@@ -217,11 +214,10 @@ create _ _ _ blockData _ sender' origin' _ _ _ newAddress code txHash' chainId' 
         !args = either (parseError "create arguments") Xabi.OrderedArgs maybeArgs
 
     (hsh, cc) <- codeCollectionFromSource initCode
-    create' sender' newAddress hsh cc contractName' args x509s
+    create' sender' newAddress hsh cc contractName' args
 
-create' :: MonadSM m => Account -> Account -> Keccak256 -> CodeCollection -> String -> Xabi.ArgList -> M.Map Address X509Certificate -> m ExecResults
-create' creator newAccount ch cc contractName' argExps x509s = do
-  Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ x509s
+create' :: MonadSM m => Account -> Account -> Keccak256 -> CodeCollection -> String -> Xabi.ArgList -> m ExecResults
+create' creator newAccount ch cc contractName' argExps = do
   parentName <- fromMaybeM (return "") $ runMaybeT 
      $   pure creator                                               -- Creator's address
      >>= MaybeT . getAddressStateMaybe                              -- Address's state
@@ -254,23 +250,19 @@ create' creator newAccount ch cc contractName' argExps x509s = do
   onTraced $ liftIO $ putStrLn $ C.red $ "Done Creating Contract: " ++ show newAccount ++ " of type " ++ contractName'
 
   finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
-  x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
 
 
   -- make sure the org is updated
-  maybeCertLevelDB <- x509CertDBGet $ _accountAddress creator
-  let maybeCertBlockDB = M.lookup (_accountAddress creator) x509s'
-      maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
-      org = T.pack . fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
+  maybeCert <- x509CertDBGet $ _accountAddress creator
+  let org = T.pack . fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
 
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     actionData %= M.adjust (actionDataOrganization .~ org) newAccount
 
   case maybeCert of
-      Just c  -> Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.insert (_accountAddress newAccount) c x509s'
+      Just c  -> x509CertDBPut (_accountAddress newAccount) c
       Nothing -> pure ()
 
-  x509s'' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
   finalAct <- Mod.get (Mod.Proxy @Action)
 
   return ExecResults {
@@ -284,8 +276,7 @@ create' creator newAccount ch cc contractName' argExps x509s = do
     erSuicideList = S.empty,
     erAction = Just finalAct,
     erException = Nothing,
-    erKind = SolidVM,
-    erNewX509Certs = x509s''
+    erKind = SolidVM
     }
 
 {-
@@ -350,7 +341,6 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
 
     finalAct <- Mod.get (Mod.Proxy @Action)
     finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
-    x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
 
     return $ ExecResults {
       erRemainingTxGas = 0, --Just use up all the allocated gas for now....
@@ -363,8 +353,7 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
       erSuicideList = S.empty,
       erAction = Just $ finalAct,
       erException = Nothing,
-      erKind = SolidVM,
-      erNewX509Certs = x509s
+      erKind = SolidVM
       }
 
 
@@ -784,12 +773,17 @@ runStatement st@(Xabi.EmitStatement eventName exptups pos) = do
       else do
         let account = currentAccount curInfo
             address = _accountAddress account
+<<<<<<< Updated upstream
         x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
         maybeCertLevelDB <- x509CertDBGet address
         let maybeCertBlockDB = M.lookup address x509s
             maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
             organization = fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
          
+=======
+        maybeCert <- x509CertDBGet address
+        let organization = fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
+>>>>>>> Stashed changes
         parentName <- fromMaybeM (return "") $ runMaybeT 
             $   pure account
             >>= MaybeT . getAddressStateMaybe
@@ -990,22 +984,13 @@ expToVar' x@(Xabi.MemberAccess expr name) = do
       (SBuiltinVariable "msg", "sender") -> (Constant . SAccount . accountToNamedAccount chainId . Env.sender) <$> getEnv
       (SBuiltinVariable "tx", "origin") -> (Constant . SAccount . accountToNamedAccount chainId . Env.origin) <$> getEnv
       (SBuiltinVariable "tx", "username") -> do env' <- getEnv
-                                                x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-                                                maybeCertLevelDB <- x509CertDBGet $ _accountAddress $ Env.origin env'
-                                                let maybeCertBlockDB = M.lookup (_accountAddress $ Env.origin env') x509s
-                                                    maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
+                                                maybeCert <- x509CertDBGet $ _accountAddress $ Env.origin env'
                                                 return . Constant . SString . fromMaybe "" . fmap subCommonName $ getCertSubject =<< maybeCert
       (SBuiltinVariable "tx", "organization") -> do env' <- getEnv
-                                                    x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-                                                    maybeCertLevelDB <- x509CertDBGet $ _accountAddress $ Env.origin env'
-                                                    let maybeCertBlockDB = M.lookup (_accountAddress $ Env.origin env') x509s
-                                                        maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
+                                                    maybeCert <- x509CertDBGet $ _accountAddress $ Env.origin env'
                                                     return . Constant . SString . fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
       (SBuiltinVariable "tx", "group") -> do env' <- getEnv
-                                             x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-                                             maybeCertLevelDB <- x509CertDBGet $ _accountAddress $ Env.origin env'
-                                             let maybeCertBlockDB = M.lookup (_accountAddress $ Env.origin env') x509s
-                                                 maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
+                                             maybeCert <- x509CertDBGet $ _accountAddress $ Env.origin env'
                                              return . Constant . SString . fromMaybe "" $ subUnit =<< getCertSubject =<< maybeCert
       (SStruct _ theMap, fieldName) -> case M.lookup fieldName theMap of
           Nothing -> missingField "struct member access" fieldName
@@ -1251,8 +1236,7 @@ expToVar' (Xabi.FunctionCall (Xabi.NewExpression (Xabi.Label contractName')) arg
   creator <- getCurrentAccount
   (hsh, cc) <- getCurrentCodeCollection
   newAddress <- getNewAddress creator
-  x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-  execResults <- create' creator newAddress hsh cc contractName' args x509s'
+  execResults <- create' creator newAddress hsh cc contractName' args
   return $ Constant $ SContract contractName' $ accountOnUnspecifiedChain
     $ fromMaybe (internalError "a call to create did not create an address" execResults)
     $  erNewContractAccount execResults
@@ -1488,14 +1472,10 @@ callBuiltin "registerCert" [SAccount a, SString cert] _ = do
     let ex509Cert = bsToCert . BC.pack $ cert
     case ex509Cert of
         Left _         -> return SNULL
-        Right x509Cert -> do x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-                             Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.insert (_accountAddress $ namedAccountToAccount Nothing a) x509Cert x509s
+        Right x509Cert -> do x509CertDBPut (_namedAccountAddress a) x509Cert
                              return SNULL
 callBuiltin "getUserCert" [SAccount a] _ = do
-    x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-    maybeCertLevelDB <- x509CertDBGet $ _namedAccountAddress a
-    let maybeCertBlockDB = M.lookup (_namedAccountAddress a) x509s
-        maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
+    maybeCert <- x509CertDBGet $ _namedAccountAddress a
     return $ certificateMap (fmap (BC.unpack . certToBytes) maybeCert)
 callBuiltin "parseCert" [SString cert] _ = return $ certificateMap (Just cert)
 callBuiltin x _ _ = unknownFunction "callBuiltin" x

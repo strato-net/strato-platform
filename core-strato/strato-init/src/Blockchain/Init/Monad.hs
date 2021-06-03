@@ -49,7 +49,8 @@ data SetupDBs =
     localStorageTx :: IORef (M.Map (Account, B.ByteString) B.ByteString),
     localStorageBlock :: IORef (M.Map (Account, B.ByteString) B.ByteString),
     localAddressStateTx :: IORef (M.Map Account AddressStateModification),
-    localAddressStateBlock :: IORef (M.Map Account AddressStateModification)
+    localAddressStateBlock :: IORef (M.Map Account AddressStateModification),
+    localX509s :: IORef X509CertMap
     }
 
 type SetupDBM = ReaderT SetupDBs (ResourceT (LoggingT IO))
@@ -64,9 +65,10 @@ runSetupDBM mv = do
   xdb <- X509CertDB <$> open x509CertDBPath
   [m1, m2] <- liftIO . replicateM 2 . newIORef $ M.empty
   [m3, m4] <- liftIO . replicateM 2 . newIORef $ M.empty
+  m5 <- liftIO . newIORef $ M.empty
   pool <- createPostgresqlPool connStr 20
   redisConn <- RBDB.RedisConnection <$> liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
-  runReaderT mv $ SetupDBs sdb srRef hdb cdb xdb pool redisConn m1 m2 m3 m4
+  runReaderT mv $ SetupDBs sdb srRef hdb cdb xdb pool redisConn m1 m2 m3 m4 m5
 
 instance (Maybe Word256 `A.Alters` MP.StateRoot) SetupDBM where
   lookup _ k = fmap (M.lookup k) $ liftIO . readIORef =<< asks stateRoots
@@ -114,9 +116,11 @@ instance (Keccak256 `A.Alters` DBCode) SetupDBM where
   delete _ = genericDeleteCodeDB $ asks codeDB
 
 instance (Address `A.Alters` X509Certificate) SetupDBM where
-  lookup _ = genericLookupX509CertDB $ asks x509DB
-  insert _ = genericInsertX509CertDB $ asks x509DB
-  delete _ = genericDeleteX509CertDB $ asks x509DB
+  lookup _ = genericLookupX509CertDB' (asks x509DB) (asks localX509s >>= liftIO . readIORef)
+  insert _ k v = do iom <- asks localX509s
+                    liftIO $ modifyIORef iom (\m -> genericInsertX509CertDB m k v)
+  delete _ k = do iom <- asks localX509s
+                  liftIO $ modifyIORef iom (\m -> genericDeleteX509CertDB m k)
 
 instance (N.NibbleString `A.Alters` N.NibbleString) SetupDBM where
   lookup _ = genericLookupHashDB $ asks hashDB
