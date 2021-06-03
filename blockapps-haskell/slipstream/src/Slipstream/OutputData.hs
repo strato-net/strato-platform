@@ -152,7 +152,7 @@ baseTableColumns = baseColumns ++ ["transaction_function_name"]
 
 -- sometimes we need the unwrapped tablename
 tableNameToDoubleQuoteText :: TableName -> Text
-tableNameToDoubleQuoteText = wrapDoubleQuotes . tableNameToText
+tableNameToDoubleQuoteText = wrapDoubleQuotes . escapeQuotes . tableNameToText
 
 tableNameToText :: TableName -> Text
 tableNameToText (IndexTableName o a c) =
@@ -161,14 +161,14 @@ tableNameToText (IndexTableName o a c) =
                  else if T.null a
                    then o <> ":"
                    else o <> ":" <> a <> ":"
-  in escapeQuotes $ prefix <> c
+  in prefix <> c
 tableNameToText (HistoryTableName o a c) = 
   let prefix = if T.null o
                  then ""
                  else if T.null a
                    then o <> ":"
                    else o <> ":" <> a <> ":"
-  in escapeQuotes $ "history@" <> prefix <> c
+  in "history@" <> prefix <> c
 tableNameToText (EventTableName o a c e) = 
   let prefix = if T.null o
                  then ""
@@ -176,7 +176,7 @@ tableNameToText (EventTableName o a c e) =
                    then o <> ":"
                    else o <> ":" <> a <> ":"
       contractAndEvent = c <> "." <> e
-  in escapeQuotes $ prefix <> contractAndEvent
+  in prefix <> contractAndEvent
 
 createInserts :: OutputM m
               => IORef Globals
@@ -350,7 +350,7 @@ createIndexTableQuery contract =
                "block_number text", "transaction_hash text", "transaction_sender text",
                "transaction_function_name text"] ++ tableColumns list
         , ",\n  CONSTRAINT "
-        , wrapDoubleQuotes ((tableNameToText tableName) <> "_pkey")
+        , wrapDoubleQuotes ((escapeQuotes $ tableNameToText tableName) <> "_pkey")
         , "\n  PRIMARY KEY (address, \"chainId\") );"
         ]
 
@@ -371,7 +371,7 @@ addHistoryUnique :: ProcessedContract -> Text
 addHistoryUnique contract =
   let historyName' = HistoryTableName (organization contract) (application contract) (contractName contract)
       historyName = tableNameToDoubleQuoteText historyName'
-      indexName = "index_" <> (tableNameToText historyName')
+      indexName = "index_" <> (escapeQuotes $ tableNameToText historyName')
   in  "CREATE UNIQUE INDEX IF NOT EXISTS " <> wrapDoubleQuotes indexName <>
       "\n  ON " <> historyName <> " (address, \"chainId\", block_hash, transaction_hash);\n" <>
       "ALTER TABLE " <> historyName <> " ADD PRIMARY KEY USING INDEX " <> wrapDoubleQuotes indexName <> ";"
