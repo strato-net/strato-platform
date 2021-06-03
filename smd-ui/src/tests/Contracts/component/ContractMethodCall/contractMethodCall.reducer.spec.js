@@ -33,7 +33,7 @@ describe('ContractMethodCall: reducer', () => {
 
     // METHOD_CALL_FETCH_ARGS_SUCCESS
     test('on success', () => {
-      const action = methodCallFetchArgsSuccess(modals.key, modals.args);
+      const action = methodCallFetchArgsSuccess(modals.key, modals.args, modals.isPayable);
       expect(reducer(initialState, action)).toMatchSnapshot();
     });
 
