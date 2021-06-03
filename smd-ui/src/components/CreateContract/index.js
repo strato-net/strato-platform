@@ -240,7 +240,7 @@ class CreateContract extends Component {
       </tr>);
     } else {
       let contract = src[contractname];
-      if (contract && contract['constr'] && contract['constr'].args !== undefined && contract['constr'].payable) {
+      if (contract && contract['constr'] && contract['constr'].args !== undefined) {
         const funcArgs = contract['constr'].args
         return Object.getOwnPropertyNames(funcArgs).map((arg, i) => {
           return (

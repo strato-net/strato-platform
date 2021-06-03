@@ -186,7 +186,7 @@ class ContractMethodCall extends Component {
     const handleSubmit = this.props.handleSubmit;
     const isModeOauth = isOauthEnabled();
 
-    if (this.props.modal.args && Object.getOwnPropertyNames(this.props.modal.args).length > 0 && this.props.modal.isPayable) {
+    if (this.props.modal.args && Object.getOwnPropertyNames(this.props.modal.args).length > 0) {
       const args = Object.getOwnPropertyNames(this.props.modal.args);
       const self = this;
       args.forEach(function (arg, i) {
@@ -280,7 +280,7 @@ class ContractMethodCall extends Component {
                   />
                 </div>
               </div>}
-              <div className="row">
+              {this.props.modal.isPayable && <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label label-margin">
                     Value
@@ -292,7 +292,7 @@ class ContractMethodCall extends Component {
                     component={ValueInput}
                   />
                 </div>
-              </div>
+              </div>}
               <div className="row">
                 <div className="col-sm-12">
                   <h5>Parameters</h5>
@@ -327,7 +327,6 @@ class ContractMethodCall extends Component {
               <div className="pt-dialog-footer-actions">
                 <Button text="Cancel" onClick={this.handleCloseModal} />
                 <button
-                  disabled={this.props.pristine || this.props.submitting || !this.props.valid}
                   className="pt-button pt-intent-primary"
                   type="button"
                   onClick={handleSubmit(this.submit)}
