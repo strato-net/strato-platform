@@ -26,7 +26,7 @@ main = do
           [x, y] -> (Just x, Just y)
           _      -> error "You can only supply 2 parameters"
 
-  _ <- flip runLoggingT noLog $ runContextM $ do
+  _ <- flip runLoggingT noLog $ runContextM Nothing $ do
     runAllTests maybeFileName maybeTestName
 
   return ()

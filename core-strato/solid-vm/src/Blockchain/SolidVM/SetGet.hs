@@ -1,9 +1,13 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeSynonymInstances  #-}
 
 module Blockchain.SolidVM.SetGet (
   setVar,
@@ -27,8 +31,8 @@ module Blockchain.SolidVM.SetGet (
 import           Control.Monad
 import           Control.Monad.IO.Class
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.UTF8  as UTF8
 import           Data.Foldable (for_)
-import           Data.IORef
 import           Data.List
 import qualified Data.Map as M
 import qualified Data.Text as T
@@ -43,6 +47,7 @@ import           Blockchain.Strato.Model.Account
 import qualified SolidVM.Model.Storable as MS
 import qualified SolidVM.Solidity.Xabi.Type as Xabi
 import           Text.Format
+import           UnliftIO
 
 --import Debug.Trace
 
@@ -140,11 +145,20 @@ setVal (STuple dstVector) (STuple srcVector) =
       srcItemVal <- getVar srcItemVar
       setVar dstItem srcItemVal
     
-setVal dst@(SReference (AccountPath addr path)) src = do
+setVal dst@(SReference addressedPath@(AccountPath addr path)) src = do
   ro <- readOnly <$> getCurrentCallInfo
   when ro $ invalidWrite "Invalid write during read-only access" $ "src: " ++ show src ++ ", dst: " ++ show dst
-  markDiffForAction addr path $ toBasic src
-  putSolidStorageKeyVal' addr path $ toBasic src
+  t <- getXabiValueType addressedPath   -- IMPORTANT: t is not evaulated until it is used
+  let basicSrc = case src of
+                        SString s ->
+                            case t of   -- t is evaluated here because Haskell is lazy
+                                        -- We ONLY want to evaluate it if we know src is a SString because
+                                        -- in some non-SString cases getXabiValueType will throw an exception
+                                Xabi.String{} -> MS.BString . UTF8.fromString $ s 
+                                _             -> toBasic src
+                        _         -> toBasic src
+  markDiffForAction addr path basicSrc
+  putSolidStorageKeyVal' addr path basicSrc
 
 
 setVal dst src = typeError "unknown case called in setVal:" ("src = " ++ show src ++ ", dst = " ++ show dst)
@@ -201,6 +215,11 @@ getVar (Constant (SReference addressedPath@(AccountPath addr key))) = do
         TStruct _ _ -> return $ SReference addressedPath
         TComplex -> return $ SReference addressedPath
         _ -> return $ findDefault typeHint
+    MS.BString bs -> do
+        t <- getXabiValueType addressedPath
+        case t of
+                Xabi.String{} -> return . SString $ UTF8.toString bs
+                _             -> return $ fromBasic theValue
     _ -> return $ fromBasic theValue
 getVar (Constant v) = return v
 getVar (Variable v) = liftIO $ readIORef v

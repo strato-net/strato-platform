@@ -5,10 +5,8 @@
 
 module SolidVM.Solidity.Xabi.Def where
 
-import           Control.DeepSeq
 import           Control.Lens                 (mapped, (&), (?~))
 import           Data.Aeson
-import           Data.Binary
 import           Data.Swagger
 import           Data.Text                    (Text)
 import qualified Generic.Random               as GR
@@ -25,7 +23,7 @@ defAesonOptions = defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="t
 data Def = Enum { names::[Text], bytes::Word }
          | Struct { fields::[(Text, Xabi.FieldType)], bytes::Word }
          | Contract { bytes::Word }
-         deriving (Eq, Show, Read, Generic, NFData, Binary)
+         deriving (Eq, Show, Generic)
 
 instance Arbitrary Def where arbitrary = GR.genericArbitrary GR.uniform
 instance ToJSON Def where

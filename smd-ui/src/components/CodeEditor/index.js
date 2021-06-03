@@ -3,7 +3,7 @@ import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import MonacoEditor from 'react-monaco-editor';
-import { Button, Tab2, Tabs2, Popover, Position } from '@blueprintjs/core';
+import { Button, Tab2, Tabs2, Popover, Position, Icon} from '@blueprintjs/core';
 import { onCompileFileLocally, onChangeFileName, contractNameChange, compileCodeFromEditor, changeCreateActionState, addNewFileTab, removeTab, onTabChange } from './codeEditor.actions';
 import { getSelectedTabContent } from './codeEditor.selector';
 import CreateContract from '../CreateContract';
@@ -12,7 +12,6 @@ import { downloadFile } from '../../lib/fileHandler.js';
 import Dropzone from 'react-dropzone';
 import { toasts } from "../Toasts";
 import debounce from 'lodash/debounce'
-
 class CodeEditor extends Component {
   constructor() {
     super()
@@ -79,7 +78,7 @@ class CodeEditor extends Component {
       };
       reader.onabort = () => toasts.show({ message: 'file reading was aborted' })
       reader.onerror = () => toasts.show({ message: 'file reading has failed' })
-      reader.readAsBinaryString(file);
+      reader.readAsText(file);
     });
   }
 
@@ -90,7 +89,7 @@ class CodeEditor extends Component {
   //   }, 3000);
   // }
 
-  compileCode() {
+  compileCode(codeType) {
     this.props.onCompileFileLocally('')
     try {
       if (this.props.codeEditorData.sourceCode === undefined || this.props.codeEditorData.sourceCode.length === 0) {
@@ -102,9 +101,7 @@ class CodeEditor extends Component {
         throw new Error("Can't find the imported file.")
       }
       mixpanelWrapper.track("compile_contract_code_click");
-      this.props.compileCodeFromEditor(
-        code
-      );
+      this.props.compileCodeFromEditor(code, codeType);
     } catch (e) {
       this.props.onCompileFileLocally(`${e}`)
     }
@@ -194,17 +191,36 @@ class CodeEditor extends Component {
           <div className="col-md-4 text-left">
             <h3>Contract Editor</h3>
           </div>
-          <div className="col-md-8 text-right">
-            <Button onClick={() => this.compileCode()} className="pt-intent-primary"
-              text="Compile" />
+          <div className="text-right">
+            <Popover
+              className="h-align"
+              position={Position.BOTTOM}
+              content={
+                <div>
+                <Button className="pt-intent-primary smd-margin-8" 
+                  text="SolidVM" 
+                  onClick={() => {this.compileCode("SolidVM")}}/>
+                <Button className="pt-intent-primary smd-margin-8" 
+                  text="EVM" 
+                  onClick={() => {this.compileCode("EVM")}}/>
+                </div>
+              }
+            >
+              <Button
+                className="pt-intent-primary smd-margin-8"
+                disabled={false}
+                text="Compile">
+                  <Icon style={{margin: 0, padding: 0}} iconName="caret-down"/>
+              </Button>
+            </Popover>
             <CreateContract
               onChangeEditorContractName={this.props.contractNameChange}
               contractNameFromEditor={this.props.codeEditorData.contractName}
               enableCreateContract={this.props.codeEditorData.enableCreateAction}
               textFromEditor={sourceCode}
               sourceFromEditor={this.props.codeEditorData.response && this.props.codeEditorData.response.src} />
+            </div>
           </div>
-        </div>
         {this.renderFileHandlerButtons()}
         <div className="row">
           <div className="col-md-12">

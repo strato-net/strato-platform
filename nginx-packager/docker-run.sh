@@ -16,6 +16,10 @@ OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
 OAUTH_JWT_USERNAME_PROPERTY=${OAUTH_JWT_USERNAME_PROPERTY:-email}
 OAUTH_SCOPE=${OAUTH_SCOPE:-openid email profile}
 OAUTH_STRATO42_FALLBACK=${OAUTH_STRATO42_FALLBACK:-false}
+VM_DEBUG=${vmDebug:-false}
+debugPort=${debugPort:-8051}
+debugWSPort=${debugWSPort:-8052}
+STATS_ENABLED=${STATS_ENABLED:-true}
 
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
@@ -65,6 +69,12 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
     sed -i '/#TEMPLATE_MARK_OAUTH_STRATO_43_AND_ABOVE/d' /tmp/nginx.conf
   fi
 
+  if [ "$VM_DEBUG" != true ]; then
+    sed -i '/#TEMPLATE_MARK_DEBUG/d' /tmp/nginx.conf
+  fi
+  sed -i 's/<DEBUG_PORT_PLACEHOLDER>/'"$debugPort"'/g' /tmp/nginx.conf
+  sed -i 's/<WS_DEBUG_PORT_PLACEHOLDER>/'"$debugWSPort"'/g' /tmp/nginx.conf
+
   # Remove SSL lines if deployment is not SSL-enabled
   # Set SSL cert file type if SSL-enabled
   if [ "$ssl" != true ]; then
@@ -79,9 +89,9 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
     sed -i '/#TEMPLATE_MARK_OLD_STRATO_API/d' /tmp/nginx.conf
   fi
 
-  # Remove tracking lines if running in mode 1
-  if [ "$STRATO_GS_MODE" = 1 ] ; then
-    sed -i '/#TEMPLATE_MARK_TRACK/d' /tmp/nginx.conf
+  # Remove Stats lines if running in STATS_ENABLED=false
+  if [ "$STATS_ENABLED" != true ] ; then
+    sed -i '/#TEMPLATE_MARK_STATS_ENABLED/d' /tmp/nginx.conf
   fi
 
   if [ "$blockstanbul" != true ]; then
@@ -90,6 +100,10 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
 
   if [ "$SERVE_LOGS" != true ]; then
     sed -i '/#TEMPLATE_MARK_LOGS/d' /tmp/nginx.conf
+  fi
+
+  if [ "$START_EXPERIMENTAL_STRATO_API" != true ]; then
+    sed -i '/#TEMPLATE_MARK_EXPERIMENTAL_STRATO_API/d' /tmp/nginx.conf
   fi
 
   # Set the Bloc API timeout

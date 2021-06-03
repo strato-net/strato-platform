@@ -15,6 +15,7 @@ import qualified Data.ByteString.Internal as BI
 import qualified Data.ByteString.Unsafe as BU
 import qualified Data.ByteString.Char8 as C8
 import qualified Data.ByteString.Base16 as B16
+import qualified Data.ByteString.UTF8   as UTF8
 import           Data.Char
 import           Data.Hashable
 import           Data.Scientific (isInteger, toBoundedInteger)
@@ -43,10 +44,19 @@ data BasicValue = BInteger !Integer
                 | BDefault -- Indicates a not present value
                 deriving (Show, Eq, Generic, NFData, Hashable, Binary)
 
+isDefault :: BasicValue -> Bool
+isDefault (BInteger i)     = i == 0
+isDefault (BString bs)     = B.null bs
+isDefault (BBool b)        = not b
+isDefault (BAccount a)     = a == unspecifiedChain 0x0
+isDefault (BEnumVal _ _ w) = w == 0
+isDefault (BContract _ a)  = a == unspecifiedChain 0x0
+isDefault BMappingSentinel = False
+isDefault BDefault         = True
 
 instance Format BasicValue where
   format (BInteger i) = show i
-  format (BString s) = show s
+  format (BString s) = ('"':) . (++"\"") $ UTF8.toString s
   format (BBool True) = "true"
   format (BBool False) = "false"
   format (BAccount a) = "account(" ++ show a ++ ")"

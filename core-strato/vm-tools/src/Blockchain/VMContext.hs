@@ -28,6 +28,7 @@ module Blockchain.VMContext
     , stateDB
     , hashDB
     , codeDB
+    , x509CertDB
     , blockSummaryDB
     , kafkaState
     , redisPool
@@ -69,6 +70,7 @@ module Blockchain.VMContext
 
 import           Control.DeepSeq
 import           Control.Lens                       hiding (Context(..))
+import           Control.Monad.Catch                (MonadCatch)
 import qualified Control.Monad.Change.Alter         as A
 import qualified Control.Monad.Change.Modify        as Mod
 import           Control.Monad.IO.Class
@@ -87,6 +89,7 @@ import           Data.Traversable                   (for)
 import qualified Database.LevelDB                   as DB
 import qualified Database.Persist.Sqlite            as Lite
 import qualified Database.Redis                     as Redis
+import           Debugger
 import           GHC.Generics
 import qualified Network.Kafka                      as K
 import qualified Network.Kafka.Protocol             as K
@@ -113,6 +116,7 @@ import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
+import           Blockchain.DB.X509CertDB
 import           Blockchain.EthConf
 import           Blockchain.ExtWord
 import           Blockchain.Strato.Model.Account
@@ -139,6 +143,7 @@ data ContextDBs = ContextDBs
   { _stateDB        :: MP.StateDB
   , _hashDB         :: HashDB
   , _codeDB         :: CodeDB
+  , _x509CertDB     :: X509CertDB
   , _blockSummaryDB :: BlockSummaryDB
   , _kafkaState     :: IORef K.KafkaState
   , _redisPool      :: RBDB.RedisConnection
@@ -164,6 +169,8 @@ data ContextState = ContextState
   , _blockRequested    :: Bool
   , _coinbaseQueue     :: Q.Seq ((Address,Word64), Address)
   , _txRunResultsCache :: TRC.Cache
+  , _debugSettings     :: Maybe DebugSettings
+  , _newX509Certs      :: M.Map Address X509Certificate
   } deriving (Generic, NFData)
 makeLenses ''ContextState
 
@@ -176,8 +183,10 @@ makeLenses ''Context
 type ContextM = ReaderT Context (ResourceT (LoggingT IO))
 
 type VMBase m = ( MonadIO m
+                , MonadCatch m
                 , MonadUnliftIO m
                 , MonadLogger m
+                , Mod.Modifiable (Maybe DebugSettings) m
                 , Mod.Modifiable ContextState m
                 , Mod.Accessible ContextState m
                 , Mod.Modifiable MemDBs m
@@ -192,6 +201,8 @@ type VMBase m = ( MonadIO m
                 , (MP.StateRoot `A.Alters` MP.NodeData) m
                 , (Account `A.Alters` AddressState) m
                 , (Keccak256 `A.Alters` DBCode) m
+                , HasX509CertDB m
+                , Mod.Modifiable (M.Map Address X509Certificate) m
                 , (N.NibbleString `A.Alters` N.NibbleString) m
                 , HasMemRawStorageDB m
                 , (RawStorageKey `A.Alters` RawStorageValue) m
@@ -229,6 +240,9 @@ getHashDB = view $ dbs . hashDB
 
 getCodeDB :: ContextM CodeDB
 getCodeDB = view $ dbs . codeDB
+
+getX509CertDB :: ContextM X509CertDB
+getX509CertDB = view $ dbs . x509CertDB
 
 getBlockSummaryDB :: ContextM BlockSummaryDB
 getBlockSummaryDB = view $ dbs . blockSummaryDB
@@ -282,6 +296,10 @@ instance Mod.Modifiable ContextState ContextM where
 
 instance Mod.Accessible Context ContextM where
   access _ = ask
+
+instance Mod.Modifiable (Maybe DebugSettings) ContextM where
+  get _    = gets $ view debugSettings
+  put _ ds = modify $ debugSettings .~ ds
 
 instance Mod.Accessible ContextState ContextM where
   access _ = get
@@ -381,6 +399,15 @@ instance (Keccak256 `A.Alters` DBCode) ContextM where
   insert _ = genericInsertCodeDB $ getCodeDB
   delete _ = genericDeleteCodeDB $ getCodeDB
 
+instance (Address `A.Alters` X509Certificate) ContextM where
+  lookup _ = genericLookupX509CertDB $ getX509CertDB
+  insert _ = genericInsertX509CertDB $ getX509CertDB
+  delete _ = genericDeleteX509CertDB $ getX509CertDB
+
+instance Mod.Modifiable (M.Map Address X509Certificate) ContextM where
+    get _ = contextGets (^. newX509Certs) 
+    put _ newM = contextModify (set newX509Certs newM)
+
 instance (N.NibbleString `A.Alters` N.NibbleString) ContextM where
   lookup _ = genericLookupHashDB $ getHashDB
   insert _ = genericInsertHashDB $ getHashDB
@@ -437,6 +464,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
       sdb <- openDB stateDBPath
       hdb <- openDB hashDBPath
       cdb <- openDB codeDBPath
+      x509db <- openDB x509CertDBPath
       blksumdb <- openDB blockSummaryCacheDBPath
       rPool <- liftIO . Redis.connect $ Redis.defaultConnectInfo {
         Redis.connectHost = "localhost",
@@ -452,6 +480,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
             { _stateDB        = MP.StateDB sdb
             , _hashDB         = HashDB hdb
             , _codeDB         = CodeDB cdb
+            , _x509CertDB     = X509CertDB x509db
             , _blockSummaryDB = BlockSummaryDB blksumdb
             , _kafkaState     = initialKafkaState
             , _redisPool      = RBDB.RedisConnection rPool
@@ -475,6 +504,8 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
             , _blockRequested    = False
             , _coinbaseQueue     = Q.empty
             , _txRunResultsCache = cache
+            , _debugSettings     = Nothing
+            , _newX509Certs      = M.empty
             }
 
       let ctx = Context
@@ -488,9 +519,11 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
       cstate' <- readIORef cstate
       return (a, cstate')
 
-runContextM :: (MonadIO m, MonadUnliftIO m, MonadLogger m) =>
-                ReaderT Context (ResourceT m) a -> m (a, ContextState)
-runContextM f = do
+runContextM :: (MonadIO m, MonadUnliftIO m, MonadLogger m)
+            => Maybe DebugSettings
+            -> ReaderT Context (ResourceT m) a
+            -> m (a, ContextState)
+runContextM dSettings f = do
     liftIO $ createDirectoryIfMissing False $ dbDir "h"
     runResourceT $ do
       conn <- createPostgresqlPool connStr 20
@@ -502,6 +535,7 @@ runContextM f = do
       sdb <- DB.open (dbDir "h" ++ stateDBPath) ldbOptions
       hdb <- DB.open (dbDir "h" ++ hashDBPath)  ldbOptions
       cdb <- DB.open (dbDir "h" ++ codeDBPath)  ldbOptions
+      x509db <- DB.open (dbDir "h" ++ x509CertDBPath) ldbOptions
       blksumdb <- DB.open (dbDir "h" ++ blockSummaryCacheDBPath) ldbOptions
       rPool <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
       kafkaStateRef <- newIORef $ mkConfiguredKafkaState "ethereum-vm"
@@ -511,6 +545,7 @@ runContextM f = do
             { _stateDB        = MP.StateDB sdb
             , _hashDB         = HashDB hdb
             , _codeDB         = CodeDB cdb
+            , _x509CertDB     = X509CertDB x509db
             , _blockSummaryDB = BlockSummaryDB blksumdb
             , _kafkaState     = kafkaStateRef
             , _redisPool      = RBDB.RedisConnection rPool
@@ -534,6 +569,8 @@ runContextM f = do
             , _blockRequested    = False
             , _coinbaseQueue     = Q.empty
             , _txRunResultsCache = cache
+            , _debugSettings     = dSettings
+            , _newX509Certs      = M.empty
             }
 
       let ctx = Context
@@ -545,11 +582,17 @@ runContextM f = do
       return (a, cstate')
 
 
-evalContextM :: (MonadIO m, MonadUnliftIO m, MonadLogger m) => ReaderT Context (ResourceT m) a -> m a
-evalContextM f = fst <$> runContextM f
+evalContextM :: (MonadIO m, MonadUnliftIO m, MonadLogger m)
+             => Maybe DebugSettings
+             -> ReaderT Context (ResourceT m) a
+             -> m a
+evalContextM d f = fst <$> runContextM d f
 
-execContextM :: (MonadIO m, MonadUnliftIO m, MonadLogger m) => ReaderT Context (ResourceT m) a -> m ContextState
-execContextM f = snd <$> runContextM f
+execContextM :: (MonadIO m, MonadUnliftIO m, MonadLogger m)
+             => Maybe DebugSettings
+             -> ReaderT Context (ResourceT m) a
+             -> m ContextState
+execContextM d f = snd <$> runContextM d f
 
 incrementNonce :: (Account `A.Alters` AddressState) f => Account -> f ()
 incrementNonce account = A.adjustWithDefault_ Mod.Proxy account $ \addressState ->

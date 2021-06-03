@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 module Blockchain.VM.SolidException
   ( SolidException(..)
+  , showSolidException
   , typeError
   , todo
   , indexOutOfBounds
@@ -55,27 +56,30 @@ data SolidException = TypeError String String
                     deriving (Eq, Exception, Generic, NFData)
 
 instance Show SolidException where
-  show (ArityMismatch m got want) = printf "arity mismatch: %s: got %d, want %d" m got want
-  show (InternalError m v) = printf "internal error: %s: %s" m v
-  show (InvalidArguments m v) = printf "invalid arguments: %s: %s" m v
-  show (IndexOutOfBounds a b)= printf "index out of bounds: %s: %s" a b
-  show (MissingField m v) = printf "missing field: %s: %s" m v
-  show (MissingType m v) = printf "missing type: %s: %s" m v
-  show (DuplicateDefinition m v) = printf "duplicate definition: %s: %s" m v
-  show (ParseError m v) = printf "parse error: %s: %s" m v
-  show (Require Nothing) = printf "solidity require failed"
-  show (Require (Just m)) = printf "solidity require failed: %s" m
-  show Assert = printf "solidity assert failed"
-  show (TODO m v) = printf "Unimplemented feature in SolidVM: %s: %s" m v
-  show (TypeError a b) = printf "type error: %s: %s" a b
-  show (UnknownConstant a b) = printf "unknown constant: %s: %s" a b
-  show (UnknownFunction a b) = printf "unknown function: %s: %s" a b
-  show (UnknownVariable a b) = printf "unknown variable: %s: %s" a b
-  show (UnknownStatement a b) = printf "unknown statement: %s: %s" a b
-  show (DivideByZero a) = printf "divide by zero error: %s" a
-  show (MissingCodeCollection a b) = printf "missing code collection: %s: %s" a b
-  show (InaccessibleChain a b) = printf "inaccessible chain: %s: %s" a b
-  show (InvalidWrite a b) = printf "invalid write: %s: %s" a b
+  show = showSolidException
+
+showSolidException :: SolidException -> String
+showSolidException (ArityMismatch m got want) = printf "arity mismatch: %s: got %d, want %d" m got want
+showSolidException (InternalError m v) = printf "internal error: %s: %s" m v
+showSolidException (InvalidArguments m v) = printf "invalid arguments: %s: %s" m v
+showSolidException (IndexOutOfBounds a b)= printf "index out of bounds: %s: %s" a b
+showSolidException (MissingField m v) = printf "missing field: %s: %s" m v
+showSolidException (MissingType m v) = printf "missing type: %s: %s" m v
+showSolidException (DuplicateDefinition m v) = printf "duplicate definition: %s: %s" m v
+showSolidException (ParseError m v) = printf "parse error: %s: %s" m v
+showSolidException (Require Nothing) = printf "solidity require failed"
+showSolidException (Require (Just m)) = printf "solidity require failed: %s" m
+showSolidException Assert = printf "solidity assert failed"
+showSolidException (TODO m v) = printf "Unimplemented feature in SolidVM: %s: %s" m v
+showSolidException (TypeError a b) = printf "type error: %s: %s" a b
+showSolidException (UnknownConstant a b) = printf "unknown constant: %s: %s" a b
+showSolidException (UnknownFunction a b) = printf "unknown function: %s: %s" a b
+showSolidException (UnknownVariable a b) = printf "unknown variable: %s: %s" a b
+showSolidException (UnknownStatement a b) = printf "unknown statement: %s: %s" a b
+showSolidException (DivideByZero a) = printf "divide by zero error: %s" a
+showSolidException (MissingCodeCollection a b) = printf "missing code collection: %s: %s" a b
+showSolidException (InaccessibleChain a b) = printf "inaccessible chain: %s: %s" a b
+showSolidException (InvalidWrite a b) = printf "invalid write: %s: %s" a b
 
 toThrower :: (Show v) => (String -> String -> SolidException) -> String -> v -> a
 toThrower cont msg = throw . cont msg . show

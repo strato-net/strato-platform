@@ -3,12 +3,14 @@ module Blockchain.SolidVM.CodeCollectionDB (codeCollectionFromSource, codeCollec
 
 import           Control.Exception
 import           Control.Monad.IO.Class
+import qualified Data.Aeson                           as Aeson
 import qualified Data.ByteString                      as B
-import qualified Data.ByteString.Char8                as BC
+import qualified Data.ByteString.Lazy                 as BL
 import           Data.IORef
 import           Data.Map                             (Map)
 import qualified Data.Map                             as M
 import qualified Data.Text                            as T
+import           Data.Text.Encoding                   (decodeUtf8, encodeUtf8)
 import           System.IO.Unsafe
 import           Text.Parsec                          (runParser)
 
@@ -26,21 +28,32 @@ import           CodeCollection
 unsafeCodeMapIORef :: IORef (Map Keccak256 CodeCollection)
 unsafeCodeMapIORef = unsafePerformIO $ newIORef M.empty
 
-compileSource :: B.ByteString -> CodeCollection
-compileSource initCode =
-  let maybeFile = runParser solidityFile "" "" $ BC.unpack initCode
-      file = either (parseError "compileSource") id maybeFile
+compileSource :: Map T.Text T.Text -> CodeCollection
+compileSource initCodeMap =
+  let getNamedContracts fileName src =
+        let maybeFile = runParser solidityFile "" (T.unpack fileName) $ T.unpack src
+            file = either (parseError "compileSource") id maybeFile
 
-      namedContracts = [(T.unpack name, xabiToContract (T.unpack name) (map T.unpack parents') xabi)
-                       | NamedXabi name (xabi, parents') <- unsourceUnits file]
-  in applyInheritance
+         in [(T.unpack name, xabiToContract (T.unpack name) (map T.unpack parents') xabi)
+            | NamedXabi name (xabi, parents') <- unsourceUnits file]
+      allContracts = concat . map (uncurry getNamedContracts) $ M.toList initCodeMap
+   in applyInheritance
         $ CodeCollection {
-            _contracts=M.fromList namedContracts
+            _contracts=M.fromList allContracts
           }
 
 codeCollectionFromSource :: (MonadIO m, HasCodeDB m) => B.ByteString -> m (Keccak256, CodeCollection)
 codeCollectionFromSource initCode = do
-  let hsh = hash initCode
+  let initList = case Aeson.decode $ BL.fromStrict initCode of
+        Just l -> l
+        Nothing -> case Aeson.decode $ BL.fromStrict initCode of
+          Just m -> M.toList m
+          Nothing -> [(T.empty, decodeUtf8 initCode)] -- for backwards compatibility
+      initMap = M.fromList initList
+      canonicalInitCode = case initList of
+        [(t, src)] | T.null t -> encodeUtf8 src -- for backwards compatibility
+        _ -> BL.toStrict $ Aeson.encode initList
+      hsh = hash canonicalInitCode
   codeMap <- liftIO $ readIORef unsafeCodeMapIORef
   case M.lookup hsh codeMap of
     Just cc -> do
@@ -48,8 +61,8 @@ codeCollectionFromSource initCode = do
       return (hsh, cc)
     Nothing -> do
       recordCacheEvent StorageWrite
-      hsh' <- addCode SolidVM initCode
-      let cc = compileSource initCode
+      hsh' <- addCode SolidVM canonicalInitCode
+      let cc = compileSource initMap
       let codeMap' = M.insert hsh cc codeMap
       recordCacheSize $ M.size codeMap'
       liftIO $ writeIORef unsafeCodeMapIORef codeMap'
@@ -67,7 +80,10 @@ codeCollectionFromHash hsh = do
       mCode <- getCode hsh
       case mCode of
         Just (_, initCode) -> do
-          let cc = compileSource initCode
+          let initMap = case Aeson.decode $ BL.fromStrict initCode of
+                  Just l -> M.fromList l
+                  Nothing -> M.singleton T.empty (decodeUtf8 initCode)
+          let cc = compileSource initMap
               codeMap' = M.insert hsh cc codeMap
           recordCacheSize $ M.size codeMap'
           liftIO $ writeIORef unsafeCodeMapIORef codeMap'

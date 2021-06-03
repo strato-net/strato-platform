@@ -39,7 +39,6 @@ services:
     - SINGLE_NODE=${SINGLE_NODE}
     - SMD_MODE=${SMD_MODE}
     - ssl=${ssl:-false}
-    - STRATO_GS_MODE=${STRATO_GS_MODE}
     build: .
     image: ${SMD_IMAGE:-<REPO_URL>smd:<VERSION>}
     restart: always
@@ -73,7 +72,10 @@ services:
     - prometheusHost=prometheus:9090
     - SINGLE_NODE=${SINGLE_NODE}
     - SMD_MODE=${SMD_MODE}
-    - STRATO_GS_MODE=${STRATO_GS_MODE}
+    - STATS_ENABLED=${STATS_ENABLED}
+    - STATS_DEBUG_CUSTOM_SERVER_URL=${STATS_DEBUG_CUSTOM_SERVER_URL}
+    - STATS_SUBMIT_ENABLED=${STATS_SUBMIT_ENABLED}
+    - STATS_SUBMIT_CONTRACT_TYPES_ENABLED=${STATS_SUBMIT_CONTRACT_TYPES_ENABLED}
     - stratoHost=strato:3000
     - vaultWrapperHost=vault-wrapper:8000
     build: .
@@ -115,7 +117,7 @@ services:
     - vault-wrapper
     environment:
     - BLOC_DEBUG=${BLOC_DEBUG}
-    - gasOn=${gasOn:-true}
+    - gasOn=${gasOn:-false}
     - kafkaHost=kafka
     - kafkaPort=9092
     - nonceCounterTimeout=${nonceCounterTimeout:-10}
@@ -204,11 +206,13 @@ services:
     - cacheTransactionResults=${cacheTransactionResults}
     - connectionTimeout=${connectionTimeout}
     - debugFail=${debugFail}
+    - debugPort=${debugPort}
+    - debugWSPort=${debugWSPort}
     - evmDebugMode=${evmDebugMode}
     - evmTraceMode=${evmTraceMode}
     - extraFaucets=${extraFaucets}
     - faucetEnabled=${faucetEnabled}
-    - gasOn=${gasOn:-true}
+    - gasOn=${gasOn:-false}
     - generateKey=${generateKey:-true}
     - genesis=${genesis}
     - genesisBlock=${genesisBlock}
@@ -241,6 +245,7 @@ services:
     - seqMaxUsPerIter=${seqMaxUsPerIter}
     - seqRTSOPTs=${seqRTSOPTs}
     - splitinit=true
+    - START_EXPERIMENTAL_STRATO_API=${START_EXPERIMENTAL_STRATO_API}
     - svmTrace=${svmTrace}
     - sqlDiff=${sqlDiff}
     - svmDev=${svmDev}
@@ -248,8 +253,10 @@ services:
     - useSyncMode=${useSyncMode}
     - validators=${validators}
     - vaultWrapperHost=${vaultWrapperHost:-vault-wrapper:8000}
+    - vmDebug=${vmDebug}
     - vmRunnerRTSOPTs=${vmRunnerRTSOPTs}
     - wireMessageCacheSize=${wireMessageCacheSize}
+    - wsDebug=${wsDebug}
     - zkHost=zookeeper
     build: .
     image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>}
@@ -317,6 +324,8 @@ services:
     - authBasic=${authBasic}
     - blockstanbul=${blockstanbul}
     - blockTime=${blockTime}
+    - debugPort=${debugPort}
+    - debugWSPort=${debugWSPort}
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
     - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
     - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
@@ -330,9 +339,11 @@ services:
     - SERVE_LOGS=${SERVE_LOGS}
     - ssl=${ssl}
     - sslCertFileType=${sslCertFileType}
-    - STRATO_GS_MODE=${STRATO_GS_MODE}
+    - START_EXPERIMENTAL_STRATO_API=${START_EXPERIMENTAL_STRATO_API}
+    - STATS_ENABLED=${STATS_ENABLED}
     - uiPassword=${uiPassword}
     - USE_OLD_STRATO_API=${USE_OLD_STRATO_API}
+    - vmDebug=${vmDebug}
     build: .
     image: ${NGINX_IMAGE:-<REPO_URL>nginx:<VERSION>}
     ports:

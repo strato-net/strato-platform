@@ -19,6 +19,7 @@ dependencies:
   - resourcet
   - strato-model
   - transformers
+  - utf8-string
 
 library:
   source-dirs: src

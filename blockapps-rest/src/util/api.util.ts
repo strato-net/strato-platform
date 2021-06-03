@@ -4,14 +4,19 @@ import ax from "../axios-wrapper";
 import { RestError } from "./rest.util";
 import { Options, OAuthUser } from "../types";
 
+const apexUrl = "/apex-api";
 const blocUrl = "/bloc/v2.2";
 const strato12Url = "/strato-api/eth/v1.2";
 const strato23Url = "/strato/v2.3";
 const cirrusUrl = "/cirrus/search";
 const externalStorageUrl = "/apex-api/bloc/file";
+const debugUrl = "/vm-debug";
 
 const Endpoint = {
+  HEALTH: `/health`,
+  STATUS: `${apexUrl}/status`,
   ACCOUNT: `${strato12Url}/account`,
+  VERSION: `${strato12Url}/version`,
   USER: `${blocUrl}/users/:username`,
   FILL: `${blocUrl}/users/user/:address/fill`,
   STATE: `${blocUrl}/contracts/:name/:address/state`,
@@ -27,7 +32,19 @@ const Endpoint = {
   EXT_ATTEST: `${externalStorageUrl}/attest`,
   EXT_VERIFY: `${externalStorageUrl}/verify`,
   EXT_DOWNLOAD: `${externalStorageUrl}/download`,
-  EXT_LIST: `${externalStorageUrl}/list`
+  EXT_LIST: `${externalStorageUrl}/list`,
+  DEBUG_STATUS: `${debugUrl}/status`,
+  DEBUG_PAUSE: `${debugUrl}/pause`,
+  DEBUG_RESUME: `${debugUrl}/resume`,
+  DEBUG_BREAKPOINTS: `${debugUrl}/breakpoints`,
+  DEBUG_BREAKPOINTS_PATH: `${debugUrl}/breakpoints/:path`,
+  DEBUG_STEP_IN: `${debugUrl}/step-in`,
+  DEBUG_STEP_OVER: `${debugUrl}/step-over`,
+  DEBUG_STEP_OUT: `${debugUrl}/step-out`,
+  DEBUG_STACK_TRACE: `${debugUrl}/stack-trace`,
+  DEBUG_VARIABLES: `${debugUrl}/variables`,
+  DEBUG_WATCHES: `${debugUrl}/watches`,
+  DEBUG_EVAL: `${debugUrl}/eval`
 };
 
 function constructEndpoint(endpointTemplate, options:Options, params = {}) {
@@ -192,9 +209,19 @@ async function get(host, endpoint, options:Options) {
   return ax.get(host, endpoint, options);
 }
 
+async function put(host, endpoint, data, options:Options) {
+  // TODO - @samrit do we need txParams here
+  return ax.put(host, endpoint, data, options);
+}
+
 async function postue(host, endpoint, data, options:Options) {
   // TODO - @samrit do we need txParams here
   return ax.postue(host, endpoint, data, options);
+}
+
+async function httpDelete(host, endpoint, data, options:Options) {
+  // TODO - @samrit do we need txParams here
+  return ax.httpDelete(host, endpoint, data, options);
 }
 
 export {
@@ -203,7 +230,9 @@ export {
   Endpoint,
   get,
   getNodeUrl,
+  put,
   post,
   postue,
+  httpDelete,
   setAuthHeaders
 };

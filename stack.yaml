@@ -3,6 +3,7 @@ packages:
 - api/bloc2api
 - api/core-api2
 - api/strato-api
+- api2/strato-api2
 - composable-monads/bloc-sql-monad
 - composable-monads/core-api-monad
 - composable-monads/sql-monad
@@ -28,6 +29,7 @@ packages:
 - core-strato/blockapps-data/
 - core-strato/blockapps-datadefs/
 - core-strato/blockapps-mpdbs/
+- core-strato/debugger/
 - core-strato/fast-keccak256/
 - core-strato/strato-init/
 - core-strato/ethereum-discovery/
@@ -66,6 +68,7 @@ packages:
 - shared-util/solid-vm-model/
 - clockwork
 - logserver
+- x509-certs/
 
 extra-deps:
 - Crypto-4.2.5.1@sha256:52275a055f4adf7c488260fb9fae60d03679632e64d3c8fc69d8b5951e8129cc,3688
@@ -83,7 +86,7 @@ extra-deps:
 - servant-options-0.1.0.0@sha256:39f50166a68006250e79370372f553ca476f14d06d93fa0c401050253aeba803,914
 - wai-middleware-prometheus-1.0.0@sha256:1625792914fb2139f005685be8ce519111451cfb854816e430fbf54af46238b4,1314
 - servant-aeson-specs-0.6.2.0@sha256:c2139f729695c18186394aeb50adceb5ba4b8adb3986626659f2210979bf5f99,2185
-
+- servant-swagger-tags-0.1.0.1@sha256:2d743e9ad1cfcca537acc99e0b97e0e4feda3b5c842937dbf5895261e3105bf1,1094
 
 
 #- git: https://github.com/blockapps/milena

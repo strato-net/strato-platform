@@ -32,11 +32,12 @@ export const methodCallFetchArgs = function (name, address, symbol, key, chainId
   };
 }
 
-export const methodCallFetchArgsSuccess = function (key, args) {
+export const methodCallFetchArgsSuccess = function (key, args, isPayable) {
   return {
     type: METHOD_CALL_FETCH_ARGS_SUCCESS,
     key: key,
-    args: args
+    args: args,
+    isPayable
   };
 }
 

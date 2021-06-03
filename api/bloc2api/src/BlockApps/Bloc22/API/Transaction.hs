@@ -7,6 +7,7 @@
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE OverloadedLists            #-}
 {-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TypeOperators              #-}
 
@@ -19,6 +20,7 @@ import           Data.Aeson                         hiding (Success)
 import           Data.Aeson.Casing
 import           Data.Map                           (Map)
 import qualified Data.Map                           as Map
+import           Data.Maybe
 import           Data.Text                          (Text)
 import qualified Generic.Random                     as GR
 import           GHC.Generics
@@ -37,6 +39,7 @@ import           BlockApps.Strato.Types
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Nonce
+import           Blockchain.Strato.Model.SourceMap
 import           Blockchain.Strato.Model.Wei
 
 --------------------------------------------------------------------------------
@@ -79,7 +82,7 @@ data PostBlocTransactionRequest = PostBlocTransactionRequest
   { postbloctransactionrequestAddress  :: Maybe Address
   , postbloctransactionrequestTxs      :: [BlocTransactionPayload]
   , postbloctransactionrequestTxParams :: Maybe TxParams
-  , postbloctransactionrequestSrcs     :: Maybe (Map Text Text)
+  , postbloctransactionrequestSrcs     :: Maybe (Map Text SourceMap) 
   } deriving (Eq, Show, Generic)
 
 instance Arbitrary PostBlocTransactionRequest where
@@ -148,10 +151,10 @@ instance FromJSON BlocTransactionPayload where
       CONTRACT -> BlocContract <$> (o .: "payload")
       FUNCTION -> BlocFunction <$> (o .: "payload")
       GENESIS  -> BlocGenesis  <$> (o .: "payload")
-  parseJSON o = error $ "fromJSON BlocTransactionPayload: Expected Object, but got " ++ show o
+  parseJSON o = fail $ "fromJSON BlocTransactionPayload: Expected Object, but got " ++ show o
 
 data ContractPayload = ContractPayload
-  { contractpayloadSrc      :: Maybe Text
+  { contractpayloadSrc      :: SourceMap
   , contractpayloadContract :: Maybe Text
   , contractpayloadArgs     :: Maybe (Map Text ArgValue)
   , contractpayloadValue    :: Maybe (Strung Natural)
@@ -187,14 +190,31 @@ instance Arbitrary FunctionPayload where
   arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToJSON ContractPayload where
-  toJSON = genericToJSON (aesonPrefix camelCase)
+  toJSON ContractPayload{..} = object
+    [ "contract" .= contractpayloadContract
+    , "src" .= contractpayloadSrc
+    , "args" .= contractpayloadArgs
+    , "value" .= contractpayloadValue
+    , "txParams" .= contractpayloadTxParams
+    , "chainid" .= contractpayloadChainid
+    , "metadata" .= contractpayloadMetadata
+    ]
 instance ToJSON TransferPayload where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance ToJSON FunctionPayload where
   toJSON = genericToJSON (aesonPrefix camelCase)
 
 instance FromJSON ContractPayload where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
+  parseJSON (Object o) =
+    ContractPayload
+      <$> (fromMaybe mempty <$> o .:? "src")
+      <*> (o .:? "contract")
+      <*> (o .:? "args")
+      <*> (o .:? "value")
+      <*> (o .:? "txParams")
+      <*> (o .:? "chainid")
+      <*> (o .:? "metadata")
+  parseJSON o = fail $ "parseJSON ContractPayload: Expected Object, got " ++ show o
 instance FromJSON TransferPayload where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 instance FromJSON FunctionPayload where
@@ -208,7 +228,7 @@ instance ToSchema BlocTransactionPayload where
     where
       ex :: BlocTransactionPayload
       ex = BlocContract $ ContractPayload
-        { contractpayloadSrc      = Just "contract SimpleStorage { uint x; function SimpleStorage(uint _x) { x = _x; } function set(uint _x) { x = _x; } }"
+        { contractpayloadSrc      = namedSource "SimpleStorage.sol" "contract SimpleStorage { uint x; function SimpleStorage(uint _x) { x = _x; } function set(uint _x) { x = _x; } }"
         , contractpayloadContract = Nothing
         , contractpayloadArgs     = Just $ Map.fromList [("_x", ArgInt 1)]
         , contractpayloadValue    = Nothing
@@ -225,7 +245,7 @@ instance ToSchema ContractPayload where
     where
       ex :: ContractPayload
       ex = ContractPayload
-        { contractpayloadSrc      = Just "contract SimpleStorage { uint x; function SimpleStorage(uint _x) { x = _x; } function set(uint _x) { x = _x; } }"
+        { contractpayloadSrc      = namedSource "SimpleStorage.sol" "contract SimpleStorage { uint x; function SimpleStorage(uint _x) { x = _x; } function set(uint _x) { x = _x; } }"
         , contractpayloadContract = Nothing
         , contractpayloadArgs     = Just $ Map.fromList [("_x", ArgInt 1)]
         , contractpayloadValue    = Nothing
@@ -278,7 +298,6 @@ instance ToJSON BlocChainOrTransactionResult where
 instance FromJSON BlocChainOrTransactionResult where
   parseJSON o = (BlocTxResult <$> parseJSON o)
             <|> (BlocChainResult <$> parseJSON o)
-            <|> pure (error $ "fromJSON BlocChainOrTransactionResult: Expected Object or hex-encoded string, but got " ++ show o)
 
 instance Arbitrary BlocChainOrTransactionResult where
   arbitrary = GR.genericArbitrary GR.uniform

@@ -4,8 +4,10 @@ import {
   constructMetadata,
   constructEndpoint,
   get,
+  put,
   post,
   postue,
+  httpDelete,
   getNodeUrl,
   setAuthHeaders
 } from "./util/api.util";
@@ -102,6 +104,24 @@ async function blocResults(user:OAuthUser, hashes, options:Options) {
 async function getAccounts(user:OAuthUser, options:Options) {
   const url = getNodeUrl(options);
   const endpoint = constructEndpoint(Endpoint.ACCOUNT, options);
+  return get(url, endpoint, setAuthHeaders(user, options));
+}
+
+
+async function getHealth(user:OAuthUser, options:Options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.HEALTH, options);
+  return get(url, endpoint, setAuthHeaders(user, options));
+}
+async function getStatus(user:OAuthUser, options:Options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.STATUS, options);
+  return get(url, endpoint, setAuthHeaders(user, options));
+}
+
+async function getVersion(user:OAuthUser, options:Options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.VERSION, options);
   return get(url, endpoint, setAuthHeaders(user, options));
 }
 
@@ -328,8 +348,119 @@ async function pingOauth(user:OAuthUser, options:Options) {
   return result.status;
 }
 
+async function debugStatus(user:OAuthUser, options:Options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.DEBUG_STATUS, options, {});
+  return get(url, endpoint, setAuthHeaders(user, options));
+}
+
+async function debugPause(user:OAuthUser, options:Options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.DEBUG_PAUSE, options, {});
+  return put(url, endpoint, {}, setAuthHeaders(user, options));
+}
+
+async function debugResume(user:OAuthUser, options:Options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.DEBUG_RESUME, options, {});
+  return put(url, endpoint, {}, setAuthHeaders(user, options));
+}
+
+async function debugGetBreakpoints(user:OAuthUser, options:Options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.DEBUG_BREAKPOINTS, options, {});
+  return get(url, endpoint, setAuthHeaders(user, options));
+}
+
+async function debugPutBreakpoints(user:OAuthUser, args, options:Options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.DEBUG_BREAKPOINTS, options, {});
+  return put(url, endpoint, args, setAuthHeaders(user, options));
+}
+
+async function debugDeleteBreakpoints(user:OAuthUser, args, options:Options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.DEBUG_BREAKPOINTS, options, {});
+  return httpDelete(url, endpoint, args, setAuthHeaders(user, options));
+}
+
+async function debugClearBreakpoints(user:OAuthUser, options:Options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.DEBUG_BREAKPOINTS, options, {});
+  return httpDelete(url, endpoint, [], setAuthHeaders(user, options));
+}
+
+async function debugClearBreakpointsPath(user:OAuthUser, path:string, options:Options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.DEBUG_BREAKPOINTS_PATH, options, {path});
+  return httpDelete(url, endpoint, {}, setAuthHeaders(user, options));
+}
+
+async function debugStepIn(user:OAuthUser, options:Options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.DEBUG_STEP_IN, options, {});
+  return postue(url, endpoint, {}, setAuthHeaders(user, options));
+}
+
+async function debugStepOver(user:OAuthUser, options:Options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.DEBUG_STEP_OVER, options, {});
+  return postue(url, endpoint, {}, setAuthHeaders(user, options));
+}
+
+async function debugStepOut(user:OAuthUser, options:Options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.DEBUG_STEP_OUT, options, {});
+  return postue(url, endpoint, {}, setAuthHeaders(user, options));
+}
+
+async function debugGetStackTrace(user:OAuthUser, options:Options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.DEBUG_STACK_TRACE, options, {});
+  return get(url, endpoint, setAuthHeaders(user, options));
+}
+
+async function debugGetVariables(user:OAuthUser, options:Options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.DEBUG_VARIABLES, options, {});
+  return get(url, endpoint, setAuthHeaders(user, options));
+}
+
+async function debugGetWatches(user:OAuthUser, options:Options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.DEBUG_WATCHES, options, {});
+  return get(url, endpoint, setAuthHeaders(user, options));
+}
+
+async function debugPutWatches(user:OAuthUser, args, options:Options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.DEBUG_WATCHES, options, {});
+  return put(url, endpoint, args, setAuthHeaders(user, options));
+}
+
+async function debugDeleteWatches(user:OAuthUser, args, options:Options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.DEBUG_WATCHES, options, {});
+  return httpDelete(url, endpoint, args, setAuthHeaders(user, options));
+}
+
+async function debugClearWatches(user:OAuthUser, options:Options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.DEBUG_WATCHES, options, {});
+  return httpDelete(url, endpoint, [], setAuthHeaders(user, options));
+}
+
+async function debugPostEval(user:OAuthUser, args, options:Options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.DEBUG_EVAL, options);
+  return post(url, endpoint, args, setAuthHeaders(user, options));
+}
+
 export default {
   getAccounts,
+  getHealth,
+  getStatus,
+  getVersion,
   getBalance,
   createUser,
   getCreateArgs,
@@ -357,5 +488,23 @@ export default {
   verifyExtStorage,
   downloadExtStorage,
   listExtStorage,
-  pingOauth
+  pingOauth,
+  debugStatus,
+  debugPause,
+  debugResume,
+  debugGetBreakpoints,
+  debugPutBreakpoints,
+  debugDeleteBreakpoints,
+  debugClearBreakpoints,
+  debugClearBreakpointsPath,
+  debugStepIn,
+  debugStepOver,
+  debugStepOut,
+  debugGetStackTrace,
+  debugGetVariables,
+  debugGetWatches,
+  debugPutWatches,
+  debugDeleteWatches,
+  debugClearWatches,
+  debugPostEval
 };

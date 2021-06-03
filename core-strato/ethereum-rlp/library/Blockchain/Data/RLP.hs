@@ -12,8 +12,12 @@ module Blockchain.Data.RLP (
   formatRLPObject,
   RLPSerializable(..),
   rlpSplit,
+  rlpSplitMaybe,
+  rlpSplitEither,
   rlpSerialize,
   rlpDeserialize,
+  rlpDeserializeMaybe,
+  rlpDeserializeEither,
   int2Bytes
   ) where
 
@@ -56,44 +60,49 @@ instance Pretty RLPObject where
 formatRLPObject::RLPObject->String
 formatRLPObject = show . pretty
 
-splitAtWithError::Int->B.ByteString->(B.ByteString, B.ByteString)
-splitAtWithError i s | i > B.length s = error "splitAtWithError called with n > length arr"
-splitAtWithError i s = B.splitAt i s
+splitAtEither :: Int -> B.ByteString -> Either String (B.ByteString, B.ByteString)
+splitAtEither i s | i > B.length s = Left "splitAtEither called with n > length arr"
+splitAtEither i s = Right $ B.splitAt i s
 
 getLength::Int->B.ByteString->(Integer, B.ByteString)
 getLength sizeOfLength bytes =
   (bytes2Integer $ B.unpack $ B.take sizeOfLength bytes, B.drop sizeOfLength bytes)
 
 rlpSplit::B.ByteString->(RLPObject, B.ByteString)
-rlpSplit input =
+rlpSplit = either error id . rlpSplitEither
+
+rlpSplitMaybe :: B.ByteString -> Maybe (RLPObject, B.ByteString)
+rlpSplitMaybe = either (const Nothing) Just . rlpSplitEither
+
+rlpSplitEither :: B.ByteString -> Either String (RLPObject, B.ByteString)
+rlpSplitEither input =
   case B.head input of
     x | x >= 192 && x <= 192+55 ->
-      let (arrayData, nextRest) =
-            splitAtWithError (fromIntegral x - 192) $ B.tail input
-      in (RLPArray $ getRLPObjects arrayData, nextRest)
+      let eResult = splitAtEither (fromIntegral x - 192) $ B.tail input
+      in (\(arrayData, nextRest) -> (RLPArray $ getRLPObjects arrayData, nextRest)) <$> eResult
 
     x | x >= 0xF8 && x <= 0xFF ->
       let
         (arrLength, restAfterLen) = getLength (fromIntegral x - 0xF7) $ B.tail input
-        (arrayData, nextRest) = splitAtWithError (fromIntegral arrLength) restAfterLen
-      in (RLPArray $ getRLPObjects arrayData, nextRest)
+        eResult = splitAtEither (fromIntegral arrLength) restAfterLen
+      in (\(arrayData, nextRest) -> (RLPArray $ getRLPObjects arrayData, nextRest)) <$> eResult
 
     x | x >= 128 && x <= 128+55 ->
       let
-        (strList, nextRest) = splitAtWithError (fromIntegral $ x - 128) $ B.tail input
+        eResult = splitAtEither (fromIntegral $ x - 128) $ B.tail input
       in
-       (RLPString strList, nextRest)
+       (\(strList, nextRest) -> (RLPString strList, nextRest)) <$> eResult
 
     x | x >= 0xB8 && x <= 0xBF ->
       let
         (strLength, restAfterLen) = getLength (fromIntegral x - 0xB7) $ B.tail input
-        (strList, nextRest) = splitAtWithError (fromIntegral strLength) restAfterLen
+        eResult = splitAtEither (fromIntegral strLength) restAfterLen
       in
-       (RLPString strList, nextRest)
+       (\(strList, nextRest) -> (RLPString strList, nextRest)) <$> eResult
 
-    x | x < 128 -> (RLPScalar x, B.tail input)
+    x | x < 128 -> Right (RLPScalar x, B.tail input)
 
-    x -> error ("Missing case in rlpSplit: " ++ show x)
+    x -> Left ("Missing case in rlpSplit: " ++ show x)
 
 
 getRLPObjects::ByteString->[RLPObject]
@@ -120,7 +129,18 @@ rlpDeserialize s =
     (o, x) | B.null x -> o
     _ -> error ("parse error converting ByteString to an RLP Object: " ++ show (B.unpack s))
 
+rlpDeserializeMaybe :: B.ByteString -> Maybe RLPObject
+rlpDeserializeMaybe s =
+  case rlpSplitMaybe s of
+    Just (o, x) | B.null x -> Just o
+    _ -> Nothing
 
+rlpDeserializeEither :: B.ByteString -> Either String RLPObject
+rlpDeserializeEither s =
+  case rlpSplitEither s of
+    Right (o, x) | B.null x -> Right o
+    Right _ -> Left ("parse error converting ByteString to an RLP Object: " ++ show (B.unpack s))
+    Left e -> Left e
 -- | Converts 'RLPObject's to bytes.
 --
 -- Full serialization of an object can be obtained using @rlpSerialize . rlpEncode@.
@@ -148,12 +168,13 @@ rlpSerialize = \case
 
 instance RLPSerializable Integer where
   rlpEncode 0             = RLPString B.empty
-  rlpEncode x | x < 0     = error "cannot encode negative numbers in RLP"
+  rlpEncode x | x < 0     = RLPArray [rlpEncode (-x)]
   rlpEncode x | x < 128   = RLPScalar $ fromIntegral x
   rlpEncode x             = RLPString $ B.pack $ integer2Bytes x
   rlpDecode (RLPScalar x) = fromIntegral x
   rlpDecode (RLPString s) = byteString2Integer s
-  rlpDecode (RLPArray _)  = error "rlpDecode called for Integer for array"
+  rlpDecode (RLPArray [x])  = - rlpDecode x
+  rlpDecode (RLPArray _)  = error "rlpDecode called for Integer for array of wrong size"
 
 instance {-# OVERLAPPING #-} RLPSerializable String where
   rlpEncode s = rlpEncode $ BC.pack s

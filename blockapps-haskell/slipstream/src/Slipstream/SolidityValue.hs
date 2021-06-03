@@ -16,13 +16,13 @@ module Slipstream.SolidityValue where
 
 import           Data.Aeson               hiding (Value)
 import qualified Data.ByteString          as B
-import qualified Data.ByteString.Char8    as BC
 import           Data.Foldable            (toList)
 import           Data.List
 import qualified Data.Map                 as M
 import           Data.Maybe               (mapMaybe)
 import           Data.Scientific          (floatingOrInteger)
 import           Data.Text (Text)
+import           Data.Text.Encoding (decodeUtf8)
 import qualified Data.Text as Text
 import           GHC.Generics
 import           Text.Printf
@@ -92,7 +92,7 @@ valueToSolidityValue' = \case
    Just $ SolidityValueAsString $ Text.pack $ show acct
   ValueContract acct ->
    Just $ SolidityValueAsString $ Text.pack $ show acct
-  SimpleValue (ValueBytes _ bytes) -> Just $ SolidityValueAsString $ Text.pack $ BC.unpack bytes
+  SimpleValue (ValueBytes _ bytes) -> Just $ SolidityValueAsString $ decodeUtf8 bytes
   ValueEnum _ _ index              -> Just $ SolidityValueAsString $ Text.pack $ show index
   ValueFunction _ paramTypes returnTypes -> Just $
    SolidityValueAsString $ Text.pack $ "function ("

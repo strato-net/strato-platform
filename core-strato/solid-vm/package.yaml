@@ -16,6 +16,7 @@ library:
   source-dirs: src/
   exposed-modules:
     - Blockchain.SolidVM
+    - Blockchain.SolidVM.SM
     - Blockchain.SolidVM.Exception
     - SolidVM.Solidity.Parse.File
     - SolidVM.Solidity.Parse.Lexer
@@ -39,8 +40,10 @@ library:
   - bytestring
   - containers
   - cryptonite
+  - debugger
   - deepseq
   - ethereum-rlp
+  - exceptions
   - extra
   - format
   - generic-random
@@ -62,8 +65,10 @@ library:
   - transformers
   - unliftio
   - unordered-containers
+  - utf8-string
   - vector
   - vm-tools
+  - x509-certs
 
 
 executables:
@@ -115,6 +120,7 @@ tests:
       - text
       - time
       - vm-tools
+      - utf8-string
 
 benchmarks:
     codebench:

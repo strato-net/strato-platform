@@ -20,16 +20,20 @@ import           Blockchain.Strato.Model.Account
 
 data Event =
   Event {
+    evContractOrganization :: String,
+    evContractApplication  :: String,
     evContractName    :: String,
     evContractAccount :: Account,
     evName            :: String,
-    evArgs            :: [String] -- TODO: probably should use Solidity values here?
+    evArgs            :: [(String, String)] -- TODO: probably should use Solidity values here?
     } deriving (Eq, Read, Show, Generic)
 
 
 instance ToJSON Event where
   toJSON Event{..} = object
-    [ "eventContractName" .= evContractName
+    [ "eventContractOrganization" .= evContractOrganization
+    , "eventContractApplication" .= evContractApplication
+    , "eventContractName" .= evContractName
     , "eventContractAccount" .= evContractAccount
     , "eventName"         .= evName
     , "eventArgs"         .= evArgs
@@ -37,7 +41,9 @@ instance ToJSON Event where
 
 instance FromJSON Event where
   parseJSON (Object o) = Event
-    <$> (o .: "eventContractName")
+    <$> (o .: "eventContractOrganization")
+    <*> (o .: "eventContractApplication")
+    <*> (o .: "eventContractName")
     <*> (o .: "eventContractAccount")
     <*> (o .: "eventName")
     <*> (o .: "eventArgs")

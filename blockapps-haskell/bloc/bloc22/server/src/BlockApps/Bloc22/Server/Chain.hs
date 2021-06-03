@@ -14,15 +14,17 @@ import           Control.Applicative               (liftA2)
 import           Control.Lens                      ((?~), at)
 import           Control.Monad                     (when, unless)
 import           Crypto.Random.Entropy
+import qualified Data.Aeson                        as Aeson
 import qualified Data.ByteString.Base16            as B16
+import qualified Data.ByteString.Lazy              as BL
 import           Data.Foldable                     (for_)
 import           Data.Int                          (Int32)
 import qualified Data.Map.Ordered                  as OMap
 import qualified Data.Map.Strict                   as Map
-import           Data.Maybe                        (catMaybes, fromMaybe, maybeToList)
+import           Data.Maybe                        (catMaybes, fromMaybe)
 import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
-import           Data.Text.Encoding                (encodeUtf8)
+import           Data.Text.Encoding                (decodeUtf8, encodeUtf8)
 import qualified Data.Vector                       as V
 
 import           BlockApps.Bloc22.API.Chain
@@ -71,16 +73,17 @@ replaceMembers Struct{..} addrs m =
           _ -> m
 
 createChainInfo :: Keccak256 -> ChainInput -> Bloc (Maybe Int32, ChainInfo)
-createChainInfo creationBlockHash (ChainInput msrc mCodePtr cname lbl balances chaininputArgs members mmd _) = do
+createChainInfo creationBlockHash (ChainInput src mCodePtr cname lbl balances chaininputArgs members mmd _) = do
   when (null members) $ throwIO $ UserError "Private chains must include at least one member"
   when (sum (nmap2' balances) == 0) $ throwIO $ UserError "At least one account must have a non-zero balance"
   let md = fromMaybe Map.empty mmd
       theVM = fromMaybe "EVM" $ Map.lookup "VM" md
-  mContract <- case msrc of
-    Just src -> fmap snd <$> getContractDetailsForContract theVM src cname
-    Nothing -> case mCodePtr of
-      Just codePtr -> getContractDetailsByCodeHash codePtr
-      Nothing -> fmap snd <$> getContractDetailsForContract theVM "" cname
+  mContract <-
+    if src /= mempty
+      then fmap snd <$> getContractDetailsForContract theVM src cname
+      else case mCodePtr of
+        Just codePtr -> getContractDetailsByCodeHash codePtr
+        Nothing -> fmap snd <$> getContractDetailsForContract theVM mempty cname
   (cAcctInfo, codeInfo, metaData) <- case mContract of
       Nothing -> return ([],[], md)
       Just (_, ContractDetails{..}) -> do
@@ -108,7 +111,8 @@ createChainInfo creationBlockHash (ChainInput msrc mCodePtr cname lbl balances c
 
           let contractAcctInfo = ContractWithStorage governanceAddress govBal contractHash storage
               b' = fst . B16.decode $ encodeUtf8 b
-              codeInfo' = maybeToList $ (\s -> CodeInfo b' s $ Just contractdetailsName) <$> msrc
+              jsrc = decodeUtf8 . BL.toStrict $ Aeson.encode src
+              codeInfo' = [CodeInfo b' jsrc $ Just contractdetailsName]
           md' <- case theVM of
               "SolidVM" -> do
                 let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi

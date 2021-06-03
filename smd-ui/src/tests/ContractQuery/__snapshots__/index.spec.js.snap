@@ -9808,6 +9808,7 @@ ShallowWrapper {
 
 exports[`ContractQuery: index mapStateToProps:  inspection 1`] = `
 Object {
+  "contractAddress": undefined,
   "contractQuery": Object {
     "error": null,
     "queryResults": Array [

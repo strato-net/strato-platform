@@ -151,34 +151,51 @@ tab [] = []
 tab ('\n':rest) = "\n    " ++ tab rest
 tab (x:rest) = x:tab rest
 
-unparseStatement :: Statement -> String
-unparseStatement (SimpleStatement s) = unparseSimpleStatement s ++ ";"
-unparseStatement (IfStatement e s1 s2) =
+unparseStatement :: StatementF a -> String
+unparseStatement = unparseStatementWith (flip const)
+
+unparseStatementWith :: (a -> String -> String) -> StatementF a -> String
+unparseStatementWith f (SimpleStatement s a) = f a $ unparseSimpleStatement s ++ ";"
+unparseStatementWith f (IfStatement e s1 s2 a) =
   let
     elseString Nothing = ""
     elseString (Just elseStatements) =
-      " else {" ++ unlines (map unparseStatement elseStatements) ++ "}"
+      " else {\n" ++ tab (unlines (map (unparseStatementWith f) elseStatements)) ++ "\n}"
   in
-    "if (" ++ unparseExpression e ++ ") {\n    " ++ tab (unlines (map unparseStatement s1)) ++ "}" ++ elseString s2
+    f a $ "if (" ++ unparseExpression e ++ ") {\n" ++ tab (unlines (map (unparseStatementWith f) s1)) ++ "\n}" ++ elseString s2
 
-unparseStatement (WhileStatement cond code) =
-  "while (" ++ unparseExpression cond ++ ") \n{ " ++ tab (unlines $ map unparseStatement code) ++ "\n}"
+unparseStatementWith f (WhileStatement cond code a) = f a $
+  "while (" ++ unparseExpression cond ++ ") {\n" ++ tab (unlines $ map (unparseStatementWith f) code) ++ "\n}"
 
-unparseStatement (ForStatement v1 v2 v3 s) =
-  "for (" ++ fromMaybe "" (fmap unparseSimpleStatement v1) ++ "; " ++ fromMaybe "" (fmap unparseExpression v2) ++ "; " ++ fromMaybe "" (fmap unparseExpression v3) ++ ") {\n    " ++ tab (unlines (map unparseStatement s)) ++ "}"
-unparseStatement (Return Nothing) = "return;"
-unparseStatement (Return (Just e)) = "return " ++ unparseExpression e ++ ";"
-unparseStatement Break = "break;"
-unparseStatement Continue = "continue;"
-unparseStatement (AssemblyStatement (MloadAdd32 dst src)) = printf "assembly { %s := mload(add(%s, 32)) }" dst src
+unparseStatementWith f (DoWhileStatement code cond a) = f a $
+  "do {\n" ++ tab (unlines $ map (unparseStatementWith f) code) ++ "\n} while (" ++ unparseExpression cond ++ ");"
 
-unparseStatement (EmitStatement eventName extups) = 
+unparseStatementWith f (ForStatement v1 v2 v3 s a) = f a $ concat
+  [ "for ("
+  , fromMaybe "" (fmap unparseSimpleStatement v1)
+  ,  "; "
+  , fromMaybe "" (fmap unparseExpression v2)
+  , "; "
+  , fromMaybe "" (fmap unparseExpression v3)
+  , ") {\n    "
+  , tab (unlines (map (unparseStatementWith f) s))
+  , "}"
+  ]
+unparseStatementWith f (Return Nothing a) = f a $ "return;"
+unparseStatementWith f (Return (Just e) a) = f a $ "return " ++ unparseExpression e ++ ";"
+unparseStatementWith f (Break a) = f a $ "break;"
+unparseStatementWith f (Continue a) = f a $ "continue;"
+unparseStatementWith f (Throw a) = f a $ "throw;"
+unparseStatementWith f (Block a) = f a $ "{ }"
+unparseStatementWith f (AssemblyStatement (MloadAdd32 dst src) a) = f a $ printf "assembly { %s := mload(add(%s, 32)) }" dst src
+
+unparseStatementWith f (EmitStatement eventName extups a) = 
   let 
     expVals = map (unparseExpression . snd) extups
   in
-    "emit " ++ eventName ++ "(" ++ (List.intercalate ", " expVals) ++ ");"
+    f a $ "emit " ++ eventName ++ "(" ++ (List.intercalate ", " expVals) ++ ");"
 
-unparseStatement x = internalError "missing case in call to unparseStatement" $ show x
+-- unparseStatementWith _ x = internalError "missing case in call to unparseStatementWith" $ show x
 
 unparseVarDefEntry :: VarDefEntry -> String
 unparseVarDefEntry BlankEntry = ""
@@ -218,7 +235,7 @@ unparseExpression (MemberAccess e name) = unparseExpression e ++ "." ++ name
 unparseExpression (NumberLiteral x Nothing) = show x
 unparseExpression (BoolLiteral False) = "false"
 unparseExpression (BoolLiteral True) = "true"
-unparseExpression (StringLiteral s) = show s
+unparseExpression (StringLiteral s) = ('"':) . (++"\"") $ s
 unparseExpression (TupleExpression vals) = "(" ++ List.intercalate ", " (map (maybe "" unparseExpression) vals) ++ ")"
 unparseExpression (IndexAccess e maybeVal) = unparseExpression e ++ "[" ++ fromMaybe "" (fmap unparseExpression maybeVal) ++ "]"
 unparseExpression (FunctionCall e args) =

@@ -116,7 +116,7 @@ spec = do
         uploadListContracts =
           [ UploadListContract
             { uploadlistcontractContractName = simpleStorageContractName
-            , uploadlistcontractSrc = Nothing
+            , uploadlistcontractSrc = mempty
             , uploadlistcontractArgs = Map.empty
             , _uploadlistcontractTxParams = testTxParams
             , uploadlistcontractValue = Nothing

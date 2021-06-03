@@ -16,6 +16,7 @@ dependencies:
   - blockapps-solidity
   - containers
   - text
+  - utf8-string
 
 library:
   source-dirs: src/
@@ -42,6 +43,7 @@ library:
     - cryptonite
     - directory
     - extra
+    - ethereum-rlp
     - filepath
     - format
     - haskoin-shim
@@ -75,6 +77,7 @@ library:
     - unliftio
     - unordered-containers
     - vector
+    - utf8-string
 
 tests:
   blockapps-bloc22-server-test:

@@ -27,7 +27,7 @@ describe('ContractMethodCall: action', () => {
     });
 
     test('success', () => {
-      expect(methodCallFetchArgsSuccess(modals.key, modals.args)).toMatchSnapshot();
+      expect(methodCallFetchArgsSuccess(modals.key, modals.args, modals.isPayable)).toMatchSnapshot();
     });
 
     test('failure', () => {

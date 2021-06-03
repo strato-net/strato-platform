@@ -14,6 +14,10 @@ import Blockchain.Data.RLP
 import Blockchain.Strato.Model.ExtendedWord
 import qualified Network.Haskoin.Internals as HK
 
+
+-- deprecated. Use Blockchain.Strato.Model.Secp256k1
+
+
 data ExtendedSignature = ExtendedSignature HK.Signature Bool deriving (Show, Eq, Generic, Data)
 
 instance Binary ExtendedSignature where

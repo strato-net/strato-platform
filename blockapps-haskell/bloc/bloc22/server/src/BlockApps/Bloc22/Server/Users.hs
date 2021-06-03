@@ -24,7 +24,6 @@ import           Crypto.HaskoinShim
 import qualified Data.Aeson                        as Aeson
 import           Data.ByteString                   (ByteString)
 import qualified Data.ByteString                   as ByteString
-import qualified Data.ByteString.Char8             as BC
 import qualified Data.ByteString.Lazy              as BL
 import qualified Data.ByteString.Base16            as Base16
 import           Data.ByteString.Short             (fromShort)
@@ -88,6 +87,7 @@ import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Nonce
+import           Blockchain.Strato.Model.SourceMap
 import           Blockchain.Strato.Model.Wei
 import           Handlers.AccountInfo
 import           Handlers.Faucet
@@ -273,7 +273,7 @@ postUsersContractEVM' cacheNonce ContractParameters{..} sign = blocTransaction $
     Just x -> pure x
   let
     (bin,leftOver) = Base16.decode $ Text.encodeUtf8 contractdetailsBin
-    metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("src", src),("name", cName)]
+    metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("src", serializeSourceMap contractdetailsSrc),("name", cName)]
   unless (ByteString.null leftOver) $ throwIO $ AnError "Couldn't decode binary"
   let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi
   argsBin <- constructArgValues args xabiArgs
@@ -317,7 +317,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} sign = blocTransacti
       fromAddr
       params
       (Wei (fromIntegral (maybe 0 unStrung value)))
-      (Code . BC.pack $ Text.unpack src)
+      (Code $ Text.encodeUtf8 $ serializeSourceMap contractdetailsSrc)
       chainId
   $logDebugLS "postUsersContractSolidVM'/tx" tx
   txHash <- blocStrato $ postTx tx
@@ -334,7 +334,10 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} sign = blocTransacti
 postUsersUploadList :: UserName -> Address -> Maybe ChainId -> Bool -> UploadListRequest -> Bloc [BlocTransactionResult]
 postUsersUploadList userName addr chainId resolve (UploadListRequest pw contracts msrcs _resolve) = do
   sk <- getAccountSecKey userName pw addr
-  let getSrc c = uploadlistcontractSrc c <|> (msrcs >>= Map.lookup (uploadlistcontractContractName c))
+  let srcMap p = Map.lookup (uploadlistcontractContractName p) =<< msrcs
+      getSrc c = if uploadlistcontractSrc c == mempty
+                   then fromMaybe mempty $ srcMap c
+                   else uploadlistcontractSrc c
       setSrc c = c{uploadlistcontractSrc = getSrc c}
       bclp = ContractListParameters
                addr
@@ -353,14 +356,15 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} sign = do
   let contracts' = map (uploadlistcontractChainid %~ (<|> chainId)) contracts
   txsWithParams <- genNonces cacheNonce fromAddr uploadlistcontractChainid uploadlistcontractTxParams contracts'
   namesCmIdsTxs <- forStateT Map.empty txsWithParams $
-    \(UploadListContract name mSrc args params value cid md) -> do
-      (src, cmId, xabi) <- case mSrc of
-        Just src -> do
-          (cmId', cd) <- fmap snd . lift $ getContractDetailsForContract "SolidVM" src (Just name) >>= \case
+    \(UploadListContract name srcs args params value cid md) -> do
+      (src, cmId, xabi) <-
+       if srcs /= mempty
+        then do
+          (cmId', cd) <- fmap snd . lift $ getContractDetailsForContract "SolidVM" srcs (Just name) >>= \case
             Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
             Just x -> pure x
-          at name <?= (src, cmId', contractdetailsXabi cd)
-        Nothing -> do
+          at name <?= (contractdetailsSrc cd, cmId', contractdetailsXabi cd)
+        else do
           mtuple <- use $ at name
           case mtuple of
             Just (src, cmId', x) -> return (src, cmId', x)
@@ -377,7 +381,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} sign = do
                   ]
                 Just (src,(cmId' :: Int32),x') -> do
                   x <- lift $ deserializeXabi x'
-                  at name <?= (src, cmId', x)
+                  at name <?= (deserializeSourceMap src, cmId', x)
       let xabiArgs = maybe Map.empty funcArgs $ xabiConstr xabi
       (_, argsAsSource) <- lift $ constructArgValuesAndSource (Just args) xabiArgs
 
@@ -388,7 +392,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} sign = do
             fromAddr
             (fromMaybe emptyTxParams params)
             (Wei (maybe 0 fromIntegral $ fmap unStrung value))
-            (Code . BC.pack $ Text.unpack src)
+            (Code $ Text.encodeUtf8 $ serializeSourceMap src)
             cid
       return ((name,cmId),tx)
   let
@@ -420,7 +424,7 @@ postUsersUploadListEVM' cacheNonce ContractListParameters{..} sign = do
   txsWithParams <- genNonces cacheNonce fromAddr uploadlistcontractChainid uploadlistcontractTxParams contracts'
   namesCmIdsTxs <- forStateT Map.empty txsWithParams $
     \(UploadListContract name mSrc args params value cid md) -> do
-      when (isJust mSrc) . lift . throwIO $ UserError evmUploadListError
+      when (mSrc /= mempty) . lift . throwIO $ UserError evmUploadListError
       mtuple <- use $ at name
       (bin, src, cmId, xabi) <- case mtuple of
         Just (b, src, cmId', x) -> return (b, src, cmId', x)
@@ -435,10 +439,10 @@ postUsersUploadListEVM' cacheNonce ContractListParameters{..} sign = do
               let (b, leftOver) = Base16.decode b16
               unless (ByteString.null leftOver) $ throwIO $ AnError "Couldn't decode binary"
               x <- lift $ deserializeXabi x'
-              at name <?= (b, src, cmId', x)
+              at name <?= (b, deserializeSourceMap src, cmId', x)
       let xabiArgs = maybe Map.empty funcArgs $ xabiConstr xabi
       argsBin <- lift $ constructArgValues (Just args) xabiArgs
-      let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("src",src),("name",name)]
+      let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("src", serializeSourceMap src),("name",name)]
       tx <- lift . signAndPrepare sign fromAddr metadata' $
           TransactionHeader
             Nothing

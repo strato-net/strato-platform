@@ -45,7 +45,6 @@ import qualified Data.Set                                as S
 import qualified Data.Text                               as T
 import           Data.Time.Clock
 import           Prometheus                                as P
-import           System.Exit
 import           Text.PrettyPrint.ANSI.Leijen            (pretty)
 import           Text.Printf
 import           UnliftIO.IORef
@@ -72,6 +71,7 @@ import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.ModifyStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StorageDB
+import           Blockchain.DB.X509CertDB
 import           Blockchain.EVM.Code
 import qualified Blockchain.EVM                          as EVM
 import           Blockchain.Event
@@ -81,7 +81,6 @@ import           Blockchain.Sequencer.Event
 import qualified Blockchain.SolidVM                      as SolidVM
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.TheDAOFork
-import           Blockchain.Util
 import           Blockchain.Verifier
 import           Blockchain.VMContext
 import           Blockchain.VM.VMException
@@ -308,7 +307,7 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
       ++ show (blockDataNumber . obBlockData $ b)
       ++ " ("
       ++ format obh
-      ++ ", " ++ show (length . obReceiptTransactions $ b)
+      ++ ", " ++ show (length otxs)
       ++ "TXs)."
     when flags_debug $ do
       bhr <- Mod.get (Proxy @BlockHashRoot)
@@ -318,7 +317,6 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
         Nothing -> $logDebugS "addBlock" $ T.pack $ "Could not locate old chain root. Using emptyTriePtr"
         Just cr -> $logDebugS "addBlock" $ T.pack $ "Old chain root: " ++ format cr
 
-    mcr <- getChainRoot $ blockHash b
     putBlockHeaderInChainDB bd
 
     when flags_debug $ do
@@ -332,27 +330,18 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
     bSum <- setParentStateRoot b
     when (False && blockDataNumber bd == 1920000) runTheDAOFork -- TODO: Only run this if connected to Ethereum publicnet (i.e. never)
 
-    addBlockTransactions True b
+    addBlockTransactions b
 
-    postRewardSR <-
-      if isNothing mcr
-        then lift $ Bagger.rewardCoinbases (blockDataCoinbase bd) uncles (blockDataNumber bd)
-        else A.lookupWithDefault (Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
+    postRewardSR <- lift $ Bagger.rewardCoinbases (blockDataCoinbase bd) uncles (blockDataNumber bd)
 
-    -- If there are no transactions in th
-    -- TODO: this should be handled more officially,
-    -- e.g. adding a chainId to the block
-    let skipCheck = (not $ null otxs)
-                 && (isNothing . listToMaybe $ filter (isNothing . txChainId) otxs)
-    unless skipCheck $ do
-      when (blockDataStateRoot (obBlockData b) /= postRewardSR) $ do
-        $logInfoS "addBlock/mined" . T.pack $ "newStateRoot: " ++ format postRewardSR
-        error $ "stateRoot mismatch!!  New stateRoot doesn't match block stateRoot: " ++ format (blockDataStateRoot $ obBlockData b)
+    when (blockDataStateRoot (obBlockData b) /= postRewardSR) $ do
+      $logInfoS "addBlock/mined" . T.pack $ "newStateRoot: " ++ format postRewardSR
+      error $ "stateRoot mismatch!!  New stateRoot doesn't match block stateRoot: " ++ format (blockDataStateRoot $ obBlockData b)
 
-      valid <- checkValidity (blockIsHomestead $ blockDataNumber bd) bSum b
-      case valid of
-          Nothing -> lift $ P.incCounter vmBlocksValid
-          Just  _ -> lift $ P.incCounter vmBlocksInvalid -- error err -- todo: i dont think we ACTUALLY need to error here
+    valid <- checkValidity (blockIsHomestead $ blockDataNumber bd) bSum b
+    case valid of
+        Nothing -> lift $ P.incCounter vmBlocksValid
+        Just  _ -> lift $ P.incCounter vmBlocksInvalid -- error err -- todo: i dont think we ACTUALLY need to error here
 
     when flags_debug $ do
       bhr'' <- Mod.get (Proxy @BlockHashRoot)
@@ -366,65 +355,43 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
     lift $ P.incCounter vmBlocksProcessed
     $logInfoS "addBlock" .  T.pack $ "Inserted block became #" ++ show (blockDataNumber $ obBlockData b) ++ " (" ++ format obh ++ ")."
 
-addBlockTransactions :: (VMBase m, Bagger.MonadBagger m, MonadMonitor m) => Bool -> OutputBlock -> ConduitT a VmOutEvent m ()
-addBlockTransactions runPublicTxs b@OutputBlock{obBlockData = bd, obReceiptTransactions = transactions} = do
+addBlockTransactions :: (VMBase m, Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> ConduitT a VmOutEvent m ()
+addBlockTransactions OutputBlock{obBlockData = bd, obReceiptTransactions = transactions} = do
   $logDebugS "addBlockTransactions" . T.pack $ "All transactions: " ++ show transactions
   $logDebugS "addBlockTransactions" . T.pack $ "AnchorChains: " ++ show (map (otAnchorChain &&& txType) transactions)
-  let f = if runPublicTxs then isAnchored else isAnchoredPrivate
-      chains = partitionWith otAnchorChain
-             . filter ((/= PrivateHash) . txType)
-             $ filter (f . otAnchorChain) transactions
-  forM_ chains $ \(anchor, txs) -> do
-    let chainId = fromAnchorChain anchor
-    $logDebugS "addBlockTransactions" . T.pack $ "Running chain: " ++ formatChainId chainId ++ " with txs: " ++ show txs
-    when flags_debug $ do
-      sr <- A.lookupWithDefault (Proxy @MP.StateRoot) chainId
-      $logDebugS "addBlockTransactions/withBlockchain" $ T.pack $ "Old chain state root: " ++ format sr
-    $logDebugS "evm/loop" $ T.pack $ "Running block for chain " ++ formatChainId chainId
-    let canUseCache = chainId == Nothing
-    -- TODO: Run the checks Bagger does reject invalid transactions for private chains
-    addTransactions chainId canUseCache bd (blockDataGasLimit $ obBlockData b) txs
+  let txs = filter ((/= PrivateHash) . txType)
+          $ filter (isAnchored . otAnchorChain) transactions
+  -- TODO: Run the checks Bagger does reject invalid transactions for private chains
+  addTransactions bd txs
 
-    lift $ timeit "flushMemStorageDB" (Just vmBlockInsertionMined) flushMemStorageDB
-    lift $ timeit "flushMemAddressStateDB" (Just vmBlockInsertionMined) flushMemAddressStateDB
-    when flags_debug $ do
-      sr' <- A.lookupWithDefault (Proxy @MP.StateRoot) chainId
-      $logDebugS "addBlockTransactions/withBlockchain" $ T.pack $ "New chain state root: " ++ format sr'
+  lift $ timeit "flushMemStorageDB" (Just vmBlockInsertionMined) flushMemStorageDB
+  lift $ timeit "flushMemAddressStateDB" (Just vmBlockInsertionMined) flushMemAddressStateDB
+  lift $ timeit "flushX509ToLevelDB" (Just vmBlockInsertionMined) flushX509ToLevelDB
 
 addTransactions :: (VMBase m, Bagger.MonadBagger m, MonadMonitor m)
-                => Maybe Word256
-                -> Bool
-                -> BlockData
-                -> Integer
+                => BlockData
                 -> [OutputTx]
                 -> ConduitT a VmOutEvent m ()
-addTransactions chainId canCache blockData blockGas0 txs =
+addTransactions blockData txs =
  timeit ("addTransactions, " ++ show (length txs) ++ " TXs") (Just vmBlockInsertionMined) $ do
-  trrs <- lift $ do
-    mtrrs <- if canCache
-              then Bagger.getCachedRunResults blockData
-              else return Nothing
-    case mtrrs of
-      Nothing -> go blockGas0 txs DL.empty
-      Just (cachedSR, _, cachedTRRs) -> do
-        let cachedTXs = map trrTransaction cachedTRRs
-        when (flags_debug && txs /= cachedTXs) $ do
-          $logErrorS "addTransactions" "Invalid transaction cache entry"
-          $logErrorLS "addTransactions/cached" cachedTXs
-          $logErrorLS "addTransactions/from_block" txs
-          liftIO exitFailure
-        A.insert (Proxy @MP.StateRoot) chainId cachedSR
-        return cachedTRRs
+  trrs <- lift $ go (blockDataGasLimit blockData) txs DL.empty M.empty
   mapM_ (outputTransactionResult blockData blockHeaderHash) trrs
   yield . OutASM $ foldr (flip M.union) M.empty $ map trrAfterMap trrs
 
   where
-    go _ [] trrs = return $ DL.toList trrs
-    go blockGas (t@OutputTx{otBaseTx=bt}:rest) trrs = do
+    go _ [] trrs _ = return $ DL.toList trrs
+    go blockGas (t@OutputTx{otBaseTx=bt}:rest) trrs x509s = do
       flushMemAddressStateTxToBlockDB
       flushMemStorageTxDBToBlockDB
       beforeMap <- getAddressStateTxDBMap
+      let chainId = fromAnchorChain $ otAnchorChain t
+      Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) x509s
+      beforeX509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
       (!deltaT, !result) <- timeIt $ runExceptT $ addTransaction chainId False blockData blockGas t
+      case result of
+          Left _  -> Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) beforeX509s
+          Right execResult -> Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.union (erNewX509Certs execResult) beforeX509s
+
       afterMap <- getAddressStateTxDBMap
 
       printTransactionMessage t result deltaT (txChainId bt)
@@ -437,7 +404,9 @@ addTransactions chainId canCache blockData blockGas0 txs =
             Left _           -> blockGas
             Right execResult -> blockGas - (transactionGasLimit bt - calculateReturned bt execResult)
 
-      go remainingBlockGas rest (trrs `DL.snoc` trr)
+      x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
+
+      go remainingBlockGas rest (trrs `DL.snoc` trr) x509s'
 
 data TxMiningResult = TxMiningResult { tmrFailure  :: Maybe TransactionFailureCause
                                      , tmrRanTxs   :: [TxRunResult]
@@ -449,6 +418,7 @@ mineTransactions' :: (VMBase m, MonadMonitor m) => BlockData -> Integer -> DL.DL
 mineTransactions' _ remGas ran [] = return $ TxMiningResult Nothing (DL.toList ran) [] remGas
 mineTransactions' header remGas ran unran@(tx@OutputTx{otBaseTx=bt}:txs) = do
     beforeMap <- getAddressStateTxDBMap
+    beforeX509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
     (!time', !result) <- timeIt . runExceptT $ addTransaction Nothing False header remGas tx
     afterMap <- getAddressStateTxDBMap
     P.setGauge vmTxMining (realToFrac time')
@@ -459,8 +429,11 @@ mineTransactions' header remGas ran unran@(tx@OutputTx{otBaseTx=bt}:txs) = do
           let nextRemGas = remGas - (transactionGasLimit bt-calculateReturned bt execResult)
           flushMemAddressStateTxToBlockDB
           flushMemStorageTxDBToBlockDB
+
+          Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.union (erNewX509Certs execResult) beforeX509s
           mineTransactions' header nextRemGas (ran `DL.snoc` trr) txs
-        Left  failure    -> return $ TxMiningResult (Just failure) (DL.toList ran) unran remGas
+        Left  failure    -> do Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) beforeX509s -- revert changes to X509 map
+                               return $ TxMiningResult (Just failure) (DL.toList ran) unran remGas
 
 
 blockIsHomestead :: Integer -> Bool
@@ -517,7 +490,9 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=b
     lift $ P.incCounter txTypeCounter
     if success
         then do
+            x509s <- lift $ Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
             execResults <- runCodeForTransaction isRunningTests' isHomestead b (fromInteger (transactionGasLimit bt) - intrinsicGas') tAcct t
+            lift $ Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.union (erNewX509Certs execResults) x509s
             s1 <- lift $ addToBalance coinbaseAcct (transactionGasLimit bt * transactionGasPrice bt)
             unless s1 $ error "addToBalance failed even after a check in addBlock"
             lift $ P.incCounter vmTxsProcessed
@@ -693,7 +668,7 @@ outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otB
         afterDeletes = S.fromList [ x | (x, ASDeleted) <-  M.toList afterMap ]
         ranBlockHash = hashFunction b
         mkLogEntry Log{..} = LogDB ranBlockHash theHash chainId (account ^. accountAddress) (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
-        mkEventEntry Event{..} = EventDB chainId evName evArgs
+        mkEventEntry Event{..} = EventDB chainId evName $ map snd evArgs -- drop the field names, only slipstream needs them
         (!response, theTrace', theLogs, theEvents) =
           case result of
             Left _ -> (BSS.empty, [], [], []) --TODO keep the trace when the run fails
@@ -853,12 +828,18 @@ compactDiffs base (p:ps) = go (cost p) (promote base p) ps
 completeDiff :: ( MonadLogger m
                 , HasCodeDB m
                 , HasHashDB m
+                , Mod.Modifiable MemDBs m
+                , Mod.Modifiable CurrentBlockHash m
                 , Mod.Modifiable BestBlockRoot m
+                , HasMemAddressStateDB m
                 , (MP.StateRoot `A.Alters` MP.NodeData) m
                 , (Account `A.Alters` AddressState) m
+                , (Maybe Word256 `A.Alters` MP.StateRoot) m
+                , HasMemRawStorageDB m
+                , (RawStorageKey `A.Alters` RawStorageValue) m
                 )
              => ToDiff -> m SD.StateDiff
-completeDiff (src, dst, hsh, num) = do
+completeDiff (src, dst, hsh, num) = withCurrentBlockHash hsh $ do
   $logInfoS "calculateAndEmitStateDiffs" . T.pack $
       "Calculating StateDiff from: " ++ format src ++ "\nto: " ++ format dst
   SD.stateDiff Nothing num hsh src dst

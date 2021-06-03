@@ -3,38 +3,54 @@ const models = require('../models');
 const config = require('../config/app.config');
 const moment = require('moment');
 
-cleanOnce();
-setInterval(cleanOnce, config.healthCheck.cleanFrequency);
+(async () => {
+  await cleanOnce();
+  setInterval(await cleanOnce, config.healthCheck.cleanFrequency);
+})()
 
 async function cleanOnce() {
-        winston.info('Cleaning HealthStats Data');
-        const mDate = moment().subtract(config.healthCheck.retention_hours, "hours");
-        await models.HealthStat.destroy({
-            where:{
-                createdAt: {
-                    $lt: mDate
-                }
-            }
-        }).then(destroyedCount => {
-            winston.info(`CLEANUP - HealthStat: Completed on ${moment().format()} - cleaned ${destroyedCount} rows`);
-        }).catch(err => {
-        winston.error('CLEANUP - HealthStat: Failed with error: ' + err.message);
-        })
+  const mDateHealth = moment().subtract(config.healthCheck.retentionHours, "hours");
+  const mDateApiCallCounter = moment().subtract(config.statistics.apiCallCounterRetentionHours, "hours");
 
-        winston.info('Cleaning StallStats Data');
-        await models.StallStat.destroy({
-            where:{
-                createdAt: {
-                    $lt: mDate
-                }
-            }
-        }).then(destroyedCount => {
-            winston.info(`CLEANUP - StallStats: Completed on ${moment().format()} - cleaned ${destroyedCount} rows`);
-        }).catch(err => {
-        winston.error('CLEANUP - StallStats: Failed with error: ' + err.message);
-        })
+  winston.info('Cleaning the historical DB Data (HealthStats, StallStats, ApiCallCounts...');
+  
+  // We could use Promise.allSettled but do we really want to destroy data in multiple tables in parallel?
+  try {
+    const destroyedCount = await models.HealthStat.destroy({
+      where: {
+        createdAt: {
+          $lt: mDateHealth
+        }
+      }
+    })
+    winston.info(`Cleanup - HealthStats: Completed on ${moment().format()} - cleaned ${destroyedCount} rows`);
+  } catch(err) {
+    winston.error('Cleanup - HealthStats: Failed with error: ' + err.message);
+  }
 
+  try {
+    const destroyedCount = await models.StallStat.destroy({
+      where: {
+        createdAt: {
+          $lt: mDateHealth
+        }
+      }
+    })
+    winston.info(`Cleanup - StallStats: Completed on ${moment().format()} - cleaned ${destroyedCount} rows`);
+  } catch(err) {
+    winston.error('Cleanup - StallStats: Failed with error: ' + err.message);
+  }
+
+  try {
+    const destroyedCount = await models.ApiCallCount.destroy({
+      where: {
+        createdAt: {
+          $lt: mDateApiCallCounter
+        }
+      }
+    })
+    winston.info(`Cleanup - ApiCallCounts: Completed on ${moment().format()} - cleaned ${destroyedCount} rows`);
+  } catch(err) {
+    winston.error('Cleanup - ApiCallCounts: Failed with error: ' + err.message);
+  }
 }
-
-
-

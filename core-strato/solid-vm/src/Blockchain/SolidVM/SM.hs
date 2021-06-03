@@ -22,7 +22,9 @@ module Blockchain.SolidVM.SM (
   runSM,
   getCurrentAccount,
   addCallInfo,
+  dupCallInfo,
   popCallInfo,
+  withTempCallInfo,
   getLocal,
   setLocal,
   getCurrentCallInfo,
@@ -37,13 +39,15 @@ module Blockchain.SolidVM.SM (
   getXabiValueType,
   getValueType,
   pushSender,
-  initializeAction,
+  initializeActionCreate,
+  initializeActionCall,
   markDiffForAction,
   addEvent
   ) where
 
 import           Control.Applicative ((<|>))
 import           Control.Lens hiding (Context)
+import           Control.Monad.Catch (MonadCatch)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import           Control.Monad.IO.Class
@@ -53,6 +57,7 @@ import           Data.Bifunctor (first)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.UTF8  as UTF8
 --import           Data.IORef
 import           Data.Map (Map)
 import qualified Data.Map as M
@@ -61,6 +66,7 @@ import qualified Data.NibbleString as N
 import qualified Data.Sequence as Q
 import qualified Data.Text as T
 import           Data.Text.Encoding(encodeUtf8,decodeUtf8)
+import           Debugger
 
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.ChainInfo
@@ -69,10 +75,12 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
+import           Blockchain.DB.X509CertDB
 import           Blockchain.ExtWord
 import           Blockchain.Output
 import           Blockchain.Strato.Model.Action
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Keccak256
@@ -81,6 +89,7 @@ import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.Value
 import           Blockchain.VMContext
 import           Blockchain.VMOptions
+import           Blockchain.DB.StateDB
 
 import qualified SolidVM.Model.Storable as MS
 import qualified SolidVM.Solidity.Xabi as Xabi
@@ -100,6 +109,7 @@ data CallInfo = CallInfo
   , collectionHash      :: Keccak256
   , localVariables      :: Map String (Xabi.Type, Variable)
   , readOnly            :: Bool
+  , currentSourcePos    :: Maybe Xabi.SourcePos
   } deriving (Show)
 
 {-
@@ -126,6 +136,7 @@ data SState = SState
   { env             :: Env.Environment
   , callStack       :: [CallInfo]
   , ssEvents        :: Q.Seq Event
+  , _ssNewX509Certs  :: M.Map Address X509Certificate
   , _ssMemDBs       :: MemDBs
   , _action         :: Action
   }
@@ -134,18 +145,24 @@ makeLenses ''SState
 type SM m = StateT SState m
 
 type MonadSM m = ( (Account `A.Alters` AddressState) m
+                 , HasStateDB m
                  , (Keccak256 `A.Alters` DBCode) m
+                 , HasX509CertDB m
                  , A.Selectable (Maybe Word256) ParentChainId m
                  , HasRawStorageDB m
                  , HasMemAddressStateDB m
                  , HasMemRawStorageDB m
                  , Mod.Accessible Env.Environment m
+                 , Mod.Modifiable (M.Map Address X509Certificate) m
                  , Mod.Modifiable MemDBs m
                  , Mod.Modifiable Env.Sender m
                  , Mod.Modifiable [CallInfo] m
                  , Mod.Modifiable Action m
                  , Mod.Modifiable (Q.Seq Event) m
+                 , Mod.Modifiable (Maybe DebugSettings) m
                  , MonadIO m --todo: remove
+                 , MonadCatch m
+                 , MonadLogger m
                  )
 
 instance Monad m => HasMemAddressStateDB (SM m) where
@@ -211,6 +228,11 @@ instance (Keccak256 `A.Alters` DBCode) m => (Keccak256 `A.Alters` DBCode) (SM m)
   insert p k = lift . A.insert p k
   delete p   = lift . A.delete p
 
+instance (Address `A.Alters` X509Certificate) m => (Address `A.Alters` X509Certificate) (SM m) where
+  lookup p   = lift . A.lookup p
+  insert p k = lift . A.insert p k
+  delete p   = lift . A.delete p
+
 instance (N.NibbleString `A.Alters` N.NibbleString) m => (N.NibbleString `A.Alters` N.NibbleString) (SM m) where
   lookup p   = lift . A.lookup p
   insert p k = lift . A.insert p k
@@ -218,6 +240,11 @@ instance (N.NibbleString `A.Alters` N.NibbleString) m => (N.NibbleString `A.Alte
 
 instance Monad m => Mod.Accessible Env.Environment (SM m) where
   access _ = gets env
+
+instance (Monad m, Mod.Modifiable (Maybe DebugSettings) m)
+  => Mod.Modifiable (Maybe DebugSettings) (SM m) where
+  get _ = lift $ Mod.get (Mod.Proxy @(Maybe DebugSettings))
+  put _ = lift . Mod.put (Mod.Proxy @(Maybe DebugSettings))
 
 instance Monad m => Mod.Modifiable Env.Sender (SM m) where
   get _ = Env.Sender . Env.sender <$> gets env
@@ -230,6 +257,10 @@ instance Monad m => Mod.Modifiable [CallInfo] (SM m) where
 instance Monad m => Mod.Modifiable MemDBs (SM m) where
   get _    = gets $ _ssMemDBs
   put _ md = modify $ ssMemDBs .~ md
+
+instance Monad m => Mod.Modifiable (M.Map Address X509Certificate) (SM m) where
+  get _ = use ssNewX509Certs
+  put _ = assign ssNewX509Certs
 
 instance Monad m => Mod.Modifiable Action (SM m) where
   get _ = use action
@@ -261,6 +292,7 @@ runSM maybeCode env f = do
         env = env,
         callStack = [],
         ssEvents = Q.empty,
+        _ssNewX509Certs = M.empty,
         _ssMemDBs = csMemDBs,
         _action = startingAction maybeCode env
         }
@@ -306,7 +338,7 @@ startingAction maybeCode env' = Action
   , _actionMetadata           =
       case maybeCode of
         Just theCode ->
-          Just $ M.insert "src" (T.pack $ BC.unpack theCode) $ fromMaybe M.empty $ Env.metadata env'
+          Just $ M.insert "src" (T.pack $ UTF8.toString theCode) $ fromMaybe M.empty $ Env.metadata env'
         Nothing -> Env.metadata env'
   , _actionEvents             = Q.empty
   }
@@ -342,7 +374,8 @@ getVariableOfName name = do
                                                   , "string", "keccak256"
                                                   , "require", "revert", "assert", "sha3"
                                                   , "sha256", "ecrecover", "addmod", "mulmod"
-                                                  , "selfdestruct", "suicide", "bytes32ToString"]) $
+                                                  , "selfdestruct", "suicide", "bytes32ToString"
+                                                  , "registerCert", "getUserCert", "parseCert"]) $
         t "builtin function" $ Constant $ SBuiltinFunction name Nothing
 
       maybeBuiltinVariable :: Maybe Variable
@@ -447,15 +480,28 @@ addCallInfo a c fn hsh cc initialLocalVariables ro = do
           codeCollection=cc,
           collectionHash=hsh,
           localVariables=initialLocalVariables,
-          readOnly=ro
+          readOnly=ro,
+          currentSourcePos=Nothing
         }
 
   Mod.modify_ (Mod.Proxy @[CallInfo]) $ pure . (newCallInfo:)
+
+dupCallInfo :: MonadSM m => Bool -> m ()
+dupCallInfo ro = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
+  [] -> internalError "dupCallInfo was called on an already empty stack" ()
+  (ci:rest) -> pure $ ci{readOnly=ro}:ci:rest
 
 popCallInfo :: MonadSM m => m ()
 popCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
   [] -> internalError "popCallInfo was called on an already empty stack" ()
   (_:rest) -> pure rest
+
+withTempCallInfo :: MonadSM m => Bool -> m a -> m a
+withTempCallInfo ro f = do
+  dupCallInfo ro
+  result <- f
+  popCallInfo
+  pure result
 
 getCurrentCallInfo :: MonadSM m => m CallInfo
 getCurrentCallInfo = do
@@ -596,9 +642,27 @@ getXabiValueType (AccountPath loc path) = do
 getValueType :: MonadSM m => AccountPath -> m BasicType
 getValueType p = hintFromType =<< getXabiValueType p
 
-initializeAction :: Mod.Modifiable Action m => Account -> String -> Keccak256 -> m ()
-initializeAction acct name hsh = do
-  let newData = ActionData (SolidVMCode name hsh) SolidVM (ActionSolidVMDiff M.empty) []
+initializeActionCreate :: MonadSM m => Account -> Account -> String -> String -> Keccak256 -> m ()
+initializeActionCreate creator acct name prt hsh = do
+  let address = _accountAddress creator
+  x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
+  maybeCertLevelDB <- x509CertDBGet address
+  let maybeCertBlockDB = M.lookup address x509s
+      maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
+      organization = T.pack $ fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
+  let newData = ActionData (SolidVMCode name hsh) organization (T.pack prt) SolidVM (ActionSolidVMDiff M.empty) []
+  Mod.modifyStatefully_ (Mod.Proxy @Action) $
+    actionData %= M.insertWith mergeActionData acct newData
+
+initializeActionCall :: MonadSM m => Account -> String -> String -> Keccak256 -> m ()
+initializeActionCall acct name prt hsh = do
+  let address = _accountAddress acct
+  x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
+  maybeCertLevelDB <- x509CertDBGet address
+  let maybeCertBlockDB = M.lookup address x509s
+      maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
+      organization = T.pack $ fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
+  let newData = ActionData (SolidVMCode name hsh) organization (T.pack prt) SolidVM (ActionSolidVMDiff M.empty) []
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     actionData %= M.insertWith mergeActionData acct newData
 

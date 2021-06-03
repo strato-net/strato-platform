@@ -4,7 +4,7 @@ import { extAbi, error, selectedTabContent, codeEditor, sourceCodeUndefinedImpor
 
 describe('CodeEditor: index', () => {
   let files
-  const readAsBinaryString = jest.fn();
+  const readAsText = jest.fn();
 
   beforeAll(() => {
     localStorage.clear();
@@ -19,7 +19,7 @@ describe('CodeEditor: index', () => {
     const expectedFinalState = { fileContents: fileContents };
     const file = new Blob([fileContents], { type: 'text/plain' });
     const addEventListener = jest.fn((_, evtHandler) => { evtHandler(); });
-    const dummyFileReader = { addEventListener, readAsBinaryString, result: fileContents };
+    const dummyFileReader = { addEventListener, readAsText, result: fileContents };
     window.FileReader = jest.fn(() => dummyFileReader);
   });
 
@@ -55,8 +55,10 @@ describe('CodeEditor: index', () => {
     const wrapper = shallow(
       <CodeEditor.WrappedComponent {...props} />
     );
-    const popOver = wrapper.find('Popover')
-    wrapper.find('Button').at(0).simulate('click')
+    const popOver = wrapper.find('Popover').at(1)
+    console.log(wrapper.find('Popover').at(0).dive().find('Button').at(1).simulate('click'))
+    // wrapper.find('Button').forEach(n => console.log(n.debug()))
+    wrapper.find('Popover').at(0).find('Button').at(0).simulate('click')
     expect(props.onCompileFileLocally).toHaveBeenCalled()
     wrapper.find('Button').at(1).simulate('click')
     wrapper.find('Button').at(2).simulate('click')
@@ -107,7 +109,7 @@ describe('CodeEditor: index', () => {
     );
     const dropzone = wrapper.find('Dropzone')
     dropzone.simulate('drop', files)
-    expect(readAsBinaryString).toHaveBeenCalled()
+    expect(readAsText).toHaveBeenCalled()
 
   });
 
@@ -128,7 +130,7 @@ describe('CodeEditor: index', () => {
     files[0]['name'] = 'pqr.txt'
     const dropzone = wrapper.find('Dropzone')
     dropzone.simulate('drop', files)
-    expect(readAsBinaryString).toHaveBeenCalled()
+    expect(readAsText).toHaveBeenCalled()
   });
 
   test('multiple file drop', () => {
@@ -152,7 +154,7 @@ describe('CodeEditor: index', () => {
     })
     const dropzone = wrapper.find('Dropzone')
     dropzone.simulate('drop', files)
-    expect(readAsBinaryString).toHaveBeenCalled()
+    expect(readAsText).toHaveBeenCalled()
   });
 
   test('local storage', () => {

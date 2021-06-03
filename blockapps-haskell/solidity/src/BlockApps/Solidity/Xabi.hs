@@ -17,7 +17,7 @@ import           Data.Aeson.Types
 import qualified Data.HashMap.Strict          as Hash
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as Map
-import           Data.Maybe                   (listToMaybe, maybeToList)
+import           Data.Maybe                   (fromMaybe, listToMaybe, maybeToList)
 import           Data.Swagger
 import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
@@ -33,6 +33,7 @@ import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.SourceMap
 
 data XabiKind = ContractKind
               | InterfaceKind
@@ -330,7 +331,7 @@ data ContractDetails = ContractDetails
   , contractdetailsBinRuntime :: Text
   , contractdetailsCodeHash   :: CodePtr
   , contractdetailsName       :: Text
-  , contractdetailsSrc        :: Text
+  , contractdetailsSrc        :: SourceMap
   , contractdetailsXabi       :: Xabi
   } deriving (Show,Eq,Generic,NFData)
 
@@ -358,7 +359,7 @@ instance FromJSON ContractDetails where
       <*> obj .: "bin-runtime"
       <*> obj .: "codeHash"
       <*> obj .: "name"
-      <*> obj .: "src"
+      <*> (fromMaybe mempty <$> obj .:? "src")
       <*> obj .: "xabi"
 
 instance ToSample ContractDetails where toSamples _ = noSamples
@@ -379,7 +380,7 @@ instance ToSchema ContractDetails where
         , contractdetailsBinRuntime = "ContractRuntime"
         , contractdetailsCodeHash = EVMCode $ unsafeCreateKeccak256FromWord256 0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365
         , contractdetailsName = "DetailsName"
-        , contractdetailsSrc = "contract DetailsName { }"
+        , contractdetailsSrc = namedSource "DetailsName.sol" "contract DetailsName { }"
         , contractdetailsXabi = sampleXabi
         }
 

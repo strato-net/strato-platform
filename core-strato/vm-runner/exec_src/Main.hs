@@ -1,9 +1,13 @@
+{-# LANGUAGE DeriveAnyClass    #-}
+{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 
 import           Control.Monad
 import           Control.Concurrent.Async             as Async
+import           Debugger
+import           Debugger.Options() -- HFlags
 import           Network.Wai.Middleware.Prometheus
 import           Network.Wai.Handler.Warp
 import           HFlags
@@ -18,4 +22,11 @@ main :: IO ()
 main = do
   blockappsInit "vm_main"
   void $ $initHFlags "Ethereum VM"
-  race_ (runLoggingT ethereumVM) (run 8000 metricsApp)
+  mDebugger <- initializeDebugger
+  let metricsRunner = run 8000 metricsApp
+      debugSettings = fst <$> mDebugger
+      helpers = case snd <$> mDebugger of
+        Nothing -> metricsRunner
+        Just debuggerRunner -> race_ metricsRunner debuggerRunner
+      runVM = runLoggingT $ ethereumVM debugSettings
+  race_ helpers runVM

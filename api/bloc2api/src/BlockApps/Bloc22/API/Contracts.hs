@@ -35,13 +35,19 @@ import           BlockApps.Solidity.Xabi
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.SourceMap
 
 --------------------------------------------------------------------------------
 -- | Routes and types
 --------------------------------------------------------------------------------
 type GetContracts = "contracts"
+                 :> QueryParam "offset" Integer
+                 :> QueryParam "limit" Integer
                  :> QueryParam "chainid" ChainId
                  :> Get '[JSON] GetContractsResponse
+
+instance ToParam (QueryParam "limit" Integer) where
+  toParam _ = DocQueryParam "limit" [] "Maximum number of entries to return" Normal
 
 data AddressCreatedAt = AddressCreatedAt
   { createdAt  :: Int64
@@ -334,7 +340,7 @@ type PostContractsCompile = "contracts"
 
 data PostCompileRequest = PostCompileRequest
   { postcompilerequestContractName :: Maybe Text
-  , postcompilerequestSource       :: Text
+  , postcompilerequestSource       :: SourceMap
   , postcompilerequestVm           :: Maybe Text
   } deriving (Eq,Show,Generic)
 
@@ -357,7 +363,7 @@ instance ToSchema PostCompileRequest where
       ex :: PostCompileRequest
       ex = PostCompileRequest
         { postcompilerequestContractName = Just "MySampleContract"
-        , postcompilerequestSource = "contract MySampleContract { ...} "
+        , postcompilerequestSource = unnamedSource "contract MySampleContract { ...} "
         , postcompilerequestVm = Just "SolidVM"
         }
 

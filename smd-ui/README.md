@@ -33,14 +33,14 @@ To run react dev server locally with all features enabled go through the steps:
     ```
     vim /usr/local/openresty/nginx/conf/nginx.conf
     ```
-    replace the existing `location / {...}` block with the following (note the difference between linux and mac):
+    replace the existing `location / {...}` block with the following (note the difference between linux, mac and windows):
     ```
     location / {
       set $is_ui "true";
       rewrite_by_lua_file  lua/openid.lua;
       proxy_set_header Accept-Encoding "";
-      proxy_pass http://172.17.0.1:3000/;                        # !!ON MAC USE `http://docker.for.mac.localhost:3000/` instead
-    };
+      proxy_pass http://172.17.0.1:3000/;                        # !!ON MAC USE `http://docker.for.mac.localhost:3000/` AND ON WINDOWS USE `http://host.docker.internal:3000/` instead
+    }
     ```
     and add the new location block (note the difference between linux and mac):
     ```
@@ -48,7 +48,7 @@ To run react dev server locally with all features enabled go through the steps:
       proxy_set_header Upgrade $http_upgrade;
       proxy_set_header Connection "upgrade";
       proxy_http_version 1.1;
-      proxy_pass http://172.17.0.1:3000/sockjs-node;             # !!ON MAC USE `http://docker.for.mac.localhost:3000/sockjs-node` instead
+      proxy_pass http://172.17.0.1:3000/sockjs-node;             # !!ON MAC USE `http://docker.for.mac.localhost:3000/` AND ON WINDOWS USE `http://host.docker.internal:3000/` instead
     }
     ```
     Validate and reload config:
@@ -65,5 +65,5 @@ To run react dev server locally with all features enabled go through the steps:
     ```
     (The env vars have the prefix REACT_APP_ as it is the requirement of React in order to pass the unprefixed vars to browser)
 
-4. Open `localhost:8080/` in the browser, login and start making changes in SMD code to see updates live in browser. 
+4. Open `localhost:8080/` (**NOTE: PORT 8080, NOT THE 3000!!**) in the browser, login and start making changes in SMD code to see updates live in browser. 
 

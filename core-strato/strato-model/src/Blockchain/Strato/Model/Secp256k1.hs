@@ -35,6 +35,7 @@ import           Crypto.Random.Entropy
 import qualified Crypto.Secp256k1                 as S
 
 import           Data.Aeson
+import           Data.ASN1.Types
 import           Data.Binary                
 import           Data.ByteString                  as B
 import qualified Data.ByteString.Base16           as B16
@@ -112,13 +113,46 @@ instance Arbitrary PrivateKey where
     return $ fromMaybe (error "could not generate arbitrary private key") (importPrivateKey $ B.pack k)
 
 
+instance ToJSON PrivateKey where
+  toJSON = String . T.pack . C8.unpack . B16.encode . exportPrivateKey
+
+instance FromJSON PrivateKey where
+  parseJSON (String str) = maybe err pure $ importPrivateKey $ fst $ B16.decode $ C8.pack $ T.unpack str
+    where err = fail $ "parseJSON for PrivateKey failed to read " ++ T.unpack str
+  parseJSON x = fail $ "parseJSON for PrivateKey: expected string, got " ++ show x
+
+instance ASN1Object PrivateKey where
+  toASN1 key xs = 
+    ( Start Sequence
+      : IntVal 1
+      : OctetString (exportPrivateKey key)
+      : Start (Container Context 0) 
+      : OID [1,3,132,0,10]
+      : End (Container Context 0)
+      : End Sequence 
+      : xs 
+    )
+
+  fromASN1 [] = fail "tried to decode an empty ASN1 object?"
+  fromASN1 ( Start Sequence 
+        : IntVal 1 
+        : OctetString str 
+        : Start (Container Context 0) 
+        : OID [1,3,132,0,10]
+        : End (Container Context 0) 
+        : End Sequence : xs ) = case (importPrivateKey str) of
+                                  Nothing -> fail "could not asn1decode privkey"
+                                  Just pk -> Right (pk, xs) 
+  fromASN1 _ = fail "no ASN1 decoding for this kind of EC private key"
+
+
 instance ToJSON PublicKey where
   toJSON = String . T.pack . C8.unpack . B16.encode . exportPublicKey False
 
 instance FromJSON PublicKey where
-  parseJSON (String str) = return $ fromMaybe (err) $ importPublicKey $ fst $ B16.decode $ C8.pack $ T.unpack str
-    where err = error $ "parseJSON for PublicKey failed to read " ++ T.unpack str
-  parseJSON x = error $ "parseJSON for PublicKey: expected string, got " ++ show x
+  parseJSON (String str) = maybe err pure $ importPublicKey $ fst $ B16.decode $ C8.pack $ T.unpack str
+    where err = fail $ "parseJSON for PublicKey failed to read " ++ T.unpack str
+  parseJSON x = fail $ "parseJSON for PublicKey: expected string, got " ++ show x
 
 instance ToSchema PublicKey where
   declareNamedSchema _ = return $ named "PublicKey" binarySchema
@@ -132,7 +166,7 @@ instance ToJSON SharedKey where
 
 instance FromJSON SharedKey where
   parseJSON (String str) = return $ SharedKey $ fst $ B16.decode $ C8.pack $ T.unpack str
-  parseJSON x = error $ "parseJSON failed for SharedKey: expected string, got " ++ show x
+  parseJSON x = fail $ "parseJSON failed for SharedKey: expected string, got " ++ show x
 
 instance ToSchema SharedKey where
   declareNamedSchema _ = return $ named "SharedKey" binarySchema
@@ -221,7 +255,7 @@ instance FromJSON Signature where
     v <- o .: "v"
     return $ Signature $ S.CompactRecSig (dec r) (dec s) v
       where dec = BSS.toShort . fst . B16.decode . C8.pack . T.unpack
-  parseJSON o = error $ "parseJSON Signature failed: expected object, got: " ++ show o
+  parseJSON o = fail $ "parseJSON Signature failed: expected object, got: " ++ show o
 
 instance ToSchema Signature where
   declareNamedSchema _ = return $ named "Signature" binarySchema

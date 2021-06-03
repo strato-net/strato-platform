@@ -104,25 +104,6 @@ describe("TransactionTable: index", () => {
     expect(props.fetchTx).toHaveBeenCalled();
   });
 
-  test('component will unmount', () => {
-    const props = {
-      query: { last: 15 },
-      queryResults: [],
-      fetchTx: jest.fn(),
-      executeQuery: jest.fn(),
-      updateQuery: jest.fn(),
-      removeQuery: jest.fn(),
-      clearQuery: jest.fn()
-    }
-    let wrapper = mount(
-      <Provider store={store}>
-        <TransactionTable.WrappedComponent {...props} />
-      </Provider>
-    )
-    wrapper.unmount()
-    expect(props.clearQuery).toHaveBeenCalled()
-  });
-
   test('mapStateToProps with default state', () => {
     const state = {
       queryEngine: {

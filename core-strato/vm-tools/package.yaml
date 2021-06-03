@@ -13,6 +13,7 @@ dependencies:
   - blockapps-util
   - blockstanbul
   - containers
+  - exceptions
   - hflags
   - strato-conf
   - strato-model
@@ -36,12 +37,14 @@ library:
     - Executable.EVMFlags
   ghc-options: -Wall -O2
   dependencies:
+    - aeson
     - ansi-wl-pprint
     - binary
     - blockapps-mpdbs
     - bytestring
     - cross-monitoring
     - data-default
+    - debugger
     - deepseq
     - directory
     - dlist
@@ -73,6 +76,7 @@ library:
     - transformers
     - unliftio
     - unliftio-core
+    - x509-certs
 
 
 

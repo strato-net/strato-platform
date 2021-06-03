@@ -49,6 +49,7 @@ default-extensions:
 dependencies:
   - base
   - bytestring
+  - utf8-string
 
 library:
   source-dirs: library/

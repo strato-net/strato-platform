@@ -11,6 +11,7 @@ dependencies:
   - blockapps-solidity
   - containers
   - text
+  - utf8-string
 
 library:
   source-dirs: src/
@@ -38,6 +39,8 @@ library:
     - core-api2
     - cryptonite
     - directory
+    - esqueleto
+    - ethereum-rlp
     - extra
     - filepath
     - format

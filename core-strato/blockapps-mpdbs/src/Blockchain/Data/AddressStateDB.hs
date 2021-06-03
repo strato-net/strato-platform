@@ -14,6 +14,7 @@ module Blockchain.Data.AddressStateDB (
   blankAddressState,
   resolveCodePtr,
   unsafeResolveCodePtr,
+  resolveCodePtrParent,
   codePtrToSHA,
   resolvedCodePtrToSHA,
   codePtrToCodeKind,
@@ -95,17 +96,29 @@ instance RLPSerializable AddressState where
       addressStateChainId = Nothing
       }
   rlpDecode x = error $ "Missing case in rlpDecode for AddressState: " ++ show (pretty x)
-
+{-- TODO: 
+    resolveCodePtr fails when there is a circular reference of code pointers on the same chain
+    possible solution is to have a helper function that keeps track of all previously visited codepointers and termiantes if it visits the same one twice (aka cycle detection)
+--}
 resolveCodePtr :: ( Selectable (Maybe Word256) ParentChainId m
                   , (Account `Alters` AddressState) m
                   )
                => Maybe Word256 -> CodePtr -> m (Maybe CodePtr)
-resolveCodePtr chainId cp@(CodeAtAccount acct _) = do
-  isAccessibleChain <- (acct ^. accountChainId) `isAncestorChainOf` chainId
-  if isAccessibleChain
-    then unsafeResolveCodePtr cp
-    else pure Nothing
-resolveCodePtr _ cp = unsafeResolveCodePtr cp
+resolveCodePtr chainId (CodeAtAccount acct name) = do
+  lookup Proxy acct >>= \case
+    Nothing -> pure Nothing
+    Just AddressState{..} -> do
+      let codeAccountChainId = (acct ^. accountChainId)
+      isAccessibleChain <- codeAccountChainId `isAncestorChainOf` chainId
+      if isAccessibleChain
+        then resolveCodePtr codeAccountChainId addressStateCodeHash >>= \case
+          Just e@(EVMCode _) -> pure $ Just e
+          Just (SolidVMCode _ d) -> pure . Just $ SolidVMCode name d
+          _ -> pure Nothing
+        else pure Nothing
+
+-- for solidVM/EVM code
+resolveCodePtr _ cp = pure $ Just cp
 
 unsafeResolveCodePtr :: (Account `Alters` AddressState) m => CodePtr -> m (Maybe CodePtr)
 unsafeResolveCodePtr (CodeAtAccount acct name) = lookup Proxy acct >>= \case
@@ -115,6 +128,26 @@ unsafeResolveCodePtr (CodeAtAccount acct name) = lookup Proxy acct >>= \case
     Just (SolidVMCode _ d) -> pure . Just $ SolidVMCode name d
     _ -> pure Nothing
 unsafeResolveCodePtr codePtr = pure $ Just codePtr
+
+resolveCodePtrParent :: ( Selectable (Maybe Word256) ParentChainId m
+                        , (Account `Alters` AddressState) m
+                        )
+                        => Maybe Word256 -> CodePtr -> m (Maybe CodePtr)
+resolveCodePtrParent chainId cp@(CodeAtAccount acct _) = do
+  isAccessibleChain <- (acct ^. accountChainId) `isAncestorChainOf` chainId
+  if isAccessibleChain
+    then unsafeResolveCodePtrParent cp
+    else pure Nothing
+resolveCodePtrParent _ cp = unsafeResolveCodePtrParent cp
+
+unsafeResolveCodePtrParent :: (Account `Alters` AddressState) m => CodePtr -> m (Maybe CodePtr)
+unsafeResolveCodePtrParent (CodeAtAccount acct _) = lookup Proxy acct >>= \case
+  Nothing -> pure Nothing
+  Just AddressState{..} -> unsafeResolveCodePtrParent addressStateCodeHash >>= \case
+    Just e@(EVMCode _) -> pure $ Just e
+    Just (SolidVMCode name' d) -> pure . Just $ SolidVMCode name' d
+    _ -> pure Nothing
+unsafeResolveCodePtrParent codePtr = pure $ Just codePtr
 
 codePtrToSHA :: ( Selectable (Maybe Word256) ParentChainId m
                 , (Account `Alters` AddressState) m

@@ -20,7 +20,8 @@ getParams "oldblockappsnet" = return $ Just
 getParams "blockappsnet" = return $ Just
   [
     NetworkParams {
-      ethAddress = Address 0x7d102f0afa763557acd0b5332f375013db2a760a,
+      -- pubkey 04bddb5191e26688310253d075fe2b673ec2cdb81c64cc86383e194710d601b45465c746e31300d28e096d4ad045fd50a915b302b3e5d53cb77655d192e36bd2c2
+      ethAddress = Address 0xa17487ff88e58c916a9c4ada54a32f10c7081075,
       webAddress = "54.243.143.176"
 --      webAddress = "engineering.stratoid.blockapps.net"
       }
