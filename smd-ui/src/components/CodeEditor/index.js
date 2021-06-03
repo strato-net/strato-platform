@@ -12,7 +12,6 @@ import { downloadFile } from '../../lib/fileHandler.js';
 import Dropzone from 'react-dropzone';
 import { toasts } from "../Toasts";
 import debounce from 'lodash/debounce'
-import { hasSubmitFailed } from 'redux-form';
 class CodeEditor extends Component {
   constructor() {
     super()
