@@ -7,14 +7,20 @@ export const QUERY_CIRRUS_FAILURE = 'QUERY_CIRRUS_FAILURE';
 export const QUERY_CIRRUS_VARS_REQUEST = 'QUERY_CIRRUS_VARS_REQUEST';
 export const QUERY_CIRRUS_VARS_SUCCESS = 'QUERY_CIRRUS_VARS_SUCCESS';
 export const QUERY_CIRRUS_VARS_FAILURE = 'QUERY_CIRRUS_VARS_FAILURE';
-
-export const queryCirrusVars = function (contractName) {
+export const QUERY_CIRRUS_ADDRESS_SUCCESS = 'QUERY_CIRRUS_ADDRESS_SUCCESS';
+export const queryCirrusVars = function (contractName, contractAddress) {
   return {
     type: QUERY_CIRRUS_VARS_REQUEST,
-    contractName
+    contractName,
+    contractAddress
   }
 }
-
+export const queryCirrusAddressSuccess = function (contractAddress) {
+  return {
+    type: QUERY_CIRRUS_ADDRESS_SUCCESS,
+    contractAddress
+  }
+}
 export const queryCirrusVarsSuccess = function (vars) {
   return {
     type: QUERY_CIRRUS_VARS_SUCCESS,
