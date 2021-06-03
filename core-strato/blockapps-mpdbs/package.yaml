@@ -42,6 +42,7 @@ library:
   - nibblestring
   - solid-vm-model
   - strato-model
+  - text
   - transformers
   - x509-certs
 

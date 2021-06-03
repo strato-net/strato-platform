@@ -39,7 +39,8 @@ module Blockchain.SolidVM.SM (
   getXabiValueType,
   getValueType,
   pushSender,
-  initializeAction,
+  initializeActionCreate,
+  initializeActionCall,
   markDiffForAction,
   addEvent
   ) where
@@ -79,6 +80,7 @@ import           Blockchain.ExtWord
 import           Blockchain.Output
 import           Blockchain.Strato.Model.Action
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Keccak256
@@ -87,6 +89,7 @@ import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.Value
 import           Blockchain.VMContext
 import           Blockchain.VMOptions
+import           Blockchain.DB.StateDB
 
 import qualified SolidVM.Model.Storable as MS
 import qualified SolidVM.Solidity.Xabi as Xabi
@@ -133,6 +136,7 @@ data SState = SState
   { env             :: Env.Environment
   , callStack       :: [CallInfo]
   , ssEvents        :: Q.Seq Event
+  , _ssNewX509Certs  :: M.Map Address X509Certificate
   , _ssMemDBs       :: MemDBs
   , _action         :: Action
   }
@@ -141,6 +145,7 @@ makeLenses ''SState
 type SM m = StateT SState m
 
 type MonadSM m = ( (Account `A.Alters` AddressState) m
+                 , HasStateDB m
                  , (Keccak256 `A.Alters` DBCode) m
                  , HasX509CertDB m
                  , A.Selectable (Maybe Word256) ParentChainId m
@@ -148,6 +153,7 @@ type MonadSM m = ( (Account `A.Alters` AddressState) m
                  , HasMemAddressStateDB m
                  , HasMemRawStorageDB m
                  , Mod.Accessible Env.Environment m
+                 , Mod.Modifiable (M.Map Address X509Certificate) m
                  , Mod.Modifiable MemDBs m
                  , Mod.Modifiable Env.Sender m
                  , Mod.Modifiable [CallInfo] m
@@ -222,7 +228,7 @@ instance (Keccak256 `A.Alters` DBCode) m => (Keccak256 `A.Alters` DBCode) (SM m)
   insert p k = lift . A.insert p k
   delete p   = lift . A.delete p
 
-instance (Account `A.Alters` X509Certificate) m => (Account `A.Alters` X509Certificate) (SM m) where
+instance (Address `A.Alters` X509Certificate) m => (Address `A.Alters` X509Certificate) (SM m) where
   lookup p   = lift . A.lookup p
   insert p k = lift . A.insert p k
   delete p   = lift . A.delete p
@@ -251,6 +257,10 @@ instance Monad m => Mod.Modifiable [CallInfo] (SM m) where
 instance Monad m => Mod.Modifiable MemDBs (SM m) where
   get _    = gets $ _ssMemDBs
   put _ md = modify $ ssMemDBs .~ md
+
+instance Monad m => Mod.Modifiable (M.Map Address X509Certificate) (SM m) where
+  get _ = use ssNewX509Certs
+  put _ = assign ssNewX509Certs
 
 instance Monad m => Mod.Modifiable Action (SM m) where
   get _ = use action
@@ -282,6 +292,7 @@ runSM maybeCode env f = do
         env = env,
         callStack = [],
         ssEvents = Q.empty,
+        _ssNewX509Certs = M.empty,
         _ssMemDBs = csMemDBs,
         _action = startingAction maybeCode env
         }
@@ -631,9 +642,27 @@ getXabiValueType (AccountPath loc path) = do
 getValueType :: MonadSM m => AccountPath -> m BasicType
 getValueType p = hintFromType =<< getXabiValueType p
 
-initializeAction :: Mod.Modifiable Action m => Account -> String -> Keccak256 -> m ()
-initializeAction acct name hsh = do
-  let newData = ActionData (SolidVMCode name hsh) SolidVM (ActionSolidVMDiff M.empty) []
+initializeActionCreate :: MonadSM m => Account -> Account -> String -> String -> Keccak256 -> m ()
+initializeActionCreate creator acct name prt hsh = do
+  let address = _accountAddress creator
+  x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
+  maybeCertLevelDB <- x509CertDBGet address
+  let maybeCertBlockDB = M.lookup address x509s
+      maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
+      organization = T.pack $ fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
+  let newData = ActionData (SolidVMCode name hsh) organization (T.pack prt) SolidVM (ActionSolidVMDiff M.empty) []
+  Mod.modifyStatefully_ (Mod.Proxy @Action) $
+    actionData %= M.insertWith mergeActionData acct newData
+
+initializeActionCall :: MonadSM m => Account -> String -> String -> Keccak256 -> m ()
+initializeActionCall acct name prt hsh = do
+  let address = _accountAddress acct
+  x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
+  maybeCertLevelDB <- x509CertDBGet address
+  let maybeCertBlockDB = M.lookup address x509s
+      maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
+      organization = T.pack $ fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
+  let newData = ActionData (SolidVMCode name hsh) organization (T.pack prt) SolidVM (ActionSolidVMDiff M.empty) []
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     actionData %= M.insertWith mergeActionData acct newData
 

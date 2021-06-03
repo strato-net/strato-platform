@@ -12,8 +12,10 @@ import           Control.DeepSeq
 import qualified Data.ByteString.Short   as BSS
 import qualified Data.Set                as S
 import           GHC.Generics
+import           Data.Map                as M
 
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Event
 
 import           Blockchain.VM.SolidException
@@ -23,6 +25,8 @@ import           Blockchain.Data.Log
 import           Blockchain.Data.Transaction
 import           Blockchain.SolidVM.Model
 import           Blockchain.VMOptions
+
+import           BlockApps.X509.Certificate
 
 data ExecResults =
   ExecResults {
@@ -36,7 +40,8 @@ data ExecResults =
     erSuicideList        :: S.Set Account,
     erAction             :: Maybe Action,
     erException          :: Maybe (Either SolidException VMException),
-    erKind               :: CodeKind
+    erKind               :: CodeKind,
+    erNewX509Certs       :: M.Map Address X509Certificate
     } deriving (Eq, Show, Generic)
 
 instance NFData ExecResults
@@ -71,5 +76,6 @@ errorResults ck remainingGas e =
     , erAction = Nothing
     , erException = Just e
     , erKind = ck
+    , erNewX509Certs = M.empty
     }
 
