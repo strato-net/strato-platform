@@ -10,9 +10,6 @@ class HexText extends Component {
       copied: false
     }
   }
-  componentDidMount() {
-    console.log(this.props.hash, this.props.shorten);
-  }
   render() {
     return (
       <span className="hex-text">
