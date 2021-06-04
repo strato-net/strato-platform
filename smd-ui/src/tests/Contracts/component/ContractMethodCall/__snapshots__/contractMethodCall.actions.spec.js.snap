@@ -35,6 +35,7 @@ Object {
       "type": "String",
     },
   },
+  "isPayable": true,
   "key": "methodCallgreet8070db2390462e2b5748085bde1350590e08bb17",
   "type": "METHOD_CALL_FETCH_ARGS_SUCCESS",
 }

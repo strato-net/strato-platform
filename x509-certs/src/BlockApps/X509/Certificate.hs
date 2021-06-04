@@ -20,11 +20,11 @@ module BlockApps.X509.Certificate (
 
 
 
-
 import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.Secp256k1
 import           BlockApps.X509.Keys
 
+import           Control.DeepSeq
 import           Control.Monad.IO.Class
 import           Crypto.Random.Entropy
 import           Crypto.Hash
@@ -59,6 +59,8 @@ import           Time.System
 
 newtype X509Certificate = X509Certificate SignedCertificate deriving (Show, Eq)
 
+instance NFData X509Certificate where
+    rnf (X509Certificate cert) = cert `seq` ()
 
 data Issuer = Issuer
   {

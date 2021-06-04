@@ -28,6 +28,7 @@ library:
   - cereal
   - containers
   - cryptonite
+  - deepseq
   - ethereum-rlp
   - hourglass
   - memory
@@ -40,6 +41,7 @@ library:
   - strato-model
   - x509
   - x509-validation
+  - deepseq
 #  - x509-store
 #  - x509-util
 

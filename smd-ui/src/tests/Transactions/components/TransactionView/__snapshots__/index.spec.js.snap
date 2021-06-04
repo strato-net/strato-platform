@@ -2,6 +2,9 @@
 
 exports[`TransactionView mapStateToProps with queryEngine as a state 1`] = `
 Object {
+  "query": Object {
+    "last": 15,
+  },
   "selectedChain": "1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14",
   "tx": undefined,
 }
@@ -9,6 +12,9 @@ Object {
 
 exports[`TransactionView mapStateToProps with transaction as a state 1`] = `
 Object {
+  "query": Object {
+    "last": 1,
+  },
   "selectedChain": "1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14",
   "tx": Object {
     "blockNumber": 19,
@@ -35,7 +41,7 @@ ShallowWrapper {
   "length": 1,
   Symbol(enzyme.__root__): [Circular],
   Symbol(enzyme.__unrendered__): <TransactionView
-    fetchTx={[Function]}
+    executeQuery={[Function]}
     match={
       Object {
         "params": Object {
@@ -3179,7 +3185,7 @@ ShallowWrapper {
   "length": 1,
   Symbol(enzyme.__root__): [Circular],
   Symbol(enzyme.__unrendered__): <TransactionView
-    fetchTx={[Function]}
+    executeQuery={[Function]}
     match={
       Object {
         "params": Object {

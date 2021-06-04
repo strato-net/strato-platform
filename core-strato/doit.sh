@@ -3,6 +3,8 @@
 set -e
 set -x
 
+echo 'export PS1="⛓ \w> "' >> /root/.bashrc
+
 PROCESS_MONITORING=${PROCESS_MONITORING:-true}
 declare -A MONITORED_PIDS
 MONITORING_TIMER=5;
@@ -12,10 +14,19 @@ vaultWrapperRoot=http://${vaultWrapperHost}/strato/v2.3
 
 function newnode {
 
-  if [[ ! -d .ethereumH ]] ; then
-    mkdir logs
-    cleanupDB
-    doInit
+  if [[ ! -f .initialized ]] ; then
+    # if node is being updated from the earlier version that did not have `.initialized` flag implemented (pre-7.0):
+    if [[ -d .ethereumH && -d config && ! -f .initNotFinished ]]; then
+      touch .initialized
+      sleep 10
+    else
+      touch .initNotFinished
+      mkdir logs
+      cleanupDB
+      doInit
+      touch .initialized
+      rm .initNotFinished
+    fi
   else
     sleep 10
   fi
@@ -157,7 +168,7 @@ function newnode {
 
   if [ "${USE_OLD_STRATO_API}" = true ]; then
       echo "Starting core-api"
-      runBackgroundProcess core-api --appFetchLimit=${appFetchLimit:-100} >> logs/core-api 2>&1
+      runBackgroundProcess core-api --appFetchLimit=${appFetchLimit:-100} +RTS -N1 >> logs/core-api 2>&1
   else
       echo "Starting strato-api"
       runBackgroundProcess strato-api --gasOn=$gasOn >> logs/strato-api 2>&1
@@ -222,7 +233,7 @@ function cleanupDB {
     SELECT pg_terminate_backend(pg_stat_activity.pid)
     FROM pg_stat_activity
     WHERE pg_stat_activity.datname like '%eth_%';"
-
+  PGPASSWORD=$pgPass dropdb ${db_conn_params} --if-exists "bloc22"
   PGPASSWORD=$pgPass psql ${db_conn_params} -c "copy (select datname from pg_database where datname like '%eth_%') to stdout" | while read line; do
     echo "dropping the old db: $line"
     PGPASSWORD=$pgPass dropdb ${db_conn_params} "$line"

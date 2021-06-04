@@ -130,13 +130,13 @@ const reducer = function (state = initialState, action) {
     case UPDATE_HEALTH:
       return {
         ...state,
-          uptime: action.data
+        healthStatus: action.data
       }
 
     case PRELOAD_NODE_UPTIME:
       return {
         ...state,
-        healthStatus: action.data
+        uptime: action.data
       }
 
     case UPDATE_NODE_UPTIME:

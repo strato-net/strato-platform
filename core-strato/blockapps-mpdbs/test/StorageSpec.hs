@@ -8,6 +8,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE TypeApplications #-}
 module StorageSpec (storageSpec) where
@@ -17,6 +18,7 @@ import Control.Monad
 import Control.Monad.Change.Alter
 import Control.Monad.Trans.State
 import Control.Monad.Trans.Resource
+import Data.Either
 import qualified Data.ByteString as B
 import qualified Data.Map as M
 import qualified Blockchain.Database.MerklePatricia as MP
@@ -36,6 +38,7 @@ import Blockchain.DB.HashDB
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.RawStorageDB
 import Blockchain.DB.SolidStorageDB
+import Blockchain.DB.X509CertDB
 import Blockchain.DB.StorageDB
 import Blockchain.ExtWord
 import Blockchain.Output
@@ -56,6 +59,7 @@ data CachedStorage = CS
   , _atx :: AMap
   , _abs :: AMap
   , _srm :: M.Map (Maybe Word256) MP.StateRoot
+  , _x50 :: M.Map Address X509Certificate
   , _parentChainMap :: M.Map (Maybe Word256) ParentChainId
   } deriving (Generic)
 makeLenses ''CachedStorage
@@ -108,6 +112,11 @@ instance (Maybe Word256 `Alters` MP.StateRoot) StorM where
   insert _ k v = srm . at k ?= v
   delete _ k = srm . at k .= Nothing
 
+instance (Address `Alters` X509Certificate) StorM where
+  lookup _ k   = use $ x50 . at k
+  insert _ k v = x50 . at k ?= v
+  delete _ k   = x50 . at k .= Nothing
+
 initialEnv :: IO (FilePath, CachedStorage)
 initialEnv = do
   tmpdir <- mkdtemp "/tmp/storage_spec"
@@ -115,7 +124,7 @@ initialEnv = do
       openDB b = DBB.open (tmpdir ++ b) ldbOptions
   s <- openDB "/state/"
   h <- HashDB <$> openDB "/hash/"
-  let st = CS s h M.empty M.empty M.empty M.empty M.empty M.empty
+  let st = CS s h M.empty M.empty M.empty M.empty M.empty M.empty M.empty
   fmap (tmpdir,) . runLoggingTWithLevel LevelError . runResourceT $ execStateT MP.initializeBlank st
 
 runStorM :: StorM a -> IO a
@@ -205,6 +214,47 @@ storageSpec = do
     it "should be able to flush" . runStorM $ do
       putSolidStorageKeyVal' (Account 0x342 Nothing) (MS.singleton "x") (MS.BBool True)
       flushMemSolidStorageDB
+
+    let solidIdTest msg bv = it ("put " <> msg <> " in SolidStorage should not change the state root") . runStorM $ do
+          want <- addressStateContractRoot <$> lookupWithDefault Proxy (Account 0x1234 Nothing)
+          want `shouldBe` "V\232\US\ETB\ESC\204U\166\255\131E\230\146\192\248n[H\224\ESC\153l\173\192\SOHb/\181\227c\180!"
+          putSolidStorageKeyVal' (Account 0x1234 Nothing) (MS.fromList [MS.Field "x", MS.ArrayIndex 99]) bv
+          flushMemStorageDB
+          got <- addressStateContractRoot <$> lookupWithDefault Proxy (Account 0x1234 Nothing)
+          want `shouldBe` got
+    
+    solidIdTest "0"               (MS.BInteger 0)
+    solidIdTest "empty string"    (MS.BString "")
+    solidIdTest "False"           (MS.BBool False)
+    solidIdTest "zero account"    (MS.BAccount $ unspecifiedChain 0)
+    solidIdTest "zero enum value" (MS.BEnumVal "myEnum" "myEnumKey" 0)
+    solidIdTest "zero contract"   (MS.BContract "MyContractName" $ unspecifiedChain 0)
+    solidIdTest "BDefault"        (MS.BDefault)
+
+    it "put 1 in SolidStorage should change the state root" . runStorM $ do
+      want <- addressStateContractRoot <$> lookupWithDefault Proxy (Account 0x1234 Nothing)
+      putSolidStorageKeyVal' (Account 0x1234 Nothing) (MS.fromList [MS.Field "x", MS.ArrayIndex 99]) (MS.BInteger 1)
+      flushMemStorageDB
+      got <- addressStateContractRoot <$> lookupWithDefault Proxy (Account 0x1234 Nothing)
+      want `shouldNotBe` got
+      got `shouldBe` "\223\231^\"\234'\233\249\208*D\163\210\237\147\ETXq\202\EM\208\195\140\223\&7J\SI\201\250\&9\165\177\141"
+
+  describe "X509 Certificates" $ do
+    it "should get its puts" . runStorM $ do
+      let address = 0x888 :: Address
+          x509Cert = fromRight (error "failed to parse cert") $ bsToCert "-----BEGIN CERTIFICATE-----\nMIIBiDCCAS2gAwIBAgIQCgO76hC29iXEFXJNco5ekjAMBggqhkjOPQQDAgUAMEYx\nDDAKBgNVBAMMA2RhbjEMMAoGA1UEBgwDVVNBMRIwEAYDVQQKDAlibG9ja2FwcHMx\nFDASBgNVBAsMC2VuZ2luZWVyaW5nMB4XDTIxMDMxODE1NDgwN1oXDTIyMDMxODE1\nNDgwN1owRjEMMAoGA1UEAwwDZGFuMQwwCgYDVQQGDANVU0ExEjAQBgNVBAoMCWJs\nb2NrYXBwczEUMBIGA1UECwwLZW5naW5lZXJpbmcwVjAQBgcqhkjOPQIBBgUrgQQA\nCgNCAAQY4p67l1IIEUdVC7L+rUDwF5Nv30bze0NV5y8ced7qwp+YFk3UAiOGkcYo\n7ba8F92rd0yf9AGpvZN1H3Dda8xdMAwGCCqGSM49BAMCBQADRwAwRAIgbKXO8tZ5\noPhBusPQFkNEQDnLO/MRru4KjtCpPnVb5sACIE0TwBJ7yeIGuPc/8G50/858Pf3a\n0t1hHbhYnJarPkNA\n-----END CERTIFICATE-----"
+      insert Proxy address x509Cert
+      value <- lookup Proxy address
+      value `shouldBe` Just x509Cert
+    it "replace a puts" . runStorM $ do
+      let address = 0x888 :: Address
+          x509Cert = fromRight (error "failed to parse cert") $ bsToCert "-----BEGIN CERTIFICATE-----\nMIIBiDCCAS2gAwIBAgIQCgO76hC29iXEFXJNco5ekjAMBggqhkjOPQQDAgUAMEYx\nDDAKBgNVBAMMA2RhbjEMMAoGA1UEBgwDVVNBMRIwEAYDVQQKDAlibG9ja2FwcHMx\nFDASBgNVBAsMC2VuZ2luZWVyaW5nMB4XDTIxMDMxODE1NDgwN1oXDTIyMDMxODE1\nNDgwN1owRjEMMAoGA1UEAwwDZGFuMQwwCgYDVQQGDANVU0ExEjAQBgNVBAoMCWJs\nb2NrYXBwczEUMBIGA1UECwwLZW5naW5lZXJpbmcwVjAQBgcqhkjOPQIBBgUrgQQA\nCgNCAAQY4p67l1IIEUdVC7L+rUDwF5Nv30bze0NV5y8ced7qwp+YFk3UAiOGkcYo\n7ba8F92rd0yf9AGpvZN1H3Dda8xdMAwGCCqGSM49BAMCBQADRwAwRAIgbKXO8tZ5\noPhBusPQFkNEQDnLO/MRru4KjtCpPnVb5sACIE0TwBJ7yeIGuPc/8G50/858Pf3a\n0t1hHbhYnJarPkNA\n-----END CERTIFICATE-----"
+          x509Cert' = fromRight (error "failed to parse cert") $ bsToCert "-----BEGIN CERTIFICATE-----\nMIIBdjCCARugAwIBAgIQL0qWnhe3DPTMIaL5AiYxOTAMBggqhkjOPQQDAgUAMD0x\nDTALBgNVBAMMBGx1a2UxDDAKBgNVBAYMA1VTQTEOMAwGA1UECgwFYmF5ZXIxDjAM\nBgNVBAsMBXNhbGVzMB4XDTIxMDQwMjE3NDMzMloXDTIyMDQwMjE3NDMzMlowPTEN\nMAsGA1UEAwwEbHVrZTEMMAoGA1UEBgwDVVNBMQ4wDAYDVQQKDAViYXllcjEOMAwG\nA1UECwwFc2FsZXMwVjAQBgcqhkjOPQIBBgUrgQQACgNCAATs37kyFit5b5P4dS1D\nJr04iHsN9fy7Rw4Os+3TpYcTd4OqZa1OoInwEUirQPXmDmt/77uY+0TybMhdnRtL\n+6dsMAwGCCqGSM49BAMCBQADRwAwRAIgdsXIAZNAL64Cha00S5tAsz2DxmQhPd4W\n2PWbBqwTbOcCICId88YjO0rOa/sYyOoYj2P2RaZFXESa4zqadO1MYcBo\n-----END CERTIFICATE-----";
+      insert Proxy address x509Cert
+      insert Proxy address x509Cert'
+      value <- lookup Proxy address
+      value `shouldNotBe` Just x509Cert
+
   describe "resolveCodePtr" $ do
     it "should resolve direct code pointers" . runStorM $ do
       let chainRelationships = [(Just (0 :: Word256), ParentChainId $ Nothing)]

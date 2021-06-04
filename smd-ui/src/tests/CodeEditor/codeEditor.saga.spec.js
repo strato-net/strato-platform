@@ -29,24 +29,24 @@ describe('CodeEditor: saga', () => {
     describe('inspection', () => {
 
       test('success without values', () => {
-        const gen = compileCodeFromEditor({ type: "CODE_EDITOR_COMPILE_REQUEST", code: '' });
+        const gen = compileCodeFromEditor({ type: "CODE_EDITOR_COMPILE_REQUEST", code: '', codeType: "EVM" });
         expect(gen.next().value).toEqual(call(tokenizeSource, ''));
         expect(gen.next().value).toEqual(put(compileCodeFromEditorSuccess()));
         expect(gen.next().done).toBe(true);
       })
 
       test('success with values', () => {
-        const gen = compileCodeFromEditor({ type: "CODE_EDITOR_COMPILE_REQUEST", code: '' });
+        const gen = compileCodeFromEditor({ type: "CODE_EDITOR_COMPILE_REQUEST", code: '', codeType : "EVM" });
         expect(gen.next().value).toEqual(call(tokenizeSource, ''));
-        expect(gen.next(extAbi).value).toEqual(call(compileSource, 'Cloner', ''))
+        expect(gen.next(extAbi).value).toEqual(call(compileSource, 'Cloner', '', 'EVM'))
         expect(gen.next().value).toEqual(put(compileCodeFromEditorSuccess(extAbi)));
         expect(gen.next().done).toBe(true);
       })
 
       test('failure', () => {
-        const gen = compileCodeFromEditor({ type: "CODE_EDITOR_COMPILE_REQUEST", code: '' });
+        const gen = compileCodeFromEditor({ type: "CODE_EDITOR_COMPILE_REQUEST", code: '', codeType : "EVM"});
         expect(gen.next().value).toEqual(call(tokenizeSource, ''));
-        expect(gen.next(extAbi).value).toEqual(call(compileSource, 'Cloner', ''))
+        expect(gen.next(extAbi).value).toEqual(call(compileSource, 'Cloner', '', 'EVM'))
         expect(gen.throw(error).value).toEqual(put(compileCodeFromEditorFailure(error)));
         expect(gen.next().done).toBe(true);
       })

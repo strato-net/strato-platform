@@ -27,6 +27,11 @@ sed -i -e 's|__bloc_postgres_password__|'"${postgres_password}"'|g' models/strat
 sed -i -e 's|__bloc_postgres_host__|'"${postgres_host}"'|g' models/strato/bloc22/config.json
 sed -i -e 's|__bloc_postgres_port__|'"${postgres_port}"'|g' models/strato/bloc22/config.json
 
+sed -i -e 's|__oauth_postgres_user__|'"${postgres_user}"'|g' models/strato/oauth/config.json
+sed -i -e 's|__oauth_postgres_password__|'"${postgres_password}"'|g' models/strato/oauth/config.json
+sed -i -e 's|__oauth_postgres_host__|'"${postgres_host}"'|g' models/strato/oauth/config.json
+sed -i -e 's|__oauth_postgres_port__|'"${postgres_port}"'|g' models/strato/oauth/config.json
+
 sed -i -e 's|__strato_postgres_user__|'"${postgres_user}"'|g' models/strato/eth/config.js
 sed -i -e 's|__strato_postgres_password__|'"${postgres_password}"'|g' models/strato/eth/config.js
 sed -i -e 's|__strato_postgres_host__|'"${postgres_host}"'|g' models/strato/eth/config.js

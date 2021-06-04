@@ -43,7 +43,11 @@ toKey :: Account -> StoragePath -> RawStorageKey
 toKey =  curry $ fmap unparsePath
 
 toVal :: BasicValue -> RawStorageValue
-toVal = rlpSerialize  . rlpEncode
+toVal bv =
+  let v = if isDefault bv
+            then BDefault
+            else bv
+   in rlpSerialize $ rlpEncode v
 
 fromVal :: RawStorageValue -> BasicValue
 fromVal = rlpDecode . rlpDeserialize

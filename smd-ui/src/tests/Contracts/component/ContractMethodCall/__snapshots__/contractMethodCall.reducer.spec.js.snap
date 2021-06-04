@@ -63,6 +63,7 @@ Object {
         },
       },
       "isOpen": true,
+      "isPayable": true,
       "result": "Waiting for method to be called...",
     },
   },
