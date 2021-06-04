@@ -39,8 +39,7 @@ module Blockchain.SolidVM.SM (
   getXabiValueType,
   getValueType,
   pushSender,
-  initializeActionCreate,
-  initializeActionCall,
+  initializeAction,
   markDiffForAction,
   addEvent
   ) where
@@ -642,29 +641,14 @@ getXabiValueType (AccountPath loc path) = do
 getValueType :: MonadSM m => AccountPath -> m BasicType
 getValueType p = hintFromType =<< getXabiValueType p
 
-initializeActionCreate :: MonadSM m => Account -> Account -> String -> String -> Keccak256 -> m ()
-initializeActionCreate creator acct name prt hsh = do
-  let address = _accountAddress creator
-  x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-  maybeCertLevelDB <- x509CertDBGet address
-  let maybeCertBlockDB = M.lookup address x509s
-      maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
-      organization = T.pack $ fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
-  let newData = ActionData (SolidVMCode name hsh) organization (T.pack prt) SolidVM (ActionSolidVMDiff M.empty) []
+
+initializeAction :: MonadSM m => Account -> String -> String -> Keccak256 -> m ()
+initializeAction acct name appName hsh = do
+  -- org name to be set later, b/c the lookup is complex
+  let newData = ActionData (SolidVMCode name hsh) "" (T.pack appName) SolidVM (ActionSolidVMDiff M.empty) []
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     actionData %= M.insertWith mergeActionData acct newData
 
-initializeActionCall :: MonadSM m => Account -> String -> String -> Keccak256 -> m ()
-initializeActionCall acct name prt hsh = do
-  let address = _accountAddress acct
-  x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-  maybeCertLevelDB <- x509CertDBGet address
-  let maybeCertBlockDB = M.lookup address x509s
-      maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
-      organization = T.pack $ fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
-  let newData = ActionData (SolidVMCode name hsh) organization (T.pack prt) SolidVM (ActionSolidVMDiff M.empty) []
-  Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    actionData %= M.insertWith mergeActionData acct newData
 
 markDiffForAction :: Mod.Modifiable Action m => Account -> MS.StoragePath -> MS.BasicValue -> m ()
 markDiffForAction owner key' val' = do

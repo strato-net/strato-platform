@@ -69,6 +69,7 @@ import           Blockchain.DB.CodeDB
 import           Blockchain.DB.ModifyStateDB          (pay)
 import           Blockchain.DB.X509CertDB
 import           Blockchain.DB.AddressStateDB
+import           Blockchain.DB.SolidStorageDB
 import           Blockchain.ExtWord
 import qualified Blockchain.SolidVM.Builtins          as Builtins
 import           Blockchain.SolidVM.CodeCollectionDB
@@ -230,8 +231,13 @@ create' creator newAccount ch cc contractName' argExps x509s = do
      >>= (\case     
             SolidVMCode name _ -> pure name                         -- Name of the parent
             _                  -> pure "")
+  
+  
+  liftIO $ putStrLn $ "DAN -----------------CREATE ------------------"
+  liftIO $ putStrLn $ "DAN - we are creating " ++ contractName' ++ " with parent " ++ show parentName
+ 
 
-  initializeActionCreate creator newAccount contractName' parentName ch
+  initializeAction newAccount contractName' parentName ch
 
   A.adjustWithDefault_ (A.Proxy @AddressState) newAccount $ \newAddressState ->
     pure newAddressState{ addressStateContractRoot = MP.emptyTriePtr
@@ -248,30 +254,34 @@ create' creator newAccount ch cc contractName' argExps x509s = do
 
   popCallInfo
 
+  -- get org first, set creator
+  beforeOrg <- getOrg creator newAccount
+  liftIO $ putStrLn $ "DAN - org before constructor " ++ show beforeOrg
+  flip setCreator newAccount =<< (Env.origin <$> getEnv)
+
+
   -- Run the constructor
   runTheConstructors creator newAccount ch cc contractName' argExps
 
   onTraced $ liftIO $ putStrLn $ C.red $ "Done Creating Contract: " ++ show newAccount ++ " of type " ++ contractName'
 
-  finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
-  x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
 
 
-  -- make sure the org is updated
-  maybeCertLevelDB <- x509CertDBGet $ _accountAddress creator
-  let maybeCertBlockDB = M.lookup (_accountAddress creator) x509s'
-      maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
-      org = T.pack . fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
+  -- get org and set creator again, in case something changed during constructor execution
+  afterOrg <- getOrg creator newAccount 
+  liftIO $ putStrLn $ "DAN - org after constructor " ++ show afterOrg
+  flip setCreator newAccount =<< (Env.origin <$> getEnv)
+
 
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    actionData %= M.adjust (actionDataOrganization .~ org) newAccount
+    actionData %= M.adjust (actionDataOrganization .~ (T.pack afterOrg)) newAccount
 
-  case maybeCert of
-      Just c  -> Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.insert (_accountAddress newAccount) c x509s'
-      Nothing -> pure ()
 
-  x509s'' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
+
+  finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
   finalAct <- Mod.get (Mod.Proxy @Action)
+  x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
+
 
   return ExecResults {
     erRemainingTxGas = 0, --Just use up all the allocated gas for now....
@@ -285,7 +295,7 @@ create' creator newAccount ch cc contractName' argExps x509s = do
     erAction = Just finalAct,
     erException = Nothing,
     erKind = SolidVM,
-    erNewX509Certs = x509s''
+    erNewX509Certs = x509s'
     }
 
 {-
@@ -366,6 +376,56 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
       erKind = SolidVM,
       erNewX509Certs = x509s
       }
+
+
+-- set the hidden ":creator" field, if the caller has a cert
+setCreator :: MonadSM m => Account -> Account -> m ()
+setCreator creator contract = do
+  x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
+  maybeCertLevelDB <- x509CertDBGet $ _accountAddress creator
+  let maybeCertBlockDB = M.lookup (_accountAddress creator) x509s'
+      maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
+      org = fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
+  case org of
+    "" -> do
+      liftIO $ putStrLn $ "DAN - we didn't get an org the creator...."
+      return ()
+    str -> do 
+    -- insert the org for this contract into storage, in the ":creator" field
+      liftIO $ putStrLn $ "DAN - we actually got an org for the creator, so we are setting it: " ++ show org
+      putSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack str)
+
+
+
+-- get the org and app for the Cirrus table name
+getOrg :: MonadSM m => Account -> Account -> m (String)
+getOrg creator thisContract = do 
+  creatorCodeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) creator
+--  thisCodeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) thisContract
+
+  case creatorCodeHash of
+    EVMCode _ -> do 
+    -- creator is a user account, so they are creating the first instance of this app
+    -- we will look up their cert in the DB and use it to get the org name for this app
+      x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
+      maybeCertLevelDB <- x509CertDBGet $ _accountAddress creator
+      let maybeCertBlockDB = M.lookup (_accountAddress creator) x509s'
+          maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
+      let org' = fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
+      liftIO $ putStrLn $ "DAN - OMG! A user created us. Their org is :" ++ show org'
+      return org'
+    x -> do
+    -- creator is a contract account, so this app already exists
+    -- so we need to find the app contract and get its ":creator" and it's name
+      mAppAccount <- getAppAddress (thisContract ^. accountChainId) creator
+      case mAppAccount of 
+        Nothing -> internalError "somehow, the parent contract didn't have an AddressState?" x
+        Just acct -> do
+          appCreator <- getSolidStorageKeyVal' acct $ MS.StoragePath [MS.Field ":creator"]
+          liftIO $ putStrLn $ "DAN - OMG! We got the parent's creator! It's " ++ show appCreator
+          case appCreator of
+            MS.BString org' -> return $ BC.unpack org'
+            _ -> return "" 
 
 
 getCodeAndCollection :: MonadSM m => Account -> m (Contract, Keccak256, CodeCollection)
@@ -479,7 +539,19 @@ callWrapper from to mContract functionName argExps = do
 
   let contract = fromMaybe contract' $ mContract >>= \c -> M.lookup c $ _contracts cc
       parentName' = if parentName == (_contractName contract) then "" else parentName
-  initializeActionCall to (_contractName contract) parentName' hsh
+  
+  
+  liftIO $ putStrLn $ "DAN -----------------CALL------------------"
+  liftIO $ putStrLn $ "DAN - we are calling " ++ (_contractName contract) ++ " with parent " ++ show parentName
+ 
+  initializeAction to (_contractName contract) parentName' hsh
+
+  -- grab the org for this contract
+  org <- getOrg from to
+  liftIO $ putStrLn $ "DAN - org after call " ++ show org
+  Mod.modifyStatefully_ (Mod.Proxy @Action) $
+    actionData %= M.adjust (actionDataOrganization .~ (T.pack org)) to
+
 
   let functionsIncludingConstructor =
         case contract^.constructor of
@@ -503,7 +575,6 @@ callWrapper from to mContract functionName argExps = do
                 -- "public", right now I just ignore this and allow anything to be called as a getter
                 return (fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack functionName, OrderedVals [])
               Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.contractName)
-
 
 
   logFunctionCall args to contract functionName f
@@ -783,12 +854,7 @@ runStatement st@(Xabi.EmitStatement eventName exptups pos) = do
         invalidArguments "arguments to statement are inconsistent with those declared" (unparseStatement st)
       else do
         let account = currentAccount curInfo
-            address = _accountAddress account
-        x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-        maybeCertLevelDB <- x509CertDBGet address
-        let maybeCertBlockDB = M.lookup address x509s
-            maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
-            organization = fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
+        org <- flip getOrg account =<< (Env.sender <$> getEnv) -- the org of the app
          
         parentName <- fromMaybeM (return "") $ runMaybeT 
             $   pure account
@@ -802,7 +868,7 @@ runStatement st@(Xabi.EmitStatement eventName exptups pos) = do
         -- pair up field names with values one-by-one (no type checking tho, lol)
         let pairs = zip (map (T.unpack . fst) $ Xabi.eventLogs ev) expStrs
         
-        addEvent $ Event organization parentName (_contractName curCnct) account eventName pairs
+        addEvent $ Event org parentName (_contractName curCnct) account eventName pairs
         return Nothing
 
 
@@ -1619,7 +1685,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
 
 
   addCallInfo to contract' (contractName' ++ " constructer") hsh cc (M.fromList zipped) False
-
+  
 
   forM_ [(n, e) | (n, Xabi.VariableDecl _ _ (Just e)) <- M.toList $ contract'^.storageDefs] $ \(n, e) -> do
     v <- expToVar e
@@ -1643,14 +1709,33 @@ runTheConstructors from to hsh cc contractName' argExps = do
         commands <- case Xabi.funcContents theFunction of
           Nothing -> missingField "contract constructor has been declared but not defined" contractName'
           Just cms -> pure cms
+
         _ <- pushSender from $ runStatements commands
         return ()
 
       Nothing -> return ()
 
+
+
+------------------- MY TRASH! NO TOUCH! --------------------
+
+  -- TODO: lookup creator org, create and set it, then do same after body is run
+  parentCodeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) from
+  myCodeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) to
+
+
+  liftIO $ putStrLn $ "DAN - we got the codeHash of the from, address is " ++ (format from) ++ " with hash " ++ show parentCodeHash
+  liftIO $ putStrLn $ "DAN - we got the codeHash of the to, address is " ++ (format to) ++ " with hash " ++ show myCodeHash
+  
+
+---------------------------------------------------------------
+
   popCallInfo
 
   return ()
+
+
+
 
 -- Note: this is intentionally nonstrict in `theType`
 addLocalVariable :: MonadSM m => Xabi.Type -> String -> Value -> m ()
