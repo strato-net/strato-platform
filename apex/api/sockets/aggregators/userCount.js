@@ -7,7 +7,7 @@ let userCount
 
 function getUserCount() {
   User.count().then(users => {
-    const newUserCount = users - 1;
+    const newUserCount = users - 1; // Subtract one to account for the nodekey account
     if (userCount !== newUserCount) {
       userCount = newUserCount
       emitter.emit(ON_SOCKET_PUBLISH_EVENTS, USERS_COUNT, userCount)
