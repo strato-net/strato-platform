@@ -110,6 +110,10 @@ Object {
     "displayName": "Gas Limit",
     "key": "gaslimit",
   },
+  "hash": Object {
+    "displayName": "Hash",
+    "key": "hash",
+  },
   "last": Object {
     "displayName": "Last",
     "key": "last",
