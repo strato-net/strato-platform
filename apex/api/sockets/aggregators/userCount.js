@@ -1,6 +1,6 @@
 const { USERS_COUNT } = require('../rooms')
 const { emitter, ON_SOCKET_PUBLISH_EVENTS } = require('../eventBroker')
-const User = require('../../models/strato/bloc22/user');
+const User = require('../../models/strato/oauth/user');
 const config = require('../../config/app.config')
 
 let userCount
