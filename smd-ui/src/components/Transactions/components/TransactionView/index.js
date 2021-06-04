@@ -22,7 +22,7 @@ class TransactionView extends Component {
           <div className="row">
             <div className="col-sm-9">
               <div className="h3">
-                <HexText value={hash} classes="smd-pad-2" />
+                <HexText value={hash} shorten={false} classes="smd-pad-2" />
               </div>
             </div>
             <div className="col-sm-3 smd-pad-16 text-right">
@@ -50,7 +50,7 @@ class TransactionView extends Component {
                     </tr>
                     <tr>
                       <td><strong>From</strong></td>
-                      <td>{tx.from === undefined ? '' : <HexText value={tx.from} classes="smd-pad-2" />}</td>
+                      <td>{tx.from === undefined ? '' : <HexText value={tx.from} classes="smd-pad-2"/>}</td>
                     </tr>
                     {tx.to !== undefined && <tr>
                       <td><strong>To</strong></td>

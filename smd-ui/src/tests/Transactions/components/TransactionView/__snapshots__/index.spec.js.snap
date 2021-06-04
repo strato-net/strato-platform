@@ -97,6 +97,7 @@ ShallowWrapper {
             >
               <HexText
                 classes="smd-pad-2"
+                shorten={false}
                 value="70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81"
               />
             </div>
@@ -260,6 +261,7 @@ ShallowWrapper {
               >
                 <HexText
                   classes="smd-pad-2"
+                  shorten={false}
                   value="70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81"
                 />
               </div>
@@ -288,6 +290,7 @@ ShallowWrapper {
               >
                 <HexText
                   classes="smd-pad-2"
+                  shorten={false}
                   value="70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81"
                 />
               </div>,
@@ -301,6 +304,7 @@ ShallowWrapper {
               "props": Object {
                 "children": <HexText
                   classes="smd-pad-2"
+                  shorten={false}
                   value="70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81"
                 />,
                 "className": "h3",
@@ -312,6 +316,7 @@ ShallowWrapper {
                 "nodeType": "class",
                 "props": Object {
                   "classes": "smd-pad-2",
+                  "shorten": false,
                   "value": "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81",
                 },
                 "ref": null,
@@ -1634,6 +1639,7 @@ ShallowWrapper {
               >
                 <HexText
                   classes="smd-pad-2"
+                  shorten={false}
                   value="70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81"
                 />
               </div>
@@ -1797,6 +1803,7 @@ ShallowWrapper {
                 >
                   <HexText
                     classes="smd-pad-2"
+                    shorten={false}
                     value="70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81"
                   />
                 </div>
@@ -1825,6 +1832,7 @@ ShallowWrapper {
                 >
                   <HexText
                     classes="smd-pad-2"
+                    shorten={false}
                     value="70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81"
                   />
                 </div>,
@@ -1838,6 +1846,7 @@ ShallowWrapper {
                 "props": Object {
                   "children": <HexText
                     classes="smd-pad-2"
+                    shorten={false}
                     value="70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81"
                   />,
                   "className": "h3",
@@ -1849,6 +1858,7 @@ ShallowWrapper {
                   "nodeType": "class",
                   "props": Object {
                     "classes": "smd-pad-2",
+                    "shorten": false,
                     "value": "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81",
                   },
                   "ref": null,
@@ -3216,6 +3226,7 @@ ShallowWrapper {
             >
               <HexText
                 classes="smd-pad-2"
+                shorten={false}
                 value="70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81"
               />
             </div>
@@ -3357,6 +3368,7 @@ ShallowWrapper {
               >
                 <HexText
                   classes="smd-pad-2"
+                  shorten={false}
                   value="70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81"
                 />
               </div>
@@ -3385,6 +3397,7 @@ ShallowWrapper {
               >
                 <HexText
                   classes="smd-pad-2"
+                  shorten={false}
                   value="70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81"
                 />
               </div>,
@@ -3398,6 +3411,7 @@ ShallowWrapper {
               "props": Object {
                 "children": <HexText
                   classes="smd-pad-2"
+                  shorten={false}
                   value="70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81"
                 />,
                 "className": "h3",
@@ -3409,6 +3423,7 @@ ShallowWrapper {
                 "nodeType": "class",
                 "props": Object {
                   "classes": "smd-pad-2",
+                  "shorten": false,
                   "value": "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81",
                 },
                 "ref": null,
@@ -4528,6 +4543,7 @@ ShallowWrapper {
               >
                 <HexText
                   classes="smd-pad-2"
+                  shorten={false}
                   value="70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81"
                 />
               </div>
@@ -4669,6 +4685,7 @@ ShallowWrapper {
                 >
                   <HexText
                     classes="smd-pad-2"
+                    shorten={false}
                     value="70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81"
                   />
                 </div>
@@ -4697,6 +4714,7 @@ ShallowWrapper {
                 >
                   <HexText
                     classes="smd-pad-2"
+                    shorten={false}
                     value="70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81"
                   />
                 </div>,
@@ -4710,6 +4728,7 @@ ShallowWrapper {
                 "props": Object {
                   "children": <HexText
                     classes="smd-pad-2"
+                    shorten={false}
                     value="70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81"
                   />,
                   "className": "h3",
@@ -4721,6 +4740,7 @@ ShallowWrapper {
                   "nodeType": "class",
                   "props": Object {
                     "classes": "smd-pad-2",
+                    "shorten": false,
                     "value": "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81",
                   },
                   "ref": null,

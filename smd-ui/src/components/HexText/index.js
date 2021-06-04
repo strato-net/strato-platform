@@ -10,7 +10,9 @@ class HexText extends Component {
       copied: false
     }
   }
-
+  componentDidMount() {
+    console.log(this.props.hash, this.props.shorten);
+  }
   render() {
     return (
       <span className="hex-text">
@@ -38,7 +40,7 @@ class HexText extends Component {
           content={this.props.value}
           className={`text-tooltip text-left ${this.props.classes || ''}`}
           position={Position.TOP}>
-          <Text ellipsize={true}>
+          <Text ellipsize={this.props.shorten !== undefined ? this.props.shorten : true}>
             {this.props.value}
           </Text>
         </Tooltip>
