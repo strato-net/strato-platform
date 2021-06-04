@@ -21,12 +21,11 @@ import           Data.Foldable                     (for_)
 import           Data.Int                          (Int32)
 import qualified Data.Map.Ordered                  as OMap
 import qualified Data.Map.Strict                   as Map
-import           Data.Maybe                        (catMaybes, fromMaybe, listToMaybe)
+import           Data.Maybe                        (catMaybes, fromMaybe)
 import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
 import           Data.Text.Encoding                (encodeUtf8)
 import qualified Data.Vector                       as V
-import qualified Database.Esqueleto as E
 
 import           BlockApps.Bloc22.API.Chain
 import           BlockApps.Bloc22.Monad
@@ -43,16 +42,18 @@ import           BlockApps.Bloc22.Server.Utils     (waitFor)
 import           BlockApps.XAbiConverter           (xAbiToContract)
 
 import           Blockchain.Data.ChainInfo
-import           Blockchain.Data.DataDefs
-import           Blockchain.DB.SQLDB
+import           Blockchain.Data.Json
 import           Blockchain.TypeLits
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Class     (blockHash)
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.SourceMap (serializeSourceMap)
 import           Control.Monad.Change.Alter
 import           Control.Monad.Composable.BlocSQL
+import           Control.Monad.Composable.CoreAPI
 import           Control.Monad.Composable.SQL
+import           Handlers.BlkLast
 import           Handlers.Chain
 import           SQLM
 
@@ -147,27 +148,19 @@ createChainInfo creationBlockHash (ChainInput src mCodePtr cname lbl balances ch
         Nothing
   return (fst <$> mContract, chainInfo)
 
-withLastBlockHash :: (MonadIO m, MonadUnliftIO m, HasSQL m) =>
+withLastBlockHash :: (MonadIO m, MonadLogger m, HasCoreAPI m) =>
                      (Keccak256 -> m b) -> m b
+
+--withLastBlockHash :: Monad m =>
+--                     (Keccak256 -> m Bloc) -> m a
 withLastBlockHash f = do
-  maybeBlkHash <- getLastBlockHash
-  case maybeBlkHash of
-    Just blkHash -> f blkHash
+  blks <- blocStrato $ getBlkLastClient 1
+  case blks of
+    (Block' blk _):_ -> f $ blockHash blk
     _ -> throwIO . UserError $ Text.pack "STRATO has not been initialized yet"
 
-getLastBlockHash :: (MonadIO m, HasSQL m) => m (Maybe Keccak256)
-getLastBlockHash = do
-    blks <- fmap (map (E.entityVal)) . sqlQuery $ E.select $
-        E.from $ \a -> do
-          E.limit 1
-          E.orderBy [E.desc (a E.^. BlockDataRefNumber)]
-          return a
-
-    return $ fmap blockDataRefHash $ listToMaybe blks
-
-
 postChainInfo :: (MonadIO m, MonadLogger m, HasBlocSQL m,
-                  HasBlocEnv m, HasSQL m) =>
+                  HasBlocEnv m, HasSQL m, HasCoreAPI m) =>
                  ChainInput -> m ChainId
 postChainInfo chainInput = withLastBlockHash $ \bHash -> do
   (mCmId, chainInfo') <- createChainInfo bHash chainInput
@@ -178,7 +171,7 @@ postChainInfo chainInput = withLastBlockHash $ \bHash -> do
   return chainId
 
 postChainInfos :: (MonadIO m, MonadLogger m, HasBlocSQL m,
-                   HasSQL m, HasBlocEnv m) =>
+                   HasSQL m, HasBlocEnv m, HasCoreAPI m) =>
                   [ChainInput] -> m [ChainId]
 postChainInfos chainInputs = withLastBlockHash $ \bHash -> do
   chainInfos <- traverse (createChainInfo bHash) chainInputs

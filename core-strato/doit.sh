@@ -3,8 +3,6 @@
 set -e
 set -x
 
-echo 'export PS1="⛓ \w> "' >> /root/.bashrc
-
 PROCESS_MONITORING=${PROCESS_MONITORING:-true}
 declare -A MONITORED_PIDS
 MONITORING_TIMER=5;
@@ -168,7 +166,7 @@ function newnode {
 
   if [ "${USE_OLD_STRATO_API}" = true ]; then
       echo "Starting core-api"
-      runBackgroundProcess core-api --appFetchLimit=${appFetchLimit:-100} +RTS -N1 >> logs/core-api 2>&1
+      runBackgroundProcess core-api --appFetchLimit=${appFetchLimit:-100} >> logs/core-api 2>&1
   else
       echo "Starting strato-api"
       runBackgroundProcess strato-api --gasOn=$gasOn >> logs/strato-api 2>&1
