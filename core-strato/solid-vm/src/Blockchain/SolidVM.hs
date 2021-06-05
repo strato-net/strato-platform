@@ -413,7 +413,7 @@ getOrg caller = do
     x -> do
     -- caller is a contract account, so this app already exists
     -- so we need to find the app contract and get its ":creator" and it's name
-      mAppAccount <- getAppAddress (caller ^. accountChainId) caller
+      mAppAccount <- getAppAccount (caller ^. accountChainId) caller
       case mAppAccount of 
         Nothing -> internalError "getOrg/versioning --> the app contract didn't have an AddressState, or was on an inaccessible chain" x
         Just acct -> do

@@ -19,7 +19,7 @@ module Blockchain.Data.AddressStateDB (
   resolvedCodePtrToSHA,
   codePtrToCodeKind,
   unsafeCodePtrToCodeKind,
-  getAppAddress
+  getAppAccount
 ) where
 
 import           Prelude hiding (lookup)
@@ -178,11 +178,11 @@ unsafeCodePtrToCodeKind = unsafeResolveCodePtr >=> \case
   _ -> pure EVM -- TODO: should this return (Maybe CodeKind)?
 
 
-getAppAddress :: ( Selectable (Maybe Word256) ParentChainId m
+getAppAccount :: ( Selectable (Maybe Word256) ParentChainId m
                  , (Account `Alters` AddressState) m
                  )
               => Maybe Word256 -> Account -> m (Maybe Account)
-getAppAddress chainId acct = do
+getAppAccount chainId acct = do
   lookup Proxy acct >>= \case
     Nothing -> pure Nothing
     Just AddressState{..} -> do
@@ -190,6 +190,6 @@ getAppAddress chainId acct = do
       isAccessibleChain <- codeAccountChainId `isAncestorChainOf` chainId
       if isAccessibleChain
         then case addressStateCodeHash of
-          (CodeAtAccount pAcct _) -> getAppAddress codeAccountChainId pAcct
+          (CodeAtAccount pAcct _) -> getAppAccount codeAccountChainId pAcct
           _-> pure $ Just acct
         else pure Nothing
