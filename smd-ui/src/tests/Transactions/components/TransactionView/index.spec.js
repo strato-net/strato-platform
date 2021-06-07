@@ -19,7 +19,9 @@ describe('TransactionView', () => {
         match: { params: { hash: "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81" } },
         tx: transactionDetail,
         executeQuery: jest.fn(),
-        store: store
+        store: store,
+        getTransactionResultRequest : jest.fn(),
+        txResult : "success"
       };
 
       const wrapper = shallow(
@@ -34,7 +36,9 @@ describe('TransactionView', () => {
         match: { params: { hash: "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81" } },
         tx: { timestamp: "2017-12-13 07:47:05.998689 UTC" },
         executeQuery: jest.fn(),
-        store: store
+        store: store,
+        getTransactionResultRequest : jest.fn(),
+        txResult : "success"
       };
 
       const wrapper = shallow(
@@ -53,7 +57,9 @@ describe('TransactionView', () => {
         match: { params: { hash: "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81" } },
         tx: null,
         executeQuery: jest.fn(),
-        history: { goBack: jest.fn().mockReturnValue('historyUpdated'), push: jest.fn().mockReturnValue('historyPushed') }
+        history: { goBack: jest.fn().mockReturnValue('historyUpdated'), push: jest.fn().mockReturnValue('historyPushed') },
+        getTransactionResultRequest : jest.fn(),
+        txResult : "success"
       };
 
       const wrapper = mount(
@@ -71,7 +77,9 @@ describe('TransactionView', () => {
         match: { params: { hash: "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81" } },
         tx: transactionDetail,
         executeQuery: jest.fn(),
-        history: { goBack: jest.fn().mockReturnValue('historyUpdated') }
+        history: { goBack: jest.fn().mockReturnValue('historyUpdated') },
+        getTransactionResultRequest : jest.fn(),
+        txResult : "success"
       };
 
       const wrapper = mount(

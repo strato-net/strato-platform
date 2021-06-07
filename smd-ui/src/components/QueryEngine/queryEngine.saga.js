@@ -5,8 +5,11 @@ import {
 } from 'redux-saga/effects';
 import {
   EXECUTE_QUERY_REQUEST,
+  TRANSACTION_RESULT_REQUEST,
   executeQuerySuccess,
-  executeQueryFailure
+  executeQueryFailure,
+  getTransactionResultSuccess,
+  getTransactionResultFailure
 } from './queryEngine.actions';
 import { TRANSACTION_QUERY_TYPES } from './queryTypes';
 import { env } from '../../env';
@@ -15,6 +18,7 @@ import { handleErrors } from '../../lib/handleErrors';
 const url = env.STRATO_URL;
 
 export function query(query, resourceType, chainId) {
+  console.log(query);
   let constructedURL = url + resourceType;
   const queryParts = Object.getOwnPropertyNames(query);
   queryParts.forEach(function (part) {
@@ -31,6 +35,7 @@ export function query(query, resourceType, chainId) {
     const symbol = constructedURL.indexOf("?") > -1 ? "&" : "?";
     constructedURL += symbol + `chainid=${chainId}`;
   }
+  // let query_request =
   return fetch(
     constructedURL,
     {
@@ -39,8 +44,7 @@ export function query(query, resourceType, chainId) {
       headers: {
         'Accept': 'application/json'
       },
-    })
-    .then(handleErrors)
+    }).then(handleErrors)
     .then(function (res) {
       return res.json();
     })
@@ -48,6 +52,29 @@ export function query(query, resourceType, chainId) {
       throw error;
     });
 }
+
+function transactionResultRequest(txHash) {
+  let queryUrl = `${url}/transactionResult/${txHash}`
+  return fetch(queryUrl, {
+          method: 'GET',
+          credentials: "include",
+          headers: {
+            'Accept': 'application/json'
+          }
+        })
+        .then(handleErrors)
+        .then(res => res.json())
+        .catch(error => {throw error;});
+} 
+/**
+ * @todo Add action, reducer and saga to query transaction results either with each query in transaction table, or for each transaction that is viewed in TransactionView component (preferred)
+ * Actions: query transaction result request, success, failure
+ * reducer: success: sets transaction result to response result
+ *          failure: sets transaction result to null, sets error to error
+ * saga: watchExecuteTXresult, getTXresult
+ * fetcher: get transaction result
+ * connect transaction view/app to this extra saga/redux  
+ *  */ 
 
 export function* executeQuery(action) {
   try {
@@ -59,6 +86,19 @@ export function* executeQuery(action) {
   }
 }
 
-export default function* watchExecuteQuery() {
+export function* getTransactionResult(action) {
+  try {
+    let response = yield call(transactionResultRequest, action.txHash);
+    yield put(getTransactionResultSuccess(response));
+  }
+  catch (err) {
+    yield put(getTransactionResultFailure(err));
+  }
+}
+
+export function* watchExecuteQuery() {
   yield takeEvery(EXECUTE_QUERY_REQUEST, executeQuery);
+}
+export function* watchTransactionResult() {
+  yield takeEvery(TRANSACTION_RESULT_REQUEST, getTransactionResult);
 }
