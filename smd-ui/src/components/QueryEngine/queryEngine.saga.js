@@ -53,7 +53,7 @@ export function query(query, resourceType, chainId) {
     });
 }
 
-function transactionResultRequest(txHash) {
+export function transactionResultRequest(txHash) {
   let queryUrl = `${url}/transactionResult/${txHash}`
   return fetch(queryUrl, {
           method: 'GET',
