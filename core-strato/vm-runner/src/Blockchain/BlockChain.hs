@@ -798,7 +798,7 @@ calculateAndEmitChainDiffs chainMap = do
       chainIds = format . unsafeCreateKeccak256FromWord256 . fst <$> chainList
   $logInfoS "calculateAndEmitChainDiffs" . T.pack $ "Calculating ChainDiffs for: " ++ show chainIds
   runConduit $ yieldMany chainList
-            .| mapMC (\(cId, (newNumber, newHash)) -> SD.chainDiff (Just cId) newNumber newHash)
+            .| mapMC (\(cId, (newNumber, newHash)) -> withCurrentBlockHash newHash $ SD.chainDiff (Just cId) newNumber newHash)
             .| mapM_C (traverse_ $ yield . OutStateDiff)
 
 diffMaxCost :: Int
