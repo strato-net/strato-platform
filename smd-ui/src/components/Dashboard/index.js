@@ -26,7 +26,7 @@ import {
   BLOCKS_DIFFICULTY,
   BLOCKS_FREQUENCY,
   TRANSACTIONS_TYPE,
-  GET_NODE_UPTINE,
+  GET_NODE_UPTIME,
   GET_HEALTH,
   GET_SYSTEM_INFO
 } from '../../sockets/rooms'
@@ -70,7 +70,7 @@ class Dashboard extends Component {
     this.props.subscribeRoom(TRANSACTIONS_COUNT)
     this.props.subscribeRoom(TRANSACTIONS_TYPE)
     this.props.subscribeRoom(GET_HEALTH)
-    this.props.subscribeRoom(GET_NODE_UPTINE)
+    this.props.subscribeRoom(GET_NODE_UPTIME)
     this.props.subscribeRoom(GET_SYSTEM_INFO)
 
     mixpanelWrapper.track('dashboard_page_load');
@@ -82,7 +82,7 @@ class Dashboard extends Component {
     socket.on('reconnect', () => {
       this.props.changeHealthStatus(true);
       this.props.subscribeRoom(GET_HEALTH)
-      this.props.subscribeRoom(GET_NODE_UPTINE)
+      this.props.subscribeRoom(GET_NODE_UPTIME)
       this.props.subscribeRoom(GET_SYSTEM_INFO)
     });
   }
@@ -97,7 +97,7 @@ class Dashboard extends Component {
     this.props.unSubscribeRoom(TRANSACTIONS_COUNT)
     this.props.unSubscribeRoom(TRANSACTIONS_TYPE)
     this.props.unSubscribeRoom(GET_HEALTH)
-    this.props.unSubscribeRoom(GET_NODE_UPTINE)
+    this.props.unSubscribeRoom(GET_NODE_UPTIME)
     this.props.unSubscribeRoom(GET_SYSTEM_INFO)
   }
 
@@ -132,7 +132,7 @@ class Dashboard extends Component {
           >
             <NumberCard
               number={health ? 'HEALTHY' : 'UNHEALTHY'}
-              description= {uptime ? sec2Date(uptime) : ''}
+              description= {sec2Date(uptime)}
               mode={(health && systemHealth) ? 'success':'warning' }
               iconClass={(health && systemHealth) ? 'fa-check-circle' : 'fa-exclamation-circle'}
             />

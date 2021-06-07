@@ -112,6 +112,7 @@ Object {
 
 exports[`ContractQuery: action fetch queryCirrusVars request 1`] = `
 Object {
+  "contractAddress": undefined,
   "contractName": "Bid",
   "type": "QUERY_CIRRUS_VARS_REQUEST",
 }

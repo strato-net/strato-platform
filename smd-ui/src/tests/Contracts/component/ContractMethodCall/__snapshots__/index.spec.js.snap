@@ -253,16 +253,6 @@ exports[`ContractMethodCall: index renders contracts card (Oauth mode) 1`] = `
           </div>
         </div>
         <div className=\\"row\\">
-          <div className=\\"col-sm-3 text-right\\">
-            <label className=\\"pt-label label-margin\\">
-              Value
-            </label>
-          </div>
-          <div className=\\"col-sm-9 smd-pad-4\\">
-            <Field name=\\"modalValue\\" component={[Function: ValueInput]} />
-          </div>
-        </div>
-        <div className=\\"row\\">
           <div className=\\"col-sm-12\\">
             <h5>
               Parameters
@@ -310,7 +300,7 @@ exports[`ContractMethodCall: index renders contracts card (Oauth mode) 1`] = `
       <div className=\\"pt-dialog-footer\\">
         <div className=\\"pt-dialog-footer-actions\\">
           <Blueprint.Button text=\\"Cancel\\" onClick={[Function]} />
-          <button disabled={true} className=\\"pt-button pt-intent-primary\\" type=\\"button\\" onClick={[Function]}>
+          <button className=\\"pt-button pt-intent-primary\\" type=\\"button\\" onClick={[Function]}>
             Call Method
           </button>
         </div>
@@ -623,7 +613,7 @@ exports[`ContractMethodCall: index renders contracts card (non Oauth mode) 1`] =
       <div className=\\"pt-dialog-footer\\">
         <div className=\\"pt-dialog-footer-actions\\">
           <Blueprint.Button text=\\"Cancel\\" onClick={[Function]} />
-          <button disabled={true} className=\\"pt-button pt-intent-primary\\" type=\\"button\\" onClick={[Function]}>
+          <button className=\\"pt-button pt-intent-primary\\" type=\\"button\\" onClick={[Function]}>
             Call Method
           </button>
         </div>

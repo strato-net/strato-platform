@@ -34,6 +34,7 @@ import           Blockchain.Output
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Address
 
 
 data SetupDBs =
@@ -112,7 +113,7 @@ instance (Keccak256 `A.Alters` DBCode) SetupDBM where
   insert _ = genericInsertCodeDB $ asks codeDB
   delete _ = genericDeleteCodeDB $ asks codeDB
 
-instance (Account `A.Alters` X509Certificate) SetupDBM where
+instance (Address `A.Alters` X509Certificate) SetupDBM where
   lookup _ = genericLookupX509CertDB $ asks x509DB
   insert _ = genericInsertX509CertDB $ asks x509DB
   delete _ = genericDeleteX509CertDB $ asks x509DB

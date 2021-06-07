@@ -44,6 +44,15 @@ data BasicValue = BInteger !Integer
                 | BDefault -- Indicates a not present value
                 deriving (Show, Eq, Generic, NFData, Hashable, Binary)
 
+isDefault :: BasicValue -> Bool
+isDefault (BInteger i)     = i == 0
+isDefault (BString bs)     = B.null bs
+isDefault (BBool b)        = not b
+isDefault (BAccount a)     = a == unspecifiedChain 0x0
+isDefault (BEnumVal _ _ w) = w == 0
+isDefault (BContract _ a)  = a == unspecifiedChain 0x0
+isDefault BMappingSentinel = False
+isDefault BDefault         = True
 
 instance Format BasicValue where
   format (BInteger i) = show i

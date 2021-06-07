@@ -34,12 +34,15 @@ import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Keccak256
 
+
 data AggregateAction = AggregateAction
   { actionBlockHash      :: Keccak256
   , actionBlockTimestamp :: UTCTime
   , actionBlockNumber    :: Integer
   , actionTxHash         :: Keccak256
   , actionTxSender       :: Account
+  , actionOrganization   :: Text
+  , actionApplication    :: Text
   , actionAccount        :: Account
   , actionCodeHash       :: CodePtr
   , actionStorage        :: ActionDataDiff
@@ -59,6 +62,8 @@ flatten Action{..} = flip map (M.toList _actionData) $
           , actionBlockNumber    = _actionBlockNumber
           , actionTxHash         = _actionTransactionHash
           , actionTxSender       = _actionTransactionSender
+          , actionOrganization   = _actionDataOrganization
+          , actionApplication    = _actionDataApplication
           , actionAccount        = account
           , actionCodeHash       = _actionDataCodeHash
           , actionStorage        = _actionDataStorageDiffs
@@ -97,20 +102,24 @@ formatAction AggregateAction{..} = T.concat
 
 
 data AggregateEvent = AggregateEvent
-  { agContractName         :: Text
+  { agOrganization         :: Text
+  , agApplication          :: Text
+  , agContractName         :: Text
   , agContractAccount      :: Account
   , agEventName            :: Text
-  , agEventArgs            :: [Text]
+  , agEventArgs            :: [(Text, Text)]
   } deriving (Show, Generic, NFData)
 
 
 squash :: Action -> [AggregateEvent]
 squash Action{..} = flip map (toList _actionEvents)
   (\ev -> AggregateEvent
-    { agContractName          = T.pack $ evContractName ev
+    { agOrganization          = T.pack $ evContractOrganization ev
+    , agApplication           = T.pack $ evContractApplication ev
+    , agContractName          = T.pack $ evContractName ev
     , agContractAccount       = evContractAccount ev
     , agEventName             = T.pack $ evName ev
-    , agEventArgs             = map T.pack (evArgs ev)
+    , agEventArgs             = map (\(x,y) -> (T.pack x, T.pack y)) $ evArgs ev
     }
   )
  

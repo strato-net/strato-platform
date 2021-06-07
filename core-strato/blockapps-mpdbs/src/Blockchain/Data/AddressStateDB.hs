@@ -14,10 +14,12 @@ module Blockchain.Data.AddressStateDB (
   blankAddressState,
   resolveCodePtr,
   unsafeResolveCodePtr,
+  resolveCodePtrParent,
   codePtrToSHA,
   resolvedCodePtrToSHA,
   codePtrToCodeKind,
-  unsafeCodePtrToCodeKind
+  unsafeCodePtrToCodeKind,
+  getAppAccount
 ) where
 
 import           Prelude hiding (lookup)
@@ -128,6 +130,26 @@ unsafeResolveCodePtr (CodeAtAccount acct name) = lookup Proxy acct >>= \case
     _ -> pure Nothing
 unsafeResolveCodePtr codePtr = pure $ Just codePtr
 
+resolveCodePtrParent :: ( Selectable (Maybe Word256) ParentChainId m
+                        , (Account `Alters` AddressState) m
+                        )
+                        => Maybe Word256 -> CodePtr -> m (Maybe CodePtr)
+resolveCodePtrParent chainId cp@(CodeAtAccount acct _) = do
+  isAccessibleChain <- (acct ^. accountChainId) `isAncestorChainOf` chainId
+  if isAccessibleChain
+    then unsafeResolveCodePtrParent cp
+    else pure Nothing
+resolveCodePtrParent _ cp = unsafeResolveCodePtrParent cp
+
+unsafeResolveCodePtrParent :: (Account `Alters` AddressState) m => CodePtr -> m (Maybe CodePtr)
+unsafeResolveCodePtrParent (CodeAtAccount acct _) = lookup Proxy acct >>= \case
+  Nothing -> pure Nothing
+  Just AddressState{..} -> unsafeResolveCodePtrParent addressStateCodeHash >>= \case
+    Just e@(EVMCode _) -> pure $ Just e
+    Just (SolidVMCode name' d) -> pure . Just $ SolidVMCode name' d
+    _ -> pure Nothing
+unsafeResolveCodePtrParent codePtr = pure $ Just codePtr
+
 codePtrToSHA :: ( Selectable (Maybe Word256) ParentChainId m
                 , (Account `Alters` AddressState) m
                 )
@@ -154,3 +176,20 @@ unsafeCodePtrToCodeKind :: (Account `Alters` AddressState) m => CodePtr -> m Cod
 unsafeCodePtrToCodeKind = unsafeResolveCodePtr >=> \case
   Just (SolidVMCode _ _) -> pure SolidVM
   _ -> pure EVM -- TODO: should this return (Maybe CodeKind)?
+
+
+getAppAccount :: ( Selectable (Maybe Word256) ParentChainId m
+                 , (Account `Alters` AddressState) m
+                 )
+              => Maybe Word256 -> Account -> m (Maybe Account)
+getAppAccount chainId acct = do
+  lookup Proxy acct >>= \case
+    Nothing -> pure Nothing
+    Just AddressState{..} -> do
+      let codeAccountChainId = (acct ^. accountChainId)
+      isAccessibleChain <- codeAccountChainId `isAncestorChainOf` chainId
+      if isAccessibleChain
+        then case addressStateCodeHash of
+          (CodeAtAccount pAcct _) -> getAppAccount codeAccountChainId pAcct
+          _-> pure $ Just acct
+        else pure Nothing
