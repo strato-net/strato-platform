@@ -226,5 +226,9 @@ export const blocksMock = [
     }
   }
 ];
-
+export const resultsMock =
+  [{
+    status : "success",
+    hash : "ef1c523bd46a"
+  }]
 export const error = "ERROR";
