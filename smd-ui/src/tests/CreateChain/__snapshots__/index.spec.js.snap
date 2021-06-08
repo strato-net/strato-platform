@@ -55,6 +55,7 @@ Object {
   "createErrorMessage": null,
   "isOpen": true,
   "isSpinning": true,
+  "publicKey": "undefined",
 }
 `;
 
@@ -174,7 +175,7 @@ exports[`CreateChain: index render component with empty values 1`] = `
               </span>
             </div>
             <span className=\\"error-text\\" />
-            <withRouter(Connect(ReduxForm)) handler={[Function: bound updateMembers]} />
+            <withRouter(Connect(ReduxForm)) handler={[Function: bound updateMembers]} publicKey={[undefined]} />
           </div>
         </div>
       </div>
@@ -292,7 +293,7 @@ exports[`CreateChain: index render component with values 1`] = `
               </span>
             </div>
             <span className=\\"error-text\\" />
-            <withRouter(Connect(ReduxForm)) handler={[Function: bound updateMembers]} />
+            <withRouter(Connect(ReduxForm)) handler={[Function: bound updateMembers]} publicKey={[undefined]} />
           </div>
         </div>
       </div>

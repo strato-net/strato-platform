@@ -130,6 +130,7 @@ Object {
     },
   },
   "initialValues": Object {
+    "enode": "enode://undefined@1.2.3.4:30303",
     "from": "Supplier2_1301_46441",
     "fromAddress": "57f2ed9058d2e868d7bbae9db03af12d27675117",
   },
@@ -141,7 +142,7 @@ exports[`CreateChain: index render component (Oauth mode) form fields with value
 Object {
   "address": null,
   "balance": 0,
-  "enode": null,
+  "enode": "enode://undefined@1.2.3.4:30303",
   "errors": null,
   "form": Object {
     "userSelected": true,
@@ -211,7 +212,7 @@ exports[`CreateChain: index render component (Oauth mode) with empty values 1`] 
           </div>
           <div className=\\"col-sm-9 smd-pad-4\\">
             <div className=\\"form-width\\">
-              <Field name=\\"enode\\" component=\\"input\\" type=\\"text\\" placeholder=\\"Enode\\" value={{...}} className=\\"pt-input form-width\\" onChange={[Function: onChange]} required={true} />
+              <Field name=\\"enode\\" component=\\"input\\" type=\\"text\\" placeholder=\\"Enode\\" value=\\"enode://undefined@1.2.3.4:30303\\" className=\\"pt-input form-width\\" onChange={[Function: onChange]} required={true} />
               <br />
               <span className=\\"error-text\\" />
             </div>
@@ -293,7 +294,7 @@ exports[`CreateChain: index render component (Oauth mode) with values 1`] = `
           </div>
           <div className=\\"col-sm-9 smd-pad-4\\">
             <div className=\\"form-width\\">
-              <Field name=\\"enode\\" component=\\"input\\" type=\\"text\\" placeholder=\\"Enode\\" value={{...}} className=\\"pt-input form-width\\" onChange={[Function: onChange]} required={true} />
+              <Field name=\\"enode\\" component=\\"input\\" type=\\"text\\" placeholder=\\"Enode\\" value=\\"enode://undefined@1.2.3.4:30303\\" className=\\"pt-input form-width\\" onChange={[Function: onChange]} required={true} />
               <br />
               <span className=\\"error-text\\" />
             </div>
@@ -331,7 +332,7 @@ exports[`CreateChain: index render component (non Oauth mode) form fields 1`] = 
 Object {
   "address": null,
   "balance": 0,
-  "enode": null,
+  "enode": "enode://undefined@1.2.3.4:30303",
   "errors": null,
   "form": Object {
     "userSelected": true,
@@ -426,7 +427,7 @@ exports[`CreateChain: index render component (non Oauth mode) with empty values 
           </div>
           <div className=\\"col-sm-9 smd-pad-4\\">
             <div className=\\"form-width\\">
-              <Field name=\\"enode\\" component=\\"input\\" type=\\"text\\" placeholder=\\"Enode\\" value={{...}} className=\\"pt-input form-width\\" onChange={[Function: onChange]} required={true} />
+              <Field name=\\"enode\\" component=\\"input\\" type=\\"text\\" placeholder=\\"Enode\\" value=\\"enode://undefined@1.2.3.4:30303\\" className=\\"pt-input form-width\\" onChange={[Function: onChange]} required={true} />
               <br />
               <span className=\\"error-text\\" />
             </div>
@@ -588,7 +589,7 @@ exports[`CreateChain: index render component (non Oauth mode) with values 1`] = 
           </div>
           <div className=\\"col-sm-9 smd-pad-4\\">
             <div className=\\"form-width\\">
-              <Field name=\\"enode\\" component=\\"input\\" type=\\"text\\" placeholder=\\"Enode\\" value={{...}} className=\\"pt-input form-width\\" onChange={[Function: onChange]} required={true} />
+              <Field name=\\"enode\\" component=\\"input\\" type=\\"text\\" placeholder=\\"Enode\\" value=\\"enode://undefined@1.2.3.4:30303\\" className=\\"pt-input form-width\\" onChange={[Function: onChange]} required={true} />
               <br />
               <span className=\\"error-text\\" />
             </div>
