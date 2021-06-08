@@ -206,7 +206,7 @@ instance Arbitrary ActionDataDiff where
     arbitrary = oneof [ActionEVMDiff <$> arbitrary, ActionSolidVMDiff <$> arbitrary]
 
 instance Arbitrary ActionData where
-    arbitrary = applyArbitrary4 ActionData
+    arbitrary = ActionData <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
 
 instance Arbitrary Action where 
     arbitrary = Action <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary

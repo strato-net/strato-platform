@@ -51,4 +51,5 @@ instance FromJSON Event where
 
 instance NFData Event
 instance Arbitrary Event where
-    arbitrary = applyArbitrary4 Event
+    arbitrary = Event <$> arbitrary <*> arbitrary  <*> arbitrary  
+                        <*> arbitrary  <*> arbitrary  <*> arbitrary

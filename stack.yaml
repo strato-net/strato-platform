@@ -117,13 +117,5 @@ docker:
   run-args: ["--ulimit=nofile=60000"]
 
 nix:
-  path: [nixpkgs=channel:nixos-20.03]
-  packages:
-  - zlib
-  - lzma
-  - leveldb
-  - postgresql
-  - pkg-config
-  - libsodium
-  - openlibm
-  - (pkgs.secp256k1.override { enableECDH = true; })
+  enable: false
+  shell-file: shell.nix
