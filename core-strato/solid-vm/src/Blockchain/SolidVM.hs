@@ -254,7 +254,7 @@ create' creator newAccount ch cc contractName' argExps = do
 
   -- make sure the org is updated
   maybeCert <- x509CertDBGet $ _accountAddress creator
-  let org = T.pack . fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
+  let org = T.pack $ x509CertOrg maybeCert
 
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     actionData %= M.adjust (actionDataOrganization .~ org) newAccount
@@ -773,17 +773,7 @@ runStatement st@(Xabi.EmitStatement eventName exptups pos) = do
       else do
         let account = currentAccount curInfo
             address = _accountAddress account
-<<<<<<< Updated upstream
-        x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-        maybeCertLevelDB <- x509CertDBGet address
-        let maybeCertBlockDB = M.lookup address x509s
-            maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
-            organization = fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
-         
-=======
-        maybeCert <- x509CertDBGet address
-        let organization = fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
->>>>>>> Stashed changes
+        organization <- x509CertGetOrg address
         parentName <- fromMaybeM (return "") $ runMaybeT 
             $   pure account
             >>= MaybeT . getAddressStateMaybe
@@ -984,14 +974,14 @@ expToVar' x@(Xabi.MemberAccess expr name) = do
       (SBuiltinVariable "msg", "sender") -> (Constant . SAccount . accountToNamedAccount chainId . Env.sender) <$> getEnv
       (SBuiltinVariable "tx", "origin") -> (Constant . SAccount . accountToNamedAccount chainId . Env.origin) <$> getEnv
       (SBuiltinVariable "tx", "username") -> do env' <- getEnv
-                                                maybeCert <- x509CertDBGet $ _accountAddress $ Env.origin env'
-                                                return . Constant . SString . fromMaybe "" . fmap subCommonName $ getCertSubject =<< maybeCert
+                                                org <- x509CertGetOrg $ _accountAddress $ Env.origin env'
+                                                return . Constant . SString $ org
       (SBuiltinVariable "tx", "organization") -> do env' <- getEnv
-                                                    maybeCert <- x509CertDBGet $ _accountAddress $ Env.origin env'
-                                                    return . Constant . SString . fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
+                                                    org <- x509CertGetOrg $ _accountAddress $ Env.origin env'
+                                                    return . Constant . SString $ org
       (SBuiltinVariable "tx", "group") -> do env' <- getEnv
-                                             maybeCert <- x509CertDBGet $ _accountAddress $ Env.origin env'
-                                             return . Constant . SString . fromMaybe "" $ subUnit =<< getCertSubject =<< maybeCert
+                                             org <- x509CertGetOrg $ _accountAddress $ Env.origin env'
+                                             return . Constant . SString $ org
       (SStruct _ theMap, fieldName) -> case M.lookup fieldName theMap of
           Nothing -> missingField "struct member access" fieldName
           Just v -> return v

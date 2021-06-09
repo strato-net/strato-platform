@@ -11,6 +11,7 @@ import qualified Control.Monad.Change.Modify        as Mod
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Resource
+import           Control.Applicative
 import qualified Data.ByteString                    as B
 import           Data.IORef
 import qualified Data.Map                           as M
@@ -116,11 +117,9 @@ instance (Keccak256 `A.Alters` DBCode) SetupDBM where
   delete _ = genericDeleteCodeDB $ asks codeDB
 
 instance (Address `A.Alters` X509Certificate) SetupDBM where
-  lookup _ = genericLookupX509CertDB' (asks x509DB) (asks localX509s >>= liftIO . readIORef)
-  insert _ k v = do iom <- asks localX509s
-                    liftIO $ modifyIORef iom (\m -> genericInsertX509CertDB m k v)
-  delete _ k = do iom <- asks localX509s
-                  liftIO $ modifyIORef iom (\m -> genericDeleteX509CertDB m k)
+  lookup _ k = join $ liftA3 genericLookupX509CertDB (asks x509DB) (asks localX509s >>= liftIO . readIORef) (pure k)
+  insert _ k v = asks localX509s >>= liftIO . flip modifyIORef (\m -> genericInsertX509CertDB m k v)
+  delete _ k = asks localX509s >>= liftIO . flip modifyIORef (\m -> genericDeleteX509CertDB m k)
 
 instance (N.NibbleString `A.Alters` N.NibbleString) SetupDBM where
   lookup _ = genericLookupHashDB $ asks hashDB

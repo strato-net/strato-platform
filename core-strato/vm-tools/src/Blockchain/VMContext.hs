@@ -74,6 +74,7 @@ import           Control.Monad.Catch                (MonadCatch)
 import qualified Control.Monad.Change.Alter         as A
 import qualified Control.Monad.Change.Modify        as Mod
 import           Control.Monad.IO.Class
+import           Control.Applicative
 import           Blockchain.Output
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Resource
@@ -402,18 +403,15 @@ instance (Keccak256 `A.Alters` DBCode) ContextM where
   delete _ = genericDeleteCodeDB $ getCodeDB
 
 instance (Address `A.Alters` X509Certificate) ContextM where
-  lookup _ = genericLookupX509CertDB' getX509CertDB getX509CertMap
+  lookup _ k = join $ liftA3 genericLookupX509CertDB getX509CertDB getX509CertMap (pure k)
   insert _ k v = do certMap <- getX509CertMap
                     modify $ memDBs . newX509Certs .~ (genericInsertX509CertDB certMap k v)
   delete _ k = do certMap <- getX509CertMap
                   modify $ memDBs . newX509Certs .~ (genericDeleteX509CertDB certMap k)
 
 instance (Address `Flushable` X509Certificate) ContextM where
-    flush _ _ = do
-        certDb <- getX509CertDB
-        certMap <- getX509CertMap
-        genericFlushX509 certDb certMap
-        modify $ memDBs . newX509Certs .~ M.empty
+    flush _ _ = join (liftA2 genericFlushX509 getX509CertDB getX509CertMap) 
+                    >> modify (memDBs . newX509Certs .~ M.empty)
 
 
 instance (N.NibbleString `A.Alters` N.NibbleString) ContextM where

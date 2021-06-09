@@ -642,7 +642,7 @@ initializeActionCreate :: MonadSM m => Account -> Account -> String -> String ->
 initializeActionCreate creator acct name prt hsh = do
   let address = _accountAddress creator
   maybeCert <- x509CertDBGet address
-  let organization = T.pack $ fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
+  let organization = T.pack $ x509CertOrg maybeCert
   let newData = ActionData (SolidVMCode name hsh) organization (T.pack prt) SolidVM (ActionSolidVMDiff M.empty) []
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     actionData %= M.insertWith mergeActionData acct newData
@@ -651,7 +651,7 @@ initializeActionCall :: MonadSM m => Account -> String -> String -> Keccak256 ->
 initializeActionCall acct name prt hsh = do
   let address = _accountAddress acct
   maybeCert <- x509CertDBGet address
-  let organization = T.pack $ fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
+  let organization = T.pack $ x509CertOrg maybeCert
   let newData = ActionData (SolidVMCode name hsh) organization (T.pack prt) SolidVM (ActionSolidVMDiff M.empty) []
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     actionData %= M.insertWith mergeActionData acct newData
