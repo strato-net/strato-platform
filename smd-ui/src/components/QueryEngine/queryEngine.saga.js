@@ -32,7 +32,7 @@ export function query(query, resourceType, chainId) {
   }
   if (chainId) {
     const symbol = constructedURL.indexOf("?") > -1 ? "&" : "?";
-    constructedURL += symbol + `chainid=${chainId}`;
+    constructedURL += symbol + `chainId=${chainId}`;
   }
   console.log(constructedURL);
   return fetch(

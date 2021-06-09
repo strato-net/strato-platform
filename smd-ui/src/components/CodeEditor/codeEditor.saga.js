@@ -42,7 +42,6 @@ export function tokenizeSource(source) {
 }
 
 export function compileSource(contractName, source, codeType) {
-  console.log(source)
   const searchable = [];
   return fetch(blocCompileUrl, {
     method: 'POST',
@@ -69,7 +68,11 @@ export function compileSource(contractName, source, codeType) {
         throw value;
       });
     }
-  }).catch(function (error) {
+  })
+  .then(json => {
+    return Promise.resolve(json);
+  })
+  .catch(function (error) {
     throw error;
   });
 }

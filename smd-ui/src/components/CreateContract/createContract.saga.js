@@ -43,7 +43,6 @@ export function createContractApiCall(contract, src, username, address, password
   }
 
   const body = isOauthEnabled() ? oauthBody : blocBody;
-
   return fetch(
     url,
     {
@@ -56,8 +55,23 @@ export function createContractApiCall(contract, src, username, address, password
     })
     .then(handleErrors)
     .then(function (response) {
+      if (response.status === 400) {
+        return response.text().then(error => {
+          throw error;
+        })
+      }
       return response.json();
-    }).catch(function (error) {
+    })
+    .then(json => {
+      json = json[0];
+      return new Promise((resolve, reject) => {
+        if (json.status === "Failure") {
+          reject(json.txResult.message)
+        }
+        resolve(json)
+      })
+    })
+    .catch(function (error) {
       throw error;
     });
 }
@@ -119,7 +133,7 @@ export function* createContract(action) {
     yield put(createContractSuccess(response[0] || response));
     yield put(updateToast());
     yield put(fetchContracts());
-    yield put(fetchCirrusInstances(action.payload.contract));
+    yield put(fetchCirrusInstances(action.payload.contract, action.payload.chainId));
   } catch (err) {
     yield put(createContractFailure(err));
   }
