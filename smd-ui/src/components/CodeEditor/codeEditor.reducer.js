@@ -26,7 +26,8 @@ const initialState = {
   lastTabSelected: 0,
   currentTabSelected: 0,
   isRemoveTab: false,
-  localCompileException: ''
+  localCompileException: '',
+  codeType : "SolidVM"
 };
 
 const formatCompilationErrors = function (error) {
@@ -73,7 +74,8 @@ const reducer = function (state = loadState(), action) {
         ...state,
         response: "Uploading Contract...",
         createDisabled: true,
-        enableCreateAction: false
+        enableCreateAction: false,
+        codeType : action.codeType
       };
 
     case CODE_EDITOR_COMPILE_SUCCESS:

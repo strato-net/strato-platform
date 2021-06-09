@@ -113,7 +113,7 @@ class CreateContract extends Component {
     const fileText = this.props.textFromEditor ? this.props.textFromEditor : this.props.contract
 
     const contracts = this.props.sourceFromEditor ? Object.keys(this.props.sourceFromEditor) : this.props.abi && this.props.abi.src && Object.keys(this.props.abi.src);
-    const metadata = { VM: this.props.solidvm ? 'SolidVM' : 'EVM' };
+    const metadata = { VM: this.props.codeType ? this.props.codeType : 'SolidVM' };
     contracts.forEach(function (contract) {
       if (values[`history@${contract}`]) {
         if (metadata['history']) {
@@ -596,7 +596,7 @@ export const validate = (values) => {
 
 export const CREATE_CONTRACT_FORM = 'create-contract'
 
-const selector = formValueSelector(CREATE_CONTRACT_FORM);
+// const selector = formValueSelector(CREATE_CONTRACT_FORM);
 
 export function mapStateToProps(state) {
   return {
@@ -609,18 +609,18 @@ export function mapStateToProps(state) {
     username: state.createContract.username,
     isToasts: state.createContract.isToasts,
     toastsMessage: state.createContract.toastsMessage,
-    // TODO: update the testcase for selector
-    solidvm: selector(state, 'solidvm'),
+    codeType : state.codeEditor.codeType,
     initialValues: {
       username: state.user.oauthUser ? state.user.oauthUser.username : '',
-      address: state.user.oauthUser ? state.user.oauthUser.address : ''
+      address: state.user.oauthUser ? state.user.oauthUser.address : '',
+      solidvm : state.codeEditor.codeType === "SolidVM"
     },
     chainLabel: state.chains.listChain,
     chainLabelIds: state.chains.listLabelIds
   };
 }
 
-const formed = reduxForm({ form: CREATE_CONTRACT_FORM, validate })(CreateContract);
+const formed = reduxForm({ form: CREATE_CONTRACT_FORM, validate, enableReinitialize : true})(CreateContract);
 const connected = connect(mapStateToProps, {
   contractOpenModal,
   contractCloseModal,
