@@ -389,7 +389,9 @@ setCreator creator contract = do
     str -> do 
     -- insert the org for this contract into storage, in the ":creator" field
       liftIO $ putStrLn $ "setCreator/versioning ---> setting the org as " ++ (show str)
-      putSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack str)
+      contract' <- getCurrentContract
+      let svm3_0 = _vmVersion contract' == "svm3.0"
+      putSolidStorageKeyVal' svm3_0 contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack str)
 
 
 
