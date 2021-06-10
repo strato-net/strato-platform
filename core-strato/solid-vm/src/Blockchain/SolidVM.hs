@@ -250,7 +250,7 @@ create' creator newAccount ch cc contractName' argExps x509s = do
 
 
   -- set creator
-  flip setCreator newAccount =<< (Env.origin <$> getEnv)
+  (\crtr -> setCreator crtr newAccount contract') =<< (Env.origin <$> getEnv)
 
 
   -- Run the constructor
@@ -260,7 +260,7 @@ create' creator newAccount ch cc contractName' argExps x509s = do
 
 
   -- set creator again, in case the caller's cert changed during constructor execution
-  flip setCreator newAccount =<< (Env.origin <$> getEnv)
+  (\crtr -> setCreator crtr newAccount contract') =<< (Env.origin <$> getEnv)
   
   org <- getOrg creator
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
@@ -373,8 +373,8 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
 
 
 -- set the hidden ":creator" field, if the caller has a cert
-setCreator :: MonadSM m => Account -> Account -> m ()
-setCreator creator contract = do
+setCreator :: MonadSM m => Account -> Account -> Contract -> m ()
+setCreator creator contract cntrct = do
   liftIO $ putStrLn $ "setCreator/versioning ---> getting creator org of " ++ (format creator) ++ " for new contract " ++ format contract
   
   x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
@@ -389,8 +389,8 @@ setCreator creator contract = do
     str -> do 
     -- insert the org for this contract into storage, in the ":creator" field
       liftIO $ putStrLn $ "setCreator/versioning ---> setting the org as " ++ (show str)
-      contract' <- getCurrentContract
-      let svm3_0 = _vmVersion contract' == "svm3.0"
+      onTraced $ liftIO $ putStrLn $ "setCreator/versioning ---> the vm version is " ++ _vmVersion cntrct
+      let svm3_0 = _vmVersion cntrct == "svm3.0"
       putSolidStorageKeyVal' svm3_0 contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack str)
 
 
