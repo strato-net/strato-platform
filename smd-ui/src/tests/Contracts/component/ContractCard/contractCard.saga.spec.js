@@ -119,8 +119,8 @@ describe('ContractCard: saga', () => {
   })
 
   test('cirrus inspection', () => {
-    const gen = fetchCirrusInstances({ type: "FETCH_CIRRUS_INSTANCES_REQUEST", name: 'Greeter' });
-    expect(gen.next().value).toEqual(call(getCirrusInstances, 'Greeter'));
+    const gen = fetchCirrusInstances({ type: "FETCH_CIRRUS_INSTANCES_REQUEST", name: 'Greeter', chainId : "abcdef123456" });
+    expect(gen.next().value).toEqual(call(getCirrusInstances, 'Greeter',  "abcdef123456"));
     expect(gen.next().value).toEqual(put(fetchCirrusInstancesSuccess('Greeter')))
   })
 
