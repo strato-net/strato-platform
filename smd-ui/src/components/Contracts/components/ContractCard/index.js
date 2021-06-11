@@ -22,7 +22,7 @@ class ContractCard extends Component {
   }
 
   componentWillMount() {
-    this.props.fetchCirrusInstances(this.props.contract.name);
+    this.props.fetchCirrusInstances(this.props.contract.name, this.props.selectedChain);
   }
 
   render() {

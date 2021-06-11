@@ -12,7 +12,7 @@ export const payload = {
   chainId: "75dc24995abf63fe7d637b4879353a41593ef05c37ee6d11704bb97403306a86"
 }
 
-export const createContractResponse = {
+export const createContractResponse = [{
   data: {
     tag: "Upload", contents: {
       address: "1d7c7e29a34a698fa1f7167ec9197be4aad310fc",
@@ -45,7 +45,7 @@ export const createContractResponse = {
     transactionHash: "32aa0f6672c049c167592949182481c248e8c83ccfd40669b94ff40aa15fbdcc"
   },
 
-}
+}]
 
 export const payloadCompile = {
   contract: "contract SimpleStorage { uint public storedData; }",

@@ -18,7 +18,6 @@ import { handleErrors } from '../../lib/handleErrors';
 const url = env.STRATO_URL;
 
 export function query(query, resourceType, chainId) {
-  console.log(query);
   let constructedURL = url + resourceType;
   const queryParts = Object.getOwnPropertyNames(query);
   queryParts.forEach(function (part) {
@@ -33,9 +32,9 @@ export function query(query, resourceType, chainId) {
   }
   if (chainId) {
     const symbol = constructedURL.indexOf("?") > -1 ? "&" : "?";
-    constructedURL += symbol + `chainid=${chainId}`;
+    constructedURL += symbol + `chainId=${chainId}`;
   }
-  // let query_request =
+  console.log(constructedURL);
   return fetch(
     constructedURL,
     {
@@ -65,16 +64,7 @@ export function transactionResultRequest(txHash) {
         .then(handleErrors)
         .then(res => res.json())
         .catch(error => {throw error;});
-} 
-/**
- * @todo Add action, reducer and saga to query transaction results either with each query in transaction table, or for each transaction that is viewed in TransactionView component (preferred)
- * Actions: query transaction result request, success, failure
- * reducer: success: sets transaction result to response result
- *          failure: sets transaction result to null, sets error to error
- * saga: watchExecuteTXresult, getTXresult
- * fetcher: get transaction result
- * connect transaction view/app to this extra saga/redux  
- *  */ 
+}
 
 export function* executeQuery(action) {
   try {

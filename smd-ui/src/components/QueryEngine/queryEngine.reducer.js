@@ -72,7 +72,7 @@ const reducer = function (state = initialState, action) {
         error: action.error
       };
     case TRANSACTION_RESULT_SUCCESS:
-      const r = `${action.txResult[0].toUpperCase()}${action.txResult.substring(1)}`
+      const r = action.txResult ? `${action.txResult[0].toUpperCase()}${action.txResult.substring(1)}` : "";
       return {
         ...state,
         error : null,

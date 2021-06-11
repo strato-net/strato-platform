@@ -41,6 +41,7 @@ Object {
 
 exports[`ContractCard: action fetch instance request 1`] = `
 Object {
+  "chainId": undefined,
   "name": "Greeter",
   "type": "FETCH_CIRRUS_INSTANCES_REQUEST",
 }
