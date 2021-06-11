@@ -51,18 +51,18 @@ describe('CreateContract: saga', () => {
 
   describe('createContract generator', () => {
 
-    test('inspection', () => {
+    test('create request inspection', () => {
       const gen = createContract({ type: CREATE_CONTRACT_REQUEST, payload });
       expect(gen.next().value).toEqual(call(createContractApiCall, payload.contract, payload.fileText, payload.username, payload.address, payload.password, payload.arguments, payload.chainId, payload.metadata));
       expect(gen.next([createContractResponse]).value).toEqual(put(createContractSuccess(createContractResponse)));
       expect(gen.next().value).toEqual(put(updateToast()));
       expect(gen.next().value).toEqual(put(fetchContracts()));
-      expect(gen.next().value).toEqual(put(fetchCirrusInstances('GreeterC')));
+      expect(gen.next().value).toEqual(put(fetchCirrusInstances('GreeterC', payload.chainId)));
       expect(gen.throw().value).toEqual(put(createContractFailure()))
       expect(gen.next().done).toBe(true);
     })
 
-    test('inspection', () => {
+    test('compile contract request inspection', () => {
       const gen = compileContract({ type: COMPILE_CONTRACT_REQUEST, name: payloadCompile.name, contract: payloadCompile.contract, searchable: payloadCompile.searchable });
       expect(gen.next().value).toEqual(call(compileContractApiCall, payloadCompile.name, payloadCompile.contract, payloadCompile.searchable));
       expect(gen.next(compileResponse).value).toEqual(put(compileContractSuccess(compileResponse)));
@@ -71,7 +71,7 @@ describe('CreateContract: saga', () => {
       expect(gen.next().done).toBe(true);
     })
 
-    test('inspection', () => {
+    test('compile chain contract request inspection', () => {
       const gen = compileChainContract({ type: COMPILE_CHAIN_CONTRACT_REQUEST, name: payloadCompile.name, contract: payloadCompile.contract, searchable: payloadCompile.searchable });
       expect(gen.next().value).toEqual(call(compileContractApiCall, payloadCompile.name, payloadCompile.contract, payloadCompile.searchable));
       expect(gen.next(compileResponse).value).toEqual(put(compileChainContractSuccess(compileResponse)));
@@ -84,7 +84,7 @@ describe('CreateContract: saga', () => {
       test('success', (done) => {
         fetch.mockResponse(JSON.stringify(createContractResponse));
         expectSaga(createContract, { payload: payload })
-          .call.fn(createContractApiCall, payload.contract, payload.fileText, payload.username, payload.address, payload.password, payload.arguments).put.like({ action: { type: CREATE_CONTRACT_SUCCESS } })
+          .call.fn(createContractApiCall, payload.contract, payload.fileText, payload.username, payload.address, payload.password, payload.chainId, payload.arguments).put.like({ action: { type: CREATE_CONTRACT_SUCCESS } })
           .run().then((result) => { done() });
       });
 
