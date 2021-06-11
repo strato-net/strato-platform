@@ -122,6 +122,9 @@ onTracedSM :: MonadSM m => Contract -> m () -> m ()
 onTracedSM cntrct m = do
       let svm3_0 = _vmVersion cntrct == "svm3.0"
       when (flags_svmTrace && not svm3_0) m
+      when (flags_svmTrace && svm3_0) $
+        liftIO $ putStrLn $ "svmTrace statement(s) is absent because contract " 
+                    ++ _contractName cntrct ++ " uses SolidVM=3.0"
 
 withSrcPos :: MonadIO m => Xabi.SourcePos -> String -> m ()
 withSrcPos pos str = liftIO . putStrLn $ concat 
