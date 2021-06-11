@@ -24,9 +24,8 @@ const initialState = {
   contractName: undefined,
   createDisabled: true,
   filename: undefined,
-  solidvm: true,
-  toster: false,
-  tosterMessage: ''
+  isToasts: false,
+  toastsMessage: ''
 };
 
 const reducer = function (state = initialState, action) {

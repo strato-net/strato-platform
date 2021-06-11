@@ -6,7 +6,7 @@ describe('App: index', () => {
 
   test('render component', () => {
     const wrapper = shallow(
-      <App.WrappedComponent />
+      <App.WrappedComponent getOrCreateOauthUserRequest={jest.fn()}/>
     );
 
     expect(wrapper.debug()).toMatchSnapshot();

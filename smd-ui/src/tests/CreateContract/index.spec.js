@@ -533,7 +533,6 @@ describe('CreateContract: index', () => {
         username: '',
         isToasts: false,
         toastsMessage: 'message',
-        solidvm: true,
       },
       accounts: {
         accounts: indexAccountsMock
@@ -548,6 +547,9 @@ describe('CreateContract: index', () => {
       chains: {
         listChain: chain,
         listLabelIds: chain["airline cartel 9"]
+      },
+      codeEditor : {
+        codeType : "SolidVM"
       }
     }
     expect(mapStateToProps(state)).toMatchSnapshot();

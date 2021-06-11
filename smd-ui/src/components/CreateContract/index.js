@@ -13,7 +13,7 @@ import { fetchAccounts, fetchUserAddresses } from '../Accounts/accounts.actions'
 import { fetchContracts } from '../Contracts/contracts.actions';
 import { Button, Dialog } from '@blueprintjs/core';
 import Dropzone from 'react-dropzone'
-import { Field, reduxForm, formValueSelector } from 'redux-form';
+import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
@@ -26,6 +26,13 @@ import './createContract.css';
 // TODO: use solc instead of /contracts/xabi for compile
 
 class CreateContract extends Component {
+
+  componentWillReceiveProps(nextProps) {
+    if (nextProps.isToasts) {
+      toasts.show({ message: nextProps.toastsMessage });
+      this.props.resetError();
+    }
+  }
 
   renderDropzoneInput = (field) => {
     const touchedAndHasErrors = field.meta.touched && field.meta.error
@@ -59,13 +66,6 @@ class CreateContract extends Component {
       : this.props.contractNameChange(
         e.target.value
       );
-  }
-
-  componentWillReceiveProps(nextProps) {
-    if (nextProps.isToasts) {
-      toasts.show({ message: nextProps.toastsMessage });
-      this.props.resetError();
-    }
   }
 
   handleFileDrop = (files, dropZoneField) => {
@@ -113,7 +113,7 @@ class CreateContract extends Component {
     const fileText = this.props.textFromEditor ? this.props.textFromEditor : this.props.contract
 
     const contracts = this.props.sourceFromEditor ? Object.keys(this.props.sourceFromEditor) : this.props.abi && this.props.abi.src && Object.keys(this.props.abi.src);
-    const metadata = { VM: this.props.solidvm ? 'SolidVM' : 'EVM' };
+    const metadata = { VM: this.props.codeType ? this.props.codeType : 'SolidVM' };
     contracts.forEach(function (contract) {
       if (values[`history@${contract}`]) {
         if (metadata['history']) {
@@ -454,22 +454,11 @@ class CreateContract extends Component {
               {contracts && <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label smd-pad-4">
-                    SolidVM
+                    VM
                   </label>
                 </div>
                 <div className="col-sm-9 smd-pad-4">
-                  <label className="pt-control pt-checkbox">
-                    <Field
-                      id="input-b"
-                      className="form-width"
-                      name="solidvm"
-                      type="checkbox"
-                      component="input"
-                      dir="auto"
-                      title="SolidVM"
-                    />
-                    <span className="pt-control-indicator"></span>
-                  </label>
+                  {this.props.codeType}
                 </div>
               </div>}
               {contracts && <div className="row">
@@ -596,7 +585,6 @@ export const validate = (values) => {
 
 export const CREATE_CONTRACT_FORM = 'create-contract'
 
-const selector = formValueSelector(CREATE_CONTRACT_FORM);
 
 export function mapStateToProps(state) {
   return {
@@ -609,8 +597,7 @@ export function mapStateToProps(state) {
     username: state.createContract.username,
     isToasts: state.createContract.isToasts,
     toastsMessage: state.createContract.toastsMessage,
-    // TODO: update the testcase for selector
-    solidvm: selector(state, 'solidvm'),
+    codeType : state.codeEditor.codeType,
     initialValues: {
       username: state.user.oauthUser ? state.user.oauthUser.username : '',
       address: state.user.oauthUser ? state.user.oauthUser.address : ''
