@@ -627,6 +627,7 @@ contract qq {
 
     it "can index into maps with bool" . runTest $ do
       runBS [r|
+pragma solidvm 3.0;
 contract qq {
   mapping(bool => uint) bs;
   constructor() public {
@@ -710,6 +711,7 @@ contract qq {
 
   it "can array index with uninitialized numbers" . runTest $ do
     runBS [r|
+pragma solidvm 3.0;
 contract qq {
   uint[] xs;
   uint y;
@@ -722,6 +724,7 @@ contract qq {
 
   it "can map index with uninitialized numbers" . runTest $ do
     runBS [r|
+pragma solidvm 3.0;
 contract qq {
   mapping(uint => uint) xs;
   uint y;
@@ -734,6 +737,7 @@ contract qq {
 
   it "can map index with uninitialized strings" . runTest $ do
     runBS [r|
+pragma solidvm 3.0;
 contract qq {
   mapping(string => uint) xs;
   uint y;
@@ -833,6 +837,7 @@ contract qq {
 
   it "can detect nulls" . runTest $ do
     runBS [r|
+pragma solidvm 3.0;
 contract qq {
   mapping(uint => uint) ns;
   bool found;
@@ -1225,6 +1230,7 @@ contract qq {
 
   it "can accept nested arrays" . runTest $ do
     runBS [r|
+pragma solidvm 3.0;
 contract qq {
   bool[2][] pairs;
 
@@ -1319,6 +1325,7 @@ contract qq {
 
   it "can call a remote function" . runTest $ do
     let qq = [r|
+pragma solidvm 3.0;
 contract qq {
   qq x;
   uint num;
@@ -1464,6 +1471,7 @@ contract qq {
 
   it "can pass local arrays as arguments" . runTest $ do
     runBS [r|
+pragma solidvm 3.0;
 contract Validator {
   function isEmptyArray(bytes32[] memory _arr) pure internal returns (bool) {
     return _arr.length == 0;
@@ -1722,6 +1730,7 @@ contract qq {
 
   it "can compare contracts to int literals" . runTest $ do
     runBS [r|
+pragma solidvm 3.0;
 contract qq {
   bool eq;
   bool neq;
@@ -1792,6 +1801,7 @@ contract qq {
 
   it "can compare ints to enums" . runTest $ do
     runCall "f" "(1)" [r|
+pragma solidvm 3.0;
 contract qq {
   enum E {A, B, C, D}
   bool is_a;
@@ -1895,6 +1905,7 @@ contract qq {
 
   it "can call boolean arguments" . runTest $ do
     runCall "set" "(true,false)" [r|
+pragma solidvm 3.0;
 contract qq {
   bool a;
   bool b;
@@ -2313,6 +2324,7 @@ contract qq {
 
   it "can cast empty bytes32 to int" . runTest $ do
     void $ runBS [r|
+pragma solidvm 3.0;
 contract qq {
   uint public x;
   constructor() public {
@@ -2532,6 +2544,7 @@ contract qq {
 
   it "RHS expr in an AND clause is not evaluated if the LHS expr evaluates to False" . runTest $ do
     runBS [r|
+pragma solidvm 3.0;
 contract qq {
   uint x = 0;
   uint magic = 42;
@@ -2573,6 +2586,7 @@ contract qq {
 
   it "RHS expr in an OR clause is not evaluated if the LHS expr evaluates to True" . runTest $ do
     runBS [r|
+pragma solidvm 3.0;
 contract qq {
   uint x = 0;
   uint magic = 42;
@@ -2757,6 +2771,7 @@ contract qq {
 
   it "can cast strings to bool" . runTest $ do
     runBS [r|
+pragma solidvm 3.0;
 contract qq {
   bool control;
   bool t;

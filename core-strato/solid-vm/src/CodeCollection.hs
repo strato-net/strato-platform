@@ -33,7 +33,8 @@ data Contract =
     _structs :: Map String [(T.Text, Xabi.FieldType)],
     _events :: Map T.Text Xabi.Event,
     _functions :: Map String Func,
-    _constructor :: Maybe Func
+    _constructor :: Maybe Func,
+    _vmVersion :: String
   } deriving (Show, Generic)
 
 makeLenses ''Contract
@@ -52,8 +53,8 @@ emptyCodeCollection =
 
 
 
-xabiToContract :: String -> [String] -> Xabi -> Contract
-xabiToContract contractName' parents' xabi = validateXabi xabi `seq`
+xabiToContract :: String -> [String] -> String -> Xabi -> Contract
+xabiToContract contractName' parents' vmVersion' xabi = validateXabi xabi `seq`
   Contract {
   _contractName = contractName',
   _parents = parents',
@@ -67,7 +68,8 @@ xabiToContract contractName' parents' xabi = validateXabi xabi `seq`
       case M.toList $ Xabi.xabiConstr xabi of
         [] -> Nothing
         [(_, x)] -> Just x
-        _ -> duplicateDefinition "multiple constructors in contract" contractName' --TODO- figure out if this is allowed in Solidity
+        _ -> duplicateDefinition "multiple constructors in contract" contractName', --TODO- figure out if this is allowed in Solidity
+  _vmVersion = vmVersion'
   }
 
 validateXabi :: Xabi -> ()
