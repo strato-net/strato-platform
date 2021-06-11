@@ -109,6 +109,20 @@ type SolidVMBase m = VMBase m
 onTraced :: Monad m => m () -> m ()
 onTraced = when flags_svmTrace
 
+-- TL;DR Use onTracedSM whenever you have a showSM in a trace over onTraced
+-- Full: In some onTraced logging statements we called showSM. Through a series
+-- of function calls (showSM -> getVar -> getSolidStorageKeyVal'
+-- -> getRawStorageKeyVal' -> getRawStorageKeyValMC -> lookupWithDefault 
+-- -> genericLookupRawStorageDB) we end up calling genericLookupRawStorageDB.
+-- This adds default values to the MP Trie whenever we lookup a nonexistant 
+-- value in our DB. THIS IS PROBLOMATIC, we are adding somthing to the MP Trie
+-- (and therefore changing the stateroot) for just having a logging statement!
+-- TODO: Do not add default values to RawStorageDBs for SolidVM > 3.
+onTracedSM :: MonadSM m => Contract -> m () -> m ()
+onTracedSM cntrct m = do
+      let svm3_0 = _vmVersion cntrct == "svm3.0"
+      when (flags_svmTrace && not svm3_0) m
+
 withSrcPos :: MonadIO m => Xabi.SourcePos -> String -> m ()
 withSrcPos pos str = liftIO . putStrLn $ concat 
   [ show pos
@@ -464,7 +478,7 @@ getCodeAndCollection address' = do
 
 logFunctionCall :: MonadSM m => ValList -> Account -> Contract -> String -> m (Maybe Value) -> m (Maybe Value)
 logFunctionCall args address contract functionName f = do
-  onTraced $ do
+  onTracedSM contract $ do
     argStrings <-
       case args of
         OrderedVals argList -> fmap (intercalate ", ") $ forM argList showSM
@@ -480,7 +494,7 @@ logFunctionCall args address contract functionName f = do
 
   result <- f
 
-  onTraced $ do
+  onTracedSM contract $ do
     resultString <- maybe (return "()") showSM result
     liftIO $ putStrLn $ box ["returning from " ++ functionName ++ ":", resultString]
 
@@ -621,7 +635,8 @@ runStatement st@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "="
   srcVar <- expToVar src
   srcVal <- getVar srcVar
 
-  onTraced $ do
+  cntrct <- getCurrentContract
+  onTracedSM cntrct $ do
     valString <- showSM srcVal
     withSrcPos pos $ "    Setting: " ++ unparseExpression dst ++ " = " ++ valString
 
@@ -658,7 +673,8 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary "=" ds
 
   setVar dstVar srcVal
   
-  onTraced $ do
+  cntrct <- getCurrentContract
+  onTracedSM cntrct $ do
     valString <- showSM srcVal
     withSrcPos pos $ "    Setting: " ++ unparseExpression dst ++ " = " ++ valString
               
@@ -729,7 +745,8 @@ runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition entries maybeExpre
           (_, SReference{}) -> getVar $ Constant rhs
           (_, c) -> return c
 
-  onTraced $ do
+  cntrct <- getCurrentContract
+  onTracedSM cntrct $ do
     valueString <- showSM value
     let toName :: Xabi.VarDefEntry -> String
         toName Xabi.BlankEntry = ""
@@ -1822,7 +1839,8 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro = do
 logAssigningVariable :: MonadSM m => Value -> m ()
 logAssigningVariable v = do
   valueString <- showSM v
-  onTraced $ liftIO $ putStrLn $ "            %%%% assigning variable: " ++ valueString
+  cntrct <- getCurrentContract
+  onTracedSM cntrct $ liftIO $ putStrLn $ "            %%%% assigning variable: " ++ valueString
 
 logVals :: (Show a, Show b, MonadIO m) => a -> b -> m ()
 logVals val1 val2 = onTraced . liftIO $ printf
