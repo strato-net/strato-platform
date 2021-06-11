@@ -1,5 +1,6 @@
 import React from 'react';
 import CreateChain, { mapStateToProps } from '../../components/CreateChain';
+import { fetchUserPubkey } from '../../components/User/user.actions'
 import { reducer as formReducer } from 'redux-form';
 import { createStore, combineReducers } from 'redux';
 import { xabiMock } from './createChainMock';
@@ -16,6 +17,7 @@ describe('CreateChain: index', () => {
 
     test('with empty values', () => {
       const props = {
+        fetchUserPubkey : () => {"undefined"},
         isOpen: false,
         isSpinning: false,
         error: null,
@@ -31,6 +33,7 @@ describe('CreateChain: index', () => {
 
     test('with values', () => {
       const props = {
+        fetchUserPubkey : () => {"undefined"},
         isOpen: true,
         isSpinning: false,
         error: null,
@@ -48,6 +51,7 @@ describe('CreateChain: index', () => {
 
   test('isValidFileType', () => {
     const props = {
+      fetchUserPubkey : fetchUserPubkey,
       isOpen: false,
       isSpinning: false,
       error: null,
@@ -87,6 +91,7 @@ describe('CreateChain: index', () => {
 
   test('errorMessageFor', () => {
     const props = {
+      fetchUserPubkey : fetchUserPubkey,
       isOpen: false,
       isSpinning: false,
       error: null,
@@ -110,6 +115,7 @@ describe('CreateChain: index', () => {
 
   test('submit form', () => {
     const props = {
+      fetchUserPubkey : fetchUserPubkey,
       isOpen: false,
       isSpinning: false,
       error: null,
@@ -156,6 +162,7 @@ describe('CreateChain: index', () => {
 
   test('remove members', () => {
     const props = {
+      fetchUserPubkey : fetchUserPubkey,
       isOpen: false,
       isSpinning: false,
       error: null,
@@ -188,6 +195,7 @@ describe('CreateChain: index', () => {
 
   test('open modal', () => {
     const props = {
+      fetchUserPubkey : fetchUserPubkey,
       isOpen: false,
       isSpinning: false,
       error: null,
@@ -211,6 +219,7 @@ describe('CreateChain: index', () => {
 
   test('close modal', () => {
     const props = {
+      fetchUserPubkey : fetchUserPubkey,
       isOpen: false,
       isSpinning: false,
       error: null,
@@ -236,6 +245,7 @@ describe('CreateChain: index', () => {
 
   test('componentWillReceiveProps', () => {
     const props = {
+      fetchUserPubkey : fetchUserPubkey,
       isOpen: false,
       isSpinning: false,
       error: null,
@@ -266,6 +276,9 @@ describe('CreateChain: index', () => {
         error: null,
         contractName: 'Governance',
         abi: xabiMock
+      },
+      user : {
+        publicKey : "undefined"
       }
     }
 
