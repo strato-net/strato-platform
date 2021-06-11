@@ -5,18 +5,18 @@ import { Button } from '@blueprintjs/core';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import HexText from '../../../HexText';
 import { parseDateFromString } from '../../../../lib/dateUtils';
-import { executeQuery } from '../../../QueryEngine/queryEngine.actions';
+import { executeQuery, getTransactionResultRequest} from '../../../QueryEngine/queryEngine.actions';
 import { RESOURCE_TYPES } from '../../../QueryEngine/queryTypes';
 
 class TransactionView extends Component {
   componentDidMount() {
     this.props.executeQuery(RESOURCE_TYPES.transaction, this.props.query, this.props.selectedChain);
+    this.props.getTransactionResultRequest(this.props.match.params.hash);
+    console.log("TransactionView component mounted,", this.props);
   }
-
   render() {
     const history = this.props.history;
     const hash = this.props.match.params.hash;
-
     const tx = this.props.tx ? this.props.tx : {};
     if (!Object.keys(tx).length) history.push(`/transactions`);
     return (
@@ -82,6 +82,10 @@ class TransactionView extends Component {
                     <td><strong>Nonce</strong></td>
                     <td>{tx.nonce}</td>
                   </tr>
+                  <tr>
+                    <td><strong>Result</strong></td>
+                    <td>{this.props.txResult ? this.props.txResult : ""}</td>
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -97,13 +101,14 @@ export function mapStateToProps(state, ownProps) {
   return {
     query: state.queryEngine.query,
     selectedChain: state.chains.selectedChain,
-    tx: state.transactions.tx.filter((val) => { return val.hash === hash })[0] || state.queryEngine.queryResult.filter((val) => { return val.hash === hash })[0]
+    tx: state.transactions.tx.filter((val) => { return val.hash === hash })[0] || state.queryEngine.queryResult.filter((val) => { return val.hash === hash })[0],
+    txResult : state.queryEngine.txResult
   };
 }
 
 export default withRouter(
   connect(
     mapStateToProps,
-    { executeQuery }
+    { executeQuery, getTransactionResultRequest }
   )(TransactionView)
 );

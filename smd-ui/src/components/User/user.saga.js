@@ -7,7 +7,11 @@ import {
   getOrCreateOauthUserSuccess,
   getOrCreateOauthUserFailure,
   GET_OR_CREATE_OAUTH_USER_REQUEST,
+  FETCH_USER_PUBLIC_KEY_REQUEST,
+  fetchUserPubKeySuccess,
+  fetchUserPubKeyFailure
 } from './user.actions';
+import { handleErrors } from '../../lib/handleErrors'; 
 import { env } from '../../env';
 
 const oauthUserUrl = env.APEX_URL + "/user";
@@ -32,7 +36,24 @@ function getOrCreateOauthUserApi() {
     });
 }
 
-function* getOrCreateOauthUser() {
+function fetchUserPubKeyRequest() {
+  const pubkeyURL = `${env.STRATO_URL_V23}/key?username=nodekey`
+  return fetch(
+    pubkeyURL,
+    {
+      method: 'GET',
+      credentials: "include",
+      headers: {
+        'Accept': 'application/json'
+      }
+    }
+  )
+  .then(handleErrors)
+  .then(res => res.json()
+  .catch(e => {throw e}))
+}
+
+export function* getOrCreateOauthUser() {
   try {
     const user = yield call(getOrCreateOauthUserApi);
     if (user.error) {
@@ -48,8 +69,20 @@ function* getOrCreateOauthUser() {
   }
 }
 
-export default function* watchFetchUser() {
-  yield [
-    takeEvery(GET_OR_CREATE_OAUTH_USER_REQUEST, getOrCreateOauthUser)
-  ];
+export function* getUserPubKey() {
+  try {
+    const response = yield call(fetchUserPubKeyRequest);
+    yield put(fetchUserPubKeySuccess(response.pubkey));
+  }
+  catch (err) {
+    yield put(fetchUserPubKeyFailure(err));
+  }
+}
+
+export function* watchFetchUser() {
+  yield takeEvery(GET_OR_CREATE_OAUTH_USER_REQUEST, getOrCreateOauthUser);
+}
+
+export function* watchFetchPubKey() {
+  yield takeEvery(FETCH_USER_PUBLIC_KEY_REQUEST, getUserPubKey);
 }

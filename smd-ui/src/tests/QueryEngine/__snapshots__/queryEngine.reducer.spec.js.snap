@@ -184,5 +184,6 @@ Object {
     "last": 15,
   },
   "queryResult": Array [],
+  "txResult": null,
 }
 `;

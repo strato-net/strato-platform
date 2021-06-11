@@ -7,7 +7,7 @@ let userCount
 
 function getUserCount() {
   User.count().then(users => {
-    const newUserCount = users - 1; // Subtract one to account for the nodekey account
+    const newUserCount = users - 1; // The oauth/users table always contains a row that is the information for the "nodekey", which is the node's internal account, so the true user count is always one fewer than the number of rows in the table
     if (userCount !== newUserCount) {
       userCount = newUserCount
       emitter.emit(ON_SOCKET_PUBLISH_EVENTS, USERS_COUNT, userCount)
