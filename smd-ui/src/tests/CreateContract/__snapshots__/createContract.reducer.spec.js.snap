@@ -254,10 +254,9 @@ Object {
   "createDisabled": true,
   "filename": undefined,
   "isOpen": false,
+  "isToasts": false,
   "response": "Status: Upload Contract",
-  "solidvm": true,
-  "toster": false,
-  "tosterMessage": "",
+  "toastsMessage": "",
   "username": "",
 }
 `;

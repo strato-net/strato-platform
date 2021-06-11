@@ -97,6 +97,7 @@ exports[`CodeEditor: reducer compile code request 1`] = `
 Object {
   "abi": undefined,
   "codeCompileSuccess": undefined,
+  "codeType": undefined,
   "contractName": undefined,
   "createDisabled": true,
   "currentTabSelected": 0,
@@ -350,6 +351,7 @@ exports[`CodeEditor: reducer set initial state 1`] = `
 Object {
   "abi": undefined,
   "codeCompileSuccess": undefined,
+  "codeType": "SolidVM",
   "contractName": undefined,
   "createDisabled": true,
   "currentTabSelected": 0,
