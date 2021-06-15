@@ -415,36 +415,42 @@ setCreator creator contract cntrct = do
 -- get the org for the Cirrus table name
 getOrg :: MonadSM m => Account -> m (String)
 getOrg caller = do
-  liftIO $ putStrLn $ "getOrg/versioning ---> Getting org for the caller " ++ format caller
-  callerCodeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) caller
+  c' <- getCurrentContract
+  let pragma = c' ^. vmVersion 
 
-  case callerCodeHash of
-    EVMCode _ -> do 
-    -- caller is a user account, so they are creating the first instance of this app
-    -- we will look up their cert in the DB and use it to get the org name for this app
-      x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-      maybeCertLevelDB <- x509CertDBGet $ _accountAddress caller
-      let maybeCertBlockDB = M.lookup (_accountAddress caller) x509s'
-          maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
-      let org' = fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
-      liftIO $ putStrLn $ "getOrg/versioning ---> They are a user, of org " ++ (show org')
-      return org'
-    x -> do
-    -- caller is a contract account, so this app already exists
-    -- so we need to find the app contract and get its ":creator" and it's name
-      mAppAccount <- getAppAccount (caller ^. accountChainId) caller
-      case mAppAccount of 
-        Nothing -> internalError "getOrg/versioning --> the app contract didn't have an AddressState, or was on an inaccessible chain" x
-        Just acct -> do
-          liftIO $ putStrLn $ "getOrg/versioning ---> They are part of app contract " ++ (format acct) 
-          appCreator <- getSolidStorageKeyVal' acct $ MS.StoragePath [MS.Field ":creator"]
-          case appCreator of
-            MS.BString org' -> do 
-              liftIO $ putStrLn $ "getOrg/versioning ---> Its org is " ++ show org'
-              return $ BC.unpack org'
-            _ -> do
-              liftIO $ putStrLn "getOrg/versioning ---> It's org is unset? Returning empty string" 
-              return "" 
+  if (pragma /= "svm3.0") 
+    then return ""
+  else do 
+    liftIO $ putStrLn $ "getOrg/versioning ---> Getting org for the caller " ++ format caller
+    callerCodeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) caller
+
+    case callerCodeHash of
+      EVMCode _ -> do 
+      -- caller is a user account, so they are creating the first instance of this app
+      -- we will look up their cert in the DB and use it to get the org name for this app
+        x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
+        maybeCertLevelDB <- x509CertDBGet $ _accountAddress caller
+        let maybeCertBlockDB = M.lookup (_accountAddress caller) x509s'
+            maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
+        let org' = fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
+        liftIO $ putStrLn $ "getOrg/versioning ---> They are a user, of org " ++ (show org')
+        return org'
+      x -> do
+      -- caller is a contract account, so this app already exists
+      -- so we need to find the app contract and get its ":creator" and it's name
+        mAppAccount <- getAppAccount (caller ^. accountChainId) caller
+        case mAppAccount of 
+          Nothing -> internalError "getOrg/versioning --> the app contract didn't have an AddressState, or was on an inaccessible chain" x
+          Just acct -> do
+            liftIO $ putStrLn $ "getOrg/versioning ---> They are part of app contract " ++ (format acct) 
+            appCreator <- getSolidStorageKeyVal' acct $ MS.StoragePath [MS.Field ":creator"]
+            case appCreator of
+              MS.BString org' -> do 
+                liftIO $ putStrLn $ "getOrg/versioning ---> Its org is " ++ show org'
+                return $ BC.unpack org'
+              _ -> do
+                liftIO $ putStrLn "getOrg/versioning ---> It's org is unset? Returning empty string" 
+                return "" 
 
 
 getCodeAndCollection :: MonadSM m => Account -> m (Contract, Keccak256, CodeCollection)
