@@ -9,7 +9,7 @@
     "test": "yarn test:lib && yarn test:util",
     "test:lib": "mocha --require=@babel/register lib/test/*.test.js -b",
     "test:util": "mocha --require=@babel/register lib/util/test/*.test.js -b",
-    "token-getter": "node --require=@babel/register src/util/oauth.client.js"
+    "token-getter": "ts-node --require=@babel/register src/util/oauth.client.ts"
   },
   "keywords": [
     "BlockApps",
@@ -26,6 +26,7 @@
     "@babel/polyfill": "^7.8.3",
     "@types/mocha": "^8.0.3",
     "@types/simple-oauth2": "^2.2.1",
+    "@types/tcp-port-used": "^1.0.0",
     "axios": "^0.19.0",
     "bignumber.js": "^9.0.0",
     "bluebird": "^3.4.6",
@@ -73,6 +74,7 @@
     "gulp-cli": "^2.0.1",
     "gulp-sourcemaps": "^2.6.5",
     "jsdoc": "^3.6.4",
-    "mocha": "^6.0.2"
+    "mocha": "^6.0.2",
+    "ts-node": "^10.0.0"
   }
 }
