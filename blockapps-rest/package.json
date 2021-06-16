@@ -9,7 +9,7 @@
     "test": "yarn test:lib && yarn test:util",
     "test:lib": "mocha --require=@babel/register lib/test/*.test.js -b",
     "test:util": "mocha --require=@babel/register lib/util/test/*.test.js -b",
-    "token-getter": "node --require=@babel/register lib/util/oauth.client.js"
+    "token-getter": "node --require=@babel/register src/util/oauth.client.js"
   },
   "keywords": [
     "BlockApps",
