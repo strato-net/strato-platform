@@ -251,14 +251,15 @@ create' creator newAccount ch cc contractName' argExps x509s = do
   
   initializeAction newAccount contractName' parentName ch
 
+  let !contract' = fromMaybe (missingType "create'/contract" contractName') (cc ^. contracts . at contractName')
+      vmVersion' = contract' ^. vmVersion
+
   A.adjustWithDefault_ (A.Proxy @AddressState) newAccount $ \newAddressState ->
     pure newAddressState{ addressStateContractRoot = MP.emptyTriePtr
-                        , addressStateCodeHash = if (contractName' /= parentName && not (null parentName)) then CodeAtAccount creator contractName' else SolidVMCode contractName' ch
+                        , addressStateCodeHash = if (vmVersion' == "svm3.0" && contractName' /= parentName && not (null parentName)) then CodeAtAccount creator contractName' else SolidVMCode contractName' ch
                         }
 
   onTraced $ liftIO $ putStrLn $ C.red $ "Creating Contract: " ++ show newAccount ++ " of type " ++ contractName'
-
-  let !contract' = fromMaybe (missingType "create'/contract" contractName') (cc ^. contracts . at contractName')
 
   -- Add Storage
   addCallInfo newAccount contract' (contractName' ++ " constructor") ch cc M.empty False
@@ -279,7 +280,7 @@ create' creator newAccount ch cc contractName' argExps x509s = do
   -- set creator again, in case the caller's cert changed during constructor execution
   (\crtr -> setCreator crtr newAccount contract') =<< (Env.origin <$> getEnv)
   
-  org <- getOrg creator
+  org <- getOrg creator (contract' ^. vmVersion)
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     actionData %= M.adjust (actionDataOrganization .~ (T.pack org)) newAccount
 
@@ -413,38 +414,41 @@ setCreator creator contract cntrct = do
 
 
 -- get the org for the Cirrus table name
-getOrg :: MonadSM m => Account -> m (String)
-getOrg caller = do
-  liftIO $ putStrLn $ "getOrg/versioning ---> Getting org for the caller " ++ format caller
-  callerCodeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) caller
+getOrg :: MonadSM m => Account -> String -> m (String)
+getOrg caller vers = do
+  if (vers /= "svm3.0") 
+    then return ""
+  else do 
+    liftIO $ putStrLn $ "getOrg/versioning ---> Getting org for the caller " ++ format caller
+    callerCodeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) caller
 
-  case callerCodeHash of
-    EVMCode _ -> do 
-    -- caller is a user account, so they are creating the first instance of this app
-    -- we will look up their cert in the DB and use it to get the org name for this app
-      x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-      maybeCertLevelDB <- x509CertDBGet $ _accountAddress caller
-      let maybeCertBlockDB = M.lookup (_accountAddress caller) x509s'
-          maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
-      let org' = fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
-      liftIO $ putStrLn $ "getOrg/versioning ---> They are a user, of org " ++ (show org')
-      return org'
-    x -> do
-    -- caller is a contract account, so this app already exists
-    -- so we need to find the app contract and get its ":creator" and it's name
-      mAppAccount <- getAppAccount (caller ^. accountChainId) caller
-      case mAppAccount of 
-        Nothing -> internalError "getOrg/versioning --> the app contract didn't have an AddressState, or was on an inaccessible chain" x
-        Just acct -> do
-          liftIO $ putStrLn $ "getOrg/versioning ---> They are part of app contract " ++ (format acct) 
-          appCreator <- getSolidStorageKeyVal' acct $ MS.StoragePath [MS.Field ":creator"]
-          case appCreator of
-            MS.BString org' -> do 
-              liftIO $ putStrLn $ "getOrg/versioning ---> Its org is " ++ show org'
-              return $ BC.unpack org'
-            _ -> do
-              liftIO $ putStrLn "getOrg/versioning ---> It's org is unset? Returning empty string" 
-              return "" 
+    case callerCodeHash of
+      EVMCode _ -> do 
+      -- caller is a user account, so they are creating the first instance of this app
+      -- we will look up their cert in the DB and use it to get the org name for this app
+        x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
+        maybeCertLevelDB <- x509CertDBGet $ _accountAddress caller
+        let maybeCertBlockDB = M.lookup (_accountAddress caller) x509s'
+            maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
+        let org' = fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
+        liftIO $ putStrLn $ "getOrg/versioning ---> They are a user, of org " ++ (show org')
+        return org'
+      x -> do
+      -- caller is a contract account, so this app already exists
+      -- so we need to find the app contract and get its ":creator"
+        mAppAccount <- getAppAccount (caller ^. accountChainId) caller
+        case mAppAccount of 
+          Nothing -> internalError "getOrg/versioning --> the app contract didn't have an AddressState, or was on an inaccessible chain" x
+          Just acct -> do
+            liftIO $ putStrLn $ "getOrg/versioning ---> They are part of app contract " ++ (format acct) 
+            appCreator <- getSolidStorageKeyVal' acct $ MS.StoragePath [MS.Field ":creator"]
+            case appCreator of
+              MS.BString org' -> do 
+                liftIO $ putStrLn $ "getOrg/versioning ---> Its org is " ++ show org'
+                return $ BC.unpack org'
+              _ -> do
+                liftIO $ putStrLn "getOrg/versioning ---> It's org is unset? Returning empty string" 
+                return "" 
 
 
 getCodeAndCollection :: MonadSM m => Account -> m (Contract, Keccak256, CodeCollection)
@@ -562,7 +566,7 @@ callWrapper from to mContract functionName argExps = do
   initializeAction to (_contractName contract) parentName' hsh
 
   -- grab the org for this contract
-  org <- getOrg to
+  org <- getOrg to (contract ^. vmVersion)
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     actionData %= M.adjust (actionDataOrganization .~ (T.pack org)) to
 
@@ -874,7 +878,7 @@ runStatement st@(Xabi.EmitStatement eventName exptups pos) = do
         invalidArguments "arguments to statement are inconsistent with those declared" (unparseStatement st)
       else do
         let account = currentAccount curInfo
-        org <- getOrg account -- the org of the app
+        org <- getOrg account (curCnct ^. vmVersion) -- the org of the app
          
         parentName <- fromMaybeM (return "") $ runMaybeT 
             $   pure account
