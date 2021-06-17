@@ -4,7 +4,7 @@ category:            Web
 build-type:          Simple
 extra-source-files:  README.md
 
-ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N -Werror -fsimpl-tick-factor=20000
+ghc-options: -Wall -Werror -fsimpl-tick-factor=20000
 
 dependencies:
   - base
