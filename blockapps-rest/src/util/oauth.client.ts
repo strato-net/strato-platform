@@ -2,7 +2,7 @@ import * as commander from "commander";
 import * as fs from "fs";
 import fsUtil from "./fsUtil";
 import oauthUtil from "./oauth.util";
-import tcpPortUsed from "tcp-port-used";
+import * as tcpPortUsed from "tcp-port-used";
 import * as http from "http";
 import * as https from "https";
 import * as qs from "query-string";
