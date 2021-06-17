@@ -49,8 +49,6 @@ docs
 
 .env
 
-package-lock.json
-
 config.yaml
 
 # OS files
