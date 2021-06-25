@@ -160,7 +160,7 @@ function newnode {
       runBackgroundProcess core-api --appFetchLimit=${appFetchLimit:-100} >> logs/core-api 2>&1
   else
       echo "Starting strato-api"
-      runBackgroundProcess strato-api --gasOn=$gasOn >> logs/strato-api 2>&1
+      runBackgroundProcess strato-api --gasOn=$gasOn --evmCompatible=$evmCompatible >> logs/strato-api 2>&1
   fi
 
   if [ "${START_EXPERIMENTAL_STRATO_API}" = true ]; then
