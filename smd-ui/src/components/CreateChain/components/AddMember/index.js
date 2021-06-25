@@ -20,7 +20,7 @@ class AddMember extends Component {
       },
       username: null,
       address: null,
-      enode: null,
+      enode: `enode://${this.props.publicKey}@1.2.3.4:30303`,
       balance: 0,
       errors: null
     }
@@ -34,7 +34,7 @@ class AddMember extends Component {
     mixpanelWrapper.track("add_member_loaded");
     this.props.fetchAccounts(true, true);
   }
-
+  
   handleUsernameChange(event) {
     this.setState({
       username: event.target.value
@@ -187,7 +187,7 @@ class AddMember extends Component {
                               username: null,
                               address: null,
                               balance: 0,
-                              enode: null,
+                              enode: `enode://${this.props.publicKey}@1.2.3.4:3030`,
                               errors: null
                             };
                           });
@@ -210,7 +210,7 @@ class AddMember extends Component {
                               username: null,
                               address: null,
                               balance: 0,
-                              enode: null,
+                              enode: `enode://${this.props.publicKey}@1.2.3.4:3030`,
                               errors: null
                             };
                           });
@@ -353,7 +353,8 @@ export function mapStateToProps(state) {
     accounts: state.accounts.accounts,
     initialValues: {
       from: state.user.oauthUser ? state.user.oauthUser.username : '',
-      fromAddress: state.user.oauthUser ? state.user.oauthUser.address : ''
+      fromAddress: state.user.oauthUser ? state.user.oauthUser.address : '',
+      enode : `enode://${state.user.publicKey}@1.2.3.4:30303`
     }
   };
 }

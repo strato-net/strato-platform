@@ -7,17 +7,25 @@ export const TRANSACTION_QUERY_TYPES = {
     key: 'blocknumber',
     displayName : 'Block Number'
   },
+  hash : {
+    key : 'hash',
+    displayName : 'Hash'
+  },
   to : {
     key: 'to',
     displayName : 'To'
   },
-  maxvalue: {
-    key: 'maxvalue',
-    displayName: 'Max Value'
+  from : {
+    key: 'from',
+    displayName : 'From'
   },
   minvalue: {
     key: 'minvalue',
     displayName: 'Min Value'
+  },
+  maxvalue: {
+    key: 'maxvalue',
+    displayName: 'Max Value'
   },
   mingasprice: {
     key: 'mingasprice',
@@ -34,10 +42,6 @@ export const TRANSACTION_QUERY_TYPES = {
   value : {
     key: 'value',
     displayName : 'Value'
-  },
-  from : {
-    key: 'from',
-    displayName : 'From'
   },
   last : {
     key: 'last',

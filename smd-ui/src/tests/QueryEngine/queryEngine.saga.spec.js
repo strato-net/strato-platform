@@ -4,18 +4,27 @@ import {
   put,
   call
 } from 'redux-saga/effects';
-import watchExecuteQuery, {
+import { watchExecuteQuery,
   executeQuery,
-  query
+  query,
+  watchTransactionResult,
+  getTransactionResult,
+  transactionResultRequest
 } from '../../components/QueryEngine/queryEngine.saga';
 import {
   EXECUTE_QUERY_REQUEST,
   executeQuerySuccess,
   executeQueryFailure,
   EXECUTE_QUERY_SUCCESS,
-  EXECUTE_QUERY_FAILURE
+  EXECUTE_QUERY_FAILURE,
+  TRANSACTION_RESULT_REQUEST,
+  TRANSACTION_RESULT_SUCCESS,
+  TRANSACTION_RESULT_FAILURE,
+  getTransactionResultSuccess,
+  getTransactionResultFailure,
+  getTransactionResultRequest
 } from '../../components/QueryEngine/queryEngine.actions';
-import { transactionsMock, error, blocksMock } from './queryEngineMock';
+import { transactionsMock, blocksMock, resultsMock, error } from './queryEngineMock';
 
 describe('QueryEngine: saga', () => {
 
@@ -89,4 +98,43 @@ describe('QueryEngine: saga', () => {
 
   });
 
+
+  test('watchTransactionResult', () => {
+    const gen = watchTransactionResult();
+    expect(gen.next().value).toEqual(takeEvery(TRANSACTION_RESULT_REQUEST, getTransactionResult));
+    expect(gen.next().done).toBe(true);
+  });
+
+  describe('getTransactionResult generator', () => {
+
+    const action = {
+      txHash : "ef1c523bd46a",
+      type: EXECUTE_QUERY_REQUEST
+    }
+
+    test('inspection', () => {
+      const gen = getTransactionResult(action);
+      expect(gen.next().value).toEqual(call(transactionResultRequest, action.txHash));
+      expect(gen.next(resultsMock).value).toEqual(put(getTransactionResultSuccess(resultsMock)));
+      expect(gen.throw(error).value).toEqual(put(getTransactionResultFailure(error)));
+      expect(gen.next().done).toBe(true);
+    });
+
+    test('call transactions result with success', (done) => {
+      fetch.mockResponse(JSON.stringify(resultsMock));
+
+      expectSaga(getTransactionResult, action)
+        .call.fn(transactionResultRequest).put.like({ action: { type: TRANSACTION_RESULT_SUCCESS } })
+        .run().then((result) => { done() });
+    });
+
+    test('call transactions result with failure', (done) => {
+      fetch.mockReject(JSON.stringify(error));
+
+      expectSaga(getTransactionResult, action)
+        .call.fn(transactionResultRequest).put.like({ action: { type: TRANSACTION_RESULT_FAILURE } })
+        .run().then((result) => { done() });
+    });
+
+  });
 });

@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { Field, reduxForm, reset } from 'redux-form';
 import { TRANSACTION_QUERY_TYPES, RESOURCE_TYPES } from '../../../QueryEngine/queryTypes';
-import { updateQuery, clearQuery, executeQuery, removeQuery } from '../../../QueryEngine/queryEngine.actions';
+import { updateQuery, clearQuery, executeQuery, removeQuery} from '../../../QueryEngine/queryEngine.actions';
 import { withRouter } from 'react-router-dom';
 import { Text, Position, Tooltip, Button } from '@blueprintjs/core';
 import { parseDateFromString } from '../../../../lib/dateUtils';
@@ -11,7 +11,6 @@ import { fetchTx } from '../../../TransactionList/transactionList.actions';
 import HexText from '../../../HexText';
 
 class TransactionTable extends Component {
-
   componentDidMount() {
     this.props.fetchTx(null, this.props.selectedChain);
     this.props.executeQuery(RESOURCE_TYPES.transaction, this.props.query, this.props.selectedChain);
@@ -42,16 +41,13 @@ class TransactionTable extends Component {
     this.props.clearQuery();
     this.props.executeQuery(RESOURCE_TYPES.transaction, this.props.query, this.props.selectedChain);
   };
-
+  
   render() {
-    const history = this.props.history;
-    const { handleSubmit } = this.props;
-
-    function handleClick(hash) {
+    const { handleSubmit, history} = this.props; 
+    const handleClick = function(hash) {
       mixpanelWrapper.track('transactions_row_click');
       history.push(`/transactions/${hash}`);
     }
-
     let txRows = this.props.queryResults.length && this.props.queryResults[0]['transactionType'] && this.props.queryResults.map(
       function (tx, i) {
         return (

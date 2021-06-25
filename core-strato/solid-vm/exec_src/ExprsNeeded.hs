@@ -19,7 +19,8 @@ main = do
   contents <- readFile filename
   File parsedFile <- either (die . show) return
               $ runParser solidityFile "" "" contents
-  let namedContracts = [(T.unpack name, xabiToContract (T.unpack name) (map T.unpack parents') xabi)
+  let vmVersion' = if (Pragma "solidvm" "3.0") `elem` parsedFile then "svm3.0" else ""
+      namedContracts = [(T.unpack name, xabiToContract (T.unpack name) (map T.unpack parents') vmVersion' xabi)
                        | NamedXabi name (xabi, parents') <- parsedFile]
       cc = CodeCollection $ M.fromList namedContracts
       nodes = codeCollectionCrawler cc

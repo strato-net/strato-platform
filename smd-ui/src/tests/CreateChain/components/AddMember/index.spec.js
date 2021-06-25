@@ -56,6 +56,7 @@ describe('CreateChain: index', () => {
 
     test('form fields', () => {
       const props = {
+        publicKey : "undefined",
         accounts: indexAccountsMock,
         initialValues: {
           fromAddress: null,
@@ -216,7 +217,7 @@ describe('CreateChain: index', () => {
         const wrapper = shallow(
           <AddMember.WrappedComponent {...props} />
         ).dive().dive().dive();
-
+        wrapper.find('Field').at(2).simulate('change', { target: { value: '' } });
         wrapper.find('Button').last().simulate('click');
         expect(props.handler).not.toHaveBeenCalled();
         expect(props.handler).not.toHaveBeenCalledTimes(1);
@@ -294,7 +295,8 @@ describe('CreateChain: index', () => {
         oauthUser: {
           username: 'Supplier2_1301_46441',
           address: '57f2ed9058d2e868d7bbae9db03af12d27675117'
-        }
+        },
+        publicKey : "undefined"
       }
     }
 

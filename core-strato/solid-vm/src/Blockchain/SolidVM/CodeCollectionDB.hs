@@ -33,8 +33,8 @@ compileSource initCodeMap =
   let getNamedContracts fileName src =
         let maybeFile = runParser solidityFile "" (T.unpack fileName) $ T.unpack src
             file = either (parseError "compileSource") id maybeFile
-
-         in [(T.unpack name, xabiToContract (T.unpack name) (map T.unpack parents') xabi)
+            vmVersion' = if (Pragma "solidvm" "3.0") `elem` (unsourceUnits file) then "svm3.0" else ""
+         in [(T.unpack name, xabiToContract (T.unpack name) (map T.unpack parents') vmVersion' xabi)
             | NamedXabi name (xabi, parents') <- unsourceUnits file]
       allContracts = concat . map (uncurry getNamedContracts) $ M.toList initCodeMap
    in applyInheritance

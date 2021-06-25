@@ -40,10 +40,11 @@ export function getState(contractName, contractAddress, chainid) {
     });
 }
 
-export function getCirrusInstances(contractName) {
-  const options = { params: { contractName } };
-  const url = env.CIRRUS_URL + createUrl("/::contractName", options);
-
+export function getCirrusInstances(contractName, chainId) {
+  let url = `${env.CIRRUS_URL}/${contractName}`;
+  if (chainId) {
+    url = `${url}?chainId=eq.${chainId}`;
+  }
   return fetch(
     url,
     {
@@ -98,7 +99,7 @@ export function* fetchState(action) {
 
 export function* fetchCirrusInstances(action) {
   try {
-    let response = yield call(getCirrusInstances, action.name);
+    let response = yield call(getCirrusInstances, action.name, action.chainId);
     yield put(fetchCirrusInstancesSuccess(action.name, response));
   }
   catch (err) {

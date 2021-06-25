@@ -42,7 +42,6 @@ export function tokenizeSource(source) {
 }
 
 export function compileSource(contractName, source, codeType) {
-  console.log(source)
   const searchable = [];
   return fetch(blocCompileUrl, {
     method: 'POST',
@@ -69,19 +68,23 @@ export function compileSource(contractName, source, codeType) {
         throw value;
       });
     }
-  }).catch(function (error) {
+  })
+  .then(json => {
+    return Promise.resolve(json);
+  })
+  .catch(function (error) {
     throw error;
   });
 }
 
-export function* compileCodeFromEditor(codeAction) {
+export function* compileCodeFromEditor(action) {
   try {
     let response
-    response = yield call(tokenizeSource, codeAction.code);
+    response = yield call(tokenizeSource, action.code);
     if (response) {
       let contracts = response.src && Object.keys(response.src);
       const contractName = contracts && contracts[0]
-      yield call(compileSource, contractName, codeAction.code, codeAction.codeType);
+      yield call(compileSource, contractName, action.code, action.codeType);
     }
     yield put(compileCodeFromEditorSuccess(response));
   }

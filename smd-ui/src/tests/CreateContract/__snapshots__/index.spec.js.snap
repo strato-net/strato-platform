@@ -214,6 +214,7 @@ Object {
     "936986d54af89e2fa3c4888563856940d8f80cd5c1d01c386bd98207d29ae1e9": Object {},
     "ab1696d5f6a36836f0bd23d96918cce4f78b3667518d70e721914f391142a5e1": Object {},
   },
+  "codeType": "SolidVM",
   "contract": "",
   "contractName": "Cloner",
   "createDisabled": false,
@@ -223,7 +224,6 @@ Object {
   },
   "isOpen": true,
   "isToasts": false,
-  "solidvm": undefined,
   "toastsMessage": "message",
   "username": "",
 }
