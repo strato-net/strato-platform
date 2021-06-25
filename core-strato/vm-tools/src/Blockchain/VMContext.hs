@@ -159,7 +159,6 @@ data MemDBs = MemDBs
   , _storageBlockMap :: M.Map (Account, B.ByteString) B.ByteString
   , _stateRoots      :: M.Map (Keccak256, Maybe Word256) MP.StateRoot
   , _currentBlock    :: Maybe CurrentBlockHash
-  , _newX509Certs    :: X509CertMap
   } deriving (Generic, NFData, Show)
 makeLenses ''MemDBs
 
@@ -172,6 +171,7 @@ data ContextState = ContextState
   , _coinbaseQueue     :: Q.Seq ((Address,Word64), Address)
   , _txRunResultsCache :: TRC.Cache
   , _debugSettings     :: Maybe DebugSettings
+  , _newX509Certs      :: X509CertMap
   } deriving (Generic, NFData)
 makeLenses ''ContextState
 
@@ -245,7 +245,7 @@ getX509CertDB :: ContextM X509CertDB
 getX509CertDB = view $ dbs . x509CertDB
 
 getX509CertMap :: ContextM X509CertMap
-getX509CertMap = gets $ _newX509Certs . _memDBs
+getX509CertMap = gets $ _newX509Certs
 
 getBlockSummaryDB :: ContextM BlockSummaryDB
 getBlockSummaryDB = view $ dbs . blockSummaryDB
@@ -405,13 +405,15 @@ instance (Keccak256 `A.Alters` DBCode) ContextM where
 instance (Address `A.Alters` X509Certificate) ContextM where
   lookup _ k = join $ liftA3 genericLookupX509CertDB getX509CertDB getX509CertMap (pure k)
   insert _ k v = do certMap <- getX509CertMap
-                    modify $ memDBs . newX509Certs .~ (genericInsertX509CertDB certMap k v)
+                    modify $ newX509Certs .~ (genericInsertX509CertDB certMap k v)
   delete _ k = do certMap <- getX509CertMap
-                  modify $ memDBs . newX509Certs .~ (genericDeleteX509CertDB certMap k)
+                  modify $ newX509Certs .~ (genericDeleteX509CertDB certMap k)
 
 instance (Address `Flushable` X509Certificate) ContextM where
     flush _ _ = join (liftA2 genericFlushX509 getX509CertDB getX509CertMap) 
-                    >> modify (memDBs . newX509Certs .~ M.empty)
+                    >> modify (newX509Certs .~ M.empty)
+    topCache _ _ = gets (_newX509Certs)
+    popCache _ _ = gets (_newX509Certs) <* modify (newX509Certs .~ M.empty)
 
 
 instance (N.NibbleString `A.Alters` N.NibbleString) ContextM where
@@ -500,7 +502,6 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
             , _storageBlockMap = M.empty
             , _stateRoots      = M.empty
             , _currentBlock    = Nothing
-            , _newX509Certs    = M.empty
             }
 
       cstate <- newIORef $ ContextState
@@ -512,6 +513,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
             , _coinbaseQueue     = Q.empty
             , _txRunResultsCache = cache
             , _debugSettings     = Nothing
+            , _newX509Certs    = M.empty
             }
 
       let ctx = Context
@@ -565,7 +567,6 @@ runContextM dSettings f = do
             , _storageBlockMap = M.empty
             , _stateRoots      = M.empty
             , _currentBlock    = Nothing
-            , _newX509Certs    = M.empty
             }
 
       cstate <- newIORef $ ContextState
@@ -577,6 +578,7 @@ runContextM dSettings f = do
             , _coinbaseQueue     = Q.empty
             , _txRunResultsCache = cache
             , _debugSettings     = dSettings
+            , _newX509Certs    = M.empty
             }
 
       let ctx = Context

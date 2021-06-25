@@ -232,7 +232,9 @@ instance (Address `A.Alters` X509Certificate) m => (Address `A.Alters` X509Certi
   delete p   = lift . A.delete p
 
 instance (Address `Flushable` X509Certificate) m => (Address `Flushable` X509Certificate) (SM m) where
-  flush p p' = lift $ flush p p'
+  flush p    = lift . flush p
+  topCache p = lift . topCache p
+  popCache p = lift . popCache p
 
 instance (N.NibbleString `A.Alters` N.NibbleString) m => (N.NibbleString `A.Alters` N.NibbleString) (SM m) where
   lookup p   = lift . A.lookup p
