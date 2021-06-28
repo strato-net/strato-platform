@@ -10,8 +10,6 @@ license: Apache-2.0
 description:
     RLP, as described in the Ethereum Yellowpaper
 
-github: blockapps/strato-platform/core-strato/ethereum-rlp
-
 default-extensions:
   - Arrows
   - BangPatterns
