@@ -2,7 +2,6 @@ name: blockapps-solidity
 version: 0.1.0.0
 synopsis: Solidity datatypes
 description: Solidity datatypes
-github: blockapps/strato-platform/blockapps-haskall/blockapps-solidity
 license: BSD3
 license-file: LICENSE
 author: Eitan Chatav

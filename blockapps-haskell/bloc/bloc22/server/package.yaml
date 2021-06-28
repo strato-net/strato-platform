@@ -2,7 +2,6 @@ name: blockapps-bloc22-server
 version: 0.1.0.0
 synopsis: Bloc microservice
 description: Bloc microservice
-github: blockapps/strato-platform/blockapps-haskell/blockapps-bloc
 license: BSD3
 license-file: LICENSE
 author: Eitan Chatav
