@@ -374,22 +374,21 @@ addTransactions :: (VMBase m, Bagger.MonadBagger m, MonadMonitor m)
                 -> ConduitT a VmOutEvent m ()
 addTransactions blockData txs =
  timeit ("addTransactions, " ++ show (length txs) ++ " TXs") (Just vmBlockInsertionMined) $ do
-  trrs <- lift $ go (blockDataGasLimit blockData) txs DL.empty
+  trrs <- lift $ go (blockDataGasLimit blockData) txs DL.empty M.empty
   mapM_ (outputTransactionResult blockData blockHeaderHash) trrs
   yield . OutASM $ foldr (flip M.union) M.empty $ map trrAfterMap trrs
 
   where
-    go _ [] trrs = return $ DL.toList trrs
-    go blockGas (t@OutputTx{otBaseTx=bt}:rest) trrs  = do
+    go _ [] trrs _ = return $ DL.toList trrs
+    go blockGas (t@OutputTx{otBaseTx=bt}:rest) trrs oldX509s = do
       flushMemAddressStateTxToBlockDB
       flushMemStorageTxDBToBlockDB
       beforeMap <- getAddressStateTxDBMap
       let chainId = fromAnchorChain $ otAnchorChain t
-      beforeX509s <- x509CertCacheTop
       (!deltaT, !result) <- timeIt $ runExceptT $ addTransaction chainId False blockData blockGas t
       case result of
-          Left _ -> x509CertCachePut beforeX509s
-          _ -> pure ()
+          Left _  -> x509CertCachePut oldX509s
+          Right _ -> pure ()
 
       afterMap <- getAddressStateTxDBMap
 
@@ -403,8 +402,8 @@ addTransactions blockData txs =
             Left _           -> blockGas
             Right execResult -> blockGas - (transactionGasLimit bt - calculateReturned bt execResult)
 
-
-      go remainingBlockGas rest (trrs `DL.snoc` trr)
+      currentX509s' <- x509CertCacheTop
+      go remainingBlockGas rest (trrs `DL.snoc` trr) currentX509s'
 
 data TxMiningResult = TxMiningResult { tmrFailure  :: Maybe TransactionFailureCause
                                      , tmrRanTxs   :: [TxRunResult]
@@ -488,8 +487,6 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=b
     if success
         then do
             execResults <- runCodeForTransaction isRunningTests' isHomestead b (fromInteger (transactionGasLimit bt) - intrinsicGas') tAcct t
-            -- x509cache <- lift $ x509CertCacheTop
-            -- $logDebugS "addTx/execres" . T.pack $ "create/Our current X509 certs: " ++ show (M.keys x509cache)
             s1 <- lift $ addToBalance coinbaseAcct (transactionGasLimit bt * transactionGasPrice bt)
             unless s1 $ error "addToBalance failed even after a check in addBlock"
             lift $ P.incCounter vmTxsProcessed

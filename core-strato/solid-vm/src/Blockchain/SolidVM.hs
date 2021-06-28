@@ -276,9 +276,11 @@ create' creator newAccount ch cc contractName' argExps = do
   -- set creator again, in case the caller's cert changed during constructor execution
   (\crtr -> setCreator crtr newAccount contract') =<< (Env.origin <$> getEnv)
   
-  org <- getOrg creator (contract' ^. vmVersion)
+  maybeCert <- x509CertDBGet $ _accountAddress creator
+  let org = T.pack $ x509CertOrg maybeCert
+
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    actionData %= M.adjust (actionDataOrganization .~ (T.pack org)) newAccount
+    actionData %= M.adjust (actionDataOrganization .~ org) newAccount
 
 
   -- I'm showing these strings because I like them to be in quotes in the logs :)
@@ -292,7 +294,6 @@ create' creator newAccount ch cc contractName' argExps = do
 
   finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
   finalAct <- Mod.get (Mod.Proxy @Action)
-  x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
 
 
   return ExecResults {
@@ -391,12 +392,7 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
 setCreator :: MonadSM m => Account -> Account -> Contract -> m ()
 setCreator creator contract cntrct = do
   liftIO $ putStrLn $ "setCreator/versioning ---> getting creator org of " ++ (format creator) ++ " for new contract " ++ format contract
-  
-  x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-  maybeCertLevelDB <- x509CertDBGet $ _accountAddress creator
-  let maybeCertBlockDB = M.lookup (_accountAddress creator) x509s'
-      maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
-      org = fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
+  org <- x509CertGetOrg $ _accountAddress creator
   case org of
     "" -> do
       liftIO $ putStrLn $ "setCreator/versioning ---> no org found for this creator...."
@@ -423,11 +419,7 @@ getOrg caller vers = do
       EVMCode _ -> do 
       -- caller is a user account, so they are creating the first instance of this app
       -- we will look up their cert in the DB and use it to get the org name for this app
-        x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-        maybeCertLevelDB <- x509CertDBGet $ _accountAddress caller
-        let maybeCertBlockDB = M.lookup (_accountAddress caller) x509s'
-            maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
-        let org' = fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
+        org' <- x509CertGetOrg $ _accountAddress caller
         liftIO $ putStrLn $ "getOrg/versioning ---> They are a user, of org " ++ (show org')
         return org'
       x -> do
