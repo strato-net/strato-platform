@@ -276,17 +276,17 @@ create' creator newAccount ch cc contractName' argExps = do
   -- set creator again, in case the caller's cert changed during constructor execution
   (\crtr -> setCreator crtr newAccount contract') =<< (Env.origin <$> getEnv)
   
-  maybeCert <- x509CertDBGet $ _accountAddress creator
-  let org = T.pack $ x509CertOrg maybeCert
+  org <- getOrg creator (contract' ^. vmVersion)
 
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    actionData %= M.adjust (actionDataOrganization .~ org) newAccount
+    actionData %= M.adjust (actionDataOrganization .~ (T.pack org)) newAccount
 
 
   -- I'm showing these strings because I like them to be in quotes in the logs :)
   liftIO $ putStrLn $ "create'/versioning --->  we created " ++ (show contractName') ++ 
       " in app " ++ (show parentName) ++ " of org " ++ show org
 
+  maybeCert <- x509CertDBGet $ _accountAddress creator
   case maybeCert of
       Just c  -> x509CertDBPut (_accountAddress newAccount) c
       Nothing -> pure ()

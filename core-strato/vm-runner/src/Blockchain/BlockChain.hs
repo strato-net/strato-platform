@@ -385,6 +385,7 @@ addTransactions blockData txs =
       flushMemStorageTxDBToBlockDB
       beforeMap <- getAddressStateTxDBMap
       let chainId = fromAnchorChain $ otAnchorChain t
+      x509CertCachePut oldX509s
       (!deltaT, !result) <- timeIt $ runExceptT $ addTransaction chainId False blockData blockGas t
       case result of
           Left _  -> x509CertCachePut oldX509s
