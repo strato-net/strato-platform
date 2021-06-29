@@ -47,7 +47,7 @@ class StatsDaemon {
     const pgClientCirrus = new Sequelize(`${sequelizeConnUriPrefix}/cirrus`, {logging: (dbconfig.logging ? dbconfig.logging : undefined)})
     
     const [[txsForPeriodResult], [usersCountResult], [cirrusTableListResult, cirrusTableListMetadata]] = await Promise.all([
-      pgClientEth.query(`SELECT count(*) FROM raw_transaction AS rt LEFT JOIN transaction_result AS tr ON rt.id=tr.id WHERE rt.timestamp >= now() - INTERVAL '${secondsSinceLastStat} SECONDS' and tr.status='Success'`),
+      pgClientEth.query(`SELECT count(*) FROM raw_transaction AS rt LEFT JOIN transaction_result AS tr ON rt.tx_hash=tr.transaction_hash WHERE rt.timestamp >= now() - INTERVAL '${secondsSinceLastStat} SECONDS' and tr.status='Success' and rt.block_number >= 0`),
       pgClientVault.query("SELECT count(*) FROM users WHERE x_user_unique_name != 'nodekey'"),
       pgClientCirrus.query("SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename != 'contract' AND tablename != 'cold_storage'"),
     ])

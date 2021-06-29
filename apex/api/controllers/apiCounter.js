@@ -73,12 +73,14 @@ async function apiCounterRouteController(req, res) {
   res.status(200).send();
   if (
       process.env['STATS_ENABLED'] === "true" &&
-      !['OPTIONS', 'TRACE'].includes(req.headers['x-original-method'])
+      !['OPTIONS', 'TRACE', 'HEAD', 'CONNECT'].includes(req.headers['x-original-method'])
   ) {
-    if (['GET', 'HEAD'].includes(req.headers['x-original-method'])) {
+    if (req.headers['x-original-method'] === 'GET') {
       counter.incrementReads()
-    } else {
+    } else if (['POST', 'PATCH', 'PUT', 'DELETE'].includes(req.headers['x-original-method'])) {
       counter.incrementWrites()
+    } else {
+      winston.warn(`Unknown HTTP method called: ${req.headers['x-original-method']}`)
     }
   }
 }
