@@ -1,3 +1,5 @@
+pragma solidvm 3.0;
+
 /**
 * Role Enums
 *
