@@ -33,6 +33,8 @@ module Blockchain.DB.X509CertDB (
   , x509CertCachePop
   , x509CertCachePut
   , x509CertGetOrg
+  , x509CertGetUser
+  , x509CertGetGroup
   , x509CertOrg
   ) where
 
@@ -131,5 +133,17 @@ x509CertCachePut mp = M.traverseWithKey traverseFunc mp >> pure ()
 x509CertGetOrg :: HasX509CertDB m => Address -> m String
 x509CertGetOrg addr = x509CertOrg <$> x509CertDBGet addr
 
+x509CertGetUser :: HasX509CertDB m => Address -> m String
+x509CertGetUser addr = x509CertUser <$> x509CertDBGet addr
+
+x509CertGetGroup :: HasX509CertDB m => Address -> m String
+x509CertGetGroup addr = x509CertGroup <$> x509CertDBGet addr
+
 x509CertOrg :: Maybe X509Certificate -> String
 x509CertOrg mcert = fromMaybe "" . fmap subOrg $ getCertSubject =<< mcert
+
+x509CertUser :: Maybe X509Certificate -> String
+x509CertUser mcert = fromMaybe "" . fmap subCommonName $ getCertSubject =<< mcert
+
+x509CertGroup :: Maybe X509Certificate -> String
+x509CertGroup mcert = fromMaybe "" $ subUnit =<< getCertSubject =<< mcert

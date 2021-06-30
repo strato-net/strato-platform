@@ -381,14 +381,18 @@ addTransactions blockData txs =
   where
     go _ [] trrs _ = return $ DL.toList trrs
     go blockGas (t@OutputTx{otBaseTx=bt}:rest) trrs oldX509s = do
+      _ <- x509CertCachePop
+      x509CertCachePut oldX509s
+      x509certs <- x509CertCacheTop
+      $logInfoS "addTransactions/go" . T.pack $ "Start of go x509s': " ++ show (M.keys x509certs)
       flushMemAddressStateTxToBlockDB
       flushMemStorageTxDBToBlockDB
       beforeMap <- getAddressStateTxDBMap
       let chainId = fromAnchorChain $ otAnchorChain t
-      x509CertCachePut oldX509s
       (!deltaT, !result) <- timeIt $ runExceptT $ addTransaction chainId False blockData blockGas t
       case result of
-          Left _  -> x509CertCachePut oldX509s
+          Left _  -> do _ <- x509CertCachePop
+                        x509CertCachePut oldX509s
           Right _ -> pure ()
 
       afterMap <- getAddressStateTxDBMap
@@ -404,6 +408,8 @@ addTransactions blockData txs =
             Right execResult -> blockGas - (transactionGasLimit bt - calculateReturned bt execResult)
 
       currentX509s' <- x509CertCacheTop
+      x509certs' <- x509CertCacheTop
+      $logInfoS "addTransactions/go" . T.pack $ "End of go x509s: " ++ show (M.keys x509certs')
       go remainingBlockGas rest (trrs `DL.snoc` trr) currentX509s'
 
 data TxMiningResult = TxMiningResult { tmrFailure  :: Maybe TransactionFailureCause
@@ -429,7 +435,8 @@ mineTransactions' header remGas ran unran@(tx@OutputTx{otBaseTx=bt}:txs) = do
           flushMemStorageTxDBToBlockDB
 
           mineTransactions' header nextRemGas (ran `DL.snoc` trr) txs
-        Left  failure    -> do x509CertCachePut beforeX509s
+        Left  failure    -> do _ <- x509CertCachePop
+                               x509CertCachePut beforeX509s
                                return $ TxMiningResult (Just failure) (DL.toList ran) unran remGas
 
 
@@ -487,7 +494,11 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=b
     lift $ P.incCounter txTypeCounter
     if success
         then do
+            x509certs <- lift $ x509CertCacheTop
+            $logInfoS "addTransaction/success=true" . T.pack $ "Before rcft x509s: " ++ show (M.keys x509certs)
             execResults <- runCodeForTransaction isRunningTests' isHomestead b (fromInteger (transactionGasLimit bt) - intrinsicGas') tAcct t
+            x509certs' <- lift $ x509CertCacheTop
+            $logInfoS "addTransaction/success=true" . T.pack $ "After rcft x509s: " ++ show (M.keys x509certs')
             s1 <- lift $ addToBalance coinbaseAcct (transactionGasLimit bt * transactionGasPrice bt)
             unless s1 $ error "addToBalance failed even after a check in addBlock"
             lift $ P.incCounter vmTxsProcessed

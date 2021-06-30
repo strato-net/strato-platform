@@ -205,6 +205,8 @@ create :: SolidVMBase m
 --create isRunningTests' isHomestead preExistingSuicideList b callDepth sender origin
 --       value gasPrice availableGas newAddress initCode txHash chainId metadata =
 create _ _ _ blockData _ sender' origin' _ _ _ newAddress code txHash' chainId' metadata = do
+  x509sCache <- x509CertCacheTop
+  onTraced $ liftIO $ putStrLn $ C.red $ "Our x509 cache to start " ++ show (M.keys x509sCache)
   recordCreate
   let env' = Env.Environment {
         Env.blockHeader = blockData,
@@ -231,7 +233,10 @@ create _ _ _ blockData _ sender' origin' _ _ _ newAddress code txHash' chainId' 
         !args = either (parseError "create arguments") Xabi.OrderedArgs maybeArgs
 
     (hsh, cc) <- codeCollectionFromSource initCode
-    create' sender' newAddress hsh cc contractName' args
+    res <- create' sender' newAddress hsh cc contractName' args
+    x509sCache' <- x509CertCacheTop
+    onTraced $ liftIO $ putStrLn $ C.red $ "Our x509 cache to end " ++ show (M.keys x509sCache')
+    pure res
 
 create' :: MonadSM m => Account -> Account -> Keccak256 -> CodeCollection -> String -> Xabi.ArgList -> m ExecResults
 create' creator newAccount ch cc contractName' argExps = do
@@ -1073,13 +1078,13 @@ expToVar' x@(Xabi.MemberAccess expr name) = do
       (SBuiltinVariable "msg", "sender") -> (Constant . SAccount . accountToNamedAccount chainId . Env.sender) <$> getEnv
       (SBuiltinVariable "tx", "origin") -> (Constant . SAccount . accountToNamedAccount chainId . Env.origin) <$> getEnv
       (SBuiltinVariable "tx", "username") -> do env' <- getEnv
-                                                org <- x509CertGetOrg $ _accountAddress $ Env.origin env'
+                                                org <- x509CertGetUser $ _accountAddress $ Env.origin env'
                                                 return . Constant . SString $ org
       (SBuiltinVariable "tx", "organization") -> do env' <- getEnv
                                                     org <- x509CertGetOrg $ _accountAddress $ Env.origin env'
                                                     return . Constant . SString $ org
       (SBuiltinVariable "tx", "group") -> do env' <- getEnv
-                                             org <- x509CertGetOrg $ _accountAddress $ Env.origin env'
+                                             org <- x509CertGetGroup $ _accountAddress $ Env.origin env'
                                              return . Constant . SString $ org
       (SStruct _ theMap, fieldName) -> case M.lookup fieldName theMap of
           Nothing -> missingField "struct member access" fieldName
