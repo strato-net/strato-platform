@@ -1,4 +1,4 @@
-pragma solidvm 3.0;
+// pragma solidvm 3.0; // TODO: do we need this? SolidityParser doesn't like seing it, when we do getEnumsCached() 
 
 /**
 * Carbon Permissions Enums

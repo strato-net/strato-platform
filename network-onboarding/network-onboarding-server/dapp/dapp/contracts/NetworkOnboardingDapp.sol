@@ -10,7 +10,7 @@ import "/dapp/permission/contracts/NetworkOnboardingPermissionManager.sol";
 contract NetworkOnboardingDapp {
  
   address owner; 
-  NetworkOnboardngPermissionManager public permissionManager;
+  NetworkOnboardingPermissionManager public permissionManager;
 
   constructor() {
     owner = msg.sender;
