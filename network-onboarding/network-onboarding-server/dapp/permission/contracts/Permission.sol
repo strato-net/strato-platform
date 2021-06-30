@@ -1,3 +1,5 @@
+// pragma solidvm 3.0; // TODO: do we need this? SolidityParser doesn't like seing it, when we do getEnumsCached() 
+
 /**
 * Carbon Permissions Enums
 *
@@ -11,15 +13,23 @@
 
 contract Permission {
     enum Permission {
+        // ORGS
+        INVITE_ORG,
         CREATE_ORG,
-        UPDATE_ORG,
-        UPDATE_ORG_LIMITED,
-        CREATE_RU,
-        UPDATE_RU,
+        REMOVE_ORG,
+//        UPDATE_ORG,
+        
+        // APPS
+        REQUEST_JOIN_APP,
+        INVITE_JOIN_APP,
+        CREATE_APP,
+//        UPDATE_APP,
+        
+        // USERS
+        INVITE_JOIN_ORG,
         CREATE_USER,
-        CREATE_USER_LIMITED,
-        UPDATE_USER,
-        UPDATE_USER_LIMITED,
-        MODIFY_MEMBERSHIP
+        UPDATE_ROLE_NETWORK,
+        UPDATE_ROLE_ORG
+//        UPDATE_USER,
     }
 }

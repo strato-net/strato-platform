@@ -1,21 +1,20 @@
+// pragma solidvm 3.0; // TODO: do we need this? SolidityParser doesn't like seing it, when we do getEnumsCached() 
+
 /**
 * Role Enums
 *
-* Roles in the Carbon main chain
+* Roles in the Network Onboarding App
 *
 * #see RolePermissions
-* #see PermissionManager
+* #see NetworkOnboardingPermissionManager
 *
 * #return none
 */
 
-// NOTE: this is the same as the regular OrgRole enum. We need them the same so the UI
-//   can distinguish all 3 roles. Otherwise we have two roles that share number 1, number 2, etc.
-//   Eventually, one of them should be removed and all contracts point to the other
 contract Role {
     enum Role {
         NULL,
-        GLOBAL_ADMIN,
+        NETWORK_ADMIN,
         ORG_ADMIN,
         ORG_USER,
         MAX

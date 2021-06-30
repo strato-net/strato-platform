@@ -2,7 +2,7 @@ import { rest, assert } from 'blockapps-rest'
 import dotenv from 'dotenv'
 import config from '/load.config'
 import oauthHelper from '/helpers/oauthHelper'
-import carbonPermissionManager from '../permissionManager'
+import networkOnboardingPermissionManager from '../permissionManager'
 
 const options = { config }
 
@@ -12,33 +12,33 @@ assert.isUndefined(loadEnv.error)
 describe('Permission Manager', function () {
   this.timeout(config.timeout)
 
-  let globalAdmin
+  let networkAdmin
   let orgAdmin
   let orgUser
   let contract
 
   before(async () => {
-    let globalAdminToken
+    let networkAdminToken
     try {
-      globalAdminToken = await oauthHelper.getUserToken(`${process.env.GLOBAL_ADMIN_NAME}`, `${process.env.TEST_USER_PASSWORD}`)
+      networkAdminToken = await oauthHelper.getUserToken(`${process.env.NETWORK_ADMIN_NAME}`, `${process.env.TEST_USER_PASSWORD}`)
     } catch (e) {
-      console.error('ERROR: Unable to fetch the global admin token, check your OAuth settings in config', e)
+      console.error('ERROR: Unable to fetch the network admin token, check your OAuth settings in config', e)
       throw e
     }
-    const globalAdminCredentials = { token: globalAdminToken }
-    globalAdmin = await rest.createUser(globalAdminCredentials, options)
+    const networkAdminCredentials = { token: networkAdminToken }
+    networkAdmin = await rest.createUser(networkAdminCredentials, options)
     const args = {
-      admin: globalAdmin.address,
-      master: globalAdmin.address,
+      admin: networkAdmin.address,
+      master: networkAdmin.address,
     }
-    contract = await carbonPermissionManager.uploadContract(globalAdmin, args, options)
-    await contract.grantGlobalAdminRole({ user: globalAdmin })
+    contract = await networkOnboardingPermissionManager.uploadContract(networkAdmin, args, options)
+    await contract.grantNetworkAdminRole({ user: networkAdmin })
 
     let orgAdminToken
     try {
       orgAdminToken = await oauthHelper.getUserToken(`${process.env.ORGANIZATION_ADMIN_NAME}`, `${process.env.TEST_USER_PASSWORD}`)
     } catch (e) {
-      console.error('ERROR: Unable to fetch the global admin token, check your OAuth settings in config', e)
+      console.error('ERROR: Unable to fetch the org admin token, check your OAuth settings in config', e)
       throw e
     }
     const orgAdminCredentials = { token: orgAdminToken }
@@ -49,7 +49,7 @@ describe('Permission Manager', function () {
     try {
       orgUserToken = await oauthHelper.getUserToken(`${process.env.ORGANIZATION_USER_NAME}`, `${process.env.TEST_USER_PASSWORD}`)
     } catch (e) {
-      console.error('ERROR: Unable to fetch the global admin token, check your OAuth settings in config', e)
+      console.error('ERROR: Unable to fetch the org user token, check your OAuth settings in config', e)
       throw e
     }
     const orgUserCredentials = { token: orgUserToken }
@@ -57,21 +57,21 @@ describe('Permission Manager', function () {
   })
 
   const generatePermissionsTests = ({
-    canModifyMembership,
+    canInviteOrganization,
     canCreateOrganization,
-    canUpdateOrganization,
-    canUpdateOrganizationLimited,
-    canCreateReferenceUnit,
-    canUpdateReferenceUnit,
+    canRemoveOrganization,
+    canRequestToJoinApplication,
+    canInviteToJoinApplication,
+    canCreateApplication,
+    canInviteToJoinOrganization,
     canCreateUser,
-    canCreateUserLimited,
-    canUpdateUser,
-    canUpdateUserLimited,
+    canUpdateRoleInNetwork,
+    canUpdateRoleInOrganization,
   }) => [
     {
-      action: 'modify membership',
-      method: 'canModifyMembership',
-      expected: canModifyMembership || false,
+      action: 'invite organization',
+      method: 'canInviteOrganization',
+      expected: canInviteOrganization || false,
     },
     {
       action: 'create organization',
@@ -79,24 +79,29 @@ describe('Permission Manager', function () {
       expected: canCreateOrganization || false,
     },
     {
-      action: 'update organization',
-      method: 'canUpdateOrganization',
-      expected: canUpdateOrganization || false,
+      action: 'remove organization',
+      method: 'canRemoveOrganization',
+      expected: canRemoveOrganization || false,
     },
     {
-      action: 'update organization (limited)',
-      method: 'canUpdateOrganizationLimited',
-      expected: canUpdateOrganizationLimited || false,
+      action: 'request to join application',
+      method: 'canRequestToJoinApplication',
+      expected: canRequestToJoinApplication || false,
     },
     {
-      action: 'create RU',
-      method: 'canCreateReferenceUnit',
-      expected: canCreateReferenceUnit || false,
+      action: 'invite to join application',
+      method: 'canInviteToJoinApplication',
+      expected: canInviteToJoinApplication || false,
     },
     {
-      action: 'update RU',
-      method: 'canUpdateReferenceUnit',
-      expected: canUpdateReferenceUnit || false,
+      action: 'create application',
+      method: 'canCreateApplication',
+      expected: canCreateApplication || false,
+    },
+    {
+      action: 'invite to join organization',
+      method: 'canInviteToJoinOrganization',
+      expected: canInviteToJoinOrganization || false,
     },
     {
       action: 'create user',
@@ -104,40 +109,33 @@ describe('Permission Manager', function () {
       expected: canCreateUser || false,
     },
     {
-      action: 'create user (limited)',
-      method: 'canCreateUserLimited',
-      expected: canCreateUserLimited || false,
+      action: 'update role in network',
+      method: 'canUpdateRoleInNetwork',
+      expected: canUpdateRoleInNetwork || false,
     },
     {
-      action: 'update user',
-      method: 'canUpdateUser',
-      expected: canUpdateUser || false,
-    },
-    {
-      action: 'update user (limited)',
-      method: 'canUpdateUserLimited',
-      expected: canUpdateUserLimited || false,
+      action: 'update role in organization',
+      method: 'canUpdateRoleInOrganization',
+      expected: canUpdateRoleInOrganization || false,
     },
   ]
 
-  describe('Global Admin role', () => {
+  describe('Network Admin role', () => {
     const tests = generatePermissionsTests({
-      canModifyMembership: true,
+      canInviteOrganization: true,
       canCreateOrganization: true,
-      canUpdateOrganization: true,
-      canCreateReferenceUnit: true,
-      canUpdateReferenceUnit: true,
+      canRemoveOrganization: true,
       canCreateUser: true,
-      canUpdateUser: true,
+      canUpdateRoleInNetwork: true,
     })
 
     tests.forEach((test) => {
-      it(`Global Admin ${test.expected ? 'can' : 'can not'} ${test.action}`, async () => {
-        const isPermitted = await contract[test.method](globalAdmin)
+      it(`Network Admin ${test.expected ? 'can' : 'can not'} ${test.action}`, async () => {
+        const isPermitted = await contract[test.method](networkAdmin)
         assert.equal(
           isPermitted,
           test.expected,
-          `Global Admin ${test.expected ? 'should' : 'should not'} be able to ${test.action}`,
+          `Network Admin ${test.expected ? 'should' : 'should not'} be able to ${test.action}`,
         )
       })
     })
@@ -145,9 +143,12 @@ describe('Permission Manager', function () {
 
   describe('Organization Admin role', () => {
     const tests = generatePermissionsTests({
-      canUpdateOrganizationLimited: true,
-      canCreateUserLimited: true,
-      canUpdateUserLimited: true,
+      canRequestToJoinApplication: true,
+      canInviteToJoinApplication: true,
+      canCreateApplication: true,
+      canInviteToJoinOrganization: true,
+      canCreateUser: true,
+      canUpdateRoleInOrganization: true,
     })
 
     tests.forEach((test) => {
