@@ -1,7 +1,10 @@
-import { rest, oauthUtil } from "blockapps-rest";
-import jwtDecode from "jwt-decode";
-import config from "../load.config";
+import { rest, oauthUtil } from 'blockapps-rest'
+import RestStatus from 'http-status-codes'
+import jwtDecode from 'jwt-decode'
+import config from '/load.config'
+import constants from './constants'
 
+const options = { config }
 const oauth = oauthUtil.init(config.nodes[0].oauth)
 
 const CACHED_DATA = {
@@ -9,29 +12,32 @@ const CACHED_DATA = {
   serviceTokenExpiresAt: null,
 }
 
-const SERVICE_TOKEN_LIFETIME_RESERVE_SECONDS = 5
-
-const options = { config };
-
 const getEmailIdFromToken = function (accessToken) {
-  return jwtDecode(accessToken)["email"];
-};
+  return jwtDecode(accessToken).email
+}
 
 async function createStratoUser(accessToken) {
   try {
-    let user = await rest.createUser(accessToken, options);
-    return { status: 200, message: "success", user };
+    const user = await rest.createUser(accessToken, options)
+    return { status: RestStatus.OK, message: 'success', user }
   } catch (e) {
-    console.error(e);
     return {
-      status: e.response ? e.response.status : (e.code ? e.code : "NO_CONNECTION"),
-      message: `error while creating user`
-    };
+      // eslint-disable-next-line no-nested-ternary
+      status: e.response
+        ? e.response.status
+        : e.code
+          ? e.code
+          : 'NO_CONNECTION',
+      message: 'error while creating user',
+    }
   }
 }
 
 const getUsernameFromDecodedToken = (decodedToken) => {
-  const { tokenUsernameProperty, tokenUsernamePropertyServiceFlow } = config.nodes[0].oauth
+  const {
+    tokenUsernameProperty,
+    tokenUsernamePropertyServiceFlow,
+  } = config.nodes[0].oauth
   let username
   if (decodedToken[tokenUsernameProperty]) {
     username = decodedToken[tokenUsernameProperty]
@@ -57,11 +63,51 @@ const getCredentialsFromTokenEnv = (envVariable) => {
 const getServiceToken = async () => {
   let token = CACHED_DATA.serviceToken
   const expiresAt = CACHED_DATA.serviceTokenExpiresAt
-  if (!token || !expiresAt || expiresAt <= (Math.floor(Date.now() / 1000) + SERVICE_TOKEN_LIFETIME_RESERVE_SECONDS)) {
+  if (
+    !token
+    || !expiresAt
+    || expiresAt
+      <= Math.floor(Date.now() / 1000)
+        + constants.serviceTokeLifetimeReserveSeconds
+  ) {
     const tokenObj = await oauth.getAccessTokenByClientSecret()
-    token = tokenObj.token[config.nodes[0].oauth.tokenField ? config.nodes[0].oauth.tokenField : 'access_token']
+    token = tokenObj.token[
+      config.nodes[0].oauth.tokenField
+        ? config.nodes[0].oauth.tokenField
+        : 'access_token'
+    ]
     CACHED_DATA.serviceToken = token
-    CACHED_DATA.serviceTokenExpiresAt = Math.floor(tokenObj.token.expires_at / 1000)
+    CACHED_DATA.serviceTokenExpiresAt = Math.floor(
+      tokenObj.token.expires_at / 1000,
+    )
+  }
+  return token
+}
+
+const getUserToken = async (username, password) => {
+  const userTokenData = CACHED_DATA[`${username}`]
+  if (
+    userTokenData
+    && userTokenData.token
+    && userTokenData.expiresAt
+    && userTokenData.expiresAt
+      <= Math.floor(Date.now() / 1000)
+        + constants.serviceTokeLifetimeReserveSeconds
+  ) {
+    return userTokenData.token
+  }
+  const tokenObj = await oauth.getAccessTokenByResourceOwnerCredential(
+    username,
+    password,
+  )
+  const token = tokenObj.token[
+    config.nodes[0].oauth.tokenField
+      ? config.nodes[0].oauth.tokenField
+      : 'access_token'
+  ]
+  CACHED_DATA[`${username}`] = {
+    token,
+    expiresAt: Math.floor(tokenObj.token.expires_at / 1000),
   }
   return token
 }
@@ -73,4 +119,5 @@ export default {
   getUsernameFromDecodedToken,
   getCredentialsFromTokenEnv,
   getServiceToken,
-};
+  getUserToken,
+}

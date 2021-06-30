@@ -5,6 +5,8 @@
   "license": "MIT",
   "private": true,
   "dependencies": {
+    "@hapi/joi": "^15.0.3",
+    "babel-plugin-module-resolver": "^4.0.0",
     "blockapps-rest": "^8.0.0",
     "body-parser": "^1.19.0",
     "chai": "^4.3.4",
@@ -13,7 +15,9 @@
     "express": "^4.17.1",
     "express-winston": "^4.1.0",
     "helmet": "^4.6.0",
+    "is-subset": "^0.1.1",
     "jwt-decode": "^3.1.2",
+    "js-yaml": "^3.14.0",
     "moment": "^2.29.1",
     "mocha": "^8.2.0",
     "winston": "^3.3.3"
@@ -23,15 +27,24 @@
     "@babel/core": "^7.14.6",
     "@babel/node": "^7.14.7",
     "@babel/preset-env": "^7.14.7",
-    "@babel/register": "^7.14.5"
+    "@babel/register": "^7.14.5",
+    "chai-http": "^4.3.0",
+    "eslint": "^7.11.0",
+    "eslint-config-airbnb-base": "^14.2.0",
+    "eslint-plugin-import": "^2.22.1",
+    "eslint-plugin-jsx-a11y": "^6.3.1",
+    "eslint-plugin-mocha": "^8.0.0",
+    "eslint-plugin-react": "^7.21.5"
   },
   "scripts": {
     "token-getter": "babel-node node_modules/blockapps-rest/dist/util/oauth.client.js --flow authorization-code --config config/${SERVER:-localhost}.config.yaml",
     "start": "babel-node index",
     "start:prod": "NODE_ENV=production babel-node index",
     "deploy": "cp config/${SERVER:-localhost}.config.yaml ${CONFIG_DIR_PATH:-.}/config.yaml && mocha --require @babel/register dapp/dapp/dapp.deploy.js --config ${CONFIG_DIR_PATH:-.}/config.yaml",
+    "test:permission": "mocha --require @babel/register dapp/permission/test -b",
     "test:dapp": "mocha --require @babel/register dapp/dapp/test/dapp.test.js -b",
     "test:e2e": "mocha --require @babel/register dapp/dapp/test/e2e.test.js -b",
-    "test": "yarn test:dapp && yarn test:e2e"
+    "test": "yarn test:permission && yarn test:dapp && yarn test:e2e",
+    "clean": "rm -f config/*.deploy.yaml config/testdeploy.*"
   }
 }

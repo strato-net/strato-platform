@@ -6,7 +6,7 @@ import "./RolePermissions.sol";
 import "./Role.sol";
 
 /**
-* Carbon Permissions Manager
+* Network Onboarding Permissions Manager
 *
 * Entry point to grant and revoke role for a user. Also check whether a
 * user has permission to perform a particular actions or not.
@@ -47,9 +47,9 @@ contract NetworkOnboardingPermissionManager is RestStatus, PermissionManager, Pe
         return super.revoke(_address);
     }
 
-    function canModifyMembership(address _address) public returns (bool) {
+    function canInviteOrganization(address _address) public returns (bool) {
         // Get permission
-        uint permissions = 1 << uint(Permission.MODIFY_MEMBERSHIP);
+        uint permissions = 1 << uint(Permission.INVITE_ORG);
         // Check permission
         return check(_address, permissions) == RestStatus.OK;
     }
@@ -61,34 +61,41 @@ contract NetworkOnboardingPermissionManager is RestStatus, PermissionManager, Pe
         return check(_address, permissions) == RestStatus.OK;
     }
 
-    function canUpdateOrganization(address _address) public returns (bool) {
+    function canRemoveOrganization(address _address) public returns (bool) {
         // Get permission
-        uint permissions = 1 << uint(Permission.UPDATE_ORG);
+        uint permissions = 1 << uint(Permission.REMOVE_ORG);
         // Check permission
         return check(_address, permissions) == RestStatus.OK;
     }
 
-    function canUpdateOrganizationLimited(address _address) public returns (bool) {
+    function canRequestToJoinApplication(address _address) public returns (bool) {
         // Get permission
-        uint permissions = 1 << uint(Permission.UPDATE_ORG_LIMITED);
+        uint permissions = 1 << uint(Permission.REQUEST_JOIN_APP);
         // Check permission
         return check(_address, permissions) == RestStatus.OK;
     }
 
-    function canCreateReferenceUnit(address _address) public returns (bool) {
+    function canInviteToJoinApplication(address _address) public returns (bool) {
         // Get permission
-        uint permissions = 1 << uint(Permission.CREATE_RU);
+        uint permissions = 1 << uint(Permission.INVITE_JOIN_APP);
         // Check permission
         return check(_address, permissions) == RestStatus.OK;
     }
 
-    function canUpdateReferenceUnit(address _address) public returns (bool) {
+    function canCreateApplication(address _address) public returns (bool) {
         // Get permission
-        uint permissions = 1 << uint(Permission.UPDATE_RU);
+        uint permissions = 1 << uint(Permission.CREATE_APP);
         // Check permission
         return check(_address, permissions) == RestStatus.OK;
     }
 
+    function canInviteToJoinOrganization(address _address) public returns (bool) {
+        // Get permission
+        uint permissions = 1 << uint(Permission.INVITE_JOIN_ORG);
+        // Check permission
+        return check(_address, permissions) == RestStatus.OK;
+    }
+    
     function canCreateUser(address _address) public returns (bool) {
         // Get permission
         uint permissions = 1 << uint(Permission.CREATE_USER);
@@ -96,23 +103,16 @@ contract NetworkOnboardingPermissionManager is RestStatus, PermissionManager, Pe
         return check(_address, permissions) == RestStatus.OK;
     }
 
-    function canCreateUserLimited(address _address) public returns (bool) {
+    function canUpdateRoleInNetwork(address _address) public returns (bool) {
         // Get permission
-        uint permissions = 1 << uint(Permission.CREATE_USER_LIMITED);
+        uint permissions = 1 << uint(Permission.UPDATE_ROLE_NETWORK);
         // Check permission
         return check(_address, permissions) == RestStatus.OK;
     }
 
-    function canUpdateUser(address _address) public returns (bool) {
+    function canUpdateRoleInOrganization(address _address) public returns (bool) {
         // Get permission
-        uint permissions = 1 << uint(Permission.UPDATE_USER);
-        // Check permission
-        return check(_address, permissions) == RestStatus.OK;
-    }
-
-    function canUpdateUserLimited(address _address) public returns (bool) {
-        // Get permission
-        uint permissions = 1 << uint(Permission.UPDATE_USER_LIMITED);
+        uint permissions = 1 << uint(Permission.UPDATE_ROLE_ORG);
         // Check permission
         return check(_address, permissions) == RestStatus.OK;
     }
