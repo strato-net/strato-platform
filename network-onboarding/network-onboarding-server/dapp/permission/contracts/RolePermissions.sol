@@ -2,11 +2,11 @@ import "./Permission.sol";
 import "./Role.sol";
 
 /**
-* Carbon Role Permissions
+* Network Onboarding Role Permissions
 *
 * Mapping of the roles to their respective permissions
 *
-* #see CarbonPermissionManager
+* #see NetworkOnboardingPermissionManager
 * #see Role
 * #see Permission
 *
@@ -24,20 +24,21 @@ contract RolePermissions is Role, Permission {
         rolePermissions[uint(Role.NULL)] = 0;
         rolePermissions[uint(Role.ORG_USER)] = 0;
 
-        // Assigning permissions to Beanstalk roles
-        rolePermissions[uint(Role.GLOBAL_ADMIN)] =
+        // Assigning permissions to roles
+        rolePermissions[uint(Role.NETWORK_ADMIN)] =
+          (1 << uint(Permission.INVITE_ORG)) |
           (1 << uint(Permission.CREATE_ORG)) |
-          (1 << uint(Permission.UPDATE_ORG)) |
-          (1 << uint(Permission.CREATE_RU)) |
-          (1 << uint(Permission.UPDATE_RU)) |
+          (1 << uint(Permission.REMOVE_ORG)) |
           (1 << uint(Permission.CREATE_USER)) |
-          (1 << uint(Permission.UPDATE_USER)) |
-          (1 << uint(Permission.MODIFY_MEMBERSHIP));
+          (1 << uint(Permission.UPDATE_ROLE_NETWORK));
 
         rolePermissions[uint(Role.ORG_ADMIN)] =
-          (1 << uint(Permission.UPDATE_ORG_LIMITED)) |
-          (1 << uint(Permission.CREATE_USER_LIMITED)) |
-          (1 << uint(Permission.UPDATE_USER_LIMITED));
+          (1 << uint(Permission.REQUEST_JOIN_APP)) |
+          (1 << uint(Permission.INVITE_JOIN_APP)) |
+          (1 << uint(Permission.CREATE_APP)) |
+          (1 << uint(Permission.INVITE_JOIN_ORG)) |
+          (1 << uint(Permission.CREATE_USER)) |
+          (1 << uint(Permission.UPDATE_ROLE_ORG));
     }
 
     function getRolePermissions(Role _role) public view returns (uint) {
