@@ -1,6 +1,7 @@
 apiDebug: true
 password: '1234'
 timeout: 600000
+VM: SolidVM
 dappPath: dapp
 deployFilename: ./config/localhost.deploy.yaml
 nodes:
