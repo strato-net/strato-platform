@@ -10,10 +10,6 @@ license: Apache-2.0
 description:
     RLP, as described in the Ethereum Yellowpaper
 
-<<<<<<< HEAD
-
-=======
->>>>>>> develop
 default-extensions:
   - Arrows
   - BangPatterns
