@@ -3,7 +3,9 @@ import {
   EXECUTE_QUERY_SUCCESS,
   REMOVE_QUERY,
   UPDATE_QUERY,
-  CLEAR_QUERY
+  CLEAR_QUERY,
+  TRANSACTION_RESULT_SUCCESS,
+  TRANSACTION_RESULT_FAILURE
 } from './queryEngine.actions';
 
 import {TRANSACTION_QUERY_TYPES} from './queryTypes';
@@ -12,6 +14,7 @@ const initialState = {
   query: {last: 15},
   queryResult: [],
   error: null,
+  txResult : null
 };
 
 const reducer = function (state = initialState, action) {
@@ -21,6 +24,7 @@ const reducer = function (state = initialState, action) {
         return state;
       }
       return {
+        ...state,
         query: {
           ...state.query,
           [action.queryType] : action.queryTerm,
@@ -30,6 +34,7 @@ const reducer = function (state = initialState, action) {
       };
     case CLEAR_QUERY:
       return {
+        ...state,
         query: {last: 15},
         queryResult: [],
         error: null,
@@ -41,6 +46,7 @@ const reducer = function (state = initialState, action) {
           newQuery[queryType] = state.query[queryType];
       });
       return {
+        ...state,
         query: newQuery,
         queryResult: state.queryResult,
         error: null,
@@ -53,15 +59,30 @@ const reducer = function (state = initialState, action) {
       //   result = result.slice(stat);
       // }
       return {
+        ...state,
         query: state.query,
         queryResult: result,
         error: null
       };
     case EXECUTE_QUERY_FAILURE:
       return {
+        ...state,
         query: state.query,
         queryResult: [],
         error: action.error
+      };
+    case TRANSACTION_RESULT_SUCCESS:
+      const r = action.txResult ? `${action.txResult[0].toUpperCase()}${action.txResult.substring(1)}` : "";
+      return {
+        ...state,
+        error : null,
+        txResult : r
+      };
+    case TRANSACTION_RESULT_FAILURE:
+      return {
+        ...state,
+        error : action.error,
+        txResult : null
       };
     default:
       return state;

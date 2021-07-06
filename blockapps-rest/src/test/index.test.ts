@@ -261,7 +261,8 @@ describe("call", function() {
     assert.equal(result, expected, "method call results");
   });
 
-  it("call method with value - BAD_REQUEST - low account balance", async () => {
+  // skipping for gasOn=false mode (which is the new default)
+  xit("call method with value - BAD_REQUEST - low account balance", async () => {
     // create contract
     const uid = util.uid();
     const constructorArgs = { var1: 1234 };

@@ -16,16 +16,16 @@ const compileUrl = env.BLOC_URL + "/contracts/xabi";
 const blocCompileUrl = env.BLOC_URL + "/contracts/compile";
 
 export function tokenizeSource(source) {
+  let body = JSON.stringify({src : source});
   return fetch(
     compileUrl,
     {
       method: 'POST',
       credentials: "include",
       headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
+        "Content-Type": "application/json"
       },
-      body:
-      "src=" + encodeURIComponent(source)
+      body 
     })
     .then(function (res) {
       if (res.ok) {
@@ -41,8 +41,7 @@ export function tokenizeSource(source) {
     });
 }
 
-export function compileSource(contractName, source) {
-
+export function compileSource(contractName, source, codeType) {
   const searchable = [];
   return fetch(blocCompileUrl, {
     method: 'POST',
@@ -55,7 +54,8 @@ export function compileSource(contractName, source) {
       {
         "contractName": contractName,
         "source": source,
-        "searchable": searchable
+        "searchable": searchable,
+        "vm" : codeType
       }
     ])
   })
@@ -68,7 +68,11 @@ export function compileSource(contractName, source) {
         throw value;
       });
     }
-  }).catch(function (error) {
+  })
+  .then(json => {
+    return Promise.resolve(json);
+  })
+  .catch(function (error) {
     throw error;
   });
 }
@@ -80,7 +84,7 @@ export function* compileCodeFromEditor(action) {
     if (response) {
       let contracts = response.src && Object.keys(response.src);
       const contractName = contracts && contracts[0]
-      yield call(compileSource, contractName, action.code);
+      yield call(compileSource, contractName, action.code, action.codeType);
     }
     yield put(compileCodeFromEditorSuccess(response));
   }

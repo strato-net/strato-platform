@@ -42,7 +42,8 @@ const reducer = function (state = initialState, action) {
           ...state.modals,
           [action.key]: {
             ...state.modals[action.key],
-            args: action.args
+            args: action.args,
+            isPayable: action.isPayable
           }
         }
       }

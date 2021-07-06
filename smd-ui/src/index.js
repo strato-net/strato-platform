@@ -44,7 +44,7 @@ import { watchCompileSourceFromEditor } from './components/CodeEditor/codeEditor
 import watchFetchAccounts from './components/Accounts/accounts.saga';
 import { watchCompileContract } from './components/CreateContract/createContract.saga';
 import watchFetchContracts from './components/Contracts/contracts.saga';
-import watchFetchUser from './components/User/user.saga';
+import {watchFetchUser, watchFetchPubKey} from './components/User/user.saga';
 import {
   watchFetchState,
   watchFetchCirrusContracts,
@@ -54,8 +54,8 @@ import {
   watchMethodCall,
   watchFetchArgs
 } from './components/Contracts/components/ContractMethodCall/contractMethodCall.saga';
-import watchExecuteQuery from './components/QueryEngine/queryEngine.saga';
-import { watchQueryCirrus, watchQueryCirrusVars } from './components/ContractQuery/contractQuery.saga';
+import {watchExecuteQuery, watchTransactionResult} from './components/QueryEngine/queryEngine.saga';
+import { watchQueryCirrus, watchQueryCirrusVars} from './components/ContractQuery/contractQuery.saga';
 import watchSendTokens from './components/Accounts/components/SendTokens/sendTokens.saga';
 import watchCreateBlocUser from './components/CreateBlocUser/createBlocUser.saga';
 import watchFetchUpload from './components/ExternalStorage/externalStorage.saga';
@@ -118,12 +118,14 @@ const rootSaga = function* startForeman() {
     fork(watchMethodCall),
     fork(watchFetchCirrusContracts),
     fork(watchExecuteQuery),
+    fork(watchTransactionResult),
     fork(watchQueryCirrus),
     fork(watchQueryCirrusVars),
     fork(watchSendTokens),
     fork(watchAccount),
     fork(watchCommunicateOverSocket),
     fork(watchFetchUser),
+    fork(watchFetchPubKey),
     fork(watchCreateBlocUser),
     fork(watchUploadFile),
     fork(watchFetchUpload),

@@ -283,7 +283,7 @@ putChainStateRoot :: ( Modifiable BlockHashRoot m
 putChainStateRoot chainId bHash stateRoot = do
   mChainRoot <- getChainBlockHashInfo bHash
   case mChainRoot of
-    Nothing -> error $ "putChainStateRoot: Attempting to set chain root for block hash " ++ format bHash ++ ", but it doesn't exist"
+    Nothing -> pure ()
     Just (parentHash, chainRoot) -> do
       newChainRoot <- putkv chainRoot (word256ToMPKey chainId) (chainId, stateRoot)
       putChainBlockHashInfo bHash parentHash newChainRoot
@@ -295,7 +295,7 @@ deleteChainStateRoot :: ( Modifiable BlockHashRoot m
 deleteChainStateRoot chainId bHash = do
   mChainRoot <- getChainBlockHashInfo bHash
   case mChainRoot of
-    Nothing -> error $ "putChainStateRoot: Attempting to set chain root for block hash " ++ format bHash ++ ", but it doesn't exist"
+    Nothing -> pure ()
     Just (parentHash, chainRoot) -> do
       newChainRoot <- MP.deleteKey chainRoot (word256ToMPKey chainId)
       putChainBlockHashInfo bHash parentHash newChainRoot

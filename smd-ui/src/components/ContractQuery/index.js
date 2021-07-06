@@ -78,7 +78,7 @@ class ContractQuery extends Component {
     mixpanelWrapper.track('contract_query_load');
     this.props.queryCirrus(this.props.match.params.name, this.props.contractQuery.queryString, this.props.selectedChain);
   }
-
+  
   componentWillMount() {
     this.props.clearQueryString();
     this.props.queryCirrusVars(this.props.match.params.name);
@@ -167,7 +167,6 @@ class ContractQuery extends Component {
     })
 
     const addFilterEnabled = this.state.value !== '' && this.state.field !== 'Select field';
-
     return (
       <div className="container-fluid pt-dark">
         <div className="row">
@@ -269,7 +268,8 @@ class ContractQuery extends Component {
 export function mapStateToProps(state) {
   return {
     contractQuery: state.contractQuery,
-    selectedChain: state.chains.selectedChain
+    selectedChain: state.chains.selectedChain,
+    contractAddress: state.contractAddress
   };
 }
 

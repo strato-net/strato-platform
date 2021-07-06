@@ -281,13 +281,25 @@ bAddress :: Address -> BasicValue
 bAddress = BAccount . unspecifiedChain
 
 bContract :: T.Text -> Address -> BasicValue
-bContract t = BContract t . unspecifiedChain
+bContract t a =
+  let u = unspecifiedChain a
+   in if u == unspecifiedChain 0
+        then BDefault
+        else BContract t u
 
 bContract' :: T.Text -> Account -> BasicValue
-bContract' t = BContract t . accountOnUnspecifiedChain
+bContract' t a =
+  let u = accountOnUnspecifiedChain a
+   in if u == unspecifiedChain 0
+        then BDefault
+        else BContract t u
 
 bAccount :: Account -> BasicValue
-bAccount = BAccount . accountOnUnspecifiedChain
+bAccount a =
+  let u = accountOnUnspecifiedChain a
+   in if u == unspecifiedChain 0
+        then BDefault
+        else BAccount u
 
 iAddress :: Address -> IndexType
 iAddress = IAccount . unspecifiedChain
@@ -373,7 +385,7 @@ spec = do
         , [Field "xs", MapIndex (INum 400)]
         , [Field "y"]
         , [Field "z"]
-        ] `shouldReturn` [BMappingSentinel, BInteger 343, BInteger 343, BInteger 0]
+        ] `shouldReturn` [BMappingSentinel, BInteger 343, BInteger 343, BDefault]
 
     it "should be able to set array length" . runTest $ do
       runFile "testdata/Length.sol"
@@ -615,6 +627,7 @@ contract qq {
 
     it "can index into maps with bool" . runTest $ do
       runBS [r|
+pragma solidvm 3.0;
 contract qq {
   mapping(bool => uint) bs;
   constructor() public {
@@ -623,7 +636,7 @@ contract qq {
   }
 }|]
       getAll [ [Field "bs", MapIndex $ IBool False]
-             , [Field "bs", MapIndex $ IBool True]] `shouldReturn` [BInteger 0, BInteger 0x87324]
+             , [Field "bs", MapIndex $ IBool True]] `shouldReturn` [BDefault, BInteger 0x87324]
 
     it "should be able to store a contract" . runTest $ do
       runBS [r|
@@ -698,6 +711,7 @@ contract qq {
 
   it "can array index with uninitialized numbers" . runTest $ do
     runBS [r|
+pragma solidvm 3.0;
 contract qq {
   uint[] xs;
   uint y;
@@ -706,10 +720,11 @@ contract qq {
     y = xs[idx];
   }
 }|]
-    getAll [ [Field "y" ]] `shouldReturn` [BInteger 0]
+    getAll [ [Field "y" ]] `shouldReturn` [BDefault]
 
   it "can map index with uninitialized numbers" . runTest $ do
     runBS [r|
+pragma solidvm 3.0;
 contract qq {
   mapping(uint => uint) xs;
   uint y;
@@ -718,10 +733,11 @@ contract qq {
     y = xs[idx];
   }
 }|]
-    getAll [ [Field "y" ]] `shouldReturn` [BInteger 0]
+    getAll [ [Field "y" ]] `shouldReturn` [BDefault]
 
   it "can map index with uninitialized strings" . runTest $ do
     runBS [r|
+pragma solidvm 3.0;
 contract qq {
   mapping(string => uint) xs;
   uint y;
@@ -730,7 +746,7 @@ contract qq {
     y = xs[idx];
   }
 }|]
-    getFields ["y"] `shouldReturn` [BInteger 0]
+    getFields ["y"] `shouldReturn` [BDefault]
 
   it "can access fields of structs from arrays" . runTest $ do
     runBS [r|
@@ -821,6 +837,7 @@ contract qq {
 
   it "can detect nulls" . runTest $ do
     runBS [r|
+pragma solidvm 3.0;
 contract qq {
   mapping(uint => uint) ns;
   bool found;
@@ -828,7 +845,7 @@ contract qq {
     found = ns[0x0ddba11] != 0x0;
   }
 }|]
-    getFields ["found"] `shouldReturn` [BBool False]
+    getFields ["found"] `shouldReturn` [BDefault]
 
   it "supports boolean equality" . runTest $ do
     runBS [r|
@@ -861,7 +878,7 @@ contract qq {
     z = x == y;
   }
 }|]
-    getFields ["x", "y", "z"] `shouldReturn` [BInteger 0, BInteger 0, BBool True]
+    getFields ["x", "y", "z"] `shouldReturn` [BDefault, BDefault, BBool True]
 
   it "can check msg.sender" . runTest $ do
     runBS [r|
@@ -1140,7 +1157,7 @@ contract qq {
   }
 }|]
     getFields ["text", "notext", "zero", "nonempty", "empty"] `shouldReturn`
-              [BString "ok", BString "", BString "", BBool False, BBool True]
+              [BString "ok", BDefault, BDefault, BDefault, BBool True]
 
   it "can treat integer literals as addresses" . runTest $ do
     liftIO $ pendingWith "add static typing" --TODO- Jim
@@ -1213,6 +1230,7 @@ contract qq {
 
   it "can accept nested arrays" . runTest $ do
     runBS [r|
+pragma solidvm 3.0;
 contract qq {
   bool[2][] pairs;
 
@@ -1229,8 +1247,8 @@ contract qq {
           return [pre, suf]
     getAll (map (Field "pairs":) ([Field "length"]:subArrays))
            `shouldReturn` [ BInteger 3
-                          , BInteger 2, BBool True, BBool False
-                          , BInteger 2, BBool False, BBool False
+                          , BInteger 2, BBool True, BDefault
+                          , BInteger 2, BDefault, BDefault
                           , BInteger 2, BBool True, BBool True
                           ]
 
@@ -1307,6 +1325,7 @@ contract qq {
 
   it "can call a remote function" . runTest $ do
     let qq = [r|
+pragma solidvm 3.0;
 contract qq {
   qq x;
   uint num;
@@ -1452,6 +1471,7 @@ contract qq {
 
   it "can pass local arrays as arguments" . runTest $ do
     runBS [r|
+pragma solidvm 3.0;
 contract Validator {
   function isEmptyArray(bytes32[] memory _arr) pure internal returns (bool) {
     return _arr.length == 0;
@@ -1472,7 +1492,7 @@ contract qq is Validator {
   }
 }
 |]
-    getFields ["empty_is_empty", "nonempty_is_empty"] `shouldReturn` [BBool True, BBool False]
+    getFields ["empty_is_empty", "nonempty_is_empty"] `shouldReturn` [BBool True, BDefault]
 
   it "can resolve super" . runTest $ do
     let ctract = [r|
@@ -1696,8 +1716,8 @@ contract qq {
   }
 }|]
     [BContract "X" x] <- getFields ["x"]
-    getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "i") `shouldReturn` BInteger 0
-    getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "s") `shouldReturn` BString ""
+    getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "i") `shouldReturn` BDefault
+    getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "s") `shouldReturn` BDefault
 
   it "will create a sentinel for mappings" . runTest $ do
     liftIO $ pendingWith "deal with BMappingSentinel" --TODO- Jim
@@ -1710,6 +1730,7 @@ contract qq {
 
   it "can compare contracts to int literals" . runTest $ do
     runBS [r|
+pragma solidvm 3.0;
 contract qq {
   bool eq;
   bool neq;
@@ -1719,7 +1740,7 @@ contract qq {
     neq = q != 0x0;
   }
 }|]
-    getFields ["eq", "neq"] `shouldReturn` [BBool True, BBool False]
+    getFields ["eq", "neq"] `shouldReturn` [BBool True, BDefault]
 
   it "can return a contract" . runTest $ do
     runCall "self" "()" [r|
@@ -1780,6 +1801,7 @@ contract qq {
 
   it "can compare ints to enums" . runTest $ do
     runCall "f" "(1)" [r|
+pragma solidvm 3.0;
 contract qq {
   enum E {A, B, C, D}
   bool is_a;
@@ -1794,7 +1816,7 @@ contract qq {
   }
 }|] `shouldReturn` Nothing
     getFields ["is_a", "is_b", "is_c", "is_d"] `shouldReturn`
-      map BBool [False, True, False, False]
+      [BDefault, BBool True, BDefault, BDefault]
 
 
 
@@ -1883,6 +1905,7 @@ contract qq {
 
   it "can call boolean arguments" . runTest $ do
     runCall "set" "(true,false)" [r|
+pragma solidvm 3.0;
 contract qq {
   bool a;
   bool b;
@@ -1891,7 +1914,7 @@ contract qq {
     b = _b;
   }
 }|] `shouldReturn` Nothing
-    getFields ["a", "b"] `shouldReturn` [BBool True, BBool False]
+    getFields ["a", "b"] `shouldReturn` [BBool True, BDefault]
 
   it "sets the origin correctly" . runTest $ do
     runBS [r|
@@ -2301,13 +2324,14 @@ contract qq {
 
   it "can cast empty bytes32 to int" . runTest $ do
     void $ runBS [r|
+pragma solidvm 3.0;
 contract qq {
   uint public x;
   constructor() public {
     x = uint(bytes(""));
   }
 }|]
-    getFields ["x"] `shouldReturn` [BInteger 0x0]
+    getFields ["x"] `shouldReturn` [BDefault]
 
   it "can store nested structs" . runTest $ do
     void $ runBS [r|
@@ -2520,6 +2544,7 @@ contract qq {
 
   it "RHS expr in an AND clause is not evaluated if the LHS expr evaluates to False" . runTest $ do
     runBS [r|
+pragma solidvm 3.0;
 contract qq {
   uint x = 0;
   uint magic = 42;
@@ -2533,7 +2558,7 @@ contract qq {
   }
 
 }|]
-    getFields ["x"] `shouldReturn` [BInteger 0]
+    getFields ["x"] `shouldReturn` [BDefault]
 
   it "can handle all expr combinations for logical OR clause " . runTest $ do
     runBS [r|
@@ -2561,6 +2586,7 @@ contract qq {
 
   it "RHS expr in an OR clause is not evaluated if the LHS expr evaluates to True" . runTest $ do
     runBS [r|
+pragma solidvm 3.0;
 contract qq {
   uint x = 0;
   uint magic = 42;
@@ -2574,7 +2600,7 @@ contract qq {
   }
 
 }|]
-    getFields ["x"] `shouldReturn` [BInteger 0]
+    getFields ["x"] `shouldReturn` [BDefault]
 
   it "rejects declared but undefined constructor" $ (runTest (runBS [r|
 contract qq {
@@ -2745,6 +2771,7 @@ contract qq {
 
   it "can cast strings to bool" . runTest $ do
     runBS [r|
+pragma solidvm 3.0;
 contract qq {
   bool control;
   bool t;
@@ -2758,7 +2785,7 @@ contract qq {
     getFields ["control", "t", "f"] `shouldReturn`
       [ BBool True
       , BBool True
-      , BBool False
+      , BDefault
       ]
 
   it "can parse an X509 certificate" . runTest $ do

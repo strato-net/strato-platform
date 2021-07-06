@@ -42,10 +42,11 @@ export const selectContractInstance = function(name, address) {
   }
 }
 
-export const fetchCirrusInstances = function (contractName) {
+export const fetchCirrusInstances = function (contractName, chainId) {
   return {
     type: FETCH_CIRRUS_INSTANCES_REQUEST,
-    name: contractName
+    name: contractName,
+    chainId
   }
 };
 

@@ -39,6 +39,7 @@ import qualified Data.Text as T
 import qualified Data.Vector as V
 import           Text.Printf
 
+import           CodeCollection
 import           Blockchain.DB.SolidStorageDB
 import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.SM
@@ -158,7 +159,9 @@ setVal dst@(SReference addressedPath@(AccountPath addr path)) src = do
                                 _             -> toBasic src
                         _         -> toBasic src
   markDiffForAction addr path basicSrc
-  putSolidStorageKeyVal' addr path basicSrc
+  contract <- getCurrentContract
+  let svm3_0 = _vmVersion contract == "svm3.0"
+  putSolidStorageKeyVal' svm3_0 addr path basicSrc
 
 
 setVal dst src = typeError "unknown case called in setVal:" ("src = " ++ show src ++ ", dst = " ++ show dst)
@@ -254,7 +257,9 @@ deleteVar (Constant (SReference a@(AccountPath addr path))) = do
       ro <- readOnly <$> getCurrentCallInfo
       when ro $ invalidWrite "Invalid delete during read-only access" $ "addr: " ++ show addr ++ ", path: " ++ show path
       markDiffForAction addr path $ MS.BDefault
-      putSolidStorageKeyVal' addr path $ MS.BDefault
+      contract <- getCurrentContract
+      let svm3_0 = _vmVersion contract == "svm3.0"
+      putSolidStorageKeyVal' svm3_0 addr path $ MS.BDefault
 
 deleteVar v = todo "deleteVar not yet supported for local variables" $ show v
 

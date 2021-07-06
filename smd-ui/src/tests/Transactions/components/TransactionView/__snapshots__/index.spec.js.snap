@@ -2,13 +2,20 @@
 
 exports[`TransactionView mapStateToProps with queryEngine as a state 1`] = `
 Object {
+  "query": Object {
+    "last": 15,
+  },
   "selectedChain": "1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14",
   "tx": undefined,
+  "txResult": undefined,
 }
 `;
 
 exports[`TransactionView mapStateToProps with transaction as a state 1`] = `
 Object {
+  "query": Object {
+    "last": 1,
+  },
   "selectedChain": "1c8792a7e43d132487500936d946f510e7ff51635838060757bf886828403a14",
   "tx": Object {
     "blockNumber": 19,
@@ -27,6 +34,7 @@ Object {
     "v": "1b",
     "value": "0",
   },
+  "txResult": undefined,
 }
 `;
 
@@ -35,7 +43,8 @@ ShallowWrapper {
   "length": 1,
   Symbol(enzyme.__root__): [Circular],
   Symbol(enzyme.__unrendered__): <TransactionView
-    fetchTx={[Function]}
+    executeQuery={[Function]}
+    getTransactionResultRequest={[Function]}
     match={
       Object {
         "params": Object {
@@ -72,6 +81,7 @@ ShallowWrapper {
         "value": "0",
       }
     }
+    txResult="success"
   />,
   Symbol(enzyme.__renderer__): Object {
     "batchedUpdates": [Function],
@@ -97,6 +107,7 @@ ShallowWrapper {
             >
               <HexText
                 classes="smd-pad-2"
+                shorten={false}
                 value="70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81"
               />
             </div>
@@ -236,6 +247,16 @@ ShallowWrapper {
                       16
                     </td>
                   </tr>
+                  <tr>
+                    <td>
+                      <strong>
+                        Result
+                      </strong>
+                    </td>
+                    <td>
+                      success
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -260,6 +281,7 @@ ShallowWrapper {
               >
                 <HexText
                   classes="smd-pad-2"
+                  shorten={false}
                   value="70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81"
                 />
               </div>
@@ -288,6 +310,7 @@ ShallowWrapper {
               >
                 <HexText
                   classes="smd-pad-2"
+                  shorten={false}
                   value="70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81"
                 />
               </div>,
@@ -301,6 +324,7 @@ ShallowWrapper {
               "props": Object {
                 "children": <HexText
                   classes="smd-pad-2"
+                  shorten={false}
                   value="70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81"
                 />,
                 "className": "h3",
@@ -312,6 +336,7 @@ ShallowWrapper {
                 "nodeType": "class",
                 "props": Object {
                   "classes": "smd-pad-2",
+                  "shorten": false,
                   "value": "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81",
                 },
                 "ref": null,
@@ -480,6 +505,16 @@ ShallowWrapper {
                       16
                     </td>
                   </tr>
+                  <tr>
+                    <td>
+                      <strong>
+                        Result
+                      </strong>
+                    </td>
+                    <td>
+                      success
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -611,6 +646,16 @@ ShallowWrapper {
                       16
                     </td>
                   </tr>
+                  <tr>
+                    <td>
+                      <strong>
+                        Result
+                      </strong>
+                    </td>
+                    <td>
+                      success
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>,
@@ -738,6 +783,16 @@ ShallowWrapper {
                       16
                     </td>
                   </tr>
+                  <tr>
+                    <td>
+                      <strong>
+                        Result
+                      </strong>
+                    </td>
+                    <td>
+                      success
+                    </td>
+                  </tr>
                 </tbody>
               </table>,
               "className": "pt-card",
@@ -860,6 +915,16 @@ ShallowWrapper {
                       </td>
                       <td>
                         16
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <strong>
+                          Result
+                        </strong>
+                      </td>
+                      <td>
+                        success
                       </td>
                     </tr>
                   </tbody>,
@@ -1032,6 +1097,16 @@ ShallowWrapper {
                         </td>
                         <td>
                           16
+                        </td>
+                      </tr>,
+                      <tr>
+                        <td>
+                          <strong>
+                            Result
+                          </strong>
+                        </td>
+                        <td>
+                          success
                         </td>
                       </tr>,
                     ],
@@ -1601,6 +1676,61 @@ ShallowWrapper {
                       ],
                       "type": "tr",
                     },
+                    Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": Array [
+                          <td>
+                            <strong>
+                              Result
+                            </strong>
+                          </td>,
+                          <td>
+                            success
+                          </td>,
+                        ],
+                      },
+                      "ref": null,
+                      "rendered": Array [
+                        Object {
+                          "instance": null,
+                          "key": undefined,
+                          "nodeType": "host",
+                          "props": Object {
+                            "children": <strong>
+                              Result
+                            </strong>,
+                          },
+                          "ref": null,
+                          "rendered": Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": "Result",
+                            },
+                            "ref": null,
+                            "rendered": "Result",
+                            "type": "strong",
+                          },
+                          "type": "td",
+                        },
+                        Object {
+                          "instance": null,
+                          "key": undefined,
+                          "nodeType": "host",
+                          "props": Object {
+                            "children": "success",
+                          },
+                          "ref": null,
+                          "rendered": "success",
+                          "type": "td",
+                        },
+                      ],
+                      "type": "tr",
+                    },
                   ],
                   "type": "tbody",
                 },
@@ -1634,6 +1764,7 @@ ShallowWrapper {
               >
                 <HexText
                   classes="smd-pad-2"
+                  shorten={false}
                   value="70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81"
                 />
               </div>
@@ -1773,6 +1904,16 @@ ShallowWrapper {
                         16
                       </td>
                     </tr>
+                    <tr>
+                      <td>
+                        <strong>
+                          Result
+                        </strong>
+                      </td>
+                      <td>
+                        success
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
@@ -1797,6 +1938,7 @@ ShallowWrapper {
                 >
                   <HexText
                     classes="smd-pad-2"
+                    shorten={false}
                     value="70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81"
                   />
                 </div>
@@ -1825,6 +1967,7 @@ ShallowWrapper {
                 >
                   <HexText
                     classes="smd-pad-2"
+                    shorten={false}
                     value="70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81"
                   />
                 </div>,
@@ -1838,6 +1981,7 @@ ShallowWrapper {
                 "props": Object {
                   "children": <HexText
                     classes="smd-pad-2"
+                    shorten={false}
                     value="70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81"
                   />,
                   "className": "h3",
@@ -1849,6 +1993,7 @@ ShallowWrapper {
                   "nodeType": "class",
                   "props": Object {
                     "classes": "smd-pad-2",
+                    "shorten": false,
                     "value": "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81",
                   },
                   "ref": null,
@@ -2017,6 +2162,16 @@ ShallowWrapper {
                         16
                       </td>
                     </tr>
+                    <tr>
+                      <td>
+                        <strong>
+                          Result
+                        </strong>
+                      </td>
+                      <td>
+                        success
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
@@ -2148,6 +2303,16 @@ ShallowWrapper {
                         16
                       </td>
                     </tr>
+                    <tr>
+                      <td>
+                        <strong>
+                          Result
+                        </strong>
+                      </td>
+                      <td>
+                        success
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
               </div>,
@@ -2275,6 +2440,16 @@ ShallowWrapper {
                         16
                       </td>
                     </tr>
+                    <tr>
+                      <td>
+                        <strong>
+                          Result
+                        </strong>
+                      </td>
+                      <td>
+                        success
+                      </td>
+                    </tr>
                   </tbody>
                 </table>,
                 "className": "pt-card",
@@ -2397,6 +2572,16 @@ ShallowWrapper {
                         </td>
                         <td>
                           16
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>
+                          <strong>
+                            Result
+                          </strong>
+                        </td>
+                        <td>
+                          success
                         </td>
                       </tr>
                     </tbody>,
@@ -2569,6 +2754,16 @@ ShallowWrapper {
                           </td>
                           <td>
                             16
+                          </td>
+                        </tr>,
+                        <tr>
+                          <td>
+                            <strong>
+                              Result
+                            </strong>
+                          </td>
+                          <td>
+                            success
                           </td>
                         </tr>,
                       ],
@@ -3138,6 +3333,61 @@ ShallowWrapper {
                         ],
                         "type": "tr",
                       },
+                      Object {
+                        "instance": null,
+                        "key": undefined,
+                        "nodeType": "host",
+                        "props": Object {
+                          "children": Array [
+                            <td>
+                              <strong>
+                                Result
+                              </strong>
+                            </td>,
+                            <td>
+                              success
+                            </td>,
+                          ],
+                        },
+                        "ref": null,
+                        "rendered": Array [
+                          Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": <strong>
+                                Result
+                              </strong>,
+                            },
+                            "ref": null,
+                            "rendered": Object {
+                              "instance": null,
+                              "key": undefined,
+                              "nodeType": "host",
+                              "props": Object {
+                                "children": "Result",
+                              },
+                              "ref": null,
+                              "rendered": "Result",
+                              "type": "strong",
+                            },
+                            "type": "td",
+                          },
+                          Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": "success",
+                            },
+                            "ref": null,
+                            "rendered": "success",
+                            "type": "td",
+                          },
+                        ],
+                        "type": "tr",
+                      },
                     ],
                     "type": "tbody",
                   },
@@ -3169,7 +3419,8 @@ ShallowWrapper {
   "length": 1,
   Symbol(enzyme.__root__): [Circular],
   Symbol(enzyme.__unrendered__): <TransactionView
-    fetchTx={[Function]}
+    executeQuery={[Function]}
+    getTransactionResultRequest={[Function]}
     match={
       Object {
         "params": Object {
@@ -3191,6 +3442,7 @@ ShallowWrapper {
         "timestamp": "2017-12-13 07:47:05.998689 UTC",
       }
     }
+    txResult="success"
   />,
   Symbol(enzyme.__renderer__): Object {
     "batchedUpdates": [Function],
@@ -3216,6 +3468,7 @@ ShallowWrapper {
             >
               <HexText
                 classes="smd-pad-2"
+                shorten={false}
                 value="70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81"
               />
             </div>
@@ -3333,6 +3586,16 @@ ShallowWrapper {
                     </td>
                     <td />
                   </tr>
+                  <tr>
+                    <td>
+                      <strong>
+                        Result
+                      </strong>
+                    </td>
+                    <td>
+                      success
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -3357,6 +3620,7 @@ ShallowWrapper {
               >
                 <HexText
                   classes="smd-pad-2"
+                  shorten={false}
                   value="70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81"
                 />
               </div>
@@ -3385,6 +3649,7 @@ ShallowWrapper {
               >
                 <HexText
                   classes="smd-pad-2"
+                  shorten={false}
                   value="70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81"
                 />
               </div>,
@@ -3398,6 +3663,7 @@ ShallowWrapper {
               "props": Object {
                 "children": <HexText
                   classes="smd-pad-2"
+                  shorten={false}
                   value="70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81"
                 />,
                 "className": "h3",
@@ -3409,6 +3675,7 @@ ShallowWrapper {
                 "nodeType": "class",
                 "props": Object {
                   "classes": "smd-pad-2",
+                  "shorten": false,
                   "value": "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81",
                 },
                 "ref": null,
@@ -3555,6 +3822,16 @@ ShallowWrapper {
                     </td>
                     <td />
                   </tr>
+                  <tr>
+                    <td>
+                      <strong>
+                        Result
+                      </strong>
+                    </td>
+                    <td>
+                      success
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -3664,6 +3941,16 @@ ShallowWrapper {
                     </td>
                     <td />
                   </tr>
+                  <tr>
+                    <td>
+                      <strong>
+                        Result
+                      </strong>
+                    </td>
+                    <td>
+                      success
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>,
@@ -3769,6 +4056,16 @@ ShallowWrapper {
                     </td>
                     <td />
                   </tr>
+                  <tr>
+                    <td>
+                      <strong>
+                        Result
+                      </strong>
+                    </td>
+                    <td>
+                      success
+                    </td>
+                  </tr>
                 </tbody>
               </table>,
               "className": "pt-card",
@@ -3870,6 +4167,16 @@ ShallowWrapper {
                         </strong>
                       </td>
                       <td />
+                    </tr>
+                    <tr>
+                      <td>
+                        <strong>
+                          Result
+                        </strong>
+                      </td>
+                      <td>
+                        success
+                      </td>
                     </tr>
                   </tbody>,
                 ],
@@ -4021,6 +4328,16 @@ ShallowWrapper {
                           </strong>
                         </td>
                         <td />
+                      </tr>,
+                      <tr>
+                        <td>
+                          <strong>
+                            Result
+                          </strong>
+                        </td>
+                        <td>
+                          success
+                        </td>
                       </tr>,
                     ],
                   },
@@ -4495,6 +4812,61 @@ ShallowWrapper {
                       ],
                       "type": "tr",
                     },
+                    Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": Array [
+                          <td>
+                            <strong>
+                              Result
+                            </strong>
+                          </td>,
+                          <td>
+                            success
+                          </td>,
+                        ],
+                      },
+                      "ref": null,
+                      "rendered": Array [
+                        Object {
+                          "instance": null,
+                          "key": undefined,
+                          "nodeType": "host",
+                          "props": Object {
+                            "children": <strong>
+                              Result
+                            </strong>,
+                          },
+                          "ref": null,
+                          "rendered": Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": "Result",
+                            },
+                            "ref": null,
+                            "rendered": "Result",
+                            "type": "strong",
+                          },
+                          "type": "td",
+                        },
+                        Object {
+                          "instance": null,
+                          "key": undefined,
+                          "nodeType": "host",
+                          "props": Object {
+                            "children": "success",
+                          },
+                          "ref": null,
+                          "rendered": "success",
+                          "type": "td",
+                        },
+                      ],
+                      "type": "tr",
+                    },
                   ],
                   "type": "tbody",
                 },
@@ -4528,6 +4900,7 @@ ShallowWrapper {
               >
                 <HexText
                   classes="smd-pad-2"
+                  shorten={false}
                   value="70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81"
                 />
               </div>
@@ -4645,6 +5018,16 @@ ShallowWrapper {
                       </td>
                       <td />
                     </tr>
+                    <tr>
+                      <td>
+                        <strong>
+                          Result
+                        </strong>
+                      </td>
+                      <td>
+                        success
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
@@ -4669,6 +5052,7 @@ ShallowWrapper {
                 >
                   <HexText
                     classes="smd-pad-2"
+                    shorten={false}
                     value="70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81"
                   />
                 </div>
@@ -4697,6 +5081,7 @@ ShallowWrapper {
                 >
                   <HexText
                     classes="smd-pad-2"
+                    shorten={false}
                     value="70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81"
                   />
                 </div>,
@@ -4710,6 +5095,7 @@ ShallowWrapper {
                 "props": Object {
                   "children": <HexText
                     classes="smd-pad-2"
+                    shorten={false}
                     value="70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81"
                   />,
                   "className": "h3",
@@ -4721,6 +5107,7 @@ ShallowWrapper {
                   "nodeType": "class",
                   "props": Object {
                     "classes": "smd-pad-2",
+                    "shorten": false,
                     "value": "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81",
                   },
                   "ref": null,
@@ -4867,6 +5254,16 @@ ShallowWrapper {
                       </td>
                       <td />
                     </tr>
+                    <tr>
+                      <td>
+                        <strong>
+                          Result
+                        </strong>
+                      </td>
+                      <td>
+                        success
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
@@ -4976,6 +5373,16 @@ ShallowWrapper {
                       </td>
                       <td />
                     </tr>
+                    <tr>
+                      <td>
+                        <strong>
+                          Result
+                        </strong>
+                      </td>
+                      <td>
+                        success
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
               </div>,
@@ -5081,6 +5488,16 @@ ShallowWrapper {
                       </td>
                       <td />
                     </tr>
+                    <tr>
+                      <td>
+                        <strong>
+                          Result
+                        </strong>
+                      </td>
+                      <td>
+                        success
+                      </td>
+                    </tr>
                   </tbody>
                 </table>,
                 "className": "pt-card",
@@ -5182,6 +5599,16 @@ ShallowWrapper {
                           </strong>
                         </td>
                         <td />
+                      </tr>
+                      <tr>
+                        <td>
+                          <strong>
+                            Result
+                          </strong>
+                        </td>
+                        <td>
+                          success
+                        </td>
                       </tr>
                     </tbody>,
                   ],
@@ -5333,6 +5760,16 @@ ShallowWrapper {
                             </strong>
                           </td>
                           <td />
+                        </tr>,
+                        <tr>
+                          <td>
+                            <strong>
+                              Result
+                            </strong>
+                          </td>
+                          <td>
+                            success
+                          </td>
                         </tr>,
                       ],
                     },
@@ -5802,6 +6239,61 @@ ShallowWrapper {
                             },
                             "ref": null,
                             "rendered": null,
+                            "type": "td",
+                          },
+                        ],
+                        "type": "tr",
+                      },
+                      Object {
+                        "instance": null,
+                        "key": undefined,
+                        "nodeType": "host",
+                        "props": Object {
+                          "children": Array [
+                            <td>
+                              <strong>
+                                Result
+                              </strong>
+                            </td>,
+                            <td>
+                              success
+                            </td>,
+                          ],
+                        },
+                        "ref": null,
+                        "rendered": Array [
+                          Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": <strong>
+                                Result
+                              </strong>,
+                            },
+                            "ref": null,
+                            "rendered": Object {
+                              "instance": null,
+                              "key": undefined,
+                              "nodeType": "host",
+                              "props": Object {
+                                "children": "Result",
+                              },
+                              "ref": null,
+                              "rendered": "Result",
+                              "type": "strong",
+                            },
+                            "type": "td",
+                          },
+                          Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": "success",
+                            },
+                            "ref": null,
+                            "rendered": "success",
                             "type": "td",
                           },
                         ],

@@ -20,7 +20,8 @@ describe('Accounts: index', () => {
         changeAccountFilter: jest.fn(),
         faucetRequest: jest.fn(),
         resetUserAddress: jest.fn(),
-        fetchUserAddresses: jest.fn()
+        fetchUserAddresses: jest.fn(),
+        fetchOauthAccounts : jest.fn()
       }
       const wrapper = shallow(
         <Accounts.WrappedComponent {...props} />
@@ -38,7 +39,8 @@ describe('Accounts: index', () => {
         changeAccountFilter: jest.fn(),
         faucetRequest: jest.fn(),
         resetUserAddress: jest.fn(),
-        fetchUserAddresses: jest.fn()
+        fetchUserAddresses: jest.fn(),
+        fetchOauthAccounts : jest.fn()
       }
       const wrapper = shallow(
         <Accounts.WrappedComponent {...props} />
@@ -82,7 +84,8 @@ describe('Accounts: index', () => {
         changeAccountFilter: jest.fn(),
         faucetRequest: jest.fn(),
         resetUserAddress: jest.fn(),
-        fetchUserAddresses: jest.fn()
+        fetchUserAddresses: jest.fn(),
+        fetchOauthAccounts : jest.fn()
       }
       const wrapper = shallow(
         <Accounts.WrappedComponent {...props} />
@@ -103,7 +106,8 @@ describe('Accounts: index', () => {
       changeAccountFilter: jest.fn(),
       faucetRequest: jest.fn(),
       resetUserAddress: jest.fn(),
-      fetchUserAddresses: jest.fn()
+      fetchUserAddresses: jest.fn(),
+      fetchOauthAccounts : jest.fn()
     }
 
     shallow(

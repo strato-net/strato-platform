@@ -5,8 +5,11 @@ import {
 } from 'redux-saga/effects';
 import {
   EXECUTE_QUERY_REQUEST,
+  TRANSACTION_RESULT_REQUEST,
   executeQuerySuccess,
-  executeQueryFailure
+  executeQueryFailure,
+  getTransactionResultSuccess,
+  getTransactionResultFailure
 } from './queryEngine.actions';
 import { TRANSACTION_QUERY_TYPES } from './queryTypes';
 import { env } from '../../env';
@@ -29,8 +32,9 @@ export function query(query, resourceType, chainId) {
   }
   if (chainId) {
     const symbol = constructedURL.indexOf("?") > -1 ? "&" : "?";
-    constructedURL += symbol + `chainid=${chainId}`;
+    constructedURL += symbol + `chainId=${chainId}`;
   }
+  console.log(constructedURL);
   return fetch(
     constructedURL,
     {
@@ -39,14 +43,27 @@ export function query(query, resourceType, chainId) {
       headers: {
         'Accept': 'application/json'
       },
-    })
-    .then(handleErrors)
+    }).then(handleErrors)
     .then(function (res) {
       return res.json();
     })
     .catch(function (error) {
       throw error;
     });
+}
+
+export function transactionResultRequest(txHash) {
+  let queryUrl = `${url}/transactionResult/${txHash}`
+  return fetch(queryUrl, {
+          method: 'GET',
+          credentials: "include",
+          headers: {
+            'Accept': 'application/json'
+          }
+        })
+        .then(handleErrors)
+        .then(res => res.json())
+        .catch(error => {throw error;});
 }
 
 export function* executeQuery(action) {
@@ -59,6 +76,19 @@ export function* executeQuery(action) {
   }
 }
 
-export default function* watchExecuteQuery() {
+export function* getTransactionResult(action) {
+  try {
+    let response = yield call(transactionResultRequest, action.txHash);
+    yield put(getTransactionResultSuccess(response));
+  }
+  catch (err) {
+    yield put(getTransactionResultFailure(err));
+  }
+}
+
+export function* watchExecuteQuery() {
   yield takeEvery(EXECUTE_QUERY_REQUEST, executeQuery);
+}
+export function* watchTransactionResult() {
+  yield takeEvery(TRANSACTION_RESULT_REQUEST, getTransactionResult);
 }

@@ -30,7 +30,7 @@ wingsContract = BC.unpack $(embedFile "bench/wings.sol")
 wingsCC :: CodeCollection
 wingsCC =
   let file = either (error . show) id $ runParser solidityFile "" ""  wingsContract
-      namedContracts = [(T.unpack name, xabiToContract (T.unpack name) (map T.unpack parents') xabi)
+      namedContracts = [(T.unpack name, xabiToContract (T.unpack name) (map T.unpack parents') "" xabi)
                         | NamedXabi name (xabi, parents') <- unsourceUnits file]
   in applyInheritance . CodeCollection $ M.fromList namedContracts
 

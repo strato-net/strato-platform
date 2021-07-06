@@ -26,10 +26,14 @@ const initialState = {
   lastTabSelected: 0,
   currentTabSelected: 0,
   isRemoveTab: false,
-  localCompileException: ''
+  localCompileException: '',
+  codeType : "SolidVM"
 };
 
 const formatCompilationErrors = function (error) {
+  if (typeof error !== "string") {
+    return "Failed to connect to the Strato compiler."
+  }
   if (error.indexOf('\n') === -1) {
     const jsonErr = JSON.parse(error);
     return jsonErr.replace(/\n/g, "\n");
@@ -70,7 +74,8 @@ const reducer = function (state = loadState(), action) {
         ...state,
         response: "Uploading Contract...",
         createDisabled: true,
-        enableCreateAction: false
+        enableCreateAction: false,
+        codeType : action.codeType
       };
 
     case CODE_EDITOR_COMPILE_SUCCESS:

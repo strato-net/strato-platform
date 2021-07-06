@@ -117,7 +117,7 @@ services:
     - vault-wrapper
     environment:
     - BLOC_DEBUG=${BLOC_DEBUG}
-    - gasOn=${gasOn:-true}
+    - gasOn=${gasOn:-false}
     - kafkaHost=kafka
     - kafkaPort=9092
     - nonceCounterTimeout=${nonceCounterTimeout:-10}
@@ -212,7 +212,7 @@ services:
     - evmTraceMode=${evmTraceMode}
     - extraFaucets=${extraFaucets}
     - faucetEnabled=${faucetEnabled}
-    - gasOn=${gasOn:-true}
+    - gasOn=${gasOn:-false}
     - generateKey=${generateKey:-true}
     - genesis=${genesis}
     - genesisBlock=${genesisBlock}

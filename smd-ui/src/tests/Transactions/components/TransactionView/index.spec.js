@@ -18,8 +18,10 @@ describe('TransactionView', () => {
       const props = {
         match: { params: { hash: "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81" } },
         tx: transactionDetail,
-        fetchTx: jest.fn(),
-        store: store
+        executeQuery: jest.fn(),
+        store: store,
+        getTransactionResultRequest : jest.fn(),
+        txResult : "success"
       };
 
       const wrapper = shallow(
@@ -33,8 +35,10 @@ describe('TransactionView', () => {
       const props = {
         match: { params: { hash: "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81" } },
         tx: { timestamp: "2017-12-13 07:47:05.998689 UTC" },
-        fetchTx: jest.fn(),
-        store: store
+        executeQuery: jest.fn(),
+        store: store,
+        getTransactionResultRequest : jest.fn(),
+        txResult : "success"
       };
 
       const wrapper = shallow(
@@ -52,8 +56,10 @@ describe('TransactionView', () => {
       const props = {
         match: { params: { hash: "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81" } },
         tx: null,
-        fetchTx: jest.fn(),
-        history: { goBack: jest.fn().mockReturnValue('historyUpdated') }
+        executeQuery: jest.fn(),
+        history: { goBack: jest.fn().mockReturnValue('historyUpdated'), push: jest.fn().mockReturnValue('historyPushed') },
+        getTransactionResultRequest : jest.fn(),
+        txResult : "success"
       };
 
       const wrapper = mount(
@@ -70,8 +76,10 @@ describe('TransactionView', () => {
       const props = {
         match: { params: { hash: "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81" } },
         tx: transactionDetail,
-        fetchTx: jest.fn(),
-        history: { goBack: jest.fn().mockReturnValue('historyUpdated') }
+        executeQuery: jest.fn(),
+        history: { goBack: jest.fn().mockReturnValue('historyUpdated') },
+        getTransactionResultRequest : jest.fn(),
+        txResult : "success"
       };
 
       const wrapper = mount(
@@ -90,6 +98,11 @@ describe('TransactionView', () => {
 
     test('transaction as a state', () => {
       const state = {
+        queryEngine: {
+          "query": {
+            "last": 1
+          }
+        },
         transactions: {
           tx: updatedData
         },

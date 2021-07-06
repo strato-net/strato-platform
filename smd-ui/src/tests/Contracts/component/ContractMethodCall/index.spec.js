@@ -17,7 +17,9 @@ describe('ContractMethodCall: index', () => {
 
   test('renders contracts card (non Oauth mode)', () => {
     const props = {
-      modal: {},
+      modal: {
+        isPayable: true
+      },
       accounts: indexAccountsMock,
       modalUsername: 'Buyer1',
       oAuthUser: {
@@ -48,7 +50,9 @@ describe('ContractMethodCall: index', () => {
 
   test('renders contracts card (Oauth mode)', () => {
     const props = {
-      modal: {},
+      modal: {
+        isPayable: false
+      },
       accounts: {},
       modalUsername: 'Buyer1',
       chainLabel: chain,

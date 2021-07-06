@@ -14,7 +14,7 @@ import { autoApprove } from './contracts/AutoApprove';
 import { twoIn } from './contracts/TwoIn';
 import { majorityRules } from './contracts/MajorityRules';
 import { adminOnly } from './contracts/AdminOnly';
-
+import { fetchUserPubkey } from "../User/user.actions";
 class CreateChain extends Component {
 
   constructor(props) {
@@ -34,6 +34,7 @@ class CreateChain extends Component {
 
   componentDidMount() {
     mixpanelWrapper.track("create_chain_loaded");
+    this.props.fetchUserPubkey();
   }
 
   componentWillReceiveProps(nextProps) {
@@ -473,7 +474,7 @@ class CreateChain extends Component {
                   </label>
                   {this.showMembers(this.state.members)}
                   <span className="error-text">{this.errorMessageFor('members')}</span>
-                  <AddMember handler={this.updateMembers} />
+                  <AddMember handler={this.updateMembers} publicKey={this.props.publicKey}/>
                 </div>
               </div>
             </div>
@@ -510,7 +511,8 @@ export function mapStateToProps(state) {
     isSpinning: state.createChain.spinning,
     createErrorMessage: state.createChain.error,
     abi: state.createChain.abi,
-    contractName: state.createChain.contractName
+    contractName: state.createChain.contractName,
+    publicKey : state.user.publicKey
   };
 }
 
@@ -523,7 +525,8 @@ const connected = connect(
     createChain,
     resetError,
     compileChainContract,
-    resetContract
+    resetContract,
+    fetchUserPubkey
   }
 )(formed);
 
