@@ -7,7 +7,6 @@
 
 module BlockApps.Bloc22.Server.Contracts where
 
-import           ClassyPrelude                   ((<>))
 import           Control.Arrow
 import           Control.Monad                   (join)
 import           Control.Monad.Reader.Class      (asks)

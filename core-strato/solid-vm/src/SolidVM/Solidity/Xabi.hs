@@ -10,7 +10,7 @@ module SolidVM.Solidity.Xabi where
 import           Control.Lens                 (mapped, (&), (?~))
 import           Data.Aeson
 import           Data.Aeson.Casing
-import           Data.Aeson.Casing.Internal   (camelCase, dropFPrefix)
+import           Data.Aeson.Casing.Internal   (dropFPrefix)
 import           Data.Aeson.Types
 import qualified Data.HashMap.Strict          as Hash
 import           Data.Map.Strict              (Map)

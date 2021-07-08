@@ -10,7 +10,6 @@ import Control.Concurrent     (threadDelay)
 import Control.Exception (Exception, IOException)
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty (NonEmpty(..))
-import Data.Monoid ((<>))
 import GHC.Generics (Generic)
 import System.IO
 

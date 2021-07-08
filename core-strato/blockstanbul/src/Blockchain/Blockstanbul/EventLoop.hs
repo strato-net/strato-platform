@@ -14,7 +14,6 @@ import Blockchain.Output
 import Control.Monad.State.Class
 import qualified Data.Map.Strict as M
 import Data.Maybe
-import Data.Monoid ((<>))
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Prelude hiding (round, sequence)

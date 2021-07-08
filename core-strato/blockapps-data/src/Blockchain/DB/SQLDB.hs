@@ -48,7 +48,7 @@ runPostgresConn :: (MonadUnliftIO m, MonadLogger m, backend ~ SQL.SqlBackend)
                 -> m a
 runPostgresConn pgConn = PSQL.withPostgresqlConn pgConn . runReaderT
 
-createPostgresqlPool :: (MonadUnliftIO m, MonadLogger m, backend ~ SQL.SqlBackend)
+createPostgresqlPool :: (MonadUnliftIO m, MonadLogger m)
                      => PSQL.ConnectionString -> Int -> m SQLDB
 createPostgresqlPool cString n = SQLDB <$> PSQL.createPostgresqlPool cString n
 
