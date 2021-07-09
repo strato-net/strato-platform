@@ -582,7 +582,7 @@ instance Serializable MessageSet where
           compressor :: CompressionCodec -> (ByteString -> ByteString)
           compressor c = case c of
             Gzip -> LB.toStrict . GZip.compress . LB.fromStrict
-            _ -> fail "Unsupported compression codec"
+            _ -> error "Unsupported compression codec"
 
           value :: (ByteString -> ByteString) -> [MessageSetMember] -> Value
           value c ms = Value . Just . KBytes $ c (runPut $ mapM_ serialize ms)
@@ -665,7 +665,7 @@ instance Deserializable MessageSet where
             decompressor :: Attributes -> (ByteString -> ByteString)
             decompressor att = case _compressionCodec att of
               Gzip -> LB.toStrict . GZip.decompress . LB.fromStrict
-              _ -> fail "Unsupported compression codec."
+              _ -> error "Unsupported compression codec."
 
             decompressMessage :: (ByteString -> ByteString) -> ByteString -> Get [MessageSetMember]
             decompressMessage f = getDecompressedMembers . f
