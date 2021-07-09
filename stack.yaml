@@ -115,8 +115,6 @@ extra-lib-dirs:
 - /usr/local/lib
 - /usr/lib
 
-allow-newer: true
-
 ghc-options:
   "$locals": -Wall -Werror -fwarn-redundant-constraints
 
