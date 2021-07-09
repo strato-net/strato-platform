@@ -8,6 +8,8 @@ import           Data.Aeson
 import           Data.Binary
 import           Data.Data
 import           Database.Persist.TH
+import           Test.QuickCheck
+import           Test.QuickCheck.Arbitrary.Generic
 
 import           Blockchain.Data.PersistTypes ()
 import           Blockchain.Strato.Model.Keccak256
@@ -22,6 +24,10 @@ derivePersistField "TXOrigin"
 
 instance ToJSON TXOrigin where
 instance FromJSON TXOrigin where
+
+instance Arbitrary TXOrigin where
+  arbitrary = genericArbitrary
+
 
 instance Binary TXOrigin where
     put Direct          = putWord8 0

@@ -30,6 +30,10 @@ module Blockchain.Data.ChainInfo
 import           Control.Applicative               (many)
 import qualified Control.Monad.Change.Alter        as A
 import           Control.Monad                     (join)
+import           Test.QuickCheck
+import           Test.QuickCheck.Instances.ByteString  ()
+import           Test.QuickCheck.Arbitrary.Generic
+import           Test.QuickCheck.Instances.Text        ()
 
 import           Blockchain.ExtWord
 import           Blockchain.Data.Enode
@@ -100,6 +104,13 @@ instance ToJSON CodeInfo where
     , "src"  .= s1
     , "name" .= s2
     ]
+
+instance Arbitrary CodeInfo where
+  arbitrary = CodeInfo
+      <$> arbitrary
+      <*> (T.pack <$> arbitrary)
+      <*> (fmap T.pack <$> arbitrary)
+
 
 instance RLPSerializable CodeInfo where
   rlpEncode (CodeInfo a b Nothing) =
@@ -197,6 +208,12 @@ instance RLPSerializable AccountInfo where
   rlpDecode (RLPArray [a,b]) = NonContract (rlpDecode a) (rlpDecode b)
   rlpDecode _ = error ("Error in rlpDecode for AccountInfo: bad RLPObject")
 
+instance Arbitrary AccountInfo where
+  arbitrary = NonContract
+      <$> arbitrary
+      <*> arbitrary `suchThat` (>=0)
+
+
 data ChainSignature = ChainSignature
   { chainR :: Word256
   , chainS :: Word256
@@ -240,6 +257,9 @@ instance RLPSerializable ChainSignature where
       (fromInteger $ rlpDecode v)
   rlpDecode o = error $ "rlpDecode ChainSignature: Expected 3 element RLPArray, got " ++ show o
 
+instance Arbitrary ChainSignature where
+  arbitrary = genericArbitrary
+
 data UnsignedChainInfo = UnsignedChainInfo
   { chainLabel     :: T.Text
   , accountInfo    :: [AccountInfo]
@@ -253,13 +273,10 @@ data UnsignedChainInfo = UnsignedChainInfo
 
 
 
-instance ToSchema IPAddress where
-instance ToSchema OrgId where
-  declareNamedSchema _ = return $
-    NamedSchema (Just "OrgId")
-      ( mempty )
-  
-instance ToSchema Enode where
+instance Arbitrary UnsignedChainInfo where
+  arbitrary = genericArbitrary
+
+
 instance ToSchema CodeInfo where
   declareNamedSchema _ = return $
     NamedSchema (Just "CodeInfo")
@@ -329,6 +346,9 @@ instance ToJSON ChainInfo where
            , "metadata" .= md
            , "signature" .= sig
            ]
+
+instance Arbitrary ChainInfo where
+  arbitrary = genericArbitrary
 
 instance RLPSerializable UnsignedChainInfo where
   rlpEncode UnsignedChainInfo{..} = RLPArray
