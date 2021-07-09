@@ -10,9 +10,7 @@ module Blockchain.Strato.Discovery.UDPServer
      , connectMe
      ) where
 
-import           ClassyPrelude                           ((<>))
 import           Control.Monad.Catch
-import           Control.Monad.Fail
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
 import           Blockchain.Output
