@@ -157,7 +157,7 @@ oneTimeSetup genesisBlockName = do
       liftIO $ putStrLn $ CL.blue $ "  connection is " ++ show rawConn
       let query = T.pack $ "CREATE DATABASE " ++ show db ++ ";"
 
-      runNoLoggingT $ withPostgresqlConn rawConn (runReaderT (rawExecute query []) :: SqlWriteBackend -> LoggingT IO ())
+      runNoLoggingT $ withPostgresqlConn rawConn (runReaderT (rawExecute query []) :: SqlBackend -> LoggingT IO ())
 
       {- CONFIG: create kafka topics -}
 

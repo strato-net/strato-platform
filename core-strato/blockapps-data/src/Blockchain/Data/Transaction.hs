@@ -60,7 +60,6 @@ import           Control.DeepSeq
 import           System.Clock
 
 import           Blockchain.Strato.Model.Class
-import           Blockchain.Strato.Model.ExtendedWord (Word256)
 
 
 --TODO: remove some of these, reorganize

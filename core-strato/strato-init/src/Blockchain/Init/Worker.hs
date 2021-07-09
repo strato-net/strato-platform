@@ -112,7 +112,7 @@ process pathRoot off = (>> return off) . \case
     $logInfoLS "ethconf/Create Database" rawConn
     let query = T.pack $ "CREATE DATABASE " ++ show db ++ ";"
 
-    withPostgresqlConn rawConn (runReaderT (rawExecute query []) :: SqlWriteBackend -> LoggingT IO ())
+    withPostgresqlConn rawConn (runReaderT (rawExecute query []) :: SqlBackend -> LoggingT IO ())
 
     withPostgresqlConn localConn $ runReaderT $ do
       $logInfoS "ethconf/migrate" . T.pack $ CL.yellow ">>>> Migrating eth"
