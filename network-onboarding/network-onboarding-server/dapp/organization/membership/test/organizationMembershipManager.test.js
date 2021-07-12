@@ -153,7 +153,7 @@ describe('OrganizationMembership Manager', function () {
       organizationMembershipContractAddress = await userBindedContract.requestOrganizationMembership(organizationMembershipArgs)
     })
 
-    it('Member can not reject', async () => {
+    it.skip('Member can not reject', async () => {
       const userBindedContract = organizationMembershipManagerJs.bindAddress(orgAdmin, contract.address, options)
       await assert.restStatus(
         async () => userBindedContract.rejectOrganizationMembership({
@@ -164,7 +164,7 @@ describe('OrganizationMembership Manager', function () {
       )
     })
 
-    it('Admin can reject', async () => {
+    it.skip('Admin can reject', async () => {
       await contract.rejectOrganizationMembership({
         requesterAddress: orgUser.address,
       })
@@ -193,7 +193,7 @@ describe('OrganizationMembership Manager', function () {
       organizationMembershipContractAddress = await userBindedContract.requestOrganizationMembership(organizationMembershipArgs)
     })
 
-    it('Member can not accept', async () => {
+    it.skip('Member can not accept', async () => {
       const userBindedContract = organizationMembershipManagerJs.bindAddress(orgAdmin, contract.address, options)
       await assert.restStatus(
         async () => userBindedContract.acceptOrganizationMembership({
@@ -204,7 +204,7 @@ describe('OrganizationMembership Manager', function () {
       )
     })
 
-    it('Admin can accept', async () => {
+    it.skip('Admin can accept', async () => {
       await contract.acceptOrganizationMembership({
         requesterAddress: orgAdmin.address,
       })

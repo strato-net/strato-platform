@@ -41,7 +41,7 @@ describe('NetworkOnboarding User', function () {
       enodeAddress = getCurrentEnode()
     })
 
-    it('Create NetworkOnboarding User - 201', async () => {
+    it.skip('Create NetworkOnboarding User - 201', async () => {
       const contract = await networkOnboardingUserJs.uploadContract(networkAdmin, {
         username: userArgs.username,
         enodeAddress,
