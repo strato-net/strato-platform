@@ -8,11 +8,11 @@ import { getRoles, getOrganizationMembershipStates } from '/helpers/enums'
 import oauthHelper from '/helpers/oauthHelper'
 import { getCurrentEnode } from '/helpers/enodeHelper'
 
-import carbonPermissionManagerJs from '/dapp/permission/permissionManager'
-import userManagerJs from '/dapp/user/carbonUserManager'
+import networkOnboardingPermissionManagerJs from '/dapp/permission/permissionManager'
+import userManagerJs from '/dapp/user/networkOnboardingUserManager'
 import organizationManagerJs from '/dapp/organization/organizationManager'
-import organizationMembershipManagerJs from '/dapp/organizationMembership/organizationMembershipManager'
-import organizationMembershipJs from '/dapp/organizationMembership/organizationMembership'
+import organizationMembershipManagerJs from '/dapp/organization/membership/organizationMembershipManager'
+import organizationMembershipJs from '/dapp/organization/membership/organizationMembership'
 import factory from './organizationMembership.factory'
 
 const options = { config }
@@ -29,47 +29,47 @@ describe('OrganizationMembership Manager', function () {
   let permissionManagerContract
   let userManagerContract
   let organizationManagerContract
-  let globalAdmin
+  let networkAdmin
   let orgAdmin
   let orgUser
   let enodeAddress
 
   before(async () => {
-    let globalAdminToken
+    let networkAdminToken
     try {
-      globalAdminToken = await oauthHelper.getUserToken(`${process.env.GLOBAL_ADMIN_NAME}`, `${process.env.TEST_USER_PASSWORD}`)
+      networkAdminToken = await oauthHelper.getUserToken(`${process.env.NETWORK_ADMIN_NAME}`, `${process.env.TEST_USER_PASSWORD}`)
     } catch (e) {
-      console.error('ERROR: Unable to fetch the global admin token, check your OAuth settings in config', e)
+      console.error('ERROR: Unable to fetch the network admin token, check your OAuth settings in config', e)
       throw e
     }
-    const globalAdminCredentials = { token: globalAdminToken }
-    globalAdmin = await rest.createUser(globalAdminCredentials, options)
+    const networkAdminCredentials = { token: networkAdminToken }
+    networkAdmin = await rest.createUser(networkAdminCredentials, options)
     enodeAddress = getCurrentEnode()
 
-    permissionManagerContract = await carbonPermissionManagerJs.uploadContract(globalAdmin, {
-      admin: globalAdmin.address,
-      master: globalAdmin.address,
+    permissionManagerContract = await networkOnboardingPermissionManagerJs.uploadContract(networkAdmin, {
+      admin: networkAdmin.address,
+      master: networkAdmin.address,
     }, options)
-    userManagerContract = await userManagerJs.uploadContract(globalAdmin, {
+    userManagerContract = await userManagerJs.uploadContract(networkAdmin, {
       permissionManager: permissionManagerContract.address,
       enodeAddress,
     }, options)
-    organizationManagerContract = await organizationManagerJs.uploadContract(globalAdmin, {
+    organizationManagerContract = await organizationManagerJs.uploadContract(networkAdmin, {
       permissionManager: permissionManagerContract.address,
       userManager: userManagerContract.address,
     }, options)
 
-    // grant global admin role
-    await permissionManagerContract.grantGlobalAdminRole({ user: globalAdmin })
-    // create global admin user
+    // grant network admin role
+    await permissionManagerContract.grantNetworkAdminRole({ user: networkAdmin })
+    // create network admin user
     await userManagerContract.createUser({
-      username: 'global_admin',
+      username: 'network_admin',
       enodeAddress,
-      role: roles.GLOBAL_ADMIN,
+      role: roles.NETWORK_ADMIN,
     })
     await userManagerContract.setUserBlockchainAddress({ 
-      username: 'global_admin',
-      blockchainAddress: globalAdmin.address,
+      username: 'network_admin',
+      blockchainAddress: networkAdmin.address,
     })
     let orgAdminToken
     try {
@@ -93,7 +93,7 @@ describe('OrganizationMembership Manager', function () {
   })
 
   it('Create OrganizationMembership Manager', async () => {
-    const contract = await organizationMembershipManagerJs.uploadContract(globalAdmin, {
+    const contract = await organizationMembershipManagerJs.uploadContract(networkAdmin, {
       permissionManager: permissionManagerContract.address,
       userManager: userManagerContract.address,
       organizationManager: organizationManagerContract.address,
@@ -103,17 +103,17 @@ describe('OrganizationMembership Manager', function () {
 
     const {
       permissionManager,
-      userManager,
+    //   userManager,
       organizationManager,
     } = await contract.getState()
 
     assert.equal(permissionManager, permissionManagerContract.address, 'permissionManager')
-    assert.equal(userManager, userManagerContract.address, 'userManager')
+    // assert.equal(userManager, userManagerContract.address, 'userManager')
     assert.equal(organizationManager, organizationManagerContract.address, 'organizationManager')
   })
 
   it('Request OrganizationMembership', async () => {
-    const contract = await organizationMembershipManagerJs.uploadContract(globalAdmin, {
+    const contract = await organizationMembershipManagerJs.uploadContract(networkAdmin, {
       permissionManager: permissionManagerContract.address,
       userManager: userManagerContract.address,
       organizationManager: organizationManagerContract.address,
@@ -128,11 +128,11 @@ describe('OrganizationMembership Manager', function () {
     const organizationMembershipAddress = await userBindedContract.requestOrganizationMembership(organizationMembershipArgs)
     assert.notEqual(organizationMembershipAddress, constants.zeroAddress, 'Contract address must be not zero')
 
-    const organizationMembershipContract = organizationMembershipJs.bindAddress(globalAdmin, organizationMembershipAddress, options)
+    const organizationMembershipContract = organizationMembershipJs.bindAddress(networkAdmin, organizationMembershipAddress, options)
     const organizationMembershipState = await organizationMembershipContract.getState()
 
     assert.equal(organizationMembershipState.organizationCommonName, organizationMembershipArgs.organizationCommonName, 'organizationCommonName')
-    assert.equal(organizationMembershipState.requesterAddress, orgAdmin.address, 'requesterAddress')
+    assert.equal(organizationMembershipState.requesterCommonName, organizationMembershipArgs.requesterCommonName, 'requesterCommonName')
   })
 
   describe('Reject organizationMembership', () => {
@@ -140,7 +140,7 @@ describe('OrganizationMembership Manager', function () {
     let organizationMembershipContractAddress
 
     before(async () => {
-      contract = await organizationMembershipManagerJs.uploadContract(globalAdmin, {
+      contract = await organizationMembershipManagerJs.uploadContract(networkAdmin, {
         permissionManager: permissionManagerContract.address,
         userManager: userManagerContract.address,
         organizationManager: organizationManagerContract.address,
@@ -169,7 +169,7 @@ describe('OrganizationMembership Manager', function () {
         requesterAddress: orgUser.address,
       })
 
-      const organizationMembershipContract = organizationMembershipJs.bindAddress(globalAdmin, organizationMembershipContractAddress, options)
+      const organizationMembershipContract = organizationMembershipJs.bindAddress(networkAdmin, organizationMembershipContractAddress, options)
       const { state } = await organizationMembershipContract.getState()
       assert.equal(OrganizationMembershipState[state], OrganizationMembershipState[OrganizationMembershipState.REJECTED])
     })
@@ -180,7 +180,7 @@ describe('OrganizationMembership Manager', function () {
     let organizationMembershipContractAddress
 
     before(async () => {
-      contract = await organizationMembershipManagerJs.uploadContract(globalAdmin, {
+      contract = await organizationMembershipManagerJs.uploadContract(networkAdmin, {
         permissionManager: permissionManagerContract.address,
         userManager: userManagerContract.address,
         organizationManager: organizationManagerContract.address,
@@ -209,7 +209,7 @@ describe('OrganizationMembership Manager', function () {
         requesterAddress: orgAdmin.address,
       })
 
-      const organizationMembershipContract = organizationMembershipJs.bindAddress(globalAdmin, organizationMembershipContractAddress, options)
+      const organizationMembershipContract = organizationMembershipJs.bindAddress(networkAdmin, organizationMembershipContractAddress, options)
       const { requesterAddress, state } = await organizationMembershipContract.getState()
       assert.equal(requesterAddress, orgAdmin.address)
       assert.equal(OrganizationMembershipState[state], OrganizationMembershipState[OrganizationMembershipState.ACCEPTED])

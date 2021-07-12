@@ -105,6 +105,13 @@ contract NetworkOnboardingPermissionManager is RestStatus, PermissionManager, Pe
         return check(_address, permissions) == RestStatus.OK;
     }
 
+    function canUpdateUser(address _address) public returns (bool) {
+        // Get permission
+        uint permissions = 1 << uint(Permission.UPDATE_USER);
+        // Check permission
+        return check(_address, permissions) == RestStatus.OK;
+    }
+
     function canUpdateRoleInNetwork(address _address) public returns (bool) {
         // Get permission
         uint permissions = 1 << uint(Permission.UPDATE_ROLE_NETWORK);

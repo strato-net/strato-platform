@@ -1,17 +1,19 @@
 import { rest, util, assert } from '/blockapps-rest-plus'
 import config from '/load.config'
 import oauthHelper from '/helpers/oauthHelper'
+import { getCurrentEnode } from '/helpers/enodeHelper'
+import { getRoles } from '/helpers/enums'
 import dotenv from 'dotenv'
 
-import organizationJs from '../organization'
-import factory from './organization.factory'
+import networkOnboardingUserJs from '../networkOnboardingUser'
+import factory from './networkOnboardingUser.factory'
 
 const options = { config }
 
 const loadEnv = dotenv.config()
 assert.isUndefined(loadEnv.error)
 
-describe('Organization', function () {
+describe('NetworkOnboarding User', function () {
   this.timeout(config.timeout)
 
   let networkAdmin
@@ -28,19 +30,25 @@ describe('Organization', function () {
     networkAdmin = await rest.createUser(networkAdminCredentials, options)
   })
 
-  describe('Organization', () => {
-    let organizationArgs
+  describe('NetworkOnboarding User', () => {
+    let userArgs
+    let enodeAddress
 
     before(async () => {
-      organizationArgs = {
-        ...(factory.getOrganizationArgs(util.uid())),
+      userArgs = {
+        ...(factory.getNetworkOnboardingUserArgs(util.uid())),
       }
+      enodeAddress = getCurrentEnode()
     })
 
-    it('Create Organization - 200', async () => {
-      const contract = await organizationJs.uploadContract(networkAdmin, organizationArgs, options)
+    it('Create NetworkOnboarding User - 201', async () => {
+      const contract = await networkOnboardingUserJs.uploadContract(networkAdmin, {
+        username: userArgs.username,
+        enodeAddress,
+        role: (getRoles()).NETWORK_ADMIN,
+      }, options)
       const state = await contract.getState()
-      assert.isSubset(state, organizationArgs, 'organization')
+      assert.equal(state.username, userArgs.username, 'blockchainAddress')
     })
   })
 })

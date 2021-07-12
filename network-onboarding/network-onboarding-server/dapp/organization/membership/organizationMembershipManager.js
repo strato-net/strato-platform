@@ -10,7 +10,7 @@ import { getOrganizationMembershipEvents } from '/helpers/enums'
 const { createContract } = rest
 
 const contractName = 'OrganizationMembershipManager'
-const contractFilename = `${util.cwd}/dapp/organizationMembership/contracts/OrganizationMembershipManager.sol`
+const contractFilename = `${util.cwd}/dapp/organization/membership/contracts/OrganizationMembershipManager.sol`
 
 const OrganizationMembershipEvent = getOrganizationMembershipEvents()
 

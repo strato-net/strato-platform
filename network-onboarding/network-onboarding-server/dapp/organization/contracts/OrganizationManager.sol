@@ -1,6 +1,6 @@
 import "./Organization.sol";
-import "/network-onboarding-server/blockapps-sol/lib/rest/contracts/RestStatus.sol";
-import "network-onboarding-server/dapp/permission/contracts/NetworkOnboardingPermissionManager.sol";
+import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
+import "/dapp/permission/contracts/NetworkOnboardingPermissionManager.sol";
 
 /**
  * The OrganizationManager contract is responsible for the onboarding and removal of organizations 
@@ -17,7 +17,7 @@ import "network-onboarding-server/dapp/permission/contracts/NetworkOnboardingPer
 
 contract OrganizationManager is RestStatus {
     mapping(string => address) organizations;
-    NetworkOnboardingPermissionManager public networkOnboardingPermissionManager;
+    NetworkOnboardingPermissionManager public permissionManager;
 
 
     constructor(address _permissionManager) {
@@ -36,14 +36,14 @@ contract OrganizationManager is RestStatus {
      * string, creates a new X509 contract for it’s certificate.
      * Adds the newly created Organization contract address to the organization list
      */
-    function createOrganization(string _commonName, string _cert) returns (address) {
-        if (!permissionManager.canAddOrganization(tx.origin))
-            return RestStatus.FORBIDDEN;
+    function createOrganization(string _commonName, string _certificateString) returns (uint, address) {
+        if (!permissionManager.canCreateOrganization(tx.origin))
+            return (RestStatus.FORBIDDEN, tx.origin);
 
-        mapping(string=>string) cert = parseCert(_cert);
-        Organization org = new Organization(_commonName, cert["certString"], [], Active, Network);
+        mapping(string=>string) certificate = parseCert(_certificateString);
+        Organization org = new Organization(_commonName, certificate["certString"]);
         organizations[_commonName] = org;
-        return org ;
+        return (RestStatus.CREATED, org);
     }
 
     function removeOrganization(string _commonName) returns (uint) {
@@ -60,5 +60,9 @@ contract OrganizationManager is RestStatus {
         }
 
         
+    }
+
+    function updateOrganizationCertificate(string _commonName, string _newCertificate) {
+        // TODO
     }
 }

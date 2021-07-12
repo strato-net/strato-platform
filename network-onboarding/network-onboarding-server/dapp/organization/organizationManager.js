@@ -212,5 +212,5 @@ export default {
   bindAddress,
   get,
   getByChainId,
-  getAll,
+  getAll
 }

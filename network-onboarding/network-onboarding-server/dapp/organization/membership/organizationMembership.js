@@ -4,7 +4,7 @@ import RestStatus from 'http-status-codes'
 import { getOrganizationMembershipStates } from '/helpers/enums'
 
 const contractName = 'OrganizationMembership'
-const contractFilename = `${util.cwd}/dapp/organizationMembership/contracts/OrganizationMembership.sol`
+const contractFilename = `${util.cwd}/dapp/organization/membership/contracts/OrganizationMembership.sol`
 
 const setState = async (user, contract, args, options) => {
   const callArgs = {

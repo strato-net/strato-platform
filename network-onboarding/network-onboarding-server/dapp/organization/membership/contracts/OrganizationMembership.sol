@@ -1,4 +1,5 @@
 import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
+import "/dapp/permission/contracts/NetworkOnboardingPermissionManager.sol";
 
 import "./OrganizationMembershipState.sol";
 
@@ -15,7 +16,6 @@ import "./OrganizationMembershipState.sol";
 
 contract OrganizationMembership is RestStatus, OrganizationMembershipState {
     address public owner;                   // The original contract that instantiated this one
-    address public requesterAddress;
     string public requesterCommonName;
     string public enodeAddress;
     string public organizationCommonName;
@@ -23,10 +23,10 @@ contract OrganizationMembership is RestStatus, OrganizationMembershipState {
 
     OrganizationMembershipState public state;
 
-    constructor(string _organizationCommonName, string _requesterUsername, string _enodeAddress) public {
+    constructor(string _organizationCommonName, string _requesterCommonName, string _enodeAddress) public {
         owner = msg.sender;
         organizationCommonName = _organizationCommonName;
-        requesterUsername = _requesterUsername;
+        requesterCommonName = _requesterCommonName;
         enodeAddress = _enodeAddress;
         state = OrganizationMembershipState.NEW;
     }

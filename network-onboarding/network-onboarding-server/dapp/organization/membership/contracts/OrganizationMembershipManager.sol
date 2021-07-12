@@ -6,10 +6,10 @@ import "./OrganizationMembership.sol";
 import "./OrganizationMembershipEvent.sol";
 import "./OrganizationMembershipState.sol";
 
-import "/dapp/permission/contracts/CarbonPermissionManager.sol";
+import "/dapp/permission/contracts/NetworkOnboardingPermissionManager.sol";
 import "/dapp/permission/contracts/Role.sol";
 import "/dapp/organization/contracts/OrganizationManager.sol";
-import "/dapp/user/contracts/CarbonUserManager.sol";
+import "/dapp/user/contracts/NetworkOnboardingUserManager.sol";
 import "/dapp/organization/contracts/OrganizationManager.sol";
 
 contract OrganizationMembershipManager is
@@ -19,7 +19,7 @@ contract OrganizationMembershipManager is
     OrganizationMembershipState,
     Role
 {
-    NetworkOnboardingPermissionManager networkOnboardingPermissionManager;
+    NetworkOnboardingPermissionManager permissionManager;
     OrganizationManager organizationManager;
     OrganizationMembershipFSM organizationMembershipFSM;
 
@@ -29,14 +29,14 @@ contract OrganizationMembershipManager is
         address _permissionManager,
         address _organizationManager
     ) public {
-        permissionManager = CarbonPermissionManager(_permissionManager);
+        permissionManager = NetworkOnboardingPermissionManager(_permissionManager);
         organizationManager = OrganizationManager(_organizationManager);
         organizationMembershipFSM = new OrganizationMembershipFSM();
     }
 
     function requestOrganizationMembership(
         string _organizationCommonName,
-        string _requesterUsername,
+        string _requesterCommonName,
         string _enodeAddress
     ) public returns (uint256, address) {
         address requesterAddress = tx.origin;
@@ -55,7 +55,7 @@ contract OrganizationMembershipManager is
         address organizationMembership =
             new OrganizationMembership(
                 _organizationCommonName,
-                _requesterUsername,
+                _requesterCommonName,
                 _enodeAddress
             );
 

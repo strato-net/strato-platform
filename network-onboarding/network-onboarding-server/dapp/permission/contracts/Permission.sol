@@ -29,7 +29,7 @@ contract Permission {
         INVITE_JOIN_ORG,
         CREATE_USER,
         UPDATE_ROLE_NETWORK,
-        UPDATE_ROLE_ORG
-//        UPDATE_USER,
+        UPDATE_ROLE_ORG,
+        UPDATE_USER
     }
 }

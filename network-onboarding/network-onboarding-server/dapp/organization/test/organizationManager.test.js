@@ -8,8 +8,8 @@ import oauthHelper from '/helpers/oauthHelper'
 import { getCurrentEnode } from '/helpers/enodeHelper'
 import { getRoles } from '/helpers/enums'
 
-import carbonPermissionManagerJs from '/dapp/permission/permissionManager'
-import userManagerJs from '/dapp/user/carbonUserManager'
+import networkOnboardingPermissionManagerJs from '/dapp/permission/permissionManager'
+import userManagerJs from '/dapp/user/networkOnboardingUserManager'
 import organizationManagerJs from '/dapp/organization/organizationManager'
 import factory from './organization.factory'
 
@@ -24,43 +24,43 @@ describe('Organization Manager', function () {
 
   let permissionManagerContract
   let userManagerContract
-  let globalAdmin
+  let networkAdmin
   let enodeAddress
 
   before(async () => {
-    let globalAdminToken
+    let networkAdminToken
     try {
-      globalAdminToken = await oauthHelper.getUserToken(`${process.env.GLOBAL_ADMIN_NAME}`, `${process.env.TEST_USER_PASSWORD}`)
+      networkAdminToken = await oauthHelper.getUserToken(`${process.env.NETWORK_ADMIN_NAME}`, `${process.env.TEST_USER_PASSWORD}`)
     } catch (e) {
-      console.error('ERROR: Unable to fetch the global admin token, check your OAuth settings in config', e)
+      console.error('ERROR: Unable to fetch the network admin token, check your OAuth settings in config', e)
       throw e
     }
-    const globalAdminCredentials = { token: globalAdminToken }
-    globalAdmin = await rest.createUser(globalAdminCredentials, options)
+    const networkAdminCredentials = { token: networkAdminToken }
+    networkAdmin = await rest.createUser(networkAdminCredentials, options)
     enodeAddress = getCurrentEnode()
 
-    permissionManagerContract = await carbonPermissionManagerJs.uploadContract(globalAdmin, {
-      admin: globalAdmin.address,
-      master: globalAdmin.address,
+    permissionManagerContract = await networkOnboardingPermissionManagerJs.uploadContract(networkAdmin, {
+      admin: networkAdmin.address,
+      master: networkAdmin.address,
     }, options)
-    userManagerContract = await userManagerJs.uploadContract(globalAdmin, {
+    userManagerContract = await userManagerJs.uploadContract(networkAdmin, {
       permissionManager: permissionManagerContract.address,
       enodeAddress,
     }, options)
 
-    // grant global admin role
-    await permissionManagerContract.grantGlobalAdminRole({ user: globalAdmin })
+    // grant network admin role
+    await permissionManagerContract.grantNetworkAdminRole({ user: networkAdmin })
 
-    // create global admin user
+    // create network admin user
     await userManagerContract.createUser({
-      username: 'global_admin',
+      username: 'network_admin',
       enodeAddress,
-      role: roles.GLOBAL_ADMIN,
+      role: roles.NETWORK_ADMIN,
     })
   })
 
   it('Create Organization Manager', async () => {
-    const contract = await organizationManagerJs.uploadContract(globalAdmin, {
+    const contract = await organizationManagerJs.uploadContract(networkAdmin, {
       permissionManager: permissionManagerContract.address,
       userManager: userManagerContract.address,
     }, options)
@@ -73,7 +73,7 @@ describe('Organization Manager', function () {
     } = await contract.getState()
 
     assert.equal(permissionManager, permissionManagerContract.address, 'permissionManager')
-    assert.equal(userManager, userManagerContract.address, 'userManager')
+    // assert.equal(userManager, userManagerContract.address, 'userManager')
   })
 
   describe('Organization Create/Update', () => {
@@ -82,7 +82,7 @@ describe('Organization Manager', function () {
     let organization
 
     before(async () => {
-      contract = await organizationManagerJs.uploadContract(globalAdmin, {
+      contract = await organizationManagerJs.uploadContract(networkAdmin, {
         permissionManager: permissionManagerContract.address,
         userManager: userManagerContract.address,
       }, options)
@@ -96,63 +96,9 @@ describe('Organization Manager', function () {
       // create Organization
       organization = await contract.createOrganization({
         commonName: organizationArgs.commonName,
+        certificateString: organizationArgs.certificateString
       }, options)
       assert.equal(organization.commonName, organizationArgs.commonName, 'commonName')
-    })
-
-    it('Set Organization Private Chain ID - 200 - OK', async () => {
-      const privateChainId = `${util.uid()}`.padStart(40, '0')
-
-      organization = await contract.setPrivateChainId({
-        organization: organization.address,
-        privateChainId,
-      }, options)
-      assert.equal(organization.privateChainId, privateChainId, 'privateChainId')
-    })
-
-    it('Update Organization - 200 - OK', async () => {
-      // update Organization
-      const {
-        commonName,
-        ...restArgs
-      } = organizationArgs
-
-      organization = await contract.updateOrganization({
-        organization: organization.address,
-        ...restArgs,
-      }, options)
-      assert.isSubset(organization, organizationArgs, 'organization')
-    })
-
-    it('Update Organization Partially - 200 - OK', async () => {
-      const newOrganizationArgs = {
-        ...(factory.getOrganizationArgs(util.uid())),
-      }
-
-      const {
-        commonName,
-        state,
-        addressLine2,
-        postalCode,
-      } = newOrganizationArgs
-
-      organization = await contract.updateOrganization({
-        organization: organization.address,
-        commonName,
-        state,
-        addressLine2,
-        postalCode,
-      }, options)
-      assert.equal(organization.commonName, newOrganizationArgs.commonName, 'commonName')
-      assert.equal(organization.state, newOrganizationArgs.state, 'state')
-      assert.equal(organization.addressLine2, newOrganizationArgs.addressLine2, 'addressLine2')
-      assert.equal(organization.postalCode, newOrganizationArgs.postalCode, 'postalCode')
-    })
-
-    it('Update Organization - 400 - BAD REQUEST', async () => {
-      await assert.restStatus(async () => {
-        await contract.updateOrganization({}, options)
-      }, RestStatus.BAD_REQUEST)
     })
   })
 })

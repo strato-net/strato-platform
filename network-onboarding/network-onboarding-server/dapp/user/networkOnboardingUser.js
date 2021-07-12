@@ -1,36 +1,26 @@
-import { importer, rest, util } from '/blockapps-rest-plus'
+import { util, rest, importer } from '/blockapps-rest-plus'
 import config from '/load.config'
 
-const contractName = 'Organization'
-const contractFilename = `${util.cwd}/${config.dappPath}/organization/contracts/Organization.sol`
+const contractName = 'NetworkOnboardingUser'
+const contractFilename = `${util.cwd}/${config.dappPath}/user/contracts/NetworkOnboardingUser.sol`
 
-async function uploadContract(admin, _constructorArgs, baseOptions) {
+async function uploadContract(admin, _constructorArgs, options) {
   const constructorArgs = marshalIn(_constructorArgs)
-
+  console.log("HERE2");
   const contractArgs = {
     name: contractName,
     source: await importer.combine(contractFilename),
     args: util.usc(constructorArgs),
   }
-
-  const options = {
-    ...baseOptions,
-    history: [contractName],
-  }
   const contract = await rest.createContract(admin, contractArgs, options)
   contract.src = 'removed'
-  await rest.waitForAddress(admin, contract, baseOptions)
+
   return bind(admin, contract, options)
 }
 
 function marshalIn(_args) {
-  const {
-    commonName = '',
-    certificateString=''
-  } = _args
   const args = {
-    commonName,
-    certificateString
+    ..._args,
   }
   return args
 }
@@ -43,16 +33,8 @@ function marshalOut(_args) {
 }
 
 async function getState(admin, contract, options) {
-  const [contractState] = await rest.search(admin, { name: contract.name }, {
-    ...options,
-    query: {
-      address: `eq.${contract.address}`,
-    },
-  })
-  if (contractState) {
-    return marshalOut(contractState)
-  }
-  return {}
+  const state = await rest.getState(admin, contract, options)
+  return marshalOut(state)
 }
 
 function bind(admin, _contract, defaultOptions) {

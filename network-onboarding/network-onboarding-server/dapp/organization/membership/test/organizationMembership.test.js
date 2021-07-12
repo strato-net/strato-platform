@@ -47,14 +47,12 @@ describe('OrganizationMembership', function () {
 
     const {
       organizationCommonName,
-      requesterAddress,
-      requesterUsername,
+      requesterCommonName,
       state,
     } = await contract.getState()
 
     assert.equal(organizationCommonName, args.organizationCommonName, 'organizationCommonName')
-    assert.equal(requesterAddress, args.requesterAddress, 'requesterAddress')
-    assert.equal(requesterUsername, args.requesterUsername, 'requesterUsername')
+    assert.equal(requesterCommonName, args.requesterCommonName, 'requesterUsername')
     assert.equal(OrganizationMembershipState[state], OrganizationMembershipState[OrganizationMembershipState.NEW], 'state')
   })
 
