@@ -8,11 +8,11 @@
  */
 
 contract Application {
-  address public owner;               // address of ApplicationManager
+  address public owner;                     // address of ApplicationManager
   
-  string public name;                 // application name
-  address public ownerOrganization;   // address of the org that owns this app 
-  address[] organizations;            // other orgs that participate in this app
+  string public name;                       // application name
+  address public ownerOrganization;         // address of the org that owns this app 
+  mapping(string => address) organizations;   // other orgs that participate in this app
 
   constructor(
     string _name,

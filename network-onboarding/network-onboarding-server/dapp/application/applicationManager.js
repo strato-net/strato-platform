@@ -39,6 +39,9 @@ function bind(admin, _contract, contractOptions) {
   contract.createApplication = async function (args, options = contractOptions) {
     return createApplication(admin, contract, args, options)
   }
+  contract.addOrganizationToApplication = async function (args, options = contractOptions) {
+    return addOrganizationToApplication(admin, contract, args, options)
+  }
 
   return contract
 }
@@ -128,6 +131,28 @@ async function createApplication(admin, contract, _args, baseOptions) {
   return waitApplication(admin, applicationAddress, options)
 }
 
+async function addOrganizationToApplication(admin, contract, _args, baseOptions) {
+  const { app, org } = _args
+
+  const callArgs = {
+    contract,
+    method: 'addOrganizationToApplication',
+    args: util.usc({ app, org}),
+  }
+
+  const options = {
+    ...baseOptions,
+    history: [applicationJs.contractName],
+  }
+
+  const [restStatus, appAddress] = await rest.call(admin, callArgs, options)
+
+  if (parseInt(restStatus, 10) !== RestStatus.CREATED {
+    throw new rest.RestError(restStatus, 0, { callArgs })
+  }
+
+  return waitOrganization(admin, appAddress, options)
+}
 
 
 export default {

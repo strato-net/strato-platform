@@ -131,5 +131,52 @@ describe('Application Manager', function () {
         })
       }, RestStatus.FORBIDDEN)
     })
+
+
+/* 
+
+    // TODO: orgAdmin user needs a valid cert for the app's owner for the below tests
+    //        also, would be nice to test that a user from a different org can't do it
+    it('Add Organization To Application - 200 - OK', async () => {
+      application = await orgAdminContract.addOrganizationToApplication({
+        app: application.address,
+        org: applicationArgs.ownerOrganization, // TODO: need a real org here
+      })
+      assert.equal(application.name, applicationArgs.name, 'name')
+    })
+
+    it('Add Organization To Application as Network Admin - 403 - FORBIDDEN', async () => {
+      // create Organization
+      await assert.restStatus(async () => {
+        await adminContract.addOrganizationToApplication({
+          app: application.address,
+          ownerOrganization: applicationArgs.ownerOrganization, // TODO: need a real org here
+        })
+      }, RestStatus.FORBIDDEN)
+    })
+
+    it('Add Non-Existent Organization to Application - 404 - NOT FOUND', async () => {
+      // create Organization
+      await assert.restStatus(async () => {
+        await adminContract.addOrganizationToApplication({
+          app: application.address,
+          ownerOrganization: applicationArgs.ownerOrganization,
+        })
+      }, RestStatus.NOT_FOUND)
+    })
+
+    it('Add Organization to Non-Existent Application - 404 - NOT FOUND', async () => {
+      // create Organization
+      await assert.restStatus(async () => {
+        await adminContract.addOrganizationToApplication({
+          app: applicationArgs.ownerOrganization,
+          ownerOrganization: applicationArgs.ownerOrganization, // TODO: need a real org here
+        })
+      }, RestStatus.NOT_FOUND)
+    })
+
+*/
+
+
   })
 })

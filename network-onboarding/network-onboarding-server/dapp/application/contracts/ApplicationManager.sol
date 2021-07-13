@@ -40,7 +40,7 @@ contract ApplicationManager is RestStatus {
 
         // check user's org from cert, find corresponding Org contract
 
-        // Organization organization = organizationManager.get(tx.username);
+        // Organization organization = organizationManager.get(tx.organization);
         // if (organization == address(0)) {
         //     return (RestStatus.NOT_FOUND, tx.origin);
         // }
@@ -51,5 +51,38 @@ contract ApplicationManager is RestStatus {
 
         // created
         return (RestStatus.CREATED, application);
+    }
+
+    function addOrganizationToApplication(
+          address _app,
+          address _org
+    ) public returns (uint256, address) {
+        
+        // ensure caller is an org admin
+        if (!permissionManager.canInviteToJoinApplication(tx.origin)) {
+            return (RestStatus.FORBIDDEN, tx.origin);
+        }
+
+        // ensure that the org we want to add exists
+        Organization newOrg = Organization(_org);
+        if (address(newOrg) == 0) return (RestStatus.NOT_FOUND, _org);
+
+        // get the app
+        Application app = Application(_app);
+        if (address(app) == 0) return (RestStatus.NOT_FOUND, _app);
+
+        // get the owner org
+        Organization ownerOrg = Organization(app.ownerOrganization);
+        if (address(ownerOrg) == 0) return (RestStatus.NOT_FOUND, address(0));
+
+
+        // check that this caller is actually part of this org
+        if (tx.organization != ownerOrg.commonName) {
+          return (RestStatus.FORBIDDEN, tx.origin);
+        }
+
+        // add the org to the app
+        app.organizations[newOrg.commonName] = address(newOrg);
+        return (RestStatus.OK, address(app));
     }
 }
