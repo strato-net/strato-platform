@@ -23,7 +23,7 @@ contract NetworkOnboardingDapp {
     permissionManager = new NetworkOnboardingPermissionManager(msg.sender, msg.sender);
     userManager = new NetworkOnboardingUserManager(permissionManager);
     organizationManager = new OrganizationManager(permissionManager); // userManager?
-    organizationMembershipManager = new OrganizationMembershipManager(permissionManager, organizationManager);
+    organizationMembershipManager = new OrganizationMembershipManager(permissionManager, organizationManager); // userManager?
      
     // TODO: add the rest of the manager initializations
   }

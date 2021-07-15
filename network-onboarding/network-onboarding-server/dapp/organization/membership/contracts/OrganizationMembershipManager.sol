@@ -36,8 +36,7 @@ contract OrganizationMembershipManager is
 
     function requestOrganizationMembership(
         string _organizationCommonName,
-        string _requesterCommonName,
-        string _enodeAddress
+        string _requesterCommonName
     ) public returns (uint256, address) {
         address requesterAddress = tx.origin;
         address alreadyRequested = organizationMemberships[requesterAddress];
@@ -55,8 +54,7 @@ contract OrganizationMembershipManager is
         address organizationMembership =
             new OrganizationMembership(
                 _organizationCommonName,
-                _requesterCommonName,
-                _enodeAddress
+                _requesterCommonName
             );
 
         organizationMemberships[requesterAddress] = address(organizationMembership);

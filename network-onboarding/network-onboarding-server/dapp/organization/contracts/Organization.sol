@@ -1,3 +1,5 @@
+import "/dapp/user/contracts/NetworkOnboardingUser.sol";
+
 /**
  * Organization data contract
  * The Organization contract stores data pertinent to the organization, it will also expose a number
@@ -8,27 +10,28 @@
  */
 contract Organization {
     address public owner;    // Ties the Organization contract with the OrganizationManager
-    string public commonName;
-    string public certificateString;
-    string[] public members;
-    // UserInvitationManager userInvitationManager;
+    // string public commonName;
+    string public certificateString;    // Intermediate certificate for an organization
+    address[] public members;
 
-    constructor(string _commonName, string _certificateString) {
+    constructor(string _certificateString) {
         owner = msg.sender;
-        commonName = _commonName;
+        // commonName = parseCert(_commonName)["commonName"];
         certificateString = _certificateString;
         members = [];
     }
 
-    function revoke() {
-        status = Removed;
-    }
-  
-    function addMember(string _member) {
+    function addMember(address _user) returns (uint256) {
+        // user exists
+        NetworkOnboardingUser user = NetworkOnboardingUser(_member);
+        if (address(user) == 0) return (RestStatus.NOT_FOUND, 0);
+
+        // TODO Add more verification to adding members
+
         members.push(_member);
     }
 
-    function removeMember(string _member) {
+    function removeMember(address _member) {
         // TODO
     }
 }

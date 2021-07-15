@@ -17,17 +17,15 @@ import "./OrganizationMembershipState.sol";
 contract OrganizationMembership is RestStatus, OrganizationMembershipState {
     address public owner;                   // The original contract that instantiated this one
     string public requesterCommonName;
-    string public enodeAddress;
     string public organizationCommonName;
     address public organization;
 
     OrganizationMembershipState public state;
 
-    constructor(string _organizationCommonName, string _requesterCommonName, string _enodeAddress) public {
+    constructor(string _organizationCommonName, string _requesterCommonName) public {
         owner = msg.sender;
         organizationCommonName = _organizationCommonName;
         requesterCommonName = _requesterCommonName;
-        enodeAddress = _enodeAddress;
         state = OrganizationMembershipState.NEW;
     }
 

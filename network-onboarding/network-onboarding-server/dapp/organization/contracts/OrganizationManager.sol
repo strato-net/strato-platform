@@ -1,6 +1,7 @@
 import "./Organization.sol";
 import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "/dapp/permission/contracts/NetworkOnboardingPermissionManager.sol";
+import "/dapp/user/contracts/NetworkOnboardingUserManager.sol";
 
 /**
  * The OrganizationManager contract is responsible for the onboarding and removal of organizations 
@@ -16,19 +17,14 @@ import "/dapp/permission/contracts/NetworkOnboardingPermissionManager.sol";
  */
 
 contract OrganizationManager is RestStatus {
-    mapping(string => address) organizations;
+    mapping(string => address) organizations;       // Ideally we would like to iterate through the list too
     NetworkOnboardingPermissionManager public permissionManager;
+    NetworkOnboardingUserManager public userManager;
 
 
-    constructor(address _permissionManager) {
+    constructor(address _permissionManager, address _userManager) {
         permissionManager = NetworkOnboardingPermissionManager(_permissionManager);
-    }
-
-    /**
-     * Returns the mapping of organization common names to Organization contract addresses
-     */
-    function getOrganizations() returns (mapping(string=>address)) {
-        return organizations;
+        userManager = NetworkOnboardingUserManager(_userManager);
     }
 
     /**
@@ -40,8 +36,9 @@ contract OrganizationManager is RestStatus {
         if (!permissionManager.canCreateOrganization(tx.origin))
             return (RestStatus.FORBIDDEN, tx.origin);
 
-        mapping(string=>string) certificate = parseCert(_certificateString);
-        Organization org = new Organization(_commonName, certificate["certString"]);
+        // TODO: Add check for if the organization already exists
+
+        Organization org = new Organization(_commonName, _certificateString);
         organizations[_commonName] = org;
         return (RestStatus.CREATED, org);
     }
@@ -60,6 +57,24 @@ contract OrganizationManager is RestStatus {
         }
 
         
+    }
+
+    function updateOrganizationCertificate() public (uint256, address) {
+        // TODO
+    }
+
+    /**
+     * Returns the mapping of organization common names to Organization contract addresses
+     */
+    function getOrganizations() returns (mapping(string=>address)) {
+        return organizations;
+    }
+
+    function getOrganization(string _orgName) returns (uint256, address) {
+        if (organziations[_orgName] == address(0))
+            return (RestStatus.NOT_FOUND, address(0));
+        
+        return (RestStatus.OK, organizations[_orgName]);
     }
 
     function updateOrganizationCertificate(string _commonName, string _newCertificate) {
