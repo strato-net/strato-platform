@@ -45,9 +45,10 @@
     "test:organization": "mocha --require @babel/register dapp/organization/test -b",
     "test:organization-membership": "mocha --require @babel/register dapp/organization/membership/test -b",
     "test:user": "mocha --require @babel/register dapp/user/test -b",
+    "test:application": "mocha --require @babel/register dapp/application/test -b",
     "test:dapp": "mocha --require @babel/register dapp/dapp/test/dapp.test.js -b",
     "test:e2e": "mocha --require @babel/register dapp/dapp/test/e2e.test.js -b",
-    "test": "yarn test:permission && yarn test:organization && yarn test:organization-membership && yarn test:user && yarn test:dapp && yarn test:e2e",
+    "test": "yarn test:permission && yarn test:organization && yarn test:organization-membership && yarn test:application && yarn test:user && yarn test:dapp && yarn test:e2e",
     "clean": "rm -f config/*.deploy.yaml config/testdeploy.*"
   }
 }

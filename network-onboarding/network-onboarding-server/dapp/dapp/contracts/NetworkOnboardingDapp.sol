@@ -5,6 +5,9 @@ import "/dapp/user/contracts/NetworkOnboardingUserManager.sol";
 import "/dapp/organization/contracts/OrganizationManager.sol";
 import "/dapp/organization/membership/contracts/OrganizationMembershipManager.sol";
 
+import "/dapp/application/contracts/ApplicationManager.sol";
+
+
 /**
  * Single entry point to all the project's contract
  * Deployed by the deploy script
@@ -17,6 +20,7 @@ contract NetworkOnboardingDapp {
   NetworkOnboardingUserManager public userManager;
   OrganizationManager public organizationManager;
   OrganizationMembershipManager public organizationMembershipManager;
+  ApplicationManager public applicationManager;
 
   constructor() {
     owner = msg.sender;
@@ -25,6 +29,8 @@ contract NetworkOnboardingDapp {
     organizationManager = new OrganizationManager(permissionManager); // userManager?
     organizationMembershipManager = new OrganizationMembershipManager(permissionManager, organizationManager); // userManager?
      
+    applicationManager = new ApplicationManager(permissionManager, /* TODO */ address(0)); 
+
     // TODO: add the rest of the manager initializations
   }
 }
