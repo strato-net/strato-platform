@@ -26,7 +26,7 @@ import qualified Data.Pool as Pool
 import qualified Data.Map as M
 import Data.Set (Set)
 import qualified Data.Set as Set
-import qualified Network
+import qualified DeprecatedNetworkFunction
 
 -- local
 import Network.Kafka.Protocol
@@ -364,7 +364,7 @@ withAddressHandle address kafkaAction = do
     where
       mkPool :: KafkaAddress -> IO (Pool.Pool Handle)
       mkPool a = Pool.createPool (createHandle a) hClose 1 10 1
-        where createHandle (h, p) = Network.connectTo (h ^. hostString) (p ^. portId)
+        where createHandle (h, p) = DeprecatedNetworkFunction.connectTo (h ^. hostString) (fromIntegral p)
 
 broker2address :: Broker -> KafkaAddress
 broker2address broker = (,) (broker ^. brokerHost) (broker ^. brokerPort)

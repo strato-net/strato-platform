@@ -37,7 +37,7 @@ import qualified Data.Set                    as S
 import           Data.Swagger                         hiding (Format, format)
 import qualified Data.Text                   as T
 import qualified GHC.Generics                as GHCG
-import           Network.Socket.Internal
+import           Network.Socket
 import           Test.QuickCheck             (suchThat, vectorOf)
 import           Test.QuickCheck.Arbitrary
 import           Test.QuickCheck.Arbitrary.Generic

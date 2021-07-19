@@ -5,7 +5,7 @@
 module Blockchain.Strato.Discovery.UDPSpec where
 
 import           Data.Bits
-import           Network.Socket                  (inet_addr, tupleToHostAddress6)
+import           Network.Socket                  (tupleToHostAddress, tupleToHostAddress6)
 import           Test.Hspec
 
 import           Blockchain.Strato.Discovery.UDP
@@ -15,7 +15,7 @@ spec :: Spec
 spec = do
     describe "IAddr Format instance" $ do
         it "formats an IPv4 address" $ do
-            addr <- inet_addr "127.0.0.1"
+            let addr = tupleToHostAddress (127, 0, 0, 1)
             format (IPV4Addr addr) `shouldBe` "127.0.0.1"
 
         it "formats an IPv6 address" $ do

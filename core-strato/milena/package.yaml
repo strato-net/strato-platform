@@ -41,6 +41,8 @@ library:
     - Network.Kafka.Consumer
     - Network.Kafka.Protocol
     - Network.Kafka.Producer
+  other-modules:
+    - DeprecatedNetworkFunction
 
   dependencies:
     - base >=4.7 && <5
@@ -53,7 +55,7 @@ library:
     - monad-control >=1.0 && <1.1
     - mtl >=2.1 && <2.3
     - murmur-hash >=0.1.0.8 && <0.2
-    - network >=2.4 && <3.0
+    - network 
     - random >=1.0 && <1.2
     - resource-pool >=0.2.3.2 && <0.3
     - semigroups >=0.16.2.2 && <0.19
