@@ -110,20 +110,11 @@ pipeline {
             '''
           },
 
-          'Core Strato tests': {
+          'Strato unit tests': {
             sh '''#!/bin/bash -le
               set -x
-              echo "Running core-strato unit tests"
-              cd strato-worktree/core-strato
-              ./run_unit_tests.sh
-            '''
-          },
-
-          'Bloch tests': {
-            sh '''#!/bin/bash -le
-              set -x
-              echo 'Running BlockApps Haskell tests'
-              cd strato-worktree/blockapps-haskell
+              echo "Running unit tests"
+              cd strato-worktree
               ./run_unit_tests.sh
             '''
           },
@@ -175,14 +166,6 @@ pipeline {
                 sh 'SERVER=jenkinstest yarn test'
               }
             }
-          },
-
-          'Shared tests': {
-            sh '''#!/bin/bash -le
-              set -x
-              cd strato-worktree
-              stack test ./shared-util/
-            '''
           },
 
           'SMD tests': {
