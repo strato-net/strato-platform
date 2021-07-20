@@ -17,11 +17,11 @@ data MigrationErrorBehavior = Throw | Catch
 
 runMigrations :: Connection -> IO Int64
 runMigrations conn = do
-  dbsvs <- (query_ conn getSchemaVersion :: IO [Only Int]) `catch` (\e@SqlError{..} -> putStrLn "Error getting schema version" >> print e >> return [Only 0])
+  dbsvs <- (query_ conn getSchemaVersion :: IO [Only Int]) `catch` (\e@SqlError{} -> putStrLn "Error getting schema version" >> print e >> return [Only 0])
   let dbSchemaVersion = maybe 0 fromOnly $ listToMaybe dbsvs
   forM_ (drop dbSchemaVersion migrations) $ \(meb,q) -> do
     case meb of
-      Catch -> (execute_ conn q) `catch` (\e@SqlError{..} -> putStrLn "Error suppressed: " >> print e >> return 0)
+      Catch -> (execute_ conn q) `catch` (\e@SqlError{} -> putStrLn "Error suppressed: " >> print e >> return 0)
       Throw -> execute_ conn q
   updateMigrationNumber conn
 
