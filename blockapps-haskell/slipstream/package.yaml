@@ -3,8 +3,6 @@ version: 0.1.0.0
 synopsis: Solidity datatypes
 description: Solidity datatypes
 homepage: https://github.com/blockapps/blockapps-haskell/slipstream
-license: BSD3
-license-file: LICENSE
 copyright: 2016 BlockApps
 category: Web
 
