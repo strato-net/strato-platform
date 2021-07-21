@@ -1,5 +1,6 @@
 
--- {-# OPTIONS -fno-warn-unused-top-binds #-}
+{-# OPTIONS -fno-warn-unused-top-binds #-}
+{-# OPTIONS -fno-warn-unused-imports #-}
 
 module Network.Haskoin.Crypto.Keys
 ( PubKeyI(pubKeyCompressed, pubKeyPoint)
@@ -62,7 +63,7 @@ type PubKeyU = PubKeyI Uncompressed
 data PubKeyI c = PubKeyI
     { pubKeyPoint      :: !Point
     , pubKeyCompressed :: !Bool
-    } deriving (Eq, Read, Show)
+    } deriving (Read, Show)
 
 instance NFData (PubKeyI c) where
     rnf (PubKeyI p c) = rnf p `seq` rnf c

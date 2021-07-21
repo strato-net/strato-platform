@@ -1,12 +1,13 @@
+
+-- {-# OPTIONS -fno-warn-unused-top-binds #-}
+-- {-# OPTIONS -fno-warn-unused-imports #-}
+
+
 module Network.Haskoin.Crypto.Point
 ( Point( InfPoint )
 , makePoint
-, makeInfPoint
-, getAffine, getX, getY
-, validatePoint
-, isInfPoint
-, addPoint
-, doublePoint
+, getAffine
+, getX, getY
 , mulPoint
 , shamirsTrick
 , curveB
@@ -57,9 +58,6 @@ makePoint x y
   where
     point = Point x y 1
 
-makeInfPoint :: Point
-makeInfPoint = InfPoint
-
 -- Get the original (x,y) coordinates from the Jacobian triple (X,Y,Z)
 getAffine :: Point -> Maybe (FieldP, FieldP)
 getAffine point = case point of
@@ -81,11 +79,6 @@ validatePoint point = case getAffine point of
     Nothing    -> False
     -- 3.2.2.1.2 (check that the point lies on the curve)
     Just (x,y) -> y ^ (2 :: Int) == x ^ (3 :: Int) + (curveA * x) + curveB
-
-isInfPoint :: Point -> Bool
-isInfPoint InfPoint      = True
-isInfPoint (Point _ _ 0) = True
-isInfPoint _             = False
 
 -- Elliptic curve point addition
 -- http://en.wikibooks.org/wiki/Cryptography/Prime_Curve/Jacobian_Coordinates

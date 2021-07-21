@@ -1,11 +1,16 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
+
+-- {-# OPTIONS -fno-warn-unused-top-binds #-}
+-- {-# OPTIONS -fno-warn-unused-imports #-}
+
+
 module Network.Haskoin.Crypto.BigWord
 (
 -- Useful type aliases
-  TxHash
-, BlockHash
+--  TxHash
+  BlockHash
 , Word512
 , Word256
 , Word160
@@ -15,25 +20,11 @@ module Network.Haskoin.Crypto.BigWord
 
 -- Data types
 , BigWord(..)
-, BigWordMod(..)
-, Mod512
-, Mod256
-, Mod256Tx
-, Mod256Block
-, Mod160
-, Mod128
-, ModP
-, ModN
 
--- Functions
-, inverseP
+---- Functions
 , inverseN
 , quadraticResidue
 , isIntegerValidKey
-, encodeTxHashLE
-, decodeTxHashLE
-, encodeBlockHashLE
-, decodeBlockHashLE
 ) where
 
 import Test.QuickCheck
