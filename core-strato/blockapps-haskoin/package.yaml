@@ -24,14 +24,14 @@ dependencies:
 library:
   source-dirs: ./
   exposed-modules:
-    - Network.Haskoin.Util
+#    - Network.Haskoin.Util
     - Network.Haskoin.Crypto
-    - Network.Haskoin.Node
-    - Network.Haskoin.Script
-    - Network.Haskoin.Transaction
-    - Network.Haskoin.Block
+#    - Network.Haskoin.Node
+#    - Network.Haskoin.Script
+#    - Network.Haskoin.Transaction
+#    - Network.Haskoin.Block
     - Network.Haskoin.Constants
-    - Network.Haskoin.Test
+#    - Network.Haskoin.Test
     - Network.Haskoin.Internals
   default-extensions:
     - EmptyDataDecls
@@ -62,35 +62,5 @@ library:
   - text
   - time
   - transformers
-
-
-tests:
-  test-blockapps-haskoin:
-    main:           Main.hs
-    source-dirs: tests/
-    dependencies:
-      - QuickCheck
-      - aeson
-      - binary
-      - blockapps-haskoin
-      - bytestring
-      - containers
-      - HUnit
-      - mtl
-      - split
-      - test-framework
-      - test-framework-quickcheck2
-      - test-framework-hunit
-
-benchmarks:
-  bigword:
-    main: Bigword.hs
-    source-dirs: bench/
-    dependencies:
-      - blockapps-haskoin
-      - criterion
-      - deepseq
-      - largeword
-      - data-dword
 
 
