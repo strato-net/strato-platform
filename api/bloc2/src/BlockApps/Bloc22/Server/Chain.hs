@@ -172,7 +172,7 @@ postChainInfo :: (MonadIO m, MonadLogger m, HasBlocSQL m,
 postChainInfo chainInput = withLastBlockHash $ \bHash -> do
   evmCompatibleOn <- fmap evmCompatible getBlocEnv
   if evmCompatibleOn
-      then throwIO $ UserError $ Text.pack "Error: EVM Compatibility flag is On. Private chains cannot be used."
+      then throwIO $ UserError $ Text.pack "Error: EVM Compatibility flag is On. This feature cannot be used."
   else do
       (mCmId, chainInfo') <- createChainInfo bHash chainInput
       chainId <- CORE.postChain chainInfo'

@@ -212,7 +212,7 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
                             Just vm -> \_ _ _ -> throwIO $ UserError $ Text.pack
                                                $ "Invalid value for VM choice: " ++ show vm
             if evmCompatibleOn && (Map.lookup "VM" =<< md) == Just "SolidVM"
-                then throwIO $ UserError $ Text.pack "Error: EVM Compatibility flag is On. SolidVM cannot be used."
+                then throwIO $ UserError $ Text.pack "Error: EVM Compatibility flag is On. This feature cannot be used."
             else do
                 fmap ((:[]) . BlocTxResult) $ poster cacheNonce bcp userName
           xs -> do
@@ -235,7 +235,7 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
                   Just vm -> \_ _ _ -> throwIO $ UserError $ Text.pack
                                      $ "Invalid value for VM choice: " ++ show vm
             if evmCompatibleOn && (Map.lookup "VM" =<< md) == Just "SolidVM"
-              then throwIO $ UserError $ Text.pack "Error: EVM Compatibility flag is On. SolidVM cannot be used."
+              then throwIO $ UserError $ Text.pack "Error: EVM Compatibility flag is On. This feature cannot be used."
             else do
               fmap BlocTxResult <$> poster cacheNonce bclp userName
         FUNCTION -> case txs of
