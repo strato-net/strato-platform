@@ -1,4 +1,7 @@
 {-# OPTIONS_GHC -fno-cse -fno-full-laziness #-}
+
+-- {-# OPTIONS -fno-warn-unused-top-binds #-}
+
 {-|
   Network specific constants
 -}
@@ -6,31 +9,18 @@ module Network.Haskoin.Constants
 ( -- ** Data
   Network(..)
   -- ** Functions
-, switchToTestnet3
-, setNetwork
-, getNetwork
-  -- ** Network parameters
-, networkName
-, addrPrefix
-, scriptPrefix
-, secretPrefix
-, extPubKeyPrefix
-, extSecretPrefix
-, networkMagic
-, genesisHeader
-, maxBlockSize
-, maxSatoshi
-, haskoinUserAgent
-, defaultPort
-, allowMinDifficultyBlocks
-, powLimit
-, targetTimespan
-, targetSpacing
-, checkpoints
+ , addrPrefix
+ , scriptPrefix
+ , secretPrefix
+ , extPubKeyPrefix
+ , extSecretPrefix
+-- , networkMagic
+ , maxBlockSize
+ , haskoinUserAgent
 ) where
 
 import Data.Bits (shiftR)
-import Data.IORef (IORef, newIORef, readIORef, writeIORef)
+import Data.IORef (IORef, newIORef, readIORef)
 import Data.Word (Word8, Word32, Word64)
 import Network.Haskoin.Crypto.BigWord
 import Network.Haskoin.Block.Types
@@ -56,15 +46,6 @@ data Network = Network
     , getCheckpoints                :: ![(Int, BlockHash)]
     } deriving (Eq, Show, Read)
 
--- | Switch to Testnet3.  Do at start of program.
-switchToTestnet3 :: IO ()
-switchToTestnet3 = setNetwork testnet3
-
--- | Change network constants manually.  If switching to Testnet3, use
--- switchToTestnet3 instead.
-setNetwork :: Network -> IO ()
-setNetwork n = writeIORef networkRef n
-
 {-# NOINLINE networkRef #-}
 -- | Use this if you want to change constants to something other than Testnet3.
 networkRef :: IORef Network
@@ -74,10 +55,6 @@ networkRef = unsafePerformIO $ newIORef prodnet
 -- | Read current network constants record
 getNetwork :: Network
 getNetwork = unsafePerformIO $ readIORef networkRef
-
--- | Name of the bitcoin network
-networkName :: String
-networkName = getNetworkName getNetwork
 
 -- | Prefix for base58 PubKey hash address
 addrPrefix :: Word8
@@ -99,49 +76,13 @@ extPubKeyPrefix = getExtPubKeyPrefix getNetwork
 extSecretPrefix :: Word32
 extSecretPrefix = getExtSecretPrefix getNetwork
 
--- | Network magic bytes
-networkMagic :: Word32
-networkMagic = getNetworkMagic getNetwork
-
--- | Genesis block header information
-genesisHeader :: BlockHeader
-genesisHeader = getGenesisHeader getNetwork
-
 -- | Maximum size of a block in bytes
 maxBlockSize :: Int
 maxBlockSize = getMaxBlockSize getNetwork
 
--- | Maximum number of satoshi
-maxSatoshi :: Word64
-maxSatoshi = getMaxSatoshi getNetwork
-
 -- | User agent string
 haskoinUserAgent :: String
 haskoinUserAgent = getHaskoinUserAgent getNetwork
-
--- | Default port
-defaultPort :: Int
-defaultPort = getDefaultPort getNetwork
-
--- | Allow relaxed difficulty transition rules
-allowMinDifficultyBlocks :: Bool
-allowMinDifficultyBlocks = getAllowMinDifficultyBlocks getNetwork
-
--- | Lower bound for the proof of work difficulty
-powLimit :: Integer
-powLimit = getPowLimit getNetwork
-
--- | Time between difficulty cycles (2 weeks on average)
-targetTimespan :: Word32
-targetTimespan = getTargetTimespan getNetwork
-
--- | Time between blocks (10 minutes per block)
-targetSpacing :: Word32
-targetSpacing = getTargetSpacing getNetwork
-
--- | Checkpoints to enfore
-checkpoints :: [(Int, BlockHash)]
-checkpoints = getCheckpoints getNetwork
 
 prodnet :: Network
 prodnet = Network
@@ -207,41 +148,6 @@ prodnet = Network
           )
         , ( 279000
           , 0x0000000000000001ae8c72a0b0c301f67e3afca10e819efa9041e458e9bd7e40
-          )
-        ]
-    }
-
-testnet3 :: Network
-testnet3 = Network
-    { getNetworkName = "testnet"
-    , getAddrPrefix = 111
-    , getScriptPrefix = 196
-    , getSecretPrefix = 239
-    , getExtPubKeyPrefix = 0x043587cf
-    , getExtSecretPrefix = 0x04358394
-    , getNetworkMagic = 0x0b110907
-    , getGenesisHeader = BlockHeader
-        -- Hash 000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943
-        { blockVersion   = 0x01
-        , prevBlock      = 0x00
-        , merkleRoot     =
-            0x3ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a
-        , blockTimestamp = 1296688602
-        , blockBits      = 486604799
-        , bhNonce        = 414098458
-        }
-    , getMaxBlockSize = 1000000
-    , getMaxSatoshi = 2100000000000000
-    , getHaskoinUserAgent = "/haskoin-testnet:0.2.0/"
-    , getDefaultPort = 18333
-    , getAllowMinDifficultyBlocks = True
-    , getPowLimit = fromIntegral (maxBound `shiftR` 32 :: Word256)
-    , getTargetTimespan = 14 * 24 * 60 * 60
-    , getTargetSpacing = 10 * 60
-    , getCheckpoints =
-        -- These are in little endian notation!
-        [ ( 546
-          , 0x000000002a936ca763904c3c35fce2f3556c559c0214345d31b1bcebf76acb70
           )
         ]
     }

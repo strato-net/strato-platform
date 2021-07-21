@@ -1,54 +1,37 @@
+
+-- {-# OPTIONS -fno-warn-unused-top-binds #-}
+
 module Network.Haskoin.Crypto.Keys
 ( PubKeyI(pubKeyCompressed, pubKeyPoint)
 , PubKey, PubKeyC, PubKeyU
 , makePubKey
 , makePubKeyG
-, makePubKeyC
 , makePubKeyU
-, toPubKeyG
 , eitherPubKey
-, maybePubKeyC
 , maybePubKeyU
-, isValidPubKey
 , derivePubKey
 , pubKeyAddr
 , PrvKeyI(prvKeyCompressed, prvKeyFieldN)
-, PrvKey, PrvKeyC, PrvKeyU
+, PrvKey
 , makePrvKey
-, makePrvKeyG
-, makePrvKeyC
-, makePrvKeyU
-, toPrvKeyG
-, eitherPrvKey
-, maybePrvKeyC
-, maybePrvKeyU
-, isValidPrvKey
 , fromPrvKey
 , encodePrvKey
 , decodePrvKey
-, prvKeyPutMonad
-, prvKeyGetMonad
-, fromWif
-, toWif
 , curveG
 ) where
 
 import Control.Applicative ((<|>))
-import Control.Monad (when, unless, guard, mzero)
+import Control.Monad (when, unless, mzero)
 import Control.DeepSeq (NFData, rnf)
 
 import Data.Aeson (Value(String), FromJSON, ToJSON, parseJSON, toJSON, withText)
-import Data.Maybe (isJust, fromJust, fromMaybe)
+import Data.Maybe (isJust, fromJust)
 import Data.Binary (Binary, get, put)
 import Data.Binary.Get (Get, getWord8)
 import Data.Binary.Put (Put, putWord8)
 import Data.Text (pack, unpack)
 import qualified Data.ByteString as BS
     ( ByteString
-    , head, tail
-    , last, init
-    , cons, snoc
-    , length
     )
 
 import Network.Haskoin.Crypto.Curve
@@ -56,7 +39,6 @@ import Network.Haskoin.Crypto.BigWord
 import Network.Haskoin.Crypto.Point
 import Network.Haskoin.Crypto.Base58
 import Network.Haskoin.Crypto.Hash
-import Network.Haskoin.Constants
 import Network.Haskoin.Util
 
 -- | G parameter of the EC curve expressed as a Point
@@ -127,20 +109,10 @@ eitherPubKey pk
     | pubKeyCompressed pk = Right $ makePubKeyC $ pubKeyPoint pk
     | otherwise           = Left  $ makePubKeyU $ pubKeyPoint pk
 
-maybePubKeyC :: PubKeyI c -> Maybe PubKeyC
-maybePubKeyC pk
-    | pubKeyCompressed pk = Just $ makePubKeyC $ pubKeyPoint pk
-    | otherwise           = Nothing
-
 maybePubKeyU :: PubKeyI c -> Maybe PubKeyU
 maybePubKeyU pk
     | not (pubKeyCompressed pk) = Just $ makePubKeyU $ pubKeyPoint pk
     | otherwise                 = Nothing
-
--- | Returns True if the public key is valid. This will check if the public
--- key point lies on the curve.
-isValidPubKey :: PubKeyI c -> Bool
-isValidPubKey = validatePoint . pubKeyPoint
 
 -- | Derives a public key from a private key. This function will preserve
 -- information on key compression (PrvKey becomes PubKey and PrvKeyU becomes
@@ -225,8 +197,8 @@ instance NFData (PrvKeyI c) where
     rnf (PrvKeyI d c) = rnf d `seq` rnf c
 
 type PrvKey = PrvKeyI Generic
-type PrvKeyC = PrvKeyI Compressed
-type PrvKeyU = PrvKeyI Uncompressed
+--type PrvKeyC = PrvKeyI Compressed
+--type PrvKeyU = PrvKeyI Uncompressed
 
 makePrvKeyI :: Integer -> Bool -> Maybe (PrvKeyI c)
 makePrvKeyI d c
@@ -235,33 +207,6 @@ makePrvKeyI d c
 
 makePrvKey :: Integer -> Maybe PrvKey
 makePrvKey d = makePrvKeyI d True
-
-makePrvKeyG :: Bool -> Integer -> Maybe PrvKey
-makePrvKeyG c d = makePrvKeyI d c
-
-makePrvKeyC :: Integer -> Maybe PrvKeyC
-makePrvKeyC d = makePrvKeyI d True
-
-makePrvKeyU :: Integer -> Maybe PrvKeyU
-makePrvKeyU d = makePrvKeyI d False
-
-toPrvKeyG :: PrvKeyI c -> PrvKey
-toPrvKeyG (PrvKeyI d c) = PrvKeyI d c
-
-eitherPrvKey :: PrvKeyI c -> Either PrvKeyU PrvKeyC
-eitherPrvKey (PrvKeyI d compressed)
-    | compressed = Right $ PrvKeyI d compressed
-    | otherwise  = Left  $ PrvKeyI d compressed
-
-maybePrvKeyC :: PrvKeyI c -> Maybe PrvKeyC
-maybePrvKeyC (PrvKeyI d compressed)
-    | compressed = Just $ PrvKeyI d compressed
-    | otherwise  = Nothing
-
-maybePrvKeyU :: PrvKeyI c -> Maybe PrvKeyU
-maybePrvKeyU (PrvKeyI d compressed)
-    | not compressed = Just $ PrvKeyI d compressed
-    | otherwise      = Nothing
 
 -- | Returns True if the private key is valid. This will check if the integer
 -- value representing the private key is greater than 0 and smaller than the
@@ -285,42 +230,8 @@ decodePrvKey :: (Integer -> Maybe (PrvKeyI c)) -> BS.ByteString
              -> Maybe (PrvKeyI c)
 decodePrvKey f bs = f . fromIntegral =<< (decodeToMaybe bs :: Maybe Word256)
 
-prvKeyGetMonad :: (Integer -> Maybe (PrvKeyI c)) -> Get (PrvKeyI c)
-prvKeyGetMonad f = do
-    i <- get :: Get Word256
-    fromMaybe err $ return <$> f (fromIntegral i)
-  where
-    err = fail "Get: Invalid private key encoding"
-
 prvKeyPutMonad :: PrvKeyI c -> Put
 prvKeyPutMonad k
     | prvKeyFieldN k == 0 = error "Put: 0 is an invalid private key"
     | otherwise           = put (fromIntegral (prvKeyFieldN k) :: Word256)
-
--- | Decodes a private key from a WIF encoded String. This function can fail
--- if the input string does not decode correctly as a base 58 string or if
--- the checksum fails.
--- <http://en.bitcoin.it/wiki/Wallet_import_format>
-fromWif :: String -> Maybe PrvKey
-fromWif str = do
-    bs <- decodeBase58Check $ stringToBS str
-    -- Check that this is a private key
-    guard (BS.head bs == secretPrefix)
-    case BS.length bs of
-        33 -> do               -- Uncompressed format
-            let i = bsToInteger (BS.tail bs)
-            makePrvKeyG False i
-        34 -> do               -- Compressed format
-            guard (BS.last bs == 0x01)
-            let i = bsToInteger $ BS.tail $ BS.init bs
-            makePrvKeyG True i
-        _  -> Nothing          -- Bad length
-
--- | Encodes a private key into WIF format
-toWif :: PrvKeyI c -> String
-toWif k = bsToString $ encodeBase58Check $ BS.cons secretPrefix enc
-  where
-    enc | prvKeyCompressed k = BS.snoc bs 0x01
-        | otherwise          = bs
-    bs = encodePrvKey k
 

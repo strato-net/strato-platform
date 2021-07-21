@@ -37,7 +37,7 @@ import qualified Data.Swagger                         as Sw
 import qualified Data.Text                            as T
 import           Database.Persist.TH
 import           GHC.Generics
-import           Network.Haskoin.Crypto               hiding (Address, Word160)
+import           Network.Haskoin.Crypto               hiding (Word160)
 import           Servant.API
 import           Servant.Docs
 import qualified Text.PrettyPrint.ANSI.Leijen         as Lei

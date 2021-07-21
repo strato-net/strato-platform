@@ -12,7 +12,7 @@ import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Base64 as B64
 import Data.List (sort)
 import Control.Monad
-import Network.Haskoin.Crypto hiding (Address, derivePubKey)
+import Network.Haskoin.Crypto hiding (derivePubKey)
 import System.Entropy
 import HFlags
 

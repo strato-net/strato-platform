@@ -17,7 +17,7 @@ import qualified Data.ByteString.Lazy        as BL
 import           System.Directory
 import           System.Entropy
 
-import           Network.Haskoin.Crypto      hiding (Address)
+import           Network.Haskoin.Crypto
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.ChainInfo
