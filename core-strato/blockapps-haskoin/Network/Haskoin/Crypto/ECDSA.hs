@@ -1,24 +1,25 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+--{-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
 -- | ECDSA Signatures
 module Network.Haskoin.Crypto.ECDSA
 ( SecretT
 , Signature(..)
 , withSource
 , devURandom
-, devRandom
-, signMsg
-, detSignMsg
-, unsafeSignMsg
+--, devRandom
+--, signMsg
+--, detSignMsg
+--, unsafeSignMsg
 , verifySig
 , genPrvKey
-, isCanonicalHalfOrder
+--, isCanonicalHalfOrder
 ) where
 
 import System.IO
 
 import Control.DeepSeq (NFData, rnf)
-import Control.Monad (liftM, liftM2, guard, unless)
+import Control.Monad (liftM, liftM2, unless)
 import Control.Monad.Trans (lift)
 import qualified Control.Monad.State as S
     ( StateT
@@ -26,7 +27,7 @@ import qualified Control.Monad.State as S
     , get, put
     )
 
-import Data.Maybe (fromJust, fromMaybe)
+import Data.Maybe (fromJust)
 import Data.Binary (Binary, get, put)
 import Data.Binary.Put (putWord8, putByteString)
 import Data.Binary.Get (getWord8)
@@ -37,7 +38,6 @@ import qualified Data.ByteString as BS
     ( ByteString
     , length
     , hGet
-    , empty
     )
 
 import Test.QuickCheck (Arbitrary(..))
@@ -71,11 +71,6 @@ withSource f m = do
 devURandom :: Int -> IO BS.ByteString
 devURandom i = withBinaryFile "/dev/urandom" ReadMode $ flip BS.hGet i
 
--- | \/dev\/random entropy source. This is only available on machines
--- supporting it. This function is meant to be used together with 'withSource'.
-devRandom :: Int -> IO BS.ByteString
-devRandom i = withBinaryFile "/dev/random" ReadMode $ flip BS.hGet i
-
 -- | Generate a new random 'FieldN' value from the 'SecretT' monad. This will
 -- invoke the HMAC DRBG routine. Of the internal entropy pool of the HMAC DRBG
 -- was stretched too much, this function will reseed it.
@@ -103,17 +98,6 @@ genPrvKey = liftM (fromJust . makePrvKey . toInteger) nextSecret
 instance Arbitrary PrvKey where
   arbitrary = withSource slowRandBs genPrvKey
 
--- Section 3.2.1 http://www.secg.org/download/aid-780/sec1-v2.pdf
--- Produce a new private/public key pair from the 'SecretT' monad.
-genKeyPair :: Monad m => SecretT m (FieldN, Point)
-genKeyPair = do
-    -- 3.2.1.1
-    d <- nextSecret
-    -- 3.2.1.2
-    let q = mulPoint d curveG
-    -- 3.2.1.3
-    return (d,q)
-
 -- | Data type representing an ECDSA signature.
 data Signature =
     Signature { sigR :: !FieldN
@@ -126,60 +110,6 @@ instance NFData Signature where
 
 instance Arbitrary Signature where
   arbitrary = liftM2 Signature arbitrary arbitrary
-
--- Section 4.1.3 http://www.secg.org/download/aid-780/sec1-v2.pdf
--- | Safely sign a message inside the 'SecretT' monad. The 'SecretT' monad will
--- generate a new nonce for each signature.
-signMsg :: Monad m => Word256 -> PrvKey -> SecretT m Signature
-signMsg h d
-    | fromPrvKey d == 0 = error "signMsg: Invalid private key 0"
-    | otherwise = do
-        -- 4.1.3.1
-        (k,p) <- genKeyPair
-        case unsafeSignMsg h (prvKeyFieldN d) (k,p) of
-            (Just sig) -> return sig
-            -- If signing failed, retry with a new nonce
-            Nothing    -> signMsg h d
-
--- | Sign a message using ECDSA deterministic signatures as defined by
--- RFC 6979 <http://tools.ietf.org/html/rfc6979>
-detSignMsg :: Word256 -> PrvKey -> Signature
-detSignMsg h d
-    | fromPrvKey d == 0 = error "detSignMsg: Invalid private key 0"
-    | otherwise = go $ hmacDRBGNew (encodePrvKey d) (encode' h) BS.empty
-  where
-    go ws = case hmacDRBGGen ws 32 BS.empty of
-        (_, Nothing)  -> error "detSignMsg: No suitable K value found"
-        (ws', Just k) ->
-            let kI   = bsToInteger k
-                p    = mulPoint (fromInteger kI) curveG
-                sigM = unsafeSignMsg h (prvKeyFieldN d) (fromInteger kI,p)
-                in if isIntegerValidKey kI
-                       then fromMaybe (go ws') sigM
-                       else go ws'
-
--- Signs a message by providing the nonce
--- Re-using the same nonce twice will expose the private keys
--- Use signMsg within the SecretT monad or detSignMsg instead
--- Section 4.1.3 http://www.secg.org/download/aid-780/sec1-v2.pdf
-unsafeSignMsg :: Word256 -> FieldN -> (FieldN, Point) -> Maybe Signature
-unsafeSignMsg _ 0 _ = Nothing
-unsafeSignMsg h d (k,p) = do
-    -- 4.1.3.1 (4.1.3.2 not required)
-    (x,_) <- getAffine p
-    -- 4.1.3.3
-    let r = (fromIntegral x :: FieldN)
-    guard (r /= 0)
-    -- 4.1.3.4 / 4.1.3.5
-    let e = (fromIntegral h :: FieldN)
-    -- 4.1.3.6
-    let s' = (e + r*d)/k
-        -- Canonicalize signatures: s <= order/2
-        -- maxBound/2 = (maxBound+1)/2 = order/2 (because order is odd)
-        s  = if s' > (maxBound `div` 2) then (-s') else s'
-    guard (s /= 0)
-    -- 4.1.3.7
-    return $ Signature r s
 
 -- Section 4.1.4 http://www.secg.org/download/aid-780/sec1-v2.pdf
 -- | Verify an ECDSA signature
@@ -200,11 +130,6 @@ verifySig h (Signature r s) q = case getAffine p of
     u2 = r*s'
     -- 4.1.4.5 (u1*G + u2*q)
     p  = shamirsTrick u1 curveG u2 (pubKeyPoint q)
-
--- | Returns True if the S component of a Signature is <= order/2.
--- Signatures need to pass this test to be canonical.
-isCanonicalHalfOrder :: Signature -> Bool
-isCanonicalHalfOrder (Signature _ s) = s <= maxBound `div` 2
 
 instance Binary Signature where
     get = do

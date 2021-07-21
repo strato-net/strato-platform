@@ -1,3 +1,5 @@
+-- {-# OPTIONS -fno-warn-unused-top-binds #-}
+
 {-|
   This module defines various utility functions used across the
   Network.Haskoin modules.
@@ -5,69 +7,29 @@
 module Network.Haskoin.Util
 (
   -- * ByteString helpers
-  toStrictBS
-, toLazyBS
-, stringToBS
-, bsToString
+  stringToBS
 , bsToInteger
 , integerToBS
 , bsToHex
 , hexToBS
 
-  -- * Data.Binary helpers
 , encode'
 , decode'
 , runPut'
 , runGet'
-, decodeOrFail'
-, runGetOrFail'
-, fromDecode
-, fromRunGet
-, decodeToEither
 , decodeToMaybe
 , isolate
-
-  -- * Maybe and Either monad helpers
-, isLeft
-, isRight
-, fromRight
-, fromLeft
-, eitherToMaybe
 , maybeToEither
-, liftEither
-, liftMaybe
-
-  -- * Various helpers
-, updateIndex
-, matchTemplate
-
-  -- * Triples
-, fst3
-, snd3
-, lst3
-
-  -- * MonadState
-, modify'
-
-  -- * JSON Utilities
-, dropFieldLabel
-, dropSumLabels
-
 ) where
 
 import Control.Monad (guard)
-import Control.Monad.Trans.Except (ExceptT(..))
-import Control.Monad.State (MonadState, get, put)
 
 import Data.Word (Word8)
 import Data.Bits ((.|.), shiftL, shiftR)
 import Data.List (unfoldr)
-import Data.Char (toLower)
 import Data.Binary.Put (Put, runPut)
 import Data.Binary (Binary, encode, decode, decodeOrFail)
 import Data.Binary.Get (Get, runGetOrFail, getByteString, ByteOffset, runGet)
-import Data.Aeson.Types
-    (Options(..), SumEncoding(..), defaultOptions, defaultTaggedObject)
 
 import qualified Data.ByteString.Lazy as BL (ByteString, toChunks, fromChunks)
 import qualified Data.ByteString.Base16 as B16
@@ -165,24 +127,6 @@ fromDecode bs def f = either (const def) (f . lst) $ decodeOrFail' bs
   where
     lst (_,_,c) = c
 
--- | Try to run a Data.Binary.Get monad. If decoding succeeds, apply a function
--- to the result. Otherwise, return the default value.
-fromRunGet :: Get a         -- ^ The Get monad to run
-           -> BS.ByteString -- ^ The bytestring to decode
-           -> b             -- ^ Default value to return when decoding fails
-           -> (a -> b)      -- ^ Function to apply when decoding succeeds
-           -> b             -- ^ Final result
-fromRunGet m bs def f = either (const def) (f . lst) $ runGetOrFail' m bs
-  where
-    lst (_,_,c) = c
-
--- | Decode a Data.Binary value into the Either monad. A Right value is returned
--- with the result upon success. Otherwise a Left value with the error message
--- is returned.
-decodeToEither :: Binary a => BS.ByteString -> Either String a
-decodeToEither bs = case decodeOrFail' bs of
-    Left  (_,_,err) -> Left err
-    Right (_,_,res) -> Right res
 
 -- | Decode a Data.Binary value into the Maybe monad. A Just value is returned
 -- with the result upon success. Otherwise, Nothing is returned.
@@ -204,98 +148,10 @@ isolate i g = do
 
 -- Maybe and Eithre monad helpers
 
--- | Returns True if the Either value is Right
-isRight :: Either a b -> Bool
-isRight (Right _) = True
-isRight _         = False
-
--- | Returns True if the Either value is Left
-isLeft :: Either a b -> Bool
-isLeft = not . isRight
-
--- | Extract the Right value from an Either value. Fails if the value is Left
-fromRight :: Either a b -> b
-fromRight (Right b) = b
-fromRight _ = error "Either.fromRight: Left"
-
--- | Extract the Left value from an Either value. Fails if the value is Right
-fromLeft :: Either a b -> a
-fromLeft (Left a) = a
-fromLeft _ = error "Either.fromLeft: Right"
-
--- | Transforms an Either value into a Maybe value. Right is mapped to Just
--- and Left is mapped to Nothing. The value inside Left is lost.
-eitherToMaybe :: Either a b -> Maybe b
-eitherToMaybe (Right b) = Just b
-eitherToMaybe _ = Nothing
 
 -- | Transforms a Maybe value into an Either value. Just is mapped to Right and
 -- Nothing is mapped to Left. You also pass in an error value in case Left is
 -- returned.
 maybeToEither :: b -> Maybe a -> Either b a
 maybeToEither err m = maybe (Left err) Right m
-
--- | Lift a Either computation into the ExceptT monad
-liftEither :: Monad m => Either b a -> ExceptT b m a
-liftEither = ExceptT . return
-
--- | Lift a Maybe computation into the ExceptT monad
-liftMaybe :: Monad m => b -> Maybe a -> ExceptT b m a
-liftMaybe err = liftEither . (maybeToEither err)
-
--- Various helpers
-
--- | Applies a function to only one element of a list defined by it's index.
--- If the index is out of the bounds of the list, the original list is returned.
-updateIndex :: Int      -- ^ The index of the element to change
-            -> [a]      -- ^ The list of elements
-            -> (a -> a) -- ^ The function to apply
-            -> [a]      -- ^ The result with one element changed
-updateIndex i xs f
-    | i < 0 || i >= length xs = xs
-    | otherwise = l ++ (f h : r)
-  where
-    (l,h:r) = splitAt i xs
-
--- | Use the list [b] as a template and try to match the elements of [a]
--- against it. For each element of [b] return the (first) matching element of
--- [a], or Nothing. Output list has same size as [b] and contains results in
--- same order. Elements of [a] can only appear once.
-matchTemplate :: [a]              -- ^ The input list
-              -> [b]              -- ^ The list to serve as a template
-              -> (a -> b -> Bool) -- ^ The comparison function
-              -> [Maybe a]        -- ^ Results of the template matching
-matchTemplate [] bs _ = replicate (length bs) Nothing
-matchTemplate _  [] _ = []
-matchTemplate as (b:bs) f = case break (flip f b) as of
-    (l,(r:rs)) -> (Just r) : matchTemplate (l ++ rs) bs f
-    _          -> Nothing  : matchTemplate as bs f
-
--- | Returns the first value of a triple.
-fst3 :: (a,b,c) -> a
-fst3 (a,_,_) = a
-
--- | Returns the second value of a triple.
-snd3 :: (a,b,c) -> b
-snd3 (_,b,_) = b
-
--- | Returns the last value of a triple.
-lst3 :: (a,b,c) -> c
-lst3 (_,_,c) = c
-
--- | Strict evaluation of the new state
-modify' :: MonadState s m => (s -> s) -> m ()
-modify' f = get >>= \x -> put $! f x
-
-dropFieldLabel :: Int -> Options
-dropFieldLabel n = defaultOptions
-    { fieldLabelModifier = map toLower . drop n
-    , omitNothingFields  = True
-    }
-
-dropSumLabels :: Int -> Int -> String -> Options
-dropSumLabels c f tag = (dropFieldLabel f)
-    { constructorTagModifier = map toLower . drop c
-    , sumEncoding = defaultTaggedObject { tagFieldName = tag }
-    }
 

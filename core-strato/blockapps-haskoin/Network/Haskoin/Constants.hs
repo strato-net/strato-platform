@@ -1,22 +1,22 @@
 {-# OPTIONS_GHC -fno-cse -fno-full-laziness #-}
 
--- {-# OPTIONS -fno-warn-unused-top-binds #-}
+{-# OPTIONS -fno-warn-unused-top-binds #-}
 
 {-|
   Network specific constants
 -}
 module Network.Haskoin.Constants
 ( -- ** Data
-  Network(..)
+--  Network(..)
   -- ** Functions
- , addrPrefix
- , scriptPrefix
- , secretPrefix
- , extPubKeyPrefix
- , extSecretPrefix
+--   addrPrefix
+-- , scriptPrefix
+-- , secretPrefix
+-- , extPubKeyPrefix
+-- , extSecretPrefix
 -- , networkMagic
- , maxBlockSize
- , haskoinUserAgent
+-- , maxBlockSize
+   haskoinUserAgent
 ) where
 
 import Data.Bits (shiftR)
@@ -55,30 +55,6 @@ networkRef = unsafePerformIO $ newIORef prodnet
 -- | Read current network constants record
 getNetwork :: Network
 getNetwork = unsafePerformIO $ readIORef networkRef
-
--- | Prefix for base58 PubKey hash address
-addrPrefix :: Word8
-addrPrefix = getAddrPrefix getNetwork
-
--- | Prefix for base58 script hash address
-scriptPrefix :: Word8
-scriptPrefix = getScriptPrefix getNetwork
-
--- | Prefix for private key WIF format
-secretPrefix :: Word8
-secretPrefix = getSecretPrefix getNetwork
-
--- | Prefix for extended public keys (BIP32)
-extPubKeyPrefix :: Word32
-extPubKeyPrefix = getExtPubKeyPrefix getNetwork
-
--- | Prefix for extended private keys (BIP32)
-extSecretPrefix :: Word32
-extSecretPrefix = getExtSecretPrefix getNetwork
-
--- | Maximum size of a block in bytes
-maxBlockSize :: Int
-maxBlockSize = getMaxBlockSize getNetwork
 
 -- | User agent string
 haskoinUserAgent :: String
