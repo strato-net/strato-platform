@@ -1,3 +1,4 @@
+pragma solidity ^0.8.4;
 contract BooleanTest {
     
     
@@ -10,7 +11,8 @@ contract BooleanTest {
     bool val7;
     bool val8;
     bool public val9;
-    constructor(){
+    
+            constructor() {
         
         val1 = true;
         val2 = true;
@@ -48,9 +50,5 @@ contract BooleanTest {
         //if val9 == false then something broke, if val9 == true, everything worked.
         
     }
-    
-    
-    
-    
     
 }
