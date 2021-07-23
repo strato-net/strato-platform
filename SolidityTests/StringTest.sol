@@ -12,8 +12,8 @@ contract StringTest{
     string public val8; 
     string public val9;
     string public val10;
-    string public h 
-    string x
+    string public h; 
+    string x;
     string val11;
     constructor()public {
         
