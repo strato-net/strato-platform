@@ -173,10 +173,13 @@ constructFromNothing' (ArrayIndex n:sp) =
 
 synthesize :: [(StoragePath, BasicValue)] -> Either ReplayFailure TotalStorage
 synthesize spbvs = do
-  byFields <- mapM fieldsOnly spbvs
+  byFields <- mapM fieldsOnly $ filter correctFields spbvs
   let basicLists = foldr (\(t, p) m -> HM.alter (Just . maybe [p] (p:)) t m) HM.empty byFields
   sequence $ HM.map synthesize' basicLists
- where fieldsOnly (StoragePath (Field t:sp), bv) = return (t, (StoragePath sp, bv))
+ where correctFields (StoragePath (Field _:_), _) = True  -- Motivation: we are filting out the
+       correctFields (StoragePath [], _) = False  -- the :creator field. Without doing this registerCert
+       correctFields _ = True -- causes issues. See commit's diff & parseField.
+       fieldsOnly (StoragePath (Field t:sp), bv) = return (t, (StoragePath sp, bv))
        fieldsOnly _ = Left FieldRequiredAtTopLevel
 
 synthesize' :: [(StoragePath, BasicValue)] -> Either ReplayFailure V.Value
