@@ -9,7 +9,7 @@ import { getCurrentEnode } from '/helpers/enodeHelper'
 import { getRoles } from '/helpers/enums'
 
 import networkOnboardingPermissionManagerJs from '/dapp/permission/permissionManager'
-import userManagerJs from '/dapp/user/networkOnboardingUserManager'
+import userManagerJs from '/dapp/user-manager/networkOnboardingUserManager'
 import organizationManagerJs from '/dapp/organization/organizationManager'
 import factory from './organization.factory'
 
@@ -44,17 +44,16 @@ describe('Organization Manager', function () {
       master: networkAdmin.address,
     }, options)
     userManagerContract = await userManagerJs.uploadContract(networkAdmin, {
-      permissionManager: permissionManagerContract.address,
-      enodeAddress,
+      permissionManager: permissionManagerContract.address
     }, options)
 
     // grant network admin role
     await permissionManagerContract.grantNetworkAdminRole({ user: networkAdmin })
 
     // create network admin user
-    await userManagerContract.createUser({
-      username: 'network_admin',
-      enodeAddress,
+    await userManagerContract.registerUser({
+      userAddress: '54321',
+      userCertificate: '-----BEGIN CERTIFICATE-----\nMIIBiDCCAS2gAwIBAgIQCgO76hC29iXEFXJNco5ekjAMBggqhkjOPQQDAgUAMEYx\nDDAKBgNVBAMMA2RhbjEMMAoGA1UEBgwDVVNBMRIwEAYDVQQKDAlibG9ja2FwcHMx\nFDASBgNVBAsMC2VuZ2luZWVyaW5nMB4XDTIxMDMxODE1NDgwN1oXDTIyMDMxODE1\nNDgwN1owRjEMMAoGA1UEAwwDZGFuMQwwCgYDVQQGDANVU0ExEjAQBgNVBAoMCWJs\nb2NrYXBwczEUMBIGA1UECwwLZW5naW5lZXJpbmcwVjAQBgcqhkjOPQIBBgUrgQQA\nCgNCAAQY4p67l1IIEUdVC7L+rUDwF5Nv30bze0NV5y8ced7qwp+YFk3UAiOGkcYo\n7ba8F92rd0yf9AGpvZN1H3Dda8xdMAwGCCqGSM49BAMCBQADRwAwRAIgbKXO8tZ5\noPhBusPQFkNEQDnLO/MRru4KjtCpPnVb5sACIE0TwBJ7yeIGuPc/8G50/858Pf3a\n0t1hHbhYnJarPkNA\n-----END CERTIFICATE-----',
       role: roles.NETWORK_ADMIN,
     })
   })
@@ -73,7 +72,7 @@ describe('Organization Manager', function () {
     } = await contract.getState()
 
     assert.equal(permissionManager, permissionManagerContract.address, 'permissionManager')
-    // assert.equal(userManager, userManagerContract.address, 'userManager')
+    assert.equal(userManager, userManagerContract.address, 'userManager')
   })
 
   describe('Organization Create/Update', () => {
@@ -95,7 +94,6 @@ describe('Organization Manager', function () {
     it('Create Organization - 201 - CREATED', async () => {
       // create Organization
       organization = await contract.createOrganization({
-        commonName: organizationArgs.commonName,
         certificateString: organizationArgs.certificateString
       }, options)
       assert.equal(organization.commonName, organizationArgs.commonName, 'commonName')

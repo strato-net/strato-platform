@@ -1,8 +1,6 @@
 import "/blockapps-sol/lib/collections/hashmap/contracts/Hashmap.sol";
 import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 
-import "./NetworkOnboardingUser.sol";
-
 import "/dapp/permission/contracts/NetworkOnboardingPermissionManager.sol";
 import "/dapp/organization/contracts/Organization.sol";
 import "/dapp/permission/contracts/Role.sol";
@@ -29,7 +27,7 @@ contract NetworkOnboardingUserManager is RestStatus, Role {
         permissionManager = NetworkOnboardingPermissionManager(_permissionManager);
     }
 
-    // creates a user with no associated blockchain address, to be set later
+    // Register a user with the solidvm builtin registerCert
     function registerUser(
         address _userAddress,
         string _userCertificate,
@@ -54,20 +52,14 @@ contract NetworkOnboardingUserManager is RestStatus, Role {
             }
         }
 
-        // user already exists?
-        address existingUser = getUserByCommonName(_commonName);
-        if (existingUser != address(0)) {
-            return (RestStatus.CONFLICT, address(existingUser));
-        }
-
         // create new
         registerCert(_userAddress, _userCertificate);
         userRoles[_userAddress] = _role;
 
-        return (RestStatus.CREATED, address(user));
+        return (RestStatus.CREATED, _userAddress);
     }
 
-    function updateUserCeritificate(
+    function updateUserCertificate(
         address _userAddress,
         string _userCertificate,
         Role _role

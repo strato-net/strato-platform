@@ -1,10 +1,10 @@
 import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
-// import "/blockapps-sol/lib/util/contracts/Util.sol";
+import "/blockapps-sol/lib/util/contracts/Util.sol";
 
 import "./Application.sol";
 
 import "/dapp/permission/contracts/NetworkOnboardingPermissionManager.sol";
-// import "/dapp/organizations/contracts/OrganizationManager.sol";
+import "/dapp/organization/contracts/OrganizationManager.sol";
 
 /**
  * Application Manager
@@ -18,16 +18,16 @@ import "/dapp/permission/contracts/NetworkOnboardingPermissionManager.sol";
 
 contract ApplicationManager is RestStatus {
     NetworkOnboardingPermissionManager permissionManager;
-//    OrganizationManager organizationManager;
-    address organization;
+    OrganizationManager organizationManager;
+
+    // mapping(string => mapping(string => address)) applications; // orgName -> appName -> Application
 
     /**
      * Constructor
      */
     constructor(address _permissionManager, address _organizationManager) public {
         permissionManager = NetworkOnboardingPermissionManager(_permissionManager);
-        //organizationManager = OrganizationManager(_organizationManager);
-        organization = _organizationManager;
+        organizationManager = OrganizationManager(_organizationManager);
     }
 
     function createApplication(
@@ -39,11 +39,13 @@ contract ApplicationManager is RestStatus {
         }
 
         // check user's org from cert, find corresponding Org contract
-
-        // Organization organization = organizationManager.get(tx.organization);
-        // if (organization == address(0)) {
-        //     return (RestStatus.NOT_FOUND, tx.origin);
-        // }
+        uint256 _restStatus;
+        address orgAddress; 
+        (_restStatus, orgAddress) = organizationManager.getOrganization(tx.organization);
+        Organization organization = Organization(orgAddress);
+        if (organization == address(0)) {
+            return (RestStatus.NOT_FOUND, tx.origin);
+        }
 
 
         // create new Application
@@ -72,17 +74,25 @@ contract ApplicationManager is RestStatus {
         if (address(app) == 0) return (RestStatus.NOT_FOUND, _app);
 
         // get the owner org
-        Organization ownerOrg = Organization(app.ownerOrganization);
+        address ownerOrgAddress = app.getApplicationOwner();
+        Organization ownerOrg = Organization(ownerOrgAddress);
         if (address(ownerOrg) == 0) return (RestStatus.NOT_FOUND, address(0));
 
 
         // check that this caller is actually part of this org
-        if (tx.organization != ownerOrg.commonName) {
+        address ownerOrgAddress2 = address(ownerOrgAddress);
+        string appOwnerOrgName = getUserCert(ownerOrgAddress2)["organization"];
+        if (tx.organization != appOwnerOrgName) {
           return (RestStatus.FORBIDDEN, tx.origin);
         }
 
         // add the org to the app
-        app.organizations[newOrg.commonName] = address(newOrg);
+        string newOrgCommonName = getUserCert(address(newOrg))["commonName"];
+        app.addOrganization(newOrgCommonName, address(newOrg));
         return (RestStatus.OK, address(app));
     }
+
+    // function removeOrganizationFromApplication(address _app, address _org) public returns (uint256, address) {
+    //     // TODO
+    // }
 }

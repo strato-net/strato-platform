@@ -1,7 +1,7 @@
 import "./Organization.sol";
 import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "/dapp/permission/contracts/NetworkOnboardingPermissionManager.sol";
-import "/dapp/user/contracts/NetworkOnboardingUserManager.sol";
+import "/dapp/user-manager/contracts/NetworkOnboardingUserManager.sol";
 
 /**
  * The OrganizationManager contract is responsible for the onboarding and removal of organizations 
@@ -17,7 +17,7 @@ import "/dapp/user/contracts/NetworkOnboardingUserManager.sol";
  */
 
 contract OrganizationManager is RestStatus {
-    mapping(string => address) organizations;       // Ideally we would like to iterate through the list too
+    mapping(string => address) organizations;   // orgName |-> Organization
     NetworkOnboardingPermissionManager public permissionManager;
     NetworkOnboardingUserManager public userManager;
 
@@ -32,35 +32,38 @@ contract OrganizationManager is RestStatus {
      * string, creates a new X509 contract for it’s certificate.
      * Adds the newly created Organization contract address to the organization list
      */
-    function createOrganization(string _commonName, string _certificateString) returns (uint, address) {
+    function createOrganization(string _certificateString) returns (uint, address) {
         if (!permissionManager.canCreateOrganization(tx.origin))
             return (RestStatus.FORBIDDEN, tx.origin);
 
         // TODO: Add check for if the organization already exists
 
-        Organization org = new Organization(_commonName, _certificateString);
-        organizations[_commonName] = org;
+        // TODO: Add check for if the user has the correct role
+
+        Organization org = new Organization();
+        registerCert(address(org), _certificateString);
+        organizations[parseCert(_certificateString)["commonName"]] = org;
         return (RestStatus.CREATED, org);
+    }
+
+    function updateOrganizationCertificate(string _commonName, string _newCertificate) {
+        // TODO
     }
 
     function removeOrganization(string _commonName) returns (uint) {
         if (!permissionManager.canRemoveOrganization(tx.origin))
             return RestStatus.FORBIDDEN;
 
+        // TODO: Add check for if the user has the correct role
+
         org = organizations[_commonName];
         if(org != address(0)) {
             delete organizations[_commonName];
-            org.revoke();
+            // org.revoke();
             return RestStatus.OK;
         } else {
             return RestStatus.BAD_REQUEST;
         }
-
-        
-    }
-
-    function updateOrganizationCertificate() public (uint256, address) {
-        // TODO
     }
 
     /**
@@ -71,13 +74,9 @@ contract OrganizationManager is RestStatus {
     }
 
     function getOrganization(string _orgName) returns (uint256, address) {
-        if (organziations[_orgName] == address(0))
+        if (organizations[_orgName] == address(0))
             return (RestStatus.NOT_FOUND, address(0));
         
         return (RestStatus.OK, organizations[_orgName]);
-    }
-
-    function updateOrganizationCertificate(string _commonName, string _newCertificate) {
-        // TODO
     }
 }

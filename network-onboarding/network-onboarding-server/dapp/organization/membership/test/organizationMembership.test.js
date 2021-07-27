@@ -10,12 +10,12 @@ import { getCurrentEnode } from '/helpers/enodeHelper'
 import factory from './organizationMembership.factory'
 import organizationMembership from '../organizationMembership'
 
-const options = { config }
+// const options = { config }
 
-const loadEnv = dotenv.config()
-assert.isUndefined(loadEnv.error)
+// const loadEnv = dotenv.config()
+// assert.isUndefined(loadEnv.error)
 
-describe('OrganizationMembership', function () {
+describe.skip('OrganizationMembership', function () {
   this.timeout(config.timeout)
 
   const OrganizationMembershipState = getOrganizationMembershipStates()
@@ -36,7 +36,7 @@ describe('OrganizationMembership', function () {
     enodeAddress = getCurrentEnode()
   })
 
-  it('Create OrganizationMembership', async () => {
+  it.skip('Create OrganizationMembership', async () => {
     const args = {
       ...(factory.getOrganizationMembershipArgs(util.uid())),
       enodeAddress,
@@ -56,7 +56,7 @@ describe('OrganizationMembership', function () {
     assert.equal(OrganizationMembershipState[state], OrganizationMembershipState[OrganizationMembershipState.NEW], 'state')
   })
 
-  describe('Set State', () => {
+  describe.skip('Set State', () => {
     let contract
 
     before(async () => {
@@ -67,7 +67,7 @@ describe('OrganizationMembership', function () {
       contract = await organizationMembership.uploadContract(user, args, options)
     })
 
-    it('Set state - APPROVED', async () => {
+    it.skip('Set state - APPROVED', async () => {
       const args = { state: OrganizationMembershipState.ACCEPTED }
       await contract.setState(args)
 
@@ -75,7 +75,7 @@ describe('OrganizationMembership', function () {
       assert.equal(OrganizationMembershipState[state], OrganizationMembershipState[OrganizationMembershipState.ACCEPTED], 'state')
     })
 
-    it('Set state - REJECTED', async () => {
+    it.skip('Set state - REJECTED', async () => {
       const args = { state: OrganizationMembershipState.REJECTED }
       await contract.setState(args)
 

@@ -9,9 +9,12 @@ import "./OrganizationMembershipState.sol";
 import "/dapp/permission/contracts/NetworkOnboardingPermissionManager.sol";
 import "/dapp/permission/contracts/Role.sol";
 import "/dapp/organization/contracts/OrganizationManager.sol";
-import "/dapp/user/contracts/NetworkOnboardingUserManager.sol";
+import "/dapp/user-manager/contracts/NetworkOnboardingUserManager.sol";
 import "/dapp/organization/contracts/OrganizationManager.sol";
 
+/**
+ * Manage the Organzations currently on the network (not the members of a particular organizations)
+ */
 contract OrganizationMembershipManager is
     RestStatus,
     Util,
@@ -23,7 +26,7 @@ contract OrganizationMembershipManager is
     OrganizationManager organizationManager;
     OrganizationMembershipFSM organizationMembershipFSM;
 
-    mapping(address => address) private organizationMemberships;
+    mapping(address => address) private organizationMemberships; // :: requesterAddress |-> OrganizationMembership
 
     constructor(
         address _permissionManager,
@@ -35,8 +38,8 @@ contract OrganizationMembershipManager is
     }
 
     function requestOrganizationMembership(
-        string _organizationCommonName,
-        string _requesterCommonName
+        string _requesterCommonName,
+        string _organizationCommonName
     ) public returns (uint256, address) {
         address requesterAddress = tx.origin;
         address alreadyRequested = organizationMemberships[requesterAddress];
@@ -53,8 +56,8 @@ contract OrganizationMembershipManager is
 
         address organizationMembership =
             new OrganizationMembership(
-                _organizationCommonName,
-                _requesterCommonName
+                _requesterCommonName,
+                _organizationCommonName
             );
 
         organizationMemberships[requesterAddress] = address(organizationMembership);
@@ -63,34 +66,37 @@ contract OrganizationMembershipManager is
     }
 
     function handleOrganizationMembershipEvent(
-        address _requesterAddress,
+        address _requesterAddress,          // Person who made the original request
         string _organizationCertificate,
         OrganizationMembershipEvent _organizationMembershipEvent
     ) public returns (uint256, OrganizationMembershipState) {
-        address organizationMembershipAddress = organizationMemberships[_requesterAddress];
 
-        OrganizationMembership organizationMembership = OrganizationMembership(organizationMembershipAddress);
+        OrganizationMembership organizationMembership = 
+            OrganizationMembership(organizationMemberships[_requesterAddress]);
 
+        // Does and organizationMembership exist already?
         if (address(organizationMembership) == 0)
             return (RestStatus.NOT_FOUND, OrganizationMembershipState.NULL);
 
+        // Can tx.origin modify organization membership?
         if (!permissionManager.canModifyOrganizationMembership(tx.origin))
             return (RestStatus.FORBIDDEN, OrganizationMembershipState.NULL);
 
         OrganizationMembershipState newState =
             organizationMembershipFSM.handleEvent(organizationMembership.state(), _organizationMembershipEvent);
 
+        // Is the state change (e.g. NEW -> ACCEPTED) valid?
         if (newState == OrganizationMembershipState.NULL)
             return (RestStatus.BAD_REQUEST, OrganizationMembershipState.NULL);
+
+        // TODO Should we check information? Refer to Carbon for inspiration
 
         uint256 restStatusState = organizationMembership.setState(newState);
 
         if (newState == OrganizationMembershipState.ACCEPTED) {
             (uint256 restStatusOrganization, address organizationAddress) =
-                organizationManager.createOrganization(
-                    organizationMembership.organizationCommonName(),
-                    _organizationCertificate
-                );
+                organizationManager.createOrganization(_organizationCertificate);
+
             if (restStatusOrganization != RestStatus.CREATED) {
                 OrganizationMembershipState rejectedState = OrganizationMembershipState.REJECTED;
                 organizationMembership.setState(rejectedState);

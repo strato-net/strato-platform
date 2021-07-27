@@ -9,8 +9,9 @@ import { getCurrentEnode } from '/helpers/enodeHelper'
 import { getRoles } from '/helpers/enums'
 
 import permissionManagerJs from '/dapp/permission/permissionManager'
-//import organizationManagerJs from '/dapp/organization/organizationManager'
+import organizationManagerJs from '/dapp/organization/organizationManager'
 import applicationManagerJs from '/dapp/application/applicationManager'
+import userManagerJs from '/dapp/user-manager/networkOnboardingUserManager'
 import factory from './application.factory'
 
 const options = { config }
@@ -23,7 +24,8 @@ describe('Application Manager', function () {
   this.timeout(config.timeout)
 
   let permissionManagerContract
-  let applicationManagerContract
+  let userManagerContract
+  let organizationManagerContract
   let networkAdmin
   let orgAdmin
 
@@ -53,9 +55,13 @@ describe('Application Manager', function () {
       admin: networkAdmin.address,
       master: networkAdmin.address,
     }, options)
-//    organizationManagerContract = await organizationManagerJs.uploadContract(networkAdmin, {
-//      permissionManager: permissionManagerContract.address,
-//    }, options)
+    userManagerContract = await userManagerJs.uploadContract(networkAdmin, {
+      permissionManager: permissionManagerContract.address
+    }, options)
+    organizationManagerContract = await organizationManagerJs.uploadContract(networkAdmin, {
+      permissionManager: permissionManagerContract.address,
+      userManager: userManagerContract.address
+    }, options)
 
 
     // grant roles
@@ -66,24 +72,21 @@ describe('Application Manager', function () {
   })
 
   it('Create Application Manager', async () => {
-
-    // TODO: remove
-    const TEMP_ORG = `${util.uid()}`.padStart(40, '0');
     
     const contract = await applicationManagerJs.uploadContract(networkAdmin, {
       permissionManager: permissionManagerContract.address,
-      organizationManager: TEMP_ORG, //organizationManager: organizationManagerContract.address,
+      organizationManager: organizationManagerContract.address,
     }, options)
 
     assert.notEqual(contract.address, constants.zeroAddress, 'Contract address must be not zero')
 
     const {
       permissionManager,
-      applicationManager,
+      organizationManager,
     } = await contract.getState()
 
     assert.equal(permissionManager, permissionManagerContract.address, 'permissionManager')
-//    assert.equal(organizationManager, organizationManagerContract.address, 'organizationManager')
+    assert.equal(organizationManager, organizationManagerContract.address, 'organizationManager')
   })
 
   describe('Application Creation', () => {
@@ -92,19 +95,15 @@ describe('Application Manager', function () {
     let applicationArgs
     let application
 
-    // TODO: remove
-    const TEMP_ORG = `${util.uid()}`.padStart(40, '0');
-
-
     before(async () => {
       adminContract = await applicationManagerJs.uploadContract(networkAdmin, {
         permissionManager: permissionManagerContract.address,
-        organizationManager: TEMP_ORG, //organizationManager: organizationManagerContract.address,
+        organizationManager: organizationManagerContract.address,
       }, options)
 
       orgAdminContract = await applicationManagerJs.uploadContract(orgAdmin, {
         permissionManager: permissionManagerContract.address,
-        organizationManager: TEMP_ORG, //organizationManager: organizationManagerContract.address,
+        organizationManager: organizationManagerContract.address,
       }, options)
 
       applicationArgs = {
@@ -113,11 +112,20 @@ describe('Application Manager', function () {
 
     })
 
-    it('Create Application - 201 - CREATED', async () => {
+    it.skip('Create Application - 201 - CREATED', async () => {
+      // register tx.origin to a certificate
+      const result2 = await userManagerContract.registerUser({
+        userAddress: orgAdmin.address,
+        userCertificate: '-----BEGIN CERTIFICATE-----\nMIIBiDCCAS2gAwIBAgIQCgO76hC29iXEFXJNco5ekjAMBggqhkjOPQQDAgUAMEYx\nDDAKBgNVBAMMA2RhbjEMMAoGA1UEBgwDVVNBMRIwEAYDVQQKDAlibG9ja2FwcHMx\nFDASBgNVBAsMC2VuZ2luZWVyaW5nMB4XDTIxMDMxODE1NDgwN1oXDTIyMDMxODE1\nNDgwN1owRjEMMAoGA1UEAwwDZGFuMQwwCgYDVQQGDANVU0ExEjAQBgNVBAoMCWJs\nb2NrYXBwczEUMBIGA1UECwwLZW5naW5lZXJpbmcwVjAQBgcqhkjOPQIBBgUrgQQA\nCgNCAAQY4p67l1IIEUdVC7L+rUDwF5Nv30bze0NV5y8ced7qwp+YFk3UAiOGkcYo\n7ba8F92rd0yf9AGpvZN1H3Dda8xdMAwGCCqGSM49BAMCBQADRwAwRAIgbKXO8tZ5\noPhBusPQFkNEQDnLO/MRru4KjtCpPnVb5sACIE0TwBJ7yeIGuPc/8G50/858Pf3a\n0t1hHbhYnJarPkNA\n-----END CERTIFICATE-----',
+        role: getRoles.ORG_ADMIN
+      })
+
       // create Organization
+      const result = await organizationManagerContract.createOrganization({
+        userCertificate: '-----BEGIN CERTIFICATE-----\nMIIBiDCCAS2gAwIBAgIQCgO76hC29iXEFXJNco5ekjAMBggqhkjOPQQDAgUAMEYx\nDDAKBgNVBAMMA2RhbjEMMAoGA1UEBgwDVVNBMRIwEAYDVQQKDAlibG9ja2FwcHMx\nFDASBgNVBAsMC2VuZ2luZWVyaW5nMB4XDTIxMDMxODE1NDgwN1oXDTIyMDMxODE1\nNDgwN1owRjEMMAoGA1UEAwwDZGFuMQwwCgYDVQQGDANVU0ExEjAQBgNVBAoMCWJs\nb2NrYXBwczEUMBIGA1UECwwLZW5naW5lZXJpbmcwVjAQBgcqhkjOPQIBBgUrgQQA\nCgNCAAQY4p67l1IIEUdVC7L+rUDwF5Nv30bze0NV5y8ced7qwp+YFk3UAiOGkcYo\n7ba8F92rd0yf9AGpvZN1H3Dda8xdMAwGCCqGSM49BAMCBQADRwAwRAIgbKXO8tZ5\noPhBusPQFkNEQDnLO/MRru4KjtCpPnVb5sACIE0TwBJ7yeIGuPc/8G50/858Pf3a\n0t1hHbhYnJarPkNA\n-----END CERTIFICATE-----'
+      })
       application = await orgAdminContract.createApplication({
-        name: applicationArgs.name,
-        ownerOrganization: applicationArgs.ownerOrganization,
+        name: applicationArgs.name
       })
       assert.equal(application.name, applicationArgs.name, 'name')
     })
@@ -132,51 +140,45 @@ describe('Application Manager', function () {
       }, RestStatus.FORBIDDEN)
     })
 
-
-/* 
-
     // TODO: orgAdmin user needs a valid cert for the app's owner for the below tests
     //        also, would be nice to test that a user from a different org can't do it
-    it('Add Organization To Application - 200 - OK', async () => {
-      application = await orgAdminContract.addOrganizationToApplication({
-        app: application.address,
-        org: applicationArgs.ownerOrganization, // TODO: need a real org here
-      })
-      assert.equal(application.name, applicationArgs.name, 'name')
+    it.skip('Add Organization To Application - 200 - OK', async () => {
+      await assert.restStatus(async () => {
+        await orgAdminContract.addOrganizationToApplication({
+          app: application.address,
+          org: applicationArgs.ownerOrganization, // TODO: need a real org here
+        })
+      }, RestStatus.OK) // TODO: check that the value was added rather than just rest status
     })
 
-    it('Add Organization To Application as Network Admin - 403 - FORBIDDEN', async () => {
+    it.skip('Add Organization To Application as Network Admin - 403 - FORBIDDEN', async () => {
       // create Organization
       await assert.restStatus(async () => {
         await adminContract.addOrganizationToApplication({
           app: application.address,
-          ownerOrganization: applicationArgs.ownerOrganization, // TODO: need a real org here
+          org: applicationArgs.ownerOrganization
         })
       }, RestStatus.FORBIDDEN)
     })
 
-    it('Add Non-Existent Organization to Application - 404 - NOT FOUND', async () => {
+    it.skip('Add Non-Existent Organization to Application - 404 - NOT FOUND', async () => {
       // create Organization
       await assert.restStatus(async () => {
-        await adminContract.addOrganizationToApplication({
+        await orgAdminContract.addOrganizationToApplication({
           app: application.address,
-          ownerOrganization: applicationArgs.ownerOrganization,
+          org: `${util.uid()}`.padStart(40, '0')
         })
       }, RestStatus.NOT_FOUND)
     })
 
-    it('Add Organization to Non-Existent Application - 404 - NOT FOUND', async () => {
+    it.skip('Add Organization to Non-Existent Application - 404 - NOT FOUND', async () => {
       // create Organization
       await assert.restStatus(async () => {
         await adminContract.addOrganizationToApplication({
-          app: applicationArgs.ownerOrganization,
-          ownerOrganization: applicationArgs.ownerOrganization, // TODO: need a real org here
+          app: `${util.uid()}`.padStart(40, '0'),
+          org: applicationArgs.ownerOrganization
         })
       }, RestStatus.NOT_FOUND)
     })
-
-*/
-
-
   })
 })

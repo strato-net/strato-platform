@@ -1,4 +1,4 @@
-pragma solidvm 3.0;
+// pragma solidvm 3.0;
 
 import "./Permission.sol";
 import "./Role.sol";

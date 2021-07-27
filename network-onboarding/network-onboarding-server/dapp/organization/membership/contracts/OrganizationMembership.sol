@@ -6,7 +6,8 @@ import "./OrganizationMembershipState.sol";
 /**
 * OrganizationMembership container
 *
-* This container holds the data for an organization membership.
+* This container holds the data for an organization membership. This container is refrenced through
+* a mapping of requesterAddress |-> OrganizationMembership inside OrganizationMembershipManager
 *
 * #see OrganizationMembershipManager
 * #see OrganizationMembershipState
@@ -15,31 +16,25 @@ import "./OrganizationMembershipState.sol";
 */
 
 contract OrganizationMembership is RestStatus, OrganizationMembershipState {
-    address public owner;                   // The original contract that instantiated this one
+    address public owner;   // The creator of this contract, i.e. OrganizationMembershipManager
     string public requesterCommonName;
     string public organizationCommonName;
-    address public organization;
-
     OrganizationMembershipState public state;
 
-    constructor(string _organizationCommonName, string _requesterCommonName) public {
+    constructor(string _requesterCommonName, string _organizationCommonName) public {
         owner = msg.sender;
-        organizationCommonName = _organizationCommonName;
         requesterCommonName = _requesterCommonName;
+        organizationCommonName = _organizationCommonName;
         state = OrganizationMembershipState.NEW;
     }
 
+    /**
+     * Set the membership state
+     */
     function setState(OrganizationMembershipState _state) public returns (uint) {
         if (owner != msg.sender) return RestStatus.FORBIDDEN;   // pervents people from calling this directly
 
         state = _state;
-        return RestStatus.OK;
-    }
-
-    function setOrganization(address _organization) public returns (uint) {
-        if (owner != msg.sender) return RestStatus.FORBIDDEN;
-
-        organization = _organization;
         return RestStatus.OK;
     }
 }

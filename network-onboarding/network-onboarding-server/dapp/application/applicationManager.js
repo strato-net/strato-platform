@@ -147,7 +147,7 @@ async function addOrganizationToApplication(admin, contract, _args, baseOptions)
 
   const [restStatus, appAddress] = await rest.call(admin, callArgs, options)
 
-  if (parseInt(restStatus, 10) !== RestStatus.CREATED {
+  if (parseInt(restStatus, 10) !== RestStatus.CREATED) {
     throw new rest.RestError(restStatus, 0, { callArgs })
   }
 

@@ -1,4 +1,4 @@
-pragma solidvm 3.0;
+// pragma solidvm 3.0;
 
 import "/blockapps-sol/lib/auth/permission/contracts/PermissionManager.sol";
 import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
