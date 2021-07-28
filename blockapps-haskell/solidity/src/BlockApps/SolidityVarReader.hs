@@ -555,7 +555,7 @@ encodeValue'
   -> Type
   -> Value
   -> [(Word256,Word256)]
-encodeValue' typeDefs'@TypeDefs{..} position@Storage.Position{..} ty = \case
+encodeValue' typeDefs'@TypeDefs{} position@Storage.Position{..} ty = \case
   SimpleValue (ValueBool v) -> encodeInt offset byte ((if v then 1 else 0) :: Word8)
   SimpleValue (ValueInt _ _ v) -> encodeInt offset byte v
   SimpleValue (ValueAddress (Address a)) -> encodeValue' typeDefs' position ty . SimpleValue $ ValueInt False (Just 20) $ toInteger a

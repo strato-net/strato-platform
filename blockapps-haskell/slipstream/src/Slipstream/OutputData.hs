@@ -18,7 +18,6 @@ import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Lazy            as BL
 import qualified Data.Map                        as Map
 import           Data.Maybe                      (fromMaybe, catMaybes)
-import           Data.Monoid                     ((<>))
 import           Data.Text                       (Text)
 import qualified Data.Text                       as T
 import           Data.Text.Encoding              (decodeUtf8, encodeUtf8)

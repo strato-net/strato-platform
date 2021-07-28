@@ -10,7 +10,7 @@
 
 module BlockApps.Bloc22.Server.Users where
 
-import           ClassyPrelude                     ((<>), Hashable, getCurrentTime, UTCTime(..))
+import           ClassyPrelude                     (Hashable, getCurrentTime, UTCTime(..))
 import           Control.Concurrent
 import           Control.Applicative               ((<|>), liftA2)
 import           Control.Arrow

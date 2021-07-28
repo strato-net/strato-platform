@@ -238,7 +238,7 @@ outputNewChains = traverse_ $ \(cId, cInfo, bHash, actions) -> do
   yield $ OutToStateDiff cId cInfo bHash
   for_ actions $ yield . OutAction
 
-processBlocks :: (VMBase m, Bagger.MonadBagger m, MonadMonitor m)
+processBlocks :: (MonadFail m, VMBase m, Bagger.MonadBagger m, MonadMonitor m)
               => [OutputBlock]
               -> ConduitT a VmOutEvent m ()
 processBlocks blocks = do
