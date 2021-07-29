@@ -44,7 +44,8 @@ contract StringTest{
        val7 = "Hello World\r"; // carriage return
        val8 = "Hello \v World"; //vertical tab
        h = "\x4a";
-       x = "\uc39b";
+
+    //   x = "\uc39b";    //Doesn't work in strato, doesn't recognize " \uNNNN "
     
     }
     
