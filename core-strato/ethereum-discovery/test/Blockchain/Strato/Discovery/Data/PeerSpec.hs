@@ -2,7 +2,6 @@ module Blockchain.Strato.Discovery.Data.PeerSpec (
   spec
   ) where
 
-import           Data.Monoid                           ((<>))
 import           Test.Hspec
 
 import           Blockchain.Strato.Discovery.Data.Peer

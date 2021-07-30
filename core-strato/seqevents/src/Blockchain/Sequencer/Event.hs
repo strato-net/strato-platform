@@ -14,8 +14,8 @@ import           Data.Binary
 import           Data.Data
 import           Data.List                                 (intercalate)
 import           Data.Maybe                                (fromJust, isNothing)
-import           Data.DeriveTH
 import           Test.QuickCheck
+import           Test.QuickCheck.Arbitrary.Generic
 
 import qualified Blockchain.Data.Address                   as A
 import qualified Blockchain.Data.Block                     as BDB
@@ -518,17 +518,38 @@ instance BlockLike DD.BlockData OutputTx OutputBlock where
     blockOrdering = DD.blockDataNumber . obBlockData
     buildBlock = OutputBlock TO.Morphism 0
 
-derive makeArbitrary ''AnchorChain
-derive makeArbitrary ''IngestEvent
-derive makeArbitrary ''IngestTx
-derive makeArbitrary ''IngestBlock
-derive makeArbitrary ''IngestGenesis
-derive makeArbitrary ''SequencedBlock
-derive makeArbitrary ''P2pEvent
-derive makeArbitrary ''VmEvent
-derive makeArbitrary ''OutputTx
-derive makeArbitrary ''OutputBlock
-derive makeArbitrary ''OutputGenesis
+instance Arbitrary AnchorChain where
+  arbitrary = genericArbitrary
+
+instance Arbitrary IngestEvent where
+  arbitrary = genericArbitrary
+
+instance Arbitrary IngestTx where
+  arbitrary = genericArbitrary
+
+instance Arbitrary IngestBlock where
+  arbitrary = genericArbitrary
+
+instance Arbitrary IngestGenesis where
+  arbitrary = genericArbitrary
+
+instance Arbitrary SequencedBlock where
+  arbitrary = genericArbitrary
+
+instance Arbitrary P2pEvent where
+  arbitrary = genericArbitrary
+
+instance Arbitrary VmEvent where
+  arbitrary = genericArbitrary
+
+instance Arbitrary OutputTx where
+  arbitrary = genericArbitrary
+
+instance Arbitrary OutputBlock where
+  arbitrary = genericArbitrary
+
+instance Arbitrary OutputGenesis where
+  arbitrary = genericArbitrary
 
 instance ToJSON OutputBlock' where
 instance FromJSON OutputBlock' where

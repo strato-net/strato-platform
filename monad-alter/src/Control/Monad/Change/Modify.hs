@@ -20,7 +20,7 @@ module Control.Monad.Change.Modify
   ) where
 
 import           Control.Lens
-import           Control.Monad                    (void, mapM_)
+import           Control.Monad                    (void)
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.State        (execStateT, StateT)
 import           Data.Proxy

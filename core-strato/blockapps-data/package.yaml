@@ -32,12 +32,12 @@ library:
   - containers
   - data-default
   - deepseq
-  - derive
   - esqueleto
   - ethereum-encryption
   - ethereum-rlp
   - filepath
   - format
+  - generic-arbitrary
   - http-api-data
   - json-stream
   - labeled-error

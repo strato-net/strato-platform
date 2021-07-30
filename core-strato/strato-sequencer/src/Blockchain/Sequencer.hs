@@ -24,7 +24,6 @@ import           Control.Lens
 import qualified Control.Monad.Change.Alter                as A
 import qualified Control.Monad.Change.Modify               as Mod
 import           Control.Monad.Reader
-import           Control.Monad.IO.Class                    (liftIO)
 
 import           Data.ByteString.Char8                     (pack)
 import           Data.ByteString.Base16                    as B16

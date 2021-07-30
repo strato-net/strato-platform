@@ -13,7 +13,6 @@ import Control.Monad (void)
 import Data.Text hiding (replicate)
 import Data.Maybe
 import Data.Either (isRight)
-import Data.Monoid ((<>))
 import           Test.Hspec
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map

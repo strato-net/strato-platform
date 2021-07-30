@@ -24,7 +24,6 @@ import           Network.Wai.Middleware.Servant.Options
 import           Servant
 import           Servant.Client
 import           System.Clock
-import           System.IO (BufferMode (..), stderr, stdout)
 import           UnliftIO
 
 

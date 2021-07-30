@@ -6,7 +6,6 @@ module BlockApps.Solidity.ArgValue where
 import           BlockApps.Solidity.Type
 import           BlockApps.Solidity.TypeDefs
 import           BlockApps.Solidity.Value
-import           ClassyPrelude                ((<>))
 import           Control.Lens                 ((&), (?~))
 import qualified Data.Aeson                   as A
 import qualified Data.Bimap                   as Bimap

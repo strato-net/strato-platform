@@ -7,7 +7,6 @@ module Blockchain.Data.TransactionResultStatus where
 
 import           Control.DeepSeq
 import           Data.Aeson          hiding (Success)
-import           Data.Maybe          (maybe)
 import           Database.Persist.TH
 import           GHC.Generics
 

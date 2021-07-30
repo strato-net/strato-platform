@@ -6,7 +6,6 @@ import qualified Data.Digest.Murmur32 as Murmur32
 import Control.Applicative
 import Control.Lens
 import Control.Monad.Trans (liftIO)
-import Data.Monoid ((<>))
 import Data.Set (Set)
 import qualified Data.Set as Set
 import System.IO

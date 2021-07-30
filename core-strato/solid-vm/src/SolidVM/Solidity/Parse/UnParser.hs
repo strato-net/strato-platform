@@ -13,7 +13,6 @@ import qualified Data.Text                  as Text
 import qualified Data.List                  as List
 import           Data.Map                   ()
 import qualified Data.Map                   as Map
-import Data.Monoid ((<>))
 import           Text.Printf
 
 import           SolidVM.Solidity.Parse.Declarations

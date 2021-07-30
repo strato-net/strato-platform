@@ -9,8 +9,6 @@ import           Conduit
 import           Control.DeepSeq
 import           Control.Exception
 import           Control.Monad
-import           Control.Monad.Trans.Class          (lift)
-import           Control.Exception                  (SomeException)
 import           Data.Binary
 import qualified Data.ByteString                    as BS
 import qualified Data.ByteString.Char8              as C8

@@ -55,11 +55,10 @@ import qualified Data.HashMap.Strict          as HashMap
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
 import           Data.Maybe
-import           Data.Monoid                  ((<>))
 import           Data.Proxy
 import           Data.Swagger
 import qualified Data.Swagger                 as Sw
-import           Data.Swagger.Internal.Schema (named, sketchSchema)
+import           Data.Swagger.Internal.Schema (named)
 import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
 import           Data.Time

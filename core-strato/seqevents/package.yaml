@@ -16,9 +16,9 @@ library:
     - bytestring
     - conduit
     - deepseq
-    - derive
     - ethereum-rlp
     - format
+    - generic-arbitrary
     - lens
     - milena
     - monad-alter
