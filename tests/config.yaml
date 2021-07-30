@@ -1,19 +1,19 @@
-apiDebug: true
+apiDebug: false
 password: "1234"
 timeout: 600000
 contractsPath: ./contracts/
 
 nodes:
   - id: 0
-    url: 'http://localhost:8080'
+    url: 'http://localhost'
     publicKey: '6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0'
     port: 30303
     oauth:
       appTokenCookieName: "oauth_tests"
       scope: 'email openid'
       appTokenCookieMaxAge: 7776000000 # 90 days: 90 * 24 * 60 * 60 * 1000
-      clientId: "blockapps-test"
-      clientSecret: "6612be6c-241c-4d7e-a6f6-5d841e19377e"
-      openIdDiscoveryUrl: "http://172.17.0.1:8081/auth/realms/myrealm/.well-known/openid-configuration"
+      clientId: "dev-testing1"
+      clientSecret: "e4ccbcec-1824-468a-a869-c90a842de9be"
+      openIdDiscoveryUrl: "https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration"
       redirectUri: "http://localhost/callback"
       logoutRedirectUri: "http://localhost"
