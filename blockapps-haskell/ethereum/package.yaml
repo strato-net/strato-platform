@@ -45,4 +45,3 @@ tests:
       - blockapps-ethereum
       - clock
       - hspec
-

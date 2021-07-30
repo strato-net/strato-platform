@@ -92,5 +92,3 @@ benchmarks:
       - deepseq
       - largeword
       - data-dword
-
-

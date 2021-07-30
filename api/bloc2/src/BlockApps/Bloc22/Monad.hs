@@ -74,10 +74,11 @@ data Compile = Compile
 data CacheNonce = CacheNonce
 
 type HasBlocEnv m = Accessible BlocEnv m
-  
+
 data BlocEnv = BlocEnv
   { stateFetchLimit    :: Integer
   , gasOn              :: Bool
+  , evmCompatible      :: Bool
   , globalNonceCounter :: Cache (Address, Maybe ChainId) Nonce
   , globalSourceCache  :: Cache (Text, SourceMap) (Map Text (Int32, ContractDetails))
   , globalCodePtrCache :: Cache CodePtr (Int32, ContractDetails)
