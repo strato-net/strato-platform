@@ -12,7 +12,6 @@ import qualified Data.Text                  as Text
 import qualified Data.List                  as List
 import           Data.Map                   ()
 import qualified Data.Map                   as Map
-import Data.Monoid ((<>))
 
 import           BlockApps.Solidity.Parse.ParserTypes
 import           BlockApps.Solidity.Xabi

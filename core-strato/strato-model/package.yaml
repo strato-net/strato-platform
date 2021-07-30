@@ -40,11 +40,11 @@ library:
     - cryptonite
     - data-default
     - deepseq
-    - derive
     - ethereum-rlp
     - extra
     - fast-keccak256
     - format
+    - generic-arbitrary
     - hashable
     - http-api-data
     - integer-gmp

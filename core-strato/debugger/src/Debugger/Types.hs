@@ -172,7 +172,7 @@ type DebugSettings = DebugSettingsF TVar TChan TMVar
 type DebugSettingsI = DebugSettingsF Identity [] Maybe
 
 instance NFData DebugSettings where
-  rnf d@DebugSettings{..} = d `seq` ()
+  rnf d@DebugSettings{} = d `seq` ()
 
 emptyDebugSettings :: DebugSettingsI
 emptyDebugSettings =

@@ -9,7 +9,6 @@ module BlockApps.Bloc22.API.SwaggerSchema
 import           Data.Aeson.Casing.Internal   (camelCase, dropFPrefix)
 import           Data.Swagger
 import           Data.Swagger.Internal.Schema (named)
-import           Data.Swagger.SchemaOptions   (SchemaOptions (..))
 
 -- | The model's field modifiers will match the JSON instances
 blocSchemaOptions :: SchemaOptions

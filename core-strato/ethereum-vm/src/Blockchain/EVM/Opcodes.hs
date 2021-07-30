@@ -22,7 +22,7 @@ import qualified Data.Map                     as M
 import           Data.Maybe
 import           Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 
-import           Network.Haskoin.Internals (BigWord(..), Word256)
+import           Network.Haskoin.Internals (BigWord(..))
 import           Blockchain.Strato.Model.ExtendedWord
 
 type CodePointer = Int

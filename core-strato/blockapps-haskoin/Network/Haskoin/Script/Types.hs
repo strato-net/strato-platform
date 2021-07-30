@@ -352,21 +352,21 @@ instance Binary ScriptOp where
             let len = BS.length payload
             case optype of
                 OPCODE -> do
-                    unless (len <= 0x4b) $ fail
+                    unless (len <= 0x4b) $ error
                         "OP_PUSHDATA OPCODE: Payload size too big"
                     putWord8 $ fromIntegral len
                 OPDATA1 -> do
-                    unless (len <= 0xff) $ fail
+                    unless (len <= 0xff) $ error
                         "OP_PUSHDATA OPDATA1: Payload size too big"
                     putWord8 0x4c
                     putWord8 $ fromIntegral len
                 OPDATA2 -> do
-                    unless (len <= 0xffff) $ fail
+                    unless (len <= 0xffff) $ error
                         "OP_PUSHDATA OPDATA2: Payload size too big"
                     putWord8 0x4d
                     putWord16le $ fromIntegral len
                 OPDATA4 -> do
-                    unless (len <= 0x7fffffff) $ fail
+                    unless (len <= 0x7fffffff) $ error
                         "OP_PUSHDATA OPDATA4: Payload size too big"
                     putWord8 0x4e
                     putWord32le $ fromIntegral len

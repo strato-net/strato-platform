@@ -3,7 +3,6 @@
 
 module BlockApps.Bloc22.Database.Solc (compileSolc, compileSolcIO) where
 
-import           ClassyPrelude              ((<>))
 import           Control.Monad.IO.Class     (MonadIO(..))
 import           Control.Monad.Logger
 import           Control.Monad.Trans.Except

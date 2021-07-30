@@ -27,7 +27,7 @@ module Blockchain.Sequencer.Gregor
 
 import           Control.Concurrent.Async.Lifted (race_)
 import           Control.Concurrent.Extra (Lock, withLock, newLock)
-import           Control.Concurrent.STM (orElse, flushTQueue)
+import           Control.Concurrent.STM (flushTQueue)
 import           Control.Lens               hiding (op)
 import qualified Control.Monad.Change.Modify as Mod
 import           Control.Monad.State

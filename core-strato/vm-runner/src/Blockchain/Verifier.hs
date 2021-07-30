@@ -50,7 +50,7 @@ instance Format BlockValidityError where
     format (BlockDifficultyWrong d expected) = "Block difficulty is wrong, is '" ++ show d ++ "', expected '" ++ show expected ++ "'"
 -}
 
-checkParentChildValidity :: (Monad m)
+checkParentChildValidity :: (MonadFail m)
                          => Bool -> OutputBlock -> BlockSummary -> m ()
 checkParentChildValidity isHomestead OutputBlock{obBlockData=c} parentBSum = do
     let nextDifficulty' = if isHomestead then homesteadNextDifficulty flags_difficultyBomb else nextDifficulty flags_difficultyBomb
@@ -91,7 +91,7 @@ verifyTransactionRoot OutputBlock{obBlockData=bd,obReceiptTransactions=txs} = do
 verifyOmmersRoot::HasStateDB m=>OutputBlock->m Bool
 verifyOmmersRoot OutputBlock{obBlockData=bd, obBlockUncles=bu} = return $ blockDataUnclesHash bd == hash (rlpSerialize $ RLPArray $ map rlpEncode $ bu)
 
-checkValidity :: HasStateDB m => Bool -> BlockSummary -> OutputBlock -> m (Maybe String)
+checkValidity :: (MonadFail m, HasStateDB m) => Bool -> BlockSummary -> OutputBlock -> m (Maybe String)
 checkValidity isHomestead parentBSum b = do
   when (flags_transactionRootVerification) $ do
            trVerified <- verifyTransactionRoot b
