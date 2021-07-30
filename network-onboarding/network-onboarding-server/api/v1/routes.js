@@ -4,13 +4,19 @@ import moment from "moment";
 import * as packageJson from "../../package.json";
 import { deployParamName } from "../../helpers/constants";
 
-import { Authentication, User, Organization, Application } from "./endpoints";
+import { Authentication, Users, Organizations, Applications } from "./endpoints";
+
+import authentication from './authentication';
+import users from './users';
+import organizations from './organizations';
+import applications from './applications';
 
 const router = express.Router();
 
 router.use(Authentication.prefix, authentication)
-router.use(User.prefix, user)
-router.user(Organization.prefix, organization)
+router.use(Users.prefix, users)
+router.user(Organizations.prefix, organizations)
+router.user(Applications.prefix, applications)
 
 router.get(`/health`, (req, res) => {
   const deployment = req.app.get(deployParamName);
@@ -23,7 +29,5 @@ router.get(`/health`, (req, res) => {
     deployment
   });
 });
-
-// TODO: Authenticated route example
 
 export default router;

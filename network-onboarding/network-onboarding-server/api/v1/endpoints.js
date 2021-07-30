@@ -78,7 +78,7 @@ export const Applications = {
     // Update for organizations - Nothing!
 
     // Delete for organizations
-    removeOrg: '/:address/organizations/:orgAddress',   // DELETE
+    removeOrgfromApp: '/:address/organizations/:orgAddress',   // DELETE
 
   // Delete
   remove: '/:address'   // DELETE
