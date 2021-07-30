@@ -1,8 +1,16 @@
 import express from "express";
-const router = express.Router();
 import moment from "moment";
+
 import * as packageJson from "../../package.json";
 import { deployParamName } from "../../helpers/constants";
+
+import { Authentication, User, Organization, Application } from "./endpoints";
+
+const router = express.Router();
+
+router.use(Authentication.prefix, authentication)
+router.use(User.prefix, user)
+router.user(Organization.prefix, organization)
 
 router.get(`/health`, (req, res) => {
   const deployment = req.app.get(deployParamName);
