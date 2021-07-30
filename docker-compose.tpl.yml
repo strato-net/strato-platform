@@ -299,10 +299,16 @@ services:
         ipv4_address: 172.20.20.8
   postgres:
     environment:
-    - POSTGRES_PASSWORD=${postgres_password:-api}
+      - POSTGRES_PASSWORD=${postgres_password:-api}
     image: postgres:9.6
     volumes:
-    - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=300"
+      - "-c"
+      - "shared_buffers=512MB"
     restart: always
     logging:
       driver: "json-file"
