@@ -18,7 +18,7 @@
     "test:truchainz": "mocha -r ts-node/register e2e/createChain.test.ts && mocha -r ts-node/register e2e/governance.test.ts",
     "test:multicontract": "mocha -r ts-node/register e2e/multicontract.test.ts",
     "test:uploadOrder": "mocha -r ts-node/register e2e/uploadOrder.test.ts",
-    "test:slipstream": "mocha -r ts-node/register e2e/slipstream.test.ts",
+    "test:slipstream": "mocha -r ts-node/register e2e/slipstream.test.ts"
   },
   "dependencies": {
     "@types/mocha": "^8.0.3",
