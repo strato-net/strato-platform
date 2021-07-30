@@ -2,11 +2,9 @@ name: ethereum-rlp
 version: 0.1.0
 build-type: Simple
 author: Jamshid
-license-file:  LICENSE
 maintainer:    jamshidnh@gmail.com
 synopsis: Ethereum Recursive Length Prefix Encoding
 category:      Data Structures
-license: Apache-2.0
 description:
     RLP, as described in the Ethereum Yellowpaper
 

@@ -5,7 +5,6 @@ author: dpmesko
 maintainer:   daniel@blockapps.net
 synopsis: A Haskell x509 certificate generator
 category:      Data Structures
-license: Apache-2.0
 description:
     A Haskell x509 certificate generator
 

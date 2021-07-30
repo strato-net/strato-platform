@@ -5,7 +5,6 @@ author: Dustin Norwood
 maintainer:    dustin@blockapps.net
 synopsis: A debugging API that can be hooked in to any Haskell project
 category:      Debuggers
-license: Apache-2.0
 description:
     A debugging API that can be hooked in to any Haskell project
 

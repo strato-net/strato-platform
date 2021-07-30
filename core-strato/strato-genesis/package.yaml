@@ -2,11 +2,9 @@ name: strato-genesis
 version: 0.0.1
 build-type: Simple
 author: Jamshid
-license-file:  LICENSE
 maintainer:    jamshidnh@gmail.com
 synopsis: A tool to setup the DBs for a Strato instance
 category:      Data Structures
-license: Apache-2.0
 description: A tool to setup the DBs for a Strato instance
 
 dependencies:

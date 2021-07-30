@@ -2,8 +2,6 @@ name: blockapps-bloc22-server
 version: 0.1.0.0
 synopsis: Bloc microservice
 description: Bloc microservice
-license: BSD3
-license-file: LICENSE
 author: Eitan Chatav
 maintainer: eitan@blockapps.net
 copyright: 2016 BlockApps

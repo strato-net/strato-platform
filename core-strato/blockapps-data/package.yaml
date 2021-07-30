@@ -2,11 +2,9 @@ name: blockapps-data
 version: 0.0.1
 build-type: Simple
 author: Jamshid
-license-file: LICENSE
 maintainer: jamshidnh@gmail.com
 synopsis: A Haskell version of an Ethereum client
 category: Data Structures
-license: Apache-2.0
 description: The client described in the Ethereum Yellowpaper
 
 dependencies:
