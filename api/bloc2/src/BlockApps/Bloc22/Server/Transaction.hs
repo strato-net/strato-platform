@@ -54,7 +54,7 @@ import           UnliftIO
 
 import           BlockApps.Bloc22.API.Chain
 import           BlockApps.Bloc22.API.Transaction
-import           BlockApps.Bloc22.API.Users        
+import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Database.Tables
@@ -133,7 +133,7 @@ postBlocTransactionParallel a b resolve queue c =
     then do
       tbqueue <- fmap txTBQueue getBlocEnv
       atomically $ writeTBQueue tbqueue (a,b,resolve,c)
-      pure [] 
+      pure []
     else postBlocTransaction' (Do CacheNonce) a b resolve c
 
 postBlocTransaction :: (MonadLogger m,
@@ -154,6 +154,7 @@ postBlocTransaction' :: (MonadLogger m,
                      -> PostBlocTransactionRequest
                      -> m [BlocChainOrTransactionResult]
 postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRequest mAddr txs' txParams msrcs) = do
+  evmCompatibleOn <- fmap evmCompatible getBlocEnv
   case mUserName of
     Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-UNIQUE-NAME in the header"
     Just userName -> do
@@ -210,7 +211,10 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
                             Just "SolidVM" -> postUsersContractSolidVM'
                             Just vm -> \_ _ _ -> throwIO $ UserError $ Text.pack
                                                $ "Invalid value for VM choice: " ++ show vm
-            fmap ((:[]) . BlocTxResult) $ poster cacheNonce bcp userName
+            if evmCompatibleOn && (Map.lookup "VM" =<< md) == Just "SolidVM"
+                then throwIO $ UserError $ Text.pack "Error: EVM Compatibility flag is On. This feature cannot be used."
+            else do
+                fmap ((:[]) . BlocTxResult) $ poster cacheNonce bcp userName
           xs -> do
             ps <- mapM fromContract xs
             let bclp = ContractListParameters
@@ -230,7 +234,10 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
                   Just "SolidVM" -> postUsersUploadListSolidVM'
                   Just vm -> \_ _ _ -> throwIO $ UserError $ Text.pack
                                      $ "Invalid value for VM choice: " ++ show vm
-            fmap BlocTxResult <$> poster cacheNonce bclp userName
+            if evmCompatibleOn && (Map.lookup "VM" =<< md) == Just "SolidVM"
+              then throwIO $ UserError $ Text.pack "Error: EVM Compatibility flag is On. This feature cannot be used."
+            else do
+              fmap BlocTxResult <$> poster cacheNonce bclp userName
         FUNCTION -> case txs of
           [] -> return []
           [x] -> do
@@ -288,7 +295,7 @@ getSigVals :: Signature -> (Word256, Word256, Word8)
 getSigVals (Signature (S.CompactRecSig r s v)) =
   let convert = bytesToWord256 . BSS.fromShort
   in (convert r, convert s, v + 0x1b)
- 
+
 
 callSignature :: (MonadIO m, MonadLogger m, HasVault m) =>
                  Text -> UnsignedTransaction -> m Transaction
@@ -927,4 +934,3 @@ getArgValues argsMap argNamesTypes = do
         throwIO (UserError ("argument names don't match: " <> argNames1 <> " " <> argNames2))
       else sequence $ Map.intersectionWith determineValue argsMap argNamesTypes
     return $ map snd (sortOn fst (toList argsVals))
-

@@ -186,8 +186,10 @@ parseMapIndex = do
 parseField :: Parser [StoragePathPiece]
 parseField = do
   skip (== c2w8 '.')
-  n <- Atto.takeWhile1 (inClass "_a-zA-Z0-9")
-  (Field n:) <$> pathParser
+  (do n <- Atto.takeWhile1 (inClass "_a-zA-Z0-9")
+      (Field n:) <$> pathParser)
+    <|>
+      ((string ":creator") *> pathParser)
 
 parsePath :: B.ByteString-> Either String StoragePath
 parsePath = fmap StoragePath . parseOnly pathParser

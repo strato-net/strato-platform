@@ -87,4 +87,3 @@ benchmarks:
       - ethereum-rlp
       - criterion
       - zlib
-

@@ -18,3 +18,4 @@ import           HFlags
 --defineFlag "sourceCacheTimeout" (60::Integer) "The number of seconds nonces are held in the global source code cache"
 --defineFlag "txQueueSize" (4096::Integer) "The maximum number of requests to queue"
 defineFlag "gasOn" (True :: Bool) "Whether or not to throw an error if an account sending a TX has no balance - used in conjunction with the VM gasOn flag"
+defineFlag "evmCompatible" (False :: Bool) "Whether to turn off STRATO enhancements or not"
