@@ -117,11 +117,11 @@ postFaucetMultipart :: (MonadIO m, MonadLogger m, Selectable Address Integer m)
                     => MultipartData Mem -> ConduitT a IngestEvent m [Keccak256]
 postFaucetMultipart multipartData = do
   case lookupInput "address" multipartData of
-    Just a ->
+    Right a ->
       case toAddr a of
         Right address -> postFaucet address
         Left e -> throwIO $ InvalidArgs e
-    Nothing -> throwIO $ MissingParameterError "You need to provide the 'address' parameter"
+    Left e -> throwIO $ MissingParameterError e
 
 toAddr :: Text -> Either String Address
 toAddr v =

@@ -10,7 +10,6 @@
 
 module BlockApps.Bloc22.Database.Queries.Deprecated where
 
-import           ClassyPrelude                   ((<>))
 import           Control.Arrow
 import           Data.Int                        (Int32)
 import           Data.Map.Strict                 (Map)

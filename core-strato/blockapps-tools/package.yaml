@@ -2,11 +2,9 @@ name: blockapps-tools
 version: 0.0.1
 build-type: Simple
 author: Jamshid
-license-file:  LICENSE
 maintainer:    jamshidnh@gmail.com
 synopsis: A Haskell version of an Ethereum client
 category:      Data Structures
-license: Apache-2.0
 description:
               Tool to query the ethereum databases
 

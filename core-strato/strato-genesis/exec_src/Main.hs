@@ -3,7 +3,7 @@
 import HFlags
 import System.Environment (getProgName)
 import System.Exit        (die)
-import System.IO (readFile, withFile, IOMode(..))
+import System.IO (withFile, IOMode(..))
 
 import Control.Monad (when)
 import Data.Aeson (encode, eitherDecodeStrict)

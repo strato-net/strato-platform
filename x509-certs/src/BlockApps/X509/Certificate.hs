@@ -113,7 +113,7 @@ instance ToJSON X509Certificate where
   toJSON = String . T.pack . C8.unpack . certToBytes
 
 instance FromJSON X509Certificate where
-  parseJSON (String str) = either (fail "failed to JSON parse cert") pure $ bsToCert $ C8.pack $ T.unpack str
+  parseJSON (String str) = either (error "failed to JSON parse cert") pure $ bsToCert $ C8.pack $ T.unpack str
   parseJSON x = fail $ "parseJSON for SignedCertificate expects a String, but was given " ++ show x
 
 

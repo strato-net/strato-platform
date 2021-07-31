@@ -9,7 +9,6 @@ import           Data.Binary
 import qualified Data.ByteString     as B
 import qualified Data.ByteString.Base16     as B16
 import           Data.Data
-import           Data.DeriveTH
 import qualified Data.Text as T
 import           Data.Text.Encoding  (encodeUtf8, decodeUtf8)
 import           Database.Persist.TH
@@ -28,7 +27,8 @@ data Code = Code { codeBytes :: B.ByteString }
 instance Binary Code where
 instance NFData Code
 
-derive makeArbitrary ''Code
+instance Arbitrary Code where
+  arbitrary = Code <$> arbitrary
 
 derivePersistField "Code"
 

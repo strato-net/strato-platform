@@ -26,7 +26,6 @@ import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
 import           System.GlobalLock
 import           System.IO
-import           System.Log.FastLogger  (fromLogStr)
 
 import           Text.Printf
 

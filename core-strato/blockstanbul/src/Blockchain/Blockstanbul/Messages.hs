@@ -18,11 +18,11 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as LB
 import Data.Data
 import Data.Default
-import Data.DeriveTH
 import qualified Data.Map as M
 import Data.Text
 import GHC.Generics
 import Test.QuickCheck
+import Test.QuickCheck.Arbitrary.Generic
 import Text.Printf
 
 import qualified Blockchain.Blockstanbul.HTTPAdmin as HA
@@ -101,11 +101,20 @@ instance Format ForcedConfigChange where
 blockstanbulSender :: WireMessage -> Address
 blockstanbulSender (WireMessage a _) = sender a
 
-derive makeArbitrary ''MsgAuth
-derive makeArbitrary ''View
-derive makeArbitrary ''TrustedMessage
-derive makeArbitrary ''WireMessage
-derive makeArbitrary ''ForcedConfigChange
+instance Arbitrary MsgAuth where
+  arbitrary = genericArbitrary
+
+instance Arbitrary View where
+  arbitrary = genericArbitrary
+
+instance Arbitrary TrustedMessage where
+  arbitrary = genericArbitrary
+
+instance Arbitrary WireMessage where
+  arbitrary = genericArbitrary
+
+instance Arbitrary ForcedConfigChange where
+  arbitrary = genericArbitrary
 
 instance Format WireMessage where
   format (WireMessage (MsgAuth s _) msg) = format msg ++ " " ++ format s
@@ -305,7 +314,8 @@ data Checkpoint = Checkpoint
 instance Default Checkpoint where
   def = Checkpoint (View 0 0) M.empty [] []
 
-derive makeArbitrary ''Checkpoint
+instance Arbitrary Checkpoint where
+  arbitrary = genericArbitrary
 
 -- JSON was chosen to allow manual inspection and override during outages
 encodeCheckpoint :: Checkpoint -> B.ByteString

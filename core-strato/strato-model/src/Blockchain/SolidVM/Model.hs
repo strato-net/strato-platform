@@ -11,13 +11,13 @@ import Data.Aeson.Types
 import Data.Binary
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
-import Data.DeriveTH
 import Data.Swagger.Schema
 import Data.Swagger.Internal.Schema (named)
 import qualified Data.Text as T
 import Data.Text.Encoding
 import GHC.Generics
 import Test.QuickCheck
+import Test.QuickCheck.Arbitrary.Generic
 import Web.HttpApiData
 
 import              Control.Lens.Operators
@@ -43,7 +43,7 @@ instance ToHttpApiData HexStorage where
 instance FromHttpApiData HexStorage where
   parseQueryParam t = case B16.decode (encodeUtf8 t) of
     (hs, "") -> pure $ HexStorage hs
-    _ -> fail $ "non-hex string passed off as hex: " ++ T.unpack t
+    _ -> Left $ "non-hex string passed off as hex: " `T.append` t
 
 instance ToSchema HexStorage where
   declareNamedSchema _ = return $ named "solidvm hex storage"  binarySchema
@@ -68,5 +68,6 @@ instance FromJSON CodeKind where
   parseJSON (String t) = return . LabeledError.read "FromJSON/CodeKind" . T.unpack $ t
   parseJSON x = typeMismatch "CodeKind" x
 
-derive makeArbitrary ''CodeKind
+instance Arbitrary CodeKind where
+  arbitrary = genericArbitrary
 

@@ -34,9 +34,15 @@ import           Data.List
 import           Database.Persist.Sql
 import qualified Data.Map.Strict             as M
 import qualified Data.Set                    as S
+import           Data.Swagger                         hiding (Format, format)
 import qualified Data.Text                   as T
 import qualified GHC.Generics                as GHCG
-import           Network.Socket.Internal
+import           Network.Socket
+import           Test.QuickCheck             (suchThat, vectorOf)
+import           Test.QuickCheck.Arbitrary
+import           Test.QuickCheck.Arbitrary.Generic
+import           Test.QuickCheck.Instances.ByteString  ()
+
 import           Text.Regex
 
 import           Blockchain.Data.Address
@@ -52,11 +58,25 @@ instance RLPSerializable IPAddress where
   rlpEncode (IPv4 addy) = rlpEncode $ toInteger addy
   rlpDecode x = IPv4 (fromInteger $ rlpDecode x)
 
+instance Arbitrary IPAddress where
+  arbitrary = genericArbitrary
+
 newtype OrgId = OrgId { unOrgId :: B.ByteString } deriving (Show, Read, Eq, Ord, GHCG.Generic, NFData, Binary, Data)
 
 instance RLPSerializable OrgId where
   rlpEncode (OrgId bs) = rlpEncode bs
   rlpDecode = OrgId . rlpDecode
+
+instance ToSchema OrgId where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "OrgId")
+      ( mempty )
+
+instance Arbitrary OrgId where
+  arbitrary = genericArbitrary
+
+instance ToSchema IPAddress where
+  
 
 data Enode = Enode
   { pubKey     :: OrgId
@@ -64,6 +84,8 @@ data Enode = Enode
   , tcpPort    :: Int
   , udpPort    :: Maybe Int
   } deriving (Show, Read, Eq, Ord, GHCG.Generic, NFData, Binary, Data)
+
+instance ToSchema Enode where
 
 newtype ChainMembers = ChainMembers { unChainMembers :: M.Map Address Enode } deriving (Eq)
 newtype ChainTxsInBlock = ChainTxsInBlock { unChainTxsInBlock :: M.Map Word256 [Keccak256] } deriving (Eq)
@@ -93,6 +115,13 @@ instance FromJSON Enode where
 
 instance ToJSON Enode where
   toJSON enode = String (T.pack $ showEnode enode)
+
+instance Arbitrary Enode where
+  arbitrary = Enode
+          <$> (OrgId . B.pack <$> vectorOf 64 arbitrary)
+          <*> arbitrary
+          <*> arbitrary `suchThat` (>=0)
+          <*> (arbitrary `suchThat` maybe True (>=0))
 
 -- replacements for show/read for IPAddress and Enode, because implementing read is a nightmare
 showIP :: IPAddress -> String
@@ -159,7 +188,7 @@ readEnodeOrFail :: String -> Either String Enode
 readEnodeOrFail input =
   case matchRegex (mkRegex "^enode://([0-9a-f]+)@([^:]+)\\:([0-9]+)(\\?discport=([0-9]+))?$") input of
     Nothing -> Left $ "enode is in the wrong format: " ++ input
-    Just [pubkey', ip, port, _, discport] -> do
+    Just [pubkey', ip, port', _, discport] -> do
       let publen = length pubkey'
           pubkey = if publen >= 128
                      then pubkey'
@@ -167,9 +196,9 @@ readEnodeOrFail input =
           ~(oId, rest) = B16.decode $ C8.pack pubkey
       orgId <- if B.null rest
         then pure $ OrgId oId
-        else fail $ "Failed on parsing OrdId: " ++ pubkey
+        else Left $ "Failed on parsing OrdId: " ++ pubkey
       ipAddr <- readEitherIP ip
-      tcp <- LabeledError.readEither "Enode/readEnodeOrFail" port
+      tcp <- LabeledError.readEither "Enode/readEnodeOrFail" port'
       udp <- case discport of
         "" -> pure Nothing
         _ -> Just <$> LabeledError.readEither "Enode/readEnodeOrFail" discport
@@ -183,6 +212,6 @@ instance PersistField Enode where
   toPersistValue = PersistText . T.pack . showEnode
   fromPersistValue (PersistText t) =
     case readEnodeOrFail $ T.unpack t of
-      Left e -> fail e
+      Left e -> Left $ T.pack e
       Right val -> return val
   fromPersistValue x = Left . T.pack $ "PersistField Enode: expected PersistText: " ++ show x

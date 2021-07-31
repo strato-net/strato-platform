@@ -10,7 +10,6 @@ module BlockApps.Bloc22.API.Search where
 import           Control.Applicative              (liftA2)
 import           Control.Lens                     ((&), (?~))
 import           Data.Aeson
-import           Data.Monoid                      ((<>))
 import           Data.Swagger
 import qualified Data.Text                        as Text
 import           Servant.API

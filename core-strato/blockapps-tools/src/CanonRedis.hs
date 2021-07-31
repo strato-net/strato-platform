@@ -3,7 +3,6 @@ module CanonRedis where
 
 import           Control.Monad.IO.Class
 import           Control.Monad
-import           Data.Monoid                           ((<>))
 import           Database.Redis
 
 -- import           Blockchain.EthConf                    (lookupRedisBlockDBConfig)

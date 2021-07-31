@@ -2,24 +2,20 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Blockchain.Data.ArbitraryInstances where
 
-import           Data.DeriveTH
 import           Data.Maybe                         (fromJust, isJust)
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances()
 
 import           Data.ByteString.Arbitrary
 import qualified Data.ByteString                    as B
-import qualified Data.Text                          as T
 import           Data.Time.Clock.POSIX
 
 import           System.IO.Unsafe                   (unsafePerformIO)
 
 import           Blockchain.Data.Block
-import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
-import           Blockchain.Data.Enode
 import           Blockchain.Data.Transaction
-import           Blockchain.Data.TXOrigin
+import           Blockchain.Data.TXOrigin           ()
 import           Blockchain.Database.MerklePatricia
 import           Blockchain.Util
 
@@ -38,8 +34,6 @@ positiveIntegerMax = 99999999
 data HaskoinPrvKey = HaskoinPrvKey H.PrvKey
 unboxPK :: HaskoinPrvKey -> H.PrvKey
 unboxPK (HaskoinPrvKey pk) = pk
-
-derive makeArbitrary ''TXOrigin
 
 instance Arbitrary PositiveInteger where
     arbitrary = PositiveInteger . abs <$> arbitrary
@@ -132,27 +126,3 @@ instance Arbitrary RawTransaction where
 instance Arbitrary StateRoot where
     arbitrary = StateRoot <$> fastRandBs 32
 
-instance Arbitrary IPAddress where
-  arbitrary = IPv4 <$> arbitrary
-
-instance Arbitrary Enode where
-  arbitrary = Enode
-          <$> (OrgId . B.pack <$> vectorOf 64 arbitrary)
-          <*> arbitrary
-          <*> arbitrary `suchThat` (>=0)
-          <*> (arbitrary `suchThat` maybe True (>=0))
-
-instance Arbitrary CodeInfo where
-  arbitrary = CodeInfo
-      <$> arbitrary
-      <*> (T.pack <$> arbitrary)
-      <*> (fmap T.pack <$> arbitrary)
-
-instance Arbitrary AccountInfo where
-  arbitrary = NonContract
-      <$> arbitrary
-      <*> arbitrary `suchThat` (>=0)
-
-derive makeArbitrary ''ChainSignature
-derive makeArbitrary ''UnsignedChainInfo
-derive makeArbitrary ''ChainInfo

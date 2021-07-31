@@ -6,9 +6,7 @@
 module BlockApps.Solidity.Value where
 
 
-import           ClassyPrelude           ((<>))
 import           Control.DeepSeq
-import           Control.Monad           (sequence)
 import qualified Data.Bimap              as Bimap
 import qualified Data.Binary             as Binary
 import           Data.Bits               (complement, shiftL, (.|.))

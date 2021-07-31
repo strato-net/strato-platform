@@ -2,7 +2,6 @@ name: blockapps-bloc22-client
 version: 0.1.0.0
 synopsis: Bloc microservice client
 description: Bloc microservice client
-license-file: LICENSE
 author: Eitan Chatav
 maintainer: eitan@blockapps.net
 copyright: 2016 BlockApps

@@ -14,11 +14,16 @@
 {-# LANGUAGE TypeFamilies               #-}
 {-# OPTIONS_GHC -fno-warn-orphans       #-}
 
+
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE UndecidableInstances #-}
+  
+
 module Blockchain.Data.DataDefs where
 
 import           Control.DeepSeq
 import           Control.Lens
-import           Control.Lens.TH                         (makeLensesFor)
 import           Control.Monad.Trans.Class (lift)
 
 import           Database.Persist
