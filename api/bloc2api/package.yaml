@@ -49,5 +49,5 @@ tests:
     source-dirs: test/
     main: APISpec.hs
     dependencies:
-      - blockapps-bloc22-api
+      - bloc2api
       - hspec
