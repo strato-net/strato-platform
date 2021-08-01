@@ -5,17 +5,16 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module BlockApps.Bloc22.Crypto where
+module BlockApps.Bloc22.Crypto (
+  KeyStore(..),
+  exKeyStore,
+  Password(..)
+  ) where
 
 import           Control.Lens                      (mapped, (&), (?~))
-import           Control.Monad.IO.Class
 import           Crypto.HaskoinShim
-import qualified Crypto.KDF.BCrypt                 as BCrypt
-import qualified Crypto.KDF.Scrypt                 as Scrypt
-import           Crypto.Random.Entropy
 import qualified Crypto.Saltine.Class              as Saltine
 import qualified Crypto.Saltine.Core.SecretBox     as SecretBox
-import qualified Crypto.Saltine.Internal.ByteSizes as Saltine
 import           Data.Aeson
 import           Data.Aeson.Types
 import           Data.ByteString                   (ByteString)
@@ -36,7 +35,6 @@ import           Web.HttpApiData
 
 
 import           BlockApps.Bloc22.API.SwaggerSchema
-import           BlockApps.Ethereum
 import           Blockchain.Strato.Model.Address
 
 
@@ -173,51 +171,3 @@ exKeyStore  = KeyStore
    , keystoreAcctAddress = Address 0x97b8c8d8334b6f3cd15e4e09986741e76b32c0f1
    }
 
-decryptSecKey
-  :: Password
-  -> ByteString -- salt
-  -> SecretBox.Nonce
-  -> ByteString -- encrypted secret key
-  -> Maybe SecKey
-decryptSecKey (Password pw) salt nonce encSecKey = do
-  decKey <- Saltine.decode $ Scrypt.generate scryptParams pw salt
-  secKey =<< SecretBox.secretboxOpen decKey nonce encSecKey
-  where
-    scryptParams = Scrypt.Parameters
-      { Scrypt.n = 16384
-      , Scrypt.r = 8
-      , Scrypt.p = 1
-      , Scrypt.outputLength = Saltine.secretBoxKey
-      }
-
-newKeyStore :: MonadIO io => Password -> io KeyStore
-newKeyStore (Password pw) = liftIO $ do
-  -- BCrypt for password validation
-  -- Scrypt for password derived encryption key
-  -- NaCl SecretBox (XSalsa20 Poly1305) for encryption
-  -- Secp256k1 for ethereum account creation
-  salt <- getEntropy 16
-  acctNonce <- SecretBox.newNonce
-  acctSk <- newSecKey
-  pwHash <- BCrypt.hashPassword 6 pw
-  let
-    scryptParams = Scrypt.Parameters
-      { Scrypt.n = 16384
-      , Scrypt.r = 8
-      , Scrypt.p = 1
-      , Scrypt.outputLength = Saltine.secretBoxKey
-      }
-    err = error "could not decode encryption key"
-    encKey = fromMaybe err . Saltine.decode $
-      Scrypt.generate scryptParams pw salt
-    encAcctSk = SecretBox.secretbox encKey acctNonce (getSecKey acctSk)
-    acctPk = derivePubKey acctSk
-    acctAddr = deriveAddress acctPk
-  return KeyStore
-    { keystoreSalt = salt
-    , keystorePasswordHash = pwHash
-    , keystoreAcctNonce = acctNonce
-    , keystoreAcctEncSecKey = encAcctSk
-    , keystorePubKey = acctPk
-    , keystoreAcctAddress = acctAddr
-    }

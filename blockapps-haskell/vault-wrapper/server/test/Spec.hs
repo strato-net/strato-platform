@@ -60,10 +60,6 @@ secp256k1_haskell_spec =
       let oldPubBS = HK.exportPubKey False $ HK.derivePubKey oldPriv
           newPubBS = SEC.exportPubKey False $ SEC.derivePubKey newPriv
       oldPubBS `shouldBe` newPubBS 
-    it "create Ethereum addresses" $ do
-      let oldAddy = E.deriveAddress $ HK.derivePubKey oldPriv
-          newAddy = fromPrivateKey (PrivateKey newPriv)
-      oldAddy `shouldBe` newAddy
     
     it "create secp256k1 private keys from test key value" $ do
       let testOldPriv = fromMaybe (error "couldn't get test haskoin key") (HK.secKey testPriv)
@@ -76,12 +72,6 @@ secp256k1_haskell_spec =
           testOldPubBS = HK.exportPubKey False $ HK.derivePubKey testOldPriv
           testNewPubBS = SEC.exportPubKey False $ SEC.derivePubKey testNewPriv
       testOldPubBS `shouldBe` testNewPubBS
-    it "create Ethereum addresses from test key value" $ do
-      let testOldPriv = fromMaybe (error "couldn't get test haskoin key") (HK.secKey testPriv)
-          testNewPriv = fromMaybe (error "couldn't get test secp key") (SEC.secKey testPriv)
-          oldAddy = E.deriveAddress $ HK.derivePubKey testOldPriv
-          newAddy = fromPrivateKey (PrivateKey testNewPriv)
-      oldAddy `shouldBe` newAddy
    
 
    -- for some reason R and S values are swapped in secp256k1-haskell
@@ -154,10 +144,6 @@ timingTests = do
 
   
   putStrLn "\nAddress derivation:"
-  putStrLn "Haskoin: "
-  _ <- cwPrintTime $ do
-    let !addr = E.deriveAddress $ HK.derivePubKey oldPriv
-    return addr
   putStrLn "secp256k1-haskell: "
   _ <- cwPrintTime $ do
     let !addr = fromPrivateKey (PrivateKey newPriv)
