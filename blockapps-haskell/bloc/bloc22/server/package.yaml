@@ -21,7 +21,7 @@ library:
   dependencies:
     - aeson
     - base16-bytestring
-    - blockapps-bloc22-api
+    - bloc2api
     - blockapps-strato-api
     - bytestring
     - cache

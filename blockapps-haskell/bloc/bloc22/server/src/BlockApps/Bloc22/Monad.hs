@@ -30,7 +30,6 @@ import           Control.Monad.Reader
 import           Data.Cache
 import           Data.Foldable
 import           Data.Int                           (Int32)
-import           Data.Map.Strict                    (Map)
 import           Data.Pool (Pool, withResource)
 import           Data.Profunctor.Product.Default
 import           Data.Text                          (Text)
@@ -45,14 +44,9 @@ import           Text.Printf
 
 import           UnliftIO                           hiding (Handler(..))
 
-import           BlockApps.Bloc22.API.Transaction
 import           BlockApps.Logging
 import           BlockApps.Solidity.Xabi
-import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.CodePtr
-import           Blockchain.Strato.Model.Nonce
-import           Blockchain.Strato.Model.SourceMap
 
 data Should a = Don't a | Do a
 data Compile = Compile
@@ -74,11 +68,7 @@ data BlocEnv = BlocEnv
   , dbPool             :: Pool Connection
   , deployMode         :: DeployMode
   , stateFetchLimit    :: Integer
-  , gasOn              :: Bool
-  , globalNonceCounter :: Cache (Address, Maybe ChainId) Nonce
-  , globalSourceCache  :: Cache (Text, SourceMap) (Map Text (Int32, ContractDetails))
   , globalCodePtrCache :: Cache CodePtr (Int32, ContractDetails)
-  , txTBQueue          :: TBQueue (Maybe Text, Maybe ChainId, Bool, PostBlocTransactionRequest)
   }
 
 data BlocError

@@ -8,7 +8,6 @@ packages:
 - composable-monads/core-api-monad
 - composable-monads/sql-monad
 - composable-monads/vault-monad
-- blockapps-haskell/bloc/bloc22/api
 - blockapps-haskell/bloc/bloc22/server
 - blockapps-haskell/ethereum
 - blockapps-haskell/slipstream
