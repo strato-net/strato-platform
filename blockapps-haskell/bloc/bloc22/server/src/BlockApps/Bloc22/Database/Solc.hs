@@ -1,7 +1,10 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module BlockApps.Bloc22.Database.Solc (compileSolc, compileSolcIO) where
+module BlockApps.Bloc22.Database.Solc (
+  compileSolc
+  --compileSolcIO
+  ) where
 
 import           Control.Monad.IO.Class     (MonadIO(..))
 import           Control.Monad.Trans.Except
@@ -58,17 +61,6 @@ compileSolc solcVersion mainSrc = do
       maybe (blocError . AnError $ "SolcError : No \"src\" field in json artifact")
             return $ Map.lookup "src" res
 
-
--- For solc compiling during testing, outside of Bloc monad
-compileSolcIO :: SolcVersion -> Text -> IO (Either String Aeson.Value)
-compileSolcIO solcVersion mainSrc = do
-  (postParams, mainFiles, importFiles) <- getSolSrc mainSrc
-  eRes <- liftIO . runExceptT $ runSolc solcVersion postParams mainFiles importFiles
-  return $ case eRes of
-    Left (err, ExitFailure 1) -> Left err
-    Left (err,_) -> Left err
-    Right res ->
-      maybe (Left "SolcError : No \"src\" field in json artifact") Right $ Map.lookup "src" res
 
 runSolc :: SolcVersion
         -> Map String String

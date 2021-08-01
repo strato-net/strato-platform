@@ -9,14 +9,15 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TupleSections         #-}
 
-module BlockApps.Bloc22.Database.Queries where
+module BlockApps.Bloc22.Database.Queries (
+  getContractDetailsByCodeHash,
+  sourceToContractDetails,
+  insertContractInstance
+  ) where
 
 import           Control.Arrow
 import           Control.Monad
 import           Control.Monad.Reader            (asks)
-import           Crypto.HaskoinShim
-import qualified Crypto.Saltine.Class            as Saltine
-import qualified Crypto.Saltine.Core.SecretBox   as SecretBox
 import           Data.Aeson                      (Result(..), fromJSON, decode, encode)
 import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString                 as BS
@@ -37,15 +38,11 @@ import qualified Data.Text                       as Text
 import qualified Data.Text.Encoding              as Text
 import           Data.Traversable
 import           Data.Tuple                      (swap)
-import           Database.PostgreSQL.Simple      (Connection)
-import           GHC.Stack
 import           Opaleye                         hiding (not, null, index)
 import           System.Clock
-import           Text.Format
 import           UnliftIO
 
 import           BlockApps.Bloc22.API.Utils
-import           BlockApps.Bloc22.Crypto
 import           BlockApps.Bloc22.Database.Tables
 import           BlockApps.Bloc22.Database.Solc
 import           BlockApps.Bloc22.Monad
@@ -62,89 +59,6 @@ import           Blockchain.Strato.Model.SourceMap
 
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
-
-{- |
-SELECT address from key_store;
--}
-getAddressesQuery :: Query (Column PGBytea)
-getAddressesQuery = proc () -> do
-  (_,_,_,_,_,_,addr,_) <- queryTable keyStoreTable -< ()
-  returnA -< addr
-
-{- |
-SELECT name FROM users;
--}
-getUsersQuery :: Query (Column PGText)
-getUsersQuery = proc () -> do
-  (_,user) <- queryTable usersTable -< ()
-  returnA -< user
-
-{- |
-SELECT id FROM users WHERE name = $1;
--}
-getUserIdQuery :: UserName -> Query (Column PGInt4)
-getUserIdQuery username = proc () -> do
-  (uid, name) <- queryTable usersTable -< ()
-  restrict -< name .== constant username
-  returnA -< uid
-
-{- |
-SELECT K.address FROM users U JOIN keystore K
-  ON K.user_id = U.id WHERE U.name = $1;
--}
-getUsersUserQuery :: Text -> Query (Column PGBytea)
-getUsersUserQuery userName = proc () -> do
-  (name,addr) <- usersJoinKeyStore -< ()
-  restrict -< name .== constant userName
-  returnA -< addr
-  where
-    usersJoinKeyStore = joinF
-      (\ (_,name) (_,_,_,_,_,_,addr,_) -> (name,addr))
-      (\ (uid,_) (_,_,_,_,_,_,_,userId) -> userId .== uid)
-      (queryTable usersTable)
-      (queryTable keyStoreTable)
-
-{- |
-WITH userid AS (
- SELECT id FROM users WHERE name = $1)
- , newUserId AS
- (
-   INSERT INTO users (name)
-   SELECT $1 WHERE NOT EXISTS (SELECT id FROM users WHERE name = $1)
-   RETURNING id
- )
- INSERT INTO keystore (salt,password_hash,nonce,enc_sec_key,pub_key,address,user_id)
- SELECT $2, $3, $4, $5, $6, $7, uid.id FROM
-(SELECT id FROM userid UNION SELECT id FROM newUserId) uid;
--}
-
-postUsersUserQuery :: Text -> KeyStore -> Connection -> IO Bool
-postUsersUserQuery userName keystore conn = do
-  userIds1 <- runQuery conn $ proc () -> do
-    (userId,name) <- queryTable usersTable -< ()
-    restrict -< name .== constant userName
-    returnA -< userId
-  userIds2 <- case listToMaybe userIds1 of
-    Nothing -> runInsertManyReturning conn usersTable
-      [(Nothing,constant userName)] fst
-    Just userId -> return [userId::Int32]
-  case listToMaybe userIds2 of
-    Nothing -> return False
-    Just userId -> insertKeyStore userId keystore conn
-
-insertKeyStore :: Int32 -> KeyStore -> Connection -> IO Bool
-insertKeyStore userId KeyStore{..} conn = do
-    _ <- runInsertMany conn keyStoreTable [
-      ( Nothing
-      , constant keystoreSalt
-      , constant keystorePasswordHash
-      , constant keystoreAcctNonce
-      , constant keystoreAcctEncSecKey
-      , constant keystorePubKey
-      , constant keystoreAcctAddress
-      , constant userId
-      )]
-    return True
 
 contractsJoinTable :: Query
   ( Column PGInt4
@@ -226,36 +140,6 @@ contractByCodeHash codeHash = proc () -> do
   restrict -< ch .== constant codeHash
   returnA -< contract
 
-contractByMetadataId
-  :: Int32
-  -> Query
-    ( Column PGBytea
-    , Column PGBytea
-    , Column PGBytea
-    , Column PGBytea
-    , Column PGBytea
-    , Column PGText
-    , Column PGText
-    , Column PGInt4
-    , Column PGBytea
-    )
-contractByMetadataId metadataId = proc () -> do
-  contract@(_,_,_,_,_,_,_,cmId,_) <- contractDetailsJoinTable -< ()
-  restrict -< cmId .== constant metadataId
-  returnA -< contract
-
-contractInstancesByCodeHash
-  :: CodePtr
-  -> Address
-  -> Maybe ChainId
-  -> Query (Column PGInt4)
-contractInstancesByCodeHash codeHash address chainId = proc () -> do
-  (cmId,_,_,addr,_,_,_,ch,_,cid,_) <- contractsJoinTable -< ()
-  restrict -< ch .== constant codeHash
-  restrict -< addr .== constant address
-  restrict -< cid .== constant chainId
-  returnA -< cmId
-
 contractBySourceHash
   :: Keccak256
   -> Query
@@ -274,142 +158,6 @@ contractBySourceHash srcHash = proc () -> do
   restrict -< sh .== constant srcHash
   returnA -< contract
 
-contractNameFromAccount :: Account -> Query (Column PGText)
-contractNameFromAccount (Account contractAddress chainId) = proc () -> do
-  (_,name,_,addr,_,_,_,_,_,cid,_) <- contractsJoinTable -< ()
-  restrict -< addr .== constant contractAddress
-  restrict -< cid .== constant (ChainId <$> chainId)
-  returnA -< name
-
-contractByTxHash :: Keccak256 -> Query (Column PGInt4, Column PGInt4, Column PGText)
-contractByTxHash txHash = limit 1 $ proc () -> do
-  (_,tx_hash,cmId,ttype,name) <- queryTable hashNameTable -< ()
-  restrict -< tx_hash .== constant txHash
-  returnA -< (cmId,ttype,name)
-
-linkedContractsJoinTable :: Query
-  ( Column PGBytea
-  , Column PGBytea
-  , Column PGBytea
-  , Column PGBytea
-  , Column PGText
-  , Column PGText
-  , Column PGText
-  , Column PGInt4
-  , Column PGBytea
-  )
-linkedContractsJoinTable = joinF
-  (\ (_,name2) (b,br,ch,xch,name,src,cm2Id,_,xabi) -> (b,br,ch,xch,name,name2,src,cm2Id,xabi))
-  (\ (c2Id,_) (_,_,_,_,_,_,_,contractId2,_) -> c2Id .== contractId2)
-  (queryTable contractsTable) $ joinF
-    (\ (cm2Id,contractId2,_,_,_,_,_,_) (b,br,ch,xch,_,name,src,_,xabi) -> (b,br,ch,xch,name,src,cm2Id,contractId2,xabi))
-    (\ (_,_,_,_,_,_,sh',_) (_,_,_,_,sh,_,_,_,_) -> sh' .== sh)
-    (queryTable contractsMetaDataTable)
-    contractDetailsJoinTable
-
-{- |
-SELECT CI.address FROM contracts_instance CI
- JOIN contracts_metadata CM ON CM.id = CI.contracts_metadata_id
- JOIN contracts C ON C.id = CM.contract_id
- WHERE C.name = $1 ORDER BY timestamp DESC;
--}
-getSearchContractQuery :: Text -> Query (Column PGBytea, Column PGBytea)
-getSearchContractQuery contractName = proc () -> do
-  (_,name,_,addr,_,_,_,_,_,cid,_) <-
-    orderBy (desc (\(_,_,_,_,timestamp,_,_,_,_,_,_) -> timestamp))
-      contractsJoinTable -< ()
-  restrict -< name .== constant contractName
-  returnA -< (addr,cid)
-
-{- |
-SELECT
-   C.name
- , CI.address
- , CI.timestamp
-FROM contracts C
-JOIN contracts_metadata CM
-  ON CM.contract_id = C.id
-JOIN contracts_instance CI
-  ON CI.contract_metadata_id = CM.id;
--}
-getContractsAddressesQuery :: Maybe ChainId -> Query
-  ( Column PGText
-  , Column PGBytea
-  , Column PGTimestamptz
-  , Column PGBytea
-  )
-getContractsAddressesQuery chainId = limit 100 $ proc () -> do
-  (_,name,_,addr,timestamp,_,_,_,_,cid,_) <- contractsJoinTable -< ()
-  restrict -< cid .== constant chainId
-  returnA -< (name,addr,timestamp,cid)
-
-{- |
-SELECT
-  CI.address
-FROM contracts C
-JOIN contracts_metadata CM
-  ON CM.contract_id = C.id
-JOIN contracts_instance CI
-  ON CI.contract_metadata_id = CM.id
-WHERE C.name=$1;
--}
-getContractsDataAddressesQuery :: Text -> Query (Column PGBytea, Column PGBytea)
-getContractsDataAddressesQuery contractName = proc () -> do
-  (_,name,_,addr,_,_,_,_,_,cid,_) <- contractsJoinTable -< ()
-  restrict -< name .== constant contractName
-  returnA -< (addr,cid)
-
-{- |
-SELECT C.name
-FROM contracts C
-WHERE C.name=$1
-UNION
-SELECT
-  C2.Name
-FROM contracts C
-JOIN contracts_metadata CM
-  ON CM.contract_id = C.id
-JOIN contracts_lookup CL
-  ON CL.contract_metadata_id = CM.id
-JOIN contracts_metadata CM2
-  ON CM2.id = CL.linked_metadata_id
-JOIN contracts C2
-  ON C2.id = CM2.contract_id
-WHERE C.name=$1
-UNION
-SELECT 'Latest'
-FROM contracts C
-WHERE C.name=$1;
--}
-getContractsDataNamesQuery :: Text -> Query (Column PGText)
-getContractsDataNamesQuery contractName =
-  sameName `union` differentName `union` latest
-  where
-    sameName = proc () -> do
-      (_,name) <- queryTable contractsTable -< ()
-      restrict -< name .== constant contractName
-      returnA -< name
-    differentName = proc () -> do
-      (_,_,_,_,name,name2,_,_,_) <- linkedContractsJoinTable -< ()
-      restrict -< name .== constant contractName
-      returnA -< name2
-    latest = proc () -> do
-      (_,name) <- queryTable contractsTable -< ()
-      restrict -< name .== constant contractName
-      returnA -< constant ("Latest"::Text)
-
-getContractsMetaDataId :: Text -> Account -> Bloc (Maybe Int32)
-getContractsMetaDataId name = fmap (fmap fst) . getContractDetailsAndMetadataId (ContractName name)
-
-getContractDetailsAndMetadataIdByAccountOnly :: Account -> Bloc (Maybe (Int32, ContractDetails))
-getContractDetailsAndMetadataIdByAccountOnly contractAcct = do
-  mName <- fmap listToMaybe . blocQuery $ contractNameFromAccount contractAcct
-  fmap join . for mName $ \name -> getContractDetailsAndMetadataId (ContractName name) contractAcct
-
-getContractDetailsByAccountOnly :: Account -> Bloc (Maybe ContractDetails)
-getContractDetailsByAccountOnly contractAcct = do
-  mName <- fmap listToMaybe . blocQuery $ contractNameFromAccount contractAcct
-  fmap join . for mName $ \name -> getContractDetails (ContractName name) contractAcct
 
 {- |
 SELECT
@@ -466,70 +214,6 @@ getContractsContractByCodeHashQuery codeHash =
 
 {- |
 SELECT
-   CM2.bin
- , CM2.bin_runtime
- , CM2.code_hash
- , C2.name
-FROM contracts_metadata CM
-JOIN contracts C
-  ON C.id = CM.contract_id
-JOIN contracts_lookup CL
-  ON CL.contract_metadata_id = CM.id
-JOIN contracts_metadata CM2
-  ON CM2.id = CL.linked_metadata_id
-JOIN contracts C2
-  ON C2.id = CM2.contract_id
-WHERE C.name = $1 AND C2.name=$2
--}
-getContractsContractByNameQuery
-  :: Text
-  -> Text
-  -> Query
-    ( Column PGBytea
-    , Column PGBytea
-    , Column PGBytea
-    , Column PGBytea
-    , Column PGText
-    , Column PGText
-    , Column PGInt4
-    , Column PGBytea
-    )
-getContractsContractByNameQuery contractName1 contractName2 = proc () -> do
-  (b,br,ch,xch,name1,name2,src,cm2Id,xabi) <- linkedContractsJoinTable -< ()
-  restrict -< name1 .== constant contractName1
-  restrict -< name2 .== constant contractName2
-  returnA -< (b,br,ch,xch,name2,src,cm2Id,xabi)
-
-{- |
-SELECT
-   CM.bin
- , CM.bin_runtime
- , CM.code_hash
- , C.name
-FROM contracts_metadata CM
-JOIN contracts C
-  ON C.id = CM.contract_id
-WHERE C.name = $1
--}
-getContractsContractBySameNameQuery
-  :: Text
-  -> Query
-    ( Column PGBytea
-    , Column PGBytea
-    , Column PGBytea
-    , Column PGBytea
-    , Column PGText
-    , Column PGText
-    , Column PGInt4
-    , Column PGBytea
-    )
-getContractsContractBySameNameQuery contractName = proc () -> do
-  (b,br,ch,xch,_,name,src,cmId,xabi) <- contractDetailsJoinTable -< ()
-  restrict -< name .== constant contractName
-  returnA -< (b,br,ch,xch,name,src,cmId,xabi)
-
-{- |
-SELECT
    CM.bin
  , CM.bin_runtime
  , CM.code_hash
@@ -573,24 +257,6 @@ decodeXabiJSON :: ByteString -> Bloc Xabi
 decodeXabiJSON xabi' = case decode (fromStrict xabi') of
   Nothing -> throwIO $ DBError "Corrupted Xabi stored in database"
   Just x -> return x
-
-getContractDetailsByMetadataId :: Int32 -> Account -> Bloc ContractDetails
-getContractDetailsByMetadataId cmId acct = do
-  (bin,binRuntime,codeHash,_ :: ByteString,_ :: Keccak256,name,src,_ :: Int32,xabi') <-
-    blocQuery1 "getContractDetailsByMetadataId" $ contractByMetadataId cmId
-  xabi <- deserializeXabi xabi'
-  return ContractDetails
-    { contractdetailsBin = Text.decodeUtf8 bin
-    , contractdetailsAccount = Just acct
-    , contractdetailsBinRuntime = Text.decodeUtf8 binRuntime
-    , contractdetailsCodeHash = codeHash
-    , contractdetailsName = name
-    , contractdetailsSrc = deserializeSourceMap src
-    , contractdetailsXabi = xabi
-    }
-
-getContractDetails :: ContractName -> Account -> Bloc (Maybe ContractDetails)
-getContractDetails name = fmap (fmap snd) . getContractDetailsAndMetadataId name
 
 getContractDetailsAndMetadataId :: ContractName -> Account -> Bloc (Maybe (Int32, ContractDetails))
 getContractDetailsAndMetadataId (ContractName contractName) acct = do
@@ -648,28 +314,6 @@ getContractDetailsByCodeHash codePtr = do
       liftIO . for_ mIdAndDetails $ Cache.insert srcCache codePtr
       pure mIdAndDetails
 
-{- |
-WITH contract_id AS (
- SELECT id FROM contracts WHERE name = $1)
- , new_contract_id AS
- (
-   INSERT INTO contracts (name)
-   SELECT $1 WHERE NOT EXISTS (SELECT id FROM contracts WHERE name = $1)
-   RETURNING id
- )
-SELECT id FROM contract_id UNION SELECT id FROM new_contract_id;
--}
-createContractQuery :: Text -> Bloc Int32
-createContractQuery contractName = do
-  cIds <- blocQuery $ proc () -> do
-    (cId,name) <- queryTable contractsTable -< ()
-    restrict -< name .== constant contractName
-    returnA -< cId
-  case listToMaybe cIds of
-    Just cId -> return cId
-    Nothing -> blocModify1 $ \ conn -> runInsertManyReturning conn contractsTable
-      [(Nothing, constant contractName)]
-      fst
 
 createContractBatchQuery :: [Text] -> Bloc (Map Text Int32)
 createContractBatchQuery names = do
@@ -697,33 +341,6 @@ insertContractSourceQuery src' = do
       )]
       (\ (csId,sh,_) -> (csId,sh))
 
-{- |
-Insert metadata into contract metadata table if metadata table does not contain codehash
-and xcodehash combination.
--}
-insertContractMetaDataQuery
-  :: Int32
-  -> Text
-  -> Text
-  -> CodePtr
-  -> Keccak256
-  -> Keccak256
-  -> Xabi
-  -> Bloc Int32
-insertContractMetaDataQuery
-  contractId bin binRuntime codeHash xcodeHash srcHash xabi = blocModify1 $ \ conn ->
-    runInsertManyReturning conn contractsMetaDataTable [
-      ( Nothing
-      , constant contractId
-      , constant (Text.encodeUtf8 bin)
-      , constant (Text.encodeUtf8 binRuntime)
-      , constant codeHash
-      , constant xcodeHash
-      , constant srcHash
-      , constant (serializeXabi xabi)
-      )]
-      (\ (contractmetadataId,_,_,_,_,_,_,_) -> contractmetadataId)
-
 insertContractMetaDataBatchQuery
   :: Keccak256
   -> [(Int32, ContractDetails)]
@@ -742,28 +359,8 @@ insertContractMetaDataBatchQuery srcHash details = blocModify $ \ conn ->
    in Map.fromList <$> runInsertManyReturning conn contractsMetaDataTable inserts
         (\(contractmetadataId,cId,_,_,_,_,_,_) -> (cId,contractmetadataId))
 
-instance QueryRunnerColumnDefault PGBytea Address where
-  queryRunnerColumnDefault = queryRunnerColumn id
-    (fromMaybe (error "could not decode address") . stringAddress . Char8.unpack)
-    queryRunnerColumnDefault
 instance Default Constant Address (Column PGBytea) where
   def = lmap (Char8.pack . formatAddressWithoutColor) def
-
-instance QueryRunnerColumnDefault PGBytea SecretBox.Nonce where
-  queryRunnerColumnDefault = queryRunnerColumn id
-    (fromMaybe (error "could not decode nonce") . Saltine.decode)
-    queryRunnerColumnDefault
-instance Default Constant SecretBox.Nonce (Column PGBytea) where
-  def = lmap Saltine.encode def
-
-instance Default Constant PubKey (Column PGBytea) where
-  def = lmap (exportPubKey False) def
-
-instance QueryRunnerColumnDefault PGBytea PubKey where
-  queryRunnerColumnDefault =
-     queryRunnerColumn id toPubKey queryRunnerColumnDefault
-     where toPubKey :: ByteString -> PubKey
-           toPubKey = fromMaybe (error "could not import pubkey") . importPubKey
 
 instance Default Constant UserName (Column PGText) where
   def = lmap getUserName def
@@ -832,56 +429,6 @@ insertContractInstance cmId (Account address chainId) = blocModify1 $ \conn -> r
   )
   ]
   (\ (contractInstanceId,_,_,_,_) -> contractInstanceId)
-
-evmContractSolidVMError :: Text
-evmContractSolidVMError = Text.concat
-  [ "Upload Contract (EVM): The given contracts were previously uploaded for "
-  , "SolidVM. Please retry your request specifying SolidVM as the VM type. "
-  , "If you are intending to use EVM, please modify your contracts and try again."
-  ]
-
-getContractDetailsForContract :: Text -> SourceMap -> Maybe Text -> Bloc (Maybe (Text, (Int32, ContractDetails)))
-getContractDetailsForContract theVM src mContract = do
-  let shouldCompile = if theVM == "EVM" then Do Compile else Don't Compile
-      cacheKey = (theVM, src)
-  srcCache <- asks globalSourceCache
-  now <- liftIO $ getTime Monotonic
-  let later = (now +) <$> Cache.defaultExpiration srcCache
-  mCachedDetails <- atomically $ do
-    Cache.purgeExpiredSTM srcCache now -- todo: this should probably go somewhere else, like a worker thread,
-                                       --       but we need this to prevent the cache growing unboundedly
-    r <- Cache.lookupSTM True cacheKey srcCache now
-    for_ r $ \v -> Cache.insertSTM cacheKey v srcCache later -- refresh to timestamp of this item
-    pure r
-
-  idsAndDetails <- case mCachedDetails of
-    Just cachedDetails -> pure cachedDetails
-    Nothing -> do
-      details <- if hasAnyNonEmptySources src
-                   then sourceToContractDetails shouldCompile src
-                   else return Map.empty
-      liftIO $ Cache.insert srcCache cacheKey details
-      pure details
-  case mContract of
-    Nothing ->
-      case Map.toList idsAndDetails of
-        [] -> pure Nothing
-        [x] -> Just <$> checkCodeHash x
-        _ -> throwIO $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data"
-    Just contract -> do
-      x <- let src' = serializeSourceMap src
-            in blocMaybe ("Could not find global contract metadataId for " <> contract <> " in source " <> src')  (Map.lookup contract idsAndDetails)
-      Just <$> checkCodeHash (contract, x)
-  where checkCodeHash x@(_,(_,cd)) = case contractdetailsCodeHash cd of
-          (EVMCode _) -> pure x
-          (SolidVMCode _ _) -> case theVM of
-            "EVM" -> throwIO $ UserError evmContractSolidVMError
-            _ -> pure x
-          (CodeAtAccount acct name) -> do
-            mCmIdDetails <- getContractDetailsAndMetadataIdByAccountOnly acct
-            case mCmIdDetails of
-              Nothing -> throwIO . UserError . Text.pack $ "Could not find contract details for " ++ name ++ " at address " ++ format acct
-              Just cmIdDetails -> pure (Text.pack name, cmIdDetails)
 
 sourceToContractDetails :: Should Compile -> SourceMap -> Bloc (Map Text (Int32, ContractDetails))
 sourceToContractDetails shouldCompile sourceList = do
@@ -969,13 +516,3 @@ createMetadataNoCompile sourceList = do
   mdIdMap <- insertContractMetaDataBatchQuery srcHash idDetails
   let cmIdDetails = Map.elems . Map.intersectionWith (,) mdIdMap $ Map.fromList idDetails
   return . Map.fromList $ map ((contractdetailsName . snd) &&& id) cmIdDetails
-
-getContractXabiByMetadataId :: HasCallStack => Int32 -> Bloc Xabi
-getContractXabiByMetadataId cmId = do
-  xabi' <- blocQuery1 "getContractXabiByMetadataId" . fmap ninth $ contractByMetadataId cmId
-  deserializeXabi xabi'
-  where ninth (_,_,_,_,_,_,_,_,x) = x
-
-getContractXabi :: ContractName -> Account -> Bloc (Maybe Xabi)
-getContractXabi contractName  =
-  fmap (fmap contractdetailsXabi) . getContractDetails contractName

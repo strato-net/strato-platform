@@ -9,9 +9,7 @@ packages:
 - composable-monads/sql-monad
 - composable-monads/vault-monad
 - blockapps-haskell/bloc/bloc22/api
-- blockapps-haskell/bloc/bloc22/client
 - blockapps-haskell/bloc/bloc22/server
-- blockapps-haskell/bloc/exe
 - blockapps-haskell/ethereum
 - blockapps-haskell/slipstream
 - blockapps-haskell/solidity
