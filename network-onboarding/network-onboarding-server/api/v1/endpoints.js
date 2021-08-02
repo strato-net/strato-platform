@@ -9,14 +9,22 @@ export const Authentication = {
   logout: '/logout',
 }
 
-
+// Users' membership of organizations is controlled by the Users endpoints
+// The lists returned getUserInvites and getUserRequests endpoints in Organizations 
+// are created by invite and request in Users
 export const Users = {
   prefix: '/users',
 
   // Create -- NB this will update organization's lists! We get an address from this!
   create: '/',          // PUT
-  invite: '/invite',    // PUT invite, accept, reject.
+
+  invite: '/invite',    // PUT invite
+  inviteAccept: '/invite/:address/accept',  // PUT invite acceptance
+  inviteReject: '/invite/:address/reject',  // PUT invite rejection
+
   request: '/request',  // PUT request, accept, reject.
+  requestAccept: '/request/:address/accept', // PUT request accept
+  requestReject: '/request/:address/reject', // PUT request reject
 
   // Read
   me: '/me',            // GET all my information
@@ -35,8 +43,14 @@ export const Organizations = {
 
   // Create
   create: '/',          // PUT
-  invite: '/invite',    // PUT invite, accept, reject.
+
+  invite: '/invite',    // PUT invite
+  inviteAccept: '/invite/:address/accept',  // PUT invite acceptance
+  inviteReject: '/invite/:address/reject',  // PUT invite rejection
+
   request: '/request',  // PUT request, accept, reject.
+  requestAccept: '/request/:address/accept', // PUT request accept
+  requestReject: '/request/:address/reject', // PUT request reject
 
   // Read
   me: '/me',                                    // GET my organization's information
@@ -67,13 +81,19 @@ export const Applications = {
     // Update/CRUD to applications's organizations list -- address = app's address
     // Create for orgs
     addOrganization: '/:address/organizations',                  // PUT
+
     inviteOrganization: '/:address/organizations/invite',        // PUT invite, accept, reject.
+    inviteOrganizationAccept: '/:appAddress/organizations/invite/:orgAddress/accept', // PUT invite, accept, reject.
+    inviteOrganizationReject: '/:appAddress/organizations/invite/:orgAddress/reject', // PUT invite, accept, reject.
+
     requestOrganization: '/:address/organizations/request',      // PUT request, accept, reject.
+    requestOrganizationAccept: '/:appAddress/organizations/invite/:orgAddress/accept', // PUT invite, accept, reject.
+    requestOrganizationReject: '/:appAddress/organizations/invite/:orgAddress/reject', // PUT invite, accept, reject.
 
     // Read for organizations
     getOrganizations: '/:address/organizations',                 // GET an apps organizations
-    getOrganizationInvites: '/:address/organizations/invites',   // GET current org invites
-    getOrganizationRequests: '/:address/organizations/requests', // GET current org requests
+    getOrganizationInvites: '/:address/organizations/invites',   // GET current pending org invites
+    getOrganizationRequests: '/:address/organizations/requests', // GET current pending org requests
 
     // Update for organizations - Nothing!
 
