@@ -4,7 +4,7 @@ const { createContract, getState, call, RestError } = rest;
 import config from '../../util/load.config';
 
 const contractName = 'UserManager';
-const contractFilename = `${util.cwd}/${config.libPath}/auth/user-manager/contracts/UserManager.sol`;
+const contractFilename = `${util.cwd}/${config.libPath}/auth/users/contracts/UserManager.sol`;
 
 const options = { config };
 

@@ -9,3 +9,5 @@
 
 # deploy files
 **/*.deploy.yaml
+
+node_modules

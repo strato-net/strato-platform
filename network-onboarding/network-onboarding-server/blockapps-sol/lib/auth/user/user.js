@@ -5,7 +5,7 @@ import config from '../../util/load.config';
 const options = { config };
 
 const contractName = 'User';
-const contractFilename = `${util.cwd}/${config.libPath}/auth/user-manager/contracts/User.sol`;
+const contractFilename = `${util.cwd}/${config.libPath}/auth/users/contracts/User.sol`;
 
 async function uploadContract(admin, args) {
   const contractArgs = {

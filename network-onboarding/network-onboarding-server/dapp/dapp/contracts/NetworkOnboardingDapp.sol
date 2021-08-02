@@ -1,11 +1,11 @@
 // pragma solidvm 3.0;
 
 import "/dapp/permission/contracts/NetworkOnboardingPermissionManager.sol";
-import "/dapp/user-manager/contracts/NetworkOnboardingUserManager.sol";
-import "/dapp/organization/contracts/OrganizationManager.sol";
-import "/dapp/organization/membership/contracts/OrganizationMembershipManager.sol";
+import "/dapp/users/contracts/NetworkOnboardingUsersManager.sol";
+import "/dapp/organizations/contracts/OrganizationsManager.sol";
+import "/dapp/organizations/membership/contracts/OrganizationMembershipsManager.sol";
 
-import "/dapp/application/contracts/ApplicationManager.sol";
+import "/dapp/applications/contracts/ApplicationsManager.sol";
 
 
 /**
@@ -17,17 +17,17 @@ contract NetworkOnboardingDapp {
  
   address owner; 
   NetworkOnboardingPermissionManager public permissionManager;
-  NetworkOnboardingUserManager public userManager;
-  OrganizationManager public organizationManager;
-  OrganizationMembershipManager public organizationMembershipManager;
-  ApplicationManager public applicationManager;
+  NetworkOnboardingUsersManager public userManager;
+  OrganizationsManager public organizationsManager;
+  OrganizationMembershipsManager public organizationMembershipsManager;
+  ApplicationsManager public applicationsManager;
 
   constructor() {
     owner = msg.sender;
     permissionManager = new NetworkOnboardingPermissionManager(msg.sender, msg.sender);
-    userManager = new NetworkOnboardingUserManager(permissionManager);
-    organizationManager = new OrganizationManager(permissionManager, userManager);
-    organizationMembershipManager = new OrganizationMembershipManager(permissionManager, organizationManager); // userManager?
-    applicationManager = new ApplicationManager(permissionManager, organizationManager);
+    userManager = new NetworkOnboardingUsersManager(permissionManager);
+    organizationsManager = new OrganizationsManager(permissionManager, userManager);
+    organizationMembershipsManager = new OrganizationMembershipsManager(permissionManager, organizationsManager); // userManager?
+    applicationsManager = new ApplicationsManager(permissionManager, organizationsManager);
   }
 }

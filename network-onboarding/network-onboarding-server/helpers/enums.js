@@ -10,10 +10,10 @@ const getRoles = () => getRolesInternal()
 const getPermissions = () => getPermissionsInternal()
 
 // membership states
-const getOrganizationMembershipStatesInternal = getEnumsCached(`${util.cwd}/${config.dappPath}/organization/membership/contracts/OrganizationMembershipState.sol`)
-const getOrganizationMembershipEventsInternal = getEnumsCached(`${util.cwd}/${config.dappPath}/organization/membership/contracts/OrganizationMembershipEvent.sol`)
-const getOrganizationMembershipStatusesInternal = getEnumsCached(`${util.cwd}/${config.dappPath}/organization/membership/contracts/OrganizationMembershipStatus.sol`)
-const getOrganizationMembershipLevelsInternal = getEnumsCached(`${util.cwd}/${config.dappPath}/organization/membership/contracts/OrganizationMembershipLevel.sol`)
+const getOrganizationMembershipStatesInternal = getEnumsCached(`${util.cwd}/${config.dappPath}/organizations/membership/contracts/OrganizationMembershipState.sol`)
+const getOrganizationMembershipEventsInternal = getEnumsCached(`${util.cwd}/${config.dappPath}/organizations/membership/contracts/OrganizationMembershipEvent.sol`)
+const getOrganizationMembershipStatusesInternal = getEnumsCached(`${util.cwd}/${config.dappPath}/organizations/membership/contracts/OrganizationMembershipStatus.sol`)
+const getOrganizationMembershipLevelsInternal = getEnumsCached(`${util.cwd}/${config.dappPath}/organizations/membership/contracts/OrganizationMembershipLevel.sol`)
 
 const getOrganizationMembershipStates = () => getOrganizationMembershipStatesInternal()
 const getOrganizationMembershipEvents = () => getOrganizationMembershipEventsInternal()
