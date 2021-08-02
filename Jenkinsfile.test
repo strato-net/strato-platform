@@ -175,7 +175,7 @@ pipeline {
                 sh '''sed -i 's|.*blockapps-rest.*|"blockapps-rest": "file:./blockapps-rest",|' package.json'''
                 sh 'touch .env'
                 sh 'yarn build'
-                sh 'yarn install --frozen-lockfile'
+                sh 'yarn install'
                 sh 'SERVER=jenkinstest yarn test'
               }
             }
