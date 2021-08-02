@@ -1,6 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Main where
+
+module Main (main) where
 
 import Blockchain.Strato.Model.Address
 import Crypto.HaskoinShim
@@ -12,7 +13,7 @@ import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Base64 as B64
 import Data.List (sort)
 import Control.Monad
-import Network.Haskoin.Crypto hiding (derivePubKey)
+import Network.Haskoin.Crypto
 import System.Entropy
 import HFlags
 

@@ -39,7 +39,6 @@ import qualified Data.Swagger                         as Sw
 import qualified Data.Text                            as T
 import           Database.Persist.Sql                 hiding (get)
 import           GHC.Generics
-import qualified Network.Haskoin.Crypto               as Deprecated 
 import qualified Network.Haskoin.Internals            as Deprecated 
 import           Numeric
 import           Servant.API

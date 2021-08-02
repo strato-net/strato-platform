@@ -16,7 +16,6 @@ import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.ExtendedECDSA.Model.ExtendedSignature
 
 import           Network.Haskoin.Constants
-import           Network.Haskoin.Crypto
 import           Network.Haskoin.Internals
 
 --import Debug.Trace

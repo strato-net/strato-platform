@@ -19,7 +19,6 @@ import           Data.Coerce
 import           Test.QuickCheck
 
 import           Blockchain.Strato.Model.ExtendedWord
-import qualified Network.Haskoin.Crypto    as HK
 import qualified Network.Haskoin.Internals as HK
 
 import           Blockchain.ExtendedECDSA

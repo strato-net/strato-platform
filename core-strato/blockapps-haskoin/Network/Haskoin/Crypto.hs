@@ -7,12 +7,8 @@
 -}
 module Network.Haskoin.Crypto
 (
-  -- **Public Keys
-  PubKey
-, derivePubKey
-
   -- **Private Keys
-, PrvKey
+  PrvKey
 , makePrvKey
 , encodePrvKey
 , decodePrvKey
