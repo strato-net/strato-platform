@@ -26,6 +26,7 @@ router.put(
     loadDapps,
     ApplicationsController.addOrganizationToApplication
 )
+
 router.put(
     Applications.inviteOrganization,
     AuthHandler.authorizeRequest(),
@@ -33,10 +34,35 @@ router.put(
     ApplicationsController.inviteOrganizationToApplication
 )
 router.put(
+    Applications.inviteOrganizationAccept,
+    AuthHandler.authorizeRequest(),
+    loadDapps,
+    ApplicationsController.inviteOrganizationToApplicationAccept
+)
+router.put(
+    Applications.inviteOrganizationReject,
+    AuthHandler.authorizeRequest(),
+    loadDapps,
+    ApplicationsController.inviteOrganizationToApplicationReject
+)
+
+router.put(
     Applications.requestOrganization,
     AuthHandler.authorizeRequest(),
     loadDapps,
     ApplicationsController.requestOrganizationToApplication
+)
+router.put(
+    Applications.requestOrganizationAccept,
+    AuthHandler.authorizeRequest(),
+    loadDapps,
+    ApplicationsController.requestOrganizationToApplicationAccept
+)
+router.put(
+    Applications.requestOrganizationReject,
+    AuthHandler.authorizeRequest(),
+    loadDapps,
+    ApplicationsController.requestOrganizationToApplicationReject
 )
 
 router.put(

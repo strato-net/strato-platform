@@ -14,6 +14,7 @@ router.put(
     loadDapps, 
     UsersController.createUser
 )
+
 router.put(
     Users.invite,
     AuthHandler.authorizeRequest(), 
@@ -21,10 +22,35 @@ router.put(
     UsersController.inviteUser
 )
 router.put(
+    Users.inviteAccept,
+    AuthHandler.authorizeRequest(), 
+    loadDapps, 
+    UsersController.inviteUserAccept
+)
+router.put(
+    Users.inviteReject,
+    AuthHandler.authorizeRequest(), 
+    loadDapps, 
+    UsersController.inviteUserReject
+)
+
+router.put(
     Users.request,
     AuthHandler.authorizeRequest(), 
     loadDapps, 
     UsersController.requestUser
+)
+router.put(
+    Users.requestAccept,
+    AuthHandler.authorizeRequest(), 
+    loadDapps, 
+    UsersController.requestUserAccept
+)
+router.put(
+    Users.request,
+    AuthHandler.authorizeRequest(), 
+    loadDapps, 
+    UsersController.requestUserAccept
 )
 
 // Read

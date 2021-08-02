@@ -6,7 +6,17 @@ class OrganizationsController {
 
     static async inviteOrganization(req, res, next) {}
 
+    static async inviteOrganizationAccept(req, res, next) {}
+
+    static async inviteOrganizationReject(req, res, next) {}
+
+
     static async requestOrganization(req, res, next) {}
+
+    static async requestOrganizationAccept(req, res, next) {}
+
+    static async requestOrganizationReject(req, res, next) {}
+
 
     // Read
     static async myOrganization(req, res, next) {}

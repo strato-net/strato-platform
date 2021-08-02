@@ -14,6 +14,7 @@ router.put(
     loadDapps, 
     OrganizationsController.createOrganization
 )
+
 router.put(
     Organizations.invite,
     AuthHandler.authorizeRequest(), 
@@ -21,10 +22,35 @@ router.put(
     OrganizationsController.inviteOrganization
 )
 router.put(
+    Organizations.inviteAccept,
+    AuthHandler.authorizeRequest(), 
+    loadDapps, 
+    OrganizationsController.inviteOrganizationAccept
+)
+router.put(
+    Organizations.inviteReject,
+    AuthHandler.authorizeRequest(), 
+    loadDapps, 
+    OrganizationsController.inviteOrganizationReject
+)
+
+router.put(
     Organizations.request,
     AuthHandler.authorizeRequest(), 
     loadDapps, 
     OrganizationsController.requestOrganization
+)
+router.put(
+    Organizations.requestAccept,
+    AuthHandler.authorizeRequest(), 
+    loadDapps, 
+    OrganizationsController.requestOrganizationAccept
+)
+router.put(
+    Organizations.requestReject,
+    AuthHandler.authorizeRequest(), 
+    loadDapps, 
+    OrganizationsController.requestOrganizationReject
 )
 
 // Read

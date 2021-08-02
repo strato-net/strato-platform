@@ -9,9 +9,20 @@ class ApplicationsController {
     // Update
     static async addOrganizationToApplication(req, res, next) {}
 
+
     static async inviteOrganizationToApplication(req, res, next) {}
 
+    static async inviteOrganizationToApplicationAccept(req, res, next) {}
+
+    static async inviteOrganizationToApplicationReject(req, res, next) {}
+
+
     static async requestOrganizationToApplication(req, res, next) {}
+
+    static async requestOrganizationToApplicationAccept(req, res, next) {}
+
+    static async requestOrganizationToApplicationReject(req, res, next) {}
+
 
 
     static async getOrganizations(req, res, next) {}

@@ -3,10 +3,21 @@ import { rest } from 'blockapps-rest'
 class UsersController {
     // Create
     static async createUser(req, res, next) {}
+    
 
     static async inviteUser(req, res, next) {}
 
+    static async inviteUserAccept(req, res, next) {}
+
+    static async inviteUserReject(req, res, next) {}
+
+
     static async requestUser(req, res, next) {}
+
+    static async requestUserAccept(req, res, next) {}
+
+    static async requestUserReject(req, res, next) {}
+
 
     // Read
     static async myUser(req, res, next) {}
