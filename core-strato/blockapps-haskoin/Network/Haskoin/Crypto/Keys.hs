@@ -1,17 +1,11 @@
 
-{-# OPTIONS -fno-warn-unused-top-binds #-}
-{-# OPTIONS -fno-warn-unused-imports #-}
-
 module Network.Haskoin.Crypto.Keys
 ( PubKeyI(pubKeyCompressed, pubKeyPoint)
-, PubKey, PubKeyC, PubKeyU
+, PubKey
 , makePubKey
 , makePubKeyG
-, makePubKeyU
 , eitherPubKey
-, maybePubKeyU
 , derivePubKey
-, pubKeyAddr
 , PrvKeyI(prvKeyCompressed, prvKeyFieldN)
 , PrvKey
 , makePrvKey
@@ -38,8 +32,6 @@ import qualified Data.ByteString as BS
 import Network.Haskoin.Crypto.Curve
 import Network.Haskoin.Crypto.BigWord
 import Network.Haskoin.Crypto.Point
-import Network.Haskoin.Crypto.Base58
-import Network.Haskoin.Crypto.Hash
 import Network.Haskoin.Util
 
 -- | G parameter of the EC curve expressed as a Point
@@ -110,11 +102,6 @@ eitherPubKey pk
     | pubKeyCompressed pk = Right $ makePubKeyC $ pubKeyPoint pk
     | otherwise           = Left  $ makePubKeyU $ pubKeyPoint pk
 
-maybePubKeyU :: PubKeyI c -> Maybe PubKeyU
-maybePubKeyU pk
-    | not (pubKeyCompressed pk) = Just $ makePubKeyU $ pubKeyPoint pk
-    | otherwise                 = Nothing
-
 -- | Derives a public key from a private key. This function will preserve
 -- information on key compression (PrvKey becomes PubKey and PrvKeyU becomes
 -- PubKeyU)
@@ -176,10 +163,6 @@ instance Binary (PubKeyI Uncompressed) where
         -- 2.3.3.1
         Nothing     -> error "Put: Invalid public key"
         Just (x, y) -> putWord8 4 >> put x >> put y
-
--- | Computes an Address value from a public key
-pubKeyAddr :: Binary (PubKeyI c) => PubKeyI c -> Address
-pubKeyAddr = PubKeyAddress . hash160 . hash256BS . encode'
 
 {- Private Keys -}
 

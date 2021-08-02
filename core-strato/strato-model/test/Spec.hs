@@ -36,7 +36,7 @@ import           Network.Haskoin.Internals          (BigWord(..))
 
 -- all the different crypto modules to compare to ours
 import qualified Blockchain.ExtendedECDSA           as HK
-import qualified Network.Haskoin.Crypto             as HK
+--import qualified Network.Haskoin.Crypto             as HK
 import qualified Network.Haskoin.Internals          as HK
 
 import qualified Crypto.Secp256k1                   as SEC

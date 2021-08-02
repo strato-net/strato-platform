@@ -1,46 +1,27 @@
+
+-- {-# OPTIONS -fno-warn-unused-top-binds #-}
+
 -- | Hashing functions and HMAC DRBG definition
 module Network.Haskoin.Crypto.Hash
-( CheckSum32
-, hash512
-, hash256
-, hashSha1
-, hash160
-, hash512BS
+( hash160
 , hash256BS
-, hashSha1BS
-, hash160BS
-, doubleHash256
-, doubleHash256BS
-, chksum32
-, hmac512
-, hmac512BS
-, hmac256
-, hmac256BS
 , hmacDRBGNew
-, hmacDRBGUpd
 , hmacDRBGRsd
 , hmacDRBGGen
 , WorkingState
-, split512
-, join512
-, decodeCompact
-, encodeCompact
 ) where
 
 import Crypto.Hash
     ( Digest
-    , SHA512
     , SHA256
-    , SHA1
     , RIPEMD160
     , hash
     )
 import Crypto.MAC.HMAC (hmac)
 
-import Data.Word (Word16, Word32)
+import Data.Word (Word16)
 import Data.Byteable (toBytes)
 import Data.Binary (get)
-import Data.Bits (shiftL, shiftR, (.&.), (.|.))
 
 import qualified Data.ByteString as BS
     ( ByteString
@@ -57,129 +38,26 @@ import qualified Data.ByteString as BS
 import Network.Haskoin.Util
 import Network.Haskoin.Crypto.BigWord
 
-type CheckSum32 = Word32
-
-run512 :: BS.ByteString -> BS.ByteString
-run512 = (toBytes :: Digest SHA512 -> BS.ByteString) . hash
-
 run256 :: BS.ByteString -> BS.ByteString
 run256 = (toBytes :: Digest SHA256 -> BS.ByteString) . hash
 
 run160 :: BS.ByteString -> BS.ByteString
 run160 = (toBytes :: Digest RIPEMD160 -> BS.ByteString) . hash
 
-runSha1 :: BS.ByteString -> BS.ByteString
-runSha1 = (toBytes :: Digest SHA1 -> BS.ByteString) . hash
-
--- | Computes SHA-512.
-hash512 :: BS.ByteString -> Word512
-hash512 bs = runGet' get (run512 bs)
-
--- | Computes SHA-512 and returns the result as a bytestring.
-hash512BS :: BS.ByteString -> BS.ByteString
-hash512BS bs = run512 bs
-
--- | Computes SHA-256.
-hash256 :: BS.ByteString -> Word256
-hash256 bs = runGet' get (run256 bs)
-
 -- | Computes SHA-256 and returns the result as a bytestring.
 hash256BS :: BS.ByteString -> BS.ByteString
 hash256BS bs = run256 bs
-
--- | Computes SHA-160.
-hashSha1 :: BS.ByteString -> Word160
-hashSha1 bs = runGet' get (runSha1 bs)
-
--- | Computes SHA-160 and returns the result as a bytestring.
-hashSha1BS :: BS.ByteString -> BS.ByteString
-hashSha1BS bs = runSha1 bs
 
 -- | Computes RIPEMD-160.
 hash160 :: BS.ByteString -> Word160
 hash160 bs = runGet' get (run160 bs)
 
--- | Computes RIPEMD-160 and returns the result as a bytestring.
-hash160BS :: BS.ByteString -> BS.ByteString
-hash160BS bs = run160 bs
-
--- | Computes two rounds of SHA-256.
-doubleHash256 :: BS.ByteString -> Word256
-doubleHash256 bs = runGet' get (run256 $ run256 bs)
-
--- | Computes two rounds of SHA-256 and returns the result as a bytestring.
-doubleHash256BS :: BS.ByteString -> BS.ByteString
-doubleHash256BS bs = run256 $ run256 bs
-
-{- CheckSum -}
-
--- | Computes a 32 bit checksum.
-chksum32 :: BS.ByteString -> CheckSum32
-chksum32 bs = fromIntegral $ (doubleHash256 bs) `shiftR` 224
 
 {- HMAC -}
-
--- | Computes HMAC over SHA-512.
-hmac512 :: BS.ByteString -> BS.ByteString -> Word512
-hmac512 key = decode' . (hmac512BS key)
-
--- | Computes HMAC over SHA-512 and return the result as a bytestring.
-hmac512BS :: BS.ByteString -> BS.ByteString -> BS.ByteString
-hmac512BS key msg = hmac hash512BS 128 key msg
-
--- | Computes HMAC over SHA-256.
-hmac256 :: BS.ByteString -> BS.ByteString -> Word256
-hmac256 key = decode' . (hmac256BS key)
 
 -- | Computes HMAC over SHA-256 and return the result as a bytestring.
 hmac256BS :: BS.ByteString -> BS.ByteString -> BS.ByteString
 hmac256BS key msg = hmac hash256BS 64 key msg
-
--- | Split a 'Word512' into a pair of 'Word256'.
-split512 :: Word512 -> (Word256, Word256)
-split512 i = (fromIntegral $ i `shiftR` 256, fromIntegral i)
-
--- | Join a pair of 'Word256' into a 'Word512'.
-join512 :: (Word256, Word256) -> Word512
-join512 (a,b) =
-    ((fromIntegral a :: Word512) `shiftL` 256) + (fromIntegral b :: Word512)
-
--- | Decode the compact number used in the difficulty target of a block into an
--- Integer.
---
--- As described in the Satoshi reference implementation /src/bignum.h:
---
--- The "compact" format is a representation of a whole number N using an
--- unsigned 32bit number similar to a floating point format. The most
--- significant 8 bits are the unsigned exponent of base 256. This exponent can
--- be thought of as "number of bytes of N". The lower 23 bits are the mantissa.
--- Bit number 24 (0x800000) represents the sign of N.
---
--- >    N = (-1^sign) * mantissa * 256^(exponent-3)
-decodeCompact :: Word32 -> Integer
-decodeCompact c =
-    if neg then (-res) else res
-  where
-    size = fromIntegral $ c `shiftR` 24
-    neg  = (c .&. 0x00800000) /= 0
-    wrd  = c .&. 0x007fffff
-    res | size <= 3 = (toInteger wrd) `shiftR` (8*(3 - size))
-        | otherwise = (toInteger wrd) `shiftL` (8*(size - 3))
-
--- | Encode an Integer to the compact number format used in the difficulty
--- target of a block.
-encodeCompact :: Integer -> Word32
-encodeCompact i
-    | i < 0     = c3 .|. 0x00800000
-    | otherwise = c3
-  where
-    posi = abs i
-    s1 = BS.length $ integerToBS posi
-    c1 | s1 < 3    = posi `shiftL` (8*(3 - s1))
-       | otherwise = posi `shiftR` (8*(s1 - 3))
-    (s2,c2) | c1 .&. 0x00800000 /= 0  = (s1 + 1, c1 `shiftR` 8)
-            | otherwise               = (s1, c1)
-    c3 = fromIntegral $ c2 .|. ((toInteger s2) `shiftL` 24)
 
 {- 10.1.2 HMAC_DRBG with HMAC-SHA256
    http://csrc.nist.gov/publications/nistpubs/800-90A/SP800-90A.pdf

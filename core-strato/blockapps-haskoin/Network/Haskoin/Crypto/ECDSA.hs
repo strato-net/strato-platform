@@ -7,13 +7,7 @@ module Network.Haskoin.Crypto.ECDSA
 , Signature(..)
 , withSource
 , devURandom
---, devRandom
---, signMsg
---, detSignMsg
---, unsafeSignMsg
-, verifySig
 , genPrvKey
---, isCanonicalHalfOrder
 ) where
 
 import System.IO
@@ -46,7 +40,6 @@ import Network.Haskoin.Util
 import Network.Haskoin.Constants
 import Network.Haskoin.Crypto.Hash
 import Network.Haskoin.Crypto.Keys
-import Network.Haskoin.Crypto.Point
 import Network.Haskoin.Crypto.BigWord
 
 -- | Internal state of the 'SecretT' monad
@@ -110,26 +103,6 @@ instance NFData Signature where
 
 instance Arbitrary Signature where
   arbitrary = liftM2 Signature arbitrary arbitrary
-
--- Section 4.1.4 http://www.secg.org/download/aid-780/sec1-v2.pdf
--- | Verify an ECDSA signature
-verifySig :: Word256 -> Signature -> PubKey -> Bool
--- 4.1.4.1 (r and s can not be zero)
-verifySig _ (Signature 0 _) _ = False
-verifySig _ (Signature _ 0) _ = False
-verifySig h (Signature r s) q = case getAffine p of
-    Nothing      -> False
-    -- 4.1.4.7 / 4.1.4.8
-    (Just (x,_)) -> (fromIntegral x :: FieldN) == r
-  where
-    -- 4.1.4.2 / 4.1.4.3
-    e  = (fromIntegral h :: FieldN)
-    -- 4.1.4.4
-    s' = inverseN s
-    u1 = e*s'
-    u2 = r*s'
-    -- 4.1.4.5 (u1*G + u2*q)
-    p  = shamirsTrick u1 curveG u2 (pubKeyPoint q)
 
 instance Binary Signature where
     get = do
