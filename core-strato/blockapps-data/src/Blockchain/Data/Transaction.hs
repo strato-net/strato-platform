@@ -33,6 +33,7 @@ import           Control.Monad.Trans.Reader
 import qualified Data.ByteString                as B
 import qualified Data.ByteString.Base16         as B16
 import           Data.ByteString.Internal
+import qualified Data.ByteString.Short as BSS
 import           Data.Map.Strict                (Map)
 import qualified Data.Map.Strict                as M
 import           Data.Maybe
@@ -50,22 +51,20 @@ import           Blockchain.Data.TransactionDef
 import           Blockchain.Data.TXOrigin
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
+import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
+import qualified Blockchain.Strato.Model.Secp256k1 as EC
 import           Blockchain.Util
 
 import           Blockchain.ExtendedECDSA
+import qualified Crypto.Secp256k1 as SEC
 import           Network.Haskoin.Internals
 
 import           Control.DeepSeq
 import           System.Clock
 
-import           Blockchain.Strato.Model.Class
 
-
---TODO: remove some of these, reorganize
---import qualified Crypto.Secp256k1 as SEC
---import qualified Data.ByteString.Short as BSS
---import qualified Blockchain.Strato.Model.Secp256k1 as EC
 
 instance TransactionLike Transaction where
     txHash        = \case
@@ -279,7 +278,7 @@ createChainContractCreationTX n gp gl val init' cid md prvKey = do
   Switch to Either?
 -}
 
-{-whoSignedThisTransaction :: Transaction -> Maybe Address
+whoSignedThisTransaction :: Transaction -> Maybe Address
 whoSignedThisTransaction tx = case tx of
   PrivateHashTX{} -> Just (Address 0)
   t -> fromPublicKey <$> EC.recoverPub sig mesg
@@ -287,8 +286,8 @@ whoSignedThisTransaction tx = case tx of
           intToBSS = BSS.toShort . word256ToBytes . fromInteger
           sig = EC.Signature (SEC.CompactRecSig (intToBSS $ transactionR t) (intToBSS $ transactionS t) ((transactionV t) - 0x1b))
           mesg = keccak256ToByteString $ partialTransactionHash t
--}
 
+{-
 whoSignedThisTransaction::Transaction->Maybe Address -- Signatures can be malformed, hence the Maybe
 whoSignedThisTransaction tx = case tx of
   PrivateHashTX{} -> Just (Address 0)
@@ -296,7 +295,7 @@ whoSignedThisTransaction tx = case tx of
         where
           xSignature = ExtendedSignature (Signature (fromInteger $ transactionR t) (fromInteger $ transactionS t)) (0x1c == transactionV t)
           theHash = partialTransactionHash t
-
+-}
 isContractCreationTX::Transaction->Bool
 isContractCreationTX ContractCreationTX{} = True
 isContractCreationTX _                    = False
