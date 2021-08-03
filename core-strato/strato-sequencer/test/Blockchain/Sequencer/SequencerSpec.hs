@@ -417,7 +417,7 @@ spec = do
              in (chainId, IEGenesis (IngestGenesis TO.Morphism (keccak256ToWord256 chainId, cInfo)))
           getChainTx chainId = do
             tx <- runIO . HK.withSource HK.devURandom $ do
-              pk <- HK.genPrvKey
+              pk <- liftIO newPrivateKey
               createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just $ keccak256ToWord256 chainId) Nothing pk
             let hashTx = PrivateHashTX (txHash tx) chainId
             pure (hashTx, tx)
@@ -728,3 +728,4 @@ spec = do
         let [(j, og2)] = ogs2
         og2 `shouldBe` og
         i `shouldSatisfy` (< j)
+

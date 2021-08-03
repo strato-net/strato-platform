@@ -31,16 +31,14 @@ import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
 import           Control.Monad.Trans.Reader
 import qualified Data.ByteString                as B
-import qualified Data.ByteString.Base16         as B16
-import           Data.ByteString.Internal
 import qualified Data.ByteString.Short as BSS
 import           Data.Map.Strict                (Map)
 import qualified Data.Map.Strict                as M
 import           Data.Maybe
 import           Data.Text                      (Text)
 import           Data.Time.Clock
+import           Data.Word
 import qualified Database.Persist.Postgresql    as SQL
-import           Numeric
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.Code
@@ -57,7 +55,6 @@ import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.Secp256k1 as EC
 import           Blockchain.Util
 
-import           Blockchain.ExtendedECDSA
 import qualified Crypto.Secp256k1 as SEC
 import           Network.Haskoin.Internals
 
@@ -185,11 +182,16 @@ insertTX' mode origin blockNum txs = do
         map (\tx -> txAndTime2RawTX origin tx (fromMaybe (-1) blockNum) time) txs
   insertRawTX' mode rawTXs
 
-addLeadingZerosTo64::String->String
-addLeadingZerosTo64 x = replicate (64 - length x) '0' ++ x
-
-createMessageTX::MonadIO m=>Integer->Integer->Integer->Address->Integer->B.ByteString-> Maybe (Map Text Text) -> PrvKey->SecretT m Transaction
+createMessageTX::MonadIO m=>Integer->Integer->Integer->Address->Integer->B.ByteString-> Maybe (Map Text Text) -> EC.PrivateKey->SecretT m Transaction
 createMessageTX n gp gl to' val theData md prvKey = createChainMessageTX n gp gl to' val theData Nothing md prvKey
+
+
+-- so we can convert R and S from the signature, and add 27 to V, per
+-- Ethereum protocol (and backwards compatibility)
+getSigVals :: EC.Signature -> (Word256, Word256, Word8)
+getSigVals (EC.Signature (SEC.CompactRecSig r s v)) =
+  let convert = bytesToWord256 . BSS.fromShort
+  in (convert r, convert s, v + 0x1b)
 
 createChainMessageTX :: MonadIO m
                      => Integer
@@ -200,7 +202,7 @@ createChainMessageTX :: MonadIO m
                      -> B.ByteString
                      -> Maybe Word256
                      -> Maybe (Map Text Text)
-                     -> PrvKey
+                     -> EC.PrivateKey
                      -> SecretT m Transaction
 createChainMessageTX n gp gl to' val theData cid md prvKey = do
   let unsignedTX = MessageTX {
@@ -217,21 +219,12 @@ createChainMessageTX n gp gl to' val theData cid md prvKey = do
                      transactionMetadata = md
                    }
   let theHash = partialTransactionHash unsignedTX
-  ExtendedSignature signature yIsOdd <- extSignMsg (keccak256ToWord256 theHash) prvKey
-  return
-    unsignedTX {
-      transactionR =
-        case B16.decode $ B.pack $ map c2w $ addLeadingZerosTo64 $ showHex (sigR signature) "" of
-          (val', "") -> byteString2Integer val'
-          _          -> error ("error: sigR is: " ++ showHex (sigR signature) ""),
-      transactionS =
-        case B16.decode $ B.pack $ map c2w $ addLeadingZerosTo64 $ showHex (sigS signature) "" of
-          (val', "") -> byteString2Integer val'
-          _          -> error ("error: sigS is: " ++ showHex (sigS signature) ""),
-      transactionV = if yIsOdd then 0x1c else 0x1b
-    }
 
-createContractCreationTX::MonadIO m=>Integer->Integer->Integer->Integer->Code-> Maybe (Map Text Text) -> PrvKey->SecretT m Transaction
+  let (r, s, v) = getSigVals $ EC.signMsg prvKey $ word256ToBytes $ keccak256ToWord256 theHash
+  
+  return unsignedTX { transactionR = toInteger r, transactionS = toInteger s, transactionV = v }
+
+createContractCreationTX::MonadIO m=>Integer->Integer->Integer->Integer->Code-> Maybe (Map Text Text) -> EC.PrivateKey->SecretT m Transaction
 createContractCreationTX n gp gl val init' md prvKey = createChainContractCreationTX n gp gl val init' Nothing md prvKey
 
 createChainContractCreationTX :: MonadIO m
@@ -242,7 +235,7 @@ createChainContractCreationTX :: MonadIO m
                               -> Code
                               -> Maybe Word256
                               -> Maybe (Map Text Text)
-                              -> PrvKey
+                              -> EC.PrivateKey
                               -> SecretT m Transaction
 createChainContractCreationTX n gp gl val init' cid md prvKey = do
   let unsignedTX = ContractCreationTX {
@@ -259,20 +252,10 @@ createChainContractCreationTX n gp gl val init' cid md prvKey = do
                    }
 
   let theHash = partialTransactionHash unsignedTX
-  ExtendedSignature signature yIsOdd <- extSignMsg (keccak256ToWord256 theHash) prvKey
-  return
-    unsignedTX {
-      transactionR =
-        case B16.decode $ B.pack $ map c2w $ addLeadingZerosTo64 $ showHex (sigR signature) "" of
-          (val', "") -> byteString2Integer val'
-          _          -> error ("error: sigR is: " ++ showHex (sigR signature) ""),
-      transactionS =
-        case B16.decode $ B.pack $ map c2w $ addLeadingZerosTo64 $ showHex (sigS signature) "" of
-          (val', "") -> byteString2Integer val'
-          _          -> error ("error: sigS is: " ++ showHex (sigS signature) ""),
-      transactionV = if yIsOdd then 0x1c else 0x1b
-    }
 
+  let (r, s, v) = getSigVals $ EC.signMsg prvKey $ word256ToBytes $ keccak256ToWord256 theHash
+  
+  return unsignedTX { transactionR = toInteger r, transactionS = toInteger s, transactionV = v }
 
 {-
   Switch to Either?

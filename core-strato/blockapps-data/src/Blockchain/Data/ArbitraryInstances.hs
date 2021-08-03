@@ -2,7 +2,6 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Blockchain.Data.ArbitraryInstances where
 
-import           Data.Maybe                         (fromJust, isJust)
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances()
 
@@ -17,6 +16,7 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin           ()
 import           Blockchain.Database.MerklePatricia
+import           Blockchain.Strato.Model.Secp256k1            ()
 import           Blockchain.Util
 
 import qualified Network.Haskoin.Crypto             as H
@@ -37,9 +37,6 @@ unboxPK (HaskoinPrvKey pk) = pk
 
 instance Arbitrary PositiveInteger where
     arbitrary = PositiveInteger . abs <$> arbitrary
-
-instance Arbitrary HaskoinPrvKey where
-    arbitrary = HaskoinPrvKey <$> fromJust <$> ((H.makePrvKey <$> arbitrary) `suchThat` (isJust))
 
 instance Arbitrary BlockData where
     arbitrary = do
@@ -100,7 +97,7 @@ instance Arbitrary Transaction where
           gasPrice  <- unboxPI <$> arbitrary
           gasLimit  <- arbitrary `suchThat` (> gasPrice)
           value     <- unboxPI <$> arbitrary
-          prvKey    <- unboxPK <$> arbitrary
+          prvKey    <- arbitrary
           isMessage <- arbitrary :: Gen Bool
           chainId   <- arbitrary
           md        <- arbitrary

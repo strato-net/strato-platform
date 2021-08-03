@@ -17,11 +17,12 @@ import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
 import           Blockchain.DB.SQLDB          (runSqlPool, createPostgresqlPool)
 import           Blockchain.EthConf
+import           Blockchain.Strato.Model.Secp256k1
 
-retrievePrvKey :: FilePath -> IO (Maybe H.PrvKey)
+retrievePrvKey :: FilePath -> IO (Maybe PrivateKey)
 retrievePrvKey filePath = do
     keyBytes <- BL.readFile filePath
-    return $ H.makePrvKey $ BN.decode keyBytes
+    return $ importPrivateKey $ BN.decode keyBytes
 
 insertTX :: IO ()
 insertTX = do

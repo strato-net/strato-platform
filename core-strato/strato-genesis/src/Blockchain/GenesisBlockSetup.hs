@@ -15,7 +15,6 @@ import qualified Data.ByteString             as B
 import qualified Data.ByteString.Lazy        as BL
 
 import           System.Directory
-import           System.Entropy
 
 import           Network.Haskoin.Crypto
 
@@ -42,7 +41,7 @@ genesisBlockSetup n = do
 
 generateNPrivkeyAddressPairs :: Int -> IO [(Int,PrvKey,Address)]
 generateNPrivkeyAddressPairs n = forM [1..n] $ \index -> do
-    newPrvKey <- withSource getEntropy genPrvKey
+    newPrvKey <- undefined -- withSource getEntropy genPrvKey
     return (index,newPrvKey, prvKey2Address newPrvKey)
 
 

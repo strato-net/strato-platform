@@ -9,12 +9,8 @@ module Network.Haskoin.Crypto
 (
   -- **Private Keys
   PrvKey
-, makePrvKey
-, encodePrvKey
-, decodePrvKey
 , withSource
 , devURandom
-, genPrvKey
 
   -- * Big words
 , Word512

@@ -33,6 +33,7 @@ import           Blockchain.EVM.VMState
 import           Blockchain.Util
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Secp256k1
 
 data Env =
   Env {
@@ -72,7 +73,7 @@ data Transaction' =
     tGasLimit'  ::  String,
     tGasPrice'  ::  String,
     tNonce'     ::  String,
-    tSecretKey' ::  Haskoin.PrvKey,
+    tSecretKey' ::  PrivateKey,
     tTo'        ::  Maybe Account,
     tValue'     ::  String
     } deriving (Show, Eq)
