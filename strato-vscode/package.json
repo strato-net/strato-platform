@@ -36,7 +36,7 @@
 			"properties": {
 				"strato-vscode.createProjectCommand": {
 					"type": "string",
-					"default": "git clone https://github.com/blockapps/track-and-trace $1; cd $1; cd server; yarn install; yarn build; cd ../ui; yarn install; yarn build; cd .."
+					"default": "git clone https://github.com/blockapps/traceability-framework $1; cd $1; cd server; yarn install; yarn build; cd ../ui; yarn install; yarn build; cd .."
 				},
 				"strato-vscode.deployProjectCommand": {
 					"type": "string",
