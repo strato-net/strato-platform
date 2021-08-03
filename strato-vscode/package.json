@@ -52,7 +52,7 @@
 				},
 				"strato-vscode.runUICommand": {
 					"type": "string",
-					"default": "pushd ui; yarn install; yarn build; touch .env; yarn start; popd"
+					"default": "pushd ui; yarn install; yarn build; touch .env; REACT_APP_URL=http://localhost yarn start; popd"
 				},
 				"strato-vscode.testUICommand": {
 					"type": "string",
