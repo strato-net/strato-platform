@@ -2,7 +2,17 @@ import { rest } from 'blockapps-rest'
 
 class OrganizationsController {
     // Create
-    static async createOrganization(req, res, next) {}
+    static async createOrganization(req, res, next) {
+        try {
+            const { dapp, body } = req
+            const result = await dapp.managers.organizationsManager.createOrganization(body)
+            rest.response.status200(res, result)
+            return next()
+        } catch (e) {
+            return next(e)
+        }
+    }
+
 
     static async inviteOrganization(req, res, next) {}
 

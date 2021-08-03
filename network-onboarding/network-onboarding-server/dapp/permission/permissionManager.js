@@ -73,7 +73,8 @@ const canRequestToJoinApplication = async (admin, contract, args, options) => ca
 const canInviteToJoinApplication = async (admin, contract, args, options) => can(admin, contract, { ...args, method: 'canInviteToJoinApplication' }, options)
 const canCreateApplication = async (admin, contract, args, options) => can(admin, contract, { ...args, method: 'canCreateApplication' }, options)
 const canInviteToJoinOrganization = async (admin, contract, args, options) => can(admin, contract, { ...args, method: 'canInviteToJoinOrganization' }, options)
-const canCreateUser = async (admin, contract, args, options) => can(admin, contract, { ...args, method: 'canCreateUser' }, options)
+const canCreateOrgUser = async (admin, contract, args, options) => can(admin, contract, { ...args, method: 'canCreateOrgUser' }, options)
+const canCreateAnyUser = async (admin, contract, args, options) => can(admin, contract, { ...args, method: 'canCreateAnyUser' }, options)
 const canUpdateRoleInNetwork = async (admin, contract, args, options) => can(admin, contract, { ...args, method: 'canUpdateRoleInNetwork' }, options)
 const canUpdateRoleInOrganization = async (admin, contract, args, options) => can(admin, contract, { ...args, method: 'canUpdateRoleInOrganization' }, options)
 
@@ -109,7 +110,8 @@ const bind = (admin, _contract, options) => {
   contract.canInviteToJoinApplication = async (args) => canInviteToJoinApplication(admin, contract, args, options)
   contract.canCreateApplication = async (args) => canCreateApplication(admin, contract, args, options)
   contract.canInviteToJoinOrganization = async (args) => canInviteToJoinOrganization(admin, contract, args, options)
-  contract.canCreateUser = async (args) => canCreateUser(admin, contract, args, options)
+  contract.canCreateOrgUser = async (args) => canCreateOrgUser(admin, contract, args, options)
+  contract.canCreateAnyUser = async (args) => canCreateAnyUser(admin, contract, args, options)
   contract.canUpdateRoleInNetwork = async (args) => canUpdateRoleInNetwork(admin, contract, args, options)
   contract.canUpdateRoleInOrganization = async (args) => canUpdateRoleInOrganization(admin, contract, args, options)
   return contract

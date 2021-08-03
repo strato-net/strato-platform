@@ -36,9 +36,9 @@ contract OrganizationsManager is RestStatus {
         if (!permissionManager.canCreateOrganization(tx.origin))
             return (RestStatus.FORBIDDEN, tx.origin);
 
-        // TODO: Add check for if the organization already exists
-
-        // TODO: Add check for if the user has the correct role
+        // Does this organization exist?
+        if (organizations[parseCert(_certificateString)["commonName"]] == 0)
+            return (RestStatus.CONFLICT, tx.origin);
 
         Organization org = new Organization();
         registerCert(address(org), _certificateString);
@@ -46,7 +46,7 @@ contract OrganizationsManager is RestStatus {
         return (RestStatus.CREATED, org);
     }
 
-    function updateOrganizationCertificate(string _commonName, string _newCertificate) {
+    function updateOrganizationCertificate(address _organization, string _newCertificate) {
         // TODO
     }
 

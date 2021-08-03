@@ -18,8 +18,6 @@ import "/dapp/permission/contracts/Role.sol";
 contract NetworkOnboardingUsersManager is RestStatus, Role {
     NetworkOnboardingPermissionManager permissionManager;
 
-    mapping(address => Role) private userRoles;
-
     /**
      * Constructor
      */
@@ -34,27 +32,22 @@ contract NetworkOnboardingUsersManager is RestStatus, Role {
         Role _role
     ) public returns (uint256, address) {
 
-        // check tx.origin's organization
+        if (permissionManager.canCreateAnyUser(tx.origin)) {
+            registerCert(_userAddress, _userCertificate);
+            permissionManager.grantRole(parseCert(_userCertificate)["commonName"], _userAddress, _role);
 
-        // check permissions
-        if (!permissionManager.canCreateUser(tx.origin)) {
-            address adminUser = getUser(tx.origin);
-            if (adminUser == address(0)) {
-                return (RestStatus.FORBIDDEN, address(0));
-            }
-            if (!permissionManager.canCreateUserLimited(tx.origin)) {
-                return (RestStatus.FORBIDDEN, address(0));
-            }
+        } else if (permissionManage.canCreateOrgUser(tx.origin)) {
 
-            // org admins (which canCreateUserLimited), can only create other org admins
-            if (_role != Role.ORG_ADMIN) {
+            if (getUserCert(tx.origin)["organization"] == parseCert(_userCertificate)["organization"]) {
+                registerCert(_userAddress, _userCertificate);
+                permissionManager.grantRole(parseCert(_userCertificate)["commonName"], _userAddress, _role);
+            } else {
                 return (RestStatus.FORBIDDEN, address(0));
             }
+            
+        } else {
+            return (RestStatus.FORBIDDEN, address(0));
         }
-
-        // create new
-        registerCert(_userAddress, _userCertificate);
-        userRoles[_userAddress] = _role;
 
         return (RestStatus.CREATED, _userAddress);
     }

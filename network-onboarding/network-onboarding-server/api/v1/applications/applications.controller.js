@@ -2,7 +2,16 @@ import { rest } from 'blockapps-rest'
 
 class ApplicationsController {
     // Create
-    static async createApplication(req, res, next) {}
+    static async createApplication(req, res, next) {
+        try {
+            const { dapp, body } = req
+            const result = await dapp.managers.applicationsManager.createApplication(body)
+            rest.response.status200(res, result)
+            return next()
+        } catch (e) {
+            return next(e)
+        }
+    }
 
     // Read - Nothing to read?
 

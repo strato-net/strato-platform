@@ -2,8 +2,17 @@ import { rest } from 'blockapps-rest'
 
 class UsersController {
     // Create
-    static async createUser(req, res, next) {}
-    
+    static async createUser(req, res, next) {
+        try {
+            const { dapp, body } = req
+            const result = await dapp.managers.usersManager.registerUser(body)
+            rest.response.status200(res, result)
+            return next()
+        } catch (e) {
+            return next(e)
+        }
+    }
+
 
     static async inviteUser(req, res, next) {}
 

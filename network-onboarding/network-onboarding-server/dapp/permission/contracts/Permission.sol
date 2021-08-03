@@ -27,7 +27,8 @@ contract Permission {
         
         // USERS
         INVITE_JOIN_ORG,
-        CREATE_USER,
+        CREATE_ORG_USER,
+        CREATE_ANY_USER,
         UPDATE_ROLE_NETWORK,
         UPDATE_ROLE_ORG,
         UPDATE_USER

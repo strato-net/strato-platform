@@ -98,9 +98,18 @@ contract NetworkOnboardingPermissionManager is RestStatus, PermissionManager, Pe
         return check(_address, permissions) == RestStatus.OK;
     }
     
-    function canCreateUser(address _address) public returns (bool) {
+    // Create an user as part of your organization
+    function canCreateOrgUser(address _address) public returns (bool) {
         // Get permission
-        uint permissions = 1 << uint(Permission.CREATE_USER);
+        uint permissions = 1 << uint(Permission.CREATE_ORG_USER);
+        // Check permission
+        return check(_address, permissions) == RestStatus.OK;
+    }
+
+    // Create any user as part of any organization
+    function canCreateAnyUser(address _address) public returns (bool) {
+        // Get permission
+        uint permissions = 1 << uint(Permission.CREATE_ANY_USER);
         // Check permission
         return check(_address, permissions) == RestStatus.OK;
     }
