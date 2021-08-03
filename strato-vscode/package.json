@@ -60,7 +60,11 @@
 				},
 				"strato-vscode.configPath": {
 					"type": "string",
-					"default": "server"
+					"default": "server/config"
+				},
+				"strato-vscode.configFile": {
+					"type": "string",
+					"default": "config.yaml"
 				},
 				"blame.dateFormat": {
 					"type": "string",
