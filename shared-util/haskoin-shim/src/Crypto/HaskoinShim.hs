@@ -6,10 +6,10 @@
 module Crypto.HaskoinShim
   ( PubKey(..)
   , SecKey(..)
-  , Msg
+--  , Msg
   , exportPubKey
   , importPubKey
-  , derivePubKey
+--  , derivePubKey
   ) where
 
 import qualified Data.ByteString           as B

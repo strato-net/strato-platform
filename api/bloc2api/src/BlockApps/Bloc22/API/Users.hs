@@ -16,24 +16,15 @@
 module BlockApps.Bloc22.API.Users (
     BlocTransactionResult(..),
     BlocTransactionStatus(..),
-    GetUsersKeyStore,
-    PostUsersKeyStore,
     PostUsersFill,
     GetBlocTransactionResult,
     PostBlocTransactionResults,
-    PostUsersKeyStoreRequest(..),
-    PostSendParameters(..),
     TransferParameters(..),
-    PostUsersContractRequest(..),
     ContractParameters(..),
-    UploadListRequest(..),
     UploadListContract(..),
     ContractListParameters(..),
-    PostSendListRequest(..),
     TransferListParameters(..),
-    PostMethodListRequest(..),
     FunctionListParameters(..),
-    PostUsersContractMethodRequest(..),
     FunctionParameters(..),
     SendTransaction(..),
     MethodCall(..),
@@ -55,7 +46,6 @@ import qualified Data.ByteString.Lazy               as ByteString.Lazy
 import           Data.Map                           (Map)
 import qualified Data.Map                           as Map
 import           Data.Maybe
-import           Data.Proxy
 import           Data.Text                          (Text)
 import qualified Data.Text.Encoding                 as Text
 import qualified Generic.Random                     as GR
@@ -67,7 +57,6 @@ import           Test.QuickCheck                    hiding (Success,Failure)
 
 import           BlockApps.Bloc22.API.SwaggerSchema
 import           BlockApps.Bloc22.API.Utils
-import           BlockApps.Bloc22.Crypto
 import           BlockApps.Ethereum
 import           BlockApps.Solidity.ArgValue
 import           BlockApps.Solidity.SolidityValue
@@ -226,46 +215,6 @@ instance ToParam (QueryFlag "resolve") where
   toParam _ =
     DocQueryParam "resolve" ["0","1",""] "flag for resolving a transaction result" Flag
 
--- It would probably better to use the Authorization header
--- and make this a GET request.
-type GetUsersKeyStore = "users"
-  :> Capture "user" UserName
-  :> Capture "address" Address
-  :> "keystore"
-  :> ReqBody '[JSON, FormUrlEncoded] Password
-  :> Post '[JSON] KeyStore
-
-
-type PostUsersKeyStore = "users"
-  :> Capture "user" UserName
-  :> "keystore"
-  :> ReqBody '[JSON] PostUsersKeyStoreRequest
-  :> Post '[JSON] Bool
-
-data PostUsersKeyStoreRequest = PostUsersKeyStoreRequest
-  { postuserskeystorerequestPassword :: Password
-  , postuserskeystorerequestKeyStore :: KeyStore
-  } deriving (Eq, Show, Generic)
-
-instance Arbitrary PostUsersKeyStoreRequest where
-  arbitrary = GR.genericArbitrary GR.uniform
-
-instance ToJSON PostUsersKeyStoreRequest where
-  toJSON = genericToJSON (aesonPrefix camelCase)
-
-instance FromJSON PostUsersKeyStoreRequest where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
-
-instance ToSample PostUsersKeyStoreRequest where
-  toSamples _ = noSamples
-
-instance ToSchema PostUsersKeyStoreRequest where
-  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
-    & mapped.name ?~ "KeyStore entry"
-    & mapped.schema.example ?~ toJSON ex
-    where
-      ex :: PostUsersKeyStoreRequest
-      ex = PostUsersKeyStoreRequest (Password "hunter2") exKeyStore
 --------------------------------------------------------------------------------
 
 type PostUsersFill = "users"
@@ -274,46 +223,6 @@ type PostUsersFill = "users"
   :> "fill"
   :> QueryFlag "resolve"
   :> Post '[JSON] BlocTransactionResult
-
-data PostSendParameters = PostSendParameters
-  { sendToAddress :: Address
-  , sendValue     :: Strung Natural
-  , sendPassword  :: Password
-  , sendTxParams  :: Maybe TxParams
-  , sendMetadata  :: Maybe (Map Text Text)
-  } deriving (Eq, Show, Generic)
-
-instance Arbitrary PostSendParameters where arbitrary = GR.genericArbitrary GR.uniform
-
-instance ToJSON PostSendParameters where
-  toJSON = genericToJSON (aesonPrefix camelCase)
-
-instance FromJSON PostSendParameters where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
-
-instance ToSample PostSendParameters where
-  toSamples _ = singleSample PostSendParameters
-    { sendToAddress = Address 0xdeadbeef
-    , sendValue = Strung 10
-    , sendPassword = "securePassword"
-    , sendTxParams = Nothing
-    , sendMetadata = Nothing
-    }
-
-instance ToSchema PostSendParameters where
-  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
-    & mapped.schema.description ?~ "Send ether from one account to another (value is in Wei)"
-    & mapped.schema.example ?~ toJSON ex
-    where
-      ex :: PostSendParameters
-      ex = PostSendParameters
-        { sendToAddress = Address 0xdeadbeef
-        , sendValue = Strung 100000000
-        , sendPassword = "securePassword"
-        , sendTxParams = Nothing
-        , sendMetadata = Nothing
-        }
-
 data TransferParameters = TransferParameters
   { fromAddress :: Address
   , toAddress   :: Address
@@ -325,95 +234,6 @@ data TransferParameters = TransferParameters
   } deriving (Eq, Show, Generic)
 
 --------------------------------------------------------------------------------
-
-data PostUsersContractRequest = PostUsersContractRequest
-  { postuserscontractrequestSrc      :: SourceMap
-  , postuserscontractrequestPassword :: Password
-  , postuserscontractrequestContract :: Maybe Text
-  , postuserscontractrequestArgs     :: Maybe (Map Text ArgValue)
-  , postuserscontractrequestTxParams :: Maybe TxParams
-  , postuserscontractrequestValue    :: Maybe (Strung Natural)
-  , postuserscontractrequestMetadata :: Maybe (Map Text Text)
-  } deriving (Eq,Show,Generic)
-
-instance Arbitrary PostUsersContractRequest where arbitrary = GR.genericArbitrary GR.uniform
-
-instance ToJSON PostUsersContractRequest where
-  toJSON PostUsersContractRequest{..} = object
-    [ "src" .= postuserscontractrequestSrc
-    , "password" .= postuserscontractrequestPassword
-    , "contract" .= postuserscontractrequestContract
-    , "args" .= postuserscontractrequestArgs
-    , "txParams" .= postuserscontractrequestTxParams
-    , "value" .= postuserscontractrequestValue
-    , "metadata" .= postuserscontractrequestMetadata
-    ]
-
-instance FromJSON PostUsersContractRequest where
-  parseJSON (Object o) =
-    PostUsersContractRequest
-      <$> (fromMaybe mempty <$> o .:? "src")
-      <*> (o .: "password")
-      <*> (o .:? "contract")
-      <*> (o .:? "args")
-      <*> (o .:? "txParams")
-      <*> (o .:? "value")
-      <*> (o .:? "metadata")
-  parseJSON o = fail $ "parseJSON PostUsersContractRequest: Expected Object, got " ++ show o
-
-instance ToSample PostUsersContractRequest where
-  toSamples _ = singleSample PostUsersContractRequest
-    { postuserscontractrequestSrc = namedSource "SimpleStorage.sol"
-      "contract SimpleStorage { uint storedData; function set(uint x) \
-      \{ storedData = x; } function get() returns (uint retVal) \
-      \{ return storedData; } }"
-    , postuserscontractrequestPassword = "securePassword"
-    , postuserscontractrequestContract = Just "SimpleStorage"
-    , postuserscontractrequestArgs = Nothing
-    , postuserscontractrequestTxParams = Nothing
-    , postuserscontractrequestValue = Just $ Strung 10
-    , postuserscontractrequestMetadata = Nothing
-    }
-
-instance ToSchema PostUsersContractRequest where
-  declareNamedSchema _ = do
-    textSchema <- declareSchemaRef (Proxy :: Proxy Text)
-    pwSchema <- declareSchemaRef (Proxy :: Proxy Password)
-    contractNameSchema <- declareSchemaRef (Proxy :: Proxy (Maybe Text))
-    srcSchema <- declareSchemaRef (Proxy :: Proxy (Map Text Text))
-    argsSchema <- declareSchemaRef (Proxy :: Proxy (Maybe (Map Text ArgValue)))
-    txParamsSchema <- declareSchemaRef (Proxy :: Proxy (Maybe TxParams))
-    metadataSchema <- declareSchemaRef (Proxy :: Proxy (Maybe (Map Text Text)))
-    return $ NamedSchema (Just "Post Users Contract Request")
-      ( mempty
-        & type_ ?~ SwaggerObject
-        & properties .~
-            [ ("src", srcSchema & mapped.description ?~ "Solidity source code")
-            , ("password", pwSchema)
-            , ("contract", contractNameSchema & mapped.description ?~ "Contract name")
-            , ("args", argsSchema)
-            , ("txParams", txParamsSchema)
-            , ("value", textSchema & mapped.description ?~ "Contract value in Eth")
-            , ("metadata", metadataSchema)
-            ]
-        & required .~ [ "src"
-                      , "password"
-                      ]
-        & description ?~ "Post Users Contract Request"
-        & example ?~ toJSON PostUsersContractRequest
-            { postuserscontractrequestSrc = namedSource "SimpleStorage.sol"
-              "contract SimpleStorage { uint storedData; function set(uint x) \
-              \{ storedData = x; } function get() returns (uint retVal) \
-              \{ return storedData; } }"
-            , postuserscontractrequestPassword = "securePassword"
-            , postuserscontractrequestContract = Just "SimpleStorage"
-            , postuserscontractrequestArgs = Nothing
-            , postuserscontractrequestTxParams = Nothing
-            , postuserscontractrequestValue = Nothing
-            , postuserscontractrequestMetadata = Nothing
-            }
-      )
-
 data ContractParameters = ContractParameters
   { fromAddr :: Address
   , src      :: SourceMap
@@ -426,43 +246,6 @@ data ContractParameters = ContractParameters
   , resolve  :: Bool
   }
 --------------------------------------------------------------------------------
-
-data UploadListRequest = UploadListRequest
-  { uploadlistPassword  :: Password
-  , uploadlistContracts :: [UploadListContract]
-  , uploadlistSrcs      :: Maybe (Map Text SourceMap)
-  , uploadlistResolve   :: Bool
-  } deriving (Eq,Show,Generic)
-
-instance ToJSON UploadListRequest where
-  toJSON = genericToJSON (aesonPrefix camelCase)
-
-instance FromJSON UploadListRequest where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
-
-instance Arbitrary UploadListRequest where arbitrary = GR.genericArbitrary GR.uniform
-
-instance ToSample UploadListRequest where
-  toSamples _ = noSamples
-
-instance ToSchema UploadListRequest where
-  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
-    & mapped.schema.description ?~ "Make a request to upload a list of contracts"
-    & mapped.schema.example ?~ toJSON ex
-    where
-      exContract1 :: UploadListContract
-      exContract1 = UploadListContract
-        { uploadlistcontractContractName = "AccountsContract"
-        , uploadlistcontractSrc = mempty
-        , uploadlistcontractArgs = Map.fromList [("accountType", ArgString "Checking"), ("balance",ArgInt 10)]
-        , _uploadlistcontractTxParams = Nothing
-        , uploadlistcontractValue = Nothing
-        , _uploadlistcontractChainid = Nothing
-        , uploadlistcontractMetadata = Nothing
-        }
-      ex :: UploadListRequest
-      ex = UploadListRequest "SecretPassword" [exContract1] Nothing True
-
 data UploadListContract = UploadListContract
   { uploadlistcontractContractName :: Text
   , uploadlistcontractSrc          :: SourceMap
@@ -545,82 +328,6 @@ data ContractListParameters = ContractListParameters
   } deriving (Eq,Show,Generic)
 
 --------------------------------------------------------------------------------
-
-data PostUsersContractMethodRequest = PostUsersContractMethodRequest
-  { postuserscontractmethodPassword :: Password
-  , postuserscontractmethodMethod   :: Text
-  , postuserscontractmethodArgs     :: Map Text ArgValue
-  , postuserscontractmethodValue    :: Maybe (Strung Natural)
-  , postuserscontractmethodTxParams :: Maybe TxParams
-  , postuserscontractmethodMetadata :: Maybe (Map Text Text)
-  } deriving (Eq,Show,Generic)
-
-instance Arbitrary PostUsersContractMethodRequest where arbitrary = GR.genericArbitrary GR.uniform
-instance ToJSON PostUsersContractMethodRequest where
-  toJSON = genericToJSON (aesonPrefix camelCase){omitNothingFields = True}
-instance FromJSON PostUsersContractMethodRequest where
-  parseJSON = genericParseJSON (aesonPrefix camelCase){omitNothingFields = True}
-instance ToSample PostUsersContractMethodRequest where
-  toSamples _ = noSamples
-
-newtype PostUsersContractMethodResponse = PostUsersContractMethodResponse
-  { postusercontractmethodresponseReturns :: [SolidityValue]
-  } deriving (Eq,Show,Generic)
-    deriving newtype (Arbitrary)
-
-instance ToJSON PostUsersContractMethodResponse where
-  toJSON = genericToJSON (aesonPrefix camelCase)
-instance FromJSON PostUsersContractMethodResponse where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
-instance ToSample PostUsersContractMethodResponse where
-  toSamples _ = singleSample $
-    PostUsersContractMethodResponse [SolidityValueAsString "return"]
-
-instance ToSchema PostUsersContractMethodRequest where
-  declareNamedSchema _ = do
-    textSchema <- declareSchemaRef (Proxy :: Proxy Text)
-    pwSchema <- declareSchemaRef (Proxy :: Proxy Password)
-    argsSchema <- declareSchemaRef (Proxy :: Proxy (Map Text ArgValue))
-    txParamsSchema <- declareSchemaRef (Proxy :: Proxy (Maybe TxParams))
-    metadataSchema <- declareSchemaRef (Proxy :: Proxy (Maybe (Map Text Text)))
-    return $ NamedSchema (Just "Post Users Contract Method Request")
-      ( mempty
-        & type_ ?~ SwaggerObject
-        & properties .~
-            [ ("password", pwSchema)
-            , ("method", textSchema & mapped.description ?~ "Method name")
-            , ("args", argsSchema)
-            , ("value", textSchema & mapped.description ?~ "Method value in Eth")
-            , ("txParams", txParamsSchema)
-            , ("metadata", metadataSchema)
-            ]
-        & required .~ [ "password", "method", "args" ]
-        & description ?~ "Post Users Contract Method Request"
-        & example ?~ toJSON PostUsersContractMethodRequest
-            { postuserscontractmethodPassword = "securePassword"
-            , postuserscontractmethodMethod = "get"
-            , postuserscontractmethodArgs = Map.empty
-            , postuserscontractmethodValue = Just $ Strung 0
-            , postuserscontractmethodTxParams = Nothing
-            , postuserscontractmethodMetadata = Nothing
-            }
-      )
-
-instance ToSchema PostUsersContractMethodResponse where
-  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
-    & mapped.name ?~ "Post Users Contract Method Response"
-    & mapped.schema.description ?~ "Post Users Contract Method Response"
-    & mapped.schema.example ?~ toJSON ex
-    where
-      ex :: PostUsersContractMethodResponse
-      ex = PostUsersContractMethodResponse
-        { postusercontractmethodresponseReturns =
-          [ SolidityValueAsString "tomahawk"
-          , SolidityValueAsString "2"
-          , SolidityBool True
-          ]
-        }
-
 data FunctionParameters = FunctionParameters
   { fromAddr     :: Address
   , contractName :: Text
@@ -634,46 +341,6 @@ data FunctionParameters = FunctionParameters
   , resolve      :: Bool
   }
 --------------------------------------------------------------------------------
-
-data PostSendListRequest = PostSendListRequest
-  { postsendlistrequestPassword :: Password
-  , postsendlistrequestResolve  :: Bool
-  , postsendlistrequestTxs      :: [SendTransaction]
-  } deriving (Eq,Show,Generic)
-
-instance Arbitrary PostSendListRequest where arbitrary = GR.genericArbitrary GR.uniform
-
-instance ToJSON PostSendListRequest where
-  toJSON = genericToJSON (aesonPrefix camelCase)
-
-instance FromJSON PostSendListRequest where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
-
-instance ToSample PostSendListRequest where
-  toSamples _ = noSamples
-
-instance ToSchema PostSendListRequest where
-  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
-    & mapped.name ?~ "Post Users Send List Request"
-    & mapped.schema.description ?~ "Send a list of users some ether (value in Wei)"
-    & mapped.schema.example ?~ toJSON ex
-    where
-      ex :: PostSendListRequest
-      ex = PostSendListRequest
-        { postsendlistrequestPassword = "MyPassword"
-        , postsendlistrequestResolve = False
-        , postsendlistrequestTxs = [sendEx]
-        }
-      sendEx :: SendTransaction
-      sendEx = SendTransaction
-        { sendtransactionToAddress = Address 0xdeadbeef
-        , sendtransactionValue = Strung 1000000000000000
-        , _sendtransactionTxParams = Just (TxParams (Just $ Gas 123) (Just $ Wei 345)
-            (Just $ Nonce 9876))
-        , _sendtransactionChainid = Nothing
-        , sendtransactionMetadata = (Just $ Map.fromList [("purpose","groceries")])
-        }
-
 data SendTransaction = SendTransaction
   { sendtransactionToAddress :: Address
   , sendtransactionValue     :: Strung Natural
@@ -844,48 +511,6 @@ instance ToSchema MethodErrored where
      & mapped.name ?~ "Method Errored Response"
      & mapped.schema.description ?~ "response object when method fails in a methodList call"
      & mapped.schema.example ?~ toJSON methodErroredExample
-
-data PostMethodListRequest = PostMethodListRequest
-  { postmethodlistrequestPassword :: Password
-  , postmethodlistrequestResolve  :: Bool
-  , postmethodlistrequestTxs      :: [MethodCall]
-  } deriving (Eq,Show,Generic)
-
-instance Arbitrary PostMethodListRequest where arbitrary = GR.genericArbitrary GR.uniform
-
-instance ToJSON PostMethodListRequest where
-  toJSON = genericToJSON (aesonPrefix camelCase)
-
-instance FromJSON PostMethodListRequest where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
-
-instance ToSample PostMethodListRequest where
-  toSamples _ = noSamples
-
-instance ToSchema PostMethodListRequest where
-  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
-    & mapped.name ?~ "Post Method List Request"
-    & mapped.schema.description ?~ "Everything you need to batch method calls"
-    & mapped.schema.example ?~ toJSON ex
-    where
-      ex :: PostMethodListRequest
-      ex = PostMethodListRequest
-        { postmethodlistrequestPassword = "MyPassword"
-        , postmethodlistrequestResolve = True
-        , postmethodlistrequestTxs = [exMethodCall]
-        }
-      exMethodCall :: MethodCall
-      exMethodCall = MethodCall
-        { _methodcallTxParams = Nothing
-        , methodcallValue = Strung 1000000000
-        , methodcallArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 52)]
-        , methodcallMethodName = "getHoroscope"
-        , methodcallContractAddress = Address 0xdeadbeef
-        , methodcallContractName = "HoroscopeApp"
-        , _methodcallChainid = Nothing
-        , methodcallMetadata = Nothing
-        }
-
 data MethodCall = MethodCall
   { methodcallContractName    :: Text
   , methodcallContractAddress :: Address
