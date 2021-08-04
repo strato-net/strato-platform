@@ -416,8 +416,8 @@ spec = do
             let chainId = Keccak256.rlpHash cInfo
              in (chainId, IEGenesis (IngestGenesis TO.Morphism (keccak256ToWord256 chainId, cInfo)))
           getChainTx chainId = do
-            tx <- runIO . HK.withSource HK.devURandom $ do
-              pk <- liftIO newPrivateKey
+            tx <- runIO $ do
+              pk <- newPrivateKey
               createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just $ keccak256ToWord256 chainId) Nothing pk
             let hashTx = PrivateHashTX (txHash tx) chainId
             pure (hashTx, tx)

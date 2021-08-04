@@ -9,8 +9,6 @@ module Network.Haskoin.Crypto
 (
   -- **Private Keys
   PrvKey
-, withSource
-, devURandom
 
   -- * Big words
 , Word512
@@ -19,7 +17,7 @@ module Network.Haskoin.Crypto
 , Word128
 ) where
 
-import Network.Haskoin.Crypto.ECDSA
+--import Network.Haskoin.Crypto.ECDSA
 import Network.Haskoin.Crypto.Keys
 --import Network.Haskoin.Crypto.Hash
 --import Network.Haskoin.Crypto.Base58

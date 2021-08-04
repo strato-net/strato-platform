@@ -56,7 +56,6 @@ import qualified Blockchain.Strato.Model.Secp256k1 as EC
 import           Blockchain.Util
 
 import qualified Crypto.Secp256k1 as SEC
-import           Network.Haskoin.Internals
 
 import           Control.DeepSeq
 import           System.Clock
@@ -182,7 +181,7 @@ insertTX' mode origin blockNum txs = do
         map (\tx -> txAndTime2RawTX origin tx (fromMaybe (-1) blockNum) time) txs
   insertRawTX' mode rawTXs
 
-createMessageTX::MonadIO m=>Integer->Integer->Integer->Address->Integer->B.ByteString-> Maybe (Map Text Text) -> EC.PrivateKey->SecretT m Transaction
+createMessageTX::Integer->Integer->Integer->Address->Integer->B.ByteString-> Maybe (Map Text Text) -> EC.PrivateKey->IO Transaction
 createMessageTX n gp gl to' val theData md prvKey = createChainMessageTX n gp gl to' val theData Nothing md prvKey
 
 
@@ -193,8 +192,7 @@ getSigVals (EC.Signature (SEC.CompactRecSig r s v)) =
   let convert = bytesToWord256 . BSS.fromShort
   in (convert r, convert s, v + 0x1b)
 
-createChainMessageTX :: MonadIO m
-                     => Integer
+createChainMessageTX :: Integer
                      -> Integer
                      -> Integer
                      -> Address
@@ -203,7 +201,7 @@ createChainMessageTX :: MonadIO m
                      -> Maybe Word256
                      -> Maybe (Map Text Text)
                      -> EC.PrivateKey
-                     -> SecretT m Transaction
+                     -> IO Transaction
 createChainMessageTX n gp gl to' val theData cid md prvKey = do
   let unsignedTX = MessageTX {
                      transactionNonce = n,
@@ -224,11 +222,10 @@ createChainMessageTX n gp gl to' val theData cid md prvKey = do
   
   return unsignedTX { transactionR = toInteger r, transactionS = toInteger s, transactionV = v }
 
-createContractCreationTX::MonadIO m=>Integer->Integer->Integer->Integer->Code-> Maybe (Map Text Text) -> EC.PrivateKey->SecretT m Transaction
+createContractCreationTX::Integer->Integer->Integer->Integer->Code-> Maybe (Map Text Text) -> EC.PrivateKey->IO Transaction
 createContractCreationTX n gp gl val init' md prvKey = createChainContractCreationTX n gp gl val init' Nothing md prvKey
 
-createChainContractCreationTX :: MonadIO m
-                              => Integer
+createChainContractCreationTX :: Integer
                               -> Integer
                               -> Integer
                               -> Integer
@@ -236,7 +233,7 @@ createChainContractCreationTX :: MonadIO m
                               -> Maybe Word256
                               -> Maybe (Map Text Text)
                               -> EC.PrivateKey
-                              -> SecretT m Transaction
+                              -> IO Transaction
 createChainContractCreationTX n gp gl val init' cid md prvKey = do
   let unsignedTX = ContractCreationTX {
                      transactionNonce = n,

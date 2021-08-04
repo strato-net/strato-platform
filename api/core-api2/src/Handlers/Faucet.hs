@@ -30,7 +30,6 @@ import           Data.Maybe
 import           Data.Text                             (Text)
 import qualified Data.Text                             as T
 import qualified Database.Esqueleto                    as E
-import qualified Network.Haskoin.Crypto                as H
 import           Numeric
 import           Servant
 import           Servant.Client
@@ -193,8 +192,7 @@ makeSendTX maxN k a n = do
   -- with [n, n+1, n+2] has highest priority for n+2, second priority for n+1,
   -- and will only take n if both faucet(x) and faucet(y) don't.
   let gasPrice = 50000000000 - 100000 * (maxN - n)
-  liftIO . H.withSource H.devURandom $
-    createMessageTX n gasPrice 100000 a (1000*ether) "" Nothing k
+  liftIO $ createMessageTX n gasPrice 100000 a (1000*ether) "" Nothing k
 
 -- TODO(tim): Add a queryparam for contracts with variable length bin-runtimes, rather
 -- than these that have empty bin-runtimes.
@@ -205,4 +203,4 @@ makeSizedTX nonce size pk =
       gasLimit = 100000
       val = 0
       mk = createContractCreationTX nonce gasPrice gasLimit val code Nothing pk
-  in liftIO . H.withSource H.devURandom $ mk
+  in liftIO mk

@@ -13,8 +13,6 @@ import           Control.Monad.IO.Class
 import           Blockchain.Output
 import           Control.Monad.Trans.Except
 import           HFlags
-import           Network.Haskoin.Crypto                      (withSource)
-import qualified Network.Haskoin.Internals                   as Haskoin
 import           Prometheus
 
 import           Blockchain.BlockChain
@@ -56,7 +54,7 @@ main = do
             Nothing
             secretKey
 
-  signedTransaction' <- liftIO $ withSource Haskoin.devURandom t
+  signedTransaction' <- liftIO t
 
   let blockData = BlockData {
         blockDataParentHash = unsafeCreateKeccak256FromWord256 0xabcd,

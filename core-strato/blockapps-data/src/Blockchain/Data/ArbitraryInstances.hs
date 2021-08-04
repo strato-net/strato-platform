@@ -19,9 +19,6 @@ import           Blockchain.Database.MerklePatricia
 import           Blockchain.Strato.Model.Secp256k1            ()
 import           Blockchain.Util
 
-import qualified Network.Haskoin.Crypto             as H
-
-
 instance Arbitrary Microtime where
     arbitrary = (Microtime . unboxPI) <$> (arbitrary :: Gen PositiveInteger)
 
@@ -30,11 +27,11 @@ unboxPI :: PositiveInteger -> Integer
 unboxPI (PositiveInteger n) = n
 positiveIntegerMax :: Integer
 positiveIntegerMax = 99999999
-
+{-
 data HaskoinPrvKey = HaskoinPrvKey H.PrvKey
 unboxPK :: HaskoinPrvKey -> H.PrvKey
 unboxPK (HaskoinPrvKey pk) = pk
-
+-}
 instance Arbitrary PositiveInteger where
     arbitrary = PositiveInteger . abs <$> arbitrary
 
@@ -105,13 +102,11 @@ instance Arbitrary Transaction where
               True  -> do
                   to     <- arbitrary
                   txData <- arbitrary
-                  return . unsafePerformIO .
-                      H.withSource H.devURandom $
+                  return . unsafePerformIO $
                           createChainMessageTX nonce gasPrice gasLimit to value txData chainId md prvKey
               False -> do
                   contractCode <- arbitrary
-                  return . unsafePerformIO .
-                      H.withSource H.devURandom $
+                  return . unsafePerformIO $
                           createChainContractCreationTX nonce gasPrice gasLimit value contractCode chainId md prvKey
 
 instance Arbitrary RawTransaction where
