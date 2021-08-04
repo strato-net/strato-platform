@@ -11,12 +11,86 @@ export class NodesProvider implements vscode.TreeDataProvider<Node> {
     return element;
   }
 
+  createNode(label: any, target: any){
+    console.log('TARGET', target);
+    
+    let childData = this.getNodesFromParent(target[1]);
+    return new Node(label, vscode.TreeItemCollapsibleState.Expanded, childData)
+  }
+
+  toChild = (key: string, value: any): Node => {
+    return new Node({label: key, tooltip: value, description: value}, vscode.TreeItemCollapsibleState.None);
+  }
+
+  getNodesFromParent(target: any) {
+    let childrenArray: any = [];
+    for(let i in target) {
+      let currentChild: any = target[i];
+      // console.log('HERE IS CURRENT KEY FOR CHILD', i);
+      
+      // console.log('HERE IS CURRENT CHILD', currentChild);
+      let currentConvertedChild = this.toChild(i, currentChild);
+      childrenArray.push(currentConvertedChild);
+    }
+    console.log('HERE IS ARRAY', childrenArray);
+    return childrenArray;
+  }
+  getMenu(element?: any) {
+    console.log('INSIDE GET MENU', element);
+    let menus: any = [];
+    for(let i in element) {
+      if(element[i][0] != 'version' && Object.keys(element[i][1]).length != 0) {
+        menus.push(this.createNode({label: element[i][0], tooltip: element[i][1], description: element[i][1]}, element[i]));
+      } else {
+        menus.push(new Node({label: element[i][0], tooltip: element[i][1], description: element[i][1]}, vscode.TreeItemCollapsibleState.None))
+      }
+    }
+    
+    return menus;
+    
+  }
+
   async getChildren(element?: Node): Promise<Node[]> {
     if (element) {
+
+      console.log('Here is element', element);
+      
+      
       const node = await this.getNodeVersion(element);
+      console.log('Here is NODE', node);
+      
       if (!node) return []
-      const entries = Object.entries(node)
-      const items = entries.map((e) => new Node({label: `${e[0]}`, tooltip: `${JSON.stringify(e[1])}`, description: `${JSON.stringify(e[1])}`}, vscode.TreeItemCollapsibleState.None))
+      const entries = Object.entries(node);
+      console.log('ENTRIES', entries);
+      let newResults = this.getMenu(entries);
+      console.log('NEWRESULTS', newResults);
+      
+      let i;
+      let testReturn = [];
+      // for(i = 0; i < entries.length; ++i) {
+      //   // console.log('Entries data', entries[i][1]);
+      //   if(Object.keys(entries[i][1]).length != 0 && entries[i][0] != 'version') {
+      //     console.log('THIS IS AN OBJECT', entries[i][1]);
+      //     let j, tempObj;
+      //     let tempArr = 0;
+      //     for(j = 0; j < entries[i][1].length; ++j) {
+      //       tempObj = new Node({label: entries[i][1][j][0], tooltip: entries[i][1][j][1], description: entries[i][1][j][1]}, vscode.TreeItemCollapsibleState.None);
+      //       tempArr.push(tempObj);
+      //     }
+      //     testReturn.push(new Node({label: entries[i][0], tooltip: ''}))
+      //   } else {
+      //     testReturn.push(new Node({label: entries[i][0], tooltip: entries[i][1], description: entries[i][1]}, vscode.TreeItemCollapsibleState.None));
+      //   }
+      //   // if(entries[i][1].charAt(0) == '{' && entries[i][1].charAt(entries[i][1].length -1) == '}') {
+      //   //   console.log('CHECK');
+
+      //   // }
+
+      // }
+      // console.log('HERE IS TEST RETURN', testReturn);
+      
+      const items = entries.map((e) => new Node({label: `${e[0]}`, tooltip: `${JSON.stringify(e[1])}`, description: `${JSON.stringify(e[1])}`}, vscode.TreeItemCollapsibleState.None));
+      console.log('HERE', items);
       return items;
     } else {
       return this.getNodes();
@@ -24,12 +98,16 @@ export class NodesProvider implements vscode.TreeDataProvider<Node> {
   }
 
   async getNodeVersion(node): Promise<any> {
+    console.log('INSIDE GETNODEVERSION');
+    
     const config = getConfig() || {}
     const options = { config };
     try {
       const results:any[] = []
       const user = await getApplicationUser(node.id)
-      const res = await rest.getStatus(user, { ...options, node: node.id })
+      const res = await rest.getStatus(user, { ...options, node: node.id })   
+      console.log('HERE IS RES', res);
+      
       return res;
     } catch(e) {
       console.log(e)
@@ -66,7 +144,6 @@ export class NodesProvider implements vscode.TreeDataProvider<Node> {
         connected ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None
       );
     };
-
     return nodes.map((a: any) => toDep(a));
   }
 
@@ -89,7 +166,8 @@ class Node extends vscode.TreeItem {
   id: any;
   constructor(
     public readonly node: any,
-    public readonly collapsibleState: vscode.TreeItemCollapsibleState
+    public readonly collapsibleState: vscode.TreeItemCollapsibleState,
+    public children?: Node[],
   ) {
     super(node.label, collapsibleState);
     this._node = node;
