@@ -95,13 +95,16 @@ function bind(rawAdmin, _contract, defaultOptions) {
     return managers.organizationsManager.createOrganization(args, options)
   }
   contract.getOrganization = async function (args, options = defaultOptions) {
-    return managers.organizationsManager.getOrganization(args, options)
+    return managers.organizationsManager.get(args, options)
   }
   contract.registerUser = async function (args, options = defaultOptions) {
     return managers.usersManager.registerUser(args, options)
   }
   contract.getUser = async function (args, options = defaultOptions) {
     return managers.usersManager.getUser(args, options)
+  }
+  contract.getAllOrganizations = async function (args, options = defaultOptions) {
+    return managers.organizationsManager.get(args, options)
   }
   return contract;
 }

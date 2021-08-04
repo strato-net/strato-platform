@@ -31,7 +31,16 @@ class OrganizationsController {
     // Read
     static async myOrganization(req, res, next) {}
 
-    static async getAllOrganizations(req, res, next) {}
+    static async getAllOrganizations(req, res, next) {
+        try {
+            const { dapp, body } = req
+            const result = await dapp.getAllOrganizations(body)
+            rest.response.status200(res, result)
+            return next()
+        } catch (e) {
+            return next(e)
+        }
+    }
 
     static async getOrganization(req, res, next) {
         try {

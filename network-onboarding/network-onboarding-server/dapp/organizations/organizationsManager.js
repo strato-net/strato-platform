@@ -98,6 +98,7 @@ async function getByChainId(admin, args, options) {
 }
 
 async function getAll(admin, args = {}, options) {
+  // TODO Change this to filter viewable ones
   const organizations = await searchAll(organizationJs.contractName, args, options, admin)
   return organizations.map((organization) => organizationJs.marshalOut(organization))
 }
