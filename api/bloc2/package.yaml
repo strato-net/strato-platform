@@ -44,7 +44,6 @@ library:
     - filepath
     - format
     - hashable
-    - haskoin-shim
     - http-client
     - http-types
     - insert-ordered-containers

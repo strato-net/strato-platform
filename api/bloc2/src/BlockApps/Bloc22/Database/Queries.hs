@@ -31,7 +31,6 @@ module BlockApps.Bloc22.Database.Queries (
 import           Control.Arrow
 import           Control.Monad
 import           Control.Monad.Logger
-import           Crypto.HaskoinShim
 import qualified Crypto.Saltine.Class            as Saltine
 import qualified Crypto.Saltine.Core.SecretBox   as SecretBox
 import           Data.Aeson                      (Result(..), fromJSON, decode, encode)
@@ -496,16 +495,6 @@ instance QueryRunnerColumnDefault PGBytea SecretBox.Nonce where
     queryRunnerColumnDefault
 instance Default Constant SecretBox.Nonce (Column PGBytea) where
   def = lmap Saltine.encode def
-
-instance Default Constant PubKey (Column PGBytea) where
-  def = lmap (exportPubKey False) def
-
-instance QueryRunnerColumnDefault PGBytea PubKey where
-  queryRunnerColumnDefault =
-     queryRunnerColumn id toPubKey queryRunnerColumnDefault
-     where toPubKey :: ByteString -> PubKey
-           toPubKey = fromMaybe (error "could not import pubkey") . importPubKey
-
 instance Default Constant UserName (Column PGText) where
   def = lmap getUserName def
 
