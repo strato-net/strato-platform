@@ -113,10 +113,18 @@ contract NetworkOnboardingUsersManager is RestStatus, Role {
 
         // Make sure the orgs remain the same
 
-        userRoles[_userAddress] = _role;
     }
 
-    function getRole(address _user) public view returns (Role) {
-        return userRoles[_user];
+    // TODO Test for when it is not found and return RestStatus.NOT_FOUND
+    // TODO Platform: Let SolidVM return larger data structures
+    getUser(address _user, string _index) returns (uint256, string) {
+        if (permissionManager.canReadAnyUser(tx.origin)) {
+            return (RestStatus.OK, getUserCert(_user)[_index]);
+        } else if (permissionManager.canReadOrgUser(tx.origin)) {
+            if (getUserCert(_user)["organization"] == getUserCert(tx.origin)["organization"]) {
+                return (RestStatus.OK, getUserCert(_user)[_index]);
+        } else {
+            return (RestStatus.FORBIDDEN, "");
+        }
     }
 }

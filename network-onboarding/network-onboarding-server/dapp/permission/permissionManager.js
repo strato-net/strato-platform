@@ -75,6 +75,8 @@ const canCreateApplication = async (admin, contract, args, options) => can(admin
 const canInviteToJoinOrganization = async (admin, contract, args, options) => can(admin, contract, { ...args, method: 'canInviteToJoinOrganization' }, options)
 const canCreateOrgUser = async (admin, contract, args, options) => can(admin, contract, { ...args, method: 'canCreateOrgUser' }, options)
 const canCreateAnyUser = async (admin, contract, args, options) => can(admin, contract, { ...args, method: 'canCreateAnyUser' }, options)
+const canReadOrgUser = async (admin, contract, args, options) => can(admin, contract, { ...args, method: 'canReadOrgUser' }, options)
+const canReadAnyUser = async (admin, contract, args, options) => can(admin, contract, { ...args, method: 'canReadAnyUser' }, options)
 const canUpdateRoleInNetwork = async (admin, contract, args, options) => can(admin, contract, { ...args, method: 'canUpdateRoleInNetwork' }, options)
 const canUpdateRoleInOrganization = async (admin, contract, args, options) => can(admin, contract, { ...args, method: 'canUpdateRoleInOrganization' }, options)
 
@@ -112,6 +114,8 @@ const bind = (admin, _contract, options) => {
   contract.canInviteToJoinOrganization = async (args) => canInviteToJoinOrganization(admin, contract, args, options)
   contract.canCreateOrgUser = async (args) => canCreateOrgUser(admin, contract, args, options)
   contract.canCreateAnyUser = async (args) => canCreateAnyUser(admin, contract, args, options)
+  contract.canReadOrgUser = async (args) => canReadOrgUser(admin, contract, args, options)
+  contract.canReadAnyUser = async (args) => canReadAnyUser(admin, contract, args, options)
   contract.canUpdateRoleInNetwork = async (args) => canUpdateRoleInNetwork(admin, contract, args, options)
   contract.canUpdateRoleInOrganization = async (args) => canUpdateRoleInOrganization(admin, contract, args, options)
   return contract

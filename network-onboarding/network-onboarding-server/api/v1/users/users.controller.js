@@ -5,7 +5,7 @@ class UsersController {
     static async createUser(req, res, next) {
         try {
             const { dapp, body } = req
-            const result = await dapp.managers.usersManager.registerUser(body)
+            const result = await dapp.registerUser(body)
             rest.response.status200(res, result)
             return next()
         } catch (e) {
@@ -31,7 +31,22 @@ class UsersController {
     // Read
     static async myUser(req, res, next) {}
 
-    static async getUser(req, res, next) {}
+    static async getUser(req, res, next) {
+        try {
+            const { dapp, body, params } = req
+      
+            const args = {
+              ...body,
+              user: params.address,
+            }
+
+            const result = await dapp.getUser(args)
+            rest.response.status200(res, result)
+            return next()
+        } catch (e) {
+            return next(e)
+        }
+    }
 
     // Update
     static async updateUser(req, res, next) {}

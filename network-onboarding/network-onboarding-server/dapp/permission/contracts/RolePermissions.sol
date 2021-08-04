@@ -33,6 +33,8 @@ contract RolePermissions is Role, Permission {
           (1 << uint(Permission.REMOVE_ORG)) |
           (1 << uint(Permission.CREATE_ORG_USER)) |
           (1 << uint(Permission.CREATE_ANY_USER)) |
+          (1 << uint(Permission.READ_ORG_USER)) |
+          (1 << uint(Permission.READ_ANY_USER)) |
           (1 << uint(Permission.UPDATE_USER)) |
           (1 << uint(Permission.UPDATE_ROLE_NETWORK));
 
@@ -42,6 +44,7 @@ contract RolePermissions is Role, Permission {
           (1 << uint(Permission.CREATE_APP)) |
           (1 << uint(Permission.INVITE_JOIN_ORG)) |
           (1 << uint(Permission.CREATE_ORG_USER)) |
+          (1 << uint(Permission.READ_ORG_USER)) |
           (1 << uint(Permission.UPDATE_USER)) |
           (1 << uint(Permission.UPDATE_ROLE_ORG));
     }

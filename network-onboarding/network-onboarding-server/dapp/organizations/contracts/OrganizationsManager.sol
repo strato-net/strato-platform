@@ -69,10 +69,6 @@ contract OrganizationsManager is RestStatus {
     /**
      * Returns the mapping of organization common names to Organization contract addresses
      */
-    function getOrganizations() returns (mapping(string=>address)) {
-        return organizations;
-    }
-
     function getOrganization(string _orgName) returns (uint256, address) {
         if (organizations[_orgName] == address(0))
             return (RestStatus.NOT_FOUND, address(0));

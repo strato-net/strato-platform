@@ -5,7 +5,7 @@ class OrganizationsController {
     static async createOrganization(req, res, next) {
         try {
             const { dapp, body } = req
-            const result = await dapp.managers.organizationsManager.createOrganization(body)
+            const result = await dapp.createOrganization(body)
             rest.response.status200(res, result)
             return next()
         } catch (e) {
@@ -33,7 +33,22 @@ class OrganizationsController {
 
     static async getAllOrganizations(req, res, next) {}
 
-    static async getOrganization(req, res, next) {}
+    static async getOrganization(req, res, next) {
+        try {
+            const { dapp, body, params } = req
+      
+            const args = {
+              ...body,
+              address: params.address,
+            }
+      
+            const result = await dapp.getOrganization(args)
+            rest.response.status200(res, result)
+            return next()
+        } catch (e) {
+            return next(e)
+        }
+    }
 
     static async getAnOrganizationsUsers(req, res, next) {}
 

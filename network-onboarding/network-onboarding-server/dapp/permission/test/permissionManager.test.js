@@ -66,6 +66,8 @@ describe('Permission Manager', function () {
     canInviteToJoinOrganization,
     canCreateOrgUser,
     canCreateAnyUser,
+    canReadOrgUser,
+    canReadAnyUser,
     canUpdateRoleInNetwork,
     canUpdateRoleInOrganization,
   }) => [
@@ -115,6 +117,16 @@ describe('Permission Manager', function () {
       expected: canCreateAnyUser || false,
     },
     {
+      action: 'read org user',
+      method: 'canReadOrgUser',
+      expected: canReadOrgUser || false,
+    },
+    {
+      action: 'read any user',
+      method: 'canReadAnyUser',
+      expected: canReadAnyUser || false,
+    },
+    {
       action: 'update role in network',
       method: 'canUpdateRoleInNetwork',
       expected: canUpdateRoleInNetwork || false,
@@ -133,6 +145,8 @@ describe('Permission Manager', function () {
       canRemoveOrganization: true,
       canCreateOrgUser: true,
       canCreateAnyUser: true,
+      canReadOrgUser: true,
+      canReadAnyUser: true,
       canUpdateRoleInNetwork: true,
     })
 
@@ -156,6 +170,8 @@ describe('Permission Manager', function () {
       canInviteToJoinOrganization: true,
       canCreateOrgUser: true,
       canCreateAnyUser: false,
+      canReadOrgUser: true,
+      canReadAnyUser: false,
       canUpdateRoleInOrganization: true,
     })
 

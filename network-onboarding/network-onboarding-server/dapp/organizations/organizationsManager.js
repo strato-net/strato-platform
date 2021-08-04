@@ -73,20 +73,8 @@ async function waitOrganization(admin, organizationAddress, options) {
 }
 
 async function get(admin, args, options) {
-  const { commonName, address, ...restArgs } = args
-  let organization
-
-  if (address) {
-    organization = await getByAddress(admin, args, options)
-  }
-  else {
-    const searchArgs = setSearchQueryOptions(restArgs, { key: 'commonName', value: commonName })
-    organization = await searchOne(organizationJs.contractName, searchArgs, options, admin)
-  }
-  if (!organization) {
-    return undefined
-  }
-  return organizationJs.marshalOut(organization)
+  const organization = await getByAddress(admin, args, options)
+  return organization
 }
 
 async function getByAddress(admin, args, options) {

@@ -5,7 +5,7 @@ class ApplicationsController {
     static async createApplication(req, res, next) {
         try {
             const { dapp, body } = req
-            const result = await dapp.managers.applicationsManager.createApplication(body)
+            const result = await dapp.createApplication(body)
             rest.response.status200(res, result)
             return next()
         } catch (e) {

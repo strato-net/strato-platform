@@ -29,15 +29,9 @@ function bind(user, _contract, contractOptions) {
   contract.registerUser = async function (args, options = contractOptions) {
     return registerUser(user, contract, args, options)
   }
-  // contract.updateUserCertificate = async function (args, options = contractOptions) {
-  //   return updateUserCertificate(user, contract, args, options)
-  // }
-  // contract.updateUserRole = async function (args, options = contractOptions) {
-  //   return updateUserRole(user, contract, args, options)
-  // }
-  // contract.getRole = async function (args, options = contractOptions) {
-  //   return getRole(user, contract, args, options)
-  // }
+  contract.getUser = async function (args, options = contractOptions) {
+    return getUser(user, contract, args, options)
+  }
   return contract
 }
 
@@ -69,6 +63,27 @@ async function registerUser(user, contract, _args, baseOptions) {
   }
 
   return restStatus
+}
+
+async function getUser(user, contract, _args, baseOptions) {
+
+  const callArgs = {
+    contract,
+    method: 'getUser',
+    args: util.usc(_args),
+  }
+
+  const options = {
+    ...baseOptions,
+  }
+
+  const [restStatus, userField] = await rest.call(user, callArgs, options)
+
+  if (parseInt(restStatus, 10) !== RestStatus.CREATED) {
+    throw new rest.RestError(restStatus, 0, { callArgs })
+  }
+
+  return (restStatus, userField)
 }
 
 export default {

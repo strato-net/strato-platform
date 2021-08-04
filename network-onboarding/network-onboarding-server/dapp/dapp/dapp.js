@@ -40,14 +40,46 @@ async function uploadContract(token, options) {
   const contract = await createContract(token, contractArgs, options);
   contract.src = "removed";
 
+  await waitDapp(admin, contract.address, options)
+
   return bind(token, contract, options);
+}
+
+async function waitDapp(admin, dappAddress, options) {
+  const contractArgs = {
+    name: contractName,
+    address: dappAddress,
+  }
+  // wait for the data to show up in search
+  const dappInSearch = await rest.waitForAddress(admin, contractArgs, options)
+  return dappInSearch
+}
+
+async function getManagers(admin, contract, options) {
+  const state = await rest.getState(admin, contract, options)
+
+  const membershipsManager = organizationMembershipsManagerJs.bindAddress(admin, state.membershipManager, options)
+  const permissionManager = permissionManagerJs.bindAddress(admin, state.permissionManager, options)
+  const organizationsManager = organizationsManagerJs.bindAddress(admin, state.organizationsManager, options)
+  const usersManager = networkOnboardingUsersManagerJs.bindAddress(admin, state.userManager, options)
+  const applicationsManager = applicationsManagerJs.bindAddress(admin, state.applicationsManager, options)
+
+  return {
+    membershipsManager,
+    permissionManager,
+    organizationsManager,
+    usersManager,
+    applicationsManager
+  }
 }
 
 function bind(rawAdmin, _contract, defaultOptions) {
   const contract = _contract;
   const dappAddress = contract.address
   const admin = { dappAddress, ...rawAdmin }
+  const managers = await getManagers(admin, contract, defaultOptions)
 
+  contract.managers = managers
   contract.getState = async function (args, options = defaultOptions) {
     return rest.getState(admin, contract, options)
   }
@@ -56,7 +88,21 @@ function bind(rawAdmin, _contract, defaultOptions) {
     const deployment = deploy(contract, args, options);
     return deployment;
   };
-  // TODO: Write a sample manager pattern contract
+  contract.createApplication = async function (args, options = defaultOptions) {
+    return managers.applicationsManager.createApplication(args, options)
+  }
+  contract.createOrganization = async function (args, options = defaultOptions) {
+    return managers.organizationsManager.createOrganization(args, options)
+  }
+  contract.getOrganization = async function (args, options = defaultOptions) {
+    return managers.organizationsManager.getOrganization(args, options)
+  }
+  contract.registerUser = async function (args, options = defaultOptions) {
+    return managers.usersManager.registerUser(args, options)
+  }
+  contract.getUser = async function (args, options = defaultOptions) {
+    return managers.usersManager.getUser(args, options)
+  }
   return contract;
 }
 
