@@ -4,10 +4,8 @@ module FaucetKey (
   ) where
 
 import           Control.Monad.Except
-import           Data.Binary                    as Bin
 import qualified Data.ByteString.Base64         as Base64
 import qualified Data.ByteString.Char8          as BC
-import qualified Data.ByteString.Lazy           as BL
 import           Data.Either.Extra
 import           System.Environment
 import           System.Exit
@@ -19,7 +17,7 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Secp256k1
 
 getGlobalKey :: IO (Maybe PrivateKey)
-getGlobalKey = fmap (importPrivateKey . Bin.decode . BL.fromStrict) . BC.readFile $ "config" </> "priv"
+getGlobalKey = fmap importPrivateKey . BC.readFile $ "config" </> "priv"
 
 getLocalKey :: IO (Maybe PrivateKey)
 getLocalKey = eitherExtractNodeKey >>= \case
