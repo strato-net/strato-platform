@@ -71,12 +71,84 @@ type PostBlocTransactionParallel = "transaction"
   :> ReqBody '[JSON] PostBlocTransactionRequest
   :> Post '[JSON] [BlocChainOrTransactionResult]
 
+type PostBlocTransactionRaw = "transaction"
+  :> "raw"
+  :> S.Header "X-USER-UNIQUE-NAME" Text
+  :> QueryParam "chainid" ChainId
+  :> QueryFlag "resolve"
+  :> QueryFlag "queue"
+  :> ReqBody '[JSON] PostBlocTransactionRawRequest
+  :> Post '[JSON] [BlocChainOrTransactionResult]
+
 type PostBlocTransaction = "transaction"
   :> S.Header "X-USER-UNIQUE-NAME" Text
   :> QueryParam "chainid" ChainId
   :> QueryFlag "resolve"
   :> ReqBody '[JSON] PostBlocTransactionRequest
   :> Post '[JSON] [BlocChainOrTransactionResult]
+
+
+data PostBlocTransactionRawRequest = PostBlocTransactionRawRequest
+  { postbloctransactionrawrequestAddress  :: Address
+  , postbloctransactionrawrequestNonce    :: Integer
+  , postbloctransactionrawrequestGasPrice :: Integer
+  , postbloctransactionrawrequestGasLimit :: Integer
+  , postbloctransactionrawrequestTo       :: Maybe Address
+  , postbloctransactionrawrequestValue    :: Wei
+  , postbloctransactionrawrequestChainId  :: Maybe ChainId
+  , postbloctransactionrawrequestR        :: Word256
+  , postbloctransactionrawrequestS        :: Word256
+  , postbloctransactionrawrequestV        :: Maybe Word8   -- we can infer from Address if necessary
+  , postbloctransactionrawrequestMetadata :: Maybe (Map Text Text)
+}
+
+
+instance Arbitrary PostBlocTransactionRawRequest where
+  arbitrary = GR.genericArbitrary GR.uniform
+
+instance ToJSON PostBlocTransactionRawRequest where
+   toJSON = genericToJSON (aesonPrefix camelCase)
+
+instance FromJSON PostBlocTransactionRawRequest where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+ 
+
+instance ToSample PostBlocTransactionRawRequest where
+  toSamples _ = singleSaple $ 
+    PostBlocTransactionRawRequest
+      (Address 0x12345678)
+      42
+      1
+      2190000
+      Nothing
+      (Wei 4)
+      Nothing
+      -- r
+      -- s
+      -- v
+      Nothing
+
+instance ToSchema PostBlocTransactionRawRequest where
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.name ?~ "PostBlocTransactionRawRequest"
+    & mapped.schema.description ?~ "Post Bloc Transaction Raw Request"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex :: PostBlocTransactionRawRequest
+      ex = PostBlocTransactionRawRequest
+        (Address 0x12345678)
+        42
+        1
+        2190000
+        Nothing
+        (Wei 4)
+        Nothing
+        -- r
+        -- s
+        -- v
+        Nothing
+       
+
 
 data PostBlocTransactionRequest = PostBlocTransactionRequest
   { postbloctransactionrequestAddress  :: Maybe Address
