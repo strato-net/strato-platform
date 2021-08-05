@@ -43,7 +43,7 @@ import           System.Timeout
 
 import           Blockchain.Data.PubKey
 import           Blockchain.Data.RLP
-import           Blockchain.ExtendedECDSA -- say it with me: DEPRECATED!
+import           Blockchain.ExtendedECDSA.Model.ExtendedSignature -- say it with me: DEPRECATED!
 import           Blockchain.ExtWord
 import           Blockchain.Strato.Discovery.P2PUtil   (DiscoverException (..))
 import           Blockchain.Strato.Model.Keccak256           

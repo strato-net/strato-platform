@@ -1,4 +1,3 @@
--- {-# OPTIONS -fno-warn-unused-top-binds #-}
 
 {-|
   This module defines various utility functions used across the
@@ -7,19 +6,13 @@
 module Network.Haskoin.Util
 (
   -- * ByteString helpers
-  stringToBS
-, bsToInteger
+  bsToInteger
 , integerToBS
 , bsToHex
 , hexToBS
 
 , encode'
-, decode'
-, runPut'
-, runGet'
 , decodeToMaybe
-, isolate
-, maybeToEither
 ) where
 
 import Control.Monad (guard)
@@ -27,15 +20,14 @@ import Control.Monad (guard)
 import Data.Word (Word8)
 import Data.Bits ((.|.), shiftL, shiftR)
 import Data.List (unfoldr)
-import Data.Binary.Put (Put, runPut)
-import Data.Binary (Binary, encode, decode, decodeOrFail)
-import Data.Binary.Get (Get, runGetOrFail, getByteString, ByteOffset, runGet)
+import Data.Binary (Binary, encode, decodeOrFail)
+import Data.Binary.Get (ByteOffset)
 
 import qualified Data.ByteString.Lazy as BL (ByteString, toChunks, fromChunks)
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as C (pack, unpack)
 import qualified Data.ByteString as BS
-    (ByteString, concat, pack, unpack, null, empty)
+    (ByteString, concat, pack, unpack, empty)
 
 -- ByteString helpers
 
@@ -88,31 +80,12 @@ hexToBS xs = guard (bad == BS.empty) >> return x
 encode' :: Binary a => a -> BS.ByteString
 encode' = toStrictBS . encode
 
--- | Strict version of @Data.Binary.decode@
-decode' :: Binary a => BS.ByteString -> a
-decode' = decode . toLazyBS
-
--- | Strict version of @Data.Binary.runGet@
-runGet' :: Get a -> BS.ByteString -> a
-runGet' m = (runGet m) . toLazyBS
-
--- | Strict version of @Data.Binary.runPut@
-runPut' :: Put -> BS.ByteString
-runPut' = toStrictBS . runPut
-
 -- | Strict version of @Data.Binary.decodeOrFail@
 decodeOrFail' ::
     Binary a =>
     BS.ByteString ->
     Either (BS.ByteString, ByteOffset, String) (BS.ByteString, ByteOffset, a)
 decodeOrFail' bs = case decodeOrFail $ toLazyBS bs of
-    Left  (lbs,o,err) -> Left  (toStrictBS lbs,o,err)
-    Right (lbs,o,res) -> Right (toStrictBS lbs,o,res)
-
--- | Strict version of @Data.Binary.runGetOrFail@
-runGetOrFail' :: Get a -> BS.ByteString ->
-    Either (BS.ByteString, ByteOffset, String) (BS.ByteString, ByteOffset, a)
-runGetOrFail' m bs = case runGetOrFail m $ toLazyBS bs of
     Left  (lbs,o,err) -> Left  (toStrictBS lbs,o,err)
     Right (lbs,o,res) -> Right (toStrictBS lbs,o,res)
 
@@ -132,26 +105,3 @@ fromDecode bs def f = either (const def) (f . lst) $ decodeOrFail' bs
 -- with the result upon success. Otherwise, Nothing is returned.
 decodeToMaybe :: Binary a => BS.ByteString -> Maybe a
 decodeToMaybe bs = fromDecode bs Nothing Just
-
--- | Isolate a Data.Binary.Get monad for the next @Int@ bytes. Only the next
--- @Int@ bytes of the input bytestring will be available for the Get monad to
--- consume. This function will fail if the Get monad fails or some of the input
--- is not consumed.
-isolate :: Int -> Get a -> Get a
-isolate i g = do
-    bs <- getByteString i
-    case runGetOrFail' g bs of
-        Left (_, _, err) -> fail err
-        Right (unconsumed, _, res)
-            | BS.null unconsumed -> return res
-            | otherwise          -> fail "Isolate: unconsumed input"
-
--- Maybe and Eithre monad helpers
-
-
--- | Transforms a Maybe value into an Either value. Just is mapped to Right and
--- Nothing is mapped to Left. You also pass in an error value in case Left is
--- returned.
-maybeToEither :: b -> Maybe a -> Either b a
-maybeToEither err m = maybe (Left err) Right m
-
