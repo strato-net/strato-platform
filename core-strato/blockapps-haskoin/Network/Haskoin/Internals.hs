@@ -5,8 +5,7 @@
 -}
 module Network.Haskoin.Internals
 ( module Network.Haskoin.Crypto.BigWord
-, module Network.Haskoin.Crypto.ECDSA
 ) where
 
+
 import Network.Haskoin.Crypto.BigWord
-import Network.Haskoin.Crypto.ECDSA

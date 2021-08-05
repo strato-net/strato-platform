@@ -5,7 +5,6 @@ module Blockchain.Strato.Discovery.UDP (
   dataToPacket,
   sendPacket,
   getServerPubKey,
---  findNeighbors,
   ndPacketToRLP,
   NodeDiscoveryPacket(..),
   Endpoint(..),
@@ -43,7 +42,6 @@ import           System.Timeout
 
 import           Blockchain.Data.PubKey
 import           Blockchain.Data.RLP
-import           Blockchain.ExtendedECDSA.Model.ExtendedSignature -- say it with me: DEPRECATED!
 import           Blockchain.ExtWord
 import           Blockchain.Strato.Discovery.P2PUtil   (DiscoverException (..))
 import           Blockchain.Strato.Model.Keccak256           
@@ -53,10 +51,6 @@ import           Blockchain.Util
 import           Blockchain.Strato.Discovery.Data.Peer
 import qualified Text.Colors                           as CL
 import           Text.Format
-
-
-data RawNodeDiscoveryPacket =
-  RawNDPacket Keccak256 ExtendedSignature Integer RLPObject deriving (Show)
 
 data NodeDiscoveryPacket =
   Ping Integer Endpoint Endpoint Integer |
