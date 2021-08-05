@@ -166,13 +166,8 @@ function newnode {
                          "${tbFlag}" "${breFlag}" "${sebFlag}" "${sechFlag}" "${svdFlag}" "${ctrFlag}" \
                          --gasOn=$gasOn +RTS "${vmRunnerRTSOPTs:-}" -N1 &>> logs/vm-runner
 
-  if [ "${USE_OLD_STRATO_API}" = true ]; then
-      echo "Starting core-api"
-      runBackgroundProcess core-api --appFetchLimit=${appFetchLimit:-100} +RTS -N1 >> logs/core-api 2>&1
-  else
-      echo "Starting strato-api"
-      runBackgroundProcess strato-api --gasOn=$gasOn --evmCompatible=$evmCompatible >> logs/strato-api 2>&1
-  fi
+  echo "Starting strato-api"
+  runBackgroundProcess strato-api --gasOn=$gasOn --evmCompatible=$evmCompatible >> logs/strato-api 2>&1
 
   if [ "${START_EXPERIMENTAL_STRATO_API}" = true ]; then
       echo "Starting strato-api2"

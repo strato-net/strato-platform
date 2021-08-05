@@ -17,7 +17,6 @@ packages:
 - blockapps-haskell/vault-wrapper/client
 - blockapps-haskell/vault-wrapper/server
 - core-strato/milena/
-#- core-strato/core-api
 - core-strato/strato-conf/
 - core-strato/miner-ethash/
 - core-strato/merkle-patricia-db/
