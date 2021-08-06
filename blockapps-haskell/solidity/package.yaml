@@ -2,8 +2,6 @@ name: blockapps-solidity
 version: 0.1.0.0
 synopsis: Solidity datatypes
 description: Solidity datatypes
-license: BSD3
-license-file: LICENSE
 author: Eitan Chatav
 maintainer: eitan@blockapps.net
 copyright: 2016 BlockApps
@@ -50,7 +48,7 @@ library:
   - servant
   - servant-docs
   - swagger2
-  
+
 
 tests:
   blockapps-solidity-test:

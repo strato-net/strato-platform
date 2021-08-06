@@ -13,8 +13,6 @@ import           Control.Monad.IO.Class
 import           Blockchain.Output
 import           Control.Monad.Trans.Except
 import           HFlags
-import           Network.Haskoin.Crypto                      (withSource)
-import qualified Network.Haskoin.Internals                   as Haskoin
 import           Prometheus
 
 import           Blockchain.BlockChain
@@ -30,6 +28,7 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.VMContext
 import           Blockchain.VMOptions       ()
 import           Executable.EVMFlags        ()
@@ -38,7 +37,7 @@ main :: IO ()
 main = do
   _ <- $initHFlags "The Ethereum Test program"
 
-  let secretKey = fromJust . Haskoin.makePrvKey $ 0x1234
+  let secretKey = fromJust . importPrivateKey $ B.pack [0x12, 0x34]
       rep = B.concat . replicate 100000 . B.pack
       jumpAll = B.replicate 1000000 0x5b
       pushOnes = rep [0x60, 0xf2, 0x50]
@@ -55,7 +54,7 @@ main = do
             Nothing
             secretKey
 
-  signedTransaction' <- liftIO $ withSource Haskoin.devURandom t
+  signedTransaction' <- liftIO t
 
   let blockData = BlockData {
         blockDataParentHash = unsafeCreateKeccak256FromWord256 0xabcd,

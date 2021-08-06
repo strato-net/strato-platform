@@ -259,23 +259,45 @@ runBlocks :: ( MonadLogger m
              , HasFullPrivacy m
              )
           => Word256 -> m [OutputBlock]
-runBlocks chainId = go
+runBlocks chainId = go Nothing
   where
-    go = do
+    go mPreviousBlock = do
       btr <- getAllBlocksToRun chainId
       if S.null btr
         then return []
         else do
           let b0 = S.elemAt 0 btr
-          mBlock <- lookup (Proxy @OutputBlock) (_bhash b0)
-          fmap (fromMaybe [] . join) . for mBlock $ \block -> do
-            mHydrated <- hydratePrivateHashes (Just chainId) block
-            for mHydrated $ \b -> do
-              logFF "Privacy/runBlocks" $ "blocksToRun deleting " ++ format b0
-              let chainIds = S.toList . (S.\\ (S.singleton Nothing)) . S.fromList $ txChainId <$> obReceiptTransactions b
-              for_ chainIds $ \(Just cId) -> forAncestorChains cId . flip (adjustStatefully_ (Proxy @ChainIdEntry)) $
-                blocksToRun %= S.delete b0
-              (b:) <$> go
+          if Just b0 == mPreviousBlock
+            then do
+              $logWarnS "Privacy/runBlocks" . T.pack $ concat
+                [ "Failed to clear previous block from cache: "
+                , format b0
+                , ". Breaking to prevent infinite loop."
+                , " This probably means this node was removed from the private chain "
+                , format chainId
+                , "."
+                ]
+              pure []
+            else do
+              mBlock <- lookup (Proxy @OutputBlock) (_bhash b0)
+              fmap (fromMaybe [] . join) . for mBlock $ \block -> do
+                mHydrated <- hydratePrivateHashes (Just chainId) block
+                for mHydrated $ \b -> do
+                  logFF "Privacy/runBlocks" $ concat
+                    [ "blocksToRun deleting "
+                    , format b0
+                    , " for private chain "
+                    , format chainId
+                    , " and its ancestors."
+                    ]
+                  let chainIds = S.toList
+                               . (S.\\ (S.singleton Nothing))
+                               . S.fromList
+                               . (Just chainId :) -- It's possible that there aren't any transactions with this chainId in the block
+                               $ txChainId <$> obReceiptTransactions b
+                  for_ chainIds $ \(Just cId) -> forAncestorChains cId . flip (adjustStatefully_ (Proxy @ChainIdEntry)) $
+                    blocksToRun %= S.delete b0
+                  (b:) <$> go (Just b0)
 
 hasAllAncestorChains :: (Word256 `Alters` ChainIdEntry) m
                      => Maybe Word256 -> m Bool
@@ -372,8 +394,8 @@ hydratePrivateHashes chainF b = do
                       lookup (Proxy @OutputTx) tHash >>= \case
                         Nothing -> do
                           notHydrating "we don't have this transaction's body"
-                          when (isNothing chainF) . void . forAncestorChains cId $ \ancestorChainId -> do
-                            adjustStatefully_ (Proxy @ChainIdEntry) ancestorChainId $ do
+                          when (isNothing chainF)
+                            . adjustStatefully_ (Proxy @ChainIdEntry) cId $ do
                               -- logF $ "blocksToRun inserting " ++ format bHash
                               blocksToRun %= S.insert (BlockInfo bHash (blockOrdering b))
                           return (tx, (tHash:dts, S.insert chainId cs))

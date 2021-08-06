@@ -37,7 +37,6 @@ import qualified Data.Swagger                         as Sw
 import qualified Data.Text                            as T
 import           Database.Persist.TH
 import           GHC.Generics
-import           Network.Haskoin.Crypto               hiding (Address, Word160)
 import           Servant.API
 import           Servant.Docs
 import qualified Text.PrettyPrint.ANSI.Leijen         as Lei
@@ -47,6 +46,7 @@ import           Web.FormUrlEncoded
 
 import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ExtendedWord
 import qualified Data.RLP                             as RLP2
 import qualified Text.Colors       as CL
 import           Text.Format

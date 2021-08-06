@@ -14,7 +14,6 @@ import           Control.Monad                (liftM2)
 import           Data.Aeson
 import           Data.Aeson.Types
 import qualified Data.ByteString              as B
-import           Data.DeriveTH
 import qualified Data.ByteString.Short        as BSS
 import           Data.Function                (on)
 import qualified Data.HashMap.Strict          as HM
@@ -25,6 +24,7 @@ import           Data.Time
 import qualified Data.Sequence                as S
 import           GHC.Generics
 import           Test.QuickCheck
+import           Test.QuickCheck.Arbitrary.Generic
 import           Test.QuickCheck.Instances()
 
 import           Blockchain.MiscJSON()
@@ -197,8 +197,18 @@ instance FromJSON Action where
     <*> (o .: "events")
   parseJSON o = error $ "parseJSON Action: Expected object, got: " ++ show o
 
-derive makeArbitrary ''CallType
-derive makeArbitrary ''CallData
-derive makeArbitrary ''ActionDataDiff
-derive makeArbitrary ''ActionData
-derive makeArbitrary ''Action
+instance Arbitrary CallType where
+  arbitrary = genericArbitrary
+
+instance Arbitrary CallData where
+  arbitrary = genericArbitrary
+
+instance Arbitrary ActionDataDiff where
+  arbitrary = genericArbitrary
+
+instance Arbitrary ActionData where
+  arbitrary = genericArbitrary
+
+instance Arbitrary Action where
+  arbitrary = genericArbitrary
+  

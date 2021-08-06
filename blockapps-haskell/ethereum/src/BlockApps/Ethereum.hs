@@ -18,23 +18,15 @@ module BlockApps.Ethereum
   ( -- Number type reexports
     lastWord64
   , Hex (..)
-  , deriveAddress
-  , newSecKey
   , Transaction (..)
   , UnsignedTransaction (..)
   , rlpHash
-  , signTransaction
-  , verifyTransaction
-  , recoverTransaction
-  , transactionFrom
   , CodeInfo (..)
   , AccountInfo (..)
   ) where
 
 import           Control.Lens.Operators
 import           Control.DeepSeq (NFData)
-import           Crypto.Random.Entropy
-import           Crypto.HaskoinShim
 import           Data.Aeson             hiding (Array, String)
 import qualified Data.Aeson             as Aeson
 import           Data.Bits
@@ -48,13 +40,10 @@ import qualified Data.RLP               as RLP (RLPObject(..))
 import           Data.Swagger
 import           Data.Text              (Text)
 import qualified Data.Text              as Text
---import           Data.Time
 import           Data.Word
 import           Generic.Random
 import           GHC.Generics
 import           Numeric
---import           Numeric.Natural
-import           Servant.API
 import           Test.QuickCheck        hiding ((.&.))
 import           Test.QuickCheck.Instances    ()
 import           Text.Read              hiding (String)
@@ -92,9 +81,6 @@ instance Num n => FromJSON (Hex n) where
 instance (Integral n, Show n) => ToJSON (Hex n) where
   toJSON = toJSON . show
 
-instance (Integral n, Show n) => ToHttpApiData (Hex n) where
-  toUrlPiece = Text.pack . show
-
 instance Arbitrary x => Arbitrary (Hex x) where
   arbitrary = genericArbitrary uniform
 
@@ -128,15 +114,8 @@ instance RLPEncodable Code where
 
   rlpDecode (RLP.Array [x]) = PtrToCode <$> rlpDecode x
   rlpDecode x = Code <$> rlpDecode x
+
 --------------------------------------------------------------------------------
-
-
-newSecKey :: IO SecKey
-newSecKey = fromMaybe err . secKey <$> getEntropy 32
-  where
-    err = error "could not generate secret key"
---------------------------------------------------------------------------------
-
 
 data Transaction = Transaction
   { transactionNonce      :: Nonce
@@ -234,78 +213,12 @@ instance RLPEncodable UnsignedTransaction where
              x -> Left $ "rlpDecode UnsignedTransaction: Too many entries, got: " ++ show x)
   rlpDecode x = Left $ "rlpDecode UnsignedTransaction: Got " ++ show x
 
-rlpMsg :: RLPEncodable x => x -> Msg
-rlpMsg
-  = fromMaybe (error "rlpMsg failure")
-  . msg
-  . bytesToWord256
-  . rlpHash
-
 rlpHash :: RLPEncodable x => x -> ByteString
 rlpHash
   = keccak256ToByteString
   . hash
   . packRLP
   . rlpEncode
-
-signTransaction :: SecKey -> UnsignedTransaction -> Transaction
-signTransaction = signTransactionWithMetadata Nothing
-
-signTransactionWithMetadata :: Maybe (Map Text Text)
-                            -> SecKey
-                            -> UnsignedTransaction
-                            -> Transaction
-signTransactionWithMetadata md sk u@UnsignedTransaction{..} =
-  Transaction
-    { transactionNonce = unsignedTransactionNonce
-    , transactionGasPrice = unsignedTransactionGasPrice
-    , transactionGasLimit = unsignedTransactionGasLimit
-    , transactionTo = unsignedTransactionTo
-    , transactionValue = unsignedTransactionValue
-    , transactionV = testV + 0x1b
-    , transactionR = r
-    , transactionS = s
-    , transactionInitOrData = unsignedTransactionInitOrData
-    , transactionChainId = unsignedTransactionChainId
-    , transactionMetadata = md
-    }
-  where
-    CompactRecSig r s testV =
-      exportCompactRecSig
-      . signRecMsg sk
-      $ rlpMsg u
-
-unsignTransaction :: Transaction -> UnsignedTransaction
-unsignTransaction Transaction{..} = UnsignedTransaction
-  { unsignedTransactionNonce = transactionNonce
-  , unsignedTransactionGasPrice = transactionGasPrice
-  , unsignedTransactionGasLimit = transactionGasLimit
-  , unsignedTransactionTo = transactionTo
-  , unsignedTransactionValue = transactionValue
-  , unsignedTransactionInitOrData = transactionInitOrData
-  , unsignedTransactionChainId = transactionChainId
-  }
-
-verifyTransaction :: PubKey -> Transaction -> Bool
-verifyTransaction pk t@Transaction{transactionR = r, transactionS = s} =
-  let
-    message = rlpMsg $ unsignTransaction t
-  in
-    case importCompactSig (CompactSig r s) of
-      Nothing  -> False
-      Just sig -> verifySig pk sig message
-
-recoverTransaction :: Transaction -> Maybe PubKey
-recoverTransaction t@Transaction{transactionR = r, transactionS = s, transactionV = v} = do
-  let
-    message = rlpMsg $ unsignTransaction t
-    v' = v - 0x1b
-    compactRecSig = CompactRecSig r s v'
-  recSig <- importCompactRecSig compactRecSig
-  recover recSig message
-
-transactionFrom :: Transaction -> Maybe Address
-transactionFrom = fmap deriveAddress . recoverTransaction
 
 {-
 -- | Yellow Paper (82)
@@ -388,11 +301,5 @@ instance ToSchema AccountInfo where
         & type_ ?~ SwaggerInteger
         & example ?~ toJSON (NonContract (Address 0x5815b9975001135697b5739956b9a6c87f1c575c) (20000000 :: Integer))
         & description ?~ "Account Info" )
-
-
-
-deriveAddress :: PubKey -> Address
-deriveAddress (PubKey val) = pubKey2Address val
-
 
 

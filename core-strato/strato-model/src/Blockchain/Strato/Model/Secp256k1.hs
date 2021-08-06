@@ -133,7 +133,7 @@ instance ASN1Object PrivateKey where
       : xs 
     )
 
-  fromASN1 [] = fail "tried to decode an empty ASN1 object?"
+  fromASN1 [] = Left "tried to decode an empty ASN1 object?"
   fromASN1 ( Start Sequence 
         : IntVal 1 
         : OctetString str 
@@ -141,9 +141,9 @@ instance ASN1Object PrivateKey where
         : OID [1,3,132,0,10]
         : End (Container Context 0) 
         : End Sequence : xs ) = case (importPrivateKey str) of
-                                  Nothing -> fail "could not asn1decode privkey"
+                                  Nothing -> Left "could not asn1decode privkey"
                                   Just pk -> Right (pk, xs) 
-  fromASN1 _ = fail "no ASN1 decoding for this kind of EC private key"
+  fromASN1 _ = Left "no ASN1 decoding for this kind of EC private key"
 
 
 instance ToJSON PublicKey where

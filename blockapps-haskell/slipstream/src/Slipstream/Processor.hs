@@ -23,7 +23,6 @@ import Control.Lens ((^.))
 import Control.Monad.Except
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.State.Strict hiding (state)
-import Control.Monad.Trans.Class (lift)
 import qualified Data.Aeson as JSON
 import Data.Bifunctor (second)
 --import Data.ByteString (ByteString)
@@ -41,7 +40,6 @@ import Data.IORef
 import Data.List (foldl', sortOn)
 --import qualified Data.Map.Ordered as OMap
 import qualified Data.Map as Map
-import Data.Monoid ((<>))
 import Data.Maybe
 import Data.Ord (Down(..))
 import qualified Data.Text as T

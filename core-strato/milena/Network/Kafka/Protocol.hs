@@ -31,7 +31,6 @@ import Numeric.Lens
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy.Char8 as LB (fromStrict, toStrict)
 import qualified Codec.Compression.GZip as GZip (compress, decompress)
-import qualified Network
 
 data ReqResp a where
   MetadataRR :: MonadIO m => MetadataRequest -> ReqResp (m MetadataResponse)
@@ -582,7 +581,7 @@ instance Serializable MessageSet where
           compressor :: CompressionCodec -> (ByteString -> ByteString)
           compressor c = case c of
             Gzip -> LB.toStrict . GZip.compress . LB.fromStrict
-            _ -> fail "Unsupported compression codec"
+            _ -> error "Unsupported compression codec"
 
           value :: (ByteString -> ByteString) -> [MessageSetMember] -> Value
           value c ms = Value . Just . KBytes $ c (runPut $ mapM_ serialize ms)
@@ -665,7 +664,7 @@ instance Deserializable MessageSet where
             decompressor :: Attributes -> (ByteString -> ByteString)
             decompressor att = case _compressionCodec att of
               Gzip -> LB.toStrict . GZip.decompress . LB.fromStrict
-              _ -> fail "Unsupported compression codec."
+              _ -> error "Unsupported compression codec."
 
             decompressMessage :: (ByteString -> ByteString) -> ByteString -> Get [MessageSetMember]
             decompressMessage f = getDecompressedMembers . f
@@ -872,5 +871,3 @@ findPartition p = filtered (view $ partitionId . to (== p))
 hostString :: Lens' Host String
 hostString = hostKString . kString . unpackedChars
 
-portId :: IndexPreservingGetter Port Network.PortID
-portId = portInt . to fromIntegral . to Network.PortNumber

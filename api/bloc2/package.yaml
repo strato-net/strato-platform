@@ -25,7 +25,6 @@ library:
     - blockapps-datadefs
     - blockapps-ethereum
     - blockapps-strato-api
-    - blockapps-strato-client
     - blockapps-util
     - blockapps-vault-wrapper-api
     - blockapps-vault-wrapper-client
@@ -45,7 +44,6 @@ library:
     - filepath
     - format
     - hashable
-    - haskoin-shim
     - http-client
     - http-types
     - insert-ordered-containers

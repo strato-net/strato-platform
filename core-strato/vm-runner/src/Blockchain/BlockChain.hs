@@ -248,7 +248,7 @@ baggerRejectionToTransactionResultBits rejection = case rejection of
 
 -- todo: lovely!
 
-addBlocks :: (VMBase m, Bagger.MonadBagger m, MonadMonitor m) => [OutputBlock] -> ConduitT a VmOutEvent m ()
+addBlocks :: (MonadFail m, VMBase m, Bagger.MonadBagger m, MonadMonitor m) => [OutputBlock] -> ConduitT a VmOutEvent m ()
 addBlocks unfiltered = do
   let filtered = filter ((/= 0) . blockDataNumber . obBlockData) unfiltered
       timerToUse = Just vmBlockInsertionMined
@@ -291,15 +291,13 @@ addBlocks unfiltered = do
           calculateAndEmitStateDiffs srLog oldHeader
       when (flags_sqlDiff && not (M.null ranPrivateTxs')) $ calculateAndEmitChainDiffs ranPrivateTxs'
 
-setParentStateRoot :: ( MonadIO m
-                      , BSDB.HasBlockSummaryDB m
-                      )
+setParentStateRoot :: ( MonadFail m, MonadIO m, BSDB.HasBlockSummaryDB m)
                    => OutputBlock -> m BlockSummary
 setParentStateRoot OutputBlock{..} = do
     liftIO $ setTitle $ "Block #" ++ show (blockDataNumber obBlockData)
     BSDB.getBSum (blockDataParentHash obBlockData)
 
-addBlock :: (VMBase m, Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> ConduitT a VmOutEvent m ()
+addBlock :: (MonadFail m, VMBase m, Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> ConduitT a VmOutEvent m ()
 addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransactions = otxs} =
   let obh = outputBlockHash b in withCurrentBlockHash obh $ do
     $logInfoS "addBlocks" . T.pack $

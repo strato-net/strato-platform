@@ -17,8 +17,7 @@ import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Lazy            as BL
 import qualified Data.Map                        as Map
-import           Data.Maybe                      (fromMaybe, catMaybes)
-import           Data.Monoid                     ((<>))
+import           Data.Maybe                      (fromMaybe, catMaybes, listToMaybe)
 import           Data.Text                       (Text)
 import qualified Data.Text                       as T
 import           Data.Text.Encoding              (decodeUtf8, encodeUtf8)
@@ -75,6 +74,9 @@ wrapAndEscape = wrapParens . csv . map wrapSingleQuotes
 wrapAndEscapeDouble :: [Text] -> Text
 wrapAndEscapeDouble = wrapParens . csv . map wrapDoubleQuotes
 
+unwrapDoubleQuotes :: Text -> Text
+unwrapDoubleQuotes = T.dropAround (== '"')
+
 solidityValueToText :: SolidityValue -> Text
 solidityValueToText (SolidityValueAsString x) = escapeQuotes x
 solidityValueToText (SolidityBool x)          = tshow x
@@ -96,6 +98,11 @@ tableColumns :: [(Text, SolidityValue)] -> TableColumns
 tableColumns = map go
   where go (x,y) = let z = wrapDoubleQuotes $ escapeQuotes x
                    in T.concat [z, " ", typeText y]
+
+-- Considered partial because I'm assuming the TableColumns will always be in this format:
+-- ["\"myCol1\" type1", "\"myCol2\" type2", "\"myCol3\" type3"]
+partialParseTableColumns :: TableColumns -> [Text]
+partialParseTableColumns = concat . mapM (fmap unwrapDoubleQuotes . listToMaybe . T.words)
 
 tableUpsert :: [Text] -> Text
 tableUpsert = csv . map go
@@ -284,8 +291,9 @@ expandContractTable globalsIORef (x:xs) tableName = do
           ]
       expandContractTable globalsIORef xs tableName
     Just cols -> do
-      let list = tableColumns $ Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData x
-          extras = filter (not . flip elem cols) list
+      let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData x
+          difference new old = filter ((`notElem` old) . fst) new
+          extras = tableColumns $ difference list (partialParseTableColumns cols)
       unless (null extras) $ do
         $logInfoS "expandTable" . T.pack $ "We just got new fields for a contract that already has a table!"
         $logInfoS "expandTable" $ T.concat

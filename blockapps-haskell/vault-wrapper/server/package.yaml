@@ -1,7 +1,6 @@
 name:                blockapps-vault-wrapper-server
 version:             0.1.0.0
 github:              "githubuser/vault-wrapper"
-license:             BSD3
 author:              "Author name here"
 maintainer:          "example@example.com"
 copyright:           "2018 Author name here"
@@ -132,7 +131,6 @@ tests:
       - ethereum-encryption
       - clockwork
       - cryptonite
-      - haskoin-shim
       - hspec
       - secp256k1-haskell
       - strato-model

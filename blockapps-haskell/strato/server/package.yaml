@@ -2,7 +2,6 @@ name: blockapps-strato-server
 version: 0.1.0.0
 synopsis: Strato microservice
 description: Strato microservice API definitions
-license-file: LICENSE
 author: Kristoffer Josefsson
 maintainer: kristoffer@blockapps.net
 copyright: 2017 BlockApps

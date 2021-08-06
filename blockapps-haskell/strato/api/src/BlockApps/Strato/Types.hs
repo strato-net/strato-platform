@@ -55,11 +55,10 @@ import qualified Data.HashMap.Strict          as HashMap
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
 import           Data.Maybe
-import           Data.Monoid                  ((<>))
 import           Data.Proxy
 import           Data.Swagger
 import qualified Data.Swagger                 as Sw
-import           Data.Swagger.Internal.Schema (named, sketchSchema)
+import           Data.Swagger.Internal.Schema (named)
 import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
 import           Data.Time
@@ -74,7 +73,7 @@ import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
 import           Text.Read
 -- TODO: Unify Bloch and Strato transactions
-import           BlockApps.Ethereum           hiding (Transaction(..), transactionFrom)
+import           BlockApps.Ethereum           hiding (Transaction(..))
 import           Blockchain.SolidVM.Model
 import           BlockApps.Strato.TypeLits
 import           Blockchain.Strato.Model.Address

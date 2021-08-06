@@ -1,3 +1,4 @@
+{-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE EmptyDataDecls             #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE FlexibleInstances          #-}
@@ -8,8 +9,11 @@
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE QuasiQuotes                #-}
 {-# LANGUAGE Rank2Types                 #-}
+{-# LANGUAGE StandaloneDeriving         #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE UndecidableInstances       #-}
+
 {-# OPTIONS_GHC -fno-warn-unused-binds  #-}
 
 module Blockchain.Data.Blockchain
@@ -44,7 +48,7 @@ createDB :: ConnectionString -> IO ()
 createDB pgConn = do
     putStrLn $ CL.yellow ">>>> Creating global database"
     let create = "CREATE DATABASE blockchain;"
-    runNoLoggingT $ withPostgresqlConn pgConn (runReaderT (rawExecute create []) :: SqlWriteBackend -> LoggingT IO ())
+    runNoLoggingT $ withPostgresqlConn pgConn (runReaderT (rawExecute create []) :: SqlBackend -> LoggingT IO ())
 
 migrateDB :: MonadUnliftIO m => ConnectionString -> m ()
 migrateDB pgConn = runNoLoggingT . runPostgresConn pgConn $ runMigration migrateAll

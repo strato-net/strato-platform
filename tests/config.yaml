@@ -17,4 +17,3 @@ nodes:
       openIdDiscoveryUrl: "https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration"
       redirectUri: "http://localhost/callback"
       logoutRedirectUri: "http://localhost"
-

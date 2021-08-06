@@ -1,3 +1,4 @@
+{-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
@@ -5,9 +6,11 @@
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE QuasiQuotes                #-}
 {-# LANGUAGE RecordWildCards            #-}
+{-# LANGUAGE StandaloneDeriving         #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
-
+{-# LANGUAGE UndecidableInstances       #-}
+  
 module Blockchain.Strato.Discovery.Data.Peer
   ( module Blockchain.Strato.Discovery.Metrics
   , module Blockchain.Strato.Discovery.Data.Peer

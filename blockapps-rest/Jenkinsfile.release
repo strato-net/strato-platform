@@ -123,7 +123,7 @@ pipeline {
             sh "git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/blockapps-rest"
           }
           dir ("blockapps-rest") {
-            sh "yarn"
+            sh "yarn install --frozen-lockfile"
             sh "yarn build"
             sh "cp ~/.npmrc ~/.npmrc.BAK"
             withCredentials([string(credentialsId: 'npm-admin-token', variable: 'NPMTOKEN')]) {

@@ -26,7 +26,6 @@ sockAddrToIP :: S.SockAddr -> String
 sockAddrToIP (S.SockAddrInet6 _ _ host _) = show host
 sockAddrToIP s@S.SockAddrInet{}           = takeWhile (/=':') (show s)
 sockAddrToIP (S.SockAddrUnix str)         = str
-sockAddrToIP _ = error "unsupported socket type"
 
 looksLikeHostname :: String -> Bool
 looksLikeHostname = stringToIAddr >>> \case
