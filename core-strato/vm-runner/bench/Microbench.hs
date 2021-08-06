@@ -14,8 +14,8 @@ import qualified Data.Set as S
 import qualified Data.IntSet as I
 
 import Blockchain.Strato.Model.Code
+import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.EVM.Code
-import Network.Haskoin.Internals (Word256)
 import qualified Blockchain.EVM.MutableStack as MS
 
 -- JumpDest benchmarks

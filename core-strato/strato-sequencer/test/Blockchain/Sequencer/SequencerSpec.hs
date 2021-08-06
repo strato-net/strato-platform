@@ -55,12 +55,12 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Monad
 import           Blockchain.Sequencer.OrderValidator
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.Keccak256         as Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 import qualified Data.ByteString.Char8               as C8
 import qualified Data.Set                            as S
-import qualified Network.Haskoin.Crypto     as HK    -- TODO: get rid of this
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.RequestLogger
 import           Network.Wai.Middleware.Prometheus

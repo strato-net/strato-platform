@@ -30,7 +30,7 @@ import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1  as SEC 
 import           Blockchain.Strato.Model.SourceMap
-import           Network.Haskoin.Internals          (BigWord(..))
+import           Network.Haskoin.Crypto.BigWord     (BigWord(..))
 
 
 

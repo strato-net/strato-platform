@@ -24,8 +24,7 @@ dependencies:
 library:
   source-dirs: ./
   exposed-modules:
-    - Network.Haskoin.Crypto
-    - Network.Haskoin.Internals
+    - Network.Haskoin.Crypto.BigWord
   dependencies:
   - QuickCheck
   - aeson
