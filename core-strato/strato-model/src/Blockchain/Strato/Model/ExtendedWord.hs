@@ -42,7 +42,7 @@ import           System.Endian
 import           System.IO.Unsafe
 import           Web.HttpApiData
 
-import           Network.Haskoin.Internals (Word128, Word160, Word256, Word512, BigWord(..))
+import           Network.Haskoin.Crypto.BigWord (Word128, Word160, Word256, Word512, BigWord(..))
 import           Blockchain.Data.RLP
 import           Text.Format
 

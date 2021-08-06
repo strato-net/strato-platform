@@ -90,27 +90,6 @@ executables:
       - warp
     other-modules: [Flags]
 
-  keygen:
-    source-dirs: exec-src/
-    main: KeyGen.hs
-    dependencies:
-      - aeson
-      - aeson-pretty
-      - base16-bytestring
-      - base64-bytestring
-      - blockapps-data
-      - blockapps-haskoin
-      - bytestring
-      - entropy
-      - haskoin-shim
-      - hflags
-      - http-client
-      - prometheus-client
-      - seqevents
-      - strato-model
-      - text
-    other-modules: [Flags]
-
   forced-config-change:
     source-dirs: exec-src
     main: ForcedConfigChange.hs

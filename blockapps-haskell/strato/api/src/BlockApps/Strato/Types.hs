@@ -73,7 +73,7 @@ import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
 import           Text.Read
 -- TODO: Unify Bloch and Strato transactions
-import           BlockApps.Ethereum           hiding (Transaction(..), transactionFrom)
+import           BlockApps.Ethereum           hiding (Transaction(..))
 import           Blockchain.SolidVM.Model
 import           BlockApps.Strato.TypeLits
 import           Blockchain.Strato.Model.Address

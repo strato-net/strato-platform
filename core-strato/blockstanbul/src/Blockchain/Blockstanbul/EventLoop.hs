@@ -32,9 +32,9 @@ import Blockchain.Blockstanbul.Messages
 import Blockchain.Blockstanbul.Metrics
 import Blockchain.Blockstanbul.Voting
 import Blockchain.Strato.Model.Class (blockHash)
+import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
-import qualified Network.Haskoin.Crypto as HK
 import Text.Format
 
 import Blockchain.Blockstanbul.StateMachine
@@ -107,7 +107,7 @@ isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ 
       unless ret . raiseInProd $ "Rejecting Commit; bad seal"
     _ -> return () -- No specific auth for any other messages
 
-assertChainConsistency :: HK.Word256 -> Maybe Keccak256 -> Block -> Either T.Text ()
+assertChainConsistency :: Word256 -> Maybe Keccak256 -> Block -> Either T.Text ()
 assertChainConsistency seqNo wantParent blk = do
   let blkData = blockBlockData blk
       blkNo = fromIntegral . blockDataNumber $ blkData

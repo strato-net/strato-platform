@@ -35,6 +35,7 @@ dependencies:
   - nibblestring
   - primitive
   - resourcet
+  - secp256k1-haskell
   - strato-model
   - text
   - time

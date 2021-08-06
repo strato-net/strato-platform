@@ -14,7 +14,6 @@ dependencies:
   - base
   - aeson
   - deepseq
-  - haskoin-shim
   - http-api-data
   - QuickCheck
   - quickcheck-instances

@@ -15,7 +15,6 @@ import qualified Data.HashMap.Strict         as H
 import qualified Data.Map                    as M
 import qualified Data.Text                   as T
 import qualified Data.Vector                 as V
-import qualified Network.Haskoin.Internals   as H
 import           Network.JsonRpc.Server
 import           Network.Kafka
 import           Network.Kafka.Protocol
@@ -334,8 +333,7 @@ eth_call = toMethod "eth_call" f (Required "codeString" :+: Required "blockStrin
         f codeString blockString = do
           let id = "qqqq"
           let nope = error "jsonrpc.eth_call.createMessageTX"
-          _ <- liftIO $ H.withSource H.devURandom $
-            createMessageTX nope nope nope nope nope nope nope nope
+          _ <- liftIO $ createMessageTX nope nope nope nope nope nope nope nope
           case strToByteString codeString of
            Left err -> throwError $ rpcError (-32602) $ T.pack err
            Right codeBytes -> do
