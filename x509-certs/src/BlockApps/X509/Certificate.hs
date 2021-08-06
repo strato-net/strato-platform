@@ -271,4 +271,4 @@ getCertIssuer (X509Certificate cert) = do
                   , issCountry    = extractDn DnCountry
                   }
   where extractDn :: DnElement -> Maybe String
-        extractDn dn = fmap fromASN1CS . getDnElement dn . certSubjectDN $ getCertificate cert    
+        extractDn dn = fmap fromASN1CS . getDnElement dn . certIssuerDN $ getCertificate cert
