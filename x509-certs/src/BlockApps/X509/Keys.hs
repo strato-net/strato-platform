@@ -13,7 +13,6 @@ import           Data.ASN1.Encoding
 import           Data.ASN1.BinaryEncoding
 import           Data.ASN1.Types                
 import qualified Data.ByteString                    as B
-import           Data.Maybe
 import           Data.PEM
 import           Data.X509
 
@@ -69,7 +68,9 @@ bsToPub bs =
         Left err -> Left (show err)
         Right asn -> case fromASN1 asn of
           Left str -> Left str
-          Right (pub, _) -> Right $ fromMaybe (error "could not unserialize key") $ unserializeAndUnwrap pub
+          Right (pub', _) -> case unserializeAndUnwrap pub' of
+            Just pub -> Right pub
+            Nothing -> Left $ "failed to unserialize and unwrap this key " ++ (show pub')
 
 
 -- from the actual secp256k1 type to the X509 wrapper type
@@ -81,4 +82,4 @@ serializeAndWrap pub =
 -- from the X509 wrapper type to the actual secp256k1 type
 unserializeAndUnwrap :: PubKey -> Maybe PublicKey
 unserializeAndUnwrap (PubKeyEC (PubKeyEC_Named SEC_p256k1 (SerializedPoint sp))) = importPublicKey sp
-unserializeAndUnwrap x = error $ "unserializeAndUnwrap called with unsupported pubkey type: " ++ show x
+unserializeAndUnwrap _ = Nothing 
