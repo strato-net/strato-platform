@@ -55,43 +55,23 @@ export class NodesProvider implements vscode.TreeDataProvider<Node> {
 
       console.log('Here is element', element);
       
-      
-      const node = await this.getNodeVersion(element);
-      console.log('Here is NODE', node);
-      
-      if (!node) return []
-      const entries = Object.entries(node);
-      console.log('ENTRIES', entries);
-      let newResults = this.getMenu(entries);
-      console.log('NEWRESULTS', newResults);
-      
-      let i;
-      let testReturn = [];
-      // for(i = 0; i < entries.length; ++i) {
-      //   // console.log('Entries data', entries[i][1]);
-      //   if(Object.keys(entries[i][1]).length != 0 && entries[i][0] != 'version') {
-      //     console.log('THIS IS AN OBJECT', entries[i][1]);
-      //     let j, tempObj;
-      //     let tempArr = 0;
-      //     for(j = 0; j < entries[i][1].length; ++j) {
-      //       tempObj = new Node({label: entries[i][1][j][0], tooltip: entries[i][1][j][1], description: entries[i][1][j][1]}, vscode.TreeItemCollapsibleState.None);
-      //       tempArr.push(tempObj);
-      //     }
-      //     testReturn.push(new Node({label: entries[i][0], tooltip: ''}))
-      //   } else {
-      //     testReturn.push(new Node({label: entries[i][0], tooltip: entries[i][1], description: entries[i][1]}, vscode.TreeItemCollapsibleState.None));
-      //   }
-      //   // if(entries[i][1].charAt(0) == '{' && entries[i][1].charAt(entries[i][1].length -1) == '}') {
-      //   //   console.log('CHECK');
-
-      //   // }
-
-      // }
-      // console.log('HERE IS TEST RETURN', testReturn);
-      
-      const items = entries.map((e) => new Node({label: `${e[0]}`, tooltip: `${JSON.stringify(e[1])}`, description: `${JSON.stringify(e[1])}`}, vscode.TreeItemCollapsibleState.None));
-      console.log('HERE', items);
-      return items;
+      if(element.collapsibleState != 2) {
+        const node = await this.getNodeVersion(element);
+        console.log('Here is NODE', node);
+        
+        if (!node) return []
+        const entries = Object.entries(node);
+        console.log('ENTRIES', entries);
+        let newResults = this.getMenu(entries);
+        console.log('NEWRESULTS', newResults);
+        return newResults;
+        
+        // const items = entries.map((e) => new Node({label: `${e[0]}`, tooltip: `${JSON.stringify(e[1])}`, description: `${JSON.stringify(e[1])}`}, vscode.TreeItemCollapsibleState.None));
+        // console.log('HERE', items);
+        // return items;
+      } else {
+        return element.children;
+      }
     } else {
       return this.getNodes();
     }
@@ -141,7 +121,9 @@ export class NodesProvider implements vscode.TreeDataProvider<Node> {
       const prefixedLabel = `${prefix}${dep.label}`;
       return new Node(
         { ...dep, label: prefixedLabel, tooltip: dep.url, description: dep.url },
-        connected ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None
+        connected ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None,
+        undefined,
+        'node'
       );
     };
     return nodes.map((a: any) => toDep(a));
@@ -168,6 +150,7 @@ class Node extends vscode.TreeItem {
     public readonly node: any,
     public readonly collapsibleState: vscode.TreeItemCollapsibleState,
     public children?: Node[],
+    public nodeType?: string
   ) {
     super(node.label, collapsibleState);
     this._node = node;
