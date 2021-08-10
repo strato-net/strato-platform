@@ -18,10 +18,12 @@ import           Control.Lens                       (mapped)
 import           Control.Lens.Operators             hiding ((.=))
 import           Data.Aeson                         hiding (Success)
 import           Data.Aeson.Casing
+import qualified Data.ByteString                    as B
 import           Data.Map                           (Map)
 import qualified Data.Map                           as Map
 import           Data.Maybe
 import           Data.Text                          (Text)
+import           Data.Word
 import qualified Generic.Random                     as GR
 import           GHC.Generics
 import           Numeric.Natural
@@ -36,6 +38,8 @@ import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Solidity.ArgValue
 import           BlockApps.Strato.Types
 
+import           Blockchain.Strato.Model.Code
+import           Blockchain.Strato.Model.ExtendedWord   (Word256)
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Nonce
@@ -76,9 +80,8 @@ type PostBlocTransactionRaw = "transaction"
   :> S.Header "X-USER-UNIQUE-NAME" Text
   :> QueryParam "chainid" ChainId
   :> QueryFlag "resolve"
-  :> QueryFlag "queue"
   :> ReqBody '[JSON] PostBlocTransactionRawRequest
-  :> Post '[JSON] [BlocChainOrTransactionResult]
+  :> Post '[JSON] BlocChainOrTransactionResult
 
 type PostBlocTransaction = "transaction"
   :> S.Header "X-USER-UNIQUE-NAME" Text
@@ -89,18 +92,19 @@ type PostBlocTransaction = "transaction"
 
 
 data PostBlocTransactionRawRequest = PostBlocTransactionRawRequest
-  { postbloctransactionrawrequestAddress  :: Address
-  , postbloctransactionrawrequestNonce    :: Integer
-  , postbloctransactionrawrequestGasPrice :: Integer
-  , postbloctransactionrawrequestGasLimit :: Integer
-  , postbloctransactionrawrequestTo       :: Maybe Address
-  , postbloctransactionrawrequestValue    :: Wei
-  , postbloctransactionrawrequestChainId  :: Maybe ChainId
-  , postbloctransactionrawrequestR        :: Word256
-  , postbloctransactionrawrequestS        :: Word256
-  , postbloctransactionrawrequestV        :: Maybe Word8   -- we can infer from Address if necessary
-  , postbloctransactionrawrequestMetadata :: Maybe (Map Text Text)
-}
+  { postbloctransactionrawrequestAddress    :: Address
+  , postbloctransactionrawrequestNonce      :: Nonce
+  , postbloctransactionrawrequestGasPrice   :: Wei
+  , postbloctransactionrawrequestGasLimit   :: Gas
+  , postbloctransactionrawrequestTo         :: Maybe Address
+  , postbloctransactionrawrequestValue      :: Wei
+  , postbloctransactionrawrequestInitOrData :: Code
+  , postbloctransactionrawrequestChainId    :: Maybe ChainId
+  , postbloctransactionrawrequestR          :: Word256
+  , postbloctransactionrawrequestS          :: Word256
+  , postbloctransactionrawrequestV          :: Maybe Word8   -- we can infer from Address if necessary
+  , postbloctransactionrawrequestMetadata   :: Maybe (Map Text Text)
+} deriving (Eq, Show, Generic)
 
 
 instance Arbitrary PostBlocTransactionRawRequest where
@@ -114,18 +118,19 @@ instance FromJSON PostBlocTransactionRawRequest where
  
 
 instance ToSample PostBlocTransactionRawRequest where
-  toSamples _ = singleSaple $ 
+  toSamples _ = singleSample $ 
     PostBlocTransactionRawRequest
       (Address 0x12345678)
-      42
-      1
-      2190000
+      (Nonce 42)
+      (Wei 1)
+      (Gas 2190000)
       Nothing
       (Wei 4)
+      (Code (B.singleton 7))
       Nothing
-      -- r
-      -- s
-      -- v
+      (21 :: Word256) 
+      (42 :: Word256)
+      Nothing
       Nothing
 
 instance ToSchema PostBlocTransactionRawRequest where
@@ -137,15 +142,16 @@ instance ToSchema PostBlocTransactionRawRequest where
       ex :: PostBlocTransactionRawRequest
       ex = PostBlocTransactionRawRequest
         (Address 0x12345678)
-        42
-        1
-        2190000
+        (Nonce 42)
+        (Wei 1)
+        (Gas 2190000)
         Nothing
         (Wei 4)
+        (Code (B.singleton 7))
         Nothing
-        -- r
-        -- s
-        -- v
+        (21 :: Word256) 
+        (42 :: Word256)
+        Nothing
         Nothing
        
 

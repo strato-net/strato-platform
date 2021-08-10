@@ -82,7 +82,7 @@ import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address  hiding (unAddress)
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.CodePtr
-import           Blockchain.Strato.Model.ExtendedWord   (Word256, bytesToWord256)
+import           Blockchain.Strato.Model.ExtendedWord   (Word256, bytesToWord256, word256ToBytes)
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Keccak256  hiding (rlpHash)
 import           Blockchain.Strato.Model.Nonce
@@ -120,6 +120,71 @@ txWorker = forever $ do
   where processTxs = awaitForever $ \(a,b,r,c) ->
           lift . void $ postBlocTransaction' (Do CacheNonce) a b r c
 
+
+
+------------------------------- RAW/OFFLINE TRANSACTIONS ------------------------------------
+
+postBlocTransactionRaw :: (MonadLogger m,
+                           HasBlocSQL m, HasSQL m) =>
+                          Maybe Text     -- username
+                       -> Maybe ChainId  
+                       -> Bool -- resolve
+                       -> PostBlocTransactionRawRequest
+                       -> m BlocChainOrTransactionResult
+postBlocTransactionRaw _ _ resolve PostBlocTransactionRawRequest{..} = do
+  let v = case postbloctransactionrawrequestV of 
+        Just v' -> v'
+        Nothing -> do
+          -- as a requirement for Pepsi, we have to be able to accept non-rec sigs
+          -- so, to make the transaction, we have to figure out what 'v' is here
+          let makeSigFromVals :: (Word256, Word256, Word8) -> Signature
+              makeSigFromVals (r', s', v') = Signature 
+                (S.CompactRecSig
+                  (BSS.toShort $ word256ToBytes r')
+                  (BSS.toShort $ word256ToBytes s')
+                  (v' - 0x1b))
+              unsignedTX = UnsignedTransaction
+                postbloctransactionrawrequestNonce
+                postbloctransactionrawrequestGasPrice
+                postbloctransactionrawrequestGasLimit
+                postbloctransactionrawrequestTo
+                postbloctransactionrawrequestValue
+                postbloctransactionrawrequestInitOrData
+                postbloctransactionrawrequestChainId
+              txHash = rlpHash unsignedTX
+          
+          -- try both 27 and 28, see what matches
+              sig1 = makeSigFromVals (postbloctransactionrawrequestR, postbloctransactionrawrequestS, 27)
+              address1 = fromMaybe (Address 0x0) $ fmap fromPublicKey $ recoverPub sig1 txHash 
+              sig2 = makeSigFromVals (postbloctransactionrawrequestR, postbloctransactionrawrequestS, 28)
+              address2 = fromMaybe (Address 0x0) $ fmap fromPublicKey $ recoverPub sig2 txHash
+          if address1 == postbloctransactionrawrequestAddress
+            then 27
+          else if address2 == postbloctransactionrawrequestAddress
+            then 28
+          else 0
+  if v == 0 
+    then throwIO $ UserError $ Text.pack "Couldn't calculate 'v' for transaction signature - must be a bad signature"
+  else do
+    time <- liftIO getCurrentTime
+    let tx = Transaction
+               postbloctransactionrawrequestNonce
+               postbloctransactionrawrequestGasPrice
+               postbloctransactionrawrequestGasLimit
+               postbloctransactionrawrequestTo
+               postbloctransactionrawrequestValue
+               postbloctransactionrawrequestInitOrData
+               postbloctransactionrawrequestChainId
+               v
+               postbloctransactionrawrequestR
+               postbloctransactionrawrequestS
+               postbloctransactionrawrequestMetadata
+        rawTx = preparePostTx time postbloctransactionrawrequestAddress tx
+    txHash <- postTransaction rawTx
+    fmap BlocTxResult $ getBlocTransactionResult' [txHash] resolve
+
+
+
 postBlocTransactionParallel :: (MonadLogger m,
                                 HasBlocEnv m, HasBlocSQL m, HasCoreAPI m, HasVault m, HasSQL m) =>
                                Maybe Text
@@ -135,6 +200,7 @@ postBlocTransactionParallel a b resolve queue c =
       atomically $ writeTBQueue tbqueue (a,b,resolve,c)
       pure []
     else postBlocTransaction' (Do CacheNonce) a b resolve c
+
 
 postBlocTransaction :: (MonadLogger m,
                         HasBlocEnv m, HasBlocSQL m, HasCoreAPI m, HasVault m, HasSQL m) =>
@@ -287,6 +353,7 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
         fromGenesis = \case
           BlocGenesis f -> return f
           _ -> throwIO $ UserError "Could not decode function arguments from body"
+
 
 
 -- so we can convert R and S from the signature, and add 27 to V, per
