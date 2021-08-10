@@ -171,12 +171,12 @@ function newnode {
       runBackgroundProcess core-api --appFetchLimit=${appFetchLimit:-100} +RTS -N1 >> logs/core-api 2>&1
   else
       echo "Starting strato-api"
-      runBackgroundProcess strato-api --gasOn=$gasOn --evmCompatible=$evmCompatible >> logs/strato-api 2>&1
+      runBackgroundProcess strato-api --gasOn=$gasOn --evmCompatible=$evmCompatible +RTS -N1 >> logs/strato-api 2>&1
   fi
 
   if [ "${START_EXPERIMENTAL_STRATO_API}" = true ]; then
       echo "Starting strato-api2"
-      runBackgroundProcess strato-api2 --gasOn=$gasOn >> logs/strato-api2 2>&1
+      runBackgroundProcess strato-api2 --gasOn=$gasOn +RTS -N1 >> logs/strato-api2 2>&1
   fi
 
   echo "Configuring log rotation..."
