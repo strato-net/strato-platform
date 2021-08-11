@@ -65,11 +65,7 @@ createBlocEnv = liftIO $ do
                  , dbPool = pool
                  , deployMode = Public
                  , stateFetchLimit = 0
-                 , gasOn = error "gasOn being accessed in Slipstream"
-                 , globalNonceCounter = error "globalNonceCounter being accessed in Slipstream"
-                 , globalSourceCache = error "globalSourceCache being accessed in Slipstream"
                  , globalCodePtrCache = codePtrCache
-                 , txTBQueue = error "txTBQueue being accessed by in Slipstream"
                  }
 
 connectToCirrus :: MonadIO m => m PGConnection

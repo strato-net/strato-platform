@@ -131,7 +131,6 @@ tests:
       - ethereum-encryption
       - clockwork
       - cryptonite
-      - haskoin-shim
       - hspec
       - secp256k1-haskell
       - strato-model

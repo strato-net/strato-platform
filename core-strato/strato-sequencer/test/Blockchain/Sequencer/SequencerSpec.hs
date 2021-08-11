@@ -55,12 +55,12 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Monad
 import           Blockchain.Sequencer.OrderValidator
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.Keccak256         as Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 import qualified Data.ByteString.Char8               as C8
 import qualified Data.Set                            as S
-import qualified Network.Haskoin.Crypto     as HK    -- TODO: get rid of this
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.RequestLogger
 import           Network.Wai.Middleware.Prometheus
@@ -416,8 +416,8 @@ spec = do
             let chainId = Keccak256.rlpHash cInfo
              in (chainId, IEGenesis (IngestGenesis TO.Morphism (keccak256ToWord256 chainId, cInfo)))
           getChainTx chainId = do
-            tx <- runIO . HK.withSource HK.devURandom $ do
-              pk <- HK.genPrvKey
+            tx <- runIO $ do
+              pk <- newPrivateKey
               createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just $ keccak256ToWord256 chainId) Nothing pk
             let hashTx = PrivateHashTX (txHash tx) chainId
             pure (hashTx, tx)
@@ -728,3 +728,4 @@ spec = do
         let [(j, og2)] = ogs2
         og2 `shouldBe` og
         i `shouldSatisfy` (< j)
+

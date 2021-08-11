@@ -30,7 +30,6 @@ import           Data.Maybe
 import           Data.Text                             (Text)
 import qualified Data.Text                             as T
 import qualified Database.Esqueleto                    as E
-import qualified Network.Haskoin.Crypto                as H
 import           Numeric
 import           Servant
 import           Servant.Client
@@ -51,6 +50,7 @@ import           Blockchain.Sequencer.Event     (IngestEvent (IETx), IngestTx (.
 import           Blockchain.Sequencer.Kafka     (writeUnseqEvents)
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Util                (getCurrentMicrotime)
 import           Control.Monad.Composable.SQL
 
@@ -101,7 +101,7 @@ postFaucet :: (MonadIO m, MonadLogger m, Selectable Address Integer m)
            => Address -> ConduitT a IngestEvent m [Keccak256]
 postFaucet target = do
   key <- liftIO $ fmap (fromMaybe $ error "missing faucet key") getFaucetKey
-  minNonce <- lift . lookupNonce $ prvKey2Address key
+  minNonce <- lift . lookupNonce $ fromPrivateKey key
 
   maxNonce <- acquireNewMaxNonce minNonce
   $logInfoS "postFaucet" . T.pack $ printf "%s: [min..max]=[%d,%d]" (format target) minNonce maxNonce
@@ -134,7 +134,7 @@ postDataFaucet :: (MonadIO m, Selectable Address Integer m)
                => Maybe Int -> Maybe Int -> ConduitT a IngestEvent m [Keccak256]
 postDataFaucet mSize mCountOf = do
   key <- liftIO $ fmap (fromMaybe $ error "missing faucet key") getFaucetKey
-  minNonce <- lift . lookupNonce $ prvKey2Address key
+  minNonce <- lift . lookupNonce $ fromPrivateKey key
   let size = fromMaybe 4096 mSize
       countOf = fromMaybe 1 mCountOf
   replicateM countOf $ do
@@ -183,7 +183,7 @@ emitKafkaTransactions = loop id
           Left e      -> $logError $ T.pack $ "Could not write txs to Kafka: " ++ show e
           Right resps -> $logDebug $ T.pack $ "writeUnseqEventsEnd Kafka commit: " ++ show resps
 
-makeSendTX :: MonadIO m => Integer -> H.PrvKey -> Address -> Integer -> m Transaction
+makeSendTX :: MonadIO m => Integer -> PrivateKey -> Address -> Integer -> m Transaction
 makeSendTX maxN k a n = do
   -- We use a declining gas schedule to prevent ejecting faucets that
   -- might more urgently need a nonce. For example, if faucet(y) is
@@ -192,16 +192,15 @@ makeSendTX maxN k a n = do
   -- with [n, n+1, n+2] has highest priority for n+2, second priority for n+1,
   -- and will only take n if both faucet(x) and faucet(y) don't.
   let gasPrice = 50000000000 - 100000 * (maxN - n)
-  liftIO . H.withSource H.devURandom $
-    createMessageTX n gasPrice 100000 a (1000*ether) "" Nothing k
+  liftIO $ createMessageTX n gasPrice 100000 a (1000*ether) "" Nothing k
 
 -- TODO(tim): Add a queryparam for contracts with variable length bin-runtimes, rather
 -- than these that have empty bin-runtimes.
-makeSizedTX :: MonadIO m => Integer -> Int -> H.PrvKey -> m Transaction
+makeSizedTX :: MonadIO m => Integer -> Int -> PrivateKey -> m Transaction
 makeSizedTX nonce size pk =
   let code = Code $ B.replicate size 0x0
       gasPrice = 50000000000
       gasLimit = 100000
       val = 0
       mk = createContractCreationTX nonce gasPrice gasLimit val code Nothing pk
-  in liftIO . H.withSource H.devURandom $ mk
+  in liftIO mk

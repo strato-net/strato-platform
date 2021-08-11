@@ -35,7 +35,7 @@ stack test -j1 \
       blockapps-solidity \
       blockapps-strato-api \
       blockapps-bloc22-server \
-      blockapps-bloc22-api \
+      bloc2api \
       blockapps-vault-wrapper-server \
       slipstream \
       blockapps-privacy \

@@ -134,7 +134,6 @@ services:
     #    - stateDiffTopic=${stateDiffTopic}
     - stratoHost=strato:3000
     - txQueueSize=${txQueueSize:-4096}
-    - USE_OLD_STRATO_API=${USE_OLD_STRATO_API}
     - vaultWrapperHost=vault-wrapper:8000
     - zookeeper_conn=zookeeper
     build: .
@@ -249,7 +248,6 @@ services:
     - svmTrace=${svmTrace}
     - sqlDiff=${sqlDiff}
     - svmDev=${svmDev}
-    - USE_OLD_STRATO_API=${USE_OLD_STRATO_API}
     - useSyncMode=${useSyncMode}
     - validators=${validators}
     - vaultWrapperHost=${vaultWrapperHost:-vault-wrapper:8000}
@@ -349,7 +347,6 @@ services:
     - START_EXPERIMENTAL_STRATO_API=${START_EXPERIMENTAL_STRATO_API}
     - STATS_ENABLED=${STATS_ENABLED}
     - uiPassword=${uiPassword}
-    - USE_OLD_STRATO_API=${USE_OLD_STRATO_API}
     - vmDebug=${vmDebug}
     build: .
     image: ${NGINX_IMAGE:-<REPO_URL>nginx:<VERSION>}

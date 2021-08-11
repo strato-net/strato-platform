@@ -9,7 +9,7 @@ import           Data.Maybe
 
 import           Blockchain.Data.RLP
 import           Blockchain.Data.PubKey
-import           Blockchain.ExtendedECDSA
+import           Blockchain.ExtendedECDSA.Model.ExtendedSignature
 
 import qualified Blockchain.Strato.Model.Secp256k1         as NEW
 

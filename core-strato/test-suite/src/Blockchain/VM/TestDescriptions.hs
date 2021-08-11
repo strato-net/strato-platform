@@ -20,19 +20,17 @@ import qualified Data.ByteString.Base16    as B16
 import qualified Data.ByteString.Char8     as BC
 import qualified Data.HashMap.Lazy         as H
 import qualified Data.Map                  as M
-import           Data.Maybe
 import qualified Data.Text                 as T
 import           Data.Time.Clock
 import           Data.Time.Clock.POSIX
 import           GHC.Generics              hiding (to)
-import qualified Network.Haskoin.Internals as Haskoin
 import           Numeric
 
 import           Blockchain.Data.Code
 import           Blockchain.EVM.VMState
-import           Blockchain.Util
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Secp256k1
 
 data Env =
   Env {
@@ -72,7 +70,7 @@ data Transaction' =
     tGasLimit'  ::  String,
     tGasPrice'  ::  String,
     tNonce'     ::  String,
-    tSecretKey' ::  Haskoin.PrvKey,
+    tSecretKey' ::  PrivateKey,
     tTo'        ::  Maybe Account,
     tValue'     ::  String
     } deriving (Show, Eq)
@@ -232,12 +230,6 @@ b16_decode_optional0x x =
   case BC.unpack x of
     ('0':'x':rest) -> B16.decode $ BC.pack rest
     _              -> B16.decode x
-
-
-instance FromJSON Haskoin.PrvKey where
-  parseJSON =
-    withText "PrvKey" $
-    pure . fromJust . Haskoin.makePrvKey . fromInteger . byteString2Integer . fst . B16.decode . BC.pack . T.unpack
 
 instance FromJSON RawData where
   parseJSON =

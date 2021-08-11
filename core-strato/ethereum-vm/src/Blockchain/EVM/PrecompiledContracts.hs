@@ -8,16 +8,17 @@ import           Prelude                    hiding (EQ, GT, LT)
 
 import qualified Crypto.Hash.RIPEMD160      as RIPEMD
 import qualified Crypto.Hash.SHA256         as SHA2
+import qualified Crypto.Secp256k1           as S
 import           Data.Binary                hiding (get, put)
 import qualified Data.ByteString            as B
 import qualified Data.ByteString.Lazy       as BL
-import           Network.Haskoin.Internals  (Signature (..))
+import qualified Data.ByteString.Short      as Short
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.Code
-import           Blockchain.ExtendedECDSA
 import           Blockchain.EVM.OpcodePrices
 import           Blockchain.Strato.Model.Gas
+import qualified Blockchain.Strato.Model.Secp256k1 as EC
 import           Blockchain.Util
 
 
@@ -25,15 +26,15 @@ import           Blockchain.Util
 
 ecdsaRecover::B.ByteString->B.ByteString
 ecdsaRecover input =
-    let h = fromInteger $ byteString2Integer $ B.take 32 input
+    let h = B.take 32 input
         v = byteString2Integer $ B.take 32 $ B.drop 32 input
-        r = fromInteger $ byteString2Integer $ B.take 32 $ B.drop 64 input
-        s = fromInteger $ byteString2Integer $ B.take 32 $ B.drop 96 input
-        maybePubKey = getPubKeyFromSignature (ExtendedSignature (Signature r s) (v == 28)) h
+        r = Short.toShort $ B.take 32 $ B.drop 64 input
+        s = Short.toShort $ B.take 32 $ B.drop 96 input
+        maybePubKey = EC.recoverPub (EC.Signature (S.CompactRecSig r s (fromInteger v - 0x1b))) h
     in
      case (v >= 27, v <= 28, maybePubKey) of
        (True, True, Just pubKey) ->
-         B.pack [0,0,0,0,0,0,0,0,0,0,0,0] `B.append` BL.toStrict (encode $ pubKey2Address pubKey)
+         B.pack [0,0,0,0,0,0,0,0,0,0,0,0] `B.append` BL.toStrict (encode $ fromPublicKey pubKey)
        _ -> B.empty -- B.pack (replicate 32 0)
 
 ripemd::B.ByteString->B.ByteString

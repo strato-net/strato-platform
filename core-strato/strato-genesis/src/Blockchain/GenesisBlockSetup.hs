@@ -12,18 +12,15 @@ import           Control.Monad               (forM, forM_)
 import qualified Data.Aeson                  as J
 import           Data.Binary
 import qualified Data.ByteString             as B
+import qualified Data.ByteString.Char8       as BC
 import qualified Data.ByteString.Lazy        as BL
 
 import           System.Directory
-import           System.Entropy
-
-import           Network.Haskoin.Crypto      hiding (Address)
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.GenesisInfo
-
-import qualified LabeledError
+import           Blockchain.Strato.Model.Secp256k1
 
 bigBalance::Integer
 bigBalance = 1809251394333065553493296640760748560207343510400633813116524750123642650624
@@ -40,20 +37,22 @@ genesisBlockSetup n = do
     B.writeFile "hackathonGenesis.json" $ BL.toStrict $ J.encode genesis
     return ()
 
-generateNPrivkeyAddressPairs :: Int -> IO [(Int,PrvKey,Address)]
+generateNPrivkeyAddressPairs :: Int -> IO [(Int,PrivateKey,Address)]
 generateNPrivkeyAddressPairs n = forM [1..n] $ \index -> do
-    newPrvKey <- withSource getEntropy genPrvKey
-    return (index,newPrvKey, prvKey2Address newPrvKey)
+    newPrvKey <- newPrivateKey
+    return (index,newPrvKey, fromPrivateKey newPrvKey)
 
 
-writePrvKeys :: [(Int,PrvKey,Address)] -> IO ()
+writePrvKeys :: [(Int,PrivateKey,Address)] -> IO ()
 writePrvKeys list = forM_ list $ \(index,priv, _) -> do
     encodeFile ("priv_" ++ (show index)) (show priv)
 
-readPrvKey :: FilePath -> IO PrvKey
+readPrvKey :: FilePath -> IO PrivateKey
 readPrvKey path = do
     keyString <- decodeFile path :: IO String
-    return . LabeledError.read "GenesisBlockSetup/readPrvKey" $ keyString
+    case importPrivateKey $ BC.pack keyString of
+      Nothing -> error $ "unable to read private key in file \"" ++ path ++ "\""
+      Just v -> return v
 
-retrieveRandomPrivKey :: Int -> IO PrvKey
+retrieveRandomPrivKey :: Int -> IO PrivateKey
 retrieveRandomPrivKey n = readPrvKey $ "priv_" ++ (show n)
