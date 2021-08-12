@@ -80,7 +80,7 @@
 				},
 				"blame.heatMap.location": {
 					"type": "string",
-					"default": "New York"
+					"default": "Los Angeles"
 				}
 			}
 		},
