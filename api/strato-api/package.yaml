@@ -50,3 +50,17 @@ executables:
     source-dirs:         app
     other-modules:
     - SelectAccessible
+
+  post-raw-transaction:
+    main:                PostRawTransaction.hs
+    source-dirs:         app
+    other-modules:
+    - Options
+    dependencies:
+    - bloc2api
+    - blockapps-ethereum
+    - format
+    - http-client
+    - servant-client
+    - strato-model
+    - text
