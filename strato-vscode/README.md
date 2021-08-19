@@ -6,6 +6,7 @@ This extension interfaces with a running STRATO node using STRATO's API and a de
 The scripts run for various commands (such as **Create Project**, **Deploy Project**, etc.) can be found and modified by clicking **File -> Preferences -> Settings** and then navigating to **Extensions -> STRATO**.  
 
 ![Navigate to settings](docs/vscode-settings.png)
+![Navigate to extension](docs/vscode-extension.png)
 
 Below is a list of the default scripts for each command:  
 **Create Project**
@@ -105,8 +106,16 @@ nodes:
 This will list the Deployments of the Dapp and give information about the Dapp such as the `address`, `chainID`, `block_hash`, etc.
 
 ## Debugger Setup
-To set the Debugger up, click on the icon for **Run and Debug**. Click the dropdown for the box with the green play arrow.  
+To set the Debugger up, click on the icon for **Run and Debug**. Click the dropdown for the box with the green play arrow. 
 
-In the dropdown, select **Add Configuration...**, which will open the `launch.json` file with a dropdown. Click **Debug SolidVM** in the dropdown.   
 
-Go to the box with the green arrow once again and make sure **Debug SolidVM** is selected from the dropdown. Click the green play button itself, which should start the debugger.
+In the dropdown, select **Add Configuration...**, which will open the `launch.json` file with a dropdown.   
+![Add confugration](docs/add_configuration.png)
+
+Click **Debug SolidVM** in the dropdown.   
+![Debug SolidVM](docs/launch_json.png)
+![Configuration Set](docs/strato_launch.png)
+
+Go to the box with the green arrow once again and make sure **Debug SolidVM** is selected from the dropdown. Click the green play button itself, which should start the debugger.  
+![Run and Debug SolidVM](docs/debug_solidvm.png)
+![Press Play](docs/press_play.png)
