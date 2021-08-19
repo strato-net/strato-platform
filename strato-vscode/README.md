@@ -104,6 +104,7 @@ nodes:
 
 ## Deployment
 This will list the Deployments of the Dapp and give information about the Dapp such as the `address`, `chainID`, `block_hash`, etc.
+![Deployments Tree View](docs/deployments.png)
 
 ## Debugger Setup
 To set the Debugger up, click on the icon for **Run and Debug**. Click the dropdown for the box with the green play arrow. 
