@@ -5,6 +5,8 @@ This extension interfaces with a running STRATO node using STRATO's API and a de
 ## Customize Commands in Extension Settings
 The scripts run for various commands (such as **Create Project**, **Deploy Project**, etc.) can be found and modified by clicking **File -> Preferences -> Settings** and then navigating to **Extensions -> STRATO**.  
 
+![Navigate to settings](docs/vscode-settings.png)
+
 Below is a list of the default scripts for each command:  
 **Create Project**
 ```
