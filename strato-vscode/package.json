@@ -3,7 +3,6 @@
         "publisher": "BlockApps, Inc.",
 	"displayName": "STRATO",
 	"description": "VSCode Integration for BlockApps STRATO",
-	"repository": "https://github.com/blockapps/strato-platform",
 	"version": "0.0.1",
 	"engines": {
 		"vscode": "^1.52.1"
