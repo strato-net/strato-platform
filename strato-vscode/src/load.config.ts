@@ -5,6 +5,7 @@ import * as vscode from 'vscode';
 export default function getConfig(): any {
     const cfgPath: string = vscode.workspace.getConfiguration().get('strato-vscode.configPath') || '';
     const serverName: string = vscode.workspace.getConfiguration().get('strato-vscode.serverName') || 'localhost';
+    const filename: string = vscode.workspace.getConfiguration().get('strato-vscode.configFile') || 'config.yaml';
     const folders = vscode.workspace.workspaceFolders || []
     if (folders.length === 0) {
       return {}
@@ -14,8 +15,8 @@ export default function getConfig(): any {
     // eslint-disable-next-line import/no-mutable-exports
     const pathName = 
       process.env.SERVER
-        ? `${folder}/${cfgPath}/${serverName}.config.yaml`
-        : `${folder}${cfgPath ? `/${cfgPath}` : ''}/config.yaml`
+        ? `${folder}/${cfgPath}/${serverName}.${filename}`
+        : `${folder}${cfgPath ? `/${cfgPath}` : ''}/${filename}`
     const config = yaml.load(fs.readFileSync(pathName, 'utf-8'));
     return config
 }
