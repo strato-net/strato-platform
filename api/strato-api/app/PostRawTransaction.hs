@@ -18,6 +18,7 @@ import           Blockchain.Strato.Model.SourceMap
 import           Blockchain.Strato.Model.Wei
 
 
+import qualified Data.Map.Strict                      as M
 import           Data.Proxy
 import qualified Data.Text                            as T
 import qualified Data.Text.Encoding                   as T
@@ -52,7 +53,7 @@ main = do
 
   -- let's make a contract creation TX
   let srcCode = T.unlines 
-          [ "contract PreSignedTest { "
+          [ "\ncontract PreSignedTest { "
           , "    uint x;"
           , "    constructor() {"
           , "        x = 10;"
@@ -65,11 +66,11 @@ main = do
       srcMap = unnamedSource srcCode 
       
       unsignedTx = UnsignedTransaction
-        { unsignedTransactionNonce      = Nonce 1
-        , unsignedTransactionGasPrice   = Wei 1
-        , unsignedTransactionGasLimit   = Gas 2900000
+        { unsignedTransactionNonce      = Nonce 0
+        , unsignedTransactionGasPrice   = Wei 10000
+        , unsignedTransactionGasLimit   = Gas 29000000000
         , unsignedTransactionTo         = Nothing
-        , unsignedTransactionValue      = Wei 1
+        , unsignedTransactionValue      = Wei 0
         , unsignedTransactionInitOrData = Code $ T.encodeUtf8 $ serializeSourceMap srcMap
         , unsignedTransactionChainId    = Nothing
         }
@@ -91,13 +92,18 @@ main = do
           r
           s
           (Just v)
-          Nothing
+          (Just $ M.fromList $
+            [ ("VM", "SolidVM")
+            , ("name", "PreSignedTest")
+            , ("args", "()")
+            ]
+          )
   
-  putStrLn $ "unsigned transaction: " ++ show unsignedTx
-  putStrLn $ "request with V: " ++ show request
+  putStrLn $ "Transaction Hash: " ++ format txHash
+  putStrLn $ "\nThe unsigned transaction: " ++ show unsignedTx
 
   result <- runClientM (postRawTransaction Nothing Nothing True request) clientEnv
-  putStrLn $ "result of posting with V: " ++ show result
+  putStrLn $ "\n\nTransaction result: " ++ show result
       
       -- try without V
 

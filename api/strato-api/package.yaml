@@ -59,6 +59,7 @@ executables:
     dependencies:
     - bloc2api
     - blockapps-ethereum
+    - containers
     - format
     - http-client
     - servant-client
