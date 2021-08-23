@@ -38,6 +38,7 @@ pipeline {
       steps {
         dir ('strato-worktree') {
           sh 'REPO=private make all'
+          sh 'rm -rf .docker-work'
           dir ('blockapps-rest') {
             sh 'yarn install --pure-lockfile'
             sh 'yarn build'

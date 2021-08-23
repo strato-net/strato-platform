@@ -45,6 +45,7 @@ pipeline {
           dir ('strato-worktree') {
             sh 'echo ${RELEASE_VERSION} > VERSION'
             sh 'REPO=public make all'
+            sh 'rm -rf .docker-work'
             dir ('blockapps-rest') {
               sh 'yarn install --pure-lockfile'
               sh 'yarn build'
