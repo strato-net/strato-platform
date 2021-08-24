@@ -44,8 +44,8 @@ pipeline {
         withEnv(["RELEASE_VERSION=${env.RELEASE_VERSION}"]) {
           dir ('strato-worktree') {
             sh 'echo ${RELEASE_VERSION} > VERSION'
-            sh 'REPO=public make all'
             sh 'rm -rf .docker-work'
+            sh 'REPO=public make all'
             dir ('blockapps-rest') {
               sh 'yarn install --pure-lockfile'
               sh 'yarn build'
