@@ -13,13 +13,11 @@ author:                Philippe Laprade, Jean-Pierre Rupp
 maintainer:            plaprade+hackage@gmail.com
 category:              Bitcoin, Finance, Network
 build-type:            Simple
-extra-source-files:
-  - tests/data/*.json
 
 ghc-options: -Wall
 
 dependencies:
-  - base                     >= 4.8          && < 5
+  - base
 
 library:
   source-dirs: ./
