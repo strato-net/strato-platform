@@ -127,8 +127,6 @@ function logRotation {
 
 runBackgroundProcess logserver "--directory=/logs" --uri_root=/logs/bloc/ &>> /logs/logserver
 
-runBackgroundProcess blockapps-strato-server >> /logs/strato-server 2>&1
-
 
 if [ "$USE_OLD_STRATO_API" == "true" ]
 then
