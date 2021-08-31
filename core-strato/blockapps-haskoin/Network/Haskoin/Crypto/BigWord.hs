@@ -14,8 +14,8 @@ module Network.Haskoin.Crypto.BigWord
 , Word160
 , Word128
 
-  , FieldP
-, FieldN
+--, FieldP
+--, FieldN
 
 -- Data types
 , BigWord(..)
