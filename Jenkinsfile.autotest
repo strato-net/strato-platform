@@ -8,23 +8,23 @@ pipeline {
         wrap([$class: 'BuildUser']) {
           script {
             try {
-              currentBuild.description = "origin/${env.PLATFORM_BRANCH_NAME} on ${env.NODE_NAME}// ${BUILD_USER_FIRST_NAME}"
+              currentBuild.description = "Agent ${env.NODE_NAME}// ${BUILD_USER_FIRST_NAME}"
             } catch (Exception e) {
-              currentBuild.description = "origin/${env.PLATFORM_BRANCH_NAME} on ${env.NODE_NAME}// anon"
+              currentBuild.description = "Agent ${env.NODE_NAME}// anon"
             }
           }
         }
-        withEnv(["PLATFORM_BRANCH_NAME=${env.PLATFORM_BRANCH_NAME}"]) {
+        withEnv(["BRANCH_NAME=${env.BRANCH_NAME}"]) {
           sh '''#!/bin/bash -le
             set -x
             docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes
             if [ -d "strato-worktree" ]; then
               cd strato-worktree
               git checkout ${PLATFORM_BRANCH_NAME}
-              git reset --hard remotes/origin/${PLATFORM_BRANCH_NAME}
+              git reset --hard remotes/origin/${BRANCH_NAME}
               cd ..
             else
-              git worktree add strato-worktree remotes/origin/${PLATFORM_BRANCH_NAME}
+              git worktree add strato-worktree remotes/origin/${BRANCH_NAME}
             fi
             git worktree list
           '''
