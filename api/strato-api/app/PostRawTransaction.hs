@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications  #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 
 module Main where
@@ -8,6 +9,13 @@ module Main where
 import           BlockApps.Bloc22.API
 import           BlockApps.Bloc22.Server.Transaction
 import           BlockApps.Ethereum
+-- import           BlockApps.Solidity.Parse.Parser     (parseXabi)
+-- import           BlockApps.Solidity.Type
+-- import           BlockApps.XAbiConverter             (funcToType)
+import           BlockApps.X509
+
+
+import           Blockchain.Data.DataDefs
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Code
@@ -17,65 +25,265 @@ import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.SourceMap
 import           Blockchain.Strato.Model.Wei
 
+import           Control.Exception
 
+import qualified Data.ByteString                      as B
+import           Data.Foldable                        (foldlM)
+import           Data.List                            (intercalate)
+import           Data.List.Split                      (splitOn)
 import qualified Data.Map.Strict                      as M
 import           Data.Proxy
 import qualified Data.Text                            as T
 import qualified Data.Text.Encoding                   as T
-import           Network.HTTP.Client        (newManager, defaultManagerSettings)
+import           Network.HTTP.Client                  (newManager, defaultManagerSettings)
 import           Servant.Client
+import           System.Console.GetOpt
+import           System.Environment
 import           Text.Format
+import           Text.Printf
 
 
+
+-- this tool makes transactions to send to the transaction/raw endpoint
+
+
+--  assumptions:
+--      -- one contract per source file
+--      -- will send with SolidVM
+
+
+
+---------------------------------- PARSE ARGS --------------------------------
+
+
+data Options = Options 
+  { optTxType        :: BlocTransactionType
+  , optOmitV         :: Bool
+  , optSourceCode    :: Maybe SourceMap
+  , optAddress       :: Maybe Address
+  , optChainId       :: Maybe ChainId
+  , optFunctionName  :: Maybe String
+  , optFunctionArgs  :: Maybe [String]
+  , optNonce         :: Nonce
+  , optValue         :: Wei
+  , optKey           :: PrivateKey
+  } deriving Show
+
+
+defaultOptions :: Options
+defaultOptions = Options
+  { optTxType       = TRANSFER
+  , optOmitV        = False
+  , optSourceCode   = Nothing
+  , optAddress      = Nothing
+  , optChainId      = Nothing
+  , optFunctionName = Nothing
+  , optFunctionArgs = Nothing
+  , optNonce        = Nonce 0
+  , optValue        = Wei 0
+  , optKey          = throw $ userError "give me a private key with which to sign the TX" 
+  }
+
+options :: [OptDescr (Options -> IO Options)]
+options = 
+  [Option ['c'] ["contract"]
+      (NoArg
+       (\ opts -> return opts{optTxType = CONTRACT})) 
+   "Transaction type is a contract creation"
+  , Option ['f'] ["function"]
+      (NoArg
+       (\ opts -> return opts{optTxType = FUNCTION})) 
+   "Transaction type is a function call"
+  , Option ['t'] ["transfer"]
+      (NoArg
+       (\ opts -> return opts{optTxType = TRANSFER})) 
+   "Transaction type is a value transfer"
+  , Option ['o'] ["omitV"]
+      (NoArg
+       (\ opts -> return opts{optOmitV = True})) 
+   "Will omit \'V\' rec-id signature value in the transaction"
+  , Option ['s'] ["source"]
+      (OptArg
+       (\mS opts -> do
+          case mS of 
+            Nothing -> return opts
+            Just s -> do
+              src <- readFile s
+              return opts{optSourceCode = Just $ namedSource (T.pack s) (T.pack src)}
+       ) "Source")
+    "The filepath to the solidity source code of the contract you want to create" 
+  , Option ['a'] ["address"]
+      (OptArg
+       (\mA opts -> 
+          case mA of
+            Nothing -> return opts
+            Just a ->
+              let strAddr = stringAddress a
+              in case strAddr of
+                   Just addr -> return opts{optAddress = Just addr}
+                   Nothing -> ioError . userError . printf "invalid address: %s" $ show strAddr
+       ) "Address")
+    "The address of the contract you want to call, or the user to send value to"
+  , Option ['c'] ["chainId"]
+      (OptArg
+       (\mC opts -> 
+          case mC of
+            Nothing -> return opts
+            Just c ->
+              let mCid = stringChainId c
+              in case mCid of
+                   Just cid -> return opts{optChainId = Just cid}
+                   Nothing -> ioError . userError . printf "invalid chainId: %s" $ show c
+       ) "Address")
+    "The chainId on which to create the contract, of the contract you want to call, or of the user to send value to"
+  , Option ['m'] ["funcName"]
+      (OptArg
+       (\fn opts -> return opts{optFunctionName = fn}
+       ) "Function Name")
+    "The name of the contract function you want to call" 
+  , Option ['r'] ["args"]
+      (OptArg
+       (\mR opts -> 
+          case mR of
+            Nothing -> return opts
+            Just r -> return opts{optFunctionArgs = Just (splitOn "," r)}
+       ) "Function Args")
+    "The comma-separated args of the contract function you want to call" 
+  , Option ['n'] ["nonce"]
+      (ReqArg
+       (\n opts -> do 
+         return opts{optNonce = Nonce $ read n }
+       ) "Nonce")
+    "The user nonce to use for this transaction" 
+  , Option ['v'] ["value"]
+      (OptArg
+       (\mV opts -> 
+          case mV of 
+            Nothing -> return opts 
+            Just v -> return opts{optValue = Wei $ read v }
+       ) "Nonce")
+    "The user nonce to use for this transaction" 
+  , Option ['k'] ["key"]
+      (ReqArg
+       (\k opts -> do
+          pkeyBS <- B.readFile k
+          let ePkey = bsToPriv pkeyBS
+          case ePkey of
+            Left err -> error err
+            Right pkey -> return opts{optKey = pkey}
+       ) "PrivateKey")
+    "The .pem filepath of the user's private key"
+  ]
+
+helpMessage :: String
+helpMessage = usageInfo header options
+  where header = "Usage: " ++ "post-raw-transaction" ++ " [OPTION...]"
+
+
+parseArgs :: IO Options
+parseArgs = do
+  argv <- getArgs
+  case getOpt RequireOrder options argv of
+    ([], _, errs) -> ioError (userError (concat errs ++ helpMessage))
+    (opts, _, _) -> foldlM (flip id) defaultOptions opts
+
+
+---------------------------------------------------------------------------------------
+
+
+
+
+-- servant client for the endpoint
 postRawTransaction :: Maybe T.Text -> Maybe ChainId -> Bool -> PostBlocTransactionRawRequest
-                   -> ClientM BlocChainOrTransactionResult 
+                   -> ClientM TransactionResult
 postRawTransaction = client (Proxy @ PostBlocTransactionRaw)
 
 
 
--- let's see if we can post pre-signed transactions to STRATO! exciting stuff
+
+
 main :: IO ()
 main = do
+  Options{..} <- parseArgs
+
+
   -- setup servant client
   mgr <- newManager defaultManagerSettings
   stratoURL <- parseBaseUrl "http://strato:3000/bloc/v2.2"
   let clientEnv = ClientEnv mgr stratoURL Nothing
 
 
-
-  -- let's create a new user key + address
-  priv <- newPrivateKey
-  let addr = fromPrivateKey priv
-  putStrLn $ "new user address: " ++ format addr
+  -- the user's address 
+  let addr = fromPrivateKey optKey
+  putStrLn $ "user address: " ++ format addr
 
 
 
+  -- parse TX type and figure out what to put for the initOrData
+  let (metadata, txData) = case optTxType of
+        
+        TRANSFER -> (M.fromList $ [("VM", "SolidVM")], Code $ B.empty)
 
-  -- let's make a contract creation TX
-  let srcCode = T.unlines 
-          [ "\ncontract PreSignedTest { "
-          , "    uint x;"
-          , "    constructor() {"
-          , "        x = 10;"
-          , "    }"
-          , "    function setX(uint val) {"
-          , "        x = val;"
-          , "    }"
-          , "}"
-          ]
-      srcMap = unnamedSource srcCode 
-      
-      unsignedTx = UnsignedTransaction
-        { unsignedTransactionNonce      = Nonce 0
-        , unsignedTransactionGasPrice   = Wei 10000
-        , unsignedTransactionGasLimit   = Gas 29000000000
-        , unsignedTransactionTo         = Nothing
-        , unsignedTransactionValue      = Wei 0
-        , unsignedTransactionInitOrData = Code $ T.encodeUtf8 $ serializeSourceMap srcMap
-        , unsignedTransactionChainId    = Nothing
+ 
+        CONTRACT -> case optSourceCode of 
+          Nothing -> throw $ userError "source code not given, put you want to create a contract??"
+          Just c -> (M.fromList $ [("VM", "SolidVM")], Code $ T.encodeUtf8 $ serializeSourceMap c)
+
+        FUNCTION -> do 
+          case optFunctionName of
+            Nothing -> throw $ userError "need a function name to call a function!"
+            Just name -> case optFunctionArgs of
+              Nothing -> (M.fromList $ [("VM", "SolidVM")], Code $ B.empty)
+              Just lst -> 
+                let argMd = "(" ++ (intercalate "," lst) ++ ")"
+                in (M.fromList $
+                      [ ("VM", "SolidVM")
+                      , ("funcName", T.pack name)
+                      , ("args", T.pack argMd)
+                      ]
+                   , Code $ B.empty
+                   )
+        _ -> error "a logical impossibility! We parsed this TX as a GENESIS tx???"
+ 
+
+
+
+{-       NOTE: if we ever want this to work with EVM, we need to be able to generate function selectors
+                and properly encoded args for the txData..... which is a pain. I started to do it below:
+ 
+-
+          -- all because of function selectors, we have to parse the source code for a function call
+          case optSource of
+            Nothing -> throw $ userError "source code not given, but we need it to set function call selectors"
+            Just c -> case length c of 
+              0 -> throw $ userError "source code file found, but it's empty?"
+              1 -> do
+                let (_, nameAndXabiTuples) = eitherM (throw . userError) pure (pure $ parseXabi "" $ T.unpack $ snd $ head c)
+                case length nameAndXabiTuples of
+                  0 -> throw $ userError "could not parse source for function call"
+                  1 -> do
+                    let (cname, xabi)) = head nameAndXabiTuples
+                        mFunc = M.lookup (T.pack optFunctionName) (xabiFuncs xabi)
+                    case mFunc of 
+                      Nothing -> throw $ userError $ "function " ++ optFunctionName ++ " not found in contract " ++ (T.unpack cname)
+                      Just func -> do
+                        let (TypeFunction sel _ _) = eitherM (throw . userError) pure (pure $ funcToType xabi cname func)
+  -}                      
+
+                
+       
+  -- create the unsigned transaction
+  let unsignedTx = UnsignedTransaction
+        { unsignedTransactionNonce      = optNonce
+        , unsignedTransactionGasPrice   = Wei 10000        -- default val
+        , unsignedTransactionGasLimit   = Gas 29000000000  -- default val
+        , unsignedTransactionTo         = optAddress
+        , unsignedTransactionValue      = optValue 
+        , unsignedTransactionInitOrData = txData
+        , unsignedTransactionChainId    = optChainId
         }
       txHash = rlpHash unsignedTx
-      sig = signMsg priv txHash
+      sig = signMsg optKey txHash
       (r,s,v) = getSigVals sig
 
 
@@ -91,22 +299,14 @@ main = do
           (unsignedTransactionChainId unsignedTx)
           r
           s
-          (Just v)
-          (Just $ M.fromList $
-            [ ("VM", "SolidVM")
-            , ("name", "PreSignedTest")
-            , ("args", "()")
-            ]
-          )
+          (if optOmitV then Nothing else Just v)
+          (Just metadata)
   
+  putStrLn $ "\nThe TX metadata: " ++ show metadata
   putStrLn $ "Transaction Hash: " ++ format txHash
   putStrLn $ "\nThe unsigned transaction: " ++ show unsignedTx
 
   result <- runClientM (postRawTransaction Nothing Nothing True request) clientEnv
   putStrLn $ "\n\nTransaction result: " ++ show result
       
-      -- try without V
 
-
-
-      -- try a function call

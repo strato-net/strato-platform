@@ -73,7 +73,7 @@ import           BlockApps.Solidity.Type
 import           BlockApps.Solidity.Value
 import           BlockApps.Solidity.Xabi
 import qualified BlockApps.Solidity.Xabi.Type      as Xabi
-import           BlockApps.Strato.Types            hiding (Account, Transaction (..))
+import           BlockApps.Strato.Types            hiding (Account, Transaction (..), TransactionResult(..))
 import           BlockApps.XAbiConverter
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json
@@ -124,13 +124,12 @@ txWorker = forever $ do
 
 ------------------------------- RAW/OFFLINE TRANSACTIONS ------------------------------------
 
-postBlocTransactionRaw :: (MonadLogger m, HasBlocEnv m,
-                           HasBlocSQL m, HasSQL m) =>
+postBlocTransactionRaw :: (MonadLogger m, HasSQL m) =>
                           Maybe Text     -- username
                        -> Maybe ChainId  
                        -> Bool -- resolve
                        -> PostBlocTransactionRawRequest
-                       -> m BlocChainOrTransactionResult
+                       -> m TransactionResult
 postBlocTransactionRaw _ _ resolve PostBlocTransactionRawRequest{..} = do
   v <- case postbloctransactionrawrequestV of 
         Just v' -> do 
@@ -187,6 +186,9 @@ postBlocTransactionRaw _ _ resolve PostBlocTransactionRawRequest{..} = do
                postbloctransactionrawrequestMetadata
       rawTx = preparePostTx time postbloctransactionrawrequestAddress tx
 
+  txHash <- postTransaction rawTx
+  
+{-
   -- add details/check details from BlocDB so we can still use those neat features
   vm <- case Map.lookup "VM" =<< postbloctransactionrawrequestMetadata of
           Nothing -> return "EVM"
@@ -197,7 +199,6 @@ postBlocTransactionRaw _ _ resolve PostBlocTransactionRawRequest{..} = do
   let src = deserializeSourceMap (Text.decodeUtf8 $ codeBytes postbloctransactionrawrequestInitOrData)
 
 
-  txHash <- postTransaction rawTx
   
   
   -- somewhat of a hack to figure out if this is a contract, function, or value TX
@@ -219,10 +220,21 @@ postBlocTransactionRaw _ _ resolve PostBlocTransactionRawRequest{..} = do
                         Code x -> if ByteString.null x 
                                   then
                                     return () -- value transfer
-                                  else 
+                                  else do
                                     return () -- TODO: do function call checks
+-}
+  
 
-  fmap BlocTxResult $ getBlocTransactionResult' [txHash] resolve
+  trds <- recurseTRDs resolve [txHash]
+  case trds of
+    [] -> throwIO $ UserError $ Text.pack "could not find this transaction result"
+    [x] -> case trdResult x of
+            Just res -> return res
+            Nothing -> throwIO $ UserError $ Text.pack "could not find this transaction result"
+    _ -> throwIO $ UserError $ Text.pack "found multiple tx results for a single tx"
+
+
+
 
 
 

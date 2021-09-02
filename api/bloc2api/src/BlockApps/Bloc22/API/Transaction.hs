@@ -36,8 +36,9 @@ import           BlockApps.Bloc22.API.SwaggerSchema
 import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Solidity.ArgValue
-import           BlockApps.Strato.Types
-
+import           BlockApps.Strato.Types            hiding (TransactionResult)
+  
+import           Blockchain.Data.DataDefs          (TransactionResult)
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.ExtendedWord   (Word256)
 import           Blockchain.Strato.Model.Gas
@@ -81,7 +82,7 @@ type PostBlocTransactionRaw = "transaction"
   :> QueryParam "chainid" ChainId
   :> QueryFlag "resolve"
   :> ReqBody '[JSON] PostBlocTransactionRawRequest
-  :> Post '[JSON] BlocChainOrTransactionResult
+  :> Post '[JSON] TransactionResult
 
 type PostBlocTransaction = "transaction"
   :> S.Header "X-USER-UNIQUE-NAME" Text

@@ -11,6 +11,7 @@
 module Handlers.TransactionResult
   ( API
   , getTransactionResultClient
+  , getTransactionResult
   , server
   ) where
 

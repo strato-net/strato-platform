@@ -58,10 +58,14 @@ executables:
     - Options
     dependencies:
     - bloc2api
+    - blockapps-datadefs
     - blockapps-ethereum
+    - bytestring
     - containers
     - format
     - http-client
     - servant-client
+    - split
     - strato-model
     - text
+    - x509-certs
