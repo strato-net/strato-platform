@@ -10,7 +10,7 @@ pipeline {
             try {
               currentBuild.description = "Agent ${env.NODE_NAME}// ${BUILD_USER_FIRST_NAME}"
             } catch (Exception e) {
-              currentBuild.description = "Agent ${env.NODE_NAME}// anon"
+              currentBuild.description = "Agent ${env.NODE_NAME}// github"
             }
           }
         }
@@ -238,38 +238,38 @@ pipeline {
 
   }
 
-//  post {
-//    always {
-//      dir ('strato-getting-started') {
-//        sh 'rm -rf strato_logs*'
-//        sh './fetchlogs --as-dir'
-//        archiveArtifacts artifacts: 'strato_logs/**', fingerprint: true
-//      }
-//    }
-//
-//    success {
-//      slackSend (
-//        color: 'good',
-//        message: "Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL}) on node ${env.NODE_NAME}"
-//      )
-//    }
-//
-//    failure {
-//      slackSend (
-//        color: 'danger',
-//        message: "Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL} on node ${env.NODE_NAME})"
-//      )
-//
-//
-//      script {
-//        if (env.PLATFORM_BRANCH_NAME == 'develop') {
-//          slackSend(
-//              channel: '#engineering',
-//              color: 'danger',
-//              message: "Develop branch build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL} on node ${env.NODE_NAME})"
-//          )
-//        }
-//      }
-//    }
-//  }
+  post {
+    always {
+      dir ('strato-getting-started') {
+        sh 'rm -rf strato_logs*'
+        sh './fetchlogs --as-dir'
+        archiveArtifacts artifacts: 'strato_logs/**', fingerprint: true
+      }
+    }
+
+    success {
+      slackSend (
+        color: 'good',
+        message: "Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL}) on node ${env.NODE_NAME}"
+      )
+    }
+
+    failure {
+      slackSend (
+        color: 'danger',
+        message: "Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL} on node ${env.NODE_NAME})"
+      )
+
+
+      script {
+        if (env.PLATFORM_BRANCH_NAME == 'develop') {
+          slackSend(
+              channel: '#engineering',
+              color: 'danger',
+              message: "Develop branch build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL} on node ${env.NODE_NAME})"
+          )
+        }
+      }
+    }
+  }
 }
