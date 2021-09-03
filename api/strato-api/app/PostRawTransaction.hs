@@ -232,14 +232,14 @@ main = do
   -- parse TX type and figure out what to put for the metadata and txdata
   let (metadata, txData) = case optTxType of
         
-        TRANSFER -> (M.fromList $ [("VM", "SolidVM")], Code $ B.empty)
+        TRANSFER -> (M.empty, Code $ B.empty)
  
         CONTRACT -> case (optSourceCode, optContractName) of 
           (Just src, Just name) -> 
             ( M.fromList $ [("VM", "SolidVM"), ("name", T.pack name)] 
             , Code $ T.encodeUtf8 $ serializeSourceMap src
             )
-          _ -> throw $ userError "source code or contract name not given for contracy creation"
+          _ -> throw $ userError "source code or contract name not given for contract creation"
 
         FUNCTION -> do 
           case optFunctionName of
