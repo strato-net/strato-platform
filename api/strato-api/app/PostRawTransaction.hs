@@ -46,10 +46,14 @@ import           Text.Printf
 
 -- this tool makes transactions to send to the transaction/raw endpoint
 
+--  try it out in your nearest strato docker container!
+--      $ docker exec -it strato_strato_1 bash
+--      $ post-raw-transaction
 
---  assumptions:
---      -- one contract per source file
---      -- will send with SolidVM
+
+
+
+-- NOTE: will send TXs with SolidVM (EVM function call encoding is a pain)
 
 
 
@@ -59,6 +63,7 @@ import           Text.Printf
 data Options = Options 
   { optTxType        :: BlocTransactionType
   , optOmitV         :: Bool
+  , optContractName  :: Maybe String
   , optSourceCode    :: Maybe SourceMap
   , optAddress       :: Maybe Address
   , optChainId       :: Maybe ChainId
@@ -74,6 +79,7 @@ defaultOptions :: Options
 defaultOptions = Options
   { optTxType       = TRANSFER
   , optOmitV        = False
+  , optContractName = Nothing
   , optSourceCode   = Nothing
   , optAddress      = Nothing
   , optChainId      = Nothing
@@ -86,11 +92,7 @@ defaultOptions = Options
 
 options :: [OptDescr (Options -> IO Options)]
 options = 
-  [Option ['c'] ["contract"]
-      (NoArg
-       (\ opts -> return opts{optTxType = CONTRACT})) 
-   "Transaction type is a contract creation"
-  , Option ['f'] ["function"]
+  [Option ['f'] ["function"]
       (NoArg
        (\ opts -> return opts{optTxType = FUNCTION})) 
    "Transaction type is a function call"
@@ -102,6 +104,14 @@ options =
       (NoArg
        (\ opts -> return opts{optOmitV = True})) 
    "Will omit \'V\' rec-id signature value in the transaction"
+  , Option ['c'] ["contract"]
+      (OptArg
+       (\mC opts -> 
+          case mC of
+            Nothing -> return opts
+            Just c -> return opts{optTxType = CONTRACT, optContractName = Just c}
+       ) "String") 
+   "Transaction type is a contract creation + the name of the contract to create"
   , Option ['s'] ["source"]
       (OptArg
        (\mS opts -> do
@@ -110,7 +120,7 @@ options =
             Just s -> do
               src <- readFile s
               return opts{optSourceCode = Just $ namedSource (T.pack s) (T.pack src)}
-       ) "Source")
+       ) "FileName")
     "The filepath to the solidity source code of the contract you want to create" 
   , Option ['a'] ["address"]
       (OptArg
@@ -124,7 +134,7 @@ options =
                    Nothing -> ioError . userError . printf "invalid address: %s" $ show strAddr
        ) "Address")
     "The address of the contract you want to call, or the user to send value to"
-  , Option ['c'] ["chainId"]
+  , Option ['i'] ["chainId"]
       (OptArg
        (\mC opts -> 
           case mC of
@@ -134,12 +144,12 @@ options =
               in case mCid of
                    Just cid -> return opts{optChainId = Just cid}
                    Nothing -> ioError . userError . printf "invalid chainId: %s" $ show c
-       ) "Address")
+       ) "ChainId")
     "The chainId on which to create the contract, of the contract you want to call, or of the user to send value to"
   , Option ['m'] ["funcName"]
       (OptArg
        (\fn opts -> return opts{optFunctionName = fn}
-       ) "Function Name")
+       ) "String")
     "The name of the contract function you want to call" 
   , Option ['r'] ["args"]
       (OptArg
@@ -147,7 +157,7 @@ options =
           case mR of
             Nothing -> return opts
             Just r -> return opts{optFunctionArgs = Just (splitOn "," r)}
-       ) "Function Args")
+       ) "(String,String,etc.)")
     "The comma-separated args of the contract function you want to call" 
   , Option ['n'] ["nonce"]
       (ReqArg
@@ -161,7 +171,7 @@ options =
           case mV of 
             Nothing -> return opts 
             Just v -> return opts{optValue = Wei $ read v }
-       ) "Nonce")
+       ) "Integer")
     "The user nonce to use for this transaction" 
   , Option ['k'] ["key"]
       (ReqArg
@@ -171,7 +181,7 @@ options =
           case ePkey of
             Left err -> error err
             Right pkey -> return opts{optKey = pkey}
-       ) "PrivateKey")
+       ) "FileName")
     "The .pem filepath of the user's private key"
   ]
 
@@ -183,7 +193,7 @@ helpMessage = usageInfo header options
 parseArgs :: IO Options
 parseArgs = do
   argv <- getArgs
-  case getOpt RequireOrder options argv of
+  case getOpt Permute options argv of
     ([], _, errs) -> ioError (userError (concat errs ++ helpMessage))
     (opts, _, _) -> foldlM (flip id) defaultOptions opts
 
@@ -219,15 +229,17 @@ main = do
 
 
 
-  -- parse TX type and figure out what to put for the initOrData
+  -- parse TX type and figure out what to put for the metadata and txdata
   let (metadata, txData) = case optTxType of
         
         TRANSFER -> (M.fromList $ [("VM", "SolidVM")], Code $ B.empty)
-
  
-        CONTRACT -> case optSourceCode of 
-          Nothing -> throw $ userError "source code not given, put you want to create a contract??"
-          Just c -> (M.fromList $ [("VM", "SolidVM")], Code $ T.encodeUtf8 $ serializeSourceMap c)
+        CONTRACT -> case (optSourceCode, optContractName) of 
+          (Just src, Just name) -> 
+            ( M.fromList $ [("VM", "SolidVM"), ("name", T.pack name)] 
+            , Code $ T.encodeUtf8 $ serializeSourceMap src
+            )
+          _ -> throw $ userError "source code or contract name not given for contracy creation"
 
         FUNCTION -> do 
           case optFunctionName of
@@ -247,30 +259,6 @@ main = do
  
 
 
-
-{-       NOTE: if we ever want this to work with EVM, we need to be able to generate function selectors
-                and properly encoded args for the txData..... which is a pain. I started to do it below:
- 
--
-          -- all because of function selectors, we have to parse the source code for a function call
-          case optSource of
-            Nothing -> throw $ userError "source code not given, but we need it to set function call selectors"
-            Just c -> case length c of 
-              0 -> throw $ userError "source code file found, but it's empty?"
-              1 -> do
-                let (_, nameAndXabiTuples) = eitherM (throw . userError) pure (pure $ parseXabi "" $ T.unpack $ snd $ head c)
-                case length nameAndXabiTuples of
-                  0 -> throw $ userError "could not parse source for function call"
-                  1 -> do
-                    let (cname, xabi)) = head nameAndXabiTuples
-                        mFunc = M.lookup (T.pack optFunctionName) (xabiFuncs xabi)
-                    case mFunc of 
-                      Nothing -> throw $ userError $ "function " ++ optFunctionName ++ " not found in contract " ++ (T.unpack cname)
-                      Just func -> do
-                        let (TypeFunction sel _ _) = eitherM (throw . userError) pure (pure $ funcToType xabi cname func)
-  -}                      
-
-                
        
   -- create the unsigned transaction
   let unsignedTx = UnsignedTransaction
@@ -287,7 +275,7 @@ main = do
       (r,s,v) = getSigVals sig
 
 
-      -- try to post it with V value
+      -- create the API request body
       request = PostBlocTransactionRawRequest
           addr
           (unsignedTransactionNonce unsignedTx)
@@ -306,6 +294,7 @@ main = do
   putStrLn $ "Transaction Hash: " ++ format txHash
   putStrLn $ "\nThe unsigned transaction: " ++ show unsignedTx
 
+  -- post it
   result <- runClientM (postRawTransaction Nothing Nothing True request) clientEnv
   putStrLn $ "\n\nTransaction result: " ++ show result
       

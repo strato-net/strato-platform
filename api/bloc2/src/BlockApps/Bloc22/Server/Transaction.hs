@@ -122,22 +122,21 @@ txWorker = forever $ do
 
 
 
-------------------------------- RAW/OFFLINE TRANSACTIONS ------------------------------------
+--------------------------------- RAW (PRE-SIGNED) TRANSACTIONS ------------------------------------
 
 postBlocTransactionRaw :: (MonadLogger m, HasSQL m) =>
-                          Maybe Text     -- username
+                          Maybe Text     -- username (unused)
                        -> Maybe ChainId  
-                       -> Bool -- resolve
+                       -> Bool           -- resolve
                        -> PostBlocTransactionRawRequest
                        -> m TransactionResult
 postBlocTransactionRaw _ _ resolve PostBlocTransactionRawRequest{..} = do
+  -- as a requirement for Pepsi, we have to be able to accept non-rec sigs
+  -- so, if 'v' is not provided, we have to figure out what 'v' is here
+
   v <- case postbloctransactionrawrequestV of 
-        Just v' -> do 
-          $logInfoS "DAN" . Text.pack $ "v provided, it's " ++ show v' 
-          return v'
+        Just v' -> return v'
         Nothing -> do
-          -- as a requirement for Pepsi, we have to be able to accept non-rec sigs
-          -- so, to make the transaction, we have to figure out what 'v' is here
           let makeSigFromVals :: (Word256, Word256, Word8) -> Signature
               makeSigFromVals (r', s', v') = Signature 
                 (S.CompactRecSig
@@ -160,13 +159,9 @@ postBlocTransactionRaw _ _ resolve PostBlocTransactionRawRequest{..} = do
               sig2 = makeSigFromVals (postbloctransactionrawrequestR, postbloctransactionrawrequestS, 28)
               address2 = fromMaybe (Address 0x0) $ fmap fromPublicKey $ recoverPub sig2 txHash
           if address1 == postbloctransactionrawrequestAddress
-            then do 
-              $logInfoS "DAN" . Text.pack $ "first match, v is 27" 
-              return 27
+            then return 27
           else if address2 == postbloctransactionrawrequestAddress
-            then do 
-              $logInfoS "DAN" . Text.pack $ "second match, v is 28" 
-              return 28
+            then return 28
           else
             throwIO $ UserError $ Text.pack "Couldn't calculate 'v' for transaction signature - must be a bad signature"
   
@@ -188,41 +183,6 @@ postBlocTransactionRaw _ _ resolve PostBlocTransactionRawRequest{..} = do
 
   txHash <- postTransaction rawTx
   
-{-
-  -- add details/check details from BlocDB so we can still use those neat features
-  vm <- case Map.lookup "VM" =<< postbloctransactionrawrequestMetadata of
-          Nothing -> return "EVM"
-          Just "EVM" -> return "EVM"
-          Just "SolidVM" -> return "SolidVM"
-          x -> throwIO $ UserError $ Text.pack $ "Unknown VM type provided: " ++ show x
-
-  let src = deserializeSourceMap (Text.decodeUtf8 $ codeBytes postbloctransactionrawrequestInitOrData)
-
-
-  
-  
-  -- somewhat of a hack to figure out if this is a contract, function, or value TX
-  _ <- case postbloctransactionrawrequestTo of 
-         Nothing -> do 
-           (_,(cmId,ContractDetails{..})) <- getContractDetailsForContract vm src Nothing >>= \case
-              Nothing -> throwIO $ UserError "You need to supply at least one contract in the source"
-              Just x -> pure x
-           void . blocModify $ \conn -> runInsertMany conn hashNameTable [
-             ( Nothing
-             , constant txHash
-             , constant cmId
-             , constant (1 :: Int32)
-             , constant contractdetailsName
-             )]
-           return ()
-         Just _ -> case postbloctransactionrawrequestInitOrData of
-                        PtrToCode _ -> throwIO $ UserError $ Text.pack "PtrToCode not accepted" 
-                        Code x -> if ByteString.null x 
-                                  then
-                                    return () -- value transfer
-                                  else do
-                                    return () -- TODO: do function call checks
--}
   
 
   trds <- recurseTRDs resolve [txHash]
@@ -235,6 +195,8 @@ postBlocTransactionRaw _ _ resolve PostBlocTransactionRawRequest{..} = do
 
 
 
+
+---------------------------------- REGULAR TRANSACTIONS ---------------------------------------
 
 
 
