@@ -52,9 +52,7 @@ FROM built as bloc
 COPY ./bloc /bloc
 EXPOSE 8000 8002
 HEALTHCHECK --interval=5s --timeout=1s --start-period=20s \ 
-  CMD pgrep slipstream && \
-        curl --silent --output /dev/null --fail localhost:8002/swagger.json || \
-        exit 1
+  CMD pgrep slipstream || exit 1
 ENTRYPOINT ["/bloc/doit.sh"]
 
 

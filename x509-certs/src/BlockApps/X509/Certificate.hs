@@ -113,7 +113,9 @@ instance ToJSON X509Certificate where
   toJSON = String . T.pack . C8.unpack . certToBytes
 
 instance FromJSON X509Certificate where
-  parseJSON (String str) = either (error "failed to JSON parse cert") pure $ bsToCert $ C8.pack $ T.unpack str
+  parseJSON (String str) = 
+    let errDump err = fail $ "failed to JSON parse cert " ++ (show str) ++ " because " ++ err 
+    in either (errDump) pure $ bsToCert $ C8.pack $ T.unpack str
   parseJSON x = fail $ "parseJSON for SignedCertificate expects a String, but was given " ++ show x
 
 
@@ -208,7 +210,7 @@ toASN1CS = asn1CharacterString UTF8
 fromASN1CS :: ASN1CharacterString -> String
 fromASN1CS cs = 
   let errstr = "failed to decode ASN1CharacterString: " ++ show cs
-  in fromMaybe (error errstr) (asn1CharacterToString cs)
+  in fromMaybe errstr (asn1CharacterToString cs)
 
 
 getIssuerDN :: Issuer -> DistinguishedName
@@ -269,4 +271,4 @@ getCertIssuer (X509Certificate cert) = do
                   , issCountry    = extractDn DnCountry
                   }
   where extractDn :: DnElement -> Maybe String
-        extractDn dn = fmap fromASN1CS . getDnElement dn . certSubjectDN $ getCertificate cert    
+        extractDn dn = fmap fromASN1CS . getDnElement dn . certIssuerDN $ getCertificate cert
