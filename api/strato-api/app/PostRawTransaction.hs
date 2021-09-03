@@ -172,7 +172,7 @@ options =
             Nothing -> return opts 
             Just v -> return opts{optValue = Wei $ read v }
        ) "Integer")
-    "The user nonce to use for this transaction" 
+    "The value to send for this transaction" 
   , Option ['k'] ["key"]
       (ReqArg
        (\k opts -> do
