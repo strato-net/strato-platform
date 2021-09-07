@@ -20,6 +20,7 @@ import           BlockApps.Bloc22.API
 import           BlockApps.Bloc22.Server.Chain
 import           BlockApps.Bloc22.Server.Contracts
 import           BlockApps.Bloc22.Server.Transaction
+import           BlockApps.Bloc22.Server.TransactionResult
 import           BlockApps.Bloc22.Server.Users
 
 import Control.Monad.Change.Alter

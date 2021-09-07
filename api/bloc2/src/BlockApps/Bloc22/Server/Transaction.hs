@@ -61,7 +61,7 @@ import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Database.Tables
 import           BlockApps.Bloc22.Monad
 import           BlockApps.Bloc22.Server.Chain
-import           BlockApps.Bloc22.Server.Users     hiding (constructArgValuesAndSource)
+import           BlockApps.Bloc22.Server.TransactionResult     hiding (constructArgValuesAndSource)
 import           BlockApps.Bloc22.Server.Utils
 import           BlockApps.Ethereum
 import           BlockApps.Logging
