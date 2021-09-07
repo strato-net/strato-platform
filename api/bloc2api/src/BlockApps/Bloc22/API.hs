@@ -9,6 +9,7 @@ module BlockApps.Bloc22.API
   , module BlockApps.Bloc22.API.Git
   , module BlockApps.Bloc22.API.Users
   , module BlockApps.Bloc22.API.Contracts
+  , module BlockApps.Bloc22.API.Transaction
   , module BlockApps.Bloc22.API.Utils
   ) where
 
@@ -54,6 +55,7 @@ type BlocAPI =
   :<|> PostChainInfos
   -- /transaction endpoints
   :<|> PostBlocTransactionParallel
+  :<|> PostBlocTransactionRaw
   :<|> PostBlocTransaction
 
 markdownBloc :: String

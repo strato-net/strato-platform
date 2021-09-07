@@ -18,7 +18,9 @@ module BlockApps.Bloc22.Server.Users (
   getBlocTransactionResult',
   postUsersFill,
   forStateT,
-  constructArgValuesAndSource
+  constructArgValuesAndSource,
+  recurseTRDs,
+  TRD(..),
   ) where
 
 import           Control.Concurrent
