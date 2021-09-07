@@ -9,7 +9,10 @@
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE TypeApplications    #-}
 
-module BlockApps.Bloc22.Server.Transaction where
+module BlockApps.Bloc22.Server.Transaction (
+  postBlocTransaction,
+  postBlocTransactionParallel
+  ) where
 
 
 import           Control.Applicative               ((<|>), liftA2)
@@ -28,8 +31,6 @@ import qualified Data.ByteString.Lazy              as BL
 import qualified Data.ByteString.Short             as BSS
 import qualified Data.Cache                        as Cache
 import qualified Data.Cache.Internal               as Cache
-import           Data.Conduit
-import           Data.Conduit.TQueue
 import           Data.Foldable
 import           Data.Hashable                     hiding (hash)
 import           Data.Int                          (Int32)
@@ -108,17 +109,6 @@ mergeTxParams (Just inner) (Just outer) = Just $
            (txparamsGasPrice inner <|> txparamsGasPrice outer)
            (txparamsNonce inner <|> txparamsNonce outer)
 mergeTxParams inner outer = inner <|> outer
-
-txWorker :: (MonadLogger m, HasBlocEnv m, HasBlocSQL m, HasCoreAPI m, HasVault m, HasSQL m) =>
-            m ()
-txWorker = forever $ do
-  tbqueue <- fmap txTBQueue getBlocEnv
-  e <- try . runConduit $ sourceTBQueue tbqueue .| processTxs
-  case e of
-    Left (ex :: SomeException) -> $logErrorS "txWorker/error" . Text.pack $ show ex
-    Right () -> error "txWorker returned a Right (). This should never happen. Please contact Simon Peyton Jones."
-  where processTxs = awaitForever $ \(a,b,r,c) ->
-          lift . void $ postBlocTransaction' (Do CacheNonce) a b r c
 
 postBlocTransactionParallel :: (MonadLogger m,
                                 HasBlocEnv m, HasBlocSQL m, HasCoreAPI m, HasVault m, HasSQL m) =>
