@@ -396,10 +396,7 @@ getContractDetailsAndMetadataId (ContractName contractName) acct = do
       getContractsContractByAddressQuery contractName acct
     case tuple of
       Just t -> Just <$> detailsWith (Just acct) t
-      Nothing -> do
-        tuple' <- blocQueryMaybe $
-          getContractsContractLatestQuery contractName
-        for tuple' $ detailsWith (Just acct)
+      Nothing -> throwIO $ UserError $ Text.pack $ "Contract " ++ show acct ++ " doesn't exist"
 
 getContractDetailsByCodeHash :: (MonadIO m, MonadLogger m, HasBlocSQL m, HasBlocEnv m) =>
                                 CodePtr -> m (Maybe (Int32, ContractDetails))
