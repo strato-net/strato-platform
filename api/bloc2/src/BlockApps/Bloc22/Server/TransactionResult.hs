@@ -17,7 +17,9 @@ module BlockApps.Bloc22.Server.TransactionResult (
   getBatchBlocTransactionResult',
   getBlocTransactionResult',
   forStateT,
-  constructArgValuesAndSource
+  constructArgValuesAndSource,
+  recurseTRDs,
+  trdResult
   ) where
 
 import           Control.Concurrent

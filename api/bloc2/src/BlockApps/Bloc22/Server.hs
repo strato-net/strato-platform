@@ -59,6 +59,7 @@ bloc = return gitInfo
   :<|> getChainInfo
   :<|> postChainInfos
   :<|> postBlocTransactionParallel
+  :<|> postBlocTransactionRaw
   :<|> postBlocTransaction
 
 --serveBloc :: BlocEnv -> Server BlocAPI

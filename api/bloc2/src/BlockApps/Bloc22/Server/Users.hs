@@ -5,6 +5,15 @@
 
 module BlockApps.Bloc22.Server.Users (
   postUsersFill
+--  getBlocTransactionResult,
+--  postBlocTransactionResults,
+--  getBatchBlocTransactionResult',
+--  getBlocTransactionResult',
+--  postUsersFill,
+--  forStateT,
+--  constructArgValuesAndSource,
+--  recurseTRDs,
+--  TRD(..),
   ) where
 
 import           Control.Monad
