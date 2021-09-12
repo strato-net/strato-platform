@@ -317,16 +317,6 @@ adjustGlobals gref shouldCompile row details = do
                           ,("nohistory", removeFromHistoryList)
                           ]
 
-ensureContractInstance :: IORef Globals -> Int32 -> AggregateAction -> Bloc ()
-ensureContractInstance g cmId row = do
-  let acct = actionAccount row
-      codePtr = actionCodeHash row
-  instExists <- isInstanceCreated g codePtr
-  if instExists then
-    return ()
-  else
-    insertContractInstance cmId acct >> setInstanceCreated g codePtr
-
 readPreviousEVMState :: IORef Globals -> Account -> Contract -> Bloc [(Text, Value)]
 readPreviousEVMState gref acct cont = do
   let default' = SVR.decodeValues 0 (typeDefs cont) (mainStruct cont) (const 0) 0
@@ -434,7 +424,7 @@ processTheMessages env conn g messages = do
                   cont = either error id . xAbiToContract $ contractdetailsXabi details
               adjustGlobals g (Do Compile) row details
 
-              ensureContractInstance g cmId row
+              _ <- insertContractInstance cmId $ actionAccount row
 
               oldState <- readPreviousEVMState g acct cont
               indexContract <- rowToInsert g abiid row cont oldState
@@ -452,7 +442,8 @@ processTheMessages env conn g messages = do
                   abiid = ABIID abi name $ maybe "" (T.pack . chainIdString . ChainId) $ (actionAccount row ^. accountChainId)
                   cont = error "internal error: contract should be unused for solidvm"
 
-              ensureContractInstance g cmId row
+              _ <- insertContractInstance cmId $ actionAccount row
+
           
               adjustGlobals g (Don't Compile) row details
               oldState <- readPreviousSolidVMState g acct
