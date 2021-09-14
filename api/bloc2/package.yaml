@@ -44,6 +44,7 @@ library:
     - filepath
     - format
     - hashable
+    - hflags
     - http-client
     - http-types
     - insert-ordered-containers

@@ -5,15 +5,6 @@
 
 module BlockApps.Bloc22.Server.Users (
   postUsersFill
---  getBlocTransactionResult,
---  postBlocTransactionResults,
---  getBatchBlocTransactionResult',
---  getBlocTransactionResult',
---  postUsersFill,
---  forStateT,
---  constructArgValuesAndSource,
---  recurseTRDs,
---  TRD(..),
   ) where
 
 import           Control.Monad
@@ -22,6 +13,7 @@ import qualified Data.Aeson                        as Aeson
 import qualified Data.ByteString.Lazy              as BL
 import           Data.Int                          (Int32)
 import qualified Data.Text.Encoding                as Text
+import           HFlags
 import           Opaleye                           hiding (not, null, index, max)
 import           UnliftIO
 
@@ -43,6 +35,7 @@ import           Handlers.AccountInfo
 import           Handlers.Faucet
 import           SQLM
 
+defineFlag "useDeprecatedFillFailBehavior" (False :: Bool) "don't return an error when gas is off and user tries to fill gas (just fail silently).  This options is only included for backwards compatibility"
 
 postUsersFill :: (HasCoreAPI m, HasBlocSQL m, MonadLogger m, HasSQL m, HasBlocEnv m) =>
                  UserName  -> Address -> Bool -> m BlocTransactionResult
@@ -67,7 +60,10 @@ postUsersFill _ addr resolve = do
       when (Failure == blocTransactionStatus result) $
         throwIO $ UnavailableError "faucet transaction failed; please try again"
       return result
-    else pure $ BlocTransactionResult Success zeroHash Nothing Nothing
+    else do
+    if flags_useDeprecatedFillFailBehavior
+      then pure $ BlocTransactionResult Success zeroHash Nothing Nothing
+      else throwIO $ UserError "the '/fill' route doesn't work when the 'gasOn' flag has been set to false."
 
 waitForBalance :: (MonadIO m, MonadLogger m,  HasCoreAPI m) => Address -> m ()
 waitForBalance addr = waitFor "no user account found" go
