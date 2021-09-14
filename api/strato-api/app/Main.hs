@@ -42,6 +42,7 @@ import           System.Clock
 import           BlockApps.Bloc22.API
 import           BlockApps.Bloc22.Monad          -- hiding (handleRuntimeError)
 import           BlockApps.Bloc22.Server
+import           BlockApps.Bloc22.Server.BlocOptions    ()
 import           BlockApps.Init
 
 import           Control.Monad.Composable.BlocSQL

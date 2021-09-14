@@ -13,7 +13,6 @@ import qualified Data.Aeson                        as Aeson
 import qualified Data.ByteString.Lazy              as BL
 import           Data.Int                          (Int32)
 import qualified Data.Text.Encoding                as Text
-import           HFlags
 import           Opaleye                           hiding (not, null, index, max)
 import           UnliftIO
 
@@ -28,6 +27,7 @@ import           BlockApps.Solidity.Contract()
 import qualified BlockApps.Strato.Types            as Deprecated
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256
+import           BlockApps.Bloc22.Server.BlocOptions
 import           Control.Monad.Composable.BlocSQL
 import           Control.Monad.Composable.CoreAPI
 import           Control.Monad.Composable.SQL
@@ -35,7 +35,6 @@ import           Handlers.AccountInfo
 import           Handlers.Faucet
 import           SQLM
 
-defineFlag "useDeprecatedFillFailBehavior" (False :: Bool) "don't return an error when gas is off and user tries to fill gas (just fail silently).  This options is only included for backwards compatibility"
 
 postUsersFill :: (HasCoreAPI m, HasBlocSQL m, MonadLogger m, HasSQL m, HasBlocEnv m) =>
                  UserName  -> Address -> Bool -> m BlocTransactionResult
