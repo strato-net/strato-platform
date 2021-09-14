@@ -15,7 +15,6 @@ import           BlockApps.Ethereum
 import           BlockApps.X509
 
 
-import           Blockchain.Data.DataDefs
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Code
@@ -27,7 +26,9 @@ import           Blockchain.Strato.Model.Wei
 
 import           Control.Exception
 
+import qualified Data.Aeson                           as Ae
 import qualified Data.ByteString                      as B
+import qualified Data.ByteString.Lazy                 as BL
 import           Data.Foldable                        (foldlM)
 import           Data.List                            (intercalate)
 import           Data.List.Split                      (splitOn)
@@ -63,6 +64,7 @@ import           Text.Printf
 data Options = Options 
   { optTxType        :: BlocTransactionType
   , optOmitV         :: Bool
+  , optPrintOnly     :: Bool
   , optContractName  :: Maybe String
   , optSourceCode    :: Maybe SourceMap
   , optAddress       :: Maybe Address
@@ -79,6 +81,7 @@ defaultOptions :: Options
 defaultOptions = Options
   { optTxType       = TRANSFER
   , optOmitV        = False
+  , optPrintOnly    = False
   , optContractName = Nothing
   , optSourceCode   = Nothing
   , optAddress      = Nothing
@@ -104,6 +107,10 @@ options =
       (NoArg
        (\ opts -> return opts{optOmitV = True})) 
    "Will omit \'V\' rec-id signature value in the transaction"
+  , Option ['p'] ["printOnly"]
+      (NoArg
+       (\ opts -> return opts{optPrintOnly = True})) 
+   "Will just print the request, not post it"
   , Option ['c'] ["contract"]
       (OptArg
        (\mC opts -> 
@@ -205,7 +212,7 @@ parseArgs = do
 
 -- servant client for the endpoint
 postRawTransaction :: Maybe T.Text -> Maybe ChainId -> Bool -> PostBlocTransactionRawRequest
-                   -> ClientM TransactionResult
+                   -> ClientM BlocChainOrTransactionResult
 postRawTransaction = client (Proxy @ PostBlocTransactionRaw)
 
 
@@ -217,16 +224,9 @@ main = do
   Options{..} <- parseArgs
 
 
-  -- setup servant client
-  mgr <- newManager defaultManagerSettings
-  stratoURL <- parseBaseUrl "http://strato:3000/bloc/v2.2"
-  let clientEnv = ClientEnv mgr stratoURL Nothing
-
-
   -- the user's address 
   let addr = fromPrivateKey optKey
   putStrLn $ "user address: " ++ format addr
-
 
 
   -- parse TX type and figure out what to put for the metadata and txdata
@@ -290,12 +290,23 @@ main = do
           (if optOmitV then Nothing else Just v)
           (Just metadata)
   
-  putStrLn $ "\nThe TX metadata: " ++ show metadata
+  
   putStrLn $ "Transaction Hash: " ++ format txHash
-  putStrLn $ "\nThe unsigned transaction: " ++ show unsignedTx
 
-  -- post it
-  result <- runClientM (postRawTransaction Nothing Nothing True request) clientEnv
-  putStrLn $ "\n\nTransaction result: " ++ show result
+
+  if optPrintOnly then do
+    putStrLn "printOnly=true --> we will dump the request to the console, but not send it\n\n"
+    BL.putStr $ Ae.encode request
+  else do 
+    putStrLn "printOnly=false --> we will post this transaction"
+
+    -- setup servant client
+    mgr <- newManager defaultManagerSettings
+    stratoURL <- parseBaseUrl "http://strato:3000/bloc/v2.2"
+    let clientEnv = ClientEnv mgr stratoURL Nothing
+
+    -- post it
+    result <- runClientM (postRawTransaction Nothing Nothing True request) clientEnv
+    putStrLn $ "\n\nTransaction result: " ++ show result
       
 
