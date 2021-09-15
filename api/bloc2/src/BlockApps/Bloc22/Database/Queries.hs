@@ -35,8 +35,7 @@ import qualified Crypto.Saltine.Class            as Saltine
 import qualified Crypto.Saltine.Core.SecretBox   as SecretBox
 import           Data.Aeson                      (Result(..), fromJSON, decode, encode)
 import           Data.ByteString                 (ByteString)
-import qualified Data.ByteString                 as BS
-import qualified Data.ByteString.Char8           as Char8
+import qualified Data.ByteString                 as B
 import           Data.ByteString.Lazy            (fromStrict, toStrict)
 import qualified Data.Cache                      as Cache
 import           Data.Either                     (fromRight)
@@ -69,8 +68,8 @@ import           BlockApps.Solidity.Parse.Parser
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Types hiding (Account(..))
 import           Blockchain.Strato.Model.Account
-import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.CodePtr
+import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.SourceMap
 
@@ -481,10 +480,12 @@ insertContractMetaDataBatchQuery srcHash details = blocModify $ \ conn ->
 
 instance QueryRunnerColumnDefault PGBytea Address where
   queryRunnerColumnDefault = queryRunnerColumn id
-    (fromMaybe (error "could not decode address") . stringAddress . Char8.unpack)
+    (Address . bytesToWord160 . B.unpack)
     queryRunnerColumnDefault
 instance Default Constant Address (Column PGBytea) where
-  def = lmap (Char8.pack . formatAddressWithoutColor) def
+  def = lmap getBytes def
+    where
+      getBytes (Address x) = B.pack . word160ToBytes $ x
 
 instance QueryRunnerColumnDefault PGBytea SecretBox.Nonce where
   queryRunnerColumnDefault = queryRunnerColumn id
@@ -532,7 +533,7 @@ instance QueryRunnerColumnDefault PGBytea (Maybe ChainId) where
     where
       toChainId :: ByteString -> Maybe ChainId
       toChainId bs
-        = if BS.null bs
+        = if B.null bs
             then Nothing
             else Just
                . ChainId
@@ -542,7 +543,7 @@ instance QueryRunnerColumnDefault PGBytea (Maybe ChainId) where
 instance Default Constant (Maybe ChainId) (Column PGBytea) where
   def = lmap fromChainId def
         where fromChainId = \case
-                Nothing -> BS.empty
+                Nothing -> B.empty
                 Just cid -> word256ToByteString $ unChainId cid
 
 insertContractInstance :: (MonadIO m, HasBlocSQL m, MonadLogger m) =>
