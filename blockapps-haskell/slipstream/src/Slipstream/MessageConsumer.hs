@@ -31,6 +31,9 @@ import qualified Network.Kafka.Protocol as K hiding (Message)
 import BlockApps.Bloc22.Monad (BlocEnv)
 import BlockApps.Logging
 import Blockchain.MilenaTools
+
+import Control.Monad.Composable.BlocSQL
+
 import Slipstream.Globals
 import Slipstream.Metrics
 import Slipstream.Options
@@ -136,14 +139,14 @@ getTheMessages offset = do
               Left e -> error $ "getTheMessages: " ++ e
               Right bs -> bs
 
-getAndProcessMessages :: BlocEnv -> PGConnection -> IORef Globals -> SlipKafka ()
-getAndProcessMessages env conn cache = do
+getAndProcessMessages :: BlocEnv -> BlocSQLEnv -> PGConnection -> IORef Globals -> SlipKafka ()
+getAndProcessMessages env sqlEnv conn cache = do
   let errorCount = 0
   offset <- getStatediffOffset
-  getAndProcessMessages' env conn cache offset errorCount
+  getAndProcessMessages' env sqlEnv conn cache offset errorCount
 
-getAndProcessMessages' :: BlocEnv -> PGConnection -> IORef Globals -> K.Offset -> Int -> SlipKafka ()
-getAndProcessMessages' env conn cache offset errorCounter = do
+getAndProcessMessages' :: BlocEnv -> BlocSQLEnv -> PGConnection -> IORef Globals -> K.Offset -> Int -> SlipKafka ()
+getAndProcessMessages' env sqlEnv conn cache offset errorCounter = do
   recordOffset offset
   eMessages <- try $ getTheMessages offset
   case eMessages of
@@ -152,12 +155,12 @@ getAndProcessMessages' env conn cache offset errorCounter = do
       liftIO $ threadDelay 1000000
       if (errorCounter > exceptionMaxCount )
            then error $ "Slipstream reached exceptionMaxCount."
-           else getAndProcessMessages' env conn cache offset (errorCounter + 1)
+           else getAndProcessMessages' env sqlEnv conn cache offset (errorCounter + 1)
     Right messages -> do
       $logDebugLS "getAndProcessMessages'" messages
       recordKafkaMessages messages
       forceGlobalEval cache
-      lift . lift $ processTheMessages env conn cache messages
+      lift . lift $ processTheMessages env sqlEnv conn cache messages
       let newOffset = offset + fromIntegral (length messages)
       currentOffset <- getStatediffOffset
       offset' <- if currentOffset /= offset
@@ -169,4 +172,4 @@ getAndProcessMessages' env conn cache offset errorCounter = do
                       putStatediffOffset newOffset
                       return newOffset
 
-      getAndProcessMessages' env conn cache offset' errorCounter
+      getAndProcessMessages' env sqlEnv conn cache offset' errorCounter

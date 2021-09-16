@@ -25,7 +25,8 @@ library:
   dependencies: 
     - aeson
     - binary
-    - blockapps-bloc22-server
+    - bloc-sql-monad
+    - bloc2
     - blockapps-mpdbs
     - blockapps-solidity
     - blockapps-util
@@ -40,6 +41,8 @@ library:
     - lifted-base
     - lrucache
     - milena
+    - monad-alter
+    - monad-control
     - mtl
     - network
     - ordered-containers
@@ -63,7 +66,8 @@ executables:
     main: Main.hs
     dependencies:
       - base
-      - blockapps-bloc22-server
+      - bloc-sql-monad
+      - bloc2
       - blockapps-init
       - cache
       - clock
