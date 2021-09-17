@@ -136,7 +136,7 @@ postBlocTransactionRaw :: (MonadLogger m, HasSQL m) =>
                        -> Maybe ChainId  
                        -> Bool           -- resolve
                        -> PostBlocTransactionRawRequest
-                       -> m TransactionResult
+                       -> m BlocChainOrTransactionResult
 postBlocTransactionRaw _ _ resolve PostBlocTransactionRawRequest{..} = do
   -- as a requirement for Pepsi, we have to be able to accept non-rec sigs
   -- so, if 'v' is not provided, we have to figure out what 'v' is here
@@ -194,10 +194,13 @@ postBlocTransactionRaw _ _ resolve PostBlocTransactionRawRequest{..} = do
 
   trds <- recurseTRDs resolve [txHash]
   case trds of
-    [] -> throwIO $ UserError $ Text.pack "could not find this transaction result"
-    [x] -> case trdResult x of
-            Just res -> return res
-            Nothing -> throwIO $ UserError $ Text.pack "could not find this transaction result"
+    [] -> throwIO $ AnError $ Text.pack "empty TRD response, which shouldn't happen"
+    [x] -> return $ BlocTxResult $ BlocTransactionResult 
+              { blocTransactionStatus   = trdStatus x
+              , blocTransactionHash     = txHash
+              , blocTransactionTxResult = trdResult x
+              , blocTransactionData     = Nothing   -- can we get this without the txHash table query?
+              }
     _ -> throwIO $ UserError $ Text.pack "found multiple tx results for a single tx"
 
 
