@@ -19,7 +19,7 @@ module BlockApps.Bloc22.Server.TransactionResult (
   forStateT,
   constructArgValuesAndSource,
   recurseTRDs,
-  trdResult
+  TRD(..)
   ) where
 
 import           Control.Concurrent
