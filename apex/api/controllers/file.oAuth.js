@@ -113,10 +113,15 @@ async function verify(req, res, next) {
     const data = await externalStorage.getExternalStorage(contractAddress);
     res.status(RestStatus.OK).json({ uri: data.uri, timeStamp: data.timeStamp, signers: data.signers });
   } catch (error) {
-    let err = new Error(error);
-    console.error(err);
-    err.status = RestStatus.INTERNAL_SERVER_ERROR;
-    return next(err);
+    if (error.status == RestStatus.BAD_REQUEST) {
+	return next(error);
+    }
+    else {
+      let err = new Error(error);
+	console.error(err);
+	err.status = RestStatus.INTERNAL_SERVER_ERROR;
+	return next(err);
+    }
   }
 }
 
