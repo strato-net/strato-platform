@@ -136,7 +136,7 @@ describe("state", function() {
         return rest.getState(admin, { name: uid, address: "0" }, options);
       },
       RestStatus.BAD_REQUEST,
-      /Couldn't find/
+      /doesn't exist/
     );
   });
 
