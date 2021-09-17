@@ -159,10 +159,15 @@ async function attest(req, res, next) {
     }
 
   } catch (error) {
-    let err = new Error(error);
-    console.error(err);
-    err.status = RestStatus.INTERNAL_SERVER_ERROR;
-    return next(err);
+    if (error.status == RestStatus.BAD_REQUEST) {
+	return next(error);
+    }
+    else {
+	let err = new Error(error);
+	console.error(err);
+	err.status = RestStatus.INTERNAL_SERVER_ERROR;
+	return next(err);
+    }
   }
 }
 
