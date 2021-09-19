@@ -1,70 +1,127 @@
-# strato-vscode README
+# STRATO VS Code
 
-This is the README for your extension "strato-vscode". After writing up a brief description, we recommend including the following sections.
+This extension interfaces with a running STRATO node using STRATO's API and a debugging API.
 
-## Features
+## Customize Commands in Extension Settings
+The scripts run for various commands (such as **Create Project**, **Deploy Project**, etc.) can be found and modified by clicking **File -> Preferences -> Settings** and then navigating to **Extensions -> STRATO**.  
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+![Navigate to settings](docs/vscode-settings.png)
+![Navigate to extension](docs/vscode-extension.png)
 
-For example if there is an image subfolder under your extension project workspace:
+Below is a list of the default scripts for each command:  
+**Create Project**
+```
+git clone https://github.com/blockapps/traceability-framework $1 
+cd $1
+cd server
+yarn install
+yarn build
+cd ../ui
+yarn install
+yarn build
+cd ..
+```
+**Deploy Project**
+```
+pushd server
+yarn install
+yarn build
+touch .env
+yarn deploy
+popd
+```
+**Run Project**
+```
+pushd server
+yarn install
+yarn build
+touch .env
+MOCK_INT_SERVER=true yarn start:prod
+popd
+```
 
-\!\[feature X\]\(images/feature-x.png\)
+**Test Project**
+```
+pushd server
+yarn install
+yarn build
+touch .env
+yarn test
+popd
+```
+## Project Management
+The following lists the project commands available to use in the extension.
+### Create Project 
+When a user clicks **Create Project**, a text box will appear at the top of the window asking the user to input the URL of the STRATO Test Node.
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+After that is entered, the user will be asked to input the URL of the STRATO Production Node. Following that, the user will be asked where they would like the cloned repository to be placed in their file system.
 
-## Requirements
+Once that is selected, the commands specified in the Settings of the extension will be run. These commands can be changed by the user following the steps in **Customize Commands in Extension Settings**.
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+### Deploy Project
+When a user clicks **Deploy Project**, the Dapp will be deployed to the local STRATO node. The commands run during this process are the ones specified in the Settings of the extension. The commands can be changed by the user following the steps in **Customize Commands in Extension Settings**.
 
-## Extension Settings
+Once the deployment is complete, the **Deployments** section in the extension's sidebar should display a dropdown that shows information of the deployment.
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+### Run Project
+When a user clicks on **Run Project**, the steps to start the server for the Dapp will be exectuted following the commands specified in the **Extension Settings**. The commands can be changed by the user following the steps in **Customize Commands in Extension Settings**.
 
-For example:
+### Test Project
+When a user clicks **Test Project**, the test suite of the Dapp will be run using the commands specified in the Settings of the extension. The commands to run the test are specified in the Settings of the extension and can be changed following the steps in **Customize Commands in Extension Settings**.
 
-This extension contributes the following settings:
+## Nodes
+Under the list of commands in **Project Management** is **Nodes**. This will list STRATO nodes and information about those nodes. In order for the nodes to be listed, the extension looks for a `config.yaml` file found in the `server` directory of the project.  
 
-* `myExtension.enable`: enable/disable this extension
-* `myExtension.thing`: set to `blah` to do something
+The path of the `config.yaml` file that the extension searches for can be modified by clicking  **File -> Preferences -> Settings** and then navigating to **Extensions -> STRATO**. Once there, the path can be changed under **Config Path**.    
 
-## Known Issues
+The `config.yaml` should contain the information about the node(s) to be displayed.
+Example:
+```
+apiDebug: false
+restVersion: 6
+timeout: 120000
+dappPath: ./dapp
+libPath: blockapps-sol/dist
+apiUrl: /api/v1
+deployFilename: ./config/localhost.deploy.yaml
+dappContractName: [NAME_OF_DAPP]
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+nodes:
+  - id: 0
+    url: "http://localhost:8080"
+    publicKey: "6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0"
+    port: 30303
+    oauth:
+      appTokenCookieName: "tt_session"
+      scope: "email openid"
+      appTokenCookieMaxAge: 7776000000 # 90 days: 90 * 24 * 60 * 60 * 1000
+      clientId: "[CLIENT_ID_GOES_HERE]"
+      clientSecret: "[CLIENT_SECRET_GOES_HERE]"
+      openIdDiscoveryUrl: "[OPEN_ID_DISCOVERY_URL_GOES_HERE]"
+      redirectUri: "http://localhost/api/v1/authentication/callback"
+      logoutRedirectUri: "http://localhost"
+```
 
-## Release Notes
+## Deployment
+This will list the Deployments of the Dapp and give information about the Dapp such as the `address`, `chainID`, `block_hash`, etc.
+![Deployments Tree View](docs/deployments.png)
 
-Users appreciate release notes as you update your extension.
+## Debugger Setup
+**NOTE: The following are required in order to use the debugger:**
+- The project must be using blockapps-rest 8.0 or higher
+- The STRATO node must be started with vmDebug=true
+- The version of STRATO must be 7.0 or higher  
 
-### 1.0.0
+To set the Debugger up, click on the icon for **Run and Debug**. Click the dropdown for the box with the green play arrow. 
 
-Initial release of ...
 
-### 1.0.1
+In the dropdown, select **Add Configuration...**, which will open the `launch.json` file with a dropdown.   
+![Add confugration](docs/add_configuration.png)
 
-Fixed issue #.
+Click **Debug SolidVM** in the dropdown.   
+![Debug SolidVM](docs/launch_json.png)
+![Configuration Set](docs/strato_launch.png)
 
-### 1.1.0
-
-Added features X, Y, and Z.
-
------------------------------------------------------------------------------------------------------------
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-**Note:** You can author your README using Visual Studio Code.  Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux)
-* Toggle preview (`Shift+CMD+V` on macOS or `Shift+Ctrl+V` on Windows and Linux)
-* Press `Ctrl+Space` (Windows, Linux) or `Cmd+Space` (macOS) to see a list of Markdown snippets
-
-### For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+Go to the box with the green arrow once again and make sure **Debug SolidVM** is selected from the dropdown. Click the green play button itself, which should start the debugger.  
+![Run and Debug SolidVM](docs/debug_solidvm.png)
+![Press Play](docs/press_play.png)

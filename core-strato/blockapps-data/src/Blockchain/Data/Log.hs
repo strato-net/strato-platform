@@ -4,10 +4,10 @@ module Blockchain.Data.Log (
   ) where
 
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.ExtendedWord
 import           Control.DeepSeq
 import qualified Data.ByteString           as B
 import           GHC.Generics
-import           Network.Haskoin.Internals (Word256, Word512)
 
 data Log =
   Log {

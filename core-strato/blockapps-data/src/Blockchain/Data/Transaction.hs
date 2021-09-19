@@ -31,15 +31,14 @@ import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
 import           Control.Monad.Trans.Reader
 import qualified Data.ByteString                as B
-import qualified Data.ByteString.Base16         as B16
-import           Data.ByteString.Internal
+import qualified Data.ByteString.Short as BSS
 import           Data.Map.Strict                (Map)
 import qualified Data.Map.Strict                as M
 import           Data.Maybe
 import           Data.Text                      (Text)
 import           Data.Time.Clock
+import           Data.Word
 import qualified Database.Persist.Postgresql    as SQL
-import           Numeric
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.Code
@@ -50,23 +49,18 @@ import           Blockchain.Data.TransactionDef
 import           Blockchain.Data.TXOrigin
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
+import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
+import qualified Blockchain.Strato.Model.Secp256k1 as EC
 import           Blockchain.Util
 
-import           Blockchain.ExtendedECDSA
-import           Network.Haskoin.Internals      hiding (Address, txHash, txSignature)
+import qualified Crypto.Secp256k1 as SEC
 
 import           Control.DeepSeq
 import           System.Clock
 
-import           Blockchain.Strato.Model.Class
-import           Blockchain.Strato.Model.ExtendedWord (Word256)
 
-
---TODO: remove some of these, reorganize
---import qualified Crypto.Secp256k1 as SEC
---import qualified Data.ByteString.Short as BSS
---import qualified Blockchain.Strato.Model.Secp256k1 as EC
 
 instance TransactionLike Transaction where
     txHash        = \case
@@ -187,14 +181,18 @@ insertTX' mode origin blockNum txs = do
         map (\tx -> txAndTime2RawTX origin tx (fromMaybe (-1) blockNum) time) txs
   insertRawTX' mode rawTXs
 
-addLeadingZerosTo64::String->String
-addLeadingZerosTo64 x = replicate (64 - length x) '0' ++ x
-
-createMessageTX::MonadIO m=>Integer->Integer->Integer->Address->Integer->B.ByteString-> Maybe (Map Text Text) -> PrvKey->SecretT m Transaction
+createMessageTX::Integer->Integer->Integer->Address->Integer->B.ByteString-> Maybe (Map Text Text) -> EC.PrivateKey->IO Transaction
 createMessageTX n gp gl to' val theData md prvKey = createChainMessageTX n gp gl to' val theData Nothing md prvKey
 
-createChainMessageTX :: MonadIO m
-                     => Integer
+
+-- so we can convert R and S from the signature, and add 27 to V, per
+-- Ethereum protocol (and backwards compatibility)
+getSigVals :: EC.Signature -> (Word256, Word256, Word8)
+getSigVals (EC.Signature (SEC.CompactRecSig r s v)) =
+  let convert = bytesToWord256 . BSS.fromShort
+  in (convert r, convert s, v + 0x1b)
+
+createChainMessageTX :: Integer
                      -> Integer
                      -> Integer
                      -> Address
@@ -202,8 +200,8 @@ createChainMessageTX :: MonadIO m
                      -> B.ByteString
                      -> Maybe Word256
                      -> Maybe (Map Text Text)
-                     -> PrvKey
-                     -> SecretT m Transaction
+                     -> EC.PrivateKey
+                     -> IO Transaction
 createChainMessageTX n gp gl to' val theData cid md prvKey = do
   let unsignedTX = MessageTX {
                      transactionNonce = n,
@@ -219,33 +217,23 @@ createChainMessageTX n gp gl to' val theData cid md prvKey = do
                      transactionMetadata = md
                    }
   let theHash = partialTransactionHash unsignedTX
-  ExtendedSignature signature yIsOdd <- extSignMsg (keccak256ToWord256 theHash) prvKey
-  return
-    unsignedTX {
-      transactionR =
-        case B16.decode $ B.pack $ map c2w $ addLeadingZerosTo64 $ showHex (sigR signature) "" of
-          (val', "") -> byteString2Integer val'
-          _          -> error ("error: sigR is: " ++ showHex (sigR signature) ""),
-      transactionS =
-        case B16.decode $ B.pack $ map c2w $ addLeadingZerosTo64 $ showHex (sigS signature) "" of
-          (val', "") -> byteString2Integer val'
-          _          -> error ("error: sigS is: " ++ showHex (sigS signature) ""),
-      transactionV = if yIsOdd then 0x1c else 0x1b
-    }
 
-createContractCreationTX::MonadIO m=>Integer->Integer->Integer->Integer->Code-> Maybe (Map Text Text) -> PrvKey->SecretT m Transaction
+  let (r, s, v) = getSigVals $ EC.signMsg prvKey $ word256ToBytes $ keccak256ToWord256 theHash
+  
+  return unsignedTX { transactionR = toInteger r, transactionS = toInteger s, transactionV = v }
+
+createContractCreationTX::Integer->Integer->Integer->Integer->Code-> Maybe (Map Text Text) -> EC.PrivateKey->IO Transaction
 createContractCreationTX n gp gl val init' md prvKey = createChainContractCreationTX n gp gl val init' Nothing md prvKey
 
-createChainContractCreationTX :: MonadIO m
-                              => Integer
+createChainContractCreationTX :: Integer
                               -> Integer
                               -> Integer
                               -> Integer
                               -> Code
                               -> Maybe Word256
                               -> Maybe (Map Text Text)
-                              -> PrvKey
-                              -> SecretT m Transaction
+                              -> EC.PrivateKey
+                              -> IO Transaction
 createChainContractCreationTX n gp gl val init' cid md prvKey = do
   let unsignedTX = ContractCreationTX {
                      transactionNonce = n,
@@ -261,26 +249,16 @@ createChainContractCreationTX n gp gl val init' cid md prvKey = do
                    }
 
   let theHash = partialTransactionHash unsignedTX
-  ExtendedSignature signature yIsOdd <- extSignMsg (keccak256ToWord256 theHash) prvKey
-  return
-    unsignedTX {
-      transactionR =
-        case B16.decode $ B.pack $ map c2w $ addLeadingZerosTo64 $ showHex (sigR signature) "" of
-          (val', "") -> byteString2Integer val'
-          _          -> error ("error: sigR is: " ++ showHex (sigR signature) ""),
-      transactionS =
-        case B16.decode $ B.pack $ map c2w $ addLeadingZerosTo64 $ showHex (sigS signature) "" of
-          (val', "") -> byteString2Integer val'
-          _          -> error ("error: sigS is: " ++ showHex (sigS signature) ""),
-      transactionV = if yIsOdd then 0x1c else 0x1b
-    }
 
+  let (r, s, v) = getSigVals $ EC.signMsg prvKey $ word256ToBytes $ keccak256ToWord256 theHash
+  
+  return unsignedTX { transactionR = toInteger r, transactionS = toInteger s, transactionV = v }
 
 {-
   Switch to Either?
 -}
 
-{-whoSignedThisTransaction :: Transaction -> Maybe Address
+whoSignedThisTransaction :: Transaction -> Maybe Address
 whoSignedThisTransaction tx = case tx of
   PrivateHashTX{} -> Just (Address 0)
   t -> fromPublicKey <$> EC.recoverPub sig mesg
@@ -288,8 +266,8 @@ whoSignedThisTransaction tx = case tx of
           intToBSS = BSS.toShort . word256ToBytes . fromInteger
           sig = EC.Signature (SEC.CompactRecSig (intToBSS $ transactionR t) (intToBSS $ transactionS t) ((transactionV t) - 0x1b))
           mesg = keccak256ToByteString $ partialTransactionHash t
--}
 
+{-
 whoSignedThisTransaction::Transaction->Maybe Address -- Signatures can be malformed, hence the Maybe
 whoSignedThisTransaction tx = case tx of
   PrivateHashTX{} -> Just (Address 0)
@@ -297,7 +275,7 @@ whoSignedThisTransaction tx = case tx of
         where
           xSignature = ExtendedSignature (Signature (fromInteger $ transactionR t) (fromInteger $ transactionS t)) (0x1c == transactionV t)
           theHash = partialTransactionHash t
-
+-}
 isContractCreationTX::Transaction->Bool
 isContractCreationTX ContractCreationTX{} = True
 isContractCreationTX _                    = False

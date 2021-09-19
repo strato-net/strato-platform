@@ -4,7 +4,6 @@ version:             0.1.0.0
 author:              jamshid
 maintainer:          jim
 build-type:          Simple
-license:             Apache-2.0
 
 dependencies:
   - base
@@ -37,15 +36,16 @@ library:
   - strato-model
 
 
-tests:
-  encryption-tests:
-    source-dirs: test/
-    main: Spec.hs
-    dependencies:
-      - base16-bytestring
-      - bytestring
-      - crypto-pubkey-types
-      - ethereum-encryption
-      - hspec
-      - strato-model
-      - QuickCheck
+#temporarily removing this test while I decide if it is still needed
+#tests:
+#  encryption-tests:
+#    source-dirs: test/
+#    main: Spec.hs
+#    dependencies:
+#      - base16-bytestring
+#      - bytestring
+#      - crypto-pubkey-types
+#      - ethereum-encryption
+#      - hspec
+#      - strato-model
+#      - QuickCheck

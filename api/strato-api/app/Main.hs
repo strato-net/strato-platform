@@ -96,7 +96,7 @@ type CoreAPI =
   )
 
 type FullAPI = CoreAPI :<|> "bloc" :> "v2.2" :> BlocAPI
-  
+
 coreServer :: (MonadLogger m, HasSQL m) => ServerT CoreAPI m
 coreServer = Account.server
   :<|> BatchTransactionResult.server
@@ -160,7 +160,7 @@ main = do
       nonceCounterTimeout=10
       sourceCacheTimeout=60
       txQueueSize=4096
-      
+
   nonceCache <- Cache.newCache . Just $ TimeSpec nonceCounterTimeout 0
   codePtrCache <- Cache.newCache . Just $ TimeSpec sourceCacheTimeout 0
   sourceCache <- Cache.newCache . Just $ TimeSpec sourceCacheTimeout 0
@@ -168,10 +168,11 @@ main = do
 
   sqlEnv <- createSQLEnv
   blocSQLEnv <- createBlocSQLEnv "postgres" 5432 "postgres" "api"
-  
+
   let env =
         BlocEnv{
           gasOn = flags_gasOn,
+          evmCompatible= flags_evmCompatible,
           stateFetchLimit = stateFetchLimit',
           globalNonceCounter = nonceCache,
           globalCodePtrCache = codePtrCache,
@@ -181,7 +182,7 @@ main = do
   run 3000 $ app env sqlEnv blocSQLEnv theDoc
 
 app :: BlocEnv -> SQLEnv -> BlocSQLEnv -> Swagger -> Application
-app blocEnv sqlEnv blocSQLEnv theDoc = 
+app blocEnv sqlEnv blocSQLEnv theDoc =
   prometheus def{prometheusInstrumentApp = False}
   $ instrumentApp "core-api"
   $ logStdoutDev
@@ -198,7 +199,7 @@ addPathsTo404 baseApp req respond =
   baseApp req $ \response -> do
     if responseStatus response /= status404
     then respond response
-    else 
+    else
       respond $ responseLBS notFound404 [("Content-Type", "text/plain")] $ BLC.pack
         $ "There is no content at: " ++ show (rawPathInfo req)
         ++ "\nHere are the available routes:" ++ tab ("\n" ++ unlines allPaths) ++ "\n"

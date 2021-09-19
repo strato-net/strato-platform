@@ -11,7 +11,6 @@
 module Blockchain.Strato.Model.Address
     ( Address(..),
       fromPrivateKey, fromPublicKey,
-      prvKey2Address, pubKey2Address,
       formatAddressWithoutColor,
       stringAddress,
       getNewAddress_unsafe,
@@ -33,14 +32,11 @@ import qualified Data.ByteString.Char8                as BC
 import qualified Data.ByteString.Lazy                 as BL
 import           Data.Data
 import           Data.Hashable
-import           Data.Maybe                           (fromMaybe)
 import           Data.Swagger                         hiding (Format, format, get, put)
 import qualified Data.Swagger                         as Sw
 import qualified Data.Text                            as T
 import           Database.Persist.Sql                 hiding (get)
 import           GHC.Generics
-import qualified Network.Haskoin.Crypto               as Deprecated 
-import qualified Network.Haskoin.Internals            as Deprecated 
 import           Numeric
 import           Servant.API
 import           Servant.Docs
@@ -90,24 +86,7 @@ fromPrivateKey =
 
 fromPublicKey :: PublicKey -> Address
 fromPublicKey = Address . fromIntegral . SHA.keccak256ToWord256 . SHA.hash . B.drop 1 . exportPublicKey False
- 
 
--- below are the deprecated Haskoin key->address functions
-prvKey2Address :: Deprecated.PrvKey -> Address
-prvKey2Address prvKey =
-  Address $ fromIntegral $ SHA.keccak256ToWord256 $ SHA.hash $ BL.toStrict $ encode x `BL.append` encode y
-  where
-    point = Deprecated.pubKeyPoint $ Deprecated.derivePubKey prvKey
-    x = fromMaybe (error "getX failed in prvKey2Address") $ Deprecated.getX point
-    y = fromMaybe (error "getY failed in prvKey2Address") $ Deprecated.getY point
-
-pubKey2Address :: Deprecated.PubKey -> Address
-pubKey2Address pubKey =
-  Address $ fromIntegral $ SHA.keccak256ToWord256 $ SHA.hash $ BL.toStrict $ encode x `BL.append` encode y
-  where
-    x = fromMaybe (error "getX failed in prvKey2Address") $ Deprecated.getX point
-    y = fromMaybe (error "getY failed in prvKey2Address") $ Deprecated.getY point
-    point = Deprecated.pubKeyPoint pubKey
 
 {-
  Was necessary to make Address a primary key - which we no longer do (but rather index on the address field).
@@ -155,9 +134,13 @@ instance Binary Address where
     let byteString = B.pack bytes
     return (Address $ fromInteger $ byteString2Integer byteString)
 
+maybeToEither :: b -> Maybe a -> Either b a
+maybeToEither err m = maybe (Left err) Right m
+
+
 instance PersistField Address where
   toPersistValue = PersistText . T.pack . formatAddressWithoutColor
-  fromPersistValue (PersistText t) = Deprecated.maybeToEither "could not decode address"
+  fromPersistValue (PersistText t) = maybeToEither "could not decode address"
                                    . stringAddress
                                    . T.unpack $ t
   fromPersistValue x = Left . T.pack $ "PersistField Address: expected PersistText: " ++ show x

@@ -18,10 +18,12 @@ import           Control.Lens                       (mapped)
 import           Control.Lens.Operators             hiding ((.=))
 import           Data.Aeson                         hiding (Success)
 import           Data.Aeson.Casing
+import qualified Data.ByteString                    as B
 import           Data.Map                           (Map)
 import qualified Data.Map                           as Map
 import           Data.Maybe
 import           Data.Text                          (Text)
+import           Data.Word
 import qualified Generic.Random                     as GR
 import           GHC.Generics
 import           Numeric.Natural
@@ -34,8 +36,10 @@ import           BlockApps.Bloc22.API.SwaggerSchema
 import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Solidity.ArgValue
-import           BlockApps.Strato.Types
-
+import           BlockApps.Strato.Types            hiding (TransactionResult)
+  
+import           Blockchain.Strato.Model.Code
+import           Blockchain.Strato.Model.ExtendedWord   (Word256)
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Nonce
@@ -71,12 +75,86 @@ type PostBlocTransactionParallel = "transaction"
   :> ReqBody '[JSON] PostBlocTransactionRequest
   :> Post '[JSON] [BlocChainOrTransactionResult]
 
+type PostBlocTransactionRaw = "transaction"
+  :> "raw"
+  :> S.Header "X-USER-UNIQUE-NAME" Text
+  :> QueryParam "chainid" ChainId
+  :> QueryFlag "resolve"
+  :> ReqBody '[JSON] PostBlocTransactionRawRequest
+  :> Post '[JSON] BlocChainOrTransactionResult
+
 type PostBlocTransaction = "transaction"
   :> S.Header "X-USER-UNIQUE-NAME" Text
   :> QueryParam "chainid" ChainId
   :> QueryFlag "resolve"
   :> ReqBody '[JSON] PostBlocTransactionRequest
   :> Post '[JSON] [BlocChainOrTransactionResult]
+
+
+data PostBlocTransactionRawRequest = PostBlocTransactionRawRequest
+  { postbloctransactionrawrequestAddress    :: Address
+  , postbloctransactionrawrequestNonce      :: Nonce
+  , postbloctransactionrawrequestGasPrice   :: Wei
+  , postbloctransactionrawrequestGasLimit   :: Gas
+  , postbloctransactionrawrequestTo         :: Maybe Address
+  , postbloctransactionrawrequestValue      :: Wei
+  , postbloctransactionrawrequestInitOrData :: Code
+  , postbloctransactionrawrequestChainId    :: Maybe ChainId
+  , postbloctransactionrawrequestR          :: Word256
+  , postbloctransactionrawrequestS          :: Word256
+  , postbloctransactionrawrequestV          :: Maybe Word8   -- we can infer from Address if necessary
+  , postbloctransactionrawrequestMetadata   :: Maybe (Map Text Text)
+} deriving (Eq, Show, Generic)
+
+
+instance Arbitrary PostBlocTransactionRawRequest where
+  arbitrary = GR.genericArbitrary GR.uniform
+
+instance ToJSON PostBlocTransactionRawRequest where
+   toJSON = genericToJSON (aesonPrefix camelCase)
+
+instance FromJSON PostBlocTransactionRawRequest where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+ 
+
+instance ToSample PostBlocTransactionRawRequest where
+  toSamples _ = singleSample $ 
+    PostBlocTransactionRawRequest
+      (Address 0x12345678)
+      (Nonce 42)
+      (Wei 1)
+      (Gas 2190000)
+      Nothing
+      (Wei 4)
+      (Code (B.singleton 7))
+      Nothing
+      (21 :: Word256) 
+      (42 :: Word256)
+      Nothing
+      Nothing
+
+instance ToSchema PostBlocTransactionRawRequest where
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.name ?~ "PostBlocTransactionRawRequest"
+    & mapped.schema.description ?~ "Post Bloc Transaction Raw Request"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex :: PostBlocTransactionRawRequest
+      ex = PostBlocTransactionRawRequest
+        (Address 0x12345678)
+        (Nonce 42)
+        (Wei 1)
+        (Gas 2190000)
+        Nothing
+        (Wei 4)
+        (Code (B.singleton 7))
+        Nothing
+        (21 :: Word256) 
+        (42 :: Word256)
+        Nothing
+        Nothing
+       
+
 
 data PostBlocTransactionRequest = PostBlocTransactionRequest
   { postbloctransactionrequestAddress  :: Maybe Address

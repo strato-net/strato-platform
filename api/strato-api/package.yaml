@@ -44,9 +44,30 @@ executables:
     - wai-extra
     - wai-middleware-prometheus
     - warp
+    ghc-options: -threaded
 
   strato-api-init:
     main:                StratoAPIInit.hs
     source-dirs:         app
     other-modules:
     - SelectAccessible
+
+  post-raw-transaction:
+    main:                PostRawTransaction.hs
+    source-dirs:         app
+    other-modules:
+    - Options
+    dependencies:
+    - aeson
+    - bloc2api
+    - blockapps-datadefs
+    - blockapps-ethereum
+    - bytestring
+    - containers
+    - format
+    - http-client
+    - servant-client
+    - split
+    - strato-model
+    - text
+    - x509-certs

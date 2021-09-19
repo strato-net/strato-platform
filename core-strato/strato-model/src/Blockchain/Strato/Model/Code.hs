@@ -4,14 +4,15 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Blockchain.Strato.Model.Code where
 
+import           Control.Lens.Operators
 import           Control.DeepSeq
 import           Data.Binary
 import qualified Data.ByteString     as B
 import qualified Data.ByteString.Base16     as B16
 import           Data.Data
-import           Data.DeriveTH
 import qualified Data.Text as T
 import           Data.Text.Encoding  (encodeUtf8, decodeUtf8)
+import           Data.Swagger
 import           Database.Persist.TH
 import           GHC.Generics
 import           Data.Aeson
@@ -28,7 +29,8 @@ data Code = Code { codeBytes :: B.ByteString }
 instance Binary Code where
 instance NFData Code
 
-derive makeArbitrary ''Code
+instance Arbitrary Code where
+  arbitrary = Code <$> arbitrary
 
 derivePersistField "Code"
 
@@ -37,6 +39,14 @@ instance RLPSerializable Code where
     rlpEncode (PtrToCode codePtr) = RLPArray [rlpEncode codePtr]
     rlpDecode (RLPArray [x]) = PtrToCode $ rlpDecode x
     rlpDecode x = Code $ rlpDecode x
+
+instance ToSchema Code where
+  declareNamedSchema _ = return $
+    NamedSchema (Just "Code")
+      ( mempty
+        & type_ ?~ SwaggerString
+        & example ?~ toJSON (Code (B.singleton 1))
+        & description ?~ "Code Bytestring" )
 
 instance ToJSON Code where
   toJSON (Code bytes) = String . decodeUtf8 . B16.encode $ bytes

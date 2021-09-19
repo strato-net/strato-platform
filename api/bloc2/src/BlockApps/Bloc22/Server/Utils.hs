@@ -19,7 +19,6 @@ module BlockApps.Bloc22.Server.Utils
 
 import           Control.Concurrent               (threadDelay)
 import           Control.Monad                    (forM, unless, when)
-import           Control.Monad.IO.Class           (liftIO)
 import qualified Data.ByteString.Base16           as BS16
 import qualified Data.Map.Strict                  as M
 import           Data.Maybe

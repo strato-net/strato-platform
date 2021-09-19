@@ -11,10 +11,14 @@ dependencies:
   - deepseq
   - ethereum-rlp
   - format
+  - generic-arbitrary
+  - generic-random
   - labeled-error
   - lens
   - persistent
   - persistent-template
+  - QuickCheck
+  - servant-docs
   - strato-model
   - swagger2
   - text

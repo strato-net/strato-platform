@@ -7,11 +7,9 @@ module AuthenticationSpec where
 
 
 import           Control.Lens
-import           Data.Maybe                 (isJust)
 import qualified Data.ByteString            as B
 import qualified Data.ByteString.Base16     as B16
 import qualified Data.ByteString.Char8      as C8
-import           Data.Monoid ((<>))
 import           Data.Maybe
 import qualified Data.Set                   as S
 import           Data.Time.Clock.POSIX

@@ -55,12 +55,12 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Monad
 import           Blockchain.Sequencer.OrderValidator
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.Keccak256         as Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 import qualified Data.ByteString.Char8               as C8
 import qualified Data.Set                            as S
-import qualified Network.Haskoin.Crypto     as HK    -- TODO: get rid of this
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.RequestLogger
 import           Network.Wai.Middleware.Prometheus
@@ -248,24 +248,40 @@ spec = do
             length dedupedOut `shouldBe` length dedupedOut
 
     describe "SequencerM" $ do
+      -- This test sets off three timers, which will fire every millisecond
+      -- Each timer begins by writing the number passed to it to an IORef,
+      -- which stores the current round number. When each timer fires, 
+      -- it checks the current round number in the IORef. If the current
+      -- round number is less than or equal to the value passed to the timer,
+      -- the timer will reset itself to fire after another millisecond.
+      -- Each timer will fire at least once, even if the current round number
+      -- is greater than its value when it is first initialized.
+      -- In this test, since 45 is immediately written to the IORef after 20,
+      -- the timer for 20 should only fire once. The timer for 30 should
+      -- only fire once, since the IORef will already have 45 stored by the
+      -- time the timer for 30 is set. The timer for 45 will repeatedly fire
+      -- until after the threadDelay, when the IORef is set to 200. The call
+      -- to drainTimeouts gets the list of all occurrences of timers firing
+      -- since the beginning of the test. 20 and 30 should show up only once,
+      -- and 45 should show up more than once.
+      -- NOTE: This test can fail in two ways:
+      --   1. The initial timer for 45 is set more than 1 ms after the timer
+      --      for 20, so the timer for 20 resets itself. This results in
+      --      20 being in the list from drainTimeouts more than once.
+      --   2. The timer for 45 does not fire more than once before the end
+      --      of the threadDelay.
+      -- If this test fails, it indicates that the machine on which the test
+      -- is run is overloaded. However, with round period timeout of 1 ms,
+      -- and a threadDelay of 100 ms, this should be ample time for the test
+      -- to run correctly, even if the machine is under heavy load.
       it "queues timeouts -- with retries" $ runTestM $ do
         let input = [20, 45, 30]
-            waitForIt n xs | n > 6000 = pure xs -- 60 seconds
-                           | otherwise = do
-              liftIO . putStrLn $ "waitForIt iteration " ++ show n
-              liftIO $ threadDelay 10000 -- Who are you to judge?
-              rnref <- gets _latestRoundNumber
-              liftIO $ atomicWriteIORef rnref 200
-              xs' <- (xs <>) <$> drainTimeouts
-              let num20 = length $ filter (==20) xs'
-                  num30 = length $ filter (==30) xs'
-                  num45 = length $ filter (==45) xs'
-              if num20 >= 1 && num30 >= 1 && num45 >= 2
-                then pure xs'
-                else waitForIt (n+1) xs'
-        local (\cfg -> cfg{blockstanbulRoundPeriod = RoundPeriod 0.00005}) $
+        local (\cfg -> cfg{blockstanbulRoundPeriod = RoundPeriod 0.001}) $
           mapM_ createNewTimer input
-        out <- waitForIt (0 :: Int) []
+        liftIO $ threadDelay 100000 -- Who are you to judge?
+        rnref <- gets _latestRoundNumber
+        liftIO $ atomicWriteIORef rnref 200
+        out <- drainTimeouts
         filter (==20) out `shouldBe` [20]
         filter (==30) out `shouldBe` [30]
         filter (==45) out `shouldContain` [45, 45]
@@ -416,8 +432,8 @@ spec = do
             let chainId = Keccak256.rlpHash cInfo
              in (chainId, IEGenesis (IngestGenesis TO.Morphism (keccak256ToWord256 chainId, cInfo)))
           getChainTx chainId = do
-            tx <- runIO . HK.withSource HK.devURandom $ do
-              pk <- HK.genPrvKey
+            tx <- runIO $ do
+              pk <- newPrivateKey
               createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just $ keccak256ToWord256 chainId) Nothing pk
             let hashTx = PrivateHashTX (txHash tx) chainId
             pure (hashTx, tx)
@@ -728,3 +744,4 @@ spec = do
         let [(j, og2)] = ogs2
         og2 `shouldBe` og
         i `shouldSatisfy` (< j)
+

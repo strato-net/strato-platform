@@ -10,9 +10,7 @@ module Blockchain.Strato.Discovery.UDPServer
      , connectMe
      ) where
 
-import           ClassyPrelude                           ((<>))
 import           Control.Monad.Catch
-import           Control.Monad.Fail
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
 import           Blockchain.Output
@@ -188,7 +186,7 @@ handleValidPacket sock addr _ packet otherPubKey = let portNum = 30303 :: Int in
     Ping{} -> do
         addPeer'
         time <- liftIO $ round `fmap` getPOSIXTime
-        peerAddr <- fmap IPV4Addr $ liftIO $ inet_addr "127.0.0.1" -- todo: WHAT THE FUCK?!???!?!
+        let peerAddr = IPV4Addr $ tupleToHostAddress (127, 0, 0, 1) -- todo: why is this hardcoded?
         sendPacket sock addr $ Pong (Endpoint peerAddr 30303 30303) 4 (time+50)
 
     Pong{} -> do

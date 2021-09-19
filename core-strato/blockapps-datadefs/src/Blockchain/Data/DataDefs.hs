@@ -14,11 +14,16 @@
 {-# LANGUAGE TypeFamilies               #-}
 {-# OPTIONS_GHC -fno-warn-orphans       #-}
 
+
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE UndecidableInstances #-}
+  
+
 module Blockchain.Data.DataDefs where
 
 import           Control.DeepSeq
 import           Control.Lens
-import           Control.Lens.TH                         (makeLensesFor)
 import           Control.Monad.Trans.Class (lift)
 
 import           Database.Persist
@@ -37,10 +42,13 @@ import           Data.Text                               (Text)
 import           Data.Time
 import           Data.Time.Clock.POSIX
 import           Data.Word
+import qualified Generic.Random               as GR
 import           GHC.Generics
 import           Numeric
+import           Test.QuickCheck
 import           Text.Format
 import           Text.PrettyPrint.ANSI.Leijen            hiding ((<$>))
+import           Servant.Docs                            hiding (pretty)
 
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
@@ -123,6 +131,32 @@ instance NFData TransactionResult
 instance NFData LogDB
 instance NFData EventDB
 
+
+instance Arbitrary TransactionResult where
+  arbitrary = GR.genericArbitrary GR.uniform
+
+
+instance ToSample TransactionResult where
+  toSamples _ = singleSample exampleTxResult
+
+
+exampleTxResult :: TransactionResult
+exampleTxResult = TransactionResult (hash "blockHask")
+                                    (hash "txhash")
+                                    "I'm a tx result message"
+                                    (BSS.pack [5 :: Word8])
+                                    "I'm a tx trace"
+                                    (21 :: Word256)
+                                    (42 :: Word256)
+                                    "[MyNewContractA, MyNewContractB]"
+                                    "[MyOldContract]"
+                                    "I am a state Diff"
+                                    0.2321
+                                    "New Storage"
+                                    "Deleted Storage"
+                                    Nothing
+                                    Nothing
+                                    (Just SolidVM)
 
 instance ToSchema LogDB where
   declareNamedSchema _ = return $

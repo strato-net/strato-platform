@@ -45,14 +45,14 @@ function newnode {
   fi
 
   echo "Starting ethereum-discover"
-  runBackgroundProcess ethereum-discover --vaultWrapperUrl=$vaultWrapperRoot &>> logs/ethereum-discover 
+  runBackgroundProcess ethereum-discover --vaultWrapperUrl=$vaultWrapperRoot &>> logs/ethereum-discover
 
   actualTimeout="${connectionTimeout:-300}"
   if [ -n "${blockstanbulRoundPeriodS}" ]; then
     withCushion=$(( 2 * blockstanbulRoundPeriodS ))
     actualTimeout=$(( actualTimeout > withCushion ? actualTimeout : withCushion ))
   fi
- 
+
   if [[ -n "${blockstanbul}" || -n "${txGossipFanout}" ]]; then
     txgFlag="--txGossipFanout=${txGossipFanout:-3}"
   fi
@@ -120,11 +120,11 @@ function newnode {
   if [ -n "${blockstanbulAdmins}" ]; then
     baFlag="--blockstanbul_admins=${blockstanbulAdmins}"
   fi
-  
+
   adFlag="--isAdmin=${isAdmin}"
   rtFlag="--isRootNode=${isRootNode}"
   vwFlag="--vaultWrapperUrl=${vaultWrapperRoot}"
-  
+
   runBackgroundProcess strato-sequencer \
     "${bpFlag}" "${rpFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" "${vsFlag}" \
     "${baFlag}" "${scFlag}" "${adFlag}" "${rtFlag}" --minLogLevel=$seqMinLogLevel \
@@ -162,21 +162,16 @@ function newnode {
                          --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb \
                          --debugEnabled=$vmDebug --wsDebug=$wsDebug \
                          --debugPort=$debugPort --debugWSPort=$debugWSPort \
-                         --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$evmMinLogLevel \
+                         --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$evmMinLogLevel --evmCompatible=$evmCompatible \
                          "${tbFlag}" "${breFlag}" "${sebFlag}" "${sechFlag}" "${svdFlag}" "${ctrFlag}" \
                          --gasOn=$gasOn +RTS "${vmRunnerRTSOPTs:-}" -N1 &>> logs/vm-runner
-
-  if [ "${USE_OLD_STRATO_API}" = true ]; then
-      echo "Starting core-api"
-      runBackgroundProcess core-api --appFetchLimit=${appFetchLimit:-100} +RTS -N1 >> logs/core-api 2>&1
-  else
-      echo "Starting strato-api"
-      runBackgroundProcess strato-api --gasOn=$gasOn >> logs/strato-api 2>&1
-  fi
+  
+  echo "Starting strato-api"
+  runBackgroundProcess strato-api --gasOn=$gasOn --evmCompatible=$evmCompatible +RTS -N1 >> logs/strato-api 2>&1
 
   if [ "${START_EXPERIMENTAL_STRATO_API}" = true ]; then
       echo "Starting strato-api2"
-      runBackgroundProcess strato-api2 --gasOn=$gasOn >> logs/strato-api2 2>&1
+      runBackgroundProcess strato-api2 --gasOn=$gasOn +RTS -N1 >> logs/strato-api2 2>&1
   fi
 
   echo "Configuring log rotation..."
@@ -287,10 +282,12 @@ function doInit {
       strato-api-init
   fi
 
-  
+
   #we need to create the private key for the faucet
   mkdir config
-  echo -en '\x01\x01\x00\x00\x00\x00\x00\x00\x00\x20\x81\xa2\x9e\x1d\x87\x01\x18\x37\x50\x91\x07\x81\xa3\xb3\xdb\xaf\x0a\xd4\x66\xfa\x6a\x11\x0f\x74\x12\xe2\xf4\x23\xa4\x85\xd8\x1d' > config/priv
+
+  echo -ne "\x1d\xd8\x85\xa4\x23\xf4\xe2\x12\x74\x0f\x11\x6a\xfa\x66\xd4\x0a\xaf\xdb\xb3\xa3\x81\x07\x91\x50\x37\x18\x01\x87\x1d\x9e\xa2\x81" > config/priv
+
 }
 
 # Find all logs greater than 10M, then copy and truncate
@@ -364,6 +361,8 @@ setEnv difficultyBomb false
 setEnv sqlDiff ${sqlDiff:-true}
 setEnv svmTrace ${svmTrace:-false}
 setEnv diffPublish true
+
+setEnv evmCompatible ${EVM_COMPATIBLE:-false}
 
 setEnv evmDebugMode false
 setEnv evmTraceMode false

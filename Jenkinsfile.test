@@ -37,9 +37,10 @@ pipeline {
     stage('Build') {
       steps {
         dir ('strato-worktree') {
+          sh 'rm -rf .docker-work'
           sh 'REPO=private make all'
           dir ('blockapps-rest') {
-            sh 'yarn'
+            sh 'yarn install --pure-lockfile'
             sh 'yarn build'
           }
         }
@@ -123,24 +124,15 @@ pipeline {
             '''
           },
 
-          'Core Strato tests': {
+          'Strato unit tests': {
             sh '''#!/bin/bash -le
               set -x
-              echo "Running core-strato unit tests"
-              cd strato-worktree/core-strato
+              echo "Running unit tests"
+              cd strato-worktree
               ./run_unit_tests.sh
             '''
           },
 
-          'Bloch tests': {
-            sh '''#!/bin/bash -le
-              set -x
-              echo 'Running BlockApps Haskell tests'
-              cd strato-worktree/blockapps-haskell
-              ./run_unit_tests.sh
-            '''
-          },
-            
           'Track And Trace': {
             withEnv([
                 "ADMIN_TOKEN=eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJWY0N4SEpnUjFOdnJ4UWR5QXhQcEI5VEowM205SVRDdWt0b1JfTENVSE1VIn0.eyJqdGkiOiI1ZWE2NTBkNi1lMTM2LTQ5YjEtYTEzYi01MzY5MDM5MDdiNDEiLCJleHAiOjIwMjM5NzQxNDAsIm5iZiI6MCwiaWF0IjoxNTkxOTc0MTQwLCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvc3RyYXRvLWRldmVsIiwiYXVkIjoiYWNjb3VudCIsInN1YiI6IjBjYWFlM2RmLWQ2ZWUtNDkxZC04ODYyLTJlY2ZmM2Y2YTI0MyIsInR5cCI6IkJlYXJlciIsImF6cCI6ImRldi1pbmZpbml0ZSIsImF1dGhfdGltZSI6MTU5MTk3NDE0MCwic2Vzc2lvbl9zdGF0ZSI6IjI3MjEyNjBhLWU1ODItNGJiOS04N2I5LTc0YWQ3YWI5MmMzNyIsImFjciI6IjEiLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsib2ZmbGluZV9hY2Nlc3MiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sInNjb3BlIjoib3BlbmlkIGVtYWlsIHByb2ZpbGUiLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwicHJlZmVycmVkX3VzZXJuYW1lIjoiYWRtaW5pc3RyYXRvckB0dC5hcHAiLCJlbWFpbCI6ImFkbWluaXN0cmF0b3JAdHQuYXBwIn0.s-0MRMAEsG532YLM1k6GaXr3RKFUFpB13vR0WuYP8R1je2cP83hvE7Ll-N8hHbyAy8lumfEgSS6NXVIBCRrm0DEqX-XICOIEEkE6d6H-BPXqKZhfFV_HItfVWbWPDRHsCwvTI2ZAR8rgt19Dd8tWNOUVT_demsi20XYj8H2HuMo9vNMT7AN2wl1qRQPHffEppBrtPAx-PSauQpHm51xPgJSJMJPVhaVMWoM1tL91Ef6TOldZS8y89hReRaxeSZJP9kQWtIMLYe41AWcIKzrteOMBhPwa5e8PFfcDFJjvT6N_ASDtPldsxlNGrceMb0JVMwqmbcoetoE5_lMNKzGTkw",
@@ -184,18 +176,10 @@ pipeline {
                 sh '''sed -i 's|.*blockapps-rest.*|"blockapps-rest": "file:./blockapps-rest",|' package.json'''
                 sh 'touch .env'
                 sh 'yarn build'
-                sh 'yarn install'
+                sh 'yarn install --pure-lockfile'
                 sh 'SERVER=jenkinstest yarn test'
               }
             }
-          },
-
-          'Shared tests': {
-            sh '''#!/bin/bash -le
-              set -x
-              cd strato-worktree
-              stack test ./shared-util/
-            '''
           },
 
           'SMD tests': {

@@ -3,7 +3,6 @@ version:             0.1.0.0
 author:              BlockApps
 maintainer:          blockapps
 build-type:          Simple
-license:             Apache-2.0
 
 dependencies:
   - base
@@ -40,11 +39,11 @@ library:
     - cryptonite
     - data-default
     - deepseq
-    - derive
     - ethereum-rlp
     - extra
     - fast-keccak256
     - format
+    - generic-arbitrary
     - hashable
     - http-api-data
     - integer-gmp

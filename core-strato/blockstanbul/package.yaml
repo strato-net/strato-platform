@@ -22,11 +22,11 @@ library:
   - cross-monitoring
   - data-default
   - deepseq
-  - derive
   - ethereum-encryption
   - ethereum-rlp
   - extra
   - format
+  - generic-arbitrary
   - http-client
   - lens
   - mtl

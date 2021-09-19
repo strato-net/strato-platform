@@ -44,9 +44,10 @@ pipeline {
         withEnv(["RELEASE_VERSION=${env.RELEASE_VERSION}"]) {
           dir ('strato-worktree') {
             sh 'echo ${RELEASE_VERSION} > VERSION'
+            sh 'rm -rf .docker-work'
             sh 'REPO=public make all'
             dir ('blockapps-rest') {
-              sh 'yarn'
+              sh 'yarn install --pure-lockfile'
               sh 'yarn build'
             }
           }
@@ -162,7 +163,7 @@ pipeline {
                   sh '''sed -i 's|.*blockapps-rest.*|"blockapps-rest": "file:./blockapps-rest",|' package.json'''
                   sh 'touch .env'
                   sh 'yarn build'
-                  sh 'yarn install'
+                  sh 'yarn install --pure-lockfile'
                   sh 'SERVER=jenkinstest yarn test'
                 }
               }

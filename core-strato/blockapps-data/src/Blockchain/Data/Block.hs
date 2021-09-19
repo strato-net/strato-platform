@@ -20,7 +20,6 @@ module Blockchain.Data.Block
 
 import Control.DeepSeq
 import Control.Lens
-import Control.Lens.TH (makeLensesFor)
 import Data.Binary
 import Data.Bits
 import qualified Data.ByteString as BS

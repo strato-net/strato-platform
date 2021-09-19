@@ -29,8 +29,6 @@ import qualified Data.Map                                    as M
 import           Data.Maybe
 import qualified Data.Set                                    as S
 import           HFlags
-import           Network.Haskoin.Crypto                      (withSource)
-import qualified Network.Haskoin.Internals                   as Haskoin
 import           Numeric
 import           Text.PrettyPrint.ANSI.Leijen                hiding ((<$>), (</>))
 import           Test.Hspec.Expectations.Lifted
@@ -265,7 +263,7 @@ runTest test = do
                     (theData $ tData' transaction)
                     Nothing
                     (tSecretKey' transaction)
-        signedTransaction' <- liftIO $ withSource Haskoin.devURandom t
+        signedTransaction' <- liftIO t
         let signedTransaction = txToOutputTx signedTransaction'
         result <-
           runExceptT $ addTransaction Nothing True (blockBlockData block) (currentGasLimit $ env test) signedTransaction

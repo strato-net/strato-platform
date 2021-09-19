@@ -9,8 +9,8 @@ module BlockApps.Bloc22.API
   , module BlockApps.Bloc22.API.Git
   , module BlockApps.Bloc22.API.Users
   , module BlockApps.Bloc22.API.Contracts
+  , module BlockApps.Bloc22.API.Transaction
   , module BlockApps.Bloc22.API.Utils
-  , module BlockApps.Bloc22.Crypto
   ) where
 
 import           Data.Proxy
@@ -25,7 +25,6 @@ import           BlockApps.Bloc22.API.Git
 import           BlockApps.Bloc22.API.Transaction
 import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
-import           BlockApps.Bloc22.Crypto
 
 type BlocAPI =
   -- / endpoint, for smoke test. Also exports git details.
@@ -56,6 +55,7 @@ type BlocAPI =
   :<|> PostChainInfos
   -- /transaction endpoints
   :<|> PostBlocTransactionParallel
+  :<|> PostBlocTransactionRaw
   :<|> PostBlocTransaction
 
 markdownBloc :: String

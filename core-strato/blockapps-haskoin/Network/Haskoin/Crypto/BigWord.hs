@@ -1,39 +1,25 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
+
+-- {-# OPTIONS -fno-warn-unused-top-binds #-}
+-- {-# OPTIONS -fno-warn-unused-imports #-}
+
+
 module Network.Haskoin.Crypto.BigWord
 (
--- Useful type aliases
-  TxHash
-, BlockHash
-, Word512
+  Word512
 , Word256
 , Word160
 , Word128
-, FieldP
-, FieldN
+
+--, FieldP
+--, FieldN
 
 -- Data types
 , BigWord(..)
-, BigWordMod(..)
-, Mod512
-, Mod256
-, Mod256Tx
-, Mod256Block
-, Mod160
-, Mod128
-, ModP
-, ModN
 
--- Functions
-, inverseP
-, inverseN
-, quadraticResidue
-, isIntegerValidKey
-, encodeTxHashLE
-, decodeTxHashLE
-, encodeBlockHashLE
-, decodeBlockHashLE
 ) where
 
 import Test.QuickCheck
@@ -42,7 +28,7 @@ import Test.QuickCheck
     , arbitrarySizedBoundedIntegral
     )
 
-import Control.Monad (unless, guard, mzero, (<=<))
+import Control.Monad (unless, mzero, (<=<))
 import Control.DeepSeq (NFData, rnf)
 
 import Data.Bits (Bits(..), FiniteBits(..))
@@ -381,14 +367,6 @@ instance FromJSON (BigWord Mod256) where
 
 instance BigWordMod n => Arbitrary (BigWord n) where
     arbitrary = arbitrarySizedBoundedIntegral
-
--- curveP = 3 (mod 4), thus Lagrange solutions apply
--- http://en.wikipedia.org/wiki/Quadratic_residue
-quadraticResidue :: FieldP -> [FieldP]
-quadraticResidue x = guard (y^(2 :: Int) == x) >> [y, (-y)]
-  where
-    q = (curveP + 1) `div` 4
-    y = x^q
 
 isIntegerValidKey :: Integer -> Bool
 isIntegerValidKey i = i > 0 && i < curveN

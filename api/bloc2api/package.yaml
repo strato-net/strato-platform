@@ -31,7 +31,6 @@ library:
   - cryptonite
   - generic-random
   - gitrev
-  - haskoin-shim
   - http-api-data
   - lens
   - quickcheck-instances
@@ -44,10 +43,3 @@ library:
   - swagger2
   - text
 
-tests:
-  api-test:
-    source-dirs: test/
-    main: APISpec.hs
-    dependencies:
-      - blockapps-bloc22-api
-      - hspec

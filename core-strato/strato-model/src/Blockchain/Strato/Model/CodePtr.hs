@@ -129,7 +129,7 @@ instance FromHttpApiData CodePtr where
            [acct, name] -> flip CodeAtAccount (T.unpack name) <$> parseQueryParam acct
            _ -> case T.split (==':') x of
              [name, hsh] -> SolidVMCode (T.unpack name) <$> parseQueryParam hsh
-             _ -> fail $ "FromHttpApiData CodePtr: couldn't resolve CodePtr from " ++ T.unpack x
+             _ -> Left $ "FromHttpApiData CodePtr: couldn't resolve CodePtr from " `T.append` x
 
 instance S.ToParamSchema CodePtr where
   toParamSchema _ = mempty

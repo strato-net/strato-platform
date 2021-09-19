@@ -54,7 +54,7 @@ import           UnliftIO
 
 import           BlockApps.Bloc22.API.Chain
 import           BlockApps.Bloc22.API.Transaction
-import           BlockApps.Bloc22.API.Users        
+import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Database.Tables
@@ -73,7 +73,7 @@ import           BlockApps.Solidity.Type
 import           BlockApps.Solidity.Value
 import           BlockApps.Solidity.Xabi
 import qualified BlockApps.Solidity.Xabi.Type      as Xabi
-import           BlockApps.Strato.Types            hiding (Account, Transaction (..))
+import           BlockApps.Strato.Types            hiding (Account, Transaction (..), TransactionResult(..))
 import           BlockApps.XAbiConverter
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json
@@ -82,7 +82,7 @@ import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address  hiding (unAddress)
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.CodePtr
-import           Blockchain.Strato.Model.ExtendedWord   (Word256, bytesToWord256)
+import           Blockchain.Strato.Model.ExtendedWord   (Word256, bytesToWord256, word256ToBytes)
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Keccak256  hiding (rlpHash)
 import           Blockchain.Strato.Model.Nonce
@@ -120,6 +120,89 @@ txWorker = forever $ do
   where processTxs = awaitForever $ \(a,b,r,c) ->
           lift . void $ postBlocTransaction' (Do CacheNonce) a b r c
 
+
+
+--------------------------------- RAW (PRE-SIGNED) TRANSACTIONS ------------------------------------
+
+postBlocTransactionRaw :: (MonadLogger m, HasSQL m) =>
+                          Maybe Text     -- username (unused)
+                       -> Maybe ChainId  
+                       -> Bool           -- resolve
+                       -> PostBlocTransactionRawRequest
+                       -> m BlocChainOrTransactionResult
+postBlocTransactionRaw _ _ resolve PostBlocTransactionRawRequest{..} = do
+  -- as a requirement for Pepsi, we have to be able to accept non-rec sigs
+  -- so, if 'v' is not provided, we have to figure out what 'v' is here
+
+  v <- case postbloctransactionrawrequestV of 
+        Just v' -> return v'
+        Nothing -> do
+          let makeSigFromVals :: (Word256, Word256, Word8) -> Signature
+              makeSigFromVals (r', s', v') = Signature 
+                (S.CompactRecSig
+                  (BSS.toShort $ word256ToBytes r')
+                  (BSS.toShort $ word256ToBytes s')
+                  (v' - 0x1b))
+              unsignedTX = UnsignedTransaction
+                postbloctransactionrawrequestNonce
+                postbloctransactionrawrequestGasPrice
+                postbloctransactionrawrequestGasLimit
+                postbloctransactionrawrequestTo
+                postbloctransactionrawrequestValue
+                postbloctransactionrawrequestInitOrData
+                postbloctransactionrawrequestChainId
+              txHash = rlpHash unsignedTX
+          
+          -- try both 27 and 28, see what matches
+              sig1 = makeSigFromVals (postbloctransactionrawrequestR, postbloctransactionrawrequestS, 27)
+              address1 = fromMaybe (Address 0x0) $ fmap fromPublicKey $ recoverPub sig1 txHash 
+              sig2 = makeSigFromVals (postbloctransactionrawrequestR, postbloctransactionrawrequestS, 28)
+              address2 = fromMaybe (Address 0x0) $ fmap fromPublicKey $ recoverPub sig2 txHash
+          if address1 == postbloctransactionrawrequestAddress
+            then return 27
+          else if address2 == postbloctransactionrawrequestAddress
+            then return 28
+          else
+            throwIO $ UserError $ Text.pack "Couldn't calculate 'v' for transaction signature - must be a bad signature"
+  
+  -- construct the Transaction
+  time <- liftIO getCurrentTime
+  let tx = Transaction
+               postbloctransactionrawrequestNonce
+               postbloctransactionrawrequestGasPrice
+               postbloctransactionrawrequestGasLimit
+               postbloctransactionrawrequestTo
+               postbloctransactionrawrequestValue
+               postbloctransactionrawrequestInitOrData
+               postbloctransactionrawrequestChainId
+               v
+               postbloctransactionrawrequestR
+               postbloctransactionrawrequestS
+               postbloctransactionrawrequestMetadata
+      rawTx = preparePostTx time postbloctransactionrawrequestAddress tx
+
+  txHash <- postTransaction rawTx
+  
+  
+
+  trds <- recurseTRDs resolve [txHash]
+  case trds of
+    [] -> throwIO $ AnError $ Text.pack "empty TRD response, which shouldn't happen"
+    [x] -> return $ BlocTxResult $ BlocTransactionResult 
+              { blocTransactionStatus   = trdStatus x
+              , blocTransactionHash     = txHash
+              , blocTransactionTxResult = trdResult x
+              , blocTransactionData     = Nothing   -- can we get this without the txHash table query?
+              }
+    _ -> throwIO $ UserError $ Text.pack "found multiple tx results for a single tx"
+
+
+
+
+---------------------------------- REGULAR TRANSACTIONS ---------------------------------------
+
+
+
 postBlocTransactionParallel :: (MonadLogger m,
                                 HasBlocEnv m, HasBlocSQL m, HasCoreAPI m, HasVault m, HasSQL m) =>
                                Maybe Text
@@ -133,8 +216,9 @@ postBlocTransactionParallel a b resolve queue c =
     then do
       tbqueue <- fmap txTBQueue getBlocEnv
       atomically $ writeTBQueue tbqueue (a,b,resolve,c)
-      pure [] 
+      pure []
     else postBlocTransaction' (Do CacheNonce) a b resolve c
+
 
 postBlocTransaction :: (MonadLogger m,
                         HasBlocEnv m, HasBlocSQL m, HasCoreAPI m, HasVault m, HasSQL m) =>
@@ -154,6 +238,7 @@ postBlocTransaction' :: (MonadLogger m,
                      -> PostBlocTransactionRequest
                      -> m [BlocChainOrTransactionResult]
 postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRequest mAddr txs' txParams msrcs) = do
+  evmCompatibleOn <- fmap evmCompatible getBlocEnv
   case mUserName of
     Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-UNIQUE-NAME in the header"
     Just userName -> do
@@ -210,7 +295,10 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
                             Just "SolidVM" -> postUsersContractSolidVM'
                             Just vm -> \_ _ _ -> throwIO $ UserError $ Text.pack
                                                $ "Invalid value for VM choice: " ++ show vm
-            fmap ((:[]) . BlocTxResult) $ poster cacheNonce bcp userName
+            if evmCompatibleOn && (Map.lookup "VM" =<< md) == Just "SolidVM"
+                then throwIO $ UserError $ Text.pack "Error: EVM Compatibility flag is On. This feature cannot be used."
+            else do
+                fmap ((:[]) . BlocTxResult) $ poster cacheNonce bcp userName
           xs -> do
             ps <- mapM fromContract xs
             let bclp = ContractListParameters
@@ -230,7 +318,10 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
                   Just "SolidVM" -> postUsersUploadListSolidVM'
                   Just vm -> \_ _ _ -> throwIO $ UserError $ Text.pack
                                      $ "Invalid value for VM choice: " ++ show vm
-            fmap BlocTxResult <$> poster cacheNonce bclp userName
+            if evmCompatibleOn && (Map.lookup "VM" =<< md) == Just "SolidVM"
+              then throwIO $ UserError $ Text.pack "Error: EVM Compatibility flag is On. This feature cannot be used."
+            else do
+              fmap BlocTxResult <$> poster cacheNonce bclp userName
         FUNCTION -> case txs of
           [] -> return []
           [x] -> do
@@ -282,13 +373,14 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
           _ -> throwIO $ UserError "Could not decode function arguments from body"
 
 
+
 -- so we can convert R and S from the signature, and add 27 to V, per
 -- Ethereum protocol (and backwards compatibility)
 getSigVals :: Signature -> (Word256, Word256, Word8)
 getSigVals (Signature (S.CompactRecSig r s v)) =
   let convert = bytesToWord256 . BSS.fromShort
   in (convert r, convert s, v + 0x1b)
- 
+
 
 callSignature :: (MonadIO m, MonadLogger m, HasVault m) =>
                  Text -> UnsignedTransaction -> m Transaction
@@ -406,6 +498,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} userName = blocTrans
       (Code $ Text.encodeUtf8 $ serializeSourceMap contractdetailsSrc)
       chainId
   $logDebugLS "postUsersContractSolidVM'/tx" tx
+
   txHash <- postTransaction tx
   $logInfoLS "postUsersContractSolidVM'/hash" txHash
   void . blocModify $ \conn -> runInsertMany conn hashNameTable [
@@ -927,4 +1020,3 @@ getArgValues argsMap argNamesTypes = do
         throwIO (UserError ("argument names don't match: " <> argNames1 <> " " <> argNames2))
       else sequence $ Map.intersectionWith determineValue argsMap argNamesTypes
     return $ map snd (sortOn fst (toList argsVals))
-

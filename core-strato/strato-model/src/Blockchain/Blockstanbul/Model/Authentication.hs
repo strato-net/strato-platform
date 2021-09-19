@@ -3,7 +3,6 @@ module Blockchain.Blockstanbul.Model.Authentication where
 
 import Control.Lens
 import qualified Data.ByteString as B
-import Data.Monoid ((<>))
 
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Address
