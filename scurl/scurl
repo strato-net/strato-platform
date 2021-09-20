@@ -7,7 +7,7 @@ set -e
 #This should be replaced with the new `--fail-with-body` flag once we are all using curl 7.76+
 curlf() {
     OUTPUT_FILE=$(mktemp)
-    HTTP_CODE=$(curl --silent --output $OUTPUT_FILE --write-out "%{http_code}" "$@")
+    HTTP_CODE=$(curl --silent --show-error --output $OUTPUT_FILE --write-out "%{http_code}" "$@")
     if [[ ${HTTP_CODE} -lt 200 || ${HTTP_CODE} -gt 299 ]] ; then
 	>&2 cat $OUTPUT_FILE
 	return 22
