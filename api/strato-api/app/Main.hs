@@ -18,6 +18,7 @@ import           Control.Lens.Operators
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Reader
 import           Data.Aeson
+import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString.Lazy.Char8      as BLC
 import qualified Data.Cache                      as Cache
 import qualified Data.HashMap.Strict.InsOrd      as H
@@ -41,6 +42,7 @@ import           System.Clock
 import           BlockApps.Bloc22.API
 import           BlockApps.Bloc22.Monad          -- hiding (handleRuntimeError)
 import           BlockApps.Bloc22.Server
+import           BlockApps.Bloc22.Server.BlocOptions    ()
 import           BlockApps.Init
 
 import           Control.Monad.Composable.BlocSQL
@@ -201,7 +203,7 @@ addPathsTo404 baseApp req respond =
     then respond response
     else
       respond $ responseLBS notFound404 [("Content-Type", "text/plain")] $ BLC.pack
-        $ "There is no content at: " ++ show (rawPathInfo req)
+        $ "There is no content at: \"" ++ BC.unpack (requestMethod req) ++ " " ++ BC.unpack (rawPathInfo req) ++ "\""
         ++ "\nHere are the available routes:" ++ tab ("\n" ++ unlines allPaths) ++ "\n"
       where
         allPaths = H.keys $ _swaggerPaths $ toSwagger (Proxy :: Proxy FullAPI)

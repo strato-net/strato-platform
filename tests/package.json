@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "description": "platform tests",
   "scripts": {
-    "test": "npm run test:blockhash && npm run test:e2e && npm run test:dataTypes && npm run test:load && npm run test:load10k && npm run test:solidvm && npm run test:upload && npm run test:upload10k && npm run test:loadFF && npm run test:truchainz && npm run test:multicontract && npm run test:uploadOrder && npm run test:slipstream",
+    "test": "npm run test:blockhash && npm run test:truchainz && npm run test:multicontract && npm run test:slipstream && npm run test:solidvm && npm run test:uploadOrder",
     "test:blockhash": "mocha -r ts-node/register e2e/blockhash.test.ts",
     "test:e2e": "mocha -r ts-node/register e2e/createUser.test.ts && mocha -r ts-node/register e2e/import.constructor.test.ts && mocha -r ts-node/register e2e/import.test.ts",
     "test:dataTypes": "mocha -r ts-node/register regressions/address.test.ts && mocha -r ts-node/register regressions/bool.test.ts && mocha -r ts-node/register regressions/bytes.test.ts && mocha -r ts-node/register regressions/enum.test.ts && mocha -r ts-node/register regressions/string.test.ts && mocha -r ts-node/register regressions/uint.test.ts && mocha -r ts-node/register regressions/negative.test.ts",
