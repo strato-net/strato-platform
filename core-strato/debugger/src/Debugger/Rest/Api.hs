@@ -13,6 +13,7 @@ module Debugger.Rest.Api
   , restDebuggerAPI
   ) where
 
+import           Data.Aeson      as A
 import qualified Data.Map.Strict as M
 import qualified Data.Text       as T
 import           Debugger.Types
@@ -34,6 +35,7 @@ type RestDebuggerAPI = GetStatus
                   :<|> PutWatches
                   :<|> DeleteWatches
                   :<|> PostEvals
+                  :<|> PostParse
 
 type GetStatus = "status" :> Get '[JSON] DebuggerStatus
 type PutPause = "pause" :> Put '[JSON] DebuggerStatus
@@ -51,6 +53,7 @@ type GetWatches = "watches" :> Get '[JSON] (M.Map EvaluationRequest EvaluationRe
 type PutWatches = "watches" :> ReqBody '[JSON] [EvaluationRequest] :> Put '[JSON] DebuggerStatus
 type DeleteWatches = "watches" :> ReqBody '[JSON] [EvaluationRequest] :> Delete '[JSON] DebuggerStatus
 type PostEvals = "eval" :> ReqBody '[JSON] [EvaluationRequest] :> Post '[JSON] [EvaluationResponse]
+type PostParse = "parse" :> ReqBody '[JSON] (M.Map T.Text T.Text) :> Post '[JSON] A.Value
 
 restDebuggerAPI :: Proxy RestDebuggerAPI
 restDebuggerAPI = Proxy

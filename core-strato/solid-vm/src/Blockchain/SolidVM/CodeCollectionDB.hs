@@ -1,5 +1,9 @@
 {-# LANGUAGE FlexibleContexts #-}
-module Blockchain.SolidVM.CodeCollectionDB (codeCollectionFromSource, codeCollectionFromHash) where
+module Blockchain.SolidVM.CodeCollectionDB
+  ( compileSource
+  , codeCollectionFromSource
+  , codeCollectionFromHash
+  ) where
 
 import           Control.Exception
 import           Control.Monad.IO.Class
