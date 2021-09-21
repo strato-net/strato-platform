@@ -95,7 +95,7 @@ describe('Test Offline Transactions', async function () {
       (ssCount2 - ssCount1 < 1) && (+new Date()) <= startTimestamp + 10000
     )
     // Get address from post-raw-transaction response:
-    const ss1Addr = ss1Resp.stdout.split('transactionResultContractsCreated = "')[1].split(',')[0]
+    const ss1Addr = ss1Resp.stdout.split('transactionResultContractsCreated = "')[1].split(',')[0].split('"')[0] // possible trailing quote (find a better parsing method?)
     const valueToSet = 123
     const funcCallResp = await exec(dockerPrefix + `docker exec strato_strato_1 post-raw-transaction -f --funcName=set --args='${valueToSet}' --key=priv.pem --address=${ss1Addr} --nonce=${nonceCounter}`)
     nonceCounter+=1
