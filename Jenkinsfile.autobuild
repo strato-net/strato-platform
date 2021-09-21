@@ -211,7 +211,7 @@ pipeline {
             dir ('tests') {
               sh 'rm -rf node_modules'
               sh 'npm install'
-              sh 'npm run test' 
+              sh 'npm run test'
             }
             dir ('core-strato/strato-init') {
               sh './check_genesis_ingestion.sh'

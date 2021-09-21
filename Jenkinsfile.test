@@ -229,7 +229,7 @@ pipeline {
             dir ('strato-worktree/tests') {
               sh 'rm -rf node_modules'
               sh 'npm install'
-              sh 'npm run test' 
+              sh 'npm run test'
             }
             dir ('strato-worktree/core-strato/strato-init') {
               sh './check_genesis_ingestion.sh'
