@@ -6,8 +6,22 @@
 {-# LANGUAGE TupleSections #-}
 
 module Slipstream.Globals
-  ( module Slipstream.Globals
-  , module Slipstream.Data.Globals
+  (
+    setTableCreated,
+    getTableColumns,
+    isTableCreated,
+    isHistoric,
+    setContractState,
+    xabiToText,
+    flushPendingWrites,
+    getContractState,
+    removeFromHistoryList,
+    addToHistoryList,
+    getContractABIs,
+    setContractABIs,
+    forceGlobalEval,
+    newGlobals,
+    module Slipstream.Data.Globals
   ) where
 
 
@@ -22,7 +36,7 @@ import           Data.Either.Extra
 import qualified Data.HashMap.Strict         as HM
 import qualified Data.Map.Strict              as M
 import           Data.Int                    (Int32)
-import           Data.Set                    (Set)
+--import           Data.Set                    (Set)
 import qualified Data.Set                    as Set
 import           Data.Text                   (Text)
 import qualified Data.Text                   as T
@@ -83,19 +97,6 @@ getTableColumns globalsIORef tableName = do
   Globals{..} <- readIORef globalsIORef
   return $ M.lookup tableName createdTables
 
--- this "instance" is actually whether there is row in the blo22 contractsSourceTable for a given codeHash
--- caching the record of its existence in that table prevents an extra call to bloc to make sure it's there
-setInstanceCreated :: MonadIO m => IORef Globals -> CodePtr -> m ()
-setInstanceCreated globalsIORef codeHash = do
-  globals@Globals{..} <- readIORef globalsIORef
-  updateGlobals globalsIORef globals{createdInstances=Set.insert codeHash createdInstances}
-
-isInstanceCreated :: MonadIO m => IORef Globals -> CodePtr -> m Bool
-isInstanceCreated globalsIORef codeHash = do
-  Globals{..} <- readIORef globalsIORef
-  return $ codeHash `Set.member` createdInstances
-
-
 isHistoric :: (MonadLogger m, MonadIO m) => IORef Globals -> TableName -> m Bool
 isHistoric globalsIORef name = do
   Globals{..} <- readIORef globalsIORef
@@ -103,8 +104,10 @@ isHistoric globalsIORef name = do
   $logInfoS "isHistoric" . T.pack $ "History list: " ++ show historyList
   return $ name `Set.member` historyList
 
+{-
 getHistoryList :: MonadIO m => IORef Globals -> m (Set TableName)
 getHistoryList = fmap historyList . readIORef
+-}
 
 addToHistoryList :: MonadIO m => IORef Globals -> TableName -> m ()
 addToHistoryList g tableName = do
