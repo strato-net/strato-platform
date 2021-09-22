@@ -1,5 +1,9 @@
 ## RELEASE NOTES
 
+### Version: 8.0.3
+
+- Added the debugPostParse function to support compilation and static analysis tools
+
 ### Version: 8.0.2
 
 - Hotfix for access token lifetime reserve setting introduced in 8.0.1
