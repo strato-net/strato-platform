@@ -1582,7 +1582,9 @@ callBuiltin "registerCert" [SAccount a, SString cert] _ = do
     case ex509Cert of
         Left _         -> return SNULL
         Right x509Cert -> do x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-                             Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.insert (_accountAddress $ namedAccountToAccount Nothing a) x509Cert x509s
+                             let theAddress = _accountAddress $ namedAccountToAccount Nothing a
+                             Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.insert theAddress x509Cert x509s
+                             onTraced $ liftIO $ putStrLn $ "    registering cert to address: " ++ format theAddress ++ " as " ++ show (fmap subCommonName $ getCertSubject x509Cert)
                              return SNULL
 callBuiltin "getUserCert" [SAccount a] _ = do
     x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
