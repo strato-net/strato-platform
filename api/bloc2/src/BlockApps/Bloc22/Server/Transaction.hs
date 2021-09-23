@@ -442,7 +442,7 @@ postUsersSend' cacheNonce TransferParameters{..} userName = do
       , constant (0 :: Int32)
       , constant (Text.decodeUtf8 . BL.toStrict $ Aeson.encode tx)
       )]
-    getBlocTransactionResult' [txHash] resolve
+    getResultAndRespond [txHash] resolve
 
 postUsersContractEVM' :: (MonadLogger m,
                           HasBlocEnv m, HasBlocSQL m, HasCoreAPI m, HasVault m, HasSQL m) =>
@@ -478,7 +478,7 @@ postUsersContractEVM' cacheNonce ContractParameters{..} userName = blocTransacti
     , constant (1 :: Int32)
     , constant contractdetailsName
     )]
-  getBlocTransactionResult' [txHash] resolve
+  getResultAndRespond [txHash] resolve
 
 postUsersContractSolidVM' :: (MonadLogger m,
                               HasBlocEnv m, HasBlocSQL m, HasCoreAPI m, HasVault m, HasSQL m) =>
@@ -515,7 +515,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} userName = blocTrans
     , constant (1 :: Int32)
     , constant contractdetailsName
     )]
-  getBlocTransactionResult' [txHash] resolve
+  getResultAndRespond [txHash] resolve
 
 postUsersUploadListSolidVM' :: (MonadLogger m, HasBlocEnv m,
                                 HasBlocSQL m, HasCoreAPI m, HasVault m, HasSQL m) =>
@@ -778,7 +778,7 @@ postUsersContractMethod' cacheNonce FunctionParameters{..} userName = do
       , constant (2 :: Int32)
       , constant funcName
       )]
-    getBlocTransactionResult' [txHash] resolve
+    getResultAndRespond [txHash] resolve
 
 
 prepareUnsignedTx :: TransactionHeader -> UnsignedTransaction
@@ -1027,3 +1027,15 @@ getArgValues argsMap argNamesTypes = do
         throwIO (UserError ("argument names don't match: " <> argNames1 <> " " <> argNames2))
       else sequence $ Map.intersectionWith determineValue argsMap argNamesTypes
     return $ map snd (sortOn fst (toList argsVals))
+
+
+
+getResultAndRespond :: (MonadLogger m, HasBlocSQL m, HasSQL m) =>
+                       [Keccak256] -> Bool -> m BlocTransactionResult
+getResultAndRespond txHashes resolve = do
+  result <- getBlocTransactionResult' txHashes resolve
+  case (blocTransactionStatus result, blocTransactionTxResult result) of
+    (Success, _) -> return result
+    (Failure, Nothing) -> throwIO (VMError "unknown reason")
+    (Failure, Just tr) -> throwIO (VMError $ Text.pack $ "Error running the transaction: " ++ transactionResultMessage tr)
+    (Pending, _) -> throwIO (Timeout "Timeout: blockchain peer hasn't responded to transaction request for over 60 seconds")
