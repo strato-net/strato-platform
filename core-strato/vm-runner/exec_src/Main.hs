@@ -14,15 +14,17 @@ import           HFlags
 
 import           BlockApps.Init
 import           Blockchain.Output
+import           Blockchain.SolidVM.CodeCollectionDB  (compileSource)
 import           Blockchain.VMOptions() -- HFlags
 import           Executable.EthereumVM
 import           Executable.EVMFlags() -- HFlags
+import           SolidVM.Solidity.Xabi.Statement      (toSourcePosition)
 
 main :: IO ()
 main = do
   blockappsInit "vm_main"
   void $ $initHFlags "Ethereum VM"
-  mDebugger <- initializeDebugger
+  mDebugger <- initializeDebugger (fmap toSourcePosition . compileSource)
   let metricsRunner = run 8000 metricsApp
       debugSettings = fst <$> mDebugger
       helpers = case snd <$> mDebugger of

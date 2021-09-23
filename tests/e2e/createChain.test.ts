@@ -115,7 +115,7 @@ describe("Create Chain", function() {
 
     // Despite not running the constructor, bloch will at least
     // return the constants and functions.
-    const state = await rest.getState(alice, {name: 'Governance', address: chainAddress, chainId}, options);
+    const state = await rest.getState(alice, {name: 'Governance', address: chainAddress, chainId}, {...options, chainIds: chainId});
     assert.hasAnyKeys(state, ['TEN']);
 
     for(var i=0; i < 10; i++) {

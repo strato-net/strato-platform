@@ -16,6 +16,7 @@ library:
   exposed-modules:
     - Blockchain.SolidVM
     - Blockchain.SolidVM.SM
+    - Blockchain.SolidVM.CodeCollectionDB
     - Blockchain.SolidVM.Exception
     - SolidVM.Solidity.Parse.File
     - SolidVM.Solidity.Parse.Lexer

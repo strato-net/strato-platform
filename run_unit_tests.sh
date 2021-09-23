@@ -34,7 +34,6 @@ stack test -j1 \
       blockapps-ethereum \
       blockapps-solidity \
       blockapps-strato-api \
-      blockapps-bloc22-server \
       bloc2api \
       blockapps-vault-wrapper-server \
       slipstream \

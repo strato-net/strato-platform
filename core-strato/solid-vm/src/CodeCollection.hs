@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -8,6 +9,7 @@
 module CodeCollection where
 
 import Control.Lens
+import Data.Aeson as A
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Maybe
@@ -23,7 +25,7 @@ import qualified SolidVM.Solidity.Xabi.Def as Xabi
 import qualified SolidVM.Solidity.Xabi.Statement as Xabi
 import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
 
-data Contract =
+data ContractF a =
   Contract {
     _contractName :: String,
     _parents :: [String],
@@ -32,20 +34,29 @@ data Contract =
     _enums :: Map String [String],
     _structs :: Map String [(T.Text, Xabi.FieldType)],
     _events :: Map T.Text Xabi.Event,
-    _functions :: Map String Func,
-    _constructor :: Maybe Func,
+    _functions :: Map String (FuncF a),
+    _constructor :: Maybe (FuncF a),
     _vmVersion :: String
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, Functor)
 
-makeLenses ''Contract
+instance ToJSON a => ToJSON (ContractF a)
+instance FromJSON a => FromJSON (ContractF a)
 
-data CodeCollection =
+type Contract = ContractF Xabi.SourcePos
+
+makeLenses ''ContractF
+
+data CodeCollectionF a =
   CodeCollection {
-    _contracts :: Map String Contract
-  } deriving (Show, Generic)
+    _contracts :: Map String (ContractF a)
+  } deriving (Show, Generic, Functor)
 
-makeLenses ''CodeCollection
+instance ToJSON a => ToJSON (CodeCollectionF a)
+instance FromJSON a => FromJSON (CodeCollectionF a)
 
+type CodeCollection = CodeCollectionF Xabi.SourcePos
+
+makeLenses ''CodeCollectionF
 
 emptyCodeCollection :: CodeCollection
 emptyCodeCollection =

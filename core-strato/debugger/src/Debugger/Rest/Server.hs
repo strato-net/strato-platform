@@ -12,6 +12,7 @@ module Debugger.Rest.Server where
 
 import           Control.Monad
 import           Control.Monad.IO.Class
+import           Data.Aeson             as A
 import qualified Data.Map.Strict        as M
 import           Data.Maybe             (fromMaybe)
 import qualified Data.Text              as T
@@ -74,8 +75,17 @@ deleteWatches = flip removeWatches
 postEvals :: DebugSettings -> [EvaluationRequest] -> Handler [EvaluationResponse]
 postEvals d ts = fmap (fromMaybe $ Left "") <$> liftIO (evaluateExpressions ts d)
 
-restDebuggerServer :: DebugSettings -> Server RestDebuggerAPI
-restDebuggerServer dSettings =
+postParse :: ToJSON a
+          => (M.Map T.Text T.Text -> a)
+          -> M.Map T.Text T.Text
+          -> Handler A.Value
+postParse parse = pure . toJSON . parse
+
+restDebuggerServer :: ToJSON a
+                   => DebugSettings
+                   -> (M.Map T.Text T.Text -> a)
+                   -> Server RestDebuggerAPI
+restDebuggerServer dSettings parse =
        getStatus dSettings
   :<|> putPause dSettings
   :<|> putResume dSettings
@@ -92,6 +102,10 @@ restDebuggerServer dSettings =
   :<|> putWatches dSettings
   :<|> deleteWatches dSettings
   :<|> postEvals dSettings
+  :<|> postParse parse
 
-restDebugger :: DebugSettings -> Application
-restDebugger dSettings = serve restDebuggerAPI (restDebuggerServer dSettings)
+restDebugger :: ToJSON a
+             => DebugSettings
+             -> (M.Map T.Text T.Text -> a)
+             -> Application
+restDebugger dSettings parse = serve restDebuggerAPI (restDebuggerServer dSettings parse)

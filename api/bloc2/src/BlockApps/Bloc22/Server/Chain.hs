@@ -38,9 +38,9 @@ import           BlockApps.Solidity.Struct
 import           BlockApps.Solidity.Type
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Bloc22.Database.Queries
-import           BlockApps.Bloc22.Server.Users     (constructArgValuesAndSource)
-import           BlockApps.Bloc22.Server.Utils     (waitFor)
-import           BlockApps.XAbiConverter           (xAbiToContract)
+import           BlockApps.Bloc22.Server.TransactionResult  (constructArgValuesAndSource)
+import           BlockApps.Bloc22.Server.Utils              (waitFor)
+import           BlockApps.XAbiConverter                    (xAbiToContract)
 
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs

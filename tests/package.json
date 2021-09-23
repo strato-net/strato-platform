@@ -3,22 +3,21 @@
   "version": "0.0.1",
   "description": "platform tests",
   "scripts": {
-    "test": "npm run test:blockhash && npm run test:e2e && npm run test:dataTypes && npm run test:load && npm run test:load10k && npm run test:solidvm && npm run test:upload && npm run test:upload10k && npm run test:loadFF && npm run test:truchainz && npm run test:multicontract && npm run test:uploadOrder && npm run test:slipstream",
-    "test:blockhash": "mocha -r ts-node/register e2e/blockhash.test.ts",
-    "test:e2e": "mocha -r ts-node/register e2e/createUser.test.ts && mocha -r ts-node/register e2e/import.constructor.test.ts && mocha -r ts-node/register e2e/import.test.ts",
-    "test:dataTypes": "mocha -r ts-node/register regressions/address.test.ts && mocha -r ts-node/register regressions/bool.test.ts && mocha -r ts-node/register regressions/bytes.test.ts && mocha -r ts-node/register regressions/enum.test.ts && mocha -r ts-node/register regressions/string.test.ts && mocha -r ts-node/register regressions/uint.test.ts && mocha -r ts-node/register regressions/negative.test.ts",
-    "test:load": "mocha -r ts-node/register load/stratoLoad.test.ts --batchCount 20 --batchSize 20 && mocha -r ts-node/register load/stratoLoadFactory.test.ts --batchCount 20 --batchSize 20",
-    "test:load10k": "mocha -r ts-node/register load/stratoLoad.test.ts --batchCount 100 --batchSize 100",
-    "test:loadecho": "mocha -r ts-node/register load/stratoLoadEcho.test.ts --batchCount 20 --batchSize 20 --config config/localhost.config.yaml",
-    "test:solidvm": "mocha -r ts-node/register e2e/solidvm.test.ts",
-    "test:upload": "mocha -r ts-node/register load/uploadString.test.ts --batchCount 10 --batchSize 10 && mocha -r ts-node/register load/uploadUniqueAddresses.test.ts --batchCount 10 --batchSize 10",
-    "test:upload10k": "mocha -r ts-node/register load/uploadString.test.ts --batchCount 100 --batchSize 100",
-    "test:loadFF": "mocha -r ts-node/register load/stratoLoadFiscalFactory.test.ts --batchCount 100 --batchSize 100",
-    "test:loadFFEvents": "mocha -r ts-node/register load/stratoLoadFiscalFactoryEvent.test.ts --batchCount 100 --batchSize 100",
-    "test:truchainz": "mocha -r ts-node/register e2e/createChain.test.ts && mocha -r ts-node/register e2e/governance.test.ts",
-    "test:multicontract": "mocha -r ts-node/register e2e/multicontract.test.ts",
-    "test:uploadOrder": "mocha -r ts-node/register e2e/uploadOrder.test.ts",
-    "test:slipstream": "mocha -r ts-node/register e2e/slipstream.test.ts"
+    "mocha-ts": "mocha -r ts-node/register",
+    "test": "npm run mocha-ts e2e/**/*.test.ts",
+    "test:long": "npm run mocha-ts to_be_determined",
+    
+    "test:e2e__to_be_revised": "npm run mocha-ts e2e__toberevised/**/*.test.ts",
+    "test:regressions__to_be_revised": "npm run mocha-ts regressions/**/*.test.ts",
+    "test:loadtests__to_be_revised": "npm run test:load && npm run test:load10k && npm run test:upload && npm run test:upload10k && npm run test:loadFF",
+    
+    "test:load": "npm run mocha-ts load/stratoLoad.test.ts --batchCount 20 --batchSize 20 && npm run mocha-ts load/stratoLoadFactory.test.ts --batchCount 20 --batchSize 20",
+    "test:load10k": "npm run mocha-ts load/stratoLoad.test.ts --batchCount 100 --batchSize 100",
+    "test:loadecho": "npm run mocha-ts load/stratoLoadEcho.test.ts --batchCount 20 --batchSize 20 --config config/localhost.config.yaml",
+    "test:upload": "npm run mocha-ts load/uploadString.test.ts --batchCount 10 --batchSize 10 && npm run mocha-ts load/uploadUniqueAddresses.test.ts --batchCount 10 --batchSize 10",
+    "test:upload10k": "npm run mocha-ts load/uploadString.test.ts --batchCount 100 --batchSize 100",
+    "test:loadFF": "npm run mocha-ts load/stratoLoadFiscalFactory.test.ts --batchCount 100 --batchSize 100",
+    "test:loadFFEvents": "npm run mocha-ts load/stratoLoadFiscalFactoryEvent.test.ts --batchCount 100 --batchSize 100"
   },
   "dependencies": {
     "@types/mocha": "^8.0.3",

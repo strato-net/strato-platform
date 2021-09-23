@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE DeriveAnyClass    #-}
+{-# LANGUAGE DeriveFunctor     #-}
 {-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -127,7 +128,7 @@ instance ToSchema StateMutability where
     & mapped.schema.description ?~ "Reserved keywords for function state mutability"
     & mapped.schema.example ?~ toJSON View
 
-data Func = Func
+data FuncF a = Func
   { funcArgs :: [(Maybe Text, Xabi.IndexedType)]
   , funcVals :: [(Maybe Text, Xabi.IndexedType)]
   , funcStateMutability :: Maybe StateMutability
@@ -135,11 +136,16 @@ data Func = Func
   -- These Values are only used for parsing and unparsing solidity.
   -- This data will not be stored in the db and will have no
   -- relevance when constructing from the db.
-  , funcContents :: Maybe [Statement]
+  , funcContents :: Maybe [StatementF a]
   , funcVisibility :: Maybe Visibility
   , funcConstructorCalls :: Map String [Expression]
   , funcModifiers :: Maybe [String]
-  } deriving (Eq,Show,Generic)
+  } deriving (Eq,Show,Generic, Functor)
+
+instance ToJSON a => ToJSON (FuncF a)
+instance FromJSON a => FromJSON (FuncF a)
+
+type Func = FuncF SourcePos
 
 data VariableDecl =
   VariableDecl {
@@ -148,12 +154,18 @@ data VariableDecl =
   varInitialVal :: Maybe Expression
   } deriving (Show, Eq,Generic)
 
+instance ToJSON VariableDecl
+instance FromJSON VariableDecl
+
 data ConstantDecl =
   ConstantDecl {
   constType :: Xabi.Type,
   constIsPublic :: Bool,
   constInitialVal :: Expression
   } deriving (Show, Eq, Generic)
+
+instance ToJSON ConstantDecl
+instance FromJSON ConstantDecl
 
 funcPayable :: Func -> Bool
 funcPayable Func{funcStateMutability = Just Payable} = True

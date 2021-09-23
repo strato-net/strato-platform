@@ -69,7 +69,8 @@ async function upload() {
 
 async function send(user, address, xs) {
   let result = await rest.getAccounts(user, {...options, params: {address: user.address}})
-  let nonce = result[0].nonce;
+  let nonce = 0;
+  if (result[0] !== undefined) nonce = result[0].nonce;
   nonce += xs.length;
   // Set nonces in reverse list order
   const txs = xs.map(x => {
@@ -166,7 +167,9 @@ async function get(user, contract) {
 
 async function getBalance(user:OAuthUser, address:string) {
   let result = await rest.getAccounts(user, {...options, params: {address}})
-  return result[0].balance;
+  if (result[0] !== undefined) {
+     return result[0].balance;
+  } else return 0;
 }
 
 describe('Nonce upload orders', async () => {
