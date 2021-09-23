@@ -18,6 +18,7 @@ library:
     - Blockchain.SolidVM.SM
     - Blockchain.SolidVM.CodeCollectionDB
     - Blockchain.SolidVM.Exception
+    - SolidVM.Solidity.Detectors
     - SolidVM.Solidity.Parse.File
     - SolidVM.Solidity.Parse.Lexer
     - SolidVM.Solidity.Parse.Statement

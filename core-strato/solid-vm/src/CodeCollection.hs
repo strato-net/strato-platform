@@ -14,6 +14,7 @@ import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Maybe
 import qualified Data.Set as S
+import Data.Source
 import qualified Data.Text as T
 import GHC.Generics
 
@@ -55,6 +56,7 @@ instance ToJSON a => ToJSON (CodeCollectionF a)
 instance FromJSON a => FromJSON (CodeCollectionF a)
 
 type CodeCollection = CodeCollectionF Xabi.SourcePos
+type Detector = CodeCollectionF SourcePosition -> [SourceAnnotation T.Text]
 
 makeLenses ''CodeCollectionF
 

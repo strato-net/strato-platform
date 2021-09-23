@@ -21,6 +21,7 @@ import           Blockchain.VMOptions() -- HFlags
 import           Executable.EthereumVM
 import           Executable.EVMFlags() -- HFlags
 import           Data.Source
+import           SolidVM.Solidity.Detectors
 
 main :: IO ()
 main = do
@@ -31,7 +32,7 @@ main = do
             . compileSource
             . M.fromList
             . unSourceMap
-      analyze = Identity . const []
+      analyze = runDetectors parse
       tools = SourceTools parse analyze
   mDebugger <- initializeDebugger tools
   let metricsRunner = run 8000 metricsApp
