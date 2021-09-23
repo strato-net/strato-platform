@@ -58,6 +58,7 @@ library:
   - semver-range
   - servant-docs
   - solid-vm-model
+  - source-tools
   - strato-model
   - swagger2
   - text

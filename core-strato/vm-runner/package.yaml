@@ -71,6 +71,7 @@ executables:
       - hflags
       - servant-server
       - solid-vm
+      - source-tools
       - strato-conf
       - text
       - transformers

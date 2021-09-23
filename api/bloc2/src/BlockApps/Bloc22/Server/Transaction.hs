@@ -94,7 +94,7 @@ import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Keccak256  hiding (rlpHash)
 import           Blockchain.Strato.Model.Nonce
 import           Blockchain.Strato.Model.Secp256k1      hiding (HasVault)
-import           Blockchain.Strato.Model.SourceMap
+import           Data.Source.Map
 import           Blockchain.Strato.Model.Wei
 
 import           Control.Monad.Composable.BlocSQL

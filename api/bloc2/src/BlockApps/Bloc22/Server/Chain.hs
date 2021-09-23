@@ -49,7 +49,7 @@ import           Blockchain.TypeLits
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Strato.Model.SourceMap (serializeSourceMap)
+import           Data.Source.Map (serializeSourceMap)
 import           Control.Monad.Change.Alter
 import           Control.Monad.Composable.BlocSQL
 import           Control.Monad.Composable.SQL

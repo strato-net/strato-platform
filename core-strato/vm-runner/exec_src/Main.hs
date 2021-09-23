@@ -18,7 +18,7 @@ import           Blockchain.SolidVM.CodeCollectionDB  (compileSource)
 import           Blockchain.VMOptions() -- HFlags
 import           Executable.EthereumVM
 import           Executable.EVMFlags() -- HFlags
-import           SolidVM.Solidity.Xabi.Statement      (toSourcePosition)
+import           Data.Source.Position                 (toSourcePosition)
 
 main :: IO ()
 main = do

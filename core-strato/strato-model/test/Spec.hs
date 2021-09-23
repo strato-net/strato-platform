@@ -29,7 +29,6 @@ import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1  as SEC 
-import           Blockchain.Strato.Model.SourceMap
 import           Network.Haskoin.Crypto.BigWord     (BigWord(..))
 
 
@@ -183,9 +182,3 @@ spec = do
       fromPublicKey (fromJust mRecPub) `shouldBe` add
       fromPublicKey (fromJust mRecPub) `shouldBe` fromPrivateKey k
       fromPrivateKey k `shouldBe` add
-      
-  describe "SourceMap" $ do
-    let rt :: SourceMap -> Either String SourceMap
-        rt = Ae.eitherDecode . Ae.encode
-    it "round trips correctly" $ property $ \(src::SourceMap) -> do
-      rt src `shouldBe` Right src

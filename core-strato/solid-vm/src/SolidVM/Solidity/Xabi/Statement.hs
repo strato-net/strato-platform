@@ -3,10 +3,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 module SolidVM.Solidity.Xabi.Statement
-  ( SourcePosition(..)
-  , toSourcePosition
-  , fromSourcePosition
-  , StatementF(..)
+  ( StatementF(..)
   , Statement
   , Location(..)
   , VarDefEntry(..)
@@ -24,23 +21,6 @@ import qualified Data.Text as T
 import GHC.Generics
 import SolidVM.Solidity.Xabi.Type
 import Text.Parsec.Pos
-
-data SourcePosition = SourcePosition
-  { _sourcePositionName   :: String
-  , _sourcePositionLine   :: !Int
-  , _sourcePositionColumn :: !Int
-  } deriving (Show, Eq, Generic)
-
-instance ToJSON SourcePosition
-instance FromJSON SourcePosition
-
-toSourcePosition :: SourcePos -> SourcePosition
-toSourcePosition pos = SourcePosition (sourceName pos)
-                                      (sourceLine pos)
-                                      (sourceColumn pos)
-
-fromSourcePosition :: SourcePosition -> SourcePos
-fromSourcePosition (SourcePosition n l c) = newPos n l c
 
 data StatementF a =
   IfStatement Expression [StatementF a] (Maybe [StatementF a]) a -- if then else

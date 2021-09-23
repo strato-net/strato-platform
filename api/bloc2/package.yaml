@@ -68,6 +68,7 @@ library:
     - servant-client
     - servant-server
     - servant-swagger
+    - source-tools
     - sql-monad
     - stm-conduit
     - strato-model

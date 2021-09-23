@@ -10,6 +10,7 @@ dependencies:
 - mtl
 - postgresql-simple
 - transformers
+- source-tools
 
 executables:
   strato-api:

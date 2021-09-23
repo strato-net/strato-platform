@@ -43,7 +43,7 @@ import           Blockchain.Strato.Model.ExtendedWord   (Word256)
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Nonce
-import           Blockchain.Strato.Model.SourceMap
+import           Data.Source.Map
 import           Blockchain.Strato.Model.Wei
 
 --------------------------------------------------------------------------------

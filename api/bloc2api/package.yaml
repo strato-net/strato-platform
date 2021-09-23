@@ -39,6 +39,7 @@ library:
   - servant-docs
   - servant-mock
   - servant-server
+  - source-tools
   - strato-model
   - swagger2
   - text
