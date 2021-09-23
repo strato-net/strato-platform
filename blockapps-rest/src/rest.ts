@@ -1598,6 +1598,11 @@ async function debugPostEval(user:OAuthUser, args, options:Options) {
   return response;
 }
 
+async function debugPostParse(user:OAuthUser, args, options:Options) {
+  const response = await api.debugPostParse(user, args, options);
+  return response;
+}
+
 // =====================================================================
 //   Common patterns used in applications
 // =====================================================================
@@ -1717,6 +1722,7 @@ export default {
   debugDeleteWatches,
   debugClearWatches,
   debugPostEval,
+  debugPostParse,
   //
   RestError,
   response,
