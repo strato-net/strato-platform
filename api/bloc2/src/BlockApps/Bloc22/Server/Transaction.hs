@@ -1034,8 +1034,9 @@ getResultAndRespond :: (MonadLogger m, HasBlocSQL m, HasSQL m) =>
                        [Keccak256] -> Bool -> m BlocTransactionResult
 getResultAndRespond txHashes resolve = do
   result <- getBlocTransactionResult' txHashes resolve
-  case (blocTransactionStatus result, blocTransactionTxResult result) of
-    (Success, _) -> return result
-    (Failure, Nothing) -> throwIO (VMError "unknown reason")
-    (Failure, Just tr) -> throwIO (VMError $ Text.pack $ "Error running the transaction: " ++ transactionResultMessage tr)
-    (Pending, _) -> throwIO (Timeout "Timeout: blockchain peer hasn't responded to transaction request for over 60 seconds")
+  case (blocTransactionStatus result, blocTransactionTxResult result, resolve) of
+    (Success, _, _) -> return result
+    (Failure, Nothing, _) -> throwIO (VMError "unknown reason")
+    (Failure, Just tr, _) -> throwIO (VMError $ Text.pack $ "Error running the transaction: " ++ transactionResultMessage tr)
+    (Pending, _, False) -> return result
+    (Pending, _, _) -> throwIO (Timeout "Timeout: blockchain peer hasn't responded to transaction request for over 60 seconds")
