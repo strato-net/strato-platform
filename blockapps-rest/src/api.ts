@@ -462,6 +462,12 @@ async function debugPostParse(user:OAuthUser, args, options:Options) {
   return post(url, endpoint, args, setAuthHeaders(user, options));
 }
 
+async function debugPostAnalyze(user:OAuthUser, args, options:Options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.DEBUG_ANALYZE, options);
+  return post(url, endpoint, args, setAuthHeaders(user, options));
+}
+
 export default {
   getAccounts,
   getHealth,
@@ -514,4 +520,5 @@ export default {
   debugClearWatches,
   debugPostEval,
   debugPostParse,
+  debugPostAnalyze,
 };

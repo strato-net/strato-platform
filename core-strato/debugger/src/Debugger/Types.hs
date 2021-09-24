@@ -55,17 +55,14 @@ import qualified Data.Map.Strict                      as M
 import           Data.Set                             (Set)
 import qualified Data.Set                             as S
 import           Data.Text                            (Text)
-import qualified Data.Text                            as T
 import           Data.Traversable
 import           GHC.Generics
 import           Text.Parsec                          (ParseError)
 import           Text.Parsec.Pos
 import           Test.QuickCheck
+import           Test.QuickCheck.Instances.Text       ()
 
 import           UnliftIO                             hiding (assert)
-
-instance Arbitrary Text where
-  arbitrary = T.pack <$> arbitrary
 
 instance NFData SourcePos where
   rnf pos = pos `seq` ()

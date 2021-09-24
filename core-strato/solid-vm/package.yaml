@@ -18,6 +18,7 @@ library:
     - Blockchain.SolidVM.SM
     - Blockchain.SolidVM.CodeCollectionDB
     - Blockchain.SolidVM.Exception
+    - SolidVM.Solidity.Detectors
     - SolidVM.Solidity.Parse.File
     - SolidVM.Solidity.Parse.Lexer
     - SolidVM.Solidity.Parse.Statement
@@ -58,6 +59,7 @@ library:
   - semver-range
   - servant-docs
   - solid-vm-model
+  - source-tools
   - strato-model
   - swagger2
   - text

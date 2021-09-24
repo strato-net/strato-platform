@@ -6,6 +6,8 @@
 
 import           Control.Monad
 import           Control.Concurrent.Async             as Async
+import           Data.Functor.Identity
+import qualified Data.Map.Strict                      as M
 import           Debugger
 import           Debugger.Options() -- HFlags
 import           Network.Wai.Middleware.Prometheus
@@ -18,13 +20,21 @@ import           Blockchain.SolidVM.CodeCollectionDB  (compileSource)
 import           Blockchain.VMOptions() -- HFlags
 import           Executable.EthereumVM
 import           Executable.EVMFlags() -- HFlags
-import           SolidVM.Solidity.Xabi.Statement      (toSourcePosition)
+import           Data.Source
+import           SolidVM.Solidity.Detectors
 
 main :: IO ()
 main = do
   blockappsInit "vm_main"
   void $ $initHFlags "Ethereum VM"
-  mDebugger <- initializeDebugger (fmap toSourcePosition . compileSource)
+  let parse = Identity
+            . fmap toSourcePosition
+            . compileSource
+            . M.fromList
+            . unSourceMap
+      analyze = runDetectors parse
+      tools = SourceTools parse analyze
+  mDebugger <- initializeDebugger tools
   let metricsRunner = run 8000 metricsApp
       debugSettings = fst <$> mDebugger
       helpers = case snd <$> mDebugger of

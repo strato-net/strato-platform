@@ -53,6 +53,7 @@ library:
     - QuickCheck
     - retry
     - scientific
+    - source-tools
     - strato-model
     - template-haskell
     - time

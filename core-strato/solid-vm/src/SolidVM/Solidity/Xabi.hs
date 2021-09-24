@@ -27,7 +27,7 @@ import           Test.QuickCheck.Instances    ()
 
 import           BlockApps.Ethereum
 import           Blockchain.Strato.Model.Account
-import           Blockchain.Strato.Model.SourceMap
+import           Data.Source.Map
 --import           SolidVM.Solidity.Parse.Expression
 import           SolidVM.Solidity.Xabi.Statement
 import qualified SolidVM.Solidity.Xabi.Def  as Xabi
