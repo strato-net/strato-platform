@@ -133,9 +133,11 @@ contractByAccount
     , Column PGBytea
     , Column PGBytea
     )
-contractByAccount contractName (Account contractAddress chainId) = proc () -> do
-  contract@(_,name,_,addr,_,_,_,_,_,cid,_) <- contractsJoinTable -< ()
-  restrict -< name .== constant contractName
+contractByAccount _ (Account contractAddress chainId) = proc () -> do
+--contractByAccount contractName (Account contractAddress chainId) = proc () -> do
+  contract@(_,_,_,addr,_,_,_,_,_,cid,_) <- contractsJoinTable -< ()
+--  contract@(_,name,_,addr,_,_,_,_,_,cid,_) <- contractsJoinTable -< ()
+--  restrict -< name .== constant contractName
   restrict -< addr .== constant contractAddress
   restrict -< cid .== constant (ChainId <$> chainId)
   returnA -< contract
