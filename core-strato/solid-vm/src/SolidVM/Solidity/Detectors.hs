@@ -11,7 +11,7 @@ detectors :: [Detector]
 detectors = [trivialDetector]
 
 runDetectors :: Functor f
-             => (SourceMap -> f (CodeCollectionF SourcePosition))
+             => (SourceMap -> f CodeCollection)
              -> SourceMap
              -> f [SourceAnnotation Text]
 runDetectors parse source = concat . (detectors <*>) . (:[]) <$> parse source

@@ -20,7 +20,6 @@ import           Blockchain.SolidVM.CodeCollectionDB  (compileSource)
 import           Blockchain.VMOptions() -- HFlags
 import           Executable.EthereumVM
 import           Executable.EVMFlags() -- HFlags
-import           Data.Source
 import           SolidVM.Solidity.Detectors
 
 main :: IO ()
@@ -28,7 +27,6 @@ main = do
   blockappsInit "vm_main"
   void $ $initHFlags "Ethereum VM"
   let parse = Identity
-            . fmap toSourcePosition
             . compileSource
             . M.fromList
             . unSourceMap

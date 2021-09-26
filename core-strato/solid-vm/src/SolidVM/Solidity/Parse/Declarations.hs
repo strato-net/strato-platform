@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 -- |
 -- Module: Declarations
@@ -13,6 +14,7 @@ import qualified Data.Map as Map
 import           Data.Maybe
 import           Data.Text                            (Text)
 import qualified Data.Text                            as Text
+import           Data.Source
 
 import           GHC.Generics
 
@@ -26,7 +28,7 @@ import           SolidVM.Solidity.Parse.ParserTypes
 import           SolidVM.Solidity.Parse.Types
 
 import           SolidVM.Solidity.Xabi.Statement
-import           SolidVM.Solidity.Xabi              (Xabi (..))
+import           SolidVM.Solidity.Xabi              (XabiF (..))
 import qualified SolidVM.Solidity.Xabi              as Xabi
 import qualified SolidVM.Solidity.Xabi.Def          as Xabi
 import qualified SolidVM.Solidity.Xabi.Type         as Xabitype
@@ -34,27 +36,30 @@ import qualified SolidVM.Solidity.Xabi.VarDef       as Xabitype
 
 import           Blockchain.VM.SolidException
 
-data SourceUnit = Pragma Identifier String
-                | NamedXabi Text.Text (Xabi, [Text.Text])
-                deriving (Eq, Show, Generic)
+data SourceUnitF a = Pragma a Identifier String
+                   | NamedXabi Text.Text (XabiF a, [Text.Text])
+                   deriving (Eq, Show, Generic, Functor)
 
+type SourceUnit = Positioned SourceUnitF
 
 -- | Parses an entire Solidity contract
 solidityContract :: SolidityParser SourceUnit
 solidityContract = do
-  kind <- (reserved "contract" >> return Xabi.ContractKind)
-        <|> (reserved "interface" >> return Xabi.InterfaceKind)
-        <|> (reserved "library" >> return Xabi.LibraryKind)
-  contractName' <- identifier
-  setContractName contractName'
-  baseConstrs <- option [] $ do
-    reserved "is"
-    commaSep1 $ do
-      name <- intercalate "." <$> sepBy1 identifier dot
-      consArgs <- option "" parensCode
-      return (name, consArgs)
-  declarations <-
-    braces (many solidityDeclaration)
+  ~(a, (kind, contractName', baseConstrs, declarations)) <- withPosition $ do
+    kind <- (reserved "contract" >> return Xabi.ContractKind)
+          <|> (reserved "interface" >> return Xabi.InterfaceKind)
+          <|> (reserved "library" >> return Xabi.LibraryKind)
+    contractName' <- identifier
+    setContractName contractName'
+    baseConstrs <- option [] $ do
+      reserved "is"
+      commaSep1 $ do
+        name <- intercalate "." <$> sepBy1 identifier dot
+        consArgs <- option "" parensCode
+        return (name, consArgs)
+    declarations <-
+      braces (many solidityDeclaration)
+    pure (kind, contractName', baseConstrs, declarations)
 
   let allFunctions = Map.fromList [ (Text.pack n, f) | (n, FuncDeclaration f) <- declarations]
   let ctorList = [(Text.pack n, c) | (n, ConstructorDeclaration c) <- declarations]
@@ -78,6 +83,7 @@ solidityContract = do
              , xabiEvents = Map.fromList events
              , xabiKind = kind
              , xabiUsing = Map.fromList using
+             , xabiContext = a
            },
         map (Text.pack . fst) baseConstrs
       )
@@ -135,46 +141,54 @@ solidityDeclaration =
 -- | Parses a struct definition
 structDeclaration :: SolidityParser (String, Declaration)
 structDeclaration = do
-  reserved "struct"
-  structName <- identifier
-  structFields <- braces $ many1 $ do
-    (fieldName, VariableDeclaration (Xabi.VariableDecl decl _ _)) <- simpleVariableDeclaration
-    return (fieldName, decl)
+  ~(a, (structName, structFields)) <- withPosition $ do
+    reserved "struct"
+    structName <- identifier
+    structFields <- braces $ many1 $ do
+      (fieldName, VariableDeclaration (Xabi.VariableDecl decl _ _ _)) <- simpleVariableDeclaration
+      return (fieldName, decl)
+    pure (structName, structFields)
   return
     (
       structName,
       StructDeclaration Xabi.Struct{
         Xabi.fields =
            zipWith (\(n, v) i -> (Text.pack n, Xabitype.FieldType i v)) structFields [0..],
-        Xabi.bytes = 0
+        Xabi.bytes = 0,
+        Xabi.context = a
         }
     )
 
 -- | Parses an enum definition
 enumDeclaration :: SolidityParser (String, Declaration)
 enumDeclaration = do
-  reserved "enum"
-  enumName <- identifier
-  enumFields <- braces $ commaSep1 identifier
+  ~(a, (enumName, enumFields)) <- withPosition $ do
+    reserved "enum"
+    enumName <- identifier
+    enumFields <- braces $ commaSep1 identifier
+    pure (enumName, enumFields)
   return
     (
       enumName,
       EnumDeclaration Xabi.Enum {
         Xabi.names = map Text.pack enumFields,
-        Xabi.bytes = 0
+        Xabi.bytes = 0,
+        Xabi.context = a
         }
     )
 
 usingDeclaration :: SolidityParser (String, Declaration)
 usingDeclaration = do
-  reserved "using"
-  usingContract' <- identifier
-  rest <- many1 (noneOf ";")
-  semi
+  ~(a, (usingContract', rest)) <- withPosition $ do
+    reserved "using"
+    usingContract' <- identifier
+    rest <- many1 (noneOf ";")
+    semi
+    pure (usingContract', rest)
   return
     (
       usingContract',
-      UsingDeclaration (Xabi.Using rest)
+      UsingDeclaration (Xabi.Using rest a)
     )
 
 {- Variables -}
@@ -207,6 +221,7 @@ public keywords =
 -- function arguments.
 simpleVariableDeclaration :: SolidityParser (String, Declaration) -- , Maybe Expression)
 simpleVariableDeclaration = do
+  start <- getSourcePosition
   variableType <- simpleTypeExpression
   -- We have to remember which variables are "public", because they
   -- generate accessor functions
@@ -218,10 +233,12 @@ simpleVariableDeclaration = do
     reservedOp "="
     expression
   semi
+  end <- getSourcePosition
+  let ctx = SourceAnnotation start end ()
 
   if isConstant
-    then return (variableName, ConstantDeclaration $ Xabi.ConstantDecl variableType isPublic $ fromMaybe (parseError "constants must be initialized" variableName) value)
-    else return (variableName, VariableDeclaration $ Xabi.VariableDecl variableType isPublic value)
+    then return (variableName, ConstantDeclaration $ Xabi.ConstantDecl variableType isPublic (fromMaybe (parseError "constants must be initialized" variableName) value) ctx)
+    else return (variableName, VariableDeclaration $ Xabi.VariableDecl variableType isPublic value ctx)
 
 {- Functions and function-like -}
 
@@ -229,23 +246,29 @@ simpleVariableDeclaration = do
 --
 functionDeclaration :: SolidityParser (String, Declaration)
 functionDeclaration = do
-  functionName <- (reserved "function" >> fromMaybe "" <$> optionMaybe identifier) <|>
-                  -- Starting with 0.4.22, constructor() <mods> { <body> } is
-                  -- the preferred syntax for defining a constructor
-                  (reserved "constructor" >> getContractName)
+  ~(a, (functionName, xabi')) <- withPosition $ do
+    functionName <- (reserved "function" >> fromMaybe "" <$> optionMaybe identifier) <|>
+                    -- Starting with 0.4.22, constructor() <mods> { <body> } is
+                    -- the preferred syntax for defining a constructor
+                    (reserved "constructor" >> getContractName)
+    xabi <- functionXabi
+    pure (functionName, xabi)
   cName <- getContractName
-  xabi <- functionXabi
-  let tipe = if cName == functionName
+  let xabi = xabi'{Xabi.funcContext = a <> Xabi.funcContext xabi'}
+      tipe = if cName == functionName
                 then ConstructorDeclaration
                 else FuncDeclaration
   return (functionName, tipe xabi)
 
 functionXabi :: SolidityParser Xabi.Func
 functionXabi = do
+  start <- getSourcePosition
   functionArgs <- tupleDeclaration
   (functionRet, visibility, mutability, constructorCalls, modifiers) <- functionModifiers
   contents <- Just <$> statements <|> (reservedOp ";" >> return Nothing)
+  end <- getSourcePosition
   let nameUnnamed (name,ty) = if Text.null name then (Nothing, ty) else (Just name,ty)
+      ctx = SourceAnnotation start end ()
   return Xabi.Func{
         Xabi.funcArgs =
            zipWith (\x i -> fmap (Xabitype.IndexedType i) (nameUnnamed x)) functionArgs [0..]
@@ -256,22 +279,27 @@ functionXabi = do
       , Xabi.funcStateMutability = mutability
       , Xabi.funcConstructorCalls = Map.fromList constructorCalls
       , Xabi.funcModifiers = Just modifiers
+      , Xabi.funcContext = ctx
       }
 
 
 eventDeclaration :: SolidityParser (String, Declaration)
 eventDeclaration = do
+  start <- getSourcePosition
   reserved "event"
   name <- identifier
   logs <- tupleDeclaration
   anon <- option False (reserved "anonymous" >> return True)
   semi
+  end <- getSourcePosition
+  let ctx = SourceAnnotation start end ()
   return
     (
       name,
       EventDeclaration Xabi.Event{
           Xabi.eventAnonymous = anon
         , Xabi.eventLogs = zipWith (\i -> fmap (Xabitype.IndexedType i)) [0..] logs
+        , Xabi.eventContext = ctx
 --         objName = name,
 --         objValueType = NoValue,
 --         objArgType = logs,
@@ -285,12 +313,15 @@ eventDeclaration = do
 -- that use modifiers.
 modifierDeclaration :: SolidityParser (String, Declaration)
 modifierDeclaration = do
+  start <- getSourcePosition
   reserved "modifier"
   name <- identifier
   args <- option [] tupleDeclaration
 --  defn <- bracedCode
   contents <- bracedCode
-  let nameUnnamed (_name,ty) i = if Text.null _name then (Text.pack ('#' : show i),ty) else (_name,ty)
+  end <- getSourcePosition
+  let ctx = SourceAnnotation start end ()
+      nameUnnamed (_name,ty) i = if Text.null _name then (Text.pack ('#' : show i),ty) else (_name,ty)
   return
     (
       name,
@@ -301,6 +332,7 @@ modifierDeclaration = do
       , Xabi.modifierSelector = Text.pack name -- ? -- undefined -- :: Text
       , Xabi.modifierVals = Map.fromList [] -- undefined -- :: Map Text Xabi.IndexedType
       , Xabi.modifierContents = if null contents then Nothing else Just $ Text.pack contents
+      , Xabi.modifierContext = ctx
 --        objName = name,
 --        objValueType = NoValue,
 --        objArgType = args,

@@ -17,7 +17,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Debugger.Types
-  ( module Text.Parsec.Pos
+  ( module Data.Source
   , ParseError
   , Breakpoint(..)
   , DebugOperation(..)
@@ -54,42 +54,21 @@ import           Data.Map.Strict                      (Map)
 import qualified Data.Map.Strict                      as M
 import           Data.Set                             (Set)
 import qualified Data.Set                             as S
+import           Data.Source
 import           Data.Text                            (Text)
 import           Data.Traversable
 import           GHC.Generics
 import           Text.Parsec                          (ParseError)
-import           Text.Parsec.Pos
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances.Text       ()
 
 import           UnliftIO                             hiding (assert)
 
-instance NFData SourcePos where
-  rnf pos = pos `seq` ()
-
-instance Arbitrary SourcePos where
-  arbitrary = newPos <$> arbitrary <*> arbitrary <*> arbitrary
-
-instance ToJSON SourcePos where
-  toJSON pos = object [
-    "name" .= sourceName pos,
-    "line" .= sourceLine pos,
-    "column" .= sourceColumn pos
-    ]
-
-instance FromJSON SourcePos where
-  parseJSON (Object o) = do
-    name <- o .: "name"
-    line <- o .: "line"
-    column <- o .: "column"
-    pure $ newPos name line column
-  parseJSON o = fail $ "parseJSON SourcePos: expected Object, got " ++ show o
-
-data Breakpoint = UnconditionalBP SourcePos
-                | ConditionalBP SourcePos Text -- TODO: should be Expression
+data Breakpoint = UnconditionalBP SourcePosition
+                | ConditionalBP SourcePosition Text -- TODO: should be Expression
                 | DataBP Text -- TODO: should be Expression
                 | FunctionBP Text -- function name
-                | HitcountBP SourcePos
+                | HitcountBP SourcePosition
                 deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
 
 instance Arbitrary Breakpoint where
@@ -125,8 +104,8 @@ newtype WatchSet = WatchSet (Set Text)
 newtype WatchMap = WatchMap (Map Text EvaluationResponse)
 
 data DebugState = DebugState
-  { debugStateBreakpoint :: SourcePos
-  , debugStateCallStack  :: [SourcePos]
+  { debugStateBreakpoint :: SourcePosition
+  , debugStateCallStack  :: [SourcePosition]
   , debugStateVariables  :: (Map Text (Map Text EvaluationResponse))
   , debugStateWatches    :: (Map Text EvaluationResponse)
   } deriving (Eq, Ord, Show, Generic, NFData, ToJSON, FromJSON)
@@ -200,7 +179,7 @@ newDebugSettings =
 type Debuggable m =
   ( MonadIO m
   , Mod.Modifiable (Maybe DebugSettings) m
-  , Mod.Accessible [SourcePos] m
+  , Mod.Accessible [SourcePosition] m
   , Mod.Accessible VariableSet m
   )
 
@@ -216,7 +195,7 @@ withoutDebugging f = do
 
 breakpoint :: Debuggable m => Evaluator m -> m ()
 breakpoint eval = do
-  poss <- Mod.access (Mod.Proxy @[SourcePos])
+  poss <- Mod.access (Mod.Proxy @[SourcePosition])
   case poss of
     [] -> pure ()
     (pos:_) -> do
@@ -225,7 +204,7 @@ breakpoint eval = do
 
 breakpointMatches :: Debuggable m
                   => Evaluator m
-                  -> SourcePos
+                  -> SourcePosition
                   -> Breakpoint
                   -> m Bool
 breakpointMatches eval pos = \case
@@ -237,8 +216,8 @@ breakpointMatches eval pos = \case
   DataBP exprText -> runCond exprText
   FunctionBP _ -> pure False -- TODO
   where matchesLoc loc = let eqOn f a b = f a == f b
-                             fMatch = eqOn sourceName pos loc
-                             lMatch = eqOn sourceLine pos loc
+                             fMatch = eqOn _sourcePositionName pos loc
+                             lMatch = eqOn _sourcePositionLine pos loc
                           in fMatch && lMatch
         runCond exprText = do
           val <- withoutDebugging $ eval exprText
@@ -249,7 +228,7 @@ breakpointMatches eval pos = \case
 
 isBreakpoint :: Debuggable m
              => Evaluator m
-             -> SourcePos
+             -> SourcePosition
              -> m Bool
 isBreakpoint eval pos = do
   debugSettings <- Mod.get (Mod.Proxy @(Maybe DebugSettings))
@@ -268,7 +247,7 @@ isBreakpoint eval pos = do
 
 handleBreakpoint :: Debuggable m
                  => Evaluator m
-                 -> SourcePos
+                 -> SourcePosition
                  -> m ()
 handleBreakpoint eval pos = do
   debugSettings <- Mod.get (Mod.Proxy @(Maybe DebugSettings))
@@ -283,11 +262,11 @@ handleBreakpoint eval pos = do
         (_, Just StepOver) -> step 1
         (_, Just StepOut) -> step 0
         (Stepping n, _) -> do
-          cStack <- Mod.access (Mod.Proxy @[SourcePos])
+          cStack <- Mod.access (Mod.Proxy @[SourcePosition])
           unless (length cStack >= n) $ doPause >> loop False d
         _ -> doPause >> loop False d
       where step k = do
-              n <- length <$> Mod.access (Mod.Proxy @[SourcePos])
+              n <- length <$> Mod.access (Mod.Proxy @[SourcePosition])
               void . atomically . writeTVar current . Stepping $ n + k
             evalLoop = do
               mReq <- atomically $ tryReadTChan requests
@@ -299,7 +278,7 @@ handleBreakpoint eval pos = do
                 evalLoop
 
             doPause = do
-              cStack <- Mod.access (Mod.Proxy @[SourcePos])
+              cStack <- Mod.access (Mod.Proxy @[SourcePosition])
               watchExprs <- fmap S.toList . atomically $ readTVar watchExpressions
               watchVals <- traverse (withoutDebugging . eval) watchExprs
               let watchValsMap = M.fromList $ zip watchExprs watchVals

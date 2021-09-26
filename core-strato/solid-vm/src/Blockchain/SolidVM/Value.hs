@@ -150,7 +150,7 @@ coerceFromInt ct (SEnumVal tipe _ _) n' =
     let n = fromIntegral n'
     enumDef <- M.lookup tipe $ _enums ct
     when (n >= length enumDef) $ fail "enum val out of range"
-    return $ SEnumVal tipe (enumDef !! n) $ fromIntegral n'
+    return $ SEnumVal tipe (fst enumDef !! n) $ fromIntegral n'
 coerceFromInt _ t x = typeError "invalid literal for type" (t, x)
 
 -- coerceType allows integer literals to initialize integers, addresses, and
@@ -200,11 +200,12 @@ defaultValue _ (Xabi.Bytes _ _) = SString ""
 defaultValue ctract (Xabi.Label name) = fromMaybe (SContract name $ unspecifiedChain 0x0) $ asum
   [ do
       ns <- M.lookup name $ _enums ctract
-      val <- listToMaybe ns
+      val <- listToMaybe $ fst ns
       return $ SEnumVal name val 0x0
   , do
-    sdef <- M.lookup name $ _structs ctract
+    sdef' <- M.lookup name $ _structs ctract
     let initializeField = Constant . defaultValue ctract . Xabi.fieldTypeType
+        sdef = (\(a,b,_) -> (a,b)) <$> sdef'
     return . SStruct name . M.map initializeField . M.mapKeys T.unpack . M.fromList $ sdef
   ]
 
@@ -222,10 +223,10 @@ createDefaultValue _ (Xabi.String _) = return $ SString ""
 createDefaultValue _ (Xabi.Bytes _ _) = return $ SString ""
 createDefaultValue ctract (Xabi.Label name) =
   case (M.lookup name $ _enums ctract, M.lookup name $ _structs ctract) of
-    (Just (val:_), _) -> return $ SEnumVal name val 0x0
+    (Just ((val:_), _), _) -> return $ SEnumVal name val 0x0
     (Nothing, Just sdef) -> do
       items <-
-        forM sdef $ \(n, itemType) -> do
+        forM sdef $ \(n, itemType, _) -> do
           itemVal <- createDefaultValue ctract $ Xabi.fieldTypeType itemType
           itemVar <- createVar itemVal
           return (T.unpack n, itemVar)

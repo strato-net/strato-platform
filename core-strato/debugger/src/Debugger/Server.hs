@@ -72,8 +72,8 @@ removeBreakpointsPath paths dSettings@DebugSettings{..} = do
   void . atomically $ do
     modifyTVar breakpoints $ \bps ->
       let pathsSet = S.fromList $ T.unpack <$> paths
-          bpf ps (UnconditionalBP loc) = not $ sourceName loc `S.member` ps
-          bpf ps (ConditionalBP loc _) = not $ sourceName loc `S.member` ps
+          bpf ps (UnconditionalBP loc) = not $ _sourcePositionName loc `S.member` ps
+          bpf ps (ConditionalBP loc _) = not $ _sourcePositionName loc `S.member` ps
           bpf _ _ = True
        in S.filter (bpf pathsSet) bps
   status dSettings

@@ -43,7 +43,7 @@ decideVersion :: File -> SolcVersion
 decideVersion = maximum . (ZeroPointFour:) . mapMaybe go . unsourceUnits
   where go :: SourceUnit -> Maybe SolcVersion
         go NamedXabi{} = Nothing
-        go (Pragma pragmaName rest) = do
+        go (Pragma _ pragmaName rest) = do
           guard $ pragmaName == "solidity"
           rng <- eitherToMaybe . parseSemVerRange . T.strip . T.pack $ rest
           -- It would be much better to check for a nonempty intersection of ranges,

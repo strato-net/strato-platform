@@ -1,12 +1,16 @@
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module SolidVM.Solidity.Xabi.Def where
 
 import           Control.Lens                 (mapped, (&), (?~))
 import           Data.Aeson
+import           Data.Source
 import           Data.Swagger
 import           Data.Text                    (Text)
 import qualified Generic.Random               as GR
@@ -20,19 +24,23 @@ import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
 defAesonOptions :: Options
 defAesonOptions = defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="type"}}
 
-data Def = Enum { names::[Text], bytes::Word }
-         | Struct { fields::[(Text, Xabi.FieldType)], bytes::Word }
-         | Contract { bytes::Word }
-         deriving (Eq, Show, Generic)
+data DefF a = Enum { names::[Text], bytes::Word, context :: a}
+            | Struct { fields::[(Text, Xabi.FieldType)], bytes::Word, context :: a}
+            | Contract { bytes::Word, context :: a}
+         deriving (Eq, Show, Generic, Functor)
 
-instance Arbitrary Def where arbitrary = GR.genericArbitrary GR.uniform
-instance ToJSON Def where
+type Def = Positioned DefF
+
+instance Arbitrary a => Arbitrary (DefF a) where arbitrary = GR.genericArbitrary GR.uniform
+instance ToJSON a => ToJSON (DefF a) where
   toJSON = genericToJSON defAesonOptions
-instance FromJSON Def where
+instance FromJSON a => FromJSON (DefF a) where
   parseJSON = genericParseJSON defAesonOptions
 
 instance ToSchema Def where
   declareNamedSchema proxy = genericDeclareNamedSchema defaultSchemaOptions proxy
     & mapped.name ?~ "TypeDef"
     & mapped.schema.description ?~ "User defined type (Struct or Enum)"
-    & mapped.schema.example ?~ toJSON (Enum ["SUCCESS", "FAILURE", "NOT_AUTHORIZED"] 0xdeadbeef)
+    & mapped.schema.example ?~ toJSON (Enum ["SUCCESS", "FAILURE", "NOT_AUTHORIZED"]
+                                            0xdeadbeef
+                                            (SourcePosition "A.sol" 0 0))

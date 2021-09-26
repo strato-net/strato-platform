@@ -53,7 +53,7 @@ postStepOver = stepOver
 postStepOut :: DebugSettings -> Handler DebuggerStatus
 postStepOut = stepOut
 
-getStackTrace :: DebugSettings -> Handler [SourcePos]
+getStackTrace :: DebugSettings -> Handler [SourcePosition]
 getStackTrace = status >=> \case
   Paused DebugState{..} -> pure debugStateCallStack
   _ -> pure []
