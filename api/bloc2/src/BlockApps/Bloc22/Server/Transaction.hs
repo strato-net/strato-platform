@@ -733,14 +733,11 @@ postUsersContractMethod' cacheNonce FunctionParameters{..} userName = do
     params <- getAccountTxParams cacheNonce fromAddr chainId txParams
 
     let err = CouldNotFind $ Text.concat
-                [ "postUsersContractMethod': Couldn't find contract details for "
-                , contractName
-                , " at address "
+                [ "postUsersContractMethod': Couldn't find contract details for contract at address "
                 , Text.pack $ formatAddressWithoutColor contractAddr
                 ]
     (cmId,xabi) <- maybe (throwIO err) (return . fmap contractdetailsXabi) =<<
       getContractDetailsAndMetadataId
-        (ContractName contractName)
         (Account contractAddr (unChainId <$> chainId))
     contract' <- case xAbiToContract xabi of
       Left e -> throwIO . AnError $ Text.pack e
