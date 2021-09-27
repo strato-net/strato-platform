@@ -11,13 +11,14 @@ import           Control.Monad.IO.Class
 import qualified Data.Aeson                           as Aeson
 import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Lazy                 as BL
+import           Data.Functor                         ((<&>))
 import           Data.IORef
 import           Data.Map                             (Map)
 import qualified Data.Map                             as M
 import qualified Data.Text                            as T
 import           Data.Text.Encoding                   (decodeUtf8, encodeUtf8)
 import           System.IO.Unsafe
-import           Text.Parsec                          (runParser)
+import           Text.Parsec                          (runParser, ParseError)
 
 import           Blockchain.DB.CodeDB
 import           Blockchain.SolidVM.Exception         hiding (assert)
@@ -33,21 +34,20 @@ import           CodeCollection
 unsafeCodeMapIORef :: IORef (Map Keccak256 CodeCollection)
 unsafeCodeMapIORef = unsafePerformIO $ newIORef M.empty
 
-compileSource :: Map T.Text T.Text -> CodeCollection
+compileSource :: Map T.Text T.Text -> Either ParseError CodeCollection
 compileSource initCodeMap =
-  let getNamedContracts fileName src =
-        let maybeFile = runParser solidityFile "" (T.unpack fileName) $ T.unpack src
-            file = either (parseError "compileSource") id maybeFile
-            pragmas = \case
+  let getNamedContracts fileName src = do
+        file <- runParser solidityFile "" (T.unpack fileName) $ T.unpack src
+        let pragmas = \case
               Pragma _ n v -> Just (n, v)
               _ -> Nothing
             vmVersion' = if Just ("solidvm", "3.0") `elem` (pragmas <$> unsourceUnits file) then "svm3.0" else ""
-         in [(T.unpack name, xabiToContract (T.unpack name) (map T.unpack parents') vmVersion' xabi)
-            | NamedXabi name (xabi, parents') <- unsourceUnits file]
-      allContracts = concat . map (uncurry getNamedContracts) $ M.toList initCodeMap
-   in applyInheritance
+        pure [(T.unpack name, xabiToContract (T.unpack name) (map T.unpack parents') vmVersion' xabi)
+             | NamedXabi name (xabi, parents') <- unsourceUnits file]
+      allContracts = fmap concat . traverse (uncurry getNamedContracts) $ M.toList initCodeMap
+   in allContracts <&> \cs -> applyInheritance
         $ CodeCollection {
-            _contracts=M.fromList allContracts
+            _contracts=M.fromList cs
           }
 
 codeCollectionFromSource :: (MonadIO m, HasCodeDB m) => B.ByteString -> m (Keccak256, CodeCollection)
@@ -70,7 +70,8 @@ codeCollectionFromSource initCode = do
     Nothing -> do
       recordCacheEvent StorageWrite
       hsh' <- addCode SolidVM canonicalInitCode
-      let cc = compileSource initMap
+      let ecc = compileSource initMap
+          cc = either (parseError "codeCollectionFromSource") id ecc
       let codeMap' = M.insert hsh cc codeMap
       recordCacheSize $ M.size codeMap'
       liftIO $ writeIORef unsafeCodeMapIORef codeMap'
@@ -91,7 +92,8 @@ codeCollectionFromHash hsh = do
           let initMap = case Aeson.decode $ BL.fromStrict initCode of
                   Just l -> M.fromList l
                   Nothing -> M.singleton T.empty (decodeUtf8 initCode)
-          let cc = compileSource initMap
+          let ecc = compileSource initMap
+              cc = either (parseError "codeCollectionFromHash") id ecc
               codeMap' = M.insert hsh cc codeMap
           recordCacheSize $ M.size codeMap'
           liftIO $ writeIORef unsafeCodeMapIORef codeMap'

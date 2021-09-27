@@ -13,7 +13,6 @@ module Debugger.Rest.Server where
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Data.Aeson             as A
-import           Data.Functor.Identity
 import qualified Data.Map.Strict        as M
 import           Data.Maybe             (fromMaybe)
 import           Data.Source
@@ -22,6 +21,7 @@ import           Debugger.Rest.Api
 import           Debugger.Server
 import           Debugger.Types
 import           Servant
+import           Text.Parsec.Error
 
 getStatus :: DebugSettings -> Handler DebuggerStatus
 getStatus = status
@@ -77,16 +77,29 @@ deleteWatches = flip removeWatches
 postEvals :: DebugSettings -> [EvaluationRequest] -> Handler [EvaluationResponse]
 postEvals d ts = fmap (fromMaybe $ Left "") <$> liftIO (evaluateExpressions ts d)
 
+parseErrorToAnnotation :: ParseError -> SourceAnnotation T.Text
+parseErrorToAnnotation pe =
+  let msgs = errorMessages pe
+      sp = toSourcePosition $ errorPos pe
+      ann = showErrorMessages
+        "or"
+        "unknown parse error"
+        "expecting"
+        "unexpected"
+        "end of input"
+        msgs
+   in SourceAnnotation sp sp $ T.pack ann
+
 postParse :: ToJSON a
-          => (SourceMap -> Identity a)
+          => (SourceMap -> Either ParseError a)
           -> SourceMap
           -> Handler A.Value
-postParse parse = pure . toJSON . runIdentity . parse
+postParse parse = pure . either (toJSON . parseErrorToAnnotation) toJSON . parse
 
-postAnalyze :: (SourceMap -> Identity [SourceAnnotation T.Text])
+postAnalyze :: (SourceMap -> Either ParseError [SourceAnnotation T.Text])
             -> SourceMap
             -> Handler [SourceAnnotation T.Text]
-postAnalyze analyze = pure . runIdentity . analyze
+postAnalyze analyze = pure . either ((:[]) . parseErrorToAnnotation) id . analyze
 
 restDebuggerServer :: ToJSON a
                    => DebugSettings
