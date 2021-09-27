@@ -148,9 +148,9 @@ coerceFromInt _ (SContract c a) n = SContract c $ (namedAccountAddress .~ fromIn
 coerceFromInt ct (SEnumVal tipe _ _) n' =
   fromMaybe (typeError "missing enum val" (tipe, n')) $ do
     let n = fromIntegral n'
-    enumDef <- M.lookup tipe $ _enums ct
+    enumDef <- fmap fst . M.lookup tipe $ _enums ct
     when (n >= length enumDef) $ fail "enum val out of range"
-    return $ SEnumVal tipe (fst enumDef !! n) $ fromIntegral n'
+    return $ SEnumVal tipe (enumDef !! n) $ fromIntegral n'
 coerceFromInt _ t x = typeError "invalid literal for type" (t, x)
 
 -- coerceType allows integer literals to initialize integers, addresses, and
