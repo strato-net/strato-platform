@@ -1,4 +1,6 @@
-module SolidVM.Solidity.Detectors.Trivial where
+module SolidVM.Solidity.Detectors.Trivial
+  ( detector
+  ) where
 
-trivialDetector :: a -> [b]
-trivialDetector = const []
+detector :: a -> [b]
+detector = const []
