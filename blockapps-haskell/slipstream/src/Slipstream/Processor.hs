@@ -69,7 +69,7 @@ import qualified Blockchain.Strato.Model.Action as BS
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.SourceMap
+import Data.Source.Map
 
 import Control.Monad.Change.Modify              hiding (modify)
 import Control.Monad.Composable.BlocSQL

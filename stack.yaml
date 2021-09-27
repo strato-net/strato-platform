@@ -58,6 +58,7 @@ packages:
 - shared-util/format
 - shared-util/labeled-error/
 - shared-util/solid-vm-model/
+- shared-util/source-tools/
 - clockwork
 - logserver
 - x509-certs/

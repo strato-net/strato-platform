@@ -21,7 +21,7 @@ import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Nonce
 import           Blockchain.Strato.Model.Secp256k1
-import           Blockchain.Strato.Model.SourceMap
+import           Data.Source.Map
 import           Blockchain.Strato.Model.Wei
 
 import           Control.Exception

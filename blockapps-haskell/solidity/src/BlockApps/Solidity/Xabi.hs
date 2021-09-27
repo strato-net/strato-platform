@@ -33,7 +33,7 @@ import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Strato.Model.SourceMap
+import           Data.Source.Map
 
 data XabiKind = ContractKind
               | InterfaceKind

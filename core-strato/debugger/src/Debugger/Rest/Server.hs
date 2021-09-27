@@ -13,8 +13,10 @@ module Debugger.Rest.Server where
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Data.Aeson             as A
+import           Data.Functor.Identity
 import qualified Data.Map.Strict        as M
 import           Data.Maybe             (fromMaybe)
+import           Data.Source
 import qualified Data.Text              as T
 import           Debugger.Rest.Api
 import           Debugger.Server
@@ -76,16 +78,21 @@ postEvals :: DebugSettings -> [EvaluationRequest] -> Handler [EvaluationResponse
 postEvals d ts = fmap (fromMaybe $ Left "") <$> liftIO (evaluateExpressions ts d)
 
 postParse :: ToJSON a
-          => (M.Map T.Text T.Text -> a)
-          -> M.Map T.Text T.Text
+          => (SourceMap -> Identity a)
+          -> SourceMap
           -> Handler A.Value
-postParse parse = pure . toJSON . parse
+postParse parse = pure . toJSON . runIdentity . parse
+
+postAnalyze :: (SourceMap -> Identity [SourceAnnotation T.Text])
+            -> SourceMap
+            -> Handler [SourceAnnotation T.Text]
+postAnalyze analyze = pure . runIdentity . analyze
 
 restDebuggerServer :: ToJSON a
                    => DebugSettings
-                   -> (M.Map T.Text T.Text -> a)
+                   -> SourceTools a
                    -> Server RestDebuggerAPI
-restDebuggerServer dSettings parse =
+restDebuggerServer dSettings tools =
        getStatus dSettings
   :<|> putPause dSettings
   :<|> putResume dSettings
@@ -102,10 +109,11 @@ restDebuggerServer dSettings parse =
   :<|> putWatches dSettings
   :<|> deleteWatches dSettings
   :<|> postEvals dSettings
-  :<|> postParse parse
+  :<|> postParse (parser tools)
+  :<|> postAnalyze (analyzer tools)
 
 restDebugger :: ToJSON a
              => DebugSettings
-             -> (M.Map T.Text T.Text -> a)
+             -> SourceTools a
              -> Application
-restDebugger dSettings parse = serve restDebuggerAPI (restDebuggerServer dSettings parse)
+restDebugger dSettings tools = serve restDebuggerAPI (restDebuggerServer dSettings tools)

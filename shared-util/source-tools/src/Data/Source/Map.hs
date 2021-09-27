@@ -2,8 +2,8 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Blockchain.Strato.Model.SourceMap
-  ( SourceMap
+module Data.Source.Map
+  ( SourceMap(..)
   , namedSource
   , unnamedSource
   , sourceBlob

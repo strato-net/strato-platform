@@ -35,7 +35,7 @@ import           BlockApps.Solidity.Xabi
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Strato.Model.SourceMap
+import           Data.Source.Map
 
 --------------------------------------------------------------------------------
 -- | Routes and types

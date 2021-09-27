@@ -46,6 +46,7 @@ const Endpoint = {
   DEBUG_WATCHES: `${debugUrl}/watches`,
   DEBUG_EVAL: `${debugUrl}/eval`,
   DEBUG_PARSE: `${debugUrl}/parse`,
+  DEBUG_ANALYZE: `${debugUrl}/analyze`,
 };
 
 function constructEndpoint(endpointTemplate, options:Options, params = {}) {

@@ -3,6 +3,7 @@
 ### Version: 8.0.3
 
 - Added the debugPostParse function to support compilation and static analysis tools
+- Added the debugPostAnalyze function to support static analysis tools
 
 ### Version: 8.0.2
 

@@ -40,7 +40,7 @@ import           Blockchain.TypeLits
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.CodePtr
-import           Blockchain.Strato.Model.SourceMap
+import           Data.Source.Map
 
 --------------------------------------------------------------------------------
 -- | Routes and types
