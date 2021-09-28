@@ -30,11 +30,11 @@ data ContractF a =
   Contract {
     _contractName :: String,
     _parents :: [String],
-    _constants :: Map String ConstantDecl,
-    _storageDefs :: Map String VariableDecl,
-    _enums :: Map String [String],
-    _structs :: Map String [(T.Text, Xabi.FieldType)],
-    _events :: Map T.Text Xabi.Event,
+    _constants :: Map String (ConstantDeclF a),
+    _storageDefs :: Map String (VariableDeclF a),
+    _enums :: Map String ([String], a),
+    _structs :: Map String [(T.Text, Xabi.FieldType, a)],
+    _events :: Map T.Text (Xabi.EventF a),
     _functions :: Map String (FuncF a),
     _constructor :: Maybe (FuncF a),
     _vmVersion :: String
@@ -43,7 +43,7 @@ data ContractF a =
 instance ToJSON a => ToJSON (ContractF a)
 instance FromJSON a => FromJSON (ContractF a)
 
-type Contract = ContractF Xabi.SourcePos
+type Contract = Positioned ContractF
 
 makeLenses ''ContractF
 
@@ -55,8 +55,8 @@ data CodeCollectionF a =
 instance ToJSON a => ToJSON (CodeCollectionF a)
 instance FromJSON a => FromJSON (CodeCollectionF a)
 
-type CodeCollection = CodeCollectionF Xabi.SourcePos
-type Detector = CodeCollectionF SourcePosition -> [SourceAnnotation T.Text]
+type CodeCollection = Positioned CodeCollectionF
+type Detector = CodeCollection -> [SourceAnnotation T.Text]
 
 makeLenses ''CodeCollectionF
 
@@ -73,8 +73,8 @@ xabiToContract contractName' parents' vmVersion' xabi = validateXabi xabi `seq`
   _parents = parents',
   _storageDefs = M.fromList $ map (\(k,v) -> (T.unpack k, v)) $ M.toList $ Xabi.xabiVars xabi,
   _constants = M.fromList $ map (\(k,v) -> (T.unpack k, v)) $ M.toList $ Xabi.xabiConstants xabi,
-  _enums = M.fromList [(T.unpack name, map T.unpack vals) | (name, Xabi.Enum vals _) <- M.toList $ Xabi.xabiTypes xabi],
-  _structs = M.fromList [(T.unpack name, vals) | (name, Xabi.Struct vals _) <- M.toList $ Xabi.xabiTypes xabi],
+  _enums = M.fromList [(T.unpack name, (map T.unpack vals, a)) | (name, Xabi.Enum vals _ a) <- M.toList $ Xabi.xabiTypes xabi],
+  _structs = M.fromList [(T.unpack name, (\(k,v) -> (k,v,a)) <$> vals) | (name, Xabi.Struct vals _ a) <- M.toList $ Xabi.xabiTypes xabi],
   _events = Xabi.xabiEvents xabi,
   _functions = M.fromList $ map (\(k,v) -> (T.unpack k, v)) $ M.toList $ Xabi.xabiFuncs xabi,
   _constructor =
@@ -146,44 +146,44 @@ statementCrawler = \case
                                     ++ maybe [] expressionCrawler mInc
                                     ++ concatMap statementCrawler blk
 
-expressionCrawler :: Xabi.Expression -> [T.Text]
+expressionCrawler :: Xabi.ExpressionF a -> [T.Text]
 expressionCrawler = \case
-  Xabi.PlusPlus expr -> "PlusPlus":expressionCrawler expr
-  Xabi.MinusMinus expr -> "MinusMinus":expressionCrawler expr
+  Xabi.PlusPlus _ expr -> "PlusPlus":expressionCrawler expr
+  Xabi.MinusMinus _ expr -> "MinusMinus":expressionCrawler expr
   Xabi.NewExpression{} -> ["NewExpression"]
-  Xabi.IndexAccess obj mIdx -> "IndexAccess" : do
+  Xabi.IndexAccess _ obj mIdx -> "IndexAccess" : do
     expr <- obj : maybeToList mIdx
     expressionCrawler expr
-  Xabi.MemberAccess expr _ -> "MemberAccess":expressionCrawler expr
-  Xabi.FunctionCall func args -> "FunctionCall" : do
+  Xabi.MemberAccess _ expr _ -> "MemberAccess":expressionCrawler expr
+  Xabi.FunctionCall _ func args -> "FunctionCall" : do
     expr <- case args of
       Xabi.OrderedArgs args' -> func:args'
       Xabi.NamedArgs args' -> func:map snd args'
     expressionCrawler expr
-  Xabi.Unitary n expr -> T.pack ("Unitary: " ++ n):expressionCrawler expr
-  Xabi.Binary n lhs rhs -> T.pack ("Binary: " ++ n) : do
+  Xabi.Unitary _ n expr -> T.pack ("Unitary: " ++ n):expressionCrawler expr
+  Xabi.Binary _ n lhs rhs -> T.pack ("Binary: " ++ n) : do
     expr <- [lhs, rhs]
     expressionCrawler expr
-  Xabi.Ternary cond thn els -> "Ternary" : do
+  Xabi.Ternary _ cond thn els -> "Ternary" : do
     expr <- [cond, thn, els]
     expressionCrawler expr
   Xabi.BoolLiteral{} -> ["BoolLiteral"]
   Xabi.NumberLiteral{} -> ["NumberLiteral"]
   Xabi.StringLiteral{} -> ["StringLiteral"]
-  Xabi.TupleExpression subexprs -> "TupleExpression" : do
+  Xabi.TupleExpression _ subexprs -> "TupleExpression" : do
     expr <- catMaybes subexprs
     expressionCrawler expr
-  Xabi.ArrayExpression subexprs -> "ArrayExpression" : do
+  Xabi.ArrayExpression _ subexprs -> "ArrayExpression" : do
     expr <- subexprs
     expressionCrawler expr
   Xabi.Variable{} -> ["Variable"]
 
-simpleStatementCrawler :: Xabi.SimpleStatement -> [T.Text]
+simpleStatementCrawler :: Xabi.SimpleStatementF a -> [T.Text]
 simpleStatementCrawler = \case
   Xabi.ExpressionStatement expr -> expressionCrawler expr
   Xabi.VariableDefinition _ mExpr -> maybe [] expressionCrawler mExpr
 
-funcCrawler :: Xabi.Func -> [T.Text]
+funcCrawler :: Xabi.FuncF a -> [T.Text]
 funcCrawler = maybe [] (concatMap statementCrawler) . Xabi.funcContents
 
 contractCrawler :: Contract -> [T.Text]

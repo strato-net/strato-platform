@@ -33,7 +33,7 @@ unparse :: File -> String
 unparse (File units) = List.concat $ List.map unparseSourceUnit units
 
 unparseSourceUnit :: SourceUnit -> String
-unparseSourceUnit (Pragma ident contents) = "pragma " ++ ident ++ " " ++ contents ++ ";\n"
+unparseSourceUnit (Pragma _ ident contents) = "pragma " ++ ident ++ " " ++ contents ++ ";\n"
 unparseSourceUnit (NamedXabi name (contract,inherited)) =
      (case xabiKind contract of
         ContractKind -> "contract "
@@ -56,7 +56,7 @@ unparseSourceUnit (NamedXabi name (contract,inherited)) =
   <> "\n}"
 
 unparseVar :: (Text, VariableDecl) -> String
-unparseVar (name, (VariableDecl theType isPublic maybeExpression)) =
+unparseVar (name, (VariableDecl theType isPublic maybeExpression _)) =
      unparseVarType (theType)
   <> " "
   <> (if isPublic --TODO- I need to expand this to public, private or nothing
@@ -71,7 +71,7 @@ unparseVar (name, (VariableDecl theType isPublic maybeExpression)) =
   <> ";"
 
 unparseConstant :: (Text, ConstantDecl) -> String
-unparseConstant (name, (ConstantDecl theType isPublic expression)) =
+unparseConstant (name, (ConstantDecl theType isPublic expression _)) =
      unparseVarType (theType)
   <> " "
   <> (if isPublic --TODO- I need to expand this to public, private or nothing
@@ -150,10 +150,10 @@ tab [] = []
 tab ('\n':rest) = "\n    " ++ tab rest
 tab (x:rest) = x:tab rest
 
-unparseStatement :: StatementF a -> String
+unparseStatement :: Show a => StatementF a -> String
 unparseStatement = unparseStatementWith (flip const)
 
-unparseStatementWith :: (a -> String -> String) -> StatementF a -> String
+unparseStatementWith :: Show a => (a -> String -> String) -> StatementF a -> String
 unparseStatementWith f (SimpleStatement s a) = f a $ unparseSimpleStatement s ++ ";"
 unparseStatementWith f (IfStatement e s1 s2 a) =
   let
@@ -196,9 +196,9 @@ unparseStatementWith f (EmitStatement eventName extups a) =
 
 -- unparseStatementWith _ x = internalError "missing case in call to unparseStatementWith" $ show x
 
-unparseVarDefEntry :: VarDefEntry -> String
+unparseVarDefEntry :: VarDefEntryF a -> String
 unparseVarDefEntry BlankEntry = ""
-unparseVarDefEntry (VarDefEntry maybeType maybeLoc theName) =
+unparseVarDefEntry (VarDefEntry maybeType maybeLoc theName _) =
   let typeString = case maybeType of
                        Nothing -> "var" -- TODO: This isn't exactly correct to put "var" inside a tuple
                        Just theType -> unparseVarType theType
@@ -210,7 +210,7 @@ unparseVarDefEntry (VarDefEntry maybeType maybeLoc theName) =
 
 
 
-unparseSimpleStatement :: SimpleStatement -> String
+unparseSimpleStatement :: Show a => SimpleStatementF a -> String
 unparseSimpleStatement (VariableDefinition entries maybeVal) =
   let entriesString = case entries of
                         [e] -> unparseVarDefEntry e
@@ -223,31 +223,31 @@ unparseSimpleStatement (VariableDefinition entries maybeVal) =
 unparseSimpleStatement (ExpressionStatement e) = unparseExpression e
 
 -- TODO- deal with parenthesis properly....  this is a bit difficult to do
-unparseExpression :: Expression -> String
-unparseExpression (PlusPlus v) = unparseExpression v ++ "++"
-unparseExpression (MinusMinus v) = unparseExpression v ++ "--"
-unparseExpression (Unitary op v) = op ++ unparseExpression v
-unparseExpression (Binary op v1 v2) =
+unparseExpression :: Show a => ExpressionF a -> String
+unparseExpression (PlusPlus _ v) = unparseExpression v ++ "++"
+unparseExpression (MinusMinus _ v) = unparseExpression v ++ "--"
+unparseExpression (Unitary _ op v) = op ++ unparseExpression v
+unparseExpression (Binary _ op v1 v2) =
   unparseExpression v1 ++ " " ++ op ++ " " ++ unparseExpression v2
-unparseExpression (Variable name) = name
-unparseExpression (MemberAccess e name) = unparseExpression e ++ "." ++ name
-unparseExpression (NumberLiteral x Nothing) = show x
-unparseExpression (BoolLiteral False) = "false"
-unparseExpression (BoolLiteral True) = "true"
-unparseExpression (StringLiteral s) = ('"':) . (++"\"") $ s
-unparseExpression (TupleExpression vals) = "(" ++ List.intercalate ", " (map (maybe "" unparseExpression) vals) ++ ")"
-unparseExpression (IndexAccess e maybeVal) = unparseExpression e ++ "[" ++ fromMaybe "" (fmap unparseExpression maybeVal) ++ "]"
-unparseExpression (FunctionCall e args) =
+unparseExpression (Variable _ name) = name
+unparseExpression (MemberAccess _ e name) = unparseExpression e ++ "." ++ name
+unparseExpression (NumberLiteral _ x Nothing) = show x
+unparseExpression (BoolLiteral _ False) = "false"
+unparseExpression (BoolLiteral _ True) = "true"
+unparseExpression (StringLiteral _ s) = ('"':) . (++"\"") $ s
+unparseExpression (TupleExpression _ vals) = "(" ++ List.intercalate ", " (map (maybe "" unparseExpression) vals) ++ ")"
+unparseExpression (IndexAccess _ e maybeVal) = unparseExpression e ++ "[" ++ fromMaybe "" (fmap unparseExpression maybeVal) ++ "]"
+unparseExpression (FunctionCall _ e args) =
     let shownArgs = case args of
                       OrderedArgs xs -> List.intercalate "," $ map unparseExpression xs
                       NamedArgs xs -> "{" ++ List.intercalate "," (map (\(n, x) -> printf "%s:%s" n $ unparseExpression x) xs) ++ "}"
     in unparseExpression e ++ "(" ++ shownArgs ++ ")"
-unparseExpression (Ternary x y z) = unparseExpression x ++ "?" ++ unparseExpression y ++ ":" ++ unparseExpression z
-unparseExpression (NewExpression x) = "new " ++ unparseVarType x
-unparseExpression (ArrayExpression xs) = "[" ++ List.intercalate "," (map unparseExpression xs) ++ "]"
+unparseExpression (Ternary _ x y z) = unparseExpression x ++ "?" ++ unparseExpression y ++ ":" ++ unparseExpression z
+unparseExpression (NewExpression _ x) = "new " ++ unparseVarType x
+unparseExpression (ArrayExpression _ xs) = "[" ++ List.intercalate "," (map unparseExpression xs) ++ "]"
 unparseExpression x = internalError "missing case in call to unparseExpression" $ show x
 
-unparseModifier :: (Text, Modifier) -> String
+unparseModifier :: (Text, ModifierF a) -> String
 unparseModifier (name, Modifier{..}) = Text.unpack $
      "modifier "
   <> name
@@ -259,7 +259,7 @@ unparseModifier (name, Modifier{..}) = Text.unpack $
        Nothing -> ""
   <> "}"
 
-unparseEvent :: (Text, Event) -> String
+unparseEvent :: (Text, EventF a) -> String
 unparseEvent (name, Event{..}) = Text.unpack $
      "event "
   <> name
@@ -269,10 +269,10 @@ unparseEvent (name, Event{..}) = Text.unpack $
   <> (if eventAnonymous then "anonymous" else "")
   <> ";"
 
-unparseUsing :: (Text, Using) -> String
-unparseUsing (name, Using body) = Text.unpack . mconcat $ ["using ", name, " ", Text.pack body, ";\n"]
+unparseUsing :: (Text, UsingF a) -> String
+unparseUsing (name, Using body _) = Text.unpack . mconcat $ ["using ", name, " ", Text.pack body, ";\n"]
 
-unparseTypes :: (Text, Xabi.Def) -> String
+unparseTypes :: (Text, Xabi.DefF a) -> String
 unparseTypes (name, Xabi.Enum {names=names'}) =
   Text.unpack $ "enum "
              <> name

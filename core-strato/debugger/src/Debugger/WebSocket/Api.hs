@@ -36,7 +36,7 @@ data WSDebuggerInput = WSIStatus
                      deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
 data WSDebuggerOutput = WSOStatus DebuggerStatus
-                      | WSOStackTrace [SourcePos]
+                      | WSOStackTrace [SourcePosition]
                       | WSOVariables (M.Map T.Text (M.Map T.Text EvaluationResponse))
                       | WSOWatches (M.Map EvaluationRequest EvaluationResponse)
                       | WSOBreakpoints [Breakpoint]

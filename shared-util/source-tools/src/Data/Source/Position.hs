@@ -11,22 +11,26 @@ module Data.Source.Position
   , sourcePositionName
   , sourcePositionLine
   , sourcePositionColumn
+  , initialPosition
   , toSourcePosition
   , fromSourcePosition
+  , getSourcePosition
   ) where
 
+import Control.DeepSeq (NFData)
 import Control.Lens hiding ((.=))
 import Data.Aeson
 import Data.Data
 import GHC.Generics
 import Test.QuickCheck
 import Text.Parsec.Pos
+import Text.Parsec
 
 data SourcePosition = SourcePosition
   { _sourcePositionName   :: String
   , _sourcePositionLine   :: !Int
   , _sourcePositionColumn :: !Int
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data, NFData)
 
 makeLenses ''SourcePosition
 
@@ -48,6 +52,9 @@ instance FromJSON SourcePosition where
 instance Arbitrary SourcePosition where
   arbitrary = SourcePosition <$> arbitrary <*> arbitrary <*> arbitrary
 
+initialPosition :: String -> SourcePosition
+initialPosition name = SourcePosition name 0 0
+
 toSourcePosition :: SourcePos -> SourcePosition
 toSourcePosition pos = SourcePosition (sourceName pos)
                                       (sourceLine pos)
@@ -55,3 +62,6 @@ toSourcePosition pos = SourcePosition (sourceName pos)
 
 fromSourcePosition :: SourcePosition -> SourcePos
 fromSourcePosition (SourcePosition n l c) = newPos n l c
+
+getSourcePosition :: Monad m => ParsecT s u m SourcePosition
+getSourcePosition = toSourcePosition <$> getPosition

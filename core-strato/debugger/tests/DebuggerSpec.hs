@@ -11,11 +11,6 @@ jsonRT =  either (error . ("Failed jsonRT: " ++ )) id . Aeson.eitherDecode . Aes
 jsonCheck :: (Eq a, Show a, ToJSON a, FromJSON a) => a -> Expectation
 jsonCheck x = jsonRT x `shouldBe` x
 
-sourcePosJSON :: Spec
-sourcePosJSON = do
-  it "should convert a SourcePos to and from its JSON encoding" $ property $
-    (\x -> jsonCheck (x :: SourcePos))
-
 breakpointJSON :: Spec
 breakpointJSON = do
   it "should convert a Breakpoint to and from its JSON encoding" $ property $
@@ -39,7 +34,6 @@ debuggerStatusJSON = do
 spec :: Spec
 spec = do
   describe "JSON roundtrips" $ do
-    sourcePosJSON
     breakpointJSON
     debugOperationJSON
     debugStateJSON
