@@ -524,31 +524,12 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} userName = do
   txsWithParams <- genNonces cacheNonce fromAddr uploadlistcontractChainid uploadlistcontractTxParams contracts'
   namesCmIdsTxs <- forStateT Map.empty txsWithParams $
     \(UploadListContract name srcs args params value cid md) -> do
-      (src, cmId, xabi) <-
-       if srcs /= mempty
-        then do
-          (cmId', cd) <- fmap snd . lift $ getContractDetailsForContract "SolidVM" srcs (Just name) >>= \case
-            Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
-            Just x -> pure x
-          at name <?= (contractdetailsSrc cd, cmId', contractdetailsXabi cd)
-        else do
-          mtuple <- use $ at name
-          case mtuple of
-            Just (src, cmId', x) -> return (src, cmId', x)
-            Nothing -> do
-              mContract <- lift . blocQueryMaybe $ proc () -> do
-                (_,_,_,_,_,src,cmId',x'') <- getContractsContractLatestQuery name -< ()
-                returnA -< (src,cmId',x'')
-              case mContract of
-                Nothing -> throwIO . UserError $ Text.concat
-                  [ "Upload List (SolidVM): When deploying multiple contract creation transactions, "
-                  , "the contracts' source code must be supplied when using SolidVM. "
-                  , "Please try supplying the contracts' source code and try again. "
-                  , "If you continue to receive this error message, please contact your administrator."
-                  ]
-                Just (src,(cmId' :: Int32),x') -> do
-                  x <- lift $ deserializeXabi x'
-                  at name <?= (deserializeSourceMap src, cmId', x)
+      (src, cmId, xabi) <- do
+        (cmId', cd) <- fmap snd . lift $ getContractDetailsForContract "SolidVM" srcs (Just name) >>= \case
+          Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
+          Just x -> pure x
+        at name <?= (contractdetailsSrc cd, cmId', contractdetailsXabi cd)
+                  
       let xabiArgs = maybe Map.empty funcArgs $ xabiConstr xabi
       (_, argsAsSource) <- lift $ constructArgValuesAndSource (Just args) xabiArgs
 
