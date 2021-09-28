@@ -15,11 +15,14 @@ import           Data.Aeson
 import           Data.Aeson.Types
 import qualified Data.ByteString              as B
 import qualified Data.ByteString.Short        as BSS
+import           Data.Foldable
 import           Data.Function                (on)
 import qualified Data.HashMap.Strict          as HM
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
+import           Data.Maybe
 import           Data.Text                    (Text)
+import qualified Data.Text                    as T
 import           Data.Time
 import qualified Data.Sequence                as S
 import           GHC.Generics
@@ -36,6 +39,11 @@ import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Keccak256
 
+import qualified Text.Colors                  as CL
+import           Text.Format
+import           Text.Tools
+
+
 data CallType = Create | Delete | Update deriving (Eq, Show, Generic, NFData)
 
 instance ToJSON CallType where
@@ -51,6 +59,17 @@ data CallData = CallData
   , _callDataOutput   :: Maybe BSS.ShortByteString
   } deriving (Eq, Show, Generic, NFData)
 makeLenses ''CallData
+
+instance Format CallData where
+  format CallData{..} =
+    "callDataType: " ++ show _callDataType ++ "\n"
+    ++ "callDataSender: " ++ format _callDataSender ++ "\n"
+    ++ "callDataOwner: " ++ format _callDataOwner ++ "\n"
+    ++ "callDataGasPrice: " ++ show _callDataGasPrice ++ "\n"
+    ++ "callDataValue: " ++ show _callDataValue ++ "\n"
+    ++ "callDataInput: " ++ show _callDataInput ++ "\n"
+    ++ "callDataOutput: " ++ show _callDataOutput ++ "\n"
+
 
 instance ToJSON CallData where
   toJSON CallData{..} = object
@@ -126,6 +145,16 @@ data ActionData = ActionData
   } deriving (Eq, Show, Generic, NFData)
 makeLenses ''ActionData
 
+instance Format ActionData where
+  format ActionData{..} = 
+    "actionDataCodeHash: " ++ format _actionDataCodeHash ++ "\n"
+    ++ "actionDataOrganization: " ++ show _actionDataOrganization ++ "\n"
+    ++ "actionDataApplication: " ++ T.unpack _actionDataApplication ++ "\n"
+    ++ "actionDataCodeKind: " ++ show _actionDataCodeKind ++ "\n"
+    ++ "actionDataStorageDiffs: " ++ show _actionDataStorageDiffs ++ "\n"
+    ++ "actionDataCallData:\n" ++ tab (unlines (map format _actionDataCallData))
+  
+
 mergeActionData :: ActionData -> ActionData -> ActionData
 mergeActionData newData oldData =
   let diffs = case (_actionDataStorageDiffs newData, _actionDataStorageDiffs oldData) of
@@ -170,6 +199,18 @@ data Action = Action
   , _actionEvents             :: S.Seq Event
   } deriving (Eq, Show, Generic, NFData)
 makeLenses ''Action
+
+instance Format Action where
+  format Action{..} =
+    "actionBlockHash: " ++ format _actionBlockHash ++ "\n"
+    ++ "actionBlockTimestamp: " ++ show _actionBlockTimestamp ++ "\n"
+    ++ "actionBlockNumber: " ++ show _actionBlockNumber ++ "\n"
+    ++ "actionTransactionHash: " ++ format _actionTransactionHash ++ "\n"
+    ++ "actionTransactionChainId: " ++ format _actionTransactionChainId ++ "\n"
+    ++ "actionTransactionSender: " ++ format _actionTransactionSender ++ "\n"
+    ++ "actionData:\n" ++ unlines (map (\(k, v) -> tab $ format k ++ ":\n" ++ (tab $ format v)) $ M.toList _actionData) ++ "\n"
+    ++ "actionMetadata: " ++ unwords (map (\(k, v) -> "(" ++ CL.blue (show k) ++ ": " ++ show (shorten 10 $ T.unpack v) ++ ")") $ M.toList $ fromMaybe M.empty $ _actionMetadata) ++ "\n"
+    ++ "actionEvents: " ++ unlines (map show $ toList _actionEvents) ++ "\n"
 
 instance ToJSON Action where
   toJSON Action{..} = object

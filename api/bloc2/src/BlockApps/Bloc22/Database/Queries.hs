@@ -18,13 +18,13 @@ module BlockApps.Bloc22.Database.Queries (
   sourceToContractDetails,
   getContractsAddressesQuery,
   getContractDetails,
-  getContractDetailsByAddressOnly,
   getContractsDataAddressesQuery,
   getContractDetailsForContract,
   getContractDetailsByCodeHash,
   insertContractInstance,
   deserializeXabi,
   getContractsContractLatestQuery,
+  getContractsContractByAddressQuery,
   evmContractSolidVMError
   ) where
 
@@ -118,8 +118,7 @@ contractDetailsJoinTable = joinF
     (queryTable contractsSourceTable)
 
 contractByAccount
-  :: Text
-  -> Account
+  :: Account
   -> Query
     ( Column PGInt4
     , Column PGText
@@ -133,9 +132,8 @@ contractByAccount
     , Column PGBytea
     , Column PGBytea
     )
-contractByAccount contractName (Account contractAddress chainId) = proc () -> do
-  contract@(_,name,_,addr,_,_,_,_,_,cid,_) <- contractsJoinTable -< ()
-  restrict -< name .== constant contractName
+contractByAccount (Account contractAddress chainId) = proc () -> do
+  contract@(_,_,_,addr,_,_,_,_,_,cid,_) <- contractsJoinTable -< ()
   restrict -< addr .== constant contractAddress
   restrict -< cid .== constant (ChainId <$> chainId)
   returnA -< contract
@@ -194,13 +192,6 @@ contractBySourceHash srcHash = proc () -> do
   restrict -< sh .== constant srcHash
   returnA -< contract
 
-contractNameFromAccount :: Account -> Query (Column PGText)
-contractNameFromAccount (Account contractAddress chainId) = proc () -> do
-  (_,name,_,addr,_,_,_,_,_,cid,_) <- contractsJoinTable -< ()
-  restrict -< addr .== constant contractAddress
-  restrict -< cid .== constant (ChainId <$> chainId)
-  returnA -< name
-
 contractByTxHash :: Keccak256 -> Query (Column PGInt4, Column PGInt4, Column PGText)
 contractByTxHash txHash = limit 1 $ proc () -> do
   (_,tx_hash,cmId,ttype,name) <- queryTable hashNameTable -< ()
@@ -245,18 +236,6 @@ getContractsDataAddressesQuery contractName = proc () -> do
   restrict -< name .== constant contractName
   returnA -< (addr,cid)
 
-getContractDetailsAndMetadataIdByAccountOnly :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
-                                                Account -> m (Maybe (Int32, ContractDetails))
-getContractDetailsAndMetadataIdByAccountOnly contractAcct = do
-  mName <- fmap listToMaybe . blocQuery $ contractNameFromAccount contractAcct
-  fmap join . for mName $ \name -> getContractDetailsAndMetadataId (ContractName name) contractAcct
- 
-getContractDetailsByAddressOnly :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
-                                   Account -> m (Maybe ContractDetails)
-getContractDetailsByAddressOnly contractAcct = do
-  mName <- fmap listToMaybe . blocQuery $ contractNameFromAccount contractAcct
-  fmap join . for mName $ \name -> getContractDetails (ContractName name) contractAcct
-
 {- |
 SELECT
    CM.bin
@@ -274,8 +253,7 @@ WHERE C.name=$1 AND CI.address=$2
 LIMIT 1;
 -}
 getContractsContractByAddressQuery
-  :: Text
-  -> Account
+  :: Account
   -> Query
     ( Column PGBytea
     , Column PGBytea
@@ -286,10 +264,10 @@ getContractsContractByAddressQuery
     , Column PGInt4
     , Column PGBytea
     )
-getContractsContractByAddressQuery contractName contractAcct =
+getContractsContractByAddressQuery contractAcct =
   limit 1 $ proc () -> do
     (cmId,name,src,_,_,bin,binRuntime,codeHash,xcodeHash,_,xabi) <-
-      contractByAccount contractName contractAcct -< ()
+      contractByAccount contractAcct -< ()
     returnA -< (bin,binRuntime,codeHash,xcodeHash,name,src,cmId,xabi)
 
 getContractsContractByCodeHashQuery
@@ -373,12 +351,12 @@ getContractDetailsByMetadataId cmId acct = do
     }
 
 getContractDetails :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
-                      ContractName -> Account -> m (Maybe ContractDetails)
-getContractDetails name = fmap (fmap snd) . getContractDetailsAndMetadataId name
+                      Account -> m (Maybe ContractDetails)
+getContractDetails = fmap (fmap snd) . getContractDetailsAndMetadataId
 
 getContractDetailsAndMetadataId :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
-                                   ContractName -> Account -> m (Maybe (Int32, ContractDetails))
-getContractDetailsAndMetadataId (ContractName contractName) acct = do
+                                   Account -> m (Maybe (Int32, ContractDetails))
+getContractDetailsAndMetadataId acct = do
     let
       detailsWith detailsAcct (bin,binRuntime,codeHash,_ :: ByteString,name,src,cmId,xabi') = do
         xabi <- deserializeXabi xabi'
@@ -392,7 +370,7 @@ getContractDetailsAndMetadataId (ContractName contractName) acct = do
           , contractdetailsXabi = xabi
           })
     tuple <- fmap listToMaybe . blocQuery $
-      getContractsContractByAddressQuery contractName acct
+      getContractsContractByAddressQuery acct
     case tuple of
       Just t -> Just <$> detailsWith (Just acct) t
       Nothing -> throwIO $ UserError $ Text.pack $ "Contract " ++ show acct ++ " doesn't exist"
@@ -414,7 +392,7 @@ getContractDetailsByCodeHash codePtr = do
     Just cachedDetails -> pure $ Just cachedDetails
     Nothing -> do
       mIdAndDetails <- case codePtr of
-        CodeAtAccount acct name -> getContractDetailsAndMetadataId (ContractName $ Text.pack name) acct
+        CodeAtAccount acct _ -> getContractDetailsAndMetadataId acct
         codeHash -> do
           mDetails <- fmap listToMaybe . blocQuery $ getContractsContractByCodeHashQuery codeHash
           for mDetails $ \(bin,binr,ch,_ :: ByteString,_ :: ByteString,name,src,cmId,xabi') -> do
@@ -606,7 +584,7 @@ getContractDetailsForContract theVM src mContract = do
             "EVM" -> throwIO $ UserError evmContractSolidVMError
             _ -> pure x
           (CodeAtAccount acct name) -> do
-            mCmIdDetails <- getContractDetailsAndMetadataIdByAccountOnly acct
+            mCmIdDetails <- getContractDetailsAndMetadataId acct
             case mCmIdDetails of
               Nothing -> throwIO . UserError . Text.pack $ "Could not find contract details for " ++ name ++ " at address " ++ format acct
               Just cmIdDetails -> pure (Text.pack name, cmIdDetails)
@@ -712,6 +690,6 @@ getContractXabiByMetadataId cmId = do
   where ninth (_,_,_,_,_,_,_,_,x) = x
 
 getContractXabi :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
-                   ContractName -> Account -> m (Maybe Xabi)
-getContractXabi contractName =
-  fmap (fmap contractdetailsXabi) . getContractDetails contractName
+                   Account -> m (Maybe Xabi)
+getContractXabi =
+  fmap (fmap contractdetailsXabi) . getContractDetails

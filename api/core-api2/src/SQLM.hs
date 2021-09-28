@@ -47,6 +47,8 @@ data ApiError
   | RuntimeError SomeException
   | UnavailableError Text
   | InternalError Text
+  | VMError Text
+  | Timeout Text
   deriving (Show, Exception)
 
 apiErrorToServantErr :: ApiError -> SERVANT.ServerError
@@ -153,7 +155,8 @@ apiErrorToServantErr = \case
                      "Error Message:",
                      T.unpack err
                    ]}
-
+  VMError err -> err422{errBody = JSON.encode err}
+  Timeout err -> err504{errBody = JSON.encode err}
 
 
 

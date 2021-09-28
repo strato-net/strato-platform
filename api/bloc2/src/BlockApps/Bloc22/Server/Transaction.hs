@@ -335,7 +335,6 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
             p <- fromFunction x
             let bfp = FunctionParameters
                         addr
-                        ((\(ContractName c) -> c) $ functionpayloadContractName p)
                         (functionpayloadContractAddress p)
                         (functionpayloadMethod p)
                         (functionpayloadArgs p)
@@ -349,8 +348,8 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
             p <- mapM fromFunction xs
             let bflp = FunctionListParameters
                         addr
-                        (map (\(FunctionPayload (ContractName n) a m r v x c md) ->
-                                MethodCall n a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md) p)
+                        (map (\(FunctionPayload a m r v x c md) ->
+                                MethodCall a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md) p)
                         chainId
                         resolve
             fmap BlocTxResult <$> postUsersContractMethodList' cacheNonce bflp userName
@@ -442,7 +441,7 @@ postUsersSend' cacheNonce TransferParameters{..} userName = do
       , constant (0 :: Int32)
       , constant (Text.decodeUtf8 . BL.toStrict $ Aeson.encode tx)
       )]
-    getBlocTransactionResult' [txHash] resolve
+    getResultAndRespond [txHash] resolve
 
 postUsersContractEVM' :: (MonadLogger m,
                           HasBlocEnv m, HasBlocSQL m, HasCoreAPI m, HasVault m, HasSQL m) =>
@@ -478,7 +477,7 @@ postUsersContractEVM' cacheNonce ContractParameters{..} userName = blocTransacti
     , constant (1 :: Int32)
     , constant contractdetailsName
     )]
-  getBlocTransactionResult' [txHash] resolve
+  getResultAndRespond [txHash] resolve
 
 postUsersContractSolidVM' :: (MonadLogger m,
                               HasBlocEnv m, HasBlocSQL m, HasCoreAPI m, HasVault m, HasSQL m) =>
@@ -515,7 +514,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} userName = blocTrans
     , constant (1 :: Int32)
     , constant contractdetailsName
     )]
-  getBlocTransactionResult' [txHash] resolve
+  getResultAndRespond [txHash] resolve
 
 postUsersUploadListSolidVM' :: (MonadLogger m, HasBlocEnv m,
                                 HasBlocSQL m, HasCoreAPI m, HasVault m, HasSQL m) =>
@@ -676,15 +675,16 @@ postUsersContractMethodList' cacheNonce FunctionListParameters{..} userName = do
       txsWithParams <- genNonces cacheNonce fromAddr methodcallChainid methodcallTxParams txsWithChainids
       txsCmIdsFuncNames <- forStateT Map.empty txsWithParams $
         \(MethodCall{..}) -> do
-          mtuple <- use $ at methodcallContractName
+          let theAccount = Account methodcallContractAddress $ fmap unChainId _methodcallChainid
+          mtuple <- use $ at theAccount
           (mapKey, xabi) <- case mtuple of
             Just (cmId, x) -> return (cmId, x)
             Nothing -> do
               (mapKey' :: Int32,x') <- lift $ blocQuery1 "postUsersContractMethodList'" $ proc () -> do
-                (_,_,_,_,_,_,cmId,x'') <- getContractsContractLatestQuery methodcallContractName -< ()
+                (_,_,_,_,_,_,cmId,x'') <- getContractsContractByAddressQuery theAccount -< ()
                 returnA -< (cmId,x'')
               x <- lift $ deserializeXabi x'
-              at methodcallContractName <?= (mapKey', x)
+              at theAccount <?= (mapKey', x)
           contract' <- case xAbiToContract xabi of
             Left err -> throwIO . AnError $ Text.pack err
             Right c -> return c
@@ -733,14 +733,11 @@ postUsersContractMethod' cacheNonce FunctionParameters{..} userName = do
     params <- getAccountTxParams cacheNonce fromAddr chainId txParams
 
     let err = CouldNotFind $ Text.concat
-                [ "postUsersContractMethod': Couldn't find contract details for "
-                , contractName
-                , " at address "
+                [ "postUsersContractMethod': Couldn't find contract details for contract at address "
                 , Text.pack $ formatAddressWithoutColor contractAddr
                 ]
     (cmId,xabi) <- maybe (throwIO err) (return . fmap contractdetailsXabi) =<<
       getContractDetailsAndMetadataId
-        (ContractName contractName)
         (Account contractAddr (unChainId <$> chainId))
     contract' <- case xAbiToContract xabi of
       Left e -> throwIO . AnError $ Text.pack e
@@ -778,7 +775,7 @@ postUsersContractMethod' cacheNonce FunctionParameters{..} userName = do
       , constant (2 :: Int32)
       , constant funcName
       )]
-    getBlocTransactionResult' [txHash] resolve
+    getResultAndRespond [txHash] resolve
 
 
 prepareUnsignedTx :: TransactionHeader -> UnsignedTransaction
@@ -1027,3 +1024,16 @@ getArgValues argsMap argNamesTypes = do
         throwIO (UserError ("argument names don't match: " <> argNames1 <> " " <> argNames2))
       else sequence $ Map.intersectionWith determineValue argsMap argNamesTypes
     return $ map snd (sortOn fst (toList argsVals))
+
+
+
+getResultAndRespond :: (MonadLogger m, HasBlocSQL m, HasSQL m) =>
+                       [Keccak256] -> Bool -> m BlocTransactionResult
+getResultAndRespond txHashes resolve = do
+  result <- getBlocTransactionResult' txHashes resolve
+  case (blocTransactionStatus result, blocTransactionTxResult result, resolve) of
+    (Success, _, _) -> return result
+    (Failure, Nothing, _) -> throwIO (VMError "unknown reason")
+    (Failure, Just tr, _) -> throwIO (VMError $ Text.pack $ "Error running the transaction: " ++ transactionResultMessage tr)
+    (Pending, _, False) -> return result
+    (Pending, _, _) -> throwIO (Timeout "Timeout: blockchain peer hasn't responded to transaction request for over 60 seconds")

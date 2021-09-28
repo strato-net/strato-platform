@@ -202,7 +202,7 @@ pipeline {
                 rm -rf strato-api-tests
                 git clone -b master https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git
                 cd strato-api-tests
-                git checkout tags/strato-7.0.0  #TODO: api version tags in the future
+                git checkout tags/strato-7.3.0  #TODO: api version tags in the future
                 docker build --tag strato-api-tests .
                 docker run \
                   -e OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \

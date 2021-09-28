@@ -39,9 +39,12 @@ boringBox strings = unlines $
   where width = maximum (map printedLength strings) + 4
 
 tab::String->String
-tab []          = []
-tab ('\n':rest) = '\n':' ':' ':' ':' ':tab rest
-tab (c:rest)    = c:tab rest
+tab s = ' ':' ':' ':' ':tab' s
+
+tab'::String->String
+tab' []          = []
+tab' ('\n':rest) = '\n':' ':' ':' ':' ':tab' rest
+tab' (c:rest)    = c:tab' rest
 
 
 setTitle :: String->IO()
