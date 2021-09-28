@@ -6,7 +6,6 @@
 
 import           Control.Monad
 import           Control.Concurrent.Async             as Async
-import           Data.Functor.Identity
 import qualified Data.Map.Strict                      as M
 import           Debugger
 import           Debugger.Options() -- HFlags
@@ -26,8 +25,7 @@ main :: IO ()
 main = do
   blockappsInit "vm_main"
   void $ $initHFlags "Ethereum VM"
-  let parse = Identity
-            . compileSource
+  let parse = compileSource
             . M.fromList
             . unSourceMap
       analyze = runDetectors parse
