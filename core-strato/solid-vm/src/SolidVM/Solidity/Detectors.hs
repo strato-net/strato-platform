@@ -2,19 +2,29 @@ module SolidVM.Solidity.Detectors
   ( runDetectors
   ) where
 
-import CodeCollection
-import Data.Source
-import Data.Text                          (Text)
+import           CodeCollection
+import           Data.Source
+import           Data.Text                                                   (Text)
+import           SolidVM.Solidity.Parse.Declarations                         (SourceUnit)
 import qualified SolidVM.Solidity.Detectors.Trivial                          as Trivial
+import qualified SolidVM.Solidity.Detectors.Pragmas.IncorrectSolidityVersion as IncorrectSolidityVersion
 import qualified SolidVM.Solidity.Detectors.Functions.Unimplemented.Continue as Continue
 
-detectors :: [Detector]
-detectors = [ Trivial.detector
-            , Continue.detector
-            ]
+parserDetectors :: [ParserDetector]
+parserDetectors = [ IncorrectSolidityVersion.detector
+                  ]
 
-runDetectors :: Functor f
-             => (SourceMap -> f CodeCollection)
+compilerDetectors :: [CompilerDetector]
+compilerDetectors = [ Trivial.detector
+                    , Continue.detector
+                    ]
+
+runDetectors :: Applicative f
+             => (SourceMap -> f [SourceUnit])
+             -> (SourceMap -> f CodeCollection)
              -> SourceMap
              -> f [SourceAnnotation Text]
-runDetectors parse source = concat . (detectors <*>) . (:[]) <$> parse source
+runDetectors parse compile source =
+  let parserAnnotations = concat . (parserDetectors <*>) . (:[]) <$> parse source
+      compilerAnnotations = concat . (compilerDetectors <*>) . (:[]) <$> compile source
+   in (++) <$> parserAnnotations <*> compilerAnnotations

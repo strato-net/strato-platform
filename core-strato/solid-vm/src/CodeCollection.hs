@@ -20,6 +20,7 @@ import GHC.Generics
 
 import           Blockchain.SolidVM.Exception
 
+import           SolidVM.Solidity.Parse.Declarations (SourceUnit)
 import           SolidVM.Solidity.Xabi
 import qualified SolidVM.Solidity.Xabi as Xabi
 import qualified SolidVM.Solidity.Xabi.Def as Xabi
@@ -57,7 +58,8 @@ instance ToJSON a => ToJSON (CodeCollectionF a)
 instance FromJSON a => FromJSON (CodeCollectionF a)
 
 type CodeCollection = Positioned CodeCollectionF
-type Detector = CodeCollection -> [SourceAnnotation T.Text]
+type ParserDetector = [SourceUnit] -> [SourceAnnotation T.Text]
+type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]
 
 makeLenses ''CodeCollectionF
 
