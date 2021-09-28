@@ -6,10 +6,11 @@ import { DeploymentsProvider } from './deployments';
 import { NodesProvider } from './nodes';
 import { ProjectActionProvider } from './project';
 import { activateStratoDebug } from './activateStratoDebug';
+import { subscribeToDocumentChanges } from './diagnostics';
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
 
 	// Use the console to output diagnostic information (console.log) and errors (console.error)
 	// This line of code will only be executed once when your extension is activated
@@ -19,8 +20,7 @@ export function activate(context: vscode.ExtensionContext) {
 	// The commandId parameter must match the command field in package.json
 	context.subscriptions.push(vscode.commands.registerCommand('strato-vscode.createProject', async () => {
 		const testInput = await vscode.window.showInputBox({
-			ignoreFocusOut: true,
-			placeHolder: 'E.g. http://test-node.blockapps.net:8080',
+			ignoreFocusOut: true, placeHolder: 'E.g. http://test-node.blockapps.net:8080',
 			prompt: 'URL to STRATO Test Node'
 		});
 
@@ -140,7 +140,11 @@ export function activate(context: vscode.ExtensionContext) {
 		'project-management',
 		new ProjectActionProvider()
 	)
-    activateStratoDebug(context);
+  activateStratoDebug(context);
+	const solidityDiagnostics = vscode.languages.createDiagnosticCollection("solidity");
+	context.subscriptions.push(solidityDiagnostics);
+
+	await subscribeToDocumentChanges(context, solidityDiagnostics);
 }
 
 async function sleep(ms: number){

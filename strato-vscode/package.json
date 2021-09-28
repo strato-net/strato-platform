@@ -1,6 +1,6 @@
 {
 	"name": "strato-vscode",
-        "publisher": "BlockApps, Inc.",
+	"publisher": "BlockApps, Inc.",
 	"displayName": "STRATO",
 	"description": "VSCode Integration for BlockApps STRATO",
 	"version": "0.0.1",
@@ -124,7 +124,7 @@
 				"title": "Refresh",
 				"icon": "$(refresh)"
 			},
-            {
+			{
 				"command": "extension.strato-debug.debugEditorContents",
 				"title": "Debug SolidVM",
 				"category": "Debug SolidVM",
@@ -134,39 +134,39 @@
 		],
 		"debuggers": [
 			{
-			  "type": "strato",
-			  "label": "Debug SolidVM",
-			  "program": "./out/debugAdapter.js",
-			  "runtime": "node",
-			  "configurationAttributes": {
-				"launch": {
-				  "properties": {
-					"trace": {
-					  "type": "boolean",
-					  "description": "Enable logging of the Debug Adapter Protocol.",
-					  "default": true
+				"type": "strato",
+				"label": "Debug SolidVM",
+				"program": "./out/debugAdapter.js",
+				"runtime": "node",
+				"configurationAttributes": {
+					"launch": {
+						"properties": {
+							"trace": {
+								"type": "boolean",
+								"description": "Enable logging of the Debug Adapter Protocol.",
+								"default": true
+							}
+						}
 					}
-				  }
-				}
-			  },
-			  "initialConfigurations": [
-				{
-				  "type": "strato",
-				  "request": "launch",
-				  "name": "Debug SolidVM"
-				}
-			  ],
-			  "configurationSnippets": [
-				{
-				  "label": "Debug SolidVM",
-				  "description": "A new configuration for debugging SolidVM smart contracts.",
-				  "body": {
-					"type": "strato",
-					"request": "launch",
-					"name": "Debug SolidVM"
-				  }
-				}
-			  ]
+				},
+				"initialConfigurations": [
+					{
+						"type": "strato",
+						"request": "launch",
+						"name": "Debug SolidVM"
+					}
+				],
+				"configurationSnippets": [
+					{
+						"label": "Debug SolidVM",
+						"description": "A new configuration for debugging SolidVM smart contracts.",
+						"body": {
+							"type": "strato",
+							"request": "launch",
+							"name": "Debug SolidVM"
+						}
+					}
+				]
 			}
 		],
 		"grammars": [
@@ -191,30 +191,30 @@
 		],
 		"menus": {
 			"editor/title": [
-			  {
-				"command": "extension.strato-debug.debugEditorContents",
-				"when": "resourceLangId == solidity",
-				"group": "1_run@20"
-			  }
+				{
+					"command": "extension.strato-debug.debugEditorContents",
+					"when": "resourceLangId == solidity",
+					"group": "1_run@20"
+				}
 			],
 			"commandPalette": [
-			  {
-				  "command": "extension.strato-debug.debugEditorContents",
-				  "when": "resourceLangId == solidity"
-			  }
+				{
+					"command": "extension.strato-debug.debugEditorContents",
+					"when": "resourceLangId == solidity"
+				}
 			],
 			"view/title": [
-                {
-                    "command": "deployments.refreshEntry",
-                    "when": "view == deployments",
-                    "group": "navigation"
-                },
-                {
-                    "command": "nodes.refreshEntry",
-                    "when": "view == nodes",
-                    "group": "navigation"
-                }
-            ]
+				{
+					"command": "deployments.refreshEntry",
+					"when": "view == deployments",
+					"group": "navigation"
+				},
+				{
+					"command": "nodes.refreshEntry",
+					"when": "view == nodes",
+					"group": "navigation"
+				}
+			]
 		},
 		"viewsContainers": {
 			"activitybar": [
