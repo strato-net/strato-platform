@@ -118,6 +118,7 @@ tests:
       - raw-strings-qq
       - solid-vm
       - solid-vm-model
+      - source-tools
       - strato-model
       - text
       - time

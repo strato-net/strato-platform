@@ -6,6 +6,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Data.Source.Annotation
   ( SourceAnnotation(..)
+  , Positioned
+  , Annotated
+  , withAnnotation
+  , withPosition
+  , position
   ) where
 
 import           Control.Lens              hiding ((.=))
@@ -17,6 +22,7 @@ import           Data.Text                 (Text)
 import           GHC.Generics
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances ()
+import           Text.Parsec
 
 data SourceAnnotation a = SourceAnnotation
   { _sourceAnnotationStart      :: SourcePosition
@@ -42,7 +48,7 @@ instance FromJSON a => FromJSON (SourceAnnotation a) where
 instance Arbitrary a => Arbitrary (SourceAnnotation a) where
   arbitrary = SourceAnnotation <$> arbitrary <*> arbitrary <*> arbitrary
 
-instance ToSchema (SourceAnnotation Text) where
+instance ToSchema (SourceAnnotation a) where
   declareNamedSchema _ = return $ NamedSchema (Just "SourceAnnotation")
     ( mempty
       & type_ ?~ SwaggerString
@@ -50,3 +56,29 @@ instance ToSchema (SourceAnnotation Text) where
                                             (SourcePosition "A.sol" 41 13)
                                             ("Unknown identifier: centralization" :: Text))
       & description ?~ "SourceAnnotation" )
+
+instance Semigroup a => Semigroup (SourceAnnotation a) where
+  (SourceAnnotation s _ a) <> (SourceAnnotation _ e b) = SourceAnnotation s e (a <> b)
+
+type Positioned f = f (SourceAnnotation ())
+type Annotated f = f (SourceAnnotation Text)
+
+withAnnotation :: Monad m
+               => a
+               -> ParsecT s u m b
+               -> ParsecT s u m (SourceAnnotation a, b)
+withAnnotation a p = do
+  s <- getSourcePosition
+  p' <- p
+  e <- getSourcePosition
+  pure (SourceAnnotation s e a, p')
+
+withPosition :: Monad m
+           => ParsecT s u m b
+           -> ParsecT s u m (SourceAnnotation (), b)
+withPosition = withAnnotation ()
+
+position :: Monad m
+            => ParsecT s u m a
+            -> ParsecT s u m (SourceAnnotation ())
+position = fmap fst . withPosition
