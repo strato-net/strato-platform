@@ -7,6 +7,7 @@ import           Data.Source
 import           Data.Text                                                   (Text)
 import           SolidVM.Solidity.Parse.Declarations                         (SourceUnit)
 import qualified SolidVM.Solidity.Detectors.Trivial                          as Trivial
+import qualified SolidVM.Solidity.Detectors.Expressions.DivideBeforeMultiply as DivideBeforeMultiply
 import qualified SolidVM.Solidity.Detectors.Pragmas.IncorrectSolidityVersion as IncorrectSolidityVersion
 import qualified SolidVM.Solidity.Detectors.Functions.Unimplemented.Continue as Continue
 
@@ -17,6 +18,7 @@ parserDetectors = [ IncorrectSolidityVersion.detector
 compilerDetectors :: [CompilerDetector]
 compilerDetectors = [ Trivial.detector
                     , Continue.detector
+                    , DivideBeforeMultiply.detector
                     ]
 
 runDetectors :: Applicative f
