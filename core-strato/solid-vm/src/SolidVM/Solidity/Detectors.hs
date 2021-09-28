@@ -5,10 +5,13 @@ module SolidVM.Solidity.Detectors
 import CodeCollection
 import Data.Source
 import Data.Text                          (Text)
-import SolidVM.Solidity.Detectors.Trivial
+import qualified SolidVM.Solidity.Detectors.Trivial                          as Trivial
+import qualified SolidVM.Solidity.Detectors.Functions.Unimplemented.Continue as Continue
 
 detectors :: [Detector]
-detectors = [trivialDetector]
+detectors = [ Trivial.detector
+            , Continue.detector
+            ]
 
 runDetectors :: Functor f
              => (SourceMap -> f CodeCollection)
