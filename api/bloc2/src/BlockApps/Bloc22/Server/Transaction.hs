@@ -335,7 +335,6 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
             p <- fromFunction x
             let bfp = FunctionParameters
                         addr
-                        ((\(ContractName c) -> c) $ functionpayloadContractName p)
                         (functionpayloadContractAddress p)
                         (functionpayloadMethod p)
                         (functionpayloadArgs p)
@@ -349,8 +348,8 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
             p <- mapM fromFunction xs
             let bflp = FunctionListParameters
                         addr
-                        (map (\(FunctionPayload (ContractName n) a m r v x c md) ->
-                                MethodCall n a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md) p)
+                        (map (\(FunctionPayload a m r v x c md) ->
+                                MethodCall a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md) p)
                         chainId
                         resolve
             fmap BlocTxResult <$> postUsersContractMethodList' cacheNonce bflp userName
