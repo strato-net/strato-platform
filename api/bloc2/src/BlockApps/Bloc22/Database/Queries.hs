@@ -24,6 +24,7 @@ module BlockApps.Bloc22.Database.Queries (
   insertContractInstance,
   deserializeXabi,
   getContractsContractLatestQuery,
+  getContractsContractByAddressQuery,
   evmContractSolidVMError
   ) where
 

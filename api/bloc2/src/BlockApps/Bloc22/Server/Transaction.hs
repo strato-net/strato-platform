@@ -676,15 +676,16 @@ postUsersContractMethodList' cacheNonce FunctionListParameters{..} userName = do
       txsWithParams <- genNonces cacheNonce fromAddr methodcallChainid methodcallTxParams txsWithChainids
       txsCmIdsFuncNames <- forStateT Map.empty txsWithParams $
         \(MethodCall{..}) -> do
-          mtuple <- use $ at methodcallContractName
+          let theAccount = Account methodcallContractAddress $ fmap unChainId _methodcallChainid
+          mtuple <- use $ at theAccount
           (mapKey, xabi) <- case mtuple of
             Just (cmId, x) -> return (cmId, x)
             Nothing -> do
               (mapKey' :: Int32,x') <- lift $ blocQuery1 "postUsersContractMethodList'" $ proc () -> do
-                (_,_,_,_,_,_,cmId,x'') <- getContractsContractLatestQuery methodcallContractName -< ()
+                (_,_,_,_,_,_,cmId,x'') <- getContractsContractByAddressQuery theAccount -< ()
                 returnA -< (cmId,x'')
               x <- lift $ deserializeXabi x'
-              at methodcallContractName <?= (mapKey', x)
+              at theAccount <?= (mapKey', x)
           contract' <- case xAbiToContract xabi of
             Left err -> throwIO . AnError $ Text.pack err
             Right c -> return c
