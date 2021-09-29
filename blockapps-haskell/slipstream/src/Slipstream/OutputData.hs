@@ -7,7 +7,15 @@
   , TemplateHaskell
 #-}
 
-module Slipstream.OutputData where
+module Slipstream.OutputData (
+  outputData,
+  insertExpandEventTables,
+  createInserts,
+  createEventTables,
+  createExpandInsertIndexTable,
+  createExpandInsertHistoryTable,
+  cirrusInfo
+  ) where
 
 import           BlockApps.Solidity.Value
 import           Conduit
