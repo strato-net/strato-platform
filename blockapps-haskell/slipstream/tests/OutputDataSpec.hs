@@ -62,7 +62,6 @@ spec = do
             blockNumber = 123,
             transactionHash = hash "<TRANSACTIONHASH>",
             transactionSender = testAdd,
-            functionCallData = Nothing,
             contractData = M.singleton "owners" . V.ValueArrayDynamic $ V.tosparse [
                 V.ValueStruct $ M.fromList [
                   ("number", V.SimpleValue $ V.valueUInt 18199984780605),
@@ -140,7 +139,6 @@ spec = do
              blockNumber = 123,
              transactionHash = hash "<TRANSACTIONHASH>",
              transactionSender = testAdd,
-             functionCallData = Nothing,
              contractData = M.singleton "owners" . V.ValueArrayDynamic $ V.tosparse [
                 V.ValueStruct $ M.fromList [
                   ("number", V.SimpleValue $ V.valueUInt 18199984780605),
@@ -255,7 +253,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
             blockNumber = 123,
             transactionHash = hash "<TRANSACTIONHASH>",
             transactionSender = testAdd,
-            functionCallData = Nothing,
             contractData = M.singleton "\"owners\"" . V.ValueArrayDynamic $ V.tosparse [
                 V.ValueStruct $ M.fromList [
                   ("number\"", V.SimpleValue $ V.valueUInt 18199984780605),
@@ -332,7 +329,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
           blockNumber = 123,
           transactionHash = hash "<TRANSACTIONHASH>",
           transactionSender = testAdd,
-          functionCallData = Nothing,
           contractData = M.fromList
             [ ("addr", addr 0xdeadbeef)
             , ("boolean", bool True)
@@ -453,7 +449,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
           blockNumber = 146,
           transactionHash = hash "<TRANSACTIONHASH>",
           transactionSender = testAdd,
-          functionCallData = Nothing,
           contractData = M.singleton "array_nums" . V.ValueArrayDynamic
                        . I.singleton 1 $ V.ValueArraySentinel 1
           }]
@@ -480,7 +475,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
           blockNumber = 146,
           transactionHash = hash "<TRANSACTIONHASH>",
           transactionSender = testAdd,
-          functionCallData = Nothing,
           contractData = M.fromList [ ("isIterable", bool False)
                                     , ("keyMap", V.ValueMapping $ M.fromList [
                                           (V.valueBytes "4517546854860", int 1)])
@@ -511,7 +505,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
           blockNumber = 123,
           transactionHash = hash "<TRANSACTIONHASH>",
           transactionSender = testAdd,
-          functionCallData = Nothing,
           contractData = M.fromList
             [ ("addr", addr 0xdeadbeef)
             , ("boolean", bool True)

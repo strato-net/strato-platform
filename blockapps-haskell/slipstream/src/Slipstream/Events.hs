@@ -41,7 +41,6 @@ data ProcessedContract = ProcessedContract
   , blockNumber       :: Integer
   , transactionHash   :: Keccak256
   , transactionSender :: Address
-  , functionCallData  :: Maybe FunctionCallData
   , contractData      :: Map Text V.Value
   } deriving (Show)
 
