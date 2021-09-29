@@ -204,7 +204,9 @@ expressionHelper (IndexAccess _ a b) = do
   pure $ concat [as, bs]
 expressionHelper (MemberAccess _ e _) = expressionHelper e
 expressionHelper (FunctionCall _ e args) = do
-  as <- expressionHelper e
+  as <- case e of
+          Variable _ _ -> pure []
+          _ -> expressionHelper e
   bs <- case args of
           OrderedArgs es -> concat <$> traverse expressionHelper es
           NamedArgs nes -> concat <$> traverse expressionHelper (snd <$> nes)
