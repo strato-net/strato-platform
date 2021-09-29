@@ -9,6 +9,7 @@ import           SolidVM.Solidity.Parse.Declarations                            
 import qualified SolidVM.Solidity.Detectors.Trivial                                as Trivial
 import qualified SolidVM.Solidity.Detectors.Expressions.DivideBeforeMultiply       as DivideBeforeMultiply
 import qualified SolidVM.Solidity.Detectors.Pragmas.IncorrectSolidityVersion       as IncorrectSolidityVersion
+import qualified SolidVM.Solidity.Detectors.Functions.ConstantFunctions            as ConstantFunctions
 import qualified SolidVM.Solidity.Detectors.Functions.Unimplemented.Continue       as Continue
 import qualified SolidVM.Solidity.Detectors.Statements.StateVariableShadowing      as StateVariableShadowing
 import qualified SolidVM.Solidity.Detectors.Statements.UninitializedLocalVariables as UninitializedLocalVariables
@@ -25,6 +26,7 @@ compilerDetectors = [ Trivial.detector
                     , StateVariableShadowing.detector
                     , UninitializedLocalVariables.detector
                     , WriteAfterWrite.detector
+                    , ConstantFunctions.detector
                     ]
 
 runDetectors :: Applicative f
