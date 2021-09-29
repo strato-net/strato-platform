@@ -12,6 +12,7 @@ import qualified SolidVM.Solidity.Detectors.Pragmas.IncorrectSolidityVersion    
 import qualified SolidVM.Solidity.Detectors.Functions.Unimplemented.Continue       as Continue
 import qualified SolidVM.Solidity.Detectors.Statements.StateVariableShadowing      as StateVariableShadowing
 import qualified SolidVM.Solidity.Detectors.Statements.UninitializedLocalVariables as UninitializedLocalVariables
+import qualified SolidVM.Solidity.Detectors.Statements.WriteAfterWrite             as WriteAfterWrite
 
 parserDetectors :: [ParserDetector]
 parserDetectors = [ IncorrectSolidityVersion.detector
@@ -23,6 +24,7 @@ compilerDetectors = [ Trivial.detector
                     , DivideBeforeMultiply.detector
                     , StateVariableShadowing.detector
                     , UninitializedLocalVariables.detector
+                    , WriteAfterWrite.detector
                     ]
 
 runDetectors :: Applicative f
