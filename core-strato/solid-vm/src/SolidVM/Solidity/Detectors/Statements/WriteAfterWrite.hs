@@ -35,18 +35,18 @@ statementsHelper' ss = concat . evalState (traverse statementHelper ss) <$> get
 statementHelper :: Statement -> SSS [SourceAnnotation Text]
 statementHelper (IfStatement cond thens mElse _) = do
   cs <- expressionHelper cond
-  ts <- statementsHelper' thens
-  es <- maybe (pure []) statementsHelper' mElse
+  let ts = statementsHelper thens
+      es = maybe [] statementsHelper mElse
   pure $ concat [cs, ts, es]
 statementHelper (WhileStatement cond body _) = do
   cs <- expressionHelper cond
-  bs <- statementsHelper' body
+  let bs = statementsHelper body
   pure $ concat [cs, bs]
 statementHelper (ForStatement mInit mCond mPost body _) = do
   is <- maybe (pure []) simpleStatementHelper mInit
   cs <- maybe (pure []) expressionHelper mCond
   ps <- maybe (pure []) expressionHelper mPost
-  bs <- statementsHelper' body
+  let bs = statementsHelper body
   pure $ concat [is, cs, ps, bs]
 statementHelper (Block _) = pure []
 statementHelper (DoWhileStatement body cond _) = do
