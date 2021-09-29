@@ -37,21 +37,25 @@ statementHelper (IfStatement cond thens mElse _) = do
   cs <- expressionHelper cond
   let ts = statementsHelper thens
       es = maybe [] statementsHelper mElse
+  put M.empty
   pure $ concat [cs, ts, es]
 statementHelper (WhileStatement cond body _) = do
   cs <- expressionHelper cond
   let bs = statementsHelper body
+  put M.empty
   pure $ concat [cs, bs]
 statementHelper (ForStatement mInit mCond mPost body _) = do
   is <- maybe (pure []) simpleStatementHelper mInit
   cs <- maybe (pure []) expressionHelper mCond
   ps <- maybe (pure []) expressionHelper mPost
   let bs = statementsHelper body
+  put M.empty
   pure $ concat [is, cs, ps, bs]
 statementHelper (Block _) = pure []
 statementHelper (DoWhileStatement body cond _) = do
   cs <- expressionHelper cond
   bs <- statementsHelper' body
+  put M.empty
   pure $ concat [bs, cs]
 statementHelper (Continue _) = pure []
 statementHelper (Break _) = pure []
@@ -78,6 +82,30 @@ expressionHelper (Binary y "=" (Variable x name) b) = do
   modify $ M.insert name (x <> y)
   bs <- expressionHelper b
   pure $ concat [ann, bs]
+expressionHelper (Binary y "+=" (Variable x name) b) = do
+  modify $ M.insert name (x <> y)
+  expressionHelper b
+expressionHelper (Binary y "-=" (Variable x name) b) = do
+  modify $ M.insert name (x <> y)
+  expressionHelper b
+expressionHelper (Binary y "*=" (Variable x name) b) = do
+  modify $ M.insert name (x <> y)
+  expressionHelper b
+expressionHelper (Binary y "/=" (Variable x name) b) = do
+  modify $ M.insert name (x <> y)
+  expressionHelper b
+expressionHelper (Binary y "%=" (Variable x name) b) = do
+  modify $ M.insert name (x <> y)
+  expressionHelper b
+expressionHelper (Binary y "|=" (Variable x name) b) = do
+  modify $ M.insert name (x <> y)
+  expressionHelper b
+expressionHelper (Binary y "&=" (Variable x name) b) = do
+  modify $ M.insert name (x <> y)
+  expressionHelper b
+expressionHelper (Binary y "^=" (Variable x name) b) = do
+  modify $ M.insert name (x <> y)
+  expressionHelper b
 expressionHelper (Binary _ _ a b) =
   concat <$> traverse expressionHelper [a, b]
 expressionHelper (PlusPlus _ (Variable x name)) = do
@@ -99,6 +127,7 @@ expressionHelper (FunctionCall _ e args) = do
   bs <- case args of
           OrderedArgs es -> concat <$> traverse expressionHelper es
           NamedArgs nes -> concat <$> traverse expressionHelper (snd <$> nes)
+  put M.empty
   pure $ concat [as, bs]
 expressionHelper (Unitary _ _ a) = expressionHelper a
 expressionHelper (Ternary _ a b c) = concat <$> traverse expressionHelper [a, b, c]
