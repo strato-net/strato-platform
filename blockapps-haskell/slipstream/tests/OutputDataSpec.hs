@@ -87,7 +87,6 @@ spec = do
     block_number text,
     transaction_hash text,
     transaction_sender text,
-    transaction_function_name text,
     "owners" jsonb,
   CONSTRAINT "Vehicle_pkey"
   PRIMARY KEY (address, "chainId") );|]
@@ -100,7 +99,6 @@ spec = do
     "block_number",
     "transaction_hash",
     "transaction_sender",
-    "transaction_function_name",
     "owners")
   VALUES ('0000000000000000000000000000000000000add',
     '<CHAIN>',
@@ -109,7 +107,6 @@ spec = do
     '123',
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
     '0000000000000000000000000000000000000add',
-    '',
     '[{"hash":"Owner_hash_181999847806006","number":"18199984780605"}]')
   ON CONFLICT (address, "chainId") DO UPDATE SET
     address = excluded.address,
@@ -119,7 +116,6 @@ spec = do
     block_number = excluded.block_number,
     transaction_hash = excluded.transaction_hash,
     transaction_sender = excluded.transaction_sender,
-    transaction_function_name = excluded.transaction_function_name,
     "owners" = excluded."owners";|]
 
   describe "Array serialization with history enabled" $ do
@@ -165,7 +161,6 @@ spec = do
     block_number text,
     transaction_hash text,
     transaction_sender text,
-    transaction_function_name text,
     "owners" jsonb,
   CONSTRAINT "Vehicle_pkey"
   PRIMARY KEY (address, "chainId") );|]
@@ -178,7 +173,6 @@ spec = do
     block_number text,
     transaction_hash text NOT NULL,
     transaction_sender text,
-    transaction_function_name text,
     "owners" jsonb);|]
 
       historyIndex `shouldBe`
@@ -194,7 +188,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     "block_number",
     "transaction_hash",
     "transaction_sender",
-    "transaction_function_name",
     "owners")
   VALUES ('0000000000000000000000000000000000000add',
     '<CHAIN>',
@@ -203,7 +196,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     '123',
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
     '0000000000000000000000000000000000000add',
-    '',
     '[{"hash":"Owner_hash_181999847806006","number":"18199984780605"}]')
   ON CONFLICT (address, "chainId") DO UPDATE SET
     address = excluded.address,
@@ -213,7 +205,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     block_number = excluded.block_number,
     transaction_hash = excluded.transaction_hash,
     transaction_sender = excluded.transaction_sender,
-    transaction_function_name = excluded.transaction_function_name,
     "owners" = excluded."owners";|]
 
       historyInsert `shouldBe`
@@ -224,7 +215,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     "block_number",
     "transaction_hash",
     "transaction_sender",
-    "transaction_function_name",
     "owners")
   VALUES ('0000000000000000000000000000000000000add',
     '<CHAIN>',
@@ -233,7 +223,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     '123',
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
     '0000000000000000000000000000000000000add',
-    '',
     '[{"hash":"Owner_hash_181999847806006","number":"18199984780605"}]')
   ON CONFLICT DO NOTHING;|]
 
@@ -279,7 +268,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     block_number text,
     transaction_hash text,
     transaction_sender text,
-    transaction_function_name text,
     "\"owners\"" jsonb,
   CONSTRAINT "\"Vehicle''''_pkey"
   PRIMARY KEY (address, "chainId") );|]
@@ -292,7 +280,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     "block_number",
     "transaction_hash",
     "transaction_sender",
-    "transaction_function_name",
     "\"owners\"")
   VALUES ('0000000000000000000000000000000000000add',
     '<CHAIN>',
@@ -301,7 +288,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     '123',
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
     '0000000000000000000000000000000000000add',
-    '',
     '[{"h''a\"''sh":"''''Owner_hash_181999847806006","number\"":"18199984780605"}]')
   ON CONFLICT (address, "chainId") DO UPDATE SET
     address = excluded.address,
@@ -311,7 +297,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     block_number = excluded.block_number,
     transaction_hash = excluded.transaction_hash,
     transaction_sender = excluded.transaction_sender,
-    transaction_function_name = excluded.transaction_function_name,
     "\"owners\"" = excluded."\"owners\"";|]
 
   it "can unparse all solidvm value types" $ do
@@ -368,7 +353,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     block_number text,
     transaction_hash text,
     transaction_sender text,
-    transaction_function_name text,
     "addr" text,
     "array_nums" jsonb,
     "boolean" bool,
@@ -388,7 +372,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     "block_number",
     "transaction_hash",
     "transaction_sender",
-    "transaction_function_name",
     "addr",
     "array_nums",
     "boolean",
@@ -405,7 +388,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     '123',
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
     '000000000000000000000000000000098eaddede',
-    '',
     '00000000000000000000000000000000deadbeef',
     '["0","20","40","77","0"]',
     'True',
@@ -423,7 +405,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     block_number = excluded.block_number,
     transaction_hash = excluded.transaction_hash,
     transaction_sender = excluded.transaction_sender,
-    transaction_function_name = excluded.transaction_function_name,
     "addr" = excluded."addr",
     "array_nums" = excluded."array_nums",
     "boolean" = excluded."boolean",
@@ -544,7 +525,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     block_number text,
     transaction_hash text,
     transaction_sender text,
-    transaction_function_name text,
     "addr" text,
     "array_nums" jsonb,
     "boolean" bool,
@@ -564,7 +544,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     "block_number",
     "transaction_hash",
     "transaction_sender",
-    "transaction_function_name",
     "addr",
     "array_nums",
     "boolean",
@@ -581,7 +560,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     '123',
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
     '000000000000000000000000000000098eaddede',
-    '',
     '00000000000000000000000000000000deadbeef',
     '["0","20","40","77","0"]',
     'True',
@@ -599,7 +577,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     block_number = excluded.block_number,
     transaction_hash = excluded.transaction_hash,
     transaction_sender = excluded.transaction_sender,
-    transaction_function_name = excluded.transaction_function_name,
     "addr" = excluded."addr",
     "array_nums" = excluded."array_nums",
     "boolean" = excluded."boolean",
