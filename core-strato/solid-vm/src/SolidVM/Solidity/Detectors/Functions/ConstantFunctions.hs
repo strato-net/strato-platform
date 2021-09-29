@@ -90,7 +90,13 @@ statementHelper (Return mExpr _) =
 statementHelper (Throw _) = pure []
 statementHelper (EmitStatement _ vals _) =
   concat <$> traverse (expressionHelper . snd) vals
-statementHelper (AssemblyStatement _ _) = pure []
+statementHelper (AssemblyStatement _ x) = asks fst >>= \case
+  Payable -> pure []
+  mut -> let msg = T.pack $ concat
+               [ show mut
+               , " function using assembly code."
+               ]
+          in pure [msg <$ x]
 statementHelper (SimpleStatement stmt _) = simpleStatementHelper stmt
 
 simpleStatementHelper :: SimpleStatement -> SSS [SourceAnnotation Text]
