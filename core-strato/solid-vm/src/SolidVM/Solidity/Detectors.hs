@@ -4,13 +4,14 @@ module SolidVM.Solidity.Detectors
 
 import           CodeCollection
 import           Data.Source
-import           Data.Text                                                    (Text)
-import           SolidVM.Solidity.Parse.Declarations                          (SourceUnit)
-import qualified SolidVM.Solidity.Detectors.Trivial                           as Trivial
-import qualified SolidVM.Solidity.Detectors.Expressions.DivideBeforeMultiply  as DivideBeforeMultiply
-import qualified SolidVM.Solidity.Detectors.Pragmas.IncorrectSolidityVersion  as IncorrectSolidityVersion
-import qualified SolidVM.Solidity.Detectors.Functions.Unimplemented.Continue  as Continue
-import qualified SolidVM.Solidity.Detectors.Statements.StateVariableShadowing as StateVariableShadowing
+import           Data.Text                                                         (Text)
+import           SolidVM.Solidity.Parse.Declarations                               (SourceUnit)
+import qualified SolidVM.Solidity.Detectors.Trivial                                as Trivial
+import qualified SolidVM.Solidity.Detectors.Expressions.DivideBeforeMultiply       as DivideBeforeMultiply
+import qualified SolidVM.Solidity.Detectors.Pragmas.IncorrectSolidityVersion       as IncorrectSolidityVersion
+import qualified SolidVM.Solidity.Detectors.Functions.Unimplemented.Continue       as Continue
+import qualified SolidVM.Solidity.Detectors.Statements.StateVariableShadowing      as StateVariableShadowing
+import qualified SolidVM.Solidity.Detectors.Statements.UninitializedLocalVariables as UninitializedLocalVariables
 
 parserDetectors :: [ParserDetector]
 parserDetectors = [ IncorrectSolidityVersion.detector
@@ -21,6 +22,7 @@ compilerDetectors = [ Trivial.detector
                     , Continue.detector
                     , DivideBeforeMultiply.detector
                     , StateVariableShadowing.detector
+                    , UninitializedLocalVariables.detector
                     ]
 
 runDetectors :: Applicative f
