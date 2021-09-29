@@ -157,6 +157,38 @@ expressionHelper (Binary y "=" (Variable x name) b) = do
   ann <- localVarWriteHelper name (x <> y)
   bs <- expressionHelper b
   pure $ concat [ann, bs]
+expressionHelper (Binary y "+=" (Variable x name) b) = do
+  ann <- localVarWriteHelper name (x <> y)
+  bs <- expressionHelper b
+  pure $ concat [ann, bs]
+expressionHelper (Binary y "-=" (Variable x name) b) = do
+  ann <- localVarWriteHelper name (x <> y)
+  bs <- expressionHelper b
+  pure $ concat [ann, bs]
+expressionHelper (Binary y "*=" (Variable x name) b) = do
+  ann <- localVarWriteHelper name (x <> y)
+  bs <- expressionHelper b
+  pure $ concat [ann, bs]
+expressionHelper (Binary y "/=" (Variable x name) b) = do
+  ann <- localVarWriteHelper name (x <> y)
+  bs <- expressionHelper b
+  pure $ concat [ann, bs]
+expressionHelper (Binary y "%=" (Variable x name) b) = do
+  ann <- localVarWriteHelper name (x <> y)
+  bs <- expressionHelper b
+  pure $ concat [ann, bs]
+expressionHelper (Binary y "|=" (Variable x name) b) = do
+  ann <- localVarWriteHelper name (x <> y)
+  bs <- expressionHelper b
+  pure $ concat [ann, bs]
+expressionHelper (Binary y "&=" (Variable x name) b) = do
+  ann <- localVarWriteHelper name (x <> y)
+  bs <- expressionHelper b
+  pure $ concat [ann, bs]
+expressionHelper (Binary y "^=" (Variable x name) b) = do
+  ann <- localVarWriteHelper name (x <> y)
+  bs <- expressionHelper b
+  pure $ concat [ann, bs]
 expressionHelper (Binary _ _ a b) =
   concat <$> traverse expressionHelper [a, b]
 expressionHelper (PlusPlus y (Variable x name)) =
