@@ -20,6 +20,7 @@ import GHC.Generics
 
 import           Blockchain.SolidVM.Exception
 
+import           SolidVM.Solidity.Parse.Declarations (SourceUnit)
 import           SolidVM.Solidity.Xabi
 import qualified SolidVM.Solidity.Xabi as Xabi
 import qualified SolidVM.Solidity.Xabi.Def as Xabi
@@ -37,7 +38,8 @@ data ContractF a =
     _events :: Map T.Text (Xabi.EventF a),
     _functions :: Map String (FuncF a),
     _constructor :: Maybe (FuncF a),
-    _vmVersion :: String
+    _vmVersion :: String,
+    _contractContext :: a
   } deriving (Show, Generic, Functor)
 
 instance ToJSON a => ToJSON (ContractF a)
@@ -56,7 +58,8 @@ instance ToJSON a => ToJSON (CodeCollectionF a)
 instance FromJSON a => FromJSON (CodeCollectionF a)
 
 type CodeCollection = Positioned CodeCollectionF
-type Detector = CodeCollection -> [SourceAnnotation T.Text]
+type ParserDetector = [SourceUnit] -> [SourceAnnotation T.Text]
+type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]
 
 makeLenses ''CodeCollectionF
 
@@ -82,7 +85,8 @@ xabiToContract contractName' parents' vmVersion' xabi = validateXabi xabi `seq`
         [] -> Nothing
         [(_, x)] -> Just x
         _ -> duplicateDefinition "multiple constructors in contract" contractName', --TODO- figure out if this is allowed in Solidity
-  _vmVersion = vmVersion'
+  _vmVersion = vmVersion',
+  _contractContext = Xabi.xabiContext xabi
   }
 
 validateXabi :: Xabi -> ()

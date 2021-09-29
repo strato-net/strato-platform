@@ -11,8 +11,8 @@ import           Data.Text       (Text)
 import           SolidVM.Solidity.Xabi
 import           SolidVM.Solidity.Xabi.Statement
 
--- type Detector = CodeCollection -> [SourceAnnotation T.Text]
-detector :: Detector
+-- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]
+detector :: CompilerDetector
 detector CodeCollection{..} = concat $ contractHelper <$> M.elems _contracts
 
 contractHelper :: Contract -> [SourceAnnotation Text]
