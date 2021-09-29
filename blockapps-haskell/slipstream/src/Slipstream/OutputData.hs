@@ -398,6 +398,7 @@ insertIndexTableQuery contracts@(x:_) =
   let tableName = IndexTableName (organization x) (application x) (contractName x)
       list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData x
       keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
+      transactionFuncName = const ""
       baseVals = [ tshow . address
                  , chain
                  , T.pack . keccak256ToHex . blockHash
@@ -406,9 +407,10 @@ insertIndexTableQuery contracts@(x:_) =
                  , T.pack . keccak256ToHex . transactionHash
                  , tshow . transactionSender
                  ]
+      tableVals = baseVals ++ [escapeQuotes . transactionFuncName]
       vals = flip map contracts $ \row ->
         let rowList = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row
-         in wrapAndEscape $ map ($ row) baseVals ++ map solidityValueToText (snd <$> rowList)
+         in wrapAndEscape $ map ($ row) tableVals ++ map solidityValueToText (snd <$> rowList)
       inserts = csv vals
    in T.concat
         [ "INSERT INTO "
@@ -438,6 +440,7 @@ insertHistoryTableQuery contracts@(x:_) =
   let tableName = HistoryTableName (organization x) (application x) (contractName x)
       list = Map.toList . Map.map valueToSolidityValue . Map.filter isFunction $ contractData x
       keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
+      transactionFuncName = const ""
       baseVals = [ tshow . address
                  , chain
                  , T.pack . keccak256ToHex . blockHash
@@ -446,9 +449,10 @@ insertHistoryTableQuery contracts@(x:_) =
                  , T.pack . keccak256ToHex . transactionHash
                  , tshow . transactionSender
                  ]
+      tableVals = baseVals ++ [escapeQuotes . transactionFuncName]
       vals = flip map contracts $ \row ->
         let rowList = Map.toList . Map.map valueToSolidityValue . Map.filter isFunction $ contractData row
-         in wrapAndEscape $ map ($ row) baseVals ++ map solidityValueToText (snd <$> rowList)
+         in wrapAndEscape $ map ($ row) tableVals ++ map solidityValueToText (snd <$> rowList)
       inserts = csv vals
    in T.concat $
         [ "INSERT INTO "
