@@ -15,7 +15,7 @@ import           HFlags
 
 import           BlockApps.Init
 import           Blockchain.Output
-import           Blockchain.SolidVM.CodeCollectionDB  (parseSource, compileSourceNoInheritance)
+import           Blockchain.SolidVM.CodeCollectionDB  (parseSource, compileSource)
 import           Blockchain.VMOptions() -- HFlags
 import           Executable.EthereumVM
 import           Executable.EVMFlags() -- HFlags
@@ -28,7 +28,7 @@ main = do
   let parse = fmap concat
             . traverse (uncurry parseSource)
             . unSourceMap
-      compile = compileSourceNoInheritance
+      compile = compileSource
               . M.fromList
               . unSourceMap
       analyze = runDetectors parse compile

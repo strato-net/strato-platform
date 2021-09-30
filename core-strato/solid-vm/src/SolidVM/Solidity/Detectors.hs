@@ -12,6 +12,7 @@ import qualified SolidVM.Solidity.Detectors.Expressions.DivideBeforeMultiply    
 import qualified SolidVM.Solidity.Detectors.Pragmas.IncorrectSolidityVersion       as IncorrectSolidityVersion
 import qualified SolidVM.Solidity.Detectors.Functions.ConstantFunctions            as ConstantFunctions
 import qualified SolidVM.Solidity.Detectors.Functions.Unimplemented.Continue       as Continue
+import qualified SolidVM.Solidity.Detectors.Functions.Unimplemented.Modifiers      as Modifiers
 import qualified SolidVM.Solidity.Detectors.Statements.StateVariableShadowing      as StateVariableShadowing
 import qualified SolidVM.Solidity.Detectors.Statements.UninitializedLocalVariables as UninitializedLocalVariables
 import qualified SolidVM.Solidity.Detectors.Statements.WriteAfterWrite             as WriteAfterWrite
@@ -24,6 +25,7 @@ parserDetectors = [ IncorrectSolidityVersion.detector
 compilerDetectors :: [CompilerDetector]
 compilerDetectors = [ Trivial.detector
                     , Continue.detector
+                    , Modifiers.detector
                     , BooleanLiterals.detector
                     , DivideBeforeMultiply.detector
                     , StateVariableShadowing.detector

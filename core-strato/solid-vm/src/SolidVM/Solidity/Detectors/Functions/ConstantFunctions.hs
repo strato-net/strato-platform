@@ -6,36 +6,38 @@ module SolidVM.Solidity.Detectors.Functions.ConstantFunctions
   ) where
 
 import           CodeCollection
+import           Control.Applicative ((<|>))
 import           Control.Monad.Reader
 import           Control.Monad.Trans.State
 import           Data.Foldable (traverse_)
 import qualified Data.Map.Strict as M
-import           Data.Maybe      (isJust)
+import           Data.Maybe      (isJust, maybeToList)
 import           Data.Source
 import           Data.Text       (Text)
 import qualified Data.Text       as T
 import           SolidVM.Solidity.Xabi
 import           SolidVM.Solidity.Xabi.Statement
 
-type R = (StateMutability, M.Map String VariableDecl)
+data R = R
+  { mutability :: Maybe StateMutability
+  , stateVars  :: M.Map String VariableDecl
+  , codeCollection :: CodeCollection
+  }
 type SSS = StateT [M.Map String (SourceAnnotation ())] (Reader R)
 
 -- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]
 detector :: CompilerDetector
-detector CodeCollection{..} = concat $ contractHelper <$> M.elems _contracts
+detector cc@CodeCollection{..} = concat $ contractHelper cc <$> M.elems _contracts
 
-contractHelper :: Contract -> [SourceAnnotation Text]
-contractHelper Contract{..} = concat $ functionHelper _storageDefs <$> M.elems _functions
+contractHelper :: CodeCollection -> Contract -> [SourceAnnotation Text]
+contractHelper cc Contract{..} = concat $ functionHelper cc _storageDefs <$> M.elems _functions
 
-functionHelper :: M.Map String VariableDecl -> Func -> [SourceAnnotation Text]
-functionHelper stateVariables Func{..} =
-  let f mut = case funcContents of
-        Nothing -> []
-        Just stmts -> runReader (statementsHelper stmts) (mut, stateVariables)
-   in case funcStateMutability of
-        Nothing -> []
-        Just Payable -> []
-        Just m -> f m
+functionHelper :: CodeCollection -> M.Map String VariableDecl -> Func -> [SourceAnnotation Text]
+functionHelper cc stateVariables Func{..} = case funcContents of
+  Nothing -> []
+  Just stmts ->
+    let r = R funcStateMutability stateVariables cc
+     in runReader (statementsHelper stmts) r
 
 statementsHelper :: [Statement] -> Reader R [SourceAnnotation Text]
 statementsHelper ss = concat <$> evalStateT (traverse statementHelper ss) [M.empty]
@@ -90,8 +92,9 @@ statementHelper (Return mExpr _) =
 statementHelper (Throw _) = pure []
 statementHelper (EmitStatement _ vals _) =
   concat <$> traverse (expressionHelper . snd) vals
-statementHelper (AssemblyStatement _ x) = asks fst >>= \case
-  Payable -> pure []
+statementHelper (AssemblyStatement _ x) = asks mutability >>= \case
+  Nothing -> pure []
+  Just Payable -> pure []
   mut -> let msg = T.pack $ concat
                [ show mut
                , " function using assembly code."
@@ -106,22 +109,69 @@ simpleStatementHelper (VariableDefinition vdefs mExpr) = do
 simpleStatementHelper (ExpressionStatement expr) =
   expressionHelper expr
 
+ccVarHelper :: CodeCollection
+            -> String
+            -> SourceAnnotation ()
+            -> [SourceAnnotation Text]
+ccVarHelper CodeCollection{..} varName x = generateAnn $ M.foldMapWithKey findVars _contracts
+  where findVars cName Contract{..} =
+          maybeToList $ (cName <$ M.lookup varName _storageDefs)
+                    <|> (cName <$ M.lookup varName _enums)
+                    <|> (cName <$ M.lookup varName _structs)
+                    <|> (cName <$ M.lookup varName _constants)
+        generateAnn = \case
+          [] ->
+            let msg = T.pack $ concat
+                  [ "Undefined variable: "
+                  , varName
+                  ]
+             in [msg <$ x]
+          (c:[]) ->
+            let msg = T.pack $ concat
+                  [ "Variable "
+                  , varName
+                  , " undefined, but found in other contracts. "
+                  , "Check if this contract is missing inheritance from "
+                  , c
+                  , "."
+                  ]
+             in [msg <$ x]
+          (c:d:[]) ->
+            let msg = T.pack $ concat
+                  [ "Variable "
+                  , varName
+                  , " undefined, but found in other contracts. "
+                  , "Check if this contract is missing inheritance from "
+                  , c
+                  , " or "
+                  , d
+                  , "."
+                  ]
+             in [msg <$ x]
+          cs ->
+            let build (c:[]) = ["or " ++ c ++ "."]
+                build (c:rest) = (c ++ ", ") : build rest
+                build [] = ["."] -- playing Pascal's wager with the type system
+                msg = T.pack $ concat
+                  [ "Variable "
+                  , varName
+                  , " undefined, but found in other contracts. "
+                  , "Check if this contract is missing inheritance from "
+                  , concat $ build cs
+                  ]
+             in [msg <$ x]
+
 localVarReadHelper :: String -> SourceAnnotation () -> SSS [SourceAnnotation Text]
 localVarReadHelper name x = do
   isLocal <- isLocalVariable name
   if isLocal
     then pure []
     else do
-      ~(mut, stateVars) <- ask
+      ~R{..} <- ask
       case M.lookup name stateVars of
-        Nothing ->
-          let msg = T.pack $ concat
-                [ "Undefined variable: "
-                , name
-                ]
-           in pure [msg <$ x]
-        Just _ -> case mut of
-          Pure ->
+        Nothing -> pure $ ccVarHelper codeCollection name x
+        Just _ -> case mutability of
+          Just Pure ->
             let msg = T.pack $ concat
                   [ "Pure function reading state variable "
                   , name
@@ -135,22 +185,19 @@ localVarWriteHelper name x = do
   if isLocal
     then pure []
     else do
-      ~(mut, stateVars) <- ask
+      ~R{..} <- ask
       case M.lookup name stateVars of
-        Nothing ->
-          let msg = T.pack $ concat
-                [ "Undefined variable: "
-                , name
-                ]
-           in pure [msg <$ x]
-        Just _ -> case mut of
-          Payable -> pure []
-          _ -> let msg = T.pack $ concat
-                     [ show mut
-                     , " function mutating state variable "
-                     , name
-                     ]
-                in pure [msg <$ x]
+        Nothing -> pure $ ccVarHelper codeCollection name x
+        Just _ -> case mutability of
+          Nothing -> pure []
+          Just Payable -> pure []
+          Just mut ->
+            let msg = T.pack $ concat
+                  [ show mut
+                  , " function mutating state variable "
+                  , name
+                  ]
+             in pure [msg <$ x]
 
 expressionHelper :: Expression -> SSS [SourceAnnotation Text]
 expressionHelper (Binary y "=" (Variable x name) b) = do
