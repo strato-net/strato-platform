@@ -27,25 +27,26 @@ statement = do
   <|> (do
           ~(a, e) <- withPosition $ do
             void $ reserved "return"
-            optionMaybe expression <* semi
+            optionMaybe expression
+          _ <- semi
           pure $ Return e a)
   <|> (do
           ~(a, (i, e)) <- withPosition $ do
             reserved "emit"
             ident <- identifier
             exps <- parens $ commaSep expression
-            _ <- semi
             pure (ident, exps)
+          _ <- semi
           pure $ EmitStatement i (map ((,) Nothing) e) a
       )
   <|> try (do
-              ~(a, e) <- withPosition $ variableDefinitionStatement <* semi
+              ~(a, e) <- (withPosition variableDefinitionStatement) <* semi
               pure $ SimpleStatement e a 
           )
-  <|> (Continue <$> position (reserved "continue" >> semi))
-  <|> (Break <$> position (reserved "break" >> semi))
+  <|> (Continue <$> (position (reserved "continue") <* semi))
+  <|> (Break <$> (position (reserved "break") <* semi))
   <|> (reserved "assembly" >> inlineAssembly)
-  <|> (uncurry (flip SimpleStatement) <$> withPosition (ExpressionStatement <$> expression <* semi))
+  <|> ((\(a,e) -> SimpleStatement (ExpressionStatement e) a) <$> ((withPosition expression) <* semi))
 
 
 
