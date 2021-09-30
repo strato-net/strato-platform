@@ -302,12 +302,12 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) = do
       toAction a d = do
         vm <- codePtrToCodeKind chainId $ codeHash d
         pure A.Action
-          { A._actionBlockHash = creationBlock
-          , A._actionBlockTimestamp = posixSecondsToUTCTime 0
-          , A._actionBlockNumber = 0
-          , A._actionTransactionHash = unsafeCreateKeccak256FromWord256 $ fromMaybe 0 chainId
-          , A._actionTransactionChainId = chainId
-          , A._actionTransactionSender = Account (Ad.Address 0) chainId
+          { A._blockHash = creationBlock
+          , A._blockTimestamp = posixSecondsToUTCTime 0
+          , A._blockNumber = 0
+          , A._transactionHash = unsafeCreateKeccak256FromWord256 $ fromMaybe 0 chainId
+          , A._transactionChainId = chainId
+          , A._transactionSender = Account (Ad.Address 0) chainId
           , A._actionData = Map.singleton a $
                              A.ActionData
                                (codeHash d)
@@ -315,11 +315,11 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) = do
                                ""
                                vm
                                (case storage d of
-                                  EVMDiff m -> A.ActionEVMDiff $ Map.map fromDiff m
-                                  SolidVMDiff m -> A.ActionSolidVMDiff $ Map.map fromDiff m)
+                                  EVMDiff m -> A.EVMDiff $ Map.map fromDiff m
+                                  SolidVMDiff m -> A.SolidVMDiff $ Map.map fromDiff m)
                                [A.emptyCallData]
-          , A._actionMetadata = getMetadata ch
-          , A._actionEvents = S.empty
+          , A._metadata = getMetadata ch
+          , A._events = S.empty
           }
         where
              ch =

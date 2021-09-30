@@ -24,10 +24,10 @@ convert :: Action -> Either String Action -- 🤔
 convert = eitherDecode . encode
 
 emptyEVMData :: Action.ActionData
-emptyEVMData = Action.ActionData (EVMCode $ unsafeCreateKeccak256FromWord256 0) "LambdaCorp1" "Clozure1" EVM (Action.ActionEVMDiff M.empty) []
+emptyEVMData = Action.ActionData (EVMCode $ unsafeCreateKeccak256FromWord256 0) "LambdaCorp1" "Clozure1" EVM (Action.EVMDiff M.empty) []
 
 emptySolidVMData :: Action.ActionData
-emptySolidVMData = Action.ActionData (SolidVMCode "ContractName" $ unsafeCreateKeccak256FromWord256 0) "LambdaCorp2" "Clozure2" SolidVM (Action.ActionSolidVMDiff M.empty) []
+emptySolidVMData = Action.ActionData (SolidVMCode "ContractName" $ unsafeCreateKeccak256FromWord256 0) "LambdaCorp2" "Clozure2" SolidVM (Action.SolidVMDiff M.empty) []
 
 emptyAction :: Action
 emptyAction = Action.Action (unsafeCreateKeccak256FromWord256 0) (posixSecondsToUTCTime 0) 0 (unsafeCreateKeccak256FromWord256 0) Nothing (Account 0x0 Nothing) M.empty Nothing S.empty
@@ -46,12 +46,12 @@ spec = describe "Action conversions" $ do
           `shouldSatisfy` isRight
 
    it "should parse basic Word256 actions" $ do
-    let diff = Action.ActionEVMDiff $ M.singleton 0xffffffffff 0xeeeeeeeeeeeeeee
+    let diff = Action.EVMDiff $ M.singleton 0xffffffffff 0xeeeeeeeeeeeeeee
         daytuh = emptyEVMData {Action._actionDataStorageDiffs = diff}
     convert emptyAction{Action._actionData = M.singleton (Account 0x988 Nothing) daytuh} `shouldSatisfy` isRight
 
    it "should parse basic bytestring actions" $ do
-    let diff = Action.ActionSolidVMDiff $ M.singleton (B.replicate 34 0x6b) (B.replicate 33 0x76)
+    let diff = Action.SolidVMDiff $ M.singleton (B.replicate 34 0x6b) (B.replicate 33 0x76)
         daytuh = emptySolidVMData {Action._actionDataStorageDiffs = diff}
     convert emptyAction{Action._actionData = M.singleton (Account 0x988 Nothing) daytuh} `shouldSatisfy` isRight
 
@@ -118,14 +118,14 @@ spec = describe "Action conversions" $ do
        }|]
 
      eitherDecode (encode oldStyle) `shouldBe` Right (Action.Action
-        { Action._actionBlockHash = forceHash "53fe605019e925357f1077cf753b17384e56379fa4dca1064cbb5e956d76e32f"
-        , Action._actionBlockTimestamp = posixSecondsToUTCTime 1550858759
-        , Action._actionBlockNumber = 9
-        , Action._actionTransactionHash = forceHash "3d5069c6b8f6e3922f8a98bef4f23c2d73794403172c12d6915d51ad47a9e827"
-        , Action._actionTransactionChainId = Nothing
-        , Action._actionTransactionSender = Account 0xc2191df3032cb8ee72e37ab6bbc4e83f92b9911c Nothing
+        { Action._blockHash = forceHash "53fe605019e925357f1077cf753b17384e56379fa4dca1064cbb5e956d76e32f"
+        , Action._blockTimestamp = posixSecondsToUTCTime 1550858759
+        , Action._blockNumber = 9
+        , Action._transactionHash = forceHash "3d5069c6b8f6e3922f8a98bef4f23c2d73794403172c12d6915d51ad47a9e827"
+        , Action._transactionChainId = Nothing
+        , Action._transactionSender = Account 0xc2191df3032cb8ee72e37ab6bbc4e83f92b9911c Nothing
         , Action._actionData = M.singleton (Account 0x2f6ff9d4a35c07f7b630fe1ce039bc45559b5fb6 Nothing) $ Action.ActionData
-          { Action._actionDataStorageDiffs = Action.ActionEVMDiff . M.fromList $
+          { Action._actionDataStorageDiffs = Action.EVMDiff . M.fromList $
             [ (0, 0x5c703a07)
             , (1, 0x76696e5f305f300000000000000000000000000000000000000000000000000e)
             , (2, 0x73305f305f30000000000000000000000000000000000000000000000000000c)
@@ -147,7 +147,7 @@ spec = describe "Action conversions" $ do
             , Action._callDataOutput = Just "\x60\x80\x60"
             }]
           }
-        , Action._actionMetadata = Just . M.fromList $ [("name", "Vehicle"), ("src", "contract Vehicle {}")]
-        , Action._actionEvents = S.singleton $ Event "BlockApps2" "LogisticsEngine2" "Vehicle" (Account 0x2e385b6a3aea46d4172df98617b5385c13b7100d Nothing) "Vehicle Event" [("field", "value"), ("anotherField", "anotherValue")]
+        , Action._metadata = Just . M.fromList $ [("name", "Vehicle"), ("src", "contract Vehicle {}")]
+        , Action._events = S.singleton $ Event "BlockApps2" "LogisticsEngine2" "Vehicle" (Account 0x2e385b6a3aea46d4172df98617b5385c13b7100d Nothing) "Vehicle Event" [("field", "value"), ("anotherField", "anotherValue")]
          
       })

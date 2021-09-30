@@ -112,15 +112,15 @@ instance Format VMState where
 
 startingAction :: Environment -> Action
 startingAction Environment{..} = Action.Action
-  { _actionBlockHash          = blockHeaderHash envBlockHeader
-  , _actionBlockTimestamp     = blockHeaderTimestamp envBlockHeader
-  , _actionBlockNumber        = blockHeaderBlockNumber envBlockHeader
-  , _actionTransactionHash    = envTxHash
-  , _actionTransactionChainId = envChainId
-  , _actionTransactionSender  = envSender
+  { _blockHash                = blockHeaderHash envBlockHeader
+  , _blockTimestamp           = blockHeaderTimestamp envBlockHeader
+  , _blockNumber              = blockHeaderBlockNumber envBlockHeader
+  , _transactionHash          = envTxHash
+  , _transactionChainId       = envChainId
+  , _transactionSender        = envSender
   , _actionData               = M.empty
-  , _actionMetadata           = envMetadata
-  , _actionEvents             = Seq.empty
+  , _metadata                 = envMetadata
+  , _events                   = Seq.empty
   }
 
 startingState :: Bool -> Bool -> Environment -> MemDBs -> IO VMState

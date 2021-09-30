@@ -203,12 +203,12 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
           fullAddrStates = [(acct, fullAddressState)]
           filteredAddrStates = [(acct, filteredAddressState)]
           toAction a d = A.Action
-            { A._actionBlockHash = blockHeaderHash $ blockHeader genesisBlock
-            , A._actionBlockTimestamp = blockHeaderTimestamp $ blockHeader genesisBlock
-            , A._actionBlockNumber = blockHeaderBlockNumber $ blockHeader genesisBlock
-            , A._actionTransactionHash = unsafeCreateKeccak256FromWord256 $ fromMaybe 0 genesisChainId
-            , A._actionTransactionChainId = genesisChainId
-            , A._actionTransactionSender = Ac.Account (Ad.Address 0) genesisChainId
+            { A._blockHash = blockHeaderHash $ blockHeader genesisBlock
+            , A._blockTimestamp = blockHeaderTimestamp $ blockHeader genesisBlock
+            , A._blockNumber = blockHeaderBlockNumber $ blockHeader genesisBlock
+            , A._transactionHash = unsafeCreateKeccak256FromWord256 $ fromMaybe 0 genesisChainId
+            , A._transactionChainId = genesisChainId
+            , A._transactionSender = Ac.Account (Ad.Address 0) genesisChainId
             , A._actionData = Map.singleton a $
                                 A.ActionData
                                   (EVMCode ch)
@@ -216,11 +216,11 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
                                   ""
                                   EVM
                                   (case storage d of
-                                    EVMDiff m -> A.ActionEVMDiff $ Map.map fromDiff m
+                                    EVMDiff m -> A.EVMDiff $ Map.map fromDiff m
                                     SolidVMDiff _ -> error "TODO(tim): SolidVMDiff genesis block support")
                                   [A.emptyCallData]
-            , A._actionMetadata = getMetadata ch
-            , A._actionEvents = S.empty
+            , A._metadata = getMetadata ch
+            , A._events = S.empty
             }
             where ch =
                     case codeHash d of

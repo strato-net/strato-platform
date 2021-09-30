@@ -104,43 +104,43 @@ emptyCallData = CallData
   , _callDataOutput   = Nothing
   }
 
-data ActionDataDiff = ActionEVMDiff (Map Word256 Word256)
-                    | ActionSolidVMDiff (Map B.ByteString B.ByteString)
-                    deriving (Eq, Show, Generic, NFData)
+data DataDiff = EVMDiff (Map Word256 Word256)
+              | SolidVMDiff (Map B.ByteString B.ByteString)
+              deriving (Eq, Show, Generic, NFData)
 
-instance ToJSON ActionDataDiff where
-  toJSON (ActionEVMDiff m) = toJSON m
-  toJSON (ActionSolidVMDiff m) = toJSON m
+instance ToJSON DataDiff where
+  toJSON (EVMDiff m) = toJSON m
+  toJSON (SolidVMDiff m) = toJSON m
 
 sequenceTuple :: Monad m => (m a, m b) -> m (a, b)
 sequenceTuple = uncurry (liftM2 (,))
 
 -- There is intentionally no FromJSON instance. The ToJSON instance does
 -- not have enough information to recover the original type, and it is
--- expected that a sibling of ActionDataDiff will have the information to
+-- expected that a sibling of DataDiff will have the information to
 -- determine with parser to use.
-parseDiffEVM :: Value -> Parser ActionDataDiff
-parseDiffEVM (Object obs) = fmap (ActionEVMDiff . M.fromList)
+parseDiffEVM :: Value -> Parser DataDiff
+parseDiffEVM (Object obs) = fmap (EVMDiff . M.fromList)
                           . mapM (sequenceTuple . bimap (f.String) f)
                           $ HM.toList obs
   where f :: Value -> Parser Word256
         f = fmap bytesToWord256 . parseJSON
-parseDiffEVM x = typeMismatch "ActionEVMDiff" x
+parseDiffEVM x = typeMismatch "EVMDiff" x
 
-parseDiffSolidVM :: Value -> Parser ActionDataDiff
-parseDiffSolidVM (Object obs) = fmap (ActionSolidVMDiff . M.fromList)
+parseDiffSolidVM :: Value -> Parser DataDiff
+parseDiffSolidVM (Object obs) = fmap (SolidVMDiff . M.fromList)
                               . mapM (sequenceTuple . bimap (f.String) f)
                               $ HM.toList obs
   where f :: Value -> Parser B.ByteString
         f = parseJSON
-parseDiffSolidVM x = typeMismatch "ActionSolidVMDiff" x
+parseDiffSolidVM x = typeMismatch "SolidVMDiff" x
 
 data ActionData = ActionData
   { _actionDataCodeHash     :: CodePtr
   , _actionDataOrganization :: Text
   , _actionDataApplication  :: Text
   , _actionDataCodeKind     :: CodeKind
-  , _actionDataStorageDiffs :: ActionDataDiff
+  , _actionDataStorageDiffs :: DataDiff
   , _actionDataCallData     :: [CallData]
   } deriving (Eq, Show, Generic, NFData)
 makeLenses ''ActionData
@@ -158,8 +158,8 @@ instance Format ActionData where
 mergeActionData :: ActionData -> ActionData -> ActionData
 mergeActionData newData oldData =
   let diffs = case (_actionDataStorageDiffs newData, _actionDataStorageDiffs oldData) of
-          (ActionEVMDiff n, ActionEVMDiff o) -> ActionEVMDiff $ n <> o
-          (ActionSolidVMDiff n, ActionSolidVMDiff o) -> ActionSolidVMDiff $ n <> o
+          (EVMDiff n, EVMDiff o) -> EVMDiff $ n <> o
+          (SolidVMDiff n, SolidVMDiff o) -> SolidVMDiff $ n <> o
           _ -> error "mismatched action kinds at the same address"
       calls = ((++) `on` _actionDataCallData) oldData newData
    in ActionData (_actionDataCodeHash oldData) (_actionDataOrganization newData) (_actionDataApplication newData) (_actionDataCodeKind oldData) diffs calls
@@ -188,41 +188,41 @@ instance FromJSON ActionData where
   parseJSON o = error $ "parseJSON ActionData: Expected object, got: " ++ show o
 
 data Action = Action
-  { _actionBlockHash          :: Keccak256
-  , _actionBlockTimestamp     :: UTCTime
-  , _actionBlockNumber        :: Integer
-  , _actionTransactionHash    :: Keccak256
-  , _actionTransactionChainId :: Maybe Word256
-  , _actionTransactionSender  :: Account
+  { _blockHash          :: Keccak256
+  , _blockTimestamp     :: UTCTime
+  , _blockNumber        :: Integer
+  , _transactionHash    :: Keccak256
+  , _transactionChainId :: Maybe Word256
+  , _transactionSender  :: Account
   , _actionData               :: Map Account ActionData
-  , _actionMetadata           :: Maybe (Map Text Text)
-  , _actionEvents             :: S.Seq Event
+  , _metadata           :: Maybe (Map Text Text)
+  , _events             :: S.Seq Event
   } deriving (Eq, Show, Generic, NFData)
 makeLenses ''Action
 
 instance Format Action where
   format Action{..} =
-    "actionBlockHash: " ++ format _actionBlockHash ++ "\n"
-    ++ "actionBlockTimestamp: " ++ show _actionBlockTimestamp ++ "\n"
-    ++ "actionBlockNumber: " ++ show _actionBlockNumber ++ "\n"
-    ++ "actionTransactionHash: " ++ format _actionTransactionHash ++ "\n"
-    ++ "actionTransactionChainId: " ++ format _actionTransactionChainId ++ "\n"
-    ++ "actionTransactionSender: " ++ format _actionTransactionSender ++ "\n"
+    "blockHash: " ++ format _blockHash ++ "\n"
+    ++ "actionBlockTimestamp: " ++ show _blockTimestamp ++ "\n"
+    ++ "actionBlockNumber: " ++ show _blockNumber ++ "\n"
+    ++ "actionTransactionHash: " ++ format _transactionHash ++ "\n"
+    ++ "actionTransactionChainId: " ++ format _transactionChainId ++ "\n"
+    ++ "actionTransactionSender: " ++ format _transactionSender ++ "\n"
     ++ "actionData:\n" ++ unlines (map (\(k, v) -> tab $ format k ++ ":\n" ++ (tab $ format v)) $ M.toList _actionData) ++ "\n"
-    ++ "actionMetadata: " ++ unwords (map (\(k, v) -> "(" ++ CL.blue (show k) ++ ": " ++ show (shorten 30 $ T.unpack v) ++ ")") $ M.toList $ fromMaybe M.empty $ _actionMetadata) ++ "\n"
-    ++ "actionEvents: " ++ unlines (map show $ toList _actionEvents) ++ "\n"
+    ++ "actionMetadata: " ++ unwords (map (\(k, v) -> "(" ++ CL.blue (show k) ++ ": " ++ show (shorten 30 $ T.unpack v) ++ ")") $ M.toList $ fromMaybe M.empty $ _metadata) ++ "\n"
+    ++ "actionEvents: " ++ unlines (map show $ toList _events) ++ "\n"
 
 instance ToJSON Action where
   toJSON Action{..} = object
-    [ "blockHash"       .= _actionBlockHash
-    , "blockTimestamp"  .= _actionBlockTimestamp
-    , "blockNumber"     .= _actionBlockNumber
-    , "transactionHash" .= _actionTransactionHash
-    , "chainId"         .= _actionTransactionChainId
-    , "sender"          .= _actionTransactionSender
+    [ "blockHash"       .= _blockHash
+    , "blockTimestamp"  .= _blockTimestamp
+    , "blockNumber"     .= _blockNumber
+    , "transactionHash" .= _transactionHash
+    , "chainId"         .= _transactionChainId
+    , "sender"          .= _transactionSender
     , "data"            .= _actionData
-    , "metadata"        .= _actionMetadata
-    , "events"          .= _actionEvents
+    , "metadata"        .= _metadata
+    , "events"          .= _events
     ]
 
 instance FromJSON Action where
@@ -244,7 +244,7 @@ instance Arbitrary CallType where
 instance Arbitrary CallData where
   arbitrary = genericArbitrary
 
-instance Arbitrary ActionDataDiff where
+instance Arbitrary DataDiff where
   arbitrary = genericArbitrary
 
 instance Arbitrary ActionData where

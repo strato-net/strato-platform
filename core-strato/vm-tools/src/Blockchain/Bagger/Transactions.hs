@@ -38,7 +38,7 @@ rewriteBlockHash hsh (TxRunResult otx res t before after new) =
   TxRunResult otx{otOrigin = BlockHash hsh} res' t before after new
   where res' = case res of
                   Left{} -> res
-                  Right er@ExecResults {erAction=mAction}-> Right er{erAction = set Action.actionBlockHash hsh <$> mAction}
+                  Right er@ExecResults {erAction=mAction}-> Right er{erAction = set Action.blockHash hsh <$> mAction}
 
 instance NFData TxRunResult
 

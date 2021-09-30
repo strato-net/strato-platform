@@ -53,7 +53,6 @@ import qualified BlockApps.SolidityVarReader as SVR
 import qualified BlockApps.SolidVMStorageDecoder as SolidVM
 
 import Blockchain.Data.AddressStateDB
-import qualified Blockchain.Strato.Model.Action as BS
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Action           (Action)
 import qualified Blockchain.Strato.Model.Action as Action
@@ -72,13 +71,13 @@ import Slipstream.Globals
 import Slipstream.Metrics
 import Slipstream.OutputData
 
-diffNull :: BS.ActionDataDiff -> Bool
-diffNull (BS.ActionEVMDiff m) = Map.null m
-diffNull (BS.ActionSolidVMDiff m) = Map.null m
+diffNull :: Action.DataDiff -> Bool
+diffNull (Action.EVMDiff m) = Map.null m
+diffNull (Action.SolidVMDiff m) = Map.null m
 
-mergeDiffs :: BS.ActionDataDiff -> BS.ActionDataDiff -> BS.ActionDataDiff
-mergeDiffs (BS.ActionEVMDiff lhs) (BS.ActionEVMDiff rhs) = BS.ActionEVMDiff $ lhs <> rhs
-mergeDiffs (BS.ActionSolidVMDiff lhs) (BS.ActionSolidVMDiff rhs) = BS.ActionSolidVMDiff $ lhs <> rhs
+mergeDiffs :: Action.DataDiff -> Action.DataDiff -> Action.DataDiff
+mergeDiffs (Action.EVMDiff lhs) (Action.EVMDiff rhs) = Action.EVMDiff $ lhs <> rhs
+mergeDiffs (Action.SolidVMDiff lhs) (Action.SolidVMDiff rhs) = Action.SolidVMDiff $ lhs <> rhs
 mergeDiffs lhs rhs = error $ "Invalid diff combination: " ++ show (lhs, rhs)
 
 data BatchedInserts = BatchedInserts
@@ -243,8 +242,8 @@ rowToInsert :: MonadIO m =>
             -> m ProcessedContract
 rowToInsert gref abiid row cont oldState = do
   let newState = case actionStorage row of
-                    BS.ActionEVMDiff mp -> SVR.decodeCacheValues cont (flip Map.lookup mp) oldState
-                    BS.ActionSolidVMDiff mp -> SolidVM.decodeCacheValues mp oldState
+                    Action.EVMDiff mp -> SVR.decodeCacheValues cont (flip Map.lookup mp) oldState
+                    Action.SolidVMDiff mp -> SolidVM.decodeCacheValues mp oldState
   setContractState gref (actionAccount row) newState
   return $ processedContract abiid (Map.fromList $ newState) row
 
@@ -258,8 +257,8 @@ rowToHistories gref abiid row actions cont oldState = do
     then pure []
     else flip evalStateT oldState . forM actions $ \hRow -> do
       modify $ case actionStorage hRow of
-                  BS.ActionEVMDiff mp -> SVR.decodeCacheValues cont (flip Map.lookup mp)
-                  BS.ActionSolidVMDiff mp -> SolidVM.decodeCacheValues mp
+                  Action.EVMDiff mp -> SVR.decodeCacheValues cont (flip Map.lookup mp)
+                  Action.SolidVMDiff mp -> SolidVM.decodeCacheValues mp
       newMap <- gets Map.fromList
       return $ processedContract abiid newMap hRow
 
@@ -322,7 +321,7 @@ processTheMessages env sqlEnv conn g messages = do
       $logDebugLS "the diff is " $ actionStorage row
 
       case actionStorage row of
-        BS.ActionEVMDiff{} -> do
+        Action.EVMDiff{} -> do
           mDetails <- getEVMDetailsForRow row
           case mDetails of
             Nothing -> pure . Left $ "No details found for code hash "
@@ -343,7 +342,7 @@ processTheMessages env sqlEnv conn g messages = do
               indexContract <- rowToInsert g abiid row cont oldState
               hs <- rowToHistories g abiid row actions cont oldState
               pure . Right $ BatchedInserts indexContract hs []
-        BS.ActionSolidVMDiff{} -> do
+        Action.SolidVMDiff{} -> do
           mName <- getSolidVMDetailsForRow g row
           case mName of
             Nothing -> pure . Left $ "No SolidVM details for code hash "

@@ -273,7 +273,7 @@ instance Monad m => Mod.Modifiable (Q.Seq Event) (SM m) where
   --    TxrIndexer for governance updates
   get    _   = gets ssEvents
   put    _ q = do
-    action . Action.actionEvents .= q
+    action . Action.events .= q
     modify $ \sstate -> sstate { ssEvents = q }
 
 runSM :: ( MonadIO m
@@ -329,19 +329,19 @@ pushSender newSender mv = do
 
 startingAction :: Maybe ByteString -> Env.Environment -> Action
 startingAction maybeCode env' = Action.Action
-  { _actionBlockHash          = blockHeaderHash $ Env.blockHeader env'
-  , _actionBlockTimestamp     = blockHeaderTimestamp $ Env.blockHeader env'
-  , _actionBlockNumber        = blockHeaderBlockNumber $ Env.blockHeader env'
-  , _actionTransactionHash    = Env.txHash env'
-  , _actionTransactionChainId = Env.chainId env'
-  , _actionTransactionSender  = Env.sender env'
+  { _blockHash                = blockHeaderHash $ Env.blockHeader env'
+  , _blockTimestamp           = blockHeaderTimestamp $ Env.blockHeader env'
+  , _blockNumber              = blockHeaderBlockNumber $ Env.blockHeader env'
+  , _transactionHash          = Env.txHash env'
+  , _transactionChainId       = Env.chainId env'
+  , _transactionSender        = Env.sender env'
   , _actionData               = M.empty
-  , _actionMetadata           =
+  , _metadata                 =
       case maybeCode of
         Just theCode ->
           Just $ M.insert "src" (T.pack $ UTF8.toString theCode) $ fromMaybe M.empty $ Env.metadata env'
         Nothing -> Env.metadata env'
-  , _actionEvents             = Q.empty
+  , _events             = Q.empty
   }
 
 
@@ -647,7 +647,7 @@ getValueType p = hintFromType =<< getXabiValueType p
 initializeAction :: MonadSM m => Account -> String -> String -> Keccak256 -> m ()
 initializeAction acct name appName hsh = do
   -- org name to be set later, b/c the lookup is complex
-  let newData = Action.ActionData (SolidVMCode name hsh) "" (T.pack appName) SolidVM (Action.ActionSolidVMDiff M.empty) []
+  let newData = Action.ActionData (SolidVMCode name hsh) "" (T.pack appName) SolidVM (Action.SolidVMDiff M.empty) []
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= M.insertWith Action.mergeActionData acct newData
 
@@ -657,7 +657,7 @@ markDiffForAction owner key' val' = do
   let key = MS.unparsePath key'
       val = rlpSerialize $ rlpEncode val'
       ins = \case
-              Action.ActionSolidVMDiff m -> Action.ActionSolidVMDiff $ M.insert key val m
+              Action.SolidVMDiff m -> Action.SolidVMDiff $ M.insert key val m
               e -> internalError "SolidVM Diff executing in EVM" $ show e
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData . at owner . mapped . Action.actionDataStorageDiffs %= ins

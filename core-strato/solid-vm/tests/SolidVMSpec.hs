@@ -1771,9 +1771,9 @@ contract qq {
 }|]
     let diffs = fmap Action._actionDataStorageDiffs . Action._actionData <$> erAction xr
     diffs `shouldBe` Just (M.fromList
-      [ (uploadAddress, Action.ActionSolidVMDiff $ M.singleton ".s"
+      [ (uploadAddress, Action.SolidVMDiff $ M.singleton ".s"
             (rlpSerialize $ rlpEncode $ bContract' "Sub" recursiveAddr))
-      , (recursiveAddr, Action.ActionSolidVMDiff $ M.fromList
+      , (recursiveAddr, Action.SolidVMDiff $ M.fromList
           [ (".x", rlpSerialize $ rlpEncode $ BInteger 20)
           , (".y", rlpSerialize $ rlpEncode $ BInteger 80)
           ]
