@@ -80,7 +80,8 @@ import           Blockchain.SolidVM.TraceTools
 import           Blockchain.SolidVM.Value
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.Action
+import           Blockchain.Strato.Model.Action       (Action)
+import qualified Blockchain.Strato.Model.Action       as Action
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Keccak256
@@ -283,7 +284,7 @@ create' creator newAccount ch cc contractName' argExps x509s = do
   
   org <- getOrg creator (contract' ^. vmVersion)
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    actionData %= M.adjust (actionDataOrganization .~ (T.pack org)) newAccount
+    Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) newAccount
 
 
   -- I'm showing these strings because I like them to be in quotes in the logs :)
@@ -569,7 +570,7 @@ callWrapper from to mContract functionName argExps = do
   -- grab the org for this contract
   org <- getOrg to (contract ^. vmVersion)
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    actionData %= M.adjust (actionDataOrganization .~ (T.pack org)) to
+    Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) to
 
   liftIO $ putStrLn $ "callWraper/versioning --->  we are calling " ++ (_contractName contract) ++ 
         " in app " ++ (show parentName) ++ " of org " ++ show org

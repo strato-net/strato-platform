@@ -28,7 +28,8 @@ import           Data.Word
 import qualified Data.Sequence                as Seq
 import           GHC.Generics
 
-import           Blockchain.Strato.Model.Action
+import           Blockchain.Strato.Model.Action (Action)
+import qualified Blockchain.Strato.Model.Action as Action
 import           Blockchain.Data.Log
 import           Blockchain.EVM.Environment
 import qualified Blockchain.EVM.MutableStack as MS
@@ -110,7 +111,7 @@ instance Format VMState where
     "stack: " ++ show stack ++ "\n"
 
 startingAction :: Environment -> Action
-startingAction Environment{..} = Action
+startingAction Environment{..} = Action.Action
   { _actionBlockHash          = blockHeaderHash envBlockHeader
   , _actionBlockTimestamp     = blockHeaderTimestamp envBlockHeader
   , _actionBlockNumber        = blockHeaderBlockNumber envBlockHeader

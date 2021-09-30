@@ -12,10 +12,7 @@
     , FlexibleInstances
 #-}
 
-module Slipstream.Data.Action
-  ( module Blockchain.Strato.Model.Action
-  , module Slipstream.Data.Action
-  ) where
+module Slipstream.Data.Action where
 
 import           Control.DeepSeq
 import           Data.Map.Strict         (Map)
@@ -27,8 +24,8 @@ import qualified Data.Text               as T
 import           Data.Time
 import           GHC.Generics
 
-import           Blockchain.Strato.Model.Action ( Action(..), ActionData(..), ActionDataDiff(..)
-                                                , CallType(..), CallData(..))
+import           Blockchain.Strato.Model.Action (Action)
+import qualified Blockchain.Strato.Model.Action as Action ( Action(..), ActionData(..), ActionDataDiff(..), CallType(..), CallData(..))
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Event
@@ -45,17 +42,17 @@ data AggregateAction = AggregateAction
   , actionApplication    :: Text
   , actionAccount        :: Account
   , actionCodeHash       :: CodePtr
-  , actionStorage        :: ActionDataDiff
-  , actionType           :: CallType
-  , actionCallData       :: [CallData]
+  , actionStorage        :: Action.ActionDataDiff
+  , actionType           :: Action.CallType
+  , actionCallData       :: [Action.CallData]
   , actionMetadata       :: Map Text Text
   } deriving (Show, Generic, NFData)
 
 
 flatten :: Action -> [AggregateAction]
-flatten Action{..} = flip map (M.toList _actionData) $
-  \(account, ActionData{..}) -> -- It's a Create because I said so
-    let t = maybe Create _callDataType $ listToMaybe _actionDataCallData
+flatten Action.Action{..} = flip map (M.toList _actionData) $
+  \(account, Action.ActionData{..}) -> -- It's a Create because I said so
+    let t = maybe Action.Create Action._callDataType $ listToMaybe _actionDataCallData
      in AggregateAction
           { actionBlockHash      = _actionBlockHash
           , actionBlockTimestamp = _actionBlockTimestamp
@@ -91,8 +88,8 @@ formatAction AggregateAction{..} = T.concat
   , tshow (_accountAddress actionAccount)
   , " with "
   , tshow (case actionStorage of
-      ActionEVMDiff m -> M.size m
-      ActionSolidVMDiff m -> M.size m)
+      Action.ActionEVMDiff m -> M.size m
+      Action.ActionSolidVMDiff m -> M.size m)
   , " items\n"
   , "    codeHash = "
   , tshow actionCodeHash
@@ -112,7 +109,7 @@ data AggregateEvent = AggregateEvent
 
 
 squash :: Action -> [AggregateEvent]
-squash Action{..} = flip map (toList _actionEvents)
+squash Action.Action{..} = flip map (toList _actionEvents)
   (\ev -> AggregateEvent
     { agOrganization          = T.pack $ evContractOrganization ev
     , agApplication           = T.pack $ evContractApplication ev

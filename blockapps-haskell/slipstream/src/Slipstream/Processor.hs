@@ -55,6 +55,8 @@ import qualified BlockApps.SolidVMStorageDecoder as SolidVM
 import Blockchain.Data.AddressStateDB
 import qualified Blockchain.Strato.Model.Action as BS
 import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Action           (Action)
+import qualified Blockchain.Strato.Model.Action as Action
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256
 import Data.Source.Map
@@ -98,7 +100,7 @@ enterBloc2 blocEnv sqlEnv f =
   $ f
 
 matters :: AggregateAction -> Bool
-matters AggregateAction{..} = (actionType == Create || (not $ diffNull actionStorage))
+matters AggregateAction{..} = (actionType == Action.Create || (not $ diffNull actionStorage))
                            && (resolvedCodePtrToSHA actionCodeHash /= emptyHash)
 
 -- assumes all Actions in the list are for the same Account
