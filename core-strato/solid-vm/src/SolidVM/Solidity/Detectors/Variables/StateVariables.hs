@@ -1,6 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TupleSections #-}
 module SolidVM.Solidity.Detectors.Variables.StateVariables
   ( detector
   ) where
@@ -17,7 +18,7 @@ import qualified Data.Text           as T
 import           SolidVM.Solidity.Xabi
 import           SolidVM.Solidity.Xabi.Statement
 
-type StateVars = M.Map String (Bool, Bool, SourceAnnotation ())
+type StateVars = M.Map String (Bool, Bool, VariableDecl)
 type LocalVars = [M.Map String (SourceAnnotation ())]
 type SSS = State (StateVars, LocalVars)
 
@@ -27,12 +28,16 @@ detector CodeCollection{..} = concat $ contractHelper <$> M.elems _contracts
 
 contractHelper :: Contract -> [SourceAnnotation Text]
 contractHelper Contract{..} =
-  let stateVariables = M.map (\v -> (False, False, varContext v)) _storageDefs
+  let stateVariables = M.map (False, False,) _storageDefs
       emptyState = (stateVariables, [])
       action = traverse functionHelper $ M.elems _functions
       stateVariables' = fst $ execState action emptyState
-      findStateAnns name (False, False, a) = [(T.pack $ "Unused state variable " ++ name ++ ".") <$ a]
-      findStateAnns name (True, False, a) = [(T.pack $ "State variable " ++ name ++ " is never written to. Consider making it a constant.") <$ a]
+      findStateAnns name (False, False, a) =
+        [(T.pack $ "Unused state variable " ++ name ++ ".") <$ varContext a]
+      findStateAnns name (True, False, VariableDecl{..}) | varInitialVal == Nothing =
+        [(T.pack $ "Uninitialized state variable " ++ name ++ ". Consider initializing it to prevent incorrect behavior.") <$ varContext]
+      findStateAnns name (True, False, a) =
+        [(T.pack $ "State variable " ++ name ++ " is never written to. Consider making it a constant.") <$ varContext a]
       findStateAnns _ _ = []
    in M.foldMapWithKey findStateAnns stateVariables'
 
