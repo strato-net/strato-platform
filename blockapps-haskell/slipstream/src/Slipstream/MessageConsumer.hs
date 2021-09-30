@@ -6,7 +6,11 @@
     , TemplateHaskell
 #-}
 
-module Slipstream.MessageConsumer where
+module Slipstream.MessageConsumer (
+  mkConfiguredKafkaState,
+  runKafka,
+  getAndProcessMessages
+  ) where
 
 import Control.Concurrent     (threadDelay)
 import Control.Exception.Lifted
@@ -24,7 +28,7 @@ import qualified Data.Map as M
 import Data.String
 import Database.PostgreSQL.Typed
 import GHC.Generics
-import Network.Kafka
+import Network.Kafka                    hiding (runKafka)
 import Network.Kafka.Consumer
 import qualified Network.Kafka.Protocol as K hiding (Message)
 
