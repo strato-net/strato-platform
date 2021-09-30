@@ -27,21 +27,13 @@ import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Strict hiding (state)
 import qualified Data.Aeson as JSON
-import Data.Bifunctor (second)
---import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
---import qualified Data.ByteString.Short as SB
---import Data.Conduit
--- import qualified Data.ByteString.Char8 as C8
 import Data.Either (lefts, rights)
 import Data.Function
---import Data.Foldable
---import Data.Traversable
 import Data.Int (Int32)
 import Data.IORef
 import Data.List (foldl', sortOn)
---import qualified Data.Map.Ordered as OMap
 import qualified Data.Map as Map
 import Data.Maybe
 import Data.Ord (Down(..))
@@ -49,15 +41,11 @@ import qualified Data.Text as T
 import Data.Text (Text)
 import Database.PostgreSQL.Typed (PGConnection)
 
---import Blockapps.Crossmon
-
 import BlockApps.Bloc22.Database.Queries
 import BlockApps.Bloc22.Monad
 import BlockApps.Bloc22.Server.Utils
 import BlockApps.Logging
 import BlockApps.Solidity.Contract
---import BlockApps.Solidity.Type
---import BlockApps.Solidity.Struct
 import BlockApps.Solidity.Value
 import BlockApps.Solidity.Xabi
 import BlockApps.XAbiConverter
@@ -81,7 +69,6 @@ import Slipstream.Events
 import Slipstream.Globals
 import Slipstream.Metrics
 import Slipstream.OutputData
---import Slipstream.SolidityValue
 
 diffNull :: BS.ActionDataDiff -> Bool
 diffNull (BS.ActionEVMDiff m) = Map.null m
@@ -125,53 +112,6 @@ combineActions (x:xs) = foldl' merge x xs
 
 splitActions :: [AggregateAction] -> [(Account, [AggregateAction])]
 splitActions = partitionWith actionAccount
-{-
-functionDetailsFromContract :: Contract -> ByteString -> (Text, ([(Text, Type)],[(Maybe Text, Type)]))
-functionDetailsFromContract contract selector' =
-  let selector = B.take 4 selector'
-      isSelector = \case
-        TypeFunction s a r | s == selector -> Just (a,r)
-        _                                  -> Nothing
-   in fromMaybe ("",([],[]))
-      . listToMaybe
-      . map (fmap fromJust)
-      . filter (isJust . snd)
-      . map (fmap (isSelector . snd))
-      $ OMap.assocs
-        (fields $ mainStruct contract)
-
-getFunctionDetailsFromSelector :: Xabi -> ByteString -> (Text, ([(Text,Type)],[(Maybe Text, Type)]))
-getFunctionDetailsFromSelector xabi sel' = case xAbiToContract xabi of
-  Left err -> error $ "getFunctionDetailsFromSelector: " ++ err
-  Right contract' -> functionDetailsFromContract contract' sel'
-
-convertEnumTypeToInt :: Type -> Type
-convertEnumTypeToInt = \case
-  TypeEnum _ -> SimpleType $ TypeInt False $ Just 32
-  TypeArrayFixed n ty -> TypeArrayFixed n (convertEnumTypeToInt ty)
-  TypeArrayDynamic ty -> TypeArrayDynamic (convertEnumTypeToInt ty)
-  ty -> ty
-
-convertByteStringToVals :: ByteString -> [Type] -> Maybe [SolidityValue]
-convertByteStringToVals byteResp responseTypes = map valueToSolidityValue <$> bytestringToValues byteResp responseTypes
-
-getFunctionCallValues :: Xabi -> ByteString -> ByteString -> (Text, [(Text, SolidityValue)], [(Text, SolidityValue)])
-getFunctionCallValues xabi input' output' =
-  let sel = B.take 4 input'
-      data' = B.drop 4 input'
-      (fname,(itypes,otypes)) = getFunctionDetailsFromSelector xabi sel
-      typemap bs = uncurry zip
-                   . fmap ( fromMaybe (repeat (SolidityValueAsString ""))
-                     . convertByteStringToVals bs
-                     . map convertEnumTypeToInt
-                   ) . unzip
-      imap = typemap data' itypes
-      omap = zipWith
-               (\i (n,v) -> (fromMaybe (T.pack $ '#':show i) n, v))
-               ([0..] :: [Integer])
-               (typemap output' otypes)
-   in (fname,imap,omap)
--}
 
 data ABIID = ABIID { aiAbi :: Text
                    , aiName :: Text
@@ -197,47 +137,7 @@ processedContract ABIID{..} state AggregateAction{..} =
     , blockNumber = actionBlockNumber
     , transactionHash = actionTxHash
     , transactionSender = actionTxSender ^. accountAddress
-    , functionCallData = Nothing
     }
-{-
-makeFunctionInserts :: Xabi
-                    -> ABIID
-                    -> Map.Map Text Value
-                    -> AggregateAction
-                    -> Bloc [ProcessedContract]
-makeFunctionInserts xabi ABIID{..} state AggregateAction{..} =
-  forM actionCallData $ \CallData{..} -> do
-    let ibytes = SB.fromShort $ _callDataInput
-        obytes = SB.fromShort $ fromMaybe SB.empty _callDataOutput
-        (f',i,o) = getFunctionCallValues xabi ibytes obytes
-        f = if T.null f'
-              then if actionType == Create
-                    then "constructor"
-                    else "fallback"
-              else f'
-    recordMaxBlockNumber "slipstream_processor" actionBlockNumber
-    pure $ ProcessedContract
-      { address = actionAccount ^. accountAddress
-      , codehash = actionCodeHash
-      , abi = aiAbi
-      , organization = actionOrganization
-      , application  = actionApplication
-      , contractName = aiName
-      , chain = aiChain
-      , contractData = state
-      , blockHash = actionBlockHash
-      , blockTimestamp = actionBlockTimestamp
-      , blockNumber = actionBlockNumber
-      , transactionHash = actionTxHash
-      , transactionSender = actionTxSender ^. accountAddress
-      , functionCallData = Just $ FunctionCallData
-          { functioncalldataName = f
-          , functioncalldataInput = i
-          , functioncalldataOutput = o
-          }
-      }
-
--}
 
 lookupT :: (Monad m, Ord k) => k -> Map.Map k v -> MaybeT m v
 lookupT k = MaybeT . return . Map.lookup k
@@ -349,19 +249,17 @@ rowToInsert gref abiid row cont oldState = do
 rowToHistories :: (MonadIO m, MonadLogger m) =>
                   IORef Globals -> ABIID -> AggregateAction -> [AggregateAction] -> Contract
                -> [(Text, Value)]
-               -> m ([ProcessedContract], [ProcessedContract])
+               -> m [ProcessedContract]
 rowToHistories gref abiid row actions cont oldState = do
   hist <- isHistoric gref $ HistoryTableName (actionOrganization row) (actionApplication row) (aiName abiid)
-  second join . unzip <$> if not hist
+  if not hist
     then pure []
     else flip evalStateT oldState . forM actions $ \hRow -> do
       modify $ case actionStorage hRow of
                   BS.ActionEVMDiff mp -> SVR.decodeCacheValues cont (flip Map.lookup mp)
                   BS.ActionSolidVMDiff mp -> SolidVM.decodeCacheValues mp
       newMap <- gets Map.fromList
-      let hInsert = processedContract abiid newMap hRow
-      fInserts <- pure [] -- TODO: remove the fInserts altogether
-      pure (hInsert, fInserts)
+      return $ processedContract abiid newMap hRow
 
 
 -- Parses xabi event declarations to create a table,
@@ -441,7 +339,7 @@ processTheMessages env sqlEnv conn g messages = do
 
               oldState <- readPreviousEVMState g acct cont
               indexContract <- rowToInsert g abiid row cont oldState
-              (hs, _) <- rowToHistories g abiid row actions cont oldState
+              hs <- rowToHistories g abiid row actions cont oldState
               pure . Right $ BatchedInserts indexContract hs []
         BS.ActionSolidVMDiff{} -> do
           mName <- getSolidVMDetailsForRow g row
@@ -461,7 +359,7 @@ processTheMessages env sqlEnv conn g messages = do
               adjustGlobals g (Don't Compile) row details
               oldState <- readPreviousSolidVMState g acct
               indexContract <- rowToInsert g abiid row cont oldState
-              (hs, _) <- rowToHistories g abiid row actions cont oldState
+              hs <- rowToHistories g abiid row actions cont oldState
               eventTables <- createEvents details (actionOrganization row) (actionApplication row)
               pure . Right $ BatchedInserts indexContract hs eventTables
 
