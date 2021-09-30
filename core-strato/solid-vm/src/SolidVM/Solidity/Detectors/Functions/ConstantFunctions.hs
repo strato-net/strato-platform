@@ -11,7 +11,7 @@ import           Control.Monad.Reader
 import           Control.Monad.Trans.State
 import           Data.Foldable (find, traverse_)
 import qualified Data.Map.Strict as M
-import           Data.Maybe      (isJust, maybeToList)
+import           Data.Maybe      (catMaybes, isJust, maybeToList)
 import           Data.Source
 import           Data.Text       (Text)
 import qualified Data.Text       as T
@@ -41,10 +41,15 @@ functionHelper cc c stateVariables Func{..} = case funcContents of
   Nothing -> []
   Just stmts ->
     let r = R funcStateMutability stateVariables cc c
-     in runReader (statementsHelper stmts) r
+        argNames = T.unpack <$> (catMaybes $ fst <$> funcArgs)
+        valNames = T.unpack <$> (catMaybes $ fst <$> funcVals)
+        args = M.fromList $ zip (argNames ++ valNames) (repeat funcContext)
+     in runReader (statementsHelper args stmts) r
 
-statementsHelper :: [Statement] -> Reader R [SourceAnnotation Text]
-statementsHelper ss = concat <$> evalStateT (traverse statementHelper ss) [M.empty]
+statementsHelper :: (M.Map String (SourceAnnotation ()))
+                 -> [Statement]
+                 -> Reader R [SourceAnnotation Text]
+statementsHelper args ss = concat <$> evalStateT (traverse statementHelper ss) [args]
 
 statementsHelper' :: [Statement] -> SSS [SourceAnnotation Text]
 statementsHelper' ss = do
