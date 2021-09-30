@@ -209,7 +209,7 @@ instance Format Action where
     ++ "actionTransactionChainId: " ++ format _actionTransactionChainId ++ "\n"
     ++ "actionTransactionSender: " ++ format _actionTransactionSender ++ "\n"
     ++ "actionData:\n" ++ unlines (map (\(k, v) -> tab $ format k ++ ":\n" ++ (tab $ format v)) $ M.toList _actionData) ++ "\n"
-    ++ "actionMetadata: " ++ unwords (map (\(k, v) -> "(" ++ CL.blue (show k) ++ ": " ++ show (shorten 10 $ T.unpack v) ++ ")") $ M.toList $ fromMaybe M.empty $ _actionMetadata) ++ "\n"
+    ++ "actionMetadata: " ++ unwords (map (\(k, v) -> "(" ++ CL.blue (show k) ++ ": " ++ show (shorten 30 $ T.unpack v) ++ ")") $ M.toList $ fromMaybe M.empty $ _actionMetadata) ++ "\n"
     ++ "actionEvents: " ++ unlines (map show $ toList _actionEvents) ++ "\n"
 
 instance ToJSON Action where
