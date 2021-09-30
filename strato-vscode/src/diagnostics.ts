@@ -3,7 +3,7 @@ import { rest, importer } from 'blockapps-rest';
 import getConfig from './load.config';
 import { getApplicationUser } from './auth';
 
-let validatingDocument = false;
+let validationCounter: number = 0;
 
 /**
  * Analyzes the text document for problems. 
@@ -13,29 +13,30 @@ let validatingDocument = false;
  */
 export async function refreshDiagnostics(doc: vscode.TextDocument, solidityDiagnostics: vscode.DiagnosticCollection): Promise<void> {
   if (doc.uri.path.slice(-4) === '.sol') {
-    if (!validatingDocument) {
-      validatingDocument = true; // control the flag at a higher level
-      // slow down, give enough time to type (1.5 seconds?)
-      setTimeout(async () => await validate(doc, solidityDiagnostics), 1500);
-    }
+    validationCounter = (validationCounter + 1) % 10000;
+    const thisCounter = validationCounter;
+    setTimeout(async () => await validate(thisCounter, doc, solidityDiagnostics), 1500);
   }
 }
 
-async function validate(doc: vscode.TextDocument, solidityDiagnostics: vscode.DiagnosticCollection): Promise<void> {
-  try {
-    const diagnostics: vscode.Diagnostic[] = [];
-    const user = await getApplicationUser();
-    const config = getConfig() || {};
-    const options = { config };
-    const annotations = await rest.debugPostAnalyze(user, [[doc.uri.path, doc.getText()]], options);
+async function validate(counter: number, doc: vscode.TextDocument, solidityDiagnostics: vscode.DiagnosticCollection): Promise<void> {
+  if (validationCounter === counter) {
+    try {
+      const diagnostics: vscode.Diagnostic[] = [];
 
-    for (let ann in annotations) {
-      diagnostics.push(createDiagnostic(doc, annotations[ann]));
+      const user = await getApplicationUser();
+      const config = getConfig() || {};
+      const options = { config };
+      const annotations = await rest.debugPostAnalyze(user, [[doc.uri.path, doc.getText()]], options);
+
+      for (let ann in annotations) {
+        diagnostics.push(createDiagnostic(doc, annotations[ann]));
+      }
+
+      solidityDiagnostics.set(doc.uri, diagnostics);
+    } catch (e) {
+      console.log(`validate exception: ${JSON.stringify(e)}`);
     }
-
-    solidityDiagnostics.set(doc.uri, diagnostics);
-  } finally {
-    validatingDocument = false;
   }
 }
 
