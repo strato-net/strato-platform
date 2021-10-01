@@ -1192,16 +1192,8 @@ create' = do
     assignDetails = do
       vmState <- vmstateGet
       let Environment{..} = environment vmState
-      vmstateModify $ action . Action.actionData . at envOwner. mapped . Action.actionDataCallData %~
-        (:) Action.CallData
-              { _callDataType        = Action.Create
-              , _callDataSender      = envSender
-              , _callDataOwner       = envOwner
-              , _callDataGasPrice    = envGasPrice
-              , _callDataValue       = envValue
-              , _callDataInput       = BSS.toShort envInputData
-              , _callDataOutput      = BSS.toShort <$> returnVal vmState
-              }
+      vmstateModify $ action . Action.actionData . at envOwner. mapped . Action.actionDataCallTypes %~
+        (:) Action.Create
 
 call :: EVMBase m
      => Bool
@@ -1277,16 +1269,8 @@ call' noValueTransfer = do
   --    putStrLn $ "Gas remaining: " ++ show (vmGasRemaining vmState) ++ ", needed: " ++ show (5*toInteger (B.length result))
   --    --putStrLn $ show (pretty address) ++ ": " ++ format result
   let Environment{..} = environment vmState
-  vmstateModify $ action . Action.actionData . at envOwner. mapped . Action.actionDataCallData %~
-    (:) Action.CallData
-          { _callDataType        = Action.Update
-          , _callDataSender      = envSender
-          , _callDataOwner       = envOwner
-          , _callDataGasPrice    = envGasPrice
-          , _callDataValue       = envValue
-          , _callDataInput       = BSS.toShort envInputData
-          , _callDataOutput      = BSS.toShort <$> returnVal vmState
-          }
+  vmstateModify $ action . Action.actionData . at envOwner. mapped . Action.actionDataCallTypes %~
+    (:) Action.Update
 
   return (fromMaybe B.empty $ returnVal vmState)
 
@@ -1307,16 +1291,8 @@ callPrecompiled' noValueTransfer precompiled = do
   vmState <- vmstateGet
 
   let Environment{..} = environment vmState
-  vmstateModify $ action . Action.actionData . at envOwner. mapped . Action.actionDataCallData %~
-    (:) Action.CallData
-          { _callDataType        = Action.Update
-          , _callDataSender      = envSender
-          , _callDataOwner       = envOwner
-          , _callDataGasPrice    = envGasPrice
-          , _callDataValue       = envValue
-          , _callDataInput       = BSS.toShort envInputData
-          , _callDataOutput      = BSS.toShort <$> returnVal vmState
-          }
+  vmstateModify $ action . Action.actionData . at envOwner. mapped . Action.actionDataCallTypes %~
+    (:) Action.Update
 
   return (fromMaybe B.empty $ returnVal vmState)
 

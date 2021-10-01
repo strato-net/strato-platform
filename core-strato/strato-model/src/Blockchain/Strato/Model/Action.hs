@@ -141,7 +141,7 @@ data ActionData = ActionData
   , _actionDataApplication  :: Text
   , _actionDataCodeKind     :: CodeKind
   , _actionDataStorageDiffs :: DataDiff
-  , _actionDataCallData     :: [CallData]
+  , _actionDataCallTypes    :: [CallType]
   } deriving (Eq, Show, Generic, NFData)
 makeLenses ''ActionData
 
@@ -152,7 +152,7 @@ instance Format ActionData where
     ++ "actionDataApplication: " ++ T.unpack _actionDataApplication ++ "\n"
     ++ "actionDataCodeKind: " ++ show _actionDataCodeKind ++ "\n"
     ++ "actionDataStorageDiffs: " ++ show _actionDataStorageDiffs ++ "\n"
-    ++ "actionDataCallData:\n" ++ tab (unlines (map format _actionDataCallData))
+    ++ "actionDataCallTypes:\n" ++ tab (show _actionDataCallTypes)
   
 
 mergeActionData :: ActionData -> ActionData -> ActionData
@@ -161,7 +161,7 @@ mergeActionData newData oldData =
           (EVMDiff n, EVMDiff o) -> EVMDiff $ n <> o
           (SolidVMDiff n, SolidVMDiff o) -> SolidVMDiff $ n <> o
           _ -> error "mismatched action kinds at the same address"
-      calls = ((++) `on` _actionDataCallData) oldData newData
+      calls = ((++) `on` _actionDataCallTypes) oldData newData
    in ActionData (_actionDataCodeHash oldData) (_actionDataOrganization newData) (_actionDataApplication newData) (_actionDataCodeKind oldData) diffs calls
 
 instance ToJSON ActionData where
@@ -170,7 +170,7 @@ instance ToJSON ActionData where
     , "organization" .= _actionDataOrganization
     , "application" .= _actionDataApplication
     , "diff"     .= _actionDataStorageDiffs
-    , "data"     .= _actionDataCallData
+    , "data"     .= _actionDataCallTypes
     , "codeKind" .= _actionDataCodeKind
     ]
 

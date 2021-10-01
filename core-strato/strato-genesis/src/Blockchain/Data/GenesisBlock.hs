@@ -317,7 +317,7 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) = do
                                (case storage d of
                                   EVMDiff m -> A.EVMDiff $ Map.map fromDiff m
                                   SolidVMDiff m -> A.SolidVMDiff $ Map.map fromDiff m)
-                               [A.emptyCallData]
+                               [A.Create]
           , A._metadata = getMetadata ch
           , A._events = S.empty
           }

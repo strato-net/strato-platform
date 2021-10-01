@@ -137,15 +137,7 @@ spec = describe "Action conversions" $ do
           , Action._actionDataOrganization = "BlockApps1"
           , Action._actionDataApplication = "LogisticsEngine1"
           , Action._actionDataCodeKind = EVM
-          , Action._actionDataCallData = [Action.CallData
-            { Action._callDataType = Action.Create
-            , Action._callDataSender = Account 0xc2191df3032cb8ee72e37ab6bbc4e83f92b9911c Nothing
-            , Action._callDataOwner = Account 0x2f6ff9d4a35c07f7b630fe1ce039bc45559b5fb6 Nothing
-            , Action._callDataGasPrice = 1
-            , Action._callDataValue = 0
-            , Action._callDataInput = ""
-            , Action._callDataOutput = Just "\x60\x80\x60"
-            }]
+          , Action._actionDataCallTypes = [Action.Create]
           }
         , Action._metadata = Just . M.fromList $ [("name", "Vehicle"), ("src", "contract Vehicle {}")]
         , Action._events = S.singleton $ Event "BlockApps2" "LogisticsEngine2" "Vehicle" (Account 0x2e385b6a3aea46d4172df98617b5385c13b7100d Nothing) "Vehicle Event" [("field", "value"), ("anotherField", "anotherValue")]

@@ -25,7 +25,7 @@ import           Data.Time
 import           GHC.Generics
 
 import           Blockchain.Strato.Model.Action (Action)
-import qualified Blockchain.Strato.Model.Action as Action ( Action(..), ActionData(..), DataDiff(..), CallType(..), CallData(..))
+import qualified Blockchain.Strato.Model.Action as Action ( Action(..), ActionData(..), DataDiff(..), CallType(..))
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Event
@@ -44,7 +44,6 @@ data AggregateAction = AggregateAction
   , actionCodeHash       :: CodePtr
   , actionStorage        :: Action.DataDiff
   , actionType           :: Action.CallType
-  , actionCallData       :: [Action.CallData]
   , actionMetadata       :: Map Text Text
   } deriving (Show, Generic, NFData)
 
@@ -52,7 +51,7 @@ data AggregateAction = AggregateAction
 flatten :: Action -> [AggregateAction]
 flatten Action.Action{..} = flip map (M.toList _actionData) $
   \(account, Action.ActionData{..}) -> -- It's a Create because I said so
-    let t = maybe Action.Create Action._callDataType $ listToMaybe _actionDataCallData
+    let t = fromMaybe Action.Create $ listToMaybe _actionDataCallTypes
      in AggregateAction
           { actionBlockHash      = _blockHash
           , actionBlockTimestamp = _blockTimestamp
@@ -65,7 +64,6 @@ flatten Action.Action{..} = flip map (M.toList _actionData) $
           , actionCodeHash       = _actionDataCodeHash
           , actionStorage        = _actionDataStorageDiffs
           , actionType           = t
-          , actionCallData       = _actionDataCallData
           , actionMetadata       = fromMaybe M.empty _metadata
           }
 

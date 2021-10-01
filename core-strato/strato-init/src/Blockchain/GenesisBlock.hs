@@ -218,7 +218,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
                                   (case storage d of
                                     EVMDiff m -> A.EVMDiff $ Map.map fromDiff m
                                     SolidVMDiff _ -> error "TODO(tim): SolidVMDiff genesis block support")
-                                  [A.emptyCallData]
+                                  [A.Create]
             , A._metadata = getMetadata ch
             , A._events = S.empty
             }
