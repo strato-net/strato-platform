@@ -6,39 +6,50 @@ module SolidVM.Solidity.Detectors.Functions.ConstantFunctions
   ) where
 
 import           CodeCollection
+import           Control.Applicative ((<|>))
 import           Control.Monad.Reader
 import           Control.Monad.Trans.State
-import           Data.Foldable (traverse_)
+import           Data.Foldable (find, traverse_)
 import qualified Data.Map.Strict as M
-import           Data.Maybe      (isJust)
+import           Data.Maybe      (catMaybes, isJust, maybeToList)
 import           Data.Source
 import           Data.Text       (Text)
 import qualified Data.Text       as T
 import           SolidVM.Solidity.Xabi
 import           SolidVM.Solidity.Xabi.Statement
 
-type R = (StateMutability, M.Map String VariableDecl)
+data R = R
+  { mutability :: Maybe StateMutability
+  , stateVars  :: M.Map String VariableDecl
+  , codeCollection :: CodeCollection
+  , contract :: Contract
+  }
 type SSS = StateT [M.Map String (SourceAnnotation ())] (Reader R)
 
 -- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]
 detector :: CompilerDetector
-detector CodeCollection{..} = concat $ contractHelper <$> M.elems _contracts
+detector cc@CodeCollection{..} = concat $ contractHelper cc <$> M.elems _contracts
 
-contractHelper :: Contract -> [SourceAnnotation Text]
-contractHelper Contract{..} = concat $ functionHelper _storageDefs <$> M.elems _functions
+contractHelper :: CodeCollection -> Contract -> [SourceAnnotation Text]
+contractHelper cc c@Contract{..} = 
+  let constr = maybe M.empty (M.singleton "constructor") _constructor
+      funcsAndConstr = constr <> _functions
+   in concat $ functionHelper cc c _storageDefs <$> M.elems funcsAndConstr
 
-functionHelper :: M.Map String VariableDecl -> Func -> [SourceAnnotation Text]
-functionHelper stateVariables Func{..} =
-  let f mut = case funcContents of
-        Nothing -> []
-        Just stmts -> runReader (statementsHelper stmts) (mut, stateVariables)
-   in case funcStateMutability of
-        Nothing -> []
-        Just Payable -> []
-        Just m -> f m
+functionHelper :: CodeCollection -> Contract -> M.Map String VariableDecl -> Func -> [SourceAnnotation Text]
+functionHelper cc c stateVariables Func{..} = case funcContents of
+  Nothing -> []
+  Just stmts ->
+    let r = R funcStateMutability stateVariables cc c
+        argNames = T.unpack <$> (catMaybes $ fst <$> funcArgs)
+        valNames = T.unpack <$> (catMaybes $ fst <$> funcVals)
+        args = M.fromList $ zip (argNames ++ valNames) (repeat funcContext)
+     in runReader (statementsHelper args stmts) r
 
-statementsHelper :: [Statement] -> Reader R [SourceAnnotation Text]
-statementsHelper ss = concat <$> evalStateT (traverse statementHelper ss) [M.empty]
+statementsHelper :: (M.Map String (SourceAnnotation ()))
+                 -> [Statement]
+                 -> Reader R [SourceAnnotation Text]
+statementsHelper args ss = concat <$> evalStateT (traverse statementHelper ss) [args]
 
 statementsHelper' :: [Statement] -> SSS [SourceAnnotation Text]
 statementsHelper' ss = do
@@ -90,8 +101,9 @@ statementHelper (Return mExpr _) =
 statementHelper (Throw _) = pure []
 statementHelper (EmitStatement _ vals _) =
   concat <$> traverse (expressionHelper . snd) vals
-statementHelper (AssemblyStatement _ x) = asks fst >>= \case
-  Payable -> pure []
+statementHelper (AssemblyStatement _ x) = asks mutability >>= \case
+  Nothing -> pure []
+  Just Payable -> pure []
   mut -> let msg = T.pack $ concat
                [ show mut
                , " function using assembly code."
@@ -106,22 +118,86 @@ simpleStatementHelper (VariableDefinition vdefs mExpr) = do
 simpleStatementHelper (ExpressionStatement expr) =
   expressionHelper expr
 
+generateAnn :: String -> SourceAnnotation () -> [String] -> [SourceAnnotation Text]
+generateAnn varName x = \case
+  [] ->
+    let msg = T.pack $ concat
+          [ "Undefined variable: "
+          , varName
+          ]
+     in [msg <$ x]
+  (c:[]) ->
+    let msg = T.pack $ concat
+          [ "Variable "
+          , varName
+          , " undefined, but found in other contracts. "
+          , "Check if this contract is missing inheritance from "
+          , c
+          , "."
+          ]
+     in [msg <$ x]
+  (c:d:[]) ->
+    let msg = T.pack $ concat
+          [ "Variable "
+          , varName
+          , " undefined, but found in other contracts. "
+          , "Check if this contract is missing inheritance from "
+          , c
+          , " or "
+          , d
+          , "."
+          ]
+     in [msg <$ x]
+  cs ->
+    let build (c:[]) = ["or " ++ c ++ "."]
+        build (c:rest) = (c ++ ", ") : build rest
+        build [] = ["."] -- playing Pascal's wager with the type system
+        msg = T.pack $ concat
+          [ "Variable "
+          , varName
+          , " undefined, but found in other contracts. "
+          , "Check if this contract is missing inheritance from "
+          , concat $ build cs
+          ]
+     in [msg <$ x]
+
+ccVarHelper :: CodeCollection
+            -> String
+            -> SourceAnnotation ()
+            -> [SourceAnnotation Text]
+ccVarHelper CodeCollection{..} varName x = generateAnn varName x $ M.foldMapWithKey findVars _contracts
+  where findVars cName Contract{..} =
+          maybeToList $ (cName <$ M.lookup varName _storageDefs)
+                    <|> (cName <$ M.lookup varName _constants)
+
+ccMemberAccessHelper :: CodeCollection
+                     -> Contract
+                     -> String
+                     -> String
+                     -> SourceAnnotation ()
+                     -> [SourceAnnotation Text]
+ccMemberAccessHelper CodeCollection{..} c varName fieldName x =
+  if isJust $ findDefs >>= find (==fieldName)
+    then []
+    else generateAnn fullName x $ M.foldMapWithKey findVars _contracts
+  where findVars cName Contract{..} =
+          maybeToList $ (cName <$ M.lookup varName _enums)
+                    <|> (cName <$ M.lookup varName _structs)
+        findDefs = (fst <$> M.lookup varName (_enums c))
+               <|> (map (\(a,_,_) -> T.unpack a) <$> M.lookup varName (_structs c))
+        fullName = varName ++ "." ++ fieldName
+
 localVarReadHelper :: String -> SourceAnnotation () -> SSS [SourceAnnotation Text]
 localVarReadHelper name x = do
   isLocal <- isLocalVariable name
   if isLocal
     then pure []
     else do
-      ~(mut, stateVars) <- ask
+      ~R{..} <- ask
       case M.lookup name stateVars of
-        Nothing ->
-          let msg = T.pack $ concat
-                [ "Undefined variable: "
-                , name
-                ]
-           in pure [msg <$ x]
-        Just _ -> case mut of
-          Pure ->
+        Nothing -> pure $ ccVarHelper codeCollection name x
+        Just _ -> case mutability of
+          Just Pure ->
             let msg = T.pack $ concat
                   [ "Pure function reading state variable "
                   , name
@@ -135,22 +211,19 @@ localVarWriteHelper name x = do
   if isLocal
     then pure []
     else do
-      ~(mut, stateVars) <- ask
+      ~R{..} <- ask
       case M.lookup name stateVars of
-        Nothing ->
-          let msg = T.pack $ concat
-                [ "Undefined variable: "
-                , name
-                ]
-           in pure [msg <$ x]
-        Just _ -> case mut of
-          Payable -> pure []
-          _ -> let msg = T.pack $ concat
-                     [ show mut
-                     , " function mutating state variable "
-                     , name
-                     ]
-                in pure [msg <$ x]
+        Nothing -> pure $ ccVarHelper codeCollection name x
+        Just _ -> case mutability of
+          Nothing -> pure []
+          Just Payable -> pure []
+          Just mut ->
+            let msg = T.pack $ concat
+                  [ show mut
+                  , " function mutating state variable "
+                  , name
+                  ]
+             in pure [msg <$ x]
 
 expressionHelper :: Expression -> SSS [SourceAnnotation Text]
 expressionHelper (Binary y "=" (Variable x name) b) = do
@@ -202,9 +275,15 @@ expressionHelper (IndexAccess _ a b) = do
   as <- expressionHelper a
   bs <- maybe (pure []) expressionHelper b
   pure $ concat [as, bs]
+expressionHelper (MemberAccess x (Variable _ varName) fieldName) = do
+  cc <- asks codeCollection
+  c <- asks contract
+  pure $ ccMemberAccessHelper cc c varName fieldName x
 expressionHelper (MemberAccess _ e _) = expressionHelper e
 expressionHelper (FunctionCall _ e args) = do
-  as <- expressionHelper e
+  as <- case e of
+          Variable _ _ -> pure []
+          _ -> expressionHelper e
   bs <- case args of
           OrderedArgs es -> concat <$> traverse expressionHelper es
           NamedArgs nes -> concat <$> traverse expressionHelper (snd <$> nes)
