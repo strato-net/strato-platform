@@ -7,6 +7,7 @@ import           Data.Source
 import           Data.Text                                                         (Text)
 import           SolidVM.Solidity.Parse.Declarations                               (SourceUnit)
 import qualified SolidVM.Solidity.Detectors.Trivial                                as Trivial
+import qualified SolidVM.Solidity.Detectors.Contracts.ParentConstructors           as ParentConstructors
 import qualified SolidVM.Solidity.Detectors.Expressions.BooleanLiterals            as BooleanLiterals
 import qualified SolidVM.Solidity.Detectors.Expressions.DivideBeforeMultiply       as DivideBeforeMultiply
 import qualified SolidVM.Solidity.Detectors.Pragmas.IncorrectSolidityVersion       as IncorrectSolidityVersion
@@ -26,6 +27,7 @@ compilerDetectors :: [CompilerDetector]
 compilerDetectors = [ Trivial.detector
                     , Continue.detector
                     , Modifiers.detector
+                    , ParentConstructors.detector
                     , BooleanLiterals.detector
                     , DivideBeforeMultiply.detector
                     , StateVariableShadowing.detector
