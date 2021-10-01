@@ -45,7 +45,7 @@ type SourceUnit = Positioned SourceUnitF
 -- | Parses an entire Solidity contract
 solidityContract :: SolidityParser SourceUnit
 solidityContract = do
-  ~(a, (kind, contractName', baseConstrs, declarations)) <- withPosition $ do
+  ~(a, (kind, contractName', baseConstrs)) <- withPosition $ do
     kind <- (reserved "contract" >> return Xabi.ContractKind)
           <|> (reserved "interface" >> return Xabi.InterfaceKind)
           <|> (reserved "library" >> return Xabi.LibraryKind)
@@ -57,9 +57,9 @@ solidityContract = do
         name <- intercalate "." <$> sepBy1 identifier dot
         consArgs <- option "" parensCode
         return (name, consArgs)
-    declarations <-
-      braces (many solidityDeclaration)
-    pure (kind, contractName', baseConstrs, declarations)
+    pure (kind, contractName', baseConstrs)
+  declarations <-
+    braces (many solidityDeclaration)
 
   let allFunctions = Map.fromList [ (Text.pack n, f) | (n, FuncDeclaration f) <- declarations]
   let ctorList = [(Text.pack n, c) | (n, ConstructorDeclaration c) <- declarations]
@@ -232,8 +232,8 @@ simpleVariableDeclaration = do
   value <- optionMaybe $ do
     reservedOp "="
     expression
-  semi
   end <- getSourcePosition
+  semi
   let ctx = SourceAnnotation start end ()
 
   if isConstant
@@ -265,8 +265,8 @@ functionXabi = do
   start <- getSourcePosition
   functionArgs <- tupleDeclaration
   (functionRet, visibility, mutability, constructorCalls, modifiers) <- functionModifiers
-  contents <- Just <$> statements <|> (reservedOp ";" >> return Nothing)
   end <- getSourcePosition
+  contents <- Just <$> statements <|> (reservedOp ";" >> return Nothing)
   let nameUnnamed (name,ty) = if Text.null name then (Nothing, ty) else (Just name,ty)
       ctx = SourceAnnotation start end ()
   return Xabi.Func{
