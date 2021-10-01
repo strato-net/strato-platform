@@ -6,9 +6,11 @@ module SolidVM.Solidity.Detectors.Functions.ConstantFunctions
   ) where
 
 import           CodeCollection
+import           Control.Arrow       ((&&&))
 import           Control.Applicative ((<|>))
 import           Control.Monad.Reader
 import           Control.Monad.Trans.State
+import           Data.Bitraversable (bisequence)
 import           Data.Foldable (find, traverse_)
 import qualified Data.Map.Strict as M
 import           Data.Maybe      (catMaybes, isJust, maybeToList)
@@ -17,6 +19,9 @@ import           Data.Text       (Text)
 import qualified Data.Text       as T
 import           SolidVM.Solidity.Xabi
 import           SolidVM.Solidity.Xabi.Statement
+import           SolidVM.Solidity.Xabi.Type      (Type)
+import qualified SolidVM.Solidity.Xabi.Type      as Xabi
+import           SolidVM.Solidity.Xabi.VarDef
 
 data R = R
   { mutability :: Maybe StateMutability
@@ -34,17 +39,25 @@ contractHelper :: CodeCollection -> Contract -> [SourceAnnotation Text]
 contractHelper cc c@Contract{..} = 
   let constr = maybe M.empty (M.singleton "constructor") _constructor
       funcsAndConstr = constr <> _functions
-   in concat $ functionHelper cc c _storageDefs <$> M.elems funcsAndConstr
+      varTypes = (varContext &&& varType) <$> M.elems _storageDefs
+      constTypes = (constContext &&& constType) <$> M.elems _constants
+      varAnns = uncurry (ccTypeHelper cc c) <$> varTypes ++ constTypes
+      funcAnns = functionHelper cc c _storageDefs <$> M.elems funcsAndConstr
+   in concat $ varAnns ++ funcAnns
 
 functionHelper :: CodeCollection -> Contract -> M.Map String VariableDecl -> Func -> [SourceAnnotation Text]
 functionHelper cc c stateVariables Func{..} = case funcContents of
   Nothing -> []
   Just stmts ->
     let r = R funcStateMutability stateVariables cc c
+        argTypes = indexedTypeType . snd <$> funcArgs
+        valTypes = indexedTypeType . snd <$> funcVals
+        typeAnns = ccTypeHelper cc c funcContext <$> argTypes ++ valTypes
         argNames = T.unpack <$> (catMaybes $ fst <$> funcArgs)
         valNames = T.unpack <$> (catMaybes $ fst <$> funcVals)
-        args = M.fromList $ zip (argNames ++ valNames) (repeat funcContext)
-     in runReader (statementsHelper args stmts) r
+        names = M.fromList $ zip (argNames ++ valNames) (repeat funcContext)
+        nameAnns = runReader (statementsHelper names stmts) r
+     in concat $ nameAnns : typeAnns
 
 statementsHelper :: (M.Map String (SourceAnnotation ()))
                  -> [Statement]
@@ -113,8 +126,15 @@ statementHelper (SimpleStatement stmt _) = simpleStatementHelper stmt
 
 simpleStatementHelper :: SimpleStatement -> SSS [SourceAnnotation Text]
 simpleStatementHelper (VariableDefinition vdefs mExpr) = do
+  cc <- asks codeCollection
+  c <- asks contract
   pushLocalVariables vdefs
-  maybe (pure []) expressionHelper mExpr
+  let typeAnns = concat $ uncurry (ccTypeHelper cc c)
+             <$> catMaybes ( bisequence
+                           . (getVarDefContext &&& getVarDefType)
+                           <$> vdefs)
+  stmtAnns <- maybe (pure []) expressionHelper mExpr
+  pure $ typeAnns ++ stmtAnns
 simpleStatementHelper (ExpressionStatement expr) =
   expressionHelper expr
 
@@ -186,6 +206,22 @@ ccMemberAccessHelper CodeCollection{..} c varName fieldName x =
         findDefs = (fst <$> M.lookup varName (_enums c))
                <|> (map (\(a,_,_) -> T.unpack a) <$> M.lookup varName (_structs c))
         fullName = varName ++ "." ++ fieldName
+
+ccTypeHelper :: CodeCollection
+             -> Contract
+             -> SourceAnnotation ()
+             -> Type
+             -> [SourceAnnotation Text]
+ccTypeHelper CodeCollection{..} c x (Xabi.Label typeName) =
+  if isJust findDefs
+    then []
+    else generateAnn typeName x $ M.foldMapWithKey findVars _contracts
+  where findVars cName Contract{..} =
+          maybeToList $ (cName <$ M.lookup typeName _enums)
+                    <|> (cName <$ M.lookup typeName _structs)
+        findDefs = (fst <$> M.lookup typeName (_enums c))
+               <|> (map (\(a,_,_) -> T.unpack a) <$> M.lookup typeName (_structs c))
+ccTypeHelper _ _ _ _ = []
 
 localVarReadHelper :: String -> SourceAnnotation () -> SSS [SourceAnnotation Text]
 localVarReadHelper name x = do

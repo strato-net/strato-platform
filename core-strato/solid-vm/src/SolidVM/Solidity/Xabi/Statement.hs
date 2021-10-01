@@ -10,6 +10,8 @@ module SolidVM.Solidity.Xabi.Statement
   , VarDefEntryF(..)
   , VarDefEntry
   , vardefLocation
+  , getVarDefType
+  , getVarDefContext
   , SimpleStatementF(..)
   , SimpleStatement
   , InlineAssembly(..)
@@ -78,6 +80,14 @@ instance FromJSON a => FromJSON (VarDefEntryF a)
 vardefLocation :: VarDefEntryF a -> Maybe Location
 vardefLocation BlankEntry = Nothing
 vardefLocation (VarDefEntry _ mLoc _ _) = mLoc
+
+getVarDefType :: VarDefEntryF a -> Maybe Type
+getVarDefType (VarDefEntry mTy _ _ _) = mTy
+getVarDefType BlankEntry = Nothing
+
+getVarDefContext :: VarDefEntryF a -> Maybe a
+getVarDefContext (VarDefEntry _ _ _ a) = Just a
+getVarDefContext BlankEntry = Nothing
 
 data SimpleStatementF a =
   VariableDefinition [VarDefEntryF a] (Maybe (ExpressionF a)) -- Nothing type indicates "var" keyword
