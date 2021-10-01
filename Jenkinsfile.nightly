@@ -88,6 +88,8 @@ pipeline {
     stage('Test and Push Images') {
       steps {
         parallel (
+          // TODO: uncomment the following list of tests after testing the build and before merging to develop
+          /*
           'Push images': {
             withCredentials([
                 usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER')
@@ -177,6 +179,7 @@ pipeline {
               docker build -f Dockerfile.test .
             '''
           },
+          */
             
           'STRATO API Tests': {
             withCredentials([
@@ -226,8 +229,48 @@ pipeline {
         )
       }
     }
+
+    stage('Test dev docs') {
+      steps {
+        withCredentials([
+            usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')
+        ]) {
+          sh 'git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/docs-website -b start-restructuring' // TODO: remove custom branch before merging this into strato-platform develop!
+          dir('docs-website/') {
+            sh 'npm i'
+            
+            writeFile file: "test-util/config.json", text: """
+{
+  "clientId": "dev",
+  "clientSecret": "d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f",
+  "discoveryUrl": "https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration",
+  "stratoUrl": "http://localhost:8080",
+  "stratoIP": "127.0.0.1",
+  "stratoPath": "../strato-getting-started"
+}
+            """
+            writeFile file: "test-util/strato-config.json", text: """
+{
+  "PASSWORD": 1234,
+  "OAUTH_ENABLED": true,
+  "OAUTH_CLIENT_ID": "dev",
+  "OAUTH_CLIENT_SECRET": "d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f",
+  "OAUTH_DISCOVERY_URL": "https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration",
+  "OAUTH_JWT_USERNAME_PROPERTY": "email",
+  "HTTP_PORT": "8080",
+  "NODE_HOST": "localhost:8080"
+}
+            """
+            sh 'npm test'
+          }
+        }
+      }
+    }
+    
   }
 
+// TODO: uncomment post{ } after testing and before merging to develop
+/*
   post {
     always {
       dir ('strato-getting-started') {
@@ -265,4 +308,5 @@ pipeline {
     }
 
   }
+*/
 }
