@@ -1,7 +1,9 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 module Blockchain.SolidVM.CodeCollectionDB
-  ( compileSource
+  ( parseSource
+  , compileSourceNoInheritance
+  , compileSource
   , codeCollectionFromSource
   , codeCollectionFromHash
   ) where
@@ -11,14 +13,16 @@ import           Control.Monad.IO.Class
 import qualified Data.Aeson                           as Aeson
 import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Lazy                 as BL
-import           Data.Functor                         ((<&>))
+import           Data.Foldable                        (foldrM)
 import           Data.IORef
 import           Data.Map                             (Map)
 import qualified Data.Map                             as M
+import           Data.Source
 import qualified Data.Text                            as T
 import           Data.Text.Encoding                   (decodeUtf8, encodeUtf8)
 import           System.IO.Unsafe
-import           Text.Parsec                          (runParser, ParseError)
+import           Text.Parsec                          (runParser)
+import           Text.Parsec.Error
 
 import           Blockchain.DB.CodeDB
 import           Blockchain.SolidVM.Exception         hiding (assert)
@@ -34,21 +38,31 @@ import           CodeCollection
 unsafeCodeMapIORef :: IORef (Map Keccak256 CodeCollection)
 unsafeCodeMapIORef = unsafePerformIO $ newIORef M.empty
 
-compileSource :: Map T.Text T.Text -> Either ParseError CodeCollection
-compileSource initCodeMap =
+parseSource :: T.Text -> T.Text -> Either ParseError [SourceUnit]
+parseSource fileName src = unsourceUnits <$> runParser solidityFile "" (T.unpack fileName) (T.unpack src)
+
+compileSourceNoInheritance :: Map T.Text T.Text -> Either ParseError CodeCollection
+compileSourceNoInheritance initCodeMap = do
   let getNamedContracts fileName src = do
-        file <- runParser solidityFile "" (T.unpack fileName) $ T.unpack src
+        sourceUnits <- parseSource fileName src
         let pragmas = \case
               Pragma _ n v -> Just (n, v)
               _ -> Nothing
-            vmVersion' = if Just ("solidvm", "3.0") `elem` (pragmas <$> unsourceUnits file) then "svm3.0" else ""
+            vmVersion' = if Just ("solidvm", "3.0") `elem` (pragmas <$> sourceUnits) then "svm3.0" else ""
         pure [(T.unpack name, xabiToContract (T.unpack name) (map T.unpack parents') vmVersion' xabi)
-             | NamedXabi name (xabi, parents') <- unsourceUnits file]
-      allContracts = fmap concat . traverse (uncurry getNamedContracts) $ M.toList initCodeMap
-   in allContracts <&> \cs -> applyInheritance
-        $ CodeCollection {
-            _contracts=M.fromList cs
-          }
+             | NamedXabi name (xabi, parents') <- sourceUnits]
+      throwDuplicate (cName, contract) m = case M.lookup cName m of
+        Nothing -> pure $ M.insert cName contract m
+        Just _ ->  Left $ newErrorMessage (Message $ "Duplicate contract found: " ++ cName)
+                                          (fromSourcePosition $ _sourceAnnotationStart $ _contractContext contract)
+  allContracts <- fmap concat . traverse (uncurry getNamedContracts) $ M.toList initCodeMap
+  deduplicatedContracts <- foldrM throwDuplicate M.empty allContracts
+  pure $ CodeCollection {
+    _contracts = deduplicatedContracts
+  }
+
+compileSource :: Map T.Text T.Text -> Either ParseError CodeCollection
+compileSource = fmap applyInheritance . compileSourceNoInheritance
 
 codeCollectionFromSource :: (MonadIO m, HasCodeDB m) => B.ByteString -> m (Keccak256, CodeCollection)
 codeCollectionFromSource initCode = do

@@ -52,6 +52,7 @@ library:
   - memory
   - merkle-patricia-db
   - monad-alter
+  - mtl
   - nibblestring
   - parsec
   - prometheus-client
