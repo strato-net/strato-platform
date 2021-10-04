@@ -81,17 +81,7 @@ spec = describe "Action conversions" $ do
                "0000000000000000000000000000000000000000000000000000000000000003":
                  "73315f305f30000000000000000000000000000000000000000000000000000c"
              },
-             "data": [
-               {
-                 "gasPrice": 1,
-                 "sender": "c2191df3032cb8ee72e37ab6bbc4e83f92b9911c",
-                 "value": 0,
-                 "input": "",
-                 "owner": "2f6ff9d4a35c07f7b630fe1ce039bc45559b5fb6",
-                 "output": "608060",
-                 "type": "Create"
-               }
-             ],
+             "types": ["Create"],
              "codeHash": "86bc2e2a375e6ea377ae90026248f472fbeaa1354ef4424f568d01f3a48ab5b9",
              "organization": "BlockApps1",
              "application": "LogisticsEngine1"

@@ -170,7 +170,7 @@ instance ToJSON ActionData where
     , "organization" .= _actionDataOrganization
     , "application" .= _actionDataApplication
     , "diff"     .= _actionDataStorageDiffs
-    , "data"     .= _actionDataCallTypes
+    , "types"     .= _actionDataCallTypes
     , "codeKind" .= _actionDataCodeKind
     ]
 
@@ -183,7 +183,7 @@ instance FromJSON ActionData where
     df <- (case ck of
       EVM -> explicitParseField parseDiffEVM
       SolidVM -> explicitParseField parseDiffSolidVM) o "diff"
-    dt <- o .: "data"
+    dt <- o .: "types"
     return $ ActionData ch og ap ck df dt
   parseJSON o = error $ "parseJSON ActionData: Expected object, got: " ++ show o
 
