@@ -18,7 +18,6 @@ import           Control.DeepSeq
 import           Data.Map.Strict         (Map)
 import qualified Data.Map.Strict         as M
 import           Data.Maybe              (fromMaybe,listToMaybe)
-import           Data.Foldable           (toList)
 import           Data.Text               (Text)
 import qualified Data.Text               as T
 import           Data.Time
@@ -28,7 +27,6 @@ import           Blockchain.Strato.Model.Action (Action)
 import qualified Blockchain.Strato.Model.Action as Action ( Action(..), ActionData(..), DataDiff(..), CallType(..))
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.CodePtr
-import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Keccak256
 
 
@@ -94,27 +92,3 @@ formatAction AggregateAction{..} = T.concat
   ]
   where tshow :: Show a => a -> Text
         tshow = T.pack . show
-
-
-data AggregateEvent = AggregateEvent
-  { agOrganization         :: Text
-  , agApplication          :: Text
-  , agContractName         :: Text
-  , agContractAccount      :: Account
-  , agEventName            :: Text
-  , agEventArgs            :: [(Text, Text)]
-  } deriving (Show, Generic, NFData)
-
-
-squash :: Action -> [AggregateEvent]
-squash Action.Action{..} = flip map (toList _events)
-  (\ev -> AggregateEvent
-    { agOrganization          = T.pack $ evContractOrganization ev
-    , agApplication           = T.pack $ evContractApplication ev
-    , agContractName          = T.pack $ evContractName ev
-    , agContractAccount       = evContractAccount ev
-    , agEventName             = T.pack $ evName ev
-    , agEventArgs             = map (\(x,y) -> (T.pack x, T.pack y)) $ evArgs ev
-    }
-  )
- 

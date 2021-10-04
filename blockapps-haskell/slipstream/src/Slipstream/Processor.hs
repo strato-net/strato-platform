@@ -30,6 +30,7 @@ import qualified Data.Aeson as JSON
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Data.Either (lefts, rights)
+import Data.Foldable (toList)
 import Data.Function
 import Data.Int (Int32)
 import Data.IORef
@@ -57,6 +58,7 @@ import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Action           (Action)
 import qualified Blockchain.Strato.Model.Action as Action
 import Blockchain.Strato.Model.ChainId
+import qualified Blockchain.Strato.Model.Event            as Action
 import Blockchain.Strato.Model.Keccak256
 import Data.Source.Map
 
@@ -293,8 +295,8 @@ parseActions = sortOn withSourceFirst
              . filter matters
              . concatMap (flatten . toAction . BL.fromStrict)
 
-parseEvents :: [B.ByteString] -> [AggregateEvent]
-parseEvents = concatMap (squash . toAction . BL.fromStrict)
+parseEvents :: [B.ByteString] -> [Action.Event]
+parseEvents = concatMap (toList . Action._events . toAction . BL.fromStrict)
 
 processTheMessages :: BlocEnv -> BlocSQLEnv -> PGConnection -> IORef Globals -> [B.ByteString] -> LoggingT IO ()
 processTheMessages env sqlEnv conn g messages = do
