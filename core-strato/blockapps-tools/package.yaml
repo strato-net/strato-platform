@@ -61,6 +61,7 @@ library:
     - time
     - transformers
     - unliftio
+    - vm-tools
 
 executables:
   queryStrato:

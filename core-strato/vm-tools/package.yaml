@@ -28,6 +28,7 @@ library:
     - Blockchain.Data.ExecResults
     - Blockchain.DB.BlockSummaryDB
     - Blockchain.DB.ModifyStateDB
+    - Blockchain.Stream.VMOutput
     - Blockchain.TxRunResultCache
     - Blockchain.VMContext
     - Blockchain.VMOptions
@@ -42,6 +43,7 @@ library:
     - binary
     - blockapps-mpdbs
     - bytestring
+    - conduit
     - cross-monitoring
     - data-default
     - debugger

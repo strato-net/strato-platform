@@ -49,7 +49,7 @@ import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.ExtWord
 import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Stream.VMEvent
+import           Blockchain.Stream.VMOutput
 import           Blockchain.Util
 
 
@@ -137,7 +137,7 @@ initializeGenesisBlock :: ( HasCodeDB m
 initializeGenesisBlock genesisBlockName extraFaucets = do
     $logInfoS "initgen" "Begin of initgen"
     (srcInfo, genesisBlock) <- getGenesisBlockAndPopulateInitialMPs genesisBlockName extraFaucets
-    _ <- produceVMEvents [ChainBlock genesisBlock]
+    _ <- produceVMOutputs [ChainBlock genesisBlock]
     obGB <- liftIO $ bootstrapSequencer genesisBlock
     putGenesisHash $ blockHash genesisBlock
     $logInfoS "initgen" "Initial merkle patricia tries successfully created"

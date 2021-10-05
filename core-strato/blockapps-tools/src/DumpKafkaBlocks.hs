@@ -6,7 +6,7 @@ import           Control.Monad.IO.Class
 import           Network.Kafka.Protocol
 
 import           Blockchain.EthConf
-import           Blockchain.Stream.VMEvent
+import           Blockchain.Stream.VMOutput
 
 import           Text.Format
 
@@ -18,6 +18,6 @@ dumpKafkaBlocks startingBlock = do
     Right _ -> return ()
   where
     doConsume' offset = do
-      vmEvents <- fetchVMEvents offset
+      vmEvents <- fetchVMOutputs offset
       liftIO $ putStrLn $ unlines $ map format vmEvents
       doConsume' (offset + fromIntegral (length vmEvents))

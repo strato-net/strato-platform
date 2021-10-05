@@ -7,19 +7,19 @@
 {-# LANGUAGE TypeFamilies          #-}
 {-# OPTIONS_GHC -fno-warn-orphans       #-}
 
-module Blockchain.Stream.VMEvent (
-  VMEvent(..),
-  produceVMEvents,
-  produceVMEventsM,
-  fetchVMEvents,
-  fetchVMEvents',
-  fetchVMEventsIO,
-  fetchVMEventsOneIO,
-  fetchLastVMEvents,
-  fetchVMEventsFromTopic,
-  defaultVMEventsTopicName,
+module Blockchain.Stream.VMOutput (
+  VMOutput(..),
+  produceVMOutputs,
+  produceVMOutputsM,
+  fetchVMOutputs,
+  fetchVMOutputs',
+  fetchVMOutputsIO,
+  fetchVMOutputsOneIO,
+  fetchLastVMOutputs,
+  fetchVMOutputsFromTopic,
+  defaultVMOutputsTopicName,
   getBestKafkaBlockNumber,
-  HasVMEventsSink(..)
+  HasVMOutputsSink(..)
 ) where
 
 import           Conduit
@@ -46,17 +46,17 @@ import           Text.Format
 
 import qualified Data.Binary                 as Binary
 
-data VMEvent = ChainBlock Block | NewUnminedBlockAvailable
+data VMOutput = ChainBlock Block | NewUnminedBlockAvailable
 
-instance Format VMEvent where
+instance Format VMOutput where
   format (ChainBlock b)           = "Block: " ++ format b
   format NewUnminedBlockAvailable = "<NewUnminedBlockAvailable>"
 
-instance Binary.Binary VMEvent where
+instance Binary.Binary VMOutput where
     get = Binary.getWord8 >>= \case
         0 -> ChainBlock . rlpDecode . rlpDeserialize <$> Binary.get
         1 -> return NewUnminedBlockAvailable
-        b -> error $ "VMEvent has unexpected tag: " ++ show b
+        b -> error $ "VMOutput has unexpected tag: " ++ show b
 
     put NewUnminedBlockAvailable = Binary.putWord8 1
     put (ChainBlock b) = do
@@ -64,28 +64,28 @@ instance Binary.Binary VMEvent where
         Binary.put . rlpSerialize $ rlpEncode b
 
 -- todo: get rid of these next two completely and use Binary.encode/decode in their place everywhere else
-bytesToVMEvent :: B.ByteString -> VMEvent
-bytesToVMEvent = Binary.decode . BL.fromStrict
+bytesToVMOutput :: B.ByteString -> VMOutput
+bytesToVMOutput = Binary.decode . BL.fromStrict
 
-vmEventToBytes :: VMEvent -> B.ByteString
-vmEventToBytes = BL.toStrict . Binary.encode
+vmOutputToBytes :: VMOutput -> B.ByteString
+vmOutputToBytes = BL.toStrict . Binary.encode
 
-class HasVMEventsSink k where
-  getVMEventsSink :: k ([VMEvent] -> k ())
+class HasVMOutputsSink k where
+  getVMOutputsSink :: k ([VMOutput] -> k ())
 
-produceVMEventsM :: (Modifiable KafkaState m, MonadLogger m, MonadIO m) => [VMEvent] -> m Offset
-produceVMEventsM vmEvents = do
+produceVMOutputsM :: (Modifiable KafkaState m, MonadLogger m, MonadIO m) => [VMOutput] -> m Offset
+produceVMOutputsM vmOutputs = do
     x <- withKafkaRetry1s . produceMessages $
-        map (TopicAndMessage (lookupTopic "block") . makeMessage . vmEventToBytes) vmEvents
+        map (TopicAndMessage (lookupTopic "block") . makeMessage . vmOutputToBytes) vmOutputs
 
     let [offset] = concatMap (map (\(_, _, x') ->x') . concatMap snd . _produceResponseFields) x
     return offset
 
--- todo: refactor this to consume produceVMEventsM
-produceVMEvents::(MonadIO m)=>[VMEvent]->m Offset
-produceVMEvents vmEvents = do
+-- todo: refactor this to consume produceVMOutputsM
+produceVMOutputs::(MonadIO m)=>[VMOutput]->m Offset
+produceVMOutputs vmOutputs = do
   result <- liftIO $ runKafkaConfigured "blockapps-data" $
-            produceMessages $ map (TopicAndMessage (lookupTopic "block") . makeMessage . vmEventToBytes) vmEvents
+            produceMessages $ map (TopicAndMessage (lookupTopic "block") . makeMessage . vmOutputToBytes) vmOutputs
 
   case result of
    Left e -> error $ show e
@@ -93,48 +93,48 @@ produceVMEvents vmEvents = do
      let [offset] = concatMap (map (\(_, _, x') ->x') . concatMap snd . _produceResponseFields) x
      return offset
 
--- | Reads VMEvents from `defaultVMEventsTopicName`
-fetchVMEvents :: Kafka k => Offset -> k [VMEvent]
-fetchVMEvents = fetchVMEventsFromTopic defaultVMEventsTopicName
+-- | Reads VMOutputs from `defaultVMOutputsTopicName`
+fetchVMOutputs :: Kafka k => Offset -> k [VMOutput]
+fetchVMOutputs = fetchVMOutputsFromTopic defaultVMOutputsTopicName
 
--- | Same as `fetchVMEvents`, except sets our commonly-used Milena state configurations
-fetchVMEvents' :: Kafka k => Offset -> k [VMEvent]
-fetchVMEvents' ofs = fetchVMEventsFromTopic defaultVMEventsTopicName ofs
+-- | Same as `fetchVMOutputs`, except sets our commonly-used Milena state configurations
+fetchVMOutputs' :: Kafka k => Offset -> k [VMOutput]
+fetchVMOutputs' ofs = fetchVMOutputsFromTopic defaultVMOutputsTopicName ofs
 
-fetchVMEventsFromTopic :: Kafka k => TopicName -> Offset -> k [VMEvent]
-fetchVMEventsFromTopic topic offset = map bytesToVMEvent <$> fetchBytes topic offset
+fetchVMOutputsFromTopic :: Kafka k => TopicName -> Offset -> k [VMOutput]
+fetchVMOutputsFromTopic topic offset = map bytesToVMOutput <$> fetchBytes topic offset
 
-defaultVMEventsTopicName :: TopicName
-defaultVMEventsTopicName = lookupTopic "block"
+defaultVMOutputsTopicName :: TopicName
+defaultVMOutputsTopicName = lookupTopic "block"
 
-fetchVMEventsRange :: Kafka k => Offset -> Offset -> k [VMEvent]
-fetchVMEventsRange lower upper = do
-  events <- fetchVMEvents lower
+fetchVMOutputsRange :: Kafka k => Offset -> Offset -> k [VMOutput]
+fetchVMOutputsRange lower upper = do
+  events <- fetchVMOutputs lower
 
   let returned = length events
       newOffset = lower + fromIntegral returned
   if newOffset >= upper
     then return (take (fromIntegral upper - fromIntegral lower + 1) events)
     else do
-      events' <- fetchVMEventsRange newOffset upper
+      events' <- fetchVMOutputsRange newOffset upper
       return (events ++ events')
 
-fetchVMEventsIO::Offset->IO (Maybe [VMEvent])
-fetchVMEventsIO offset =
-  fmap (map bytesToVMEvent) <$> fetchBytesIO (lookupTopic "block") offset
+fetchVMOutputsIO::Offset->IO (Maybe [VMOutput])
+fetchVMOutputsIO offset =
+  fmap (map bytesToVMOutput) <$> fetchBytesIO (lookupTopic "block") offset
 
-fetchVMEventsOneIO::Offset->IO (Maybe VMEvent)
-fetchVMEventsOneIO offset =
-  fmap bytesToVMEvent <$> fetchBytesOneIO (lookupTopic "block") offset
+fetchVMOutputsOneIO::Offset->IO (Maybe VMOutput)
+fetchVMOutputsOneIO offset =
+  fmap bytesToVMOutput <$> fetchBytesOneIO (lookupTopic "block") offset
 
-fetchLastVMEvents::Offset->IO [VMEvent]
-fetchLastVMEvents n = do
+fetchLastVMOutputs::Offset->IO [VMOutput]
+fetchLastVMOutputs n = do
   ret <-
     runKafkaConfigured "strato-p2p-client" $ do
       lastOffset <- getLastOffset LatestTime 0 (lookupTopic "block")
       when (lastOffset == 0) $ error "Block stream is empty, you need to run strato-setup to insert the genesis block."
       let offset = max (lastOffset - n) 0
-      fetchVMEvents offset
+      fetchVMOutputs offset
 
   case ret of
     Left e  -> error $ show e
@@ -161,13 +161,13 @@ getBestKafkaBlockNumber = do
 
 getBestKafkaBlockHelper::Offset->Offset->IO (Maybe Integer)
 getBestKafkaBlockHelper lower upper = do
-  vmEventsErr <-
-    runKafkaConfigured "strato-p2p-client" $ fetchVMEventsRange lower upper
+  vmOutputsErr <-
+    runKafkaConfigured "strato-p2p-client" $ fetchVMOutputsRange lower upper
 
-  case vmEventsErr of
+  case vmOutputsErr of
     Left e -> error $ show e
-    Right vmEvents -> do
-      let blocks = [ b | ChainBlock b <- vmEvents ]
+    Right vmOutputs -> do
+      let blocks = [ b | ChainBlock b <- vmOutputs ]
       case blocks of
         [] -> return Nothing
         xs -> return . Just $ maximum (map (blockDataNumber . blockBlockData) xs)
