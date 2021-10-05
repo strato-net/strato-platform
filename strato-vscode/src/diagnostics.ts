@@ -12,9 +12,7 @@ let validationCounter: number = 0;
  * @param doc text document to analyze
  * @param emojiDiagnostics diagnostic collection
  */
-export async function refreshDiagnostics(doc: vscode.TextDocument, solidityDiagnostics: vscode.DiagnosticCollection): Promise<void> {
-  console.log('IN REFRESHDIAGNOSTICS');
-  
+export async function refreshDiagnostics(doc: vscode.TextDocument, solidityDiagnostics: vscode.DiagnosticCollection): Promise<void> {  
   if (doc.uri.path.slice(-4) === '.sol') {
     validationCounter = (validationCounter + 1) % 10000;
     const thisCounter = validationCounter;
@@ -22,19 +20,17 @@ export async function refreshDiagnostics(doc: vscode.TextDocument, solidityDiagn
   }
 }
 
-async function findDeadCode(doc: string): Promise<void> {
-  console.log('IN FINDDEADCODE');
-  
+/**
+ * Analyzes the text document for dead code. 
+ * This detector finds all instances of dead code.
+ * @param doc text document to analyze
+ */
+async function findDeadCode(doc: vscode.TextDocument): Promise<Array<Object>> {  
   const user = await getApplicationUser();
   const config = getConfig() || {};
   const options = { config };
-  if(typeof doc == 'string'){
-    console.log('TRUEE', user);
-    
-  }
-  console.log('CALLING DEBUGPOSTPARSE');
-  const contractAST = await rest.debugPostParse(user, doc, options);
-  console.log('HERE IS CONTRACTAST', contractAST);
+
+  const contractAST = await rest.debugPostParse(user, {source: doc.getText()}, options);
   
   let privFuncs = Array();
   let searchFuncs = Array();
@@ -45,10 +41,21 @@ async function findDeadCode(doc: string): Promise<void> {
 
     const contractFunctions = contractAST._contracts[contractName]._functions;                  //Save JSON object containing functions of a contract
 
-    for (let key in contractFunctions) {
+    for (let key in contractFunctions) {      
       searchFuncs.push(contractAST._contracts[contractName]._functions[key].funcContents);    //Save functions from JSON to an array.
       if(contractFunctions[key].funcVisibility != 'Public') {                                 // Distinguish which functions are not Public
-        privFuncs.push(key)
+        privFuncs.push({
+          'funcName': key, 
+          'start': {
+            'line': contractFunctions[key].funcContext.start.line, 
+            'column': contractFunctions[key].funcContext.start.column, 
+            'name': doc.uri.path
+          }, 
+          'end': {
+            'line': contractFunctions[key].funcContext.end.line,
+            'column':  contractFunctions[key].funcContext.end.column,
+            'name': doc.uri.path
+          }});
       }
     }
 
@@ -56,17 +63,13 @@ async function findDeadCode(doc: string): Promise<void> {
     for(let i = 0; i < privFuncs.length; ++i) {
       for(let j = 0; j < searchFuncs.length; ++j) {
         if(searchFuncs[j].length != 0) {
-          // console.log('This array is not empty', searchFuncs[j]);
           for(let k = 0; k < searchFuncs[j].length; ++k) {
-            // console.log('Contents of not empty array', searchFuncs[j][k].contents);
-            // console.log('Contents of Contents', searchFuncs[j][k].contents[0].contents);
             if(searchFuncs[j][k].contents[0].contents.tag === 'FunctionCall') {
+              
               // If the private function is used, it is not dead code. Remove from array.
-              if(searchFuncs[j][k].contents[0].contents.contents[0].contents == privFuncs[i]) {
-                // console.log('State of privFuncs before removing position', i);
-                // console.log(privFuncs);
+              // original if statement is searchFuncs[j][k].contents[0].contents.contents[0].contents
+              if(searchFuncs[j][k].contents[0].contents.contents[1].contents[1] == privFuncs[i].funcName) {
                 privFuncs.splice(i,1);
-                // console.log('AFTER REMOVAL', privFuncs);
               }
             }
           }
@@ -78,23 +81,31 @@ async function findDeadCode(doc: string): Promise<void> {
     if( privFuncs.length != 0) {
       for(let i = 0; i < privFuncs.length; ++i) {
         if (privFuncs.length != 0) {
-          deadFuncs.push({'contract': contractName, 'deadFunction': privFuncs[i]})
+          deadFuncs.push({
+            'annotation': `The function '${privFuncs[i].funcName}' in contract '${contractName}' is never used and should be removed`,
+            'start': {
+              'line': privFuncs[i].start.line,
+              'column': privFuncs[i].start.column,
+              'name': privFuncs[i].start.name
+            },
+            'end': {
+              'line': privFuncs[i].end.line,
+              'column': privFuncs[i].end.column,
+              'name': privFuncs[i].end.name
+            }
+          })
         }
       }
     }
     // Reset arrays for the next contract
-    privFuncs = [];
-    searchFuncs = [];
+    privFuncs = Array();
+    searchFuncs = Array();
   }
-  console.log('List of dead code', deadFuncs);
+  
+  return deadFuncs;
 }
 
 async function validate(counter: number, doc: vscode.TextDocument, solidityDiagnostics: vscode.DiagnosticCollection): Promise<void> {
-  console.log('IN VALIDATE');
-  console.log('Here is validationCounter', validationCounter);
-  console.log('Here is counter', counter);
-  
-  
   if (validationCounter === counter) {
     try {
       const diagnostics: vscode.Diagnostic[] = [];
@@ -102,14 +113,18 @@ async function validate(counter: number, doc: vscode.TextDocument, solidityDiagn
       const user = await getApplicationUser();
       const config = getConfig() || {};
       const options = { config };
-      console.log('HERE IS REST', rest);
-      
 
-      console.log('HERE IS DOC.GETTEXT', doc.getText() );
-      findDeadCode(doc.getText());
+      // Run dead code detector
+      const deadCodeArr = await findDeadCode(doc);
+      
       
       const annotations = await rest.debugPostAnalyze(user, [[doc.uri.path, doc.getText()]], options);
-      console.log('Here are annotations', annotations);
+
+      // Push dead code detector annotations in
+      for(let i = 0; i < deadCodeArr.length; ++i) {
+        annotations.push(deadCodeArr[i]);
+      }
+
       
 
       for (let ann in annotations) {
@@ -123,9 +138,7 @@ async function validate(counter: number, doc: vscode.TextDocument, solidityDiagn
   }
 }
 
-function createDiagnostic(doc: vscode.TextDocument, ann: any): vscode.Diagnostic {
-  console.log('IN CREATEDIAGNOSTIC');
-  
+function createDiagnostic(doc: vscode.TextDocument, ann: any): vscode.Diagnostic {  
   const { start, end } = ann;
 
   // create range that represents, where in the document the word is
@@ -137,9 +150,7 @@ function createDiagnostic(doc: vscode.TextDocument, ann: any): vscode.Diagnostic
   return diagnostic;
 }
 
-export async function subscribeToDocumentChanges(context: vscode.ExtensionContext, solidityDiagnostics: vscode.DiagnosticCollection): Promise<void> {
-  console.log('IN SUBSCRIBETODOCUMENTCHANGES');
-  
+export async function subscribeToDocumentChanges(context: vscode.ExtensionContext, solidityDiagnostics: vscode.DiagnosticCollection): Promise<void> {  
   if (vscode.window.activeTextEditor) {
     await refreshDiagnostics(vscode.window.activeTextEditor.document, solidityDiagnostics);
   }
