@@ -28,6 +28,7 @@ library:
     - Blockchain.Data.ExecResults
     - Blockchain.DB.BlockSummaryDB
     - Blockchain.DB.ModifyStateDB
+    - Blockchain.Stream.VMEvent
     - Blockchain.Stream.VMOutput
     - Blockchain.TxRunResultCache
     - Blockchain.VMContext

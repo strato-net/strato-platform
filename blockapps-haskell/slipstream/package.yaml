@@ -60,6 +60,7 @@ library:
     - unliftio
     - unliftio-core
     - unordered-containers
+    - vm-tools
 
 executables:
   slipstream:

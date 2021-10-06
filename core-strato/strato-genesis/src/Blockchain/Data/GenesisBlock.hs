@@ -46,15 +46,14 @@ import qualified Blockchain.DB.MemAddressStateDB      as Mem
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
-import           Blockchain.EthConf                   (runKafkaConfigured)
 import           Blockchain.ExtWord
 import           Blockchain.Output
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Stream.VMEvent
 
 import           Blockchain.Strato.StateDiff          hiding (StateDiff (chainId, blockHash, stateRoot))
 import qualified Blockchain.Strato.StateDiff          as StateDiff (StateDiff (chainId, blockHash, stateRoot))
 import           Blockchain.Strato.StateDiff.Database
-import           Blockchain.Strato.StateDiff.Kafka    (writeActionJSONToKafka, filterResponse)
 
 import           Blockchain.Strato.Model.Account
 import qualified Blockchain.Strato.Model.Address      as Ad
@@ -330,8 +329,5 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) = do
       fromDiff (Value v) = v
       squashMap f = traverse (uncurry f) . Map.toList
   actions <- squashMap toAction accountDiffs
-  mErr <- liftIO . runKafkaConfigured "strato-genesis" $ writeActionJSONToKafka actions
-  case filterResponse <$> mErr of
-    Right [] -> return ()
-    Right errs -> error . show $ errs
-    Left err -> error . show $ err
+  _ <- produceVMEvents $ map NewAction actions
+  return ()

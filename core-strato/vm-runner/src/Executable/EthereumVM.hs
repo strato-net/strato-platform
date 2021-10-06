@@ -59,6 +59,7 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Kafka
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Stream.UnminedBlock        (produceUnminedBlocksM)
+import           Blockchain.Stream.VMEvent
 import           Blockchain.VMContext
 import           Blockchain.VMMetrics
 import           Blockchain.VMOptions
@@ -82,7 +83,6 @@ import           Blockchain.Strato.Model.Action        (Action)
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.StateDiff.Database  (commitSqlDiffs)
-import           Blockchain.Strato.StateDiff.Kafka     (writeActionJSONToKafka)
 import           Blockchain.Timing
 import           Blockchain.Util
 
@@ -455,9 +455,9 @@ logEventSummaries events = do
 
 sendOutEvents :: VmOutEventBatch -> ContextM ()
 sendOutEvents OutBatch{..} = do
-  loopTimeit "writeActionJSONToKafka" $
-    void . K.withKafkaRetry1s . writeActionJSONToKafka $
-      toList outActions
+  _ <- loopTimeit "productVMEvents" $
+         produceVMEvents $ map NewAction $ toList outActions
+      
   loopTimeit "produceUnminedBlocksM" $
     void . K.withKafkaRetry1s . produceUnminedBlocksM $
       outputBlockToBlock <$> toList outBlocks

@@ -218,6 +218,7 @@ services:
     - isAdmin=${isAdmin:-false}
     - isRootNode=${isRootNode:-false}
     - kafkaHost=kafka
+    - kafkaPort=9092
     - lazyBlocks=${lazyBlocks}
     - maxConn=${maxConn}
     - maxReturnedHeaders=${maxReturnedHeaders}
@@ -231,6 +232,8 @@ services:
     - numMinPeers=${numMinPeers}
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
+    - postgres_port=5432
+    - postgres_slipstream_db=cirrus
     - postgres_user=postgres
     - privateChainAuthorizationMode=${privateChainAuthorizationMode}
     - PROCESS_MONITORING=${PROCESS_MONITORING}
@@ -245,6 +248,7 @@ services:
     - seqRTSOPTs=${seqRTSOPTs}
     - splitinit=true
     - START_EXPERIMENTAL_STRATO_API=${START_EXPERIMENTAL_STRATO_API}
+    - stratoHost=strato:3000
     - svmTrace=${svmTrace}
     - sqlDiff=${sqlDiff}
     - svmDev=${svmDev}

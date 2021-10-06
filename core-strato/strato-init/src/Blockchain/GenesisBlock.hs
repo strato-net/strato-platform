@@ -49,6 +49,7 @@ import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.ExtWord
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Stream.VMEvent
 import           Blockchain.Stream.VMOutput
 import           Blockchain.Util
 
@@ -56,7 +57,7 @@ import           Blockchain.Util
 import           Blockchain.Strato.StateDiff          hiding (StateDiff (chainId, blockHash, stateRoot))
 import qualified Blockchain.Strato.StateDiff          as StateDiff (StateDiff (chainId, blockHash, stateRoot))
 import           Blockchain.Strato.StateDiff.Database
-import           Blockchain.Strato.StateDiff.Kafka    (assertTopicCreation, writeActionJSONToKafka, filterResponse)
+import           Blockchain.Strato.StateDiff.Kafka    (assertTopicCreation)
 
 import           Blockchain.MilenaTools               (commitSingleOffset)
 import           Blockchain.Sequencer.Bootstrap       (bootstrapSequencer)
@@ -247,11 +248,8 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
 
       commitSqlDiffs (statediff fullAccountDiffs)
 
-      mErr <- liftIO . runKafkaConfigured "strato-init" $ writeActionJSONToKafka filteredActions
-      case filterResponse <$> mErr of
-       Right [] -> return ()
-       Right errs -> error . show $ errs
-       Left err -> error . show $ err
+      _ <- produceVMEvents $ map NewAction filteredActions
+      return ()
 
 bootstrapIndexer :: OutputBlock -> IO ()
 bootstrapIndexer obGB =

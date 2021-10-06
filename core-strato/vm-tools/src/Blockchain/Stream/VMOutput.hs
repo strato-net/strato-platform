@@ -12,12 +12,12 @@ module Blockchain.Stream.VMOutput (
   produceVMOutputs,
   produceVMOutputsM,
   fetchVMOutputs,
-  fetchVMOutputs',
-  fetchVMOutputsIO,
-  fetchVMOutputsOneIO,
+--  fetchVMOutputs',
+--  fetchVMOutputsIO,
+--  fetchVMOutputsOneIO,
   fetchLastVMOutputs,
-  fetchVMOutputsFromTopic,
-  defaultVMOutputsTopicName,
+--  fetchVMOutputsFromTopic,
+--  defaultVMOutputsTopicName,
   getBestKafkaBlockNumber,
   HasVMOutputsSink(..)
 ) where
@@ -97,9 +97,11 @@ produceVMOutputs vmOutputs = do
 fetchVMOutputs :: Kafka k => Offset -> k [VMOutput]
 fetchVMOutputs = fetchVMOutputsFromTopic defaultVMOutputsTopicName
 
+{-
 -- | Same as `fetchVMOutputs`, except sets our commonly-used Milena state configurations
 fetchVMOutputs' :: Kafka k => Offset -> k [VMOutput]
 fetchVMOutputs' ofs = fetchVMOutputsFromTopic defaultVMOutputsTopicName ofs
+-}
 
 fetchVMOutputsFromTopic :: Kafka k => TopicName -> Offset -> k [VMOutput]
 fetchVMOutputsFromTopic topic offset = map bytesToVMOutput <$> fetchBytes topic offset
@@ -119,6 +121,7 @@ fetchVMOutputsRange lower upper = do
       events' <- fetchVMOutputsRange newOffset upper
       return (events ++ events')
 
+{-
 fetchVMOutputsIO::Offset->IO (Maybe [VMOutput])
 fetchVMOutputsIO offset =
   fmap (map bytesToVMOutput) <$> fetchBytesIO (lookupTopic "block") offset
@@ -126,6 +129,7 @@ fetchVMOutputsIO offset =
 fetchVMOutputsOneIO::Offset->IO (Maybe VMOutput)
 fetchVMOutputsOneIO offset =
   fmap bytesToVMOutput <$> fetchBytesOneIO (lookupTopic "block") offset
+-}
 
 fetchLastVMOutputs::Offset->IO [VMOutput]
 fetchLastVMOutputs n = do

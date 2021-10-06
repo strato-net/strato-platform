@@ -146,17 +146,6 @@ fi
     
 echo "Bloc is up - running slipstream now..."
 
-SLIPSTREAM_CMD="slipstream --pghost=${postgres_host} --pgport=${postgres_port} \
-  --pguser=${postgres_user} --password=${postgres_password} --database=${postgres_slipstream_db} \
-  --stratourl=${stratoRoot} --vaultwrapperurl=${vaultWrapperRoot}  \
-  --kafkahost=${kafkaHost} --kafkaport=${kafkaPort} --minLogLevel=${slipMinLogLevel}"
-
-if [ ${SLIPSTREAM_OPTIONAL:-true} = true ]; then
-  $SLIPSTREAM_CMD &>> /logs/slipstream &
-else
-  runBackgroundProcess $SLIPSTREAM_CMD &>> /logs/slipstream
-fi
-
 echo "Configuring log rotation..."
 runBackgroundProcess logRotation
 

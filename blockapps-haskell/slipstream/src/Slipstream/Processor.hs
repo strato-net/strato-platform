@@ -26,9 +26,6 @@ import Control.Monad.Except
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Strict hiding (state)
-import qualified Data.Aeson as JSON
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as BL
 import Data.Either (lefts, rights)
 import Data.Foldable (toList)
 import Data.Function
@@ -55,11 +52,11 @@ import qualified BlockApps.SolidVMStorageDecoder as SolidVM
 
 import Blockchain.Data.AddressStateDB
 import Blockchain.Strato.Model.Account
-import Blockchain.Strato.Model.Action           (Action)
 import qualified Blockchain.Strato.Model.Action as Action
 import Blockchain.Strato.Model.ChainId
 import qualified Blockchain.Strato.Model.Event            as Action
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Stream.VMEvent
 import Data.Source.Map
 
 import Control.Monad.Change.Modify              hiding (modify)
@@ -87,12 +84,6 @@ data BatchedInserts = BatchedInserts
   , historyInserts  :: [ProcessedContract]
   , eventCreations  :: [EventTable]
   } deriving (Show)
-
-toAction :: BL.ByteString -> Action
-toAction x =
- case JSON.eitherDecode x of
-  Left e -> error $ show e
-  Right y -> y
 
 enterBloc2 :: BlocEnv -> BlocSQLEnv -> ReaderT BlocEnv (BlocSQLM (LoggingT IO)) x -> LoggingT IO x
 enterBloc2 blocEnv sqlEnv f =
@@ -289,16 +280,17 @@ createEvents details org app = do
 withSourceFirst :: (a, [AggregateAction]) -> Down Bool
 withSourceFirst = Down . any (Map.member "src" . actionMetadata) . snd
 
-parseActions :: [B.ByteString] -> [(Account, [AggregateAction])]
-parseActions = sortOn withSourceFirst
-             . splitActions
-             . filter matters
-             . concatMap (flatten . toAction . BL.fromStrict)
+parseActions :: [VMEvent] -> [(Account, [AggregateAction])]
+parseActions events =
+  sortOn withSourceFirst
+  . splitActions
+  . filter matters
+  . concatMap (flatten) $ [a | NewAction a <- events]
 
-parseEvents :: [B.ByteString] -> [Action.Event]
-parseEvents = concatMap (toList . Action._events . toAction . BL.fromStrict)
+parseEvents :: [VMEvent] -> [Action.Event]
+parseEvents events = concatMap (toList . Action._events) [a | NewAction a <- events]
 
-processTheMessages :: BlocEnv -> BlocSQLEnv -> PGConnection -> IORef Globals -> [B.ByteString] -> LoggingT IO ()
+processTheMessages :: BlocEnv -> BlocSQLEnv -> PGConnection -> IORef Globals -> [VMEvent] -> LoggingT IO ()
 processTheMessages env sqlEnv conn g messages = do
 
   let changes = parseActions messages
