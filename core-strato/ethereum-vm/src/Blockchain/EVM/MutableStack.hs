@@ -66,7 +66,7 @@ pop (MutableStack spref p) = do
 dup :: MutableStack a -> Int -> IO Bool
 dup (MutableStack spref p) k = do
   off <- readIORefU spref
-  if off + k >= stackMax || k > 15 || k < 0
+  if off == 0 || off + k >= stackMax || k > 15 || k < 0
     then return False
     else do
       n <- V.read p (off + k)
