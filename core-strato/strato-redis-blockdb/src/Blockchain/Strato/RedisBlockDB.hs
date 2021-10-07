@@ -7,6 +7,7 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE RecordWildCards       #-}
 {-# OPTIONS -fno-warn-orphans #-}
 
 module Blockchain.Strato.RedisBlockDB
@@ -33,6 +34,7 @@ module Blockchain.Strato.RedisBlockDB
     , commonAncestorHelper
     , getWorldBestBlockInfo, updateWorldBestBlockInfo
     , acquireRedlock, releaseRedlock, defaultRedlockTTL
+    , getSyncStatus, putSyncStatus
     ) where
 
 import           Blockchain.Data.ChainInfo
@@ -675,7 +677,29 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
 -- | Used to seed the first bestBlock, e.g. genesis block in strato-setup
 forceBestBlockInfo :: RedisCtx m f => Keccak256 -> Integer -> Integer -> m (f Status)
 forceBestBlockInfo sha i j = do
-        forceBestBlockInfo' bestBlockInfoKey (RedisBestBlock sha i j) --`totalRecall` (,,)
+    status <- liftRedis getSyncStatus
+    wbb <- liftRedis getWorldBestBlockInfo
+    case (status, wbb) of
+        (Just False, Just RedisBestBlock{..}) -> if j >= bestBlockTotalDifficulty
+                                                    then do _ <- liftRedis $ putSyncStatus True
+                                                            pure ()
+                                                    else pure ()
+        _                                     -> pure ()
+    forceBestBlockInfo' bestBlockInfoKey (RedisBestBlock sha i j) --`totalRecall` (,,)
+
+forceWorldBestBlockInfo :: RedisCtx m f => Keccak256 -> Integer -> Integer -> m (f Status)
+forceWorldBestBlockInfo sha i j = do
+    status <- liftRedis getSyncStatus
+    bb <- liftRedis getBestBlockInfo
+    case (status, bb) of
+        (Nothing, Just RedisBestBlock{..}) -> if bestBlockTotalDifficulty < j
+                                                 then do _ <- liftRedis $ putSyncStatus False
+                                                         pure ()
+                                                 else pure ()
+        (Nothing, Nothing) -> do _ <- liftRedis $ putSyncStatus False
+                                 pure ()
+        _ -> pure ()
+    forceBestBlockInfo' worldBestBlockKey (RedisBestBlock sha i j)
 
 forceBestBlockInfo' :: RedisCtx m f => S8.ByteString -> RedisBestBlock -> m (f Status)
 forceBestBlockInfo' key = set key . toValue
@@ -760,7 +784,7 @@ updateWorldBestBlockInfo sha num tdiff = withRetryCount 0
                       case maybeExistingWBBI of
                           Nothing -> do
                               liftLog $ $logWarnS "updateWorldBestBlockInfo" "No WorldBestBlock in Redis, will force"
-                              void $ forceBestBlockInfo' worldBestBlockKey (RedisBestBlock sha num tdiff)
+                              void $ forceWorldBestBlockInfo sha num tdiff
                               releaseAndFinalize lockID True
                           Just (RedisBestBlock _ _ oldTDiff) -> do
                               liftLog $ $logDebugS "updateWorldBestBlockInfo" $ T.pack ( "oldTDiff = " ++ show oldTDiff ++ "; newTDiff = " ++ show tdiff)
@@ -768,7 +792,7 @@ updateWorldBestBlockInfo sha num tdiff = withRetryCount 0
                               if willUpdate
                                   then do
                                       liftLog $ $logDebugS "updateWorldBestBlockInfo" . T.pack $ "Updating best block: " ++ show num
-                                      void $ forceBestBlockInfo' worldBestBlockKey (RedisBestBlock sha num tdiff)
+                                      void $ forceWorldBestBlockInfo sha num tdiff
                                   else
                                       liftLog $ $logDebugS "updateWorldBestBlockInfo" "Not updating"
                               releaseAndFinalize lockID willUpdate
@@ -778,3 +802,20 @@ updateWorldBestBlockInfo sha num tdiff = withRetryCount 0
                             Right True  -> Right didUpdate
                             Right False -> Left $ SingleLine "Couldn't release redlock, it either expired or we had the wrong key"
                             err         -> err
+
+syncStatusKey :: S8.ByteString
+syncStatusKey = "<sync_status>"
+{-# INLINE syncStatusKey #-}
+
+getSyncStatus :: Redis (Maybe Bool)
+getSyncStatus = get syncStatusKey >>= \case
+    Left e  -> do liftLog $ $logWarnS "getSyncStatus" . T.pack $ show e
+                  pure Nothing     -- is this the problem?
+    Right Nothing -> do liftLog $ $logWarnS "getSyncStatus" . T.pack $ "the sync status is Nothing"
+                        pure Nothing
+    Right (Just bs) -> do liftLog $ $logWarnS "getSyncStatus" . T.pack $ "the sync status is '" ++ show bs ++ "'"
+                          pure $ Just $ (fromValue bs :: Bool)
+
+putSyncStatus :: RedisCtx m f => Bool -> m (f Status)
+putSyncStatus status = do
+    set syncStatusKey $ toValue status

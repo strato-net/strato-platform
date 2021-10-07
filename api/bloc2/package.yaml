@@ -44,6 +44,7 @@ library:
     - filepath
     - format
     - hashable
+    - hedis
     - hflags
     - http-client
     - http-types
@@ -70,7 +71,9 @@ library:
     - servant-swagger
     - sql-monad
     - stm-conduit
+    - strato-conf
     - strato-model
+    - strato-redis-blockdb
     - swagger2
     - temporary
     - time
