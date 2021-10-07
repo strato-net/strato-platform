@@ -15,6 +15,7 @@ module Debugger.Rest.Api
 
 import           Data.Aeson      as A
 import qualified Data.Map.Strict as M
+import           Data.Source
 import qualified Data.Text       as T
 import           Debugger.Types
 import           Servant
@@ -36,6 +37,7 @@ type RestDebuggerAPI = GetStatus
                   :<|> DeleteWatches
                   :<|> PostEvals
                   :<|> PostParse
+                  :<|> PostAnalyze
 
 type GetStatus = "status" :> Get '[JSON] DebuggerStatus
 type PutPause = "pause" :> Put '[JSON] DebuggerStatus
@@ -47,13 +49,14 @@ type DeleteBreakpointsPath = "breakpoints" :> Capture "file" T.Text :> Delete '[
 type PostStepIn = "step-in" :> Post '[JSON] DebuggerStatus
 type PostStepOver = "step-over" :> Post '[JSON] DebuggerStatus
 type PostStepOut = "step-out" :> Post '[JSON] DebuggerStatus
-type GetStackTrace = "stack-trace" :> Get '[JSON] [SourcePos]
+type GetStackTrace = "stack-trace" :> Get '[JSON] [SourcePosition]
 type GetVariables = "variables" :> Get '[JSON] (M.Map T.Text (M.Map T.Text EvaluationResponse))
 type GetWatches = "watches" :> Get '[JSON] (M.Map EvaluationRequest EvaluationResponse)
 type PutWatches = "watches" :> ReqBody '[JSON] [EvaluationRequest] :> Put '[JSON] DebuggerStatus
 type DeleteWatches = "watches" :> ReqBody '[JSON] [EvaluationRequest] :> Delete '[JSON] DebuggerStatus
 type PostEvals = "eval" :> ReqBody '[JSON] [EvaluationRequest] :> Post '[JSON] [EvaluationResponse]
-type PostParse = "parse" :> ReqBody '[JSON] (M.Map T.Text T.Text) :> Post '[JSON] A.Value
+type PostParse = "parse" :> ReqBody '[JSON] SourceMap :> Post '[JSON] A.Value
+type PostAnalyze = "analyze" :> ReqBody '[JSON] SourceMap :> Post '[JSON] [SourceAnnotation T.Text]
 
 restDebuggerAPI :: Proxy RestDebuggerAPI
 restDebuggerAPI = Proxy

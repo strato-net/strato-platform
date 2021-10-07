@@ -15,11 +15,13 @@ import           Control.Monad.IO.Class
 import           Data.Aeson             as A
 import qualified Data.Map.Strict        as M
 import           Data.Maybe             (fromMaybe)
+import           Data.Source
 import qualified Data.Text              as T
 import           Debugger.Rest.Api
 import           Debugger.Server
 import           Debugger.Types
 import           Servant
+import           Text.Parsec.Error
 
 getStatus :: DebugSettings -> Handler DebuggerStatus
 getStatus = status
@@ -51,7 +53,7 @@ postStepOver = stepOver
 postStepOut :: DebugSettings -> Handler DebuggerStatus
 postStepOut = stepOut
 
-getStackTrace :: DebugSettings -> Handler [SourcePos]
+getStackTrace :: DebugSettings -> Handler [SourcePosition]
 getStackTrace = status >=> \case
   Paused DebugState{..} -> pure debugStateCallStack
   _ -> pure []
@@ -75,17 +77,35 @@ deleteWatches = flip removeWatches
 postEvals :: DebugSettings -> [EvaluationRequest] -> Handler [EvaluationResponse]
 postEvals d ts = fmap (fromMaybe $ Left "") <$> liftIO (evaluateExpressions ts d)
 
+parseErrorToAnnotation :: ParseError -> SourceAnnotation T.Text
+parseErrorToAnnotation pe =
+  let msgs = errorMessages pe
+      sp = toSourcePosition $ errorPos pe
+      ann = showErrorMessages
+        "or"
+        "unknown parse error"
+        "expecting"
+        "unexpected"
+        "end of input"
+        msgs
+   in SourceAnnotation sp sp $ T.pack ann
+
 postParse :: ToJSON a
-          => (M.Map T.Text T.Text -> a)
-          -> M.Map T.Text T.Text
+          => (SourceMap -> Either ParseError a)
+          -> SourceMap
           -> Handler A.Value
-postParse parse = pure . toJSON . parse
+postParse parse = pure . either (toJSON . parseErrorToAnnotation) toJSON . parse
+
+postAnalyze :: (SourceMap -> Either ParseError [SourceAnnotation T.Text])
+            -> SourceMap
+            -> Handler [SourceAnnotation T.Text]
+postAnalyze analyze = pure . either ((:[]) . parseErrorToAnnotation) id . analyze
 
 restDebuggerServer :: ToJSON a
                    => DebugSettings
-                   -> (M.Map T.Text T.Text -> a)
+                   -> SourceTools a
                    -> Server RestDebuggerAPI
-restDebuggerServer dSettings parse =
+restDebuggerServer dSettings tools =
        getStatus dSettings
   :<|> putPause dSettings
   :<|> putResume dSettings
@@ -102,10 +122,11 @@ restDebuggerServer dSettings parse =
   :<|> putWatches dSettings
   :<|> deleteWatches dSettings
   :<|> postEvals dSettings
-  :<|> postParse parse
+  :<|> postParse (parser tools)
+  :<|> postAnalyze (analyzer tools)
 
 restDebugger :: ToJSON a
              => DebugSettings
-             -> (M.Map T.Text T.Text -> a)
+             -> SourceTools a
              -> Application
-restDebugger dSettings parse = serve restDebuggerAPI (restDebuggerServer dSettings parse)
+restDebugger dSettings tools = serve restDebuggerAPI (restDebuggerServer dSettings tools)

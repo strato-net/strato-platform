@@ -6,6 +6,7 @@ import {
   get,
   put,
   post,
+  postRaw,
   postue,
   httpDelete,
   getNodeUrl,
@@ -453,13 +454,19 @@ async function debugClearWatches(user:OAuthUser, options:Options) {
 async function debugPostEval(user:OAuthUser, args, options:Options) {
   const url = getNodeUrl(options);
   const endpoint = constructEndpoint(Endpoint.DEBUG_EVAL, options);
-  return post(url, endpoint, args, setAuthHeaders(user, options));
+  return postRaw(url, endpoint, args, setAuthHeaders(user, options));
 }
 
 async function debugPostParse(user:OAuthUser, args, options:Options) {
   const url = getNodeUrl(options);
   const endpoint = constructEndpoint(Endpoint.DEBUG_PARSE, options);
-  return post(url, endpoint, args, setAuthHeaders(user, options));
+  return postRaw(url, endpoint, args, setAuthHeaders(user, options));
+}
+
+async function debugPostAnalyze(user:OAuthUser, args, options:Options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.DEBUG_ANALYZE, options);
+  return postRaw(url, endpoint, args, setAuthHeaders(user, options));
 }
 
 export default {
@@ -514,4 +521,5 @@ export default {
   debugClearWatches,
   debugPostEval,
   debugPostParse,
+  debugPostAnalyze,
 };

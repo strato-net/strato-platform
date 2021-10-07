@@ -48,6 +48,8 @@ data ApiError
   | UnavailableError Text
   | InternalError Text
   | NotYetSynced Integer Integer String
+  | VMError Text
+  | Timeout Text
   deriving (Show, Exception)
 
 apiErrorToServantErr :: ApiError -> SERVANT.ServerError
@@ -162,7 +164,8 @@ apiErrorToServantErr = \case
                     concat [ "Progress: ", show n, " / ", show d ],
                     s
                   ]}
-
+  VMError err -> err422{errBody = JSON.encode err}
+  Timeout err -> err504{errBody = JSON.encode err}
 
 
 

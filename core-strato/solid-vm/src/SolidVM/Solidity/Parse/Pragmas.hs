@@ -6,6 +6,7 @@
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 module SolidVM.Solidity.Parse.Pragmas (solidityPragma) where
 
+import           Data.Source
 import           Text.Parsec
 
 import           SolidVM.Solidity.Parse.Declarations
@@ -15,8 +16,10 @@ import           SolidVM.Solidity.Parse.ParserTypes
 
 solidityPragma :: SolidityParser SourceUnit
 solidityPragma = do
-  reserved "pragma"
-  pragmaName <- identifier
-  rest <- many1 (noneOf ";")
-  semi
-  return $ Pragma pragmaName rest
+  ~(a, (pragmaName, rest)) <- withPosition $ do
+    reserved "pragma"
+    pragmaName <- identifier
+    rest <- many1 (noneOf ";")
+    semi
+    pure (pragmaName, rest)
+  return $ Pragma a pragmaName rest

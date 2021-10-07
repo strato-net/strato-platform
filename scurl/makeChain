@@ -1,0 +1,16 @@
+#!/bin/bash
+
+set -e
+
+apibase="http://localhost"
+#apibase="http://localhost/experimental"
+
+vaultbase="http://localhost"
+
+
+#address=`./scurl -X POST "$vaultbase/strato/v2.3/key" | jq ".address"`
+
+#echo "address = $address"
+
+./scurl -d'{"label": "abcd", "balances": [{"address": "0123456789abcdef0123456789abcdefabcdabcd", "balance": 1}], "args": {}, "members": [{"address": "0123456789abcdef0123456789abcdefabcdabcd", "enode": "enode://6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@171.16.0.4:30303"}]}' -X POST "$apibase/bloc/v2.2/chain?resolve" -i
+

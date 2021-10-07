@@ -63,6 +63,7 @@ import qualified Data.Map as M
 import           Data.Maybe
 import qualified Data.NibbleString as N
 import qualified Data.Sequence as Q
+import           Data.Source
 import qualified Data.Text as T
 import           Data.Text.Encoding(encodeUtf8,decodeUtf8)
 import           Debugger
@@ -108,7 +109,7 @@ data CallInfo = CallInfo
   , collectionHash      :: Keccak256
   , localVariables      :: Map String (Xabi.Type, Variable)
   , readOnly            :: Bool
-  , currentSourcePos    :: Maybe Xabi.SourcePos
+  , currentSourcePos    :: Maybe SourcePosition
   } deriving (Show)
 
 {-
@@ -390,7 +391,7 @@ getVariableOfName name = do
         let ctract = currentContract currentCallInfo
         Xabi.ConstantDecl{..} <- M.lookup name $ ctract ^. constants
         return $ coerceType ctract constType $ case constInitialVal of
-                                            Xabi.NumberLiteral x _ -> SInteger x
+                                            Xabi.NumberLiteral _ x _ -> SInteger x
                                             x -> todo "constant initial val" x
 
       maybeStructDef :: Maybe Variable
@@ -448,8 +449,8 @@ getTypeOfName' :: String -> CodeCollection -> Typo
 getTypeOfName' s (CodeCollection ccs) =
   let lookInContract :: Contract -> [Typo]
       lookInContract (Contract{..}) = catMaybes
-        [ fmap StructTypo (M.lookup s _structs)
-        , fmap EnumTypo (M.lookup s _enums)
+        [ fmap StructTypo (fmap (\(a,b,_) -> (a,b)) <$> M.lookup s _structs)
+        , fmap EnumTypo (fst <$> M.lookup s _enums)
         ]
       ctrs = map ContractTypo $ M.keys ccs
    in case concatMap lookInContract ccs ++ ctrs of

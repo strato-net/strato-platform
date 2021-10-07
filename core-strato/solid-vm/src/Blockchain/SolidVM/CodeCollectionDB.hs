@@ -1,6 +1,9 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 module Blockchain.SolidVM.CodeCollectionDB
-  ( compileSource
+  ( parseSource
+  , compileSourceNoInheritance
+  , compileSource
   , codeCollectionFromSource
   , codeCollectionFromHash
   ) where
@@ -10,13 +13,16 @@ import           Control.Monad.IO.Class
 import qualified Data.Aeson                           as Aeson
 import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Lazy                 as BL
+import           Data.Foldable                        (foldrM)
 import           Data.IORef
 import           Data.Map                             (Map)
 import qualified Data.Map                             as M
+import           Data.Source
 import qualified Data.Text                            as T
 import           Data.Text.Encoding                   (decodeUtf8, encodeUtf8)
 import           System.IO.Unsafe
 import           Text.Parsec                          (runParser)
+import           Text.Parsec.Error
 
 import           Blockchain.DB.CodeDB
 import           Blockchain.SolidVM.Exception         hiding (assert)
@@ -32,19 +38,31 @@ import           CodeCollection
 unsafeCodeMapIORef :: IORef (Map Keccak256 CodeCollection)
 unsafeCodeMapIORef = unsafePerformIO $ newIORef M.empty
 
-compileSource :: Map T.Text T.Text -> CodeCollection
-compileSource initCodeMap =
-  let getNamedContracts fileName src =
-        let maybeFile = runParser solidityFile "" (T.unpack fileName) $ T.unpack src
-            file = either (parseError "compileSource") id maybeFile
-            vmVersion' = if (Pragma "solidvm" "3.0") `elem` (unsourceUnits file) then "svm3.0" else ""
-         in [(T.unpack name, xabiToContract (T.unpack name) (map T.unpack parents') vmVersion' xabi)
-            | NamedXabi name (xabi, parents') <- unsourceUnits file]
-      allContracts = concat . map (uncurry getNamedContracts) $ M.toList initCodeMap
-   in applyInheritance
-        $ CodeCollection {
-            _contracts=M.fromList allContracts
-          }
+parseSource :: T.Text -> T.Text -> Either ParseError [SourceUnit]
+parseSource fileName src = unsourceUnits <$> runParser solidityFile "" (T.unpack fileName) (T.unpack src)
+
+compileSourceNoInheritance :: Map T.Text T.Text -> Either ParseError CodeCollection
+compileSourceNoInheritance initCodeMap = do
+  let getNamedContracts fileName src = do
+        sourceUnits <- parseSource fileName src
+        let pragmas = \case
+              Pragma _ n v -> Just (n, v)
+              _ -> Nothing
+            vmVersion' = if Just ("solidvm", "3.0") `elem` (pragmas <$> sourceUnits) then "svm3.0" else ""
+        pure [(T.unpack name, xabiToContract (T.unpack name) (map T.unpack parents') vmVersion' xabi)
+             | NamedXabi name (xabi, parents') <- sourceUnits]
+      throwDuplicate (cName, contract) m = case M.lookup cName m of
+        Nothing -> pure $ M.insert cName contract m
+        Just _ ->  Left $ newErrorMessage (Message $ "Duplicate contract found: " ++ cName)
+                                          (fromSourcePosition $ _sourceAnnotationStart $ _contractContext contract)
+  allContracts <- fmap concat . traverse (uncurry getNamedContracts) $ M.toList initCodeMap
+  deduplicatedContracts <- foldrM throwDuplicate M.empty allContracts
+  pure $ CodeCollection {
+    _contracts = deduplicatedContracts
+  }
+
+compileSource :: Map T.Text T.Text -> Either ParseError CodeCollection
+compileSource = fmap applyInheritance . compileSourceNoInheritance
 
 codeCollectionFromSource :: (MonadIO m, HasCodeDB m) => B.ByteString -> m (Keccak256, CodeCollection)
 codeCollectionFromSource initCode = do
@@ -66,7 +84,8 @@ codeCollectionFromSource initCode = do
     Nothing -> do
       recordCacheEvent StorageWrite
       hsh' <- addCode SolidVM canonicalInitCode
-      let cc = compileSource initMap
+      let ecc = compileSource initMap
+          cc = either (parseError "codeCollectionFromSource") id ecc
       let codeMap' = M.insert hsh cc codeMap
       recordCacheSize $ M.size codeMap'
       liftIO $ writeIORef unsafeCodeMapIORef codeMap'
@@ -87,7 +106,8 @@ codeCollectionFromHash hsh = do
           let initMap = case Aeson.decode $ BL.fromStrict initCode of
                   Just l -> M.fromList l
                   Nothing -> M.singleton T.empty (decodeUtf8 initCode)
-          let cc = compileSource initMap
+          let ecc = compileSource initMap
+              cc = either (parseError "codeCollectionFromHash") id ecc
               codeMap' = M.insert hsh cc codeMap
           recordCacheSize $ M.size codeMap'
           liftIO $ writeIORef unsafeCodeMapIORef codeMap'

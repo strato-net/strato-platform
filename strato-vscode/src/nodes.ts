@@ -56,7 +56,7 @@ export class NodesProvider implements vscode.TreeDataProvider<Node> {
         return newResults;
 
       } else {
-        return element.children;
+        return element.children ? element.children : [];
       }
     } else {
       return this.getNodes();

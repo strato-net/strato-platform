@@ -18,6 +18,7 @@ library:
     - Blockchain.SolidVM.SM
     - Blockchain.SolidVM.CodeCollectionDB
     - Blockchain.SolidVM.Exception
+    - SolidVM.Solidity.Detectors
     - SolidVM.Solidity.Parse.File
     - SolidVM.Solidity.Parse.Lexer
     - SolidVM.Solidity.Parse.Statement
@@ -51,6 +52,7 @@ library:
   - memory
   - merkle-patricia-db
   - monad-alter
+  - mtl
   - nibblestring
   - parsec
   - prometheus-client
@@ -58,6 +60,7 @@ library:
   - semver-range
   - servant-docs
   - solid-vm-model
+  - source-tools
   - strato-model
   - swagger2
   - text
@@ -116,6 +119,7 @@ tests:
       - raw-strings-qq
       - solid-vm
       - solid-vm-model
+      - source-tools
       - strato-model
       - text
       - time

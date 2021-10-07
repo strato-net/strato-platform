@@ -67,6 +67,8 @@ main = do
   
   run 3001 $ app sqlEnv theDoc
 
+type DocAPI =   "docs" :> "v2.0" :> SwaggerSchemaUI "swagger-ui" "swagger.json"
+
 app :: SQLEnv -> Swagger -> Application
 app sqlEnv theDoc = 
   prometheus def{prometheusInstrumentApp = False}
@@ -75,5 +77,5 @@ app sqlEnv theDoc =
   $ cors (const $ Just simpleCorsResourcePolicy{corsRequestHeaders=["Content-Type"]})
 --  $ serve (Proxy :: Proxy (API :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $ (coreServer pool :<|> swaggerSchemaUIServer theDoc)
   $ addPathsTo404
-  $ serve (Proxy :: Proxy (API :<|> SwaggerSchemaUI "swagger-ui" "swagger.json"))
+  $ serve (Proxy :: Proxy (API :<|> DocAPI))
   $ hoistCoreServer sqlEnv :<|> swaggerSchemaUIServer theDoc

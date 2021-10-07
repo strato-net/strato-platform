@@ -72,7 +72,7 @@ import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Nonce
-import           Blockchain.Strato.Model.SourceMap
+import           Data.Source.Map
 import           Blockchain.Strato.Model.Wei
 
 --------------------------------------------------------------------------------
@@ -330,7 +330,6 @@ data ContractListParameters = ContractListParameters
 --------------------------------------------------------------------------------
 data FunctionParameters = FunctionParameters
   { fromAddr     :: Address
-  , contractName :: Text
   , contractAddr :: Address
   , funcName     :: Text
   , args         :: Map Text ArgValue
@@ -497,7 +496,6 @@ methodErroredExample =
        , methodcallArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 52)]
        , methodcallMethodName = "getHoroscope"
        , methodcallContractAddress = Address 0xdeadbeef
-       , methodcallContractName = "HoroscopeApp"
        , _methodcallChainid = Nothing
        , methodcallMetadata = Nothing
        }
@@ -512,8 +510,7 @@ instance ToSchema MethodErrored where
      & mapped.schema.description ?~ "response object when method fails in a methodList call"
      & mapped.schema.example ?~ toJSON methodErroredExample
 data MethodCall = MethodCall
-  { methodcallContractName    :: Text
-  , methodcallContractAddress :: Address
+  { methodcallContractAddress :: Address
   , methodcallMethodName      :: Text
   , methodcallArgs            :: Map Text ArgValue
   , methodcallValue           :: Strung Natural
@@ -544,7 +541,6 @@ instance ToSchema MethodCall where
         , methodcallArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 52)]
         , methodcallMethodName = "getHoroscope"
         , methodcallContractAddress = Address 0xdeadbeef
-        , methodcallContractName = "HoroscopeApp"
         , _methodcallChainid = Nothing
         , methodcallMetadata = Nothing
         }

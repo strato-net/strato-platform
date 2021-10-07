@@ -7,7 +7,15 @@
   , TemplateHaskell
 #-}
 
-module Slipstream.OutputData where
+module Slipstream.OutputData (
+  outputData,
+  insertExpandEventTables,
+  createInserts,
+  createEventTables,
+  createExpandInsertIndexTable,
+  createExpandInsertHistoryTable,
+  cirrusInfo
+  ) where
 
 import           BlockApps.Solidity.Value
 import           Conduit
@@ -17,7 +25,7 @@ import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Lazy            as BL
 import qualified Data.Map                        as Map
-import           Data.Maybe                      (fromMaybe, catMaybes, listToMaybe)
+import           Data.Maybe                      (catMaybes, listToMaybe)
 import           Data.Text                       (Text)
 import qualified Data.Text                       as T
 import           Data.Text.Encoding              (decodeUtf8, encodeUtf8)
@@ -154,7 +162,7 @@ baseColumns = [ "address"
               ]
 
 baseTableColumns :: TableColumns
-baseTableColumns = baseColumns ++ ["transaction_function_name"]
+baseTableColumns = baseColumns
 
 
 -- sometimes we need the unwrapped tablename
@@ -355,8 +363,7 @@ createIndexTableQuery contract =
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
         , csv $ ["address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
-               "block_number text", "transaction_hash text", "transaction_sender text",
-               "transaction_function_name text"] ++ tableColumns list
+               "block_number text", "transaction_hash text", "transaction_sender text"] ++ tableColumns list
         , ",\n  CONSTRAINT "
         , wrapDoubleQuotes ((escapeQuotes $ tableNameToText tableName) <> "_pkey")
         , "\n  PRIMARY KEY (address, \"chainId\") );"
@@ -369,8 +376,7 @@ createHistoryTableQuery contract =
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS ", tableNameToDoubleQuoteText tableName, " ("
         , csv $ ["address text NOT NULL", "\"chainId\" text NOT NULL", "block_hash text NOT NULL", "block_timestamp text",
-                 "block_number text", "transaction_hash text NOT NULL", "transaction_sender text",
-                 "transaction_function_name text"]
+                 "block_number text", "transaction_hash text NOT NULL", "transaction_sender text"]
                  ++ tableColumns list
         , ");"
         ]
@@ -390,7 +396,6 @@ insertIndexTableQuery contracts@(x:_) =
   let tableName = IndexTableName (organization x) (application x) (contractName x)
       list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData x
       keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
-      transactionFuncName = fromMaybe "" . fmap functioncalldataName . functionCallData
       baseVals = [ tshow . address
                  , chain
                  , T.pack . keccak256ToHex . blockHash
@@ -399,10 +404,9 @@ insertIndexTableQuery contracts@(x:_) =
                  , T.pack . keccak256ToHex . transactionHash
                  , tshow . transactionSender
                  ]
-      tableVals = baseVals ++ [escapeQuotes . transactionFuncName]
       vals = flip map contracts $ \row ->
         let rowList = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row
-         in wrapAndEscape $ map ($ row) tableVals ++ map solidityValueToText (snd <$> rowList)
+         in wrapAndEscape $ map ($ row) baseVals ++ map solidityValueToText (snd <$> rowList)
       inserts = csv vals
    in T.concat
         [ "INSERT INTO "
@@ -419,8 +423,7 @@ insertIndexTableQuery contracts@(x:_) =
     block_timestamp = excluded.block_timestamp,
     block_number = excluded.block_number,
     transaction_hash = excluded.transaction_hash,
-    transaction_sender = excluded.transaction_sender,
-    transaction_function_name = excluded.transaction_function_name|]
+    transaction_sender = excluded.transaction_sender|]
         , if null list then "" else ",\n    "
         , tableUpsert $ map fst list
         , ";"
@@ -432,7 +435,6 @@ insertHistoryTableQuery contracts@(x:_) =
   let tableName = HistoryTableName (organization x) (application x) (contractName x)
       list = Map.toList . Map.map valueToSolidityValue . Map.filter isFunction $ contractData x
       keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
-      transactionFuncName = fromMaybe "" . fmap functioncalldataName . functionCallData
       baseVals = [ tshow . address
                  , chain
                  , T.pack . keccak256ToHex . blockHash
@@ -441,10 +443,9 @@ insertHistoryTableQuery contracts@(x:_) =
                  , T.pack . keccak256ToHex . transactionHash
                  , tshow . transactionSender
                  ]
-      tableVals = baseVals ++ [escapeQuotes . transactionFuncName]
       vals = flip map contracts $ \row ->
         let rowList = Map.toList . Map.map valueToSolidityValue . Map.filter isFunction $ contractData row
-         in wrapAndEscape $ map ($ row) tableVals ++ map solidityValueToText (snd <$> rowList)
+         in wrapAndEscape $ map ($ row) baseVals ++ map solidityValueToText (snd <$> rowList)
       inserts = csv vals
    in T.concat $
         [ "INSERT INTO "

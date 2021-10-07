@@ -43,7 +43,7 @@ import           Blockchain.Strato.Model.ExtendedWord   (Word256)
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Nonce
-import           Blockchain.Strato.Model.SourceMap
+import           Data.Source.Map
 import           Blockchain.Strato.Model.Wei
 
 --------------------------------------------------------------------------------
@@ -250,8 +250,7 @@ data TransferPayload = TransferPayload
   } deriving (Eq, Show, Generic)
 
 data FunctionPayload = FunctionPayload
-  { functionpayloadContractName    :: ContractName
-  , functionpayloadContractAddress :: Address
+  { functionpayloadContractAddress :: Address
   , functionpayloadMethod          :: Text
   , functionpayloadArgs            :: Map Text ArgValue
   , functionpayloadValue           :: Maybe (Strung Natural)
@@ -355,8 +354,7 @@ instance ToSchema FunctionPayload where
     where
       ex :: FunctionPayload
       ex = FunctionPayload
-        { functionpayloadContractName    = ContractName "SimpleStorage"
-        , functionpayloadContractAddress = Address (0xdeadbeef)
+        { functionpayloadContractAddress = Address (0xdeadbeef)
         , functionpayloadMethod          = "set"
         , functionpayloadArgs            = Map.fromList [("_x", ArgInt 5)]
         , functionpayloadValue           = Nothing

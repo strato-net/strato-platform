@@ -30,9 +30,11 @@ library:
   - monad-alter
   - parsec
   - QuickCheck
+  - quickcheck-instances
   - servant
   - servant-docs
   - servant-server
+  - source-tools
   - swagger2
   - text
   - time

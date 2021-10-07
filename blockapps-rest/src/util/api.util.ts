@@ -46,6 +46,7 @@ const Endpoint = {
   DEBUG_WATCHES: `${debugUrl}/watches`,
   DEBUG_EVAL: `${debugUrl}/eval`,
   DEBUG_PARSE: `${debugUrl}/parse`,
+  DEBUG_ANALYZE: `${debugUrl}/analyze`,
 };
 
 function constructEndpoint(endpointTemplate, options:Options, params = {}) {
@@ -206,6 +207,10 @@ async function post(url, endpoint, _body, options:Options) {
   return ax.post(url, endpoint, body, options);
 }
 
+async function postRaw(url, endpoint, body, options:Options) {
+  return ax.post(url, endpoint, body, options);
+}
+
 async function get(host, endpoint, options:Options) {
   return ax.get(host, endpoint, options);
 }
@@ -233,6 +238,7 @@ export {
   getNodeUrl,
   put,
   post,
+  postRaw,
   postue,
   httpDelete,
   setAuthHeaders
