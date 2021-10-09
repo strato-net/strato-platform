@@ -10,52 +10,10 @@ MONITORING_TIMER=5;
 stratoRoot=http://${stratoHost}/eth/v1.2
 vaultWrapperRoot=http://${vaultWrapperHost}/strato/v2.3
 
-isPublic=false
-if [ "${SMD_MODE}" == public ]; then
- isPublic=true
-fi
-
 blocMinLogLevel=LevelInfo
 if [ "${BLOC_DEBUG:-false}" == true ] ; then
    blocMinLogLevel=LevelDebug
 fi
-
-slipMinLogLevel=LevelInfo
-if [ "${SLIPSTREAM_DEBUG:-false}" == true ] ; then
-  slipMinLogLevel=LevelDebug
-fi
-
-echo "Environment variables:
-slipstream:
---pghost=\$postgres_host="${postgres_host}"
---pgport=\$postgres_port="${postgres_port}"
---pguser=\$postgres_user="${postgres_user}"
---password=\$postgres_password="${postgres_password}"
---database=\$postgres_slipstream_db="${postgres_slipstream_db}"
---stratourl=\$stratoRoot="${stratoRoot}"
---vaultwrapperurl=\$vaultWrapperRoot="${vaultWrapperRoot}"
---kafkahost=\$kafkaHost"${kafkaHost}"
---kafkaport=${kafkaPort}
---minLogLevel="${slipMinLogLevel}"
-
-strato-server:
-no vars/flags set
-
-bloc:
-stratoHost="${stratoHost}"
-vaultWrapperHost="${vaultWrapperHost}"
---stratourl=\$stratoRoot="${stratoRoot}"
---vaultwrapperurl=\$vaultWrapperRoot="${vaultWrapperRoot}"
---pghost=\$postgres_host="${postgres_host}"
---pgport=\$postgres_port="${postgres_port}"
---pguser=\$postgres_user="${postgres_user}"
---password=\$postgres_password="${postgres_password}"
---minLogLevel=\$minLogLevel="${blocMinLogLevel}"
---nonceCounterTimeout=\$nonceCounterTimeout="${nonceCounterTimeout}"
---sourceCacheTimeout=\$sourceCacheTimeout="${sourceCacheTimeout}"
---txQueueSize=\$txQueueSize="${txQueueSize}"
---gasOn="${gasOn}"
-"
 
 locale-gen "en_US.UTF-8"
 export LC_ALL=en_US.UTF-8
@@ -87,25 +45,6 @@ do  echo "Waiting for Kafka to become available"
     sleep 1
 done
 
-PSQL_CONNECTION_PARAMS="-h ${postgres_host} -p ${postgres_port} -U ${postgres_user}"
-# Check if this container was initialized before
-if [ ! -f _container_initialized ]; then
-  # Check if need to wipe slipstream ("cirrus") db (NOT REQUIRED if in-place update with containers re-created and all volumes intact; REQUIRED in case of re-sync after --drop-chains)
-  if [ ! -f /volume_data/_volume_initialized ]; then
-    # drop slipstream db if already exists
-    PGPASSWORD=${postgres_password} dropdb ${PSQL_CONNECTION_PARAMS} --if-exists ${postgres_slipstream_db}
-    # Create the database for slipstream
-    PGPASSWORD=${postgres_password} createdb ${PSQL_CONNECTION_PARAMS} ${postgres_slipstream_db}
-    # Make sure the volume dir exists
-    mkdir -p /volume_data
-    date '+%Y-%m-%d %H:%M:%S' >  /volume_data/_volume_initialized
-  fi
-  # Create logs directory
-  mkdir /logs
-  # Create the '_container_initialized' sentinel file
-  date '+%Y-%m-%d %H:%M:%S' > _container_initialized
-fi
-
 function runBackgroundProcess {
   $@ &
   proc_pid=$!
@@ -126,23 +65,6 @@ function logRotation {
 }
 
 runBackgroundProcess logserver "--directory=/logs" --uri_root=/logs/bloc/ &>> /logs/logserver
-
-
-if [ "$USE_OLD_STRATO_API" == "true" ]
-then
-    echo "running old strato api, starting bloc"
-    runBackgroundProcess blockapps-bloc --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
-           --stratourl="$stratoRoot" --vaultwrapperurl="$vaultWrapperRoot" --minLogLevel="${blocMinLogLevel}" \
-           --nonceCounterTimeout="$nonceCounterTimeout" --sourceCacheTimeout="$sourceCacheTimeout" --txQueueSize="$txQueueSize" --gasOn="$gasOn" \
-           +RTS -N1 &>> /logs/bloc
-    
-    until curl localhost:8000 &> /dev/null; do
-	echo "Slipstream is waiting for bloc to come up..."
-	sleep 1;
-    done
-else
-    echo "running new strato api, bloc will not be started"
-fi
     
 echo "Bloc is up - running slipstream now..."
 
