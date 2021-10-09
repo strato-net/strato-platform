@@ -27,7 +27,6 @@ services:
   smd:
     depends_on:
     - apex
-    - bloc
     - postgrest
     - prometheus
     - strato
@@ -52,7 +51,6 @@ services:
         ipv4_address: 172.20.20.1
   apex:
     depends_on:
-    - bloc
     - postgres
     - postgrest
     - strato
@@ -93,7 +91,6 @@ services:
         ipv4_address: 172.20.20.2
   dappstore:
     depends_on:
-    - bloc
     - postgrest
     - strato
     environment:
@@ -110,45 +107,6 @@ services:
     networks:
       static:
         ipv4_address: 172.20.20.3
-  bloc:
-    depends_on:
-    - postgres
-    - strato
-    - vault-wrapper
-    environment:
-    - BLOC_DEBUG=${BLOC_DEBUG}
-    - gasOn=${gasOn:-false}
-    - kafkaHost=kafka
-    - kafkaPort=9092
-    - nonceCounterTimeout=${nonceCounterTimeout:-10}
-    - postgres_host=postgres
-    - postgres_password=${postgres_password:-api}
-    - postgres_port=5432
-    - postgres_slipstream_db=cirrus
-    - postgres_user=postgres
-    - PROCESS_MONITORING=${PROCESS_MONITORING}
-    - sourceCacheTimeout=${sourceCacheTimeout:-60}
-    - SLIPSTREAM_OPTIONAL=${SLIPSTREAM_OPTIONAL}
-    - SLIPSTREAM_DEBUG=${SLIPSTREAM_DEBUG}
-    - SMD_MODE=${SMD_MODE}
-    #    - stateDiffTopic=${stateDiffTopic}
-    - stratoHost=strato:3000
-    - txQueueSize=${txQueueSize:-4096}
-    - vaultWrapperHost=vault-wrapper:8000
-    - zookeeper_conn=zookeeper
-    build: .
-    image: ${BLOC_IMAGE:-<REPO_URL>bloc:<VERSION>}
-    restart: always
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "100m"
-        max-file: "3"
-    networks:
-      static:
-        ipv4_address: 172.20.20.4
-    volumes:
-      - blocdata:/volume_data
   redis:
     command: [redis-server, --appendonly, "yes"]
     image: redis:3.2
@@ -279,7 +237,6 @@ services:
       - stratodata:/var/lib/strato
   postgrest:
     depends_on:
-    - bloc
     - postgres
     environment:
     - blocHost=${blocHost:-strato:3000}
@@ -323,7 +280,6 @@ services:
   nginx:
     depends_on:
     - apex
-    - bloc
     - postgrest
     - prometheus
     - smd
