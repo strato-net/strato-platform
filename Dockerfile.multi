@@ -47,13 +47,6 @@ HEALTHCHECK --interval=5s --timeout=1s --start-period=20s \
 WORKDIR /var/lib/strato
 ENTRYPOINT ["/strato/doit.sh"]
 
-
-FROM built as bloc
-COPY ./bloc /bloc
-EXPOSE 8000 8002
-ENTRYPOINT ["/bloc/doit.sh"]
-
-
 FROM built as vault-wrapper
 COPY ./vault-wrapper /vault-wrapper
 EXPOSE 8000
