@@ -133,7 +133,7 @@ async function getBalance(user:OAuthUser, bcuser:BlockChainUser | null, options:
     address = response.address;
   }
   else address = bcuser.address;
-  
+
   const accounts = await getAccounts(user, {
     ...options,
     // this endpoint does not accept the resolve flag
