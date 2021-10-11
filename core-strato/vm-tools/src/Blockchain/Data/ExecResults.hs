@@ -20,7 +20,7 @@ import           Blockchain.Strato.Model.Event
 
 import           Blockchain.VM.SolidException
 import           Blockchain.VM.VMException
-import           Blockchain.Strato.Model.Action
+import           Blockchain.Strato.Model.Action      (Action)
 import           Blockchain.Data.Log
 import           Blockchain.Data.Transaction
 import           Blockchain.SolidVM.Model

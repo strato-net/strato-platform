@@ -18,6 +18,7 @@ import           Test.QuickCheck.Instances()
 
 import           Blockchain.MiscJSON()
 import           Blockchain.Strato.Model.Account
+import           Text.Format
 
 data Event =
   Event {
@@ -29,6 +30,15 @@ data Event =
     evArgs            :: [(String, String)] -- TODO: probably should use Solidity values here?
     } deriving (Eq, Read, Show, Generic)
 
+instance Format Event where
+  format Event{..} =
+    "evContractOrganization: " ++ evContractOrganization ++ "\n" ++
+    "evContractApplication: " ++ evContractApplication ++ "\n" ++
+    "evContractName: " ++ evContractName ++ "\n" ++
+    "evContractAccount: " ++ format evContractAccount ++ "\n" ++
+    "evName: " ++ evName ++ "\n" ++
+    "evArgs: " ++ show evArgs ++ "\n"
+    
 
 instance ToJSON Event where
   toJSON Event{..} = object

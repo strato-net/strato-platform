@@ -90,11 +90,11 @@ import qualified Blockchain.Sequencer.Kafka            as SK
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
-import           Blockchain.Stream.VMEvent             ( HasVMEventsSink(..)
-                                                       , VMEvent(..)
-                                                       , fetchLastVMEvents
+import           Blockchain.Stream.VMOutput            ( HasVMOutputsSink(..)
+                                                       , VMOutput(..)
+                                                       , fetchLastVMOutputs
                                                        , getBestKafkaBlockNumber
-                                                       , produceVMEventsM
+                                                       , produceVMOutputsM
                                                        )
 
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
@@ -142,7 +142,7 @@ data Config = Config
   { configSQLDB              :: SQLDB
   , configRedisBlockDB       :: RBDB.RedisConnection
   , configUnseqSink          :: forall m . (MonadIO m, MonadLogger m, Mod.Modifiable K.KafkaState m) => [IngestEvent] -> m ()
-  , configVmEventsSink       :: forall m . (MonadIO m, MonadLogger m, Mod.Modifiable K.KafkaState m) => [VMEvent] -> m ()
+  , configVmEventsSink       :: forall m . (MonadIO m, MonadLogger m, Mod.Modifiable K.KafkaState m) => [VMOutput] -> m ()
   , configConnectionTimeout  :: ConnectionTimeout
   , configMaxReturnedHeaders :: MaxReturnedHeaders
   , configVaultClient        :: ClientEnv
@@ -353,14 +353,14 @@ instance MonadIO m => ((T.Text, Int) `A.Alters` ActivityState) (ReaderT Config m
 instance (MonadIO m, MonadLogger m) => Mod.Accessible (SK.UnseqSink (ReaderT Config m)) (ReaderT Config m) where
   access _ = asks configUnseqSink
 
-instance (MonadIO m, MonadLogger m) => HasVMEventsSink (ReaderT Config m) where
-  getVMEventsSink = asks configVmEventsSink
+instance (MonadIO m, MonadLogger m) => HasVMOutputsSink (ReaderT Config m) where
+  getVMOutputsSink = asks configVmEventsSink
 
 instance (MonadIO m, MonadLogger m) => Stacks Block (ReaderT Config m) where
   takeStack _ n = do
-    vmEvents <- liftIO . fetchLastVMEvents $ fromIntegral n
+    vmEvents <- liftIO . fetchLastVMOutputs $ fromIntegral n
     pure [b | ChainBlock b <- vmEvents]
-  pushStack b = getVMEventsSink >>= \sink -> sink (ChainBlock <$> b)
+  pushStack b = getVMOutputsSink >>= \sink -> sink (ChainBlock <$> b)
 
 instance MonadUnliftIO m => A.Selectable String PPeer (ReaderT Config m) where
   select _ ip = sqlQuery actions >>= \case
@@ -482,7 +482,7 @@ initConfig wireMessagesRef maxHeaders = do
     { configSQLDB = sqlDB' dbs
     , configRedisBlockDB = RBDB.RedisConnection redisBDBPool
     , configUnseqSink = void . K.withKafkaRetry1s . SK.writeUnseqEvents
-    , configVmEventsSink = void . produceVMEventsM
+    , configVmEventsSink = void . produceVMOutputsM
     , configConnectionTimeout = ConnectionTimeout flags_connectionTimeout
     , configMaxReturnedHeaders = MaxReturnedHeaders maxHeaders
     , configVaultClient = vaultClient

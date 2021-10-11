@@ -18,7 +18,7 @@ import           Blockchain.Database.MerklePatricia (StateRoot (..))
 import           Blockchain.ExtWord
 import           Blockchain.Sequencer.Event         (OutputTx (..))
 import           Blockchain.Strato.Model.Account
-import           Blockchain.Strato.Model.Action
+import qualified Blockchain.Strato.Model.Action     as Action
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256        hiding (hash)
 
@@ -38,7 +38,7 @@ rewriteBlockHash hsh (TxRunResult otx res t before after new) =
   TxRunResult otx{otOrigin = BlockHash hsh} res' t before after new
   where res' = case res of
                   Left{} -> res
-                  Right er@ExecResults {erAction=mAction}-> Right er{erAction = set actionBlockHash hsh <$> mAction}
+                  Right er@ExecResults {erAction=mAction}-> Right er{erAction = set Action.blockHash hsh <$> mAction}
 
 instance NFData TxRunResult
 

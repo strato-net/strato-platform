@@ -27,6 +27,7 @@ import Network.Kafka.Protocol (Offset)
 import Prometheus
 
 import Blockapps.Crossmon
+import qualified Blockchain.Strato.Model.Action as Action
 
 import Slipstream.Data.Action
 import Slipstream.Data.Globals
@@ -85,9 +86,9 @@ recordKafkaMessages = liftIO . void . addCounter kafkaCount . fromIntegral . len
 recordActionOn :: MonadIO m => T.Text -> AggregateAction -> m ()
 recordActionOn stage act = do
   let kind = case actionType act of
-              Create -> "create"
-              Delete -> "delete"
-              Update -> "update"
+              Action.Create -> "create"
+              Action.Delete -> "delete"
+              Action.Update -> "update"
   liftIO $ withLabel actionCount (stage, kind) incCounter
   recordMaxBlockNumber "slipstream_processor" . actionBlockNumber $ act
 

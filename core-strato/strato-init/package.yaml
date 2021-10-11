@@ -69,6 +69,7 @@ library:
   - turtle
   - unliftio
   - unliftio-core
+  - vm-tools
   - yaml
 
 executables:

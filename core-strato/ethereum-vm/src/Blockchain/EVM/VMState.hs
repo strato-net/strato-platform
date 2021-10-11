@@ -28,7 +28,8 @@ import           Data.Word
 import qualified Data.Sequence                as Seq
 import           GHC.Generics
 
-import           Blockchain.Strato.Model.Action
+import           Blockchain.Strato.Model.Action (Action)
+import qualified Blockchain.Strato.Model.Action as Action
 import           Blockchain.Data.Log
 import           Blockchain.EVM.Environment
 import qualified Blockchain.EVM.MutableStack as MS
@@ -110,16 +111,16 @@ instance Format VMState where
     "stack: " ++ show stack ++ "\n"
 
 startingAction :: Environment -> Action
-startingAction Environment{..} = Action
-  { _actionBlockHash          = blockHeaderHash envBlockHeader
-  , _actionBlockTimestamp     = blockHeaderTimestamp envBlockHeader
-  , _actionBlockNumber        = blockHeaderBlockNumber envBlockHeader
-  , _actionTransactionHash    = envTxHash
-  , _actionTransactionChainId = envChainId
-  , _actionTransactionSender  = envSender
+startingAction Environment{..} = Action.Action
+  { _blockHash                = blockHeaderHash envBlockHeader
+  , _blockTimestamp           = blockHeaderTimestamp envBlockHeader
+  , _blockNumber              = blockHeaderBlockNumber envBlockHeader
+  , _transactionHash          = envTxHash
+  , _transactionChainId       = envChainId
+  , _transactionSender        = envSender
   , _actionData               = M.empty
-  , _actionMetadata           = envMetadata
-  , _actionEvents             = Seq.empty
+  , _metadata                 = envMetadata
+  , _events                   = Seq.empty
   }
 
 startingState :: Bool -> Bool -> Environment -> MemDBs -> IO VMState

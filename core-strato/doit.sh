@@ -9,7 +9,33 @@ PROCESS_MONITORING=${PROCESS_MONITORING:-true}
 declare -A MONITORED_PIDS
 MONITORING_TIMER=5;
 
+stratoRoot=http://${stratoHost}/eth/v1.2
+
 vaultWrapperRoot=http://${vaultWrapperHost}/strato/v2.3
+
+slipMinLogLevel=LevelInfo
+if [ "${SLIPSTREAM_DEBUG:-false}" == true ] ; then
+  slipMinLogLevel=LevelDebug
+fi
+
+PSQL_CONNECTION_PARAMS="-h ${postgres_host} -p ${postgres_port} -U ${postgres_user}"
+# Check if this container was initialized before
+if [ ! -f _container_initialized ]; then
+  # Check if need to wipe slipstream ("cirrus") db (NOT REQUIRED if in-place update with containers re-created and all volumes intact; REQUIRED in case of re-sync after --drop-chains)
+  if [ ! -f /volume_data/_volume_initialized ]; then
+    # drop slipstream db if already exists
+    PGPASSWORD=${postgres_password} dropdb ${PSQL_CONNECTION_PARAMS} --if-exists ${postgres_slipstream_db}
+    # Create the database for slipstream
+    PGPASSWORD=${postgres_password} createdb ${PSQL_CONNECTION_PARAMS} ${postgres_slipstream_db}
+    # Make sure the volume dir exists
+    mkdir -p /volume_data
+    date '+%Y-%m-%d %H:%M:%S' >  /volume_data/_volume_initialized
+  fi
+  # Create logs directory
+  mkdir /logs
+  # Create the '_container_initialized' sentinel file
+  date '+%Y-%m-%d %H:%M:%S' > _container_initialized
+fi
 
 
 function newnode {
@@ -174,6 +200,17 @@ function newnode {
       runBackgroundProcess strato-api2 --gasOn=$gasOn +RTS -N1 >> logs/strato-api2 2>&1
   fi
 
+  SLIPSTREAM_CMD="slipstream --pghost=${postgres_host} --pgport=${postgres_port} \
+    --pguser=${postgres_user} --password=${postgres_password} --database=${postgres_slipstream_db} \
+    --stratourl=${stratoRoot} --vaultwrapperurl=${vaultWrapperRoot}  \
+    --kafkahost=${kafkaHost} --kafkaport=${kafkaPort} --minLogLevel=${slipMinLogLevel}"
+
+  if [ ${SLIPSTREAM_OPTIONAL:-true} = true ]; then
+      $SLIPSTREAM_CMD &>> logs/slipstream &
+  else
+      runBackgroundProcess $SLIPSTREAM_CMD &>> logs/slipstream
+  fi
+  
   echo "Configuring log rotation..."
   runBackgroundProcess logRotation
 
