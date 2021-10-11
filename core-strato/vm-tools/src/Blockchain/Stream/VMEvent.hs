@@ -36,8 +36,10 @@ import           Network.Kafka
 import           Network.Kafka.Producer
 import           Network.Kafka.Protocol      hiding (Key)
 
+import           Blockchain.Data.TransactionResult
 import           Blockchain.EthConf
 import           Blockchain.Strato.Model.Action (Action)
+import           Blockchain.Strato.Model.Event
 import           Blockchain.KafkaTopics
 import           Blockchain.MilenaTools
 import           Blockchain.Output
@@ -46,7 +48,12 @@ import           Text.Format
 import           Text.Tools
 
 
-data VMEvent = NewAction Action deriving (Show, Generic)
+
+data VMEvent =
+  NewAction Action |
+  EventEmitted Event |
+  CodeCollectionAdded String |
+  NewTransactionResult TransactionResult deriving (Show, Generic)
 
 instance JSON.ToJSON VMEvent where
 
@@ -55,6 +62,9 @@ instance JSON.FromJSON VMEvent where
 
 instance Format VMEvent where
   format (NewAction a) = "NewAction:\n" ++ tab (format a)
+  format (EventEmitted e) = "EventEmitted:\n" ++ tab (format e)
+  format (CodeCollectionAdded c) = "CodeCollectionAdded: " ++ shorten 30 c
+  format (NewTransactionResult tr) = "NewTransactionResult:\n" ++ tab (format tr)
 
 class HasVMEventsSink k where
   getVMEventsSink :: k ([VMEvent] -> k ())

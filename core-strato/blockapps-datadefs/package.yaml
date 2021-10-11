@@ -18,7 +18,6 @@ dependencies:
   - persistent
   - persistent-template
   - QuickCheck
-  - servant-docs
   - strato-model
   - swagger2
   - text

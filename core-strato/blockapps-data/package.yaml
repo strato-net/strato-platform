@@ -34,6 +34,7 @@ library:
   - filepath
   - format
   - generic-arbitrary
+  - generic-random
   - json-stream
   - labeled-error
   - lens
@@ -49,6 +50,7 @@ library:
   - regex-compat
   - resourcet
   - secp256k1-haskell # remove
+  - servant-docs
   - strato-conf
   - strato-model
   - swagger2
