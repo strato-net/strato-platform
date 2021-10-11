@@ -22,16 +22,17 @@ import           Control.Monad.Trans.Maybe
 import qualified Blockchain.Database.MerklePatricia    as MP
 import           Blockchain.Output
 import qualified Data.ByteString                       as BS
-import qualified Data.ByteString.Char8          as BC
+import qualified Data.ByteString.Char8                 as BC
 import           Data.Conduit.List                     (fold)
 import           Data.Foldable                         hiding (fold)
 import           Data.List
 import           Data.List.Split                       (chunksOf)
-import           Data.Proxy
-import qualified Data.Text                             as T
 import qualified Data.Map                              as M
-import           Data.Maybe                            (catMaybes, isNothing, fromMaybe)
+import           Data.Maybe
+import           Data.Proxy
 import qualified Data.Set                              as S
+--import qualified Data.Sequence                         as Seq
+import qualified Data.Text                             as T
 import           Data.Time.Clock.POSIX
 import           Data.Traversable                      (for)
 import           Debugger
@@ -80,6 +81,7 @@ import           Blockchain.Strato.Indexer.Kafka       (writeIndexEvents)
 import           Blockchain.Strato.Indexer.Model       (IndexEvent (..))
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Action        (Action)
+import qualified Blockchain.Strato.Model.Action        as Action
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.StateDiff.Database  (commitSqlDiffs)
@@ -455,8 +457,19 @@ logEventSummaries events = do
 
 sendOutEvents :: VmOutEventBatch -> ContextM ()
 sendOutEvents OutBatch{..} = do
-  _ <- loopTimeit "productVMEvents" $
-         produceVMEvents $ map NewAction $ toList outActions
+  let
+--    filterOutEvents :: Action -> Action
+--    filterOutEvents x = x{Action._events=Seq.empty}
+--    filterOutMetadata :: Action -> Action
+--    filterOutMetadata x = x{Action._metadata=Nothing}
+    newVMEvents :: [VMEvent]
+    newVMEvents =
+        concat (map (map (CodeCollectionAdded . T.unpack) . maybeToList . M.lookup "src" . fromMaybe M.empty . Action._metadata) (toList outActions))
+        ++ concat (map (map EventEmitted . toList . Action._events) (toList outActions))
+        ++ map NewAction (toList outActions)
+--        ++ map (NewAction . filterOutMetadata . filterOutEvents) (toList outActions)
+        
+  _ <- loopTimeit "productVMEvents" $ produceVMEvents $ newVMEvents
       
   loopTimeit "produceUnminedBlocksM" $
     void . K.withKafkaRetry1s . produceUnminedBlocksM $
