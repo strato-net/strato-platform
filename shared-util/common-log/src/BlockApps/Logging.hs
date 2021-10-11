@@ -22,6 +22,7 @@ import           Control.Concurrent     (ThreadId, myThreadId)
 import           Control.Monad
 import qualified Data.ByteString.Char8  as BC
 import qualified Data.Text              as Text
+import           Data.Fixed
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
 import           System.GlobalLock
@@ -74,7 +75,17 @@ formatLogOutput timestamp tid loc logSource level msg =
    where mLoc = if (level == LevelDebug || level == LevelWarn) then printf "%50s | " loc else ""
 
 instance PrintfArg UTCTime where
-  formatArg = formatString . show
+  formatArg = formatString . customShow . utcToZonedTime utc
+    where customShow (ZonedTime (LocalTime d (TimeOfDay h m s)) zone) 
+            = concat [showGregorian d, " ", show2 h, ":", show2 m, ":", rightPad (show2Fixed s) 12 '0', " ", show zone]
+          show2Fixed x
+            | x < 10 = '0' : (showFixed True x)
+          show2Fixed x = showFixed True x
+          show2 i
+            | i < 10 = '0' : show i
+          show2 i = show i
+          -- rightPad is our addition. The rest of the previous code is derived from the time library
+          rightPad s l c = s ++ replicate (l - length s) c
 
 instance PrintfArg LogLevel where
   formatArg = formatString . (\case
