@@ -157,7 +157,7 @@ handleVmEvents = awaitForever $ \InBatch{..} -> do
           if pbft
             then reqd && (hasTxs || hasVotes)
             else not makeLazyBlocks || hasTxs)
-   $logInfoS "evm/loop/newBlock" . T.pack $ printf "Num poolable: %d, num pending: %d"
+    $logInfoS "evm/loop/newBlock" . T.pack $ printf "Num poolable: %d, num pending: %d"
         numPoolable (M.size pending)
     $logInfoS "evm/loop/newBlock" . T.pack $ "Decision making for block creation: " ++
         "(isCaughtUp, pbft, reqd, hasTxs, makeLazyBlocks, shouldOutputBlocks) = " ++ show
