@@ -31,7 +31,7 @@ import qualified Data.Map                              as M
 import           Data.Maybe
 import           Data.Proxy
 import qualified Data.Set                              as S
---import qualified Data.Sequence                         as Seq
+import qualified Data.Sequence                         as Seq
 import qualified Data.Text                             as T
 import           Data.Time.Clock.POSIX
 import           Data.Traversable                      (for)
@@ -157,7 +157,7 @@ handleVmEvents = awaitForever $ \InBatch{..} -> do
           if pbft
             then reqd && (hasTxs || hasVotes)
             else not makeLazyBlocks || hasTxs)
-    $logInfoS "evm/loop/newBlock" . T.pack $ printf "Num poolable: %d, num pending: %d"
+   $logInfoS "evm/loop/newBlock" . T.pack $ printf "Num poolable: %d, num pending: %d"
         numPoolable (M.size pending)
     $logInfoS "evm/loop/newBlock" . T.pack $ "Decision making for block creation: " ++
         "(isCaughtUp, pbft, reqd, hasTxs, makeLazyBlocks, shouldOutputBlocks) = " ++ show
@@ -458,15 +458,15 @@ logEventSummaries events = do
 sendOutEvents :: VmOutEventBatch -> ContextM ()
 sendOutEvents OutBatch{..} = do
   let
---    filterOutEvents :: Action -> Action
---    filterOutEvents x = x{Action._events=Seq.empty}
+    filterOutEvents :: Action -> Action
+    filterOutEvents x = x{Action._events=Seq.empty}
 --    filterOutMetadata :: Action -> Action
 --    filterOutMetadata x = x{Action._metadata=Nothing}
     newVMEvents :: [VMEvent]
     newVMEvents =
         concat (map (map (CodeCollectionAdded . T.unpack) . maybeToList . M.lookup "src" . fromMaybe M.empty . Action._metadata) (toList outActions))
         ++ concat (map (map EventEmitted . toList . Action._events) (toList outActions))
-        ++ map NewAction (toList outActions)
+        ++ map (NewAction . filterOutEvents) (toList outActions)
 --        ++ map (NewAction . filterOutMetadata . filterOutEvents) (toList outActions)
         
   _ <- loopTimeit "productVMEvents" $ produceVMEvents $ newVMEvents

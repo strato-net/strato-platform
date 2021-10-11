@@ -27,7 +27,6 @@ import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Strict hiding (state)
 import Data.Either (lefts, rights)
-import Data.Foldable (toList)
 import Data.Function
 import Data.Int (Int32)
 import Data.IORef
@@ -288,7 +287,7 @@ parseActions events =
   . concatMap (flatten) $ [a | NewAction a <- events]
 
 parseEvents :: [VMEvent] -> [Action.Event]
-parseEvents events = concatMap (toList . Action._events) [a | NewAction a <- events]
+parseEvents events = [a | EventEmitted a <- events]
 
 processTheMessages :: BlocEnv -> BlocSQLEnv -> PGConnection -> IORef Globals -> [VMEvent] -> LoggingT IO ()
 processTheMessages env sqlEnv conn g messages = do
