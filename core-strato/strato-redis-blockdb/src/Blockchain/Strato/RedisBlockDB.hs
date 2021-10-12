@@ -610,6 +610,15 @@ putBestBlockInfo newSha newNumber newTDiff = do
                       forM_ updates $ \(sha, num) -> set (inNamespace Canonical $ num) (toValue sha)
                       unless (null deletions) . void . del $ inNamespace Canonical . toKey <$> deletions
                       forceBestBlockInfo newSha newNumber newTDiff
+                  newBBI' <- getBestBlockInfo
+                  status <- liftRedis getSyncStatus
+                  wbb <- getWorldBestBlockInfo
+                  case (status, newBBI', wbb) of
+                      (Just False, Just (RedisBestBlock _ _ newTDiff'), Just (RedisBestBlock _ _ wtd)) -> if newTDiff' >= wtd
+                                                                                                            then do _ <- liftRedis $ putSyncStatus True
+                                                                                                                    pure ()
+                                                                                                            else pure ()
+                      _ -> pure ()
                   case res of
                       TxSuccess _ -> return $ Right Ok
                       TxAborted   -> return . Left $ SingleLine (S8.pack "Aborted")
