@@ -140,9 +140,12 @@ async function validate(counter: number, doc: vscode.TextDocument, solidityDiagn
 
 function createDiagnostic(doc: vscode.TextDocument, ann: any): vscode.Diagnostic {  
   const { start, end } = ann;
-
+  const sLine = start.line && start.line > 0 ? start.line - 1 : 0;
+  const sCol = start.column && start.column > 0 ? start.column - 1 : 0;
+  const eLine = end.line && end.line > 0 ? end.line - 1 : 0;
+  const eCol = end.column && end.column > 0 ? end.column - 1 : 0;
   // create range that represents, where in the document the word is
-  const range = new vscode.Range(start.line - 1, start.column - 1, end.line - 1, end.column - 1);
+  const range = new vscode.Range(sLine, sCol, eLine, eCol);
 
   const diagnostic = new vscode.Diagnostic(range, ann.annotation,
     vscode.DiagnosticSeverity.Warning);
