@@ -22,6 +22,7 @@ import           Text.Parsec
 
 
 import           SolidVM.Solidity.Parse.Declarations
+import           SolidVM.Solidity.Parse.Imports
 import           SolidVM.Solidity.Parse.Lexer
 import           SolidVM.Solidity.Parse.ParserTypes
 import           SolidVM.Solidity.Parse.Pragmas
@@ -34,7 +35,7 @@ newtype File = File {
 solidityFile :: SolidityParser File
 solidityFile = do
   whiteSpace
-  units <- many (solidityPragma <|> solidityContract)
+  units <- many (solidityPragma <|> solidityImport <|> solidityContract)
   eof
   return . File $ units
 
@@ -42,7 +43,6 @@ solidityFile = do
 decideVersion :: File -> SolcVersion
 decideVersion = maximum . (ZeroPointFour:) . mapMaybe go . unsourceUnits
   where go :: SourceUnit -> Maybe SolcVersion
-        go NamedXabi{} = Nothing
         go (Pragma _ pragmaName rest) = do
           guard $ pragmaName == "solidity"
           rng <- eitherToMaybe . parseSemVerRange . T.strip . T.pack $ rest
@@ -51,3 +51,4 @@ decideVersion = maximum . (ZeroPointFour:) . mapMaybe go . unsourceUnits
           let possibilities = [semver 0 5 n | n <- [0..99]]
           guard $ any (matchesSimple rng) possibilities
           return ZeroPointFive
+        go _ = Nothing

@@ -37,6 +37,7 @@ import qualified SolidVM.Solidity.Xabi.VarDef       as Xabitype
 import           Blockchain.VM.SolidException
 
 data SourceUnitF a = Pragma a Identifier String
+                   | Import a Text.Text
                    | NamedXabi Text.Text (XabiF a, [Text.Text])
                    deriving (Eq, Show, Generic, Functor)
 
