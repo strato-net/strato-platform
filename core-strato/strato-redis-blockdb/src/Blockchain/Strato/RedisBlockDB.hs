@@ -817,13 +817,10 @@ syncStatusKey = "<sync_status>"
 {-# INLINE syncStatusKey #-}
 
 getSyncStatus :: Redis (Maybe Bool)
-getSyncStatus = get syncStatusKey >>= \case
-    Left e  -> do liftLog $ $logWarnS "getSyncStatus" . T.pack $ show e
-                  pure Nothing     -- is this the problem?
-    Right Nothing -> do liftLog $ $logWarnS "getSyncStatus" . T.pack $ "the sync status is Nothing"
-                        pure Nothing
-    Right (Just bs) -> do liftLog $ $logWarnS "getSyncStatus" . T.pack $ "the sync status is '" ++ show bs ++ "'"
-                          pure $ Just $ (fromValue bs :: Bool)
+getSyncStatus = fmap fromValue . eitherToMaybe <$> get syncStatusKey
+    where eitherToMaybe :: Either a (Maybe b) -> Maybe b
+          eitherToMaybe (Left _)  = Nothing
+          eitherToMaybe (Right a) = a
 
 putSyncStatus :: RedisCtx m f => Bool -> m (f Status)
 putSyncStatus status = do

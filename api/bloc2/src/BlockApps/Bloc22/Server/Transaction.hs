@@ -1014,6 +1014,8 @@ getArgValues argsMap argNamesTypes = do
       else sequence $ Map.intersectionWith determineValue argsMap argNamesTypes
     return $ map snd (sortOn fst (toList argsVals))
 
+
+
 getResultAndRespond :: (MonadLogger m, HasBlocSQL m, HasSQL m) =>
                        [Keccak256] -> Bool -> m BlocTransactionResult
 getResultAndRespond txHashes resolve = do
@@ -1032,7 +1034,7 @@ checkIsSynced = do
   status <- syncStatus
 
   case (status, worldTotalDiff, nodeTotalDiff) of
-    (Just False, Just wtd, Just ntd) -> throwIO $ NotYetSynced ntd wtd (show status)
+    (Just False, Just wtd, Just ntd) -> throwIO $ NotYetSynced ntd wtd
     _                                -> pure ()
 
 syncStatus :: MonadIO m => m (Maybe Bool)
@@ -1046,11 +1048,6 @@ getNodeTotalDifficulty = do
   conn <- liftIO $ checkedConnect lookupRedisBlockDBConfig
   redisBestBlock <- liftIO $ runRedis conn getBestBlockInfo
   pure $ bestBlockTotalDifficulty <$> redisBestBlock
-
--- Alternate (possibly faster) implementation
--- getNodeTotalDifficulty :: (HasSQL m) => m Integer
--- getNodeTotalDifficulty = blockDataRefTotalDifficulty <$> getBestBlock
-
 
 getWorldTotalDifficulty :: MonadIO m => m (Maybe Integer)
 getWorldTotalDifficulty = do
