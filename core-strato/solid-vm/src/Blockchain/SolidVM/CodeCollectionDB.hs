@@ -1,25 +1,34 @@
+{-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RankNTypes #-}
 module Blockchain.SolidVM.CodeCollectionDB
-  ( parseSource
+  ( ParseOrSolidVMError(..)
+  , parseSource
+  , parseSourceWithAnnotations
   , compileSourceNoInheritance
   , compileSource
+  , compileSourceWithAnnotations
   , codeCollectionFromSource
   , codeCollectionFromHash
   ) where
 
 import           Control.Exception
+import           Control.Monad                        ((<=<))
 import           Control.Monad.IO.Class
 import qualified Data.Aeson                           as Aeson
+import           Data.Bifunctor                       (bimap, first)
 import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Lazy                 as BL
 import           Data.Foldable                        (foldrM)
 import           Data.IORef
 import           Data.Map                             (Map)
 import qualified Data.Map                             as M
+import           Data.Maybe                           (catMaybes)
 import           Data.Source
 import qualified Data.Text                            as T
 import           Data.Text.Encoding                   (decodeUtf8, encodeUtf8)
+import           Data.Traversable                     (for)
 import           System.IO.Unsafe
 import           Text.Parsec                          (runParser)
 import           Text.Parsec.Error
@@ -34,14 +43,25 @@ import           SolidVM.Solidity.Parse.File
 
 import           CodeCollection
 
+data ParseOrSolidVMError = PEx ParseError
+                         | SVMEx (Positioned ((,) SolidException))
+
 {-# NOINLINE unsafeCodeMapIORef #-}
 unsafeCodeMapIORef :: IORef (Map Keccak256 CodeCollection)
 unsafeCodeMapIORef = unsafePerformIO $ newIORef M.empty
 
-parseSource :: T.Text -> T.Text -> Either ParseError [SourceUnit]
-parseSource fileName src = unsourceUnits <$> runParser solidityFile "" (T.unpack fileName) (T.unpack src)
+withAnnotations :: (a -> Either ParseOrSolidVMError b) -> a -> Either [SourceAnnotation T.Text] b
+withAnnotations f = first unwind . f
+  where unwind (PEx pe) = [parseErrorToAnnotation pe]
+        unwind (SVMEx (e,x)) = [T.pack (show e) <$ x]
 
-compileSourceNoInheritance :: Map T.Text T.Text -> Either ParseError CodeCollection
+parseSource :: T.Text -> T.Text -> Either ParseOrSolidVMError [SourceUnit]
+parseSource fileName src = bimap PEx unsourceUnits $ runParser solidityFile "" (T.unpack fileName) (T.unpack src)
+
+parseSourceWithAnnotations :: T.Text -> T.Text -> Either [SourceAnnotation T.Text] [SourceUnit]
+parseSourceWithAnnotations = withAnnotations . parseSource
+
+compileSourceNoInheritance :: Map T.Text T.Text -> Either ParseOrSolidVMError CodeCollection
 compileSourceNoInheritance initCodeMap = do
   let getNamedContracts fileName src = do
         sourceUnits <- parseSource fileName src
@@ -49,20 +69,29 @@ compileSourceNoInheritance initCodeMap = do
               Pragma _ n v -> Just (n, v)
               _ -> Nothing
             vmVersion' = if Just ("solidvm", "3.0") `elem` (pragmas <$> sourceUnits) then "svm3.0" else ""
-        pure [(T.unpack name, xabiToContract (T.unpack name) (map T.unpack parents') vmVersion' xabi)
-             | NamedXabi name (xabi, parents') <- sourceUnits]
+        fmap catMaybes . for sourceUnits $ \case
+          NamedXabi name (xabi, parents') -> do
+            ctrct <- first SVMEx
+                   $ xabiToContract (T.unpack name) (map T.unpack parents') vmVersion' xabi
+            pure $ Just (T.unpack name, ctrct)
+          _ -> pure Nothing
       throwDuplicate (cName, contract) m = case M.lookup cName m of
         Nothing -> pure $ M.insert cName contract m
-        Just _ ->  Left $ newErrorMessage (Message $ "Duplicate contract found: " ++ cName)
-                                          (fromSourcePosition $ _sourceAnnotationStart $ _contractContext contract)
+        Just _ ->  Left . PEx
+                 $ newErrorMessage (Message $ "Duplicate contract found: " ++ cName)
+                                   (fromSourcePosition $ _sourceAnnotationStart $ _contractContext contract)
   allContracts <- fmap concat . traverse (uncurry getNamedContracts) $ M.toList initCodeMap
   deduplicatedContracts <- foldrM throwDuplicate M.empty allContracts
   pure $ CodeCollection {
     _contracts = deduplicatedContracts
   }
 
-compileSource :: Map T.Text T.Text -> Either ParseError CodeCollection
-compileSource = fmap applyInheritance . compileSourceNoInheritance
+compileSource :: Map T.Text T.Text -> Either ParseOrSolidVMError CodeCollection
+compileSource = applyInheritanceE <=< compileSourceNoInheritance
+  where applyInheritanceE = first SVMEx . applyInheritance
+
+compileSourceWithAnnotations :: Map T.Text T.Text -> Either [SourceAnnotation T.Text] CodeCollection
+compileSourceWithAnnotations = withAnnotations compileSource
 
 codeCollectionFromSource :: (MonadIO m, HasCodeDB m) => B.ByteString -> m (Keccak256, CodeCollection)
 codeCollectionFromSource initCode = do
@@ -85,7 +114,10 @@ codeCollectionFromSource initCode = do
       recordCacheEvent StorageWrite
       hsh' <- addCode SolidVM canonicalInitCode
       let ecc = compileSource initMap
-          cc = either (parseError "codeCollectionFromSource") id ecc
+          cc = case ecc of
+                 Right a -> a
+                 Left (PEx p) -> parseError "codeCollectionFromSource" p
+                 Left (SVMEx (s, _)) -> throw s
       let codeMap' = M.insert hsh cc codeMap
       recordCacheSize $ M.size codeMap'
       liftIO $ writeIORef unsafeCodeMapIORef codeMap'
@@ -107,7 +139,10 @@ codeCollectionFromHash hsh = do
                   Just l -> M.fromList l
                   Nothing -> M.singleton T.empty (decodeUtf8 initCode)
           let ecc = compileSource initMap
-              cc = either (parseError "codeCollectionFromHash") id ecc
+              cc = case ecc of
+                     Right a -> a
+                     Left (PEx p) -> parseError "codeCollectionFromHash" p
+                     Left (SVMEx (s, _)) -> throw s
               codeMap' = M.insert hsh cc codeMap
           recordCacheSize $ M.size codeMap'
           liftIO $ writeIORef unsafeCodeMapIORef codeMap'
