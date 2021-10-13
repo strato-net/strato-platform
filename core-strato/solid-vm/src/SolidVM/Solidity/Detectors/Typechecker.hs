@@ -900,4 +900,5 @@ tcExpr (StringLiteral x _) = pure $ stringType' x
 tcExpr (TupleExpression x es) =
   productType' x <$> traverse (maybe (pure $ topType' x) tcExpr) es
 tcExpr (ArrayExpression x es) = foldr (<~>) (pure $ topType' x) $ tcExpr <$> es
+tcExpr (Variable x "this") = pure $ Static Account x
 tcExpr (Variable x name) = getVarType' name x
