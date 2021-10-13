@@ -3,6 +3,7 @@ module SolidVM.Solidity.Detectors
   ) where
 
 import           CodeCollection
+import           Data.Bifoldable
 import           Data.Source
 import           Data.Text                                                         (Text)
 import           SolidVM.Solidity.Parse.Declarations                               (SourceUnit)
@@ -39,12 +40,13 @@ compilerDetectors = [ Trivial.detector
                     , StateVariables.detector
                     ]
 
-runDetectors :: Applicative f
-             => (SourceMap -> f [SourceUnit])
-             -> (SourceMap -> f CodeCollection)
+runDetectors :: (Applicative (f a), Bifoldable f)
+             => (SourceMap -> f a [SourceUnit])
+             -> (SourceMap -> f a CodeCollection)
+             -> (a -> [SourceAnnotation Text])
              -> SourceMap
-             -> f [SourceAnnotation Text]
-runDetectors parse compile source =
+             -> [SourceAnnotation Text]
+runDetectors parse compile handleErrors source =
   let parserAnnotations = concat . (parserDetectors <*>) . (:[]) <$> parse source
       compilerAnnotations = concat . (compilerDetectors <*>) . (:[]) <$> compile source
-   in (++) <$> parserAnnotations <*> compilerAnnotations
+   in bifoldMap handleErrors id $ (++) <$> parserAnnotations <*> compilerAnnotations
