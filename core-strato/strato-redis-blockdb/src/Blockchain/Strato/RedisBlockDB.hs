@@ -796,7 +796,7 @@ checkAndUpdateSyncStatus = do
     
     case (status, nodeTotalDiff, worldTotalDiff) of
         (Just False, Just ntd, Just wtd) -> when (ntd >= wtd) (void $ putSyncStatus True)
-        (Nothing,    Just ntd, Just wtd) -> when (ntd <  wtd) (void $ putSyncStatus False)
+        (Nothing,    Just ntd, Just wtd) -> void $ putSyncStatus (ntd >= wtd)
         (Nothing,    Nothing,  Just _  ) -> void $ putSyncStatus False
         _ -> pure ()
 
