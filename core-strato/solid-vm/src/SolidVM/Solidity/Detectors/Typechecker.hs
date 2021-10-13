@@ -276,6 +276,8 @@ typecheck' f r1 r2 = case (r1, r2) of
   (Top n1 _, Top n2 x) -> pure $ Top (n1 <> n2) x
   (Top names _, m@(Static t x)) -> reduceType' x . (m:) <$> traverse (\n -> f x n t) (S.toList names)
   (m@(Static t x), Top names _) -> m <$ reduceType' x . (m:) <$> traverse (\n -> f x n t) (S.toList names)
+  (Top _ _, m) -> pure m
+  (m, Top _ _) -> pure m
   (t1, Sum t2) -> pickType' (context' t1) <$> traverse (typecheck' f t1) (NE.toList t2)
   (Sum t1, t2) -> pickType' (context' t2) <$> traverse (flip (typecheck' f) t2) (NE.toList t1)
   (Static t1 _, Static t2 x) -> pure $ case typecheckStatic t1 t2 of
@@ -511,7 +513,7 @@ typecheckMember (Static (Label c') x) n = do
             t -> pure t
         t -> pure t
     t -> pure t
-typecheckMember x n = pure . bottom $ ("Unknown member: " <> T.pack (show x) <> "\n  " <> n) <$ context' x
+typecheckMember x n = pure . bottom $ ("Unknown member: " <> showType' x <> "\n  " <> n) <$ context' x
 
 getConstructorType' :: MonadReader R m => SourceAnnotation Text -> Text -> m Type'
 getConstructorType' x l = do
@@ -728,9 +730,11 @@ getVarType' name ctx = do
           Nothing -> do
             cc <- asks codeCollection
             pure $ case M.lookup name $ _contracts cc of
-              Just _-> Function (Static Account ctx)
-                                (Static (Xabi.Contract $ T.pack name) ctx)
-                                ctx
+              Just _->
+                let ctrct = Static (Xabi.Contract $ T.pack name) ctx
+                 in Function (Sum (Static Account ctx :| [ctrct]))
+                             ctrct
+                             ctx
               Nothing -> bottom $ ("Unknown variable: " <> T.pack name) <$ ctx
             
   where lookupVar m Nothing = M.lookup name m
