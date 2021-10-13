@@ -7,11 +7,10 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeOperators         #-}
-{-# LANGUAGE RecordWildCards       #-}
 {-# OPTIONS -fno-warn-orphans #-}
 
 module Blockchain.Strato.RedisBlockDB
-    ( RedisConnection(..), inNamespace, findNamespace, readRedis
+    ( RedisConnection(..), inNamespace, findNamespace, runStratoRedisIO
     , getSHAsByNumber
     , getChainInfo, putChainInfo
     , getChainMembers, putChainMembers
@@ -814,8 +813,8 @@ getSyncStatus = fmap fromValue . eitherToMaybe <$> get syncStatusKey
 putSyncStatus :: RedisCtx m f => Bool -> m (f Status)
 putSyncStatus status = set syncStatusKey $ toValue status
 
--- TODO: Use and effect system (runs in IO... 😒)
-readRedis :: MonadIO m => Redis a -> m a
-readRedis r = liftIO $ do
+-- TODO: Use an effect system (IO eww... 😒)
+runStratoRedisIO :: MonadIO m => Redis a -> m a
+runStratoRedisIO r = liftIO $ do
   conn <- checkedConnect lookupRedisBlockDBConfig
   runRedis conn r

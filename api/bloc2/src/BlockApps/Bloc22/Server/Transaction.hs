@@ -96,14 +96,13 @@ import           Blockchain.Strato.Model.Nonce
 import           Blockchain.Strato.Model.Secp256k1      hiding (HasVault)
 import           Data.Source.Map
 import           Blockchain.Strato.Model.Wei
-import           Blockchain.Strato.RedisBlockDB         (readRedis, getWorldBestBlockInfo, getBestBlockInfo, getSyncStatus)
+import           Blockchain.Strato.RedisBlockDB         (runStratoRedisIO, getWorldBestBlockInfo, getBestBlockInfo, getSyncStatus)
 
 import           Control.Monad.Composable.BlocSQL
 import           Control.Monad.Composable.CoreAPI
 import           Control.Monad.Composable.SQL
 import           Control.Monad.Composable.Vault
 
--- import           Blockchain.EthConf                     (lookupRedisBlockDBConfig)
 import           Blockchain.Strato.RedisBlockDB.Models  (RedisBestBlock(..))
 
 import           Handlers.AccountInfo
@@ -112,7 +111,6 @@ import           Handlers.Transaction
 import           Strato.Strato23.Client
 import           Strato.Strato23.API.Types
 import           SQLM
--- import           Database.Redis                         (runRedis, checkedConnect)
 
 mergeTxParams :: Maybe TxParams -> Maybe TxParams -> Maybe TxParams
 mergeTxParams (Just inner) (Just outer) = Just $
@@ -1029,9 +1027,9 @@ getResultAndRespond txHashes resolve = do
 
 checkIsSynced :: (Monad m, HasSQL m) => m ()
 checkIsSynced = do
-  status         <- readRedis getSyncStatus
-  nodeBestBlock  <- readRedis getBestBlockInfo
-  worldBestBlock <- readRedis getWorldBestBlockInfo
+  status         <- runStratoRedisIO getSyncStatus
+  nodeBestBlock  <- runStratoRedisIO getBestBlockInfo
+  worldBestBlock <- runStratoRedisIO getWorldBestBlockInfo
   let nodeTotalDiff  = bestBlockTotalDifficulty <$> nodeBestBlock
       worldTotalDiff = bestBlockTotalDifficulty <$> worldBestBlock
 
