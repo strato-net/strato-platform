@@ -11,7 +11,7 @@
 {-# OPTIONS -fno-warn-orphans #-}
 
 module Blockchain.Strato.RedisBlockDB
-    ( RedisConnection(..), inNamespace, findNamespace
+    ( RedisConnection(..), inNamespace, findNamespace, readRedis
     , getSHAsByNumber
     , getChainInfo, putChainInfo
     , getChainMembers, putChainMembers
@@ -40,6 +40,7 @@ module Blockchain.Strato.RedisBlockDB
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Enode
+import           Blockchain.EthConf                    (lookupRedisBlockDBConfig)
 import           Blockchain.ExtWord                    (Word256)
 import           Blockchain.Output
 import           Blockchain.Sequencer.Event
@@ -610,15 +611,7 @@ putBestBlockInfo newSha newNumber newTDiff = do
                       forM_ updates $ \(sha, num) -> set (inNamespace Canonical $ num) (toValue sha)
                       unless (null deletions) . void . del $ inNamespace Canonical . toKey <$> deletions
                       forceBestBlockInfo newSha newNumber newTDiff
-                  newBBI' <- getBestBlockInfo
-                  status <- liftRedis getSyncStatus
-                  wbb <- getWorldBestBlockInfo
-                  case (status, newBBI', wbb) of
-                      (Just False, Just (RedisBestBlock _ _ newTDiff'), Just (RedisBestBlock _ _ wtd)) -> if newTDiff' >= wtd
-                                                                                                            then do _ <- liftRedis $ putSyncStatus True
-                                                                                                                    pure ()
-                                                                                                            else pure ()
-                      _ -> pure ()
+                  checkAndUpdateSyncStatus
                   case res of
                       TxSuccess _ -> return $ Right Ok
                       TxAborted   -> return . Left $ SingleLine (S8.pack "Aborted")
@@ -686,29 +679,7 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
 -- | Used to seed the first bestBlock, e.g. genesis block in strato-setup
 forceBestBlockInfo :: RedisCtx m f => Keccak256 -> Integer -> Integer -> m (f Status)
 forceBestBlockInfo sha i j = do
-    status <- liftRedis getSyncStatus
-    wbb <- liftRedis getWorldBestBlockInfo
-    case (status, wbb) of
-        (Just False, Just RedisBestBlock{..}) -> if j >= bestBlockTotalDifficulty
-                                                    then do _ <- liftRedis $ putSyncStatus True
-                                                            pure ()
-                                                    else pure ()
-        _                                     -> pure ()
-    forceBestBlockInfo' bestBlockInfoKey (RedisBestBlock sha i j) --`totalRecall` (,,)
-
-forceWorldBestBlockInfo :: RedisCtx m f => Keccak256 -> Integer -> Integer -> m (f Status)
-forceWorldBestBlockInfo sha i j = do
-    status <- liftRedis getSyncStatus
-    bb <- liftRedis getBestBlockInfo
-    case (status, bb) of
-        (Nothing, Just RedisBestBlock{..}) -> if bestBlockTotalDifficulty < j
-                                                 then do _ <- liftRedis $ putSyncStatus False
-                                                         pure ()
-                                                 else pure ()
-        (Nothing, Nothing) -> do _ <- liftRedis $ putSyncStatus False
-                                 pure ()
-        _ -> pure ()
-    forceBestBlockInfo' worldBestBlockKey (RedisBestBlock sha i j)
+        forceBestBlockInfo' bestBlockInfoKey (RedisBestBlock sha i j) --`totalRecall` (,,)
 
 forceBestBlockInfo' :: RedisCtx m f => S8.ByteString -> RedisBestBlock -> m (f Status)
 forceBestBlockInfo' key = set key . toValue
@@ -793,7 +764,8 @@ updateWorldBestBlockInfo sha num tdiff = withRetryCount 0
                       case maybeExistingWBBI of
                           Nothing -> do
                               liftLog $ $logWarnS "updateWorldBestBlockInfo" "No WorldBestBlock in Redis, will force"
-                              void $ forceWorldBestBlockInfo sha num tdiff
+                              void $ forceBestBlockInfo' worldBestBlockKey (RedisBestBlock sha num tdiff)
+                              checkAndUpdateSyncStatus
                               releaseAndFinalize lockID True
                           Just (RedisBestBlock _ _ oldTDiff) -> do
                               liftLog $ $logDebugS "updateWorldBestBlockInfo" $ T.pack ( "oldTDiff = " ++ show oldTDiff ++ "; newTDiff = " ++ show tdiff)
@@ -801,7 +773,8 @@ updateWorldBestBlockInfo sha num tdiff = withRetryCount 0
                               if willUpdate
                                   then do
                                       liftLog $ $logDebugS "updateWorldBestBlockInfo" . T.pack $ "Updating best block: " ++ show num
-                                      void $ forceWorldBestBlockInfo sha num tdiff
+                                      void $ forceBestBlockInfo' worldBestBlockKey (RedisBestBlock sha num tdiff)
+                                      checkAndUpdateSyncStatus
                                   else
                                       liftLog $ $logDebugS "updateWorldBestBlockInfo" "Not updating"
                               releaseAndFinalize lockID willUpdate
@@ -811,6 +784,22 @@ updateWorldBestBlockInfo sha num tdiff = withRetryCount 0
                             Right True  -> Right didUpdate
                             Right False -> Left $ SingleLine "Couldn't release redlock, it either expired or we had the wrong key"
                             err         -> err
+
+-- Put this after any "best block" or "world best block" update.
+-- We can't put this in the update functions themselves since multiExec fudges things up
+checkAndUpdateSyncStatus :: Redis ()
+checkAndUpdateSyncStatus = do
+    status         <- getSyncStatus
+    nodeBestBlock  <- getBestBlockInfo
+    worldBestBlock <- getWorldBestBlockInfo
+    let nodeTotalDiff  = bestBlockTotalDifficulty <$> nodeBestBlock
+        worldTotalDiff = bestBlockTotalDifficulty <$> worldBestBlock
+    
+    case (status, nodeTotalDiff, worldTotalDiff) of
+        (Just False, Just ntd, Just wtd) -> when (ntd >= wtd) (void $ putSyncStatus True)
+        (Nothing,    Just ntd, Just wtd) -> when (ntd <  wtd) (void $ putSyncStatus False)
+        (Nothing,    Nothing,  Just _  ) -> void $ putSyncStatus False
+        _ -> pure ()
 
 syncStatusKey :: S8.ByteString
 syncStatusKey = "<sync_status>"
@@ -823,5 +812,10 @@ getSyncStatus = fmap fromValue . eitherToMaybe <$> get syncStatusKey
           eitherToMaybe (Right a) = a
 
 putSyncStatus :: RedisCtx m f => Bool -> m (f Status)
-putSyncStatus status = do
-    set syncStatusKey $ toValue status
+putSyncStatus status = set syncStatusKey $ toValue status
+
+-- TODO: Use and effect system (runs in IO... 😒)
+readRedis :: MonadIO m => Redis a -> m a
+readRedis r = liftIO $ do
+  conn <- checkedConnect lookupRedisBlockDBConfig
+  runRedis conn r

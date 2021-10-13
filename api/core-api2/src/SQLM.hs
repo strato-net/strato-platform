@@ -158,10 +158,10 @@ apiErrorToServantErr = \case
                    ]}
   NotYetSynced n d -> err503{errBody = JSON.encode $ unlines
                   [ 
-                    "Not Yet Synced! whyyyy isn't thiss changing??!?",
+                    "Not Yet Synced!",
                     "Transactions cannot be posted to this node until it has synced with the network.",
                     "Please wait or use another node.",
-                    concat [ "Progress: ", show n, " / ", show d ]
+                    concat [ "Total Difficulty: ", show n, " / ", show d ]
                   ]}
   VMError err -> err422{errBody = JSON.encode err}
   Timeout err -> err504{errBody = JSON.encode err}

@@ -96,14 +96,14 @@ import           Blockchain.Strato.Model.Nonce
 import           Blockchain.Strato.Model.Secp256k1      hiding (HasVault)
 import           Data.Source.Map
 import           Blockchain.Strato.Model.Wei
-import           Blockchain.Strato.RedisBlockDB         (getWorldBestBlockInfo, getBestBlockInfo, getSyncStatus)
+import           Blockchain.Strato.RedisBlockDB         (readRedis, getWorldBestBlockInfo, getBestBlockInfo, getSyncStatus)
 
 import           Control.Monad.Composable.BlocSQL
 import           Control.Monad.Composable.CoreAPI
 import           Control.Monad.Composable.SQL
 import           Control.Monad.Composable.Vault
 
-import           Blockchain.EthConf                     (lookupRedisBlockDBConfig)
+-- import           Blockchain.EthConf                     (lookupRedisBlockDBConfig)
 import           Blockchain.Strato.RedisBlockDB.Models  (RedisBestBlock(..))
 
 import           Handlers.AccountInfo
@@ -112,7 +112,7 @@ import           Handlers.Transaction
 import           Strato.Strato23.Client
 import           Strato.Strato23.API.Types
 import           SQLM
-import           Database.Redis                         (runRedis, checkedConnect)
+-- import           Database.Redis                         (runRedis, checkedConnect)
 
 mergeTxParams :: Maybe TxParams -> Maybe TxParams -> Maybe TxParams
 mergeTxParams (Just inner) (Just outer) = Just $
@@ -1029,28 +1029,12 @@ getResultAndRespond txHashes resolve = do
 
 checkIsSynced :: (Monad m, HasSQL m) => m ()
 checkIsSynced = do
-  worldTotalDiff <- getWorldTotalDifficulty
-  nodeTotalDiff <- getNodeTotalDifficulty
-  status <- syncStatus
+  status         <- readRedis getSyncStatus
+  nodeBestBlock  <- readRedis getBestBlockInfo
+  worldBestBlock <- readRedis getWorldBestBlockInfo
+  let nodeTotalDiff  = bestBlockTotalDifficulty <$> nodeBestBlock
+      worldTotalDiff = bestBlockTotalDifficulty <$> worldBestBlock
 
   case (status, worldTotalDiff, nodeTotalDiff) of
     (Just False, Just wtd, Just ntd) -> throwIO $ NotYetSynced ntd wtd
     _                                -> pure ()
-
-syncStatus :: MonadIO m => m (Maybe Bool)
-syncStatus = do
-  conn <- liftIO $ checkedConnect lookupRedisBlockDBConfig
-  syncStatus' <- liftIO $ runRedis conn getSyncStatus
-  pure syncStatus'
-
-getNodeTotalDifficulty :: MonadIO m => m (Maybe Integer)
-getNodeTotalDifficulty = do
-  conn <- liftIO $ checkedConnect lookupRedisBlockDBConfig
-  redisBestBlock <- liftIO $ runRedis conn getBestBlockInfo
-  pure $ bestBlockTotalDifficulty <$> redisBestBlock
-
-getWorldTotalDifficulty :: MonadIO m => m (Maybe Integer)
-getWorldTotalDifficulty = do
-  conn <- liftIO $ checkedConnect lookupRedisBlockDBConfig
-  redisBestBlock <- liftIO $ runRedis conn getWorldBestBlockInfo
-  pure $ bestBlockTotalDifficulty <$> redisBestBlock
