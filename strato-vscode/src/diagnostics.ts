@@ -25,12 +25,12 @@ export async function refreshDiagnostics(doc: vscode.TextDocument, solidityDiagn
  * This detector finds all instances of dead code.
  * @param doc text document to analyze
  */
-async function findDeadCode(doc: vscode.TextDocument): Promise<Array<Object>> {  
+async function findDeadCode(srcArr: Array<Array<string>>): Promise<Array<Object>> {  
   const user = await getApplicationUser();
   const config = getConfig() || {};
   const options = { config };
 
-  const contractAST = await rest.debugPostParse(user, {source: doc.getText()}, options);
+  const contractAST = await rest.debugPostParse(user, srcArr, options);
   
   let privFuncs = Array();
   let searchFuncs = Array();
@@ -49,12 +49,12 @@ async function findDeadCode(doc: vscode.TextDocument): Promise<Array<Object>> {
           'start': {
             'line': contractFunctions[key].funcContext.start.line, 
             'column': contractFunctions[key].funcContext.start.column, 
-            'name': doc.uri.path
+            'name': contractFunctions[key].funcContext.start.name
           }, 
           'end': {
             'line': contractFunctions[key].funcContext.end.line,
             'column':  contractFunctions[key].funcContext.end.column,
-            'name': doc.uri.path
+            'name': contractFunctions[key].funcContext.end.name
           }});
       }
     }
@@ -124,7 +124,7 @@ async function validate(counter: number, doc: vscode.TextDocument, solidityDiagn
         srcArr = await importer.combine(doc.uri.path, false, dirPath);
       }
       // Run dead code detector
-      const deadCodeArr = await findDeadCode(doc);
+      const deadCodeArr = await findDeadCode(srcArr);
       
       
       const annotations = await rest.debugPostAnalyze(user, srcArr, options);
