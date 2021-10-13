@@ -56,7 +56,7 @@ type PutWatches = "watches" :> ReqBody '[JSON] [EvaluationRequest] :> Put '[JSON
 type DeleteWatches = "watches" :> ReqBody '[JSON] [EvaluationRequest] :> Delete '[JSON] DebuggerStatus
 type PostEvals = "eval" :> ReqBody '[JSON] [EvaluationRequest] :> Post '[JSON] [EvaluationResponse]
 type PostParse = "parse" :> ReqBody '[JSON] SourceMap :> Post '[JSON] A.Value
-type PostAnalyze = "analyze" :> ReqBody '[JSON] SourceMap :> Post '[JSON] [SourceAnnotation T.Text]
+type PostAnalyze = "analyze" :> ReqBody '[JSON] SourceMap :> Post '[JSON] [SourceAnnotation (WithSeverity T.Text)]
 
 restDebuggerAPI :: Proxy RestDebuggerAPI
 restDebuggerAPI = Proxy
