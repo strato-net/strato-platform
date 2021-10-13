@@ -46,6 +46,7 @@ statementHelper (DoWhileStatement body cond _) =
    in concat [bs, cs]
 statementHelper (Continue _) = []
 statementHelper (Break _) = []
+statementHelper (Return (Just (BoolLiteral _ _)) _) = []
 statementHelper (Return mExpr _) =
   maybe [] expressionHelper mExpr
 statementHelper (Throw _) = []
