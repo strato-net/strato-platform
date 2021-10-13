@@ -521,11 +521,10 @@ getConstructorType' x l = do
   case M.lookup (T.unpack l) _contracts of
     Nothing -> pure . bottom $ ("Unknown contract: " <> l) <$ x
     Just c -> case _constructor c of
-      Nothing -> pure $ Function (Product [] x) (Sum (Static Account x :| [Product [] x])) x
+      Nothing -> pure $ Function (Product [] x) (Static (Xabi.Contract l) x) x
       Just Func{..} ->
         let fArgs = flip Product x $ flip Static x . indexedTypeType . snd <$> funcArgs
-            fRets = flip Product x $ flip Static x . indexedTypeType . snd <$> funcVals
-         in pure $ Function fArgs (Sum (Static Account x :| [Product [] x, fRets])) x
+         in pure $ Function fArgs (Static (Xabi.Contract l) x) x
 
 getTypeErrors :: Type' -> [SourceAnnotation Text]
 getTypeErrors (Bottom ts) = NE.toList ts
@@ -581,9 +580,10 @@ statementsHelper args ss = do
   let x = funcContext f
   ~(ts', s) <- flip runStateT ((Nothing, args) :| []) $ do
     cCalls <- for (M.assocs $ funcConstructorCalls f) $ \(cName, exprs) -> do
-      let constructorArgs = getConstructorType' x $ T.pack cName
+      let cName' = T.pack cName
+          constructorArgs = getConstructorType' x cName'
           givenArgs = flip Product x <$> traverse tcExpr exprs
-          givenFunc = (\t-> Function t (Product [] x) x) <$> givenArgs
+          givenFunc = (\t-> Function t (Static (Xabi.Contract cName') x) x) <$> givenArgs
       constructorArgs <~> givenFunc
     stmts' <- traverse statementHelper ss
     pure $ concat [stmts', cCalls]
@@ -692,6 +692,7 @@ parseCertArgs :: SourceAnnotation Text -> Type'
 parseCertArgs x = stringType' x
 
 getVarType' :: String -> SourceAnnotation Text -> SSS Type'
+getVarType' "this" ctx = pure $ Static Account ctx
 getVarType' "uint" ctx = pure $ Function (intArgs ctx) (Static (Int (Just False) Nothing) ctx) ctx
 getVarType' "int" ctx =  pure $ Function (intArgs ctx) (Static (Int (Just True) Nothing) ctx) ctx
 getVarType' "address" ctx =  pure $ Function (addressArgs ctx) (Static Account ctx) ctx
@@ -707,6 +708,12 @@ getVarType' "assert" ctx =  pure $ Function (assertArgs ctx) (Product [] ctx) ct
 getVarType' "registerCert" ctx =  pure $ Function (registerCertArgs ctx) (Product [] ctx) ctx
 getVarType' "getUserCert" ctx =  pure $ Function (getUserCertArgs ctx) (certType' ctx) ctx
 getVarType' "parseCert" ctx =  pure $ Function (parseCertArgs ctx) (certType' ctx) ctx
+getVarType' "Util" ctx = pure $ Static (Label "Util") ctx
+getVarType' "msg" ctx = pure $ Static (Label "msg") ctx
+getVarType' "tx" ctx = pure $ Static (Label "tx") ctx
+getVarType' "block" ctx = pure $ Static (Label "block") ctx
+getVarType' "super" ctx = pure $ Static (Label "super") ctx
+
 getVarType' name ctx = do
   mVar <- foldr (lookupVar . snd) Nothing <$> get
   case mVar of
@@ -732,7 +739,8 @@ getVarType' name ctx = do
             pure $ case M.lookup name $ _contracts cc of
               Just _->
                 let ctrct = Static (Xabi.Contract $ T.pack name) ctx
-                 in Function (Sum (Static Account ctx :| [ctrct]))
+                    lbl = Static (Label name) ctx
+                 in Function (Sum (Static Account ctx :| [ctrct, lbl]))
                              ctrct
                              ctx
               Nothing -> bottom $ ("Unknown variable: " <> T.pack name) <$ ctx
@@ -900,5 +908,4 @@ tcExpr (StringLiteral x _) = pure $ stringType' x
 tcExpr (TupleExpression x es) =
   productType' x <$> traverse (maybe (pure $ topType' x) tcExpr) es
 tcExpr (ArrayExpression x es) = foldr (<~>) (pure $ topType' x) $ tcExpr <$> es
-tcExpr (Variable x "this") = pure $ Static Account x
 tcExpr (Variable x name) = getVarType' name x
