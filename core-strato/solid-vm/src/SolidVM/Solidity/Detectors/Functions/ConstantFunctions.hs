@@ -140,12 +140,7 @@ simpleStatementHelper (ExpressionStatement expr) =
 
 generateAnn :: String -> SourceAnnotation () -> [String] -> [SourceAnnotation Text]
 generateAnn varName x = \case
-  [] ->
-    let msg = T.pack $ concat
-          [ "Undefined variable: "
-          , varName
-          ]
-     in [msg <$ x]
+  [] -> []
   (c:[]) ->
     let msg = T.pack $ concat
           [ "Variable "

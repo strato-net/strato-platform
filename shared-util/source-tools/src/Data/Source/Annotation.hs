@@ -8,6 +8,7 @@ module Data.Source.Annotation
   ( SourceAnnotation(..)
   , Positioned
   , Annotated
+  , parseErrorToAnnotation
   , withAnnotation
   , withPosition
   , position
@@ -18,11 +19,12 @@ import           Data.Aeson                as Aeson
 import           Data.Data
 import           Data.Source.Position
 import           Data.Swagger
-import           Data.Text                 (Text)
+import           Data.Text                 (Text, pack)
 import           GHC.Generics
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances ()
-import           Text.Parsec
+import           Text.Parsec               (ParsecT)
+import           Text.Parsec.Error
 
 data SourceAnnotation a = SourceAnnotation
   { _sourceAnnotationStart      :: SourcePosition
@@ -62,6 +64,19 @@ instance Semigroup a => Semigroup (SourceAnnotation a) where
 
 type Positioned f = f (SourceAnnotation ())
 type Annotated f = f (SourceAnnotation Text)
+
+parseErrorToAnnotation :: ParseError -> SourceAnnotation Text
+parseErrorToAnnotation pe =
+  let msgs = errorMessages pe
+      sp = toSourcePosition $ errorPos pe
+      ann = showErrorMessages
+        "or"
+        "unknown parse error"
+        "expecting"
+        "unexpected"
+        "end of input"
+        msgs
+   in SourceAnnotation sp sp $ pack ann
 
 withAnnotation :: Monad m
                => a

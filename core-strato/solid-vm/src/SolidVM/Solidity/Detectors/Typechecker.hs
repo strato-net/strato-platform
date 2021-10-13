@@ -276,6 +276,8 @@ typecheck' f r1 r2 = case (r1, r2) of
   (Top n1 _, Top n2 x) -> pure $ Top (n1 <> n2) x
   (Top names _, m@(Static t x)) -> reduceType' x . (m:) <$> traverse (\n -> f x n t) (S.toList names)
   (m@(Static t x), Top names _) -> m <$ reduceType' x . (m:) <$> traverse (\n -> f x n t) (S.toList names)
+  (Top _ _, m) -> pure m
+  (m, Top _ _) -> pure m
   (t1, Sum t2) -> pickType' (context' t1) <$> traverse (typecheck' f t1) (NE.toList t2)
   (Sum t1, t2) -> pickType' (context' t2) <$> traverse (flip (typecheck' f) t2) (NE.toList t1)
   (Static t1 _, Static t2 x) -> pure $ case typecheckStatic t1 t2 of
@@ -439,7 +441,31 @@ typecheckIndex x y = bottom $ "Mismatched index type" <$ (context' x <> context'
 
 typecheckMember :: Type' -> Text -> SSS Type'
 typecheckMember (Static (Array _ _) x) "length" = pure $ Static (Int Nothing Nothing) x
+typecheckMember (Static (Array t _) x) "push" = pure $ Function (Static t x) (Product [] x) x
 typecheckMember (Static (Array _ _) x) n = pure . bottom $ ("Unknown member of Array: " <> n) <$ x
+typecheckMember (Static (Label "Util") x) "bytes32ToString" = pure $ Function (Static (Bytes Nothing (Just 32)) x) (Static (String Nothing) x) x
+typecheckMember (Static (Label "Util") x) "b32" = pure $ Function (Static (Bytes Nothing (Just 32)) x) (Static (Bytes Nothing (Just 32)) x) x
+typecheckMember (Static (Label "msg") x) "sender" = pure $ Static Account x
+typecheckMember (Static (Label "tx") x) "origin" = pure $ Static Account x
+typecheckMember (Static (Label "tx") x) "username" = pure $ Static (String Nothing) x
+typecheckMember (Static (Label "tx") x) "organization" = pure $ Static (String Nothing) x
+typecheckMember (Static (Label "tx") x) "group" = pure $ Static (String Nothing) x
+typecheckMember (Static (Label "block") x) "timestamp" = pure $ Static (Int Nothing Nothing) x
+typecheckMember (Static (Label "block") x) "number" = pure $ Static (Int Nothing Nothing) x
+typecheckMember (Static (Label "super") x) method = do
+  ctract <- asks contract
+  cc <- asks codeCollection
+  let method' = T.unpack method
+  case getParents ((fmap $ const ()) <$> cc) ((fmap $ const ()) <$> ctract) of
+    Left _ -> pure . bottom $ "Contract has missing parents" <$ x
+    Right parents' -> case filter (elem method' . M.keys .  _functions) parents' of
+      [] -> pure . bottom $ "cannot use super without a parent contract" <$ x
+      ps -> case M.lookup method' . _functions $ last ps of
+        Nothing -> pure . bottom $ ("super does not have a function called " <> method) <$ x
+        Just Func{..} ->
+          let fArgs = flip Product x $ flip Static x . indexedTypeType . snd <$> funcArgs
+              fRets = flip Product x $ flip Static x . indexedTypeType . snd <$> funcVals
+           in pure $ Function fArgs fRets x
 typecheckMember (Static e@(Enum _ enum mNames) x) n = do
   names <- case mNames of
     Just names -> pure names
@@ -487,7 +513,7 @@ typecheckMember (Static (Label c') x) n = do
             t -> pure t
         t -> pure t
     t -> pure t
-typecheckMember x n = pure . bottom $ ("Unknown member: " <> T.pack (show x) <> "\n  " <> n) <$ context' x
+typecheckMember x n = pure . bottom $ ("Unknown member: " <> showType' x <> "\n  " <> n) <$ context' x
 
 getConstructorType' :: MonadReader R m => SourceAnnotation Text -> Text -> m Type'
 getConstructorType' x l = do
@@ -495,11 +521,10 @@ getConstructorType' x l = do
   case M.lookup (T.unpack l) _contracts of
     Nothing -> pure . bottom $ ("Unknown contract: " <> l) <$ x
     Just c -> case _constructor c of
-      Nothing -> pure $ Function (Product [] x) (Sum (Static Account x :| [Product [] x])) x
+      Nothing -> pure $ Function (Product [] x) (Static (Xabi.Contract l) x) x
       Just Func{..} ->
         let fArgs = flip Product x $ flip Static x . indexedTypeType . snd <$> funcArgs
-            fRets = flip Product x $ flip Static x . indexedTypeType . snd <$> funcVals
-         in pure $ Function fArgs (Sum (Static Account x :| [Product [] x, fRets])) x
+         in pure $ Function fArgs (Static (Xabi.Contract l) x) x
 
 getTypeErrors :: Type' -> [SourceAnnotation Text]
 getTypeErrors (Bottom ts) = NE.toList ts
@@ -555,9 +580,10 @@ statementsHelper args ss = do
   let x = funcContext f
   ~(ts', s) <- flip runStateT ((Nothing, args) :| []) $ do
     cCalls <- for (M.assocs $ funcConstructorCalls f) $ \(cName, exprs) -> do
-      let constructorArgs = getConstructorType' x $ T.pack cName
+      let cName' = T.pack cName
+          constructorArgs = getConstructorType' x cName'
           givenArgs = flip Product x <$> traverse tcExpr exprs
-          givenFunc = (\t-> Function t (Product [] x) x) <$> givenArgs
+          givenFunc = (\t-> Function t (Static (Xabi.Contract cName') x) x) <$> givenArgs
       constructorArgs <~> givenFunc
     stmts' <- traverse statementHelper ss
     pure $ concat [stmts', cCalls]
@@ -666,6 +692,7 @@ parseCertArgs :: SourceAnnotation Text -> Type'
 parseCertArgs x = stringType' x
 
 getVarType' :: String -> SourceAnnotation Text -> SSS Type'
+getVarType' "this" ctx = pure $ Static Account ctx
 getVarType' "uint" ctx = pure $ Function (intArgs ctx) (Static (Int (Just False) Nothing) ctx) ctx
 getVarType' "int" ctx =  pure $ Function (intArgs ctx) (Static (Int (Just True) Nothing) ctx) ctx
 getVarType' "address" ctx =  pure $ Function (addressArgs ctx) (Static Account ctx) ctx
@@ -681,6 +708,12 @@ getVarType' "assert" ctx =  pure $ Function (assertArgs ctx) (Product [] ctx) ct
 getVarType' "registerCert" ctx =  pure $ Function (registerCertArgs ctx) (Product [] ctx) ctx
 getVarType' "getUserCert" ctx =  pure $ Function (getUserCertArgs ctx) (certType' ctx) ctx
 getVarType' "parseCert" ctx =  pure $ Function (parseCertArgs ctx) (certType' ctx) ctx
+getVarType' "Util" ctx = pure $ Static (Label "Util") ctx
+getVarType' "msg" ctx = pure $ Static (Label "msg") ctx
+getVarType' "tx" ctx = pure $ Static (Label "tx") ctx
+getVarType' "block" ctx = pure $ Static (Label "block") ctx
+getVarType' "super" ctx = pure $ Static (Label "super") ctx
+
 getVarType' name ctx = do
   mVar <- foldr (lookupVar . snd) Nothing <$> get
   case mVar of
@@ -704,9 +737,12 @@ getVarType' name ctx = do
           Nothing -> do
             cc <- asks codeCollection
             pure $ case M.lookup name $ _contracts cc of
-              Just _-> Function (Static Account ctx)
-                                (Static (Xabi.Contract $ T.pack name) ctx)
-                                ctx
+              Just _->
+                let ctrct = Static (Xabi.Contract $ T.pack name) ctx
+                    lbl = Static (Label name) ctx
+                 in Function (Sum (Static Account ctx :| [ctrct, lbl]))
+                             ctrct
+                             ctx
               Nothing -> bottom $ ("Unknown variable: " <> T.pack name) <$ ctx
             
   where lookupVar m Nothing = M.lookup name m
