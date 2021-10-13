@@ -439,7 +439,31 @@ typecheckIndex x y = bottom $ "Mismatched index type" <$ (context' x <> context'
 
 typecheckMember :: Type' -> Text -> SSS Type'
 typecheckMember (Static (Array _ _) x) "length" = pure $ Static (Int Nothing Nothing) x
+typecheckMember (Static (Array t _) x) "push" = pure $ Function (Static t x) (Product [] x) x
 typecheckMember (Static (Array _ _) x) n = pure . bottom $ ("Unknown member of Array: " <> n) <$ x
+typecheckMember (Static (Label "Util") x) "bytes32ToString" = pure $ Function (Static (Bytes Nothing (Just 32)) x) (Static (String Nothing) x) x
+typecheckMember (Static (Label "Util") x) "b32" = pure $ Function (Static (Bytes Nothing (Just 32)) x) (Static (Bytes Nothing (Just 32)) x) x
+typecheckMember (Static (Label "msg") x) "sender" = pure $ Static Account x
+typecheckMember (Static (Label "tx") x) "origin" = pure $ Static Account x
+typecheckMember (Static (Label "tx") x) "username" = pure $ Static (String Nothing) x
+typecheckMember (Static (Label "tx") x) "organization" = pure $ Static (String Nothing) x
+typecheckMember (Static (Label "tx") x) "group" = pure $ Static (String Nothing) x
+typecheckMember (Static (Label "block") x) "timestamp" = pure $ Static (Int Nothing Nothing) x
+typecheckMember (Static (Label "block") x) "number" = pure $ Static (Int Nothing Nothing) x
+typecheckMember (Static (Label "super") x) method = do
+  ctract <- asks contract
+  cc <- asks codeCollection
+  let method' = T.unpack method
+  case getParents ((fmap $ const ()) <$> cc) ((fmap $ const ()) <$> ctract) of
+    Left _ -> pure . bottom $ "Contract has missing parents" <$ x
+    Right parents' -> case filter (elem method' . M.keys .  _functions) parents' of
+      [] -> pure . bottom $ "cannot use super without a parent contract" <$ x
+      ps -> case M.lookup method' . _functions $ last ps of
+        Nothing -> pure . bottom $ ("super does not have a function called " <> method) <$ x
+        Just Func{..} ->
+          let fArgs = flip Product x $ flip Static x . indexedTypeType . snd <$> funcArgs
+              fRets = flip Product x $ flip Static x . indexedTypeType . snd <$> funcVals
+           in pure $ Function fArgs fRets x
 typecheckMember (Static e@(Enum _ enum mNames) x) n = do
   names <- case mNames of
     Just names -> pure names
