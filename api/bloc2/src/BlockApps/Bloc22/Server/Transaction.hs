@@ -96,11 +96,14 @@ import           Blockchain.Strato.Model.Nonce
 import           Blockchain.Strato.Model.Secp256k1      hiding (HasVault)
 import           Data.Source.Map
 import           Blockchain.Strato.Model.Wei
+import           Blockchain.Strato.RedisBlockDB         (runStratoRedisIO, getWorldBestBlockInfo, getBestBlockInfo, getSyncStatus)
 
 import           Control.Monad.Composable.BlocSQL
 import           Control.Monad.Composable.CoreAPI
 import           Control.Monad.Composable.SQL
 import           Control.Monad.Composable.Vault
+
+import           Blockchain.Strato.RedisBlockDB.Models  (RedisBestBlock(..))
 
 import           Handlers.AccountInfo
 import           Handlers.Transaction
@@ -138,6 +141,7 @@ postBlocTransactionRaw :: (MonadLogger m, HasSQL m) =>
                        -> PostBlocTransactionRawRequest
                        -> m BlocChainOrTransactionResult
 postBlocTransactionRaw _ _ resolve PostBlocTransactionRawRequest{..} = do
+  checkIsSynced
   -- as a requirement for Pepsi, we have to be able to accept non-rec sigs
   -- so, if 'v' is not provided, we have to figure out what 'v' is here
 
@@ -221,6 +225,7 @@ postBlocTransactionParallel :: (MonadLogger m,
 postBlocTransactionParallel a b resolve queue c =
   if queue && not resolve
     then do
+      checkIsSynced
       tbqueue <- fmap txTBQueue getBlocEnv
       atomically $ writeTBQueue tbqueue (a,b,resolve,c)
       pure []
@@ -245,6 +250,7 @@ postBlocTransaction' :: (MonadLogger m,
                      -> PostBlocTransactionRequest
                      -> m [BlocChainOrTransactionResult]
 postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRequest mAddr txs' txParams msrcs) = do
+  checkIsSynced
   evmCompatibleOn <- fmap evmCompatible getBlocEnv
   case mUserName of
     Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-UNIQUE-NAME in the header"
@@ -1018,3 +1024,15 @@ getResultAndRespond txHashes resolve = do
     (Failure, Just tr, _) -> throwIO (VMError $ Text.pack $ "Error running the transaction: " ++ transactionResultMessage tr)
     (Pending, _, False) -> return result
     (Pending, _, _) -> throwIO (Timeout "Timeout: blockchain peer hasn't responded to transaction request for over 60 seconds")
+
+checkIsSynced :: (Monad m, HasSQL m) => m ()
+checkIsSynced = do
+  status         <- runStratoRedisIO getSyncStatus
+  nodeBestBlock  <- runStratoRedisIO getBestBlockInfo
+  worldBestBlock <- runStratoRedisIO getWorldBestBlockInfo
+  let nodeTotalDiff  = bestBlockTotalDifficulty <$> nodeBestBlock
+      worldTotalDiff = bestBlockTotalDifficulty <$> worldBestBlock
+
+  case (status, worldTotalDiff, nodeTotalDiff) of
+    (Just False, Just wtd, Just ntd) -> throwIO $ NotYetSynced ntd wtd
+    _                                -> pure ()

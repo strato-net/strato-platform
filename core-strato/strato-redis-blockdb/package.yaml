@@ -28,6 +28,7 @@ library:
   - mtl
   - random
   - seqevents
+  - strato-conf
   - strato-model
   - text
   

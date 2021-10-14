@@ -72,6 +72,7 @@ library:
     - sql-monad
     - stm-conduit
     - strato-model
+    - strato-redis-blockdb
     - swagger2
     - temporary
     - time
