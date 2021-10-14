@@ -907,5 +907,9 @@ tcExpr (NumberLiteral x _ _) = pure $ intType' x
 tcExpr (StringLiteral x _) = pure $ stringType' x
 tcExpr (TupleExpression x es) =
   productType' x <$> traverse (maybe (pure $ topType' x) tcExpr) es
-tcExpr (ArrayExpression x es) = foldr (<~>) (pure $ topType' x) $ tcExpr <$> es
+tcExpr (ArrayExpression x es) = do
+  t' <- foldr (<~>) (pure $ topType' x) $ tcExpr <$> es
+  pure $ case t' of
+    (Static t _) ->Static (Array t Nothing) x
+    _ -> t'
 tcExpr (Variable x name) = getVarType' name x
