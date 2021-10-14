@@ -247,7 +247,7 @@ pipeline {
 
 
       script {
-        if (env.PLATFORM_BRANCH_NAME == 'develop') {
+        if (env.BRANCH_NAME == 'develop') {
           slackSend(
               channel: '#engineering',
               color: 'danger',
