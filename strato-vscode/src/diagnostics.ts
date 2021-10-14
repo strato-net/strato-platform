@@ -82,7 +82,10 @@ async function findDeadCode(srcArr: Array<Array<string>>): Promise<Array<Object>
       for(let i = 0; i < privFuncs.length; ++i) {
         if (privFuncs.length != 0) {
           deadFuncs.push({
-            'annotation': `The function '${privFuncs[i].funcName}' in contract '${contractName}' is never used and should be removed`,
+            'annotation': {
+              '_context': `The function '${privFuncs[i].funcName}' in contract '${contractName}' is never used and should be removed`,
+              '_severity': 'Warning'
+            },
             'start': {
               'line': privFuncs[i].start.line,
               'column': privFuncs[i].start.column,
@@ -121,7 +124,8 @@ async function validate(counter: number, doc: vscode.TextDocument, solidityDiagn
 		    const folder = currentFolder.uri.path;
         // eslint-disable-next-line import/no-mutable-exports
         const dirPath = `${folder}/${serverPath}`
-        srcArr = await importer.combine(doc.uri.path, false, dirPath);
+        srcArr = await importer.combine(doc.uri.path, true, dirPath);
+        srcArr[importer.getShortName(doc.uri.path)] = doc.getText();
       }
       // Run dead code detector
       const deadCodeArr = await findDeadCode(srcArr);
@@ -172,8 +176,16 @@ function createDiagnostic(doc: vscode.TextDocument, ann: any): vscode.Diagnostic
     // create range that represents, where in the document the word is
     const range = new vscode.Range(sLine, sCol, eLine, eCol);
 
-    const diagnostic = new vscode.Diagnostic(range, ann.annotation,
-      vscode.DiagnosticSeverity.Warning);
+    let severity = vscode.DiagnosticSeverity.Information;
+    switch (ann.annotation._severity) {
+      case 'Error': severity = vscode.DiagnosticSeverity.Error; break;
+      case 'Warning': severity = vscode.DiagnosticSeverity.Warning; break;
+      case 'Info': severity = vscode.DiagnosticSeverity.Information; break;
+      case 'Debug': severity = vscode.DiagnosticSeverity.Hint; break;
+    }
+
+    const diagnostic = new vscode.Diagnostic(range, ann.annotation._context,
+      severity);
     diagnostic.code = '';
     return diagnostic;
   }

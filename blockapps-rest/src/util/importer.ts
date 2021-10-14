@@ -257,4 +257,5 @@ function combine(filename, toObject, relativePath):Promise<any> {
 
 export default {
   combine,
+  getShortName,
 }
