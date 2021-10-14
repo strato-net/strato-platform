@@ -1155,7 +1155,7 @@ expToVar' x@(Xabi.MemberAccess _ expr name) = do
           _ -> return . Constant . SReference . apSnoc apt $ MS.Field "length"
 
       (SReference p, itemName) -> return . Constant . SReference $ apSnoc p $ MS.Field $ BC.pack itemName
-      _ -> typeError "illegal member access" $ unparseExpression x
+      m -> typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ show m)
 {-
     Variable vref -> do
       val' <- liftIO $ readIORef vref
