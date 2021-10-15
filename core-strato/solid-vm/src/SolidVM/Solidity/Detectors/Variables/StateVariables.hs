@@ -11,12 +11,13 @@ import           Control.Lens
 import           Control.Monad.State
 import           Data.Foldable       (traverse_)
 import qualified Data.Map.Strict     as M
-import           Data.Maybe          (isJust)
+import           Data.Maybe          (isJust, maybeToList)
 import           Data.Source
 import           Data.Text           (Text)
 import qualified Data.Text           as T
 import           SolidVM.Solidity.Xabi
 import           SolidVM.Solidity.Xabi.Statement
+import qualified SolidVM.Solidity.Xabi.Type as Xabi
 
 type StateVars = M.Map String (Bool, Bool, VariableDecl)
 type LocalVars = [M.Map String (SourceAnnotation ())]
@@ -30,14 +31,20 @@ contractHelper :: Contract -> [SourceAnnotation Text]
 contractHelper Contract{..} =
   let stateVariables = M.map (False, False,) _storageDefs
       emptyState = (stateVariables, [])
-      action = traverse functionHelper $ M.elems _functions
+      action = traverse functionHelper $ maybeToList _constructor ++ M.elems _functions
       stateVariables' = fst $ execState action emptyState
       findStateAnns name (False, False, a) =
         [(T.pack $ "Unused state variable " ++ name ++ ".") <$ varContext a]
-      findStateAnns name (True, False, VariableDecl{..}) | varInitialVal == Nothing =
-        [(T.pack $ "Uninitialized state variable " ++ name ++ ". Consider initializing it to prevent incorrect behavior.") <$ varContext]
-      findStateAnns name (True, False, a) =
-        [(T.pack $ "State variable " ++ name ++ " is never written to. Consider making it a constant.") <$ varContext a]
+      findStateAnns name (True, False, VariableDecl{..}) | varInitialVal == Nothing = case varType of
+        Xabi.Struct{} -> []
+        Xabi.Array _ Nothing -> []
+        Xabi.Mapping{} -> []
+        _ -> [(T.pack $ "Uninitialized state variable " ++ name ++ ". Consider initializing it to prevent incorrect behavior.") <$ varContext]
+      findStateAnns name (True, False, a) = case varType a of
+        Xabi.Struct{} -> []
+        Xabi.Array _ Nothing -> []
+        Xabi.Mapping{} -> []
+        _ -> [(T.pack $ "State variable " ++ name ++ " is never written to. Consider making it a constant.") <$ varContext a]
       findStateAnns _ _ = []
    in M.foldMapWithKey findStateAnns stateVariables'
 
