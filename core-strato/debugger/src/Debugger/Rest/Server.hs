@@ -83,9 +83,9 @@ postParse :: ToJSON a
           -> Handler A.Value
 postParse parse = pure . either toJSON toJSON . parse
 
-postAnalyze :: (SourceMap -> Identity [SourceAnnotation T.Text])
+postAnalyze :: (SourceMap -> Identity [SourceAnnotation (WithSeverity T.Text)])
             -> SourceMap
-            -> Handler [SourceAnnotation T.Text]
+            -> Handler [SourceAnnotation (WithSeverity T.Text)]
 postAnalyze analyze = pure . runIdentity . analyze
 
 restDebuggerServer :: ToJSON a

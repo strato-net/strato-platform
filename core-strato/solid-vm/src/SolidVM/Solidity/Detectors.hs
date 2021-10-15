@@ -25,28 +25,47 @@ parserDetectors :: [ParserDetector]
 parserDetectors = [ IncorrectSolidityVersion.detector
                   ]
 
-compilerDetectors :: [CompilerDetector]
-compilerDetectors = [ Trivial.detector
-                    , Typechecker.detector
-                    , Continue.detector
-                    , Modifiers.detector
-                    , ParentConstructors.detector
-                    , BooleanLiterals.detector
-                    , DivideBeforeMultiply.detector
-                    , StateVariableShadowing.detector
-                    , UninitializedLocalVariables.detector
-                    , WriteAfterWrite.detector
-                    , ConstantFunctions.detector
-                    , StateVariables.detector
-                    ]
+compilerWarningDetectors :: [CompilerDetector]
+compilerWarningDetectors = [ Trivial.detector
+                           , Continue.detector
+                           , Modifiers.detector
+                           , ParentConstructors.detector
+                           , BooleanLiterals.detector
+                           , DivideBeforeMultiply.detector
+                           , StateVariableShadowing.detector
+                           , UninitializedLocalVariables.detector
+                           , WriteAfterWrite.detector
+                           , ConstantFunctions.detector
+                           , StateVariables.detector
+                           ]
+compilerErrorDetectors :: [CompilerDetector]
+compilerErrorDetectors = [ Typechecker.detector
+                         ]
 
 runDetectors :: (Applicative (f a), Bifoldable f)
              => (SourceMap -> f a [SourceUnit])
              -> (SourceMap -> f a CodeCollection)
              -> (a -> [SourceAnnotation Text])
              -> SourceMap
-             -> [SourceAnnotation Text]
+             -> [SourceAnnotation (WithSeverity Text)]
 runDetectors parse compile handleErrors source =
-  let parserAnnotations = concat . (parserDetectors <*>) . (:[]) <$> parse source
-      compilerAnnotations = concat . (compilerDetectors <*>) . (:[]) <$> compile source
-   in bifoldMap handleErrors id $ (++) <$> parserAnnotations <*> compilerAnnotations
+  let parserAnnotations = map (withSeverity Warning)
+                        . concat
+                        . (parserDetectors <*>)
+                        . (:[])
+                        <$> parse source
+      compilerErrors = map (withSeverity Error) 
+                     . concat
+                     . (compilerErrorDetectors <*>)
+                     . (:[])
+                     <$> compile source
+      compilerWarnings = map (withSeverity Warning)
+                       . concat
+                       . (compilerWarningDetectors <*>)
+                       . (:[])
+                       <$> compile source
+   in bifoldMap (map (withSeverity Error) . handleErrors) id $
+        (\p e w -> concat [p,e,w])
+        <$> parserAnnotations
+        <*> compilerErrors
+        <*> compilerWarnings
