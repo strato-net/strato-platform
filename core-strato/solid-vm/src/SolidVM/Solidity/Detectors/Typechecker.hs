@@ -16,7 +16,6 @@ import           Data.Foldable (traverse_)
 import           Data.Functor.Identity (runIdentity)
 import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
-import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import           Data.Maybe      (catMaybes, fromJust, fromMaybe)
 import qualified Data.Set        as S
@@ -123,11 +122,11 @@ lookupEnum name = do
   c <- asks contract
   pure . fmap T.pack . maybe [] fst $ M.lookup (T.unpack name) (_enums c)
 
-lookupStruct :: Text -> SSS (Map Text Type)
+lookupStruct :: Text -> SSS [(Text, Type)]
 lookupStruct name = do
   c <- asks contract
   let str = fromMaybe [] $ M.lookup (T.unpack name) (_structs c)
-  pure . M.fromList $ f <$> str
+  pure $ f <$> str
   where f (t, ft, _) = (t, fieldTypeType ft)
 
 lookupContractFunction :: Text -> Text -> SSS (Either Text ([Type], [Type]))
@@ -198,6 +197,10 @@ apply (Bottom es) (Bottom ess) = pure $ Bottom (es <> ess)
 apply (Bottom es) _            = pure $ Bottom es
 apply _ (Bottom ess)           = pure $ Bottom ess
 apply (Function argTypes valTypes _) args = apply' argTypes valTypes args
+apply (Sum types@(t :| _)) args =
+  let isFunction (Function _ _ _) = True
+      isFunction _ = False
+   in pickType' (context' t) <$> traverse (flip apply args) (filter isFunction $ NE.toList types)
 apply x _ = pure . bottom $ "trying to apply function to a non-function type" <$ context' x
 
 bottom :: a -> TypeF' a
@@ -324,18 +327,41 @@ ma !> mb = do
 infixl 5 !>
 
 typecheckProduct :: Monad m => (SourceAnnotation Text -> String -> Type -> m Type') -> SourceAnnotation Text -> [Type'] -> [Type'] -> m Type'
-typecheckProduct _ c []     []     = pure $ Product [] c
-typecheckProduct _ c []     _      = pure . bottom $ "arities do not match." <$ c
-typecheckProduct _ c _      []     = pure . bottom $ "arities do not match." <$ c
-typecheckProduct f c (x:xs) (y:ys) = do
-  t <- typecheck' f x y
-  ts <- typecheckProduct f c xs ys
-  pure $ case (t, ts) of
-    (Bottom e, Bottom es) -> Bottom (e <> es)
-    (Bottom es, _) -> Bottom es
-    (_, Bottom es) -> Bottom es
-    (t', Product ts' ctx) -> Product (t':ts') ctx
-    (_, _) -> bottom $ "Could not resolve product type: " <$ c
+typecheckProduct f c t1 t2 = typecheckProduct' (Product t1 c) (Product t2 c) t1 t2
+  where
+    typecheckProduct' _ _ []     []     = pure $ Product [] c
+    typecheckProduct' e a []     _      = pure . bottom $
+      (T.concat
+      [ "arities do not match. Expected "
+      , showType' e
+      , ", but got "
+      , showType' a
+      , "."
+      ]) <$ c
+    typecheckProduct' e a _      []     = pure . bottom $
+      (T.concat
+      [ "arities do not match. Expected "
+      , showType' e
+      , ", but got "
+      , showType' a
+      , "."
+      ]) <$ c
+    typecheckProduct' e a (x:xs) (y:ys) = do
+      t <- typecheck' f x y
+      ts <- typecheckProduct' e a xs ys
+      pure $ case (t, ts) of
+        (Bottom es, Bottom ess) -> Bottom (es <> ess)
+        (Bottom es, _) -> Bottom es
+        (_, Bottom es) -> Bottom es
+        (t', Product ts' ctx) -> Product (t':ts') ctx
+        (_, _) -> bottom $
+          (T.concat
+          [ "Could not resolve product type. Expected "
+          , showType' e
+          , ", but got "
+          , showType' a
+          , "."
+          ]) <$ c
 
 string' :: (Eq a, IsString a) => [a] -> a
 string' [] = fromString ""
@@ -433,13 +459,24 @@ typecheckStatic t1 t2 = Left $ "Type mismatch: "
                             <> " do not match."
 
 typecheckIndex :: Type' -> Type' -> Type'
+typecheckIndex (Bottom es) (Bottom ess) = Bottom (es <> ess)
+typecheckIndex (Bottom es) _ = Bottom es
+typecheckIndex _ (Bottom es) = Bottom es
 typecheckIndex (Static (Array t _) x) (Static (Int _ _) y) = Static t (x <> y)
 typecheckIndex (Static (Mapping _ k v) x) (Static t y) = case typecheckStatic k t of
   Left l -> bottom $ l <$ (x <> y)
   Right _ -> Static v (x <> y)
-typecheckIndex x y = bottom $ "Mismatched index type" <$ (context' x <> context' y)
+typecheckIndex x y = bottom $
+  (T.concat
+  [ "Mismatched index type: trying to lookup index of type "
+  , showType' y
+  , " from type "
+  , showType' x
+  , "."
+  ]) <$ (context' x <> context' y)
 
 typecheckMember :: Type' -> Text -> SSS Type'
+typecheckMember (Bottom es) _ = pure $ Bottom es
 typecheckMember (Static (Array _ _) x) "length" = pure $ Static (Int Nothing Nothing) x
 typecheckMember (Static (Array t _) x) "push" = pure $ Function (Static t x) (Product [] x) x
 typecheckMember (Static (Array _ _) x) n = pure . bottom $ ("Unknown member of Array: " <> n) <$ x
@@ -479,7 +516,7 @@ typecheckMember (Static e@(Enum _ enum mNames) x) n = do
              , enum
              ]) <$ x
 typecheckMember (Static (Struct _ struct) x) n = do
-  names <- lookupStruct struct
+  names <- M.fromList <$> lookupStruct struct
   pure $ case M.lookup n names of
     Just t -> Static t x
     Nothing -> bottom $ (T.concat
@@ -513,7 +550,7 @@ typecheckMember (Static (Label c') x) n = do
             t -> pure t
         t -> pure t
     t -> pure t
-typecheckMember x n = pure . bottom $ ("Unknown member: " <> showType' x <> "\n  " <> n) <$ context' x
+typecheckMember x n = pure . bottom $ ("Unknown member: " <> showType' x <> "." <> n) <$ context' x
 
 getConstructorType' :: MonadReader R m => SourceAnnotation Text -> Text -> m Type'
 getConstructorType' x l = do
@@ -728,6 +765,18 @@ getVarType' name ctx = do
                  <|> (const (Enum Nothing (T.pack name) Nothing, ctx) <$> M.lookup name (_enums c))
                  <|> (const (Struct Nothing (T.pack name), ctx) <$> M.lookup name (_structs c))
       case mVarDecl of
+        Just (e@(Enum{}), ctx') -> pure . Sum $
+          (Static e ctx') :|
+          [ Function (Static e ctx') (Static e ctx') ctx'
+          , Function (intType' ctx') (Static e ctx') ctx'
+          ]
+        Just (s@(Struct _ struct), ctx') -> do
+          fields <- fmap snd <$> lookupStruct struct
+          let fArgs = flip Product ctx $ flip Static ctx <$> fields
+          pure . Sum $
+            (Static s ctx') :|
+            [ Function fArgs (Static s ctx') ctx'
+            ]
         Just (t, ctx') -> pure $ Static t ctx'
         Nothing -> case M.lookup name $ _functions c of
           Just Func{..} ->
@@ -907,5 +956,9 @@ tcExpr (NumberLiteral x _ _) = pure $ intType' x
 tcExpr (StringLiteral x _) = pure $ stringType' x
 tcExpr (TupleExpression x es) =
   productType' x <$> traverse (maybe (pure $ topType' x) tcExpr) es
-tcExpr (ArrayExpression x es) = foldr (<~>) (pure $ topType' x) $ tcExpr <$> es
+tcExpr (ArrayExpression x es) = do
+  t' <- foldr (<~>) (pure $ topType' x) $ tcExpr <$> es
+  pure $ case t' of
+    (Static t _) ->Static (Array t Nothing) x
+    _ -> t'
 tcExpr (Variable x name) = getVarType' name x

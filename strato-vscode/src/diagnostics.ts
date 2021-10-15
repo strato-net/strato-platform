@@ -25,12 +25,12 @@ export async function refreshDiagnostics(doc: vscode.TextDocument, solidityDiagn
  * This detector finds all instances of dead code.
  * @param doc text document to analyze
  */
-async function findDeadCode(srcArr: Array<Array<string>>): Promise<Array<Object>> {  
+async function findDeadCode(srcMap: Object): Promise<Array<Object>> {  
   const user = await getApplicationUser();
   const config = getConfig() || {};
   const options = { config };
 
-  const contractAST = await rest.debugPostParse(user, srcArr, options);
+  const contractAST = await rest.debugPostParse(user, srcMap, options);
   
   let privFuncs = Array();
   let searchFuncs = Array();
@@ -116,7 +116,7 @@ async function validate(counter: number, doc: vscode.TextDocument, solidityDiagn
       const user = await getApplicationUser();
       const config = getConfig() || {};
       const options = { config };
-      let srcArr = [[doc.uri.path, doc.getText()]];
+      let srcMap = {[doc.uri.path]: doc.getText()};
       const folders = vscode.workspace.workspaceFolders || [];
       if (folders.length > 0) {
         const serverPath: string = vscode.workspace.getConfiguration().get('strato-vscode.serverPath') || '';
@@ -124,14 +124,14 @@ async function validate(counter: number, doc: vscode.TextDocument, solidityDiagn
 		    const folder = currentFolder.uri.path;
         // eslint-disable-next-line import/no-mutable-exports
         const dirPath = `${folder}/${serverPath}`
-        srcArr = await importer.combine(doc.uri.path, true, dirPath);
-        srcArr[importer.getShortName(doc.uri.path)] = doc.getText();
+        srcMap = await importer.combine(doc.uri.path, true, dirPath);
+        srcMap[importer.getShortName(doc.uri.path)] = doc.getText();
       }
       // Run dead code detector
-      const deadCodeArr = await findDeadCode(srcArr);
+      const deadCodeArr = await findDeadCode(srcMap);
       
       
-      const annotations = await rest.debugPostAnalyze(user, srcArr, options);
+      const annotations = await rest.debugPostAnalyze(user, srcMap, options);
 
       // Push dead code detector annotations in
       for(let i = 0; i < deadCodeArr.length; ++i) {
