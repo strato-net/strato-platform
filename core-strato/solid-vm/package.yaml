@@ -15,10 +15,12 @@ library:
   source-dirs: src/
   exposed-modules:
     - Blockchain.SolidVM
+    - Blockchain.SolidVM.Simple
     - Blockchain.SolidVM.SM
     - Blockchain.SolidVM.CodeCollectionDB
     - Blockchain.SolidVM.Exception
     - SolidVM.Solidity.Detectors
+    - SolidVM.Solidity.Fuzzer
     - SolidVM.Solidity.Parse.File
     - SolidVM.Solidity.Parse.Lexer
     - SolidVM.Solidity.Parse.Statement

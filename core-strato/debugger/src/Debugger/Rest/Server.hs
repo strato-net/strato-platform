@@ -88,6 +88,11 @@ postAnalyze :: (SourceMap -> Identity [SourceAnnotation (WithSeverity T.Text)])
             -> Handler [SourceAnnotation (WithSeverity T.Text)]
 postAnalyze analyze = pure . runIdentity . analyze
 
+postFuzz :: (SourceMap -> IO (Either [SourceAnnotation T.Text] ()))
+         -> SourceMap
+         -> Handler [SourceAnnotation T.Text]
+postFuzz fuzz = fmap (either id (const [])) . liftIO . fuzz
+
 restDebuggerServer :: ToJSON a
                    => DebugSettings
                    -> SourceTools a
@@ -111,6 +116,7 @@ restDebuggerServer dSettings tools =
   :<|> postEvals dSettings
   :<|> postParse (parser tools)
   :<|> postAnalyze (analyzer tools)
+  :<|> postFuzz (fuzzer tools)
 
 restDebugger :: ToJSON a
              => DebugSettings

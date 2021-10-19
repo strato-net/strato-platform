@@ -38,6 +38,7 @@ type RestDebuggerAPI = GetStatus
                   :<|> PostEvals
                   :<|> PostParse
                   :<|> PostAnalyze
+                  :<|> PostFuzz
 
 type GetStatus = "status" :> Get '[JSON] DebuggerStatus
 type PutPause = "pause" :> Put '[JSON] DebuggerStatus
@@ -57,6 +58,7 @@ type DeleteWatches = "watches" :> ReqBody '[JSON] [EvaluationRequest] :> Delete 
 type PostEvals = "eval" :> ReqBody '[JSON] [EvaluationRequest] :> Post '[JSON] [EvaluationResponse]
 type PostParse = "parse" :> ReqBody '[JSON] SourceMap :> Post '[JSON] A.Value
 type PostAnalyze = "analyze" :> ReqBody '[JSON] SourceMap :> Post '[JSON] [SourceAnnotation (WithSeverity T.Text)]
+type PostFuzz = "fuzz" :> ReqBody '[JSON] SourceMap :> Post '[JSON] [SourceAnnotation T.Text]
 
 restDebuggerAPI :: Proxy RestDebuggerAPI
 restDebuggerAPI = Proxy

@@ -21,6 +21,7 @@ import           Blockchain.VMOptions() -- HFlags
 import           Executable.EthereumVM
 import           Executable.EVMFlags() -- HFlags
 import           SolidVM.Solidity.Detectors
+import           SolidVM.Solidity.Fuzzer
 
 main :: IO ()
 main = do
@@ -33,7 +34,8 @@ main = do
               . M.fromList
               . unSourceMap
       analyze = Identity . runDetectors parse compile id
-      tools = SourceTools compile analyze
+      fuzz = runFuzzer compile
+      tools = SourceTools compile analyze fuzz
   mDebugger <- initializeDebugger tools
   let metricsRunner = run 8000 metricsApp
       debugSettings = fst <$> mDebugger
