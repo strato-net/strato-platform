@@ -41,6 +41,7 @@ library:
   - bytestring
   - containers
   - cryptonite
+  - data-default
   - debugger
   - deepseq
   - ethereum-rlp
