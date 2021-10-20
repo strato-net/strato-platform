@@ -13,8 +13,9 @@ import Control.Applicative
 import Control.Category (Category(..))
 import Control.Exception (Exception)
 import Control.Monad (replicateM, liftM2, liftM3, liftM4, liftM5, unless)
-import Data.Bits ((.&.))
+import Data.Bits ((.&.), shiftR)
 import Data.Int
+import Data.Maybe
 import GHC.Exts (IsString(..))
 import GHC.Generics (Generic)
 import System.IO
@@ -54,6 +55,7 @@ doRequest' correlationId h r = do
     Left s -> return $ Left s
     Right dataLength -> do
       responseBytes <- liftIO $ B.hGet h dataLength
+      liftIO $ putStrLn $ "response = " ++ show responseBytes
       return $ flip runGet responseBytes $ do
         correlationId' <- deserialize
         unless (correlationId == correlationId') $ fail ("Expected " ++ show correlationId ++ " but got " ++ show correlationId')
@@ -70,6 +72,7 @@ doRequest clientId correlationId h (DeleteTopicsRR req)   = doRequest' correlati
 doRequest clientId correlationId h (OffsetCommitRR req) = doRequest' correlationId h $ Request (correlationId, clientId, OffsetCommitRequest req)
 doRequest clientId correlationId h (OffsetFetchRR req) = doRequest' correlationId h $ Request (correlationId, clientId, OffsetFetchRequest req)
 doRequest clientId correlationId h (GroupCoordinatorRR req)  = doRequest' correlationId h $ Request (correlationId, clientId, GroupCoordinatorRequest req)
+
 
 class Serializable a where
   serialize :: a -> Put
@@ -175,10 +178,53 @@ newtype Timeout =
 newtype Partition =
   Partition Int32 deriving (Show, Eq, Serializable, Deserializable, Num, Integral, Ord, Real, Enum, Generic)
 
-data MessageSet = MessageSet { _codec :: CompressionCodec, _messageSetMembers :: [MessageSetMember] }
-  deriving (Show, Eq, Generic)
+{-
+  Messages are sent in different forms, depending on the version of Kafka....
+  For details, see https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-Overview
+
+  Pre 0.11, messages are sent as a MessageSet (magic byte = 0)
+  0.11 and after, messages are sent as RecordBatch (magic byte = 2)
+  (there is a third style with magic byte = 1, but we don't currently support that)
+
+  (empirically, 0.11 and after actually send both styles, it isn't clear what decides which, but it is clear that we have to support both styles.  I've never seen magic byte = 1 in practice, yet)
+-}
+data MessageSet = MessageSet {
+    _codec :: CompressionCodec,
+    _messageSetMembers :: [MessageSetMember]
+  } |
+  RecordBatch {
+    _firstOffset :: Offset,
+    _partitionLeaderEpoch :: Int32,
+    _magic :: MagicByte,
+    _crc :: Crc,
+    _recordAttributes :: Int16,
+    _lastOffsetDelta :: Int32,
+    _firstTimestamp :: Int64,
+    _maxTimestamp :: Int64,
+    _producerId :: Int64,
+    _producerEpoch :: Int16,
+    _firstSequence :: Int32,
+    _records :: [Record]
+  } deriving (Show, Eq, Generic)
+
 data MessageSetMember =
   MessageSetMember { _setOffset :: Offset, _setMessage :: Message } deriving (Show, Eq, Generic)
+
+data Record = Record {
+  _attributes :: Attributes,
+  _timestampDelta :: Varint,
+  _offsetDelta :: Varint,
+  _key :: Maybe KafkaBytes,
+  _value :: Maybe KafkaBytes,
+  _headers :: [Header]
+} deriving (Show, Eq)
+
+data Header = Header {
+  _headerKey :: Maybe KafkaString,
+  _headerValue :: Maybe KafkaBytes
+  }  deriving (Show, Eq)
+
+newtype Varint = Varint Integer deriving (Show, Eq)
 
 newtype Offset = Offset Int64 deriving (Show, Eq, Serializable, Deserializable, Num, Integral, Ord, Real, Enum, Generic)
 
@@ -585,6 +631,7 @@ instance Serializable MessageSet where
 
           value :: (ByteString -> ByteString) -> [MessageSetMember] -> Value
           value c ms = Value . Just . KBytes $ c (runPut $ mapM_ serialize ms)
+  serialize (RecordBatch _ _ _ _ _ _ _ _ _ _ _ _) = error "milena doesn't yet support RecordBatch serialization.  You can upload messages as a MessageSet."
 
 instance Serializable Attributes where
   serialize = serialize . bits
@@ -629,21 +676,75 @@ instance (Serializable a, Serializable b, Serializable c, Serializable d) => Ser
 instance (Serializable a, Serializable b, Serializable c, Serializable d, Serializable e) => Serializable ((,,,,) a b c d e) where
   serialize (v, w, x, y, z) = serialize v >> serialize w >> serialize x >> serialize y >> serialize z
 
+--Unfortunately, the deserialization of MessageSet needs to be a bit messy....
+--To distinguish between the message format version, you have to partially deserialize the
+--first message, to get the magic byte.  Once this is done, you have a half parsed object,
+--so you then have to parse the second half, then start a full parse of the remaining objects
+--in the list.
+--Because of this, the parsing logic is duplicated in the code here (once as two half parses, then
+--later on as a full parse.)
+--We could avoid this with a look-ahead (might be worth it to add this someday).  We should
+--avoid anything that causes a parse followed by a reparse of the same area though.
 instance Deserializable MessageSet where
   deserialize = do
     l <- deserialize :: Get Int32
-    ms <- isolate (fromIntegral l) getMembers
 
-    decompressed <- mapM decompress ms
+    if l == 0
+      then return $ MessageSet NoCompression []
+      else do
+      firstOffset <- deserialize :: Get Offset
+      _ <- deserialize :: Get Int32 -- message size
+      crcOrPartitionLeaderEpoch <- deserialize :: Get Int32
+      magicByte <- deserialize :: Get MagicByte
 
-    return $ MessageSet NoCompression (concat decompressed)
+      case magicByte of
+        0 -> do
+          attributes <- deserialize :: Get Attributes
+          key <- deserialize :: Get Key
+          value <- deserialize :: Get Value
+        
+          let keyLength = 4 + (fromMaybe 0 $ fmap (B.length . _kafkaByteString) $ _keyBytes key)
+              valueLength = 4 + (fromMaybe 0 $ fmap (B.length . _kafkaByteString) $ _valueBytes value)
+    
+          rest <- isolate (fromIntegral $ l - fromIntegral (8 + 4 + 4 + 1 + 1 + keyLength + valueLength)) getMembers
 
+          let ms = MessageSetMember firstOffset (Message (Crc crcOrPartitionLeaderEpoch, magicByte, attributes, key, value)):rest
+
+          decompressed <- mapM decompress ms
+
+          return $ MessageSet NoCompression (concat decompressed)
+        1 -> -- for more info on "magic byte = 1", see https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-FetchResponse
+          error "When deserializing the message set, the magic byte was 1.  This is currently unsupported"
+        2 -> do
+          crc <- deserialize
+          attributes <- deserialize
+          lastOffsetDelta <- deserialize :: Get Int32
+          firstTimestamp <- deserialize :: Get Int64
+          maxTimestamp <- deserialize :: Get Int64
+          producerId <- deserialize :: Get Int64
+          producerEpoch <- deserialize :: Get Int16
+          firstSequence <- deserialize :: Get Int32
+          _ <- deserialize :: Get Int32
+
+          records <- getRecords :: Get [Record]
+
+          return $ RecordBatch firstOffset crcOrPartitionLeaderEpoch magicByte crc attributes lastOffsetDelta firstTimestamp maxTimestamp producerId producerEpoch firstSequence records
+
+        _ -> error $ "unknown magic byte: " ++ show magicByte
+    
       where getMembers :: Get [MessageSetMember]
             getMembers = do
               wasEmpty <- isEmpty
               if wasEmpty
               then return []
               else liftM2 (:) deserialize getMembers <|> (remaining >>= getBytes >> return [])
+
+            getRecords :: Get [Record]
+            getRecords = do
+              wasEmpty <- isEmpty
+              if wasEmpty
+              then return []
+              else liftM2 (:) deserialize getRecords <|> (remaining >>= getBytes >> return [])
 
             decompress :: MessageSetMember -> Get [MessageSetMember]
             decompress m = if isCompressed m
@@ -677,6 +778,70 @@ instance Deserializable MessageSet where
                 Fail err _ -> fail err
                 Partial _ -> fail "Could not consume all available data"
                 Done v vv -> fmap (v :) (getDecompressedMembers vv)
+
+-- varint is described here: https://developers.google.com/protocol-buffers/docs/encoding?csw=1
+instance Deserializable Varint where
+  deserialize = do
+    vals <- getAllBytes
+
+    let theUnsignedInteger = bytesToBase128Integer vals
+
+    if even theUnsignedInteger
+      then return $ Varint $ theUnsignedInteger `shiftR` 1
+      else return $ Varint $ -((theUnsignedInteger+1) `shiftR` 1)
+        
+      where
+        getAllBytes :: Get [Integer]
+        getAllBytes = do
+          v <- deserialize :: Get Int8
+          if v < 0
+            then do
+            rest <- getAllBytes
+            return $ toInteger v + 128:rest
+            else return [toInteger v]
+
+        bytesToBase128Integer :: [Integer] -> Integer
+        bytesToBase128Integer [] = 0
+        bytesToBase128Integer [x] = x
+        bytesToBase128Integer (x:rest) =
+          x + 128*bytesToBase128Integer rest
+        
+getVString :: Get (Maybe KafkaString)
+getVString = do
+  Varint len <- deserialize :: Get Varint
+  if len == -1
+    then return Nothing
+    else fmap (Just . KString) $ getByteString $ fromIntegral len
+  
+getVBytes :: Get (Maybe KafkaBytes)
+getVBytes = do
+  Varint len <- deserialize :: Get Varint
+  if len == -1
+    then return Nothing
+    else fmap (Just . KBytes) $ getByteString $ fromIntegral len
+  
+instance Deserializable Record where
+  deserialize = do
+    _ <- deserialize :: Get Varint
+    attributes <- deserialize :: Get Attributes
+    timestampDelta <- deserialize :: Get Varint
+    offsetDelta <- deserialize :: Get Varint
+
+    key <- getVBytes
+    value <- getVBytes
+
+    Varint headersLength <- deserialize :: Get Varint
+
+    headers <- replicateM (fromInteger headersLength) deserialize
+
+    return $ Record attributes timestampDelta offsetDelta key value headers
+    
+instance Deserializable Header where
+  deserialize = do
+    key <- getVString
+    value <- getVBytes
+
+    return $ Header key value
 
 instance Deserializable MessageSetMember where
   deserialize = do
