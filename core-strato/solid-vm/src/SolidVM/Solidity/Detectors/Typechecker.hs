@@ -29,6 +29,7 @@ import           SolidVM.Solidity.Xabi.Statement
 import           SolidVM.Solidity.Xabi.Type
 import qualified SolidVM.Solidity.Xabi.Type as Xabi
 import           SolidVM.Solidity.Xabi.VarDef
+import           Text.Read (readMaybe)
 
 emptyAnnotation :: SourceAnnotation Text
 emptyAnnotation = (SourceAnnotation (initialPosition "") (initialPosition "") "")
@@ -129,42 +130,33 @@ lookupStruct name = do
   pure $ f <$> str
   where f (t, ft, _) = (t, fieldTypeType ft)
 
-lookupContractFunction :: Text -> Text -> SSS (Either Text ([Type], [Type]))
-lookupContractFunction cName fName = do
+lookupContractFunction :: SourceAnnotation Text -> Text -> Text -> SSS Type'
+lookupContractFunction x cName fName = do
   ~CodeCollection{..} <- asks codeCollection
   case M.lookup (T.unpack cName) _contracts of
-    Nothing -> pure $ Left $ "Unknown contract: " <> cName
+    Nothing -> pure . bottom $ ("Unknown contract: " <> cName) <$ x
     Just c -> case M.lookup (T.unpack fName) (_functions c) of
       Nothing -> case M.lookup (T.unpack fName) (_constants c) of
         Nothing -> case M.lookup (T.unpack fName) (_storageDefs c) of
-          Nothing -> pure . Left $ T.concat
+          Nothing -> pure . bottom $ (T.concat
             [ "Unknown contract function: "
             , cName
             , "."
             , fName
-            ]
+            ]) <$ x
           Just VariableDecl{..} ->
             if varIsPublic
-              then pure $ Right ([], [varType])
-              else pure . Left $ T.concat
+              then pure $ Function (Product [] x) (Static varType x) x
+              else pure . bottom $ (T.concat
                 [ "Contract variable "
                 , cName
                 , "."
                 , fName
                 , " is not public."
-                ]
-        Just ConstantDecl{..} ->
-          if constIsPublic
-            then pure $ Right ([], [constType])
-            else pure . Left $ T.concat
-              [ "Contract constant "
-              , cName
-              , "."
-              , fName
-              , " is not public."
-              ]
+                ]) <$ x
+        Just ConstantDecl{..} -> pure $ Static constType x
       Just Func{..} -> case funcVisibility of
-        Just v | v == Internal || v == Private -> pure $ Left $ T.concat
+        Just v | v == Internal || v == Private -> pure . bottom $ (T.concat
           [ "Function "
           , cName
           , "."
@@ -172,10 +164,10 @@ lookupContractFunction cName fName = do
           , " has visibility of "
           , T.pack $ show v
           , " so it cannot be called externally."
-          ]
-        _ -> let fArgs = indexedTypeType . snd <$> funcArgs
-                 fRets = indexedTypeType . snd <$> funcVals
-              in pure $ Right (fArgs, fRets)
+          ]) <$ x
+        _ -> let fArgs = flip Product x $ flip Static x . indexedTypeType . snd <$> funcArgs
+                 fRets = flip Product x $ flip Static x . indexedTypeType . snd <$> funcVals
+              in pure $ Function fArgs fRets x
 
 productType' :: SourceAnnotation Text -> [Type'] -> Type'
 productType' _ [Bottom es] = Bottom es
@@ -458,15 +450,18 @@ typecheckStatic t1 t2 = Left $ "Type mismatch: "
                             <> showType t2
                             <> " do not match."
 
-typecheckIndex :: Type' -> Type' -> Type'
-typecheckIndex (Bottom es) (Bottom ess) = Bottom (es <> ess)
-typecheckIndex (Bottom es) _ = Bottom es
-typecheckIndex _ (Bottom es) = Bottom es
-typecheckIndex (Static (Array t _) x) (Static (Int _ _) y) = Static t (x <> y)
-typecheckIndex (Static (Mapping _ k v) x) (Static t y) = case typecheckStatic k t of
-  Left l -> bottom $ l <$ (x <> y)
-  Right _ -> Static v (x <> y)
-typecheckIndex x y = bottom $
+typecheckIndex :: Type' -> Type' -> SSS Type'
+typecheckIndex (Bottom es) (Bottom ess) = pure $ Bottom (es <> ess)
+typecheckIndex (Bottom es) _ = pure $ Bottom es
+typecheckIndex _ (Bottom es) = pure $ Bottom es
+typecheckIndex (Static (Array t _) x) i = i ~> (pure $ intType' x) !> pure (Static t x)
+typecheckIndex (Static (Bytes _ _) x) i = i ~> (pure $ intType' x) !> pure (Static (Bytes Nothing (Just 1)) x)
+typecheckIndex (Static (Mapping _ k v) x) i = do
+  t <- typecheck (Static k x) i
+  pure $ case t of
+    Bottom es -> Bottom es
+    _ -> Static v x
+typecheckIndex x y = pure . bottom $
   (T.concat
   [ "Mismatched index type: trying to lookup index of type "
   , showType' y
@@ -477,9 +472,11 @@ typecheckIndex x y = bottom $
 
 typecheckMember :: Type' -> Text -> SSS Type'
 typecheckMember (Bottom es) _ = pure $ Bottom es
+typecheckMember (Sum ts'@(t :| _)) n = pickType' (context' t) <$> traverse (flip typecheckMember n) (NE.toList ts')
 typecheckMember (Static (Array _ _) x) "length" = pure $ Static (Int Nothing Nothing) x
 typecheckMember (Static (Array t _) x) "push" = pure $ Function (Static t x) (Product [] x) x
 typecheckMember (Static (Array _ _) x) n = pure . bottom $ ("Unknown member of Array: " <> n) <$ x
+typecheckMember (Static (Bytes _ _) x) "length" = pure $ Static (Int Nothing Nothing) x
 typecheckMember (Static (Label "Util") x) "bytes32ToString" = pure $ Function (Static (Bytes Nothing (Just 32)) x) (Static (String Nothing) x) x
 typecheckMember (Static (Label "Util") x) "b32" = pure $ Function (Static (Bytes Nothing (Just 32)) x) (Static (Bytes Nothing (Just 32)) x) x
 typecheckMember (Static (Label "msg") x) "sender" = pure $ Static Account x
@@ -525,13 +522,7 @@ typecheckMember (Static (Struct _ struct) x) n = do
       , " is not a field of "
       , struct
       ]) <$ x
-typecheckMember (Static (Xabi.Contract c) x) n = do
-  types <- lookupContractFunction c n
-  case types of
-    Left t -> pure . bottom $ t <$ x
-    Right (args, rets) -> pure $ Function (flip Product x $ flip Static x <$> args)
-                                          (flip Product x $ flip Static x <$> rets)
-                                          x
+typecheckMember (Static (Xabi.Contract c) x) n = lookupContractFunction x c n
 typecheckMember (Static (Label c') x) n = do
   let c = T.pack c'
   e <- typecheckMember (Static (Enum Nothing c Nothing) x) n
@@ -730,12 +721,25 @@ parseCertArgs x = stringType' x
 
 getVarType' :: String -> SourceAnnotation Text -> SSS Type'
 getVarType' "this" ctx = pure $ Static Account ctx
-getVarType' "uint" ctx = pure $ Function (intArgs ctx) (Static (Int (Just False) Nothing) ctx) ctx
-getVarType' "int" ctx =  pure $ Function (intArgs ctx) (Static (Int (Just True) Nothing) ctx) ctx
+getVarType' s@('u':'i':'n':'t':n) ctx = case n of
+  [] -> pure $ Function (intArgs ctx) (Static (Int (Just False) Nothing) ctx) ctx
+  _ -> case readMaybe n of
+    Just n' -> pure $ Function (intArgs ctx) (Static (Int (Just False) (Just n')) ctx) ctx
+    Nothing -> getVarTypeByName' s ctx
+getVarType' s@('i':'n':'t':n) ctx = case n of
+  [] -> pure $ Function (intArgs ctx) (Static (Int (Just True) Nothing) ctx) ctx
+  _ -> case readMaybe n of
+    Just n' -> pure $ Function (intArgs ctx) (Static (Int (Just True) (Just n')) ctx) ctx
+    Nothing -> getVarTypeByName' s ctx
 getVarType' "address" ctx =  pure $ Function (addressArgs ctx) (Static Account ctx) ctx
 getVarType' "account" ctx =  pure $ Function (accountArgs ctx) (Static Account ctx) ctx
 getVarType' "string" ctx =  pure $ Function (stringArgs ctx) (stringType' ctx) ctx
 getVarType' "bool" ctx =  pure $ Function (boolArgs ctx) (boolType' ctx) ctx
+getVarType' s@('b':'y':'t':'e':'s':n) ctx = case n of
+  [] -> pure $ Function (byteArgs ctx) (Static (Bytes Nothing Nothing) ctx) ctx
+  _ -> case readMaybe n of
+    Just n' -> pure $ Function (byteArgs ctx) (Static (Bytes Nothing (Just n')) ctx) ctx
+    Nothing -> getVarTypeByName' s ctx
 getVarType' "byte" ctx =  pure $ Function (byteArgs ctx) (intType' ctx) ctx
 getVarType' "push" ctx =  pure $ Function (topType' ctx) (Product [] ctx) ctx
 getVarType' "identity" ctx =  pure $ Function (topType' ctx) (topType' ctx) ctx
@@ -750,11 +754,13 @@ getVarType' "msg" ctx = pure $ Static (Label "msg") ctx
 getVarType' "tx" ctx = pure $ Static (Label "tx") ctx
 getVarType' "block" ctx = pure $ Static (Label "block") ctx
 getVarType' "super" ctx = pure $ Static (Label "super") ctx
-
-getVarType' name ctx = do
+getVarType' name ctx = getVarTypeByName' name ctx
+  
+getVarTypeByName' :: String -> SourceAnnotation Text -> SSS Type'
+getVarTypeByName' name ctx = do
   mVar <- foldr (lookupVar . snd) Nothing <$> get
   case mVar of
-    Just BlankEntry -> error "getVarType' BlankEntry: I don't think this can happen"
+    Just BlankEntry -> error "getVarTypeByName' BlankEntry: I don't think this can happen"
     Just VarDefEntry{..} -> case vardefType of
       Just t -> pure $ Static t ctx
       Nothing -> pure $ Top (S.singleton name) ctx
@@ -789,9 +795,10 @@ getVarType' name ctx = do
               Just _->
                 let ctrct = Static (Xabi.Contract $ T.pack name) ctx
                     lbl = Static (Label name) ctx
-                 in Function (Sum (Static Account ctx :| [ctrct, lbl]))
-                             ctrct
-                             ctx
+                 in Sum $ ctrct :|
+                        [Function (Sum (Static Account ctx :| [ctrct, lbl]))
+                           ctrct
+                           ctx]
               Nothing -> bottom $ ("Unknown variable: " <> T.pack name) <$ ctx
             
   where lookupVar m Nothing = M.lookup name m
@@ -932,8 +939,10 @@ tcExpr (NewExpression x a@Array{}) = pure $ Static a x
 tcExpr (NewExpression x (Label l)) = getConstructorType' x $ T.pack l
 tcExpr (NewExpression x (Xabi.Contract l)) = getConstructorType' x l
 tcExpr (NewExpression x t) = pure . bottom $ ("Cannot use keyword 'new' in conjuction with type " <> showType t) <$ x
-tcExpr (IndexAccess _ a (Just b)) =
-  typecheckIndex <$> tcExpr a <*> tcExpr b
+tcExpr (IndexAccess _ a (Just b)) = do
+  a' <- tcExpr a
+  b' <- tcExpr b
+  typecheckIndex a' b'
 tcExpr (IndexAccess _ a Nothing) = tcExpr a
 tcExpr (MemberAccess _ a fieldName) = do
   t <- tcExpr a
@@ -944,6 +953,7 @@ tcExpr (FunctionCall x expr args) = do
          OrderedArgs es -> productType' x <$> traverse tcExpr es
          NamedArgs es -> productType' x <$> traverse (tcExpr . snd) es
   apply e a
+tcExpr (Unitary x "-" _) = pure . bottom $ "Negative number literals not yet supported in SolidVM. Please try using the form `0 - <number>` to declare a negative number." <$ x
 tcExpr (Unitary x "++" a) = intType' x ~> tcExpr a
 tcExpr (Unitary x "--" a) = intType' x ~> tcExpr a
 tcExpr (Unitary x "!" a) = boolType' x ~> tcExpr a
