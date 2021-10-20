@@ -55,8 +55,8 @@ runWorker :: K.KafkaAddress -> LoggingT IO ()
 runWorker kaddr = do
   withSystemTempFile "genesis_block" $ \tf _ -> do
     workerKafka kaddr $ do
-      firstOffset <- start
-      runConduit $ yieldMany [firstOffset..]
+      firstOffset' <- start
+      runConduit $ yieldMany [firstOffset'..]
                 .| mapMC (\o -> (o,) <$> receiveEvent o)
                 .| takeWhileC ((/= InitComplete) . snd)
                 .| iterMC ($logInfoLS "runWorker/inbound")
