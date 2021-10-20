@@ -5,6 +5,7 @@ module Data.Source.Tools
   , SourceTools
   ) where
 
+import Data.Aeson (Value)
 import Data.Functor.Identity  (Identity)
 import Data.Source.Annotation
 import Data.Source.Map
@@ -15,9 +16,9 @@ import GHC.Generics
 data SourceToolsF parse analyze fuzz a = SourceTools
   { parser   :: SourceMap -> parse a
   , analyzer :: SourceMap -> analyze [SourceAnnotation (WithSeverity Text)]
-  , fuzzer   :: SourceMap -> fuzz
+  , fuzzer   :: SourceMap -> Text -> Text -> Text -> Text -> fuzz
   } deriving (Generic)
 
 type SourceTools = SourceToolsF (Either [SourceAnnotation Text])
                                 Identity
-                                (IO (Either [SourceAnnotation Text] ()))
+                                (IO (Either [SourceAnnotation Text] Value))

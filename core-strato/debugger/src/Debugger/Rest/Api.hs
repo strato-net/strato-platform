@@ -11,6 +11,7 @@
 module Debugger.Rest.Api
   ( RestDebuggerAPI
   , restDebuggerAPI
+  , FuzzerArgs(..)
   ) where
 
 import           Data.Aeson      as A
@@ -18,6 +19,7 @@ import qualified Data.Map.Strict as M
 import           Data.Source
 import qualified Data.Text       as T
 import           Debugger.Types
+import           GHC.Generics
 import           Servant
 
 type RestDebuggerAPI = GetStatus
@@ -40,6 +42,14 @@ type RestDebuggerAPI = GetStatus
                   :<|> PostAnalyze
                   :<|> PostFuzz
 
+data FuzzerArgs = FuzzerArgs
+  { fuzzerSrc :: SourceMap
+  , fuzzerContractName :: T.Text
+  , fuzzerCreateArgs :: T.Text
+  , fuzzerFuncName :: T.Text
+  , fuzzerCallArgs :: T.Text
+  } deriving (Eq, Show, Generic, A.ToJSON, A.FromJSON)
+
 type GetStatus = "status" :> Get '[JSON] DebuggerStatus
 type PutPause = "pause" :> Put '[JSON] DebuggerStatus
 type PutResume = "resume" :> Put '[JSON] DebuggerStatus
@@ -58,7 +68,7 @@ type DeleteWatches = "watches" :> ReqBody '[JSON] [EvaluationRequest] :> Delete 
 type PostEvals = "eval" :> ReqBody '[JSON] [EvaluationRequest] :> Post '[JSON] [EvaluationResponse]
 type PostParse = "parse" :> ReqBody '[JSON] SourceMap :> Post '[JSON] A.Value
 type PostAnalyze = "analyze" :> ReqBody '[JSON] SourceMap :> Post '[JSON] [SourceAnnotation (WithSeverity T.Text)]
-type PostFuzz = "fuzz" :> ReqBody '[JSON] SourceMap :> Post '[JSON] [SourceAnnotation T.Text]
+type PostFuzz = "fuzz" :> ReqBody '[JSON] FuzzerArgs :> Post '[JSON] A.Value
 
 restDebuggerAPI :: Proxy RestDebuggerAPI
 restDebuggerAPI = Proxy

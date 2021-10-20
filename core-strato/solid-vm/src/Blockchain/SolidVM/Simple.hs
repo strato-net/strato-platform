@@ -30,6 +30,7 @@ module Blockchain.SolidVM.Simple
   , module Blockchain.ExtWord
   , module Blockchain.Strato.Model.Account
   , module Blockchain.Strato.Model.Keccak256
+  , module Data.Default
   ) where
 
 import           Control.Lens
