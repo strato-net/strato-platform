@@ -10,7 +10,7 @@
 {-# OPTIONS -fno-warn-orphans #-}
 
 module Blockchain.Strato.RedisBlockDB
-    ( RedisConnection(..), inNamespace, findNamespace
+    ( RedisConnection(..), inNamespace, findNamespace, runStratoRedisIO
     , getSHAsByNumber
     , getChainInfo, putChainInfo
     , getChainMembers, putChainMembers
@@ -33,11 +33,13 @@ module Blockchain.Strato.RedisBlockDB
     , commonAncestorHelper
     , getWorldBestBlockInfo, updateWorldBestBlockInfo
     , acquireRedlock, releaseRedlock, defaultRedlockTTL
+    , getSyncStatus, putSyncStatus
     ) where
 
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Enode
+import           Blockchain.EthConf                    (lookupRedisBlockDBConfig)
 import           Blockchain.ExtWord                    (Word256)
 import           Blockchain.Output
 import           Blockchain.Sequencer.Event
@@ -608,6 +610,7 @@ putBestBlockInfo newSha newNumber newTDiff = do
                       forM_ updates $ \(sha, num) -> set (inNamespace Canonical $ num) (toValue sha)
                       unless (null deletions) . void . del $ inNamespace Canonical . toKey <$> deletions
                       forceBestBlockInfo newSha newNumber newTDiff
+                  checkAndUpdateSyncStatus
                   case res of
                       TxSuccess _ -> return $ Right Ok
                       TxAborted   -> return . Left $ SingleLine (S8.pack "Aborted")
@@ -761,6 +764,7 @@ updateWorldBestBlockInfo sha num tdiff = withRetryCount 0
                           Nothing -> do
                               liftLog $ $logWarnS "updateWorldBestBlockInfo" "No WorldBestBlock in Redis, will force"
                               void $ forceBestBlockInfo' worldBestBlockKey (RedisBestBlock sha num tdiff)
+                              checkAndUpdateSyncStatus
                               releaseAndFinalize lockID True
                           Just (RedisBestBlock _ _ oldTDiff) -> do
                               liftLog $ $logDebugS "updateWorldBestBlockInfo" $ T.pack ( "oldTDiff = " ++ show oldTDiff ++ "; newTDiff = " ++ show tdiff)
@@ -769,6 +773,7 @@ updateWorldBestBlockInfo sha num tdiff = withRetryCount 0
                                   then do
                                       liftLog $ $logDebugS "updateWorldBestBlockInfo" . T.pack $ "Updating best block: " ++ show num
                                       void $ forceBestBlockInfo' worldBestBlockKey (RedisBestBlock sha num tdiff)
+                                      checkAndUpdateSyncStatus
                                   else
                                       liftLog $ $logDebugS "updateWorldBestBlockInfo" "Not updating"
                               releaseAndFinalize lockID willUpdate
@@ -778,3 +783,38 @@ updateWorldBestBlockInfo sha num tdiff = withRetryCount 0
                             Right True  -> Right didUpdate
                             Right False -> Left $ SingleLine "Couldn't release redlock, it either expired or we had the wrong key"
                             err         -> err
+
+-- Put this after any "best block" or "world best block" update.
+-- We can't put this in the update functions themselves since multiExec fudges things up
+checkAndUpdateSyncStatus :: Redis ()
+checkAndUpdateSyncStatus = do
+    status         <- getSyncStatus
+    nodeBestBlock  <- getBestBlockInfo
+    worldBestBlock <- getWorldBestBlockInfo
+    let nodeTotalDiff  = bestBlockTotalDifficulty <$> nodeBestBlock
+        worldTotalDiff = bestBlockTotalDifficulty <$> worldBestBlock
+    
+    case (status, nodeTotalDiff, worldTotalDiff) of
+        (Just False, Just ntd, Just wtd) -> when (ntd >= wtd) (void $ putSyncStatus True)
+        (Nothing,    Just ntd, Just wtd) -> void $ putSyncStatus (ntd >= wtd)
+        (Nothing,    Nothing,  Just _  ) -> void $ putSyncStatus False
+        _ -> pure ()
+
+syncStatusKey :: S8.ByteString
+syncStatusKey = "<sync_status>"
+{-# INLINE syncStatusKey #-}
+
+getSyncStatus :: Redis (Maybe Bool)
+getSyncStatus = fmap fromValue . eitherToMaybe <$> get syncStatusKey
+    where eitherToMaybe :: Either a (Maybe b) -> Maybe b
+          eitherToMaybe (Left _)  = Nothing
+          eitherToMaybe (Right a) = a
+
+putSyncStatus :: RedisCtx m f => Bool -> m (f Status)
+putSyncStatus status = set syncStatusKey $ toValue status
+
+-- TODO: Use an effect system (IO eww... 😒)
+runStratoRedisIO :: MonadIO m => Redis a -> m a
+runStratoRedisIO r = liftIO $ do
+  conn <- checkedConnect lookupRedisBlockDBConfig
+  runRedis conn r

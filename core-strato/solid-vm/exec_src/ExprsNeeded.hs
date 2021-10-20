@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+import Control.Exception (throw)
 import qualified Data.Map as M
 import qualified Data.Text as T
 import System.Environment
@@ -24,7 +25,7 @@ main = do
         Pragma _ n v -> Just (n, v)
         _ -> Nothing
   let vmVersion' = if (Just ("solidvm","3.0")) `elem` (pragmas <$> parsedFile) then "svm3.0" else ""
-      namedContracts = [(T.unpack name, xabiToContract (T.unpack name) (map T.unpack parents') vmVersion' xabi)
+      namedContracts = [(T.unpack name, either (throw . fst) id $ xabiToContract (T.unpack name) (map T.unpack parents') vmVersion' xabi)
                        | NamedXabi name (xabi, parents') <- parsedFile]
       cc = CodeCollection $ M.fromList namedContracts
       nodes = codeCollectionCrawler cc

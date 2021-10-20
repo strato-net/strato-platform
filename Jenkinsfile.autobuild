@@ -24,6 +24,7 @@ pipeline {
       steps {
         sh 'rm -rf .docker-work'
         sh 'REPO=private make all'
+        sh 'rm -rf .docker-work'
         dir ('blockapps-rest') {
           sh 'yarn install --pure-lockfile'
           sh 'yarn build'

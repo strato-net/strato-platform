@@ -47,6 +47,11 @@ class RedisDBValuable v where
     toValue   :: v -> S8.ByteString
     fromValue :: S8.ByteString -> v
 
+instance RedisDBValuable Bool where
+    toValue True = S8.singleton 't'
+    toValue False = S8.empty
+    fromValue = not . S8.null
+
 instance RedisDBKeyable S8.ByteString where
     toKey = SB16.encode
 

@@ -22,6 +22,7 @@ module Blockchain.SolidVM
   ) where
 
 import           Control.DeepSeq                      (force)
+import           Control.Exception                    (throw)
 import           Control.Lens hiding (assign, from, to, Context)
 import           Control.Applicative
 import           Control.Monad
@@ -1130,7 +1131,7 @@ expToVar' x@(Xabi.MemberAccess _ expr name) = do
       (SBuiltinVariable "super", method) -> do
         ctract <- getCurrentContract
         (_, cc) <- getCurrentCodeCollection
-        let parents' = getParents cc ctract
+        let parents' = either (throw . fst) id $ getParents cc ctract
         case filter (elem method . M.keys .  _functions) parents' of
           [] -> typeError "cannot use super without a parent contract" (method, ctract)
           ps -> do
@@ -1154,7 +1155,7 @@ expToVar' x@(Xabi.MemberAccess _ expr name) = do
           _ -> return . Constant . SReference . apSnoc apt $ MS.Field "length"
 
       (SReference p, itemName) -> return . Constant . SReference $ apSnoc p $ MS.Field $ BC.pack itemName
-      _ -> typeError "illegal member access" $ unparseExpression x
+      m -> typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ show m)
 {-
     Variable vref -> do
       val' <- liftIO $ readIORef vref

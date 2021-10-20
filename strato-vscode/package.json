@@ -58,6 +58,10 @@
 					"type": "string",
 					"default": "pushd ui; yarn install; yarn build; touch .env; yarn test; popd"
 				},
+				"strato-vscode.serverPath": {
+					"type": "string",
+					"default": "server"
+				},
 				"strato-vscode.configPath": {
 					"type": "string",
 					"default": "server/config"
