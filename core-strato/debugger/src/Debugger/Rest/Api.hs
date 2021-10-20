@@ -3,7 +3,6 @@
 {-# LANGUAGE RecordWildCards   #-} -- DEBUGGING
 {-# LANGUAGE TypeOperators     #-} -- DEBUGGING
 {-# LANGUAGE DeriveAnyClass    #-}
-{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
@@ -11,15 +10,12 @@
 module Debugger.Rest.Api
   ( RestDebuggerAPI
   , restDebuggerAPI
-  , FuzzerArgs(..)
   ) where
 
-import           Data.Aeson      as A
 import qualified Data.Map.Strict as M
 import           Data.Source
 import qualified Data.Text       as T
 import           Debugger.Types
-import           GHC.Generics
 import           Servant
 
 type RestDebuggerAPI = GetStatus
@@ -38,17 +34,6 @@ type RestDebuggerAPI = GetStatus
                   :<|> PutWatches
                   :<|> DeleteWatches
                   :<|> PostEvals
-                  :<|> PostParse
-                  :<|> PostAnalyze
-                  :<|> PostFuzz
-
-data FuzzerArgs = FuzzerArgs
-  { fuzzerSrc :: SourceMap
-  , fuzzerContractName :: T.Text
-  , fuzzerCreateArgs :: T.Text
-  , fuzzerFuncName :: T.Text
-  , fuzzerCallArgs :: T.Text
-  } deriving (Eq, Show, Generic, A.ToJSON, A.FromJSON)
 
 type GetStatus = "status" :> Get '[JSON] DebuggerStatus
 type PutPause = "pause" :> Put '[JSON] DebuggerStatus
@@ -66,9 +51,6 @@ type GetWatches = "watches" :> Get '[JSON] (M.Map EvaluationRequest EvaluationRe
 type PutWatches = "watches" :> ReqBody '[JSON] [EvaluationRequest] :> Put '[JSON] DebuggerStatus
 type DeleteWatches = "watches" :> ReqBody '[JSON] [EvaluationRequest] :> Delete '[JSON] DebuggerStatus
 type PostEvals = "eval" :> ReqBody '[JSON] [EvaluationRequest] :> Post '[JSON] [EvaluationResponse]
-type PostParse = "parse" :> ReqBody '[JSON] SourceMap :> Post '[JSON] A.Value
-type PostAnalyze = "analyze" :> ReqBody '[JSON] SourceMap :> Post '[JSON] [SourceAnnotation (WithSeverity T.Text)]
-type PostFuzz = "fuzz" :> ReqBody '[JSON] FuzzerArgs :> Post '[JSON] A.Value
 
 restDebuggerAPI :: Proxy RestDebuggerAPI
 restDebuggerAPI = Proxy

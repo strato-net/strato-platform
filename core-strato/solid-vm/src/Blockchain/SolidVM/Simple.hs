@@ -30,6 +30,7 @@ module Blockchain.SolidVM.Simple
   , module Blockchain.ExtWord
   , module Blockchain.Strato.Model.Account
   , module Blockchain.Strato.Model.Keccak256
+  , module Blockchain.VM.SolidException
   , module Data.Default
   ) where
 
@@ -48,6 +49,7 @@ import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.SolidVM                as SolidVM
+import           Blockchain.VM.SolidException
 
 defaultBlockData :: BlockData
 defaultBlockData = BlockData

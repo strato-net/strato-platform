@@ -30,6 +30,7 @@ import Control.DeepSeq
 import Control.Exception (throw, throwIO, Exception)
 import Control.Monad (unless, when)
 import Control.Monad.IO.Class (MonadIO, liftIO)
+import Data.Aeson (ToJSON, FromJSON)
 import GHC.Generics
 import Text.Printf (printf)
 
@@ -53,7 +54,7 @@ data SolidException = TypeError String String
                     | MissingCodeCollection String String
                     | InaccessibleChain String String
                     | InvalidWrite String String
-                    deriving (Eq, Exception, Generic, NFData)
+                    deriving (Eq, Exception, Generic, NFData, ToJSON, FromJSON)
 
 instance Show SolidException where
   show = showSolidException
