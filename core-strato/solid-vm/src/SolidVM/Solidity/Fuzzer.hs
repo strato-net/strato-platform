@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -12,51 +13,142 @@ module SolidVM.Solidity.Fuzzer
 import           Blockchain.MemVMContext
 import           Blockchain.Output
 import           Blockchain.SolidVM.Simple
+import           Blockchain.Strato.Model.Address
 import           CodeCollection
 import           Control.Lens
+import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Trans.Class (lift)
 import           Control.Monad.Trans.Reader
 import qualified Data.Aeson as Aeson
+import           Data.Bool (bool)
 import qualified Data.ByteString.Lazy as BL
-import           Data.Maybe (fromMaybe)
+import qualified Data.ByteString.Short as BSS
+import           Data.Maybe (fromMaybe, maybeToList)
 import           Data.Source
 import qualified Data.Map.Strict as M
+import qualified Data.Text as T
 import           Data.Traversable (for)
 import           SolidVM.Solidity.Fuzzer.Types
+import           SolidVM.Solidity.Xabi
+import           SolidVM.Solidity.Xabi.Type   hiding (Account, Address, Contract)
+import qualified SolidVM.Solidity.Xabi.Type as Xabi
+import           SolidVM.Solidity.Xabi.VarDef
+import           Test.QuickCheck
 
 defaultFuzzerRuns :: Integer
 defaultFuzzerRuns = 100
+{-# INLINE defaultFuzzerRuns #-}
 
-runFuzzer :: Traversable t
-          => (SourceMap -> t CodeCollection)
-          -> FuzzerArgs
-          -> IO (t [FuzzerResult])
-runFuzzer compile args = do
-  for (compile $ args ^. fuzzerArgsSrc) $ \cc ->
-    runLoggingT . evalMemContextM Nothing . flip runReaderT (args, cc) $
-      runFuzzerNTimes . fromMaybe defaultFuzzerRuns $ args ^. fuzzerArgsMaxRuns
+describePrefix :: T.Text
+describePrefix = "Describe_"
+{-# INLINE describePrefix #-}
 
-runFuzzerNTimes :: Integer -> FuzzerM [FuzzerResult]
-runFuzzerNTimes n | n <= 0 = pure [FuzzerSuccess]
-runFuzzerNTimes n = runFuzzerOnce >>= \case
-  FuzzerSuccess -> runFuzzerNTimes (n-1) 
-  r -> pure [r]
+testPrefix :: T.Text
+testPrefix = "it_"
+{-# INLINE testPrefix #-}
 
-runFuzzerOnce :: FuzzerM FuzzerResult
-runFuzzerOnce = do
-  ~(FuzzerArgs{..}, _) <- ask
+propertyPrefix :: T.Text
+propertyPrefix = "property_"
+{-# INLINE propertyPrefix #-}
+
+success :: Applicative f => SourceAnnotation a -> f FuzzerResult
+success ctx = pure . FuzzerSuccess $ "Test succeeded" <$ ctx
+
+trueVal :: BSS.ShortByteString
+trueVal = BSS.toShort . word256ToBytes . fromIntegral $ fromEnum True
+{-# NOINLINE trueVal #-}
+
+runFuzzer :: (SourceMap -> Either [SourceAnnotation T.Text] CodeCollection)
+          -> SourceMap
+          -> IO [FuzzerResult]
+runFuzzer compile src = flip (either $ pure . map (FuzzerFailure Nothing)) (compile src) $ \cc -> do
+  let args = FuzzerArgs src "" "" "" "" Nothing
+  runLoggingT . evalMemContextM Nothing . flip runReaderT args $
+    fmap concat . for (M.toList $ cc ^. contracts) $ \(cName, c) ->
+      if not (describePrefix `T.isPrefixOf` T.pack cName) then pure []
+      else case funcArgs <$> c ^. constructor of
+        Just (_:_) -> pure . fmap (\f -> FuzzerFailure Nothing $ "Expected constructor to have zero arguments" <$ funcContext f) . maybeToList $ c ^. constructor
+        _ -> fmap concat . for (M.toList $ c ^. functions) $ \(fName, f) ->
+          if | testPrefix `T.isPrefixOf` T.pack fName -> (:[]) <$> test cName fName f
+             | propertyPrefix `T.isPrefixOf` T.pack fName -> (:[]) <$> prop cName fName f
+             | otherwise -> pure []
+
+test :: String -> String -> Func -> FuzzerM FuzzerResult
+test cName fName f = case (funcVisibility f, funcArgs f, funcVals f) of
+  (Just External, [], [(_, IndexedType _ Bool)]) -> flip local (runFuzzerOnce $ funcContext f)
+    $ (fuzzerArgsContractName .~ T.pack cName)
+    . (fuzzerArgsCreateArgs .~ "()")
+    . (fuzzerArgsFuncName .~ T.pack fName)
+    . (fuzzerArgsCallArgs .~ "()")
+  (_, [], [(_, IndexedType _ Bool)]) ->
+    pure . FuzzerFailure Nothing $ "Test must be marked as external" <$ funcContext f
+  (_, _, [(_, IndexedType _ Bool)]) ->
+    pure . FuzzerFailure Nothing $ ("Expected unit test to have zero arguments. To write a property test, prefix the function name with " <> propertyPrefix <> ".") <$ funcContext f
+  _ ->
+    pure . FuzzerFailure Nothing $ ("Test must return (bool).") <$ funcContext f
+
+generateArgString :: [Type] -> IO T.Text
+generateArgString = fmap (\t -> "(" <> T.intercalate "," t <> ")") . traverse generateArg
+  where generateArg (Int _ _) = T.pack . show . abs <$> (generate arbitrary :: IO Integer)
+        generateArg (String _) = generate arbitrary
+        generateArg (Bytes _ _) = generate arbitrary
+        generateArg Bool = bool "false" "true" <$> (generate arbitrary :: IO Bool)
+        generateArg Xabi.Address = T.pack . show <$> (generate arbitrary :: IO Address)
+        generateArg Xabi.Account = T.pack . show <$> (generate arbitrary :: IO Account)
+        generateArg (Label _) = T.pack . show <$> (generate arbitrary :: IO Account)
+        generateArg (Struct _ _) = pure "<struct>" -- haha lol
+        generateArg (Enum _ _ _) = T.pack . show . abs <$> (generate arbitrary :: IO Integer)
+        generateArg (Array t l) = do
+          n <- case l of Just n -> pure $ toInteger n
+                         Nothing -> abs <$> generate arbitrary
+          ts <- map (T.pack . show) <$> traverse (const $ generateArg t) [0..n-1]
+          pure $ "[" <> T.intercalate "," ts <> "]"
+        generateArg (Xabi.Contract _) = T.pack . show <$> (generate arbitrary :: IO Account)
+        generateArg (Mapping _ _ _) = pure "<mapping>" --haha lol
+
+prop :: String -> String -> Func -> FuzzerM FuzzerResult
+prop cName fName f = case (funcVisibility f, funcArgs f, funcVals f) of
+  (Just External, (_:_), [(_, IndexedType _ Bool)]) -> flip local runProp
+    $ (fuzzerArgsContractName .~ T.pack cName)
+    . (fuzzerArgsCreateArgs .~ "()")
+    . (fuzzerArgsFuncName .~ T.pack fName)
+  (_, (_:_), [(_, IndexedType _ Bool)]) ->
+    pure . FuzzerFailure Nothing $ "Test must be marked as external" <$ funcContext f
+  (_, _, [(_, IndexedType _ Bool)]) ->
+    pure . FuzzerFailure Nothing $ ("Expected property test to have at least one argument. To write a unit test, prefix the function name with " <> testPrefix <> ".") <$ funcContext f
+  _ ->
+    pure . FuzzerFailure Nothing $ ("Test must return (bool).") <$ funcContext f
+  where
+    runProp :: FuzzerM FuzzerResult
+    runProp = do
+      n <- asks $ fromMaybe defaultFuzzerRuns . view fuzzerArgsMaxRuns
+      runPropNTimes n
+    runPropNTimes :: Integer -> FuzzerM FuzzerResult
+    runPropNTimes n | n <= 0 = success $ funcContext f
+    runPropNTimes n = do
+      argString <- liftIO . generateArgString $ indexedTypeType . snd <$> funcArgs f
+      $logInfoS "runPropNTimes/generateArgString" argString
+      r <- flip local (runFuzzerOnce $ funcContext f) $ fuzzerArgsCallArgs .~ argString
+      case r of
+        FuzzerSuccess _ -> runPropNTimes $ n - 1
+        _ -> pure r
+
+runFuzzerOnce :: SourceAnnotation a -> FuzzerM FuzzerResult
+runFuzzerOnce ctx = do
+  ~FuzzerArgs{..} <- ask
+  contractAddress <- liftIO $ flip Account Nothing <$> generate arbitrary
   let svmErr (Left e) = e
       svmErr (Right e) = InternalError "SolidVM for non-solidvm code" (show e)
-      contractAddress = Account 0xdeadbeef Nothing
       txArgs = def & createNewAddress .~ contractAddress
                    & createCode .~ (Code . BL.toStrict $ Aeson.encode _fuzzerArgsSrc)
                    & createArgs . argsMetadata ?~ M.empty
                    & createArgs . argsMetadata . _Just . at "name" ?~ _fuzzerArgsContractName
                    & createArgs . argsMetadata . _Just . at "args" ?~ _fuzzerArgsCreateArgs
-      failure = FuzzerFailure contractAddress _fuzzerArgsContractName _fuzzerArgsCreateArgs
+      failure txs e = pure . FuzzerFailure (Just $ FuzzerFailureDetails contractAddress _fuzzerArgsContractName _fuzzerArgsCreateArgs txs) $ e <$ ctx
+      exception txs = failure txs . T.pack . show
   createResults <- lift $ create txArgs
   case erException createResults of
-    Just e -> pure $ failure [] $ svmErr e
+    Just e -> exception [] $ svmErr e
     Nothing -> do
       let txArgs' = def & callArgs . argsBlockData .~ txArgs ^. createArgs . argsBlockData
                         & callCodeAddress .~ contractAddress
@@ -64,8 +156,11 @@ runFuzzerOnce = do
                         & callArgs . argsMetadata . _Just . at "funcName" ?~ _fuzzerArgsFuncName
                         & callArgs . argsMetadata . _Just . at "args" ?~ _fuzzerArgsCallArgs
       callResults <- lift $ call txArgs'
+      let failure' = failure [FuzzerTx _fuzzerArgsFuncName _fuzzerArgsCallArgs]
+          exception' = exception [FuzzerTx _fuzzerArgsFuncName _fuzzerArgsCallArgs]
+      $logInfoS "runFuzzerOnce/callResults" (T.pack $ show $ erReturnVal callResults)
       case erException callResults of
-        Nothing -> pure FuzzerSuccess
-        Just e' -> pure $ case svmErr e' of
-          Require _ -> FuzzerSuccess
-          e -> let tx = FuzzerTx _fuzzerArgsFuncName _fuzzerArgsCallArgs in failure [tx] e
+        Nothing -> case erReturnVal callResults of
+          Just bss | bss == trueVal -> success ctx
+          _ -> failure' $ "Test " <> _fuzzerArgsFuncName <> " failed with arguments " <> _fuzzerArgsCallArgs
+        Just e -> exception' e

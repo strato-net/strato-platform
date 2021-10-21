@@ -6,7 +6,6 @@ module SolidVM.Solidity.Fuzzer.Types where
 
 import           Blockchain.MemVMContext
 import           Blockchain.SolidVM.Simple
-import           CodeCollection
 import           Control.Lens
 import           Control.Monad.Trans.Reader
 import           Data.Aeson (ToJSON, FromJSON)
@@ -24,7 +23,7 @@ data FuzzerArgs = FuzzerArgs
   } deriving (Eq, Show, Generic, ToJSON, FromJSON)
 makeLenses ''FuzzerArgs
 
-type FuzzerM = ReaderT (FuzzerArgs, CodeCollection) MemContextM
+type FuzzerM = ReaderT FuzzerArgs MemContextM
 
 data FuzzerTx = FuzzerTx
   { _fuzzerTxFuncName :: Text
@@ -32,12 +31,19 @@ data FuzzerTx = FuzzerTx
   } deriving (Eq, Show, Generic, ToJSON, FromJSON)
 makeLenses ''FuzzerTx
 
-data FuzzerResult = FuzzerSuccess
-                  | FuzzerFailure
-                    { _fuzzerResultContractAddress :: Account
-                    , _fuzzerResultContractName :: Text
-                    , _fuzzerResultCreateArgs :: Text
-                    , _fuzzerResultTxs :: [FuzzerTx]
-                    , _fuzzerResultException  :: SolidException
-                    } deriving (Eq, Show, Generic, ToJSON, FromJSON)
-makePrisms ''FuzzerResult
+data FuzzerFailureDetails = FuzzerFailureDetails
+   { _failureContractAddress :: Account
+   , _failureContractName :: Text
+   , _failureCreateArgs :: Text
+   , _failureTxs :: [FuzzerTx]
+   } deriving (Eq, Show, Generic, ToJSON, FromJSON)
+makeLenses ''FuzzerFailureDetails
+
+data FuzzerResultF a = FuzzerSuccess a
+                     | FuzzerFailure
+                       { _fuzzerFailureDetails :: Maybe FuzzerFailureDetails
+                       , _fuzzerFailureContext :: a
+                       } deriving (Eq, Show, Generic, ToJSON, FromJSON)
+makePrisms ''FuzzerResultF
+
+type FuzzerResult = Annotated FuzzerResultF

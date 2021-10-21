@@ -20,7 +20,7 @@ import           SolidVM.Solidity.Fuzzer
 data SourceTools = SourceTools
   { parser   :: SourceMap -> Either [SourceAnnotation Text] CodeCollection
   , analyzer :: SourceMap -> [SourceAnnotation (WithSeverity Text)]
-  , fuzzer   :: FuzzerArgs -> (IO (Either [SourceAnnotation Text] [FuzzerResult]))
+  , fuzzer   :: SourceMap -> (IO [FuzzerResult])
   } deriving (Generic)
 
 type SourceToolsAPI = PostParse
@@ -29,7 +29,7 @@ type SourceToolsAPI = PostParse
 
 type PostParse = "parse" :> ReqBody '[JSON] SourceMap :> Post '[JSON] A.Value
 type PostAnalyze = "analyze" :> ReqBody '[JSON] SourceMap :> Post '[JSON] [SourceAnnotation (WithSeverity Text)]
-type PostFuzz = "fuzz" :> ReqBody '[JSON] FuzzerArgs :> Post '[JSON] A.Value
+type PostFuzz = "fuzz" :> ReqBody '[JSON] SourceMap :> Post '[JSON] [FuzzerResult]
 
 sourceToolsAPI :: Proxy SourceToolsAPI
 sourceToolsAPI = Proxy
@@ -44,10 +44,10 @@ postAnalyze :: (SourceMap -> [SourceAnnotation (WithSeverity Text)])
             -> Handler [SourceAnnotation (WithSeverity Text)]
 postAnalyze analyze = pure . analyze
 
-postFuzz :: (FuzzerArgs -> IO (Either [SourceAnnotation Text] [FuzzerResult]))
-         -> FuzzerArgs
-         -> Handler A.Value
-postFuzz fuzz args = either A.toJSON A.toJSON <$> liftIO (fuzz args)
+postFuzz :: (SourceMap -> IO [FuzzerResult])
+         -> SourceMap
+         -> Handler [FuzzerResult]
+postFuzz fuzz args = liftIO (fuzz args)
 
 sourceToolsServer :: SourceTools
                   -> Server SourceToolsAPI

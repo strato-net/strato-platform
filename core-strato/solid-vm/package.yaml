@@ -60,6 +60,7 @@ library:
   - nibblestring
   - parsec
   - prometheus-client
+  - QuickCheck
   - quickcheck-instances
   - semver-range
   - servant-server
