@@ -87,23 +87,27 @@ test cName fName f = case (funcVisibility f, funcArgs f, funcVals f) of
   _ ->
     pure . FuzzerFailure Nothing $ ("Test must return (bool).") <$ funcContext f
 
+escapeText :: T.Text -> T.Text
+escapeText = T.replace "\"" "\\\""
+           . T.replace "\\" "\\\\"
+
 generateArgString :: [Type] -> IO T.Text
 generateArgString = fmap (\t -> "(" <> T.intercalate "," t <> ")") . traverse generateArg
   where generateArg (Int _ _) = T.pack . show . abs <$> (generate arbitrary :: IO Integer)
-        generateArg (String _) = generate arbitrary
-        generateArg (Bytes _ _) = generate arbitrary
+        generateArg (String _) = (\t -> "\"" <> t <> "\"") . escapeText <$> generate arbitrary
+        generateArg (Bytes _ _) = (\t -> "\"" <> t <> "\"") . escapeText <$> generate arbitrary
         generateArg Bool = bool "false" "true" <$> (generate arbitrary :: IO Bool)
-        generateArg Xabi.Address = T.pack . show <$> (generate arbitrary :: IO Address)
-        generateArg Xabi.Account = T.pack . show <$> (generate arbitrary :: IO Account)
-        generateArg (Label _) = T.pack . show <$> (generate arbitrary :: IO Account)
+        generateArg Xabi.Address = ("0x" <>) . T.pack . show <$> (generate arbitrary :: IO Address)
+        generateArg Xabi.Account = ("0x" <>) . T.pack . show <$> (generate arbitrary :: IO Account)
+        generateArg (Label _) = ("0x" <>) . T.pack . show <$> (generate arbitrary :: IO Account)
         generateArg (Struct _ _) = pure "<struct>" -- haha lol
         generateArg (Enum _ _ _) = T.pack . show . abs <$> (generate arbitrary :: IO Integer)
         generateArg (Array t l) = do
-          n <- case l of Just n -> pure $ toInteger n
+          n <- case l of Just n -> pure . toInteger $ n - 1
                          Nothing -> abs <$> generate arbitrary
-          ts <- map (T.pack . show) <$> traverse (const $ generateArg t) [0..n-1]
+          ts <- traverse (const $ generateArg t) [0..n]
           pure $ "[" <> T.intercalate "," ts <> "]"
-        generateArg (Xabi.Contract _) = T.pack . show <$> (generate arbitrary :: IO Account)
+        generateArg (Xabi.Contract _) = ("0x" <>) . T.pack . show <$> (generate arbitrary :: IO Account)
         generateArg (Mapping _ _ _) = pure "<mapping>" --haha lol
 
 prop :: String -> String -> Func -> FuzzerM FuzzerResult
