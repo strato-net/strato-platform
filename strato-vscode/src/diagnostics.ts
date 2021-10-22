@@ -25,12 +25,7 @@ export async function refreshDiagnostics(doc: vscode.TextDocument, solidityDiagn
  * This detector finds all instances of dead code.
  * @param doc text document to analyze
  */
-async function findDeadCode(doc: vscode.TextDocument): Promise<Array<Object>> {  
-  const user = await getApplicationUser();
-  const config = getConfig() || {};
-  const options = { config };
-
-  const contractAST = await rest.debugPostParse(user, {source: doc.getText()}, options);  
+async function findDeadCode(doc: vscode.TextDocument, contractAST: any): Promise<Array<Object>> {
   
   let privFuncs = Array();
   let searchFuncs = Array();
@@ -105,21 +100,14 @@ async function findDeadCode(doc: vscode.TextDocument): Promise<Array<Object>> {
   return deadFuncs;
 }
 
-async function findReusedBaseCons(doc: vscode.TextDocument): Promise<Array<Object>> {
-
-  // search through all contracts. Contracts with empty "FuncCOnstructorCalls" don't call the constructors of other contracts.
-  const user = await getApplicationUser();
-  const config = getConfig() || {};
-  const options = { config };
-
-  const contractAST = await rest.debugPostParse(user, {source: doc.getText()}, options);
+async function findReusedBaseCons(doc: vscode.TextDocument, contractAST: any): Promise<Array<Object>> {
 
   // Loop through all the contracts and find the ones that don't 
   // have any '_parents' and its constructor doesn't call on 
   // another contract's constructor
   const baseCons = Array();
   for(let contractName in contractAST._contracts) {
-    if(Object.keys(contractAST._contracts[contractName]._constructor.funcConstructorCalls).length === 0 && contractAST._contracts[contractName]._parents.length === 0) {
+    if(contractAST._contracts[contractName]._constructor && Object.keys(contractAST._contracts[contractName]._constructor.funcConstructorCalls).length === 0 && contractAST._contracts[contractName]._parents.length === 0) {
       baseCons.push(contractName);
     }
   }
@@ -129,19 +117,21 @@ async function findReusedBaseCons(doc: vscode.TextDocument): Promise<Array<Objec
   // Loop through all contracts and find which ones inherit a base constructor
   for(let contractName in contractAST._contracts) {
     // Push the locations of the constructors of each contract into an array
-    contractConstructorLines.push({
-      'contractName': `${contractName}`,
-      'start': {
-        'column': contractAST._contracts[contractName]._constructor.funcContext.start.column,
-        'line': contractAST._contracts[contractName]._constructor.funcContext.start.line,
-        'name': contractAST._contracts[contractName]._constructor.funcContext.start.source
-      },
-      'end': {
-        'column': contractAST._contracts[contractName]._constructor.funcContext.end.column,
-        'line': contractAST._contracts[contractName]._constructor.funcContext.end.line,
-        'name': contractAST._contracts[contractName]._constructor.funcContext.end.source
-      }
-    });
+    if (contractAST._contracts[contractName]._constructor) {
+      contractConstructorLines.push({
+        'contractName': `${contractName}`,
+        'start': {
+          'column': contractAST._contracts[contractName]._constructor.funcContext.start.column,
+          'line': contractAST._contracts[contractName]._constructor.funcContext.start.line,
+          'name': contractAST._contracts[contractName]._constructor.funcContext.start.source
+        },
+        'end': {
+          'column': contractAST._contracts[contractName]._constructor.funcContext.end.column,
+          'line': contractAST._contracts[contractName]._constructor.funcContext.end.line,
+          'name': contractAST._contracts[contractName]._constructor.funcContext.end.source
+        }
+      });
+    }
 
     for(let baseContractIndex in baseCons) {
       if(contractAST._contracts[contractName] == baseCons[baseContractIndex]) {              // Break loop if contractName matches the name of one of the base constructors
@@ -193,63 +183,65 @@ async function findReusedBaseCons(doc: vscode.TextDocument): Promise<Array<Objec
         if(parentChild[parentChildIndex].child == contractAST._contracts[contractName]._parents[0]) {
           // The parent of this contract is a child that inherits a base constructor.
           // Check the constructor of this contract to see if it constructs the same base constructor.
-          for(let key in contractAST._contracts[contractName]._constructor.funcConstructorCalls){
-            if(key == parentChild[parentChildIndex].parent){
-              foundReusedBaseCont = true;
-              let parentConstructorLineNumber;
-              // Push annotation for constructor in the parent contract
-              for(let i = 0; i < contractConstructorLines.length; ++i) {
-                if(contractConstructorLines[i].contractName === contractAST._contracts[contractName]._parents[0]) {
-                  parentConstructorLineNumber = contractConstructorLines[i].start.line
-                  reusedBaseCons.push({
-                    'annotation': `Base constructor arguments given twice for contract '${contractName}' in line ${contractAST._contracts[contractName]._contractContext.start.line}. \nFirst constructor call is in the contract '${contractName}' in line ${contractAST._contracts[contractName]._constructor.funcContext.start.line}. \nSecond constructor call in the contract '${contractAST._contracts[contractName]._parents[0]}' in line ${parentConstructorLineNumber}.`,
-                    'start': {
-                      'line': contractConstructorLines[i].start.line,
-                      'column': contractConstructorLines[i].start.column,
-                      'name': contractConstructorLines[i].start.name
-                    },
-                    'end': {
-                      'line': contractConstructorLines[i].end.line,
-                      'column': contractConstructorLines[i].end.column,
-                      'name': contractConstructorLines[i].end.name
-                    }
-                  });
-                  break;
+          if (contractAST._contracts[contractName]._constructor) {
+            for(let key in contractAST._contracts[contractName]._constructor.funcConstructorCalls){
+              if(key == parentChild[parentChildIndex].parent){
+                foundReusedBaseCont = true;
+                let parentConstructorLineNumber;
+                // Push annotation for constructor in the parent contract
+                for(let i = 0; i < contractConstructorLines.length; ++i) {
+                  if(contractConstructorLines[i].contractName === contractAST._contracts[contractName]._parents[0]) {
+                    parentConstructorLineNumber = contractConstructorLines[i].start.line
+                    reusedBaseCons.push({
+                      'annotation': `Base constructor arguments given twice for contract '${contractName}' in line ${contractAST._contracts[contractName]._contractContext.start.line}. \nFirst constructor call is in the contract '${contractName}' in line ${contractAST._contracts[contractName]._constructor.funcContext.start.line}. \nSecond constructor call in the contract '${contractAST._contracts[contractName]._parents[0]}' in line ${parentConstructorLineNumber}.`,
+                      'start': {
+                        'line': contractConstructorLines[i].start.line,
+                        'column': contractConstructorLines[i].start.column,
+                        'name': contractConstructorLines[i].start.name
+                      },
+                      'end': {
+                        'line': contractConstructorLines[i].end.line,
+                        'column': contractConstructorLines[i].end.column,
+                        'name': contractConstructorLines[i].end.name
+                      }
+                    });
+                    break;
+                  }
                 }
+
+                // Push annotation for the line with the contract name
+                reusedBaseCons.push({
+                  'annotation': `Base constructor arguments given twice for contract '${contractName}' in line ${contractAST._contracts[contractName]._contractContext.start.line}. \nFirst constructor call is in the contract '${contractName}' in line ${contractAST._contracts[contractName]._constructor.funcContext.start.line}. \nSecond constructor call in the contract '${contractAST._contracts[contractName]._parents[0]}' in line ${parentConstructorLineNumber}.`,
+                  'start': {
+                    'line': contractAST._contracts[contractName]._contractContext.start.line,
+                    'column': contractAST._contracts[contractName]._contractContext.start.column,
+                    'name': contractAST._contracts[contractName]._contractContext.start.name
+                  },
+                  'end': {
+                    'line': contractAST._contracts[contractName]._contractContext.end.line,
+                    'column': contractAST._contracts[contractName]._contractContext.end.column,
+                    'name': contractAST._contracts[contractName]._contractContext.end.name
+                  }
+                });
+
+                // Push annotation for constructor of this contract
+                reusedBaseCons.push({
+                  'annotation': `Base constructor arguments given twice for contract '${contractName}' in line ${contractAST._contracts[contractName]._contractContext.start.line}. \nFirst constructor call is in the contract '${contractName}' in line ${contractAST._contracts[contractName]._constructor.funcContext.start.line}. \nSecond constructor call in the contract '${contractAST._contracts[contractName]._parents[0]}' in line ${parentConstructorLineNumber}.`,
+                  'start': {
+                    'line': contractAST._contracts[contractName]._constructor.funcContext.start.line,
+                    'column': contractAST._contracts[contractName]._constructor.funcContext.start.column,
+                    'name': contractAST._contracts[contractName]._constructor.funcContext.start.name
+                  },
+                  'end': {
+                    'line': contractAST._contracts[contractName]._constructor.funcContext.end.line,
+                    'column': contractAST._contracts[contractName]._constructor.funcContext.end.column,
+                    'name': contractAST._contracts[contractName]._constructor.funcContext.end.name
+                  }
+                });
+
+
+                break;
               }
-
-              // Push annotation for the line with the contract name
-              reusedBaseCons.push({
-                'annotation': `Base constructor arguments given twice for contract '${contractName}' in line ${contractAST._contracts[contractName]._contractContext.start.line}. \nFirst constructor call is in the contract '${contractName}' in line ${contractAST._contracts[contractName]._constructor.funcContext.start.line}. \nSecond constructor call in the contract '${contractAST._contracts[contractName]._parents[0]}' in line ${parentConstructorLineNumber}.`,
-                'start': {
-                  'line': contractAST._contracts[contractName]._contractContext.start.line,
-                  'column': contractAST._contracts[contractName]._contractContext.start.column,
-                  'name': contractAST._contracts[contractName]._contractContext.start.name
-                },
-                'end': {
-                  'line': contractAST._contracts[contractName]._contractContext.end.line,
-                  'column': contractAST._contracts[contractName]._contractContext.end.column,
-                  'name': contractAST._contracts[contractName]._contractContext.end.name
-                }
-              });
-
-              // Push annotation for constructor of this contract
-              reusedBaseCons.push({
-                'annotation': `Base constructor arguments given twice for contract '${contractName}' in line ${contractAST._contracts[contractName]._contractContext.start.line}. \nFirst constructor call is in the contract '${contractName}' in line ${contractAST._contracts[contractName]._constructor.funcContext.start.line}. \nSecond constructor call in the contract '${contractAST._contracts[contractName]._parents[0]}' in line ${parentConstructorLineNumber}.`,
-                'start': {
-                  'line': contractAST._contracts[contractName]._constructor.funcContext.start.line,
-                  'column': contractAST._contracts[contractName]._constructor.funcContext.start.column,
-                  'name': contractAST._contracts[contractName]._constructor.funcContext.start.name
-                },
-                'end': {
-                  'line': contractAST._contracts[contractName]._constructor.funcContext.end.line,
-                  'column': contractAST._contracts[contractName]._constructor.funcContext.end.column,
-                  'name': contractAST._contracts[contractName]._constructor.funcContext.end.name
-                }
-              });
-
-
-              break;
             }
           }
         }
@@ -268,8 +260,10 @@ async function findReusedBaseCons(doc: vscode.TextDocument): Promise<Array<Objec
           if(parentChild[parentChildIndex].parent === parentChild[i].parent){
             foundReusedBaseCont = true;
             // Push annotation for the contract itself
+            const firstStart = contractAST._contracts[parentChild[parentChildIndex].child]._constructor ? contractAST._contracts[parentChild[parentChildIndex].child]._constructor.funcContext.start.line : contractAST._contracts[parentChild[parentChildIndex].child]._contractContext.start.line
+            const secondStart = contractAST._contracts[parentChild[i].child]._constructor ? contractAST._contracts[parentChild[i].child]._constructor.funcContext.start.line : contractAST._contracts[parentChild[i].child]._contractContext.start.line
             reusedBaseCons.push({
-              'annotation': `Base constructor arguments given twice for contract '${contractName}' in line ${contractAST._contracts[contractName]._contractContext.start.line}. \nFirst constructor call is in the contract '${parentChild[parentChildIndex].child}' in line ${contractAST._contracts[parentChild[parentChildIndex].child]._constructor.funcContext.start.line}. \nSecond constructor call in the contract '${parentChild[i].child}' in line ${contractAST._contracts[parentChild[i].child]._constructor.funcContext.start.line}.`,
+              'annotation': `Base constructor arguments given twice for contract '${contractName}' in line ${contractAST._contracts[contractName]._contractContext.start.line}. \nFirst constructor call is in the contract '${parentChild[parentChildIndex].child}' in line ${firstStart}. \nSecond constructor call in the contract '${parentChild[i].child}' in line ${secondStart}.`,
               'start': {
                 'line': contractAST._contracts[contractName]._contractContext.start.line,
                 'column': contractAST._contracts[contractName]._contractContext.start.column,
@@ -279,36 +273,6 @@ async function findReusedBaseCons(doc: vscode.TextDocument): Promise<Array<Objec
                 'line': contractAST._contracts[contractName]._contractContext.end.line,
                 'column': contractAST._contracts[contractName]._contractContext.end.column,
                 'name': contractAST._contracts[contractName]._contractContext.end.name
-              }
-            });
-
-            // Push annotation for first child contract's constructor
-            reusedBaseCons.push({
-              'annotation': `Base constructor arguments given twice for contract '${contractName}' in line ${contractAST._contracts[contractName]._contractContext.start.line}. \nFirst constructor call is in the contract '${parentChild[parentChildIndex].child}' in line ${contractAST._contracts[parentChild[parentChildIndex].child]._constructor.funcContext.start.line}. \nSecond constructor call in the contract '${parentChild[i].child}' in line ${contractAST._contracts[parentChild[i].child]._constructor.funcContext.start.line}.`,
-              'start': {
-                'line': contractAST._contracts[parentChild[parentChildIndex].child]._constructor.funcContext.start.line,
-                'column': contractAST._contracts[parentChild[parentChildIndex].child]._constructor.funcContext.start.column,
-                'name': contractAST._contracts[parentChild[parentChildIndex].child]._constructor.funcContext.start.name
-              },
-              'end': {
-                'line': contractAST._contracts[parentChild[parentChildIndex].child]._constructor.funcContext.end.line,
-                'column': contractAST._contracts[parentChild[parentChildIndex].child]._constructor.funcContext.end.column,
-                'name': contractAST._contracts[parentChild[parentChildIndex].child]._constructor.funcContext.end.name
-              }
-            });
-
-            // Push annotation for second child contract's constructor
-            reusedBaseCons.push({
-              'annotation': `Base constructor arguments given twice for contract '${contractName}' in line ${contractAST._contracts[contractName]._contractContext.start.line}. \nFirst constructor call is in the contract '${parentChild[parentChildIndex].child}' in line ${contractAST._contracts[parentChild[parentChildIndex].child]._constructor.funcContext.start.line}. \nSecond constructor call in the contract '${parentChild[i].child}' in line ${contractAST._contracts[parentChild[i].child]._constructor.funcContext.start.line}.`,
-              'start': {
-                'line': contractAST._contracts[parentChild[i].child]._constructor.funcContext.start.line,
-                'column': contractAST._contracts[parentChild[i].child]._constructor.funcContext.start.column,
-                'name': contractAST._contracts[parentChild[i].child]._constructor.funcContext.start.name
-              },
-              'end': {
-                'line': contractAST._contracts[parentChild[i].child]._constructor.funcContext.end.line,
-                'column': contractAST._contracts[parentChild[i].child]._constructor.funcContext.end.column,
-                'name': contractAST._contracts[parentChild[i].child]._constructor.funcContext.end.name
               }
             });
             break;
@@ -330,12 +294,13 @@ async function validate(counter: number, doc: vscode.TextDocument, solidityDiagn
       const user = await getApplicationUser();
       const config = getConfig() || {};
       const options = { config };
+      const contractAST = await rest.debugPostParse(user, [[doc.uri.path, doc.getText()]], options);
 
       // Run dead code detector
-      const deadCodeArr = await findDeadCode(doc);
+      const deadCodeArr = await findDeadCode(doc, contractAST);
 
       // Run reused base constructor detector
-      const reusedBaseCons = await findReusedBaseCons(doc);
+      const reusedBaseCons = await findReusedBaseCons(doc, contractAST);
       
       
       const annotations = await rest.debugPostAnalyze(user, [[doc.uri.path, doc.getText()]], options);
