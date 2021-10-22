@@ -469,6 +469,12 @@ async function debugPostAnalyze(user:OAuthUser, args, options:Options) {
   return postRaw(url, endpoint, args, setAuthHeaders(user, options));
 }
 
+async function debugPostFuzz(user:OAuthUser, args, options:Options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.DEBUG_FUZZ, options);
+  return postRaw(url, endpoint, args, setAuthHeaders(user, options));
+}
+
 export default {
   getAccounts,
   getHealth,
@@ -522,4 +528,5 @@ export default {
   debugPostEval,
   debugPostParse,
   debugPostAnalyze,
+  debugPostFuzz,
 };

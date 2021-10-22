@@ -15,15 +15,18 @@ library:
   source-dirs: src/
   exposed-modules:
     - Blockchain.SolidVM
+    - Blockchain.SolidVM.Simple
     - Blockchain.SolidVM.SM
     - Blockchain.SolidVM.CodeCollectionDB
     - Blockchain.SolidVM.Exception
     - SolidVM.Solidity.Detectors
+    - SolidVM.Solidity.Fuzzer
     - SolidVM.Solidity.Parse.File
     - SolidVM.Solidity.Parse.Lexer
     - SolidVM.Solidity.Parse.Statement
     - SolidVM.Solidity.Parse.UnParser
     - SolidVM.Solidity.Parse.Declarations
+    - SolidVM.Solidity.SourceTools
     - SolidVM.Solidity.Xabi.Statement
     - SolidVM.Solidity.Xabi.Type
     - CodeCollection
@@ -41,6 +44,7 @@ library:
   - bytestring
   - containers
   - cryptonite
+  - data-default
   - debugger
   - deepseq
   - ethereum-rlp
@@ -56,8 +60,10 @@ library:
   - nibblestring
   - parsec
   - prometheus-client
+  - QuickCheck
   - quickcheck-instances
   - semver-range
+  - servant-server
   - servant-docs
   - solid-vm-model
   - source-tools

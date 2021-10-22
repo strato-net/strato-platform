@@ -46,6 +46,8 @@ module Blockchain.VMContext
     , blockRequested
     , coinbaseQueue
     , txRunResultsCache
+    , debugSettings
+    , newX509Certs
     , dbs
     , state
     , contextGet

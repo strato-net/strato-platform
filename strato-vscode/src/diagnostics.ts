@@ -43,7 +43,7 @@ async function findDeadCode(srcMap: Object): Promise<Array<Object>> {
 
     for (let key in contractFunctions) {      
       searchFuncs.push(contractAST._contracts[contractName]._functions[key].funcContents);    //Save functions from JSON to an array.
-      if(contractFunctions[key].funcVisibility != 'Public') {                                 // Distinguish which functions are not Public
+      if(contractFunctions[key].funcVisibility === 'Internal') {                                 // Distinguish which functions are not Public
         privFuncs.push({
           'funcName': key, 
           'start': {
@@ -148,6 +148,17 @@ async function validate(counter: number, doc: vscode.TextDocument, solidityDiagn
       }
 
       solidityDiagnostics.set(doc.uri, diagnostics);
+
+      const fuzzAnns = await rest.debugPostFuzz(user, srcMap, options);
+
+      for (let ann in fuzzAnns) {
+        const mDiag = createFuzzDiagnostic(doc, fuzzAnns[ann]);
+        if (mDiag) {
+          diagnostics.push(mDiag);
+        }
+      }
+
+      solidityDiagnostics.set(doc.uri, diagnostics);
     } catch (e) {
       console.log(`validate exception: ${JSON.stringify(e)}`);
     }
@@ -180,7 +191,6 @@ function createDiagnostic(doc: vscode.TextDocument, ann: any): vscode.Diagnostic
     switch (ann.annotation._severity) {
       case 'Error': severity = vscode.DiagnosticSeverity.Error; break;
       case 'Warning': severity = vscode.DiagnosticSeverity.Warning; break;
-      case 'Info': severity = vscode.DiagnosticSeverity.Information; break;
       case 'Debug': severity = vscode.DiagnosticSeverity.Hint; break;
     }
 
@@ -188,6 +198,21 @@ function createDiagnostic(doc: vscode.TextDocument, ann: any): vscode.Diagnostic
       severity);
     diagnostic.code = '';
     return diagnostic;
+  }
+}
+
+function createFuzzDiagnostic(doc: vscode.TextDocument, ann: any): vscode.Diagnostic | undefined {
+  const { tag } = ann;
+  if (tag === 'FuzzerFailure') {
+    const { _fuzzerFailureContext={} } = ann;
+    const { annotation='' } = _fuzzerFailureContext;
+    const withSeverity = { _context: annotation, _severity: 'Error' }
+    return createDiagnostic(doc, {  ..._fuzzerFailureContext, annotation: withSeverity });
+  } else {
+    const { contents={} } = ann;
+    const { annotation='' } = contents;
+    const withSeverity = { _context: annotation, _severity: 'Debug' }
+    return createDiagnostic(doc, { ...contents, annotation: withSeverity });
   }
 }
 

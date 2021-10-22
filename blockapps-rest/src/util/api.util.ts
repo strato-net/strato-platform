@@ -47,6 +47,7 @@ const Endpoint = {
   DEBUG_EVAL: `${debugUrl}/eval`,
   DEBUG_PARSE: `${debugUrl}/parse`,
   DEBUG_ANALYZE: `${debugUrl}/analyze`,
+  DEBUG_FUZZ: `${debugUrl}/fuzz`,
 };
 
 function constructEndpoint(endpointTemplate, options:Options, params = {}) {

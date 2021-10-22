@@ -1608,6 +1608,11 @@ async function debugPostAnalyze(user:OAuthUser, args, options:Options) {
   return response;
 }
 
+async function debugPostFuzz(user:OAuthUser, args, options:Options) {
+  const response = await api.debugPostFuzz(user, args, options);
+  return response;
+}
+
 // =====================================================================
 //   Common patterns used in applications
 // =====================================================================
@@ -1729,6 +1734,7 @@ export default {
   debugPostEval,
   debugPostParse,
   debugPostAnalyze,
+  debugPostFuzz,
   //
   RestError,
   response,
