@@ -56,8 +56,8 @@ sourceToolsServer tools =
   :<|> postAnalyze (analyzer tools)
   :<|> postFuzz (fuzzer tools)
 
-defaultSourceTools :: SourceTools
-defaultSourceTools =
+defaultSourceTools :: Maybe DebugSettings -> SourceTools
+defaultSourceTools dSettings =
   let parse = fmap concat
             . traverse (uncurry parseSourceWithAnnotations)
             . unSourceMap
@@ -65,12 +65,12 @@ defaultSourceTools =
               . M.fromList
               . unSourceMap
       analyze = runDetectors parse compile id
-      fuzz = runFuzzer compile
+      fuzz = runFuzzer dSettings compile
    in SourceTools compile analyze fuzz
 
-initializeSolidVMDebugger :: SourceTools -> IO (Maybe (DebugSettings, IO ()))
+initializeSolidVMDebugger :: (Maybe DebugSettings -> SourceTools) -> IO (Maybe (DebugSettings, IO ()))
 initializeSolidVMDebugger tools =
-  let restServer = restDebuggerAnd sourceToolsAPI (sourceToolsServer tools)
+  let restServer = restDebuggerAnd sourceToolsAPI (sourceToolsServer . tools . Just)
    in initializeDebugger restServer
 
 initializeSolidVMDebuggerSimple :: IO (Maybe (DebugSettings, IO ()))
