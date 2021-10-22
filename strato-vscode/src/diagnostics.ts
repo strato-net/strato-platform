@@ -196,7 +196,10 @@ async function findReusedBaseCons(doc: vscode.TextDocument, contractAST: any): P
                   if(contractConstructorLines[i].contractName === contractAST._contracts[contractName]._parents[0]) {
                     parentConstructorLineNumber = contractConstructorLines[i].start.line
                     reusedBaseCons.push({
-                      'annotation': `Base constructor arguments given twice for contract '${contractName}' in line ${contractAST._contracts[contractName]._contractContext.start.line}. \nFirst constructor call is in the contract '${contractName}' in line ${contractAST._contracts[contractName]._constructor.funcContext.start.line}. \nSecond constructor call in the contract '${contractAST._contracts[contractName]._parents[0]}' in line ${parentConstructorLineNumber}.`,
+                      'annotation': {
+                        '_context': `Base constructor arguments given twice for contract '${contractName}' in line ${contractAST._contracts[contractName]._contractContext.start.line}. \nFirst constructor call is in the contract '${contractName}' in line ${contractAST._contracts[contractName]._constructor.funcContext.start.line}. \nSecond constructor call in the contract '${contractAST._contracts[contractName]._parents[0]}' in line ${parentConstructorLineNumber}.`,
+                        '_severity': 'Warning'
+                      },
                       'start': {
                         'line': contractConstructorLines[i].start.line,
                         'column': contractConstructorLines[i].start.column,
@@ -214,7 +217,10 @@ async function findReusedBaseCons(doc: vscode.TextDocument, contractAST: any): P
 
                 // Push annotation for the line with the contract name
                 reusedBaseCons.push({
-                  'annotation': `Base constructor arguments given twice for contract '${contractName}' in line ${contractAST._contracts[contractName]._contractContext.start.line}. \nFirst constructor call is in the contract '${contractName}' in line ${contractAST._contracts[contractName]._constructor.funcContext.start.line}. \nSecond constructor call in the contract '${contractAST._contracts[contractName]._parents[0]}' in line ${parentConstructorLineNumber}.`,
+                  'annotation': {
+                    '_context': `Base constructor arguments given twice for contract '${contractName}' in line ${contractAST._contracts[contractName]._contractContext.start.line}. \nFirst constructor call is in the contract '${contractName}' in line ${contractAST._contracts[contractName]._constructor.funcContext.start.line}. \nSecond constructor call in the contract '${contractAST._contracts[contractName]._parents[0]}' in line ${parentConstructorLineNumber}.`,
+                    '_severity': 'Warning'
+                  },
                   'start': {
                     'line': contractAST._contracts[contractName]._contractContext.start.line,
                     'column': contractAST._contracts[contractName]._contractContext.start.column,
@@ -229,7 +235,10 @@ async function findReusedBaseCons(doc: vscode.TextDocument, contractAST: any): P
 
                 // Push annotation for constructor of this contract
                 reusedBaseCons.push({
-                  'annotation': `Base constructor arguments given twice for contract '${contractName}' in line ${contractAST._contracts[contractName]._contractContext.start.line}. \nFirst constructor call is in the contract '${contractName}' in line ${contractAST._contracts[contractName]._constructor.funcContext.start.line}. \nSecond constructor call in the contract '${contractAST._contracts[contractName]._parents[0]}' in line ${parentConstructorLineNumber}.`,
+                  'annotation': {
+                    '_context': `Base constructor arguments given twice for contract '${contractName}' in line ${contractAST._contracts[contractName]._contractContext.start.line}. \nFirst constructor call is in the contract '${contractName}' in line ${contractAST._contracts[contractName]._constructor.funcContext.start.line}. \nSecond constructor call in the contract '${contractAST._contracts[contractName]._parents[0]}' in line ${parentConstructorLineNumber}.`,
+                    '_severity': 'Warning'
+                  },
                   'start': {
                     'line': contractAST._contracts[contractName]._constructor.funcContext.start.line,
                     'column': contractAST._contracts[contractName]._constructor.funcContext.start.column,
@@ -266,7 +275,10 @@ async function findReusedBaseCons(doc: vscode.TextDocument, contractAST: any): P
             const firstStart = contractAST._contracts[parentChild[parentChildIndex].child]._constructor ? contractAST._contracts[parentChild[parentChildIndex].child]._constructor.funcContext.start.line : contractAST._contracts[parentChild[parentChildIndex].child]._contractContext.start.line
             const secondStart = contractAST._contracts[parentChild[i].child]._constructor ? contractAST._contracts[parentChild[i].child]._constructor.funcContext.start.line : contractAST._contracts[parentChild[i].child]._contractContext.start.line
             reusedBaseCons.push({
-              'annotation': `Base constructor arguments given twice for contract '${contractName}' in line ${contractAST._contracts[contractName]._contractContext.start.line}. \nFirst constructor call is in the contract '${parentChild[parentChildIndex].child}' in line ${firstStart}. \nSecond constructor call in the contract '${parentChild[i].child}' in line ${secondStart}.`,
+              'annotation': {
+                '_context': `Base constructor arguments given twice for contract '${contractName}' in line ${contractAST._contracts[contractName]._contractContext.start.line}. \nFirst constructor call is in the contract '${parentChild[parentChildIndex].child}' in line ${firstStart}. \nSecond constructor call in the contract '${parentChild[i].child}' in line ${secondStart}.`,
+                '_severity': 'Warning'
+              },
               'start': {
                 'line': contractAST._contracts[contractName]._contractContext.start.line,
                 'column': contractAST._contracts[contractName]._contractContext.start.column,
