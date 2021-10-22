@@ -55,7 +55,6 @@ doRequest' correlationId h r = do
     Left s -> return $ Left s
     Right dataLength -> do
       responseBytes <- liftIO $ B.hGet h dataLength
-      liftIO $ putStrLn $ "response = " ++ show responseBytes
       return $ flip runGet responseBytes $ do
         correlationId' <- deserialize
         unless (correlationId == correlationId') $ fail ("Expected " ++ show correlationId ++ " but got " ++ show correlationId')
