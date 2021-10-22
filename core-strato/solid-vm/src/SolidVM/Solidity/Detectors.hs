@@ -38,7 +38,6 @@ compilerWarningDetectors = [ Trivial.detector
                            , ConstantFunctions.detector
                            , StateVariables.detector
                            ]
-
 compilerErrorDetectors :: [CompilerDetector]
 compilerErrorDetectors = [ Typechecker.detector
                          ]
