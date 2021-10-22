@@ -22,6 +22,7 @@ module Blockchain.SolidVM
   ) where
 
 import           Control.DeepSeq                      (force)
+import           Control.Exception                    (throw)
 import           Control.Lens hiding (assign, from, to, Context)
 import           Control.Applicative
 import           Control.Monad
@@ -80,7 +81,8 @@ import           Blockchain.SolidVM.TraceTools
 import           Blockchain.SolidVM.Value
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.Action
+import           Blockchain.Strato.Model.Action       (Action)
+import qualified Blockchain.Strato.Model.Action       as Action
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Keccak256
@@ -283,7 +285,7 @@ create' creator newAccount ch cc contractName' argExps x509s = do
   
   org <- getOrg creator (contract' ^. vmVersion)
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    actionData %= M.adjust (actionDataOrganization .~ (T.pack org)) newAccount
+    Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) newAccount
 
 
   -- I'm showing these strings because I like them to be in quotes in the logs :)
@@ -569,7 +571,7 @@ callWrapper from to mContract functionName argExps = do
   -- grab the org for this contract
   org <- getOrg to (contract ^. vmVersion)
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    actionData %= M.adjust (actionDataOrganization .~ (T.pack org)) to
+    Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) to
 
   liftIO $ putStrLn $ "callWraper/versioning --->  we are calling " ++ (_contractName contract) ++ 
         " in app " ++ (show parentName) ++ " of org " ++ show org
@@ -1129,7 +1131,7 @@ expToVar' x@(Xabi.MemberAccess _ expr name) = do
       (SBuiltinVariable "super", method) -> do
         ctract <- getCurrentContract
         (_, cc) <- getCurrentCodeCollection
-        let parents' = getParents cc ctract
+        let parents' = either (throw . fst) id $ getParents cc ctract
         case filter (elem method . M.keys .  _functions) parents' of
           [] -> typeError "cannot use super without a parent contract" (method, ctract)
           ps -> do
@@ -1153,7 +1155,7 @@ expToVar' x@(Xabi.MemberAccess _ expr name) = do
           _ -> return . Constant . SReference . apSnoc apt $ MS.Field "length"
 
       (SReference p, itemName) -> return . Constant . SReference $ apSnoc p $ MS.Field $ BC.pack itemName
-      _ -> typeError "illegal member access" $ unparseExpression x
+      m -> typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ show m)
 {-
     Variable vref -> do
       val' <- liftIO $ readIORef vref

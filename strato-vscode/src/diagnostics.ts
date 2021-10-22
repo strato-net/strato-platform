@@ -25,8 +25,8 @@ export async function refreshDiagnostics(doc: vscode.TextDocument, solidityDiagn
  * This detector finds all instances of dead code.
  * @param doc text document to analyze
  */
-async function findDeadCode(doc: vscode.TextDocument, contractAST: any): Promise<Array<Object>> {
-  
+
+async function findDeadCode(doc: vscode.TextDocument, contractAST: any): Promise<Array<Object>> {  
   let privFuncs = Array();
   let searchFuncs = Array();
   let deadFuncs = Array();
@@ -44,12 +44,12 @@ async function findDeadCode(doc: vscode.TextDocument, contractAST: any): Promise
           'start': {
             'line': contractFunctions[key].funcContext.start.line, 
             'column': contractFunctions[key].funcContext.start.column, 
-            'name': doc.uri.path
+            'name': contractFunctions[key].funcContext.start.name
           }, 
           'end': {
             'line': contractFunctions[key].funcContext.end.line,
             'column':  contractFunctions[key].funcContext.end.column,
-            'name': doc.uri.path
+            'name': contractFunctions[key].funcContext.end.name
           }});
       }
     }
@@ -77,7 +77,10 @@ async function findDeadCode(doc: vscode.TextDocument, contractAST: any): Promise
       for(let i = 0; i < privFuncs.length; ++i) {
         if (privFuncs.length != 0) {
           deadFuncs.push({
-            'annotation': `The function '${privFuncs[i].funcName}' in contract '${contractName}' is never used and should be removed`,
+            'annotation': {
+              '_context': `The function '${privFuncs[i].funcName}' in contract '${contractName}' is never used and should be removed`,
+              '_severity': 'Warning'
+            },
             'start': {
               'line': privFuncs[i].start.line,
               'column': privFuncs[i].start.column,
@@ -294,7 +297,19 @@ async function validate(counter: number, doc: vscode.TextDocument, solidityDiagn
       const user = await getApplicationUser();
       const config = getConfig() || {};
       const options = { config };
-      const contractAST = await rest.debugPostParse(user, [[doc.uri.path, doc.getText()]], options);
+      let srcMap = {[doc.uri.path]: doc.getText()};
+      const folders = vscode.workspace.workspaceFolders || [];
+      if (folders.length > 0) {
+        const serverPath: string = vscode.workspace.getConfiguration().get('strato-vscode.serverPath') || '';
+        const currentFolder = folders[0]
+		    const folder = currentFolder.uri.path;
+        // eslint-disable-next-line import/no-mutable-exports
+        const dirPath = `${folder}/${serverPath}`
+        srcMap = await importer.combine(doc.uri.path, true, dirPath);
+        srcMap[importer.getShortName(doc.uri.path)] = doc.getText();
+      }
+
+      const contractAST = await rest.debugPostParse(user, srcMap, options);
 
       // Run dead code detector
       const deadCodeArr = await findDeadCode(doc, contractAST);
@@ -302,8 +317,12 @@ async function validate(counter: number, doc: vscode.TextDocument, solidityDiagn
       // Run reused base constructor detector
       const reusedBaseCons = await findReusedBaseCons(doc, contractAST);
       
-      
-      const annotations = await rest.debugPostAnalyze(user, [[doc.uri.path, doc.getText()]], options);
+      const annotations = await rest.debugPostAnalyze(user, srcMap, options);
+
+      // Push dead code detector annotations in
+      for(let i = 0; i < deadCodeArr.length; ++i) {
+        annotations.push(deadCodeArr[i]);
+      }
 
       // Push dead code detector annotations in
       for(let i = 0; i < deadCodeArr.length; ++i) {
@@ -317,7 +336,10 @@ async function validate(counter: number, doc: vscode.TextDocument, solidityDiagn
       
 
       for (let ann in annotations) {
-        diagnostics.push(createDiagnostic(doc, annotations[ann]));
+        const mDiag = createDiagnostic(doc, annotations[ann]);
+        if (mDiag) {
+          diagnostics.push(mDiag);
+        }
       }
 
       solidityDiagnostics.set(doc.uri, diagnostics);
@@ -327,16 +349,41 @@ async function validate(counter: number, doc: vscode.TextDocument, solidityDiagn
   }
 }
 
-function createDiagnostic(doc: vscode.TextDocument, ann: any): vscode.Diagnostic {  
+function createDiagnostic(doc: vscode.TextDocument, ann: any): vscode.Diagnostic | undefined {
   const { start, end } = ann;
+  let showAnn = false;
+  let sLine = 0;
+  let sCol = 0;
+  let eLine = 0;
+  let eCol = 0;
+  if (doc.uri.path.endsWith(start.name)) {
+    showAnn = true;
+    sLine = start.line && start.line > 0 ? start.line - 1 : 0;
+    sCol = start.column && start.column > 0 ? start.column - 1 : 0;
+  }
+  if (doc.uri.path.endsWith(start.name)) {
+    showAnn = true;
+    eLine = end.line && end.line > 0 ? end.line - 1 : 0;
+    eCol = end.column && end.column > 0 ? end.column - 1 : 0;
+  }
 
-  // create range that represents, where in the document the word is
-  const range = new vscode.Range(start.line - 1, start.column - 1, end.line - 1, end.column - 1);
+  if (showAnn) {
+    // create range that represents, where in the document the word is
+    const range = new vscode.Range(sLine, sCol, eLine, eCol);
 
-  const diagnostic = new vscode.Diagnostic(range, ann.annotation,
-    vscode.DiagnosticSeverity.Warning);
-  diagnostic.code = '';
-  return diagnostic;
+    let severity = vscode.DiagnosticSeverity.Information;
+    switch (ann.annotation._severity) {
+      case 'Error': severity = vscode.DiagnosticSeverity.Error; break;
+      case 'Warning': severity = vscode.DiagnosticSeverity.Warning; break;
+      case 'Info': severity = vscode.DiagnosticSeverity.Information; break;
+      case 'Debug': severity = vscode.DiagnosticSeverity.Hint; break;
+    }
+
+    const diagnostic = new vscode.Diagnostic(range, ann.annotation._context,
+      severity);
+    diagnostic.code = '';
+    return diagnostic;
+  }
 }
 
 export async function subscribeToDocumentChanges(context: vscode.ExtensionContext, solidityDiagnostics: vscode.DiagnosticCollection): Promise<void> {  

@@ -18,27 +18,23 @@ library:
   dependencies:
   - QuickCheck
   - aeson
-  - ansi-wl-pprint
   - base-unicode-symbols
   - base16-bytestring
   - binary
   - blockapps-datadefs
-  - blockapps-haskoin
   - blockapps-util
   - bytestring
   - bytestring-arbitrary
   - clock
-  - conduit
   - containers
   - data-default
   - deepseq
   - esqueleto
-  - ethereum-encryption
   - ethereum-rlp
   - filepath
   - format
   - generic-arbitrary
-  - http-api-data
+  - generic-random
   - json-stream
   - labeled-error
   - lens
@@ -54,6 +50,7 @@ library:
   - regex-compat
   - resourcet
   - secp256k1-haskell # remove
+  - servant-docs
   - strato-conf
   - strato-model
   - swagger2
@@ -62,7 +59,6 @@ library:
   - transformers
   - unliftio
   - unliftio-core
-  - unordered-containers
   - vector
 
 executables:

@@ -38,6 +38,7 @@ library:
       - time
       - unordered-containers
       - vector
+      - vm-tools
 
       - aeson
       - bytestring

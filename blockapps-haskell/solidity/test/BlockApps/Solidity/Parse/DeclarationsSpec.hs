@@ -202,7 +202,7 @@ spec = do
     let xempty = xabiEmpty
     let parseContract = runParser solidityContract "" ""
     let nameOf (NamedXabi n _) = n
-        nameOf _ = error "unexpected pragma"
+        nameOf _ = error "unexpected pragma or import"
     it "should parse an empty contract" $ do
       let contractString = "contract a {}"
           eRes = parseContract contractString

@@ -46,15 +46,14 @@ import qualified Blockchain.DB.MemAddressStateDB      as Mem
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
-import           Blockchain.EthConf                   (runKafkaConfigured)
 import           Blockchain.ExtWord
 import           Blockchain.Output
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Stream.VMEvent
 
 import           Blockchain.Strato.StateDiff          hiding (StateDiff (chainId, blockHash, stateRoot))
 import qualified Blockchain.Strato.StateDiff          as StateDiff (StateDiff (chainId, blockHash, stateRoot))
 import           Blockchain.Strato.StateDiff.Database
-import           Blockchain.Strato.StateDiff.Kafka    (writeActionJSONToKafka, filterResponse)
 
 import           Blockchain.Strato.Model.Account
 import qualified Blockchain.Strato.Model.Address      as Ad
@@ -302,12 +301,12 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) = do
       toAction a d = do
         vm <- codePtrToCodeKind chainId $ codeHash d
         pure A.Action
-          { A._actionBlockHash = creationBlock
-          , A._actionBlockTimestamp = posixSecondsToUTCTime 0
-          , A._actionBlockNumber = 0
-          , A._actionTransactionHash = unsafeCreateKeccak256FromWord256 $ fromMaybe 0 chainId
-          , A._actionTransactionChainId = chainId
-          , A._actionTransactionSender = Account (Ad.Address 0) chainId
+          { A._blockHash = creationBlock
+          , A._blockTimestamp = posixSecondsToUTCTime 0
+          , A._blockNumber = 0
+          , A._transactionHash = unsafeCreateKeccak256FromWord256 $ fromMaybe 0 chainId
+          , A._transactionChainId = chainId
+          , A._transactionSender = Account (Ad.Address 0) chainId
           , A._actionData = Map.singleton a $
                              A.ActionData
                                (codeHash d)
@@ -315,11 +314,11 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) = do
                                ""
                                vm
                                (case storage d of
-                                  EVMDiff m -> A.ActionEVMDiff $ Map.map fromDiff m
-                                  SolidVMDiff m -> A.ActionSolidVMDiff $ Map.map fromDiff m)
-                               [A.emptyCallData]
-          , A._actionMetadata = getMetadata ch
-          , A._actionEvents = S.empty
+                                  EVMDiff m -> A.EVMDiff $ Map.map fromDiff m
+                                  SolidVMDiff m -> A.SolidVMDiff $ Map.map fromDiff m)
+                               [A.Create]
+          , A._metadata = getMetadata ch
+          , A._events = S.empty
           }
         where
              ch =
@@ -330,8 +329,5 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) = do
       fromDiff (Value v) = v
       squashMap f = traverse (uncurry f) . Map.toList
   actions <- squashMap toAction accountDiffs
-  mErr <- liftIO . runKafkaConfigured "strato-genesis" $ writeActionJSONToKafka actions
-  case filterResponse <$> mErr of
-    Right [] -> return ()
-    Right errs -> error . show $ errs
-    Left err -> error . show $ err
+  _ <- produceVMEvents $ map NewAction actions
+  return ()

@@ -13,6 +13,7 @@ import           Text.Parsec
 import           Prelude                               hiding (lookup)
 
 import           BlockApps.Solidity.Parse.Declarations
+import           BlockApps.Solidity.Parse.Imports
 import           BlockApps.Solidity.Parse.Lexer
 import           BlockApps.Solidity.Parse.ParserTypes
 import           BlockApps.Solidity.Parse.Pragmas
@@ -20,6 +21,6 @@ import           BlockApps.Solidity.Parse.Pragmas
 solidityFile :: SolidityParser File
 solidityFile = do
   whiteSpace
-  units <- many (solidityPragma <|> solidityContract)
+  units <- many (solidityPragma <|> solidityImport <|> solidityContract)
   eof
   return . File $ units

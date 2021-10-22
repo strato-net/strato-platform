@@ -35,9 +35,9 @@ $(info )
 
 all: build_all docker-compose
 
-build_all: bloc strato apex dappstore nginx postgrest prometheus smd vault-wrapper
+build_all: strato apex dappstore nginx postgrest prometheus smd vault-wrapper
 
-.PHONY: bloc strato apex dappstore nginx postgrest prometheus smd vault-wrapper get_solcs build_buildbase build_common build_common_profiled
+.PHONY: strato apex dappstore nginx postgrest prometheus smd vault-wrapper get_solcs build_buildbase build_common build_common_profiled
 
 apex:
 	@echo Now building apex...
@@ -95,12 +95,6 @@ build_common_profiled: get_solcs build_buildbase
 	stack build \
 		--profile --work-dir .stack-work-profile \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
-
-bloc: build_common
-	@echo Now building bloc...
-	cp -fr blockapps-haskell/licenses ${BLOCDIR}
-	cp blockapps-haskell/doit.sh ${BLOCDIR}
-	docker build --target bloc --tag ${REPO_URL}bloc:${VERSION} --file Dockerfile.multi ${FAKEROOT}
 
 strato: build_common
 	@echo Now building core-strato...

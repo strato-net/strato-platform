@@ -6,31 +6,29 @@
     , TemplateHaskell
 #-}
 
-module Slipstream.MessageConsumer where
+module Slipstream.MessageConsumer (
+  mkConfiguredKafkaState,
+  runKafka,
+  getAndProcessMessages
+  ) where
 
-import Control.Concurrent     (threadDelay)
-import Control.Exception.Lifted
-import Control.Lens
 import Control.Monad.Reader
 import Control.Monad.Trans.State
 import Control.Monad.Trans.Except
-import Control.Retry
 import Data.Aeson hiding (Error)
-import qualified Data.ByteString as B
 import Data.IORef
-import Data.List
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
 import Data.String
 import Database.PostgreSQL.Typed
 import GHC.Generics
-import Network.Kafka
-import Network.Kafka.Consumer
+import Network.Kafka                    hiding (runKafka)
 import qualified Network.Kafka.Protocol as K hiding (Message)
 
 import BlockApps.Bloc22.Monad (BlocEnv)
 import BlockApps.Logging
 import Blockchain.MilenaTools
+import Blockchain.Stream.VMEvent
 
 import Control.Monad.Composable.BlocSQL
 
@@ -38,9 +36,6 @@ import Slipstream.Globals
 import Slipstream.Metrics
 import Slipstream.Options
 import Slipstream.Processor
-
-exceptionMaxCount :: Int
-exceptionMaxCount = 20
 
 data KafkaConf =
   KafkaConf {
@@ -117,28 +112,6 @@ putStatediffOffset off = do
         error $ show err
       Right () -> return ()
 
-
-getTheMessages :: K.Offset -> SlipKafka [B.ByteString]
-getTheMessages offset = do
-  let extract :: K.FetchResponse -> Either String [B.ByteString]
-      extract fr =
-        let errorStatuses = concatMap (^.. _2 . folded . _2) (fr ^. K.fetchResponseFields)
-        in case find (/= K.NoError) errorStatuses of
-          Just e -> Left . show $ e
-          Nothing -> Right . map tamPayload . fetchMessages $ fr
-      shouldRetry :: (MonadLogger m) => RetryStatus -> Either String [B.ByteString] -> m Bool
-      shouldRetry _ = \case
-                         Left e -> do
-                           $logErrorLS "getTheMessages/kafka_response" e
-                           return True
-                         Right _ -> return False
-      policy :: RetryPolicy
-      policy = limitRetriesByCumulativeDelay 20000000 . exponentialBackoff $ 40000
-  fetched <- retrying policy shouldRetry . const $ extract <$> fetch offset 0 lookupTopic
-  return $ case fetched of
-              Left e -> error $ "getTheMessages: " ++ e
-              Right bs -> bs
-
 getAndProcessMessages :: BlocEnv -> BlocSQLEnv -> PGConnection -> IORef Globals -> SlipKafka ()
 getAndProcessMessages env sqlEnv conn cache = do
   let errorCount = 0
@@ -148,28 +121,20 @@ getAndProcessMessages env sqlEnv conn cache = do
 getAndProcessMessages' :: BlocEnv -> BlocSQLEnv -> PGConnection -> IORef Globals -> K.Offset -> Int -> SlipKafka ()
 getAndProcessMessages' env sqlEnv conn cache offset errorCounter = do
   recordOffset offset
-  eMessages <- try $ getTheMessages offset
-  case eMessages of
-    Left e -> do
-      $logErrorLS "getTheMessages" (e :: KafkaClientError)
-      liftIO $ threadDelay 1000000
-      if (errorCounter > exceptionMaxCount )
-           then error $ "Slipstream reached exceptionMaxCount."
-           else getAndProcessMessages' env sqlEnv conn cache offset (errorCounter + 1)
-    Right messages -> do
-      $logDebugLS "getAndProcessMessages'" messages
-      recordKafkaMessages messages
-      forceGlobalEval cache
-      lift . lift $ processTheMessages env sqlEnv conn cache messages
-      let newOffset = offset + fromIntegral (length messages)
-      currentOffset <- getStatediffOffset
-      offset' <- if currentOffset /= offset
-                    then do
-                      $logInfoLS "getAndProcessMessages'/manual_offset" currentOffset
-                      recordOffsetOverride
-                      return currentOffset
-                    else do
-                      putStatediffOffset newOffset
-                      return newOffset
+  messages <- fetchVMEvents offset
+  $logDebugLS "getAndProcessMessages'" messages
+  recordKafkaMessages messages
+  forceGlobalEval cache
+  lift . lift $ processTheMessages env sqlEnv conn cache messages
+  let newOffset = offset + fromIntegral (length messages)
+  currentOffset <- getStatediffOffset
+  offset' <- if currentOffset /= offset
+             then do
+               $logInfoLS "getAndProcessMessages'/manual_offset" currentOffset
+               recordOffsetOverride
+               return currentOffset
+             else do
+               putStatediffOffset newOffset
+               return newOffset
 
-      getAndProcessMessages' env sqlEnv conn cache offset' errorCounter
+  getAndProcessMessages' env sqlEnv conn cache offset' errorCounter

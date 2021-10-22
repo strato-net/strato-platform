@@ -40,7 +40,7 @@ import Blockchain.Database.MerklePatricia as MP
 import Blockchain.DB.RawStorageDB
 import Blockchain.DB.SolidStorageDB
 import Blockchain.DB.StateDB
-import Blockchain.Strato.Model.Action
+import qualified Blockchain.Strato.Model.Action as Action
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Code
@@ -1769,11 +1769,11 @@ contract qq {
     s.doubleY();
   }
 }|]
-    let diffs = fmap _actionDataStorageDiffs . _actionData <$> erAction xr
+    let diffs = fmap Action._actionDataStorageDiffs . Action._actionData <$> erAction xr
     diffs `shouldBe` Just (M.fromList
-      [ (uploadAddress, ActionSolidVMDiff $ M.singleton ".s"
+      [ (uploadAddress, Action.SolidVMDiff $ M.singleton ".s"
             (rlpSerialize $ rlpEncode $ bContract' "Sub" recursiveAddr))
-      , (recursiveAddr, ActionSolidVMDiff $ M.fromList
+      , (recursiveAddr, Action.SolidVMDiff $ M.fromList
           [ (".x", rlpSerialize $ rlpEncode $ BInteger 20)
           , (".y", rlpSerialize $ rlpEncode $ BInteger 80)
           ]

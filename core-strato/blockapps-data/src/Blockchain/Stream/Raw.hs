@@ -40,11 +40,7 @@ fetchBytes' topic offset = do
    Just e -> error $ "There was a critical Kafka error while fetching messages: " ++ show e ++ "\ntopic = " ++ BC.unpack (topic ^. tName ^. kString) ++ ", offset = " ++ show offset
    _ -> return ()
 
-  let datas = (map tamPayload' . fetchMessages) fetched
-  return $ zip [offset..] datas
-
-tamPayload' :: TopicAndMessage -> B.ByteString
-tamPayload' = foldOf (tamMessage . payload)
+  return $ zip [offset..] $ fetchResponseToPayload fetched
 
 fetchBytesIO::TopicName->Offset->IO (Maybe [B.ByteString])
 fetchBytesIO topic offset = do

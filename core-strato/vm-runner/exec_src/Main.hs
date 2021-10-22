@@ -6,6 +6,7 @@
 
 import           Control.Monad
 import           Control.Concurrent.Async             as Async
+import           Data.Functor.Identity                (Identity(..))
 import qualified Data.Map.Strict                      as M
 import           Debugger
 import           Debugger.Options() -- HFlags
@@ -15,7 +16,7 @@ import           HFlags
 
 import           BlockApps.Init
 import           Blockchain.Output
-import           Blockchain.SolidVM.CodeCollectionDB  (parseSource, compileSource)
+import           Blockchain.SolidVM.CodeCollectionDB
 import           Blockchain.VMOptions() -- HFlags
 import           Executable.EthereumVM
 import           Executable.EVMFlags() -- HFlags
@@ -26,12 +27,12 @@ main = do
   blockappsInit "vm_main"
   void $ $initHFlags "Ethereum VM"
   let parse = fmap concat
-            . traverse (uncurry parseSource)
+            . traverse (uncurry parseSourceWithAnnotations)
             . unSourceMap
-      compile = compileSource
+      compile = compileSourceWithAnnotations
               . M.fromList
               . unSourceMap
-      analyze = runDetectors parse compile
+      analyze = Identity . runDetectors parse compile id
       tools = SourceTools compile analyze
   mDebugger <- initializeDebugger tools
   let metricsRunner = run 8000 metricsApp

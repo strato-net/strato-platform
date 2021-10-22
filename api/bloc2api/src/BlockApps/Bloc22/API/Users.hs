@@ -64,7 +64,7 @@ import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Types (Strung(..))
 import qualified BlockApps.Strato.Types as Deprecated
 
-import           Blockchain.Data.DataDefs
+import           Blockchain.Data.TransactionResult
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId

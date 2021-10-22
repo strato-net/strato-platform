@@ -38,9 +38,9 @@ import           UnliftIO.Exception              (handle, SomeException)
 
 import           BlockApps.Logging
 import           Blockchain.Data.AddressStateDB
+import qualified Blockchain.Strato.Model.Event   as Action
 import           Blockchain.Strato.Model.Keccak256
 
-import Slipstream.Data.Action
 import Slipstream.Events
 import Slipstream.Globals
 import Slipstream.Metrics
@@ -500,7 +500,7 @@ createEventTableQuery ev =
 --   events from being emitted (it should also do an argument check)
 insertExpandEventTables :: OutputM m
                         => IORef Globals
-                        -> [AggregateEvent]
+                        -> [Action.Event]
                         -> ConduitM () Text m ()
 insertExpandEventTables _ [] = return ()
 insertExpandEventTables globalsIORef events = do
@@ -509,11 +509,11 @@ insertExpandEventTables globalsIORef events = do
 
 expandEventTables :: OutputM m
                   => IORef Globals
-                  -> [AggregateEvent]
+                  -> [Action.Event]
                   -> ConduitM () Text m ()
 expandEventTables _ [] = return ()
 expandEventTables globalsIORef (x:xs) = do
-  let tableName = EventTableName (agOrganization x) (agApplication x) (agContractName x) (agEventName x)
+  let tableName = EventTableName (T.pack $ Action.evContractOrganization x) (T.pack $ Action.evContractApplication x) (T.pack $ Action.evContractName x) (T.pack $ Action.evName x)
   columns <- getTableColumns globalsIORef tableName
   case columns of
     Nothing -> do
@@ -524,7 +524,7 @@ expandEventTables globalsIORef (x:xs) = do
           ]
       expandEventTables globalsIORef xs
     Just cols -> do
-      let extras = filter (not . flip elem cols) (map fst $ agEventArgs x)
+      let extras = filter (not . flip elem cols) (map (T.pack . fst) $ Action.evArgs x)
       unless (null extras) $ do
         $logInfoS "expandEventTable" . T.pack $ "We just got new fields for a contract that already has a table!"
         $logInfoS "expandEventTable" $ T.concat
@@ -540,26 +540,26 @@ expandEventTables globalsIORef (x:xs) = do
 
 insertEventTables :: OutputM m
                   => IORef Globals
-                  -> [AggregateEvent]
+                  -> [Action.Event]
                   -> ConduitM () Text m ()
 insertEventTables globalsIORef events = do
   yieldMany . catMaybes =<< lift (mapM (insertEventTable globalsIORef) events)
 
 insertEventTable :: OutputM m
                  => IORef Globals
-                 -> AggregateEvent
+                 -> Action.Event
                  -> m (Maybe Text)
 insertEventTable globalsIORef ev = do
-  let eventTable = EventTableName (agOrganization ev) (agApplication ev) (agContractName ev) (agEventName ev)
+  let eventTable = EventTableName (T.pack $ Action.evContractOrganization ev) (T.pack $ Action.evContractApplication ev) (T.pack $ Action.evContractName ev) (T.pack $ Action.evName ev)
   eventExists <- isTableCreated globalsIORef eventTable
   if eventExists then return (Just $ insertEventTableQuery ev)
   else return Nothing
 
-insertEventTableQuery :: AggregateEvent -> Text
+insertEventTableQuery :: Action.Event -> Text
 insertEventTableQuery ev = 
- let tableName = EventTableName (agOrganization ev) (agApplication ev) (agContractName ev) (agEventName ev)
-     cols = wrapAndEscapeDouble . map escapeQuotes $ ["id", "address"] ++ (map fst $ agEventArgs ev)
-     vals = csv $ map (wrapSingleQuotes . snd) $ agEventArgs ev
+ let tableName = EventTableName (T.pack $ Action.evContractOrganization ev) (T.pack $ Action.evContractApplication ev) (T.pack $ Action.evContractName ev) (T.pack $ Action.evName ev)
+     cols = wrapAndEscapeDouble . map escapeQuotes $ ["id", "address"] ++ (map (T.pack . fst) $ Action.evArgs ev)
+     vals = csv $ map (wrapSingleQuotes . T.pack . snd) $ Action.evArgs ev
  in T.concat
         [ "INSERT INTO "
         , tableNameToDoubleQuoteText tableName
@@ -567,7 +567,7 @@ insertEventTableQuery ev =
         , cols
         , " VALUES "
         , "( DEFAULT,\n" -- id, set by Postgres
-        , wrapSingleQuotes $ tshow $ agContractAccount ev
+        , wrapSingleQuotes $ tshow $ Action.evContractAccount ev
         , ",\n"
         , vals
         ,  " );"

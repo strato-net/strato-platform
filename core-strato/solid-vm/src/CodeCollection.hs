@@ -15,6 +15,7 @@ import qualified Data.Map as M
 import Data.Maybe
 import qualified Data.Set as S
 import Data.Source
+import Data.Traversable (for)
 import qualified Data.Text as T
 import GHC.Generics
 
@@ -67,11 +68,18 @@ emptyCodeCollection :: CodeCollection
 emptyCodeCollection =
   CodeCollection M.empty
 
+type SolidEither = Either (Positioned ((,) SolidException))
 
-
-xabiToContract :: String -> [String] -> String -> Xabi -> Contract
-xabiToContract contractName' parents' vmVersion' xabi = validateXabi xabi `seq`
-  Contract {
+xabiToContract :: String -> [String] -> String -> Xabi -> SolidEither Contract
+xabiToContract contractName' parents' vmVersion' xabi = do
+  validateXabi xabi
+  constr <- case M.toList $ Xabi.xabiConstr xabi of
+    [] -> Right Nothing
+    [(_, x)] -> Right $ Just x
+    _ -> Left $ ( DuplicateDefinition "multiple constructors in contract" (show contractName') --TODO- figure out if this is allowed in Solidity
+                , Xabi.xabiContext xabi
+                )
+  pure Contract {
   _contractName = contractName',
   _parents = parents',
   _storageDefs = M.fromList $ map (\(k,v) -> (T.unpack k, v)) $ M.toList $ Xabi.xabiVars xabi,
@@ -80,49 +88,58 @@ xabiToContract contractName' parents' vmVersion' xabi = validateXabi xabi `seq`
   _structs = M.fromList [(T.unpack name, (\(k,v) -> (k,v,a)) <$> vals) | (name, Xabi.Struct vals _ a) <- M.toList $ Xabi.xabiTypes xabi],
   _events = Xabi.xabiEvents xabi,
   _functions = M.fromList $ map (\(k,v) -> (T.unpack k, v)) $ M.toList $ Xabi.xabiFuncs xabi,
-  _constructor =
-      case M.toList $ Xabi.xabiConstr xabi of
-        [] -> Nothing
-        [(_, x)] -> Just x
-        _ -> duplicateDefinition "multiple constructors in contract" contractName', --TODO- figure out if this is allowed in Solidity
+  _constructor = constr,
   _vmVersion = vmVersion',
   _contractContext = Xabi.xabiContext xabi
   }
 
-validateXabi :: Xabi -> ()
-validateXabi Xabi{xabiModifiers=mx} =
+validateXabi :: Xabi -> SolidEither ()
+validateXabi Xabi{xabiModifiers=mx, xabiContext=ctx} =
   case M.size mx of
-      0 -> ()
-      _ -> todo "modifiers not supported by solidvm" mx
+      0 -> Right ()
+      _ -> Left $ ( TODO "modifiers not supported by solidvm" (show mx)
+                  , ctx
+                  )
 
 
-applyInheritance :: CodeCollection -> CodeCollection
-applyInheritance cc =
-  cc{
-    _contracts = M.map (addInheritedObjects cc) $ cc^.contracts
+applyInheritance :: CodeCollection -> SolidEither CodeCollection
+applyInheritance cc = do
+  ccs <- traverse (addInheritedObjects cc) $ cc^.contracts
+  pure $ cc{
+    _contracts = ccs
   }
 
-addInheritedObjects :: CodeCollection -> Contract -> Contract
-addInheritedObjects cc c =
-  c{
-  _functions=toUnionMaker _functions cc c,
-  _storageDefs=toUnionMaker _storageDefs cc c,
-  _enums=toUnionMaker _enums cc c,
-  _structs=toUnionMaker _structs cc c,
-  _events = toUnionMaker _events cc c,
-  _constants=toUnionMaker _constants cc c
+addInheritedObjects :: CodeCollection -> Contract -> SolidEither Contract
+addInheritedObjects cc c = do
+  fu <- toUnionMaker _functions cc c
+  sd <- toUnionMaker _storageDefs cc c
+  en <- toUnionMaker _enums cc c
+  st <- toUnionMaker _structs cc c
+  ev <- toUnionMaker _events cc c
+  co <- toUnionMaker _constants cc c
+  pure $ c{
+  _functions=fu,
+  _storageDefs=sd,
+  _enums=en,
+  _structs=st,
+  _events = ev,
+  _constants=co
   }
 
-getParents :: CodeCollection -> Contract -> [Contract]
+getParents :: CodeCollection -> Contract -> SolidEither [Contract]
 getParents cc c =
-  let toErr p = fromMaybe (internalError "contract parent does not exist" p)
-  in map (\p -> toErr p . M.lookup p $ cc ^. contracts) $ c ^. parents
+  let toErr x p = maybe (Left ( InternalError "contract parent does not exist" p
+                              , x
+                              ))
+                        Right
+  in for (c ^. parents) $ \p ->
+       toErr (c ^. contractContext) p . M.lookup p $ cc ^. contracts
 
-toUnionMaker :: (Ord a) => (Contract -> M.Map a b) -> CodeCollection -> Contract -> M.Map a b
-toUnionMaker f cc c =
-  let parents' = getParents cc c
-      parentMaps = map (toUnionMaker f cc) parents'
-  in M.unions $ f c : parentMaps
+toUnionMaker :: (Ord a) => (Contract -> M.Map a b) -> CodeCollection -> Contract -> SolidEither (M.Map a b)
+toUnionMaker f cc c = do
+  parents' <- getParents cc c
+  parentMaps <- traverse (toUnionMaker f cc) parents'
+  pure . M.unions $ f c : parentMaps
 
 statementCrawler :: Xabi.StatementF a -> [T.Text]
 statementCrawler = \case
