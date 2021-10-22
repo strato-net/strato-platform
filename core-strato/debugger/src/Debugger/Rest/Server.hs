@@ -98,11 +98,11 @@ combineProxies _ _ = Proxy
 
 restDebuggerAnd :: HasServer api '[]
                 => Proxy api
-                -> Server api
+                -> (DebugSettings -> Server api)
                 -> DebugSettings
                 -> Application
 restDebuggerAnd otherAPI otherServer dSettings =
-  serve (combineProxies restDebuggerAPI otherAPI) (restDebuggerServer dSettings :<|> otherServer)
+  serve (combineProxies restDebuggerAPI otherAPI) (restDebuggerServer dSettings :<|> otherServer dSettings)
 
 restDebugger :: DebugSettings
              -> Application

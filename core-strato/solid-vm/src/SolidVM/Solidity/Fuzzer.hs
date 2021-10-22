@@ -28,6 +28,7 @@ import           Data.Source
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import           Data.Traversable (for)
+import           Debugger
 import           SolidVM.Solidity.Fuzzer.Types
 import           SolidVM.Solidity.Xabi
 import           SolidVM.Solidity.Xabi.Type   hiding (Account, Address, Contract)
@@ -58,12 +59,13 @@ trueVal :: BSS.ShortByteString
 trueVal = BSS.toShort . word256ToBytes . fromIntegral $ fromEnum True
 {-# NOINLINE trueVal #-}
 
-runFuzzer :: (SourceMap -> Either [SourceAnnotation T.Text] CodeCollection)
+runFuzzer :: Maybe DebugSettings
+          -> (SourceMap -> Either [SourceAnnotation T.Text] CodeCollection)
           -> SourceMap
           -> IO [FuzzerResult]
-runFuzzer compile src = flip (either $ pure . map (FuzzerFailure Nothing)) (compile src) $ \cc -> do
+runFuzzer dSettings compile src = flip (either $ pure . map (FuzzerFailure Nothing)) (compile src) $ \cc -> do
   let args = FuzzerArgs src "" "" "" "" Nothing
-  runLoggingT . evalMemContextM Nothing . flip runReaderT args $
+  runLoggingT . evalMemContextM dSettings . flip runReaderT args $
     fmap concat . for (M.toList $ cc ^. contracts) $ \(cName, c) ->
       if not (describePrefix `T.isPrefixOf` T.pack cName) then pure []
       else case funcArgs <$> c ^. constructor of
