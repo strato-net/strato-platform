@@ -310,30 +310,20 @@ async function validate(counter: number, doc: vscode.TextDocument, solidityDiagn
       }
 
       const contractAST = await rest.debugPostParse(user, srcMap, options);
+      const annotations = await rest.debugPostAnalyze(user, srcMap, options);
 
       // Run dead code detector
       const deadCodeArr = await findDeadCode(doc, contractAST);
+      // Push dead code detector annotations in
+      for(let i = 0; i < deadCodeArr.length; ++i) {
+        annotations.push(deadCodeArr[i]);
+      }
 
       // Run reused base constructor detector
       const reusedBaseCons = await findReusedBaseCons(doc, contractAST);
-      
-      const annotations = await rest.debugPostAnalyze(user, srcMap, options);
-
-      // Push dead code detector annotations in
-      for(let i = 0; i < deadCodeArr.length; ++i) {
-        annotations.push(deadCodeArr[i]);
-      }
-
-      // Push dead code detector annotations in
-      for(let i = 0; i < deadCodeArr.length; ++i) {
-        annotations.push(deadCodeArr[i]);
-      }
-
       for(let i = 0; i < reusedBaseCons.length; ++i) {
         annotations.push(reusedBaseCons[i]);
-      }
-
-      
+      }      
 
       for (let ann in annotations) {
         const mDiag = createDiagnostic(doc, annotations[ann]);
