@@ -205,7 +205,7 @@ function newnode {
     --stratourl=${stratoRoot} --vaultwrapperurl=${vaultWrapperRoot}  \
     --kafkahost=${kafkaHost} --kafkaport=${kafkaPort} --minLogLevel=${slipMinLogLevel}"
 
-  if [ ${SLIPSTREAM_OPTIONAL:-true} = true ]; then
+  if [ ${SLIPSTREAM_OPTIONAL} = true ]; then
       $SLIPSTREAM_CMD &>> logs/slipstream &
   else
       runBackgroundProcess $SLIPSTREAM_CMD &>> logs/slipstream
