@@ -443,7 +443,7 @@ getContractDetailsByCodeAtAccount (CodeAtAccount acct contractName) = do
 
     case tuple of
       Just t -> Just <$> detailsWith (Just acct) t
-      Nothing -> throwIO $ UserError $ Text.pack $ "Contract " ++ show acct ++ " doesn't exist"
+      Nothing -> throwIO $ UserError $ Text.pack $ "Can't find " ++ (show contractName) ++ " in code collection at " ++ (show acct)
 getContractDetailsByCodeAtAccount p = throwIO $ UserError $ Text.pack $ "CodePtr" ++ (show p) ++  " is not CodeAtAccount"
 
 
