@@ -117,6 +117,25 @@ contractDetailsJoinTable = joinF
     (queryTable contractsMetaDataTable)
     (queryTable contractsSourceTable)
 
+
+-- lets us query contract definitions in a code collection (via CodeAtAccount)
+contractInstanceMetadataJoinTable :: Query
+  ( Column PGBytea -- address
+  , Column PGBytea -- chainId
+  , Column PGBytea -- bin
+  , Column PGBytea -- bin runtime
+  , Column PGBytea -- codehash
+  , Column PGBytea -- source hash
+  , Column PGBytea -- xabi
+  )
+contractInstanceMetadataJoinTable = joinF
+  ( \ (_,_,addr,_,chId) (_,_,bin,binRuntime,codeHash,_,sh,xabi) -> (addr,chId,bin,binRuntime,codeHash,sh,xabi))
+  ( \ (_,cmId,_,_,_) (cmId2,_,_,_,_,_,_,_) -> cmId .== cmId2)
+  (queryTable contractsInstanceTable)
+  (queryTable contractsMetaDataTable)
+
+
+
 contractByAccount
   :: Account
   -> Query
@@ -138,29 +157,6 @@ contractByAccount (Account contractAddress chainId) = proc () -> do
   restrict -< cid .== constant (ChainId <$> chainId)
   returnA -< contract
 
-
-contractByCodeAtAccount
-  :: Account
-  -> Text
-  -> Query
-    ( Column PGInt4
-    , Column PGText
-    , Column PGText
-    , Column PGBytea
-    , Column PGTimestamptz
-    , Column PGBytea
-    , Column PGBytea
-    , Column PGBytea
-    , Column PGBytea
-    , Column PGBytea
-    , Column PGBytea
-    )
-contractByCodeAtAccount (Account contractAddress chainId) contractName = proc () -> do
-  contract@(_,name,_,addr,_,_,_,_,_,cid,_) <- contractsJoinTable -< ()
-  restrict -< name .== constant contractName
-  restrict -< addr .== constant contractAddress
-  restrict -< cid .== constant (ChainId <$> chainId)
-  returnA -< contract
 
 contractByCodeHash
   :: CodePtr
@@ -277,25 +273,6 @@ WHERE C.name=$1 AND CI.address=$2
 LIMIT 1;
 -}
 
-getContractsContractByCodeAtAccountQuery
-  :: Account
-  -> Text
-  -> Query
-    ( Column PGBytea
-    , Column PGBytea
-    , Column PGBytea
-    , Column PGBytea
-    , Column PGText
-    , Column PGText
-    , Column PGInt4
-    , Column PGBytea
-    )
-getContractsContractByCodeAtAccountQuery contractAcct contractName=
-  limit 1 $ proc () -> do
-    (cmId,name,src,_,_,bin,binRuntime,codeHash,xcodeHash,_,xabi) <-
-      contractByCodeAtAccount contractAcct contractName -< ()
-    returnA -< (bin,binRuntime,codeHash,xcodeHash,name,src,cmId,xabi)
-
 
 
 
@@ -381,6 +358,36 @@ decodeXabiJSON xabi' = case decode (fromStrict xabi') of
   Nothing -> throwIO $ DBError "Corrupted Xabi stored in database"
   Just x -> return x
 
+
+getContractDetailsByCodeCollection :: (MonadIO m, MonadLogger m, HasBlocSQL m)
+                                   => Account
+                                   -> Text
+                                   -> m (Maybe (Int32, ContractDetails))
+getContractDetailsByCodeCollection (Account parentAddress parentChainId) contractName = do
+  sourceHash <- blocQuery1 "sourceHashByAccount" $ proc () -> do
+    (addr,chId,_,_,_,sh,_) <- contractInstanceMetadataJoinTable-< ()
+    restrict -< addr .== constant parentAddress
+    restrict -< chId .== constant (ChainId <$> parentChainId)
+    returnA -< sh
+  row <- blocQuery1 "contractBySourceHashAndName" $ proc () -> do
+    contract@(_,_,_,_,_,name,_,_,_) <- contractBySourceHash sourceHash -< ()
+    restrict -< name .== constant contractName
+    returnA -< contract
+  detailsWith row
+  where
+    detailsWith (bin,binr,ch,_ :: ByteString,_ :: ByteString,name,src,cmId,xabi') = do
+      xabi <- deserializeXabi xabi'
+      return $ Just (cmId, ContractDetails
+        { contractdetailsBin = Text.decodeUtf8 bin
+        , contractdetailsAccount = Nothing
+        , contractdetailsBinRuntime = Text.decodeUtf8 binr
+        , contractdetailsCodeHash = ch
+        , contractdetailsName = name
+        , contractdetailsSrc = deserializeSourceMap src
+        , contractdetailsXabi = xabi
+        })
+
+
 getContractDetailsByMetadataId :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
                                   Int32 -> Account -> m ContractDetails
 getContractDetailsByMetadataId cmId acct = do
@@ -416,41 +423,17 @@ getContractDetailsAndMetadataId acct = do
           , contractdetailsSrc = deserializeSourceMap src
           , contractdetailsXabi = xabi
           })
-    tuple <- fmap listToMaybe . blocQuery $ getContractsContractByAddressQuery acct
-    
+    tuple <- fmap listToMaybe . blocQuery $
+      getContractsContractByAddressQuery acct
     case tuple of
       Just t -> Just <$> detailsWith (Just acct) t
       Nothing -> throwIO $ UserError $ Text.pack $ "Contract " ++ show acct ++ " doesn't exist"
 
 
 
-getContractDetailsByCodeAtAccount :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
-                                      CodePtr -> m (Maybe (Int32, ContractDetails))
-getContractDetailsByCodeAtAccount (CodeAtAccount acct contractName) = do
-    let
-      detailsWith detailsAcct (bin,binRuntime,codeHash,_ :: ByteString,name,src,cmId,xabi') = do
-        xabi <- deserializeXabi xabi'
-        return (cmId, ContractDetails
-          { contractdetailsBin = Text.decodeUtf8 bin
-          , contractdetailsAccount = detailsAcct
-          , contractdetailsBinRuntime = Text.decodeUtf8 binRuntime
-          , contractdetailsCodeHash = codeHash
-          , contractdetailsName = name
-          , contractdetailsSrc = deserializeSourceMap src
-          , contractdetailsXabi = xabi
-          })
-    tuple <- fmap listToMaybe . blocQuery $ getContractsContractByCodeAtAccountQuery acct (Text.pack contractName) 
-
-    case tuple of
-      Just t -> Just <$> detailsWith (Just acct) t
-      Nothing -> throwIO $ UserError $ Text.pack $ "Can't find " ++ (show contractName) ++ " in code collection at " ++ (show acct)
-getContractDetailsByCodeAtAccount p = throwIO $ UserError $ Text.pack $ "CodePtr" ++ (show p) ++  " is not CodeAtAccount"
-
-
-
 getContractDetailsByCodeHash :: (MonadIO m, MonadLogger m, HasBlocSQL m, HasBlocEnv m) =>
                                 CodePtr -> m (Maybe (Int32, ContractDetails))
-getContractDetailsByCodeHash codePtr = do 
+getContractDetailsByCodeHash codePtr = do
   srcCache <- fmap globalCodePtrCache getBlocEnv
   now <- liftIO $ getTime Monotonic
   let later = (now +) <$> Cache.defaultExpiration srcCache
@@ -465,7 +448,7 @@ getContractDetailsByCodeHash codePtr = do
     Just cachedDetails -> pure $ Just cachedDetails
     Nothing -> do
       mIdAndDetails <- case codePtr of
-        caa@(CodeAtAccount _ _) -> getContractDetailsByCodeAtAccount caa 
+        (CodeAtAccount acct name) -> getContractDetailsByCodeCollection acct (Text.pack name)
         codeHash -> do
           mDetails <- fmap listToMaybe . blocQuery $ getContractsContractByCodeHashQuery codeHash
           for mDetails $ \(bin,binr,ch,_ :: ByteString,_ :: ByteString,name,src,cmId,xabi') -> do

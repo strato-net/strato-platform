@@ -84,6 +84,7 @@ createChainInfo :: (MonadIO m, MonadLogger m, HasBlocSQL m, HasBlocEnv m) =>
 createChainInfo creationBlockHash (ChainInput src mCodePtr cname lbl balances chaininputArgs members pChain mmd _) = do
   when (null members) $ throwIO $ UserError "Private chains must include at least one member"
   when (sum (nmap2' balances) == 0) $ throwIO $ UserError "At least one account must have a non-zero balance"
+
   let md = fromMaybe Map.empty mmd
       theVM = fromMaybe "EVM" $ Map.lookup "VM" md
   mContract <-
@@ -123,13 +124,9 @@ createChainInfo creationBlockHash (ChainInput src mCodePtr cname lbl balances ch
               codeInfo' = [CodeInfo b' jsrc $ Just contractdetailsName]
           md' <- case theVM of
               "SolidVM" -> do
-                $logInfoS "DAN" . Text.pack $ "the xabi " ++ (show $ contractdetailsXabi)
-                $logInfoS "DAN" . Text.pack $ "the xabi funcArgs " ++ (show $ funcArgs <$> xabiConstr contractdetailsXabi)
                 let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi
                 (_, argsAsSource) <- constructArgValuesAndSource (Just argValues) xabiArgs
-                let thing = (at "args" ?~ argsAsSource) md
-                $logInfoS "DAN" . Text.pack $ "the final metadata: " ++ show thing
-                pure thing
+                pure $ (at "args" ?~ argsAsSource) md
               _ -> pure md
           return ([contractAcctInfo],codeInfo',md') -- Perhaps in the future, we can support multiple contracts
   nonce <- byteStringToWord256 <$> liftIO (getEntropy 32)
