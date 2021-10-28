@@ -87,7 +87,7 @@ produceVMEvents vmEvents = do
    Left e -> error $ show e
    Right x -> do
      let e = concatMap (map (\(_, x', _) ->x') . concatMap snd . _produceResponseFields) x
-     when (any (/= NoError) e) $ void $ error $ "error = " ++ show e
+     when (any (/= NoError) e) $ void $ error $ "error: kafka write failed: " ++ show e
      let [offset] = concatMap (map (\(_, _, x') ->x') . concatMap snd . _produceResponseFields) x
      return offset
 
