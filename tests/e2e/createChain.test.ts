@@ -244,7 +244,7 @@ describe("Create Chain", function() {
     vmOptions.config.VM = 'SolidVM'; 
     
     // upload main (and thus, the whole code collection)
-    const main = await rest.createContract(alice, {name: "Main", source: ccSrc, args: {}}, vmOptions);
+    const main = <Contract> await rest.createContract(alice, {name: "Main", source: ccSrc, args: {}}, vmOptions);
     
     assert.isDefined(main, "should exist");
     assert.isDefined(main.address, "should be defined");
@@ -260,7 +260,12 @@ describe("Create Chain", function() {
     
     const codePtr = { account: main.address, name: "Governance" };
 
+    // TODO: we need to add `codePtr` to the definition of `Chain` in blockapps-rest. Then, we can remove the ts-ignore below
+    // More details here: https://blockapps.atlassian.net/browse/STRATO-2313 
+
+    // @ts-ignore
     const chainId = await rest.createChain(alice, {label, members: mems, balances: bals, codePtr, args}, {name: "Governance"}, vmOptions);
+
     assert.isDefined(chainId, "chainId defined");
     assert.notEqual(chainId, "", "chainId is not zero");
 
