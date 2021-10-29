@@ -56,6 +56,6 @@ messageSetToPayload _ MessageSet { _messageSetMembers = msms } =
 messageSetToPayload requestedOffset RecordBatch{ _records = rs, _firstOffset=firstReturnedOffset } =
   let allPayloads = map (_kafkaByteString . fromMaybe (error "deformed kafka message, message is NULL") . _value) rs
   in
-    if length allPayloads <= fromIntegral (requestedOffset - firstReturnedOffset)
+    if length allPayloads < fromIntegral (requestedOffset - firstReturnedOffset)
     then error $ "fetchBytes': missing messages: # messages returned: " ++ show (length allPayloads) ++ ", offset=" ++ show requestedOffset ++ ", firstReturnedOffset=" ++ show firstReturnedOffset
     else drop (fromIntegral $ requestedOffset-firstReturnedOffset) allPayloads
