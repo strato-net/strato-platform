@@ -41,13 +41,21 @@ fetchMessages fr = (fr ^.. fetchResponseFields . folded) >>= tam
     where tam a = TopicAndMessage (a ^. _1) <$> a ^.. _2 . folded . _4 . messageSetMembers . folded . setMessage
 
 
-fetchResponseToPayload :: FetchResponse -> [ByteString]
-fetchResponseToPayload fr =  concat . map messageSetToPayload $ fr ^.. fetchResponseFields . folded . _2 .folded . _4
+--RecordBatches can contain messages lower than the requested offset, so we need to
+--supply the requested offsets so that we know which values to ignore
+fetchResponseToPayload :: [Offset] -> FetchResponse -> [ByteString]
+fetchResponseToPayload [offset] res =
+  concat . map (messageSetToPayload offset) $ res ^.. fetchResponseFields . folded . _2 .folded . _4
+fetchResponseToPayload _ _ = error "fetchResponseToPayload doesn't support requests from multiple topics"
 
-messageSetToPayload :: MessageSet -> [ByteString]
-messageSetToPayload MessageSet { _messageSetMembers = msms } =
+
+messageSetToPayload :: Offset -> MessageSet -> [ByteString]
+messageSetToPayload _ MessageSet { _messageSetMembers = msms } =
   map (^. setMessage . messageFields . _5 . valueBytes . folded . kafkaByteString) msms
 
-messageSetToPayload RecordBatch{ _records = rs } =
-  map (_kafkaByteString . fromMaybe (error "deformed kafka message, message is NULL") . _value) rs 
-
+messageSetToPayload requestedOffset RecordBatch{ _records = rs, _firstOffset=firstReturnedOffset } =
+  let allPayloads = map (_kafkaByteString . fromMaybe (error "deformed kafka message, message is NULL") . _value) rs
+  in
+    if length allPayloads <= fromIntegral (requestedOffset - firstReturnedOffset)
+    then error $ "fetchBytes': missing messages: # messages returned: " ++ show (length allPayloads) ++ ", offset=" ++ show requestedOffset ++ ", firstReturnedOffset=" ++ show firstReturnedOffset
+    else drop (fromIntegral $ requestedOffset-firstReturnedOffset) allPayloads
