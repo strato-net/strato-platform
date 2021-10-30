@@ -23,6 +23,8 @@ import Control.Arrow ((&&&))
 import Control.Applicative
 import Control.Lens ((^.))
 import Control.Monad.Except
+import Control.Monad.IO.Unlift
+import Control.Monad.Trans.Control
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Strict hiding (state)
@@ -86,7 +88,7 @@ data BatchedInserts = BatchedInserts
   , eventCreations  :: [EventTable]
   } deriving (Show)
 
-enterBloc2 :: BlocEnv -> BlocSQLEnv -> ReaderT BlocEnv (BlocSQLM (LoggingT IO)) x -> LoggingT IO x
+enterBloc2 :: r -> BlocSQLEnv -> ReaderT r (ReaderT BlocSQLEnv m) a -> m a
 enterBloc2 blocEnv sqlEnv f =
   runBlocSQLMUsingEnv sqlEnv
   $ flip runReaderT blocEnv
@@ -291,7 +293,8 @@ parseActions events =
 parseEvents :: [VMEvent] -> [Action.Event]
 parseEvents events = [a | EventEmitted a <- events]
 
-processTheMessages :: BlocEnv -> BlocSQLEnv -> PGConnection -> IORef Globals -> [VMEvent] -> LoggingT IO ()
+processTheMessages :: (MonadIO m, MonadUnliftIO m, MonadBaseControl IO m, MonadLogger m) =>
+                      BlocEnv -> BlocSQLEnv -> PGConnection -> IORef Globals -> [VMEvent] -> m ()
 processTheMessages env sqlEnv conn g messages = do
 
   let changes = parseActions messages
