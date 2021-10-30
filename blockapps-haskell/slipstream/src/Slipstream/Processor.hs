@@ -50,6 +50,8 @@ import qualified BlockApps.SolidityVarReader as SVR
 import qualified BlockApps.SolidVMStorageDecoder as SolidVM
 
 import Blockchain.Data.AddressStateDB
+--import Blockchain.Data.TransactionResult
+--import Blockchain.DB.SQLDB
 import Blockchain.Strato.Model.Account
 import qualified Blockchain.Strato.Model.Action as Action
 import Blockchain.Strato.Model.ChainId
@@ -295,7 +297,8 @@ processTheMessages env sqlEnv conn g messages = do
   let changes = parseActions messages
       events = parseEvents messages
       -- TODO (Dan) : would be nice if we didn't just rip events out at the top level like this
-      
+--      creates = [c|ContractCreated c <- messages]
+--      transactionResults = [tr | NewTransactionResult tr <- messages]
 
   unless (null messages) $
     $logDebugS "processTheMessages" . T.pack . unlines . map show $ messages
@@ -368,10 +371,13 @@ processTheMessages env sqlEnv conn g messages = do
                         $ rights inserts
   forM_ (rights inserts) $ $logDebugLS "processTheMessages/toInsert"
   forM_ insertsByCodeHash $ \ins -> do
-    outputData conn . createExpandInsertIndexTable g $ map indexInsert ins
+    outputData conn . createExpandIndexTable g $ map indexInsert ins
+    unless (null ins) $ outputData conn . insertIndexTable g $ map indexInsert ins
     outputData conn . createExpandInsertHistoryTable g $ concatMap historyInserts ins
     when (length (concatMap eventCreations ins) > 0) $
       outputData conn . createEventTables g $ concatMap eventCreations ins
+
+--  forM_ transactionResults $ putTransactionResult
   
   when (length events > 0) $ 
     outputData conn $ insertExpandEventTables g events

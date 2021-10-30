@@ -27,6 +27,7 @@ library:
     - binary
     - bloc-sql-monad
     - bloc2
+    - blockapps-data
     - blockapps-mpdbs
     - blockapps-solidity
     - blockapps-util
@@ -110,4 +111,5 @@ tests:
       - strato-model
       - text
       - time
+      - unliftio
       - vector

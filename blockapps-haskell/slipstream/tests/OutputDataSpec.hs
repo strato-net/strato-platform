@@ -6,14 +6,17 @@
 module OutputDataSpec where
 
 import Conduit
+import Control.Monad
 import qualified Data.ByteString as B
 import qualified Data.IntMap as I
 import qualified Data.Map as M
+import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time
 import Numeric
 import Test.Hspec
 import Text.RawString.QQ
+import UnliftIO.IORef
 
 import BlockApps.Logging
 import qualified BlockApps.Solidity.Value as V
@@ -38,6 +41,21 @@ bytes = V.SimpleValue . V.valueBytes
 
 int :: Integer -> V.Value
 int = V.SimpleValue . V.valueInt
+
+
+createInserts :: OutputM m
+              => IORef Globals
+              -> [ProcessedContract]
+              -> ConduitM () Text m ()
+createInserts globalsIORef contracts = do
+  unless (null contracts) $ do
+    let contract = head contracts
+    createIndexTable globalsIORef contract
+    createHistoryTable globalsIORef contract
+    insertIndexTable globalsIORef contracts
+    insertHistoryTable globalsIORef contracts
+
+
 
 spec :: Spec
 spec = do
@@ -468,8 +486,9 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
           }]
     g <- newGlobals fakeHandle
 
-    cs <- runLoggingT . runConduit $ createExpandInsertIndexTable g input .| sinkList
-    cs `shouldNotBe` []
+    cs1 <- runLoggingT . runConduit $ createExpandIndexTable g input .| sinkList
+    cs2 <- runLoggingT . runConduit $ insertIndexTable g input .| sinkList
+    (cs1 ++ cs2) `shouldNotBe` []
 
   it "can use solidvm without application nor organization" $ do
     let testAdd = Address 0x98eaddede
