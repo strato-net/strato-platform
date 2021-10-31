@@ -88,7 +88,8 @@ lookupPartition = K.Partition 0
 lookupGroup :: K.ConsumerGroup
 lookupGroup = "slipstream"
 
-getStatediffOffset :: SlipKafka K.Offset
+getStatediffOffset :: (MonadLogger m, Kafka m) =>
+                      m K.Offset
 getStatediffOffset = do
   resp <- fetchSingleOffset lookupGroup lookupTopic lookupPartition
   $logDebugLS "getStateDiffOffset/resp" resp
@@ -101,7 +102,8 @@ getStatediffOffset = do
       error $ show err
     Right (off, _) -> return off
 
-putStatediffOffset :: K.Offset -> SlipKafka ()
+putStatediffOffset :: (MonadLogger m, Kafka m) =>
+                      K.Offset -> m ()
 putStatediffOffset off = do
     $logInfoLS "putStateDiffOffset/req" off
     resp <- commitSingleOffset lookupGroup lookupTopic lookupPartition off ""
@@ -119,6 +121,8 @@ getAndProcessMessages env sqlEnv conn cache = do
   getAndProcessMessages' env sqlEnv conn cache offset errorCount
 
 getAndProcessMessages' :: BlocEnv -> BlocSQLEnv -> PGConnection -> IORef Globals -> K.Offset -> Int -> SlipKafka ()
+--getAndProcessMessages' :: (MonadIO m, MonadLogger m, Kafka m) =>
+--                          BlocEnv -> BlocSQLEnv -> PGConnection -> IORef Globals -> K.Offset -> Int -> m ()
 getAndProcessMessages' env sqlEnv conn cache offset errorCounter = do
   recordOffset offset
   messages <- fetchVMEvents offset
