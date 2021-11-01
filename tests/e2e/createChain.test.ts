@@ -224,6 +224,59 @@ describe("Create Chain", function() {
     assert.isUndefined(chainId, "chainId not defined");
   });
 
+  it('should be able to create a private chain with a CodePtr to existing code', async() => {
+    // create users
+    const alice = await rest.createUser(ouser1, options);
+    const bob   = await rest.createUser(ouser2, options);
+    assert.isDefined(alice, "should exit");
+    assert.isDefined(alice.address, "should be defined");
+    assert.notEqual(alice.address, 0, "should be a nonzero address");
+    assert.isDefined(bob, "should exit");
+    assert.isDefined(bob.address, "should be defined");
+    assert.notEqual(bob.address, 0, "should be a nonzero address");
+
+
+    const ccSrc = "contract Main { uint x; constructor() { x = 0; } } contract Governance { uint y; constructor() { y = 1; } }";
+
+
+    // this is a SolidVM feature
+    let vmOptions = {config};
+    vmOptions.config.VM = 'SolidVM'; 
+    
+    // upload main (and thus, the whole code collection)
+    const main = <Contract> await rest.createContract(alice, {name: "Main", source: ccSrc, args: {}}, vmOptions);
+    
+    assert.isDefined(main, "should exist");
+    assert.isDefined(main.address, "should be defined");
+    assert.notEqual(main.address, 0, "should be a nonzero address");
+
+    // create chain with codePtr
+    const mems = [{address: alice.address, enode: members[0].enode}
+                  ,{address: bob.address, enode: members[1].enode}
+		             ];
+    const bals = [{ address: alice.address, balance: 1000000}
+                 ,{ address: bob.address, balance: 10000000}
+                 ];
+    
+    const codePtr = { account: main.address, name: "Governance" };
+
+    // TODO: we need to add `codePtr` to the definition of `Chain` in blockapps-rest. Then, we can remove the ts-ignore below
+    // More details here: https://blockapps.atlassian.net/browse/STRATO-2313 
+
+    // @ts-ignore
+    const chainId = await rest.createChain(alice, {label, members: mems, balances: bals, codePtr, args}, {name: "Governance"}, vmOptions);
+
+    assert.isDefined(chainId, "chainId defined");
+    assert.notEqual(chainId, "", "chainId is not zero");
+
+    // query cirrus for the gov contract
+    const govList = await rest.search(alice, { name: "Governance" }, { query: { chainId: `eq.${chainId}` }, ...options });
+    assert.equal(govList.length, 1, "one instance of Governance on this chain");
+    const gov = govList[0];
+    assert.isDefined(gov, "Governance contract apperas in Cirrus");
+    assert.equal(gov.y, '1', "Governance contract storage matches what we expect");
+  });
+
 });
 
 function promiseTimeout(timeout) {
