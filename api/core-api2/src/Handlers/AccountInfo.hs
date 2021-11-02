@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds              #-}
 {-# LANGUAGE FlexibleContexts       #-}
 {-# LANGUAGE FlexibleInstances      #-}
+{-# LANGUAGE LambdaCase             #-}
 {-# LANGUAGE MultiParamTypeClasses  #-}
 {-# LANGUAGE OverloadedStrings      #-}
 {-# LANGUAGE RecordWildCards        #-}
@@ -16,6 +17,8 @@ module Handlers.AccountInfo
   , accountsFilterParams
   , getAccountsFilter
   , server
+  , getAccount
+  , getAccount'
   ) where
 
 import           Control.Monad.Change.Alter
@@ -38,6 +41,7 @@ import           Blockchain.Data.Json
 import           Blockchain.DB.SQLDB
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.CodePtr
+import           Blockchain.Strato.Model.Keccak256 (emptyHash)
 
 import           Control.Monad.Composable.SQL
 
@@ -63,6 +67,9 @@ type API = -- Tags "section1" :> Summary "get user accounts" :> Description "Get
             :> QueryParam "code" Text
             :> QueryParam "codeHash" CodePtr
             :> QueryParams "chainid" ChainId
+            :> QueryParam "external" Bool
+            :> QueryParam "limit" Natural
+            :> QueryParam "offset" Natural
             :> Get '[JSON] [AddressStateRef']
 
 data AccountsFilterParams = AccountsFilterParams
@@ -77,12 +84,15 @@ data AccountsFilterParams = AccountsFilterParams
   , qaCode       :: Maybe Text
   , qaCodeHash   :: Maybe CodePtr
   , qaChainId    :: [ChainId]
+  , qaExternal   :: Maybe Bool
+  , qaLimit      :: Maybe Natural
+  , qaOffset     :: Maybe Natural
   } deriving (Eq, Ord, Show)
 
 accountsFilterParams :: AccountsFilterParams
 accountsFilterParams = AccountsFilterParams
   Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
-  Nothing Nothing []
+  Nothing Nothing [] Nothing Nothing Nothing
 
 getAccountsFilter :: AccountsFilterParams -> ClientM [AddressStateRef']
 getAccountsFilter = uncurryAccountsFilterParams (client $ Proxy @API)
@@ -98,6 +108,9 @@ uncurryAccountsFilterParams :: ( Maybe Address
                               -> Maybe Text
                               -> Maybe CodePtr
                               -> [ChainId]
+                              -> Maybe Bool
+                              -> Maybe Natural
+                              -> Maybe Natural
                               -> r
                                )
                             -> AccountsFilterParams
@@ -105,7 +118,7 @@ uncurryAccountsFilterParams :: ( Maybe Address
 uncurryAccountsFilterParams f AccountsFilterParams{..} = f
   qaAddress qaBalance qaMinBalance qaMaxBalance qaNonce
   qaMinNonce qaMaxNonce qaMaxNumber qaCode qaCodeHash
-  qaChainId
+  qaChainId qaExternal qaLimit qaOffset
 
 server :: HasSQL m => ServerT API m
 server = getAccount
@@ -130,6 +143,11 @@ instance HasSQL m => Selectable AccountsFilterParams [AddressStateRef] m where
         criteria =
           catMaybes
           [
+            fmap
+              (\case
+                True -> accStateRef E.^. AddressStateRefCodeHash E.==. E.val (EVMCode emptyHash)
+                False -> E.not_ $ accStateRef E.^. AddressStateRefCodeHash E.==. E.val (EVMCode emptyHash)
+              ) qaExternal,
             fmap (\v -> accStateRef E.^. AddressStateRefBalance E.==. E.val v) (fromIntegral <$> qaBalance),
             fmap (\v -> accStateRef E.^. AddressStateRefBalance E.>=. E.val v) (fromIntegral <$> qaMinBalance),
             fmap (\v -> accStateRef E.^. AddressStateRefBalance E.<=. E.val v) (fromIntegral <$> qaMaxBalance),
@@ -151,7 +169,8 @@ instance HasSQL m => Selectable AccountsFilterParams [AddressStateRef] m where
 
       E.where_ (foldl1 (E.||.) (map (foldl1 (E.&&.)) allCriteria))
 
-      E.limit $ appFetchLimit
+      E.offset . fromIntegral $ fromMaybe 0 qaOffset
+      E.limit $ maybe appFetchLimit (min appFetchLimit . fromIntegral) qaLimit
 
       E.orderBy [E.asc (accStateRef E.^. AddressStateRefAddress)]
       return accStateRef
@@ -159,10 +178,11 @@ instance HasSQL m => Selectable AccountsFilterParams [AddressStateRef] m where
 getAccount :: Selectable AccountsFilterParams [AddressStateRef] m
            => Maybe Address -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
               Maybe Natural -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
-              Maybe Text -> Maybe CodePtr -> [ChainId] ->
+              Maybe Text -> Maybe CodePtr -> [ChainId] -> Maybe Bool ->
+              Maybe Natural -> Maybe Natural ->
               m [AddressStateRef']
-getAccount a b c d e f g h i j k
-  = getAccount' (AccountsFilterParams a b c d e f g h i j k)
+getAccount a b c d e f g h i j k l m n
+  = getAccount' (AccountsFilterParams a b c d e f g h i j k l m n)
     
 getAccount' :: Selectable AccountsFilterParams [AddressStateRef] m => AccountsFilterParams -> m [AddressStateRef']
 getAccount' a = do
@@ -181,7 +201,11 @@ accountQueryParams = [ "address",
                        "code",
                        "index",
                        "codeHash",
-                       "chainid"]
+                       "chainid",
+                       "external",
+                       "limit",
+                       "offset"
+                     ]
 
 toCode :: Text -> BC.ByteString
 toCode v = fst $ B16.decode $ BC.pack $ (T.unpack v)

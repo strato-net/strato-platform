@@ -37,7 +37,6 @@ module BlockApps.Bloc22.Monad (
 import           Control.Monad.Reader
 import           Data.Cache
 import           Data.Foldable
-import           Data.Int                           (Int32)
 import           Data.Map.Strict                    (Map)
 import           Data.Pool                          (withResource)
 import           Data.Profunctor.Product.Default
@@ -55,7 +54,7 @@ import           UnliftIO                           hiding (Handler(..))
 import           BlockApps.Bloc22.API.Transaction
 import           BlockApps.Logging
 import           BlockApps.Solidity.Xabi
-import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Nonce
@@ -78,9 +77,9 @@ data BlocEnv = BlocEnv
   { stateFetchLimit    :: Integer
   , gasOn              :: Bool
   , evmCompatible      :: Bool
-  , globalNonceCounter :: Cache (Address, Maybe ChainId) Nonce
-  , globalSourceCache  :: Cache (Text, SourceMap) (Map Text (Int32, ContractDetails))
-  , globalCodePtrCache :: Cache CodePtr (Int32, ContractDetails)
+  , globalNonceCounter :: Cache Account Nonce
+  , globalSourceCache  :: Cache (Text, SourceMap) (Map Text ContractDetails)
+  , globalCodePtrCache :: Cache CodePtr ContractDetails
   , txTBQueue          :: TBQueue (Maybe Text, Maybe ChainId, Bool, PostBlocTransactionRequest)
   }
 

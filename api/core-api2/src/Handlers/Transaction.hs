@@ -18,6 +18,8 @@ module Handlers.Transaction
   , txsFilterParams
   , API
   , getTxsFilter
+  , getTransaction
+  , getTransaction'
   , postTx
   , postTxList
   , postTransaction
