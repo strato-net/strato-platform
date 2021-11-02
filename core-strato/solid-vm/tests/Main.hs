@@ -8,6 +8,7 @@ import Test.Hspec.Runner
 import Blockchain.VMOptions() -- for HFlags
 import Executable.EVMFlags() -- for HFlags
 import qualified Spec
+import qualified DetectorsSpec
 
 predicate :: Path -> Bool
 predicate (_, _) = True
@@ -17,3 +18,4 @@ main :: IO ()
 main = do
   void $ $initHFlags "solid vm spec"
   hspecWith (configAddFilter predicate defaultConfig) Spec.spec
+  hspecWith (configAddFilter predicate defaultConfig) DetectorsSpec.spec

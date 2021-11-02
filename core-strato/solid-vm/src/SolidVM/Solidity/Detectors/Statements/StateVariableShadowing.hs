@@ -6,7 +6,7 @@ module SolidVM.Solidity.Detectors.Statements.StateVariableShadowing
 
 import           CodeCollection
 import qualified Data.Map.Strict as M
-import           Data.Maybe      (catMaybes)
+import           Data.Maybe      (catMaybes, maybeToList)
 import           Data.Source
 import qualified Data.Text       as T
 import           Data.Text       (Text)
@@ -19,7 +19,7 @@ detector CodeCollection{..} = concat $ contractHelper <$> M.elems _contracts
 
 contractHelper :: Contract -> [SourceAnnotation Text]
 contractHelper Contract{..} =
-  concat $ functionHelper _storageDefs <$> M.elems _functions
+  concat $ functionHelper _storageDefs <$> maybeToList _constructor ++ M.elems _functions
 
 functionHelper :: M.Map String VariableDecl -> Func -> [SourceAnnotation Text]
 functionHelper vars Func{..} = case funcContents of
