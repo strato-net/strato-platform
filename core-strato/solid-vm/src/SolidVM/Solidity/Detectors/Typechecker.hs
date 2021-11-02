@@ -37,7 +37,7 @@ emptyAnnotation = (SourceAnnotation (initialPosition "") (initialPosition "") ""
 data R = R
   { codeCollection :: Annotated CodeCollectionF
   , contract :: Annotated ContractF
-  , function :: Annotated FuncF
+  , function :: Maybe (Annotated FuncF)
   }
 type SSS = StateT (NonEmpty (Maybe Type', M.Map String (Annotated VarDefEntryF))) (Reader R)
 
@@ -578,7 +578,31 @@ contractHelper :: Annotated CodeCollectionF
 contractHelper cc c = 
   let constr = maybe M.empty (M.singleton "constructor") $ _constructor c
       funcsAndConstr = constr <> _functions c
-   in reduceType' (_contractContext c) $ functionHelper cc c <$> M.elems funcsAndConstr
+      varTypes' = reduceType' (_contractContext c) $ varDeclHelper cc c <$> M.elems (_storageDefs c)
+      constTypes' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_constants c)
+      funcTypes' = reduceType' (_contractContext c) $ functionHelper cc c <$> M.elems funcsAndConstr
+   in reduceType' (_contractContext c) [varTypes', constTypes', funcTypes']
+
+varDeclHelper :: Annotated CodeCollectionF
+              -> Annotated ContractF
+              -> Annotated VariableDeclF
+              -> Type'
+varDeclHelper cc c VariableDecl{..} =
+  let ty = Static varType varContext
+   in case varInitialVal of
+        Nothing -> ty
+        Just e ->
+          let r = R cc c Nothing
+           in runReader (evalStateT (ty ~> tcExpr e) ((Nothing, M.empty) :| [])) r
+
+constDeclHelper :: Annotated CodeCollectionF
+                -> Annotated ContractF
+                -> Annotated ConstantDeclF
+                -> Type'
+constDeclHelper cc c ConstantDecl{..} =
+  let ty = Static constType constContext
+      r = R cc c Nothing
+   in runReader (evalStateT (ty ~> tcExpr constInitialVal) ((Nothing, M.empty) :| [])) r
 
 functionHelper :: Annotated CodeCollectionF
                -> Annotated ContractF
@@ -587,7 +611,7 @@ functionHelper :: Annotated CodeCollectionF
 functionHelper cc c f@Func{..} = case funcContents of
   Nothing -> Function (Product [] funcContext) (Product [] funcContext) funcContext
   Just stmts ->
-    let r = R cc c f
+    let r = R cc c (Just f)
         swap = uncurry $ flip (,)
         args = (\(it,n) -> ( n
                            , VarDefEntry (Just $ indexedTypeType it) Nothing n funcContext
@@ -604,35 +628,40 @@ statementsHelper :: (M.Map String (Annotated VarDefEntryF))
                  -> [Annotated StatementF]
                  -> Reader R Type'
 statementsHelper args ss = do
-  f <- asks function
-  let x = funcContext f
-  ~(ts', s) <- flip runStateT ((Nothing, args) :| []) $ do
-    cCalls <- for (M.assocs $ funcConstructorCalls f) $ \(cName, exprs) -> do
-      let cName' = T.pack cName
-          constructorArgs = getConstructorType' x cName'
-          givenArgs = flip Product x <$> traverse tcExpr exprs
-          givenFunc = (\t-> Function t (Static (Xabi.Contract cName') x) x) <$> givenArgs
-      constructorArgs <~> givenFunc
-    stmts' <- traverse statementHelper ss
-    pure $ concat [stmts', cCalls]
-  let ret = case fst $ NE.head s of
-              Nothing -> Product [] x
-              Just (Sum rs) -> runIdentity $
-                foldr
-                  (\a mb -> mb >>= \b -> case (a,b) of
-                    (Bottom es, Bottom ess) -> pure $ Bottom (es <> ess)
-                    (Bottom es, _) -> pure $ Bottom es
-                    (_, Bottom ess) -> pure $ Bottom ess
-                    _ -> do
-                      t' <- typecheck' (\c _ _ -> pure $ topType' c) a b
-                      case t' of
-                        Bottom _ -> pure . bottom $ "not all paths return a value." <$ x
-                        _ -> pure t'
-                  )
-                  (pure $ topType' x)
-                  (NE.toList rs)
-              Just r -> r
-  pure $ reduceType' x $ ret:ts'
+  mf <- asks function
+  case mf of
+    Nothing -> do
+      x <- asks $ _contractContext . contract
+      pure . bottom $ "Cannot use keyword 'return' outside of a function" <$ x
+    Just f -> do
+      let x = funcContext f
+      ~(ts', s) <- flip runStateT ((Nothing, args) :| []) $ do
+        cCalls <- for (M.assocs $ funcConstructorCalls f) $ \(cName, exprs) -> do
+          let cName' = T.pack cName
+              constructorArgs = getConstructorType' x cName'
+              givenArgs = flip Product x <$> traverse tcExpr exprs
+              givenFunc = (\t-> Function t (Static (Xabi.Contract cName') x) x) <$> givenArgs
+          constructorArgs <~> givenFunc
+        stmts' <- traverse statementHelper ss
+        pure $ concat [stmts', cCalls]
+      let ret = case fst $ NE.head s of
+                  Nothing -> Product [] x
+                  Just (Sum rs) -> runIdentity $
+                    foldr
+                      (\a mb -> mb >>= \b -> case (a,b) of
+                        (Bottom es, Bottom ess) -> pure $ Bottom (es <> ess)
+                        (Bottom es, _) -> pure $ Bottom es
+                        (_, Bottom ess) -> pure $ Bottom ess
+                        _ -> do
+                          t' <- typecheck' (\c _ _ -> pure $ topType' c) a b
+                          case t' of
+                            Bottom _ -> pure . bottom $ "not all paths return a value." <$ x
+                            _ -> pure t'
+                      )
+                      (pure $ topType' x)
+                      (NE.toList rs)
+                  Just r -> r
+      pure $ reduceType' x $ ret:ts'
 
 statementsHelper' :: SourceAnnotation Text -> [Annotated StatementF] -> SSS Type'
 statementsHelper' x stmts = do
@@ -851,14 +880,17 @@ statementHelper (DoWhileStatement body cond x) = do
 statementHelper (Continue x) = pure $ topType' x
 statementHelper (Break x) = pure $ topType' x
 statementHelper (Return mExpr x) = do
-  f <- asks function
-  let fRets = flip Product x $ flip Static x . indexedTypeType . snd <$> funcVals f
-  t' <- fRets ~> maybe (pure $ Product [] x) tcExpr mExpr
-  modify $ \((ret, locals) :| rest) -> case ret of
-    Nothing -> (Just t', locals) :| rest
-    Just (Sum _) -> (Just t', locals) :| rest
-    _ -> (ret, locals) :| rest
-  pure t'
+  mf <- asks function
+  case mf of
+    Nothing -> pure . bottom $ "Cannot use keyword 'return' outside of a function" <$ x
+    Just f -> do
+      let fRets = flip Product x $ flip Static x . indexedTypeType . snd <$> funcVals f
+      t' <- fRets ~> maybe (pure $ Product [] x) tcExpr mExpr
+      modify $ \((ret, locals) :| rest) -> case ret of
+        Nothing -> (Just t', locals) :| rest
+        Just (Sum _) -> (Just t', locals) :| rest
+        _ -> (ret, locals) :| rest
+      pure t'
 statementHelper (Throw x) = pure $ topType' x
 statementHelper (EmitStatement _ vals x) =
   reduceType' x <$> traverse (tcExpr . snd) vals
