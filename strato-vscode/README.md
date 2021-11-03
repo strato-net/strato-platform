@@ -144,7 +144,7 @@ The `Config Path` setting is the directory path of the YAML file used to store t
 ### Create Project Command
 ![Create Project Command](docs/create_project_command.png)
 
-The `Create Project Command` setting is a shell script that is responsible for cloning and installing a new project in a given directory. The script takes a single parameter, a directory path, which can be accessed using "$1" in the script. By default, the script clones the traceability-framework repo from BlockApps' GitHub, and installs both the server and ui projects from yarn.
+The `Create Project Command` setting is a shell script that is responsible for cloning and installing a new project in a given directory. The script takes a single parameter, a directory path, which can be accessed using "$1" in the script. The directory path is entered by the user when creating a new project, and long with a test node URL and production node URL. By default, the script clones the traceability-framework repo from BlockApps' GitHub, and installs both the server and ui projects from yarn.
 
 ### Deploy Project Command
 ![Deploy Project Command](docs/deploy_project_command.png)
