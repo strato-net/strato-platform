@@ -67,3 +67,13 @@ contract Describe_A {
 |]
     length results `shouldBe` 1
     results `shouldSatisfy` all (not . isSuccess)
+  it "can run a faulty property test that won't fail deterministically" $ do
+    results <- runTheFuzzer [r|
+contract Describe_A {
+  function property_less_than(uint x, uint y) external returns (bool) {
+    return x < y;
+  }
+}
+|]
+    length results `shouldBe` 1
+    results `shouldSatisfy` all (not . isSuccess)
