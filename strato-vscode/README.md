@@ -125,3 +125,44 @@ Click **Debug SolidVM** in the dropdown.
 Go to the box with the green arrow once again and make sure **Debug SolidVM** is selected from the dropdown. Click the green play button itself, which should start the debugger.  
 ![Run and Debug SolidVM](docs/debug_solidvm.png)
 ![Press Play](docs/press_play.png)
+
+## Extension Settings
+Below is an explanation of each setting for the STRATO VSCode extension. To change the settings for the STRATO VSCode extension, navigate to File > Preferences > Settings, and select Extensions > STRATO.
+![File > Preferences > Settings](docs/file_preferences_settings.png)
+![Extensions > STRATO](docs/extensions_strato.png)
+
+### Config File
+![Config File](docs/config_file.png)
+The `Config File` setting is the filename of the YAML file used to store the current project's configuration. The YAML file includes information such as a list of node URLs, OAuth credentials, and project preferences. Most of the STRATO extension's functionality depends on this value being set correctly. Typically, the project's YAML configuration is stored at "server/config.yaml", so the `Config File` setting should be "config.yaml".
+
+### Config Path
+![Config Path](docs/config_path.png)
+The `Config Path` setting is the directory path of the YAML file used to store the current project's configuration. The YAML file includes information such as a list of node URLs, OAuth credentials, and project preferences. Most of the STRATO extension's functionality depends on this value being set correctly. Typically, the project's YAML configuration is stored at "server/config.yaml", so the `Config Path` setting should be "server". The extension automatically adds the "/" between "server" and "config.yaml" when creating the full filepath of the config file.
+
+### Create Project Command
+![Create Project Command](docs/create_project_command.png)
+The `Create Project Command` setting is a shell script that is responsible for cloning and installing a new project in a given directory. The script takes a single parameter, a directory path, which can be accessed using "$1" in the script. By default, the script clones the traceability-framework repo from BlockApps' GitHub, and installs both the server and ui projects from yarn.
+
+### Deploy Project Command
+![Deploy Project Command](docs/deploy_project_command.png)
+The `Deploy Project Command` setting is a shell script that is responsible for deploying a new instance of a project to a running STRATO network. The script takes no parameters.
+
+### Run Server Command
+![Run Server Command](docs/run_server_command.png)
+The `Run Server Command` setting is a shell script that is responsible for running an instance of the project's server, connected to a running STRATO network. The script takes no parameters.
+
+### Run UI Command
+![Run UI Command](docs/run_ui_command.png)
+The `Run Server Command` setting is a shell script that is responsible for running an instance of the project's UI, connected to a running STRATO network. The script takes no parameters.
+
+### Server Path
+![Server Path](docs/server_path.png)
+The `Server Path` setting is the path to the directory containing the project's server code. This setting is used by the test tools to combine Solidity files together to send to STRATO.
+
+### Test Server Command
+![Test Server Command](docs/test_server_command.png)
+The `Test Server Command` setting is a shell script that is responsible for running project's server test suite. The script takes no parameters.
+
+### Test UI Command
+![Test UI Command](docs/test_ui_command.png)
+The `Test UI Command` setting is a shell script that is responsible for running project's UI test suite. The script takes no parameters.
