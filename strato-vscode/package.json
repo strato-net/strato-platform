@@ -73,22 +73,6 @@
 				"strato-vscode.configFile": {
 					"type": "string",
 					"default": "config.yaml"
-				},
-				"blame.dateFormat": {
-					"type": "string",
-					"default": "mm/dd/yy"
-				},
-				"blame.format": {
-					"type": "string",
-					"default": "abc"
-				},
-				"blame.heatMap.enabled": {
-					"type": "boolean",
-					"default": false
-				},
-				"blame.heatMap.location": {
-					"type": "string",
-					"default": "New York"
 				}
 			}
 		},
