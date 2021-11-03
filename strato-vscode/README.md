@@ -178,7 +178,10 @@ The `Test UI Command` setting is a shell script that is responsible for running 
 
 ## Troubleshooting
 **I pressed step in/over/out while debugging, and the debugger appears to have resumed execution unexpectedly.**
+
 Try pressing the pause button in the debugger control panel again.
 
+
 **I have configured my extension correctly, but I am still not able to connect to my node.**
+
 Check to make sure that the OAuth configuration in your config.yaml file matches the OAuth configuration used when starting the node.
