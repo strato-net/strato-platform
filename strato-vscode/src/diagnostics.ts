@@ -346,16 +346,19 @@ async function validate(counter: number, doc: vscode.TextDocument, solidityDiagn
 
       solidityDiagnostics.set(doc.uri, diagnostics);
 
-      const fuzzAnns = await rest.debugPostFuzz(user, srcMap, options);
+		  const shouldFuzz = vscode.workspace.getConfiguration().get('strato-vscode.autoFuzz') || false;
+      if (shouldFuzz) {
+        const fuzzAnns = await rest.debugPostFuzz(user, srcMap, options);
 
-      for (let ann in fuzzAnns) {
-        const mDiag = createFuzzDiagnostic(doc, fuzzAnns[ann]);
-        if (mDiag) {
-          diagnostics.push(mDiag);
+        for (let ann in fuzzAnns) {
+          const mDiag = createFuzzDiagnostic(doc, fuzzAnns[ann]);
+          if (mDiag) {
+            diagnostics.push(mDiag);
+          }
         }
-      }
 
-      solidityDiagnostics.set(doc.uri, diagnostics);
+        solidityDiagnostics.set(doc.uri, diagnostics);
+      }
     } catch (e) {
       console.log(`validate exception: ${JSON.stringify(e)}`);
     }
