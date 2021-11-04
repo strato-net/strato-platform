@@ -131,6 +131,11 @@ Below is an explanation of each setting for the STRATO VSCode extension. To chan
 ![File > Preferences > Settings](docs/file_preferences_settings.png)
 ![Extensions > STRATO](docs/extensions_strato.png)
 
+### Auto Fuzz
+![Auto Fuzz](docs/auto_fuzz.png)
+
+The `Auto Fuzz` setting tells the extension whether to automatically run the SolidVM code fuzzing tool after the user stops typing. Since the tool can take a long time to complete, disabling this option may be desirable in projects with many unit and/or property tests.
+
 ### Config File
 ![Config File](docs/config_file.png)
 
