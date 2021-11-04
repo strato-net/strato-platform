@@ -24,7 +24,6 @@ import Control.Applicative
 import Control.Lens ((^.))
 import Control.Monad.Except
 import Control.Monad.IO.Unlift
-import Control.Monad.Trans.Control
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Strict hiding (state)
@@ -293,7 +292,7 @@ parseActions events =
 parseEvents :: [VMEvent] -> [Action.Event]
 parseEvents events = [a | EventEmitted a <- events]
 
-processTheMessages :: (MonadIO m, MonadUnliftIO m, MonadBaseControl IO m, MonadLogger m) =>
+processTheMessages :: (MonadIO m, MonadUnliftIO m, MonadLogger m) =>
                       BlocEnv -> BlocSQLEnv -> PGConnection -> IORef Globals -> [VMEvent] -> m ()
 processTheMessages env sqlEnv conn g messages = do
 

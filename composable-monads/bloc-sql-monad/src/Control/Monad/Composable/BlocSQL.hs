@@ -6,16 +6,16 @@
 module Control.Monad.Composable.BlocSQL where
 
 import           Control.Monad.Reader
-import           Control.Monad.Trans.Control
 import           Data.Pool
 import           Data.Word
 import           Database.PostgreSQL.Simple
+import           UnliftIO
 
 import           Control.Monad.Change.Modify
 
 type BlocSQLM = ReaderT BlocSQLEnv
 
-type HasBlocSQL m = (Accessible BlocSQLEnv m, MonadBaseControl IO m)
+type HasBlocSQL m = (Accessible BlocSQLEnv m, MonadUnliftIO m)
 
 data BlocSQLEnv =
   BlocSQLEnv {

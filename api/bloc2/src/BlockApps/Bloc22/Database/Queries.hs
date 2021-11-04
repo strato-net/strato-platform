@@ -423,7 +423,7 @@ createContractBatchQuery names = do
   return $ Map.union newCids cidMap
 
 insertContractSourceQuery
-  :: (MonadIO m, MonadLogger m, HasBlocSQL m)
+  :: (MonadLogger m, HasBlocSQL m)
   => SourceMap
   -> m (Int32, Keccak256)
 insertContractSourceQuery src' = do
@@ -438,7 +438,7 @@ insertContractSourceQuery src' = do
       (\ (csId,sh,_) -> (csId,sh))
 
 insertContractMetaDataBatchQuery
-  :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
+  :: (MonadLogger m, HasBlocSQL m) =>
      Keccak256
   -> [(Int32, ContractDetails)]
   -> m (Map Int32 Int32)
@@ -524,7 +524,7 @@ instance Default Constant (Maybe ChainId) (Column PGBytea) where
                 Nothing -> B.empty
                 Just cid -> word256ToByteString $ unChainId cid
 
-insertContractInstance :: (MonadIO m, HasBlocSQL m, MonadLogger m) =>
+insertContractInstance :: (HasBlocSQL m, MonadLogger m) =>
                           Int32 -> Account -> m Int32
 insertContractInstance cmId (Account address chainId) = blocModify1 $ \conn -> runInsertManyReturning conn contractsInstanceTable
   [
