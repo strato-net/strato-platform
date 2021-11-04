@@ -1,19 +1,15 @@
-{-# LANGUAGE DataKinds         #-} -- DEBUGGING
-{-# LANGUAGE LambdaCase        #-} -- DEBUGGING
-{-# LANGUAGE RecordWildCards   #-} -- DEBUGGING
-{-# LANGUAGE TypeOperators     #-} -- DEBUGGING
-{-# LANGUAGE DeriveAnyClass    #-}
-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE FlexibleContexts  #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RecordWildCards     #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeOperators       #-}
 
 module Debugger.Rest.Server where
 
 import           Control.Monad
 import           Control.Monad.IO.Class
-import           Data.Aeson             as A
-import           Data.Functor.Identity
 import qualified Data.Map.Strict        as M
 import           Data.Maybe             (fromMaybe)
 import           Data.Source
@@ -77,22 +73,9 @@ deleteWatches = flip removeWatches
 postEvals :: DebugSettings -> [EvaluationRequest] -> Handler [EvaluationResponse]
 postEvals d ts = fmap (fromMaybe $ Left "") <$> liftIO (evaluateExpressions ts d)
 
-postParse :: ToJSON a
-          => (SourceMap -> Either [SourceAnnotation T.Text] a)
-          -> SourceMap
-          -> Handler A.Value
-postParse parse = pure . either toJSON toJSON . parse
-
-postAnalyze :: (SourceMap -> Identity [SourceAnnotation (WithSeverity T.Text)])
-            -> SourceMap
-            -> Handler [SourceAnnotation (WithSeverity T.Text)]
-postAnalyze analyze = pure . runIdentity . analyze
-
-restDebuggerServer :: ToJSON a
-                   => DebugSettings
-                   -> SourceTools a
+restDebuggerServer :: DebugSettings
                    -> Server RestDebuggerAPI
-restDebuggerServer dSettings tools =
+restDebuggerServer dSettings =
        getStatus dSettings
   :<|> putPause dSettings
   :<|> putResume dSettings
@@ -109,11 +92,18 @@ restDebuggerServer dSettings tools =
   :<|> putWatches dSettings
   :<|> deleteWatches dSettings
   :<|> postEvals dSettings
-  :<|> postParse (parser tools)
-  :<|> postAnalyze (analyzer tools)
 
-restDebugger :: ToJSON a
-             => DebugSettings
-             -> SourceTools a
+combineProxies :: Proxy a -> Proxy b -> Proxy (a :<|> b)
+combineProxies _ _ = Proxy
+
+restDebuggerAnd :: HasServer api '[]
+                => Proxy api
+                -> (DebugSettings -> Server api)
+                -> DebugSettings
+                -> Application
+restDebuggerAnd otherAPI otherServer dSettings =
+  serve (combineProxies restDebuggerAPI otherAPI) (restDebuggerServer dSettings :<|> otherServer dSettings)
+
+restDebugger :: DebugSettings
              -> Application
-restDebugger dSettings tools = serve restDebuggerAPI (restDebuggerServer dSettings tools)
+restDebugger dSettings = serve restDebuggerAPI (restDebuggerServer dSettings)

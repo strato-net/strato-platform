@@ -31,6 +31,7 @@ library:
     - Blockchain.Stream.VMEvent
     - Blockchain.Stream.VMOutput
     - Blockchain.TxRunResultCache
+    - Blockchain.MemVMContext
     - Blockchain.VMContext
     - Blockchain.VMOptions
     - Blockchain.VM.SolidException

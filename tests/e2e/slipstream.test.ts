@@ -77,7 +77,7 @@ contract Y {
   it("can index contracts recursively constructed", async () => {
     const [user, contract] = await upload("Y", newContract, options);
     await sleep(2000);
-    const indexY = await rest.search(user, {...contract, name: "Y"}, options);
+    const indexY = await rest.search(user, {...contract, name: "Y"}, {...options, query: {address: `eq.${contract.address}`}});
     assert.equal(indexY.length, 1, JSON.stringify(indexY, null, 2));
     const indexX = await rest.search(user, {...contract, name: "X"}, options);
     console.log(`indexX returned ${JSON.stringify(indexX, null, 2)}`);
@@ -96,7 +96,7 @@ contract Z {
   it("Will index updates to a contract", async () => {
     const [user, contract] = await upload("Z", Counter, options);
     await sleep(2000);
-    let indexZ = await rest.search(user, {...contract, name: "Z"}, options);
+    let indexZ = await rest.search(user, {...contract, name: "Z"}, {...options, query: {address: `eq.${contract.address}`}});
     assert.equal(indexZ.length, 1, JSON.stringify(indexZ, null, 2));
     console.log(`Initial index: ${JSON.stringify(indexZ, null, 2)}`);
     let res = await rest.call(user, {contract, method: "incr", args: {}}, options);
@@ -184,6 +184,24 @@ contract KeywordEventTest {
   });
 
 
+
+  it("Will expand Cirrus tables when contract versions with new fields are created", async () => {
+    const version1 = "contract ExpansionTest { uint x; constructor() { x = 0; } }";
+    const version2 = "contract ExpansionTest { uint x; uint y; constructor() { x = 2; y = 10; } }";
+
+    const [user, contract] = await upload("ExpansionTest", version1, options);
+    const v1SearchList = await rest.search(user, {...contract, name: "ExpansionTest"}, {...options, query: {address: `eq.${contract.address}`}});
+    assert.equal(v1SearchList.length, 1, "one result from Cirrus");
+    const v1 = v1SearchList[0];
+    assert.equal(v1.x, 0, "first version appears correctly in Cirrus");
+
+    const [user2, contract2] = await upload("ExpansionTest", version2, options);
+    const v2SearchList = await rest.search(user, {...contract, name: "ExpansionTest"}, {...options, query: {address: `eq.${contract2.address}`}});
+    assert.equal(v2SearchList.length, 1, "one result from Cirrus");
+    const v2 = v2SearchList[0];
+    assert.equal(v2.x, 2, "second version appears correctly in Cirrus");
+    assert.equal(v2.y, 10, "second version new field appears correctly in Cirrus");
+  });
 
 });
 

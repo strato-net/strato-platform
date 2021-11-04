@@ -188,7 +188,7 @@ vaultQuery
   => Query x
   -> VaultM [y]
 vaultQuery q = do
-  traverse_ (logInfoCS callStack . Text.pack) (showSql q)
+  traverse_ (logDebugCS callStack . Text.pack) (showSql q)
   pool <- asks dbPool
   withResource pool $ (\conn -> liftIO $ runQuery conn q)
 
