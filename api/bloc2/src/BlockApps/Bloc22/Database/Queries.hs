@@ -364,11 +364,14 @@ getContractDetailsByCodeCollection :: (MonadIO m, MonadLogger m, HasBlocSQL m)
                                    -> Text
                                    -> m (Maybe (Int32, ContractDetails))
 getContractDetailsByCodeCollection (Account parentAddress parentChainId) contractName = do
-  sourceHash <- blocQuery1 "sourceHashByAccount" $ proc () -> do
+  sourceHashList <- blocQuery {- "sourceHashByAccount" -} $ proc () -> do
     (addr,chId,_,_,_,sh,_) <- contractInstanceMetadataJoinTable-< ()
     restrict -< addr .== constant parentAddress
     restrict -< chId .== constant (ChainId <$> parentChainId)
     returnA -< sh
+  liftIO $ putStrLn $ "DAN we got a list of sourceHashes, check it: " ++ show sourceHashList
+  let sourceHash = head sourceHashList
+
   row <- blocQuery1 "contractBySourceHashAndName" $ proc () -> do
     contract@(_,_,_,_,_,name,_,_,_) <- contractBySourceHash sourceHash -< ()
     restrict -< name .== constant contractName
