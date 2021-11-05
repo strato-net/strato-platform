@@ -108,7 +108,6 @@ This will list the Deployments of the Dapp and give information about the Dapp s
 
 ## Debugger Setup
 **NOTE: The following are required in order to use the debugger:**
-- The project must be using blockapps-rest 8.0 or higher
 - The STRATO node must be started with vmDebug=true
 - The version of STRATO must be 7.0 or higher  
 
