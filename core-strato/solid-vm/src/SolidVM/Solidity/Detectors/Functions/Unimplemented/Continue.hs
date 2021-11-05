@@ -6,6 +6,7 @@ module SolidVM.Solidity.Detectors.Functions.Unimplemented.Continue
 
 import           CodeCollection
 import qualified Data.Map.Strict as M
+import           Data.Maybe      (maybeToList)
 import           Data.Source
 import           Data.Text       (Text)
 import           SolidVM.Solidity.Xabi
@@ -16,7 +17,7 @@ detector :: CompilerDetector
 detector CodeCollection{..} = concat $ contractHelper <$> M.elems _contracts
 
 contractHelper :: Contract -> [SourceAnnotation Text]
-contractHelper Contract{..} = concat $ functionHelper <$> M.elems _functions
+contractHelper Contract{..} = concat $ functionHelper <$> maybeToList _constructor ++ M.elems _functions
 
 functionHelper :: Func -> [SourceAnnotation Text]
 functionHelper Func{..} = case funcContents of
@@ -30,7 +31,7 @@ statementHelper (ForStatement _ _ _ body _) = concat $ statementHelper <$> body
 statementHelper (Block _) = []
 statementHelper (DoWhileStatement body _ _) = concat $ statementHelper <$> body
 statementHelper (Continue a) = [const "Unimplemented: Continue" <$> a]
-statementHelper (Break _) = []
+statementHelper (Break a) = [const "Unimplemented: Break" <$> a]
 statementHelper (Return _ _) = []
 statementHelper (Throw _) = []
 statementHelper (EmitStatement _ _ _) = []
