@@ -363,12 +363,20 @@ getContractDetailsByCodeCollection :: (MonadIO m, MonadLogger m, HasBlocSQL m)
                                    => Account
                                    -> Text
                                    -> m (Maybe (Int32, ContractDetails))
-getContractDetailsByCodeCollection (Account parentAddress parentChainId) contractName = do
-  sourceHash <- blocQuery1 "sourceHashByAccount" $ proc () -> do
+getContractDetailsByCodeCollection ac@(Account parentAddress parentChainId) contractName = do
+  sourceHashList <- blocQuery {- "sourceHashByAccount" -} $ proc () -> do
     (addr,chId,_,_,_,sh,_) <- contractInstanceMetadataJoinTable-< ()
     restrict -< addr .== constant parentAddress
     restrict -< chId .== constant (ChainId <$> parentChainId)
     returnA -< sh
+  sourceHash <-
+    if length sourceHashList == 0 then
+      throwIO $ UserError $ Text.pack $ "No metadata found for this contract instance: " ++ show ac
+    else return $ head sourceHashList
+    -- NOTE: currently, it is possible for there to be duplicate rows in the contracts_instance table
+    --       for a particular contract instance.... eventually, that should not be the case, and this query
+    --       should fail if it finds multiple rows. But for now, we just grab the head of the list
+
   row <- blocQuery1 "contractBySourceHashAndName" $ proc () -> do
     contract@(_,_,_,_,_,name,_,_,_) <- contractBySourceHash sourceHash -< ()
     restrict -< name .== constant contractName
