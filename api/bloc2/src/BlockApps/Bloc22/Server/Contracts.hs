@@ -54,7 +54,6 @@ import           Handlers.AccountInfo
 import           Handlers.Storage
 import qualified MaybeNamed
 import           SQLM
-import           Text.Format
 
 hexStorageToWord256 :: HexStorage -> Word256
 hexStorageToWord256 (HexStorage bs) = bytesToWord256 bs
@@ -70,17 +69,7 @@ getContracts mOffset mLimit chainId = blocTransaction $ do
   let
     addressToVal addr cid = AddressCreatedAt 0 addr cid
     addressesToMap = foldrM
-      (\(AddressStateRef' (AddressStateRef{..}) _) m -> do
-        $logInfoS "getContracts" . Text.pack $ concat
-          [ "Got: "
-          , format addressStateRefCodeHash
-          , " "
-          , fromMaybe "Nothing" addressStateRefContractName
-          , " "
-          , format addressStateRefCodePtrAddress
-          , " "
-          , format addressStateRefCodePtrChainId
-          ]
+      (\(AddressStateRef' (AddressStateRef{..}) _) m ->
         case addressStateRefContractName of
           Just n -> pure $ Map.insertWith (++) (Text.pack n) [addressToVal addressStateRefAddress chainId] m
           Nothing -> case addressStateRefCodeHash of

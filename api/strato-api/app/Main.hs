@@ -27,10 +27,9 @@ import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString.Lazy.Char8      as BLC
 import qualified Data.Cache                      as Cache
 import qualified Data.HashMap.Strict.InsOrd      as H
-import           Data.Maybe                      (fromMaybe, listToMaybe, maybeToList)
+import           Data.Maybe                      (listToMaybe, maybeToList)
 import           Data.Source.Map
-import           Data.Swagger                    hiding (delete, format)
-import qualified Data.Text                       as Text
+import           Data.Swagger                    hiding (delete)
 import           HFlags
 import           Network.HTTP.Types.Status
 import           Network.Wai
@@ -67,7 +66,6 @@ import           Control.Monad.Composable.CoreAPI hiding (httpManager)
 import           Control.Monad.Composable.SQL    hiding (SQLM)
 import           Control.Monad.Composable.Vault  hiding (httpManager)
 
-import           Text.Format
 import           Text.Tools
 
 import qualified Handlers.AccountInfo            as Account
@@ -126,7 +124,6 @@ instance (MonadIO m, MonadLogger m, MonadBaseControl IO m) => (Keccak256 `Alters
 
 instance (MonadIO m, MonadLogger m) => Selectable Account AddressState (CoreAPIM m) where
   select _ a = runMaybeT $ do
-    $logInfoS "Selectable Account AddressState (CoreAPIM m)" . Text.pack $ "Selecting for " ++ format a
     (AddressStateRef' r _) <- MaybeT
                             . fmap listToMaybe
                             . blocStrato
@@ -134,18 +131,7 @@ instance (MonadIO m, MonadLogger m) => Selectable Account AddressState (CoreAPIM
                             $ Account.accountsFilterParams
                             & Account.qaAddress ?~ (a ^. accountAddress)
                             & Account.qaChainId .~ (fmap ChainId . maybeToList $ a ^. accountChainId)
-    $logInfoS "Selectable Account AddressState (CoreAPIM m)" . Text.pack $ concat
-      [ "Got: "
-      , format $ addressStateRefCodeHash r
-      , " "
-      , fromMaybe "Nothing" $ addressStateRefContractName r
-      , " "
-      , format $ addressStateRefCodePtrAddress r
-      , " "
-      , format $ addressStateRefCodePtrChainId r
-      ]
     codePtr <- MaybeT . pure $ addressStateRefCodePtr r
-    $logInfoS "Selectable Account AddressState (CoreAPIM m)" . Text.pack $ "CodePtr: " ++ format codePtr
     pure $ AddressState
       (addressStateRefNonce r)
       (addressStateRefBalance r)
