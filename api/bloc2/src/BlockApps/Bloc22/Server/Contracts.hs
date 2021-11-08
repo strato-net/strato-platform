@@ -10,7 +10,7 @@
 
 module BlockApps.Bloc22.Server.Contracts where
 
--- import           Control.Arrow
+import           Control.Arrow
 -- import           Control.Monad                   (join)
 import qualified Control.Monad.Change.Alter      as A
 import           Data.Foldable
@@ -56,6 +56,7 @@ import           Handlers.AccountInfo
 import           Handlers.Storage
 -- import qualified MaybeNamed
 import           SQLM
+import           Text.Format
 
 hexStorageToWord256 :: HexStorage -> Word256
 hexStorageToWord256 (HexStorage bs) = bytesToWord256 bs
@@ -71,7 +72,17 @@ getContracts mOffset mLimit chainId = blocTransaction $ do
   let
     addressToVal addr cid = AddressCreatedAt 0 addr cid
     addressesToMap = foldrM
-      (\(AddressStateRef' (AddressStateRef{..}) _) m ->
+      (\(AddressStateRef' (AddressStateRef{..}) _) m -> do
+        $logInfoS "getContracts" . Text.pack $ concat
+          [ "Got: "
+          , format addressStateRefCodeHash
+          , " "
+          , fromMaybe "Nothing" addressStateRefContractName
+          , " "
+          , format addressStateRefCodePtrAddress
+          , " "
+          , format addressStateRefCodePtrChainId
+          ]
         case addressStateRefContractName of
           Just n -> pure $ Map.insertWith (++) (Text.pack n) [addressToVal addressStateRefAddress chainId] m
           Nothing -> case addressStateRefCodeHash of
@@ -148,9 +159,9 @@ translateStorageMap storage' =
       storage k = fromMaybe 0 $ Map.lookup k storageMap
   in storage
 
-getContractsState :: -- (MonadIO m, MonadLogger m, HasBlocSQL m,
-                     --  HasBlocEnv m, HasCoreAPI m) =>
-                     ContractName
+getContractsState :: MonadIO m -- (MonadIO m, MonadLogger m, HasBlocSQL m,
+                     --  HasBlocEnv m, HasCoreAPI m)
+                  => ContractName
                   -> Address
                   -> Maybe ChainId
                   -> Maybe Text
@@ -158,7 +169,7 @@ getContractsState :: -- (MonadIO m, MonadLogger m, HasBlocSQL m,
                   -> Maybe Integer
                   -> Bool
                   -> m GetContractsStateResponses -- state-translation
-getContractsState _ _ _ _ _ _ _ = error "getContractsState" -- address chainId mName mCount mOffset mLength = do
+getContractsState _ _ _ _ _ _ _ = pure Map.empty -- address chainId mName mCount mOffset mLength = do
 --   let err = UserError $ Text.concat
 --               [ "getContractsState: Couldn't find contract with address "
 --               , Text.pack $ show address
@@ -230,11 +241,11 @@ getContractsState _ _ _ _ _ _ _ = error "getContractsState" -- address chainId m
 --                            , qsChainId = MaybeNamed.Unnamed <$> chainId
 --                            }
 
-postContractsBatchStates :: -- (MonadIO m,
-                            --  MonadLogger m, HasBlocSQL m, HasBlocEnv m, HasCoreAPI m) =>
-                            [PostContractsBatchStatesRequest]
+postContractsBatchStates :: MonadIO m -- (MonadIO m,
+                            --  MonadLogger m, HasBlocSQL m, HasBlocEnv m, HasCoreAPI m)
+                         => [PostContractsBatchStatesRequest]
                          -> m [GetContractsStateResponses]
-postContractsBatchStates = error "postContractsBatchStates" -- traverse flattenRequest
+postContractsBatchStates = traverse $ pure . const Map.empty -- traverse flattenRequest
 --  where flattenRequest PostContractsBatchStatesRequest{..} =
 --          getContractsState postcontractsbatchstatesrequestContractName
 --                            postcontractsbatchstatesrequestAddress
@@ -244,17 +255,35 @@ postContractsBatchStates = error "postContractsBatchStates" -- traverse flattenR
 --                            postcontractsbatchstatesrequestOffset
 --                            (fromMaybe False postcontractsbatchstatesrequestLength)
 
-getContractsDetails :: -- (MonadIO m, MonadLogger m, HasBlocSQL m) =>
-                       Address -> Maybe ChainId -> m ContractDetails
-getContractsDetails _ _ = error "getContractsDetails" -- contractAddress chainId = do
---  let err = UserError $ Text.concat
---              [ "getContractsDetails: couldn't find contract details for address "
---              , Text.pack $ formatAddressWithoutColor contractAddress
---              , " on chain "
---              , maybe "Main" (Text.pack . show) chainId
---              ]
---  mdetails <- getContractDetails $ Account contractAddress $ unChainId <$> chainId
---  maybe (throwIO err) (return . completeContractDetailXabi) mdetails
+getContractsDetails :: ( MonadUnliftIO m
+                       , A.Selectable Account AddressState m
+                       , (Keccak256 `A.Alters` SourceMap) m
+                       , MonadLogger m
+                       , HasSQL m
+                       , HasBlocSQL m
+                       , HasBlocEnv m
+                       )
+                    => Address -> Maybe ChainId -> m ContractDetails
+getContractsDetails contractAddress chainId = do
+  let err = UserError $ Text.concat
+              [ "getContractsDetails: couldn't find contract details for address "
+              , Text.pack $ formatAddressWithoutColor contractAddress
+              , " on chain "
+              , maybe "Main" (Text.pack . show) chainId
+              ]
+  mAddrStateRef <- listToMaybe <$> getAccount' accountsFilterParams
+    { _qaChainId = maybeToList chainId
+    , _qaAddress = Just contractAddress
+    , _qaExternal = Just False
+    , _qaLimit = Just 1
+    }
+  case mAddrStateRef of
+    Nothing -> throwIO err
+    Just (AddressStateRef' a@AddressStateRef{..} _) -> case addressStateRefCodePtr a of
+      Nothing -> throwIO err
+      Just cp -> getContractDetailsByCodeHash cp >>= \case
+        Left e -> throwIO $ UserError e
+        Right details -> pure details
 
 getContractsFunctions :: -- (MonadIO m, MonadLogger m, HasBlocSQL m) =>
                          ContractName -> Address -> Maybe ChainId -> m [FunctionName]
@@ -339,26 +368,30 @@ getContractsStates :: MonadIO m =>
                       ContractName -> m [GetContractsStatesResponse] -- state-translation
 getContractsStates _ = throwIO $ Unimplemented "getContractsStates"
 
-postContractsCompile :: -- (MonadIO m, MonadLogger m, HasBlocSQL m) =>
-                        [PostCompileRequest] -> m [PostCompileResponse]
-postContractsCompile _ = error "postContractsCompile" -- blocTransaction . fmap concat . traverse compileOneContract
---   where
---     compileOneContract PostCompileRequest{..} = do
---       let shouldCompile = case Text.toLower <$> postcompilerequestVm of
---             Just "solidvm" -> Don't Compile
---             _ -> Do Compile
---       idsAndDetails <- sourceToContractDetails shouldCompile postcompilerequestSource
---       for (toList idsAndDetails) $ \ details -> do
---         let eBlockappsjsXabi = uncurry completeXabi $ (contractdetailsName &&& contractdetailsXabi) details
---         case eBlockappsjsXabi of
---           Left msg -> throwIO $
---             AnError (Text.append "Xabi conversion to Blockapps-js Xabi failed, "  (Text.pack msg))
---           Right _ -> do
---             let ptr = contractdetailsCodeHash details
---             case ptr of
---               EVMCode hsh -> return $ PostCompileResponse (contractdetailsName details) hsh
---               SolidVMCode name hsh -> return $ PostCompileResponse (Text.pack name) hsh
---               CodeAtAccount _ _ -> throwIO . AnError $ "sourceToContractDetails somehow returned CodeAtAccount"
+postContractsCompile :: ( MonadIO m
+                        , (Keccak256 `A.Alters` SourceMap) m
+                        , MonadLogger m
+                        , HasBlocSQL m
+                        )
+                     => [PostCompileRequest] -> m [PostCompileResponse]
+postContractsCompile = blocTransaction . fmap concat . traverse compileOneContract
+  where
+    compileOneContract PostCompileRequest{..} = do
+      let shouldCompile = case Text.toLower <$> postcompilerequestVm of
+            Just "solidvm" -> Don't Compile
+            _ -> Do Compile
+      idsAndDetails <- sourceToContractDetails shouldCompile postcompilerequestSource
+      for (toList idsAndDetails) $ \ details -> do
+        let eBlockappsjsXabi = uncurry completeXabi $ (contractdetailsName &&& contractdetailsXabi) details
+        case eBlockappsjsXabi of
+          Left msg -> throwIO $
+            AnError (Text.append "Xabi conversion to Blockapps-js Xabi failed, "  (Text.pack msg))
+          Right _ -> do
+            let ptr = contractdetailsCodeHash details
+            case ptr of
+              EVMCode hsh -> return $ PostCompileResponse (contractdetailsName details) hsh
+              SolidVMCode name hsh -> return $ PostCompileResponse (Text.pack name) hsh
+              CodeAtAccount _ _ -> throwIO . AnError $ "sourceToContractDetails somehow returned CodeAtAccount"
               
 postContractsXabi :: MonadIO m =>
                      PostXabiRequest -> m PostXabiResponse

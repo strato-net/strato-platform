@@ -151,7 +151,8 @@ instance HasSQL m => Selectable AccountsFilterParams [AddressStateRef] m where
             fmap
               (\case
                 True -> accStateRef E.^. AddressStateRefCodeHash E.==. E.val (Just emptyHash)
-                False -> E.not_ $ accStateRef E.^. AddressStateRefCodeHash E.==. E.val (Just emptyHash)
+                False -> (E.||.) (E.not_ $ accStateRef E.^. AddressStateRefCodeHash E.==. E.val (Just emptyHash))
+                                 (E.isNothing $ accStateRef E.^. AddressStateRefCodeHash)
               ) _qaExternal,
             fmap (\v -> accStateRef E.^. AddressStateRefBalance E.==. E.val v) (fromIntegral <$> _qaBalance),
             fmap (\v -> accStateRef E.^. AddressStateRefBalance E.>=. E.val v) (fromIntegral <$> _qaMinBalance),
