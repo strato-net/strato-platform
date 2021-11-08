@@ -33,7 +33,7 @@ export class NodesProvider implements vscode.TreeDataProvider<Node> {
     let menus: any = [];
     for(let i in element) {
       if(element[i][0] != 'version' && Object.keys(element[i][1]).length != 0) {
-        menus.push(this.createNode({label: `${element[i][0]}`, tooltip: `${JSON.stringify(element[i][1])}`, description: `${JSON.stringify(element[i][1])}`}, element[i]));
+        menus.push(this.createNode({label: `${element[i][0]}`, tooltip: `${element[i][0]}`}, element[i]));
       } else {
         menus.push(new Node({label: `${element[i][0]}`, tooltip: `${JSON.stringify(element[i][1])}`, description: `${JSON.stringify(element[i][1])}`}, vscode.TreeItemCollapsibleState.None))
       }
@@ -98,10 +98,10 @@ export class NodesProvider implements vscode.TreeDataProvider<Node> {
 
     const toDep = (dep: any): Node => {
       const connected = dep && dep.healthInfo
-      const prefix = connected ? (connected.isHealthy ? '✅ ' : '❌ ') : '📴 ';
-      const prefixedLabel = `${prefix}${dep.label}`;
+      const prefix = connected ? (connected.isHealthy ? '✅ ' : '⚠️ ') : '❌ ';
+      const prefixedLabel = `${prefix}${dep.label ? dep.label : dep.url}`;
       return new Node(
-        { ...dep, label: prefixedLabel, tooltip: dep.url, description: dep.url },
+        { ...dep, label: prefixedLabel, tooltip: dep.url, description: dep.label ? dep.url : undefined },
         connected ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None,
         undefined,
         'node'

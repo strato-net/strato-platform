@@ -6,7 +6,9 @@ module SolidVM.Solidity.Detectors.Statements.WriteAfterWrite
 
 import           CodeCollection
 import           Control.Monad.State
+import           Data.Foldable (for_)
 import qualified Data.Map.Strict as M
+import           Data.Maybe      (maybeToList)
 import           Data.Source
 import           Data.Text       (Text)
 import           SolidVM.Solidity.Xabi
@@ -19,7 +21,7 @@ detector :: CompilerDetector
 detector CodeCollection{..} = concat $ contractHelper <$> M.elems _contracts
 
 contractHelper :: Contract -> [SourceAnnotation Text]
-contractHelper Contract{..} = concat $ functionHelper <$> M.elems _functions
+contractHelper Contract{..} = concat $ functionHelper <$> maybeToList _constructor ++ M.elems _functions
 
 functionHelper :: Func -> [SourceAnnotation Text]
 functionHelper Func{..} = case funcContents of
@@ -30,26 +32,34 @@ statementsHelper :: [Statement] -> [SourceAnnotation Text]
 statementsHelper = concat . flip evalState M.empty . traverse statementHelper
 
 statementsHelper' :: [Statement] -> SSS [SourceAnnotation Text]
-statementsHelper' ss = concat . evalState (traverse statementHelper ss) <$> get
+statementsHelper' = fmap concat . traverse statementHelper
 
 statementHelper :: Statement -> SSS [SourceAnnotation Text]
 statementHelper (IfStatement cond thens mElse _) = do
   cs <- expressionHelper cond
-  let ts = statementsHelper thens
-      es = maybe [] statementsHelper mElse
-  put M.empty
+  s <- get
+  ts <- statementsHelper' thens
+  sThen <- get
+  put s
+  es <- maybe (pure []) statementsHelper' mElse
+  sElse <- get
+  put $ M.intersection s $ M.intersection sThen sElse
   pure $ concat [cs, ts, es]
 statementHelper (WhileStatement cond body _) = do
   cs <- expressionHelper cond
-  let bs = statementsHelper body
-  put M.empty
+  s <- get
+  bs <- statementsHelper' body
+  sWhile <- get
+  put $ M.intersection s sWhile
   pure $ concat [cs, bs]
 statementHelper (ForStatement mInit mCond mPost body _) = do
   is <- maybe (pure []) simpleStatementHelper mInit
   cs <- maybe (pure []) expressionHelper mCond
   ps <- maybe (pure []) expressionHelper mPost
-  let bs = statementsHelper body
-  put M.empty
+  s <- get
+  bs <- statementsHelper' body
+  sFor <- get
+  put $ M.intersection s sFor
   pure $ concat [is, cs, ps, bs]
 statementHelper (Block _) = pure []
 statementHelper (DoWhileStatement body cond _) = do
@@ -68,8 +78,12 @@ statementHelper (AssemblyStatement _ _) = pure []
 statementHelper (SimpleStatement stmt _) = simpleStatementHelper stmt
 
 simpleStatementHelper :: SimpleStatement -> SSS [SourceAnnotation Text]
-simpleStatementHelper (VariableDefinition _ mExpr) =
-  maybe (pure []) expressionHelper mExpr
+simpleStatementHelper (VariableDefinition vs mExpr) = case mExpr of
+  Nothing -> pure []
+  Just expr -> do
+    anns <- expressionHelper expr
+    for_ vs $ \VarDefEntry{..} -> modify $ M.insert vardefName vardefContext
+    pure anns
 simpleStatementHelper (ExpressionStatement expr) =
   expressionHelper expr
 

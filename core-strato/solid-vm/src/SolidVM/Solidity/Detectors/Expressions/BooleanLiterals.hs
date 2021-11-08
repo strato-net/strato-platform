@@ -6,6 +6,7 @@ module SolidVM.Solidity.Detectors.Expressions.BooleanLiterals
 
 import           CodeCollection
 import qualified Data.Map.Strict as M
+import           Data.Maybe      (maybeToList)
 import           Data.Source
 import           Data.Text       (Text)
 import           SolidVM.Solidity.Xabi
@@ -16,7 +17,7 @@ detector :: CompilerDetector
 detector CodeCollection{..} = concat $ contractHelper <$> M.elems _contracts
 
 contractHelper :: Contract -> [SourceAnnotation Text]
-contractHelper Contract{..} = concat $ functionHelper <$> M.elems _functions
+contractHelper Contract{..} = concat $ functionHelper <$> maybeToList _constructor ++ M.elems _functions
 
 functionHelper :: Func -> [SourceAnnotation Text]
 functionHelper Func{..} = case funcContents of
@@ -56,6 +57,7 @@ statementHelper (AssemblyStatement _ _) = []
 statementHelper (SimpleStatement stmt _) = simpleStatementHelper stmt
 
 simpleStatementHelper :: SimpleStatement -> [SourceAnnotation Text]
+simpleStatementHelper (VariableDefinition _ (Just (BoolLiteral _ _))) = []
 simpleStatementHelper (VariableDefinition _ mExpr) =
   maybe [] expressionHelper mExpr
 simpleStatementHelper (ExpressionStatement expr) =
