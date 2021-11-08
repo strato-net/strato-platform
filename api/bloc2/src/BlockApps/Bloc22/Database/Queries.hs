@@ -7,6 +7,7 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TupleSections         #-}
 {-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeOperators         #-}
@@ -152,22 +153,26 @@ getContractDetailsByCodeHash codePtr = do
     Just cachedDetails -> pure cachedDetails
     Nothing -> do
       mDetails <- lift (unsafeResolveCodePtrSelect codePtr) >>= \mcp -> flip traverse mcp $ \codeHash -> do
-        ~(mName, ch) <- case codeHash of
-          EVMCode ch -> pure (Nothing, ch)
-          SolidVMCode name ch -> pure (Just name, ch)
+        ~(shouldCompile, name, ch) <- case codeHash of
+          EVMCode ch -> lift (evmContractByCodeHash ch) >>= \case
+            [] -> throwE $ "Could not find EVM contract for code hash " <> Text.pack (format ch)
+            ((name, sh):xs) -> do
+              unless (null xs) $
+                $logWarnS "getContractDetailsByCodeHash" . Text.pack $ concat
+                  [ "Found multiple EVM contracts for code hash "
+                  , format ch
+                  , ". Picking first one from the list."
+                  ]
+              pure (Do Compile, name, sh)
+          SolidVMCode name ch -> pure (Don't Compile, Text.pack name, ch)
           CodeAtAccount acct _ -> throwE $ "Could not resolve code at account " <> Text.pack (show acct)
         srcMap <- lift (A.lookup (A.Proxy @SourceMap) ch) >>= \case
           Nothing -> throwE $ "Could not find source code for code hash " <> Text.pack (format ch)
           Just s -> pure s
-        let shouldCompile = if isJust mName then Don't Compile else Do Compile
         detailsMap <- lift $ sourceToContractDetails shouldCompile srcMap
-        case mName of
-          Just name -> case Map.lookup (Text.pack name) detailsMap of
-            Nothing -> throwE $ "Could not find contract " <> Text.pack name <> " in code collection " <> Text.pack (format ch)
+        case Map.lookup name detailsMap of
+            Nothing -> throwE $ "Could not find contract " <> name <> " in code collection " <> Text.pack (format ch)
             Just d -> pure d
-          Nothing -> case Map.toList detailsMap of
-            [(_,d)] -> pure d
-            _ -> throwE $ "Could not detremine contract from EVM code collection with multiple contracts"
       case mDetails of
         Nothing -> throwE $ "Could not resolve code pointer " <> Text.pack (format codePtr)
         Just details -> do
