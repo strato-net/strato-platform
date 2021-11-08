@@ -11,12 +11,12 @@
 import Control.Concurrent
 import Control.Monad
 import Control.Monad.IO.Class
-import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Resource
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import Data.Cache
+import Data.String
 import Database.Persist.Postgresql
 import Database.PostgreSQL.Typed
 import HFlags
@@ -33,6 +33,7 @@ import BlockApps.Init
 import BlockApps.Logging
 
 import Control.Monad.Composable.BlocSQL
+import Control.Monad.Composable.Kafka
 
 import Slipstream.MessageConsumer
 import Slipstream.Globals
@@ -65,14 +66,19 @@ main :: IO ()
 main = do
   _ <- $initHFlags "Setup Slipstream Variables"
   blockappsInit "slipstream_main"
-  runLoggingT $ do
+  
+  runLoggingT 
+    . runResourceT
+    . runKafkaM ("slipstream" :: KafkaClientId) (fromString flags_kafkahost, fromIntegral flags_kafkaport)
+    . withPostgresqlConn workerConnStr $ \workerConn -> do
+    
     $logInfoS "main" "Welcome to Slipstream!!!!"
     void . liftIO . forkIO . run 10777 $ metricsApp
     $logInfoS "main" "Serving metrics on port 10777"
 
     env <- createBlocEnv
     conn <- connectToCirrus
-    let migrateCirrus :: B.ByteString -> LoggingT IO ()
+    let migrateCirrus :: MonadIO m => B.ByteString -> m ()
         migrateCirrus = liftIO . void . pgQuery conn
     migrateCirrus  [r|create table if not exists
                       contract (id serial primary key, "codeHash" text, contract text, abi text)|]
@@ -82,17 +88,12 @@ main = do
     -- 1. The `workerConn` is from persistent-postgresql for the storage worker in the background
     -- 2. `conn` connects slipstream to the cirrus database
     -- 3. The `pool` in the BlocEnv connects slipstream to the bloc22 database
-    msg <- runResourceT . withPostgresqlConn workerConnStr $ \workerConn -> do
-      (ourBloom, handle) <- runReaderT (initStorage flags_globalsStateCount) workerConn
-      unless ourBloom . liftIO . die $
-        "storage has been previously initialized! This should not happen"
-
-      let state = mkConfiguredKafkaState ("slipstream" :: KafkaClientId) . fromIntegral $ flags_kafkaMaxBytes
-
-      gref <- newGlobals handle
-      sqlEnv <- createBlocSQLEnv flags_pghost (fromIntegral flags_pgport) flags_pguser flags_password
       
-      lift . runKafka state $ getAndProcessMessages env sqlEnv conn gref
-    case msg of
-      Left e -> liftIO . die $ show e
-      Right () -> $logInfoS "main" "completing successfully"
+    (ourBloom, handle) <- runReaderT (initStorage flags_globalsStateCount) workerConn
+    unless ourBloom . liftIO . die $
+      "storage has been previously initialized! This should not happen"
+
+    gref <- newGlobals handle
+    sqlEnv <- createBlocSQLEnv flags_pghost (fromIntegral flags_pgport) flags_pguser flags_password
+      
+    getAndProcessMessages env sqlEnv conn gref

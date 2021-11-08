@@ -462,15 +462,20 @@ sendOutEvents OutBatch{..} = do
     filterOutEvents x = x{Action._events=Seq.empty}
 --    filterOutMetadata :: Action -> Action
 --    filterOutMetadata x = x{Action._metadata=Nothing}
-    newVMEvents :: [VMEvent]
-    newVMEvents =
-        concat (map (map (CodeCollectionAdded . T.unpack) . maybeToList . M.lookup "src" . fromMaybe M.empty . Action._metadata) (toList outActions))
-        ++ concat (map (map EventEmitted . toList . Action._events) (toList outActions))
-        ++ map (NewAction . filterOutEvents) (toList outActions)
---        ++ map (NewAction . filterOutMetadata . filterOutEvents) (toList outActions)
-        
-  _ <- loopTimeit "productVMEvents" $ produceVMEvents $ newVMEvents
-      
+  
+  loopTimeit "productVMEvents" $ do
+      _ <- produceVMEvents $ 
+             concat (map (map (CodeCollectionAdded . T.unpack) . maybeToList . M.lookup "src" . fromMaybe M.empty . Action._metadata) (toList outActions))
+
+      _ <- produceVMEvents $ 
+             concat (map (map EventEmitted . toList . Action._events) (toList outActions))
+
+      _ <- produceVMEvents $ map (NewAction . filterOutEvents) (toList outActions)
+
+--      _ <- produceVMEvents $ map (NewAction . filterOutMetadata . filterOutEvents) (toList outActions)
+
+      return ()
+       
   loopTimeit "produceUnminedBlocksM" $
     void . K.withKafkaRetry1s . produceUnminedBlocksM $
       outputBlockToBlock <$> toList outBlocks
