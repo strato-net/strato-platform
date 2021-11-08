@@ -42,7 +42,7 @@ import           Data.Map.Strict                   (Map)
 import qualified Data.Map.Strict                   as Map
 import           Data.Maybe
 import           Data.Set                          (isSubsetOf)
-import           Data.Source.Map                   (SourceMap, deserializeSourceMap)
+import           Data.Source.Map
 import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
 import qualified Data.Text.Encoding                as Text
@@ -211,15 +211,15 @@ evalAndReturn list = forStateT emptyBatchState list $
         Success -> case mtxr of
           Nothing -> return $ BlocTransactionResult Pending txHash Nothing Nothing
           Just (RawTransaction{..}, txr) -> case (rawTransactionToAddress, rawTransactionCodeOrData) of
-            (Nothing, _) -> contractResult i txHash txr (Map.fromList <$> rawTransactionMetadata)
+            (Nothing, code) -> contractResult i txHash code txr (Map.fromList <$> rawTransactionMetadata)
             (_, Code "") -> return $ BlocTransactionResult Success txHash (Just txr) (Just . Send $ error "send tx") -- . Deprecated.toPostTx $ rawTX2TX r)
             (Just addr, _) -> functionResult i txHash txr (Map.fromList <$> rawTransactionMetadata) (Account addr $ toMaybe 0 rawTransactionChainId)
 
 nth :: Integer -> Text
-nth n | n `mod` 10 == 1 = Text.pack (show n) <> "st"
-      | n `mod` 10 == 2 = Text.pack (show n) <> "nd"
-      | n `mod` 10 == 3 = Text.pack (show n) <> "rd"
-      | otherwise       = Text.pack (show n) <> "th"
+nth n | n `mod` 10 == 0 = Text.pack (show $ n + 1) <> "st"
+      | n `mod` 10 == 1 = Text.pack (show $ n + 1) <> "nd"
+      | n `mod` 10 == 2 = Text.pack (show $ n + 1) <> "rd"
+      | otherwise       = Text.pack (show $ n + 1) <> "th"
 
 contractResult :: ( MonadIO m
                   , A.Selectable Account AddressState m
@@ -230,17 +230,24 @@ contractResult :: ( MonadIO m
                   )
                => Integer
                -> Keccak256
+               -> Code
                -> TransactionResult
                -> Maybe (Map Text Text)
                -> StateT BatchState m BlocTransactionResult
-contractResult i txHash txResult mmd = do
+contractResult i txHash code txResult mmd = do
   ~(name, src, vm) <- case mmd of
     Nothing -> lift . throwIO . UserError $ "Could not get the metadata of the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
     Just md -> case Map.lookup "name" md of
       Nothing -> lift . throwIO . UserError $ "Could not get the name of the contract for the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
-      Just name -> case Map.lookup "src" md of
-        Nothing -> lift . throwIO . UserError $ "Could not get the source of the contract for the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
-        Just src -> pure (name, src, fromMaybe "EVM" $ Map.lookup "VM" md)
+      Just name -> case fromMaybe "EVM" $ Map.lookup "VM" md of
+        "EVM" -> case Map.lookup "src" md of
+          Nothing -> lift . throwIO . UserError $ "Could not get the source of the contract for the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
+          Just src -> pure (name, src, "EVM")
+        vm -> case code of
+          Code bs -> pure (name, Text.decodeUtf8 bs, vm)
+          PtrToCode codePtr -> lift $ getContractDetailsByCodeHash codePtr >>= \case
+            Left e -> throwIO $ UserError e
+            Right ContractDetails{..} -> pure (name, serializeSourceMap contractdetailsSrc, vm)
   let
     accountMaybe = do
       str <- listToMaybe $
