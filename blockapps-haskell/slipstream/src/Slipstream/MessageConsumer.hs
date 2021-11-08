@@ -23,6 +23,7 @@ import Blockchain.Stream.VMEvent
 
 import Control.Monad.Composable.BlocSQL
 import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.SQL
 
 import Slipstream.Globals
 import Slipstream.Metrics
@@ -63,14 +64,14 @@ putStatediffOffset off = do
         error $ show err
       Right () -> return ()
 
-getAndProcessMessages :: (MonadIO m, MonadLogger m, MonadUnliftIO m, HasKafka m) =>
+getAndProcessMessages :: (MonadIO m, MonadLogger m, MonadUnliftIO m, HasKafka m, HasSQL m) =>
                          BlocEnv -> BlocSQLEnv -> PGConnection -> IORef Globals -> m ()
 getAndProcessMessages env sqlEnv conn cache = do
   let errorCount = 0
   offset <- getStatediffOffset
   getAndProcessMessages' env sqlEnv conn cache offset errorCount
 
-getAndProcessMessages' :: (MonadIO m, MonadLogger m, MonadUnliftIO m, HasKafka m) =>
+getAndProcessMessages' :: (MonadIO m, MonadLogger m, MonadUnliftIO m, HasKafka m, HasSQL m) =>
                           BlocEnv -> BlocSQLEnv -> PGConnection -> IORef Globals -> K.Offset -> Int -> m ()
 getAndProcessMessages' env sqlEnv conn cache offset errorCounter = do
   recordOffset offset

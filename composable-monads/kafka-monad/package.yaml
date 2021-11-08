@@ -8,6 +8,7 @@ library:
   source-dirs: src
   dependencies: 
   - milena
+  - monad-alter
   - mtl
   - transformers
   - unliftio-core

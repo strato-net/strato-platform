@@ -51,7 +51,7 @@ import qualified BlockApps.SolidityVarReader as SVR
 import qualified BlockApps.SolidVMStorageDecoder as SolidVM
 
 import Blockchain.Data.AddressStateDB
---import Blockchain.Data.TransactionResult
+import Blockchain.Data.TransactionResult
 --import Blockchain.DB.SQLDB
 import Blockchain.Strato.Model.Account
 import qualified Blockchain.Strato.Model.Action as Action
@@ -63,6 +63,7 @@ import Data.Source.Map
 
 import Control.Monad.Change.Modify              hiding (modify)
 import Control.Monad.Composable.BlocSQL
+import Control.Monad.Composable.SQL
 
 import SelectAccessible                         ()
 
@@ -292,7 +293,7 @@ parseActions events =
 parseEvents :: [VMEvent] -> [Action.Event]
 parseEvents events = [a | EventEmitted a <- events]
 
-processTheMessages :: (MonadIO m, MonadUnliftIO m, MonadLogger m) =>
+processTheMessages :: (MonadIO m, MonadUnliftIO m, MonadLogger m, HasSQL m) =>
                       BlocEnv -> BlocSQLEnv -> PGConnection -> IORef Globals -> [VMEvent] -> m ()
 processTheMessages env sqlEnv conn g messages = do
 
@@ -300,7 +301,7 @@ processTheMessages env sqlEnv conn g messages = do
       events = parseEvents messages
       -- TODO (Dan) : would be nice if we didn't just rip events out at the top level like this
 --      creates = [c|ContractCreated c <- messages]
---      transactionResults = [tr | NewTransactionResult tr <- messages]
+      transactionResults = [tr | NewTransactionResult tr <- messages]
 
   unless (null messages) $
     $logDebugS "processTheMessages" . T.pack . unlines . map show $ messages
@@ -379,9 +380,12 @@ processTheMessages env sqlEnv conn g messages = do
     when (length (concatMap eventCreations ins) > 0) $
       outputData conn . createEventTables g $ concatMap eventCreations ins
 
---  forM_ transactionResults $ putTransactionResult
-  
   when (length events > 0) $ 
     outputData conn $ insertExpandEventTables g events
+
+  $logInfoS "processTheMessages" . T.pack $ "inserting " ++ show (length transactionResults) ++ " transaction results"
+
+  forM_ transactionResults $ putTransactionResult
+  
   flushPendingWrites g
   

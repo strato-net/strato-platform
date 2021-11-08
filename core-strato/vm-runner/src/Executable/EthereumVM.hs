@@ -26,7 +26,7 @@ import qualified Data.ByteString.Char8                 as BC
 import           Data.Conduit.List                     (fold)
 import           Data.Foldable                         hiding (fold)
 import           Data.List
-import           Data.List.Split                       (chunksOf)
+--import           Data.List.Split                       (chunksOf)
 import qualified Data.Map                              as M
 import           Data.Maybe
 import           Data.Proxy
@@ -474,6 +474,9 @@ sendOutEvents OutBatch{..} = do
 
 --      _ <- produceVMEvents $ map (NewAction . filterOutMetadata . filterOutEvents) (toList outActions)
 
+      _ <- produceVMEvents $ map NewTransactionResult $ toList outTXRs
+
+
       return ()
        
   loopTimeit "produceUnminedBlocksM" $
@@ -487,11 +490,13 @@ sendOutEvents OutBatch{..} = do
     void . K.withKafkaRetry1s $ writeIndexEvents (LogDBEntry <$> toList outLogs)
   loopTimeit "flushEventEntries" $ do
     void . K.withKafkaRetry1s $ writeIndexEvents (EventDBEntry <$> toList outEvents)
-  loopTimeit "flushTransactionResults" $ do
-    let q = toList outTXRs
-        toWrite = chunksOf 2000 $ TxResult <$> q
-    recordTxrFlush $ length q
-    mapM_ (K.withKafkaRetry1s . writeIndexEvents) toWrite
+-- I've moved the transaction result indexing to slipstream and the VMEvent stream, above
+-- I'll keep the old code commented out below until we verify that the changes all work.
+--  loopTimeit "flushTransactionResults" $ do
+--    let q = toList outTXRs
+--        toWrite = chunksOf 2000 $ TxResult <$> q
+--    recordTxrFlush $ length q
+--    mapM_ (K.withKafkaRetry1s . writeIndexEvents) toWrite
   when (not flags_sqlDiff) $
     timeit "updateSQLBalanceAndNonce" (Just vmBlockInsertionMined) $
       forM_ outASMs $ \asm -> do

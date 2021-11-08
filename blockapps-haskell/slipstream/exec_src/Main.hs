@@ -34,6 +34,7 @@ import BlockApps.Logging
 
 import Control.Monad.Composable.BlocSQL
 import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.SQL
 
 import Slipstream.MessageConsumer
 import Slipstream.Globals
@@ -41,6 +42,7 @@ import Slipstream.GlobalsColdStorage
 import Slipstream.Options
 import Slipstream.OutputData
 
+import SelectAccessible ()
 
 workerConnStr :: ConnectionString
 workerConnStr = BC.pack $ printf "host=%s port=%d user=%s password=%s dbname=%s"
@@ -70,6 +72,7 @@ main = do
   runLoggingT 
     . runResourceT
     . runKafkaM ("slipstream" :: KafkaClientId) (fromString flags_kafkahost, fromIntegral flags_kafkaport)
+    . runSQLM
     . withPostgresqlConn workerConnStr $ \workerConn -> do
     
     $logInfoS "main" "Welcome to Slipstream!!!!"

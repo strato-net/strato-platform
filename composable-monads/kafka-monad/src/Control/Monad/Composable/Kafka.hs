@@ -13,13 +13,14 @@ import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.State
 import           Data.IORef
 
+import           Control.Monad.Change.Modify
+
 import           Network.Kafka
 import           Network.Kafka.Protocol
 
 type KafkaM = ReaderT (IORef KafkaState)
 
-class HasKafka m where
-  getKafkaStateIORef :: m (IORef KafkaState)
+type HasKafka m = Accessible (IORef KafkaState) m
 
 data KafkaEnv =
   KafkaEnv {
@@ -31,8 +32,8 @@ createKafkaEnv :: MonadIO m =>
 createKafkaEnv x y = do
   let kafkaState =
         (mkKafkaState x y){
-          _stateWaitSize=1,  -- Awaken from sleep only if there is at least one message
-          _stateWaitTime=100000    -- 100s
+          _stateWaitSize=1,      -- Awaken from sleep only if there is at least one message
+          _stateWaitTime=100000  -- 100s
         }
         
   ksIORef <- liftIO $ newIORef kafkaState
@@ -43,17 +44,13 @@ runKafkaMUsingEnv :: KafkaEnv -> KafkaM m a -> m a
 runKafkaMUsingEnv env f = 
   runReaderT f $ kafkaStateIORef env
 
-
-instance Monad m => HasKafka (KafkaM m) where
-  getKafkaStateIORef = ask
-
 runKafkaM :: MonadUnliftIO m => KafkaString -> KafkaAddress -> KafkaM m a -> m a
 runKafkaM x y f = flip runKafkaMUsingEnv f =<< createKafkaEnv x y
 
 execKafka :: (HasKafka m, MonadIO m) =>
              StateT KafkaState (ExceptT KafkaClientError IO) a -> m a
 execKafka f = do
-  ksIORef <- getKafkaStateIORef
+  ksIORef <- access Proxy
   ks <- liftIO $ readIORef ksIORef
   result <- liftIO $ runExceptT $ runStateT f ks
   case result of

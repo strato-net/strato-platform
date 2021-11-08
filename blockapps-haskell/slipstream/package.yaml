@@ -18,6 +18,7 @@ dependencies:
   - raw-strings-qq
   - resourcet
   - semigroups
+  - sql-monad
   - text
   - transformers
 
