@@ -251,6 +251,8 @@ compileContract :: ( MonadIO m
 compileContract sourceList = do
   let source = sourceBlob sourceList
       eVerXabis = parseXabi "-" $ Text.unpack source
+      encodedSrc = serializeSourceMap sourceList
+      srcHash = hash (Text.encodeUtf8 encodedSrc)
   (ver, xabis) <- case eVerXabis of
     Left err -> blocError . UserError . Text.pack $ err
     Right (v, xs) -> return (v, Map.fromList xs)
@@ -264,7 +266,6 @@ compileContract sourceList = do
   --       get rid of error
   --       name nicer, mabye merge with next let
   let contracts = Map.intersectionWith (,) xabis abiBins
-      srcHash = (hash $ Text.encodeUtf8 source)
   details <- for (Map.toList contracts) $ \ (contrName, (xabi,AbiBin{..})) -> do
     let ch = binRuntimeToCodeHash binRuntime
         cds = ContractDetails
@@ -292,6 +293,7 @@ createMetadataNoCompile sourceList = do
   let source = sourceBlob sourceList
       encodedSrc = serializeSourceMap sourceList
       eVerXabis = parseXabi "-" $ Text.unpack source
+      srcHash = hash (Text.encodeUtf8 encodedSrc)
   xabis <- case eVerXabis of
     Left err -> blocError . UserError . Text.pack $ err
     Right (_, xs) -> return $ Map.fromList xs
@@ -301,13 +303,12 @@ createMetadataNoCompile sourceList = do
         { contractdetailsBin = source
         , contractdetailsAccount = Nothing
         , contractdetailsBinRuntime = contrName `Text.append` source
-        , contractdetailsCodeHash = SolidVMCode (Text.unpack contrName) $ hash (Text.encodeUtf8 encodedSrc)
+        , contractdetailsCodeHash = SolidVMCode (Text.unpack contrName) srcHash
         , contractdetailsName = contrName
         , contractdetailsSrc = sourceList
         , contractdetailsXabi = xabi
         }
 
-      srcHash = (hash $ Text.encodeUtf8 source)
   A.insert (A.Proxy @SourceMap) srcHash sourceList
   pure details
 
