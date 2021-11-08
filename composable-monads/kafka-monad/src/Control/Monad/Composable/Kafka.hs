@@ -29,7 +29,13 @@ data KafkaEnv =
 createKafkaEnv :: MonadIO m =>
                   KafkaString -> KafkaAddress -> m KafkaEnv
 createKafkaEnv x y = do
-  ksIORef <- liftIO $ newIORef $ mkKafkaState x y
+  let kafkaState =
+        (mkKafkaState x y){
+          _stateWaitSize=1,  -- Awaken from sleep only if there is at least one message
+          _stateWaitTime=100000    -- 100s
+        }
+        
+  ksIORef <- liftIO $ newIORef kafkaState
   return $ KafkaEnv ksIORef
 
 
