@@ -8,6 +8,7 @@ module BlockApps.Bloc22.Server.Users (
   postUsersFill
   ) where
 
+import           Control.Lens
 import           Control.Monad
 import qualified Control.Monad.Change.Alter        as A
 import           Control.Monad.Except
@@ -36,7 +37,6 @@ import           SQLM
 
 postUsersFill :: ( HasCoreAPI m
                  , A.Selectable Account AddressState m
-                 , (Account `A.Alters` AddressState) m
                  , (Keccak256 `A.Alters` SourceMap) m
                  , HasBlocSQL m
                  , MonadLogger m
@@ -67,7 +67,7 @@ waitForBalance :: (MonadIO m, MonadLogger m,  HasCoreAPI m) => Address -> m ()
 waitForBalance addr = waitFor "no user account found" go
   where go :: (MonadIO m, MonadLogger m, HasCoreAPI m) => m Bool
         go = do
-          let params = accountsFilterParams{qaAddress = Just addr, qaMinBalance = Just 1}
+          let params = accountsFilterParams & qaAddress ?~ addr & qaMinBalance ?~ 1
           accts <- blocStrato $ getAccountsFilter params
           $logInfoLS "waitForBalance/req" params
           $logInfoLS "waitForBalance/resp" accts

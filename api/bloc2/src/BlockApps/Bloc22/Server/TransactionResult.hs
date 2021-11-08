@@ -99,7 +99,6 @@ emptyBatchState = BatchState Map.empty Map.empty
 getBlocTransactionResult' :: ( MonadIO m
                              , (Keccak256 `A.Alters` SourceMap) m
                              , A.Selectable Account AddressState m
-                             , (Account `A.Alters` AddressState) m
                              , MonadLogger m
                              , HasBlocSQL m
                              , HasBlocEnv m
@@ -121,7 +120,6 @@ getBlocTransactionResult' hashes@(txh:_) resolve =
 getBlocTransactionResult :: ( MonadIO m
                             , (Keccak256 `A.Alters` SourceMap) m
                             , A.Selectable Account AddressState m
-                            , (Account `A.Alters` AddressState) m
                             , MonadLogger m
                             , HasBlocSQL m
                             , HasBlocEnv m
@@ -134,7 +132,6 @@ getBlocTransactionResult txHash resolve = fmap head $ postBlocTransactionResults
 getBatchBlocTransactionResult' :: ( MonadIO m
                                   , (Keccak256 `A.Alters` SourceMap) m
                                   , A.Selectable Account AddressState m
-                                  , (Account `A.Alters` AddressState) m
                                   , MonadLogger m
                                   , HasBlocSQL m
                                   , HasBlocEnv m
@@ -149,7 +146,6 @@ getBatchBlocTransactionResult' hashes resolve =
 postBlocTransactionResults :: ( MonadIO m
                               , (Keccak256 `A.Alters` SourceMap) m
                               , A.Selectable Account AddressState m
-                              , (Account `A.Alters` AddressState) m
                               , MonadLogger m
                               , HasBlocSQL m
                               , HasBlocEnv m
@@ -203,7 +199,6 @@ forStateT s as = flip evalStateT s . for as
 evalAndReturn :: ( MonadIO m
                  , (Keccak256 `A.Alters` SourceMap) m
                  , A.Selectable Account AddressState m
-                 , (Account `A.Alters` AddressState) m
                  , MonadLogger m
                  , HasBlocSQL m
                  , HasBlocEnv m
@@ -227,8 +222,8 @@ nth n | n `mod` 10 == 1 = Text.pack (show n) <> "st"
       | otherwise       = Text.pack (show n) <> "th"
 
 contractResult :: ( MonadIO m
+                  , A.Selectable Account AddressState m
                   , (Keccak256 `A.Alters` SourceMap) m
-                  , (Account `A.Alters` AddressState) m
                   , MonadLogger m
                   , HasBlocSQL m
                   , HasBlocEnv m
@@ -275,7 +270,6 @@ contractResult i txHash txResult mmd = do
 functionResult :: ( MonadIO m
                   , A.Selectable Account AddressState m
                   , (Keccak256 `A.Alters` SourceMap) m
-                  , (Account `A.Alters` AddressState) m
                   , MonadLogger m
                   , HasBlocSQL m
                   , HasBlocEnv m
@@ -299,7 +293,9 @@ functionResult i txHash txResult mmd toAccount = do
       mch <- lift $ fmap addressStateCodeHash <$> A.select (A.Proxy @AddressState) toAccount
       xabi' <- case mch of
         Nothing -> lift . throwIO . UserError $ "Could not find contract at " <> Text.pack (format toAccount)
-        Just ch -> lift $ contractdetailsXabi <$> getContractDetailsByCodeHash ch
+        Just ch -> lift $ getContractDetailsByCodeHash ch >>= \case
+          Left e -> throwIO $ UserError e
+          Right d -> pure $ contractdetailsXabi d
       functionXabiMap . at (toAccount, funcName) <?= xabi'
   let resultXabiTypes = maybe [] (Map.elems . funcVals) . Map.lookup funcName $ xabiFuncs xabi
       orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes

@@ -16,11 +16,11 @@ trap "docker rm -f ${CONTAINER}" EXIT
 docker cp "${CONTAINER}:/usr/bin/solc" "${TARGET}"
 
 # Fetching ethereum/solidity source code of same version as the GPLv3 license requires that
-# if [ ! -d ${SOURCE_OUTPUT_DIR} ]
-# then
-#     git clone --single-branch --branch v${VERSION} https://github.com/ethereum/solidity ${SOURCE_OUTPUT_DIR}
-# else
-#     cd ${SOURCE_OUTPUT_DIR}
-#     git pull https://github.com/ethereum/solidity v${VERSION}
-# fi
+if [ ! -d ${SOURCE_OUTPUT_DIR} ]
+then
+    git clone --single-branch --branch v${VERSION} https://github.com/ethereum/solidity ${SOURCE_OUTPUT_DIR}
+else
+    cd ${SOURCE_OUTPUT_DIR}
+    git pull https://github.com/ethereum/solidity v${VERSION}
+fi
 

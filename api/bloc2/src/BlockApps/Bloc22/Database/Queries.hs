@@ -23,11 +23,13 @@ module BlockApps.Bloc22.Database.Queries
   , evmContractSolidVMError
   ) where
 
-import           Blockchain.Data.AddressStateDB  (AddressState, unsafeResolveCodePtr)
+import           Blockchain.Data.AddressStateDB  (AddressState, unsafeResolveCodePtrSelect)
 import           Control.Arrow
 import           Control.Monad
 import qualified Control.Monad.Change.Alter      as A
 import           Control.Monad.Logger
+import           Control.Monad.Trans.Class       (lift)
+import           Control.Monad.Trans.Except
 import qualified Crypto.Saltine.Class            as Saltine
 import qualified Crypto.Saltine.Core.SecretBox   as SecretBox
 import           Data.Aeson                      (Result(..), fromJSON)
@@ -128,13 +130,13 @@ insertEvmContractNameQuery codeHash cName srcHash = do
       )]
 
 getContractDetailsByCodeHash :: ( MonadIO m
-                                , (Account `A.Alters` AddressState) m
+                                , A.Selectable Account AddressState m
                                 , (Keccak256 `A.Alters` SourceMap) m
                                 , MonadLogger m
                                 , HasBlocEnv m
                                 , HasBlocSQL m
                                 )
-                             => CodePtr -> m ContractDetails
+                             => CodePtr -> m (Either Text ContractDetails)
 getContractDetailsByCodeHash codePtr = do
   srcCache <- fmap globalCodePtrCache getBlocEnv
   now <- liftIO $ getTime Monotonic
@@ -146,28 +148,28 @@ getContractDetailsByCodeHash codePtr = do
     for_ r $ \v -> Cache.insertSTM codePtr v srcCache later -- refresh to timestamp of this item
     pure r
 
-  case mCachedDetails of
+  runExceptT $ case mCachedDetails of
     Just cachedDetails -> pure cachedDetails
     Nothing -> do
-      mDetails <- unsafeResolveCodePtr codePtr >>= \mcp -> flip traverse mcp $ \codeHash -> do
+      mDetails <- lift (unsafeResolveCodePtrSelect codePtr) >>= \mcp -> flip traverse mcp $ \codeHash -> do
         ~(mName, ch) <- case codeHash of
           EVMCode ch -> pure (Nothing, ch)
           SolidVMCode name ch -> pure (Just name, ch)
-          CodeAtAccount acct _ -> throwIO . UserError $ "Could not resolve code at account " <> Text.pack (show acct)
-        srcMap <- A.lookup (A.Proxy @SourceMap) ch >>= \case
-          Nothing -> throwIO . UserError $ "Could not find source code for code hash " <> Text.pack (format ch)
+          CodeAtAccount acct _ -> throwE $ "Could not resolve code at account " <> Text.pack (show acct)
+        srcMap <- lift (A.lookup (A.Proxy @SourceMap) ch) >>= \case
+          Nothing -> throwE $ "Could not find source code for code hash " <> Text.pack (format ch)
           Just s -> pure s
         let shouldCompile = if isJust mName then Don't Compile else Do Compile
-        detailsMap <- sourceToContractDetails shouldCompile srcMap
+        detailsMap <- lift $ sourceToContractDetails shouldCompile srcMap
         case mName of
           Just name -> case Map.lookup (Text.pack name) detailsMap of
-            Nothing -> throwIO . UserError $ "Could not find contract " <> Text.pack name <> " in code collection " <> Text.pack (format ch)
+            Nothing -> throwE $ "Could not find contract " <> Text.pack name <> " in code collection " <> Text.pack (format ch)
             Just d -> pure d
           Nothing -> case Map.toList detailsMap of
             [(_,d)] -> pure d
-            _ -> throwIO . UserError $ "Could not detremine contract from EVM code collection with multiple contracts"
+            _ -> throwE $ "Could not detremine contract from EVM code collection with multiple contracts"
       case mDetails of
-        Nothing -> throwIO . UserError $ "Could not resolve code pointer " <> Text.pack (format codePtr)
+        Nothing -> throwE $ "Could not resolve code pointer " <> Text.pack (format codePtr)
         Just details -> do
           liftIO $ Cache.insert srcCache codePtr details
           pure details
@@ -180,7 +182,7 @@ evmContractSolidVMError = Text.concat
   ]
 
 getContractDetailsForContract :: ( MonadIO m
-                                 , (Account `A.Alters` AddressState) m
+                                 , A.Selectable Account AddressState m
                                  , (Keccak256 `A.Alters` SourceMap) m
                                  , MonadLogger m
                                  , HasBlocEnv m
@@ -223,9 +225,9 @@ getContractDetailsForContract theVM src mContract = do
           (SolidVMCode _ _) -> case theVM of
             "EVM" -> throwIO $ UserError evmContractSolidVMError
             _ -> pure x
-          c@(CodeAtAccount _ name) -> do
-            details <- getContractDetailsByCodeHash c
-            pure (Text.pack name, details)
+          c@(CodeAtAccount _ name) -> getContractDetailsByCodeHash c >>= \case
+            Left e -> throwIO $ UserError e
+            Right details -> pure (Text.pack name, details)
  
 sourceToContractDetails :: ( MonadIO m
                            , (Keccak256 `A.Alters` SourceMap) m

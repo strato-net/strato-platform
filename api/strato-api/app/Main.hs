@@ -13,17 +13,23 @@
 
 module Main where
 
+import           Prelude hiding (lookup)
 import           Blockchain.Output
 import           Control.Lens.Operators
+import           Control.Monad.Change.Alter
+import           Control.Monad.Trans.Class
+import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.Except
+import           Control.Monad.Trans.Maybe
 import           Control.Monad.Trans.Reader
 import           Data.Aeson
 import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString.Lazy.Char8      as BLC
 import qualified Data.Cache                      as Cache
 import qualified Data.HashMap.Strict.InsOrd      as H
-import           Data.Proxy
-import           Data.Swagger
+import           Data.Maybe                      (listToMaybe, maybeToList)
+import           Data.Source.Map
+import           Data.Swagger                    hiding (delete)
 import           HFlags
 import           Network.HTTP.Types.Status
 import           Network.Wai
@@ -41,9 +47,19 @@ import           System.Clock
 
 import           BlockApps.Bloc22.API
 import           BlockApps.Bloc22.Monad          -- hiding (handleRuntimeError)
+import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Server
 import           BlockApps.Bloc22.Server.BlocOptions    ()
+import           BlockApps.Bloc22.Server.Utils          (toMaybe)
 import           BlockApps.Init
+import           BlockApps.Solidity.Xabi
+import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Data.AddressStateDB
+import           Blockchain.Data.AddressStateRef
+import           Blockchain.Data.DataDefs
+import           Blockchain.Data.Json
 
 import           Control.Monad.Composable.BlocSQL
 import           Control.Monad.Composable.CoreAPI hiding (httpManager)
@@ -74,6 +90,54 @@ import           SelectAccessible                ()
 import           SQLM
 import           UnliftIO                        hiding (Handler)
 
+instance ( (Keccak256 `Alters` SourceMap) m
+         , MonadLogger m
+         , HasBlocEnv m
+         , HasBlocSQL m
+         , MonadIO m
+         ) => Selectable Account ContractDetails (CoreAPIM m) where
+  select _ a = runMaybeT $ do
+    (AddressStateRef' r _) <- MaybeT
+                            . fmap listToMaybe
+                            . blocStrato
+                            . Account.getAccountsFilter
+                            $ Account.accountsFilterParams
+                            & Account.qaAddress ?~ (a ^. accountAddress)
+                            & Account.qaChainId .~ (fmap ChainId . maybeToList $ a ^. accountChainId)
+    codePtr <- MaybeT . pure $ addressStateRefCodePtr r
+    MaybeT $ either (const Nothing) Just <$> getContractDetailsByCodeHash codePtr
+
+instance (Keccak256 `Alters` SourceMap) m => (Keccak256 `Alters` SourceMap) (CoreAPIM m) where
+  lookup p   = lift . lookup p
+  insert p k = lift . insert p k
+  delete p   = lift . delete p
+
+instance (Keccak256 `Alters` SourceMap) m => (Keccak256 `Alters` SourceMap) (VaultM m) where
+  lookup p   = lift . lookup p
+  insert p k = lift . insert p k
+  delete p   = lift . delete p
+
+instance (MonadIO m, MonadLogger m, MonadBaseControl IO m) => (Keccak256 `Alters` SourceMap) (BlocSQLM m) where
+  lookup _   = contractBySourceHash
+  insert _   = insertContractSourceQuery
+  delete _ _ = liftIO . throwIO . AnError $ "Cannot delete from contractsSourceTable"
+
+instance (MonadIO m, MonadLogger m) => Selectable Account AddressState (CoreAPIM m) where
+  select _ a = runMaybeT $ do
+    (AddressStateRef' r _) <- MaybeT
+                            . fmap listToMaybe
+                            . blocStrato
+                            . Account.getAccountsFilter
+                            $ Account.accountsFilterParams
+                            & Account.qaAddress ?~ (a ^. accountAddress)
+                            & Account.qaChainId .~ (fmap ChainId . maybeToList $ a ^. accountChainId)
+    codePtr <- MaybeT . pure $ addressStateRefCodePtr r
+    pure $ AddressState
+      (addressStateRefNonce r)
+      (addressStateRefBalance r)
+      (addressStateRefContractRoot r)
+      codePtr
+      (toMaybe 0 $ addressStateRefChainId r)
 
 type CoreAPI =
   "eth" :> "v1.2" :>
@@ -118,8 +182,17 @@ coreServer = Account.server
   :<|> UUID.server
   :<|> Version.server
 
-fullServer :: (MonadLogger m, HasSQL m, HasBlocSQL m, HasBlocEnv m, HasVault m, HasCoreAPI m) =>
-              ServerT FullAPI m
+fullServer :: ( MonadLogger m
+              , HasSQL m
+              , HasBlocSQL m
+              , HasBlocEnv m
+              , HasVault m
+              , HasCoreAPI m
+              , Selectable Account ContractDetails m
+              , Selectable Account AddressState m
+              , (Keccak256 `Alters` SourceMap) m
+              )
+           => ServerT FullAPI m
 fullServer = coreServer :<|> bloc
 
 ----------------

@@ -6,22 +6,16 @@
 {-# LANGUAGE OverloadedStrings      #-}
 {-# LANGUAGE RecordWildCards        #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
+{-# LANGUAGE TemplateHaskell        #-}
 {-# LANGUAGE TypeApplications       #-}
 {-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE TypeOperators          #-}
 {-# OPTIONS_GHC -fno-warn-orphans   #-}
 
-module Handlers.AccountInfo
-  ( API
-  , AccountsFilterParams(..)
-  , accountsFilterParams
-  , getAccountsFilter
-  , server
-  , getAccount
-  , getAccount'
-  ) where
+module Handlers.AccountInfo where
 
 import           Control.Monad.Change.Alter
+import           Control.Lens
 import           Data.ByteString.Base16      as B16
 import qualified Data.ByteString.Char8       as BC
 import           Data.List
@@ -40,8 +34,7 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json
 import           Blockchain.DB.SQLDB
 import           Blockchain.Strato.Model.ChainId
-import           Blockchain.Strato.Model.CodePtr
-import           Blockchain.Strato.Model.Keccak256 (emptyHash)
+import           Blockchain.Strato.Model.Keccak256
 
 import           Control.Monad.Composable.SQL
 
@@ -65,7 +58,10 @@ type API = -- Tags "section1" :> Summary "get user accounts" :> Description "Get
             :> QueryParam "maxnonce" Natural
             :> QueryParam "maxnumber" Natural
             :> QueryParam "code" Text
-            :> QueryParam "codeHash" CodePtr
+            :> QueryParam "codeHash" Keccak256
+            :> QueryParam "contractName" Text
+            :> QueryParam "codePtrAddress" Address
+            :> QueryParam "codePtrChainId" ChainId
             :> QueryParams "chainid" ChainId
             :> QueryParam "external" Bool
             :> QueryParam "limit" Natural
@@ -73,26 +69,31 @@ type API = -- Tags "section1" :> Summary "get user accounts" :> Description "Get
             :> Get '[JSON] [AddressStateRef']
 
 data AccountsFilterParams = AccountsFilterParams
-  { qaAddress    :: Maybe Address
-  , qaBalance    :: Maybe Natural
-  , qaMinBalance :: Maybe Natural
-  , qaMaxBalance :: Maybe Natural
-  , qaNonce      :: Maybe Natural
-  , qaMinNonce   :: Maybe Natural
-  , qaMaxNonce   :: Maybe Natural
-  , qaMaxNumber  :: Maybe Natural
-  , qaCode       :: Maybe Text
-  , qaCodeHash   :: Maybe CodePtr
-  , qaChainId    :: [ChainId]
-  , qaExternal   :: Maybe Bool
-  , qaLimit      :: Maybe Natural
-  , qaOffset     :: Maybe Natural
+  { _qaAddress        :: Maybe Address
+  , _qaBalance        :: Maybe Natural
+  , _qaMinBalance     :: Maybe Natural
+  , _qaMaxBalance     :: Maybe Natural
+  , _qaNonce          :: Maybe Natural
+  , _qaMinNonce       :: Maybe Natural
+  , _qaMaxNonce       :: Maybe Natural
+  , _qaMaxNumber      :: Maybe Natural
+  , _qaCode           :: Maybe Text
+  , _qaCodeHash       :: Maybe Keccak256
+  , _qaContractName   :: Maybe Text
+  , _qaCodePtrAddress :: Maybe Address
+  , _qaCodePtrChainId :: Maybe ChainId
+  , _qaChainId        :: [ChainId]
+  , _qaExternal       :: Maybe Bool
+  , _qaLimit          :: Maybe Natural
+  , _qaOffset         :: Maybe Natural
   } deriving (Eq, Ord, Show)
+
+makeLenses ''AccountsFilterParams
 
 accountsFilterParams :: AccountsFilterParams
 accountsFilterParams = AccountsFilterParams
   Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
-  Nothing Nothing [] Nothing Nothing Nothing
+  Nothing Nothing Nothing Nothing Nothing [] Nothing Nothing Nothing
 
 getAccountsFilter :: AccountsFilterParams -> ClientM [AddressStateRef']
 getAccountsFilter = uncurryAccountsFilterParams (client $ Proxy @API)
@@ -106,7 +107,10 @@ uncurryAccountsFilterParams :: ( Maybe Address
                               -> Maybe Natural
                               -> Maybe Natural
                               -> Maybe Text
-                              -> Maybe CodePtr
+                              -> Maybe Keccak256
+                              -> Maybe Text 
+                              -> Maybe Address
+                              -> Maybe ChainId
                               -> [ChainId]
                               -> Maybe Bool
                               -> Maybe Natural
@@ -116,9 +120,10 @@ uncurryAccountsFilterParams :: ( Maybe Address
                             -> AccountsFilterParams
                             -> r
 uncurryAccountsFilterParams f AccountsFilterParams{..} = f
-  qaAddress qaBalance qaMinBalance qaMaxBalance qaNonce
-  qaMinNonce qaMaxNonce qaMaxNumber qaCode qaCodeHash
-  qaChainId qaExternal qaLimit qaOffset
+  _qaAddress _qaBalance _qaMinBalance _qaMaxBalance _qaNonce
+  _qaMinNonce _qaMaxNonce _qaMaxNumber _qaCode _qaCodeHash
+  _qaContractName _qaCodePtrAddress _qaCodePtrChainId
+  _qaChainId _qaExternal _qaLimit _qaOffset
 
 server :: HasSQL m => ServerT API m
 server = getAccount
@@ -132,7 +137,7 @@ instance HasSQL m => Selectable AccountsFilterParams [AddressStateRef] m where
   select _ a@AccountsFilterParams{..} | a == accountsFilterParams =
     throwIO . NoFilterError $ "Need one of: " ++ intercalate ", " accountQueryParams
                                       | otherwise = do
-    chainid <- case qaChainId of
+    chainid <- case _qaChainId of
       [] -> pure MainChain
       cids -> pure $ UnnamedChainIds cids
 
@@ -145,18 +150,21 @@ instance HasSQL m => Selectable AccountsFilterParams [AddressStateRef] m where
           [
             fmap
               (\case
-                True -> accStateRef E.^. AddressStateRefCodeHash E.==. E.val (EVMCode emptyHash)
-                False -> E.not_ $ accStateRef E.^. AddressStateRefCodeHash E.==. E.val (EVMCode emptyHash)
-              ) qaExternal,
-            fmap (\v -> accStateRef E.^. AddressStateRefBalance E.==. E.val v) (fromIntegral <$> qaBalance),
-            fmap (\v -> accStateRef E.^. AddressStateRefBalance E.>=. E.val v) (fromIntegral <$> qaMinBalance),
-            fmap (\v -> accStateRef E.^. AddressStateRefBalance E.<=. E.val v) (fromIntegral <$> qaMaxBalance),
-            fmap (\v -> accStateRef E.^. AddressStateRefNonce E.==. E.val v) (fromIntegral <$> qaNonce),
-            fmap (\v -> accStateRef E.^. AddressStateRefNonce E.>=. E.val v) (fromIntegral <$> qaMinNonce),
-            fmap (\v -> accStateRef E.^. AddressStateRefNonce E.<=. E.val v) (fromIntegral <$> qaMaxNonce),
-            fmap (\v -> accStateRef E.^. AddressStateRefAddress E.==. E.val v) qaAddress,
-            fmap (\v -> accStateRef E.^. AddressStateRefCode E.==. E.val (toCode v)) qaCode,
-            fmap (\v -> accStateRef E.^. AddressStateRefCodeHash E.==. E.val v) qaCodeHash
+                True -> accStateRef E.^. AddressStateRefCodeHash E.==. E.val (Just emptyHash)
+                False -> E.not_ $ accStateRef E.^. AddressStateRefCodeHash E.==. E.val (Just emptyHash)
+              ) _qaExternal,
+            fmap (\v -> accStateRef E.^. AddressStateRefBalance E.==. E.val v) (fromIntegral <$> _qaBalance),
+            fmap (\v -> accStateRef E.^. AddressStateRefBalance E.>=. E.val v) (fromIntegral <$> _qaMinBalance),
+            fmap (\v -> accStateRef E.^. AddressStateRefBalance E.<=. E.val v) (fromIntegral <$> _qaMaxBalance),
+            fmap (\v -> accStateRef E.^. AddressStateRefNonce E.==. E.val v) (fromIntegral <$> _qaNonce),
+            fmap (\v -> accStateRef E.^. AddressStateRefNonce E.>=. E.val v) (fromIntegral <$> _qaMinNonce),
+            fmap (\v -> accStateRef E.^. AddressStateRefNonce E.<=. E.val v) (fromIntegral <$> _qaMaxNonce),
+            fmap (\v -> accStateRef E.^. AddressStateRefAddress E.==. E.val v) _qaAddress,
+            fmap (\v -> accStateRef E.^. AddressStateRefCode E.==. E.val (toCode v)) _qaCode,
+            fmap (\v -> accStateRef E.^. AddressStateRefCodeHash E.==. E.val (Just v)) _qaCodeHash,
+            fmap (\v -> accStateRef E.^. AddressStateRefContractName E.==. E.val (Just $ T.unpack v)) _qaContractName,
+            fmap (\v -> accStateRef E.^. AddressStateRefCodePtrAddress E.==. E.val (Just v)) _qaCodePtrAddress,
+            fmap (\v -> accStateRef E.^. AddressStateRefCodePtrChainId E.==. E.val (Just $ unChainId v)) _qaCodePtrChainId
           ] 
       
       let matchChainId (ChainId cid) = (accStateRef E.^. AddressStateRefChainId) E.==. (E.val cid)
@@ -169,8 +177,8 @@ instance HasSQL m => Selectable AccountsFilterParams [AddressStateRef] m where
 
       E.where_ (foldl1 (E.||.) (map (foldl1 (E.&&.)) allCriteria))
 
-      E.offset . fromIntegral $ fromMaybe 0 qaOffset
-      E.limit $ maybe appFetchLimit (min appFetchLimit . fromIntegral) qaLimit
+      E.offset . fromIntegral $ fromMaybe 0 _qaOffset
+      E.limit $ maybe appFetchLimit (min appFetchLimit . fromIntegral) _qaLimit
 
       E.orderBy [E.asc (accStateRef E.^. AddressStateRefAddress)]
       return accStateRef
@@ -178,11 +186,12 @@ instance HasSQL m => Selectable AccountsFilterParams [AddressStateRef] m where
 getAccount :: Selectable AccountsFilterParams [AddressStateRef] m
            => Maybe Address -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
               Maybe Natural -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
-              Maybe Text -> Maybe CodePtr -> [ChainId] -> Maybe Bool ->
+              Maybe Text -> Maybe Keccak256 -> Maybe Text -> Maybe Address ->
+              Maybe ChainId -> [ChainId] -> Maybe Bool ->
               Maybe Natural -> Maybe Natural ->
               m [AddressStateRef']
-getAccount a b c d e f g h i j k l m n
-  = getAccount' (AccountsFilterParams a b c d e f g h i j k l m n)
+getAccount a b c d e f g h i j k l m n o p q
+  = getAccount' (AccountsFilterParams a b c d e f g h i j k l m n o p q)
     
 getAccount' :: Selectable AccountsFilterParams [AddressStateRef] m => AccountsFilterParams -> m [AddressStateRef']
 getAccount' a = do
@@ -201,6 +210,9 @@ accountQueryParams = [ "address",
                        "code",
                        "index",
                        "codeHash",
+                       "contractName",
+                       "codePtrAddress",
+                       "codePtrChainId",
                        "chainid",
                        "external",
                        "limit",

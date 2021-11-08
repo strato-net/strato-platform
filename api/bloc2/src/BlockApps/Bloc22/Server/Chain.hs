@@ -9,20 +9,19 @@
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE TypeOperators       #-}
 
 module BlockApps.Bloc22.Server.Chain where
 
-import           Control.Applicative               (liftA2)
 import           Control.Lens                      ((?~), at)
 import           Control.Monad                     (when, unless)
 import qualified Control.Monad.Change.Alter        as A
 import           Crypto.Random.Entropy
 import qualified Data.ByteString.Base16            as B16
-import           Data.Foldable                     (for_)
-import           Data.Int                          (Int32)
 import qualified Data.Map.Ordered                  as OMap
 import qualified Data.Map.Strict                   as Map
 import           Data.Maybe                        (catMaybes, fromMaybe, listToMaybe)
+import           Data.Source.Map
 import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
 import           Data.Text.Encoding                (encodeUtf8)
@@ -43,6 +42,7 @@ import           BlockApps.Bloc22.Server.TransactionResult  (constructArgValuesA
 import           BlockApps.Bloc22.Server.Utils              (waitFor)
 import           BlockApps.XAbiConverter                    (xAbiToContract)
 
+import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
@@ -50,7 +50,6 @@ import           Blockchain.TypeLits
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256
-import           Data.Source.Map (serializeSourceMap)
 import           Control.Monad.Change.Alter
 import           Control.Monad.Composable.BlocSQL
 import           Control.Monad.Composable.SQL
@@ -98,7 +97,7 @@ createChainInfo creationBlockHash (ChainInput src mCodePtr cname lbl balances ch
     if src /= mempty
       then fmap snd <$> getContractDetailsForContract theVM src cname
       else case mCodePtr of
-        Just codePtr -> Just <$> getContractDetailsByCodeHash codePtr
+        Just codePtr -> either (const Nothing) Just <$> getContractDetailsByCodeHash codePtr
         Nothing -> fmap snd <$> getContractDetailsForContract theVM mempty cname
   (cAcctInfo, codeInfo, metaData) <- case mContract of
       Nothing -> return ([],[], md)

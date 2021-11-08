@@ -8,6 +8,7 @@
 {-# LANGUAGE TemplateHaskell     #-}
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE TypeOperators       #-}
 
 {-# OPTIONS -fno-warn-unused-top-binds #-}
 
@@ -61,6 +62,7 @@ import           BlockApps.Bloc22.API.Chain
 import           BlockApps.Bloc22.API.Transaction
 import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
+import           BlockApps.Bloc22.Database.Queries  (getContractDetailsForContract)
 import           BlockApps.Bloc22.Monad
 import           BlockApps.Bloc22.Server.Chain
 import           BlockApps.Bloc22.Server.TransactionResult     hiding (constructArgValuesAndSource)
@@ -78,6 +80,7 @@ import           BlockApps.Solidity.Xabi
 import qualified BlockApps.Solidity.Xabi.Type      as Xabi
 import           BlockApps.Strato.Types            hiding (Account, Transaction (..), TransactionResult(..))
 import           BlockApps.XAbiConverter
+import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json
 import           Blockchain.Data.TXOrigin
@@ -115,8 +118,9 @@ mergeTxParams (Just inner) (Just outer) = Just $
 mergeTxParams inner outer = inner <|> outer
 
 txWorker :: ( MonadLogger m
-            , A.Selectable (Text, SourceMap, Maybe Text) (Text, ContractDetails) m
             , A.Selectable Account ContractDetails m
+            , A.Selectable Account AddressState m
+            , (Keccak256 `A.Alters` SourceMap) m
             , HasBlocEnv m
             , HasBlocSQL m
             , HasCoreAPI m
@@ -205,7 +209,7 @@ postBlocTransactionRaw _ _ resolve PostBlocTransactionRawRequest{..} = do
     [x] -> return $ BlocTxResult $ BlocTransactionResult 
               { blocTransactionStatus   = trdStatus x
               , blocTransactionHash     = txHash
-              , blocTransactionTxResult = trdResult x
+              , blocTransactionTxResult = snd <$> trdResult x
               , blocTransactionData     = Nothing   -- can we get this without the txHash table query?
               }
     _ -> throwIO $ UserError $ Text.pack "found multiple tx results for a single tx"
@@ -218,8 +222,9 @@ postBlocTransactionRaw _ _ resolve PostBlocTransactionRawRequest{..} = do
 
 
 postBlocTransactionParallel :: ( MonadLogger m
-                               , A.Selectable (Text, SourceMap, Maybe Text) (Text, ContractDetails) m
                                , A.Selectable Account ContractDetails m
+                               , A.Selectable Account AddressState m
+                               , (Keccak256 `A.Alters` SourceMap) m
                                , HasBlocEnv m
                                , HasBlocSQL m
                                , HasCoreAPI m
@@ -243,8 +248,9 @@ postBlocTransactionParallel a b resolve queue c =
 
 
 postBlocTransaction :: ( MonadLogger m
-                       , A.Selectable (Text, SourceMap, Maybe Text) (Text, ContractDetails) m
                        , A.Selectable Account ContractDetails m
+                       , A.Selectable Account AddressState m
+                       , (Keccak256 `A.Alters` SourceMap) m
                        , HasBlocEnv m
                        , HasBlocSQL m
                        , HasCoreAPI m
@@ -259,8 +265,9 @@ postBlocTransaction :: ( MonadLogger m
 postBlocTransaction = postBlocTransaction' (Don't CacheNonce)
 
 postBlocTransaction' :: ( MonadLogger m
-                        , A.Selectable (Text, SourceMap, Maybe Text) (Text, ContractDetails) m
                         , A.Selectable Account ContractDetails m
+                        , A.Selectable Account AddressState m
+                        , (Keccak256 `A.Alters` SourceMap) m
                         , HasBlocEnv m
                         , HasBlocSQL m
                         , HasCoreAPI m
@@ -450,9 +457,16 @@ data TransactionHeader = TransactionHeader
   }
 
 
-postUsersSend' :: (MonadLogger m,
-                   HasBlocEnv m, HasBlocSQL m, HasCoreAPI m, HasVault m, HasSQL m) =>
-                  Should CacheNonce -> TransferParameters -> Text -> m BlocTransactionResult
+postUsersSend' :: ( A.Selectable Account AddressState m
+                  , (Keccak256 `A.Alters` SourceMap) m
+                  , MonadLogger m
+                  , HasBlocEnv m
+                  , HasBlocSQL m
+                  , HasCoreAPI m
+                  , HasVault m
+                  , HasSQL m
+                  )
+               => Should CacheNonce -> TransferParameters -> Text -> m BlocTransactionResult
 postUsersSend' cacheNonce TransferParameters{..} userName = do
     params <- getAccountTxParams cacheNonce fromAddress chainId txParams
     tx <- signAndPrepare userName fromAddress metadata $
@@ -467,7 +481,8 @@ postUsersSend' cacheNonce TransferParameters{..} userName = do
     getResultAndRespond [txHash] resolve
 
 postUsersContractEVM' :: ( MonadLogger m
-                         , A.Selectable (Text, SourceMap, Maybe Text) (Text, ContractDetails) m
+                         , A.Selectable Account AddressState m
+                         , (Keccak256 `A.Alters` SourceMap) m
                          , HasBlocEnv m
                          , HasBlocSQL m
                          , HasCoreAPI m
@@ -479,7 +494,7 @@ postUsersContractEVM' cacheNonce ContractParameters{..} userName = blocTransacti
   params <- getAccountTxParams cacheNonce fromAddr chainId txParams
   --TODO: check what happens with mismatching args
   $logInfoLS "postUsersContractEVM'/args" args
-  (cName,ContractDetails{..}) <- A.select (A.Proxy @(Text, ContractDetails)) ("EVM" :: Text, src, contract) >>= \case
+  (cName,ContractDetails{..}) <- getContractDetailsForContract "EVM" src contract >>= \case
     Nothing -> throwIO $ UserError "You need to supply at least one contract in the source"
     Just x -> pure x
   let
@@ -502,7 +517,8 @@ postUsersContractEVM' cacheNonce ContractParameters{..} userName = blocTransacti
   getResultAndRespond [txHash] resolve
 
 postUsersContractSolidVM' :: ( MonadLogger m
-                             , A.Selectable (Text, SourceMap, Maybe Text) (Text, ContractDetails) m
+                             , A.Selectable Account AddressState m
+                             , (Keccak256 `A.Alters` SourceMap) m
                              , HasBlocEnv m
                              , HasBlocSQL m
                              , HasCoreAPI m
@@ -514,7 +530,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} userName = blocTrans
   params <- getAccountTxParams cacheNonce fromAddr chainId txParams
   --We might be able to get rid of the metadata for SolidVM, but that will require a change in the API, and needs to be discussed
   $logInfoLS "postUsersContractSolidVM'/args" args
-  (cName,ContractDetails{..}) <- A.select (A.Proxy @(Text, ContractDetails)) ("SolidVM" :: Text, src, contract) >>= \case
+  (cName,ContractDetails{..}) <- getContractDetailsForContract "SolidVM"  src contract >>= \case
     Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
     Just x -> pure x
 
@@ -538,7 +554,8 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} userName = blocTrans
   getResultAndRespond [txHash] resolve
 
 postUsersUploadListSolidVM' :: ( MonadLogger m
-                               , A.Selectable (Text, SourceMap, Maybe Text) (Text, ContractDetails) m
+                               , A.Selectable Account AddressState m
+                               , (Keccak256 `A.Alters` SourceMap) m
                                , HasBlocEnv m
                                , HasBlocSQL m
                                , HasCoreAPI m
@@ -552,7 +569,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} userName = do
   namesTxs <- forStateT Map.empty txsWithParams $
     \(UploadListContract name srcs args params value cid md) -> do
       (src, xabi) <- do
-        cd <- fmap snd . lift $ A.select (A.Proxy @(Text, ContractDetails)) ("SolidVM" :: Text, srcs, Just name) >>= \case
+        cd <- fmap snd . lift $ getContractDetailsForContract "SolidVM" srcs (Just name) >>= \case
           Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
           Just x -> pure x
         at name <?= (contractdetailsSrc cd, contractdetailsXabi cd)
@@ -585,7 +602,8 @@ evmUploadListError = Text.concat
   ]
 
 postUsersUploadListEVM' :: ( MonadLogger m
-                           , A.Selectable (Text, SourceMap, Maybe Text) (Text, ContractDetails) m
+                           , A.Selectable Account AddressState m
+                           , (Keccak256 `A.Alters` SourceMap) m
                            , HasBlocEnv m
                            , HasBlocSQL m
                            , HasCoreAPI m
@@ -602,7 +620,7 @@ postUsersUploadListEVM' cacheNonce ContractListParameters{..} userName = do
       ~ContractDetails{..} <- case mtuple of
         Just cd -> pure cd
         Nothing -> do
-          cd <- fmap snd . lift $ A.select (A.Proxy @(Text, ContractDetails)) ("EVM" :: Text, src, Just name) >>= \case
+          cd <- fmap snd . lift $ getContractDetailsForContract "EVM" src (Just name) >>= \case
             Nothing -> throwIO $ UserError evmUploadListError
             Just cd -> pure cd
           at name <?= cd
@@ -625,6 +643,8 @@ postUsersUploadListEVM' cacheNonce ContractListParameters{..} userName = do
   getBatchBlocTransactionResult' hashes resolve
 
 postUsersSendList' :: ( MonadLogger m
+                      , A.Selectable Account AddressState m
+                      , (Keccak256 `A.Alters` SourceMap) m
                       , HasBlocEnv m
                       , HasBlocSQL m
                       , HasCoreAPI m
@@ -651,6 +671,8 @@ postUsersSendList' cacheNonce TransferListParameters{..} userName = do
 
 postUsersContractMethodList' :: ( MonadLogger m
                                 , A.Selectable Account ContractDetails m
+                                , A.Selectable Account AddressState m
+                                , (Keccak256 `A.Alters` SourceMap) m
                                 , HasBlocEnv m
                                 , HasBlocSQL m
                                 , HasCoreAPI m
@@ -710,6 +732,8 @@ postUsersContractMethodList' cacheNonce FunctionListParameters{..} userName = do
 
 postUsersContractMethod' :: ( MonadLogger m
                             , A.Selectable Account ContractDetails m
+                            , A.Selectable Account AddressState m
+                            , (Keccak256 `A.Alters` SourceMap) m
                             , HasBlocEnv m
                             , HasBlocSQL m
                             , HasCoreAPI m
@@ -841,7 +865,7 @@ getAccountTxParams :: (MonadIO m, MonadLogger m, HasBlocEnv m, HasCoreAPI m) =>
                       Should CacheNonce -> Address -> Maybe ChainId -> Maybe TxParams -> m TxParams
 getAccountTxParams cacheNonce addr chainId mTxParams = do
   let params = fromMaybe emptyTxParams mTxParams
-      cacheKey = (addr, chainId)
+      cacheKey = Account addr (unChainId <$> chainId)
   nonceCache <- fmap globalNonceCounter getBlocEnv
   now <- liftIO $ getTime Monotonic
   mCachedNonce <- case cacheNonce of
@@ -881,7 +905,7 @@ genNonces :: (MonadIO m, MonadLogger m, HasBlocEnv m, HasCoreAPI m) =>
 genNonces cacheNonce fromAddr chainLens l unindexedAs = do
   let getChainId = view chainLens
       chainIdsList = S.toList . S.fromList $ getChainId <$> unindexedAs
-      cacheKeys = (fromAddr,) <$> chainIdsList
+      cacheKeys = Account fromAddr . fmap unChainId <$> chainIdsList
       viewNonce = txparamsNonce <=< view l
   let indexedByChainId = indexedPartitionWith getChainId unindexedAs
   nonceCache <- fmap globalNonceCounter getBlocEnv
@@ -901,7 +925,7 @@ genNonces cacheNonce fromAddr chainLens l unindexedAs = do
                then pure . Nonce . error $
                       "internal error: unused nonce when already specified " ++ show indexedAs
                else do
-                 mmNonce <- cacheLookup nonceCache now' (fromAddr, chainId)
+                 mmNonce <- cacheLookup nonceCache now' (Account fromAddr $ unChainId <$> chainId)
                  let mNonce = case cacheNonce of
                        Do CacheNonce -> mmNonce
                        Don't CacheNonce -> Nothing
@@ -920,14 +944,14 @@ genNonces cacheNonce fromAddr chainLens l unindexedAs = do
                 return (i, (l .~ Just params'{txparamsNonce = Just newNonce}) a)
         newCachedNonce = 1 + getMax (foldMap (Max . fromMaybe 0 . viewNonce . snd) txs)
         expTime = (now' +) <$> Cache.defaultExpiration nonceCache
-    Cache.insertSTM (fromAddr, chainId) newCachedNonce nonceCache expTime
+    Cache.insertSTM (Account fromAddr $ unChainId <$> chainId) newCachedNonce nonceCache expTime
     pure (chainId, txs)
 
 getAccountNonce :: (MonadIO m, MonadLogger m, HasBlocEnv m, HasCoreAPI m) =>
                    Address -> S.Set (Maybe ChainId) -> m (Map (Maybe ChainId) Nonce)
 getAccountNonce addr chainIds = do
   let chainIds' = map (fromMaybe (ChainId 0)) $ S.toList chainIds
-  let params = accountsFilterParams{qaAddress = Just addr, qaChainId = chainIds'}
+  let params = accountsFilterParams & qaAddress ?~ addr & qaChainId .~ chainIds'
   mAccts <- fmap (map (\(AddressStateRef' a _) -> a)) . blocStrato $ getAccountsFilter params
   $logInfoLS "getAccountNonce/req" params
   $logInfoLS "getAccountNonce/resp" mAccts
@@ -1008,8 +1032,14 @@ getArgValues argsMap argNamesTypes = do
 
 
 
-getResultAndRespond :: (MonadLogger m, HasBlocSQL m, HasSQL m) =>
-                       [Keccak256] -> Bool -> m BlocTransactionResult
+getResultAndRespond :: ( A.Selectable Account AddressState m
+                       , (Keccak256 `A.Alters` SourceMap) m
+                       , MonadLogger m
+                       , HasBlocEnv m
+                       , HasBlocSQL m
+                       , HasSQL m
+                       )
+                    => [Keccak256] -> Bool -> m BlocTransactionResult
 getResultAndRespond txHashes resolve = do
   result <- getBlocTransactionResult' txHashes resolve
   case (blocTransactionStatus result, blocTransactionTxResult result, resolve) of

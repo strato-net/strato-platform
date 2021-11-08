@@ -9,7 +9,6 @@ import qualified Data.HashMap.Strict as HM
 import qualified Data.Map.Strict     as M
 import qualified Data.Set            as S
 import           Data.Text
-import           Data.Int (Int32)
 import           GHC.Generics
 
 import           BlockApps.Solidity.Value
@@ -30,7 +29,7 @@ instance NFData (TableName) where
 data Globals = Globals { createdTables :: M.Map TableName TableColumns
                        , historyList :: S.Set TableName
                        , createdInstances :: S.Set CodePtr -- lets us avoid an extra bloc call
-                       , contractABIs :: HM.HashMap Keccak256 (M.Map Text (Int32, ContractDetails))
+                       , contractABIs :: HM.HashMap Keccak256 (M.Map Text ContractDetails)
                        , contractStates :: LRU Account [(Text, Value)]
                        , csHandle :: Handle
                        } deriving (Generic, NFData)
