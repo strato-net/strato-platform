@@ -169,7 +169,7 @@ getContractsState :: ( MonadIO m
                   -> Bool
                   -> m GetContractsStateResponses -- state-translation
 getContractsState _ address chainId mName mCount mOffset mLength = do
-  details <- getContractsDetails address chainId
+  details <- getContractsDetails' address chainId
   let eitherErrorOrContract' = xAbiToContract $ contractdetailsXabi details
   contract' <- either (throwIO . UserError . Text.pack) return eitherErrorOrContract'
 
@@ -257,18 +257,18 @@ postContractsBatchStates = traverse flattenRequest
                             postcontractsbatchstatesrequestOffset
                             (fromMaybe False postcontractsbatchstatesrequestLength)
 
-getContractsDetails :: ( MonadUnliftIO m
-                       , A.Selectable Account AddressState m
-                       , (Keccak256 `A.Alters` SourceMap) m
-                       , MonadLogger m
-                       , HasSQL m
-                       , HasBlocSQL m
-                       , HasBlocEnv m
-                       )
-                    => Address -> Maybe ChainId -> m ContractDetails
-getContractsDetails contractAddress chainId = do
+getContractsDetails' :: ( MonadUnliftIO m
+                        , A.Selectable Account AddressState m
+                        , (Keccak256 `A.Alters` SourceMap) m
+                        , MonadLogger m
+                        , HasSQL m
+                        , HasBlocSQL m
+                        , HasBlocEnv m
+                        )
+                     => Address -> Maybe ChainId -> m ContractDetails
+getContractsDetails' contractAddress chainId = do
   let err = UserError $ Text.concat
-              [ "getContractsDetails: couldn't find contract details for address "
+              [ "getContractsDetails': couldn't find contract details for address "
               , Text.pack $ formatAddressWithoutColor contractAddress
               , " on chain "
               , maybe "Main" (Text.pack . show) chainId
@@ -285,7 +285,19 @@ getContractsDetails contractAddress chainId = do
       Nothing -> throwIO err
       Just cp -> getContractDetailsByCodeHash cp >>= \case
         Left e -> throwIO $ UserError e
-        Right details -> pure (completeContractDetailXabi details){contractdetailsAccount = Just (Account contractAddress (unChainId <$> chainId))}
+        Right details -> pure details{contractdetailsAccount = Just (Account contractAddress (unChainId <$> chainId))}
+
+getContractsDetails :: ( MonadUnliftIO m
+                       , A.Selectable Account AddressState m
+                       , (Keccak256 `A.Alters` SourceMap) m
+                       , MonadLogger m
+                       , HasSQL m
+                       , HasBlocSQL m
+                       , HasBlocEnv m
+                       )
+                    => Address -> Maybe ChainId -> m ContractDetails
+getContractsDetails contractAddress chainId =
+  completeContractDetailXabi <$> getContractsDetails' contractAddress chainId
 
 getContractXabi :: ( MonadUnliftIO m
                    , A.Selectable Account AddressState m
@@ -296,7 +308,7 @@ getContractXabi :: ( MonadUnliftIO m
                    , HasBlocEnv m
                    )
                 => Account -> m Xabi
-getContractXabi (Account addr chainId) = contractdetailsXabi <$> getContractsDetails addr (ChainId <$> chainId)
+getContractXabi (Account addr chainId) = contractdetailsXabi <$> getContractsDetails' addr (ChainId <$> chainId)
 
 getContractsFunctions :: ( MonadIO m
                          , A.Selectable Account AddressState m
@@ -355,7 +367,7 @@ getContractsStateMapping :: (MonadIO m
                          -> m GetContractsStateMappingResponse
                          -- state-translation
 getContractsStateMapping _ address (SymbolName mappingName) keyName chainId = do
-  details <- getContractsDetails address chainId
+  details <- getContractsDetails' address chainId
   let eitherErrorOrContract = xAbiToContract $ contractdetailsXabi details
 
   contract' <- either (throwIO . UserError . Text.pack) return eitherErrorOrContract

@@ -1046,8 +1046,7 @@ getResultAndRespond txHashes resolve = do
     (Success, _, _) -> return result
     (Failure, Nothing, _) -> throwIO (VMError "unknown reason")
     (Failure, Just tr, _) -> throwIO (VMError $ Text.pack $ "Error running the transaction: " ++ transactionResultMessage tr)
-    (Pending, _, False) -> return result
-    (Pending, _, _) -> throwIO (Timeout "Timeout: blockchain peer hasn't responded to transaction request for over 60 seconds")
+    (Pending, _, _) -> return result
 
 checkIsSynced :: (Monad m, HasSQL m) => m ()
 checkIsSynced = do

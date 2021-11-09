@@ -39,6 +39,7 @@ import           Control.Monad.Composable.SQL
 
 import           Handlers.BatchTransactionResult
 import           Handlers.Transaction
+import qualified MaybeNamed
 import           SQLM
 
 
@@ -48,7 +49,7 @@ toMaybe a b = if a == b then Nothing else Just b
 maybeTxBatchResult :: HasSQL m =>
                       [Keccak256] -> m [Maybe (RawTransaction, TransactionResult)]
 maybeTxBatchResult hashes = do
-  rtxs <- fmap (map (map rtPrimeToRt)) . for hashes $ \h -> getTransaction' txsFilterParams{qtHash=Just h}
+  rtxs <- fmap (map (map rtPrimeToRt)) . for hashes $ \h -> getTransaction' txsFilterParams{qtHash=Just h, qtMinGasLimit=Just 1, qtChainId=Just (MaybeNamed.Named "all")}
   mtxrs <- postBatchTransactionResult hashes
   pure . map (maybeHeads mtxrs) $ (zip hashes rtxs :: [(Keccak256, [RawTransaction])])
   where maybeHeads :: M.Map Keccak256 [TransactionResult] -> (Keccak256, [RawTransaction]) -> Maybe (RawTransaction, TransactionResult)
