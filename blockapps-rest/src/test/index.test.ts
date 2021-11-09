@@ -135,8 +135,7 @@ describe("state", function() {
       async () => {
         return rest.getState(admin, { name: uid, address: "0" }, options);
       },
-      RestStatus.BAD_REQUEST,
-      /doesn't exist/
+      RestStatus.BAD_REQUEST
     );
   });
 

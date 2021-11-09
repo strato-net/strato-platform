@@ -96,7 +96,7 @@ instance ( (Keccak256 `Alters` SourceMap) m
                             & Account.qaAddress ?~ (a ^. accountAddress)
                             & Account.qaChainId .~ (fmap ChainId . maybeToList $ a ^. accountChainId)
     codePtr <- MaybeT . pure $ addressStateRefCodePtr r
-    MaybeT $ either (const Nothing) Just <$> getContractDetailsByCodeHash codePtr
+    MaybeT $ either (const Nothing) (\d -> Just d{contractdetailsAccount = Just a}) <$> getContractDetailsByCodeHash codePtr
 
 instance (Keccak256 `Alters` SourceMap) m => (Keccak256 `Alters` SourceMap) (CoreAPIM m) where
   lookup p   = lift . lookup p
