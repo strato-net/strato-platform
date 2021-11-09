@@ -430,9 +430,10 @@ describe("history", function() {
     );
     const txResult = await rest.call(admin, txCallArgs, options);
 
-    const eventHistory = await rest.search(
+    const eventHistory = await rest.searchUntil(
       admin,
       { name: `history@Event` },
+      (r) => r.length > 0,
       {
         ...options,
         query: {
@@ -443,9 +444,10 @@ describe("history", function() {
     assert.isArray(eventHistory);
     assert.equal(eventHistory.length, 1);
 
-    const ticketHistory = await rest.search(
+    const ticketHistory = await rest.searchUntil(
       admin,
       { name: `history@Ticket` },
+      (r) => r.length > 0,
       {
         ...options,
         query: {
@@ -457,9 +459,10 @@ describe("history", function() {
     assert.isArray(ticketHistory);
     assert.equal(ticketHistory.length, 1);
 
-    const txHistory = await rest.search(
+    const txHistory = await rest.searchUntil(
       admin,
       { name: `history@Transaction` },
+      (r) => r.length > 0,
       {
         ...options,
         query: {

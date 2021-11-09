@@ -56,6 +56,7 @@ import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Monad
 import           BlockApps.Bloc22.Server.Utils
+import           BlockApps.Ethereum                (Hex(..))
 import           BlockApps.Logging
 import           BlockApps.Solidity.ArgValue
 import           BlockApps.Solidity.Contract()
@@ -70,8 +71,10 @@ import           BlockApps.XAbiConverter
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.DataDefs
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.Keccak256
+import qualified BlockApps.Strato.Types as Deprecated
 import           Control.Monad.Composable.BlocSQL
 import           Control.Monad.Composable.SQL
 import           SQLM
@@ -196,6 +199,23 @@ forStateT :: Monad m => s -> [a] -> (a -> StateT s m b) -> m [b]
 forStateT s as = flip evalStateT s . for as
 
 
+rawTx2PostTx :: RawTransaction -> Deprecated.PostTransaction
+rawTx2PostTx RawTransaction{..} = Deprecated.PostTransaction
+  { Deprecated.posttransactionHash = rawTransactionTxHash
+  , Deprecated.posttransactionGasLimit = fromInteger rawTransactionGasLimit
+  , Deprecated.posttransactionCodeOrData = "" -- this is only for send txs anyway
+  , Deprecated.posttransactionGasPrice = fromInteger rawTransactionGasPrice
+  , Deprecated.posttransactionTo = rawTransactionToAddress
+  , Deprecated.posttransactionFrom = rawTransactionFromAddress
+  , Deprecated.posttransactionValue = Deprecated.Strung $ fromInteger rawTransactionValue
+  , Deprecated.posttransactionR = Hex $ fromInteger rawTransactionR
+  , Deprecated.posttransactionS = Hex $ fromInteger rawTransactionS
+  , Deprecated.posttransactionV = Hex rawTransactionV
+  , Deprecated.posttransactionNonce = fromInteger rawTransactionNonce
+  , Deprecated.posttransactionChainId = ChainId <$> toMaybe 0 rawTransactionChainId
+  , Deprecated.posttransactionMetadata = Map.fromList <$> rawTransactionMetadata
+  }
+
 evalAndReturn :: ( MonadIO m
                  , (Keccak256 `A.Alters` SourceMap) m
                  , A.Selectable Account AddressState m
@@ -210,9 +230,9 @@ evalAndReturn list = forStateT emptyBatchState list $
         Failure -> return $ BlocTransactionResult Failure txHash (snd <$> mtxr) Nothing
         Success -> case mtxr of
           Nothing -> return $ BlocTransactionResult Pending txHash Nothing Nothing
-          Just (RawTransaction{..}, txr) -> case (rawTransactionToAddress, rawTransactionCodeOrData) of
+          Just (r@RawTransaction{..}, txr) -> case (rawTransactionToAddress, rawTransactionCodeOrData) of
             (Nothing, code) -> contractResult i txHash code txr (Map.fromList <$> rawTransactionMetadata)
-            (_, Code "") -> return $ BlocTransactionResult Success txHash (Just txr) (Just . Send $ error "send tx") -- . Deprecated.toPostTx $ rawTX2TX r)
+            (_, Code "") -> return $ BlocTransactionResult Success txHash (Just txr) (Just . Send $ rawTx2PostTx r)
             (Just addr, _) -> functionResult i txHash txr (Map.fromList <$> rawTransactionMetadata) (Account addr $ toMaybe 0 rawTransactionChainId)
 
 nth :: Integer -> Text
