@@ -271,7 +271,7 @@ contractResult i txHash code txResult mmd = do
           cds <- lift $ getContractDetailsForContract vm (deserializeSourceMap src) (Just name)
           case cds of
             Nothing -> lift . throwIO . UserError $ "Could not get details for contract" <> name
-            Just (_, ds) -> contractDetailsMap . at cn <?= ds
+            Just (_, ds) -> contractDetailsMap . at cn <?= ds{contractdetailsAccount = Just acct}
       return $ BlocTransactionResult Success txHash (Just txResult) (Just $ Upload details)
 
 functionResult :: ( MonadIO m
