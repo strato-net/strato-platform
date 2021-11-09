@@ -23,11 +23,11 @@ import Control.Arrow ((&&&))
 import Control.Applicative
 import Control.Lens ((^.))
 import Control.Monad.Except
+import Control.Monad.IO.Unlift
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Strict hiding (state)
 import Data.Either (lefts, rights)
-import Data.Foldable (toList)
 import Data.Function
 import Data.Int (Int32)
 import Data.IORef
@@ -51,6 +51,8 @@ import qualified BlockApps.SolidityVarReader as SVR
 import qualified BlockApps.SolidVMStorageDecoder as SolidVM
 
 import Blockchain.Data.AddressStateDB
+import Blockchain.Data.TransactionResult
+--import Blockchain.DB.SQLDB
 import Blockchain.Strato.Model.Account
 import qualified Blockchain.Strato.Model.Action as Action
 import Blockchain.Strato.Model.ChainId
@@ -61,6 +63,7 @@ import Data.Source.Map
 
 import Control.Monad.Change.Modify              hiding (modify)
 import Control.Monad.Composable.BlocSQL
+import Control.Monad.Composable.SQL
 
 import SelectAccessible                         ()
 
@@ -85,7 +88,7 @@ data BatchedInserts = BatchedInserts
   , eventCreations  :: [EventTable]
   } deriving (Show)
 
-enterBloc2 :: BlocEnv -> BlocSQLEnv -> ReaderT BlocEnv (BlocSQLM (LoggingT IO)) x -> LoggingT IO x
+enterBloc2 :: r -> BlocSQLEnv -> ReaderT r (ReaderT BlocSQLEnv m) a -> m a
 enterBloc2 blocEnv sqlEnv f =
   runBlocSQLMUsingEnv sqlEnv
   $ flip runReaderT blocEnv
@@ -288,15 +291,17 @@ parseActions events =
   . concatMap (flatten) $ [a | NewAction a <- events]
 
 parseEvents :: [VMEvent] -> [Action.Event]
-parseEvents events = concatMap (toList . Action._events) [a | NewAction a <- events]
+parseEvents events = [a | EventEmitted a <- events]
 
-processTheMessages :: BlocEnv -> BlocSQLEnv -> PGConnection -> IORef Globals -> [VMEvent] -> LoggingT IO ()
+processTheMessages :: (MonadIO m, MonadUnliftIO m, MonadLogger m, HasSQL m) =>
+                      BlocEnv -> BlocSQLEnv -> PGConnection -> IORef Globals -> [VMEvent] -> m ()
 processTheMessages env sqlEnv conn g messages = do
 
   let changes = parseActions messages
       events = parseEvents messages
       -- TODO (Dan) : would be nice if we didn't just rip events out at the top level like this
-      
+--      creates = [c|ContractCreated c <- messages]
+      transactionResults = [tr | NewTransactionResult tr <- messages]
 
   unless (null messages) $
     $logDebugS "processTheMessages" . T.pack . unlines . map show $ messages
@@ -369,12 +374,18 @@ processTheMessages env sqlEnv conn g messages = do
                         $ rights inserts
   forM_ (rights inserts) $ $logDebugLS "processTheMessages/toInsert"
   forM_ insertsByCodeHash $ \ins -> do
-    outputData conn . createExpandInsertIndexTable g $ map indexInsert ins
+    outputData conn . createExpandIndexTable g $ map indexInsert ins
+    unless (null ins) $ outputData conn . insertIndexTable g $ map indexInsert ins
     outputData conn . createExpandInsertHistoryTable g $ concatMap historyInserts ins
     when (length (concatMap eventCreations ins) > 0) $
       outputData conn . createEventTables g $ concatMap eventCreations ins
-  
+
   when (length events > 0) $ 
     outputData conn $ insertExpandEventTables g events
+
+  $logInfoS "processTheMessages" . T.pack $ "inserting " ++ show (length transactionResults) ++ " transaction results"
+
+  forM_ transactionResults $ putTransactionResult
+  
   flushPendingWrites g
   

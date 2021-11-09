@@ -6,6 +6,7 @@ packages:
 - api2/strato-api2
 - composable-monads/bloc-sql-monad
 - composable-monads/core-api-monad
+- composable-monads/kafka-monad
 - composable-monads/sql-monad
 - composable-monads/vault-monad
 - blockapps-haskell/ethereum

@@ -204,6 +204,7 @@ services:
     - seqMaxEventsPerIter=${seqMaxEventsPerIter}
     - seqMaxUsPerIter=${seqMaxUsPerIter}
     - seqRTSOPTs=${seqRTSOPTs}
+    - SLIPSTREAM_DEBUG=${SLIPSTREAM_DEBUG}
     - SLIPSTREAM_OPTIONAL=${SLIPSTREAM_OPTIONAL}
     - splitinit=true
     - START_EXPERIMENTAL_STRATO_API=${START_EXPERIMENTAL_STRATO_API}

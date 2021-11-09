@@ -9,10 +9,14 @@
 
 module Slipstream.OutputData (
   outputData,
+  OutputM,
   insertExpandEventTables,
-  createInserts,
+  insertIndexTable,
+  createIndexTable,
+  createHistoryTable,
+  insertHistoryTable,
   createEventTables,
-  createExpandInsertIndexTable,
+  createExpandIndexTable,
   createExpandInsertHistoryTable,
   cirrusInfo
   ) where
@@ -202,29 +206,16 @@ tableNameToText (EventTableName o a c e) =
       contractAndEvent = c <> "." <> e
   in prefix <> contractAndEvent
 
-createInserts :: OutputM m
-              => IORef Globals
-              -> [ProcessedContract]
-              -> ConduitM () Text m ()
-createInserts globalsIORef contracts = do
-  unless (null contracts) $ do
-    let contract = head contracts
-    createIndexTable globalsIORef contract
-    createHistoryTable globalsIORef contract
-    insertIndexTable globalsIORef contracts
-    insertHistoryTable globalsIORef contracts
-
-createExpandInsertIndexTable
+createExpandIndexTable
   :: OutputM m
   => IORef Globals
   -> [ProcessedContract]
   -> ConduitM () Text m ()
-createExpandInsertIndexTable g cs = do
+createExpandIndexTable g cs = do
   unless (null cs) $ do
     let c = head cs
     createIndexTable g c
     expandIndexTable g cs
-    insertIndexTable g cs
 
 createExpandInsertHistoryTable
   :: OutputM m

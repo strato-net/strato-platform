@@ -35,7 +35,6 @@ module BlockApps.Bloc22.Monad (
 
 
 import           Control.Monad.Reader
-import           Control.Monad.Trans.Control
 import           Data.Cache
 import           Data.Foldable
 import           Data.Int                           (Int32)
@@ -88,12 +87,12 @@ data BlocEnv = BlocEnv
 --------------------------------------------------------------------------------
 
 blocQuery :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y, HasBlocSQL m,
-              MonadIO m, MonadLogger m) =>
+              MonadLogger m) =>
              Query x -> m [y]
 blocQuery q = do
   traverse_ (logInfoCS callStack . Text.pack) (showSql q)
   BlocSQLEnv pool <- access Proxy
-  withResource pool $ liftIO . flip runQuery q
+  liftIO $ withResource pool $ liftIO . flip runQuery q
 
 blocQueryMaybe
   :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y,
@@ -120,7 +119,7 @@ blocModify :: (HasCallStack, MonadIO m, HasBlocSQL m, MonadLogger m) =>
 blocModify modify = do
   logInfoCS callStack "Updating the database"
   BlocSQLEnv pool <- access Proxy
-  withResource pool (liftIO . modify)
+  liftIO $ withResource pool (liftIO . modify)
 
 blocModify1 :: (HasCallStack, MonadIO m, HasBlocSQL m, MonadLogger m) =>
                (Connection -> IO [x]) -> m x
@@ -136,7 +135,8 @@ blocTransaction :: HasBlocSQL m =>
                    m x -> m x
 blocTransaction bloc = do
   BlocSQLEnv pool <- access Proxy
-  withResource pool (\conn -> liftBaseOp_ (withTransaction conn) bloc)
+  bloc' <- toIO bloc
+  liftIO $ withResource pool $ \conn -> withTransaction conn bloc'
 
 blocStrato :: (MonadIO m, MonadLogger m, HasCoreAPI m, HasCallStack) =>
               ClientM x -> m x
