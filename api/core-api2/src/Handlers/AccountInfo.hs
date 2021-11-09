@@ -66,6 +66,7 @@ type API = -- Tags "section1" :> Summary "get user accounts" :> Description "Get
             :> QueryParam "external" Bool
             :> QueryParam "limit" Natural
             :> QueryParam "offset" Natural
+            :> QueryParam "ignoreChain" Bool
             :> Get '[JSON] [AddressStateRef']
 
 data AccountsFilterParams = AccountsFilterParams
@@ -86,6 +87,7 @@ data AccountsFilterParams = AccountsFilterParams
   , _qaExternal       :: Maybe Bool
   , _qaLimit          :: Maybe Natural
   , _qaOffset         :: Maybe Natural
+  , _qaIgnoreChain    :: Maybe Bool
   } deriving (Eq, Ord, Show)
 
 makeLenses ''AccountsFilterParams
@@ -94,6 +96,7 @@ accountsFilterParams :: AccountsFilterParams
 accountsFilterParams = AccountsFilterParams
   Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
   Nothing Nothing Nothing Nothing Nothing [] Nothing Nothing Nothing
+  Nothing
 
 getAccountsFilter :: AccountsFilterParams -> ClientM [AddressStateRef']
 getAccountsFilter = uncurryAccountsFilterParams (client $ Proxy @API)
@@ -115,6 +118,7 @@ uncurryAccountsFilterParams :: ( Maybe Address
                               -> Maybe Bool
                               -> Maybe Natural
                               -> Maybe Natural
+                              -> Maybe Bool
                               -> r
                                )
                             -> AccountsFilterParams
@@ -123,7 +127,7 @@ uncurryAccountsFilterParams f AccountsFilterParams{..} = f
   _qaAddress _qaBalance _qaMinBalance _qaMaxBalance _qaNonce
   _qaMinNonce _qaMaxNonce _qaMaxNumber _qaCode _qaCodeHash
   _qaContractName _qaCodePtrAddress _qaCodePtrChainId
-  _qaChainId _qaExternal _qaLimit _qaOffset
+  _qaChainId _qaExternal _qaLimit _qaOffset _qaIgnoreChain
 
 server :: HasSQL m => ServerT API m
 server = getAccount
@@ -172,9 +176,10 @@ instance HasSQL m => Selectable AccountsFilterParams [AddressStateRef] m where
       let chainCriteria = case chainid of
             MainChain -> [accStateRef E.^. AddressStateRefChainId E.==. E.val 0]
             UnnamedChainIds cids -> matchChainId <$> cids
-      let allCriteria = case chainCriteria of
-              [] -> [criteria]
-              _ -> map (\cc -> cc : criteria) chainCriteria
+      let allCriteria = case (_qaIgnoreChain, chainCriteria) of
+              (Just True, _) -> [criteria]
+              (_, []) -> [criteria]
+              _-> map (\cc -> cc : criteria) chainCriteria
 
       E.where_ (foldl1 (E.||.) (map (foldl1 (E.&&.)) allCriteria))
 
@@ -189,10 +194,10 @@ getAccount :: Selectable AccountsFilterParams [AddressStateRef] m
               Maybe Natural -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
               Maybe Text -> Maybe Keccak256 -> Maybe Text -> Maybe Address ->
               Maybe ChainId -> [ChainId] -> Maybe Bool ->
-              Maybe Natural -> Maybe Natural ->
+              Maybe Natural -> Maybe Natural -> Maybe Bool ->
               m [AddressStateRef']
-getAccount a b c d e f g h i j k l m n o p q
-  = getAccount' (AccountsFilterParams a b c d e f g h i j k l m n o p q)
+getAccount a b c d e f g h i j k l m n o p q r
+  = getAccount' (AccountsFilterParams a b c d e f g h i j k l m n o p q r)
     
 getAccount' :: Selectable AccountsFilterParams [AddressStateRef] m => AccountsFilterParams -> m [AddressStateRef']
 getAccount' a = do
@@ -217,7 +222,8 @@ accountQueryParams = [ "address",
                        "chainid",
                        "external",
                        "limit",
-                       "offset"
+                       "offset",
+                       "ignoreChain"
                      ]
 
 toCode :: Text -> BC.ByteString

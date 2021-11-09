@@ -99,10 +99,15 @@ getContractsData :: ( MonadIO m
                  => ContractName -> m [Address]
 getContractsData (ContractName contractName) = blocTransaction $ do
   evmCodeHashes <- evmCodeHashByName contractName
-  addrStateRefs <- fmap concat . for evmCodeHashes $ \codeHash -> getAccount' accountsFilterParams
+  evmRefs <- fmap concat . for evmCodeHashes $ \codeHash -> getAccount' accountsFilterParams
     { _qaCodeHash = Just codeHash
+    , _qaIgnoreChain = Just True
     }
-  return $ (\(AddressStateRef' r _)-> addressStateRefAddress r) <$> addrStateRefs
+  svmRefs <- getAccount' accountsFilterParams
+    { _qaContractName = Just contractName
+    , _qaIgnoreChain = Just True
+    }
+  return $ (\(AddressStateRef' r _)-> addressStateRefAddress r) <$> (evmRefs <> svmRefs)
 
 getContractsContract :: ( MonadIO m
                         , MonadUnliftIO m
