@@ -163,10 +163,8 @@ function newnode {
   echo "Starting strato-p2p-indexer"
   runBackgroundProcess strato-p2p-indexer +RTS -N1 >> logs/strato-p2p-indexer 2>&1
 
-  # I have moved the transaction results indexer to slipstream, so I'll comment this out
-  # while we determine if the change will work.
-#  echo "Starting strato-txr-indexer"
-#  runBackgroundProcess strato-txr-indexer +RTS -N1 >> logs/strato-txr-indexer 2>&1
+  echo "Starting strato-txr-indexer"
+  runBackgroundProcess strato-txr-indexer +RTS -N1 >> logs/strato-txr-indexer 2>&1
 
   if [ -n "${brokenRefundReenable}" ]; then
     breFlag="--brokenRefundReenable=${brokenRefundReenable}"
