@@ -285,7 +285,7 @@ getContractsDetails contractAddress chainId = do
       Nothing -> throwIO err
       Just cp -> getContractDetailsByCodeHash cp >>= \case
         Left e -> throwIO $ UserError e
-        Right details -> pure details{contractdetailsAccount = Just (Account contractAddress (unChainId <$> chainId))}
+        Right details -> pure (completeContractDetailXabi details){contractdetailsAccount = Just (Account contractAddress (unChainId <$> chainId))}
 
 getContractXabi :: ( MonadUnliftIO m
                    , A.Selectable Account AddressState m
