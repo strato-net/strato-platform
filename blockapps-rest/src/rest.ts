@@ -748,6 +748,19 @@ async function getBlocResults(user:OAuthUser, hashes:string[], options:Options) 
 
 /**
  * @static
+ * This call gets the list of smart contract names on a particular chain
+ *
+ * @param {module:rest~User} user This must contain the token for the user
+ * @param chainId The chainId of the chain to query.
+ * @param {module:rest~Options} options This identifies the options and configurations for this call
+ * @returns {Object} Returns an object with all contract names on the chain as keys.
+ */
+async function getContracts(user:OAuthUser, chainId, options:Options) {
+  return api.getContracts(user, chainId, options);
+}
+
+/**
+ * @static
  * This call gets the state of a STRATO smart contract
  * @example
  *
@@ -1681,6 +1694,7 @@ export default {
   createContract,
   createContractList,
   getBlocResults,
+  getContracts,
   getState,
   getArray,
   call,

@@ -149,6 +149,15 @@ async function getBalance(user:OAuthUser, bcuser:BlockChainUser | null, options:
   return new BigNumber(accounts[0].balance);
 }
 
+async function getContracts(user:OAuthUser, chainId, options:Options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.CONTRACTS, {
+    config: options.config,
+    chainIds: [chainId]
+  });
+  return get(url, endpoint, setAuthHeaders(user, options));
+}
+
 async function getState(user:OAuthUser, contract, options:Options) {
   const url = getNodeUrl(options);
   const urlParams = {
@@ -488,6 +497,7 @@ export default {
   createContractList,
   fill,
   blocResults,
+  getContracts,
   getState,
   getCallArgs,
   call,
