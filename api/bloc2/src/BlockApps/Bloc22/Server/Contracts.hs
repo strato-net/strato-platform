@@ -58,9 +58,7 @@ import           SQLM
 hexStorageToWord256 :: HexStorage -> Word256
 hexStorageToWord256 (HexStorage bs) = bytesToWord256 bs
 
-getContracts :: ( MonadIO m
-                , MonadUnliftIO m
-                , MonadLogger m
+getContracts :: ( MonadLogger m
                 , HasBlocSQL m
                 , HasSQL m
                 )
@@ -90,9 +88,7 @@ getContracts mOffset mLimit chainId = blocTransaction $ do
   reducedResponseMap <- addressesToMap addrStateRefs
   return . GetContractsResponse $ reducedResponseMap
 
-getContractsData :: ( MonadIO m
-                    , MonadUnliftIO m
-                    , MonadLogger m
+getContractsData :: ( MonadLogger m
                     , HasBlocSQL m
                     , HasSQL m
                     )

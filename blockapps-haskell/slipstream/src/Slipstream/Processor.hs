@@ -85,7 +85,6 @@ instance ( (Keccak256 `Alters` SourceMap) m
          , MonadLogger m
          , HasBlocEnv m
          , HasBlocSQL m
-         , MonadIO m
          ) => Selectable Account ContractDetails (CoreAPIM m) where
   select _ a = runMaybeT $ do
     (AddressStateRef' r _) <- MaybeT
@@ -108,7 +107,7 @@ instance (Keccak256 `Alters` SourceMap) m => (Keccak256 `Alters` SourceMap) (Rea
   insert p k = lift . insert p k
   delete p   = lift . delete p
 
-instance (MonadIO m, MonadLogger m, MonadBaseControl IO m) => (Keccak256 `Alters` SourceMap) (BlocSQLM m) where
+instance (MonadUnliftIO m, MonadLogger m) => (Keccak256 `Alters` SourceMap) (BlocSQLM m) where
   lookup _   = contractBySourceHash
   insert _   = insertContractSourceQuery
   delete _ _ = error "Cannot delete from contractsSourceTable"
@@ -145,7 +144,7 @@ data BatchedInserts = BatchedInserts
   , eventCreations  :: [EventTable]
   } deriving (Show)
 
-enterBloc2 :: r -> BlocSQLEnv -> CoreAPIM (ReaderT r (ReaderT BlocSQLEnv m)) a -> m a
+enterBloc2 :: MonadIO m => r -> BlocSQLEnv -> CoreAPIM (ReaderT r (ReaderT BlocSQLEnv m)) a -> m a
 enterBloc2 blocEnv sqlEnv f =
   runBlocSQLMUsingEnv sqlEnv
   $ flip runReaderT blocEnv

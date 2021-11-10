@@ -18,7 +18,6 @@ import           Blockchain.Output
 import           Control.Lens.Operators
 import           Control.Monad.Change.Alter
 import           Control.Monad.Trans.Class
-import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Maybe
 import           Control.Monad.Trans.Reader
@@ -94,7 +93,6 @@ instance ( (Keccak256 `Alters` SourceMap) m
          , MonadLogger m
          , HasBlocEnv m
          , HasBlocSQL m
-         , MonadIO m
          ) => Selectable Account ContractDetails (CoreAPIM m) where
   select _ a = runMaybeT $ do
     (AddressStateRef' r _) <- MaybeT
@@ -117,12 +115,12 @@ instance (Keccak256 `Alters` SourceMap) m => (Keccak256 `Alters` SourceMap) (Vau
   insert p k = lift . insert p k
   delete p   = lift . delete p
 
-instance (MonadIO m, MonadLogger m, MonadBaseControl IO m) => (Keccak256 `Alters` SourceMap) (BlocSQLM m) where
+instance (MonadLogger m, MonadUnliftIO m) => (Keccak256 `Alters` SourceMap) (BlocSQLM m) where
   lookup _   = contractBySourceHash
   insert _   = insertContractSourceQuery
   delete _ _ = liftIO . throwIO . AnError $ "Cannot delete from contractsSourceTable"
 
-instance (MonadIO m, MonadLogger m) => Selectable Account AddressState (CoreAPIM m) where
+instance (MonadUnliftIO m, MonadLogger m) => Selectable Account AddressState (CoreAPIM m) where
   select _ a = runMaybeT $ do
     (AddressStateRef' r _) <- MaybeT
                             . fmap listToMaybe

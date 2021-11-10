@@ -75,7 +75,7 @@ import           SQLM
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 
 contractBySourceHash
-  :: (MonadIO m, MonadLogger m, HasBlocSQL m)
+  :: (MonadLogger m, HasBlocSQL m)
   => Keccak256
   -> m (Maybe SourceMap)
 contractBySourceHash srcHash = fmap (fmap deserializeSourceMap . listToMaybe) . blocQuery $ proc () -> do
@@ -84,7 +84,7 @@ contractBySourceHash srcHash = fmap (fmap deserializeSourceMap . listToMaybe) . 
   returnA -< (src)
 
 insertContractSourceQuery
-  :: (MonadIO m, MonadLogger m, HasBlocSQL m)
+  :: (MonadLogger m, HasBlocSQL m)
   => Keccak256
   -> SourceMap
   -> m ()
@@ -98,7 +98,7 @@ insertContractSourceQuery srcHash src' = do
       )]
 
 evmContractByCodeHash
-  :: (MonadIO m, MonadLogger m, HasBlocSQL m)
+  :: (MonadLogger m, HasBlocSQL m)
   => Keccak256
   -> m [(Text, Keccak256)]
 evmContractByCodeHash codeHash = blocQuery $ proc () -> do
@@ -107,7 +107,7 @@ evmContractByCodeHash codeHash = blocQuery $ proc () -> do
   returnA -< (name,sh)
 
 evmCodeHashByName
-  :: (MonadIO m, MonadLogger m, HasBlocSQL m)
+  :: (MonadLogger m, HasBlocSQL m)
   => Text
   -> m [Keccak256]
 evmCodeHashByName cName = blocQuery $ proc () -> do
@@ -116,7 +116,7 @@ evmCodeHashByName cName = blocQuery $ proc () -> do
   returnA -< ch
 
 insertEvmContractNameQuery
-  :: (MonadIO m, MonadLogger m, HasBlocSQL m)
+  :: (MonadLogger m, HasBlocSQL m)
   => Keccak256
   -> Text
   -> Keccak256
@@ -130,8 +130,7 @@ insertEvmContractNameQuery codeHash cName srcHash = do
       , constant srcHash
       )]
 
-getContractDetailsByCodeHash :: ( MonadIO m
-                                , A.Selectable Account AddressState m
+getContractDetailsByCodeHash :: ( A.Selectable Account AddressState m
                                 , (Keccak256 `A.Alters` SourceMap) m
                                 , MonadLogger m
                                 , HasBlocEnv m
@@ -186,8 +185,7 @@ evmContractSolidVMError = Text.concat
   , "If you are intending to use EVM, please modify your contracts and try again."
   ]
 
-getContractDetailsForContract :: ( MonadIO m
-                                 , A.Selectable Account AddressState m
+getContractDetailsForContract :: ( A.Selectable Account AddressState m
                                  , (Keccak256 `A.Alters` SourceMap) m
                                  , MonadLogger m
                                  , HasBlocEnv m
@@ -234,8 +232,7 @@ getContractDetailsForContract theVM src mContract = do
             Left e -> throwIO $ UserError e
             Right details -> pure (Text.pack name, details)
  
-sourceToContractDetails :: ( MonadIO m
-                           , (Keccak256 `A.Alters` SourceMap) m
+sourceToContractDetails :: ( (Keccak256 `A.Alters` SourceMap) m
                            , MonadLogger m
                            , HasBlocSQL m
                            )
@@ -247,8 +244,7 @@ sourceToContractDetails shouldCompile sourceList =
           Don't Compile -> createMetadataNoCompile
    in createContractDetails sourceList
 
-compileContract :: ( MonadIO m
-                   , (Keccak256 `A.Alters` SourceMap) m
+compileContract :: ( (Keccak256 `A.Alters` SourceMap) m
                    , MonadLogger m
                    , HasBlocSQL m
                    )
