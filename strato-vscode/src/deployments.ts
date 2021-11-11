@@ -36,9 +36,9 @@ export class DeploymentsProvider implements vscode.TreeDataProvider<Deployment> 
     const config = getConfig() || {}
     const dappName = config.dappContractName || 'BeanstalkDapp'
     const deployments = await this.getDeploymentsFromCirrus(dappName);
-
+    const acct = (_dep) => `${_dep.address}${_dep.chainId ? `:${_dep.chainId}` : ''}`;
     const toDep = (_dep: any): Deployment => {
-      const dep = { ..._dep, label: _dep.address, tooltip: _dep.address, description: _dep.address }
+      const dep = { ..._dep, label: acct(_dep), tooltip: acct(_dep), description: '' }
       return new Deployment(
         dep,
         vscode.TreeItemCollapsibleState.Collapsed

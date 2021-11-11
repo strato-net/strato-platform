@@ -152,7 +152,7 @@ async function getBalance(user:OAuthUser, bcuser:BlockChainUser | null, options:
 async function getContracts(user:OAuthUser, chainId, options:Options) {
   const url = getNodeUrl(options);
   const endpoint = constructEndpoint(Endpoint.CONTRACTS, {
-    config: options.config,
+    ...options,
     chainIds: [chainId]
   });
   return get(url, endpoint, setAuthHeaders(user, options));

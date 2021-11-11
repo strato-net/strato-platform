@@ -26,10 +26,10 @@ export async function getApplicationUser(mNodeId?: number): Promise<any> {
   }
   const nodeId = mNodeId || 0
   const nodeOauth = nodes[nodeId].oauth
-  const oauth = oauthUtil.init(nodeOauth)
-  const { applicationUserName = 'APP_USER' } = config
-  // const { clientId, clientSecret, scope } = oauth
   try {
+    const oauth = oauthUtil.init(nodeOauth)
+    const { applicationUserName = 'APP_USER' } = config
+    // const { clientId, clientSecret, scope } = oauth
     var req = {
       method: 'post',
       url: oauth.openIdConfig.token_endpoint,

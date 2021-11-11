@@ -27,14 +27,14 @@ export class ContractsProvider implements vscode.TreeDataProvider<ContractTreeIt
         }
         case 'address': {
           const state = await this.getContractState(element.item.contractName, element.item.contractAddress, element.item.chainId);
-          const items = state.map((e) => new ContractTreeItem('stateItem', {label: `${e[0]}`, description: `${e[1]}`, tooltip: `${e[0]}: ${e[1]}`}, vscode.TreeItemCollapsibleState.None))
+          const items = Object.entries(state).map((e) => new ContractTreeItem('stateItem', {label: `${e[0]}`, description: `${e[1]}`, tooltip: `${e[0]}: ${e[1]}`}, vscode.TreeItemCollapsibleState.None))
           return Promise.resolve(items);
         }
       }
       return Promise.resolve([]);
     } else {
       const chains = await this.getChains();
-      const items = chains.map((e) => new ContractTreeItem('chainId', {label: `${e[1].label}`, description: `${e[0]}`, tooltip: `${e[0]}`}, vscode.TreeItemCollapsibleState.Collapsed))
+      const items = chains.map((e) => new ContractTreeItem('chainId', {chainId: e.id, label: `${e.info.label}`, description: `${e.id ? e.id : ''}`, tooltip: `${e.info.label}${e.id ? `:${e.id}` : ''}`}, vscode.TreeItemCollapsibleState.Collapsed))
       return Promise.resolve(items);
     }
   }
@@ -43,20 +43,22 @@ export class ContractsProvider implements vscode.TreeDataProvider<ContractTreeIt
     const config = getConfig() || {}
     const options = { config };
     const appUser = await getApplicationUser()
-    const results = await rest.getContracts(appUser, chainId, options)
+    const query = {
+      limit: 10000
+    }
+    const results = await rest.getContracts(appUser, chainId, {...options, query })
     return results
   }
 
-  async getContractState(contractName, contractAddress, chainId) {
+  async getContractState(name, address, chainId) {
     const config = getConfig() || {}
     const options = { config };
     const appUser = await getApplicationUser()
     const contract = {
-      contractName,
-      contractAddress,
-      chainId
+      name,
+      address
     }
-    const results = await rest.getState(appUser, contract, options)
+    const results = await rest.getState(appUser, contract, { ...options, chainIds:[chainId] })
     return results
   }
 
@@ -64,8 +66,18 @@ export class ContractsProvider implements vscode.TreeDataProvider<ContractTreeIt
     const config = getConfig() || {}
     const options = { config };
     const appUser = await getApplicationUser()
+    try {
     const results = await rest.getChains(appUser, [], options)
-    return results
+    const mainChain = {
+      info: {
+        label: 'Main Chain'
+      }
+    }
+    return [mainChain, ...results]
+    } catch (e) {
+      console.log(e);
+      return [];
+    }
   }
 
   private _onDidChangeTreeData: vscode.EventEmitter<
