@@ -293,7 +293,7 @@ addTransactions blockData txs =
 
       go remainingBlockGas rest (trrs `DL.snoc` trr) x509s'
 
-mineTransactions :: (VMBase m, MonadMonitor m) => BlockData -> Integer -> [OutputTx] -> m Bagger.TxMiningResult
+mineTransactions :: (VMBase m, MonadMonitor m) => Bagger.MineTransactions m
 mineTransactions bd remGas otxs = mineTransactions' bd remGas DL.empty otxs
 
 mineTransactions' :: (VMBase m, MonadMonitor m) => BlockData -> Integer -> DL.DList TxRunResult -> [OutputTx] -> m Bagger.TxMiningResult

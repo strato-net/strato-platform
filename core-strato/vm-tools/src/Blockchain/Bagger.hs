@@ -81,7 +81,7 @@ data TxMiningResult = TxMiningResult { tmrFailure  :: Maybe TransactionFailureCa
                                      , tmrRemGas   :: Integer
                                      } deriving (Show)
 
-type RunTransaction m = DD.BlockData -> Integer -> [OutputTx] -> m TxMiningResult
+type MineTransactions m = DD.BlockData -> Integer -> [OutputTx] -> m TxMiningResult
 
 isBlockstanbul :: (Functor m, Mod.Accessible IsBlockstanbul m) => m Bool
 isBlockstanbul = unIsBlockstanbul <$> Mod.access (Mod.Proxy @IsBlockstanbul)
@@ -92,12 +92,12 @@ getBaggerState = Mod.get (Mod.Proxy @B.BaggerState)
 putBaggerState :: Mod.Modifiable B.BaggerState m => B.BaggerState -> m ()
 putBaggerState = Mod.put (Mod.Proxy @B.BaggerState)
 
-runFromStateRoot :: MonadBagger m => RunTransaction m -> Integer -> DD.BlockData -> [OutputTx] -> m (Either RunAttemptError (StateRoot, [TxRunResult], Integer))
-runFromStateRoot runTransaction remainingGas theBlockHeader txs = do
+runFromStateRoot :: MonadBagger m => MineTransactions m -> Integer -> DD.BlockData -> [OutputTx] -> m (Either RunAttemptError (StateRoot, [TxRunResult], Integer))
+runFromStateRoot mineTransactions remainingGas theBlockHeader txs = do
     A.insert (A.Proxy @StateRoot) (Nothing :: Maybe Word256) (DD.blockDataStateRoot theBlockHeader)
     (TxMiningResult res ranTxs unranTxs newGas) <-
       timeit "mineTransactions bagger" (Just vmBlockInsertionMined)
-      $ runTransaction theBlockHeader remainingGas txs
+      $ mineTransactions theBlockHeader remainingGas txs
     timeit "flushMemStorageDB bagger" (Just vmBlockInsertionMined) flushMemStorageDB
     timeit "flushMemAddressStateDB bagger" (Just vmBlockInsertionMined) flushMemAddressStateDB
     newStateRoot <- A.lookupWithDefault (A.Proxy @StateRoot) (Nothing :: Maybe Word256)
@@ -253,8 +253,8 @@ processNewBestBlock bh bd txShas = do
       demoteUnexecutables
       promoteExecutables
 
-makeNewBlock :: MonadBagger m => RunTransaction m -> m OutputBlock
-makeNewBlock runTransaction = do
+makeNewBlock :: MonadBagger m => MineTransactions m -> m OutputBlock
+makeNewBlock mineTransactions = do
     state <- getBaggerState
     let seen'       = B.seen state
     let cache       = B.miningCache state
@@ -281,7 +281,7 @@ makeNewBlock runTransaction = do
                 let remGas          = B.remainingGas cache
                 $logDebugS "Bagger.makeNewBlock" . T.pack $ "pre-incremental run :: (" ++ show remGas ++ ", " ++ format lastSR ++ ")"
                 withBagger $ do
-                  !run <- runFromStateRoot runTransaction remGas tempBlockHeader promoted
+                  !run <- runFromStateRoot mineTransactions remGas tempBlockHeader promoted
                   (newSR, newGas, newExec, newUnexec) <- case run of
                           Right (newSR', newRR', newGas') -> return (newSR', newGas', lastExec ++ newRR', [])
                           Left e -> do
@@ -311,7 +311,7 @@ makeNewBlock runTransaction = do
           let header = B.bestBlockHeader cache
           let txShas = B.bestBlockTxHashes cache
           processNewBestBlock sha header txShas
-          !nb <- makeNewBlock runTransaction
+          !nb <- makeNewBlock mineTransactions
           return nb
 
 setCalculateIntrinsicGas :: MonadBagger m => (Integer -> OutputTx -> Integer) -> m ()
