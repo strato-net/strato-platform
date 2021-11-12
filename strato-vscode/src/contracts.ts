@@ -22,7 +22,7 @@ export class ContractsProvider implements vscode.TreeDataProvider<ContractTreeIt
         }
         case 'contractName': {
           const { contractName, chainId, contracts } = element.item
-          const items = contracts.map((e) => new ContractTreeItem('address', {contractName, contractAddress: e.address, chainId, label: `${e.address}`, tooltip: `${e.address}`}, vscode.TreeItemCollapsibleState.Collapsed))
+          const items = contracts.map((e) => new ContractTreeItem('address', {contractName, contractAddress: e.address, chainId, label: `📝 ${e.address}`, tooltip: `${e.address}`}, vscode.TreeItemCollapsibleState.Collapsed))
           return Promise.resolve(items);
         }
         case 'address': {
@@ -34,7 +34,7 @@ export class ContractsProvider implements vscode.TreeDataProvider<ContractTreeIt
       return Promise.resolve([]);
     } else {
       const chains = await this.getChains();
-      const items = chains.map((e) => new ContractTreeItem('chainId', {chainId: e.id, label: `${e.info.label}`, description: `${e.id ? e.id : ''}`, tooltip: `${e.info.label}${e.id ? `:${e.id}` : ''}`}, vscode.TreeItemCollapsibleState.Collapsed))
+      const items = chains.map((e) => new ContractTreeItem('chainId', {chainId: e.id, label: `⛓ ${e.info.label}`, description: `${e.id ? e.id : ''}`, tooltip: `${e.info.label}${e.id ? `:${e.id}` : ''}`}, vscode.TreeItemCollapsibleState.Collapsed))
       return Promise.resolve(items);
     }
   }
