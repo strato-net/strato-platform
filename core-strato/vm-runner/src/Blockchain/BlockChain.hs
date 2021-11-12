@@ -15,6 +15,7 @@
 module Blockchain.BlockChain
     ( addBlock
     , addBlocks
+    , mineTransactions
     , addTransaction
     , addTransactions
     , outputTransactionResult
@@ -49,7 +50,6 @@ import           Text.PrettyPrint.ANSI.Leijen            (pretty)
 import           Text.Printf
 import           UnliftIO.IORef
 
-import           Blockchain.Constants
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockSummary
@@ -59,7 +59,6 @@ import           Blockchain.Data.ExecResults
 import           Blockchain.Data.Log
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TransactionDef          (formatChainId)
-import           Blockchain.Data.TransactionResult
 import           Blockchain.Data.TransactionResultStatus
 import qualified Blockchain.Database.MerklePatricia      as MP
 import qualified Blockchain.DB.AddressStateDB            as NoCache
@@ -98,7 +97,6 @@ import qualified Blockchain.Strato.StateDiff             as SD
 
 import           Blockchain.Strato.Indexer.Model         (IndexEvent (..))
 import           Blockchain.Timing
-import qualified Blockchain.TxRunResultCache             as TRC
 
 import qualified Text.Colors                             as CL
 import           Text.Format
@@ -134,117 +132,6 @@ instance (Monad m, HasMemRawStorageDB m) => HasMemRawStorageDB (ConduitT i o m) 
   putMemRawStorageTxMap    = lift . putMemRawStorageTxMap
   getMemRawStorageBlockDB  = lift getMemRawStorageBlockDB
   putMemRawStorageBlockMap = lift. putMemRawStorageBlockMap
-
--- has to be here unfortunately, or else BlockChain.hs puts a circular dependency on VMContext.hs
-instance Bagger.MonadBagger ContextM where
-    isBlockstanbul = contextGets _hasBlockstanbul
-    getBaggerState = contextGets _baggerState
-    peekPendingVote = peekPendingVote
-    clearPendingVote b = clearPendingVote b
-    putBaggerState s = contextModify $ baggerState .~ s
-
-    runFromStateRoot remainingGas theBlockHeader txs = do
-        A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256) (blockDataStateRoot theBlockHeader)
-        (TxMiningResult res ranTxs unranTxs newGas) <-
-          timeit "mineTransactions bagger" (Just vmBlockInsertionMined)
-          $ mineTransactions' theBlockHeader remainingGas DL.empty txs
-        timeit "flushMemStorageDB bagger" (Just vmBlockInsertionMined) flushMemStorageDB
-        timeit "flushMemAddressStateDB bagger" (Just vmBlockInsertionMined) flushMemAddressStateDB
-        newStateRoot <- A.lookupWithDefault (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
-        let recoverable f = Left (RecoverableFailure (tfToBaggerTxRejection f) ranTxs unranTxs newStateRoot newGas)
-        return $ case res of -- currently only get GasLimit errors out of mineTransactions'
-            Nothing -> Right (newStateRoot, ranTxs, newGas)
-            Just TFBlockGasLimitExceeded{}  -> Left (GasLimitReached ranTxs unranTxs newStateRoot newGas)
-            Just f@TFInsufficientFunds{} -> recoverable f
-            Just f@TFIntrinsicGasExceedsTxLimit{} -> recoverable f
-            Just f@TFChainIdMismatch{} -> recoverable f
-            Just f@TFNonceMismatch{} -> error $ "mineTransactions' we messed up: " ++ format f
-            Just f@TFCodeCollectionNotFound{} -> recoverable f
-
-    rewardCoinbases us uncles ourNumber = do
-        _ <- addToBalance (Account us Nothing) $ rewardBase flags_testnet
-        forM_ uncles $ \uncle -> do
-            _ <- addToBalance (Account us Nothing) (rewardBase flags_testnet `quot` 32)
-            _ <- addToBalance (Account (blockDataCoinbase uncle) Nothing) ((rewardBase flags_testnet * (8+blockDataNumber uncle - ourNumber )) `quot` 8)
-            return ()
-        flushMemStorageDB
-        flushMemAddressStateDB
-        A.lookupWithDefault (Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
-
-    -- todo batch insert results
-    txsDroppedCallback rejections bestBlockShas = forM_ rejections $ \rejection -> do
-        let (message, theHash) = baggerRejectionToTransactionResultBits rejection
-        -- if a tx is dropped from Queued during demotion, it means it was likely culled during the demotion as the
-        -- new best block we just mined came in
-        let isRecentlyRan = theHash `elem` bestBlockShas
-        when (flags_createTransactionResults && not isRecentlyRan) $ do
-            $logInfoS "txsDroppedCallback" . T.pack $ "Transaction rejection :: " ++ format theHash
-            $logInfoS "txsDroppedCallback" . T.pack $ "Reason: " ++ message
-            void $ putTransactionResult
-              TransactionResult { transactionResultBlockHash        = unsafeCreateKeccak256FromWord256 0
-                                , transactionResultTransactionHash  = theHash
-                                , transactionResultMessage          = message
-                                , transactionResultResponse         = BSS.empty
-                                , transactionResultTrace            = "rejected"
-                                , transactionResultGasUsed          = 0
-                                , transactionResultEtherUsed        = 0
-                                , transactionResultContractsCreated = ""
-                                , transactionResultContractsDeleted = ""
-                                , transactionResultStateDiff        = ""
-                                , transactionResultTime             = 0
-                                , transactionResultNewStorage       = ""
-                                , transactionResultDeletedStorage   = ""
-                                , transactionResultStatus           = Just (txRejectionToAPIFailureCause rejection)
-                                , transactionResultChainId          = txChainId . otBaseTx $ rejectedTx rejection
-                                , transactionResultKind             = Nothing
-                                }
-
-    cacheRunResults bd (sr, gasRemaining, trrs) = when flags_cacheTransactionResults $ do
-      -- Private run results should not be cached, as on the second run
-      -- the hydrated transaction will reach a different stateroot.
-      -- Filtering them out makes the assumption that the inclusion of the unhydrated
-      -- private txs reach the same stateroot as the public txs alone.
-      let publicTrrs = filter ((== Nothing) . txChainId . trrTransaction) trrs
-          bhash = blockHeaderPartialHash bd
-      $logInfoLS "cacheRunResults" (bhash, length publicTrrs)
-      $logDebugLS "cacheRunResults" bd
-      cache <- contextGets _txRunResultsCache
-      liftIO $ TRC.insert cache bhash (sr, gasRemaining, publicTrrs)
-
-    getCachedRunResults bd =
-      if not flags_cacheTransactionResults
-        then return Nothing
-        else do
-          cache <- contextGets _txRunResultsCache
-          let pHash = blockHeaderPartialHash bd
-          mres <- liftIO $ TRC.lookup cache pHash
-          case mres of
-            Nothing -> do
-              $logInfoLS "getCachedRunResults/cache_miss" . T.pack $ format pHash
-              $logDebugLS "getCacheRunResults/cache_miss" bd
-              return Nothing
-            Just (sr, gasRemaining, trrs) -> do
-              $logInfoLS "getCachedRunResults/cache_hit" . T.pack $ format pHash
-              let trrs' = map (rewriteBlockHash (blockHeaderHash bd)) trrs
-              return $ Just (sr, gasRemaining, trrs')
-
-baggerRejectionToTransactionResultBits :: TxRejection -> (String, Keccak256) -- pretty, txHash
-baggerRejectionToTransactionResultBits rejection = case rejection of
-    WrongChainId   s q OutputTx{otHash=hsh, otBaseTx=bt} ->
-        (p' s q ++ "chainId (expected: main, actual: " ++ formatChainId (txChainId bt) ++ ")", hsh)
-    NonceTooLow    s q expected OutputTx{otHash=hsh, otBaseTx=bt} ->
-        (p' s q ++ "tx nonce (expected: " ++ show expected ++ ", actual: " ++ show (transactionNonce bt) ++ ")", hsh)
-    BalanceTooLow  s q needed actual OutputTx{otHash=hsh} ->
-        (p' s q ++ "account balance (expected: " ++ show needed ++ ", actual: " ++ show actual ++ ")", hsh)
-    GasLimitTooLow s q _ OutputTx{otHash=hsh} ->
-        (p' s q ++ "tx gas limit", hsh)
-    LessLucrative  s q OutputTx{otHash=hashBetter} OutputTx{otHash=hashWorse} ->
-        (p s q ++ formatKeccak256WithoutColor hashBetter ++ " being a more lucrative transaction", hashWorse)
-    CodeNotFound s q a n OutputTx{otHash=h} ->
-        (p s q ++ " code not found at address " ++ format a ++ " with name " ++ n, h)
-
-    where p stage queue = "Rejected from mempool at " ++ show stage ++ "/" ++ show queue ++ " due to "
-          p' s q        = p s q ++ "low "
 
 -- todo: lovely!
 
@@ -406,14 +293,11 @@ addTransactions blockData txs =
 
       go remainingBlockGas rest (trrs `DL.snoc` trr) x509s'
 
-data TxMiningResult = TxMiningResult { tmrFailure  :: Maybe TransactionFailureCause
-                                     , tmrRanTxs   :: [TxRunResult]
-                                     , tmrUnranTxs :: [OutputTx]
-                                     , tmrRemGas   :: Integer
-                                     } deriving (Show)
+mineTransactions :: (VMBase m, MonadMonitor m) => BlockData -> Integer -> [OutputTx] -> m Bagger.TxMiningResult
+mineTransactions bd remGas otxs = mineTransactions' bd remGas DL.empty otxs
 
-mineTransactions' :: (VMBase m, MonadMonitor m) => BlockData -> Integer -> DL.DList TxRunResult -> [OutputTx] -> m TxMiningResult
-mineTransactions' _ remGas ran [] = return $ TxMiningResult Nothing (DL.toList ran) [] remGas
+mineTransactions' :: (VMBase m, MonadMonitor m) => BlockData -> Integer -> DL.DList TxRunResult -> [OutputTx] -> m Bagger.TxMiningResult
+mineTransactions' _ remGas ran [] = return $ Bagger.TxMiningResult Nothing (DL.toList ran) [] remGas
 mineTransactions' header remGas ran unran@(tx@OutputTx{otBaseTx=bt}:txs) = do
     beforeMap <- getAddressStateTxDBMap
     beforeX509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
@@ -431,7 +315,7 @@ mineTransactions' header remGas ran unran@(tx@OutputTx{otBaseTx=bt}:txs) = do
           Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.union (erNewX509Certs execResult) beforeX509s
           mineTransactions' header nextRemGas (ran `DL.snoc` trr) txs
         Left  failure    -> do Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) beforeX509s -- revert changes to X509 map
-                               return $ TxMiningResult (Just failure) (DL.toList ran) unran remGas
+                               return $ Bagger.TxMiningResult (Just failure) (DL.toList ran) unran remGas
 
 
 blockIsHomestead :: Integer -> Bool

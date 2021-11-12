@@ -169,7 +169,7 @@ handleVmEvents = awaitForever $ \InBatch{..} -> do
     if shouldOutputBlocks
       then do
         $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
-        newBlock <- Bagger.makeNewBlock
+        newBlock <- Bagger.makeNewBlock mineTransactions
         $logInfoS "evm/loop/newBlock" "calling produceUnminedBlocksM"
         pure $ Just newBlock
       else pure Nothing
