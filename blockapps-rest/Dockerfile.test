@@ -20,4 +20,4 @@ RUN sed -i 's|http://localhost|http://'"${host}"'|g' .oauth-test-config && \
 
 RUN yarn build
 
-RUN npm run test
+RUN yarn test
