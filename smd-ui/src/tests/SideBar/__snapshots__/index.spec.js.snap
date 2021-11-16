@@ -57,15 +57,6 @@ exports[`SideBar: index render component for non oauth mode 1`] = `
         Contracts
       </span>
     </NavLink>
-    <NavLink id=\\"code_editor\\" to=\\"/code_editor\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
-      <i className=\\"fa fa-code\\">
-         
-      </i>
-      <span className=\\"menu-text\\">
-         
-        Contract Editor
-      </span>
-    </NavLink>
     <NavLink id=\\"external_storage\\" to=\\"/external_storage\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
       <i className=\\"fa fa-cloud-upload\\">
          
@@ -140,15 +131,6 @@ exports[`SideBar: index render component for public mode 1`] = `
         Contracts
       </span>
     </NavLink>
-    <NavLink id=\\"code_editor\\" to=\\"/code_editor\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
-      <i className=\\"fa fa-code\\">
-         
-      </i>
-      <span className=\\"menu-text\\">
-         
-        Contract Editor
-      </span>
-    </NavLink>
   </div>
   <div className=\\"smd-sidebar-logo\\">
     <a href=\\"http://blockapps.net\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\">
@@ -156,27 +138,6 @@ exports[`SideBar: index render component for public mode 1`] = `
     </a>
   </div>
 </aside>"
-`;
-
-exports[`SideBar: index sequence of links for oauth and non-oauth mode eighth position /external-storage 1`] = `
-<NavLink
-  activeClassName="active-menu-item"
-  className="menu-item"
-  id="external_storage"
-  onClick={[Function]}
-  to="/external_storage"
->
-  <i
-    className="fa fa-cloud-upload"
-  >
-     
-  </i>
-  <span
-    className="menu-text"
-  >
-    External Storage
-  </span>
-</NavLink>
 `;
 
 exports[`SideBar: index sequence of links for oauth and non-oauth mode fifth position /accounts 1`] = `
@@ -271,20 +232,19 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode seventh p
 <NavLink
   activeClassName="active-menu-item"
   className="menu-item"
-  id="code_editor"
+  id="external_storage"
   onClick={[Function]}
-  to="/code_editor"
+  to="/external_storage"
 >
   <i
-    className="fa fa-code"
+    className="fa fa-cloud-upload"
   >
      
   </i>
   <span
     className="menu-text"
   >
-     
-    Contract Editor
+    External Storage
   </span>
 </NavLink>
 `;
