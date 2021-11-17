@@ -228,7 +228,7 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode secound p
 </NavLink>
 `;
 
-exports[`SideBar: index sequence of links for oauth and non-oauth mode seventh position /code_editor 1`] = `
+exports[`SideBar: index sequence of links for oauth and non-oauth mode seventh position /external-storage 1`] = `
 <NavLink
   activeClassName="active-menu-item"
   className="menu-item"
