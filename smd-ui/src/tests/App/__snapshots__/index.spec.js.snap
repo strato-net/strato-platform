@@ -12,18 +12,18 @@ exports[`App: index componentDidMount 1`] = `
       <Route exact={true} path=\\"/\\" component={[undefined]}>
         <Redirect to=\\"/home\\" push={false} />
       </Route>
-      <Route exact={true} path=\\"/home\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/accounts\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/external_storage\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/home\\" component={[Function: C] { displayName: 'withRouter(Connect(Dashboard))', WrappedComponent: [Function: Dashboard], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/accounts\\" component={[Function: C] { displayName: 'withRouter(Connect(Accounts))', WrappedComponent: [Function: Accounts], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/external_storage\\" component={[Function: C] { displayName: 'withRouter(Connect(ExternalStorage))', WrappedComponent: [Function: ExternalStorage], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
       <Route exact={true} path=\\"/nodes\\" component={[Function: Nodes]} />
       <Route exact={true} path=\\"/blocks\\" component={[Function: Blocks]} />
-      <Route exact={true} path=\\"/blocks/:block\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/chains\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/blocks/:block\\" component={[Function: C] { displayName: 'withRouter(Connect(BlockView))', WrappedComponent: [Function: BlockView], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/chains\\" component={[Function: C] { displayName: 'withRouter(Connect(Chains))', WrappedComponent: [Function: Chains], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
       <Route exact={true} path=\\"/transactions\\" component={[Function: Transactions]} />
-      <Route exact={true} path=\\"/transactions/:hash\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/contracts\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/contracts/:name/query\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/code_editor\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/transactions/:hash\\" component={[Function: C] { displayName: 'withRouter(Connect(TransactionView))', WrappedComponent: [Function: TransactionView], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/contracts\\" component={[Function: C] { displayName: 'withRouter(Connect(Contracts))', WrappedComponent: [Function: Contracts], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/contracts/:name/query\\" component={[Function: C] { displayName: 'withRouter(Connect(ContractQuery))', WrappedComponent: [Function: ContractQuery], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/code_editor\\" component={[Function: C] { displayName: 'withRouter(Connect(CodeEditor))', WrappedComponent: [Function: CodeEditor], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
     </Switch>
   </main>
 </div>"
@@ -39,18 +39,18 @@ exports[`App: index componentDidMount 2`] = `
       <Route exact={true} path=\\"/\\" component={[undefined]}>
         <Redirect to=\\"/home\\" push={false} />
       </Route>
-      <Route exact={true} path=\\"/home\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/accounts\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/external_storage\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/home\\" component={[Function: C] { displayName: 'withRouter(Connect(Dashboard))', WrappedComponent: [Function: Dashboard], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/accounts\\" component={[Function: C] { displayName: 'withRouter(Connect(Accounts))', WrappedComponent: [Function: Accounts], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/external_storage\\" component={[Function: C] { displayName: 'withRouter(Connect(ExternalStorage))', WrappedComponent: [Function: ExternalStorage], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
       <Route exact={true} path=\\"/nodes\\" component={[Function: Nodes]} />
       <Route exact={true} path=\\"/blocks\\" component={[Function: Blocks]} />
-      <Route exact={true} path=\\"/blocks/:block\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/chains\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/blocks/:block\\" component={[Function: C] { displayName: 'withRouter(Connect(BlockView))', WrappedComponent: [Function: BlockView], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/chains\\" component={[Function: C] { displayName: 'withRouter(Connect(Chains))', WrappedComponent: [Function: Chains], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
       <Route exact={true} path=\\"/transactions\\" component={[Function: Transactions]} />
-      <Route exact={true} path=\\"/transactions/:hash\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/contracts\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/contracts/:name/query\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/code_editor\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/transactions/:hash\\" component={[Function: C] { displayName: 'withRouter(Connect(TransactionView))', WrappedComponent: [Function: TransactionView], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/contracts\\" component={[Function: C] { displayName: 'withRouter(Connect(Contracts))', WrappedComponent: [Function: Contracts], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/contracts/:name/query\\" component={[Function: C] { displayName: 'withRouter(Connect(ContractQuery))', WrappedComponent: [Function: ContractQuery], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/code_editor\\" component={[Function: C] { displayName: 'withRouter(Connect(CodeEditor))', WrappedComponent: [Function: CodeEditor], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
     </Switch>
   </main>
 </div>"
@@ -66,18 +66,18 @@ exports[`App: index render component 1`] = `
       <Route exact={true} path=\\"/\\" component={[undefined]}>
         <Redirect to=\\"/home\\" push={false} />
       </Route>
-      <Route exact={true} path=\\"/home\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/accounts\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/external_storage\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/home\\" component={[Function: C] { displayName: 'withRouter(Connect(Dashboard))', WrappedComponent: [Function: Dashboard], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/accounts\\" component={[Function: C] { displayName: 'withRouter(Connect(Accounts))', WrappedComponent: [Function: Accounts], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/external_storage\\" component={[Function: C] { displayName: 'withRouter(Connect(ExternalStorage))', WrappedComponent: [Function: ExternalStorage], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
       <Route exact={true} path=\\"/nodes\\" component={[Function: Nodes]} />
       <Route exact={true} path=\\"/blocks\\" component={[Function: Blocks]} />
-      <Route exact={true} path=\\"/blocks/:block\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/chains\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/blocks/:block\\" component={[Function: C] { displayName: 'withRouter(Connect(BlockView))', WrappedComponent: [Function: BlockView], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/chains\\" component={[Function: C] { displayName: 'withRouter(Connect(Chains))', WrappedComponent: [Function: Chains], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
       <Route exact={true} path=\\"/transactions\\" component={[Function: Transactions]} />
-      <Route exact={true} path=\\"/transactions/:hash\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/contracts\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/contracts/:name/query\\" component={[Function: C]} />
-      <Route exact={true} path=\\"/code_editor\\" component={[Function: C]} />
+      <Route exact={true} path=\\"/transactions/:hash\\" component={[Function: C] { displayName: 'withRouter(Connect(TransactionView))', WrappedComponent: [Function: TransactionView], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/contracts\\" component={[Function: C] { displayName: 'withRouter(Connect(Contracts))', WrappedComponent: [Function: Contracts], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/contracts/:name/query\\" component={[Function: C] { displayName: 'withRouter(Connect(ContractQuery))', WrappedComponent: [Function: ContractQuery], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
+      <Route exact={true} path=\\"/code_editor\\" component={[Function: C] { displayName: 'withRouter(Connect(CodeEditor))', WrappedComponent: [Function: CodeEditor], propTypes: { wrappedComponentRef: [Function: bound checkType] { isRequired: [Function: bound checkType] } } }} />
     </Switch>
   </main>
 </div>"

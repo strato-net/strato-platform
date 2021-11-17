@@ -97,7 +97,7 @@ exports[`ContractMethodCall: index renders contracts card (Oauth mode) 1`] = `
     Call Method
   </Blueprint.Button>
   <form>
-    <Blueprint.Dialog iconName=\\"exchange\\" isOpen={false} onClose={[Function]} title=\\"Call \\\\'undefined\\\\' on undefined\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
+    <Blueprint.Dialog iconName=\\"exchange\\" isOpen={false} onClose={[Function (anonymous)]} title=\\"Call \\\\'undefined\\\\' on undefined\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
       <div className=\\"pt-dialog-body\\">
         <div className=\\"row\\">
           <div className=\\"col-sm-12\\">
@@ -228,7 +228,7 @@ exports[`ContractMethodCall: index renders contracts card (Oauth mode) 1`] = `
           </div>
           <div className=\\"col-sm-9\\">
             <div className=\\"\\">
-              <Field className=\\"pt-input\\" name=\\"modalUsername\\" component=\\"select\\" onChange={[Function]} disabled={true} required={true}>
+              <Field className=\\"pt-input\\" name=\\"modalUsername\\" component=\\"select\\" onChange={[Function (anonymous)]} disabled={true} required={true}>
                 <option value=\\"Supplier1\\">
                   Supplier1
                 </option>
@@ -299,8 +299,8 @@ exports[`ContractMethodCall: index renders contracts card (Oauth mode) 1`] = `
       </div>
       <div className=\\"pt-dialog-footer\\">
         <div className=\\"pt-dialog-footer-actions\\">
-          <Blueprint.Button text=\\"Cancel\\" onClick={[Function]} />
-          <button className=\\"pt-button pt-intent-primary\\" type=\\"button\\" onClick={[Function]}>
+          <Blueprint.Button text=\\"Cancel\\" onClick={[Function (anonymous)]} />
+          <button className=\\"pt-button pt-intent-primary\\" type=\\"button\\" onClick={[Function (anonymous)]}>
             Call Method
           </button>
         </div>
@@ -316,7 +316,7 @@ exports[`ContractMethodCall: index renders contracts card (non Oauth mode) 1`] =
     Call Method
   </Blueprint.Button>
   <form>
-    <Blueprint.Dialog iconName=\\"exchange\\" isOpen={false} onClose={[Function]} title=\\"Call \\\\'undefined\\\\' on undefined\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
+    <Blueprint.Dialog iconName=\\"exchange\\" isOpen={false} onClose={[Function (anonymous)]} title=\\"Call \\\\'undefined\\\\' on undefined\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
       <div className=\\"pt-dialog-body\\">
         <div className=\\"row\\">
           <div className=\\"col-sm-12\\">
@@ -447,7 +447,7 @@ exports[`ContractMethodCall: index renders contracts card (non Oauth mode) 1`] =
           </div>
           <div className=\\"col-sm-9\\">
             <div className=\\"pt-select\\">
-              <Field className=\\"pt-input\\" name=\\"modalUsername\\" component=\\"select\\" onChange={[Function]} disabled={false} required={true}>
+              <Field className=\\"pt-input\\" name=\\"modalUsername\\" component=\\"select\\" onChange={[Function (anonymous)]} disabled={false} required={true}>
                 <option value={{...}} />
                 <option value=\\"Admin_1085_64667\\">
                   Admin_1085_64667
@@ -612,8 +612,8 @@ exports[`ContractMethodCall: index renders contracts card (non Oauth mode) 1`] =
       </div>
       <div className=\\"pt-dialog-footer\\">
         <div className=\\"pt-dialog-footer-actions\\">
-          <Blueprint.Button text=\\"Cancel\\" onClick={[Function]} />
-          <button className=\\"pt-button pt-intent-primary\\" type=\\"button\\" onClick={[Function]}>
+          <Blueprint.Button text=\\"Cancel\\" onClick={[Function (anonymous)]} />
+          <button className=\\"pt-button pt-intent-primary\\" type=\\"button\\" onClick={[Function (anonymous)]}>
             Call Method
           </button>
         </div>

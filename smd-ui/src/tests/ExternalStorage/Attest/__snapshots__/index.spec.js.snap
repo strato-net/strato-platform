@@ -137,7 +137,7 @@ exports[`Verify: index render component (Oauth mode) without values 1`] = `
             </div>
             <div className=\\"col-sm-9 smd-pad-4\\">
               <div className=\\"\\">
-                <Field className=\\"pt-input\\" component=\\"select\\" name=\\"username\\" onChange={[Function]} required={true} disabled={true}>
+                <Field className=\\"pt-input\\" component=\\"select\\" name=\\"username\\" onChange={[Function (anonymous)]} required={true} disabled={true}>
                   <option value={{...}} />
                   <option value=\\"0\\">
                     0
@@ -322,7 +322,7 @@ exports[`Verify: index render component (non Oauth mode) without values 1`] = `
             </div>
             <div className=\\"col-sm-9 smd-pad-4\\">
               <div className=\\"pt-select\\">
-                <Field className=\\"pt-input\\" component=\\"select\\" name=\\"username\\" onChange={[Function]} required={true} disabled={false}>
+                <Field className=\\"pt-input\\" component=\\"select\\" name=\\"username\\" onChange={[Function (anonymous)]} required={true} disabled={false}>
                   <option value={{...}} />
                   <option value=\\"0\\">
                     0
