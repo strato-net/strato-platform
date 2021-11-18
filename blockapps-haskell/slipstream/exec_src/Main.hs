@@ -51,11 +51,12 @@ workerConnStr = BC.pack $ printf "host=%s port=%d user=%s password=%s dbname=%s"
 createBlocEnv :: MonadIO m => m BlocEnv
 createBlocEnv = liftIO $ do
   codePtrCache <- newCache . Just $ TimeSpec (fromIntegral flags_sourceCacheTimeout) 0
+  sourceCache <- newCache . Just $ TimeSpec (fromIntegral flags_sourceCacheTimeout) 0
   return BlocEnv { stateFetchLimit = 0
                  , gasOn=error("gasOn shouldn't be needed in slipstream, it is undefined")
                  , evmCompatible=False
                  , globalNonceCounter=error("globalNonceCounter shouldn't be needed in slipstream, it is undefined")
-                 , globalSourceCache=error("globalSourceCache shouldn't be needed in slipstream, it is undefined")
+                 , globalSourceCache=sourceCache
                  , globalCodePtrCache=codePtrCache
                  , txTBQueue=error("txTBQueue shouldn't be needed in slipstream, it is undefined")
     }

@@ -24,6 +24,7 @@ import qualified Data.Map.Strict                  as M
 import           Data.Maybe
 import qualified Data.Text                        as Text
 import qualified Data.Text.Encoding               as Text
+import           Data.Traversable                 (for)
 import           UnliftIO
 
 
@@ -31,11 +32,14 @@ import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
 
 import           Blockchain.Data.DataDefs
+import           Blockchain.Data.Json            (rtPrimeToRt)
 import           Blockchain.Strato.Model.Keccak256
 
 import           Control.Monad.Composable.SQL
 
 import           Handlers.BatchTransactionResult
+import           Handlers.Transaction
+import qualified MaybeNamed
 import           SQLM
 
 
@@ -43,23 +47,24 @@ toMaybe :: Eq a => a -> a -> Maybe a
 toMaybe a b = if a == b then Nothing else Just b
 
 maybeTxBatchResult :: HasSQL m =>
-                      [Keccak256] -> m [Maybe TransactionResult]
-maybeTxBatchResult hashes = maybeHeads <$> postBatchTransactionResult hashes
-  where maybeHeads btxr =
-          let list = map (flip M.lookup btxr) hashes
-          in flip map list $ \mtrs -> case mtrs of
-            Nothing -> Nothing
-            Just trs -> listToMaybe trs
-
+                      [Keccak256] -> m [Maybe (RawTransaction, TransactionResult)]
+maybeTxBatchResult hashes = do
+  rtxs <- fmap (map (map rtPrimeToRt)) . for hashes $ \h -> getTransaction' txsFilterParams{qtHash=Just h, qtMinGasLimit=Just 1, qtChainId=Just (MaybeNamed.Named "all")}
+  mtxrs <- postBatchTransactionResult hashes
+  pure . map (maybeHeads mtxrs) $ (zip hashes rtxs :: [(Keccak256, [RawTransaction])])
+  where maybeHeads :: M.Map Keccak256 [TransactionResult] -> (Keccak256, [RawTransaction]) -> Maybe (RawTransaction, TransactionResult)
+        maybeHeads btxr (h, rtxs) = case (rtxs, M.lookup h btxr) of
+          ((rtx:_), Just (txr:_)) -> Just (rtx, txr)
+          _ -> Nothing
 
 getBatchBlocTxStatus :: HasSQL m =>
-                        [Keccak256] -> m [(BlocTransactionStatus, Maybe TransactionResult)]
+                        [Keccak256] -> m [(BlocTransactionStatus, Maybe (RawTransaction, TransactionResult))]
 getBatchBlocTxStatus hashes = do
   mtxrs <- maybeTxBatchResult hashes
   forM mtxrs $ \mtxr ->
     case mtxr of
       Nothing -> return (Pending, mtxr)
-      Just txr -> do
+      Just (_, txr) -> do
         case transactionResultMessage txr of
           "Success!" -> return (Success, mtxr)
           _          -> return (Failure, mtxr)

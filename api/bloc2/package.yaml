@@ -24,6 +24,7 @@ library:
     - blockapps-data
     - blockapps-datadefs
     - blockapps-ethereum
+    - blockapps-mpdbs
     - blockapps-strato-api
     - blockapps-util
     - blockapps-vault-wrapper-api

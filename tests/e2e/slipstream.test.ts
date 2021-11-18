@@ -190,13 +190,13 @@ contract KeywordEventTest {
     const version2 = "contract ExpansionTest { uint x; uint y; constructor() { x = 2; y = 10; } }";
 
     const [user, contract] = await upload("ExpansionTest", version1, options);
-    const v1SearchList = await rest.search(user, {...contract, name: "ExpansionTest"}, {...options, query: {address: `eq.${contract.address}`}});
+    const v1SearchList = await rest.searchUntil(user, {...contract, name: "ExpansionTest"}, (r) => r.length > 0, {...options, query: {address: `eq.${contract.address}`}});
     assert.equal(v1SearchList.length, 1, "one result from Cirrus");
     const v1 = v1SearchList[0];
     assert.equal(v1.x, 0, "first version appears correctly in Cirrus");
 
     const [user2, contract2] = await upload("ExpansionTest", version2, options);
-    const v2SearchList = await rest.search(user, {...contract, name: "ExpansionTest"}, {...options, query: {address: `eq.${contract2.address}`}});
+    const v2SearchList = await rest.searchUntil(user, {...contract, name: "ExpansionTest"}, (r) => r.length > 0, {...options, query: {address: `eq.${contract2.address}`}});
     assert.equal(v2SearchList.length, 1, "one result from Cirrus");
     const v2 = v2SearchList[0];
     assert.equal(v2.x, 2, "second version appears correctly in Cirrus");

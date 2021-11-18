@@ -8,6 +8,7 @@
 {-# LANGUAGE TemplateHaskell     #-}
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE TypeOperators       #-}
 
 {-# OPTIONS -fno-warn-unused-top-binds #-}
 
@@ -26,12 +27,11 @@ import           Control.Concurrent
 import           Control.Arrow
 import           Control.Lens                      hiding (from, ix)
 import           Control.Monad
+import qualified Control.Monad.Change.Alter        as A
 import           Control.Monad.Except
 import           Control.Monad.Trans.State.Lazy
-import qualified Data.Aeson                        as Aeson
 import           Data.ByteString                   (ByteString)
 import qualified Data.ByteString                   as ByteString
-import qualified Data.ByteString.Lazy              as BL
 import qualified Data.ByteString.Base16            as Base16
 import           Data.ByteString.Short             (fromShort)
 import           Data.Either
@@ -42,6 +42,7 @@ import           Data.Map.Strict                   (Map)
 import qualified Data.Map.Strict                   as Map
 import           Data.Maybe
 import           Data.Set                          (isSubsetOf)
+import           Data.Source.Map
 import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
 import qualified Data.Text.Encoding                as Text
@@ -55,6 +56,7 @@ import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Monad
 import           BlockApps.Bloc22.Server.Utils
+import           BlockApps.Ethereum                (Hex(..))
 import           BlockApps.Logging
 import           BlockApps.Solidity.ArgValue
 import           BlockApps.Solidity.Contract()
@@ -66,9 +68,13 @@ import           BlockApps.Solidity.Xabi
 import qualified BlockApps.Solidity.Xabi.Type      as Xabi
 import           BlockApps.SolidityVarReader
 import           BlockApps.XAbiConverter
+import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.DataDefs
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.Keccak256
+import qualified BlockApps.Strato.Types as Deprecated
 import           Control.Monad.Composable.BlocSQL
 import           Control.Monad.Composable.SQL
 import           SQLM
@@ -77,12 +83,12 @@ data TRD = TRD -- transaction resolution data
   { trdStatus :: BlocTransactionStatus
   , trdHash   :: Keccak256
   , trdIndex  :: Integer
-  , trdResult :: Maybe TransactionResult
+  , trdResult :: Maybe (RawTransaction, TransactionResult)
   }
 
 data BatchState = BatchState
   { _contractDetailsMap :: Map.Map ContractName ContractDetails
-  , _functionXabiMap    :: Map.Map Int32 Xabi
+  , _functionXabiMap    :: Map.Map (Account, Text) Xabi
   }
 makeLenses ''BatchState
 
@@ -93,8 +99,15 @@ emptyBatchState = BatchState Map.empty Map.empty
 -- getBlocTransactionResult' will return only one of the results
 -- when multiple hashes are provided. This is a glass-half-full
 -- function, and if one TX succeeds then the result is a success.
-getBlocTransactionResult' :: (MonadIO m, MonadLogger m, HasBlocSQL m, HasSQL m) =>
-                             [Keccak256] -> Bool -> m BlocTransactionResult
+getBlocTransactionResult' :: ( MonadIO m
+                             , (Keccak256 `A.Alters` SourceMap) m
+                             , A.Selectable Account AddressState m
+                             , MonadLogger m
+                             , HasBlocSQL m
+                             , HasBlocEnv m
+                             , HasSQL m
+                             )
+                          => [Keccak256] -> Bool -> m BlocTransactionResult
 getBlocTransactionResult' [] _ = throwIO $ AnError "getBlockTransactionResult': no TX hashes"
 getBlocTransactionResult' hashes@(txh:_) resolve =
   if resolve
@@ -107,23 +120,41 @@ getBlocTransactionResult' hashes@(txh:_) resolve =
         [] -> return $ head results
     else return $ BlocTransactionResult Pending txh Nothing Nothing
 
-getBlocTransactionResult :: (MonadIO m, MonadLogger m, HasBlocSQL m, HasSQL m) =>
-                            Keccak256 -> Bool -> m BlocTransactionResult
+getBlocTransactionResult :: ( MonadIO m
+                            , (Keccak256 `A.Alters` SourceMap) m
+                            , A.Selectable Account AddressState m
+                            , MonadLogger m
+                            , HasBlocSQL m
+                            , HasBlocEnv m
+                            , HasSQL m
+                            )
+                         => Keccak256 -> Bool -> m BlocTransactionResult
 getBlocTransactionResult txHash resolve = fmap head $ postBlocTransactionResults resolve [txHash]
 
 
-getBatchBlocTransactionResult' :: (MonadIO m, MonadLogger m, HasBlocSQL m,
-                                   HasSQL m) =>
-                                  [Keccak256] -> Bool -> m [BlocTransactionResult]
+getBatchBlocTransactionResult' :: ( MonadIO m
+                                  , (Keccak256 `A.Alters` SourceMap) m
+                                  , A.Selectable Account AddressState m
+                                  , MonadLogger m
+                                  , HasBlocSQL m
+                                  , HasBlocEnv m
+                                  , HasSQL m
+                                  )
+                               => [Keccak256] -> Bool -> m [BlocTransactionResult]
 getBatchBlocTransactionResult' hashes resolve =
   if resolve
     then postBlocTransactionResults True hashes
     else return $ map (\h -> BlocTransactionResult Pending h Nothing Nothing) hashes
 
-postBlocTransactionResults :: (MonadIO m, MonadLogger m, HasBlocSQL m,
-                               HasSQL m) =>
-
-                              Bool -> [Keccak256] -> m [BlocTransactionResult]
+postBlocTransactionResults :: ( MonadIO m
+                              , (Keccak256 `A.Alters` SourceMap) m
+                              , A.Selectable Account AddressState m
+                              , MonadLogger m
+                              , HasBlocSQL m
+                              , HasBlocEnv m
+                              , HasSQL m
+                              )
+                           => Bool -> [Keccak256] -> m [BlocTransactionResult]
 postBlocTransactionResults resolve hashes = recurseTRDs resolve hashes >>= evalAndReturn
 
 recurseTRDs :: (MonadLogger m, HasSQL m) =>
@@ -135,17 +166,17 @@ recurseTRDs resolve hashes = go 0 (toPending hashes)
     go :: (MonadLogger m, HasSQL m) => Int -> [TRD] -> m [TRD]
     go num list = do
       let his = map (trdHash &&& trdIndex) list
-      statusAndMtxrs <- flip zip his <$> getBatchBlocTxStatus (map fst his)
+      statusAndMtxrs <- zip his <$> getBatchBlocTxStatus (map fst his)
       let (pending', done) = partitionEithers $
                       flip map statusAndMtxrs
-                        (\((s,r),(h,i)) ->
+                        (\((h,i),(s,r)) ->
                           if s == Pending
                             then Left $ TRD s h i r
                             else Right $ TRD s h i r)
       pending <- if not resolve || null pending'
         then return pending'
         else
-          if num >= 600
+          if num >= 100 -- poll for 10 seconds. With PBFT, a transaction that hasn't resolved by this point is almost certainly lost
             then return pending'
             else do
               $logDebugLS "recurseTRDs/pending'" $ map (format . trdHash) pending'
@@ -168,29 +199,76 @@ forStateT :: Monad m => s -> [a] -> (a -> StateT s m b) -> m [b]
 forStateT s as = flip evalStateT s . for as
 
 
-evalAndReturn :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
-                 [TRD] -> m [BlocTransactionResult]
-evalAndReturn list = forStateT emptyBatchState list $
-    \(TRD status txHash _ mtxr) -> case status of
-        Pending -> return $ BlocTransactionResult Pending txHash Nothing Nothing
-        Failure -> return $ BlocTransactionResult Failure txHash mtxr Nothing
-        Success -> do
-          (cmId,ttype,tdata)::(Int32,Int32,Text) <- lift $ blocQuery1 "evalAndReturn" $ contractByTxHash txHash
-          case ttype of
-            0 -> return $ BlocTransactionResult Success txHash mtxr (Just . Send . fromJust . Aeson.decode . BL.fromStrict $ Text.encodeUtf8 tdata)
-            1 -> contractResult txHash mtxr cmId tdata
-            2 -> functionResult txHash mtxr cmId tdata
-            _ -> throwIO $ InternalError $ Text.pack $ "Unexpected transaction type: got" ++ show ttype
+rawTx2PostTx :: RawTransaction -> Deprecated.PostTransaction
+rawTx2PostTx RawTransaction{..} = Deprecated.PostTransaction
+  { Deprecated.posttransactionHash = rawTransactionTxHash
+  , Deprecated.posttransactionGasLimit = fromInteger rawTransactionGasLimit
+  , Deprecated.posttransactionCodeOrData = "" -- this is only for send txs anyway
+  , Deprecated.posttransactionGasPrice = fromInteger rawTransactionGasPrice
+  , Deprecated.posttransactionTo = rawTransactionToAddress
+  , Deprecated.posttransactionFrom = rawTransactionFromAddress
+  , Deprecated.posttransactionValue = Deprecated.Strung $ fromInteger rawTransactionValue
+  , Deprecated.posttransactionR = Hex $ fromInteger rawTransactionR
+  , Deprecated.posttransactionS = Hex $ fromInteger rawTransactionS
+  , Deprecated.posttransactionV = Hex rawTransactionV
+  , Deprecated.posttransactionNonce = fromInteger rawTransactionNonce
+  , Deprecated.posttransactionChainId = ChainId <$> toMaybe 0 rawTransactionChainId
+  , Deprecated.posttransactionMetadata = Map.fromList <$> rawTransactionMetadata
+  }
 
-contractResult :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
-                  Keccak256
-               -> Maybe TransactionResult
-               -> Int32
-               -> Text
+evalAndReturn :: ( MonadIO m
+                 , (Keccak256 `A.Alters` SourceMap) m
+                 , A.Selectable Account AddressState m
+                 , MonadLogger m
+                 , HasBlocSQL m
+                 , HasBlocEnv m
+                 )
+              => [TRD] -> m [BlocTransactionResult]
+evalAndReturn list = forStateT emptyBatchState list $
+    \(TRD status txHash i mtxr) -> case status of
+        Pending -> return $ BlocTransactionResult Pending txHash Nothing Nothing
+        Failure -> return $ BlocTransactionResult Failure txHash (snd <$> mtxr) Nothing
+        Success -> case mtxr of
+          Nothing -> return $ BlocTransactionResult Pending txHash Nothing Nothing
+          Just (r@RawTransaction{..}, txr) -> case (rawTransactionToAddress, rawTransactionCodeOrData) of
+            (Nothing, code) -> contractResult i txHash code txr (Map.fromList <$> rawTransactionMetadata)
+            (_, Code "") -> return $ BlocTransactionResult Success txHash (Just txr) (Just . Send $ rawTx2PostTx r)
+            (Just addr, _) -> functionResult i txHash txr (Map.fromList <$> rawTransactionMetadata) (Account addr $ toMaybe 0 rawTransactionChainId)
+
+nth :: Integer -> Text
+nth n | n `mod` 10 == 0 = Text.pack (show $ n + 1) <> "st"
+      | n `mod` 10 == 1 = Text.pack (show $ n + 1) <> "nd"
+      | n `mod` 10 == 2 = Text.pack (show $ n + 1) <> "rd"
+      | otherwise       = Text.pack (show $ n + 1) <> "th"
+
+contractResult :: ( MonadIO m
+                  , A.Selectable Account AddressState m
+                  , (Keccak256 `A.Alters` SourceMap) m
+                  , MonadLogger m
+                  , HasBlocSQL m
+                  , HasBlocEnv m
+                  )
+               => Integer
+               -> Keccak256
+               -> Code
+               -> TransactionResult
+               -> Maybe (Map Text Text)
                -> StateT BatchState m BlocTransactionResult
-contractResult txHash mtxr cmId name = do
+contractResult i txHash code txResult mmd = do
+  ~(name, src, vm) <- case mmd of
+    Nothing -> lift . throwIO . UserError $ "Could not get the metadata of the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
+    Just md -> case Map.lookup "name" md of
+      Nothing -> lift . throwIO . UserError $ "Could not get the name of the contract for the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
+      Just name -> case fromMaybe "EVM" $ Map.lookup "VM" md of
+        "EVM" -> case Map.lookup "src" md of
+          Nothing -> lift . throwIO . UserError $ "Could not get the source of the contract for the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
+          Just src -> pure (name, src, "EVM")
+        vm -> case code of
+          Code bs -> pure (name, Text.decodeUtf8 bs, vm)
+          PtrToCode codePtr -> lift $ getContractDetailsByCodeHash codePtr >>= \case
+            Left e -> throwIO $ UserError e
+            Right ContractDetails{..} -> pure (name, serializeSourceMap contractdetailsSrc, vm)
   let
-    Just txResult = mtxr
     accountMaybe = do
       str <- listToMaybe $
         Text.splitOn "," (Text.pack $ transactionResultContractsCreated txResult)
@@ -201,33 +279,51 @@ contractResult txHash mtxr cmId name = do
         let mDelAddr = readMaybe @Account . Text.unpack =<<
               (listToMaybe . Text.splitOn "," . Text.pack $ transactionResultContractsDeleted txResult)
         case mDelAddr of
-          Just _ -> lift $ throwIO $ UserError "Contract failed to upload, likely because the constructor threw"
-          Nothing -> lift $ throwIO $ UserError "Transaction succeeded, but contract was neither created, nor destroyed"
-      stratoMsg  -> lift $ throwIO $ UserError $ Text.pack stratoMsg
+          Just _ -> lift . throwIO . UserError $ "Contract failed to upload, likely because the constructor threw"
+          Nothing -> lift . throwIO . UserError $ "Transaction succeeded, but contract was neither created, nor destroyed"
+      stratoMsg  -> lift . throwIO . UserError $ Text.pack stratoMsg
     Just acct -> do
       let cn = ContractName name
       mdetails <- use $ contractDetailsMap . at cn
       details <- case mdetails of
         Just details' -> return details'{contractdetailsAccount = Just acct}
         Nothing -> do
-          cds <- lift $ getContractDetailsByMetadataId cmId acct
-          contractDetailsMap . at cn <?= cds
-      return $ BlocTransactionResult Success txHash mtxr (Just $ Upload details)
+          cds <- lift $ getContractDetailsForContract vm (deserializeSourceMap src) (Just name)
+          case cds of
+            Nothing -> lift . throwIO . UserError $ "Could not get details for contract" <> name
+            Just (_, ds) -> contractDetailsMap . at cn <?= ds{contractdetailsAccount = Just acct}
+      return $ BlocTransactionResult Success txHash (Just txResult) (Just $ Upload details)
 
-functionResult :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
-                  Keccak256
-               -> Maybe TransactionResult
-               -> Int32
-               -> Text
+functionResult :: ( MonadIO m
+                  , A.Selectable Account AddressState m
+                  , (Keccak256 `A.Alters` SourceMap) m
+                  , MonadLogger m
+                  , HasBlocSQL m
+                  , HasBlocEnv m
+                  )
+               => Integer
+               -> Keccak256
+               -> TransactionResult
+               -> Maybe (Map Text Text)
+               -> Account
                -> StateT BatchState m BlocTransactionResult
-functionResult txHash mtxr cmId funcName = do
-  let Just txResult = mtxr
-  mxabi <- use $ functionXabiMap . at cmId
+functionResult i txHash txResult mmd toAccount = do
+  funcName <- case mmd of
+    Nothing -> lift . throwIO . UserError $ "Could not get the metadata of the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
+    Just md -> case Map.lookup "funcName" md of
+      Nothing -> lift . throwIO . UserError $ "Could not get the name of the contract for the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
+      Just funcName -> pure funcName
+  mxabi <- use $ functionXabiMap . at (toAccount, funcName)
   xabi <- case mxabi of
     Just xabi' -> return xabi'
     Nothing -> do
-      xabi' <- lift $ getContractXabiByMetadataId cmId
-      functionXabiMap . at cmId <?= xabi'
+      mch <- lift $ fmap addressStateCodeHash <$> A.select (A.Proxy @AddressState) toAccount
+      xabi' <- case mch of
+        Nothing -> lift . throwIO . UserError $ "Could not find contract at " <> Text.pack (format toAccount)
+        Just ch -> lift $ getContractDetailsByCodeHash ch >>= \case
+          Left e -> throwIO $ UserError e
+          Right d -> pure $ contractdetailsXabi d
+      functionXabiMap . at (toAccount, funcName) <?= xabi'
   let resultXabiTypes = maybe [] (Map.elems . funcVals) . Map.lookup funcName $ xabiFuncs xabi
       orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
   orderedResultTypes <- lift $
@@ -243,7 +339,7 @@ functionResult txHash mtxr cmId funcName = do
     "Success!" -> do
       let r = Text.decodeUtf8 $ Base16.encode txResp
       formattedResponse <- lift $ blocMaybe ("Failed to parse response: " <> r) mFormattedResponse
-      return $ BlocTransactionResult Success txHash mtxr (Just $ Call formattedResponse)
+      return $ BlocTransactionResult Success txHash (Just txResult) (Just $ Call formattedResponse)
     stratoMsg  -> throwIO $ UserError $ Text.pack stratoMsg
 
 convertEnumTypeToInt :: Type -> Type
