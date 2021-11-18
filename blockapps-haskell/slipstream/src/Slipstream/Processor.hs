@@ -19,6 +19,7 @@ module Slipstream.Processor
   , parseActions -- For testing
   ) where
 
+import qualified Data.Aeson                           as Aeson
 import Control.Arrow ((&&&))
 import Control.Applicative
 import Control.Lens ((^.))
@@ -27,6 +28,7 @@ import Control.Monad.IO.Unlift
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Strict hiding (state)
+import qualified Data.ByteString.Lazy.Char8           as BLC
 import Data.Either (lefts, rights)
 import Data.Function
 import Data.Int (Int32)
@@ -43,7 +45,7 @@ import BlockApps.Bloc22.Database.Queries
 import BlockApps.Bloc22.Monad
 import BlockApps.Bloc22.Server.Utils
 import BlockApps.Logging
-import BlockApps.Solidity.Contract
+import qualified BlockApps.Solidity.Contract as OLD
 import BlockApps.Solidity.Value
 import BlockApps.Solidity.Xabi
 import BlockApps.XAbiConverter
@@ -53,17 +55,21 @@ import qualified BlockApps.SolidVMStorageDecoder as SolidVM
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.TransactionResult
 --import Blockchain.DB.SQLDB
+import Blockchain.SolidVM.CodeCollectionDB
 import Blockchain.Strato.Model.Account
 import qualified Blockchain.Strato.Model.Action as Action
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import qualified Blockchain.Strato.Model.Event            as Action
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Stream.VMEvent
-import Data.Source.Map
 
+import CodeCollection hiding (contractName, events)
 import Control.Monad.Change.Modify              hiding (modify)
 import Control.Monad.Composable.BlocSQL
 import Control.Monad.Composable.SQL
+
+import Data.Source.Map
 
 import SelectAccessible                         ()
 
@@ -72,6 +78,9 @@ import Slipstream.Events
 import Slipstream.Globals
 import Slipstream.Metrics
 import Slipstream.OutputData
+
+import SolidVM.Solidity.Xabi                    (VariableDeclF(..))
+import qualified SolidVM.Solidity.Xabi.Type               as Xabi
 
 diffNull :: Action.DataDiff -> Bool
 diffNull (Action.EVMDiff m) = Map.null m
@@ -200,8 +209,8 @@ adjustGlobals gref shouldCompile row details = do
   -- TODO: because this uses HistoryTableName directly - this won't work if we add other (non-history) globals
   let go m (k,f) = runMaybeT $ do
         v <- lookupT k $ actionMetadata row
-        let contracts = filter (not . T.null) $ T.splitOn "," v
-        forM_ contracts $ \c -> do
+        let contracts' = filter (not . T.null) $ T.splitOn "," v
+        forM_ contracts' $ \c -> do
           (_, details') <- lookupT c m
           let codePtr = contractdetailsCodeHash details'
           $logInfoS "adjustGlobals" . T.pack $ "Adding to globals for " ++ T.unpack k ++ ": " ++ show codePtr
@@ -223,9 +232,9 @@ adjustGlobals gref shouldCompile row details = do
                           ]
 
 readPreviousEVMState :: MonadIO m =>
-                        IORef Globals -> Account -> Contract -> m [(Text, Value)]
+                        IORef Globals -> Account -> OLD.Contract -> m [(Text, Value)]
 readPreviousEVMState gref acct cont = do
-  let default' = SVR.decodeValues 0 (typeDefs cont) (mainStruct cont) (const 0) 0
+  let default' = SVR.decodeValues 0 (OLD.typeDefs cont) (OLD.mainStruct cont) (const 0) 0
   fromMaybe default' <$> getContractState gref acct
 
 readPreviousSolidVMState :: MonadIO m =>
@@ -234,7 +243,7 @@ readPreviousSolidVMState gref acct = fromMaybe [] <$> getContractState gref acct
 
 
 rowToInsert :: MonadIO m =>
-               IORef Globals -> ABIID -> AggregateAction -> Contract -> [(Text, Value)]
+               IORef Globals -> ABIID -> AggregateAction -> OLD.Contract -> [(Text, Value)]
             -> m ProcessedContract
 rowToInsert gref abiid row cont oldState = do
   let newState = case actionStorage row of
@@ -244,7 +253,7 @@ rowToInsert gref abiid row cont oldState = do
   return $ processedContract abiid (Map.fromList $ newState) row
 
 rowToHistories :: (MonadIO m, MonadLogger m) =>
-                  IORef Globals -> ABIID -> AggregateAction -> [AggregateAction] -> Contract
+                  IORef Globals -> ABIID -> AggregateAction -> [AggregateAction] -> OLD.Contract
                -> [(Text, Value)]
                -> m [ProcessedContract]
 rowToHistories gref abiid row actions cont oldState = do
@@ -293,6 +302,56 @@ parseActions events =
 parseEvents :: [VMEvent] -> [Action.Event]
 parseEvents events = [a | EventEmitted a <- events]
 
+getCodeCollection :: MonadIO m => String -> m CodeCollection
+getCodeCollection ccString = do
+  let initList =
+        case Aeson.decode $ BLC.pack ccString of
+          Just l -> l
+          Nothing -> case Aeson.decode $ BLC.pack ccString of
+            Just m -> Map.toList m
+            Nothing -> [(T.empty, T.pack ccString)] -- for backwards compatibility
+
+  --for now I am just ignoreing code collections that can't be parsed....
+  --we should filter these out earlier, but we seem to allow them into the blockchain, so
+  --slipstream just has deal with them.
+  case compileSource $ Map.fromList initList of
+    Left _ -> return $ CodeCollection Map.empty
+    Right v -> return v
+
+--This is a temporary function that converts solidity types to a sample value...  I am just using this now to convert table creation from the old way (value based when values come through) to the new way (direct from the types when a CC is registered)
+sampleValue :: Show a => VariableDeclF a -> Value
+sampleValue VariableDecl{varType=Xabi.Bool} = SimpleValue (ValueBool True)
+sampleValue VariableDecl{varType=Xabi.Int _ _} = SimpleValue (ValueInt False Nothing 0)
+sampleValue VariableDecl{varType=Xabi.String _} = SimpleValue (ValueString "")
+sampleValue VariableDecl{varType=Xabi.Bytes _ _} = SimpleValue (ValueString "")
+sampleValue VariableDecl{varType=Xabi.Address} = SimpleValue (ValueAddress $ Address 0xabcd)
+sampleValue VariableDecl{varType=Xabi.Account} = SimpleValue (ValueAddress $ Address 0xabcd)
+sampleValue VariableDecl{varType=Xabi.Array _ _} = ValueArrayFixed 0 []
+sampleValue VariableDecl{varType=Xabi.Mapping _ _ _} = ValueMapping Map.empty
+sampleValue VariableDecl{varType=Xabi.Label _} = SimpleValue (ValueAddress $ Address 0xabcd)
+sampleValue x = error $ "undefined type in sampleValue: " ++ show x
+
+--Another temporary function used until I create contracts based on the CC itself
+ccToProcessedContract :: CodePtr -> Text -> Text -> (String, Contract) -> ProcessedContract
+ccToProcessedContract cp o a (contractName, contract) =
+  ProcessedContract
+  {
+    codehash = cp,
+    organization = o,
+    application = if a == T.pack contractName then "" else a,
+    contractData = fmap sampleValue $ Map.mapKeys T.pack $ contract^.storageDefs,
+    contractName = T.pack contractName,
+    chain = "chain",
+    abi = "abi",
+    
+    address = error "value1",
+    blockHash = error "value7",
+    blockTimestamp = error "value8",
+    blockNumber = error "value9",
+    transactionHash = error "value10",
+    transactionSender = error "value11"
+  }
+
 processTheMessages :: (MonadIO m, MonadUnliftIO m, MonadLogger m, HasSQL m) =>
                       BlocEnv -> BlocSQLEnv -> PGConnection -> IORef Globals -> [VMEvent] -> m ()
 processTheMessages env sqlEnv conn g messages = do
@@ -300,9 +359,15 @@ processTheMessages env sqlEnv conn g messages = do
   let changes = parseActions messages
       events = parseEvents messages
       -- TODO (Dan) : would be nice if we didn't just rip events out at the top level like this
---      creates = [c|ContractCreated c <- messages]
+      creates = [(c, cp, o, a) | CodeCollectionAdded c cp o a <- messages]
       transactionResults = [tr | NewTransactionResult tr <- messages]
 
+
+
+  forM_ creates $ \(ccString, cp, o, a) -> do
+    cc <- getCodeCollection $ T.unpack ccString
+    outputData conn $ createExpandIndexTable g $ map (ccToProcessedContract cp o a) $ Map.toList (cc^.contracts)
+  
   unless (null messages) $
     $logDebugS "processTheMessages" . T.pack . unlines . map show $ messages
   
@@ -374,7 +439,6 @@ processTheMessages env sqlEnv conn g messages = do
                         $ rights inserts
   forM_ (rights inserts) $ $logDebugLS "processTheMessages/toInsert"
   forM_ insertsByCodeHash $ \ins -> do
-    outputData conn . createExpandIndexTable g $ map indexInsert ins
     unless (null ins) $ outputData conn . insertIndexTable g $ map indexInsert ins
     outputData conn . createExpandInsertHistoryTable g $ concatMap historyInserts ins
     when (length (concatMap eventCreations ins) > 0) $

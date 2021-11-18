@@ -29,6 +29,8 @@ import           Control.Monad.State
 import qualified Data.Aeson                  as JSON
 import qualified Data.ByteString             as B
 import qualified Data.ByteString.Lazy        as BL
+import           Data.Text                   (Text)
+import qualified Data.Text                   as T
 import           Data.Maybe
 import           GHC.Generics
 
@@ -39,6 +41,7 @@ import           Network.Kafka.Protocol      hiding (Key)
 import           Blockchain.Data.TransactionResult
 import           Blockchain.EthConf
 import           Blockchain.Strato.Model.Action (Action)
+import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Event
 import           Blockchain.KafkaTopics
 import           Blockchain.MilenaTools
@@ -52,7 +55,12 @@ import           Text.Tools
 data VMEvent =
   NewAction Action |
   EventEmitted Event |
-  CodeCollectionAdded String |
+  CodeCollectionAdded {
+    ccString :: Text,
+    codePtr :: CodePtr,
+    organization :: Text,
+    application :: Text
+    } |
   NewTransactionResult TransactionResult deriving (Show, Generic)
 
 instance JSON.ToJSON VMEvent where
@@ -63,7 +71,7 @@ instance JSON.FromJSON VMEvent where
 instance Format VMEvent where
   format (NewAction a) = "NewAction:\n" ++ tab (format a)
   format (EventEmitted e) = "EventEmitted:\n" ++ tab (format e)
-  format (CodeCollectionAdded c) = "CodeCollectionAdded: " ++ shorten 30 c
+  format (CodeCollectionAdded c _ _ _) = "CodeCollectionAdded: " ++ show (shorten 120 (T.unpack c))
   format (NewTransactionResult tr) = "NewTransactionResult:\n" ++ tab (format tr)
 
 class HasVMEventsSink k where

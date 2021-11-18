@@ -213,8 +213,7 @@ createExpandIndexTable
   -> ConduitM () Text m ()
 createExpandIndexTable g cs = do
   unless (null cs) $ do
-    let c = head cs
-    createIndexTable g c
+    forM_ cs $ \c -> createIndexTable g c
     expandIndexTable g cs
 
 createExpandInsertHistoryTable

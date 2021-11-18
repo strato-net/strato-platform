@@ -44,7 +44,7 @@ import           SolidVM.Solidity.Parse.File
 import           CodeCollection
 
 data ParseOrSolidVMError = PEx ParseError
-                         | SVMEx (Positioned ((,) SolidException))
+                         | SVMEx (Positioned ((,) SolidException)) deriving (Show)
 
 {-# NOINLINE unsafeCodeMapIORef #-}
 unsafeCodeMapIORef :: IORef (Map Keccak256 CodeCollection)

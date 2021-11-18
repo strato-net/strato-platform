@@ -83,7 +83,8 @@ import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Action        (Action)
 import qualified Blockchain.Strato.Model.Action        as Action
 import           Blockchain.Strato.Model.Class
-import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Keccak256     (Keccak256)
+import qualified Blockchain.Strato.Model.Keccak256     as Keccak256
 import           Blockchain.Strato.StateDiff.Database  (commitSqlDiffs)
 import           Blockchain.Timing
 import           Blockchain.Util
@@ -216,7 +217,7 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
       let cBlock = creationBlock $ chainInfo cInfo
           pChain = parentChain $ chainInfo cInfo
       bHash' <- getChainCreationBlock cBlock pChain
-      bHash <- if bHash' /= zeroHash
+      bHash <- if bHash' /= Keccak256.zeroHash
                  then pure bHash'
                  else do
                    mBB <- getChainGenesisInfo Nothing
@@ -308,7 +309,7 @@ runChainConstructors cId cInfo = do
   -- some of these variables in the future.
 
   let getSrcBS = BC.pack . T.unpack . codeInfoSource
-      getCodeHash ci = hash $ getSrcBS ci
+      getCodeHash ci = Keccak256.hash $ getSrcBS ci
       codeHashMap = M.fromList . map (getCodeHash &&& codeInfoSource) $ codeInfo $ chainInfo cInfo
       resolveSrc a ch = do
         mcp <- resolveCodePtr (Just cId) ch
@@ -333,8 +334,8 @@ runChainConstructors cId cInfo = do
          False --noValueTransfer
          S.empty --pre-existing suicide list
          (BlockData
-            (unsafeCreateKeccak256FromWord256 0)
-            (unsafeCreateKeccak256FromWord256 0)
+            (Keccak256.unsafeCreateKeccak256FromWord256 0)
+            (Keccak256.unsafeCreateKeccak256FromWord256 0)
             (Address 0)
             MP.emptyTriePtr
             MP.emptyTriePtr
@@ -347,7 +348,7 @@ runChainConstructors cId cInfo = do
             (posixSecondsToUTCTime 0)
             ""
             0
-            (unsafeCreateKeccak256FromWord256 0))
+            (Keccak256.unsafeCreateKeccak256FromWord256 0))
          0 --callDepth
          (Account 0 $ Just cId) --receiveAddress
          (Account addr $ Just cId) --codeAddress
@@ -357,7 +358,7 @@ runChainConstructors cId cInfo = do
          ""
          1000000000000 --availableGas
          (Account 0 $ Just cId)
-         (unsafeCreateKeccak256FromWord256 0)
+         (Keccak256.unsafeCreateKeccak256FromWord256 0)
          (Just cId)
          (Just $ M.fromList $
            [ ("args", fromMaybe "()" (M.lookup "args" . chainMetadata $ chainInfo cInfo))
@@ -462,10 +463,29 @@ sendOutEvents OutBatch{..} = do
     filterOutEvents x = x{Action._events=Seq.empty}
 --    filterOutMetadata :: Action -> Action
 --    filterOutMetadata x = x{Action._metadata=Nothing}
+
+    extractCodeCollectionAddedMessages :: Action -> Maybe VMEvent
+    extractCodeCollectionAddedMessages a =
+      case (join $ fmap (M.lookup "src") $ a^.Action.metadata,
+            join $ fmap (M.lookup "name") $ a^.Action.metadata,
+            M.toList $ a^.Action.actionData) of
+        (Just c, Just n, first:_) -> Just $ CodeCollectionAdded {
+            ccString = c,
+            codePtr =
+                case join $ fmap (M.lookup "VM") $ a^.Action.metadata of
+                  Just "SolidVM" -> SolidVMCode (T.unpack n) $ Keccak256.hash $ BC.pack $ T.unpack c
+                  Just "EVM" -> EVMCode $ Keccak256.hash $ BC.pack $ T.unpack c
+                  Just v -> error $ "qqqqqq: " ++ show v
+                  Nothing -> EVMCode $ Keccak256.hash $ BC.pack $ T.unpack c,
+            organization = first^._2.Action.actionDataOrganization,
+            application = n
+--            application = first^._2.Action.actionDataApplication
+          }
+        _ -> Nothing
   
   loopTimeit "productVMEvents" $ do
-      _ <- produceVMEvents $ 
-             concat (map (map (CodeCollectionAdded . T.unpack) . maybeToList . M.lookup "src" . fromMaybe M.empty . Action._metadata) (toList outActions))
+      _ <- produceVMEvents $
+           concat (map (maybeToList . extractCodeCollectionAddedMessages) (toList outActions))
 
       _ <- produceVMEvents $ 
              concat (map (map EventEmitted . toList . Action._events) (toList outActions))
