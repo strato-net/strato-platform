@@ -5,6 +5,14 @@
 - Added the debugPostParse function to support compilation and static analysis tools
 - Added the debugPostAnalyze function to support static analysis tools
 
+### Version: 8.0.5
+
+- Hotfix for runtime failure due to chai dependency in prod installation
+
+### Version: 8.0.4
+
+- Production dependencies cleanup
+
 ### Version: 8.0.3
 
 - Updated non-dev dependencies to address security vulnerabilities in production installation
