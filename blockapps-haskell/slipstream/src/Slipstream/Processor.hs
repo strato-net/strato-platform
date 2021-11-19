@@ -46,6 +46,7 @@ import BlockApps.Bloc22.Monad
 import BlockApps.Bloc22.Server.Utils
 import BlockApps.Logging
 import qualified BlockApps.Solidity.Contract as OLD
+import BlockApps.Solidity.Parse.Parser
 import BlockApps.Solidity.Value
 import BlockApps.Solidity.Xabi
 import BlockApps.XAbiConverter
@@ -78,6 +79,7 @@ import Slipstream.Events
 import Slipstream.Globals
 import Slipstream.Metrics
 import Slipstream.OutputData
+import Slipstream.XabiContract
 
 import SolidVM.Solidity.Xabi                    (VariableDeclF(..))
 import qualified SolidVM.Solidity.Xabi.Type               as Xabi
@@ -302,8 +304,9 @@ parseActions events =
 parseEvents :: [VMEvent] -> [Action.Event]
 parseEvents events = [a | EventEmitted a <- events]
 
-getCodeCollection :: MonadIO m => String -> m CodeCollection
-getCodeCollection ccString = do
+
+getCodeCollection :: MonadIO m => CodePtr -> String -> m CodeCollection
+getCodeCollection cp ccString = do
   let initList =
         case Aeson.decode $ BLC.pack ccString of
           Just l -> l
@@ -314,9 +317,17 @@ getCodeCollection ccString = do
   --for now I am just ignoreing code collections that can't be parsed....
   --we should filter these out earlier, but we seem to allow them into the blockchain, so
   --slipstream just has deal with them.
-  case compileSource $ Map.fromList initList of
-    Left _ -> return $ CodeCollection Map.empty
-    Right v -> return v
+
+  case cp of
+    SolidVMCode _ _ ->
+      case compileSource $ Map.fromList initList of
+        Left e -> error $ "failed parse: "  ++ show e --return $ CodeCollection Map.empty
+        Right v -> return v
+    EVMCode _ ->
+      case parseXabi "--" ccString of
+        Left _ -> return $ CodeCollection Map.empty -- error $ "failed EVM parse: " ++ show e ++ "\n" ++ ccString
+        Right (_, v) -> return $ CodeCollection $ Map.fromList $ map (\(x, y) -> (T.unpack x, xabiToPartialContract y)) v
+    CodeAtAccount _ _ -> error "no compilo codeataccount"
 
 --This is a temporary function that converts solidity types to a sample value...  I am just using this now to convert table creation from the old way (value based when values come through) to the new way (direct from the types when a CC is registered)
 sampleValue :: Show a => VariableDeclF a -> Value
@@ -365,7 +376,7 @@ processTheMessages env sqlEnv conn g messages = do
 
 
   forM_ creates $ \(ccString, cp, o, a) -> do
-    cc <- getCodeCollection $ T.unpack ccString
+    cc <- getCodeCollection cp $ T.unpack ccString
     outputData conn $ createExpandIndexTable g $ map (ccToProcessedContract cp o a) $ Map.toList (cc^.contracts)
   
   unless (null messages) $
