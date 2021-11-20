@@ -270,7 +270,7 @@ describe("Create Chain", function() {
     assert.notEqual(chainId, "", "chainId is not zero");
 
     // query cirrus for the gov contract
-    const govList = await rest.search(alice, { name: "Governance" }, { query: { chainId: `eq.${chainId}` }, ...options });
+    const govList = await rest.searchUntil(alice, { name: "Governance" }, (r) => r.length > 0, { query: { chainId: `eq.${chainId}` }, ...options });
     assert.equal(govList.length, 1, "one instance of Governance on this chain");
     const gov = govList[0];
     assert.isDefined(gov, "Governance contract apperas in Cirrus");
