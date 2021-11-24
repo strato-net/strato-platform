@@ -29,7 +29,7 @@ import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Strict hiding (state)
 import qualified Data.ByteString.Lazy.Char8           as BLC
-import Data.Either (lefts, rights)
+import Data.Either (lefts, rights, partitionEithers)
 import Data.Function
 import Data.Int (Int32)
 import Data.IORef
@@ -324,9 +324,11 @@ getCodeCollection cp ccString = do
         Left e -> error $ "failed parse: "  ++ show e --return $ CodeCollection Map.empty
         Right v -> return v
     EVMCode _ ->
-      case parseXabi "--" ccString of
-        Left _ -> return $ CodeCollection Map.empty -- error $ "failed EVM parse: " ++ show e ++ "\n" ++ ccString
-        Right (_, v) -> return $ CodeCollection $ Map.fromList $ map (\(x, y) -> (T.unpack x, xabiToPartialContract y)) v
+      case partitionEithers $ map (parseXabi "--" . T.unpack . snd) initList of
+        (e:_, _) ->
+          --return $ CodeCollection Map.empty
+          error $ "failed EVM parse: " ++ show e ++ "\n" ++ ccString
+        ([], v) -> return $ CodeCollection $ Map.fromList $ map (\(x, y) -> (T.unpack x, xabiToPartialContract y)) $ concat $ map snd v
     CodeAtAccount _ _ -> error "no compilo codeataccount"
 
 --This is a temporary function that converts solidity types to a sample value...  I am just using this now to convert table creation from the old way (value based when values come through) to the new way (direct from the types when a CC is registered)
