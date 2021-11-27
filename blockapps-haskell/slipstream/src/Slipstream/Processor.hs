@@ -28,7 +28,6 @@ import Control.Monad.IO.Unlift
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Strict hiding (state)
-import qualified Data.ByteString.Lazy.Char8           as BLC
 import Data.Either (lefts, rights)
 import Data.Function
 import Data.Int (Int32)
@@ -39,6 +38,7 @@ import Data.Maybe
 import Data.Ord (Down(..))
 import qualified Data.Text as T
 import Data.Text (Text)
+import Data.Text.Encoding
 import Database.PostgreSQL.Typed (PGConnection)
 
 import BlockApps.Bloc22.Database.Queries
@@ -305,14 +305,14 @@ parseEvents :: [VMEvent] -> [Action.Event]
 parseEvents events = [a | EventEmitted a <- events]
 
 
-getCodeCollection :: MonadIO m => CodePtr -> String -> m CodeCollection
+getCodeCollection :: MonadIO m => CodePtr -> Text -> m CodeCollection
 getCodeCollection cp ccString = do
   let initList =
-        case Aeson.decode $ BLC.pack ccString of
+        case Aeson.decodeStrict $ encodeUtf8 ccString of
           Just l -> l
-          Nothing -> case Aeson.decode $ BLC.pack ccString of
+          Nothing -> case Aeson.decodeStrict $ encodeUtf8 ccString of
             Just m -> Map.toList m
-            Nothing -> [(T.empty, T.pack ccString)] -- for backwards compatibility
+            Nothing -> [(T.empty, ccString)] -- for backwards compatibility
 
   --for now I am just ignoreing code collections that can't be parsed....
   --we should filter these out earlier, but we seem to allow them into the blockchain, so
@@ -327,7 +327,7 @@ getCodeCollection cp ccString = do
       case parseXabi "--" $ T.unpack $ sourceBlob $ SourceMap initList of
         Left e ->
           --return $ CodeCollection Map.empty
-          error $ "failed EVM parse: " ++ show e ++ "\n" ++ ccString
+          error $ "failed EVM parse: " ++ show e ++ "\n" ++ T.unpack ccString
         Right v -> return $ CodeCollection $ Map.fromList $ map (\(x, y) -> (T.unpack x, xabiToPartialContract y)) $ snd v
     CodeAtAccount _ _ -> error "no compilo codeataccount"
 
@@ -378,7 +378,7 @@ processTheMessages env sqlEnv conn g messages = do
 
 
   forM_ creates $ \(ccString, cp, o, a) -> do
-    cc <- getCodeCollection cp $ T.unpack ccString
+    cc <- getCodeCollection cp ccString
     outputData conn $ createExpandIndexTable g $ map (ccToProcessedContract cp o a) $ Map.toList (cc^.contracts)
   
   unless (null messages) $
