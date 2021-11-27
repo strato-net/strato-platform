@@ -475,11 +475,10 @@ sendOutEvents OutBatch{..} = do
                 case join $ fmap (M.lookup "VM") $ a^.Action.metadata of
                   Just "SolidVM" -> SolidVMCode (T.unpack n) $ Keccak256.hash $ BC.pack $ T.unpack c
                   Just "EVM" -> EVMCode $ Keccak256.hash $ BC.pack $ T.unpack c
-                  Just v -> error $ "qqqqqq: " ++ show v
+                  Just v -> error $ "Unknown VM: " ++ show v
                   Nothing -> EVMCode $ Keccak256.hash $ BC.pack $ T.unpack c,
             organization = first^._2.Action.actionDataOrganization,
             application = n
---            application = first^._2.Action.actionDataApplication
           }
         _ -> Nothing
   
