@@ -276,13 +276,14 @@ expandIndexTable :: OutputM m
                  -> [ProcessedContract]
                  -> ConduitM () Text m ()
 expandIndexTable _ [] = return ()
-expandIndexTable globalsIORef lst@(x:_) = do
-  let (org, app, cname) = constructTableNameParameters
-          (organization x)
-          (application x)
-          (contractName x)
-      tableName = IndexTableName org app cname
-  forM_ lst $ \c -> expandContractTable globalsIORef c tableName
+expandIndexTable globalsIORef lst = do
+  forM_ lst $ \c -> do
+    let (org, app, cname) = constructTableNameParameters
+                            (organization c)
+                            (application c)
+                            (contractName c)
+        tableName = IndexTableName org app cname
+    expandContractTable globalsIORef c tableName
 
 expandHistoryTable :: OutputM m
                  => IORef Globals
