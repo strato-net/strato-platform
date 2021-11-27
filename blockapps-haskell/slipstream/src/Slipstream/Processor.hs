@@ -314,9 +314,9 @@ getCodeCollection cp ccString = do
             Just m -> Map.toList m
             Nothing -> [(T.empty, ccString)] -- for backwards compatibility
 
-  --for now I am just ignoreing code collections that can't be parsed....
-  --we should filter these out earlier, but we seem to allow them into the blockchain, so
-  --slipstream just has deal with them.
+  --We shouldn't crash if the source can't be parsed (a bad validator could brind the network down)
+  --For now I'm going to keep the crash in, since it will be a warning to us that we let a
+  --bad contract into the blockchain (the API shouldn't allow this)
 
   case cp of
     SolidVMCode _ _ ->
