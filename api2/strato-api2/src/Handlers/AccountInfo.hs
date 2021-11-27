@@ -37,7 +37,7 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json
 import           Blockchain.DB.SQLDB
 import           Blockchain.Strato.Model.ChainId
-import           Blockchain.Strato.Model.CodePtr
+import           Blockchain.Strato.Model.Keccak256
 
 import           Control.Monad.Composable.SQL
 
@@ -61,28 +61,34 @@ type API = -- Tags "section1" :> Summary "get user accounts" :> Description "Get
             :> QueryParam "maxnonce" Natural
             :> QueryParam "maxnumber" Natural
             :> QueryParam "code" Text
-            :> QueryParam "codeHash" CodePtr
+            :> QueryParam "codeHash" Keccak256
+            :> QueryParam "contractName" Text
+            :> QueryParam "codePtrAddress" Address
+            :> QueryParam "codePtrChainId" ChainId
             :> QueryParams "chainid" ChainId
             :> Get '[JSON] [AddressStateRef']
 
 data AccountsFilterParams = AccountsFilterParams
-  { qaAddress    :: Maybe Address
-  , qaBalance    :: Maybe Natural
-  , qaMinBalance :: Maybe Natural
-  , qaMaxBalance :: Maybe Natural
-  , qaNonce      :: Maybe Natural
-  , qaMinNonce   :: Maybe Natural
-  , qaMaxNonce   :: Maybe Natural
-  , qaMaxNumber  :: Maybe Natural
-  , qaCode       :: Maybe Text
-  , qaCodeHash   :: Maybe CodePtr
-  , qaChainId    :: [ChainId]
+  { qaAddress        :: Maybe Address
+  , qaBalance        :: Maybe Natural
+  , qaMinBalance     :: Maybe Natural
+  , qaMaxBalance     :: Maybe Natural
+  , qaNonce          :: Maybe Natural
+  , qaMinNonce       :: Maybe Natural
+  , qaMaxNonce       :: Maybe Natural
+  , qaMaxNumber      :: Maybe Natural
+  , qaCode           :: Maybe Text
+  , qaCodeHash       :: Maybe Keccak256
+  , qaContractName   :: Maybe Text
+  , qaCodePtrAddress :: Maybe Address
+  , qaCodePtrChainId :: Maybe ChainId
+  , qaChainId        :: [ChainId]
   } deriving (Eq, Ord, Show)
 
 accountsFilterParams :: AccountsFilterParams
 accountsFilterParams = AccountsFilterParams
   Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
-  Nothing Nothing []
+  Nothing Nothing Nothing Nothing Nothing []
 
 getAccountsFilter :: AccountsFilterParams -> ClientM [AddressStateRef']
 getAccountsFilter = uncurryAccountsFilterParams (client $ Proxy @API)
@@ -96,7 +102,10 @@ uncurryAccountsFilterParams :: ( Maybe Address
                               -> Maybe Natural
                               -> Maybe Natural
                               -> Maybe Text
-                              -> Maybe CodePtr
+                              -> Maybe Keccak256
+                              -> Maybe Text
+                              -> Maybe Address
+                              -> Maybe ChainId
                               -> [ChainId]
                               -> r
                                )
@@ -105,7 +114,7 @@ uncurryAccountsFilterParams :: ( Maybe Address
 uncurryAccountsFilterParams f AccountsFilterParams{..} = f
   qaAddress qaBalance qaMinBalance qaMaxBalance qaNonce
   qaMinNonce qaMaxNonce qaMaxNumber qaCode qaCodeHash
-  qaChainId
+  qaContractName qaCodePtrAddress qaCodePtrChainId qaChainId
 
 server :: HasSQL m => ServerT API m
 server = getAccount
@@ -138,7 +147,10 @@ instance HasSQL m => Selectable AccountsFilterParams [AddressStateRef] m where
             fmap (\v -> accStateRef E.^. AddressStateRefNonce E.<=. E.val v) (fromIntegral <$> qaMaxNonce),
             fmap (\v -> accStateRef E.^. AddressStateRefAddress E.==. E.val v) qaAddress,
             fmap (\v -> accStateRef E.^. AddressStateRefCode E.==. E.val (toCode v)) qaCode,
-            fmap (\v -> accStateRef E.^. AddressStateRefCodeHash E.==. E.val v) qaCodeHash
+            fmap (\v -> accStateRef E.^. AddressStateRefCodeHash E.==. E.val (Just v)) qaCodeHash,
+            fmap (\v -> accStateRef E.^. AddressStateRefContractName E.==. E.val (Just $ T.unpack v)) qaContractName,
+            fmap (\v -> accStateRef E.^. AddressStateRefCodePtrAddress E.==. E.val (Just v)) qaCodePtrAddress,
+            fmap (\v -> accStateRef E.^. AddressStateRefCodePtrChainId E.==. E.val (Just $ unChainId v)) qaCodePtrChainId
           ] 
       
       let matchChainId (ChainId cid) = (accStateRef E.^. AddressStateRefChainId) E.==. (E.val cid)
@@ -159,10 +171,11 @@ instance HasSQL m => Selectable AccountsFilterParams [AddressStateRef] m where
 getAccount :: Selectable AccountsFilterParams [AddressStateRef] m
            => Maybe Address -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
               Maybe Natural -> Maybe Natural -> Maybe Natural -> Maybe Natural ->
-              Maybe Text -> Maybe CodePtr -> [ChainId] ->
+              Maybe Text -> Maybe Keccak256 -> Maybe Text -> Maybe Address ->
+              Maybe ChainId -> [ChainId] ->
               m [AddressStateRef']
-getAccount a b c d e f g h i j k
-  = getAccount' (AccountsFilterParams a b c d e f g h i j k)
+getAccount a b c d e f g h i j k l m n
+  = getAccount' (AccountsFilterParams a b c d e f g h i j k l m n)
     
 getAccount' :: Selectable AccountsFilterParams [AddressStateRef] m => AccountsFilterParams -> m [AddressStateRef']
 getAccount' a = do
@@ -181,6 +194,9 @@ accountQueryParams = [ "address",
                        "code",
                        "index",
                        "codeHash",
+                       "contractName",
+                       "codePtrAddress",
+                       "codePtrChainId",
                        "chainid"]
 
 toCode :: Text -> BC.ByteString

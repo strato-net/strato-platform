@@ -30,6 +30,7 @@ library:
     - bloc-sql-monad
     - bloc2
     - blockapps-data
+    - blockapps-datadefs
     - blockapps-mpdbs
     - blockapps-solidity
     - blockapps-util
@@ -37,6 +38,8 @@ library:
     - classy-prelude
     - conduit
     - containers
+    - core-api-monad
+    - core-api2
     - cross-monitoring
     - deepseq
     - extra

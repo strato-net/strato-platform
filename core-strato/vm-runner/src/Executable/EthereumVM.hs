@@ -170,7 +170,7 @@ handleVmEvents = awaitForever $ \InBatch{..} -> do
     if shouldOutputBlocks
       then do
         $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
-        newBlock <- Bagger.makeNewBlock
+        newBlock <- Bagger.makeNewBlock mineTransactions
         $logInfoS "evm/loop/newBlock" "calling produceUnminedBlocksM"
         pure $ Just newBlock
       else pure Nothing
@@ -482,6 +482,17 @@ sendOutEvents OutBatch{..} = do
           }
         _ -> Nothing
   
+  for_ outToStateDiffs $ \(cId, cInfo, bHash) ->
+    withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo
+  traverse_ commitSqlDiffs outStateDiffs
+  when (not flags_sqlDiff) $
+    timeit "updateSQLBalanceAndNonce" (Just vmBlockInsertionMined) $
+      forM_ outASMs $ \asm -> do
+        updateSQLBalanceAndNonce $
+          [ (theAccount,
+             (addressStateBalance asMod, addressStateNonce asMod))
+          | (theAccount, Mem.ASModification asMod) <- M.toList asm
+          ]
   loopTimeit "productVMEvents" $ do
       _ <- produceVMEvents $
            concat (map (maybeToList . extractCodeCollectionAddedMessages) (toList outActions))
@@ -502,9 +513,6 @@ sendOutEvents OutBatch{..} = do
     void . K.withKafkaRetry1s . produceUnminedBlocksM $
       outputBlockToBlock <$> toList outBlocks
   void . K.withKafkaRetry1s . writeIndexEvents $ toList outIndexEvents
-  for_ outToStateDiffs $ \(cId, cInfo, bHash) ->
-    withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo
-  traverse_ commitSqlDiffs outStateDiffs
   loopTimeit "flushLogEntries" $ do
     void . K.withKafkaRetry1s $ writeIndexEvents (LogDBEntry <$> toList outLogs)
   loopTimeit "flushEventEntries" $ do
@@ -516,14 +524,6 @@ sendOutEvents OutBatch{..} = do
 --        toWrite = chunksOf 2000 $ TxResult <$> q
 --    recordTxrFlush $ length q
 --    mapM_ (K.withKafkaRetry1s . writeIndexEvents) toWrite
-  when (not flags_sqlDiff) $
-    timeit "updateSQLBalanceAndNonce" (Just vmBlockInsertionMined) $
-      forM_ outASMs $ \asm -> do
-        updateSQLBalanceAndNonce $
-          [ (theAccount,
-             (addressStateBalance asMod, addressStateNonce asMod))
-          | (theAccount, Mem.ASModification asMod) <- M.toList asm
-          ]
 
 consumerGroup :: KP.ConsumerGroup
 consumerGroup = lookupConsumerGroup "ethereum-vm"

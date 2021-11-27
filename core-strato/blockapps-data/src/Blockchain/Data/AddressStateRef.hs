@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TypeApplications  #-}
 {-# LANGUAGE TypeOperators     #-}
 
@@ -17,6 +18,13 @@ import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Keccak256
 
+addressStateRefCodePtr :: AddressStateRef -> Maybe CodePtr
+addressStateRefCodePtr AddressStateRef{..} = case addressStateRefContractName of
+  Nothing -> EVMCode <$> addressStateRefCodeHash
+  Just name -> case addressStateRefCodePtrAddress of 
+    Just a -> Just $ CodeAtAccount (Account a addressStateRefCodePtrChainId) name
+    Nothing -> SolidVMCode name <$> addressStateRefCodeHash
+
 updateSQLBalanceAndNonce :: HasSQLDB m =>
                             [(Account, (Integer, Integer))] -> m ()
 updateSQLBalanceAndNonce vals = do
@@ -30,7 +38,10 @@ updateSQLBalanceAndNonce vals = do
               addressStateRefBalance = v,
               addressStateRefContractRoot = MP.emptyTriePtr,
               addressStateRefCode = "",
-              addressStateRefCodeHash = EVMCode $ hash "",
+              addressStateRefCodeHash = Just $ hash "",
+              addressStateRefContractName = Nothing,
+              addressStateRefCodePtrAddress = Nothing,
+              addressStateRefCodePtrChainId = Nothing,
               addressStateRefChainId = fromMaybe 0 c,
               addressStateRefLatestBlockDataRefNumber = 0
             }

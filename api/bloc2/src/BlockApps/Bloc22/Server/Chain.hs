@@ -9,19 +9,19 @@
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE TypeOperators       #-}
 
 module BlockApps.Bloc22.Server.Chain where
 
-import           Control.Applicative               (liftA2)
 import           Control.Lens                      ((?~), at)
 import           Control.Monad                     (when, unless)
+import qualified Control.Monad.Change.Alter        as A
 import           Crypto.Random.Entropy
 import qualified Data.ByteString.Base16            as B16
-import           Data.Foldable                     (for_)
-import           Data.Int                          (Int32)
 import qualified Data.Map.Ordered                  as OMap
 import qualified Data.Map.Strict                   as Map
 import           Data.Maybe                        (catMaybes, fromMaybe, listToMaybe)
+import           Data.Source.Map
 import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
 import           Data.Text.Encoding                (encodeUtf8)
@@ -42,6 +42,7 @@ import           BlockApps.Bloc22.Server.TransactionResult  (constructArgValuesA
 import           BlockApps.Bloc22.Server.Utils              (waitFor)
 import           BlockApps.XAbiConverter                    (xAbiToContract)
 
+import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
@@ -49,7 +50,6 @@ import           Blockchain.TypeLits
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256
-import           Data.Source.Map (serializeSourceMap)
 import           Control.Monad.Change.Alter
 import           Control.Monad.Composable.BlocSQL
 import           Control.Monad.Composable.SQL
@@ -79,8 +79,14 @@ replaceMembers Struct{..} addrs m =
           TypeArrayDynamic (SimpleType TypeAccount) -> m'
           _ -> m
 
-createChainInfo :: (MonadIO m, MonadLogger m, HasBlocSQL m, HasBlocEnv m) =>
-                   Keccak256 -> ChainInput -> m (Maybe Int32, ChainInfo)
+createChainInfo :: ( MonadIO m
+                   , A.Selectable Account AddressState m
+                   , (Keccak256 `A.Alters` SourceMap) m
+                   , MonadLogger m
+                   , HasBlocSQL m
+                   , HasBlocEnv m
+                   )
+                => Keccak256 -> ChainInput -> m ChainInfo
 createChainInfo creationBlockHash (ChainInput src mCodePtr cname lbl balances chaininputArgs members pChain mmd _) = do
   when (null members) $ throwIO $ UserError "Private chains must include at least one member"
   when (sum (nmap2' balances) == 0) $ throwIO $ UserError "At least one account must have a non-zero balance"
@@ -91,11 +97,11 @@ createChainInfo creationBlockHash (ChainInput src mCodePtr cname lbl balances ch
     if src /= mempty
       then fmap snd <$> getContractDetailsForContract theVM src cname
       else case mCodePtr of
-        Just codePtr -> getContractDetailsByCodeHash codePtr
+        Just codePtr -> either (const Nothing) Just <$> getContractDetailsByCodeHash codePtr
         Nothing -> fmap snd <$> getContractDetailsForContract theVM mempty cname
   (cAcctInfo, codeInfo, metaData) <- case mContract of
       Nothing -> return ([],[], md)
-      Just (_, ContractDetails{..}) -> do
+      Just ContractDetails{..} -> do
           contract <- either (throwIO . UserError . Text.pack) return $ xAbiToContract contractdetailsXabi
           let argValues = replaceMembers
                             (mainStruct contract)
@@ -145,7 +151,7 @@ createChainInfo creationBlockHash (ChainInput src mCodePtr cname lbl balances ch
                            metaData
         )
         Nothing
-  return (fst <$> mContract, chainInfo)
+  return chainInfo
 
 withLastBlockHash :: (MonadIO m, MonadUnliftIO m, HasSQL m) =>
                      (Keccak256 -> m b) -> m b
@@ -166,32 +172,41 @@ getLastBlockHash = do
     return $ fmap blockDataRefHash $ listToMaybe blks
 
 
-postChainInfo :: (MonadIO m, MonadLogger m, HasBlocSQL m,
-                  HasBlocEnv m, HasSQL m) =>
-                 ChainInput -> m ChainId
+postChainInfo :: ( MonadIO m
+                 , A.Selectable Account AddressState m
+                 , (Keccak256 `A.Alters` SourceMap) m
+                 , MonadLogger m
+                 , HasBlocSQL m
+                 , HasBlocEnv m
+                 , HasSQL m
+                 )
+              => ChainInput -> m ChainId
 postChainInfo chainInput = withLastBlockHash $ \bHash -> do
   evmCompatibleOn <- fmap evmCompatible getBlocEnv
   if evmCompatibleOn
       then throwIO $ UserError $ Text.pack "Error: EVM Compatibility flag is On. This feature cannot be used."
   else do
-      (mCmId, chainInfo') <- createChainInfo bHash chainInput
+      chainInfo' <- createChainInfo bHash chainInput
       chainId <- CORE.postChain chainInfo'
       let isAsync = fromMaybe False $ chaininputAsync chainInput
       unless isAsync $ waitForChainInfo chainId
-      for_ mCmId $ \cmId -> insertContractInstance cmId $ Account governanceAddress (Just $ unChainId chainId)
       return chainId
 
-postChainInfos :: (MonadIO m, MonadLogger m, HasBlocSQL m,
-                   HasSQL m, HasBlocEnv m) =>
-                  [ChainInput] -> m [ChainId]
+postChainInfos :: ( MonadIO m
+                  , A.Selectable Account AddressState m
+                  , (Keccak256 `A.Alters` SourceMap) m
+                  , MonadLogger m
+                  , HasBlocSQL m
+                  , HasSQL m
+                  , HasBlocEnv m
+                  )
+               => [ChainInput] -> m [ChainId]
 postChainInfos chainInputs = withLastBlockHash $ \bHash -> do
   chainInfos <- traverse (createChainInfo bHash) chainInputs
-  chainIds <- postChains $ map snd chainInfos
+  chainIds <- postChains chainInfos
   let asyncInputs = fromMaybe False . chaininputAsync <$> chainInputs
       asyncChains = map snd . filter (not . fst) $ zip asyncInputs chainIds
   unless (null asyncChains) $ waitForChainInfos asyncChains
-  let cmIdChains = catMaybes $ zipWith (liftA2 (,)) (map fst chainInfos) (map Just chainIds)
-  for_ cmIdChains $ \(cmId, chainId) -> insertContractInstance cmId $ Account governanceAddress (Just $ unChainId chainId)
   return chainIds
 
 waitForChainInfo :: (MonadLogger m, Selectable ChainId ChainInfo m,

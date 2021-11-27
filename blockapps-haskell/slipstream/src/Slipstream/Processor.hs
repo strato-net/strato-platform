@@ -12,17 +12,21 @@
     , ScopedTypeVariables
     , TemplateHaskell
     , TupleSections
+    , TypeOperators
 #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Slipstream.Processor
   ( processTheMessages
   , parseActions -- For testing
   ) where
 
+import Prelude hiding (lookup)
 import qualified Data.Aeson                           as Aeson
 import Control.Arrow ((&&&))
 import Control.Applicative
-import Control.Lens ((^.))
+import Control.Lens ((^.), (.~), (?~))
+import Control.Monad.Change.Alter
 import Control.Monad.Except
 import Control.Monad.IO.Unlift
 import Control.Monad.Trans.Maybe
@@ -30,7 +34,6 @@ import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Strict hiding (state)
 import Data.Either (lefts, rights)
 import Data.Function
-import Data.Int (Int32)
 import Data.IORef
 import Data.List (foldl', sortOn)
 import qualified Data.Map as Map
@@ -53,9 +56,12 @@ import BlockApps.XAbiConverter
 import qualified BlockApps.SolidityVarReader as SVR
 import qualified BlockApps.SolidVMStorageDecoder as SolidVM
 
+import Blockchain.Data.AddressStateRef
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.TransactionResult
 --import Blockchain.DB.SQLDB
+import Blockchain.Data.DataDefs
+import Blockchain.Data.Json
 import Blockchain.SolidVM.CodeCollectionDB
 import Blockchain.Strato.Model.Account
 import qualified Blockchain.Strato.Model.Action as Action
@@ -69,6 +75,8 @@ import CodeCollection hiding (contractName, events)
 import Control.Monad.Change.Modify              hiding (modify)
 import Control.Monad.Composable.BlocSQL
 import Control.Monad.Composable.SQL
+import Control.Monad.Composable.CoreAPI
+import qualified Handlers.AccountInfo            as Account
 
 import Data.Source.Map
 
@@ -83,6 +91,54 @@ import Slipstream.XabiContract
 
 import SolidVM.Solidity.Xabi                    (VariableDeclF(..))
 import qualified SolidVM.Solidity.Xabi.Type               as Xabi
+
+instance ( (Keccak256 `Alters` SourceMap) m
+         , MonadLogger m
+         , HasBlocEnv m
+         , HasBlocSQL m
+         ) => Selectable Account ContractDetails (CoreAPIM m) where
+  select _ a = runMaybeT $ do
+    (AddressStateRef' r _) <- MaybeT
+                            . fmap listToMaybe
+                            . blocStrato
+                            . Account.getAccountsFilter
+                            $ Account.accountsFilterParams
+                            & Account.qaAddress ?~ (a ^. accountAddress)
+                            & Account.qaChainId .~ (fmap ChainId . maybeToList $ a ^. accountChainId)
+    codePtr <- MaybeT . pure $ addressStateRefCodePtr r
+    MaybeT $ either (const Nothing) (\d -> Just d{contractdetailsAccount = Just a}) <$> getContractDetailsByCodeHash codePtr
+
+instance (Keccak256 `Alters` SourceMap) m => (Keccak256 `Alters` SourceMap) (CoreAPIM m) where
+  lookup p   = lift . lookup p
+  insert p k = lift . insert p k
+  delete p   = lift . delete p
+
+instance (Keccak256 `Alters` SourceMap) m => (Keccak256 `Alters` SourceMap) (ReaderT BlocEnv m) where
+  lookup p   = lift . lookup p
+  insert p k = lift . insert p k
+  delete p   = lift . delete p
+
+instance (MonadUnliftIO m, MonadLogger m) => (Keccak256 `Alters` SourceMap) (BlocSQLM m) where
+  lookup _   = contractBySourceHash
+  insert _   = insertContractSourceQuery
+  delete _ _ = error "Cannot delete from contractsSourceTable"
+
+instance (MonadIO m, MonadLogger m) => Selectable Account AddressState (CoreAPIM m) where
+  select _ a = runMaybeT $ do
+    (AddressStateRef' r _) <- MaybeT
+                            . fmap listToMaybe
+                            . blocStrato
+                            . Account.getAccountsFilter
+                            $ Account.accountsFilterParams
+                            & Account.qaAddress ?~ (a ^. accountAddress)
+                            & Account.qaChainId .~ (fmap ChainId . maybeToList $ a ^. accountChainId)
+    codePtr <- MaybeT . pure $ addressStateRefCodePtr r
+    pure $ AddressState
+      (addressStateRefNonce r)
+      (addressStateRefBalance r)
+      (addressStateRefContractRoot r)
+      codePtr
+      (toMaybe 0 $ addressStateRefChainId r)
 
 diffNull :: Action.DataDiff -> Bool
 diffNull (Action.EVMDiff m) = Map.null m
@@ -99,10 +155,11 @@ data BatchedInserts = BatchedInserts
   , eventCreations  :: [EventTable]
   } deriving (Show)
 
-enterBloc2 :: r -> BlocSQLEnv -> ReaderT r (ReaderT BlocSQLEnv m) a -> m a
+enterBloc2 :: MonadIO m => r -> BlocSQLEnv -> CoreAPIM (ReaderT r (ReaderT BlocSQLEnv m)) a -> m a
 enterBloc2 blocEnv sqlEnv f =
   runBlocSQLMUsingEnv sqlEnv
   $ flip runReaderT blocEnv
+  $ runCoreAPIM "http://strato:3000/eth/v1.2"
   $ f
 
 matters :: AggregateAction -> Bool
@@ -153,8 +210,14 @@ lookupT k = MaybeT . return . Map.lookup k
 -- Tries to get contract metadata ID and contract details for a given contract.
 --  If they're not in the cache but they are in bloc database or action metadata,
 --  it reparses the whole source blob, and caches the details for every contract
-getSolidVMDetailsForRow :: (MonadIO m, MonadLogger m, Accessible BlocEnv m, HasBlocSQL m) =>
-                           IORef Globals -> AggregateAction -> m (Maybe (Int32, ContractDetails))
+getSolidVMDetailsForRow :: ( MonadIO m
+                           , MonadLogger m
+                           , Accessible BlocEnv m
+                           , HasBlocSQL m
+                           , Selectable Account AddressState m
+                           , (Keccak256 `Alters` SourceMap) m
+                           )
+                        => IORef Globals -> AggregateAction -> m (Maybe ContractDetails)
 getSolidVMDetailsForRow g row = runMaybeT  
    $  checkCache 
   <|> checkBloc 
@@ -166,7 +229,7 @@ getSolidVMDetailsForRow g row = runMaybeT
         
         checkBloc = do
           $logInfoS "getDetailsForRow" . T.pack $ "checking bloc database for contract details"
-          (MaybeT $ getContractDetailsByCodeHash codePtr) >>= (parseAndSet . contractdetailsSrc . snd)
+          (MaybeT $ either (const Nothing) Just <$> getContractDetailsByCodeHash codePtr) >>= (parseAndSet . contractdetailsSrc)
         
         checkMetadata = do
           $logInfoS "getDetailsForRow" . T.pack $ "checking metadata for contract details"
@@ -174,8 +237,6 @@ getSolidVMDetailsForRow g row = runMaybeT
         
 
         -- parse source code, add all of details to cache, return the one we need
-        parseAndSet :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
-                       SourceMap -> MaybeT m (Int32, ContractDetails)
         parseAndSet src = do
           detailsMap <- lift $ sourceToContractDetails (Don't Compile) src
           setContractABIs g codePtr detailsMap
@@ -186,11 +247,16 @@ getSolidVMDetailsForRow g row = runMaybeT
 
 
 -- For now, EVM details are not cached, because the cache links all the contracts in a source blob by source hash, and we only have source hashes for SolidVM code pointers. 
-getEVMDetailsForRow :: (MonadIO m, MonadLogger m, Accessible BlocEnv m,
-                        HasBlocSQL m) =>
-                       AggregateAction -> m (Maybe (Int32, ContractDetails))
+getEVMDetailsForRow :: ( MonadIO m
+                       , MonadLogger m
+                       , Accessible BlocEnv m
+                       , HasBlocSQL m
+                       , Selectable Account AddressState m
+                       , (Keccak256 `Alters` SourceMap) m
+                       )
+                    => AggregateAction -> m (Maybe ContractDetails)
 getEVMDetailsForRow row = liftM2 (<|>)
-  (getContractDetailsByCodeHash $ actionCodeHash row)
+  (fmap (either (const Nothing) Just) . getContractDetailsByCodeHash $ actionCodeHash row)
   (runMaybeT $ do
     let md = actionMetadata row
     src <- lookupT "src" md
@@ -201,8 +267,12 @@ getEVMDetailsForRow row = liftM2 (<|>)
 
 
 -- we want adjustGlobals to use cache and not recompile where possible, so we need the cache to link all contracts that share a source, and at the moment, we can only do this with SolidVMCode pointers
-adjustGlobals :: (MonadIO m, MonadLogger m, HasBlocSQL m) =>
-                 IORef Globals
+adjustGlobals :: ( MonadIO m
+                 , MonadLogger m
+                 , HasBlocSQL m
+                 , (Keccak256 `Alters` SourceMap) m
+                 )
+              => IORef Globals
               -> Should Compile
               -> AggregateAction
               -> ContractDetails
@@ -213,7 +283,7 @@ adjustGlobals gref shouldCompile row details = do
         v <- lookupT k $ actionMetadata row
         let contracts' = filter (not . T.null) $ T.splitOn "," v
         forM_ contracts' $ \c -> do
-          (_, details') <- lookupT c m
+          details' <- lookupT c m
           let codePtr = contractdetailsCodeHash details'
           $logInfoS "adjustGlobals" . T.pack $ "Adding to globals for " ++ T.unpack k ++ ": " ++ show codePtr
           lift $ f gref $ HistoryTableName (actionOrganization row) (actionApplication row) (contractdetailsName details')
@@ -404,7 +474,7 @@ processTheMessages env sqlEnv conn g messages = do
             Nothing -> pure . Left $ "No details found for code hash "
                             <> (T.pack . show $ actionCodeHash row)
                             <> " and no 'src' field found in actionMetadata"
-            Just (cmId, details) -> do
+            Just details -> do
               let abiid = ABIID
                     { aiAbi = xabiToText $ contractdetailsXabi details
                     , aiName = T.filter (/= '"') $ contractdetailsName details
@@ -412,8 +482,6 @@ processTheMessages env sqlEnv conn g messages = do
                     }
                   cont = either error id . xAbiToContract $ contractdetailsXabi details
               adjustGlobals g (Do Compile) row details
-
-              _ <- insertContractInstance cmId $ actionAccount row
 
               oldState <- readPreviousEVMState g acct cont
               indexContract <- rowToInsert g abiid row cont oldState
@@ -425,15 +493,12 @@ processTheMessages env sqlEnv conn g messages = do
             Nothing -> pure . Left $ "No SolidVM details for code hash "
                             <> (T.pack . show $ actionCodeHash row)
                             <> " and no 'src' field found in metadata"
-            Just (cmId, details) -> do
+            Just details -> do
               let abi = xabiToText $ contractdetailsXabi details
                   name = T.filter (/= '"') $ contractdetailsName details
                   abiid = ABIID abi name $ maybe "" (T.pack . chainIdString . ChainId) $ (actionAccount row ^. accountChainId)
                   cont = error "internal error: contract should be unused for solidvm"
 
-              _ <- insertContractInstance cmId $ actionAccount row
-
-          
               adjustGlobals g (Don't Compile) row details
               oldState <- readPreviousSolidVMState g acct
               indexContract <- rowToInsert g abiid row cont oldState

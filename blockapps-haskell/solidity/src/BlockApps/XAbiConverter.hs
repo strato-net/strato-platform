@@ -194,6 +194,9 @@ xAbiToContract contractXabi@Xabi{..} = mdo
 --------------------------------------------
 --Inverse Conversion
 
+-- DANGER: Lossy function! Does not preserve typedefs, modifiers, events, or usings.
+--         Use with caution, only when returning from API, not to be converted back
+--         into a Contract type.
 contractToXabi :: Text -> Contract -> Xabi
 contractToXabi cName Contract{..} =
   let

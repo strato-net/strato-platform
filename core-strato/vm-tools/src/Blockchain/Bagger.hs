@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns        #-}
+{-# LANGUAGE ConstraintKinds     #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecordWildCards     #-}
@@ -10,12 +11,15 @@
 module Blockchain.Bagger where
 
 import           Control.Arrow                      ((&&&))
+import           Control.Monad
 import qualified Control.Monad.Change.Alter         as A
+import qualified Control.Monad.Change.Modify        as Mod
 import           Control.Monad.Extra
 import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Except
 import           Blockchain.Output
 import           Control.Monad.Trans.Class          (lift)
-import           Control.Monad.Trans.Except
+import qualified Data.ByteString.Short              as BSS
 import qualified Data.DList                         as DL
 import qualified Data.Map                           as M
 import qualified Data.Text                          as T
@@ -25,20 +29,24 @@ import qualified Data.Set                           as S
 import           Data.Word
 import           Numeric                            (readHex)
 
+import           Blockchain.Constants
 import           Blockapps.Crossmon
-
-import           Blockchain.CoreFlags               (flags_difficultyBomb, flags_testnet)
 
 import qualified Blockchain.Bagger.BaggerState      as B
 import           Blockchain.Bagger.Transactions
 import           Blockchain.Data.Address
 import qualified Blockchain.Data.AddressStateDB     as DD
 import           Blockchain.Data.Block
-import qualified Blockchain.Data.DataDefs           as DD
 import           Blockchain.Data.BlockHeader        (txsLen2ExtraData)
+import qualified Blockchain.Data.DataDefs           as DD
+import           Blockchain.Data.Transaction
 import qualified Blockchain.Data.TransactionDef     as TD
+import           Blockchain.Data.TransactionResult
 import qualified Blockchain.Data.TXOrigin           as TO
 import           Blockchain.DB.ChainDB
+import           Blockchain.DB.MemAddressStateDB
+import           Blockchain.DB.ModifyStateDB
+import           Blockchain.DB.StorageDB
 import           Blockchain.Database.MerklePatricia (StateRoot (..))
 import qualified Blockchain.EthConf                 as Conf
 import           Blockchain.ExtWord
@@ -46,149 +54,268 @@ import           Blockchain.Sequencer.Event         (OutputBlock (..), OutputTx 
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Timing
+import qualified Blockchain.TxRunResultCache        as TRC
 import qualified Blockchain.Verification            as V
-import           Blockchain.VMContext               hiding (peekPendingVote, state)
-import           Blockchain.VMOptions               (flags_gasOn)
+import           Blockchain.VMContext               hiding (state)
+import           Blockchain.VMMetrics
+import           Blockchain.VMOptions
 
 import           Executable.EVMFlags                (flags_maxTxsPerBlock)
-
 import           Text.Format
 
 {-# NOINLINE baggerBlockHash #-}
 baggerBlockHash :: Keccak256
 baggerBlockHash = hash "This is the bagger block hash. It is a dummy value used to keep track of the bagger's state roots through time"
 
-class VMBase m => MonadBagger m where
-    isBlockstanbul     :: m Bool
-    getBaggerState     :: m B.BaggerState
-    peekPendingVote    :: m (Address, Word64)
-    clearPendingVote   :: Block -> m ()
-    putBaggerState     :: B.BaggerState -> m ()
-    runFromStateRoot   :: Integer -> DD.BlockData -> [OutputTx] -> m (Either RunAttemptError (StateRoot, [TxRunResult], Integer))
-    rewardCoinbases    :: Address -> [DD.BlockData] -> Integer -> m StateRoot -- miner coinbase -> known uncles -> this block number -> stateRoot
-    txsDroppedCallback :: [TxRejection] -> [Keccak256] -> m () -- called when a Tx is dropped from/rejected by the pool
+type MonadBagger m = ( VMBase m
+                     , Mod.Accessible IsBlockstanbul m
+                     , Mod.Accessible TRC.Cache m
+                     , Mod.Modifiable B.BaggerState m
+                     , Mod.Yields m TransactionResult
+                     )
 
-    -- Would it make more sense to expand the MiningCache than to introduce a separate cache?
-    cacheRunResults :: DD.BlockData -> (StateRoot, Integer, [TxRunResult]) -> m ()
-    getCachedRunResults :: DD.BlockData -> m (Maybe (StateRoot, Integer, [TxRunResult]))
-    {-# MINIMAL isBlockstanbul, getBaggerState, peekPendingVote, clearPendingVote, putBaggerState,
-        runFromStateRoot, rewardCoinbases, txsDroppedCallback, cacheRunResults, getCachedRunResults #-}
+data TxMiningResult = TxMiningResult { tmrFailure  :: Maybe TransactionFailureCause
+                                     , tmrRanTxs   :: [TxRunResult]
+                                     , tmrUnranTxs :: [OutputTx]
+                                     , tmrRemGas   :: Integer
+                                     } deriving (Show)
 
-    getCheckpointableState :: m (Keccak256, DD.BlockData)
-    getCheckpointableState = do
-        state <- getBaggerState
-        let miningCache = B.miningCache state
-            bestSHA     = B.bestBlockSHA miningCache
-            bestHeader  = B.bestBlockHeader miningCache
-        return (bestSHA, bestHeader)
+type MineTransactions m = DD.BlockData -> Integer -> [OutputTx] -> m TxMiningResult
 
-    updateBaggerState :: (B.BaggerState -> B.BaggerState) -> m ()
-    updateBaggerState f = putBaggerState =<< (f <$> getBaggerState)
+isBlockstanbul :: (Functor m, Mod.Accessible IsBlockstanbul m) => m Bool
+isBlockstanbul = unIsBlockstanbul <$> Mod.access (Mod.Proxy @IsBlockstanbul)
 
-    addTransactionsToMempool :: [OutputTx] -> m ()
-    addTransactionsToMempool ts = do
-        let publicTxs  = filter ((/= PrivateHash) . txType) ts
-            privateTxs = filter ((== PrivateHash) . txType) ts
-        $logDebugS "Bagger.addTransactionsToMempool" $ T.pack $ "Adding " ++ show (length ts) ++ " txs"
-        withBagger $ do
-          sequence_ (addToQueued Insertion <$> publicTxs)
-          state <- getBaggerState
-          let cache = B.miningCache state
-              hashes = B.privateHashes cache `DL.append` DL.fromList privateTxs
-          putBaggerState state{ B.miningCache = cache{ B.privateHashes = hashes } }
-          promoteExecutables
+getBaggerState :: Mod.Modifiable B.BaggerState m => m B.BaggerState
+getBaggerState = Mod.get (Mod.Proxy @B.BaggerState)
 
-    processNewBestBlock :: Keccak256 -> DD.BlockData -> [Keccak256] -> m ()
-    processNewBestBlock bh bd txShas = do
-        $logDebugS "Bagger.processNewBestBlock" . T.pack $ "called with " ++ show (length txShas) ++ " txs"
-        state <- getBaggerState
-        -- This will be rounded in RLPEncode, but just for consistency.
-        -- Really, it should just be Int and then we wouldn't need to worry about leap seconds.
-        time  <- posixSecondsToUTCTime . fromInteger . round . utcTimeToPOSIXSeconds <$> liftIO getCurrentTime
-        let pHashes = B.privateHashes $ B.miningCache state
-            shaSet = S.fromList txShas
-            f = not . (`S.member` shaSet) . txHash . otBaseTx
-            hashMap = DL.fromList . filter f $ DL.toList pHashes
-            thisStateRoot = DD.blockDataStateRoot bd
-            newMiningCache = B.MiningCache { B.bestBlockSHA          = bh
-                                           , B.bestBlockHeader       = bd
-                                           , B.bestBlockTxHashes     = txShas
-                                           , B.lastExecutedStateRoot = thisStateRoot
-                                           , B.remainingGas          = nextGasLimit $ DD.blockDataGasLimit bd
-                                           , B.lastExecutedTxs       = []
-                                           , B.promotedTransactions  = []
-                                           , B.privateHashes         = hashMap
-                                           , B.startTimestamp        = time
-                                           }
-        putBaggerState $ state { B.seen = S.empty, B.miningCache = newMiningCache }
-        migrateBlockHeader bd baggerBlockHash
-        withBagger $ do
-          demoteUnexecutables
-          promoteExecutables
+putBaggerState :: Mod.Modifiable B.BaggerState m => B.BaggerState -> m ()
+putBaggerState = Mod.put (Mod.Proxy @B.BaggerState)
 
-    makeNewBlock :: m OutputBlock
-    makeNewBlock = do
-        state <- getBaggerState
-        let seen'       = B.seen state
-        let cache       = B.miningCache state
-        let lastExec    = B.lastExecutedTxs cache
-        let lastExecLen = length lastExec
-        let lastExecGuardLen = length [t | t  <- lastExec, otHash (trrTransaction t) `S.member` seen']
-        let noCachedTxsCulled = lastExecLen == lastExecGuardLen
-        if noCachedTxsCulled then do
-            $logDebugS "Bagger.makeNewBlock" "noCachedTxsCulled = True"
-            if null $ B.promotedTransactions cache then do
-                    $logDebugS "Bagger.makeNewBlock" "null $ B.promotedTransactions cache = True"
-                    !build <- withBagger buildFromMiningCache
-                    return build
-                else do
-                    $logDebugS "Bagger.makeNewBlock" "null $ B.promotedTransactions cache = False"
-                    isPBFT <- isBlockstanbul
-                    (coinbaseAddr, nonce) <- peekPendingVote
-                    let lastSR          = B.lastExecutedStateRoot cache
-                    let lastSHA         = B.bestBlockSHA cache
-                    let lastHead        = B.bestBlockHeader cache
-                    let promoted        = take ((fromInteger flags_maxTxsPerBlock) - lastExecLen) $ B.promotedTransactions cache
-                    let time            = B.startTimestamp cache
-                    let tempBlockHeader = buildNextBlockHeader lastHead lastSHA [] lastSR [] time isPBFT coinbaseAddr nonce
-                    let remGas          = B.remainingGas cache
-                    $logDebugS "Bagger.makeNewBlock" . T.pack $ "pre-incremental run :: (" ++ show remGas ++ ", " ++ format lastSR ++ ")"
-                    withBagger $ do
-                      !run <- runFromStateRoot remGas tempBlockHeader promoted
-                      (newSR, newGas, newExec, newUnexec) <- case run of
-                              Right (newSR', newRR', newGas') -> return (newSR', newGas', lastExec ++ newRR', [])
-                              Left e -> do
-                                  logRAE e
-                                  case e of
-                                      (GasLimitReached rtx urtx nsr nbg)      -> return (nsr, nbg, lastExec ++ rtx, urtx)
-                                      (RecoverableFailure f rtx urtx nsr nbg) -> do
-                                          txsDroppedCallback [f] []
-                                          let theRejectedTx = rejectedTx f
-                                          purgeFromPending theRejectedTx
-                                          return (nsr, nbg, lastExec ++ rtx, filter (/= theRejectedTx) urtx)
-                                      x                                       -> error (show x)
+runFromStateRoot :: MonadBagger m => MineTransactions m -> Integer -> DD.BlockData -> [OutputTx] -> m (Either RunAttemptError (StateRoot, [TxRunResult], Integer))
+runFromStateRoot mineTransactions remainingGas theBlockHeader txs = do
+    A.insert (A.Proxy @StateRoot) (Nothing :: Maybe Word256) (DD.blockDataStateRoot theBlockHeader)
+    (TxMiningResult res ranTxs unranTxs newGas) <-
+      timeit "mineTransactions bagger" (Just vmBlockInsertionMined)
+      $ mineTransactions theBlockHeader remainingGas txs
+    timeit "flushMemStorageDB bagger" (Just vmBlockInsertionMined) flushMemStorageDB
+    timeit "flushMemAddressStateDB bagger" (Just vmBlockInsertionMined) flushMemAddressStateDB
+    newStateRoot <- A.lookupWithDefault (A.Proxy @StateRoot) (Nothing :: Maybe Word256)
+    let recoverable f = Left (RecoverableFailure (tfToBaggerTxRejection f) ranTxs unranTxs newStateRoot newGas)
+    return $ case res of -- currently only get GasLimit errors out of mineTransactions'
+        Nothing -> Right (newStateRoot, ranTxs, newGas)
+        Just TFBlockGasLimitExceeded{}  -> Left (GasLimitReached ranTxs unranTxs newStateRoot newGas)
+        Just f@TFInsufficientFunds{} -> recoverable f
+        Just f@TFIntrinsicGasExceedsTxLimit{} -> recoverable f
+        Just f@TFChainIdMismatch{} -> recoverable f
+        Just f@TFNonceMismatch{} -> error $ "mineTransactions' we messed up: " ++ format f
+        Just f@TFCodeCollectionNotFound{} -> recoverable f
 
-                      let !newMiningCache = cache { B.lastExecutedStateRoot = newSR
-                                                  , B.remainingGas          = newGas
-                                                  , B.lastExecutedTxs       = newExec
-                                                  , B.promotedTransactions  = newUnexec
-                                                  }
-                      $logDebugS "Bagger.makeNewBlock" . T.pack $ "post-incremental run :: (" ++ show newGas ++ ", " ++ format newSR ++ ")"
-                      updateBaggerState (\s -> s { B.miningCache = newMiningCache })
-                      !build <- buildFromMiningCache
-                      $logInfoS "Bagger.makeNewBlock" . T.pack $ "Returned from buildFromMiningCache with stateRoot " ++ show (DD.blockDataStateRoot $ obBlockData build)
-                      return build
-          else do -- some transactions which were cached have been evicted, need to recalculate entire block cache
-              $logDebugS "Bagger.makeNewBlock" "noCachedTxsCulled = False"
-              let sha    = B.bestBlockSHA cache
-              let header = B.bestBlockHeader cache
-              let txShas = B.bestBlockTxHashes cache
-              processNewBestBlock sha header txShas
-              !nb <- makeNewBlock
-              return nb
+rewardCoinbases :: MonadBagger m => Address -> [DD.BlockData] -> Integer -> m StateRoot -- miner coinbase -> known uncles -> this block number -> stateRoot
+rewardCoinbases us uncles ourNumber = do
+    _ <- addToBalance (Account us Nothing) $ rewardBase flags_testnet
+    forM_ uncles $ \uncle -> do
+        _ <- addToBalance (Account us Nothing) (rewardBase flags_testnet `quot` 32)
+        _ <- addToBalance (Account (DD.blockDataCoinbase uncle) Nothing) ((rewardBase flags_testnet * (8+DD.blockDataNumber uncle - ourNumber )) `quot` 8)
+        return ()
+    flushMemStorageDB
+    flushMemAddressStateDB
+    A.lookupWithDefault (A.Proxy @StateRoot) (Nothing :: Maybe Word256)
 
-    setCalculateIntrinsicGas :: (Integer -> OutputTx -> Integer) -> m ()
-    setCalculateIntrinsicGas cig = putBaggerState =<< (\s -> s { B.calculateIntrinsicGas = cig }) <$> getBaggerState
+-- todo batch insert results
+txsDroppedCallback :: MonadBagger m => [TxRejection] -> [Keccak256] -> m () -- called when a Tx is dropped from/rejected by the pool
+txsDroppedCallback rejections bestBlockShas = forM_ rejections $ \rejection -> do
+    let (message, theHash) = baggerRejectionToTransactionResultBits rejection
+    -- if a tx is dropped from Queued during demotion, it means it was likely culled during the demotion as the
+    -- new best block we just mined came in
+    let isRecentlyRan = theHash `elem` bestBlockShas
+    when (flags_createTransactionResults && not isRecentlyRan) $ do
+        $logInfoS "txsDroppedCallback" . T.pack $ "Transaction rejection :: " ++ format theHash
+        $logInfoS "txsDroppedCallback" . T.pack $ "Reason: " ++ message
+        Mod.yield
+          DD.TransactionResult { transactionResultBlockHash        = unsafeCreateKeccak256FromWord256 0
+                               , transactionResultTransactionHash  = theHash
+                               , transactionResultMessage          = message
+                               , transactionResultResponse         = BSS.empty
+                               , transactionResultTrace            = "rejected"
+                               , transactionResultGasUsed          = 0
+                               , transactionResultEtherUsed        = 0
+                               , transactionResultContractsCreated = ""
+                               , transactionResultContractsDeleted = ""
+                               , transactionResultStateDiff        = ""
+                               , transactionResultTime             = 0
+                               , transactionResultNewStorage       = ""
+                               , transactionResultDeletedStorage   = ""
+                               , transactionResultStatus           = Just (txRejectionToAPIFailureCause rejection)
+                               , transactionResultChainId          = txChainId . otBaseTx $ rejectedTx rejection
+                               , transactionResultKind             = Nothing
+                               }
+
+-- Would it make more sense to expand the MiningCache than to introduce a separate cache?
+cacheRunResults :: MonadBagger m => DD.BlockData -> (StateRoot, Integer, [TxRunResult]) -> m ()
+cacheRunResults bd (sr, gasRemaining, trrs) = when flags_cacheTransactionResults $ do
+  -- Private run results should not be cached, as on the second run
+  -- the hydrated transaction will reach a different stateroot.
+  -- Filtering them out makes the assumption that the inclusion of the unhydrated
+  -- private txs reach the same stateroot as the public txs alone.
+  let publicTrrs = filter ((== Nothing) . txChainId . trrTransaction) trrs
+      bhash = blockHeaderPartialHash bd
+  $logInfoLS "cacheRunResults" (bhash, length publicTrrs)
+  $logDebugLS "cacheRunResults" bd
+  cache <- Mod.access (Mod.Proxy @TRC.Cache)
+  liftIO $ TRC.insert cache bhash (sr, gasRemaining, publicTrrs)
+
+getCachedRunResults :: MonadBagger m => DD.BlockData -> m (Maybe (StateRoot, Integer, [TxRunResult]))
+getCachedRunResults bd =
+  if not flags_cacheTransactionResults
+    then return Nothing
+    else do
+      cache <- Mod.access (Mod.Proxy @TRC.Cache)
+      let pHash = blockHeaderPartialHash bd
+      mres <- liftIO $ TRC.lookup cache pHash
+      case mres of
+        Nothing -> do
+          $logInfoLS "getCachedRunResults/cache_miss" . T.pack $ format pHash
+          $logDebugLS "getCacheRunResults/cache_miss" bd
+          return Nothing
+        Just (sr, gasRemaining, trrs) -> do
+          $logInfoLS "getCachedRunResults/cache_hit" . T.pack $ format pHash
+          let trrs' = map (rewriteBlockHash (blockHeaderHash bd)) trrs
+          return $ Just (sr, gasRemaining, trrs')
+
+baggerRejectionToTransactionResultBits :: TxRejection -> (String, Keccak256) -- pretty, txHash
+baggerRejectionToTransactionResultBits rejection = case rejection of
+    WrongChainId   s q OutputTx{otHash=hsh, otBaseTx=bt} ->
+        (p' s q ++ "chainId (expected: main, actual: " ++ TD.formatChainId (txChainId bt) ++ ")", hsh)
+    NonceTooLow    s q expected OutputTx{otHash=hsh, otBaseTx=bt} ->
+        (p' s q ++ "tx nonce (expected: " ++ show expected ++ ", actual: " ++ show (transactionNonce bt) ++ ")", hsh)
+    BalanceTooLow  s q needed actual OutputTx{otHash=hsh} ->
+        (p' s q ++ "account balance (expected: " ++ show needed ++ ", actual: " ++ show actual ++ ")", hsh)
+    GasLimitTooLow s q _ OutputTx{otHash=hsh} ->
+        (p' s q ++ "tx gas limit", hsh)
+    LessLucrative  s q OutputTx{otHash=hashBetter} OutputTx{otHash=hashWorse} ->
+        (p s q ++ formatKeccak256WithoutColor hashBetter ++ " being a more lucrative transaction", hashWorse)
+    CodeNotFound s q a n OutputTx{otHash=h} ->
+        (p s q ++ " code not found at address " ++ format a ++ " with name " ++ n, h)
+
+    where p stage queue = "Rejected from mempool at " ++ show stage ++ "/" ++ show queue ++ " due to "
+          p' s q        = p s q ++ "low "
+
+getCheckpointableState :: MonadBagger m => m (Keccak256, DD.BlockData)
+getCheckpointableState = do
+    state <- getBaggerState
+    let miningCache = B.miningCache state
+        bestSHA     = B.bestBlockSHA miningCache
+        bestHeader  = B.bestBlockHeader miningCache
+    return (bestSHA, bestHeader)
+
+updateBaggerState :: MonadBagger m => (B.BaggerState -> B.BaggerState) -> m ()
+updateBaggerState f = putBaggerState =<< (f <$> getBaggerState)
+
+addTransactionsToMempool :: MonadBagger m => [OutputTx] -> m ()
+addTransactionsToMempool ts = do
+    let publicTxs  = filter ((/= PrivateHash) . txType) ts
+        privateTxs = filter ((== PrivateHash) . txType) ts
+    $logDebugS "Bagger.addTransactionsToMempool" $ T.pack $ "Adding " ++ show (length ts) ++ " txs"
+    withBagger $ do
+      sequence_ (addToQueued Insertion <$> publicTxs)
+      state <- getBaggerState
+      let cache = B.miningCache state
+          hashes = B.privateHashes cache `DL.append` DL.fromList privateTxs
+      putBaggerState state{ B.miningCache = cache{ B.privateHashes = hashes } }
+      promoteExecutables
+
+processNewBestBlock :: MonadBagger m => Keccak256 -> DD.BlockData -> [Keccak256] -> m ()
+processNewBestBlock bh bd txShas = do
+    $logDebugS "Bagger.processNewBestBlock" . T.pack $ "called with " ++ show (length txShas) ++ " txs"
+    state <- getBaggerState
+    -- This will be rounded in RLPEncode, but just for consistency.
+    -- Really, it should just be Int and then we wouldn't need to worry about leap seconds.
+    time  <- posixSecondsToUTCTime . fromInteger . round . utcTimeToPOSIXSeconds <$> liftIO getCurrentTime
+    let pHashes = B.privateHashes $ B.miningCache state
+        shaSet = S.fromList txShas
+        f = not . (`S.member` shaSet) . txHash . otBaseTx
+        hashMap = DL.fromList . filter f $ DL.toList pHashes
+        thisStateRoot = DD.blockDataStateRoot bd
+        newMiningCache = B.MiningCache { B.bestBlockSHA          = bh
+                                       , B.bestBlockHeader       = bd
+                                       , B.bestBlockTxHashes     = txShas
+                                       , B.lastExecutedStateRoot = thisStateRoot
+                                       , B.remainingGas          = nextGasLimit $ DD.blockDataGasLimit bd
+                                       , B.lastExecutedTxs       = []
+                                       , B.promotedTransactions  = []
+                                       , B.privateHashes         = hashMap
+                                       , B.startTimestamp        = time
+                                       }
+    putBaggerState $ state { B.seen = S.empty, B.miningCache = newMiningCache }
+    migrateBlockHeader bd baggerBlockHash
+    withBagger $ do
+      demoteUnexecutables
+      promoteExecutables
+
+makeNewBlock :: MonadBagger m => MineTransactions m -> m OutputBlock
+makeNewBlock mineTransactions = do
+    state <- getBaggerState
+    let seen'       = B.seen state
+    let cache       = B.miningCache state
+    let lastExec    = B.lastExecutedTxs cache
+    let lastExecLen = length lastExec
+    let lastExecGuardLen = length [t | t  <- lastExec, otHash (trrTransaction t) `S.member` seen']
+    let noCachedTxsCulled = lastExecLen == lastExecGuardLen
+    if noCachedTxsCulled then do
+        $logDebugS "Bagger.makeNewBlock" "noCachedTxsCulled = True"
+        if null $ B.promotedTransactions cache then do
+                $logDebugS "Bagger.makeNewBlock" "null $ B.promotedTransactions cache = True"
+                !build <- withBagger buildFromMiningCache
+                return build
+            else do
+                $logDebugS "Bagger.makeNewBlock" "null $ B.promotedTransactions cache = False"
+                isPBFT <- isBlockstanbul
+                (coinbaseAddr, nonce) <- peekPendingVote
+                let lastSR          = B.lastExecutedStateRoot cache
+                let lastSHA         = B.bestBlockSHA cache
+                let lastHead        = B.bestBlockHeader cache
+                let promoted        = take ((fromInteger flags_maxTxsPerBlock) - lastExecLen) $ B.promotedTransactions cache
+                let time            = B.startTimestamp cache
+                let tempBlockHeader = buildNextBlockHeader lastHead lastSHA [] lastSR [] time isPBFT coinbaseAddr nonce
+                let remGas          = B.remainingGas cache
+                $logDebugS "Bagger.makeNewBlock" . T.pack $ "pre-incremental run :: (" ++ show remGas ++ ", " ++ format lastSR ++ ")"
+                withBagger $ do
+                  !run <- runFromStateRoot mineTransactions remGas tempBlockHeader promoted
+                  (newSR, newGas, newExec, newUnexec) <- case run of
+                          Right (newSR', newRR', newGas') -> return (newSR', newGas', lastExec ++ newRR', [])
+                          Left e -> do
+                              logRAE e
+                              case e of
+                                  (GasLimitReached rtx urtx nsr nbg)      -> return (nsr, nbg, lastExec ++ rtx, urtx)
+                                  (RecoverableFailure f rtx urtx nsr nbg) -> do
+                                      txsDroppedCallback [f] []
+                                      let theRejectedTx = rejectedTx f
+                                      purgeFromPending theRejectedTx
+                                      return (nsr, nbg, lastExec ++ rtx, filter (/= theRejectedTx) urtx)
+                                  x                                       -> error (show x)
+
+                  let !newMiningCache = cache { B.lastExecutedStateRoot = newSR
+                                              , B.remainingGas          = newGas
+                                              , B.lastExecutedTxs       = newExec
+                                              , B.promotedTransactions  = newUnexec
+                                              }
+                  $logDebugS "Bagger.makeNewBlock" . T.pack $ "post-incremental run :: (" ++ show newGas ++ ", " ++ format newSR ++ ")"
+                  updateBaggerState (\s -> s { B.miningCache = newMiningCache })
+                  !build <- buildFromMiningCache
+                  $logInfoS "Bagger.makeNewBlock" . T.pack $ "Returned from buildFromMiningCache with stateRoot " ++ show (DD.blockDataStateRoot $ obBlockData build)
+                  return build
+      else do -- some transactions which were cached have been evicted, need to recalculate entire block cache
+          $logDebugS "Bagger.makeNewBlock" "noCachedTxsCulled = False"
+          let sha    = B.bestBlockSHA cache
+          let header = B.bestBlockHeader cache
+          let txShas = B.bestBlockTxHashes cache
+          processNewBestBlock sha header txShas
+          !nb <- makeNewBlock mineTransactions
+          return nb
+
+setCalculateIntrinsicGas :: MonadBagger m => (Integer -> OutputTx -> Integer) -> m ()
+setCalculateIntrinsicGas cig = putBaggerState =<< (\s -> s { B.calculateIntrinsicGas = cig }) <$> getBaggerState
 
 logRAE :: (MonadLogger m) => RunAttemptError -> m ()
 logRAE rae = do
