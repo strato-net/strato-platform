@@ -282,7 +282,7 @@ expandIndexTable globalsIORef lst@(x:_) = do
           (application x)
           (contractName x)
       tableName = IndexTableName org app cname
-  expandContractTable globalsIORef lst tableName
+  forM_ lst $ \c -> expandContractTable globalsIORef c tableName
 
 expandHistoryTable :: OutputM m
                  => IORef Globals
@@ -295,15 +295,14 @@ expandHistoryTable globalsIORef lst@(x:_) = do
           (application x)
           (contractName x)
       tableName = HistoryTableName org app cname
-  expandContractTable globalsIORef lst tableName
+  forM_ lst $ \c -> expandContractTable globalsIORef c tableName
 
 expandContractTable :: OutputM m
                     => IORef Globals
-                    -> [ProcessedContract]
+                    -> ProcessedContract
                     -> TableName
                     -> ConduitM () Text m ()
-expandContractTable _ [] _ = return ()
-expandContractTable globalsIORef (x:xs) tableName = do
+expandContractTable globalsIORef x tableName = do
   columns <- getTableColumns globalsIORef tableName
   case columns of
     Nothing -> do
@@ -312,7 +311,6 @@ expandContractTable globalsIORef (x:xs) tableName = do
           , (tableNameToText tableName)
           , " does not exist, but we are trying to expand it?"
           ]
-      expandContractTable globalsIORef xs tableName
     Just cols -> do
       let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData x
           difference new old = filter ((`notElem` old) . fst) new
@@ -327,7 +325,6 @@ expandContractTable globalsIORef (x:xs) tableName = do
             ]
         setTableCreated globalsIORef tableName $ cols ++ extras
         yield $ expandTableQuery tableName extras
-      expandContractTable globalsIORef xs tableName
 
 expandTableQuery :: TableName ->  TableColumns -> Text
 expandTableQuery tableName cols = T.concat
