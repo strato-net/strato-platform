@@ -486,7 +486,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
           }]
     g <- newGlobals fakeHandle
 
-    cs1 <- runLoggingT . runConduit $ createExpandIndexTable g input .| sinkList
+    cs1 <- fmap concat $ forM input $ \c -> runLoggingT . runConduit $ createExpandIndexTable g c .| sinkList
     cs2 <- runLoggingT . runConduit $ insertIndexTable g input .| sinkList
     (cs1 ++ cs2) `shouldNotBe` []
 

@@ -209,12 +209,11 @@ tableNameToText (EventTableName o a c e) =
 createExpandIndexTable
   :: OutputM m
   => IORef Globals
-  -> [ProcessedContract]
+  -> ProcessedContract
   -> ConduitM () Text m ()
-createExpandIndexTable g cs = do
-  unless (null cs) $ do
-    forM_ cs $ \c -> createIndexTable g c
-    expandIndexTable g cs
+createExpandIndexTable g c = do
+  createIndexTable g c
+  expandIndexTable g c
 
 createExpandInsertHistoryTable
   :: OutputM m
@@ -273,17 +272,15 @@ createHistoryTable globalsIORef contract = do
 -- Runs ALTER TABLE <name> [ADD COLUMN <column>] for any new fields added to a contract definition   
 expandIndexTable :: OutputM m
                  => IORef Globals
-                 -> [ProcessedContract]
+                 -> ProcessedContract
                  -> ConduitM () Text m ()
-expandIndexTable _ [] = return ()
-expandIndexTable globalsIORef lst = do
-  forM_ lst $ \c -> do
-    let (org, app, cname) = constructTableNameParameters
-                            (organization c)
-                            (application c)
-                            (contractName c)
-        tableName = IndexTableName org app cname
-    expandContractTable globalsIORef c tableName
+expandIndexTable globalsIORef c = do
+  let (org, app, cname) = constructTableNameParameters
+                          (organization c)
+                          (application c)
+                          (contractName c)
+      tableName = IndexTableName org app cname
+  expandContractTable globalsIORef c tableName
 
 expandHistoryTable :: OutputM m
                  => IORef Globals

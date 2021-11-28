@@ -449,7 +449,8 @@ processTheMessages env sqlEnv conn g messages = do
 
   forM_ creates $ \(ccString, cp, o, a) -> do
     cc <- getCodeCollection cp ccString
-    outputData conn $ createExpandIndexTable g $ map (ccToProcessedContract cp o a) $ Map.toList (cc^.contracts)
+    forM_ (map (ccToProcessedContract cp o a) $ Map.toList (cc^.contracts)) $ \c ->
+      outputData conn $ createExpandIndexTable g c
   
   unless (null messages) $
     $logDebugS "processTheMessages" . T.pack . unlines . map show $ messages
