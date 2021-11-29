@@ -49,15 +49,15 @@ int = V.SimpleValue . V.valueInt
 
 createInserts :: OutputM m
               => IORef Globals
-              -> [ProcessedContract]
+              -> [(ProcessedContract, Contract)]
               -> ConduitM () Text m ()
 createInserts globalsIORef contracts = do
   unless (null contracts) $ do
     let contract = head contracts
-    createIndexTable globalsIORef contract
-    createHistoryTable globalsIORef contract
-    insertIndexTable globalsIORef contracts
-    insertHistoryTable globalsIORef contracts
+    createIndexTable globalsIORef (snd contract) (fst contract)
+    createHistoryTable globalsIORef $ fst contract
+    insertIndexTable globalsIORef $ map fst contracts
+    insertHistoryTable globalsIORef $ map fst contracts
 
 
 
@@ -71,7 +71,7 @@ spec = do
   describe "Array serialization" $ do
     it "should create JSON entries" $ do
       let testAdd = Address $ fst . head . readHex $ "ADDRESS"
-      let input = [ProcessedContract {
+      let input = [(ProcessedContract {
             address = testAdd,
             codehash = EVMCode $ hash "<CODEHASH>",
             abi = "<ABI>",
@@ -88,7 +88,10 @@ spec = do
                 V.ValueStruct $ M.fromList [
                   ("number", V.SimpleValue $ V.valueUInt 18199984780605),
                   ("hash", V.SimpleValue $ V.ValueString "Owner_hash_181999847806006")]]
-            }]
+            }, createDummyContract [
+                  ("number", Xabi.Int Nothing Nothing),
+                  ("hash", Xabi.String Nothing)
+                  ])]
 
       g <- newGlobals fakeHandle
       [contractInsert, vehicleCreate, vehicleInsert] <- runLoggingT . runConduit $ createInserts g input .| sinkList
@@ -144,7 +147,7 @@ spec = do
     it "should create JSON entries" $ do
       let testAdd = Address $ fst . head . readHex $ "ADDRESS"
           cHash = EVMCode $ hash "<CODEHASH>"
-      let input = [ProcessedContract {
+      let input = [(ProcessedContract {
              address = testAdd,
              codehash = cHash,
              abi = "<ABI>",
@@ -161,7 +164,10 @@ spec = do
                 V.ValueStruct $ M.fromList [
                   ("number", V.SimpleValue $ V.valueUInt 18199984780605),
                   ("hash", V.SimpleValue $ V.ValueString "Owner_hash_181999847806006")]]
-            }]
+            }, createDummyContract [
+                  ("number", Xabi.Int Nothing Nothing),
+                  ("hash", Xabi.String Nothing)
+                  ])]
       g <- newGlobals fakeHandle
       addToHistoryList g (HistoryTableName "" "" "Vehicle")
       [contractInsert, vehicleCreate, historyCreate, historyIndex, vehicleInsert, historyInsert]
@@ -251,7 +257,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
   describe "String escaping" $ do
     it "should create JSON entries with quotes escaped" $ do
       let testAdd = Address $ fst . head . readHex $ "ADDRESS"
-      let input = [ProcessedContract {
+      let input = [(ProcessedContract {
             address = testAdd,
             codehash = EVMCode $ hash "<CODEHASH>",
             abi = "<ABI>",
@@ -268,7 +274,10 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
                 V.ValueStruct $ M.fromList [
                   ("number\"", V.SimpleValue $ V.valueUInt 18199984780605),
                   ("h'a\"'sh", V.SimpleValue $ V.ValueString "''Owner_hash_181999847806006")]]
-            }]
+            }, createDummyContract [
+                       ("number\"", Xabi.Int Nothing Nothing),
+                       ("h'a\"'sh", Xabi.String Nothing)
+                       ])]
 
       g <- newGlobals fakeHandle
       [contractInsert, vehicleCreate, vehicleInsert] <-
@@ -323,7 +332,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
 
   it "can unparse all solidvm value types" $ do
     let testAdd = Address 0x98eaddede
-        input = [ProcessedContract {
+        input = [(ProcessedContract {
           address = testAdd,
           codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
           abi = "<ABI>",
@@ -355,7 +364,17 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
                 , (V.valueInt 46, bool True)
                 ])
             ]
-          }]
+          }, createDummyContract [
+                     ("addr", Xabi.Address)
+                   , ("boolean", Xabi.Bool)
+                   , ("contract", Xabi.Contract "")
+                   , ("number", Xabi.Int Nothing Nothing)
+                   , ("str", Xabi.Bytes Nothing Nothing)
+                   , ("enum_val", Xabi.Enum Nothing "" Nothing)
+                   , ("array_nums", Xabi.Array (Xabi.Int Nothing Nothing) Nothing)
+                   , ("strukt", Xabi.Struct Nothing "")
+                   , ("set", Xabi.Mapping Nothing (Xabi.Int Nothing Nothing) (Xabi.Bool))
+                   ])]
 
     g <- newGlobals fakeHandle
     [contractInsert, swissArmyCreate, swissArmyInsert] <-
@@ -439,7 +458,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
 
   it "can createInserts an empty array" $ do
     let testAdd = Address 0x22222222
-        input = [ProcessedContract {
+        input = [(ProcessedContract {
           address = testAdd,
           codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
           abi = "<ABI>",
@@ -454,7 +473,9 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
           transactionSender = testAdd,
           contractData = M.singleton "array_nums" . V.ValueArrayDynamic
                        . I.singleton 1 $ V.ValueArraySentinel 1
-          }]
+          }, createDummyContract [
+                     ("array_nums", Xabi.Array (Xabi.Int Nothing Nothing) Nothing)
+                     ])]
     g <- newGlobals fakeHandle
 
     [_, swissArmyCreate, swissArmyInsert] <-
@@ -466,19 +487,19 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
   it "can createInsertsIndexTable an empty array" $ do
     let testAdd = Address 0x22222222
         input = (ProcessedContract {
-          address = testAdd,
-          codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
-          abi = "<ABI>",
-          organization = "MyOrg",
-          application = "MyApp",
-          contractName = "SwissArmy",
-          chain = "<CHAIN>",
-          blockHash = hash "<BLOCKHASH>",
-          blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
-          blockNumber = 146,
-          transactionHash = hash "<TRANSACTIONHASH>",
-          transactionSender = testAdd,
-          contractData = M.fromList [ ("isIterable", bool False)
+                    address = testAdd,
+                    codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
+                    abi = "<ABI>",
+                    organization = "MyOrg",
+                    application = "MyApp",
+                    contractName = "SwissArmy",
+                    chain = "<CHAIN>",
+                    blockHash = hash "<BLOCKHASH>",
+                    blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
+                    blockNumber = 146,
+                    transactionHash = hash "<TRANSACTIONHASH>",
+                    transactionSender = testAdd,
+                    contractData = M.fromList [ ("isIterable", bool False)
                                     , ("keyMap", V.ValueMapping $ M.fromList [
                                           (V.valueBytes "4517546854860", int 1)])
                                     , ("keys", V.ValueArraySentinel 1)
@@ -487,51 +508,16 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
                                     , ("values", V.ValueArrayDynamic . I.singleton 1
                                                   . V.ValueArraySentinel $ 1)
                                     ]
-          },
-          Contract{
-            _contractName=undefined,
-            _parents=undefined,
-            _constants=undefined,
-            _storageDefs=
-                M.fromList [ ("isIterable", VariableDecl{
-                                              varType=Xabi.Bool,
-                                              varIsPublic=True,
-                                              varInitialVal=Nothing,
-                                              varContext=undefined
-                                              })
-                           , ("keyMap", VariableDecl{
-                                          varType=Xabi.Mapping
-                                                    Nothing
-                                                    (Xabi.Bytes Nothing Nothing)
-                                                    (Xabi.Int Nothing Nothing),
-                                          varIsPublic=True,
-                                          varInitialVal=Nothing,
-                                          varContext=undefined
-                                          })
-                           , ("owner", VariableDecl{
-                                         varType=Xabi.Account,
-                                         varIsPublic=True,
-                                         varInitialVal=Nothing,
-                                         varContext=undefined
-                                         })
-                           , ("values", VariableDecl{
-                                          varType=Xabi.Array
-                                                    (Xabi.Int Nothing Nothing)
-                                                    Nothing,
-                                          varIsPublic=True,
-                                          varInitialVal=Nothing,
-                                          varContext=undefined
-                                          })
-                           ],
-            _enums=undefined,
-            _structs=undefined,
-            _events=undefined,
-            _functions=undefined,
-            _constructor=undefined,
-            _vmVersion=undefined,
-            _contractContext=undefined
-          }
-          )
+                    },
+                 createDummyContract 
+                 [
+                   ("isIterable", Xabi.Bool),
+                   ("keyMap", Xabi.Mapping Nothing (Xabi.Bytes Nothing Nothing)
+                              (Xabi.Int Nothing Nothing)),
+                   ("owner", Xabi.Account),
+                   ("values", Xabi.Array (Xabi.Int Nothing Nothing) Nothing)
+                 ]
+                )
     g <- newGlobals fakeHandle
 
     cs1 <- runLoggingT . runConduit $ createExpandIndexTable g (snd input) (fst input) .| sinkList
@@ -540,7 +526,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
 
   it "can use solidvm without application nor organization" $ do
     let testAdd = Address 0x98eaddede
-        input = [ProcessedContract {
+        input = [(ProcessedContract {
           address = testAdd,
           codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- $ hash "<CODEHASH>",
           abi = "<ABI>",
@@ -572,7 +558,17 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
                 , (V.valueInt 46, bool True)
                 ])
             ]
-          }]
+          }, createDummyContract [
+               ("addr", Xabi.Address)
+             , ("boolean", Xabi.Bool)
+             , ("contract", Xabi.Contract "")
+             , ("number", Xabi.Int Nothing Nothing)
+             , ("str", Xabi.String Nothing)
+             , ("enum_val", Xabi.Enum Nothing "" Nothing)
+             , ("array_nums", Xabi.Array (Xabi.Int Nothing Nothing) Nothing)
+             , ("strukt", Xabi.Struct Nothing "")
+             , ("set", Xabi.Mapping Nothing (Xabi.Int Nothing Nothing) (Xabi.Bool))
+            ])]
 
     g <- newGlobals fakeHandle
     [contractInsert, swissArmyCreate, swissArmyInsert] <-
@@ -653,3 +649,29 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     "set" = excluded."set",
     "str" = excluded."str",
     "strukt" = excluded."strukt";|]
+
+
+
+
+createDummyContract :: [(String, Xabi.Type)] -> Contract
+createDummyContract v = 
+  let createVariableDecl t = VariableDecl{
+        varType=t,
+        varIsPublic=True,
+        varInitialVal=Nothing,
+        varContext=undefined
+        }
+  in
+    Contract{
+      _contractName=undefined,
+      _parents=undefined,
+      _constants=undefined,
+      _storageDefs=M.fromList $ map (fmap createVariableDecl) v,
+      _enums=undefined,
+      _structs=undefined,
+      _events=undefined,
+      _functions=undefined,
+      _constructor=undefined,
+      _vmVersion=undefined,
+      _contractContext=undefined
+    }

@@ -23,6 +23,7 @@ module Slipstream.OutputData (
 
 import           BlockApps.Solidity.Value
 import           Conduit
+import           Control.Lens ((^.))
 import           Control.Monad
 import           Data.Aeson                      (encode)
 import qualified Data.ByteString.Char8           as BC
@@ -42,16 +43,22 @@ import           UnliftIO.Exception              (handle, SomeException)
 
 import           BlockApps.Logging
 import           Blockchain.Data.AddressStateDB
+import           Blockchain.Strato.Model.Address
 import qualified Blockchain.Strato.Model.Event   as Action
 import           Blockchain.Strato.Model.Keccak256
 
-import Slipstream.Events
-import Slipstream.Globals
-import Slipstream.Metrics
-import Slipstream.Options
-import Slipstream.SolidityValue
+import           CodeCollection hiding (contractName, contracts, events)
 
-import CodeCollection (Contract)
+import           Slipstream.Events
+import           Slipstream.Globals
+import           Slipstream.Metrics
+import           Slipstream.Options
+import           Slipstream.SolidityValue
+
+import           SolidVM.Solidity.Xabi                    (VariableDeclF(..))
+import qualified SolidVM.Solidity.Xabi.Type               as Xabi
+
+
 
 type OutputM m = (MonadUnliftIO m, MonadLogger m)
 
@@ -214,9 +221,9 @@ createExpandIndexTable
   -> Contract
   -> ProcessedContract
   -> ConduitM () Text m ()
-createExpandIndexTable g _ pc = do
-  createIndexTable g pc
-  expandIndexTable g pc
+createExpandIndexTable g c pc = do
+  createIndexTable g c pc
+  expandIndexTable g c pc
 
 createExpandInsertHistoryTable
   :: OutputM m
@@ -232,13 +239,14 @@ createExpandInsertHistoryTable g cs = do
 
 createIndexTable :: OutputM m
                  => IORef Globals
+                 -> Contract
                  -> ProcessedContract
                  -> ConduitM () Text m ()
-createIndexTable globalsIORef contract = do
+createIndexTable globalsIORef contract pc = do
   let (org, app, cname) = constructTableNameParameters
-          (organization contract)
-          (application contract)
-          (contractName contract)
+          (organization pc)
+          (application pc)
+          (contractName pc)
       tableName = IndexTableName org app cname
   contractAlreadyCreated <- isTableCreated globalsIORef tableName
 
@@ -246,9 +254,9 @@ createIndexTable globalsIORef contract = do
   $logDebugLS "createIndexTable/contractAlreadyCreated" (tableName, contractAlreadyCreated)
   unless contractAlreadyCreated $ do
     incNumTables
-    yield $ insertContractTableQuery contract
-    yield $ createIndexTableQuery contract
-    let list = tableColumns $ Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData contract
+    yield $ insertContractTableQuery pc
+    yield $ createIndexTableQuery contract pc
+    let list = tableColumns $ Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData pc
     setTableCreated globalsIORef tableName list
 
 createHistoryTable :: OutputM m
@@ -275,15 +283,16 @@ createHistoryTable globalsIORef contract = do
 -- Runs ALTER TABLE <name> [ADD COLUMN <column>] for any new fields added to a contract definition   
 expandIndexTable :: OutputM m
                  => IORef Globals
+                 -> Contract
                  -> ProcessedContract
                  -> ConduitM () Text m ()
-expandIndexTable globalsIORef c = do
+expandIndexTable globalsIORef _ pc = do
   let (org, app, cname) = constructTableNameParameters
-                          (organization c)
-                          (application c)
-                          (contractName c)
+                          (organization pc)
+                          (application pc)
+                          (contractName pc)
       tableName = IndexTableName org app cname
-  expandContractTable globalsIORef c tableName
+  expandContractTable globalsIORef pc tableName
 
 expandHistoryTable :: OutputM m
                  => IORef Globals
@@ -374,14 +383,15 @@ insertContractTableQuery ProcessedContract{..} =
         , "\n  ON CONFLICT DO NOTHING;"
         ]
 
-createIndexTableQuery :: ProcessedContract -> Text
-createIndexTableQuery contract =
+createIndexTableQuery :: Contract -> ProcessedContract -> Text
+createIndexTableQuery contract pc =
   let (org, app, cname) = constructTableNameParameters
-          (organization contract)
-          (application contract)
-          (contractName contract)
+          (organization pc)
+          (application pc)
+          (contractName pc)
       tableName = IndexTableName org app cname
-      list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData contract
+      sampleStorageVars = fmap sampleValue $ Map.mapKeys T.pack $ contract^.storageDefs
+      list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction sampleStorageVars
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
         , csv $ ["address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
@@ -636,3 +646,22 @@ insertEventTableQuery ev =
         ,  " );"
         , "\n"--  ON CONFLICT DO NOTHING;"
         ]
+
+
+
+------------------
+
+
+--This is a temporary function that converts solidity types to a sample value...  I am just using this now to convert table creation from the old way (value based when values come through) to the new way (direct from the types when a CC is registered)
+sampleValue :: Show a => VariableDeclF a -> Value
+sampleValue VariableDecl{varType=Xabi.Bool} = SimpleValue (ValueBool True)
+sampleValue VariableDecl{varType=Xabi.Int _ _} = SimpleValue (ValueInt False Nothing 0)
+sampleValue VariableDecl{varType=Xabi.String _} = SimpleValue (ValueString "")
+sampleValue VariableDecl{varType=Xabi.Bytes _ _} = SimpleValue (ValueString "")
+sampleValue VariableDecl{varType=Xabi.Address} = SimpleValue (ValueAddress $ Address 0xabcd)
+sampleValue VariableDecl{varType=Xabi.Account} = SimpleValue (ValueAddress $ Address 0xabcd)
+sampleValue VariableDecl{varType=Xabi.Array _ _} = ValueArrayFixed 0 []
+sampleValue VariableDecl{varType=Xabi.Mapping _ _ _} = ValueMapping Map.empty
+sampleValue VariableDecl{varType=Xabi.Label _} = SimpleValue (ValueAddress $ Address 0xabcd)
+sampleValue x = error $ "undefined type in sampleValue: " ++ show x
+
