@@ -452,6 +452,8 @@ processTheMessages env sqlEnv conn g messages = do
     forM_ (Map.toList $ cc^.contracts) $ \c -> do
       let pc = ccToProcessedContract cp o a c
       outputData conn $ createExpandIndexTable g (snd c) pc
+      outputData conn $ createExpandHistoryTable g pc
+
   
   unless (null messages) $
     $logDebugS "processTheMessages" . T.pack . unlines . map show $ messages
@@ -520,7 +522,6 @@ processTheMessages env sqlEnv conn g messages = do
   forM_ (rights inserts) $ $logDebugLS "processTheMessages/toInsert"
   forM_ insertsByCodeHash $ \ins -> do
     unless (null ins) $ outputData conn . insertIndexTable g $ map indexInsert ins
-    outputData conn . createExpandHistoryTable g $ concatMap historyInserts ins
     outputData conn . insertHistoryTable g $ concatMap historyInserts ins
     when (length (concatMap eventCreations ins) > 0) $
       outputData conn . createEventTables g $ concatMap eventCreations ins

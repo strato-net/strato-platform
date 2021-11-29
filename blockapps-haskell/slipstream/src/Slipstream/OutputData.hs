@@ -228,13 +228,11 @@ createExpandIndexTable g c pc = do
 createExpandHistoryTable
   :: OutputM m
   => IORef Globals
-  -> [ProcessedContract]
+  -> ProcessedContract
   -> ConduitM () Text m ()
-createExpandHistoryTable g cs = do
-  unless (null cs) $ do
-    let c = head cs
+createExpandHistoryTable g c = do
     createHistoryTable g c
-    expandHistoryTable g cs
+    expandHistoryTable g c
  
 createIndexTable :: OutputM m
                  => IORef Globals
@@ -295,16 +293,15 @@ expandIndexTable globalsIORef _ pc = do
 
 expandHistoryTable :: OutputM m
                  => IORef Globals
-                 -> [ProcessedContract]
+                 -> ProcessedContract
                  -> ConduitM () Text m ()
-expandHistoryTable _ [] = return ()
-expandHistoryTable globalsIORef lst@(x:_) = do
+expandHistoryTable globalsIORef c = do
   let (org, app, cname) = constructTableNameParameters
-          (organization x)
-          (application x)
-          (contractName x)
+          (organization c)
+          (application c)
+          (contractName c)
       tableName = HistoryTableName org app cname
-  forM_ lst $ \c -> expandContractTable globalsIORef c tableName
+  expandContractTable globalsIORef c tableName
 
 expandContractTable :: OutputM m
                     => IORef Globals
