@@ -17,7 +17,7 @@ module Slipstream.OutputData (
   insertHistoryTable,
   createEventTables,
   createExpandIndexTable,
-  createExpandInsertHistoryTable,
+  createExpandHistoryTable,
   cirrusInfo
   ) where
 
@@ -225,18 +225,17 @@ createExpandIndexTable g c pc = do
   createIndexTable g c pc
   expandIndexTable g c pc
 
-createExpandInsertHistoryTable
+createExpandHistoryTable
   :: OutputM m
   => IORef Globals
   -> [ProcessedContract]
   -> ConduitM () Text m ()
-createExpandInsertHistoryTable g cs = do
+createExpandHistoryTable g cs = do
   unless (null cs) $ do
     let c = head cs
     createHistoryTable g c
     expandHistoryTable g cs
-    insertHistoryTable g cs
-
+ 
 createIndexTable :: OutputM m
                  => IORef Globals
                  -> Contract
