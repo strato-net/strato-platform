@@ -356,7 +356,7 @@ insertHistoryTable :: OutputM m
                    => IORef Globals
                    -> [ProcessedContract]
                    -> ConduitM () Text m ()
-insertHistoryTable _ [] = error "insertHistoryTable: unhandled empty list"
+insertHistoryTable _ [] = return () --no data, do nothing
 insertHistoryTable globalsIORef contracts@(x:_) = do
   let (org, app, cname) = constructTableNameParameters
           (organization x)
