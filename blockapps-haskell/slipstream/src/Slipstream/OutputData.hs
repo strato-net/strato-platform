@@ -652,7 +652,7 @@ insertEventTableQuery ev =
 
 
 --This is a temporary function that converts solidity types to a sample value...  I am just using this now to convert table creation from the old way (value based when values come through) to the new way (direct from the types when a CC is registered)
-sampleValue :: Show a => VariableDeclF a -> Value
+sampleValue :: VariableDeclF a -> Value
 sampleValue VariableDecl{varType=Xabi.Bool} = SimpleValue (ValueBool True)
 sampleValue VariableDecl{varType=Xabi.Int _ _} = SimpleValue (ValueInt False Nothing 0)
 sampleValue VariableDecl{varType=Xabi.String _} = SimpleValue (ValueString "")
@@ -662,5 +662,8 @@ sampleValue VariableDecl{varType=Xabi.Account} = SimpleValue (ValueAddress $ Add
 sampleValue VariableDecl{varType=Xabi.Array _ _} = ValueArrayFixed 0 []
 sampleValue VariableDecl{varType=Xabi.Mapping _ _ _} = ValueMapping Map.empty
 sampleValue VariableDecl{varType=Xabi.Label _} = SimpleValue (ValueAddress $ Address 0xabcd)
-sampleValue x = error $ "undefined type in sampleValue: " ++ show x
+sampleValue VariableDecl{varType=Xabi.Struct _ _} = ValueStruct Map.empty
+sampleValue VariableDecl{varType=Xabi.Enum _ _ _} = SimpleValue (ValueString "")
+sampleValue VariableDecl{varType=Xabi.Contract _} = SimpleValue (ValueAddress $ Address 0xabcd)
+--sampleValue x = error $ "undefined type in sampleValue: " ++ show (varType x)
 

@@ -89,8 +89,7 @@ spec = do
                   ("number", V.SimpleValue $ V.valueUInt 18199984780605),
                   ("hash", V.SimpleValue $ V.ValueString "Owner_hash_181999847806006")]]
             }, createDummyContract [
-                  ("number", Xabi.Int Nothing Nothing),
-                  ("hash", Xabi.String Nothing)
+                  ("owners", Xabi.Array (Xabi.Int Nothing Nothing) Nothing)
                   ])]
 
       g <- newGlobals fakeHandle
@@ -165,8 +164,7 @@ spec = do
                   ("number", V.SimpleValue $ V.valueUInt 18199984780605),
                   ("hash", V.SimpleValue $ V.ValueString "Owner_hash_181999847806006")]]
             }, createDummyContract [
-                  ("number", Xabi.Int Nothing Nothing),
-                  ("hash", Xabi.String Nothing)
+                  ("owners", Xabi.Array (Xabi.Int Nothing Nothing) Nothing)
                   ])]
       g <- newGlobals fakeHandle
       addToHistoryList g (HistoryTableName "" "" "Vehicle")
@@ -275,8 +273,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
                   ("number\"", V.SimpleValue $ V.valueUInt 18199984780605),
                   ("h'a\"'sh", V.SimpleValue $ V.ValueString "''Owner_hash_181999847806006")]]
             }, createDummyContract [
-                       ("number\"", Xabi.Int Nothing Nothing),
-                       ("h'a\"'sh", Xabi.String Nothing)
+                       ("\"owners\"", Xabi.Array (Xabi.Struct Nothing "") Nothing)
                        ])]
 
       g <- newGlobals fakeHandle
@@ -659,7 +656,7 @@ createDummyContract v =
         varType=t,
         varIsPublic=True,
         varInitialVal=Nothing,
-        varContext=undefined
+        varContext=error "varContext undefined"
         }
   in
     Contract{
