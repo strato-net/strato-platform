@@ -228,11 +228,12 @@ createExpandIndexTable g c pc = do
 createExpandHistoryTable
   :: OutputM m
   => IORef Globals
+  -> Contract
   -> ProcessedContract
   -> ConduitM () Text m ()
-createExpandHistoryTable g c = do
-    createHistoryTable g c
-    expandHistoryTable g c
+createExpandHistoryTable g c pc = do
+    createHistoryTable g c pc
+    expandHistoryTable g c pc
  
 createIndexTable :: OutputM m
                  => IORef Globals
@@ -258,21 +259,22 @@ createIndexTable globalsIORef contract pc = do
 
 createHistoryTable :: OutputM m
                    => IORef Globals
+                   -> Contract
                    -> ProcessedContract
                    -> ConduitM () Text m ()
-createHistoryTable globalsIORef contract = do
+createHistoryTable globalsIORef contract pc = do
   let (org, app, cname) = constructTableNameParameters
-          (organization contract)
-          (application contract)
-          (contractName contract)
+          (organization pc)
+          (application pc)
+          (contractName pc)
       tableName = HistoryTableName org app cname
   history <- isHistoric globalsIORef tableName
   tableExists <- isTableCreated globalsIORef tableName
   when (history && not tableExists) $ do
     incNumHistoryTables
-    yield $ createHistoryTableQuery contract
-    yield $ addHistoryUnique contract
-    let list = tableColumns $ Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData contract
+    yield $ createHistoryTableQuery contract pc
+    yield $ addHistoryUnique contract pc
+    let list = tableColumns $ Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData pc
     setTableCreated globalsIORef tableName list
 
 
@@ -283,32 +285,34 @@ expandIndexTable :: OutputM m
                  -> Contract
                  -> ProcessedContract
                  -> ConduitM () Text m ()
-expandIndexTable globalsIORef _ pc = do
+expandIndexTable globalsIORef contract pc = do
   let (org, app, cname) = constructTableNameParameters
                           (organization pc)
                           (application pc)
                           (contractName pc)
       tableName = IndexTableName org app cname
-  expandContractTable globalsIORef pc tableName
+  expandContractTable globalsIORef contract pc tableName
 
 expandHistoryTable :: OutputM m
                  => IORef Globals
+                 -> Contract
                  -> ProcessedContract
                  -> ConduitM () Text m ()
-expandHistoryTable globalsIORef c = do
+expandHistoryTable globalsIORef contract c = do
   let (org, app, cname) = constructTableNameParameters
           (organization c)
           (application c)
           (contractName c)
       tableName = HistoryTableName org app cname
-  expandContractTable globalsIORef c tableName
+  expandContractTable globalsIORef contract c tableName
 
 expandContractTable :: OutputM m
                     => IORef Globals
+                    -> Contract
                     -> ProcessedContract
                     -> TableName
                     -> ConduitM () Text m ()
-expandContractTable globalsIORef x tableName = do
+expandContractTable globalsIORef _ x tableName = do
   columns <- getTableColumns globalsIORef tableName
   case columns of
     Nothing -> do
@@ -397,14 +401,14 @@ createIndexTableQuery contract pc =
         , "\n  PRIMARY KEY (address, \"chainId\") );"
         ]
 
-createHistoryTableQuery :: ProcessedContract -> Text
-createHistoryTableQuery contract =
+createHistoryTableQuery :: Contract -> ProcessedContract -> Text
+createHistoryTableQuery _ pc =
   let (org, app, cname) = constructTableNameParameters
-          (organization contract)
-          (application contract)
-          (contractName contract)
+          (organization pc)
+          (application pc)
+          (contractName pc)
       tableName = HistoryTableName org app cname
-      list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData contract
+      list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData pc
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS ", tableNameToDoubleQuoteText tableName, " ("
         , csv $ ["address text NOT NULL", "\"chainId\" text NOT NULL", "block_hash text NOT NULL", "block_timestamp text",
@@ -413,12 +417,12 @@ createHistoryTableQuery contract =
         , ");"
         ]
 
-addHistoryUnique :: ProcessedContract -> Text
-addHistoryUnique contract =
+addHistoryUnique :: Contract -> ProcessedContract -> Text
+addHistoryUnique _ pc =
   let (org, app, cname) = constructTableNameParameters
-          (organization contract)
-          (application contract)
-          (contractName contract)
+          (organization pc)
+          (application pc)
+          (contractName pc)
       historyName' = HistoryTableName org app cname
       historyName = tableNameToDoubleQuoteText historyName'
       indexName = "index_" <> (escapeQuotes $ tableNameToText historyName')

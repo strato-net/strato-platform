@@ -452,7 +452,7 @@ processTheMessages env sqlEnv conn g messages = do
     forM_ (Map.toList $ cc^.contracts) $ \c -> do
       let pc = ccToProcessedContract cp o a c
       outputData conn $ createExpandIndexTable g (snd c) pc
-      outputData conn $ createExpandHistoryTable g pc
+      outputData conn $ createExpandHistoryTable g (snd c) pc
 
   
   unless (null messages) $

@@ -55,7 +55,7 @@ createInserts globalsIORef contracts = do
   unless (null contracts) $ do
     let contract = head contracts
     createIndexTable globalsIORef (snd contract) (fst contract)
-    createHistoryTable globalsIORef $ fst contract
+    createHistoryTable globalsIORef (snd contract) (fst contract)
     insertIndexTable globalsIORef $ map fst contracts
     insertHistoryTable globalsIORef $ map fst contracts
 
