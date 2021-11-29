@@ -24,11 +24,15 @@ import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256 (hash)
+import CodeCollection hiding (contractName, contracts)
 import Slipstream.Events
 import Slipstream.Globals
 import Slipstream.GlobalsColdStorage (fakeHandle)
 import Slipstream.OutputData
 import Slipstream.SolidityValue
+
+import SolidVM.Solidity.Xabi                    (VariableDeclF(..))
+import qualified SolidVM.Solidity.Xabi.Type               as Xabi
 
 addr :: Address -> V.Value
 addr = V.SimpleValue . V.ValueAccount . unspecifiedChain
@@ -461,7 +465,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
 
   it "can createInsertsIndexTable an empty array" $ do
     let testAdd = Address 0x22222222
-        input = [ProcessedContract {
+        input = (ProcessedContract {
           address = testAdd,
           codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
           abi = "<ABI>",
@@ -483,11 +487,55 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
                                     , ("values", V.ValueArrayDynamic . I.singleton 1
                                                   . V.ValueArraySentinel $ 1)
                                     ]
-          }]
+          },
+          Contract{
+            _contractName=undefined,
+            _parents=undefined,
+            _constants=undefined,
+            _storageDefs=
+                M.fromList [ ("isIterable", VariableDecl{
+                                              varType=Xabi.Bool,
+                                              varIsPublic=True,
+                                              varInitialVal=Nothing,
+                                              varContext=undefined
+                                              })
+                           , ("keyMap", VariableDecl{
+                                          varType=Xabi.Mapping
+                                                    Nothing
+                                                    (Xabi.Bytes Nothing Nothing)
+                                                    (Xabi.Int Nothing Nothing),
+                                          varIsPublic=True,
+                                          varInitialVal=Nothing,
+                                          varContext=undefined
+                                          })
+                           , ("owner", VariableDecl{
+                                         varType=Xabi.Account,
+                                         varIsPublic=True,
+                                         varInitialVal=Nothing,
+                                         varContext=undefined
+                                         })
+                           , ("values", VariableDecl{
+                                          varType=Xabi.Array
+                                                    (Xabi.Int Nothing Nothing)
+                                                    Nothing,
+                                          varIsPublic=True,
+                                          varInitialVal=Nothing,
+                                          varContext=undefined
+                                          })
+                           ],
+            _enums=undefined,
+            _structs=undefined,
+            _events=undefined,
+            _functions=undefined,
+            _constructor=undefined,
+            _vmVersion=undefined,
+            _contractContext=undefined
+          }
+          )
     g <- newGlobals fakeHandle
 
-    cs1 <- fmap concat $ forM input $ \c -> runLoggingT . runConduit $ createExpandIndexTable g c .| sinkList
-    cs2 <- runLoggingT . runConduit $ insertIndexTable g input .| sinkList
+    cs1 <- runLoggingT . runConduit $ createExpandIndexTable g (snd input) (fst input) .| sinkList
+    cs2 <- runLoggingT . runConduit $ insertIndexTable g [fst input] .| sinkList
     (cs1 ++ cs2) `shouldNotBe` []
 
   it "can use solidvm without application nor organization" $ do

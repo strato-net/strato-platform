@@ -114,6 +114,7 @@ tests:
       - persistent-sqlite
       - QuickCheck
       - slipstream
+      - solid-vm
       - strato-model
       - text
       - time

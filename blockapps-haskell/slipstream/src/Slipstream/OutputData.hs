@@ -51,6 +51,8 @@ import Slipstream.Metrics
 import Slipstream.Options
 import Slipstream.SolidityValue
 
+import CodeCollection (Contract)
+
 type OutputM m = (MonadUnliftIO m, MonadLogger m)
 
 tshow :: Show a => a -> Text
@@ -209,11 +211,12 @@ tableNameToText (EventTableName o a c e) =
 createExpandIndexTable
   :: OutputM m
   => IORef Globals
+  -> Contract
   -> ProcessedContract
   -> ConduitM () Text m ()
-createExpandIndexTable g c = do
-  createIndexTable g c
-  expandIndexTable g c
+createExpandIndexTable g _ pc = do
+  createIndexTable g pc
+  expandIndexTable g pc
 
 createExpandInsertHistoryTable
   :: OutputM m
