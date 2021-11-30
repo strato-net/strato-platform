@@ -78,7 +78,7 @@ instance Format VMEvent where
   format (NewAction a) = "NewAction:\n" ++ tab (format a)
   format (EventEmitted e) = "EventEmitted:\n" ++ tab (format e)
   format (CodeCollectionAdded c cp o a hl) =
-    "CodeCollectionAdded: (" ++ T.unpack o ++ "/" ++ T.unpack a ++ " " ++ vmType cp
+    "CodeCollectionAdded: (" ++ show ++ "/" ++ show a ++ ") " ++ vmType cp
     ++ if (not $ null hl) then " " ++ show hl else "" ++ "\n    " 
     ++ show (shorten 120 (T.unpack c))
   format (NewTransactionResult tr) = "NewTransactionResult:\n" ++ tab (format tr)
