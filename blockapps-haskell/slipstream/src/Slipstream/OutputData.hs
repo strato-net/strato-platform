@@ -268,12 +268,11 @@ createHistoryTable globalsIORef contract pc = do
           (application pc)
           (contractName pc)
       tableName = HistoryTableName org app cname
-  history <- isHistoric globalsIORef tableName
   tableExists <- isTableCreated globalsIORef tableName
 
-  $logInfoLS "createHistoryTable/tableExists" (tableName, history, tableExists)
+  $logInfoLS "createHistoryTable/tableExists" (tableName, tableExists)
 
-  when (history && not tableExists) $ do
+  when (not tableExists) $ do
     incNumHistoryTables
     yield $ createHistoryTableQuery contract pc
     yield $ addHistoryUnique contract pc

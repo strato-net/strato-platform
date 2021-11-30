@@ -415,15 +415,15 @@ sampleValue VariableDecl{varType=Xabi.Label _} = SimpleValue (ValueAddress $ Add
 sampleValue x = error $ "undefined type in sampleValue: " ++ show x
 
 --Another temporary function used until I create contracts based on the CC itself
-ccToProcessedContract :: CodePtr -> Text -> Text -> (String, Contract) -> ProcessedContract
-ccToProcessedContract cp o a (contractName, contract) =
+ccToProcessedContract :: CodePtr -> Text -> Text -> Text -> Contract -> ProcessedContract
+ccToProcessedContract cp o a contractName contract =
   ProcessedContract
   {
     codehash = cp,
     organization = o,
-    application = if a == T.pack contractName then "" else a,
+    application = if a == contractName then "" else a,
     contractData = fmap sampleValue $ Map.mapKeys T.pack $ contract^.storageDefs,
-    contractName = T.pack contractName,
+    contractName = contractName,
     chain = "chain",
     abi = "abi",
     
@@ -447,13 +447,16 @@ processTheMessages env sqlEnv conn g messages = do
 
 
 
-  forM_ creates $ \(ccString, cp, o, a, _) -> do
+  forM_ creates $ \(ccString, cp, o, a, hl) -> do
     cc <- getCodeCollection cp ccString
-    forM_ (Map.toList $ cc^.contracts) $ \c -> do
-      $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o <> ", app=" <> a <> ", name=" <> T.pack (fst c)
-      let pc = ccToProcessedContract cp o a c
-      outputData conn $ createExpandIndexTable g (snd c) pc
-      outputData conn $ createExpandHistoryTable g (snd c) pc
+    forM_ (Map.toList $ cc^.contracts) $ \(nameString, c) -> do
+      let n = T.pack nameString
+      $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o <> ", app=" <> a <> ", name=" <> n
+      let pc = ccToProcessedContract cp o a n c
+      outputData conn $ createExpandIndexTable g c pc
+
+      when (n `elem` hl) $
+        outputData conn $ createExpandHistoryTable g c pc
 
   
   unless (null messages) $
