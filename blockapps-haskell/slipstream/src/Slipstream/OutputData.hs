@@ -249,7 +249,7 @@ createIndexTable globalsIORef contract pc = do
   contractAlreadyCreated <- isTableCreated globalsIORef tableName
 
   --When contract hasn't been written to "contract" table and indexing table doesn't exist
-  $logDebugLS "createIndexTable/contractAlreadyCreated" (tableName, contractAlreadyCreated)
+  $logInfoLS "createIndexTable/contractAlreadyCreated" (tableName, contractAlreadyCreated)
   unless contractAlreadyCreated $ do
     incNumTables
     yield $ insertContractTableQuery pc
@@ -270,6 +270,9 @@ createHistoryTable globalsIORef contract pc = do
       tableName = HistoryTableName org app cname
   history <- isHistoric globalsIORef tableName
   tableExists <- isTableCreated globalsIORef tableName
+
+  $logInfoLS "createHistoryTable/tableExists" (tableName, tableExists)
+
   when (history && not tableExists) $ do
     incNumHistoryTables
     yield $ createHistoryTableQuery contract pc

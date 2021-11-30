@@ -450,6 +450,7 @@ processTheMessages env sqlEnv conn g messages = do
   forM_ creates $ \(ccString, cp, o, a) -> do
     cc <- getCodeCollection cp ccString
     forM_ (Map.toList $ cc^.contracts) $ \c -> do
+      $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o <> ", app=" <> a <> ", name=" <> T.pack (fst c)
       let pc = ccToProcessedContract cp o a c
       outputData conn $ createExpandIndexTable g (snd c) pc
       outputData conn $ createExpandHistoryTable g (snd c) pc
