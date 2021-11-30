@@ -271,7 +271,7 @@ createHistoryTable globalsIORef contract pc = do
   history <- isHistoric globalsIORef tableName
   tableExists <- isTableCreated globalsIORef tableName
 
-  $logInfoLS "createHistoryTable/tableExists" (tableName, tableExists)
+  $logInfoLS "createHistoryTable/tableExists" (tableName, history, tableExists)
 
   when (history && not tableExists) $ do
     incNumHistoryTables
