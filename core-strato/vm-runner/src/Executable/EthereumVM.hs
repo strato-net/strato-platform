@@ -478,7 +478,11 @@ sendOutEvents OutBatch{..} = do
                   Just v -> error $ "Unknown VM: " ++ show v
                   Nothing -> EVMCode $ Keccak256.hash $ BC.pack $ T.unpack c,
             organization = first^._2.Action.actionDataOrganization,
-            application = n
+            application = n,
+            historyList=
+                case join $ fmap (M.lookup "history") (a^.Action.metadata) of
+                  Nothing -> []
+                  Just v -> T.splitOn "," v
           }
         _ -> Nothing
   

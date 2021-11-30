@@ -252,7 +252,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
       forM_ (map (fromMaybe Map.empty . A._metadata) filteredActions) $ \md ->
         case (Map.lookup "src" md, Map.lookup "name" md) of
           (Just src, Just n) -> 
-            void $ produceVMEvents [CodeCollectionAdded src (SolidVMCode (T.unpack n) $ hash $ BC.pack $ T.unpack src) "" ""]
+            void $ produceVMEvents [CodeCollectionAdded src (SolidVMCode (T.unpack n) $ hash $ BC.pack $ T.unpack src) "" "" []]
           _ -> return ()
 
       _ <- produceVMEvents $ map NewAction filteredActions

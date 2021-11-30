@@ -293,7 +293,7 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) = do
   commitSqlDiffs diff
 
   forM_ [ (src, name) | CodeInfo{codeInfoSource=src, codeInfoName=name} <- codeInfo] $ \(src, name) ->
-    produceVMEvents [CodeCollectionAdded src (SolidVMCode (fromMaybe "" $ fmap T.unpack name) $ hash $ BC.pack $ T.unpack src) "" ""]
+    produceVMEvents [CodeCollectionAdded src (SolidVMCode (fromMaybe "" $ fmap T.unpack name) $ hash $ BC.pack $ T.unpack src) "" "" []]
 
   let metadatas = Map.fromList $ flip map codeInfo $ \ci ->
         let cHash = hash $ codeInfoCode ci

@@ -442,12 +442,12 @@ processTheMessages env sqlEnv conn g messages = do
   let changes = parseActions messages
       events = parseEvents messages
       -- TODO (Dan) : would be nice if we didn't just rip events out at the top level like this
-      creates = [(c, cp, o, a) | CodeCollectionAdded c cp o a <- messages]
+      creates = [(c, cp, o, a, hl) | CodeCollectionAdded c cp o a hl <- messages]
       transactionResults = [tr | NewTransactionResult tr <- messages]
 
 
 
-  forM_ creates $ \(ccString, cp, o, a) -> do
+  forM_ creates $ \(ccString, cp, o, a, _) -> do
     cc <- getCodeCollection cp ccString
     forM_ (Map.toList $ cc^.contracts) $ \c -> do
       $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o <> ", app=" <> a <> ", name=" <> T.pack (fst c)

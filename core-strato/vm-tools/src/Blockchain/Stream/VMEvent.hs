@@ -59,7 +59,8 @@ data VMEvent =
     ccString :: Text,
     codePtr :: CodePtr,
     organization :: Text,
-    application :: Text
+    application :: Text,
+    historyList :: [Text]
     } |
   NewTransactionResult TransactionResult deriving (Show, Generic)
 
@@ -67,11 +68,19 @@ instance JSON.ToJSON VMEvent where
 
 instance JSON.FromJSON VMEvent where
 
+vmType :: CodePtr -> String
+vmType (SolidVMCode _ _) = "SolidVM"
+vmType (EVMCode _) = "EVM"
+vmType (CodeAtAccount _ _) = "CodeAtAccount"
+
 
 instance Format VMEvent where
   format (NewAction a) = "NewAction:\n" ++ tab (format a)
   format (EventEmitted e) = "EventEmitted:\n" ++ tab (format e)
-  format (CodeCollectionAdded c _ _ _) = "CodeCollectionAdded: " ++ show (shorten 120 (T.unpack c))
+  format (CodeCollectionAdded c cp o a hl) =
+    "CodeCollectionAdded: (" ++ T.unpack o ++ "/" ++ T.unpack a ++ " " ++ vmType cp
+    ++ if (not $ null hl) then " " ++ show hl else "" ++ "\n    " 
+    ++ show (shorten 120 (T.unpack c))
   format (NewTransactionResult tr) = "NewTransactionResult:\n" ++ tab (format tr)
 
 class HasVMEventsSink k where
