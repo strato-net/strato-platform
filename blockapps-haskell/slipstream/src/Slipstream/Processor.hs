@@ -59,13 +59,11 @@ import qualified BlockApps.SolidVMStorageDecoder as SolidVM
 import Blockchain.Data.AddressStateRef
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.TransactionResult
---import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
 import Blockchain.Data.Json
 import Blockchain.SolidVM.CodeCollectionDB
 import Blockchain.Strato.Model.Account
 import qualified Blockchain.Strato.Model.Action as Action
-import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import qualified Blockchain.Strato.Model.Event            as Action
 import Blockchain.Strato.Model.Keccak256
@@ -88,9 +86,6 @@ import Slipstream.Globals
 import Slipstream.Metrics
 import Slipstream.OutputData
 import Slipstream.XabiContract
-
-import SolidVM.Solidity.Xabi                    (VariableDeclF(..))
-import qualified SolidVM.Solidity.Xabi.Type               as Xabi
 
 instance ( (Keccak256 `Alters` SourceMap) m
          , MonadLogger m
@@ -401,28 +396,15 @@ getCodeCollection cp ccString = do
         Right v -> return $ CodeCollection $ Map.fromList $ map (\(x, y) -> (T.unpack x, xabiToPartialContract y)) $ snd v
     CodeAtAccount _ _ -> error "no compilo codeataccount"
 
---This is a temporary function that converts solidity types to a sample value...  I am just using this now to convert table creation from the old way (value based when values come through) to the new way (direct from the types when a CC is registered)
-sampleValue :: Show a => VariableDeclF a -> Value
-sampleValue VariableDecl{varType=Xabi.Bool} = SimpleValue (ValueBool True)
-sampleValue VariableDecl{varType=Xabi.Int _ _} = SimpleValue (ValueInt False Nothing 0)
-sampleValue VariableDecl{varType=Xabi.String _} = SimpleValue (ValueString "")
-sampleValue VariableDecl{varType=Xabi.Bytes _ _} = SimpleValue (ValueString "")
-sampleValue VariableDecl{varType=Xabi.Address} = SimpleValue (ValueAddress $ Address 0xabcd)
-sampleValue VariableDecl{varType=Xabi.Account} = SimpleValue (ValueAddress $ Address 0xabcd)
-sampleValue VariableDecl{varType=Xabi.Array _ _} = ValueArrayFixed 0 []
-sampleValue VariableDecl{varType=Xabi.Mapping _ _ _} = ValueMapping Map.empty
-sampleValue VariableDecl{varType=Xabi.Label _} = SimpleValue (ValueAddress $ Address 0xabcd)
-sampleValue x = error $ "undefined type in sampleValue: " ++ show x
-
 --Another temporary function used until I create contracts based on the CC itself
 ccToProcessedContract :: CodePtr -> Text -> Text -> Text -> Contract -> ProcessedContract
-ccToProcessedContract cp o a contractName contract =
+ccToProcessedContract cp o a contractName _ =
   ProcessedContract
   {
     codehash = cp,
     organization = o,
     application = if a == contractName then "" else a,
-    contractData = fmap sampleValue $ Map.mapKeys T.pack $ contract^.storageDefs,
+    contractData = undefined, -- fmap sampleValue $ Map.mapKeys T.pack $ contract^.storageDefs,
     contractName = contractName,
     chain = "chain",
     abi = "abi",

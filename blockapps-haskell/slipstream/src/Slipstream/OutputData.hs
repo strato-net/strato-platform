@@ -254,7 +254,7 @@ createIndexTable globalsIORef contract pc = do
     incNumTables
     yield $ insertContractTableQuery pc
     yield $ createIndexTableQuery contract pc
-    let list = tableColumns $ Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData pc
+    let list = tableColumns $ Map.toList $ Map.map valueToSolidityValue $ fmap sampleValue $ Map.mapKeys T.pack $ contract^.storageDefs
     setTableCreated globalsIORef tableName list
 
 createHistoryTable :: OutputM m
@@ -276,7 +276,7 @@ createHistoryTable globalsIORef contract pc = do
     incNumHistoryTables
     yield $ createHistoryTableQuery contract pc
     yield $ addHistoryUnique contract pc
-    let list = tableColumns $ Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData pc
+    let list = tableColumns $ Map.toList $ Map.map valueToSolidityValue $ fmap sampleValue $ Map.mapKeys T.pack $ contract^.storageDefs
     setTableCreated globalsIORef tableName list
 
 
@@ -314,7 +314,7 @@ expandContractTable :: OutputM m
                     -> ProcessedContract
                     -> TableName
                     -> ConduitM () Text m ()
-expandContractTable globalsIORef _ x tableName = do
+expandContractTable globalsIORef contract _ tableName = do
   columns <- getTableColumns globalsIORef tableName
   case columns of
     Nothing -> do
@@ -324,7 +324,7 @@ expandContractTable globalsIORef _ x tableName = do
           , " does not exist, but we are trying to expand it?"
           ]
     Just cols -> do
-      let list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData x
+      let list = Map.toList $ Map.map valueToSolidityValue $ fmap sampleValue $ Map.mapKeys T.pack $ contract^.storageDefs
           difference new old = filter ((`notElem` old) . fst) new
           extras = tableColumns $ difference list (partialParseTableColumns cols)
       unless (null extras) $ do
@@ -404,13 +404,13 @@ createIndexTableQuery contract pc =
         ]
 
 createHistoryTableQuery :: Contract -> ProcessedContract -> Text
-createHistoryTableQuery _ pc =
+createHistoryTableQuery contract pc =
   let (org, app, cname) = constructTableNameParameters
           (organization pc)
           (application pc)
           (contractName pc)
       tableName = HistoryTableName org app cname
-      list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData pc
+      list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ fmap sampleValue $ Map.mapKeys T.pack $ contract^.storageDefs
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS ", tableNameToDoubleQuoteText tableName, " ("
         , csv $ ["address text NOT NULL", "\"chainId\" text NOT NULL", "block_hash text NOT NULL", "block_timestamp text",
