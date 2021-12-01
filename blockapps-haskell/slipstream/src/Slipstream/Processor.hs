@@ -398,14 +398,14 @@ getCodeCollection cp ccString = do
 
 --Another temporary function used until I create contracts based on the CC itself
 ccToProcessedContract :: CodePtr -> Text -> Text -> Text -> Contract -> ProcessedContract
-ccToProcessedContract cp o a contractName _ =
+ccToProcessedContract cp _ _ _ _ =
   ProcessedContract
   {
     codehash = cp,
-    organization = o,
-    application = if a == contractName then "" else a,
+    organization = undefined, --o,
+    application = undefined, --if a == contractName then "" else a,
     contractData = undefined, -- fmap sampleValue $ Map.mapKeys T.pack $ contract^.storageDefs,
-    contractName = contractName,
+    contractName = undefined, --contractName,
     chain = "chain",
     abi = "abi",
     
@@ -435,10 +435,11 @@ processTheMessages env sqlEnv conn g messages = do
       let n = T.pack nameString
       $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o <> ", app=" <> a <> ", name=" <> n
       let pc = ccToProcessedContract cp o a n c
-      outputData conn $ createExpandIndexTable g c pc
+          nameParts = (o, a, n)
+      outputData conn $ createExpandIndexTable g c pc nameParts
 
       when (n `elem` hl) $
-        outputData conn $ createExpandHistoryTable g c pc
+        outputData conn $ createExpandHistoryTable g c pc nameParts
 
   
   unless (null messages) $

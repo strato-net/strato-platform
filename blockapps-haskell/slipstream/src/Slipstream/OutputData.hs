@@ -220,31 +220,31 @@ createExpandIndexTable
   => IORef Globals
   -> Contract
   -> ProcessedContract
+  -> (Text, Text, Text)
   -> ConduitM () Text m ()
-createExpandIndexTable g c pc = do
-  createIndexTable g c pc
-  expandIndexTable g c pc
+createExpandIndexTable g c pc nameParts = do
+  createIndexTable g c pc nameParts
+  expandIndexTable g c pc nameParts
 
 createExpandHistoryTable
   :: OutputM m
   => IORef Globals
   -> Contract
   -> ProcessedContract
+  -> (Text, Text, Text)
   -> ConduitM () Text m ()
-createExpandHistoryTable g c pc = do
-    createHistoryTable g c pc
-    expandHistoryTable g c pc
+createExpandHistoryTable g c pc nameParts = do
+    createHistoryTable g c pc nameParts
+    expandHistoryTable g c pc nameParts
  
 createIndexTable :: OutputM m
                  => IORef Globals
                  -> Contract
                  -> ProcessedContract
+                 -> (Text, Text, Text)
                  -> ConduitM () Text m ()
-createIndexTable globalsIORef contract pc = do
-  let (org, app, cname) = constructTableNameParameters
-          (organization pc)
-          (application pc)
-          (contractName pc)
+createIndexTable globalsIORef contract pc (o, a, n) = do
+  let (org, app, cname) = constructTableNameParameters o a n
       tableName = IndexTableName org app cname
   contractAlreadyCreated <- isTableCreated globalsIORef tableName
 
@@ -252,8 +252,8 @@ createIndexTable globalsIORef contract pc = do
   $logInfoLS "createIndexTable/contractAlreadyCreated" (tableName, contractAlreadyCreated)
   unless contractAlreadyCreated $ do
     incNumTables
-    yield $ insertContractTableQuery pc
-    yield $ createIndexTableQuery contract pc
+    yield $ insertContractTableQuery pc (o, a, n)
+    yield $ createIndexTableQuery contract (o, a, n)
     let list = tableColumns $ Map.toList $ Map.map valueToSolidityValue $ fmap sampleValue $ Map.mapKeys T.pack $ contract^.storageDefs
     setTableCreated globalsIORef tableName list
 
@@ -261,12 +261,10 @@ createHistoryTable :: OutputM m
                    => IORef Globals
                    -> Contract
                    -> ProcessedContract
+                   -> (Text, Text, Text)
                    -> ConduitM () Text m ()
-createHistoryTable globalsIORef contract pc = do
-  let (org, app, cname) = constructTableNameParameters
-          (organization pc)
-          (application pc)
-          (contractName pc)
+createHistoryTable globalsIORef contract _ (o, a, n) = do
+  let (org, app, cname) = constructTableNameParameters o a n
       tableName = HistoryTableName org app cname
   tableExists <- isTableCreated globalsIORef tableName
 
@@ -274,8 +272,8 @@ createHistoryTable globalsIORef contract pc = do
 
   when (not tableExists) $ do
     incNumHistoryTables
-    yield $ createHistoryTableQuery contract pc
-    yield $ addHistoryUnique contract pc
+    yield $ createHistoryTableQuery contract (o, a, n)
+    yield $ addHistoryUnique contract (o, a, n)
     let list = tableColumns $ Map.toList $ Map.map valueToSolidityValue $ fmap sampleValue $ Map.mapKeys T.pack $ contract^.storageDefs
     setTableCreated globalsIORef tableName list
 
@@ -286,25 +284,21 @@ expandIndexTable :: OutputM m
                  => IORef Globals
                  -> Contract
                  -> ProcessedContract
+                 -> (Text, Text, Text)
                  -> ConduitM () Text m ()
-expandIndexTable globalsIORef contract pc = do
-  let (org, app, cname) = constructTableNameParameters
-                          (organization pc)
-                          (application pc)
-                          (contractName pc)
+expandIndexTable globalsIORef contract pc (o, a, n)= do
+  let (org, app, cname) = constructTableNameParameters o a n
       tableName = IndexTableName org app cname
   expandContractTable globalsIORef contract pc tableName
 
-expandHistoryTable :: OutputM m
-                 => IORef Globals
-                 -> Contract
-                 -> ProcessedContract
-                 -> ConduitM () Text m ()
-expandHistoryTable globalsIORef contract c = do
-  let (org, app, cname) = constructTableNameParameters
-          (organization c)
-          (application c)
-          (contractName c)
+expandHistoryTable :: OutputM m =>
+                      IORef Globals ->
+                      Contract ->
+                      ProcessedContract ->
+                      (Text, Text, Text) ->
+                      ConduitM () Text m ()
+expandHistoryTable globalsIORef contract c (o, a, n) = do
+  let (org, app, cname) = constructTableNameParameters o a n
       tableName = HistoryTableName org app cname
   expandContractTable globalsIORef contract c tableName
 
@@ -369,9 +363,9 @@ insertHistoryTable globalsIORef contracts@(x:_) = do
   history <- isHistoric globalsIORef tableName
   when history . yield $ insertHistoryTableQuery contracts
 
-insertContractTableQuery :: ProcessedContract -> Text
-insertContractTableQuery ProcessedContract{..} =
-  let (org, app, cname) = constructTableNameParameters organization application contractName
+insertContractTableQuery :: ProcessedContract -> (Text, Text, Text) -> Text
+insertContractTableQuery ProcessedContract{..} (o, a, n) =
+  let (org, app, cname) = constructTableNameParameters o a n
       tableName = IndexTableName org app cname
       conVals = wrapAndEscape . map escapeQuotes $
         [ T.pack $ keccak256ToHex $ resolvedCodePtrToSHA codehash
@@ -385,12 +379,9 @@ insertContractTableQuery ProcessedContract{..} =
         , "\n  ON CONFLICT DO NOTHING;"
         ]
 
-createIndexTableQuery :: Contract -> ProcessedContract -> Text
-createIndexTableQuery contract pc =
-  let (org, app, cname) = constructTableNameParameters
-          (organization pc)
-          (application pc)
-          (contractName pc)
+createIndexTableQuery :: Contract -> (Text, Text, Text) -> Text
+createIndexTableQuery contract (o, a, n) =
+  let (org, app, cname) = constructTableNameParameters o a n
       tableName = IndexTableName org app cname
       sampleStorageVars = fmap sampleValue $ Map.mapKeys T.pack $ contract^.storageDefs
       list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction sampleStorageVars
@@ -403,12 +394,9 @@ createIndexTableQuery contract pc =
         , "\n  PRIMARY KEY (address, \"chainId\") );"
         ]
 
-createHistoryTableQuery :: Contract -> ProcessedContract -> Text
-createHistoryTableQuery contract pc =
-  let (org, app, cname) = constructTableNameParameters
-          (organization pc)
-          (application pc)
-          (contractName pc)
+createHistoryTableQuery :: Contract -> (Text, Text, Text) -> Text
+createHistoryTableQuery contract (o, a, n) =
+  let (org, app, cname) = constructTableNameParameters o a n
       tableName = HistoryTableName org app cname
       list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ fmap sampleValue $ Map.mapKeys T.pack $ contract^.storageDefs
    in T.concat
@@ -419,12 +407,9 @@ createHistoryTableQuery contract pc =
         , ");"
         ]
 
-addHistoryUnique :: Contract -> ProcessedContract -> Text
-addHistoryUnique _ pc =
-  let (org, app, cname) = constructTableNameParameters
-          (organization pc)
-          (application pc)
-          (contractName pc)
+addHistoryUnique :: Contract -> (Text, Text, Text) -> Text
+addHistoryUnique _ (o, a, n)=
+  let (org, app, cname) = constructTableNameParameters o a n
       historyName' = HistoryTableName org app cname
       historyName = tableNameToDoubleQuoteText historyName'
       indexName = "index_" <> (escapeQuotes $ tableNameToText historyName')
