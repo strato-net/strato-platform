@@ -49,13 +49,15 @@ int = V.SimpleValue . V.valueInt
 
 createInserts :: OutputM m
               => IORef Globals
+              -> [Text]
               -> [(ProcessedContract, Contract)]
               -> ConduitM () Text m ()
-createInserts globalsIORef contracts = do
+createInserts globalsIORef historyList' contracts = do
   unless (null contracts) $ do
     let contract = head contracts
+        hasHistory = contractName (fst contract) `elem` historyList'
     createIndexTable globalsIORef (snd contract) (fst contract)
-    createHistoryTable globalsIORef (snd contract) (fst contract)
+    when hasHistory $ createHistoryTable globalsIORef (snd contract) (fst contract)
     insertIndexTable globalsIORef $ map fst contracts
     insertHistoryTable globalsIORef $ map fst contracts
 
@@ -93,7 +95,7 @@ spec = do
                   ])]
 
       g <- newGlobals fakeHandle
-      [contractInsert, vehicleCreate, vehicleInsert] <- runLoggingT . runConduit $ createInserts g input .| sinkList
+      [contractInsert, vehicleCreate, vehicleInsert] <- runLoggingT . runConduit $ createInserts g [] input .| sinkList
 
       contractInsert `shouldBe`
           [r|INSERT INTO contract ("codeHash", contract, abi, "chainId")
@@ -168,8 +170,10 @@ spec = do
                   ])]
       g <- newGlobals fakeHandle
       addToHistoryList g (HistoryTableName "" "" "Vehicle")
+      let hl = ["Vehicle"]
+
       [contractInsert, vehicleCreate, historyCreate, historyIndex, vehicleInsert, historyInsert]
-        <- runLoggingT . runConduit $ createInserts g input .| sinkList
+        <- runLoggingT . runConduit $ createInserts g hl input .| sinkList
 
       contractInsert `shouldBe`
           [r|INSERT INTO contract ("codeHash", contract, abi, "chainId")
@@ -278,7 +282,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
 
       g <- newGlobals fakeHandle
       [contractInsert, vehicleCreate, vehicleInsert] <-
-          runLoggingT . runConduit $ createInserts g input .| sinkList
+          runLoggingT . runConduit $ createInserts g [] input .| sinkList
 
       contractInsert `shouldBe`
           [r|INSERT INTO contract ("codeHash", contract, abi, "chainId")
@@ -375,7 +379,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
 
     g <- newGlobals fakeHandle
     [contractInsert, swissArmyCreate, swissArmyInsert] <-
-        runLoggingT . runConduit $ createInserts g input .| sinkList
+        runLoggingT . runConduit $ createInserts g [] input .| sinkList
 
     contractInsert `shouldBe` [r|INSERT INTO contract ("codeHash", contract, abi, "chainId")
   VALUES ('dd993a7bf0018419be434b8232c93936b65b1ebf663006e2f906c333427b1402',
@@ -476,7 +480,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     g <- newGlobals fakeHandle
 
     [_, swissArmyCreate, swissArmyInsert] <-
-        runLoggingT . runConduit $ createInserts g input .| sinkList
+        runLoggingT . runConduit $ createInserts g [] input .| sinkList
 
     T.unpack swissArmyCreate `shouldContain` "\"array_nums\" jsonb,"
     T.unpack swissArmyInsert `shouldContain` [r|'["0"]')|]
@@ -569,7 +573,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
 
     g <- newGlobals fakeHandle
     [contractInsert, swissArmyCreate, swissArmyInsert] <-
-        runLoggingT . runConduit $ createInserts g input .| sinkList
+        runLoggingT . runConduit $ createInserts g [] input .| sinkList
 
     contractInsert `shouldBe` [r|INSERT INTO contract ("codeHash", contract, abi, "chainId")
   VALUES ('c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470',
