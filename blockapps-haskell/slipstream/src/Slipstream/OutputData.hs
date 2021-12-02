@@ -43,7 +43,6 @@ import           UnliftIO.Exception              (handle, SomeException)
 
 import           BlockApps.Logging
 import           Blockchain.Data.AddressStateDB
-import           Blockchain.Strato.Model.Address
 import qualified Blockchain.Strato.Model.Event   as Action
 import           Blockchain.Strato.Model.Keccak256
 
@@ -112,7 +111,7 @@ escapeQuotes = escapeSingleQuotes . escapeDoubleQuotes
 tableColumns :: [(Text, VariableDeclF a)] -> TableColumns
 tableColumns = map go
   where go (x,y) = let z = wrapDoubleQuotes $ escapeQuotes x
-                   in T.concat [z, " ", typeText $ valueToSolidityValue $ sampleValue y]
+                   in T.concat [z, " ", solidityTypeToSQLType y]
 
 -- Considered partial because I'm assuming the TableColumns will always be in this format:
 -- ["\"myCol1\" type1", "\"myCol2\" type2", "\"myCol3\" type3"]
@@ -628,24 +627,17 @@ insertEventTableQuery ev =
 
 
 --This is a temporary function that converts solidity types to a sample value...  I am just using this now to convert table creation from the old way (value based when values come through) to the new way (direct from the types when a CC is registered)
-sampleValue :: VariableDeclF a -> Value
-sampleValue VariableDecl{varType=Xabi.Bool} = SimpleValue (ValueBool True)
-sampleValue VariableDecl{varType=Xabi.Int _ _} = SimpleValue (ValueInt False Nothing 0)
-sampleValue VariableDecl{varType=Xabi.String _} = SimpleValue (ValueString "")
-sampleValue VariableDecl{varType=Xabi.Bytes _ _} = SimpleValue (ValueString "")
-sampleValue VariableDecl{varType=Xabi.Address} = SimpleValue (ValueAddress $ Address 0xabcd)
-sampleValue VariableDecl{varType=Xabi.Account} = SimpleValue (ValueAddress $ Address 0xabcd)
-sampleValue VariableDecl{varType=Xabi.Array _ _} = ValueArrayFixed 0 []
-sampleValue VariableDecl{varType=Xabi.Mapping _ _ _} = ValueMapping Map.empty
-sampleValue VariableDecl{varType=Xabi.Label _} = SimpleValue (ValueAddress $ Address 0xabcd)
-sampleValue VariableDecl{varType=Xabi.Struct _ _} = ValueStruct Map.empty
-sampleValue VariableDecl{varType=Xabi.Enum _ _ _} = SimpleValue (ValueString "")
-sampleValue VariableDecl{varType=Xabi.Contract _} = SimpleValue (ValueAddress $ Address 0xabcd)
---sampleValue x = error $ "undefined type in sampleValue: " ++ show (varType x)
-
-
-typeText :: SolidityValue -> Text
-typeText (SolidityValueAsString _) = "text"
-typeText (SolidityNum _) = "bigint"
-typeText (SolidityBool _) = "bool"
-typeText _ = "jsonb"
+solidityTypeToSQLType :: VariableDeclF a -> Text
+solidityTypeToSQLType VariableDecl{varType=Xabi.Bool} = "bool"
+solidityTypeToSQLType VariableDecl{varType=Xabi.Int _ _} = "bigint"
+solidityTypeToSQLType VariableDecl{varType=Xabi.String _} = "text"
+solidityTypeToSQLType VariableDecl{varType=Xabi.Bytes _ _} = "text"
+solidityTypeToSQLType VariableDecl{varType=Xabi.Address} = "text"
+solidityTypeToSQLType VariableDecl{varType=Xabi.Account} = "text"
+solidityTypeToSQLType VariableDecl{varType=Xabi.Array _ _} = "jsonb"
+solidityTypeToSQLType VariableDecl{varType=Xabi.Mapping _ _ _} = "jsonb"
+solidityTypeToSQLType VariableDecl{varType=Xabi.Label _} = "text"
+solidityTypeToSQLType VariableDecl{varType=Xabi.Struct _ _} = "jsonb"
+solidityTypeToSQLType VariableDecl{varType=Xabi.Enum _ _ _} = "text"
+solidityTypeToSQLType VariableDecl{varType=Xabi.Contract _} = "text"
+--solidityTypeToSQLType x = error $ "undefined type in solidityTypeToSQLType: " ++ show (varType x)

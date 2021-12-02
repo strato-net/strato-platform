@@ -12,7 +12,10 @@
     , TupleSections
 #-}
 
-module Slipstream.SolidityValue where
+module Slipstream.SolidityValue (
+  SolidityValue(..),
+  valueToSolidityValue
+  ) where
 
 import           Data.Aeson               hiding (Value)
 import qualified Data.ByteString          as B
