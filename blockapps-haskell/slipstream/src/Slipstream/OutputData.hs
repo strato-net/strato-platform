@@ -65,12 +65,6 @@ type OutputM m = (MonadUnliftIO m, MonadLogger m)
 tshow :: Show a => a -> Text
 tshow = T.pack . show
 
-typeText :: SolidityValue -> Text
-typeText (SolidityValueAsString _) = "text"
-typeText (SolidityNum _) = "bigint"
-typeText (SolidityBool _) = "bool"
-typeText _ = "jsonb"
-
 csv :: [Text] -> Text
 csv = T.intercalate ",\n    "
 
@@ -115,10 +109,10 @@ escapeDoubleQuotes = T.replace "\"" "\\\""
 escapeQuotes :: Text -> Text
 escapeQuotes = escapeSingleQuotes . escapeDoubleQuotes
 
-tableColumns :: [(Text, SolidityValue)] -> TableColumns
+tableColumns :: [(Text, VariableDeclF a)] -> TableColumns
 tableColumns = map go
   where go (x,y) = let z = wrapDoubleQuotes $ escapeQuotes x
-                   in T.concat [z, " ", typeText y]
+                   in T.concat [z, " ", typeText $ valueToSolidityValue $ sampleValue y]
 
 -- Considered partial because I'm assuming the TableColumns will always be in this format:
 -- ["\"myCol1\" type1", "\"myCol2\" type2", "\"myCol3\" type3"]
@@ -253,7 +247,7 @@ createIndexTable globalsIORef contract pc (o, a, n) = do
     incNumTables
     yield $ insertContractTableQuery pc (o, a, n)
     yield $ createIndexTableQuery contract (o, a, n)
-    let list = tableColumns $ Map.toList $ Map.map valueToSolidityValue $ fmap sampleValue $ Map.mapKeys T.pack $ contract^.storageDefs
+    let list = tableColumns $ Map.toList $ Map.mapKeys T.pack $ contract^.storageDefs
     setTableCreated globalsIORef tableName list
 
 createHistoryTable :: OutputM m
@@ -272,7 +266,7 @@ createHistoryTable globalsIORef contract (o, a, n) = do
     incNumHistoryTables
     yield $ createHistoryTableQuery contract (o, a, n)
     yield $ addHistoryUnique (o, a, n)
-    let list = tableColumns $ Map.toList $ Map.map valueToSolidityValue $ fmap sampleValue $ Map.mapKeys T.pack $ contract^.storageDefs
+    let list = tableColumns $ Map.toList $ Map.mapKeys T.pack $ contract^.storageDefs
     setTableCreated globalsIORef tableName list
 
 
@@ -313,7 +307,7 @@ expandContractTable globalsIORef contract tableName = do
           , " does not exist, but we are trying to expand it?"
           ]
     Just cols -> do
-      let list = Map.toList $ Map.map valueToSolidityValue $ fmap sampleValue $ Map.mapKeys T.pack $ contract^.storageDefs
+      let list = Map.toList $ Map.mapKeys T.pack $ contract^.storageDefs
           difference new old = filter ((`notElem` old) . fst) new
           extras = tableColumns $ difference list (partialParseTableColumns cols)
       unless (null extras) $ do
@@ -378,8 +372,7 @@ createIndexTableQuery :: Contract -> (Text, Text, Text) -> Text
 createIndexTableQuery contract (o, a, n) =
   let (org, app, cname) = constructTableNameParameters o a n
       tableName = IndexTableName org app cname
-      sampleStorageVars = fmap sampleValue $ Map.mapKeys T.pack $ contract^.storageDefs
-      list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction sampleStorageVars
+      list = Map.toList $ Map.mapKeys T.pack $ contract^.storageDefs
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
         , csv $ ["address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
@@ -393,7 +386,7 @@ createHistoryTableQuery :: Contract -> (Text, Text, Text) -> Text
 createHistoryTableQuery contract (o, a, n) =
   let (org, app, cname) = constructTableNameParameters o a n
       tableName = HistoryTableName org app cname
-      list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ fmap sampleValue $ Map.mapKeys T.pack $ contract^.storageDefs
+      list = Map.toList $ Map.mapKeys T.pack $ contract^.storageDefs
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS ", tableNameToDoubleQuoteText tableName, " ("
         , csv $ ["address text NOT NULL", "\"chainId\" text NOT NULL", "block_hash text NOT NULL", "block_timestamp text",
@@ -650,3 +643,9 @@ sampleValue VariableDecl{varType=Xabi.Enum _ _ _} = SimpleValue (ValueString "")
 sampleValue VariableDecl{varType=Xabi.Contract _} = SimpleValue (ValueAddress $ Address 0xabcd)
 --sampleValue x = error $ "undefined type in sampleValue: " ++ show (varType x)
 
+
+typeText :: SolidityValue -> Text
+typeText (SolidityValueAsString _) = "text"
+typeText (SolidityNum _) = "bigint"
+typeText (SolidityBool _) = "bool"
+typeText _ = "jsonb"
