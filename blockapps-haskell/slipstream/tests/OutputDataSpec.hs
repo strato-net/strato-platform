@@ -57,7 +57,7 @@ createInserts globalsIORef historyList' contracts = do
     let contract = head contracts
         hasHistory = contractName (fst contract) `elem` historyList'
     createIndexTable globalsIORef (snd contract) (fst contract) (organization $ fst contract, application $ fst contract, contractName $ fst contract)
-    when hasHistory $ createHistoryTable globalsIORef (snd contract) (fst contract) (organization $ fst contract, application $ fst contract, contractName $ fst contract)
+    when hasHistory $ createHistoryTable globalsIORef (snd contract) (organization $ fst contract, application $ fst contract, contractName $ fst contract)
     insertIndexTable globalsIORef $ map fst contracts
     insertHistoryTable globalsIORef $ map fst contracts
 

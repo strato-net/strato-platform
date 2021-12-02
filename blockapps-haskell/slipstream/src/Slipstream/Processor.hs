@@ -435,7 +435,7 @@ processTheMessages env sqlEnv conn g messages = do
       let n = T.pack nameString
       $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o <> ", app=" <> a <> ", name=" <> n
       let pc = ccToProcessedContract cp o a n c
-          nameParts = (o, a, n)
+          nameParts = (o, if a == n then "" else a, n)
       outputData conn $ createExpandIndexTable g c pc nameParts
 
       when (n `elem` hl) $

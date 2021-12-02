@@ -234,7 +234,7 @@ createExpandHistoryTable
   -> (Text, Text, Text)
   -> ConduitM () Text m ()
 createExpandHistoryTable g c pc nameParts = do
-    createHistoryTable g c pc nameParts
+    createHistoryTable g c nameParts
     expandHistoryTable g c pc nameParts
  
 createIndexTable :: OutputM m
@@ -260,10 +260,9 @@ createIndexTable globalsIORef contract pc (o, a, n) = do
 createHistoryTable :: OutputM m
                    => IORef Globals
                    -> Contract
-                   -> ProcessedContract
                    -> (Text, Text, Text)
                    -> ConduitM () Text m ()
-createHistoryTable globalsIORef contract _ (o, a, n) = do
+createHistoryTable globalsIORef contract (o, a, n) = do
   let (org, app, cname) = constructTableNameParameters o a n
       tableName = HistoryTableName org app cname
   tableExists <- isTableCreated globalsIORef tableName
@@ -273,7 +272,7 @@ createHistoryTable globalsIORef contract _ (o, a, n) = do
   when (not tableExists) $ do
     incNumHistoryTables
     yield $ createHistoryTableQuery contract (o, a, n)
-    yield $ addHistoryUnique contract (o, a, n)
+    yield $ addHistoryUnique (o, a, n)
     let list = tableColumns $ Map.toList $ Map.map valueToSolidityValue $ fmap sampleValue $ Map.mapKeys T.pack $ contract^.storageDefs
     setTableCreated globalsIORef tableName list
 
@@ -286,10 +285,10 @@ expandIndexTable :: OutputM m
                  -> ProcessedContract
                  -> (Text, Text, Text)
                  -> ConduitM () Text m ()
-expandIndexTable globalsIORef contract pc (o, a, n)= do
+expandIndexTable globalsIORef contract _ (o, a, n)= do
   let (org, app, cname) = constructTableNameParameters o a n
       tableName = IndexTableName org app cname
-  expandContractTable globalsIORef contract pc tableName
+  expandContractTable globalsIORef contract tableName
 
 expandHistoryTable :: OutputM m =>
                       IORef Globals ->
@@ -297,18 +296,17 @@ expandHistoryTable :: OutputM m =>
                       ProcessedContract ->
                       (Text, Text, Text) ->
                       ConduitM () Text m ()
-expandHistoryTable globalsIORef contract c (o, a, n) = do
+expandHistoryTable globalsIORef contract _ (o, a, n) = do
   let (org, app, cname) = constructTableNameParameters o a n
       tableName = HistoryTableName org app cname
-  expandContractTable globalsIORef contract c tableName
+  expandContractTable globalsIORef contract tableName
 
 expandContractTable :: OutputM m
                     => IORef Globals
                     -> Contract
-                    -> ProcessedContract
                     -> TableName
                     -> ConduitM () Text m ()
-expandContractTable globalsIORef contract _ tableName = do
+expandContractTable globalsIORef contract tableName = do
   columns <- getTableColumns globalsIORef tableName
   case columns of
     Nothing -> do
@@ -407,8 +405,8 @@ createHistoryTableQuery contract (o, a, n) =
         , ");"
         ]
 
-addHistoryUnique :: Contract -> (Text, Text, Text) -> Text
-addHistoryUnique _ (o, a, n)=
+addHistoryUnique :: (Text, Text, Text) -> Text
+addHistoryUnique (o, a, n)=
   let (org, app, cname) = constructTableNameParameters o a n
       historyName' = HistoryTableName org app cname
       historyName = tableNameToDoubleQuoteText historyName'
