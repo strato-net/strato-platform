@@ -224,18 +224,17 @@ createExpandIndexTable
   -> ConduitM () Text m ()
 createExpandIndexTable g c pc nameParts = do
   createIndexTable g c pc nameParts
-  expandIndexTable g c pc nameParts
+  expandIndexTable g c nameParts
 
 createExpandHistoryTable
   :: OutputM m
   => IORef Globals
   -> Contract
-  -> ProcessedContract
   -> (Text, Text, Text)
   -> ConduitM () Text m ()
-createExpandHistoryTable g c pc nameParts = do
+createExpandHistoryTable g c nameParts = do
     createHistoryTable g c nameParts
-    expandHistoryTable g c pc nameParts
+    expandHistoryTable g c nameParts
  
 createIndexTable :: OutputM m
                  => IORef Globals
@@ -282,10 +281,9 @@ createHistoryTable globalsIORef contract (o, a, n) = do
 expandIndexTable :: OutputM m
                  => IORef Globals
                  -> Contract
-                 -> ProcessedContract
                  -> (Text, Text, Text)
                  -> ConduitM () Text m ()
-expandIndexTable globalsIORef contract _ (o, a, n)= do
+expandIndexTable globalsIORef contract (o, a, n)= do
   let (org, app, cname) = constructTableNameParameters o a n
       tableName = IndexTableName org app cname
   expandContractTable globalsIORef contract tableName
@@ -293,10 +291,9 @@ expandIndexTable globalsIORef contract _ (o, a, n)= do
 expandHistoryTable :: OutputM m =>
                       IORef Globals ->
                       Contract ->
-                      ProcessedContract ->
                       (Text, Text, Text) ->
                       ConduitM () Text m ()
-expandHistoryTable globalsIORef contract _ (o, a, n) = do
+expandHistoryTable globalsIORef contract (o, a, n) = do
   let (org, app, cname) = constructTableNameParameters o a n
       tableName = HistoryTableName org app cname
   expandContractTable globalsIORef contract tableName

@@ -439,7 +439,7 @@ processTheMessages env sqlEnv conn g messages = do
       outputData conn $ createExpandIndexTable g c pc nameParts
 
       when (n `elem` hl) $
-        outputData conn $ createExpandHistoryTable g c pc nameParts
+        outputData conn $ createExpandHistoryTable g c nameParts
 
   
   unless (null messages) $
