@@ -30,6 +30,7 @@ library:
     - Blockchain.DB.ModifyStateDB
     - Blockchain.Stream.VMEvent
     - Blockchain.Stream.VMOutput
+    - Blockchain.Timing
     - Blockchain.TxRunResultCache
     - Blockchain.MemVMContext
     - Blockchain.VMContext

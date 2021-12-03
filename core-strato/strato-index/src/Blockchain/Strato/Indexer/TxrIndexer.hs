@@ -27,7 +27,7 @@ import           Blockchain.Data.Enode
 import qualified Blockchain.Data.LogDB              as LogDB
 -- import qualified Blockchain.Data.EventDB            as EventDB
 import           Blockchain.Data.TransactionDef     (formatChainId)
-import qualified Blockchain.Data.TransactionResult  as TxrDB
+--import qualified Blockchain.Data.TransactionResult  as TxrDB
 import           Blockchain.EthConf                 (lookupConsumerGroup)
 import           Blockchain.ExtWord
 
@@ -161,13 +161,13 @@ txrResultHandler = \case
          , " for chainID: "
          , formatChainId $ eventDBChainId ev
          ]
-  PutTxResult r -> do
-    logF [ "Inserting TXResult for tx "
-         , format $ transactionResultTransactionHash r
-         , " at block "
-         , format $ transactionResultBlockHash r
-         ]
-    void . lift $ TxrDB.putTransactionResult r
+  PutTxResult _ -> return () --do
+--    logF [ "Inserting TXResult for tx "
+--         , format $ transactionResultTransactionHash r
+--         , " at block "
+--         , format $ transactionResultBlockHash r
+--         ]
+--    void . lift $ TxrDB.putTransactionResult r
 
 kafkaClientIds :: (KafkaClientId, ConsumerGroup)
 kafkaClientIds = ("strato-txr-indexer", lookupConsumerGroup "strato-txr-indexer")

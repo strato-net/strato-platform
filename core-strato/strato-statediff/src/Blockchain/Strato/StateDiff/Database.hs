@@ -18,6 +18,9 @@ import           Blockchain.DB.CodeDB
 import           Blockchain.DB.SQLDB
 import           Blockchain.ExtWord
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.CodePtr
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.SolidVM.Model
 
 import           Control.Lens ((^.))
@@ -38,6 +41,24 @@ commitSqlDiffs StateDiff{blockNumber, createdAccounts, deletedAccounts, updatedA
     createAccount blockNumber $ Map.toList createdAccounts
     sequence_ $ Map.mapWithKey (const . deleteAccount) deletedAccounts
     sequence_ $ Map.mapWithKey (updateAccount blockNumber) updatedAccounts
+
+codePtrHash :: CodePtr -> Maybe Keccak256
+codePtrHash (EVMCode k) = Just k
+codePtrHash (SolidVMCode _ k) = Just k
+codePtrHash _ = Nothing
+
+codePtrName :: CodePtr -> Maybe String
+codePtrName (SolidVMCode n _) = Just n
+codePtrName (CodeAtAccount _ n) = Just n
+codePtrName _ = Nothing
+
+codePtrAddress :: CodePtr -> Maybe Address
+codePtrAddress (CodeAtAccount a _) = Just $ a ^. accountAddress
+codePtrAddress _ = Nothing
+
+codePtrChainId :: CodePtr -> Maybe Word256
+codePtrChainId (CodeAtAccount a _) = a ^. accountChainId
+codePtrChainId _ = Nothing
 
 createAccount :: MonadIO m =>
                  Integer -> [(Account, AccountDiff 'Eventual)] -> SQL.SqlPersistT m ()
@@ -62,7 +83,10 @@ createAccount blockNumber accountDiffs = do
       addressStateRefBalance = getField (theError account "balance") $ balance diff,
       addressStateRefContractRoot = getField (theError account "contractRoot") $ contractRoot diff,
       addressStateRefCode = getField (theError account "code") $ code diff,
-      addressStateRefCodeHash = codeHash diff,
+      addressStateRefCodeHash = codePtrHash $ codeHash diff,
+      addressStateRefContractName = codePtrName $ codeHash diff,
+      addressStateRefCodePtrAddress = codePtrAddress $ codeHash diff,
+      addressStateRefCodePtrChainId = codePtrChainId $ codeHash diff,
       addressStateRefLatestBlockDataRefNumber = blockNumber,
       addressStateRefChainId = fromMaybe 0 $ account ^. accountChainId
       }

@@ -20,7 +20,20 @@ library:
     - Blockchain.SolidVM.CodeCollectionDB
     - Blockchain.SolidVM.Exception
     - SolidVM.Solidity.Detectors
+    - SolidVM.Solidity.Detectors.Contracts.ParentConstructors
+    - SolidVM.Solidity.Detectors.Typechecker
+    - SolidVM.Solidity.Detectors.Expressions.BooleanLiterals
+    - SolidVM.Solidity.Detectors.Expressions.DivideBeforeMultiply
+    - SolidVM.Solidity.Detectors.Pragmas.IncorrectSolidityVersion
+    - SolidVM.Solidity.Detectors.Functions.ConstantFunctions
+    - SolidVM.Solidity.Detectors.Functions.Unimplemented.Continue
+    - SolidVM.Solidity.Detectors.Functions.Unimplemented.Modifiers
+    - SolidVM.Solidity.Detectors.Statements.StateVariableShadowing
+    - SolidVM.Solidity.Detectors.Statements.UninitializedLocalVariables
+    - SolidVM.Solidity.Detectors.Statements.WriteAfterWrite
+    - SolidVM.Solidity.Detectors.Variables.StateVariables
     - SolidVM.Solidity.Fuzzer
+    - SolidVM.Solidity.Fuzzer.Types
     - SolidVM.Solidity.Parse.File
     - SolidVM.Solidity.Parse.Lexer
     - SolidVM.Solidity.Parse.Statement

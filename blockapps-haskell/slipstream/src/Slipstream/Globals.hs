@@ -35,7 +35,6 @@ import qualified Data.Cache.LRU              as LRU
 import           Data.Either.Extra
 import qualified Data.HashMap.Strict         as HM
 import qualified Data.Map.Strict              as M
-import           Data.Int                    (Int32)
 --import           Data.Set                    (Set)
 import qualified Data.Set                    as Set
 import           Data.Text                   (Text)
@@ -67,7 +66,7 @@ xabiToText = T.replace "\'" "\'\'"
            . decodeUtf8 . BL.toStrict
            . JSON.encode
 
-setContractABIs :: MonadIO m => IORef Globals -> CodePtr -> M.Map Text (Int32, ContractDetails) -> m ()
+setContractABIs :: MonadIO m => IORef Globals -> CodePtr -> M.Map Text ContractDetails -> m ()
 setContractABIs gref (SolidVMCode _ !codeHash) detailsMap = do 
   globals@Globals{..} <- readIORef gref
   updateGlobals gref globals{contractABIs=HM.insert codeHash detailsMap contractABIs}
@@ -75,7 +74,7 @@ setContractABIs _ (EVMCode _) _ = error "cannot use the contractABIs cache for E
 setContractABIs _ (CodeAtAccount _ _) _ = error "cannot use the contractABIs cache for CodeAtAccount contracts"
 
 
-getContractABIs :: MonadIO m => IORef Globals -> CodePtr -> m (Maybe (M.Map Text (Int32, ContractDetails)))
+getContractABIs :: MonadIO m => IORef Globals -> CodePtr -> m (Maybe (M.Map Text ContractDetails))
 getContractABIs gref (SolidVMCode _ !codeHash) = do
   abis <- contractABIs <$> readIORef gref
   return $ HM.lookup codeHash abis

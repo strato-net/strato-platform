@@ -48,10 +48,8 @@ async function fill(user, options:Options) {
 }
 
 function getCreateArgs(contract:ContractDefinition, options:Options) {
-  const src = options.config.VM === "EVM" ? {} : { src: contract.source };
-
   const payload = {
-    ...src,
+    src: contract.source,
     contract: contract.name,
     args: contract.args,
     chainid: contract.chainid,
@@ -147,6 +145,15 @@ async function getBalance(user:OAuthUser, bcuser:BlockChainUser | null, options:
   }
 
   return new BigNumber(accounts[0].balance);
+}
+
+async function getContracts(user:OAuthUser, chainId, options:Options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.CONTRACTS, {
+    ...options,
+    chainIds: [chainId]
+  });
+  return get(url, endpoint, setAuthHeaders(user, options));
 }
 
 async function getState(user:OAuthUser, contract, options:Options) {
@@ -488,6 +495,7 @@ export default {
   createContractList,
   fill,
   blocResults,
+  getContracts,
   getState,
   getCallArgs,
   call,

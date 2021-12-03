@@ -1717,7 +1717,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
           return (n, (t, var))
 
 
-  addCallInfo to contract' (contractName' ++ " constructer") hsh cc (M.fromList zipped) False
+  addCallInfo to contract' (contractName' ++ " constructor") hsh cc (M.fromList zipped) False
 
   forM_ [(n, e) | (n, Xabi.VariableDecl _ _ (Just e) _) <- M.toList $ contract'^.storageDefs] $ \(n, e) -> do
     v <- expToVar e

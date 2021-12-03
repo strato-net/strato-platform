@@ -8,8 +8,8 @@ library:
   source-dirs: src
   dependencies:
   - monad-alter
-  - monad-control
   - mtl
   - persistent
   - postgresql-simple
   - resource-pool
+  - unliftio

@@ -2,6 +2,7 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 import * as fs from 'fs';
+import { ContractsProvider } from './contracts';
 import { DeploymentsProvider } from './deployments';
 import { NodesProvider } from './nodes';
 import { ProjectActionProvider } from './project';
@@ -118,6 +119,15 @@ export async function activate(context: vscode.ExtensionContext) {
 		}
 	}));
 
+	const contractsProvider = new ContractsProvider();
+	vscode.window.registerTreeDataProvider('contracts', contractsProvider);
+	vscode.commands.registerCommand('contracts.refreshEntry', () =>
+		contractsProvider.refresh()
+	);
+	vscode.window.registerTreeDataProvider(
+		'contracts',
+		contractsProvider
+	)
 	const deploymentsProvider = new DeploymentsProvider();
 	vscode.window.registerTreeDataProvider('deployments', deploymentsProvider);
 	vscode.commands.registerCommand('deployments.refreshEntry', () =>

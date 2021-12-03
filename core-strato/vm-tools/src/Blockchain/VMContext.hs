@@ -17,6 +17,7 @@
 
 module Blockchain.VMContext
     ( CurrentBlockHash(..)
+    , IsBlockstanbul(..)
     , withCurrentBlockHash
     , VMBase
     , ContextDBs(..)
@@ -108,6 +109,7 @@ import           Blockchain.Data.Block
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
+import           Blockchain.Data.TransactionResult
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.BlockSummaryDB
 import           Blockchain.DB.ChainDB
@@ -134,6 +136,9 @@ import           UnliftIO
 
 newtype CurrentBlockHash = CurrentBlockHash { unCurrentBlockHash :: Keccak256 }
   deriving (Generic, NFData, Show)
+
+newtype IsBlockstanbul = IsBlockstanbul { unIsBlockstanbul :: Bool }
+  deriving (Generic, NFData, Show, Eq)
 
 instance NFData RBDB.RedisConnection where
   rnf (RBDB.RedisConnection c) = c `seq` ()
@@ -312,6 +317,19 @@ instance Mod.Accessible MemDBs ContextM where
 instance Mod.Modifiable MemDBs ContextM where
   get _    = gets $ view memDBs
   put _ md = modify $ memDBs .~ md
+
+instance Mod.Accessible IsBlockstanbul ContextM where
+  access _ = IsBlockstanbul <$> contextGets _hasBlockstanbul
+
+instance Mod.Modifiable BaggerState ContextM where
+  get _   = contextGets _baggerState
+  put _ s = contextModify $ baggerState .~ s
+
+instance Mod.Accessible TRC.Cache ContextM where
+  access _ = contextGets _txRunResultsCache
+
+instance ContextM `Mod.Yields` TransactionResult where
+  yield = void . putTransactionResult
 
 vmBlockHashRootKey :: B.ByteString
 vmBlockHashRootKey = "block_hash_root"

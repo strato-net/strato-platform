@@ -333,11 +333,12 @@ instance ToSchema AddressStateRef' where
     NamedSchema (Just "AddresStateRef'") mempty
 
 instance ToJSON AddressStateRef' where
-    toJSON (AddressStateRef' (AddressStateRef addr n b cr c ch cid bNum) next) =
+    toJSON (AddressStateRef' (AddressStateRef addr n b cr c ch cn cpa cpc cid bNum) next) =
         object $ ["next" .= next, "kind" .= ("AddressStateRef" :: String),
                   "address" .= addr, "nonce" .= n, "balance" .= show b,
                   "contractRoot" .= cr, "code" .= c, "codeHash" .= ch,
-                  "latestBlockNum" .= bNum]
+                  "contractName" .= cn, "codePtrAddress" .= cpa,
+                  "codePtrChainId" .= cpc, "latestBlockNum" .= bNum]
                   ++ (("chainId" .=) <$> (if cid == 0 then [] else [cid]))
 
 instance FromJSON AddressStateRef' where
@@ -351,7 +352,10 @@ instance FromJSON AddressStateRef' where
                 <*> (LabeledError.read "FromJSON/AddressRef'" <$> (s .: "balance"))
                 <*> s .: "contractRoot"
                 <*> s .: "code"
-                <*> s .: "codeHash"
+                <*> s .:? "codeHash"
+                <*> s .:? "contractName"
+                <*> s .:? "codePtrAddress"
+                <*> s .:? "codePtrChainId"
                 <*> s .:? "chainId" .!= 0
                 <*> s .: "latestBlockNum"
               )

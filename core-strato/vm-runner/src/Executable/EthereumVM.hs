@@ -22,16 +22,17 @@ import           Control.Monad.Trans.Maybe
 import qualified Blockchain.Database.MerklePatricia    as MP
 import           Blockchain.Output
 import qualified Data.ByteString                       as BS
-import qualified Data.ByteString.Char8          as BC
+import qualified Data.ByteString.Char8                 as BC
 import           Data.Conduit.List                     (fold)
 import           Data.Foldable                         hiding (fold)
 import           Data.List
-import           Data.List.Split                       (chunksOf)
-import           Data.Proxy
-import qualified Data.Text                             as T
+--import           Data.List.Split                       (chunksOf)
 import qualified Data.Map                              as M
-import           Data.Maybe                            (catMaybes, isNothing, fromMaybe)
+import           Data.Maybe
+import           Data.Proxy
 import qualified Data.Set                              as S
+import qualified Data.Sequence                         as Seq
+import qualified Data.Text                             as T
 import           Data.Time.Clock.POSIX
 import           Data.Traversable                      (for)
 import           Debugger
@@ -80,6 +81,7 @@ import           Blockchain.Strato.Indexer.Kafka       (writeIndexEvents)
 import           Blockchain.Strato.Indexer.Model       (IndexEvent (..))
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Action        (Action)
+import qualified Blockchain.Strato.Model.Action        as Action
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.StateDiff.Database  (commitSqlDiffs)
@@ -167,7 +169,7 @@ handleVmEvents = awaitForever $ \InBatch{..} -> do
     if shouldOutputBlocks
       then do
         $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
-        newBlock <- Bagger.makeNewBlock
+        newBlock <- Bagger.makeNewBlock mineTransactions
         $logInfoS "evm/loop/newBlock" "calling produceUnminedBlocksM"
         pure $ Just newBlock
       else pure Nothing
@@ -455,25 +457,15 @@ logEventSummaries events = do
 
 sendOutEvents :: VmOutEventBatch -> ContextM ()
 sendOutEvents OutBatch{..} = do
-  _ <- loopTimeit "productVMEvents" $
-         produceVMEvents $ map NewAction $ toList outActions
-      
-  loopTimeit "produceUnminedBlocksM" $
-    void . K.withKafkaRetry1s . produceUnminedBlocksM $
-      outputBlockToBlock <$> toList outBlocks
-  void . K.withKafkaRetry1s . writeIndexEvents $ toList outIndexEvents
+  let
+    filterOutEvents :: Action -> Action
+    filterOutEvents x = x{Action._events=Seq.empty}
+--    filterOutMetadata :: Action -> Action
+--    filterOutMetadata x = x{Action._metadata=Nothing}
+  
   for_ outToStateDiffs $ \(cId, cInfo, bHash) ->
     withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo
   traverse_ commitSqlDiffs outStateDiffs
-  loopTimeit "flushLogEntries" $ do
-    void . K.withKafkaRetry1s $ writeIndexEvents (LogDBEntry <$> toList outLogs)
-  loopTimeit "flushEventEntries" $ do
-    void . K.withKafkaRetry1s $ writeIndexEvents (EventDBEntry <$> toList outEvents)
-  loopTimeit "flushTransactionResults" $ do
-    let q = toList outTXRs
-        toWrite = chunksOf 2000 $ TxResult <$> q
-    recordTxrFlush $ length q
-    mapM_ (K.withKafkaRetry1s . writeIndexEvents) toWrite
   when (not flags_sqlDiff) $
     timeit "updateSQLBalanceAndNonce" (Just vmBlockInsertionMined) $
       forM_ outASMs $ \asm -> do
@@ -482,6 +474,37 @@ sendOutEvents OutBatch{..} = do
              (addressStateBalance asMod, addressStateNonce asMod))
           | (theAccount, Mem.ASModification asMod) <- M.toList asm
           ]
+  loopTimeit "productVMEvents" $ do
+      _ <- produceVMEvents $ 
+             concat (map (map (CodeCollectionAdded . T.unpack) . maybeToList . M.lookup "src" . fromMaybe M.empty . Action._metadata) (toList outActions))
+
+      _ <- produceVMEvents $ 
+             concat (map (map EventEmitted . toList . Action._events) (toList outActions))
+
+      _ <- produceVMEvents $ map (NewAction . filterOutEvents) (toList outActions)
+
+--      _ <- produceVMEvents $ map (NewAction . filterOutMetadata . filterOutEvents) (toList outActions)
+
+      _ <- produceVMEvents $ map NewTransactionResult $ toList outTXRs
+
+
+      return ()
+       
+  loopTimeit "produceUnminedBlocksM" $
+    void . K.withKafkaRetry1s . produceUnminedBlocksM $
+      outputBlockToBlock <$> toList outBlocks
+  void . K.withKafkaRetry1s . writeIndexEvents $ toList outIndexEvents
+  loopTimeit "flushLogEntries" $ do
+    void . K.withKafkaRetry1s $ writeIndexEvents (LogDBEntry <$> toList outLogs)
+  loopTimeit "flushEventEntries" $ do
+    void . K.withKafkaRetry1s $ writeIndexEvents (EventDBEntry <$> toList outEvents)
+-- I've moved the transaction result indexing to slipstream and the VMEvent stream, above
+-- I'll keep the old code commented out below until we verify that the changes all work.
+--  loopTimeit "flushTransactionResults" $ do
+--    let q = toList outTXRs
+--        toWrite = chunksOf 2000 $ TxResult <$> q
+--    recordTxrFlush $ length q
+--    mapM_ (K.withKafkaRetry1s . writeIndexEvents) toWrite
 
 consumerGroup :: KP.ConsumerGroup
 consumerGroup = lookupConsumerGroup "ethereum-vm"

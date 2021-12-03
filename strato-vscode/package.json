@@ -21,6 +21,7 @@
 		"onCommand:strato-vscode.runUI",
 		"onCommand:strato-vscode.testUI",
 		"onView:project-management",
+		"onView:contracts",
 		"onView:deployments",
 		"onView:nodes",
 		"onCommand:extension.strato-debug.debugEditorContents"
@@ -35,6 +36,10 @@
 		"configuration": {
 			"title": "STRATO",
 			"properties": {
+				"strato-vscode.autoFuzz": {
+					"type": "boolean",
+					"default": true
+				},
 				"strato-vscode.createProjectCommand": {
 					"type": "string",
 					"default": "git clone https://github.com/blockapps/traceability-framework $1; cd $1; cd server; yarn install; yarn build; cd ../ui; yarn install; yarn build; cd .."
@@ -70,22 +75,6 @@
 				"strato-vscode.configFile": {
 					"type": "string",
 					"default": "config.yaml"
-				},
-				"blame.dateFormat": {
-					"type": "string",
-					"default": "mm/dd/yy"
-				},
-				"blame.format": {
-					"type": "string",
-					"default": "abc"
-				},
-				"blame.heatMap.enabled": {
-					"type": "boolean",
-					"default": false
-				},
-				"blame.heatMap.location": {
-					"type": "string",
-					"default": "New York"
 				}
 			}
 		},
@@ -118,6 +107,11 @@
 			{
 				"command": "strato-vscode.testUI",
 				"title": "Test STRATO Project UI"
+			},
+			{
+				"command": "contracts.refreshEntry",
+				"title": "Refresh",
+				"icon": "$(refresh)"
 			},
 			{
 				"command": "deployments.refreshEntry",
@@ -209,6 +203,11 @@
 				}
 			],
 			"view/title": [
+				{
+					"command": "contracts.refreshEntry",
+					"when": "view == contracts",
+					"group": "navigation"
+				},
 				{
 					"command": "deployments.refreshEntry",
 					"when": "view == deployments",
