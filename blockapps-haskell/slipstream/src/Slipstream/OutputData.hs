@@ -167,10 +167,6 @@ dbInsert conn insrt = handle handlePostgresError
                     . pgQuery conn
                     . rawPGSimpleQuery $! encodeUtf8 insrt
 
-isFunction :: Value -> Bool
-isFunction ValueFunction{} = False
-isFunction _ = True
-
 handlePostgresError :: OutputM m => SomeException -> m ()
 handlePostgresError = $logErrorLS "handlePGError"
 --handlePostgresError :: SomeException -> m ()
@@ -439,7 +435,7 @@ insertIndexTableQuery contracts@(x:_) =
           (application x)
           (contractName x)
       tableName = IndexTableName org app cname
-      list = Map.toList $ Map.filter isFunction $ contractData x
+      list = Map.toList $ Map.mapMaybe valueToSQLText $ contractData x
       keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
       baseVals = [ tshow . address
                  , chain
@@ -482,7 +478,7 @@ insertHistoryTableQuery contracts@(x:_) =
           (application x)
           (contractName x)
       tableName = HistoryTableName org app cname
-      list = Map.toList . Map.filter isFunction $ contractData x
+      list = Map.toList . Map.mapMaybe valueToSQLText $ contractData x
       keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
       baseVals = [ tshow . address
                  , chain
