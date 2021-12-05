@@ -30,7 +30,7 @@ import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Lazy            as BL
 import qualified Data.Map                        as Map
-import           Data.Maybe                      (catMaybes, listToMaybe)
+import           Data.Maybe                      (catMaybes, listToMaybe, mapMaybe)
 import           Data.Text                       (Text)
 import qualified Data.Text                       as T
 import           Data.Text.Encoding              (decodeUtf8, encodeUtf8)
@@ -134,9 +134,11 @@ escapeQuotes :: Text -> Text
 escapeQuotes = escapeSingleQuotes . escapeDoubleQuotes
 
 tableColumns :: [(Text, VariableDeclF a)] -> TableColumns
-tableColumns = map go
-  where go (x,y) = let z = wrapDoubleQuotes $ escapeQuotes x
-                   in T.concat [z, " ", solidityTypeToSQLType y]
+tableColumns = mapMaybe go
+  where go (x,y) =
+          case solidityTypeToSQLType y of
+            Nothing -> Nothing
+            Just v -> Just $ wrapDoubleQuotes (escapeQuotes x) <> " " <> v
 
 -- Considered partial because I'm assuming the TableColumns will always be in this format:
 -- ["\"myCol1\" type1", "\"myCol2\" type2", "\"myCol3\" type3"]
@@ -446,8 +448,8 @@ insertIndexTableQuery contracts@(x:_) =
                  , tshow . transactionSender
                  ]
       vals = flip map contracts $ \row ->
-        let rowList = Map.toList $ contractData row
-         in wrapAndEscape $ map ($ row) baseVals ++ catMaybes (map (valueToSQLText . snd) rowList)
+        let rowList = Map.toList $ Map.mapMaybe valueToSQLText $ contractData row
+         in wrapAndEscape $ map ($ row) baseVals ++ map snd rowList
       inserts = csv vals
    in T.concat
         [ "INSERT INTO "
@@ -489,8 +491,8 @@ insertHistoryTableQuery contracts@(x:_) =
                  , tshow . transactionSender
                  ]
       vals = flip map contracts $ \row ->
-        let rowList = Map.toList $ contractData row
-         in wrapAndEscape $ map ($ row) baseVals ++ catMaybes (map (valueToSQLText .snd) rowList)
+        let rowList = Map.toList $ Map.mapMaybe valueToSQLText $ contractData row
+         in wrapAndEscape $ map ($ row) baseVals ++ map snd rowList
       inserts = csv vals
    in T.concat $
         [ "INSERT INTO "
@@ -650,18 +652,18 @@ insertEventTableQuery ev =
 
 
 --This is a temporary function that converts solidity types to a sample value...  I am just using this now to convert table creation from the old way (value based when values come through) to the new way (direct from the types when a CC is registered)
-solidityTypeToSQLType :: VariableDeclF a -> Text
-solidityTypeToSQLType VariableDecl{varType=Xabi.Bool} = "bool"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Int _ _} = "bigint"
-solidityTypeToSQLType VariableDecl{varType=Xabi.String _} = "text"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Bytes _ _} = "text"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Address} = "text"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Account} = "text"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Array _ _} = "jsonb"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Mapping _ _ _} = "jsonb"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Label _} = "text"
---solidityTypeToSQLType VariableDecl{varType=Xabi.Label x} = "text references " <> T.pack x <> "(id)"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Struct _ _} = "jsonb"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Enum _ _ _} = "text"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Contract _} = "text"
+solidityTypeToSQLType :: VariableDeclF a -> Maybe Text
+solidityTypeToSQLType VariableDecl{varType=Xabi.Bool} = Just "bool"
+solidityTypeToSQLType VariableDecl{varType=Xabi.Int _ _} = Just "bigint"
+solidityTypeToSQLType VariableDecl{varType=Xabi.String _} = Just "text"
+solidityTypeToSQLType VariableDecl{varType=Xabi.Bytes _ _} = Just "text"
+solidityTypeToSQLType VariableDecl{varType=Xabi.Address} = Just "text"
+solidityTypeToSQLType VariableDecl{varType=Xabi.Account} = Just "text"
+solidityTypeToSQLType VariableDecl{varType=Xabi.Array _ _} = Just "jsonb"
+solidityTypeToSQLType VariableDecl{varType=Xabi.Mapping _ _ _} = Just "jsonb"
+solidityTypeToSQLType VariableDecl{varType=Xabi.Label _} = Just "text"
+--solidityTypeToSQLType VariableDecl{varType=Xabi.Label x} = Just $ "text references " <> T.pack x <> "(id)"
+solidityTypeToSQLType VariableDecl{varType=Xabi.Struct _ _} = Just "jsonb"
+solidityTypeToSQLType VariableDecl{varType=Xabi.Enum _ _ _} = Just "text"
+solidityTypeToSQLType VariableDecl{varType=Xabi.Contract _} = Just "text"
 --solidityTypeToSQLType x = error $ "undefined type in solidityTypeToSQLType: " ++ show (varType x)
