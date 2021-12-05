@@ -37,14 +37,14 @@ import           Data.Text.Encoding              (decodeUtf8, encodeUtf8)
 import           Database.PostgreSQL.Typed
 import           Database.PostgreSQL.Typed.Protocol
 import           Database.PostgreSQL.Typed.Query
---import           Text.Printf
+import           Text.Printf
 import           Text.RawString.QQ
 import           UnliftIO.IORef
 import           UnliftIO.Exception              (handle, SomeException)
 
 import           BlockApps.Logging
 import           Blockchain.Data.AddressStateDB
---import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Address
 import qualified Blockchain.Strato.Model.Event   as Action
 import           Blockchain.Strato.Model.Keccak256
 
@@ -102,7 +102,6 @@ solidityValueToText (SolidityArray x)         = escapeSingleQuotes . decodeUtf8 
 solidityValueToText (SolidityObject x)        = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ encode x
 
 
-{-
 valueToSQLText :: Value -> Maybe Text
 valueToSQLText (SimpleValue (ValueBool x)) = Just $ tshow x
 valueToSQLText (SimpleValue (ValueInt _ _ v)) = Just $ tshow v
@@ -110,11 +109,16 @@ valueToSQLText (SimpleValue (ValueString s)) = Just $ escapeQuotes s
 valueToSQLText (SimpleValue (ValueAddress (Address addr))) = Just $ escapeQuotes $ T.pack $ printf "%040x" (fromIntegral addr::Integer)
 valueToSQLText (SimpleValue (ValueAccount acct)) = Just $ escapeQuotes $ T.pack $ show acct
 valueToSQLText (SimpleValue (ValueBytes _ bytes)) = Just $ escapeQuotes $ decodeUtf8 bytes
-valueToSQLText (ValueArrayDynamic _) = Nothing
-[<0;7;11MvalueToSQLText  (ValueArrayFixed _ _) = Nothing
-valueToSQLText (ValueContract acct) = Just $ escapeQuotes $ T.pack $ show acct
 valueToSQLText (ValueEnum _ _ index) = Just $ escapeQuotes $ T.pack $ show index
+valueToSQLText (ValueContract acct) = Just $ escapeQuotes $ T.pack $ show acct
 valueToSQLText (ValueFunction _ _ _) = Nothing
+valueToSQLText x = Just . solidityValueToText . valueToSolidityValue $ x
+
+
+{-
+valueToSQLText :: Value -> Maybe Text
+valueToSQLText (ValueArrayDynamic _) = Nothing
+valueToSQLText (ValueArrayFixed _ _) = Nothing
 valueToSQLText (ValueMapping _) = Nothing
 valueToSQLText (ValueStruct _) = Nothing
 valueToSQLText (ValueArraySentinel _) = Nothing
@@ -446,8 +450,8 @@ insertIndexTableQuery contracts@(x:_) =
                  , tshow . transactionSender
                  ]
       vals = flip map contracts $ \row ->
-        let rowList = Map.toList $ Map.filter isFunction $ contractData row
-         in wrapAndEscape $ map ($ row) baseVals ++ map (solidityValueToText . valueToSolidityValue) (snd <$> rowList)
+        let rowList = Map.toList $ contractData row
+         in wrapAndEscape $ map ($ row) baseVals ++ catMaybes (map (valueToSQLText . snd) rowList)
       inserts = csv vals
    in T.concat
         [ "INSERT INTO "
@@ -489,8 +493,8 @@ insertHistoryTableQuery contracts@(x:_) =
                  , tshow . transactionSender
                  ]
       vals = flip map contracts $ \row ->
-        let rowList = Map.toList . Map.filter isFunction $ contractData row
-         in wrapAndEscape $ map ($ row) baseVals ++ map (solidityValueToText . valueToSolidityValue) (snd <$> rowList)
+        let rowList = Map.toList $ contractData row
+         in wrapAndEscape $ map ($ row) baseVals ++ catMaybes (map (valueToSQLText .snd) rowList)
       inserts = csv vals
    in T.concat $
         [ "INSERT INTO "
