@@ -37,12 +37,14 @@ import           Data.Text.Encoding              (decodeUtf8, encodeUtf8)
 import           Database.PostgreSQL.Typed
 import           Database.PostgreSQL.Typed.Protocol
 import           Database.PostgreSQL.Typed.Query
+--import           Text.Printf
 import           Text.RawString.QQ
 import           UnliftIO.IORef
 import           UnliftIO.Exception              (handle, SomeException)
 
 import           BlockApps.Logging
 import           Blockchain.Data.AddressStateDB
+--import           Blockchain.Strato.Model.Address
 import qualified Blockchain.Strato.Model.Event   as Action
 import           Blockchain.Strato.Model.Keccak256
 
@@ -99,6 +101,25 @@ solidityValueToText (SolidityBytes x)         = escapeQuotes $ tshow x
 solidityValueToText (SolidityArray x)         = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ encode x
 solidityValueToText (SolidityObject x)        = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ encode x
 
+
+{-
+valueToSQLText :: Value -> Maybe Text
+valueToSQLText (SimpleValue (ValueBool x)) = Just $ tshow x
+valueToSQLText (SimpleValue (ValueInt _ _ v)) = Just $ tshow v
+valueToSQLText (SimpleValue (ValueString s)) = Just $ escapeQuotes s
+valueToSQLText (SimpleValue (ValueAddress (Address addr))) = Just $ escapeQuotes $ T.pack $ printf "%040x" (fromIntegral addr::Integer)
+valueToSQLText (SimpleValue (ValueAccount acct)) = Just $ escapeQuotes $ T.pack $ show acct
+valueToSQLText (SimpleValue (ValueBytes _ bytes)) = Just $ escapeQuotes $ decodeUtf8 bytes
+valueToSQLText (ValueArrayDynamic _) = Nothing
+[<0;7;11MvalueToSQLText  (ValueArrayFixed _ _) = Nothing
+valueToSQLText (ValueContract acct) = Just $ escapeQuotes $ T.pack $ show acct
+valueToSQLText (ValueEnum _ _ index) = Just $ escapeQuotes $ T.pack $ show index
+valueToSQLText (ValueFunction _ _ _) = Nothing
+valueToSQLText (ValueMapping _) = Nothing
+valueToSQLText (ValueStruct _) = Nothing
+valueToSQLText (ValueArraySentinel _) = Nothing
+-}
+
 escapeSingleQuotes :: Text -> Text
 escapeSingleQuotes = T.replace "\'" "\'\'"
 
@@ -148,6 +169,8 @@ isFunction _ = True
 
 handlePostgresError :: OutputM m => SomeException -> m ()
 handlePostgresError = $logErrorLS "handlePGError"
+--handlePostgresError :: SomeException -> m ()
+--handlePostgresError = error . show
 
 outputData :: OutputM m
            => PGConnection
@@ -412,7 +435,7 @@ insertIndexTableQuery contracts@(x:_) =
           (application x)
           (contractName x)
       tableName = IndexTableName org app cname
-      list = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData x
+      list = Map.toList $ Map.filter isFunction $ contractData x
       keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
       baseVals = [ tshow . address
                  , chain
@@ -423,8 +446,8 @@ insertIndexTableQuery contracts@(x:_) =
                  , tshow . transactionSender
                  ]
       vals = flip map contracts $ \row ->
-        let rowList = Map.toList $ Map.map valueToSolidityValue $ Map.filter isFunction $ contractData row
-         in wrapAndEscape $ map ($ row) baseVals ++ map solidityValueToText (snd <$> rowList)
+        let rowList = Map.toList $ Map.filter isFunction $ contractData row
+         in wrapAndEscape $ map ($ row) baseVals ++ map (solidityValueToText . valueToSolidityValue) (snd <$> rowList)
       inserts = csv vals
    in T.concat
         [ "INSERT INTO "
@@ -455,7 +478,7 @@ insertHistoryTableQuery contracts@(x:_) =
           (application x)
           (contractName x)
       tableName = HistoryTableName org app cname
-      list = Map.toList . Map.map valueToSolidityValue . Map.filter isFunction $ contractData x
+      list = Map.toList . Map.filter isFunction $ contractData x
       keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
       baseVals = [ tshow . address
                  , chain
@@ -466,8 +489,8 @@ insertHistoryTableQuery contracts@(x:_) =
                  , tshow . transactionSender
                  ]
       vals = flip map contracts $ \row ->
-        let rowList = Map.toList . Map.map valueToSolidityValue . Map.filter isFunction $ contractData row
-         in wrapAndEscape $ map ($ row) baseVals ++ map solidityValueToText (snd <$> rowList)
+        let rowList = Map.toList . Map.filter isFunction $ contractData row
+         in wrapAndEscape $ map ($ row) baseVals ++ map (solidityValueToText . valueToSolidityValue) (snd <$> rowList)
       inserts = csv vals
    in T.concat $
         [ "INSERT INTO "
@@ -637,6 +660,7 @@ solidityTypeToSQLType VariableDecl{varType=Xabi.Account} = "text"
 solidityTypeToSQLType VariableDecl{varType=Xabi.Array _ _} = "jsonb"
 solidityTypeToSQLType VariableDecl{varType=Xabi.Mapping _ _ _} = "jsonb"
 solidityTypeToSQLType VariableDecl{varType=Xabi.Label _} = "text"
+--solidityTypeToSQLType VariableDecl{varType=Xabi.Label x} = "text references " <> T.pack x <> "(id)"
 solidityTypeToSQLType VariableDecl{varType=Xabi.Struct _ _} = "jsonb"
 solidityTypeToSQLType VariableDecl{varType=Xabi.Enum _ _ _} = "text"
 solidityTypeToSQLType VariableDecl{varType=Xabi.Contract _} = "text"
