@@ -420,7 +420,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     "contract",
     "enum_val",
     "number",
-    "set",
     "str",
     "strukt")
   VALUES ('000000000000000000000000000000098eaddede',
@@ -436,7 +435,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     '0000000000000000000000000000000000000999',
     '564',
     '77714314',
-    '[["22",true],["23",true],["46",true]]',
     'Hello, World!',
     '[["first_field","887"],["second_field","CLOROX DISINFECTING WIPES"]]')
   ON CONFLICT (address, "chainId") DO UPDATE SET
@@ -453,7 +451,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     "contract" = excluded."contract",
     "enum_val" = excluded."enum_val",
     "number" = excluded."number",
-    "set" = excluded."set",
     "str" = excluded."str",
     "strukt" = excluded."strukt";|]
 
@@ -614,7 +611,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     "contract",
     "enum_val",
     "number",
-    "set",
     "str",
     "strukt")
   VALUES ('000000000000000000000000000000098eaddede',
@@ -630,7 +626,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     '0000000000000000000000000000000000000999',
     '564',
     '77714314',
-    '[["22",true],["23",true],["46",true]]',
     'Hello, World!',
     '[["first_field","887"],["second_field","CLOROX DISINFECTING WIPES"]]')
   ON CONFLICT (address, "chainId") DO UPDATE SET
@@ -647,7 +642,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     "contract" = excluded."contract",
     "enum_val" = excluded."enum_val",
     "number" = excluded."number",
-    "set" = excluded."set",
     "str" = excluded."str",
     "strukt" = excluded."strukt";|]
 

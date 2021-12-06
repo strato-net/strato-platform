@@ -93,28 +93,6 @@ wrapAndEscapeDouble = wrapParens . csv . map wrapDoubleQuotes
 unwrapDoubleQuotes :: Text -> Text
 unwrapDoubleQuotes = T.dropAround (== '"')
 
-solidityValueToText :: SolidityValue -> Text
-solidityValueToText (SolidityValueAsString x) = escapeQuotes x
-solidityValueToText (SolidityBool x)          = tshow x
-solidityValueToText (SolidityNum x )          = tshow x
-solidityValueToText (SolidityBytes x)         = escapeQuotes $ tshow x
-solidityValueToText (SolidityArray x)         = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ encode x
-solidityValueToText (SolidityObject x)        = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ encode x
-
-
-valueToSQLText :: Value -> Maybe Text
-valueToSQLText (SimpleValue (ValueBool x)) = Just $ tshow x
-valueToSQLText (SimpleValue (ValueInt _ _ v)) = Just $ tshow v
-valueToSQLText (SimpleValue (ValueString s)) = Just $ escapeQuotes s
-valueToSQLText (SimpleValue (ValueAddress (Address addr))) = Just $ escapeQuotes $ T.pack $ printf "%040x" (fromIntegral addr::Integer)
-valueToSQLText (SimpleValue (ValueAccount acct)) = Just $ escapeQuotes $ T.pack $ show acct
-valueToSQLText (SimpleValue (ValueBytes _ bytes)) = Just $ escapeQuotes $ decodeUtf8 bytes
-valueToSQLText (ValueEnum _ _ index) = Just $ escapeQuotes $ T.pack $ show index
-valueToSQLText (ValueContract acct) = Just $ escapeQuotes $ T.pack $ show acct
-valueToSQLText (ValueFunction _ _ _) = Nothing
-valueToSQLText x = Just . solidityValueToText . valueToSolidityValue $ x
-
-
 {-
 valueToSQLText :: Value -> Maybe Text
 valueToSQLText (ValueArrayDynamic _) = Nothing
@@ -667,3 +645,31 @@ solidityTypeToSQLType VariableDecl{varType=Xabi.Struct _ _} = Just "jsonb"
 solidityTypeToSQLType VariableDecl{varType=Xabi.Enum _ _ _} = Just "text"
 solidityTypeToSQLType VariableDecl{varType=Xabi.Contract _} = Just "text"
 --solidityTypeToSQLType x = error $ "undefined type in solidityTypeToSQLType: " ++ show (varType x)
+
+
+------------------
+
+solidityValueToText :: SolidityValue -> Text
+solidityValueToText (SolidityValueAsString x) = escapeQuotes x
+solidityValueToText (SolidityBool x)          = tshow x
+solidityValueToText (SolidityNum x )          = tshow x
+solidityValueToText (SolidityBytes x)         = escapeQuotes $ tshow x
+solidityValueToText (SolidityArray x)         = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ encode x
+solidityValueToText (SolidityObject x)        = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ encode x
+
+
+valueToSQLText :: Value -> Maybe Text
+valueToSQLText (SimpleValue (ValueBool x)) = Just $ tshow x
+valueToSQLText (SimpleValue (ValueInt _ _ v)) = Just $ tshow v
+valueToSQLText (SimpleValue (ValueString s)) = Just $ escapeQuotes s
+valueToSQLText (SimpleValue (ValueAddress (Address addr))) = Just $ escapeQuotes $ T.pack $ printf "%040x" (fromIntegral addr::Integer)
+valueToSQLText (SimpleValue (ValueAccount acct)) = Just $ escapeQuotes $ T.pack $ show acct
+valueToSQLText (SimpleValue (ValueBytes _ bytes)) = Just $ escapeQuotes $ decodeUtf8 bytes
+valueToSQLText (ValueEnum _ _ index) = Just $ escapeQuotes $ T.pack $ show index
+valueToSQLText (ValueContract acct) = Just $ escapeQuotes $ T.pack $ show acct
+valueToSQLText (ValueFunction _ _ _) = Nothing
+valueToSQLText (ValueMapping _) = Nothing
+--valueToSQLText (ValueArrayFixed _ values) = Nothing
+--valueToSQLText (ValueArrayDynamic values) = Nothing
+--valueToSQLText (ValueStruct namedItems) = Nothing
+valueToSQLText x = Just . solidityValueToText . valueToSolidityValue $ x
