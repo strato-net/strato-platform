@@ -15,18 +15,11 @@ import qualified BlockApps.Solidity.Value as V
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Keccak256
-import           Slipstream.SolidityValue
 import           Slipstream.Data.Globals
 
 type StateRoot = Text
 
 data Detail = Incremental | Eventual
-
-data FunctionCallData = FunctionCallData
-  { functioncalldataName   :: Text
-  , functioncalldataInput  :: [(Text,SolidityValue)]
-  , functioncalldataOutput :: [(Text,SolidityValue)]
-  } deriving (Show)
 
 data ProcessedContract = ProcessedContract
   { address           :: Address
