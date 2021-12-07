@@ -670,6 +670,6 @@ valueToSQLText (ValueContract acct) = Just $ escapeQuotes $ T.pack $ show acct
 valueToSQLText (ValueFunction _ _ _) = Nothing
 valueToSQLText (ValueMapping _) = Nothing
 valueToSQLText (ValueArrayFixed _ _) = Nothing
---valueToSQLText (ValueArrayDynamic _) = Nothing
+valueToSQLText (ValueArrayDynamic _) = Nothing
 --valueToSQLText (ValueStruct namedItems) = Nothing
 valueToSQLText x = Just . solidityValueToText . valueToSolidityValue $ x
