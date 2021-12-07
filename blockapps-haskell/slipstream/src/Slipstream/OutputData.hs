@@ -637,7 +637,7 @@ solidityTypeToSQLType VariableDecl{varType=Xabi.String _} = Just "text"
 solidityTypeToSQLType VariableDecl{varType=Xabi.Bytes _ _} = Just "text"
 solidityTypeToSQLType VariableDecl{varType=Xabi.Address} = Just "text"
 solidityTypeToSQLType VariableDecl{varType=Xabi.Account} = Just "text"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Array _ _} = Just "jsonb"
+solidityTypeToSQLType VariableDecl{varType=Xabi.Array _ _} = Nothing -- Just "jsonb"
 solidityTypeToSQLType VariableDecl{varType=Xabi.Mapping _ _ _} = Just "jsonb"
 solidityTypeToSQLType VariableDecl{varType=Xabi.Label _} = Just "text"
 --solidityTypeToSQLType VariableDecl{varType=Xabi.Label x} = Just $ "text references " <> T.pack x <> "(id)"
@@ -669,7 +669,7 @@ valueToSQLText (ValueEnum _ _ index) = Just $ escapeQuotes $ T.pack $ show index
 valueToSQLText (ValueContract acct) = Just $ escapeQuotes $ T.pack $ show acct
 valueToSQLText (ValueFunction _ _ _) = Nothing
 valueToSQLText (ValueMapping _) = Nothing
---valueToSQLText (ValueArrayFixed _ values) = Nothing
---valueToSQLText (ValueArrayDynamic values) = Nothing
+valueToSQLText (ValueArrayFixed _ _) = Nothing
+valueToSQLText (ValueArrayDynamic _) = Nothing
 --valueToSQLText (ValueStruct namedItems) = Nothing
 valueToSQLText x = Just . solidityValueToText . valueToSolidityValue $ x
