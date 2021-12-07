@@ -11,7 +11,7 @@ import qualified Data.ByteString as B
 import qualified Data.IntMap as I
 import qualified Data.Map as M
 import Data.Text (Text)
-import qualified Data.Text as T
+--import qualified Data.Text as T
 import Data.Time
 import Numeric
 import Test.Hspec
@@ -124,16 +124,14 @@ spec = do
     "block_timestamp",
     "block_number",
     "transaction_hash",
-    "transaction_sender",
-    "owners")
+    "transaction_sender")
   VALUES ('0000000000000000000000000000000000000add',
     '<CHAIN>',
     '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
     '2018-09-16 18:28:52.607875 UTC',
     '123',
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
-    '0000000000000000000000000000000000000add',
-    '[{"hash":"Owner_hash_181999847806006","number":"18199984780605"}]')
+    '0000000000000000000000000000000000000add')
   ON CONFLICT (address, "chainId") DO UPDATE SET
     address = excluded.address,
     "chainId" = excluded."chainId",
@@ -141,8 +139,7 @@ spec = do
     block_timestamp = excluded.block_timestamp,
     block_number = excluded.block_number,
     transaction_hash = excluded.transaction_hash,
-    transaction_sender = excluded.transaction_sender,
-    "owners" = excluded."owners";|]
+    transaction_sender = excluded.transaction_sender;|]
 
   describe "Array serialization with history enabled" $ do
     it "should create JSON entries" $ do
@@ -217,16 +214,14 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     "block_timestamp",
     "block_number",
     "transaction_hash",
-    "transaction_sender",
-    "owners")
+    "transaction_sender")
   VALUES ('0000000000000000000000000000000000000add',
     '<CHAIN>',
     '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
     '2018-09-16 18:28:52.607875 UTC',
     '123',
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
-    '0000000000000000000000000000000000000add',
-    '[{"hash":"Owner_hash_181999847806006","number":"18199984780605"}]')
+    '0000000000000000000000000000000000000add')
   ON CONFLICT (address, "chainId") DO UPDATE SET
     address = excluded.address,
     "chainId" = excluded."chainId",
@@ -234,8 +229,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     block_timestamp = excluded.block_timestamp,
     block_number = excluded.block_number,
     transaction_hash = excluded.transaction_hash,
-    transaction_sender = excluded.transaction_sender,
-    "owners" = excluded."owners";|]
+    transaction_sender = excluded.transaction_sender;|]
 
       historyInsert `shouldBe`
           [r|INSERT INTO "history@Vehicle" ("address",
@@ -244,16 +238,14 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     "block_timestamp",
     "block_number",
     "transaction_hash",
-    "transaction_sender",
-    "owners")
+    "transaction_sender")
   VALUES ('0000000000000000000000000000000000000add',
     '<CHAIN>',
     '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
     '2018-09-16 18:28:52.607875 UTC',
     '123',
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
-    '0000000000000000000000000000000000000add',
-    '[{"hash":"Owner_hash_181999847806006","number":"18199984780605"}]')
+    '0000000000000000000000000000000000000add')
   ON CONFLICT DO NOTHING;|]
 
   describe "String escaping" $ do
@@ -311,16 +303,14 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     "block_timestamp",
     "block_number",
     "transaction_hash",
-    "transaction_sender",
-    "\"owners\"")
+    "transaction_sender")
   VALUES ('0000000000000000000000000000000000000add',
     '<CHAIN>',
     '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
     '2018-09-16 18:28:52.607875 UTC',
     '123',
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
-    '0000000000000000000000000000000000000add',
-    '[{"h''a\"''sh":"''''Owner_hash_181999847806006","number\"":"18199984780605"}]')
+    '0000000000000000000000000000000000000add')
   ON CONFLICT (address, "chainId") DO UPDATE SET
     address = excluded.address,
     "chainId" = excluded."chainId",
@@ -328,8 +318,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     block_timestamp = excluded.block_timestamp,
     block_number = excluded.block_number,
     transaction_hash = excluded.transaction_hash,
-    transaction_sender = excluded.transaction_sender,
-    "\"owners\"" = excluded."\"owners\"";|]
+    transaction_sender = excluded.transaction_sender;|]
 
   it "can unparse all solidvm value types" $ do
     let testAdd = Address 0x98eaddede
@@ -415,7 +404,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     "transaction_hash",
     "transaction_sender",
     "addr",
-    "array_nums",
     "boolean",
     "contract",
     "enum_val",
@@ -430,7 +418,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
     '000000000000000000000000000000098eaddede',
     '00000000000000000000000000000000deadbeef',
-    '["0","20","40","77","0"]',
     'True',
     '0000000000000000000000000000000000000999',
     '564',
@@ -446,14 +433,13 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     transaction_hash = excluded.transaction_hash,
     transaction_sender = excluded.transaction_sender,
     "addr" = excluded."addr",
-    "array_nums" = excluded."array_nums",
     "boolean" = excluded."boolean",
     "contract" = excluded."contract",
     "enum_val" = excluded."enum_val",
     "number" = excluded."number",
     "str" = excluded."str",
     "strukt" = excluded."strukt";|]
-
+{-
   it "can createInserts an empty array" $ do
     let testAdd = Address 0x22222222
         input = [(ProcessedContract {
@@ -481,7 +467,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
 
     T.unpack swissArmyCreate `shouldContain` "\"array_nums\" jsonb,"
     T.unpack swissArmyInsert `shouldContain` [r|'["0"]')|]
-
+-}
   it "can createInsertsIndexTable an empty array" $ do
     let testAdd = Address 0x22222222
         input = (ProcessedContract {
@@ -606,7 +592,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     "transaction_hash",
     "transaction_sender",
     "addr",
-    "array_nums",
     "boolean",
     "contract",
     "enum_val",
@@ -621,7 +606,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
     '000000000000000000000000000000098eaddede',
     '00000000000000000000000000000000deadbeef',
-    '["0","20","40","77","0"]',
     'True',
     '0000000000000000000000000000000000000999',
     '564',
@@ -637,7 +621,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     transaction_hash = excluded.transaction_hash,
     transaction_sender = excluded.transaction_sender,
     "addr" = excluded."addr",
-    "array_nums" = excluded."array_nums",
     "boolean" = excluded."boolean",
     "contract" = excluded."contract",
     "enum_val" = excluded."enum_val",
