@@ -508,7 +508,7 @@ processTheMessages env sqlEnv conn g messages = do
                         $ rights inserts
   forM_ (rights inserts) $ $logDebugLS "processTheMessages/toInsert"
   forM_ insertsByCodeHash $ \ins -> do
-    unless (null ins) $ outputData conn . insertIndexTable g $ map indexInsert ins
+    unless (null ins) $ outputData conn . insertIndexTable $ map indexInsert ins
     outputData conn . insertHistoryTable g $ concatMap historyInserts ins
     when (length (concatMap eventCreations ins) > 0) $
       outputData conn . createEventTables g $ concatMap eventCreations ins

@@ -334,11 +334,10 @@ expandTableQuery tableName cols = T.concat
 
 
 insertIndexTable :: OutputM m
-                 => IORef Globals
-                 -> [ProcessedContract]
+                 => [ProcessedContract]
                  -> ConduitM () Text m ()
-insertIndexTable _ [] = error "insertIndexTable: unhandled empty list"
-insertIndexTable _ contracts = yield $ insertIndexTableQuery contracts
+insertIndexTable [] = error "insertIndexTable: unhandled empty list"
+insertIndexTable contracts = yield $ insertIndexTableQuery contracts
 
 insertHistoryTable :: OutputM m
                    => IORef Globals
