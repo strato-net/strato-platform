@@ -396,27 +396,6 @@ getCodeCollection cp ccString = do
         Right v -> return $ CodeCollection $ Map.fromList $ map (\(x, y) -> (T.unpack x, xabiToPartialContract y)) $ snd v
     CodeAtAccount _ _ -> error "no compilo codeataccount"
 
---Another temporary function used until I create contracts based on the CC itself
-ccToProcessedContract :: CodePtr -> Text -> Text -> Text -> Contract -> ProcessedContract
-ccToProcessedContract cp _ _ _ _ =
-  ProcessedContract
-  {
-    codehash = cp,
-    organization = undefined, --o,
-    application = undefined, --if a == contractName then "" else a,
-    contractData = undefined, -- fmap sampleValue $ Map.mapKeys T.pack $ contract^.storageDefs,
-    contractName = undefined, --contractName,
-    chain = "chain",
-    abi = "abi",
-    
-    address = error "value1",
-    blockHash = error "value7",
-    blockTimestamp = error "value8",
-    blockNumber = error "value9",
-    transactionHash = error "value10",
-    transactionSender = error "value11"
-  }
-
 processTheMessages :: (MonadIO m, MonadUnliftIO m, MonadLogger m, HasSQL m) =>
                       BlocEnv -> BlocSQLEnv -> PGConnection -> IORef Globals -> [VMEvent] -> m ()
 processTheMessages env sqlEnv conn g messages = do
@@ -434,9 +413,8 @@ processTheMessages env sqlEnv conn g messages = do
     forM_ (Map.toList $ cc^.contracts) $ \(nameString, c) -> do
       let n = T.pack nameString
       $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o <> ", app=" <> a <> ", name=" <> n
-      let pc = ccToProcessedContract cp o a n c
-          nameParts = (o, if a == n then "" else a, n)
-      outputData conn $ createExpandIndexTable g c pc nameParts
+      let nameParts = (o, if a == n then "" else a, n)
+      outputData conn $ createExpandIndexTable g c nameParts
 
       when (n `elem` hl) $
         outputData conn $ createExpandHistoryTable g c nameParts

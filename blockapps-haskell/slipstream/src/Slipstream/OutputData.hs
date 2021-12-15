@@ -43,7 +43,6 @@ import           UnliftIO.IORef
 import           UnliftIO.Exception              (handle, SomeException)
 
 import           BlockApps.Logging
-import           Blockchain.Data.AddressStateDB
 import           Blockchain.Strato.Model.Address
 import qualified Blockchain.Strato.Model.Event   as Action
 import           Blockchain.Strato.Model.Keccak256
@@ -215,11 +214,10 @@ createExpandIndexTable
   :: OutputM m
   => IORef Globals
   -> Contract
-  -> ProcessedContract
   -> (Text, Text, Text)
   -> ConduitM () Text m ()
-createExpandIndexTable g c pc nameParts = do
-  createIndexTable g c pc nameParts
+createExpandIndexTable g c nameParts = do
+  createIndexTable g c nameParts
   expandIndexTable g c nameParts
 
 createExpandHistoryTable
@@ -235,10 +233,9 @@ createExpandHistoryTable g c nameParts = do
 createIndexTable :: OutputM m
                  => IORef Globals
                  -> Contract
-                 -> ProcessedContract
                  -> (Text, Text, Text)
                  -> ConduitM () Text m ()
-createIndexTable globalsIORef contract pc (o, a, n) = do
+createIndexTable globalsIORef contract (o, a, n) = do
   let (org, app, cname) = constructTableNameParameters o a n
       tableName = IndexTableName org app cname
   contractAlreadyCreated <- isTableCreated globalsIORef tableName
@@ -247,7 +244,6 @@ createIndexTable globalsIORef contract pc (o, a, n) = do
   $logInfoLS "createIndexTable/contractAlreadyCreated" (tableName, contractAlreadyCreated)
   unless contractAlreadyCreated $ do
     incNumTables
-    yield $ insertContractTableQuery pc (o, a, n)
     yield $ createIndexTableQuery contract (o, a, n)
     let list = tableColumns $ Map.toList $ Map.mapKeys T.pack $ contract^.storageDefs
     setTableCreated globalsIORef tableName list
@@ -352,22 +348,6 @@ insertHistoryTable globalsIORef contracts@(x:_) = do
       tableName = HistoryTableName org app cname
   history <- isHistoric globalsIORef tableName
   when history . yield $ insertHistoryTableQuery contracts
-
-insertContractTableQuery :: ProcessedContract -> (Text, Text, Text) -> Text
-insertContractTableQuery ProcessedContract{..} (o, a, n) =
-  let (org, app, cname) = constructTableNameParameters o a n
-      tableName = IndexTableName org app cname
-      conVals = wrapAndEscape . map escapeQuotes $
-        [ T.pack $ keccak256ToHex $ resolvedCodePtrToSHA codehash
-        , tableNameToText tableName
-        , abi
-        , chain
-        ]
-   in T.concat
-        [ "INSERT INTO contract (\"codeHash\", contract, abi, \"chainId\")\n  VALUES "
-        , conVals
-        , "\n  ON CONFLICT DO NOTHING;"
-        ]
 
 createIndexTableQuery :: Contract -> (Text, Text, Text) -> Text
 createIndexTableQuery contract (o, a, n) =

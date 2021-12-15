@@ -56,7 +56,7 @@ createInserts globalsIORef historyList' contracts = do
   unless (null contracts) $ do
     let contract = head contracts
         hasHistory = contractName (fst contract) `elem` historyList'
-    createIndexTable globalsIORef (snd contract) (fst contract) (organization $ fst contract, application $ fst contract, contractName $ fst contract)
+    createIndexTable globalsIORef (snd contract) (organization $ fst contract, application $ fst contract, contractName $ fst contract)
     when hasHistory $ createHistoryTable globalsIORef (snd contract) (organization $ fst contract, application $ fst contract, contractName $ fst contract)
     insertIndexTable $ map fst contracts
     insertHistoryTable globalsIORef $ map fst contracts
@@ -95,16 +95,8 @@ spec = do
                   ])]
 
       g <- newGlobals fakeHandle
-      [contractInsert, vehicleCreate, vehicleInsert] <- runLoggingT . runConduit $ createInserts g [] input .| sinkList
-
-      contractInsert `shouldBe`
-          [r|INSERT INTO contract ("codeHash", contract, abi, "chainId")
-  VALUES ('dd993a7bf0018419be434b8232c93936b65b1ebf663006e2f906c333427b1402',
-    'Vehicle',
-    '<ABI>',
-    '<CHAIN>')
-  ON CONFLICT DO NOTHING;|]
-
+      [vehicleCreate, vehicleInsert] <- runLoggingT . runConduit $ createInserts g [] input .| sinkList
+      
       vehicleCreate `shouldBe`
           [r|CREATE TABLE IF NOT EXISTS "Vehicle" (address text,
     "chainId" text,
@@ -169,16 +161,8 @@ spec = do
       addToHistoryList g (HistoryTableName "" "" "Vehicle")
       let hl = ["Vehicle"]
 
-      [contractInsert, vehicleCreate, historyCreate, historyIndex, vehicleInsert, historyInsert]
+      [vehicleCreate, historyCreate, historyIndex, vehicleInsert, historyInsert]
         <- runLoggingT . runConduit $ createInserts g hl input .| sinkList
-
-      contractInsert `shouldBe`
-          [r|INSERT INTO contract ("codeHash", contract, abi, "chainId")
-  VALUES ('dd993a7bf0018419be434b8232c93936b65b1ebf663006e2f906c333427b1402',
-    'Vehicle',
-    '<ABI>',
-    '<CHAIN>')
-  ON CONFLICT DO NOTHING;|]
 
       vehicleCreate `shouldBe`
           [r|CREATE TABLE IF NOT EXISTS "Vehicle" (address text,
@@ -273,16 +257,8 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
                        ])]
 
       g <- newGlobals fakeHandle
-      [contractInsert, vehicleCreate, vehicleInsert] <-
+      [vehicleCreate, vehicleInsert] <-
           runLoggingT . runConduit $ createInserts g [] input .| sinkList
-
-      contractInsert `shouldBe`
-          [r|INSERT INTO contract ("codeHash", contract, abi, "chainId")
-  VALUES ('dd993a7bf0018419be434b8232c93936b65b1ebf663006e2f906c333427b1402',
-    '\"Vehicle''''',
-    '<ABI>',
-    '<CHAIN>')
-  ON CONFLICT DO NOTHING;|]
 
       vehicleCreate `shouldBe`
           [r|CREATE TABLE IF NOT EXISTS "\"Vehicle''''" (address text,
@@ -367,15 +343,8 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
                    ])]
 
     g <- newGlobals fakeHandle
-    [contractInsert, swissArmyCreate, swissArmyInsert] <-
+    [swissArmyCreate, swissArmyInsert] <-
         runLoggingT . runConduit $ createInserts g [] input .| sinkList
-
-    contractInsert `shouldBe` [r|INSERT INTO contract ("codeHash", contract, abi, "chainId")
-  VALUES ('dd993a7bf0018419be434b8232c93936b65b1ebf663006e2f906c333427b1402',
-    'MyOrg:MyApp:SwissArmy',
-    '<ABI>',
-    '<CHAIN>')
-  ON CONFLICT DO NOTHING;|]
 
     swissArmyCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "MyOrg:MyApp:SwissArmy" (address text,
     "chainId" text,
@@ -504,7 +473,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
                 )
     g <- newGlobals fakeHandle
 
-    cs1 <- runLoggingT . runConduit $ createExpandIndexTable g (snd input) (fst input) (organization $ fst input, application $ fst input, contractName $ fst input) .| sinkList
+    cs1 <- runLoggingT . runConduit $ createExpandIndexTable g (snd input) (organization $ fst input, application $ fst input, contractName $ fst input) .| sinkList
     cs2 <- runLoggingT . runConduit $ insertIndexTable [fst input] .| sinkList
     (cs1 ++ cs2) `shouldNotBe` []
 
@@ -555,15 +524,8 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
             ])]
 
     g <- newGlobals fakeHandle
-    [contractInsert, swissArmyCreate, swissArmyInsert] <-
+    [swissArmyCreate, swissArmyInsert] <-
         runLoggingT . runConduit $ createInserts g [] input .| sinkList
-
-    contractInsert `shouldBe` [r|INSERT INTO contract ("codeHash", contract, abi, "chainId")
-  VALUES ('c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470',
-    'SwissArmy',
-    '<ABI>',
-    '<CHAIN>')
-  ON CONFLICT DO NOTHING;|]
 
     swissArmyCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy" (address text,
     "chainId" text,
