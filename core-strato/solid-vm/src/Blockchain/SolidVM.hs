@@ -106,6 +106,21 @@ import           UnliftIO                             hiding (assert)
 
 import           CodeCollection
 
+-- | Copying from Data.List.Extra, since our version of the extra library seems to not contain it.
+-- | A total variant of the list index function `(!!)`.
+--
+-- > [2,3,4] !? 1    == Just 3
+-- > [2,3,4] !? (-1) == Nothing
+-- > []      !? 0    == Nothing
+(!?) :: [a] -> Int -> Maybe a
+xs !? n
+  | n < 0     = Nothing
+             -- Definition adapted from GHC.List
+  | otherwise = foldr (\x r k -> case k of
+                                   0 -> Just x
+                                   _ -> r (k-1)) (const Nothing) xs n
+{-# INLINABLE (!?) #-}
+
 type SolidVMBase m = VMBase m
 
 onTraced :: Monad m => m () -> m ()
@@ -1444,7 +1459,9 @@ expToVar' (Xabi.FunctionCall _ e args) = do
           c <- getCurrentContract
           let !theEnum = fromMaybe (missingType "enum constructor" enumName)
                       $ M.lookup enumName $ c^.enums
-          return $ Constant $ SEnumVal enumName (fst theEnum !! fromInteger i) (fromInteger i)
+          case fst theEnum !? fromInteger i of
+            Nothing -> typeError "enum val out of range" argVals
+            Just enumVal -> pure . Constant . SEnumVal enumName enumVal $ fromInteger i
         _ -> typeError "called enum constructor with improper args" argVals
 
     Constant (SPush theArray) -> Builtins.push theArray argVals
