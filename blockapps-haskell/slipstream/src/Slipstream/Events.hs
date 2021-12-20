@@ -24,7 +24,6 @@ data Detail = Incremental | Eventual
 data ProcessedContract = ProcessedContract
   { address           :: Address
   , codehash          :: CodePtr
-  , abi               :: Text
   , organization      :: Text
   , application       :: Text
   , contractName      :: Text

@@ -11,36 +11,48 @@ import qualified Data.Map as Map
 import Data.Source.Annotation
 import Data.Source.Position
 import qualified Data.Text as T
-import BlockApps.Solidity.Xabi
+import qualified BlockApps.Solidity.Xabi      as OLDXABI
 import qualified BlockApps.Solidity.Xabi.Type as OLDXABI
 
 import CodeCollection hiding (contractName, events)
 
 import SelectAccessible                         ()
 
-import SolidVM.Solidity.Xabi                    (VariableDeclF(..))
+import SolidVM.Solidity.Xabi
+import SolidVM.Solidity.Xabi.VarDef
 import qualified SolidVM.Solidity.Xabi.Type               as Xabi
 
 --I am leaving a lot of this undefined....  Partly because the values don't exist in a XABI,
 --and partly just because we don't need some of these values yet.  If a dev uses one of these
 --undefined values, the error messages will let them know something needs to be filled in.
-xabiToPartialContract :: Xabi -> Contract
+xabiToPartialContract :: OLDXABI.Xabi -> Contract
 xabiToPartialContract xabi =
   Contract {
     _contractName=error "_contractName undefined",
     _parents=error "_parents undefined",
     _constants=error "_constants undefined",
-    _storageDefs=Map.mapKeys T.unpack $ fmap varTypeToVariableDecl $ xabiVars xabi,
+    _storageDefs=Map.mapKeys T.unpack $ fmap varTypeToVariableDecl $ OLDXABI.xabiVars xabi,
     _enums=error "_enums undefined",
     _structs=error "_structs undefined",
-    _events=error "_events undefined",
+    _events=fmap evmEventToEvent $ OLDXABI.xabiEvents xabi,
     _functions=error "_functions undefined",
     _constructor=error "_constructor undefined",
     _vmVersion=error "_vmVersion undefined",
     _contractContext=error "_contractContext undefined"
     }
 
+evmEventToEvent :: OLDXABI.Event -> Event
+evmEventToEvent e = Event {
+  eventAnonymous = OLDXABI.eventAnonymous e,
+  eventLogs = map (fmap evmIndexedTypeToIndexedType) $ OLDXABI.eventLogs e,
+  eventContext = dummyAnnotation
+  }
 
+evmIndexedTypeToIndexedType :: OLDXABI.IndexedType -> IndexedType
+evmIndexedTypeToIndexedType x = IndexedType {
+  indexedTypeIndex = OLDXABI.indexedTypeIndex x,
+  indexedTypeType = evmTypeToType $ OLDXABI.indexedTypeType x
+  }
 
 evmTypeToType :: OLDXABI.Type -> Xabi.Type
 evmTypeToType (OLDXABI.Int x y) = Xabi.Int x y

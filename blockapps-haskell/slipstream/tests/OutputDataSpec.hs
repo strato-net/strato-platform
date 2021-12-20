@@ -76,7 +76,6 @@ spec = do
       let input = [(ProcessedContract {
             address = testAdd,
             codehash = EVMCode $ hash "<CODEHASH>",
-            abi = "<ABI>",
             organization = "",
             application = "",
             contractName = "Vehicle",
@@ -140,7 +139,6 @@ spec = do
       let input = [(ProcessedContract {
              address = testAdd,
              codehash = cHash,
-             abi = "<ABI>",
              organization = "",
              application = "",
              contractName = "Vehicle",
@@ -238,7 +236,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
       let input = [(ProcessedContract {
             address = testAdd,
             codehash = EVMCode $ hash "<CODEHASH>",
-            abi = "<ABI>",
             organization = "",
             application = "",
             contractName = "\"Vehicle''",
@@ -301,7 +298,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
         input = [(ProcessedContract {
           address = testAdd,
           codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
-          abi = "<ABI>",
           organization = "MyOrg",
           application = "MyApp",
           contractName = "SwissArmy",
@@ -414,7 +410,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
         input = [(ProcessedContract {
           address = testAdd,
           codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
-          abi = "<ABI>",
           organization = "MyOrg",
           application = "MyApp",
           contractName = "SwissArmy",
@@ -442,7 +437,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
         input = (ProcessedContract {
                     address = testAdd,
                     codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
-                    abi = "<ABI>",
                     organization = "MyOrg",
                     application = "MyApp",
                     contractName = "SwissArmy",
@@ -482,7 +476,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
         input = [(ProcessedContract {
           address = testAdd,
           codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- $ hash "<CODEHASH>",
-          abi = "<ABI>",
           organization = "",
           application = "",
           contractName = "SwissArmy",
