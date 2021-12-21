@@ -127,7 +127,7 @@ pipeline {
             ]) {
 
               sh 'rm -rf track-and-trace'
-              sh 'git clone -b master https://github.com/blockapps/track-and-trace.git'
+              sh 'git clone -b addJoins https://github.com/blockapps/track-and-trace.git'
               dir ('track-and-trace/server') {
                 writeFile file: "config/jenkinstest.config.yaml", text: """
                 apiDebug: false
