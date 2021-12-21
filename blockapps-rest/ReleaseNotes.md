@@ -1,13 +1,10 @@
 ## RELEASE NOTES
 
-### Version: 8.1.1
-
-- Removed yarn.lock file
-
 ### Version: 8.1.0
 
 - Added the debugPostParse function to support compilation and static analysis tools
 - Added the debugPostAnalyze function to support static analysis tools
+- Removed yarn.lock file
 
 ### Version: 8.0.5
 
