@@ -22,7 +22,7 @@ const SKIP_TEST_BLOCK = process.env.OAUTH_ENABLED != appConfig.oAuthEnabledTrueV
 
 chai.use(chaiHttp);
 
-describe('File - ExternalStorage - OAuth', function () {
+describe.skip('File - ExternalStorage - OAuth', function () {
   this.timeout(200000);
 
   const userData = testFactory.getUserData();
