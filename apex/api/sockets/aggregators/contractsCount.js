@@ -6,10 +6,10 @@ const db = require('../../models/strato/eth/connection');
 
 let contractsCount
 
-const chainGovernanceContractHash = 'c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470'
+const emptyCodeHash = 'c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470'
 
 function getContractsCount() {
-  return AddressStateRef.count({ where: { code_hash: { [db.Sequelize.Op.ne]: chainGovernanceContractHash } } }).then(result => {
+  return AddressStateRef.count({ where: { code_hash: { [db.Sequelize.Op.ne]: emptyCodeHash } } }).then(result => {
     contractsCount = result
     return emitter.emit(ON_SOCKET_PUBLISH_EVENTS, CONTRACTS_COUNT, contractsCount)
   })
