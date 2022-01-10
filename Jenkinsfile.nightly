@@ -233,7 +233,7 @@ pipeline {
             usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')
         ]) {
           sh 'rm -rf docs-website'
-          sh 'git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/docs-website -b develop' // TODO: keep using develop here add the master tests to Release?
+          sh 'git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/docs-website -b master'
           dir('docs-website/') {
             sh 'npm i'
             
