@@ -462,7 +462,7 @@ sendOutEvents OutBatch{..} = do
     filterOutEvents x = x{Action._events=Seq.empty}
 --    filterOutMetadata :: Action -> Action
 --    filterOutMetadata x = x{Action._metadata=Nothing}
-  
+
   for_ outToStateDiffs $ \(cId, cInfo, bHash) ->
     withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo
   traverse_ commitSqlDiffs outStateDiffs
@@ -474,21 +474,20 @@ sendOutEvents OutBatch{..} = do
              (addressStateBalance asMod, addressStateNonce asMod))
           | (theAccount, Mem.ASModification asMod) <- M.toList asm
           ]
+
+  let ccEvents = concat (map (map (CodeCollectionAdded . T.unpack) . maybeToList . M.lookup "src" . fromMaybe M.empty . Action._metadata) (toList outActions))
+        
+      eventEvents = concat (map (map EventEmitted . toList . Action._events) (toList outActions))
+      actionEvents = map (NewAction . filterOutEvents) (toList outActions)
+      --actionEvents =  map (NewAction . filterOutMetadata . filterOutEvents) (toList outActions)
+          
   loopTimeit "productVMEvents" $ do
-      _ <- produceVMEvents $ 
-             concat (map (map (CodeCollectionAdded . T.unpack) . maybeToList . M.lookup "src" . fromMaybe M.empty . Action._metadata) (toList outActions))
-
-      _ <- produceVMEvents $ 
-             concat (map (map EventEmitted . toList . Action._events) (toList outActions))
-
-      _ <- produceVMEvents $ map (NewAction . filterOutEvents) (toList outActions)
-
---      _ <- produceVMEvents $ map (NewAction . filterOutMetadata . filterOutEvents) (toList outActions)
-
-      _ <- produceVMEvents $ map NewTransactionResult $ toList outTXRs
-
-
-      return ()
+    $logInfoS "sendOutEvnets" $ "outputting CodeCollectionAdded Events"
+    forM_ ccEvents $ \ev -> produceVMEvents [ev]
+    $logInfoS "sendOutEvnets" $ "outputting Event Events"
+    forM_ eventEvents $ \ev -> produceVMEvents [ev]
+    $logInfoS "sendOutEvnets" $ "outputting Action Events"
+    forM_ actionEvents $ \ev -> produceVMEvents [ev]
        
   loopTimeit "produceUnminedBlocksM" $
     void . K.withKafkaRetry1s . produceUnminedBlocksM $
