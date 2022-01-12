@@ -480,6 +480,7 @@ sendOutEvents OutBatch{..} = do
       eventEvents = concat (map (map EventEmitted . toList . Action._events) (toList outActions))
       actionEvents = map (NewAction . filterOutEvents) (toList outActions)
       --actionEvents =  map (NewAction . filterOutMetadata . filterOutEvents) (toList outActions)
+      trEvents = map NewTransactionResult $ toList outTXRs
           
   loopTimeit "productVMEvents" $ do
     $logInfoS "sendOutEvnets" $ "outputting CodeCollectionAdded Events"
@@ -488,7 +489,10 @@ sendOutEvents OutBatch{..} = do
     forM_ eventEvents $ \ev -> produceVMEvents [ev]
     $logInfoS "sendOutEvnets" $ "outputting Action Events"
     forM_ actionEvents $ \ev -> produceVMEvents [ev]
-       
+    $logInfoS "sendOutEvnets" $ "outputting NewTransactionResult"    
+    forM_ trEvents $ \ev -> produceVMEvents [ev]
+    return ()
+         
   loopTimeit "produceUnminedBlocksM" $
     void . K.withKafkaRetry1s . produceUnminedBlocksM $
       outputBlockToBlock <$> toList outBlocks
