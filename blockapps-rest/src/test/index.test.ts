@@ -184,7 +184,7 @@ describe("state", function() {
     }
   });
 
-  it("get state - getArray", async () => {
+  it.skip("get state - getArray", async () => {
     const SIZE = 230;
     const name = "array";
     const uid = util.uid();
