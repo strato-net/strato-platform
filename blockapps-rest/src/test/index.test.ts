@@ -139,7 +139,7 @@ describe("state", function() {
     );
   });
 
-  it("get state - large array", async () => {
+  it.skip("get state - large array", async () => {
     const MAX_SEGMENT_SIZE = 100;
     const SIZE = MAX_SEGMENT_SIZE * 2 + 30;
     const name = "array";
