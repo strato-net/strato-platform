@@ -1,6 +1,7 @@
 # APEX (an SMD backend server)
 
 ## Prepare to run server/tests locally (development mode):
+0. Use the same NodeJS version as in Dockerfile (e.g. `nvm install 8 && nvm use 8`). As of Dec 2021, using the newer node version (like 14) with current Apex code makes all DB queries stall (and no migrations run on first start).
 1. Run strato-getting-started single node locally with ports proxied (by changing docker-compose.yml):
     1. postgres (15433:5432)
     2. strato (3333:3000)
@@ -9,6 +10,7 @@
     5. prometheus (9090:9090)
     6. bloc (8888:8000) (!only if using USE_OLD_STRATO_API=true)
 2. cd `apex/api`
+3. Temporary (don't push!) comment out line `const registerAppMetadata = require('../migrations/init-script/registerAppMetadata');` and line `yield registerAppMetadata();` of `apex/api/bin/www` to prevent server crashing.
 
 ### Run Apex server locally (development mode):
 (have prep steps 1 and 2 done)
@@ -36,9 +38,6 @@
    ```
     (this is the list of vars passed to apex docker container in docker-compose.yml + the vars added with set-aux-env-vars.sh in prod / tests)
 
-  You might need additional steps to comment out line `yield registerAppMetadata();` of bin/www to prevent server crashing.
-  
-  You might also want to temporary (don't push!) comment out lines `sockets.init(server);` and `const sockets = require('../sockets/init');` to turn off websocket server and stop getting `ECONNREFUSED 127.0.0.1:5432` errors from it (todo: find the way to run in dev mode too)
   
 ### Run Apex tests locally (development mode):
 (have prep steps 1 and 2 done)
