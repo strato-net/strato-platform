@@ -7,10 +7,8 @@ module Slipstream.XabiContract (
 
 
 
-import qualified Data.Map as Map
 import Data.Source.Annotation
 import Data.Source.Position
-import qualified Data.Text as T
 import qualified BlockApps.Solidity.Xabi      as OLDXABI
 import qualified BlockApps.Solidity.Xabi.Type as OLDXABI
 
@@ -31,7 +29,7 @@ xabiToPartialContract xabi =
     _contractName=error "_contractName undefined",
     _parents=error "_parents undefined",
     _constants=error "_constants undefined",
-    _storageDefs=Map.mapKeys T.unpack $ fmap varTypeToVariableDecl $ OLDXABI.xabiVars xabi,
+    _storageDefs=fmap varTypeToVariableDecl $ OLDXABI.xabiVars xabi,
     _enums=error "_enums undefined",
     _structs=error "_structs undefined",
     _events=fmap evmEventToEvent $ OLDXABI.xabiEvents xabi,

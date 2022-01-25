@@ -406,7 +406,7 @@ getVariableOfName name = do
       maybeStorageItem :: Maybe Variable
       maybeStorageItem =
         -- TODO(tim): This might just be restricted to a field name
-        if name `elem` M.keys (currentContract currentCallInfo^.storageDefs)
+        if T.pack name `elem` M.keys (currentContract currentCallInfo^.storageDefs)
         then Just . Constant . SReference $ AccountPath
                 (currentAccount currentCallInfo)
                 (MS.singleton $ BC.pack name)
@@ -584,7 +584,7 @@ hintFromType = \case
  tt'' -> todo "hintFromType" tt''
 
 getXabiType' :: B.ByteString -> CallInfo -> Maybe Xabi.Type
-getXabiType' field callInfo = M.lookup (BC.unpack field)
+getXabiType' field callInfo = M.lookup (T.pack $ BC.unpack field)
                             . fmap Xabi.varType
                             . _storageDefs
                             . currentContract

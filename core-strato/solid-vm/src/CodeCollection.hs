@@ -33,7 +33,7 @@ data ContractF a =
     _contractName :: String,
     _parents :: [String],
     _constants :: Map String (ConstantDeclF a),
-    _storageDefs :: Map String (VariableDeclF a),
+    _storageDefs :: Map T.Text (VariableDeclF a),
     _enums :: Map String ([String], a),
     _structs :: Map String [(T.Text, Xabi.FieldType, a)],
     _events :: Map T.Text (Xabi.EventF a),
@@ -82,7 +82,7 @@ xabiToContract contractName' parents' vmVersion' xabi = do
   pure Contract {
   _contractName = contractName',
   _parents = parents',
-  _storageDefs = M.fromList $ map (\(k,v) -> (T.unpack k, v)) $ M.toList $ Xabi.xabiVars xabi,
+  _storageDefs = M.fromList $ M.toList $ Xabi.xabiVars xabi,
   _constants = M.fromList $ map (\(k,v) -> (T.unpack k, v)) $ M.toList $ Xabi.xabiConstants xabi,
   _enums = M.fromList [(T.unpack name, (map T.unpack vals, a)) | (name, Xabi.Enum vals _ a) <- M.toList $ Xabi.xabiTypes xabi],
   _structs = M.fromList [(T.unpack name, (\(k,v) -> (k,v,a)) <$> vals) | (name, Xabi.Struct vals _ a) <- M.toList $ Xabi.xabiTypes xabi],

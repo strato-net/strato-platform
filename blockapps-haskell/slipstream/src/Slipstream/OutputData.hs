@@ -245,7 +245,7 @@ createIndexTable globalsIORef contract (o, a, n) = do
   unless contractAlreadyCreated $ do
     incNumTables
     yield $ createIndexTableQuery contract (o, a, n)
-    let list = tableColumns $ Map.toList $ Map.mapKeys T.pack $ contract^.storageDefs
+    let list = tableColumns $ Map.toList $ contract^.storageDefs
     setTableCreated globalsIORef tableName list
 
 createHistoryTable :: OutputM m
@@ -264,7 +264,7 @@ createHistoryTable globalsIORef contract (o, a, n) = do
     incNumHistoryTables
     yield $ createHistoryTableQuery contract (o, a, n)
     yield $ addHistoryUnique (o, a, n)
-    let list = tableColumns $ Map.toList $ Map.mapKeys T.pack $ contract^.storageDefs
+    let list = tableColumns $ Map.toList $ contract^.storageDefs
     setTableCreated globalsIORef tableName list
 
 
@@ -305,7 +305,7 @@ expandContractTable globalsIORef contract tableName = do
           , " does not exist, but we are trying to expand it?"
           ]
     Just cols -> do
-      let list = Map.toList $ Map.mapKeys T.pack $ contract^.storageDefs
+      let list = Map.toList $ contract^.storageDefs
           difference new old = filter ((`notElem` old) . fst) new
           extras = tableColumns $ difference list (partialParseTableColumns cols)
       unless (null extras) $ do
@@ -353,7 +353,7 @@ createIndexTableQuery :: Contract -> (Text, Text, Text) -> Text
 createIndexTableQuery contract (o, a, n) =
   let (org, app, cname) = constructTableNameParameters o a n
       tableName = IndexTableName org app cname
-      list = Map.toList $ Map.mapKeys T.pack $ contract^.storageDefs
+      list = Map.toList $ contract^.storageDefs
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
         , csv $ ["address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
@@ -367,7 +367,7 @@ createHistoryTableQuery :: Contract -> (Text, Text, Text) -> Text
 createHistoryTableQuery contract (o, a, n) =
   let (org, app, cname) = constructTableNameParameters o a n
       tableName = HistoryTableName org app cname
-      list = Map.toList $ Map.mapKeys T.pack $ contract^.storageDefs
+      list = Map.toList $ contract^.storageDefs
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS ", tableNameToDoubleQuoteText tableName, " ("
         , csv $ ["address text NOT NULL", "\"chainId\" text NOT NULL", "block_hash text NOT NULL", "block_timestamp text",

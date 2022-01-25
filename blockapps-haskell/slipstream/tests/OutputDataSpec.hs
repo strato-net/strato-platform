@@ -586,7 +586,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
 
 
 
-createDummyContract :: [(String, Xabi.Type)] -> Contract
+createDummyContract :: [(Text, Xabi.Type)] -> Contract
 createDummyContract v = 
   let createVariableDecl t = VariableDecl{
         varType=t,
