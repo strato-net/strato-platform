@@ -15,8 +15,10 @@ module Slipstream.Globals
     xabiToText,
     flushPendingWrites,
     getContractState,
-    removeFromHistoryList,
-    addToHistoryList,
+    addAndEnableHistoryTable,
+    enableHistoryTable,
+    hasHistoryTable,
+    disableHistoryTable,
     getContractABIs,
     setContractABIs,
     forceGlobalEval,
@@ -53,7 +55,7 @@ import           Slipstream.GlobalsColdStorage
 import           Slipstream.Metrics
 
 newGlobals :: MonadIO m => Handle -> m (IORef Globals)
-newGlobals = newIORef . Globals M.empty Set.empty Set.empty HM.empty (LRU.newLRU (Just 1024))
+newGlobals = newIORef . Globals M.empty M.empty Set.empty HM.empty (LRU.newLRU (Just 1024))
 
 updateGlobals :: MonadIO m => IORef Globals -> Globals -> m ()
 updateGlobals gref g = do
@@ -101,23 +103,41 @@ isHistoric globalsIORef name = do
   Globals{..} <- readIORef globalsIORef
   $logInfoS "isHistoric" . T.pack $ "Checking history status of " ++ show name
   $logInfoS "isHistoric" . T.pack $ "History list: " ++ show historyList
-  return $ name `Set.member` historyList
+  return $ name `M.member` historyList
 
 {-
 getHistoryList :: MonadIO m => IORef Globals -> m (Set TableName)
 getHistoryList = fmap historyList . readIORef
 -}
 
-addToHistoryList :: MonadIO m => IORef Globals -> TableName -> m ()
-addToHistoryList g tableName = do
+addAndEnableHistoryTable :: MonadIO m => IORef Globals -> TableName -> m ()
+addAndEnableHistoryTable g tableName = do
   globals@Globals{..} <- readIORef g
-  updateGlobals g globals{historyList=Set.insert tableName historyList}
+  updateGlobals g globals{historyList=M.insert tableName True historyList}
 
-removeFromHistoryList :: MonadIO m => IORef Globals -> TableName -> m ()
-removeFromHistoryList g tableName = do
+enableHistoryTable :: MonadIO m => IORef Globals -> TableName -> m Bool
+enableHistoryTable g tableName = do
   globals@Globals{..} <- readIORef g
-  updateGlobals g globals{historyList=Set.delete tableName historyList}
+  
+  case M.lookup tableName historyList of
+    Nothing -> return False
+    Just _ -> do
+      updateGlobals g globals{historyList=M.insert tableName True historyList}
+      return True
 
+hasHistoryTable :: MonadIO m => IORef Globals -> TableName -> m Bool
+hasHistoryTable g tableName = do
+  Globals{..} <- readIORef g
+  return $ tableName `M.member` historyList
+
+disableHistoryTable :: MonadIO m => IORef Globals -> TableName -> m Bool
+disableHistoryTable g tableName = do
+  globals@Globals{..} <- readIORef g
+  case M.lookup tableName historyList of
+    Nothing -> return False
+    Just _ -> do
+      updateGlobals g globals{historyList=M.insert tableName False historyList}
+      return True
 
 getContractState :: MonadIO m => IORef Globals -> Account -> m (Maybe [(Text,Value)])
 getContractState globalsIORef account = do
