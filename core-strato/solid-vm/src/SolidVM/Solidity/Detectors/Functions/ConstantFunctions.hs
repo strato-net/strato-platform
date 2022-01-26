@@ -25,7 +25,7 @@ import           SolidVM.Solidity.Xabi.VarDef
 
 data R = R
   { mutability :: Maybe StateMutability
-  , stateVars  :: M.Map String VariableDecl
+  , stateVars  :: M.Map Text VariableDecl
   , codeCollection :: CodeCollection
   , contract :: Contract
   }
@@ -45,7 +45,7 @@ contractHelper cc c@Contract{..} =
       funcAnns = functionHelper cc c _storageDefs <$> M.elems funcsAndConstr
    in concat $ varAnns ++ funcAnns
 
-functionHelper :: CodeCollection -> Contract -> M.Map String VariableDecl -> Func -> [SourceAnnotation Text]
+functionHelper :: CodeCollection -> Contract -> M.Map Text VariableDecl -> Func -> [SourceAnnotation Text]
 functionHelper cc c stateVariables Func{..} = case funcContents of
   Nothing -> []
   Just stmts ->
@@ -182,7 +182,7 @@ ccVarHelper :: CodeCollection
             -> [SourceAnnotation Text]
 ccVarHelper CodeCollection{..} varName x = generateAnn varName x $ M.foldMapWithKey findVars _contracts
   where findVars cName Contract{..} =
-          maybeToList $ (cName <$ M.lookup varName _storageDefs)
+          maybeToList $ (cName <$ M.lookup (T.pack varName) _storageDefs)
                     <|> (cName <$ M.lookup varName _constants)
 
 ccMemberAccessHelper :: CodeCollection
@@ -225,7 +225,7 @@ localVarReadHelper name x = do
     then pure []
     else do
       ~R{..} <- ask
-      case M.lookup name stateVars of
+      case M.lookup (T.pack name) stateVars of
         Nothing -> pure $ ccVarHelper codeCollection name x
         Just _ -> case mutability of
           Just Pure ->
@@ -243,7 +243,7 @@ localVarWriteHelper name x = do
     then pure []
     else do
       ~R{..} <- ask
-      case M.lookup name stateVars of
+      case M.lookup (T.pack name) stateVars of
         Nothing -> pure $ ccVarHelper codeCollection name x
         Just _ -> case mutability of
           Nothing -> pure []

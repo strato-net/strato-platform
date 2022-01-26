@@ -22,6 +22,7 @@ module Slipstream.Processor
   ) where
 
 import Prelude hiding (lookup)
+import qualified Data.Aeson                           as Aeson
 import Control.Arrow ((&&&))
 import Control.Applicative
 import Control.Lens ((^.), (.~), (?~))
@@ -40,15 +41,18 @@ import Data.Maybe
 import Data.Ord (Down(..))
 import qualified Data.Text as T
 import Data.Text (Text)
+import Data.Text.Encoding
 import Database.PostgreSQL.Typed (PGConnection)
 
 import BlockApps.Bloc22.Database.Queries
 import BlockApps.Bloc22.Monad
 import BlockApps.Bloc22.Server.Utils
 import BlockApps.Logging
-import BlockApps.Solidity.Contract
+import qualified BlockApps.Solidity.Contract as OLD
+import BlockApps.Solidity.Parse.Parser
 import BlockApps.Solidity.Value
-import BlockApps.Solidity.Xabi
+import qualified BlockApps.Solidity.Xabi     as OLD
+import SolidVM.Solidity.Xabi
 import BlockApps.XAbiConverter
 import qualified BlockApps.SolidityVarReader as SVR
 import qualified BlockApps.SolidVMStorageDecoder as SolidVM
@@ -56,22 +60,24 @@ import qualified BlockApps.SolidVMStorageDecoder as SolidVM
 import Blockchain.Data.AddressStateRef
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.TransactionResult
---import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
 import Blockchain.Data.Json
+import Blockchain.SolidVM.CodeCollectionDB
 import Blockchain.Strato.Model.Account
 import qualified Blockchain.Strato.Model.Action as Action
 import Blockchain.Strato.Model.ChainId
 import qualified Blockchain.Strato.Model.Event            as Action
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Stream.VMEvent
-import Data.Source.Map
 
+import CodeCollection hiding (contractName)
 import Control.Monad.Change.Modify              hiding (modify)
 import Control.Monad.Composable.BlocSQL
 import Control.Monad.Composable.SQL
 import Control.Monad.Composable.CoreAPI
 import qualified Handlers.AccountInfo            as Account
+
+import Data.Source.Map
 
 import SelectAccessible                         ()
 
@@ -80,12 +86,13 @@ import Slipstream.Events
 import Slipstream.Globals
 import Slipstream.Metrics
 import Slipstream.OutputData
+import Slipstream.XabiContract
 
 instance ( (Keccak256 `Alters` SourceMap) m
          , MonadLogger m
          , HasBlocEnv m
          , HasBlocSQL m
-         ) => Selectable Account ContractDetails (CoreAPIM m) where
+         ) => Selectable Account OLD.ContractDetails (CoreAPIM m) where
   select _ a = runMaybeT $ do
     (AddressStateRef' r _) <- MaybeT
                             . fmap listToMaybe
@@ -95,7 +102,7 @@ instance ( (Keccak256 `Alters` SourceMap) m
                             & Account.qaAddress ?~ (a ^. accountAddress)
                             & Account.qaChainId .~ (fmap ChainId . maybeToList $ a ^. accountChainId)
     codePtr <- MaybeT . pure $ addressStateRefCodePtr r
-    MaybeT $ either (const Nothing) (\d -> Just d{contractdetailsAccount = Just a}) <$> getContractDetailsByCodeHash codePtr
+    MaybeT $ either (const Nothing) (\d -> Just d{OLD.contractdetailsAccount = Just a}) <$> getContractDetailsByCodeHash codePtr
 
 instance (Keccak256 `Alters` SourceMap) m => (Keccak256 `Alters` SourceMap) (CoreAPIM m) where
   lookup p   = lift . lookup p
@@ -167,8 +174,7 @@ combineActions (x:xs) = foldl' merge x xs
 splitActions :: [AggregateAction] -> [(Account, [AggregateAction])]
 splitActions = partitionWith actionAccount
 
-data ABIID = ABIID { aiAbi :: Text
-                   , aiName :: Text
+data ABIID = ABIID { aiName :: Text
                    , aiChain :: Text
                    } deriving (Eq, Show)
 
@@ -180,7 +186,6 @@ processedContract ABIID{..} state AggregateAction{..} =
   ProcessedContract
     { address = actionAccount ^. accountAddress
     , codehash = actionCodeHash
-    , abi = aiAbi
     , organization = actionOrganization
     , application  = actionApplication
     , contractName = aiName
@@ -206,7 +211,7 @@ getSolidVMDetailsForRow :: ( MonadIO m
                            , Selectable Account AddressState m
                            , (Keccak256 `Alters` SourceMap) m
                            )
-                        => IORef Globals -> AggregateAction -> m (Maybe ContractDetails)
+                        => IORef Globals -> AggregateAction -> m (Maybe OLD.ContractDetails)
 getSolidVMDetailsForRow g row = runMaybeT  
    $  checkCache 
   <|> checkBloc 
@@ -218,7 +223,7 @@ getSolidVMDetailsForRow g row = runMaybeT
         
         checkBloc = do
           $logInfoS "getDetailsForRow" . T.pack $ "checking bloc database for contract details"
-          (MaybeT $ either (const Nothing) Just <$> getContractDetailsByCodeHash codePtr) >>= (parseAndSet . contractdetailsSrc)
+          (MaybeT $ either (const Nothing) Just <$> getContractDetailsByCodeHash codePtr) >>= (parseAndSet . OLD.contractdetailsSrc)
         
         checkMetadata = do
           $logInfoS "getDetailsForRow" . T.pack $ "checking metadata for contract details"
@@ -243,7 +248,7 @@ getEVMDetailsForRow :: ( MonadIO m
                        , Selectable Account AddressState m
                        , (Keccak256 `Alters` SourceMap) m
                        )
-                    => AggregateAction -> m (Maybe ContractDetails)
+                    => AggregateAction -> m (Maybe OLD.ContractDetails)
 getEVMDetailsForRow row = liftM2 (<|>)
   (fmap (either (const Nothing) Just) . getContractDetailsByCodeHash $ actionCodeHash row)
   (runMaybeT $ do
@@ -264,23 +269,23 @@ adjustGlobals :: ( MonadIO m
               => IORef Globals
               -> Should Compile
               -> AggregateAction
-              -> ContractDetails
+              -> OLD.ContractDetails
               -> m ()
 adjustGlobals gref shouldCompile row details = do
   -- TODO: because this uses HistoryTableName directly - this won't work if we add other (non-history) globals
   let go m (k,f) = runMaybeT $ do
         v <- lookupT k $ actionMetadata row
-        let contracts = filter (not . T.null) $ T.splitOn "," v
-        forM_ contracts $ \c -> do
+        let contracts' = filter (not . T.null) $ T.splitOn "," v
+        forM_ contracts' $ \c -> do
           details' <- lookupT c m
-          let codePtr = contractdetailsCodeHash details'
+          let codePtr = OLD.contractdetailsCodeHash details'
           $logInfoS "adjustGlobals" . T.pack $ "Adding to globals for " ++ T.unpack k ++ ": " ++ show codePtr
-          lift $ f gref $ HistoryTableName (actionOrganization row) (actionApplication row) (contractdetailsName details')
+          lift $ f gref $ HistoryTableName (actionOrganization row) (actionApplication row) (OLD.contractdetailsName details')
  
 
   -- if we pass Don't Compile, we assume it's SolidVMCode, and use details from cache
   detailsMap <- case shouldCompile of
-    Do Compile -> sourceToContractDetails shouldCompile $ contractdetailsSrc details
+    Do Compile -> sourceToContractDetails shouldCompile $ OLD.contractdetailsSrc details
     Don't Compile -> do 
       mMap <- getContractABIs gref (actionCodeHash row)
       case mMap of
@@ -293,9 +298,9 @@ adjustGlobals gref shouldCompile row details = do
                           ]
 
 readPreviousEVMState :: MonadIO m =>
-                        IORef Globals -> Account -> Contract -> m [(Text, Value)]
+                        IORef Globals -> Account -> OLD.Contract -> m [(Text, Value)]
 readPreviousEVMState gref acct cont = do
-  let default' = SVR.decodeValues 0 (typeDefs cont) (mainStruct cont) (const 0) 0
+  let default' = SVR.decodeValues 0 (OLD.typeDefs cont) (OLD.mainStruct cont) (const 0) 0
   fromMaybe default' <$> getContractState gref acct
 
 readPreviousSolidVMState :: MonadIO m =>
@@ -304,7 +309,7 @@ readPreviousSolidVMState gref acct = fromMaybe [] <$> getContractState gref acct
 
 
 rowToInsert :: MonadIO m =>
-               IORef Globals -> ABIID -> AggregateAction -> Contract -> [(Text, Value)]
+               IORef Globals -> ABIID -> AggregateAction -> OLD.Contract -> [(Text, Value)]
             -> m ProcessedContract
 rowToInsert gref abiid row cont oldState = do
   let newState = case actionStorage row of
@@ -314,7 +319,7 @@ rowToInsert gref abiid row cont oldState = do
   return $ processedContract abiid (Map.fromList $ newState) row
 
 rowToHistories :: (MonadIO m, MonadLogger m) =>
-                  IORef Globals -> ABIID -> AggregateAction -> [AggregateAction] -> Contract
+                  IORef Globals -> ABIID -> AggregateAction -> [AggregateAction] -> OLD.Contract
                -> [(Text, Value)]
                -> m [ProcessedContract]
 rowToHistories gref abiid row actions cont oldState = do
@@ -332,46 +337,100 @@ rowToHistories gref abiid row actions cont oldState = do
 -- Parses xabi event declarations to create a table,
 -- ignoring indexes and anonymous flag
 createEvents :: Monad m =>
-                ContractDetails -> Text -> Text -> m [EventTable]
+                OLD.ContractDetails -> Text -> Text -> m [EventTable]
 createEvents details org app = do
-  let events = xabiEvents $ contractdetailsXabi details
-  return $ map makeEvent $ Map.toList events
+  let events' = OLD.xabiEvents $ OLD.contractdetailsXabi details
+  return $ map makeEvent $ Map.toList events'
   where
-    makeEvent :: (Text, Event) -> EventTable 
+    makeEvent :: (Text, OLD.Event) -> EventTable 
     makeEvent (name, event) = 
       EventTable
       { eventOrganization = org
       , eventApplication  = app
-      , eventContractName = contractdetailsName details
+      , eventContractName = OLD.contractdetailsName details
       , eventName = name
-      , eventFields = map fst $ eventLogs event
+      , eventFields = map fst $ OLD.eventLogs event
       }
       
 
+contractToEventTables :: (Text, Text, Text) -> Contract -> [EventTable]
+contractToEventTables (o, a, n) c =
+  flip map (Map.toList $ c^.events) $
+      \(eName, fields) ->
+        EventTable {
+          eventOrganization = o,
+          eventApplication  = a,
+          eventContractName = n,
+          eventName = eName,
+          eventFields = map fst $ eventLogs fields
+        }
+  
 -- Prioritizing with-source actions prevents the issue where updates to contracts
 -- at different addresses are lost because the schema has not been seen yet.
 withSourceFirst :: (a, [AggregateAction]) -> Down Bool
 withSourceFirst = Down . any (Map.member "src" . actionMetadata) . snd
 
 parseActions :: [VMEvent] -> [(Account, [AggregateAction])]
-parseActions events =
+parseActions events' =
   sortOn withSourceFirst
   . splitActions
   . filter matters
-  . concatMap (flatten) $ [a | NewAction a <- events]
+  . concatMap (flatten) $ [a | NewAction a <- events']
 
 parseEvents :: [VMEvent] -> [Action.Event]
-parseEvents events = [a | EventEmitted a <- events]
+parseEvents events' = [a | EventEmitted a <- events']
+
+
+getCodeCollection :: MonadIO m => CodePtr -> Text -> m CodeCollection
+getCodeCollection cp ccString = do
+  let initList =
+        case Aeson.decodeStrict $ encodeUtf8 ccString of
+          Just l -> l
+          Nothing -> case Aeson.decodeStrict $ encodeUtf8 ccString of
+            Just m -> Map.toList m
+            Nothing -> [(T.empty, ccString)] -- for backwards compatibility
+
+  --We shouldn't crash if the source can't be parsed (a bad validator could brind the network down)
+  --For now I'm going to keep the crash in, since it will be a warning to us that we let a
+  --bad contract into the blockchain (the API shouldn't allow this)
+
+  case cp of
+    SolidVMCode _ _ ->
+      case compileSource $ Map.fromList initList of
+        Left e -> error $ "failed parse: "  ++ show e --return $ CodeCollection Map.empty
+        Right v -> return v
+    EVMCode _ ->
+      case parseXabi "--" $ T.unpack $ sourceBlob $ SourceMap initList of
+        Left e ->
+          --return $ CodeCollection Map.empty
+          error $ "failed EVM parse: " ++ show e ++ "\n" ++ T.unpack ccString
+        Right v -> return $ CodeCollection $ Map.fromList $ map (\(x, y) -> (T.unpack x, xabiToPartialContract y)) $ snd v
+    CodeAtAccount _ _ -> error "no compilo codeataccount"
 
 processTheMessages :: (MonadIO m, MonadUnliftIO m, MonadLogger m, HasSQL m) =>
                       BlocEnv -> BlocSQLEnv -> PGConnection -> IORef Globals -> [VMEvent] -> m ()
 processTheMessages env sqlEnv conn g messages = do
 
   let changes = parseActions messages
-      events = parseEvents messages
+      events' = parseEvents messages
       -- TODO (Dan) : would be nice if we didn't just rip events out at the top level like this
---      creates = [c|ContractCreated c <- messages]
+      creates = [(c, cp, o, a, hl) | CodeCollectionAdded c cp o a hl <- messages]
       transactionResults = [tr | NewTransactionResult tr <- messages]
+
+
+
+  forM_ creates $ \(ccString, cp, o, a, hl) -> do
+    cc <- getCodeCollection cp ccString
+    forM_ (Map.toList $ cc^.contracts) $ \(nameString, c) -> do
+      let n = T.pack nameString
+      $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o <> ", app=" <> a <> ", name=" <> n
+      let nameParts = (o, if a == n then "" else a, n)
+      outputData conn $ createExpandIndexTable g c nameParts
+
+      when (n `elem` hl) $
+        outputData conn $ createExpandHistoryTable g c nameParts
+
+      outputData conn . createEventTables g $ contractToEventTables nameParts c
 
   unless (null messages) $
     $logDebugS "processTheMessages" . T.pack . unlines . map show $ messages
@@ -398,11 +457,10 @@ processTheMessages env sqlEnv conn g messages = do
                             <> " and no 'src' field found in actionMetadata"
             Just details -> do
               let abiid = ABIID
-                    { aiAbi = xabiToText $ contractdetailsXabi details
-                    , aiName = T.filter (/= '"') $ contractdetailsName details
+                    { aiName = T.filter (/= '"') $ OLD.contractdetailsName details
                     , aiChain = maybe "" (T.pack . chainIdString . ChainId) $ (actionAccount row ^. accountChainId)
                     }
-                  cont = either error id . xAbiToContract $ contractdetailsXabi details
+                  cont = either error id . xAbiToContract $ OLD.contractdetailsXabi details
               adjustGlobals g (Do Compile) row details
 
               oldState <- readPreviousEVMState g acct cont
@@ -416,9 +474,8 @@ processTheMessages env sqlEnv conn g messages = do
                             <> (T.pack . show $ actionCodeHash row)
                             <> " and no 'src' field found in metadata"
             Just details -> do
-              let abi = xabiToText $ contractdetailsXabi details
-                  name = T.filter (/= '"') $ contractdetailsName details
-                  abiid = ABIID abi name $ maybe "" (T.pack . chainIdString . ChainId) $ (actionAccount row ^. accountChainId)
+              let name = T.filter (/= '"') $ OLD.contractdetailsName details
+                  abiid = ABIID name $ maybe "" (T.pack . chainIdString . ChainId) $ (actionAccount row ^. accountChainId)
                   cont = error "internal error: contract should be unused for solidvm"
 
               adjustGlobals g (Don't Compile) row details
@@ -439,14 +496,11 @@ processTheMessages env sqlEnv conn g messages = do
                         $ rights inserts
   forM_ (rights inserts) $ $logDebugLS "processTheMessages/toInsert"
   forM_ insertsByCodeHash $ \ins -> do
-    outputData conn . createExpandIndexTable g $ map indexInsert ins
-    unless (null ins) $ outputData conn . insertIndexTable g $ map indexInsert ins
-    outputData conn . createExpandInsertHistoryTable g $ concatMap historyInserts ins
-    when (length (concatMap eventCreations ins) > 0) $
-      outputData conn . createEventTables g $ concatMap eventCreations ins
+    unless (null ins) $ outputData conn . insertIndexTable $ map indexInsert ins
+    outputData conn . insertHistoryTable g $ concatMap historyInserts ins
 
-  when (length events > 0) $ 
-    outputData conn $ insertExpandEventTables g events
+  when (length events' > 0) $ 
+    outputData conn $ insertExpandEventTables g events'
 
   $logInfoS "processTheMessages" . T.pack $ "inserting " ++ show (length transactionResults) ++ " transaction results"
 

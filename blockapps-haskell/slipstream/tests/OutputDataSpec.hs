@@ -11,7 +11,7 @@ import qualified Data.ByteString as B
 import qualified Data.IntMap as I
 import qualified Data.Map as M
 import Data.Text (Text)
-import qualified Data.Text as T
+--import qualified Data.Text as T
 import Data.Time
 import Numeric
 import Test.Hspec
@@ -24,11 +24,15 @@ import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256 (hash)
+import CodeCollection hiding (contractName, contracts)
 import Slipstream.Events
 import Slipstream.Globals
 import Slipstream.GlobalsColdStorage (fakeHandle)
 import Slipstream.OutputData
 import Slipstream.SolidityValue
+
+import SolidVM.Solidity.Xabi                    (VariableDeclF(..))
+import qualified SolidVM.Solidity.Xabi.Type               as Xabi
 
 addr :: Address -> V.Value
 addr = V.SimpleValue . V.ValueAccount . unspecifiedChain
@@ -45,15 +49,17 @@ int = V.SimpleValue . V.valueInt
 
 createInserts :: OutputM m
               => IORef Globals
-              -> [ProcessedContract]
+              -> [Text]
+              -> [(ProcessedContract, Contract)]
               -> ConduitM () Text m ()
-createInserts globalsIORef contracts = do
+createInserts globalsIORef historyList' contracts = do
   unless (null contracts) $ do
     let contract = head contracts
-    createIndexTable globalsIORef contract
-    createHistoryTable globalsIORef contract
-    insertIndexTable globalsIORef contracts
-    insertHistoryTable globalsIORef contracts
+        hasHistory = contractName (fst contract) `elem` historyList'
+    createIndexTable globalsIORef (snd contract) (organization $ fst contract, application $ fst contract, contractName $ fst contract)
+    when hasHistory $ createHistoryTable globalsIORef (snd contract) (organization $ fst contract, application $ fst contract, contractName $ fst contract)
+    insertIndexTable $ map fst contracts
+    insertHistoryTable globalsIORef $ map fst contracts
 
 
 
@@ -67,10 +73,9 @@ spec = do
   describe "Array serialization" $ do
     it "should create JSON entries" $ do
       let testAdd = Address $ fst . head . readHex $ "ADDRESS"
-      let input = [ProcessedContract {
+      let input = [(ProcessedContract {
             address = testAdd,
             codehash = EVMCode $ hash "<CODEHASH>",
-            abi = "<ABI>",
             organization = "",
             application = "",
             contractName = "Vehicle",
@@ -84,19 +89,13 @@ spec = do
                 V.ValueStruct $ M.fromList [
                   ("number", V.SimpleValue $ V.valueUInt 18199984780605),
                   ("hash", V.SimpleValue $ V.ValueString "Owner_hash_181999847806006")]]
-            }]
+            }, createDummyContract [
+                  ("owners", Xabi.Array (Xabi.Int Nothing Nothing) Nothing)
+                  ])]
 
       g <- newGlobals fakeHandle
-      [contractInsert, vehicleCreate, vehicleInsert] <- runLoggingT . runConduit $ createInserts g input .| sinkList
-
-      contractInsert `shouldBe`
-          [r|INSERT INTO contract ("codeHash", contract, abi, "chainId")
-  VALUES ('dd993a7bf0018419be434b8232c93936b65b1ebf663006e2f906c333427b1402',
-    'Vehicle',
-    '<ABI>',
-    '<CHAIN>')
-  ON CONFLICT DO NOTHING;|]
-
+      [vehicleCreate, vehicleInsert] <- runLoggingT . runConduit $ createInserts g [] input .| sinkList
+      
       vehicleCreate `shouldBe`
           [r|CREATE TABLE IF NOT EXISTS "Vehicle" (address text,
     "chainId" text,
@@ -116,16 +115,14 @@ spec = do
     "block_timestamp",
     "block_number",
     "transaction_hash",
-    "transaction_sender",
-    "owners")
+    "transaction_sender")
   VALUES ('0000000000000000000000000000000000000add',
     '<CHAIN>',
     '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
     '2018-09-16 18:28:52.607875 UTC',
     '123',
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
-    '0000000000000000000000000000000000000add',
-    '[{"hash":"Owner_hash_181999847806006","number":"18199984780605"}]')
+    '0000000000000000000000000000000000000add')
   ON CONFLICT (address, "chainId") DO UPDATE SET
     address = excluded.address,
     "chainId" = excluded."chainId",
@@ -133,17 +130,15 @@ spec = do
     block_timestamp = excluded.block_timestamp,
     block_number = excluded.block_number,
     transaction_hash = excluded.transaction_hash,
-    transaction_sender = excluded.transaction_sender,
-    "owners" = excluded."owners";|]
+    transaction_sender = excluded.transaction_sender;|]
 
   describe "Array serialization with history enabled" $ do
     it "should create JSON entries" $ do
       let testAdd = Address $ fst . head . readHex $ "ADDRESS"
           cHash = EVMCode $ hash "<CODEHASH>"
-      let input = [ProcessedContract {
+      let input = [(ProcessedContract {
              address = testAdd,
              codehash = cHash,
-             abi = "<ABI>",
              organization = "",
              application = "",
              contractName = "Vehicle",
@@ -157,19 +152,15 @@ spec = do
                 V.ValueStruct $ M.fromList [
                   ("number", V.SimpleValue $ V.valueUInt 18199984780605),
                   ("hash", V.SimpleValue $ V.ValueString "Owner_hash_181999847806006")]]
-            }]
+            }, createDummyContract [
+                  ("owners", Xabi.Array (Xabi.Int Nothing Nothing) Nothing)
+                  ])]
       g <- newGlobals fakeHandle
       addToHistoryList g (HistoryTableName "" "" "Vehicle")
-      [contractInsert, vehicleCreate, historyCreate, historyIndex, vehicleInsert, historyInsert]
-        <- runLoggingT . runConduit $ createInserts g input .| sinkList
+      let hl = ["Vehicle"]
 
-      contractInsert `shouldBe`
-          [r|INSERT INTO contract ("codeHash", contract, abi, "chainId")
-  VALUES ('dd993a7bf0018419be434b8232c93936b65b1ebf663006e2f906c333427b1402',
-    'Vehicle',
-    '<ABI>',
-    '<CHAIN>')
-  ON CONFLICT DO NOTHING;|]
+      [vehicleCreate, historyCreate, historyIndex, vehicleInsert, historyInsert]
+        <- runLoggingT . runConduit $ createInserts g hl input .| sinkList
 
       vehicleCreate `shouldBe`
           [r|CREATE TABLE IF NOT EXISTS "Vehicle" (address text,
@@ -205,16 +196,14 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     "block_timestamp",
     "block_number",
     "transaction_hash",
-    "transaction_sender",
-    "owners")
+    "transaction_sender")
   VALUES ('0000000000000000000000000000000000000add',
     '<CHAIN>',
     '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
     '2018-09-16 18:28:52.607875 UTC',
     '123',
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
-    '0000000000000000000000000000000000000add',
-    '[{"hash":"Owner_hash_181999847806006","number":"18199984780605"}]')
+    '0000000000000000000000000000000000000add')
   ON CONFLICT (address, "chainId") DO UPDATE SET
     address = excluded.address,
     "chainId" = excluded."chainId",
@@ -222,8 +211,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     block_timestamp = excluded.block_timestamp,
     block_number = excluded.block_number,
     transaction_hash = excluded.transaction_hash,
-    transaction_sender = excluded.transaction_sender,
-    "owners" = excluded."owners";|]
+    transaction_sender = excluded.transaction_sender;|]
 
       historyInsert `shouldBe`
           [r|INSERT INTO "history@Vehicle" ("address",
@@ -232,25 +220,22 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     "block_timestamp",
     "block_number",
     "transaction_hash",
-    "transaction_sender",
-    "owners")
+    "transaction_sender")
   VALUES ('0000000000000000000000000000000000000add',
     '<CHAIN>',
     '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
     '2018-09-16 18:28:52.607875 UTC',
     '123',
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
-    '0000000000000000000000000000000000000add',
-    '[{"hash":"Owner_hash_181999847806006","number":"18199984780605"}]')
+    '0000000000000000000000000000000000000add')
   ON CONFLICT DO NOTHING;|]
 
   describe "String escaping" $ do
     it "should create JSON entries with quotes escaped" $ do
       let testAdd = Address $ fst . head . readHex $ "ADDRESS"
-      let input = [ProcessedContract {
+      let input = [(ProcessedContract {
             address = testAdd,
             codehash = EVMCode $ hash "<CODEHASH>",
-            abi = "<ABI>",
             organization = "",
             application = "",
             contractName = "\"Vehicle''",
@@ -264,19 +249,13 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
                 V.ValueStruct $ M.fromList [
                   ("number\"", V.SimpleValue $ V.valueUInt 18199984780605),
                   ("h'a\"'sh", V.SimpleValue $ V.ValueString "''Owner_hash_181999847806006")]]
-            }]
+            }, createDummyContract [
+                       ("\"owners\"", Xabi.Array (Xabi.Struct Nothing "") Nothing)
+                       ])]
 
       g <- newGlobals fakeHandle
-      [contractInsert, vehicleCreate, vehicleInsert] <-
-          runLoggingT . runConduit $ createInserts g input .| sinkList
-
-      contractInsert `shouldBe`
-          [r|INSERT INTO contract ("codeHash", contract, abi, "chainId")
-  VALUES ('dd993a7bf0018419be434b8232c93936b65b1ebf663006e2f906c333427b1402',
-    '\"Vehicle''''',
-    '<ABI>',
-    '<CHAIN>')
-  ON CONFLICT DO NOTHING;|]
+      [vehicleCreate, vehicleInsert] <-
+          runLoggingT . runConduit $ createInserts g [] input .| sinkList
 
       vehicleCreate `shouldBe`
           [r|CREATE TABLE IF NOT EXISTS "\"Vehicle''''" (address text,
@@ -297,16 +276,14 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     "block_timestamp",
     "block_number",
     "transaction_hash",
-    "transaction_sender",
-    "\"owners\"")
+    "transaction_sender")
   VALUES ('0000000000000000000000000000000000000add',
     '<CHAIN>',
     '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
     '2018-09-16 18:28:52.607875 UTC',
     '123',
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
-    '0000000000000000000000000000000000000add',
-    '[{"h''a\"''sh":"''''Owner_hash_181999847806006","number\"":"18199984780605"}]')
+    '0000000000000000000000000000000000000add')
   ON CONFLICT (address, "chainId") DO UPDATE SET
     address = excluded.address,
     "chainId" = excluded."chainId",
@@ -314,15 +291,13 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     block_timestamp = excluded.block_timestamp,
     block_number = excluded.block_number,
     transaction_hash = excluded.transaction_hash,
-    transaction_sender = excluded.transaction_sender,
-    "\"owners\"" = excluded."\"owners\"";|]
+    transaction_sender = excluded.transaction_sender;|]
 
   it "can unparse all solidvm value types" $ do
     let testAdd = Address 0x98eaddede
-        input = [ProcessedContract {
+        input = [(ProcessedContract {
           address = testAdd,
           codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
-          abi = "<ABI>",
           organization = "MyOrg",
           application = "MyApp",
           contractName = "SwissArmy",
@@ -351,18 +326,21 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
                 , (V.valueInt 46, bool True)
                 ])
             ]
-          }]
+          }, createDummyContract [
+                     ("addr", Xabi.Address)
+                   , ("boolean", Xabi.Bool)
+                   , ("contract", Xabi.Contract "")
+                   , ("number", Xabi.Int Nothing Nothing)
+                   , ("str", Xabi.Bytes Nothing Nothing)
+                   , ("enum_val", Xabi.Enum Nothing "" Nothing)
+                   , ("array_nums", Xabi.Array (Xabi.Int Nothing Nothing) Nothing)
+                   , ("strukt", Xabi.Struct Nothing "")
+                   , ("set", Xabi.Mapping Nothing (Xabi.Int Nothing Nothing) (Xabi.Bool))
+                   ])]
 
     g <- newGlobals fakeHandle
-    [contractInsert, swissArmyCreate, swissArmyInsert] <-
-        runLoggingT . runConduit $ createInserts g input .| sinkList
-
-    contractInsert `shouldBe` [r|INSERT INTO contract ("codeHash", contract, abi, "chainId")
-  VALUES ('dd993a7bf0018419be434b8232c93936b65b1ebf663006e2f906c333427b1402',
-    'MyOrg:MyApp:SwissArmy',
-    '<ABI>',
-    '<CHAIN>')
-  ON CONFLICT DO NOTHING;|]
+    [swissArmyCreate, swissArmyInsert] <-
+        runLoggingT . runConduit $ createInserts g [] input .| sinkList
 
     swissArmyCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "MyOrg:MyApp:SwissArmy" (address text,
     "chainId" text,
@@ -391,12 +369,10 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     "transaction_hash",
     "transaction_sender",
     "addr",
-    "array_nums",
     "boolean",
     "contract",
     "enum_val",
     "number",
-    "set",
     "str",
     "strukt")
   VALUES ('000000000000000000000000000000098eaddede',
@@ -407,12 +383,10 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
     '000000000000000000000000000000098eaddede',
     '00000000000000000000000000000000deadbeef',
-    '["0","20","40","77","0"]',
     'True',
     '0000000000000000000000000000000000000999',
     '564',
     '77714314',
-    '[["22",true],["23",true],["46",true]]',
     'Hello, World!',
     '[["first_field","887"],["second_field","CLOROX DISINFECTING WIPES"]]')
   ON CONFLICT (address, "chainId") DO UPDATE SET
@@ -424,21 +398,18 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     transaction_hash = excluded.transaction_hash,
     transaction_sender = excluded.transaction_sender,
     "addr" = excluded."addr",
-    "array_nums" = excluded."array_nums",
     "boolean" = excluded."boolean",
     "contract" = excluded."contract",
     "enum_val" = excluded."enum_val",
     "number" = excluded."number",
-    "set" = excluded."set",
     "str" = excluded."str",
     "strukt" = excluded."strukt";|]
-
+{-
   it "can createInserts an empty array" $ do
     let testAdd = Address 0x22222222
-        input = [ProcessedContract {
+        input = [(ProcessedContract {
           address = testAdd,
           codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
-          abi = "<ABI>",
           organization = "MyOrg",
           application = "MyApp",
           contractName = "SwissArmy",
@@ -450,31 +421,32 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
           transactionSender = testAdd,
           contractData = M.singleton "array_nums" . V.ValueArrayDynamic
                        . I.singleton 1 $ V.ValueArraySentinel 1
-          }]
+          }, createDummyContract [
+                     ("array_nums", Xabi.Array (Xabi.Int Nothing Nothing) Nothing)
+                     ])]
     g <- newGlobals fakeHandle
 
     [_, swissArmyCreate, swissArmyInsert] <-
-        runLoggingT . runConduit $ createInserts g input .| sinkList
+        runLoggingT . runConduit $ createInserts g [] input .| sinkList
 
     T.unpack swissArmyCreate `shouldContain` "\"array_nums\" jsonb,"
     T.unpack swissArmyInsert `shouldContain` [r|'["0"]')|]
-
+-}
   it "can createInsertsIndexTable an empty array" $ do
     let testAdd = Address 0x22222222
-        input = [ProcessedContract {
-          address = testAdd,
-          codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
-          abi = "<ABI>",
-          organization = "MyOrg",
-          application = "MyApp",
-          contractName = "SwissArmy",
-          chain = "<CHAIN>",
-          blockHash = hash "<BLOCKHASH>",
-          blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
-          blockNumber = 146,
-          transactionHash = hash "<TRANSACTIONHASH>",
-          transactionSender = testAdd,
-          contractData = M.fromList [ ("isIterable", bool False)
+        input = (ProcessedContract {
+                    address = testAdd,
+                    codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
+                    organization = "MyOrg",
+                    application = "MyApp",
+                    contractName = "SwissArmy",
+                    chain = "<CHAIN>",
+                    blockHash = hash "<BLOCKHASH>",
+                    blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
+                    blockNumber = 146,
+                    transactionHash = hash "<TRANSACTIONHASH>",
+                    transactionSender = testAdd,
+                    contractData = M.fromList [ ("isIterable", bool False)
                                     , ("keyMap", V.ValueMapping $ M.fromList [
                                           (V.valueBytes "4517546854860", int 1)])
                                     , ("keys", V.ValueArraySentinel 1)
@@ -483,19 +455,27 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
                                     , ("values", V.ValueArrayDynamic . I.singleton 1
                                                   . V.ValueArraySentinel $ 1)
                                     ]
-          }]
+                    },
+                 createDummyContract 
+                 [
+                   ("isIterable", Xabi.Bool),
+                   ("keyMap", Xabi.Mapping Nothing (Xabi.Bytes Nothing Nothing)
+                              (Xabi.Int Nothing Nothing)),
+                   ("owner", Xabi.Account),
+                   ("values", Xabi.Array (Xabi.Int Nothing Nothing) Nothing)
+                 ]
+                )
     g <- newGlobals fakeHandle
 
-    cs1 <- runLoggingT . runConduit $ createExpandIndexTable g input .| sinkList
-    cs2 <- runLoggingT . runConduit $ insertIndexTable g input .| sinkList
+    cs1 <- runLoggingT . runConduit $ createExpandIndexTable g (snd input) (organization $ fst input, application $ fst input, contractName $ fst input) .| sinkList
+    cs2 <- runLoggingT . runConduit $ insertIndexTable [fst input] .| sinkList
     (cs1 ++ cs2) `shouldNotBe` []
 
   it "can use solidvm without application nor organization" $ do
     let testAdd = Address 0x98eaddede
-        input = [ProcessedContract {
+        input = [(ProcessedContract {
           address = testAdd,
           codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- $ hash "<CODEHASH>",
-          abi = "<ABI>",
           organization = "",
           application = "",
           contractName = "SwissArmy",
@@ -524,18 +504,21 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
                 , (V.valueInt 46, bool True)
                 ])
             ]
-          }]
+          }, createDummyContract [
+               ("addr", Xabi.Address)
+             , ("boolean", Xabi.Bool)
+             , ("contract", Xabi.Contract "")
+             , ("number", Xabi.Int Nothing Nothing)
+             , ("str", Xabi.String Nothing)
+             , ("enum_val", Xabi.Enum Nothing "" Nothing)
+             , ("array_nums", Xabi.Array (Xabi.Int Nothing Nothing) Nothing)
+             , ("strukt", Xabi.Struct Nothing "")
+             , ("set", Xabi.Mapping Nothing (Xabi.Int Nothing Nothing) (Xabi.Bool))
+            ])]
 
     g <- newGlobals fakeHandle
-    [contractInsert, swissArmyCreate, swissArmyInsert] <-
-        runLoggingT . runConduit $ createInserts g input .| sinkList
-
-    contractInsert `shouldBe` [r|INSERT INTO contract ("codeHash", contract, abi, "chainId")
-  VALUES ('c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470',
-    'SwissArmy',
-    '<ABI>',
-    '<CHAIN>')
-  ON CONFLICT DO NOTHING;|]
+    [swissArmyCreate, swissArmyInsert] <-
+        runLoggingT . runConduit $ createInserts g [] input .| sinkList
 
     swissArmyCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy" (address text,
     "chainId" text,
@@ -564,12 +547,10 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     "transaction_hash",
     "transaction_sender",
     "addr",
-    "array_nums",
     "boolean",
     "contract",
     "enum_val",
     "number",
-    "set",
     "str",
     "strukt")
   VALUES ('000000000000000000000000000000098eaddede',
@@ -580,12 +561,10 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
     '000000000000000000000000000000098eaddede',
     '00000000000000000000000000000000deadbeef',
-    '["0","20","40","77","0"]',
     'True',
     '0000000000000000000000000000000000000999',
     '564',
     '77714314',
-    '[["22",true],["23",true],["46",true]]',
     'Hello, World!',
     '[["first_field","887"],["second_field","CLOROX DISINFECTING WIPES"]]')
   ON CONFLICT (address, "chainId") DO UPDATE SET
@@ -597,11 +576,35 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     transaction_hash = excluded.transaction_hash,
     transaction_sender = excluded.transaction_sender,
     "addr" = excluded."addr",
-    "array_nums" = excluded."array_nums",
     "boolean" = excluded."boolean",
     "contract" = excluded."contract",
     "enum_val" = excluded."enum_val",
     "number" = excluded."number",
-    "set" = excluded."set",
     "str" = excluded."str",
     "strukt" = excluded."strukt";|]
+
+
+
+
+createDummyContract :: [(Text, Xabi.Type)] -> Contract
+createDummyContract v = 
+  let createVariableDecl t = VariableDecl{
+        varType=t,
+        varIsPublic=True,
+        varInitialVal=Nothing,
+        varContext=error "varContext undefined"
+        }
+  in
+    Contract{
+      _contractName=undefined,
+      _parents=undefined,
+      _constants=undefined,
+      _storageDefs=M.fromList $ map (fmap createVariableDecl) v,
+      _enums=undefined,
+      _structs=undefined,
+      _events=undefined,
+      _functions=undefined,
+      _constructor=undefined,
+      _vmVersion=undefined,
+      _contractContext=undefined
+    }

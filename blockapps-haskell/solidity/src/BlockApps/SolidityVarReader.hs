@@ -183,7 +183,7 @@ decodeCacheValue
   -> Maybe (Text, Value)
 decodeCacheValue typeDefs' Struct{..} cache offset (name,value) = case OMap.lookup name fields of
    Nothing -> Nothing
-   Just (Right position, theType) -> Just (name, decodeCacheValue' typeDefs' cache (position `Storage.addOffset` fromIntegral offset) value theType)
+   Just (Right position, theType) -> fmap (name,) $  decodeCacheValue' typeDefs' cache (position `Storage.addOffset` fromIntegral offset) value theType
    Just (Left text, theType) -> case (textToValue (Just typeDefs') text theType) of
       Left err -> error $ "decodeCacheValue: textToValue failed to parse with: " ++ show err -- Solidity is a "strongly typed" "language"
       Right val -> Just (name,val)
@@ -194,18 +194,18 @@ decodeCacheValue'
   -> Storage.Position
   -> Value
   -> Type
-  -> Value
+  -> Maybe Value
 decodeCacheValue' typeDefs'@TypeDefs{..} cache position@Storage.Position{..} value = \case
   SimpleType TypeBool ->
     let
       v = decodeCacheValue' typeDefs' cache position value $ SimpleType $ TypeInt False (Just 1)
      in case v of
-      SimpleValue (ValueInt _ (Just 1) word8) -> SimpleValue $ ValueBool $ word8 /= 0
-      b@(SimpleValue (ValueBool _)) -> b
+      Just (SimpleValue (ValueInt _ (Just 1) word8)) -> Just $ SimpleValue $ ValueBool $ word8 /= 0
+      Just (b@(SimpleValue (ValueBool _))) -> Just b
       o -> error $ "decodeCacheValue': Expected ValueInt or ValueBool, but got: " ++ show o
   SimpleType t@(TypeInt _ mb) -> let b = fromInteger $ fromMaybe 32 mb
                                      b' = if byte + b > 32 then 0 else 32 - byte - b
-                                  in fromMaybe value
+                                  in Just . fromMaybe value
                                      $ SimpleValue
                                      . fromJust
                                      . flip bytesToSimpleValue t
@@ -217,25 +217,25 @@ decodeCacheValue' typeDefs'@TypeDefs{..} cache position@Storage.Position{..} val
     let
       v = decodeCacheValue' typeDefs' cache position value $ SimpleType $ TypeInt False (Just 20)
      in case v of
-      SimpleValue (ValueInt _ _ addr) -> SimpleValue . ValueAddress . Address $ fromIntegral addr
-      a@(SimpleValue (ValueAddress _)) -> a
+      Just (SimpleValue (ValueInt _ _ addr)) -> Just . SimpleValue . ValueAddress . Address $ fromIntegral addr
+      Just (a@(SimpleValue (ValueAddress _))) -> Just a
       o -> error $ "decodeCacheValue': Expected ValueInt or ValueAddress, but got: " ++ show o
   SimpleType TypeAccount ->
     let
       v = decodeCacheValue' typeDefs' cache position value $ SimpleType $ TypeInt False (Just 20)
      in case v of
-      SimpleValue (ValueInt _ _ addr) -> SimpleValue . ValueAccount . unspecifiedChain $ fromIntegral addr
-      a@(SimpleValue (ValueAccount _)) -> a
+      Just (SimpleValue (ValueInt _ _ addr)) -> Just . SimpleValue . ValueAccount . unspecifiedChain $ fromIntegral addr
+      Just (a@(SimpleValue (ValueAccount _))) -> Just a
       o -> error $ "decodeCacheValue': Expected ValueInt or ValueAccount, but got: " ++ show o
   TypeContract _ ->
     let
       v = decodeCacheValue' typeDefs' cache position value $ SimpleType $ TypeInt False (Just 20)
      in case v of
-      SimpleValue (ValueInt _ _ addr) -> ValueContract . unspecifiedChain $ fromIntegral addr
-      c@(ValueContract _) -> c
+      Just (SimpleValue (ValueInt _ _ addr)) -> Just . ValueContract . unspecifiedChain $ fromIntegral addr
+      Just (c@(ValueContract _)) -> Just c
       o -> error $ "decodeCacheValue': Expected ValueInt or ValueContract, but got: " ++ show o
-  SimpleType (TypeBytes (Just n)) -> decodeCacheByteString cache offset byte (fromInteger n) value
-  SimpleType (TypeBytes Nothing) -> fromMaybe value . flip fmap (cache offset) $ \w ->
+  SimpleType (TypeBytes (Just n)) -> Just $ decodeCacheByteString cache offset byte (fromInteger n) value
+  SimpleType (TypeBytes Nothing) -> Just . fromMaybe value . flip fmap (cache offset) $ \w ->
     if w `testBit` 0
       then --large string, 32+ bytes
         let
@@ -252,12 +252,14 @@ decodeCacheValue' typeDefs'@TypeDefs{..} cache position@Storage.Position{..} val
     let
       v = decodeCacheValue' typeDefs' cache position value $ SimpleType typeBytes
      in case v of
-      SimpleValue (ValueBytes Nothing bytes) -> SimpleValue . ValueString $ Text.decodeUtf8 bytes
-      s@(SimpleValue (ValueString _)) -> s
+      Just (SimpleValue (ValueBytes Nothing bytes)) -> Just . SimpleValue . ValueString $ Text.decodeUtf8 bytes
+      Just (s@(SimpleValue (ValueString _))) -> Just s
       o -> error $ "decodeCacheValue': Expected ValueBytes or ValueString, but got: " ++ show o
 
-  TypeFunction selector args returns -> ValueFunction selector args returns
+  TypeFunction selector args returns -> Just $ ValueFunction selector args returns
 
+  TypeArrayFixed _ _ -> Nothing
+  {-
   TypeArrayFixed size ty ->
     case value of
       ValueArrayFixed sz vals | sz == size -> ValueArrayFixed size theList
@@ -265,7 +267,10 @@ decodeCacheValue' typeDefs'@TypeDefs{..} cache position@Storage.Position{..} val
           (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
           theList = zipWith (\ofs val -> decodeCacheValue' typeDefs' cache ((arrayPosition (toInteger elementSize) ofs) `Storage.addOffset` offset) val ty) [0..] vals
       v -> error $ "decodeCacheValue': Expected ValueArrayFixed of size " ++ show size ++ ", but got: " ++ show v
+-}
 
+  TypeArrayDynamic _ -> Nothing
+  {-
   TypeArrayDynamic ty ->
     case value of
       ValueArrayDynamic vals -> ValueArrayDynamic theList
@@ -282,8 +287,11 @@ decodeCacheValue' typeDefs'@TypeDefs{..} cache position@Storage.Position{..} val
           toPosition ofs' = arrayPosition (toInteger elementSize) (fromIntegral ofs') `Storage.addOffset` startingKey
           theList = I.mapWithKey (\ofs val -> decodeCacheValue' typeDefs' cache (toPosition ofs) val ty) vals'
       v -> error $ "decodeCacheValue': Expected ValueArrayDynamic, but got: " ++ show v
+-}
 
-  TypeMapping tyk tyv -> SimpleValue $ ValueString $ Text.pack $ "mapping (" ++ formatSimpleType tyk ++ " => " ++ formatType tyv ++ ")"
+  TypeMapping _ _ -> Nothing
+  
+--  TypeMapping tyk tyv -> Just $ SimpleValue $ ValueString $ Text.pack $ "mapping (" ++ formatSimpleType tyk ++ " => " ++ formatType tyv ++ ")"
 
   TypeEnum name ->
     case Map.lookup name enumDefs of
@@ -297,7 +305,7 @@ decodeCacheValue' typeDefs'@TypeDefs{..} cache position@Storage.Position{..} val
            in
             case Bimap.lookup ival enumset of
               Nothing -> throw $ EnumOutOfBounds name ival
-              Just x  -> ValueEnum name x val
+              Just x  -> Just $ ValueEnum name x val
         v -> error $ "decodeCacheValue': Expected ValueEnum, but got: " ++ show v
 
   TypeStruct name ->
@@ -306,7 +314,7 @@ decodeCacheValue' typeDefs'@TypeDefs{..} cache position@Storage.Position{..} val
      Just theStruct -> case value of
        ValueStruct kvs ->
         let raw_kvs = structSort theStruct $ Map.toList kvs
-        in ValueStruct . Map.fromList $ decodeCacheValues' typeDefs' theStruct cache (Storage.alignedByte position) raw_kvs
+        in Just . ValueStruct . Map.fromList $ decodeCacheValues' typeDefs' theStruct cache (Storage.alignedByte position) raw_kvs
        v -> error $ "decodeCacheValue': Expected ValueStruct, but got: " ++ show v
 
 structSort :: Struct -> [(Text, Value)] -> [(Text, Value)]
@@ -365,7 +373,7 @@ decodeValue
 decodeValue typeDefs' storage offset Struct{..} ofs cnt len varName = case OMap.lookup varName fields of
    Nothing -> Nothing
    Just (Right position, theType) ->
-     Just $ decodeValue' typeDefs' storage ofs cnt len (position `Storage.addOffset` fromIntegral offset) theType
+     decodeValue' typeDefs' storage ofs cnt len (position `Storage.addOffset` fromIntegral offset) theType
    Just (Left text, theType) -> case (textToValue (Just typeDefs') text theType) of
       Left err -> error $ "decodeValue: textToValue failed to parse with: " ++ show err -- Solidity is a "strongly typed" "language"
       Right val -> Just val
@@ -379,16 +387,17 @@ decodeValue'
   -> Bool
   -> Storage.Position
   -> Type
-  -> Value
+  -> Maybe Value
 decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Position{..} = \case
   SimpleType TypeBool ->
     let
-      SimpleValue (ValueInt _ (Just 1) word8) = decodeValue' typeDefs' storage ofs cnt len position $ SimpleType $ TypeInt False (Just 1)
+      Just (SimpleValue (ValueInt _ (Just 1) word8)) = decodeValue' typeDefs' storage ofs cnt len position $ SimpleType $ TypeInt False (Just 1)
     in
-     SimpleValue $ ValueBool $ word8 /= 0
+     Just $ SimpleValue $ ValueBool $ word8 /= 0
   SimpleType t@(TypeInt _ mb) -> let b = fromInteger $ fromMaybe 32 mb
                                      b' = if byte + b > 32 then 0 else 32 - byte - b
-                                  in SimpleValue
+                                  in Just
+                                     . SimpleValue
                                      . fromJust
                                      . flip bytesToSimpleValue t
                                      . ByteString.take b
@@ -397,40 +406,43 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
                                      $ storage offset
   SimpleType TypeAddress ->
     let
-      SimpleValue (ValueInt _ _ addr) = decodeValue' typeDefs' storage ofs cnt len position $ SimpleType $ TypeInt False (Just 20)
+      Just (SimpleValue (ValueInt _ _ addr)) = decodeValue' typeDefs' storage ofs cnt len position $ SimpleType $ TypeInt False (Just 20)
     in
-      SimpleValue . ValueAddress . Address $ fromIntegral addr
+      Just . SimpleValue . ValueAddress . Address $ fromIntegral addr
   SimpleType TypeAccount ->
     let
-      SimpleValue (ValueInt _ _ addr) = decodeValue' typeDefs' storage ofs cnt len position $ SimpleType $ TypeInt False (Just 20)
+      Just (SimpleValue (ValueInt _ _ addr)) = decodeValue' typeDefs' storage ofs cnt len position $ SimpleType $ TypeInt False (Just 20)
     in
-      SimpleValue . ValueAccount . unspecifiedChain $ fromIntegral addr
+      Just . SimpleValue . ValueAccount . unspecifiedChain $ fromIntegral addr
   TypeContract _ ->
     let
-      SimpleValue (ValueAccount addr) = decodeValue' typeDefs' storage ofs cnt len position $ SimpleType TypeAccount
+      Just (SimpleValue (ValueAccount addr)) = decodeValue' typeDefs' storage ofs cnt len position $ SimpleType TypeAccount
     in
-      ValueContract addr
-  SimpleType (TypeBytes (Just n)) -> decodeByteString storage offset byte $ fromInteger n
+      Just $ ValueContract addr
+  SimpleType (TypeBytes (Just n)) -> Just $ decodeByteString storage offset byte $ fromInteger n
   SimpleType (TypeBytes Nothing) | storage offset `testBit` 0 -> --large string, 32+ bytes
     let
       len' = lastWord64 (storage offset) `div` 2
       startingKey = getArrayStartingKey offset
-    in SimpleValue $ valueBytes $ ByteString.pack $ take (fromIntegral len') $ concatMap (ByteString.unpack . word256ToByteString . storage . (startingKey+)) [0..]
+    in Just $ SimpleValue $ valueBytes $ ByteString.pack $ take (fromIntegral len') $ concatMap (ByteString.unpack . word256ToByteString . storage . (startingKey+)) [0..]
 
   SimpleType (TypeBytes Nothing) -> --small string, less than 32 bytes
     let
       len' = lastWord64 (storage offset) .&. 0xfe `div` 2
     in
-      SimpleValue $ valueBytes $ ByteString.take (fromIntegral len') $ word256ToByteString $ storage offset
+      Just $ SimpleValue $ valueBytes $ ByteString.take (fromIntegral len') $ word256ToByteString $ storage offset
 
   SimpleType TypeString ->
     let
-      SimpleValue (ValueBytes Nothing bytes) = decodeValue' typeDefs' storage ofs cnt len position $ SimpleType typeBytes
+      Just (SimpleValue (ValueBytes Nothing bytes)) = decodeValue' typeDefs' storage ofs cnt len position $ SimpleType typeBytes
     in
-      SimpleValue $ ValueString $ Text.decodeUtf8 bytes
+      Just $ SimpleValue $ ValueString $ Text.decodeUtf8 bytes
 
-  TypeFunction selector args returns -> ValueFunction selector args returns
+  TypeFunction selector args returns -> Just $ ValueFunction selector args returns
 
+  TypeArrayFixed _ _ -> Nothing
+    
+  {-
   TypeArrayFixed size ty -> if len
     then SimpleValue $ valueUInt $ fromIntegral size
     else ValueArrayFixed size theList
@@ -438,7 +450,11 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
       (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
       cnt' = min ((toInteger size) - ofs) cnt
       theList = map (flip (decodeValue' typeDefs' storage ofs cnt len) ty . (`Storage.addOffset` offset) . arrayPosition (toInteger elementSize)) [ofs .. (ofs + cnt' - 1)]
-
+  -}
+    
+  TypeArrayDynamic _ -> Nothing
+  
+  {-  
   TypeArrayDynamic ty -> if len
     then SimpleValue $ valueUInt (toInteger $ storage offset)
     else ValueArrayDynamic $ tosparse theList
@@ -448,8 +464,11 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
       cnt' = min ((toInteger $ storage offset) - ofs) cnt
       theList = (flip (decodeValue' typeDefs' storage ofs cnt len) ty . (`Storage.addOffset` startingKey) . arrayPosition (toInteger elementSize)) <$> [ofs..(ofs + cnt' - 1)]
       startingKey = getArrayStartingKey offset
-
-  TypeMapping tyk tyv -> SimpleValue $ ValueString $ Text.pack $ "mapping (" ++ formatSimpleType tyk ++ " => " ++ formatType tyv ++ ")"
+  -}
+    
+  TypeMapping _ _ -> Nothing
+  
+  --TypeMapping tyk tyv -> SimpleValue $ ValueString $ Text.pack $ "mapping (" ++ formatSimpleType tyk ++ " => " ++ formatType tyv ++ ")"
 
   TypeEnum name ->
     case Map.lookup name enumDefs of
@@ -461,13 +480,13 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
        in
         case Bimap.lookup val enumset of
          Nothing -> throw $ EnumOutOfBounds name val
-         Just x  -> ValueEnum name x (fromIntegral val)
+         Just x  -> Just $ ValueEnum name x (fromIntegral val)
 
   TypeStruct name ->
     case Map.lookup name structDefs of
      Nothing -> throw $ MissingTypeStruct name
 
-     Just theStruct -> ValueStruct . Map.fromList $ decodeValues cnt typeDefs' theStruct storage (Storage.alignedByte position)
+     Just theStruct -> Just . ValueStruct . Map.fromList $ decodeValues cnt typeDefs' theStruct storage (Storage.alignedByte position)
 
 
 
@@ -514,7 +533,9 @@ decodeMapValue fetchLimit typeDefs' Struct{..} storage mappingName keyName = do
 
   let val = decodeValue' typeDefs' storage 0 fetchLimit False valPosition toType
 
-  return val
+  case val of
+    Just v -> return v
+    Nothing -> Left "Not supported type in call to decodeMapValue"
 
 encodeValues
   :: TypeDefs

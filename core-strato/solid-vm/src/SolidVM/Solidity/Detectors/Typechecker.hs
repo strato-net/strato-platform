@@ -137,7 +137,7 @@ lookupContractFunction x cName fName = do
     Nothing -> pure . bottom $ ("Unknown contract: " <> cName) <$ x
     Just c -> case M.lookup (T.unpack fName) (_functions c) of
       Nothing -> case M.lookup (T.unpack fName) (_constants c) of
-        Nothing -> case M.lookup (T.unpack fName) (_storageDefs c) of
+        Nothing -> case M.lookup fName (_storageDefs c) of
           Nothing -> pure . bottom $ (T.concat
             [ "Unknown contract function: "
             , cName
@@ -796,7 +796,7 @@ getVarTypeByName' name ctx = do
       Nothing -> pure $ Top (S.singleton name) ctx
     Nothing -> do
       c <- asks contract
-      let mVarDecl = ((varType &&& const ctx) <$> M.lookup name (_storageDefs c))
+      let mVarDecl = ((varType &&& const ctx) <$> M.lookup (T.pack name) (_storageDefs c))
                  <|> ((constType &&& const ctx) <$> M.lookup name (_constants c))
                  <|> (const (Enum Nothing (T.pack name) Nothing, ctx) <$> M.lookup name (_enums c))
                  <|> (const (Struct Nothing (T.pack name), ctx) <$> M.lookup name (_structs c))

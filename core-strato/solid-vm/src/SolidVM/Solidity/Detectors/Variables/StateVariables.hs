@@ -19,7 +19,7 @@ import           SolidVM.Solidity.Xabi
 import           SolidVM.Solidity.Xabi.Statement
 import qualified SolidVM.Solidity.Xabi.Type as Xabi
 
-type StateVars = M.Map String (Bool, Bool, VariableDecl)
+type StateVars = M.Map Text (Bool, Bool, VariableDecl)
 type LocalVars = [M.Map String (SourceAnnotation ())]
 type SSS = State (StateVars, LocalVars)
 
@@ -34,17 +34,17 @@ contractHelper Contract{..} =
       action = traverse functionHelper $ maybeToList _constructor ++ M.elems _functions
       stateVariables' = fst $ execState action emptyState
       findStateAnns name (False, False, a) =
-        [(T.pack $ "Unused state variable " ++ name ++ ".") <$ varContext a]
+        [("Unused state variable " <> name <> ".") <$ varContext a]
       findStateAnns name (True, False, VariableDecl{..}) | varInitialVal == Nothing = case varType of
         Xabi.Struct{} -> []
         Xabi.Array _ Nothing -> []
         Xabi.Mapping{} -> []
-        _ -> [(T.pack $ "Uninitialized state variable " ++ name ++ ". Consider initializing it to prevent incorrect behavior.") <$ varContext]
+        _ -> [("Uninitialized state variable " <> name <> ". Consider initializing it to prevent incorrect behavior.") <$ varContext]
       findStateAnns name (True, False, a) = case varType a of
         Xabi.Struct{} -> []
         Xabi.Array _ Nothing -> []
         Xabi.Mapping{} -> []
-        _ -> [(T.pack $ "State variable " ++ name ++ " is never written to. Consider making it a constant.") <$ varContext a]
+        _ -> [("State variable " <> name <> " is never written to. Consider making it a constant.") <$ varContext a]
       findStateAnns _ _ = []
    in M.foldMapWithKey findStateAnns stateVariables'
 
@@ -115,14 +115,14 @@ stateVarReadHelper :: String -> SourceAnnotation () -> SSS [SourceAnnotation Tex
 stateVarReadHelper name _ = do
   isLocal <- isLocalVariable name
   unless isLocal $
-    id . _1 . at name . _Just . _1 .= True
+    id . _1 . at (T.pack name) . _Just . _1 .= True
   pure [] -- don't @ me
 
 stateVarWriteHelper :: String -> SourceAnnotation () -> SSS [SourceAnnotation Text]
 stateVarWriteHelper name _ = do
   isLocal <- isLocalVariable name
   unless isLocal $
-    id . _1 . at name . _Just . _2 .= True
+    id . _1 . at (T.pack name) . _Just . _2 .= True
   pure [] -- don't @ me
 
 expressionHelper :: Expression -> SSS [SourceAnnotation Text]

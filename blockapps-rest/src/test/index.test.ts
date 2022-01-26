@@ -139,7 +139,7 @@ describe("state", function() {
     );
   });
 
-  it("get state - large array", async () => {
+  it.skip("get state - large array", async () => {
     const MAX_SEGMENT_SIZE = 100;
     const SIZE = MAX_SEGMENT_SIZE * 2 + 30;
     const name = "array";
@@ -184,7 +184,7 @@ describe("state", function() {
     }
   });
 
-  it("get state - getArray", async () => {
+  it.skip("get state - getArray", async () => {
     const SIZE = 230;
     const name = "array";
     const uid = util.uid();

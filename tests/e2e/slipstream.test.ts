@@ -51,17 +51,6 @@ contract StringArray {
 }
 `;
 
-  it("can index string arrays", async () => {
-    const [user, contract] = await upload("StringArray", stringArray, options);
-    await sleep(2000);
-    const index = await rest.search(user, contract,
-    	  {...options, query: {address: `eq.${contract.address}`}});
-    console.log(`Index returned ${JSON.stringify(index, null, 2)}`);
-    assert.equal(index[0].address, contract.address, "address");
-    assert.deepEqual(index[0].xs, ["first", "second", "third"], "xs");
-
-  });
-
   const newContract = `
 contract X {
   uint public z = 7624;

@@ -4,17 +4,18 @@ module BlockApps.SolidityVarReaderSpec where
 import Control.Monad
 import qualified Data.IntMap as I
 import qualified Data.Map.Ordered as OM
-import qualified Data.Map.Strict as M
+--import qualified Data.Map.Strict as M
 import Test.Hspec
 
 import BlockApps.Solidity.Struct
 import qualified Data.Text as T
-import BlockApps.Storage
-import BlockApps.Solidity.Contract
+--import BlockApps.Storage
+--import BlockApps.Solidity.Contract
 import BlockApps.Solidity.Type
-import BlockApps.Solidity.TypeDefs
+--import BlockApps.Solidity.TypeDefs
 import BlockApps.Solidity.Value
-import BlockApps.SolidityVarReader (decodeCacheValues, structSort)
+import BlockApps.SolidityVarReader (structSort)
+--import BlockApps.SolidityVarReader (decodeCacheValues, structSort)
 
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
@@ -52,7 +53,7 @@ spec = do
     unsparse (I.singleton 0 (ValueArraySentinel 0)) `shouldBe` []
     unsparse (I.fromList [(1, addr 9), (3, ValueArraySentinel 3)]) `shouldBe` [addr 0, addr 9, addr 0]
     unsparse (I.singleton 2 (ValueArraySentinel 2)) `shouldBe` [int 0, int 0]
-
+{-
   it "should be able to decode arrays of strings" $ do
     let spine = ValueArrayDynamic . tosparse . map (SimpleValue . ValueString)
         oldState = [("xs", spine [])]
@@ -75,3 +76,4 @@ spec = do
             )
           ]
     decodeCacheValues contract (flip M.lookup storageMap) oldState `shouldBe` wantState
+-}
