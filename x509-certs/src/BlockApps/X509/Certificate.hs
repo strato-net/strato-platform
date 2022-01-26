@@ -46,8 +46,8 @@ import           Data.X509
 
 import           Time.Types
 import           Time.System
-
-
+import qualified Text.Colors       as CL
+import           Text.Format
 
 
 
@@ -61,6 +61,7 @@ newtype X509Certificate = X509Certificate SignedCertificate deriving (Show, Eq)
 
 instance NFData X509Certificate where
     rnf (X509Certificate cert) = cert `seq` ()
+
 
 data Issuer = Issuer
   {
@@ -80,6 +81,8 @@ data Subject = Subject
   , subPub        :: PublicKey
   } deriving (Show, Eq)
 
+instance Format Subject where
+  format = CL.blue . show
 
 
 instance ToJSON Subject where

@@ -278,6 +278,7 @@ create' creator newAccount ch cc contractName' argExps x509s = do
                         }
 
   onTraced $ liftIO $ putStrLn $ C.red $ "Creating Contract: " ++ show newAccount ++ " of type " ++ contractName'
+  onTraced $ liftIO $ putStrLn $ "Contract uses SolidVM version: " ++ show vmVersion'
 
   -- Add Storage
   addCallInfo newAccount contract' (contractName' ++ " constructor") ch cc M.empty False
@@ -292,7 +293,7 @@ create' creator newAccount ch cc contractName' argExps x509s = do
   -- Run the constructor
   runTheConstructors creator newAccount ch cc contractName' argExps
 
-  onTraced $ liftIO $ putStrLn $ C.red $ "Done Creating Contract: " ++ show newAccount ++ " of type " ++ contractName'
+  onTraced $ liftIO $ putStrLn $ C.green $ "Done Creating Contract: " ++ show newAccount ++ " of type " ++ contractName'
 
 
   -- set creator again, in case the caller's cert changed during constructor execution
@@ -408,28 +409,37 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
       }
 
 
--- set the hidden ":creator" field, if the caller has a cert
+-- set the hidden ":creator" field, for solidvm 3.0 only
 setCreator :: MonadSM m => Account -> Account -> Contract -> m ()
 setCreator creator contract cntrct = do
-  liftIO $ putStrLn $ "setCreator/versioning ---> getting creator org of " ++ (format creator) ++ " for new contract " ++ format contract
   
   x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
   maybeCertLevelDB <- x509CertDBGet $ _accountAddress creator
   let maybeCertBlockDB = M.lookup (_accountAddress creator) x509s'
       maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
-      org = fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
-  case org of
-    "" -> do
-      liftIO $ putStrLn $ "setCreator/versioning ---> no org found for this creator...."
+  case maybeCert of
+    (Just cert) -> onTraced $ liftIO $ putStrLn $ "setCreator/versioning ---> Found cert for " ++ (format creator) ++ ": " ++ (format $ getCertSubject cert)
+    
+    Nothing -> onTraced $ liftIO $ putStrLn $ "setCreator/versioning ---> No cert found for " ++ (format creator)
+  
+  let org = fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
+  
+  let hasSvm3_0 = _vmVersion cntrct == "svm3.0"
+  if hasSvm3_0 
+    then do
+      liftIO $ putStrLn $ "setCreator/versioning ---> getting org of " ++ (format creator) ++ " for new contract " ++ format contract
+      liftIO $ putStrLn $ "setCreator/versioning ---> setting the org as " ++ (show org)
+      putSolidStorageKeyVal' hasSvm3_0 contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack org)
+  --   -- insert the org for this contract into storage, in the ":creator" field
+    else do
+      onTraced $ liftIO $ putStrLn $ C.red $ "Ignoring creator field for non-svm3.0 contract"
       return ()
-    str -> do 
-    -- insert the org for this contract into storage, in the ":creator" field
-      liftIO $ putStrLn $ "setCreator/versioning ---> setting the org as " ++ (show str)
-      onTraced $ liftIO $ putStrLn $ "setCreator/versioning ---> the vm version is " ++ _vmVersion cntrct
-      let svm3_0 = _vmVersion cntrct == "svm3.0"
-      putSolidStorageKeyVal' svm3_0 contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack str)
-
-
+      
+  -- case org of
+  --   "" -> do
+  --     liftIO $ putStrLn $ "setCreator/versioning ---> no org found for this creator...."
+  --     return ()
+  --   (Just org) -> do 
 
 -- get the org for the Cirrus table name
 getOrg :: MonadSM m => Account -> String -> m (String)
