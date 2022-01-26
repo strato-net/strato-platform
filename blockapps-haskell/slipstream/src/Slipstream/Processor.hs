@@ -498,8 +498,6 @@ processTheMessages env sqlEnv conn g messages = do
   forM_ insertsByCodeHash $ \ins -> do
     unless (null ins) $ outputData conn . insertIndexTable $ map indexInsert ins
     outputData conn . insertHistoryTable g $ concatMap historyInserts ins
---    when (length (concatMap eventCreations ins) > 0) $
---      outputData conn . createEventTables g $ concatMap eventCreations ins
 
   when (length events' > 0) $ 
     outputData conn $ insertExpandEventTables g events'

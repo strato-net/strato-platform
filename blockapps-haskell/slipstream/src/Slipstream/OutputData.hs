@@ -92,15 +92,6 @@ wrapAndEscapeDouble = wrapParens . csv . map wrapDoubleQuotes
 unwrapDoubleQuotes :: Text -> Text
 unwrapDoubleQuotes = T.dropAround (== '"')
 
-{-
-valueToSQLText :: Value -> Maybe Text
-valueToSQLText (ValueArrayDynamic _) = Nothing
-valueToSQLText (ValueArrayFixed _ _) = Nothing
-valueToSQLText (ValueMapping _) = Nothing
-valueToSQLText (ValueStruct _) = Nothing
-valueToSQLText (ValueArraySentinel _) = Nothing
--}
-
 escapeSingleQuotes :: Text -> Text
 escapeSingleQuotes = T.replace "\'" "\'\'"
 
