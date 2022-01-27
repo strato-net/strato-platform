@@ -409,7 +409,7 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
       }
 
 
--- set the hidden ":creator" field, for solidvm 3.0 only
+-- set the hidden ":creator" field
 setCreator :: MonadSM m => Account -> Account -> Contract -> m ()
 setCreator creator contract cntrct = do
   
@@ -417,23 +417,22 @@ setCreator creator contract cntrct = do
   maybeCertLevelDB <- x509CertDBGet $ _accountAddress creator
   let maybeCertBlockDB = M.lookup (_accountAddress creator) x509s'
       maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
+      _org = fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
   case maybeCert of
     (Just cert) -> onTraced $ liftIO $ putStrLn $ "setCreator/versioning ---> Found cert for " ++ (format creator) ++ ": " ++ (format $ getCertSubject cert)
     
     Nothing -> onTraced $ liftIO $ putStrLn $ "setCreator/versioning ---> No cert found for " ++ (format creator)
   
-  let org = fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
-  
   let hasSvm3_0 = _vmVersion cntrct == "svm3.0"
-  if hasSvm3_0 
-    then do
-      liftIO $ putStrLn $ "setCreator/versioning ---> getting org of " ++ (format creator) ++ " for new contract " ++ format contract
+  case _org of
+    "" -> do
+      onTraced $ liftIO $ putStrLn $ C.red $ "Ignoring creator field for emtpy org field"
+      return ()
+    org -> do
+      -- liftIO $ putStrLn $ "setCreator/versioning ---> getting org of " ++ (format creator) ++ " for new contract " ++ format contract
       liftIO $ putStrLn $ "setCreator/versioning ---> setting the org as " ++ (show org)
       putSolidStorageKeyVal' hasSvm3_0 contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack org)
   --   -- insert the org for this contract into storage, in the ":creator" field
-    else do
-      onTraced $ liftIO $ putStrLn $ C.red $ "Ignoring creator field for non-svm3.0 contract"
-      return ()
       
   -- case org of
   --   "" -> do
