@@ -21,6 +21,7 @@ import qualified Control.Monad.Change.Alter           as A
 import           Control.Monad.Change.Modify
 import           Control.Monad.IO.Class
 import           Crypto.Util                          (i2bs_unsized)
+import qualified Data.ByteString.Char8                as BC
 import qualified Data.ByteString.Lazy.Char8           as BLC
 import qualified Data.Map                             as Map
 import           Data.Maybe                           (catMaybes, fromMaybe)
@@ -290,6 +291,10 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) = do
       updatedAccounts     = Map.empty
   }
   commitSqlDiffs diff
+
+  forM_ [ (src, name) | CodeInfo{codeInfoSource=src, codeInfoName=name} <- codeInfo] $ \(src, name) ->
+    produceVMEvents [CodeCollectionAdded src (SolidVMCode (fromMaybe "" $ fmap T.unpack name) $ hash $ BC.pack $ T.unpack src) "" "" []]
+
   let metadatas = Map.fromList $ flip map codeInfo $ \ci ->
         let cHash = hash $ codeInfoCode ci
             md    = Map.fromList $ [("src",codeInfoSource ci)] ++
@@ -330,4 +335,5 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) = do
       squashMap f = traverse (uncurry f) . Map.toList
   actions <- squashMap toAction accountDiffs
   _ <- produceVMEvents $ map NewAction actions
+
   return ()

@@ -168,7 +168,7 @@ variableSet = do
       locals = M.singleton "Local Variables" varNames
   acct <- getCurrentAccount
   ~(contract, _, _) <- getCodeAndCollection acct
-  let stateVars = textSet $ contract ^. storageDefs
+  let stateVars = S.fromList $ M.keys $ contract ^. storageDefs
       globals = M.singleton "State Variables" stateVars
   pure . VariableSet $ locals <> globals
 
@@ -617,7 +617,7 @@ callWrapper from to mContract functionName argExps = do
             let f' = (if from == to then id else pushSender from) $ runTheCall to contract functionName hsh cc theFunction args' ro
             return (f', args')
           _ -> do --Maybe the function is actually a getter
-            case M.lookup functionName $ contract^.storageDefs of
+            case M.lookup (T.pack functionName) $ contract^.storageDefs of
               Just _ -> do
                 --TODO- this should only exist if the storage variable is declared
                 -- "public", right now I just ignore this and allow anything to be called as a getter
@@ -1747,10 +1747,10 @@ runTheConstructors from to hsh cc contractName' argExps = do
 
   forM_ [(n, e) | (n, Xabi.VariableDecl _ _ (Just e) _) <- M.toList $ contract'^.storageDefs] $ \(n, e) -> do
     v <- expToVar e
-    setVar (Constant (SReference (AccountPath to $ MS.StoragePath [MS.Field $ BC.pack n]))) =<< getVar v
+    setVar (Constant (SReference (AccountPath to $ MS.StoragePath [MS.Field $ BC.pack $ T.unpack n]))) =<< getVar v
 
   forM_ [n | (n, Xabi.VariableDecl _ _ Nothing _) <- M.toList $ contract'^.storageDefs] $ \n -> do
-    markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack n]) MS.BDefault
+    markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ T.unpack n]) MS.BDefault
 
   forM_ (reverse $ contract'^.parents) $ \parent -> do
     let args = Xabi.OrderedArgs

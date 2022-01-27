@@ -58,6 +58,7 @@ library:
     - prometheus-client
     - QuickCheck
     - retry
+    - solid-vm
     - scientific
     - source-tools
     - strato-model
@@ -113,6 +114,7 @@ tests:
       - persistent-sqlite
       - QuickCheck
       - slipstream
+      - solid-vm
       - strato-model
       - text
       - time

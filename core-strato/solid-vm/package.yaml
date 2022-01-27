@@ -40,8 +40,10 @@ library:
     - SolidVM.Solidity.Parse.UnParser
     - SolidVM.Solidity.Parse.Declarations
     - SolidVM.Solidity.SourceTools
+    - SolidVM.Solidity.Xabi
     - SolidVM.Solidity.Xabi.Statement
     - SolidVM.Solidity.Xabi.Type
+    - SolidVM.Solidity.Xabi.VarDef
     - CodeCollection
   ghc-options: -Wall -O2
   dependencies:

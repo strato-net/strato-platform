@@ -18,6 +18,7 @@ import           Control.Monad.Change.Modify                  (Accessible)
 import           Control.Monad.IO.Class
 import qualified Data.ByteString.Base16                       as B16
 import qualified Data.ByteString.Char8                        as C8
+import qualified Data.ByteString.Char8                        as BC
 import qualified Data.ByteString.Lazy.Char8                   as BLC
 import           Data.Either                                  (isLeft)
 import           Data.Map.Strict                              (Map)
@@ -247,6 +248,12 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
             }
 
       commitSqlDiffs (statediff fullAccountDiffs)
+
+      forM_ (map (fromMaybe Map.empty . A._metadata) filteredActions) $ \md ->
+        case (Map.lookup "src" md, Map.lookup "name" md) of
+          (Just src, Just n) -> 
+            void $ produceVMEvents [CodeCollectionAdded src (SolidVMCode (T.unpack n) $ hash $ BC.pack $ T.unpack src) "" "" []]
+          _ -> return ()
 
       _ <- produceVMEvents $ map NewAction filteredActions
       return ()

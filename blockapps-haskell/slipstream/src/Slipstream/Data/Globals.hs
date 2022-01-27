@@ -1,7 +1,12 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-module Slipstream.Data.Globals where
+
+module Slipstream.Data.Globals (
+  Globals(..),
+  TableColumns,
+  TableName(..)
+  ) where
 
 import           Control.DeepSeq
 import           Data.Cache.LRU

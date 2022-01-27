@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TypeApplications  #-}
 
 {-# OPTIONS -fno-warn-orphans #-}
@@ -15,7 +16,7 @@ module Blockchain.Data.TransactionResult
 
 import           Control.DeepSeq
 import qualified Data.ByteString.Short                   as BSS
-import           Data.Swagger                 hiding (Format)
+import           Data.Swagger                 hiding (Format, format)
 import           Data.Word
 import           Database.Persist             hiding (get)
 import qualified Database.Persist.Postgresql  as SQL
@@ -33,7 +34,23 @@ import           Text.Format
 
 
 instance Format TransactionResult where
-  format = show
+  format TransactionResult{..} = 
+    "blockHash: " ++ format transactionResultBlockHash ++ "\n" ++
+    "transactionHash: " ++ format transactionResultTransactionHash ++ "\n" ++
+    "message: " ++ show transactionResultMessage ++ "\n" ++
+    "response: " ++ show transactionResultResponse ++ "\n" ++
+    "trace: " ++ show transactionResultTrace ++ "\n" ++
+    "gasUsed: " ++ format transactionResultGasUsed ++ "\n" ++
+    "etherUsed: " ++ format transactionResultEtherUsed ++ "\n" ++
+    "contractsCreated: " ++ show transactionResultContractsCreated ++ "\n" ++
+    "contractsDeleted: " ++ show transactionResultContractsDeleted ++ "\n" ++
+    "stateDiff: " ++ show transactionResultStateDiff ++ "\n" ++
+    "time: " ++ show transactionResultTime ++ "\n" ++
+    "newStorage: " ++ show transactionResultNewStorage ++ "\n" ++
+    "deletedStorage: " ++ show transactionResultDeletedStorage ++ "\n" ++
+    "status: " ++ show transactionResultStatus ++ "\n" ++
+    "chainId: " ++ format transactionResultChainId ++ "\n" ++
+    "kind: " ++ show transactionResultKind
 
 instance NFData TransactionResult
 
