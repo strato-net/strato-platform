@@ -602,7 +602,7 @@ insertEventTableQuery ev =
 --This is a temporary function that converts solidity types to a sample value...  I am just using this now to convert table creation from the old way (value based when values come through) to the new way (direct from the types when a CC is registered)
 solidityTypeToSQLType :: VariableDeclF a -> Maybe Text
 solidityTypeToSQLType VariableDecl{varType=Xabi.Bool} = Just "bool"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Int _ _} = Just "bigint"
+solidityTypeToSQLType VariableDecl{varType=Xabi.Int _ _} = Just "decimal"
 solidityTypeToSQLType VariableDecl{varType=Xabi.String _} = Just "text"
 solidityTypeToSQLType VariableDecl{varType=Xabi.Bytes _ _} = Just "text"
 solidityTypeToSQLType VariableDecl{varType=Xabi.Address} = Just "text"
