@@ -257,7 +257,7 @@ createHistoryTable globalsIORef contract (o, a, n) = do
     yield $ addHistoryUnique (o, a, n)
     let list = tableColumns $ Map.toList $ contract^.storageDefs
     setTableCreated globalsIORef tableName list
-
+    addAndEnableHistoryTable globalsIORef tableName
 
 
 -- Runs ALTER TABLE <name> [ADD COLUMN <column>] for any new fields added to a contract definition   
@@ -338,7 +338,10 @@ insertHistoryTable globalsIORef contracts@(x:_) = do
           (contractName x)
       tableName = HistoryTableName org app cname
   history <- isHistoric globalsIORef tableName
-  when history . yield $ insertHistoryTableQuery contracts
+
+  when history $ do
+    $logInfoS "insertHistoryTable" $ T.pack $ "Inserting row in history table for: " ++ show tableName
+    yield $ insertHistoryTableQuery contracts
 
 createIndexTableQuery :: Contract -> (Text, Text, Text) -> Text
 createIndexTableQuery contract (o, a, n) =
