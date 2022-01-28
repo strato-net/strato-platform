@@ -97,8 +97,9 @@ produceVMEventsM vmEvents = do
 -- todo: refactor this to consume produceVMEventsM
 produceVMEvents::(MonadIO m)=>[VMEvent]->m Offset
 produceVMEvents vmEvents = do
-  result <- liftIO $ runKafkaConfigured "blockapps-data" $
-            produceMessages $ map (TopicAndMessage (lookupTopic "vmevents") . makeMessage . BL.toStrict . JSON.encode) vmEvents
+  result <-
+    liftIO $ runKafkaConfigured "blockapps-data" $ fmap concat $
+      forM vmEvents $ \e -> produceMessages [TopicAndMessage (lookupTopic "vmevents") . makeMessage . BL.toStrict . JSON.encode $ e]
 
   case result of
    Left e -> error $ show e

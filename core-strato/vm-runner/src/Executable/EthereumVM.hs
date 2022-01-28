@@ -505,14 +505,8 @@ sendOutEvents OutBatch{..} = do
       trEvents = map NewTransactionResult $ toList outTXRs
           
   loopTimeit "productVMEvents" $ do
-    $logInfoS "sendOutEvnets" $ "outputting CodeCollectionAdded Events"
-    forM_ ccEvents $ \ev -> produceVMEvents [ev]
-    $logInfoS "sendOutEvnets" $ "outputting Event Events"
-    forM_ eventEvents $ \ev -> produceVMEvents [ev]
-    $logInfoS "sendOutEvnets" $ "outputting Action Events"
-    forM_ actionEvents $ \ev -> produceVMEvents [ev]
-    $logInfoS "sendOutEvnets" $ "outputting NewTransactionResult"    
-    forM_ trEvents $ \ev -> produceVMEvents [ev]
+    $logInfoS "sendOutEvnets" $ "outputting VMEvents"
+    _ <- produceVMEvents $ ccEvents ++ eventEvents ++ actionEvents ++ trEvents
     return ()
          
   loopTimeit "produceUnminedBlocksM" $
