@@ -13,6 +13,7 @@ module Slipstream.MessageConsumer (
 import Control.Monad.IO.Unlift
 import Data.IORef
 import Data.String
+import qualified Data.Text as T
 import Database.PostgreSQL.Typed
 import qualified Network.Kafka.Protocol as K hiding (Message)
 
@@ -74,6 +75,7 @@ getAndProcessMessages env sqlEnv conn cache = do
 getAndProcessMessages' :: (MonadIO m, MonadLogger m, MonadUnliftIO m, HasKafka m, HasSQL m) =>
                           BlocEnv -> BlocSQLEnv -> PGConnection -> IORef Globals -> K.Offset -> Int -> m ()
 getAndProcessMessages' env sqlEnv conn cache offset errorCounter = do
+  $logInfoS "getAndProcessMessages'" $ T.pack $ "#### fetching VMEvents: Offset=" ++ show offset
   recordOffset offset
   messages <- execKafka $ fetchVMEvents offset
   $logDebugLS "getAndProcessMessages'" messages

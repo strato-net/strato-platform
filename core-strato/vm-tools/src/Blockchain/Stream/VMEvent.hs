@@ -79,7 +79,7 @@ instance Format VMEvent where
   format (EventEmitted e) = "EventEmitted:\n" ++ tab (format e)
   format (CodeCollectionAdded c cp o a hl) =
     "CodeCollectionAdded: (" ++ show o ++ "/" ++ show a ++ ") " ++ vmType cp
-    ++ if (not $ null hl) then " " ++ show hl else "" ++ "\n    " 
+    ++ (if (not $ null hl) then " " ++ show hl else "") ++ "\n    "
     ++ show (shorten 120 (T.unpack c))
   format (NewTransactionResult tr) = "NewTransactionResult:\n" ++ tab (format tr)
 
@@ -97,8 +97,9 @@ produceVMEventsM vmEvents = do
 -- todo: refactor this to consume produceVMEventsM
 produceVMEvents::(MonadIO m)=>[VMEvent]->m Offset
 produceVMEvents vmEvents = do
-  result <- liftIO $ runKafkaConfigured "blockapps-data" $
-            produceMessages $ map (TopicAndMessage (lookupTopic "vmevents") . makeMessage . BL.toStrict . JSON.encode) vmEvents
+  result <-
+    liftIO $ runKafkaConfigured "blockapps-data" $ fmap concat $
+      forM vmEvents $ \e -> produceMessages [TopicAndMessage (lookupTopic "vmevents") . makeMessage . BL.toStrict . JSON.encode $ e]
 
   case result of
    Left e -> error $ show e
