@@ -56,13 +56,15 @@ commitSingleOffset groupName topic partition offset ofsMetadata = do
 
 
 
-withKafkaRetry :: (MonadIO m, MonadLogger m, Mod.Modifiable KafkaState m) => Int -> StateT KafkaState (ExceptT KafkaClientError IO) a -> m a
+withKafkaRetry :: (MonadIO m, MonadLogger m, Mod.Modifiable KafkaState m, Show a) => Int -> StateT KafkaState (ExceptT KafkaClientError IO) a -> m a
 withKafkaRetry t k = do
   s <- Mod.get (Mod.Proxy @KafkaState)
   let go = do
         r <- liftIO . runExceptT $ runStateT k s
         case r of
-          Right a -> return a
+          Right a -> do
+            $logDebugLS "withKafkaRetry allegedly succeded with: " . T.pack $ show a
+            return a
           Left e -> do
             $logErrorS "withKafkaRetry" . T.pack $ show e
             (liftIO $ threadDelay (1000*t)) >> go
@@ -70,5 +72,5 @@ withKafkaRetry t k = do
   Mod.put (Mod.Proxy @KafkaState) newS
   return a
 
-withKafkaRetry1s :: (MonadIO m, MonadLogger m, Mod.Modifiable KafkaState m) => StateT KafkaState (ExceptT KafkaClientError IO) a -> m a
+withKafkaRetry1s :: (MonadIO m, MonadLogger m, Mod.Modifiable KafkaState m, Show a) => StateT KafkaState (ExceptT KafkaClientError IO) a -> m a
 withKafkaRetry1s = withKafkaRetry 1000

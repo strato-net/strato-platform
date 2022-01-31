@@ -426,7 +426,7 @@ setCreator creator contract cntrct = do
   let hasSvm3_0 = _vmVersion cntrct == "svm3.0"
   case _org of
     "" -> do
-      onTraced $ liftIO $ putStrLn $ C.red $ "Ignoring creator field for emtpy org field"
+      onTraced $ liftIO $ putStrLn $ C.red $ "Ignoring creator field for empty org field"
       return ()
     org -> do
       -- liftIO $ putStrLn $ "setCreator/versioning ---> getting org of " ++ (format creator) ++ " for new contract " ++ format contract
@@ -474,7 +474,7 @@ getOrg caller vers = do
                 liftIO $ putStrLn $ "getOrg/versioning ---> Its org is " ++ show org'
                 return $ BC.unpack org'
               _ -> do
-                liftIO $ putStrLn "getOrg/versioning ---> It's org is unset? Returning empty string" 
+                liftIO $ putStrLn "getOrg/versioning ---> It's org is unset. Returning empty string" 
                 return "" 
 
 

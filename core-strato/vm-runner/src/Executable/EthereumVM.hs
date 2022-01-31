@@ -504,8 +504,8 @@ sendOutEvents OutBatch{..} = do
       --actionEvents =  map (NewAction . filterOutMetadata . filterOutEvents) (toList outActions)
       trEvents = map NewTransactionResult $ toList outTXRs
           
-  loopTimeit "productVMEvents" $ do
-    $logInfoS "sendOutEvnets" $ "outputting VMEvents"
+  loopTimeit "produceVMEvents" $ do
+    $logInfoS "sendOutEvents" $ "outputting VMEvents"
     _ <- produceVMEvents $ ccEvents ++ eventEvents ++ actionEvents ++ trEvents
     return ()
          
