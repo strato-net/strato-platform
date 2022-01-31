@@ -1026,7 +1026,7 @@ getArgValues argsMap argNamesTypes = do
         let
           argNames1 = "(" <> Text.intercalate ", " (Map.keys argNamesTypes) <> ")"
           argNames2 = "(" <> Text.intercalate ", " (Map.keys argsMap) <> ")"
-        throwIO (UserError ("argument names don't match: " <> argNames1 <> " " <> argNames2))
+        throwIO (UserError ("Argument names don't match - Expected Arguments: " <> argNames1 <> "; Received Arguments: " <> argNames2))
       else sequence $ Map.intersectionWith determineValue argsMap argNamesTypes
     return $ map snd (sortOn fst (toList argsVals))
 
