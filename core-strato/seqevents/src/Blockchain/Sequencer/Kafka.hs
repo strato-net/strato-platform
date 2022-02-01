@@ -89,19 +89,19 @@ readSeqP2pEventsFromTopic = readFromTopic'
 writeUnseqEvents :: K.Kafka k => [IngestEvent] -> k [KP.ProduceResponse]
 writeUnseqEvents events = do
   recordEvents unseqWrites events
-  KW.produceMessages $
+  KW.produceMessagesAsSingletonSets $
       (K.TopicAndMessage unseqEventsTopicName . KW.makeMessage . BL.toStrict . encode) <$> events
 
 writeSeqVmEvents :: K.Kafka k => [VmEvent] -> k [KP.ProduceResponse]
 writeSeqVmEvents events = do
   recordEvents seqVMWrites events
-  KW.produceMessages $
+  KW.produceMessagesAsSingletonSets $
       (K.TopicAndMessage seqVmEventsTopicName . KW.makeMessage . BL.toStrict . encode) <$> events
 
 writeSeqP2pEvents :: K.Kafka k => [P2pEvent] -> k [KP.ProduceResponse]
 writeSeqP2pEvents events = do
   recordEvents seqP2PWrites events
-  KW.produceMessages $
+  KW.produceMessagesAsSingletonSets $
       (K.TopicAndMessage seqP2pEventsTopicName . KW.makeMessage . BL.toStrict . encode) <$> events
 
 readFromTopic' :: (Binary b, K.Kafka k) => KP.TopicName -> KP.Offset -> k [b]

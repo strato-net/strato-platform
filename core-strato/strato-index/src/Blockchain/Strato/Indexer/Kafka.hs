@@ -34,7 +34,7 @@ readIndexEventsFromTopic topic offset = setDefaultKafkaState >> map (decode . L.
 
 writeIndexEvents :: K.Kafka k => [IndexEvent] -> k [KP.ProduceResponse]
 writeIndexEvents events = do
-  results <- KW.produceMessages $
+  results <- KW.produceMessagesAsSingletonSets $
     (K.TopicAndMessage indexEventsTopicName . KW.makeMessage . L.toStrict . encode) <$> events
   mapM_ parseKafkaResponse results
   return results

@@ -87,7 +87,7 @@ class HasVMEventsSink k where
 
 produceVMEventsM :: (Modifiable KafkaState m, MonadLogger m, MonadIO m) => [VMEvent] -> m Offset
 produceVMEventsM vmEvents = do
-    x <- withKafkaRetry1s . produceMessages $
+    x <- withKafkaRetry1s . produceMessagesAsSingletonSets $
         map (TopicAndMessage (lookupTopic "vmevents") . makeMessage . BL.toStrict . JSON.encode) vmEvents
 
     let [offset] = concatMap (map (\(_, _, x') ->x') . concatMap snd . _produceResponseFields) x
@@ -98,7 +98,7 @@ produceVMEvents:: (MonadIO m) => [VMEvent] -> m Offset
 produceVMEvents vmEvents = do
   result <- -- type Either KafkaClientError [ProduceResponse]
     liftIO $ runKafkaConfigured "blockapps-data" $ fmap concat $
-      forM vmEvents $ \e -> produceMessages [TopicAndMessage (lookupTopic "vmevents") . makeMessage . BL.toStrict . JSON.encode $ e]
+      forM vmEvents $ \e -> produceMessagesAsSingletonSets [TopicAndMessage (lookupTopic "vmevents") . makeMessage . BL.toStrict . JSON.encode $ e]
   case result of 
     Left kce -> error $ "Error: Kafka Connection error: " ++ show kce
     Right res -> do -- [ProduceResponse]
