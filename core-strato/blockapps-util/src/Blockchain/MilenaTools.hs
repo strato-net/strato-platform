@@ -19,6 +19,7 @@ import qualified Data.Text                   as T
 import           Network.Kafka
 import           Network.Kafka.Protocol
 import           Prelude
+-- import Control.Monad.Reader (Monad)
 
 _kMetadata::Metadata->KafkaString
 _kMetadata (Metadata x) = x
@@ -56,30 +57,15 @@ commitSingleOffset groupName topic partition offset ofsMetadata = do
     _ -> error "unexpected response from commitOffset in call to commitSingleOffset"
 
 -- Functions that parse kafka responses for errors that are hidden within the list of responses
-parseResult :: ProduceResponse -> Either [KafkaError] ProduceResponse
-parseResult x =
-  let scd = concatMap snd $ _produceResponseFields x -- type [(Partition, KafkaError, Offset)]
+parseKafkaResponse :: Monad m => ProduceResponse -> m ()
+parseKafkaResponse pr =
+  let scd = concatMap snd $ _produceResponseFields pr -- type [(Partition, KafkaError, Offset)]
       e = map (\(_, ke, _) -> ke) scd -- type [KafkaError]
   in
   if (any (/= NoError) e) then 
-    Left e
-  else 
-    Right x
-  -- let [offset] = concatMap (map (\(_, _, x') ->x') . concatMap snd . _produceResponseFields) x
-
--- parseResult (Right (MetadataResponse x)) = do 
---   let e = concatMap (map (\(_, x', _) -> x') . concatMap snd . _produceResponseFields) x
---   when (any (/= NoError) e) $ void $ error $ "Error: Kafka write failed: " ++ show e
---   let [offset] = concatMap (map (\(_, _, x') ->x') . concatMap snd . _produceResponseFields) x
---   return offset
--- parseResult (Right (FetchResponse x))
--- parseResult (Right (OffsetResponse x))
--- parseResult (Right (OffsetCommitResponse x))
--- parseResult (Right (OffsetFetchResponse x))
--- parseResult (Right (HeartbeatResponse x))
--- parseResult (Right (GroupCoordinatorResponse x))
--- parseResult (Right (CreateTopicsResponse x))
--- parseResult (Right (DeleteTopicsResponse x))
+    error $ "Kafka write error: " ++ show e
+  else
+    return ()
 
 
 withKafkaRetry :: (MonadIO m, MonadLogger m, Mod.Modifiable KafkaState m, Show a) => Int -> StateT KafkaState (ExceptT KafkaClientError IO) a -> m a
@@ -89,7 +75,6 @@ withKafkaRetry t k = do
         r <- liftIO . runExceptT $ runStateT k s
         case r of
           Right a -> do
-            $logDebugLS "withKafkaRetry allegedly succeded with: " . T.pack $ show a
             return a
           Left e -> do
             $logErrorS "withKafkaRetry" . T.pack $ show e

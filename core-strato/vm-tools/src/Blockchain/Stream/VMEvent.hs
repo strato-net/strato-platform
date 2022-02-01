@@ -100,18 +100,12 @@ produceVMEvents vmEvents = do
     liftIO $ runKafkaConfigured "blockapps-data" $ fmap concat $
       forM vmEvents $ \e -> produceMessages [TopicAndMessage (lookupTopic "vmevents") . makeMessage . BL.toStrict . JSON.encode $ e]
   case result of 
-    Left kce -> error $ "Error: Kafka write failed: " ++ show kce
-    Right res -> -- [ProduceResponse]
-      if (any (/= NoError) $ mapResults parsedResults) then
-          error $ "Kafka Write Error:" ++ show parsedResults
-        else
-          return offset
-      where parsedResults = map parseResult res --type [Either [KafkaError] ProduceResponse]
-            mapResults :: [Either [KafkaError] ProduceResponse] -> [KafkaError]
-            mapResults [] = [NoError]
-            mapResults (Left es : xs)= es ++ mapResults xs
-            mapResults (Right _ : xs) = [NoError] ++ mapResults xs
-            [offset] = concatMap (map (\(_, _, x') -> x') . concatMap snd . _produceResponseFields) res
+    Left kce -> error $ "Error: Kafka Connection error: " ++ show kce
+    Right res -> do -- [ProduceResponse]
+      mapM_ parseKafkaResponse res
+      return offset
+      where [offset] = concatMap (map (\(_, _, x') -> x') . concatMap snd . _produceResponseFields) res
+            -- parsedResults = map parseKafkaResponse res
 
 
 -- | Reads VMEvents from `defaultVMEventsTopicName`
