@@ -18,7 +18,8 @@ module Slipstream.OutputData (
   createEventTables,
   createExpandIndexTable,
   createExpandHistoryTable,
-  cirrusInfo
+  cirrusInfo,
+  constructTableNameParameters
   ) where
 
 import           BlockApps.Solidity.Value
@@ -169,7 +170,9 @@ constructTableNameParameters :: Text -> Text -> Text -> (Text, Text, Text)
 constructTableNameParameters org app contract =
   if T.null org
     then ("", "", contract)
-    else (org, app, contract)
+    else if app == contract
+         then (org, "", contract)
+         else (org, app, contract)
 
 
 -- sometimes we need the unwrapped tablename
