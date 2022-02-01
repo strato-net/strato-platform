@@ -171,7 +171,6 @@ handleVmEvents = awaitForever $ \InBatch{..} -> do
       then do
         $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
         newBlock <- Bagger.makeNewBlock mineTransactions
-        $logInfoS "evm/loop/newBlock" "calling produceUnminedBlocksM"
         pure $ Just newBlock
       else pure Nothing
   traverse_ (yield . OutBlock) mNewBlock

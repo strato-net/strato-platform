@@ -19,14 +19,26 @@ import           Blockchain.Stream.Raw
 import           Blockchain.EthConf
 import           Blockchain.KafkaTopics
 import           Control.Monad.State
+import           Blockchain.MilenaTools
+
+
+
 
 produceUnminedBlocks :: MonadIO m => [Block] -> m ()
 produceUnminedBlocks = void . liftIO . runKafkaConfigured "blockapps-data" . produceUnminedBlocksM
 
 produceUnminedBlocksM :: Kafka k => [Block] -> k ()
-produceUnminedBlocksM = void . produceMessages . fmap makeMessage'
-    where makeMessage' = TopicAndMessage (lookupTopic "unminedblock") . makeMessage . rlpSerialize . rlpEncode
-
+produceUnminedBlocksM blks = do
+  results <- fmap concat $ forM blks $ \b -> produceMessages [TopicAndMessage (lookupTopic "unminedblock") . makeMessage . rlpSerialize . rlpEncode $ b]
+  let parsedResults = map parseResult results -- type [Either [KafkaError] ProduceResponse]
+  when (any (/= NoError) $ mapResults parsedResults) $ void $ error $ "Error: Kafka write failed: " ++ show parsedResults
+  -- return ()
+  -- void . produceMessages . fmap makeMessage'
+  --   where makeMessage' = TopicAndMessage (lookupTopic "unminedblock") . makeMessage . rlpSerialize . rlpEncode
+  where mapResults :: [Either [KafkaError] ProduceResponse] -> [KafkaError]
+        mapResults [] = [NoError]
+        mapResults (Left es : xs)= es ++ mapResults xs
+        mapResults (Right _ : xs) = [NoError] ++ mapResults xs
 fetchUnminedBlocks :: Kafka k => Offset -> k [Block]
 fetchUnminedBlocks = fmap (map (rlpDecode . rlpDeserialize)) . fetchBytes (lookupTopic "unminedblock")
 
