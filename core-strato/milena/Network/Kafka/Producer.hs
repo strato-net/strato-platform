@@ -5,6 +5,7 @@ import Data.ByteString.Char8 (ByteString)
 import qualified Data.Digest.Murmur32 as Murmur32
 import Control.Applicative
 import Control.Lens
+import Control.Monad (join)
 import Control.Monad.Trans (liftIO)
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -32,6 +33,10 @@ produceRequest ra ti ts =
 -- | Send messages to partition calculated by 'partitionAndCollate'.
 produceMessages :: Kafka m => [TopicAndMessage] -> m [ProduceResponse]
 produceMessages = prod (groupMessagesToSet NoCompression)
+
+-- | Send messages to partition calculated by 'partitionAndCollate'.
+produceMessagesAsSingletonSets :: Kafka m => [TopicAndMessage] -> m [ProduceResponse]
+produceMessagesAsSingletonSets = fmap join . traverse (prod (groupMessagesToSet NoCompression) . pure)
 
 -- | Send compressed messages to partition calculated by 'partitionAndCollate'.
 produceCompressedMessages :: Kafka m => CompressionCodec -> [TopicAndMessage] -> m [ProduceResponse]
