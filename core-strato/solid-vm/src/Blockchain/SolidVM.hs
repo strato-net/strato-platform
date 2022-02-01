@@ -419,14 +419,14 @@ setCreator creator contract cntrct = do
       maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
       _org = fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
   case maybeCert of
-    (Just cert) -> onTraced $ liftIO $ putStrLn $ "setCreator/versioning ---> Found cert for " ++ (format creator) ++ ": " ++ (format $ getCertSubject cert)
+    (Just cert) -> liftIO $ putStrLn $ "setCreator/versioning ---> Found cert for " ++ (format creator) ++ ":\n\t\t" ++ (format $ getCertSubject cert)
     
-    Nothing -> onTraced $ liftIO $ putStrLn $ "setCreator/versioning ---> No cert found for " ++ (format creator)
+    Nothing -> liftIO $ putStrLn $ "setCreator/versioning ---> No cert found for " ++ (format creator)
   
   let hasSvm3_0 = _vmVersion cntrct == "svm3.0"
   case _org of
     "" -> do
-      onTraced $ liftIO $ putStrLn $ C.red $ "Ignoring creator field for empty org field"
+      liftIO $ putStrLn $ C.red $ "Ignoring creator field for empty org field"
       return ()
     org -> do
       -- liftIO $ putStrLn $ "setCreator/versioning ---> getting org of " ++ (format creator) ++ " for new contract " ++ format contract
