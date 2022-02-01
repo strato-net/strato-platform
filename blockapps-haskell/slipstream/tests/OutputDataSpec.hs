@@ -155,7 +155,7 @@ spec = do
                   ("owners", Xabi.Array (Xabi.Int Nothing Nothing) Nothing)
                   ])]
       g <- newGlobals fakeHandle
-      addAndEnableHistoryTable g (HistoryTableName "" "" "Vehicle")
+      runLoggingT $ addAndEnableHistoryTable g (HistoryTableName "" "" "Vehicle")
       let hl = ["Vehicle"]
 
       [vehicleCreate, historyCreate, historyIndex, vehicleInsert, historyInsert]
