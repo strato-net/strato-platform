@@ -507,7 +507,7 @@ sendOutEvents OutBatch{..} = do
     $logInfoS "sendOutEvents" $ "outputting VMEvents"
     _ <- produceVMEvents $ ccEvents ++ eventEvents ++ actionEvents ++ trEvents
     return ()
-         
+  
   loopTimeit "produceUnminedBlocksM" $
     void . K.withKafkaRetry1s . produceUnminedBlocksM $
       outputBlockToBlock <$> toList outBlocks
