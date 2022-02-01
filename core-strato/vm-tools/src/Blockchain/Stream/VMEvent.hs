@@ -51,7 +51,6 @@ import           Text.Format
 import           Text.Tools
 
 
-
 data VMEvent =
   NewAction Action |
   EventEmitted Event |
@@ -88,26 +87,26 @@ class HasVMEventsSink k where
 
 produceVMEventsM :: (Modifiable KafkaState m, MonadLogger m, MonadIO m) => [VMEvent] -> m Offset
 produceVMEventsM vmEvents = do
-    x <- withKafkaRetry1s . produceMessages $
+    x <- withKafkaRetry1s . produceMessagesAsSingletonSets $
         map (TopicAndMessage (lookupTopic "vmevents") . makeMessage . BL.toStrict . JSON.encode) vmEvents
 
     let [offset] = concatMap (map (\(_, _, x') ->x') . concatMap snd . _produceResponseFields) x
     return offset
 
 -- todo: refactor this to consume produceVMEventsM
-produceVMEvents::(MonadIO m)=>[VMEvent]->m Offset
+produceVMEvents:: (MonadIO m) => [VMEvent] -> m Offset
 produceVMEvents vmEvents = do
-  result <-
+  result <- -- type Either KafkaClientError [ProduceResponse]
     liftIO $ runKafkaConfigured "blockapps-data" $ fmap concat $
-      forM vmEvents $ \e -> produceMessages [TopicAndMessage (lookupTopic "vmevents") . makeMessage . BL.toStrict . JSON.encode $ e]
+      forM vmEvents $ \e -> produceMessagesAsSingletonSets [TopicAndMessage (lookupTopic "vmevents") . makeMessage . BL.toStrict . JSON.encode $ e]
+  case result of 
+    Left kce -> error $ "Error: Kafka Connection error: " ++ show kce
+    Right res -> do -- [ProduceResponse]
+      mapM_ parseKafkaResponse res
+      return offset
+      where [offset] = concatMap (map (\(_, _, x') -> x') . concatMap snd . _produceResponseFields) res
+            -- parsedResults = map parseKafkaResponse res
 
-  case result of
-   Left e -> error $ show e
-   Right x -> do
-     let e = concatMap (map (\(_, x', _) ->x') . concatMap snd . _produceResponseFields) x
-     when (any (/= NoError) e) $ void $ error $ "error: kafka write failed: " ++ show e
-     let [offset] = concatMap (map (\(_, _, x') ->x') . concatMap snd . _produceResponseFields) x
-     return offset
 
 -- | Reads VMEvents from `defaultVMEventsTopicName`
 fetchVMEvents :: Kafka k => Offset -> k [VMEvent]

@@ -34,6 +34,7 @@ library:
   - pem
   - random
   - text
+  - format
   - time
   - transformers
   - secp256k1-haskell
