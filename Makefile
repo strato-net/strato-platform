@@ -64,15 +64,18 @@ smd:
 	BASIL_DOCKER_TAG=${REPO_URL}smd:${VERSION} STRATO_VERSION=${VERSION} make --directory=smd-ui/
 
 get_solcs:
-	mkdir -p ${TMPDIR} ${FAKEROOT}/usr/local/bin
-	# One copy for the buildbase and one copy for the deploybase for tests and production respectively
-	blockapps-haskell/pull_solc.sh 0.4.25 ${TMPDIR}/solc-0.4 ${TMPDIR}/license-solc-0.4
-	blockapps-haskell/pull_solc.sh 0.5.2 ${TMPDIR}/solc-0.5 ${TMPDIR}/license-solc-0.5
-	cp ${TMPDIR}/solc-0.4 ${FAKEROOT}/usr/local/bin
-	cp ${TMPDIR}/solc-0.5 ${FAKEROOT}/usr/local/bin
-	cp -fr ${TMPDIR}/license* ${FAKEROOT}
-	ln -f ${TMPDIR}/solc-0.4 ${TMPDIR}/solc
-	ln -f ${FAKEROOT}/usr/local/bin/solc-0.4 ${FAKEROOT}/usr/local/bin/solc
+	@if [ ! -f "${FAKEROOT}/usr/local/bin/solc" ]; then\
+		bash -c "\
+			mkdir -p ${TMPDIR} ${FAKEROOT}/usr/local/bin ;\
+			blockapps-haskell/pull_solc.sh 0.4.25 ${TMPDIR}/solc-0.4 ${TMPDIR}/license-solc-0.4 ;\
+			blockapps-haskell/pull_solc.sh 0.5.2 ${TMPDIR}/solc-0.5 ${TMPDIR}/license-solc-0.5 ;\
+			cp ${TMPDIR}/solc-0.4 ${FAKEROOT}/usr/local/bin ;\
+			cp ${TMPDIR}/solc-0.5 ${FAKEROOT}/usr/local/bin ;\
+			cp -fr ${TMPDIR}/license* ${FAKEROOT} ;\
+			ln -f ${TMPDIR}/solc-0.4 ${TMPDIR}/solc ;\
+			ln -f ${FAKEROOT}/usr/local/bin/solc-0.4 ${FAKEROOT}/usr/local/bin/solc \
+		" ;\
+	fi
 
 build_buildbase: get_solcs
 	cp -f Dockerfile.buildbase ${TMPDIR}

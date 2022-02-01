@@ -75,7 +75,7 @@ class HasVMOutputsSink k where
 
 produceVMOutputsM :: (Modifiable KafkaState m, MonadLogger m, MonadIO m) => [VMOutput] -> m Offset
 produceVMOutputsM vmOutputs = do
-    x <- withKafkaRetry1s . produceMessages $
+    x <- withKafkaRetry1s . produceMessagesAsSingletonSets $
         map (TopicAndMessage (lookupTopic "block") . makeMessage . vmOutputToBytes) vmOutputs
 
     let [offset] = concatMap (map (\(_, _, x') ->x') . concatMap snd . _produceResponseFields) x
@@ -85,7 +85,7 @@ produceVMOutputsM vmOutputs = do
 produceVMOutputs::(MonadIO m)=>[VMOutput]->m Offset
 produceVMOutputs vmOutputs = do
   result <- liftIO $ runKafkaConfigured "blockapps-data" $
-            produceMessages $ map (TopicAndMessage (lookupTopic "block") . makeMessage . vmOutputToBytes) vmOutputs
+            produceMessagesAsSingletonSets $ map (TopicAndMessage (lookupTopic "block") . makeMessage . vmOutputToBytes) vmOutputs
 
   case result of
    Left e -> error $ show e

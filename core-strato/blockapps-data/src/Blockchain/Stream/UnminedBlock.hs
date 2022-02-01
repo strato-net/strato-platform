@@ -7,6 +7,7 @@ module Blockchain.Stream.UnminedBlock (
   fetchUnminedBlocks,
   fetchUnminedBlocksIO
 ) where
+import           Control.Monad
 
 import           Network.Kafka
 import           Network.Kafka.Producer
@@ -19,13 +20,16 @@ import           Blockchain.Stream.Raw
 import           Blockchain.EthConf
 import           Blockchain.KafkaTopics
 import           Control.Monad.State
+import           Blockchain.MilenaTools
+
 
 produceUnminedBlocks :: MonadIO m => [Block] -> m ()
 produceUnminedBlocks = void . liftIO . runKafkaConfigured "blockapps-data" . produceUnminedBlocksM
 
-produceUnminedBlocksM :: Kafka k => [Block] -> k ()
-produceUnminedBlocksM = void . produceMessages . fmap makeMessage'
-    where makeMessage' = TopicAndMessage (lookupTopic "unminedblock") . makeMessage . rlpSerialize . rlpEncode
+produceUnminedBlocksM :: (Kafka k) => [Block] -> k ()
+produceUnminedBlocksM blks = do
+  results <- fmap concat $ forM blks $ \b -> produceMessages [TopicAndMessage (lookupTopic "unminedblock") . makeMessage . rlpSerialize . rlpEncode $ b]
+  mapM_ parseKafkaResponse results -- type [Either [KafkaError] ProduceResponse]
 
 fetchUnminedBlocks :: Kafka k => Offset -> k [Block]
 fetchUnminedBlocks = fmap (map (rlpDecode . rlpDeserialize)) . fetchBytes (lookupTopic "unminedblock")

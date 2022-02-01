@@ -171,7 +171,6 @@ handleVmEvents = awaitForever $ \InBatch{..} -> do
       then do
         $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
         newBlock <- Bagger.makeNewBlock mineTransactions
-        $logInfoS "evm/loop/newBlock" "calling produceUnminedBlocksM"
         pure $ Just newBlock
       else pure Nothing
   traverse_ (yield . OutBlock) mNewBlock
@@ -504,11 +503,11 @@ sendOutEvents OutBatch{..} = do
       --actionEvents =  map (NewAction . filterOutMetadata . filterOutEvents) (toList outActions)
       trEvents = map NewTransactionResult $ toList outTXRs
           
-  loopTimeit "productVMEvents" $ do
-    $logInfoS "sendOutEvnets" $ "outputting VMEvents"
+  loopTimeit "produceVMEvents" $ do
+    $logInfoS "sendOutEvents" $ "outputting VMEvents"
     _ <- produceVMEvents $ ccEvents ++ eventEvents ++ actionEvents ++ trEvents
     return ()
-         
+  
   loopTimeit "produceUnminedBlocksM" $
     void . K.withKafkaRetry1s . produceUnminedBlocksM $
       outputBlockToBlock <$> toList outBlocks

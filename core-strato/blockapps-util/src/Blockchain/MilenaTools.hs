@@ -14,10 +14,12 @@ import qualified Control.Monad.Change.Modify as Mod
 import           Control.Monad.IO.Class      (MonadIO, liftIO)
 import           Control.Monad.Except        (ExceptT (..), runExceptT, throwError)
 import           Control.Monad.Trans.State
+-- import           Control.Monad               (when, void)
 import qualified Data.Text                   as T
 import           Network.Kafka
 import           Network.Kafka.Protocol
 import           Prelude
+-- import Control.Monad.Reader (Monad)
 
 _kMetadata::Metadata->KafkaString
 _kMetadata (Metadata x) = x
@@ -54,21 +56,32 @@ commitSingleOffset groupName topic partition offset ofsMetadata = do
       
     _ -> error "unexpected response from commitOffset in call to commitSingleOffset"
 
+-- Functions that parse kafka responses for errors that are hidden within the list of responses
+parseKafkaResponse :: Monad m => ProduceResponse -> m ()
+parseKafkaResponse pr =
+  let scd = concatMap snd $ _produceResponseFields pr -- type [(Partition, KafkaError, Offset)]
+      e = map (\(_, ke, _) -> ke) scd -- type [KafkaError]
+  in
+  if (any (/= NoError) e) then 
+    error $ "Kafka write error: " ++ show e
+  else
+    return ()
 
 
-withKafkaRetry :: (MonadIO m, MonadLogger m, Mod.Modifiable KafkaState m) => Int -> StateT KafkaState (ExceptT KafkaClientError IO) a -> m a
+withKafkaRetry :: (MonadIO m, MonadLogger m, Mod.Modifiable KafkaState m, Show a) => Int -> StateT KafkaState (ExceptT KafkaClientError IO) a -> m a
 withKafkaRetry t k = do
   s <- Mod.get (Mod.Proxy @KafkaState)
   let go = do
         r <- liftIO . runExceptT $ runStateT k s
         case r of
-          Right a -> return a
+          Right a -> do
+            return a
           Left e -> do
             $logErrorS "withKafkaRetry" . T.pack $ show e
-            (liftIO $ threadDelay (1000*t)) >> go
+            (liftIO $ threadDelay (1000 * t)) >> go
   (a, newS) <- go
   Mod.put (Mod.Proxy @KafkaState) newS
   return a
 
-withKafkaRetry1s :: (MonadIO m, MonadLogger m, Mod.Modifiable KafkaState m) => StateT KafkaState (ExceptT KafkaClientError IO) a -> m a
+withKafkaRetry1s :: (MonadIO m, MonadLogger m, Mod.Modifiable KafkaState m, Show a) => StateT KafkaState (ExceptT KafkaClientError IO) a -> m a
 withKafkaRetry1s = withKafkaRetry 1000
