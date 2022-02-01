@@ -293,8 +293,8 @@ adjustGlobals gref shouldCompile row details = do
         Just dMap -> return dMap
   
   -- TODO: ideally we check if these flags are in the metadata BEFORE we get the detailsMap
-  mapM_ (go detailsMap) $ [("history", addToHistoryList)
-                          ,("nohistory", removeFromHistoryList)
+  mapM_ (go detailsMap) $ [("history", enableHistoryTable)
+                          ,("nohistory", disableHistoryTable)
                           ]
 
 readPreviousEVMState :: MonadIO m =>

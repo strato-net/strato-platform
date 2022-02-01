@@ -104,7 +104,6 @@ spec = do
     block_number text,
     transaction_hash text,
     transaction_sender text,
-    "owners" jsonb,
   CONSTRAINT "Vehicle_pkey"
   PRIMARY KEY (address, "chainId") );|]
 
@@ -156,7 +155,7 @@ spec = do
                   ("owners", Xabi.Array (Xabi.Int Nothing Nothing) Nothing)
                   ])]
       g <- newGlobals fakeHandle
-      addToHistoryList g (HistoryTableName "" "" "Vehicle")
+      addAndEnableHistoryTable g (HistoryTableName "" "" "Vehicle")
       let hl = ["Vehicle"]
 
       [vehicleCreate, historyCreate, historyIndex, vehicleInsert, historyInsert]
@@ -170,7 +169,6 @@ spec = do
     block_number text,
     transaction_hash text,
     transaction_sender text,
-    "owners" jsonb,
   CONSTRAINT "Vehicle_pkey"
   PRIMARY KEY (address, "chainId") );|]
 
@@ -181,8 +179,7 @@ spec = do
     block_timestamp text,
     block_number text,
     transaction_hash text NOT NULL,
-    transaction_sender text,
-    "owners" jsonb);|]
+    transaction_sender text);|]
 
       historyIndex `shouldBe`
           [r|CREATE UNIQUE INDEX IF NOT EXISTS "index_history@Vehicle"
@@ -265,7 +262,6 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     block_number text,
     transaction_hash text,
     transaction_sender text,
-    "\"owners\"" jsonb,
   CONSTRAINT "\"Vehicle''''_pkey"
   PRIMARY KEY (address, "chainId") );|]
 
@@ -350,12 +346,10 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     transaction_hash text,
     transaction_sender text,
     "addr" text,
-    "array_nums" jsonb,
     "boolean" bool,
     "contract" text,
     "enum_val" text,
-    "number" bigint,
-    "set" jsonb,
+    "number" decimal,
     "str" text,
     "strukt" jsonb,
   CONSTRAINT "MyOrg:MyApp:SwissArmy_pkey"
@@ -528,12 +522,10 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     transaction_hash text,
     transaction_sender text,
     "addr" text,
-    "array_nums" jsonb,
     "boolean" bool,
     "contract" text,
     "enum_val" text,
-    "number" bigint,
-    "set" jsonb,
+    "number" decimal,
     "str" text,
     "strukt" jsonb,
   CONSTRAINT "SwissArmy_pkey"

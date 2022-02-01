@@ -32,7 +32,7 @@ instance NFData (TableName) where
 
 
 data Globals = Globals { createdTables :: M.Map TableName TableColumns
-                       , historyList :: S.Set TableName
+                       , historyList :: M.Map TableName Bool
                        , createdInstances :: S.Set CodePtr -- lets us avoid an extra bloc call
                        , contractABIs :: HM.HashMap Keccak256 (M.Map Text ContractDetails)
                        , contractStates :: LRU Account [(Text, Value)]

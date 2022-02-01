@@ -21,7 +21,6 @@ import Control.Monad.IO.Class
 import qualified Data.Cache.LRU as LRU
 import qualified Data.HashMap.Strict as HM
 import qualified Data.Map.Strict as M
-import qualified Data.Set as S
 import qualified Data.Text as T
 import Network.Kafka.Protocol (Offset)
 import Prometheus
@@ -76,7 +75,7 @@ recordGlobals g = liftIO $ do
   let rec  :: T.Text -> (Globals -> Int) -> IO ()
       rec lab acc = withLabel globalsSize lab (flip setGauge . fromIntegral . acc $ g)
   rec "created_tables" (M.size . createdTables)
-  rec "history_list" (S.size . historyList)
+  rec "history_list" (M.size . historyList)
   rec "contract_abis" (HM.size . contractABIs)
   rec "contract_states" (LRU.size . contractStates)
 

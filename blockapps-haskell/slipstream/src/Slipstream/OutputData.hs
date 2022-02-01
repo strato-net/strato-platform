@@ -257,7 +257,7 @@ createHistoryTable globalsIORef contract (o, a, n) = do
     yield $ addHistoryUnique (o, a, n)
     let list = tableColumns $ Map.toList $ contract^.storageDefs
     setTableCreated globalsIORef tableName list
-
+    addAndEnableHistoryTable globalsIORef tableName
 
 
 -- Runs ALTER TABLE <name> [ADD COLUMN <column>] for any new fields added to a contract definition   
@@ -338,7 +338,10 @@ insertHistoryTable globalsIORef contracts@(x:_) = do
           (contractName x)
       tableName = HistoryTableName org app cname
   history <- isHistoric globalsIORef tableName
-  when history . yield $ insertHistoryTableQuery contracts
+
+  when history $ do
+    $logInfoS "insertHistoryTable" $ T.pack $ "Inserting row in history table for: " ++ show tableName
+    yield $ insertHistoryTableQuery contracts
 
 createIndexTableQuery :: Contract -> (Text, Text, Text) -> Text
 createIndexTableQuery contract (o, a, n) =
@@ -602,13 +605,13 @@ insertEventTableQuery ev =
 --This is a temporary function that converts solidity types to a sample value...  I am just using this now to convert table creation from the old way (value based when values come through) to the new way (direct from the types when a CC is registered)
 solidityTypeToSQLType :: VariableDeclF a -> Maybe Text
 solidityTypeToSQLType VariableDecl{varType=Xabi.Bool} = Just "bool"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Int _ _} = Just "bigint"
+solidityTypeToSQLType VariableDecl{varType=Xabi.Int _ _} = Just "decimal"
 solidityTypeToSQLType VariableDecl{varType=Xabi.String _} = Just "text"
 solidityTypeToSQLType VariableDecl{varType=Xabi.Bytes _ _} = Just "text"
 solidityTypeToSQLType VariableDecl{varType=Xabi.Address} = Just "text"
 solidityTypeToSQLType VariableDecl{varType=Xabi.Account} = Just "text"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Array _ _} = Just "jsonb"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Mapping _ _ _} = Just "jsonb"
+solidityTypeToSQLType VariableDecl{varType=Xabi.Array _ _} = Nothing -- Just "jsonb"
+solidityTypeToSQLType VariableDecl{varType=Xabi.Mapping _ _ _} = Nothing -- Just "jsonb"
 solidityTypeToSQLType VariableDecl{varType=Xabi.Label _} = Just "text"
 --solidityTypeToSQLType VariableDecl{varType=Xabi.Label x} = Just $ "text references " <> T.pack x <> "(id)"
 solidityTypeToSQLType VariableDecl{varType=Xabi.Struct _ _} = Just "jsonb"
