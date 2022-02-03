@@ -7,7 +7,7 @@ module Blockchain.Strato.Indexer.Kafka
     , writeIndexEvents
     ) where
 
-
+import           Control.Monad.IO.Class
 import           Data.Binary
 
 import qualified Data.ByteString.Lazy            as L
@@ -36,5 +36,5 @@ writeIndexEvents :: K.Kafka k => [IndexEvent] -> k [KP.ProduceResponse]
 writeIndexEvents events = do
   results <- KW.produceMessagesAsSingletonSets $
     (K.TopicAndMessage indexEventsTopicName . KW.makeMessage . L.toStrict . encode) <$> events
-  mapM_ parseKafkaResponse results
+  liftIO $ mapM_ parseKafkaResponse results
   return results

@@ -26,6 +26,7 @@ module Blockchain.Stream.VMEvent (
 import           Conduit
 import           Control.Monad.Change.Modify (Modifiable)
 import           Control.Monad.State
+import           Control.Exception
 import qualified Data.Aeson                  as JSON
 import qualified Data.ByteString             as B
 import qualified Data.ByteString.Lazy        as BL
@@ -100,9 +101,9 @@ produceVMEvents vmEvents = do
     liftIO $ runKafkaConfigured "blockapps-data" $ fmap concat $
       forM vmEvents $ \e -> produceMessagesAsSingletonSets [TopicAndMessage (lookupTopic "vmevents") . makeMessage . BL.toStrict . JSON.encode $ e]
   case result of 
-    Left kce -> error $ "Error: Kafka Connection error: " ++ show kce
+    Left kce -> liftIO $ throwIO kce
     Right res -> do -- [ProduceResponse]
-      mapM_ parseKafkaResponse res
+      liftIO $ mapM_ parseKafkaResponse res
       return offset
       where [offset] = concatMap (map (\(_, _, x') -> x') . concatMap snd . _produceResponseFields) res
             -- parsedResults = map parseKafkaResponse res

@@ -14,6 +14,8 @@ import qualified Control.Monad.Change.Modify as Mod
 import           Control.Monad.IO.Class      (MonadIO, liftIO)
 import           Control.Monad.Except        (ExceptT (..), runExceptT, throwError)
 import           Control.Monad.Trans.State
+import           Control.Exception
+import           Data.List                    (find)
 -- import           Control.Monad               (when, void)
 import qualified Data.Text                   as T
 import           Network.Kafka
@@ -57,15 +59,21 @@ commitSingleOffset groupName topic partition offset ofsMetadata = do
     _ -> error "unexpected response from commitOffset in call to commitSingleOffset"
 
 -- Functions that parse kafka responses for errors that are hidden within the list of responses
-parseKafkaResponse :: Monad m => ProduceResponse -> m ()
+parseKafkaResponse :: ProduceResponse -> IO ()
 parseKafkaResponse pr =
-  let scd = concatMap snd $ _produceResponseFields pr -- type [(Partition, KafkaError, Offset)]
-      e = map (\(_, ke, _) -> ke) scd -- type [KafkaError]
-  in
-  if (any (/= NoError) e) then 
-    error $ "Kafka write error: " ++ show e
-  else
-    return ()
+  case maybeError of
+    (Just e) -> throwIO e
+
+    Nothing -> return ()
+
+  where scd = concatMap snd $ _produceResponseFields pr -- type [(Partition, KafkaError, Offset)]
+        es = map (\(_, ke, _) -> ke) scd -- type [KafkaError]
+        maybeError = find (/= NoError) es
+
+  -- if (any (/= NoError) e) then 
+  --   throwIO $ e !! 0
+  -- else
+  --   return ()
 
 
 withKafkaRetry :: (MonadIO m, MonadLogger m, Mod.Modifiable KafkaState m, Show a) => Int -> StateT KafkaState (ExceptT KafkaClientError IO) a -> m a
