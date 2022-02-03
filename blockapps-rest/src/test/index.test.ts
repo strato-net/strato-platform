@@ -101,7 +101,7 @@ describe("contracts", function() {
         return rest.createContract(admin, contractArgs, options);
       },
       RestStatus.BAD_REQUEST,
-      /argument names don't match:/
+      /Argument names don't match - Expected Arguments: /
     );
   });
 });
