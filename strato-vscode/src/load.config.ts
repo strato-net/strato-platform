@@ -20,6 +20,6 @@ export default function getConfig(): any {
         : cfgPath
         ? path.join(folder, cfgPath, filename)
         : path.join(folder, filename);
-    const config = yaml.load(fs.readFileSync(path.resolve(pathName).replace('C:\\c:\\','C:\\'), 'utf-8'));
+    const config = yaml.load(fs.readFileSync(path.resolve(pathName).replace('C:\\c:\\','C:\\').replace('C:\\C:\\','C:\\'), 'utf-8'));
     return config
 }
