@@ -259,6 +259,7 @@ addTransactions :: (VMBase m, Bagger.MonadBagger m, MonadMonitor m)
                 -> ConduitT a VmOutEvent m ()
 addTransactions blockData txs =
  timeit ("addTransactions, " ++ show (length txs) ++ " TXs") (Just vmBlockInsertionMined) $ do
+  lift $ $logInfoS "addTransactions" "Adding transactions, starting with blank x509 map"
   trrs <- lift $ go (blockDataGasLimit blockData) txs DL.empty M.empty
   mapM_ (outputTransactionResult blockData blockHeaderHash) trrs
   yield . OutASM $ foldr (flip M.union) M.empty $ map trrAfterMap trrs
@@ -271,11 +272,18 @@ addTransactions blockData txs =
       beforeMap <- getAddressStateTxDBMap
       let chainId = fromAnchorChain $ otAnchorChain t
       Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) x509s
+      $logInfoS "addTransactions/go" "setting argument x509s into memory"
       beforeX509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
+      $logInfoS "addTransactions/go" $ T.pack $ "Getting beforeX509s from memory - there are" ++ (show $ M.size beforeX509s) ++ "certs in memory"
       (!deltaT, !result) <- timeIt $ runExceptT $ addTransaction chainId False blockData blockGas t
       case result of
-          Left _  -> Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) beforeX509s
-          Right execResult -> Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.union (erNewX509Certs execResult) beforeX509s
+          Left _  -> do
+            Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) beforeX509s
+            $logInfoS "addTransactions/go" "putting beforex509s into memory"
+
+          Right execResult -> do
+            Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.union (erNewX509Certs execResult) beforeX509s
+            $logInfoS "addTransactions/go" "putting union of beforex509s and tx x509s into memory"
 
       afterMap <- getAddressStateTxDBMap
 
@@ -290,7 +298,7 @@ addTransactions blockData txs =
             Right execResult -> blockGas - (transactionGasLimit bt - calculateReturned bt execResult)
 
       x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-
+      $logInfoS "addTransactions/go" $ T.pack $ "getting x509s' from memory and calling go with these x509s - there are " ++ (show $ M.size x509s') ++ " certs in memory"
       go remainingBlockGas rest (trrs `DL.snoc` trr) x509s'
 
 mineTransactions :: (VMBase m, MonadMonitor m) => Bagger.MineTransactions m
@@ -373,8 +381,12 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=b
     if success
         then do
             x509s <- lift $ Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
+            $logInfoS "addTx" $ T.pack $ "Getting X509s from memory - there are " ++ (show $ M.size x509s) ++ "in memory"
             execResults <- runCodeForTransaction isRunningTests' isHomestead b (fromInteger (transactionGasLimit bt) - intrinsicGas') tAcct t
             lift $ Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.union (erNewX509Certs execResults) x509s
+            $logInfoS "addTx" "Putting the union of old X509s and existing X509s into memory"
+            x509s_ <- lift $ Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
+            $logInfoS "addTx" $ T.pack $ "There are now " ++ (show $ M.size x509s_) ++ " certs in memory"
             s1 <- lift $ addToBalance coinbaseAcct (transactionGasLimit bt * transactionGasPrice bt)
             unless s1 $ error "addToBalance failed even after a check in addBlock"
             lift $ P.incCounter vmTxsProcessed
