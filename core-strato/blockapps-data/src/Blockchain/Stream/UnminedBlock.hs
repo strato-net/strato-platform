@@ -26,10 +26,10 @@ import           Blockchain.MilenaTools
 produceUnminedBlocks :: MonadIO m => [Block] -> m ()
 produceUnminedBlocks = void . liftIO . runKafkaConfigured "blockapps-data" . produceUnminedBlocksM
 
-produceUnminedBlocksM :: (Kafka k) => [Block] -> k ()
+produceUnminedBlocksM :: (Kafka m) => [Block] -> m ()
 produceUnminedBlocksM blks = do
   results <- fmap concat $ forM blks $ \b -> produceMessages [TopicAndMessage (lookupTopic "unminedblock") . makeMessage . rlpSerialize . rlpEncode $ b]
-  mapM_ parseKafkaResponse results -- type [Either [KafkaError] ProduceResponse]
+  liftIO $ mapM_ parseKafkaResponse $ results -- type [Either [KafkaError] ProduceResponse]
 
 fetchUnminedBlocks :: Kafka k => Offset -> k [Block]
 fetchUnminedBlocks = fmap (map (rlpDecode . rlpDeserialize)) . fetchBytes (lookupTopic "unminedblock")
