@@ -414,11 +414,11 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
 -- set the hidden ":creator" field
 setCreator :: MonadSM m => Account -> Account -> Contract -> m ()
 setCreator creator contract cntrct = do
-  
+  let creatorAddress = _accountAddress creator
   x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
   liftIO $ putStrLn $ "setCreator " ++ "There are" ++ (show $ M.size x509s') ++ " certs in memory"
-  maybeCertLevelDB <- x509CertDBGet $ _accountAddress creator
-  let maybeCertBlockDB = M.lookup (_accountAddress creator) x509s'
+  maybeCertLevelDB <- x509CertDBGet $ creatorAddress
+  let maybeCertBlockDB = M.lookup creatorAddress x509s'
       maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
       _org = fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
   case maybeCertBlockDB of
@@ -427,7 +427,10 @@ setCreator creator contract cntrct = do
     Nothing -> liftIO $ putStrLn $ C.red "setCreator/versioning ---> Cache miss for x509 cert - now looking in levelDB"
 
   case maybeCert of
-    (Just cert) -> liftIO $ putStrLn $ C.green $ "setCreator/versioning ---> Found cert for " ++ (format creator) ++ ":\n\t" ++ (format $ getCertSubject cert)
+    (Just cert) -> do
+      liftIO $ putStrLn $ C.green $ "setCreator/versioning ---> Found cert for " ++ (format creator) ++ ":\n\t" ++ (format $ getCertSubject cert)
+      
+      Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.insert creatorAddress cert x509s'
     
     Nothing -> liftIO $ putStrLn $ C.red $ "setCreator/versioning ---> No cert found for " ++ (format creator)
   
