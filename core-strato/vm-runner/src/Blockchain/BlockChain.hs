@@ -274,7 +274,7 @@ addTransactions blockData txs =
       Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) x509s
       $logInfoS "addTransactions/go" "setting argument x509s into memory"
       beforeX509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-      $logInfoS "addTransactions/go" $ T.pack $ "Getting beforeX509s from memory - there are" ++ (show $ M.size beforeX509s) ++ "certs in memory"
+      $logInfoS "addTransactions/go" $ T.pack $ "Getting beforeX509s from memory - there are" ++ (show $ M.size beforeX509s) ++ " certs in memory"
       (!deltaT, !result) <- timeIt $ runExceptT $ addTransaction chainId False blockData blockGas t
       case result of
           Left _  -> do
