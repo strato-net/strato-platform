@@ -226,7 +226,6 @@ create :: SolidVMBase m
 --       value gasPrice availableGas newAddress initCode txHash chainId metadata =
 create _ _ _ blockData _ sender' origin' _ _ _ newAddress code txHash' chainId' metadata = do
   x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-  liftIO $ putStrLn $ "create/contract " ++ "Got X509s from memory - There are" ++ (show $ M.size x509s) ++ " certs in memory" 
   recordCreate
   let env' = Env.Environment {
         Env.blockHeader = blockData,
@@ -258,7 +257,6 @@ create _ _ _ blockData _ sender' origin' _ _ _ newAddress code txHash' chainId' 
 create' :: MonadSM m => Account -> Account -> Keccak256 -> CodeCollection -> String -> Xabi.ArgList -> M.Map Address X509Certificate -> m ExecResults
 create' creator newAccount ch cc contractName' argExps x509s = do
   Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ x509s
-  liftIO $ putStrLn $ "create'/contract " ++ "Putting X509s from argument into memory"
   parentName <- fromMaybeM (return "") $ runMaybeT 
      $   pure creator                                               -- Creator's address
      >>= MaybeT . A.lookup (A.Proxy @AddressState)                  -- Address's state
@@ -314,7 +312,6 @@ create' creator newAccount ch cc contractName' argExps x509s = do
   finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
   finalAct <- Mod.get (Mod.Proxy @Action)
   x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-  liftIO $ putStrLn $ "create'/contract " ++ "Getting and returning X509s from memory - There are " ++ (show $ M.size x509s') ++ " certs in memory"
 
   return ExecResults {
     erRemainingTxGas = 0, --Just use up all the allocated gas for now....
@@ -416,19 +413,18 @@ setCreator :: MonadSM m => Account -> Account -> Contract -> m ()
 setCreator creator contract cntrct = do
   let creatorAddress = _accountAddress creator
   x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-  liftIO $ putStrLn $ "setCreator " ++ "There are" ++ (show $ M.size x509s') ++ " certs in memory"
   maybeCertLevelDB <- x509CertDBGet $ creatorAddress
   let maybeCertBlockDB = M.lookup creatorAddress x509s'
       maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
       _org = fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
   case maybeCertBlockDB of
-    (Just _) -> liftIO $ putStrLn $ C.green "setCreator/versioning ---> Cache hit for x509 cert"
+    (Just _) -> onTraced $ liftIO $ putStrLn $ C.green "setCreator/versioning ---> Cache hit for x509 cert"
 
-    Nothing -> liftIO $ putStrLn $ C.red "setCreator/versioning ---> Cache miss for x509 cert - now looking in levelDB"
+    Nothing -> onTraced $ liftIO $ putStrLn $ C.red "setCreator/versioning ---> Cache miss for x509 cert - now looking in levelDB"
 
   case maybeCert of
     (Just cert) -> do
-      liftIO $ putStrLn $ C.green $ "setCreator/versioning ---> Found cert for " ++ (format creator) ++ ":\n\t" ++ (format $ getCertSubject cert)
+      onTraced $ liftIO $ putStrLn $ C.green $ "setCreator/versioning ---> Found cert for " ++ (format creator) ++ ":\n\t" ++ (format $ getCertSubject cert)
       
       Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.insert creatorAddress cert x509s'
     
@@ -440,16 +436,10 @@ setCreator creator contract cntrct = do
       liftIO $ putStrLn $ C.yellow "Ignoring creator field for empty org field"
       return ()
     org -> do
-      -- liftIO $ putStrLn $ "setCreator/versioning ---> getting org of " ++ (format creator) ++ " for new contract " ++ format contract
       liftIO $ putStrLn $ "setCreator/versioning ---> setting the org as " ++ (show org)
-  --   -- insert the org for this contract into storage, in the ":creator" field
+      -- insert the org for this contract into storage, in the ":creator" field
       putSolidStorageKeyVal' hasSvm3_0 contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack org)
-      
-  -- case org of
-  --   "" -> do
-  --     liftIO $ putStrLn $ "setCreator/versioning ---> no org found for this creator...."
-  --     return ()
-  --   (Just org) -> do 
+
 
 -- get the org for the Cirrus table name
 getOrg :: MonadSM m => Account -> String -> m (String)
@@ -469,7 +459,7 @@ getOrg caller vers = do
         let maybeCertBlockDB = M.lookup (_accountAddress caller) x509s'
             maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
         let org' = fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
-        liftIO $ putStrLn $ "getOrg/versioning ---> They are a user, of org " ++ (show org')
+        liftIO $ putStrLn $ "getOrg/versioning ---> They are a user of org " ++ (show org')
         return org'
       x -> do
       -- caller is a contract account, so this app already exists
@@ -1623,7 +1613,6 @@ callBuiltin "registerCert" [SAccount a, SString cert] _ = do
     case ex509Cert of
         Left _         -> return SNULL
         Right x509Cert -> do x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-                             liftIO $ putStrLn $ "Getting X509s from memory - there are " ++ (show $ M.size x509s) ++ " certs in memory" 
                              let theAddress = _accountAddress $ namedAccountToAccount Nothing a
                              Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.insert theAddress x509Cert x509s
                              onTraced $ liftIO $ putStrLn $ "    registering cert to address: " ++ format theAddress ++ " as " ++ show (fmap subCommonName $ getCertSubject x509Cert)
