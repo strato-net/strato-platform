@@ -76,6 +76,7 @@ import           Blockchain.Data.ExecResults
 import           Blockchain.DB.CodeDB                  (getCode)
 import qualified Blockchain.DB.MemAddressStateDB       as Mem
 import           Blockchain.DB.StorageDB
+import           Blockchain.DB.X509CertDB
 import qualified Blockchain.SolidVM                    as SolidVM
 import           Blockchain.Strato.Indexer.Kafka       (writeIndexEvents)
 import           Blockchain.Strato.Indexer.Model       (IndexEvent (..))
@@ -88,7 +89,6 @@ import qualified Blockchain.Strato.Model.Keccak256     as Keccak256
 import           Blockchain.Strato.StateDiff.Database  (commitSqlDiffs)
 import           Blockchain.Timing
 import           Blockchain.Util
-
 import qualified Text.Colors                           as CL
 import           Text.Format                           (format)
 
@@ -365,9 +365,12 @@ runChainConstructors cId cInfo = do
            ]
            ++ case ms of Nothing -> []; Just s -> [("src", s)])
 
+  $logInfoS "runChainConstructor" "flushMemStorageDB"
   flushMemStorageDB
+  $logInfoS "runChainConstructor" "flushMemAddressStateDB"
   Mem.flushMemAddressStateDB
-
+  $logInfoS "runChainConstructor" "flushX509ToLevelDB"
+  flushX509ToLevelDB
   sr <- A.lookupWithDefault (Proxy @MP.StateRoot) (Just cId)
   return (sr, actions)
 

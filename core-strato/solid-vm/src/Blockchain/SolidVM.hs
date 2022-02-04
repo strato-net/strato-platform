@@ -572,6 +572,7 @@ argsToVals ctract fn args =
 
 callWrapper :: MonadSM m => Account -> Account -> Maybe String -> String -> Xabi.ArgList -> m (Maybe Value)
 callWrapper from to mContract functionName argExps = do
+  beforeX509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
   let fromChain = from ^. accountChainId
       toChain = to ^. accountChainId
   isAccessibleChain <- toChain `isAncestorChainOf` fromChain
@@ -624,9 +625,13 @@ callWrapper from to mContract functionName argExps = do
                 return (fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack functionName, OrderedVals [])
               Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.contractName)
 
+  funcResult <- logFunctionCall args to contract functionName f
+  case funcResult of
+    Just _ -> return funcResult
 
-  logFunctionCall args to contract functionName f
-
+    Nothing -> do
+      Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ beforeX509s --revert X509s to previous state on call failure
+      return funcResult
 
 runStatements :: MonadSM m => [Xabi.Statement] -> m (Maybe Value)
 runStatements [] = return Nothing
