@@ -439,10 +439,10 @@ processTheMessages env sqlEnv conn g messages = do
         outputData conn $ createExpandHistoryTable g c nameParts
 
       outputData conn . createEventTables g $ contractToEventTables nameParts c
+      
+--    forM_ (Map.toList $ cc^.contracts) $ \(nameString, c) -> do
+--      outputData conn $ createForeignIndexesForJoins g c (o, a, T.pack nameString)
 
-  unless (null messages) $
-    $logDebugS "processTheMessages" . T.pack . unlines . map show $ messages
-  
   case length messages of
    0 -> return ()
    1 -> $logInfoS "processTheMessages" "1 message has arrived"
@@ -453,7 +453,7 @@ processTheMessages env sqlEnv conn g messages = do
       let row = combineActions actions
       mapM_ recordAction actions
       recordCombinedAction row
-      $logInfoS "processTheMessages" $ formatAction row
+      $logInfoS "processTheMessages" $ "Combined Action = " <> formatAction row
       $logDebugLS "the diff is " $ actionStorage row
 
       case actionStorage row of
