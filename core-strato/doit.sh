@@ -400,8 +400,12 @@ setEnv svmTrace ${svmTrace:-false}
 setEnv diffPublish true
 
 setEnv evmCompatible ${EVM_COMPATIBLE:-false}
-setEnv indexEVM ${indexEVM:-false}
-
+if [ "${evmCompatible}" = true ]
+then
+  setEnv indexEVM true
+else
+  setEnv indexEVM ${indexEVM:-false}
+fi
 setEnv evmDebugMode false
 setEnv evmTraceMode false
 
