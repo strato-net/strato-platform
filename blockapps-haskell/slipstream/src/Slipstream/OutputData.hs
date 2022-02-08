@@ -17,6 +17,7 @@ module Slipstream.OutputData (
   insertHistoryTable,
   createEventTables,
   createExpandIndexTable,
+  createForeignIndexesForJoins,
   createExpandHistoryTable,
   cirrusInfo,
   constructTableNameParameters
@@ -85,7 +86,7 @@ wrapParens :: Text -> Text
 wrapParens = wrap "(" ")"
 
 wrapAndEscape :: [Text] -> Text
-wrapAndEscape = wrapParens . csv . map wrapSingleQuotes
+wrapAndEscape = wrapParens . csv
 
 wrapAndEscapeDouble :: [Text] -> Text
 wrapAndEscapeDouble = wrapParens . csv . map wrapDoubleQuotes
@@ -213,6 +214,20 @@ createExpandIndexTable
 createExpandIndexTable g c nameParts = do
   createIndexTable g c nameParts
   expandIndexTable g c nameParts
+
+createForeignIndexesForJoins :: OutputM m =>
+                                IORef Globals -> Contract -> (Text, Text, Text) -> ConduitM () Text m ()
+createForeignIndexesForJoins _ c (o, a, n) = do
+  let (org, app, cname) = constructTableNameParameters o a n
+      tableName = IndexTableName org app cname
+
+
+  forM_ (Map.toList $ c^.storageDefs) $ \(theName, theType) -> do
+    case varType theType of
+      Xabi.Label x -> do
+        yield $ "ALTER TABLE " <> tableNameToDoubleQuoteText tableName <> " ADD FOREIGN KEY (" <> wrapDoubleQuotes theName <> ") REFERENCES " <> wrapDoubleQuotes (T.pack x) <> " (address);"
+      _ -> 
+        return ()
 
 createExpandHistoryTable
   :: OutputM m
@@ -358,6 +373,7 @@ createIndexTableQuery contract (o, a, n) =
         , ",\n  CONSTRAINT "
         , wrapDoubleQuotes ((escapeQuotes $ tableNameToText tableName) <> "_pkey")
         , "\n  PRIMARY KEY (address, \"chainId\") );"
+--        , "\n  PRIMARY KEY (address, \"chainId\"), UNIQUE (address) );"
         ]
 
 createHistoryTableQuery :: Contract -> (Text, Text, Text) -> Text
@@ -403,7 +419,7 @@ insertIndexTableQuery contracts@(x:_) =
                  ]
       vals = flip map contracts $ \row ->
         let rowList = Map.toList $ Map.mapMaybe valueToSQLText $ contractData row
-         in wrapAndEscape $ map ($ row) baseVals ++ map snd rowList
+         in wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList
       inserts = csv vals
    in T.concat
         [ "INSERT INTO "
@@ -446,7 +462,7 @@ insertHistoryTableQuery contracts@(x:_) =
                  ]
       vals = flip map contracts $ \row ->
         let rowList = Map.toList $ Map.mapMaybe valueToSQLText $ contractData row
-         in wrapAndEscape $ map ($ row) baseVals ++ map snd rowList
+         in wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList
       inserts = csv vals
    in T.concat $
         [ "INSERT INTO "
@@ -633,19 +649,21 @@ solidityValueToText (SolidityBytes x)         = escapeQuotes $ tshow x
 solidityValueToText (SolidityArray x)         = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ encode x
 solidityValueToText (SolidityObject x)        = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ encode x
 
-
 valueToSQLText :: Value -> Maybe Text
-valueToSQLText (SimpleValue (ValueBool x)) = Just $ tshow x
-valueToSQLText (SimpleValue (ValueInt _ _ v)) = Just $ tshow v
-valueToSQLText (SimpleValue (ValueString s)) = Just $ escapeQuotes s
-valueToSQLText (SimpleValue (ValueAddress (Address addr))) = Just $ escapeQuotes $ T.pack $ printf "%040x" (fromIntegral addr::Integer)
-valueToSQLText (SimpleValue (ValueAccount acct)) = Just $ escapeQuotes $ T.pack $ show acct
-valueToSQLText (SimpleValue (ValueBytes _ bytes)) = Just $ escapeQuotes $ decodeUtf8 bytes
-valueToSQLText (ValueEnum _ _ index) = Just $ escapeQuotes $ T.pack $ show index
-valueToSQLText (ValueContract acct) = Just $ escapeQuotes $ T.pack $ show acct
+valueToSQLText (SimpleValue (ValueBool x)) = Just $ wrapSingleQuotes $ tshow x
+valueToSQLText (SimpleValue (ValueInt _ _ v)) = Just $ wrapSingleQuotes $ tshow v
+valueToSQLText (SimpleValue (ValueString s)) = Just $ wrapSingleQuotes $ escapeQuotes s
+valueToSQLText (SimpleValue (ValueAddress (Address addr))) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ printf "%040x" (fromIntegral addr::Integer)
+valueToSQLText (SimpleValue (ValueAccount acct)) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show acct
+valueToSQLText (SimpleValue (ValueBytes _ bytes)) = Just $ wrapSingleQuotes $ escapeQuotes $ decodeUtf8 bytes
+valueToSQLText (ValueEnum _ _ index) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show index
+valueToSQLText (ValueContract acct) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show acct
+--valueToSQLText (ValueContract _) = Just "NULL"
 valueToSQLText (ValueFunction _ _ _) = Nothing
 valueToSQLText (ValueMapping _) = Nothing
 valueToSQLText (ValueArrayFixed _ _) = Nothing
 valueToSQLText (ValueArrayDynamic _) = Nothing
 --valueToSQLText (ValueStruct namedItems) = Nothing
+
+
 valueToSQLText x = Just . solidityValueToText . valueToSolidityValue $ x
