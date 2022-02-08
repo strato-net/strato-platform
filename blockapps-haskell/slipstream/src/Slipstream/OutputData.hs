@@ -666,4 +666,4 @@ valueToSQLText (ValueArrayDynamic _) = Nothing
 --valueToSQLText (ValueStruct namedItems) = Nothing
 
 
-valueToSQLText x = Just . solidityValueToText . valueToSolidityValue $ x
+valueToSQLText x = Just . wrapSingleQuotes . solidityValueToText . valueToSolidityValue $ x
