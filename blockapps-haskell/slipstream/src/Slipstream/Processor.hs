@@ -451,7 +451,7 @@ processTheMessages env sqlEnv conn g messages = do
 
       case actionStorage row of
         Action.EVMDiff{} -> do
-          if flags_indexEVM == True then do
+          if flags_indexEVM then do
             mDetails <- getEVMDetailsForRow row
             case mDetails of
               Nothing -> pure . Left $ "No details found for code hash "
