@@ -221,6 +221,7 @@ services:
     - wsDebug=${wsDebug}
     - zkHost=zookeeper
     - EVM_COMPATIBLE=${EVM_COMPATIBLE}
+    - indexEVM=${indexEVM:-false}
     build: .
     image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>}
     ports:

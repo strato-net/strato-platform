@@ -203,7 +203,7 @@ function newnode {
   SLIPSTREAM_CMD="slipstream --pghost=${postgres_host} --pgport=${postgres_port} \
     --pguser=${postgres_user} --password=${postgres_password} --database=${postgres_slipstream_db} \
     --stratourl=${stratoRoot} --vaultwrapperurl=${vaultWrapperRoot}  \
-    --kafkahost=${kafkaHost} --kafkaport=${kafkaPort} --minLogLevel=${slipMinLogLevel}"
+    --kafkahost=${kafkaHost} --kafkaport=${kafkaPort} --minLogLevel=${slipMinLogLevel} --indexEVM=${indexEVM}"
 
   if [ ${SLIPSTREAM_OPTIONAL} = true ]; then
       $SLIPSTREAM_CMD &>> logs/slipstream &
@@ -400,6 +400,7 @@ setEnv svmTrace ${svmTrace:-false}
 setEnv diffPublish true
 
 setEnv evmCompatible ${EVM_COMPATIBLE:-false}
+setEnv indexEVM ${indexEVM:-false}
 
 setEnv evmDebugMode false
 setEnv evmTraceMode false
@@ -408,6 +409,7 @@ setEnv vmDebug ${vmDebug:-false}
 setEnv wsDebug ${wsDebug:-false}
 setEnv debugPort ${debugPort:-8051}
 setEnv debugWSPort ${debugWSPort:-8052}
+
 
 stratoBootnode=${bootnode:+--stratoBootnode=$bootnode}
 [[ -n $bootnode ]] && addBootnodes=true

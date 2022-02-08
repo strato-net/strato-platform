@@ -87,6 +87,7 @@ import Slipstream.Globals
 import Slipstream.Metrics
 import Slipstream.OutputData
 import Slipstream.XabiContract
+import Slipstream.Options
 
 instance ( (Keccak256 `Alters` SourceMap) m
          , MonadLogger m
@@ -450,23 +451,26 @@ processTheMessages env sqlEnv conn g messages = do
 
       case actionStorage row of
         Action.EVMDiff{} -> do
-          mDetails <- getEVMDetailsForRow row
-          case mDetails of
-            Nothing -> pure . Left $ "No details found for code hash "
-                            <> (T.pack . show $ actionCodeHash row)
-                            <> " and no 'src' field found in actionMetadata"
-            Just details -> do
-              let abiid = ABIID
-                    { aiName = T.filter (/= '"') $ OLD.contractdetailsName details
-                    , aiChain = maybe "" (T.pack . chainIdString . ChainId) $ (actionAccount row ^. accountChainId)
-                    }
-                  cont = either error id . xAbiToContract $ OLD.contractdetailsXabi details
-              adjustGlobals g (Do Compile) row details
+          if flags_indexEVM == True then do
+            mDetails <- getEVMDetailsForRow row
+            case mDetails of
+              Nothing -> pure . Left $ "No details found for code hash "
+                              <> (T.pack . show $ actionCodeHash row)
+                              <> " and no 'src' field found in actionMetadata"
+              Just details -> do
+                let abiid = ABIID
+                      { aiName = T.filter (/= '"') $ OLD.contractdetailsName details
+                      , aiChain = maybe "" (T.pack . chainIdString . ChainId) $ (actionAccount row ^. accountChainId)
+                      }
+                    cont = either error id . xAbiToContract $ OLD.contractdetailsXabi details
+                adjustGlobals g (Do Compile) row details
 
-              oldState <- readPreviousEVMState g acct cont
-              indexContract <- rowToInsert g abiid row cont oldState
-              hs <- rowToHistories g abiid row actions cont oldState
-              pure . Right $ BatchedInserts indexContract hs []
+                oldState <- readPreviousEVMState g acct cont
+                indexContract <- rowToInsert g abiid row cont oldState
+                hs <- rowToHistories g abiid row actions cont oldState
+                pure . Right $ BatchedInserts indexContract hs []
+            else 
+              pure . Left $ "Cirrus Indexing turned off by flag"
         Action.SolidVMDiff{} -> do
           mName <- getSolidVMDetailsForRow g row
           case mName of
