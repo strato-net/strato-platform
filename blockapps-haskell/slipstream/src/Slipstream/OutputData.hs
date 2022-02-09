@@ -12,6 +12,7 @@ module Slipstream.OutputData (
   OutputM,
   insertExpandEventTables,
   insertIndexTable,
+  insertForeignKeys,
   createIndexTable,
   createHistoryTable,
   insertHistoryTable,
@@ -225,7 +226,9 @@ createForeignIndexesForJoins _ c (o, a, n) = do
   forM_ (Map.toList $ c^.storageDefs) $ \(theName, theType) -> do
     case varType theType of
       Xabi.Label x -> do
-        yield $ "ALTER TABLE " <> tableNameToDoubleQuoteText tableName <> " ADD FOREIGN KEY (" <> wrapDoubleQuotes theName <> ") REFERENCES " <> wrapDoubleQuotes (T.pack x) <> " (address);"
+        let (foreignOrg, foreignApp, foreignName) = constructTableNameParameters o a $ T.pack x
+            foreignTableName = IndexTableName foreignOrg foreignApp foreignName
+        yield $ "ALTER TABLE " <> tableNameToDoubleQuoteText tableName <> " ADD FOREIGN KEY (" <> wrapDoubleQuotes theName <> ") REFERENCES " <> tableNameToDoubleQuoteText foreignTableName <> " (address);"
       _ -> 
         return ()
 
@@ -344,6 +347,20 @@ insertIndexTable :: OutputM m
 insertIndexTable [] = error "insertIndexTable: unhandled empty list"
 insertIndexTable contracts = yield $ insertIndexTableQuery contracts
 
+insertForeignKeys :: Monad m =>
+                     [ProcessedContract] -> ConduitM () Text m ()
+insertForeignKeys contracts = do
+  forM_ contracts $ \c -> do
+    let (org, app, cname) = constructTableNameParameters
+                            (organization c)
+                            (application c)
+                            (contractName c)
+        tableName = IndexTableName org app cname
+    
+    forM_ [(n, a) | (n, ValueContract a) <- Map.toList $ contractData c] $ \(theName, acct) -> do
+          yield $ "UPDATE " <> tableNameToDoubleQuoteText tableName <> " SET " <> wrapDoubleQuotes theName <> "=" <> wrapSingleQuotes (escapeQuotes $ T.pack $ show acct) <> " WHERE address=" <> wrapSingleQuotes (tshow $ address c)
+
+
 insertHistoryTable :: OutputM m
                    => IORef Globals
                    -> [ProcessedContract]
@@ -372,8 +389,7 @@ createIndexTableQuery contract (o, a, n) =
                "block_number text", "transaction_hash text", "transaction_sender text"] ++ tableColumns list
         , ",\n  CONSTRAINT "
         , wrapDoubleQuotes ((escapeQuotes $ tableNameToText tableName) <> "_pkey")
-        , "\n  PRIMARY KEY (address, \"chainId\") );"
---        , "\n  PRIMARY KEY (address, \"chainId\"), UNIQUE (address) );"
+        , "\n  PRIMARY KEY (address, \"chainId\"), UNIQUE (address) );"
         ]
 
 createHistoryTableQuery :: Contract -> (Text, Text, Text) -> Text
@@ -407,7 +423,7 @@ insertIndexTableQuery contracts@(x:_) =
           (application x)
           (contractName x)
       tableName = IndexTableName org app cname
-      list = Map.toList $ Map.mapMaybe valueToSQLText $ contractData x
+      list = Map.toList $ Map.mapMaybe valueToSQLTextFilterContract $ contractData x
       keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
       baseVals = [ tshow . address
                  , chain
@@ -418,7 +434,7 @@ insertIndexTableQuery contracts@(x:_) =
                  , tshow . transactionSender
                  ]
       vals = flip map contracts $ \row ->
-        let rowList = Map.toList $ Map.mapMaybe valueToSQLText $ contractData row
+        let rowList = Map.toList $ Map.mapMaybe valueToSQLTextFilterContract $ contractData row
          in wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList
       inserts = csv vals
    in T.concat
@@ -649,6 +665,12 @@ solidityValueToText (SolidityBytes x)         = escapeQuotes $ tshow x
 solidityValueToText (SolidityArray x)         = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ encode x
 solidityValueToText (SolidityObject x)        = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ encode x
 
+
+valueToSQLTextFilterContract :: Value -> Maybe Text
+valueToSQLTextFilterContract (ValueContract _) = Just "NULL"
+valueToSQLTextFilterContract x = valueToSQLText x
+
+
 valueToSQLText :: Value -> Maybe Text
 valueToSQLText (SimpleValue (ValueBool x)) = Just $ wrapSingleQuotes $ tshow x
 valueToSQLText (SimpleValue (ValueInt _ _ v)) = Just $ wrapSingleQuotes $ tshow v
@@ -658,7 +680,6 @@ valueToSQLText (SimpleValue (ValueAccount acct)) = Just $ wrapSingleQuotes $ esc
 valueToSQLText (SimpleValue (ValueBytes _ bytes)) = Just $ wrapSingleQuotes $ escapeQuotes $ decodeUtf8 bytes
 valueToSQLText (ValueEnum _ _ index) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show index
 valueToSQLText (ValueContract acct) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show acct
---valueToSQLText (ValueContract _) = Just "NULL"
 valueToSQLText (ValueFunction _ _ _) = Nothing
 valueToSQLText (ValueMapping _) = Nothing
 valueToSQLText (ValueArrayFixed _ _) = Nothing

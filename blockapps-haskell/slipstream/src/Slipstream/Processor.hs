@@ -440,8 +440,8 @@ processTheMessages env sqlEnv conn g messages = do
 
       outputData conn . createEventTables g $ contractToEventTables nameParts c
       
---    forM_ (Map.toList $ cc^.contracts) $ \(nameString, c) -> do
---      outputData conn $ createForeignIndexesForJoins g c (o, a, T.pack nameString)
+    forM_ (Map.toList $ cc^.contracts) $ \(nameString, c) -> do
+      outputData conn $ createForeignIndexesForJoins g c (o, a, T.pack nameString)
 
   case length messages of
    0 -> return ()
@@ -506,6 +506,9 @@ processTheMessages env sqlEnv conn g messages = do
   forM_ insertsByCodeHash $ \ins -> do
     unless (null ins) $ outputData conn . insertIndexTable $ map indexInsert ins
     outputData conn . insertHistoryTable g $ concatMap historyInserts ins
+
+  forM_ insertsByCodeHash $ \ins -> do
+    unless (null ins) $ outputData conn . insertForeignKeys $ map indexInsert ins
 
   when (length events' > 0) $ 
     outputData conn $ insertExpandEventTables g events'
