@@ -408,6 +408,57 @@ getCodeCollection cp ccString = do
         Right v -> return $ CodeCollection $ Map.fromList $ map (\(x, y) -> (T.unpack x, xabiToPartialContract y)) $ snd v
     CodeAtAccount _ _ -> error "no compilo codeataccount"
 
+getCodeCollectionIgnoreEVM :: MonadIO m => CodePtr -> Text -> m CodeCollection
+getCodeCollectionIgnoreEVM cp ccString = do
+  let initList =
+        case Aeson.decodeStrict $ encodeUtf8 ccString of
+          Just l -> l
+          Nothing -> case Aeson.decodeStrict $ encodeUtf8 ccString of
+            Just m -> Map.toList m
+            Nothing -> [(T.empty, ccString)] -- for backwards compatibility
+
+  --We shouldn't crash if the source can't be parsed (a bad validator could brind the network down)
+  --For now I'm going to keep the crash in, since it will be a warning to us that we let a
+  --bad contract into the blockchain (the API shouldn't allow this)
+
+  case cp of
+    SolidVMCode _ _ ->
+      case compileSource $ Map.fromList initList of
+        Left e -> error $ "failed parse: "  ++ show e --return $ CodeCollection Map.empty
+        Right v -> return v
+    EVMCode _ -> return $ CodeCollection Map.empty
+    CodeAtAccount _ _ -> error "no compilo codeataccount"
+
+getEVMInserts :: (
+  MonadIO m, 
+  MonadUnliftIO m, 
+  MonadLogger m,
+  Accessible BlocEnv m,
+  HasBlocSQL m,
+  Selectable Account AddressState m,
+  (Keccak256 `Alters` SourceMap) m) => IORef Globals -> AggregateAction -> [AggregateAction] -> Account -> m (Either Text BatchedInserts)
+getEVMInserts g row actions acct = do
+  mDetails <- getEVMDetailsForRow row
+  case mDetails of
+    Nothing -> pure . Left $ "No details found for code hash "
+                    <> (T.pack . show $ actionCodeHash row)
+                    <> " and no 'src' field found in actionMetadata"
+    Just details -> do
+      let abiid = ABIID
+            { aiName = T.filter (/= '"') $ OLD.contractdetailsName details
+            , aiChain = maybe "" (T.pack . chainIdString . ChainId) $ (actionAccount row ^. accountChainId)
+            }
+          cont = either error id . xAbiToContract $ OLD.contractdetailsXabi details
+      adjustGlobals g (Do Compile) row details
+
+      oldState <- readPreviousEVMState g acct cont
+      indexContract <- rowToInsert g abiid row cont oldState
+      hs <- rowToHistories g abiid row actions cont oldState
+      pure . Right $ BatchedInserts indexContract hs []
+
+getInsertsIgnoreEVM :: (Monad m) => IORef Globals -> AggregateAction -> [AggregateAction] -> Account -> m (Either Text BatchedInserts)
+getInsertsIgnoreEVM _ _ _ _ = pure $ Left "EVM code indexing ignored"
+
 processTheMessages :: (MonadIO m, MonadUnliftIO m, MonadLogger m, HasSQL m) =>
                       BlocEnv -> BlocSQLEnv -> PGConnection -> IORef Globals -> [VMEvent] -> m ()
 processTheMessages env sqlEnv conn g messages = do
@@ -417,11 +468,12 @@ processTheMessages env sqlEnv conn g messages = do
       -- TODO (Dan) : would be nice if we didn't just rip events out at the top level like this
       creates = [(c, cp, o, a, hl) | CodeCollectionAdded c cp o a hl <- messages]
       transactionResults = [tr | NewTransactionResult tr <- messages]
-
-
+      -- Use different functions based on flag value, this way it is only computed once, saving cpu cycles with if statements
+      getCC = if flags_indexEVM then getCodeCollection else getCodeCollectionIgnoreEVM
+      evmInserts = if flags_indexEVM then getEVMInserts else getInsertsIgnoreEVM
 
   forM_ creates $ \(ccString, cp, o, a, hl) -> do
-    cc <- getCodeCollection cp ccString
+    cc <- getCC cp ccString
     forM_ (Map.toList $ cc^.contracts) $ \(nameString, c) -> do
       let n = T.pack nameString
       $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o <> ", app=" <> a <> ", name=" <> n
@@ -450,27 +502,7 @@ processTheMessages env sqlEnv conn g messages = do
       $logDebugLS "the diff is " $ actionStorage row
 
       case actionStorage row of
-        Action.EVMDiff{} -> do
-          if flags_indexEVM then do
-            mDetails <- getEVMDetailsForRow row
-            case mDetails of
-              Nothing -> pure . Left $ "No details found for code hash "
-                              <> (T.pack . show $ actionCodeHash row)
-                              <> " and no 'src' field found in actionMetadata"
-              Just details -> do
-                let abiid = ABIID
-                      { aiName = T.filter (/= '"') $ OLD.contractdetailsName details
-                      , aiChain = maybe "" (T.pack . chainIdString . ChainId) $ (actionAccount row ^. accountChainId)
-                      }
-                    cont = either error id . xAbiToContract $ OLD.contractdetailsXabi details
-                adjustGlobals g (Do Compile) row details
-
-                oldState <- readPreviousEVMState g acct cont
-                indexContract <- rowToInsert g abiid row cont oldState
-                hs <- rowToHistories g abiid row actions cont oldState
-                pure . Right $ BatchedInserts indexContract hs []
-            else 
-              pure . Left $ "Cirrus Indexing turned off by flag"
+        Action.EVMDiff{} -> evmInserts g row actions acct
         Action.SolidVMDiff{} -> do
           mName <- getSolidVMDetailsForRow g row
           case mName of

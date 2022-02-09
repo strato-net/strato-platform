@@ -5,6 +5,7 @@ libPath: ./server/lib
 dataFilename: ./server/dapp/dapp.presets.yaml
 deployFilename: ./server/config/192.deploy.yaml
 contractsPath: ./contracts/
+VM: SolidVM
 
 # WARNING - extra strict syntax
 # DO NOT change the nodes order
