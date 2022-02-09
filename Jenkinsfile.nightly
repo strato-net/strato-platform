@@ -219,9 +219,6 @@ pipeline {
               sh 'npm run test'
               //sh 'npm run test:long' // TODO: revise tests, determine the long test suite and uncomment line
             }
-            dir ('strato-worktree/core-strato/strato-init') {
-              sh './check_genesis_ingestion.sh'
-            }
           },
         )
       }
