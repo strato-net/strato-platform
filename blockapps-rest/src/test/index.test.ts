@@ -403,7 +403,7 @@ describe("history", function() {
       {
         ...options,
         query: {
-          someInt: `eq.${fst}`,
+          x: `eq.${fst}`,
           address: `eq.${contract.address}`
         }
       }
