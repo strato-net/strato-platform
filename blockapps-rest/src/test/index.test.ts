@@ -385,7 +385,7 @@ describe("history", function() {
     assert.isOk(util.isAddress(contract.address), "address");
 
     // call a function
-    const methodArgs = { _x: scd };
+    const methodArgs = { x: scd };
     const method = "setX";
 
     const callArgs = factory.createCallArgs(
