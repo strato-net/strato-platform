@@ -25,7 +25,7 @@ contract Random {
 `;
 
 let config:Config = fsUtil.getYaml("config.yaml");
-let options:Options = {config};
+let options:Options = {VM:"EVM", config};
 
 describe('Using blockhash', function () {
   it('should upload a contract that uses blockhash', async () => {
