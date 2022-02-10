@@ -381,9 +381,12 @@ parseActions events' =
 parseEvents :: [VMEvent] -> [Action.Event]
 parseEvents events' = [a | EventEmitted a <- events']
 
+getCodeCollection' :: MonadIO m => Bool -> CodePtr -> Text -> m CodeCollection
+getCodeCollection' True = getCodeCollection (Map.fromList . map (\(x, y) -> (T.unpack x, xabiToPartialContract y)) )
+getCodeCollection' False = getCodeCollection (const Map.empty)
 
-getCodeCollection :: MonadIO m => CodePtr -> Text -> m CodeCollection
-getCodeCollection cp ccString = do
+getCodeCollection :: MonadIO m => ([(Text, OLD.Xabi)] -> Map.Map String Contract) -> CodePtr -> Text -> m CodeCollection
+getCodeCollection f cp ccString = do
   let initList =
         case Aeson.decodeStrict $ encodeUtf8 ccString of
           Just l -> l
@@ -405,28 +408,7 @@ getCodeCollection cp ccString = do
         Left e ->
           --return $ CodeCollection Map.empty
           error $ "failed EVM parse: " ++ show e ++ "\n" ++ T.unpack ccString
-        Right v -> return $ CodeCollection $ Map.fromList $ map (\(x, y) -> (T.unpack x, xabiToPartialContract y)) $ snd v
-    CodeAtAccount _ _ -> error "no compilo codeataccount"
-
-getCodeCollectionIgnoreEVM :: MonadIO m => CodePtr -> Text -> m CodeCollection
-getCodeCollectionIgnoreEVM cp ccString = do
-  let initList =
-        case Aeson.decodeStrict $ encodeUtf8 ccString of
-          Just l -> l
-          Nothing -> case Aeson.decodeStrict $ encodeUtf8 ccString of
-            Just m -> Map.toList m
-            Nothing -> [(T.empty, ccString)] -- for backwards compatibility
-
-  --We shouldn't crash if the source can't be parsed (a bad validator could brind the network down)
-  --For now I'm going to keep the crash in, since it will be a warning to us that we let a
-  --bad contract into the blockchain (the API shouldn't allow this)
-
-  case cp of
-    SolidVMCode _ _ ->
-      case compileSource $ Map.fromList initList of
-        Left e -> error $ "failed parse: "  ++ show e --return $ CodeCollection Map.empty
-        Right v -> return v
-    EVMCode _ -> return $ CodeCollection Map.empty
+        Right v -> return $ CodeCollection $ f $ snd v
     CodeAtAccount _ _ -> error "no compilo codeataccount"
 
 getEVMInserts :: (
@@ -469,7 +451,7 @@ processTheMessages env sqlEnv conn g messages = do
       creates = [(c, cp, o, a, hl) | CodeCollectionAdded c cp o a hl <- messages]
       transactionResults = [tr | NewTransactionResult tr <- messages]
       -- Use different functions based on flag value, this way it is only computed once, saving cpu cycles with if statements
-      getCC = if flags_indexEVM then getCodeCollection else getCodeCollectionIgnoreEVM
+      getCC = getCodeCollection' flags_indexEVM
       evmInserts = if flags_indexEVM then getEVMInserts else getInsertsIgnoreEVM
 
   forM_ creates $ \(ccString, cp, o, a, hl) -> do
