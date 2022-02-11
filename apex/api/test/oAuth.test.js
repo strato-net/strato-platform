@@ -5,14 +5,8 @@ const assert = chai.assert;
 const process = require('process');
 const co = require('co');
 
-const appConfig = require('../config/app.config');
-
-const testFactory = require(`${process.cwd()}/test/factory`);
 const RestStatus = require(`${process.cwd()}/lib/rest-utils/rest-constants`);
-const util = require(`${process.cwd()}/lib/rest-utils/util`);
 const oAuth = require(`${process.cwd()}/lib/oAuth/oAuth`);
-
-const SKIP_TEST_BLOCK = process.env.OAUTH_ENABLED != appConfig.oAuthEnabledTrueValue;
 
 const waitFaucet = async function(address) {
   const res = await chai.request(process.env.stratoRoot)
@@ -43,53 +37,50 @@ chai.use(chaiHttp);
 describe('OAuth tests', function () {
   this.timeout(10000);
 
-  const userData = testFactory.getUserData();
+  const username = 'test02@test.com'
 
   let app, userAccountAddress;
 
     //need to add skip check to each describe block because of mocha bug.
     // technically beforeEach would work, but other beforeEach's still run
   before(function(){
-
-      if(SKIP_TEST_BLOCK){
-          this.skip();
-      }
-
     app = require('../app');
-
   })
 
 
   it('replies Bad Request without headers', async function () {
-    await assert.shouldThrowRest(
-        async function () {
-          await co.wrap(oAuth.createKey);
-        }, RestStatus.BAD_REQUEST
-    )
-
+    let result;
+    const status = RestStatus.BAD_REQUEST
+    try {
+      result = await oAuth.createKey()
+    } catch (err) {
+      assert.equal(err.status, status);
+      return
+    }
+    // should not have succeeded
+    assert(false, `Should have thrown error: ${status} instead got ${JSON.stringify(result)}`);
+    
   });
 
 
   it('creates new user', async function () {
-    const username = util.uid(userData.userName); //fixme - small chance of collision if not run w/ fresh system, should clear db in before block
-
-    const user = await co.wrap(oAuth.createKey)(username);
+    const _username = username + new Date()
+    const user = await co.wrap(oAuth.createKey)(_username);
 
     assert.equal(user.status,RestStatus.OK,'user created')
   });
 
 
   it('finds existing user', async function () {
-    const username = util.uid(userData.userName); //fixme - small chance of collision if not run w/ fresh system, should clear db in before block
-
-    const result = await co.wrap(oAuth.createKey)(username);
+    const _username = username + new Date()
+    const result = await co.wrap(oAuth.createKey)(_username);
 
     if(result.status == RestStatus.OK){ //user created, faucet em
       userAccountAddress = result.user.address;
       await waitFaucet(userAccountAddress);
     }
 
-    const user = await co.wrap(oAuth.getKey)(username)
+    const user = await co.wrap(oAuth.getKey)(_username)
 
     assert.equal(user.status,RestStatus.OK,'user found')
   });

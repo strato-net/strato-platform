@@ -1,9 +1,8 @@
 /* jshint esnext: true */
-const ba = require('blockapps-rest');
+const assert = require('chai').assert;
 const nock = require('nock');
 const { posix } = require('path');
 
-const {assert} = ba.common
 
 process.env.STATS_DEBUG_CUSTOM_SERVER_URL = 'https://mocked.blockapps.stat.server' //should go before we require config and statsUtils
 const config = require('../config/app.config');

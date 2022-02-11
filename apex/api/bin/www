@@ -11,8 +11,6 @@ const co = require('co');
 
 const sockets = require('../sockets/init');
 
-const registerAppMetadata = require('../migrations/init-script/registerAppMetadata');
-
 
 /**
  * Get port from environment and store in Express.
@@ -28,8 +26,6 @@ app.set('port', port);
 var server = http.createServer(app);
 
 co(function*(){
-  yield registerAppMetadata();
-
   sockets.init(server);
 
   server.listen(port);

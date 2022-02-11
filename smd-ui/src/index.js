@@ -27,11 +27,11 @@ import sendTokensReducer from './components/Accounts/components/SendTokens/sendT
 import userReducer from './components/User/user.reducer';
 import codeEditorReducer from './components/CodeEditor/codeEditor.reducer';
 import createBlocUserReducer from './components/CreateBlocUser/createBlocUser.reducer';
-import externalStorageReducer from './components/ExternalStorage/externalStorage.reducer';
-import uploadFileReducer from './components/ExternalStorage/UploadFile/uploadFile.reducer';
-import attestReducer from './components/ExternalStorage/Attest/attest.reducer';
-import verifyReducer from './components/ExternalStorage/Verify/verify.reducer';
-import downloadReducer from './components/ExternalStorage/Download/download.reducer';
+// import externalStorageReducer from './components/ExternalStorage/externalStorage.reducer';
+// import uploadFileReducer from './components/ExternalStorage/UploadFile/uploadFile.reducer';
+// import attestReducer from './components/ExternalStorage/Attest/attest.reducer';
+// import verifyReducer from './components/ExternalStorage/Verify/verify.reducer';
+// import downloadReducer from './components/ExternalStorage/Download/download.reducer';
 import chainsReducer from './components/Chains/chains.reducer'
 import createChainReducer from './components/CreateChain/createChain.reducer';
 import oauthAccountsReducer from './components/Accounts/components/OauthAccounts/oauthAccounts.reducer';
@@ -57,9 +57,9 @@ import {
 import {watchExecuteQuery, watchTransactionResult} from './components/QueryEngine/queryEngine.saga';
 import { watchQueryCirrus, watchQueryCirrusVars} from './components/ContractQuery/contractQuery.saga';
 import watchSendTokens from './components/Accounts/components/SendTokens/sendTokens.saga';
-import watchCreateBlocUser from './components/CreateBlocUser/createBlocUser.saga';
-import watchFetchUpload from './components/ExternalStorage/externalStorage.saga';
-import watchUploadFile from './components/ExternalStorage/UploadFile/uploadFile.saga';
+// import watchCreateBlocUser from './components/CreateBlocUser/createBlocUser.saga';
+// import watchFetchUpload from './components/ExternalStorage/externalStorage.saga';
+// import watchUploadFile from './components/ExternalStorage/UploadFile/uploadFile.saga';
 import watchFetchChains from './components/Chains/chains.saga';
 import watchCreateChain from './components/CreateChain/createChain.saga';
 import watchOauthAccountActions from './components/Accounts/components/OauthAccounts/oauthAccounts.saga';
@@ -95,11 +95,11 @@ const rootReducer = combineReducers({
   user: userReducer,
   dashboard: dashboardReducer,
   createBlocUser: createBlocUserReducer,
-  uploadFile: uploadFileReducer,
-  externalStorage: externalStorageReducer,
-  attest: attestReducer,
-  verify: verifyReducer,
-  download: downloadReducer,
+  // uploadFile: uploadFileReducer,
+  // externalStorage: externalStorageReducer,
+  // attest: attestReducer,
+  // verify: verifyReducer,
+  // download: downloadReducer,
   createChain: createChainReducer,
   oauthAccounts: oauthAccountsReducer
 });
@@ -126,9 +126,9 @@ const rootSaga = function* startForeman() {
     fork(watchCommunicateOverSocket),
     fork(watchFetchUser),
     fork(watchFetchPubKey),
-    fork(watchCreateBlocUser),
-    fork(watchUploadFile),
-    fork(watchFetchUpload),
+    // fork(watchCreateBlocUser),
+    // fork(watchUploadFile),
+    // fork(watchFetchUpload),
     fork(watchFetchChains),
     fork(watchCreateChain),
     fork(watchOauthAccountActions),

@@ -1455,6 +1455,7 @@ async function createChains(user, chains, options:Options) {
 
 // =====================================================================
 //   External Storage
+//   Deprecated in STRATO 7.5 (#deprecate-7.5)
 // =====================================================================
 
 async function uploadExtStorage(user, args, options:Options) {
