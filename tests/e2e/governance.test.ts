@@ -23,7 +23,17 @@ let config:Config=fsUtil.getYaml("config.yaml");
 let options:Options={config}
 
 const label = 'My chain label';
-const src = 'contract Governance { enum Rule { NOTHING, AUTO_APPROVE, TWO_VOTES_IN, MAJORITY_RULES } event MemberAdded(address member, string enode); event MemberRemoved(address member); function voteToAdd(address m, string e) { MemberAdded(m,e); } function voteToRemove(address m) { MemberRemoved(m); } }';
+const src = `contract Governance {
+  enum Rule { NOTHING, AUTO_APPROVE, TWO_VOTES_IN, MAJORITY_RULES }
+  event MemberAdded(address member, string enode);
+  event MemberRemoved(address member);
+  function voteToAdd(address m, string e) { 
+    emit MemberAdded(m,e);
+  }
+  function voteToRemove(address m) {
+    emit MemberRemoved(m);
+  }
+}`;
 const args = {addRule: 'AUTO_APPROVE', removeRule: 'AUTO_APPROVE'};
 const members = [{
     address: "00000000000000000000000000000000deadbeef"

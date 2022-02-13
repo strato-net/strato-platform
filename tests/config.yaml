@@ -2,7 +2,7 @@ apiDebug: false
 password: "1234"
 timeout: 600000
 contractsPath: ./contracts/
-
+VM: SolidVM
 nodes:
   - id: 0
     url: 'http://localhost'

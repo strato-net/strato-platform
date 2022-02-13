@@ -51,5 +51,6 @@ docs
 
 config.yaml
 
+yarn.lock
 # OS files
 **/.DS_Store

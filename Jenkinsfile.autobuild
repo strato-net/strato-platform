@@ -185,7 +185,7 @@ pipeline {
                 rm -rf strato-api-tests
                 git clone -b master https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git
                 cd strato-api-tests
-                git checkout strato-7.5.0  #TODO: api version tags in the future
+                git checkout tags/strato-7.5-no-ext-storage  #TODO: api version tags in the future
                 docker build --tag strato-api-tests .
                 docker run \
                   -e OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \
@@ -213,9 +213,6 @@ pipeline {
               sh 'rm -rf node_modules'
               sh 'npm install'
               sh 'npm run test'
-            }
-            dir ('core-strato/strato-init') {
-              sh './check_genesis_ingestion.sh'
             }
           },
         )

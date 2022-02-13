@@ -75,7 +75,7 @@ spec = do
       let testAdd = Address $ fst . head . readHex $ "ADDRESS"
       let input = [(ProcessedContract {
             address = testAdd,
-            codehash = EVMCode $ hash "<CODEHASH>",
+            codehash = SolidVMCode "Vehicle" $ hash "<CODEHASH>",
             organization = "",
             application = "",
             contractName = "Vehicle",
@@ -134,7 +134,7 @@ spec = do
   describe "Array serialization with history enabled" $ do
     it "should create JSON entries" $ do
       let testAdd = Address $ fst . head . readHex $ "ADDRESS"
-          cHash = EVMCode $ hash "<CODEHASH>"
+          cHash = SolidVMCode "Vehicle" $ hash "<CODEHASH>"
       let input = [(ProcessedContract {
              address = testAdd,
              codehash = cHash,
@@ -232,7 +232,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
       let testAdd = Address $ fst . head . readHex $ "ADDRESS"
       let input = [(ProcessedContract {
             address = testAdd,
-            codehash = EVMCode $ hash "<CODEHASH>",
+            codehash = SolidVMCode "\"Vehicle''" $ hash "<CODEHASH>",
             organization = "",
             application = "",
             contractName = "\"Vehicle''",
