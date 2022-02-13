@@ -62,6 +62,8 @@ import           SolidVM.Solidity.Xabi                    (VariableDeclF(..))
 import qualified SolidVM.Solidity.Xabi.Type               as Xabi
 
 
+tableSeparator :: Text
+tableSeparator=":"
 
 type OutputM m = (MonadUnliftIO m, MonadLogger m)
 
@@ -187,22 +189,22 @@ tableNameToText (IndexTableName o a c) =
   let prefix = if T.null o
                  then ""
                  else if T.null a
-                   then o <> ":"
-                   else o <> ":" <> a <> ":"
+                   then o <> tableSeparator
+                   else o <> tableSeparator <> a <> tableSeparator
   in prefix <> c
 tableNameToText (HistoryTableName o a c) = 
   let prefix = if T.null o
                  then ""
                  else if T.null a
-                   then o <> ":"
-                   else o <> ":" <> a <> ":"
+                   then o <> tableSeparator
+                   else o <> tableSeparator <> a <> tableSeparator
   in "history@" <> prefix <> c
 tableNameToText (EventTableName o a c e) = 
   let prefix = if T.null o
                  then ""
                  else if T.null a
-                   then o <> ":"
-                   else o <> ":" <> a <> ":"
+                   then o <> tableSeparator
+                   else o <> tableSeparator <> a <> tableSeparator
       contractAndEvent = c <> "." <> e
   in prefix <> contractAndEvent
 
