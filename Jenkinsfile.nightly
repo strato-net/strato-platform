@@ -186,15 +186,15 @@ pipeline {
                 rm -rf strato-api-tests
                 git clone -b master https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git
                 cd strato-api-tests
-                git checkout tags/strato-pre7.5-ext-storage-gone  #TODO: api version tags in the future
+                git checkout tags/strato-pre7.5-nonoauth-cleanup  #TODO: api version tags in the future
                 docker build --tag strato-api-tests .
                 docker run \
                   -e OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \
                   -e OAUTH_CLIENT_ID=dev \
                   -e OAUTH_CLIENT_SECRET=d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f \
                   -e STRATO_NODE_URL=http://172.17.0.1:80 \
-                  -e OAUTH_ENABLED=true \
-                  -e DEBUG_LOG=false strato-api-tests
+                  -e DEBUG_LOG=false \
+                  strato-api-tests
               '''
             }
           },
