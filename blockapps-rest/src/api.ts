@@ -308,18 +308,21 @@ async function createChains(body, options:Options) {
   return await post(url, endpoint, body, options);
 }
 
+//#deprecate-7.5
 async function uploadExtStorage(body, options:Options) {
   const url = getNodeUrl(options);
   const endpoint = constructEndpoint(Endpoint.EXT_UPLOAD, options);
   return await post(url, endpoint, body, options);
 }
 
+//#deprecate-7.5
 async function attestExtStorage(body, options:Options) {
   const url = getNodeUrl(options);
   const endpoint = constructEndpoint(Endpoint.EXT_ATTEST, options);
   return await post(url, endpoint, body, options);
 }
 
+//#deprecate-7.5
 async function verifyExtStorage(user:OAuthUser, contract, options:Options) {
   const url = getNodeUrl(options);
   const params = {
@@ -329,6 +332,7 @@ async function verifyExtStorage(user:OAuthUser, contract, options:Options) {
   return get(url, endpoint, setAuthHeaders(user, options));
 }
 
+//#deprecate-7.5
 async function downloadExtStorage(user:OAuthUser, contract, options:Options) {
   const url = getNodeUrl(options);
   const params = {
@@ -338,6 +342,7 @@ async function downloadExtStorage(user:OAuthUser, contract, options:Options) {
   return get(url, endpoint, setAuthHeaders(user, options));
 }
 
+//#deprecate-7.5
 async function listExtStorage(user:OAuthUser, args, options:Options) {
   const url = getNodeUrl(options);
   const { limit, offset } = args;

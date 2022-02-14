@@ -1,7 +1,5 @@
 /* jshint esnext: true */
-const ba = require('blockapps-rest');
-const {assert} = ba.common
-
+const assert = require('chai').assert;
 const models = require('../models');
 const { ApiCallCounter } = require('../controllers/apiCounter');
 

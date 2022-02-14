@@ -35,17 +35,13 @@ $(info )
 
 all: build_all docker-compose
 
-build_all: strato apex dappstore nginx postgrest prometheus smd vault-wrapper
+build_all: strato apex nginx postgrest prometheus smd vault-wrapper
 
-.PHONY: strato apex dappstore nginx postgrest prometheus smd vault-wrapper get_solcs build_buildbase build_common build_common_profiled
+.PHONY: strato apex nginx postgrest prometheus smd vault-wrapper get_solcs build_buildbase build_common build_common_profiled
 
 apex:
 	@echo Now building apex...
 	BASIL_DOCKER_TAG=${REPO_URL}apex:${VERSION} STRATO_VERSION=${VERSION} make --directory=apex/
-
-dappstore:
-	@echo Now building dappstore...
-	BASIL_DOCKER_TAG=${REPO_URL}dappstore:${VERSION} make --directory=dapp-store/
 
 nginx:
 	@echo Now building nginx...

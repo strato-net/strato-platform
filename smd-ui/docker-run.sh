@@ -11,7 +11,6 @@ sed -i "s|__OAUTH_ENABLED__|$OAUTH_ENABLED|g" build/index.html
 sed -i "s|__SINGLE_NODE__|$SINGLE_NODE|g" build/index.html
 sed -i "s|__IS_SSL__|$ssl|g" build/index.html
 sed -i "s|__SMD_MODE__|$SMD_MODE|g" build/index.html
-sed -i "s|__EXT_STORAGE_S3_BUCKET__|$EXT_STORAGE_S3_BUCKET|g" build/index.html
 sed -i "s|__STRATO_VERSION__|$STRATO_VERSION|g" build/index.html
 
 NO_UPDATE_CHECK=1 serve -l 3002 build

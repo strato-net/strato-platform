@@ -29,11 +29,11 @@ const Endpoint = {
   CHAIN: `${blocUrl}/chain`,
   CHAINS: `${blocUrl}/chains`,
   COMPILE: `${blocUrl}/contracts/compile`,
-  EXT_UPLOAD: `${externalStorageUrl}/upload`,
-  EXT_ATTEST: `${externalStorageUrl}/attest`,
-  EXT_VERIFY: `${externalStorageUrl}/verify`,
-  EXT_DOWNLOAD: `${externalStorageUrl}/download`,
-  EXT_LIST: `${externalStorageUrl}/list`,
+  EXT_UPLOAD: `${externalStorageUrl}/upload`, // Deprecated in STRATO 7.5 (#deprecate-7.5)
+  EXT_ATTEST: `${externalStorageUrl}/attest`, // Deprecated in STRATO 7.5 (#deprecate-7.5)
+  EXT_VERIFY: `${externalStorageUrl}/verify`, // Deprecated in STRATO 7.5 (#deprecate-7.5)
+  EXT_DOWNLOAD: `${externalStorageUrl}/download`, // Deprecated in STRATO 7.5 (#deprecate-7.5)
+  EXT_LIST: `${externalStorageUrl}/list`, // Deprecated in STRATO 7.5 (#deprecate-7.5)
   DEBUG_STATUS: `${debugUrl}/status`,
   DEBUG_PAUSE: `${debugUrl}/pause`,
   DEBUG_RESUME: `${debugUrl}/resume`,

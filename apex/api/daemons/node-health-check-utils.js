@@ -15,11 +15,8 @@ const neededJobs = {
   "vm_main": "vm-runner",
   "seq_main": "strato-sequencer",
   "blockapps-vault-wrapper-server": "vault-wrapper",
-//  "blockapps-bloc": "bloc",  // This will soon be deprecated, so there is no need to keep it in the health check
   "core-api": "core-api"
 }
-
-const isOauthEnabled = (process.env['OAUTH_ENABLED'] === config.oAuthEnabledTrueValue);
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
@@ -138,7 +135,7 @@ async function calcNodeHealthAndSaveVitalStats(prometheusHealthMetrics, isGlobal
   });
 
   // TODO: move out from here (into checkSystemInfo?)
-  if (isOauthEnabled && !isGlobalPasswordSet) {
+  if (!isGlobalPasswordSet) {
     isNodeHealthy = false;
     failedChecks.push('stratoPassword')
   }
@@ -296,7 +293,7 @@ async function checkSystemInfo(isGlobalPasswordSet) {
     })
     sysInfoCollected.networkStats = nwStats;
 
-    if (isOauthEnabled && !isGlobalPasswordSet) {
+    if (!isGlobalPasswordSet) {
       isHealthy = false;
       additional_info.push("STRATO password is not set")
     }

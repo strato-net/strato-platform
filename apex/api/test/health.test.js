@@ -1,15 +1,14 @@
 /* jshint esnext: true */
+
 require('co-mocha')
-const env = process.env.NODE_ENV || 'development';
+const assert = require('chai').assert;
 const models = require('../models');
 const nodeHealthCheckJs = require('../daemons/node-health-check-utils')
 const stallCheckJs = require('../daemons/stall-check-utils')
 const prometheusFailResponse = require('./testdata/prometheusFailResponse')
 const prometheusCorrectResponse = require('./testdata/prometheusCorrectResponse')
 const config = require('../config/app.config');
-const ba = require('blockapps-rest');
 
-const {assert} = ba.common
 
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";

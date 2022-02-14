@@ -20,7 +20,6 @@ async function createKey(username, userParams = null) {
       const userAccount = await ax.post(process.env.vaultWrapperHttpHost, userParams, '/strato/v2.3/key', {
         "x-user-unique-name": username,
       });
-
       //faucet user so they can do stuff
       await waitFaucet(userAccount.address);
 
@@ -75,7 +74,7 @@ async function getOrCreateKey(userUniqueName, userQuery = null){
 // Helper functions
 //===================
 
-async function waitFaucet(address) { //fixme - function duplicated in multiple tests, move to util file
+async function waitFaucet(address) {
   const params = {
     address: address
   }
