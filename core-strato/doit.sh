@@ -200,7 +200,7 @@ function newnode {
       runBackgroundProcess strato-api2 --gasOn=$gasOn +RTS -N1 >> logs/strato-api2 2>&1
   fi
 
-  SLIPSTREAM_CMD="slipstream +RTS -p -h -RTS --pghost=${postgres_host} --pgport=${postgres_port} \
+  SLIPSTREAM_CMD="slipstream --pghost=${postgres_host} --pgport=${postgres_port} \
     --pguser=${postgres_user} --password=${postgres_password} --database=${postgres_slipstream_db} \
     --stratourl=${stratoRoot} --vaultwrapperurl=${vaultWrapperRoot}  \
     --kafkahost=${kafkaHost} --kafkaport=${kafkaPort} --minLogLevel=${slipMinLogLevel} --indexEVM=${indexEVM}"

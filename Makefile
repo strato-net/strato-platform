@@ -96,7 +96,7 @@ build_common_profiled: get_solcs build_buildbase
 	mkdir -p ${FAKEROOT}/strato
 	mkdir -p ${FAKEROOT}/vault-wrapper
 	stack build \
-		--profile --ghc-options="-fno-prof-auto" --work-dir .stack-work-profile \
+		--profile --work-dir .stack-work-profile \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
 
 strato: build_common

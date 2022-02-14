@@ -201,11 +201,6 @@ processedContract ABIID{..} state AggregateAction{..} =
 lookupT :: (Monad m, Ord k) => k -> Map.Map k v -> MaybeT m v
 lookupT k = MaybeT . return . Map.lookup k
 
-contractDetailsToSlipstreamInfo :: OLD.ContractDetails -> SlipstreamInfo
-contractDetailsToSlipstreamInfo details = SlipstreamInfo {
-  slipName = OLD.contractdetailsName details,
-  slipHash = OLD.contractdetailsCodeHash details
-}
 
 -- Tries to get contract metadata ID and contract details for a given contract.
 --  If they're not in the cache but they are in bloc database or action metadata,
@@ -217,7 +212,7 @@ getSolidVMInfoForRow :: ( MonadIO m
                            , Selectable Account AddressState m
                            , (Keccak256 `Alters` SourceMap) m
                            )
-                        => IORef Globals -> AggregateAction -> m (Maybe (Map.Map Text SlipstreamInfo))
+                        => IORef Globals -> AggregateAction -> m (Maybe (Map.Map Text CodePtr))
 getSolidVMInfoForRow g row = runMaybeT  
    $  checkCache 
   <|> checkMetadata
@@ -240,16 +235,15 @@ getSolidVMInfoForRow g row = runMaybeT
         -- parse source code, add all of details to cache, return the one we need
         parseAndSet src = do
           details <- lift $ sourceToContractDetails (Don't Compile) src -- :: Map Text ContractDetails
-          let infoMap = fmap contractDetailsToSlipstreamInfo details
+          let infoMap = fmap OLD.contractdetailsCodeHash details
           setSolidVMInfo g codePtr infoMap
           pure infoMap
           
         codePtr = actionCodeHash row
-{-# SCC getSolidVMInfoForRow #-}
 
 
 
--- For now, EVM details are not cached, because the cache links all the contracts in a source blob by source hash, and we only have source hashes for SolidVM code pointers. 
+-- EVM details are not cached, because the cache links all the contracts in a source blob by source hash, and we only have source hashes for SolidVM code pointers. 
 getEVMDetailsForRow :: ( MonadIO m
                        , MonadLogger m
                        , Accessible BlocEnv m
@@ -268,7 +262,7 @@ getEVMDetailsForRow row = liftM2 (<|>)
     lookupT name detailsMap)
 
 
--- Now only used for EVM
+-- only used for EVM
 adjustGlobals :: ( MonadIO m
                  , MonadLogger m
                  , HasBlocSQL m
@@ -294,9 +288,8 @@ adjustGlobals gref row details = do
           let codePtr = OLD.contractdetailsCodeHash details'
           $logInfoS "adjustGlobals" . T.pack $ "Adding to globals for " ++ T.unpack k ++ ": " ++ show codePtr
           lift $ f gref $ HistoryTableName (actionOrganization row) (actionApplication row) (OLD.contractdetailsName details')
-  -- if we pass Don't Compile, we assume it's SolidVMCode, and use details from cache
-  
   -- TODO: ideally we check if these flags are in the metadata BEFORE we get the detailsMap
+  
 adjustSolidVMGlobals :: ( MonadIO m
                  , MonadLogger m
                  , HasBlocSQL m
@@ -307,30 +300,28 @@ adjustSolidVMGlobals :: ( MonadIO m
               => IORef Globals
               -> AggregateAction
               -> m ()
-{- Make two functions - one for solidVM, one for EVM
-SolidVM only needs names of all contracts within its pointer -}
 adjustSolidVMGlobals gref row = do
   -- TODO: because this uses HistoryTableName directly - this won't work if we add other (non-history) globals
-  let go m (k,f) = runMaybeT $ do
+  let
+    go m (k,f) = runMaybeT $ do
+        -- if neither key (history/nohistory) is found, then this monad will contain the value of Nothing and nothing else will be computed
         v <- lookupT k $ actionMetadata row
         let contracts' = filter (not . T.null) $ T.splitOn "," v
         forM_ contracts' $ \c -> do
-          info' <- lookupT c m
-          let codePtr = slipHash info'
-          $logInfoS "adjustGlobals" . T.pack $ "Adding to globals for " ++ T.unpack k ++ ": " ++ show codePtr
-          lift $ f gref $ HistoryTableName (actionOrganization row) (actionApplication row) (slipName info')
+          -- infoMap (m) is only computed if this statement is evaluated 
+          codePtr@(SolidVMCode name _) <- lookupT c m
+          $logInfoS "adjustGlobals" . T.pack $ "Adding to globals for " ++ T.unpack k ++ ": " ++ (show codePtr)
+          lift $ f gref $ HistoryTableName (actionOrganization row) (actionApplication row) (T.pack name)
 
   infoMap <- do 
     mMap <- getSolidVMInfoForRow gref row
     case mMap of
-      Nothing -> error "SolidVMABIs should be in the cache, but adjustGlobals didn't find them"
+      Nothing -> error "SolidVMInfo should be in the cache, but adjustGlobals didn't find them"
       Just dMap -> return dMap
-  
-  -- TODO: ideally we check if these flags are in the metadata BEFORE we get the detailsMap
   mapM_ (go infoMap) $ [("history", enableHistoryTable)
                           ,("nohistory", disableHistoryTable)
                           ]
-{-# SCC adjustSolidVMGlobals #-}
+  -- Because of haskell lazy evaluation, the infoMap will only be computed if it is needed
 
 readPreviousEVMState :: MonadIO m =>
                         IORef Globals -> Account -> OLD.Contract -> m [(Text, Value)]
@@ -341,7 +332,6 @@ readPreviousEVMState gref acct cont = do
 readPreviousSolidVMState :: MonadIO m =>
                             IORef Globals -> Account -> m [(Text, Value)]
 readPreviousSolidVMState gref acct = fromMaybe [] <$> getContractState gref acct
-{-# SCC readPreviousSolidVMState #-}
 
 rowToInsert :: MonadIO m =>
                IORef Globals -> ABIID -> AggregateAction -> OLD.Contract -> [(Text, Value)]
@@ -352,7 +342,6 @@ rowToInsert gref abiid row cont oldState = do
                     Action.SolidVMDiff mp -> SolidVM.decodeCacheValues mp oldState
   setContractState gref (actionAccount row) newState
   return $ processedContract abiid (Map.fromList $ newState) row
-{-# SCC rowToInsert #-}
 
 rowToHistories :: (MonadIO m, MonadLogger m) =>
                   IORef Globals -> ABIID -> AggregateAction -> [AggregateAction] -> OLD.Contract
@@ -368,7 +357,6 @@ rowToHistories gref abiid row actions cont oldState = do
                   Action.SolidVMDiff mp -> SolidVM.decodeCacheValues mp
       newMap <- gets Map.fromList
       return $ processedContract abiid newMap hRow
-{-# SCC  rowToHistories #-}
 
 -- Parses xabi event declarations to create a table,
 -- ignoring indexes and anonymous flag
@@ -388,7 +376,6 @@ rowToHistories gref abiid row actions cont oldState = do
 --       , eventFields = map fst $ OLD.eventLogs event
 --       }
       
-
 contractToEventTables :: (Text, Text, Text) -> Contract -> [EventTable]
 contractToEventTables (org, app, name) c =
   flip map (Map.toList $ c^.events) $
@@ -444,7 +431,6 @@ getCodeCollection f cp ccString = do
           error $ "failed EVM parse: " ++ show e ++ "\n" ++ T.unpack ccString
         Right v -> return $ CodeCollection $ f $ snd v
     CodeAtAccount _ _ -> error "Cannot compile or parse code at account"
-{-# SCC getCodeCollection #-}
 
 getEVMInserts :: (
   MonadIO m, 
@@ -476,9 +462,6 @@ getEVMInserts g row actions acct = do
 getInsertsIgnoreEVM :: (Monad m) => IORef Globals -> AggregateAction -> [AggregateAction] -> Account -> m (Either Text BatchedInserts)
 getInsertsIgnoreEVM _ _ _ _ = pure $ Left "EVM code indexing ignored"
 
--- TODO: use LRU cache for solidVM details
--- Only call enable/disable history when the history flags are present (to prevent unnecessary querying to the cache/sql)
--- Figure out about table expansion for history tables not working
 processTheMessages :: (MonadIO m, MonadUnliftIO m, MonadLogger m, HasSQL m) =>
                       BlocEnv -> BlocSQLEnv -> PGConnection -> IORef Globals -> [VMEvent] -> m ()
 processTheMessages env sqlEnv conn g messages = do
@@ -490,7 +473,7 @@ processTheMessages env sqlEnv conn g messages = do
       transactionResults = [tr | NewTransactionResult tr <- messages]
       -- Use different functions based on flag value, this way it is only computed once, saving cpu cycles with if statements
       getCC = getCodeCollection' flags_indexEVM
-      evmInserts = if flags_indexEVM then getEVMInserts else getInsertsIgnoreEVM
+      evmInsertsF = if flags_indexEVM then getEVMInserts else getInsertsIgnoreEVM
 
   forM_ creates $ \(ccString, cp, o, a, hl) -> do
     cc <- getCC cp ccString
@@ -519,13 +502,11 @@ processTheMessages env sqlEnv conn g messages = do
       mapM_ recordAction actions
       recordCombinedAction row
       $logInfoS "processTheMessages" $ formatAction row
-      $logDebugLS "the diff is " $ actionStorage row
+      $logDebugLS "The diff is " $ actionStorage row
 
       case actionStorage row of
-        Action.EVMDiff{} -> evmInserts g row actions acct
+        Action.EVMDiff{} -> evmInsertsF g row actions acct
         Action.SolidVMDiff{} -> do
-          -- mInfo <- getSolidVMInfoForRow g row
-          -- mName :: Maybe OLD.ContractDetails
           let abiid = ABIID (T.pack name) $ maybe "" (T.pack . chainIdString . ChainId) $ (actionAccount row ^. accountChainId)
               (SolidVMCode name _) = actionCodeHash row
               cont = error "internal error: contract should be unused for Solidvm"
@@ -534,12 +515,6 @@ processTheMessages env sqlEnv conn g messages = do
           indexContract <- rowToInsert g abiid row cont oldState
           hs <- rowToHistories g abiid row actions cont oldState
           pure . Right $ BatchedInserts indexContract hs
-          -- case mInfo of
-          --   Nothing -> pure . Left $ "No SolidVM details for code hash "
-          --                   <> (T.pack . show $ actionCodeHash row)
-          --                   <> " and no 'src' field found in metadata"
-          --   Just info -> do
-
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
 
@@ -562,5 +537,3 @@ processTheMessages env sqlEnv conn g messages = do
   forM_ transactionResults $ putTransactionResult
   
   flushPendingWrites g
-{-# SCC processTheMessages #-}
-  

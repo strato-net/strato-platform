@@ -61,7 +61,6 @@ updateGlobals :: MonadIO m => IORef Globals -> Globals -> m ()
 updateGlobals gref g = do
   recordGlobals g
   writeIORef gref g
-{-# SCC updateGlobals #-}
 
 
 xabiToText :: Xabi -> Text
@@ -69,33 +68,19 @@ xabiToText = T.replace "\'" "\'\'"
            . decodeUtf8 . BL.toStrict
            . JSON.encode
 
--- setContractABIs :: MonadIO m => IORef Globals -> CodePtr -> M.Map Text ContractDetails -> m ()
--- setContractABIs gref (SolidVMCode _ !codeHash) detailsMap = do 
---   globals@Globals{..} <- readIORef gref
---   updateGlobals gref globals{contractABIs=HM.insert codeHash detailsMap contractABIs}
--- setContractABIs _ (EVMCode _) _ = error "cannot use the contractABIs cache for EVM contracts"
--- setContractABIs _ (CodeAtAccount _ _) _ = error "cannot use the contractABIs cache for CodeAtAccount contracts"
-
--- getContractABIs :: MonadIO m => IORef Globals -> CodePtr -> m (Maybe (M.Map Text ContractDetails))
--- getContractABIs gref (SolidVMCode _ !codeHash) = do
---   abis <- contractABIs <$> readIORef gref
---   return $ HM.lookup codeHash abis
--- getContractABIs _ (EVMCode _) = error "cannot use the contractABIs cache for EVM contracts"
--- getContractABIs _ (CodeAtAccount _ _) = error "cannot use the contractABIs cache for CodeAtAccount contracts"
-
-setSolidVMInfo :: MonadIO m => IORef Globals -> CodePtr -> M.Map Text SlipstreamInfo -> m ()
+setSolidVMInfo :: MonadIO m => IORef Globals -> CodePtr -> M.Map Text CodePtr -> m ()
 setSolidVMInfo gref (SolidVMCode _ !codeHash) infoMap = do 
   globals@Globals{..} <- readIORef gref
   updateGlobals gref globals{solidVMInfo=HM.insert codeHash infoMap solidVMInfo}
-setSolidVMInfo _ (EVMCode _) _ = error "cannot use the SolidVMInfo cache for EVM contracts"
-setSolidVMInfo _ (CodeAtAccount _ _) _ = error "cannot use the SolidVMInfo cache for CodeAtAccount contracts"
+setSolidVMInfo _ (EVMCode _) _ = error "Cannot use the SolidVMInfo cache for EVM contracts"
+setSolidVMInfo _ (CodeAtAccount _ _) _ = error "Cannot use the SolidVMInfo cache for CodeAtAccount contracts"
 
-getSolidVMInfo :: MonadIO m => IORef Globals -> CodePtr -> m (Maybe (M.Map Text SlipstreamInfo))
+getSolidVMInfo :: MonadIO m => IORef Globals -> CodePtr -> m (Maybe (M.Map Text CodePtr))
 getSolidVMInfo gref (SolidVMCode _ !codeHash) = do
   info <- solidVMInfo <$> readIORef gref
   return $ HM.lookup codeHash info
-getSolidVMInfo _ (EVMCode _) = error "cannot use the SolidVMInfo cache for EVM contracts"
-getSolidVMInfo _ (CodeAtAccount _ _) = error "cannot use the SolidVMInfo cache for CodeAtAccount contracts"
+getSolidVMInfo _ (EVMCode _) = error "Cannot use the SolidVMInfo cache for EVM contracts"
+getSolidVMInfo _ (CodeAtAccount _ _) = error "Cannot use the SolidVMInfo cache for CodeAtAccount contracts"
 
 setTableCreated :: MonadIO m => IORef Globals -> TableName -> TableColumns -> m ()
 setTableCreated globalsIORef tableName tableColumns = do

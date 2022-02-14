@@ -4,7 +4,6 @@
 
 module Slipstream.Data.Globals (
   Globals(..),
-  SlipstreamInfo(..),
   TableColumns,
   TableName(..)
   ) where
@@ -30,15 +29,11 @@ instance NFData (LRU key val) where
 instance NFData (TableName) where
   rnf = (`seq` ())
 
-data SlipstreamInfo = SlipstreamInfo {
-  slipName :: Text,
-  slipHash :: CodePtr
-} deriving (Show, Generic, NFData)
 
 data Globals = Globals { createdTables :: M.Map TableName TableColumns
                        , historyList :: M.Map TableName Bool
                        , createdInstances :: S.Set CodePtr -- lets us avoid an extra bloc call
-                       , solidVMInfo :: HM.HashMap Keccak256 (M.Map Text SlipstreamInfo)
+                       , solidVMInfo :: HM.HashMap Keccak256 (M.Map Text CodePtr)
                        , contractStates :: LRU Account [(Text, Value)]
                        , csHandle :: Handle
                        } deriving (Generic, NFData)
