@@ -4,6 +4,7 @@
 
 module Slipstream.Data.Globals (
   Globals(..),
+  SlipstreamInfo(..),
   TableColumns,
   TableName(..)
   ) where
@@ -17,7 +18,6 @@ import           Data.Text
 import           GHC.Generics
 
 import           BlockApps.Solidity.Value
-import           BlockApps.Solidity.Xabi     (ContractDetails(..))
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Keccak256
@@ -30,11 +30,15 @@ instance NFData (LRU key val) where
 instance NFData (TableName) where
   rnf = (`seq` ())
 
+data SlipstreamInfo = SlipstreamInfo {
+  slipName :: Text,
+  slipHash :: CodePtr
+} deriving (Show, Generic, NFData)
 
 data Globals = Globals { createdTables :: M.Map TableName TableColumns
                        , historyList :: M.Map TableName Bool
                        , createdInstances :: S.Set CodePtr -- lets us avoid an extra bloc call
-                       , contractABIs :: HM.HashMap Keccak256 (M.Map Text ContractDetails)
+                       , solidVMInfo :: HM.HashMap Keccak256 (M.Map Text SlipstreamInfo)
                        , contractStates :: LRU Account [(Text, Value)]
                        , csHandle :: Handle
                        } deriving (Generic, NFData)

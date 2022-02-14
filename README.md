@@ -47,7 +47,18 @@ In Docker for Mac "Preferences" -> "Advanced" allocate at least *2 CPU cores, 6 
     ```
     <CONFIG_VARS> make docker-compose
     ```
+### Debugging
+- GHC/Stack provides a tool called "profiling" which allows you to create a report of how much memory and cycles a process is using for each function, etc. 
+  [GHC Profiling](https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/profiling.html)
+- Modify the `doit.sh` script so that the program you are profiling has the following args:
 
+```
+<progname> +RTS -p -RTS ...<args>
+```
+
+- Build strato with the `make build_common_profiled` command, then push the docker images using `make docker-build`
+- Run strato in docker using the `./strato` command
+- A `<progname>.prof` file will be created in the `var/lib/strato/` folder for you to analyze
 ### Plain `stack` usage for core-strato and bloc
 Stack commands (like `stack build`, `stack test` etc.) can only be used once the buildbase image is built.
 

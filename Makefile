@@ -96,7 +96,7 @@ build_common_profiled: get_solcs build_buildbase
 	mkdir -p ${FAKEROOT}/strato
 	mkdir -p ${FAKEROOT}/vault-wrapper
 	stack build \
-		--profile --work-dir .stack-work-profile \
+		--profile --ghc-options="-fno-prof-auto" --work-dir .stack-work-profile \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
 
 strato: build_common
@@ -117,6 +117,10 @@ docker-compose:
 	@echo Creating the final docker-compose.yml...
 	awk '/build: ./{getline} 1' docker-compose.push.yml > docker-compose.yml
 
+docker-build:
+	cp -fr core-strato/licenses ${STRATODIR}
+	cp core-strato/doit.sh ${STRATODIR}
+	docker build --target strato --tag ${REPO_URL}strato:${VERSION} --file Dockerfile.multi ${FAKEROOT}
 
 test:
 	@echo ${VERSION}

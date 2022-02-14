@@ -76,7 +76,7 @@ recordGlobals g = liftIO $ do
       rec lab acc = withLabel globalsSize lab (flip setGauge . fromIntegral . acc $ g)
   rec "created_tables" (M.size . createdTables)
   rec "history_list" (M.size . historyList)
-  rec "contract_abis" (HM.size . contractABIs)
+  rec "solidVM_info" (HM.size . solidVMInfo)
   rec "contract_states" (LRU.size . contractStates)
 
 recordKafkaMessages :: MonadIO m => [a] -> m ()
