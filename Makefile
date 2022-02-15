@@ -113,6 +113,10 @@ docker-compose:
 	@echo Creating the final docker-compose.yml...
 	awk '/build: ./{getline} 1' docker-compose.push.yml > docker-compose.yml
 
+docker-build:
+	cp -fr core-strato/licenses ${STRATODIR}
+	cp core-strato/doit.sh ${STRATODIR}
+	docker build --target strato --tag ${REPO_URL}strato:${VERSION} --file Dockerfile.multi ${FAKEROOT}
 
 test:
 	@echo ${VERSION}
