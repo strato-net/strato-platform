@@ -53,7 +53,7 @@ In Docker for Mac "Preferences" -> "Advanced" allocate at least *2 CPU cores, 6 
 - Modify the `doit.sh` script so that the program you are profiling has the following args:
 
 ```
-<progname> +RTS -p -RTS ...<args>
+<progname> +RTS -p -h -RTS ...<args>
 ```
 
 - Build strato with the `make build_common_profiled` command, then push the docker images using `make docker-build`
