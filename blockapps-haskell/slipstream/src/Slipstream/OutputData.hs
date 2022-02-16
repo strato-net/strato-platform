@@ -19,6 +19,7 @@ module Slipstream.OutputData (
   createEventTables,
   createExpandIndexTable,
   createForeignIndexesForJoins,
+  notifyPostgREST,
   createExpandHistoryTable,
   cirrusInfo,
   historyTableName
@@ -247,6 +248,11 @@ createForeignIndexesForJoins foreignKey = do
     <> ") REFERENCES "
     <> tableNameToDoubleQuoteText (foreignTableName foreignKey)
     <> " (address);"
+
+notifyPostgREST :: OutputM m =>
+                   ConduitM () Text m ()
+notifyPostgREST = do
+    yield "NOTIFY pgrst, 'reload schema;'"
 
 createExpandHistoryTable
   :: OutputM m
