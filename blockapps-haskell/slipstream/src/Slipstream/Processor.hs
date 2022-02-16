@@ -477,27 +477,31 @@ processTheMessages env sqlEnv conn g messages = do
 
   forM_ creates $ \(ccString, cp, o, a, hl) -> do
     cc <- getCC cp ccString
-    forM_ (Map.toList $ cc^.contracts) $ \(nameString, c) -> do
+
+    deferredForeignKeys <- fmap concat $ forM (Map.toList $ cc^.contracts) $ \(nameString, c) -> do
       let n = T.pack nameString
 
       --If the request gives this a history list, or if a previous one gave this a history list,
       --it has a history list
-      let (o', a', n') = constructTableNameParameters o a n
-      historic <- isHistoric g $ HistoryTableName o' a' n'
+      historic <- isHistoric g $ historyTableName o a n
       let hasHistoryTable' = n `elem` hl || historic
       
       $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o <> ", app=" <> a <> ", name=" <> n <> " (fields: " <> T.pack (show $ Map.keys $ c^.storageDefs) <> ")" <> if hasHistoryTable' then " HAS HISTORY TABLE" else ""
       let nameParts = (o, a, n)
 
-      outputData conn $ createExpandIndexTable g c nameParts
+      deferredForeignKeys <- outputData conn $ createExpandIndexTable g c nameParts
 
       when hasHistoryTable' $
         outputData conn $ createExpandHistoryTable g c nameParts
 
       outputData conn . createEventTables g $ contractToEventTables nameParts c
-      
-    forM_ (Map.toList $ cc^.contracts) $ \(nameString, c) -> do
-      outputData conn $ createForeignIndexesForJoins g c (o, a, T.pack nameString)
+
+      return deferredForeignKeys
+
+    forM_ deferredForeignKeys $ \deferredForeignKey -> do
+      outputData conn $ createForeignIndexesForJoins deferredForeignKey
+
+
 
   case length messages of
    0 -> return ()

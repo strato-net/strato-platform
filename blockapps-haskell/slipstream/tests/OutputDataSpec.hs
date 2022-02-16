@@ -56,7 +56,7 @@ createInserts globalsIORef historyList' contracts = do
   unless (null contracts) $ do
     let contract = head contracts
         hasHistory = contractName (fst contract) `elem` historyList'
-    createIndexTable globalsIORef (snd contract) (organization $ fst contract, application $ fst contract, contractName $ fst contract)
+    _ <- createIndexTable globalsIORef (snd contract) (organization $ fst contract, application $ fst contract, contractName $ fst contract)
     when hasHistory $ createHistoryTable globalsIORef (snd contract) (organization $ fst contract, application $ fst contract, contractName $ fst contract)
     insertIndexTable $ map fst contracts
     insertHistoryTable globalsIORef $ map fst contracts
@@ -461,7 +461,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
                 )
     g <- newGlobals fakeHandle
 
-    cs1 <- runLoggingT . runConduit $ createExpandIndexTable g (snd input) (organization $ fst input, application $ fst input, contractName $ fst input) .| sinkList
+    (_, cs1) <- runLoggingT . runConduit $ createExpandIndexTable g (snd input) (organization $ fst input, application $ fst input, contractName $ fst input) `fuseBoth` sinkList
     cs2 <- runLoggingT . runConduit $ insertIndexTable [fst input] .| sinkList
     (cs1 ++ cs2) `shouldNotBe` []
 
