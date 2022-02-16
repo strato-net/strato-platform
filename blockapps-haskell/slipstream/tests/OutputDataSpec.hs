@@ -105,7 +105,7 @@ spec = do
     transaction_hash text,
     transaction_sender text,
   CONSTRAINT "Vehicle_pkey"
-  PRIMARY KEY (address, "chainId") );|]
+  PRIMARY KEY (address, "chainId"), UNIQUE (address) );|]
 
       vehicleInsert `shouldBe`
           [r|INSERT INTO "Vehicle" ("address",
@@ -170,7 +170,7 @@ spec = do
     transaction_hash text,
     transaction_sender text,
   CONSTRAINT "Vehicle_pkey"
-  PRIMARY KEY (address, "chainId") );|]
+  PRIMARY KEY (address, "chainId"), UNIQUE (address) );|]
 
       historyCreate `shouldBe`
           [r|CREATE TABLE IF NOT EXISTS "history@Vehicle" (address text NOT NULL,
@@ -263,7 +263,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     transaction_hash text,
     transaction_sender text,
   CONSTRAINT "\"Vehicle''''_pkey"
-  PRIMARY KEY (address, "chainId") );|]
+  PRIMARY KEY (address, "chainId"), UNIQUE (address) );|]
 
       vehicleInsert `shouldBe`
           [r|INSERT INTO "\"Vehicle''''" ("address",
@@ -338,7 +338,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     [swissArmyCreate, swissArmyInsert] <-
         runLoggingT . runConduit $ createInserts g [] input .| sinkList
 
-    swissArmyCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "MyOrg:MyApp:SwissArmy" (address text,
+    swissArmyCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "MyOrg-MyApp-SwissArmy" (address text,
     "chainId" text,
     block_hash text,
     block_timestamp text,
@@ -352,10 +352,10 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     "number" decimal,
     "str" text,
     "strukt" jsonb,
-  CONSTRAINT "MyOrg:MyApp:SwissArmy_pkey"
-  PRIMARY KEY (address, "chainId") );|]
+  CONSTRAINT "MyOrg-MyApp-SwissArmy_pkey"
+  PRIMARY KEY (address, "chainId"), UNIQUE (address) );|]
 
-    swissArmyInsert `shouldBe` [r|INSERT INTO "MyOrg:MyApp:SwissArmy" ("address",
+    swissArmyInsert `shouldBe` [r|INSERT INTO "MyOrg-MyApp-SwissArmy" ("address",
     "chainId",
     "block_hash",
     "block_timestamp",
@@ -378,7 +378,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     '000000000000000000000000000000098eaddede',
     '00000000000000000000000000000000deadbeef',
     'True',
-    '0000000000000000000000000000000000000999',
+    NULL,
     '564',
     '77714314',
     'Hello, World!',
@@ -529,7 +529,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     "str" text,
     "strukt" jsonb,
   CONSTRAINT "SwissArmy_pkey"
-  PRIMARY KEY (address, "chainId") );|]
+  PRIMARY KEY (address, "chainId"), UNIQUE (address) );|]
 
     swissArmyInsert `shouldBe` [r|INSERT INTO "SwissArmy" ("address",
     "chainId",
@@ -554,7 +554,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     '000000000000000000000000000000098eaddede',
     '00000000000000000000000000000000deadbeef',
     'True',
-    '0000000000000000000000000000000000000999',
+    NULL,
     '564',
     '77714314',
     'Hello, World!',
