@@ -21,7 +21,7 @@ module Slipstream.OutputData (
   createForeignIndexesForJoins,
   createExpandHistoryTable,
   cirrusInfo,
-  constructTableNameParameters
+  historyTableName
   ) where
 
 import           BlockApps.Solidity.Value
@@ -63,7 +63,7 @@ import qualified SolidVM.Solidity.Xabi.Type               as Xabi
 
 
 tableSeparator :: Text
-tableSeparator=":"
+tableSeparator = "-"
 
 type OutputM m = (MonadUnliftIO m, MonadLogger m)
 
@@ -149,11 +149,11 @@ handlePostgresError = $logErrorLS "handlePGError"
 
 outputData :: OutputM m
            => PGConnection
-           -> ConduitM () Text m ()
-           -> m ()
+           -> ConduitM () Text m a
+           -> m a
 outputData conn c = runConduit $ c
-                              .| iterMC ($logDebugS "outputData")
-                              .| mapM_C (dbInsert conn)
+                              `fuseUpstream` iterMC ($logDebugS "outputData")
+                              `fuseUpstream` mapM_C (dbInsert conn)
 
 baseColumns :: TableColumns
 baseColumns = [ "address"
@@ -177,6 +177,16 @@ constructTableNameParameters org app contract =
     else if app == contract
          then (org, "", contract)
          else (org, app, contract)
+
+uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
+uncurry3 f (x, y, z) = f x y z
+
+historyTableName :: Text -> Text -> Text -> TableName
+historyTableName o a n = uncurry3 HistoryTableName $ constructTableNameParameters o a n
+
+indexTableName :: Text -> Text -> Text -> TableName
+indexTableName o a n = uncurry3 IndexTableName $ constructTableNameParameters o a n
+
 
 
 -- sometimes we need the unwrapped tablename
@@ -213,26 +223,30 @@ createExpandIndexTable
   => IORef Globals
   -> Contract
   -> (Text, Text, Text)
-  -> ConduitM () Text m ()
+  -> ConduitM () Text m [ForeignKeyInfo]
 createExpandIndexTable g c nameParts = do
-  createIndexTable g c nameParts
-  expandIndexTable g c nameParts
+  creationForeignKeys <- createIndexTable g c nameParts
+  expansionForeignKeys <- expandIndexTable g c nameParts
+  return $ creationForeignKeys ++ expansionForeignKeys
+
+data ForeignKeyInfo =
+  ForeignKeyInfo {
+    tableName :: TableName,
+    columnName :: Text,
+    foreignTableName :: TableName
+    }
 
 createForeignIndexesForJoins :: OutputM m =>
-                                IORef Globals -> Contract -> (Text, Text, Text) -> ConduitM () Text m ()
-createForeignIndexesForJoins _ c (o, a, n) = do
-  let (org, app, cname) = constructTableNameParameters o a n
-      tableName = IndexTableName org app cname
-
-
-  forM_ (Map.toList $ c^.storageDefs) $ \(theName, theType) -> do
-    case varType theType of
-      Xabi.Label x -> do
-        let (foreignOrg, foreignApp, foreignName) = constructTableNameParameters o a $ T.pack x
-            foreignTableName = IndexTableName foreignOrg foreignApp foreignName
-        yield $ "ALTER TABLE " <> tableNameToDoubleQuoteText tableName <> " ADD FOREIGN KEY (" <> wrapDoubleQuotes theName <> ") REFERENCES " <> tableNameToDoubleQuoteText foreignTableName <> " (address);"
-      _ -> 
-        return ()
+                                ForeignKeyInfo -> ConduitM () Text m ()
+createForeignIndexesForJoins foreignKey = do
+  yield $
+    "ALTER TABLE "
+    <> tableNameToDoubleQuoteText (tableName foreignKey)
+    <> " ADD FOREIGN KEY ("
+    <> wrapDoubleQuotes (columnName foreignKey)
+    <> ") REFERENCES "
+    <> tableNameToDoubleQuoteText (foreignTableName foreignKey)
+    <> " (address);"
 
 createExpandHistoryTable
   :: OutputM m
@@ -243,24 +257,38 @@ createExpandHistoryTable
 createExpandHistoryTable g c nameParts = do
     createHistoryTable g c nameParts
     expandHistoryTable g c nameParts
- 
+
+getDeferredForeignKeys :: TableName -> Contract -> Text -> Text -> [ForeignKeyInfo]
+getDeferredForeignKeys tableName c o a = 
+--    deferredForeignKeys' <- fmap concat $
+--      forM (Map.toList $ cc^.contracts) $ \(nameString, c) ->
+
+  flip map [(theName, x) | (theName, VariableDecl{varType=Xabi.Label x}) <- (Map.toList $ c^.storageDefs)] $ \(theName, x) -> 
+    ForeignKeyInfo {
+      tableName=tableName,
+      columnName=theName,
+      foreignTableName=indexTableName o a $ T.pack x
+      }
+
 createIndexTable :: OutputM m
                  => IORef Globals
                  -> Contract
                  -> (Text, Text, Text)
-                 -> ConduitM () Text m ()
+                 -> ConduitM () Text m [ForeignKeyInfo]
 createIndexTable globalsIORef contract (o, a, n) = do
-  let (org, app, cname) = constructTableNameParameters o a n
-      tableName = IndexTableName org app cname
+  let tableName = indexTableName o a n
   contractAlreadyCreated <- isTableCreated globalsIORef tableName
 
   --When contract hasn't been written to "contract" table and indexing table doesn't exist
   $logInfoLS "createIndexTable/contractAlreadyCreated" (tableName, contractAlreadyCreated)
-  unless contractAlreadyCreated $ do
+  if contractAlreadyCreated
+  then return []
+  else do
     incNumTables
     yield $ createIndexTableQuery contract (o, a, n)
     let list = tableColumns $ Map.toList $ contract^.storageDefs
     setTableCreated globalsIORef tableName list
+    return $ getDeferredForeignKeys tableName contract o a
 
 createHistoryTable :: OutputM m
                    => IORef Globals
@@ -268,8 +296,7 @@ createHistoryTable :: OutputM m
                    -> (Text, Text, Text)
                    -> ConduitM () Text m ()
 createHistoryTable globalsIORef contract (o, a, n) = do
-  let (org, app, cname) = constructTableNameParameters o a n
-      tableName = HistoryTableName org app cname
+  let tableName = historyTableName o a n
   tableExists <- isTableCreated globalsIORef tableName
 
   $logInfoLS "createHistoryTable/tableExists" (tableName, tableExists)
@@ -288,10 +315,9 @@ expandIndexTable :: OutputM m
                  => IORef Globals
                  -> Contract
                  -> (Text, Text, Text)
-                 -> ConduitM () Text m ()
+                 -> ConduitM () Text m [ForeignKeyInfo]
 expandIndexTable globalsIORef contract (o, a, n)= do
-  let (org, app, cname) = constructTableNameParameters o a n
-      tableName = IndexTableName org app cname
+  let tableName = indexTableName o a n
   expandContractTable globalsIORef contract tableName
 
 expandHistoryTable :: OutputM m =>
@@ -300,15 +326,15 @@ expandHistoryTable :: OutputM m =>
                       (Text, Text, Text) ->
                       ConduitM () Text m ()
 expandHistoryTable globalsIORef contract (o, a, n) = do
-  let (org, app, cname) = constructTableNameParameters o a n
-      tableName = HistoryTableName org app cname
-  expandContractTable globalsIORef contract tableName
+  let tableName = historyTableName o a n
+  _ <- expandContractTable globalsIORef contract tableName
+  return ()
 
 expandContractTable :: OutputM m
                     => IORef Globals
                     -> Contract
                     -> TableName
-                    -> ConduitM () Text m ()
+                    -> ConduitM () Text m [ForeignKeyInfo]
 expandContractTable globalsIORef contract tableName = do
   columns <- getTableColumns globalsIORef tableName
   case columns of
@@ -318,21 +344,35 @@ expandContractTable globalsIORef contract tableName = do
           , (tableNameToText tableName)
           , " does not exist, but we are trying to expand it?"
           ]
+      return []
     Just cols -> do
       let list = Map.toList $ contract^.storageDefs
           difference new old = filter ((`notElem` old) . fst) new
-          extras = tableColumns $ difference list (partialParseTableColumns cols)
-      unless (null extras) $ do
+          extras = difference list (partialParseTableColumns cols)
+          extraTableColumns = tableColumns extras
+      unless (null extraTableColumns) $ do
         $logInfoS "expandTable" . T.pack $ "We just got new fields for a contract that already has a table!"
         $logInfoS "expandTable" $ T.concat
             [ "Adding columns to "
             , (tableNameToText tableName)
             , " for the following new fields: "
-            , T.intercalate ", " extras
+            , T.intercalate ", " extraTableColumns
             ]
-        setTableCreated globalsIORef tableName $ cols ++ extras
-        yield $ expandTableQuery tableName extras
-
+        setTableCreated globalsIORef tableName $ cols ++ extraTableColumns
+        yield $ expandTableQuery tableName extraTableColumns
+      return $
+        case tableName of
+          IndexTableName o a n ->
+            flip map
+            [(colName, foreignName) | (colName, VariableDecl{varType=Xabi.Label foreignName}) <- extras] $ \(colName, foreignName) -> 
+            ForeignKeyInfo {
+              tableName = tableName,
+              columnName = colName,
+              foreignTableName = let a' = case a of; "" -> n; _ -> a
+                                 in indexTableName o a' $ T.pack foreignName
+              }
+          _ -> []
+        
 expandTableQuery :: TableName ->  TableColumns -> Text
 expandTableQuery tableName cols = T.concat
   [ "ALTER TABLE "
@@ -353,11 +393,10 @@ insertForeignKeys :: Monad m =>
                      [ProcessedContract] -> ConduitM () Text m ()
 insertForeignKeys contracts = do
   forM_ contracts $ \c -> do
-    let (org, app, cname) = constructTableNameParameters
+    let tableName = indexTableName 
                             (organization c)
                             (application c)
                             (contractName c)
-        tableName = IndexTableName org app cname
     
     forM_ [(n, a) | (n, ValueContract a) <- Map.toList $ contractData c] $ \(theName, acct) -> do
           yield $ "UPDATE " <> tableNameToDoubleQuoteText tableName <> " SET " <> wrapDoubleQuotes theName <> "=" <> wrapSingleQuotes (escapeQuotes $ T.pack $ show acct) <> " WHERE address=" <> wrapSingleQuotes (tshow $ address c)
@@ -369,11 +408,10 @@ insertHistoryTable :: OutputM m
                    -> ConduitM () Text m ()
 insertHistoryTable _ [] = return () --no data, do nothing
 insertHistoryTable globalsIORef contracts@(x:_) = do
-  let (org, app, cname) = constructTableNameParameters
+  let tableName = historyTableName
           (organization x)
           (application x)
           (contractName x)
-      tableName = HistoryTableName org app cname
   history <- isHistoric globalsIORef tableName
 
   when history $ do
@@ -382,8 +420,7 @@ insertHistoryTable globalsIORef contracts@(x:_) = do
 
 createIndexTableQuery :: Contract -> (Text, Text, Text) -> Text
 createIndexTableQuery contract (o, a, n) =
-  let (org, app, cname) = constructTableNameParameters o a n
-      tableName = IndexTableName org app cname
+  let tableName = indexTableName o a n
       list = Map.toList $ contract^.storageDefs
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
@@ -396,8 +433,7 @@ createIndexTableQuery contract (o, a, n) =
 
 createHistoryTableQuery :: Contract -> (Text, Text, Text) -> Text
 createHistoryTableQuery contract (o, a, n) =
-  let (org, app, cname) = constructTableNameParameters o a n
-      tableName = HistoryTableName org app cname
+  let tableName = HistoryTableName o a n
       list = Map.toList $ contract^.storageDefs
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS ", tableNameToDoubleQuoteText tableName, " ("
@@ -420,11 +456,10 @@ addHistoryUnique (o, a, n)=
 insertIndexTableQuery :: [ProcessedContract] -> Text
 insertIndexTableQuery [] = error "insertIndexTableQuery: unhandled empty list"
 insertIndexTableQuery contracts@(x:_) =
-  let (org, app, cname) = constructTableNameParameters
+  let tableName = indexTableName
           (organization x)
           (application x)
           (contractName x)
-      tableName = IndexTableName org app cname
       list = Map.toList $ Map.mapMaybe valueToSQLTextFilterContract $ contractData x
       keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
       baseVals = [ tshow . address
@@ -463,11 +498,10 @@ insertIndexTableQuery contracts@(x:_) =
 insertHistoryTableQuery :: [ProcessedContract] -> Text
 insertHistoryTableQuery [] = error "insertHistoryTableQuery: unhandled empty list"
 insertHistoryTableQuery contracts@(x:_) =
-  let (org, app, cname) = constructTableNameParameters
+  let tableName = historyTableName
           (organization x)
           (application x)
           (contractName x)
-      tableName = HistoryTableName org app cname
       list = Map.toList . Map.mapMaybe valueToSQLText $ contractData x
       keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
       baseVals = [ tshow . address
