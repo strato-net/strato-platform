@@ -252,7 +252,7 @@ createForeignIndexesForJoins foreignKey = do
 notifyPostgREST :: OutputM m =>
                    ConduitM () Text m ()
 notifyPostgREST = do
-    yield "NOTIFY pgrst, 'reload schema;'"
+    yield "NOTIFY pgrst, 'reload schema';"
 
 createExpandHistoryTable
   :: OutputM m
