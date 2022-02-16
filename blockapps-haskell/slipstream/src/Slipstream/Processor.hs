@@ -480,7 +480,7 @@ processTheMessages env sqlEnv conn g messages = do
     forM_ deferredForeignKeys $ \deferredForeignKey -> do
       outputData conn $ createForeignIndexesForJoins deferredForeignKey
 
-    outputData conn notifyPostgREST
+  outputData conn notifyPostgREST
 
   case length messages of
    0 -> return ()
