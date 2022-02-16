@@ -13,8 +13,6 @@ WORKDIR /usr/src/app
 
 EXPOSE 3001
 
-VOLUME /usr/src/app/apps
-
 COPY package*.json  /usr/src/app/
 
 RUN npm install

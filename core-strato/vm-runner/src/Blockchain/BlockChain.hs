@@ -274,8 +274,11 @@ addTransactions blockData txs =
       beforeX509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
       (!deltaT, !result) <- timeIt $ runExceptT $ addTransaction chainId False blockData blockGas t
       case result of
-          Left _  -> Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) beforeX509s
-          Right execResult -> Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.union (erNewX509Certs execResult) beforeX509s
+          Left _  -> do
+            Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) beforeX509s
+
+          Right execResult -> do
+            Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.union (erNewX509Certs execResult) beforeX509s
 
       afterMap <- getAddressStateTxDBMap
 
@@ -290,12 +293,14 @@ addTransactions blockData txs =
             Right execResult -> blockGas - (transactionGasLimit bt - calculateReturned bt execResult)
 
       x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-
       go remainingBlockGas rest (trrs `DL.snoc` trr) x509s'
 
 mineTransactions :: (VMBase m, MonadMonitor m) => Bagger.MineTransactions m
-mineTransactions bd remGas otxs = mineTransactions' bd remGas DL.empty otxs
-
+mineTransactions bd remGas otxs = do
+  res <- mineTransactions' bd remGas DL.empty otxs
+  Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.empty --clear X509 cache to prevent memory leak
+  return res
+  
 mineTransactions' :: (VMBase m, MonadMonitor m) => BlockData -> Integer -> DL.DList TxRunResult -> [OutputTx] -> m Bagger.TxMiningResult
 mineTransactions' _ remGas ran [] = return $ Bagger.TxMiningResult Nothing (DL.toList ran) [] remGas
 mineTransactions' header remGas ran unran@(tx@OutputTx{otBaseTx=bt}:txs) = do

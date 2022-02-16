@@ -1,84 +1,12 @@
 const express = require('express');
-const multer = require('multer');
 const router = express.Router();
 
 const oAuthController = require('../controllers/oAuth');
-const dappController = require('../controllers/dapp');
 const healthHandler = require('../controllers/health');
 const apiCounterHandler = require('../controllers/apiCounter');
-const appConfig = require(`${process.cwd()}/config/app.config`);
-const oAuth = require(`${process.cwd()}/lib/oAuth/oAuth`);
-const RestStatus = require(`${process.cwd()}/lib/rest-utils/rest-constants`);
-
-const fileController = isOAuth() ? require(`${process.cwd()}/controllers/file.oAuth`) : require('../controllers/file');
-
-
-const upload = multer({ storage: multer.memoryStorage() });
-
-const multerMiddleware = (req, res, next) => {
-  upload.single('content')(req, res, (error) => {
-    if (!req.file) {
-      let err = new Error('wrong params, expected: {content(file), username, password, address, provider, metadata}');
-      err.status = 400;
-      return next(err);
-    }
-    if (error) {
-      if (error.status)
-        return res.status(error.status).send({ reason: error.message });
-      return res.status(400).send({ reason: error.message });
-    }
-    next();
-  })
-};
-
-const checkUID = async (req, res, next) => {
-  if (!isOAuth()) {
-    return next();
-  }
-  const uID = req.headers['x-user-unique-name'];
-  if (!uID) {
-    // every request should have the username forwarded by nginx
-    let err = new Error('server misconfigured: was not able to fetch user id from bearer token provided in request');
-    console.error(err);
-    err.status = RestStatus.INTERNAL_SERVER_ERROR;
-    return next(err);
-  }
-  //validates or creates user account, will throw on failure
-  try {
-    await oAuth.getOrCreateKey(uID);
-    return next()
-  } catch (error) {
-    let err = new Error('server misconfigured: could not get/create the user key to post transaction');
-    console.error(err);
-    err.status = RestStatus.SERVICE_UNAVAILABLE;
-    return next(err);
-  }
-};
-
-const checkExtStorageEnabled = async (req, res, next) => {
-  if (process.env.EXT_STORAGE_S3_BUCKET) {
-    return next();
-  } else {
-    let err = new Error('external storage feature is not enabled on that node');
-    console.error(err);
-    err.status = RestStatus.METHOD_NOT_ALLOWED;
-    return next(err);
-  }
-}
-
-// TODO: fully deprecate dapps feature in the future
-router.post('/dapps', dappController.upload);
-// router.get('/dapps', dappController.list);
 
 // Endpoint called by SMD to create key for smd user logged in with oauth
 router.post('/user', oAuthController.createUserKey);
-
-// External storage endpoints
-router.post('/bloc/file/upload', checkExtStorageEnabled, checkUID, multerMiddleware, fileController.upload);
-router.post('/bloc/file/attest', checkExtStorageEnabled, checkUID, fileController.attest);
-router.get('/bloc/file/verify', checkExtStorageEnabled, fileController.verify);
-router.get('/bloc/file/download', checkExtStorageEnabled, fileController.download);
-router.get('/bloc/file/list', checkExtStorageEnabled, fileController.list);
 
 // Health
 router.get('/status', healthHandler.nodeStatus);
@@ -90,9 +18,5 @@ if (process.env.STATS_ENABLED === "true") {
   router.get('/_api_counter', apiCounterHandler.apiCounterRouteController)
 }
 
-
-function isOAuth() {
-  return process.env.OAUTH_ENABLED == appConfig.oAuthEnabledTrueValue;
-}
 
 module.exports = router;

@@ -17,7 +17,6 @@ import           Data.Text
 import           GHC.Generics
 
 import           BlockApps.Solidity.Value
-import           BlockApps.Solidity.Xabi     (ContractDetails(..))
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Keccak256
@@ -34,7 +33,7 @@ instance NFData (TableName) where
 data Globals = Globals { createdTables :: M.Map TableName TableColumns
                        , historyList :: M.Map TableName Bool
                        , createdInstances :: S.Set CodePtr -- lets us avoid an extra bloc call
-                       , contractABIs :: HM.HashMap Keccak256 (M.Map Text ContractDetails)
+                       , solidVMInfo :: HM.HashMap Keccak256 (M.Map Text CodePtr)
                        , contractStates :: LRU Account [(Text, Value)]
                        , csHandle :: Handle
                        } deriving (Generic, NFData)

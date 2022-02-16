@@ -66,6 +66,4 @@ typings/
 .node-xmlhttprequest*
 .idea
 
-apps/
 tmp/
-uploads

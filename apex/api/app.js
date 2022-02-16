@@ -6,31 +6,27 @@ var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
 const cors = require('cors');
 const appConfig = require('./config/app.config');
-const acquireDapp = require('./controllers/dapp').acquireDapp;
 var index = require('./routes/index');
 const { attachMetricsEndpoint } = require('./lib/promClient');
-// var users = require('./routes/users');
 
 var app = express();
 
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
 
-// uncomment after placing your favicon in /public // TODO
-//app.use(favicon(path.join(__dirname, 'public', 'favicon.ico')));
 app.use(logger('dev', { stream: process.stdout }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '50mb', parameterLimit: 50000 }));
 app.use(bodyParser.json());
 app.use(cookieParser());
 
 
-if (process.env.NODE_ENV !== 'production' || process.env.PROD_DEV_MODE === 'true') {
+if (process.env.NODE_ENV !== 'production') {
   const corsOptions = {
     origin: function (origin, callback) {
       if (!origin) {
         callback(null, '*');
       }
-      else if (appConfig.jwtConfig.domainWhiteList.indexOf(origin) !== -1) {
+      else if (appConfig.domainWhiteList.indexOf(origin) !== -1) {
         callback(null, true)
       }
       else {
@@ -46,9 +42,6 @@ if (process.env.NODE_ENV !== 'production' || process.env.PROD_DEV_MODE === 'true
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Serve uploaded dApps
-app.locals.acquiresInProgress = {};
-app.use('/apps/', express.static('apps'), acquireDapp);
 attachMetricsEndpoint({ app });
 app.use('/', index);
 // app.use('/users', users);

@@ -1,6 +1,5 @@
 const request = require('sync-request');
 
-// TODO: Clean the UUID retrieval. Should happen at apex initialization.
 
 const res =  request('GET',`${process.env['stratoRoot']}/uuid`);
 const user = JSON.parse(res.getBody('utf8'));
