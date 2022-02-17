@@ -73,6 +73,10 @@ anyTypeError :: Selector HandledException
 anyTypeError (HE Blockchain.SolidVM.Exception.TypeError{}) = True
 anyTypeError _ = False
 
+anyInvalidWriteError :: Selector HandledException
+anyInvalidWriteError (HE Blockchain.SolidVM.Exception.InvalidWrite{}) = True
+anyInvalidWriteError _ = False
+
 anyIndexOOBError :: Selector HandledException
 anyIndexOOBError (HE Blockchain.SolidVM.Exception.IndexOutOfBounds{}) = True
 anyIndexOOBError _ = False
@@ -103,6 +107,9 @@ failedAssertion _           = False
 
 sender :: Account
 sender = Account 0xdeadbeef Nothing
+
+pirvateChainAcc :: Account 
+pirvateChainAcc = Account 0xdeadbeee (Just 0x776622233444)
 
 origin :: Account
 origin = Account 0x8341 Nothing
@@ -143,9 +150,8 @@ rethrowEx :: ExecResults -> ContextM ()
 rethrowEx ExecResults{erException=Just ex} = either (liftIO . throwIO . HE) (void . return) ex
 rethrowEx _ = return ()
 
-
-runArgs :: T.Text -> String -> ContextM ExecResults
-runArgs args bs = do
+runArgsWithSender :: Account -> T.Text -> String -> ContextM ExecResults
+runArgsWithSender acc args bs = do
   let code = Code $ UTF8.fromString bs
       isTest = error "TODO: isTest"
       isHomestead = error "TODO: isHomestead"
@@ -173,11 +179,14 @@ runArgs args bs = do
       chainId = Nothing
       metadata = Just $ M.fromList [("name",  "qq"), ("args", args)]
 
-  newAddress <- getNewAddress sender
+  newAddress <- getNewAddress acc
   er <- SVM.create isTest isHomestead suicides blockData callDepth sender origin
           value gasPrice availableGas newAddress code txHash chainId metadata
   rethrowEx er
   return er
+
+runArgs :: T.Text -> String -> ContextM ExecResults
+runArgs = runArgsWithSender sender
 
 
 runCall :: T.Text -> T.Text -> String -> ContextM (Maybe SB.ShortByteString)
@@ -259,8 +268,6 @@ call2 funcName callArgs contractAddress = do
     contractAddress sender value gasPrice theData availableGas origin txHash chainId callMetadata
   rethrowEx er
   return $ erReturnVal er
-
-
 
 checkStorage :: ContextM [(MP.Key, B.ByteString)]
 checkStorage = flushMemRawStorageDB >> getAllRawStorageKeyVals' uploadAddress
@@ -2860,3 +2867,15 @@ contract qq {
       , BString "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEGOKeu5dSCBFHVQuy/q1A8BeTb99G83tD\nVecvHHne6sKfmBZN1AIjhpHGKO22vBfdq3dMn/QBqb2TdR9w3WvMXQ==\n-----END PUBLIC KEY-----\n"
       , BString "-----BEGIN CERTIFICATE-----\nMIIBiDCCAS2gAwIBAgIQCgO76hC29iXEFXJNco5ekjAMBggqhkjOPQQDAgUAMEYx\nDDAKBgNVBAMMA2RhbjEMMAoGA1UEBgwDVVNBMRIwEAYDVQQKDAlibG9ja2FwcHMx\nFDASBgNVBAsMC2VuZ2luZWVyaW5nMB4XDTIxMDMxODE1NDgwN1oXDTIyMDMxODE1\nNDgwN1owRjEMMAoGA1UEAwwDZGFuMQwwCgYDVQQGDANVU0ExEjAQBgNVBAoMCWJs\nb2NrYXBwczEUMBIGA1UECwwLZW5naW5lZXJpbmcwVjAQBgcqhkjOPQIBBgUrgQQA\nCgNCAAQY4p67l1IIEUdVC7L+rUDwF5Nv30bze0NV5y8ced7qwp+YFk3UAiOGkcYo\n7ba8F92rd0yf9AGpvZN1H3Dda8xdMAwGCCqGSM49BAMCBQADRwAwRAIgbKXO8tZ5\noPhBusPQFkNEQDnLO/MRru4KjtCpPnVb5sACIE0TwBJ7yeIGuPc/8G50/858Pf3a\n0t1hHbhYnJarPkNA\n-----END CERTIFICATE-----\n"
       ]
+
+  it "can't register a x509 certificate on a private chain" $ (runTest $ do
+    void $ runArgsWithSender pirvateChainAcc "()" [r|
+contract qq {
+    account myAccount = account("deadbeef:feedbeef");
+    
+    string myNewCertificate = "-----BEGIN CERTIFICATE-----\nMIIBiDCCAS2gAwIBAgIQCgO76hC29iXEFXJNco5ekjAMBggqhkjOPQQDAgUAMEYx\nDDAKBgNVBAMMA2RhbjEMMAoGA1UEBgwDVVNBMRIwEAYDVQQKDAlibG9ja2FwcHMx\nFDASBgNVBAsMC2VuZ2luZWVyaW5nMB4XDTIxMDMxODE1NDgwN1oXDTIyMDMxODE1\nNDgwN1owRjEMMAoGA1UEAwwDZGFuMQwwCgYDVQQGDANVU0ExEjAQBgNVBAoMCWJs\nb2NrYXBwczEUMBIGA1UECwwLZW5naW5lZXJpbmcwVjAQBgcqhkjOPQIBBgUrgQQA\nCgNCAAQY4p67l1IIEUdVC7L+rUDwF5Nv30bze0NV5y8ced7qwp+YFk3UAiOGkcYo\n7ba8F92rd0yf9AGpvZN1H3Dda8xdMAwGCCqGSM49BAMCBQADRwAwRAIgbKXO8tZ5\noPhBusPQFkNEQDnLO/MRru4KjtCpPnVb5sACIE0TwBJ7yeIGuPc/8G50/858Pf3a\n0t1hHbhYnJarPkNA\n-----END CERTIFICATE-----";
+
+    constructor() {
+        registerCert(myAccount, myNewCertificate); 
+    }
+}|]) `shouldThrow` anyInvalidWriteError

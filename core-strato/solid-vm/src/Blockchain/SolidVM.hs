@@ -1609,14 +1609,19 @@ callBuiltin "require" (SBool cond :msg) Nothing = do
   return SNULL
 callBuiltin "assert" [SBool cond] Nothing = SNULL <$ assert cond
 callBuiltin "registerCert" [SAccount a, SString cert] _ = do
-    let ex509Cert = bsToCert . BC.pack $ cert
-    case ex509Cert of
-        Left _         -> return SNULL
-        Right x509Cert -> do x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-                             let theAddress = _accountAddress $ namedAccountToAccount Nothing a
-                             Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.insert theAddress x509Cert x509s
-                             onTraced $ liftIO $ putStrLn $ "    registering cert to address: " ++ format theAddress ++ " as " ++ show (fmap subCommonName $ getCertSubject x509Cert)
-                             return SNULL
+    curAccount <- getCurrentAccount
+    case _accountChainId curAccount of 
+      Just cid -> invalidWrite "Cannot register X.509 certificates on a private chain" cid
+      Nothing -> do 
+        let ex509Cert = bsToCert . BC.pack $ cert
+        case ex509Cert of
+            Left _         -> return SNULL
+            Right x509Cert -> do 
+              x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
+              let theAddress = _accountAddress $ namedAccountToAccount Nothing a
+              Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.insert theAddress x509Cert x509s
+              onTraced $ liftIO $ putStrLn $ "    registering cert to address: " ++ format theAddress ++ " as " ++ show (fmap subCommonName $ getCertSubject x509Cert)
+              return SNULL
 callBuiltin "getUserCert" [SAccount a] _ = do
     x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
     maybeCertLevelDB <- x509CertDBGet $ _namedAccountAddress a
