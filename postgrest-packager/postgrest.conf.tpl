@@ -6,6 +6,8 @@ db-pool = ${POSTGREST_POOL}
 server-host = "*4"
 server-port = ${POSTGREST_LISTEN_PORT}
 
+log-level = "${POSTGREST_LOG_LEVEL}"
+
 ## base url for swagger output
 # server-proxy-uri = ""
 

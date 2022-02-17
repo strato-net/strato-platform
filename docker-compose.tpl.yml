@@ -219,6 +219,7 @@ services:
     - PG_ENV_POSTGRES_PASSWORD=${postgres_password:-api}
     - PG_ENV_POSTGRES_USER=postgres
     - PG_PORT_5432_TCP_PORT=5432
+    - POSTGREST_LOG_LEVEL=${POSTGREST_LOG_LEVEL:-error}
     build: .
     image: ${POSTGREST_IMAGE:-<REPO_URL>postgrest:<VERSION>}
     restart: always
