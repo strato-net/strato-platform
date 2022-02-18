@@ -48,10 +48,8 @@ pipeline {
     }
 
     stage('Deploy') {
+
       steps {
-        withCredentials([
-            usernamePassword(credentialsId: 'aws-s3-test-bucket-access-user', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID')
-        ]) {
           sh '''#!/bin/bash -le
             set -x
             rm -rf strato-getting-started
@@ -91,7 +89,6 @@ pipeline {
             PASSWORD=${PASSWORD} ./strato --set-password
             check_availability
           '''
-        }
       }
     }
 
