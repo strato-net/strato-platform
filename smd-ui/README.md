@@ -18,9 +18,6 @@ To run react dev server locally with all features enabled go through the steps:
       OAUTH_CLIENT_ID=dev \
       OAUTH_CLIENT_SECRET=d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f \
       PASSWORD=123 \
-      EXT_STORAGE_S3_BUCKET=strato-external-storage-test \
-      EXT_STORAGE_S3_ACCESS_KEY_ID=AKIAV5NMROVZIZQY4OAE \
-      EXT_STORAGE_S3_SECRET_ACCESS_KEY=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 \
       ./strato.sh --single
     ```
 
@@ -61,7 +58,7 @@ To run react dev server locally with all features enabled go through the steps:
     ```
     cd strato-platform/smd-ui
     npm i
-    REACT_APP_OAUTH_ENABLED=true REACT_APP_NODE_HOST=localhost:8080 REACT_APP_EXT_STORAGE_ENABLED=true npm run start
+    REACT_APP_OAUTH_ENABLED=true REACT_APP_NODE_HOST=localhost:8080 npm run start
     ```
     (The env vars have the prefix REACT_APP_ as it is the requirement of React in order to pass the unprefixed vars to browser)
 

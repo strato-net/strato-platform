@@ -52,10 +52,7 @@ pipeline {
             export OAUTH_CLIENT_ID=dev
             export OAUTH_CLIENT_SECRET=d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f
             export PASSWORD=123
-            export EXT_STORAGE_S3_BUCKET=strato-external-storage-test
-            export EXT_STORAGE_S3_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-            export EXT_STORAGE_S3_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-            ./strato -m 1 --single
+            ./strato --single
             docker ps
             # Few quick tests
             check_availability() {
