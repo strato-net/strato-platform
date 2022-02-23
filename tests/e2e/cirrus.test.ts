@@ -51,7 +51,6 @@ describe('postgREST allowed methods', function () {
         transaction_hash: 'deadbeef',
         transaction_sender: 'deadbeef',
       }, {
-        method: 'POST',
         headers: {
           Authorization: `Bearer ${admin.token}`,
           Accept: 'application/json',
@@ -64,7 +63,7 @@ describe('postgREST allowed methods', function () {
   });
   it('Cannot update an existing row - PATCH 403 Forbidden', async () => {
     try {
-      const axRes = await axios.post(`${config.nodes[0].url}/cirrus/search/${contractName}?x=lt.10&limit=1`, {
+      const axRes = await axios.patch(`${config.nodes[0].url}/cirrus/search/${contractName}?x=lt.10&limit=1`, {
         x: 100,
         address: '02345de',
         chainId: 'deadbeef',
@@ -74,7 +73,6 @@ describe('postgREST allowed methods', function () {
         transaction_hash: 'deadbeef',
         transaction_sender: 'deadbeef',
       }, {
-        method: 'PATCH',
         headers: {
           Authorization: `Bearer ${admin.token}`,
           Accept: 'application/json',
@@ -86,13 +84,12 @@ describe('postgREST allowed methods', function () {
     }
   });
   it('Can GET rows from a table - GET 200 Success', async () => {
-    const axRes = await axios.post(`${config.nodes[0].url}/cirrus/search/${contractName}`, {
-      method: 'GET',
+    const axRes = await axios.get(`${config.nodes[0].url}/cirrus/search/${contractName}`, {
       headers: {
         Authorization: `Bearer ${admin.token}`,
         Accept: 'application/json',
       },
     });
-    assert.equal(axRes.status, 200);
+    assert.equal(axRes.status, 200, `Actually recieved status: ${axRes.status}`);
   });
 });
