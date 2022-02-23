@@ -1199,6 +1199,7 @@ call :: EVMBase m
      => Bool
      -> Bool
      -> Bool
+     -> Bool
      -> S.Set Account
      -> BlockData
      -> Int
@@ -1214,7 +1215,7 @@ call :: EVMBase m
      -> Maybe Word256
      -> Maybe (M.Map T.Text T.Text)
      -> m ExecResults
-call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDepth receiveAddress
+call isRunningTests' isHomestead noValueTransfer _ preExistingSuicideList b callDepth receiveAddress
      codeAddress sender value gasPrice theData availableGas origin txHash chainId metadata = do
   let env code =
         Environment{
@@ -1374,6 +1375,7 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress owner sender value inp
     ers <- call (isRunningTests currentVMState)
                 (vmIsHomestead currentVMState)
                 noValueTransfer
+                False
                 (suicideList currentVMState)
                 (envBlockHeader env)
                 (currentCallDepth+1)
