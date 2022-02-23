@@ -194,6 +194,7 @@ runCall funcName callArgs bs = do
   let code = Code $ UTF8.fromString bs
       isTest = error "TODO: isTest"
       isHomestead = error "TODO: isHomestead"
+      isRCC = False
       suicides = error "TODO: suicides"
       blockData = BlockData { blockDataParentHash = unsafeCreateKeccak256FromWord256 0x0
                             , blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0x0
@@ -228,7 +229,7 @@ runCall funcName callArgs bs = do
   $logErrorS "runCall" "Returned from create"
   rethrowEx er1
   $logErrorS "runCall" "Beginning call"
-  er2 <- SVM.call isTest isHomestead noValueTransfer suicides blockData callDepth receiveAddress
+  er2 <- SVM.call isTest isHomestead noValueTransfer isRCC suicides blockData callDepth receiveAddress
     newAddress sender value gasPrice theData availableGas origin txHash chainId callMetadata
   $logErrorS "runCall" "Returned from call"
   rethrowEx er2
