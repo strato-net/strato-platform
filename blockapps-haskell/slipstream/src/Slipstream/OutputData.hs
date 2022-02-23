@@ -119,6 +119,14 @@ tableColumns = mapMaybe go
 partialParseTableColumns :: TableColumns -> [Text]
 partialParseTableColumns = concat . mapM (fmap unwrapDoubleQuotes . listToMaybe . T.words)
 
+makeAccount :: ProcessedContract -> Text
+makeAccount c@ProcessedContract{chain=""} = tshow $ address c
+makeAccount c = T.concat [
+  tshow $ address c,
+  ":",
+  chain c
+  ]
+
 tableUpsert :: [Text] -> Text
 tableUpsert = csv . map go
   where go x = let y = wrapDoubleQuotes $ escapeQuotes x
@@ -157,7 +165,8 @@ outputData conn c = runConduit $ c
                               `fuseUpstream` mapM_C (dbInsert conn)
 
 baseColumns :: TableColumns
-baseColumns = [ "address"
+baseColumns = [ "account"
+              , "address"
               , "chainId"
               , "block_hash"
               , "block_timestamp"
@@ -247,7 +256,7 @@ createForeignIndexesForJoins foreignKey = do
     <> wrapDoubleQuotes (columnName foreignKey)
     <> ") REFERENCES "
     <> tableNameToDoubleQuoteText (foreignTableName foreignKey)
-    <> " (address);"
+    <> " (account);"
 
 notifyPostgREST :: OutputM m =>
                    ConduitM () Text m ()
@@ -405,7 +414,15 @@ insertForeignKeys contracts = do
                             (contractName c)
     
     forM_ [(n, a) | (n, ValueContract a) <- Map.toList $ contractData c] $ \(theName, acct) -> do
-          yield $ "UPDATE " <> tableNameToDoubleQuoteText tableName <> " SET " <> wrapDoubleQuotes theName <> "=" <> wrapSingleQuotes (escapeQuotes $ T.pack $ show acct) <> " WHERE address=" <> wrapSingleQuotes (tshow $ address c)
+          yield $ 
+            "UPDATE " <> 
+            tableNameToDoubleQuoteText tableName <> 
+            " SET " <> 
+            wrapDoubleQuotes theName <> 
+            "=" <> 
+            wrapSingleQuotes (escapeQuotes $ T.pack $ show acct) <> 
+            " WHERE account=" <> 
+            wrapSingleQuotes (makeAccount c)
 
 
 insertHistoryTable :: OutputM m
@@ -430,11 +447,11 @@ createIndexTableQuery contract (o, a, n) =
       list = Map.toList $ contract^.storageDefs
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
-        , csv $ ["address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
+        , csv $ ["account text", "address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
                "block_number text", "transaction_hash text", "transaction_sender text"] ++ tableColumns list
         , ",\n  CONSTRAINT "
         , wrapDoubleQuotes ((escapeQuotes $ tableNameToText tableName) <> "_pkey")
-        , "\n  PRIMARY KEY (address, \"chainId\"), UNIQUE (address) );"
+        , "\n  PRIMARY KEY (address, \"chainId\"), UNIQUE (account) );"
         ]
 
 createHistoryTableQuery :: Contract -> (Text, Text, Text) -> Text
@@ -443,7 +460,7 @@ createHistoryTableQuery contract (o, a, n) =
       list = Map.toList $ contract^.storageDefs
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS ", tableNameToDoubleQuoteText tableName, " ("
-        , csv $ ["address text NOT NULL", "\"chainId\" text NOT NULL", "block_hash text NOT NULL", "block_timestamp text",
+        , csv $ ["account text", "address text NOT NULL", "\"chainId\" text NOT NULL", "block_hash text NOT NULL", "block_timestamp text",
                  "block_number text", "transaction_hash text NOT NULL", "transaction_sender text"]
                  ++ tableColumns list
         , ");"
@@ -468,7 +485,8 @@ insertIndexTableQuery contracts@(x:_) =
           (contractName x)
       list = Map.toList $ Map.mapMaybe valueToSQLTextFilterContract $ contractData x
       keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
-      baseVals = [ tshow . address
+      baseVals = [ makeAccount
+                 , tshow . address
                  , chain
                  , T.pack . keccak256ToHex . blockHash
                  , tshow . blockTimestamp
@@ -489,6 +507,7 @@ insertIndexTableQuery contracts@(x:_) =
         , inserts
         , [r|
   ON CONFLICT (address, "chainId") DO UPDATE SET
+    account = excluded.account,
     address = excluded.address,
     "chainId" = excluded."chainId",
     block_hash = excluded.block_hash,
@@ -509,8 +528,9 @@ insertHistoryTableQuery contracts@(x:_) =
           (application x)
           (contractName x)
       list = Map.toList . Map.mapMaybe valueToSQLText $ contractData x
-      keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
-      baseVals = [ tshow . address
+      keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list 
+      baseVals = [ makeAccount
+                 , tshow . address
                  , chain
                  , T.pack . keccak256ToHex . blockHash
                  , tshow . blockTimestamp
@@ -552,7 +572,7 @@ createEventTable globalsIORef ev = do
           (eventOrganization ev)
           (eventApplication ev)
           (eventContractName ev)
-      eventTable = EventTableName org app cname (eventName ev)
+      eventTable = EventTableName org app cname (escapeQuotes $ eventName ev)
   
   eventAlreadyCreated <- isTableCreated globalsIORef eventTable
   if eventAlreadyCreated then 
@@ -567,7 +587,7 @@ createEventTableQuery ev =
           (eventOrganization ev)
           (eventApplication ev)
           (eventContractName ev)
-      tableName = EventTableName org app cname (eventName ev)
+      tableName = EventTableName org app cname (escapeQuotes $ eventName ev)
 
       cols = csv $ ["id SERIAL NOT NULL", "address text"] ++ 
                 (map (\t -> T.concat [wrapDoubleQuotes t, " text"]) $ eventFields ev) 
@@ -602,7 +622,7 @@ expandEventTables globalsIORef (x:xs) = do
           (T.pack $ Action.evContractOrganization x)
           (T.pack $ Action.evContractApplication x)
           (T.pack $ Action.evContractName x)
-      tableName = EventTableName org app cname (T.pack $ Action.evName x)
+      tableName = EventTableName org app cname ( escapeQuotes $ T.pack $ Action.evName x)
 
   columns <- getTableColumns globalsIORef tableName
   case columns of
@@ -644,7 +664,7 @@ insertEventTable globalsIORef ev = do
           (T.pack $ Action.evContractOrganization ev)
           (T.pack $ Action.evContractApplication ev)
           (T.pack $ Action.evContractName ev)
-      eventTable = EventTableName org app cname (T.pack $ Action.evName ev)
+      eventTable = EventTableName org app cname (escapeQuotes $ T.pack $ Action.evName ev)
 
   eventExists <- isTableCreated globalsIORef eventTable
   if eventExists then return (Just $ insertEventTableQuery ev)
@@ -656,7 +676,7 @@ insertEventTableQuery ev =
           (T.pack $ Action.evContractOrganization ev)
           (T.pack $ Action.evContractApplication ev)
           (T.pack $ Action.evContractName ev)
-     tableName = EventTableName org app cname (T.pack $ Action.evName ev)
+     tableName = EventTableName org app cname (escapeQuotes $ T.pack $ Action.evName ev)
 
      cols = wrapAndEscapeDouble . map escapeQuotes $ ["id", "address"] ++ (map (T.pack . fst) $ Action.evArgs ev)
      vals = csv $ map (wrapSingleQuotes . T.pack . snd) $ Action.evArgs ev
