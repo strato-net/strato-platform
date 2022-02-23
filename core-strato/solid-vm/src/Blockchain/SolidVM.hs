@@ -19,7 +19,6 @@ module Blockchain.SolidVM
   ( SolidVMBase
   , call
   , create
-  , getCodeAndCollection
   ) where
 
 import           Control.DeepSeq                      (force)
@@ -1767,7 +1766,6 @@ runTheConstructors from to hsh cc contractName' argExps = do
       Xabi.Mapping _ _ _-> return ()
       Xabi.Array _ _-> return ()
       _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ T.unpack n]) MS.BDefault
-
 
   forM_ (reverse $ contract'^.parents) $ \parent -> do
     let args = Xabi.OrderedArgs
