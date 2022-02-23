@@ -348,6 +348,7 @@ call :: SolidVMBase m
      => Bool
      -> Bool
      -> Bool
+     -> Bool
      -> S.Set Account
      -> BlockData
      -> Int
@@ -366,7 +367,7 @@ call :: SolidVMBase m
 --call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDepth receiveAddress
 --     (Address codeAddress) sender value gasPrice theData availableGas origin txHash chainId metadata =
 
-call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' metadata = do
+call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' metadata = do
   recordCall
 
   let env' = Env.Environment {
@@ -386,7 +387,7 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
         maybeArgs = runParser parseArgs "" "" argString
         !args = either (parseError "call arguments") Xabi.OrderedArgs maybeArgs
 
-    returnVal <- mapM encodeForReturn =<< callWrapper sender' codeAddress Nothing funcName args
+    returnVal <- mapM encodeForReturn =<< callWrapper sender' codeAddress Nothing funcName isRCC args 
 
     finalAct <- Mod.get (Mod.Proxy @Action)
     finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
@@ -571,8 +572,8 @@ argsToVals ctract fn args =
            _ -> getVar =<< expToVar x
 
 
-callWrapper :: MonadSM m => Account -> Account -> Maybe String -> String -> Xabi.ArgList -> m (Maybe Value)
-callWrapper from to mContract functionName argExps = do
+callWrapper :: MonadSM m => Account -> Account -> Maybe String -> String -> Bool -> Xabi.ArgList -> m (Maybe Value)
+callWrapper from to mContract functionName isRCC argExps  = do
   let fromChain = from ^. accountChainId
       toChain = to ^. accountChainId
   isAccessibleChain <- toChain `isAncestorChainOf` fromChain
@@ -625,7 +626,12 @@ callWrapper from to mContract functionName argExps = do
                 return (fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack functionName, OrderedVals [])
               Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.contractName)
 
-
+  when isRCC (
+    forM_ [(n, theType) | (n, Xabi.VariableDecl theType _ Nothing _) <- M.toList $ contract'^.storageDefs] $ \(n, theType) -> do
+      case theType of
+        Xabi.Mapping _ _ _-> return ()
+        Xabi.Array _ _-> return ()
+        _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ T.unpack n]) MS.BDefault)
   logFunctionCall args to contract functionName f
 
 
@@ -1393,7 +1399,7 @@ expToVar' (Xabi.FunctionCall _ e args) = do
         (SContract _ toAddress', MS.Field funcName) -> do
           fromAddress <- getCurrentAccount
           let toAddress = namedAccountToAccount (fromAddress ^. accountChainId) toAddress'
-          res <- callWrapper fromAddress toAddress Nothing (BC.unpack funcName) args
+          res <- callWrapper fromAddress toAddress Nothing (BC.unpack funcName) False args 
           case res of
             Just v -> return $ Constant $ v
             Nothing -> return $ Constant SNULL
@@ -1401,7 +1407,7 @@ expToVar' (Xabi.FunctionCall _ e args) = do
         (SAccount toAddress', MS.Field funcName) -> do
           fromAddress <- getCurrentAccount
           let toAddress = namedAccountToAccount (fromAddress ^. accountChainId) toAddress'
-          res <- callWrapper fromAddress toAddress Nothing (BC.unpack funcName) args
+          res <- callWrapper fromAddress toAddress Nothing (BC.unpack funcName) False args 
           case res of
             Just v -> return $ Constant $ v
             Nothing -> return $ Constant SNULL
@@ -1453,14 +1459,14 @@ expToVar' (Xabi.FunctionCall _ e args) = do
 
       from <- getCurrentAccount
       let address = namedAccountToAccount (from ^. accountChainId) address'
-      result <- callWrapper from address Nothing itemName args
+      result <- callWrapper from address Nothing itemName False args 
       return . Constant . fromMaybe SNULL $ result
 
     Constant (SContractFunction name address' functionName) -> do
       
       from <- getCurrentAccount
       let address = namedAccountToAccount (from ^. accountChainId) address'
-      result <- callWrapper from address name functionName args
+      result <- callWrapper from address name functionName False args 
       return . Constant . fromMaybe SNULL $ result
 
     Constant (SEnum enumName) -> do

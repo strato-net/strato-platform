@@ -331,6 +331,7 @@ runChainConstructors cId cInfo = do
          False --isRunningTests
          True --isHomestead
          False --noValueTransfer
+         True -- isRunChainConstructors
          S.empty --pre-existing suicide list
          (BlockData
             (Keccak256.unsafeCreateKeccak256FromWord256 0)
