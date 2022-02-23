@@ -40,6 +40,7 @@ import qualified Network.Kafka.Protocol                as KP
 import           Prometheus
 import           Text.Printf
 import           Util                                  hiding (intercalate)
+
 import           Blockapps.Crossmon
 import           Blockchain.BlockChain
 import           Blockchain.Data.Block                 (BestBlock(..), WorldBestBlock(..))
@@ -63,8 +64,10 @@ import           Blockchain.Stream.VMEvent
 import           Blockchain.VMContext
 import           Blockchain.VMMetrics
 import           Blockchain.VMOptions
+
 import           Executable.EVMCheckpoint
 import           Executable.EVMFlags
+
 import qualified Blockchain.Bagger                     as Bagger
 import qualified Blockchain.Bagger.BaggerState         as B
 import           Blockchain.Data.AddressStateDB
@@ -293,7 +296,6 @@ getNumPoolable txPairs = do
 
 outputTransactions :: [(Timestamp, OutputTx)] -> [VmOutEvent]
 outputTransactions = map $ OutIndexEvent . uncurry IndexTransaction
-
 
 -- TODO: maybe move this into solid-vm?
 runChainConstructors :: SolidVM.SolidVMBase m => Word256 -> ChainInfo -> m (MP.StateRoot, [Action])
