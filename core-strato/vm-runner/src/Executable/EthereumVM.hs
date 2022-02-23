@@ -40,7 +40,13 @@ import qualified Network.Kafka.Protocol                as KP
 import           Prometheus
 import           Text.Printf
 import           Util                                  hiding (intercalate)
-
+--import qualified SolidVM.Model.Storable as MS
+--import qualified SolidVM.Solidity.Xabi as Xabi
+--import qualified SolidVM.Solidity.Xabi.Statement as Xabi
+--import qualified SolidVM.Solidity.Xabi.Type as Xabi
+--import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
+--import qualified CodeCollection as CC
+--import           Blockchain.SolidVM.SM
 import           Blockapps.Crossmon
 import           Blockchain.BlockChain
 import           Blockchain.Data.Block                 (BestBlock(..), WorldBestBlock(..))
@@ -67,7 +73,7 @@ import           Blockchain.VMOptions
 
 import           Executable.EVMCheckpoint
 import           Executable.EVMFlags
-
+   
 import qualified Blockchain.Bagger                     as Bagger
 import qualified Blockchain.Bagger.BaggerState         as B
 import           Blockchain.Data.AddressStateDB
@@ -297,12 +303,13 @@ getNumPoolable txPairs = do
 outputTransactions :: [(Timestamp, OutputTx)] -> [VmOutEvent]
 outputTransactions = map $ OutIndexEvent . uncurry IndexTransaction
 
+
 -- TODO: maybe move this into solid-vm?
 runChainConstructors :: SolidVM.SolidVMBase m => Word256 -> ChainInfo -> m (MP.StateRoot, [Action])
 runChainConstructors cId cInfo = do
   -- We are inventing the rules of how the constructor should run when a chain is created.
   -- Since all VM runs need some environment variables passed in, we need to define what all of
-  -- those variables should be.  The truth is, most of these variables are rarely used, but we
+  -- those variables should be.  The truth is, most of these variables are rarely used, but wehe truth is, most of these variables are rarely used, but we
   -- still need to pre-decide what they should be else the VM would crash whenever they are used.
   -- I've set most of these variables to default dummy values below...  We might decide to refine
   -- some of these variables in the future.
@@ -321,16 +328,22 @@ runChainConstructors cId cInfo = do
           (MaybeT $ pure $ M.lookup hsh codeHashMap) <|>
             MaybeT (fmap (T.pack . BC.unpack . snd) <$> getCode hsh)
         pure $ Just (a,msrc)
-
+{-      !contract' =
+        fromMaybe (missingType "contract inherits from nonexistent parent" contractName')
+        $ cc^.contracts . at contractName'
+-}
   actions <- fmap catMaybes . for (accountInfo $ chainInfo cInfo) $ \aInfo -> do
     addrSrc <- case aInfo of
       NonContract{} -> pure Nothing
       ContractNoStorage a _ ch -> resolveSrc a ch
       ContractWithStorage a _ ch _ -> resolveSrc a ch
+    
+--    map markDiffForAction addrSrc
     fmap (join . fmap erAction) . for addrSrc $ \(addr,ms) -> SolidVM.call
          False --isRunningTests
          True --isHomestead
          False --noValueTransfer
+         True -- isRunChainConstructors
          S.empty --pre-existing suicide list
          (BlockData
             (Keccak256.unsafeCreateKeccak256FromWord256 0)
@@ -364,12 +377,49 @@ runChainConstructors cId cInfo = do
            , ("funcName", "<constructor>")
            ]
            ++ case ms of Nothing -> []; Just s -> [("src", s)])
+  
 
+ {-forM_ [(n, theType) | (n, Xabi.VariableDecl theType _ Nothing _) <- M.toList $ contract'^.storageDefs] $ \(n, theType) -> do
+    case theType of
+      Xabi.Mapping _ _ _-> return ()
+      Xabi.Array _ _-> return ()
+      _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ T.unpack n]) MS.BDefault
+  -}
+  --markDiffForAction (0x100) 
+  
+  {-forM_ [n | (n, Xabi.VariableDecl _ _ Nothing _) <- M.toList $ actions^.actionData] $ \n -> do
+   markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack n]) MS.BDefault
+  -}
+
+  --(contract', _, _) <- SolidVM.getCodeAndCollection (Account 0x100 (Just cId))
+
+  {-
+  forM_ [(n, theType) | (n, Xabi.VariableDecl theType _ Nothing _) <- M.toList $ contract'^.CC.storageDefs] $ \(n, theType) -> do
+    case theType of
+      Xabi.Mapping _ _ _-> return ()
+      Xabi.Array _ _-> return ()
+      _ -> markDiffForAction (Account 0x100 (Just cId)) (MS.StoragePath [MS.Field $ BC.pack $ T.unpack n]) MS.BDefault
+  -}
   flushMemStorageDB
   Mem.flushMemAddressStateDB
 
   sr <- A.lookupWithDefault (Proxy @MP.StateRoot) (Just cId)
   return (sr, actions)
+
+{-
+Mod.Modifiable Action m => Account -> MS.StoragePath -> MS.BasicValue -> m ()
+myfunc :: Mod.Modifiable Action m => [Actions] -> m ()
+
+markDiffForAction :: Mod.Modifiable Action m => Account -> MS.StoragePath -> MS.BasicValue -> m ()
+markDiffForAction owner key' val' = do
+  let key = MS.unparsePath key'
+      val = rlpSerialize $ rlpEncode val'
+      ins = \case
+              Action.SolidVMDiff m -> Action.SolidVMDiff $ M.insert key val m
+              e -> internalError "SolidVM Diff executing in EVM" $ show e
+  Mod.modifyStatefully_ (Mod.Proxy @Action) $
+    Action.actionData . at owner . mapped . Action.actionDataStorageDiffs %= ins
+-}
 
 initializeCheckpointAndBlockSummary :: ( HasBlockSummaryDB m
                                        , Mod.Modifiable BlockHashRoot m
