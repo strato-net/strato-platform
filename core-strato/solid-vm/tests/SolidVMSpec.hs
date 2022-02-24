@@ -1025,8 +1025,7 @@ contract qq {
 }|]
     getFields ["i"] `shouldReturn` [BInteger 2]
 
-  it "can break" . runTest $ do
-    liftIO $ pendingWith "implement break"
+  it "can break from a for-loop" . runTest $ do
     runBS [r|
 contract qq {
   uint i = 25;
@@ -1041,6 +1040,49 @@ contract qq {
 }|]
     getFields ["i"] `shouldReturn` [BInteger 29]
 
+  it "can break from a while-loop" . runTest $ do
+    runBS [r|
+contract qq {
+  uint i = 0;
+  constructor() public {
+    while (i < 10) {
+      if (i == 4) {
+        break;
+      }
+      i++;
+    }
+  }
+}|]
+    getFields ["i"] `shouldReturn` [BInteger 4]
+
+  it "can break from a do-while loop" . runTest $ do
+    liftIO $ pendingWith "implement do-while"
+    runBS [r|
+contract qq {
+  uint i = 0;
+  constructor() public {
+    do {
+      if (j == 4) {
+        break;
+      }
+      i++;
+    } while (i < 10);
+  }
+}|]
+    getFields ["i"] `shouldReturn` [BInteger 4]
+
+  it "can break immediately from a loop" . runTest $ do
+    runBS [r|
+contract qq {
+  uint i = 25;
+  constructor() public {
+    for (uint j = 0; j < 100; j++) {
+      break;
+    }
+  }
+}|]
+    getFields ["i"] `shouldReturn` [BInteger 25]
+
   it "can return from a loop" . runTest $ do
     liftIO $ pendingWith "re-fix loops"
     runBS [r|
@@ -1054,7 +1096,6 @@ contract qq {
   }
 }|]
     getFields ["i"] `shouldReturn` [BInteger 1]
-
 
   it "can call functions on local contracts" . runTest $ do
     runBS [r|

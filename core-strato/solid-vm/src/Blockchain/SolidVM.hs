@@ -644,6 +644,7 @@ runStatements (s:rest) = do
     liftIO $ putStrLn $ C.green $ funcName ++ "> " ++ unparseStatement s
 
   ret <- runStatement s
+
   case ret of
     Nothing -> runStatements rest
     v -> return v
@@ -872,6 +873,8 @@ runStatement (Xabi.ForStatement maybeInitStatement maybeConditionExp maybeLoopEx
       _ <- getVar =<< expToVar loopExp
       return result
 
+runStatement (Xabi.Break _) = return $ Just SBreak
+
 runStatement (Xabi.Return maybeExpression pos) = do
   solidVMBreakpoint pos
   case maybeExpression of
@@ -945,6 +948,7 @@ while condition code = do
       result <- code
       case result of
         Nothing -> while condition code
+        Just SBreak -> return Nothing
         _ -> return result
     else return Nothing
 
@@ -958,6 +962,7 @@ doWhile condition code = do
       if c
         then doWhile condition code
         else return Nothing
+    Just SBreak -> return Nothing
     _ -> return result
 
 getIndexType :: MonadSM m => AccountPath -> m IndexType

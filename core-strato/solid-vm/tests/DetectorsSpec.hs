@@ -346,17 +346,6 @@ contract A {
 }
 |]
        in length anns `shouldBe` 1
-    it "warns for the use of break" $
-      let anns = Continue.detector `forContract` [r|
-contract A {
-  function f() {
-    while (true) {
-      break;
-    }
-  }
-}
-|]
-       in length anns `shouldBe` 1
 
   describe "Unimplemented function modifiers" $ do
     it "warns for the use of custom function modifiers" $

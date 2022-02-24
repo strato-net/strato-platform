@@ -23,6 +23,7 @@ statement :: SolidityParser Statement
 statement = do
   ifStatement
   <|> whileStatement
+  <|> doWhileStatement
   <|> forStatement
   <|> (do
           ~(a, e) <- withPosition $ do
@@ -75,6 +76,17 @@ whileStatement = do
     s <- fmap (:[]) statement <|> statements
     pure (e, s)
   pure $ WhileStatement e s a
+
+doWhileStatement :: SolidityParser Statement
+doWhileStatement = do
+  ~(a, (s, e)) <- withPosition $ do
+    reserved "do"
+    s <- fmap (:[]) statement <|> statements
+    reserved "while"
+    e <- parens expression
+    _ <- semi
+    pure (s, e)
+  pure $ DoWhileStatement s e a
 
 forStatement :: SolidityParser Statement
 forStatement = do
