@@ -158,6 +158,7 @@ call s = SolidVM.call
   (callErr "isRunningTests'")
   (callErr "isHomestead")
   (callErr "noValueTransfer")
+  False
   (callErr "preExistingSuicideList")
   (s ^. callArgs . argsBlockData)
   (callErr "callDepth")
