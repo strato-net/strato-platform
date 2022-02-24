@@ -29,6 +29,7 @@ library:
   - generic-arbitrary
   - http-client
   - lens
+  - monad-alter
   - mtl
   - prometheus-client
   - servant-client

@@ -60,6 +60,7 @@ module Blockchain.Sequencer.Monad
   , blockstanbulContext
   , loopTimeout
   , latestRoundNumber
+  , blockstanbulEvents
 ) where
 
 import           Prelude                                   hiding (round)
@@ -87,6 +88,7 @@ import           Data.Map                                  (Map)
 import qualified Data.Map                                  as M
 import           Data.Maybe
 import qualified Data.Sequence                             as Q
+import qualified Data.Set.Ordered                          as S
 import qualified Data.Text                                 as T
 import           Data.Time.Clock
 import qualified Database.LevelDB                          as LDB
@@ -105,6 +107,7 @@ import           Blockchain.Sequencer.DB.GetTransactionsDB
 import           Blockchain.Sequencer.DB.SeenTransactionDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Metrics
+import           Blockchain.Sequencer.Options
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 import           Prometheus
@@ -135,6 +138,7 @@ data SequencerContext = SequencerContext
   , _blockstanbulContext :: Maybe BlockstanbulContext
   , _loopTimeout         :: TMChan ()
   , _latestRoundNumber   :: IORef RoundNumber
+  , _blockstanbulEvents  :: S.OSet Keccak256
   }
 makeLenses ''SequencerContext
 
@@ -392,6 +396,16 @@ instance HasBlockstanbulContext SequencerM where
   getBlockstanbulContext = use blockstanbulContext
   putBlockstanbulContext = modify' . (.~) (blockstanbulContext . _Just)
 
+instance (Keccak256 `A.Alters` (A.Proxy WireMessage)) SequencerM where
+  lookup _  k = do
+    wms <- use blockstanbulEvents
+    let b = S.member k wms
+    pure $ if b then Just (A.Proxy @WireMessage) else Nothing
+  insert _ k _ = blockstanbulEvents %= (\wms ->
+    let s = S.size wms
+        wms' = if s >= flags_blockstanbulEventCacheSize then S.delete (head $ toList wms) wms else wms
+     in wms' S.>| k)
+  delete _ k = blockstanbulEvents %= S.delete k
 
 -- If there is no vault client (i.e. in hspec tests), the HasVault instance will use this key, 
 -- I know, it's ugly...the SequencerSpec test uses SequencerM itself, so this was a lot 
@@ -460,6 +474,7 @@ runSequencerM c mbc m = do
             , _blockstanbulContext = mbc
             , _loopTimeout         = loopCh
             , _latestRoundNumber   = latestRound
+            , _blockstanbulEvents  = S.empty
             }
     return $ fst a
 

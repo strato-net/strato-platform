@@ -322,6 +322,17 @@ instance MonadIO m => HasVault (MonadTest m) where
     pk <- use prvKey
     return $ deriveSharedKey pk pub
 
+instance MonadIO m => (Keccak256 `A.Alters` (A.Proxy WireMessage)) (MonadTest m) where
+  lookup _  k = do
+    wms <- use $ sequencerContext . blockstanbulEvents
+    let b = S.member k wms
+    pure $ if b then Just (A.Proxy @WireMessage) else Nothing
+  insert _ k _ = sequencerContext . blockstanbulEvents %= (\wms ->
+    let s = S.size wms
+        wms' = if s >= 2000 then S.delete (head $ toList wms) wms else wms
+     in wms' S.>| k)
+  delete _ k = sequencerContext . blockstanbulEvents %= S.delete k
+
 instance (MonadLogger m, MonadIO m) => (Keccak256 `A.Alters` (A.Proxy (Inbound WireMessage))) (MonadTest m) where
   lookup _  k = do
     wms <- readIORef =<< use pbftMessages
@@ -382,6 +393,7 @@ newSequencerContext bc = do
       , _blockstanbulContext = Just bc
       , _loopTimeout         = error "MonadTest: Evaluating loopTimeout" -- loopCh
       , _latestRoundNumber   = latestRound
+      , _blockstanbulEvents  = S.empty
       }
 
 -- testContext is useful for testing because it doesn't require

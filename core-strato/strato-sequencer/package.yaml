@@ -33,12 +33,14 @@ library:
     - ethereum-rlp
     - extra
     - format
+    - hflags
     - http-client
     - lens
     - leveldb-haskell
     - lifted-async
     - milena
     - monad-alter
+    - ordered-containers
     - prometheus-client
     - seqevents
     - stm

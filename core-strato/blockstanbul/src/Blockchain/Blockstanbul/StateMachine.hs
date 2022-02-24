@@ -3,6 +3,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeOperators #-}
 
 module Blockchain.Blockstanbul.StateMachine where 
 
@@ -10,6 +11,7 @@ module Blockchain.Blockstanbul.StateMachine where
 import           Conduit
 import           Control.Lens                     hiding (view)
 import           Control.Monad     
+import qualified Control.Monad.Change.Alter       as A
 import           Control.Monad.State.Class
 
 import qualified Data.Map.Strict                  as M
@@ -39,6 +41,7 @@ type StateMachineM m = ( MonadState BlockstanbulContext m
                        , MonadIO m
                        , MonadLogger m
                        , HasVault m
+                       , (Keccak256 `A.Alters` (A.Proxy WireMessage)) m
                        )
 
 

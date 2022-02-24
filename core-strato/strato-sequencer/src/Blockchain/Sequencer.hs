@@ -76,14 +76,6 @@ instance Mod.Modifiable r m => Mod.Modifiable r (ConduitT i o m) where
 instance (Monad m, Mod.Accessible r m) => Mod.Accessible r (ConduitT i o m) where
   access = lift . Mod.access
 
-instance (k `A.Alters` v) m => (k `A.Alters` v) (ConduitT i o m) where
-  lookup p   = lift . A.lookup p
-  insert p k = lift . A.insert p k
-  delete p   = lift . A.delete p
-
-instance (Monad m, A.Selectable k v m) => A.Selectable k v (ConduitT i o m) where
-  select p = lift . A.select p
-
 instance HasBlockstanbulContext m => HasBlockstanbulContext (ConduitT i o m) where
   getBlockstanbulContext = lift getBlockstanbulContext
   putBlockstanbulContext = lift . putBlockstanbulContext
@@ -129,6 +121,7 @@ type MonadSequencer m =
   , HasFullPrivacy m
   , (Keccak256 `A.Alters` DependentBlockEntry) m
   , (Keccak256 `A.Alters` ()) m
+  , (Keccak256 `A.Alters` (Proxy WireMessage)) m
   , HasVault m
   )
 
@@ -213,6 +206,7 @@ checkForVotes :: ( MonadLogger m
                  , MonadBlockstanbul m
                  , HasFullPrivacy m
                  , (Keccak256 `A.Alters` DependentBlockEntry) m
+                 , (Keccak256 `A.Alters` (Proxy WireMessage)) m
                  )
               => [CandidateReceived]
               -> ConduitT a SeqEvent m ()
@@ -235,6 +229,7 @@ checkForTimeouts :: ( MonadLogger m
                     , MonadBlockstanbul m
                     , HasFullPrivacy m
                     , (Keccak256 `A.Alters` DependentBlockEntry) m
+                    , (Keccak256 `A.Alters` (Proxy WireMessage)) m
                     )
                  => [RoundNumber]
                  -> ConduitT a SeqEvent m ()
@@ -260,6 +255,7 @@ blockstanbulSend :: ( MonadLogger m
                     , MonadBlockstanbul m
                     , HasFullPrivacy m
                     , (Keccak256 `A.Alters` DependentBlockEntry) m
+                    , (Keccak256 `A.Alters` (Proxy WireMessage)) m
                     )
                  => [InEvent]
                  -> ConduitT a SeqEvent m ()
@@ -273,6 +269,7 @@ blockstanbulSend' :: ( MonadLogger m
                      , MonadBlockstanbul m
                      , (Keccak256 `A.Alters` ChainHashEntry) m
                      , (Keccak256 `A.Alters` DependentBlockEntry) m
+                     , (Keccak256 `A.Alters` (Proxy WireMessage)) m
                      )
                   => InEvent
                   -> ConduitT a SeqEvent m ()
@@ -449,6 +446,7 @@ runBlockWithConsensus :: ( MonadLogger m
                          , MonadBlockstanbul m
                          , HasFullPrivacy m
                          , (Keccak256 `A.Alters` DependentBlockEntry) m
+                         , (Keccak256 `A.Alters` (Proxy WireMessage)) m
                          )
                       => SequencedBlock
                       -> ConduitT a SeqEvent m ()
@@ -490,6 +488,7 @@ runConsensus :: ( MonadLogger m
                 , MonadBlockstanbul m
                 , (Keccak256 `A.Alters` ChainHashEntry) m
                 , (Keccak256 `A.Alters` DependentBlockEntry) m
+                , (Keccak256 `A.Alters` (Proxy WireMessage)) m
                 )
              => ConduitT SequencedBlock SeqEvent m ()
 runConsensus = awaitForever $ \sb -> do
@@ -538,6 +537,7 @@ transformBlocks :: ( MonadLogger m
                    , MonadBlockstanbul m
                    , HasFullPrivacy m
                    , (Keccak256 `A.Alters` DependentBlockEntry) m
+                   , (Keccak256 `A.Alters` (Proxy WireMessage)) m
                    )
                 => [IngestBlock]
                 -> ConduitT a SeqEvent m ()
@@ -601,6 +601,7 @@ splitEvents :: ( MonadLogger m
                , HasFullPrivacy m
                , (Keccak256 `A.Alters` DependentBlockEntry) m
                , (Keccak256 `A.Alters` ()) m
+               , (Keccak256 `A.Alters` (Proxy WireMessage)) m
                )
             => [IngestEvent]
             -> ConduitT a SeqEvent m ()

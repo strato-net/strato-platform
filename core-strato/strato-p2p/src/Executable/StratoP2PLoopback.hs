@@ -6,17 +6,14 @@ module Executable.StratoP2PLoopback (stratoP2PLoopback) where
 
 import Conduit
 import Control.Monad
-import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
 import Data.IORef
 import qualified Data.Set.Ordered as S
 import qualified Data.Text as T
 import qualified Network.Kafka                         as K
 import Prometheus
-import Text.Format
 
 import BlockApps.Logging
-import Blockchain.Blockstanbul (WireMessage)
 import Blockchain.Context
 import Blockchain.Options
 import Blockchain.SeqEventNotify
@@ -41,17 +38,7 @@ stratoP2PLoopback wireMessagesRef = do
   void . runContextM cfg $ do
     ks <- Mod.get (Mod.Proxy @K.KafkaState)
     let toWireMessage = \case
-          P2pBlockstanbul wm -> do
-            let msgHash = rlpHash wm
-            msgExists <- A.exists (A.Proxy @(A.Proxy (Inbound WireMessage))) msgHash
-            if msgExists
-              then do
-                $logInfoS "stratoP2PLoopback/P2pBlockstanbul" . T.pack $ "Already seen inbound wire message " ++ format msgHash ++ ". Not forwarding to Sequencer."
-                pure Nothing
-              else do
-                $logInfoS "stratoP2PLoopback/P2pBlockstanbul" . T.pack $ "First time seeing inbound wire message " ++ format msgHash ++ ". Forwarding to Sequencer."
-                A.insert (A.Proxy @(A.Proxy (Inbound WireMessage))) msgHash A.Proxy
-                pure $ Just wm
+          P2pBlockstanbul wm -> pure $ Just wm
           _ -> pure Nothing
 
     runConduit $

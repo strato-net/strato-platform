@@ -1,16 +1,23 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeOperators #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Blockchain.Blockstanbul.EventLoop where
 
 import Conduit
 import Control.Lens hiding (view)
 import Control.Monad hiding (sequence)
+import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Extra (whenM)
 import Control.Monad.Trans.Except
 import Blockchain.Output
+import Control.Monad.Trans.State.Strict (StateT)
 import Control.Monad.State.Class
 import qualified Data.Map.Strict as M
 import Data.Maybe
@@ -39,6 +46,19 @@ import Text.Format
 
 import Blockchain.Blockstanbul.StateMachine
 
+instance (k `A.Alters` v) m => (k `A.Alters` v) (ConduitT i o m) where
+  lookup p   = lift . A.lookup p
+  insert p k = lift . A.insert p k
+  delete p   = lift . A.delete p
+
+instance (Keccak256 `A.Alters` (A.Proxy WireMessage)) m => (Keccak256 `A.Alters` (A.Proxy WireMessage)) (StateT s m) where
+  lookup p   = lift . A.lookup p
+  insert p k = lift . A.insert p k
+  delete p   = lift . A.delete p
+
+instance (Monad m, A.Selectable k v m) => A.Selectable k v (ConduitT i o m) where
+  select p = lift . A.select p
+
 yieldL :: Monad m => b -> ConduitM a (Either b c) m ()
 yieldL = yield . Left
 
@@ -51,12 +71,28 @@ yieldManyR = yieldMany . map Right
 
 authorize :: (StateMachineM m) => InEvent -> ExceptT String m ()
 authorize = \case
-  IMsg (MsgAuth addr _) _ -> do
+  IMsg a@(MsgAuth addr _) m -> do
     ret <- uses validators (addr `S.member`)
     unless ret $ do
       let reason = "Rejecting message; sender not a validator: " ++ show addr
       $logWarnS "blockstanbul/auth" . T.pack $ reason
       throwE reason
+    let msgHash = rlpHash $ WireMessage a m
+    msgExists <- lift $ A.exists (A.Proxy @(A.Proxy WireMessage)) msgHash
+    if msgExists
+      then do
+        $logInfoS "handleEvents/Blockstanbul" . T.pack $ concat
+          [ "Already seen inbound wire message "
+          , format msgHash
+          , ". Not forwarding to Sequencer."
+          ]
+      else do
+        $logInfoS "handleEvents/Blockstanbul" . T.pack $ concat 
+          [ "First time seeing inbound wire message "
+          , format msgHash
+          , ". Forwarding to Sequencer."
+          ]
+        lift $ A.insert (A.Proxy @(A.Proxy WireMessage)) msgHash A.Proxy
   _ -> return ()
 
 
@@ -180,7 +216,11 @@ nextRound nt = do
                                               (uses validators S.toList)
                                               (uses authSenders M.keys)
 
-eventLoop :: (MonadIO m, MonadLogger m, HasVault m) => BlockstanbulContext -> ConduitM InEvent EOutEvent m BlockstanbulContext
+eventLoop :: ( MonadIO m
+             , MonadLogger m
+             , HasVault m
+             , (Keccak256 `A.Alters` (A.Proxy WireMessage)) m
+             ) => BlockstanbulContext -> ConduitM InEvent EOutEvent m BlockstanbulContext
 eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
   debugShowCtx
   authz <- lift $ isAuthorized ev
@@ -367,7 +407,13 @@ loopback :: EOutEvent -> Maybe InEvent
 loopback (Right (OMsg a m)) = Just $ IMsg a m
 loopback _ = Nothing
 
-sendMessages' :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m, HasVault m) => [InEvent] -> m [EOutEvent]
+sendMessages' :: ( MonadIO m
+                 , MonadLogger m
+                 , HasBlockstanbulContext m
+                 , HasVault m
+                 , (Keccak256 `A.Alters` (A.Proxy WireMessage)) m
+                 )
+              => [InEvent] -> m [EOutEvent]
 sendMessages' wms = do
   -- It may be somewhat confusing, but there are actually 2 StateTs with BlockstanbulContext
   -- Every run of the conduit has one, but the outer monad preserves the context between runs.
@@ -389,10 +435,22 @@ sendMessages' wms = do
       putBlockstanbulContext ctx'
       return evs
 
-sendMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m, HasVault m) => [InEvent] -> m [OutEvent]
+sendMessages :: ( MonadIO m
+                , MonadLogger m
+                , HasBlockstanbulContext m
+                , HasVault m
+                , (Keccak256 `A.Alters` (A.Proxy WireMessage)) m
+                )
+             => [InEvent] -> m [OutEvent]
 sendMessages = fmap (map fromE) . sendMessages'
 
-sendAllMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m, HasVault m) => [InEvent] -> m [OutEvent]
+sendAllMessages :: ( MonadIO m
+                   , MonadLogger m
+                   , HasBlockstanbulContext m
+                   , HasVault m
+                   , (Keccak256 `A.Alters` (A.Proxy WireMessage)) m
+                   )
+                => [InEvent] -> m [OutEvent]
 sendAllMessages wms = do
   eout <- sendMessages' wms
   let out = fromE <$> eout 
