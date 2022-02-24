@@ -1056,7 +1056,6 @@ contract qq {
     getFields ["i"] `shouldReturn` [BInteger 4]
 
   it "can break from a do-while loop" . runTest $ do
-    liftIO $ pendingWith "implement do-while"
     runBS [r|
 contract qq {
   uint i = 0;
