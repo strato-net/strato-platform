@@ -506,7 +506,7 @@ insertIndexTableQuery contracts@(x:_) =
         , "\n  VALUES "
         , inserts
         , [r|
-  ON CONFLICT (address, "chainId") DO UPDATE SET
+  ON CONFLICT (account) DO UPDATE SET
     account = excluded.account,
     address = excluded.address,
     "chainId" = excluded."chainId",

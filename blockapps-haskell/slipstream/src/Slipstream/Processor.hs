@@ -219,16 +219,16 @@ getSolidVMInfoForRow g row = runMaybeT
   <|> checkBloc 
   
   where checkCache = do
-          $logInfoS "getDetailsForRow" . T.pack $ "checking cache for contract details"
+          $logInfoS "getInfoForRow" . T.pack $ "checking cache for contract info"
           MaybeT $ getSolidVMInfo g codePtr
         
         checkMetadata = do
-          $logInfoS "getDetailsForRow" . T.pack $ "checking metadata for contract details"
+          $logInfoS "getInfoForRow" . T.pack $ "checking metadata for contract info"
           src <- lookupT "src" $ actionMetadata row 
           parseAndSet $ deserializeSourceMap src
         
         checkBloc = do
-          $logInfoS "getDetailsForRow" . T.pack $ "checking bloc database for contract details"
+          $logInfoS "getDetailsForRow" . T.pack $ "checking bloc database for contract info"
           details <- (MaybeT $ either (const Nothing) Just <$> getContractDetailsByCodeHash codePtr)
           parseAndSet $ OLD.contractdetailsSrc details
 
@@ -501,8 +501,6 @@ processTheMessages env sqlEnv conn g messages = do
     forM_ deferredForeignKeys $ \deferredForeignKey -> do
       outputData conn $ createForeignIndexesForJoins deferredForeignKey
 
-  outputData conn notifyPostgREST
-
   case length messages of
    0 -> return ()
    1 -> $logInfoS "processTheMessages" "1 message has arrived"
@@ -550,5 +548,7 @@ processTheMessages env sqlEnv conn g messages = do
   $logInfoS "processTheMessages" . T.pack $ "inserting " ++ show (length transactionResults) ++ " transaction results"
 
   forM_ transactionResults $ putTransactionResult
+
+  outputData conn notifyPostgREST
   
   flushPendingWrites g

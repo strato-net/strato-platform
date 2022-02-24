@@ -125,7 +125,7 @@ spec = do
     '123',
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
     '0000000000000000000000000000000000000add')
-  ON CONFLICT (address, "chainId") DO UPDATE SET
+  ON CONFLICT (account) DO UPDATE SET
     account = excluded.account,
     address = excluded.address,
     "chainId" = excluded."chainId",
@@ -209,7 +209,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     '123',
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
     '0000000000000000000000000000000000000add')
-  ON CONFLICT (address, "chainId") DO UPDATE SET
+  ON CONFLICT (account) DO UPDATE SET
     account = excluded.account,
     address = excluded.address,
     "chainId" = excluded."chainId",
@@ -294,7 +294,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     '123',
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
     '0000000000000000000000000000000000000add')
-  ON CONFLICT (address, "chainId") DO UPDATE SET
+  ON CONFLICT (account) DO UPDATE SET
     account = excluded.account,
     address = excluded.address,
     "chainId" = excluded."chainId",
@@ -401,7 +401,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     '77714314',
     'Hello, World!',
     '[["first_field","887"],["second_field","CLOROX DISINFECTING WIPES"]]')
-  ON CONFLICT (address, "chainId") DO UPDATE SET
+  ON CONFLICT (account) DO UPDATE SET
     account = excluded.account,
     address = excluded.address,
     "chainId" = excluded."chainId",
@@ -581,7 +581,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     '77714314',
     'Hello, World!',
     '[["first_field","887"],["second_field","CLOROX DISINFECTING WIPES"]]')
-  ON CONFLICT (address, "chainId") DO UPDATE SET
+  ON CONFLICT (account) DO UPDATE SET
     account = excluded.account,
     address = excluded.address,
     "chainId" = excluded."chainId",
