@@ -875,6 +875,8 @@ runStatement (Xabi.ForStatement maybeInitStatement maybeConditionExp maybeLoopEx
 
 runStatement (Xabi.Break _) = return $ Just SBreak
 
+runStatement (Xabi.Continue _) = return $ Just SContinue
+
 runStatement (Xabi.Return maybeExpression pos) = do
   solidVMBreakpoint pos
   case maybeExpression of
@@ -948,6 +950,7 @@ while condition code = do
       result <- code
       case result of
         Nothing -> while condition code
+        Just SContinue -> while condition code
         Just SBreak -> return Nothing
         _ -> return result
     else return Nothing
@@ -963,6 +966,7 @@ doWhile condition code = do
         then doWhile condition code
         else return Nothing
     Just SBreak -> return Nothing
+    Just SContinue -> doWhile condition code
     _ -> return result
 
 getIndexType :: MonadSM m => AccountPath -> m IndexType
