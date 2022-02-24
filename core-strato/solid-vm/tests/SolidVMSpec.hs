@@ -1061,7 +1061,7 @@ contract qq {
   uint i = 0;
   constructor() public {
     do {
-      if (j == 4) {
+      if (i == 4) {
         break;
       }
       i++;
