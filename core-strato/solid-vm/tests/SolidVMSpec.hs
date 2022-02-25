@@ -573,6 +573,18 @@ contract qq {
 }|]
       getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger 19, BInteger 19]
 
+    it "can declare negative numbers" . runTest $ do
+      runBS [r|
+contract qq {
+  uint x;
+  uint y;
+  constructor() {
+    x = -1;
+    y = -x;
+  }
+}|]
+      getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger (-1), BInteger 1]
+
     it "can require" . runTest $ do
       runBS [r|
 contract qq {
