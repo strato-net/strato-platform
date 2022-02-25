@@ -104,6 +104,8 @@ data Value =
                       -- supporting indexing into bytes32s.
   | SAddressToAscii -- Hack to implement addressToAsciiString without supporting indexing into bytes
   | SMappingSentinel
+  | SBreak
+  | SContinue
   deriving (Show)
 
 --TODO- Remove this sloppy half-measure of Ord, Eq definitions once we move to Solidity static typing
