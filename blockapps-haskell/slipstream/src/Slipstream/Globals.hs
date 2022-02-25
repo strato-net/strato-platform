@@ -101,7 +101,6 @@ isHistoric :: (MonadLogger m, MonadIO m) => IORef Globals -> TableName -> m Bool
 isHistoric globalsIORef name = do
   Globals{..} <- readIORef globalsIORef
   $logInfoS "isHistoric" . T.pack $ "Checking history status of " ++ show name
-  $logInfoS "isHistoric" . T.pack $ "History list: " ++ show historyList
   return $ name `M.member` historyList
 
 {-
@@ -109,14 +108,17 @@ getHistoryList :: MonadIO m => IORef Globals -> m (Set TableName)
 getHistoryList = fmap historyList . readIORef
 -}
 
-addAndEnableHistoryTable :: MonadIO m => IORef Globals -> TableName -> m ()
+addAndEnableHistoryTable :: (MonadIO m, MonadLogger m) => IORef Globals -> TableName -> m ()
 addAndEnableHistoryTable g tableName = do
   globals@Globals{..} <- readIORef g
+  $logInfoS "addAndEnableHisotryTable" . T.pack $ "adding and enabling table to history list: " ++ show tableName
   updateGlobals g globals{historyList=M.insert tableName True historyList}
 
-enableHistoryTable :: MonadIO m => IORef Globals -> TableName -> m Bool
+enableHistoryTable :: (MonadIO m, MonadLogger m) => IORef Globals -> TableName -> m Bool
 enableHistoryTable g tableName = do
   globals@Globals{..} <- readIORef g
+  
+  $logInfoS "enableHistoryTable" . T.pack $ "enabling table in history list: " ++ show tableName
   
   case M.lookup tableName historyList of
     Nothing -> return False
@@ -129,9 +131,10 @@ hasHistoryTable g tableName = do
   Globals{..} <- readIORef g
   return $ tableName `M.member` historyList
 
-disableHistoryTable :: MonadIO m => IORef Globals -> TableName -> m Bool
+disableHistoryTable :: (MonadIO m, MonadLogger m) => IORef Globals -> TableName -> m Bool
 disableHistoryTable g tableName = do
   globals@Globals{..} <- readIORef g
+  $logInfoS "disableHistoryTable" . T.pack $ "Disabling table in history list: " ++ show tableName
   case M.lookup tableName historyList of
     Nothing -> return False
     Just _ -> do

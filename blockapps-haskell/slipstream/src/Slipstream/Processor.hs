@@ -219,16 +219,16 @@ getSolidVMInfoForRow g row = runMaybeT
   <|> checkBloc 
   
   where checkCache = do
-          $logInfoS "getDetailsForRow" . T.pack $ "checking cache for contract details"
+          $logInfoS "getInfoForRow" . T.pack $ "checking cache for contract info"
           MaybeT $ getSolidVMInfo g codePtr
         
         checkMetadata = do
-          $logInfoS "getDetailsForRow" . T.pack $ "checking metadata for contract details"
+          $logInfoS "getInfoForRow" . T.pack $ "checking metadata for contract info"
           src <- lookupT "src" $ actionMetadata row 
           parseAndSet $ deserializeSourceMap src
         
         checkBloc = do
-          $logInfoS "getDetailsForRow" . T.pack $ "checking bloc database for contract details"
+          $logInfoS "getDetailsForRow" . T.pack $ "checking bloc database for contract info"
           details <- (MaybeT $ either (const Nothing) Just <$> getContractDetailsByCodeHash codePtr)
           parseAndSet $ OLD.contractdetailsSrc details
 
@@ -477,20 +477,30 @@ processTheMessages env sqlEnv conn g messages = do
 
   forM_ creates $ \(ccString, cp, o, a, hl) -> do
     cc <- getCC cp ccString
-    forM_ (Map.toList $ cc^.contracts) $ \(nameString, c) -> do
-      let n = T.pack nameString
-      $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o <> ", app=" <> a <> ", name=" <> n
-      let nameParts = (o, if a == n then "" else a, n)
-      outputData conn $ createExpandIndexTable g c nameParts
 
-      when (n `elem` hl) $
+    deferredForeignKeys <- fmap concat $ forM (Map.toList $ cc^.contracts) $ \(nameString, c) -> do
+      let n = T.pack nameString
+
+      --If the request gives this a history list, or if a previous one gave this a history list,
+      --it has a history list
+      historic <- isHistoric g $ historyTableName o a n
+      let hasHistoryTable' = n `elem` hl || historic
+      
+      $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o <> ", app=" <> a <> ", name=" <> n <> " (fields: " <> T.pack (show $ Map.keys $ c^.storageDefs) <> ")" <> if hasHistoryTable' then " HAS HISTORY TABLE" else ""
+      let nameParts = (o, a, n)
+
+      deferredForeignKeys <- outputData conn $ createExpandIndexTable g c nameParts
+
+      when hasHistoryTable' $
         outputData conn $ createExpandHistoryTable g c nameParts
 
       outputData conn . createEventTables g $ contractToEventTables nameParts c
 
-  unless (null messages) $
-    $logDebugS "processTheMessages" . T.pack . unlines . map show $ messages
-  
+      return deferredForeignKeys
+
+    forM_ deferredForeignKeys $ \deferredForeignKey -> do
+      outputData conn $ createForeignIndexesForJoins deferredForeignKey
+
   case length messages of
    0 -> return ()
    1 -> $logInfoS "processTheMessages" "1 message has arrived"
@@ -501,8 +511,8 @@ processTheMessages env sqlEnv conn g messages = do
       let row = combineActions actions
       mapM_ recordAction actions
       recordCombinedAction row
-      $logInfoS "processTheMessages" $ formatAction row
-      $logDebugLS "The diff is " $ actionStorage row
+      $logInfoS "processTheMessages" $ "Combined Action = " <> formatAction row
+      $logDebugLS "the diff is " $ actionStorage row
 
       case actionStorage row of
         Action.EVMDiff{} -> evmInsertsF g row actions acct
@@ -529,11 +539,16 @@ processTheMessages env sqlEnv conn g messages = do
     unless (null ins) $ outputData conn . insertIndexTable $ map indexInsert ins
     outputData conn . insertHistoryTable g $ concatMap historyInserts ins
 
+  forM_ insertsByCodeHash $ \ins -> do
+    unless (null ins) $ outputData conn . insertForeignKeys $ map indexInsert ins
+
   when (length events' > 0) $ 
     outputData conn $ insertExpandEventTables g events'
 
   $logInfoS "processTheMessages" . T.pack $ "inserting " ++ show (length transactionResults) ++ " transaction results"
 
   forM_ transactionResults $ putTransactionResult
+
+  outputData conn notifyPostgREST
   
   flushPendingWrites g
