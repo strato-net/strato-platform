@@ -31,7 +31,6 @@ import           Data.Conduit
 import           Data.Conduit.Network
 import           Data.Either.Combinators
 import           Data.Maybe
-import qualified Data.Set.Ordered                      as S
 import qualified Data.Text                             as T
 import           Data.Traversable                      (for)
 import           UnliftIO
@@ -50,20 +49,18 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.UDP
-import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.TCPClientWithTimeout
 
 import qualified Text.Colors                           as C
 import           Text.Format
 
 runPeer :: (MonadIO m, MonadLogger m, MonadUnliftIO m)
-        => IORef (S.OSet Keccak256)
-        -> PPeer
+        => PPeer
         -> BC.ByteString -- otherServiceCommHost
         -> CommPort      -- otherServiceCommPort
         -> m ()
-runPeer wireMessagesRef peer _ _ = do
-  cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
+runPeer peer _ _ = do
+  cfg <- initConfig flags_maxReturnedHeaders
   runContextM cfg $ do
     ender <- toIO . $logInfoS "runPeer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
     void $ register ender
@@ -129,21 +126,20 @@ runEthClientConduit peer peerSource peerSink seqSource unseqSink peerStr = do
 
 
 runPeerInList :: (MonadIO m, MonadLogger m, MonadUnliftIO m)
-              => IORef (S.OSet Keccak256)
-              -> PPeer
+              => PPeer
               -> BC.ByteString
               -> CommPort
               -> m ()
-runPeerInList wireMessagesRef thePeer otherServiceHost otherServicePort = do
+runPeerInList thePeer otherServiceHost otherServicePort = do
   eErr <- liftIO $ nonviolentDisable thePeer --don't connect to a peer too frequently, out of politeness
   whenLeft eErr $ \err -> do
       $logErrorS "runPeerInList" . T.pack $ "Unable to disable peer:" ++ show err
       $logErrorS "runPeerInList" "Simulating disable..."
       liftIO $ threadDelay $ 10 * 1000 * 1000
-  runPeer wireMessagesRef thePeer otherServiceHost otherServicePort
+  runPeer thePeer otherServiceHost otherServicePort
 
-stratoP2PClient :: IORef (S.OSet Keccak256) -> LoggingT IO ()
-stratoP2PClient wireMessagesRef = do
+stratoP2PClient :: LoggingT IO ()
+stratoP2PClient = do
   $logInfoS "stratoP2PClient" $ T.pack $ "maxConn: " ++ show flags_maxConn
 
   activePeersSem <- liftIO (SSem.new flags_maxConn)
@@ -169,7 +165,7 @@ stratoP2PClient wireMessagesRef = do
           (liftIO (SSem.tryWait sem)) >>= \case
             Nothing -> return ()
             Just _  -> void . forkIO . runLoggingT $ do
-              result <- try $ runPeerInList wireMessagesRef p osch oscp
+              result <- try $ runPeerInList p osch oscp
               liftIO (SSem.signal sem)
               handleRunPeerResult p result
 

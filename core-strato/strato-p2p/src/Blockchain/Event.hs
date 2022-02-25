@@ -48,7 +48,7 @@ import           System.Random
 import           Text.Printf
 import           UnliftIO.Exception
 
-import           Blockchain.Blockstanbul               (blockstanbulSender, WireMessage)
+import           Blockchain.Blockstanbul               (blockstanbulSender)
 import           Blockchain.Context
 import           Blockchain.Data.Block
 import           Blockchain.Data.BlockHeader
@@ -323,8 +323,6 @@ handleEvents peer = awaitForever $ \case
         setPeerAddrIfUnset $ blockstanbulSender wm
         peerAddr <- unPeerAddress <$> access (Proxy @PeerAddress)
         $logInfoS "handleEvents/Blockstanbul" . T.pack $ "blockstanbulPeerAddr: " ++ show peerAddr
-      let msgHash = rlpHash wm
-      lift $ insert (Proxy @(Proxy (Outbound WireMessage))) (pPeerIp peer, msgHash) Proxy
       yieldL $ ToUnseq [IEBlockstanbul wm]
 
     -- private chains
@@ -396,24 +394,6 @@ handleEvents peer = awaitForever $ \case
       P2pBlockstanbul msg -> do
         let outbound = Blockstanbul msg
         $logDebugS "handleEvents/P2pBlockstanbul" . T.pack $ "Outgoing mesage: " ++ show outbound
-        -- let msgHash = rlpHash msg
-        -- msgExists <- lift $ exists (Proxy @(Proxy (Outbound WireMessage))) (pPeerIp peer, msgHash)
-        -- if msgExists
-        --   then $logInfoS "handleEvents/P2pBlockstanbul" $ T.concat
-        --          [ "Already seen outbound wire message "
-        --          , T.pack (format msgHash)
-        --          , ". Not forwarding to peer "
-        --          , pPeerIp peer
-        --          ]
-        --   else do
-        --     $logInfoS "handleEvents/P2pBlockstanbul" $ T.concat
-        --       [ "First time seeing outbound wire message "
-        --       , T.pack (format msgHash)
-        --       , ". Forwarding to peer "
-        --       , pPeerIp peer
-        --       ]
-        --     lift $ insert (Proxy @(Proxy (Outbound WireMessage))) (pPeerIp peer, msgHash) Proxy
-        --     yieldR outbound
         yieldR outbound
       P2pAskForBlocks start _ p -> do
         ss <- lift $ shouldSendToPeer p

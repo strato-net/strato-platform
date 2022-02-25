@@ -7,8 +7,6 @@ module Executable.StratoP2PLoopback (stratoP2PLoopback) where
 import Conduit
 import Control.Monad
 import qualified Control.Monad.Change.Modify           as Mod
-import Data.IORef
-import qualified Data.Set.Ordered as S
 import qualified Data.Text as T
 import qualified Network.Kafka                         as K
 import Prometheus
@@ -19,7 +17,6 @@ import Blockchain.Options
 import Blockchain.SeqEventNotify
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
-import Blockchain.Strato.Model.Keccak256
 
 {-# NOINLINE loopbackEvents #-}
 loopbackEvents :: Vector T.Text Counter
@@ -31,10 +28,10 @@ loopbackEvents = unsafeRegister
 recordEvent :: MonadIO m => T.Text -> m ()
 recordEvent lab = liftIO $ withLabel loopbackEvents lab incCounter
 
-stratoP2PLoopback :: IORef (S.OSet Keccak256) -> LoggingT IO ()
-stratoP2PLoopback wireMessagesRef = do
+stratoP2PLoopback :: LoggingT IO ()
+stratoP2PLoopback = do
   $logInfoS "stratoP2PLoopback" "Reflecting PBFT back to unseq since 2019"
-  cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
+  cfg <- initConfig flags_maxReturnedHeaders
   void . runContextM cfg $ do
     ks <- Mod.get (Mod.Proxy @K.KafkaState)
     let toWireMessage = \case

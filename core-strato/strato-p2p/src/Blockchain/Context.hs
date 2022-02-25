@@ -23,8 +23,6 @@ module Blockchain.Context
     , Stacks(..)
     , MonadP2P
     , TcpPortNumber(..)
-    , Inbound(..)
-    , Outbound(..)
     , Context(..)
     , Config(..)
     , ContextM
@@ -63,16 +61,13 @@ import qualified Control.Monad.Change.Modify           as Mod
 import           Blockchain.Output
 import           Control.Monad.Reader
 import           Data.Default
-import           Data.Foldable                         (toList)
 import qualified Data.Map.Strict                       as M
 import           Data.Maybe
 import           Data.Proxy
-import qualified Data.Set.Ordered                      as S
 import qualified Data.Text                             as T
 import           Data.Time.Clock
 import           GHC.Exts                              (Constraint)
 
-import           Blockchain.Blockstanbul               (WireMessage)
 import           Blockchain.Data.Address
 import           Blockchain.Data.Block
 import           Blockchain.Data.ChainInfo
@@ -135,9 +130,6 @@ class Stacks a m where
 
 newtype TcpPortNumber = TcpPortNumber { unTcpPortNumber :: Int }
 
-newtype Inbound a = Inbound { unInbound :: a }
-newtype Outbound a = Outbound { unOutbound :: a }
-
 data Config = Config
   { configSQLDB              :: SQLDB
   , configRedisBlockDB       :: RBDB.RedisConnection
@@ -147,7 +139,6 @@ data Config = Config
   , configMaxReturnedHeaders :: MaxReturnedHeaders
   , configVaultClient        :: ClientEnv
   , configContext            :: IORef Context
-  , configBlockstanbulWireMessages :: IORef (S.OSet Keccak256)
   }
 
 newtype ActionTimestamp = ActionTimestamp { unActionTimestamp :: Maybe UTCTime }
@@ -170,7 +161,6 @@ data Context = Context
   , remainingBlockHeaders :: RemainingBlockHeaders
   , actionTimestamp       :: ActionTimestamp
   , _blockstanbulPeerAddr :: PeerAddress
-  , _outboundWireMessages :: S.OSet (T.Text, Keccak256)
   }
 
 makeLenses ''Context
@@ -260,34 +250,6 @@ instance MonadIO m => (Keccak256 `A.Alters` OutputBlock) (ReaderT Config m) wher
                . RBDB.withRedisBlockDB . RBDB.getBlocks
   insertMany _ = void . RBDB.withRedisBlockDB . RBDB.insertBlocks
   deleteMany _ = void . RBDB.withRedisBlockDB . RBDB.deleteBlocks
-
-instance MonadIO m => (Keccak256 `A.Alters` (Proxy (Inbound WireMessage))) (ReaderT Config m) where
-  lookup _  k = do
-    wms <- readIORef =<< asks configBlockstanbulWireMessages
-    let b = S.member k wms
-    pure $ if b then Just (Proxy @(Inbound WireMessage)) else Nothing
-  insert _ k _ = asks configBlockstanbulWireMessages >>= flip atomicModifyIORef' (\wms ->
-    let s = S.size wms
-        wms' = if s >= flags_wireMessageCacheSize then S.delete (head $ toList wms) wms else wms
-        wms'' = wms' S.>| k
-     in (wms'', ()))
-  delete _ k = asks configBlockstanbulWireMessages >>= flip atomicModifyIORef' (\wms ->
-    let wms' = S.delete k wms
-     in (wms', ()))
-
-instance MonadIO m => ((T.Text, Keccak256) `A.Alters` (Proxy (Outbound WireMessage))) (ReaderT Config m) where
-  lookup _  k = do
-    wms <- _outboundWireMessages <$> Mod.get (Mod.Proxy @Context)
-    let b = S.member k wms
-    pure $ if b then Just (Proxy @(Outbound WireMessage)) else Nothing
-  insert _ k _ = Mod.modifyStatefully_ (Mod.Proxy @Context) $ do
-    wms <- use outboundWireMessages
-    let s = S.size wms
-        wms' = if s >= flags_wireMessageCacheSize then S.delete (head $ toList wms) wms else wms
-        wms'' = wms' S.>| k
-    assign outboundWireMessages wms''
-  delete _ k = Mod.modifyStatefully_ (Mod.Proxy @Context) $
-    outboundWireMessages %= S.delete k
 
 instance ( MonadIO m
          , MonadUnliftIO m
@@ -431,8 +393,6 @@ type MonadP2P m = ( MonadIO m
                   , All2 '[A.Alters]
                       '[ '(Keccak256, BlockData)
                        , '(Keccak256, OutputBlock)
-                       , '(Keccak256, Proxy (Inbound WireMessage))
-                       , '((T.Text, Keccak256), Proxy (Outbound WireMessage))
                        ] m
                   )
 
@@ -468,8 +428,8 @@ runContextM r = void . runResourceT . flip runReaderT r
 initConfig :: ( MonadLogger m
               , MonadUnliftIO m
               )
-           => IORef (S.OSet Keccak256) -> Int -> m Config
-initConfig wireMessagesRef maxHeaders = do
+           => Int -> m Config
+initConfig maxHeaders = do
   dbs <- openDBs
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
   vaultClient <- do
@@ -487,7 +447,6 @@ initConfig wireMessagesRef maxHeaders = do
     , configMaxReturnedHeaders = MaxReturnedHeaders maxHeaders
     , configVaultClient = vaultClient
     , configContext = initState
-    , configBlockstanbulWireMessages = wireMessagesRef
     }
 
 initContext :: Context
@@ -498,7 +457,6 @@ initContext = Context
   , remainingBlockHeaders = RemainingBlockHeaders []
   , vmTrace=[]
   , _blockstanbulPeerAddr = PeerAddress Nothing
-  , _outboundWireMessages = S.empty
   }
 
 

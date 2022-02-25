@@ -81,11 +81,12 @@ authorize = \case
     msgExists <- lift $ A.exists (A.Proxy @(A.Proxy WireMessage)) msgHash
     if msgExists
       then do
-        $logInfoS "handleEvents/Blockstanbul" . T.pack $ concat
-          [ "Already seen inbound wire message "
-          , format msgHash
-          , ". Not forwarding to Sequencer."
-          ]
+        let reason = concat
+              [ "Rejecting message; already seen inbound wire message "
+              , format msgHash
+              ]
+        $logWarnS "blockstanbul/auth" . T.pack $ reason
+        throwE reason
       else do
         $logInfoS "handleEvents/Blockstanbul" . T.pack $ concat 
           [ "First time seeing inbound wire message "

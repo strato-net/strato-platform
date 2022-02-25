@@ -24,7 +24,6 @@ import           Control.Monad.Trans.Resource
 import qualified Data.ByteString                       as B
 import           Data.Conduit.Network
 import           Data.Maybe                            (fromMaybe)
-import qualified Data.Set.Ordered                      as S
 import qualified Data.Text                             as T
 import           Network.Socket
 import           Network.Wai.Handler.Warp.Internal     (setSocketCloseOnExec)
@@ -38,16 +37,14 @@ import           Blockchain.P2PUtil
 import           Blockchain.SeqEventNotify
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
-import           Blockchain.Strato.Model.Keccak256
 import qualified Text.Colors                           as C
 
 runEthServer :: (MonadIO m, MonadLogger m, MonadUnliftIO m)
-             => IORef (S.OSet Keccak256)
-             -> Int
+             => Int
              -> m ()
-runEthServer wireMessagesRef listenPort = do
+runEthServer listenPort = do
   let settings = setAfterBind setSocketCloseOnExec $ serverSettings listenPort "*"
-  cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
+  cfg <- initConfig flags_maxReturnedHeaders
   runGeneralTCPServer settings $ \app ->
       runContextM cfg $ do    -- Note- the monad has to run here, inside the server connection, because ResourceT should be cleaned up per connection
         let sSource = seqEventNotificationSource $ contextKafkaState initContext
@@ -108,10 +105,10 @@ runEthServerConduit p peerSource peerSink seqSource unseqSink peerStr = do
                   .| eventSink
                   .| peerSink
 
-stratoP2PServer :: IORef (S.OSet Keccak256) -> LoggingT IO ()
-stratoP2PServer wireMessagesRef = do
+stratoP2PServer :: LoggingT IO ()
+stratoP2PServer = do
 
   $logInfoS "stratoP2PServer" $ T.pack $ "connect address: " ++ flags_address
   $logInfoS "stratoP2PServer" $ T.pack $ "listen port:     " ++ show flags_listen
 
-  void $ runEthServer wireMessagesRef flags_listen
+  void $ runEthServer flags_listen
