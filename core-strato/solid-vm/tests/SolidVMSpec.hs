@@ -1009,8 +1009,7 @@ contract qq {
   }
 }|]
 
-  it "can continue" . runTest $ do
-    liftIO $ pendingWith "implement continue"
+  it "can continue in a for-loop" . runTest $ do
     runBS [r|
 contract qq {
   uint i;
@@ -1024,6 +1023,41 @@ contract qq {
   }
 }|]
     getFields ["i"] `shouldReturn` [BInteger 2]
+
+
+  it "can continue in a while-loop" . runTest $ do
+    runBS [r|
+contract qq {
+  uint i;
+  constructor() public {
+    int j = 0;
+    while (j < 10) {
+      j++;
+      if (j % 2 == 0) {
+        continue;
+      }
+      i++;
+    }
+  }
+}|]
+    getFields ["i"] `shouldReturn` [BInteger 5]
+
+  it "can continue in a do-while-loop" . runTest $ do
+    runBS [r|
+contract qq {
+  uint i;
+  constructor() public {
+    int j = 0;
+    do {
+      j++;
+      if (j % 2 == 0) {
+        continue;
+      }
+      i++;
+    } while (j < 10);
+  }
+}|]
+    getFields ["i"] `shouldReturn` [BInteger 6]
 
   it "can break from a for-loop" . runTest $ do
     runBS [r|
