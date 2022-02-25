@@ -30,6 +30,7 @@ spec = do
         cases = [ ("x++", PlusPlus () (Variable () "x"))
                 , ("++x", Unitary () "++" (Variable () "x"))
                 , ("--x", Unitary () "--" (Variable () "x"))
+                , ("-x", Unitary () "-" (Variable () "x"))
                 , ("x--", MinusMinus () (Variable () "x"))
                 , ("x + y", Binary () "+" (Variable () "x") (Variable () "y"))
                 , ("x ** y", Binary () "**" (Variable () "x") (Variable () "y"))

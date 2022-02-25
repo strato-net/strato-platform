@@ -1062,6 +1062,11 @@ expToVar' (Xabi.Variable _ "now") =
 expToVar' (Xabi.Variable _ name) = do
   getVariableOfName name
 
+expToVar' (Xabi.Unitary _ "-" e) = do
+  var <- expToVar e
+  value <- getInt var
+  return $ Constant $ SInteger (value * (-1))
+
 expToVar' (Xabi.PlusPlus _ e) = do
   var <- expToVar e
   value <- getInt var

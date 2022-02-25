@@ -266,7 +266,7 @@ primaryExpression = do
     <|> (uncurry Variable <$> withPosition identifier)
     <|> (do 
             ~(a, (val, nu)) <- withPosition $ do
-              val <- natural
+              val <- integer
               nu <- optionMaybe numberUnit
               pure (val, nu)
             pure $ NumberLiteral a val nu)
@@ -279,14 +279,13 @@ numberUnit = do
     <|> (reserved "finny" >> return Finney)
     <|> (reserved "ether" >> return Ether)
 
-
 parseArgs :: SolidityParser [Expression]
 parseArgs = parens $ commaSep literal
 
 literal :: SolidityParser Expression
 literal = asum
         [ do
-            ~(a, (n, u)) <- withPosition $ (,) <$> natural <*> optionMaybe numberUnit
+            ~(a, (n, u)) <- withPosition $ (,) <$> integer <*> optionMaybe numberUnit
             pure $ NumberLiteral a n u
         , uncurry StringLiteral <$> withPosition stringLiteral
         , uncurry BoolLiteral <$> withPosition (False <$ reserved "false")
