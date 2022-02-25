@@ -876,6 +876,21 @@ contract qq {
   }
 }|]
 
+  it "supports contract equality" . runTest $ do
+    runBS [r|
+contract A {
+}
+
+contract qq {
+  constructor() {
+    A a1 = new A();
+    A a2 = new A();
+    A a3 = a2;
+    assert (a1 != a2);
+    assert (a2 == a3);
+  }
+}|]
+
   it "compares equal againts default" . runTest $ do
     liftIO $ pendingWith "add static typing" --TODO- Jim
     runBS [r|
