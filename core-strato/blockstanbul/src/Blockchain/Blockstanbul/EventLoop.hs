@@ -333,10 +333,10 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
           total <- poolSize
           sentRN <- use pendingRound
           let sameRNCount = maybe 0 S.size . M.lookup rn $ rs
+          rawMsg <- createRoundChangeMessage vn
           when (3 * sameRNCount > total && Just rn > sentRN) $ do
             pendingRound .= Just rn
             $logInfoS "blockstanbul/roundchange" "agreed change"
-            rawMsg <- createRoundChangeMessage vn
             msg <- signMessage rawMsg
             yieldR msg
           when (3 * sameRNCount > 2 * total) $ do
@@ -344,7 +344,6 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
             case next of
               Nothing -> error "TODO(tim): a round was voted on without existing"
               Just r -> nextRound (Round r)
-          rawMsg <- createRoundChangeMessage vn
           yieldL $ OMsg auth rawMsg
           return ()
     Timeout r' -> do
