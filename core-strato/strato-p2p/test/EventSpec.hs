@@ -32,7 +32,6 @@ import qualified Data.Set                              as Set
 import qualified Data.Set.Ordered                      as S
 import qualified Data.Sequence                         as Q
 import           Data.Text (Text)
-import qualified Data.Text                             as T
 import           Text.Printf
 
 import           Blockchain.Blockstanbul
@@ -333,22 +332,15 @@ instance MonadIO m => (Keccak256 `A.Alters` (A.Proxy WireMessage)) (MonadTest m)
      in wms' S.>| k)
   delete _ k = sequencerContext . blockstanbulEvents %= S.delete k
 
-instance (MonadLogger m, MonadIO m) => (Keccak256 `A.Alters` (A.Proxy (Inbound WireMessage))) (MonadTest m) where
+instance MonadIO m => (Keccak256 `A.Alters` (A.Proxy (Inbound WireMessage))) (MonadTest m) where
   lookup _  k = do
     wms <- readIORef =<< use pbftMessages
-    $logErrorS "WIRE_MESSAGES_REF_LOOKUP" $ T.pack $ show wms
     pure $ if S.member k wms then Just (A.Proxy @(Inbound WireMessage)) else Nothing
-  insert _ k _ = do
-    r <- use pbftMessages
-    ms <- readIORef r
-    $logErrorS "WIRE_MESSAGES_REF_PRE_INSERT" $ T.pack $ show ms
-    atomicModifyIORef' r (\wms ->
+  insert _ k _ = use pbftMessages >>= flip atomicModifyIORef' (\wms ->
       let s = S.size wms
           wms' = if s >= 2000 then S.delete (head $ toList wms) wms else wms
           wms'' = wms' S.>| k
        in (wms'', ()))
-    ms' <- readIORef r
-    $logErrorS "WIRE_MESSAGES_REF_POST_INSERT" $ T.pack $ show ms'
   delete _ k = use pbftMessages >>= flip atomicModifyIORef' (\wms -> (S.delete k wms, ()))
 
 instance MonadIO m => ((Text, Keccak256) `A.Alters` (A.Proxy (Outbound WireMessage))) (MonadTest m) where
@@ -624,7 +616,7 @@ spec = do
       ifor_ ctxs $ \i ctx -> (i, _round . _view <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 1 :: Maybe Word256)
   
 
-    fit "should update the round number after failing on a divided network first" $ do
+    it "should update the round number after failing on a divided network first" $ do
       let unseqSink = (unseqEvents %=) . (++)
       peers <- traverse (uncurry $ createPeer unseqSink)
         [ ("node1", "1.2.3.4")
