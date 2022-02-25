@@ -621,9 +621,13 @@ callWrapper from to mContract functionName isRCC argExps  = do
           _ -> do --Maybe the function is actually a getter
             case M.lookup (T.pack functionName) $ contract^.storageDefs of
               Just _ -> do
-                --TODO- this should only exist if the storage variable is declared
-                -- "public", right now I just ignore this and allow anything to be called as a getter
-                return (fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack functionName, OrderedVals [])
+                liftIO $ putStrLn ("callWrapper/getter " ++ functionName) 
+                addCallInfo to contract functionName hsh cc M.empty True
+                --TODO- this should only exist if the storage variable is declared "public", 
+                -- right now I just ignore this and allow anything to be called as a getter
+                val <- fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack functionName
+                popCallInfo
+                return (pure val, OrderedVals [])
               Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.contractName)
 
   when isRCC (
