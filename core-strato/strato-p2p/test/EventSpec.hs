@@ -32,6 +32,7 @@ import qualified Data.Set                              as Set
 import qualified Data.Set.Ordered                      as S
 import qualified Data.Sequence                         as Q
 import           Data.Text (Text)
+import qualified Data.Text                             as T
 import           Text.Printf
 
 import           Blockchain.Blockstanbul
@@ -78,6 +79,7 @@ import           Test.QuickCheck
 import           UnliftIO
 import           UnliftIO.Concurrent                   (threadDelay)
 
+type WMRef = IORef (S.OSet Keccak256)
 
 data TestContext = TestContext
   { _blocks                :: [Block]
@@ -101,7 +103,7 @@ data TestContext = TestContext
   , _genesisBlockHash      :: GenesisBlockHash
   , _bestBlockNumber       :: BestBlockNumber
   , _stringPPeerMap        :: Map String DataPeer.PPeer
-  , _pbftMessages          :: IORef (S.OSet Keccak256)
+  , _pbftMessages          :: WMRef
   , _outboundPbftMessages  :: S.OSet (Text, Keccak256)
   , _unseqEvents           :: [IngestEvent]
   , _sequencerContext      :: SequencerContext
@@ -320,15 +322,22 @@ instance MonadIO m => HasVault (MonadTest m) where
     pk <- use prvKey
     return $ deriveSharedKey pk pub
 
-instance MonadIO m => (Keccak256 `A.Alters` (A.Proxy (Inbound WireMessage))) (MonadTest m) where
+instance (MonadLogger m, MonadIO m) => (Keccak256 `A.Alters` (A.Proxy (Inbound WireMessage))) (MonadTest m) where
   lookup _  k = do
     wms <- readIORef =<< use pbftMessages
+    $logErrorS "WIRE_MESSAGES_REF_LOOKUP" $ T.pack $ show wms
     pure $ if S.member k wms then Just (A.Proxy @(Inbound WireMessage)) else Nothing
-  insert _ k _ = use pbftMessages >>= flip atomicModifyIORef' (\wms ->
-    let s = S.size wms
-        wms' = if s >= 2000 then S.delete (head $ toList wms) wms else wms
-        wms'' = wms' S.>| k
-     in (wms'', ()))
+  insert _ k _ = do
+    r <- use pbftMessages
+    ms <- readIORef r
+    $logErrorS "WIRE_MESSAGES_REF_PRE_INSERT" $ T.pack $ show ms
+    atomicModifyIORef' r (\wms ->
+      let s = S.size wms
+          wms' = if s >= 2000 then S.delete (head $ toList wms) wms else wms
+          wms'' = wms' S.>| k
+       in (wms'', ()))
+    ms' <- readIORef r
+    $logErrorS "WIRE_MESSAGES_REF_POST_INSERT" $ T.pack $ show ms'
   delete _ k = use pbftMessages >>= flip atomicModifyIORef' (\wms -> (S.delete k wms, ()))
 
 instance MonadIO m => ((Text, Keccak256) `A.Alters` (A.Proxy (Outbound WireMessage))) (MonadTest m) where
@@ -377,7 +386,7 @@ newSequencerContext bc = do
 
 -- testContext is useful for testing because it doesn't require
 -- Kafka, postgres, redis, or ethconf.
-testContext :: IORef (S.OSet Keccak256) -> PrivateKey -> SequencerContext -> TestContext
+testContext :: WMRef -> PrivateKey -> SequencerContext -> TestContext
 testContext wireMessagesRef prv ctx = TestContext
   { _blocks                = []
   , _blockHeaders          = []
@@ -417,6 +426,7 @@ runTestPeer f = do
   void . runNoLoggingT . runResourceT $ runReaderT f ctx
 
 execTestPeer :: PrivateKey
+             -> WMRef
              -> [Address]
              -> TestContextM a
              -> IO (a, TestContext)
@@ -424,12 +434,12 @@ execTestPeer = execTestPeerOnRound 0
 
 execTestPeerOnRound :: Word256
                     -> PrivateKey
+                    -> WMRef
                     -> [Address]
                     -> TestContextM a
                     -> IO (a, TestContext)
-execTestPeerOnRound n pk as f = do
+execTestPeerOnRound n pk wmr as f = do
   seqCtx <- newSequencerContext $ (view . round .~ n) (newBlockstanbulContext (fromPrivateKey pk) as)
-  wmr <- newIORef (S.empty)
   ctx <- newIORef $ testContext wmr pk seqCtx
   a <- runLoggingT . runResourceT $ runReaderT f ctx
   ctx' <- readIORef ctx
@@ -445,6 +455,7 @@ execTestPeerWithContext f ctx = do
 data P2PPeer m = P2PPeer
   { _p2pPeerPrivKey     :: PrivateKey
   , _p2pPeerPPeer       :: DataPeer.PPeer
+  , _p2pPeerWireMessageRef :: WMRef
   , _p2pPeerUnseqSource :: TQueue SeqLoopEvent
   , _p2pPeerSeqSource   :: TMChan P2pEvent
   , _p2pPeerUnseqSink   :: [IngestEvent] -> m ()
@@ -459,6 +470,7 @@ createPeer :: Seq.MonadSequencer m
            -> IO (P2PPeer m)
 createPeer unseqSink name ipAddr = do
   privKey <- newPrivateKey
+  wmr <- newIORef (S.empty)
   unseqSource <- newTQueueIO
   seqSource <- newBroadcastTMChanIO
   let sequencer = runConduit $ sourceTQueue unseqSource
@@ -476,6 +488,7 @@ createPeer unseqSink name ipAddr = do
   pure $ P2PPeer
     privKey
     ppeer
+    wmr
     unseqSource
     seqSource
     unseq
@@ -520,12 +533,14 @@ createConnection server client = do
     runServer
     runClient
 
-runConnectionWith :: (PrivateKey -> m (Maybe SomeException) -> IO b) 
+runConnectionWith :: (PrivateKey -> WMRef -> m (Maybe SomeException) -> IO b) 
                   -> P2PConnection m 
                   -> IO (b, b)
 runConnectionWith f connection =
-  let runServer = f (_p2pPeerPrivKey (_serverP2PPeer connection)) $ _runServer connection
-      runClient = f (_p2pPeerPrivKey (_clientP2PPeer connection)) $ _runClient connection
+  let server = _serverP2PPeer connection
+      client = _clientP2PPeer connection
+      runServer = f (_p2pPeerPrivKey server) (_p2pPeerWireMessageRef server) $ _runServer connection
+      runClient = f (_p2pPeerPrivKey client) (_p2pPeerWireMessageRef client) $ _runClient connection
    in concurrently runServer runClient
 
 makeValidators :: [P2PPeer m] -> [Address]
@@ -553,7 +568,7 @@ spec = do
             ContractCreationTX{} -> tx{transactionChainId = Nothing}
             PrivateHashTX{} -> tx
       otx <- (\o -> o{otBaseTx = clearChainId (otBaseTx o), otOrigin = Origin.API}) <$> liftIO (generate arbitrary)
-      let runForTwoSeconds pk = execTestPeer pk validatorAddresses . timeout 2000000
+      let runForTwoSeconds pk wmr = execTestPeer pk wmr validatorAddresses . timeout 2000000
           run = runConnectionWith runForTwoSeconds connection
           postTx = threadDelay 500000 >> (atomically $ writeTMChan (_p2pPeerSeqSource server) (P2pTx otx))
       ((_, serverCtx), (_, clientCtx)) <- fst <$> concurrently run postTx
@@ -586,9 +601,9 @@ spec = do
         ]
       let validators' = take 2 peers
           validatorAddresses = makeValidators validators'
-          runForTwoSeconds :: PrivateKey -> TestContextM a -> IO TestContext
-          runForTwoSeconds pk = fmap snd . execTestPeer pk validatorAddresses . timeout 2000000
-          runSequencers = mapConcurrently (\p -> runForTwoSeconds (_p2pPeerPrivKey p) (_p2pPeerSequencer p)) peers
+          runForTwoSeconds :: PrivateKey -> WMRef -> TestContextM a -> IO TestContext
+          runForTwoSeconds pk wmr = fmap snd . execTestPeer pk wmr validatorAddresses . timeout 2000000
+          runSequencers = mapConcurrently (\p -> runForTwoSeconds (_p2pPeerPrivKey p) (_p2pPeerWireMessageRef p) (_p2pPeerSequencer p)) peers
           runConnections = mapConcurrently (runConnectionWith runForTwoSeconds) connections
           postTimeout = do
             threadDelay 1000000
@@ -603,29 +618,25 @@ spec = do
         [ ("node1", "1.2.3.4")
         , ("node2", "5.6.7.8")
         , ("node3", "9.10.11.12")
-        , ("node4", "13.14.15.16")
         ]
       connections <- traverse (uncurry createConnection)
         [ (peers !! 0, peers !! 1)
         , (peers !! 0, peers !! 2)
-        , (peers !! 0, peers !! 3)
         , (peers !! 1, peers !! 2)
-        , (peers !! 1, peers !! 3)
-        , (peers !! 2, peers !! 3)
         ]
       let validators' = peers
           primaryValidators = [head validators']
           secondaryValidators = tail validators'
           primaryValidatorAddresses = makeValidators primaryValidators
           validatorAddresses = makeValidators validators'
-          runForTwoSecondsPrimary :: Word256 -> PrivateKey -> TestContextM a -> IO TestContext
-          runForTwoSecondsPrimary n pk = fmap snd . execTestPeerOnRound n pk primaryValidatorAddresses . timeout 2000000
-          runForTwoSecondsSecondary :: Word256 -> PrivateKey -> TestContextM a -> IO TestContext
-          runForTwoSecondsSecondary n pk = fmap snd . execTestPeerOnRound n pk validatorAddresses . timeout 2000000
+          runForTwoSecondsPrimary :: Word256 -> PrivateKey -> WMRef -> TestContextM a -> IO TestContext
+          runForTwoSecondsPrimary n pk wmr = fmap snd . execTestPeerOnRound n pk wmr primaryValidatorAddresses . timeout 2000000
+          runForTwoSecondsSecondary :: Word256 -> PrivateKey -> WMRef -> TestContextM a -> IO TestContext
+          runForTwoSecondsSecondary n pk wmr = fmap snd . execTestPeerOnRound n pk wmr validatorAddresses . timeout 2000000
           runForTwoSecondsWithContext :: TestContext -> TestContextM a -> IO TestContext
           runForTwoSecondsWithContext ctx = fmap snd . flip execTestPeerWithContext ctx . timeout 2000000
-          runSequencersPrimary1 = mapConcurrently (\p -> runForTwoSecondsPrimary 0 (_p2pPeerPrivKey p) (_p2pPeerSequencer p)) primaryValidators
-          runSequencersSecondary = mapConcurrently (\p -> runForTwoSecondsSecondary 1000 (_p2pPeerPrivKey p) (_p2pPeerSequencer p)) secondaryValidators
+          runSequencersPrimary1 = mapConcurrently (\p -> runForTwoSecondsPrimary 0 (_p2pPeerPrivKey p) (_p2pPeerWireMessageRef p) (_p2pPeerSequencer p)) primaryValidators
+          runSequencersSecondary = mapConcurrently (\p -> runForTwoSecondsSecondary 1000 (_p2pPeerPrivKey p) (_p2pPeerWireMessageRef p) (_p2pPeerSequencer p)) secondaryValidators
           runSequencers1 = concurrently runSequencersPrimary1 runSequencersSecondary
           runSequencers2 ctxs = mapConcurrently (\(ctx, p) -> runForTwoSecondsWithContext ((sequencerContext . blockstanbulContext . _Just . validators .~ Set.fromList validatorAddresses) ctx) (_p2pPeerSequencer p)) $ zip ctxs peers
           runConnections = mapConcurrently (runConnectionWith $ runForTwoSecondsSecondary 0) connections
@@ -639,9 +650,9 @@ spec = do
             threadDelay 1000000
             for_ secondaryValidators (\p -> atomically $ writeTQueue (_p2pPeerUnseqSource p) (TimerFire 1000))
       ctxs1 <- uncurry (++) . fst <$> concurrently runSequencers1 (concurrently runConnections $ concurrently postTimeoutPrimary1 postTimeoutSecondary)
-      ifor_ ctxs1 $ \i ctx -> (i, _round . _view <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, if i == 0 then Just (1 :: Word256) else Just 1001)
+      ifor_ ctxs1 $ \i ctx -> (i, _round . _view <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, if i == 0 then Just (1 :: Word256) else Just 1000)
       ctxs2 <- fst <$> concurrently (runSequencers2 ctxs1) (concurrently runConnections $ concurrently postTimeoutPrimary2 postTimeoutSecondary)
-      ifor_ ctxs2 $ \i ctx -> (i, _round . _view <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, if i == 0 then Just 1 else Just 1001 :: Maybe Word256)
+      ifor_ ctxs2 $ \i ctx -> (i, _round . _view <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 1001 :: Maybe Word256)
   
   describe "handleEvents" $ do
     it "should pong a ping" $
