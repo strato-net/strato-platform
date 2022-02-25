@@ -180,7 +180,7 @@ spec = parallel $ do
         omsgs5' <- sendMessages aborts
         let omsgs5 = [o | o@(OMsg _ _) <- omsgs5']
             rest5 = omsgs5' \\ omsgs5
-        oMessage (head omsgs5) `shouldBe` mkRoundChange next
+        roundchangeView (oMessage (head omsgs5)) `shouldBe` next
         rest5 `shouldBe` [ResetTimer 21, NewCheckpoint $ Checkpoint next M.empty (map sender as) []]
         use view `shouldReturn` over round (+1) v2
         use proposer `shouldReturn` sender nextPpr
@@ -392,23 +392,26 @@ spec = parallel $ do
         (curView, _) <- setupRound blk . map sender $ [a1, a2, a3]
         next <- uses view (over round (+4))
         let roundNext = _round next
-        sendMessages [IMsg a1 $ mkRoundChange next] `shouldReturn` [OMsg a1 $ mkRoundChange next]
+        [OMsg a1' rc] <- sendMessages [IMsg a1 $ mkRoundChange next]
+        a1' `shouldBe` a1
+        roundchangeView rc `shouldBe` next
         -- 1 vote is not enough
         use pendingRound `shouldReturn` Nothing
         use roundChanged `shouldReturn` M.singleton roundNext (S.singleton (sender a1))
         use view `shouldReturn` curView
         -- 2 votes will be broadcast, but not taken up.
         omsgs <- sendMessages [IMsg a2 $ mkRoundChange next]
-        map oMessage omsgs `shouldBe` [mkRoundChange next, mkRoundChange next]
+        map (roundchangeView . oMessage) omsgs `shouldBe` [next, next]
         use pendingRound `shouldReturn` Just roundNext
         use roundChanged `shouldReturn` M.singleton roundNext (S.fromList [sender a1, sender a2])
         use view `shouldReturn` curView
         -- 3 votes will do it
-        sendMessages [IMsg a3 $ mkRoundChange next] `shouldReturn`
-          [ ResetTimer 24
-          , NewCheckpoint (Checkpoint next M.empty (sort $ map sender [a1, a2, a3]) [])
-          , OMsg a3 $ mkRoundChange next
-          ]
+        omsgs' <- sendMessages [IMsg a3 $ mkRoundChange next]
+        omsgs' !! 0 `shouldBe` ResetTimer 24
+        omsgs' !! 1 `shouldBe` NewCheckpoint (Checkpoint next M.empty (sort $ map sender [a1, a2, a3]) [])
+        let OMsg a3' rc' = omsgs' !! 2
+        a3' `shouldBe` a3
+        roundchangeView rc' `shouldBe` next
         use pendingRound `shouldReturn` Nothing
         use roundChanged `shouldReturn` M.empty
         use view `shouldReturn` next
@@ -506,7 +509,7 @@ spec = parallel $ do
         v <- use view
         omsgs <- sendMessages [IMsg a $ Preprepare v blk]
         next <- uses view (over round (+1))
-        map oMessage omsgs `shouldBe` [mkRoundChange next]
+        map (roundchangeView . oMessage) omsgs `shouldBe` [next]
 
     it "Resets the lock after a commit result -- positive or negative" $ property $ \blk as ->
       runTest $ do
@@ -550,10 +553,9 @@ spec = parallel $ do
         resp <- sendMessages [IMsg (MsgAuth me sig) $ mkRoundChange roundAndSequencePlus1]
         let omsgs = [o | o@(OMsg _ _) <- resp]
             other = resp \\ omsgs
-        map oMessage omsgs `shouldBe` [ mkRoundChange roundAndSequencePlus1
-                                      , Preprepare roundPlus1 blk
-                                      , mkRoundChange roundAndSequencePlus1
-                                      ]
+        roundchangeView (oMessage (omsgs !! 0)) `shouldBe` roundAndSequencePlus1
+        oMessage (omsgs !! 1) `shouldBe` Preprepare roundPlus1 blk
+        roundchangeView (oMessage (omsgs !! 2)) `shouldBe` roundAndSequencePlus1
         other `shouldBe`
           [ResetTimer $ _round roundPlus1
           , NewCheckpoint (Checkpoint roundPlus1 M.empty [me] [])]
