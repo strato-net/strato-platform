@@ -29,6 +29,7 @@ import           Control.Monad
 import           Control.Monad.Change.Alter
 import           Data.Default
 import           Data.Maybe                         (maybeToList)
+import qualified Data.Set                           as Set
 
 import           Control.DeepSeq
 import           GHC.Generics
@@ -43,7 +44,7 @@ import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Util
-import qualified Text.Colors                      as CL
+import qualified Text.Colors                        as CL
 import           Text.Format
 
 data AddressState =
@@ -102,22 +103,29 @@ instance RLPSerializable AddressState where
     resolveCodePtr fails when there is a circular reference of code pointers on the same chain
     possible solution is to have a helper function that keeps track of all previously visited codepointers and termiantes if it visits the same one twice (aka cycle detection)
 --}
-resolveCodePtr :: ( Selectable (Maybe Word256) ParentChainId m
+resolveCodePtr' :: ( Selectable (Maybe Word256) ParentChainId m
                   , (Account `Alters` AddressState) m
                   )
-               => Maybe Word256 -> CodePtr -> m (Maybe CodePtr)
-resolveCodePtr chainId (CodeAtAccount acct name) = do
+               => Set.Set CodePtr -> Maybe Word256 -> CodePtr -> m (Maybe CodePtr)
+resolveCodePtr' visited chainId (CodeAtAccount acct name) = do
   lookup Proxy acct >>= \case
     Nothing -> pure Nothing
     Just AddressState{..} -> do
       let codeAccountChainId = (acct ^. accountChainId)
       isAccessibleChain <- codeAccountChainId `isAncestorChainOf` chainId
-      if isAccessibleChain
-        then resolveCodePtr codeAccountChainId addressStateCodeHash >>= \case
+      if isAccessibleChain && (Set.notMember addressStateCodeHash visited)
+        then resolveCodePtr' (Set.insert addressStateCodeHash visited) codeAccountChainId addressStateCodeHash >>= \case
           Just e@(EVMCode _) -> pure $ Just e
           Just (SolidVMCode _ d) -> pure . Just $ SolidVMCode name d
           _ -> pure Nothing
         else pure Nothing
+resolveCodePtr' _ cid cp = resolveCodePtr cid cp
+   
+resolveCodePtr :: ( Selectable (Maybe Word256) ParentChainId m
+                  , (Account `Alters` AddressState) m
+                  )
+               => Maybe Word256 -> CodePtr -> m (Maybe CodePtr)
+resolveCodePtr chainId coa@(CodeAtAccount _ _) = resolveCodePtr' Set.empty chainId coa
 
 -- for solidVM/EVM code
 resolveCodePtr _ cp = pure $ Just cp
