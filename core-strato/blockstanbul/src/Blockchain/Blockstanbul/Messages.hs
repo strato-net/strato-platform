@@ -65,7 +65,7 @@ data MsgAuth = MsgAuth {
 data TrustedMessage = Preprepare View Block
                     | Prepare View Keccak256
                     | Commit View Keccak256 Signature
-                    | RoundChange {roundchangeView :: View }
+                    | RoundChange {roundchangeView :: View, roundchangeNonce :: Word256 }
                     deriving (Eq, Show, Generic, Binary, NFData, Data)
 
 
@@ -73,7 +73,7 @@ instance Format TrustedMessage where
   format (Preprepare v theBlock) = CL.blue "PRE_PREPARE " ++ format v ++ " " ++ format (blockHash theBlock)
   format (Prepare v theSHA) = CL.blue "PREPARE " ++ format v ++ " " ++ format theSHA
   format (Commit v theSHA _) = CL.blue "COMMIT " ++ format v ++ " " ++ format theSHA
-  format (RoundChange v) = CL.blue "ROUNDCHANGE " ++ format v
+  format (RoundChange v n) = CL.blue "ROUNDCHANGE " ++ format v ++ " " ++ show n
 
 data MessageKind = PreprepareK | PrepareK | CommitK | RoundChangeK deriving (Eq, Show, Enum, Generic)
 
@@ -223,7 +223,7 @@ getHash = \case
               (Preprepare _ blk) -> keccak256ToByteString . blockHash $ blk
               (Prepare _ di) -> keccak256ToByteString di
               (Commit _ di _) -> keccak256ToByteString di
-              (RoundChange _) -> keccak256ToByteString $ hash "TODO(tim): this signature is predictable"
+              (RoundChange _ _) -> keccak256ToByteString $ hash "TODO(tim): this signature is predictable"
 
 instance RLPSerializable View where
   rlpEncode (View r s) = RLPArray [rlpEncode r, rlpEncode s]
@@ -255,11 +255,11 @@ instance RLPSerializable WireMessage where
       , rlpEncode addr
       , rlpEncode sig
       , rlpEncode seal ]
-  rlpEncode (WireMessage (MsgAuth addr sig) (RoundChange vw)) = RLPArray
+  rlpEncode (WireMessage (MsgAuth addr sig) (RoundChange vw n)) = RLPArray
       [ rlpEncode roundchangeCode
       , RLPString . rlpSerialize . RLPArray $
         [ rlpEncode vw,
-          rlpEncode $ unsafeCreateKeccak256FromWord256 0]
+          rlpEncode n]
       , rlpEncode addr
       , rlpEncode sig
       , RLPString ""]
@@ -282,7 +282,7 @@ instance RLPSerializable WireMessage where
                   _ -> error $ "invalid rlp payload for commit: " ++ show body
             3 ->
               case body of
-                  RLPArray [vw, _] -> RoundChange (rlpDecode vw)
+                  RLPArray [vw, n] -> RoundChange (rlpDecode vw) (rlpDecode n)
                   _ -> error $ "invalid rlp payload for roundchange: " ++ show body
 
             _ -> error $ "invalid code for blockstanbul message: " ++ show code
