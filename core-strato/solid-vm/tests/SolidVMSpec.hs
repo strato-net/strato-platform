@@ -1112,6 +1112,24 @@ contract qq {
 }|] `shouldReturn` Nothing
     getFields ["x"] `shouldReturn` [BInteger 100]
 
+  it "can call external getters by variable name" . runTest $ do
+    runBS [r|
+contract S {
+  string s;
+  constructor() {
+    s = "Blockapps";
+  }
+}
+contract qq {
+  string local_s;
+  S myS;
+  constructor() {
+    myS = new S();
+    local_s = myS.s();
+  }
+}|] 
+    getFields ["local_s"] `shouldReturn` [BString "Blockapps"]
+
   it "can cast address to contract" . runTest $ do
     runBS [r|
 contract X {}
