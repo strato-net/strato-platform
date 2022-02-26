@@ -165,7 +165,7 @@ outputData conn c = runConduit $ c
                               `fuseUpstream` mapM_C (dbInsert conn)
 
 baseColumns :: TableColumns
-baseColumns = [ "account"
+baseColumns = [ "record_id"
               , "address"
               , "chainId"
               , "block_hash"
@@ -256,7 +256,7 @@ createForeignIndexesForJoins foreignKey = do
     <> wrapDoubleQuotes (columnName foreignKey)
     <> ") REFERENCES "
     <> tableNameToDoubleQuoteText (foreignTableName foreignKey)
-    <> " (account);"
+    <> " (record_id);"
 
 notifyPostgREST :: OutputM m =>
                    ConduitM () Text m ()
@@ -421,7 +421,7 @@ insertForeignKeys contracts = do
             wrapDoubleQuotes theName <> 
             "=" <> 
             wrapSingleQuotes (escapeQuotes $ T.pack $ show acct) <> 
-            " WHERE account=" <> 
+            " WHERE record_id=" <> 
             wrapSingleQuotes (makeAccount c)
 
 
@@ -447,11 +447,11 @@ createIndexTableQuery contract (o, a, n) =
       list = Map.toList $ contract^.storageDefs
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
-        , csv $ ["account text", "address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
+        , csv $ ["record_id text", "address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
                "block_number text", "transaction_hash text", "transaction_sender text"] ++ tableColumns list
         , ",\n  CONSTRAINT "
         , wrapDoubleQuotes ((escapeQuotes $ tableNameToText tableName) <> "_pkey")
-        , "\n  PRIMARY KEY (address, \"chainId\"), UNIQUE (account) );"
+        , "\n  PRIMARY KEY (address, \"chainId\"), UNIQUE (record_id) );"
         ]
 
 createHistoryTableQuery :: Contract -> (Text, Text, Text) -> Text
@@ -460,7 +460,7 @@ createHistoryTableQuery contract (o, a, n) =
       list = Map.toList $ contract^.storageDefs
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS ", tableNameToDoubleQuoteText tableName, " ("
-        , csv $ ["account text", "address text NOT NULL", "\"chainId\" text NOT NULL", "block_hash text NOT NULL", "block_timestamp text",
+        , csv $ ["record_id text", "address text NOT NULL", "\"chainId\" text NOT NULL", "block_hash text NOT NULL", "block_timestamp text",
                  "block_number text", "transaction_hash text NOT NULL", "transaction_sender text"]
                  ++ tableColumns list
         , ");"
@@ -506,8 +506,8 @@ insertIndexTableQuery contracts@(x:_) =
         , "\n  VALUES "
         , inserts
         , [r|
-  ON CONFLICT (account) DO UPDATE SET
-    account = excluded.account,
+  ON CONFLICT (record_id) DO UPDATE SET
+    record_id = excluded.record_id,
     address = excluded.address,
     "chainId" = excluded."chainId",
     block_hash = excluded.block_hash,
