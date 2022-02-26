@@ -456,7 +456,7 @@ createIndexTableQuery contract (o, a, n) =
 
 createHistoryTableQuery :: Contract -> (Text, Text, Text) -> Text
 createHistoryTableQuery contract (o, a, n) =
-  let tableName = HistoryTableName o a n
+  let tableName = historyTableName o a n
       list = Map.toList $ contract^.storageDefs
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS ", tableNameToDoubleQuoteText tableName, " ("
