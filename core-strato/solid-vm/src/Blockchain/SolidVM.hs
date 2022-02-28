@@ -562,6 +562,9 @@ argsToVals ctract fn args =
            Xabi.NumberLiteral _ n (Just nu) -> todo "Number literal with units" (n, nu)
            Xabi.BoolLiteral _ b -> return . coerceType ctract t $ SBool b
            Xabi.StringLiteral _ s -> return . coerceType ctract t $ SString s
+           Xabi.AccountLiteral _ a -> case t of
+             Xabi.Account -> pure $ SAccount a
+             _ -> typeError "account literal for non account" (t, x)
            Xabi.ArrayExpression _ as -> case t of
               Xabi.Array{Xabi.entry=t'} ->
                 SArray t . V.fromList <$> mapM (fmap Constant . eval t') as

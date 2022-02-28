@@ -27,6 +27,7 @@ import Data.Aeson
 import Data.Source
 import qualified Data.Text as T
 import GHC.Generics
+import Blockchain.Strato.Model.Account
 import SolidVM.Solidity.Xabi.Type
 
 data StatementF a =
@@ -122,6 +123,7 @@ data ExpressionF a =
   | BoolLiteral a Bool
   | NumberLiteral a Integer (Maybe NumberUnit)
   | StringLiteral a String
+  | AccountLiteral a NamedAccount
   | TupleExpression a [Maybe (ExpressionF a)]
   | ArrayExpression a [(ExpressionF a)]
   | Variable a String deriving (Show, Eq, Generic, Functor)
@@ -139,6 +141,7 @@ extractExpression (Ternary a _ _ _) = a
 extractExpression (BoolLiteral a _) = a
 extractExpression (NumberLiteral a _ _) = a
 extractExpression (StringLiteral a _) = a
+extractExpression (AccountLiteral a _) = a
 extractExpression (TupleExpression a _) = a
 extractExpression (ArrayExpression a _) = a
 extractExpression (Variable a _) = a

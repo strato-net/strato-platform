@@ -290,8 +290,23 @@ literal = asum
         , uncurry StringLiteral <$> withPosition stringLiteral
         , uncurry BoolLiteral <$> withPosition (False <$ reserved "false")
         , uncurry BoolLiteral <$> withPosition (True <$ reserved "true")
+        , uncurry AccountLiteral <$> withPosition accountLiteral
         , uncurry ArrayExpression <$> withPosition (brackets $ commaSep literal)
         ]
+
+accountLiteral :: SolidityParser NamedAccount
+accountLiteral = try $ do
+  addrString <- many1 hexDigit
+  addr <- case stringAddress addr of
+    Nothing -> fail $ "Could not decode address from string: " ++ addrString
+    Just a -> pure a
+  chain <- option UnspecifiedChain $ do
+    char ':'
+    (string "main" $> MainChain)
+      <|> (many1 hexDigit >>= \chainStr -> case readMaybe (0x ++ chainStr) of
+          Nothing -> fail $ "Could not parse chain ID from string: " ++ chainStr
+          Just cId -> pure . ExplicitChain . Just $ fromInteger cId
+  pure $ NamedAccount addr chain
 
 inlineAssembly :: SolidityParser Statement
 inlineAssembly = do
