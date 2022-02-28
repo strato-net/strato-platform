@@ -1111,7 +1111,8 @@ expToVar' (Xabi.MemberAccess _ (Xabi.Variable _ "Util") "b32") = do --TODO- remo
   return $ Constant $ SBuiltinFunction "identity" Nothing
 
 expToVar' x@(Xabi.MemberAccess _ expr name) = do
-  val <- getVar =<< expToVar expr
+  var <- expToVar expr
+  val <- getVar var
   chainId <- view accountChainId <$> getCurrentAccount
 
   case (val, name) of
@@ -1181,8 +1182,8 @@ expToVar' x@(Xabi.MemberAccess _ expr name) = do
       (SAccount addr, itemName) -> return $ Constant $ SContractItem addr itemName
 
       (SContract _ a, funcName) -> return $ Constant $ SContractFunction Nothing a funcName
-      (r@(SReference _), "push") -> return $ Constant $ SPush r
-      (a@(SArray _ _), "push") -> return $ Constant $ SPush a
+      (r@(SReference _), "push") -> return $ Constant $ SPush r Nothing
+      (a@(SArray _ _), "push") -> return $ Constant $ SPush a (Just var)
       (SArray _ theVector, "length") -> return $ Constant $ SInteger $ fromIntegral $ V.length theVector
       (SString s, "length") -> return . Constant . SInteger . fromIntegral $ length s
       (SReference apt, "length") -> do
@@ -1489,7 +1490,7 @@ expToVar' (Xabi.FunctionCall _ e args) = do
             Just enumVal -> pure . Constant . SEnumVal enumName enumVal $ fromInteger i
         _ -> typeError "called enum constructor with improper args" argVals
 
-    Constant (SPush theArray) -> Builtins.push theArray argVals
+    Constant (SPush theArray mvar) -> Builtins.push theArray mvar argVals
 
     Constant SHexDecodeAndTrim ->
         case argVals of
