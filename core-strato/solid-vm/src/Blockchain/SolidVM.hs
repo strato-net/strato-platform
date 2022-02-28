@@ -1928,7 +1928,7 @@ encodeForReturn (SAccount a) =
       chainPart = case a ^. namedAccountChainId of
         UnspecifiedChain -> ""
         MainChain -> ":main"
-        ExplicitChain cid -> word256ToBytes $ fromIntegral cid
+        ExplicitChain cid -> ":" <> (word256ToBytes $ fromIntegral cid)
    in pure $ addrPart <> chainPart
 
 encodeForReturn (SContract _ a) = return . word256ToBytes . fromIntegral $ a ^. namedAccountAddress
