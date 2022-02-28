@@ -1923,7 +1923,14 @@ encodeForReturn :: MonadSM m => Value -> m ByteString
 
 encodeForReturn (SInteger i) = return . word256ToBytes . fromIntegral $ i
 encodeForReturn (SEnumVal _ _ v) = return . word256ToBytes . fromIntegral $ v
-encodeForReturn (SAccount a) = return . word256ToBytes . fromIntegral $ a ^. namedAccountAddress
+encodeForReturn (SAccount a) =
+  let addrPart = word256ToBytes . fromIntegral $ a ^. namedAccountAddress
+      chainPart = case a ^. namedAccountChainId of
+        UnspecifiedChain -> ""
+        MainChain -> ":main"
+        ExplicitChain cid -> word256ToBytes $ fromIntegral cid
+   in pure $ addrPart <> chainPart
+
 encodeForReturn (SContract _ a) = return . word256ToBytes . fromIntegral $ a ^. namedAccountAddress
 encodeForReturn (SBool b) = return . word256ToBytes . fromIntegral . fromEnum $ b
 
