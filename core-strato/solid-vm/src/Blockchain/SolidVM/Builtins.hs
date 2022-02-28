@@ -3,14 +3,12 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Blockchain.SolidVM.Builtins where
-import Control.Monad.IO.Class
 import           Blockchain.SolidVM.SetGet
 import           Blockchain.SolidVM.SM
 import           Blockchain.SolidVM.Value
 import           Blockchain.VM.SolidException
 import qualified SolidVM.Model.Storable as MS
 import           Data.Vector as V
-import           Data.IORef
 
 -- Pushes a new value to an array and returns the length of the new array
 push :: MonadSM m => Value -> Maybe Variable -> ValList -> m Variable
@@ -26,9 +24,7 @@ push (SReference apt) _ (OrderedVals [av]) = do
 
 
 push (SArray varType vec) (Just (Variable ref)) (OrderedVals [av]) = do
-  -- get IoRef of this array
-  newRef <- liftIO $ newIORef av
-  let newVar = Variable newRef
+  let newVar = Constant av
       newArr = V.snoc vec newVar 
   setVar (Variable ref) (SArray varType newArr)
   return $ Constant (SInteger $ fromIntegral $ V.length newArr)
