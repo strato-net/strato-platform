@@ -1765,6 +1765,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
     case theType of
       Xabi.Mapping _ _ _-> return ()
       Xabi.Array _ _-> return ()
+      Xabi.Bool -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ T.unpack n]) $ MS.BBool False
       _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ T.unpack n]) MS.BDefault
 
   forM_ (reverse $ contract'^.parents) $ \parent -> do
