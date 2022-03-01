@@ -81,6 +81,7 @@ import Data.Source.Map
 
 import SelectAccessible                         ()
 
+import Slipstream.CodeCollectionTools
 import Slipstream.Data.Action
 import Slipstream.Events
 import Slipstream.Globals
@@ -421,7 +422,7 @@ getCodeCollection f cp ccString = do
 
   case cp of
     SolidVMCode _ _ ->
-      case compileSource $ Map.fromList initList of
+      case fmap resolveLabels $ compileSource $ Map.fromList initList of
         Left e -> error $ "failed parse: "  ++ show e --return $ CodeCollection Map.empty
         Right v -> return v
     EVMCode _ ->

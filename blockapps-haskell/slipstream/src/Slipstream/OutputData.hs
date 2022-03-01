@@ -278,11 +278,11 @@ getDeferredForeignKeys tableName c o a =
 --    deferredForeignKeys' <- fmap concat $
 --      forM (Map.toList $ cc^.contracts) $ \(nameString, c) ->
 
-  flip map [(theName, x) | (theName, VariableDecl{varType=Xabi.Label x}) <- (Map.toList $ c^.storageDefs)] $ \(theName, x) -> 
+  flip map [(theName, x) | (theName, VariableDecl{varType=Xabi.Contract x}) <- (Map.toList $ c^.storageDefs)] $ \(theName, x) -> 
     ForeignKeyInfo {
       tableName=tableName,
       columnName=theName,
-      foreignTableName=indexTableName o a $ T.pack x
+      foreignTableName=indexTableName o a x
       }
 
 createIndexTable :: OutputM m
@@ -379,12 +379,12 @@ expandContractTable globalsIORef contract tableName = do
         case tableName of
           IndexTableName o a n ->
             flip map
-            [(colName, foreignName) | (colName, VariableDecl{varType=Xabi.Label foreignName}) <- extras] $ \(colName, foreignName) -> 
+            [(colName, foreignName) | (colName, VariableDecl{varType=Xabi.Contract foreignName}) <- extras] $ \(colName, foreignName) -> 
             ForeignKeyInfo {
               tableName = tableName,
               columnName = colName,
               foreignTableName = let a' = case a of; "" -> n; _ -> a
-                                 in indexTableName o a' $ T.pack foreignName
+                                 in indexTableName o a' foreignName
               }
           _ -> []
         
