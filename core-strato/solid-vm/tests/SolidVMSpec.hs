@@ -2889,7 +2889,7 @@ contract qq {
       , BBool True
       , BDefault
       ]
-  it "can get the chainID from the account type" . runTest $ do
+  it "can get the chainId from the account type" . runTest $ do
     runBS [r|
 contract qq {
   account a1;
@@ -2899,8 +2899,8 @@ contract qq {
   constructor() public {
     a1 = account(0xdeadbeef, 0xfeedbeef);
     a2 = account(0x123, "main");
-    cid1 = a1.chainID;
-    cid2 = a2.chainID;
+    cid1 = a1.chainId;
+    cid2 = a2.chainId;
   }
 }|]
     getFields ["cid1", "cid2"] `shouldReturn`
@@ -2908,13 +2908,13 @@ contract qq {
       , BInteger 0
       ]
 
-  it "can't access the chainID of an account with an Unknown ChainID" $ (runTest (runBS [r|
+  it "can't access the chainId of an account with an Unknown ChainID" $ (runTest (runBS [r|
 contract qq {
   account a3;
   uint cid3;
   constructor() public {
     a3 = account(0x124);
-    cid3 = a3.chainID;
+    cid3 = a3.chainId;
   }
 }|])) `shouldThrow` anyInternalError 
 
