@@ -3,15 +3,16 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Blockchain.SolidVM.Builtins where
-
 import           Blockchain.SolidVM.SetGet
 import           Blockchain.SolidVM.SM
 import           Blockchain.SolidVM.Value
 import           Blockchain.VM.SolidException
 import qualified SolidVM.Model.Storable as MS
+import           Data.Vector as V
 
-push :: MonadSM m => Value -> ValList -> m Variable
-push (SReference apt) (OrderedVals [av]) = do
+-- Pushes a new value to an array and returns the length of the new array
+push :: MonadSM m => Value -> Maybe Variable -> ValList -> m Variable
+push (SReference apt) _ (OrderedVals [av]) = do
   let lenPath = apt `apSnoc` MS.Field "length"
   len' <- getInt $ Constant $ SReference lenPath
   let len :: Int = fromIntegral len'
@@ -20,12 +21,19 @@ push (SReference apt) (OrderedVals [av]) = do
   setVar (Constant (SReference lenPath)) newLen
   setVar (Constant (SReference idxPath)) av
   return $ Constant newLen
+
+
+push (SArray varType vec) (Just (Variable ref)) (OrderedVals [av]) = do
+  let newVar = Constant av
+      newArr = V.snoc vec newVar 
+  setVar (Variable ref) (SArray varType newArr)
+  return $ Constant (SInteger $ fromIntegral $ V.length newArr)
 --  liftIO $ putStrLn $ "address = " ++ show address
 --  liftIO $ putStrLn $ "apt = " ++ show apt
 --  liftIO $ putStrLn $ "vallist = " ++ show newVal
 --  error "undefined push"
-push _ argVals = do
-  invalidArguments "push" argVals
+push _ _ argVals = do
+  invalidArguments "push" argVals 
 
 {-
     Constant (SPush apt) -> do

@@ -1344,6 +1344,17 @@ contract qq {
 }|] `shouldReturn` Nothing
     getFields ["x"] `shouldReturn` [BInteger 10]
 
+  it "can push to memory arrays" . runTest $ do
+    runCall "pushMem" "([3, 5])" [r|
+contract qq {
+  uint x;
+  function pushMem(uint[] memory ts) public {
+    ts.push(7);
+    uint[] cpy = ts; 
+    x = cpy[2];
+  }
+}|] `shouldReturn` Nothing
+    getFields ["x"] `shouldReturn` [BInteger 7]
 
   it "can store array literals" . runTest $ do
     runBS [r|

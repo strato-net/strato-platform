@@ -72,6 +72,25 @@ instance Show Variable where
   show (Variable _) = "<variable>"
   show (Constant v) = "Constant: " ++ show v
 
+-- Util functions to help display variables within the IO monad, since it reads from an IO ref to get the variable's value
+-- Uncomment when needed
+-- showVariable :: MonadIO m => Variable -> m String
+-- showVariable (Variable v) = do 
+--   val <- liftIO $ readIORef v
+--   showValue val 
+-- showVariable (Constant c) = showValue c 
+
+-- showValue :: MonadIO m => Value -> m String
+-- Only implemented useful show for Arrays, as they are the most commonly used values that use IORefs 
+-- showValue (SArray _ vc) = do
+--   ss <- mapM showVariable vc 
+--   let s :: String 
+--       s = foldl insertComma "SArray: " ss
+--   return s
+-- showValue v = return $ show v
+
+-- insertComma :: String -> String -> String
+-- insertComma a b = a ++ ", " ++ b 
 --TODO- we need to figure out this ambiguity on the Address types....
 --Sometimes address is and integer (solidity can treat an integer as an address),
 --sometimes it is a proper type.
@@ -96,7 +115,7 @@ data Value =
   | SContractItem NamedAccount String
   | SContract String NamedAccount
   | SContractFunction (Maybe String) NamedAccount String -- contractName, address, functionName
-  | SPush Value -- The array function
+  | SPush Value (Maybe Variable)-- The array function
   | SNULL
   | SReference AccountPath  -- An alias to an existing variable, so that modifications
                               -- can be canonicalized
