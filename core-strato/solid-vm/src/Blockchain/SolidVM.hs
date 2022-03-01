@@ -1179,7 +1179,7 @@ expToVar' x@(Xabi.MemberAccess _ expr name) = do
             addr <- accountOnUnspecifiedChain <$> getCurrentAccount
             return $ Constant $ SContractFunction (Just $ _contractName $ last ps) addr method
       (SAccount a, "chainID") ->  case (a ^. namedAccountChainId) of
-        UnspecifiedChain ->  internalError "Can't access the ChainID of an account with an unspecified ChainID"  (0 :: Integer)
+        UnspecifiedChain ->  internalError "Can't access the ChainID of an account with an unspecified ChainID"  (a)
         MainChain ->  return $ Constant $ SInteger 0 
         ExplicitChain cid -> return $ Constant $ intBuiltin $ flip (:) [] $ SString $ B.foldr showHex "" $ word256ToBytes cid
       (SAccount addr, itemName) -> return $ Constant $ SContractItem addr itemName
