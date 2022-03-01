@@ -77,6 +77,10 @@ anyInvalidWriteError :: Selector HandledException
 anyInvalidWriteError (HE Blockchain.SolidVM.Exception.InvalidWrite{}) = True
 anyInvalidWriteError _ = False
 
+anyInternalError :: Selector HandledException
+anyInternalError (HE Blockchain.SolidVM.Exception.InternalError{}) = True
+anyInternalError _ = False
+
 anyIndexOOBError :: Selector HandledException
 anyIndexOOBError (HE Blockchain.SolidVM.Exception.IndexOutOfBounds{}) = True
 anyIndexOOBError _ = False
@@ -2885,6 +2889,34 @@ contract qq {
       , BBool True
       , BDefault
       ]
+  it "can get the chainID from the account type" . runTest $ do
+    runBS [r|
+contract qq {
+  account a1;
+  account a2;
+  uint cid1;
+  uint cid2;
+  constructor() public {
+    a1 = account(0xdeadbeef, 0xfeedbeef);
+    a2 = account(0x123, "main");
+    cid1 = a1.chainID;
+    cid2 = a2.chainID;
+  }
+}|]
+    getFields ["cid1", "cid2"] `shouldReturn`
+      [ BInteger 0xfeedbeef
+      , BInteger 0
+      ]
+
+  it "can't access the chainID of an account with an Unknown ChainID" $ (runTest (runBS [r|
+contract qq {
+  account a3;
+  uint cid3;
+  constructor() public {
+    a3 = account(0x124);
+    cid3 = a3.chainID;
+  }
+}|])) `shouldThrow` anyInternalError 
 
   it "can parse an X509 certificate" . runTest $ do
     runBS [r|
