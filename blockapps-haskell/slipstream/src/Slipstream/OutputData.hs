@@ -449,9 +449,7 @@ createIndexTableQuery contract (o, a, n) =
         [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
         , csv $ ["record_id text", "address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
                "block_number text", "transaction_hash text", "transaction_sender text"] ++ tableColumns list
-        , ",\n  CONSTRAINT "
-        , wrapDoubleQuotes ((escapeQuotes $ tableNameToText tableName) <> "_pkey")
-        , "\n  PRIMARY KEY (address, \"chainId\"), UNIQUE (record_id) );"
+        , ",\n  PRIMARY KEY (record_id) );"
         ]
 
 createHistoryTableQuery :: Contract -> (Text, Text, Text) -> Text
