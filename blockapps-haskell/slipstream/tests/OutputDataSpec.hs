@@ -105,8 +105,7 @@ spec = do
     block_number text,
     transaction_hash text,
     transaction_sender text,
-  CONSTRAINT "Vehicle_pkey"
-  PRIMARY KEY (address, "chainId"), UNIQUE (record_id) );|]
+  PRIMARY KEY (record_id) );|]
 
       vehicleInsert `shouldBe`
           [r|INSERT INTO "Vehicle" ("record_id",
@@ -174,8 +173,7 @@ spec = do
     block_number text,
     transaction_hash text,
     transaction_sender text,
-  CONSTRAINT "Vehicle_pkey"
-  PRIMARY KEY (address, "chainId"), UNIQUE (record_id) );|]
+  PRIMARY KEY (record_id) );|]
 
       historyCreate `shouldBe`
           [r|CREATE TABLE IF NOT EXISTS "history@Vehicle" (record_id text,
@@ -274,8 +272,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     block_number text,
     transaction_hash text,
     transaction_sender text,
-  CONSTRAINT "\"Vehicle''''_pkey"
-  PRIMARY KEY (address, "chainId"), UNIQUE (record_id) );|]
+  PRIMARY KEY (record_id) );|]
 
       vehicleInsert `shouldBe`
           [r|INSERT INTO "\"Vehicle''''" ("record_id",
@@ -368,8 +365,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     "number" decimal,
     "str" text,
     "strukt" jsonb,
-  CONSTRAINT "MyOrg-MyApp-SwissArmy_pkey"
-  PRIMARY KEY (address, "chainId"), UNIQUE (record_id) );|]
+  PRIMARY KEY (record_id) );|]
 
     swissArmyInsert `shouldBe` [r|INSERT INTO "MyOrg-MyApp-SwissArmy" ("record_id",
     "address",
@@ -548,8 +544,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     "number" decimal,
     "str" text,
     "strukt" jsonb,
-  CONSTRAINT "SwissArmy_pkey"
-  PRIMARY KEY (address, "chainId"), UNIQUE (record_id) );|]
+  PRIMARY KEY (record_id) );|]
 
     swissArmyInsert `shouldBe` [r|INSERT INTO "SwissArmy" ("record_id",
     "address",
