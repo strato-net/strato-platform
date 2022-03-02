@@ -679,7 +679,7 @@ insertEventTableQuery ev =
      tableName = EventTableName org app cname (escapeQuotes $ T.pack $ Action.evName ev)
 
      cols = wrapAndEscapeDouble . map escapeQuotes $ ["id", "address"] ++ (map (T.pack . fst) $ Action.evArgs ev)
-     vals = csv $ map (wrapSingleQuotes . T.pack . snd) $ Action.evArgs ev
+     vals = csv $ map (wrapSingleQuotes . escapeQuotes . T.pack . snd) $ Action.evArgs ev
  in T.concat
         [ "INSERT INTO "
         , tableNameToDoubleQuoteText tableName
