@@ -1996,6 +1996,25 @@ contract qq {
   }
 }|] `shouldReturn` Just "Ticket ID already exists\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL"
 
+  it "can return state variables" . runTest $ do
+    runCall "getS" "()" [r|
+contract qq {
+  string s = "The mitochondria is the powerhouse of the cell";
+  function getS() public returns (string) {
+    return s;
+  }
+}|] `shouldReturn` Just "\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL \NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL.The mitochondria is the powerhouse of the cell"
+
+  it "can return state variables in tuples" . runTest $ do
+
+    runCall "getSAndB" "()" [r|
+contract qq {
+  string s = "The mitochondria is the powerhouse of the cell";
+  function getSAndB() public returns (string, s) {
+    return (s, s);
+  }
+}|] `shouldReturn` Just "\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL@\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\142\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL.The mitochondria is the powerhouse of the cell\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL.The mitochondria is the powerhouse of the cell"
+
   it "can accept string arguments" . runTest $ do
     runCall "set" "(\"deadbeef00000000000000000000000000000000000000000000000000000000\")" [r|
 contract qq {
