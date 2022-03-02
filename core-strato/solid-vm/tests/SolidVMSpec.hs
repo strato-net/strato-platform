@@ -2886,7 +2886,7 @@ contract qq {
       , BDefault
       ]
 
-  it "testyboi" $ (runTest (runBS [r|
+  it "can't assign a value to an unallocated index in an array" $ (runTest (runBS [r|
 contract qq {
   uint z;
   uint[] x;
