@@ -9,7 +9,10 @@ import           Data.Source
 import qualified Data.Text as T
 import           Text.Parsec
 import           Text.Parsec.Expr
+import           Text.Read                          (readMaybe)
 
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Account
 import           SolidVM.Solidity.Parse.Lexer
 import           SolidVM.Solidity.Parse.ParserTypes
 import           SolidVM.Solidity.Parse.Types
@@ -297,15 +300,15 @@ literal = asum
 accountLiteral :: SolidityParser NamedAccount
 accountLiteral = try $ do
   addrString <- many1 hexDigit
-  addr <- case stringAddress addr of
+  addr <- case stringAddress addrString of
     Nothing -> fail $ "Could not decode address from string: " ++ addrString
     Just a -> pure a
   chain <- option UnspecifiedChain $ do
-    char ':'
-    (string "main" $> MainChain)
-      <|> (many1 hexDigit >>= \chainStr -> case readMaybe (0x ++ chainStr) of
-          Nothing -> fail $ "Could not parse chain ID from string: " ++ chainStr
-          Just cId -> pure . ExplicitChain . Just $ fromInteger cId
+    void $ char ':'
+    (MainChain <$ string "main")
+      <|> (many1 hexDigit >>= \chainStr -> case readMaybe ("0x" ++ chainStr) of
+          Nothing -> fail $ "Could not parse chainId from string: " ++ chainStr
+          Just cId -> pure . ExplicitChain $ fromInteger cId)
   pure $ NamedAccount addr chain
 
 inlineAssembly :: SolidityParser Statement

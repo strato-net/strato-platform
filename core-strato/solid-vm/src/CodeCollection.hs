@@ -191,6 +191,7 @@ expressionCrawler = \case
   Xabi.BoolLiteral{} -> ["BoolLiteral"]
   Xabi.NumberLiteral{} -> ["NumberLiteral"]
   Xabi.StringLiteral{} -> ["StringLiteral"]
+  Xabi.AccountLiteral{} -> ["AccountLiteral"]
   Xabi.TupleExpression _ subexprs -> "TupleExpression" : do
     expr <- catMaybes subexprs
     expressionCrawler expr

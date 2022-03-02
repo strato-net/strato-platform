@@ -89,6 +89,7 @@ expressionHelper (Ternary _ a b c) =
 expressionHelper (BoolLiteral _ _) = []
 expressionHelper (NumberLiteral _ _ _) = []
 expressionHelper (StringLiteral _ _) = []
+expressionHelper (AccountLiteral _ _) = []
 expressionHelper (TupleExpression _ es) =
   concat $ maybe [] expressionHelper <$> es
 expressionHelper (ArrayExpression _ es) = concat $ expressionHelper <$> es

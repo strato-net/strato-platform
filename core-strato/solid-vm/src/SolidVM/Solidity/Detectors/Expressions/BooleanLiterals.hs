@@ -91,6 +91,7 @@ expressionHelper (BoolLiteral a _) =
   ["Misuse of boolean literal. Consider removing." <$ a]
 expressionHelper (NumberLiteral _ _ _) = []
 expressionHelper (StringLiteral _ _) = []
+expressionHelper (AccountLiteral _ _) = []
 expressionHelper (TupleExpression _ es) =
   concat $ maybe [] expressionHelper <$> es
 expressionHelper (ArrayExpression _ es) = concat $ expressionHelper <$> es
