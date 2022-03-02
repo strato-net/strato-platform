@@ -249,8 +249,8 @@ valueToText = \case
 simpleValueToText :: SimpleValue -> Text
 simpleValueToText sv = case sv of
   ValueBool tf -> if tf then "true" else "false"
-  ValueAddress addr -> Text.pack $ "0x" ++ formatAddressWithoutColor addr
-  ValueAccount acct -> Text.pack $ "0x" ++ show acct
+  ValueAddress addr -> Text.pack $ formatAddressWithoutColor addr
+  ValueAccount acct -> Text.pack $ show acct
   ValueString tx -> '"' `Text.cons` tx `Text.snoc` '"'
   ValueInt _ _ v -> Text.pack $ show v
   ValueBytes _ b -> Text.pack $ show . Base16.encode $ b
