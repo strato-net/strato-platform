@@ -2886,6 +2886,63 @@ contract qq {
       , BDefault
       ]
 
+  it "testyboi" $ (runTest (runBS [r|
+contract qq {
+  uint[] y;
+  uint z;
+  uint[] x;
+  uint[] myVar;
+  constructor() {
+    myVar = f();
+    z = myVar[0];
+  }
+  function f() returns (uint[]) {
+    // assignment of first value
+    uint[] x;
+    x[0] = 1;
+    return x;
+  }
+  function g() returns (uint[]) {
+    // assignment of second value
+    uint[] x;
+    x[1] = 2;
+    return x;
+  }
+  function h() returns (uint[]) {
+    // assignment of two values
+    uint[] x;
+    x[0] = 1;
+    x[1] = 2;
+    return x;
+  }
+  function i() {
+    // assignment, set state variable
+    uint[] x;
+    x[0] = 1;
+    y = x;
+  }
+  function j() {
+    // assignment of first value, set state variable to array element
+    uint[] x;
+    x[0] = 1;
+    z = x[0];
+  }
+  function k() {
+    // assignment of second value, set state variable to array element
+    uint[] x;
+    x[1] = 2;
+    z = x[1];
+  }
+  }|])) `shouldThrow` anyInvalidWriteError
+--    getFields ["z"] `shouldReturn` [BInteger 1]
+--  getFields ["x"]
+    {-getAll
+      [ [Field "x", Field "length"]
+      , [Field "x",  ArrayIndex 0]
+      ] `shouldReturn` [  BInteger 1
+                        , BInteger 1]-}
+
+
   it "can parse an X509 certificate" . runTest $ do
     runBS [r|
 contract qq {

@@ -693,6 +693,7 @@ runStatement st@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary _ "
       indVal <- getVar =<< expToVar indExp
       case indVal of
         SInteger ind -> do
+          when (ind >= toInteger (V.length fs) || 0 > ind) (invalidWrite "Cannot assign a value outside the allocated space for an array" (unparseStatement st))
           let newVec = fs V.// [(fromIntegral ind, srcVar)]
           setVar pVar (SArray typ newVec)
           return Nothing
