@@ -885,9 +885,10 @@ runStatement (Xabi.Return maybeExpression pos) = do
   solidVMBreakpoint pos
   case maybeExpression of
     Just e -> do
-      ql <- expToVar e
-      qlql <- getVar ql
-      return $ Just qlql
+      var <- expToVar e
+      var' <- getVar var
+      onTraced $ liftIO $ putStrLn $ (C.green ">> Returned value: ") ++ show var'
+      return $ Just var'
 --      fmap Just $ getVar =<< expToVar e
     Nothing -> return $ Just SNULL
 
@@ -1874,9 +1875,8 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro = do
 --  forM_ locals $ \(n, (_, v)) -> do
 --    liftIO $ putStrLn "need to initialize the storage 2"
 --    initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack n) v
-  let !commands = fromMaybe (missingField "function call: function has been declared but not defined" funcName) $ Xabi.funcContents theFunction
+  let !commands = fromMaybe (missingField "Function call: function has been declared but not defined" funcName) $ Xabi.funcContents theFunction
   val <- runStatements commands
-
   let findNamedReturns = do
         case returns of
           [] -> return Nothing
@@ -1895,7 +1895,6 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro = do
               case mReturnVar of
                 Nothing -> unknownVariable "findNamedReturns" name
                 Just returnVar -> Constant <$> getVar (snd returnVar)
-
   val' <- case val of
              Nothing -> findNamedReturns
              Just SNULL -> findNamedReturns
