@@ -2927,6 +2927,23 @@ contract qq {
       , BDefault
       ]
 
+  it "can't assign a value to an unallocated index in an array" $ (runTest (runBS [r|
+contract qq {
+  uint z;
+  uint[] x;
+  uint[] myVar;
+  constructor() {
+    myVar = f();
+    z = myVar[0];
+  }
+  function f() returns (uint[]) {
+    // assignment of first value
+    uint[] x;
+    x[0] = 1;
+    return x;
+  }
+  }|])) `shouldThrow` anyInvalidWriteError
+
   it "can parse an X509 certificate" . runTest $ do
     runBS [r|
 contract qq {
