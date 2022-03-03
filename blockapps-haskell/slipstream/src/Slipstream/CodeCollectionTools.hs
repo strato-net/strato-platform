@@ -27,8 +27,9 @@ resolveLabelsInDef contractDefs enumDefs structDefs x@VariableDecl{varType=Xabi.
   case (labelName `M.member` contractDefs,
         labelName `M.member` structDefs,
         labelName `M.member` enumDefs) of
-    (True, _, _) -> x{varType=Xabi.Contract $ T.pack labelName}
     (_, True, _) -> x{varType=Xabi.Enum Nothing (T.pack labelName) Nothing}
     (_, _, True) -> x{varType=Xabi.Struct Nothing (T.pack labelName)}
-    _ -> error $ "unknown label in call to resolveLabelsInDef: " ++ labelName
+    (True, _, _) -> x{varType=Xabi.Contract $ T.pack labelName}
+    _ -> x{varType=Xabi.Label labelName}
+    -- _ -> error $ "unknown label in call to resolveLabelsInDef: " ++ labelName
 resolveLabelsInDef _ _ _ x = x
