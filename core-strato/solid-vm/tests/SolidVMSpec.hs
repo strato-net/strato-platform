@@ -77,6 +77,10 @@ anyInvalidWriteError :: Selector HandledException
 anyInvalidWriteError (HE Blockchain.SolidVM.Exception.InvalidWrite{}) = True
 anyInvalidWriteError _ = False
 
+anyInternalError :: Selector HandledException
+anyInternalError (HE Blockchain.SolidVM.Exception.InternalError{}) = True
+anyInternalError _ = False
+
 anyIndexOOBError :: Selector HandledException
 anyIndexOOBError (HE Blockchain.SolidVM.Exception.IndexOutOfBounds{}) = True
 anyIndexOOBError _ = False
@@ -2944,6 +2948,29 @@ contract qq {
       [ BBool True
       , BBool True
       , BDefault
+      ]
+  it "can get the chainId from the account type" . runTest $ do
+    runBS [r|
+contract qq {
+  account a1;
+  account a2;
+  account a3;
+  uint cid1;
+  uint cid2;
+  uint cid3;
+  constructor() public {
+    a1 = account(0xdeadbeef, 0xfeedbeef);
+    a2 = account(0x123, "main");    
+    a3 = account(0x124);
+    cid1 = a1.chainId;
+    cid2 = a2.chainId;
+    cid3 = a3.chainId;
+  }
+}|]
+    getFields ["cid1", "cid2", "cid3"] `shouldReturn`
+      [ BInteger 0xfeedbeef
+      , BInteger 0
+      , BInteger 0
       ]
 
   it "can't assign a value to an unallocated index in an array" $ (runTest (runBS [r|

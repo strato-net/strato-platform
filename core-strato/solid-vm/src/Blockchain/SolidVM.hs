@@ -92,7 +92,8 @@ import           Blockchain.SolidVM.SM
 import qualified Text.Colors                          as C
 import           Text.Format
 import           Text.Tools
-
+import           Blockchain.Strato.Model.ExtendedWord()
+import           Numeric  (showHex)
 import qualified SolidVM.Model.Storable as MS
 
 import           SolidVM.Solidity.Parse.Statement
@@ -1189,7 +1190,14 @@ expToVar' x@(Xabi.MemberAccess _ expr name) = do
           ps -> do
             addr <- accountOnUnspecifiedChain <$> getCurrentAccount
             return $ Constant $ SContractFunction (Just $ _contractName $ last ps) addr method
-
+      (SAccount a, "chainId") ->  case (a ^. namedAccountChainId) of
+        UnspecifiedChain ->  do 
+          cid2 <- view accountChainId <$> getCurrentAccount
+          case cid2 of
+            Nothing -> return $ Constant $ SInteger 0 
+            Just cid3 -> return $ Constant $ intBuiltin $ flip (:) [] $ SString $ B.foldr showHex "" $ word256ToBytes cid3
+        MainChain ->  return $ Constant $ SInteger 0 
+        ExplicitChain cid -> return $ Constant $ intBuiltin $ flip (:) [] $ SString $ B.foldr showHex "" $ word256ToBytes cid
       (SAccount addr, itemName) -> return $ Constant $ SContractItem addr itemName
 
       (SContract _ a, funcName) -> return $ Constant $ SContractFunction Nothing a funcName

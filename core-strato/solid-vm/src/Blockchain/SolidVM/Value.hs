@@ -262,7 +262,7 @@ createDefaultValue _ x = todo "createDefaultValue" x
 
 
 {-
-byteStringToValue :: ByteString -> Maybe Value
+byteStringToValue :: B.ByteString -> Maybe Value
 byteStringToValue x | x == B.singleton 128 = Nothing
 byteStringToValue x = Just . SInteger . rlpDecode . rlpDeserialize $ x
 
