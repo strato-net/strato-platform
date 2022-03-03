@@ -2894,29 +2894,24 @@ contract qq {
 contract qq {
   account a1;
   account a2;
+  account a3;
   uint cid1;
   uint cid2;
-  constructor() public {
-    a1 = account(0xdeadbeef, 0xfeedbeef);
-    a2 = account(0x123, "main");
-    cid1 = a1.chainId;
-    cid2 = a2.chainId;
-  }
-}|]
-    getFields ["cid1", "cid2"] `shouldReturn`
-      [ BInteger 0xfeedbeef
-      , BInteger 0
-      ]
-
-  it "can't access the chainId of an account with an Unknown ChainID" $ (runTest (runBS [r|
-contract qq {
-  account a3;
   uint cid3;
   constructor() public {
+    a1 = account(0xdeadbeef, 0xfeedbeef);
+    a2 = account(0x123, "main");    
     a3 = account(0x124);
+    cid1 = a1.chainId;
+    cid2 = a2.chainId;
     cid3 = a3.chainId;
   }
-}|])) `shouldThrow` anyInternalError 
+}|]
+    getFields ["cid1", "cid2", "cid3"] `shouldReturn`
+      [ BInteger 0xfeedbeef
+      , BInteger 0
+      , BInteger 0
+      ]
 
   it "can parse an X509 certificate" . runTest $ do
     runBS [r|
