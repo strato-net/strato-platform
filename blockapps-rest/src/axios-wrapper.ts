@@ -125,8 +125,8 @@ function requestFormatter(_request) {
   let parsedRequest = request;
   // if this is a contract - remove the source from the debug
   if (request.hasOwnProperty('data')) {
-    if (request.data.hasOwnProperty('tx')) {
-      parsedRequest.data.tx = request.data.txs.map((tx) => {
+    if (request.data.hasOwnProperty('txs')) {
+      parsedRequest.data.txs = request.data.txs.map((tx) => {
         return {
           ...tx,
           payload: {
