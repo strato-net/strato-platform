@@ -136,9 +136,7 @@ function requestFormatter(_request) {
         }
       })
     }
-    if (parsedRequest.data.hasOwnProperty('src')) {
-      parsedRequest.data.src = 'source removed.'
-    }
+    replaceKeyIfExists(parsedRequest.data, 'src', 'source removed.')
   }
   return JSON.stringify(parsedRequest, null, 2)
 }
@@ -146,29 +144,17 @@ function requestFormatter(_request) {
 function responseFormatter(response) {
   // if this is a contract - remove the source from the debug
   let parsedResponse = response
+  const removedFields = ['src', 'bin', 'bin-runtime', 'xabi']
   if (response.hasOwnProperty('data') && Array.isArray(response.data)) {
     parsedResponse.data = response.data.map((el) => {
       let newEl = el
-      if (el.hasOwnProperty('data')) {
+      if (el.hasOwnProperty('data') && el.data !== null && el.data !== undefined) {
         if (el.data.hasOwnProperty('contents')) {
           const contents = el.data.contents
-          if (contents.hasOwnProperty('src')) {
-            contents.src = 'source removed.'
-          }
-          if (contents.hasOwnProperty('bin')) {
-            contents.bin = 'bin removed'
-          }
-          if (contents.hasOwnProperty('bin-runtime')) {
-            contents['bin-runtime'] = 'bin-runtime removed.'
-          }
-          if (contents.hasOwnProperty('xabi')) {
-            contents.xabi = 'xabi removed.'
-          }
+          removedFields.forEach((field) => replaceKeyIfExists(contents, field, `${field} removed.`))
           newEl.data.contents = contents
         }
-        if (el.data.hasOwnProperty('src')) {
-          newEl.data.src = 'source removed.'
-        }
+        replaceKeyIfExists(el.data, 'src', 'source removed.')
       }
       return newEl
     })
@@ -177,6 +163,13 @@ function responseFormatter(response) {
     return JSON.stringify(parsedResponse.data, null, 2)
   }
   return JSON.stringify(parsedResponse, null, 2)
+}
+
+function replaceKeyIfExists(obj:object, key:string, rep:string) {
+  if (obj !== null && obj !== undefined && obj.hasOwnProperty(key)) {
+    obj[key] = rep
+  }
+  return obj
 }
 
 function errorFormatter(err) {
