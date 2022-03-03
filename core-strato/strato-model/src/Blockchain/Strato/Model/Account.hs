@@ -53,6 +53,10 @@ import           Text.Format
 import           Text.Read (readMaybe)
 import           Text.ShortDescription
 
+initLast :: [a] -> Maybe ([a], a)
+initLast [] = Nothing
+initLast [a] = Just ([], a)
+initLast (a:as) = let mil = initLast as in (\(i,l) -> (a:i, l)) <$> mil
 
 data Account = Account
   { _accountAddress :: Address
@@ -201,7 +205,20 @@ instance Show NamedAccount where
   show (NamedAccount a (ExplicitChain cid)) = (printf "%040x" a) ++ ":" ++ (printf "%064x" (toInteger cid))
 
 instance Read NamedAccount where
-  readsPrec _ s = case span (/= ':') s of
+  readsPrec _ ('<':s) = case span (/= ':') s of -- case where account is wrapped in chevrons
+    (mAddr, mRem) -> case stringAddress mAddr of
+      Nothing -> []
+      Just addr -> case mRem of
+        ">" -> [(NamedAccount addr UnspecifiedChain, mRem)]
+        (':':rem') -> case rem' of
+          "main>" -> [(NamedAccount addr MainChain, "")]
+          _ -> case initLast rem' of
+            Just (mCid, '>') -> case fromInteger <$> readMaybe ("0x" ++ mCid) of
+              Nothing -> []
+              Just cid -> [(NamedAccount addr (ExplicitChain cid), "")]
+            _ -> []
+        _ -> []
+  readsPrec _ s = case span (/= ':') s of -- case where account is not wrapped in chevrons, sorry for duplicate code
     (mAddr, mRem) -> case stringAddress mAddr of
       Nothing -> []
       Just addr -> case mRem of

@@ -1060,6 +1060,7 @@ expToVar' :: MonadSM m => Xabi.Expression -> m Variable
 expToVar' (Xabi.NumberLiteral _ v Nothing) = return . Constant $ SInteger v
 expToVar' (Xabi.StringLiteral _ s) = return $ Constant $ SString s
 expToVar' (Xabi.BoolLiteral _ b) = return $ Constant $ SBool b
+expToVar' (Xabi.AccountLiteral _ a) = return $ Constant $ SAccount a
 expToVar' (Xabi.Variable _ "bytes32ToString") = return $ Constant $ SHexDecodeAndTrim
 expToVar' (Xabi.Variable _ "addressToAsciiString") = return $ Constant SAddressToAscii
 expToVar' (Xabi.Variable _ "bytes") = do --TODO- remove this hardcoded case

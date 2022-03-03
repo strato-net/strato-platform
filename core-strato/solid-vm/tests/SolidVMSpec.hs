@@ -2414,7 +2414,7 @@ contract qq {
     getAll [ [Field "names", ArrayIndex 0, Field "n"] ] `shouldReturn` [BString "stref"]
 
   it "can pass an UnspecifiedChain account as a function parameter" . runTest $ do
-    void $ runArgs "(deadbeef)" [r|
+    void $ runArgs "(<deadbeef>)" [r|
 contract qq {
   account a;
   constructor(account _a) public {
@@ -2424,7 +2424,7 @@ contract qq {
     getAll [ [Field "a"] ] `shouldReturn` [BAccount $ NamedAccount (Address 0xdeadbeef) UnspecifiedChain]
 
   it "can pass a MainChain account as a function parameter" . runTest $ do
-    void $ runArgs "(deadbeef:main)" [r|
+    void $ runArgs "(<deadbeef:main>)" [r|
 contract qq {
   account a;
   constructor(account _a) public {
@@ -2434,11 +2434,41 @@ contract qq {
     getAll [ [Field "a"] ] `shouldReturn` [BAccount $ NamedAccount (Address 0xdeadbeef) MainChain]
 
   it "can pass an ExplicitChain account as a function parameter" . runTest $ do
-    void $ runArgs "(deadbeef:feedbeef)" [r|
+    void $ runArgs "(<00000000000000000000000000000000deadbeef:00000000000000000000000000000000000000000000000000000000feedbeef>)" [r|
 contract qq {
   account a;
   constructor(account _a) public {
     a = _a;
+  }
+}|]
+    getAll [ [Field "a"] ] `shouldReturn` [BAccount $ NamedAccount (Address 0xdeadbeef) (ExplicitChain 0xfeedbeef)]
+
+  it "can declare an UnspecifiedChain account as an account literal" . runTest $ do
+    void $ runArgs "()" [r|
+contract qq {
+  account a;
+  constructor() public {
+    a = <deadbeef>;
+  }
+}|]
+    getAll [ [Field "a"] ] `shouldReturn` [BAccount $ NamedAccount (Address 0xdeadbeef) UnspecifiedChain]
+
+  it "can declare a MainChain account as an account literal" . runTest $ do
+    void $ runArgs "()" [r|
+contract qq {
+  account a;
+  constructor() public {
+    a = <deadbeef:main>;
+  }
+}|]
+    getAll [ [Field "a"] ] `shouldReturn` [BAccount $ NamedAccount (Address 0xdeadbeef) MainChain]
+
+  it "can declare an ExplicitChain account as an account literal" . runTest $ do
+    void $ runArgs "()" [r|
+contract qq {
+  account a;
+  constructor() public {
+    a = <deadbeef:feedbeef>;
   }
 }|]
     getAll [ [Field "a"] ] `shouldReturn` [BAccount $ NamedAccount (Address 0xdeadbeef) (ExplicitChain 0xfeedbeef)]

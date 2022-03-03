@@ -274,6 +274,7 @@ primaryExpression = do
               pure (val, nu)
             pure $ NumberLiteral a val nu)
     <|> (uncurry StringLiteral <$> withPosition stringLiteral)
+    <|> (uncurry AccountLiteral <$> withPosition accountLiteral)
 
 numberUnit :: SolidityParser NumberUnit
 numberUnit = do
@@ -299,6 +300,7 @@ literal = asum
 
 accountLiteral :: SolidityParser NamedAccount
 accountLiteral = try $ do
+  void $ char '<'
   addrString <- many1 hexDigit
   addr <- case stringAddress addrString of
     Nothing -> fail $ "Could not decode address from string: " ++ addrString
@@ -309,6 +311,7 @@ accountLiteral = try $ do
       <|> (many1 hexDigit >>= \chainStr -> case readMaybe ("0x" ++ chainStr) of
           Nothing -> fail $ "Could not parse chainId from string: " ++ chainStr
           Just cId -> pure . ExplicitChain $ fromInteger cId)
+  void $ char '>'
   pure $ NamedAccount addr chain
 
 inlineAssembly :: SolidityParser Statement
