@@ -1955,15 +1955,26 @@ encodeForReturn (SString s) = do
 --
 --   As an example, return type (string, uint, string) would have the following encoding:
 --                                                                            
---                                       (offsetStr1)            (offsetStr2)
---   |     32    |     32    |     32    |    32    | str1EncLen |    32    | str2EncLen |
---   |offset_str1|encoded_int|offset_str2|str1EncLen|   str1Enc  |str2EncLen|   str2Enc  |
+--                                            (offsetStr1)            (offsetStr2)
+-- Size:  |     32    |     32    |     32    |    32    | str1EncLen |    32    | str2EncLen |
+-- Value: |offset_str1|encoded_int|offset_str2|str1EncLen|   str1Enc  |str2EncLen|   str2Enc  |
 
-encodeForReturn (STuple items) = do
-  (headers, strings) <- foldM buildEncoding (B.empty, B.empty) =<< mapM getVar (V.toList items)
+-- This is a hacky way to encode arrays, only works for returning just the array
+encodeForReturn (SArray _ items) = do
+  let encLen = word256ToBytes $ fromIntegral $ (V.length items)
+  bs <- encodeVector items
+  return $ (word256ToBytes $ fromIntegral (32::Integer)) `B.append` (encLen `B.append` bs)
+
+encodeForReturn (STuple items) = encodeVector items
+
+encodeForReturn x = todo "Cannot encode this return type: " x
+
+encodeVector :: MonadSM m => V.Vector Variable -> m ByteString
+encodeVector v = do 
+  (headers, strings) <- foldM buildEncoding (B.empty, B.empty) =<< mapM getVar (V.toList v)
   return $ headers `B.append` strings
   where
-    headerLen = (V.length items) * 32
+    headerLen = (V.length v) * 32
     buildEncoding :: MonadSM m => (ByteString, ByteString) -> Value -> m (ByteString, ByteString)
     buildEncoding (headers, strings) val = case val of
       SString s -> do
@@ -1973,8 +1984,6 @@ encodeForReturn (STuple items) = do
             strBS =  encStrLen `B.append` encStr
         return (headers `B.append` offset, strings `B.append` strBS)
       tup@(STuple _) -> todo "encoding nested tuples as return values" tup 
-      v -> do 
-        bs <- encodeForReturn v
+      val' -> do 
+        bs <- encodeForReturn val'
         return (headers `B.append` bs, strings)
-
-encodeForReturn x = todo "can't encode this return type" x
