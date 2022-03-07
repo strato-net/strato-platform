@@ -10,6 +10,7 @@ default-extensions:
 library:
   source-dirs: src/
   dependencies:
+  - aeson
   - attoparsec
   - base16-bytestring
   - binary
@@ -17,9 +18,14 @@ library:
   - deepseq
   - ethereum-rlp
   - format
+  - generic-random
   - hashable
+  - lens
+  - QuickCheck
+  - quickcheck-instances
   - scientific
   - strato-model
+  - swagger2
   - text
   - utf8-string
 

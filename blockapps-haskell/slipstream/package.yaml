@@ -59,6 +59,7 @@ library:
     - QuickCheck
     - retry
     - solid-vm
+    - solid-vm-model
     - scientific
     - source-tools
     - strato-model
@@ -115,6 +116,7 @@ tests:
       - QuickCheck
       - slipstream
       - solid-vm
+      - solid-vm-model
       - strato-model
       - text
       - time
