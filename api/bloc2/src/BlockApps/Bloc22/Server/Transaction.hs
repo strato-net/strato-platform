@@ -985,38 +985,7 @@ getArgValues argsMap argNamesTypes = do
                         ArgValue -> Xabi.IndexedType -> m (Int32, Value)
       determineValue argVal (Xabi.IndexedType ix xabiType) =
         let
-          typeM = case xabiType of
-            Xabi.Int (Just True) b -> Right . SimpleType . TypeInt True $ fmap toInteger b
-            Xabi.Int _           b -> Right . SimpleType . TypeInt False $ fmap toInteger b
-            Xabi.String _          -> Right . SimpleType $ TypeString
-            Xabi.Bytes _ b         -> Right . SimpleType . TypeBytes $ fmap toInteger b
-            Xabi.Bool              -> Right . SimpleType $ TypeBool
-            Xabi.Address           -> Right . SimpleType $ TypeAddress
-            Xabi.Account           -> Right . SimpleType $ TypeAccount
-            Xabi.Struct _ name     -> Right $ TypeStruct name
-            Xabi.Enum _ name _     -> Right $ TypeEnum name
-            Xabi.Array ety len ->
-              let
-                ettyty = case ety of
-                  Xabi.Int (Just True) b -> Right . SimpleType . TypeInt True $ fmap toInteger b
-                  Xabi.Int _           b -> Right . SimpleType . TypeInt False $ fmap toInteger b
-                  Xabi.String _          -> Right . SimpleType $ TypeString
-                  Xabi.Bytes _ b         -> Right . SimpleType . TypeBytes $ fmap toInteger b
-                  Xabi.Bool              -> Right . SimpleType $ TypeBool
-                  Xabi.Address           -> Right . SimpleType $ TypeAddress
-                  Xabi.Account           -> Right . SimpleType $ TypeAccount
-                  Xabi.Struct _ name     -> Right $ TypeStruct name
-                  Xabi.Enum _ name _     -> Right $ TypeEnum name
-                  Xabi.Array{}           -> Left "Arrays of arrays are not allowed as function arguments"
-                  Xabi.Contract name     -> Right $ TypeContract name
-                  Xabi.Mapping{}         -> Left "Arrays of mappings are not allowed as function arguments"
-                  Xabi.Label{}           -> Right $ SimpleType typeUInt
-              in case len of
-                   Just l                -> TypeArrayFixed l <$> ettyty
-                   Nothing               -> TypeArrayDynamic <$> ettyty
-            Xabi.Contract name           -> Right $ TypeContract name
-            Xabi.Mapping _ _ _           -> Left "Mappings are not allowed as function arguments"
-            Xabi.Label _                 -> Right $ SimpleType typeUInt -- since Enums are converted to Ints
+          typeM = getSolidityType xabiType
         in do
           ty <- either (blocError . UserError) return typeM
           either (blocError . UserError) (return . (ix,)) (argValueToValue Nothing ty argVal)
@@ -1030,7 +999,32 @@ getArgValues argsMap argNamesTypes = do
       else sequence $ Map.intersectionWith determineValue argsMap argNamesTypes
     return $ map snd (sortOn fst (toList argsVals))
 
-
+-- We can parse the Xabi types to Solidity type constructors, however currently there is no way to pass in mappings, or structs from the API because 
+-- there is no implemented parser for these types from JSON
+getSolidityType :: Xabi.Type -> Either Text (Type) 
+getSolidityType (Xabi.Int (Just True) b) = Right . SimpleType . TypeInt True $ fmap toInteger b
+getSolidityType (Xabi.Int _           b) = Right . SimpleType . TypeInt False $ fmap toInteger b
+getSolidityType (Xabi.String _)          = Right . SimpleType $ TypeString
+getSolidityType (Xabi.Bytes _ b)         = Right . SimpleType . TypeBytes $ fmap toInteger b
+getSolidityType  Xabi.Bool               = Right . SimpleType $ TypeBool
+getSolidityType  Xabi.Address            = Right . SimpleType $ TypeAddress
+getSolidityType  Xabi.Account            = Right . SimpleType $ TypeAccount
+getSolidityType (Xabi.Struct _ name)     = Right $ TypeStruct name
+getSolidityType (Xabi.Enum _ name _)     = Right $ TypeEnum name
+getSolidityType (Xabi.Contract name)     = Right $ TypeContract name
+getSolidityType (Xabi.Label _)           = Right $ SimpleType typeUInt -- since Enums are converted to Ints
+getSolidityType (Xabi.Array typ len)     = 
+  let arrType = case len of
+        Just l -> TypeArrayFixed l
+        Nothing -> TypeArrayDynamic
+      elType = case typ of
+        Xabi.Mapping{} -> Left "Arrays of mappings are not allowed as function arguments"
+        _ -> getSolidityType typ
+  in case elType of
+    Right c -> Right (arrType c)
+    e -> e
+getSolidityType  Xabi.Mapping{}          = Left "Mappings are not allowed as function arguments"
+          
 
 getResultAndRespond :: ( A.Selectable Account AddressState m
                        , (Keccak256 `A.Alters` SourceMap) m
