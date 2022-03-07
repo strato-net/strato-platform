@@ -12,7 +12,6 @@ class TransactionView extends Component {
   componentDidMount() {
     this.props.executeQuery(RESOURCE_TYPES.transaction, this.props.query, this.props.selectedChain);
     this.props.getTransactionResultRequest(this.props.match.params.hash);
-    console.log("TransactionView component mounted,", this.props);
   }
   render() {
     const history = this.props.history;
