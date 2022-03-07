@@ -46,7 +46,6 @@ library:
     - CodeCollection
   ghc-options: -Wall -O2
   dependencies:
-  - QuickCheck
   - aeson
   - aeson-casing
   - base16-bytestring
