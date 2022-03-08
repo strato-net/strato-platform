@@ -66,8 +66,8 @@ getSolidStorageKeyVal' acct key = do
 getAllSolidStorageKeyVals' :: FullSolidStorage m => Account -> m [(MP.Key, BasicValue)]
 getAllSolidStorageKeyVals' acct = map (second fromVal) <$> getAllRawStorageKeyVals' acct
 
-deleteSolidStorageKeyVal' :: HasMemRawStorageDB m => Account -> ByteString -> m ()
-deleteSolidStorageKeyVal' acct key = genericDeleteRawStorageDB (acct, key)
+deleteSolidStorageKeyVal' :: HasSolidStorageDB m => Account -> ByteString -> m ()
+deleteSolidStorageKeyVal' acct key = deleteRawStorageKey' (acct, key)
 
 flushMemSolidStorageTxDBToBlockDB :: FullSolidStorage m => m ()
 flushMemSolidStorageTxDBToBlockDB = flushMemRawStorageTxDBToBlockDB
