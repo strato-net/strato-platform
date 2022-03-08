@@ -140,7 +140,7 @@ genericDeleteRawStorageDB :: HasMemRawStorageDB m
                           -> m ()
 genericDeleteRawStorageDB key = do
   theMap <- getMemRawStorageTxDB
-  putMemRawStorageTxMap $ M.insert key blankVal theMap
+  putMemRawStorageTxMap $ M.delete key theMap
 
 getAllRawStorageKeyValsMC :: FullRawStorage m  => Account -> m [(MP.Key, RawStorageValue)]
 getAllRawStorageKeyValsMC = getAllRawStorageKeyValsDB

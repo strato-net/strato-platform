@@ -287,7 +287,7 @@ create' creator newAccount ch cc contractName' argExps x509s = do
 
 
   -- set creator
-  (\crtr -> setCreator crtr newAccount contract') =<< (Env.origin <$> getEnv)
+  (\crtr -> setCreator crtr newAccount contract' False) =<< (Env.origin <$> getEnv)
 
 
   -- Run the constructor
@@ -297,7 +297,7 @@ create' creator newAccount ch cc contractName' argExps x509s = do
 
 
   -- set creator again, in case the caller's cert changed during constructor execution
-  (\crtr -> setCreator crtr newAccount contract') =<< (Env.origin <$> getEnv)
+  (\crtr -> setCreator crtr newAccount contract' True) =<< (Env.origin <$> getEnv)
   
   org <- getOrg creator (contract' ^. vmVersion)
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
@@ -409,8 +409,8 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
 
 
 -- set the hidden ":creator" field
-setCreator :: MonadSM m => Account -> Account -> Contract -> m ()
-setCreator creator contract cntrct = do
+setCreator :: MonadSM m => Account -> Account -> Contract -> Bool -> m ()
+setCreator creator contract cntrct isPostConstructor = do
   let creatorAddress = _accountAddress creator
   x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
   maybeCertLevelDB <- x509CertDBGet $ creatorAddress
@@ -431,15 +431,16 @@ setCreator creator contract cntrct = do
     Nothing -> liftIO $ putStrLn $ C.red $ "setCreator/versioning ---> No cert found for " ++ (format creator)
   
   let hasSvm3_0 = _vmVersion cntrct == "svm3.0"
-  case _org of
-    "" -> do
-      liftIO $ putStrLn $ C.yellow "Ignoring creator field for empty org field"
-      return ()
-    org -> do
-      liftIO $ putStrLn $ "setCreator/versioning ---> setting the org as " ++ (show org)
-      -- insert the org for this contract into storage, in the ":creator" field
-      putSolidStorageKeyVal' hasSvm3_0 contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack org)
+  let putCreatorField org = do
+        liftIO $ putStrLn $ "setCreator/versioning ---> setting the org as " ++ (show org)
+        putSolidStorageKeyVal' hasSvm3_0 contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack org)
 
+  if _org /= "" then putCreatorField _org else do
+      liftIO $ putStrLn $ C.red $ "Ignoring creator field for empty org field"
+      -- delete storage value if no cert and after constructor
+      when isPostConstructor $ do
+        liftIO $ putStrLn $ "Deleting SolidStorage key: \":creator\""
+        deleteSolidStorageKeyVal' contract (BC.pack ":creator")
 
 -- get the org for the Cirrus table name
 getOrg :: MonadSM m => Account -> String -> m (String)
