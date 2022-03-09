@@ -280,10 +280,12 @@ create' creator newAccount ch cc contractName' argExps x509s = do
   onTraced $ liftIO $ putStrLn $ C.red $ "Creating Contract: " ++ show newAccount ++ " of type " ++ contractName'
   onTraced $ liftIO $ putStrLn $ "Contract uses SolidVM version: " ++ show vmVersion'
 
-  -- Add Storage
+  -- Push call info to access creator var
   addCallInfo newAccount contract' (contractName' ++ " constructor") ch cc M.empty False
 
   popCallInfo
+
+  -- popCallInfo
 
 
   -- set creator
@@ -295,9 +297,13 @@ create' creator newAccount ch cc contractName' argExps x509s = do
 
   onTraced $ liftIO $ putStrLn $ C.green $ "Done Creating Contract: " ++ show newAccount ++ " of type " ++ contractName'
 
-
+  -- addCallInfo newAccount contract' (contractName' ++ " constructor") ch cc M.empty False
+  addCallInfo newAccount contract' (contractName' ++ " constructor") ch cc M.empty False
+  
   -- set creator again, in case the caller's cert changed during constructor execution
   (\crtr -> setCreator crtr newAccount contract' True) =<< (Env.origin <$> getEnv)
+  -- popcallinfo to remove info from stack
+  popCallInfo
   
   org <- getOrg creator (contract' ^. vmVersion)
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
@@ -440,7 +446,9 @@ setCreator creator contract cntrct isPostConstructor = do
       -- delete storage value if no cert and after constructor
       when isPostConstructor $ do
         liftIO $ putStrLn $ "Deleting SolidStorage key: \":creator\""
-        deleteSolidStorageKeyVal' contract (BC.pack ":creator")
+        deleteSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":creator"])
+        val <- getSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":creator"])
+        liftIO $ putStrLn $ ":creator field value: " ++ show val
 
 -- get the org for the Cirrus table name
 getOrg :: MonadSM m => Account -> String -> m (String)

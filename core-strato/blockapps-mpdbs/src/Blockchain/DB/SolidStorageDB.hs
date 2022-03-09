@@ -16,7 +16,6 @@ module Blockchain.DB.SolidStorageDB (
 
 import           Control.Monad.Change.Alter                  (Alters)
 import           Data.Bifunctor                              (second)
-import           Data.ByteString                             (ByteString)
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia          as MP
@@ -63,11 +62,12 @@ getSolidStorageKeyVal' acct key = do
   v' <- fromVal <$> getRawStorageKeyVal' (toKey acct key)
   return v'
 
+deleteSolidStorageKeyVal' :: HasSolidStorageDB m => Account -> StoragePath -> m ()
+deleteSolidStorageKeyVal' acct key = deleteRawStorageKey' (toKey acct key)
+
 getAllSolidStorageKeyVals' :: FullSolidStorage m => Account -> m [(MP.Key, BasicValue)]
 getAllSolidStorageKeyVals' acct = map (second fromVal) <$> getAllRawStorageKeyVals' acct
 
-deleteSolidStorageKeyVal' :: HasSolidStorageDB m => Account -> ByteString -> m ()
-deleteSolidStorageKeyVal' acct key = deleteRawStorageKey' (acct, key)
 
 flushMemSolidStorageTxDBToBlockDB :: FullSolidStorage m => m ()
 flushMemSolidStorageTxDBToBlockDB = flushMemRawStorageTxDBToBlockDB
