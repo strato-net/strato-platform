@@ -288,7 +288,7 @@ create' creator newAccount ch cc contractName' argExps x509s = do
 
 
   -- set creator
-  (\crtr -> setCreator crtr newAccount contract') =<< (Env.origin <$> getEnv)
+  (\crtr -> setCreator crtr newAccount contract' False) =<< (Env.origin <$> getEnv)
 
 
   -- Run the constructor
@@ -298,7 +298,7 @@ create' creator newAccount ch cc contractName' argExps x509s = do
 
 
   -- set creator again, in case the caller's cert changed during constructor execution
-  (\crtr -> setCreator crtr newAccount contract') =<< (Env.origin <$> getEnv)
+  (\crtr -> setCreator crtr newAccount contract' True) =<< (Env.origin <$> getEnv)
   
   org <- getOrg creator (contract' ^. vmVersion)
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
