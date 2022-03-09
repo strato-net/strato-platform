@@ -1,5 +1,5 @@
 
-module BlockApps.Ethereum
+module BlockApps.Ethereum2
   (
     Keccak256 (..)
   ) where

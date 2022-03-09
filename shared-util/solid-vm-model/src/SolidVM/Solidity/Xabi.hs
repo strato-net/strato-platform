@@ -25,7 +25,7 @@ import           Servant.Docs
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
 
-import           BlockApps.Ethereum
+import           BlockApps.Ethereum2
 import           Blockchain.Strato.Model.Account
 --import           SolidVM.Solidity.Parse.Expression
 import           SolidVM.Solidity.Xabi.Statement

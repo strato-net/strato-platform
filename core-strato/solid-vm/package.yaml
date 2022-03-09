@@ -40,14 +40,10 @@ library:
     - SolidVM.Solidity.Parse.UnParser
     - SolidVM.Solidity.Parse.Declarations
     - SolidVM.Solidity.SourceTools
-    - SolidVM.Solidity.Xabi
-    - SolidVM.Solidity.Xabi.Statement
-    - SolidVM.Solidity.Xabi.VarDef
     - CodeCollection
   ghc-options: -Wall -O2
   dependencies:
   - aeson
-  - aeson-casing
   - base16-bytestring
   - binary
   - blockapps-data
@@ -77,7 +73,6 @@ library:
   - quickcheck-instances
   - semver-range
   - servant-server
-  - servant-docs
   - solid-vm-model
   - source-tools
   - strato-model
@@ -86,7 +81,6 @@ library:
   - time
   - transformers
   - unliftio
-  - unordered-containers
   - utf8-string
   - vector
   - vm-tools

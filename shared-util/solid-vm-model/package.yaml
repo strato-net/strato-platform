@@ -11,10 +11,13 @@ library:
   source-dirs: src/
   dependencies:
   - aeson
+  - aeson-casing
   - attoparsec
   - base16-bytestring
   - binary
   - bytestring
+  - containers
+  - cryptonite
   - deepseq
   - ethereum-rlp
   - format
@@ -24,9 +27,12 @@ library:
   - QuickCheck
   - quickcheck-instances
   - scientific
+  - servant-docs
+  - source-tools
   - strato-model
   - swagger2
   - text
+  - unordered-containers
   - utf8-string
 
 tests:
