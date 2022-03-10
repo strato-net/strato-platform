@@ -418,7 +418,6 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
 -- set the hidden ":creator" field
 setCreator :: MonadSM m => Account -> Account -> Contract -> Integer -> m ()
 setCreator creator contract cntrct blockNumber = do
-  liftIO $ putStrLn $ "COMPUTED NETWORKID: " ++ show computeNetworkID
   let creatorAddress = _accountAddress creator
   x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
   maybeCertLevelDB <- x509CertDBGet $ creatorAddress
