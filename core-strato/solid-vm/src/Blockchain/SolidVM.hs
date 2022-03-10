@@ -40,6 +40,7 @@ import qualified Data.ByteString.Base16               as B16
 import qualified Data.ByteString.Char8                as BC
 import qualified Data.ByteString.Short                as BSS
 import qualified Data.ByteString.UTF8                 as UTF8
+import           Data.ByteString.Internal             (c2w)
 import           Data.Either.Extra                    (eitherToMaybe)
 import           Data.List
 import qualified Data.Map                             as M
@@ -59,6 +60,7 @@ import           GHC.Exts                             hiding (breakpoint)
 import           Text.Parsec                          (runParser)
 import           Text.Printf
 import           Text.Read (readMaybe)
+
 
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.ChainInfo
@@ -86,6 +88,7 @@ import qualified Blockchain.Strato.Model.Action       as Action
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Util
 import           Blockchain.VMContext
 import           Blockchain.VMOptions
 import           Blockchain.SolidVM.SM
@@ -280,16 +283,14 @@ create' creator newAccount ch cc contractName' argExps x509s = do
   onTraced $ liftIO $ putStrLn $ C.red $ "Creating Contract: " ++ show newAccount ++ " of type " ++ contractName'
   onTraced $ liftIO $ putStrLn $ "Contract uses SolidVM version: " ++ show vmVersion'
 
-  -- Push call info to access creator var
   addCallInfo newAccount contract' (contractName' ++ " constructor") ch cc M.empty False
 
   popCallInfo
 
-  -- popCallInfo
 
 
   -- set creator
-  (\crtr -> setCreator crtr newAccount contract' False) =<< (Env.origin <$> getEnv)
+  (\env -> setCreator (Env.origin env) newAccount contract' (blockDataNumber $ Env.blockHeader env)) =<< getEnv
 
 
   -- Run the constructor
@@ -297,11 +298,11 @@ create' creator newAccount ch cc contractName' argExps x509s = do
 
   onTraced $ liftIO $ putStrLn $ C.green $ "Done Creating Contract: " ++ show newAccount ++ " of type " ++ contractName'
 
-  -- addCallInfo newAccount contract' (contractName' ++ " constructor") ch cc M.empty False
   addCallInfo newAccount contract' (contractName' ++ " constructor") ch cc M.empty False
-  
+  -- blockdataNumber $ BlockHeader . Env
   -- set creator again, in case the caller's cert changed during constructor execution
-  (\crtr -> setCreator crtr newAccount contract' True) =<< (Env.origin <$> getEnv)
+  (\env -> setCreator (Env.origin env) newAccount contract' (blockDataNumber $ Env.blockHeader env)) =<< getEnv
+
   -- popcallinfo to remove info from stack
   popCallInfo
   
@@ -415,8 +416,9 @@ call _ _ _ _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' 
 
 
 -- set the hidden ":creator" field
-setCreator :: MonadSM m => Account -> Account -> Contract -> Bool -> m ()
-setCreator creator contract cntrct isPostConstructor = do
+setCreator :: MonadSM m => Account -> Account -> Contract -> Integer -> m ()
+setCreator creator contract cntrct blockNumber = do
+  liftIO $ putStrLn $ "COMPUTED NETWORKID: " ++ show computeNetworkID
   let creatorAddress = _accountAddress creator
   x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
   maybeCertLevelDB <- x509CertDBGet $ creatorAddress
@@ -440,15 +442,26 @@ setCreator creator contract cntrct isPostConstructor = do
   let putCreatorField org = do
         liftIO $ putStrLn $ "setCreator/versioning ---> setting the org as " ++ (show org)
         putSolidStorageKeyVal' hasSvm3_0 contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack org)
-
+  
   if _org /= "" then putCreatorField _org else do
       liftIO $ putStrLn $ C.red $ "Ignoring creator field for empty org field"
-      -- delete storage value if no cert and after constructor
-      when isPostConstructor $ do
-        liftIO $ putStrLn $ "Deleting SolidStorage key: \":creator\""
+
+      -- hardcoded delete storage value if on the very bad, not good block
+      when (blockNumber == 287472 && computeNetworkID == 30460620967655047776835626356) $ do
+        liftIO $ putStrLn $ "DEVNET EXCEPTION Deleting \":creator\" field."
         deleteSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":creator"])
-        val <- getSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":creator"])
-        liftIO $ putStrLn $ ":creator field value: " ++ show val
+
+-- ADDED AS A HARDCODED FIX TO SYNC WITH THE DEVNET 
+-- REMOVE ONCE NOT NEEDED
+computeNetworkID :: Integer
+computeNetworkID =
+  case (flags_network, flags_networkID) of
+    ("", -1) ->
+      if flags_testnet
+      then 0
+      else 1
+    (network, -1) -> bytes2Integer $ map c2w network
+    (_, _) -> toInteger flags_networkID
 
 -- get the org for the Cirrus table name
 getOrg :: MonadSM m => Account -> String -> m (String)
