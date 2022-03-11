@@ -40,6 +40,7 @@ import qualified Data.ByteString.Base16               as B16
 import qualified Data.ByteString.Char8                as BC
 import qualified Data.ByteString.Short                as BSS
 import qualified Data.ByteString.UTF8                 as UTF8
+import           Data.ByteString.Internal             (c2w)
 import           Data.Either.Extra                    (eitherToMaybe)
 import           Data.List
 import qualified Data.Map                             as M
@@ -59,6 +60,7 @@ import           GHC.Exts                             hiding (breakpoint)
 import           Text.Parsec                          (runParser)
 import           Text.Printf
 import           Text.Read (readMaybe)
+
 
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.ChainInfo
@@ -86,6 +88,7 @@ import qualified Blockchain.Strato.Model.Action       as Action
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Util
 import           Blockchain.VMContext
 import           Blockchain.VMOptions
 import           Blockchain.SolidVM.SM
@@ -281,14 +284,14 @@ create' creator newAccount ch cc contractName' argExps x509s = do
   onTraced $ liftIO $ putStrLn $ C.red $ "Creating Contract: " ++ show newAccount ++ " of type " ++ contractName'
   onTraced $ liftIO $ putStrLn $ "Contract uses SolidVM version: " ++ show vmVersion'
 
-  -- Add Storage
   addCallInfo newAccount contract' (contractName' ++ " constructor") ch cc M.empty False
 
   popCallInfo
 
 
+
   -- set creator
-  (\crtr -> setCreator crtr newAccount contract') =<< (Env.origin <$> getEnv)
+  (\env -> setCreator (Env.origin env) newAccount contract' (blockDataNumber $ Env.blockHeader env)) =<< getEnv
 
 
   -- Run the constructor
@@ -296,9 +299,13 @@ create' creator newAccount ch cc contractName' argExps x509s = do
 
   onTraced $ liftIO $ putStrLn $ C.green $ "Done Creating Contract: " ++ show newAccount ++ " of type " ++ contractName'
 
-
+  addCallInfo newAccount contract' (contractName' ++ " constructor") ch cc M.empty False
+  -- blockdataNumber $ BlockHeader . Env
   -- set creator again, in case the caller's cert changed during constructor execution
-  (\crtr -> setCreator crtr newAccount contract') =<< (Env.origin <$> getEnv)
+  (\env -> setCreator (Env.origin env) newAccount contract' (blockDataNumber $ Env.blockHeader env)) =<< getEnv
+
+  -- popcallinfo to remove info from stack
+  popCallInfo
   
   org <- getOrg creator (contract' ^. vmVersion)
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
@@ -411,8 +418,8 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' cha
 
 
 -- set the hidden ":creator" field
-setCreator :: MonadSM m => Account -> Account -> Contract -> m ()
-setCreator creator contract cntrct = do
+setCreator :: MonadSM m => Account -> Account -> Contract -> Integer -> m ()
+setCreator creator contract cntrct blockNumber = do
   let creatorAddress = _accountAddress creator
   x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
   maybeCertLevelDB <- x509CertDBGet $ creatorAddress
@@ -433,15 +440,29 @@ setCreator creator contract cntrct = do
     Nothing -> liftIO $ putStrLn $ C.red $ "setCreator/versioning ---> No cert found for " ++ (format creator)
   
   let hasSvm3_0 = _vmVersion cntrct == "svm3.0"
-  case _org of
-    "" -> do
-      liftIO $ putStrLn $ C.yellow "Ignoring creator field for empty org field"
-      return ()
-    org -> do
-      liftIO $ putStrLn $ "setCreator/versioning ---> setting the org as " ++ (show org)
-      -- insert the org for this contract into storage, in the ":creator" field
-      putSolidStorageKeyVal' hasSvm3_0 contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack org)
+  let putCreatorField org = do
+        liftIO $ putStrLn $ "setCreator/versioning ---> setting the org as " ++ (show org)
+        putSolidStorageKeyVal' hasSvm3_0 contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack org)
+  
+  if _org /= "" then putCreatorField _org else do
+      liftIO $ putStrLn $ C.red $ "Ignoring creator field for empty org field"
 
+      -- hardcoded delete storage value if on the very bad, not good block
+      when (blockNumber == 287472 && computeNetworkID == 30460620967655047776835626356) $ do
+        liftIO $ putStrLn $ "DEVNET EXCEPTION Deleting \":creator\" field."
+        deleteSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":creator"])
+
+-- ADDED AS A HARDCODED FIX TO SYNC WITH THE DEVNET 
+-- REMOVE ONCE NOT NEEDED
+computeNetworkID :: Integer
+computeNetworkID =
+  case (flags_network, flags_networkID) of
+    ("", -1) ->
+      if flags_testnet
+      then 0
+      else 1
+    (network, -1) -> bytes2Integer $ map c2w network
+    (_, _) -> toInteger flags_networkID
 
 -- get the org for the Cirrus table name
 getOrg :: MonadSM m => Account -> String -> m (String)

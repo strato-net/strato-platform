@@ -19,7 +19,9 @@ module Blockchain.VMOptions (
   flags_startingBlock,
   flags_miner,
   flags_gasOn,
-  flags_evmCompatible
+  flags_evmCompatible,
+  flags_network,
+  flags_networkID
   ) where
 
 import           Blockchain.Mining
@@ -50,3 +52,5 @@ defineFlag "cacheTransactionResults" True "Keep transaction results in an LRU ca
 defineEQFlag "miner" [| Instant :: MinerType |] "MINER" "What mining algorithm"
 defineFlag "gasOn" (True::Bool) "Whether to charge for transactions or not"
 defineFlag "evmCompatible" (False::Bool) "Whether to turn off STRATO enhancements or not"
+defineFlag "network" (""::String) "Choose a network to join"
+defineFlag "networkID" (-1::Int) "set a custom network ID for the client"
