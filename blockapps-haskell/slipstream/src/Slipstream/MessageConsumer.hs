@@ -78,7 +78,6 @@ getAndProcessMessages' env sqlEnv conn cache offset errorCounter = do
   $logInfoS "getAndProcessMessages'" $ T.pack $ "#### fetching VMEvents: Offset=" ++ show offset
   recordOffset offset
   messages <- execKafka $ fetchVMEvents offset
-  $logDebugLS "getAndProcessMessages'" messages
   recordKafkaMessages messages
   forceGlobalEval cache
   processTheMessages env sqlEnv conn cache messages

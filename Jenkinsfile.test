@@ -48,10 +48,8 @@ pipeline {
     }
 
     stage('Deploy') {
+
       steps {
-        withCredentials([
-            usernamePassword(credentialsId: 'aws-s3-test-bucket-access-user', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID')
-        ]) {
           sh '''#!/bin/bash -le
             set -x
             rm -rf strato-getting-started
@@ -67,7 +65,7 @@ pipeline {
             export OAUTH_CLIENT_ID=dev
             export OAUTH_CLIENT_SECRET=d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f
             export PASSWORD=123
-            ./strato -m 1 --single
+            ./strato --single
             docker ps
             # Few quick tests
             check_availability() {
@@ -91,7 +89,6 @@ pipeline {
             PASSWORD=${PASSWORD} ./strato --set-password
             check_availability
           '''
-        }
       }
     }
 
@@ -199,7 +196,7 @@ pipeline {
                 rm -rf strato-api-tests
                 git clone -b master https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git
                 cd strato-api-tests
-                git checkout tags/strato-pre7.5-nonoauth-cleanup  #TODO: api version tags in the future
+                git checkout tags/strato-pre7.5-change-table-sep #TODO: api version tags in the future
                 docker build --tag strato-api-tests .
                 docker run \
                   -e OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \

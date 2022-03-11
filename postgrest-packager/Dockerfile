@@ -2,11 +2,11 @@ FROM ubuntu:16.04
 
 MAINTAINER BlockApps Inc.
 
-ENV POSTGREST_VERSION=v0.4.3.0
+ENV POSTGREST_VERSION=v9.0.0
 
-ENV POSTGREST_SOURCE=http://github.com/begriffs/postgrest/releases/download \
+ENV POSTGREST_SOURCE=https://github.com/PostgREST/postgrest/releases/download \
     POSTGREST_LISTEN_PORT=3001 \
-    POSTGREST_FILE=postgrest-${POSTGREST_VERSION}-ubuntu.tar.xz \
+    POSTGREST_FILE=postgrest-${POSTGREST_VERSION}-linux-static-x64.tar.xz \
     POSTGREST_SCHEMA=public \
     POSTGREST_ANONYMOUS=postgres \
     POSTGREST_JWT_SECRET=thisisnotarealsecret \

@@ -56,7 +56,7 @@ createInserts globalsIORef historyList' contracts = do
   unless (null contracts) $ do
     let contract = head contracts
         hasHistory = contractName (fst contract) `elem` historyList'
-    createIndexTable globalsIORef (snd contract) (organization $ fst contract, application $ fst contract, contractName $ fst contract)
+    _ <- createIndexTable globalsIORef (snd contract) (organization $ fst contract, application $ fst contract, contractName $ fst contract)
     when hasHistory $ createHistoryTable globalsIORef (snd contract) (organization $ fst contract, application $ fst contract, contractName $ fst contract)
     insertIndexTable $ map fst contracts
     insertHistoryTable globalsIORef $ map fst contracts
@@ -97,7 +97,8 @@ spec = do
       [vehicleCreate, vehicleInsert] <- runLoggingT . runConduit $ createInserts g [] input .| sinkList
       
       vehicleCreate `shouldBe`
-          [r|CREATE TABLE IF NOT EXISTS "Vehicle" (address text,
+          [r|CREATE TABLE IF NOT EXISTS "Vehicle" (account text,
+    address text,
     "chainId" text,
     block_hash text,
     block_timestamp text,
@@ -105,24 +106,27 @@ spec = do
     transaction_hash text,
     transaction_sender text,
   CONSTRAINT "Vehicle_pkey"
-  PRIMARY KEY (address, "chainId") );|]
+  PRIMARY KEY (address, "chainId"), UNIQUE (account) );|]
 
       vehicleInsert `shouldBe`
-          [r|INSERT INTO "Vehicle" ("address",
+          [r|INSERT INTO "Vehicle" ("account",
+    "address",
     "chainId",
     "block_hash",
     "block_timestamp",
     "block_number",
     "transaction_hash",
     "transaction_sender")
-  VALUES ('0000000000000000000000000000000000000add',
+  VALUES ('0000000000000000000000000000000000000add:<CHAIN>',
+    '0000000000000000000000000000000000000add',
     '<CHAIN>',
     '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
     '2018-09-16 18:28:52.607875 UTC',
     '123',
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
     '0000000000000000000000000000000000000add')
-  ON CONFLICT (address, "chainId") DO UPDATE SET
+  ON CONFLICT (account) DO UPDATE SET
+    account = excluded.account,
     address = excluded.address,
     "chainId" = excluded."chainId",
     block_hash = excluded.block_hash,
@@ -155,14 +159,15 @@ spec = do
                   ("owners", Xabi.Array (Xabi.Int Nothing Nothing) Nothing)
                   ])]
       g <- newGlobals fakeHandle
-      addAndEnableHistoryTable g (HistoryTableName "" "" "Vehicle")
+      runLoggingT $ addAndEnableHistoryTable g (HistoryTableName "" "" "Vehicle")
       let hl = ["Vehicle"]
 
       [vehicleCreate, historyCreate, historyIndex, vehicleInsert, historyInsert]
         <- runLoggingT . runConduit $ createInserts g hl input .| sinkList
 
       vehicleCreate `shouldBe`
-          [r|CREATE TABLE IF NOT EXISTS "Vehicle" (address text,
+          [r|CREATE TABLE IF NOT EXISTS "Vehicle" (account text,
+    address text,
     "chainId" text,
     block_hash text,
     block_timestamp text,
@@ -170,10 +175,11 @@ spec = do
     transaction_hash text,
     transaction_sender text,
   CONSTRAINT "Vehicle_pkey"
-  PRIMARY KEY (address, "chainId") );|]
+  PRIMARY KEY (address, "chainId"), UNIQUE (account) );|]
 
       historyCreate `shouldBe`
-          [r|CREATE TABLE IF NOT EXISTS "history@Vehicle" (address text NOT NULL,
+          [r|CREATE TABLE IF NOT EXISTS "history@Vehicle" (account text,
+    address text NOT NULL,
     "chainId" text NOT NULL,
     block_hash text NOT NULL,
     block_timestamp text,
@@ -187,21 +193,24 @@ spec = do
 ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle";|]
 
       vehicleInsert `shouldBe`
-          [r|INSERT INTO "Vehicle" ("address",
+          [r|INSERT INTO "Vehicle" ("account",
+    "address",
     "chainId",
     "block_hash",
     "block_timestamp",
     "block_number",
     "transaction_hash",
     "transaction_sender")
-  VALUES ('0000000000000000000000000000000000000add',
+  VALUES ('0000000000000000000000000000000000000add:<CHAIN>',
+    '0000000000000000000000000000000000000add',
     '<CHAIN>',
     '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
     '2018-09-16 18:28:52.607875 UTC',
     '123',
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
     '0000000000000000000000000000000000000add')
-  ON CONFLICT (address, "chainId") DO UPDATE SET
+  ON CONFLICT (account) DO UPDATE SET
+    account = excluded.account,
     address = excluded.address,
     "chainId" = excluded."chainId",
     block_hash = excluded.block_hash,
@@ -211,14 +220,16 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     transaction_sender = excluded.transaction_sender;|]
 
       historyInsert `shouldBe`
-          [r|INSERT INTO "history@Vehicle" ("address",
+          [r|INSERT INTO "history@Vehicle" ("account",
+    "address",
     "chainId",
     "block_hash",
     "block_timestamp",
     "block_number",
     "transaction_hash",
     "transaction_sender")
-  VALUES ('0000000000000000000000000000000000000add',
+  VALUES ('0000000000000000000000000000000000000add:<CHAIN>',
+    '0000000000000000000000000000000000000add',
     '<CHAIN>',
     '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
     '2018-09-16 18:28:52.607875 UTC',
@@ -255,7 +266,8 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
           runLoggingT . runConduit $ createInserts g [] input .| sinkList
 
       vehicleCreate `shouldBe`
-          [r|CREATE TABLE IF NOT EXISTS "\"Vehicle''''" (address text,
+          [r|CREATE TABLE IF NOT EXISTS "\"Vehicle''''" (account text,
+    address text,
     "chainId" text,
     block_hash text,
     block_timestamp text,
@@ -263,24 +275,27 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     transaction_hash text,
     transaction_sender text,
   CONSTRAINT "\"Vehicle''''_pkey"
-  PRIMARY KEY (address, "chainId") );|]
+  PRIMARY KEY (address, "chainId"), UNIQUE (account) );|]
 
       vehicleInsert `shouldBe`
-          [r|INSERT INTO "\"Vehicle''''" ("address",
+          [r|INSERT INTO "\"Vehicle''''" ("account",
+    "address",
     "chainId",
     "block_hash",
     "block_timestamp",
     "block_number",
     "transaction_hash",
     "transaction_sender")
-  VALUES ('0000000000000000000000000000000000000add',
+  VALUES ('0000000000000000000000000000000000000add:<CHAIN>',
+    '0000000000000000000000000000000000000add',
     '<CHAIN>',
     '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
     '2018-09-16 18:28:52.607875 UTC',
     '123',
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
     '0000000000000000000000000000000000000add')
-  ON CONFLICT (address, "chainId") DO UPDATE SET
+  ON CONFLICT (account) DO UPDATE SET
+    account = excluded.account,
     address = excluded.address,
     "chainId" = excluded."chainId",
     block_hash = excluded.block_hash,
@@ -338,7 +353,8 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     [swissArmyCreate, swissArmyInsert] <-
         runLoggingT . runConduit $ createInserts g [] input .| sinkList
 
-    swissArmyCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "MyOrg:MyApp:SwissArmy" (address text,
+    swissArmyCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "MyOrg-MyApp-SwissArmy" (account text,
+    address text,
     "chainId" text,
     block_hash text,
     block_timestamp text,
@@ -352,10 +368,11 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     "number" decimal,
     "str" text,
     "strukt" jsonb,
-  CONSTRAINT "MyOrg:MyApp:SwissArmy_pkey"
-  PRIMARY KEY (address, "chainId") );|]
+  CONSTRAINT "MyOrg-MyApp-SwissArmy_pkey"
+  PRIMARY KEY (address, "chainId"), UNIQUE (account) );|]
 
-    swissArmyInsert `shouldBe` [r|INSERT INTO "MyOrg:MyApp:SwissArmy" ("address",
+    swissArmyInsert `shouldBe` [r|INSERT INTO "MyOrg-MyApp-SwissArmy" ("account",
+    "address",
     "chainId",
     "block_hash",
     "block_timestamp",
@@ -369,7 +386,8 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     "number",
     "str",
     "strukt")
-  VALUES ('000000000000000000000000000000098eaddede',
+  VALUES ('000000000000000000000000000000098eaddede:<CHAIN>',
+    '000000000000000000000000000000098eaddede',
     '<CHAIN>',
     '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
     '2018-09-16 18:28:52.607875 UTC',
@@ -378,12 +396,13 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     '000000000000000000000000000000098eaddede',
     '00000000000000000000000000000000deadbeef',
     'True',
-    '0000000000000000000000000000000000000999',
+    NULL,
     '564',
     '77714314',
     'Hello, World!',
     '[["first_field","887"],["second_field","CLOROX DISINFECTING WIPES"]]')
-  ON CONFLICT (address, "chainId") DO UPDATE SET
+  ON CONFLICT (account) DO UPDATE SET
+    account = excluded.account,
     address = excluded.address,
     "chainId" = excluded."chainId",
     block_hash = excluded.block_hash,
@@ -461,7 +480,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
                 )
     g <- newGlobals fakeHandle
 
-    cs1 <- runLoggingT . runConduit $ createExpandIndexTable g (snd input) (organization $ fst input, application $ fst input, contractName $ fst input) .| sinkList
+    (_, cs1) <- runLoggingT . runConduit $ createExpandIndexTable g (snd input) (organization $ fst input, application $ fst input, contractName $ fst input) `fuseBoth` sinkList
     cs2 <- runLoggingT . runConduit $ insertIndexTable [fst input] .| sinkList
     (cs1 ++ cs2) `shouldNotBe` []
 
@@ -514,7 +533,8 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     [swissArmyCreate, swissArmyInsert] <-
         runLoggingT . runConduit $ createInserts g [] input .| sinkList
 
-    swissArmyCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy" (address text,
+    swissArmyCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy" (account text,
+    address text,
     "chainId" text,
     block_hash text,
     block_timestamp text,
@@ -529,9 +549,10 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     "str" text,
     "strukt" jsonb,
   CONSTRAINT "SwissArmy_pkey"
-  PRIMARY KEY (address, "chainId") );|]
+  PRIMARY KEY (address, "chainId"), UNIQUE (account) );|]
 
-    swissArmyInsert `shouldBe` [r|INSERT INTO "SwissArmy" ("address",
+    swissArmyInsert `shouldBe` [r|INSERT INTO "SwissArmy" ("account",
+    "address",
     "chainId",
     "block_hash",
     "block_timestamp",
@@ -545,7 +566,8 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     "number",
     "str",
     "strukt")
-  VALUES ('000000000000000000000000000000098eaddede',
+  VALUES ('000000000000000000000000000000098eaddede:<CHAIN>',
+    '000000000000000000000000000000098eaddede',
     '<CHAIN>',
     '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
     '2018-09-16 18:28:52.607875 UTC',
@@ -554,12 +576,13 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     '000000000000000000000000000000098eaddede',
     '00000000000000000000000000000000deadbeef',
     'True',
-    '0000000000000000000000000000000000000999',
+    NULL,
     '564',
     '77714314',
     'Hello, World!',
     '[["first_field","887"],["second_field","CLOROX DISINFECTING WIPES"]]')
-  ON CONFLICT (address, "chainId") DO UPDATE SET
+  ON CONFLICT (account) DO UPDATE SET
+    account = excluded.account,
     address = excluded.address,
     "chainId" = excluded."chainId",
     block_hash = excluded.block_hash,

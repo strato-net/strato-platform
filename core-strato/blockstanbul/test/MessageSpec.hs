@@ -70,8 +70,8 @@ spec = parallel $ do
       rlpSerialize (rlpEncode msg) `shouldBe` rlp
 
     it "matches on serializing RoundChanges" $ do
-      let msg = WireMessage (MsgAuth addr sig) (RoundChange vw)
-          (rlp, extra) = B16.decode "f88c03b1f0ce850ccccccccc87a0a0a0a0a0aa0aa00000000000000000000000000000000000000000000000000000000000000000940000000000000000787878787878787878787878b841750650a73723d1e37dcd40dde70fdf4cc3a38694d37c5de66bbbfb3284dbf3e3557cd60f05df24b251ea2d49677bfef397c664374e35bda99bcd603b8be0f11c0180" 
+      let msg = WireMessage (MsgAuth addr sig) (RoundChange vw 0x0)
+          (rlp, extra) = B16.decode "f86c0391d0ce850ccccccccc87a0a0a0a0a0aa0a80940000000000000000787878787878787878787878b841750650a73723d1e37dcd40dde70fdf4cc3a38694d37c5de66bbbfb3284dbf3e3557cd60f05df24b251ea2d49677bfef397c664374e35bda99bcd603b8be0f11c0180" 
       extra `shouldBe` ""
       msg `shouldBe` rlpDecode (rlpDeserialize rlp)
       rlpEncode msg `shouldBe` rlpDeserialize rlp
