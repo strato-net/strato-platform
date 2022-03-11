@@ -288,7 +288,7 @@ create' creator newAccount ch cc contractName' argExps x509s = do
 
 
   -- set creator
-  (\crtr -> setCreator crtr newAccount contract' False) =<< (Env.origin <$> getEnv)
+  (\crtr -> setCreator crtr newAccount contract') =<< (Env.origin <$> getEnv)
 
 
   -- Run the constructor
@@ -298,7 +298,7 @@ create' creator newAccount ch cc contractName' argExps x509s = do
 
 
   -- set creator again, in case the caller's cert changed during constructor execution
-  (\crtr -> setCreator crtr newAccount contract' True) =<< (Env.origin <$> getEnv)
+  (\crtr -> setCreator crtr newAccount contract') =<< (Env.origin <$> getEnv)
   
   org <- getOrg creator (contract' ^. vmVersion)
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
@@ -558,20 +558,41 @@ argsToVals ctract fn args =
                      . map snd $ Xabi.funcArgs fn
 
         eval :: MonadSM m => Xabi.Type -> Xabi.Expression -> m Value
-        eval t x = case x of
-           Xabi.NumberLiteral _ n Nothing -> return . coerceType ctract t $ SInteger n
-           Xabi.NumberLiteral _ n (Just nu) -> todo "Number literal with units" (n, nu)
-           Xabi.BoolLiteral _ b -> return . coerceType ctract t $ SBool b
-           Xabi.StringLiteral _ s -> return . coerceType ctract t $ SString s
-           Xabi.ArrayExpression _ as -> case t of
-              Xabi.Array{Xabi.entry=t'} ->
+        eval t x = do
+          case x of
+            Xabi.NumberLiteral _ n Nothing   -> return . coerceType ctract t $ SInteger n
+            Xabi.NumberLiteral _ n (Just nu) -> todo "Number literal with units" (n, nu)
+            Xabi.BoolLiteral _ b             -> return . coerceType ctract t $ SBool b
+            Xabi.StringLiteral _ s           -> return . coerceType ctract t $ SString s
+            Xabi.ArrayExpression _ as        -> case t of
+              Xabi.Array{Xabi.entry=t'} -> 
                 SArray t . V.fromList <$> mapM (fmap Constant . eval t') as
               _ -> typeError "array literal for non array" (t, x)
-           -- This is something of a hack, where if an incoming value is not one
-           -- of the accepted literals, assume that this is not the context of
-           -- evaluating external arguments.
-           _ -> getVar =<< expToVar x
+              -- This is something of a hack, where if an incoming value is not one
+              -- of the accepted literals, assume that this is not the context of
+              -- evaluating external arguments.
+            Xabi.ObjectLiteral _ mp          -> case t of 
+              Xabi.Label l -> do
+                let ls = M.toList mp
+                m <- mapM go ls 
+                return $ SStruct l $ M.fromList m
+                where go (k, v) = do
+                                let tp = coerceExpression v
+                                v' <- eval tp v
+                                return $ (T.unpack k, Constant v')
+              -- TODO strato-2429
+              -- (Xabi.Mapping _ td) -> do
+              _ -> typeError "Object Literal for non-object argument type" (t, x)
+            _                               -> getVar =<< expToVar x
 
+-- Crude type checking of expressions
+coerceExpression :: Xabi.Expression -> Xabi.Type
+coerceExpression (Xabi.BoolLiteral _ _ ) = Xabi.Bool
+coerceExpression (Xabi.NumberLiteral _ _ _) = Xabi.Int (Just True) Nothing
+coerceExpression (Xabi.StringLiteral _ _) = Xabi.String $ Just True
+coerceExpression (Xabi.ArrayExpression _ xs) = Xabi.Array (coerceExpression (head xs)) Nothing
+coerceExpression (Xabi.ObjectLiteral _ _) = Xabi.Struct Nothing ""
+coerceExpression ex = typeError "Cannot deduce a type from" (ex, ex)
 
 callWrapper :: MonadSM m => Account -> Account -> Maybe String -> String -> Bool -> Xabi.ArgList -> m (Maybe Value)
 callWrapper from to mContract functionName isRCC argExps  = do

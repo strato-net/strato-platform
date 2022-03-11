@@ -6,6 +6,12 @@ STRATO Management Dashboard - the UI for STRATO built on React.js.
 In production we run SMD in docker as part of STRATO node (see Dockerfile, docker-run.sh, strato-platform/docker-compose.tpl.yml and github.com/blockapps/strato-getting-started)
 
 # Run for local development
+
+Pre-requisites:
+
+- Node v8.15
+- Python (dependency for some NPM modules)
+
 To run react dev server locally with all features enabled go through the steps:
 
 1. Run STRATO node normally on your localhost (say, localhost:8080):

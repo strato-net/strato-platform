@@ -48,7 +48,7 @@ toStorage = \case
   ValueContract{} -> error "toStorage for ValueContract not yet defined"
   ValueFunction{} -> error "toStorage for ValueFunction not yet defined"
   ValueEnum{}     -> error "toStorage for ValueEnum not yet defined"
-  ValueStruct{}   -> error "toStorage for ValueStruct not yet defined"
+  ValueStruct{}   -> ByteString.empty
   ValueMapping{} -> error "toStorage for ValueMapping not yet defined"
   ValueArraySentinel{} -> error "toStorage for ValueArraySentinel not yet defined"
 

@@ -198,6 +198,7 @@ expressionCrawler = \case
     expr <- subexprs
     expressionCrawler expr
   Xabi.Variable{} -> ["Variable"]
+  Xabi.ObjectLiteral{} -> ["ObjectLiteral"]
 
 simpleStatementCrawler :: Xabi.SimpleStatementF a -> [T.Text]
 simpleStatementCrawler = \case

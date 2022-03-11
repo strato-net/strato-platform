@@ -56,5 +56,5 @@ formatArg enumSizes (TypeEnum label) =
    Nothing -> error "you are using an enum not defined"
    Just x | x < 256 -> formatArg enumSizes (SimpleType $ TypeInt False $ Just 1)
    Just x -> error $ "undefined case in formatArg for enum with more than 255 items: size=" ++ show x
-
+formatArg _ (TypeStruct n) = "struct " ++ Text.unpack n
 formatArg _ x = error $ "undefined value in formatArg: " ++ show x

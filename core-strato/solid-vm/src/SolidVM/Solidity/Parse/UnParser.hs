@@ -108,6 +108,7 @@ unparseVarType (Array t (Just n)) = (unparseVarType t) <> "[" <> show n <> "]"
 unparseVarType (Array t Nothing) = (unparseVarType t) <> "[]"
 unparseVarType (Mapping _ key val) = "mapping (" <> (unparseVarType key) <> " => " <> (unparseVarType val) <> ")"
 unparseVarType (Contract contractName) = Text.unpack contractName
+unparseVarType (Struct _ n) = "struct " ++ Text.unpack n
 unparseVarType _ = "TYPE_NOT_IMPLEMENED"
 
 unparseFunc :: (Text, Func) -> String
@@ -246,6 +247,7 @@ unparseExpression (FunctionCall _ e args) =
 unparseExpression (Ternary _ x y z) = unparseExpression x ++ "?" ++ unparseExpression y ++ ":" ++ unparseExpression z
 unparseExpression (NewExpression _ x) = "new " ++ unparseVarType x
 unparseExpression (ArrayExpression _ xs) = "[" ++ List.intercalate "," (map unparseExpression xs) ++ "]"
+unparseExpression (ObjectLiteral _ m) = "{" ++ List.intercalate "," [concat [Text.unpack k, ":", unparseExpression v]  | (k, v) <- Map.toList m] ++ "}"
 unparseExpression x = internalError "missing case in call to unparseExpression" $ show x
 
 unparseModifier :: (Text, ModifierF a) -> String

@@ -172,7 +172,7 @@ coerceFromInt ct (SEnumVal tipe _ _) n' =
     enumDef <- fmap fst . M.lookup tipe $ _enums ct
     when (n >= length enumDef) $ fail "enum val out of range"
     return $ SEnumVal tipe (enumDef !! n) $ fromIntegral n'
-coerceFromInt _ t x = typeError "invalid literal for type" (t, x)
+coerceFromInt _ t x = typeError "coerceFromInt: invalid literal for type" (t, x)
 
 -- coerceType allows integer literals to initialize integers, addresses, and
 -- strings (in the special case of 0) and bytes32, determined by type instead of value

@@ -25,6 +25,7 @@ module SolidVM.Solidity.Xabi.Statement
 
 import Data.Aeson
 import Data.Source
+import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
 import GHC.Generics
 import SolidVM.Solidity.Xabi.Type
@@ -124,7 +125,9 @@ data ExpressionF a =
   | StringLiteral a String
   | TupleExpression a [Maybe (ExpressionF a)]
   | ArrayExpression a [(ExpressionF a)]
-  | Variable a String deriving (Show, Eq, Generic, Functor)
+  | Variable a String 
+  | ObjectLiteral a (Map.Map T.Text (ExpressionF a))
+  deriving (Show, Eq, Generic, Functor)
 
 extractExpression :: ExpressionF a -> a
 extractExpression (PlusPlus a _) = a
@@ -142,6 +145,7 @@ extractExpression (StringLiteral a _) = a
 extractExpression (TupleExpression a _) = a
 extractExpression (ArrayExpression a _) = a
 extractExpression (Variable a _) = a
+extractExpression (ObjectLiteral a _) = a
 
 type Expression = Positioned ExpressionF
 
