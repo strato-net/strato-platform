@@ -10,6 +10,7 @@ import           Data.Maybe      (catMaybes, maybeToList)
 import           Data.Source
 import qualified Data.Text       as T
 import           Data.Text       (Text)
+import           SolidVM.Solidity.Detectors.Types
 import           SolidVM.Solidity.Xabi
 import           SolidVM.Solidity.Xabi.Statement
 

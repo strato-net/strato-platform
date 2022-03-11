@@ -4,7 +4,6 @@
 module DetectorsSpec where
 
 import           Blockchain.SolidVM.CodeCollectionDB
-import           CodeCollection
 import qualified Data.Map as M
 import           Data.Source
 import           Data.Text (Text)
@@ -20,6 +19,7 @@ import qualified SolidVM.Solidity.Detectors.Functions.Unimplemented.Modifiers   
 import qualified SolidVM.Solidity.Detectors.Statements.StateVariableShadowing      as StateVariableShadowing
 import qualified SolidVM.Solidity.Detectors.Statements.UninitializedLocalVariables as UninitializedLocalVariables
 import qualified SolidVM.Solidity.Detectors.Statements.WriteAfterWrite             as WriteAfterWrite
+import           SolidVM.Solidity.Detectors.Types
 import qualified SolidVM.Solidity.Detectors.Variables.StateVariables               as StateVariables
 import           Test.Hspec
 import           Text.RawString.QQ

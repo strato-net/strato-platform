@@ -9,6 +9,7 @@ import qualified Data.Map.Strict as M
 import           Data.Maybe      (maybeToList)
 import           Data.Source
 import           Data.Text       (Text)
+import           SolidVM.Solidity.Detectors.Types
 import           SolidVM.Solidity.Xabi
 
 -- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]

@@ -8,6 +8,7 @@ import           CodeCollection
 import qualified Data.Map.Strict as M
 import           Data.Source
 import           Data.Text       (Text)
+import           SolidVM.Solidity.Detectors.Types
 import           SolidVM.Solidity.Xabi
 import           SolidVM.Solidity.Xabi.Statement
 

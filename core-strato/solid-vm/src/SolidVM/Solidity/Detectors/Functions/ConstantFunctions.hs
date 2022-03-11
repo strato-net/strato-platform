@@ -17,6 +17,7 @@ import           Data.Maybe      (catMaybes, isJust, maybeToList)
 import           Data.Source
 import           Data.Text       (Text)
 import qualified Data.Text       as T
+import           SolidVM.Solidity.Detectors.Types
 import           SolidVM.Solidity.Xabi
 import           SolidVM.Solidity.Xabi.Statement
 import           SolidVM.Solidity.Xabi.Type      (Type)

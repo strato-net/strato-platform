@@ -18,10 +18,10 @@ library:
     - Blockchain.SolidVM.Simple
     - Blockchain.SolidVM.SM
     - Blockchain.SolidVM.CodeCollectionDB
-    - Blockchain.SolidVM.Exception
     - SolidVM.Solidity.Detectors
     - SolidVM.Solidity.Detectors.Contracts.ParentConstructors
     - SolidVM.Solidity.Detectors.Typechecker
+    - SolidVM.Solidity.Detectors.Types
     - SolidVM.Solidity.Detectors.Expressions.BooleanLiterals
     - SolidVM.Solidity.Detectors.Expressions.DivideBeforeMultiply
     - SolidVM.Solidity.Detectors.Pragmas.IncorrectSolidityVersion
@@ -40,7 +40,6 @@ library:
     - SolidVM.Solidity.Parse.UnParser
     - SolidVM.Solidity.Parse.Declarations
     - SolidVM.Solidity.SourceTools
-    - CodeCollection
   ghc-options: -Wall -O2
   dependencies:
   - aeson
@@ -106,6 +105,7 @@ executables:
       - containers
       - parsec
       - solid-vm
+      - solid-vm-model
       - text
 
 tests:

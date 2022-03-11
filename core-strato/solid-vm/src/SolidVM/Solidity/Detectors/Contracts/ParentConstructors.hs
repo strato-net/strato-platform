@@ -13,7 +13,11 @@ import           Data.Source
 import qualified Data.Set        as S
 import           Data.Text       (Text)
 import qualified Data.Text       as T
+
+import           SolidVM.Solidity.Detectors.Types
 import           SolidVM.Solidity.Xabi
+
+
 
 -- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]
 detector :: CompilerDetector

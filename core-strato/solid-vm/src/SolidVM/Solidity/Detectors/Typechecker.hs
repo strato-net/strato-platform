@@ -24,6 +24,7 @@ import           Data.String     (IsString, fromString)
 import           Data.Text       (Text)
 import qualified Data.Text       as T
 import           Data.Traversable (for)
+import           SolidVM.Solidity.Detectors.Types
 import           SolidVM.Solidity.Xabi
 import           SolidVM.Solidity.Xabi.Statement
 import           SolidVM.Solidity.Xabi.Type

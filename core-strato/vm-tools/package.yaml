@@ -35,7 +35,6 @@ library:
     - Blockchain.MemVMContext
     - Blockchain.VMContext
     - Blockchain.VMOptions
-    - Blockchain.VM.SolidException
     - Blockchain.VM.VMException
     - Blockchain.VMMetrics
     - Executable.EVMFlags
@@ -71,6 +70,7 @@ library:
     - prometheus-client
     - resourcet
     - seqevents
+    - solid-vm-model
     - split
     - strato-adit
     - strato-index
