@@ -2,6 +2,7 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 import * as fs from 'fs';
+import * as path from 'path';
 import { ContractsProvider } from './contracts';
 import { DeploymentsProvider } from './deployments';
 import { NodesProvider } from './nodes';
@@ -58,7 +59,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		const numFolders = (vscode.workspace.workspaceFolders || []).length;
 		vscode.workspace.updateWorkspaceFolders(0, numFolders, { uri: workspaceFolderUri });
 		await sleep(500);
-		fs.readFile(process.cwd() + '/resources/testupload.sh', 'utf8', function (err, data) {
+		fs.readFile(path.resolve(path.join(process.cwd(), 'resources', 'testupload.sh')).replace('C:\\c:\\','C:\\').replace('C:\\C:\\','C:\\'), 'utf8', function (err, data) {
 			if (err) {
 				return console.log(err);
 			}
@@ -68,7 +69,7 @@ export async function activate(context: vscode.ExtensionContext) {
 			// fs.writeFile(process.cwd()+'/resources/testupload.sh', result, 'utf8', function(err){
 			// 	if (err) return console.log(err);
 			// })
-			fs.writeFile(workspaceFolderUri.path + '/testupload.sh', result, 'utf8', function (err) {
+			fs.writeFile(path.resolve(path.join(workspaceFolderUri.path, 'testupload.sh')).replace('C:\\c:\\','C:\\').replace('C:\\C:\\','C:\\'), result, 'utf8', function (err) {
 				if (err) return console.log(err);
 			})
 		})

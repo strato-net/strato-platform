@@ -40,6 +40,7 @@ import qualified Data.ByteString.Base16               as B16
 import qualified Data.ByteString.Char8                as BC
 import qualified Data.ByteString.Short                as BSS
 import qualified Data.ByteString.UTF8                 as UTF8
+import           Data.ByteString.Internal             (c2w)
 import           Data.Either.Extra                    (eitherToMaybe)
 import           Data.List
 import qualified Data.Map                             as M
@@ -59,6 +60,7 @@ import           GHC.Exts                             hiding (breakpoint)
 import           Text.Parsec                          (runParser)
 import           Text.Printf
 import           Text.Read (readMaybe)
+
 
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.ChainInfo
@@ -86,6 +88,7 @@ import qualified Blockchain.Strato.Model.Action       as Action
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Util
 import           Blockchain.VMContext
 import           Blockchain.VMOptions
 import           Blockchain.SolidVM.SM
@@ -281,14 +284,14 @@ create' creator newAccount ch cc contractName' argExps x509s = do
   onTraced $ liftIO $ putStrLn $ C.red $ "Creating Contract: " ++ show newAccount ++ " of type " ++ contractName'
   onTraced $ liftIO $ putStrLn $ "Contract uses SolidVM version: " ++ show vmVersion'
 
-  -- Add Storage
   addCallInfo newAccount contract' (contractName' ++ " constructor") ch cc M.empty False
 
   popCallInfo
 
 
+
   -- set creator
-  (\crtr -> setCreator crtr newAccount contract') =<< (Env.origin <$> getEnv)
+  (\env -> setCreator (Env.origin env) newAccount contract' (blockDataNumber $ Env.blockHeader env)) =<< getEnv
 
 
   -- Run the constructor
@@ -296,9 +299,13 @@ create' creator newAccount ch cc contractName' argExps x509s = do
 
   onTraced $ liftIO $ putStrLn $ C.green $ "Done Creating Contract: " ++ show newAccount ++ " of type " ++ contractName'
 
-
+  addCallInfo newAccount contract' (contractName' ++ " constructor") ch cc M.empty False
+  -- blockdataNumber $ BlockHeader . Env
   -- set creator again, in case the caller's cert changed during constructor execution
-  (\crtr -> setCreator crtr newAccount contract') =<< (Env.origin <$> getEnv)
+  (\env -> setCreator (Env.origin env) newAccount contract' (blockDataNumber $ Env.blockHeader env)) =<< getEnv
+
+  -- popcallinfo to remove info from stack
+  popCallInfo
   
   org <- getOrg creator (contract' ^. vmVersion)
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
@@ -411,8 +418,8 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' cha
 
 
 -- set the hidden ":creator" field
-setCreator :: MonadSM m => Account -> Account -> Contract -> m ()
-setCreator creator contract cntrct = do
+setCreator :: MonadSM m => Account -> Account -> Contract -> Integer -> m ()
+setCreator creator contract cntrct blockNumber = do
   let creatorAddress = _accountAddress creator
   x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
   maybeCertLevelDB <- x509CertDBGet $ creatorAddress
@@ -433,15 +440,29 @@ setCreator creator contract cntrct = do
     Nothing -> liftIO $ putStrLn $ C.red $ "setCreator/versioning ---> No cert found for " ++ (format creator)
   
   let hasSvm3_0 = _vmVersion cntrct == "svm3.0"
-  case _org of
-    "" -> do
-      liftIO $ putStrLn $ C.yellow "Ignoring creator field for empty org field"
-      return ()
-    org -> do
-      liftIO $ putStrLn $ "setCreator/versioning ---> setting the org as " ++ (show org)
-      -- insert the org for this contract into storage, in the ":creator" field
-      putSolidStorageKeyVal' hasSvm3_0 contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack org)
+  let putCreatorField org = do
+        liftIO $ putStrLn $ "setCreator/versioning ---> setting the org as " ++ (show org)
+        putSolidStorageKeyVal' hasSvm3_0 contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack org)
+  
+  if _org /= "" then putCreatorField _org else do
+      liftIO $ putStrLn $ C.red $ "Ignoring creator field for empty org field"
 
+      -- hardcoded delete storage value if on the very bad, not good block
+      when (blockNumber == 287472 && computeNetworkID == 30460620967655047776835626356) $ do
+        liftIO $ putStrLn $ "DEVNET EXCEPTION Deleting \":creator\" field."
+        deleteSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":creator"])
+
+-- ADDED AS A HARDCODED FIX TO SYNC WITH THE DEVNET 
+-- REMOVE ONCE NOT NEEDED
+computeNetworkID :: Integer
+computeNetworkID =
+  case (flags_network, flags_networkID) of
+    ("", -1) ->
+      if flags_testnet
+      then 0
+      else 1
+    (network, -1) -> bytes2Integer $ map c2w network
+    (_, _) -> toInteger flags_networkID
 
 -- get the org for the Cirrus table name
 getOrg :: MonadSM m => Account -> String -> m (String)
@@ -1984,15 +2005,26 @@ encodeForReturn (SString s) = do
 --
 --   As an example, return type (string, uint, string) would have the following encoding:
 --                                                                            
---                                       (offsetStr1)            (offsetStr2)
---   |     32    |     32    |     32    |    32    | str1EncLen |    32    | str2EncLen |
---   |offset_str1|encoded_int|offset_str2|str1EncLen|   str1Enc  |str2EncLen|   str2Enc  |
+--                                            (offsetStr1)            (offsetStr2)
+-- Size:  |     32    |     32    |     32    |    32    | str1EncLen |    32    | str2EncLen |
+-- Value: |offset_str1|encoded_int|offset_str2|str1EncLen|   str1Enc  |str2EncLen|   str2Enc  |
 
-encodeForReturn (STuple items) = do
-  (headers, strings) <- foldM buildEncoding (B.empty, B.empty) =<< mapM getVar (V.toList items)
+-- This is a hacky way to encode arrays, only works for returning just the array
+encodeForReturn (SArray _ items) = do
+  let encLen = word256ToBytes $ fromIntegral $ (V.length items)
+  bs <- encodeVector items
+  return $ (word256ToBytes $ fromIntegral (32::Integer)) `B.append` (encLen `B.append` bs)
+
+encodeForReturn (STuple items) = encodeVector items
+
+encodeForReturn x = todo "Cannot encode this return type: " x
+
+encodeVector :: MonadSM m => V.Vector Variable -> m ByteString
+encodeVector v = do 
+  (headers, strings) <- foldM buildEncoding (B.empty, B.empty) =<< mapM getVar (V.toList v)
   return $ headers `B.append` strings
   where
-    headerLen = (V.length items) * 32
+    headerLen = (V.length v) * 32
     buildEncoding :: MonadSM m => (ByteString, ByteString) -> Value -> m (ByteString, ByteString)
     buildEncoding (headers, strings) val = case val of
       SString s -> do
@@ -2002,8 +2034,6 @@ encodeForReturn (STuple items) = do
             strBS =  encStrLen `B.append` encStr
         return (headers `B.append` offset, strings `B.append` strBS)
       tup@(STuple _) -> todo "encoding nested tuples as return values" tup 
-      v -> do 
-        bs <- encodeForReturn v
+      val' -> do 
+        bs <- encodeForReturn val'
         return (headers `B.append` bs, strings)
-
-encodeForReturn x = todo "can't encode this return type" x

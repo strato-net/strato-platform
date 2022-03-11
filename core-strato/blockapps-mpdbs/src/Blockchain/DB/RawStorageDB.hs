@@ -19,6 +19,7 @@ module Blockchain.DB.RawStorageDB
   , putRawStorageKeyVal'
   , getRawStorageKeyVal'
   , getAllRawStorageKeyVals'
+  , deleteRawStorageKey'
   , flushMemRawStorageTxDBToBlockDB
   , flushMemRawStorageDB
   ) where
@@ -78,6 +79,9 @@ getRawStorageKeyVal' = getRawStorageKeyValMC
 getAllRawStorageKeyVals' :: FullRawStorage m => Account -> m [(MP.Key, RawStorageValue)]
 getAllRawStorageKeyVals' = getAllRawStorageKeyValsMC
 
+deleteRawStorageKey' :: HasRawStorageDB m => RawStorageKey -> m ()
+deleteRawStorageKey' = deleteRawStorageKeyMC
+
 --The following are the memory cache versions of the functions
 
 putRawStorageKeyValMC :: HasRawStorageDB m => RawStorageKey -> RawStorageValue -> m ()
@@ -85,6 +89,9 @@ putRawStorageKeyValMC = A.insert (A.Proxy @RawStorageValue)
 
 getRawStorageKeyValMC :: HasRawStorageDB m => RawStorageKey -> m RawStorageValue
 getRawStorageKeyValMC key = A.lookupWithDefault (A.Proxy @RawStorageValue) key
+
+deleteRawStorageKeyMC :: HasRawStorageDB m => RawStorageKey -> m ()
+deleteRawStorageKeyMC = A.delete (A.Proxy @RawStorageValue)
 
 genericLookupRawStorageDB :: ( HasMemRawStorageDB m
                              , (Account `A.Alters` AddressState) m
@@ -140,7 +147,7 @@ genericDeleteRawStorageDB :: HasMemRawStorageDB m
                           -> m ()
 genericDeleteRawStorageDB key = do
   theMap <- getMemRawStorageTxDB
-  putMemRawStorageTxMap $ M.insert key blankVal theMap
+  putMemRawStorageTxMap $ M.delete key theMap
 
 getAllRawStorageKeyValsMC :: FullRawStorage m  => Account -> m [(MP.Key, RawStorageValue)]
 getAllRawStorageKeyValsMC = getAllRawStorageKeyValsDB
