@@ -10,10 +10,10 @@ import qualified Data.Text as T
 import           Text.Parsec
 import           Text.Parsec.Expr
 
+import           SolidVM.Model.CodeCollection.Statement
 import           SolidVM.Solidity.Parse.Lexer
 import           SolidVM.Solidity.Parse.ParserTypes
 import           SolidVM.Solidity.Parse.Types
-import           SolidVM.Solidity.Xabi.Statement
 import           SolidVM.Solidity.Xabi.Type
 
 statements :: SolidityParser [Statement]

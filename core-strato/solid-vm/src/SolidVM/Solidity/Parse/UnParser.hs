@@ -17,10 +17,10 @@ import           Text.Printf
 
 import           SolidVM.Model.CodeCollection.ConstantDecl
 import           SolidVM.Model.CodeCollection.Function
+import           SolidVM.Model.CodeCollection.Statement
 import           SolidVM.Model.CodeCollection.VariableDecl
 import           SolidVM.Solidity.Parse.Declarations
 import           SolidVM.Solidity.Parse.File
-import           SolidVM.Solidity.Xabi.Statement
 import           SolidVM.Solidity.Xabi
 import           SolidVM.Solidity.Xabi.Type
 import           SolidVM.Solidity.Xabi.VarDef

@@ -9,7 +9,7 @@ import Test.HUnit (assertEqual)
 import Text.Parsec
 import Text.RawString.QQ
 
-import SolidVM.Solidity.Xabi.Statement
+import SolidVM.Model.CodeCollection.Statement
 import SolidVM.Solidity.Xabi.Type
 import SolidVM.Solidity.Parse.Lexer
 import SolidVM.Solidity.Parse.Statement

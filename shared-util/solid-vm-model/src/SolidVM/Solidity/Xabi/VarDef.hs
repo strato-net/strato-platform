@@ -15,7 +15,7 @@ import           GHC.Generics
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances ()
 
-import           SolidVM.Solidity.Xabi.Statement
+import           SolidVM.Model.CodeCollection.Statement
 import           SolidVM.Solidity.Xabi.Type
 
 typeAesonOptions::Options

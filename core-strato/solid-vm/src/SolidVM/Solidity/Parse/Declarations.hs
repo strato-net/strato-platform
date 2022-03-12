@@ -24,6 +24,7 @@ import           Text.Printf                          (printf)
 
 import qualified SolidVM.Model.CodeCollection.ConstantDecl as SolidVM
 import qualified SolidVM.Model.CodeCollection.Function as SolidVM
+import           SolidVM.Model.CodeCollection.Statement
 import qualified SolidVM.Model.CodeCollection.VariableDecl as SolidVM
 
 import           SolidVM.Solidity.Parse.Statement
@@ -31,7 +32,6 @@ import           SolidVM.Solidity.Parse.Lexer
 import           SolidVM.Solidity.Parse.ParserTypes
 import           SolidVM.Solidity.Parse.Types
 
-import           SolidVM.Solidity.Xabi.Statement
 import           SolidVM.Solidity.Xabi              (XabiF (..))
 import qualified SolidVM.Solidity.Xabi              as Xabi
 import qualified SolidVM.Solidity.Xabi.Def          as Xabi

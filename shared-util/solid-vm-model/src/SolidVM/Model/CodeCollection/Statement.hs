@@ -2,7 +2,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
-module SolidVM.Solidity.Xabi.Statement
+module SolidVM.Model.CodeCollection.Statement
   ( StatementF(..)
   , extractStatement
   , Statement

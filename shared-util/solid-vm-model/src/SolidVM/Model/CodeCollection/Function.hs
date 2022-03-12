@@ -28,7 +28,7 @@ import           GHC.Generics
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
 
-import           SolidVM.Solidity.Xabi.Statement
+import           SolidVM.Model.CodeCollection.Statement
 import qualified SolidVM.Solidity.Xabi.VarDef  as Xabi
 
 data StateMutability = Pure | Constant | View | Payable deriving (Eq, Ord, Show, Generic)

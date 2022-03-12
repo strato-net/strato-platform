@@ -16,7 +16,7 @@ import           Data.Source
 import           GHC.Generics
 import           Test.QuickCheck.Instances    ()
 
-import           SolidVM.Solidity.Xabi.Statement
+import           SolidVM.Model.CodeCollection.Statement
 import qualified SolidVM.Solidity.Xabi.Type as Xabi hiding (Enum)
 
 data VariableDeclF a = VariableDecl

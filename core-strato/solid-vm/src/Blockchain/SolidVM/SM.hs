@@ -94,9 +94,9 @@ import           Blockchain.DB.StateDB
 
 import           SolidVM.Model.CodeCollection
 import qualified SolidVM.Model.CodeCollection.ConstantDecl as SolidVM
+import qualified SolidVM.Model.CodeCollection.Statement as SolidVM
 import qualified SolidVM.Model.CodeCollection.VariableDecl as SolidVM
 import qualified SolidVM.Model.Storable as MS
-import qualified SolidVM.Solidity.Xabi.Statement as Xabi
 import qualified SolidVM.Solidity.Xabi.Type as Xabi
 import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
 
@@ -392,7 +392,7 @@ getVariableOfName name = do
         let ctract = currentContract currentCallInfo
         SolidVM.ConstantDecl{..} <- M.lookup name $ ctract ^. constants
         return $ coerceType ctract constType $ case constInitialVal of
-                                            Xabi.NumberLiteral _ x _ -> SInteger x
+                                            SolidVM.NumberLiteral _ x _ -> SInteger x
                                             x -> todo "constant initial val" x
 
       maybeStructDef :: Maybe Variable

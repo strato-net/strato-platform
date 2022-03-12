@@ -96,13 +96,13 @@ import           Text.Tools
 import           SolidVM.Model.CodeCollection
 import qualified SolidVM.Model.CodeCollection.ConstantDecl as SolidVM
 import qualified SolidVM.Model.CodeCollection.Function as SolidVM
+import qualified SolidVM.Model.CodeCollection.Statement as SolidVM
 import qualified SolidVM.Model.CodeCollection.VariableDecl as SolidVM
 import qualified SolidVM.Model.Storable as MS
 
 import           SolidVM.Solidity.Parse.Statement
 import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpression)
 import qualified SolidVM.Solidity.Xabi as Xabi
-import qualified SolidVM.Solidity.Xabi.Statement as Xabi
 import qualified SolidVM.Solidity.Xabi.Type as Xabi
 import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
 
@@ -251,12 +251,12 @@ create _ _ _ blockData _ sender' origin' _ _ _ newAddress code txHash' chainId' 
     let maybeArgString = M.lookup "args" =<< metadata
         argString = maybe "()" T.unpack maybeArgString
         maybeArgs = runParser parseArgs "" "" argString
-        !args = either (parseError "create arguments") Xabi.OrderedArgs maybeArgs
+        !args = either (parseError "create arguments") SolidVM.OrderedArgs maybeArgs
 
     (hsh, cc) <- codeCollectionFromSource initCode
     create' sender' newAddress hsh cc contractName' args x509s
 
-create' :: MonadSM m => Account -> Account -> Keccak256 -> CodeCollection -> String -> Xabi.ArgList -> M.Map Address X509Certificate -> m ExecResults
+create' :: MonadSM m => Account -> Account -> Keccak256 -> CodeCollection -> String -> SolidVM.ArgList -> M.Map Address X509Certificate -> m ExecResults
 create' creator newAccount ch cc contractName' argExps x509s = do
   Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ x509s
   parentName <- fromMaybeM (return "") $ runMaybeT 
@@ -387,7 +387,7 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' cha
         maybeArgString = M.lookup "args" =<< metadata
         !argString = T.unpack $ fromMaybe (missingField "TX is missing metadata parameter called 'args'" $ show metadata) maybeArgString
         maybeArgs = runParser parseArgs "" "" argString
-        !args = either (parseError "call arguments") Xabi.OrderedArgs maybeArgs
+        !args = either (parseError "call arguments") SolidVM.OrderedArgs maybeArgs
 
     returnVal <- mapM encodeForReturn =<< callWrapper sender' codeAddress Nothing funcName isRCC args 
 
@@ -540,13 +540,13 @@ logFunctionCall args address contract functionName f = do
   return result
 
 
-argsToVals :: MonadSM m => Contract -> SolidVM.Func -> Xabi.ArgList -> m ValList
+argsToVals :: MonadSM m => Contract -> SolidVM.Func -> SolidVM.ArgList -> m ValList
 argsToVals ctract fn args =
   case args of
-    Xabi.OrderedArgs xs -> do
+    SolidVM.OrderedArgs xs -> do
       when (length xs /= length orderedTypes) $ invalidArguments "arity mismatch" (xs, orderedTypes)
       OrderedVals <$> zipWithM eval orderedTypes xs
-    Xabi.NamedArgs xs -> NamedVals . M.toList <$> do
+    SolidVM.NamedArgs xs -> NamedVals . M.toList <$> do
       let strTypes = M.mapKeys (T.unpack . fromMaybe "") $ M.fromList $ SolidVM.funcArgs fn
       M.mergeA (M.mapMissing $ curry $ invalidArguments "missing argument")
                (M.mapMissing $ curry $ invalidArguments "extra argument")
@@ -558,13 +558,13 @@ argsToVals ctract fn args =
         orderedTypes = map Xabi.indexedTypeType
                      . map snd $ SolidVM.funcArgs fn
 
-        eval :: MonadSM m => Xabi.Type -> Xabi.Expression -> m Value
+        eval :: MonadSM m => Xabi.Type -> SolidVM.Expression -> m Value
         eval t x = case x of
-           Xabi.NumberLiteral _ n Nothing -> return . coerceType ctract t $ SInteger n
-           Xabi.NumberLiteral _ n (Just nu) -> todo "Number literal with units" (n, nu)
-           Xabi.BoolLiteral _ b -> return . coerceType ctract t $ SBool b
-           Xabi.StringLiteral _ s -> return . coerceType ctract t $ SString s
-           Xabi.ArrayExpression _ as -> case t of
+           SolidVM.NumberLiteral _ n Nothing -> return . coerceType ctract t $ SInteger n
+           SolidVM.NumberLiteral _ n (Just nu) -> todo "Number literal with units" (n, nu)
+           SolidVM.BoolLiteral _ b -> return . coerceType ctract t $ SBool b
+           SolidVM.StringLiteral _ s -> return . coerceType ctract t $ SString s
+           SolidVM.ArrayExpression _ as -> case t of
               Xabi.Array{Xabi.entry=t'} ->
                 SArray t . V.fromList <$> mapM (fmap Constant . eval t') as
               _ -> typeError "array literal for non array" (t, x)
@@ -574,7 +574,7 @@ argsToVals ctract fn args =
            _ -> getVar =<< expToVar x
 
 
-callWrapper :: MonadSM m => Account -> Account -> Maybe String -> String -> Bool -> Xabi.ArgList -> m (Maybe Value)
+callWrapper :: MonadSM m => Account -> Account -> Maybe String -> String -> Bool -> SolidVM.ArgList -> m (Maybe Value)
 callWrapper from to mContract functionName isRCC argExps  = do
   let fromChain = from ^. accountChainId
       toChain = to ^. accountChainId
@@ -637,7 +637,7 @@ callWrapper from to mContract functionName isRCC argExps  = do
   logFunctionCall args to contract functionName f
 
 
-runStatements :: MonadSM m => [Xabi.Statement] -> m (Maybe Value)
+runStatements :: MonadSM m => [SolidVM.Statement] -> m (Maybe Value)
 runStatements [] = return Nothing
 runStatements (s:rest) = do
   onTraced $ do
@@ -651,7 +651,7 @@ runStatements (s:rest) = do
     v -> return v
 
 
-runStatement :: MonadSM m => Xabi.Statement -> m (Maybe Value)
+runStatement :: MonadSM m => SolidVM.Statement -> m (Maybe Value)
 --runStatement x | trace (C.green $ "statement> " ++ unparseStatement x) $ False = undefined
 --runStatement x | trace (C.green $ "statement> " ++ show x) $ False = undefined
 {-
@@ -659,7 +659,7 @@ runStatement :: MonadSM m => Xabi.Statement -> m (Maybe Value)
 --      statement for now.  Until this is fixed, we won't be able to run code that
 --      looks like this `x = (y = 1)`
 --      I checked the Wings contracts, they never use this.
-runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.PlusPlus e))) = do
+runStatement (Xabi.SimpleStatement (SolidVM.ExpressionStatement (Xabi.PlusPlus e))) = do
   var <- expToVar e
   path <- expToPath e
   v <- getInt var
@@ -673,7 +673,7 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.PlusPlus e)))
 
 
 -- Assignment to an index into an array or mapping
-runStatement st@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary _ "=" dst@(Xabi.IndexAccess _ parent (Just indExp)) src)) pos) = do
+runStatement st@(SolidVM.SimpleStatement (SolidVM.ExpressionStatement (SolidVM.Binary _ "=" dst@(SolidVM.IndexAccess _ parent (Just indExp)) src)) pos) = do
   solidVMBreakpoint pos
   srcVar <- expToVar src
   srcVal <- getVar srcVar
@@ -704,12 +704,12 @@ runStatement st@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary _ "
       return Nothing
 
 
-runStatement st@(Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary _ "=" (Xabi.IndexAccess _ _ Nothing) _)) pos) = do
+runStatement st@(SolidVM.SimpleStatement (SolidVM.ExpressionStatement (SolidVM.Binary _ "=" (SolidVM.IndexAccess _ _ Nothing) _)) pos) = do
   solidVMBreakpoint pos
   missingField "index value cannot be empty" (unparseStatement st)
 
 
-runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary _ "=" dst src)) pos) = do
+runStatement (SolidVM.SimpleStatement (SolidVM.ExpressionStatement (SolidVM.Binary _ "=" dst src)) pos) = do
   solidVMBreakpoint pos
   srcVal <- getVar =<< expToVar src
   dstVar <- expToVar dst
@@ -759,22 +759,22 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary _ "=" 
               logAssigningVariable value'
               setVar v1 $ coerceType ctract ty value'
 -}
-runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement e) pos) = do
+runStatement (SolidVM.SimpleStatement (SolidVM.ExpressionStatement e) pos) = do
   solidVMBreakpoint pos
   _ <- getVar =<< expToVar e
   return Nothing -- just throw away the return value
 
-runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition entries maybeExpression) pos) = do
+runStatement s@(SolidVM.SimpleStatement (SolidVM.VariableDefinition entries maybeExpression) pos) = do
   solidVMBreakpoint pos
   let !maybeLoc = case entries of
-                      [e] -> Xabi.vardefLocation e
-                      es -> if any ((== Just Xabi.Storage) . Xabi.vardefLocation) es
+                      [e] -> SolidVM.vardefLocation e
+                      es -> if any ((== Just SolidVM.Storage) . SolidVM.vardefLocation) es
                               -- It is possible to supply locations in tuple definitions, but
                               -- I'm not sure what that exactly looks like when its not memory.
                               then todo "storage was not anticipated in a tuple entry" s
                               else Nothing
   let singleType = case entries of
-                      [e] -> fromMaybe (todo "type inference not implemented" s) $ Xabi.vardefType e
+                      [e] -> fromMaybe (todo "type inference not implemented" s) $ SolidVM.vardefType e
                       _ -> todo "could not evaluate expression without tuple type" s
   !value <-
     case maybeExpression of
@@ -784,16 +784,16 @@ runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition entries maybeExpre
       Just e -> do
         rhs <- weakGetVar =<< expToVar e
         case (maybeLoc, rhs) of
-          (Just Xabi.Storage, SReference{}) -> return rhs
+          (Just SolidVM.Storage, SReference{}) -> return rhs
           (_, SReference{}) -> getVar $ Constant rhs
           (_, c) -> return c
 
   cntrct <- getCurrentContract
   onTracedSM cntrct $ do
     valueString <- showSM value
-    let toName :: Xabi.VarDefEntry -> String
-        toName Xabi.BlankEntry = ""
-        toName vde = Xabi.vardefName vde
+    let toName :: SolidVM.VarDefEntry -> String
+        toName SolidVM.BlankEntry = ""
+        toName vde = SolidVM.vardefName vde
     withSrcPos pos $ printf "             creating and setting variables: (%s)\n" $
         intercalate ", " (map toName entries)
     withSrcPos pos $ printf "             to: %s\n" valueString
@@ -801,11 +801,11 @@ runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition entries maybeExpre
       ensureType = fromMaybe (todo "type inference not implemented" s)
 
   case (entries, value) of
-    ([Xabi.VarDefEntry mType _ name _], _) -> addLocalVariable (ensureType mType) name value
-    ([Xabi.BlankEntry], _) -> parseError "cannot declare single nameless variable" s
+    ([SolidVM.VarDefEntry mType _ name _], _) -> addLocalVariable (ensureType mType) name value
+    ([SolidVM.BlankEntry], _) -> parseError "cannot declare single nameless variable" s
     (_, STuple variables) -> do
       checkArity "var declaration tuple" (V.length variables) (length entries)
-      let nonBlanks = [(ensureType t, n, v) | (Xabi.VarDefEntry t _ n _, v) <- zip entries $ V.toList variables]
+      let nonBlanks = [(ensureType t, n, v) | (SolidVM.VarDefEntry t _ n _, v) <- zip entries $ V.toList variables]
       forM_ nonBlanks $ \(theType', name', variable') -> do
         value' <- getVar variable'
         addLocalVariable theType' name' value'
@@ -814,7 +814,7 @@ runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition entries maybeExpre
 
   return Nothing
 
-runStatement (Xabi.IfStatement condition code' maybeElseCode pos) = do
+runStatement (SolidVM.IfStatement condition code' maybeElseCode pos) = do
   solidVMBreakpoint pos
   conditionResult <- getBool =<< expToVar condition
   
@@ -829,7 +829,7 @@ runStatement (Xabi.IfStatement condition code' maybeElseCode pos) = do
       Just elseCode -> runStatements elseCode
       Nothing -> return Nothing
 
-runStatement (Xabi.WhileStatement condition code pos) = do
+runStatement (SolidVM.WhileStatement condition code pos) = do
   solidVMBreakpoint pos
      
   while (getBool =<< expToVar condition) $ do
@@ -839,7 +839,7 @@ runStatement (Xabi.WhileStatement condition code pos) = do
 
       -- TODO: this can loop infinitely
 
-runStatement (Xabi.DoWhileStatement code condition pos) = do
+runStatement (SolidVM.DoWhileStatement code condition pos) = do
   solidVMBreakpoint pos
   doWhile (getBool =<< expToVar condition) $ do
       onTraced $ withSrcPos pos $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
@@ -849,17 +849,17 @@ runStatement (Xabi.DoWhileStatement code condition pos) = do
       -- TODO: this can loop infinitely
 
 --TODO- all the variables declared in an `if` or `for` code block need to be deleted when the block is finished....
-runStatement (Xabi.ForStatement maybeInitStatement maybeConditionExp maybeLoopExp code pos) = do
+runStatement (SolidVM.ForStatement maybeInitStatement maybeConditionExp maybeLoopExp code pos) = do
   solidVMBreakpoint pos
   _ <-
     case maybeInitStatement of
-      Just initStatement -> runStatement $ Xabi.SimpleStatement initStatement pos
+      Just initStatement -> runStatement $ SolidVM.SimpleStatement initStatement pos
       _ -> return Nothing
 
   let conditionExp =
         case maybeConditionExp of
           Just x -> x
-          Nothing -> Xabi.BoolLiteral pos True
+          Nothing -> SolidVM.BoolLiteral pos True
 
   let loopExp =
         case maybeLoopExp of
@@ -874,7 +874,7 @@ runStatement (Xabi.ForStatement maybeInitStatement maybeConditionExp maybeLoopEx
       _ <- getVar =<< expToVar loopExp
       return result
 
-runStatement (Xabi.Return maybeExpression pos) = do
+runStatement (SolidVM.Return maybeExpression pos) = do
   solidVMBreakpoint pos
   case maybeExpression of
     Just e -> do
@@ -884,16 +884,16 @@ runStatement (Xabi.Return maybeExpression pos) = do
 --      fmap Just $ getVar =<< expToVar e
     Nothing -> return $ Just SNULL
 
-runStatement (Xabi.AssemblyStatement (Xabi.MloadAdd32 dst src) pos) = do
+runStatement (SolidVM.AssemblyStatement (SolidVM.MloadAdd32 dst src) pos) = do
   solidVMBreakpoint pos
-  srcVar <- expToVar $ Xabi.Variable pos $ T.unpack src;
-  dstVar <- expToVar $ Xabi.Variable pos $ T.unpack dst;
+  srcVar <- expToVar $ SolidVM.Variable pos $ T.unpack src;
+  dstVar <- expToVar $ SolidVM.Variable pos $ T.unpack dst;
 
   -- TODO(tim): should this hex encode src and pad?
   setVar dstVar =<< getString srcVar
   return Nothing
 
-runStatement st@(Xabi.EmitStatement eventName exptups pos) = do
+runStatement st@(SolidVM.EmitStatement eventName exptups pos) = do
   solidVMBreakpoint pos
   exps <- mapM (expToVar . snd) exptups
   expVals <- mapM getVar exps
@@ -987,8 +987,8 @@ getIndexType (AccountPath addr p) = do
 
 
 
-expToPath :: MonadSM m => Xabi.Expression -> m AccountPath
-expToPath (Xabi.Variable _ x) = do
+expToPath :: MonadSM m => SolidVM.Expression -> m AccountPath
+expToPath (SolidVM.Variable _ x) = do
   callInfo <- getCurrentCallInfo
   let path = MS.singleton $ BC.pack x
   case x `M.lookup` localVariables callInfo of
@@ -998,7 +998,7 @@ expToPath (Xabi.Variable _ x) = do
         SReference apt -> return apt
         _ -> typeError "expToPath should never be called for a local variable" ((show x) ++ " = " ++ show val)
     Nothing -> return $ AccountPath (currentAccount callInfo) path
-expToPath x@(Xabi.IndexAccess _ parent mIndex) = do
+expToPath x@(SolidVM.IndexAccess _ parent mIndex) = do
   parPath  <- do
     parvar <- expToVar parent
     case parvar of
@@ -1028,7 +1028,7 @@ expToPath x@(Xabi.IndexAccess _ parent mIndex) = do
     ArrayIndex -> do
       n <- getInt idxVar
       return . MS.ArrayIndex $ fromIntegral n
-expToPath (Xabi.MemberAccess _ parent field) = do
+expToPath (SolidVM.MemberAccess _ parent field) = do
   apt <- do
     parvar <- expToVar parent
     case parvar of
@@ -1037,25 +1037,25 @@ expToPath (Xabi.MemberAccess _ parent field) = do
 
 expToPath x = todo "expToPath/unhandled" x
 
-expToVar :: MonadSM m => Xabi.Expression -> m Variable
+expToVar :: MonadSM m => SolidVM.Expression -> m Variable
 expToVar x = do
   v <- expToVar' x
   return v
 
-expToVar' :: MonadSM m => Xabi.Expression -> m Variable
-expToVar' (Xabi.NumberLiteral _ v Nothing) = return . Constant $ SInteger v
-expToVar' (Xabi.StringLiteral _ s) = return $ Constant $ SString s
-expToVar' (Xabi.BoolLiteral _ b) = return $ Constant $ SBool b
-expToVar' (Xabi.Variable _ "bytes32ToString") = return $ Constant $ SHexDecodeAndTrim
-expToVar' (Xabi.Variable _ "addressToAsciiString") = return $ Constant SAddressToAscii
-expToVar' (Xabi.Variable _ "bytes") = do --TODO- remove this hardcoded case
+expToVar' :: MonadSM m => SolidVM.Expression -> m Variable
+expToVar' (SolidVM.NumberLiteral _ v Nothing) = return . Constant $ SInteger v
+expToVar' (SolidVM.StringLiteral _ s) = return $ Constant $ SString s
+expToVar' (SolidVM.BoolLiteral _ b) = return $ Constant $ SBool b
+expToVar' (SolidVM.Variable _ "bytes32ToString") = return $ Constant $ SHexDecodeAndTrim
+expToVar' (SolidVM.Variable _ "addressToAsciiString") = return $ Constant SAddressToAscii
+expToVar' (SolidVM.Variable _ "bytes") = do --TODO- remove this hardcoded case
   return $ Constant $ SBuiltinFunction "identity" Nothing
-expToVar' (Xabi.Variable _ "now") =
+expToVar' (SolidVM.Variable _ "now") =
   Constant . SInteger . round . utcTimeToPOSIXSeconds . blockDataTimestamp . Env.blockHeader <$> getEnv
-expToVar' (Xabi.Variable _ name) = do
+expToVar' (SolidVM.Variable _ name) = do
   getVariableOfName name
 
-expToVar' (Xabi.PlusPlus _ e) = do
+expToVar' (SolidVM.PlusPlus _ e) = do
   var <- expToVar e
   value <- getInt var
 
@@ -1064,7 +1064,7 @@ expToVar' (Xabi.PlusPlus _ e) = do
   setVar var $ SInteger $ value + 1
   return $ Constant $ SInteger value
 
-expToVar' (Xabi.Unitary _ "++" e) = do
+expToVar' (SolidVM.Unitary _ "++" e) = do
   var <- expToVar e
   value <- getInt var
   let next = SInteger $ value + 1
@@ -1073,14 +1073,14 @@ expToVar' (Xabi.Unitary _ "++" e) = do
   setVar var next
   return $ Constant next
 
-expToVar' (Xabi.MinusMinus _ e) = do
+expToVar' (SolidVM.MinusMinus _ e) = do
   var <- expToVar e
   value <- getInt var
   logAssigningVariable $ SInteger value
   setVar var . SInteger $ value - 1
   return $ Constant $ SInteger value
 
-expToVar' (Xabi.Unitary _ "--" e) = do
+expToVar' (SolidVM.Unitary _ "--" e) = do
   var <- expToVar e
   value <- getInt var
   let next = SInteger $ value -1
@@ -1088,22 +1088,22 @@ expToVar' (Xabi.Unitary _ "--" e) = do
   setVar var next
   return $ Constant next
 
-expToVar' (Xabi.Binary _ "+=" lhs rhs) = addAndAssign lhs rhs
-expToVar' (Xabi.Binary _ "-=" lhs rhs) = binopAssign (-) lhs rhs
-expToVar' (Xabi.Binary _ "*=" lhs rhs) = binopAssign (*) lhs rhs
-expToVar' (Xabi.Binary _ "/=" lhs rhs) = binopAssign mod lhs rhs
-expToVar' (Xabi.Binary _ "%=" lhs rhs) = binopAssign rem lhs rhs
-expToVar' (Xabi.Binary _ "|=" lhs rhs) = binopAssign (.|.) lhs rhs
-expToVar' (Xabi.Binary _ "&=" lhs rhs) = binopAssign (.&.) lhs rhs
-expToVar' (Xabi.Binary _ "^=" lhs rhs) = binopAssign xor lhs rhs
+expToVar' (SolidVM.Binary _ "+=" lhs rhs) = addAndAssign lhs rhs
+expToVar' (SolidVM.Binary _ "-=" lhs rhs) = binopAssign (-) lhs rhs
+expToVar' (SolidVM.Binary _ "*=" lhs rhs) = binopAssign (*) lhs rhs
+expToVar' (SolidVM.Binary _ "/=" lhs rhs) = binopAssign mod lhs rhs
+expToVar' (SolidVM.Binary _ "%=" lhs rhs) = binopAssign rem lhs rhs
+expToVar' (SolidVM.Binary _ "|=" lhs rhs) = binopAssign (.|.) lhs rhs
+expToVar' (SolidVM.Binary _ "&=" lhs rhs) = binopAssign (.&.) lhs rhs
+expToVar' (SolidVM.Binary _ "^=" lhs rhs) = binopAssign xor lhs rhs
 
-expToVar' (Xabi.MemberAccess _ (Xabi.Variable _ "Util") "bytes32ToString") = do
+expToVar' (SolidVM.MemberAccess _ (SolidVM.Variable _ "Util") "bytes32ToString") = do
   return $ Constant $ SHexDecodeAndTrim
 
-expToVar' (Xabi.MemberAccess _ (Xabi.Variable _ "Util") "b32") = do --TODO- remove this hardcoded case
+expToVar' (SolidVM.MemberAccess _ (SolidVM.Variable _ "Util") "b32") = do --TODO- remove this hardcoded case
   return $ Constant $ SBuiltinFunction "identity" Nothing
 
-expToVar' x@(Xabi.MemberAccess _ expr name) = do
+expToVar' x@(SolidVM.MemberAccess _ expr name) = do
   val <- getVar =<< expToVar expr
   chainId <- view accountChainId <$> getCurrentAccount
 
@@ -1222,10 +1222,10 @@ expToVar' x@(Xabi.MemberAccess _ expr name) = do
                 $ M.lookup name theMap
             _ -> todo "access member of storage item" (val', name, apt) -}
 
-expToVar' x@(Xabi.IndexAccess _ _ (Nothing)) = missingField "index value cannot be empty" (unparseExpression x)
+expToVar' x@(SolidVM.IndexAccess _ _ (Nothing)) = missingField "index value cannot be empty" (unparseExpression x)
 
 -- TODO(tim): When this is a string constant, we can index into the string directly for SInteger
-expToVar' x@(Xabi.IndexAccess _ parent (Just mIndex)) = do
+expToVar' x@(SolidVM.IndexAccess _ parent (Just mIndex)) = do
   var <- expToVar parent
 
   case var of
@@ -1248,44 +1248,44 @@ expToVar' x@(Xabi.IndexAccess _ parent (Just mIndex)) = do
 --    _ -> error $ "unknown case in expToVar' for IndexAccess: " ++ show var
 
 
-expToVar' (Xabi.Binary _ "+" expr1 expr2) = expToVarAdd expr1 expr2
-expToVar' (Xabi.Binary _ "-" expr1 expr2) = expToVarInteger expr1 (-) expr2 SInteger
-expToVar' (Xabi.Binary _ "*" expr1 expr2) = expToVarInteger expr1 (*) expr2 SInteger
-expToVar' ex@(Xabi.Binary _ "/" expr1 expr2) = do 
+expToVar' (SolidVM.Binary _ "+" expr1 expr2) = expToVarAdd expr1 expr2
+expToVar' (SolidVM.Binary _ "-" expr1 expr2) = expToVarInteger expr1 (-) expr2 SInteger
+expToVar' (SolidVM.Binary _ "*" expr1 expr2) = expToVarInteger expr1 (*) expr2 SInteger
+expToVar' ex@(SolidVM.Binary _ "/" expr1 expr2) = do 
   rhs <- getInt =<< expToVar expr2
   case rhs of
     0 -> divideByZero $ unparseExpression ex
     _ -> expToVarInteger expr1 div expr2 SInteger
-expToVar' (Xabi.Binary _ "%" expr1 expr2) = expToVarInteger expr1 rem expr2 SInteger
-expToVar' (Xabi.Binary _ "|" expr1 expr2) = expToVarInteger expr1 (.|.) expr2 SInteger
-expToVar' (Xabi.Binary _ "&" expr1 expr2) = expToVarInteger expr1 (.&.) expr2 SInteger
-expToVar' (Xabi.Binary _ "^" expr1 expr2) = expToVarInteger expr1 xor expr2 SInteger
-expToVar' (Xabi.Binary _ "**" expr1 expr2) = expToVarInteger expr1 (^) expr2 SInteger
-expToVar' (Xabi.Binary _ "<<" expr1 expr2) = expToVarInteger expr1 (\x i -> x `shift` fromInteger i) expr2 SInteger
-expToVar' (Xabi.Binary _ ">>" expr1 expr2) = expToVarInteger expr1 (\x i -> x `shiftR` fromInteger i) expr2 SInteger
+expToVar' (SolidVM.Binary _ "%" expr1 expr2) = expToVarInteger expr1 rem expr2 SInteger
+expToVar' (SolidVM.Binary _ "|" expr1 expr2) = expToVarInteger expr1 (.|.) expr2 SInteger
+expToVar' (SolidVM.Binary _ "&" expr1 expr2) = expToVarInteger expr1 (.&.) expr2 SInteger
+expToVar' (SolidVM.Binary _ "^" expr1 expr2) = expToVarInteger expr1 xor expr2 SInteger
+expToVar' (SolidVM.Binary _ "**" expr1 expr2) = expToVarInteger expr1 (^) expr2 SInteger
+expToVar' (SolidVM.Binary _ "<<" expr1 expr2) = expToVarInteger expr1 (\x i -> x `shift` fromInteger i) expr2 SInteger
+expToVar' (SolidVM.Binary _ ">>" expr1 expr2) = expToVarInteger expr1 (\x i -> x `shiftR` fromInteger i) expr2 SInteger
 
-expToVar' (Xabi.Unitary _ "!" expr) = do
+expToVar' (SolidVM.Unitary _ "!" expr) = do
   (Constant . SBool . not) <$> (getBool =<< expToVar expr)
-expToVar' (Xabi.Unitary _ "delete" expr) = do
+expToVar' (SolidVM.Unitary _ "delete" expr) = do
   p <- expToVar expr
   deleteVar p
   return $ Constant SNULL
 
-expToVar' (Xabi.Binary _ "!=" expr1 expr2) = do --TODO- generalize all of these Binary operations to a single function
+expToVar' (SolidVM.Binary _ "!=" expr1 expr2) = do --TODO- generalize all of these Binary operations to a single function
   val1 <- getVar =<< expToVar expr1
   val2 <- getVar =<< expToVar expr2
   ctract <- getCurrentContract
   onTraced $ liftIO $ putStrLn $ "            %%%% val1 = " ++ show val1 ++ "\n            %%%% val2 = " ++ show val2
   return . Constant . SBool . not $ valEquals ctract val1 val2
 
-expToVar' (Xabi.Binary _ "==" expr1 expr2) = do
+expToVar' (SolidVM.Binary _ "==" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
   val2 <- getVar =<< expToVar expr2
   ctract <- getCurrentContract
   logVals val1 val2
   return . Constant . SBool $ valEquals ctract val1 val2
 
-expToVar' (Xabi.Binary _ "<" expr1 expr2) = do
+expToVar' (SolidVM.Binary _ "<" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
 
   val2 <- getVar =<< expToVar expr2
@@ -1294,7 +1294,7 @@ expToVar' (Xabi.Binary _ "<" expr1 expr2) = do
     (SInteger i1, SInteger i2) -> return $ Constant $ SBool $ i1 < i2
     _ -> typeError "binary '<' on non-ints" (val1, val2)
 
-expToVar' (Xabi.Binary _ ">" expr1 expr2) = do
+expToVar' (SolidVM.Binary _ ">" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
 
   val2 <- getVar =<< expToVar expr2
@@ -1303,7 +1303,7 @@ expToVar' (Xabi.Binary _ ">" expr1 expr2) = do
     (SInteger i1, SInteger i2) -> return $ Constant $ SBool $ i1 > i2
     _ -> typeError "binary '>' on non-ints" (val1, val2)
 
-expToVar' (Xabi.Binary _ ">=" expr1 expr2) = do
+expToVar' (SolidVM.Binary _ ">=" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
 
   val2 <- getVar =<< expToVar expr2
@@ -1312,7 +1312,7 @@ expToVar' (Xabi.Binary _ ">=" expr1 expr2) = do
     (SInteger i1, SInteger i2) -> return $ Constant $ SBool $ i1 >= i2
     _ -> typeError "binary '>=' used on non-ints" (val1, val2)
 
-expToVar' (Xabi.Binary _ "<=" expr1 expr2) = do
+expToVar' (SolidVM.Binary _ "<=" expr1 expr2) = do
   val1 <- getVar =<< expToVar expr1
 
   val2 <- getVar =<< expToVar expr2
@@ -1321,7 +1321,7 @@ expToVar' (Xabi.Binary _ "<=" expr1 expr2) = do
     (SInteger i1, SInteger i2) -> return $ Constant $ SBool $ i1 <= i2
     _ -> typeError "binary '<=' used on non-ints" (val1, val2)
 
-expToVar' (Xabi.Binary _ "&&" expr1 expr2) = do
+expToVar' (SolidVM.Binary _ "&&" expr1 expr2) = do
   b1 <- getBool =<< expToVar expr1
 
   -- Only evaluate expr2 if b1 is True, otherwise return False
@@ -1332,7 +1332,7 @@ expToVar' (Xabi.Binary _ "&&" expr1 expr2) = do
   else
     return $ Constant $ SBool False
 
-expToVar' (Xabi.Binary _ "||" expr1 expr2) = do
+expToVar' (SolidVM.Binary _ "||" expr1 expr2) = do
   b1 <- getBool =<< expToVar expr1
 
   -- Only evaluate expr2 if b1 is False, otherwise return True
@@ -1343,39 +1343,39 @@ expToVar' (Xabi.Binary _ "||" expr1 expr2) = do
     logVals b1 b2
     return $ Constant $ SBool b2
 
-expToVar' (Xabi.TupleExpression _ exps) = do
+expToVar' (SolidVM.TupleExpression _ exps) = do
   -- Or should STuple be a Vector of Maybe?
   vars <- for exps $ maybe (return $ Constant SNULL) expToVar
   return $ Constant $ STuple $ V.fromList vars
 
-expToVar' (Xabi.ArrayExpression _ exps) = do
+expToVar' (SolidVM.ArrayExpression _ exps) = do
   vars <- for exps expToVar
 --  return $ Constant $ SArray (error "array type from array literal not known") $ V.fromList vars
   return $ Constant $ SArray (Xabi.Int Nothing Nothing) $ V.fromList vars
 
-expToVar' (Xabi.Ternary _ condition expr1 expr2) = do
+expToVar' (SolidVM.Ternary _ condition expr1 expr2) = do
   c <- getBool =<< expToVar condition
   expToVar $ if c then expr1 else expr2
 
-expToVar' (Xabi.FunctionCall _ (Xabi.NewExpression _ Xabi.Bytes{}) (Xabi.OrderedArgs args)) = do
+expToVar' (SolidVM.FunctionCall _ (SolidVM.NewExpression _ Xabi.Bytes{}) (SolidVM.OrderedArgs args)) = do
   case args of
     [a] -> do
       len <- getInt =<< expToVar a
       return . Constant . SString $ replicate (fromIntegral len) '\NUL'
     _ -> arityMismatch "newBytes" 1 (length args)
-expToVar' x@(Xabi.FunctionCall _ (Xabi.NewExpression _ Xabi.Bytes{}) (Xabi.NamedArgs{})) =
+expToVar' x@(SolidVM.FunctionCall _ (SolidVM.NewExpression _ Xabi.Bytes{}) (SolidVM.NamedArgs{})) =
   typeError "cannot create new bytes with named arguments" x
-expToVar' (Xabi.FunctionCall _ (Xabi.NewExpression _ (Xabi.Array {Xabi.entry=t})) (Xabi.OrderedArgs args)) = do
+expToVar' (SolidVM.FunctionCall _ (SolidVM.NewExpression _ (Xabi.Array {Xabi.entry=t})) (SolidVM.OrderedArgs args)) = do
   ctract <- getCurrentContract
   case args of
     [a] -> do
       len <- getInt =<< expToVar a
       return . Constant . SArray t . V.replicate (fromIntegral len) . Constant $ defaultValue ctract t
     _ -> arityMismatch "new array" 1 (length args)
-expToVar' x@(Xabi.FunctionCall _ (Xabi.NewExpression _ (Xabi.Array{})) Xabi.NamedArgs{}) =
+expToVar' x@(SolidVM.FunctionCall _ (SolidVM.NewExpression _ (Xabi.Array{})) SolidVM.NamedArgs{}) =
   typeError "cannot create new array with named arguments" x
 
-expToVar' (Xabi.FunctionCall _ (Xabi.NewExpression _ (Xabi.Label contractName')) args) = do
+expToVar' (SolidVM.FunctionCall _ (SolidVM.NewExpression _ (Xabi.Label contractName')) args) = do
   ro <- readOnly <$> getCurrentCallInfo
   when ro $ invalidWrite "Invalid contract creation during read-only access" $ "contractName: " ++ show contractName' ++ ", args: " ++ show args
   creator <- getCurrentAccount
@@ -1387,11 +1387,11 @@ expToVar' (Xabi.FunctionCall _ (Xabi.NewExpression _ (Xabi.Label contractName'))
     $ fromMaybe (internalError "a call to create did not create an address" execResults)
     $  erNewContractAccount execResults
 
-expToVar' (Xabi.FunctionCall _ e args) = do
+expToVar' (SolidVM.FunctionCall _ e args) = do
   var <- expToVar e
   argVals <- case args of
-                 Xabi.OrderedArgs as -> OrderedVals <$> mapM (getVar <=< expToVar) as
-                 Xabi.NamedArgs ns -> NamedVals <$> mapM (mapM $ getVar <=< expToVar) ns
+                 SolidVM.OrderedArgs as -> OrderedVals <$> mapM (getVar <=< expToVar) as
+                 SolidVM.NamedArgs ns -> NamedVals <$> mapM (mapM $ getVar <=< expToVar) ns
 
   case var of
     Constant (SReference (AccountPath address (MS.StoragePath pieces))) -> do
@@ -1509,7 +1509,7 @@ expToVar' x = todo "expToVar/unhandled" x
 
 --------------
 
-expToVarAdd :: MonadSM m => Xabi.Expression -> Xabi.Expression -> m Variable
+expToVarAdd :: MonadSM m => SolidVM.Expression -> SolidVM.Expression -> m Variable
 expToVarAdd expr1 expr2 = do
   i1 <- getVar =<< expToVar expr1
   i2 <- getVar =<< expToVar expr2
@@ -1518,13 +1518,13 @@ expToVarAdd expr1 expr2 = do
     (SString a, SString b) -> return . Constant . SString $ a ++ b
     _ -> typeError "expToVarAdd" (i1, i2)
 
-expToVarInteger :: MonadSM m => Xabi.Expression -> (Integer->Integer->a) -> Xabi.Expression -> (a->Value) -> m Variable
+expToVarInteger :: MonadSM m => SolidVM.Expression -> (Integer->Integer->a) -> SolidVM.Expression -> (a->Value) -> m Variable
 expToVarInteger expr1 o expr2 retType = do
   i1 <- getInt =<< expToVar expr1
   i2 <- getInt =<< expToVar expr2
   return . Constant . retType $ i1 `o` i2
 
-addAndAssign :: MonadSM m => Xabi.Expression -> Xabi.Expression -> m Variable
+addAndAssign :: MonadSM m => SolidVM.Expression -> SolidVM.Expression -> m Variable
 addAndAssign lhs rhs = do
   let readVal e = getVar =<< expToVar e
   delta <- readVal rhs
@@ -1537,7 +1537,7 @@ addAndAssign lhs rhs = do
   setVar varToAssign next
   return $ Constant next
 
-binopAssign :: MonadSM m => (Integer -> Integer -> Integer) -> Xabi.Expression -> Xabi.Expression -> m Variable
+binopAssign :: MonadSM m => (Integer -> Integer -> Integer) -> SolidVM.Expression -> SolidVM.Expression -> m Variable
 binopAssign oper lhs rhs = do
   let readInt e = getInt =<< expToVar e
   delta <- readInt rhs
@@ -1703,7 +1703,7 @@ bytesToInteger bytes =
 -}
 
 
-runTheConstructors :: MonadSM m => Account -> Account -> Keccak256 -> CodeCollection -> String -> Xabi.ArgList -> m ()
+runTheConstructors :: MonadSM m => Account -> Account -> Keccak256 -> CodeCollection -> String -> SolidVM.ArgList -> m ()
 runTheConstructors from to hsh cc contractName' argExps = do
   let !contract' =
           fromMaybe (missingType "contract inherits from nonexistent parent" contractName')
@@ -1717,10 +1717,10 @@ runTheConstructors from to hsh cc contractName' argExps = do
     ["running constructor: "++contractName'++"("++intercalate ", " (map snd argTypeNames)++")"]
 
   argVals <- case argExps of
-                  (Xabi.OrderedArgs []) -> do
+                  (SolidVM.OrderedArgs []) -> do
                     when (argCount > 0) $ invalidArguments "not enough arguments provided" argPairs
                     return $ OrderedVals []
-                  (Xabi.NamedArgs []) -> do
+                  (SolidVM.NamedArgs []) -> do
                     when (argCount > 0) $ invalidArguments "not enough arguments provided" argPairs
                     return $ NamedVals []
                   _ -> argsToVals contract'
@@ -1771,7 +1771,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
       _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ T.unpack n]) MS.BDefault
 
   forM_ (reverse $ contract'^.parents) $ \parent -> do
-    let args = Xabi.OrderedArgs
+    let args = SolidVM.OrderedArgs
              . fromMaybe []
              $ M.lookup parent =<< (fmap SolidVM.funcConstructorCalls $ contract'^.constructor)
     runTheConstructors from to hsh cc parent args

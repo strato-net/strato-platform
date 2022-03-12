@@ -26,9 +26,9 @@ import           Data.Traversable (for)
 import           SolidVM.Model.CodeCollection
 import           SolidVM.Model.CodeCollection.ConstantDecl
 import           SolidVM.Model.CodeCollection.Function
+import           SolidVM.Model.CodeCollection.Statement
 import           SolidVM.Model.CodeCollection.VariableDecl
 import           SolidVM.Solidity.Detectors.Types
-import           SolidVM.Solidity.Xabi.Statement
 import           SolidVM.Solidity.Xabi.Type
 import qualified SolidVM.Solidity.Xabi.Type as Xabi
 import           SolidVM.Solidity.Xabi.VarDef
