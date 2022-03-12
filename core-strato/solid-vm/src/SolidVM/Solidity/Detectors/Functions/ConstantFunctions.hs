@@ -22,9 +22,9 @@ import           SolidVM.Model.CodeCollection.Function
 import           SolidVM.Model.CodeCollection.Statement
 import           SolidVM.Model.CodeCollection.Type      (Type)
 import qualified SolidVM.Model.CodeCollection.Type      as SVMType
+import           SolidVM.Model.CodeCollection.VarDef
 import           SolidVM.Model.CodeCollection.VariableDecl
 import           SolidVM.Solidity.Detectors.Types
-import           SolidVM.Solidity.Xabi.VarDef
 
 data R = R
   { mutability :: Maybe StateMutability

@@ -29,7 +29,7 @@ import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
 
 import           SolidVM.Model.CodeCollection.Statement
-import qualified SolidVM.Solidity.Xabi.VarDef  as Xabi
+import qualified SolidVM.Model.CodeCollection.VarDef  as SolidVM
 
 data StateMutability = Pure | Constant | View | Payable deriving (Eq, Ord, Show, Generic)
 
@@ -65,8 +65,8 @@ instance ToSchema StateMutability where
     & mapped.schema.example ?~ toJSON View
 
 data FuncF a = Func
-  { funcArgs :: [(Maybe Text, Xabi.IndexedType)]
-  , funcVals :: [(Maybe Text, Xabi.IndexedType)]
+  { funcArgs :: [(Maybe Text, SolidVM.IndexedType)]
+  , funcVals :: [(Maybe Text, SolidVM.IndexedType)]
   , funcStateMutability :: Maybe StateMutability
 
   -- These Values are only used for parsing and unparsing solidity.

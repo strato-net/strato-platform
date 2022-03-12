@@ -30,9 +30,9 @@ import           Blockchain.Strato.Model.Account
 import           SolidVM.Model.CodeCollection.ConstantDecl
 import           SolidVM.Model.CodeCollection.Function
 import           SolidVM.Model.CodeCollection.VariableDecl
-import qualified SolidVM.Solidity.Xabi.Def  as Xabi
+import qualified SolidVM.Model.CodeCollection.Def  as SolidVM
 import qualified SolidVM.Model.CodeCollection.Type as SVMType hiding (Enum)
-import qualified SolidVM.Solidity.Xabi.VarDef  as Xabi
+import qualified SolidVM.Model.CodeCollection.VarDef  as SolidVM
 
 data XabiKind = ContractKind
               | InterfaceKind
@@ -54,7 +54,7 @@ data XabiF a = Xabi
   , xabiConstr    :: Map Text (FuncF a)
   , xabiVars      :: Map Text (VariableDeclF a)
   , xabiConstants :: Map Text (ConstantDeclF a)
-  , xabiTypes     :: Map Text Xabi.Def
+  , xabiTypes     :: Map Text SolidVM.Def
   , xabiModifiers :: Map Text (ModifierF a)
   , xabiEvents    :: Map Text (EventF a)
   , xabiKind      :: XabiKind
@@ -89,9 +89,9 @@ fallbackConstantPayable = withObject "fallbackConstantPayable" $ \obj ->
            _ -> pure Nothing
 
 data ModifierF a = Modifier
-  { modifierArgs     :: Map Text Xabi.IndexedType
+  { modifierArgs     :: Map Text SolidVM.IndexedType
   , modifierSelector :: Text
-  , modifierVals     :: Map Text Xabi.IndexedType
+  , modifierVals     :: Map Text SolidVM.IndexedType
   , modifierContents :: Maybe Text
   , modifierContext  :: a
   } deriving (Eq,Show,Generic, Functor)
@@ -115,16 +115,16 @@ instance ToSchema Modifier where
     where
       ex :: ModifierF ()
       ex = Modifier
-        { modifierArgs = Map.fromList [("userAddress", Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = SVMType.Int {signed = Just False, bytes = Just 32}})]
+        { modifierArgs = Map.fromList [("userAddress", SolidVM.IndexedType {indexedTypeIndex = 0, indexedTypeType = SVMType.Int {signed = Just False, bytes = Just 32}})]
         , modifierSelector = "0adfe412"
-        , modifierVals = Map.fromList [("#0",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = SVMType.Int {signed = Just False, bytes = Just 32}})]
+        , modifierVals = Map.fromList [("#0",SolidVM.IndexedType {indexedTypeIndex = 0, indexedTypeType = SVMType.Int {signed = Just False, bytes = Just 32}})]
         , modifierContents = Nothing
         , modifierContext = ()
         }
 
 data EventF a = Event
   { eventAnonymous :: Bool
-  , eventLogs :: [(Text, Xabi.IndexedType)]
+  , eventLogs :: [(Text, SolidVM.IndexedType)]
   , eventContext :: a
   } deriving (Eq,Show,Generic, Functor)
 
@@ -142,7 +142,7 @@ instance FromJSON a => FromJSON (EventF a) where
                      <$> (o .: "anonymous")
                      <*> (o .: "logs")
                      <*> (o .: "context")
-  parseJSON o = typeMismatch "Xabi.Event: Expected Object" o
+  parseJSON o = typeMismatch "SolidVM.Event: Expected Object" o
 
 instance Arbitrary a => Arbitrary (EventF a) where
   arbitrary = GR.genericArbitrary GR.uniform
@@ -161,7 +161,7 @@ instance FromJSON a => FromJSON (UsingF a) where
   parseJSON (Object o) = Using
                      <$> (o .: "using")
                      <*> (o .: "context")
-  parseJSON o = typeMismatch "Xabi.Using" o
+  parseJSON o = typeMismatch "SolidVM.Using" o
 
 instance Arbitrary a => Arbitrary (UsingF a) where
   arbitrary = Using <$> arbitrary <*> arbitrary

@@ -23,9 +23,11 @@ import           Text.Parsec.Token                    (GenLanguageDef(..))
 import           Text.Printf                          (printf)
 
 import qualified SolidVM.Model.CodeCollection.ConstantDecl as SolidVM
+import qualified SolidVM.Model.CodeCollection.Def          as SolidVM
 import qualified SolidVM.Model.CodeCollection.Function as SolidVM
 import           SolidVM.Model.CodeCollection.Statement
 import qualified SolidVM.Model.CodeCollection.Type  as SVMType
+import qualified SolidVM.Model.CodeCollection.VarDef       as Xabitype
 import qualified SolidVM.Model.CodeCollection.VariableDecl as SolidVM
 
 import           SolidVM.Solidity.Parse.Statement
@@ -35,8 +37,6 @@ import           SolidVM.Solidity.Parse.Types
 
 import           SolidVM.Solidity.Xabi              (XabiF (..))
 import qualified SolidVM.Solidity.Xabi              as Xabi
-import qualified SolidVM.Solidity.Xabi.Def          as Xabi
-import qualified SolidVM.Solidity.Xabi.VarDef       as Xabitype
 
 import           Blockchain.VM.SolidException
 
@@ -120,8 +120,8 @@ data Declaration =
   FuncDeclaration SolidVM.Func
   | ConstructorDeclaration SolidVM.Func
   | ModifierDeclaration Xabi.Modifier
-  | StructDeclaration Xabi.Def
-  | EnumDeclaration Xabi.Def
+  | StructDeclaration SolidVM.Def
+  | EnumDeclaration SolidVM.Def
   | UsingDeclaration Xabi.Using
   | EventDeclaration Xabi.Event
   | VariableDeclaration SolidVM.VariableDecl
@@ -156,11 +156,11 @@ structDeclaration = do
   return
     (
       structName,
-      StructDeclaration Xabi.Struct{
-        Xabi.fields =
+      StructDeclaration SolidVM.Struct{
+        SolidVM.fields =
            zipWith (\(n, v) i -> (Text.pack n, Xabitype.FieldType i v)) structFields [0..],
-        Xabi.bytes = 0,
-        Xabi.context = a
+        SolidVM.bytes = 0,
+        SolidVM.context = a
         }
     )
 
@@ -175,10 +175,10 @@ enumDeclaration = do
   return
     (
       enumName,
-      EnumDeclaration Xabi.Enum {
-        Xabi.names = map Text.pack enumFields,
-        Xabi.bytes = 0,
-        Xabi.context = a
+      EnumDeclaration SolidVM.Enum {
+        SolidVM.names = map Text.pack enumFields,
+        SolidVM.bytes = 0,
+        SolidVM.context = a
         }
     )
 
@@ -331,11 +331,11 @@ modifierDeclaration = do
     (
       name,
       ModifierDeclaration Xabi.Modifier{
-        Xabi.modifierArgs = -- undefined args -- :: Map Text Xabi.IndexedType
+        Xabi.modifierArgs = -- undefined args -- :: Map Text SolidVM.IndexedType
            Map.fromList $
              zipWith (\x i -> fmap (Xabitype.IndexedType i) (nameUnnamed x i)) args [0..]
       , Xabi.modifierSelector = Text.pack name -- ? -- undefined -- :: Text
-      , Xabi.modifierVals = Map.fromList [] -- undefined -- :: Map Text Xabi.IndexedType
+      , Xabi.modifierVals = Map.fromList [] -- undefined -- :: Map Text SolidVM.IndexedType
       , Xabi.modifierContents = if null contents then Nothing else Just $ Text.pack contents
       , Xabi.modifierContext = ctx
 --        objName = name,

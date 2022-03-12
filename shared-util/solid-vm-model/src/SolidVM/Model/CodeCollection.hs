@@ -22,13 +22,13 @@ import GHC.Generics
 import           Blockchain.SolidVM.Exception
 
 import           SolidVM.Model.CodeCollection.ConstantDecl
+import qualified SolidVM.Model.CodeCollection.Def as SolidVM
 import           SolidVM.Model.CodeCollection.Function
 import qualified SolidVM.Model.CodeCollection.Statement as SolidVM
+import qualified SolidVM.Model.CodeCollection.VarDef as SolidVM
 import           SolidVM.Model.CodeCollection.VariableDecl
 import           SolidVM.Solidity.Xabi
 import qualified SolidVM.Solidity.Xabi as Xabi
-import qualified SolidVM.Solidity.Xabi.Def as Xabi
-import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
 
 data ContractF a =
   Contract {
@@ -37,7 +37,7 @@ data ContractF a =
     _constants :: Map String (ConstantDeclF a),
     _storageDefs :: Map T.Text (VariableDeclF a),
     _enums :: Map String ([String], a),
-    _structs :: Map String [(T.Text, Xabi.FieldType, a)],
+    _structs :: Map String [(T.Text, SolidVM.FieldType, a)],
     _events :: Map T.Text (Xabi.EventF a),
     _functions :: Map String (FuncF a),
     _constructor :: Maybe (FuncF a),
@@ -84,8 +84,8 @@ xabiToContract contractName' parents' vmVersion' xabi = do
   _parents = parents',
   _storageDefs = M.fromList $ M.toList $ Xabi.xabiVars xabi,
   _constants = M.fromList $ map (\(k,v) -> (T.unpack k, v)) $ M.toList $ Xabi.xabiConstants xabi,
-  _enums = M.fromList [(T.unpack name, (map T.unpack vals, a)) | (name, Xabi.Enum vals _ a) <- M.toList $ Xabi.xabiTypes xabi],
-  _structs = M.fromList [(T.unpack name, (\(k,v) -> (k,v,a)) <$> vals) | (name, Xabi.Struct vals _ a) <- M.toList $ Xabi.xabiTypes xabi],
+  _enums = M.fromList [(T.unpack name, (map T.unpack vals, a)) | (name, SolidVM.Enum vals _ a) <- M.toList $ Xabi.xabiTypes xabi],
+  _structs = M.fromList [(T.unpack name, (\(k,v) -> (k,v,a)) <$> vals) | (name, SolidVM.Struct vals _ a) <- M.toList $ Xabi.xabiTypes xabi],
   _events = Xabi.xabiEvents xabi,
   _functions = M.fromList $ map (\(k,v) -> (T.unpack k, v)) $ M.toList $ Xabi.xabiFuncs xabi,
   _constructor = constr,

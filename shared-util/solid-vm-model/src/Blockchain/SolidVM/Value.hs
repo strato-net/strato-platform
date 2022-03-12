@@ -46,7 +46,7 @@ import           SolidVM.Model.CodeCollection
 import qualified SolidVM.Model.CodeCollection.Function as SolidVM
 import qualified SolidVM.Model.Storable           as MS
 import qualified SolidVM.Model.CodeCollection.Type       as SVMType
-import qualified SolidVM.Solidity.Xabi.VarDef     as Xabi
+import qualified SolidVM.Model.CodeCollection.VarDef     as SolidVM
 
 
 
@@ -204,7 +204,7 @@ defaultValue ctract (SVMType.Label name) = fromMaybe (SContract name $ unspecifi
       return $ SEnumVal name val 0x0
   , do
     sdef' <- M.lookup name $ _structs ctract
-    let initializeField = Constant . defaultValue ctract . Xabi.fieldTypeType
+    let initializeField = Constant . defaultValue ctract . SolidVM.fieldTypeType
         sdef = (\(a,b,_) -> (a,b)) <$> sdef'
     return . SStruct name . M.map initializeField . M.mapKeys T.unpack . M.fromList $ sdef
   ]
@@ -227,7 +227,7 @@ createDefaultValue ctract (SVMType.Label name) =
     (Nothing, Just sdef) -> do
       items <-
         forM sdef $ \(n, itemType, _) -> do
-          itemVal <- createDefaultValue ctract $ Xabi.fieldTypeType itemType
+          itemVal <- createDefaultValue ctract $ SolidVM.fieldTypeType itemType
           itemVar <- createVar itemVal
           return (T.unpack n, itemVar)
       return $ SStruct name $ M.fromList items
@@ -248,9 +248,9 @@ castToInt (SInteger i) = i
 castToInt s = typeError "castToInt" s
 -}
 
--- Typos are the possible values that a Xabi.Label
+-- Typos are the possible values that a SolidVM.Label
 -- is able to resolve to
-data Typo = StructTypo [(T.Text, Xabi.FieldType)]
+data Typo = StructTypo [(T.Text, SolidVM.FieldType)]
           | EnumTypo [String]
           | ContractTypo String
           deriving (Show)

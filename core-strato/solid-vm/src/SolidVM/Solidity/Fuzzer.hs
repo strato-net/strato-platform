@@ -33,7 +33,7 @@ import           SolidVM.Model.CodeCollection.Function
 import           SolidVM.Solidity.Fuzzer.Types
 import           SolidVM.Model.CodeCollection.Type   hiding (Account, Address, Contract)
 import qualified SolidVM.Model.CodeCollection.Type as SVMType
-import           SolidVM.Solidity.Xabi.VarDef
+import           SolidVM.Model.CodeCollection.VarDef
 import           Test.QuickCheck
 
 defaultFuzzerRuns :: Integer

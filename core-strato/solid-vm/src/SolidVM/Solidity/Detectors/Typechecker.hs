@@ -31,7 +31,7 @@ import           SolidVM.Model.CodeCollection.VariableDecl
 import           SolidVM.Solidity.Detectors.Types
 import           SolidVM.Model.CodeCollection.Type
 import qualified SolidVM.Model.CodeCollection.Type as SVMType
-import           SolidVM.Solidity.Xabi.VarDef
+import           SolidVM.Model.CodeCollection.VarDef
 import           Text.Read (readMaybe)
 
 emptyAnnotation :: SourceAnnotation Text

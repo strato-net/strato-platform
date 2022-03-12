@@ -96,9 +96,9 @@ import           SolidVM.Model.CodeCollection
 import qualified SolidVM.Model.CodeCollection.ConstantDecl as SolidVM
 import qualified SolidVM.Model.CodeCollection.Statement as SolidVM
 import qualified SolidVM.Model.CodeCollection.Type as SVMType
+import qualified SolidVM.Model.CodeCollection.VarDef as SolidVM
 import qualified SolidVM.Model.CodeCollection.VariableDecl as SolidVM
 import qualified SolidVM.Model.Storable as MS
-import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
 
 import           UnliftIO
 
@@ -427,7 +427,7 @@ getVariableOfName name = do
     liftIO $ putStrLn $ " @@@@@@@@@@@@@@@@@@@ available constants: " ++ show (M.keys $ currentContract currentCallInfo^.constants)
     case M.lookup name $ currentContract currentCallInfo^.constants of
       Nothing -> return Nothing
-      Just (Xabi.ConstantDecl _ _ e) -> do
+      Just (SolidVM.ConstantDecl _ _ e) -> do
         let val = constExpToVar e
         return $ Just $ Constant $ val
 -}
@@ -576,8 +576,8 @@ hintFromType = \case
      ContractTypo{} -> return $ TContract s
      EnumTypo{} -> return $ TEnumVal s
      StructTypo fs -> do
-       let upgrade :: MonadSM m => (T.Text, Xabi.FieldType) -> m (B.ByteString , BasicType)
-           upgrade = mapM (hintFromType . Xabi.fieldTypeType) . first encodeUtf8
+       let upgrade :: MonadSM m => (T.Text, SolidVM.FieldType) -> m (B.ByteString , BasicType)
+           upgrade = mapM (hintFromType . SolidVM.fieldTypeType) . first encodeUtf8
        TStruct s <$> mapM upgrade fs
  SVMType.Array{} -> return TComplex
  SVMType.Mapping{} -> return TComplex
@@ -629,7 +629,7 @@ getXabiValueType (AccountPath loc path) = do
                  (MS.Field n, StructTypo fs) ->
                    let mt'' = lookup (decodeUtf8 n) fs
                     in case mt'' of
-                        Just t'' -> Xabi.fieldTypeType t''
+                        Just t'' -> SolidVM.fieldTypeType t''
                         Nothing -> missingField "field not present in struct definition" $ show (n, fs)
                  (_, StructTypo{}) -> typeError "non field access to struct" x
                  (_, ContractTypo{}) -> todo "getValueType/contract access" t'

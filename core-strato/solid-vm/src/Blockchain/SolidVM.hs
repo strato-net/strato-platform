@@ -98,13 +98,13 @@ import qualified SolidVM.Model.CodeCollection.ConstantDecl as SolidVM
 import qualified SolidVM.Model.CodeCollection.Function as SolidVM
 import qualified SolidVM.Model.CodeCollection.Statement as SolidVM
 import qualified SolidVM.Model.CodeCollection.Type as SVMType
+import qualified SolidVM.Model.CodeCollection.VarDef as SolidVM
 import qualified SolidVM.Model.CodeCollection.VariableDecl as SolidVM
 import qualified SolidVM.Model.Storable as MS
 
 import           SolidVM.Solidity.Parse.Statement
 import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpression)
 import qualified SolidVM.Solidity.Xabi as Xabi
-import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
 
 import           UnliftIO                             hiding (assert)
 
@@ -550,12 +550,12 @@ argsToVals ctract fn args =
       let strTypes = M.mapKeys (T.unpack . fromMaybe "") $ M.fromList $ SolidVM.funcArgs fn
       M.mergeA (M.mapMissing $ curry $ invalidArguments "missing argument")
                (M.mapMissing $ curry $ invalidArguments "extra argument")
-               (M.zipWithAMatched $ \_k t x -> eval (Xabi.indexedTypeType t) x)
+               (M.zipWithAMatched $ \_k t x -> eval (SolidVM.indexedTypeType t) x)
                strTypes
                $ M.fromList xs
 
   where orderedTypes :: [SVMType.Type]
-        orderedTypes = map Xabi.indexedTypeType
+        orderedTypes = map SolidVM.indexedTypeType
                      . map snd $ SolidVM.funcArgs fn
 
         eval :: MonadSM m => SVMType.Type -> SolidVM.Expression -> m Value
@@ -1665,8 +1665,8 @@ certificateMap maybeCert = case maybeCert of
                                         , SVMType.value = SVMType.String Nothing }
 {-
 data Func = Func
-  { funcArgs :: Map Text Xabi.IndexedType
-  , funcVals :: Map Text Xabi.IndexedType
+  { funcArgs :: Map Text SolidVM.IndexedType
+  , funcVals :: Map Text SolidVM.IndexedType
   , funcStateMutability :: Maybe StateMutability
 
   -- These Values are only used for parsing and unparsing solidity.
@@ -1712,7 +1712,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
       argCount = length argPairs
       argTypeNames = map fst $ sortWith snd $
         [ ((t, T.unpack $ fromMaybe "" n), i) |
-          (n, Xabi.IndexedType{Xabi.indexedTypeType=t, Xabi.indexedTypeIndex=i}) <- argPairs]
+          (n, SolidVM.IndexedType{SolidVM.indexedTypeType=t, SolidVM.indexedTypeIndex=i}) <- argPairs]
   onTraced $ liftIO $ putStrLn $ box
     ["running constructor: "++contractName'++"("++intercalate ", " (map snd argTypeNames)++")"]
 
@@ -1751,7 +1751,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
                 argTypes
                 (M.fromList ns)
                          
-        forM (M.toList typeAndVal) $ \(n, (Xabi.IndexedType _ t, v)) -> do
+        forM (M.toList typeAndVal) $ \(n, (SolidVM.IndexedType _ t, v)) -> do
           let correctedVal = coerceType contract' t v
           var <- createVar correctedVal
           return (n, (t, var))
@@ -1824,10 +1824,10 @@ runTheCall :: MonadSM m
            -> Bool
            -> m (Maybe Value)
 runTheCall address' contract' funcName hsh cc theFunction argVals ro = do
-  let returns = [(T.unpack n, (t, defaultValue contract' t)) | (Just n, Xabi.IndexedType _ t) <- SolidVM.funcVals theFunction]
+  let returns = [(T.unpack n, (t, defaultValue contract' t)) | (Just n, SolidVM.IndexedType _ t) <- SolidVM.funcVals theFunction]
       args = case argVals of
         OrderedVals vs -> let argMeta = 
-                                map (\(n, Xabi.IndexedType _ t) -> (T.unpack $ fromMaybe "" n, t))
+                                map (\(n, SolidVM.IndexedType _ t) -> (T.unpack $ fromMaybe "" n, t))
                                 $ SolidVM.funcArgs theFunction
                           in zipWith (\(n, t) v -> (n, (t, v))) argMeta vs
         NamedVals ns ->
@@ -1840,7 +1840,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro = do
               -- These probably don't need to be sorted by argument index, as they are turned into a map
               -- when added to the call info.
               sortedArgs = map snd . sortWith fst
-                         . map (\(n, (Xabi.IndexedType i t, v)) -> (i, (n, (t, v))))
+                         . map (\(n, (SolidVM.IndexedType i t, v)) -> (i, (n, (t, v))))
                          $ M.toList typeAndVal
           in sortedArgs
       locals = args ++ returns

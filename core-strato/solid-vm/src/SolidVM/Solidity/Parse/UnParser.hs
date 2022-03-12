@@ -16,15 +16,15 @@ import qualified Data.Map                   as Map
 import           Text.Printf
 
 import           SolidVM.Model.CodeCollection.ConstantDecl
+import qualified SolidVM.Model.CodeCollection.Def as SolidVM
 import           SolidVM.Model.CodeCollection.Function
 import           SolidVM.Model.CodeCollection.Statement
 import           SolidVM.Model.CodeCollection.Type
+import           SolidVM.Model.CodeCollection.VarDef
 import           SolidVM.Model.CodeCollection.VariableDecl
 import           SolidVM.Solidity.Parse.Declarations
 import           SolidVM.Solidity.Parse.File
 import           SolidVM.Solidity.Xabi
-import           SolidVM.Solidity.Xabi.VarDef
-import qualified SolidVM.Solidity.Xabi.Def as Xabi
 
 import           Blockchain.VM.SolidException
 
@@ -276,14 +276,14 @@ unparseEvent (name, Event{..}) = Text.unpack $
 unparseUsing :: (Text, UsingF a) -> String
 unparseUsing (name, Using body _) = Text.unpack . mconcat $ ["using ", name, " ", Text.pack body, ";\n"]
 
-unparseTypes :: (Text, Xabi.DefF a) -> String
-unparseTypes (name, Xabi.Enum {names=names'}) =
+unparseTypes :: (Text, SolidVM.DefF a) -> String
+unparseTypes (name, SolidVM.Enum {names=names'}) =
   Text.unpack $ "enum "
              <> name
              <> " {\n      "
              <> Text.intercalate ",\n      " names'
              <> "\n    }"
-unparseTypes (name, Xabi.Struct {fields=fields'}) =
+unparseTypes (name, SolidVM.Struct {fields=fields'}) =
   Text.unpack $ "struct "
              <> name
              <> " {\n      "

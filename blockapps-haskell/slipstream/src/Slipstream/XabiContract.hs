@@ -18,8 +18,8 @@ import SolidVM.Model.CodeCollection hiding (contractName, events)
 import SolidVM.Model.CodeCollection.VariableDecl
 
 import SolidVM.Solidity.Xabi
-import SolidVM.Solidity.Xabi.VarDef
 import qualified SolidVM.Model.CodeCollection.Type               as SVMType
+import SolidVM.Model.CodeCollection.VarDef
 
 --I am leaving a lot of this undefined....  Partly because the values don't exist in a XABI,
 --and partly just because we don't need some of these values yet.  If a dev uses one of these
