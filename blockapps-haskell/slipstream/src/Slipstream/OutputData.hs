@@ -57,9 +57,9 @@ import           Slipstream.Metrics
 import           Slipstream.Options
 import           Slipstream.SolidityValue
 
+import           SolidVM.Model.CodeCollection.VariableDecl (VariableDeclF(..))
 import           SolidVM.Model.CodeCollection hiding (contractName, contracts, events)
 
-import           SolidVM.Solidity.Xabi                    (VariableDeclF(..))
 import qualified SolidVM.Solidity.Xabi.Type               as Xabi
 
 

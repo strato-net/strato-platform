@@ -15,6 +15,9 @@ import           Data.Map                   ()
 import qualified Data.Map                   as Map
 import           Text.Printf
 
+import           SolidVM.Model.CodeCollection.ConstantDecl
+import           SolidVM.Model.CodeCollection.Function
+import           SolidVM.Model.CodeCollection.VariableDecl
 import           SolidVM.Solidity.Parse.Declarations
 import           SolidVM.Solidity.Parse.File
 import           SolidVM.Solidity.Xabi.Statement

@@ -15,8 +15,9 @@ import           Data.Source
 import           Data.Text           (Text)
 import qualified Data.Text           as T
 import           SolidVM.Model.CodeCollection
+import           SolidVM.Model.CodeCollection.Function
+import           SolidVM.Model.CodeCollection.VariableDecl
 import           SolidVM.Solidity.Detectors.Types
-import           SolidVM.Solidity.Xabi
 import           SolidVM.Solidity.Xabi.Statement
 import qualified SolidVM.Solidity.Xabi.Type as Xabi
 

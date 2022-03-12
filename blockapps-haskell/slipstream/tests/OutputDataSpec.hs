@@ -31,7 +31,7 @@ import Slipstream.OutputData
 import Slipstream.SolidityValue
 
 import SolidVM.Model.CodeCollection hiding (contractName, contracts)
-import SolidVM.Solidity.Xabi                    (VariableDeclF(..))
+import SolidVM.Model.CodeCollection.VariableDecl (VariableDeclF(..))
 import qualified SolidVM.Solidity.Xabi.Type               as Xabi
 
 addr :: Address -> V.Value

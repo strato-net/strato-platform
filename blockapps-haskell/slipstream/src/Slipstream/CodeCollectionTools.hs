@@ -10,7 +10,7 @@ import qualified Data.Map as M
 import qualified Data.Text as T
 
 import SolidVM.Model.CodeCollection
-import SolidVM.Solidity.Xabi
+import SolidVM.Model.CodeCollection.VariableDecl
 import qualified SolidVM.Solidity.Xabi.Type               as Xabi
 
 resolveLabels :: CodeCollection -> CodeCollection

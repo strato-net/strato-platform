@@ -27,8 +27,9 @@ import           Test.QuickCheck.Instances    ()
 
 import           BlockApps.Ethereum2
 import           Blockchain.Strato.Model.Account
---import           SolidVM.Solidity.Parse.Expression
-import           SolidVM.Solidity.Xabi.Statement
+import           SolidVM.Model.CodeCollection.ConstantDecl
+import           SolidVM.Model.CodeCollection.Function
+import           SolidVM.Model.CodeCollection.VariableDecl
 import qualified SolidVM.Solidity.Xabi.Def  as Xabi
 import qualified SolidVM.Solidity.Xabi.Type as Xabi hiding (Enum)
 import qualified SolidVM.Solidity.Xabi.VarDef  as Xabi
@@ -62,117 +63,10 @@ data XabiF a = Xabi
   } deriving (Eq,Show,Generic, Functor)
 
 type Xabi = Positioned XabiF
-{-
-sampleXabi :: Xabi
-sampleXabi = Xabi
-  { xabiFuncs = Map.fromList
-    [ ("get", Func { funcArgs = Map.fromList []
-                   , funcVals = Map.fromList [("#0",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
-                   , funcContents = Just []
-                   , funcStateMutability  = Just View
-                   , funcVisibility = Nothing
-                   , funcConstructorCalls = Map.empty
-                   , funcModifiers = Nothing
-                   })
-    , ("set", Func { funcArgs = Map.fromList [("x",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
-                   , funcVals = Map.fromList []
-                   , funcContents = Just []
-                   , funcStateMutability  = Just Pure
-                   , funcVisibility = Nothing
-                   , funcConstructorCalls = Map.empty
-                   , funcModifiers = Nothing
-                   })
-    ]
-  , xabiConstr = Map.fromList []
-  , xabiConstants = Map.empty
-  , xabiVars = Map.fromList [("storedData",(Xabi.VarType {varTypeAtBytes = 0, varTypePublic = Just False, varTypeConstant = Just True, varTypeInitialValue = Nothing, varTypeType = Xabi.Int {signed = Just False, bytes = Just 32}}, Nothing))]
-  , xabiTypes = Map.fromList [("SimpleStorage", Xabi.Enum {bytes = 0, names = ["SUCCESS", "ERROR"]})]
-  , xabiModifiers = Map.fromList [("onlyOwner", Modifier {modifierArgs = Map.fromList [], modifierSelector="onlyOwner", modifierVals=Map.fromList [], modifierContents = Just "if (msg.sender != owner) throw; _;"})]
-  , xabiEvents = Map.empty
-  , xabiKind = ContractKind
-  , xabiUsing = Map.singleton "SafeMath" (Using "for uint256")
-  }
--}
+
 xabiEmpty :: XabiF ()
 xabiEmpty = Xabi Map.empty Map.empty Map.empty Map.empty Map.empty Map.empty Map.empty ContractKind Map.empty ()
 --------------------------------------------------------------------------------
-
-data StateMutability = Pure | Constant | View | Payable deriving (Eq, Ord, Show, Generic)
-
-tShow :: StateMutability -> Text
-tShow Pure = "pure"
-tShow Constant = "constant"
-tShow View = "view"
-tShow Payable = "payable"
-
-tRead :: Text -> Maybe StateMutability
-tRead "pure" = Just Pure
-tRead "constant" = Just Constant
-tRead "view" = Just View
-tRead "payable" = Just Payable
-tRead _ = Nothing
-
-instance ToJSON StateMutability where
-  toJSON = String . tShow
-
-instance FromJSON StateMutability where
-  parseJSON = withText "StateMutability" $ \t ->
-      case tRead t of
-          Just sm -> pure sm
-          Nothing -> fail $ "invalid StateMutability: " ++ show t
-
-
-instance Arbitrary StateMutability where
-  arbitrary = GR.genericArbitrary GR.uniform
-instance ToSchema StateMutability where
-  declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
-    & mapped.name ?~ "State Mutability"
-    & mapped.schema.description ?~ "Reserved keywords for function state mutability"
-    & mapped.schema.example ?~ toJSON View
-
-data FuncF a = Func
-  { funcArgs :: [(Maybe Text, Xabi.IndexedType)]
-  , funcVals :: [(Maybe Text, Xabi.IndexedType)]
-  , funcStateMutability :: Maybe StateMutability
-
-  -- These Values are only used for parsing and unparsing solidity.
-  -- This data will not be stored in the db and will have no
-  -- relevance when constructing from the db.
-  , funcContents :: Maybe [StatementF a]
-  , funcVisibility :: Maybe Visibility
-  , funcConstructorCalls :: Map String [(ExpressionF a)]
-  , funcModifiers :: Maybe [String]
-  , funcContext :: a
-  } deriving (Eq,Show,Generic, Functor)
-
-instance ToJSON a => ToJSON (FuncF a)
-instance FromJSON a => FromJSON (FuncF a)
-
-type Func = Positioned FuncF
-
-data VariableDeclF a = VariableDecl
-  { varType       :: Xabi.Type
-  , varIsPublic   :: Bool
-  , varInitialVal :: Maybe (ExpressionF a)
-  , varContext    :: a
-  } deriving (Show, Eq, Generic, Functor)
-
-instance ToJSON a => ToJSON (VariableDeclF a)
-instance FromJSON a => FromJSON (VariableDeclF a)
-
-type VariableDecl = Positioned VariableDeclF
-
-data ConstantDeclF a = ConstantDecl
-  { constType       :: Xabi.Type
-  , constIsPublic   :: Bool
-  , constInitialVal :: (ExpressionF a)
-  , constContext    :: a
-  } deriving (Show, Eq, Generic, Functor)
-
-instance ToJSON a => ToJSON (ConstantDeclF a)
-instance FromJSON a => FromJSON (ConstantDeclF a)
-
-type ConstantDecl = Positioned ConstantDeclF
 
 funcPayable :: FuncF a -> Bool
 funcPayable Func{funcStateMutability = Just Payable} = True
@@ -193,24 +87,6 @@ fallbackConstantPayable = withObject "fallbackConstantPayable" $ \obj ->
            (Just (Bool True), _) -> pure . Just $ Constant
            (_, Just (Bool True)) -> pure . Just $ Payable
            _ -> pure Nothing
-
-data Visibility = Private
-                | Public
-                | Internal
-                | External
-  deriving (Eq,Show,Generic)
-
-instance ToJSON Visibility
-instance FromJSON Visibility
-instance Arbitrary Visibility where arbitrary = GR.genericArbitrary GR.uniform
-instance ToSchema Visibility where
-  declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
-    & mapped.name ?~ "Visibility of a Function"
-    & mapped.schema.description ?~ "Xabi Function Visibility"
-    & mapped.schema.example ?~ toJSON ex
-    where
-      ex :: Visibility
-      ex = Public
 
 data ModifierF a = Modifier
   { modifierArgs     :: Map Text Xabi.IndexedType

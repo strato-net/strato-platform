@@ -29,8 +29,8 @@ import qualified Data.Text as T
 import           Data.Traversable (for)
 import           Debugger
 import           SolidVM.Model.CodeCollection
+import           SolidVM.Model.CodeCollection.Function
 import           SolidVM.Solidity.Fuzzer.Types
-import           SolidVM.Solidity.Xabi
 import           SolidVM.Solidity.Xabi.Type   hiding (Account, Address, Contract)
 import qualified SolidVM.Solidity.Xabi.Type as Xabi
 import           SolidVM.Solidity.Xabi.VarDef

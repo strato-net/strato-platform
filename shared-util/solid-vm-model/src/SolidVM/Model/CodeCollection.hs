@@ -21,6 +21,9 @@ import GHC.Generics
 
 import           Blockchain.SolidVM.Exception
 
+import           SolidVM.Model.CodeCollection.ConstantDecl
+import           SolidVM.Model.CodeCollection.Function
+import           SolidVM.Model.CodeCollection.VariableDecl
 import           SolidVM.Solidity.Xabi
 import qualified SolidVM.Solidity.Xabi as Xabi
 import qualified SolidVM.Solidity.Xabi.Def as Xabi
@@ -201,8 +204,8 @@ simpleStatementCrawler = \case
   Xabi.ExpressionStatement expr -> expressionCrawler expr
   Xabi.VariableDefinition _ mExpr -> maybe [] expressionCrawler mExpr
 
-funcCrawler :: Xabi.FuncF a -> [T.Text]
-funcCrawler = maybe [] (concatMap statementCrawler) . Xabi.funcContents
+funcCrawler :: FuncF a -> [T.Text]
+funcCrawler = maybe [] (concatMap statementCrawler) . funcContents
 
 contractCrawler :: Contract -> [T.Text]
 contractCrawler Contract{..} = concatMap funcCrawler _functions ++ concatMap funcCrawler _constructor

@@ -94,6 +94,9 @@ import           Text.Format
 import           Text.Tools
 
 import           SolidVM.Model.CodeCollection
+import qualified SolidVM.Model.CodeCollection.ConstantDecl as SolidVM
+import qualified SolidVM.Model.CodeCollection.Function as SolidVM
+import qualified SolidVM.Model.CodeCollection.VariableDecl as SolidVM
 import qualified SolidVM.Model.Storable as MS
 
 import           SolidVM.Solidity.Parse.Statement
@@ -537,14 +540,14 @@ logFunctionCall args address contract functionName f = do
   return result
 
 
-argsToVals :: MonadSM m => Contract -> Xabi.Func -> Xabi.ArgList -> m ValList
+argsToVals :: MonadSM m => Contract -> SolidVM.Func -> Xabi.ArgList -> m ValList
 argsToVals ctract fn args =
   case args of
     Xabi.OrderedArgs xs -> do
       when (length xs /= length orderedTypes) $ invalidArguments "arity mismatch" (xs, orderedTypes)
       OrderedVals <$> zipWithM eval orderedTypes xs
     Xabi.NamedArgs xs -> NamedVals . M.toList <$> do
-      let strTypes = M.mapKeys (T.unpack . fromMaybe "") $ M.fromList $ Xabi.funcArgs fn
+      let strTypes = M.mapKeys (T.unpack . fromMaybe "") $ M.fromList $ SolidVM.funcArgs fn
       M.mergeA (M.mapMissing $ curry $ invalidArguments "missing argument")
                (M.mapMissing $ curry $ invalidArguments "extra argument")
                (M.zipWithAMatched $ \_k t x -> eval (Xabi.indexedTypeType t) x)
@@ -553,7 +556,7 @@ argsToVals ctract fn args =
 
   where orderedTypes :: [Xabi.Type]
         orderedTypes = map Xabi.indexedTypeType
-                     . map snd $ Xabi.funcArgs fn
+                     . map snd $ SolidVM.funcArgs fn
 
         eval :: MonadSM m => Xabi.Type -> Xabi.Expression -> m Value
         eval t x = case x of
@@ -626,7 +629,7 @@ callWrapper from to mContract functionName isRCC argExps  = do
               Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.contractName)
 
   when isRCC (
-    forM_ [(n, theType) | (n, Xabi.VariableDecl theType _ Nothing _) <- M.toList $ contract'^.storageDefs] $ \(n, theType) -> do
+    forM_ [(n, theType) | (n, SolidVM.VariableDecl theType _ Nothing _) <- M.toList $ contract'^.storageDefs] $ \(n, theType) -> do
       case theType of
         Xabi.Mapping _ _ _-> return ()
         Xabi.Array _ _-> return ()
@@ -1150,7 +1153,7 @@ expToVar' x@(Xabi.MemberAccess _ expr name) = do
             return $ Constant $ SContractFunction (Just contractName') addr constName
           else case constName `M.lookup` _constants cont of
                   Nothing -> unknownConstant "constant member access" (contractName', constName)
-                  Just (Xabi.ConstantDecl _ _ constExp _) -> expToVar constExp
+                  Just (SolidVM.ConstantDecl _ _ constExp _) -> expToVar constExp
 
       (SBuiltinVariable "block", "timestamp") -> do
         env' <- getEnv
@@ -1705,7 +1708,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
   let !contract' =
           fromMaybe (missingType "contract inherits from nonexistent parent" contractName')
           $ cc^.contracts . at contractName'
-      argPairs = fromMaybe [] . fmap Xabi.funcArgs $ contract' ^. constructor
+      argPairs = fromMaybe [] . fmap SolidVM.funcArgs $ contract' ^. constructor
       argCount = length argPairs
       argTypeNames = map fst $ sortWith snd $
         [ ((t, T.unpack $ fromMaybe "" n), i) |
@@ -1738,7 +1741,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
         let argTypes =
               M.fromList
               $ map (\(k, v) -> (T.unpack . fromMaybe "" $ k, v))
-              $ maybe einval Xabi.funcArgs $ contract' ^. constructor
+              $ maybe einval SolidVM.funcArgs $ contract' ^. constructor
               
             typeAndVal =
               M.merge
@@ -1756,11 +1759,11 @@ runTheConstructors from to hsh cc contractName' argExps = do
 
   addCallInfo to contract' (contractName' ++ " constructor") hsh cc (M.fromList zipped) False
 
-  forM_ [(n, e) | (n, Xabi.VariableDecl _ _ (Just e) _) <- M.toList $ contract'^.storageDefs] $ \(n, e) -> do
+  forM_ [(n, e) | (n, SolidVM.VariableDecl _ _ (Just e) _) <- M.toList $ contract'^.storageDefs] $ \(n, e) -> do
     v <- expToVar e
     setVar (Constant (SReference (AccountPath to $ MS.StoragePath [MS.Field $ BC.pack $ T.unpack n]))) =<< getVar v
 
-  forM_ [(n, theType) | (n, Xabi.VariableDecl theType _ Nothing _) <- M.toList $ contract'^.storageDefs] $ \(n, theType) -> do
+  forM_ [(n, theType) | (n, SolidVM.VariableDecl theType _ Nothing _) <- M.toList $ contract'^.storageDefs] $ \(n, theType) -> do
     case theType of
       Xabi.Mapping _ _ _-> return ()
       Xabi.Array _ _-> return ()
@@ -1770,7 +1773,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
   forM_ (reverse $ contract'^.parents) $ \parent -> do
     let args = Xabi.OrderedArgs
              . fromMaybe []
-             $ M.lookup parent =<< (fmap Xabi.funcConstructorCalls $ contract'^.constructor)
+             $ M.lookup parent =<< (fmap SolidVM.funcConstructorCalls $ contract'^.constructor)
     runTheConstructors from to hsh cc parent args
 
 
@@ -1779,7 +1782,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
       Just theFunction -> do
         --argVals <- forM argExps evaluate
         --_ <- call' address contract' theFunction argVals
-        commands <- case Xabi.funcContents theFunction of
+        commands <- case SolidVM.funcContents theFunction of
           Nothing -> missingField "contract constructor has been declared but not defined" contractName'
           Just cms -> pure cms
 
@@ -1816,19 +1819,19 @@ runTheCall :: MonadSM m
            -> String
            -> Keccak256
            -> CodeCollection
-           -> Xabi.Func
+           -> SolidVM.Func
            -> ValList
            -> Bool
            -> m (Maybe Value)
 runTheCall address' contract' funcName hsh cc theFunction argVals ro = do
-  let returns = [(T.unpack n, (t, defaultValue contract' t)) | (Just n, Xabi.IndexedType _ t) <- Xabi.funcVals theFunction]
+  let returns = [(T.unpack n, (t, defaultValue contract' t)) | (Just n, Xabi.IndexedType _ t) <- SolidVM.funcVals theFunction]
       args = case argVals of
         OrderedVals vs -> let argMeta = 
                                 map (\(n, Xabi.IndexedType _ t) -> (T.unpack $ fromMaybe "" n, t))
-                                $ Xabi.funcArgs theFunction
+                                $ SolidVM.funcArgs theFunction
                           in zipWith (\(n, t) v -> (n, (t, v))) argMeta vs
         NamedVals ns ->
-          let strTypes = M.mapKeys T.unpack $ M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ Xabi.funcArgs theFunction
+          let strTypes = M.mapKeys T.unpack $ M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ SolidVM.funcArgs theFunction
               typeAndVal = M.merge (M.mapMissing (curry $ invalidArguments "missing argument"))
                                    (M.mapMissing (curry $ invalidArguments "extra argument"))
                                    (M.zipWithMatched $ \_k t v -> (t, v))
@@ -1855,7 +1858,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro = do
 --  forM_ locals $ \(n, (_, v)) -> do
 --    liftIO $ putStrLn "need to initialize the storage 2"
 --    initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack n) v
-  let !commands = fromMaybe (missingField "function call: function has been declared but not defined" funcName) $ Xabi.funcContents theFunction
+  let !commands = fromMaybe (missingField "function call: function has been declared but not defined" funcName) $ SolidVM.funcContents theFunction
   val <- runStatements commands
 
   let findNamedReturns = do

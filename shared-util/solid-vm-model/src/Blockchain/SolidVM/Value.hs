@@ -43,8 +43,8 @@ import           Blockchain.Strato.Model.Account
 
 
 import           SolidVM.Model.CodeCollection
+import qualified SolidVM.Model.CodeCollection.Function as SolidVM
 import qualified SolidVM.Model.Storable           as MS
-import qualified SolidVM.Solidity.Xabi            as Xabi
 import qualified SolidVM.Solidity.Xabi.Type       as Xabi
 import qualified SolidVM.Solidity.Xabi.VarDef     as Xabi
 
@@ -88,7 +88,7 @@ data Value =
   | STuple (Vector Variable)
   | SArray Xabi.Type (Vector Variable)
   | SMap Xabi.Type (Map Value Variable)
-  | SFunction String Xabi.Func
+  | SFunction String SolidVM.Func
   | SBuiltinFunction String (Maybe Value)
   | SBuiltinVariable String
   | SSetterGetter String (Maybe Value)
