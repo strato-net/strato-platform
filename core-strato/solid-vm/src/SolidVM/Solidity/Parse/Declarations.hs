@@ -25,6 +25,7 @@ import           Text.Printf                          (printf)
 import qualified SolidVM.Model.CodeCollection.ConstantDecl as SolidVM
 import qualified SolidVM.Model.CodeCollection.Function as SolidVM
 import           SolidVM.Model.CodeCollection.Statement
+import qualified SolidVM.Model.CodeCollection.Type  as SVMType
 import qualified SolidVM.Model.CodeCollection.VariableDecl as SolidVM
 
 import           SolidVM.Solidity.Parse.Statement
@@ -35,7 +36,6 @@ import           SolidVM.Solidity.Parse.Types
 import           SolidVM.Solidity.Xabi              (XabiF (..))
 import qualified SolidVM.Solidity.Xabi              as Xabi
 import qualified SolidVM.Solidity.Xabi.Def          as Xabi
-import qualified SolidVM.Solidity.Xabi.Type         as Xabitype
 import qualified SolidVM.Solidity.Xabi.VarDef       as Xabitype
 
 import           Blockchain.VM.SolidException
@@ -97,15 +97,15 @@ solidityContract = do
 
 --        variables = byMutability False [0,32..]
 
---        byMutability :: Bool -> [Int] -> [(String, Declaration)] -> [((Text, Xabitype.Type), Bool, Bool, Maybe Expression)]
+--        byMutability :: Bool -> [Int] -> [(String, Declaration)] -> [((Text, SVMType.Type), Bool, Bool, Maybe Expression)]
 --        byMutability isConst ns = Map.fromList . flip (zipWith mapVarTypes) ns . varTypesOf isConst
 
 --        mapVarTypes (v, isPub, isConst, val) i =
---          fmap (Xabitype.VarType i (visibility isPub) (Just isConst) val) v
+--          fmap (SVMType.VarType i (visibility isPub) (Just isConst) val) v
 
 --        varTypesOf :: Bool
 --                   -> [(String, Declaration)]
---                   -> [((Text, Xabitype.Type), Bool, Bool, Maybe Expression)]
+--                   -> [((Text, SVMType.Type), Bool, Bool, Maybe Expression)]
 --        varTypesOf isConstant = map (\(n, VariableDeclaration v isPub isConst val) ->
 --                                   ((Text.pack n, v), isPub, isConst, val))
 --                           . filter (\(_, decl) -> case decl of
@@ -126,7 +126,7 @@ data Declaration =
   | EventDeclaration Xabi.Event
   | VariableDeclaration SolidVM.VariableDecl
   | ConstantDeclaration SolidVM.ConstantDecl
---  | VariableDeclaration Xabitype.Type Bool Bool (Maybe Expression)
+--  | VariableDeclaration SVMType.Type Bool Bool (Maybe Expression)
   deriving (Eq, Show)
 
 -- | Parses anything that a contract can declare at the top level: new types,
@@ -350,7 +350,7 @@ modifierDeclaration = do
 
 -- | Parses a '(x, y, z)'-style tuple, such as appears in function
 -- arguments and return values.
-tupleDeclaration :: SolidityParser [(Text, Xabitype.Type)]
+tupleDeclaration :: SolidityParser [(Text, SVMType.Type)]
 tupleDeclaration = parens $ commaSep $ do
   partType <- simpleTypeExpression
   optional $ reserved "indexed" <|>
@@ -373,13 +373,13 @@ tupleDeclaration = parens $ commaSep $ do
 -- constant specifiers, and possibly base construtor arguments, in the case
 -- of a constructor.
 
-data FuncModifiers = ReturnsMod [(Text, Xabitype.Type)]
+data FuncModifiers = ReturnsMod [(Text, SVMType.Type)]
                    | VisibilityMod SolidVM.Visibility
                    | MutabilityMod SolidVM.StateMutability
                    | ConstructorCallMod (String, [Expression])
                    | OtherMod String
 
-functionModifiers :: SolidityParser ([(Text, Xabitype.Type)], SolidVM.Visibility, Maybe SolidVM.StateMutability, [(String, [Expression])], [String])
+functionModifiers :: SolidityParser ([(Text, SVMType.Type)], SolidVM.Visibility, Maybe SolidVM.StateMutability, [(String, [Expression])], [String])
 functionModifiers = do
   vals <- many $ (ReturnsMod <$> returnModifier)
              <|>  (VisibilityMod <$> visibilityModifier)

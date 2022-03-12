@@ -97,13 +97,13 @@ import           SolidVM.Model.CodeCollection
 import qualified SolidVM.Model.CodeCollection.ConstantDecl as SolidVM
 import qualified SolidVM.Model.CodeCollection.Function as SolidVM
 import qualified SolidVM.Model.CodeCollection.Statement as SolidVM
+import qualified SolidVM.Model.CodeCollection.Type as SVMType
 import qualified SolidVM.Model.CodeCollection.VariableDecl as SolidVM
 import qualified SolidVM.Model.Storable as MS
 
 import           SolidVM.Solidity.Parse.Statement
 import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpression)
 import qualified SolidVM.Solidity.Xabi as Xabi
-import qualified SolidVM.Solidity.Xabi.Type as Xabi
 import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
 
 import           UnliftIO                             hiding (assert)
@@ -554,18 +554,18 @@ argsToVals ctract fn args =
                strTypes
                $ M.fromList xs
 
-  where orderedTypes :: [Xabi.Type]
+  where orderedTypes :: [SVMType.Type]
         orderedTypes = map Xabi.indexedTypeType
                      . map snd $ SolidVM.funcArgs fn
 
-        eval :: MonadSM m => Xabi.Type -> SolidVM.Expression -> m Value
+        eval :: MonadSM m => SVMType.Type -> SolidVM.Expression -> m Value
         eval t x = case x of
            SolidVM.NumberLiteral _ n Nothing -> return . coerceType ctract t $ SInteger n
            SolidVM.NumberLiteral _ n (Just nu) -> todo "Number literal with units" (n, nu)
            SolidVM.BoolLiteral _ b -> return . coerceType ctract t $ SBool b
            SolidVM.StringLiteral _ s -> return . coerceType ctract t $ SString s
            SolidVM.ArrayExpression _ as -> case t of
-              Xabi.Array{Xabi.entry=t'} ->
+              SVMType.Array{SVMType.entry=t'} ->
                 SArray t . V.fromList <$> mapM (fmap Constant . eval t') as
               _ -> typeError "array literal for non array" (t, x)
            -- This is something of a hack, where if an incoming value is not one
@@ -631,8 +631,8 @@ callWrapper from to mContract functionName isRCC argExps  = do
   when isRCC (
     forM_ [(n, theType) | (n, SolidVM.VariableDecl theType _ Nothing _) <- M.toList $ contract'^.storageDefs] $ \(n, theType) -> do
       case theType of
-        Xabi.Mapping _ _ _-> return ()
-        Xabi.Array _ _-> return ()
+        SVMType.Mapping _ _ _-> return ()
+        SVMType.Array _ _-> return ()
         _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ T.unpack n]) MS.BDefault)
   logFunctionCall args to contract functionName f
 
@@ -737,7 +737,7 @@ runStatement (SolidVM.SimpleStatement (SolidVM.ExpressionStatement (SolidVM.Bina
        assignVal isTuple var (k, Just v1) = do
           ty <- getXabiValueType p
           case ty of
-            Xabi.Array{} -> do
+            SVMType.Array{} -> do
               onTraced $ liftIO $ putStrLn $ "Array copy to " ++ show p
               let p2 = case var of
                           Constant (SReference p2') -> p2'
@@ -797,7 +797,7 @@ runStatement s@(SolidVM.SimpleStatement (SolidVM.VariableDefinition entries mayb
     withSrcPos pos $ printf "             creating and setting variables: (%s)\n" $
         intercalate ", " (map toName entries)
     withSrcPos pos $ printf "             to: %s\n" valueString
-  let ensureType :: Maybe Xabi.Type -> Xabi.Type
+  let ensureType :: Maybe SVMType.Type -> SVMType.Type
       ensureType = fromMaybe (todo "type inference not implemented" s)
 
   case (entries, value) of
@@ -970,19 +970,19 @@ getIndexType (AccountPath addr p) = do
   case mType of
     Nothing -> todo "getIndexType/unknown storage reference" field
     Just v -> return $! loop n v
- where loop :: Int -> Xabi.Type -> IndexType
+ where loop :: Int -> SVMType.Type -> IndexType
        loop 0 t = case t of
-         Xabi.Mapping{Xabi.key=Xabi.Int{}} -> MapIntIndex
-         Xabi.Mapping{Xabi.key=Xabi.String{}} -> MapStringIndex
-         Xabi.Mapping{Xabi.key=Xabi.Bytes{}} -> MapStringIndex
-         Xabi.Mapping{Xabi.key=Xabi.Address{}} -> MapAccountIndex
-         Xabi.Mapping{Xabi.key=Xabi.Account{}} -> MapAccountIndex
-         Xabi.Mapping{Xabi.key=Xabi.Bool{}} -> MapBoolIndex
-         Xabi.Array{} -> ArrayIndex
+         SVMType.Mapping{SVMType.key=SVMType.Int{}} -> MapIntIndex
+         SVMType.Mapping{SVMType.key=SVMType.String{}} -> MapStringIndex
+         SVMType.Mapping{SVMType.key=SVMType.Bytes{}} -> MapStringIndex
+         SVMType.Mapping{SVMType.key=SVMType.Address{}} -> MapAccountIndex
+         SVMType.Mapping{SVMType.key=SVMType.Account{}} -> MapAccountIndex
+         SVMType.Mapping{SVMType.key=SVMType.Bool{}} -> MapBoolIndex
+         SVMType.Array{} -> ArrayIndex
          _ -> typeError "unanticipated index type" t
        loop n t = case t of
-         Xabi.Mapping{Xabi.value=t'} -> loop (n - 1) t'
-         Xabi.Array{Xabi.entry=t'} -> loop (n - 1) t'
+         SVMType.Mapping{SVMType.value=t'} -> loop (n - 1) t'
+         SVMType.Array{SVMType.entry=t'} -> loop (n - 1) t'
          _ -> typeError "indexing type in var dec" t
 
 
@@ -1351,31 +1351,31 @@ expToVar' (SolidVM.TupleExpression _ exps) = do
 expToVar' (SolidVM.ArrayExpression _ exps) = do
   vars <- for exps expToVar
 --  return $ Constant $ SArray (error "array type from array literal not known") $ V.fromList vars
-  return $ Constant $ SArray (Xabi.Int Nothing Nothing) $ V.fromList vars
+  return $ Constant $ SArray (SVMType.Int Nothing Nothing) $ V.fromList vars
 
 expToVar' (SolidVM.Ternary _ condition expr1 expr2) = do
   c <- getBool =<< expToVar condition
   expToVar $ if c then expr1 else expr2
 
-expToVar' (SolidVM.FunctionCall _ (SolidVM.NewExpression _ Xabi.Bytes{}) (SolidVM.OrderedArgs args)) = do
+expToVar' (SolidVM.FunctionCall _ (SolidVM.NewExpression _ SVMType.Bytes{}) (SolidVM.OrderedArgs args)) = do
   case args of
     [a] -> do
       len <- getInt =<< expToVar a
       return . Constant . SString $ replicate (fromIntegral len) '\NUL'
     _ -> arityMismatch "newBytes" 1 (length args)
-expToVar' x@(SolidVM.FunctionCall _ (SolidVM.NewExpression _ Xabi.Bytes{}) (SolidVM.NamedArgs{})) =
+expToVar' x@(SolidVM.FunctionCall _ (SolidVM.NewExpression _ SVMType.Bytes{}) (SolidVM.NamedArgs{})) =
   typeError "cannot create new bytes with named arguments" x
-expToVar' (SolidVM.FunctionCall _ (SolidVM.NewExpression _ (Xabi.Array {Xabi.entry=t})) (SolidVM.OrderedArgs args)) = do
+expToVar' (SolidVM.FunctionCall _ (SolidVM.NewExpression _ (SVMType.Array {SVMType.entry=t})) (SolidVM.OrderedArgs args)) = do
   ctract <- getCurrentContract
   case args of
     [a] -> do
       len <- getInt =<< expToVar a
       return . Constant . SArray t . V.replicate (fromIntegral len) . Constant $ defaultValue ctract t
     _ -> arityMismatch "new array" 1 (length args)
-expToVar' x@(SolidVM.FunctionCall _ (SolidVM.NewExpression _ (Xabi.Array{})) SolidVM.NamedArgs{}) =
+expToVar' x@(SolidVM.FunctionCall _ (SolidVM.NewExpression _ (SVMType.Array{})) SolidVM.NamedArgs{}) =
   typeError "cannot create new array with named arguments" x
 
-expToVar' (SolidVM.FunctionCall _ (SolidVM.NewExpression _ (Xabi.Label contractName')) args) = do
+expToVar' (SolidVM.FunctionCall _ (SolidVM.NewExpression _ (SVMType.Label contractName')) args) = do
   ro <- readOnly <$> getCurrentCallInfo
   when ro $ invalidWrite "Invalid contract creation during read-only access" $ "contractName: " ++ show contractName' ++ ", args: " ++ show args
   creator <- getCurrentAccount
@@ -1660,9 +1660,9 @@ certificateMap maybeCert = case maybeCert of
                              , (SString "publicKey", Constant . SString $ "") 
                              , (SString "certString", Constant . SString $ "")
                              ]
-          stringToString = Xabi.Mapping { Xabi.dynamic = Nothing
-                                        , Xabi.key = Xabi.String Nothing
-                                        , Xabi.value = Xabi.String Nothing }
+          stringToString = SVMType.Mapping { SVMType.dynamic = Nothing
+                                        , SVMType.key = SVMType.String Nothing
+                                        , SVMType.value = SVMType.String Nothing }
 {-
 data Func = Func
   { funcArgs :: Map Text Xabi.IndexedType
@@ -1765,9 +1765,9 @@ runTheConstructors from to hsh cc contractName' argExps = do
 
   forM_ [(n, theType) | (n, SolidVM.VariableDecl theType _ Nothing _) <- M.toList $ contract'^.storageDefs] $ \(n, theType) -> do
     case theType of
-      Xabi.Mapping _ _ _-> return ()
-      Xabi.Array _ _-> return ()
-      Xabi.Bool -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ T.unpack n]) $ MS.BBool False
+      SVMType.Mapping _ _ _-> return ()
+      SVMType.Array _ _-> return ()
+      SVMType.Bool -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ T.unpack n]) $ MS.BBool False
       _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ T.unpack n]) MS.BDefault
 
   forM_ (reverse $ contract'^.parents) $ \parent -> do
@@ -1797,7 +1797,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
 
 
 -- Note: this is intentionally nonstrict in `theType`
-addLocalVariable :: MonadSM m => Xabi.Type -> String -> Value -> m ()
+addLocalVariable :: MonadSM m => SVMType.Type -> String -> Value -> m ()
 addLocalVariable theType name value = do
 --  initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack name) value
   newVariable <- liftIO $ fmap Variable $ newIORef value

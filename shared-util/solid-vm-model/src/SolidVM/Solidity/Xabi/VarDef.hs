@@ -16,7 +16,7 @@ import           Test.QuickCheck
 import           Test.QuickCheck.Instances ()
 
 import           SolidVM.Model.CodeCollection.Statement
-import           SolidVM.Solidity.Xabi.Type
+import           SolidVM.Model.CodeCollection.Type
 
 typeAesonOptions::Options
 typeAesonOptions=defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="type"}}

@@ -14,7 +14,7 @@ import           SolidVM.Solidity.Parse.Expression
 import           SolidVM.Solidity.Parse.Lexer
 import           SolidVM.Solidity.Parse.ParserTypes
 
-import qualified SolidVM.Solidity.Xabi.Type         as Xabitype
+import qualified SolidVM.Model.CodeCollection.Type         as Xabitype
 
 -- | A type expression is either a composite type (arrays and mappings) or
 -- a simple type (builtins and user-defined names)

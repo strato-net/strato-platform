@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 
-module SolidVM.Solidity.Xabi.Type where
+module SolidVM.Model.CodeCollection.Type where
 
 import           Control.Lens              (mapped, (&), (?~))
 import           Data.Aeson

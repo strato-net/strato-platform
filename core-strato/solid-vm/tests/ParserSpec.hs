@@ -10,7 +10,7 @@ import Text.Parsec
 import Text.RawString.QQ
 
 import SolidVM.Model.CodeCollection.Statement
-import SolidVM.Solidity.Xabi.Type
+import SolidVM.Model.CodeCollection.Type
 import SolidVM.Solidity.Parse.Lexer
 import SolidVM.Solidity.Parse.Statement
 import SolidVM.Solidity.Parse.UnParser

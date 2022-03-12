@@ -20,10 +20,10 @@ import           SolidVM.Model.CodeCollection
 import           SolidVM.Model.CodeCollection.ConstantDecl
 import           SolidVM.Model.CodeCollection.Function
 import           SolidVM.Model.CodeCollection.Statement
+import           SolidVM.Model.CodeCollection.Type      (Type)
+import qualified SolidVM.Model.CodeCollection.Type      as SVMType
 import           SolidVM.Model.CodeCollection.VariableDecl
 import           SolidVM.Solidity.Detectors.Types
-import           SolidVM.Solidity.Xabi.Type      (Type)
-import qualified SolidVM.Solidity.Xabi.Type      as Xabi
 import           SolidVM.Solidity.Xabi.VarDef
 
 data R = R
@@ -210,7 +210,7 @@ ccTypeHelper :: CodeCollection
              -> SourceAnnotation ()
              -> Type
              -> [SourceAnnotation Text]
-ccTypeHelper CodeCollection{..} c x (Xabi.Label typeName) =
+ccTypeHelper CodeCollection{..} c x (SVMType.Label typeName) =
   if isJust findDefs
     then []
     else generateAnn typeName x $ M.foldMapWithKey findVars _contracts

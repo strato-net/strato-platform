@@ -29,8 +29,8 @@ import           SolidVM.Model.CodeCollection.Function
 import           SolidVM.Model.CodeCollection.Statement
 import           SolidVM.Model.CodeCollection.VariableDecl
 import           SolidVM.Solidity.Detectors.Types
-import           SolidVM.Solidity.Xabi.Type
-import qualified SolidVM.Solidity.Xabi.Type as Xabi
+import           SolidVM.Model.CodeCollection.Type
+import qualified SolidVM.Model.CodeCollection.Type as SVMType
 import           SolidVM.Solidity.Xabi.VarDef
 import           Text.Read (readMaybe)
 
@@ -83,7 +83,7 @@ showType (Array t l) = T.concat
                      , maybe "" (T.pack . show) l
                      , "]"
                      ]
-showType (Xabi.Contract n) = "contract " <> n
+showType (SVMType.Contract n) = "contract " <> n
 showType (Mapping _ k v) = "mapping (" <> showType k <> " => " <> showType v <> ")"
 
 showType' :: Type' -> Text
@@ -226,7 +226,7 @@ enumType' = Static (Enum Nothing "" Nothing)
 -- structType' = Static (Struct Nothing "")
 
 contractType' :: SourceAnnotation Text -> Type'
-contractType' = Static (Xabi.Contract "")
+contractType' = Static (SVMType.Contract "")
 
 certType' :: SourceAnnotation Text -> Type'
 certType' x = Static (Mapping Nothing (String Nothing) (String Nothing)) x
@@ -429,13 +429,13 @@ typecheckStatic (Array t1 l1) (Array t2 l2) = do
   case (l1, l2) of
     (Just a, Just b) | a /= b -> Left "Mismatched length between array values"
     _ -> Right $ Array e (l1 <|> l2)
-typecheckStatic (Label a) b@Xabi.Contract{} =
-  typecheckStatic (Xabi.Contract (T.pack a)) b
-typecheckStatic a@Xabi.Contract{} (Label b) =
-  typecheckStatic a (Xabi.Contract (T.pack b))
-typecheckStatic (Xabi.Contract a) (Xabi.Contract b) =
+typecheckStatic (Label a) b@SVMType.Contract{} =
+  typecheckStatic (SVMType.Contract (T.pack a)) b
+typecheckStatic a@SVMType.Contract{} (Label b) =
+  typecheckStatic a (SVMType.Contract (T.pack b))
+typecheckStatic (SVMType.Contract a) (SVMType.Contract b) =
   if a == b || a == "" || b == ""
-    then Right (Xabi.Contract $ string' [a, b])
+    then Right (SVMType.Contract $ string' [a, b])
     else Left $ "Type mismatch: contracts "
              <> a
              <> " and "
@@ -525,7 +525,7 @@ typecheckMember (Static (Struct _ struct) x) n = do
       , " is not a field of "
       , struct
       ]) <$ x
-typecheckMember (Static (Xabi.Contract c) x) n = lookupContractFunction x c n
+typecheckMember (Static (SVMType.Contract c) x) n = lookupContractFunction x c n
 typecheckMember (Static (Label c') x) n = do
   let c = T.pack c'
   e <- typecheckMember (Static (Enum Nothing c Nothing) x) n
@@ -534,7 +534,7 @@ typecheckMember (Static (Label c') x) n = do
       s <- typecheckMember (Static (Struct Nothing c) x) n
       case s of
         Bottom _ -> do
-          f <- typecheckMember (Static (Xabi.Contract c) x) n
+          f <- typecheckMember (Static (SVMType.Contract c) x) n
           case f of
             Bottom _ -> pure . bottom $ (T.concat
               [ "Missing label: "
@@ -552,10 +552,10 @@ getConstructorType' x l = do
   case M.lookup (T.unpack l) _contracts of
     Nothing -> pure . bottom $ ("Unknown contract: " <> l) <$ x
     Just c -> case _constructor c of
-      Nothing -> pure $ Function (Product [] x) (Static (Xabi.Contract l) x) x
+      Nothing -> pure $ Function (Product [] x) (Static (SVMType.Contract l) x) x
       Just Func{..} ->
         let fArgs = flip Product x $ flip Static x . indexedTypeType . snd <$> funcArgs
-         in pure $ Function fArgs (Static (Xabi.Contract l) x) x
+         in pure $ Function fArgs (Static (SVMType.Contract l) x) x
 
 getTypeErrors :: Type' -> [SourceAnnotation Text]
 getTypeErrors (Bottom ts) = NE.toList ts
@@ -643,7 +643,7 @@ statementsHelper args ss = do
           let cName' = T.pack cName
               constructorArgs = getConstructorType' x cName'
               givenArgs = flip Product x <$> traverse tcExpr exprs
-              givenFunc = (\t-> Function t (Static (Xabi.Contract cName') x) x) <$> givenArgs
+              givenFunc = (\t-> Function t (Static (SVMType.Contract cName') x) x) <$> givenArgs
           constructorArgs <~> givenFunc
         stmts' <- traverse statementHelper ss
         pure $ concat [stmts', cCalls]
@@ -826,7 +826,7 @@ getVarTypeByName' name ctx = do
             cc <- asks codeCollection
             pure $ case M.lookup name $ _contracts cc of
               Just _->
-                let ctrct = Static (Xabi.Contract $ T.pack name) ctx
+                let ctrct = Static (SVMType.Contract $ T.pack name) ctx
                     lbl = Static (Label name) ctx
                  in Sum $ ctrct :|
                         [Function (Sum (Static Account ctx :| [ctrct, lbl]))
@@ -973,7 +973,7 @@ tcExpr (MinusMinus x a) = do
 tcExpr (NewExpression x b@Bytes{}) = pure $ Static b x
 tcExpr (NewExpression x a@Array{}) = pure $ Static a x
 tcExpr (NewExpression x (Label l)) = getConstructorType' x $ T.pack l
-tcExpr (NewExpression x (Xabi.Contract l)) = getConstructorType' x l
+tcExpr (NewExpression x (SVMType.Contract l)) = getConstructorType' x l
 tcExpr (NewExpression x t) = pure . bottom $ ("Cannot use keyword 'new' in conjuction with type " <> showType t) <$ x
 tcExpr (IndexAccess _ a (Just b)) = do
   a' <- tcExpr a

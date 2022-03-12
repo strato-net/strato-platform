@@ -31,7 +31,7 @@ import           SolidVM.Model.CodeCollection.ConstantDecl
 import           SolidVM.Model.CodeCollection.Function
 import           SolidVM.Model.CodeCollection.VariableDecl
 import qualified SolidVM.Solidity.Xabi.Def  as Xabi
-import qualified SolidVM.Solidity.Xabi.Type as Xabi hiding (Enum)
+import qualified SolidVM.Model.CodeCollection.Type as SVMType hiding (Enum)
 import qualified SolidVM.Solidity.Xabi.VarDef  as Xabi
 
 data XabiKind = ContractKind
@@ -115,9 +115,9 @@ instance ToSchema Modifier where
     where
       ex :: ModifierF ()
       ex = Modifier
-        { modifierArgs = Map.fromList [("userAddress", Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
+        { modifierArgs = Map.fromList [("userAddress", Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = SVMType.Int {signed = Just False, bytes = Just 32}})]
         , modifierSelector = "0adfe412"
-        , modifierVals = Map.fromList [("#0",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
+        , modifierVals = Map.fromList [("#0",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = SVMType.Int {signed = Just False, bytes = Just 32}})]
         , modifierContents = Nothing
         , modifierContext = ()
         }

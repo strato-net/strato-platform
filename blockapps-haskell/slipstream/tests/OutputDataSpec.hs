@@ -31,8 +31,8 @@ import Slipstream.OutputData
 import Slipstream.SolidityValue
 
 import SolidVM.Model.CodeCollection hiding (contractName, contracts)
+import qualified SolidVM.Model.CodeCollection.Type as SVMType
 import SolidVM.Model.CodeCollection.VariableDecl (VariableDeclF(..))
-import qualified SolidVM.Solidity.Xabi.Type               as Xabi
 
 addr :: Address -> V.Value
 addr = V.SimpleValue . V.ValueAccount . unspecifiedChain
@@ -90,7 +90,7 @@ spec = do
                   ("number", V.SimpleValue $ V.valueUInt 18199984780605),
                   ("hash", V.SimpleValue $ V.ValueString "Owner_hash_181999847806006")]]
             }, createDummyContract [
-                  ("owners", Xabi.Array (Xabi.Int Nothing Nothing) Nothing)
+                  ("owners", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                   ])]
 
       g <- newGlobals fakeHandle
@@ -155,7 +155,7 @@ spec = do
                   ("number", V.SimpleValue $ V.valueUInt 18199984780605),
                   ("hash", V.SimpleValue $ V.ValueString "Owner_hash_181999847806006")]]
             }, createDummyContract [
-                  ("owners", Xabi.Array (Xabi.Int Nothing Nothing) Nothing)
+                  ("owners", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                   ])]
       g <- newGlobals fakeHandle
       runLoggingT $ addAndEnableHistoryTable g (HistoryTableName "" "" "Vehicle")
@@ -256,7 +256,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
                   ("number\"", V.SimpleValue $ V.valueUInt 18199984780605),
                   ("h'a\"'sh", V.SimpleValue $ V.ValueString "''Owner_hash_181999847806006")]]
             }, createDummyContract [
-                       ("\"owners\"", Xabi.Array (Xabi.Struct Nothing "") Nothing)
+                       ("\"owners\"", SVMType.Array (SVMType.Struct Nothing "") Nothing)
                        ])]
 
       g <- newGlobals fakeHandle
@@ -335,15 +335,15 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
                 ])
             ]
           }, createDummyContract [
-                     ("addr", Xabi.Address)
-                   , ("boolean", Xabi.Bool)
-                   , ("contract", Xabi.Contract "")
-                   , ("number", Xabi.Int Nothing Nothing)
-                   , ("str", Xabi.Bytes Nothing Nothing)
-                   , ("enum_val", Xabi.Enum Nothing "" Nothing)
-                   , ("array_nums", Xabi.Array (Xabi.Int Nothing Nothing) Nothing)
-                   , ("strukt", Xabi.Struct Nothing "")
-                   , ("set", Xabi.Mapping Nothing (Xabi.Int Nothing Nothing) (Xabi.Bool))
+                     ("addr", SVMType.Address)
+                   , ("boolean", SVMType.Bool)
+                   , ("contract", SVMType.Contract "")
+                   , ("number", SVMType.Int Nothing Nothing)
+                   , ("str", SVMType.Bytes Nothing Nothing)
+                   , ("enum_val", SVMType.Enum Nothing "" Nothing)
+                   , ("array_nums", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
+                   , ("strukt", SVMType.Struct Nothing "")
+                   , ("set", SVMType.Mapping Nothing (SVMType.Int Nothing Nothing) (SVMType.Bool))
                    ])]
 
     g <- newGlobals fakeHandle
@@ -431,7 +431,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
           contractData = M.singleton "array_nums" . V.ValueArrayDynamic
                        . I.singleton 1 $ V.ValueArraySentinel 1
           }, createDummyContract [
-                     ("array_nums", Xabi.Array (Xabi.Int Nothing Nothing) Nothing)
+                     ("array_nums", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                      ])]
     g <- newGlobals fakeHandle
 
@@ -467,11 +467,11 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
                     },
                  createDummyContract 
                  [
-                   ("isIterable", Xabi.Bool),
-                   ("keyMap", Xabi.Mapping Nothing (Xabi.Bytes Nothing Nothing)
-                              (Xabi.Int Nothing Nothing)),
-                   ("owner", Xabi.Account),
-                   ("values", Xabi.Array (Xabi.Int Nothing Nothing) Nothing)
+                   ("isIterable", SVMType.Bool),
+                   ("keyMap", SVMType.Mapping Nothing (SVMType.Bytes Nothing Nothing)
+                              (SVMType.Int Nothing Nothing)),
+                   ("owner", SVMType.Account),
+                   ("values", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                  ]
                 )
     g <- newGlobals fakeHandle
@@ -514,15 +514,15 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
                 ])
             ]
           }, createDummyContract [
-               ("addr", Xabi.Address)
-             , ("boolean", Xabi.Bool)
-             , ("contract", Xabi.Contract "")
-             , ("number", Xabi.Int Nothing Nothing)
-             , ("str", Xabi.String Nothing)
-             , ("enum_val", Xabi.Enum Nothing "" Nothing)
-             , ("array_nums", Xabi.Array (Xabi.Int Nothing Nothing) Nothing)
-             , ("strukt", Xabi.Struct Nothing "")
-             , ("set", Xabi.Mapping Nothing (Xabi.Int Nothing Nothing) (Xabi.Bool))
+               ("addr", SVMType.Address)
+             , ("boolean", SVMType.Bool)
+             , ("contract", SVMType.Contract "")
+             , ("number", SVMType.Int Nothing Nothing)
+             , ("str", SVMType.String Nothing)
+             , ("enum_val", SVMType.Enum Nothing "" Nothing)
+             , ("array_nums", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
+             , ("strukt", SVMType.Struct Nothing "")
+             , ("set", SVMType.Mapping Nothing (SVMType.Int Nothing Nothing) (SVMType.Bool))
             ])]
 
     g <- newGlobals fakeHandle
@@ -596,7 +596,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
 
 
 
-createDummyContract :: [(Text, Xabi.Type)] -> Contract
+createDummyContract :: [(Text, SVMType.Type)] -> Contract
 createDummyContract v = 
   let createVariableDecl t = VariableDecl{
         varType=t,

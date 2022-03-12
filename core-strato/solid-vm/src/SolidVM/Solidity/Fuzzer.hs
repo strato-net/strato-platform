@@ -31,8 +31,8 @@ import           Debugger
 import           SolidVM.Model.CodeCollection
 import           SolidVM.Model.CodeCollection.Function
 import           SolidVM.Solidity.Fuzzer.Types
-import           SolidVM.Solidity.Xabi.Type   hiding (Account, Address, Contract)
-import qualified SolidVM.Solidity.Xabi.Type as Xabi
+import           SolidVM.Model.CodeCollection.Type   hiding (Account, Address, Contract)
+import qualified SolidVM.Model.CodeCollection.Type as SVMType
 import           SolidVM.Solidity.Xabi.VarDef
 import           Test.QuickCheck
 
@@ -99,8 +99,8 @@ generateArgString = fmap (\t -> "(" <> T.intercalate "," t <> ")") . traverse ge
         generateArg (String _) = (\t -> "\"" <> t <> "\"") . escapeText <$> generate arbitrary
         generateArg (Bytes _ _) = (\t -> "\"" <> t <> "\"") . escapeText <$> generate arbitrary
         generateArg Bool = bool "false" "true" <$> (generate arbitrary :: IO Bool)
-        generateArg Xabi.Address = ("0x" <>) . T.pack . show <$> (generate arbitrary :: IO Address)
-        generateArg Xabi.Account = ("0x" <>) . T.pack . show <$> (generate arbitrary :: IO Account)
+        generateArg SVMType.Address = ("0x" <>) . T.pack . show <$> (generate arbitrary :: IO Address)
+        generateArg SVMType.Account = ("0x" <>) . T.pack . show <$> (generate arbitrary :: IO Account)
         generateArg (Label _) = ("0x" <>) . T.pack . show <$> (generate arbitrary :: IO Account)
         generateArg (Struct _ _) = pure "<struct>" -- haha lol
         generateArg (Enum _ _ _) = T.pack . show . abs <$> (generate arbitrary :: IO Integer)
@@ -109,7 +109,7 @@ generateArgString = fmap (\t -> "(" <> T.intercalate "," t <> ")") . traverse ge
                          Nothing -> abs <$> generate arbitrary
           ts <- traverse (const $ generateArg t) [0..n]
           pure $ "[" <> T.intercalate "," ts <> "]"
-        generateArg (Xabi.Contract _) = ("0x" <>) . T.pack . show <$> (generate arbitrary :: IO Account)
+        generateArg (SVMType.Contract _) = ("0x" <>) . T.pack . show <$> (generate arbitrary :: IO Account)
         generateArg (Mapping _ _ _) = pure "<mapping>" --haha lol
 
 prop :: String -> String -> Func -> FuzzerM FuzzerResult

@@ -95,9 +95,9 @@ import           Blockchain.DB.StateDB
 import           SolidVM.Model.CodeCollection
 import qualified SolidVM.Model.CodeCollection.ConstantDecl as SolidVM
 import qualified SolidVM.Model.CodeCollection.Statement as SolidVM
+import qualified SolidVM.Model.CodeCollection.Type as SVMType
 import qualified SolidVM.Model.CodeCollection.VariableDecl as SolidVM
 import qualified SolidVM.Model.Storable as MS
-import qualified SolidVM.Solidity.Xabi.Type as Xabi
 import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
 
 import           UnliftIO
@@ -108,7 +108,7 @@ data CallInfo = CallInfo
   , currentContract     :: Contract
   , codeCollection      :: CodeCollection
   , collectionHash      :: Keccak256
-  , localVariables      :: Map String (Xabi.Type, Variable)
+  , localVariables      :: Map String (SVMType.Type, Variable)
   , readOnly            :: Bool
   , currentSourcePos    :: Maybe SourcePosition
   } deriving (Show)
@@ -469,7 +469,7 @@ addCallInfo :: MonadSM m
             -> String
             -> Keccak256
             -> CodeCollection
-            -> Map String (Xabi.Type, Variable)
+            -> Map String (SVMType.Type, Variable)
             -> Bool
             -> m ()
 addCallInfo a c fn hsh cc initialLocalVariables ro = do
@@ -562,15 +562,15 @@ getCurrentCodeCollection = do
     (currentCallInfo:_) -> return (collectionHash currentCallInfo, codeCollection currentCallInfo)
     _ -> internalError "getCurrentContract called with an empty stack" ()
 
-hintFromType :: MonadSM m => Xabi.Type -> m BasicType
+hintFromType :: MonadSM m => SVMType.Type -> m BasicType
 hintFromType = \case
- Xabi.Address{} -> return TAccount
- Xabi.Account{} -> return TAccount
- Xabi.Bool{} -> return TBool
- Xabi.Bytes{} -> return TString
- Xabi.Int{} -> return TInteger
- Xabi.String{} -> return TString
- Xabi.Label s -> do
+ SVMType.Address{} -> return TAccount
+ SVMType.Account{} -> return TAccount
+ SVMType.Bool{} -> return TBool
+ SVMType.Bytes{} -> return TString
+ SVMType.Int{} -> return TInteger
+ SVMType.String{} -> return TString
+ SVMType.Label s -> do
    t' <- getTypeOfName s
    case t' of
      ContractTypo{} -> return $ TContract s
@@ -579,11 +579,11 @@ hintFromType = \case
        let upgrade :: MonadSM m => (T.Text, Xabi.FieldType) -> m (B.ByteString , BasicType)
            upgrade = mapM (hintFromType . Xabi.fieldTypeType) . first encodeUtf8
        TStruct s <$> mapM upgrade fs
- Xabi.Array{} -> return TComplex
- Xabi.Mapping{} -> return TComplex
+ SVMType.Array{} -> return TComplex
+ SVMType.Mapping{} -> return TComplex
  tt'' -> todo "hintFromType" tt''
 
-getXabiType' :: B.ByteString -> CallInfo -> Maybe Xabi.Type
+getXabiType' :: B.ByteString -> CallInfo -> Maybe SVMType.Type
 getXabiType' field callInfo = M.lookup (T.pack $ BC.unpack field)
                             . fmap SolidVM.varType
                             . _storageDefs
@@ -599,10 +599,10 @@ getCallInfoForAccount acct = do
     [] -> internalError "account not found in call stack" (acct, stack)
     (callInfo:_) -> return callInfo
 
-getXabiType :: Mod.Modifiable [CallInfo] m => Account -> B.ByteString -> m (Maybe Xabi.Type)
+getXabiType :: Mod.Modifiable [CallInfo] m => Account -> B.ByteString -> m (Maybe SVMType.Type)
 getXabiType acct field = getXabiType' field <$> getCallInfoForAccount acct
 
-getXabiValueType :: MonadSM m => AccountPath -> m Xabi.Type
+getXabiValueType :: MonadSM m => AccountPath -> m SVMType.Type
 getXabiValueType (AccountPath loc path) = do
   ccs' <- codeCollection <$> getCurrentCallInfo
   let field = MS.getField path
@@ -610,20 +610,20 @@ getXabiValueType (AccountPath loc path) = do
   case mType of
     Nothing -> todo "getXabiValueType/unknown storage reference" field
     Just v -> return $ loop ccs' (tail $ MS.toList path) v
- where loop :: CodeCollection -> [MS.StoragePathPiece] -> Xabi.Type -> Xabi.Type
+ where loop :: CodeCollection -> [MS.StoragePathPiece] -> SVMType.Type -> SVMType.Type
        loop _ [] = id
        loop ccs [x] = \case
-         Xabi.Mapping{Xabi.value=v} -> case x of
+         SVMType.Mapping{SVMType.value=v} -> case x of
            MS.MapIndex{} -> v
            _ -> typeError "non map index attribute of mapping" x
-         Xabi.Array{Xabi.entry=v} -> case x of
-           MS.Field "length" -> Xabi.Int{signed=Just True, bytes=Nothing}
+         SVMType.Array{SVMType.entry=v} -> case x of
+           MS.Field "length" -> SVMType.Int{signed=Just True, bytes=Nothing}
            MS.ArrayIndex{} -> v
            _ -> typeError "non-length or array index attribute of array" x
-         Xabi.String{} -> case x of
-           MS.Field "length" -> Xabi.Int{signed=Just True, bytes=Nothing}
+         SVMType.String{} -> case x of
+           MS.Field "length" -> SVMType.Int{signed=Just True, bytes=Nothing}
            _ -> typeError "non-length attribute of string" x
-         Xabi.Label s ->
+         SVMType.Label s ->
            let t' = getTypeOfName' s ccs
             in case (x, t') of
                  (MS.Field n, StructTypo fs) ->
@@ -636,8 +636,8 @@ getXabiValueType (AccountPath loc path) = do
                  (_, EnumTypo{}) -> todo "getValueType/enum acess" t'
          t'' -> todo "atomic type does not have value type" t''
        loop ccs (_:rs) = \case
-          Xabi.Mapping{Xabi.value=t'} -> loop ccs rs t'
-          Xabi.Array{Xabi.entry=t'} -> loop ccs rs t'
+          SVMType.Mapping{SVMType.value=t'} -> loop ccs rs t'
+          SVMType.Array{SVMType.entry=t'} -> loop ccs rs t'
           t -> todo "getXabiValueType/loopnext unsupported type" t
 
 getValueType :: MonadSM m => AccountPath -> m BasicType

@@ -17,10 +17,10 @@ import           GHC.Generics
 import           Test.QuickCheck.Instances    ()
 
 import           SolidVM.Model.CodeCollection.Statement
-import qualified SolidVM.Solidity.Xabi.Type as Xabi hiding (Enum)
+import qualified SolidVM.Model.CodeCollection.Type as SVMType hiding (Enum)
 
 data VariableDeclF a = VariableDecl
-  { varType       :: Xabi.Type
+  { varType       :: SVMType.Type
   , varIsPublic   :: Bool
   , varInitialVal :: Maybe (ExpressionF a)
   , varContext    :: a

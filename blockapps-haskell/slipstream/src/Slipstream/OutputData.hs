@@ -57,10 +57,9 @@ import           Slipstream.Metrics
 import           Slipstream.Options
 import           Slipstream.SolidityValue
 
+import           SolidVM.Model.CodeCollection              hiding (contractName, contracts, events)
+import qualified SolidVM.Model.CodeCollection.Type         as SVMType
 import           SolidVM.Model.CodeCollection.VariableDecl (VariableDeclF(..))
-import           SolidVM.Model.CodeCollection hiding (contractName, contracts, events)
-
-import qualified SolidVM.Solidity.Xabi.Type               as Xabi
 
 
 tableSeparator :: Text
@@ -278,7 +277,7 @@ getDeferredForeignKeys tableName c o a =
 --    deferredForeignKeys' <- fmap concat $
 --      forM (Map.toList $ cc^.contracts) $ \(nameString, c) ->
 
-  flip map [(theName, x) | (theName, VariableDecl{varType=Xabi.Contract x}) <- (Map.toList $ c^.storageDefs)] $ \(theName, x) -> 
+  flip map [(theName, x) | (theName, VariableDecl{varType=SVMType.Contract x}) <- (Map.toList $ c^.storageDefs)] $ \(theName, x) -> 
     ForeignKeyInfo {
       tableName=tableName,
       columnName=theName,
@@ -379,7 +378,7 @@ expandContractTable globalsIORef contract tableName = do
         case tableName of
           IndexTableName o a n ->
             flip map
-            [(colName, foreignName) | (colName, VariableDecl{varType=Xabi.Contract foreignName}) <- extras] $ \(colName, foreignName) -> 
+            [(colName, foreignName) | (colName, VariableDecl{varType=SVMType.Contract foreignName}) <- extras] $ \(colName, foreignName) -> 
             ForeignKeyInfo {
               tableName = tableName,
               columnName = colName,
@@ -699,19 +698,19 @@ insertEventTableQuery ev =
 
 --This is a temporary function that converts solidity types to a sample value...  I am just using this now to convert table creation from the old way (value based when values come through) to the new way (direct from the types when a CC is registered)
 solidityTypeToSQLType :: VariableDeclF a -> Maybe Text
-solidityTypeToSQLType VariableDecl{varType=Xabi.Bool} = Just "bool"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Int _ _} = Just "decimal"
-solidityTypeToSQLType VariableDecl{varType=Xabi.String _} = Just "text"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Bytes _ _} = Just "text"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Address} = Just "text"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Account} = Just "text"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Array _ _} = Nothing -- Just "jsonb"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Mapping _ _ _} = Nothing -- Just "jsonb"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Label _} = Just "text"
---solidityTypeToSQLType VariableDecl{varType=Xabi.Label x} = Just $ "text references " <> T.pack x <> "(id)"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Struct _ _} = Just "jsonb"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Enum _ _ _} = Just "text"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Contract _} = Just "text"
+solidityTypeToSQLType VariableDecl{varType=SVMType.Bool} = Just "bool"
+solidityTypeToSQLType VariableDecl{varType=SVMType.Int _ _} = Just "decimal"
+solidityTypeToSQLType VariableDecl{varType=SVMType.String _} = Just "text"
+solidityTypeToSQLType VariableDecl{varType=SVMType.Bytes _ _} = Just "text"
+solidityTypeToSQLType VariableDecl{varType=SVMType.Address} = Just "text"
+solidityTypeToSQLType VariableDecl{varType=SVMType.Account} = Just "text"
+solidityTypeToSQLType VariableDecl{varType=SVMType.Array _ _} = Nothing -- Just "jsonb"
+solidityTypeToSQLType VariableDecl{varType=SVMType.Mapping _ _ _} = Nothing -- Just "jsonb"
+solidityTypeToSQLType VariableDecl{varType=SVMType.Label _} = Just "text"
+--solidityTypeToSQLType VariableDecl{varType=SVMType.Label x} = Just $ "text references " <> T.pack x <> "(id)"
+solidityTypeToSQLType VariableDecl{varType=SVMType.Struct _ _} = Just "jsonb"
+solidityTypeToSQLType VariableDecl{varType=SVMType.Enum _ _ _} = Just "text"
+solidityTypeToSQLType VariableDecl{varType=SVMType.Contract _} = Just "text"
 --solidityTypeToSQLType x = error $ "undefined type in solidityTypeToSQLType: " ++ show (varType x)
 
 

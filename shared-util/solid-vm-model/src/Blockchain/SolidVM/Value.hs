@@ -45,7 +45,7 @@ import           Blockchain.Strato.Model.Account
 import           SolidVM.Model.CodeCollection
 import qualified SolidVM.Model.CodeCollection.Function as SolidVM
 import qualified SolidVM.Model.Storable           as MS
-import qualified SolidVM.Solidity.Xabi.Type       as Xabi
+import qualified SolidVM.Model.CodeCollection.Type       as SVMType
 import qualified SolidVM.Solidity.Xabi.VarDef     as Xabi
 
 
@@ -86,8 +86,8 @@ data Value =
   | SStructDef String
   | SStruct String (Map String Variable)
   | STuple (Vector Variable)
-  | SArray Xabi.Type (Vector Variable)
-  | SMap Xabi.Type (Map Value Variable)
+  | SArray SVMType.Type (Vector Variable)
+  | SMap SVMType.Type (Map Value Variable)
   | SFunction String SolidVM.Func
   | SBuiltinFunction String (Maybe Value)
   | SBuiltinVariable String
@@ -155,12 +155,12 @@ coerceFromInt _ t x = typeError "invalid literal for type" (t, x)
 
 -- coerceType allows integer literals to initialize integers, addresses, and
 -- strings (in the special case of 0) and bytes32, determined by type instead of value
-coerceType :: Contract -> Xabi.Type -> Value -> Value
+coerceType :: Contract -> SVMType.Type -> Value -> Value
 coerceType ct xt = \case
     SInteger i -> coerceFromInt ct (defaultValue ct xt) i
     SString s -> case xt of
-      Xabi.String{} -> SString s
-      Xabi.Bytes{} -> case B16.decode (BC.pack s) of
+      SVMType.String{} -> SString s
+      SVMType.Bytes{} -> case B16.decode (BC.pack s) of
                         (bs, "") -> SString . BC.unpack $ B.takeWhile (/=0) bs
                         _ -> SString s
       _ -> typeError "string literal must be string or bytes" (xt, s)
@@ -188,16 +188,16 @@ createVar val = liftIO $ fmap Variable $ newIORef val
 
 
 --TODO- defaultValue is deprecated, will be removed...  Instead use createDefaultValue
-defaultValue :: Contract -> Xabi.Type -> Value
-defaultValue _ (Xabi.Array valType _) = SArray valType V.empty
-defaultValue _ (Xabi.Mapping _ _ valType) = SMap valType $ M.empty
-defaultValue _ (Xabi.Int _ _) = SInteger 0
-defaultValue _ Xabi.Bool = SBool False
-defaultValue _ (Xabi.Address) = SAccount $ unspecifiedChain (Address 0)
-defaultValue _ (Xabi.Account) = SAccount $ unspecifiedChain (Address 0)
-defaultValue _ (Xabi.String _) = SString ""
-defaultValue _ (Xabi.Bytes _ _) = SString ""
-defaultValue ctract (Xabi.Label name) = fromMaybe (SContract name $ unspecifiedChain 0x0) $ asum
+defaultValue :: Contract -> SVMType.Type -> Value
+defaultValue _ (SVMType.Array valType _) = SArray valType V.empty
+defaultValue _ (SVMType.Mapping _ _ valType) = SMap valType $ M.empty
+defaultValue _ (SVMType.Int _ _) = SInteger 0
+defaultValue _ SVMType.Bool = SBool False
+defaultValue _ (SVMType.Address) = SAccount $ unspecifiedChain (Address 0)
+defaultValue _ (SVMType.Account) = SAccount $ unspecifiedChain (Address 0)
+defaultValue _ (SVMType.String _) = SString ""
+defaultValue _ (SVMType.Bytes _ _) = SString ""
+defaultValue ctract (SVMType.Label name) = fromMaybe (SContract name $ unspecifiedChain 0x0) $ asum
   [ do
       ns <- M.lookup name $ _enums ctract
       val <- listToMaybe $ fst ns
@@ -212,16 +212,16 @@ defaultValue ctract (Xabi.Label name) = fromMaybe (SContract name $ unspecifiedC
 defaultValue _ x = todo "defaultValue" x
 
 createDefaultValue :: MonadIO m =>
-                      Contract -> Xabi.Type -> m Value
-createDefaultValue _ (Xabi.Array valType _) = return $ SArray valType V.empty
-createDefaultValue _ (Xabi.Mapping _ _ valType) = return $ SMap valType $ M.empty
-createDefaultValue _ (Xabi.Int _ _) = return $ SInteger 0
-createDefaultValue _ Xabi.Bool = return $ SBool False
-createDefaultValue _ (Xabi.Address) = return $ SAccount $ unspecifiedChain (Address 0)
-createDefaultValue _ (Xabi.Account) = return $ SAccount $ unspecifiedChain (Address 0)
-createDefaultValue _ (Xabi.String _) = return $ SString ""
-createDefaultValue _ (Xabi.Bytes _ _) = return $ SString ""
-createDefaultValue ctract (Xabi.Label name) =
+                      Contract -> SVMType.Type -> m Value
+createDefaultValue _ (SVMType.Array valType _) = return $ SArray valType V.empty
+createDefaultValue _ (SVMType.Mapping _ _ valType) = return $ SMap valType $ M.empty
+createDefaultValue _ (SVMType.Int _ _) = return $ SInteger 0
+createDefaultValue _ SVMType.Bool = return $ SBool False
+createDefaultValue _ (SVMType.Address) = return $ SAccount $ unspecifiedChain (Address 0)
+createDefaultValue _ (SVMType.Account) = return $ SAccount $ unspecifiedChain (Address 0)
+createDefaultValue _ (SVMType.String _) = return $ SString ""
+createDefaultValue _ (SVMType.Bytes _ _) = return $ SString ""
+createDefaultValue ctract (SVMType.Label name) =
   case (M.lookup name $ _enums ctract, M.lookup name $ _structs ctract) of
     (Just ((val:_), _), _) -> return $ SEnumVal name val 0x0
     (Nothing, Just sdef) -> do
