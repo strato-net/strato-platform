@@ -5,7 +5,6 @@ module SolidVM.Solidity.Detectors.Functions.ConstantFunctions
   ( detector
   ) where
 
-import           CodeCollection
 import           Control.Arrow       ((&&&))
 import           Control.Applicative ((<|>))
 import           Control.Monad.Reader
@@ -17,6 +16,7 @@ import           Data.Maybe      (catMaybes, isJust, maybeToList)
 import           Data.Source
 import           Data.Text       (Text)
 import qualified Data.Text       as T
+import           SolidVM.Model.CodeCollection
 import           SolidVM.Solidity.Detectors.Types
 import           SolidVM.Solidity.Xabi
 import           SolidVM.Solidity.Xabi.Statement

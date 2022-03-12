@@ -92,6 +92,7 @@ import           Blockchain.VMContext
 import           Blockchain.VMOptions
 import           Blockchain.DB.StateDB
 
+import           SolidVM.Model.CodeCollection
 import qualified SolidVM.Model.Storable as MS
 import qualified SolidVM.Solidity.Xabi as Xabi
 import qualified SolidVM.Solidity.Xabi.Statement as Xabi
@@ -99,8 +100,6 @@ import qualified SolidVM.Solidity.Xabi.Type as Xabi
 import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
 
 import           UnliftIO
-
-import CodeCollection
 
 data CallInfo = CallInfo
   { currentFunctionName :: String

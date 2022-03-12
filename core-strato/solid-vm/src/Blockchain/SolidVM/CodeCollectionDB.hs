@@ -38,10 +38,9 @@ import           Blockchain.SolidVM.Exception         hiding (assert)
 import           Blockchain.SolidVM.Metrics
 import           Blockchain.Strato.Model.Keccak256
 
+import           SolidVM.Model.CodeCollection
 import           SolidVM.Solidity.Parse.Declarations
 import           SolidVM.Solidity.Parse.File
-
-import           CodeCollection
 
 data ParseOrSolidVMError = PEx ParseError
                          | SVMEx (Positioned ((,) SolidException)) deriving (Show)

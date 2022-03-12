@@ -39,12 +39,12 @@ import qualified Data.Text as T
 import qualified Data.Vector as V
 import           Text.Printf
 
-import           CodeCollection
 import           Blockchain.DB.SolidStorageDB
 import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.SM
 import           Blockchain.SolidVM.Value
 import           Blockchain.Strato.Model.Account
+import           SolidVM.Model.CodeCollection
 import qualified SolidVM.Model.Storable as MS
 import qualified SolidVM.Solidity.Xabi.Type as Xabi
 import           Text.Format

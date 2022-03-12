@@ -70,7 +70,6 @@ import qualified Blockchain.Strato.Model.Event            as Action
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Stream.VMEvent
 
-import CodeCollection hiding (contractName)
 import Control.Monad.Change.Modify              hiding (modify)
 import Control.Monad.Composable.BlocSQL
 import Control.Monad.Composable.SQL
@@ -89,6 +88,8 @@ import Slipstream.Metrics
 import Slipstream.OutputData
 import Slipstream.XabiContract
 import Slipstream.Options
+
+import SolidVM.Model.CodeCollection hiding (contractName)
 
 instance ( (Keccak256 `Alters` SourceMap) m
          , MonadLogger m

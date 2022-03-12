@@ -4,13 +4,13 @@ module SolidVM.Solidity.Detectors.Statements.WriteAfterWrite
   ( detector
   ) where
 
-import           CodeCollection
 import           Control.Monad.State
 import           Data.Foldable (for_)
 import qualified Data.Map.Strict as M
 import           Data.Maybe      (maybeToList)
 import           Data.Source
 import           Data.Text       (Text)
+import           SolidVM.Model.CodeCollection
 import           SolidVM.Solidity.Detectors.Types
 import           SolidVM.Solidity.Xabi
 import           SolidVM.Solidity.Xabi.Statement

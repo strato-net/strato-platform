@@ -51,13 +51,13 @@ import           Blockchain.Strato.Model.Address
 import qualified Blockchain.Strato.Model.Event   as Action
 import           Blockchain.Strato.Model.Keccak256
 
-import           CodeCollection hiding (contractName, contracts, events)
-
 import           Slipstream.Events
 import           Slipstream.Globals
 import           Slipstream.Metrics
 import           Slipstream.Options
 import           Slipstream.SolidityValue
+
+import           SolidVM.Model.CodeCollection hiding (contractName, contracts, events)
 
 import           SolidVM.Solidity.Xabi                    (VariableDeclF(..))
 import qualified SolidVM.Solidity.Xabi.Type               as Xabi

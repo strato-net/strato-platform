@@ -6,7 +6,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module CodeCollection where
+module SolidVM.Model.CodeCollection where
 
 import Control.Lens
 import Data.Aeson as A

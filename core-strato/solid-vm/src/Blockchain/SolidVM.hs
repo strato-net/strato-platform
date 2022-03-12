@@ -93,6 +93,7 @@ import qualified Text.Colors                          as C
 import           Text.Format
 import           Text.Tools
 
+import           SolidVM.Model.CodeCollection
 import qualified SolidVM.Model.Storable as MS
 
 import           SolidVM.Solidity.Parse.Statement
@@ -103,8 +104,6 @@ import qualified SolidVM.Solidity.Xabi.Type as Xabi
 import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
 
 import           UnliftIO                             hiding (assert)
-
-import           CodeCollection
 
 -- | Copying from Data.List.Extra, since our version of the extra library seems to not contain it.
 -- | A total variant of the list index function `(!!)`.

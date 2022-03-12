@@ -12,9 +12,9 @@ import Data.Source.Position
 import qualified BlockApps.Solidity.Xabi      as OLDXABI
 import qualified BlockApps.Solidity.Xabi.Type as OLDXABI
 
-import CodeCollection hiding (contractName, events)
-
 import SelectAccessible                         ()
+
+import SolidVM.Model.CodeCollection hiding (contractName, events)
 
 import SolidVM.Solidity.Xabi
 import SolidVM.Solidity.Xabi.VarDef

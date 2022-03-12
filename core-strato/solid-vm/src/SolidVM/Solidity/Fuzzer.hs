@@ -14,7 +14,6 @@ import           Blockchain.MemVMContext
 import           Blockchain.Output
 import           Blockchain.SolidVM.Simple
 import           Blockchain.Strato.Model.Address
-import           CodeCollection
 import           Control.Lens
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Trans.Class (lift)
@@ -29,6 +28,7 @@ import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import           Data.Traversable (for)
 import           Debugger
+import           SolidVM.Model.CodeCollection
 import           SolidVM.Solidity.Fuzzer.Types
 import           SolidVM.Solidity.Xabi
 import           SolidVM.Solidity.Xabi.Type   hiding (Account, Address, Contract)

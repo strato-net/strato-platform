@@ -4,11 +4,11 @@ module SolidVM.Solidity.Detectors.Functions.Unimplemented.Modifiers
   ( detector
   ) where
 
-import           CodeCollection
 import qualified Data.Map.Strict as M
 import           Data.Maybe      (maybeToList)
 import           Data.Source
 import           Data.Text       (Text)
+import           SolidVM.Model.CodeCollection
 import           SolidVM.Solidity.Detectors.Types
 import           SolidVM.Solidity.Xabi
 

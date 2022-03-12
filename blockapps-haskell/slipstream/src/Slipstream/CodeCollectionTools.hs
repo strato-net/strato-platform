@@ -9,10 +9,9 @@ import Data.Map (Map)
 import qualified Data.Map as M
 import qualified Data.Text as T
 
+import SolidVM.Model.CodeCollection
 import SolidVM.Solidity.Xabi
 import qualified SolidVM.Solidity.Xabi.Type               as Xabi
-
-import CodeCollection
 
 resolveLabels :: CodeCollection -> CodeCollection
 resolveLabels cc = cc{_contracts=fmap (resolveLabelsInContract cc) $ cc^.contracts}

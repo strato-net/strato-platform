@@ -6,7 +6,6 @@ module SolidVM.Solidity.Detectors.Variables.StateVariables
   ( detector
   ) where
 
-import           CodeCollection
 import           Control.Lens
 import           Control.Monad.State
 import           Data.Foldable       (traverse_)
@@ -15,6 +14,7 @@ import           Data.Maybe          (isJust, maybeToList)
 import           Data.Source
 import           Data.Text           (Text)
 import qualified Data.Text           as T
+import           SolidVM.Model.CodeCollection
 import           SolidVM.Solidity.Detectors.Types
 import           SolidVM.Solidity.Xabi
 import           SolidVM.Solidity.Xabi.Statement

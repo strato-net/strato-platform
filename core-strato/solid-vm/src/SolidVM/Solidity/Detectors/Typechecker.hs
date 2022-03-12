@@ -7,7 +7,6 @@ module SolidVM.Solidity.Detectors.Typechecker
   ( detector
   ) where
 
-import           CodeCollection
 import           Control.Applicative ((<|>))
 import           Control.Arrow ((&&&))
 import           Control.Monad.Reader
@@ -24,6 +23,7 @@ import           Data.String     (IsString, fromString)
 import           Data.Text       (Text)
 import qualified Data.Text       as T
 import           Data.Traversable (for)
+import           SolidVM.Model.CodeCollection
 import           SolidVM.Solidity.Detectors.Types
 import           SolidVM.Solidity.Xabi
 import           SolidVM.Solidity.Xabi.Statement

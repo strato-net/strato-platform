@@ -24,13 +24,13 @@ import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256 (hash)
-import CodeCollection hiding (contractName, contracts)
 import Slipstream.Events
 import Slipstream.Globals
 import Slipstream.GlobalsColdStorage (fakeHandle)
 import Slipstream.OutputData
 import Slipstream.SolidityValue
 
+import SolidVM.Model.CodeCollection hiding (contractName, contracts)
 import SolidVM.Solidity.Xabi                    (VariableDeclF(..))
 import qualified SolidVM.Solidity.Xabi.Type               as Xabi
 

@@ -7,7 +7,7 @@ import System.Exit
 import Text.Parsec (runParser)
 import Text.Printf
 
-import CodeCollection
+import SolidVM.Model.CodeCollection
 import SolidVM.Solidity.Parse.Declarations
 import SolidVM.Solidity.Parse.File
 

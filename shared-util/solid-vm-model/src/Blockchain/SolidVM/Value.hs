@@ -42,7 +42,7 @@ import           Blockchain.SolidVM.Exception
 import           Blockchain.Strato.Model.Account
 
 
-import           CodeCollection
+import           SolidVM.Model.CodeCollection
 import qualified SolidVM.Model.Storable           as MS
 import qualified SolidVM.Solidity.Xabi            as Xabi
 import qualified SolidVM.Solidity.Xabi.Type       as Xabi
