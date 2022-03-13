@@ -1,7 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Blockchain.SolidVM.Value (
+module SolidVM.Model.Value (
   Variable(..),
   Value(..),
   BasicType(..),

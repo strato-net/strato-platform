@@ -87,18 +87,14 @@ import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.SolidVM.Environment     as Env
 import           Blockchain.SolidVM.Exception
-import           Blockchain.SolidVM.Value
 import           Blockchain.VMContext
 import           Blockchain.VMOptions
 import           Blockchain.DB.StateDB
 
 import qualified SolidVM.Model.CodeCollection as CC
---import qualified SolidVM.Model.CodeCollection.ConstantDecl as SolidVM
---import qualified SolidVM.Model.CodeCollection.Statement as SolidVM
 import qualified SolidVM.Model.CodeCollection.Type as SVMType
---import qualified SolidVM.Model.CodeCollection.VarDef as SolidVM
---import qualified SolidVM.Model.CodeCollection.VariableDecl as SolidVM
 import qualified SolidVM.Model.Storable as MS
+import           SolidVM.Model.Value
 
 import           UnliftIO
 

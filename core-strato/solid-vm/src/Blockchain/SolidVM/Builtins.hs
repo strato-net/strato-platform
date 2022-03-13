@@ -6,9 +6,9 @@ module Blockchain.SolidVM.Builtins where
 
 import           Blockchain.SolidVM.SetGet
 import           Blockchain.SolidVM.SM
-import           Blockchain.SolidVM.Value
 import           Blockchain.VM.SolidException
 import qualified SolidVM.Model.Storable as MS
+import           SolidVM.Model.Value
 
 push :: MonadSM m => Value -> ValList -> m Variable
 push (SReference apt) (OrderedVals [av]) = do

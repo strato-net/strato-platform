@@ -78,7 +78,6 @@ import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.Metrics
 import           Blockchain.SolidVM.SetGet
 import           Blockchain.SolidVM.TraceTools
-import           Blockchain.SolidVM.Value
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Action       (Action)
@@ -102,6 +101,7 @@ import qualified SolidVM.Model.CodeCollection.Type as SVMType
 import qualified SolidVM.Model.CodeCollection.VarDef as SolidVM
 import qualified SolidVM.Model.CodeCollection.VariableDecl as SolidVM
 import qualified SolidVM.Model.Storable as MS
+import           SolidVM.Model.Value
 
 import           SolidVM.Solidity.Parse.Statement
 import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpression)
