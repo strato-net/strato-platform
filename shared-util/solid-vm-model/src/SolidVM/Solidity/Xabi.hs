@@ -36,7 +36,7 @@ import           SolidVM.Model.CodeCollection.Event
 import           SolidVM.Model.CodeCollection.Function
 import           SolidVM.Model.CodeCollection.VariableDecl
 import qualified SolidVM.Model.CodeCollection.Def  as SolidVM
-import qualified SolidVM.Model.CodeCollection.Type as SVMType hiding (Enum)
+import qualified SolidVM.Model.Type as SVMType
 import qualified SolidVM.Model.CodeCollection.VarDef  as SolidVM
 
 data XabiKind = ContractKind

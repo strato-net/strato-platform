@@ -16,7 +16,7 @@ import SelectAccessible                         ()
 
 import SolidVM.Model.CodeCollection hiding (contractName, events)
 
-import qualified SolidVM.Model.CodeCollection.Type               as SVMType
+import qualified SolidVM.Model.Type               as SVMType
 
 --I am leaving a lot of this undefined....  Partly because the values don't exist in a XABI,
 --and partly just because we don't need some of these values yet.  If a dev uses one of these

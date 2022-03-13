@@ -10,7 +10,7 @@ import qualified Data.Map as M
 import qualified Data.Text as T
 
 import SolidVM.Model.CodeCollection
-import qualified SolidVM.Model.CodeCollection.Type               as SVMType
+import qualified SolidVM.Model.Type               as SVMType
 
 resolveLabels :: CodeCollection -> CodeCollection
 resolveLabels cc = cc{_contracts=fmap (resolveLabelsInContract cc) $ cc^.contracts}

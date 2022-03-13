@@ -44,7 +44,7 @@ import           Blockchain.Strato.Model.Account
 
 import qualified SolidVM.Model.CodeCollection            as CC
 import qualified SolidVM.Model.Storable                  as MS
-import qualified SolidVM.Model.CodeCollection.Type       as SVMType
+import qualified SolidVM.Model.Type                      as SVMType
 
 
 

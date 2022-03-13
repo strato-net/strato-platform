@@ -15,14 +15,10 @@ import           Data.Map                   ()
 import qualified Data.Map                   as Map
 import           Text.Printf
 
-import           SolidVM.Model.CodeCollection.ConstantDecl
+import           SolidVM.Model.CodeCollection
 import qualified SolidVM.Model.CodeCollection.Def as SolidVM
-import           SolidVM.Model.CodeCollection.Event
-import           SolidVM.Model.CodeCollection.Function
-import           SolidVM.Model.CodeCollection.Statement
-import           SolidVM.Model.CodeCollection.Type
-import           SolidVM.Model.CodeCollection.VarDef
-import           SolidVM.Model.CodeCollection.VariableDecl
+import           SolidVM.Model.Type (Type)
+import qualified SolidVM.Model.Type as SVMType
 import           SolidVM.Solidity.Parse.Declarations
 import           SolidVM.Solidity.Parse.File
 import           SolidVM.Solidity.Xabi
@@ -94,24 +90,24 @@ unparseConstant (name, (ConstantDecl theType isPublic expression _)) =
   <> ";"
 
 unparseVarType :: Type -> String
-unparseVarType (Int (Just True) (Just n)) = "int" <> show (8*n)
-unparseVarType (Int (Just True) Nothing) = "int"
-unparseVarType (Int (Just False) (Just n)) = "uint" <> show (8*n)
-unparseVarType (Int (Just False) Nothing) = "uint"
-unparseVarType (Int Nothing (Just n)) = "uint" <> show (8*n)
-unparseVarType (Int Nothing Nothing) = "uint"
-unparseVarType (Bool) = "bool"
-unparseVarType (String _) = "string"
-unparseVarType (Address) = "address"
-unparseVarType (Account) = "account"
-unparseVarType (Bytes (Just True) _ ) = "bytes"
-unparseVarType (Bytes Nothing (Just bytes) ) = "bytes" <> (show bytes)
-unparseVarType (Label str) = str
-unparseVarType (Enum _ name _) = Text.unpack name
-unparseVarType (Array t (Just n)) = (unparseVarType t) <> "[" <> show n <> "]"
-unparseVarType (Array t Nothing) = (unparseVarType t) <> "[]"
-unparseVarType (Mapping _ key val) = "mapping (" <> (unparseVarType key) <> " => " <> (unparseVarType val) <> ")"
-unparseVarType (Contract contractName) = Text.unpack contractName
+unparseVarType (SVMType.Int (Just True) (Just n)) = "int" <> show (8*n)
+unparseVarType (SVMType.Int (Just True) Nothing) = "int"
+unparseVarType (SVMType.Int (Just False) (Just n)) = "uint" <> show (8*n)
+unparseVarType (SVMType.Int (Just False) Nothing) = "uint"
+unparseVarType (SVMType.Int Nothing (Just n)) = "uint" <> show (8*n)
+unparseVarType (SVMType.Int Nothing Nothing) = "uint"
+unparseVarType (SVMType.Bool) = "bool"
+unparseVarType (SVMType.String _) = "string"
+unparseVarType (SVMType.Address) = "address"
+unparseVarType (SVMType.Account) = "account"
+unparseVarType (SVMType.Bytes (Just True) _ ) = "bytes"
+unparseVarType (SVMType.Bytes Nothing (Just bytes) ) = "bytes" <> (show bytes)
+unparseVarType (SVMType.Label str) = str
+unparseVarType (SVMType.Enum _ name _) = Text.unpack name
+unparseVarType (SVMType.Array t (Just n)) = (unparseVarType t) <> "[" <> show n <> "]"
+unparseVarType (SVMType.Array t Nothing) = (unparseVarType t) <> "[]"
+unparseVarType (SVMType.Mapping _ key val) = "mapping (" <> (unparseVarType key) <> " => " <> (unparseVarType val) <> ")"
+unparseVarType (SVMType.Contract contractName') = Text.unpack contractName'
 unparseVarType _ = "TYPE_NOT_IMPLEMENED"
 
 unparseFunc :: (Text, Func) -> String

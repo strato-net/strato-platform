@@ -22,14 +22,9 @@ import           Text.Parsec
 import           Text.Parsec.Token                    (GenLanguageDef(..))
 import           Text.Printf                          (printf)
 
-import qualified SolidVM.Model.CodeCollection.ConstantDecl as SolidVM
+import qualified SolidVM.Model.CodeCollection              as SolidVM
 import qualified SolidVM.Model.CodeCollection.Def          as SolidVM
-import qualified SolidVM.Model.CodeCollection.Event        as SolidVM
-import qualified SolidVM.Model.CodeCollection.Function     as SolidVM
-import           SolidVM.Model.CodeCollection.Statement
-import qualified SolidVM.Model.CodeCollection.Type         as SVMType
-import qualified SolidVM.Model.CodeCollection.VarDef       as Xabitype
-import qualified SolidVM.Model.CodeCollection.VariableDecl as SolidVM
+import qualified SolidVM.Model.Type                        as SVMType
 
 import           SolidVM.Solidity.Parse.Statement
 import           SolidVM.Solidity.Parse.Lexer
@@ -159,7 +154,7 @@ structDeclaration = do
       structName,
       StructDeclaration SolidVM.Struct{
         SolidVM.fields =
-           zipWith (\(n, v) i -> (Text.pack n, Xabitype.FieldType i v)) structFields [0..],
+           zipWith (\(n, v) i -> (Text.pack n, SolidVM.FieldType i v)) structFields [0..],
         SolidVM.bytes = 0,
         SolidVM.context = a
         }
@@ -277,9 +272,9 @@ functionXabi = do
       ctx = SourceAnnotation start end ()
   return SolidVM.Func{
         SolidVM.funcArgs =
-           zipWith (\x i -> fmap (Xabitype.IndexedType i) (nameUnnamed x)) functionArgs [0..]
+           zipWith (\x i -> fmap (SolidVM.IndexedType i) (nameUnnamed x)) functionArgs [0..]
       , SolidVM.funcVals =
-           zipWith (\v i -> fmap (Xabitype.IndexedType i) (nameUnnamed v)) functionRet [0..]
+           zipWith (\v i -> fmap (SolidVM.IndexedType i) (nameUnnamed v)) functionRet [0..]
       , SolidVM.funcContents = contents
       , SolidVM.funcVisibility = Just visibility
       , SolidVM.funcStateMutability = mutability
@@ -304,7 +299,7 @@ eventDeclaration = do
       name,
       EventDeclaration SolidVM.Event{
           SolidVM.eventAnonymous = anon
-        , SolidVM.eventLogs = zipWith (\i -> fmap (Xabitype.IndexedType i)) [0..] logs
+        , SolidVM.eventLogs = zipWith (\i -> fmap (SolidVM.IndexedType i)) [0..] logs
         , SolidVM.eventContext = ctx
 --         objName = name,
 --         objValueType = NoValue,
@@ -334,7 +329,7 @@ modifierDeclaration = do
       ModifierDeclaration Xabi.Modifier{
         Xabi.modifierArgs = -- undefined args -- :: Map Text SolidVM.IndexedType
            Map.fromList $
-             zipWith (\x i -> fmap (Xabitype.IndexedType i) (nameUnnamed x i)) args [0..]
+             zipWith (\x i -> fmap (SolidVM.IndexedType i) (nameUnnamed x i)) args [0..]
       , Xabi.modifierSelector = Text.pack name -- ? -- undefined -- :: Text
       , Xabi.modifierVals = Map.fromList [] -- undefined -- :: Map Text SolidVM.IndexedType
       , Xabi.modifierContents = if null contents then Nothing else Just $ Text.pack contents
@@ -377,10 +372,10 @@ tupleDeclaration = parens $ commaSep $ do
 data FuncModifiers = ReturnsMod [(Text, SVMType.Type)]
                    | VisibilityMod SolidVM.Visibility
                    | MutabilityMod SolidVM.StateMutability
-                   | ConstructorCallMod (String, [Expression])
+                   | ConstructorCallMod (String, [SolidVM.Expression])
                    | OtherMod String
 
-functionModifiers :: SolidityParser ([(Text, SVMType.Type)], SolidVM.Visibility, Maybe SolidVM.StateMutability, [(String, [Expression])], [String])
+functionModifiers :: SolidityParser ([(Text, SVMType.Type)], SolidVM.Visibility, Maybe SolidVM.StateMutability, [(String, [SolidVM.Expression])], [String])
 functionModifiers = do
   vals <- many $ (ReturnsMod <$> returnModifier)
              <|>  (VisibilityMod <$> visibilityModifier)

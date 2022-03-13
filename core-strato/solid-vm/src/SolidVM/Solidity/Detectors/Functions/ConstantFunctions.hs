@@ -17,8 +17,8 @@ import           Data.Source
 import           Data.Text       (Text)
 import qualified Data.Text       as T
 import           SolidVM.Model.CodeCollection
-import           SolidVM.Model.CodeCollection.Type      (Type)
-import qualified SolidVM.Model.CodeCollection.Type      as SVMType
+import           SolidVM.Model.Type                     (Type)
+import qualified SolidVM.Model.Type                     as SVMType
 import           SolidVM.Solidity.Detectors.Types
 
 data R = R

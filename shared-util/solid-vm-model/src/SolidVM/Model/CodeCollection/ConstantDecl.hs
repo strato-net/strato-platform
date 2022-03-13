@@ -17,7 +17,7 @@ import           GHC.Generics
 import           Test.QuickCheck.Instances    ()
 
 import           SolidVM.Model.CodeCollection.Statement
-import qualified SolidVM.Model.CodeCollection.Type as SVMType hiding (Enum)
+import qualified SolidVM.Model.Type as SVMType hiding (Enum)
 
 data ConstantDeclF a = ConstantDecl
   { constType       :: SVMType.Type

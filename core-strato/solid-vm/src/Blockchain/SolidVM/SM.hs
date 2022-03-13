@@ -92,7 +92,7 @@ import           Blockchain.VMOptions
 import           Blockchain.DB.StateDB
 
 import qualified SolidVM.Model.CodeCollection as CC
-import qualified SolidVM.Model.CodeCollection.Type as SVMType
+import qualified SolidVM.Model.Type as SVMType
 import qualified SolidVM.Model.Storable as MS
 import           SolidVM.Model.Value
 

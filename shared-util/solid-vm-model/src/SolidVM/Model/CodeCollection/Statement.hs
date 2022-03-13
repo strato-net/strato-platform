@@ -27,7 +27,7 @@ import Data.Aeson
 import Data.Source
 import qualified Data.Text as T
 import GHC.Generics
-import SolidVM.Model.CodeCollection.Type
+import SolidVM.Model.Type
 
 data StatementF a =
   IfStatement (ExpressionF a) [StatementF a] (Maybe [StatementF a]) a -- if then else

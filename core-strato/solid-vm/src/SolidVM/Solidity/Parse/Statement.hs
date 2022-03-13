@@ -11,7 +11,7 @@ import           Text.Parsec
 import           Text.Parsec.Expr
 
 import           SolidVM.Model.CodeCollection.Statement
-import           SolidVM.Model.CodeCollection.Type
+import           SolidVM.Model.Type
 import           SolidVM.Solidity.Parse.Lexer
 import           SolidVM.Solidity.Parse.ParserTypes
 import           SolidVM.Solidity.Parse.Types
