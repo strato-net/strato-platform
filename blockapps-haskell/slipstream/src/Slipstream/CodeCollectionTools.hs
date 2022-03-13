@@ -10,7 +10,6 @@ import qualified Data.Map as M
 import qualified Data.Text as T
 
 import SolidVM.Model.CodeCollection
-import SolidVM.Model.CodeCollection.VariableDecl
 import qualified SolidVM.Model.CodeCollection.Type               as SVMType
 
 resolveLabels :: CodeCollection -> CodeCollection

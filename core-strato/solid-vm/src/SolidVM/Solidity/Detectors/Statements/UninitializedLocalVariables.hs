@@ -8,8 +8,6 @@ import qualified Data.Map.Strict as M
 import           Data.Source
 import           Data.Text       (Text)
 import           SolidVM.Model.CodeCollection
-import           SolidVM.Model.CodeCollection.Function
-import           SolidVM.Model.CodeCollection.Statement
 import           SolidVM.Solidity.Detectors.Types
 
 -- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]

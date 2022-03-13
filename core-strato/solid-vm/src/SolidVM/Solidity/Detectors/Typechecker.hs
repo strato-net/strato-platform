@@ -24,14 +24,9 @@ import           Data.Text       (Text)
 import qualified Data.Text       as T
 import           Data.Traversable (for)
 import           SolidVM.Model.CodeCollection
-import           SolidVM.Model.CodeCollection.ConstantDecl
-import           SolidVM.Model.CodeCollection.Function
-import           SolidVM.Model.CodeCollection.Statement
-import           SolidVM.Model.CodeCollection.VariableDecl
 import           SolidVM.Solidity.Detectors.Types
 import           SolidVM.Model.CodeCollection.Type
 import qualified SolidVM.Model.CodeCollection.Type as SVMType
-import           SolidVM.Model.CodeCollection.VarDef
 import           Text.Read (readMaybe)
 
 emptyAnnotation :: SourceAnnotation Text

@@ -44,7 +44,7 @@ import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.SM
 import           Blockchain.SolidVM.Value
 import           Blockchain.Strato.Model.Account
-import           SolidVM.Model.CodeCollection
+import qualified SolidVM.Model.CodeCollection as CC
 import qualified SolidVM.Model.CodeCollection.Type as SVMType
 import qualified SolidVM.Model.Storable as MS
 import           Text.Format
@@ -160,7 +160,7 @@ setVal dst@(SReference addressedPath@(AccountPath addr path)) src = do
                         _         -> toBasic src
   markDiffForAction addr path basicSrc
   contract <- getCurrentContract
-  let svm3_0 = _vmVersion contract == "svm3.0"
+  let svm3_0 = CC._vmVersion contract == "svm3.0"
   putSolidStorageKeyVal' svm3_0 addr path basicSrc
 
 
@@ -258,7 +258,7 @@ deleteVar (Constant (SReference a@(AccountPath addr path))) = do
       when ro $ invalidWrite "Invalid delete during read-only access" $ "addr: " ++ show addr ++ ", path: " ++ show path
       markDiffForAction addr path $ MS.BDefault
       contract <- getCurrentContract
-      let svm3_0 = _vmVersion contract == "svm3.0"
+      let svm3_0 = CC._vmVersion contract == "svm3.0"
       putSolidStorageKeyVal' svm3_0 addr path $ MS.BDefault
 
 deleteVar v = todo "deleteVar not yet supported for local variables" $ show v

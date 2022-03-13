@@ -6,7 +6,6 @@ module SolidVM.Solidity.Detectors.Contracts.ParentConstructors
   ) where
 
 import           SolidVM.Model.CodeCollection
-import           SolidVM.Model.CodeCollection.Function
 import           Data.Functor  ((<&>))
 import qualified Data.Map.Strict as M
 import           Data.Maybe      (fromMaybe)

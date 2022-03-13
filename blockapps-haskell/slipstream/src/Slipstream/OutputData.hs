@@ -59,7 +59,6 @@ import           Slipstream.SolidityValue
 
 import           SolidVM.Model.CodeCollection              hiding (contractName, contracts, events)
 import qualified SolidVM.Model.CodeCollection.Type         as SVMType
-import           SolidVM.Model.CodeCollection.VariableDecl (VariableDeclF(..))
 
 
 tableSeparator :: Text

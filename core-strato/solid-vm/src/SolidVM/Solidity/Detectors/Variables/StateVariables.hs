@@ -15,10 +15,7 @@ import           Data.Source
 import           Data.Text           (Text)
 import qualified Data.Text           as T
 import           SolidVM.Model.CodeCollection
-import           SolidVM.Model.CodeCollection.Function
-import           SolidVM.Model.CodeCollection.Statement
 import qualified SolidVM.Model.CodeCollection.Type as SVMType
-import           SolidVM.Model.CodeCollection.VariableDecl
 import           SolidVM.Solidity.Detectors.Types
 
 type StateVars = M.Map Text (Bool, Bool, VariableDecl)

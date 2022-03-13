@@ -9,7 +9,6 @@ import           Data.Maybe      (maybeToList)
 import           Data.Source
 import           Data.Text       (Text)
 import           SolidVM.Model.CodeCollection
-import           SolidVM.Model.CodeCollection.Function
 import           SolidVM.Solidity.Detectors.Types
 
 -- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]

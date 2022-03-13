@@ -93,7 +93,7 @@ import qualified Text.Colors                          as C
 import           Text.Format
 import           Text.Tools
 
-import           SolidVM.Model.CodeCollection
+import qualified SolidVM.Model.CodeCollection as CC
 import qualified SolidVM.Model.CodeCollection.ConstantDecl as SolidVM
 import qualified SolidVM.Model.CodeCollection.Event as SolidVM
 import qualified SolidVM.Model.CodeCollection.Function as SolidVM
@@ -137,13 +137,13 @@ onTraced = when flags_svmTrace
 -- value in our DB. THIS IS PROBLOMATIC, we are adding somthing to the MP Trie
 -- (and therefore changing the stateroot) for just having a logging statement!
 -- TODO: Do not add default values to RawStorageDBs for SolidVM > 3.
-onTracedSM :: MonadSM m => Contract -> m () -> m ()
+onTracedSM :: MonadSM m => CC.Contract -> m () -> m ()
 onTracedSM cntrct m = do
-      let svm3_0 = _vmVersion cntrct == "svm3.0"
+      let svm3_0 = CC._vmVersion cntrct == "svm3.0"
       when (flags_svmTrace && not svm3_0) m
       when (flags_svmTrace && svm3_0) $
         liftIO $ putStrLn $ "svmTrace statement(s) is absent because contract " 
-                    ++ _contractName cntrct ++ " uses SolidVM=3.0"
+                    ++ CC._contractName cntrct ++ " uses SolidVM=3.0"
 
 withSrcPos :: MonadIO m => SourceAnnotation () -> String -> m ()
 withSrcPos pos str = liftIO . putStrLn $ concat 
@@ -170,7 +170,7 @@ variableSet = do
       locals = M.singleton "Local Variables" varNames
   acct <- getCurrentAccount
   ~(contract, _, _) <- getCodeAndCollection acct
-  let stateVars = S.fromList $ M.keys $ contract ^. storageDefs
+  let stateVars = S.fromList $ M.keys $ contract ^. CC.storageDefs
       globals = M.singleton "State Variables" stateVars
   pure . VariableSet $ locals <> globals
 
@@ -256,7 +256,7 @@ create _ _ _ blockData _ sender' origin' _ _ _ newAddress code txHash' chainId' 
     (hsh, cc) <- codeCollectionFromSource initCode
     create' sender' newAddress hsh cc contractName' args x509s
 
-create' :: MonadSM m => Account -> Account -> Keccak256 -> CodeCollection -> String -> SolidVM.ArgList -> M.Map Address X509Certificate -> m ExecResults
+create' :: MonadSM m => Account -> Account -> Keccak256 -> CC.CodeCollection -> String -> SolidVM.ArgList -> M.Map Address X509Certificate -> m ExecResults
 create' creator newAccount ch cc contractName' argExps x509s = do
   Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ x509s
   parentName <- fromMaybeM (return "") $ runMaybeT 
@@ -271,8 +271,8 @@ create' creator newAccount ch cc contractName' argExps x509s = do
   
   initializeAction newAccount contractName' parentName ch
 
-  let !contract' = fromMaybe (missingType "create'/contract" contractName') (cc ^. contracts . at contractName')
-      vmVersion' = contract' ^. vmVersion
+  let !contract' = fromMaybe (missingType "create'/contract" contractName') (cc ^. CC.contracts . at contractName')
+      vmVersion' = contract' ^. CC.vmVersion
 
   A.adjustWithDefault_ (A.Proxy @AddressState) newAccount $ \newAddressState ->
     pure newAddressState{ addressStateContractRoot = MP.emptyTriePtr
@@ -301,7 +301,7 @@ create' creator newAccount ch cc contractName' argExps x509s = do
   -- set creator again, in case the caller's cert changed during constructor execution
   (\crtr -> setCreator crtr newAccount contract') =<< (Env.origin <$> getEnv)
   
-  org <- getOrg creator (contract' ^. vmVersion)
+  org <- getOrg creator (contract' ^. CC.vmVersion)
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) newAccount
 
@@ -412,7 +412,7 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' cha
 
 
 -- set the hidden ":creator" field
-setCreator :: MonadSM m => Account -> Account -> Contract -> m ()
+setCreator :: MonadSM m => Account -> Account -> CC.Contract -> m ()
 setCreator creator contract cntrct = do
   let creatorAddress = _accountAddress creator
   x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
@@ -433,7 +433,7 @@ setCreator creator contract cntrct = do
     
     Nothing -> liftIO $ putStrLn $ C.red $ "setCreator/versioning ---> No cert found for " ++ (format creator)
   
-  let hasSvm3_0 = _vmVersion cntrct == "svm3.0"
+  let hasSvm3_0 = CC._vmVersion cntrct == "svm3.0"
   case _org of
     "" -> do
       liftIO $ putStrLn $ C.yellow "Ignoring creator field for empty org field"
@@ -482,7 +482,7 @@ getOrg caller vers = do
                 return "" 
 
 
-getCodeAndCollection :: MonadSM m => Account -> m (Contract, Keccak256, CodeCollection)
+getCodeAndCollection :: MonadSM m => Account -> m (CC.Contract, Keccak256, CC.CodeCollection)
 getCodeAndCollection address' = do
   callStack' <- Mod.get (Mod.Proxy @[CallInfo])
   let maybeAddress =
@@ -510,11 +510,11 @@ getCodeAndCollection address' = do
         Nothing -> missingCodeCollection "SolidVM for non-existent code" (format codeHash)
 
 
-    let !contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc^.contracts
+    let !contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc^.CC.contracts
 
     return (contract', ch, cc)
 
-logFunctionCall :: MonadSM m => ValList -> Account -> Contract -> String -> m (Maybe Value) -> m (Maybe Value)
+logFunctionCall :: MonadSM m => ValList -> Account -> CC.Contract -> String -> m (Maybe Value) -> m (Maybe Value)
 logFunctionCall args address contract functionName f = do
   onTracedSM contract $ do
     argStrings <-
@@ -528,7 +528,7 @@ logFunctionCall args address contract functionName f = do
 
     let shownFunc = functionName ++ "(" ++ argStrings ++ ")"
     liftIO $ putStrLn $ box $ concat $ map (wrap 150)
-      ["calling function: " ++ format address, (contract^.contractName) ++ "/" ++ shownFunc]
+      ["calling function: " ++ format address, (contract^.CC.contractName) ++ "/" ++ shownFunc]
 
   result <- f
 
@@ -540,7 +540,7 @@ logFunctionCall args address contract functionName f = do
   return result
 
 
-argsToVals :: MonadSM m => Contract -> SolidVM.Func -> SolidVM.ArgList -> m ValList
+argsToVals :: MonadSM m => CC.Contract -> SolidVM.Func -> SolidVM.ArgList -> m ValList
 argsToVals ctract fn args =
   case args of
     SolidVM.OrderedArgs xs -> do
@@ -591,24 +591,24 @@ callWrapper from to mContract functionName isRCC argExps  = do
             SolidVMCode name _ -> pure name                     -- Name of the parent
             _                  -> pure "")
 
-  let contract = fromMaybe contract' $ mContract >>= \c -> M.lookup c $ _contracts cc
-      parentName' = if parentName == (_contractName contract) then "" else parentName
+  let contract = fromMaybe contract' $ mContract >>= \c -> M.lookup c $ CC._contracts cc
+      parentName' = if parentName == (CC._contractName contract) then "" else parentName
   
-  initializeAction to (_contractName contract) parentName' hsh
+  initializeAction to (CC._contractName contract) parentName' hsh
 
   -- grab the org for this contract
-  org <- getOrg to (contract ^. vmVersion)
+  org <- getOrg to (contract ^. CC.vmVersion)
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) to
 
-  liftIO $ putStrLn $ "callWraper/versioning --->  we are calling " ++ (_contractName contract) ++ 
+  liftIO $ putStrLn $ "callWraper/versioning --->  we are calling " ++ (CC._contractName contract) ++ 
         " in app " ++ (show parentName) ++ " of org " ++ show org
 
 
   let functionsIncludingConstructor =
-        case contract^.constructor of
-          Nothing -> contract^.functions
-          Just c -> M.insert "<constructor>" c $ contract^.functions
+        case contract^.CC.constructor of
+          Nothing -> contract^.CC.functions
+          Just c -> M.insert "<constructor>" c $ contract^.CC.functions
 
   (f, args) <-
         case M.lookup functionName functionsIncludingConstructor of
@@ -621,15 +621,15 @@ callWrapper from to mContract functionName isRCC argExps  = do
             let f' = (if from == to then id else pushSender from) $ runTheCall to contract functionName hsh cc theFunction args' ro
             return (f', args')
           _ -> do --Maybe the function is actually a getter
-            case M.lookup (T.pack functionName) $ contract^.storageDefs of
+            case M.lookup (T.pack functionName) $ contract^.CC.storageDefs of
               Just _ -> do
                 --TODO- this should only exist if the storage variable is declared
                 -- "public", right now I just ignore this and allow anything to be called as a getter
                 return (fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack functionName, OrderedVals [])
-              Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.contractName)
+              Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName)
 
   when isRCC (
-    forM_ [(n, theType) | (n, SolidVM.VariableDecl theType _ Nothing _) <- M.toList $ contract'^.storageDefs] $ \(n, theType) -> do
+    forM_ [(n, theType) | (n, SolidVM.VariableDecl theType _ Nothing _) <- M.toList $ contract'^.CC.storageDefs] $ \(n, theType) -> do
       case theType of
         SVMType.Mapping _ _ _-> return ()
         SVMType.Array _ _-> return ()
@@ -904,7 +904,7 @@ runStatement st@(SolidVM.EmitStatement eventName exptups pos) = do
   --   DOES NOT check consistency of arg types
   curInfo <- getCurrentCallInfo
   curCnct <- getCurrentContract
-  let evs = _events curCnct
+  let evs = CC._events curCnct
       mEv = M.lookup (T.pack eventName) evs
   case mEv of
     Nothing -> 
@@ -914,7 +914,7 @@ runStatement st@(SolidVM.EmitStatement eventName exptups pos) = do
         invalidArguments "arguments to statement are inconsistent with those declared" (unparseStatement st)
       else do
         let account = currentAccount curInfo
-        org <- getOrg account (curCnct ^. vmVersion) -- the org of the app
+        org <- getOrg account (curCnct ^. CC.vmVersion) -- the org of the app
          
         parentName <- fromMaybeM (return "") $ runMaybeT 
             $   pure account
@@ -922,17 +922,17 @@ runStatement st@(SolidVM.EmitStatement eventName exptups pos) = do
             >>= pure  .  addressStateCodeHash
             >>= MaybeT . resolveCodePtrParent (account ^. accountChainId)
             >>= (\case     
-                    SolidVMCode name _ | name /= (_contractName curCnct) -> pure name
+                    SolidVMCode name _ | name /= (CC._contractName curCnct) -> pure name
                     _                                                    -> pure "")
         
         -- pair up field names with values one-by-one (no type checking tho, lol)
         let pairs = zip (map (T.unpack . fst) $ SolidVM.eventLogs ev) expStrs
         
         liftIO $ putStrLn $ "Emit Event/versioning ---> we are emitting event " ++ eventName ++ 
-              " in contract " ++ (_contractName curCnct) ++ " in app " ++ (show parentName) ++ 
+              " in contract " ++ (CC._contractName curCnct) ++ " in app " ++ (show parentName) ++ 
               " of org " ++ show org
 
-        addEvent $ Event org parentName (_contractName curCnct) account eventName pairs
+        addEvent $ Event org parentName (CC._contractName curCnct) account eventName pairs
         return Nothing
 
 
@@ -1111,7 +1111,7 @@ expToVar' x@(SolidVM.MemberAccess _ expr name) = do
 --    Constant c -> case (c, name) of
       (SEnum enumName, _) -> do
         contract' <- getCurrentContract
-        let maybeEnumValues = M.lookup enumName $ contract' ^. enums
+        let maybeEnumValues = M.lookup enumName $ contract' ^. CC.enums
             !enumVals = fromMaybe (missingType "Enum nonexistent type" enumName) maybeEnumValues
             !num = maybe (missingType "Enum nonexistent member" (enumName, name)) 
                          fromIntegral 
@@ -1143,15 +1143,15 @@ expToVar' x@(SolidVM.MemberAccess _ expr name) = do
       (SContractDef contractName', constName) -> do
         --TODO- move all variable name resolution by contract to a function
         (_, cc) <- getCurrentCodeCollection
-        cont <- case M.lookup contractName' $ cc^.contracts of
+        cont <- case M.lookup contractName' $ cc^.CC.contracts of
           Nothing -> missingType "contract function lookup" contractName'
           Just ct -> pure ct
-        if constName `M.member` _functions cont
+        if constName `M.member` CC._functions cont
           then do
             -- TODO: Check that this contract actually is a contractName'
             addr <- accountOnUnspecifiedChain <$> getCurrentAccount
             return $ Constant $ SContractFunction (Just contractName') addr constName
-          else case constName `M.lookup` _constants cont of
+          else case constName `M.lookup` CC._constants cont of
                   Nothing -> unknownConstant "constant member access" (contractName', constName)
                   Just (SolidVM.ConstantDecl _ _ constExp _) -> expToVar constExp
 
@@ -1164,12 +1164,12 @@ expToVar' x@(SolidVM.MemberAccess _ expr name) = do
       (SBuiltinVariable "super", method) -> do
         ctract <- getCurrentContract
         (_, cc) <- getCurrentCodeCollection
-        let parents' = either (throw . fst) id $ getParents cc ctract
-        case filter (elem method . M.keys .  _functions) parents' of
+        let parents' = either (throw . fst) id $ CC.getParents cc ctract
+        case filter (elem method . M.keys .  CC._functions) parents' of
           [] -> typeError "cannot use super without a parent contract" (method, ctract)
           ps -> do
             addr <- accountOnUnspecifiedChain <$> getCurrentAccount
-            return $ Constant $ SContractFunction (Just $ _contractName $ last ps) addr method
+            return $ Constant $ SContractFunction (Just $ CC._contractName $ last ps) addr method
 
       (SAccount addr, itemName) -> return $ Constant $ SContractItem addr itemName
 
@@ -1432,7 +1432,7 @@ expToVar' (SolidVM.FunctionCall _ e args) = do
     Constant (SStructDef structName) -> do
       contract' <- getCurrentContract
       let !vals = fromMaybe (missingType "struct constructor not found" structName)
-               $ M.lookup structName $ contract'^.structs
+               $ M.lookup structName $ contract'^.CC.structs
       return . Constant . SStruct structName . fmap Constant . M.fromList $
         case argVals of
           OrderedVals as -> zip (map (T.unpack . (\(a,_,_) -> a)) vals) as
@@ -1476,7 +1476,7 @@ expToVar' (SolidVM.FunctionCall _ e args) = do
         OrderedVals [SInteger i] -> do
           c <- getCurrentContract
           let !theEnum = fromMaybe (missingType "enum constructor" enumName)
-                      $ M.lookup enumName $ c^.enums
+                      $ M.lookup enumName $ c^.CC.enums
           case fst theEnum !? fromInteger i of
             Nothing -> typeError "enum val out of range" argVals
             Just enumVal -> pure . Constant . SEnumVal enumName enumVal $ fromInteger i
@@ -1703,12 +1703,12 @@ bytesToInteger bytes =
 -}
 
 
-runTheConstructors :: MonadSM m => Account -> Account -> Keccak256 -> CodeCollection -> String -> SolidVM.ArgList -> m ()
+runTheConstructors :: MonadSM m => Account -> Account -> Keccak256 -> CC.CodeCollection -> String -> SolidVM.ArgList -> m ()
 runTheConstructors from to hsh cc contractName' argExps = do
   let !contract' =
           fromMaybe (missingType "contract inherits from nonexistent parent" contractName')
-          $ cc^.contracts . at contractName'
-      argPairs = fromMaybe [] . fmap SolidVM.funcArgs $ contract' ^. constructor
+          $ cc^.CC.contracts . at contractName'
+      argPairs = fromMaybe [] . fmap SolidVM.funcArgs $ contract' ^. CC.constructor
       argCount = length argPairs
       argTypeNames = map fst $ sortWith snd $
         [ ((t, T.unpack $ fromMaybe "" n), i) |
@@ -1725,7 +1725,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
                     return $ NamedVals []
                   _ -> argsToVals contract'
                                   (fromMaybe (invalidArguments ("arguments provided for missing constructor in contract " ++ contractName') argPairs)
-                                        $ _constructor contract')
+                                        $ CC._constructor contract')
                                   argExps
   let einval = invalidArguments "named arguments to contract without constructor" (contractName', argVals)
 
@@ -1741,7 +1741,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
         let argTypes =
               M.fromList
               $ map (\(k, v) -> (T.unpack . fromMaybe "" $ k, v))
-              $ maybe einval SolidVM.funcArgs $ contract' ^. constructor
+              $ maybe einval SolidVM.funcArgs $ contract' ^. CC.constructor
               
             typeAndVal =
               M.merge
@@ -1759,26 +1759,26 @@ runTheConstructors from to hsh cc contractName' argExps = do
 
   addCallInfo to contract' (contractName' ++ " constructor") hsh cc (M.fromList zipped) False
 
-  forM_ [(n, e) | (n, SolidVM.VariableDecl _ _ (Just e) _) <- M.toList $ contract'^.storageDefs] $ \(n, e) -> do
+  forM_ [(n, e) | (n, SolidVM.VariableDecl _ _ (Just e) _) <- M.toList $ contract'^.CC.storageDefs] $ \(n, e) -> do
     v <- expToVar e
     setVar (Constant (SReference (AccountPath to $ MS.StoragePath [MS.Field $ BC.pack $ T.unpack n]))) =<< getVar v
 
-  forM_ [(n, theType) | (n, SolidVM.VariableDecl theType _ Nothing _) <- M.toList $ contract'^.storageDefs] $ \(n, theType) -> do
+  forM_ [(n, theType) | (n, SolidVM.VariableDecl theType _ Nothing _) <- M.toList $ contract'^.CC.storageDefs] $ \(n, theType) -> do
     case theType of
       SVMType.Mapping _ _ _-> return ()
       SVMType.Array _ _-> return ()
       SVMType.Bool -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ T.unpack n]) $ MS.BBool False
       _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ T.unpack n]) MS.BDefault
 
-  forM_ (reverse $ contract'^.parents) $ \parent -> do
+  forM_ (reverse $ contract'^.CC.parents) $ \parent -> do
     let args = SolidVM.OrderedArgs
              . fromMaybe []
-             $ M.lookup parent =<< (fmap SolidVM.funcConstructorCalls $ contract'^.constructor)
+             $ M.lookup parent =<< (fmap SolidVM.funcConstructorCalls $ contract'^.CC.constructor)
     runTheConstructors from to hsh cc parent args
 
 
   _ <-
-    case contract'^.constructor of
+    case contract'^.CC.constructor of
       Just theFunction -> do
         --argVals <- forM argExps evaluate
         --_ <- call' address contract' theFunction argVals
@@ -1815,10 +1815,10 @@ addLocalVariable theType name value = do
 
 runTheCall :: MonadSM m
            => Account
-           -> Contract
+           -> CC.Contract
            -> String
            -> Keccak256
-           -> CodeCollection
+           -> CC.CodeCollection
            -> SolidVM.Func
            -> ValList
            -> Bool

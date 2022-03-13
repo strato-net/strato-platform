@@ -10,9 +10,6 @@ import           Data.Source
 import qualified Data.Text       as T
 import           Data.Text       (Text)
 import           SolidVM.Model.CodeCollection
-import           SolidVM.Model.CodeCollection.Function
-import           SolidVM.Model.CodeCollection.Statement
-import           SolidVM.Model.CodeCollection.VariableDecl
 import           SolidVM.Solidity.Detectors.Types
 
 -- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]

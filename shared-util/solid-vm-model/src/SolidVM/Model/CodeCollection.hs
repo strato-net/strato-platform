@@ -12,7 +12,15 @@ module SolidVM.Model.CodeCollection (
   xabiToContract,
   applyInheritance,
   codeCollectionCrawler,
-  module SolidVM.Model.CodeCollection.Contract
+  module SolidVM.Model.CodeCollection.Contract,
+  --module SolidVM.Model.CodeCollection.Def,
+  module SolidVM.Model.CodeCollection.Function,
+  module SolidVM.Model.CodeCollection.Statement,
+  module SolidVM.Model.CodeCollection.ConstantDecl,
+  --module SolidVM.Model.CodeCollection.Type,
+  module SolidVM.Model.CodeCollection.VariableDecl,
+  module SolidVM.Model.CodeCollection.Event,
+  module SolidVM.Model.CodeCollection.VarDef
   ) where
 
 import Control.Lens
@@ -28,10 +36,16 @@ import GHC.Generics
 
 import           Blockchain.SolidVM.Exception
 
+import           SolidVM.Model.CodeCollection.ConstantDecl
 import           SolidVM.Model.CodeCollection.Contract
-import qualified SolidVM.Model.CodeCollection.Def as SolidVM
+import qualified SolidVM.Model.CodeCollection.Def as Def
+import           SolidVM.Model.CodeCollection.Event
 import           SolidVM.Model.CodeCollection.Function
-import qualified SolidVM.Model.CodeCollection.Statement as SolidVM
+import           SolidVM.Model.CodeCollection.Statement
+--import           SolidVM.Model.CodeCollection.Type
+import           SolidVM.Model.CodeCollection.VarDef
+import           SolidVM.Model.CodeCollection.VariableDecl
+
 import           SolidVM.Solidity.Xabi
 import qualified SolidVM.Solidity.Xabi as Xabi
 
@@ -63,8 +77,8 @@ xabiToContract contractName' parents' vmVersion' xabi = do
   _parents = parents',
   _storageDefs = M.fromList $ M.toList $ Xabi.xabiVars xabi,
   _constants = M.fromList $ map (\(k,v) -> (T.unpack k, v)) $ M.toList $ Xabi.xabiConstants xabi,
-  _enums = M.fromList [(T.unpack name, (map T.unpack vals, a)) | (name, SolidVM.Enum vals _ a) <- M.toList $ Xabi.xabiTypes xabi],
-  _structs = M.fromList [(T.unpack name, (\(k,v) -> (k,v,a)) <$> vals) | (name, SolidVM.Struct vals _ a) <- M.toList $ Xabi.xabiTypes xabi],
+  _enums = M.fromList [(T.unpack name, (map T.unpack vals, a)) | (name, Def.Enum vals _ a) <- M.toList $ Xabi.xabiTypes xabi],
+  _structs = M.fromList [(T.unpack name, (\(k,v) -> (k,v,a)) <$> vals) | (name, Def.Struct vals _ a) <- M.toList $ Xabi.xabiTypes xabi],
   _events = Xabi.xabiEvents xabi,
   _functions = M.fromList $ map (\(k,v) -> (T.unpack k, v)) $ M.toList $ Xabi.xabiFuncs xabi,
   _constructor = constr,
@@ -120,68 +134,68 @@ toUnionMaker f cc c = do
   parentMaps <- traverse (toUnionMaker f cc) parents'
   pure . M.unions $ f c : parentMaps
 
-statementCrawler :: SolidVM.StatementF a -> [T.Text]
+statementCrawler :: StatementF a -> [T.Text]
 statementCrawler = \case
-  SolidVM.AssemblyStatement{} -> ["AssemblyStatement"]
-  SolidVM.Block _ -> ["Block"]
-  SolidVM.Break _ -> ["Break"]
-  SolidVM.Continue _ -> ["Continue"]
-  SolidVM.Throw _ -> ["Throw"]
-  SolidVM.EmitStatement _ evts _ ->  "EmitStatement":concatMap (expressionCrawler . snd) evts
-  SolidVM.SimpleStatement st _ -> simpleStatementCrawler st
-  SolidVM.Return mExpr _ -> "Return":maybe [] expressionCrawler mExpr
-  SolidVM.DoWhileStatement blk test _ -> "DoWhileStatement"
+  AssemblyStatement{} -> ["AssemblyStatement"]
+  Block _ -> ["Block"]
+  Break _ -> ["Break"]
+  Continue _ -> ["Continue"]
+  Throw _ -> ["Throw"]
+  EmitStatement _ evts _ ->  "EmitStatement":concatMap (expressionCrawler . snd) evts
+  SimpleStatement st _ -> simpleStatementCrawler st
+  Return mExpr _ -> "Return":maybe [] expressionCrawler mExpr
+  DoWhileStatement blk test _ -> "DoWhileStatement"
                              :(concatMap statementCrawler blk)
                             ++ expressionCrawler test
-  SolidVM.WhileStatement expr blk _ -> "WhileStatement"
+  WhileStatement expr blk _ -> "WhileStatement"
                            :expressionCrawler expr
                           ++ concatMap statementCrawler blk
-  SolidVM.IfStatement expr thn els _ -> "IfStatement"
+  IfStatement expr thn els _ -> "IfStatement"
                             :expressionCrawler expr
                            ++ concatMap statementCrawler thn
                            ++ maybe [] (concatMap statementCrawler) els
-  SolidVM.ForStatement mInit mTest mInc blk _ -> "ForStatement"
+  ForStatement mInit mTest mInc blk _ -> "ForStatement"
                                      : maybe [] simpleStatementCrawler mInit
                                     ++ maybe [] expressionCrawler mTest
                                     ++ maybe [] expressionCrawler mInc
                                     ++ concatMap statementCrawler blk
 
-expressionCrawler :: SolidVM.ExpressionF a -> [T.Text]
+expressionCrawler :: ExpressionF a -> [T.Text]
 expressionCrawler = \case
-  SolidVM.PlusPlus _ expr -> "PlusPlus":expressionCrawler expr
-  SolidVM.MinusMinus _ expr -> "MinusMinus":expressionCrawler expr
-  SolidVM.NewExpression{} -> ["NewExpression"]
-  SolidVM.IndexAccess _ obj mIdx -> "IndexAccess" : do
+  PlusPlus _ expr -> "PlusPlus":expressionCrawler expr
+  MinusMinus _ expr -> "MinusMinus":expressionCrawler expr
+  NewExpression{} -> ["NewExpression"]
+  IndexAccess _ obj mIdx -> "IndexAccess" : do
     expr <- obj : maybeToList mIdx
     expressionCrawler expr
-  SolidVM.MemberAccess _ expr _ -> "MemberAccess":expressionCrawler expr
-  SolidVM.FunctionCall _ func args -> "FunctionCall" : do
+  MemberAccess _ expr _ -> "MemberAccess":expressionCrawler expr
+  FunctionCall _ func args -> "FunctionCall" : do
     expr <- case args of
-      SolidVM.OrderedArgs args' -> func:args'
-      SolidVM.NamedArgs args' -> func:map snd args'
+      OrderedArgs args' -> func:args'
+      NamedArgs args' -> func:map snd args'
     expressionCrawler expr
-  SolidVM.Unitary _ n expr -> T.pack ("Unitary: " ++ n):expressionCrawler expr
-  SolidVM.Binary _ n lhs rhs -> T.pack ("Binary: " ++ n) : do
+  Unitary _ n expr -> T.pack ("Unitary: " ++ n):expressionCrawler expr
+  Binary _ n lhs rhs -> T.pack ("Binary: " ++ n) : do
     expr <- [lhs, rhs]
     expressionCrawler expr
-  SolidVM.Ternary _ cond thn els -> "Ternary" : do
+  Ternary _ cond thn els -> "Ternary" : do
     expr <- [cond, thn, els]
     expressionCrawler expr
-  SolidVM.BoolLiteral{} -> ["BoolLiteral"]
-  SolidVM.NumberLiteral{} -> ["NumberLiteral"]
-  SolidVM.StringLiteral{} -> ["StringLiteral"]
-  SolidVM.TupleExpression _ subexprs -> "TupleExpression" : do
+  BoolLiteral{} -> ["BoolLiteral"]
+  NumberLiteral{} -> ["NumberLiteral"]
+  StringLiteral{} -> ["StringLiteral"]
+  TupleExpression _ subexprs -> "TupleExpression" : do
     expr <- catMaybes subexprs
     expressionCrawler expr
-  SolidVM.ArrayExpression _ subexprs -> "ArrayExpression" : do
+  ArrayExpression _ subexprs -> "ArrayExpression" : do
     expr <- subexprs
     expressionCrawler expr
-  SolidVM.Variable{} -> ["Variable"]
+  Variable{} -> ["Variable"]
 
-simpleStatementCrawler :: SolidVM.SimpleStatementF a -> [T.Text]
+simpleStatementCrawler :: SimpleStatementF a -> [T.Text]
 simpleStatementCrawler = \case
-  SolidVM.ExpressionStatement expr -> expressionCrawler expr
-  SolidVM.VariableDefinition _ mExpr -> maybe [] expressionCrawler mExpr
+  ExpressionStatement expr -> expressionCrawler expr
+  VariableDefinition _ mExpr -> maybe [] expressionCrawler mExpr
 
 funcCrawler :: FuncF a -> [T.Text]
 funcCrawler = maybe [] (concatMap statementCrawler) . funcContents

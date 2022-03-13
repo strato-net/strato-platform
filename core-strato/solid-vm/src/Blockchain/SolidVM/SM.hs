@@ -92,12 +92,12 @@ import           Blockchain.VMContext
 import           Blockchain.VMOptions
 import           Blockchain.DB.StateDB
 
-import           SolidVM.Model.CodeCollection
-import qualified SolidVM.Model.CodeCollection.ConstantDecl as SolidVM
-import qualified SolidVM.Model.CodeCollection.Statement as SolidVM
+import qualified SolidVM.Model.CodeCollection as CC
+--import qualified SolidVM.Model.CodeCollection.ConstantDecl as SolidVM
+--import qualified SolidVM.Model.CodeCollection.Statement as SolidVM
 import qualified SolidVM.Model.CodeCollection.Type as SVMType
-import qualified SolidVM.Model.CodeCollection.VarDef as SolidVM
-import qualified SolidVM.Model.CodeCollection.VariableDecl as SolidVM
+--import qualified SolidVM.Model.CodeCollection.VarDef as SolidVM
+--import qualified SolidVM.Model.CodeCollection.VariableDecl as SolidVM
 import qualified SolidVM.Model.Storable as MS
 
 import           UnliftIO
@@ -105,8 +105,8 @@ import           UnliftIO
 data CallInfo = CallInfo
   { currentFunctionName :: String
   , currentAccount      :: Account
-  , currentContract     :: Contract
-  , codeCollection      :: CodeCollection
+  , currentContract     :: CC.Contract
+  , codeCollection      :: CC.CodeCollection
   , collectionHash      :: Keccak256
   , localVariables      :: Map String (SVMType.Type, Variable)
   , readOnly            :: Bool
@@ -368,7 +368,7 @@ getVariableOfName name = do
   let maybeLocalValue = fmap snd $ M.lookup name vars
 
   let maybeContractFunction :: Maybe Variable
-      maybeContractFunction = fmap (t "constant function" . Constant . SFunction name) $ M.lookup name $ currentContract currentCallInfo^.functions
+      maybeContractFunction = fmap (t "constant function" . Constant . SFunction name) $ M.lookup name $ currentContract currentCallInfo^.CC.functions
 
       maybeBuiltinFunction :: Maybe Variable
       maybeBuiltinFunction = toMaybe (name `elem` ["address", "account", "uint", "int", "bool", "byte", "bytes"
@@ -384,29 +384,29 @@ getVariableOfName name = do
         t "builtin variable" $ Constant $ SBuiltinVariable name
 
       maybeEnum :: Maybe Variable
-      maybeEnum = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.enums)) $
+      maybeEnum = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.CC.enums)) $
         t "enum" $ Constant $ SEnum name
 
       maybeConstant :: Maybe Variable
       maybeConstant = fmap (t "constant constant" . Constant) $ do
         let ctract = currentContract currentCallInfo
-        SolidVM.ConstantDecl{..} <- M.lookup name $ ctract ^. constants
+        CC.ConstantDecl{..} <- M.lookup name $ ctract ^. CC.constants
         return $ coerceType ctract constType $ case constInitialVal of
-                                            SolidVM.NumberLiteral _ x _ -> SInteger x
+                                            CC.NumberLiteral _ x _ -> SInteger x
                                             x -> todo "constant initial val" x
 
       maybeStructDef :: Maybe Variable
-      maybeStructDef = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.structs)) $
+      maybeStructDef = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.CC.structs)) $
         t "struct def" $ Constant $ SStructDef name
 
       maybeContract :: Maybe Variable
-      maybeContract = toMaybe (name `elem` M.keys (codeCollection currentCallInfo^.contracts)) $
+      maybeContract = toMaybe (name `elem` M.keys (codeCollection currentCallInfo^.CC.contracts)) $
         t "contract" $ Constant $ SContractDef name
 
       maybeStorageItem :: Maybe Variable
       maybeStorageItem =
         -- TODO(tim): This might just be restricted to a field name
-        if T.pack name `elem` M.keys (currentContract currentCallInfo^.storageDefs)
+        if T.pack name `elem` M.keys (currentContract currentCallInfo^.CC.storageDefs)
         then Just . Constant . SReference $ AccountPath
                 (currentAccount currentCallInfo)
                 (MS.singleton $ BC.pack name)
@@ -427,7 +427,7 @@ getVariableOfName name = do
     liftIO $ putStrLn $ " @@@@@@@@@@@@@@@@@@@ available constants: " ++ show (M.keys $ currentContract currentCallInfo^.constants)
     case M.lookup name $ currentContract currentCallInfo^.constants of
       Nothing -> return Nothing
-      Just (SolidVM.ConstantDecl _ _ e) -> do
+      Just (CC.ConstantDecl _ _ e) -> do
         let val = constExpToVar e
         return $ Just $ Constant $ val
 -}
@@ -446,10 +446,10 @@ getVariableOfName name = do
       , unknownVariable "getVariableOfName" name
       ]
 
-getTypeOfName' :: String -> CodeCollection -> Typo
-getTypeOfName' s (CodeCollection ccs) =
-  let lookInContract :: Contract -> [Typo]
-      lookInContract (Contract{..}) = catMaybes
+getTypeOfName' :: String -> CC.CodeCollection -> Typo
+getTypeOfName' s (CC.CodeCollection ccs) =
+  let lookInContract :: CC.Contract -> [Typo]
+      lookInContract (CC.Contract{..}) = catMaybes
         [ fmap StructTypo (fmap (\(a,b,_) -> (a,b)) <$> M.lookup s _structs)
         , fmap EnumTypo (fst <$> M.lookup s _enums)
         ]
@@ -465,10 +465,10 @@ getTypeOfName s = getTypeOfName' s . codeCollection <$> getCurrentCallInfo
 
 addCallInfo :: MonadSM m
             => Account
-            -> Contract
+            -> CC.Contract
             -> String
             -> Keccak256
-            -> CodeCollection
+            -> CC.CodeCollection
             -> Map String (SVMType.Type, Variable)
             -> Bool
             -> m ()
@@ -514,7 +514,7 @@ getCurrentCallInfo = do
 getCurrentCallInfoIfExists :: MonadSM m => m (Maybe CallInfo)
 getCurrentCallInfoIfExists = listToMaybe <$> Mod.get (Mod.Proxy @[CallInfo])
 
-getCurrentContract :: MonadSM m => m Contract
+getCurrentContract :: MonadSM m => m CC.Contract
 getCurrentContract = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
@@ -555,7 +555,7 @@ setLocal name val = do
   Mod.put (Mod.Proxy @[CallInfo]) $ info{localVariables=newVariables} : rest
 
 
-getCurrentCodeCollection :: MonadSM m => m (Keccak256, CodeCollection)
+getCurrentCodeCollection :: MonadSM m => m (Keccak256, CC.CodeCollection)
 getCurrentCodeCollection = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
@@ -576,8 +576,8 @@ hintFromType = \case
      ContractTypo{} -> return $ TContract s
      EnumTypo{} -> return $ TEnumVal s
      StructTypo fs -> do
-       let upgrade :: MonadSM m => (T.Text, SolidVM.FieldType) -> m (B.ByteString , BasicType)
-           upgrade = mapM (hintFromType . SolidVM.fieldTypeType) . first encodeUtf8
+       let upgrade :: MonadSM m => (T.Text, CC.FieldType) -> m (B.ByteString , BasicType)
+           upgrade = mapM (hintFromType . CC.fieldTypeType) . first encodeUtf8
        TStruct s <$> mapM upgrade fs
  SVMType.Array{} -> return TComplex
  SVMType.Mapping{} -> return TComplex
@@ -585,8 +585,8 @@ hintFromType = \case
 
 getXabiType' :: B.ByteString -> CallInfo -> Maybe SVMType.Type
 getXabiType' field callInfo = M.lookup (T.pack $ BC.unpack field)
-                            . fmap SolidVM.varType
-                            . _storageDefs
+                            . fmap CC.varType
+                            . CC._storageDefs
                             . currentContract
                             $ callInfo
 
@@ -610,7 +610,7 @@ getXabiValueType (AccountPath loc path) = do
   case mType of
     Nothing -> todo "getXabiValueType/unknown storage reference" field
     Just v -> return $ loop ccs' (tail $ MS.toList path) v
- where loop :: CodeCollection -> [MS.StoragePathPiece] -> SVMType.Type -> SVMType.Type
+ where loop :: CC.CodeCollection -> [MS.StoragePathPiece] -> SVMType.Type -> SVMType.Type
        loop _ [] = id
        loop ccs [x] = \case
          SVMType.Mapping{SVMType.value=v} -> case x of
@@ -629,7 +629,7 @@ getXabiValueType (AccountPath loc path) = do
                  (MS.Field n, StructTypo fs) ->
                    let mt'' = lookup (decodeUtf8 n) fs
                     in case mt'' of
-                        Just t'' -> SolidVM.fieldTypeType t''
+                        Just t'' -> CC.fieldTypeType t''
                         Nothing -> missingField "field not present in struct definition" $ show (n, fs)
                  (_, StructTypo{}) -> typeError "non field access to struct" x
                  (_, ContractTypo{}) -> todo "getValueType/contract access" t'

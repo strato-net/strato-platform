@@ -32,7 +32,6 @@ import Slipstream.SolidityValue
 
 import SolidVM.Model.CodeCollection hiding (contractName, contracts)
 import qualified SolidVM.Model.CodeCollection.Type as SVMType
-import SolidVM.Model.CodeCollection.VariableDecl (VariableDeclF(..))
 
 addr :: Address -> V.Value
 addr = V.SimpleValue . V.ValueAccount . unspecifiedChain

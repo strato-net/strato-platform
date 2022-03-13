@@ -42,11 +42,9 @@ import           Blockchain.SolidVM.Exception
 import           Blockchain.Strato.Model.Account
 
 
-import           SolidVM.Model.CodeCollection
-import qualified SolidVM.Model.CodeCollection.Function as SolidVM
-import qualified SolidVM.Model.Storable           as MS
+import qualified SolidVM.Model.CodeCollection            as CC
+import qualified SolidVM.Model.Storable                  as MS
 import qualified SolidVM.Model.CodeCollection.Type       as SVMType
-import qualified SolidVM.Model.CodeCollection.VarDef     as SolidVM
 
 
 
@@ -88,7 +86,7 @@ data Value =
   | STuple (Vector Variable)
   | SArray SVMType.Type (Vector Variable)
   | SMap SVMType.Type (Map Value Variable)
-  | SFunction String SolidVM.Func
+  | SFunction String CC.Func
   | SBuiltinFunction String (Maybe Value)
   | SBuiltinVariable String
   | SSetterGetter String (Maybe Value)
@@ -139,7 +137,7 @@ instance RLPSerializable Value where
 -- coerceFromInt is useful to force integer literals
 -- to assume the type that was intended for them, once
 -- it is determined that their expected type is
-coerceFromInt :: Contract -> Value -> Integer -> Value
+coerceFromInt :: CC.Contract -> Value -> Integer -> Value
 coerceFromInt _ SInteger{} n = SInteger n
 coerceFromInt _ (SAccount a) n = SAccount $ (namedAccountAddress .~ fromIntegral n) a
 coerceFromInt _ SString{} 0 = SString ""
@@ -148,14 +146,14 @@ coerceFromInt _ (SContract c a) n = SContract c $ (namedAccountAddress .~ fromIn
 coerceFromInt ct (SEnumVal tipe _ _) n' =
   fromMaybe (typeError "missing enum val" (tipe, n')) $ do
     let n = fromIntegral n'
-    enumDef <- fmap fst . M.lookup tipe $ _enums ct
+    enumDef <- fmap fst . M.lookup tipe $ CC._enums ct
     when (n >= length enumDef) $ fail "enum val out of range"
     return $ SEnumVal tipe (enumDef !! n) $ fromIntegral n'
 coerceFromInt _ t x = typeError "invalid literal for type" (t, x)
 
 -- coerceType allows integer literals to initialize integers, addresses, and
 -- strings (in the special case of 0) and bytes32, determined by type instead of value
-coerceType :: Contract -> SVMType.Type -> Value -> Value
+coerceType :: CC.Contract -> SVMType.Type -> Value -> Value
 coerceType ct xt = \case
     SInteger i -> coerceFromInt ct (defaultValue ct xt) i
     SString s -> case xt of
@@ -167,7 +165,7 @@ coerceType ct xt = \case
     v -> v
 
 
-valEquals :: Contract -> Value -> Value -> Bool
+valEquals :: CC.Contract -> Value -> Value -> Bool
 valEquals ct lhs rhs = case (lhs, rhs) of
   (SInteger i, _) -> coerceFromInt ct rhs i == rhs
   (_, SInteger i) -> coerceFromInt ct lhs i == lhs
@@ -188,7 +186,7 @@ createVar val = liftIO $ fmap Variable $ newIORef val
 
 
 --TODO- defaultValue is deprecated, will be removed...  Instead use createDefaultValue
-defaultValue :: Contract -> SVMType.Type -> Value
+defaultValue :: CC.Contract -> SVMType.Type -> Value
 defaultValue _ (SVMType.Array valType _) = SArray valType V.empty
 defaultValue _ (SVMType.Mapping _ _ valType) = SMap valType $ M.empty
 defaultValue _ (SVMType.Int _ _) = SInteger 0
@@ -199,12 +197,12 @@ defaultValue _ (SVMType.String _) = SString ""
 defaultValue _ (SVMType.Bytes _ _) = SString ""
 defaultValue ctract (SVMType.Label name) = fromMaybe (SContract name $ unspecifiedChain 0x0) $ asum
   [ do
-      ns <- M.lookup name $ _enums ctract
+      ns <- M.lookup name $ CC._enums ctract
       val <- listToMaybe $ fst ns
       return $ SEnumVal name val 0x0
   , do
-    sdef' <- M.lookup name $ _structs ctract
-    let initializeField = Constant . defaultValue ctract . SolidVM.fieldTypeType
+    sdef' <- M.lookup name $ CC._structs ctract
+    let initializeField = Constant . defaultValue ctract . CC.fieldTypeType
         sdef = (\(a,b,_) -> (a,b)) <$> sdef'
     return . SStruct name . M.map initializeField . M.mapKeys T.unpack . M.fromList $ sdef
   ]
@@ -212,7 +210,7 @@ defaultValue ctract (SVMType.Label name) = fromMaybe (SContract name $ unspecifi
 defaultValue _ x = todo "defaultValue" x
 
 createDefaultValue :: MonadIO m =>
-                      Contract -> SVMType.Type -> m Value
+                      CC.Contract -> SVMType.Type -> m Value
 createDefaultValue _ (SVMType.Array valType _) = return $ SArray valType V.empty
 createDefaultValue _ (SVMType.Mapping _ _ valType) = return $ SMap valType $ M.empty
 createDefaultValue _ (SVMType.Int _ _) = return $ SInteger 0
@@ -222,12 +220,12 @@ createDefaultValue _ (SVMType.Account) = return $ SAccount $ unspecifiedChain (A
 createDefaultValue _ (SVMType.String _) = return $ SString ""
 createDefaultValue _ (SVMType.Bytes _ _) = return $ SString ""
 createDefaultValue ctract (SVMType.Label name) =
-  case (M.lookup name $ _enums ctract, M.lookup name $ _structs ctract) of
+  case (M.lookup name $ CC._enums ctract, M.lookup name $ CC._structs ctract) of
     (Just ((val:_), _), _) -> return $ SEnumVal name val 0x0
     (Nothing, Just sdef) -> do
       items <-
         forM sdef $ \(n, itemType, _) -> do
-          itemVal <- createDefaultValue ctract $ SolidVM.fieldTypeType itemType
+          itemVal <- createDefaultValue ctract $ CC.fieldTypeType itemType
           itemVar <- createVar itemVal
           return (T.unpack n, itemVar)
       return $ SStruct name $ M.fromList items
@@ -248,9 +246,9 @@ castToInt (SInteger i) = i
 castToInt s = typeError "castToInt" s
 -}
 
--- Typos are the possible values that a SolidVM.Label
+-- Typos are the possible values that a CC.Label
 -- is able to resolve to
-data Typo = StructTypo [(T.Text, SolidVM.FieldType)]
+data Typo = StructTypo [(T.Text, CC.FieldType)]
           | EnumTypo [String]
           | ContractTypo String
           deriving (Show)

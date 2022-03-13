@@ -89,7 +89,6 @@ import Slipstream.XabiContract
 import Slipstream.Options
 
 import SolidVM.Model.CodeCollection hiding (contractName)
-import SolidVM.Model.CodeCollection.Event
 
 instance ( (Keccak256 `Alters` SourceMap) m
          , MonadLogger m
