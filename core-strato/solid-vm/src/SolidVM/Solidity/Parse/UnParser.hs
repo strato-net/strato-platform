@@ -17,6 +17,7 @@ import           Text.Printf
 
 import           SolidVM.Model.CodeCollection.ConstantDecl
 import qualified SolidVM.Model.CodeCollection.Def as SolidVM
+import           SolidVM.Model.CodeCollection.Event
 import           SolidVM.Model.CodeCollection.Function
 import           SolidVM.Model.CodeCollection.Statement
 import           SolidVM.Model.CodeCollection.Type

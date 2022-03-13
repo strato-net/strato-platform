@@ -95,6 +95,7 @@ import           Text.Tools
 
 import           SolidVM.Model.CodeCollection
 import qualified SolidVM.Model.CodeCollection.ConstantDecl as SolidVM
+import qualified SolidVM.Model.CodeCollection.Event as SolidVM
 import qualified SolidVM.Model.CodeCollection.Function as SolidVM
 import qualified SolidVM.Model.CodeCollection.Statement as SolidVM
 import qualified SolidVM.Model.CodeCollection.Type as SVMType
@@ -104,7 +105,6 @@ import qualified SolidVM.Model.Storable as MS
 
 import           SolidVM.Solidity.Parse.Statement
 import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpression)
-import qualified SolidVM.Solidity.Xabi as Xabi
 
 import           UnliftIO                             hiding (assert)
 
@@ -910,7 +910,7 @@ runStatement st@(SolidVM.EmitStatement eventName exptups pos) = do
     Nothing -> 
       missingType "no corresponding event has been declared for the following emit statement: " (unparseStatement st)
     Just ev -> do
-      if (length exptups) /= (length $ Xabi.eventLogs ev) then 
+      if (length exptups) /= (length $ SolidVM.eventLogs ev) then 
         invalidArguments "arguments to statement are inconsistent with those declared" (unparseStatement st)
       else do
         let account = currentAccount curInfo
@@ -926,7 +926,7 @@ runStatement st@(SolidVM.EmitStatement eventName exptups pos) = do
                     _                                                    -> pure "")
         
         -- pair up field names with values one-by-one (no type checking tho, lol)
-        let pairs = zip (map (T.unpack . fst) $ Xabi.eventLogs ev) expStrs
+        let pairs = zip (map (T.unpack . fst) $ SolidVM.eventLogs ev) expStrs
         
         liftIO $ putStrLn $ "Emit Event/versioning ---> we are emitting event " ++ eventName ++ 
               " in contract " ++ (_contractName curCnct) ++ " in app " ++ (show parentName) ++ 

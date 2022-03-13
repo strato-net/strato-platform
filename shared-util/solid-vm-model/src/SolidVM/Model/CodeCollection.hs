@@ -23,6 +23,7 @@ import           Blockchain.SolidVM.Exception
 
 import           SolidVM.Model.CodeCollection.ConstantDecl
 import qualified SolidVM.Model.CodeCollection.Def as SolidVM
+import qualified SolidVM.Model.CodeCollection.Event as SolidVM
 import           SolidVM.Model.CodeCollection.Function
 import qualified SolidVM.Model.CodeCollection.Statement as SolidVM
 import qualified SolidVM.Model.CodeCollection.VarDef as SolidVM
@@ -38,7 +39,7 @@ data ContractF a =
     _storageDefs :: Map T.Text (VariableDeclF a),
     _enums :: Map String ([String], a),
     _structs :: Map String [(T.Text, SolidVM.FieldType, a)],
-    _events :: Map T.Text (Xabi.EventF a),
+    _events :: Map T.Text (SolidVM.EventF a),
     _functions :: Map String (FuncF a),
     _constructor :: Maybe (FuncF a),
     _vmVersion :: String,

@@ -6,14 +6,21 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 
-module SolidVM.Solidity.Xabi where
+module SolidVM.Solidity.Xabi (
+  XabiF(..),
+  Xabi,
+  XabiKind(..),
+  ModifierF(..),
+  Modifier,
+  UsingF(..),
+  Using
+  ) where
 
 import           Control.Lens                 (mapped, (&), (?~))
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
 import           Data.Aeson.Types
-import qualified Data.HashMap.Strict          as Hash
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as Map
 import           Data.Source
@@ -21,13 +28,11 @@ import           Data.Swagger
 import           Data.Text                    (Text)
 import qualified Generic.Random               as GR
 import           GHC.Generics
-import           Servant.Docs
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
 
-import           BlockApps.Ethereum2
-import           Blockchain.Strato.Model.Account
 import           SolidVM.Model.CodeCollection.ConstantDecl
+import           SolidVM.Model.CodeCollection.Event
 import           SolidVM.Model.CodeCollection.Function
 import           SolidVM.Model.CodeCollection.VariableDecl
 import qualified SolidVM.Model.CodeCollection.Def  as SolidVM
@@ -64,30 +69,6 @@ data XabiF a = Xabi
 
 type Xabi = Positioned XabiF
 
-xabiEmpty :: XabiF ()
-xabiEmpty = Xabi Map.empty Map.empty Map.empty Map.empty Map.empty Map.empty Map.empty ContractKind Map.empty ()
---------------------------------------------------------------------------------
-
-funcPayable :: FuncF a -> Bool
-funcPayable Func{funcStateMutability = Just Payable} = True
-funcPayable _ = False
-
-funcConstant :: FuncF a -> Bool
-funcConstant Func{funcStateMutability = Nothing} = False
-funcConstant Func{funcStateMutability = Just Payable} = False
-funcConstant _ = True
-
--- constant and payable are a deprecated way of specifying state mutability
-fallbackConstantPayable :: Value -> Parser (Maybe StateMutability)
-fallbackConstantPayable = withObject "fallbackConstantPayable" $ \obj ->
-    let constant = Hash.lookup "constant" obj
-        payable = Hash.lookup "payable" obj
-    in case (constant, payable) of
-           (Just (Bool True), Just (Bool True)) -> fail "functions cannot be constant and payable"
-           (Just (Bool True), _) -> pure . Just $ Constant
-           (_, Just (Bool True)) -> pure . Just $ Payable
-           _ -> pure Nothing
-
 data ModifierF a = Modifier
   { modifierArgs     :: Map Text SolidVM.IndexedType
   , modifierSelector :: Text
@@ -122,31 +103,6 @@ instance ToSchema Modifier where
         , modifierContext = ()
         }
 
-data EventF a = Event
-  { eventAnonymous :: Bool
-  , eventLogs :: [(Text, SolidVM.IndexedType)]
-  , eventContext :: a
-  } deriving (Eq,Show,Generic, Functor)
-
-type Event = Positioned EventF
-
-instance ToJSON a => ToJSON (EventF a) where
-  toJSON e = object [
-      "anonymous" .= eventAnonymous e
-    , "logs" .= eventLogs e
-    , "context" .= eventContext e
-    ]
-
-instance FromJSON a => FromJSON (EventF a) where
-  parseJSON (Object o) = Event
-                     <$> (o .: "anonymous")
-                     <*> (o .: "logs")
-                     <*> (o .: "context")
-  parseJSON o = typeMismatch "SolidVM.Event: Expected Object" o
-
-instance Arbitrary a => Arbitrary (EventF a) where
-  arbitrary = GR.genericArbitrary GR.uniform
-
 data UsingF a = Using String a deriving (Eq,Show,Generic, Functor)
 
 type Using = Positioned UsingF
@@ -173,21 +129,6 @@ instance ToSchema Using where
      & mapped.schema.example ?~ toJSON sampleUsing
      where sampleUsing :: UsingF ()
            sampleUsing = Using "for uint[]" ()
-
-
-data ContractDetailsF a = ContractDetails
-  { contractdetailsBin        :: Text
-  , contractdetailsAccount    :: Maybe Account
-  , contractdetailsBinRuntime :: Text
-  , contractdetailsCodeHash   :: Keccak256
-  , contractdetailsName       :: Text
-  , contractdetailsSrc        :: SourceMap
-  , contractdetailsXabi       :: XabiF a
-  } deriving (Show,Eq,Generic, Functor)
-
-type ContractDetails = Positioned ContractDetailsF
-
-instance ToSample ContractDetails where toSamples _ = noSamples
 
 --------------------------------------------------------------------------------
 

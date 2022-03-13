@@ -24,9 +24,10 @@ import           Text.Printf                          (printf)
 
 import qualified SolidVM.Model.CodeCollection.ConstantDecl as SolidVM
 import qualified SolidVM.Model.CodeCollection.Def          as SolidVM
-import qualified SolidVM.Model.CodeCollection.Function as SolidVM
+import qualified SolidVM.Model.CodeCollection.Event        as SolidVM
+import qualified SolidVM.Model.CodeCollection.Function     as SolidVM
 import           SolidVM.Model.CodeCollection.Statement
-import qualified SolidVM.Model.CodeCollection.Type  as SVMType
+import qualified SolidVM.Model.CodeCollection.Type         as SVMType
 import qualified SolidVM.Model.CodeCollection.VarDef       as Xabitype
 import qualified SolidVM.Model.CodeCollection.VariableDecl as SolidVM
 
@@ -123,7 +124,7 @@ data Declaration =
   | StructDeclaration SolidVM.Def
   | EnumDeclaration SolidVM.Def
   | UsingDeclaration Xabi.Using
-  | EventDeclaration Xabi.Event
+  | EventDeclaration SolidVM.Event
   | VariableDeclaration SolidVM.VariableDecl
   | ConstantDeclaration SolidVM.ConstantDecl
 --  | VariableDeclaration SVMType.Type Bool Bool (Maybe Expression)
@@ -301,10 +302,10 @@ eventDeclaration = do
   return
     (
       name,
-      EventDeclaration Xabi.Event{
-          Xabi.eventAnonymous = anon
-        , Xabi.eventLogs = zipWith (\i -> fmap (Xabitype.IndexedType i)) [0..] logs
-        , Xabi.eventContext = ctx
+      EventDeclaration SolidVM.Event{
+          SolidVM.eventAnonymous = anon
+        , SolidVM.eventLogs = zipWith (\i -> fmap (Xabitype.IndexedType i)) [0..] logs
+        , SolidVM.eventContext = ctx
 --         objName = name,
 --         objValueType = NoValue,
 --         objArgType = logs,

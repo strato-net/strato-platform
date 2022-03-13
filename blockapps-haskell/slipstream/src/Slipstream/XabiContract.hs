@@ -15,9 +15,9 @@ import qualified BlockApps.Solidity.Xabi.Type as OLDXABI
 import SelectAccessible                         ()
 
 import SolidVM.Model.CodeCollection hiding (contractName, events)
+import SolidVM.Model.CodeCollection.Event
 import SolidVM.Model.CodeCollection.VariableDecl
 
-import SolidVM.Solidity.Xabi
 import qualified SolidVM.Model.CodeCollection.Type               as SVMType
 import SolidVM.Model.CodeCollection.VarDef
 
