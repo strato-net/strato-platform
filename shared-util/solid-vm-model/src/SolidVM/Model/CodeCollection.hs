@@ -1,12 +1,19 @@
-{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module SolidVM.Model.CodeCollection where
+module SolidVM.Model.CodeCollection (
+  CodeCollectionF(..),
+  CodeCollection,
+  contracts,
+  getParents,
+  xabiToContract,
+  applyInheritance,
+  codeCollectionCrawler,
+  module SolidVM.Model.CodeCollection.Contract
+  ) where
 
 import Control.Lens
 import Data.Aeson as A
@@ -21,37 +28,12 @@ import GHC.Generics
 
 import           Blockchain.SolidVM.Exception
 
-import           SolidVM.Model.CodeCollection.ConstantDecl
+import           SolidVM.Model.CodeCollection.Contract
 import qualified SolidVM.Model.CodeCollection.Def as SolidVM
-import qualified SolidVM.Model.CodeCollection.Event as SolidVM
 import           SolidVM.Model.CodeCollection.Function
 import qualified SolidVM.Model.CodeCollection.Statement as SolidVM
-import qualified SolidVM.Model.CodeCollection.VarDef as SolidVM
-import           SolidVM.Model.CodeCollection.VariableDecl
 import           SolidVM.Solidity.Xabi
 import qualified SolidVM.Solidity.Xabi as Xabi
-
-data ContractF a =
-  Contract {
-    _contractName :: String,
-    _parents :: [String],
-    _constants :: Map String (ConstantDeclF a),
-    _storageDefs :: Map T.Text (VariableDeclF a),
-    _enums :: Map String ([String], a),
-    _structs :: Map String [(T.Text, SolidVM.FieldType, a)],
-    _events :: Map T.Text (SolidVM.EventF a),
-    _functions :: Map String (FuncF a),
-    _constructor :: Maybe (FuncF a),
-    _vmVersion :: String,
-    _contractContext :: a
-  } deriving (Show, Generic, Functor)
-
-instance ToJSON a => ToJSON (ContractF a)
-instance FromJSON a => FromJSON (ContractF a)
-
-type Contract = Positioned ContractF
-
-makeLenses ''ContractF
 
 data CodeCollectionF a =
   CodeCollection {
@@ -64,10 +46,6 @@ instance FromJSON a => FromJSON (CodeCollectionF a)
 type CodeCollection = Positioned CodeCollectionF
 
 makeLenses ''CodeCollectionF
-
-emptyCodeCollection :: CodeCollection
-emptyCodeCollection =
-  CodeCollection M.empty
 
 type SolidEither = Either (Positioned ((,) SolidException))
 
