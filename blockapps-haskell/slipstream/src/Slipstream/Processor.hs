@@ -79,7 +79,6 @@ import Data.Source.Map
 
 import SelectAccessible                         ()
 
-import Slipstream.CodeCollectionTools
 import Slipstream.Data.Action
 import Slipstream.Events
 import Slipstream.Globals
@@ -88,6 +87,7 @@ import Slipstream.OutputData
 import Slipstream.XabiContract
 import Slipstream.Options
 
+import SolidVM.CodeCollectionTools
 import SolidVM.Model.CodeCollection hiding (contractName)
 
 instance ( (Keccak256 `Alters` SourceMap) m

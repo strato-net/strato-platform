@@ -18,6 +18,7 @@ library:
     - Blockchain.SolidVM.Simple
     - Blockchain.SolidVM.SM
     - Blockchain.SolidVM.CodeCollectionDB
+    - SolidVM.CodeCollectionTools
     - SolidVM.Solidity.Detectors
     - SolidVM.Solidity.Detectors.Contracts.ParentConstructors
     - SolidVM.Solidity.Detectors.Typechecker
