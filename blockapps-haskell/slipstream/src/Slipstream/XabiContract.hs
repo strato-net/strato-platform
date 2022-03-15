@@ -12,13 +12,11 @@ import Data.Source.Position
 import qualified BlockApps.Solidity.Xabi      as OLDXABI
 import qualified BlockApps.Solidity.Xabi.Type as OLDXABI
 
-import CodeCollection hiding (contractName, events)
-
 import SelectAccessible                         ()
 
-import SolidVM.Solidity.Xabi
-import SolidVM.Solidity.Xabi.VarDef
-import qualified SolidVM.Solidity.Xabi.Type               as Xabi
+import SolidVM.Model.CodeCollection hiding (contractName, events)
+
+import qualified SolidVM.Model.Type               as SVMType
 
 --I am leaving a lot of this undefined....  Partly because the values don't exist in a XABI,
 --and partly just because we don't need some of these values yet.  If a dev uses one of these
@@ -52,19 +50,19 @@ evmIndexedTypeToIndexedType x = IndexedType {
   indexedTypeType = evmTypeToType $ OLDXABI.indexedTypeType x
   }
 
-evmTypeToType :: OLDXABI.Type -> Xabi.Type
-evmTypeToType (OLDXABI.Int x y) = Xabi.Int x y
-evmTypeToType (OLDXABI.String x) = Xabi.String x
-evmTypeToType (OLDXABI.Bytes x y) = Xabi.Bytes x y
-evmTypeToType OLDXABI.Bool = Xabi.Bool
-evmTypeToType OLDXABI.Address = Xabi.Address
-evmTypeToType OLDXABI.Account = Xabi.Account
-evmTypeToType (OLDXABI.Label x) = Xabi.Label x
-evmTypeToType (OLDXABI.Struct x y) = Xabi.Struct x y
-evmTypeToType (OLDXABI.Enum x y z) = Xabi.Enum x y z
-evmTypeToType (OLDXABI.Array x y) = Xabi.Array (evmTypeToType x) y
-evmTypeToType (OLDXABI.Contract x) = Xabi.Contract x
-evmTypeToType (OLDXABI.Mapping x y z) = Xabi.Mapping x (evmTypeToType y) (evmTypeToType z)
+evmTypeToType :: OLDXABI.Type -> SVMType.Type
+evmTypeToType (OLDXABI.Int x y) = SVMType.Int x y
+evmTypeToType (OLDXABI.String x) = SVMType.String x
+evmTypeToType (OLDXABI.Bytes x y) = SVMType.Bytes x y
+evmTypeToType OLDXABI.Bool = SVMType.Bool
+evmTypeToType OLDXABI.Address = SVMType.Address
+evmTypeToType OLDXABI.Account = SVMType.Account
+evmTypeToType (OLDXABI.Label x) = SVMType.Label x
+evmTypeToType (OLDXABI.Struct x y) = SVMType.Struct x y
+evmTypeToType (OLDXABI.Enum x y z) = SVMType.Enum x y z
+evmTypeToType (OLDXABI.Array x y) = SVMType.Array (evmTypeToType x) y
+evmTypeToType (OLDXABI.Contract x) = SVMType.Contract x
+evmTypeToType (OLDXABI.Mapping x y z) = SVMType.Mapping x (evmTypeToType y) (evmTypeToType z)
 
 varTypeToVariableDecl :: OLDXABI.VarType -> VariableDeclF (SourceAnnotation ())
 varTypeToVariableDecl x =

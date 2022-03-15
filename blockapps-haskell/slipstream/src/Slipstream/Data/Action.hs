@@ -23,11 +23,11 @@ import qualified Data.Text               as T
 import           Data.Time
 import           GHC.Generics
 
-import           Blockchain.Strato.Model.Action (Action)
-import qualified Blockchain.Strato.Model.Action as Action ( Action(..), ActionData(..), DataDiff(..), CallType(..))
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Stream.Action (Action)
+import qualified Blockchain.Stream.Action as Action ( Action(..), ActionData(..), DataDiff(..), CallType(..))
 
 
 data AggregateAction = AggregateAction

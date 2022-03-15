@@ -29,7 +29,6 @@ import qualified Data.Text                                    as T
 import qualified Data.Sequence                                as S
 import           System.Directory
 
-import qualified Blockchain.Strato.Model.Action               as A
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.Block
 import           Blockchain.Data.BlockDB
@@ -50,6 +49,7 @@ import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.ExtWord
 import           Blockchain.Strato.Model.Keccak256
+import qualified Blockchain.Stream.Action                     as A
 import           Blockchain.Stream.VMEvent
 import           Blockchain.Stream.VMOutput
 import           Blockchain.Util

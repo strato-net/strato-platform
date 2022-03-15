@@ -125,7 +125,7 @@ apiErrorToServantErr = \case
   CirrusError err -> err500{errBody = JSON.encode (show err)}
   UserError err -> err400{errBody = JSON.encode err}
   AlreadyExists err -> err409{errBody = JSON.encode err}
-  CouldNotFind err -> err404{errBody = JSON.encode err}
+  CouldNotFind err -> err400{errBody = JSON.encode err}
   UnavailableError err -> err503{errBody = JSON.encode err}
   AnError _ ->
             err500{errBody = JSON.encode $ unlines

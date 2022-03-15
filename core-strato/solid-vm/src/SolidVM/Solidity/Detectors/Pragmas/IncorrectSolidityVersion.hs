@@ -4,10 +4,10 @@ module SolidVM.Solidity.Detectors.Pragmas.IncorrectSolidityVersion
   ( detector
   ) where
 
-import           CodeCollection
 import           Data.Source
 import           Data.Text                           (Text)
 import qualified Data.Text                           as T
+import           SolidVM.Solidity.Detectors.Types
 import           SolidVM.Solidity.Parse.Declarations (SourceUnitF(..), SourceUnit)
 
 -- type ParserDetector = [SourceUnit] -> [SourceAnnotation T.Text]

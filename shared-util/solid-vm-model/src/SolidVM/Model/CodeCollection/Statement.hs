@@ -2,7 +2,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
-module SolidVM.Solidity.Xabi.Statement
+module SolidVM.Model.CodeCollection.Statement
   ( StatementF(..)
   , extractStatement
   , Statement
@@ -27,7 +27,7 @@ import Data.Aeson
 import Data.Source
 import qualified Data.Text as T
 import GHC.Generics
-import SolidVM.Solidity.Xabi.Type
+import SolidVM.Model.Type
 
 data StatementF a =
   IfStatement (ExpressionF a) [StatementF a] (Maybe [StatementF a]) a -- if then else

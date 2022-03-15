@@ -39,14 +39,14 @@ import qualified Data.Text as T
 import qualified Data.Vector as V
 import           Text.Printf
 
-import           CodeCollection
 import           Blockchain.DB.SolidStorageDB
 import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.SM
-import           Blockchain.SolidVM.Value
 import           Blockchain.Strato.Model.Account
+import qualified SolidVM.Model.CodeCollection as CC
+import qualified SolidVM.Model.Type as SVMType
 import qualified SolidVM.Model.Storable as MS
-import qualified SolidVM.Solidity.Xabi.Type as Xabi
+import           SolidVM.Model.Value
 import           Text.Format
 import           UnliftIO
 
@@ -115,7 +115,7 @@ setVal :: MonadSM m => Value -> Value -> m ()
 setVal (SReference dst) (SReference src) = do
   t <- getXabiValueType src
   case t of
-    Xabi.Array{} -> do
+    SVMType.Array{} -> do
       len <- getInt (Constant $ SReference $ src `apSnoc` MS.Field "length")
       setVal (SReference $ dst `apSnoc` MS.Field "length") $ SInteger len
       forM_ [0..len-1] $ \i -> do
@@ -155,12 +155,12 @@ setVal dst@(SReference addressedPath@(AccountPath addr path)) src = do
                             case t of   -- t is evaluated here because Haskell is lazy
                                         -- We ONLY want to evaluate it if we know src is a SString because
                                         -- in some non-SString cases getXabiValueType will throw an exception
-                                Xabi.String{} -> MS.BString . UTF8.fromString $ s 
+                                SVMType.String{} -> MS.BString . UTF8.fromString $ s 
                                 _             -> toBasic src
                         _         -> toBasic src
   markDiffForAction addr path basicSrc
   contract <- getCurrentContract
-  let svm3_0 = _vmVersion contract == "svm3.0"
+  let svm3_0 = CC._vmVersion contract == "svm3.0"
   putSolidStorageKeyVal' svm3_0 addr path basicSrc
 
 
@@ -221,7 +221,7 @@ getVar (Constant (SReference addressedPath@(AccountPath addr key))) = do
     MS.BString bs -> do
         t <- getXabiValueType addressedPath
         case t of
-                Xabi.String{} -> return . SString $ UTF8.toString bs
+                SVMType.String{} -> return . SString $ UTF8.toString bs
                 _             -> return $ fromBasic theValue
     _ -> return $ fromBasic theValue
 
@@ -280,7 +280,7 @@ deleteVar :: MonadSM m => Variable -> m ()
 deleteVar (Constant (SReference a@(AccountPath addr path))) = do
   xType <- getXabiValueType a
   case xType of
-    Xabi.Array{} -> do
+    SVMType.Array{} -> do
       let lengthVar = Constant . SReference $ a `apSnoc` MS.Field "length"
       len <- fromInteger <$> getInt lengthVar
       deleteVar lengthVar
@@ -292,7 +292,7 @@ deleteVar (Constant (SReference a@(AccountPath addr path))) = do
       when ro $ invalidWrite "Invalid delete during read-only access" $ "addr: " ++ show addr ++ ", path: " ++ show path
       markDiffForAction addr path $ MS.BDefault
       contract <- getCurrentContract
-      let svm3_0 = _vmVersion contract == "svm3.0"
+      let svm3_0 = CC._vmVersion contract == "svm3.0"
       putSolidStorageKeyVal' svm3_0 addr path $ MS.BDefault
 
 deleteVar v = todo "deleteVar not yet supported for local variables" $ show v
