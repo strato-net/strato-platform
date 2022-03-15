@@ -23,6 +23,7 @@ statement :: SolidityParser Statement
 statement = do
   ifStatement
   <|> whileStatement
+  <|> doWhileStatement
   <|> forStatement
   <|> (do
           ~(a, e) <- withPosition $ do
@@ -75,6 +76,17 @@ whileStatement = do
     s <- fmap (:[]) statement <|> statements
     pure (e, s)
   pure $ WhileStatement e s a
+
+doWhileStatement :: SolidityParser Statement
+doWhileStatement = do
+  ~(a, (s, e)) <- withPosition $ do
+    reserved "do"
+    s <- fmap (:[]) statement <|> statements
+    reserved "while"
+    e <- parens expression
+    _ <- semi
+    pure (s, e)
+  pure $ DoWhileStatement s e a
 
 forStatement :: SolidityParser Statement
 forStatement = do
@@ -254,7 +266,7 @@ primaryExpression = do
     <|> (uncurry Variable <$> withPosition identifier)
     <|> (do 
             ~(a, (val, nu)) <- withPosition $ do
-              val <- natural
+              val <- integer
               nu <- optionMaybe numberUnit
               pure (val, nu)
             pure $ NumberLiteral a val nu)
@@ -267,14 +279,13 @@ numberUnit = do
     <|> (reserved "finny" >> return Finney)
     <|> (reserved "ether" >> return Ether)
 
-
 parseArgs :: SolidityParser [Expression]
 parseArgs = parens $ commaSep literal
 
 literal :: SolidityParser Expression
 literal = asum
         [ do
-            ~(a, (n, u)) <- withPosition $ (,) <$> natural <*> optionMaybe numberUnit
+            ~(a, (n, u)) <- withPosition $ (,) <$> integer <*> optionMaybe numberUnit
             pure $ NumberLiteral a n u
         , uncurry StringLiteral <$> withPosition stringLiteral
         , uncurry BoolLiteral <$> withPosition (False <$ reserved "false")

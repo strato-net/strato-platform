@@ -330,7 +330,7 @@ wireMessage2Obj (Blockstanbul wm@PBFT.WireMessage{PBFT._message=msg}) =
      PBFT.Preprepare _ _ -> (0x18, rlpEncode wm)
      PBFT.Prepare _ _ -> (0x19, rlpEncode wm)
      PBFT.Commit _ _ _ -> (0x1a, rlpEncode wm)
-     PBFT.RoundChange _ -> (0x1b, rlpEncode wm)
+     PBFT.RoundChange _ _ -> (0x1b, rlpEncode wm)
 
 -- private chains
 wireMessage2Obj (GetChainDetails cIds) =

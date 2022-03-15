@@ -77,6 +77,10 @@ anyInvalidWriteError :: Selector HandledException
 anyInvalidWriteError (HE Blockchain.SolidVM.Exception.InvalidWrite{}) = True
 anyInvalidWriteError _ = False
 
+anyInternalError :: Selector HandledException
+anyInternalError (HE Blockchain.SolidVM.Exception.InternalError{}) = True
+anyInternalError _ = False
+
 anyIndexOOBError :: Selector HandledException
 anyIndexOOBError (HE Blockchain.SolidVM.Exception.IndexOutOfBounds{}) = True
 anyIndexOOBError _ = False
@@ -573,6 +577,18 @@ contract qq {
 }|]
       getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger 19, BInteger 19]
 
+    it "can declare negative numbers" . runTest $ do
+      runBS [r|
+contract qq {
+  uint x;
+  uint y;
+  constructor() {
+    x = -1;
+    y = -x;
+  }
+}|]
+      getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger (-1), BInteger 1]
+
     it "can require" . runTest $ do
       runBS [r|
 contract qq {
@@ -876,6 +892,21 @@ contract qq {
   }
 }|]
 
+  it "supports contract equality" . runTest $ do
+    runBS [r|
+contract A {
+}
+
+contract qq {
+  constructor() {
+    A a1 = new A();
+    A a2 = new A();
+    A a3 = a2;
+    assert (a1 != a2);
+    assert (a2 == a3);
+  }
+}|]
+
   it "compares equal againts default" . runTest $ do
     liftIO $ pendingWith "add static typing" --TODO- Jim
     runBS [r|
@@ -1009,8 +1040,7 @@ contract qq {
   }
 }|]
 
-  it "can continue" . runTest $ do
-    liftIO $ pendingWith "implement continue"
+  it "can continue in a for-loop" . runTest $ do
     runBS [r|
 contract qq {
   uint i;
@@ -1025,8 +1055,42 @@ contract qq {
 }|]
     getFields ["i"] `shouldReturn` [BInteger 2]
 
-  it "can break" . runTest $ do
-    liftIO $ pendingWith "implement break"
+
+  it "can continue in a while-loop" . runTest $ do
+    runBS [r|
+contract qq {
+  uint i;
+  constructor() public {
+    int j = 0;
+    while (j < 10) {
+      j++;
+      if (j % 2 == 0) {
+        continue;
+      }
+      i++;
+    }
+  }
+}|]
+    getFields ["i"] `shouldReturn` [BInteger 5]
+
+  it "can continue in a do-while-loop" . runTest $ do
+    runBS [r|
+contract qq {
+  uint i;
+  constructor() public {
+    int j = 0;
+    do {
+      j++;
+      if (j % 2 == 0) {
+        continue;
+      }
+      i++;
+    } while (j < 10);
+  }
+}|]
+    getFields ["i"] `shouldReturn` [BInteger 6]
+
+  it "can break from a for-loop" . runTest $ do
     runBS [r|
 contract qq {
   uint i = 25;
@@ -1041,6 +1105,48 @@ contract qq {
 }|]
     getFields ["i"] `shouldReturn` [BInteger 29]
 
+  it "can break from a while-loop" . runTest $ do
+    runBS [r|
+contract qq {
+  uint i = 0;
+  constructor() public {
+    while (i < 10) {
+      if (i == 4) {
+        break;
+      }
+      i++;
+    }
+  }
+}|]
+    getFields ["i"] `shouldReturn` [BInteger 4]
+
+  it "can break from a do-while loop" . runTest $ do
+    runBS [r|
+contract qq {
+  uint i = 0;
+  constructor() public {
+    do {
+      if (i == 4) {
+        break;
+      }
+      i++;
+    } while (i < 10);
+  }
+}|]
+    getFields ["i"] `shouldReturn` [BInteger 4]
+
+  it "can break immediately from a loop" . runTest $ do
+    runBS [r|
+contract qq {
+  uint i = 25;
+  constructor() public {
+    for (uint j = 0; j < 100; j++) {
+      break;
+    }
+  }
+}|]
+    getFields ["i"] `shouldReturn` [BInteger 25]
+
   it "can return from a loop" . runTest $ do
     liftIO $ pendingWith "re-fix loops"
     runBS [r|
@@ -1054,7 +1160,6 @@ contract qq {
   }
 }|]
     getFields ["i"] `shouldReturn` [BInteger 1]
-
 
   it "can call functions on local contracts" . runTest $ do
     runBS [r|
@@ -1111,6 +1216,24 @@ contract qq {
   }
 }|] `shouldReturn` Nothing
     getFields ["x"] `shouldReturn` [BInteger 100]
+
+  it "can call external getters by variable name" . runTest $ do
+    runBS [r|
+contract S {
+  string s;
+  constructor() {
+    s = "Blockapps";
+  }
+}
+contract qq {
+  string local_s;
+  S myS;
+  constructor() {
+    myS = new S();
+    local_s = myS.s();
+  }
+}|] 
+    getFields ["local_s"] `shouldReturn` [BString "Blockapps"]
 
   it "can cast address to contract" . runTest $ do
     runBS [r|
@@ -1225,6 +1348,17 @@ contract qq {
 }|] `shouldReturn` Nothing
     getFields ["x"] `shouldReturn` [BInteger 10]
 
+  it "can push to memory arrays" . runTest $ do
+    runCall "pushMem" "([3, 5])" [r|
+contract qq {
+  uint x;
+  function pushMem(uint[] memory ts) public {
+    ts.push(7);
+    uint[] cpy = ts; 
+    x = cpy[2];
+  }
+}|] `shouldReturn` Nothing
+    getFields ["x"] `shouldReturn` [BInteger 7]
 
   it "can store array literals" . runTest $ do
     runBS [r|
@@ -1865,6 +1999,25 @@ contract qq {
     return ret;
   }
 }|] `shouldReturn` Just "Ticket ID already exists\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL"
+
+  it "can return state variables" . runTest $ do
+    runCall "getS" "()" [r|
+contract qq {
+  string s = "The mitochondria is the powerhouse of the cell";
+  function getS() public returns (string) {
+    return s;
+  }
+}|] `shouldReturn` Just "\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL \NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL.The mitochondria is the powerhouse of the cell"
+
+  it "can return state variables in tuples" . runTest $ do
+
+    runCall "getSAndB" "()" [r|
+contract qq {
+  string s = "The mitochondria is the powerhouse of the cell";
+  function getSAndB() public returns (string, s) {
+    return (s, s);
+  }
+}|] `shouldReturn` Just "\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL@\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\142\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL.The mitochondria is the powerhouse of the cell\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL.The mitochondria is the powerhouse of the cell"
 
   it "can accept string arguments" . runTest $ do
     runCall "set" "(\"deadbeef00000000000000000000000000000000000000000000000000000000\")" [r|
@@ -2796,6 +2949,46 @@ contract qq {
       , BBool True
       , BDefault
       ]
+  it "can get the chainId from the account type" . runTest $ do
+    runBS [r|
+contract qq {
+  account a1;
+  account a2;
+  account a3;
+  uint cid1;
+  uint cid2;
+  uint cid3;
+  constructor() public {
+    a1 = account(0xdeadbeef, 0xfeedbeef);
+    a2 = account(0x123, "main");    
+    a3 = account(0x124);
+    cid1 = a1.chainId;
+    cid2 = a2.chainId;
+    cid3 = a3.chainId;
+  }
+}|]
+    getFields ["cid1", "cid2", "cid3"] `shouldReturn`
+      [ BInteger 0xfeedbeef
+      , BInteger 0
+      , BInteger 0
+      ]
+
+  it "can't assign a value to an unallocated index in an array" $ (runTest (runBS [r|
+contract qq {
+  uint z;
+  uint[] x;
+  uint[] myVar;
+  constructor() {
+    myVar = f();
+    z = myVar[0];
+  }
+  function f() returns (uint[]) {
+    // assignment of first value
+    uint[] x;
+    x[0] = 1;
+    return x;
+  }
+  }|])) `shouldThrow` anyInvalidWriteError
 
   it "can parse an X509 certificate" . runTest $ do
     runBS [r|

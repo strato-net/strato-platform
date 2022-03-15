@@ -10,6 +10,7 @@
 module SolidVM.Solidity.Parse.Lexer (
   parens,
   natural,
+  integer,
   reservedOp,
   brackets,
   reserved,
@@ -40,6 +41,7 @@ reservedOp = P.reservedOp solidityLexer
 identifier = P.identifier solidityLexer
 lexeme = P.lexeme solidityLexer
 natural = P.natural solidityLexer
+integer = P.integer solidityLexer
 braces = P.braces solidityLexer
 parens = P.parens solidityLexer
 brackets = P.brackets solidityLexer

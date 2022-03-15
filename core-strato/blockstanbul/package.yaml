@@ -20,6 +20,7 @@ library:
   - conduit
   - containers
   - cross-monitoring
+  - cryptonite
   - data-default
   - deepseq
   - ethereum-encryption

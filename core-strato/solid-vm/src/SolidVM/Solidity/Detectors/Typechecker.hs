@@ -984,7 +984,7 @@ tcExpr (FunctionCall x expr args) = do
          OrderedArgs es -> productType' x <$> traverse tcExpr es
          NamedArgs es -> productType' x <$> traverse (tcExpr . snd) es
   apply e a
-tcExpr (Unitary x "-" _) = pure . bottom $ "Negative number literals not yet supported in SolidVM. Please try using the form `0 - <number>` to declare a negative number." <$ x
+tcExpr (Unitary x "-" a) = intType' x ~> tcExpr a
 tcExpr (Unitary x "++" a) = intType' x ~> tcExpr a
 tcExpr (Unitary x "--" a) = intType' x ~> tcExpr a
 tcExpr (Unitary x "!" a) = boolType' x ~> tcExpr a

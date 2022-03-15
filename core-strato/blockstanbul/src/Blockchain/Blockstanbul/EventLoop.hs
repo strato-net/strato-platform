@@ -12,6 +12,7 @@ import Control.Monad.Extra (whenM)
 import Control.Monad.Trans.Except
 import Blockchain.Output
 import Control.Monad.State.Class
+import Crypto.Random.Entropy (getEntropy)
 import qualified Data.Map.Strict as M
 import Data.Maybe
 import qualified Data.Set as S
@@ -122,11 +123,17 @@ assertChainConsistency seqNo wantParent blk = do
 hasSameHash :: (StateMachineM m) => Keccak256 -> m Bool
 hasSameHash di = uses proposal $ maybe False ((==di) . blockHash)
 
+createRoundChangeMessage :: MonadIO m => View -> m TrustedMessage
+createRoundChangeMessage vw = do
+  nonce <- bytesToWord256 <$> liftIO (getEntropy 32)
+  pure $ RoundChange vw nonce
+
 roundChange :: (StateMachineM m) => ConduitM InEvent EOutEvent m ()
 roundChange = do
   nextView <- uses view (over round (+1))
   pendingRound .= Just (_round nextView)
-  msg <- signMessage (RoundChange nextView)
+  rawMsg <- createRoundChangeMessage nextView
+  msg <- signMessage rawMsg
   yieldR msg
 
 nextRound :: (StateMachineM m) => NextType -> ConduitM InEvent EOutEvent m ()
@@ -316,7 +323,7 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
             let blockNo = blockDataNumber . blockBlockData $ blk
             recordMaxBlockNumber "pbft_commit" blockNo
             yieldR . ToCommit . addCommitmentSeals seals $ blk
-    IMsg auth (RoundChange vn) -> when (_round v < _round vn) $ do
+    IMsg auth (RoundChange vn _) -> when (_round v < _round vn) $ do
       let rn = _round vn
       mSigners <- use $ roundChanged . at rn
       case S.member (sender auth) <$> mSigners of
@@ -326,17 +333,18 @@ eventLoop ctx = execStateC ctx $ awaitForever $ \ev -> do
           total <- poolSize
           sentRN <- use pendingRound
           let sameRNCount = maybe 0 S.size . M.lookup rn $ rs
+          rawMsg <- createRoundChangeMessage vn
           when (3 * sameRNCount > total && Just rn > sentRN) $ do
             pendingRound .= Just rn
             $logInfoS "blockstanbul/roundchange" "agreed change"
-            msg <- signMessage (RoundChange vn)
+            msg <- signMessage rawMsg
             yieldR msg
           when (3 * sameRNCount > 2 * total) $ do
             next <- use pendingRound
             case next of
               Nothing -> error "TODO(tim): a round was voted on without existing"
               Just r -> nextRound (Round r)
-          yieldL $ OMsg auth (RoundChange vn)
+          yieldL $ OMsg auth rawMsg
           return ()
     Timeout r' -> do
       case r' `compare` _round v of

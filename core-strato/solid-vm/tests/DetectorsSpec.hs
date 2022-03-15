@@ -14,7 +14,6 @@ import qualified SolidVM.Solidity.Detectors.Expressions.BooleanLiterals         
 import qualified SolidVM.Solidity.Detectors.Expressions.DivideBeforeMultiply       as DivideBeforeMultiply
 import qualified SolidVM.Solidity.Detectors.Pragmas.IncorrectSolidityVersion       as IncorrectSolidityVersion
 import qualified SolidVM.Solidity.Detectors.Functions.ConstantFunctions            as ConstantFunctions
-import qualified SolidVM.Solidity.Detectors.Functions.Unimplemented.Continue       as Continue
 import qualified SolidVM.Solidity.Detectors.Functions.Unimplemented.Modifiers      as Modifiers
 import qualified SolidVM.Solidity.Detectors.Statements.StateVariableShadowing      as StateVariableShadowing
 import qualified SolidVM.Solidity.Detectors.Statements.UninitializedLocalVariables as UninitializedLocalVariables
@@ -329,30 +328,6 @@ contract A {
 contract B {
   function f() {
     x = 8;
-  }
-}
-|]
-       in length anns `shouldBe` 1
-
-  describe "Unimplemented break and continue statements" $ do
-    it "warns for the use of continue" $
-      let anns = Continue.detector `forContract` [r|
-contract A {
-  function f() {
-    while (true) {
-      continue;
-    }
-  }
-}
-|]
-       in length anns `shouldBe` 1
-    it "warns for the use of break" $
-      let anns = Continue.detector `forContract` [r|
-contract A {
-  function f() {
-    while (true) {
-      break;
-    }
   }
 }
 |]

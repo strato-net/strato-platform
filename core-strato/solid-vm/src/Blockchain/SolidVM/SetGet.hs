@@ -224,7 +224,41 @@ getVar (Constant (SReference addressedPath@(AccountPath addr key))) = do
                 SVMType.String{} -> return . SString $ UTF8.toString bs
                 _             -> return $ fromBasic theValue
     _ -> return $ fromBasic theValue
+
+getVar (Constant (SStruct s ma)) = do
+  resolved <- mapM (\var -> do
+      v <- getVar var
+      return $ Constant v
+    ) ma
+  return $ SStruct s resolved
+
+getVar (Constant (SArray typ vc)) = do
+  resolved <- V.mapM (\var -> do
+      v <- getVar var
+      return $ Constant v
+    ) vc
+  return $ SArray typ resolved
+
+getVar (Constant (STuple vct)) = do
+  resolved <- V.mapM (\var -> do
+      v <- getVar var
+      return $ Constant v
+    ) vct
+  return $ STuple resolved
+  
+getVar (Constant (SMap ty mp)) = do
+  resolved <- mapM (\var -> do
+      v <- getVar var
+      return $ Constant v
+    ) mp
+  return $ SMap ty resolved
+
+getVar (Constant (SPush v (Just var))) = do
+  resolved <- getVar var
+  return $ SPush v (Just $ Constant resolved)
+
 getVar (Constant v) = return v
+
 getVar (Variable v) = liftIO $ readIORef v
 
 

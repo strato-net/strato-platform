@@ -70,6 +70,25 @@ instance Show Variable where
   show (Variable _) = "<variable>"
   show (Constant v) = "Constant: " ++ show v
 
+-- Util functions to help display variables within the IO monad, since it reads from an IO ref to get the variable's value
+-- Uncomment when needed
+-- showVariable :: MonadIO m => Variable -> m String
+-- showVariable (Variable v) = do 
+--   val <- liftIO $ readIORef v
+--   showValue val 
+-- showVariable (Constant c) = showValue c 
+
+-- showValue :: MonadIO m => Value -> m String
+-- Only implemented useful show for Arrays, as they are the most commonly used values that use IORefs 
+-- showValue (SArray _ vc) = do
+--   ss <- mapM showVariable vc 
+--   let s :: String 
+--       s = foldl insertComma "SArray: " ss
+--   return s
+-- showValue v = return $ show v
+
+-- insertComma :: String -> String -> String
+-- insertComma a b = a ++ ", " ++ b 
 --TODO- we need to figure out this ambiguity on the Address types....
 --Sometimes address is and integer (solidity can treat an integer as an address),
 --sometimes it is a proper type.
@@ -94,7 +113,7 @@ data Value =
   | SContractItem NamedAccount String
   | SContract String NamedAccount
   | SContractFunction (Maybe String) NamedAccount String -- contractName, address, functionName
-  | SPush Value -- The array function
+  | SPush Value (Maybe Variable)-- The array function
   | SNULL
   | SReference AccountPath  -- An alias to an existing variable, so that modifications
                               -- can be canonicalized
@@ -102,6 +121,8 @@ data Value =
                       -- supporting indexing into bytes32s.
   | SAddressToAscii -- Hack to implement addressToAsciiString without supporting indexing into bytes
   | SMappingSentinel
+  | SBreak
+  | SContinue
   deriving (Show)
 
 --TODO- Remove this sloppy half-measure of Ord, Eq definitions once we move to Solidity static typing
@@ -175,6 +196,7 @@ valEquals ct lhs rhs = case (lhs, rhs) of
   (SEnumVal e1 _ n1, SEnumVal e2 _ n2) -> e1 == e2 && n1 == n2
   (SContract _ a1, SAccount a2) -> a1 == a2
   (SAccount a1, SContract _ a2) -> a1 == a2
+  (SContract _ a1, SContract _ a2) -> a1 == a2 
   (SBuiltinVariable v1, SBuiltinVariable v2) ->
     todo "comparison of builtin vars requires evaluation: " (v1, v2)
   _ -> todo "unsupported type combination in valEquals: " (lhs, rhs)
@@ -237,7 +259,7 @@ createDefaultValue _ x = todo "createDefaultValue" x
 
 
 {-
-byteStringToValue :: ByteString -> Maybe Value
+byteStringToValue :: B.ByteString -> Maybe Value
 byteStringToValue x | x == B.singleton 128 = Nothing
 byteStringToValue x = Just . SInteger . rlpDecode . rlpDeserialize $ x
 

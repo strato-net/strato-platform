@@ -258,12 +258,8 @@ describe("Create Chain", function() {
                  ,{ address: bob.address, balance: 10000000}
                  ];
     
-    const codePtr = { account: main.address, name: "Governance" };
+    const codePtr = { account: main.address, name: "Governance" }; 
 
-    // TODO: we need to add `codePtr` to the definition of `Chain` in blockapps-rest. Then, we can remove the ts-ignore below
-    // More details here: https://blockapps.atlassian.net/browse/STRATO-2313 
-
-    // @ts-ignore
     const chainId = await rest.createChain(alice, {label, members: mems, balances: bals, codePtr, args}, {name: "Governance"}, vmOptions);
 
     assert.isDefined(chainId, "chainId defined");
