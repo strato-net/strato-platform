@@ -90,6 +90,8 @@ import Slipstream.Options
 import SolidVM.CodeCollectionTools
 import SolidVM.Model.CodeCollection hiding (contractName)
 
+import Text.Format
+
 instance ( (Keccak256 `Alters` SourceMap) m
          , MonadLogger m
          , HasBlocEnv m
@@ -513,7 +515,7 @@ processTheMessages env sqlEnv conn g messages = do
       mapM_ recordAction actions
       recordCombinedAction row
       $logInfoS "processTheMessages" $ "Combined Action = " <> formatAction row
-      $logDebugLS "the diff is " $ actionStorage row
+      $logDebugS "processTheMessages" $ T.pack $ "the diff is " ++ format (actionStorage row)
 
       case actionStorage row of
         Action.EVMDiff{} -> evmInsertsF g row actions acct

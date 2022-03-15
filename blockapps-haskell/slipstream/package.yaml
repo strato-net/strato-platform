@@ -43,6 +43,7 @@ library:
     - cross-monitoring
     - deepseq
     - extra
+    - format
     - lens
     - lifted-base
     - lrucache
