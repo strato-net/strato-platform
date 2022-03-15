@@ -44,6 +44,7 @@ library:
   ghc-options: -Wall -O2
   dependencies:
   - aeson
+  - aeson-casing
   - base16-bytestring
   - binary
   - blockapps-data
@@ -60,6 +61,7 @@ library:
   - exceptions
   - extra
   - format
+  - generic-random
   - lens
   - memory
   - merkle-patricia-db
@@ -69,11 +71,13 @@ library:
   - parsec
   - prometheus-client
   - QuickCheck
+  - quickcheck-instances
   - semver-range
   - servant-server
   - solid-vm-model
   - source-tools
   - strato-model
+  - swagger2
   - text
   - time
   - transformers

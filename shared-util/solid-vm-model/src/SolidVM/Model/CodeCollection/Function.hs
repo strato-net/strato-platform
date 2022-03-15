@@ -96,7 +96,7 @@ instance Arbitrary Visibility where arbitrary = GR.genericArbitrary GR.uniform
 instance ToSchema Visibility where
   declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
     & mapped.name ?~ "Visibility of a Function"
-    & mapped.schema.description ?~ "Xabi Function Visibility"
+    & mapped.schema.description ?~ "SolidVM Function Visibility"
     & mapped.schema.example ?~ toJSON ex
     where
       ex :: Visibility

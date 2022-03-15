@@ -15,8 +15,6 @@ import           GHC.Generics
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances ()
 
---import           SolidVM.Solidity.Xabi.Statement
-
 typeAesonOptions::Options
 typeAesonOptions=defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="type"}}
 
