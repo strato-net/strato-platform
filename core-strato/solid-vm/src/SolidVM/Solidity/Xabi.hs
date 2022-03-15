@@ -6,14 +6,21 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 
-module SolidVM.Solidity.Xabi where
+module SolidVM.Solidity.Xabi (
+  XabiF(..),
+  Xabi,
+  XabiKind(..),
+  ModifierF(..),
+  Modifier,
+  UsingF(..),
+  Using
+  ) where
 
 import           Control.Lens                 (mapped, (&), (?~))
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
 import           Data.Aeson.Types
-import qualified Data.HashMap.Strict          as Hash
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as Map
 import           Data.Source
@@ -21,17 +28,16 @@ import           Data.Swagger
 import           Data.Text                    (Text)
 import qualified Generic.Random               as GR
 import           GHC.Generics
-import           Servant.Docs
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
 
-import           BlockApps.Ethereum
-import           Blockchain.Strato.Model.Account
---import           SolidVM.Solidity.Parse.Expression
-import           SolidVM.Solidity.Xabi.Statement
-import qualified SolidVM.Solidity.Xabi.Def  as Xabi
-import qualified SolidVM.Solidity.Xabi.Type as Xabi hiding (Enum)
-import qualified SolidVM.Solidity.Xabi.VarDef  as Xabi
+import           SolidVM.Model.CodeCollection.ConstantDecl
+import           SolidVM.Model.CodeCollection.Event
+import           SolidVM.Model.CodeCollection.Function
+import           SolidVM.Model.CodeCollection.VariableDecl
+import qualified SolidVM.Model.CodeCollection.Def  as SolidVM
+import qualified SolidVM.Model.Type as SVMType
+import qualified SolidVM.Model.CodeCollection.VarDef  as SolidVM
 
 data XabiKind = ContractKind
               | InterfaceKind
@@ -53,7 +59,7 @@ data XabiF a = Xabi
   , xabiConstr    :: Map Text (FuncF a)
   , xabiVars      :: Map Text (VariableDeclF a)
   , xabiConstants :: Map Text (ConstantDeclF a)
-  , xabiTypes     :: Map Text Xabi.Def
+  , xabiTypes     :: Map Text SolidVM.Def
   , xabiModifiers :: Map Text (ModifierF a)
   , xabiEvents    :: Map Text (EventF a)
   , xabiKind      :: XabiKind
@@ -62,160 +68,11 @@ data XabiF a = Xabi
   } deriving (Eq,Show,Generic, Functor)
 
 type Xabi = Positioned XabiF
-{-
-sampleXabi :: Xabi
-sampleXabi = Xabi
-  { xabiFuncs = Map.fromList
-    [ ("get", Func { funcArgs = Map.fromList []
-                   , funcVals = Map.fromList [("#0",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
-                   , funcContents = Just []
-                   , funcStateMutability  = Just View
-                   , funcVisibility = Nothing
-                   , funcConstructorCalls = Map.empty
-                   , funcModifiers = Nothing
-                   })
-    , ("set", Func { funcArgs = Map.fromList [("x",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
-                   , funcVals = Map.fromList []
-                   , funcContents = Just []
-                   , funcStateMutability  = Just Pure
-                   , funcVisibility = Nothing
-                   , funcConstructorCalls = Map.empty
-                   , funcModifiers = Nothing
-                   })
-    ]
-  , xabiConstr = Map.fromList []
-  , xabiConstants = Map.empty
-  , xabiVars = Map.fromList [("storedData",(Xabi.VarType {varTypeAtBytes = 0, varTypePublic = Just False, varTypeConstant = Just True, varTypeInitialValue = Nothing, varTypeType = Xabi.Int {signed = Just False, bytes = Just 32}}, Nothing))]
-  , xabiTypes = Map.fromList [("SimpleStorage", Xabi.Enum {bytes = 0, names = ["SUCCESS", "ERROR"]})]
-  , xabiModifiers = Map.fromList [("onlyOwner", Modifier {modifierArgs = Map.fromList [], modifierSelector="onlyOwner", modifierVals=Map.fromList [], modifierContents = Just "if (msg.sender != owner) throw; _;"})]
-  , xabiEvents = Map.empty
-  , xabiKind = ContractKind
-  , xabiUsing = Map.singleton "SafeMath" (Using "for uint256")
-  }
--}
-xabiEmpty :: XabiF ()
-xabiEmpty = Xabi Map.empty Map.empty Map.empty Map.empty Map.empty Map.empty Map.empty ContractKind Map.empty ()
---------------------------------------------------------------------------------
-
-data StateMutability = Pure | Constant | View | Payable deriving (Eq, Ord, Show, Generic)
-
-tShow :: StateMutability -> Text
-tShow Pure = "pure"
-tShow Constant = "constant"
-tShow View = "view"
-tShow Payable = "payable"
-
-tRead :: Text -> Maybe StateMutability
-tRead "pure" = Just Pure
-tRead "constant" = Just Constant
-tRead "view" = Just View
-tRead "payable" = Just Payable
-tRead _ = Nothing
-
-instance ToJSON StateMutability where
-  toJSON = String . tShow
-
-instance FromJSON StateMutability where
-  parseJSON = withText "StateMutability" $ \t ->
-      case tRead t of
-          Just sm -> pure sm
-          Nothing -> fail $ "invalid StateMutability: " ++ show t
-
-
-instance Arbitrary StateMutability where
-  arbitrary = GR.genericArbitrary GR.uniform
-instance ToSchema StateMutability where
-  declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
-    & mapped.name ?~ "State Mutability"
-    & mapped.schema.description ?~ "Reserved keywords for function state mutability"
-    & mapped.schema.example ?~ toJSON View
-
-data FuncF a = Func
-  { funcArgs :: [(Maybe Text, Xabi.IndexedType)]
-  , funcVals :: [(Maybe Text, Xabi.IndexedType)]
-  , funcStateMutability :: Maybe StateMutability
-
-  -- These Values are only used for parsing and unparsing solidity.
-  -- This data will not be stored in the db and will have no
-  -- relevance when constructing from the db.
-  , funcContents :: Maybe [StatementF a]
-  , funcVisibility :: Maybe Visibility
-  , funcConstructorCalls :: Map String [(ExpressionF a)]
-  , funcModifiers :: Maybe [String]
-  , funcContext :: a
-  } deriving (Eq,Show,Generic, Functor)
-
-instance ToJSON a => ToJSON (FuncF a)
-instance FromJSON a => FromJSON (FuncF a)
-
-type Func = Positioned FuncF
-
-data VariableDeclF a = VariableDecl
-  { varType       :: Xabi.Type
-  , varIsPublic   :: Bool
-  , varInitialVal :: Maybe (ExpressionF a)
-  , varContext    :: a
-  } deriving (Show, Eq, Generic, Functor)
-
-instance ToJSON a => ToJSON (VariableDeclF a)
-instance FromJSON a => FromJSON (VariableDeclF a)
-
-type VariableDecl = Positioned VariableDeclF
-
-data ConstantDeclF a = ConstantDecl
-  { constType       :: Xabi.Type
-  , constIsPublic   :: Bool
-  , constInitialVal :: (ExpressionF a)
-  , constContext    :: a
-  } deriving (Show, Eq, Generic, Functor)
-
-instance ToJSON a => ToJSON (ConstantDeclF a)
-instance FromJSON a => FromJSON (ConstantDeclF a)
-
-type ConstantDecl = Positioned ConstantDeclF
-
-funcPayable :: FuncF a -> Bool
-funcPayable Func{funcStateMutability = Just Payable} = True
-funcPayable _ = False
-
-funcConstant :: FuncF a -> Bool
-funcConstant Func{funcStateMutability = Nothing} = False
-funcConstant Func{funcStateMutability = Just Payable} = False
-funcConstant _ = True
-
--- constant and payable are a deprecated way of specifying state mutability
-fallbackConstantPayable :: Value -> Parser (Maybe StateMutability)
-fallbackConstantPayable = withObject "fallbackConstantPayable" $ \obj ->
-    let constant = Hash.lookup "constant" obj
-        payable = Hash.lookup "payable" obj
-    in case (constant, payable) of
-           (Just (Bool True), Just (Bool True)) -> fail "functions cannot be constant and payable"
-           (Just (Bool True), _) -> pure . Just $ Constant
-           (_, Just (Bool True)) -> pure . Just $ Payable
-           _ -> pure Nothing
-
-data Visibility = Private
-                | Public
-                | Internal
-                | External
-  deriving (Eq,Show,Generic)
-
-instance ToJSON Visibility
-instance FromJSON Visibility
-instance Arbitrary Visibility where arbitrary = GR.genericArbitrary GR.uniform
-instance ToSchema Visibility where
-  declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
-    & mapped.name ?~ "Visibility of a Function"
-    & mapped.schema.description ?~ "Xabi Function Visibility"
-    & mapped.schema.example ?~ toJSON ex
-    where
-      ex :: Visibility
-      ex = Public
 
 data ModifierF a = Modifier
-  { modifierArgs     :: Map Text Xabi.IndexedType
+  { modifierArgs     :: Map Text SolidVM.IndexedType
   , modifierSelector :: Text
-  , modifierVals     :: Map Text Xabi.IndexedType
+  , modifierVals     :: Map Text SolidVM.IndexedType
   , modifierContents :: Maybe Text
   , modifierContext  :: a
   } deriving (Eq,Show,Generic, Functor)
@@ -239,37 +96,12 @@ instance ToSchema Modifier where
     where
       ex :: ModifierF ()
       ex = Modifier
-        { modifierArgs = Map.fromList [("userAddress", Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
+        { modifierArgs = Map.fromList [("userAddress", SolidVM.IndexedType {indexedTypeIndex = 0, indexedTypeType = SVMType.Int {signed = Just False, bytes = Just 32}})]
         , modifierSelector = "0adfe412"
-        , modifierVals = Map.fromList [("#0",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
+        , modifierVals = Map.fromList [("#0",SolidVM.IndexedType {indexedTypeIndex = 0, indexedTypeType = SVMType.Int {signed = Just False, bytes = Just 32}})]
         , modifierContents = Nothing
         , modifierContext = ()
         }
-
-data EventF a = Event
-  { eventAnonymous :: Bool
-  , eventLogs :: [(Text, Xabi.IndexedType)]
-  , eventContext :: a
-  } deriving (Eq,Show,Generic, Functor)
-
-type Event = Positioned EventF
-
-instance ToJSON a => ToJSON (EventF a) where
-  toJSON e = object [
-      "anonymous" .= eventAnonymous e
-    , "logs" .= eventLogs e
-    , "context" .= eventContext e
-    ]
-
-instance FromJSON a => FromJSON (EventF a) where
-  parseJSON (Object o) = Event
-                     <$> (o .: "anonymous")
-                     <*> (o .: "logs")
-                     <*> (o .: "context")
-  parseJSON o = typeMismatch "Xabi.Event: Expected Object" o
-
-instance Arbitrary a => Arbitrary (EventF a) where
-  arbitrary = GR.genericArbitrary GR.uniform
 
 data UsingF a = Using String a deriving (Eq,Show,Generic, Functor)
 
@@ -285,7 +117,7 @@ instance FromJSON a => FromJSON (UsingF a) where
   parseJSON (Object o) = Using
                      <$> (o .: "using")
                      <*> (o .: "context")
-  parseJSON o = typeMismatch "Xabi.Using" o
+  parseJSON o = typeMismatch "SolidVM.Using" o
 
 instance Arbitrary a => Arbitrary (UsingF a) where
   arbitrary = Using <$> arbitrary <*> arbitrary
@@ -297,21 +129,6 @@ instance ToSchema Using where
      & mapped.schema.example ?~ toJSON sampleUsing
      where sampleUsing :: UsingF ()
            sampleUsing = Using "for uint[]" ()
-
-
-data ContractDetailsF a = ContractDetails
-  { contractdetailsBin        :: Text
-  , contractdetailsAccount    :: Maybe Account
-  , contractdetailsBinRuntime :: Text
-  , contractdetailsCodeHash   :: Keccak256
-  , contractdetailsName       :: Text
-  , contractdetailsSrc        :: SourceMap
-  , contractdetailsXabi       :: XabiF a
-  } deriving (Show,Eq,Generic, Functor)
-
-type ContractDetails = Positioned ContractDetailsF
-
-instance ToSample ContractDetails where toSamples _ = noSamples
 
 --------------------------------------------------------------------------------
 

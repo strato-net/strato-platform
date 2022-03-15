@@ -78,37 +78,33 @@ import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.X509CertDB
 import           Blockchain.ExtWord
 import           Blockchain.Output
-import           Blockchain.Strato.Model.Action     (Action)
-import qualified Blockchain.Strato.Model.Action     as Action
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Stream.Action           (Action)
+import qualified Blockchain.Stream.Action           as Action
 import qualified Blockchain.SolidVM.Environment     as Env
 import           Blockchain.SolidVM.Exception
-import           Blockchain.SolidVM.Value
 import           Blockchain.VMContext
 import           Blockchain.VMOptions
 import           Blockchain.DB.StateDB
 
+import qualified SolidVM.Model.CodeCollection as CC
+import qualified SolidVM.Model.Type as SVMType
 import qualified SolidVM.Model.Storable as MS
-import qualified SolidVM.Solidity.Xabi as Xabi
-import qualified SolidVM.Solidity.Xabi.Statement as Xabi
-import qualified SolidVM.Solidity.Xabi.Type as Xabi
-import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
+import           SolidVM.Model.Value
 
 import           UnliftIO
-
-import CodeCollection
 
 data CallInfo = CallInfo
   { currentFunctionName :: String
   , currentAccount      :: Account
-  , currentContract     :: Contract
-  , codeCollection      :: CodeCollection
+  , currentContract     :: CC.Contract
+  , codeCollection      :: CC.CodeCollection
   , collectionHash      :: Keccak256
-  , localVariables      :: Map String (Xabi.Type, Variable)
+  , localVariables      :: Map String (SVMType.Type, Variable)
   , readOnly            :: Bool
   , currentSourcePos    :: Maybe SourcePosition
   } deriving (Show)
@@ -368,7 +364,7 @@ getVariableOfName name = do
   let maybeLocalValue = fmap snd $ M.lookup name vars
 
   let maybeContractFunction :: Maybe Variable
-      maybeContractFunction = fmap (t "constant function" . Constant . SFunction name) $ M.lookup name $ currentContract currentCallInfo^.functions
+      maybeContractFunction = fmap (t "constant function" . Constant . SFunction name) $ M.lookup name $ currentContract currentCallInfo^.CC.functions
 
       maybeBuiltinFunction :: Maybe Variable
       maybeBuiltinFunction = toMaybe (name `elem` ["address", "account", "uint", "int", "bool", "byte", "bytes"
@@ -384,29 +380,29 @@ getVariableOfName name = do
         t "builtin variable" $ Constant $ SBuiltinVariable name
 
       maybeEnum :: Maybe Variable
-      maybeEnum = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.enums)) $
+      maybeEnum = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.CC.enums)) $
         t "enum" $ Constant $ SEnum name
 
       maybeConstant :: Maybe Variable
       maybeConstant = fmap (t "constant constant" . Constant) $ do
         let ctract = currentContract currentCallInfo
-        Xabi.ConstantDecl{..} <- M.lookup name $ ctract ^. constants
+        CC.ConstantDecl{..} <- M.lookup name $ ctract ^. CC.constants
         return $ coerceType ctract constType $ case constInitialVal of
-                                            Xabi.NumberLiteral _ x _ -> SInteger x
+                                            CC.NumberLiteral _ x _ -> SInteger x
                                             x -> todo "constant initial val" x
 
       maybeStructDef :: Maybe Variable
-      maybeStructDef = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.structs)) $
+      maybeStructDef = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.CC.structs)) $
         t "struct def" $ Constant $ SStructDef name
 
       maybeContract :: Maybe Variable
-      maybeContract = toMaybe (name `elem` M.keys (codeCollection currentCallInfo^.contracts)) $
+      maybeContract = toMaybe (name `elem` M.keys (codeCollection currentCallInfo^.CC.contracts)) $
         t "contract" $ Constant $ SContractDef name
 
       maybeStorageItem :: Maybe Variable
       maybeStorageItem =
         -- TODO(tim): This might just be restricted to a field name
-        if T.pack name `elem` M.keys (currentContract currentCallInfo^.storageDefs)
+        if T.pack name `elem` M.keys (currentContract currentCallInfo^.CC.storageDefs)
         then Just . Constant . SReference $ AccountPath
                 (currentAccount currentCallInfo)
                 (MS.singleton $ BC.pack name)
@@ -427,7 +423,7 @@ getVariableOfName name = do
     liftIO $ putStrLn $ " @@@@@@@@@@@@@@@@@@@ available constants: " ++ show (M.keys $ currentContract currentCallInfo^.constants)
     case M.lookup name $ currentContract currentCallInfo^.constants of
       Nothing -> return Nothing
-      Just (Xabi.ConstantDecl _ _ e) -> do
+      Just (CC.ConstantDecl _ _ e) -> do
         let val = constExpToVar e
         return $ Just $ Constant $ val
 -}
@@ -446,10 +442,10 @@ getVariableOfName name = do
       , unknownVariable "getVariableOfName" name
       ]
 
-getTypeOfName' :: String -> CodeCollection -> Typo
-getTypeOfName' s (CodeCollection ccs) =
-  let lookInContract :: Contract -> [Typo]
-      lookInContract (Contract{..}) = catMaybes
+getTypeOfName' :: String -> CC.CodeCollection -> Typo
+getTypeOfName' s (CC.CodeCollection ccs) =
+  let lookInContract :: CC.Contract -> [Typo]
+      lookInContract (CC.Contract{..}) = catMaybes
         [ fmap StructTypo (fmap (\(a,b,_) -> (a,b)) <$> M.lookup s _structs)
         , fmap EnumTypo (fst <$> M.lookup s _enums)
         ]
@@ -465,11 +461,11 @@ getTypeOfName s = getTypeOfName' s . codeCollection <$> getCurrentCallInfo
 
 addCallInfo :: MonadSM m
             => Account
-            -> Contract
+            -> CC.Contract
             -> String
             -> Keccak256
-            -> CodeCollection
-            -> Map String (Xabi.Type, Variable)
+            -> CC.CodeCollection
+            -> Map String (SVMType.Type, Variable)
             -> Bool
             -> m ()
 addCallInfo a c fn hsh cc initialLocalVariables ro = do
@@ -514,7 +510,7 @@ getCurrentCallInfo = do
 getCurrentCallInfoIfExists :: MonadSM m => m (Maybe CallInfo)
 getCurrentCallInfoIfExists = listToMaybe <$> Mod.get (Mod.Proxy @[CallInfo])
 
-getCurrentContract :: MonadSM m => m Contract
+getCurrentContract :: MonadSM m => m CC.Contract
 getCurrentContract = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
@@ -555,38 +551,38 @@ setLocal name val = do
   Mod.put (Mod.Proxy @[CallInfo]) $ info{localVariables=newVariables} : rest
 
 
-getCurrentCodeCollection :: MonadSM m => m (Keccak256, CodeCollection)
+getCurrentCodeCollection :: MonadSM m => m (Keccak256, CC.CodeCollection)
 getCurrentCodeCollection = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
     (currentCallInfo:_) -> return (collectionHash currentCallInfo, codeCollection currentCallInfo)
     _ -> internalError "getCurrentContract called with an empty stack" ()
 
-hintFromType :: MonadSM m => Xabi.Type -> m BasicType
+hintFromType :: MonadSM m => SVMType.Type -> m BasicType
 hintFromType = \case
- Xabi.Address{} -> return TAccount
- Xabi.Account{} -> return TAccount
- Xabi.Bool{} -> return TBool
- Xabi.Bytes{} -> return TString
- Xabi.Int{} -> return TInteger
- Xabi.String{} -> return TString
- Xabi.Label s -> do
+ SVMType.Address{} -> return TAccount
+ SVMType.Account{} -> return TAccount
+ SVMType.Bool{} -> return TBool
+ SVMType.Bytes{} -> return TString
+ SVMType.Int{} -> return TInteger
+ SVMType.String{} -> return TString
+ SVMType.Label s -> do
    t' <- getTypeOfName s
    case t' of
      ContractTypo{} -> return $ TContract s
      EnumTypo{} -> return $ TEnumVal s
      StructTypo fs -> do
-       let upgrade :: MonadSM m => (T.Text, Xabi.FieldType) -> m (B.ByteString , BasicType)
-           upgrade = mapM (hintFromType . Xabi.fieldTypeType) . first encodeUtf8
+       let upgrade :: MonadSM m => (T.Text, CC.FieldType) -> m (B.ByteString , BasicType)
+           upgrade = mapM (hintFromType . CC.fieldTypeType) . first encodeUtf8
        TStruct s <$> mapM upgrade fs
- Xabi.Array{} -> return TComplex
- Xabi.Mapping{} -> return TComplex
+ SVMType.Array{} -> return TComplex
+ SVMType.Mapping{} -> return TComplex
  tt'' -> todo "hintFromType" tt''
 
-getXabiType' :: B.ByteString -> CallInfo -> Maybe Xabi.Type
+getXabiType' :: B.ByteString -> CallInfo -> Maybe SVMType.Type
 getXabiType' field callInfo = M.lookup (T.pack $ BC.unpack field)
-                            . fmap Xabi.varType
-                            . _storageDefs
+                            . fmap CC.varType
+                            . CC._storageDefs
                             . currentContract
                             $ callInfo
 
@@ -599,10 +595,10 @@ getCallInfoForAccount acct = do
     [] -> internalError "account not found in call stack" (acct, stack)
     (callInfo:_) -> return callInfo
 
-getXabiType :: Mod.Modifiable [CallInfo] m => Account -> B.ByteString -> m (Maybe Xabi.Type)
+getXabiType :: Mod.Modifiable [CallInfo] m => Account -> B.ByteString -> m (Maybe SVMType.Type)
 getXabiType acct field = getXabiType' field <$> getCallInfoForAccount acct
 
-getXabiValueType :: MonadSM m => AccountPath -> m Xabi.Type
+getXabiValueType :: MonadSM m => AccountPath -> m SVMType.Type
 getXabiValueType (AccountPath loc path) = do
   ccs' <- codeCollection <$> getCurrentCallInfo
   let field = MS.getField path
@@ -610,34 +606,34 @@ getXabiValueType (AccountPath loc path) = do
   case mType of
     Nothing -> todo "getXabiValueType/unknown storage reference" field
     Just v -> return $ loop ccs' (tail $ MS.toList path) v
- where loop :: CodeCollection -> [MS.StoragePathPiece] -> Xabi.Type -> Xabi.Type
+ where loop :: CC.CodeCollection -> [MS.StoragePathPiece] -> SVMType.Type -> SVMType.Type
        loop _ [] = id
        loop ccs [x] = \case
-         Xabi.Mapping{Xabi.value=v} -> case x of
+         SVMType.Mapping{SVMType.value=v} -> case x of
            MS.MapIndex{} -> v
            _ -> typeError "non map index attribute of mapping" x
-         Xabi.Array{Xabi.entry=v} -> case x of
-           MS.Field "length" -> Xabi.Int{signed=Just True, bytes=Nothing}
+         SVMType.Array{SVMType.entry=v} -> case x of
+           MS.Field "length" -> SVMType.Int{signed=Just True, bytes=Nothing}
            MS.ArrayIndex{} -> v
            _ -> typeError "non-length or array index attribute of array" x
-         Xabi.String{} -> case x of
-           MS.Field "length" -> Xabi.Int{signed=Just True, bytes=Nothing}
+         SVMType.String{} -> case x of
+           MS.Field "length" -> SVMType.Int{signed=Just True, bytes=Nothing}
            _ -> typeError "non-length attribute of string" x
-         Xabi.Label s ->
+         SVMType.Label s ->
            let t' = getTypeOfName' s ccs
             in case (x, t') of
                  (MS.Field n, StructTypo fs) ->
                    let mt'' = lookup (decodeUtf8 n) fs
                     in case mt'' of
-                        Just t'' -> Xabi.fieldTypeType t''
+                        Just t'' -> CC.fieldTypeType t''
                         Nothing -> missingField "field not present in struct definition" $ show (n, fs)
                  (_, StructTypo{}) -> typeError "non field access to struct" x
                  (_, ContractTypo{}) -> todo "getValueType/contract access" t'
                  (_, EnumTypo{}) -> todo "getValueType/enum acess" t'
          t'' -> todo "atomic type does not have value type" t''
        loop ccs (_:rs) = \case
-          Xabi.Mapping{Xabi.value=t'} -> loop ccs rs t'
-          Xabi.Array{Xabi.entry=t'} -> loop ccs rs t'
+          SVMType.Mapping{SVMType.value=t'} -> loop ccs rs t'
+          SVMType.Array{SVMType.entry=t'} -> loop ccs rs t'
           t -> todo "getXabiValueType/loopnext unsupported type" t
 
 getValueType :: MonadSM m => AccountPath -> m BasicType

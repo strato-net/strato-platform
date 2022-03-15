@@ -10,18 +10,32 @@ default-extensions:
 library:
   source-dirs: src/
   dependencies:
+  - aeson
+  - aeson-casing
   - attoparsec
   - base16-bytestring
   - binary
+  - blockapps-data
   - bytestring
+  - containers
+  - cryptonite
   - deepseq
   - ethereum-rlp
   - format
+  - generic-random
   - hashable
+  - lens
+  - QuickCheck
+  - quickcheck-instances
   - scientific
+  - servant-docs
+  - source-tools
   - strato-model
+  - swagger2
   - text
+  - unordered-containers
   - utf8-string
+  - vector
 
 tests:
   storage-test:

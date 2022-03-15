@@ -40,15 +40,15 @@ import Blockchain.Database.MerklePatricia as MP
 import Blockchain.DB.RawStorageDB
 import Blockchain.DB.SolidStorageDB
 import Blockchain.DB.StateDB
-import qualified Blockchain.Strato.Model.Action as Action
+import qualified Blockchain.SolidVM as SVM
+import Blockchain.SolidVM.Exception
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
+import qualified Blockchain.Stream.Action as Action
 import Blockchain.VMContext
-import qualified Blockchain.SolidVM as SVM
-import Blockchain.SolidVM.Exception
 import Executable.EVMFlags() -- for HFlags
 import Blockchain.VMOptions() -- for HFlags
 import SolidVM.Model.Storable as MS

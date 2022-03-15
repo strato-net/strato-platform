@@ -6,7 +6,7 @@
 {-# LANGUAGE TemplateHaskell      #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Blockchain.Strato.Model.Action where
+module Blockchain.Stream.Action where
 
 import           Control.DeepSeq
 import           Control.Lens                 hiding ((.=))
@@ -14,10 +14,12 @@ import           Control.Monad                (liftM2)
 import           Data.Aeson
 import           Data.Aeson.Types
 import qualified Data.ByteString              as B
+import qualified Data.ByteString.Char8        as BC
 import qualified Data.ByteString.Short        as BSS
 import           Data.Foldable
 import           Data.Function                (on)
 import qualified Data.HashMap.Strict          as HM
+import           Data.List
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
 import           Data.Maybe
@@ -38,6 +40,8 @@ import           Blockchain.Strato.Model.ExtendedWord (Word256, bytesToWord256)
 import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Keccak256
+
+import           SolidVM.Model.Storable       hiding (toList)
 
 import qualified Text.Colors                  as CL
 import           Text.Format
@@ -108,6 +112,13 @@ data DataDiff = EVMDiff (Map Word256 Word256)
               | SolidVMDiff (Map B.ByteString B.ByteString)
               deriving (Eq, Show, Generic, NFData)
 
+instance Format DataDiff where
+  format x@(EVMDiff _) = show x
+  format (SolidVMDiff vals) =
+    let formatVal (Left e) = "Error: " ++ show e
+        formatVal (Right v) = format v
+    in "SolidVMDiff [" ++ intercalate ", " (map (\(k, v) -> "(" ++ BC.unpack k ++ ", " ++ v ++ ")") (M.toList $ fmap (formatVal . hexStorageToBasic . HexStorage) vals)) ++ "]"
+
 instance ToJSON DataDiff where
   toJSON (EVMDiff m) = toJSON m
   toJSON (SolidVMDiff m) = toJSON m
@@ -151,7 +162,7 @@ instance Format ActionData where
     ++ "actionDataOrganization: " ++ show _actionDataOrganization ++ "\n"
     ++ "actionDataApplication: " ++ T.unpack _actionDataApplication ++ "\n"
     ++ "actionDataCodeKind: " ++ show _actionDataCodeKind ++ "\n"
-    ++ "actionDataStorageDiffs: " ++ show _actionDataStorageDiffs ++ "\n"
+    ++ "actionDataStorageDiffs: " ++ format _actionDataStorageDiffs ++ "\n"
     ++ "actionDataCallTypes:\n" ++ tab (show _actionDataCallTypes)
   
 
