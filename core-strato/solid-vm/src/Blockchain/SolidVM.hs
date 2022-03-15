@@ -77,17 +77,17 @@ import qualified Blockchain.SolidVM.Environment       as Env
 import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.Metrics
 import           Blockchain.SolidVM.SetGet
+import           Blockchain.SolidVM.SM
 import           Blockchain.SolidVM.TraceTools
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.Action       (Action)
-import qualified Blockchain.Strato.Model.Action       as Action
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Stream.Action             (Action)
+import qualified Blockchain.Stream.Action             as Action
 import           Blockchain.VMContext
 import           Blockchain.VMOptions
-import           Blockchain.SolidVM.SM
 import qualified Text.Colors                          as C
 import           Text.Format
 import           Text.Tools

@@ -6,7 +6,7 @@
 {-# LANGUAGE TemplateHaskell      #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Blockchain.Strato.Model.Action where
+module Blockchain.Stream.Action where
 
 import           Control.DeepSeq
 import           Control.Lens                 hiding ((.=))

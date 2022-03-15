@@ -122,3 +122,4 @@ tests:
       - time
       - unliftio
       - vector
+      - vm-tools

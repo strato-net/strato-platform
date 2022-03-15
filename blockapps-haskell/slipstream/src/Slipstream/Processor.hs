@@ -63,10 +63,10 @@ import Blockchain.Data.DataDefs
 import Blockchain.Data.Json
 import Blockchain.SolidVM.CodeCollectionDB
 import Blockchain.Strato.Model.Account
-import qualified Blockchain.Strato.Model.Action as Action
 import Blockchain.Strato.Model.ChainId
 import qualified Blockchain.Strato.Model.Event            as Action
 import Blockchain.Strato.Model.Keccak256
+import qualified Blockchain.Stream.Action as Action
 import Blockchain.Stream.VMEvent
 
 import Control.Monad.Change.Modify              hiding (modify)

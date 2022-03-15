@@ -18,9 +18,9 @@ import           Blockchain.Database.MerklePatricia (StateRoot (..))
 import           Blockchain.ExtWord
 import           Blockchain.Sequencer.Event         (OutputTx (..))
 import           Blockchain.Strato.Model.Account
-import qualified Blockchain.Strato.Model.Action     as Action
 import           Blockchain.Strato.Model.Class
-import           Blockchain.Strato.Model.Keccak256        hiding (hash)
+import           Blockchain.Strato.Model.Keccak256  hiding (hash)
+import qualified Blockchain.Stream.Action           as Action
 
 import           Text.Format
 

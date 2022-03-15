@@ -78,13 +78,13 @@ import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.X509CertDB
 import           Blockchain.ExtWord
 import           Blockchain.Output
-import           Blockchain.Strato.Model.Action     (Action)
-import qualified Blockchain.Strato.Model.Action     as Action
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Stream.Action           (Action)
+import qualified Blockchain.Stream.Action           as Action
 import qualified Blockchain.SolidVM.Environment     as Env
 import           Blockchain.SolidVM.Exception
 import           Blockchain.VMContext
