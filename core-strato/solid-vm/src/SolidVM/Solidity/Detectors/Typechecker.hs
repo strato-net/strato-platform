@@ -7,7 +7,6 @@ module SolidVM.Solidity.Detectors.Typechecker
   ( detector
   ) where
 
-import           CodeCollection
 import           Control.Applicative ((<|>))
 import           Control.Arrow ((&&&))
 import           Control.Monad.Reader
@@ -24,11 +23,10 @@ import           Data.String     (IsString, fromString)
 import           Data.Text       (Text)
 import qualified Data.Text       as T
 import           Data.Traversable (for)
-import           SolidVM.Solidity.Xabi
-import           SolidVM.Solidity.Xabi.Statement
-import           SolidVM.Solidity.Xabi.Type
-import qualified SolidVM.Solidity.Xabi.Type as Xabi
-import           SolidVM.Solidity.Xabi.VarDef
+import           SolidVM.Model.CodeCollection
+import           SolidVM.Solidity.Detectors.Types
+import           SolidVM.Model.Type (Type)
+import qualified SolidVM.Model.Type as SVMType
 import           Text.Read (readMaybe)
 
 emptyAnnotation :: SourceAnnotation Text
@@ -62,26 +60,26 @@ data TypeF' a = Top { topName :: (S.Set String)
 type Type' = Annotated TypeF'
 
 showType :: Type -> Text
-showType (Int s b) = (if fromMaybe False s then "u" else "")
+showType (SVMType.Int s b) = (if fromMaybe False s then "u" else "")
                   <> "int"
                   <> (maybe "" (T.pack . show) b)
-showType (String _) = "string"
-showType (Bytes _ b) = "bytes"
+showType (SVMType.String _) = "string"
+showType (SVMType.Bytes _ b) = "bytes"
                     <> (maybe "" (T.pack . show) b)
-showType Bool = "bool"
-showType Address = "address"
-showType Account = "account"
-showType (Label s) = "label " <> T.pack s
-showType (Struct _ n) = "struct " <> n
-showType (Enum _ n _) = "enum " <> n
-showType (Array t l) = T.concat
+showType SVMType.Bool = "bool"
+showType SVMType.Address = "address"
+showType SVMType.Account = "account"
+showType (SVMType.Label s) = "label " <> T.pack s
+showType (SVMType.Struct _ n) = "struct " <> n
+showType (SVMType.Enum _ n _) = "enum " <> n
+showType (SVMType.Array t l) = T.concat
                      [ showType t
                      , "["
                      , maybe "" (T.pack . show) l
                      , "]"
                      ]
-showType (Xabi.Contract n) = "contract " <> n
-showType (Mapping _ k v) = "mapping (" <> showType k <> " => " <> showType v <> ")"
+showType (SVMType.Contract n) = "contract " <> n
+showType (SVMType.Mapping _ k v) = "mapping (" <> showType k <> " => " <> showType v <> ")"
 
 showType' :: Type' -> Text
 showType' (Top _ _)  = "var"
@@ -199,34 +197,34 @@ bottom :: a -> TypeF' a
 bottom a = Bottom $ a :| []
 
 intType' :: SourceAnnotation Text -> Type'
-intType' = Static (Int Nothing Nothing)
+intType' = Static (SVMType.Int Nothing Nothing)
 
 stringType' :: SourceAnnotation Text -> Type'
-stringType' = Static (String Nothing)
+stringType' = Static (SVMType.String Nothing)
 
 -- bytesType' :: SourceAnnotation Text -> Type'
--- bytesType' = Static (Bytes Nothing Nothing)
+-- bytesType' = Static (SVMType.Bytes Nothing Nothing)
 
 boolType' :: SourceAnnotation Text -> Type'
-boolType' = Static Bool
+boolType' = Static SVMType.Bool
 
 addressType' :: SourceAnnotation Text -> Type'
-addressType' = Static Address
+addressType' = Static SVMType.Address
 
 accountType' :: SourceAnnotation Text -> Type'
-accountType' = Static Account
+accountType' = Static SVMType.Account
 
 enumType' :: SourceAnnotation Text -> Type'
-enumType' = Static (Enum Nothing "" Nothing)
+enumType' = Static (SVMType.Enum Nothing "" Nothing)
 
 structType' :: SourceAnnotation Text -> Type'
-structType' = Static (Struct Nothing "")
+structType' = Static (SVMType.Struct Nothing "")
 
 contractType' :: SourceAnnotation Text -> Type'
-contractType' = Static (Xabi.Contract "")
+contractType' = Static (SVMType.Contract "")
 
 certType' :: SourceAnnotation Text -> Type'
-certType' x = Static (Mapping Nothing (String Nothing) (String Nothing)) x
+certType' x = Static (SVMType.Mapping Nothing (SVMType.String Nothing) (SVMType.String Nothing)) x
 
 topType' :: SourceAnnotation Text -> Type'
 topType' = Top S.empty
@@ -361,89 +359,89 @@ string' ("":as) = string' as
 string' (a:_) = a
 
 typecheckStatic :: Type -> Type -> Either Text Type
-typecheckStatic (Int s1 b1) (Int s2 b2) =
+typecheckStatic (SVMType.Int s1 b1) (SVMType.Int s2 b2) =
   case (s1, s2) of
     (Just a, Just b) | a /= b -> Left "Mismatched signedness between integer values"
     _ -> case (b1, b2) of
            (Just a, Just b) | a /= b -> Left "Mismatched length between integer values"
-           _ -> Right $ Int (s1 <|> s2) (b1 <|> b2)
-typecheckStatic (String d1) (String d2) =
+           _ -> Right $ SVMType.Int (s1 <|> s2) (b1 <|> b2)
+typecheckStatic (SVMType.String d1) (SVMType.String d2) =
   case (d1, d2) of
     (Just a, Just b) | a /= b -> Left "Mismatched dynamicity between string values"
-    _ -> Right $ String (d1 <|> d2)
-typecheckStatic (Bytes d1 b1) (Bytes d2 b2) =
+    _ -> Right $ SVMType.String (d1 <|> d2)
+typecheckStatic (SVMType.Bytes d1 b1) (SVMType.Bytes d2 b2) =
   case (d1, d2) of
     (Just a, Just b) | a /= b -> Left "Mismatched dynamicity between bytes values"
     _ -> case (b1, b2) of
            (Just a, Just b) | a /= b -> Left "Mismatched length between bytes values"
-           _ -> Right $ Bytes (d1 <|> d2) (b1 <|> b2)
-typecheckStatic Bool Bool = Right Bool
-typecheckStatic Address Address = Right Account
-typecheckStatic Address Account = Right Account
-typecheckStatic Account Address = Right Account
-typecheckStatic Account Account = Right Account
-typecheckStatic (Label a) (Label b) =
+           _ -> Right $ SVMType.Bytes (d1 <|> d2) (b1 <|> b2)
+typecheckStatic SVMType.Bool SVMType.Bool = Right SVMType.Bool
+typecheckStatic SVMType.Address SVMType.Address = Right SVMType.Account
+typecheckStatic SVMType.Address SVMType.Account = Right SVMType.Account
+typecheckStatic SVMType.Account SVMType.Address = Right SVMType.Account
+typecheckStatic SVMType.Account SVMType.Account = Right SVMType.Account
+typecheckStatic (SVMType.Label a) (SVMType.Label b) =
   if a == b || a == "" || b == ""
-    then Right (Label $ string' [a, b])
+    then Right (SVMType.Label $ string' [a, b])
     else Left $ "Type mismatch: labels "
              <> T.pack a
              <> " and "
              <> T.pack b
              <> " do not match."
-typecheckStatic (Label a) b@Struct{} =
-  typecheckStatic (Struct Nothing (T.pack a)) b
-typecheckStatic a@Struct{} (Label b) =
-  typecheckStatic a (Struct Nothing (T.pack b))
-typecheckStatic (Struct b1 t1) (Struct b2 t2) =
+typecheckStatic (SVMType.Label a) b@SVMType.Struct{} =
+  typecheckStatic (SVMType.Struct Nothing (T.pack a)) b
+typecheckStatic a@SVMType.Struct{} (SVMType.Label b) =
+  typecheckStatic a (SVMType.Struct Nothing (T.pack b))
+typecheckStatic (SVMType.Struct b1 t1) (SVMType.Struct b2 t2) =
   case (b1, b2) of
     (Just a, Just b) | a /= b -> Left "Mismatched byte sizes between struct types"
     _ ->
       if t1 == t2 || t1 == "" || t2 == ""
-        then Right $ Struct (b1 <|> b2) (string' [t1, t2])
+        then Right $ SVMType.Struct (b1 <|> b2) (string' [t1, t2])
         else Left $ "Type mismatch between struct values: "
                  <> t1
                  <> " and "
                  <> t2
                  <> " do not match."
-typecheckStatic (Label a) b@Enum{} =
-  typecheckStatic (Enum Nothing (T.pack a) Nothing) b
-typecheckStatic a@Enum{} (Label b) =
-  typecheckStatic a (Enum Nothing (T.pack b) Nothing)
-typecheckStatic (Enum b1 t1 n1) (Enum b2 t2 n2) =
+typecheckStatic (SVMType.Label a) b@SVMType.Enum{} =
+  typecheckStatic (SVMType.Enum Nothing (T.pack a) Nothing) b
+typecheckStatic a@SVMType.Enum{} (SVMType.Label b) =
+  typecheckStatic a (SVMType.Enum Nothing (T.pack b) Nothing)
+typecheckStatic (SVMType.Enum b1 t1 n1) (SVMType.Enum b2 t2 n2) =
   case (b1, b2) of
     (Just a, Just b) | a /= b -> Left "Mismatched byte sizes between enum types"
     _ -> case (n1, n2) of
            (Just a, Just b) | a /= b -> Left "Mismatched names between enum types"
            _ -> if t1 == t2 || t1 == "" || t2 == ""
-                  then Right $ Enum (b1 <|> b2) (string' [t1, t2]) (n1 <|> n2)
+                  then Right $ SVMType.Enum (b1 <|> b2) (string' [t1, t2]) (n1 <|> n2)
                   else Left $ "Type mismatch between enum values: "
                            <> t1
                            <> " and "
                            <> t2
                            <> " do not match."
-typecheckStatic (Array t1 l1) (Array t2 l2) = do
+typecheckStatic (SVMType.Array t1 l1) (SVMType.Array t2 l2) = do
   e <- typecheckStatic t1 t2
   case (l1, l2) of
     (Just a, Just b) | a /= b -> Left "Mismatched length between array values"
-    _ -> Right $ Array e (l1 <|> l2)
-typecheckStatic (Label a) b@Xabi.Contract{} =
-  typecheckStatic (Xabi.Contract (T.pack a)) b
-typecheckStatic a@Xabi.Contract{} (Label b) =
-  typecheckStatic a (Xabi.Contract (T.pack b))
-typecheckStatic (Xabi.Contract a) (Xabi.Contract b) =
+    _ -> Right $ SVMType.Array e (l1 <|> l2)
+typecheckStatic (SVMType.Label a) b@SVMType.Contract{} =
+  typecheckStatic (SVMType.Contract (T.pack a)) b
+typecheckStatic a@SVMType.Contract{} (SVMType.Label b) =
+  typecheckStatic a (SVMType.Contract (T.pack b))
+typecheckStatic (SVMType.Contract a) (SVMType.Contract b) =
   if a == b || a == "" || b == ""
-    then Right (Xabi.Contract $ string' [a, b])
+    then Right (SVMType.Contract $ string' [a, b])
     else Left $ "Type mismatch: contracts "
              <> a
              <> " and "
              <> b
              <> " do not match."
-typecheckStatic (Mapping d1 k1 v1) (Mapping d2 k2 v2) = do
+typecheckStatic (SVMType.Mapping d1 k1 v1) (SVMType.Mapping d2 k2 v2) = do
   k <- typecheckStatic k1 k2
   v <- typecheckStatic v1 v2
   case (d1, d2) of
     (Just a, Just b) | a /= b -> Left "Mismatched dynamicity between mapping values"
-    _ -> Right $ Mapping (d1 <|> d2) k v
+    _ -> Right $ SVMType.Mapping (d1 <|> d2) k v
 typecheckStatic t1 t2 = Left $ "Type mismatch: "
                             <> showType t1
                             <> " and "
@@ -454,9 +452,9 @@ typecheckIndex :: Type' -> Type' -> SSS Type'
 typecheckIndex (Bottom es) (Bottom ess) = pure $ Bottom (es <> ess)
 typecheckIndex (Bottom es) _ = pure $ Bottom es
 typecheckIndex _ (Bottom es) = pure $ Bottom es
-typecheckIndex (Static (Array t _) x) i = i ~> (pure $ intType' x) !> pure (Static t x)
-typecheckIndex (Static (Bytes _ _) x) i = i ~> (pure $ intType' x) !> pure (Static (Bytes Nothing (Just 1)) x)
-typecheckIndex (Static (Mapping _ k v) x) i = do
+typecheckIndex (Static (SVMType.Array t _) x) i = i ~> (pure $ intType' x) !> pure (Static t x)
+typecheckIndex (Static (SVMType.Bytes _ _) x) i = i ~> (pure $ intType' x) !> pure (Static (SVMType.Bytes Nothing (Just 1)) x)
+typecheckIndex (Static (SVMType.Mapping _ k v) x) i = do
   t <- typecheck (Static k x) i
   pure $ case t of
     Bottom es -> Bottom es
@@ -473,20 +471,20 @@ typecheckIndex x y = pure . bottom $
 typecheckMember :: Type' -> Text -> SSS Type'
 typecheckMember (Bottom es) _ = pure $ Bottom es
 typecheckMember (Sum ts'@(t :| _)) n = pickType' (context' t) <$> traverse (flip typecheckMember n) (NE.toList ts')
-typecheckMember (Static (Array _ _) x) "length" = pure $ Static (Int Nothing Nothing) x
-typecheckMember (Static (Array t _) x) "push" = pure $ Function (Static t x) (Product [] x) x
-typecheckMember (Static (Array _ _) x) n = pure . bottom $ ("Unknown member of Array: " <> n) <$ x
-typecheckMember (Static (Bytes _ _) x) "length" = pure $ Static (Int Nothing Nothing) x
-typecheckMember (Static (Label "Util") x) "bytes32ToString" = pure $ Function (Static (Bytes Nothing (Just 32)) x) (Static (String Nothing) x) x
-typecheckMember (Static (Label "Util") x) "b32" = pure $ Function (Static (Bytes Nothing (Just 32)) x) (Static (Bytes Nothing (Just 32)) x) x
-typecheckMember (Static (Label "msg") x) "sender" = pure $ Static Account x
-typecheckMember (Static (Label "tx") x) "origin" = pure $ Static Account x
-typecheckMember (Static (Label "tx") x) "username" = pure $ Static (String Nothing) x
-typecheckMember (Static (Label "tx") x) "organization" = pure $ Static (String Nothing) x
-typecheckMember (Static (Label "tx") x) "group" = pure $ Static (String Nothing) x
-typecheckMember (Static (Label "block") x) "timestamp" = pure $ Static (Int Nothing Nothing) x
-typecheckMember (Static (Label "block") x) "number" = pure $ Static (Int Nothing Nothing) x
-typecheckMember (Static (Label "super") x) method = do
+typecheckMember (Static (SVMType.Array _ _) x) "length" = pure $ Static (SVMType.Int Nothing Nothing) x
+typecheckMember (Static (SVMType.Array t _) x) "push" = pure $ Function (Static t x) (Product [] x) x
+typecheckMember (Static (SVMType.Array _ _) x) n = pure . bottom $ ("Unknown member of SVMType.Array: " <> n) <$ x
+typecheckMember (Static (SVMType.Bytes _ _) x) "length" = pure $ Static (SVMType.Int Nothing Nothing) x
+typecheckMember (Static (SVMType.Label "Util") x) "bytes32ToString" = pure $ Function (Static (SVMType.Bytes Nothing (Just 32)) x) (Static (SVMType.String Nothing) x) x
+typecheckMember (Static (SVMType.Label "Util") x) "b32" = pure $ Function (Static (SVMType.Bytes Nothing (Just 32)) x) (Static (SVMType.Bytes Nothing (Just 32)) x) x
+typecheckMember (Static (SVMType.Label "msg") x) "sender" = pure $ Static SVMType.Account x
+typecheckMember (Static (SVMType.Label "tx") x) "origin" = pure $ Static SVMType.Account x
+typecheckMember (Static (SVMType.Label "tx") x) "username" = pure $ Static (SVMType.String Nothing) x
+typecheckMember (Static (SVMType.Label "tx") x) "organization" = pure $ Static (SVMType.String Nothing) x
+typecheckMember (Static (SVMType.Label "tx") x) "group" = pure $ Static (SVMType.String Nothing) x
+typecheckMember (Static (SVMType.Label "block") x) "timestamp" = pure $ Static (SVMType.Int Nothing Nothing) x
+typecheckMember (Static (SVMType.Label "block") x) "number" = pure $ Static (SVMType.Int Nothing Nothing) x
+typecheckMember (Static (SVMType.Label "super") x) method = do
   ctract <- asks contract
   cc <- asks codeCollection
   let method' = T.unpack method
@@ -500,7 +498,7 @@ typecheckMember (Static (Label "super") x) method = do
           let fArgs = flip Product x $ flip Static x . indexedTypeType . snd <$> funcArgs
               fRets = flip Product x $ flip Static x . indexedTypeType . snd <$> funcVals
            in pure $ Function fArgs fRets x
-typecheckMember (Static e@(Enum _ enum mNames) x) n = do
+typecheckMember (Static e@(SVMType.Enum _ enum mNames) x) n = do
   names <- case mNames of
     Just names -> pure names
     Nothing -> lookupEnum enum
@@ -512,7 +510,7 @@ typecheckMember (Static e@(Enum _ enum mNames) x) n = do
              , " is not an element of "
              , enum
              ]) <$ x
-typecheckMember (Static (Struct _ struct) x) n = do
+typecheckMember (Static (SVMType.Struct _ struct) x) n = do
   names <- M.fromList <$> lookupStruct struct
   pure $ case M.lookup n names of
     Just t -> Static t x
@@ -522,16 +520,16 @@ typecheckMember (Static (Struct _ struct) x) n = do
       , " is not a field of "
       , struct
       ]) <$ x
-typecheckMember (Static (Xabi.Contract c) x) n = lookupContractFunction x c n
-typecheckMember (Static (Label c') x) n = do
+typecheckMember (Static (SVMType.Contract c) x) n = lookupContractFunction x c n
+typecheckMember (Static (SVMType.Label c') x) n = do
   let c = T.pack c'
-  e <- typecheckMember (Static (Enum Nothing c Nothing) x) n
+  e <- typecheckMember (Static (SVMType.Enum Nothing c Nothing) x) n
   case e of
     Bottom _ -> do
-      s <- typecheckMember (Static (Struct Nothing c) x) n
+      s <- typecheckMember (Static (SVMType.Struct Nothing c) x) n
       case s of
         Bottom _ -> do
-          f <- typecheckMember (Static (Xabi.Contract c) x) n
+          f <- typecheckMember (Static (SVMType.Contract c) x) n
           case f of
             Bottom _ -> pure . bottom $ (T.concat
               [ "Missing label: "
@@ -549,10 +547,10 @@ getConstructorType' x l = do
   case M.lookup (T.unpack l) _contracts of
     Nothing -> pure . bottom $ ("Unknown contract: " <> l) <$ x
     Just c -> case _constructor c of
-      Nothing -> pure $ Function (Product [] x) (Static (Xabi.Contract l) x) x
+      Nothing -> pure $ Function (Product [] x) (Static (SVMType.Contract l) x) x
       Just Func{..} ->
         let fArgs = flip Product x $ flip Static x . indexedTypeType . snd <$> funcArgs
-         in pure $ Function fArgs (Static (Xabi.Contract l) x) x
+         in pure $ Function fArgs (Static (SVMType.Contract l) x) x
 
 getTypeErrors :: Type' -> [SourceAnnotation Text]
 getTypeErrors (Bottom ts) = NE.toList ts
@@ -640,7 +638,7 @@ statementsHelper args ss = do
           let cName' = T.pack cName
               constructorArgs = getConstructorType' x cName'
               givenArgs = flip Product x <$> traverse tcExpr exprs
-              givenFunc = (\t-> Function t (Static (Xabi.Contract cName') x) x) <$> givenArgs
+              givenFunc = (\t-> Function t (Static (SVMType.Contract cName') x) x) <$> givenArgs
           constructorArgs <~> givenFunc
         stmts' <- traverse statementHelper ss
         pure $ concat [stmts', cCalls]
@@ -750,25 +748,25 @@ parseCertArgs :: SourceAnnotation Text -> Type'
 parseCertArgs x = stringType' x
 
 getVarType' :: String -> SourceAnnotation Text -> SSS Type'
-getVarType' "this" ctx = pure $ Static Account ctx
+getVarType' "this" ctx = pure $ Static SVMType.Account ctx
 getVarType' s@('u':'i':'n':'t':n) ctx = case n of
-  [] -> pure $ Function (intArgs ctx) (Static (Int (Just False) Nothing) ctx) ctx
+  [] -> pure $ Function (intArgs ctx) (Static (SVMType.Int (Just False) Nothing) ctx) ctx
   _ -> case readMaybe n of
-    Just n' -> pure $ Function (intArgs ctx) (Static (Int (Just False) (Just n')) ctx) ctx
+    Just n' -> pure $ Function (intArgs ctx) (Static (SVMType.Int (Just False) (Just n')) ctx) ctx
     Nothing -> getVarTypeByName' s ctx
 getVarType' s@('i':'n':'t':n) ctx = case n of
-  [] -> pure $ Function (intArgs ctx) (Static (Int (Just True) Nothing) ctx) ctx
+  [] -> pure $ Function (intArgs ctx) (Static (SVMType.Int (Just True) Nothing) ctx) ctx
   _ -> case readMaybe n of
-    Just n' -> pure $ Function (intArgs ctx) (Static (Int (Just True) (Just n')) ctx) ctx
+    Just n' -> pure $ Function (intArgs ctx) (Static (SVMType.Int (Just True) (Just n')) ctx) ctx
     Nothing -> getVarTypeByName' s ctx
-getVarType' "address" ctx =  pure $ Function (addressArgs ctx) (Static Account ctx) ctx
-getVarType' "account" ctx =  pure $ Function (accountArgs ctx) (Static Account ctx) ctx
+getVarType' "address" ctx =  pure $ Function (addressArgs ctx) (Static SVMType.Account ctx) ctx
+getVarType' "account" ctx =  pure $ Function (accountArgs ctx) (Static SVMType.Account ctx) ctx
 getVarType' "string" ctx =  pure $ Function (stringArgs ctx) (stringType' ctx) ctx
 getVarType' "bool" ctx =  pure $ Function (boolArgs ctx) (boolType' ctx) ctx
 getVarType' s@('b':'y':'t':'e':'s':n) ctx = case n of
-  [] -> pure $ Function (byteArgs ctx) (Static (Bytes Nothing Nothing) ctx) ctx
+  [] -> pure $ Function (byteArgs ctx) (Static (SVMType.Bytes Nothing Nothing) ctx) ctx
   _ -> case readMaybe n of
-    Just n' -> pure $ Function (byteArgs ctx) (Static (Bytes Nothing (Just n')) ctx) ctx
+    Just n' -> pure $ Function (byteArgs ctx) (Static (SVMType.Bytes Nothing (Just n')) ctx) ctx
     Nothing -> getVarTypeByName' s ctx
 getVarType' "byte" ctx =  pure $ Function (byteArgs ctx) (intType' ctx) ctx
 getVarType' "push" ctx =  pure $ Function (topType' ctx) (Product [] ctx) ctx
@@ -779,11 +777,11 @@ getVarType' "assert" ctx =  pure $ Function (assertArgs ctx) (Product [] ctx) ct
 getVarType' "registerCert" ctx =  pure $ Function (registerCertArgs ctx) (Product [] ctx) ctx
 getVarType' "getUserCert" ctx =  pure $ Function (getUserCertArgs ctx) (certType' ctx) ctx
 getVarType' "parseCert" ctx =  pure $ Function (parseCertArgs ctx) (certType' ctx) ctx
-getVarType' "Util" ctx = pure $ Static (Label "Util") ctx
-getVarType' "msg" ctx = pure $ Static (Label "msg") ctx
-getVarType' "tx" ctx = pure $ Static (Label "tx") ctx
-getVarType' "block" ctx = pure $ Static (Label "block") ctx
-getVarType' "super" ctx = pure $ Static (Label "super") ctx
+getVarType' "Util" ctx = pure $ Static (SVMType.Label "Util") ctx
+getVarType' "msg" ctx = pure $ Static (SVMType.Label "msg") ctx
+getVarType' "tx" ctx = pure $ Static (SVMType.Label "tx") ctx
+getVarType' "block" ctx = pure $ Static (SVMType.Label "block") ctx
+getVarType' "super" ctx = pure $ Static (SVMType.Label "super") ctx
 getVarType' name ctx = getVarTypeByName' name ctx
   
 getVarTypeByName' :: String -> SourceAnnotation Text -> SSS Type'
@@ -798,15 +796,15 @@ getVarTypeByName' name ctx = do
       c <- asks contract
       let mVarDecl = ((varType &&& const ctx) <$> M.lookup (T.pack name) (_storageDefs c))
                  <|> ((constType &&& const ctx) <$> M.lookup name (_constants c))
-                 <|> (const (Enum Nothing (T.pack name) Nothing, ctx) <$> M.lookup name (_enums c))
-                 <|> (const (Struct Nothing (T.pack name), ctx) <$> M.lookup name (_structs c))
+                 <|> (const (SVMType.Enum Nothing (T.pack name) Nothing, ctx) <$> M.lookup name (_enums c))
+                 <|> (const (SVMType.Struct Nothing (T.pack name), ctx) <$> M.lookup name (_structs c))
       case mVarDecl of
-        Just (e@(Enum{}), ctx') -> pure . Sum $
+        Just (e@(SVMType.Enum{}), ctx') -> pure . Sum $
           (Static e ctx') :|
           [ Function (Static e ctx') (Static e ctx') ctx'
           , Function (intType' ctx') (Static e ctx') ctx'
           ]
-        Just (s@(Struct _ struct), ctx') -> do
+        Just (s@(SVMType.Struct _ struct), ctx') -> do
           fields <- fmap snd <$> lookupStruct struct
           let fArgs = flip Product ctx $ flip Static ctx <$> fields
           pure . Sum $
@@ -823,10 +821,10 @@ getVarTypeByName' name ctx = do
             cc <- asks codeCollection
             pure $ case M.lookup name $ _contracts cc of
               Just _->
-                let ctrct = Static (Xabi.Contract $ T.pack name) ctx
-                    lbl = Static (Label name) ctx
+                let ctrct = Static (SVMType.Contract $ T.pack name) ctx
+                    lbl = Static (SVMType.Label name) ctx
                  in Sum $ ctrct :|
-                        [Function (Sum (Static Account ctx :| [ctrct, lbl]))
+                        [Function (Sum (Static SVMType.Account ctx :| [ctrct, lbl]))
                            ctrct
                            ctx]
               Nothing -> bottom $ ("Unknown variable: " <> T.pack name) <$ ctx
@@ -967,10 +965,10 @@ tcExpr (PlusPlus x a) =
   intType' x ~> tcExpr a
 tcExpr (MinusMinus x a) = do
   intType' x ~> tcExpr a
-tcExpr (NewExpression x b@Bytes{}) = pure $ Static b x
-tcExpr (NewExpression x a@Array{}) = pure $ Static a x
-tcExpr (NewExpression x (Label l)) = getConstructorType' x $ T.pack l
-tcExpr (NewExpression x (Xabi.Contract l)) = getConstructorType' x l
+tcExpr (NewExpression x b@SVMType.Bytes{}) = pure $ Static b x
+tcExpr (NewExpression x a@SVMType.Array{}) = pure $ Static a x
+tcExpr (NewExpression x (SVMType.Label l)) = getConstructorType' x $ T.pack l
+tcExpr (NewExpression x (SVMType.Contract l)) = getConstructorType' x l
 tcExpr (NewExpression x t) = pure . bottom $ ("Cannot use keyword 'new' in conjuction with type " <> showType t) <$ x
 tcExpr (IndexAccess _ a (Just b)) = do
   a' <- tcExpr a
@@ -1002,7 +1000,7 @@ tcExpr (TupleExpression x es) =
 tcExpr (ArrayExpression x es) = do
   t' <- foldr (<~>) (pure $ topType' x) $ tcExpr <$> es
   pure $ case t' of
-    (Static t _) ->Static (Array t Nothing) x
+    (Static t _) ->Static (SVMType.Array t Nothing) x
     _ -> t'
 tcExpr (Variable x name) = getVarType' name x
 tcExpr (ObjectLiteral x _) = pure $ structType' x

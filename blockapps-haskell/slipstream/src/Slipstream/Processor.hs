@@ -52,7 +52,6 @@ import qualified BlockApps.Solidity.Contract as OLD
 import BlockApps.Solidity.Parse.Parser
 import BlockApps.Solidity.Value
 import qualified BlockApps.Solidity.Xabi     as OLD
-import SolidVM.Solidity.Xabi
 import BlockApps.XAbiConverter
 import qualified BlockApps.SolidityVarReader as SVR
 import qualified BlockApps.SolidVMStorageDecoder as SolidVM
@@ -64,13 +63,12 @@ import Blockchain.Data.DataDefs
 import Blockchain.Data.Json
 import Blockchain.SolidVM.CodeCollectionDB
 import Blockchain.Strato.Model.Account
-import qualified Blockchain.Strato.Model.Action as Action
 import Blockchain.Strato.Model.ChainId
 import qualified Blockchain.Strato.Model.Event            as Action
 import Blockchain.Strato.Model.Keccak256
+import qualified Blockchain.Stream.Action as Action
 import Blockchain.Stream.VMEvent
 
-import CodeCollection hiding (contractName)
 import Control.Monad.Change.Modify              hiding (modify)
 import Control.Monad.Composable.BlocSQL
 import Control.Monad.Composable.SQL
@@ -88,6 +86,11 @@ import Slipstream.Metrics
 import Slipstream.OutputData
 import Slipstream.XabiContract
 import Slipstream.Options
+
+import SolidVM.CodeCollectionTools
+import SolidVM.Model.CodeCollection hiding (contractName)
+
+import Text.Format
 
 instance ( (Keccak256 `Alters` SourceMap) m
          , MonadLogger m
@@ -421,7 +424,7 @@ getCodeCollection f cp ccString = do
 
   case cp of
     SolidVMCode _ _ ->
-      case compileSource $ Map.fromList initList of
+      case fmap resolveLabels $ compileSource $ Map.fromList initList of
         Left e -> error $ "failed parse: "  ++ show e --return $ CodeCollection Map.empty
         Right v -> return v
     EVMCode _ ->
@@ -512,7 +515,7 @@ processTheMessages env sqlEnv conn g messages = do
       mapM_ recordAction actions
       recordCombinedAction row
       $logInfoS "processTheMessages" $ "Combined Action = " <> formatAction row
-      $logDebugLS "the diff is " $ actionStorage row
+      $logDebugS "processTheMessages" $ T.pack $ "the diff is " ++ format (actionStorage row)
 
       case actionStorage row of
         Action.EVMDiff{} -> evmInsertsF g row actions acct

@@ -40,15 +40,15 @@ import Blockchain.Database.MerklePatricia as MP
 import Blockchain.DB.RawStorageDB
 import Blockchain.DB.SolidStorageDB
 import Blockchain.DB.StateDB
-import qualified Blockchain.Strato.Model.Action as Action
+import qualified Blockchain.SolidVM as SVM
+import Blockchain.SolidVM.Exception
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
+import qualified Blockchain.Stream.Action as Action
 import Blockchain.VMContext
-import qualified Blockchain.SolidVM as SVM
-import Blockchain.SolidVM.Exception
 import Executable.EVMFlags() -- for HFlags
 import Blockchain.VMOptions() -- for HFlags
 import SolidVM.Model.Storable as MS
@@ -1747,6 +1747,30 @@ contract qq {
   }
 }|]
     getFields ["x"] `shouldReturn` [BInteger 343]
+
+  it "can get an SContractItem value from another contract and compare the value via this.variableName" . runTest $ do
+    runBS [r|
+contract string_test {
+  string v;
+  constructor() {
+    v = "test string";
+  }
+  function getTrueAndThisDotV() returns (bool, string) {
+    return (true, this.v);
+  }
+}
+contract qq {
+  bool test;
+  constructor(){ 
+    test = it_getsTrueAndThisDotV();
+  }
+  function it_getsTrueAndThisDotV() external returns (bool) { // fails
+    string_test y = new string_test();
+    (bool b, string v) = y.getTrueAndThisDotV();
+    return b && v == "test string" && (false == (v != "test string"));
+  }
+}|] 
+    getFields ["test"] `shouldReturn` [BBool True]
 
   it "can initialize from constants" . runTest $ do
     runBS [r|

@@ -25,9 +25,9 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Indexer.Model    (IndexEvent (..))
 import           Blockchain.Strato.Model.Account
-import           Blockchain.Strato.Model.Action     (Action)
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.StateDiff
+import           Blockchain.Stream.Action           (Action)
 import qualified Data.DList                         as DL
 import           Data.Map                           (Map)
 

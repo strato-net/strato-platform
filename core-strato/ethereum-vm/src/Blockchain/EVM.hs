@@ -51,7 +51,6 @@ import           UnliftIO
 
 
 
-import qualified Blockchain.Strato.Model.Action   as Action
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockSummary
@@ -69,6 +68,7 @@ import           Blockchain.DB.StateDB
 import           Blockchain.ExtWord
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Keccak256
+import qualified Blockchain.Stream.Action           as Action
 import           Blockchain.Util
 import           Blockchain.EVM.Code
 import           Blockchain.EVM.Environment

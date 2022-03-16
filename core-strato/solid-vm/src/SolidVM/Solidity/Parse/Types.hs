@@ -14,24 +14,24 @@ import           SolidVM.Solidity.Parse.Expression
 import           SolidVM.Solidity.Parse.Lexer
 import           SolidVM.Solidity.Parse.ParserTypes
 
-import qualified SolidVM.Solidity.Xabi.Type         as Xabitype
+import qualified SolidVM.Model.Type         as SVMType
 
 -- | A type expression is either a composite type (arrays and mappings) or
 -- a simple type (builtins and user-defined names)
-simpleTypeExpression :: SolidityParser Xabitype.Type
+simpleTypeExpression :: SolidityParser SVMType.Type
 simpleTypeExpression = try arrayType <|> simpleType <|> mappingType
 
 -- | Parses builtins and user-defined names
-simpleType :: SolidityParser Xabitype.Type
+simpleType :: SolidityParser SVMType.Type
 simpleType =
-  simple "bool" Xabitype.Bool <|>
-  simple "address" Xabitype.Address <|>
-  simple "account" Xabitype.Account <|>
-  simple "string" (Xabitype.String $ Just True) <|>
+  simple "bool" SVMType.Bool <|>
+  simple "address" SVMType.Address <|>
+  simple "account" SVMType.Account <|>
+  simple "string" (SVMType.String $ Just True) <|>
   bytes' <|>
-  intSuffixed "uint"  (Xabitype.Int (Just False)) <|>
-  intSuffixed "int"  (Xabitype.Int (Just True)) <|>
-  Xabitype.Label <$>
+  intSuffixed "uint"  (SVMType.Int (Just False)) <|>
+  intSuffixed "int"  (SVMType.Int (Just True)) <|>
+  SVMType.Label <$>
     choice [
       identifier,
       concat <$> sequence [identifier, dot, identifier]
@@ -41,8 +41,8 @@ simpleType =
       reserved name
       return nameType
     bytes' = -- To avoid shadowing another "bytes"
-      simple "byte" (Xabitype.Bytes Nothing $ Just 1) <|>
-      simple "bytes" (Xabitype.Bytes (Just True) Nothing) <|>
+      simple "byte" (SVMType.Bytes Nothing $ Just 1) <|>
+      simple "bytes" (SVMType.Bytes (Just True) Nothing) <|>
       lexeme (try $ do
          let base = "bytes"
          chars <- many1 alphaNum
@@ -57,7 +57,7 @@ simpleType =
                 return $ Just number
               _ ->  fail "invalid bytes size"
 
-         return $ Xabitype.Bytes Nothing size
+         return $ SVMType.Bytes Nothing size
       )
     intSuffixed base baseType = lexeme $ try $ do
       chars <- many1 alphaNum
@@ -78,18 +78,18 @@ simpleType =
 -- array length so long as they only reference explicit numbers.  Note that
 -- for nested arrays, we have 'T[n][m] = (T[n])[m]' rather than '(T[m])[n]'
 -- as in C.
-arrayType :: SolidityParser Xabitype.Type
+arrayType :: SolidityParser SVMType.Type
 arrayType = do
   baseElemType <- simpleType <|> mappingType
   sizeList <- many1 $ brackets $ optionMaybe intExpr
   return $ combine baseElemType sizeList
-    where combine :: Xabitype.Type -> [Maybe Word] -> Xabitype.Type
+    where combine :: SVMType.Type -> [Maybe Word] -> SVMType.Type
           combine t [] = t
-          combine t (l:ls) = combine (Xabitype.Array t l) ls
+          combine t (l:ls) = combine (SVMType.Array t l) ls
 
 -- | Parses mapping types, ignoring possible restrictions on what the
 -- domain and codomain can be.
-mappingType :: SolidityParser Xabitype.Type
+mappingType :: SolidityParser SVMType.Type
 mappingType = do
   reserved "mapping"
   (mapDomT, mapCodT) <- parens $ do
@@ -97,4 +97,4 @@ mappingType = do
     reservedOp "=>"
     c <- simpleTypeExpression
     return (d, c)
-  return $ Xabitype.Mapping (Just True) mapDomT mapCodT
+  return $ SVMType.Mapping (Just True) mapDomT mapCodT

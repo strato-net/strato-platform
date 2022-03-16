@@ -34,7 +34,6 @@ import           Numeric
 
 import           Blockchain.Database.MerklePatricia
 
-import qualified Blockchain.Strato.Model.Action               as A
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.Block
 import           Blockchain.Data.ChainInfo
@@ -50,6 +49,7 @@ import           Blockchain.DB.StorageDB
 import           Blockchain.ExtWord
 import           Blockchain.Output
 import           Blockchain.Strato.Model.Keccak256
+import qualified Blockchain.Stream.Action             as A
 import           Blockchain.Stream.VMEvent
 
 import           Blockchain.Strato.StateDiff          hiding (StateDiff (chainId, blockHash, stateRoot))

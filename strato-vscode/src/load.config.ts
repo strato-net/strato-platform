@@ -1,5 +1,6 @@
 import * as yaml from 'js-yaml';
 import * as fs from 'fs';
+import * as path from 'path';
 import * as vscode from 'vscode';
 
 export default function getConfig(): any {
@@ -15,8 +16,10 @@ export default function getConfig(): any {
     // eslint-disable-next-line import/no-mutable-exports
     const pathName = 
       process.env.SERVER
-        ? `${folder}/${cfgPath}/${serverName}.${filename}`
-        : `${folder}${cfgPath ? `/${cfgPath}` : ''}/${filename}`
-    const config = yaml.load(fs.readFileSync(pathName, 'utf-8'));
+        ? path.join(folder, cfgPath, serverName, filename)
+        : cfgPath
+        ? path.join(folder, cfgPath, filename)
+        : path.join(folder, filename);
+    const config = yaml.load(fs.readFileSync(path.resolve(pathName).replace('C:\\c:\\','C:\\').replace('C:\\C:\\','C:\\'), 'utf-8'));
     return config
 }

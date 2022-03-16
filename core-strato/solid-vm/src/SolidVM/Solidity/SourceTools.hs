@@ -5,7 +5,6 @@
 module SolidVM.Solidity.SourceTools where
 
 import           Blockchain.SolidVM.CodeCollectionDB
-import           CodeCollection
 import           Control.Monad.IO.Class (liftIO)
 import qualified Data.Aeson as A
 import qualified Data.Map.Strict as M
@@ -14,6 +13,7 @@ import           Data.Text (Text)
 import           Debugger
 import           GHC.Generics
 import           Servant
+import           SolidVM.Model.CodeCollection
 import           SolidVM.Solidity.Detectors
 import           SolidVM.Solidity.Fuzzer
 

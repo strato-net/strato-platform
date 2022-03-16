@@ -5,10 +5,12 @@
 module Blockchain.SolidVM.Builtins where
 import           Blockchain.SolidVM.SetGet
 import           Blockchain.SolidVM.SM
-import           Blockchain.SolidVM.Value
 import           Blockchain.VM.SolidException
 import qualified SolidVM.Model.Storable as MS
+import           SolidVM.Model.Value
+
 import           Data.Vector as V
+
 
 -- Pushes a new value to an array and returns the length of the new array
 push :: MonadSM m => Value -> Maybe Variable -> ValList -> m Variable
