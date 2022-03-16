@@ -21,7 +21,7 @@ intExpr = buildExpressionParser intTable intTerm
 
 -- | Parses integers and parenthesized expressions
 intTerm :: (Integral a) => SolidityParser a
-intTerm =  parens intTerm <|> fmap fromIntegral natural
+intTerm =  parens intTerm <|> fmap fromIntegral integer
 
 -- | All the operations, with their associativities and corresponding
 -- Haskell operations

@@ -24,15 +24,14 @@ import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256 (hash)
-import CodeCollection hiding (contractName, contracts)
 import Slipstream.Events
 import Slipstream.Globals
 import Slipstream.GlobalsColdStorage (fakeHandle)
 import Slipstream.OutputData
 import Slipstream.SolidityValue
 
-import SolidVM.Solidity.Xabi                    (VariableDeclF(..))
-import qualified SolidVM.Solidity.Xabi.Type               as Xabi
+import SolidVM.Model.CodeCollection hiding (contractName, contracts)
+import qualified SolidVM.Model.Type as SVMType
 
 addr :: Address -> V.Value
 addr = V.SimpleValue . V.ValueAccount . unspecifiedChain
@@ -90,26 +89,25 @@ spec = do
                   ("number", V.SimpleValue $ V.valueUInt 18199984780605),
                   ("hash", V.SimpleValue $ V.ValueString "Owner_hash_181999847806006")]]
             }, createDummyContract [
-                  ("owners", Xabi.Array (Xabi.Int Nothing Nothing) Nothing)
+                  ("owners", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                   ])]
 
       g <- newGlobals fakeHandle
       [vehicleCreate, vehicleInsert] <- runLoggingT . runConduit $ createInserts g [] input .| sinkList
       
       vehicleCreate `shouldBe`
-          [r|CREATE TABLE IF NOT EXISTS "Vehicle" (account text,
+          [r|CREATE TABLE IF NOT EXISTS "Vehicle" (record_id text,
     address text,
     "chainId" text,
     block_hash text,
     block_timestamp text,
     block_number text,
     transaction_hash text,
-    transaction_sender text,
-  CONSTRAINT "Vehicle_pkey"
-  PRIMARY KEY (address, "chainId"), UNIQUE (account) );|]
+    transaction_sender text
+  PRIMARY KEY (record_id) );|]
 
       vehicleInsert `shouldBe`
-          [r|INSERT INTO "Vehicle" ("account",
+          [r|INSERT INTO "Vehicle" ("record_id",
     "address",
     "chainId",
     "block_hash",
@@ -125,8 +123,8 @@ spec = do
     '123',
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
     '0000000000000000000000000000000000000add')
-  ON CONFLICT (account) DO UPDATE SET
-    account = excluded.account,
+  ON CONFLICT (record_id) DO UPDATE SET
+    record_id = excluded.record_id,
     address = excluded.address,
     "chainId" = excluded."chainId",
     block_hash = excluded.block_hash,
@@ -156,7 +154,7 @@ spec = do
                   ("number", V.SimpleValue $ V.valueUInt 18199984780605),
                   ("hash", V.SimpleValue $ V.ValueString "Owner_hash_181999847806006")]]
             }, createDummyContract [
-                  ("owners", Xabi.Array (Xabi.Int Nothing Nothing) Nothing)
+                  ("owners", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                   ])]
       g <- newGlobals fakeHandle
       runLoggingT $ setHistoryTable g (HistoryTableName "" "" "Vehicle2") True
@@ -166,19 +164,18 @@ spec = do
         <- runLoggingT . runConduit $ createInserts g hl input .| sinkList
 
       vehicleCreate `shouldBe`
-          [r|CREATE TABLE IF NOT EXISTS "Vehicle2" (account text,
+          [r|CREATE TABLE IF NOT EXISTS "Vehicle2" (record_id text,
     address text,
     "chainId" text,
     block_hash text,
     block_timestamp text,
     block_number text,
     transaction_hash text,
-    transaction_sender text,
-  CONSTRAINT "Vehicle2_pkey"
-  PRIMARY KEY (address, "chainId"), UNIQUE (account) );|]
+    transaction_sender text
+  PRIMARY KEY (record_id) );|]
 
       historyCreate `shouldBe`
-          [r|CREATE TABLE IF NOT EXISTS "history@Vehicle2" (account text,
+          [r|CREATE TABLE IF NOT EXISTS "history@Vehicle2" (record_id text,
     address text NOT NULL,
     "chainId" text NOT NULL,
     block_hash text NOT NULL,
@@ -194,7 +191,7 @@ spec = do
           [r|ALTER TABLE "history@Vehicle2" ADD PRIMARY KEY USING INDEX "index_history@Vehicle2";|]
 
       vehicleInsert `shouldBe`
-          [r|INSERT INTO "Vehicle2" ("account",
+          [r|INSERT INTO "Vehicle2" ("record_id",
     "address",
     "chainId",
     "block_hash",
@@ -210,8 +207,8 @@ spec = do
     '123',
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
     '0000000000000000000000000000000000000add')
-  ON CONFLICT (account) DO UPDATE SET
-    account = excluded.account,
+  ON CONFLICT (record_id) DO UPDATE SET
+    record_id = excluded.record_id,
     address = excluded.address,
     "chainId" = excluded."chainId",
     block_hash = excluded.block_hash,
@@ -221,7 +218,7 @@ spec = do
     transaction_sender = excluded.transaction_sender;|]
 
       historyInsert `shouldBe`
-          [r|INSERT INTO "history@Vehicle2" ("account",
+          [r|INSERT INTO "history@Vehicle2" ("record_id",
     "address",
     "chainId",
     "block_hash",
@@ -259,7 +256,7 @@ spec = do
                   ("number\"", V.SimpleValue $ V.valueUInt 18199984780605),
                   ("h'a\"'sh", V.SimpleValue $ V.ValueString "''Owner_hash_181999847806006")]]
             }, createDummyContract [
-                       ("\"owners\"", Xabi.Array (Xabi.Struct Nothing "") Nothing)
+                       ("\"owners\"", SVMType.Array (SVMType.Struct Nothing "") Nothing)
                        ])]
 
       g <- newGlobals fakeHandle
@@ -267,19 +264,18 @@ spec = do
           runLoggingT . runConduit $ createInserts g [] input .| sinkList
 
       vehicleCreate `shouldBe`
-          [r|CREATE TABLE IF NOT EXISTS "\"Vehicle''''" (account text,
+          [r|CREATE TABLE IF NOT EXISTS "\"Vehicle''''" (record_id text,
     address text,
     "chainId" text,
     block_hash text,
     block_timestamp text,
     block_number text,
     transaction_hash text,
-    transaction_sender text,
-  CONSTRAINT "\"Vehicle''''_pkey"
-  PRIMARY KEY (address, "chainId"), UNIQUE (account) );|]
+    transaction_sender text
+  PRIMARY KEY (record_id) );|]
 
       vehicleInsert `shouldBe`
-          [r|INSERT INTO "\"Vehicle''''" ("account",
+          [r|INSERT INTO "\"Vehicle''''" ("record_id",
     "address",
     "chainId",
     "block_hash",
@@ -295,8 +291,8 @@ spec = do
     '123',
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
     '0000000000000000000000000000000000000add')
-  ON CONFLICT (account) DO UPDATE SET
-    account = excluded.account,
+  ON CONFLICT (record_id) DO UPDATE SET
+    record_id = excluded.record_id,
     address = excluded.address,
     "chainId" = excluded."chainId",
     block_hash = excluded.block_hash,
@@ -339,22 +335,22 @@ spec = do
                 ])
             ]
           }, createDummyContract [
-                     ("addr", Xabi.Address)
-                   , ("boolean", Xabi.Bool)
-                   , ("contract", Xabi.Contract "")
-                   , ("number", Xabi.Int Nothing Nothing)
-                   , ("str", Xabi.Bytes Nothing Nothing)
-                   , ("enum_val", Xabi.Enum Nothing "" Nothing)
-                   , ("array_nums", Xabi.Array (Xabi.Int Nothing Nothing) Nothing)
-                   , ("strukt", Xabi.Struct Nothing "")
-                   , ("set", Xabi.Mapping Nothing (Xabi.Int Nothing Nothing) (Xabi.Bool))
+                     ("addr", SVMType.Address)
+                   , ("boolean", SVMType.Bool)
+                   , ("contract", SVMType.Contract "")
+                   , ("number", SVMType.Int Nothing Nothing)
+                   , ("str", SVMType.Bytes Nothing Nothing)
+                   , ("enum_val", SVMType.Enum Nothing "" Nothing)
+                   , ("array_nums", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
+                   , ("strukt", SVMType.Struct Nothing "")
+                   , ("set", SVMType.Mapping Nothing (SVMType.Int Nothing Nothing) (SVMType.Bool))
                    ])]
 
     g <- newGlobals fakeHandle
     [swissArmyCreate, swissArmyInsert] <-
         runLoggingT . runConduit $ createInserts g [] input .| sinkList
 
-    swissArmyCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "MyOrg-MyApp-SwissArmy" (account text,
+    swissArmyCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "MyOrg-MyApp-SwissArmy" (record_id text,
     address text,
     "chainId" text,
     block_hash text,
@@ -368,11 +364,10 @@ spec = do
     "enum_val" text,
     "number" decimal,
     "str" text,
-    "strukt" jsonb,
-  CONSTRAINT "MyOrg-MyApp-SwissArmy_pkey"
-  PRIMARY KEY (address, "chainId"), UNIQUE (account) );|]
+    "strukt" jsonb
+  PRIMARY KEY (record_id) );|]
 
-    swissArmyInsert `shouldBe` [r|INSERT INTO "MyOrg-MyApp-SwissArmy" ("account",
+    swissArmyInsert `shouldBe` [r|INSERT INTO "MyOrg-MyApp-SwissArmy" ("record_id",
     "address",
     "chainId",
     "block_hash",
@@ -402,8 +397,8 @@ spec = do
     '77714314',
     'Hello, World!',
     '[["first_field","887"],["second_field","CLOROX DISINFECTING WIPES"]]')
-  ON CONFLICT (account) DO UPDATE SET
-    account = excluded.account,
+  ON CONFLICT (record_id) DO UPDATE SET
+    record_id = excluded.record_id,
     address = excluded.address,
     "chainId" = excluded."chainId",
     block_hash = excluded.block_hash,
@@ -436,7 +431,7 @@ spec = do
           contractData = M.singleton "array_nums" . V.ValueArrayDynamic
                        . I.singleton 1 $ V.ValueArraySentinel 1
           }, createDummyContract [
-                     ("array_nums", Xabi.Array (Xabi.Int Nothing Nothing) Nothing)
+                     ("array_nums", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                      ])]
     g <- newGlobals fakeHandle
 
@@ -472,11 +467,11 @@ spec = do
                     },
                  createDummyContract 
                  [
-                   ("isIterable", Xabi.Bool),
-                   ("keyMap", Xabi.Mapping Nothing (Xabi.Bytes Nothing Nothing)
-                              (Xabi.Int Nothing Nothing)),
-                   ("owner", Xabi.Account),
-                   ("values", Xabi.Array (Xabi.Int Nothing Nothing) Nothing)
+                   ("isIterable", SVMType.Bool),
+                   ("keyMap", SVMType.Mapping Nothing (SVMType.Bytes Nothing Nothing)
+                              (SVMType.Int Nothing Nothing)),
+                   ("owner", SVMType.Account),
+                   ("values", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                  ]
                 )
     g <- newGlobals fakeHandle
@@ -519,22 +514,22 @@ spec = do
                 ])
             ]
           }, createDummyContract [
-               ("addr", Xabi.Address)
-             , ("boolean", Xabi.Bool)
-             , ("contract", Xabi.Contract "")
-             , ("number", Xabi.Int Nothing Nothing)
-             , ("str", Xabi.String Nothing)
-             , ("enum_val", Xabi.Enum Nothing "" Nothing)
-             , ("array_nums", Xabi.Array (Xabi.Int Nothing Nothing) Nothing)
-             , ("strukt", Xabi.Struct Nothing "")
-             , ("set", Xabi.Mapping Nothing (Xabi.Int Nothing Nothing) (Xabi.Bool))
+               ("addr", SVMType.Address)
+             , ("boolean", SVMType.Bool)
+             , ("contract", SVMType.Contract "")
+             , ("number", SVMType.Int Nothing Nothing)
+             , ("str", SVMType.String Nothing)
+             , ("enum_val", SVMType.Enum Nothing "" Nothing)
+             , ("array_nums", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
+             , ("strukt", SVMType.Struct Nothing "")
+             , ("set", SVMType.Mapping Nothing (SVMType.Int Nothing Nothing) (SVMType.Bool))
             ])]
 
     g <- newGlobals fakeHandle
     [swissArmyCreate, swissArmyInsert] <-
         runLoggingT . runConduit $ createInserts g [] input .| sinkList
 
-    swissArmyCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy" (account text,
+    swissArmyCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy" (record_id text,
     address text,
     "chainId" text,
     block_hash text,
@@ -548,11 +543,10 @@ spec = do
     "enum_val" text,
     "number" decimal,
     "str" text,
-    "strukt" jsonb,
-  CONSTRAINT "SwissArmy_pkey"
-  PRIMARY KEY (address, "chainId"), UNIQUE (account) );|]
+    "strukt" jsonb
+  PRIMARY KEY (record_id) );|]
 
-    swissArmyInsert `shouldBe` [r|INSERT INTO "SwissArmy" ("account",
+    swissArmyInsert `shouldBe` [r|INSERT INTO "SwissArmy" ("record_id",
     "address",
     "chainId",
     "block_hash",
@@ -582,8 +576,8 @@ spec = do
     '77714314',
     'Hello, World!',
     '[["first_field","887"],["second_field","CLOROX DISINFECTING WIPES"]]')
-  ON CONFLICT (account) DO UPDATE SET
-    account = excluded.account,
+  ON CONFLICT (record_id) DO UPDATE SET
+    record_id = excluded.record_id,
     address = excluded.address,
     "chainId" = excluded."chainId",
     block_hash = excluded.block_hash,
@@ -602,7 +596,7 @@ spec = do
 
 
 
-createDummyContract :: [(Text, Xabi.Type)] -> Contract
+createDummyContract :: [(Text, SVMType.Type)] -> Contract
 createDummyContract v = 
   let createVariableDecl t = VariableDecl{
         varType=t,

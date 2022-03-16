@@ -6,7 +6,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module SolidVM.Solidity.Xabi.Def where
+module SolidVM.Model.CodeCollection.Def where
 
 import           Control.Lens                 (mapped, (&), (?~))
 import           Data.Aeson
@@ -19,13 +19,13 @@ import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
 
 
-import qualified SolidVM.Solidity.Xabi.VarDef as Xabi
+import qualified SolidVM.Model.CodeCollection.VarDef as SolidVM
 
 defAesonOptions :: Options
 defAesonOptions = defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="type"}}
 
 data DefF a = Enum { names::[Text], bytes::Word, context :: a}
-            | Struct { fields::[(Text, Xabi.FieldType)], bytes::Word, context :: a}
+            | Struct { fields::[(Text, SolidVM.FieldType)], bytes::Word, context :: a}
             | Contract { bytes::Word, context :: a}
          deriving (Eq, Show, Generic, Functor)
 

@@ -6,7 +6,6 @@ module SolidVM.Solidity.Detectors.Variables.StateVariables
   ( detector
   ) where
 
-import           CodeCollection
 import           Control.Lens
 import           Control.Monad.State
 import           Data.Foldable       (traverse_)
@@ -15,9 +14,9 @@ import           Data.Maybe          (isJust, maybeToList)
 import           Data.Source
 import           Data.Text           (Text)
 import qualified Data.Text           as T
-import           SolidVM.Solidity.Xabi
-import           SolidVM.Solidity.Xabi.Statement
-import qualified SolidVM.Solidity.Xabi.Type as Xabi
+import           SolidVM.Model.CodeCollection
+import qualified SolidVM.Model.Type as SVMType
+import           SolidVM.Solidity.Detectors.Types
 
 type StateVars = M.Map Text (Bool, Bool, VariableDecl)
 type LocalVars = [M.Map String (SourceAnnotation ())]
@@ -36,14 +35,14 @@ contractHelper Contract{..} =
       findStateAnns name (False, False, a) =
         [("Unused state variable " <> name <> ".") <$ varContext a]
       findStateAnns name (True, False, VariableDecl{..}) | varInitialVal == Nothing = case varType of
-        Xabi.Struct{} -> []
-        Xabi.Array _ Nothing -> []
-        Xabi.Mapping{} -> []
+        SVMType.Struct{} -> []
+        SVMType.Array _ Nothing -> []
+        SVMType.Mapping{} -> []
         _ -> [("Uninitialized state variable " <> name <> ". Consider initializing it to prevent incorrect behavior.") <$ varContext]
       findStateAnns name (True, False, a) = case varType a of
-        Xabi.Struct{} -> []
-        Xabi.Array _ Nothing -> []
-        Xabi.Mapping{} -> []
+        SVMType.Struct{} -> []
+        SVMType.Array _ Nothing -> []
+        SVMType.Mapping{} -> []
         _ -> [("State variable " <> name <> " is never written to. Consider making it a constant.") <$ varContext a]
       findStateAnns _ _ = []
    in M.foldMapWithKey findStateAnns stateVariables'

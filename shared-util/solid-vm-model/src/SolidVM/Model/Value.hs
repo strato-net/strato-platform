@@ -1,7 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Blockchain.SolidVM.Value (
+module SolidVM.Model.Value (
   Variable(..),
   Value(..),
   BasicType(..),
@@ -42,11 +42,9 @@ import           Blockchain.SolidVM.Exception
 import           Blockchain.Strato.Model.Account
 
 
-import           CodeCollection
-import qualified SolidVM.Model.Storable           as MS
-import qualified SolidVM.Solidity.Xabi            as Xabi
-import qualified SolidVM.Solidity.Xabi.Type       as Xabi
-import qualified SolidVM.Solidity.Xabi.VarDef     as Xabi
+import qualified SolidVM.Model.CodeCollection            as CC
+import qualified SolidVM.Model.Storable                  as MS
+import qualified SolidVM.Model.Type                      as SVMType
 
 
 
@@ -72,6 +70,25 @@ instance Show Variable where
   show (Variable _) = "<variable>"
   show (Constant v) = "Constant: " ++ show v
 
+-- Util functions to help display variables within the IO monad, since it reads from an IO ref to get the variable's value
+-- Uncomment when needed
+-- showVariable :: MonadIO m => Variable -> m String
+-- showVariable (Variable v) = do 
+--   val <- liftIO $ readIORef v
+--   showValue val 
+-- showVariable (Constant c) = showValue c 
+
+-- showValue :: MonadIO m => Value -> m String
+-- Only implemented useful show for Arrays, as they are the most commonly used values that use IORefs 
+-- showValue (SArray _ vc) = do
+--   ss <- mapM showVariable vc 
+--   let s :: String 
+--       s = foldl insertComma "SArray: " ss
+--   return s
+-- showValue v = return $ show v
+
+-- insertComma :: String -> String -> String
+-- insertComma a b = a ++ ", " ++ b 
 --TODO- we need to figure out this ambiguity on the Address types....
 --Sometimes address is and integer (solidity can treat an integer as an address),
 --sometimes it is a proper type.
@@ -86,9 +103,9 @@ data Value =
   | SStructDef String
   | SStruct String (Map String Variable)
   | STuple (Vector Variable)
-  | SArray Xabi.Type (Vector Variable)
-  | SMap Xabi.Type (Map Value Variable)
-  | SFunction String Xabi.Func
+  | SArray SVMType.Type (Vector Variable)
+  | SMap SVMType.Type (Map Value Variable)
+  | SFunction String CC.Func
   | SBuiltinFunction String (Maybe Value)
   | SBuiltinVariable String
   | SSetterGetter String (Maybe Value)
@@ -96,7 +113,7 @@ data Value =
   | SContractItem NamedAccount String
   | SContract String NamedAccount
   | SContractFunction (Maybe String) NamedAccount String -- contractName, address, functionName
-  | SPush Value -- The array function
+  | SPush Value (Maybe Variable)-- The array function
   | SNULL
   | SReference AccountPath  -- An alias to an existing variable, so that modifications
                               -- can be canonicalized
@@ -104,6 +121,8 @@ data Value =
                       -- supporting indexing into bytes32s.
   | SAddressToAscii -- Hack to implement addressToAsciiString without supporting indexing into bytes
   | SMappingSentinel
+  | SBreak
+  | SContinue
   deriving (Show)
 
 --TODO- Remove this sloppy half-measure of Ord, Eq definitions once we move to Solidity static typing
@@ -139,7 +158,7 @@ instance RLPSerializable Value where
 -- coerceFromInt is useful to force integer literals
 -- to assume the type that was intended for them, once
 -- it is determined that their expected type is
-coerceFromInt :: Contract -> Value -> Integer -> Value
+coerceFromInt :: CC.Contract -> Value -> Integer -> Value
 coerceFromInt _ SInteger{} n = SInteger n
 coerceFromInt _ (SAccount a) n = SAccount $ (namedAccountAddress .~ fromIntegral n) a
 coerceFromInt _ SString{} 0 = SString ""
@@ -148,26 +167,26 @@ coerceFromInt _ (SContract c a) n = SContract c $ (namedAccountAddress .~ fromIn
 coerceFromInt ct (SEnumVal tipe _ _) n' =
   fromMaybe (typeError "missing enum val" (tipe, n')) $ do
     let n = fromIntegral n'
-    enumDef <- fmap fst . M.lookup tipe $ _enums ct
+    enumDef <- fmap fst . M.lookup tipe $ CC._enums ct
     when (n >= length enumDef) $ fail "enum val out of range"
     return $ SEnumVal tipe (enumDef !! n) $ fromIntegral n'
 coerceFromInt _ t x = typeError "invalid literal for type" (t, x)
 
 -- coerceType allows integer literals to initialize integers, addresses, and
 -- strings (in the special case of 0) and bytes32, determined by type instead of value
-coerceType :: Contract -> Xabi.Type -> Value -> Value
+coerceType :: CC.Contract -> SVMType.Type -> Value -> Value
 coerceType ct xt = \case
     SInteger i -> coerceFromInt ct (defaultValue ct xt) i
     SString s -> case xt of
-      Xabi.String{} -> SString s
-      Xabi.Bytes{} -> case B16.decode (BC.pack s) of
+      SVMType.String{} -> SString s
+      SVMType.Bytes{} -> case B16.decode (BC.pack s) of
                         (bs, "") -> SString . BC.unpack $ B.takeWhile (/=0) bs
                         _ -> SString s
       _ -> typeError "string literal must be string or bytes" (xt, s)
     v -> v
 
 
-valEquals :: Contract -> Value -> Value -> Bool
+valEquals :: CC.Contract -> Value -> Value -> Bool
 valEquals ct lhs rhs = case (lhs, rhs) of
   (SInteger i, _) -> coerceFromInt ct rhs i == rhs
   (_, SInteger i) -> coerceFromInt ct lhs i == lhs
@@ -177,6 +196,7 @@ valEquals ct lhs rhs = case (lhs, rhs) of
   (SEnumVal e1 _ n1, SEnumVal e2 _ n2) -> e1 == e2 && n1 == n2
   (SContract _ a1, SAccount a2) -> a1 == a2
   (SAccount a1, SContract _ a2) -> a1 == a2
+  (SContract _ a1, SContract _ a2) -> a1 == a2 
   (SBuiltinVariable v1, SBuiltinVariable v2) ->
     todo "comparison of builtin vars requires evaluation: " (v1, v2)
   _ -> todo "unsupported type combination in valEquals: " (lhs, rhs)
@@ -188,23 +208,23 @@ createVar val = liftIO $ fmap Variable $ newIORef val
 
 
 --TODO- defaultValue is deprecated, will be removed...  Instead use createDefaultValue
-defaultValue :: Contract -> Xabi.Type -> Value
-defaultValue _ (Xabi.Array valType _) = SArray valType V.empty
-defaultValue _ (Xabi.Mapping _ _ valType) = SMap valType $ M.empty
-defaultValue _ (Xabi.Int _ _) = SInteger 0
-defaultValue _ Xabi.Bool = SBool False
-defaultValue _ (Xabi.Address) = SAccount $ unspecifiedChain (Address 0)
-defaultValue _ (Xabi.Account) = SAccount $ unspecifiedChain (Address 0)
-defaultValue _ (Xabi.String _) = SString ""
-defaultValue _ (Xabi.Bytes _ _) = SString ""
-defaultValue ctract (Xabi.Label name) = fromMaybe (SContract name $ unspecifiedChain 0x0) $ asum
+defaultValue :: CC.Contract -> SVMType.Type -> Value
+defaultValue _ (SVMType.Array valType _) = SArray valType V.empty
+defaultValue _ (SVMType.Mapping _ _ valType) = SMap valType $ M.empty
+defaultValue _ (SVMType.Int _ _) = SInteger 0
+defaultValue _ SVMType.Bool = SBool False
+defaultValue _ (SVMType.Address) = SAccount $ unspecifiedChain (Address 0)
+defaultValue _ (SVMType.Account) = SAccount $ unspecifiedChain (Address 0)
+defaultValue _ (SVMType.String _) = SString ""
+defaultValue _ (SVMType.Bytes _ _) = SString ""
+defaultValue ctract (SVMType.Label name) = fromMaybe (SContract name $ unspecifiedChain 0x0) $ asum
   [ do
-      ns <- M.lookup name $ _enums ctract
+      ns <- M.lookup name $ CC._enums ctract
       val <- listToMaybe $ fst ns
       return $ SEnumVal name val 0x0
   , do
-    sdef' <- M.lookup name $ _structs ctract
-    let initializeField = Constant . defaultValue ctract . Xabi.fieldTypeType
+    sdef' <- M.lookup name $ CC._structs ctract
+    let initializeField = Constant . defaultValue ctract . CC.fieldTypeType
         sdef = (\(a,b,_) -> (a,b)) <$> sdef'
     return . SStruct name . M.map initializeField . M.mapKeys T.unpack . M.fromList $ sdef
   ]
@@ -212,22 +232,22 @@ defaultValue ctract (Xabi.Label name) = fromMaybe (SContract name $ unspecifiedC
 defaultValue _ x = todo "defaultValue" x
 
 createDefaultValue :: MonadIO m =>
-                      Contract -> Xabi.Type -> m Value
-createDefaultValue _ (Xabi.Array valType _) = return $ SArray valType V.empty
-createDefaultValue _ (Xabi.Mapping _ _ valType) = return $ SMap valType $ M.empty
-createDefaultValue _ (Xabi.Int _ _) = return $ SInteger 0
-createDefaultValue _ Xabi.Bool = return $ SBool False
-createDefaultValue _ (Xabi.Address) = return $ SAccount $ unspecifiedChain (Address 0)
-createDefaultValue _ (Xabi.Account) = return $ SAccount $ unspecifiedChain (Address 0)
-createDefaultValue _ (Xabi.String _) = return $ SString ""
-createDefaultValue _ (Xabi.Bytes _ _) = return $ SString ""
-createDefaultValue ctract (Xabi.Label name) =
-  case (M.lookup name $ _enums ctract, M.lookup name $ _structs ctract) of
+                      CC.Contract -> SVMType.Type -> m Value
+createDefaultValue _ (SVMType.Array valType _) = return $ SArray valType V.empty
+createDefaultValue _ (SVMType.Mapping _ _ valType) = return $ SMap valType $ M.empty
+createDefaultValue _ (SVMType.Int _ _) = return $ SInteger 0
+createDefaultValue _ SVMType.Bool = return $ SBool False
+createDefaultValue _ (SVMType.Address) = return $ SAccount $ unspecifiedChain (Address 0)
+createDefaultValue _ (SVMType.Account) = return $ SAccount $ unspecifiedChain (Address 0)
+createDefaultValue _ (SVMType.String _) = return $ SString ""
+createDefaultValue _ (SVMType.Bytes _ _) = return $ SString ""
+createDefaultValue ctract (SVMType.Label name) =
+  case (M.lookup name $ CC._enums ctract, M.lookup name $ CC._structs ctract) of
     (Just ((val:_), _), _) -> return $ SEnumVal name val 0x0
     (Nothing, Just sdef) -> do
       items <-
         forM sdef $ \(n, itemType, _) -> do
-          itemVal <- createDefaultValue ctract $ Xabi.fieldTypeType itemType
+          itemVal <- createDefaultValue ctract $ CC.fieldTypeType itemType
           itemVar <- createVar itemVal
           return (T.unpack n, itemVar)
       return $ SStruct name $ M.fromList items
@@ -239,7 +259,7 @@ createDefaultValue _ x = todo "createDefaultValue" x
 
 
 {-
-byteStringToValue :: ByteString -> Maybe Value
+byteStringToValue :: B.ByteString -> Maybe Value
 byteStringToValue x | x == B.singleton 128 = Nothing
 byteStringToValue x = Just . SInteger . rlpDecode . rlpDeserialize $ x
 
@@ -248,9 +268,9 @@ castToInt (SInteger i) = i
 castToInt s = typeError "castToInt" s
 -}
 
--- Typos are the possible values that a Xabi.Label
+-- Typos are the possible values that a CC.Label
 -- is able to resolve to
-data Typo = StructTypo [(T.Text, Xabi.FieldType)]
+data Typo = StructTypo [(T.Text, CC.FieldType)]
           | EnumTypo [String]
           | ContractTypo String
           deriving (Show)

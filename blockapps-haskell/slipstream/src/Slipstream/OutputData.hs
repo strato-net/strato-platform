@@ -51,16 +51,14 @@ import           Blockchain.Strato.Model.Address
 import qualified Blockchain.Strato.Model.Event   as Action
 import           Blockchain.Strato.Model.Keccak256
 
-import           CodeCollection hiding (contractName, contracts, events)
-
 import           Slipstream.Events
 import           Slipstream.Globals
 import           Slipstream.Metrics
 import           Slipstream.Options
 import           Slipstream.SolidityValue
 
-import           SolidVM.Solidity.Xabi                    (VariableDeclF(..))
-import qualified SolidVM.Solidity.Xabi.Type               as Xabi
+import           SolidVM.Model.CodeCollection              hiding (contractName, contracts, events)
+import qualified SolidVM.Model.Type         as SVMType
 
 
 tableSeparator :: Text
@@ -165,7 +163,7 @@ outputData conn c = runConduit $ c
                               `fuseUpstream` mapM_C (dbInsert conn)
 
 baseColumns :: TableColumns
-baseColumns = [ "account"
+baseColumns = [ "record_id"
               , "address"
               , "chainId"
               , "block_hash"
@@ -256,7 +254,7 @@ createForeignIndexesForJoins foreignKey = do
     <> wrapDoubleQuotes (columnName foreignKey)
     <> ") REFERENCES "
     <> tableNameToDoubleQuoteText (foreignTableName foreignKey)
-    <> " (account);"
+    <> " (record_id);"
 
 notifyPostgREST :: OutputM m =>
                    ConduitM () Text m ()
@@ -278,11 +276,11 @@ getDeferredForeignKeys tableName c o a =
 --    deferredForeignKeys' <- fmap concat $
 --      forM (Map.toList $ cc^.contracts) $ \(nameString, c) ->
 
-  flip map [(theName, x) | (theName, VariableDecl{varType=Xabi.Label x}) <- (Map.toList $ c^.storageDefs)] $ \(theName, x) -> 
+  flip map [(theName, x) | (theName, VariableDecl{varType=SVMType.Contract x}) <- (Map.toList $ c^.storageDefs)] $ \(theName, x) -> 
     ForeignKeyInfo {
       tableName=tableName,
       columnName=theName,
-      foreignTableName=indexTableName o a $ T.pack x
+      foreignTableName=indexTableName o a x
       }
 
 createIndexTable :: OutputM m
@@ -378,12 +376,12 @@ expandContractTable globalsIORef contract tableName = do
         case tableName of
           IndexTableName o a n ->
             flip map
-            [(colName, foreignName) | (colName, VariableDecl{varType=Xabi.Label foreignName}) <- extras] $ \(colName, foreignName) -> 
+            [(colName, foreignName) | (colName, VariableDecl{varType=SVMType.Contract foreignName}) <- extras] $ \(colName, foreignName) -> 
             ForeignKeyInfo {
               tableName = tableName,
               columnName = colName,
               foreignTableName = let a' = case a of; "" -> n; _ -> a
-                                 in indexTableName o a' $ T.pack foreignName
+                                 in indexTableName o a' foreignName
               }
           _ -> []
         
@@ -420,7 +418,7 @@ insertForeignKeys contracts = do
             wrapDoubleQuotes theName <> 
             "=" <> 
             wrapSingleQuotes (escapeQuotes $ T.pack $ show acct) <> 
-            " WHERE account=" <> 
+            " WHERE record_id=" <> 
             wrapSingleQuotes (makeAccount c) <>
             ";"
 
@@ -447,20 +445,18 @@ createIndexTableQuery contract (o, a, n) =
       list = Map.toList $ contract^.storageDefs
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
-        , csv $ ["account text", "address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
+        , csv $ ["record_id text", "address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
                "block_number text", "transaction_hash text", "transaction_sender text"] ++ tableColumns list
-        , ",\n  CONSTRAINT "
-        , wrapDoubleQuotes ((escapeQuotes $ tableNameToText tableName) <> "_pkey")
-        , "\n  PRIMARY KEY (address, \"chainId\"), UNIQUE (account) );"
+        , "\n  PRIMARY KEY (record_id) );"
         ]
 
 createHistoryTableQuery :: Contract -> (Text, Text, Text) -> Text
 createHistoryTableQuery contract (o, a, n) =
-  let tableName = HistoryTableName o a n
+  let tableName = historyTableName o a n
       list = Map.toList $ contract^.storageDefs
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS ", tableNameToDoubleQuoteText tableName, " ("
-        , csv $ ["account text", "address text NOT NULL", "\"chainId\" text NOT NULL", "block_hash text NOT NULL", "block_timestamp text",
+        , csv $ ["record_id text", "address text NOT NULL", "\"chainId\" text NOT NULL", "block_hash text NOT NULL", "block_timestamp text",
                  "block_number text", "transaction_hash text NOT NULL", "transaction_sender text"]
                  ++ tableColumns list
         , ");"
@@ -513,8 +509,8 @@ insertIndexTableQuery contracts@(x:_) =
         , "\n  VALUES "
         , inserts
         , [r|
-  ON CONFLICT (account) DO UPDATE SET
-    account = excluded.account,
+  ON CONFLICT (record_id) DO UPDATE SET
+    record_id = excluded.record_id,
     address = excluded.address,
     "chainId" = excluded."chainId",
     block_hash = excluded.block_hash,
@@ -686,7 +682,7 @@ insertEventTableQuery ev =
      tableName = EventTableName org app cname (escapeQuotes $ T.pack $ Action.evName ev)
 
      cols = wrapAndEscapeDouble . map escapeQuotes $ ["id", "address"] ++ (map (T.pack . fst) $ Action.evArgs ev)
-     vals = csv $ map (wrapSingleQuotes . T.pack . snd) $ Action.evArgs ev
+     vals = csv $ map (wrapSingleQuotes . escapeQuotes . T.pack . snd) $ Action.evArgs ev
  in T.concat
         [ "INSERT INTO "
         , tableNameToDoubleQuoteText tableName
@@ -708,19 +704,19 @@ insertEventTableQuery ev =
 
 --This is a temporary function that converts solidity types to a sample value...  I am just using this now to convert table creation from the old way (value based when values come through) to the new way (direct from the types when a CC is registered)
 solidityTypeToSQLType :: VariableDeclF a -> Maybe Text
-solidityTypeToSQLType VariableDecl{varType=Xabi.Bool} = Just "bool"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Int _ _} = Just "decimal"
-solidityTypeToSQLType VariableDecl{varType=Xabi.String _} = Just "text"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Bytes _ _} = Just "text"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Address} = Just "text"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Account} = Just "text"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Array _ _} = Nothing -- Just "jsonb"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Mapping _ _ _} = Nothing -- Just "jsonb"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Label _} = Just "text"
---solidityTypeToSQLType VariableDecl{varType=Xabi.Label x} = Just $ "text references " <> T.pack x <> "(id)"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Struct _ _} = Just "jsonb"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Enum _ _ _} = Just "text"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Contract _} = Just "text"
+solidityTypeToSQLType VariableDecl{varType=SVMType.Bool} = Just "bool"
+solidityTypeToSQLType VariableDecl{varType=SVMType.Int _ _} = Just "decimal"
+solidityTypeToSQLType VariableDecl{varType=SVMType.String _} = Just "text"
+solidityTypeToSQLType VariableDecl{varType=SVMType.Bytes _ _} = Just "text"
+solidityTypeToSQLType VariableDecl{varType=SVMType.Address} = Just "text"
+solidityTypeToSQLType VariableDecl{varType=SVMType.Account} = Just "text"
+solidityTypeToSQLType VariableDecl{varType=SVMType.Array _ _} = Nothing -- Just "jsonb"
+solidityTypeToSQLType VariableDecl{varType=SVMType.Mapping _ _ _} = Nothing -- Just "jsonb"
+solidityTypeToSQLType VariableDecl{varType=SVMType.Label _} = Just "text"
+--solidityTypeToSQLType VariableDecl{varType=SVMType.Label x} = Just $ "text references " <> T.pack x <> "(id)"
+solidityTypeToSQLType VariableDecl{varType=SVMType.Struct _ _} = Just "jsonb"
+solidityTypeToSQLType VariableDecl{varType=SVMType.Enum _ _ _} = Just "text"
+solidityTypeToSQLType VariableDecl{varType=SVMType.Contract _} = Just "text"
 --solidityTypeToSQLType x = error $ "undefined type in solidityTypeToSQLType: " ++ show (varType x)
 
 
