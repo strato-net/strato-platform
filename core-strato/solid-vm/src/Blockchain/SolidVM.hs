@@ -688,7 +688,7 @@ runStatement :: MonadSM m => CC.Statement -> m (Maybe Value)
 --      statement for now.  Until this is fixed, we won't be able to run code that
 --      looks like this `x = (y = 1)`
 --      I checked the Wings contracts, they never use this.
-runStatement (Xabi.SimpleStatement (CC.ExpressionStatement (Xabi.PlusPlus e))) = do
+runStatement (CC.SimpleStatement (CC.ExpressionStatement (CC.PlusPlus e))) = do
   var <- expToVar e
   path <- expToPath e
   v <- getInt var
@@ -755,7 +755,7 @@ runStatement (CC.SimpleStatement (CC.ExpressionStatement (CC.Binary _ "=" dst sr
 
 {-  
   case e1 of
-    Xabi.TupleExpression es -> do
+    CC.TupleExpression es -> do
       vs <- mapM (mapM expToVar) es
       mapM_ (setVar v2) $ zip [0..] vs
     _ -> do
@@ -1226,7 +1226,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
       (SAccount addr, itemName) -> do --return $ Constant $ SContractItem addr itemName
         from <- getCurrentAccount
         let address = namedAccountToAccount (from ^. accountChainId) addr
-        result <- callWrapper from address Nothing itemName False (Xabi.OrderedArgs [])  
+        result <- callWrapper from address Nothing itemName False (CC.OrderedArgs [])  
         return . Constant . fromMaybe SNULL $ result
 
       (SContract _ a, funcName) -> return $ Constant $ SContractFunction Nothing a funcName
@@ -1445,7 +1445,7 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.Label contractName')) 
 
 expToVar' (CC.FunctionCall _ e args) = do
   case e of -- FunctionCall Special Case when calling a function via Member Access
-    (CC.MemberAccess _ (Xabi.Variable _ "Util") _) -> regularFunctionCall Nothing --Because of the hardcoded Util functions
+    (CC.MemberAccess _ (CC.Variable _ "Util") _) -> regularFunctionCall Nothing --Because of the hardcoded Util functions
     (CC.MemberAccess _ expr name) -> do
       var1 <- expToVar expr
       val1 <- getVar var1
@@ -1459,8 +1459,8 @@ expToVar' (CC.FunctionCall _ e args) = do
           Just sci -> sci
           Nothing  -> expToVar' e
         argVals <- case args of
-                        Xabi.OrderedArgs as -> OrderedVals <$> mapM (getVar <=< expToVar) as
-                        Xabi.NamedArgs ns -> NamedVals <$> mapM (mapM $ getVar <=< expToVar) ns
+                        CC.OrderedArgs as -> OrderedVals <$> mapM (getVar <=< expToVar) as
+                        CC.NamedArgs ns -> NamedVals <$> mapM (mapM $ getVar <=< expToVar) ns
         case var of
           Constant (SReference (AccountPath address (MS.StoragePath pieces))) -> do
             val' <- getVar $ Constant $ SReference $ AccountPath address $MS.StoragePath $ init pieces
