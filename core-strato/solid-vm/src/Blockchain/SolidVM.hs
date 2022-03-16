@@ -688,7 +688,7 @@ runStatement :: MonadSM m => CC.Statement -> m (Maybe Value)
 --      statement for now.  Until this is fixed, we won't be able to run code that
 --      looks like this `x = (y = 1)`
 --      I checked the Wings contracts, they never use this.
-runStatement (Xabi.SimpleStatement (CC.ExpressionStatement (Xabi.PlusPlus e))) = do
+runStatement (CC.SimpleStatement (CC.ExpressionStatement (CC.PlusPlus e))) = do
   var <- expToVar e
   path <- expToPath e
   v <- getInt var
@@ -755,7 +755,7 @@ runStatement (CC.SimpleStatement (CC.ExpressionStatement (CC.Binary _ "=" dst sr
 
 {-  
   case e1 of
-    Xabi.TupleExpression es -> do
+    CC.TupleExpression es -> do
       vs <- mapM (mapM expToVar) es
       mapM_ (setVar v2) $ zip [0..] vs
     _ -> do
@@ -1223,7 +1223,11 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
             Just cid3 -> return $ Constant $ intBuiltin $ flip (:) [] $ SString $ B.foldr showHex "" $ word256ToBytes cid3
         MainChain ->  return $ Constant $ SInteger 0 
         ExplicitChain cid -> return $ Constant $ intBuiltin $ flip (:) [] $ SString $ B.foldr showHex "" $ word256ToBytes cid
-      (SAccount addr, itemName) -> return $ Constant $ SContractItem addr itemName
+      (SAccount addr, itemName) -> do --return $ Constant $ SContractItem addr itemName
+        from <- getCurrentAccount
+        let address = namedAccountToAccount (from ^. accountChainId) addr
+        result <- callWrapper from address Nothing itemName False (CC.OrderedArgs [])  
+        return . Constant . fromMaybe SNULL $ result
 
       (SContract _ a, funcName) -> return $ Constant $ SContractFunction Nothing a funcName
       (r@(SReference _), "push") -> return $ Constant $ SPush r Nothing
@@ -1440,118 +1444,129 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.Label contractName')) 
     $  erNewContractAccount execResults
 
 expToVar' (CC.FunctionCall _ e args) = do
-  var <- expToVar e
-  argVals <- case args of
-                 CC.OrderedArgs as -> OrderedVals <$> mapM (getVar <=< expToVar) as
-                 CC.NamedArgs ns -> NamedVals <$> mapM (mapM $ getVar <=< expToVar) ns
+  case e of -- FunctionCall Special Case when calling a function via Member Access
+    (CC.MemberAccess _ (CC.Variable _ "Util") _) -> regularFunctionCall Nothing --Because of the hardcoded Util functions
+    (CC.MemberAccess _ expr name) -> do
+      var1 <- expToVar expr
+      val1 <- getVar var1
+      case (val1, name) of
+        (SAccount addr, itemName) -> regularFunctionCall $ Just (return $ Constant $ SContractItem addr itemName)
+        _ -> regularFunctionCall Nothing
+    _ -> regularFunctionCall Nothing
+    where 
+      regularFunctionCall mSCI = do 
+        var <- case mSCI of
+          Just sci -> sci
+          Nothing  -> expToVar' e
+        argVals <- case args of
+                        CC.OrderedArgs as -> OrderedVals <$> mapM (getVar <=< expToVar) as
+                        CC.NamedArgs ns -> NamedVals <$> mapM (mapM $ getVar <=< expToVar) ns
+        case var of
+          Constant (SReference (AccountPath address (MS.StoragePath pieces))) -> do
+            val' <- getVar $ Constant $ SReference $ AccountPath address $MS.StoragePath $ init pieces
+            case (val', last pieces) of
 
-  case var of
-    Constant (SReference (AccountPath address (MS.StoragePath pieces))) -> do
-      val' <- getVar $ Constant $ SReference $ AccountPath address $MS.StoragePath $ init pieces
-      case (val', last pieces) of
-        
-        (SContract _ toAddress', MS.Field funcName) -> do
-          fromAddress <- getCurrentAccount
-          let toAddress = namedAccountToAccount (fromAddress ^. accountChainId) toAddress'
-          res <- callWrapper fromAddress toAddress Nothing (BC.unpack funcName) False args 
-          case res of
-            Just v -> return $ Constant $ v
-            Nothing -> return $ Constant SNULL
-        
-        (SAccount toAddress', MS.Field funcName) -> do
-          fromAddress <- getCurrentAccount
-          let toAddress = namedAccountToAccount (fromAddress ^. accountChainId) toAddress'
-          res <- callWrapper fromAddress toAddress Nothing (BC.unpack funcName) False args 
-          case res of
-            Just v -> return $ Constant $ v
-            Nothing -> return $ Constant SNULL
-        x -> todo "expToVar'/FunctionCall" x
+              (SContract _ toAddress', MS.Field funcName) -> do
+                fromAddress <- getCurrentAccount
+                let toAddress = namedAccountToAccount (fromAddress ^. accountChainId) toAddress'
+                res <- callWrapper fromAddress toAddress Nothing (BC.unpack funcName) False args 
+                case res of
+                  Just v -> return $ Constant $ v
+                  Nothing -> return $ Constant SNULL
 
-    Constant (SBuiltinFunction name o) -> case argVals of
-      OrderedVals vs -> Constant <$> callBuiltin name vs o
-      NamedVals{} -> invalidArguments (printf "expToVar'/builtinfunction: cannot used namedvals with builtin %s" name) argVals
+              (SAccount toAddress', MS.Field funcName) -> do
+                fromAddress <- getCurrentAccount
+                let toAddress = namedAccountToAccount (fromAddress ^. accountChainId) toAddress'
+                res <- callWrapper fromAddress toAddress Nothing (BC.unpack funcName) False args 
+                case res of
+                  Just v -> return $ Constant $ v
+                  Nothing -> return $ Constant SNULL
+              x -> todo "expToVar'/FunctionCall" x
+
+          Constant (SBuiltinFunction name o) -> case argVals of
+            OrderedVals vs -> Constant <$> callBuiltin name vs o
+            NamedVals{} -> invalidArguments (printf "expToVar'/builtinfunction: cannot used namedvals with builtin %s" name) argVals
 
 
-    Constant (SFunction funcName func) -> do
-      ro <- readOnly <$> getCurrentCallInfo
-      contract' <- getCurrentContract
-      address <- getCurrentAccount
-      (hsh, cc) <- getCurrentCodeCollection
+          Constant (SFunction funcName func) -> do
+            ro <- readOnly <$> getCurrentCallInfo
+            contract' <- getCurrentContract
+            address <- getCurrentAccount
+            (hsh, cc) <- getCurrentCodeCollection
 
-      res <- runTheCall address contract' funcName hsh cc func argVals ro
-      return . Constant . fromMaybe SNULL $ res
+            res <- runTheCall address contract' funcName hsh cc func argVals ro
+            return . Constant . fromMaybe SNULL $ res
 
-    Constant (SStructDef structName) -> do
-      contract' <- getCurrentContract
-      let !vals = fromMaybe (missingType "struct constructor not found" structName)
-               $ M.lookup structName $ contract'^.CC.structs
-      return . Constant . SStruct structName . fmap Constant . M.fromList $
-        case argVals of
-          OrderedVals as -> zip (map (T.unpack . (\(a,_,_) -> a)) vals) as
-          NamedVals ns -> ns
+          Constant (SStructDef structName) -> do
+            contract' <- getCurrentContract
+            let !vals = fromMaybe (missingType "struct constructor not found" structName)
+                     $ M.lookup structName $ contract'^.CC.structs
+            return . Constant . SStruct structName . fmap Constant . M.fromList $
+              case argVals of
+                OrderedVals as -> zip (map (T.unpack . (\(a,_,_) -> a)) vals) as
+                NamedVals ns -> ns
 
-    Constant (SContractDef contractName') -> do
-      case argVals of
-        OrderedVals [SInteger address] -> --TODO- clean up this ambiguity between SAddress and SInteger....
-          return $ Constant $ SContract contractName' $ unspecifiedChain $ fromInteger address
-        OrderedVals [SAccount address ] -> 
-          return $ Constant $ SContract contractName' address
-        OrderedVals [SContract _ addr] ->
-          return $ Constant $ SContract contractName' $ addr
-        _ -> typeError "contract variable creation" argVals
+          Constant (SContractDef contractName') -> do
+            case argVals of
+              OrderedVals [SInteger address] -> --TODO- clean up this ambiguity between SAddress and SInteger....
+                return $ Constant $ SContract contractName' $ unspecifiedChain $ fromInteger address
+              OrderedVals [SAccount address ] -> 
+                return $ Constant $ SContract contractName' address
+              OrderedVals [SContract _ addr] ->
+                return $ Constant $ SContract contractName' $ addr
+              _ -> typeError "contract variable creation" argVals
 
-    Constant (SContractItem address' "transfer") -> do
-      from <- getCurrentAccount
-      let address = namedAccountToAccount (from ^. accountChainId) address'
-      success <- case argVals of
-        OrderedVals [SInteger amount] -> do
-          pay "built-in transfer function" from address amount
-        _ -> return False
-      return . Constant $ SBool success
+          Constant (SContractItem address' "transfer") -> do
+            from <- getCurrentAccount
+            let address = namedAccountToAccount (from ^. accountChainId) address'
+            success <- case argVals of
+              OrderedVals [SInteger amount] -> do
+                pay "built-in transfer function" from address amount
+              _ -> return False
+            return . Constant $ SBool success
 
-    Constant (SContractItem address' itemName) -> do
+          Constant (SContractItem address' itemName) -> do
 
-      from <- getCurrentAccount
-      let address = namedAccountToAccount (from ^. accountChainId) address'
-      result <- callWrapper from address Nothing itemName False args 
-      return . Constant . fromMaybe SNULL $ result
+            from <- getCurrentAccount
+            let address = namedAccountToAccount (from ^. accountChainId) address'
+            result <- callWrapper from address Nothing itemName False args 
+            return . Constant . fromMaybe SNULL $ result
 
-    Constant (SContractFunction name address' functionName) -> do
-      
-      from <- getCurrentAccount
-      let address = namedAccountToAccount (from ^. accountChainId) address'
-      result <- callWrapper from address name functionName False args 
-      return . Constant . fromMaybe SNULL $ result
+          Constant (SContractFunction name address' functionName) -> do
 
-    Constant (SEnum enumName) -> do
-      case argVals of
-        OrderedVals [SInteger i] -> do
-          c <- getCurrentContract
-          let !theEnum = fromMaybe (missingType "enum constructor" enumName)
-                      $ M.lookup enumName $ c^.CC.enums
-          case fst theEnum !? fromInteger i of
-            Nothing -> typeError "enum val out of range" argVals
-            Just enumVal -> pure . Constant . SEnumVal enumName enumVal $ fromInteger i
-        _ -> typeError "called enum constructor with improper args" argVals
+            from <- getCurrentAccount
+            let address = namedAccountToAccount (from ^. accountChainId) address'
+            result <- callWrapper from address name functionName False args 
+            return . Constant . fromMaybe SNULL $ result
 
-    Constant (SPush theArray mvar) -> Builtins.push theArray mvar argVals
+          Constant (SEnum enumName) -> do
+            case argVals of
+              OrderedVals [SInteger i] -> do
+                c <- getCurrentContract
+                let !theEnum = fromMaybe (missingType "enum constructor" enumName)
+                            $ M.lookup enumName $ c^.CC.enums
+                case fst theEnum !? fromInteger i of
+                  Nothing -> typeError "enum val out of range" argVals
+                  Just enumVal -> pure . Constant . SEnumVal enumName enumVal $ fromInteger i
+              _ -> typeError "called enum constructor with improper args" argVals
 
-    Constant SHexDecodeAndTrim ->
-        case argVals of
-          -- bytes should already be hex decoded when appropriate
-          OrderedVals [s@SString{}] -> return $ Constant s
-          _ -> typeError "bytes32ToString with incorrect arguments" argVals
-    Constant SAddressToAscii ->
-      case argVals of
-        OrderedVals [SAccount a] -> return . Constant . SString $ show a
-        _ -> typeError "addressToAsciiString with incorrect arguments" argVals
+          Constant (SPush theArray mvar) -> Builtins.push theArray mvar argVals
 
-    -- It would be nice to reinterpret two element paths as a function.
-    -- How can we get a to resolve to a local variable instead of a path?
-    -- StorageItem [Field a, Field b] -> todo "reinterpret as a function
+          Constant SHexDecodeAndTrim ->
+              case argVals of
+                -- bytes should already be hex decoded when appropriate
+                OrderedVals [s@SString{}] -> return $ Constant s
+                _ -> typeError "bytes32ToString with incorrect arguments" argVals
+          Constant SAddressToAscii ->
+            case argVals of
+              OrderedVals [SAccount a] -> return . Constant . SString $ show a
+              _ -> typeError "addressToAsciiString with incorrect arguments" argVals
 
-    _ -> typeError "cannot call non-function" var
+          -- It would be nice to reinterpret two element paths as a function.
+          -- How can we get a to resolve to a local variable instead of a path?
+          -- StorageItem [Field a, Field b] -> todo "reinterpret as a function
 
+          _ -> typeError "cannot call non-function" var
 
 {-
 SimpleStatement (ExpressionStatement (Binary "=" (Variable "tickets") (FunctionCall (NewExpression (Label "Hashmap")) [])))

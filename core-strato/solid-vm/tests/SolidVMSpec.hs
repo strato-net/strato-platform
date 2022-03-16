@@ -1748,6 +1748,30 @@ contract qq {
 }|]
     getFields ["x"] `shouldReturn` [BInteger 343]
 
+  it "can get an SContractItem value from another contract and compare the value via this.variableName" . runTest $ do
+    runBS [r|
+contract string_test {
+  string v;
+  constructor() {
+    v = "test string";
+  }
+  function getTrueAndThisDotV() returns (bool, string) {
+    return (true, this.v);
+  }
+}
+contract qq {
+  bool test;
+  constructor(){ 
+    test = it_getsTrueAndThisDotV();
+  }
+  function it_getsTrueAndThisDotV() external returns (bool) { // fails
+    string_test y = new string_test();
+    (bool b, string v) = y.getTrueAndThisDotV();
+    return b && v == "test string" && (false == (v != "test string"));
+  }
+}|] 
+    getFields ["test"] `shouldReturn` [BBool True]
+
   it "can initialize from constants" . runTest $ do
     runBS [r|
 contract qq {
