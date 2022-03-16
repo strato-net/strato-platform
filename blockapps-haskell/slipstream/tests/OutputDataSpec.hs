@@ -136,13 +136,13 @@ spec = do
   describe "Array serialization with history enabled" $ do
     it "should create JSON entries" $ do
       let testAdd = Address $ fst . head . readHex $ "ADDRESS"
-          cHash = SolidVMCode "Vehicle" $ hash "<CODEHASH>"
+          cHash = SolidVMCode "Vehicle2" $ hash "<CODEHASH>"
       let input = [(ProcessedContract {
              address = testAdd,
              codehash = cHash,
              organization = "",
              application = "",
-             contractName = "Vehicle",
+             contractName = "Vehicle2",
              chain = "<CHAIN>",
              blockHash = hash "<BLOCKHASH>",
              blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
@@ -157,14 +157,14 @@ spec = do
                   ("owners", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                   ])]
       g <- newGlobals fakeHandle
-      runLoggingT $ addAndEnableHistoryTable g (HistoryTableName "" "" "Vehicle")
-      let hl = ["Vehicle"]
+      runLoggingT $ setHistoryTable g (HistoryTableName "" "" "Vehicle2") True
+      let hl = ["Vehicle2"]
 
-      [vehicleCreate, historyCreate, historyIndex, vehicleInsert, historyInsert]
+      [vehicleCreate, historyCreate, historyIndex, historyAlter, vehicleInsert, historyInsert]
         <- runLoggingT . runConduit $ createInserts g hl input .| sinkList
 
       vehicleCreate `shouldBe`
-          [r|CREATE TABLE IF NOT EXISTS "Vehicle" (record_id text,
+          [r|CREATE TABLE IF NOT EXISTS "Vehicle2" (record_id text,
     address text,
     "chainId" text,
     block_hash text,
@@ -175,7 +175,7 @@ spec = do
   PRIMARY KEY (record_id) );|]
 
       historyCreate `shouldBe`
-          [r|CREATE TABLE IF NOT EXISTS "history@Vehicle" (record_id text,
+          [r|CREATE TABLE IF NOT EXISTS "history@Vehicle2" (record_id text,
     address text NOT NULL,
     "chainId" text NOT NULL,
     block_hash text NOT NULL,
@@ -185,12 +185,13 @@ spec = do
     transaction_sender text);|]
 
       historyIndex `shouldBe`
-          [r|CREATE UNIQUE INDEX IF NOT EXISTS "index_history@Vehicle"
-  ON "history@Vehicle" (address, "chainId", block_hash, transaction_hash);
-ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle";|]
+          [r|CREATE UNIQUE INDEX IF NOT EXISTS "index_history@Vehicle2"
+  ON "history@Vehicle2" (address, "chainId", block_hash, transaction_hash);|]
+      historyAlter `shouldBe` 
+          [r|ALTER TABLE "history@Vehicle2" ADD PRIMARY KEY USING INDEX "index_history@Vehicle2";|]
 
       vehicleInsert `shouldBe`
-          [r|INSERT INTO "Vehicle" ("record_id",
+          [r|INSERT INTO "Vehicle2" ("record_id",
     "address",
     "chainId",
     "block_hash",
@@ -217,7 +218,7 @@ ALTER TABLE "history@Vehicle" ADD PRIMARY KEY USING INDEX "index_history@Vehicle
     transaction_sender = excluded.transaction_sender;|]
 
       historyInsert `shouldBe`
-          [r|INSERT INTO "history@Vehicle" ("record_id",
+          [r|INSERT INTO "history@Vehicle2" ("record_id",
     "address",
     "chainId",
     "block_hash",
