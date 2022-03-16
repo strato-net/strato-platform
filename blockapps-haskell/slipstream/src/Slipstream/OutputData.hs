@@ -61,6 +61,10 @@ import           SolidVM.Model.CodeCollection              hiding (contractName,
 import qualified SolidVM.Model.Type         as SVMType
 
 
+crashOnSQLError :: Bool
+crashOnSQLError = False
+
+
 tableSeparator :: Text
 tableSeparator = "-"
 
@@ -150,9 +154,10 @@ dbInsert conn insrt = handle handlePostgresError
                     . rawPGSimpleQuery $! encodeUtf8 insrt
 
 handlePostgresError :: OutputM m => SomeException -> m ()
-handlePostgresError = $logErrorLS "handlePGError"
---handlePostgresError :: SomeException -> m ()
---handlePostgresError = error . show
+handlePostgresError e =
+  if crashOnSQLError
+  then error . show $ e
+    else$logErrorLS "handlePGError" e
 
 outputData :: OutputM m
            => PGConnection
