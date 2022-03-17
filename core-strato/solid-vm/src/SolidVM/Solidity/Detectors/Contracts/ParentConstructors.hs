@@ -5,7 +5,7 @@ module SolidVM.Solidity.Detectors.Contracts.ParentConstructors
   ( detector
   ) where
 
-import           CodeCollection
+import           SolidVM.Model.CodeCollection
 import           Data.Functor  ((<&>))
 import qualified Data.Map.Strict as M
 import           Data.Maybe      (fromMaybe)
@@ -13,7 +13,10 @@ import           Data.Source
 import qualified Data.Set        as S
 import           Data.Text       (Text)
 import qualified Data.Text       as T
-import           SolidVM.Solidity.Xabi
+
+import           SolidVM.Solidity.Detectors.Types
+
+
 
 -- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]
 detector :: CompilerDetector

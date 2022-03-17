@@ -13,12 +13,12 @@ import qualified Data.Sequence as S
 import Test.QuickCheck
 import Test.Hspec
 
-import Blockchain.Strato.Model.Action (Action)
-import qualified Blockchain.Strato.Model.Action as Action
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Stream.Action (Action)
+import qualified Blockchain.Stream.Action as Action
 
 convert :: Action -> Either String Action -- 🤔
 convert = eitherDecode . encode

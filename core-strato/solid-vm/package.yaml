@@ -18,10 +18,11 @@ library:
     - Blockchain.SolidVM.Simple
     - Blockchain.SolidVM.SM
     - Blockchain.SolidVM.CodeCollectionDB
-    - Blockchain.SolidVM.Exception
+    - SolidVM.CodeCollectionTools
     - SolidVM.Solidity.Detectors
     - SolidVM.Solidity.Detectors.Contracts.ParentConstructors
     - SolidVM.Solidity.Detectors.Typechecker
+    - SolidVM.Solidity.Detectors.Types
     - SolidVM.Solidity.Detectors.Expressions.BooleanLiterals
     - SolidVM.Solidity.Detectors.Expressions.DivideBeforeMultiply
     - SolidVM.Solidity.Detectors.Pragmas.IncorrectSolidityVersion
@@ -40,14 +41,8 @@ library:
     - SolidVM.Solidity.Parse.UnParser
     - SolidVM.Solidity.Parse.Declarations
     - SolidVM.Solidity.SourceTools
-    - SolidVM.Solidity.Xabi
-    - SolidVM.Solidity.Xabi.Statement
-    - SolidVM.Solidity.Xabi.Type
-    - SolidVM.Solidity.Xabi.VarDef
-    - CodeCollection
   ghc-options: -Wall -O2
   dependencies:
-  - QuickCheck
   - aeson
   - aeson-casing
   - base16-bytestring
@@ -79,7 +74,6 @@ library:
   - quickcheck-instances
   - semver-range
   - servant-server
-  - servant-docs
   - solid-vm-model
   - source-tools
   - strato-model
@@ -88,11 +82,9 @@ library:
   - time
   - transformers
   - unliftio
-  - unordered-containers
   - utf8-string
   - vector
   - vm-tools
-  - x509-certs
 
 
 executables:
@@ -114,6 +106,7 @@ executables:
       - containers
       - parsec
       - solid-vm
+      - solid-vm-model
       - text
 
 tests:

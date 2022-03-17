@@ -80,12 +80,12 @@ import qualified Blockchain.SolidVM                    as SolidVM
 import           Blockchain.Strato.Indexer.Kafka       (writeIndexEvents)
 import           Blockchain.Strato.Indexer.Model       (IndexEvent (..))
 import           Blockchain.Strato.Model.Account
-import           Blockchain.Strato.Model.Action        (Action)
-import qualified Blockchain.Strato.Model.Action        as Action
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256     (Keccak256)
 import qualified Blockchain.Strato.Model.Keccak256     as Keccak256
 import           Blockchain.Strato.StateDiff.Database  (commitSqlDiffs)
+import           Blockchain.Stream.Action              (Action)
+import qualified Blockchain.Stream.Action              as Action
 import           Blockchain.Timing
 import           Blockchain.Util
 

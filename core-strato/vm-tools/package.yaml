@@ -28,6 +28,7 @@ library:
     - Blockchain.Data.ExecResults
     - Blockchain.DB.BlockSummaryDB
     - Blockchain.DB.ModifyStateDB
+    - Blockchain.Stream.Action
     - Blockchain.Stream.VMEvent
     - Blockchain.Stream.VMOutput
     - Blockchain.Timing
@@ -35,7 +36,6 @@ library:
     - Blockchain.MemVMContext
     - Blockchain.VMContext
     - Blockchain.VMOptions
-    - Blockchain.VM.SolidException
     - Blockchain.VM.VMException
     - Blockchain.VMMetrics
     - Executable.EVMFlags
@@ -57,6 +57,7 @@ library:
     - exceptions
     - extra
     - format
+    - generic-arbitrary
     - hedis
     - lens
     - leveldb-haskell
@@ -69,8 +70,11 @@ library:
     - persistent-postgresql
     - persistent-sqlite
     - prometheus-client
+    - QuickCheck
+    - quickcheck-instances
     - resourcet
     - seqevents
+    - solid-vm-model
     - split
     - strato-adit
     - strato-index
@@ -81,6 +85,7 @@ library:
     - transformers
     - unliftio
     - unliftio-core
+    - unordered-containers
     - x509-certs
 
 

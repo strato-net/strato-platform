@@ -2,13 +2,14 @@ module SolidVM.Solidity.Detectors
   ( runDetectors
   ) where
 
-import           CodeCollection
 import           Data.Bifoldable
 import           Data.Source
 import           Data.Text                                                         (Text)
+import           SolidVM.Model.CodeCollection
 import           SolidVM.Solidity.Parse.Declarations                               (SourceUnit)
 import qualified SolidVM.Solidity.Detectors.Trivial                                as Trivial
 import qualified SolidVM.Solidity.Detectors.Contracts.ParentConstructors           as ParentConstructors
+import           SolidVM.Solidity.Detectors.Types
 import qualified SolidVM.Solidity.Detectors.Typechecker                            as Typechecker
 import qualified SolidVM.Solidity.Detectors.Expressions.BooleanLiterals            as BooleanLiterals
 import qualified SolidVM.Solidity.Detectors.Expressions.DivideBeforeMultiply       as DivideBeforeMultiply

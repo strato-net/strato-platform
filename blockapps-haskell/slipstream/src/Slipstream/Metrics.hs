@@ -26,7 +26,7 @@ import Network.Kafka.Protocol (Offset)
 import Prometheus
 
 import Blockapps.Crossmon
-import qualified Blockchain.Strato.Model.Action as Action
+import qualified Blockchain.Stream.Action as Action
 
 import Slipstream.Data.Action
 import Slipstream.Data.Globals
