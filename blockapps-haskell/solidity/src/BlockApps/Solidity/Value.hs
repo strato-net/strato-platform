@@ -244,7 +244,7 @@ valueToText = \case
   ValueEnum{}        -> error "ValueEnum to text"
   ValueFunction{}    -> error "ValueFunction to text"
   ValueStruct m      -> 
-    "{" <> Text.intercalate "," (map (\(k, v) -> Text.concat [k , ":", valueToText v]) $ Map.toList m) <> "}"
+    "{" <> Text.intercalate "," (map (\(k, v) -> Text.concat [k, ":", valueToText v]) $ Map.toList m) <> "}"
 
   ValueArraySentinel{} -> error "ValueArraySentinel to text"
 

@@ -1000,8 +1000,6 @@ determineValue argVal (Xabi.IndexedType ix xabiType) =
     ty <- either (blocError . UserError) return typeM
     either (blocError . UserError) (return . (ix,)) (argValueToValue Nothing ty argVal)
 
--- We can parse the Xabi types to Solidity type constructors, however currently there is no way to pass in mappings, or structs from the API because 
--- there is no implemented parser for these types from JSON
 getSolidityType :: ArgValue -> Xabi.Type -> Either Text Type 
 getSolidityType _ (Xabi.Int (Just True) b) = Right . SimpleType . TypeInt True $ fmap toInteger b
 getSolidityType _ (Xabi.Int _           b) = Right . SimpleType . TypeInt False $ fmap toInteger b
@@ -1015,22 +1013,20 @@ getSolidityType _ (Xabi.Enum _ name _)     = Right $ TypeEnum name
 getSolidityType _ (Xabi.Contract name)     = Right $ TypeContract name
 getSolidityType (ArgInt _) (Xabi.Label _)  = Right $ SimpleType typeUInt -- since Enums are converted to Ints
 getSolidityType (ArgString _) (Xabi.Label s)  = Right $ TypeEnum $ Text.pack s
-getSolidityType (ArgObject _) (Xabi.Label s)   = Right $ TypeStruct $ Text.pack s --interpret an object strictly as a struct
+getSolidityType (ArgObject _) (Xabi.Label s)  = Right $ TypeStruct $ Text.pack s --interpret an object strictly as a struct
 getSolidityType av (Xabi.Label _)             = Left $ Text.pack $ "Expected a string, int, or object, but recieved: " ++ show av
 getSolidityType (ArgArray v) (Xabi.Array typ len)     = 
   let arrType = case len of
         Just l -> TypeArrayFixed l
         Nothing -> TypeArrayDynamic
-      elType = case typ of
-        Xabi.Mapping{} -> Left "Arrays of mappings are not allowed as function arguments"
-        _ -> getSolidityType (V.head v) typ
+      elType = getSolidityType (V.head v) typ
   in case elType of
     Right c -> Right (arrType c)
     e -> e
-getSolidityType av (Xabi.Array _ _)     = Left $ Text.pack $ "Expected Array but got" ++ show av
+getSolidityType av (Xabi.Array _ _)          = Left $ Text.pack $ "Expected Array but got " ++ show av
+getSolidityType (ArgObject _) Xabi.Mapping{} = Right $ TypeStruct "s"
+getSolidityType av Xabi.Mapping{}            = Left $ Text.pack $ "Expected Object for Mapping type, but got " ++ show av
 
-getSolidityType _ Xabi.Mapping{}          = Left "Mappings are not allowed as function arguments"
-          
 
 getResultAndRespond :: ( A.Selectable Account AddressState m
                        , (Keccak256 `A.Alters` SourceMap) m

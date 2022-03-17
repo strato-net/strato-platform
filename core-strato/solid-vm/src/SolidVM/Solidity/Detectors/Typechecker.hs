@@ -219,8 +219,8 @@ accountType' = Static Account
 enumType' :: SourceAnnotation Text -> Type'
 enumType' = Static (Enum Nothing "" Nothing)
 
-structType' :: SourceAnnotation Text -> Type'
-structType' = Static (Struct Nothing "")
+-- structType' :: SourceAnnotation Text -> Type'
+-- structType' = Static (Struct Nothing "")
 
 contractType' :: SourceAnnotation Text -> Type'
 contractType' = Static (Xabi.Contract "")
@@ -1002,7 +1002,9 @@ tcExpr (TupleExpression x es) =
 tcExpr (ArrayExpression x es) = do
   t' <- foldr (<~>) (pure $ topType' x) $ tcExpr <$> es
   pure $ case t' of
-    (Static t _) ->Static (Array t Nothing) x
+    (Static t _) -> Static (Array t Nothing) x
     _ -> t'
 tcExpr (Variable x name) = getVarType' name x
-tcExpr (ObjectLiteral x _) = pure $ structType' x
+-- Set it to the "top" type for now so it compiles
+-- TODO determine proper way to ignore this type
+tcExpr (ObjectLiteral x _) = pure $ topType' x

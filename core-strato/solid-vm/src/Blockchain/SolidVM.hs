@@ -144,11 +144,11 @@ onTracedSM cntrct m = do
       let svm3_0 = _vmVersion cntrct == "svm3.0"
       when (flags_svmTrace && not svm3_0) m
       when (flags_svmTrace && svm3_0) $
-        liftIO $ putStrLn $ "svmTrace statement(s) is absent because contract " 
+        liftIO $ putStrLn $ "svmTrace statement(s) is absent because contract "
                     ++ _contractName cntrct ++ " uses SolidVM=3.0"
 
 withSrcPos :: MonadIO m => SourceAnnotation () -> String -> m ()
-withSrcPos pos str = liftIO . putStrLn $ concat 
+withSrcPos pos str = liftIO . putStrLn $ concat
   [ show $ _sourceAnnotationStart pos
   , ": "
   , str
@@ -245,7 +245,7 @@ create _ _ _ blockData _ sender' origin' _ _ _ newAddress code txHash' chainId' 
     PtrToCode cp -> do
       hsh <- codePtrToSHA chainId' cp
       fromMaybe "" . fmap snd . join <$> traverse getCode hsh
-  
+
   fmap (either solidvmErrorResults id) . runSM (Just initCode) env' $ do
     let maybeContractName = M.lookup "name" =<< metadata
         !contractName' = T.unpack $ fromMaybe (missingField "TX is missing a metadata parameter called 'name'" $ show metadata) maybeContractName
@@ -261,16 +261,16 @@ create _ _ _ blockData _ sender' origin' _ _ _ newAddress code txHash' chainId' 
 create' :: MonadSM m => Account -> Account -> Keccak256 -> CodeCollection -> String -> Xabi.ArgList -> M.Map Address X509Certificate -> m ExecResults
 create' creator newAccount ch cc contractName' argExps x509s = do
   Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ x509s
-  parentName <- fromMaybeM (return "") $ runMaybeT 
+  parentName <- fromMaybeM (return "") $ runMaybeT
      $   pure creator                                               -- Creator's address
      >>= MaybeT . A.lookup (A.Proxy @AddressState)                  -- Address's state
      >>= pure  .  addressStateCodeHash                              -- state's codehash/CodePtr
      >>= MaybeT . resolveCodePtrParent (creator ^. accountChainId)  -- CodePtr's parent
-     >>= (\case     
+     >>= (\case
             SolidVMCode name _ -> pure name                         -- Name of the parent
             _                  -> pure "")
-  
-  
+
+
   initializeAction newAccount contractName' parentName ch
 
   let !contract' = fromMaybe (missingType "create'/contract" contractName') (cc ^. contracts . at contractName')
@@ -306,14 +306,14 @@ create' creator newAccount ch cc contractName' argExps x509s = do
 
   -- popcallinfo to remove info from stack
   popCallInfo
-  
+
   org <- getOrg creator (contract' ^. vmVersion)
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) newAccount
 
 
   -- I'm showing these strings because I like them to be in quotes in the logs :)
-  liftIO $ putStrLn $ "create'/versioning --->  we created " ++ (show contractName') ++ 
+  liftIO $ putStrLn $ "create'/versioning --->  we created " ++ (show contractName') ++
       " in app " ++ (show parentName) ++ " of org " ++ show org
 
 
@@ -395,7 +395,7 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' cha
         maybeArgs = runParser parseArgs "" "" argString
         !args = either (parseError "call arguments") Xabi.OrderedArgs maybeArgs
 
-    returnVal <- mapM encodeForReturn =<< callWrapper sender' codeAddress Nothing funcName isRCC args 
+    returnVal <- mapM encodeForReturn =<< callWrapper sender' codeAddress Nothing funcName isRCC args
 
     finalAct <- Mod.get (Mod.Proxy @Action)
     finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
@@ -434,16 +434,16 @@ setCreator creator contract cntrct blockNumber = do
   case maybeCert of
     (Just cert) -> do
       onTraced $ liftIO $ putStrLn $ C.green $ "setCreator/versioning ---> Found cert for " ++ (format creator) ++ ":\n\t" ++ (format $ getCertSubject cert)
-      
+
       Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.insert creatorAddress cert x509s'
-    
+
     Nothing -> liftIO $ putStrLn $ C.red $ "setCreator/versioning ---> No cert found for " ++ (format creator)
-  
+
   let hasSvm3_0 = _vmVersion cntrct == "svm3.0"
   let putCreatorField org = do
         liftIO $ putStrLn $ "setCreator/versioning ---> setting the org as " ++ (show org)
         putSolidStorageKeyVal' hasSvm3_0 contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack org)
-  
+
   if _org /= "" then putCreatorField _org else do
       liftIO $ putStrLn $ C.red $ "Ignoring creator field for empty org field"
 
@@ -467,14 +467,14 @@ computeNetworkID =
 -- get the org for the Cirrus table name
 getOrg :: MonadSM m => Account -> String -> m (String)
 getOrg caller vers = do
-  if (vers /= "svm3.0") 
+  if (vers /= "svm3.0")
     then return ""
-  else do 
+  else do
     liftIO $ putStrLn $ "getOrg/versioning ---> Getting org for the caller " ++ format caller
     callerCodeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) caller
 
     case callerCodeHash of
-      EVMCode _ -> do 
+      EVMCode _ -> do
       -- caller is a user account, so they are creating the first instance of this app
       -- we will look up their cert in the DB and use it to get the org name for this app
         x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
@@ -488,18 +488,18 @@ getOrg caller vers = do
       -- caller is a contract account, so this app already exists
       -- so we need to find the app contract and get its ":creator"
         mAppAccount <- getAppAccount (caller ^. accountChainId) caller
-        case mAppAccount of 
+        case mAppAccount of
           Nothing -> internalError "getOrg/versioning --> the app contract didn't have an AddressState, or was on an inaccessible chain" x
           Just acct -> do
-            liftIO $ putStrLn $ "getOrg/versioning ---> They are part of app contract " ++ (format acct) 
+            liftIO $ putStrLn $ "getOrg/versioning ---> They are part of app contract " ++ (format acct)
             appCreator <- getSolidStorageKeyVal' acct $ MS.StoragePath [MS.Field ":creator"]
             case appCreator of
-              MS.BString org' -> do 
+              MS.BString org' -> do
                 liftIO $ putStrLn $ "getOrg/versioning ---> Its org is " ++ show org'
                 return $ BC.unpack org'
               _ -> do
-                liftIO $ putStrLn "getOrg/versioning ---> It's org is unset. Returning empty string" 
-                return "" 
+                liftIO $ putStrLn "getOrg/versioning ---> It's org is unset. Returning empty string"
+                return ""
 
 
 getCodeAndCollection :: MonadSM m => Account -> m (Contract, Keccak256, CodeCollection)
@@ -586,34 +586,44 @@ argsToVals ctract fn args =
             Xabi.BoolLiteral _ b             -> return . coerceType ctract t $ SBool b
             Xabi.StringLiteral _ s           -> return . coerceType ctract t $ SString s
             Xabi.ArrayExpression _ as        -> case t of
-              Xabi.Array{Xabi.entry=t'} -> 
+              Xabi.Array{Xabi.entry=t'} ->
                 SArray t . V.fromList <$> mapM (fmap Constant . eval t') as
               _ -> typeError "array literal for non array" (t, x)
               -- This is something of a hack, where if an incoming value is not one
               -- of the accepted literals, assume that this is not the context of
               -- evaluating external arguments.
-            Xabi.ObjectLiteral _ mp          -> case t of 
+            Xabi.ObjectLiteral _ mp          -> case t of
               Xabi.Label l -> do
                 let ls = M.toList mp
-                m <- mapM go ls 
+                m <- mapM go ls
                 return $ SStruct l $ M.fromList m
                 where go (k, v) = do
-                                let tp = coerceExpression v
+                                let tp = expressionType v
                                 v' <- eval tp v
                                 return $ (T.unpack k, Constant v')
-              -- TODO strato-2429
-              -- (Xabi.Mapping _ td) -> do
-              _ -> typeError "Object Literal for non-object argument type" (t, x)
+              (Xabi.Mapping _ keyType valueType) -> do
+                m <- mapM go $ M.toList mp
+                return $ SMap valueType $ M.fromList m
+                where go (k, v) = do
+                                let !maybeExp = runParser literal "" "" (T.unpack k)
+                                case maybeExp of 
+                                  Right ex -> do
+                                    k' <- eval keyType ex
+                                    v' <- eval valueType v
+                                    return (k', Constant v')
+                                  Left err -> typeError (show err) (k, t)
+              _ -> typeError "Object Literal for non-object like argument type" (t, x)
             _                               -> getVar =<< expToVar x
+  
+-- Crude type coercion of expressions
+expressionType :: Xabi.Expression -> Xabi.Type
+expressionType (Xabi.BoolLiteral _ _ ) = Xabi.Bool
+expressionType (Xabi.NumberLiteral _ _ _) = Xabi.Int (Just True) Nothing
+expressionType (Xabi.StringLiteral _ _) = Xabi.String $ Just True
+expressionType (Xabi.ArrayExpression _ xs) = Xabi.Array (expressionType (head xs)) Nothing
 
--- Crude type checking of expressions
-coerceExpression :: Xabi.Expression -> Xabi.Type
-coerceExpression (Xabi.BoolLiteral _ _ ) = Xabi.Bool
-coerceExpression (Xabi.NumberLiteral _ _ _) = Xabi.Int (Just True) Nothing
-coerceExpression (Xabi.StringLiteral _ _) = Xabi.String $ Just True
-coerceExpression (Xabi.ArrayExpression _ xs) = Xabi.Array (coerceExpression (head xs)) Nothing
-coerceExpression (Xabi.ObjectLiteral _ _) = Xabi.Struct Nothing ""
-coerceExpression ex = typeError "Cannot deduce a type from" (ex, ex)
+expressionType ex = typeError "Cannot deduce a type from" (ex, ex)
+
 
 callWrapper :: MonadSM m => Account -> Account -> Maybe String -> String -> Bool -> Xabi.ArgList -> m (Maybe Value)
 callWrapper from to mContract functionName isRCC argExps  = do
@@ -623,18 +633,18 @@ callWrapper from to mContract functionName isRCC argExps  = do
   unless isAccessibleChain $ inaccessibleChain "Inaccessible chain violation" $ "from: " ++ show from ++ ", to: " ++ show to
 
   (contract', hsh, cc) <- getCodeAndCollection to
-  parentName <- fromMaybeM (return "") $ runMaybeT 
+  parentName <- fromMaybeM (return "") $ runMaybeT
      $   pure to                                                -- Contract's address
      >>= MaybeT . A.lookup (A.Proxy @AddressState)              -- Address's state
      >>= pure  .  addressStateCodeHash                          -- state's codehash/CodePtr
      >>= MaybeT . resolveCodePtrParent toChain                  -- CodePtr's parent
-     >>= (\case     
+     >>= (\case
             SolidVMCode name _ -> pure name                     -- Name of the parent
             _                  -> pure "")
 
   let contract = fromMaybe contract' $ mContract >>= \c -> M.lookup c $ _contracts cc
       parentName' = if parentName == (_contractName contract) then "" else parentName
-  
+
   initializeAction to (_contractName contract) parentName' hsh
 
   -- grab the org for this contract
@@ -642,7 +652,7 @@ callWrapper from to mContract functionName isRCC argExps  = do
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) to
 
-  liftIO $ putStrLn $ "callWraper/versioning --->  we are calling " ++ (_contractName contract) ++ 
+  liftIO $ putStrLn $ "callWraper/versioning --->  we are calling " ++ (_contractName contract) ++
         " in app " ++ (show parentName) ++ " of org " ++ show org
 
 
@@ -664,7 +674,7 @@ callWrapper from to mContract functionName isRCC argExps  = do
           _ -> do --Maybe the function is actually a getter
             case M.lookup (T.pack functionName) $ contract^.storageDefs of
               Just _ -> do
-                liftIO $ putStrLn ("callWrapper/getter " ++ functionName) 
+                liftIO $ putStrLn ("callWrapper/getter " ++ functionName)
                 addCallInfo to contract functionName hsh cc M.empty True
                 --TODO- this should only exist if the storage variable is declared "public", 
                 -- right now I just ignore this and allow anything to be called as a getter
@@ -762,12 +772,12 @@ runStatement (Xabi.SimpleStatement (Xabi.ExpressionStatement (Xabi.Binary _ "=" 
   dstVar <- expToVar dst
 
   setVar dstVar srcVal
-  
+
   cntrct <- getCurrentContract
   onTracedSM cntrct $ do
     valString <- showSM srcVal
     withSrcPos pos $ "    Setting: " ++ unparseExpression dst ++ " = " ++ valString
-              
+
   return Nothing
 
 {-  
@@ -864,12 +874,12 @@ runStatement s@(Xabi.SimpleStatement (Xabi.VariableDefinition entries maybeExpre
 runStatement (Xabi.IfStatement condition code' maybeElseCode pos) = do
   solidVMBreakpoint pos
   conditionResult <- getBool =<< expToVar condition
-  
+
   onTraced $ do
     if conditionResult
       then withSrcPos pos $ "       if condition succeeded, running internal code"
       else withSrcPos pos $ "       if condition failed, skipping internal code"
-    
+
   if conditionResult
     then runStatements code'
     else case maybeElseCode of
@@ -878,7 +888,7 @@ runStatement (Xabi.IfStatement condition code' maybeElseCode pos) = do
 
 runStatement (Xabi.WhileStatement condition code pos) = do
   solidVMBreakpoint pos
-     
+
   while (getBool =<< expToVar condition) $ do
       onTraced $ withSrcPos pos $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
       result <- runStatements code
@@ -959,29 +969,29 @@ runStatement st@(Xabi.EmitStatement eventName exptups pos) = do
   let evs = _events curCnct
       mEv = M.lookup (T.pack eventName) evs
   case mEv of
-    Nothing -> 
+    Nothing ->
       missingType "no corresponding event has been declared for the following emit statement: " (unparseStatement st)
     Just ev -> do
-      if (length exptups) /= (length $ Xabi.eventLogs ev) then 
+      if (length exptups) /= (length $ Xabi.eventLogs ev) then
         invalidArguments "arguments to statement are inconsistent with those declared" (unparseStatement st)
       else do
         let account = currentAccount curInfo
         org <- getOrg account (curCnct ^. vmVersion) -- the org of the app
-         
-        parentName <- fromMaybeM (return "") $ runMaybeT 
+
+        parentName <- fromMaybeM (return "") $ runMaybeT
             $   pure account
-            >>= MaybeT . A.lookup (A.Proxy @AddressState) 
+            >>= MaybeT . A.lookup (A.Proxy @AddressState)
             >>= pure  .  addressStateCodeHash
             >>= MaybeT . resolveCodePtrParent (account ^. accountChainId)
-            >>= (\case     
+            >>= (\case
                     SolidVMCode name _ | name /= (_contractName curCnct) -> pure name
                     _                                                    -> pure "")
-        
+
         -- pair up field names with values one-by-one (no type checking tho, lol)
         let pairs = zip (map (T.unpack . fst) $ Xabi.eventLogs ev) expStrs
-        
-        liftIO $ putStrLn $ "Emit Event/versioning ---> we are emitting event " ++ eventName ++ 
-              " in contract " ++ (_contractName curCnct) ++ " in app " ++ (show parentName) ++ 
+
+        liftIO $ putStrLn $ "Emit Event/versioning ---> we are emitting event " ++ eventName ++
+              " in contract " ++ (_contractName curCnct) ++ " in app " ++ (show parentName) ++
               " of org " ++ show org
 
         addEvent $ Event org parentName (_contractName curCnct) account eventName pairs
@@ -1175,8 +1185,8 @@ expToVar' x@(Xabi.MemberAccess _ expr name) = do
         contract' <- getCurrentContract
         let maybeEnumValues = M.lookup enumName $ contract' ^. enums
             !enumVals = fromMaybe (missingType "Enum nonexistent type" enumName) maybeEnumValues
-            !num = maybe (missingType "Enum nonexistent member" (enumName, name)) 
-                         fromIntegral 
+            !num = maybe (missingType "Enum nonexistent member" (enumName, name))
+                         fromIntegral
                          (name `elemIndex` fst enumVals)
         return $ Constant $ SEnumVal enumName name num
       (SBuiltinVariable "msg", "sender") -> (Constant . SAccount . accountToNamedAccount chainId . Env.sender) <$> getEnv
@@ -1233,12 +1243,12 @@ expToVar' x@(Xabi.MemberAccess _ expr name) = do
             addr <- accountOnUnspecifiedChain <$> getCurrentAccount
             return $ Constant $ SContractFunction (Just $ _contractName $ last ps) addr method
       (SAccount a, "chainId") ->  case (a ^. namedAccountChainId) of
-        UnspecifiedChain ->  do 
+        UnspecifiedChain ->  do
           cid2 <- view accountChainId <$> getCurrentAccount
           case cid2 of
-            Nothing -> return $ Constant $ SInteger 0 
+            Nothing -> return $ Constant $ SInteger 0
             Just cid3 -> return $ Constant $ intBuiltin $ flip (:) [] $ SString $ B.foldr showHex "" $ word256ToBytes cid3
-        MainChain ->  return $ Constant $ SInteger 0 
+        MainChain ->  return $ Constant $ SInteger 0
         ExplicitChain cid -> return $ Constant $ intBuiltin $ flip (:) [] $ SString $ B.foldr showHex "" $ word256ToBytes cid
       (SAccount addr, itemName) -> return $ Constant $ SContractItem addr itemName
 
@@ -1306,7 +1316,7 @@ expToVar' x@(Xabi.IndexAccess _ parent (Just mIndex)) = do
       case (val, theIndex) of
         (SArray _ theVector, SInteger i) -> do
           if (fromIntegral i) >= length theVector then
-            indexOutOfBounds ("index value was " ++ (show i) ++ ", but the array length was " ++ (show $ length theVector)) $ unparseExpression x 
+            indexOutOfBounds ("index value was " ++ (show i) ++ ", but the array length was " ++ (show $ length theVector)) $ unparseExpression x
           else
             return $ theVector V.! fromIntegral i
         (SMap _ theMap, _) -> do maybe (indexOutOfBounds ("index value was " ++ (show theIndex) ++ ", but the valid indexes were " ++ (show $ M.keys theMap)) $ unparseExpression x)
@@ -1320,7 +1330,7 @@ expToVar' x@(Xabi.IndexAccess _ parent (Just mIndex)) = do
 expToVar' (Xabi.Binary _ "+" expr1 expr2) = expToVarAdd expr1 expr2
 expToVar' (Xabi.Binary _ "-" expr1 expr2) = expToVarInteger expr1 (-) expr2 SInteger
 expToVar' (Xabi.Binary _ "*" expr1 expr2) = expToVarInteger expr1 (*) expr2 SInteger
-expToVar' ex@(Xabi.Binary _ "/" expr1 expr2) = do 
+expToVar' ex@(Xabi.Binary _ "/" expr1 expr2) = do
   rhs <- getInt =<< expToVar expr2
   case rhs of
     0 -> divideByZero $ unparseExpression ex
@@ -1466,19 +1476,19 @@ expToVar' (Xabi.FunctionCall _ e args) = do
     Constant (SReference (AccountPath address (MS.StoragePath pieces))) -> do
       val' <- getVar $ Constant $ SReference $ AccountPath address $MS.StoragePath $ init pieces
       case (val', last pieces) of
-        
+
         (SContract _ toAddress', MS.Field funcName) -> do
           fromAddress <- getCurrentAccount
           let toAddress = namedAccountToAccount (fromAddress ^. accountChainId) toAddress'
-          res <- callWrapper fromAddress toAddress Nothing (BC.unpack funcName) False args 
+          res <- callWrapper fromAddress toAddress Nothing (BC.unpack funcName) False args
           case res of
             Just v -> return $ Constant $ v
             Nothing -> return $ Constant SNULL
-        
+
         (SAccount toAddress', MS.Field funcName) -> do
           fromAddress <- getCurrentAccount
           let toAddress = namedAccountToAccount (fromAddress ^. accountChainId) toAddress'
-          res <- callWrapper fromAddress toAddress Nothing (BC.unpack funcName) False args 
+          res <- callWrapper fromAddress toAddress Nothing (BC.unpack funcName) False args
           case res of
             Just v -> return $ Constant $ v
             Nothing -> return $ Constant SNULL
@@ -1511,7 +1521,7 @@ expToVar' (Xabi.FunctionCall _ e args) = do
       case argVals of
         OrderedVals [SInteger address] -> --TODO- clean up this ambiguity between SAddress and SInteger....
           return $ Constant $ SContract contractName' $ unspecifiedChain $ fromInteger address
-        OrderedVals [SAccount address ] -> 
+        OrderedVals [SAccount address ] ->
           return $ Constant $ SContract contractName' address
         OrderedVals [SContract _ addr] ->
           return $ Constant $ SContract contractName' $ addr
@@ -1530,14 +1540,14 @@ expToVar' (Xabi.FunctionCall _ e args) = do
 
       from <- getCurrentAccount
       let address = namedAccountToAccount (from ^. accountChainId) address'
-      result <- callWrapper from address Nothing itemName False args 
+      result <- callWrapper from address Nothing itemName False args
       return . Constant . fromMaybe SNULL $ result
 
     Constant (SContractFunction name address' functionName) -> do
-      
+
       from <- getCurrentAccount
       let address = namedAccountToAccount (from ^. accountChainId) address'
-      result <- callWrapper from address name functionName False args 
+      result <- callWrapper from address name functionName False args
       return . Constant . fromMaybe SNULL $ result
 
     Constant (SEnum enumName) -> do
@@ -1687,13 +1697,13 @@ callBuiltin "require" (SBool cond :msg) Nothing = do
 callBuiltin "assert" [SBool cond] Nothing = SNULL <$ assert cond
 callBuiltin "registerCert" [SAccount a, SString cert] _ = do
     curAccount <- getCurrentAccount
-    case _accountChainId curAccount of 
+    case _accountChainId curAccount of
       Just cid -> invalidWrite "Cannot register X.509 certificates on a private chain" cid
-      Nothing -> do 
+      Nothing -> do
         let ex509Cert = bsToCert . BC.pack $ cert
         case ex509Cert of
             Left _         -> return SNULL
-            Right x509Cert -> do 
+            Right x509Cert -> do
               x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
               let theAddress = _accountAddress $ namedAccountToAccount Nothing a
               Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.insert theAddress x509Cert x509s
@@ -1716,17 +1726,17 @@ certificateMap maybeCert = case maybeCert of
     Just cert -> SMap stringToString (fromMaybe emptyCertMap $ fmap (certMap cert) (subject cert))
     where subject cert = getCertSubject =<< (eitherToMaybe . bsToCert . BC.pack $ cert)
           certMap cert sub = M.fromList [ (SString "commonName", Constant . SString $ subCommonName sub)
-                                   , (SString "country", Constant . SString $ fromMaybe "" $ subCountry sub) 
-                                   , (SString "organization", Constant . SString $ subOrg sub) 
-                                   , (SString "group", Constant . SString $ fromMaybe "" $ subUnit sub) 
-                                   , (SString "publicKey", Constant . SString $ BC.unpack $ pubToBytes $ subPub sub) 
+                                   , (SString "country", Constant . SString $ fromMaybe "" $ subCountry sub)
+                                   , (SString "organization", Constant . SString $ subOrg sub)
+                                   , (SString "group", Constant . SString $ fromMaybe "" $ subUnit sub)
+                                   , (SString "publicKey", Constant . SString $ BC.unpack $ pubToBytes $ subPub sub)
                                    , (SString "certString", Constant . SString $ cert)
                                    ]
           emptyCertMap = M.fromList [ (SString "commonName", Constant . SString $ "")
-                             , (SString "country", Constant . SString $ "") 
-                             , (SString "organization", Constant . SString $ "") 
-                             , (SString "group", Constant . SString $ "") 
-                             , (SString "publicKey", Constant . SString $ "") 
+                             , (SString "country", Constant . SString $ "")
+                             , (SString "organization", Constant . SString $ "")
+                             , (SString "group", Constant . SString $ "")
+                             , (SString "publicKey", Constant . SString $ "")
                              , (SString "certString", Constant . SString $ "")
                              ]
           stringToString = Xabi.Mapping { Xabi.dynamic = Nothing
@@ -1800,7 +1810,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
 
   zipped <-
     case argVals of
-      OrderedVals vals -> 
+      OrderedVals vals ->
         forM (zip argTypeNames vals) $ \((t, n), v) -> do
           let correctedVal = coerceType contract' t v
           var <- createVar correctedVal
@@ -1811,7 +1821,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
               M.fromList
               $ map (\(k, v) -> (T.unpack . fromMaybe "" $ k, v))
               $ maybe einval Xabi.funcArgs $ contract' ^. constructor
-              
+
             typeAndVal =
               M.merge
                 (M.mapMissing (curry $ invalidArguments "missing argument"))
@@ -1819,7 +1829,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
                 (M.zipWithMatched $ \_k t v -> (t, v))
                 argTypes
                 (M.fromList ns)
-                         
+
         forM (M.toList typeAndVal) $ \(n, (Xabi.IndexedType _ t, v)) -> do
           let correctedVal = coerceType contract' t v
           var <- createVar correctedVal
@@ -1894,7 +1904,7 @@ runTheCall :: MonadSM m
 runTheCall address' contract' funcName hsh cc theFunction argVals ro = do
   let returns = [(T.unpack n, (t, defaultValue contract' t)) | (Just n, Xabi.IndexedType _ t) <- Xabi.funcVals theFunction]
       args = case argVals of
-        OrderedVals vs -> let argMeta = 
+        OrderedVals vs -> let argMeta =
                                 map (\(n, Xabi.IndexedType _ t) -> (T.unpack $ fromMaybe "" n, t))
                                 $ Xabi.funcArgs theFunction
                           in zipWith (\(n, t) v -> (n, (t, v))) argMeta vs
@@ -1916,8 +1926,8 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro = do
   onTraced $ do
     liftIO $ putStrLn $ "            args: " ++ show (map fst args)
     when (not $ null returns) $ liftIO $ putStrLn $ "    named return: " ++ show (map fst returns)
-  
-  localVars <- 
+
+  localVars <-
     forM locals $ \(n, (t, v)) -> do
       newVar <- liftIO $ fmap Variable $ newIORef v
       return (n, (t, newVar))
@@ -1983,7 +1993,7 @@ encodeForReturn (SString s) = do
   let offset = word256ToBytes $ fromIntegral (32 :: Int)
       encodedLength = word256ToBytes $ fromIntegral (B.length stringBytes)
       retStr = offset `B.append` (encodedLength `B.append` stringBytes)
-  return retStr 
+  return retStr
   where stringBytes = TE.encodeUtf8 $ T.pack s
 
 
@@ -2020,7 +2030,7 @@ encodeForReturn (STuple items) = encodeVector items
 encodeForReturn x = todo "Cannot encode this return type: " x
 
 encodeVector :: MonadSM m => V.Vector Variable -> m ByteString
-encodeVector v = do 
+encodeVector v = do
   (headers, strings) <- foldM buildEncoding (B.empty, B.empty) =<< mapM getVar (V.toList v)
   return $ headers `B.append` strings
   where
@@ -2033,7 +2043,7 @@ encodeVector v = do
             encStrLen = word256ToBytes $ fromIntegral (B.length encStr)
             strBS =  encStrLen `B.append` encStr
         return (headers `B.append` offset, strings `B.append` strBS)
-      tup@(STuple _) -> todo "encoding nested tuples as return values" tup 
-      val' -> do 
+      tup@(STuple _) -> todo "encoding nested tuples as return values" tup
+      val' -> do
         bs <- encodeForReturn val'
         return (headers `B.append` bs, strings)

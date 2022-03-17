@@ -69,6 +69,10 @@ argValueToType (ArgString _)    = SimpleType TypeString
 argValueToType (ArgArray v)     = TypeArrayDynamic $ argValueToType $ V.head v
 argValueToType (ArgObject _)    = TypeStruct ""
 
+isSimple :: Type -> Bool
+isSimple (SimpleType _) = True
+isSimple _              = False
+
 -- TODO: create valueToArgValue
 argValueToValue :: Maybe TypeDefs -> Type -> ArgValue -> Either Text Value
 argValueToValue defs theType argVal = case theType of
@@ -82,7 +86,23 @@ argValueToValue defs theType argVal = case theType of
       then ValueArrayFixed len . V.toList <$> traverse (argValueToValue defs ty) xs
       else Left . Text.pack $ "argValueToValue: Expected length of TypeArrayFixed to match length of the array. Expected " ++ show len ++ ", but got " ++ show (length xs)
     o -> Left . Text.pack $ "argValueToValue: Expected TypeArrayFixed to be an array, but got: " ++ show o
-  TypeMapping{}  -> Left "argValueToValue TODO: TypeMapping not yet implemented"
+  TypeMapping{}  -> do
+    case argVal of
+      ArgObject hm -> do
+        mp <- mapM (\v -> do
+          let inferredType = argValueToType v
+              value = argValueToValue defs inferredType v
+          return value
+          ) hm
+        let initialValueType = argValueToType $ snd . head $ HM.toList hm
+            isUniform = foldl (\b av -> b && argValueToType av == initialValueType) True hm
+        when (any isLeft mp) $ do
+          Left "argValueToValue: Could not parse object into a Mapping"
+        when (not isUniform) $ do
+          Left "argValueToValue: Mapping object does not contain uniform values"
+          -- Use a struct because it is parsed in the VM as different types once it has the correct type info for args
+        Right $ ValueStruct $ Map.fromList $ [(k, v) | (k, Right v) <- HM.toList mp]
+      a ->  Left $ Text.pack $ "argValueToValue: Expected TypeMapping to be a object, but got a" ++ show a
   TypeFunction{} -> Left "argValueToValue TODO: TypeFunction not yet implemented"
   TypeContract{} -> case argVal of
     ArgString str -> ValueContract <$> case readMaybe (Text.unpack str) of
@@ -109,7 +129,7 @@ argValueToValue defs theType argVal = case theType of
           return value
           ) hm
         when (any isLeft mp) $ do
-          Left "argValueToValue: Could not parse into a Struct"
+          Left "argValueToValue: Could not parse object into a Struct"
         Right $ ValueStruct $ Map.fromList $ [(k, v) | (k, Right v) <- HM.toList mp]
       a ->  Left $ Text.pack $ "argValueToValue: Expected TypeStruct to be a object, but got a" ++ show a
 
