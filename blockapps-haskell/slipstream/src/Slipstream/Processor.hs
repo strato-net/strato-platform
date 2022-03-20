@@ -481,6 +481,9 @@ processTheMessages env sqlEnv conn g messages = do
   forM_ creates $ \(ccString, cp, o, a, hl) -> do
     cc <- getCC cp ccString
 
+    $logInfoS "processTheMessages" $ "CodeCollection Added: " <> T.pack (format cp) <> ", contracts = " <> T.pack (show $ Map.keys $ cc^.contracts)
+
+
     deferredForeignKeys <- fmap concat $ forM (Map.toList $ cc^.contracts) $ \(nameString, c) -> do
       let n = T.pack nameString
 
@@ -489,7 +492,7 @@ processTheMessages env sqlEnv conn g messages = do
       historic <- isHistoric g $ historyTableName o a n
       let hasHistoryTable' = n `elem` hl || historic
       
-      $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o <> ", app=" <> a <> ", name=" <> n <> " (fields: " <> T.pack (show $ Map.keys $ c^.storageDefs) <> ")" <> if hasHistoryTable' then " HAS HISTORY TABLE" else ""
+      $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o <> ", app=" <> a <> ", name=" <> n <> " (fields: " <> T.pack (show $ Map.toList $ fmap varType $ c^.storageDefs) <> ")" <> if hasHistoryTable' then " HAS HISTORY TABLE" else ""
       let nameParts = (o, a, n)
 
       deferredForeignKeys <- outputData conn $ createExpandIndexTable g c nameParts
