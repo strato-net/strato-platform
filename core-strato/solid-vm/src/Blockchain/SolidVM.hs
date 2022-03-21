@@ -646,16 +646,18 @@ callWrapper from to mContract functionName isRCC argExps  = do
             let f' = (if from == to then id else pushSender from) $ runTheCall to contract functionName hsh cc theFunction args' ro
             return (f', args')
           _ -> do --Maybe the function is actually a getter
-            case M.lookup (T.pack functionName) $ contract^.CC.storageDefs of
-              Just _ -> do
-                liftIO $ putStrLn ("callWrapper/getter " ++ functionName) 
-                addCallInfo to contract functionName hsh cc M.empty True
+            case (M.lookup (T.pack functionName) $ contract^.CC.storageDefs, isSvm3_0) of
+              (Just _, True) -> do 
+                  liftIO $ putStrLn ("callWrapper/getter " ++ functionName) 
+                  addCallInfo to contract functionName hsh cc M.empty True
                 --TODO- this should only exist if the storage variable is declared "public", 
                 -- right now I just ignore this and allow anything to be called as a getter
-                val <- fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack functionName
-                popCallInfo
-                return (pure val, OrderedVals [])
-              Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName)
+                  val <- fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack functionName 
+                  popCallInfo
+                  return (pure val, OrderedVals []) 
+              (Just _, False) -> do 
+                return (fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack functionName, OrderedVals [])
+              (Nothing, _) -> unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName)
 
   when (isRCC && isSvm3_0) (
     forM_ [(n, theType) | (n, CC.VariableDecl theType _ Nothing _) <- M.toList $ contract'^.CC.storageDefs] $ \(n, theType) -> do
@@ -724,7 +726,7 @@ runStatement st@(CC.SimpleStatement (CC.ExpressionStatement (CC.Binary _ "=" dst
       indVal <- getVar =<< expToVar indExp
       case indVal of
         SInteger ind -> do
-          when (ind >= toInteger (V.length fs) || 0 > ind) (invalidWrite "Cannot assign a value outside the allocated space for an array" (unparseStatement st))
+          when ((ind >= toInteger (V.length fs) || 0 > ind) && (CC._vmVersion cntrct == "svm3.0")) (invalidWrite "Cannot assign a value outside the allocated space for an array" (unparseStatement st))
           let newVec = fs V.// [(fromIntegral ind, srcVar)]
           setVar pVar (SArray typ newVec)
           return Nothing
@@ -1096,9 +1098,11 @@ expToVar' (CC.Variable _ name) = do
   getVariableOfName name
 
 expToVar' (CC.Unitary _ "-" e) = do
-  var <- expToVar e
-  value <- getInt var
-  return $ Constant $ SInteger (value * (-1))
+  cntrct <- getCurrentContract
+  if ( not (CC._vmVersion cntrct == "svm3.0")) then invalidArguments "To use standard negative number declaration use the svm3.0 pragma" e else do
+    var <- expToVar e
+    value <- getInt var
+    return $ Constant $ SInteger (value * (-1))
 
 expToVar' (CC.PlusPlus _ e) = do
   var <- expToVar e
@@ -1445,9 +1449,10 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.Label contractName')) 
     $  erNewContractAccount execResults
 
 expToVar' (CC.FunctionCall _ e args) = do
-  case e of -- FunctionCall Special Case when calling a function via Member Access
-    (CC.MemberAccess _ (CC.Variable _ "Util") _) -> regularFunctionCall Nothing --Because of the hardcoded Util functions
-    (CC.MemberAccess _ expr name) -> do
+  cntrct <- getCurrentContract
+  case (e, (CC._vmVersion cntrct == "svm3.0")) of -- FunctionCall Special Case when calling a function via Member Access
+    ((CC.MemberAccess _ (CC.Variable _ "Util") _), _) -> regularFunctionCall Nothing --Because of the hardcoded Util functions
+    ((CC.MemberAccess _ expr name), True) -> do
       var1 <- expToVar expr
       val1 <- getVar var1
       case (val1, name) of

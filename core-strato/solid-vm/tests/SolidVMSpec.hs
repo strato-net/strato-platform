@@ -579,6 +579,7 @@ contract qq {
 
     it "can declare negative numbers" . runTest $ do
       runBS [r|
+pragma solidvm 3.0;
 contract qq {
   uint x;
   uint y;
@@ -894,9 +895,10 @@ contract qq {
 
   it "supports contract equality" . runTest $ do
     runBS [r|
+pragma solidvm 3.0;
 contract A {
 }
-
+pragma solidvm 3.0;
 contract qq {
   constructor() {
     A a1 = new A();
@@ -1219,12 +1221,14 @@ contract qq {
 
   it "can call external getters by variable name" . runTest $ do
     runBS [r|
+pragma solidvm 3.0;
 contract S {
   string s;
   constructor() {
     s = "Blockapps";
   }
 }
+pragma solidvm 3.0;
 contract qq {
   string local_s;
   S myS;
@@ -2036,6 +2040,7 @@ contract qq {
   it "can return state variables in tuples" . runTest $ do
 
     runCall "getSAndB" "()" [r|
+pragma solidvm 3.0;
 contract qq {
   string s = "The mitochondria is the powerhouse of the cell";
   function getSAndB() public returns (string, s) {
@@ -2998,6 +3003,7 @@ contract qq {
       ]
 
   it "can't assign a value to an unallocated index in an array" $ (runTest (runBS [r|
+pragma solidvm 3.0;
 contract qq {
   uint z;
   uint[] x;
