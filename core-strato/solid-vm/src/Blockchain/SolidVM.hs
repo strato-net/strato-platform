@@ -617,7 +617,7 @@ callWrapper from to mContract functionName isRCC argExps  = do
 
   let contract = fromMaybe contract' $ mContract >>= \c -> M.lookup c $ CC._contracts cc
       parentName' = if parentName == (CC._contractName contract) then "" else parentName
-      isSvm3_1 = CC._vmVersion contract == "svm3.1"
+      isSvm3_0 = CC._vmVersion contract == "svm3.0"
   
   initializeAction to (CC._contractName contract) parentName' hsh
 
@@ -646,7 +646,7 @@ callWrapper from to mContract functionName isRCC argExps  = do
             let f' = (if from == to then id else pushSender from) $ runTheCall to contract functionName hsh cc theFunction args' ro
             return (f', args')
           _ -> do --Maybe the function is actually a getter
-            case (M.lookup (T.pack functionName) $ contract^.CC.storageDefs,isSvm3_1) of
+            case (M.lookup (T.pack functionName) $ contract^.CC.storageDefs,isSvm3_0) of
               (Just _, True) -> do 
                   liftIO $ putStrLn ("callWrapper/getter " ++ functionName) 
                   addCallInfo to contract functionName hsh cc M.empty True
@@ -874,9 +874,10 @@ runStatement (CC.IfStatement condition code' maybeElseCode pos) = do
       Nothing -> return Nothing
 
 runStatement (CC.WhileStatement condition code pos) = do
+  cntrct <- getCurrentContract
   solidVMBreakpoint pos
      
-  while (getBool =<< expToVar condition) $ do
+  while cntrct (getBool =<< expToVar condition) $ do
       onTraced $ withSrcPos pos $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
       result <- runStatements code
       return result
@@ -895,6 +896,7 @@ runStatement (CC.DoWhileStatement code condition pos) = do
 --TODO- all the variables declared in an `if` or `for` code block need to be deleted when the block is finished....
 runStatement (CC.ForStatement maybeInitStatement maybeConditionExp maybeLoopExp code pos) = do
   solidVMBreakpoint pos
+  cntrct <- getCurrentContract
   _ <-
     case maybeInitStatement of
       Just initStatement -> runStatement $ CC.SimpleStatement initStatement pos
@@ -912,7 +914,7 @@ runStatement (CC.ForStatement maybeInitStatement maybeConditionExp maybeLoopExp 
 
   let condition = getBool =<< expToVar conditionExp
 
-  while condition $ do
+  while cntrct condition $ do
       onTraced $ withSrcPos pos $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
       result <- runStatements code
       _ <- getVar =<< expToVar loopExp
@@ -993,24 +995,24 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
 
 runStatement x = unknownStatement "unknown statement in call to runStatement: " (show x)
 
-while :: MonadSM m => m Bool -> m (Maybe Value) -> m (Maybe Value)
-while condition code = do
+while :: MonadSM m => CC.Contract -> m Bool -> m (Maybe Value) -> m (Maybe Value)
+while cntrct condition code = do
   c <- condition
   onTraced $ liftIO $ putStrLn $ C.red $ "^^^^^^^^^^^^^^^^^^^^ loopy condition: " ++ show c
-  cntrct <- getCurrentContract
   if c
     then do
       result <- code
-      if ( not (CC._vmVersion cntrct == "svm3.1")) then 
-        case result of
-          Nothing -> while condition code
-          _ -> return result
-      else
-        case result of
-          Nothing -> while condition code
-          Just SContinue -> while condition code
-          Just SBreak -> return Nothing
-          _ -> return result
+      if ( not (CC._vmVersion cntrct == "svm3.0")) 
+        then 
+          case result of
+            Nothing -> while cntrct condition code
+            _ -> return result
+        else
+          case result of
+            Nothing -> while cntrct condition code
+            Just SContinue -> while cntrct condition code
+            Just SBreak -> return Nothing
+            _ -> return result
     else return Nothing
 
 doWhile :: MonadSM m => m Bool -> m (Maybe Value) -> m (Maybe Value)
