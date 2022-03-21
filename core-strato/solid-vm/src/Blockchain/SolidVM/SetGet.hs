@@ -227,7 +227,7 @@ getVar (Constant (SReference addressedPath@(AccountPath addr key))) = do
 
 getVar (Constant (SStruct s ma)) = do
   cntrct <- getCurrentContract
-  if ( not (CC._vmVersion cntrct == "svm3.0")) then return (SStruct s ma) else do
+  if ( not (CC._vmVersion cntrct == "svm3.1")) then return (SStruct s ma) else do
     resolved <- mapM (\var -> do
         v <- getVar var
         return $ Constant v

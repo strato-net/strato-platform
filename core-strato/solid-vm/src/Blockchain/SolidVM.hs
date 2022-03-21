@@ -617,7 +617,7 @@ callWrapper from to mContract functionName isRCC argExps  = do
 
   let contract = fromMaybe contract' $ mContract >>= \c -> M.lookup c $ CC._contracts cc
       parentName' = if parentName == (CC._contractName contract) then "" else parentName
-      isSvm3_0 = CC._vmVersion contract == "svm3.0"
+      isSvm3_1 = CC._vmVersion contract == "svm3.1"
   
   initializeAction to (CC._contractName contract) parentName' hsh
 
@@ -646,7 +646,7 @@ callWrapper from to mContract functionName isRCC argExps  = do
             let f' = (if from == to then id else pushSender from) $ runTheCall to contract functionName hsh cc theFunction args' ro
             return (f', args')
           _ -> do --Maybe the function is actually a getter
-            case (M.lookup (T.pack functionName) $ contract^.CC.storageDefs, isSvm3_0) of
+            case (M.lookup (T.pack functionName) $ contract^.CC.storageDefs,isSvm3_1) of
               (Just _, True) -> do 
                   liftIO $ putStrLn ("callWrapper/getter " ++ functionName) 
                   addCallInfo to contract functionName hsh cc M.empty True
@@ -659,7 +659,18 @@ callWrapper from to mContract functionName isRCC argExps  = do
                 return (fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack functionName, OrderedVals [])
               (Nothing, _) -> unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName)
 
-  when (isRCC && isSvm3_0) (
+              {-
+              Just _ -> do
+                liftIO $ putStrLn ("callWrapper/getter " ++ functionName) 
+                addCallInfo to contract functionName hsh cc M.empty True
+                --TODO- this should only exist if the storage variable is declared "public", 
+                -- right now I just ignore this and allow anything to be called as a getter
+                val <- fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack functionName
+                popCallInfo
+                return (pure val, OrderedVals [])
+              Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName)-}
+
+  when isRCC (
     forM_ [(n, theType) | (n, CC.VariableDecl theType _ Nothing _) <- M.toList $ contract'^.CC.storageDefs] $ \(n, theType) -> do
       case theType of
         SVMType.Mapping _ _ _-> return ()
@@ -726,7 +737,7 @@ runStatement st@(CC.SimpleStatement (CC.ExpressionStatement (CC.Binary _ "=" dst
       indVal <- getVar =<< expToVar indExp
       case indVal of
         SInteger ind -> do
-          when ((ind >= toInteger (V.length fs) || 0 > ind) && (CC._vmVersion cntrct == "svm3.0")) (invalidWrite "Cannot assign a value outside the allocated space for an array" (unparseStatement st))
+          when (ind >= toInteger (V.length fs) || 0 > ind) (invalidWrite "Cannot assign a value outside the allocated space for an array" (unparseStatement st))
           let newVec = fs V.// [(fromIntegral ind, srcVar)]
           setVar pVar (SArray typ newVec)
           return Nothing
@@ -907,9 +918,15 @@ runStatement (CC.ForStatement maybeInitStatement maybeConditionExp maybeLoopExp 
       _ <- getVar =<< expToVar loopExp
       return result
 
-runStatement (CC.Break _) = return $ Just SBreak
+runStatement x@(CC.Break _) = do
+  cntrct <- getCurrentContract
+  if ( not (CC._vmVersion cntrct == "svm3.0")) then unknownStatement "unknown statement in call to runStatement: " (show x) else do
+    return $ Just SBreak
 
-runStatement (CC.Continue _) = return $ Just SContinue
+runStatement x@(CC.Continue _) = do 
+  cntrct <- getCurrentContract
+  if ( not (CC._vmVersion cntrct == "svm3.0")) then unknownStatement "unknown statement in call to runStatement: " (show x) else do
+    return $ Just SContinue
 
 runStatement (CC.Return maybeExpression pos) = do
   solidVMBreakpoint pos
@@ -980,14 +997,20 @@ while :: MonadSM m => m Bool -> m (Maybe Value) -> m (Maybe Value)
 while condition code = do
   c <- condition
   onTraced $ liftIO $ putStrLn $ C.red $ "^^^^^^^^^^^^^^^^^^^^ loopy condition: " ++ show c
+  cntrct <- getCurrentContract
   if c
     then do
       result <- code
-      case result of
-        Nothing -> while condition code
-        Just SContinue -> while condition code
-        Just SBreak -> return Nothing
-        _ -> return result
+      if ( not (CC._vmVersion cntrct == "svm3.1")) then 
+        case result of
+          Nothing -> while condition code
+          _ -> return result
+      else
+        case result of
+          Nothing -> while condition code
+          Just SContinue -> while condition code
+          Just SBreak -> return Nothing
+          _ -> return result
     else return Nothing
 
 doWhile :: MonadSM m => m Bool -> m (Maybe Value) -> m (Maybe Value)
@@ -1449,10 +1472,9 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.Label contractName')) 
     $  erNewContractAccount execResults
 
 expToVar' (CC.FunctionCall _ e args) = do
-  cntrct <- getCurrentContract
-  case (e, (CC._vmVersion cntrct == "svm3.0")) of -- FunctionCall Special Case when calling a function via Member Access
-    ((CC.MemberAccess _ (CC.Variable _ "Util") _), _) -> regularFunctionCall Nothing --Because of the hardcoded Util functions
-    ((CC.MemberAccess _ expr name), True) -> do
+  case e of -- FunctionCall Special Case when calling a function via Member Access
+    (CC.MemberAccess _ (CC.Variable _ "Util") _) -> regularFunctionCall Nothing --Because of the hardcoded Util functions
+    (CC.MemberAccess _ expr name) -> do
       var1 <- expToVar expr
       val1 <- getVar var1
       case (val1, name) of
