@@ -144,7 +144,7 @@ onTraced = when flags_svmTrace
 -- TODO: Do not add default values to RawStorageDBs for SolidVM > 3.
 onTracedSM :: MonadSM m => CC.Contract -> m () -> m ()
 onTracedSM cntrct m = do
-      let svm3_0 = CC._vmVersion cntrct == "svm3.0" || CC._vmVersion cntrct == "svm3.1"
+      let svm3_0 = CC._vmVersion cntrct == "svm3.0" || (CC._vmVersion cntrct == "svm3.1")
       when (flags_svmTrace && not svm3_0) m
       when (flags_svmTrace && svm3_0) $
         liftIO $ putStrLn $ "svmTrace statement(s) is absent because contract " 
@@ -617,7 +617,7 @@ callWrapper from to mContract functionName isRCC argExps  = do
 
   let contract = fromMaybe contract' $ mContract >>= \c -> M.lookup c $ CC._contracts cc
       parentName' = if parentName == (CC._contractName contract) then "" else parentName
-      isSvm3_0 = (CC._vmVersion contract == "svm3.0") || (CC._vmVersion contract == "svm3.1")
+      isSvm3_1 =  (CC._vmVersion contract == "svm3.1")
   
   initializeAction to (CC._contractName contract) parentName' hsh
 
@@ -646,7 +646,7 @@ callWrapper from to mContract functionName isRCC argExps  = do
             let f' = (if from == to then id else pushSender from) $ runTheCall to contract functionName hsh cc theFunction args' ro
             return (f', args')
           _ -> do --Maybe the function is actually a getter
-            case (M.lookup (T.pack functionName) $ contract^.CC.storageDefs,isSvm3_0) of
+            case (M.lookup (T.pack functionName) $ contract^.CC.storageDefs,isSvm3_1) of
               (Just _, True) -> do 
                   liftIO $ putStrLn ("callWrapper/getter " ++ functionName) 
                   addCallInfo to contract functionName hsh cc M.empty True
@@ -737,7 +737,7 @@ runStatement st@(CC.SimpleStatement (CC.ExpressionStatement (CC.Binary _ "=" dst
       indVal <- getVar =<< expToVar indExp
       case indVal of
         SInteger ind -> do
-          when (ind >= toInteger (V.length fs) || 0 > ind) (invalidWrite "Cannot assign a value outside the allocated space for an array" (unparseStatement st))
+          when ((ind >= toInteger (V.length fs) || 0 > ind)) (invalidWrite "Cannot assign a value outside the allocated space for an array" (unparseStatement st))
           let newVec = fs V.// [(fromIntegral ind, srcVar)]
           setVar pVar (SArray typ newVec)
           return Nothing
@@ -920,22 +920,30 @@ runStatement (CC.ForStatement maybeInitStatement maybeConditionExp maybeLoopExp 
 
 runStatement x@(CC.Break _) = do
   cntrct <- getCurrentContract
-  if ( not (CC._vmVersion cntrct == "svm3.0")) then unknownStatement "unknown statement in call to runStatement: " (show x) else do
+  if ( not ((CC._vmVersion cntrct == "svm3.0") || (CC._vmVersion cntrct == "svm3.1")) ) then unknownStatement "unknown statement in call to runStatement: " (show x) else do
     return $ Just SBreak
 
 runStatement x@(CC.Continue _) = do 
   cntrct <- getCurrentContract
-  if ( not (CC._vmVersion cntrct == "svm3.0")) then unknownStatement "unknown statement in call to runStatement: " (show x) else do
+  if ( not ((CC._vmVersion cntrct == "svm3.0") || (CC._vmVersion cntrct == "svm3.1")) ) then unknownStatement "unknown statement in call to runStatement: " (show x) else do
     return $ Just SContinue
 
 runStatement (CC.Return maybeExpression pos) = do
   solidVMBreakpoint pos
+  cntrct <- getCurrentContract
+
   case maybeExpression of
     Just e -> do
-      var <- expToVar e
-      var' <- getVar var
-      onTraced $ liftIO $ putStrLn $ (C.green ">> Returned value: ") ++ show var'
-      return $ Just var'
+      if (not ((CC._vmVersion cntrct == "svm3.0") || (CC._vmVersion cntrct == "svm3.1"))) 
+        then do
+          ql <- expToVar e
+          qlql <- getVar ql
+          return $ Just qlql
+        else do
+          var <- expToVar e
+          var' <- getVar var
+          onTraced $ liftIO $ putStrLn $ (C.green ">> Returned value: ") ++ show var'
+          return $ Just var'
 --      fmap Just $ getVar =<< expToVar e
     Nothing -> return $ Just SNULL
 
@@ -1122,7 +1130,7 @@ expToVar' (CC.Variable _ name) = do
 
 expToVar' (CC.Unitary _ "-" e) = do
   cntrct <- getCurrentContract
-  if ( not (CC._vmVersion cntrct == "svm3.0")) then invalidArguments "To use standard negative number declaration use the svm3.0 pragma" e else do
+  if ( not ((CC._vmVersion cntrct == "svm3.0") || (CC._vmVersion cntrct == "svm3.1"))) then invalidArguments "To use standard negative number declaration use the svm3.0 pragma" e else do
     var <- expToVar e
     value <- getInt var
     return $ Constant $ SInteger (value * (-1))

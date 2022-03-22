@@ -45,9 +45,9 @@ contract A {
 }
 |]
        in length anns `shouldBe` 0
-    it "warns when using a solidvm minor version other than 3.0" $
+    it "warns when using a solidvm minor version other than 3.0 or 3.1" $
       let anns = IncorrectSolidityVersion.detector `forSource` [r|
-pragma solidvm 3.1;
+pragma solidvm 3.2;
 contract A {
 }
 contract B {
@@ -56,7 +56,7 @@ contract B {
 }
 |]
        in length anns `shouldBe` 1
-    it "warns when using a solidvm major version other than 3.0" $
+    it "warns when using a solidvm major version other than 3.0 or 3.1" $
       let anns = IncorrectSolidityVersion.detector `forSource` [r|
 pragma solidvm 4.0;
 contract A {

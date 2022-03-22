@@ -1228,7 +1228,7 @@ contract qq {
 
   it "can call external getters by variable name" . runTest $ do
     runBS [r|
-pragma solidvm 3.0;
+pragma solidvm 3.1;
 contract S {
   string s;
   constructor() {
@@ -2047,7 +2047,7 @@ contract qq {
   it "can return state variables in tuples" . runTest $ do
 
     runCall "getSAndB" "()" [r|
-pragma solidvm 3.0;
+pragma solidvm 3.1;
 contract qq {
   string s = "The mitochondria is the powerhouse of the cell";
   function getSAndB() public returns (string, s) {
