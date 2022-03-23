@@ -592,7 +592,7 @@ getCallInfoForAccount acct = do
   -- We search from the top down for the home of this data
   stack <- Mod.get (Mod.Proxy @[CallInfo])
   case filter ((== acct) . currentAccount) stack of
-    [] -> internalError "" (acct, stack)
+    [] -> internalError "account not found in call stack" (acct, stack)
     (callInfo:_) -> return callInfo
 
 getXabiType :: Mod.Modifiable [CallInfo] m => Account -> B.ByteString -> m (Maybe SVMType.Type)

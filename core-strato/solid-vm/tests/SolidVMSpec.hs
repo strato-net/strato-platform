@@ -1044,7 +1044,7 @@ contract qq {
 
   it "can continue in a for-loop" . runTest $ do
     runBS [r|
-pragma solidvm 3.1;
+pragma solidvm 3.2;
 contract qq {
   uint i;
   constructor() public {
@@ -1061,7 +1061,7 @@ contract qq {
 
   it "can continue in a while-loop" . runTest $ do
     runBS [r|
-pragma solidvm 3.1;
+pragma solidvm 3.2;
 contract qq {
   uint i;
   constructor() public {
@@ -1079,7 +1079,7 @@ contract qq {
 
   it "can continue in a do-while-loop" . runTest $ do
     runBS [r|
-pragma solidvm 3.1;
+pragma solidvm 3.2;
 contract qq {
   uint i;
   constructor() public {
@@ -1097,7 +1097,7 @@ contract qq {
 
   it "can break from a for-loop" . runTest $ do
     runBS [r|
-pragma solidvm 3.1;
+pragma solidvm 3.2;
 contract qq {
   uint i = 25;
   constructor() public {
@@ -1113,7 +1113,7 @@ contract qq {
 
   it "can break from a while-loop" . runTest $ do
     runBS [r|
-pragma solidvm 3.1;
+pragma solidvm 3.2;
 contract qq {
   uint i = 0;
   constructor() public {
@@ -1129,7 +1129,7 @@ contract qq {
 
   it "can break from a do-while loop" . runTest $ do
     runBS [r|
-pragma solidvm 3.1;
+pragma solidvm 3.2;
 contract qq {
   uint i = 0;
   constructor() public {
@@ -1145,7 +1145,7 @@ contract qq {
 
   it "can break immediately from a loop" . runTest $ do
     runBS [r|
-pragma solidvm 3.1;
+pragma solidvm 3.2;
 contract qq {
   uint i = 25;
   constructor() public {
@@ -1228,14 +1228,14 @@ contract qq {
 
   it "can call external getters by variable name" . runTest $ do
     runBS [r|
-pragma solidvm 3.1;
+pragma solidvm 3.2;
 contract S {
   string s;
   constructor() {
     s = "Blockapps";
   }
 }
-pragma solidvm 3.0;
+pragma solidvm 3.2;
 contract qq {
   string local_s;
   S myS;
@@ -2047,7 +2047,7 @@ contract qq {
   it "can return state variables in tuples" . runTest $ do
 
     runCall "getSAndB" "()" [r|
-pragma solidvm 3.1;
+pragma solidvm 3.2;
 contract qq {
   string s = "The mitochondria is the powerhouse of the cell";
   function getSAndB() public returns (string, s) {

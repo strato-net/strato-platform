@@ -144,7 +144,7 @@ onTraced = when flags_svmTrace
 -- TODO: Do not add default values to RawStorageDBs for SolidVM > 3.
 onTracedSM :: MonadSM m => CC.Contract -> m () -> m ()
 onTracedSM cntrct m = do
-      let svm3_0 = CC._vmVersion cntrct == "svm3.0" || (CC._vmVersion cntrct == "svm3.1")
+      let svm3_0 = CC._vmVersion cntrct == "svm3.0" || (CC._vmVersion cntrct == "svm3.2")
       when (flags_svmTrace && not svm3_0) m
       when (flags_svmTrace && svm3_0) $
         liftIO $ putStrLn $ "svmTrace statement(s) is absent because contract " 
@@ -281,7 +281,7 @@ create' creator newAccount ch cc contractName' argExps x509s = do
 
   A.adjustWithDefault_ (A.Proxy @AddressState) newAccount $ \newAddressState ->
     pure newAddressState{ addressStateContractRoot = MP.emptyTriePtr
-                        , addressStateCodeHash = if ((vmVersion' == "svm3.0" || vmVersion' == "svm3.1")  && contractName' /= parentName && not (null parentName)) then CodeAtAccount creator contractName' else SolidVMCode contractName' ch
+                        , addressStateCodeHash = if ((vmVersion' == "svm3.0" || vmVersion' == "svm3.2")  && contractName' /= parentName && not (null parentName)) then CodeAtAccount creator contractName' else SolidVMCode contractName' ch
                         }
 
   onTraced $ liftIO $ putStrLn $ C.red $ "Creating Contract: " ++ show newAccount ++ " of type " ++ contractName'
@@ -443,7 +443,7 @@ setCreator creator contract cntrct blockNumber = do
     
     Nothing -> liftIO $ putStrLn $ C.red $ "setCreator/versioning ---> No cert found for " ++ (format creator)
   
-  let hasSvm3_0 = CC._vmVersion cntrct == "svm3.0" || CC._vmVersion cntrct == "svm3.1"
+  let hasSvm3_0 = CC._vmVersion cntrct == "svm3.0" || CC._vmVersion cntrct == "svm3.2"
   let putCreatorField org = do
         liftIO $ putStrLn $ "setCreator/versioning ---> setting the org as " ++ (show org)
         putSolidStorageKeyVal' hasSvm3_0 contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack org)
@@ -471,7 +471,7 @@ computeNetworkID =
 -- get the org for the Cirrus table name
 getOrg :: MonadSM m => Account -> String -> m (String)
 getOrg caller vers = do
-  if ((vers /= "svm3.0") && (vers /= "svm3.1")) 
+  if ((vers /= "svm3.0") && (vers /= "svm3.2")) 
     then return ""
   else do 
     liftIO $ putStrLn $ "getOrg/versioning ---> Getting org for the caller " ++ format caller
@@ -617,7 +617,7 @@ callWrapper from to mContract functionName isRCC argExps  = do
 
   let contract = fromMaybe contract' $ mContract >>= \c -> M.lookup c $ CC._contracts cc
       parentName' = if parentName == (CC._contractName contract) then "" else parentName
-      isSvm3_1 =  (CC._vmVersion contract == "svm3.1")
+      isSvm3_1 =  (CC._vmVersion contract == "svm3.2")
   
   initializeAction to (CC._contractName contract) parentName' hsh
 
@@ -920,12 +920,12 @@ runStatement (CC.ForStatement maybeInitStatement maybeConditionExp maybeLoopExp 
 
 runStatement x@(CC.Break _) = do
   cntrct <- getCurrentContract
-  if ( not ((CC._vmVersion cntrct == "svm3.0") || (CC._vmVersion cntrct == "svm3.1")) ) then unknownStatement "unknown statement in call to runStatement: " (show x) else do
+  if ( not ((CC._vmVersion cntrct == "svm3.0") || (CC._vmVersion cntrct == "svm3.2")) ) then unknownStatement "unknown statement in call to runStatement: " (show x) else do
     return $ Just SBreak
 
 runStatement x@(CC.Continue _) = do 
   cntrct <- getCurrentContract
-  if ( not ((CC._vmVersion cntrct == "svm3.0") || (CC._vmVersion cntrct == "svm3.1")) ) then unknownStatement "unknown statement in call to runStatement: " (show x) else do
+  if ( not ((CC._vmVersion cntrct == "svm3.0") || (CC._vmVersion cntrct == "svm3.2")) ) then unknownStatement "unknown statement in call to runStatement: " (show x) else do
     return $ Just SContinue
 
 runStatement (CC.Return maybeExpression pos) = do
@@ -934,7 +934,7 @@ runStatement (CC.Return maybeExpression pos) = do
 
   case maybeExpression of
     Just e -> do
-      if (not ((CC._vmVersion cntrct == "svm3.0") || (CC._vmVersion cntrct == "svm3.1"))) 
+      if (not ((CC._vmVersion cntrct == "svm3.2"))) 
         then do
           ql <- expToVar e
           qlql <- getVar ql
@@ -1009,7 +1009,7 @@ while condition code = do
   if c
     then do
       result <- code
-      if ( not (CC._vmVersion cntrct == "svm3.1")) then 
+      if ( not (CC._vmVersion cntrct == "svm3.2")) then 
         case result of
           Nothing -> while condition code
           _ -> return result
@@ -1130,7 +1130,7 @@ expToVar' (CC.Variable _ name) = do
 
 expToVar' (CC.Unitary _ "-" e) = do
   cntrct <- getCurrentContract
-  if ( not ((CC._vmVersion cntrct == "svm3.0") || (CC._vmVersion cntrct == "svm3.1"))) then invalidArguments "To use standard negative number declaration use the svm3.0 pragma" e else do
+  if ( not ((CC._vmVersion cntrct == "svm3.0") || (CC._vmVersion cntrct == "svm3.2"))) then invalidArguments "To use standard negative number declaration use the svm3.0 pragma" e else do
     var <- expToVar e
     value <- getInt var
     return $ Constant $ SInteger (value * (-1))
