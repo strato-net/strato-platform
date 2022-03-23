@@ -204,45 +204,45 @@ processedContract ABIID{..} state AggregateAction{..} =
 lookupT :: (Monad m, Ord k) => k -> Map.Map k v -> MaybeT m v
 lookupT k = MaybeT . return . Map.lookup k
 
-
+-- Not used but kept commented out if it is needed again
 -- Tries to get contract metadata ID and contract details for a given contract.
 --  If they're not in the cache but they are in bloc database or action metadata,
 --  it reparses the whole source blob, and caches the details for every contract
-getSolidVMInfoForRow :: ( MonadIO m
-                           , MonadLogger m
-                           , Accessible BlocEnv m
-                           , HasBlocSQL m
-                           , Selectable Account AddressState m
-                           , (Keccak256 `Alters` SourceMap) m
-                           )
-                        => IORef Globals -> AggregateAction -> m (Maybe (Map.Map Text CodePtr))
-getSolidVMInfoForRow g row = runMaybeT  
-   $  checkCache 
-  <|> checkMetadata
-  <|> checkBloc 
+-- getSolidVMInfoForRow :: ( MonadIO m
+--                            , MonadLogger m
+--                            , Accessible BlocEnv m
+--                            , HasBlocSQL m
+--                            , Selectable Account AddressState m
+--                            , (Keccak256 `Alters` SourceMap) m
+--                            )
+--                         => IORef Globals -> AggregateAction -> m (Maybe (Map.Map Text CodePtr))
+-- getSolidVMInfoForRow g row = runMaybeT  
+--    $  checkCache 
+--   <|> checkMetadata
+--   <|> checkBloc 
   
-  where checkCache = do
-          $logInfoS "getInfoForRow" . T.pack $ "checking cache for contract info"
-          MaybeT $ getSolidVMInfo g codePtr
+--   where checkCache = do
+--           $logInfoS "getInfoForRow" . T.pack $ "checking cache for contract info"
+--           MaybeT $ getSolidVMInfo g codePtr
         
-        checkMetadata = do
-          $logInfoS "getInfoForRow" . T.pack $ "checking metadata for contract info"
-          src <- lookupT "src" $ actionMetadata row 
-          parseAndSet $ deserializeSourceMap src
+--         checkMetadata = do
+--           $logInfoS "getInfoForRow" . T.pack $ "checking metadata for contract info"
+--           src <- lookupT "src" $ actionMetadata row 
+--           parseAndSet $ deserializeSourceMap src
         
-        checkBloc = do
-          $logInfoS "getDetailsForRow" . T.pack $ "checking bloc database for contract info"
-          details <- (MaybeT $ either (const Nothing) Just <$> getContractDetailsByCodeHash codePtr)
-          parseAndSet $ OLD.contractdetailsSrc details
+--         checkBloc = do
+--           $logInfoS "getDetailsForRow" . T.pack $ "checking bloc database for contract info"
+--           details <- (MaybeT $ either (const Nothing) Just <$> getContractDetailsByCodeHash codePtr)
+--           parseAndSet $ OLD.contractdetailsSrc details
 
-        -- parse source code, add all of details to cache, return the one we need
-        parseAndSet src = do
-          details <- lift $ sourceToContractDetails (Don't Compile) src -- :: Map Text ContractDetails
-          let infoMap = fmap OLD.contractdetailsCodeHash details
-          setSolidVMInfo g codePtr infoMap
-          pure infoMap
+--         -- parse source code, add all of details to cache, return the one we need
+--         parseAndSet src = do
+--           details <- lift $ sourceToContractDetails (Don't Compile) src -- :: Map Text ContractDetails
+--           let infoMap = fmap OLD.contractdetailsCodeHash details
+--           setSolidVMInfo g codePtr infoMap
+--           pure infoMap
           
-        codePtr = actionCodeHash row
+--         codePtr = actionCodeHash row
 
 
 
@@ -264,67 +264,64 @@ getEVMDetailsForRow row = liftM2 (<|>)
     detailsMap <- lift . sourceToContractDetails (Do Compile) $ deserializeSourceMap src
     lookupT name detailsMap)
 
-
+-- Commented out but could still be used if we introduce more globals to slipstream
 -- only used for EVM
-adjustGlobals :: ( MonadIO m
-                 , MonadLogger m
-                 , HasBlocSQL m
-                 , (Keccak256 `Alters` SourceMap) m
-                 )
-              => IORef Globals
-              -> AggregateAction
-              -> OLD.ContractDetails
-              -> m ()
-adjustGlobals gref row details = do
+-- adjustGlobals :: ( MonadIO m
+--                  , MonadLogger m
+--                  , HasBlocSQL m
+--                  , (Keccak256 `Alters` SourceMap) m
+--                  )
+--               => IORef Globals
+--               -> AggregateAction
+--               -> OLD.ContractDetails
+--               -> m ()
+-- adjustGlobals _ _ details = do
   -- TODO: because this uses HistoryTableName directly - this won't work if we add other (non-history) globals
-  detailsMap <- sourceToContractDetails (Do Compile) $ OLD.contractdetailsSrc details
-  mapM_ (go detailsMap) $ [("history", enableHistoryTable)
-                          ,("nohistory", disableHistoryTable)
-                          ]
-
-  where 
-    go m (k,f) = runMaybeT $ do
-        v <- lookupT k $ actionMetadata row
-        let contracts' = filter (not . T.null) $ T.splitOn "," v
-        forM_ contracts' $ \c -> do
-          details' <- lookupT c m
-          let codePtr = OLD.contractdetailsCodeHash details'
-          $logInfoS "adjustGlobals" . T.pack $ "Adding to globals for " ++ T.unpack k ++ ": " ++ show codePtr
-          lift $ f gref $ HistoryTableName (actionOrganization row) (actionApplication row) (OLD.contractdetailsName details')
+  -- detailsMap <- sourceToContractDetails (Do Compile) $ OLD.contractdetailsSrc details
+  -- mapM_ (go detailsMap) $ [("history", enableHistoryTable)
+  --                         ,("nohistory", disableHistoryTable)
+  --                         ]
+  -- return $ fmap OLD.contractdetailsCodeHash detailsMap
+  -- where 
+  --   go m (k,f) = runMaybeT $ do
+  --       v <- lookupT k $ actionMetadata row
+  --       let contracts' = filter (not . T.null) $ T.splitOn "," v
+  --       forM_ contracts' $ \c -> do
+  --         details' <- lookupT c m
+  --         let codePtr = OLD.contractdetailsCodeHash details'
+  --         $logInfoS "adjustGlobals" . T.pack $ "Adding to globals for " ++ T.unpack k ++ ": " ++ show codePtr
+  --         lift $ f gref $ historyTableName (actionOrganization row) (actionApplication row) (OLD.contractdetailsName details')
   -- TODO: ideally we check if these flags are in the metadata BEFORE we get the detailsMap
   
-adjustSolidVMGlobals :: ( MonadIO m
-                 , MonadLogger m
-                 , HasBlocSQL m
-                 , Accessible BlocEnv m
-                 , Selectable Account AddressState m
-                 , (Keccak256 `Alters` SourceMap) m
-                 )
-              => IORef Globals
-              -> AggregateAction
-              -> m ()
-adjustSolidVMGlobals gref row = do
-  -- TODO: because this uses HistoryTableName directly - this won't work if we add other (non-history) globals
-  let
-    go m (k,f) = runMaybeT $ do
-        -- if neither key (history/nohistory) is found, then this monad will contain the value of Nothing and nothing else will be computed
-        v <- lookupT k $ actionMetadata row
-        let contracts' = filter (not . T.null) $ T.splitOn "," v
-        forM_ contracts' $ \c -> do
-          -- infoMap (m) is only computed if this statement is evaluated 
-          codePtr@(SolidVMCode name _) <- lookupT c m
-          $logInfoS "adjustGlobals" . T.pack $ "Adding to globals for " ++ T.unpack k ++ ": " ++ (show codePtr)
-          lift $ f gref $ HistoryTableName (actionOrganization row) (actionApplication row) (T.pack name)
+-- adjustSolidVMGlobals :: ( MonadIO m
+--                  , MonadLogger m
+--                  , HasBlocSQL m
+--                  , Accessible BlocEnv m
+--                  , Selectable Account AddressState m
+--                  , (Keccak256 `Alters` SourceMap) m
+--                  )
+--               => IORef Globals
+--               -> AggregateAction
+--               -> m (Map.Map Text CodePtr)
+-- adjustSolidVMGlobals gref row = do
+--   -- let
+--   --   go m (k,f) = runMaybeT $ do
+--   --       v <- lookupT k $ actionMetadata row
+--   --       let contracts' = filter (not . T.null) $ T.splitOn "," v
+--   --       forM_ contracts' $ \c -> do
+--   --         codePtr@(SolidVMCode name _) <- lookupT c m
+--   --         $logInfoS "adjustGlobals" . T.pack $ "Adding to globals for " ++ T.unpack k ++ ": " ++ (show codePtr)
+--   --         lift $ f gref $ historyTableName (actionOrganization row) (actionApplication row) (T.pack name)
 
-  infoMap <- do 
-    mMap <- getSolidVMInfoForRow gref row
-    case mMap of
-      Nothing -> error "SolidVMInfo should be in the cache, but adjustGlobals didn't find them"
-      Just dMap -> return dMap
-  mapM_ (go infoMap) $ [("history", enableHistoryTable)
-                          ,("nohistory", disableHistoryTable)
-                          ]
-  -- Because of haskell lazy evaluation, the infoMap will only be computed if it is needed
+--   infoMap <- do 
+--     mMap <- getSolidVMInfoForRow gref row
+--     case mMap of
+--       Nothing -> error "SolidVMInfo should be in the cache, but adjustGlobals didn't find them"
+--       Just dMap -> return dMap
+--   -- mapM_ (go infoMap) $ [("history", enableHistoryTable)
+--   --                         ,("nohistory", disableHistoryTable)
+--   --                         ]
+--   return infoMap
 
 readPreviousEVMState :: MonadIO m =>
                         IORef Globals -> Account -> OLD.Contract -> m [(Text, Value)]
@@ -351,7 +348,7 @@ rowToHistories :: (MonadIO m, MonadLogger m) =>
                -> [(Text, Value)]
                -> m [ProcessedContract]
 rowToHistories gref abiid row actions cont oldState = do
-  hist <- isHistoric gref $ HistoryTableName (actionOrganization row) (actionApplication row) (aiName abiid)
+  hist <- isHistoric gref $ historyTableName (actionOrganization row) (actionApplication row) (aiName abiid)
   if not hist
     then pure []
     else flip evalStateT oldState . forM actions $ \hRow -> do
@@ -450,13 +447,14 @@ getEVMInserts g row actions acct = do
                     <> (T.pack . show $ actionCodeHash row)
                     <> " and no 'src' field found in actionMetadata"
     Just details -> do
-      let abiid = ABIID
-            { aiName = T.filter (/= '"') $ OLD.contractdetailsName details
-            , aiChain = maybe "" (T.pack . chainIdString . ChainId) $ (actionAccount row ^. accountChainId)
-            }
+      let cid = maybe "" (T.pack . chainIdString . ChainId) $ (actionAccount row ^. accountChainId)
+          name = T.filter (/= '"') $ OLD.contractdetailsName details
+          abiid = ABIID {
+            aiName = name,
+            aiChain = cid
+          }
           cont = either error id . xAbiToContract $ OLD.contractdetailsXabi details
-      adjustGlobals g row details
-
+      -- adjustGlobals g row details
       oldState <- readPreviousEVMState g acct cont
       indexContract <- rowToInsert g abiid row cont oldState
       hs <- rowToHistories g abiid row actions cont oldState
@@ -483,18 +481,26 @@ processTheMessages env sqlEnv conn g messages = do
 
     deferredForeignKeys <- fmap concat $ forM (Map.toList $ cc^.contracts) $ \(nameString, c) -> do
       let n = T.pack nameString
+    
+      let htn = historyTableName o a n
+          historyTableNames = map (historyTableName o a) hl 
+          historyEnabled = htn `elem` historyTableNames
+      $logInfoS "processTheMessages/historyTableNames" $ T.pack $ show historyTableNames 
 
-      --If the request gives this a history list, or if a previous one gave this a history list,
-      --it has a history list
-      historic <- isHistoric g $ historyTableName o a n
-      let hasHistoryTable' = n `elem` hl || historic
+      -- If the table name is found in globals, then keep history as it is, otherwise set it to respective value from this creation
+      historyStatus <- historyStatusCreated g htn
+      when (not historyStatus) $ do
+        -- history status is not defined, so set it to whether or not this is found in the history list
+        setHistoryTable g htn historyEnabled
+
+      hasHistoryTable <- isHistoric g htn
       
-      $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o <> ", app=" <> a <> ", name=" <> n <> " (fields: " <> T.pack (show $ Map.keys $ c^.storageDefs) <> ")" <> if hasHistoryTable' then " HAS HISTORY TABLE" else ""
+      $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o <> ", app=" <> a <> ", name=" <> n <> " (fields: " <> T.pack (show $ Map.keys $ c^.storageDefs) <> ")" <> if hasHistoryTable then " HAS HISTORY TABLE" else ""
       let nameParts = (o, a, n)
 
       deferredForeignKeys <- outputData conn $ createExpandIndexTable g c nameParts
 
-      when hasHistoryTable' $
+      when hasHistoryTable $
         outputData conn $ createExpandHistoryTable g c nameParts
 
       outputData conn . createEventTables g $ contractToEventTables nameParts c
@@ -520,13 +526,18 @@ processTheMessages env sqlEnv conn g messages = do
       case actionStorage row of
         Action.EVMDiff{} -> evmInsertsF g row actions acct
         Action.SolidVMDiff{} -> do
-          let abiid = ABIID (T.pack name) $ maybe "" (T.pack . chainIdString . ChainId) $ (actionAccount row ^. accountChainId)
+          let cid = maybe "" (T.pack . chainIdString . ChainId) $ (actionAccount row ^. accountChainId)
               (SolidVMCode name _) = actionCodeHash row
+              abiid = ABIID {
+                aiName = T.pack name,
+                aiChain = cid
+              }
               cont = error "internal error: contract should be unused for Solidvm"
-          adjustSolidVMGlobals g row
+          $logDebugLS "Contract name is: " $ show name
           oldState <- readPreviousSolidVMState g acct
           indexContract <- rowToInsert g abiid row cont oldState
           hs <- rowToHistories g abiid row actions cont oldState
+          $logDebugLS "History inserts are: " $ show hs
           pure . Right $ BatchedInserts indexContract hs
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
