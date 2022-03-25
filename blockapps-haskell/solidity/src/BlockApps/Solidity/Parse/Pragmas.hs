@@ -15,6 +15,6 @@ solidityPragma :: SolidityParser SourceUnit
 solidityPragma = do
   reserved "pragma"
   pragmaName <- identifier
-  rest <- many1 (noneOf ";")
+  rest <- many (noneOf ";")
   semi
   return $ Pragma pragmaName rest

@@ -19,7 +19,7 @@ solidityPragma = do
   ~(a, (pragmaName, rest)) <- withPosition $ do
     reserved "pragma"
     pragmaName <- identifier
-    rest <- many1 (noneOf ";")
+    rest <- many (noneOf ";")
     semi
     pure (pragmaName, rest)
   return $ Pragma a pragmaName rest

@@ -42,9 +42,14 @@ import           SolidVM.CodeCollectionTools
 import           SolidVM.Model.CodeCollection
 import           SolidVM.Solidity.Parse.Declarations
 import           SolidVM.Solidity.Parse.File
+import           SolidVM.Solidity.Detectors.Typechecker as TC
 
 data ParseOrSolidVMError = PEx ParseError
                          | SVMEx (Positioned ((,) SolidException)) deriving (Show)
+
+
+--CodeCollection -> [SourceAnnotation T.Text]
+-- TC.detector
 
 {-# NOINLINE unsafeCodeMapIORef #-}
 unsafeCodeMapIORef :: IORef (Map Keccak256 CodeCollection)
@@ -91,7 +96,12 @@ compileSource = applyInheritanceE <=< compileSourceNoInheritance
   where applyInheritanceE = first SVMEx . applyInheritance
 
 compileSourceWithAnnotations :: Map T.Text T.Text -> Either [SourceAnnotation T.Text] CodeCollection
-compileSourceWithAnnotations = withAnnotations compileSource
+compileSourceWithAnnotations mTT = case (withAnnotations compileSource mTT) of
+  Left x -> Left x
+  Right cc ->
+    case TC.detector cc of
+      [] -> Right cc
+      errs -> Left errs
 
 codeCollectionFromSource :: (MonadIO m, HasCodeDB m) => B.ByteString -> m (Keccak256, CodeCollection)
 codeCollectionFromSource initCode = do

@@ -15,8 +15,9 @@ spec = do
   describe "Pragma" $ do
     it "should fail without an identifier" $
       pragmaParse "pragma;" `shouldSatisfy` isLeft
-    it "should fail without contents" $
-      pragmaParse "pragma ident  ;" `shouldSatisfy` isLeft
+    it "should pass without contents for version number" $
+      pragmaParse "pragma typecheck;" `shouldBe`
+        Right (Pragma "typecheck" "")
     it "shoudl fail without a ;" $
       pragmaParse "pragma solc 0.4.8" `shouldSatisfy` isLeft
     it "should pass with arbitrary text" $

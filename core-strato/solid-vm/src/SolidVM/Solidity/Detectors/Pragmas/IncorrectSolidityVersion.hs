@@ -17,5 +17,6 @@ detector = concatMap detectOneUnit
 detectOneUnit :: SourceUnit -> [SourceAnnotation Text]
 detectOneUnit (Pragma _ "solidvm" "3.0") = []
 detectOneUnit (Pragma _ "solidvm" "3.2") = []
+detectOneUnit (Pragma _ "typecheck" "" ) = []
 detectOneUnit (Pragma a name ver) = [(const $ T.pack $ "Unsupported pragma: " <> name <> " " <> ver) <$> a]
 detectOneUnit _ = []

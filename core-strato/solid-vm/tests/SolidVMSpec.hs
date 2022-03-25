@@ -1560,6 +1560,7 @@ contract qq {
 
   it "can assign to tuples" . runTest $ do
     runBS [r|
+pragma solidvm 3.3;
 contract qq {
   uint x;
   uint y;
