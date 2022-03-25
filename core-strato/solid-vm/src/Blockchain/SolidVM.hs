@@ -1711,8 +1711,16 @@ callBuiltin "uint" args _ = return $ intBuiltin args
 callBuiltin "int" args _ = return $ intBuiltin args
 callBuiltin "push" [v] (Just o) = typeError "push (called as func, not as method)" (v, o)
 callBuiltin "identity" [v] Nothing = return v
-callBuiltin "keccak256" [SString buf] Nothing = do
-  return . SString . BC.unpack . keccak256ToByteString . hash . BC.pack $ buf
+callBuiltin "keccak256" args Nothing = do
+  let allStrings [] = True
+      allStrings ((SString _):xs) = True && (allStrings xs)
+      allStrings _ = False
+      customConcat [] = ""
+      customConcat ((SString str):ys) = str ++ customConcat ys
+      customConcat _ = invalidArguments "cannot use a non string arguments in keccak256" args
+  case allStrings args of
+    False -> invalidArguments "cannot use a non string arguments in keccak256" args
+    True ->  return . SString . BC.unpack . keccak256ToByteString . hash . BC.pack $ customConcat args
 callBuiltin "require" (SBool cond :msg) Nothing = do
   case msg of
     [] -> require cond Nothing
