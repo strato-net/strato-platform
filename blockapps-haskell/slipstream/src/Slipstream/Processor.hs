@@ -464,6 +464,11 @@ processTheMessages :: (MonadIO m, MonadUnliftIO m, MonadLogger m, HasSQL m) =>
                       BlocEnv -> BlocSQLEnv -> PGConnection -> IORef Globals -> [VMEvent] -> m ()
 processTheMessages env sqlEnv conn g messages = do
 
+  case length messages of
+   0 -> return ()
+   1 -> $logInfoS "processTheMessages" "1 message has arrived"
+   n -> $logInfoS "processTheMessages" . T.pack $ show n ++ " messages have arrived"
+
   let changes = parseActions messages
       events' = parseEvents messages
       -- TODO (Dan) : would be nice if we didn't just rip events out at the top level like this
@@ -507,10 +512,6 @@ processTheMessages env sqlEnv conn g messages = do
     forM_ deferredForeignKeys $ \deferredForeignKey -> do
       outputData conn $ createForeignIndexesForJoins deferredForeignKey
 
-  case length messages of
-   0 -> return ()
-   1 -> $logInfoS "processTheMessages" "1 message has arrived"
-   n -> $logInfoS "processTheMessages" . T.pack $ show n ++ " messages have arrived"
 
   inserts <- enterBloc2 env sqlEnv $ do
     forM changes $ \(acct,actions) -> do
@@ -552,7 +553,10 @@ processTheMessages env sqlEnv conn g messages = do
 
   forM_ insertsByCodeHash $ \ins -> do
     unless (null ins) $ outputData conn . insertForeignKeys $ map indexInsert ins
-
+  
+  when ((length $ filter (not . null) insertsByCodeHash ) > 0 || length creates > 0) $
+    outputData conn notifyPostgREST
+  
   when (length events' > 0) $ 
     outputData conn $ insertExpandEventTables g events'
 
@@ -560,6 +564,5 @@ processTheMessages env sqlEnv conn g messages = do
 
   forM_ transactionResults $ putTransactionResult
 
-  outputData conn notifyPostgREST
   
   flushPendingWrites g
