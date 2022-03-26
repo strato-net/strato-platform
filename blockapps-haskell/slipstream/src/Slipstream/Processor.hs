@@ -546,7 +546,7 @@ processTheMessages env sqlEnv conn g messages = do
     outputData conn . insertHistoryTable g $ concatMap historyInserts ins
 
   forM_ insertsByCodeHash $ \ins -> do
-    unless (null ins) $ outputData conn . insertForeignKeys $ map indexInsert ins
+    unless (null ins) $ insertForeignKeys conn $ map indexInsert ins
 
   when (length events' > 0) $ 
     outputData conn $ insertExpandEventTables g events'
@@ -555,6 +555,6 @@ processTheMessages env sqlEnv conn g messages = do
 
   forM_ transactionResults $ putTransactionResult
 
-  outputData conn notifyPostgREST
+  notifyPostgREST conn
   
   flushPendingWrites g
