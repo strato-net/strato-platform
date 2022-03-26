@@ -9,7 +9,6 @@ blockTime=${blockTime:-13} # keep default the same as strato
 #NODE_HOST=${NODE_HOST}
 ssl=${ssl:-false}
 sslCertFileType=${sslCertFileType:-crt}
-OAUTH_ENABLED=${OAUTH_ENABLED:-false}
 OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-NULL}
 OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-NULL}
 OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
