@@ -10,15 +10,13 @@ module Slipstream.Globals
     setTableCreated,
     getTableColumns,
     isTableCreated,
-    isHistoric,
     setContractState,
     xabiToText,
     flushPendingWrites,
     getContractState,
-    addAndEnableHistoryTable,
-    enableHistoryTable,
-    hasHistoryTable,
-    disableHistoryTable,
+    isHistoric,
+    setHistoryTable,
+    historyStatusCreated,
     setSolidVMInfo,
     getSolidVMInfo,
     forceGlobalEval,
@@ -100,46 +98,26 @@ getTableColumns globalsIORef tableName = do
 isHistoric :: (MonadLogger m, MonadIO m) => IORef Globals -> TableName -> m Bool
 isHistoric globalsIORef name = do
   Globals{..} <- readIORef globalsIORef
-  $logInfoS "isHistoric" . T.pack $ "Checking history status of " ++ show name
-  return $ name `M.member` historyList
+  let h = M.findWithDefault False name historyList
+  $logInfoS "isHistoric" $ T.pack $ show name ++ ": " ++ show h
+  return h
 
-{-
-getHistoryList :: MonadIO m => IORef Globals -> m (Set TableName)
-getHistoryList = fmap historyList . readIORef
--}
-
-addAndEnableHistoryTable :: (MonadIO m, MonadLogger m) => IORef Globals -> TableName -> m ()
-addAndEnableHistoryTable g tableName = do
+setHistoryTable :: (MonadIO m, MonadLogger m) => IORef Globals -> TableName -> Bool -> m ()
+setHistoryTable g tableName b = do
   globals@Globals{..} <- readIORef g
-  $logInfoS "addAndEnableHisotryTable" . T.pack $ "adding and enabling table to history list: " ++ show tableName
-  updateGlobals g globals{historyList=M.insert tableName True historyList}
+  if tableName `M.notMember` historyList then do
+    $logInfoS "enableHistoryTable" . T.pack $ "Adding and setting history table: " ++ show tableName ++ "to: " ++ show b
+    updateGlobals g globals{historyList=M.insert tableName b historyList}
+    else do
+      $logInfoS "enableHistoryTable" . T.pack $ "Cannot set history for contract after it has been set. " ++ show tableName
+      return ()
 
-enableHistoryTable :: (MonadIO m, MonadLogger m) => IORef Globals -> TableName -> m Bool
-enableHistoryTable g tableName = do
-  globals@Globals{..} <- readIORef g
-  
-  $logInfoS "enableHistoryTable" . T.pack $ "enabling table in history list: " ++ show tableName
-  
-  case M.lookup tableName historyList of
-    Nothing -> return False
-    Just _ -> do
-      updateGlobals g globals{historyList=M.insert tableName True historyList}
-      return True
-
-hasHistoryTable :: MonadIO m => IORef Globals -> TableName -> m Bool
-hasHistoryTable g tableName = do
+historyStatusCreated :: (MonadIO m, MonadLogger m)=> IORef Globals -> TableName -> m Bool
+historyStatusCreated g tableName = do
   Globals{..} <- readIORef g
-  return $ tableName `M.member` historyList
-
-disableHistoryTable :: (MonadIO m, MonadLogger m) => IORef Globals -> TableName -> m Bool
-disableHistoryTable g tableName = do
-  globals@Globals{..} <- readIORef g
-  $logInfoS "disableHistoryTable" . T.pack $ "Disabling table in history list: " ++ show tableName
-  case M.lookup tableName historyList of
-    Nothing -> return False
-    Just _ -> do
-      updateGlobals g globals{historyList=M.insert tableName False historyList}
-      return True
+  let h = tableName `M.member` historyList
+  $logDebugS "historyStatusCreated" $ T.pack $ show h
+  return h
 
 getContractState :: MonadIO m => IORef Globals -> Account -> m (Maybe [(Text,Value)])
 getContractState globalsIORef account = do

@@ -322,10 +322,9 @@ createHistoryTable globalsIORef contract (o, a, n) = do
   when (not tableExists) $ do
     incNumHistoryTables
     yield $ createHistoryTableQuery contract (o, a, n)
-    yield $ addHistoryUnique (o, a, n)
+    yieldMany $ addHistoryUnique (o, a, n)
     let list = tableColumns $ Map.toList $ contract^.storageDefs
     setTableCreated globalsIORef tableName list
-    addAndEnableHistoryTable globalsIORef tableName
 
 
 -- Runs ALTER TABLE <name> [ADD COLUMN <column>] for any new fields added to a contract definition   
@@ -429,7 +428,8 @@ insertForeignKeys conn contracts = do
             "=" <> 
             wrapSingleQuotes (escapeQuotes $ T.pack $ show acct) <> 
             " WHERE record_id=" <> 
-            wrapSingleQuotes (makeAccount c)
+            wrapSingleQuotes (makeAccount c)  <>
+            ";"
       `catch` \(e :: SomeException) -> do
             $logInfoS "insertHistoryTable" $ T.pack $ "foreign key update failed, value will be set to null: " ++ show e
             dbInsertCatchError conn $
@@ -479,15 +479,22 @@ createHistoryTableQuery contract (o, a, n) =
         , ");"
         ]
 
-addHistoryUnique :: (Text, Text, Text) -> Text
-addHistoryUnique (o, a, n)=
+addHistoryUnique :: (Text, Text, Text) -> [Text]
+addHistoryUnique (o, a, n) =
   let (org, app, cname) = constructTableNameParameters o a n
       historyName' = HistoryTableName org app cname
       historyName = tableNameToDoubleQuoteText historyName'
       indexName = "index_" <> (escapeQuotes $ tableNameToText historyName')
-  in  "CREATE UNIQUE INDEX IF NOT EXISTS " <> wrapDoubleQuotes indexName <>
-      "\n  ON " <> historyName <> " (address, \"chainId\", block_hash, transaction_hash);\n" <>
-      "ALTER TABLE " <> historyName <> " ADD PRIMARY KEY USING INDEX " <> wrapDoubleQuotes indexName <> ";"
+  in  ["CREATE UNIQUE INDEX IF NOT EXISTS " <> 
+        wrapDoubleQuotes indexName <>
+        "\n  ON " <> 
+        historyName <> 
+        " (address, \"chainId\", block_hash, transaction_hash);",
+      "ALTER TABLE " <> 
+      historyName <> 
+      " ADD PRIMARY KEY USING INDEX " <> 
+      wrapDoubleQuotes indexName <> 
+      ";"]
 
 insertIndexTableQuery :: [ProcessedContract] -> Text
 insertIndexTableQuery [] = error "insertIndexTableQuery: unhandled empty list"

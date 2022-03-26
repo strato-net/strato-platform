@@ -20,6 +20,7 @@ import           Executable.EthereumVM
 import           Executable.EVMFlags() -- HFlags
 import           SolidVM.Solidity.SourceTools
 
+
 main :: IO ()
 main = do
   blockappsInit "vm_main"
