@@ -58,13 +58,6 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ########
   cp /tmp/nginx.tpl.conf /tmp/nginx.conf
 
-  # Remove OAuth configuration lines if deployment is not OAuth-enabled
-  if [ "$OAUTH_ENABLED" != true ]; then
-    sed -i '/#TEMPLATE_MARK_OAUTH/d' /tmp/nginx.conf
-  else
-    sed -i '/#TEMPLATE_MARK_NO_OAUTH/d' /tmp/nginx.conf
-  fi
-
   if [ "$OAUTH_STRATO42_FALLBACK" = true ]; then
     sed -i '/#TEMPLATE_MARK_OAUTH_STRATO_43_AND_ABOVE/d' /tmp/nginx.conf
   fi
