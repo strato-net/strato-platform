@@ -555,7 +555,8 @@ processTheMessages env sqlEnv conn g messages = do
   forM_ insertsByCodeHash $ \ins -> do
     unless (null ins) $ outputData conn . insertForeignKeys $ map indexInsert ins
   
-  when ((length creates) > 0 && (length fkeys > 0)) $
+  when ((length creates) > 0 && (length fkeys > 0)) $ do
+    $logDebugLS "processTheMessages" $ T.pack $ "Creates: " ++ (show $ length creates) ++ "Foreign Keys: " ++ (show $ length fkeys) ++ "Updating PostgREST schema cache."
     outputData conn notifyPostgREST
   
   when (length events' > 0) $ 
