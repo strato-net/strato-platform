@@ -530,7 +530,7 @@ processTheMessages env sqlEnv conn g messages = do
                 aiName = T.pack name,
                 aiChain = cid
               }
-              cont = error "internal error: contract should be unused for Solidvm"
+              cont = error "internal error: contract should be unused for SolidVM"
           $logDebugLS "Contract name is: " $ show name
           oldState <- readPreviousSolidVMState g acct
           indexContract <- rowToInsert g abiid row cont oldState
@@ -554,7 +554,7 @@ processTheMessages env sqlEnv conn g messages = do
   forM_ insertsByCodeHash $ \ins -> do
     unless (null ins) $ outputData conn . insertForeignKeys $ map indexInsert ins
   
-  when ((length $ filter (not . null) insertsByCodeHash ) > 0 || length creates > 0) $
+  when ((length creates) > 0 && (length deferredForeignKeys > 0)) $
     outputData conn notifyPostgREST
   
   when (length events' > 0) $ 
