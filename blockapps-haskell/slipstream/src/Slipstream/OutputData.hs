@@ -4,6 +4,7 @@
   , OverloadedStrings
   , QuasiQuotes
   , RecordWildCards
+  , ScopedTypeVariables
   , TemplateHaskell
 #-}
 
@@ -44,7 +45,7 @@ import           Database.PostgreSQL.Typed.Query
 import           Text.Printf
 import           Text.RawString.QQ
 import           UnliftIO.IORef
-import           UnliftIO.Exception              (handle, SomeException)
+import           UnliftIO.Exception              (handle, catch, SomeException)
 
 import           BlockApps.Logging
 import           Blockchain.Strato.Model.Address
@@ -59,6 +60,10 @@ import           Slipstream.SolidityValue
 
 import           SolidVM.Model.CodeCollection              hiding (contractName, contracts, events)
 import qualified SolidVM.Model.Type         as SVMType
+
+
+crashOnSQLError :: Bool
+crashOnSQLError = True
 
 
 tableSeparator :: Text
@@ -142,25 +147,25 @@ cirrusInfo = PGDatabase
   , pgDBParams = [("Timezone", "UTC")]
   }
 
-dbInsert :: OutputM m => PGConnection -> Text -> m ()
-dbInsert conn insrt = handle handlePostgresError
-                    . liftIO
-                    . void
-                    . pgQuery conn
-                    . rawPGSimpleQuery $! encodeUtf8 insrt
+dbInsertCatchError :: (MonadLogger m, MonadUnliftIO m) => PGConnection -> Text -> m ()
+dbInsertCatchError conn insrt = handle handlePostgresError $ dbInsert conn insrt
 
-handlePostgresError :: OutputM m => SomeException -> m ()
-handlePostgresError = $logErrorLS "handlePGError"
---handlePostgresError :: SomeException -> m ()
---handlePostgresError = error . show
+dbInsert :: (MonadLogger m, MonadUnliftIO m) => PGConnection -> Text -> m ()
+dbInsert conn insrt = do
+  $logDebugS "outputData" insrt
+  liftIO . void . pgQuery conn . rawPGSimpleQuery $! encodeUtf8 insrt
+
+handlePostgresError :: MonadLogger m => SomeException -> m ()
+handlePostgresError e =
+  if crashOnSQLError
+  then error . show $ e
+    else$logErrorLS "handlePGError" e
 
 outputData :: OutputM m
            => PGConnection
            -> ConduitM () Text m a
            -> m a
-outputData conn c = runConduit $ c
-                              `fuseUpstream` iterMC ($logDebugS "outputData")
-                              `fuseUpstream` mapM_C (dbInsert conn)
+outputData conn c = runConduit $ c `fuseUpstream` mapM_C (dbInsertCatchError conn)
 
 baseColumns :: TableColumns
 baseColumns = [ "record_id"
@@ -257,9 +262,9 @@ createForeignIndexesForJoins foreignKey = do
     <> " (record_id);"
 
 notifyPostgREST :: OutputM m =>
-                   ConduitM () Text m ()
-notifyPostgREST = do
-    yield "NOTIFY pgrst, 'reload schema';"
+                   PGConnection -> m ()
+notifyPostgREST conn = do
+    dbInsertCatchError conn "NOTIFY pgrst, 'reload schema';"
 
 createExpandHistoryTable
   :: OutputM m
@@ -394,24 +399,28 @@ expandTableQuery tableName cols = T.concat
   , ";"
   ]
 
-
 insertIndexTable :: OutputM m
                  => [ProcessedContract]
                  -> ConduitM () Text m ()
 insertIndexTable [] = error "insertIndexTable: unhandled empty list"
 insertIndexTable contracts = yield $ insertIndexTableQuery contracts
 
-insertForeignKeys :: Monad m =>
-                     [ProcessedContract] -> ConduitM () Text m ()
-insertForeignKeys contracts = do
+insertForeignKeys :: (MonadLogger m, MonadUnliftIO m) =>
+                     PGConnection -> [ProcessedContract] -> m ()
+insertForeignKeys conn contracts = do
   forM_ contracts $ \c -> do
     let tableName = indexTableName 
                             (organization c)
                             (application c)
                             (contractName c)
-    
+
+    --There are still reasons why a foreign key insertion might fail
+    --  1. The field type was changed in a solidity contract version update
+    --  2. solidity uses inheritance, and the foreign key points to the parent table
+    --  3. The user just sets a variable to a made up invalid address (0x1234)
+    --When an invalid foreign pointer is set, STRATO's stated behavior will be to set the value to null
     forM_ [(n, a) | (n, ValueContract a) <- Map.toList $ contractData c] $ \(theName, acct) -> do
-          yield $ 
+      dbInsert conn $
             "UPDATE " <> 
             tableNameToDoubleQuoteText tableName <> 
             " SET " <> 
@@ -421,7 +430,15 @@ insertForeignKeys contracts = do
             " WHERE record_id=" <> 
             wrapSingleQuotes (makeAccount c)  <>
             ";"
-
+      `catch` \(e :: SomeException) -> do
+            $logInfoS "insertHistoryTable" $ T.pack $ "foreign key update failed, value will be set to null: " ++ show e
+            dbInsertCatchError conn $
+              "UPDATE " <> 
+              tableNameToDoubleQuoteText tableName <> 
+              " SET " <> 
+              wrapDoubleQuotes theName <> 
+              "=null WHERE record_id=" <> 
+              wrapSingleQuotes (makeAccount c)
 
 insertHistoryTable :: OutputM m
                    => IORef Globals
@@ -740,6 +757,7 @@ valueToSQLText :: Value -> Maybe Text
 valueToSQLText (SimpleValue (ValueBool x)) = Just $ wrapSingleQuotes $ tshow x
 valueToSQLText (SimpleValue (ValueInt _ _ v)) = Just $ wrapSingleQuotes $ tshow v
 valueToSQLText (SimpleValue (ValueString s)) = Just $ wrapSingleQuotes $ escapeQuotes s
+valueToSQLText (SimpleValue (ValueAddress (Address 0))) = Just "NULL"
 valueToSQLText (SimpleValue (ValueAddress (Address addr))) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ printf "%040x" (fromIntegral addr::Integer)
 valueToSQLText (SimpleValue (ValueAccount acct)) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show acct
 valueToSQLText (SimpleValue (ValueBytes _ bytes)) = Just $ wrapSingleQuotes $ escapeQuotes $ decodeUtf8 bytes
