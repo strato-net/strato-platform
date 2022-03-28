@@ -478,7 +478,7 @@ processTheMessages env sqlEnv conn g messages = do
       getCC = getCodeCollection' flags_indexEVM
       evmInsertsF = if flags_indexEVM then getEVMInserts else getInsertsIgnoreEVM
 
-  forM_ creates $ \(ccString, cp, o, a, hl) -> do
+  fkeys <- forM creates $ \(ccString, cp, o, a, hl) -> do
     cc <- getCC cp ccString
 
     deferredForeignKeys <- fmap concat $ forM (Map.toList $ cc^.contracts) $ \(nameString, c) -> do
@@ -511,7 +511,8 @@ processTheMessages env sqlEnv conn g messages = do
 
     forM_ deferredForeignKeys $ \deferredForeignKey -> do
       outputData conn $ createForeignIndexesForJoins deferredForeignKey
-
+    
+    pure deferredForeignKeys
 
   inserts <- enterBloc2 env sqlEnv $ do
     forM changes $ \(acct,actions) -> do
@@ -554,7 +555,7 @@ processTheMessages env sqlEnv conn g messages = do
   forM_ insertsByCodeHash $ \ins -> do
     unless (null ins) $ outputData conn . insertForeignKeys $ map indexInsert ins
   
-  when ((length creates) > 0 && (length deferredForeignKeys > 0)) $
+  when ((length creates) > 0 && (length fkeys > 0)) $
     outputData conn notifyPostgREST
   
   when (length events' > 0) $ 
