@@ -165,19 +165,10 @@ outputData :: OutputM m
            => PGConnection
            -> ConduitM () Text m a
            -> m a
-<<<<<<< HEAD
-outputData conn c = runConduit $ c
-                              `fuseUpstream` iterMC ($logDebugS "outputData")
-                              `fuseUpstream` mapM_C (dbInsert conn)
-
-baseColumns :: TableColumns
-baseColumns = [ "account"
-=======
 outputData conn c = runConduit $ c `fuseUpstream` mapM_C (dbInsertCatchError conn)
 
 baseColumns :: TableColumns
 baseColumns = [ "record_id"
->>>>>>> 03a2b735c1ad78a05903aada496c766e5cc9e90b
               , "address"
               , "chainId"
               , "block_hash"
@@ -290,19 +281,11 @@ getDeferredForeignKeys tableName c o a =
 --    deferredForeignKeys' <- fmap concat $
 --      forM (Map.toList $ cc^.contracts) $ \(nameString, c) ->
 
-<<<<<<< HEAD
-  flip map [(theName, x) | (theName, VariableDecl{varType=Xabi.Label x}) <- (Map.toList $ c^.storageDefs)] $ \(theName, x) -> 
-    ForeignKeyInfo {
-      tableName=tableName,
-      columnName=theName,
-      foreignTableName=indexTableName o a $ T.pack x
-=======
   flip map [(theName, x) | (theName, VariableDecl{varType=SVMType.Contract x}) <- (Map.toList $ c^.storageDefs)] $ \(theName, x) -> 
     ForeignKeyInfo {
       tableName=tableName,
       columnName=theName,
       foreignTableName=indexTableName o a x
->>>>>>> 03a2b735c1ad78a05903aada496c766e5cc9e90b
       }
 
 createIndexTable :: OutputM m
@@ -398,20 +381,12 @@ expandContractTable globalsIORef contract tableName = do
         case tableName of
           IndexTableName o a n ->
             flip map
-<<<<<<< HEAD
-            [(colName, foreignName) | (colName, VariableDecl{varType=Xabi.Label foreignName}) <- extras] $ \(colName, foreignName) -> 
-=======
             [(colName, foreignName) | (colName, VariableDecl{varType=SVMType.Contract foreignName}) <- extras] $ \(colName, foreignName) -> 
->>>>>>> 03a2b735c1ad78a05903aada496c766e5cc9e90b
             ForeignKeyInfo {
               tableName = tableName,
               columnName = colName,
               foreignTableName = let a' = case a of; "" -> n; _ -> a
-<<<<<<< HEAD
-                                 in indexTableName o a' $ T.pack foreignName
-=======
                                  in indexTableName o a' foreignName
->>>>>>> 03a2b735c1ad78a05903aada496c766e5cc9e90b
               }
           _ -> []
         
@@ -430,25 +405,14 @@ insertIndexTable :: OutputM m
 insertIndexTable [] = error "insertIndexTable: unhandled empty list"
 insertIndexTable contracts = yield $ insertIndexTableQuery contracts
 
-<<<<<<< HEAD
-insertForeignKeys :: Monad m =>
-                     [ProcessedContract] -> ConduitM () Text m ()
-insertForeignKeys contracts = do
-=======
 insertForeignKeys :: (MonadLogger m, MonadUnliftIO m) =>
                      PGConnection -> [ProcessedContract] -> m ()
 insertForeignKeys conn contracts = do
->>>>>>> 03a2b735c1ad78a05903aada496c766e5cc9e90b
   forM_ contracts $ \c -> do
     let tableName = indexTableName 
                             (organization c)
                             (application c)
                             (contractName c)
-<<<<<<< HEAD
-    
-    forM_ [(n, a) | (n, ValueContract a) <- Map.toList $ contractData c] $ \(theName, acct) -> do
-          yield $ 
-=======
 
     --There are still reasons why a foreign key insertion might fail
     --  1. The field type was changed in a solidity contract version update
@@ -457,19 +421,12 @@ insertForeignKeys conn contracts = do
     --When an invalid foreign pointer is set, STRATO's stated behavior will be to set the value to null
     forM_ [(n, a) | (n, ValueContract a) <- Map.toList $ contractData c] $ \(theName, acct) -> do
       dbInsert conn $
->>>>>>> 03a2b735c1ad78a05903aada496c766e5cc9e90b
             "UPDATE " <> 
             tableNameToDoubleQuoteText tableName <> 
             " SET " <> 
             wrapDoubleQuotes theName <> 
             "=" <> 
             wrapSingleQuotes (escapeQuotes $ T.pack $ show acct) <> 
-<<<<<<< HEAD
-            " WHERE account=" <> 
-            wrapSingleQuotes (makeAccount c) <>
-            ";"
-
-=======
             " WHERE record_id=" <> 
             wrapSingleQuotes (makeAccount c)  <>
             ";"
@@ -482,7 +439,6 @@ insertForeignKeys conn contracts = do
               wrapDoubleQuotes theName <> 
               "=null WHERE record_id=" <> 
               wrapSingleQuotes (makeAccount c)
->>>>>>> 03a2b735c1ad78a05903aada496c766e5cc9e90b
 
 insertHistoryTable :: OutputM m
                    => IORef Globals
@@ -506,34 +462,18 @@ createIndexTableQuery contract (o, a, n) =
       list = Map.toList $ contract^.storageDefs
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
-<<<<<<< HEAD
-        , csv $ ["account text", "address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
-               "block_number text", "transaction_hash text", "transaction_sender text"] ++ tableColumns list
-        , ",\n  CONSTRAINT "
-        , wrapDoubleQuotes ((escapeQuotes $ tableNameToText tableName) <> "_pkey")
-        , "\n  PRIMARY KEY (address, \"chainId\"), UNIQUE (account) );"
-=======
         , csv $ ["record_id text", "address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
                "block_number text", "transaction_hash text", "transaction_sender text"] ++ tableColumns list
         , ",\n  PRIMARY KEY (record_id) );"
->>>>>>> 03a2b735c1ad78a05903aada496c766e5cc9e90b
         ]
 
 createHistoryTableQuery :: Contract -> (Text, Text, Text) -> Text
 createHistoryTableQuery contract (o, a, n) =
-<<<<<<< HEAD
-  let tableName = HistoryTableName o a n
-      list = Map.toList $ contract^.storageDefs
-   in T.concat
-        [ "CREATE TABLE IF NOT EXISTS ", tableNameToDoubleQuoteText tableName, " ("
-        , csv $ ["account text", "address text NOT NULL", "\"chainId\" text NOT NULL", "block_hash text NOT NULL", "block_timestamp text",
-=======
   let tableName = historyTableName o a n
       list = Map.toList $ contract^.storageDefs
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS ", tableNameToDoubleQuoteText tableName, " ("
         , csv $ ["record_id text", "address text NOT NULL", "\"chainId\" text NOT NULL", "block_hash text NOT NULL", "block_timestamp text",
->>>>>>> 03a2b735c1ad78a05903aada496c766e5cc9e90b
                  "block_number text", "transaction_hash text NOT NULL", "transaction_sender text"]
                  ++ tableColumns list
         , ");"
@@ -586,13 +526,8 @@ insertIndexTableQuery contracts@(x:_) =
         , "\n  VALUES "
         , inserts
         , [r|
-<<<<<<< HEAD
-  ON CONFLICT (account) DO UPDATE SET
-    account = excluded.account,
-=======
   ON CONFLICT (record_id) DO UPDATE SET
     record_id = excluded.record_id,
->>>>>>> 03a2b735c1ad78a05903aada496c766e5cc9e90b
     address = excluded.address,
     "chainId" = excluded."chainId",
     block_hash = excluded.block_hash,
@@ -822,10 +757,7 @@ valueToSQLText :: Value -> Maybe Text
 valueToSQLText (SimpleValue (ValueBool x)) = Just $ wrapSingleQuotes $ tshow x
 valueToSQLText (SimpleValue (ValueInt _ _ v)) = Just $ wrapSingleQuotes $ tshow v
 valueToSQLText (SimpleValue (ValueString s)) = Just $ wrapSingleQuotes $ escapeQuotes s
-<<<<<<< HEAD
-=======
 valueToSQLText (SimpleValue (ValueAddress (Address 0))) = Just "NULL"
->>>>>>> 03a2b735c1ad78a05903aada496c766e5cc9e90b
 valueToSQLText (SimpleValue (ValueAddress (Address addr))) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ printf "%040x" (fromIntegral addr::Integer)
 valueToSQLText (SimpleValue (ValueAccount acct)) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show acct
 valueToSQLText (SimpleValue (ValueBytes _ bytes)) = Just $ wrapSingleQuotes $ escapeQuotes $ decodeUtf8 bytes
