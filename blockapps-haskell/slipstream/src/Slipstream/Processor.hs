@@ -562,7 +562,7 @@ processTheMessages env sqlEnv conn g messages = do
   when (length events' > 0) $ 
     outputData conn $ insertExpandEventTables g events'
 
-  $logInfoS "processTheMessages" . T.pack $ "inserting " ++ show (length transactionResults) ++ " transaction results"
+  $logInfoS "processTheMessages" . T.pack $ "Inserting " ++ show (length transactionResults) ++ " transaction results"
 
   forM_ transactionResults $ putTransactionResult
 
