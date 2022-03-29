@@ -147,11 +147,11 @@ cirrusInfo = PGDatabase
   , pgDBParams = [("Timezone", "UTC")]
   }
 
-dbInsertCatchError :: (MonadLogger m, MonadUnliftIO m) => PGConnection -> Text -> m ()
-dbInsertCatchError conn insrt = handle handlePostgresError $ dbInsert conn insrt
+dbQueryCatchError :: (MonadLogger m, MonadUnliftIO m) => PGConnection -> Text -> m ()
+dbQueryCatchError conn insrt = handle handlePostgresError $ dbQuery conn insrt
 
-dbInsert :: (MonadLogger m, MonadUnliftIO m) => PGConnection -> Text -> m ()
-dbInsert conn insrt = do
+dbQuery :: (MonadLogger m, MonadUnliftIO m) => PGConnection -> Text -> m ()
+dbQuery conn insrt = do
   $logDebugS "outputData" insrt
   liftIO . void . pgQuery conn . rawPGSimpleQuery $! encodeUtf8 insrt
 
@@ -165,7 +165,7 @@ outputData :: OutputM m
            => PGConnection
            -> ConduitM () Text m a
            -> m a
-outputData conn c = runConduit $ c `fuseUpstream` mapM_C (dbInsertCatchError conn)
+outputData conn c = runConduit $ c `fuseUpstream` mapM_C (dbQueryCatchError conn)
 
 baseColumns :: TableColumns
 baseColumns = [ "record_id"
@@ -264,7 +264,7 @@ createForeignIndexesForJoins foreignKey = do
 notifyPostgREST :: OutputM m =>
                    PGConnection -> m ()
 notifyPostgREST conn = do
-    dbInsertCatchError conn "NOTIFY pgrst, 'reload schema';"
+    dbQueryCatchError conn "NOTIFY pgrst, 'reload schema';"
 
 createExpandHistoryTable
   :: OutputM m
@@ -420,7 +420,7 @@ insertForeignKeys conn contracts = do
     --  3. The user just sets a variable to a made up invalid address (0x1234)
     --When an invalid foreign pointer is set, STRATO's stated behavior will be to set the value to null
     forM_ [(n, a) | (n, ValueContract a) <- Map.toList $ contractData c] $ \(theName, acct) -> do
-      dbInsert conn $
+      dbQuery conn $
             "UPDATE " <> 
             tableNameToDoubleQuoteText tableName <> 
             " SET " <> 
@@ -432,7 +432,7 @@ insertForeignKeys conn contracts = do
             ";"
       `catch` \(e :: SomeException) -> do
             $logInfoS "insertHistoryTable" $ T.pack $ "foreign key update failed, value will be set to null: " ++ show e
-            dbInsertCatchError conn $
+            dbQueryCatchError conn $
               "UPDATE " <> 
               tableNameToDoubleQuoteText tableName <> 
               " SET " <> 
