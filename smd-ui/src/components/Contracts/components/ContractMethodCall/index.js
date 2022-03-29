@@ -41,23 +41,32 @@ class ContractMethodCall extends Component {
   }
 
   submit = (values) => {
-    const payload = {
-      contractName: this.props.contractName,
-      contractAddress: this.props.contractAddress,
-      methodName: this.props.symbolName,
-      username: values.modalUsername,
-      userAddress: values.modalAddress,
-      password: isOauthEnabled() ? '' : values.modalPassword,
-      value: values.modalValue,
-      args: this.props.modal.args ? Object.getOwnPropertyNames(this.props.modal.args)
-        .reduce((args, arg) => {
-          args[arg] = values[arg];
+    try {
+      const parsedArgs = this.props.modal.args ? Object.entries(this.props.modal.args)
+        .reduce((args, [arg, info]) => {
+          let val = values[arg]
+          if (['Array', 'Int', 'Bool'].includes(info.type)) {
+              val = JSON.parse(values[arg])
+          }
+          args[arg] = val;
           return args;
-        }, {}) : {},
-      chainId: values.chainId
-    }
-    mixpanelWrapper.track("method_call_submit");
-    this.props.methodCall(this.props.lookup, payload);
+        }, {}) : {}
+        const payload = {
+          contractName: this.props.contractName,
+          contractAddress: this.props.contractAddress,
+          methodName: this.props.symbolName,
+          username: values.modalUsername,
+          userAddress: values.modalAddress,
+          password: isOauthEnabled() ? '' : values.modalPassword,
+          value: values.modalValue,
+          args: parsedArgs,
+          chainId: values.chainId
+        }
+        mixpanelWrapper.track("method_call_submit");
+        this.props.methodCall(this.props.lookup, payload);
+      } catch (e) {
+        return
+      }
   }
 
   handleUsernameChange = (e) => {

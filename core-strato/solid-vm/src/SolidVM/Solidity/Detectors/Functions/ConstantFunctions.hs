@@ -5,7 +5,6 @@ module SolidVM.Solidity.Detectors.Functions.ConstantFunctions
   ( detector
   ) where
 
-import           CodeCollection
 import           Control.Arrow       ((&&&))
 import           Control.Applicative ((<|>))
 import           Control.Monad.Reader
@@ -17,11 +16,10 @@ import           Data.Maybe      (catMaybes, isJust, maybeToList)
 import           Data.Source
 import           Data.Text       (Text)
 import qualified Data.Text       as T
-import           SolidVM.Solidity.Xabi
-import           SolidVM.Solidity.Xabi.Statement
-import           SolidVM.Solidity.Xabi.Type      (Type)
-import qualified SolidVM.Solidity.Xabi.Type      as Xabi
-import           SolidVM.Solidity.Xabi.VarDef
+import           SolidVM.Model.CodeCollection
+import           SolidVM.Model.Type                     (Type)
+import qualified SolidVM.Model.Type                     as SVMType
+import           SolidVM.Solidity.Detectors.Types
 
 data R = R
   { mutability :: Maybe StateMutability
@@ -207,7 +205,7 @@ ccTypeHelper :: CodeCollection
              -> SourceAnnotation ()
              -> Type
              -> [SourceAnnotation Text]
-ccTypeHelper CodeCollection{..} c x (Xabi.Label typeName) =
+ccTypeHelper CodeCollection{..} c x (SVMType.Label typeName) =
   if isJust findDefs
     then []
     else generateAnn typeName x $ M.foldMapWithKey findVars _contracts

@@ -22,17 +22,17 @@ import           Text.Parsec
 import           Text.Parsec.Token                    (GenLanguageDef(..))
 import           Text.Printf                          (printf)
 
+import qualified SolidVM.Model.CodeCollection              as SolidVM
+import qualified SolidVM.Model.CodeCollection.Def          as SolidVM
+import qualified SolidVM.Model.Type                        as SVMType
+
 import           SolidVM.Solidity.Parse.Statement
 import           SolidVM.Solidity.Parse.Lexer
 import           SolidVM.Solidity.Parse.ParserTypes
 import           SolidVM.Solidity.Parse.Types
 
-import           SolidVM.Solidity.Xabi.Statement
 import           SolidVM.Solidity.Xabi              (XabiF (..))
 import qualified SolidVM.Solidity.Xabi              as Xabi
-import qualified SolidVM.Solidity.Xabi.Def          as Xabi
-import qualified SolidVM.Solidity.Xabi.Type         as Xabitype
-import qualified SolidVM.Solidity.Xabi.VarDef       as Xabitype
 
 import           Blockchain.VM.SolidException
 
@@ -93,15 +93,15 @@ solidityContract = do
 
 --        variables = byMutability False [0,32..]
 
---        byMutability :: Bool -> [Int] -> [(String, Declaration)] -> [((Text, Xabitype.Type), Bool, Bool, Maybe Expression)]
+--        byMutability :: Bool -> [Int] -> [(String, Declaration)] -> [((Text, SVMType.Type), Bool, Bool, Maybe Expression)]
 --        byMutability isConst ns = Map.fromList . flip (zipWith mapVarTypes) ns . varTypesOf isConst
 
 --        mapVarTypes (v, isPub, isConst, val) i =
---          fmap (Xabitype.VarType i (visibility isPub) (Just isConst) val) v
+--          fmap (SVMType.VarType i (visibility isPub) (Just isConst) val) v
 
 --        varTypesOf :: Bool
 --                   -> [(String, Declaration)]
---                   -> [((Text, Xabitype.Type), Bool, Bool, Maybe Expression)]
+--                   -> [((Text, SVMType.Type), Bool, Bool, Maybe Expression)]
 --        varTypesOf isConstant = map (\(n, VariableDeclaration v isPub isConst val) ->
 --                                   ((Text.pack n, v), isPub, isConst, val))
 --                           . filter (\(_, decl) -> case decl of
@@ -113,16 +113,16 @@ solidityContract = do
 
 
 data Declaration =
-  FuncDeclaration Xabi.Func
-  | ConstructorDeclaration Xabi.Func
+  FuncDeclaration SolidVM.Func
+  | ConstructorDeclaration SolidVM.Func
   | ModifierDeclaration Xabi.Modifier
-  | StructDeclaration Xabi.Def
-  | EnumDeclaration Xabi.Def
+  | StructDeclaration SolidVM.Def
+  | EnumDeclaration SolidVM.Def
   | UsingDeclaration Xabi.Using
-  | EventDeclaration Xabi.Event
-  | VariableDeclaration Xabi.VariableDecl
-  | ConstantDeclaration Xabi.ConstantDecl
---  | VariableDeclaration Xabitype.Type Bool Bool (Maybe Expression)
+  | EventDeclaration SolidVM.Event
+  | VariableDeclaration SolidVM.VariableDecl
+  | ConstantDeclaration SolidVM.ConstantDecl
+--  | VariableDeclaration SVMType.Type Bool Bool (Maybe Expression)
   deriving (Eq, Show)
 
 -- | Parses anything that a contract can declare at the top level: new types,
@@ -146,17 +146,17 @@ structDeclaration = do
     reserved "struct"
     structName <- identifier
     structFields <- braces $ many1 $ do
-      (fieldName, VariableDeclaration (Xabi.VariableDecl decl _ _ _)) <- simpleVariableDeclaration
+      (fieldName, VariableDeclaration (SolidVM.VariableDecl decl _ _ _)) <- simpleVariableDeclaration
       return (fieldName, decl)
     pure (structName, structFields)
   return
     (
       structName,
-      StructDeclaration Xabi.Struct{
-        Xabi.fields =
-           zipWith (\(n, v) i -> (Text.pack n, Xabitype.FieldType i v)) structFields [0..],
-        Xabi.bytes = 0,
-        Xabi.context = a
+      StructDeclaration SolidVM.Struct{
+        SolidVM.fields =
+           zipWith (\(n, v) i -> (Text.pack n, SolidVM.FieldType i v)) structFields [0..],
+        SolidVM.bytes = 0,
+        SolidVM.context = a
         }
     )
 
@@ -171,10 +171,10 @@ enumDeclaration = do
   return
     (
       enumName,
-      EnumDeclaration Xabi.Enum {
-        Xabi.names = map Text.pack enumFields,
-        Xabi.bytes = 0,
-        Xabi.context = a
+      EnumDeclaration SolidVM.Enum {
+        SolidVM.names = map Text.pack enumFields,
+        SolidVM.bytes = 0,
+        SolidVM.context = a
         }
     )
 
@@ -238,8 +238,8 @@ simpleVariableDeclaration = do
   let ctx = SourceAnnotation start end ()
 
   if isConstant
-    then return (variableName, ConstantDeclaration $ Xabi.ConstantDecl variableType isPublic (fromMaybe (parseError "constants must be initialized" variableName) value) ctx)
-    else return (variableName, VariableDeclaration $ Xabi.VariableDecl variableType isPublic value ctx)
+    then return (variableName, ConstantDeclaration $ SolidVM.ConstantDecl variableType isPublic (fromMaybe (parseError "constants must be initialized" variableName) value) ctx)
+    else return (variableName, VariableDeclaration $ SolidVM.VariableDecl variableType isPublic value ctx)
 
 {- Functions and function-like -}
 
@@ -255,13 +255,13 @@ functionDeclaration = do
     xabi <- functionXabi
     pure (functionName, xabi)
   cName <- getContractName
-  let xabi = xabi'{Xabi.funcContext = a <> Xabi.funcContext xabi'}
+  let xabi = xabi'{SolidVM.funcContext = a <> SolidVM.funcContext xabi'}
       tipe = if cName == functionName
                 then ConstructorDeclaration
                 else FuncDeclaration
   return (functionName, tipe xabi)
 
-functionXabi :: SolidityParser Xabi.Func
+functionXabi :: SolidityParser SolidVM.Func
 functionXabi = do
   start <- getSourcePosition
   functionArgs <- tupleDeclaration
@@ -270,17 +270,17 @@ functionXabi = do
   contents <- Just <$> statements <|> (reservedOp ";" >> return Nothing)
   let nameUnnamed (name,ty) = if Text.null name then (Nothing, ty) else (Just name,ty)
       ctx = SourceAnnotation start end ()
-  return Xabi.Func{
-        Xabi.funcArgs =
-           zipWith (\x i -> fmap (Xabitype.IndexedType i) (nameUnnamed x)) functionArgs [0..]
-      , Xabi.funcVals =
-           zipWith (\v i -> fmap (Xabitype.IndexedType i) (nameUnnamed v)) functionRet [0..]
-      , Xabi.funcContents = contents
-      , Xabi.funcVisibility = Just visibility
-      , Xabi.funcStateMutability = mutability
-      , Xabi.funcConstructorCalls = Map.fromList constructorCalls
-      , Xabi.funcModifiers = Just modifiers
-      , Xabi.funcContext = ctx
+  return SolidVM.Func{
+        SolidVM.funcArgs =
+           zipWith (\x i -> fmap (SolidVM.IndexedType i) (nameUnnamed x)) functionArgs [0..]
+      , SolidVM.funcVals =
+           zipWith (\v i -> fmap (SolidVM.IndexedType i) (nameUnnamed v)) functionRet [0..]
+      , SolidVM.funcContents = contents
+      , SolidVM.funcVisibility = Just visibility
+      , SolidVM.funcStateMutability = mutability
+      , SolidVM.funcConstructorCalls = Map.fromList constructorCalls
+      , SolidVM.funcModifiers = Just modifiers
+      , SolidVM.funcContext = ctx
       }
 
 
@@ -297,10 +297,10 @@ eventDeclaration = do
   return
     (
       name,
-      EventDeclaration Xabi.Event{
-          Xabi.eventAnonymous = anon
-        , Xabi.eventLogs = zipWith (\i -> fmap (Xabitype.IndexedType i)) [0..] logs
-        , Xabi.eventContext = ctx
+      EventDeclaration SolidVM.Event{
+          SolidVM.eventAnonymous = anon
+        , SolidVM.eventLogs = zipWith (\i -> fmap (SolidVM.IndexedType i)) [0..] logs
+        , SolidVM.eventContext = ctx
 --         objName = name,
 --         objValueType = NoValue,
 --         objArgType = logs,
@@ -327,11 +327,11 @@ modifierDeclaration = do
     (
       name,
       ModifierDeclaration Xabi.Modifier{
-        Xabi.modifierArgs = -- undefined args -- :: Map Text Xabi.IndexedType
+        Xabi.modifierArgs = -- undefined args -- :: Map Text SolidVM.IndexedType
            Map.fromList $
-             zipWith (\x i -> fmap (Xabitype.IndexedType i) (nameUnnamed x i)) args [0..]
+             zipWith (\x i -> fmap (SolidVM.IndexedType i) (nameUnnamed x i)) args [0..]
       , Xabi.modifierSelector = Text.pack name -- ? -- undefined -- :: Text
-      , Xabi.modifierVals = Map.fromList [] -- undefined -- :: Map Text Xabi.IndexedType
+      , Xabi.modifierVals = Map.fromList [] -- undefined -- :: Map Text SolidVM.IndexedType
       , Xabi.modifierContents = if null contents then Nothing else Just $ Text.pack contents
       , Xabi.modifierContext = ctx
 --        objName = name,
@@ -346,7 +346,7 @@ modifierDeclaration = do
 
 -- | Parses a '(x, y, z)'-style tuple, such as appears in function
 -- arguments and return values.
-tupleDeclaration :: SolidityParser [(Text, Xabitype.Type)]
+tupleDeclaration :: SolidityParser [(Text, SVMType.Type)]
 tupleDeclaration = parens $ commaSep $ do
   partType <- simpleTypeExpression
   optional $ reserved "indexed" <|>
@@ -369,13 +369,13 @@ tupleDeclaration = parens $ commaSep $ do
 -- constant specifiers, and possibly base construtor arguments, in the case
 -- of a constructor.
 
-data FuncModifiers = ReturnsMod [(Text, Xabitype.Type)]
-                   | VisibilityMod Xabi.Visibility
-                   | MutabilityMod Xabi.StateMutability
-                   | ConstructorCallMod (String, [Expression])
+data FuncModifiers = ReturnsMod [(Text, SVMType.Type)]
+                   | VisibilityMod SolidVM.Visibility
+                   | MutabilityMod SolidVM.StateMutability
+                   | ConstructorCallMod (String, [SolidVM.Expression])
                    | OtherMod String
 
-functionModifiers :: SolidityParser ([(Text, Xabitype.Type)], Xabi.Visibility, Maybe Xabi.StateMutability, [(String, [Expression])], [String])
+functionModifiers :: SolidityParser ([(Text, SVMType.Type)], SolidVM.Visibility, Maybe SolidVM.StateMutability, [(String, [SolidVM.Expression])], [String])
 functionModifiers = do
   vals <- many $ (ReturnsMod <$> returnModifier)
              <|>  (VisibilityMod <$> visibilityModifier)
@@ -386,7 +386,7 @@ functionModifiers = do
   where
     formatVals vals =
       let returns = concat [v | ReturnsMod v <- vals]
-          visibility = fromMaybe Xabi.Public $ listToMaybe [v | VisibilityMod v <- vals]
+          visibility = fromMaybe SolidVM.Public $ listToMaybe [v | VisibilityMod v <- vals]
           mutability = listToMaybe [v | MutabilityMod v <- vals]
           otherMods = [v | OtherMod v <- vals]
           constructorCallMods = [v | ConstructorCallMod v <- vals]
@@ -394,17 +394,17 @@ functionModifiers = do
     returnModifier =
       reserved "returns" >> tupleDeclaration
     visibilityModifier =
-      (   (reserved "public"   >> return Xabi.Public)
-      <|> (reserved "private"  >> return Xabi.Private)
-      <|> (reserved "external" >> return Xabi.External)
-      <|> (reserved "internal" >> return Xabi.Internal)
+      (   (reserved "public"   >> return SolidVM.Public)
+      <|> (reserved "private"  >> return SolidVM.Private)
+      <|> (reserved "external" >> return SolidVM.External)
+      <|> (reserved "internal" >> return SolidVM.Internal)
       )
     mutabilityModifier =
       (
-          (reserved "constant" >> return Xabi.Constant)
-      <|> (reserved "pure"     >> return Xabi.Pure)
-      <|> (reserved "view"     >> return Xabi.View)
-      <|> (reserved "payable"  >> return Xabi.Payable)
+          (reserved "constant" >> return SolidVM.Constant)
+      <|> (reserved "pure"     >> return SolidVM.Pure)
+      <|> (reserved "view"     >> return SolidVM.View)
+      <|> (reserved "payable"  >> return SolidVM.Payable)
       )
     constructorCallModifiers = do
       name <- identifier

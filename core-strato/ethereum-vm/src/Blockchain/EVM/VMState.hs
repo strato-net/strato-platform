@@ -28,8 +28,6 @@ import           Data.Word
 import qualified Data.Sequence                as Seq
 import           GHC.Generics
 
-import           Blockchain.Strato.Model.Action (Action)
-import qualified Blockchain.Strato.Model.Action as Action
 import           Blockchain.Data.Log
 import           Blockchain.EVM.Environment
 import qualified Blockchain.EVM.MutableStack as MS
@@ -37,6 +35,8 @@ import           Blockchain.ExtWord
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Gas
+import           Blockchain.Stream.Action     (Action)
+import qualified Blockchain.Stream.Action     as Action
 import           Blockchain.VMContext
 import           Text.Format
 

@@ -15,7 +15,7 @@ import           Network.Kafka.Protocol
 
 import           Blockchain.EthConf
 import           Blockchain.KafkaTopics
-import           Blockchain.Strato.Model.Action    (Action)
+import           Blockchain.Stream.Action    (Action)
 import           Blockchain.Stream.Raw
 
 import           Text.Format

@@ -4,6 +4,7 @@
   , OverloadedStrings
   , QuasiQuotes
   , RecordWildCards
+  , ScopedTypeVariables
   , TemplateHaskell
 #-}
 
@@ -44,14 +45,12 @@ import           Database.PostgreSQL.Typed.Query
 import           Text.Printf
 import           Text.RawString.QQ
 import           UnliftIO.IORef
-import           UnliftIO.Exception              (handle, SomeException)
+import           UnliftIO.Exception              (handle, catch, SomeException)
 
 import           BlockApps.Logging
 import           Blockchain.Strato.Model.Address
 import qualified Blockchain.Strato.Model.Event   as Action
 import           Blockchain.Strato.Model.Keccak256
-
-import           CodeCollection hiding (contractName, contracts, events)
 
 import           Slipstream.Events
 import           Slipstream.Globals
@@ -59,8 +58,12 @@ import           Slipstream.Metrics
 import           Slipstream.Options
 import           Slipstream.SolidityValue
 
-import           SolidVM.Solidity.Xabi                    (VariableDeclF(..))
-import qualified SolidVM.Solidity.Xabi.Type               as Xabi
+import           SolidVM.Model.CodeCollection              hiding (contractName, contracts, events)
+import qualified SolidVM.Model.Type         as SVMType
+
+
+crashOnSQLError :: Bool
+crashOnSQLError = True
 
 
 tableSeparator :: Text
@@ -144,28 +147,37 @@ cirrusInfo = PGDatabase
   , pgDBParams = [("Timezone", "UTC")]
   }
 
-dbInsert :: OutputM m => PGConnection -> Text -> m ()
-dbInsert conn insrt = handle handlePostgresError
-                    . liftIO
-                    . void
-                    . pgQuery conn
-                    . rawPGSimpleQuery $! encodeUtf8 insrt
+dbInsertCatchError :: (MonadLogger m, MonadUnliftIO m) => PGConnection -> Text -> m ()
+dbInsertCatchError conn insrt = handle handlePostgresError $ dbInsert conn insrt
 
-handlePostgresError :: OutputM m => SomeException -> m ()
-handlePostgresError = $logErrorLS "handlePGError"
---handlePostgresError :: SomeException -> m ()
---handlePostgresError = error . show
+dbInsert :: (MonadLogger m, MonadUnliftIO m) => PGConnection -> Text -> m ()
+dbInsert conn insrt = do
+  $logDebugS "outputData" insrt
+  liftIO . void . pgQuery conn . rawPGSimpleQuery $! encodeUtf8 insrt
+
+handlePostgresError :: MonadLogger m => SomeException -> m ()
+handlePostgresError e =
+  if crashOnSQLError
+  then error . show $ e
+    else$logErrorLS "handlePGError" e
 
 outputData :: OutputM m
            => PGConnection
            -> ConduitM () Text m a
            -> m a
+<<<<<<< HEAD
 outputData conn c = runConduit $ c
                               `fuseUpstream` iterMC ($logDebugS "outputData")
                               `fuseUpstream` mapM_C (dbInsert conn)
 
 baseColumns :: TableColumns
 baseColumns = [ "account"
+=======
+outputData conn c = runConduit $ c `fuseUpstream` mapM_C (dbInsertCatchError conn)
+
+baseColumns :: TableColumns
+baseColumns = [ "record_id"
+>>>>>>> 03a2b735c1ad78a05903aada496c766e5cc9e90b
               , "address"
               , "chainId"
               , "block_hash"
@@ -256,12 +268,12 @@ createForeignIndexesForJoins foreignKey = do
     <> wrapDoubleQuotes (columnName foreignKey)
     <> ") REFERENCES "
     <> tableNameToDoubleQuoteText (foreignTableName foreignKey)
-    <> " (account);"
+    <> " (record_id);"
 
 notifyPostgREST :: OutputM m =>
-                   ConduitM () Text m ()
-notifyPostgREST = do
-    yield "NOTIFY pgrst, 'reload schema';"
+                   PGConnection -> m ()
+notifyPostgREST conn = do
+    dbInsertCatchError conn "NOTIFY pgrst, 'reload schema';"
 
 createExpandHistoryTable
   :: OutputM m
@@ -278,11 +290,19 @@ getDeferredForeignKeys tableName c o a =
 --    deferredForeignKeys' <- fmap concat $
 --      forM (Map.toList $ cc^.contracts) $ \(nameString, c) ->
 
+<<<<<<< HEAD
   flip map [(theName, x) | (theName, VariableDecl{varType=Xabi.Label x}) <- (Map.toList $ c^.storageDefs)] $ \(theName, x) -> 
     ForeignKeyInfo {
       tableName=tableName,
       columnName=theName,
       foreignTableName=indexTableName o a $ T.pack x
+=======
+  flip map [(theName, x) | (theName, VariableDecl{varType=SVMType.Contract x}) <- (Map.toList $ c^.storageDefs)] $ \(theName, x) -> 
+    ForeignKeyInfo {
+      tableName=tableName,
+      columnName=theName,
+      foreignTableName=indexTableName o a x
+>>>>>>> 03a2b735c1ad78a05903aada496c766e5cc9e90b
       }
 
 createIndexTable :: OutputM m
@@ -378,12 +398,20 @@ expandContractTable globalsIORef contract tableName = do
         case tableName of
           IndexTableName o a n ->
             flip map
+<<<<<<< HEAD
             [(colName, foreignName) | (colName, VariableDecl{varType=Xabi.Label foreignName}) <- extras] $ \(colName, foreignName) -> 
+=======
+            [(colName, foreignName) | (colName, VariableDecl{varType=SVMType.Contract foreignName}) <- extras] $ \(colName, foreignName) -> 
+>>>>>>> 03a2b735c1ad78a05903aada496c766e5cc9e90b
             ForeignKeyInfo {
               tableName = tableName,
               columnName = colName,
               foreignTableName = let a' = case a of; "" -> n; _ -> a
+<<<<<<< HEAD
                                  in indexTableName o a' $ T.pack foreignName
+=======
+                                 in indexTableName o a' foreignName
+>>>>>>> 03a2b735c1ad78a05903aada496c766e5cc9e90b
               }
           _ -> []
         
@@ -396,34 +424,65 @@ expandTableQuery tableName cols = T.concat
   , ";"
   ]
 
-
 insertIndexTable :: OutputM m
                  => [ProcessedContract]
                  -> ConduitM () Text m ()
 insertIndexTable [] = error "insertIndexTable: unhandled empty list"
 insertIndexTable contracts = yield $ insertIndexTableQuery contracts
 
+<<<<<<< HEAD
 insertForeignKeys :: Monad m =>
                      [ProcessedContract] -> ConduitM () Text m ()
 insertForeignKeys contracts = do
+=======
+insertForeignKeys :: (MonadLogger m, MonadUnliftIO m) =>
+                     PGConnection -> [ProcessedContract] -> m ()
+insertForeignKeys conn contracts = do
+>>>>>>> 03a2b735c1ad78a05903aada496c766e5cc9e90b
   forM_ contracts $ \c -> do
     let tableName = indexTableName 
                             (organization c)
                             (application c)
                             (contractName c)
+<<<<<<< HEAD
     
     forM_ [(n, a) | (n, ValueContract a) <- Map.toList $ contractData c] $ \(theName, acct) -> do
           yield $ 
+=======
+
+    --There are still reasons why a foreign key insertion might fail
+    --  1. The field type was changed in a solidity contract version update
+    --  2. solidity uses inheritance, and the foreign key points to the parent table
+    --  3. The user just sets a variable to a made up invalid address (0x1234)
+    --When an invalid foreign pointer is set, STRATO's stated behavior will be to set the value to null
+    forM_ [(n, a) | (n, ValueContract a) <- Map.toList $ contractData c] $ \(theName, acct) -> do
+      dbInsert conn $
+>>>>>>> 03a2b735c1ad78a05903aada496c766e5cc9e90b
             "UPDATE " <> 
             tableNameToDoubleQuoteText tableName <> 
             " SET " <> 
             wrapDoubleQuotes theName <> 
             "=" <> 
             wrapSingleQuotes (escapeQuotes $ T.pack $ show acct) <> 
+<<<<<<< HEAD
             " WHERE account=" <> 
             wrapSingleQuotes (makeAccount c) <>
             ";"
 
+=======
+            " WHERE record_id=" <> 
+            wrapSingleQuotes (makeAccount c)  <>
+            ";"
+      `catch` \(e :: SomeException) -> do
+            $logInfoS "insertHistoryTable" $ T.pack $ "foreign key update failed, value will be set to null: " ++ show e
+            dbInsertCatchError conn $
+              "UPDATE " <> 
+              tableNameToDoubleQuoteText tableName <> 
+              " SET " <> 
+              wrapDoubleQuotes theName <> 
+              "=null WHERE record_id=" <> 
+              wrapSingleQuotes (makeAccount c)
+>>>>>>> 03a2b735c1ad78a05903aada496c766e5cc9e90b
 
 insertHistoryTable :: OutputM m
                    => IORef Globals
@@ -447,20 +506,34 @@ createIndexTableQuery contract (o, a, n) =
       list = Map.toList $ contract^.storageDefs
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
+<<<<<<< HEAD
         , csv $ ["account text", "address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
                "block_number text", "transaction_hash text", "transaction_sender text"] ++ tableColumns list
         , ",\n  CONSTRAINT "
         , wrapDoubleQuotes ((escapeQuotes $ tableNameToText tableName) <> "_pkey")
         , "\n  PRIMARY KEY (address, \"chainId\"), UNIQUE (account) );"
+=======
+        , csv $ ["record_id text", "address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
+               "block_number text", "transaction_hash text", "transaction_sender text"] ++ tableColumns list
+        , ",\n  PRIMARY KEY (record_id) );"
+>>>>>>> 03a2b735c1ad78a05903aada496c766e5cc9e90b
         ]
 
 createHistoryTableQuery :: Contract -> (Text, Text, Text) -> Text
 createHistoryTableQuery contract (o, a, n) =
+<<<<<<< HEAD
   let tableName = HistoryTableName o a n
       list = Map.toList $ contract^.storageDefs
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS ", tableNameToDoubleQuoteText tableName, " ("
         , csv $ ["account text", "address text NOT NULL", "\"chainId\" text NOT NULL", "block_hash text NOT NULL", "block_timestamp text",
+=======
+  let tableName = historyTableName o a n
+      list = Map.toList $ contract^.storageDefs
+   in T.concat
+        [ "CREATE TABLE IF NOT EXISTS ", tableNameToDoubleQuoteText tableName, " ("
+        , csv $ ["record_id text", "address text NOT NULL", "\"chainId\" text NOT NULL", "block_hash text NOT NULL", "block_timestamp text",
+>>>>>>> 03a2b735c1ad78a05903aada496c766e5cc9e90b
                  "block_number text", "transaction_hash text NOT NULL", "transaction_sender text"]
                  ++ tableColumns list
         , ");"
@@ -513,8 +586,13 @@ insertIndexTableQuery contracts@(x:_) =
         , "\n  VALUES "
         , inserts
         , [r|
+<<<<<<< HEAD
   ON CONFLICT (account) DO UPDATE SET
     account = excluded.account,
+=======
+  ON CONFLICT (record_id) DO UPDATE SET
+    record_id = excluded.record_id,
+>>>>>>> 03a2b735c1ad78a05903aada496c766e5cc9e90b
     address = excluded.address,
     "chainId" = excluded."chainId",
     block_hash = excluded.block_hash,
@@ -686,7 +764,7 @@ insertEventTableQuery ev =
      tableName = EventTableName org app cname (escapeQuotes $ T.pack $ Action.evName ev)
 
      cols = wrapAndEscapeDouble . map escapeQuotes $ ["id", "address"] ++ (map (T.pack . fst) $ Action.evArgs ev)
-     vals = csv $ map (wrapSingleQuotes . T.pack . snd) $ Action.evArgs ev
+     vals = csv $ map (wrapSingleQuotes . escapeQuotes . T.pack . snd) $ Action.evArgs ev
  in T.concat
         [ "INSERT INTO "
         , tableNameToDoubleQuoteText tableName
@@ -708,19 +786,19 @@ insertEventTableQuery ev =
 
 --This is a temporary function that converts solidity types to a sample value...  I am just using this now to convert table creation from the old way (value based when values come through) to the new way (direct from the types when a CC is registered)
 solidityTypeToSQLType :: VariableDeclF a -> Maybe Text
-solidityTypeToSQLType VariableDecl{varType=Xabi.Bool} = Just "bool"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Int _ _} = Just "decimal"
-solidityTypeToSQLType VariableDecl{varType=Xabi.String _} = Just "text"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Bytes _ _} = Just "text"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Address} = Just "text"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Account} = Just "text"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Array _ _} = Nothing -- Just "jsonb"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Mapping _ _ _} = Nothing -- Just "jsonb"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Label _} = Just "text"
---solidityTypeToSQLType VariableDecl{varType=Xabi.Label x} = Just $ "text references " <> T.pack x <> "(id)"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Struct _ _} = Just "jsonb"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Enum _ _ _} = Just "text"
-solidityTypeToSQLType VariableDecl{varType=Xabi.Contract _} = Just "text"
+solidityTypeToSQLType VariableDecl{varType=SVMType.Bool} = Just "bool"
+solidityTypeToSQLType VariableDecl{varType=SVMType.Int _ _} = Just "decimal"
+solidityTypeToSQLType VariableDecl{varType=SVMType.String _} = Just "text"
+solidityTypeToSQLType VariableDecl{varType=SVMType.Bytes _ _} = Just "text"
+solidityTypeToSQLType VariableDecl{varType=SVMType.Address} = Just "text"
+solidityTypeToSQLType VariableDecl{varType=SVMType.Account} = Just "text"
+solidityTypeToSQLType VariableDecl{varType=SVMType.Array _ _} = Nothing -- Just "jsonb"
+solidityTypeToSQLType VariableDecl{varType=SVMType.Mapping _ _ _} = Nothing -- Just "jsonb"
+solidityTypeToSQLType VariableDecl{varType=SVMType.Label _} = Just "text"
+--solidityTypeToSQLType VariableDecl{varType=SVMType.Label x} = Just $ "text references " <> T.pack x <> "(id)"
+solidityTypeToSQLType VariableDecl{varType=SVMType.Struct _ _} = Just "jsonb"
+solidityTypeToSQLType VariableDecl{varType=SVMType.Enum _ _ _} = Just "text"
+solidityTypeToSQLType VariableDecl{varType=SVMType.Contract _} = Just "text"
 --solidityTypeToSQLType x = error $ "undefined type in solidityTypeToSQLType: " ++ show (varType x)
 
 
@@ -744,6 +822,10 @@ valueToSQLText :: Value -> Maybe Text
 valueToSQLText (SimpleValue (ValueBool x)) = Just $ wrapSingleQuotes $ tshow x
 valueToSQLText (SimpleValue (ValueInt _ _ v)) = Just $ wrapSingleQuotes $ tshow v
 valueToSQLText (SimpleValue (ValueString s)) = Just $ wrapSingleQuotes $ escapeQuotes s
+<<<<<<< HEAD
+=======
+valueToSQLText (SimpleValue (ValueAddress (Address 0))) = Just "NULL"
+>>>>>>> 03a2b735c1ad78a05903aada496c766e5cc9e90b
 valueToSQLText (SimpleValue (ValueAddress (Address addr))) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ printf "%040x" (fromIntegral addr::Integer)
 valueToSQLText (SimpleValue (ValueAccount acct)) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show acct
 valueToSQLText (SimpleValue (ValueBytes _ bytes)) = Just $ wrapSingleQuotes $ escapeQuotes $ decodeUtf8 bytes

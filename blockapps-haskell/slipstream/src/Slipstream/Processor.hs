@@ -52,7 +52,6 @@ import qualified BlockApps.Solidity.Contract as OLD
 import BlockApps.Solidity.Parse.Parser
 import BlockApps.Solidity.Value
 import qualified BlockApps.Solidity.Xabi     as OLD
-import SolidVM.Solidity.Xabi
 import BlockApps.XAbiConverter
 import qualified BlockApps.SolidityVarReader as SVR
 import qualified BlockApps.SolidVMStorageDecoder as SolidVM
@@ -64,13 +63,12 @@ import Blockchain.Data.DataDefs
 import Blockchain.Data.Json
 import Blockchain.SolidVM.CodeCollectionDB
 import Blockchain.Strato.Model.Account
-import qualified Blockchain.Strato.Model.Action as Action
 import Blockchain.Strato.Model.ChainId
 import qualified Blockchain.Strato.Model.Event            as Action
 import Blockchain.Strato.Model.Keccak256
+import qualified Blockchain.Stream.Action as Action
 import Blockchain.Stream.VMEvent
 
-import CodeCollection hiding (contractName)
 import Control.Monad.Change.Modify              hiding (modify)
 import Control.Monad.Composable.BlocSQL
 import Control.Monad.Composable.SQL
@@ -88,6 +86,11 @@ import Slipstream.Metrics
 import Slipstream.OutputData
 import Slipstream.XabiContract
 import Slipstream.Options
+
+import SolidVM.CodeCollectionTools
+import SolidVM.Model.CodeCollection hiding (contractName)
+
+import Text.Format
 
 instance ( (Keccak256 `Alters` SourceMap) m
          , MonadLogger m
@@ -418,7 +421,7 @@ getCodeCollection f cp ccString = do
 
   case cp of
     SolidVMCode _ _ ->
-      case compileSource $ Map.fromList initList of
+      case fmap resolveLabels $ compileSource $ Map.fromList initList of
         Left e -> error $ "failed parse: "  ++ show e --return $ CodeCollection Map.empty
         Right v -> return v
     EVMCode _ ->
@@ -481,6 +484,9 @@ processTheMessages env sqlEnv conn g messages = do
   fkeys <- forM creates $ \(ccString, cp, o, a, hl) -> do
     cc <- getCC cp ccString
 
+    $logInfoS "processTheMessages" $ "CodeCollection Added: " <> T.pack (format cp) <> ", contracts = " <> T.pack (show $ Map.keys $ cc^.contracts)
+
+
     deferredForeignKeys <- fmap concat $ forM (Map.toList $ cc^.contracts) $ \(nameString, c) -> do
       let n = T.pack nameString
     
@@ -497,7 +503,7 @@ processTheMessages env sqlEnv conn g messages = do
 
       hasHistoryTable <- isHistoric g htn
       
-      $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o <> ", app=" <> a <> ", name=" <> n <> " (fields: " <> T.pack (show $ Map.keys $ c^.storageDefs) <> ")" <> if hasHistoryTable then " HAS HISTORY TABLE" else ""
+      $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o <> ", app=" <> a <> ", name=" <> n <> " (fields: " <> T.pack (show $ Map.toList $ fmap varType $ c^.storageDefs) <> ")" <> if hasHistoryTable then " HAS HISTORY TABLE" else ""
       let nameParts = (o, a, n)
 
       deferredForeignKeys <- outputData conn $ createExpandIndexTable g c nameParts
@@ -520,7 +526,7 @@ processTheMessages env sqlEnv conn g messages = do
       mapM_ recordAction actions
       recordCombinedAction row
       $logInfoS "processTheMessages" $ "Combined Action = " <> formatAction row
-      $logDebugLS "The diff is " $ actionStorage row
+      $logDebugS "processTheMessages" $ T.pack $ "the diff is " ++ format (actionStorage row)
 
       case actionStorage row of
         Action.EVMDiff{} -> evmInsertsF g row actions acct
@@ -553,11 +559,11 @@ processTheMessages env sqlEnv conn g messages = do
     outputData conn . insertHistoryTable g $ concatMap historyInserts ins
 
   forM_ insertsByCodeHash $ \ins -> do
-    unless (null ins) $ outputData conn . insertForeignKeys $ map indexInsert ins
+    unless (null ins) $ insertForeignKeys conn $ map indexInsert ins
   
   when ((length creates > 0) && any (\k -> length k > 0) fkeys) $ do
     $logDebugLS "processTheMessages" $ T.pack $ "Updating PostgREST schema cache for " ++ show (sum $ map length fkeys) ++ " foreign key relationships"
-    outputData conn notifyPostgREST
+    notifyPostgREST conn
   
   when (length events' > 0) $ 
     outputData conn $ insertExpandEventTables g events'
@@ -566,5 +572,4 @@ processTheMessages env sqlEnv conn g messages = do
 
   forM_ transactionResults $ putTransactionResult
 
-  
   flushPendingWrites g

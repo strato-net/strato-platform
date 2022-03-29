@@ -4,14 +4,13 @@ module SolidVM.Solidity.Detectors.Statements.StateVariableShadowing
   ( detector
   ) where
 
-import           CodeCollection
 import qualified Data.Map.Strict as M
 import           Data.Maybe      (catMaybes, maybeToList)
 import           Data.Source
 import qualified Data.Text       as T
 import           Data.Text       (Text)
-import           SolidVM.Solidity.Xabi
-import           SolidVM.Solidity.Xabi.Statement
+import           SolidVM.Model.CodeCollection
+import           SolidVM.Solidity.Detectors.Types
 
 -- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]
 detector :: CompilerDetector

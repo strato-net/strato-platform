@@ -4,12 +4,11 @@ module SolidVM.Solidity.Detectors.Statements.UninitializedLocalVariables
   ( detector
   ) where
 
-import           CodeCollection
 import qualified Data.Map.Strict as M
 import           Data.Source
 import           Data.Text       (Text)
-import           SolidVM.Solidity.Xabi
-import           SolidVM.Solidity.Xabi.Statement
+import           SolidVM.Model.CodeCollection
+import           SolidVM.Solidity.Detectors.Types
 
 -- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]
 detector :: CompilerDetector

@@ -4,10 +4,10 @@ module SolidVM.Solidity.Detectors.Pragmas.IncorrectSolidityVersion
   ( detector
   ) where
 
-import           CodeCollection
 import           Data.Source
 import           Data.Text                           (Text)
 import qualified Data.Text                           as T
+import           SolidVM.Solidity.Detectors.Types
 import           SolidVM.Solidity.Parse.Declarations (SourceUnitF(..), SourceUnit)
 
 -- type ParserDetector = [SourceUnit] -> [SourceAnnotation T.Text]
@@ -16,5 +16,6 @@ detector = concatMap detectOneUnit
 
 detectOneUnit :: SourceUnit -> [SourceAnnotation Text]
 detectOneUnit (Pragma _ "solidvm" "3.0") = []
+detectOneUnit (Pragma _ "solidvm" "3.2") = []
 detectOneUnit (Pragma a name ver) = [(const $ T.pack $ "Unsupported pragma: " <> name <> " " <> ver) <$> a]
 detectOneUnit _ = []

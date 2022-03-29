@@ -321,3 +321,18 @@ storageSpec = do
                       , CodeAtAccount (accts !! 1) "Ptr_1"]
       insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState{addressStateCodeHash = cp}) codePtrs
       resolveCodePtr (Just 2) (codePtrs !! 2) `shouldReturn` Nothing
+    it "should detect cycles in codeptrs (pointer1 to pointer2, pointer2 to pointer1)" . runStorM $ do
+      let chainRelationships = [ (Just (0 :: Word256), ParentChainId $ Nothing)
+                               , (Just (1 :: Word256), ParentChainId $ Just 0)
+                               ]
+      insertMany (Proxy @ParentChainId) $ M.fromList chainRelationships
+      let accts = [ Account 0xabc (Just 0)
+                  , Account 0xdef (Just 0)
+                  , Account 0xfff (Just 1)
+                  ]
+      let codePtrs = [ CodeAtAccount (accts !! 1) "Ptr_0"
+                     , CodeAtAccount (accts !! 0) "Ptr_1"
+                     , CodeAtAccount (accts !! 0) "Ptr_2"
+                     ]
+      insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState{addressStateCodeHash = cp}) codePtrs
+      resolveCodePtr (Just 1) (codePtrs !! 2) `shouldReturn` Nothing
