@@ -1230,8 +1230,8 @@ contract qq {
     runBS [r|
 pragma solidvm 3.2;
 contract S {
-  string s;
-  constructor() {
+  string public s;
+  constructor() public {
     s = "Blockapps";
   }
 }
@@ -2046,12 +2046,11 @@ contract qq {
 }|] `shouldReturn` Just "\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL \NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL.The mitochondria is the powerhouse of the cell"
 
   it "can return state variables in tuples" . runTest $ do
-
     runCall "getSAndB" "()" [r|
 pragma solidvm 3.2;
 contract qq {
   string s = "The mitochondria is the powerhouse of the cell";
-  function getSAndB() public returns (string, s) {
+  function getSAndB() public returns (string, string) {
     return (s, s);
   }
 }|] `shouldReturn` Just "\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL@\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\142\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL.The mitochondria is the powerhouse of the cell\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL.The mitochondria is the powerhouse of the cell"

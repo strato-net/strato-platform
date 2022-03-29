@@ -12,11 +12,14 @@ module Data.Source.Annotation
   , withAnnotation
   , withPosition
   , position
+  , typeErrorToAnnotation
   ) where
 
 import           Control.Lens              hiding ((.=))
 import           Data.Aeson                as Aeson
 import           Data.Data
+import qualified Data.Map                  as M
+import qualified Data.Text                 as T
 import           Data.Source.Position
 import           Data.Swagger
 import           Data.Text                 (Text, pack)
@@ -30,7 +33,7 @@ data SourceAnnotation a = SourceAnnotation
   { _sourceAnnotationStart      :: SourcePosition
   , _sourceAnnotationEnd        :: SourcePosition
   , _sourceAnnotationAnnotation :: a
-  } deriving (Eq, Show, Generic, Functor, Data)
+  } deriving (Eq, Generic, Functor, Data)
 
 instance ToJSON a => ToJSON (SourceAnnotation a) where
   toJSON ann = object [
@@ -62,6 +65,17 @@ instance ToSchema (SourceAnnotation a) where
 instance Semigroup a => Semigroup (SourceAnnotation a) where
   (SourceAnnotation s _ a) <> (SourceAnnotation _ e b) = SourceAnnotation s e (a <> b)
 
+instance Show a => Show (SourceAnnotation a) where
+  show sAT = "(line " ++ (show startPosLine) ++ ", column " ++ (show startPosColumn) ++ ") - " ++ "(line " ++ (show endPosLine) ++ ", column " ++ (show endPosColumn) ++ "): " ++ (show sAA) ++ " "
+    where 
+      startPos = (_sourceAnnotationStart sAT)
+      endPos = (_sourceAnnotationEnd sAT)
+      sAA = (_sourceAnnotationAnnotation sAT)
+      startPosLine = (_sourcePositionLine startPos)
+      startPosColumn = (_sourcePositionColumn startPos)
+      endPosLine = (_sourcePositionLine endPos)
+      endPosColumn = (_sourcePositionColumn endPos)
+
 type Positioned f = f (SourceAnnotation ())
 type Annotated f = f (SourceAnnotation Text)
 
@@ -77,6 +91,12 @@ parseErrorToAnnotation pe =
         "end of input"
         msgs
    in SourceAnnotation sp sp $ pack ann
+
+typeErrorToAnnotation :: [SourceAnnotation Text] -> Text
+typeErrorToAnnotation sats = T.pack $ turnToString sats M.empty
+  where
+    turnToString [] mapSAT = foldr (++) "" (map fst $ M.toList mapSAT)
+    turnToString (x:xs) mapSAT = turnToString xs (M.insert (show x) x mapSAT)
 
 withAnnotation :: Monad m
                => a

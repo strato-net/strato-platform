@@ -3,7 +3,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
 module Blockchain.SolidVM.CodeCollectionDB
-  ( ParseOrSolidVMError(..)
+  ( ParseTypeCheckOrSolidVMError(..)
   , parseSource
   , parseSourceWithAnnotations
   , compileSourceNoInheritance
@@ -16,6 +16,7 @@ module Blockchain.SolidVM.CodeCollectionDB
 import           Control.Exception
 import           Control.Monad                        ((<=<))
 import           Control.Monad.IO.Class
+import           Control.Lens                         hiding (assign, from, to, bimap, Context)
 import qualified Data.Aeson                           as Aeson
 import           Data.Bifunctor                       (bimap, first)
 import qualified Data.ByteString                      as B
@@ -44,29 +45,27 @@ import           SolidVM.Solidity.Parse.Declarations
 import           SolidVM.Solidity.Parse.File
 import           SolidVM.Solidity.Detectors.Typechecker as TC
 
-data ParseOrSolidVMError = PEx ParseError
-                         | SVMEx (Positioned ((,) SolidException)) deriving (Show)
-
-
---CodeCollection -> [SourceAnnotation T.Text]
--- TC.detector
+data ParseTypeCheckOrSolidVMError = PEx ParseError
+                         | TCEx [SourceAnnotation T.Text]
+                         | SVMEx (Positioned ((,) SolidException)) deriving (Show) 
 
 {-# NOINLINE unsafeCodeMapIORef #-}
 unsafeCodeMapIORef :: IORef (Map Keccak256 CodeCollection)
 unsafeCodeMapIORef = unsafePerformIO $ newIORef M.empty
 
-withAnnotations :: (a -> Either ParseOrSolidVMError b) -> a -> Either [SourceAnnotation T.Text] b
+withAnnotations :: (a -> Either ParseTypeCheckOrSolidVMError b) -> a -> Either [SourceAnnotation T.Text] b
 withAnnotations f = first unwind . f
   where unwind (PEx pe) = [parseErrorToAnnotation pe]
         unwind (SVMEx (e,x)) = [T.pack (show e) <$ x]
+        unwind (TCEx errs) = errs
 
-parseSource :: T.Text -> T.Text -> Either ParseOrSolidVMError [SourceUnit]
+parseSource :: T.Text -> T.Text -> Either ParseTypeCheckOrSolidVMError [SourceUnit]
 parseSource fileName src = bimap PEx unsourceUnits $ runParser solidityFile "" (T.unpack fileName) (T.unpack src)
 
 parseSourceWithAnnotations :: T.Text -> T.Text -> Either [SourceAnnotation T.Text] [SourceUnit]
 parseSourceWithAnnotations = withAnnotations . parseSource
 
-compileSourceNoInheritance :: Map T.Text T.Text -> Either ParseOrSolidVMError CodeCollection
+compileSourceNoInheritance :: Map T.Text T.Text -> Either ParseTypeCheckOrSolidVMError CodeCollection
 compileSourceNoInheritance initCodeMap = do
   let getNamedContracts fileName src = do
         sourceUnits <- parseSource fileName src
@@ -91,17 +90,25 @@ compileSourceNoInheritance initCodeMap = do
     _contracts = deduplicatedContracts
   }
 
-compileSource :: Map T.Text T.Text -> Either ParseOrSolidVMError CodeCollection
-compileSource = applyInheritanceE <=< compileSourceNoInheritance
-  where applyInheritanceE = first SVMEx . applyInheritance
+hasSvm3_2 :: CodeCollection -> Bool
+hasSvm3_2 cc = foldr (||) False (map (=="svm3.2") vmVers)
+  where
+    contractList = map snd $ M.toList (cc ^. contracts )
+    vmVers = map (^. vmVersion ) contractList
+
+compileSource :: Map T.Text T.Text -> Either ParseTypeCheckOrSolidVMError CodeCollection
+compileSource mTT = do
+  let applyInheritanceE = first SVMEx . applyInheritance
+  case ((applyInheritanceE <=< compileSourceNoInheritance) mTT) of   
+    Right cc -> if hasSvm3_2 cc then typeCheckDetector cc else Right cc
+    Left x -> Left x
+    where 
+      typeCheckDetector ecc = case TC.detector ecc of
+        [] -> Right ecc
+        xs -> Left $ TCEx xs
 
 compileSourceWithAnnotations :: Map T.Text T.Text -> Either [SourceAnnotation T.Text] CodeCollection
-compileSourceWithAnnotations mTT = case (withAnnotations compileSource mTT) of
-  Left x -> Left x
-  Right cc ->
-    case TC.detector cc of
-      [] -> Right cc
-      errs -> Left errs
+compileSourceWithAnnotations = withAnnotations compileSource 
 
 codeCollectionFromSource :: (MonadIO m, HasCodeDB m) => B.ByteString -> m (Keccak256, CodeCollection)
 codeCollectionFromSource initCode = do
@@ -128,6 +135,7 @@ codeCollectionFromSource initCode = do
                  Right a -> a
                  Left (PEx p) -> parseError "codeCollectionFromSource" p
                  Left (SVMEx (s, _)) -> throw s
+                 Left (TCEx xs) -> typeError "codeCollectionFromSource" (typeErrorToAnnotation xs)
       let codeMap' = M.insert hsh cc codeMap
       recordCacheSize $ M.size codeMap'
       liftIO $ writeIORef unsafeCodeMapIORef codeMap'
@@ -153,6 +161,7 @@ codeCollectionFromHash hsh = do
                      Right a -> a
                      Left (PEx p) -> parseError "codeCollectionFromHash" p
                      Left (SVMEx (s, _)) -> throw s
+                     Left (TCEx xs) -> typeError "codeCollectionFromSource" (show xs)
               codeMap' = M.insert hsh cc codeMap
           recordCacheSize $ M.size codeMap'
           liftIO $ writeIORef unsafeCodeMapIORef codeMap'
