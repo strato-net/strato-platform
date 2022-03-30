@@ -80,12 +80,10 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   # This is used to uncomment/remove lines from the nginx.conf.tmpl 
   # without having to put the entire replacement string in this file 
   if [ "$SMD_DEV_MODE" != true ]; then
-    sed -i 's/#TEMPLATE_SMD_PROD_MODE//g' /tmp/nginx.conf
     sed -i '/#TEMPLATE_SMD_DEV_MODE/d' /tmp/nginx.conf
 
   else
     sed -i '/#TEMPLATE_SMD_PROD_MODE/d' /tmp/nginx.conf
-    sed -i 's/#TEMPLATE_SMD_DEV_MODE//g' /tmp/nginx.conf
     sed -i 's/<HOST_IP>/'"$HOST_IP"'/g' /tmp/nginx.conf
   fi
   # Remove SSL lines if deployment is not SSL-enabled

@@ -5,18 +5,20 @@ STRATO Management Dashboard - the UI for STRATO built on React.js.
 # Run in production
 In production we run SMD in Docker as part of STRATO node (see Dockerfile, docker-run.sh, strato-platform/docker-compose.tpl.yml and github.com/blockapps/strato-getting-started)
 
-# Run for local development
+# Run for Local Development
 
 ## Requirements:
 
 - Node v8.15
 
-To run the React dev server locally with all features enabled, add the `SMD_DEV_MODE=true` and `HOST_IP=<MY_IP>` flags to your STRATO start script:
+To run the React dev server locally with all features enabled, add the `SMD_DEV_MODE=true` and `HOST_IP=<MY_IP>` environment variables to your STRATO start script:
 
 1. Determine correct HOST_IP value depending on your OS:
   - Linux: `172.17.0.1` (default)
   - MacOS: `docker.for.mac.localhost`
   - Windows: `host.docker.internal`
+
+  Note depending on your Docker setup and version, a different value for your IP might be required.
 
 2. Run STRATO node normally on your localhost (say, localhost:8080):
     ```
@@ -37,7 +39,7 @@ To run the React dev server locally with all features enabled, add the `SMD_DEV_
     ```
     cd strato-platform/smd-ui
     npm i
-    REACT_APP_NODE_HOST=localhost:8080 npm run start
+    REACT_APP_NODE_HOST=localhost:8080 REACT_APP_OAUTH_ENABLED=true npm run start
     ```
     (The env vars have the prefix REACT_APP_ as it is the requirement of React in order to pass the unprefixed vars to browser)
 
