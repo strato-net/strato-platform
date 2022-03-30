@@ -77,7 +77,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   sed -i 's/<DEBUG_PORT_PLACEHOLDER>/'"$debugPort"'/g' /tmp/nginx.conf
   sed -i 's/<WS_DEBUG_PORT_PLACEHOLDER>/'"$debugWSPort"'/g' /tmp/nginx.conf
   
-  # This is used to uncomment/remove lines from the nginx.conf.tmpl 
+  # This is used to remove lines from the nginx.conf 
   # without having to put the entire replacement string in this file 
   if [ "$SMD_DEV_MODE" != true ]; then
     sed -i '/#TEMPLATE_SMD_DEV_MODE/d' /tmp/nginx.conf
