@@ -68,7 +68,7 @@ compileSourceNoInheritance initCodeMap = do
         let pragmas = \case
               Pragma _ n v -> Just (n, v)
               _ -> Nothing
-            vmVersion' = if Just ("solidvm", "3.0") `elem` (pragmas <$> sourceUnits) then "svm3.0" else ""
+            vmVersion' = if (Just ("solidvm","3.2")) `elem` (pragmas <$> sourceUnits) then "svm3.2" else (if (Just ("solidvm","3.0")) `elem` (pragmas <$> sourceUnits) then "svm3.0" else "")
         fmap catMaybes . for sourceUnits $ \case
           NamedXabi name (xabi, parents') -> do
             ctrct <- first SVMEx

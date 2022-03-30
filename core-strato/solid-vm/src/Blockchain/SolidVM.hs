@@ -144,7 +144,7 @@ onTraced = when flags_svmTrace
 -- TODO: Do not add default values to RawStorageDBs for SolidVM > 3.
 onTracedSM :: MonadSM m => CC.Contract -> m () -> m ()
 onTracedSM cntrct m = do
-      let svm3_0 = CC._vmVersion cntrct == "svm3.0"
+      let svm3_0 = CC._vmVersion cntrct == "svm3.0" || (CC._vmVersion cntrct == "svm3.2")
       when (flags_svmTrace && not svm3_0) m
       when (flags_svmTrace && svm3_0) $
         liftIO $ putStrLn $ "svmTrace statement(s) is absent because contract " 
@@ -281,7 +281,7 @@ create' creator newAccount ch cc contractName' argExps x509s = do
 
   A.adjustWithDefault_ (A.Proxy @AddressState) newAccount $ \newAddressState ->
     pure newAddressState{ addressStateContractRoot = MP.emptyTriePtr
-                        , addressStateCodeHash = if (vmVersion' == "svm3.0" && contractName' /= parentName && not (null parentName)) then CodeAtAccount creator contractName' else SolidVMCode contractName' ch
+                        , addressStateCodeHash = if ((vmVersion' == "svm3.0" || vmVersion' == "svm3.2")  && contractName' /= parentName && not (null parentName)) then CodeAtAccount creator contractName' else SolidVMCode contractName' ch
                         }
 
   onTraced $ liftIO $ putStrLn $ C.red $ "Creating Contract: " ++ show newAccount ++ " of type " ++ contractName'
@@ -443,7 +443,7 @@ setCreator creator contract cntrct blockNumber = do
 
     Nothing -> liftIO $ putStrLn $ C.red $ "setCreator/versioning ---> No cert found for " ++ (format creator)
   
-  let hasSvm3_0 = CC._vmVersion cntrct == "svm3.0"
+  let hasSvm3_0 = CC._vmVersion cntrct == "svm3.0" || CC._vmVersion cntrct == "svm3.2"
   let putCreatorField org = do
         liftIO $ putStrLn $ "setCreator/versioning ---> setting the org as " ++ (show org)
         putSolidStorageKeyVal' hasSvm3_0 contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack org)
@@ -471,7 +471,7 @@ computeNetworkID =
 -- get the org for the Cirrus table name
 getOrg :: MonadSM m => Account -> String -> m (String)
 getOrg caller vers = do
-  if (vers /= "svm3.0")
+  if ((vers /= "svm3.0") && (vers /= "svm3.2")) 
     then return ""
   else do
     liftIO $ putStrLn $ "getOrg/versioning ---> Getting org for the caller " ++ format caller
@@ -648,6 +648,7 @@ callWrapper from to mContract functionName isRCC argExps  = do
 
   let contract = fromMaybe contract' $ mContract >>= \c -> M.lookup c $ CC._contracts cc
       parentName' = if parentName == (CC._contractName contract) then "" else parentName
+      isSvm3_1 =  (CC._vmVersion contract == "svm3.2")
   
   initializeAction to (CC._contractName contract) parentName' hsh
 
@@ -676,7 +677,20 @@ callWrapper from to mContract functionName isRCC argExps  = do
             let f' = (if from == to then id else pushSender from) $ runTheCall to contract functionName hsh cc theFunction args' ro
             return (f', args')
           _ -> do --Maybe the function is actually a getter
-            case M.lookup (T.pack functionName) $ contract^.CC.storageDefs of
+            case (M.lookup (T.pack functionName) $ contract^.CC.storageDefs,isSvm3_1) of
+              (Just _, True) -> do 
+                  liftIO $ putStrLn ("callWrapper/getter " ++ functionName) 
+                  addCallInfo to contract functionName hsh cc M.empty True
+                --TODO- this should only exist if the storage variable is declared "public", 
+                -- right now I just ignore this and allow anything to be called as a getter
+                  val <- fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack functionName 
+                  popCallInfo
+                  return (pure val, OrderedVals []) 
+              (Just _, False) -> do 
+                return (fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack functionName, OrderedVals [])
+              (Nothing, _) -> unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName)
+
+              {-
               Just _ -> do
                 liftIO $ putStrLn ("callWrapper/getter " ++ functionName)
                 addCallInfo to contract functionName hsh cc M.empty True
@@ -685,7 +699,7 @@ callWrapper from to mContract functionName isRCC argExps  = do
                 val <- fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack functionName
                 popCallInfo
                 return (pure val, OrderedVals [])
-              Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName)
+              Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName)-}
 
   when isRCC (
     forM_ [(n, theType) | (n, CC.VariableDecl theType _ Nothing _) <- M.toList $ contract'^.CC.storageDefs] $ \(n, theType) -> do
@@ -754,7 +768,7 @@ runStatement st@(CC.SimpleStatement (CC.ExpressionStatement (CC.Binary _ "=" dst
       indVal <- getVar =<< expToVar indExp
       case indVal of
         SInteger ind -> do
-          when (ind >= toInteger (V.length fs) || 0 > ind) (invalidWrite "Cannot assign a value outside the allocated space for an array" (unparseStatement st))
+          when ((ind >= toInteger (V.length fs) || 0 > ind)) (invalidWrite "Cannot assign a value outside the allocated space for an array" (unparseStatement st))
           let newVec = fs V.// [(fromIntegral ind, srcVar)]
           setVar pVar (SArray typ newVec)
           return Nothing
@@ -935,18 +949,32 @@ runStatement (CC.ForStatement maybeInitStatement maybeConditionExp maybeLoopExp 
       _ <- getVar =<< expToVar loopExp
       return result
 
-runStatement (CC.Break _) = return $ Just SBreak
+runStatement x@(CC.Break _) = do
+  cntrct <- getCurrentContract
+  if ( not ((CC._vmVersion cntrct == "svm3.0") || (CC._vmVersion cntrct == "svm3.2")) ) then unknownStatement "unknown statement in call to runStatement: " (show x) else do
+    return $ Just SBreak
 
-runStatement (CC.Continue _) = return $ Just SContinue
+runStatement x@(CC.Continue _) = do 
+  cntrct <- getCurrentContract
+  if ( not ((CC._vmVersion cntrct == "svm3.0") || (CC._vmVersion cntrct == "svm3.2")) ) then unknownStatement "unknown statement in call to runStatement: " (show x) else do
+    return $ Just SContinue
 
 runStatement (CC.Return maybeExpression pos) = do
   solidVMBreakpoint pos
+  cntrct <- getCurrentContract
+
   case maybeExpression of
     Just e -> do
-      var <- expToVar e
-      var' <- getVar var
-      onTraced $ liftIO $ putStrLn $ (C.green ">> Returned value: ") ++ show var'
-      return $ Just var'
+      if (not ((CC._vmVersion cntrct == "svm3.2"))) 
+        then do
+          ql <- expToVar e
+          qlql <- getVar ql
+          return $ Just qlql
+        else do
+          var <- expToVar e
+          var' <- getVar var
+          onTraced $ liftIO $ putStrLn $ (C.green ">> Returned value: ") ++ show var'
+          return $ Just var'
 --      fmap Just $ getVar =<< expToVar e
     Nothing -> return $ Just SNULL
 
@@ -1008,14 +1036,20 @@ while :: MonadSM m => m Bool -> m (Maybe Value) -> m (Maybe Value)
 while condition code = do
   c <- condition
   onTraced $ liftIO $ putStrLn $ C.red $ "^^^^^^^^^^^^^^^^^^^^ loopy condition: " ++ show c
+  cntrct <- getCurrentContract
   if c
     then do
       result <- code
-      case result of
-        Nothing -> while condition code
-        Just SContinue -> while condition code
-        Just SBreak -> return Nothing
-        _ -> return result
+      if ( not (CC._vmVersion cntrct == "svm3.2")) then 
+        case result of
+          Nothing -> while condition code
+          _ -> return result
+      else
+        case result of
+          Nothing -> while condition code
+          Just SContinue -> while condition code
+          Just SBreak -> return Nothing
+          _ -> return result
     else return Nothing
 
 doWhile :: MonadSM m => m Bool -> m (Maybe Value) -> m (Maybe Value)
@@ -1126,9 +1160,11 @@ expToVar' (CC.Variable _ name) = do
   getVariableOfName name
 
 expToVar' (CC.Unitary _ "-" e) = do
-  var <- expToVar e
-  value <- getInt var
-  return $ Constant $ SInteger (value * (-1))
+  cntrct <- getCurrentContract
+  if ( not ((CC._vmVersion cntrct == "svm3.0") || (CC._vmVersion cntrct == "svm3.2"))) then invalidArguments "To use standard negative number declaration use the svm3.0 pragma" e else do
+    var <- expToVar e
+    value <- getInt var
+    return $ Constant $ SInteger (value * (-1))
 
 expToVar' (CC.PlusPlus _ e) = do
   var <- expToVar e

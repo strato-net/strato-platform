@@ -110,7 +110,7 @@ main = do
   let pragmas = \case
         Pragma _ n v -> Just (n, v)
         _ -> Nothing
-  let vmVersion' = if (Just ("solidvm","3.0")) `elem` (pragmas <$> parsedFile) then "svm3.0" else ""
+  let vmVersion' = if (Just ("solidvm","3.2")) `elem` (pragmas <$> parsedFile) then "svm3.2" else (if (Just ("solidvm","3.0")) `elem` (pragmas <$> parsedFile) then "svm3.0" else "")
       namedContracts = [(T.unpack name, either (throw . fst) id $ xabiToContract (T.unpack name) (map T.unpack parents') vmVersion' xabi)
                        | NamedXabi name (xabi, parents') <- parsedFile]
       cc = CodeCollection $ M.fromList namedContracts
