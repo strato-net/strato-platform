@@ -355,7 +355,6 @@ initializeStorage root value = do
      x -> setVar root x
 -}
 
-
 call :: SolidVMBase m
      => Bool
      -> Bool
@@ -1168,7 +1167,6 @@ expToVar' (CC.Unitary _ "--" e) = do
   logAssigningVariable next
   setVar var next
   return $ Constant next
-
 
 expToVar' (CC.Binary _ "+=" lhs rhs) = addAndAssign lhs rhs
 expToVar' (CC.Binary _ "-=" lhs rhs) = binopAssign (-) lhs rhs
