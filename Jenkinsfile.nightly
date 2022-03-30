@@ -244,7 +244,17 @@ module.exports = {
   "stratoPath": "../strato-getting-started"
 }
             """
-            sh 'npm test'
+            script {
+              try {
+                echo 'Running Docs tests...'
+                sh 'npm test'
+              }
+              catch (exc) {
+                echo 'Docs tests failed!'
+                currentBuild.result = 'UNSTABLE'
+              }
+            }
+            
           }
         }
       }
@@ -279,7 +289,19 @@ module.exports = {
           message: "Nightly develop build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL}"
       )
     }
-
+    
+    unstable {
+      slackSend (
+          color: 'warning',
+          message: "Nightly develop build is unstable: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+      )
+      slackSend(
+          channel: '#engineering',
+          color: 'warning',
+          message: "Nightly develop build is unstable: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL}"
+      )
+    }
+    
     fixed {
       slackSend(
           channel: '#engineering',
