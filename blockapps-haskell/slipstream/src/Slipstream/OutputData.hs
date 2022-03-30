@@ -244,7 +244,7 @@ data ForeignKeyInfo =
     tableName :: TableName,
     columnName :: Text,
     foreignTableName :: TableName
-    }
+    } deriving (Show)
 
 createForeignIndexesForJoins :: OutputM m =>
                                 ForeignKeyInfo -> ConduitM () Text m ()
