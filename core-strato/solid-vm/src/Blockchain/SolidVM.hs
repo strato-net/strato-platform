@@ -355,6 +355,7 @@ initializeStorage root value = do
      x -> setVar root x
 -}
 
+
 call :: SolidVMBase m
      => Bool
      -> Bool
@@ -1168,6 +1169,7 @@ expToVar' (CC.Unitary _ "--" e) = do
   setVar var next
   return $ Constant next
 
+
 expToVar' (CC.Binary _ "+=" lhs rhs) = addAndAssign lhs rhs
 expToVar' (CC.Binary _ "-=" lhs rhs) = binopAssign (-) lhs rhs
 expToVar' (CC.Binary _ "*=" lhs rhs) = binopAssign (*) lhs rhs
@@ -1251,14 +1253,20 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
           ps -> do
             addr <- accountOnUnspecifiedChain <$> getCurrentAccount
             return $ Constant $ SContractFunction (Just $ CC._contractName $ last ps) addr method
-      (SAccount a, "chainId") ->  case (a ^. namedAccountChainId) of
-        UnspecifiedChain ->  do 
-          cid2 <- view accountChainId <$> getCurrentAccount
-          case cid2 of
-            Nothing -> return $ Constant $ SInteger 0 
-            Just cid3 -> return $ Constant $ intBuiltin $ flip (:) [] $ SString $ B.foldr showHex "" $ word256ToBytes cid3
-        MainChain ->  return $ Constant $ SInteger 0 
-        ExplicitChain cid -> return $ Constant $ intBuiltin $ flip (:) [] $ SString $ B.foldr showHex "" $ word256ToBytes cid
+      (SAccount a, "chainId") -> do
+        contract' <- getCurrentContract
+        case CC._vmVersion contract' == "svm3.2" of
+          True ->
+            case (a ^. namedAccountChainId) of
+              UnspecifiedChain -> do 
+                cid2 <- view accountChainId <$> getCurrentAccount
+                case cid2 of
+                  Nothing -> return $ Constant $ SInteger 0 
+                  Just cid3 -> return $ Constant $ intBuiltin $ flip (:) [] $ SString $ B.foldr showHex "" $ word256ToBytes cid3
+              MainChain ->  return $ Constant $ SInteger 0 
+              ExplicitChain cid -> return $ Constant $ intBuiltin $ flip (:) [] $ SString $ B.foldr showHex "" $ word256ToBytes cid
+          False ->
+            typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ (show (val, name)))
       (SAccount addr, itemName) -> do --return $ Constant $ SContractItem addr itemName
         from <- getCurrentAccount
         let address = namedAccountToAccount (from ^. accountChainId) addr
@@ -1267,6 +1275,11 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
 
       (SContract _ a, funcName) -> return $ Constant $ SContractFunction Nothing a funcName
       (r@(SReference _), "push") -> return $ Constant $ SPush r Nothing
+        {-
+        contract' <- getCurrentContract
+        if (CC._vmVersion contract' == "svm3.2")
+          then return $ Constant $ SPush r Nothing
+          else typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ show r) -}
       (a@(SArray _ _), "push") -> return $ Constant $ SPush a (Just var)
       (SArray _ theVector, "length") -> return $ Constant $ SInteger $ fromIntegral $ V.length theVector
       (SString s, "length") -> return . Constant . SInteger . fromIntegral $ length s
@@ -2045,10 +2058,15 @@ encodeForReturn (SString s) = do
 -- Value: |offset_str1|encoded_int|offset_str2|str1EncLen|   str1Enc  |str2EncLen|   str2Enc  |
 
 -- This is a hacky way to encode arrays, only works for returning just the array
-encodeForReturn (SArray _ items) = do
-  let encLen = word256ToBytes $ fromIntegral $ (V.length items)
-  bs <- encodeVector items
-  return $ (word256ToBytes $ fromIntegral (32::Integer)) `B.append` (encLen `B.append` bs)
+encodeForReturn x@(SArray _ items) = do
+  contract' <- getCurrentContract
+  if CC._vmVersion contract' == "svm3.2" 
+    then do
+      let encLen = word256ToBytes $ fromIntegral $ (V.length items)
+      bs <- encodeVector items
+      return $ (word256ToBytes $ fromIntegral (32::Integer)) `B.append` (encLen `B.append` bs)
+    else
+      todo "Please use pragma solidvm 3.2 or greater to access array encoding for return " x
 
 encodeForReturn (STuple items) = encodeVector items
 
