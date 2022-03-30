@@ -105,8 +105,14 @@ class CreateContract extends Component {
     Object.values(abi).forEach(val => {
       if (val.constr && val.constr.args !== undefined) {
         return Object.getOwnPropertyNames(val.constr.args).forEach((arg) => {
-          if (values[`field${arg}`] !== undefined)
-            args[arg] = values[`field${arg}`];
+          if (values[`field${arg}`] !== undefined) {
+            let val = values[`field${arg}`]
+            try {
+              args[arg] = JSON.parse(val)
+            } catch (e) {
+              args[arg] = val;
+            }
+          }
         })
       }
     });

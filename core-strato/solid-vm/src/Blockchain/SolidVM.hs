@@ -583,20 +583,41 @@ argsToVals ctract fn args =
                      . map snd $ CC.funcArgs fn
 
         eval :: MonadSM m => SVMType.Type -> CC.Expression -> m Value
-        eval t x = case x of
-           CC.NumberLiteral _ n Nothing -> return . coerceType ctract t $ SInteger n
-           CC.NumberLiteral _ n (Just nu) -> todo "Number literal with units" (n, nu)
-           CC.BoolLiteral _ b -> return . coerceType ctract t $ SBool b
-           CC.StringLiteral _ s -> return . coerceType ctract t $ SString s
-           CC.ArrayExpression _ as -> case t of
-              SVMType.Array{SVMType.entry=t'} ->
+        eval t x = do
+          case x of
+            CC.NumberLiteral _ n Nothing   -> return . coerceType ctract t $ SInteger n
+            CC.NumberLiteral _ n (Just nu) -> todo "Number literal with units" (n, nu)
+            CC.BoolLiteral _ b             -> return . coerceType ctract t $ SBool b
+            CC.StringLiteral _ s           -> return . coerceType ctract t $ SString s
+            CC.ArrayExpression _ as        -> case t of
+              SVMType.Array{SVMType.entry=t'} -> 
                 SArray t . V.fromList <$> mapM (fmap Constant . eval t') as
               _ -> typeError "array literal for non array" (t, x)
-           -- This is something of a hack, where if an incoming value is not one
-           -- of the accepted literals, assume that this is not the context of
-           -- evaluating external arguments.
-           _ -> getVar =<< expToVar x
+              -- This is something of a hack, where if an incoming value is not one
+              -- of the accepted literals, assume that this is not the context of
+              -- evaluating external arguments.
+            CC.ObjectLiteral _ mp          -> case t of 
+              SVMType.Label l -> do
+                let ls = M.toList mp
+                m <- mapM go ls 
+                return $ SStruct l $ M.fromList m
+                where go (k, v) = do
+                                let tp = coerceExpression v
+                                v' <- eval tp v
+                                return $ (T.unpack k, Constant v')
+              -- TODO strato-2429
+              -- (SVMType.Mapping _ td) -> do
+              _ -> typeError "Object Literal for non-object argument type" (t, x)
+            _                               -> getVar =<< expToVar x
 
+-- Crude type checking of expressions
+coerceExpression :: CC.Expression -> SVMType.Type
+coerceExpression (CC.BoolLiteral _ _ ) = SVMType.Bool
+coerceExpression (CC.NumberLiteral _ _ _) = SVMType.Int (Just True) Nothing
+coerceExpression (CC.StringLiteral _ _) = SVMType.String $ Just True
+coerceExpression (CC.ArrayExpression _ xs) = SVMType.Array (coerceExpression (head xs)) Nothing
+coerceExpression (CC.ObjectLiteral _ _) = SVMType.Struct Nothing ""
+coerceExpression ex = typeError "Cannot deduce a type from" (ex, ex)
 
 callWrapper :: MonadSM m => Account -> Account -> Maybe String -> String -> Bool -> CC.ArgList -> m (Maybe Value)
 callWrapper from to mContract functionName isRCC argExps  = do
