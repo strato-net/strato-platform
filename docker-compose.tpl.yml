@@ -280,6 +280,8 @@ services:
     - STATS_ENABLED=${STATS_ENABLED}
     - uiPassword=${uiPassword}
     - vmDebug=${vmDebug}
+    - SMD_DEV_MODE=${SMD_DEV_MODE:-false}
+    - HOST_IP=${HOST_IP:-172.17.0.1}
     build: .
     image: ${NGINX_IMAGE:-<REPO_URL>nginx:<VERSION>}
     ports:

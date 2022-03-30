@@ -20,6 +20,8 @@ VM_DEBUG=${vmDebug:-false}
 debugPort=${debugPort:-8051}
 debugWSPort=${debugWSPort:-8052}
 STATS_ENABLED=${STATS_ENABLED:-true}
+SMD_DEV_MODE=${SMD_DEV_MODE:-false}
+HOST_IP=${HOST_IP:-172.17.0.1}
 
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
@@ -74,7 +76,18 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   fi
   sed -i 's/<DEBUG_PORT_PLACEHOLDER>/'"$debugPort"'/g' /tmp/nginx.conf
   sed -i 's/<WS_DEBUG_PORT_PLACEHOLDER>/'"$debugWSPort"'/g' /tmp/nginx.conf
+  
+  # This is used to uncomment/remove lines from the nginx.conf.tmpl 
+  # without having to put the entire replacement string in this file 
+  if [ "$SMD_DEV_MODE" != true ]; then
+    sed -i 's/#TEMPLATE_SMD_PROD_MODE//g' /tmp/nginx.conf
+    sed -i '/#TEMPLATE_SMD_DEV_MODE/d' /tmp/nginx.conf
 
+  else
+    sed -i '/#TEMPLATE_SMD_PROD_MODE/d' /tmp/nginx.conf
+    sed -i 's/#TEMPLATE_SMD_DEV_MODE//g' /tmp/nginx.conf
+    sed -i 's/<HOST_IP>/'"$HOST_IP"'/g' /tmp/nginx.conf
+  fi
   # Remove SSL lines if deployment is not SSL-enabled
   # Set SSL cert file type if SSL-enabled
   if [ "$ssl" != true ]; then
