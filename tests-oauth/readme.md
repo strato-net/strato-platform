@@ -6,7 +6,6 @@ Demo app that uses STRATO to track products through a supply chain using OAuth a
 
 ### STRATO node running with parameters:
    ```
-  OAUTH_ENABLED=true \
   OAUTH_CLIENT_ID=dev-infinite \
   OAUTH_CLIENT_SECRET=091a22ec-3c81-4be4-83fb-d9f82084c3e8 \
   OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \
