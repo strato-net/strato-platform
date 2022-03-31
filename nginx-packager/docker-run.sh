@@ -14,7 +14,6 @@ OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-NULL}
 OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
 OAUTH_JWT_USERNAME_PROPERTY=${OAUTH_JWT_USERNAME_PROPERTY:-email}
 OAUTH_SCOPE=${OAUTH_SCOPE:-openid email profile}
-OAUTH_STRATO42_FALLBACK=${OAUTH_STRATO42_FALLBACK:-false}
 VM_DEBUG=${vmDebug:-false}
 debugPort=${debugPort:-8051}
 debugWSPort=${debugWSPort:-8052}
@@ -46,10 +45,6 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ### Generate nginx.conf from template according to configuration provided
   ########
   cp /tmp/nginx.tpl.conf /tmp/nginx.conf
-
-  if [ "$OAUTH_STRATO42_FALLBACK" = true ]; then
-    sed -i '/#TEMPLATE_MARK_OAUTH_STRATO_43_AND_ABOVE/d' /tmp/nginx.conf
-  fi
 
   if [ "$VM_DEBUG" != true ]; then
     sed -i '/#TEMPLATE_MARK_DEBUG/d' /tmp/nginx.conf
