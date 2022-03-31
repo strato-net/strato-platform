@@ -57,7 +57,7 @@ export function createContractApiCall(contract, src, username, address, password
     .then(function (response) {
       if (response.status === 400) {
         return response.text().then(error => {
-          throw `${error} before json`;
+          throw error;
         })
       }
       return response.json();
