@@ -137,7 +137,26 @@ exports[`CreateChain: index render component with empty values 1`] = `
         <div className=\\"row\\">
           <div className=\\"col-sm-3 text-right\\">
             <label className=\\"pt-label smd-pad-4\\">
-              Compilation
+              VM
+            </label>
+          </div>
+          <div className=\\"col-sm-9 smd-scrollable smd-pad-4\\">
+            <div className=\\"pt-select\\">
+              <Field className=\\"pt-select\\" component=\\"select\\" name=\\"vm\\" onChange={[Function: onChange]}>
+                <option value=\\"SolidVM\\">
+                  SolidVM
+                </option>
+                <option value=\\"EVM\\">
+                  EVM
+                </option>
+              </Field>
+            </div>
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\">
+              Arguments
             </label>
           </div>
           <div className=\\"col-sm-9 smd-scrollable smd-pad-4\\">
@@ -255,7 +274,26 @@ exports[`CreateChain: index render component with values 1`] = `
         <div className=\\"row\\">
           <div className=\\"col-sm-3 text-right\\">
             <label className=\\"pt-label smd-pad-4\\">
-              Compilation
+              VM
+            </label>
+          </div>
+          <div className=\\"col-sm-9 smd-scrollable smd-pad-4\\">
+            <div className=\\"pt-select\\">
+              <Field className=\\"pt-select\\" component=\\"select\\" name=\\"vm\\" onChange={[Function: onChange]}>
+                <option value=\\"SolidVM\\">
+                  SolidVM
+                </option>
+                <option value=\\"EVM\\">
+                  EVM
+                </option>
+              </Field>
+            </div>
+          </div>
+        </div>
+        <div className=\\"row\\">
+          <div className=\\"col-sm-3 text-right\\">
+            <label className=\\"pt-label smd-pad-4\\">
+              Arguments
             </label>
           </div>
           <div className=\\"col-sm-9 smd-scrollable smd-pad-4\\">

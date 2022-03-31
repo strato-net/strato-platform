@@ -39,7 +39,7 @@ export const closeAddMemberModal = function () {
   }
 }
 
-export const createChain = function (label, members, balances, src, args) {
+export const createChain = function (label, members, balances, src, args, vm) {
   return {
     type: CREATE_CHAIN_REQUEST,
     label,
@@ -47,6 +47,7 @@ export const createChain = function (label, members, balances, src, args) {
     balances,
     src,
     args,
+    vm,
     spinning: true,
     isOpen: true,
   }
@@ -76,12 +77,13 @@ export const resetError = function () {
   }
 }
 
-export const compileChainContract = function (name, contract, searchable) {
+export const compileChainContract = function (name, contract, searchable, vm) {
   return {
     type: COMPILE_CHAIN_CONTRACT_REQUEST,
     name: name,
     contract: contract,
-    searchable: searchable
+    searchable: searchable,
+    vm,
   }
 }
 

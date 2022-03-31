@@ -3,7 +3,7 @@
 exports[`CreateChain: validate when form has no values 1`] = `
 Object {
   "chainName": "required",
-  "members": "atleast add one member",
+  "members": "at least add one member",
 }
 `;
 

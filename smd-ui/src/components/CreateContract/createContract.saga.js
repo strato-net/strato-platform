@@ -151,7 +151,7 @@ export function* compileContract(action) {
 
 export function* compileChainContract(action) {
   try {
-    let response = yield call(compileContractApiCall, action.name, action.contract, action.solidvm);
+    let response = yield call(compileContractApiCall, action.name, action.contract, action.vm);
     yield put(compileChainContractSuccess(response));
   } catch (err) {
     yield put(compileChainContractFailure(err));
