@@ -14,7 +14,6 @@ import qualified Generic.Random            as GR
 import           GHC.Generics
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances ()
-
 typeAesonOptions::Options
 typeAesonOptions=defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="type"}}
 

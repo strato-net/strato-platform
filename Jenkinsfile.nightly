@@ -223,7 +223,7 @@ pipeline {
             usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')
         ]) {
           sh 'rm -rf docs-website'
-          sh 'git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/docs-website -b master'
+          sh 'git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/docs-website -b develop'
           dir('docs-website/') {
             sh 'npm i'
             

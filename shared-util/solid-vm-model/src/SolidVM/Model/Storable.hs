@@ -61,7 +61,7 @@ instance Format BasicValue where
   format (BBool False) = "false"
   format (BAccount a) = "account(" ++ show a ++ ")"
   format (BEnumVal n1 n2 _) = T.unpack n1 ++ "." ++ T.unpack n2
-  format (BContract n _) = "contract(" ++ T.unpack n ++ ")"
+  format (BContract n a) = T.unpack n ++ "(" ++ format a ++ ")"
   format BMappingSentinel = "<MappingSentinel>"
   format BDefault = "<unknown>"
 

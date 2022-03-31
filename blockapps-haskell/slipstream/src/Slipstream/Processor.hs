@@ -467,6 +467,11 @@ processTheMessages :: (MonadIO m, MonadUnliftIO m, MonadLogger m, HasSQL m) =>
                       BlocEnv -> BlocSQLEnv -> PGConnection -> IORef Globals -> [VMEvent] -> m ()
 processTheMessages env sqlEnv conn g messages = do
 
+  case length messages of
+   0 -> return ()
+   1 -> $logInfoS "processTheMessages" "1 message has arrived"
+   n -> $logInfoS "processTheMessages" . T.pack $ show n ++ " messages have arrived"
+
   let changes = parseActions messages
       events' = parseEvents messages
       -- TODO (Dan) : would be nice if we didn't just rip events out at the top level like this
@@ -476,8 +481,11 @@ processTheMessages env sqlEnv conn g messages = do
       getCC = getCodeCollection' flags_indexEVM
       evmInsertsF = if flags_indexEVM then getEVMInserts else getInsertsIgnoreEVM
 
-  forM_ creates $ \(ccString, cp, o, a, hl) -> do
+  fkeys <- forM creates $ \(ccString, cp, o, a, hl) -> do
     cc <- getCC cp ccString
+
+    $logInfoS "processTheMessages" $ "CodeCollection Added: " <> T.pack (format cp) <> ", contracts = " <> T.pack (show $ Map.keys $ cc^.contracts)
+
 
     deferredForeignKeys <- fmap concat $ forM (Map.toList $ cc^.contracts) $ \(nameString, c) -> do
       let n = T.pack nameString
@@ -495,7 +503,7 @@ processTheMessages env sqlEnv conn g messages = do
 
       hasHistoryTable <- isHistoric g htn
       
-      $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o <> ", app=" <> a <> ", name=" <> n <> " (fields: " <> T.pack (show $ Map.keys $ c^.storageDefs) <> ")" <> if hasHistoryTable then " HAS HISTORY TABLE" else ""
+      $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o <> ", app=" <> a <> ", name=" <> n <> " (fields: " <> T.pack (show $ Map.toList $ fmap varType $ c^.storageDefs) <> ")" <> if hasHistoryTable then " HAS HISTORY TABLE" else ""
       let nameParts = (o, a, n)
 
       deferredForeignKeys <- outputData conn $ createExpandIndexTable g c nameParts
@@ -509,11 +517,8 @@ processTheMessages env sqlEnv conn g messages = do
 
     forM_ deferredForeignKeys $ \deferredForeignKey -> do
       outputData conn $ createForeignIndexesForJoins deferredForeignKey
-
-  case length messages of
-   0 -> return ()
-   1 -> $logInfoS "processTheMessages" "1 message has arrived"
-   n -> $logInfoS "processTheMessages" . T.pack $ show n ++ " messages have arrived"
+    
+    pure deferredForeignKeys
 
   inserts <- enterBloc2 env sqlEnv $ do
     forM changes $ \(acct,actions) -> do
@@ -532,7 +537,7 @@ processTheMessages env sqlEnv conn g messages = do
                 aiName = T.pack name,
                 aiChain = cid
               }
-              cont = error "internal error: contract should be unused for Solidvm"
+              cont = error "internal error: contract should be unused for SolidVM"
           $logDebugLS "Contract name is: " $ show name
           oldState <- readPreviousSolidVMState g acct
           indexContract <- rowToInsert g abiid row cont oldState
@@ -554,15 +559,17 @@ processTheMessages env sqlEnv conn g messages = do
     outputData conn . insertHistoryTable g $ concatMap historyInserts ins
 
   forM_ insertsByCodeHash $ \ins -> do
-    unless (null ins) $ outputData conn . insertForeignKeys $ map indexInsert ins
-
+    unless (null ins) $ insertForeignKeys conn $ map indexInsert ins
+  
+  when ((length creates > 0) && any (\k -> length k > 0) fkeys) $ do
+    $logDebugLS "processTheMessages" $ T.pack $ "Updating PostgREST schema cache for " ++ show (sum $ map length fkeys) ++ " foreign key relationships"
+    notifyPostgREST conn
+  
   when (length events' > 0) $ 
     outputData conn $ insertExpandEventTables g events'
 
-  $logInfoS "processTheMessages" . T.pack $ "inserting " ++ show (length transactionResults) ++ " transaction results"
+  $logInfoS "processTheMessages" . T.pack $ "Inserting " ++ show (length transactionResults) ++ " transaction results"
 
   forM_ transactionResults $ putTransactionResult
 
-  outputData conn notifyPostgREST
-  
   flushPendingWrites g

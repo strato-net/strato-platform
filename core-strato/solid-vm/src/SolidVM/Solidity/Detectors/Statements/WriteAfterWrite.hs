@@ -153,3 +153,4 @@ expressionHelper (ArrayExpression _ es) = concat <$> traverse expressionHelper e
 expressionHelper (Variable _ name) = do
   modify $ M.delete name
   pure []
+expressionHelper (ObjectLiteral _ _) = pure []
