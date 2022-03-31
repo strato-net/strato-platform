@@ -448,7 +448,6 @@ spec = do
         ]
 
     it "can hash multiple arguments" . runTest $ do
-      liftIO $ pendingWith "TODO(blockapps.atlassian.net/browse/STRATO-1520)"
       runBS [r|
 contract qq {
   bytes32 hsh;
