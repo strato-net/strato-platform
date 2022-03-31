@@ -78,6 +78,7 @@ expressionCrawler = \case
     expr <- subexprs
     expressionCrawler expr
   Variable{} -> ["Variable"]
+  ObjectLiteral{} -> ["ObjectLiteral"]
 
 simpleStatementCrawler :: SimpleStatementF a -> [T.Text]
 simpleStatementCrawler = \case

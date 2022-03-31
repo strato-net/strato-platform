@@ -1361,6 +1361,7 @@ contract qq {
 
   it "can push to memory arrays" . runTest $ do
     runCall "pushMem" "([3, 5])" [r|
+pragma solidvm 3.2;
 contract qq {
   uint x;
   function pushMem(uint[] memory ts) public {
@@ -2989,6 +2990,7 @@ contract qq {
       ]
   it "can get the chainId from the account type" . runTest $ do
     runBS [r|
+pragma solidvm 3.2;
 contract qq {
   account a1;
   account a2;
@@ -3007,8 +3009,8 @@ contract qq {
 }|]
     getFields ["cid1", "cid2", "cid3"] `shouldReturn`
       [ BInteger 0xfeedbeef
-      , BInteger 0
-      , BInteger 0
+      , BDefault
+      , BDefault
       ]
 
   it "can't assign a value to an unallocated index in an array" $ (runTest (runBS [r|

@@ -8,6 +8,7 @@ import           Blockchain.SolidVM.SM
 import           Blockchain.VM.SolidException
 import qualified SolidVM.Model.Storable as MS
 import           SolidVM.Model.Value
+import qualified SolidVM.Model.CodeCollection as CC
 
 import           Data.Vector as V
 
@@ -26,10 +27,16 @@ push (SReference apt) _ (OrderedVals [av]) = do
 
 
 push (SArray varType vec) (Just (Variable ref)) (OrderedVals [av]) = do
-  let newVar = Constant av
-      newArr = V.snoc vec newVar 
-  setVar (Variable ref) (SArray varType newArr)
-  return $ Constant (SInteger $ fromIntegral $ V.length newArr)
+  contract' <- getCurrentContract
+  if CC._vmVersion contract' == "svm3.2"
+    then do
+      let newVar = Constant av
+          newArr = V.snoc vec newVar 
+      setVar (Variable ref) (SArray varType newArr)
+      return $ Constant (SInteger $ fromIntegral $ V.length newArr)
+    else do
+      invalidArguments "please use pragma solidvm 3.2 or greater" (OrderedVals [av]) 
+
 --  liftIO $ putStrLn $ "address = " ++ show address
 --  liftIO $ putStrLn $ "apt = " ++ show apt
 --  liftIO $ putStrLn $ "vallist = " ++ show newVal

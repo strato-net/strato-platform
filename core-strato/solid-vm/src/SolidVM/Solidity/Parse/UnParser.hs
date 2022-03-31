@@ -90,6 +90,7 @@ unparseConstant (name, (ConstantDecl theType isPublic expression _)) =
   <> ";"
 
 unparseVarType :: Type -> String
+
 unparseVarType (SVMType.Int (Just True) (Just n)) = "int" <> show (8*n)
 unparseVarType (SVMType.Int (Just True) Nothing) = "int"
 unparseVarType (SVMType.Int (Just False) (Just n)) = "uint" <> show (8*n)
@@ -108,6 +109,7 @@ unparseVarType (SVMType.Array t (Just n)) = (unparseVarType t) <> "[" <> show n 
 unparseVarType (SVMType.Array t Nothing) = (unparseVarType t) <> "[]"
 unparseVarType (SVMType.Mapping _ key val) = "mapping (" <> (unparseVarType key) <> " => " <> (unparseVarType val) <> ")"
 unparseVarType (SVMType.Contract contractName') = Text.unpack contractName'
+unparseVarType (SVMType.Struct _ n) = "struct " ++ Text.unpack n
 unparseVarType _ = "TYPE_NOT_IMPLEMENED"
 
 unparseFunc :: (Text, Func) -> String
@@ -246,6 +248,7 @@ unparseExpression (FunctionCall _ e args) =
 unparseExpression (Ternary _ x y z) = unparseExpression x ++ "?" ++ unparseExpression y ++ ":" ++ unparseExpression z
 unparseExpression (NewExpression _ x) = "new " ++ unparseVarType x
 unparseExpression (ArrayExpression _ xs) = "[" ++ List.intercalate "," (map unparseExpression xs) ++ "]"
+unparseExpression (ObjectLiteral _ m) = "{" ++ List.intercalate "," [concat [Text.unpack k, ":", unparseExpression v]  | (k, v) <- Map.toList m] ++ "}"
 unparseExpression x = internalError "missing case in call to unparseExpression" $ show x
 
 unparseModifier :: (Text, ModifierF a) -> String

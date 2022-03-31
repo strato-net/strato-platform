@@ -243,7 +243,9 @@ valueToText = \case
   ValueContract addr -> Text.pack $ show addr
   ValueEnum{}        -> error "ValueEnum to text"
   ValueFunction{}    -> error "ValueFunction to text"
-  ValueStruct{}      -> error "ValueStruct to text"
+  ValueStruct m      -> 
+    "{" <> Text.intercalate "," (map (\(k, v) -> Text.concat [k , ":", valueToText v]) $ Map.toList m) <> "}"
+
   ValueArraySentinel{} -> error "ValueArraySentinel to text"
 
 simpleValueToText :: SimpleValue -> Text

@@ -92,3 +92,4 @@ expressionHelper (TupleExpression _ es) =
   concat $ maybe [] expressionHelper <$> es
 expressionHelper (ArrayExpression _ es) = concat $ expressionHelper <$> es
 expressionHelper (Variable _ _) = []
+expressionHelper (ObjectLiteral _ _) = []

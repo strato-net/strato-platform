@@ -6,6 +6,7 @@ import           Control.Monad
 import           Data.Foldable (asum, foldl')
 import           Data.Functor.Identity
 import           Data.Source
+import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
 import           Text.Parsec
 import           Text.Parsec.Expr
@@ -211,7 +212,16 @@ array = do
   ~(a, exps) <- withPosition $ brackets $ commaSep expression
   return $ ArrayExpression a exps
 
-
+-- Parses a JSON object style text into a Haskell Object literal type
+structE :: SolidityParser Expression
+structE = do
+  ~(a, exps) <- withPosition $ braces $ commaSep assoc
+  return $ ObjectLiteral a $ Map.fromList exps
+  where assoc = do
+            k <- identifier
+            void colon
+            v <- expression
+            return (T.pack k, v)
 {-
 // Precedence by order (see github.com/ethereum/solidity/pull/732)
 Expression
@@ -291,6 +301,7 @@ literal = asum
         , uncurry BoolLiteral <$> withPosition (False <$ reserved "false")
         , uncurry BoolLiteral <$> withPosition (True <$ reserved "true")
         , uncurry ArrayExpression <$> withPosition (brackets $ commaSep literal)
+        , structE
         ]
 
 inlineAssembly :: SolidityParser Statement

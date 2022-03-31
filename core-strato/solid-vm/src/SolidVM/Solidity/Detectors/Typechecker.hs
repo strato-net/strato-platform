@@ -217,8 +217,8 @@ accountType' = Static SVMType.Account
 enumType' :: SourceAnnotation Text -> Type'
 enumType' = Static (SVMType.Enum Nothing "" Nothing)
 
--- structType' :: SourceAnnotation Text -> Type'
--- structType' = Static (Struct Nothing "")
+structType' :: SourceAnnotation Text -> Type'
+structType' = Static (SVMType.Struct Nothing "")
 
 contractType' :: SourceAnnotation Text -> Type'
 contractType' = Static (SVMType.Contract "")
@@ -1003,3 +1003,4 @@ tcExpr (ArrayExpression x es) = do
     (Static t _) ->Static (SVMType.Array t Nothing) x
     _ -> t'
 tcExpr (Variable x name) = getVarType' name x
+tcExpr (ObjectLiteral x _) = pure $ structType' x

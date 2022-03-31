@@ -583,20 +583,41 @@ argsToVals ctract fn args =
                      . map snd $ CC.funcArgs fn
 
         eval :: MonadSM m => SVMType.Type -> CC.Expression -> m Value
-        eval t x = case x of
-           CC.NumberLiteral _ n Nothing -> return . coerceType ctract t $ SInteger n
-           CC.NumberLiteral _ n (Just nu) -> todo "Number literal with units" (n, nu)
-           CC.BoolLiteral _ b -> return . coerceType ctract t $ SBool b
-           CC.StringLiteral _ s -> return . coerceType ctract t $ SString s
-           CC.ArrayExpression _ as -> case t of
-              SVMType.Array{SVMType.entry=t'} ->
+        eval t x = do
+          case x of
+            CC.NumberLiteral _ n Nothing   -> return . coerceType ctract t $ SInteger n
+            CC.NumberLiteral _ n (Just nu) -> todo "Number literal with units" (n, nu)
+            CC.BoolLiteral _ b             -> return . coerceType ctract t $ SBool b
+            CC.StringLiteral _ s           -> return . coerceType ctract t $ SString s
+            CC.ArrayExpression _ as        -> case t of
+              SVMType.Array{SVMType.entry=t'} -> 
                 SArray t . V.fromList <$> mapM (fmap Constant . eval t') as
               _ -> typeError "array literal for non array" (t, x)
-           -- This is something of a hack, where if an incoming value is not one
-           -- of the accepted literals, assume that this is not the context of
-           -- evaluating external arguments.
-           _ -> getVar =<< expToVar x
+              -- This is something of a hack, where if an incoming value is not one
+              -- of the accepted literals, assume that this is not the context of
+              -- evaluating external arguments.
+            CC.ObjectLiteral _ mp          -> case t of 
+              SVMType.Label l -> do
+                let ls = M.toList mp
+                m <- mapM go ls 
+                return $ SStruct l $ M.fromList m
+                where go (k, v) = do
+                                let tp = coerceExpression v
+                                v' <- eval tp v
+                                return $ (T.unpack k, Constant v')
+              -- TODO strato-2429
+              -- (SVMType.Mapping _ td) -> do
+              _ -> typeError "Object Literal for non-object argument type" (t, x)
+            _                               -> getVar =<< expToVar x
 
+-- Crude type checking of expressions
+coerceExpression :: CC.Expression -> SVMType.Type
+coerceExpression (CC.BoolLiteral _ _ ) = SVMType.Bool
+coerceExpression (CC.NumberLiteral _ _ _) = SVMType.Int (Just True) Nothing
+coerceExpression (CC.StringLiteral _ _) = SVMType.String $ Just True
+coerceExpression (CC.ArrayExpression _ xs) = SVMType.Array (coerceExpression (head xs)) Nothing
+coerceExpression (CC.ObjectLiteral _ _) = SVMType.Struct Nothing ""
+coerceExpression ex = typeError "Cannot deduce a type from" (ex, ex)
 
 callWrapper :: MonadSM m => Account -> Account -> Maybe String -> String -> Bool -> CC.ArgList -> m (Maybe Value)
 callWrapper from to mContract functionName isRCC argExps  = do
@@ -1251,14 +1272,20 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
           ps -> do
             addr <- accountOnUnspecifiedChain <$> getCurrentAccount
             return $ Constant $ SContractFunction (Just $ CC._contractName $ last ps) addr method
-      (SAccount a, "chainId") ->  case (a ^. namedAccountChainId) of
-        UnspecifiedChain ->  do 
-          cid2 <- view accountChainId <$> getCurrentAccount
-          case cid2 of
-            Nothing -> return $ Constant $ SInteger 0 
-            Just cid3 -> return $ Constant $ intBuiltin $ flip (:) [] $ SString $ B.foldr showHex "" $ word256ToBytes cid3
-        MainChain ->  return $ Constant $ SInteger 0 
-        ExplicitChain cid -> return $ Constant $ intBuiltin $ flip (:) [] $ SString $ B.foldr showHex "" $ word256ToBytes cid
+      (SAccount a, "chainId") -> do
+        contract' <- getCurrentContract
+        case CC._vmVersion contract' == "svm3.2" of
+          True ->
+            case (a ^. namedAccountChainId) of
+              UnspecifiedChain -> do 
+                cid2 <- view accountChainId <$> getCurrentAccount
+                case cid2 of
+                  Nothing -> return $ Constant $ SInteger 0 
+                  Just cid3 -> return $ Constant $ intBuiltin $ flip (:) [] $ SString $ B.foldr showHex "" $ word256ToBytes cid3
+              MainChain ->  return $ Constant $ SInteger 0 
+              ExplicitChain cid -> return $ Constant $ intBuiltin $ flip (:) [] $ SString $ B.foldr showHex "" $ word256ToBytes cid
+          False ->
+            typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ (show (val, name)))
       (SAccount addr, itemName) -> do --return $ Constant $ SContractItem addr itemName
         from <- getCurrentAccount
         let address = namedAccountToAccount (from ^. accountChainId) addr
@@ -1267,6 +1294,11 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
 
       (SContract _ a, funcName) -> return $ Constant $ SContractFunction Nothing a funcName
       (r@(SReference _), "push") -> return $ Constant $ SPush r Nothing
+        {-
+        contract' <- getCurrentContract
+        if (CC._vmVersion contract' == "svm3.2")
+          then return $ Constant $ SPush r Nothing
+          else typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ show r) -}
       (a@(SArray _ _), "push") -> return $ Constant $ SPush a (Just var)
       (SArray _ theVector, "length") -> return $ Constant $ SInteger $ fromIntegral $ V.length theVector
       (SString s, "length") -> return . Constant . SInteger . fromIntegral $ length s
@@ -2045,10 +2077,15 @@ encodeForReturn (SString s) = do
 -- Value: |offset_str1|encoded_int|offset_str2|str1EncLen|   str1Enc  |str2EncLen|   str2Enc  |
 
 -- This is a hacky way to encode arrays, only works for returning just the array
-encodeForReturn (SArray _ items) = do
-  let encLen = word256ToBytes $ fromIntegral $ (V.length items)
-  bs <- encodeVector items
-  return $ (word256ToBytes $ fromIntegral (32::Integer)) `B.append` (encLen `B.append` bs)
+encodeForReturn x@(SArray _ items) = do
+  contract' <- getCurrentContract
+  if CC._vmVersion contract' == "svm3.2" 
+    then do
+      let encLen = word256ToBytes $ fromIntegral $ (V.length items)
+      bs <- encodeVector items
+      return $ (word256ToBytes $ fromIntegral (32::Integer)) `B.append` (encLen `B.append` bs)
+    else
+      todo "Please use pragma solidvm 3.2 or greater to access array encoding for return " x
 
 encodeForReturn (STuple items) = encodeVector items
 

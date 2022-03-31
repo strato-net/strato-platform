@@ -76,9 +76,12 @@ class CreateChain extends Component {
               const v = val.vars[arg];
               if (v.initialValue !== null) {
                 args[arg] = v.initialValue;
-              } 
-              else if (!values.vm && !(v.type === 'Mapping' || v.type === 'Struct')) {
-                args[arg] = values[arg]
+              } else if (v.type !== 'Mapping' && v.type !== 'Struct') {
+                try {
+                  args[arg] = JSON.parse(values[arg]);
+                } catch (e) {
+                  args[arg] = values[arg];
+                }
               }
               else {
                 try {
