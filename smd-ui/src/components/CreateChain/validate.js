@@ -6,7 +6,7 @@ export function validate(values) {
   }
 
   if (values.members && !values.members.length) {
-    errors.members = 'atleast add one member';
+    errors.members = 'at least add one member';
   }
 
   return errors;

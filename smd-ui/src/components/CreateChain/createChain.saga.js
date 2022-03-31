@@ -20,7 +20,7 @@ import { handleErrors } from '../../lib/handleErrors';
 
 const url = env.BLOC_URL + "/chain"
 
-export function createChainApiCall(label, members, balances, src, args) {
+export function createChainApiCall(label, members, balances, src, args, vm) {
   return fetch(
     url,
     {
@@ -34,7 +34,10 @@ export function createChainApiCall(label, members, balances, src, args) {
         "balances": balances,
         "members": members,
         "src": src,
-        "label": label
+        "label": label,
+        "metadata": {
+          VM: vm ? 'SolidVM' : 'EVM' 
+        }
       })
     }
   )
@@ -49,7 +52,7 @@ export function createChainApiCall(label, members, balances, src, args) {
 
 export function* createChain(action) {
   try {
-    let response = yield call(createChainApiCall, action.label, action.members, action.balances, action.src, action.args);
+    let response = yield call(createChainApiCall, action.label, action.members, action.balances, action.src, action.args, action.vm);
     // TODO: Change when when we start getting actual error messages
     if (response.status === 200) {
       yield put(createChainSuccess(response));

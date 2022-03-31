@@ -45,11 +45,12 @@ describe('CreateChain: action', () => {
       src: `contract SimpleStorage {
         uint public storedData;
       }`,
-      args: { addRule: "MajorityRules", removeRule: "MajorityRules" }
+      args: { addRule: "MajorityRules", removeRule: "MajorityRules" },
+      vm: false,
     }
 
     test('request', () => {
-      expect(createChain(payload.label, payload.members, payload.balances, payload.src, payload.args)).toMatchSnapshot();
+      expect(createChain(payload.label, payload.members, payload.balances, payload.src, payload.args, payload.vm)).toMatchSnapshot();
     });
 
     test('success', () => {
@@ -67,11 +68,12 @@ describe('CreateChain: action', () => {
     const payload = {
       name: "Governance",
       contract: "contract Governance { string constant addRule = 'MajorityRules'; string constant removeRule = 'MajorityRules' }",
-      searchable: false
+      searchable: false,
+      vm: false,
     }
 
     test('request', () => {
-      expect(compileChainContract(payload.label, payload.contract, payload.searchable)).toMatchSnapshot();
+      expect(compileChainContract(payload.label, payload.contract, payload.searchable, payload.vm)).toMatchSnapshot();
     });
 
     test('success', () => {
