@@ -9,17 +9,17 @@ blockTime=${blockTime:-13} # keep default the same as strato
 #NODE_HOST=${NODE_HOST}
 ssl=${ssl:-false}
 sslCertFileType=${sslCertFileType:-crt}
-OAUTH_ENABLED=${OAUTH_ENABLED:-false}
 OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-NULL}
 OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-NULL}
 OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
 OAUTH_JWT_USERNAME_PROPERTY=${OAUTH_JWT_USERNAME_PROPERTY:-email}
 OAUTH_SCOPE=${OAUTH_SCOPE:-openid email profile}
-OAUTH_STRATO42_FALLBACK=${OAUTH_STRATO42_FALLBACK:-false}
 VM_DEBUG=${vmDebug:-false}
 debugPort=${debugPort:-8051}
 debugWSPort=${debugWSPort:-8052}
 STATS_ENABLED=${STATS_ENABLED:-true}
+SMD_DEV_MODE=${SMD_DEV_MODE:-false}
+HOST_IP=${HOST_IP:-172.17.0.1}
 
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
@@ -27,30 +27,18 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ### Check the validity of variables combination
   ########
 
-  if [ ${OAUTH_ENABLED} = true ]; then
-    if [[ ${SMD_MODE,,} = public ]] ; then
-      echo 'OAuth cannot be used with SMD_MODE=public'
-      exit 4
-    fi
-    if [[ ${OAUTH_DISCOVERY_URL} = NULL || ${OAUTH_CLIENT_ID} = NULL || ${OAUTH_CLIENT_SECRET} = NULL ]] ; then
-      echo 'OAUTH_DISCOVERY_URL, OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET are required for OAuth. Exit'
-      exit 5
-    fi
-    if ! curl --silent --output /dev/null --fail --location ${OAUTH_DISCOVERY_URL}
-    then
-      echo "OAuth OpenID Connect Discovery URL is unreachable: ${OAUTH_DISCOVERY_URL}. Exit"
-      exit 6
-    fi
-  else
-    # STRATO 4.2 OAuth init way compatibility
-    if [[ ${OAUTH_JWT_VALIDATION_ENABLED} = true && ${OAUTH_STRATO42_FALLBACK} = true ]]; then
-      if [ -z ${OAUTH_JWT_VALIDATION_DISCOVERY_URL} ] ; then
-        echo 'OAUTH_JWT_VALIDATION_DISCOVERY_URL is required for OAUTH_JWT_VALIDATION_ENABLED=true in OAUTH_STRATO42_FALLBACK mode. Exit'
-        exit 7
-      fi
-      OAUTH_ENABLED=${OAUTH_JWT_VALIDATION_ENABLED}
-      OAUTH_DISCOVERY_URL=${OAUTH_JWT_VALIDATION_DISCOVERY_URL}
-    fi
+  if [[ ${SMD_MODE,,} = public ]] ; then
+    echo 'OAuth cannot be used with SMD_MODE=public'
+    exit 4
+  fi
+  if [[ ${OAUTH_DISCOVERY_URL} = NULL || ${OAUTH_CLIENT_ID} = NULL || ${OAUTH_CLIENT_SECRET} = NULL ]] ; then
+    echo 'OAUTH_DISCOVERY_URL, OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET are required for OAuth. Exit'
+    exit 5
+  fi
+  if ! curl --silent --output /dev/null --fail --location ${OAUTH_DISCOVERY_URL}
+  then
+    echo "OAuth OpenID Connect Discovery URL is unreachable: ${OAUTH_DISCOVERY_URL}. Exit"
+    exit 6
   fi
 
   ########
@@ -58,23 +46,21 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ########
   cp /tmp/nginx.tpl.conf /tmp/nginx.conf
 
-  # Remove OAuth configuration lines if deployment is not OAuth-enabled
-  if [ "$OAUTH_ENABLED" != true ]; then
-    sed -i '/#TEMPLATE_MARK_OAUTH/d' /tmp/nginx.conf
-  else
-    sed -i '/#TEMPLATE_MARK_NO_OAUTH/d' /tmp/nginx.conf
-  fi
-
-  if [ "$OAUTH_STRATO42_FALLBACK" = true ]; then
-    sed -i '/#TEMPLATE_MARK_OAUTH_STRATO_43_AND_ABOVE/d' /tmp/nginx.conf
-  fi
-
   if [ "$VM_DEBUG" != true ]; then
     sed -i '/#TEMPLATE_MARK_DEBUG/d' /tmp/nginx.conf
   fi
   sed -i 's/<DEBUG_PORT_PLACEHOLDER>/'"$debugPort"'/g' /tmp/nginx.conf
   sed -i 's/<WS_DEBUG_PORT_PLACEHOLDER>/'"$debugWSPort"'/g' /tmp/nginx.conf
+  
+  # This is used to remove lines from the nginx.conf 
+  # without having to put the entire replacement string in this file 
+  if [ "$SMD_DEV_MODE" != true ]; then
+    sed -i '/#TEMPLATE_SMD_DEV_MODE/d' /tmp/nginx.conf
 
+  else
+    sed -i '/#TEMPLATE_SMD_PROD_MODE/d' /tmp/nginx.conf
+    sed -i 's/<HOST_IP>/'"$HOST_IP"'/g' /tmp/nginx.conf
+  fi
   # Remove SSL lines if deployment is not SSL-enabled
   # Set SSL cert file type if SSL-enabled
   if [ "$ssl" != true ]; then
@@ -116,21 +102,19 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ########
   ### Generate .lua scripts from templates according to configuration provided
   ########
-  if [ "$OAUTH_ENABLED" = true ] ; then
-    cp /tmp/openid.tpl.lua /tmp/openid.lua
-    sed -i 's*<OAUTH_JWT_USERNAME_PROPERTY_PLACEHOLDER>*'"$OAUTH_JWT_USERNAME_PROPERTY"'*g' /tmp/openid.lua
-    sed -i 's*<OAUTH_DISCOVERY_URL_PLACEHOLDER>*'"$OAUTH_DISCOVERY_URL"'*g' /tmp/openid.lua
-    sed -i 's*<CLIENT_ID_PLACEHOLDER>*'"$OAUTH_CLIENT_ID"'*g' /tmp/openid.lua
-    sed -i 's*<CLIENT_SECRET_PLACEHOLDER>*'"$OAUTH_CLIENT_SECRET"'*g' /tmp/openid.lua
-    sed -i 's*<OAUTH_SCOPE_PLACEHOLDER>*'"$OAUTH_SCOPE"'*g' /tmp/openid.lua
+  cp /tmp/openid.tpl.lua /tmp/openid.lua
+  sed -i 's*<OAUTH_JWT_USERNAME_PROPERTY_PLACEHOLDER>*'"$OAUTH_JWT_USERNAME_PROPERTY"'*g' /tmp/openid.lua
+  sed -i 's*<OAUTH_DISCOVERY_URL_PLACEHOLDER>*'"$OAUTH_DISCOVERY_URL"'*g' /tmp/openid.lua
+  sed -i 's*<CLIENT_ID_PLACEHOLDER>*'"$OAUTH_CLIENT_ID"'*g' /tmp/openid.lua
+  sed -i 's*<CLIENT_SECRET_PLACEHOLDER>*'"$OAUTH_CLIENT_SECRET"'*g' /tmp/openid.lua
+  sed -i 's*<OAUTH_SCOPE_PLACEHOLDER>*'"$OAUTH_SCOPE"'*g' /tmp/openid.lua
 
-    if [ "$ssl" = true ] ; then
-      sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/openid.lua
-      sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/https/g' /tmp/openid.lua
-    else
-      sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/no/g' /tmp/openid.lua
-      sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/http/g' /tmp/openid.lua
-    fi
+  if [ "$ssl" = true ] ; then
+    sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/openid.lua
+    sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/https/g' /tmp/openid.lua
+  else
+    sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/no/g' /tmp/openid.lua
+    sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/http/g' /tmp/openid.lua
   fi
 
   ########
@@ -138,9 +122,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ########
   mv /tmp/nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
 
-  if [ "$OAUTH_ENABLED" = true ]; then
-    mv /tmp/openid.lua /usr/local/openresty/nginx/lua/openid.lua
-  fi
+  mv /tmp/openid.lua /usr/local/openresty/nginx/lua/openid.lua
 
   if [ "$ssl" = true ] ; then
     cp -r /tmp/ssl/* /etc/ssl/

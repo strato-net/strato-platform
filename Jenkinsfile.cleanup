@@ -9,7 +9,7 @@ def cleanOldWorkspaces(Integer olderThanNumDays = 5) {
     // `stack purge` in every jenkins workspace directory that was not updated for at least $olderThanNumDays days and is not a @tmp dir.
     sh """
       for f in \$(find . -maxdepth 1 -type d -mtime +$olderThanNumDays | grep -v @tmp); do 
-        (cd '\$f'; stack purge); 
+        (cd '\$f'; sudo stack --allow-different-user purge); 
       done
     """
 

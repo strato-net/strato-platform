@@ -79,8 +79,11 @@ class ContractCard extends Component {
       const instance = selectedInstance[0];
       const symbolTable = [];
       const symbols = Object.getOwnPropertyNames(instance.state);
-      if (symbols.length > 0) {
+      if ((typeof instance.state !== 'string') && symbols.length > 0) {
         symbols.forEach((symbol, i) => {
+          if (symbol === 'constructor') {
+            return
+          }
           const symbolState = instance.state[symbol];
           symbolTable.push(
             <tr key={symbol + ' ' + i}>
@@ -136,18 +139,26 @@ class ContractCard extends Component {
           </div>
           <div className="row">
             <div className="col-sm-12">
-              <table className="pt-table pt-condensed pt-striped smd-full-width">
-                <thead>
-                  <tr>
-                    <th>Symbol</th>
-                    <th className="text-right">State</th>
-                    <th style={{ width: '105px' }} className="text-right"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {symbolTable}
-                </tbody>
-              </table>
+              {typeof instance.state !== 'string' ?  
+                <table className="pt-table pt-condensed pt-striped smd-full-width">
+                  <thead>
+                    <tr>
+                      <th>Symbol</th>
+                      <th className="text-right">State</th>
+                      <th style={{ width: '105px' }} className="text-right"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {symbolTable}
+                  </tbody>
+                </table>
+              : <div className='warning'> 
+                  <h4>Error</h4>
+                  <div>
+                    {instance.state}
+                  </div>
+                </div> 
+                }
             </div>
           </div>
         </div>

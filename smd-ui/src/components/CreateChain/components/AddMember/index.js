@@ -131,7 +131,7 @@ class AddMember extends Component {
       enode: this.state.enode,
       balance: this.state.balance
     }
-
+    
     let errors = validate(data, this.state.form.userSelected);
     this.setState({ errors });
 
@@ -151,7 +151,6 @@ class AddMember extends Component {
       <div >
         <Button onClick={() => {
           mixpanelWrapper.track("add_member_open_click");
-          this.setState({ username: null, address: null, balance: 0, enode: null });
           this.props.openAddMemberModal();
         }} className="pt-intent-primary pt-icon-add"
           style={{ marginTop: '8px' }}
