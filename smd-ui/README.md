@@ -31,7 +31,6 @@ To run the React dev server locally with all features enabled, add the `SMD_DEV_
     ```
     NODE_HOST=localhost:8080 \
     HTTP_PORT=8080 \
-    OAUTH_ENABLED=true \
     OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \
     OAUTH_JWT_USERNAME_PROPERTY=email \
     OAUTH_CLIENT_ID=dev \
@@ -39,7 +38,7 @@ To run the React dev server locally with all features enabled, add the `SMD_DEV_
     PASSWORD=123 \
     SMD_DEV_MODE=true \
     HOST_IP=<YOUR_IP> \
-    ./strato.sh --single
+    ./strato --single
     ```
 
 3. Run SMD react dev server locally:
