@@ -33,6 +33,7 @@ import Test.Hspec.Expectations.Lifted
 import Text.Printf
 import Text.RawString.QQ
 
+import Blockchain.SolidVM.CodeCollectionDB as CCDB
 import Blockchain.Data.DataDefs (BlockData(..))
 import Blockchain.Data.ExecResults
 import Blockchain.Data.RLP
@@ -3028,6 +3029,26 @@ contract qq {
   }
   }|])) `shouldThrow` anyInvalidWriteError
 
+  it "can run the typechecker when using pragma solidvm 3.2" $ (runTest (runBS [r|
+pragma solidvm 3.2;
+contract qq {
+  uint x = "hello";
+  string y = true;
+  bool z = 8;
+  address a = 42;
+  string[] b = "array";
+  enum RestStatus { W, X, Y, Z }
+  struct Complex {
+    uint re;
+    uint im;
+  }
+  RestStatus r = Complex(0, 1);
+  Complex i = RestStatus.Z;
+}|])) `shouldThrow` anyTypeError
+
+
+
+
   it "can parse an X509 certificate" . runTest $ do
     runBS [r|
 contract qq {
@@ -3112,3 +3133,4 @@ contract qq {
         registerCert(myAccount, myNewCertificate); 
     }
 }|]) `shouldThrow` anyInvalidWriteError
+

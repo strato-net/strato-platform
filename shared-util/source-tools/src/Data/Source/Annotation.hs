@@ -95,7 +95,7 @@ parseErrorToAnnotation pe =
 typeErrorToAnnotation :: [SourceAnnotation Text] -> Text
 typeErrorToAnnotation sats = T.pack $ turnToString sats M.empty
   where
-    turnToString [] mapSAT = foldr (++) "" (map fst $ M.toList mapSAT)
+    turnToString [] mapSAT = concat (map fst $ M.toList mapSAT)
     turnToString (x:xs) mapSAT = turnToString xs (M.insert (show x) x mapSAT)
 
 withAnnotation :: Monad m

@@ -91,7 +91,7 @@ compileSourceNoInheritance initCodeMap = do
   }
 
 hasSvm3_2 :: CodeCollection -> Bool
-hasSvm3_2 cc = foldr (||) False (map (=="svm3.2") vmVers)
+hasSvm3_2 cc = any (=="svm3.2") vmVers
   where
     contractList = map snd $ M.toList (cc ^. contracts )
     vmVers = map (^. vmVersion ) contractList
