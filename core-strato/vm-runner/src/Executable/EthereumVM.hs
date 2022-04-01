@@ -149,7 +149,7 @@ handleVmEvents = awaitForever $ \InBatch{..} -> do
     bState <- Bagger.getBaggerState
     pbft <- contextGets _hasBlockstanbul
     reqd <- contextGets _blockRequested
-    hasVotes <- uncurry (&&) . ((/= 0) *** (/= 0)) <$> peekPendingVote
+    hasVotes <- (/= 0) . fst <$> peekPendingVote
     let makeLazyBlocks = lazyBlocks $ quarryConfig ethConf
         pending = B.pending bState
         priv = toList . B.privateHashes $ B.miningCache bState
