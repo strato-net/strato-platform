@@ -228,6 +228,7 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
         $logInfoS "insertNewChains" $ T.pack $ "This is a new chain!"
         let theVM = T.unpack $ fromMaybe "EVM" $ M.lookup "VM" $ chainMetadata (chainInfo cInfo)
         sr' <- chainInfoToGenesisState theVM (Just cId) cInfo
+        void $ putChainGenesisInfo (Just cId) cBlock sr' pChain
         (sr, mAction) <-
           case theVM of
             "SolidVM" -> runChainConstructors cId cInfo
