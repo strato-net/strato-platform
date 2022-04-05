@@ -28,6 +28,8 @@ import           SolidVM.Solidity.Detectors.Types
 import           SolidVM.Model.Type (Type)
 import qualified SolidVM.Model.Type as SVMType
 import           Text.Read (readMaybe)
+--import qualified Text.Colors                          as C
+--import           Control.Monad.IO.Class
 
 emptyAnnotation :: SourceAnnotation Text
 emptyAnnotation = (SourceAnnotation (initialPosition "") (initialPosition "") "")
@@ -130,6 +132,7 @@ lookupStruct name = do
 
 lookupContractFunction :: SourceAnnotation Text -> Text -> Text -> SSS Type'
 lookupContractFunction x cName fName = do
+  --liftIO $ putStrLn $ C.green ("lookupContractFunction " ++ (show cName) ++ " " ++ (show fName))
   ~CodeCollection{..} <- asks codeCollection
   case M.lookup (T.unpack cName) _contracts of
     Nothing -> pure . bottom $ ("Unknown contract: " <> cName) <$ x
@@ -510,6 +513,7 @@ typecheckMember (Static e@(SVMType.Enum _ enum mNames) x) n = do
              , " is not an element of "
              , enum
              ]) <$ x
+typecheckMember (Static (SVMType.Account) x) "chainId" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Struct _ struct) x) n = do
   names <- M.fromList <$> lookupStruct struct
   pure $ case M.lookup n names of
@@ -534,6 +538,7 @@ typecheckMember (Static (SVMType.Label c') x) n = do
             Bottom _ -> pure . bottom $ (T.concat
               [ "Missing label: "
               , c
+              , (T.pack (show f))
               , " is not a known enum, struct, or contract."
               ]) <$ x
             t -> pure t
@@ -559,6 +564,7 @@ getTypeErrors _           = []
 const' :: Type' -> Type' -> Type'
 const' _ (Bottom e) = Bottom e
 const' t _ = t
+
 
 -- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]
 detector :: CompilerDetector

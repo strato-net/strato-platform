@@ -638,7 +638,7 @@ callWrapper from to mContract functionName isRCC argExps  = do
 
   let contract = fromMaybe contract' $ mContract >>= \c -> M.lookup c $ CC._contracts cc
       parentName' = if parentName == (CC._contractName contract) then "" else parentName
-      isSvm3_1 =  (CC._vmVersion contract == "svm3.2")
+      isSvm3_2 =  (CC._vmVersion contract == "svm3.2")
   
   initializeAction to (CC._contractName contract) parentName' hsh
 
@@ -667,7 +667,7 @@ callWrapper from to mContract functionName isRCC argExps  = do
             let f' = (if from == to then id else pushSender from) $ runTheCall to contract functionName hsh cc theFunction args' ro
             return (f', args')
           _ -> do --Maybe the function is actually a getter
-            case (M.lookup (T.pack functionName) $ contract^.CC.storageDefs,isSvm3_1) of
+            case (M.lookup (T.pack functionName) $ contract^.CC.storageDefs,isSvm3_2) of
               (Just _, True) -> do 
                   liftIO $ putStrLn ("callWrapper/getter " ++ functionName) 
                   addCallInfo to contract functionName hsh cc M.empty True
