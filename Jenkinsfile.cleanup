@@ -8,8 +8,17 @@ def cleanOldWorkspaces(Integer olderThanNumDays = 5) {
     
     // `stack purge` in every jenkins workspace directory that was not updated for at least $olderThanNumDays days and is not a @tmp dir.
     sh """
-      for f in \$(find . -maxdepth 1 -type d -mtime +$olderThanNumDays | grep -v @tmp); do 
-        (cd '\$f'; sudo stack --allow-different-user purge); 
+      pwd
+      for f in \$(find ../ -maxdepth 1 -type d -mtime +$olderThanNumDays | grep -v @tmp); do 
+        (
+          cd "\$f"
+          pwd
+          sudo stack --allow-different-user purge
+          if [ ! -d "strato-worktree" ] ; then
+            cd strato-worktree
+            sudo stack --allow-different-user purge
+          fi
+        ); 
       done
     """
 
@@ -35,6 +44,7 @@ pipeline {
   options {
     disableConcurrentBuilds()
     timestamps()
+    timeout(time: 5, unit: 'HOURS') // the job waits for the agents to become free if there are jobs running
   }
 
   stages {
