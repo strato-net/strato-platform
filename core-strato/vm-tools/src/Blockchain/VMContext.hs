@@ -642,14 +642,14 @@ queuePendingVote :: ( MonadLogger m
                     )
                  => Address -> Bool -> Address -> m ()
 queuePendingVote a r s = do
-  let nonce = case r of
+  let voteDir = case r of
         True -> maxBound
         False -> 0
-      newVote = ((a, nonce), s)
+      newVote = ((a, voteDir), s)
   $logInfoLS "queuePendingVote" newVote
   Mod.modifyStatefully_ (Mod.Proxy @ContextState) $ coinbaseQueue %= (newVote Q.<|)
 
--- (Coinbase, Nonce) to be applied on a constructed block
+-- (Coinbase, Vote Direction) to be applied on a constructed block
 -- When no pending votes are available, supplies the default coinbase (0x0)
 peekPendingVote :: ( MonadLogger m
                    , Mod.Accessible ContextState m

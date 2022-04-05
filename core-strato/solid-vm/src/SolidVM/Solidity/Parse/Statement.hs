@@ -213,15 +213,15 @@ array = do
   return $ ArrayExpression a exps
 
 -- Parses a JSON object style text into a Haskell Object literal type
-structE :: SolidityParser Expression
-structE = do
+objectE :: SolidityParser Expression
+objectE = do
   ~(a, exps) <- withPosition $ braces $ commaSep assoc
   return $ ObjectLiteral a $ Map.fromList exps
   where assoc = do
-            k <- identifier
+            k <- many1 (noneOf ":")
             void colon
             v <- expression
-            return (T.pack k, v)
+            return (T.pack $ init . tail $ show k, v) -- get rid of the surrounding quotes
 {-
 // Precedence by order (see github.com/ethereum/solidity/pull/732)
 Expression
@@ -301,7 +301,7 @@ literal = asum
         , uncurry BoolLiteral <$> withPosition (False <$ reserved "false")
         , uncurry BoolLiteral <$> withPosition (True <$ reserved "true")
         , uncurry ArrayExpression <$> withPosition (brackets $ commaSep literal)
-        , structE
+        , objectE
         ]
 
 inlineAssembly :: SolidityParser Statement

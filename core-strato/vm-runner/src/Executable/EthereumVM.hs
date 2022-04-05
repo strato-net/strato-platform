@@ -149,7 +149,7 @@ handleVmEvents = awaitForever $ \InBatch{..} -> do
     bState <- Bagger.getBaggerState
     pbft <- contextGets _hasBlockstanbul
     reqd <- contextGets _blockRequested
-    hasVotes <- uncurry (&&) . ((/= 0) *** (/= 0)) <$> peekPendingVote
+    hasVotes <- (/= 0) . fst <$> peekPendingVote
     let makeLazyBlocks = lazyBlocks $ quarryConfig ethConf
         pending = B.pending bState
         priv = toList . B.privateHashes $ B.miningCache bState
@@ -228,6 +228,7 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
         $logInfoS "insertNewChains" $ T.pack $ "This is a new chain!"
         let theVM = T.unpack $ fromMaybe "EVM" $ M.lookup "VM" $ chainMetadata (chainInfo cInfo)
         sr' <- chainInfoToGenesisState theVM (Just cId) cInfo
+        void $ putChainGenesisInfo (Just cId) cBlock sr' pChain
         (sr, mAction) <-
           case theVM of
             "SolidVM" -> runChainConstructors cId cInfo

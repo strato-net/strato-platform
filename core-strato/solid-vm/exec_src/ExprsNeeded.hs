@@ -11,7 +11,7 @@ import System.Environment
 import System.Exit
 import Text.Parsec (runParser)
 import Text.Printf
-
+import SolidVM.Solidity.Detectors.Typechecker as TC
 
 
 import SolidVM.CodeCollectionTools
@@ -114,5 +114,7 @@ main = do
       namedContracts = [(T.unpack name, either (throw . fst) id $ xabiToContract (T.unpack name) (map T.unpack parents') vmVersion' xabi)
                        | NamedXabi name (xabi, parents') <- parsedFile]
       cc = CodeCollection $ M.fromList namedContracts
+      typecheck = if vmVersion' == "svm3.2" then TC.detector cc else []
       nodes = codeCollectionCrawler cc
+  putStrLn (show typecheck) --when (not null typecheck)
   mapM_ (putStrLn . T.unpack) nodes
