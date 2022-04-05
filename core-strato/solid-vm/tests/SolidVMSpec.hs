@@ -3143,28 +3143,3 @@ contract qq {
 }|]) `shouldThrow` anyInvalidWriteError
 
 
-{-
-  it "can call the set function with the arguments ab" . runTest $ do
-    runCall "set" "(\"ab\")" [r|
-contract qq {
-  bytes b;
-  function set(bytes _b) {
-    b = _b;
-  }
-}|] `shouldReturn` Nothing
-    getFields ["b"] `shouldReturn` [BString $ B.pack "\96\97"]
--}
-{-
-  it "can append to a string" . runTest $ do
-    runCall "append" "(\" World!\")" [r|
-contract qq {
-  string a = "Hello";
-  function append(string b) public {
-    a += b;
-  }
-}|] `shouldReturn` Nothing
-    getFields ["a"] `shouldReturn` [BString "Hello World!"]
-
--}
-
-

@@ -102,7 +102,6 @@ toBasic = \case
   SContract n a -> MS.BContract (T.pack n) a
   SEnumVal k t num -> MS.BEnumVal (T.pack k) (T.pack t) num
   SMappingSentinel -> MS.BMappingSentinel
-  --SContractFunction mContract account contractName -> 
   x -> typeError "non basic solidity type cannot be stored atomically: " (show x)
 
 setVar :: MonadSM m => Variable -> Value -> m ()
