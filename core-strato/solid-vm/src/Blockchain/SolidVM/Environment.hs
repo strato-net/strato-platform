@@ -10,7 +10,7 @@ import qualified Data.Map                                    as M
 import qualified Data.Text                                   as T
 
 import           Blockchain.Data.DataDefs (BlockData(..))
-import           Blockchain.ExtWord
+--import           Blockchain.ExtWord
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Keccak256
 
@@ -22,7 +22,7 @@ data Environment =
     origin :: Account,
     blockHeader :: BlockData,
     txHash :: Keccak256,
-    chainId :: Maybe Word256,
+--    chainId :: Maybe Word256,
     metadata :: Maybe (M.Map T.Text T.Text)
     }
 

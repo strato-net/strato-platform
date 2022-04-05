@@ -239,7 +239,6 @@ create _ _ _ blockData _ sender' origin' _ _ _ newAddress code txHash' chainId' 
         Env.sender = sender',
         Env.origin = origin',
         Env.txHash=txHash',
-        Env.chainId=chainId',
         Env.metadata=metadata
       }
 
@@ -249,7 +248,7 @@ create _ _ _ blockData _ sender' origin' _ _ _ newAddress code txHash' chainId' 
       hsh <- codePtrToSHA chainId' cp
       fromMaybe "" . fmap snd . join <$> traverse getCode hsh
 
-  fmap (either solidvmErrorResults id) . runSM (Just initCode) env' $ do
+  fmap (either solidvmErrorResults id) . runSM (Just initCode) env' chainId' $ do
     let maybeContractName = M.lookup "name" =<< metadata
         !contractName' = T.unpack $ fromMaybe (missingField "TX is missing a metadata parameter called 'name'" $ show metadata) maybeContractName
 
@@ -386,11 +385,10 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' cha
         Env.sender = sender',
         Env.origin = origin',
         Env.txHash=txHash',
-        Env.chainId=chainId',
         Env.metadata=metadata
         }
 
-  fmap (either solidvmErrorResults id) . runSM Nothing env' $ do
+  fmap (either solidvmErrorResults id) . runSM Nothing env' chainId' $ do
     let maybeFuncName = M.lookup "funcName" =<< metadata
         !funcName = T.unpack $ fromMaybe (missingField "TX is missing a metadata parameter called 'funcName'" $ show metadata) maybeFuncName
         maybeArgString = M.lookup "args" =<< metadata
