@@ -763,7 +763,7 @@ valueToSQLText (SimpleValue (ValueAddress (Address 0))) = Just "NULL"
 valueToSQLText (SimpleValue (ValueAddress (Address addr))) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ printf "%040x" (fromIntegral addr::Integer)
 valueToSQLText (SimpleValue (ValueAccount acct)) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show acct
 valueToSQLText (SimpleValue (ValueBytes _ bytes)) = Just $ wrapSingleQuotes $ escapeQuotes $  case decodeUtf8' bytes of 
-  Left _ -> decodeUtf8 (Base16.encode bytes)
+  Left _ -> T.pack "\\x" `T.append` (decodeUtf8 (Base16.encode bytes))
   Right x -> x
 valueToSQLText (ValueEnum _ _ index) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show index
 valueToSQLText (ValueContract acct) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show acct

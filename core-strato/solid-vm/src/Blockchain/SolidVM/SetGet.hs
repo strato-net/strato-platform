@@ -102,6 +102,7 @@ toBasic = \case
   SContract n a -> MS.BContract (T.pack n) a
   SEnumVal k t num -> MS.BEnumVal (T.pack k) (T.pack t) num
   SMappingSentinel -> MS.BMappingSentinel
+  --SContractFunction mContract account contractName -> 
   x -> typeError "non basic solidity type cannot be stored atomically: " (show x)
 
 setVar :: MonadSM m => Variable -> Value -> m ()
@@ -380,6 +381,6 @@ showSM (SContractFunction maybeContractName address functionName ) = do
     Just name -> return name
     Nothing -> do
       contract <- getCurrentContract
-      return $ CC._name contract
+      return $ CC._contractName contract
   return $ "Contract function: " ++ contractName ++ "/" ++ format address ++ "." ++ functionName
 showSM x = todo "showSM called for unsupported value: " x

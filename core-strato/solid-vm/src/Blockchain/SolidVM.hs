@@ -148,7 +148,7 @@ onTracedSM cntrct m = do
       when (flags_svmTrace && not svm3_0) m
       when (flags_svmTrace && svm3_0) $
         liftIO $ putStrLn $ "svmTrace statement(s) is absent because contract " 
-                    ++ CC._contractName cntrct ++ " uses SolidVM=3.0"
+                    ++ CC._contractName cntrct ++ " uses "  ++ (show (CC._vmVersion cntrct))
 
 withSrcPos :: MonadIO m => SourceAnnotation () -> String -> m ()
 withSrcPos pos str = liftIO . putStrLn $ concat 

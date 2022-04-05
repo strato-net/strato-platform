@@ -319,3 +319,4 @@ textToSimpleValue str = \case
         if leftover /= ByteString.empty
           then Left $ "textToSimpleValue: could not decode as dynamically sized bytes: " <> str
           else return bytes'
+

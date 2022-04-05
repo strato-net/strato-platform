@@ -2564,6 +2564,33 @@ contract qq {
 }|]
     getFields ["x"] `shouldReturn` [BInteger 833]
 
+  it "can properly handle bytes setting" . runTest $ do
+    void $ runBS [r|
+
+pragma solidvm 3.2;
+contract Bite_Test {
+    bytes b;
+    function set(bytes _b) {
+        b = _b;
+    }
+}
+pragma solidvm 3.2;
+contract qq {
+	Bite_Test bContract;
+	bytes c;
+	bytes d;	
+	uint  e;
+	constructor (){
+		bContract = new Bite_Test();
+		d = 'ab';
+		bContract.set(d);
+		c = bContract.b();
+		e = int(c) + int(d);	
+		}
+} |]
+    getFields ["e"] `shouldReturn` [BInteger 342]
+
+
   it "rejects member access on primitives" $ (runTest (runBS [r|
 contract qq {
   uint x = 0;
@@ -3114,6 +3141,7 @@ contract qq {
         registerCert(myAccount, myNewCertificate); 
     }
 }|]) `shouldThrow` anyInvalidWriteError
+
 
 {-
   it "can call the set function with the arguments ab" . runTest $ do
