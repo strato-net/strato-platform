@@ -104,7 +104,7 @@ instance (FromJSON x, Read x) => FromJSON (Strung x) where
   parseJSON value = Strung <$> parseJSON value <|> do
     string <- parseJSON value
     case readMaybe string of
-      Nothing -> fail $ "cannot decode Strung: " ++ string
+      Nothing -> fail $ "cannot decode String: " ++ string
       Just y  -> return $ Strung y
 
 instance ToSchema x => ToSchema (WithNext x) where
