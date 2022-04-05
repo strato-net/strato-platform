@@ -90,7 +90,6 @@ unparseConstant (name, (ConstantDecl theType isPublic expression _)) =
   <> ";"
 
 unparseVarType :: Type -> String
-
 unparseVarType (SVMType.Int (Just True) (Just n)) = "int" <> show (8*n)
 unparseVarType (SVMType.Int (Just True) Nothing) = "int"
 unparseVarType (SVMType.Int (Just False) (Just n)) = "uint" <> show (8*n)
@@ -248,7 +247,7 @@ unparseExpression (FunctionCall _ e args) =
 unparseExpression (Ternary _ x y z) = unparseExpression x ++ "?" ++ unparseExpression y ++ ":" ++ unparseExpression z
 unparseExpression (NewExpression _ x) = "new " ++ unparseVarType x
 unparseExpression (ArrayExpression _ xs) = "[" ++ List.intercalate "," (map unparseExpression xs) ++ "]"
-unparseExpression (ObjectLiteral _ m) = "{" ++ List.intercalate "," [concat [Text.unpack k, ":", unparseExpression v]  | (k, v) <- Map.toList m] ++ "}"
+unparseExpression (ObjectLiteral _ m) = "{" ++ List.intercalate ",\n" [concat ["\t", Text.unpack k, ":", unparseExpression v]  | (k, v) <- Map.toList m] ++ "}"
 unparseExpression x = internalError "missing case in call to unparseExpression" $ show x
 
 unparseModifier :: (Text, ModifierF a) -> String
