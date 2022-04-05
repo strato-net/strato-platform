@@ -1003,6 +1003,4 @@ tcExpr (ArrayExpression x es) = do
     (Static t _) -> Static (SVMType.Array t Nothing) x
     _ -> t'
 tcExpr (Variable x name) = getVarType' name x
--- Set it to the "top" type for now so it compiles
--- TODO determine proper way to ignore this type
-tcExpr (ObjectLiteral x _) = pure $ topType' x
+tcExpr (ObjectLiteral x _) = pure . bottom $ "Cannot use object literals within contract definitions" <$ x
