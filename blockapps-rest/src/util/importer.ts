@@ -252,7 +252,7 @@ function splitPath(fullname) {
  * @param {String} relativePath custom file path
  */
 
-function combine(filename:string, toObject:boolean = false, relativePath:string = undefined):Promise<any> {
+function combine(filename:string, toObject:boolean = false, relativePath:string|undefined = undefined):Promise<any> {
   nameStore = [];
   return new Promise(function(resolve, reject) {
     let res: any = ''
