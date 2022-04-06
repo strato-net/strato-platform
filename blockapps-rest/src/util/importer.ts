@@ -46,7 +46,7 @@ function getImportName(line) {
  * @return {Object}
  */
 
-function readFileLinesToObject(initialFileMap, fullname, relativePath = null) {
+function readFileLinesToObject(initialFileMap, fullname, relativePath = undefined) {
   const array = fs.readFileSync(fullname).toString().split('\n');
   isImported(fullname);
   const { fileMap, buffer } = array.reduce((obj, line) => {
@@ -74,7 +74,7 @@ function readFileLinesToObject(initialFileMap, fullname, relativePath = null) {
  * @return {Array}
  */
 
-function readFileLinesToArray(initialFileArray, fullname, relativePath = null) {
+function readFileLinesToArray(initialFileArray, fullname, relativePath = undefined) {
   const array = fs.readFileSync(fullname).toString().split('\n');
   isImported(fullname);
   const { fileArray, buffer } = array.reduce((obj, line) => {
@@ -101,7 +101,7 @@ function readFileLinesToArray(initialFileArray, fullname, relativePath = null) {
  * @return {String}
  */
 
-function readFileLinesToString(fullname, relativePath = null) {
+function readFileLinesToString(fullname, relativePath = undefined) {
   let buffer = '';
   isImported(fullname);
   //buffer += '// --- start: ' + fullname + '\n';
@@ -252,15 +252,13 @@ function splitPath(fullname) {
  * @param {String} relativePath custom file path
  */
 
-function combine(filename:string, toObject:boolean = false, relativePath:string = null):Promise<any> {
+function combine(filename:string, toObject:boolean = false, relativePath:string = undefined):Promise<any> {
   nameStore = [];
   return new Promise(function(resolve, reject) {
     let res: any = ''
-    if (toObject) {
-      res = readFileLinesToObject({}, filename, relativePath);
-    } else {
-      res = readFileLinesToArray([], filename, relativePath);
-    }
+    res = toObject 
+      ? readFileLinesToObject({}, filename, relativePath) 
+      : readFileLinesToArray([], filename, relativePath)
     resolve(res);
   });
 }
