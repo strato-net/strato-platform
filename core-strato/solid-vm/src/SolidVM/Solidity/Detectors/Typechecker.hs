@@ -445,11 +445,13 @@ typecheckStatic (SVMType.Mapping d1 k1 v1) (SVMType.Mapping d2 k2 v2) = do
   case (d1, d2) of
     (Just a, Just b) | a /= b -> Left "Mismatched dynamicity between mapping values"
     _ -> Right $ SVMType.Mapping (d1 <|> d2) k v
+typecheckStatic (SVMType.Bytes d1 b1) (SVMType.String _) = Right (SVMType.Bytes d1 b1)
+typecheckStatic theType (SVMType.Bytes _ _) = Right theType
 typecheckStatic t1 t2 = Left $ "Type mismatch: "
                             <> showType t1
                             <> " and "
                             <> showType t2
-                            <> " do not match."
+                            <> " do not matchmvm."
 
 typecheckIndex :: Type' -> Type' -> SSS Type'
 typecheckIndex (Bottom es) (Bottom ess) = pure $ Bottom (es <> ess)
@@ -731,7 +733,7 @@ boolArgs x = Sum $ stringType' x :|
                  ]
 
 byteArgs :: SourceAnnotation Text -> Type'
-byteArgs x = intType' x
+byteArgs x = intType' x -- :| stringType' x
 
 keccak256Args :: SourceAnnotation Text -> Type'
 keccak256Args x = stringType' x

@@ -2566,11 +2566,10 @@ contract qq {
 
   it "can properly handle bytes setting" . runTest $ do
     void $ runBS [r|
-
 pragma solidvm 3.2;
 contract Bite_Test {
-    bytes b;
-    function set(bytes _b) {
+    bytes public b;
+    function set(bytes _b) public {
         b = _b;
     }
 }
@@ -2579,7 +2578,7 @@ contract qq {
 	Bite_Test bContract;
 	bytes c;
 	bytes d;	
-	uint  e;
+	int  e;
 	constructor (){
 		bContract = new Bite_Test();
 		d = 'ab';
