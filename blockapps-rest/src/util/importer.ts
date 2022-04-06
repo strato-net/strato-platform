@@ -40,8 +40,8 @@ function getImportName(line) {
  * readFileLinesToObject() reads a root file and parse all imports recursively into a JSON object
  *
  * @method readFileLinesToObject
- * @param {Object} initial import map
- * @param {String} input name of file to be read
+ * @param {Object} initialFileMap
+ * @param {String} fullname
  * @param {String} relativePath custom file path
  * @return {Object}
  */
@@ -68,8 +68,8 @@ function readFileLinesToObject(initialFileMap, fullname, relativePath = null) {
  * readFileLinesToArray() reads a root file and parse all imports recursively into a JSON array
  *
  * @method readFileLinesToArray
- * @param {Array} initial import array
- * @param {String} input name of file to be read
+ * @param {Array} initialFileArray
+ * @param {String} fullname
  * @param {String} relativePath custom file path
  * @return {Array}
  */
@@ -96,7 +96,7 @@ function readFileLinesToArray(initialFileArray, fullname, relativePath = null) {
  * readFileLinesToString() reads a root file and parse all imports recursively into one string
  *
  * @method readFileLinesToString
- * @param {String} input name of file to be read
+ * @param {String} fullname
  * @param {String} relativePath custom file path
  * @return {String}
  */
@@ -245,7 +245,14 @@ function splitPath(fullname) {
   return path;
 }
 
-function combine(filename, toObject, relativePath):Promise<any> {
+/**
+ * Combine file lines into object or array
+ * @param {String} filename a name of file in the path (cwd or custom when provided)
+ * @param {boolean} toObject to combine into object rather than array
+ * @param {String} relativePath custom file path
+ */
+
+function combine(filename:string, toObject:boolean = false, relativePath:string = null):Promise<any> {
   nameStore = [];
   return new Promise(function(resolve, reject) {
     let res: any = ''
