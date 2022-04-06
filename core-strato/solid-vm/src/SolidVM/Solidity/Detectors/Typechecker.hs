@@ -451,7 +451,7 @@ typecheckStatic t1 t2 = Left $ "Type mismatch: "
                             <> showType t1
                             <> " and "
                             <> showType t2
-                            <> " do not matchmvm."
+                            <> " do not match."
 
 typecheckIndex :: Type' -> Type' -> SSS Type'
 typecheckIndex (Bottom es) (Bottom ess) = pure $ Bottom (es <> ess)
@@ -733,7 +733,7 @@ boolArgs x = Sum $ stringType' x :|
                  ]
 
 byteArgs :: SourceAnnotation Text -> Type'
-byteArgs x = intType' x -- :| stringType' x
+byteArgs x = intType' x
 
 keccak256Args :: SourceAnnotation Text -> Type'
 keccak256Args x = stringType' x
