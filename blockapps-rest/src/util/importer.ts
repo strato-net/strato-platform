@@ -259,7 +259,7 @@ function combine(filename:string, toObject:boolean = false, relativePath:string 
     if (toObject) {
       res = readFileLinesToObject({}, filename, relativePath);
     } else {
-        res = readFileLinesToArray([], filename, relativePath);
+      res = readFileLinesToArray([], filename, relativePath);
     }
     resolve(res);
   });
