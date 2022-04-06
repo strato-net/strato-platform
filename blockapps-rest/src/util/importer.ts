@@ -42,10 +42,11 @@ function getImportName(line) {
  * @method readFileLinesToObject
  * @param {Object} initial import map
  * @param {String} input name of file to be read
+ * @param {String} relativePath custom file path
  * @return {Object}
  */
 
-function readFileLinesToObject(initialFileMap, fullname, relativePath) {
+function readFileLinesToObject(initialFileMap, fullname, relativePath = null) {
   const array = fs.readFileSync(fullname).toString().split('\n');
   isImported(fullname);
   const { fileMap, buffer } = array.reduce((obj, line) => {
@@ -69,10 +70,11 @@ function readFileLinesToObject(initialFileMap, fullname, relativePath) {
  * @method readFileLinesToArray
  * @param {Array} initial import array
  * @param {String} input name of file to be read
+ * @param {String} relativePath custom file path
  * @return {Array}
  */
 
-function readFileLinesToArray(initialFileArray, fullname, relativePath) {
+function readFileLinesToArray(initialFileArray, fullname, relativePath = null) {
   const array = fs.readFileSync(fullname).toString().split('\n');
   isImported(fullname);
   const { fileArray, buffer } = array.reduce((obj, line) => {
@@ -95,10 +97,11 @@ function readFileLinesToArray(initialFileArray, fullname, relativePath) {
  *
  * @method readFileLinesToString
  * @param {String} input name of file to be read
+ * @param {String} relativePath custom file path
  * @return {String}
  */
 
-function readFileLinesToString(fullname, relativePath) {
+function readFileLinesToString(fullname, relativePath = null) {
   let buffer = '';
   isImported(fullname);
   //buffer += '// --- start: ' + fullname + '\n';
@@ -245,13 +248,13 @@ function splitPath(fullname) {
 function combine(filename, toObject, relativePath):Promise<any> {
   nameStore = [];
   return new Promise(function(resolve, reject) {
-    let string = ''
+    let res: any = ''
     if (toObject) {
-      string = readFileLinesToObject({}, filename, relativePath);
+      res = readFileLinesToObject({}, filename, relativePath);
     } else {
-      string = readFileLinesToArray([], filename, relativePath);
+        res = readFileLinesToArray([], filename, relativePath);
     }
-    resolve(string);
+    resolve(res);
   });
 }
 
