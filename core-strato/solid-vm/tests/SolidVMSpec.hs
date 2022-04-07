@@ -2968,6 +2968,25 @@ contract qq {
       , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain)
       , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain)
       ]
+  
+  it "can cast strings to chainIds" . runTest $ do
+    runBS [r|
+contract qq {
+  account sce;
+  account scm;
+  account scu;
+  
+  constructor() public {
+    sce = account("deadbeef:feedbeef");
+    scm = account(address("deadbeef"), "0xfeedb33f");
+    scu = account(0xdeadbeef, "0xf33dbeef");
+  }
+}|]
+    getFields ["sce", "scm", "scu"] `shouldReturn`
+      [ BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xfeedbeef))
+      , BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xfeedb33f))
+      , BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xf33dbeef))
+      ]
 
   it "can cast strings to bool" . runTest $ do
     runBS [r|

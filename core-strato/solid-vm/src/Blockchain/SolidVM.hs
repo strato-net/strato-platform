@@ -41,6 +41,7 @@ import qualified Data.ByteString.Char8                as BC
 import qualified Data.ByteString.Short                as BSS
 import qualified Data.ByteString.UTF8                 as UTF8
 import           Data.ByteString.Internal             (c2w)
+import           Data.Char                            as CHAR
 import           Data.Either.Extra                    (eitherToMaybe)
 import           Data.List
 import qualified Data.Map                             as M
@@ -1736,12 +1737,21 @@ callBuiltin "account" [SInteger a, SString "self"] _                 = unspecifi
 callBuiltin "account" [SInteger a, SString "parent"] _               = unspecifiedChain (fromIntegral a) `castToAncestor` 1
 callBuiltin "account" [SInteger a, SString "grandparent"] _          = unspecifiedChain (fromIntegral a) `castToAncestor` 2
 callBuiltin "account" [SInteger a, SString "ancestor", SInteger n] _ = unspecifiedChain (fromIntegral a) `castToAncestor` n
+callBuiltin "account" [SInteger a, SString ('0':'x':xs)] _ = return . SAccount $ explicitChain (fromIntegral a) (fromIntegral $ base16ToIntegral xs)
+  where
+    hexChar ch = fromMaybe (invalidArguments "illegal character in chainId hexstring" [ch]) $ elemIndex ch "0123456789ABCDEF"
+    --f n c = 16*n + (hexChar $ CHAR.toUpper c)
+    base16ToIntegral = foldl' (\n c -> 16*n + (hexChar $ CHAR.toUpper c)) 0 
 callBuiltin "account" [SAccount a, SInteger b] _ = return . SAccount $ (namedAccountChainId .~ ExplicitChain (fromIntegral b)) a
 callBuiltin "account" [SAccount a, SString "main"] _ = return . SAccount $ (namedAccountChainId .~ MainChain) a
 callBuiltin "account" [SAccount a, SString "self"] _                 = a `castToAncestor` 0
 callBuiltin "account" [SAccount a, SString "parent"] _               = a `castToAncestor` 1
 callBuiltin "account" [SAccount a, SString "grandparent"] _          = a `castToAncestor` 2
 callBuiltin "account" [SAccount a, SString "ancestor", SInteger n] _ = a `castToAncestor` n
+callBuiltin "account" [SAccount a, SString ('0':'x':xs)] _ = return . SAccount $ (namedAccountChainId .~ ExplicitChain (fromIntegral $ base16ToIntegral xs)) a
+  where
+    hexChar ch = fromMaybe (invalidArguments "illegal character in chainId hexstring" [ch]) $ elemIndex ch "0123456789ABCDEF"
+    base16ToIntegral = foldl' (\n c -> 16*n + (hexChar $ CHAR.toUpper c)) 0 
 callBuiltin "account" vs _ = typeError "account cast" vs
 callBuiltin "bool" [SBool b] _ = return $ SBool b
 callBuiltin "bool" [SString "true"] _ = return $ SBool True
