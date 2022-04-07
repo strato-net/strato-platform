@@ -2,6 +2,9 @@
 
 ### Version 8.1.1
 
+- Export type definitions so they are more easily available to TypeScript developers.
+- Added `Member` and `Balance` types.
+- Improved JSDoc types and documentation
 - Changed relativePath to be optional in the importer
 
 ### Version 8.1.0
