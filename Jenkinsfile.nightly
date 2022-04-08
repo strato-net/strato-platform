@@ -12,7 +12,7 @@ pipeline {
           docker ps
           docker rmi -f $(docker images -aq) || true
           docker images -a
-          rm -rf ~/.stack
+          sudo rm -rf ~/.stack
           git worktree remove --force strato-worktree || true
           git worktree add strato-worktree remotes/origin/develop
           git worktree list
