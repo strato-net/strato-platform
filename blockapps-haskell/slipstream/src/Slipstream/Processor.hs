@@ -43,6 +43,7 @@ import qualified Data.Text as T
 import Data.Text (Text)
 import Data.Text.Encoding
 import Database.PostgreSQL.Typed (PGConnection)
+import GHC.Stack
 
 import BlockApps.Bloc22.Database.Queries
 import BlockApps.Bloc22.Monad
@@ -463,7 +464,7 @@ getEVMInserts g row actions acct = do
 getInsertsIgnoreEVM :: (Monad m) => IORef Globals -> AggregateAction -> [AggregateAction] -> Account -> m (Either Text BatchedInserts)
 getInsertsIgnoreEVM _ _ _ _ = pure $ Left "EVM code indexing ignored"
 
-processTheMessages :: (MonadIO m, MonadUnliftIO m, MonadLogger m, HasSQL m) =>
+processTheMessages :: (HasCallStack, MonadIO m, MonadUnliftIO m, MonadLogger m, HasSQL m) =>
                       BlocEnv -> BlocSQLEnv -> PGConnection -> IORef Globals -> [VMEvent] -> m ()
 processTheMessages env sqlEnv conn g messages = do
 

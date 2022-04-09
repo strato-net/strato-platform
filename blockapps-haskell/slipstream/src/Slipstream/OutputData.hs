@@ -42,6 +42,7 @@ import           Data.Text.Encoding              (decodeUtf8, encodeUtf8)
 import           Database.PostgreSQL.Typed
 import           Database.PostgreSQL.Typed.Protocol
 import           Database.PostgreSQL.Typed.Query
+import           GHC.Stack
 import           Text.Printf
 import           Text.RawString.QQ
 import           UnliftIO.IORef
@@ -147,7 +148,7 @@ cirrusInfo = PGDatabase
   , pgDBParams = [("Timezone", "UTC")]
   }
 
-dbQueryCatchError :: (MonadLogger m, MonadUnliftIO m) => PGConnection -> Text -> m ()
+dbQueryCatchError :: (HasCallStack, MonadLogger m, MonadUnliftIO m) => PGConnection -> Text -> m ()
 dbQueryCatchError conn insrt = handle handlePostgresError $ dbQuery conn insrt
 
 dbQuery :: (MonadLogger m, MonadUnliftIO m) => PGConnection -> Text -> m ()
@@ -155,13 +156,13 @@ dbQuery conn insrt = do
   $logDebugS "outputData" insrt
   liftIO . void . pgQuery conn . rawPGSimpleQuery $! encodeUtf8 insrt
 
-handlePostgresError :: MonadLogger m => SomeException -> m ()
+handlePostgresError :: (HasCallStack, MonadLogger m) => SomeException -> m ()
 handlePostgresError e =
   if crashOnSQLError
   then error . show $ e
     else$logErrorLS "handlePGError" e
 
-outputData :: OutputM m
+outputData :: (HasCallStack, OutputM m)
            => PGConnection
            -> ConduitM () Text m a
            -> m a
@@ -261,7 +262,7 @@ createForeignIndexesForJoins foreignKey = do
     <> tableNameToDoubleQuoteText (foreignTableName foreignKey)
     <> " (record_id);"
 
-notifyPostgREST :: OutputM m =>
+notifyPostgREST :: (HasCallStack, OutputM m) =>
                    PGConnection -> m ()
 notifyPostgREST conn = do
     dbQueryCatchError conn "NOTIFY pgrst, 'reload schema';"
@@ -405,7 +406,7 @@ insertIndexTable :: OutputM m
 insertIndexTable [] = error "insertIndexTable: unhandled empty list"
 insertIndexTable contracts = yield $ insertIndexTableQuery contracts
 
-insertForeignKeys :: (MonadLogger m, MonadUnliftIO m) =>
+insertForeignKeys :: (HasCallStack, MonadLogger m, MonadUnliftIO m) =>
                      PGConnection -> [ProcessedContract] -> m ()
 insertForeignKeys conn contracts = do
   forM_ contracts $ \c -> do
