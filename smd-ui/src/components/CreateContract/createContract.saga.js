@@ -57,7 +57,7 @@ export function createContractApiCall(contract, src, username, address, password
     .then(function (response) {
       if (response.status === 400) {
         return response.text().then(error => {
-          throw `${error} before json`;
+          throw error;
         })
       }
       return response.json();
@@ -151,7 +151,7 @@ export function* compileContract(action) {
 
 export function* compileChainContract(action) {
   try {
-    let response = yield call(compileContractApiCall, action.name, action.contract, action.solidvm);
+    let response = yield call(compileContractApiCall, action.name, action.contract, action.vm);
     yield put(compileChainContractSuccess(response));
   } catch (err) {
     yield put(compileChainContractFailure(err));

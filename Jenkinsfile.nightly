@@ -12,7 +12,7 @@ pipeline {
           docker ps
           docker rmi -f $(docker images -aq) || true
           docker images -a
-          rm -rf ~/.stack
+          sudo rm -rf ~/.stack
           git worktree remove --force strato-worktree || true
           git worktree add strato-worktree remotes/origin/develop
           git worktree list
@@ -46,7 +46,6 @@ pipeline {
             export genesis=smokeTest
             export BLOC_DEBUG=true
             export SLIPSTREAM_OPTIONAL=false
-            export OAUTH_ENABLED=true
             export OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration
             export OAUTH_CLIENT_ID=dev
             export OAUTH_CLIENT_SECRET=d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f
@@ -180,9 +179,9 @@ pipeline {
                 set -x
                 # Re-cloning the repo might be redundant but we'll follow same approach as other tests. And the docker rebuild should be quick with docker layer caches.
                 rm -rf strato-api-tests
-                git clone -b master https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git
+                git clone -b develop https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git
                 cd strato-api-tests
-                git checkout tags/strato-pre7.5-change-table-sep #TODO: api version tags in the future
+                #git checkout develop # we must not checkout the custom branch for nightly builds - we must test with develop branch of strato-api-tests here as well as in release job.
                 docker build --tag strato-api-tests .
                 docker run \
                   -e OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \
@@ -223,7 +222,7 @@ pipeline {
             usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')
         ]) {
           sh 'rm -rf docs-website'
-          sh 'git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/docs-website -b master'
+          sh 'git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/docs-website -b develop'
           dir('docs-website/') {
             sh 'npm i'
             

@@ -327,3 +327,4 @@ expressionHelper (TupleExpression _ es) =
 expressionHelper (ArrayExpression _ es) = concat <$> traverse expressionHelper es
 expressionHelper (Variable x name) =
   localVarReadHelper name x
+expressionHelper (ObjectLiteral _ _) = pure []

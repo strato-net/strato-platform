@@ -41,6 +41,8 @@ import           Data.Foldable
 import           Data.Hashable                     hiding (hash)
 import           Data.Int                          (Int32)
 import           Data.List                         (partition, sortOn)
+import qualified Data.Vector                       as V
+
 import qualified Data.Map.Ordered                  as OMap
 import           Data.Map.Strict                   (Map)
 import qualified Data.Map.Strict                   as Map
@@ -980,15 +982,6 @@ constructArgValues args argNamesTypes = do
 getArgValues :: (MonadIO m, MonadLogger m) =>
                 Map Text ArgValue -> Map Text Xabi.IndexedType -> m [Value]
 getArgValues argsMap argNamesTypes = do
-    let
-      determineValue :: (MonadIO m, MonadLogger m) =>
-                        ArgValue -> Xabi.IndexedType -> m (Int32, Value)
-      determineValue argVal (Xabi.IndexedType ix xabiType) =
-        let
-          typeM = getSolidityType xabiType
-        in do
-          ty <- either (blocError . UserError) return typeM
-          either (blocError . UserError) (return . (ix,)) (argValueToValue Nothing ty argVal)
     argsVals <-
       if not (Map.keysSet argNamesTypes `isSubsetOf` Map.keysSet argsMap)
       then do
@@ -999,32 +992,41 @@ getArgValues argsMap argNamesTypes = do
       else sequence $ Map.intersectionWith determineValue argsMap argNamesTypes
     return $ map snd (sortOn fst (toList argsVals))
 
--- We can parse the Xabi types to Solidity type constructors, however currently there is no way to pass in mappings, or structs from the API because 
--- there is no implemented parser for these types from JSON
-getSolidityType :: Xabi.Type -> Either Text (Type) 
-getSolidityType (Xabi.Int (Just True) b) = Right . SimpleType . TypeInt True $ fmap toInteger b
-getSolidityType (Xabi.Int _           b) = Right . SimpleType . TypeInt False $ fmap toInteger b
-getSolidityType (Xabi.String _)          = Right . SimpleType $ TypeString
-getSolidityType (Xabi.Bytes _ b)         = Right . SimpleType . TypeBytes $ fmap toInteger b
-getSolidityType  Xabi.Bool               = Right . SimpleType $ TypeBool
-getSolidityType  Xabi.Address            = Right . SimpleType $ TypeAddress
-getSolidityType  Xabi.Account            = Right . SimpleType $ TypeAccount
-getSolidityType (Xabi.Struct _ name)     = Right $ TypeStruct name
-getSolidityType (Xabi.Enum _ name _)     = Right $ TypeEnum name
-getSolidityType (Xabi.Contract name)     = Right $ TypeContract name
-getSolidityType (Xabi.Label _)           = Right $ SimpleType typeUInt -- since Enums are converted to Ints
-getSolidityType (Xabi.Array typ len)     = 
+determineValue :: (MonadIO m, MonadLogger m) => ArgValue -> Xabi.IndexedType -> m (Int32, Value)
+determineValue argVal (Xabi.IndexedType ix xabiType) =
+  let
+    typeM = getSolidityType argVal xabiType
+  in do
+    ty <- either (blocError . UserError) return typeM
+    either (blocError . UserError) (return . (ix,)) (argValueToValue Nothing ty argVal)
+
+getSolidityType :: ArgValue -> Xabi.Type -> Either Text Type 
+getSolidityType _ (Xabi.Int (Just True) b) = Right . SimpleType . TypeInt True $ fmap toInteger b
+getSolidityType _ (Xabi.Int _           b) = Right . SimpleType . TypeInt False $ fmap toInteger b
+getSolidityType _ (Xabi.String _)          = Right . SimpleType $ TypeString
+getSolidityType _ (Xabi.Bytes _ b)         = Right . SimpleType . TypeBytes $ fmap toInteger b
+getSolidityType _  Xabi.Bool               = Right . SimpleType $ TypeBool
+getSolidityType _  Xabi.Address            = Right . SimpleType $ TypeAddress
+getSolidityType _  Xabi.Account            = Right . SimpleType $ TypeAccount
+getSolidityType _ (Xabi.Struct _ name)     = Right $ TypeStruct name
+getSolidityType _ (Xabi.Enum _ name _)     = Right $ TypeEnum name
+getSolidityType _ (Xabi.Contract name)     = Right $ TypeContract name
+getSolidityType (ArgInt _) (Xabi.Label _)  = Right $ SimpleType typeUInt -- since Enums are converted to Ints
+getSolidityType (ArgString _) (Xabi.Label s)  = Right $ TypeEnum $ Text.pack s
+getSolidityType (ArgObject _) (Xabi.Label s)  = Right $ TypeStruct $ Text.pack s --interpret an object strictly as a struct
+getSolidityType av (Xabi.Label _)             = Left $ Text.pack $ "Expected a string, int, or object, but recieved: " ++ show av
+getSolidityType (ArgArray v) (Xabi.Array typ len)     = 
   let arrType = case len of
         Just l -> TypeArrayFixed l
         Nothing -> TypeArrayDynamic
-      elType = case typ of
-        Xabi.Mapping{} -> Left "Arrays of mappings are not allowed as function arguments"
-        _ -> getSolidityType typ
+      elType = getSolidityType (V.head v) typ
   in case elType of
     Right c -> Right (arrType c)
     e -> e
-getSolidityType  Xabi.Mapping{}          = Left "Mappings are not allowed as function arguments"
-          
+getSolidityType av (Xabi.Array _ _)          = Left $ Text.pack $ "Expected Array but got " ++ show av
+getSolidityType (ArgObject _) Xabi.Mapping{} = Right $ TypeStruct "s"
+getSolidityType av Xabi.Mapping{}            = Left $ Text.pack $ "Expected Object for Mapping type, but got " ++ show av
+
 
 getResultAndRespond :: ( A.Selectable Account AddressState m
                        , (Keccak256 `A.Alters` SourceMap) m

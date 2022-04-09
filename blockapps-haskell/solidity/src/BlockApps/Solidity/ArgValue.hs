@@ -7,12 +7,15 @@ import           BlockApps.Solidity.Type
 import           BlockApps.Solidity.TypeDefs
 import           BlockApps.Solidity.Value
 import           Control.Lens                 ((&), (?~))
+import           Control.Monad
 import qualified Data.Aeson                   as A
 import qualified Data.Bimap                   as Bimap
+import           Data.Either
 import           Data.ByteString              (ByteString)
 import qualified Data.ByteString              as ByteString
 import qualified Data.ByteString.Base16       as Base16
 import qualified Data.Map.Strict              as Map
+import qualified Data.HashMap.Strict          as HM
 import           Data.Swagger
 import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
@@ -28,10 +31,11 @@ data ArgValue
   | ArgBool Bool
   | ArgString Text
   | ArgArray (V.Vector ArgValue)
+  | ArgObject (HM.HashMap Text ArgValue)
   deriving (Eq,Show)
 
 instance Arbitrary ArgValue where
-  arbitrary = elements [ArgInt 5,ArgBool True,ArgBool False,ArgString "arggg"]
+  arbitrary = elements [ArgInt 5, ArgBool True, ArgBool False, ArgString "arggg"]
 
 instance A.FromJSON ArgValue where
   parseJSON = \case
@@ -40,7 +44,8 @@ instance A.FromJSON ArgValue where
     A.String x -> return $ ArgString x
     A.Array xs -> ArgArray <$> traverse A.parseJSON xs
     A.Null -> fail "parsing JSON for ArgValue: encountered Null"
-    A.Object _ -> fail "parsing JSON for ArgValue: encountered Object"
+    A.Object xo -> ArgObject <$> traverse A.parseJSON xo 
+    -- fmap A.parseJSON xo
 
 instance A.ToJSON ArgValue where
   toJSON = \case
@@ -48,12 +53,25 @@ instance A.ToJSON ArgValue where
     ArgBool x -> A.Bool x
     ArgString x -> A.String x
     ArgArray xs -> A.Array (fmap A.toJSON xs)
+    ArgObject o -> A.Object (fmap A.toJSON o)
 
 instance ToSchema ArgValue where
   declareNamedSchema = pure . pure $
     NamedSchema (Just "Solidity Argument Value") $ mempty
       & description ?~ "A Solidity argument value"
       & example ?~ A.toJSON (ArgInt 5)
+
+--Used to coerce the solidity type from the argument values, without having the actual contract type info
+argValueToType :: ArgValue -> Type
+argValueToType (ArgInt _)       = SimpleType typeInt
+argValueToType (ArgBool _)      = SimpleType TypeBool
+argValueToType (ArgString _)    = SimpleType TypeString
+argValueToType (ArgArray v)     = TypeArrayDynamic $ argValueToType $ V.head v
+argValueToType (ArgObject _)    = TypeStruct ""
+
+isSimple :: Type -> Bool
+isSimple (SimpleType _) = True
+isSimple _              = False
 
 -- TODO: create valueToArgValue
 argValueToValue :: Maybe TypeDefs -> Type -> ArgValue -> Either Text Value
@@ -68,7 +86,23 @@ argValueToValue defs theType argVal = case theType of
       then ValueArrayFixed len . V.toList <$> traverse (argValueToValue defs ty) xs
       else Left . Text.pack $ "argValueToValue: Expected length of TypeArrayFixed to match length of the array. Expected " ++ show len ++ ", but got " ++ show (length xs)
     o -> Left . Text.pack $ "argValueToValue: Expected TypeArrayFixed to be an array, but got: " ++ show o
-  TypeMapping{}  -> Left "argValueToValue TODO: TypeMapping not yet implemented"
+  TypeMapping{}  -> do
+    case argVal of
+      ArgObject hm -> do
+        mp <- mapM (\v -> do
+          let inferredType = argValueToType v
+              value = argValueToValue defs inferredType v
+          return value
+          ) hm
+        let initialValueType = argValueToType $ snd . head $ HM.toList hm
+            isUniform = foldl (\b av -> b && argValueToType av == initialValueType) True hm
+        when (any isLeft mp) $ do
+          Left "argValueToValue: Could not parse object into a Mapping"
+        when (not isUniform) $ do
+          Left "argValueToValue: Mapping object does not contain uniform values"
+          -- Use a struct because it is parsed in the VM as different types once it has the correct type info for args
+        Right $ ValueStruct $ Map.fromList $ [(k, v) | (k, Right v) <- HM.toList mp]
+      a ->  Left $ Text.pack $ "argValueToValue: Expected TypeMapping to be a object, but got a" ++ show a
   TypeFunction{} -> Left "argValueToValue TODO: TypeFunction not yet implemented"
   TypeContract{} -> case argVal of
     ArgString str -> ValueContract <$> case readMaybe (Text.unpack str) of
@@ -86,7 +120,18 @@ argValueToValue defs theType argVal = case theType of
                 Nothing -> Left $ "argValueToValue: Missing value '" <> str <> "' in enum definition for " <> enumName
                 Just i -> Right $ ValueEnum enumName str' $ fromIntegral i
         o -> Left . Text.pack $ "argValueToValue: Expected TypeEnum to be a string, but got: " ++ show o
-  TypeStruct{}   -> Left "argValueToValue TODO: TypeStruct not yet implemented"
+  TypeStruct _   -> do
+    case argVal of
+      ArgObject hm -> do
+        mp <- mapM (\v -> do
+          let inferredType = argValueToType v
+              value = argValueToValue defs inferredType v
+          return value
+          ) hm
+        when (any isLeft mp) $ do
+          Left "argValueToValue: Could not parse object into a Struct"
+        Right $ ValueStruct $ Map.fromList $ [(k, v) | (k, Right v) <- HM.toList mp]
+      a ->  Left $ Text.pack $ "argValueToValue: Expected TypeStruct to be a object, but got a" ++ show a
 
 argValueToSimpleValue :: SimpleType -> ArgValue -> Either Text SimpleValue
 argValueToSimpleValue theType argVal = case theType of

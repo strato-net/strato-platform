@@ -205,46 +205,47 @@ processedContract ABIID{..} state AggregateAction{..} =
 lookupT :: (Monad m, Ord k) => k -> Map.Map k v -> MaybeT m v
 lookupT k = MaybeT . return . Map.lookup k
 
--- Not used but kept commented out if it is needed again
--- Tries to get contract metadata ID and contract details for a given contract.
+-- Inserts the contract source into the Bloc DB.
 --  If they're not in the cache but they are in bloc database or action metadata,
---  it reparses the whole source blob, and caches the details for every contract
--- getSolidVMInfoForRow :: ( MonadIO m
---                            , MonadLogger m
---                            , Accessible BlocEnv m
---                            , HasBlocSQL m
---                            , Selectable Account AddressState m
---                            , (Keccak256 `Alters` SourceMap) m
---                            )
---                         => IORef Globals -> AggregateAction -> m (Maybe (Map.Map Text CodePtr))
--- getSolidVMInfoForRow g row = runMaybeT  
---    $  checkCache 
---   <|> checkMetadata
---   <|> checkBloc 
+--  it reparses the whole source blob, and caches the info for every contract
+insertContractBloc_ :: ( MonadIO m
+                           , MonadLogger m
+                           , Accessible BlocEnv m
+                           , HasBlocSQL m
+                           , Selectable Account AddressState m
+                           , (Keccak256 `Alters` SourceMap) m
+                           )
+                        => IORef Globals -> AggregateAction -> m ()
+insertContractBloc_ g row = void $ runMaybeT  
+   $  checkCache 
+  <|> checkMetadata
+  <|> checkBloc 
   
---   where checkCache = do
---           $logInfoS "getInfoForRow" . T.pack $ "checking cache for contract info"
---           MaybeT $ getSolidVMInfo g codePtr
+  where checkCache = do
+          $logInfoS "insertContractBloc_" . T.pack $ "Checking cache for contract info"
+          MaybeT $ getSolidVMInfo g codePtr
         
---         checkMetadata = do
---           $logInfoS "getInfoForRow" . T.pack $ "checking metadata for contract info"
---           src <- lookupT "src" $ actionMetadata row 
---           parseAndSet $ deserializeSourceMap src
+        checkMetadata = do
+          $logInfoS "insertContractBloc_" . T.pack $ "Checking metadata for contract info"
+          src <- lookupT "src" $ actionMetadata row 
+          parseAndSet $ deserializeSourceMap src
         
---         checkBloc = do
---           $logInfoS "getDetailsForRow" . T.pack $ "checking bloc database for contract info"
---           details <- (MaybeT $ either (const Nothing) Just <$> getContractDetailsByCodeHash codePtr)
---           parseAndSet $ OLD.contractdetailsSrc details
+        checkBloc = do
+          $logInfoS "insertContractBloc_" . T.pack $ "Checking bloc database for contract info"
+          details <- (MaybeT $ either (const Nothing) Just <$> getContractDetailsByCodeHash codePtr)
+          parseAndSet $ OLD.contractdetailsSrc details
 
---         -- parse source code, add all of details to cache, return the one we need
---         parseAndSet src = do
---           details <- lift $ sourceToContractDetails (Don't Compile) src -- :: Map Text ContractDetails
---           let infoMap = fmap OLD.contractdetailsCodeHash details
---           setSolidVMInfo g codePtr infoMap
---           pure infoMap
+        -- parse source code into a map, add the map of name -> contract to cache
+        -- this call is needed to insert the contract into bloc db contracts_source table
+        -- But since the contract_source table takes a serialized list of contracts from a code collection, we need to 
+        -- parse it first before inserting, since codeCollection could be multiple contracts.
+        parseAndSet src = do
+          details <- lift $ sourceToContractDetails (Don't Compile) src -- :: Map Text ContractDetails
+          let infoMap = fmap OLD.contractdetailsCodeHash details
+          setSolidVMInfo g codePtr infoMap
+          pure infoMap
           
---         codePtr = actionCodeHash row
-
+        codePtr = actionCodeHash row
 
 
 -- EVM details are not cached, because the cache links all the contracts in a source blob by source hash, and we only have source hashes for SolidVM code pointers. 
@@ -468,6 +469,11 @@ processTheMessages :: (HasCallStack, MonadIO m, MonadUnliftIO m, MonadLogger m, 
                       BlocEnv -> BlocSQLEnv -> PGConnection -> IORef Globals -> [VMEvent] -> m ()
 processTheMessages env sqlEnv conn g messages = do
 
+  case length messages of
+   0 -> return ()
+   1 -> $logInfoS "processTheMessages" "1 message has arrived"
+   n -> $logInfoS "processTheMessages" . T.pack $ show n ++ " messages have arrived"
+
   let changes = parseActions messages
       events' = parseEvents messages
       -- TODO (Dan) : would be nice if we didn't just rip events out at the top level like this
@@ -477,7 +483,7 @@ processTheMessages env sqlEnv conn g messages = do
       getCC = getCodeCollection' flags_indexEVM
       evmInsertsF = if flags_indexEVM then getEVMInserts else getInsertsIgnoreEVM
 
-  forM_ creates $ \(ccString, cp, o, a, hl) -> do
+  fkeys <- forM creates $ \(ccString, cp, o, a, hl) -> do
     cc <- getCC cp ccString
 
     $logInfoS "processTheMessages" $ "CodeCollection Added: " <> T.pack (format cp) <> ", contracts = " <> T.pack (show $ Map.keys $ cc^.contracts)
@@ -513,11 +519,8 @@ processTheMessages env sqlEnv conn g messages = do
 
     forM_ deferredForeignKeys $ \deferredForeignKey -> do
       outputData conn $ createForeignIndexesForJoins deferredForeignKey
-
-  case length messages of
-   0 -> return ()
-   1 -> $logInfoS "processTheMessages" "1 message has arrived"
-   n -> $logInfoS "processTheMessages" . T.pack $ show n ++ " messages have arrived"
+    
+    pure deferredForeignKeys
 
   inserts <- enterBloc2 env sqlEnv $ do
     forM changes $ \(acct,actions) -> do
@@ -530,13 +533,14 @@ processTheMessages env sqlEnv conn g messages = do
       case actionStorage row of
         Action.EVMDiff{} -> evmInsertsF g row actions acct
         Action.SolidVMDiff{} -> do
+          insertContractBloc_ g row
           let cid = maybe "" (T.pack . chainIdString . ChainId) $ (actionAccount row ^. accountChainId)
               (SolidVMCode name _) = actionCodeHash row
               abiid = ABIID {
                 aiName = T.pack name,
                 aiChain = cid
               }
-              cont = error "internal error: contract should be unused for Solidvm"
+              cont = error "internal error: contract should be unused for SolidVM"
           $logDebugLS "Contract name is: " $ show name
           oldState <- readPreviousSolidVMState g acct
           indexContract <- rowToInsert g abiid row cont oldState
@@ -559,14 +563,16 @@ processTheMessages env sqlEnv conn g messages = do
 
   forM_ insertsByCodeHash $ \ins -> do
     unless (null ins) $ insertForeignKeys conn $ map indexInsert ins
-
+  
+  when ((length creates > 0) && any (\k -> length k > 0) fkeys) $ do
+    $logDebugLS "processTheMessages" $ T.pack $ "Updating PostgREST schema cache for " ++ show (sum $ map length fkeys) ++ " foreign key relationships"
+    notifyPostgREST conn
+  
   when (length events' > 0) $ 
     outputData conn $ insertExpandEventTables g events'
 
-  $logInfoS "processTheMessages" . T.pack $ "inserting " ++ show (length transactionResults) ++ " transaction results"
+  $logInfoS "processTheMessages" . T.pack $ "Inserting " ++ show (length transactionResults) ++ " transaction results"
 
   forM_ transactionResults $ putTransactionResult
 
-  notifyPostgREST conn
-  
   flushPendingWrites g

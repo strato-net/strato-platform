@@ -10,10 +10,8 @@ import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { validate } from './validate';
 import { toasts } from '../Toasts';
 import Dropzone from 'react-dropzone';
-import { autoApprove } from './contracts/AutoApprove';
-import { twoIn } from './contracts/TwoIn';
-import { majorityRules } from './contracts/MajorityRules';
-import { adminOnly } from './contracts/AdminOnly';
+import EVMContracts from './contracts/EVMGovernanceContracts';
+import SolidVMContracts from './contracts/SolidVMGovernanceContracts'
 import { fetchUserPubkey } from "../User/user.actions";
 class CreateChain extends Component {
 
@@ -26,7 +24,8 @@ class CreateChain extends Component {
       droppedFileName: '',
       members: [],
       errors: null,
-      governanceContract: ''
+      governanceContract: '',
+      vm: true
     };
     this.updateMembers = this.updateMembers.bind(this);
     this.removeMember = this.removeMember.bind(this);
@@ -47,6 +46,7 @@ class CreateChain extends Component {
   submit = (values) => {
     values.members = this.state.members;
     values.governanceContract = this.state.governanceContract;
+    values.vm = this.state.vm;
     let errors = validate(values);
     this.setState({ errors });
 
@@ -74,19 +74,28 @@ class CreateChain extends Component {
           if (Object.keys(val.vars).length) {
             Object.getOwnPropertyNames(val.vars).forEach((arg) => {
               const v = val.vars[arg];
-              console.log(arg); console.log(v);
               if (v.initialValue !== null) {
                 args[arg] = v.initialValue;
-              } else if (v.type !== 'Mapping'
-                && v.type !== 'Struct') {
-                args[arg] = values[arg];
+              } else if (v.type !== 'Mapping' && v.type !== 'Struct') {
+                try {
+                  args[arg] = JSON.parse(values[arg]);
+                } catch (e) {
+                  args[arg] = values[arg];
+                }
               }
-            })
+              else {
+                try {
+                  args[arg] = JSON.parse(values[arg]);
+                } catch (e) {
+                  args[arg] = values[arg]
+                }
+              }
+            });
           }
         });
       }
 
-      this.props.createChain(values.chainName, members, balances, values.governanceContract, args);
+      this.props.createChain(values.chainName, members, balances, values.governanceContract, args, values.vm);
       this.setState({
         members: [],
       });
@@ -165,7 +174,7 @@ class CreateChain extends Component {
     if (!files || !files[0])
       return 'Please add contract source file'
     const contractSource = files[0];
-    if (!contractSource.name.includes('.sol'))
+    if (contractSource.name.slice(contractSource.name.length - 4) !== '.sol')
       return 'It should be an .sol extention file';
   };
 
@@ -213,24 +222,46 @@ class CreateChain extends Component {
       this.props.resetContract();
     }
   }
-
+  findGovernanceContractSrc = (contractName) => {
+    let contractObjSrc = this.state.vm ? SolidVMContracts : EVMContracts
+    this.updateGovernanceContract(contractName, contractObjSrc[contractName])
+  }
   updateGovernanceContract = (fileName, fileContents) => {
     this.setState({ governanceContract: fileContents })
     this.props.compileChainContract(
       fileName,
       fileContents,
-      false
+      false,
+      this.state.vm
     );
   }
 
   compilation() {
     const src = this.props.abi && this.props.abi.src;
     const contractname = this.props.contractName;
-
+    
     if (src) {
       let contract = src[contractname];
       let count = 0;
-      if (contract && Object.keys(contract['vars']).length) {
+      if (contract && this.state.vm && contract.constr) {
+        return Object.getOwnPropertyNames(contract['constr'].args).map((arg, i) => {
+          const v = contract.constr.args[arg];
+          count++;
+          return (<tr key={'arg' + i}>
+            <td style={{ paddingTop: '10px' }}>{arg}</td>
+            <td>
+              <Field
+                name={arg}
+                component="input"
+                type="text"
+                placeholder={v.type}
+                className="pt-input"
+              />
+            </td>
+          </tr>);
+        });
+      }
+      else if (contract && !this.state.vm && Object.keys(contract['vars']).length) {
         return Object.getOwnPropertyNames(contract['vars']).map((arg, i) => {
           const v = contract.vars[arg];
           if (v.initialValue
@@ -257,7 +288,7 @@ class CreateChain extends Component {
       if (count === 0) {
         return (<tr>
           <td colSpan={3}>
-            <div className="text-center">No variables</div>
+            <div className="text-center">No Variables</div>
           </td>
         </tr>)
       }
@@ -307,7 +338,7 @@ class CreateChain extends Component {
                     className="pt-input form-width"
                     tabIndex="1"
                     required
-                  />
+                    />
                   <span className="error-text">{this.errorMessageFor('chainName')}</span>
                 </div>
               </div>
@@ -333,10 +364,10 @@ class CreateChain extends Component {
                             form: { contractSelected: 'AutoApprove' }
                           };
                         });
-                        this.updateGovernanceContract('AutoApprove', autoApprove);
+                        this.findGovernanceContractSrc('AutoApprove');
                       }
                     }
-                  /> AutoApprove
+                    /> AutoApprove
                 </div>
               </div>
               <div className="row">
@@ -356,10 +387,10 @@ class CreateChain extends Component {
                             form: { contractSelected: 'TwoIn' }
                           };
                         });
-                        this.updateGovernanceContract('TwoIn', twoIn);
+                        this.findGovernanceContractSrc('TwoIn');
                       }
                     }
-                  /> TwoIn
+                    /> TwoIn
                 </div>
               </div>
               <div className="row">
@@ -379,10 +410,10 @@ class CreateChain extends Component {
                             form: { contractSelected: 'MajorityRules' }
                           };
                         });
-                        this.updateGovernanceContract('MajorityRules', majorityRules);
+                        this.findGovernanceContractSrc('MajorityRules');
                       }
                     }
-                  /> MajorityRules
+                    /> MajorityRules
                 </div>
               </div>
               <div className="row">
@@ -402,10 +433,10 @@ class CreateChain extends Component {
                             form: { contractSelected: 'AdminOnly' }
                           };
                         });
-                        this.updateGovernanceContract('AdminOnly', adminOnly);
+                        this.findGovernanceContractSrc('AdminOnly');
                       }
                     }
-                  /> AdminOnly
+                    /> AdminOnly
                 </div>
               </div>
               <div className="row">
@@ -428,7 +459,7 @@ class CreateChain extends Component {
                         this.handleContractFile(this.state.droppedFileName);
                       }
                     }
-                  /> Upload file
+                    /> Upload file
                 </div>
               </div>
               <div className="row">
@@ -436,20 +467,41 @@ class CreateChain extends Component {
                 <div className="col-sm-9 smd-pad-4">
                   {this.state.form.contractSelected === 'Governance' &&
                     <Field
-                      id="input-b"
-                      name="contract"
-                      component={this.renderDropzoneInput}
-                      dir="auto"
-                      title="Contract Source"
+                    id="input-b"
+                    name="contract"
+                    component={this.renderDropzoneInput}
+                    dir="auto"
+                    title="Contract Source"
                     />
                   }
                 </div>
               </div>
-
               <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label smd-pad-4">
-                    Compilation
+                    VM
+                  </label>
+                </div>
+                <div className="col-sm-9 smd-scrollable smd-pad-4">
+                  <div className='pt-select'>
+                    <Field
+                      className="pt-select"
+                      component="select"
+                      name="vm"
+                      onChange={(e) => {
+                        this.setState({vm: e.target.value === "SolidVM"})
+                      }}
+                      >
+                      <option key={0} value="SolidVM">SolidVM</option>
+                      <option key={1} value="EVM">EVM</option>
+                    </Field>
+                    </div>
+                </div>
+              </div>
+              <div className="row">
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    Arguments
                   </label>
                 </div>
                 <div className="col-sm-9 smd-scrollable smd-pad-4">
@@ -466,7 +518,7 @@ class CreateChain extends Component {
                   </table>
                 </div>
               </div>
-
+              
               <div className="row">
                 <div className="pt-form-group col-sm-12 pt-intent-danger">
                   <label className="pt-label" htmlFor="input-b">

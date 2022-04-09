@@ -44,12 +44,15 @@ class ContractMethodCall extends Component {
     try {
       const parsedArgs = this.props.modal.args ? Object.entries(this.props.modal.args)
         .reduce((args, [arg, info]) => {
-          let val = values[arg]
-          if (['Array', 'Int', 'Bool'].includes(info.type)) {
-              val = JSON.parse(values[arg])
+          try {
+            args[arg] = JSON.parse(values[arg]);
+            return args;
           }
-          args[arg] = val;
-          return args;
+          catch (e) {
+            console.log(e)
+            args[arg] = values[arg];
+            return args;
+          }
         }, {}) : {}
         const payload = {
           contractName: this.props.contractName,
