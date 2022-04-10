@@ -38,7 +38,8 @@ import qualified Data.Map                        as Map
 import           Data.Maybe                      (catMaybes, listToMaybe, mapMaybe)
 import           Data.Text                       (Text)
 import qualified Data.Text                       as T
-import           Data.Text.Encoding              (decodeUtf8, encodeUtf8)
+import           Data.Text.Encoding              (decodeUtf8, decodeUtf8', encodeUtf8)
+import qualified Data.ByteString.Base16          as Base16
 import           Database.PostgreSQL.Typed
 import           Database.PostgreSQL.Typed.Protocol
 import           Database.PostgreSQL.Typed.Query
@@ -760,7 +761,9 @@ valueToSQLText (SimpleValue (ValueString s)) = Just $ wrapSingleQuotes $ escapeQ
 valueToSQLText (SimpleValue (ValueAddress (Address 0))) = Just "NULL"
 valueToSQLText (SimpleValue (ValueAddress (Address addr))) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ printf "%040x" (fromIntegral addr::Integer)
 valueToSQLText (SimpleValue (ValueAccount acct)) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show acct
-valueToSQLText (SimpleValue (ValueBytes _ bytes)) = Just $ wrapSingleQuotes $ escapeQuotes $ decodeUtf8 bytes
+valueToSQLText (SimpleValue (ValueBytes _ bytes)) = Just $ wrapSingleQuotes $ escapeQuotes $  case decodeUtf8' bytes of 
+  Left _ -> decodeUtf8 $ Base16.encode bytes
+  Right x -> x
 valueToSQLText (ValueEnum _ _ index) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show index
 valueToSQLText (ValueContract acct) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show acct
 valueToSQLText (ValueFunction _ _ _) = Nothing

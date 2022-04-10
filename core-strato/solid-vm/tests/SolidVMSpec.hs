@@ -2564,6 +2564,32 @@ contract qq {
 }|]
     getFields ["x"] `shouldReturn` [BInteger 833]
 
+  it "can properly handle bytes setting" . runTest $ do
+    void $ runBS [r|
+pragma solidvm 3.2;
+contract Bite_Test {
+    bytes public b;
+    function set(bytes _b) public {
+        b = _b;
+    }
+}
+pragma solidvm 3.2;
+contract qq {
+	Bite_Test bContract;
+	bytes c;
+	bytes d;	
+	int  e;
+	constructor (){
+		bContract = new Bite_Test();
+		d = 'ab';
+		bContract.set(d);
+		c = bContract.b();
+		e = int(c) + int(d);	
+		}
+} |]
+    getFields ["e"] `shouldReturn` [BInteger 342]
+
+
   it "rejects member access on primitives" $ (runTest (runBS [r|
 contract qq {
   uint x = 0;
