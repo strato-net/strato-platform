@@ -279,9 +279,10 @@ runSM :: ( MonadIO m
          )
       => (Maybe ByteString)
       -> Env.Environment
+      -> Maybe Word256
       -> SM m a
       -> m (Either SolidException a)
-runSM maybeCode env f = do
+runSM maybeCode env chainId' f = do
   csMemDBs <- _memDBs <$> Mod.get (Mod.Proxy @ContextState)
 
   let startingState =
@@ -291,7 +292,7 @@ runSM maybeCode env f = do
         ssEvents = Q.empty,
         _ssNewX509Certs = M.empty,
         _ssMemDBs = csMemDBs,
-        _action = startingAction maybeCode env
+        _action = startingAction maybeCode env chainId'
         }
 
   eValState <- try $ runStateT f startingState
@@ -323,13 +324,13 @@ pushSender newSender mv = do
   Mod.put (Mod.Proxy @Env.Sender) oldSender
   return $ ret
 
-startingAction :: Maybe ByteString -> Env.Environment -> Action
-startingAction maybeCode env' = Action.Action
+startingAction :: Maybe ByteString -> Env.Environment -> Maybe Word256 -> Action
+startingAction maybeCode env' chainId' = Action.Action
   { _blockHash                = blockHeaderHash $ Env.blockHeader env'
   , _blockTimestamp           = blockHeaderTimestamp $ Env.blockHeader env'
   , _blockNumber              = blockHeaderBlockNumber $ Env.blockHeader env'
   , _transactionHash          = Env.txHash env'
-  , _transactionChainId       = Env.chainId env'
+  , _transactionChainId       = chainId'
   , _transactionSender        = Env.sender env'
   , _actionData               = M.empty
   , _metadata                 =
