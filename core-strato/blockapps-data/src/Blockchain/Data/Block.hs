@@ -85,18 +85,19 @@ instance BlockLike BlockData Transaction Block where
 -- if useDiffBomb is False then the expAdjustment is not added.
 nextDifficulty::Bool->Bool->Integer->Difficulty->UTCTime->UTCTime->Difficulty
 nextDifficulty useDiffBomb useTestnet parentNumber oldDifficulty oldTime newTime =
-  max nextDiff' minimumDifficulty + if not useDiffBomb then 0 else expAdjustment
-    where
-      nextDiff' =
-          if round (utcTimeToPOSIXSeconds newTime) >=
-                 (round (utcTimeToPOSIXSeconds oldTime) + difficultyDurationLimit useTestnet::Integer)
-          then oldDifficulty - oldDifficulty `shiftR` difficultyAdjustment
-          else oldDifficulty + oldDifficulty `shiftR` difficultyAdjustment
-      periodCount = (parentNumber+1) `quot` difficultyExpDiffPeriod
-      expAdjustment =
-        if periodCount > 1
-        then 2^(periodCount - 2)
-        else 0
+  if True then 1 else
+    max nextDiff' minimumDifficulty + if not useDiffBomb then 0 else expAdjustment
+      where
+        nextDiff' =
+            if round (utcTimeToPOSIXSeconds newTime) >=
+                  (round (utcTimeToPOSIXSeconds oldTime) + difficultyDurationLimit useTestnet::Integer)
+            then oldDifficulty - oldDifficulty `shiftR` difficultyAdjustment
+            else oldDifficulty + oldDifficulty `shiftR` difficultyAdjustment
+        periodCount = (parentNumber+1) `quot` difficultyExpDiffPeriod
+        expAdjustment =
+          if periodCount > 1
+          then 2^(periodCount - 2)
+          else 0
 
 -- if useDiffBomb is False then the expAdjustment is not added
 homesteadNextDifficulty::Bool->Bool->Integer->Difficulty->UTCTime->UTCTime->Difficulty

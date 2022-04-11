@@ -25,7 +25,7 @@ buildIngestChain :: IngestBlock -> Int -> Int -> IO [IngestBlock]
 buildIngestChain _    0     _           = return []
 buildIngestChain seed depth maxSiblings = do
     siblingCount   <- generate $ choose (1, maxSiblings)
-    nextDifficulty <- ((ingestBlockDifficulty seed) +) <$> (generate $ choose (1, 1000)) -- difficulty bomb
+    nextDifficulty <- return 1 --((ingestBlockDifficulty seed) +) <$> (generate $ choose (1, 1000)) -- difficulty bomb
     nextNumber     <- return $ (ingestBlockNumber seed) + 1
     siblings       <- generate $ vectorOf siblingCount arbitrary
     withUpdates    <- return $ ( (setIngestBlockParentHash . ingestBlockHash $ seed)
