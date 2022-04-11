@@ -1740,7 +1740,6 @@ callBuiltin "account" [SInteger a, SString "ancestor", SInteger n] _ = unspecifi
 callBuiltin "account" [SInteger a, SString ('0':'x':xs)] _ = return . SAccount $ explicitChain (fromIntegral a) (fromIntegral $ base16ToIntegral xs)
   where
     hexChar ch = fromMaybe (invalidArguments "illegal character in chainId hexstring" [ch]) $ elemIndex ch "0123456789ABCDEF"
-    --f n c = 16*n + (hexChar $ CHAR.toUpper c)
     base16ToIntegral = foldl' (\n c -> 16*n + (hexChar $ CHAR.toUpper c)) 0 
 callBuiltin "account" [SAccount a, SInteger b] _ = return . SAccount $ (namedAccountChainId .~ ExplicitChain (fromIntegral b)) a
 callBuiltin "account" [SAccount a, SString "main"] _ = return . SAccount $ (namedAccountChainId .~ MainChain) a

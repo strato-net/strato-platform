@@ -47,7 +47,7 @@ makeNextBlock block = do
   let
     parent = blockHeaderHash block
     nextNumber = (blockDataNumber block) + 1
-  diff <- ((blockDataDifficulty block) +) <$> (generate $ choose (1,1000))
+  diff <- return 1 --((blockDataDifficulty block) +) <$> (generate $ choose (1,1000))
   child <- generate arbitrary :: IO BlockData
   return $ ( (over _blockDataParentHash (const parent))
             . (over _blockDataDifficulty (const diff))
