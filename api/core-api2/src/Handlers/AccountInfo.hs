@@ -92,6 +92,7 @@ data AccountsFilterParams = AccountsFilterParams
 
 makeLenses ''AccountsFilterParams
 
+
 accountsFilterParams :: AccountsFilterParams
 accountsFilterParams = AccountsFilterParams
   Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
@@ -134,16 +135,16 @@ server = getAccount
 
 ---------------------------
 
-data NamedChainId = UnnamedChainIds [ChainId]
-                  | MainChain
+data NamedChainId = UnnamedChainIdsA [ChainId]
+                  | MainChainA
   
 instance HasSQL m => Selectable AccountsFilterParams [AddressStateRef] m where
   select _ a@AccountsFilterParams{..} | a == accountsFilterParams =
     throwIO . NoFilterError $ "Need one of: " ++ intercalate ", " accountQueryParams
                                       | otherwise = do
     chainid <- case _qaChainId of
-      [] -> pure MainChain
-      cids -> pure $ UnnamedChainIds cids
+      [] -> pure MainChainA
+      cids -> pure $ UnnamedChainIdsA cids
 
     fmap (Just . nub . map E.entityVal) . sqlQuery $ E.select . E.distinct $
       E.from $ \(accStateRef) -> do
@@ -174,8 +175,8 @@ instance HasSQL m => Selectable AccountsFilterParams [AddressStateRef] m where
       
       let matchChainId (ChainId cid) = (accStateRef E.^. AddressStateRefChainId) E.==. (E.val cid)
       let chainCriteria = case chainid of
-            MainChain -> [accStateRef E.^. AddressStateRefChainId E.==. E.val 0]
-            UnnamedChainIds cids -> matchChainId <$> cids
+            MainChainA -> [accStateRef E.^. AddressStateRefChainId E.==. E.val 0]
+            UnnamedChainIdsA cids -> matchChainId <$> cids
       let allCriteria = case (_qaIgnoreChain, chainCriteria) of
               (Just True, _) -> [criteria]
               (_, []) -> [criteria]

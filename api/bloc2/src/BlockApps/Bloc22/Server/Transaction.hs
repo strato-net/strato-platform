@@ -56,6 +56,8 @@ import qualified Data.Text                         as Text
 import qualified Data.Text.Encoding                as Text
 import           Data.Time.Clock
 import           Data.Word
+import qualified Database.Esqueleto                as E
+import qualified Blockchain.DB.SQLDB               as SQLDB
 import           System.Clock
 import           UnliftIO
 
@@ -99,13 +101,13 @@ import           Blockchain.Strato.Model.Wei
 import           Blockchain.Strato.RedisBlockDB         (runStratoRedisIO, getWorldBestBlockInfo, getBestBlockInfo, getSyncStatus)
 
 import           Control.Monad.Composable.BlocSQL
-import           Control.Monad.Composable.CoreAPI
+
 import           Control.Monad.Composable.SQL
 import           Control.Monad.Composable.Vault
 
 import           Blockchain.Strato.RedisBlockDB.Models  (RedisBestBlock(..))
 
-import           Handlers.AccountInfo
+import           Handlers.AccountInfo()
 import           Handlers.Transaction
 
 import           Strato.Strato23.Client
@@ -125,7 +127,6 @@ txWorker :: ( MonadLogger m
             , (Keccak256 `A.Alters` SourceMap) m
             , HasBlocEnv m
             , HasBlocSQL m
-            , HasCoreAPI m
             , HasVault m
             , HasSQL m
             )
@@ -229,7 +230,6 @@ postBlocTransactionParallel :: ( MonadLogger m
                                , (Keccak256 `A.Alters` SourceMap) m
                                , HasBlocEnv m
                                , HasBlocSQL m
-                               , HasCoreAPI m
                                , HasVault m
                                , HasSQL m
                                )
@@ -255,7 +255,6 @@ postBlocTransaction :: ( MonadLogger m
                        , (Keccak256 `A.Alters` SourceMap) m
                        , HasBlocEnv m
                        , HasBlocSQL m
-                       , HasCoreAPI m
                        , HasVault m
                        , HasSQL m
                        )
@@ -266,13 +265,13 @@ postBlocTransaction :: ( MonadLogger m
                     -> m [BlocChainOrTransactionResult]
 postBlocTransaction = postBlocTransaction' (Don't CacheNonce)
 
+
 postBlocTransaction' :: ( MonadLogger m
                         , A.Selectable Account ContractDetails m
                         , A.Selectable Account AddressState m
                         , (Keccak256 `A.Alters` SourceMap) m
                         , HasBlocEnv m
                         , HasBlocSQL m
-                        , HasCoreAPI m
                         , HasVault m
                         , HasSQL m
                         )
@@ -464,7 +463,6 @@ postUsersSend' :: ( A.Selectable Account AddressState m
                   , MonadLogger m
                   , HasBlocEnv m
                   , HasBlocSQL m
-                  , HasCoreAPI m
                   , HasVault m
                   , HasSQL m
                   )
@@ -487,7 +485,6 @@ postUsersContractEVM' :: ( MonadLogger m
                          , (Keccak256 `A.Alters` SourceMap) m
                          , HasBlocEnv m
                          , HasBlocSQL m
-                         , HasCoreAPI m
                          , HasVault m
                          , HasSQL m
                          )
@@ -523,7 +520,6 @@ postUsersContractSolidVM' :: ( MonadLogger m
                              , (Keccak256 `A.Alters` SourceMap) m
                              , HasBlocEnv m
                              , HasBlocSQL m
-                             , HasCoreAPI m
                              , HasVault m
                              , HasSQL m
                              )
@@ -560,7 +556,6 @@ postUsersUploadListSolidVM' :: ( MonadLogger m
                                , (Keccak256 `A.Alters` SourceMap) m
                                , HasBlocEnv m
                                , HasBlocSQL m
-                               , HasCoreAPI m
                                , HasVault m
                                , HasSQL m
                                )
@@ -608,7 +603,6 @@ postUsersUploadListEVM' :: ( MonadLogger m
                            , (Keccak256 `A.Alters` SourceMap) m
                            , HasBlocEnv m
                            , HasBlocSQL m
-                           , HasCoreAPI m
                            , HasVault m
                            , HasSQL m
                            )
@@ -649,7 +643,6 @@ postUsersSendList' :: ( MonadLogger m
                       , (Keccak256 `A.Alters` SourceMap) m
                       , HasBlocEnv m
                       , HasBlocSQL m
-                      , HasCoreAPI m
                       , HasVault m
                       , HasSQL m
                       )
@@ -677,7 +670,6 @@ postUsersContractMethodList' :: ( MonadLogger m
                                 , (Keccak256 `A.Alters` SourceMap) m
                                 , HasBlocEnv m
                                 , HasBlocSQL m
-                                , HasCoreAPI m
                                 , HasVault m
                                 , HasSQL m
                                 )
@@ -738,7 +730,6 @@ postUsersContractMethod' :: ( MonadLogger m
                             , (Keccak256 `A.Alters` SourceMap) m
                             , HasBlocEnv m
                             , HasBlocSQL m
-                            , HasCoreAPI m
                             , HasVault m
                             , HasSQL m
                             )
@@ -863,7 +854,7 @@ constructArgValuesAndSource args argNamesTypes = do
             "(" <> Text.intercalate "," valsAsText <> ")"
           )
 
-getAccountTxParams :: (MonadIO m, MonadLogger m, HasBlocEnv m, HasCoreAPI m) =>
+getAccountTxParams :: (MonadIO m, MonadLogger m, HasBlocEnv m, HasSQL m) =>
                       Should CacheNonce -> Address -> Maybe ChainId -> Maybe TxParams -> m TxParams
 getAccountTxParams cacheNonce addr chainId mTxParams = do
   let params = fromMaybe emptyTxParams mTxParams
@@ -896,7 +887,7 @@ cacheLookup :: (Eq k, Hashable k)
             -> STM (Maybe v)
 cacheLookup c t k = Cache.lookupSTM True k c t
 
-genNonces :: (MonadIO m, MonadLogger m, HasBlocEnv m, HasCoreAPI m) =>
+genNonces :: (MonadIO m, MonadLogger m, HasBlocEnv m, HasSQL m) =>
              Show a
           => Should CacheNonce
           -> Address
@@ -949,23 +940,29 @@ genNonces cacheNonce fromAddr chainLens l unindexedAs = do
     Cache.insertSTM (Account fromAddr $ unChainId <$> chainId) newCachedNonce nonceCache expTime
     pure (chainId, txs)
 
-getAccountNonce :: (MonadIO m, MonadLogger m, HasBlocEnv m, HasCoreAPI m) =>
+
+getAccountNonce :: (MonadIO m, MonadLogger m, HasSQL m, HasBlocEnv m) =>
                    Address -> S.Set (Maybe ChainId) -> m (Map (Maybe ChainId) Nonce)
 getAccountNonce addr chainIds = do
   let chainIds' = map (fromMaybe (ChainId 0)) $ S.toList chainIds
-  let params = accountsFilterParams & qaAddress ?~ addr & qaChainId .~ chainIds'
-  mAccts <- fmap (map (\(AddressStateRef' a _) -> a)) . blocStrato $ getAccountsFilter params
-  $logInfoLS "getAccountNonce/req" params
-  $logInfoLS "getAccountNonce/resp" mAccts
+  let chainIds'' = map (\(ChainId c) -> c) chainIds'
+  let actions = E.select . E.from $ \accStateRef -> do
+                  E.where_ (accStateRef E.^. AddressStateRefAddress E.==. E.val addr)
+                  E.where_ (accStateRef E.^. AddressStateRefChainId `E.in_` E.valList chainIds'')
+                  return accStateRef
+  mAccts <- SQLDB.sqlQuery actions
+  $logInfoLS "getAccountNonce lookup" (chainIds'', addr)
+  $logInfoLS "getAccountNonce results" mAccts
   case mAccts of
     [] -> do
       requireBalance <- fmap gasOn getBlocEnv
       if requireBalance then throwIO . UserError $ "User does not have a balance"
       else return $ Map.fromList [(Nothing, Nonce $ fromInteger 0)]
     accts -> do
+      let acts = map E.entityVal accts
       let mkCid AddressStateRef{..} = ChainId <$> toMaybe 0 addressStateRefChainId
           mkNonce AddressStateRef{..} = Nonce $ fromInteger addressStateRefNonce
-      return . Map.fromList $ map (mkCid &&& mkNonce) accts
+      return . Map.fromList $ map (mkCid &&& mkNonce) acts
 
 constructArgValues :: (MonadIO m, MonadLogger m) =>
                       Maybe (Map Text ArgValue) -> Map Text Xabi.IndexedType -> m ByteString
