@@ -101,13 +101,13 @@ import           Blockchain.Strato.Model.Wei
 import           Blockchain.Strato.RedisBlockDB         (runStratoRedisIO, getWorldBestBlockInfo, getBestBlockInfo, getSyncStatus)
 
 import           Control.Monad.Composable.BlocSQL
-import           Control.Monad.Composable.CoreAPI
+
 import           Control.Monad.Composable.SQL
 import           Control.Monad.Composable.Vault
 
 import           Blockchain.Strato.RedisBlockDB.Models  (RedisBestBlock(..))
 
-import           Handlers.AccountInfo
+import           Handlers.AccountInfo()
 import           Handlers.Transaction
 
 import           Strato.Strato23.Client
@@ -127,7 +127,6 @@ txWorker :: ( MonadLogger m
             , (Keccak256 `A.Alters` SourceMap) m
             , HasBlocEnv m
             , HasBlocSQL m
-            , HasCoreAPI m
             , HasVault m
             , HasSQL m
             )
@@ -231,7 +230,6 @@ postBlocTransactionParallel :: ( MonadLogger m
                                , (Keccak256 `A.Alters` SourceMap) m
                                , HasBlocEnv m
                                , HasBlocSQL m
-                               , HasCoreAPI m
                                , HasVault m
                                , HasSQL m
                                )
@@ -257,7 +255,6 @@ postBlocTransaction :: ( MonadLogger m
                        , (Keccak256 `A.Alters` SourceMap) m
                        , HasBlocEnv m
                        , HasBlocSQL m
-                       , HasCoreAPI m
                        , HasVault m
                        , HasSQL m
                        )
@@ -275,7 +272,6 @@ postBlocTransaction' :: ( MonadLogger m
                         , (Keccak256 `A.Alters` SourceMap) m
                         , HasBlocEnv m
                         , HasBlocSQL m
-                        , HasCoreAPI m
                         , HasVault m
                         , HasSQL m
                         )
@@ -467,7 +463,6 @@ postUsersSend' :: ( A.Selectable Account AddressState m
                   , MonadLogger m
                   , HasBlocEnv m
                   , HasBlocSQL m
-                  , HasCoreAPI m
                   , HasVault m
                   , HasSQL m
                   )
@@ -490,7 +485,6 @@ postUsersContractEVM' :: ( MonadLogger m
                          , (Keccak256 `A.Alters` SourceMap) m
                          , HasBlocEnv m
                          , HasBlocSQL m
-                         , HasCoreAPI m
                          , HasVault m
                          , HasSQL m
                          )
@@ -526,7 +520,6 @@ postUsersContractSolidVM' :: ( MonadLogger m
                              , (Keccak256 `A.Alters` SourceMap) m
                              , HasBlocEnv m
                              , HasBlocSQL m
-                             , HasCoreAPI m
                              , HasVault m
                              , HasSQL m
                              )
@@ -563,7 +556,6 @@ postUsersUploadListSolidVM' :: ( MonadLogger m
                                , (Keccak256 `A.Alters` SourceMap) m
                                , HasBlocEnv m
                                , HasBlocSQL m
-                               --, HasCoreAPI m
                                , HasVault m
                                , HasSQL m
                                )
@@ -611,7 +603,6 @@ postUsersUploadListEVM' :: ( MonadLogger m
                            , (Keccak256 `A.Alters` SourceMap) m
                            , HasBlocEnv m
                            , HasBlocSQL m
-                           --, HasCoreAPI m
                            , HasVault m
                            , HasSQL m
                            )
@@ -652,7 +643,6 @@ postUsersSendList' :: ( MonadLogger m
                       , (Keccak256 `A.Alters` SourceMap) m
                       , HasBlocEnv m
                       , HasBlocSQL m
-                      --, HasCoreAPI m
                       , HasVault m
                       , HasSQL m
                       )
@@ -680,7 +670,6 @@ postUsersContractMethodList' :: ( MonadLogger m
                                 , (Keccak256 `A.Alters` SourceMap) m
                                 , HasBlocEnv m
                                 , HasBlocSQL m
-                                --, HasCoreAPI m
                                 , HasVault m
                                 , HasSQL m
                                 )
@@ -741,7 +730,6 @@ postUsersContractMethod' :: ( MonadLogger m
                             , (Keccak256 `A.Alters` SourceMap) m
                             , HasBlocEnv m
                             , HasBlocSQL m
-                            , HasCoreAPI m
                             , HasVault m
                             , HasSQL m
                             )
@@ -866,7 +854,7 @@ constructArgValuesAndSource args argNamesTypes = do
             "(" <> Text.intercalate "," valsAsText <> ")"
           )
 
-getAccountTxParams :: (MonadIO m, MonadLogger m, HasBlocEnv m, HasCoreAPI m) =>
+getAccountTxParams :: (MonadIO m, MonadLogger m, HasBlocEnv m, HasSQL m) =>
                       Should CacheNonce -> Address -> Maybe ChainId -> Maybe TxParams -> m TxParams
 getAccountTxParams cacheNonce addr chainId mTxParams = do
   let params = fromMaybe emptyTxParams mTxParams
@@ -921,7 +909,7 @@ genNonces cacheNonce fromAddr chainLens l unindexedAs = do
   chainNonceVals <- zip chainIdsList <$> lookupCached
   let ~(chainsWithNonces, chainsWithoutNonces) = partition (isJust . snd) chainNonceVals
       cachedNonceMap = Map.fromList $ fmap fromJust <$> chainsWithNonces
-  fetchedNonceMap <- getAccountNonce' fromAddr . S.fromList $ fst <$> chainsWithoutNonces
+  fetchedNonceMap <- getAccountNonce fromAddr . S.fromList $ fst <$> chainsWithoutNonces
   let nonceMap = Map.union cachedNonceMap fetchedNonceMap
   liftIO . atomically $ fmap mergePartitions . forM indexedByChainId $ \(chainId, indexedAs) -> do
     let noncesInUse = S.fromList $ mapMaybe (viewNonce . snd) indexedAs
@@ -953,41 +941,9 @@ genNonces cacheNonce fromAddr chainLens l unindexedAs = do
     pure (chainId, txs)
 
 
-
-{-
--- SELECT *
--- FROM AccountInfo
--- WHERE AccountInfo.qaAddress = addr && qaChainId 
-
-myQuery :: SqlPersist m ()
-myQuery = do
-  accs <- E.select $
-            E.from $ \p -> do
-            E.where_ ((p E.^. qaAddress ==. val addr) && (p E.^. qaChainId `elem` chainIds')
-            return p
-
-
-getBlock :: HasSQLDB m
-         => Keccak256
-         -> m (Maybe BlockDataRef)
-getBlock h = do
-  entBlkL <- sqlQuery actions
-
-  case entBlkL of
-    []  -> return Nothing
-    lst -> return $ Just . entityVal . head $ lst
-  where actions = E.select $ E.from $ \bdRef -> do
-                                   E.where_ (bdRef E.^. BlockDataRefHash E.==. E.val h )
-                                   return bdRef
--}
-
-
-
-
-
-getAccountNonce' :: (MonadIO m, MonadLogger m, HasSQL m, HasBlocEnv m) =>
+getAccountNonce :: (MonadIO m, MonadLogger m, HasSQL m, HasBlocEnv m) =>
                    Address -> S.Set (Maybe ChainId) -> m (Map (Maybe ChainId) Nonce)
-getAccountNonce' addr chainIds = do
+getAccountNonce addr chainIds = do
   let chainIds' = map (fromMaybe (ChainId 0)) $ S.toList chainIds
   let chainIds'' = map (\(ChainId c) -> c) chainIds'
   let actions = E.select . E.from $ \accStateRef -> do
@@ -995,8 +951,8 @@ getAccountNonce' addr chainIds = do
                   E.where_ (accStateRef E.^. AddressStateRefChainId `E.in_` E.valList chainIds'')
                   return accStateRef
   mAccts <- SQLDB.sqlQuery actions
-  $logInfoLS "getAccountNonce' lookup" (chainIds'', addr)
-  $logInfoLS "getAccountNonce' results" mAccts
+  $logInfoLS "getAccountNonce lookup" (chainIds'', addr)
+  $logInfoLS "getAccountNonce results" mAccts
   case mAccts of
     [] -> do
       requireBalance <- fmap gasOn getBlocEnv
@@ -1007,49 +963,6 @@ getAccountNonce' addr chainIds = do
       let mkCid AddressStateRef{..} = ChainId <$> toMaybe 0 addressStateRefChainId
           mkNonce AddressStateRef{..} = Nonce $ fromInteger addressStateRefNonce
       return . Map.fromList $ map (mkCid &&& mkNonce) acts
-
-getAccountNonce :: (MonadIO m, MonadLogger m, HasBlocEnv m, HasCoreAPI m) =>
-                   Address -> S.Set (Maybe ChainId) -> m (Map (Maybe ChainId) Nonce)
-getAccountNonce addr chainIds = do
-  let chainIds' = map (fromMaybe (ChainId 0)) $ S.toList chainIds
-  let params = accountsFilterParams & qaAddress ?~ addr & qaChainId .~ chainIds'
-  mAccts <- fmap (map (\(AddressStateRef' a _) -> a)) . blocStrato $ getAccountsFilter params
-  $logInfoLS "getAccountNonce/req" params
-  $logInfoLS "getAccountNonce/resp" mAccts
-  case mAccts of
-    [] -> do
-      requireBalance <- fmap gasOn getBlocEnv
-      if requireBalance then throwIO . UserError $ "User does not have a balance"
-      else return $ Map.fromList [(Nothing, Nonce $ fromInteger 0)]
-    accts -> do
-      let mkCid AddressStateRef{..} = ChainId <$> toMaybe 0 addressStateRefChainId
-          mkNonce AddressStateRef{..} = Nonce $ fromInteger addressStateRefNonce
-      return . Map.fromList $ map (mkCid &&& mkNonce) accts
-
-{-
-      let myCids = map addressStateRefChainId acts
-      let myNonces = map addressStateRefNonce acts
-      let myCids' = map (\c -> (ChainId . (toMaybe 0)) c) myCids
-      let myNonces' = map (\n -> (Nonce . fromInteger) n) myNonces
-      let myMap = Map.fromList $ zip myCids' myNonces'
-      return myMap
--}
-{-
-accts -> do
-      let mkCid AddressStateRef{..} = ChainId <$> toMaybe 0 addressStateRefChainId
-          mkNonce AddressStateRef{..} = Nonce $ fromInteger addressStateRefNonce
-      return . Map.fromList $ map (mkCid &&& mkNonce) accts
--}
-
-
-{-
-                  let matchChainId (ChainId cid) = (acc E.^. AddressStateRefChainId) E.==. (E.val cid)
-                  let chainCriteria = case chainIds' of
-                        MainChainA -> [acc E.^. AddressStateRefChainId E.==. E.val 0]
-                        UnnamedChainIdsA cids -> matchChainId <$> cids
-                  E.where_ (foldl1 (E.||.) (map (foldl1 (E.&&.)) chainCriteria))
-   -}
-
 
 constructArgValues :: (MonadIO m, MonadLogger m) =>
                       Maybe (Map Text ArgValue) -> Map Text Xabi.IndexedType -> m ByteString
