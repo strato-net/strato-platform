@@ -47,7 +47,7 @@ makeNextBlock block = do
   let
     parent = blockHeaderHash block
     nextNumber = (blockDataNumber block) + 1
-  diff <- ((blockDataDifficulty block) +) <$> (generate $ choose (1,1000))
+  diff <- return 1 --((blockDataDifficulty block) +) <$> (generate $ choose (1,1000))
   child <- generate arbitrary :: IO BlockData
   return $ ( (over _blockDataParentHash (const parent))
             . (over _blockDataDifficulty (const diff))
@@ -105,7 +105,7 @@ buildY seed 0     _           = pure (Node seed [])
 buildY _    _     n | n < 2   = error "fewer than 2 siblings make no sense"
 buildY seed depth maxSiblings = do
     let spread = if depth == 1 then maxSiblings else 1
-    nextDifficulty' <- ((blockDataDifficulty seed) +) <$> (generate $ choose (1, 1000))
+    nextDifficulty' <- return 1 --((blockDataDifficulty seed) +) <$> (generate $ choose (1, 1000))
     nextNumber      <- return $ (blockDataNumber seed) + 1
     siblings        <- generate $ vectorOf spread arbitrary :: IO [BlockData]
     withUpdates     <- return $ ( (over _blockDataParentHash      (const . blockHeaderHash $ seed))
@@ -123,7 +123,7 @@ buildTree seed 0     _           = pure (Node seed [])
 buildTree _    _     n | n < 2   = error "fewer than 2 siblings make no sense"
 buildTree seed depth maxSiblings = do
     siblingCount    <- generate $ invDist maxSiblings
-    nextDifficulty' <- ((blockDataDifficulty seed) +) <$> (generate $ choose (1, 1000))
+    nextDifficulty' <- return 1 --((blockDataDifficulty seed) +) <$> (generate $ choose (1, 1000))
     nextNumber      <- return $ (blockDataNumber seed) + 1
     siblings        <- generate $ vectorOf siblingCount arbitrary :: IO [BlockData]
     withUpdates     <- return $ ( (over _blockDataParentHash      (const . blockHeaderHash $ seed))
