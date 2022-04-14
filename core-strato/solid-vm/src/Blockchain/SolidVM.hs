@@ -1778,7 +1778,9 @@ callBuiltin "require" (SBool cond :msg) Nothing = do
     (m:_) -> require cond (Just $ show m)
   return SNULL
 callBuiltin "assert" [SBool cond] Nothing = SNULL <$ assert cond
-callBuiltin "registerCert" [SAccount a, SString cert] _ = do
+callBuiltin rc@("registerCert") [SAccount a, SString cert] _ = do
+  contract' <- getCurrentContract
+  if CC._vmVersion contract' /= "svm3.2" then do
     curAccount <- getCurrentAccount
     case _accountChainId curAccount of
       Just cid -> invalidWrite "Cannot register X.509 certificates on a private chain" cid
@@ -1792,6 +1794,31 @@ callBuiltin "registerCert" [SAccount a, SString cert] _ = do
               Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.insert theAddress x509Cert x509s
               onTraced $ liftIO $ putStrLn $ "    registering cert to address: " ++ format theAddress ++ " as " ++ show (fmap subCommonName $ getCertSubject x509Cert)
               return SNULL
+  else unknownFunction "callBuiltin" rc
+
+callBuiltin rc'@("registerCert") [SString cert] _ = do
+  contract' <- getCurrentContract
+  if CC._vmVersion contract' == "svm3.2" then do
+    curAccount <- getCurrentAccount
+    case _accountChainId curAccount of
+      Just cid -> invalidCertificate "Cannot register X.509 certificates on private chains" cid
+      Nothing -> do
+        let ex509Cert = bsToCert . BC.pack $ cert
+        case ex509Cert of 
+          Left q -> invalidCertificate "Could not parse X.509 certificate" q
+          Right x509Cert -> do 
+            let mSubject = getCertSubject x509Cert
+            case mSubject of 
+              (Just subject) -> do
+                let subjectAddress = fromPublicKey $ subPub subject
+                onTraced $ liftIO $ putStrLn $ "    Registering cert to address derived from the subject's public key: " ++ 
+                  format subjectAddress ++ " as Common Name:" ++ show (subCommonName subject) ++ "; Organization: " ++ show (subOrg subject)
+                x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
+                Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.insert subjectAddress x509Cert x509s
+                return SNULL
+              _ -> invalidCertificate "No or invalid subject" x509Cert
+  else unknownFunction "callBuiltin" rc'
+
 callBuiltin "getUserCert" [SAccount a] _ = do
     x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
     maybeCertLevelDB <- x509CertDBGet $ _namedAccountAddress a
