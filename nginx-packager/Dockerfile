@@ -16,7 +16,7 @@ HEALTHCHECK --interval=5s --timeout=1s --start-period=180s \
   CMD curl  --silent --output /dev/null --fail localhost:80/_ping || \
         exit 1
 
-COPY nginx.tpl.conf auth.htpasswd openid.tpl.lua /tmp/
+COPY nginx.tpl.conf openid.tpl.lua /tmp/
 
 COPY docker-run.sh /
 

@@ -4,9 +4,7 @@ set -e
 
 MIN_TIMEOUT_BLOCKCHAIN_ENDPOINTS=60
 BLOCK_TIME_MULTIPLIER_FOR_TIMEOUT=10
-authBasic=${authBasic:-false}
 blockTime=${blockTime:-13} # keep default the same as strato
-#NODE_HOST=${NODE_HOST}
 ssl=${ssl:-false}
 sslCertFileType=${sslCertFileType:-crt}
 OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-NULL}
@@ -19,18 +17,13 @@ debugPort=${debugPort:-8051}
 debugWSPort=${debugWSPort:-8052}
 STATS_ENABLED=${STATS_ENABLED:-true}
 SMD_DEV_MODE=${SMD_DEV_MODE:-false}
-HOST_IP=${HOST_IP:-172.17.0.1}
+SMD_DEV_MODE_HOST_IP=${SMD_DEV_MODE_HOST_IP:-172.17.0.1}
 
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ########
   ### Check the validity of variables combination
   ########
-
-  if [[ ${SMD_MODE,,} = public ]] ; then
-    echo 'OAuth cannot be used with SMD_MODE=public'
-    exit 4
-  fi
   if [[ ${OAUTH_DISCOVERY_URL} = NULL || ${OAUTH_CLIENT_ID} = NULL || ${OAUTH_CLIENT_SECRET} = NULL ]] ; then
     echo 'OAUTH_DISCOVERY_URL, OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET are required for OAuth. Exit'
     exit 5
@@ -59,7 +52,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
 
   else
     sed -i '/#TEMPLATE_SMD_PROD_MODE/d' /tmp/nginx.conf
-    sed -i 's/<HOST_IP>/'"$HOST_IP"'/g' /tmp/nginx.conf
+    sed -i 's/<SMD_DEV_MODE_HOST_IP>/'"$SMD_DEV_MODE_HOST_IP"'/g' /tmp/nginx.conf
   fi
   # Remove SSL lines if deployment is not SSL-enabled
   # Set SSL cert file type if SSL-enabled
@@ -94,11 +87,6 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   fi
   sed -i 's/<BLOC_TIMEOUT>/'"$BLOC_TIMEOUT"'/g' /tmp/nginx.conf
 
-  # Remove auth_basic line if deployment is not authBasic-enabled
-  if [ "$authBasic" != true ] ; then
-    sed -i '/auth_basic/d' /tmp/nginx.conf
-  fi
-
   ########
   ### Generate .lua scripts from templates according to configuration provided
   ########
@@ -126,17 +114,6 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
 
   if [ "$ssl" = true ] ; then
     cp -r /tmp/ssl/* /etc/ssl/
-  fi
-
-  if [ "$authBasic" = true ] ; then
-    if [ -z "$uiPassword" ]
-    then
-      echo "Using the default password for user \"admin\""
-      cp /tmp/auth.htpasswd /usr/local/openresty/nginx/conf/auth.htpasswd
-    else
-      echo "Setting UI password for user \"admin\""
-      htpasswd -cb /usr/local/openresty/nginx/conf/auth.htpasswd admin ${uiPassword}
-    fi
   fi
 fi
 
