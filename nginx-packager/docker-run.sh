@@ -4,9 +4,7 @@ set -e
 
 MIN_TIMEOUT_BLOCKCHAIN_ENDPOINTS=60
 BLOCK_TIME_MULTIPLIER_FOR_TIMEOUT=10
-authBasic=${authBasic:-false}
 blockTime=${blockTime:-13} # keep default the same as strato
-#NODE_HOST=${NODE_HOST}
 ssl=${ssl:-false}
 sslCertFileType=${sslCertFileType:-crt}
 OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-NULL}
@@ -26,11 +24,6 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ########
   ### Check the validity of variables combination
   ########
-
-  if [[ ${SMD_MODE,,} = public ]] ; then
-    echo 'OAuth cannot be used with SMD_MODE=public'
-    exit 4
-  fi
   if [[ ${OAUTH_DISCOVERY_URL} = NULL || ${OAUTH_CLIENT_ID} = NULL || ${OAUTH_CLIENT_SECRET} = NULL ]] ; then
     echo 'OAUTH_DISCOVERY_URL, OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET are required for OAuth. Exit'
     exit 5
@@ -94,11 +87,6 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   fi
   sed -i 's/<BLOC_TIMEOUT>/'"$BLOC_TIMEOUT"'/g' /tmp/nginx.conf
 
-  # Remove auth_basic line if deployment is not authBasic-enabled
-  if [ "$authBasic" != true ] ; then
-    sed -i '/auth_basic/d' /tmp/nginx.conf
-  fi
-
   ########
   ### Generate .lua scripts from templates according to configuration provided
   ########
@@ -126,17 +114,6 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
 
   if [ "$ssl" = true ] ; then
     cp -r /tmp/ssl/* /etc/ssl/
-  fi
-
-  if [ "$authBasic" = true ] ; then
-    if [ -z "$uiPassword" ]
-    then
-      echo "Using the default password for user \"admin\""
-      cp /tmp/auth.htpasswd /usr/local/openresty/nginx/conf/auth.htpasswd
-    else
-      echo "Setting UI password for user \"admin\""
-      htpasswd -cb /usr/local/openresty/nginx/conf/auth.htpasswd admin ${uiPassword}
-    fi
   fi
 fi
 

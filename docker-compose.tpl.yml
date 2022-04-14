@@ -258,7 +258,6 @@ services:
     - strato
     - vault-wrapper
     environment:
-    - authBasic=${authBasic}
     - blockstanbul=${blockstanbul}
     - blockTime=${blockTime}
     - debugPort=${debugPort}
@@ -274,7 +273,6 @@ services:
     - sslCertFileType=${sslCertFileType}
     - START_EXPERIMENTAL_STRATO_API=${START_EXPERIMENTAL_STRATO_API}
     - STATS_ENABLED=${STATS_ENABLED}
-    - uiPassword=${uiPassword}
     - vmDebug=${vmDebug}
     - SMD_DEV_MODE=${SMD_DEV_MODE}
     - HOST_IP=${HOST_IP}
