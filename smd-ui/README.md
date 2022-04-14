@@ -18,9 +18,9 @@ To run react dev server locally with all features enabled go through the steps:
 
 - Node v8.15
 
-To run the React dev server locally with all features enabled, add the `SMD_DEV_MODE=true` and `HOST_IP=<MY_IP>` environment variables to your STRATO start script:
+To run the React dev server locally with all features enabled, add the `SMD_DEV_MODE=true` and `SMD_DEV_MODE_HOST_IP=<MY_IP>` environment variables to your STRATO start script:
 
-1. Determine correct HOST_IP value depending on your OS:
+1. Determine correct SMD_DEV_MODE_HOST_IP value depending on your OS:
   - Linux: `172.17.0.1` (default)
   - MacOS: `docker.for.mac.localhost`
   - Windows: `host.docker.internal`
@@ -37,7 +37,7 @@ To run the React dev server locally with all features enabled, add the `SMD_DEV_
     OAUTH_CLIENT_SECRET=d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f \
     PASSWORD=123 \
     SMD_DEV_MODE=true \
-    HOST_IP=<YOUR_IP> \
+    SMD_DEV_MODE_HOST_IP=<YOUR_IP> \
     ./strato --single
     ```
 
@@ -71,7 +71,7 @@ Alternatively, this may done manually by changing the Nginx config inside the Ng
       set $is_ui "true";
       rewrite_by_lua_file  lua/openid.lua;
       proxy_set_header Accept-Encoding "";
-      proxy_pass http://<HOST_IP>:3000/;
+      proxy_pass http://<SMD_DEV_MODE_HOST_IP>:3000/;
     }
     ```
 
@@ -82,7 +82,7 @@ Alternatively, this may done manually by changing the Nginx config inside the Ng
       proxy_set_header Upgrade $http_upgrade;
       proxy_set_header Connection "upgrade";
       proxy_http_version 1.1;
-      proxy_pass http://<HOST_IP>:3000/sockjs-node;
+      proxy_pass http://<SMD_DEV_MODE_HOST_IP>:3000/sockjs-node;
     }
     ```
 3. Validate and reload config:

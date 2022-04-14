@@ -17,7 +17,7 @@ debugPort=${debugPort:-8051}
 debugWSPort=${debugWSPort:-8052}
 STATS_ENABLED=${STATS_ENABLED:-true}
 SMD_DEV_MODE=${SMD_DEV_MODE:-false}
-HOST_IP=${HOST_IP:-172.17.0.1}
+SMD_DEV_MODE_HOST_IP=${SMD_DEV_MODE_HOST_IP:-172.17.0.1}
 
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
@@ -52,7 +52,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
 
   else
     sed -i '/#TEMPLATE_SMD_PROD_MODE/d' /tmp/nginx.conf
-    sed -i 's/<HOST_IP>/'"$HOST_IP"'/g' /tmp/nginx.conf
+    sed -i 's/<SMD_DEV_MODE_HOST_IP>/'"$SMD_DEV_MODE_HOST_IP"'/g' /tmp/nginx.conf
   fi
   # Remove SSL lines if deployment is not SSL-enabled
   # Set SSL cert file type if SSL-enabled
