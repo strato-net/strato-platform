@@ -39,7 +39,7 @@ def cleanOldWorkspaces(Integer olderThanNumDays = 5) {
 }
 
 pipeline {
-  agent { label "master" }
+  agent { label "utility" }
   options {
     disableConcurrentBuilds()
     timestamps()
