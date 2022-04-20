@@ -18,6 +18,7 @@ module BlockApps.Bloc22.Database.Queries
   , evmContractByCodeHash
   , evmCodeHashByName
   , insertEvmContractNameQuery
+  , insertContractDetailsQuery
   , sourceToContractDetails
   , getContractDetailsForContract
   , getContractDetailsByCodeHash
@@ -129,6 +130,18 @@ insertEvmContractNameQuery codeHash cName srcHash = do
       , constant cName
       , constant srcHash
       )]
+
+insertContractDetailsQuery :: ( MonadIO m
+                         , HasBlocSQL m
+                         , MonadLogger m 
+                         ) 
+                      => SourceMap -> m ()
+insertContractDetailsQuery sourceList = do
+  let encodedSrc = serializeSourceMap sourceList
+      srcHash = hash (Text.encodeUtf8 encodedSrc)
+
+  A.insert (A.Proxy @SourceMap) srcHash sourceList
+
 
 getContractDetailsByCodeHash :: ( A.Selectable Account AddressState m
                                 , (Keccak256 `A.Alters` SourceMap) m
@@ -281,7 +294,6 @@ compileContract sourceList = do
     insertEvmContractNameQuery ch contrName srcHash
     pure (contrName, cds)
 
-  A.insert (A.Proxy @SourceMap) srcHash sourceList
   pure $ Map.fromList details
 
 -- SolidVM only
@@ -310,7 +322,6 @@ createMetadataNoCompile sourceList = do
         , contractdetailsXabi = xabi
         }
 
-  A.insert (A.Proxy @SourceMap) srcHash sourceList
   pure details
 
 instance QueryRunnerColumnDefault PGBytea Address where
