@@ -1787,8 +1787,11 @@ callBuiltin rc@("registerCert") [SAccount a, SString cert] _ = do
       Nothing -> do
         let ex509Cert = bsToCert . BC.pack $ cert
         case ex509Cert of
-            Left _         -> return SNULL
+            Left err         -> do 
+              onTraced $ liftIO $ putStrLn $ C.red err
+              return SNULL
             Right x509Cert -> do
+              onTraced $ liftIO $ putStrLn $ C.red "WARNING we are unsafely registering a certificate to an arbitrary address"
               x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
               let theAddress = _accountAddress $ namedAccountToAccount Nothing a
               Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.insert theAddress x509Cert x509s
