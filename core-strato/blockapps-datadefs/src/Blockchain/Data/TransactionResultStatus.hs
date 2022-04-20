@@ -27,6 +27,7 @@ data TransactionFailureType = IncorrectChainId
                             | InsufficientFunds
                             | IntrinsicGasExceedsLimit
                             | TrumpedByMoreLucrative
+                            | InvalidPragma { trfInvalidPragma :: String }
                             | ExecutionFailure String
                             | MissingCode
                             deriving (Eq, Read, Show, Generic, NFData)

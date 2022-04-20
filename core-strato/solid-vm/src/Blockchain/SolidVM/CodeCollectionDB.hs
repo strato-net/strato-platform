@@ -72,11 +72,15 @@ compileSourceNoInheritance initCodeMap = do
         let pragmas = \case
               Pragma _ n v -> Just (n, v)
               _ -> Nothing
+            pramgaList = (pragmas <$> sourceUnits)
+            ValidPragmas = filter (\p -> (p == Nothing) || p == Just ("solidvm","3.2") || p == Just ("solidvm","3.0"))
+            invalidPragmas = pramgaList \\ ValidPragmas 
             vmVersion' = if (Just ("solidvm","3.2")) `elem` (pragmas <$> sourceUnits) then "svm3.2" else (if (Just ("solidvm","3.0")) `elem` (pragmas <$> sourceUnits) then "svm3.0" else "")
-        fmap catMaybes . for sourceUnits $ \case
+            vmVersion''  = if (not $ null invalidPragmas) then foldr "" (\(a,b) c -> a ++ b ++ c) invalidPragmas else
+        fma catMaybes . for sourceUnits $ \case
           NamedXabi name (xabi, parents') -> do
             ctrct <- first SVMEx
-                   $ xabiToContract (T.unpack name) (map T.unpack parents') vmVersion' xabi
+                   $ xabiToContract (T.unpack name) (map T.unpack parents') vmVersion'' xabi
             pure $ Just (T.unpack name, ctrct)
           _ -> pure Nothing
       throwDuplicate (cName, contract) m = case M.lookup cName m of

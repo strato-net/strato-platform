@@ -36,7 +36,7 @@ import           Data.Bits
 import           Data.Bool                            (bool)
 import           Data.ByteString                      (ByteString)
 import qualified Data.ByteString                      as B
-import qualified Data.ByteString.Base16               as B16
+import qualified Data.ByteString.Base16()               --as B16
 import qualified Data.ByteString.Char8                as BC
 import qualified Data.ByteString.Short                as BSS
 import qualified Data.ByteString.UTF8                 as UTF8
@@ -278,6 +278,8 @@ create' creator newAccount ch cc contractName' argExps x509s = do
 
   let !contract' = fromMaybe (missingType "create'/contract" contractName') (cc ^. CC.contracts . at contractName')
       vmVersion' = contract' ^. CC.vmVersion
+      isInvalidPragma = if vmVersion' `elem` ["svm3.2", "svm3.0", ""] then False else True
+      
 
   A.adjustWithDefault_ (A.Proxy @AddressState) newAccount $ \newAddressState ->
     pure newAddressState{ addressStateContractRoot = MP.emptyTriePtr
@@ -334,7 +336,7 @@ create' creator newAccount ch cc contractName' argExps x509s = do
     erNewContractAccount = Just newAccount,
     erSuicideList = S.empty,
     erAction = Just finalAct,
-    erException = Nothing,
+    erException = if (isInvalidPragma) then Just $ InvalidPragma vmVersion' else Nothing
     erKind = SolidVM,
     erNewX509Certs = x509s'
     }
@@ -1691,14 +1693,14 @@ binopAssign oper lhs rhs = do
   setVar varToAssign next
   return $ Constant next
 
+
 intBuiltin :: [Value] -> Value
 intBuiltin [SEnumVal _ _ enumNum] = SInteger $ fromIntegral enumNum
 intBuiltin [SInteger n] = SInteger n
-intBuiltin [SString hex] =
-  case B16.decode (BC.pack hex) of
-    (l, "") -> let zeros = 32 - B.length l
-               in SInteger . fromIntegral . bytesToWord256 $ B.replicate zeros 0x0 <> l
-    _ -> typeError "numeric cast - not a hex string" hex
+intBuiltin [SString hex] = invalidArguments "illegal character in hexstring" hex --SInteger $ fromIntegral $ base16ToIntegral hex
+  {-where
+    hexChar ch = fromMaybe (invalidArguments "illegal character in hexstring" [ch]) $ elemIndex ch "0123456789ABCDEF"
+    base16ToIntegral = foldl' (\n c -> 16*n + (hexChar $ CHAR.toUpper c)) 0-}
 intBuiltin args = typeError "numeric cast - invalid args" args
 
 castToAncestor :: MonadSM m => NamedAccount -> Integer -> m Value

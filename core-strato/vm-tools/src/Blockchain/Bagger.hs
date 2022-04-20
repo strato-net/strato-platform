@@ -108,6 +108,7 @@ runFromStateRoot mineTransactions remainingGas theBlockHeader txs = do
         Just f@TFInsufficientFunds{} -> recoverable f
         Just f@TFIntrinsicGasExceedsTxLimit{} -> recoverable f
         Just f@TFChainIdMismatch{} -> recoverable f
+        Just f@TFInvalidPragma{} -> recoverable f
         Just f@TFNonceMismatch{} -> error $ "mineTransactions' we messed up: " ++ format f
         Just f@TFCodeCollectionNotFound{} -> recoverable f
 
@@ -211,6 +212,7 @@ getCheckpointableState = do
 
 updateBaggerState :: MonadBagger m => (B.BaggerState -> B.BaggerState) -> m ()
 updateBaggerState f = putBaggerState =<< (f <$> getBaggerState)
+
 
 addTransactionsToMempool :: MonadBagger m => [OutputTx] -> m ()
 addTransactionsToMempool ts = do
@@ -486,6 +488,7 @@ isValidForPool t@OutputTx{otSigner=address, otBaseTx=bt} = runExceptT $ do
     let intrinsicGas = B.calculateIntrinsicGasAtNextBlock state t
         txgl         = TD.transactionGasLimit bt
         txn          = TD.transactionNonce bt
+        prgma        = TD.transactionPragma bt
         txFee        = B.calculateIntrinsicTxFee state t
     when (intrinsicGas > txgl) .
        throwE $ GasLimitTooLow Validation Incoming intrinsicGas t
@@ -494,6 +497,9 @@ isValidForPool t@OutputTx{otSigner=address, otBaseTx=bt} = runExceptT $ do
        throwE $ NonceTooLow Validation Incoming addressNonce t
     when (addressBalance < txFee) .
        throwE $ BalanceTooLow Validation Incoming txFee addressBalance t
+    --Checks to see if the pragma is valid for the transaction
+    when (prgma /= "svm3.2" && prgma /= "svm3.0" && prgma /= "") .
+       throwE $ InvalidPragma Validation Incoming t
     return ()
 
 addToSeen :: MonadBagger m => OutputTx -> m ()
@@ -588,6 +594,7 @@ buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT co
                         , DD.blockDataMixHash          = if isPBFT then blockstanbulMixHash else unsafeCreateKeccak256FromWord256 0x0
                         , DD.blockDataNonce            = nonce
                         }
+
 
 buildRewardedBlockHeader :: MonadBagger m => DD.BlockData -> [DD.BlockData] -> m DD.BlockData
 buildRewardedBlockHeader bd uncles = do
