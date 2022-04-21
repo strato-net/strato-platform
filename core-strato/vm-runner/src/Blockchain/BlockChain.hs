@@ -331,7 +331,7 @@ addTransaction :: (VMBase m, MonadMonitor m)
                -> Bool
                -> BlockData
                -> Integer
-               -> OutputTx
+               -> OutputTx --Important
                -> ExceptT TransactionFailureCause m ExecResults
 addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSigner=tAddr} = do
 
@@ -389,8 +389,11 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=b
 
             case erException execResults of
                 Just e -> do
-                    when flags_debug $ $logDebugS "addTx" . T.pack . CL.red $ show e
-                    lift $ P.incCounter vmTxsUnsuccessful
+                    case e of
+                      InvalidPragma str1 str2 -> evmErrorResults (InvalidPragma str1 str2)  
+
+                      when flags_debug $ $logDebugS "addTx" . T.pack . CL.red $ sChow e
+                      lift $ P.incCounter vmTxsUnsuccessful
                 Nothing -> do
                     when flags_debug $ $logDebugS "addTx" . T.pack $ "Removing accounts in suicideList: " ++ intercalate ", " (show . pretty <$> S.toList (erSuicideList execResults))
                     forM_ (S.toList $ erSuicideList execResults) $ \address' -> do
@@ -406,6 +409,7 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=b
             $logInfoS "addTransaction/success=false" . T.pack $ "Insufficient funds to run the VM: need " ++ show (availableGas*transactionGasPrice bt) ++ ", have " ++ show balance
             return $
               evmErrorResults (transactionGasLimit bt) Blockchain.VM.VMException.InsufficientFunds
+
 
 runCodeForTransaction :: VMBase m
                       => Bool
@@ -431,6 +435,8 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAcct OutputTx{
   nonce <- lift $ addressStateNonce <$> A.lookupWithDefault (Proxy @AddressState) tAcct
   let newAddress = getNewAddress_unsafe (tAcct ^. accountAddress) (nonce-1) --nonce has already been incremented, so subtract 1 here to get the proper value (this is directly specified in the yellowpaper)
       newAccount = Account newAddress (txChainId ut)
+
+  --Somehow I need to get the pragma from the OutputTx CreateCo
 
   lift $ create isRunningTests'
            isHomestead

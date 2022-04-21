@@ -15,7 +15,6 @@ data VMException =
   OutOfGasException |
   StackTooSmallException |
   VMException String |
-  InvalidPragmaException String |
   MalformedOpcodeException |
   DivByZeroException |
   InsufficientFunds |
