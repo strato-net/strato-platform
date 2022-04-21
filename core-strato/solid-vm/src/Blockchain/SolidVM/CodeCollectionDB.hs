@@ -75,8 +75,8 @@ compileSourceNoInheritance initCodeMap = do
             pramgaList = (pragmas <$> sourceUnits)
             ValidPragmas = filter (\p -> (p == Nothing) || p == Just ("solidvm","3.2") || p == Just ("solidvm","3.0"))
             invalidPragmas = pramgaList \\ ValidPragmas 
-            vmVersion' = if (Just ("solidvm","3.2")) `elem` (pragmas <$> sourceUnits) then "svm3.2" else (if (Just ("solidvm","3.0")) `elem` (pragmas <$> sourceUnits) then "svm3.0" else "")
-            vmVersion''  = if (not $ null invalidPragmas) then foldr "" (\(a,b) c -> a ++ b ++ c) invalidPragmas else
+            vmVersion'  = if (Just ("solidvm","3.2")) `elem` (pragmas <$> sourceUnits) then "svm3.2" else (if (Just ("solidvm","3.0")) `elem` (pragmas <$> sourceUnits) then "svm3.0" else "")
+            vmVersion'' = if (not $ null invalidPragmas) then foldr "" (\(a,b) c -> a ++ ": " ++ b ++ " " ++ c) invalidPragmas else vmVersion'
         fma catMaybes . for sourceUnits $ \case
           NamedXabi name (xabi, parents') -> do
             ctrct <- first SVMEx
