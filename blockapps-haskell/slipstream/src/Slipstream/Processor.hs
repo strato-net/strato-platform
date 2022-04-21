@@ -209,42 +209,16 @@ lookupT k = MaybeT . return . Map.lookup k
 --  it reparses the whole source blob, and caches the info for every contract
 insertContractBloc_ :: ( MonadIO m
                            , MonadLogger m
-                           , Accessible BlocEnv m
                            , HasBlocSQL m
-                           , Selectable Account AddressState m
-                           , (Keccak256 `Alters` SourceMap) m
                            )
                         => IORef Globals -> AggregateAction -> m ()
 insertContractBloc_ g row = void $ runMaybeT  
    $  checkCache 
-  <|> checkMetadata
-  <|> checkBloc 
   
   where checkCache = do
           $logInfoS "insertContractBloc_" . T.pack $ "Checking cache for contract info"
           MaybeT $ getSolidVMInfo g codePtr
         
-        checkMetadata = do
-          $logInfoS "insertContractBloc_" . T.pack $ "Checking metadata for contract info"
-          src <- lookupT "src" $ actionMetadata row 
-          parseAndSet $ deserializeSourceMap src
-        
-        checkBloc = do
-          $logInfoS "insertContractBloc_" . T.pack $ "Checking bloc database for contract info"
-          details <- (MaybeT $ either (const Nothing) Just <$> getContractDetailsByCodeHash codePtr)
-          parseAndSet $ OLD.contractdetailsSrc details
-
-        -- parse source code into a map, add the map of name -> contract to cache
-        -- this call is needed to insert the contract into bloc db contracts_source table
-        -- But since the contract_source table takes a serialized list of contracts from a code collection, we need to 
-        -- parse it first before inserting, since codeCollection could be multiple contracts.
-        parseAndSet src = do
-          details <- lift $ sourceToContractDetails (Don't Compile) src -- :: Map Text ContractDetails
-          lift $ insertContractDetailsQuery src -- insert contract details into bloc db contracts_source table
-          let infoMap = fmap OLD.contractdetailsCodeHash details
-          setSolidVMInfo g codePtr infoMap
-          pure infoMap
-          
         codePtr = actionCodeHash row
 
 

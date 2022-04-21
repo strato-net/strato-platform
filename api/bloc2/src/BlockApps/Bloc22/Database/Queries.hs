@@ -294,6 +294,8 @@ compileContract sourceList = do
     insertEvmContractNameQuery ch contrName srcHash
     pure (contrName, cds)
 
+  A.insert (A.Proxy @SourceMap) srcHash sourceList
+
   pure $ Map.fromList details
 
 -- SolidVM only
