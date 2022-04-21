@@ -747,7 +747,7 @@ assertArgs :: SourceAnnotation Text -> Type'
 assertArgs x = boolType' x
 
 registerCertArgs :: SourceAnnotation Text -> Type'
-registerCertArgs x = Product [accountType' x, stringType' x] x
+registerCertArgs x = stringType' x
 
 getUserCertArgs :: SourceAnnotation Text -> Type'
 getUserCertArgs x = accountType' x
