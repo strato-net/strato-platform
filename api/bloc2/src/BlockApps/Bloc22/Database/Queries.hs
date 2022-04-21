@@ -131,16 +131,16 @@ insertEvmContractNameQuery codeHash cName srcHash = do
       , constant srcHash
       )]
 
-insertContractDetailsQuery :: ( MonadIO m
-                         , HasBlocSQL m
-                         , MonadLogger m 
-                         ) 
-                      => SourceMap -> m ()
+insertContractDetailsQuery 
+  :: (A.Alters Keccak256 SourceMap m)
+  => SourceMap 
+  -> m ()
 insertContractDetailsQuery sourceList = do
   let encodedSrc = serializeSourceMap sourceList
-      srcHash = hash (Text.encodeUtf8 encodedSrc)
-
+      srcHash    = hash (Text.encodeUtf8 encodedSrc)
+  
   A.insert (A.Proxy @SourceMap) srcHash sourceList
+
 
 
 getContractDetailsByCodeHash :: ( A.Selectable Account AddressState m
@@ -298,7 +298,6 @@ compileContract sourceList = do
 
 -- SolidVM only
 createMetadataNoCompile :: ( MonadIO m
-                           , (Keccak256 `A.Alters` SourceMap) m
                            , MonadLogger m
                            )
                         => SourceMap -> m (Map Text ContractDetails)
