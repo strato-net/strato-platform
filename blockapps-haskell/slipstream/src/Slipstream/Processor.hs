@@ -240,7 +240,7 @@ insertContractBloc_ g row = void $ runMaybeT
         -- parse it first before inserting, since codeCollection could be multiple contracts.
         parseAndSet src = do
           details <- lift $ sourceToContractDetails (Don't Compile) src -- :: Map Text ContractDetails
-          insertContractDetailsQuery src -- insert contract details into bloc db contracts_source table
+          lift $ insertContractDetailsQuery src -- insert contract details into bloc db contracts_source table
           let infoMap = fmap OLD.contractdetailsCodeHash details
           setSolidVMInfo g codePtr infoMap
           pure infoMap
