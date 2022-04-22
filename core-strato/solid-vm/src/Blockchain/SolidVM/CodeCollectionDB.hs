@@ -135,7 +135,7 @@ codeCollectionFromSource initCode = do
                  Right a -> a
                  Left (PEx p) -> parseError "codeCollectionFromSource" p
                  Left (SVMEx (s, _)) -> throw s
-                 Left (TCEx xs) -> typeError "codeCollectionFromSource" (typeErrorToAnnotation xs)
+                 Left (TCEx xs) -> typeError "Typechecker" (typeErrorToAnnotation xs)
       let codeMap' = M.insert hsh cc codeMap
       recordCacheSize $ M.size codeMap'
       liftIO $ writeIORef unsafeCodeMapIORef codeMap'
