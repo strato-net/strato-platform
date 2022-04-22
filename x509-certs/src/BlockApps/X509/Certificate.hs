@@ -10,9 +10,13 @@ module BlockApps.X509.Certificate (
   X509Certificate(..),
   Issuer(..),
   Subject(..),
+  rootCert,
   certToBytes, 
   bsToCert,
   makeCert,
+  verifyCert,
+  verifyBlockApps,
+  verifyCertM,
   makeSignedCert,
   getCertSubject,
   getCertIssuer
@@ -23,7 +27,6 @@ module BlockApps.X509.Certificate (
 import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.Secp256k1
 import           BlockApps.X509.Keys
-
 import           Control.DeepSeq
 import           Control.Monad.IO.Class
 import           Crypto.Random.Entropy
@@ -38,18 +41,22 @@ import           Data.Bits
 import qualified Data.ByteArray                     as BA
 import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Char8              as C8
+import qualified Data.ByteString.Base16             as B16
+import qualified Data.ByteString.Short              as BSS
+
 import           Data.Either
 import           Data.Maybe
 import           Data.PEM
 import qualified Data.Text                      as T
 import           Data.X509
-
 import           Time.Types
 import           Time.System
 import qualified Text.Colors       as CL
 import           Text.Format
 
-
+-- import           Data.ASN1.Encoding
+-- import           Data.ASN1.BinaryEncoding
+-- import           Data.ASN1.Types
 
 -----------------------------------------------------------------------------------------------
 --------------------------------- TYPES AND TYPECLASS INSTANCES -------------------------------
@@ -71,7 +78,8 @@ data Issuer = Issuer
   , issCountry    :: Maybe String
   } deriving (Show, Eq)
 
-
+instance Format Issuer where
+  format = CL.magenta . show
 data Subject = Subject
   {
     subCommonName :: String
@@ -121,7 +129,27 @@ instance FromJSON X509Certificate where
     in either (errDump) pure $ bsToCert $ C8.pack $ T.unpack str
   parseJSON x = fail $ "parseJSON for SignedCertificate expects a String, but was given " ++ show x
 
+----------------------------------------------------------------------------------------------
+---------------------------------------- ROOT CERT -------------------------------------------
+----------------------------------------------------------------------------------------------
 
+rootCert :: X509Certificate
+rootCert = let eCert = bsToCert $ C8.pack $ unlines
+                [ "-----BEGIN CERTIFICATE-----"
+                , "MIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI"
+                , "MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF"
+                , "bmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy"
+                , "MDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU"
+                , "MBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG"
+                , "BSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs"
+                , "9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8"
+                , "R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n"
+                , "N8txKc8G9R27ZYAUuz15zF0="
+                , "-----END CERTIFICATE-----"
+                ]
+            in case eCert of 
+              Left _ -> error "Somehow, Palpatine has returned"
+              Right c -> c
 
 ----------------------------------------------------------------------------------------------
 --------------------------------------- IMPORT/EXPORT ----------------------------------------
@@ -195,13 +223,12 @@ makeCert iss sub = do
 ecdsaWithSHA256 :: (MonadIO m, HasVault m) => B.ByteString -> m (B.ByteString, SignatureALG)
 ecdsaWithSHA256 mesg' = do
   let mesgBS = B.pack $ BA.unpack $ hashWith CH.SHA256 mesg'
-  Signature (SEC.CompactRecSig s r v) <- sign mesgBS
-  
-  -- I too hate that we have to do this r,s swap....but strato-model swaps it because Ethereum
+  Signature (SEC.CompactRecSig r s v) <- sign mesgBS
+  -- I too hate that we have to do this r, s swap....but strato-model swaps it because Ethereum
   -- swaps it, and cert validation will fail if we leave them swapped here, so we swap it back
-  let sig'' = SEC.CompactRecSig r s v 
+  let sig'' = SEC.CompactRecSig s r v 
       sig' = fromMaybe (error "could not read a sig we just made") (SEC.importCompactRecSig sig'')
-      sig = SEC.convertRecSig sig' -- drop the 'v'
+      sig = SEC.convertRecSig sig' -- Drop the 'v' because the ASN1 protocol does not support recoverable signatures
   return (SEC.exportSig sig, SignatureALG HashSHA256 PubKeyALG_EC)
 
 
@@ -275,3 +302,35 @@ getCertIssuer (X509Certificate cert) = do
                   }
   where extractDn :: DnElement -> Maybe String
         extractDn dn = fmap fromASN1CS . getDnElement dn . certIssuerDN $ getCertificate cert
+
+
+--------------------------------------------------------------------------------------------
+------------------------------------- CERT VERIFICATION ------------------------------------
+--------------------------------------------------------------------------------------------
+
+-- Verify that a cert was signed by given public key
+verifyCert :: PublicKey -> X509Certificate -> Bool
+verifyCert pkey (X509Certificate signedCert) = 
+  let signed = getSigned signedCert
+      mesgBS = B.pack $ BA.unpack $ hashWith CH.SHA256 (getSignedData signedCert)
+  in
+  case importSignature' $ signedSignature signed of 
+    Nothing -> False
+    Just sig -> verifySig pkey sig mesgBS
+
+verifyBlockApps :: X509Certificate -> Bool 
+verifyBlockApps = verifyCert rootPubKey
+
+verifyCertM :: MonadIO m => PublicKey -> X509Certificate -> m Bool
+verifyCertM pkey cert@(X509Certificate signedCert) = do
+  let signed    = getSigned signedCert
+      mesgBS    = B.pack $ BA.unpack $ hashWith CH.SHA256 (getSignedData signedCert)
+      signature@(Signature (SEC.CompactRecSig r s _)) = fromMaybe (error "Could not decode signature from DER format") (importSignature' $ signedSignature signed)
+      isValid   = verifySig pkey signature mesgBS
+  liftIO $ putStrLn $ format (getCertIssuer cert)
+  liftIO $ putStrLn $ "Signature:"
+  liftIO $ putStrLn $ "   R: " ++ (show $ B16.encode $ BSS.fromShort r)
+  liftIO $ putStrLn $ "   S: " ++ (show $ B16.encode $ BSS.fromShort s)
+  liftIO $ putStrLn $ format (getCertSubject cert)
+  return isValid
+  

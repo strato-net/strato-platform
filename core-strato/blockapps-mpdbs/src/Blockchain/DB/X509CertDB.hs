@@ -14,6 +14,8 @@ module Blockchain.DB.X509CertDB (
   , certToBytes
   , bsToCert
   , getCertSubject
+  , rootCert
+  , rootPubKey
   , pubToBytes
   , X509CertDB(..)
   , HasX509CertDB

@@ -68,6 +68,15 @@ executables:
       - bytestring
       - strato-model
       - x509-certs
+  x509-info:
+    source-dirs: exec_src/
+    main: X509CertInfo.hs
+    other-modules: []
+    dependencies:
+      - aeson
+      - bytestring
+      - strato-model
+      - x509-certs
 
 tests:
   x509-test:
