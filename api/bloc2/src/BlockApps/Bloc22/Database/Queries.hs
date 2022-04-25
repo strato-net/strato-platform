@@ -302,6 +302,7 @@ compileContract sourceList = do
 -- SolidVM only
 createMetadataNoCompile :: ( MonadIO m
                            , MonadLogger m
+                           , (Keccak256 `A.Alters` SourceMap) m
                            )
                         => SourceMap -> m (Map Text ContractDetails)
 createMetadataNoCompile sourceList = do
@@ -324,6 +325,7 @@ createMetadataNoCompile sourceList = do
         , contractdetailsXabi = xabi
         }
 
+  A.insert (A.Proxy @SourceMap) srcHash sourceList
   pure details
 
 instance QueryRunnerColumnDefault PGBytea Address where
