@@ -26,6 +26,7 @@ module BlockApps.X509.Certificate (
 
 import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.Secp256k1
+import           Blockchain.Strato.Model.Address
 import           BlockApps.X509.Keys
 import           Control.DeepSeq
 import           Control.Monad.IO.Class
@@ -331,6 +332,13 @@ verifyCertM pkey cert@(X509Certificate signedCert) = do
   liftIO $ putStrLn $ "Signature:"
   liftIO $ putStrLn $ "   R: " ++ (show $ B16.encode $ BSS.fromShort r)
   liftIO $ putStrLn $ "   S: " ++ (show $ B16.encode $ BSS.fromShort s)
-  liftIO $ putStrLn $ format (getCertSubject cert)
+  liftIO $ putStrLn $ "Signature (DER Encoding): " ++ (show $ B16.encode $ signedSignature signed )
+  liftIO $ putStrLn $ "Certificate Hash: " ++ (show $ B16.encode mesgBS)
+  
+  case getCertSubject cert of 
+    Nothing -> liftIO $ putStrLn $ "No Subject"
+    Just subject -> do 
+      liftIO $ putStrLn $ format subject
+      liftIO $ putStrLn $ "Subject Address: " ++ (format $ fromPublicKey $ subPub subject) 
   return isValid
   

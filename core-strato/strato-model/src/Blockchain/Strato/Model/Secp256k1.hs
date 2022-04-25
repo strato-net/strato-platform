@@ -237,7 +237,9 @@ instance Arbitrary Signature where
 instance RLPSerializable Signature where
   rlpEncode = RLPString . exportSignature
 
-  rlpDecode (RLPString str) = importSignature str
+  rlpDecode (RLPString str) = case importSignature str of
+    Left err -> error $ "rlpDecode for RecSig failed for: " ++ show err
+    Right sig -> sig 
   rlpDecode (RLPArray [RLPString r, RLPString s, RLPScalar v]) = 
       Signature $ S.CompactRecSig (BSS.toShort r) (BSS.toShort s) v 
   rlpDecode x = error $ "rlpDecode for RecSig failed on " ++ show x
@@ -262,30 +264,6 @@ instance FromJSON Signature where
 
 instance ToSchema Signature where
   declareNamedSchema _ = return $ named "Signature" binarySchema
-
--- instance ASN1Object Signature where
---   toASN1 (Signature (S.CompactRecSig r s v)) xs =  
---     let enc bs = 
---           let intVal = fromMaybe (error "could not encode bytestring as integer") (C8.readInt $ B16.encode bs)-- ShortByteString/Word8 -> ByteString -> ByteString (Hex) -> Int
---           in toInteger $ fst intVal -- (Int, BS) --> Integer
---     in ( Start Sequence 
---         : IntVal (enc $ BSS.fromShort r)
---         : IntVal (enc $ BSS.fromShort s)
---         : IntVal (enc $ B.singleton v)
---         : End Sequence : xs )
---   fromASN1 [] = Left "Tried to decode an empty ASN1 object?"
---   fromASN1 ( Start Sequence 
---         : IntVal r
---         : IntVal s
---         : End Sequence : xs ) = 
---           let dec = fst . B16.decode . C8.pack . show -- Integer -> ByteString (Hex) -> ByteString -> ShortByteString/Word8
---           in Right (Signature (S.CompactRecSig (BSS.toShort $ dec r) (BSS.toShort $ dec s) (head $ B.unpack "0")), xs)
---   fromASN1 ( Start Sequence 
---         : IntVal _
---         : IntVal _
---         : IntVal _
---         : End Sequence : _ ) = Left "This signature contains the Recovery bit V, but ASN1 does not support recoverable signatures in Certs"
---   fromASN1 _ = Left "no ASN1 decoding for this kind of EC Signature"
   
 -- NOTE: secp256k1-haskell, in its infinite wisdom, has swapped the R and S
 -- values in the signatures it generates...this is verified against the signatures
@@ -331,13 +309,13 @@ verifySig pk (Signature csig) msgHash =
 exportSignature :: Signature -> B.ByteString
 exportSignature (Signature (S.CompactRecSig r s v)) = BSS.fromShort r <> BSS.fromShort s <> B.singleton v
 
-importSignature :: B.ByteString -> Signature
-importSignature bs | B.length bs /= 65 = error ("importSignature called with incorrect number of bytes: " ++ (show $ B.length bs) ++ ", expected 65")
+importSignature :: B.ByteString -> Either String Signature
+importSignature bs | B.length bs /= 65 = Left $ "importSignature called with incorrect number of bytes: " ++ (show $ B.length bs) ++ ", expected 65"
 importSignature bs = 
   let r = B.take 32 bs
       s = B.take 32 $ B.drop 32 bs
       v = B.head $ B.drop 64 bs
-  in Signature $ S.CompactRecSig (BSS.toShort r) (BSS.toShort s) v
+  in Right $ Signature $ S.CompactRecSig (BSS.toShort r) (BSS.toShort s) v
 
 -- Import a DER encoded EC Signature into a Compact Recoverable Signature
 -- Since the recovery bit is lost when stored in an X.509 Certificate, the V bit is made up

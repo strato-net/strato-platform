@@ -151,20 +151,25 @@ spec = do
       decode encSig `shouldBe` sig
     it "can export and import signature as a bytestring" $ do
       let sigBS = exportSignature sig
-      importSignature sigBS `shouldBe` sig
+      importSignature sigBS `shouldBe` (Right sig)
     it "arbitrary sigs can be exported/imported" $ property $ \s -> do
       let sigBS = exportSignature s
       B.length sigBS `shouldBe` 65
-      importSignature sigBS `shouldBe` s
+      importSignature sigBS `shouldBe` (Right s)
     it "exported sigs can be used for recovery" $ do
       let sigBS = exportSignature sig
           sig' = importSignature sigBS
-      recoverPub sig' mesg `shouldBe` Just pub
+      case sig' of 
+        Left err -> error err
+        Right sig'' -> recoverPub sig'' mesg `shouldBe` Just pub
     
     it "can recover public keys from signatures" $ do
       let mRecPub = recoverPub sig mesg
       (Just pub) `shouldBe` mRecPub
 
+
+    -- It can verify signatures given a message and key
+    
     it "can generate ECDH shared secret" $ do
       let mOtherPriv = importPrivateKey (fst $ B16.decode $ C8.pack $ "2d5daffcc515a23155bc5b5d21f852ab2554e6cae0351c5561b44fad6931f62d")
           otherPriv = fromMaybe (error "could not import the other priv key") mOtherPriv
