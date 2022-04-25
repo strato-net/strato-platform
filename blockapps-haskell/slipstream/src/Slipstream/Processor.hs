@@ -204,23 +204,6 @@ processedContract ABIID{..} state AggregateAction{..} =
 lookupT :: (Monad m, Ord k) => k -> Map.Map k v -> MaybeT m v
 lookupT k = MaybeT . return . Map.lookup k
 
--- Inserts the contract source into the Bloc DB.
---  If they're not in the cache but they are in bloc database or action metadata,
---  it reparses the whole source blob, and caches the info for every contract
-insertContractBloc_ :: ( MonadIO m
-                           , MonadLogger m
-                           , HasBlocSQL m
-                           )
-                        => IORef Globals -> AggregateAction -> m ()
-insertContractBloc_ g row = void $ runMaybeT  
-   $  checkCache 
-  
-  where checkCache = do
-          $logInfoS "insertContractBloc_" . T.pack $ "Checking cache for contract info"
-          MaybeT $ getSolidVMInfo g codePtr
-        
-        codePtr = actionCodeHash row
-
 
 -- EVM details are not cached, because the cache links all the contracts in a source blob by source hash, and we only have source hashes for SolidVM code pointers. 
 getEVMDetailsForRow :: ( MonadIO m
@@ -506,8 +489,11 @@ processTheMessages env sqlEnv conn g messages = do
 
       case actionStorage row of
         Action.EVMDiff{} -> evmInsertsF g row actions acct
-        Action.SolidVMDiff{} -> do
-          insertContractBloc_ g row
+        Action.SolidVMDiff{} -> do    
+          void . runMaybeT $ do
+              src <- lookupT "src" $ actionMetadata row
+              lift $ insertContractDetailsQuery (deserializeSourceMap src)
+            
           let cid = maybe "" (T.pack . chainIdString . ChainId) $ (actionAccount row ^. accountChainId)
               (SolidVMCode name _) = actionCodeHash row
               abiid = ABIID {

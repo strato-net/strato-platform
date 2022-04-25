@@ -135,12 +135,13 @@ insertContractDetailsQuery
   :: (A.Alters Keccak256 SourceMap m)
   => SourceMap 
   -> m ()
-insertContractDetailsQuery sourceList = do
-  let encodedSrc = serializeSourceMap sourceList
-      srcHash    = hash (Text.encodeUtf8 encodedSrc)
-  
-  A.insert (A.Proxy @SourceMap) srcHash sourceList
-
+insertContractDetailsQuery sourceList = 
+  void $ insertQuery 
+  where insertQuery = do
+          let encodedSrc = serializeSourceMap sourceList
+              srcHash    = hash (Text.encodeUtf8 encodedSrc)
+    
+          A.insert (A.Proxy @SourceMap) srcHash sourceList
 
 
 getContractDetailsByCodeHash :: ( A.Selectable Account AddressState m
