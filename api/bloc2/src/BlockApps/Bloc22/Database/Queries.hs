@@ -18,6 +18,7 @@ module BlockApps.Bloc22.Database.Queries
   , evmContractByCodeHash
   , evmCodeHashByName
   , insertEvmContractNameQuery
+  , insertContractDetailsQuery
   , sourceToContractDetails
   , getContractDetailsForContract
   , getContractDetailsByCodeHash
@@ -129,6 +130,19 @@ insertEvmContractNameQuery codeHash cName srcHash = do
       , constant cName
       , constant srcHash
       )]
+
+insertContractDetailsQuery 
+  :: (A.Alters Keccak256 SourceMap m)
+  => SourceMap 
+  -> m ()
+insertContractDetailsQuery sourceList = 
+  void $ insertQuery 
+  where insertQuery = do
+          let encodedSrc = serializeSourceMap sourceList
+              srcHash    = hash (Text.encodeUtf8 encodedSrc)
+    
+          A.insert (A.Proxy @SourceMap) srcHash sourceList
+
 
 getContractDetailsByCodeHash :: ( A.Selectable Account AddressState m
                                 , (Keccak256 `A.Alters` SourceMap) m
@@ -282,12 +296,13 @@ compileContract sourceList = do
     pure (contrName, cds)
 
   A.insert (A.Proxy @SourceMap) srcHash sourceList
+
   pure $ Map.fromList details
 
 -- SolidVM only
 createMetadataNoCompile :: ( MonadIO m
-                           , (Keccak256 `A.Alters` SourceMap) m
                            , MonadLogger m
+                           , (Keccak256 `A.Alters` SourceMap) m
                            )
                         => SourceMap -> m (Map Text ContractDetails)
 createMetadataNoCompile sourceList = do
