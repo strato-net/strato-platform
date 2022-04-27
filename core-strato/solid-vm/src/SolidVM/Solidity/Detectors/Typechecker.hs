@@ -749,6 +749,12 @@ assertArgs x = boolType' x
 registerCertArgs :: SourceAnnotation Text -> Type'
 registerCertArgs x = stringType' x
 
+verifyCertArgs :: SourceAnnotation Text -> Type'
+verifyCertArgs x = Product [stringType' x, stringType' x] x
+
+verifySignatureArgs :: SourceAnnotation Text -> Type'
+verifySignatureArgs x = Product [stringType' x, stringType' x, stringType' x] x
+
 getUserCertArgs :: SourceAnnotation Text -> Type'
 getUserCertArgs x = accountType' x
 
@@ -782,7 +788,9 @@ getVarType' "identity" ctx =  pure $ Function (topType' ctx) (topType' ctx) ctx
 getVarType' "keccak256" ctx =  pure $ Function (keccak256Args ctx) (stringType' ctx) ctx
 getVarType' "require" ctx =  pure $ Function (requireArgs ctx) (Product [] ctx) ctx
 getVarType' "assert" ctx =  pure $ Function (assertArgs ctx) (Product [] ctx) ctx
-getVarType' "registerCert" ctx =  pure $ Function (registerCertArgs ctx) (Product [] ctx) ctx
+getVarType' "registerCert" ctx =  pure $ Function (registerCertArgs ctx) (accountType' ctx) ctx
+getVarType' "verifyCert" ctx =  pure $ Function (verifyCertArgs ctx) (boolType' ctx) ctx
+getVarType' "verifySignature" ctx =  pure $ Function (verifySignatureArgs ctx) (boolType' ctx) ctx
 getVarType' "getUserCert" ctx =  pure $ Function (getUserCertArgs ctx) (certType' ctx) ctx
 getVarType' "parseCert" ctx =  pure $ Function (parseCertArgs ctx) (certType' ctx) ctx
 getVarType' "Util" ctx = pure $ Static (SVMType.Label "Util") ctx

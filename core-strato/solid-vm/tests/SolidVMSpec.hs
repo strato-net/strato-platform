@@ -53,7 +53,7 @@ import Blockchain.VMContext
 import Executable.EVMFlags() -- for HFlags
 import Blockchain.VMOptions() -- for HFlags
 import SolidVM.Model.Storable as MS
-
+import Blockchain.DB.X509CertDB as X509
 -- The newtype distinguishes uncaught SolidExceptions and
 -- those that are returned in ExecResults
 newtype HandledException = HE SolidException deriving (Show, Exception)
@@ -98,6 +98,14 @@ anyMissingTypeError :: Selector HandledException
 anyMissingTypeError (HE Blockchain.SolidVM.Exception.MissingType{}) = True
 anyMissingTypeError _ = False
 
+anyInvalidCertError :: Selector HandledException
+anyInvalidCertError (HE Blockchain.SolidVM.Exception.InvalidCertificate{}) = True
+anyInvalidCertError _ = False
+
+anyMalformedDataError :: Selector HandledException
+anyMalformedDataError (HE Blockchain.SolidVM.Exception.MalformedData{}) = True
+anyMalformedDataError _ = False
+
 failedRequirementMsg :: String -> Selector HandledException
 failedRequirementMsg str (HE (Require (Just msg))) = str == msg
 failedRequirementMsg _   _                         = False
@@ -113,8 +121,11 @@ failedAssertion _           = False
 sender :: Account
 sender = Account 0xdeadbeef Nothing
 
-pirvateChainAcc :: Account 
-pirvateChainAcc = Account 0xdeadbeee (Just 0x776622233444)
+privateChainAcc :: Account 
+privateChainAcc = Account 0xdeadbeee (Just 0x776622233444)
+
+rootAcc :: Account 
+rootAcc = Account (fromPublicKey X509.rootPubKey) Nothing
 
 origin :: Account
 origin = Account 0x8341 Nothing
@@ -127,6 +138,14 @@ secondAddress = Account (getNewAddress_unsafe (sender ^. accountAddress) 1) Noth
 
 recursiveAddr :: Account
 recursiveAddr = Account (getNewAddress_unsafe (uploadAddress ^. accountAddress) 0) Nothing
+
+-- makeStrArgs :: [T.Text] -> T.Text
+-- makeStrArgs xs = 
+--   let 
+--     escp :: T.Text -> T.Text
+--     escp s = "\"" <> s <> "\""
+--     repl = map escp
+--   in "(" <> (T.intercalate (T.pack ", ") (repl xs)) <> ")"
 
 devNull :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
 devNull _ _ _ _ = return ()
@@ -3152,69 +3171,58 @@ contract qq {
       , BString "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEGOKeu5dSCBFHVQuy/q1A8BeTb99G83tD\nVecvHHne6sKfmBZN1AIjhpHGKO22vBfdq3dMn/QBqb2TdR9w3WvMXQ==\n-----END PUBLIC KEY-----\n"
       ]
 
-  it "can post a X509 certificate and grab cert fields" . runTest $ do
-    runBS [r|
-contract qq {
-    account myAccount = account(tx.origin, "main");
+--   it "can post a X509 certificate and grab cert fields" . runTest $ do
+--     runBS [r|
+-- contract qq {
+--     account myAccount = account(tx.origin, "main");
     
-    string myNewCertificate = "-----BEGIN CERTIFICATE-----\nMIIBiDCCAS2gAwIBAgIQCgO76hC29iXEFXJNco5ekjAMBggqhkjOPQQDAgUAMEYx\nDDAKBgNVBAMMA2RhbjEMMAoGA1UEBgwDVVNBMRIwEAYDVQQKDAlibG9ja2FwcHMx\nFDASBgNVBAsMC2VuZ2luZWVyaW5nMB4XDTIxMDMxODE1NDgwN1oXDTIyMDMxODE1\nNDgwN1owRjEMMAoGA1UEAwwDZGFuMQwwCgYDVQQGDANVU0ExEjAQBgNVBAoMCWJs\nb2NrYXBwczEUMBIGA1UECwwLZW5naW5lZXJpbmcwVjAQBgcqhkjOPQIBBgUrgQQA\nCgNCAAQY4p67l1IIEUdVC7L+rUDwF5Nv30bze0NV5y8ced7qwp+YFk3UAiOGkcYo\n7ba8F92rd0yf9AGpvZN1H3Dda8xdMAwGCCqGSM49BAMCBQADRwAwRAIgbKXO8tZ5\noPhBusPQFkNEQDnLO/MRru4KjtCpPnVb5sACIE0TwBJ7yeIGuPc/8G50/858Pf3a\n0t1hHbhYnJarPkNA\n-----END CERTIFICATE-----";
+--     string myNewCertificate = "-----BEGIN CERTIFICATE-----\nMIIBiDCCAS2gAwIBAgIQCgO76hC29iXEFXJNco5ekjAMBggqhkjOPQQDAgUAMEYx\nDDAKBgNVBAMMA2RhbjEMMAoGA1UEBgwDVVNBMRIwEAYDVQQKDAlibG9ja2FwcHMx\nFDASBgNVBAsMC2VuZ2luZWVyaW5nMB4XDTIxMDMxODE1NDgwN1oXDTIyMDMxODE1\nNDgwN1owRjEMMAoGA1UEAwwDZGFuMQwwCgYDVQQGDANVU0ExEjAQBgNVBAoMCWJs\nb2NrYXBwczEUMBIGA1UECwwLZW5naW5lZXJpbmcwVjAQBgcqhkjOPQIBBgUrgQQA\nCgNCAAQY4p67l1IIEUdVC7L+rUDwF5Nv30bze0NV5y8ced7qwp+YFk3UAiOGkcYo\n7ba8F92rd0yf9AGpvZN1H3Dda8xdMAwGCCqGSM49BAMCBQADRwAwRAIgbKXO8tZ5\noPhBusPQFkNEQDnLO/MRru4KjtCpPnVb5sACIE0TwBJ7yeIGuPc/8G50/858Pf3a\n0t1hHbhYnJarPkNA\n-----END CERTIFICATE-----";
 
-    string myUsername          = "";
-    string myOrganization      = "";
-    string myGroup             = "";
+--     string myUsername          = "";
+--     string myOrganization      = "";
+--     string myGroup             = "";
     
-    string myCommonName   = "";
-    string myCountry      = "";
-    string myOrganization = "";
-    string myGroup        = "";
-    string myPublicKey    = "";
-    string myCertificate  = "";
+--     string myCommonName   = "";
+--     string myCountry      = "";
+--     string myOrganization = "";
+--     string myGroup        = "";
+--     string myPublicKey    = "";
+--     string myCertificate  = "";
 
-    constructor() {
-        registerCert(myAccount, myNewCertificate); 
+--     constructor() {
+--         registerCert(myAccount, myNewCertificate); 
 
-        myUsername     = tx.username;
-        myOrganization = tx.organization;
-        myGroup        = tx.group;
+--         myUsername     = tx.username;
+--         myOrganization = tx.organization;
+--         myGroup        = tx.group;
         
-        myCommonName   = getUserCert(myAccount)["commonName"];
-        myCountry      = getUserCert(myAccount)["country"];
-        myOrganization = getUserCert(myAccount)["organization"];
-        myGroup        = getUserCert(myAccount)["group"];
-        myPublicKey    = getUserCert(myAccount)["publicKey"];
-        myCertificate  = getUserCert(myAccount)["certString"];
-    }
-}|]
-    getFields ["myUsername", "myOrganization", "myGroup", "myCommonName", "myCountry", "myOrganization", "myGroup", "myPublicKey", "myCertificate"] `shouldReturn`
-      [ BString "dan"
-      , BString "blockapps"
-      , BString "engineering"
-      , BString "dan"
-      , BString "USA"
-      , BString "blockapps"
-      , BString "engineering"
-      , BString "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEGOKeu5dSCBFHVQuy/q1A8BeTb99G83tD\nVecvHHne6sKfmBZN1AIjhpHGKO22vBfdq3dMn/QBqb2TdR9w3WvMXQ==\n-----END PUBLIC KEY-----\n"
-      , BString "-----BEGIN CERTIFICATE-----\nMIIBiDCCAS2gAwIBAgIQCgO76hC29iXEFXJNco5ekjAMBggqhkjOPQQDAgUAMEYx\nDDAKBgNVBAMMA2RhbjEMMAoGA1UEBgwDVVNBMRIwEAYDVQQKDAlibG9ja2FwcHMx\nFDASBgNVBAsMC2VuZ2luZWVyaW5nMB4XDTIxMDMxODE1NDgwN1oXDTIyMDMxODE1\nNDgwN1owRjEMMAoGA1UEAwwDZGFuMQwwCgYDVQQGDANVU0ExEjAQBgNVBAoMCWJs\nb2NrYXBwczEUMBIGA1UECwwLZW5naW5lZXJpbmcwVjAQBgcqhkjOPQIBBgUrgQQA\nCgNCAAQY4p67l1IIEUdVC7L+rUDwF5Nv30bze0NV5y8ced7qwp+YFk3UAiOGkcYo\n7ba8F92rd0yf9AGpvZN1H3Dda8xdMAwGCCqGSM49BAMCBQADRwAwRAIgbKXO8tZ5\noPhBusPQFkNEQDnLO/MRru4KjtCpPnVb5sACIE0TwBJ7yeIGuPc/8G50/858Pf3a\n0t1hHbhYnJarPkNA\n-----END CERTIFICATE-----\n"
-      ]
+--         myCommonName   = getUserCert(myAccount)["commonName"];
+--         myCountry      = getUserCert(myAccount)["country"];
+--         myOrganization = getUserCert(myAccount)["organization"];
+--         myGroup        = getUserCert(myAccount)["group"];
+--         myPublicKey    = getUserCert(myAccount)["publicKey"];
+--         myCertificate  = getUserCert(myAccount)["certString"];
+--     }
+-- }|]
+--     getFields ["myUsername", "myOrganization", "myGroup", "myCommonName", "myCountry", "myOrganization", "myGroup", "myPublicKey", "myCertificate"] `shouldReturn`
+--       [ BString "dan"
+--       , BString "blockapps"
+--       , BString "engineering"
+--       , BString "dan"
+--       , BString "USA"
+--       , BString "blockapps"
+--       , BString "engineering"
+--       , BString "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEGOKeu5dSCBFHVQuy/q1A8BeTb99G83tD\nVecvHHne6sKfmBZN1AIjhpHGKO22vBfdq3dMn/QBqb2TdR9w3WvMXQ==\n-----END PUBLIC KEY-----\n"
+--       , BString "-----BEGIN CERTIFICATE-----\nMIIBiDCCAS2gAwIBAgIQCgO76hC29iXEFXJNco5ekjAMBggqhkjOPQQDAgUAMEYx\nDDAKBgNVBAMMA2RhbjEMMAoGA1UEBgwDVVNBMRIwEAYDVQQKDAlibG9ja2FwcHMx\nFDASBgNVBAsMC2VuZ2luZWVyaW5nMB4XDTIxMDMxODE1NDgwN1oXDTIyMDMxODE1\nNDgwN1owRjEMMAoGA1UEAwwDZGFuMQwwCgYDVQQGDANVU0ExEjAQBgNVBAoMCWJs\nb2NrYXBwczEUMBIGA1UECwwLZW5naW5lZXJpbmcwVjAQBgcqhkjOPQIBBgUrgQQA\nCgNCAAQY4p67l1IIEUdVC7L+rUDwF5Nv30bze0NV5y8ced7qwp+YFk3UAiOGkcYo\n7ba8F92rd0yf9AGpvZN1H3Dda8xdMAwGCCqGSM49BAMCBQADRwAwRAIgbKXO8tZ5\noPhBusPQFkNEQDnLO/MRru4KjtCpPnVb5sACIE0TwBJ7yeIGuPc/8G50/858Pf3a\n0t1hHbhYnJarPkNA\n-----END CERTIFICATE-----\n"
+--       ]
 
-  it "can't register a x509 certificate on a private chain" $ (runTest $ do
-    void $ runArgsWithSender pirvateChainAcc "()" [r|
-contract qq {
-    account myAccount = account("deadbeef:feedbeef");
-    
-    string myNewCertificate = "-----BEGIN CERTIFICATE-----\nMIIBiDCCAS2gAwIBAgIQCgO76hC29iXEFXJNco5ekjAMBggqhkjOPQQDAgUAMEYx\nDDAKBgNVBAMMA2RhbjEMMAoGA1UEBgwDVVNBMRIwEAYDVQQKDAlibG9ja2FwcHMx\nFDASBgNVBAsMC2VuZ2luZWVyaW5nMB4XDTIxMDMxODE1NDgwN1oXDTIyMDMxODE1\nNDgwN1owRjEMMAoGA1UEAwwDZGFuMQwwCgYDVQQGDANVU0ExEjAQBgNVBAoMCWJs\nb2NrYXBwczEUMBIGA1UECwwLZW5naW5lZXJpbmcwVjAQBgcqhkjOPQIBBgUrgQQA\nCgNCAAQY4p67l1IIEUdVC7L+rUDwF5Nv30bze0NV5y8ced7qwp+YFk3UAiOGkcYo\n7ba8F92rd0yf9AGpvZN1H3Dda8xdMAwGCCqGSM49BAMCBQADRwAwRAIgbKXO8tZ5\noPhBusPQFkNEQDnLO/MRru4KjtCpPnVb5sACIE0TwBJ7yeIGuPc/8G50/858Pf3a\n0t1hHbhYnJarPkNA\n-----END CERTIFICATE-----";
-
-    constructor() {
-        registerCert(myAccount, myNewCertificate); 
-    }
-}|]) `shouldThrow` anyInvalidWriteError
 
   it "can only post X509 certificates to the address of the public key" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
 contract qq {
-    account public certAddr = account(0x622EB3792DaA3d3770E3D27D02e53755408aE00b);
-    string public myCertificate = "-----BEGIN CERTIFICATE-----\nMIIBizCCAS+gAwIBAgIQejfmUC0VeygSTQ0htwpDbzAMBggqhkjOPQQDAgUAMEcx\nDTALBgNVBAMMBFRyb3kxEjAQBgNVBAoMCUJsb2NrYXBwczEUMBIGA1UECwwLRW5n\naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTAeFw0yMjA0MTQyMTI4NDdaFw0yMzA0MTQy\nMTI4NDdaMEcxDTALBgNVBAMMBFRyb3kxEjAQBgNVBAoMCUJsb2NrYXBwczEUMBIG\nA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEGBSuB\nBAAKA0IABCSwiVfrLj1MCa+1bcBXOnGhnLxS5DYo3/1udE/LYFi2hFgDCPQxKYqP\n7LmHV2W35B3ZZw5SQVf1FxjWE0tZqswwDAYIKoZIzj0EAwIFAANIADBFAiEAvbGZ\nqma5fKnHnzpGCI5lc4VYdHBfgqfG7CwqJ5ii66YCIFUT+eXA1fS9q4/jJ+eULQwH\neXbEHHtO6nBOorRsoG3H\n-----END CERTIFICATE-----";
+    account public certAddr = account(0x74f014FEF932D2728c6c7E2B4d3B88ac37A7E1d0);
+    string public myCertificate = "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----";
     string public certName;
     string public certOrg;
     constructor() {
@@ -3225,9 +3233,37 @@ contract qq {
     }
 }|]
     getFields ["certName", "certOrg"] `shouldReturn`
-      [ BString "Troy",
-        BString "Blockapps"
+      [ BString "Admin",
+        BString "BlockApps"
       ]
+
+  it "cannot post X509 certificates not signed by the BlockApps private key" $ (runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+    account public certAddr = account(0xe79beda3078bcb66524f91f74de982d2fcc89287);
+    string public myCertificate = "-----BEGIN CERTIFICATE-----\nMIIBjjCCATKgAwIBAgIRANJH2FERGO/3JvoPHo52I3IwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyNTE0NTIwMloXDTIzMDQy\nNTE0NTIwMlowSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANIADBFAiEA\n9sjaARt+VEUCjZv3NAuEENoD744fZIuuUTt6qwM7fKQCIDLp02y/lSHtLfOOgCW5\n40qEIDYu2UO1JqSuyGvIUOoc\n-----END CERTIFICATE-----";
+    string public certName;
+    string public certOrg;
+    constructor() {
+        registerCert(myCertificate);
+        certName = getUserCert(certAddr)["commonName"];
+        certOrg = getUserCert(certAddr)["organization"];
+    }
+}|]) `shouldThrow` anyInvalidCertError
+
+  it "can't register a x509 certificate on a private chain" $ (runTest $ do
+    void $ runArgsWithSender privateChainAcc "()" [r|
+pragma solidvm 3.2;
+contract qq {
+    account myAccount = account("deadbeef:feedbeef");
+    
+    string myNewCertificate = "-----BEGIN CERTIFICATE-----\nMIIBiDCCAS2gAwIBAgIQCgO76hC29iXEFXJNco5ekjAMBggqhkjOPQQDAgUAMEYx\nDDAKBgNVBAMMA2RhbjEMMAoGA1UEBgwDVVNBMRIwEAYDVQQKDAlibG9ja2FwcHMx\nFDASBgNVBAsMC2VuZ2luZWVyaW5nMB4XDTIxMDMxODE1NDgwN1oXDTIyMDMxODE1\nNDgwN1owRjEMMAoGA1UEAwwDZGFuMQwwCgYDVQQGDANVU0ExEjAQBgNVBAoMCWJs\nb2NrYXBwczEUMBIGA1UECwwLZW5naW5lZXJpbmcwVjAQBgcqhkjOPQIBBgUrgQQA\nCgNCAAQY4p67l1IIEUdVC7L+rUDwF5Nv30bze0NV5y8ced7qwp+YFk3UAiOGkcYo\n7ba8F92rd0yf9AGpvZN1H3Dda8xdMAwGCCqGSM49BAMCBQADRwAwRAIgbKXO8tZ5\noPhBusPQFkNEQDnLO/MRru4KjtCpPnVb5sACIE0TwBJ7yeIGuPc/8G50/858Pf3a\n0t1hHbhYnJarPkNA\n-----END CERTIFICATE-----";
+
+    constructor() {
+        registerCert(myNewCertificate); 
+    }
+}|]) `shouldThrow` anyInvalidWriteError
 
   it "cannot use old registerCert on solidvm 3.2" $ (runTest $ do
       (runBS [r|
@@ -3253,3 +3289,81 @@ contract qq {
           certPubKey = getUserCert(certAddr)["publicKey"];
       }
   }|])) `shouldThrow` anyUnknownFunc
+
+  it "can call builtin function verifyCert" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+    bool isValid = false;
+    constructor() {
+      string cert = "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----";
+      string pubkey = "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEUhJR4x+wZiX+xZK2m/pwN40cvCS0UA7Z\n0DB7sny5ZnNLw43JgKz0URDY2yYOPkhoIApxFK9UU3Bc4BRANDWmdQ==\n-----END PUBLIC KEY-----";
+      isValid = verifyCert(cert, pubkey);
+    }
+}|] 
+    getFields ["isValid"] `shouldReturn` [ BBool True ]
+
+  it "verifyCert fails for hex-encoded public keys" $ (runTest $ do
+    (runBS [r|
+pragma solidvm 3.2;
+contract qq {
+  bool isValid = false;
+    constructor () {
+      string cert = "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----";
+      string pubkey = "04521251e31fb06625fec592b69bfa70378d1cbc24b4500ed9d0307bb27cb966734bc38dc980acf45110d8db260e3e4868200a7114af5453705ce014403435a675";
+      isValid = verifyCert(cert, pubkey);
+    }
+}|])) `shouldThrow` anyMalformedDataError
+
+  it "can call builtin function verifySignature" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+  bool isValid = false;
+  constructor () {
+    string msgHash = "68410110452c1179af159f85d3a4ae72aed12101fcb55372bc97c5108ef6e4d7";
+    string signature = "304402203c47450445065b177a8952de40d1915fd99981d25fd93e322f337f3780e177c702206f16d0f0d2e40c47b699627fa9ae2737cb7129cf06f51dbb658014bb3d79cc5d";
+    string pubkey = "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEUhJR4x+wZiX+xZK2m/pwN40cvCS0UA7Z\n0DB7sny5ZnNLw43JgKz0URDY2yYOPkhoIApxFK9UU3Bc4BRANDWmdQ==\n-----END PUBLIC KEY-----";
+    isValid = verifySignature(msgHash, signature, pubkey);
+  }
+}|]  
+    getFields ["isValid"] `shouldReturn` [ BBool True ]
+  
+  it "verifySignature fails for an incorrect message hash" $ (runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+  bool isValid = false;
+  constructor () {
+    string msgHash = "I am not the message hash";
+    string signature = "304402203c47450445065b177a8952de40d1915fd99981d25fd93e322f337f3780e177c702206f16d0f0d2e40c47b699627fa9ae2737cb7129cf06f51dbb658014bb3d79cc5d";
+    string pubkey = "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEUhJR4x+wZiX+xZK2m/pwN40cvCS0UA7Z\n0DB7sny5ZnNLw43JgKz0URDY2yYOPkhoIApxFK9UU3Bc4BRANDWmdQ==\n-----END PUBLIC KEY-----";
+    isValid = verifySignature(msgHash, signature, pubkey);
+  }
+}|]) `shouldThrow` anyMalformedDataError
+
+  it "verifySignature fails for an incorrect signature" $ (runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+  bool isValid = false;
+  constructor () {
+    string msgHash = "68410110452c1179af159f85d3a4ae72aed12101fcb55372bc97c5108ef6e4d7";
+    string signature = "30450220ac3c47450445065b177a8952de40d1915fd99981d25fd93e322f337f3780e177c702206f16d0f0d2e40c47b699627fa9ae2737cb7129cf06f51dbb658014bb3d79cc5d";
+    string pubkey = "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEUhJR4x+wZiX+xZK2m/pwN40cvCS0UA7Z\n0DB7sny5ZnNLw43JgKz0URDY2yYOPkhoIApxFK9UU3Bc4BRANDWmdQ==\n-----END PUBLIC KEY-----";
+    isValid = verifySignature(msgHash, signature, pubkey);
+  }
+}|]) `shouldThrow` anyMalformedDataError
+  
+  it "verifySignature fails for a hex-encoded public key" $ (runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+  bool isValid = false;
+  constructor () {
+    string msgHash = "68410110452c1179af159f85d3a4ae72aed12101fcb55372bc97c5108ef6e4d7";
+    string signature = "304402203c47450445065b177a8952de40d1915fd99981d25fd93e322f337f3780e177c702206f16d0f0d2e40c47b699627fa9ae2737cb7129cf06f51dbb658014bb3d79cc5d";
+    string pubkey = "04521251e31fb06625fec592b69bfa70378d1cbc24b4500ed9d0307bb27cb966734bc38dc980acf45110d8db260e3e4868200a7114af5453705ce014403435a675";
+    isValid = verifySignature(msgHash, signature, pubkey);
+  }
+}|]) `shouldThrow` anyMalformedDataError

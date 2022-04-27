@@ -88,7 +88,7 @@ import           Blockchain.Strato.Model.ExtendedWord()
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Keccak256
-
+import qualified Blockchain.Strato.Model.Secp256k1    as SEC
 import           Blockchain.Strato.Model.Util
 
 import           Blockchain.Stream.Action             (Action)
@@ -1778,57 +1778,110 @@ callBuiltin "require" (SBool cond :msg) Nothing = do
     (m:_) -> require cond (Just $ show m)
   return SNULL
 callBuiltin "assert" [SBool cond] Nothing = SNULL <$ assert cond
-callBuiltin rc@("registerCert") [SAccount a, SString cert] _ = do
+
+callBuiltin rc@"registerCert" [SAccount a, SString cert] _ = do
   contract' <- getCurrentContract
-  if CC._vmVersion contract' /= "svm3.2" then do
-    curAccount <- getCurrentAccount
-    case _accountChainId curAccount of
-      Just cid -> invalidWrite "Cannot register X.509 certificates on a private chain" cid
-      Nothing -> do
-        let ex509Cert = bsToCert . BC.pack $ cert
-        case ex509Cert of
-            Left err         -> do 
-              onTraced $ liftIO $ putStrLn $ C.red err
-              return SNULL
-            Right x509Cert -> do
-              onTraced $ liftIO $ putStrLn $ C.red "WARNING we are unsafely registering a certificate to an arbitrary address"
-              x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-              let theAddress = _accountAddress $ namedAccountToAccount Nothing a
-              Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.insert theAddress x509Cert x509s
-              onTraced $ liftIO $ putStrLn $ "    registering cert to address: " ++ format theAddress ++ " as " ++ show (fmap subCommonName $ getCertSubject x509Cert)
-              return SNULL
-  else unknownFunction "callBuiltin" rc
+  if CC._vmVersion contract' == "svm3.2" 
+    then unknownFunction "callBuiltin" rc
+    else do
+      curAccount <- getCurrentAccount
+      case _accountChainId curAccount of
+        Just cid -> invalidWrite "Cannot register X.509 certificates on a private chain" cid
+        Nothing -> do
+          let ex509Cert = bsToCert . BC.pack $ cert
+          case ex509Cert of
+              Left err         -> do 
+                onTraced $ liftIO $ putStrLn $ C.red err
+                return SNULL
+              Right x509Cert -> do
+                onTraced $ liftIO $ putStrLn $ C.red "WARNING we are unsafely registering a certificate to an arbitrary address"
+                x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
+                let theAddress = _accountAddress $ namedAccountToAccount Nothing a
+                Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.insert theAddress x509Cert x509s
+                onTraced $ liftIO $ putStrLn $ "    registering cert to address: " ++ format theAddress ++ " as " ++ show (fmap subCommonName $ getCertSubject x509Cert)
+                return SNULL
 
 callBuiltin rc'@("registerCert") [SString cert] _ = do
   contract' <- getCurrentContract
-  if CC._vmVersion contract' == "svm3.2" then do
-    curAccount <- getCurrentAccount
-    case _accountChainId curAccount of
-      Just cid -> invalidCertificate "Cannot register X.509 certificates on private chains" cid
-      Nothing -> do
-        let ex509Cert = bsToCert . BC.pack $ cert
-        case ex509Cert of 
-          Left q -> invalidCertificate "Could not parse X.509 certificate" q
-          Right x509Cert -> do 
-            let mSubject = getCertSubject x509Cert
-            case mSubject of 
-              (Just subject) -> do
-                let subjectAddress = fromPublicKey $ subPub subject
-                onTraced $ liftIO $ putStrLn $ "    Registering cert to address derived from the subject's public key: " ++ 
-                  format subjectAddress ++ " as Common Name:" ++ show (subCommonName subject) ++ "; Organization: " ++ show (subOrg subject)
-                x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-                Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.insert subjectAddress x509Cert x509s
-                return SNULL
-              _ -> invalidCertificate "No or invalid subject" x509Cert
-  else unknownFunction "callBuiltin" rc'
+  if CC._vmVersion contract' /= "svm3.2" 
+    then unknownFunction "callBuiltin" rc'
+    else do
+      curAccount <- getCurrentAccount
+      case _accountChainId curAccount of
+        Just cid -> invalidWrite "Cannot register X.509 certificates on private chains" cid
+        Nothing -> do
+          let ex509Cert = bsToCert . BC.pack $ cert
+          case ex509Cert of 
+            Left q -> invalidCertificate "Could not parse X.509 certificate" q
+            Right x509Cert -> do
+              if not $ verifyBlockApps x509Cert 
+                then invalidCertificate "Certificate is not signed by the BlockApps Root Certificate" (getCertIssuer x509Cert)
+                else do
+                  let mSubject = getCertSubject x509Cert
+                  case mSubject of 
+                    Nothing -> invalidCertificate "No or invalid subject" x509Cert
+                    (Just subject) -> do
+                      let subjectAddress = fromPublicKey $ subPub subject
+                      onTraced $ liftIO $ putStrLn $ "    Registering cert to address derived from the subject's public key: " ++ 
+                        format subjectAddress ++ " as Common Name:" ++ show (subCommonName subject) ++ "; Organization: " ++ show (subOrg subject)
+                      x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
+                      Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.insert subjectAddress x509Cert x509s
+                      return $ SAccount (NamedAccount subjectAddress UnspecifiedChain)
 
 callBuiltin "getUserCert" [SAccount a] _ = do
-    x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-    maybeCertLevelDB <- x509CertDBGet $ _namedAccountAddress a
-    let maybeCertBlockDB = M.lookup (_namedAccountAddress a) x509s
-        maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
-    return $ certificateMap (fmap (BC.unpack . certToBytes) maybeCert)
+  x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
+  maybeCertLevelDB <- x509CertDBGet $ _namedAccountAddress a
+  let maybeCertBlockDB = M.lookup (_namedAccountAddress a) x509s
+      maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
+  return $ certificateMap (fmap (BC.unpack . certToBytes) maybeCert)
+
+-- SolidVM built in function that verifies a cert is signed by a given key
+-- Expects the public key to be in PEM format
+-- Raises an error if it can't parse either argument, however perhaps that should't happen...
+callBuiltin vc@"verifyCert" [SString cert, SString pubkey] _ = do
+  contract' <- getCurrentContract
+  if CC._vmVersion contract' == "svm3.2" then do
+    let ex509Cert = bsToCert . BC.pack $ cert
+    let ePublicKey = bsToPub $ BC.pack pubkey
+    case (ex509Cert, ePublicKey) of 
+      (Left q, _) -> invalidCertificate "Could not parse X.509 certificate" q
+      (_, Left r) -> malformedData "Could not parse public key" r
+      (Right x509Cert, Right publicKey) -> do
+        let isValid = verifyCert publicKey x509Cert
+        onTraced $ liftIO $ putStrLn $ (if isValid then 
+                C.green "The certificate is valid."
+                else C.red "The certificate is invalid")
+        return $ SBool isValid
+  else unknownFunction "callBuiltin" vc
+
+-- SolidVM builtin function that verifies a ECSDA non-recoverable signature is signed by a given key with on the SECP256k1 curve
+-- Expects the signature as a DER/PEM format encoded string
+-- Expects the public key to be in PEM format
+-- Raises an error if it can't parse either argument, however perhaps that should't happen...
+callBuiltin vs@"verifySignature" [SString msg, SString signature, SString pubkey] _ = do
+  contract' <- getCurrentContract
+  if CC._vmVersion contract' == "svm3.2" then do
+    let eMesgBs = B16.decode $ BC.pack msg 
+    case eMesgBs of 
+      (mesgBs, "") -> do
+        if ((BC.length mesgBs) /= 32) then malformedData "Message hash is not 32 bytes" msg
+        else do
+          let mSignature = SEC.importSignature' $ fst $ B16.decode $ BC.pack signature
+          let ePublicKey = bsToPub $ BC.pack pubkey
+          case (mSignature, ePublicKey) of 
+            (Nothing, _) -> malformedData "Could not parse EC Signature " signature
+            (_, Left pk) -> malformedData "Could not parse public key" pk
+            (Just sig, Right publicKey) -> do
+              let isValid = SEC.verifySig publicKey sig mesgBs
+              onTraced $ liftIO $ putStrLn $ (if isValid then 
+                C.green "The signature is valid."
+                else C.red "The signature is invalid")
+              return $ SBool isValid
+      (_, err) -> malformedData "Could not decode hex string" err
+  else unknownFunction "callBuiltin" vs
+
 callBuiltin "parseCert" [SString cert] _ = return $ certificateMap (Just cert)
+
 callBuiltin x _ _ = unknownFunction "callBuiltin" x
 
 

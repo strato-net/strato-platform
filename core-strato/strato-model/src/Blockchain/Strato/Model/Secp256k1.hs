@@ -21,8 +21,10 @@ module Blockchain.Strato.Model.Secp256k1
   , deriveSharedKey
   , recoverPub
   , signMsg
+  , verifySig
   , exportSignature
   , importSignature
+  , importSignature'
   ) where
 
 
@@ -37,10 +39,11 @@ import qualified Crypto.Secp256k1                 as S
 import           Data.Aeson
 import           Data.ASN1.Types
 import           Data.Binary                
-import           Data.ByteString                  as B
+import qualified Data.ByteString                  as B
 import qualified Data.ByteString.Base16           as B16
 import qualified Data.ByteString.Char8            as C8
 import qualified Data.ByteString.Short            as BSS
+-- import qualified Data.ByteString.Conversion       as BSC
 import           Data.Coerce
 import           Data.Conduit                     (ConduitT)
 import           Data.Data
@@ -70,7 +73,7 @@ import           Blockchain.Data.RLP
 
 newtype PublicKey = PublicKey S.PubKey deriving (Show, Eq)
 newtype PrivateKey = PrivateKey S.SecKey deriving (Show, Eq)
-newtype SharedKey = SharedKey ByteString deriving (Show, Eq) 
+newtype SharedKey = SharedKey B.ByteString deriving (Show, Eq) 
 newtype Signature = Signature S.CompactRecSig 
   deriving          (Show, Eq, Generic)
   deriving newtype  (NFData)
@@ -86,7 +89,7 @@ newtype Signature = Signature S.CompactRecSig
 --  In prod, this is the vault-wrapper, and we use its servant client
 --  In tests, the private key is either in the monad, or a global key
 class Monad m => HasVault m where
-  sign :: ByteString -> m Signature
+  sign :: B.ByteString -> m Signature
   getPub :: m PublicKey
   getShared :: PublicKey -> m SharedKey
   
@@ -179,19 +182,19 @@ newPrivateKey = do
   where
     err = error "could not generate new private key"
 
-importPrivateKey :: ByteString -> Maybe PrivateKey
+importPrivateKey :: B.ByteString -> Maybe PrivateKey
 importPrivateKey bs = PrivateKey <$> S.secKey bs
 
-exportPrivateKey :: PrivateKey -> ByteString
+exportPrivateKey :: PrivateKey -> B.ByteString
 exportPrivateKey = S.getSecKey . coerce
 
 derivePublicKey :: PrivateKey -> PublicKey
 derivePublicKey = PublicKey . S.derivePubKey . coerce
 
-exportPublicKey :: Bool -> PublicKey -> ByteString
+exportPublicKey :: Bool -> PublicKey -> B.ByteString
 exportPublicKey compress (PublicKey pk) = S.exportPubKey compress pk
 
-importPublicKey :: ByteString -> Maybe PublicKey
+importPublicKey :: B.ByteString -> Maybe PublicKey
 importPublicKey bs = PublicKey <$> S.importPubKey bs
 
 -- the shared Diffie-Hellman (ECDH) secret for ethereum-encryption
@@ -226,15 +229,17 @@ instance Arbitrary Signature where
     s' <- replicateM 32 (arbitrary :: Gen Word8)
     v <- (choose (0,1)) :: Gen Word8
     
-    let r = BSS.toShort $ pack r'
-        s = BSS.toShort $ pack s'
+    let r = BSS.toShort $ B.pack r'
+        s = BSS.toShort $ B.pack s'
     return $ Signature (S.CompactRecSig r s v)
 
 
 instance RLPSerializable Signature where
   rlpEncode = RLPString . exportSignature
 
-  rlpDecode (RLPString str) = importSignature str
+  rlpDecode (RLPString str) = case importSignature str of
+    Left err -> error $ "rlpDecode for RecSig failed for: " ++ show err
+    Right sig -> sig 
   rlpDecode (RLPArray [RLPString r, RLPString s, RLPScalar v]) = 
       Signature $ S.CompactRecSig (BSS.toShort r) (BSS.toShort s) v 
   rlpDecode x = error $ "rlpDecode for RecSig failed on " ++ show x
@@ -259,9 +264,7 @@ instance FromJSON Signature where
 
 instance ToSchema Signature where
   declareNamedSchema _ = return $ named "Signature" binarySchema
-
-
-
+  
 -- NOTE: secp256k1-haskell, in its infinite wisdom, has swapped the R and S
 -- values in the signatures it generates...this is verified against the signatures
 -- we use (and will soon phase out) in ExtendedECDSA
@@ -283,7 +286,7 @@ instance ToSchema Signature where
 -- We do this in Bloc, and then subtract 27 to do pubkey recovery in seqevents, so
 -- we can keep the sigVs normal here.
 
-recoverPub :: Signature -> ByteString -> Maybe PublicKey
+recoverPub :: Signature -> B.ByteString -> Maybe PublicKey
 recoverPub (Signature (S.CompactRecSig r s v)) msgHash =
   let sig' = S.CompactRecSig s r v  -- the swapped sig
       sig = fromMaybe (error "could not import recsig") (S.importCompactRecSig sig')
@@ -291,20 +294,36 @@ recoverPub (Signature (S.CompactRecSig r s v)) msgHash =
   in PublicKey <$> (S.recover sig mesg)
 
 
-signMsg :: PrivateKey -> ByteString -> Signature
+signMsg :: PrivateKey -> B.ByteString -> Signature
 signMsg pk msgHash = 
   let mesg = fromMaybe (error "msg is not 32 bytes") (S.msg msgHash)
       (S.CompactRecSig r s v) = S.exportCompactRecSig $ S.signRecMsg (coerce pk) mesg
   in Signature $ S.CompactRecSig s r v -- the swapped sig
 
+verifySig :: PublicKey -> Signature -> B.ByteString -> Bool
+verifySig pk (Signature csig) msgHash = 
+  let mesg = fromMaybe (error "msg is not 32 bytes") (S.msg msgHash)
+      sig = S.convertRecSig $ fromMaybe (error "compact recsig -> recsig failed") (S.importCompactRecSig csig)
+  in S.verifySig (coerce pk) sig mesg
 
-exportSignature :: Signature -> ByteString
+exportSignature :: Signature -> B.ByteString
 exportSignature (Signature (S.CompactRecSig r s v)) = BSS.fromShort r <> BSS.fromShort s <> B.singleton v
 
-importSignature :: ByteString -> Signature
-importSignature bs | B.length bs /= 65 = error "importSignature called with incorrect number of bytes"
+importSignature :: B.ByteString -> Either String Signature
+importSignature bs | B.length bs /= 65 = Left $ "importSignature called with incorrect number of bytes: " ++ (show $ B.length bs) ++ ", expected 65"
 importSignature bs = 
   let r = B.take 32 bs
       s = B.take 32 $ B.drop 32 bs
       v = B.head $ B.drop 64 bs
-  in Signature $ S.CompactRecSig (BSS.toShort r) (BSS.toShort s) v
+  in Right $ Signature $ S.CompactRecSig (BSS.toShort r) (BSS.toShort s) v
+
+-- Import a DER encoded EC Signature into a Compact Recoverable Signature
+-- Since the recovery bit is lost when stored in an X.509 Certificate, the V bit is made up
+-- To comply with the type structure
+importSignature' :: B.ByteString -> Maybe Signature
+importSignature' bs =
+  case S.importSig bs of 
+    Nothing -> Nothing
+    Just sig -> 
+      let (S.CompactSig r s) = S.exportCompactSig sig
+      in Just $ Signature (S.CompactRecSig r s (1::Word8))
