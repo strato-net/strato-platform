@@ -36,7 +36,7 @@ import           Data.Bits
 import           Data.Bool                            (bool)
 import           Data.ByteString                      (ByteString)
 import qualified Data.ByteString                      as B
-import qualified Data.ByteString.Base16()               --as B16
+import qualified Data.ByteString.Base16               as B16
 import qualified Data.ByteString.Char8                as BC
 import qualified Data.ByteString.Short                as BSS
 import qualified Data.ByteString.UTF8                 as UTF8
@@ -1697,10 +1697,11 @@ binopAssign oper lhs rhs = do
 intBuiltin :: [Value] -> Value
 intBuiltin [SEnumVal _ _ enumNum] = SInteger $ fromIntegral enumNum
 intBuiltin [SInteger n] = SInteger n
-intBuiltin [SString hex] = invalidArguments "illegal character in hexstring" hex --SInteger $ fromIntegral $ base16ToIntegral hex
-  {-where
-    hexChar ch = fromMaybe (invalidArguments "illegal character in hexstring" [ch]) $ elemIndex ch "0123456789ABCDEF"
-    base16ToIntegral = foldl' (\n c -> 16*n + (hexChar $ CHAR.toUpper c)) 0-}
+intBuiltin [SString hex] =
+  case B16.decode (BC.pack hex) of
+    (l, "") -> let zeros = 32 - B.length l
+               in SInteger . fromIntegral . bytesToWord256 $ B.replicate zeros 0x0 <> l
+    _ -> typeError "numeric cast - not a hex string" hex
 intBuiltin args = typeError "numeric cast - invalid args" args
 
 castToAncestor :: MonadSM m => NamedAccount -> Integer -> m Value
