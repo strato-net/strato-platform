@@ -23,6 +23,7 @@ import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Lazy                 as BL
 import           Data.Foldable                        (foldrM)
 import           Data.IORef
+import           Data.List                            ((\\))
 import           Data.Map                             (Map)
 import qualified Data.Map                             as M
 import           Data.Maybe                           (catMaybes)
@@ -73,11 +74,11 @@ compileSourceNoInheritance initCodeMap = do
               Pragma _ n v -> Just (n, v)
               _ -> Nothing
             pramgaList = (pragmas <$> sourceUnits)
-            ValidPragmas = filter (\p -> (p == Nothing) || p == Just ("solidvm","3.2") || p == Just ("solidvm","3.0"))
-            invalidPragmas = pramgaList \\ ValidPragmas 
+            validPragmas = filter (\p -> (p == Nothing) || p == Just ("solidvm","3.2") || p == Just ("solidvm","3.0")) pramgaList
+            invalidPragmas = pramgaList \\ validPragmas 
             vmVersion'  = if (Just ("solidvm","3.2")) `elem` (pragmas <$> sourceUnits) then "svm3.2" else (if (Just ("solidvm","3.0")) `elem` (pragmas <$> sourceUnits) then "svm3.0" else "")
-            vmVersion'' = if (not $ null invalidPragmas) then foldr "" (\(a,b) c -> a ++ ": " ++ b ++ " " ++ c) invalidPragmas else vmVersion'
-        fma catMaybes . for sourceUnits $ \case
+            vmVersion'' = if (not $ null invalidPragmas) then (show invalidPragmas) ++  " are invalid pragmas" else vmVersion' --(\(a,b) c -> a ++ ": " ++ b ++ " " ++ c) invalidPragmas else vmVersion'
+        fmap catMaybes . for sourceUnits $ \case
           NamedXabi name (xabi, parents') -> do
             ctrct <- first SVMEx
                    $ xabiToContract (T.unpack name) (map T.unpack parents') vmVersion'' xabi

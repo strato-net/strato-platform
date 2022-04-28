@@ -30,7 +30,7 @@ type SolidEither = Either (Positioned ((,) SolidException))
 xabiToContract :: String -> [String] -> String -> Xabi -> SolidEither Contract
 xabiToContract contractName' parents' vmVersion' xabi = do
   validateXabi xabi
-  case vmVersion' of
+--  case vmVersion' of
   constr <- case M.toList $ Xabi.xabiConstr xabi of
     [] -> Right Nothing
     [(_, x)] -> Right $ Just x

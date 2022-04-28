@@ -389,11 +389,16 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=b
 
             case erException execResults of
                 Just e -> do
+                    when flags_debug $ $logDebugS "addTx" . T.pack . CL.red $ show e
+                    lift $ P.incCounter vmTxsUnsuccessful
+                {-Just e -> do
                     case e of
-                      InvalidPragma str1 str2 -> evmErrorResults (InvalidPragma str1 str2)  
-
-                      when flags_debug $ $logDebugS "addTx" . T.pack . CL.red $ sChow e
-                      lift $ P.incCounter vmTxsUnsuccessful
+                      InvalidPragma str1 str2 ->  do
+                        when flags_debug $ $logDebugS "addTx" . T.pack . CL.red $ sChow e
+                        lift $ P.incCounter vmTxsUnsuccessful
+                        evmErrorResults (InvalidPragma str1 str2)  
+                      _ -> 
+                 -}     
                 Nothing -> do
                     when flags_debug $ $logDebugS "addTx" . T.pack $ "Removing accounts in suicideList: " ++ intercalate ", " (show . pretty <$> S.toList (erSuicideList execResults))
                     forM_ (S.toList $ erSuicideList execResults) $ \address' -> do

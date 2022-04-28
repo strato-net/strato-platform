@@ -64,7 +64,7 @@ showSolidException :: SolidException -> String
 showSolidException (ArityMismatch m got want) = printf "arity mismatch: %s: got %d, want %d" m got want
 showSolidException (InternalError m v) = printf "internal error: %s: %s" m v
 showSolidException (InvalidArguments m v) = printf "invalid arguments: %s: %s" m v
-showSolidException (InvalidPragma a) = printf "invalid pragma: %s:" a
+showSolidException (InvalidPragma m v) = printf "invalid pragma: %s:" m v
 showSolidException (IndexOutOfBounds a b)= printf "index out of bounds: %s: %s" a b
 showSolidException (MissingField m v) = printf "missing field: %s: %s" m v
 showSolidException (MissingType m v) = printf "missing type: %s: %s" m v

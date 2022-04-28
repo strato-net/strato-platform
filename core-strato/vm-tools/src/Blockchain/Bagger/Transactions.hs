@@ -82,7 +82,7 @@ rejectedTx (BalanceTooLow _ _ _ _ t) = t
 rejectedTx (GasLimitTooLow _ _ _ t)  = t
 rejectedTx (LessLucrative _ _ _ t)   = t
 rejectedTx (CodeNotFound _ _ _ _ t)  = t
-rejectedTx (InvalidPragma _ _ _ t)   = t
+rejectedTx (Blockchain.Bagger.Transactions.InvalidPragma _ _ _ t)   = t
 
 data BaggerStage = Insertion | Validation | Promotion | Demotion | Execution deriving (Read, Eq, Show)
 
@@ -117,7 +117,7 @@ instance Format TxRejection where
         "\n\ttarget address " ++ format address ++
         "\n\tcontract name " ++ name ++
         "\n" ++ format o
-    format (InvalidPragma stage queue pragma o) =
+    format (Blockchain.Bagger.Transactions.InvalidPragma stage queue pragma o) =
         "InvalidPragma at stage " ++ show stage ++ " in queue " ++ show queue ++
         "\n\tpragma " ++ pragma ++
         "\n" ++ format o
@@ -136,7 +136,9 @@ txRejectionToAPIFailureCause (LessLucrative  stage queue newTx _) =
     Failure (show stage) (Just $ show queue) TrumpedByMoreLucrative Nothing Nothing (Just $ "trumped by " ++ formatKeccak256WithoutColor (otHash newTx))
 txRejectionToAPIFailureCause (CodeNotFound  stage queue address name _) =
     Failure (show stage) (Just $ show queue) MissingCode Nothing Nothing (Just $ "code not found at address " ++ format address ++ " with name " ++ name)
-txRejectionToAPIFailureCause (InvalidPragma stage queue pragma _) = Blockchain.Data.TransactionResultStatus.InvalidPragma (show stage) (Just $ show queue) pragma Nothing
+txRejectionToAPIFailureCause (Blockchain.Bagger.Transactions.InvalidPragma stage queue pragma _) =
+    Failure (show stage) (Just $ show queue) (Blockchain.Data.TransactionResultStatus.InvalidPragma pragma) Nothing Nothing (Just $ "invalid pragma: " ++ pragma)
+    
 
 tfToBaggerTxRejection :: TransactionFailureCause -> TxRejection
 tfToBaggerTxRejection (TFInsufficientFunds cost balance tx) = BalanceTooLow Execution Queued cost balance tx
@@ -145,7 +147,7 @@ tfToBaggerTxRejection TFBlockGasLimitExceeded{} = error "please dont do that (ca
 tfToBaggerTxRejection (TFNonceMismatch expected _ tx) = NonceTooLow Execution Queued expected tx
 tfToBaggerTxRejection (TFChainIdMismatch _ _ tx) = WrongChainId Validation Queued tx
 tfToBaggerTxRejection (TFCodeCollectionNotFound addr name tx) = CodeNotFound Validation Queued addr name tx
-tfToBaggerTxRejection (TFInvalidPragma pragma tx) = InvalidPragma Validation Queued pragma tx
+tfToBaggerTxRejection (TFInvalidPragma pragma tx) = Blockchain.Bagger.Transactions.InvalidPragma Validation Queued pragma tx
 
 instance Format TransactionFailureCause where
     format (TFInsufficientFunds cost bal _) = "Insufficient funds: cost " ++ show cost ++ " > balance " ++ show bal

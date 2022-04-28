@@ -336,7 +336,7 @@ create' creator newAccount ch cc contractName' argExps x509s = do
     erNewContractAccount = Just newAccount,
     erSuicideList = S.empty,
     erAction = Just finalAct,
-    erException = if (isInvalidPragma) then Just $ InvalidPragma vmVersion' else Nothing
+    erException = if (isInvalidPragma) then Just $ Left $ InvalidPragma vmVersion' vmVersion' else Nothing,
     erKind = SolidVM,
     erNewX509Certs = x509s'
     }

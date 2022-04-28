@@ -198,6 +198,8 @@ baggerRejectionToTransactionResultBits rejection = case rejection of
         (p s q ++ formatKeccak256WithoutColor hashBetter ++ " being a more lucrative transaction", hashWorse)
     CodeNotFound s q a n OutputTx{otHash=h} ->
         (p s q ++ " code not found at address " ++ format a ++ " with name " ++ n, h)
+    InvalidPragma s q pragma OutputTx{otHash=h} ->
+        (p s q ++ " invalid pragma " ++ pragma , h)
 
     where p stage queue = "Rejected from mempool at " ++ show stage ++ "/" ++ show queue ++ " due to "
           p' s q        = p s q ++ "low "
@@ -488,7 +490,7 @@ isValidForPool t@OutputTx{otSigner=address, otBaseTx=bt} = runExceptT $ do
     let intrinsicGas = B.calculateIntrinsicGasAtNextBlock state t
         txgl         = TD.transactionGasLimit bt
         txn          = TD.transactionNonce bt
-        prgma        = TD.transactionPragma bt
+        --prgma        = TD.transactionPragma bt
         txFee        = B.calculateIntrinsicTxFee state t
     when (intrinsicGas > txgl) .
        throwE $ GasLimitTooLow Validation Incoming intrinsicGas t
@@ -498,8 +500,8 @@ isValidForPool t@OutputTx{otSigner=address, otBaseTx=bt} = runExceptT $ do
     when (addressBalance < txFee) .
        throwE $ BalanceTooLow Validation Incoming txFee addressBalance t
     --Checks to see if the pragma is valid for the transaction
-    when (prgma /= "svm3.2" && prgma /= "svm3.0" && prgma /= "") .
-       throwE $ InvalidPragma Validation Incoming t
+    --when (prgma /= "svm3.2" && prgma /= "svm3.0" && prgma /= "") .
+    --   throwE $ InvalidPragma Validation Incoming t
     return ()
 
 addToSeen :: MonadBagger m => OutputTx -> m ()
