@@ -779,8 +779,6 @@ getVarType' s@('i':'n':'t':n) ctx = case n of
     Nothing -> getVarTypeByName' s ctx
 getVarType' "address" ctx =  pure $ Function (addressArgs ctx) (Static SVMType.Account ctx) ctx
 getVarType' "account" ctx =  pure $ Function (accountArgs ctx) (Static SVMType.Account ctx) ctx
-getVarType' "address payable" ctx = pure $ Function (addressArgs ctx) (Static SVMType.AccountPayable ctx) ctx
-getVarType' "account payable" ctx = pure $ Function (accountArgs ctx) (Static SVMType.AccountPayable ctx) ctx
 getVarType' "string" ctx =  pure $ Function (stringArgs ctx) (stringType' ctx) ctx
 getVarType' "bool" ctx =  pure $ Function (boolArgs ctx) (boolType' ctx) ctx
 getVarType' s@('b':'y':'t':'e':'s':n) ctx = case n of

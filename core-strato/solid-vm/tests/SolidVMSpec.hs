@@ -1257,6 +1257,29 @@ contract qq {
 }|]
     getFields ["x"] `shouldReturn` [bContract "X" 0xdeadbeef]
 
+  it "can parse account payable type" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+  account y;
+  account payable x;
+  constructor() public {
+    y = msg.sender;
+    x = payable(y);
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BAccountPayable (NamedAccount 0xdeadbeef MainChain)]
+  
+  it "can read address payable type" . runTest $ do
+    runBS [r|
+contract qq {
+  address payable x;
+  constructor() public {
+    x = msg.sender;
+  }
+}|]
+    getFields ["x"] `shouldReturn` [bAddress 0xdeadbeef]
+
   it "can call methods of superclasses" . runTest $ do
     runBS [r|
 contract P {

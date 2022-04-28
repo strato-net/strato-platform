@@ -216,6 +216,7 @@ public keywords =
         [KPublic] -> return True
         _ -> return False
 
+
 -- | Parses the declaration part of a variable definition, which is
 -- everything except possibly the initializer and semicolon.  Necessary
 -- because these kinds of expressions also appear in struct definitions and
@@ -223,7 +224,18 @@ public keywords =
 simpleVariableDeclaration :: SolidityParser (String, Declaration) -- , Maybe Expression)
 simpleVariableDeclaration = do
   start <- getSourcePosition
-  variableType <- simpleTypeExpression
+  variableType' <- simpleTypeExpression
+  
+  --Should return True if it can parse the string "payable" but not if it can parse "payable(" and not anything else
+  isPayable <- option False $ do
+    try (reserved "payable")
+    notFollowedBy (char '(')
+    return True
+  --(option False (reserved "payable" >> return True))
+  let (variableType, isErr) = case variableType' of
+        SVMType.Account -> if isPayable then (SVMType.AccountPayable, False) else (SVMType.Account, False)
+        SVMType.Address -> if isPayable then (SVMType.AddressPayable, False) else (SVMType.Address, False)
+        _ -> if isPayable then (variableType', True) else (variableType', False)
   -- We have to remember which variables are "public", because they
   -- generate accessor functions
   keywords <- many stateVariableKeyword
@@ -239,9 +251,18 @@ simpleVariableDeclaration = do
 
   if isConstant
     then return (variableName, ConstantDeclaration $ SolidVM.ConstantDecl variableType isPublic (fromMaybe (parseError "constants must be initialized" variableName) value) ctx)
-    else return (variableName, VariableDeclaration $ SolidVM.VariableDecl variableType isPublic value ctx)
+    else if isErr 
+      then return (variableName, ConstantDeclaration $ SolidVM.ConstantDecl variableType isPublic (fromMaybe (parseError "the following type cannnot be payable: " variableName) value) ctx)
+      else return (variableName, VariableDeclaration $ SolidVM.VariableDecl variableType isPublic value ctx)
 
-{- Functions and function-like -}
+{- Functions and function-like 
+
+ variableType' <- simpleTypeExpression
+  isPayable <- option False (reserved "payable" >> return True)  
+  let variableType = case (variableType', isPayable) of 
+    (SVMType.Account, True) -> SVMType.AccountPayable 
+    (SVMType.Address, True) -> SVMType.AddressPayable
+    _ -> variableType'-}
 
 -- | Parses a function definition.
 --

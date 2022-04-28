@@ -51,6 +51,9 @@ address = SimpleValue . ValueAccount . unspecifiedChain
 bAccount :: Address -> BasicValue
 bAccount = BAccount . unspecifiedChain
 
+bAccountPayable :: Address -> BasicValue
+BAccountPayable = BAccountPayable . unspecifiedChain
+
 bContract :: Text -> Address -> BasicValue
 bContract t = BContract t . unspecifiedChain
 

@@ -183,6 +183,8 @@ public keywords =
 constant :: [StateVariableKeyword] -> Bool
 constant = any (KConstant ==)
 
+test
+
 -- | Parses the declaration part of a variable definition, which is
 -- everything except possibly the initializer and semicolon.  Necessary
 -- because these kinds of expressions also appear in struct definitions and

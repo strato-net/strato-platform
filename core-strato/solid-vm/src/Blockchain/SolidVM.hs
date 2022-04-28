@@ -1753,6 +1753,7 @@ callBuiltin "account" [SAccount a, SString ('0':'x':xs)] _ = return . SAccount $
     hexChar ch = fromMaybe (invalidArguments "illegal character in chainId hexstring" [ch]) $ elemIndex ch "0123456789ABCDEF"
     base16ToIntegral = foldl' (\n c -> 16*n + (hexChar $ CHAR.toUpper c)) 0 
 callBuiltin "account" [SAccount _, SString b] _ = invalidArguments "the chainId string must be a hexString beggining with \"0x\" " b
+callBuiltin "assert" [SBool cond] Nothing = SNULL <$ assert cond
 callBuiltin "account" vs _ = typeError "account cast" vs
 callBuiltin "bool" [SBool b] _ = return $ SBool b
 callBuiltin "bool" [SString "true"] _ = return $ SBool True
@@ -1774,12 +1775,13 @@ callBuiltin "keccak256" args Nothing = do
   case allStrings args of
     False -> invalidArguments "cannot use a non string arguments in keccak256" args
     True ->  return . SString . BC.unpack . keccak256ToByteString . hash . BC.pack $ customConcat args
+callBuiltin "payable" [SAccount a] _ = return $ SAccountPayable a
+callBuiltin "payable" [SAccountPayable a] _ = return $ SAccountPayable a
 callBuiltin "require" (SBool cond :msg) Nothing = do
   case msg of
     [] -> require cond Nothing
     (m:_) -> require cond (Just $ show m)
   return SNULL
-callBuiltin "assert" [SBool cond] Nothing = SNULL <$ assert cond
 callBuiltin rc@("registerCert") [SAccount a, SString cert] _ = do
   contract' <- getCurrentContract
   if CC._vmVersion contract' /= "svm3.2" then do

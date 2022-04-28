@@ -76,6 +76,7 @@ fromBasic = \case
   MS.BString s -> SString . BC.unpack $ s
   MS.BBool b -> SBool b
   MS.BAccount a -> SAccount a
+  MS.BAccountPayable a -> SAccountPayable a
   MS.BContract n a -> SContract (T.unpack n) a
   MS.BEnumVal k v num -> SEnumVal (T.unpack k) (T.unpack v) num
   MS.BMappingSentinel -> SMappingSentinel
@@ -100,6 +101,7 @@ toBasic = \case
   SString s -> MS.BString (BC.pack s)
   SBool b -> MS.BBool b
   SAccount a -> MS.BAccount a
+  SAccountPayable a -> MS.BAccountPayable a
   SContract n a -> MS.BContract (T.pack n) a
   SEnumVal k t num -> MS.BEnumVal (T.pack k) (T.pack t) num
   SMappingSentinel -> MS.BMappingSentinel
