@@ -1080,6 +1080,8 @@ getIndexType (AccountPath addr p) = do
          SVMType.Mapping{SVMType.key=SVMType.Bytes{}} -> MapStringIndex
          SVMType.Mapping{SVMType.key=SVMType.Address{}} -> MapAccountIndex
          SVMType.Mapping{SVMType.key=SVMType.Account{}} -> MapAccountIndex
+         SVMType.Mapping{SVMType.key=SVMType.AccountPayable{}} -> MapAccountIndex
+         SVMType.Mapping{SVMType.key=SVMType.AddressPayable{}} -> MapAccountIndex
          SVMType.Mapping{SVMType.key=SVMType.Bool{}} -> MapBoolIndex
          SVMType.Array{} -> ArrayIndex
          _ -> typeError "unanticipated index type" t

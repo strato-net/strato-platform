@@ -564,6 +564,7 @@ hintFromType = \case
  SVMType.Address{} -> return TAccount
  SVMType.Account{} -> return TAccount
  SVMType.AccountPayable{} -> return TAccountPayable
+ SVMType.AddressPayable{} -> return TAccountPayable
  SVMType.Bool{} -> return TBool
  SVMType.Bytes{} -> return TString
  SVMType.Int{} -> return TInteger

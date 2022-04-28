@@ -222,6 +222,9 @@ accountType' = Static SVMType.Account
 --accountPayableType' :: SourceAnnotation Text -> Type'
 --accountPayableType' = Static SVMType.AccountPayable
 
+--addressPayableType' :: SourceAnnotation Text -> Type'
+--addressPayableType' = Static SVMType.AddressPayable
+
 enumType' :: SourceAnnotation Text -> Type'
 enumType' = Static (SVMType.Enum Nothing "" Nothing)
 
@@ -389,6 +392,7 @@ typecheckStatic SVMType.Address SVMType.Account = Right SVMType.Account
 typecheckStatic SVMType.Account SVMType.Address = Right SVMType.Account
 typecheckStatic SVMType.Account SVMType.Account = Right SVMType.Account
 typecheckStatic SVMType.AccountPayable SVMType.AccountPayable = Right SVMType.AccountPayable
+typecheckStatic SVMType.AddressPayable SVMType.AddressPayable = Right SVMType.AccountPayable
 typecheckStatic (SVMType.Label a) (SVMType.Label b) =
   if a == b || a == "" || b == ""
     then Right (SVMType.Label $ string' [a, b])
