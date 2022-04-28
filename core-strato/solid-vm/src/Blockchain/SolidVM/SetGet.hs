@@ -87,6 +87,7 @@ findDefault = \case
   TString -> SString ""
   TBool -> SBool False
   TAccount -> SAccount $ unspecifiedChain 0x0
+  TAccountPayable -> SAccountPayable $ unspecifiedChain 0x0
   TContract n -> SContract n $ unspecifiedChain 0x0
   TEnumVal n -> SEnumVal n (todo "findDefault/enumval" n) 0x0
   TStruct n fs -> todo "findDefault/struct" (n, fs)

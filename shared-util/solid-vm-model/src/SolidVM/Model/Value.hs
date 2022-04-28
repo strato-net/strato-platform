@@ -98,6 +98,7 @@ data Value =
   | SString String
   | SBool Bool
   | SAccount NamedAccount
+  | SAccountPayable NamedAccount  -- This is a payable account, which means it can use .transfer() , .send() , .call() , .delegatecall() and .staticcall()
   | SEnum String
   | SEnumVal String String Word32
   | SStructDef String
@@ -114,6 +115,11 @@ data Value =
   | SContract String NamedAccount
   | SContractFunction (Maybe String) NamedAccount String -- contractName, address, functionName
   | SPush Value (Maybe Variable)-- The array function
+  -- | SSend Value (Maybe Variable) 
+  -- | STransfer Value (Maybe Variable) 
+  -- | SDelegateCall Value (Maybe Variable)
+  -- | SStaticCall Value (Maybe Variable)
+  -- | SCall Value (Maybe Variable)
   | SNULL
   | SReference AccountPath  -- An alias to an existing variable, so that modifications
                               -- can be canonicalized
@@ -134,6 +140,7 @@ instance Eq Value where
   (SString s1) == (SString s2) = s1 == s2
   (SBool b1) == (SBool b2) = b1 == b2
   (SAccount a1) == (SAccount a2) = a1 == a2
+  (SAccountPayable a1) == (SAccountPayable a2) = a1 == a2
   (SContract c1 a1) == (SContract c2 a2) = c1 == c2 && a1 == a2
   (SEnumVal t1 _ n1) == (SEnumVal t2 _ n2) = t1 == t2 && n1 == n2
   x == y = todo "Value/Eq" (x, y)
@@ -143,6 +150,7 @@ instance Ord Value where
   compare (SString s1) (SString s2) = compare s1 s2
   compare (SBool b1) (SBool b2) = compare b1 b2
   compare (SAccount a1) (SAccount a2) = compare a1 a2
+  compare (SAccountPayable a1) (SAccountPayable a2) = compare a1 a2
   compare x y = todo "Value/Ord" (x, y)
 
 
@@ -161,6 +169,7 @@ instance RLPSerializable Value where
 coerceFromInt :: CC.Contract -> Value -> Integer -> Value
 coerceFromInt _ SInteger{} n = SInteger n
 coerceFromInt _ (SAccount a) n = SAccount $ (namedAccountAddress .~ fromIntegral n) a
+coerceFromInt _ (SAccountPayable a) n = SAccountPayable $ (namedAccountAddress .~ fromIntegral n) a
 coerceFromInt _ SString{} 0 = SString ""
 coerceFromInt _ SString{} n = SString $ showHex n ""
 coerceFromInt _ (SContract c a) n = SContract c $ (namedAccountAddress .~ fromIntegral n) a
@@ -193,6 +202,7 @@ valEquals ct lhs rhs = case (lhs, rhs) of
   (SBool s1, SBool s2) -> s1 == s2
   (SString s1, SString s2) -> s1 == s2
   (SAccount v1, SAccount v2) -> v1 == v2
+  (SAccountPayable v1, SAccountPayable v2) -> v1 == v2
   (SEnumVal e1 _ n1, SEnumVal e2 _ n2) -> e1 == e2 && n1 == n2
   (SContract _ a1, SAccount a2) -> a1 == a2
   (SAccount a1, SContract _ a2) -> a1 == a2
@@ -215,6 +225,7 @@ defaultValue _ (SVMType.Int _ _) = SInteger 0
 defaultValue _ SVMType.Bool = SBool False
 defaultValue _ (SVMType.Address) = SAccount $ unspecifiedChain (Address 0)
 defaultValue _ (SVMType.Account) = SAccount $ unspecifiedChain (Address 0)
+defaultValue _ (SVMType.AccountPayable) = SAccountPayable $ unspecifiedChain (Address 0)
 defaultValue _ (SVMType.String _) = SString ""
 defaultValue _ (SVMType.Bytes _ _) = SString ""
 defaultValue ctract (SVMType.Label name) = fromMaybe (SContract name $ unspecifiedChain 0x0) $ asum
@@ -239,6 +250,7 @@ createDefaultValue _ (SVMType.Int _ _) = return $ SInteger 0
 createDefaultValue _ SVMType.Bool = return $ SBool False
 createDefaultValue _ (SVMType.Address) = return $ SAccount $ unspecifiedChain (Address 0)
 createDefaultValue _ (SVMType.Account) = return $ SAccount $ unspecifiedChain (Address 0)
+createDefaultValue _ (SVMType.AccountPayable) = return $ SAccountPayable $ unspecifiedChain (Address 0)
 createDefaultValue _ (SVMType.String _) = return $ SString ""
 createDefaultValue _ (SVMType.Bytes _ _) = return $ SString ""
 createDefaultValue ctract (SVMType.Label name) =
@@ -279,7 +291,7 @@ data Typo = StructTypo [(T.Text, CC.FieldType)]
 -- they are types which have an `operator=` in the parlance of C++.
 -- Even though structs cannot be stored directly, the operator=
 -- simulates their appearance by retrieving theh individual fields.
-data BasicType = TInteger | TString | TBool | TAccount
+data BasicType = TInteger | TString | TBool | TAccount | TAccountPayable
                | TEnumVal String | TContract String
                | TStruct String [(B.ByteString, BasicType)]
                | TComplex

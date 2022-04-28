@@ -71,6 +71,8 @@ showType (SVMType.Bytes _ b) = "bytes"
 showType SVMType.Bool = "bool"
 showType SVMType.Address = "address"
 showType SVMType.Account = "account"
+showType SVMType.AccountPayable = "account payable"
+showType SVMType.AddressPayable = "address payable"
 showType (SVMType.Label s) = "label " <> T.pack s
 showType (SVMType.Struct _ n) = "struct " <> n
 showType (SVMType.Enum _ n _) = "enum " <> n
@@ -216,6 +218,9 @@ addressType' = Static SVMType.Address
 
 accountType' :: SourceAnnotation Text -> Type'
 accountType' = Static SVMType.Account
+
+--accountPayableType' :: SourceAnnotation Text -> Type'
+--accountPayableType' = Static SVMType.AccountPayable
 
 enumType' :: SourceAnnotation Text -> Type'
 enumType' = Static (SVMType.Enum Nothing "" Nothing)
@@ -383,6 +388,7 @@ typecheckStatic SVMType.Address SVMType.Address = Right SVMType.Account
 typecheckStatic SVMType.Address SVMType.Account = Right SVMType.Account
 typecheckStatic SVMType.Account SVMType.Address = Right SVMType.Account
 typecheckStatic SVMType.Account SVMType.Account = Right SVMType.Account
+typecheckStatic SVMType.AccountPayable SVMType.AccountPayable = Right SVMType.AccountPayable
 typecheckStatic (SVMType.Label a) (SVMType.Label b) =
   if a == b || a == "" || b == ""
     then Right (SVMType.Label $ string' [a, b])
@@ -769,6 +775,8 @@ getVarType' s@('i':'n':'t':n) ctx = case n of
     Nothing -> getVarTypeByName' s ctx
 getVarType' "address" ctx =  pure $ Function (addressArgs ctx) (Static SVMType.Account ctx) ctx
 getVarType' "account" ctx =  pure $ Function (accountArgs ctx) (Static SVMType.Account ctx) ctx
+getVarType' "address payable" ctx = pure $ Function (addressArgs ctx) (Static SVMType.AccountPayable ctx) ctx
+getVarType' "account payable" ctx = pure $ Function (accountArgs ctx) (Static SVMType.AccountPayable ctx) ctx
 getVarType' "string" ctx =  pure $ Function (stringArgs ctx) (stringType' ctx) ctx
 getVarType' "bool" ctx =  pure $ Function (boolArgs ctx) (boolType' ctx) ctx
 getVarType' s@('b':'y':'t':'e':'s':n) ctx = case n of

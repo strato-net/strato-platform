@@ -100,6 +100,7 @@ unparseVarType (SVMType.Bool) = "bool"
 unparseVarType (SVMType.String _) = "string"
 unparseVarType (SVMType.Address) = "address"
 unparseVarType (SVMType.Account) = "account"
+unparseVarType (SVMType.AccountPayable) = "account payable"
 unparseVarType (SVMType.Bytes (Just True) _ ) = "bytes"
 unparseVarType (SVMType.Bytes Nothing (Just bytes) ) = "bytes" <> (show bytes)
 unparseVarType (SVMType.Label str) = str

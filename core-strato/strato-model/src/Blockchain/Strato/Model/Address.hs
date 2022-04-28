@@ -10,6 +10,7 @@
 
 module Blockchain.Strato.Model.Address
     ( Address(..),
+      AddressPayable,
       fromPrivateKey, fromPublicKey,
       formatAddressWithoutColor,
       stringAddress,
@@ -67,6 +68,8 @@ instance RLPSerializable Address where
   rlpEncode (Address a) = RLPString $ BL.toStrict $ encode a
   rlpDecode (RLPString s) = Address $ decode $ BL.fromStrict s
   rlpDecode x             = error ("Malformed rlp object sent to rlp2Address: " ++ show x)
+
+type AddressPayable = Address
 
 newtype Address = Address Word160 deriving (Eq, Read, Enum, Bounded, Ord, Generic, Data)
                                   deriving newtype (Real, Num, Integral, Hashable)
