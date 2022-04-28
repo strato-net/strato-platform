@@ -1283,6 +1283,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
             return $ Constant $ SContractFunction (Just $ CC._contractName $ last ps) addr method
 
       (SAccount a, "codehash") -> do
+        -- Get the chainId for the account
         cid <- case (a ^. namedAccountChainId) of 
           UnspecifiedChain -> do
             cid1 <- view accountChainId <$> getCurrentAccount
@@ -1292,15 +1293,13 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
           MainChain -> return Nothing
           ExplicitChain cid -> return $ Just cid
         let realAccount = namedAccountToAccount cid a
+        -- Retreive and resolve the codehash
         codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) realAccount
         resolvedCodeHash <- resolveCodePtr cid codeHash'
-        -- return resolvedCodeHash
-
         case resolvedCodeHash of
           Just (SolidVMCode _ ch') -> return (Constant $ SString $ format ch')
-          _ -> error "Missing code hash"
-        -- return (Constant $ SString $ format codeHash'')
-          
+          _ -> error "Missing codehash"
+        
       (SAccount a, "chainId") -> do
         contract' <- getCurrentContract
         case CC._vmVersion contract' == "svm3.2" of
