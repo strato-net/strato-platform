@@ -2,15 +2,17 @@ ARG STACK_RESOLVER
 
 FROM fpco/stack-build:${STACK_RESOLVER}
 
-# apt-key adv line is the fix for `The repository 'https://packages.confluent.io/deb/5.2 stable InRelease' is not signed.` error (started happening 05/06/2021)
+# First apt-key adv line is the fix for `The repository 'https://packages.confluent.io/deb/5.2 stable InRelease' is not signed.` error (started happening 05/06/2021)
+# Second apt-key adv line along with apt-key del is the fix for `W: GPG error: http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64  InRelease: The following signatures couldn't be verified because the public key is not available: NO_PUBKEY A4B469963BF863CC` (see https://forums.developer.nvidia.com/t/invalid-public-key-for-cuda-apt-repository/212901/18)
 # Disabling nodesource.list to resolve the problem with expired nodesource certificate on Sep 30th 2021 (see https://github.com/nodesource/distributions/issues/1266)
-RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 8B1DA6120C2BF624 && \ 
+RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 8B1DA6120C2BF624 && \
+    apt-key del 7fa2af80 && apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/3bf863cc.pub && \
     mv /etc/apt/sources.list.d/nodesource.list /etc/apt/sources.list.d/nodesource.list.disabled && \
     apt-get update && \
     apt-get -y --allow-unauthenticated install autoconf libtool libblas-dev liblapack-dev libsodium-dev jq vim && \
     apt-get autoremove && \
     rm -rf /var/lib/apt/lists/* && \
-    apt-get clean && \ 
+    apt-get clean && \
     git clone https://github.com/blockapps/secp256k1 && \
     cd secp256k1/ && \
     ./autogen.sh && \
