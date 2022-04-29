@@ -1312,14 +1312,29 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
           ExplicitChain cid -> return $ Just cid
         let realAccount = namedAccountToAccount cid a
         -- Retreive and resolve the codehash
+        
         codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) realAccount
         resolvedCodeHash <- resolveCodePtr cid codeHash'
-        cc <- case resolvedCodeHash of
-          Just (SolidVMCode _ ch') -> do
-            cc' <- codeCollectionFromHash ch'
-            return cc'
-          _ -> error "Missing codehash"
-        return cc
+        let ch' = case resolvedCodeHash of
+              Just (SolidVMCode _ ch1') -> ch1' 
+              _ -> error "Missing codehash"
+        
+        cd <- A.lookup (A.Proxy @DBCode) ch'
+        
+        -- case cd of
+        --   Just (_,bs) -> return $ format bs
+        --   _ -> return $ format mempty
+          
+        -- -- return $ format cd'
+
+        let cd' = case cd of
+              Just (_,bs) -> bs
+              _ -> error "Missing code"
+          
+        return $ Constant $ SString $ format cd'
+
+
+        
         
       (SAccount a, "chainId") -> do
         contract' <- getCurrentContract
