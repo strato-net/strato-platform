@@ -242,14 +242,6 @@ simpleVariableDeclaration = do
     then return (variableName, ConstantDeclaration $ SolidVM.ConstantDecl variableType isPublic (fromMaybe (parseError "constants must be initialized" variableName) value) ctx)
     else return (variableName, VariableDeclaration $ SolidVM.VariableDecl variableType isPublic value ctx)
 
-{- Functions and function-like 
-
- variableType' <- simpleTypeExpression
-  isPayable <- option False (reserved "payable" >> return True)  
-  let variableType = case (variableType', isPayable) of 
-    (SVMType.Account, True) -> SVMType.AccountPayable 
-    (SVMType.Address, True) -> SVMType.AddressPayable
-    _ -> variableType'-}
 
 -- | Parses a function definition.
 --
