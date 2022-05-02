@@ -1712,7 +1712,7 @@ castToAncestor a n = do
 
 callBuiltin :: MonadSM m => String -> [Value] -> Maybe Value -> m Value
 callBuiltin "string" [SString s] _ = return $ SString s
-callBuiltin "string" [SAccount a b] _ = return . SString $ show a ++ (if b then ":payable" else "")
+callBuiltin "string" [SAccount a b] _ = return . SString $ show a
 callBuiltin "string" [SInteger i] _ = return . SString $ show i
 callBuiltin "string" [SBool b] _ = return . SString $ bool "false" "true" b
 callBuiltin "string" vs _ = typeError "string cast" vs
@@ -1774,7 +1774,6 @@ callBuiltin "keccak256" args Nothing = do
     False -> invalidArguments "cannot use a non string arguments in keccak256" args
     True ->  return . SString . BC.unpack . keccak256ToByteString . hash . BC.pack $ customConcat args
 callBuiltin "payable" [SAccount a _] _ = return $ SAccount a True
-callBuiltin "isPayable" [SAccount _ b] _ = return $ SBool $ b
 callBuiltin "require" (SBool cond :msg) Nothing = do
   case msg of
     [] -> require cond Nothing
