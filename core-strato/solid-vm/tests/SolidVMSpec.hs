@@ -3032,7 +3032,7 @@ contract qq {
       , BBool True
       , BDefault
       ]
-  it "can get the chainId from the account type" . runTest $ do
+  fit "can get the chainId from the account type" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
 contract qq {
@@ -3072,69 +3072,73 @@ contract qq{
   }
 }|]
     getFields ["bal1", "bal2"] `shouldReturn`
-      [ BInteger 0,
+      [ BDefault,
         BInteger 0]
   fit "can get the codehash from an address" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
+contract Mama {
+  string s = "hello";
+  constructor(){}
+}
+
+pragma solidvm 3.2;
 contract qq{
   account a1;
   account a2;
-  bytes ch1;
-  bytes ch2;
+  bytes32 workIt;
   constructor() public {
     a1 = account(0xdeadbeef, 0xfeedbeef);
     a2 = account(0x123, "main");
-    ch1 = a1.codehash;
-    ch2 = a2.codehash;
+    Mama m = new Mama();
+    workIt = m.codehash;
   }
 }|]
-    getFields ["bal1", "bal2"] `shouldReturn`
-      [ BString "",
-        BString ""]
-  fit "can get the code from an address" . runTest $ do
+    getFields ["m"] `shouldReturn`
+      [ BInteger 0 ]
+  it "can get the code from an address" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
 contract qq{
   account a1;
   account a2;
-  string ch1;
-  string ch2;
+  string c1;
+  string c2;
   constructor() public {
     a1 = account(0xdeadbeef, 0xfeedbeef);
     a2 = account(0x123, "main");
-    ch1 = a1.code;
-    ch2 = a2.code;
+    c1 = a1.code;
+    c2 = a2.code;
   }
 }|]
-    getFields ["ch1", "ch2"] `shouldReturn`
+    getFields ["c1", "c2"] `shouldReturn`
       [ BString "",
         BString ""]
-  fit "can tranfer from one account to another account using the address's transfer member" . runTest $ do
-    runBS [r|
-pragma solidvm 3.2;
-contract qq{
-  account a1;
-  account a2;
-  string ch1;
-  string ch2;
-  bool successful;
-  constructor() public {
-    a1 = account(0xdeadbeef, 0xfeedbeef);
-    a2 = account(0x123, "main");
-  }
-  function transferTen() internal pure
-    returns (string successful){
-      if (a1.balance < 10 && a2.balance >= 10) {
-        successful = a1.transfer(10); 
-      } else {
-        successful = false;
-      }
-      return successful;
-    }
-}|]
-    getFields ["successful"] `shouldReturn`
-      [ BBool True]
+--   fit "can tranfer from one account to another account using the address's transfer member" . runTest $ do
+--     runBS [r|
+-- pragma solidvm 3.2;
+-- contract qq{
+--   account a1;
+--   account a2;
+--   string ch1;
+--   string ch2;
+--   bool successful;
+--   constructor() public {
+--     a1 = account(0xdeadbeef, 0xfeedbeef);
+--     a2 = account(0x123, "main");
+--   }
+--   function transferTen() internal pure
+--     returns (string successful){
+--       if (a1.balance < 10 && a2.balance >= 10) {
+--         successful = a1.transfer(10); 
+--       } else {
+--         successful = false;
+--       }
+--       return successful;
+--     }
+-- }|]
+--     getFields ["successful"] `shouldReturn`
+--       [ BBool True]
 
   it "can't assign a value to an unallocated index in an array" $ (runTest (runBS [r|
 pragma solidvm 3.0;

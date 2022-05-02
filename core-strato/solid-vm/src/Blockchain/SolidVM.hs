@@ -113,6 +113,7 @@ import           SolidVM.Solidity.Parse.Statement
 import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpression)
 
 import           UnliftIO                             hiding (assert)
+-- import           Debug.Trace
 
 -- | Copying from Data.List.Extra, since our version of the extra library seems to not contain it.
 -- | A total variant of the list index function `(!!)`.
@@ -1297,7 +1298,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
         codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) realAccount
         resolvedCodeHash <- resolveCodePtr cid codeHash'
         case resolvedCodeHash of
-          Just (SolidVMCode _ ch') -> return (Constant $ SString $ format ch')
+          Just (SolidVMCode _ ch') -> return (Constant $ SString . BC.unpack . keccak256ToByteString $ ch')
           _ -> error "Missing codehash"
       
       (SAccount a, "code") -> do
@@ -1338,7 +1339,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
         bal <- A.lookup (A.Proxy @AddressState) realAccount
         case bal of
           Just as -> return $ Constant $ SInteger $ addressStateBalance as
-          _ -> error "Can't find the balance, where is it?"
+          _ -> return $ Constant $ SInteger 0 
 
       -- (SAccount a, "transfer") -> do
       --   from <- getCurrentAccount
