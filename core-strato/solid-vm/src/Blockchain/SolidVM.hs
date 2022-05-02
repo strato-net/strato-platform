@@ -1340,7 +1340,14 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
           Just as -> return $ Constant $ SInteger $ addressStateBalance as
           _ -> error "Can't find the balance, where is it?"
 
-        
+      -- (SAccount a, "transfer") -> do
+      --   from <- getCurrentAccount
+      --   let address = namedAccountToAccount (from ^. accountChainId) a
+      --   success <- case argVals of
+      --     OrderedVals [SInteger amount] -> do
+      --       pay "built-in transfer function" from address amount
+      --     _ -> return False
+      --   return . Constant $ SBool success
         
       (SAccount a, "chainId") -> do
         contract' <- getCurrentContract
