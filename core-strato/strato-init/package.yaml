@@ -50,6 +50,7 @@ library:
   - monad-alter
   - nibblestring
   - persistent-postgresql
+  - raw-strings-qq
   - resourcet
   - secp256k1-haskell
   - seqevents

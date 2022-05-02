@@ -33,6 +33,7 @@ import qualified Data.ByteString.Lazy        as BL
 import           Data.Text                   (Text)
 import qualified Data.Text                   as T
 import           Data.Maybe
+-- import qualified Debug.Trace as Debug
 import           GHC.Generics
 
 import           Network.Kafka
@@ -100,10 +101,15 @@ produceVMEvents vmEvents = do
   result <- -- type Either KafkaClientError [ProduceResponse]
     liftIO $ runKafkaConfigured "blockapps-data" $ fmap concat $
       forM vmEvents $ \e -> produceMessagesAsSingletonSets [TopicAndMessage (lookupTopic "vmevents") . makeMessage . BL.toStrict . JSON.encode $ e]
+  -- $logInfoS "produceVMEvents" ("Doing a VMEvent" <> show vmEvents)
+  -- Debug.traceM "In produceVMEvents"
+  -- Debug.traceShowM vmEvents
   case result of 
     Left kce -> liftIO $ throwIO kce
     Right res -> do -- [ProduceResponse]
       liftIO $ mapM_ parseKafkaResponse res
+      -- Debug.traceM "In produceVMEvents'"
+      -- Debug.traceShowM offset
       return offset
       where [offset] = concatMap (map (\(_, _, x') -> x') . concatMap snd . _produceResponseFields) res
             -- parsedResults = map parseKafkaResponse res

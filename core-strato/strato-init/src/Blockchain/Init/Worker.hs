@@ -7,10 +7,12 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
+-- {-# LANGUAGE QuasiQuotes #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
 module Blockchain.Init.Worker (runWorker) where
 
+-- import qualified Data.ByteString.Char8 as C
 import Control.Concurrent
 import Control.Lens.Combinators (uses)
 import Control.Monad
@@ -34,6 +36,7 @@ import System.Exit
 import System.FilePath ((</>))
 import System.IO.Temp
 import Text.Printf
+-- import Text.RawString.QQ
 import Turtle (chmod, roo, fromText)
 
 import BlockApps.Logging
@@ -46,6 +49,9 @@ import Blockchain.GenesisBlock
 import Blockchain.Init.Monad
 import Blockchain.Init.Protocol
 import Blockchain.MilenaTools
+-- import Blockchain.Strato.Model.CodePtr (CodePtr(..))
+-- import Blockchain.Strato.Model.Keccak256 as Keccak256
+-- import Blockchain.Stream.VMEvent (VMEvent(..), produceVMEvents)
 import qualified Executable.EthDiscoverySetup as EthDiscovery
 import Network.Kafka as K
 import Network.Kafka.Protocol as K
@@ -68,6 +74,10 @@ runWorker kaddr = do
       void $ addCode EVM mempty -- blank code is the default for Accounts, but gets added nowhere else.
       $logInfoS "runWorker" "Processing genesis block"
       initializeGenesisBlock tf []
+    -- runResourceT . runSetupDBM $ do
+    --   liftIO $ threadDelay 10000000
+    --   $logInfoS "runWorker" "Initalizing the CertificateFactory2"
+    --   void $ produceVMEvents [CodeCollectionAdded (T.pack certificateFactory) (SolidVMCode "CertificateFactory" (Keccak256.hash $ C.pack certificateFactory)) "" "CertificateFactory" []]
     $logInfoS "runWorker" "done."
 
 makeReadOnly :: FilePath -> IO ()
@@ -153,3 +163,67 @@ process pathRoot off = (>> return off) . \case
     TIO.appendFile accountFile acs
 
   InitComplete -> liftIO $ die "InitComplete shouldn't be here"
+
+
+
+-- -- Our CertificateFactory contract
+-- certificateFactory :: String
+-- certificateFactory = [r|pragma solidvm 3.2;
+-- contract Certificate {
+--     address owner;  // The CertificateRegistery Contract
+
+--     account certificateHolder;
+
+--     // Store all the fields of a certificate in a Cirrus record
+--     string commonName;
+--     string country;
+--     string organization;
+--     string group;
+--     string publicKey;
+--     string certificateString;
+
+--     constructor(account _newAccount, string _certificateString) {
+--         owner = msg.sender;
+
+--         certificateHolder = _newAccount;
+
+--         mapping(string => string) parsedCert = parseCert(_certificateString);
+--         commonName = parsedCert["commonName"];
+--         organization = parsedCert["organization"];
+--         group = parsedCert["group"];
+--         publicKey = parsedCert["publicKey"];
+--         certificateString = parsedCert["certString"];
+--     }
+-- }
+
+-- pragma solidvm 3.2;
+-- contract CertificateFactory {
+--     // The factory maintains a list and mapping of all the certificates
+--     // We need the extra array in order for us to iterate through our certificates.
+--     // Solidity mappings are non-iterable.
+--     Certificate[] certificates;
+--     mapping(account => uint) certificatesMap;
+
+--     string rootPublicKey = "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEUhJR4x+wZiX+xZK2m/pwN40cvCS0UA7Z\n0DB7sny5ZnNLw43JgKz0URDY2yYOPkhoIApxFK9UU3Bc4BRANDWmdQ==\n-----END PUBLIC KEY-----";
+    
+--     constructor() {
+--         // Disallow the creation of the CertificateFactory on private chains
+--         require(account(this, "self").chainId == 0, "The CertificateFactory must be posted on the main chain!");
+--     }
+    
+--     function createCertificate(account newAccount, string newCertificateString) returns (int) {
+--         // Verify that the certificate was created by BlockApps (Is this nessesary, registerCert 
+--         // checks for the BlockApps public key already [I think Troy wants that behavior changed])
+--         require(verifyCert(newCertificateString, rootPublicKey));
+
+--         // Create the new certificate record
+--         Certificate c = new Certificate(newAccount, newCertificateString);
+--         certificates.push(c);
+--         certificatesMap[newAccount] = certificates.length;
+
+--         // Register the certificate into LevelDB
+--         registerCert(newCertificateString);
+--         return 200; // 200 = HTTP Status OK
+--     }
+-- }|]
+

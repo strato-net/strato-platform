@@ -56,6 +56,8 @@ library:
   - unliftio
   - util
   - vm-tools
+  - raw-strings-qq
+
 
 executables:
   vm-runner:
@@ -81,6 +83,7 @@ executables:
       - wai-middleware-prometheus
       - warp
       - websockets
+      - raw-strings-qq  
     ghc-options: -Wall -O2 -threaded -rtsopts -fprof-auto
 
 tests:
