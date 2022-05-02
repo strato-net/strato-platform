@@ -69,8 +69,8 @@ showType (SVMType.String _) = "string"
 showType (SVMType.Bytes _ b) = "bytes"
                     <> (maybe "" (T.pack . show) b)
 showType SVMType.Bool = "bool"
-showType SVMType.Address = "address"
-showType (SVMType.Account b1) = if b1 then "account payable" else "account"
+showType (SVMType.Address _) = "address"
+showType (SVMType.Account _) = "account"
 showType (SVMType.Label s) = "label " <> T.pack s
 showType (SVMType.Struct _ n) = "struct " <> n
 showType (SVMType.Enum _ n _) = "enum " <> n
@@ -212,7 +212,10 @@ boolType' :: SourceAnnotation Text -> Type'
 boolType' = Static SVMType.Bool
 
 addressType' :: SourceAnnotation Text -> Type'
-addressType' = Static SVMType.Address
+addressType' = Static $ SVMType.Address False
+
+--AddressPayableType' :: SourceAnnotation Text -> Type'
+--AddressPayableType' = Static $ SVMType.Address True
 
 accountType' :: SourceAnnotation Text -> Type'
 accountType' = Static $ SVMType.Account False
@@ -382,9 +385,9 @@ typecheckStatic (SVMType.Bytes d1 b1) (SVMType.Bytes d2 b2) =
            (Just a, Just b) | a /= b -> Left "Mismatched length between bytes values"
            _ -> Right $ SVMType.Bytes (d1 <|> d2) (b1 <|> b2)
 typecheckStatic SVMType.Bool SVMType.Bool = Right SVMType.Bool
-typecheckStatic SVMType.Address SVMType.Address = Right $ SVMType.Account False
-typecheckStatic SVMType.Address (SVMType.Account a) = Right $ SVMType.Account a
-typecheckStatic (SVMType.Account a) SVMType.Address = Right $ SVMType.Account a
+typecheckStatic (SVMType.Address a) (SVMType.Address b) = Right $ SVMType.Account (a && b)
+typecheckStatic (SVMType.Address a) (SVMType.Account b) = Right $ SVMType.Account (a && b)
+typecheckStatic (SVMType.Account a) (SVMType.Address b) = Right $ SVMType.Account (a && b)
 typecheckStatic (SVMType.Account a) (SVMType.Account b) = Right $ SVMType.Account (a && b)
 typecheckStatic (SVMType.Label a) (SVMType.Label b) =
   if a == b || a == "" || b == ""

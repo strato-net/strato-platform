@@ -23,7 +23,7 @@ data Type
   | String {dynamic::Maybe Bool}
   | Bytes {dynamic::Maybe Bool, bytes:: Maybe Int32}
   | Bool
-  | Address
+  | Address {isPayable :: Bool}
   | Account {isPayable :: Bool}
   | Label String
   | Struct { bytes::Maybe Int32, typedef::Text}

@@ -561,7 +561,7 @@ getCurrentCodeCollection = do
 
 hintFromType :: MonadSM m => SVMType.Type -> m BasicType
 hintFromType = \case
- SVMType.Address{} -> return TAccount
+ SVMType.Address _-> return TAccount
  SVMType.Account _-> return TAccount
  SVMType.Bool{} -> return TBool
  SVMType.Bytes{} -> return TString

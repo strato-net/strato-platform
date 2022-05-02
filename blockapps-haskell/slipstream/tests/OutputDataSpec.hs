@@ -335,7 +335,7 @@ spec = do
                 ])
             ]
           }, createDummyContract [
-                     ("addr", SVMType.Address)
+                     ("addr", SVMType.Address False)
                    , ("boolean", SVMType.Bool)
                    , ("contract", SVMType.Contract "")
                    , ("number", SVMType.Int Nothing Nothing)
@@ -514,7 +514,7 @@ spec = do
                 ])
             ]
           }, createDummyContract [
-               ("addr", SVMType.Address)
+               ("addr", SVMType.Address False)
              , ("boolean", SVMType.Bool)
              , ("contract", SVMType.Contract "")
              , ("number", SVMType.Int Nothing Nothing)
