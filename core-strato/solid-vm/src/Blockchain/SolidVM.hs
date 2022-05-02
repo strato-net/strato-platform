@@ -1751,7 +1751,6 @@ callBuiltin "account" [(SAccount a _), SString ('0':'x':xs)] _ = return . ((flip
     hexChar ch = fromMaybe (invalidArguments "illegal character in chainId hexstring" [ch]) $ elemIndex ch "0123456789ABCDEF"
     base16ToIntegral = foldl' (\n c -> 16*n + (hexChar $ CHAR.toUpper c)) 0 
 callBuiltin "account" [(SAccount _ _) , SString b] _ = invalidArguments "the chainId string must be a hexString beggining with \"0x\" " b
-callBuiltin "assert" [SBool cond] Nothing = SNULL <$ assert cond
 callBuiltin "account" vs _ = typeError "account cast" vs
 callBuiltin "bool" [SBool b] _ = return $ SBool b
 callBuiltin "bool" [SString "true"] _ = return $ SBool True
@@ -1799,7 +1798,7 @@ callBuiltin rc@("registerCert") [(SAccount a _), SString cert] _ = do
               onTraced $ liftIO $ putStrLn $ "    registering cert to address: " ++ format theAddress ++ " as " ++ show (fmap subCommonName $ getCertSubject x509Cert)
               return SNULL
   else unknownFunction "callBuiltin" rc
-
+callBuiltin "assert" [SBool cond] Nothing = SNULL <$ assert cond
 callBuiltin rc'@("registerCert") [SString cert] _ = do
   contract' <- getCurrentContract
   if CC._vmVersion contract' == "svm3.2" then do
