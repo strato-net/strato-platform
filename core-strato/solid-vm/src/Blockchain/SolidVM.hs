@@ -1080,8 +1080,6 @@ getIndexType (AccountPath addr p) = do
          SVMType.Mapping{SVMType.key=SVMType.Bytes{}} -> MapStringIndex
          SVMType.Mapping{SVMType.key=SVMType.Address{}} -> MapAccountIndex
          SVMType.Mapping{SVMType.key=SVMType.Account{}} -> MapAccountIndex
-         SVMType.Mapping{SVMType.key=SVMType.AccountPayable{}} -> MapAccountIndex
-         SVMType.Mapping{SVMType.key=SVMType.AddressPayable{}} -> MapAccountIndex
          SVMType.Mapping{SVMType.key=SVMType.Bool{}} -> MapBoolIndex
          SVMType.Array{} -> ArrayIndex
          _ -> typeError "unanticipated index type" t
@@ -1116,7 +1114,7 @@ expToPath x@(CC.IndexAccess _ parent mIndex) = do
     MapAccountIndex -> do
       idx <- getAccount idxVar
       return $ case idx of
-        SAccount a -> MS.MapIndex $ MS.IAccount a
+        SAccount a _ -> MS.MapIndex $ MS.IAccount a
         SInteger i -> MS.MapIndex $ MS.IAccount . unspecifiedChain $ fromIntegral i
         _ -> typeError "invalid map of addresses index" idx
     MapBoolIndex -> do
@@ -1230,8 +1228,8 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
                          fromIntegral
                          (name `elemIndex` fst enumVals)
         return $ Constant $ SEnumVal enumName name num
-      (SBuiltinVariable "msg", "sender") -> (Constant . SAccount . accountToNamedAccount chainId . Env.sender) <$> getEnv
-      (SBuiltinVariable "tx", "origin") -> (Constant . SAccount . accountToNamedAccount chainId . Env.origin) <$> getEnv
+      (SBuiltinVariable "msg", "sender") -> (Constant . ((flip SAccount) False) . accountToNamedAccount chainId . Env.sender) <$> getEnv
+      (SBuiltinVariable "tx", "origin") -> (Constant . ((flip SAccount) False) . accountToNamedAccount chainId . Env.origin) <$> getEnv
       (SBuiltinVariable "tx", "username") -> do env' <- getEnv
                                                 x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
                                                 maybeCertLevelDB <- x509CertDBGet $ _accountAddress $ Env.origin env'
@@ -1283,7 +1281,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
           ps -> do
             addr <- accountOnUnspecifiedChain <$> getCurrentAccount
             return $ Constant $ SContractFunction (Just $ CC._contractName $ last ps) addr method
-      (SAccount a, "chainId") -> do
+      (SAccount a _, "chainId") -> do
         contract' <- getCurrentContract
         case CC._vmVersion contract' == "svm3.2" of
           True ->
@@ -1297,7 +1295,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
               ExplicitChain cid -> return $ Constant $ intBuiltin $ flip (:) [] $ SString $ B.foldr showHex "" $ word256ToBytes cid
           False ->
             typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ (show (val, name)))
-      (SAccount addr, itemName) -> do --return $ Constant $ SContractItem addr itemName
+      (SAccount addr _, itemName) -> do --return $ Constant $ SContractItem addr itemName
         from <- getCurrentAccount
         let address = namedAccountToAccount (from ^. accountChainId) addr
         result <- callWrapper from address Nothing itemName False (CC.OrderedArgs [])  
@@ -1529,7 +1527,7 @@ expToVar' (CC.FunctionCall _ e args) = do
       var1 <- expToVar expr
       val1 <- getVar var1
       case (val1, name) of
-        (SAccount addr, itemName) -> regularFunctionCall $ Just (return $ Constant $ SContractItem addr itemName)
+        (SAccount addr _, itemName) -> regularFunctionCall $ Just (return $ Constant $ SContractItem addr itemName)
         _ -> regularFunctionCall Nothing
     _ -> regularFunctionCall Nothing
     where 
@@ -1553,7 +1551,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                   Just v -> return $ Constant $ v
                   Nothing -> return $ Constant SNULL
 
-              (SAccount toAddress', MS.Field funcName) -> do
+              (SAccount toAddress' _, MS.Field funcName) -> do
                 fromAddress <- getCurrentAccount
                 let toAddress = namedAccountToAccount (fromAddress ^. accountChainId) toAddress'
                 res <- callWrapper fromAddress toAddress Nothing (BC.unpack funcName) False args 
@@ -1589,7 +1587,7 @@ expToVar' (CC.FunctionCall _ e args) = do
             case argVals of
               OrderedVals [SInteger address] -> --TODO- clean up this ambiguity between SAddress and SInteger....
                 return $ Constant $ SContract contractName' $ unspecifiedChain $ fromInteger address
-              OrderedVals [SAccount address ] -> 
+              OrderedVals [SAccount address _] -> 
                 return $ Constant $ SContract contractName' address
               OrderedVals [SContract _ addr] ->
                 return $ Constant $ SContract contractName' $ addr
@@ -1638,7 +1636,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                 _ -> typeError "bytes32ToString with incorrect arguments" argVals
           Constant SAddressToAscii ->
             case argVals of
-              OrderedVals [SAccount a] -> return . Constant . SString $ show a
+              OrderedVals [SAccount a _] -> return . Constant . SString $ show a
               _ -> typeError "addressToAsciiString with incorrect arguments" argVals
 
           -- It would be nice to reinterpret two element paths as a function.
@@ -1709,50 +1707,50 @@ castToAncestor a n = do
   let currentChainId = maybe Nothing (_accountChainId . currentAccount) $ listToMaybe cInfo
   pChain <- getNthAncestorChain (fromIntegral n) currentChainId
   case pChain of
-    Nothing -> return . SAccount $ (namedAccountChainId .~ MainChain) a
-    Just b -> return . SAccount $ (namedAccountChainId .~ ExplicitChain b) a
+    Nothing -> return . ((flip SAccount) False) $ (namedAccountChainId .~ MainChain) a
+    Just b -> return . ((flip SAccount) False) $ (namedAccountChainId .~ ExplicitChain b) a
 
 callBuiltin :: MonadSM m => String -> [Value] -> Maybe Value -> m Value
 callBuiltin "string" [SString s] _ = return $ SString s
-callBuiltin "string" [SAccount a] _ = return . SString $ show a
+callBuiltin "string" [SAccount a b] _ = return . SString $ show a ++ (if b then ":payable" else "")
 callBuiltin "string" [SInteger i] _ = return . SString $ show i
 callBuiltin "string" [SBool b] _ = return . SString $ bool "false" "true" b
 callBuiltin "string" vs _ = typeError "string cast" vs
-callBuiltin "address" [SInteger a] _ = return . SAccount . unspecifiedChain $ fromIntegral a
+callBuiltin "address" [SInteger a] _ = return . ((flip SAccount) False) . unspecifiedChain $ fromIntegral a 
 callBuiltin "address" [a@SAccount{}] _ = return a
-callBuiltin "address" [SContract _ a] _ = return $ SAccount a
+callBuiltin "address" [SContract _ a] _ = return $ SAccount a False
 callBuiltin "address" [ss@(SString s)] _ = maybe (typeError "address cast" ss)
-                                                 (return . SAccount . (namedAccountChainId .~ UnspecifiedChain))
+                                                 (return . ((flip SAccount) False) . (namedAccountChainId .~ UnspecifiedChain)) 
                                                  $ readMaybe s
 callBuiltin "address" vs _ = typeError "address cast" vs
-callBuiltin "account" [SInteger a] _ = return . SAccount . unspecifiedChain $ fromIntegral a
+callBuiltin "account" [SInteger a] _ = return . ((flip SAccount) False) . unspecifiedChain $ fromIntegral a 
 callBuiltin "account" [a@SAccount{}] _ = return a
-callBuiltin "account" [SContract _ a] _ = return $ SAccount a
+callBuiltin "account" [SContract _ a] _ = return $ SAccount a False
 callBuiltin "account" [ss@(SString s)] _ = maybe (typeError "account cast" ss)
-                                                 (return . SAccount)
+                                                 (return . ((flip SAccount) False))
                                                  $ readMaybe s
-callBuiltin "account" [SInteger a, SInteger b] _ = return . SAccount $ explicitChain (fromIntegral a) (fromInteger b)
-callBuiltin "account" [SInteger a, SString "main"] _ = return . SAccount $ mainChain (fromIntegral a)
+callBuiltin "account" [SInteger a, SInteger b] _ = return . ((flip SAccount) False) $ explicitChain (fromIntegral a) (fromInteger b)
+callBuiltin "account" [SInteger a, SString "main"] _ = return . ((flip SAccount) False) $ mainChain (fromIntegral a)
 callBuiltin "account" [SInteger a, SString "self"] _                 = unspecifiedChain (fromIntegral a) `castToAncestor` 0
 callBuiltin "account" [SInteger a, SString "parent"] _               = unspecifiedChain (fromIntegral a) `castToAncestor` 1
 callBuiltin "account" [SInteger a, SString "grandparent"] _          = unspecifiedChain (fromIntegral a) `castToAncestor` 2
 callBuiltin "account" [SInteger a, SString "ancestor", SInteger n] _ = unspecifiedChain (fromIntegral a) `castToAncestor` n
-callBuiltin "account" [SInteger a, SString ('0':'x':xs)] _ = return . SAccount $ explicitChain (fromIntegral a) (fromIntegral $ base16ToIntegral xs)
+callBuiltin "account" [SInteger a, SString ('0':'x':xs)] _ = return . ((flip SAccount) False) $ explicitChain (fromIntegral a) (fromIntegral $ base16ToIntegral xs)
   where
     hexChar ch = fromMaybe (invalidArguments "illegal character in chainId hexstring" [ch]) $ elemIndex ch "0123456789ABCDEF"
     base16ToIntegral = foldl' (\n c -> 16*n + (hexChar $ CHAR.toUpper c)) 0
 callBuiltin "account" [SInteger _, SString b] _  = invalidArguments "the chainId string must be a hexString beggining with \"0x\" " b 
-callBuiltin "account" [SAccount a, SInteger b] _ = return . SAccount $ (namedAccountChainId .~ ExplicitChain (fromIntegral b)) a
-callBuiltin "account" [SAccount a, SString "main"] _ = return . SAccount $ (namedAccountChainId .~ MainChain) a
-callBuiltin "account" [SAccount a, SString "self"] _                 = a `castToAncestor` 0
-callBuiltin "account" [SAccount a, SString "parent"] _               = a `castToAncestor` 1
-callBuiltin "account" [SAccount a, SString "grandparent"] _          = a `castToAncestor` 2
-callBuiltin "account" [SAccount a, SString "ancestor", SInteger n] _ = a `castToAncestor` n
-callBuiltin "account" [SAccount a, SString ('0':'x':xs)] _ = return . SAccount $ (namedAccountChainId .~ ExplicitChain (fromIntegral $ base16ToIntegral xs)) a
+callBuiltin "account" [(SAccount a _), SInteger b] _ = return . ((flip SAccount) False) $ (namedAccountChainId .~ ExplicitChain (fromIntegral b)) a 
+callBuiltin "account" [(SAccount a _), SString "main"] _ = return . ((flip SAccount) False) $ (namedAccountChainId .~ MainChain) a
+callBuiltin "account" [(SAccount a _), SString "self"] _                 = a `castToAncestor` 0
+callBuiltin "account" [(SAccount a _), SString "parent"] _               = a `castToAncestor` 1
+callBuiltin "account" [(SAccount a _), SString "grandparent"] _          = a `castToAncestor` 2
+callBuiltin "account" [(SAccount a _), SString "ancestor", SInteger n] _ = a `castToAncestor` n
+callBuiltin "account" [(SAccount a _), SString ('0':'x':xs)] _ = return . ((flip SAccount) False) $ (namedAccountChainId .~ ExplicitChain (fromIntegral $ base16ToIntegral xs)) a 
   where
     hexChar ch = fromMaybe (invalidArguments "illegal character in chainId hexstring" [ch]) $ elemIndex ch "0123456789ABCDEF"
     base16ToIntegral = foldl' (\n c -> 16*n + (hexChar $ CHAR.toUpper c)) 0 
-callBuiltin "account" [SAccount _, SString b] _ = invalidArguments "the chainId string must be a hexString beggining with \"0x\" " b
+callBuiltin "account" [(SAccount _ _) , SString b] _ = invalidArguments "the chainId string must be a hexString beggining with \"0x\" " b
 callBuiltin "assert" [SBool cond] Nothing = SNULL <$ assert cond
 callBuiltin "account" vs _ = typeError "account cast" vs
 callBuiltin "bool" [SBool b] _ = return $ SBool b
@@ -1775,14 +1773,14 @@ callBuiltin "keccak256" args Nothing = do
   case allStrings args of
     False -> invalidArguments "cannot use a non string arguments in keccak256" args
     True ->  return . SString . BC.unpack . keccak256ToByteString . hash . BC.pack $ customConcat args
-callBuiltin "payable" [SAccount a] _ = return $ SAccountPayable a
-callBuiltin "payable" [SAccountPayable a] _ = return $ SAccountPayable a
+callBuiltin "payable" [SAccount a _] _ = return $ SAccount a True
+callBuiltin "isPayable" [SAccount _ b] _ = return $ SBool $ b
 callBuiltin "require" (SBool cond :msg) Nothing = do
   case msg of
     [] -> require cond Nothing
     (m:_) -> require cond (Just $ show m)
   return SNULL
-callBuiltin rc@("registerCert") [SAccount a, SString cert] _ = do
+callBuiltin rc@("registerCert") [(SAccount a _), SString cert] _ = do
   contract' <- getCurrentContract
   if CC._vmVersion contract' /= "svm3.2" then do
     curAccount <- getCurrentAccount
@@ -1826,7 +1824,7 @@ callBuiltin rc'@("registerCert") [SString cert] _ = do
               _ -> invalidCertificate "No or invalid subject" x509Cert
   else unknownFunction "callBuiltin" rc'
 
-callBuiltin "getUserCert" [SAccount a] _ = do
+callBuiltin "getUserCert" [(SAccount a _)] _ = do
     x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
     maybeCertLevelDB <- x509CertDBGet $ _namedAccountAddress a
     let maybeCertBlockDB = M.lookup (_namedAccountAddress a) x509s
@@ -2102,7 +2100,7 @@ encodeForReturn :: MonadSM m => Value -> m ByteString
 
 encodeForReturn (SInteger i) = return . word256ToBytes . fromIntegral $ i
 encodeForReturn (SEnumVal _ _ v) = return . word256ToBytes . fromIntegral $ v
-encodeForReturn (SAccount a) = return . word256ToBytes . fromIntegral $ a ^. namedAccountAddress
+encodeForReturn ((SAccount a _)) = return . word256ToBytes . fromIntegral $ a ^. namedAccountAddress
 encodeForReturn (SContract _ a) = return . word256ToBytes . fromIntegral $ a ^. namedAccountAddress
 encodeForReturn (SBool b) = return . word256ToBytes . fromIntegral . fromEnum $ b
 

@@ -410,7 +410,7 @@ getVariableOfName name = do
         else Nothing
 
       maybeThis :: Maybe Variable
-      maybeThis = toMaybe (name == "this") . t "this" . Constant . SAccount . accountOnUnspecifiedChain $ currentAccount currentCallInfo
+      maybeThis = toMaybe (name == "this") . t "this" . Constant . (flip (SAccount . accountOnUnspecifiedChain) False) $ currentAccount currentCallInfo
 
 
 
@@ -562,9 +562,7 @@ getCurrentCodeCollection = do
 hintFromType :: MonadSM m => SVMType.Type -> m BasicType
 hintFromType = \case
  SVMType.Address{} -> return TAccount
- SVMType.Account{} -> return TAccount
- SVMType.AccountPayable{} -> return TAccountPayable
- SVMType.AddressPayable{} -> return TAccountPayable
+ SVMType.Account _-> return TAccount
  SVMType.Bool{} -> return TBool
  SVMType.Bytes{} -> return TString
  SVMType.Int{} -> return TInteger

@@ -96,7 +96,6 @@ valueToSolidityValue = \case
           ValueInt _ _ n -> Right . T.pack . show $ n
           ValueAddress a -> Right . T.pack . show $ a
           ValueAccount a -> Right . T.pack . show $ a
-          ValueAccountPayable
           ValueString t -> Right t
           -- The collapse of bytes and str to a single types means that selecting an encoding
           -- for keys is not obvious. bytestrings may contain non UTF8 text, and at the same time
@@ -197,8 +196,7 @@ fromBasic = \case
   BBool b -> SimpleValue $ ValueBool b
   BInteger n -> SimpleValue $! valueInt n
   BString bs -> SimpleValue $! valueBytes bs
-  BAccount a -> SimpleValue $! ValueAccount a
-  BAccountPayable a -> SimpleValue $! ValueAccount a
+  BAccount a _ -> SimpleValue $! ValueAccount a
   BContract _ c -> ValueContract c
   BEnumVal tipe name num -> ValueEnum tipe name (fromIntegral num)
 

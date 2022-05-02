@@ -26,7 +26,8 @@ simpleType :: SolidityParser SVMType.Type
 simpleType =
   simple "bool" SVMType.Bool <|>
   simple "address" SVMType.Address <|>
-  simple "account" SVMType.Account <|>
+  simple "account payable" (SVMType.Account True) <|>
+  simple "account" (SVMType.Account False) <|>
   simple "string" (SVMType.String $ Just True) <|>
   bytes' <|>
   intSuffixed "uint"  (SVMType.Int (Just False)) <|>

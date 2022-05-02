@@ -97,8 +97,8 @@ data Value =
   SInteger Integer
   | SString String
   | SBool Bool
-  | SAccount NamedAccount
-  | SAccountPayable NamedAccount  -- This is a payable account, which means it can use .transfer() , .send() , .call() , .delegatecall() and .staticcall()
+  | SAccount NamedAccount Bool --isPayable
+   -- This is a payable account, which means it can use .transfer() , .send() , .call() , .delegatecall() and .staticcall()
   | SEnum String
   | SEnumVal String String Word32
   | SStructDef String
@@ -139,8 +139,7 @@ instance Eq Value where
   (SInteger i1) == (SInteger i2) = i1 == i2
   (SString s1) == (SString s2) = s1 == s2
   (SBool b1) == (SBool b2) = b1 == b2
-  (SAccount a1) == (SAccount a2) = a1 == a2
-  (SAccountPayable a1) == (SAccountPayable a2) = a1 == a2
+  (SAccount a1 b1) == (SAccount a2 b2) = (a1 == a2 && b1 == b2)
   (SContract c1 a1) == (SContract c2 a2) = c1 == c2 && a1 == a2
   (SEnumVal t1 _ n1) == (SEnumVal t2 _ n2) = t1 == t2 && n1 == n2
   x == y = todo "Value/Eq" (x, y)
@@ -149,8 +148,7 @@ instance Ord Value where
   compare (SInteger i1) (SInteger i2) = compare i1 i2
   compare (SString s1) (SString s2) = compare s1 s2
   compare (SBool b1) (SBool b2) = compare b1 b2
-  compare (SAccount a1) (SAccount a2) = compare a1 a2
-  compare (SAccountPayable a1) (SAccountPayable a2) = compare a1 a2
+  compare (SAccount a1 _) (SAccount a2 _) = compare a1 a2
   compare x y = todo "Value/Ord" (x, y)
 
 
@@ -168,8 +166,7 @@ instance RLPSerializable Value where
 -- it is determined that their expected type is
 coerceFromInt :: CC.Contract -> Value -> Integer -> Value
 coerceFromInt _ SInteger{} n = SInteger n
-coerceFromInt _ (SAccount a) n = SAccount $ (namedAccountAddress .~ fromIntegral n) a
-coerceFromInt _ (SAccountPayable a) n = SAccountPayable $ (namedAccountAddress .~ fromIntegral n) a
+coerceFromInt _ (SAccount a b) n = (SAccount $ (namedAccountAddress .~ fromIntegral n) a) b
 coerceFromInt _ SString{} 0 = SString ""
 coerceFromInt _ SString{} n = SString $ showHex n ""
 coerceFromInt _ (SContract c a) n = SContract c $ (namedAccountAddress .~ fromIntegral n) a
@@ -201,11 +198,10 @@ valEquals ct lhs rhs = case (lhs, rhs) of
   (_, SInteger i) -> coerceFromInt ct lhs i == lhs
   (SBool s1, SBool s2) -> s1 == s2
   (SString s1, SString s2) -> s1 == s2
-  (SAccount v1, SAccount v2) -> v1 == v2
-  (SAccountPayable v1, SAccountPayable v2) -> v1 == v2
+  (SAccount v1 b1, SAccount v2 b2) -> v1 == v2 && b1 == b2
   (SEnumVal e1 _ n1, SEnumVal e2 _ n2) -> e1 == e2 && n1 == n2
-  (SContract _ a1, SAccount a2) -> a1 == a2
-  (SAccount a1, SContract _ a2) -> a1 == a2
+  (SContract _ a1, SAccount a2 _) -> a1 == a2
+  (SAccount a1 _, SContract _ a2) -> a1 == a2
   (SContract _ a1, SContract _ a2) ->  if ((CC._vmVersion ct == "svm3.0") || (CC._vmVersion ct == "svm3.2")) then (a1 == a2) else todo "unsupported type combination in valEquals: " (lhs, rhs)
   (SBuiltinVariable v1, SBuiltinVariable v2) ->
     todo "comparison of builtin vars requires evaluation: " (v1, v2)
@@ -223,10 +219,8 @@ defaultValue _ (SVMType.Array valType _) = SArray valType V.empty
 defaultValue _ (SVMType.Mapping _ _ valType) = SMap valType $ M.empty
 defaultValue _ (SVMType.Int _ _) = SInteger 0
 defaultValue _ SVMType.Bool = SBool False
-defaultValue _ (SVMType.Address) = SAccount $ unspecifiedChain (Address 0)
-defaultValue _ (SVMType.AddressPayable) = SAccountPayable $ unspecifiedChain (Address 0)
-defaultValue _ (SVMType.Account) = SAccount $ unspecifiedChain (Address 0)
-defaultValue _ (SVMType.AccountPayable) = SAccountPayable $ unspecifiedChain (Address 0)
+defaultValue _ (SVMType.Address) = (SAccount $ unspecifiedChain (Address 0)) False
+defaultValue _ (SVMType.Account b1) = (SAccount $ unspecifiedChain (Address 0)) b1
 defaultValue _ (SVMType.String _) = SString ""
 defaultValue _ (SVMType.Bytes _ _) = SString ""
 defaultValue ctract (SVMType.Label name) = fromMaybe (SContract name $ unspecifiedChain 0x0) $ asum
@@ -249,10 +243,8 @@ createDefaultValue _ (SVMType.Array valType _) = return $ SArray valType V.empty
 createDefaultValue _ (SVMType.Mapping _ _ valType) = return $ SMap valType $ M.empty
 createDefaultValue _ (SVMType.Int _ _) = return $ SInteger 0
 createDefaultValue _ SVMType.Bool = return $ SBool False
-createDefaultValue _ (SVMType.Address) = return $ SAccount $ unspecifiedChain (Address 0)
-createDefaultValue _ (SVMType.AddressPayable) = return $ SAccountPayable $ unspecifiedChain (Address 0)
-createDefaultValue _ (SVMType.Account) = return $ SAccount $ unspecifiedChain (Address 0)
-createDefaultValue _ (SVMType.AccountPayable) = return $ SAccountPayable $ unspecifiedChain (Address 0)
+createDefaultValue _ (SVMType.Address) = return $ (SAccount $ unspecifiedChain (Address 0)) False
+createDefaultValue _ (SVMType.Account _) = return $ (SAccount $ unspecifiedChain (Address 0)) False
 createDefaultValue _ (SVMType.String _) = return $ SString ""
 createDefaultValue _ (SVMType.Bytes _ _) = return $ SString ""
 createDefaultValue ctract (SVMType.Label name) =
@@ -293,7 +285,7 @@ data Typo = StructTypo [(T.Text, CC.FieldType)]
 -- they are types which have an `operator=` in the parlance of C++.
 -- Even though structs cannot be stored directly, the operator=
 -- simulates their appearance by retrieving theh individual fields.
-data BasicType = TInteger | TString | TBool | TAccount | TAccountPayable
+data BasicType = TInteger | TString | TBool | TAccount
                | TEnumVal String | TContract String
                | TStruct String [(B.ByteString, BasicType)]
                | TComplex

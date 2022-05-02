@@ -24,9 +24,7 @@ data Type
   | Bytes {dynamic::Maybe Bool, bytes:: Maybe Int32}
   | Bool
   | Address
-  | AddressPayable
-  | Account
-  | AccountPayable
+  | Account {isPayable :: Bool}
   | Label String
   | Struct { bytes::Maybe Int32, typedef::Text}
   | Enum { bytes::Maybe Int32, typedef::Text, names::Maybe [Text]}
@@ -44,4 +42,4 @@ instance ToSchema Type where
   declareNamedSchema proxy = genericDeclareNamedSchemaUnrestricted defaultSchemaOptions proxy
     & mapped.name ?~ "Solidity type"
     & mapped.schema.description ?~ "Represents a soldity type"
-    & mapped.schema.example ?~ toJSON Account
+    & mapped.schema.example ?~ toJSON Account {isPayable = False}

@@ -470,7 +470,7 @@ spec = do
                    ("isIterable", SVMType.Bool),
                    ("keyMap", SVMType.Mapping Nothing (SVMType.Bytes Nothing Nothing)
                               (SVMType.Int Nothing Nothing)),
-                   ("owner", SVMType.Account),
+                   ("owner", (SVMType.Account False)),
                    ("values", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                  ]
                 )
