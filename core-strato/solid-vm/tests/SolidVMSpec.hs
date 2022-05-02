@@ -28,7 +28,7 @@ import Data.Text.Encoding
 import Data.Time.Clock.POSIX
 import HFlags
 import Numeric
-import Test.Hspec (hspec, Spec, describe, it, xit, pendingWith, shouldThrow, anyErrorCall, Selector)
+import Test.Hspec (hspec, Spec, describe, fit, it, xit, pendingWith, shouldThrow, anyErrorCall, Selector)
 import Test.Hspec.Expectations.Lifted
 import Text.Printf
 import Text.RawString.QQ
@@ -3056,6 +3056,85 @@ contract qq {
       , BDefault
       , BDefault
       ]
+  fit "can get the balance from an address" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq{
+  account a1;
+  account a2;
+  uint bal1;
+  uint bal2;
+  constructor() public {
+    a1 = account(0xdeadbeef, 0xfeedbeef);
+    a2 = account(0x123, "main");
+    bal1 = a1.balance;
+    bal2 = a2.balance;
+  }
+}|]
+    getFields ["bal1", "bal2"] `shouldReturn`
+      [ BInteger 0,
+        BInteger 0]
+  fit "can get the codehash from an address" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq{
+  account a1;
+  account a2;
+  bytes ch1;
+  bytes ch2;
+  constructor() public {
+    a1 = account(0xdeadbeef, 0xfeedbeef);
+    a2 = account(0x123, "main");
+    ch1 = a1.codehash;
+    ch2 = a2.codehash;
+  }
+}|]
+    getFields ["bal1", "bal2"] `shouldReturn`
+      [ BString "",
+        BString ""]
+  fit "can get the code from an address" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq{
+  account a1;
+  account a2;
+  string ch1;
+  string ch2;
+  constructor() public {
+    a1 = account(0xdeadbeef, 0xfeedbeef);
+    a2 = account(0x123, "main");
+    ch1 = a1.code;
+    ch2 = a2.code;
+  }
+}|]
+    getFields ["ch1", "ch2"] `shouldReturn`
+      [ BString "",
+        BString ""]
+  fit "can tranfer from one account to another account using the address's transfer member" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq{
+  account a1;
+  account a2;
+  string ch1;
+  string ch2;
+  bool successful;
+  constructor() public {
+    a1 = account(0xdeadbeef, 0xfeedbeef);
+    a2 = account(0x123, "main");
+  }
+  function transferTen() internal pure
+    returns (string successful){
+      if (a1.balance < 10 && a2.balance >= 10) {
+        successful = a1.transfer(10); 
+      } else {
+        successful = false;
+      }
+      return successful;
+    }
+}|]
+    getFields ["successful"] `shouldReturn`
+      [ BBool True]
 
   it "can't assign a value to an unallocated index in an array" $ (runTest (runBS [r|
 pragma solidvm 3.0;
