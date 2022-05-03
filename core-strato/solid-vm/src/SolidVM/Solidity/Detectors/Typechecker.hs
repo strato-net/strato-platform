@@ -519,7 +519,7 @@ typecheckMember (Static (SVMType.Account) x) "chainId" = pure $ Static (SVMType.
 typecheckMember (Static (SVMType.Account) x) "balance" = pure $ Static (SVMType.Int Nothing Nothing) x
 -- please verify code is of the correct type
 typecheckMember (Static (SVMType.Account) x) "code" = pure $ Static (SVMType.Bytes Nothing Nothing) x
-typecheckMember (Static (SVMType.Account) x) "codehash" = pure $ Static (SVMType.Int Nothing Nothing) x
+typecheckMember (Static (SVMType.Account) x) "codehash" = pure $ Static (SVMType.String Nothing) x
 -- typecheckMember (Static (SVMType.Account) x) "transfer" = pure $ Static (SVMType.Int Nothing Nothing) x
 
 typecheckMember (Static (SVMType.Struct _ struct) x) n = do

@@ -3059,24 +3059,6 @@ contract qq {
   fit "can get the balance from an address" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
-contract qq{
-  account a1;
-  account a2;
-  uint bal1;
-  uint bal2;
-  constructor() public {
-    a1 = account(0xdeadbeef, 0xfeedbeef);
-    a2 = account(0x123, "main");
-    bal1 = a1.balance;
-    bal2 = a2.balance;
-  }
-}|]
-    getFields ["bal1", "bal2"] `shouldReturn`
-      [ BDefault,
-        BInteger 0]
-  fit "can get the codehash from an address" . runTest $ do
-    runBS [r|
-pragma solidvm 3.2;
 contract Mama {
   string s = "hello";
   constructor(){}
@@ -3086,34 +3068,84 @@ pragma solidvm 3.2;
 contract qq{
   account a1;
   account a2;
-  bytes32 workIt;
+  uint workIt;
   constructor() public {
     a1 = account(0xdeadbeef, 0xfeedbeef);
     a2 = account(0x123, "main");
     Mama m = new Mama();
-    workIt = m.codehash;
+    account a3 = account(m);
+    workIt = a3.balance;
   }
 }|]
-    getFields ["m"] `shouldReturn`
+    getFields ["workIt"] `shouldReturn`
       [ BInteger 0 ]
-  it "can get the code from an address" . runTest $ do
-    runBS [r|
+  fit "can get the codehash from an address" . runTest $ do
+    let contract = [r|
+pragma solidvm 3.2;
+contract Test {
+  constructor(){}
+}
+
 pragma solidvm 3.2;
 contract qq{
-  account a1;
-  account a2;
-  string c1;
-  string c2;
+  string codeHashTest;
   constructor() public {
-    a1 = account(0xdeadbeef, 0xfeedbeef);
-    a2 = account(0x123, "main");
-    c1 = a1.code;
-    c2 = a2.code;
+    Test t = new Test();
+    codeHashTest = account(t).codehash;
   }
 }|]
-    getFields ["c1", "c2"] `shouldReturn`
-      [ BString "",
-        BString ""]
+    runBS contract
+    getFields ["codeHashTest", "codeHashTest"] `shouldReturn`
+      [ BString $ BC.pack $ keccak256ToHex $ hash $ UTF8.fromString contract
+      , BString "a37c4f1c44888f20d2b8dad57919efe0d6aec401ff8af47180e07e0b32096086" ]
+
+  fit "can the codehash from this an address" . runTest $ do
+    let contract = [r|
+pragma solidvm 3.2;
+contract qq{
+  string codeHashTest;
+  constructor() public {
+    codeHashTest = account(this).codehash;
+  }
+}|]
+    runBS contract
+    getFields ["codeHashTest", "codeHashTest"] `shouldReturn`
+      [ BString $ BC.pack $  keccak256ToHex $ hash $ UTF8.fromString contract 
+      , BString "657f5687fe89bd0bd3cee84e83c306c65458c0b13d13991087f9a7330474f2d8" ]
+
+  fit "can get the code from an address" . runTest $ do
+    let contract :: String
+        contract = [r|
+pragma solidvm 3.2;
+contract Test {
+  constructor(){}
+}
+
+pragma solidvm 3.2;
+contract qq{
+  string codeTest;
+  constructor() public {
+    Test t = new Test();
+    codeTest = account(t).code;
+  }
+}|]
+    runBS contract
+    getFields ["codeTest"] `shouldReturn`
+      [ BString $ UTF8.fromString contract]
+
+  fit "can get the current contract code" . runTest $ do
+    let contract :: String
+        contract = [r|
+pragma solidvm 3.2;
+contract qq{
+  string codeTest;
+  constructor() public {
+    codeTest = account(this).code;
+  }
+}|]
+    runBS contract
+    getFields ["codeTest"] `shouldReturn`
+      [ BString $ UTF8.fromString contract]
 --   fit "can tranfer from one account to another account using the address's transfer member" . runTest $ do
 --     runBS [r|
 -- pragma solidvm 3.2;

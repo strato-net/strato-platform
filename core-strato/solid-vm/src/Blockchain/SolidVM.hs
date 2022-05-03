@@ -100,6 +100,7 @@ import qualified Text.Colors                          as C
 import           Text.Format
 import           Text.Tools
 
+import qualified Data.Text.Encoding                   as DT
 
 import qualified SolidVM.Model.CodeCollection as CC
 
@@ -113,6 +114,7 @@ import           SolidVM.Solidity.Parse.Statement
 import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpression)
 
 import           UnliftIO                             hiding (assert)
+ 
 -- import           Debug.Trace
 
 -- | Copying from Data.List.Extra, since our version of the extra library seems to not contain it.
@@ -1298,7 +1300,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
         codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) realAccount
         resolvedCodeHash <- resolveCodePtr cid codeHash'
         case resolvedCodeHash of
-          Just (SolidVMCode _ ch') -> return (Constant $ SString . BC.unpack . keccak256ToByteString $ ch')
+          Just (SolidVMCode _ ch') -> return (Constant $ SString . keccak256ToHex $ ch')
           _ -> error "Missing codehash"
       
       (SAccount a, "code") -> do
@@ -1323,8 +1325,9 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
         let cd' = case cd of
               Just (_,bs) -> bs
               _ -> error "Missing code"
-        -- Format the result
-        return $ Constant $ SString $ format cd'
+        let decodeCD = DT.decodeUtf8 cd'
+        -- Format the result  
+        return $ Constant $ SString $ T.unpack decodeCD
 
       (SAccount a, "balance") -> do 
         cid <- case (a ^. namedAccountChainId) of 
