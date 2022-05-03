@@ -627,3 +627,17 @@ contract A {
 }
 |]
      in length anns `shouldSatisfy` (>=3) -- TODO: should be exactly 3
+  it "can throw exception when the types are different from contructor and call" $
+    let anns = runTypechecker [r|
+contract qq {
+  uint x = 0;
+
+  constructor() {
+    x = f(6,5);   
+  }
+  function f(string, uint) public returns (uint) {
+    return 7;
+  }
+
+}|]
+    in length anns `shouldBe` 1

@@ -139,24 +139,6 @@ class CreateContract extends Component {
           metadata['nohistory'] = contract;
         }
       }
-      if (values[`noindex@${contract}`]) {
-        if (metadata['noindex']) {
-          const curNoIndex = metadata['noindex'];
-          metadata['noindex'] = curNoIndex + ',' + contract;
-        }
-        else {
-          metadata['noindex'] = contract;
-        }
-      }
-      else {
-        if (metadata['index']) {
-          const curIndex = metadata['index'];
-          metadata['index'] = curIndex + ',' + contract;
-        }
-        else {
-          metadata['index'] = contract;
-        }
-      }
     });
 
     const payload = {
@@ -485,33 +467,6 @@ class CreateContract extends Component {
                           component="input"
                           dir="auto"
                           title="History"
-                        />
-                        <span className="pt-control-indicator"></span>
-                        {value}
-                      </label>
-                    )
-                  })
-                  }
-                </div>
-              </div>}
-              {contracts && <div className="row">
-                <div className="col-sm-3 text-right">
-                  <label className="pt-label smd-pad-4">
-                    No Index
-                  </label>
-                </div>
-                <div className="col-sm-9 smd-pad-4">
-                  {contracts.map((value, index) => {
-                    return (
-                      <label className="pt-control pt-checkbox">
-                        <Field
-                          id={value}
-                          className="form-width"
-                          name={"noindex@" + value}
-                          type="checkbox"
-                          component="input"
-                          dir="auto"
-                          title="NoIndex"
                         />
                         <span className="pt-control-indicator"></span>
                         {value}

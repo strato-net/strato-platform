@@ -25,6 +25,7 @@ module Blockchain.VM.SolidException
   , inaccessibleChain
   , invalidWrite
   , invalidCertificate
+  , malformedData
   ) where
 
 import Control.DeepSeq
@@ -56,6 +57,7 @@ data SolidException = TypeError String String
                     | InaccessibleChain String String
                     | InvalidWrite String String
                     | InvalidCertificate String String
+                    | MalformedData String String
                     deriving (Eq, Exception, Generic, NFData, ToJSON, FromJSON)
 
 instance Show SolidException where
@@ -83,7 +85,8 @@ showSolidException (DivideByZero a) = printf "divide by zero error: %s" a
 showSolidException (MissingCodeCollection a b) = printf "missing code collection: %s: %s" a b
 showSolidException (InaccessibleChain a b) = printf "inaccessible chain: %s: %s" a b
 showSolidException (InvalidWrite a b) = printf "invalid write: %s: %s" a b
-showSolidException (InvalidCertificate a b) = printf "invalid certificate: %s" a b
+showSolidException (InvalidCertificate a b) = printf "invalid certificate: %s: %s" a b
+showSolidException (MalformedData a b) = printf "Malformed data: %s: %s" a b
 
 
 toThrower :: (Show v) => (String -> String -> SolidException) -> String -> v -> a
@@ -154,3 +157,6 @@ invalidWrite = toThrower InvalidWrite
 
 invalidCertificate :: (Show v) => String -> v -> a
 invalidCertificate = toThrower InvalidCertificate 
+
+malformedData :: (Show v) => String -> v -> a
+malformedData = toThrower MalformedData 

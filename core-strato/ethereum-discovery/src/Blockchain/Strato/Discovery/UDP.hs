@@ -173,22 +173,25 @@ ndPacketToRLP (Neighbors neighbors expiration) = (4, RLPArray [RLPArray $ map rl
 
 dataToPacket :: B.ByteString -> Either DiscoverException (NodeDiscoveryPacket, PublicKey)
 dataToPacket msg = do
-    let signature = importSignature $ B.take 65 $ B.drop 32 msg
-        theRest = B.unpack $ B.drop 98 msg
-        (rlp, _) = rlpSplit $ B.pack theRest
-    theType <- note (ByteStringLengthException $ show msg) $ listToMaybe . B.unpack $ B.take 1 $ B.drop 97 msg
-    let messageHash = hash $ B.pack $ theType : B.unpack (rlpSerialize rlp)
-    otherPubkey <- note (MalformedUDPException $ "malformed signature in udpHandshakeServer: " ++ show (signature, messageHash))
-                        (recoverPub signature $ keccak256ToByteString messageHash)
-    packet <- typeToPacket theType rlp
-    return (packet, otherPubkey)
-  where
-    typeToPacket:: Word8 -> RLPObject -> Either DiscoverException NodeDiscoveryPacket
-    typeToPacket 1 (RLPArray [version, from, to, timestamp]) = Right $ Ping (rlpDecode version) (rlpDecode from) (rlpDecode to) (rlpDecode timestamp)
-    typeToPacket 2 (RLPArray [to, echo, timestamp]) = Right $ Pong (rlpDecode to) (rlpDecode echo) (rlpDecode timestamp)
-    typeToPacket 3 (RLPArray [target, timestamp]) = Right $ FindNeighbors (rlpDecode target) (rlpDecode timestamp)
-    typeToPacket 4 (RLPArray [RLPArray neighbors, timestamp]) = Right $ Neighbors (map rlpDecode neighbors) (rlpDecode timestamp)
-    typeToPacket x y = Left $ MalformedUDPException $ "Unsupported case called in typeToPacket: " ++ show x ++ ", " ++ show y
+    let eSignature = importSignature $ B.take 65 $ B.drop 32 msg
+    case eSignature of 
+      Left err -> Left $ MalformedUDPException err
+      Right sig -> do
+        let  theRest = B.unpack $ B.drop 98 msg
+             (rlp, _) = rlpSplit $ B.pack theRest
+        theType <- note (ByteStringLengthException $ show msg) $ listToMaybe . B.unpack $ B.take 1 $ B.drop 97 msg
+        let messageHash = hash $ B.pack $ theType : B.unpack (rlpSerialize rlp)
+        otherPubkey <- note (MalformedUDPException $ "malformed signature in udpHandshakeServer: " ++ show (sig, messageHash))
+                            (recoverPub sig $ keccak256ToByteString messageHash)
+        packet <- typeToPacket theType rlp
+        return (packet, otherPubkey)
+      where
+        typeToPacket:: Word8 -> RLPObject -> Either DiscoverException NodeDiscoveryPacket
+        typeToPacket 1 (RLPArray [version, from, to, timestamp]) = Right $ Ping (rlpDecode version) (rlpDecode from) (rlpDecode to) (rlpDecode timestamp)
+        typeToPacket 2 (RLPArray [to, echo, timestamp]) = Right $ Pong (rlpDecode to) (rlpDecode echo) (rlpDecode timestamp)
+        typeToPacket 3 (RLPArray [target, timestamp]) = Right $ FindNeighbors (rlpDecode target) (rlpDecode timestamp)
+        typeToPacket 4 (RLPArray [RLPArray neighbors, timestamp]) = Right $ Neighbors (map rlpDecode neighbors) (rlpDecode timestamp)
+        typeToPacket x y = Left $ MalformedUDPException $ "Unsupported case called in typeToPacket: " ++ show x ++ ", " ++ show y
 
 sendPacket :: (HasVault m, MonadIO m, MonadLogger m)
            => Socket
@@ -216,15 +219,18 @@ processDataStream' bs =
       (vtype, rest) = B.splitAt 1 bs''
       theType = B.index vtype 0
       theHash = bytesToWord256 hs
-      signature = importSignature sigBS 
-      (rlp, _) = rlpSplit rest
-
-      messageHash = hash $ B.singleton theType <> rlpSerialize rlp
-      publicKey = recoverPub signature $ keccak256ToByteString messageHash
-      theHash' = hash $ sigBS <> B.singleton theType <> rlpSerialize rlp
-  in if theHash /= keccak256ToWord256 theHash'
-    then error "bad UDP data sent from peer, the hash isn't correct"
-    else fromMaybe (error "malformed signature in call to processDataStream") publicKey
+      eSignature = importSignature sigBS 
+  in
+  case eSignature of 
+    Left err -> error err
+    Right signature -> 
+      let (rlp, _) = rlpSplit rest
+          messageHash = hash $ B.singleton theType <> rlpSerialize rlp
+          publicKey = recoverPub signature $ keccak256ToByteString messageHash
+          theHash' = hash $ sigBS <> B.singleton theType <> rlpSerialize rlp
+      in if theHash /= keccak256ToWord256 theHash'
+        then error "bad UDP data sent from peer, the hash isn't correct"
+        else fromMaybe (error "malformed signature in call to processDataStream") publicKey
 
 newtype NodeID = NodeID B.ByteString deriving (Show, Read, Eq)
 

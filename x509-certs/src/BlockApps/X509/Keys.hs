@@ -13,10 +13,23 @@ import           Data.ASN1.Encoding
 import           Data.ASN1.BinaryEncoding
 import           Data.ASN1.Types                
 import qualified Data.ByteString                    as B
+import qualified Data.ByteString.Char8              as C8
+
 import           Data.PEM
 import           Data.X509
 
+rootPubKey :: PublicKey
+rootPubKey = 
+    let key = bsToPub $ C8.pack $ unlines 
+                ["-----BEGIN PUBLIC KEY-----"
+                  , "MFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEUhJR4x+wZiX+xZK2m/pwN40cvCS0UA7Z"
+                  , "0DB7sny5ZnNLw43JgKz0URDY2yYOPkhoIApxFK9UU3Bc4BRANDWmdQ=="
+                  , "-----END PUBLIC KEY-----"
+                ]
 
+    in case key of 
+      Left e -> error e
+      Right k -> k
 
 ----------------------------------------------------------------------------------------------
 -------------------------------------- READING/WRITING ---------------------------------------
@@ -43,7 +56,6 @@ pubToPem pub = PEM
   , pemHeader = []
   , pemContent = encodeASN1' DER $ toASN1 (serializeAndWrap pub) []
   }
-
 
 -- TODO:  maybe make custom exception types for the Left
 bsToPriv :: B.ByteString -> Either String PrivateKey
