@@ -115,8 +115,6 @@ import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpre
 
 import           UnliftIO                             hiding (assert)
  
--- import           Debug.Trace
-
 -- | Copying from Data.List.Extra, since our version of the extra library seems to not contain it.
 -- | A total variant of the list index function `(!!)`.
 --
@@ -1343,15 +1341,6 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
         case bal of
           Just as -> return $ Constant $ SInteger $ addressStateBalance as
           _ -> return $ Constant $ SInteger 0 
-
-      -- (SAccount a, "transfer") -> do
-      --   from <- getCurrentAccount
-      --   let address = namedAccountToAccount (from ^. accountChainId) a
-      --   success <- case argVals of
-      --     OrderedVals [SInteger amount] -> do
-      --       pay "built-in transfer function" from address amount
-      --     _ -> return False
-      --   return . Constant $ SBool success
         
       (SAccount a, "chainId") -> do
         contract' <- getCurrentContract

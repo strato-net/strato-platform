@@ -3146,31 +3146,6 @@ contract qq{
     runBS contract
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString contract]
---   fit "can tranfer from one account to another account using the address's transfer member" . runTest $ do
---     runBS [r|
--- pragma solidvm 3.2;
--- contract qq{
---   account a1;
---   account a2;
---   string ch1;
---   string ch2;
---   bool successful;
---   constructor() public {
---     a1 = account(0xdeadbeef, 0xfeedbeef);
---     a2 = account(0x123, "main");
---   }
---   function transferTen() internal pure
---     returns (string successful){
---       if (a1.balance < 10 && a2.balance >= 10) {
---         successful = a1.transfer(10); 
---       } else {
---         successful = false;
---       }
---       return successful;
---     }
--- }|]
---     getFields ["successful"] `shouldReturn`
---       [ BBool True]
 
   it "can't assign a value to an unallocated index in an array" $ (runTest (runBS [r|
 pragma solidvm 3.0;
