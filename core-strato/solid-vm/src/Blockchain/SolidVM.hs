@@ -1826,7 +1826,7 @@ callBuiltin rc'@("registerCert") [SString cert] _ = do
                         format subjectAddress ++ " as Common Name:" ++ show (subCommonName subject) ++ "; Organization: " ++ show (subOrg subject)
                       x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
                       Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.insert subjectAddress x509Cert x509s
-                      return $ SAccount (NamedAccount subjectAddress UnspecifiedChain)
+                      return $ SAccount (NamedAccount subjectAddress UnspecifiedChain) (False)
 
 callBuiltin "getUserCert" [(SAccount a _)] _ = do
   x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
