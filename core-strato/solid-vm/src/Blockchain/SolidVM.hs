@@ -444,11 +444,12 @@ setCreator creator contract cntrct blockNumber = do
   
   let hasSvm3_0 = CC._vmVersion cntrct == "svm3.0"
       hasSvm3_2 = CC._vmVersion cntrct == "svm3.2"
-  liftIO $ putStrLn $ "setCreator/address ---> Setting creatorAddress to: " ++ show creator 
-  putSolidStorageKeyVal' hasSvm3_2 contract (MS.StoragePath [MS.Field ":creatorAddress"]) (MS.BAccount $ accountToNamedAccount' creator)
+  when hasSvm3_2 $ do
+    liftIO $ putStrLn $ "setCreator/address ---> Setting creatorAddress to: " ++ show creator 
+    putSolidStorageKeyVal' hasSvm3_2 contract (MS.StoragePath [MS.Field ":creatorAddress"]) (MS.BAccount $ accountToNamedAccount' creator)
   let putCreatorField org = do
         liftIO $ putStrLn $ "setCreator/versioning ---> setting the org as " ++ (show org)
-        putSolidStorageKeyVal' (hasSvm3_0 || hasSvm3_0) contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack org)
+        putSolidStorageKeyVal' (hasSvm3_0 || hasSvm3_2) contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack org)
 
   if _org /= "" then putCreatorField _org else do
       liftIO $ putStrLn $ C.red $ "Ignoring creator field for empty org field"
