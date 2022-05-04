@@ -217,6 +217,7 @@ addressType' = Static $ SVMType.Address False
 --AddressPayableType' :: SourceAnnotation Text -> Type'
 --AddressPayableType' = Static $ SVMType.Address True
 
+
 accountType' :: SourceAnnotation Text -> Type'
 accountType' = Static $ SVMType.Account False
 
