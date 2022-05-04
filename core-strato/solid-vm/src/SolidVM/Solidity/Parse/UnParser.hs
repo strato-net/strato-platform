@@ -196,6 +196,10 @@ unparseStatementWith f (EmitStatement eventName extups a) =
   in
     f a $ "emit " ++ eventName ++ "(" ++ (List.intercalate ", " expVals) ++ ");"
 
+unparseStatementWith f (RevertStatement customErr extups a) = 
+    f a $ "revert " ++ fromMaybe "" customErr ++ "(" ++ (List.intercalate ", " (map unparseExpression extups)) ++ ");\n"
+
+
 -- unparseStatementWith _ x = internalError "missing case in call to unparseStatementWith" $ show x
 
 unparseVarDefEntry :: VarDefEntryF a -> String

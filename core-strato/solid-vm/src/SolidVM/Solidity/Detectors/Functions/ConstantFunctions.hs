@@ -112,6 +112,8 @@ statementHelper (Return mExpr _) =
 statementHelper (Throw _) = pure []
 statementHelper (EmitStatement _ vals _) =
   concat <$> traverse (expressionHelper . snd) vals
+statementHelper (RevertStatement _ vals _) =
+  concat <$> traverse expressionHelper vals
 statementHelper (AssemblyStatement _ x) = asks mutability >>= \case
   Nothing -> pure []
   Just Payable -> pure []

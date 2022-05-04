@@ -49,13 +49,12 @@ statement = do
   <|> (Break <$> (position (reserved "break") <* semi))
   <|> (reserved "assembly" >> inlineAssembly)
   <|> ((\(a,e) -> SimpleStatement (ExpressionStatement e) a) <$> ((withPosition expression) <* semi))
-
-
+  <|> revertStatement
 
 {-
 Statement = IfStatement | WhileStatement | ForStatement | Block | InlineAssemblyStatement |
             ( DoWhileStatement | PlaceholderStatement | Continue | Break | Return |
-              Throw | EmitStatement | SimpleStatement ) ';'
+              Throw | EmitStatement | RevertStatement | SimpleStatement ) ';'
 -}
 
 
@@ -104,7 +103,15 @@ forStatement = do
     pure (v1, v2, v3, s)
   pure $ ForStatement v1 v2 v3 s a
 
-
+revertStatement :: SolidityParser Statement
+revertStatement = try $ do
+  ~(a, (i, e)) <- withPosition $ do
+    reserved "revert"
+    i <- optionMaybe identifier
+    e <- parens $ (commaSep expression)
+    pure (i, e)
+  _ <- semi
+  pure $ RevertStatement i e a  
 
 --ForStatement = 'for' '(' (SimpleStatement)? ';' (Expression)? ';' (ExpressionStatement)? ')' Statement
 
