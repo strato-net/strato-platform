@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeApplications  #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 {-# OPTIONS_GHC -fno-warn-missing-fields #-}
@@ -33,7 +34,9 @@ import Test.Hspec.Expectations.Lifted
 import Text.Printf
 import Text.RawString.QQ
 
+import Control.Monad.Change.Alter
 import Blockchain.SolidVM.CodeCollectionDB as CCDB
+import Blockchain.Data.AddressStateDB
 import Blockchain.Data.DataDefs (BlockData(..))
 import Blockchain.Data.ExecResults
 import Blockchain.Data.RLP
@@ -3057,28 +3060,26 @@ contract qq {
       , BDefault
       ]
   fit "can get the balance from an address" . runTest $ do
+    -- Post contract
     runBS [r|
 pragma solidvm 3.2;
-contract Mama {
-  string s = "hello";
-  constructor(){}
-}
-
-pragma solidvm 3.2;
 contract qq{
-  account a1;
-  account a2;
-  uint workIt;
+  account a;
+  uint bal;
   constructor() public {
-    a1 = account(0xdeadbeef, 0xfeedbeef);
-    a2 = account(0x123, "main");
-    Mama m = new Mama();
-    account a3 = account(m);
-    workIt = a3.balance;
+    a = account(this);
+  }
+  function myBalance() {
+    bal = a.balance;
   }
 }|]
-    getFields ["workIt"] `shouldReturn`
-      [ BInteger 0 ]
+    -- Get the contract's account
+    [ BAccount a ] <- getFields ["a"]
+    -- Set the balance
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 13 })
+    -- Check return of balance
+    void $ call2 "myBalance" "()" (namedAccountToAccount Nothing a) 
+    getFields ["bal"] `shouldReturn` [ BInteger 13 ]
   fit "can get the codehash from an address" . runTest $ do
     let contract = [r|
 pragma solidvm 3.2;
