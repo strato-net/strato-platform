@@ -29,7 +29,7 @@ import Data.Text.Encoding
 import Data.Time.Clock.POSIX
 import HFlags
 import Numeric
-import Test.Hspec (hspec, Spec, describe, fit, it, xit, pendingWith, shouldThrow, anyErrorCall, Selector)
+import Test.Hspec (hspec, Spec, describe, it, xit, pendingWith, shouldThrow, anyErrorCall, Selector)
 import Test.Hspec.Expectations.Lifted
 import Text.Printf
 import Text.RawString.QQ
@@ -3035,7 +3035,7 @@ contract qq {
       , BBool True
       , BDefault
       ]
-  fit "can get the chainId from the account type" . runTest $ do
+  it "can get the chainId from the account type" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
 contract qq {
@@ -3059,7 +3059,7 @@ contract qq {
       , BDefault
       , BDefault
       ]
-  fit "can get the balance from an address" . runTest $ do
+  it "can get the balance from an address" . runTest $ do
     -- Post contract
     runBS [r|
 pragma solidvm 3.2;
@@ -3080,7 +3080,7 @@ contract qq{
     -- Check return of balance
     void $ call2 "myBalance" "()" (namedAccountToAccount Nothing a) 
     getFields ["bal"] `shouldReturn` [ BInteger 13 ]
-  fit "can get the codehash from an address" . runTest $ do
+  it "can get the codehash from an address" . runTest $ do
     let contract = [r|
 pragma solidvm 3.2;
 contract Test {
@@ -3100,7 +3100,7 @@ contract qq{
       [ BString $ BC.pack $ keccak256ToHex $ hash $ UTF8.fromString contract
       , BString "a37c4f1c44888f20d2b8dad57919efe0d6aec401ff8af47180e07e0b32096086" ]
 
-  fit "can the codehash from this an address" . runTest $ do
+  it "can the codehash from this an address" . runTest $ do
     let contract = [r|
 pragma solidvm 3.2;
 contract qq{
@@ -3114,7 +3114,7 @@ contract qq{
       [ BString $ BC.pack $  keccak256ToHex $ hash $ UTF8.fromString contract 
       , BString "657f5687fe89bd0bd3cee84e83c306c65458c0b13d13991087f9a7330474f2d8" ]
 
-  fit "can get the code from an address" . runTest $ do
+  it "can get the code from an address" . runTest $ do
     let contract :: String
         contract = [r|
 pragma solidvm 3.2;
@@ -3134,7 +3134,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString contract]
 
-  fit "can get the current contract code" . runTest $ do
+  it "can get the current contract code" . runTest $ do
     let contract :: String
         contract = [r|
 pragma solidvm 3.2;
