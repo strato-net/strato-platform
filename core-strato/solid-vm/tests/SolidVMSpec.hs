@@ -3131,6 +3131,32 @@ contract qq {
       , BDefault
       ]
 
+  fit "can trasnfer value from account a to account b" . runTest $ do
+    -- Post contract
+    runBS [r|
+pragma solidvm 3.2;
+contract qq{
+  account a;
+  account b;
+  uint bal;
+  constructor() public {
+    a = account(this);
+  }
+  function myBalance() {
+    //from the account address "a" transfer funds to the account address "b"
+      //the full balance from account a
+    a(b).transfer(a.balance);
+    bal = b.balance;
+  }
+}|]
+    -- Get the contract's account
+    [ BAccount a ] <- getFields ["a"]
+    -- Set the balance
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 13 })
+    -- Check return of balance
+    void $ call2 "myBalance" "()" (namedAccountToAccount Nothing a) 
+    getFields ["bal"] `shouldReturn` [ BInteger 13 ]
+
   it "can't assign a value to an unallocated index in an array" $ (runTest (runBS [r|
 pragma solidvm 3.0;
 contract qq {
