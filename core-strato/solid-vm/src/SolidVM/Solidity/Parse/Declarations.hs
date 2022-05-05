@@ -67,7 +67,6 @@ solidityContract = do
   let ctorList = [(Text.pack n, c) | (n, ConstructorDeclaration c) <- declarations]
   let events = [(Text.pack n, e) | (n, EventDeclaration e) <- declarations]
   let using = [(Text.pack n, u) | (n, UsingDeclaration u) <- declarations]
-
   let enumsOrStructs = case (maybeEnumsOrStructs) of
         Nothing -> []
         Just x -> [(Text.pack name, enum) | (name, EnumDeclaration enum) <- x] ++ [(Text.pack name, struct) | (name, StructDeclaration struct) <- x]
@@ -185,11 +184,7 @@ enumDeclaration = do
         }
     )
 
--- | Parses Enums or Structs until it cannot find any more
--- enumOrStruct :: SolidityParser (Maybe (String, Declaration))
--- enumOrStruct =  
-  
-
+-- | Parses a using declaration
 usingDeclaration :: SolidityParser (String, Declaration)
 usingDeclaration = do
   ~(a, (usingContract', rest)) <- withPosition $ do
