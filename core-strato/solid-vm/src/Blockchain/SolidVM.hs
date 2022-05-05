@@ -1282,13 +1282,18 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
             addr <- accountOnUnspecifiedChain <$> getCurrentAccount
             return $ Constant $ SContractFunction (Just $ CC._contractName $ last ps) addr method
 
-      (SAccount a, "transfer") -> do
+      (a@(SArray _ _), "push") -> return $ Constant $ SPush a (Just var)
+
+      (a@(SAccount _ _), "transfer") -> do
+        -- TODO: make into a function
+        -- TODO: make gas limit of 2300 
+        -- Get the current from which to transfer from
         from <- getCurrentAccount
-        let address = namedAccountToAccount (from ^. accountChainId) a
+        let toAddress = namedAccountToAccount (from ^. accountChainId) a
         success <- case argVals of
           OrderedVals [SInteger amount] -> do
-            pay "built-in transfer function" from address amount
-          _ -> return False
+            pay "Transfer funds to the new address" from address amount
+          _ -> return throw
         return . Constant $ SBool success
       
       (SAccount a, "chainId") -> do
@@ -1638,6 +1643,12 @@ expToVar' (CC.FunctionCall _ e args) = do
               _ -> typeError "called enum constructor with improper args" argVals
 
           Constant (SPush theArray mvar) -> Builtins.push theArray mvar argVals
+
+          Constant (SAccountTransfer toAddress amount) -> do
+            --Make sure that the transfer amount does not exceed 2300 (This is a standard solidity rule)
+            when (amount > 2300) $ throw "Cannot transfer more than 2300 wei";
+            pay "built-in transfer function" from toAddress amount;
+
 
           Constant SHexDecodeAndTrim ->
               case argVals of
