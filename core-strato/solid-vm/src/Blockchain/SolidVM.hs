@@ -1281,6 +1281,16 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
           ps -> do
             addr <- accountOnUnspecifiedChain <$> getCurrentAccount
             return $ Constant $ SContractFunction (Just $ CC._contractName $ last ps) addr method
+
+      (SAccount a, "transfer") -> do
+        from <- getCurrentAccount
+        let address = namedAccountToAccount (from ^. accountChainId) a
+        success <- case argVals of
+          OrderedVals [SInteger amount] -> do
+            pay "built-in transfer function" from address amount
+          _ -> return False
+        return . Constant $ SBool success
+      
       (SAccount a, "chainId") -> do
         contract' <- getCurrentContract
         case CC._vmVersion contract' == "svm3.2" of

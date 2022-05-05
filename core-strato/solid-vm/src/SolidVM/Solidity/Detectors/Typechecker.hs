@@ -515,6 +515,7 @@ typecheckMember (Static e@(SVMType.Enum _ enum mNames) x) n = do
              , " is not an element of "
              , enum
              ]) <$ x
+typecheckMember (Static (SVMType.Account) x) "transfer" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Account) x) "chainId" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Struct _ struct) x) n = do
   names <- M.fromList <$> lookupStruct struct
