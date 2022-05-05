@@ -70,7 +70,6 @@ solidityContract = do
   let enumsOrStructs = case (maybeEnumsOrStructs) of
         Nothing -> []
         Just x -> [(Text.pack name, enum) | (name, EnumDeclaration enum) <- x] ++ [(Text.pack name, struct) | (name, StructDeclaration struct) <- x]
---  Maybe [(name, Declartion x)] -> [(packed name, x)]   
   allCtors <- if length ctorList > 1
                   then fail "multiple constructors defined"
                   else return . Map.fromList $ ctorList
