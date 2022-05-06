@@ -1282,19 +1282,11 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
             addr <- accountOnUnspecifiedChain <$> getCurrentAccount
             return $ Constant $ SContractFunction (Just $ CC._contractName $ last ps) addr method
 
-      (a@(SArray _ _), "push") -> return $ Constant $ SPush a (Just var)
+      -- (a@(SArray _ _), "push") -> return $ Constant $ SPush a (Just var)
 
-      (a@(SAccount _ _), "transfer") -> do
-        -- TODO: make into a function
-        -- TODO: make gas limit of 2300 
-        -- Get the current from which to transfer from
-        from <- getCurrentAccount
-        let toAddress = namedAccountToAccount (from ^. accountChainId) a
-        success <- case argVals of
-          OrderedVals [SInteger amount] -> do
-            pay "Transfer funds to the new address" from address amount
-          _ -> return throw
-        return . Constant $ SBool success
+      -- (a@(SAccount _), "transfer") -> do
+
+      (SAccountTransfer account amount, "transfer") -> return $ Constant $ SAccountTransfer account amount
       
       (SAccount a, "chainId") -> do
         contract' <- getCurrentContract
@@ -1644,11 +1636,35 @@ expToVar' (CC.FunctionCall _ e args) = do
 
           Constant (SPush theArray mvar) -> Builtins.push theArray mvar argVals
 
+          -- Constant (SContractItem address' "transfer") -> do
+          --   from <- getCurrentAccount
+          --   let address = namedAccountToAccount (from ^. accountChainId) address'
+          --   success <- case argVals of
+          --     OrderedVals [SInteger amount] -> do
+          --       pay "built-in transfer function" from address amount
+          --     _ -> return False
+          --   return . Constant $ SBool success
+
           Constant (SAccountTransfer toAddress amount) -> do
             --Make sure that the transfer amount does not exceed 2300 (This is a standard solidity rule)
-            when (amount > 2300) $ throw "Cannot transfer more than 2300 wei";
-            pay "built-in transfer function" from toAddress amount;
+            when (amount > 2300) $ error "Cannot transfer more than 2300 wei"
+            from <- getCurrentAccount
+            success <- pay "member transfer function" from toAddress amount
+            if success 
+              then return $ Constant $ SBool success
+              else error "Payment Error"
+            -- case success
+              -- SBool -> do
+                -- return success
+              -- _ -> throw "Unknown payment error"
+            -- when (not success) $ throw "Transfer not successful"
+            
+            -- else return $ throw "Was not able to transfer to the account."
+            
+            -- from <- getCurrentAccount
 
+            -- let address = namedAccountToAccount (from ^. accountChainId) address'
+            -- pay "built-in transfer function" getCurrentAccount toAddress amount;
 
           Constant SHexDecodeAndTrim ->
               case argVals of

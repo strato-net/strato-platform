@@ -1,6 +1,8 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TypeOperators     #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
@@ -34,6 +36,8 @@ import Text.Printf
 import Text.RawString.QQ
 
 import Blockchain.SolidVM.CodeCollectionDB as CCDB
+import Control.Monad.Change.Alter
+import Blockchain.Data.AddressStateDB
 import Blockchain.Data.DataDefs (BlockData(..))
 import Blockchain.Data.ExecResults
 import Blockchain.Data.RLP

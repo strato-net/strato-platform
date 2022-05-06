@@ -98,6 +98,7 @@ data Value =
   | SString String
   | SBool Bool
   | SAccount NamedAccount
+  | SAccountTransfer Account Integer --likely the wrong data type
   | SEnum String
   | SEnumVal String String Word32
   | SStructDef String

@@ -267,6 +267,14 @@ getVar (Constant (SPush v (Just var))) = do
     resolved <- getVar var
     return $ SPush v (Just $ Constant resolved)
 
+-- Likely wrong data types, please edit as needed
+getVar (Constant (SAccountTransfer account amount)) = do
+  cntrct <- getCurrentContract
+  if ( not (CC._vmVersion cntrct == "svm3.2")) then return (SAccountTransfer account amount) else do
+    --resolved <- getInt amount
+    --TODO: add a check to ensure that the value given is an integer
+    return $ SAccountTransfer account amount
+
 getVar (Constant v) = return v
 
 getVar (Variable v) = liftIO $ readIORef v
