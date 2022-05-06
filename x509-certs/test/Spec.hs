@@ -61,11 +61,11 @@ spec = do
       rlpDecode rlp `shouldBe` cert
       rlpEncode cert `shouldBe` rlp
     it "can verify cert signatures" $ do
-      cert <- flip runReaderT priv $ makeSignedCert iss sub
+      (X509Certificate (CertificateChain (cert:_))) <- flip runReaderT priv $ makeSignedCert iss sub
       let sigVerification = verifySignedSignature (coerce cert) (certPubKey $ getCertificate $ coerce cert)
       sigVerification `shouldBe` SignaturePass
     it "can reject invalid signatures" $ do
-      cert <- flip runReaderT priv $ makeSignedCert iss sub
+      (X509Certificate (CertificateChain (cert:_))) <- flip runReaderT priv $ makeSignedCert iss sub
       fakePriv <- newPrivateKey
       let fakeSerialPub = SerializedPoint $ exportPublicKey False (derivePublicKey fakePriv)
           fakePub = PubKeyEC $ PubKeyEC_Named SEC_p256k1 fakeSerialPub

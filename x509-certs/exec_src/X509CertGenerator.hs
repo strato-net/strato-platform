@@ -119,7 +119,7 @@ main = do
           , issUnit       = subUnit optSubjectInfo
           }
         Just cert -> 
-          fromMaybe (error "missing commonName or orgName in issuer cert") (getCertIssuer cert)
+          head $ fromMaybe (error "missing commonName or orgName in issuer cert") (getCertIssuer cert)
   
   -- generate and write cert
   flip runReaderT optKey $ do
