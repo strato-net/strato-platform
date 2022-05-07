@@ -100,8 +100,9 @@ spec = do
                  , ("var x = [];", SimpleStatement $
                       VariableDefinition [VarDefEntry Nothing Nothing "x" ()] $ Just $
                       ArrayExpression () [])
-                  --, ("revert f(x, y);\n", RevertStatement $ "f" ( TupleExpression () (map (Just) [ (Variable () "x"), (Variable () "y")])  () ) )
-                  -- , ("revert(\"e\");", RevertStatement $ OrderedArgs [StringLiteral () "e"])
+                  , ("revert f(x, y);", RevertStatement (Just "f") (OrderedArgs [(Variable () "x"), (Variable () "y")]) )
+                  , ("revert(\"e\");", RevertStatement (Nothing) (OrderedArgs [StringLiteral () "e"]) )
+                  , ("revert f({ x: y , q: z })",  RevertStatement (Just "f") (NamedArgs [("x", Variable () "y"), ("q", Variable () "z")]) )
                  ]
     forM_ scases $ \(input, want) -> do
         it ("can parse " ++ input) $ parseStatement input `shouldBe` Right (want ())

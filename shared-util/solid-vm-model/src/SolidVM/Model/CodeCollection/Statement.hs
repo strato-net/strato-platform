@@ -43,7 +43,7 @@ data StatementF a =
   | EmitStatement String [(Maybe String, (ExpressionF a))] a
   | AssemblyStatement InlineAssembly a
   | SimpleStatement (SimpleStatementF a) a
-  | RevertStatement (Maybe String) [(ExpressionF a)] a
+  | RevertStatement (Maybe String) (ArgListF a) a
   deriving (Show, Eq, Generic, Functor, ToJSON, FromJSON)
 
 extractStatement :: StatementF a -> a

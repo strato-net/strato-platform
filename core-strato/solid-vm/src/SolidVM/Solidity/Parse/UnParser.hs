@@ -196,9 +196,11 @@ unparseStatementWith f (EmitStatement eventName extups a) =
   in
     f a $ "emit " ++ eventName ++ "(" ++ (List.intercalate ", " expVals) ++ ");"
 
-unparseStatementWith f (RevertStatement customErr extups a) = 
-    f a $ "revert " ++ fromMaybe "" customErr ++ "(" ++ (List.intercalate ", " (map unparseExpression extups)) ++ ");\n"
+unparseStatementWith f (RevertStatement customErr (OrderedArgs argList) a) = 
+    f a $ "revert " ++ fromMaybe "" customErr ++ "(" ++ (List.intercalate ", " (map unparseExpression argList)) ++ ");\n"
 
+unparseStatementWith f (RevertStatement customErr (NamedArgs argList) a) = 
+    f a $ "revert " ++ fromMaybe "" customErr ++ "(" ++ (List.intercalate ", " (map (unparseExpression . snd) argList)) ++ ");\n"
 
 -- unparseStatementWith _ x = internalError "missing case in call to unparseStatementWith" $ show x
 

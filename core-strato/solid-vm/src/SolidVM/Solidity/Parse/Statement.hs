@@ -111,7 +111,7 @@ revertStatement = try $ do
     e <- parens $ (commaSep expression)
     pure (i, e)
   _ <- semi
-  pure $ RevertStatement i e a  
+  pure $ RevertStatement i (OrderedArgs e) a  
 
 --ForStatement = 'for' '(' (SimpleStatement)? ';' (Expression)? ';' (ExpressionStatement)? ')' Statement
 
