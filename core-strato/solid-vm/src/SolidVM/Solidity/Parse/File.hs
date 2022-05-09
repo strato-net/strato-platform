@@ -19,6 +19,8 @@ import           Data.SemVer
 import qualified Data.Text                             as T
 import           GHC.Generics
 import           Text.Parsec
+import           Data.Map                              as Map
+ 
 
 
 import           SolidVM.Solidity.Parse.Declarations
@@ -26,7 +28,7 @@ import           SolidVM.Solidity.Parse.Imports
 import           SolidVM.Solidity.Parse.Lexer
 import           SolidVM.Solidity.Parse.ParserTypes
 import           SolidVM.Solidity.Parse.Pragmas
-
+import           SolidVM.Solidity.Xabi              (XabiF (..))
 
 newtype File = File {
   unsourceUnits :: [SourceUnit]
@@ -35,13 +37,23 @@ newtype File = File {
 solidityFile :: SolidityParser File
 solidityFile = do
   whiteSpace
-  units <- many (solidityPragma <|> solidityImport <|> solidityContract)
+  units <- many (solidityPragma <|> solidityImport <|> solidityContract <|> structOrEnum)
   eof
-  return . File $ units
+  -- This method isn't very Haskellic could probably be done better wiht library functions like liftM?
+  let onlyStructsAndEnumsMap = Map.fromList $ concatMap (\x -> case x of FileLevelSructOrEnum y -> [y]; _ -> []) units
+  let units' = Prelude.filter (\x -> case x of FileLevelSructOrEnum _ -> False; _ -> True) units
+  units'' <- forM units' $ \unit -> do
+    case unit of
+      Import _ _ -> return unit
+      Pragma _ _ _ -> return unit
+      NamedXabi name ((Xabi funcs constrs vars constants types mods events kind using context), namearr) ->
+        return $ NamedXabi name ((Xabi funcs constrs vars constants (Map.union types onlyStructsAndEnumsMap) mods events kind using context), namearr)
+      _ -> error "unexpected FileLevelSructOrEnum"
+  return . File $ units''    
 
 
 decideVersion :: File -> SolcVersion
-decideVersion = maximum . (ZeroPointFour:) . mapMaybe go . unsourceUnits
+decideVersion = maximum . (ZeroPointFour:) . Data.Maybe.mapMaybe go . unsourceUnits
   where go :: SourceUnit -> Maybe SolcVersion
         go (Pragma _ pragmaName rest) = do
           guard $ pragmaName == "solidity"

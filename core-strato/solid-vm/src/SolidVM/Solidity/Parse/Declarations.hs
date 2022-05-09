@@ -38,15 +38,26 @@ import           Blockchain.VM.SolidException
 
 data SourceUnitF a = Pragma a Identifier String
                    | Import a Text.Text
+                   | FileLevelSructOrEnum (Text.Text, SolidVM.Def)
                    | NamedXabi Text.Text (XabiF a, [Text.Text])
                    deriving (Eq, Show, Generic, Functor)
 
 type SourceUnit = Positioned SourceUnitF
 
+
+structOrEnum :: SolidityParser SourceUnit
+structOrEnum = do
+  enumOrStruct <- (enumDeclaration <|> structDeclaration)
+  let enumOrStructForReturn = case enumOrStruct of
+        (name, StructDeclaration struct) -> (Text.pack name, struct)
+        (name, EnumDeclaration enum) -> (Text.pack name, enum)
+        _ -> error "structOrEnum: unexpected"
+  return $ FileLevelSructOrEnum enumOrStructForReturn
+
 -- | Parses an entire Solidity contract
 solidityContract :: SolidityParser SourceUnit
 solidityContract = do
-  maybeEnumsOrStructs <- optionMaybe $ many (enumDeclaration <|> structDeclaration)
+  --maybeEnumsOrStructs <- optionMaybe $ many (enumDeclaration <|> structDeclaration)
   ~(a, (kind, contractName', baseConstrs)) <- withPosition $ do
     kind <- (reserved "contract" >> return Xabi.ContractKind)
           <|> (reserved "interface" >> return Xabi.InterfaceKind)
@@ -67,9 +78,9 @@ solidityContract = do
   let ctorList = [(Text.pack n, c) | (n, ConstructorDeclaration c) <- declarations]
   let events = [(Text.pack n, e) | (n, EventDeclaration e) <- declarations]
   let using = [(Text.pack n, u) | (n, UsingDeclaration u) <- declarations]
-  let enumsOrStructs = case (maybeEnumsOrStructs) of
-        Nothing -> []
-        Just x -> [(Text.pack name, enum) | (name, EnumDeclaration enum) <- x] ++ [(Text.pack name, struct) | (name, StructDeclaration struct) <- x]
+  --let enumsOrStructs = case (maybeEnumsOrStructs) of
+  --      Nothing -> []
+  --      Just x -> [(Text.pack name, enum) | (name, EnumDeclaration enum) <- x] ++ [(Text.pack name, struct) | (name, StructDeclaration struct) <- x]
   allCtors <- if length ctorList > 1
                   then fail "multiple constructors defined"
                   else return . Map.fromList $ ctorList
@@ -84,7 +95,7 @@ solidityContract = do
                Map.fromList $
                [ (Text.pack name, enum) | (name, EnumDeclaration enum) <- declarations]
                ++ [ (Text.pack name, struct) | (name, StructDeclaration struct) <- declarations]
-               ++ enumsOrStructs
+               -- ++ enumsOrStructs
              , xabiModifiers = Map.fromList [(Text.pack name, modifier) | (name, ModifierDeclaration modifier) <- declarations]
              , xabiEvents = Map.fromList events
              , xabiKind = kind
