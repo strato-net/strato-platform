@@ -49,7 +49,10 @@ address :: Address -> V.Value
 address = SimpleValue . ValueAccount . unspecifiedChain
 
 bAccount :: Address -> BasicValue
-bAccount = BAccount . unspecifiedChain
+bAccount = ((flip BAccount) False) . unspecifiedChain
+
+bAccountPayable :: Address -> BasicValue
+bAccountPayable = ((flip BAccount) True) . unspecifiedChain
 
 bContract :: Text -> Address -> BasicValue
 bContract t = BContract t . unspecifiedChain

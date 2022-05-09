@@ -75,7 +75,7 @@ fromBasic = \case
   MS.BInteger i -> SInteger i
   MS.BString s -> SString . BC.unpack $ s
   MS.BBool b -> SBool b
-  MS.BAccount a -> SAccount a
+  MS.BAccount a b -> SAccount a b
   MS.BContract n a -> SContract (T.unpack n) a
   MS.BEnumVal k v num -> SEnumVal (T.unpack k) (T.unpack v) num
   MS.BMappingSentinel -> SMappingSentinel
@@ -86,7 +86,7 @@ findDefault = \case
   TInteger -> SInteger 0
   TString -> SString ""
   TBool -> SBool False
-  TAccount -> SAccount $ unspecifiedChain 0x0
+  TAccount -> (SAccount $ unspecifiedChain 0x0) False
   TContract n -> SContract n $ unspecifiedChain 0x0
   TEnumVal n -> SEnumVal n (todo "findDefault/enumval" n) 0x0
   TStruct n fs -> todo "findDefault/struct" (n, fs)
@@ -98,7 +98,7 @@ toBasic = \case
   SInteger i -> MS.BInteger i
   SString s -> MS.BString (BC.pack s)
   SBool b -> MS.BBool b
-  SAccount a -> MS.BAccount a
+  SAccount a b -> MS.BAccount a b
   SContract n a -> MS.BContract (T.pack n) a
   SEnumVal k t num -> MS.BEnumVal (T.pack k) (T.pack t) num
   SMappingSentinel -> MS.BMappingSentinel
@@ -343,7 +343,7 @@ showSM (SString v) = return v
 showSM (SBool v) = return $ show v
 showSM (SEnumVal enumName valName num) = return
     $ printf "%s.%s (= %x)" enumName valName num
-showSM (SAccount a) = return $ show a
+showSM (SAccount a b) = return $ show a ++ "." ++ (if b then "payable" else "not payable")
 showSM (STuple v) = do
   vals <- mapM getVar (V.toList v)
   strings <- forM vals showSM
