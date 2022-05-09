@@ -110,6 +110,10 @@ anyMalformedDataError :: Selector HandledException
 anyMalformedDataError (HE Blockchain.SolidVM.Exception.MalformedData{}) = True
 anyMalformedDataError _ = False
 
+anyTooMuchGasError :: Selector HandledException
+anyTooMuchGasError (HE Blockchain.SolidVM.Exception.TooMuchGas{}) = True
+anyTooMuchGasError _ = False
+
 failedRequirementMsg :: String -> Selector HandledException
 failedRequirementMsg str (HE (Require (Just msg))) = str == msg
 failedRequirementMsg _   _                         = False
@@ -3245,7 +3249,7 @@ contract qq{
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs { addressStateBalance = 13000 })
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs { addressStateBalance = 13000 })
     -- Check return of balance
-    (void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a))) `shouldThrow` anyException
+    (void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a))) `shouldThrow` anyTooMuchGasError
     -- "hello" `shouldBe` "Hello"
 
   it "can get the chainId from the account type" . runTest $ do
