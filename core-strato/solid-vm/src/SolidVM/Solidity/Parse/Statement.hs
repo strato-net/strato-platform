@@ -103,15 +103,34 @@ forStatement = do
     pure (v1, v2, v3, s)
   pure $ ForStatement v1 v2 v3 s a
 
+-- revert("foo") <|> revert({x: y, q: z})
 revertStatement :: SolidityParser Statement
 revertStatement = try $ do
   ~(a, (i, e)) <- withPosition $ do
     reserved "revert"
     i <- optionMaybe identifier
-    e <- parens $ (commaSep expression)
+    e <- parens $ choice 
+      [
+        fmap NamedArgs . braces $ commaSep $ do
+          fieldName <- identifier
+          void colon -- lol
+          fieldExpr <- expression
+          return (fieldName, fieldExpr)
+        , OrderedArgs <$> commaSep expression
+      ]
     pure (i, e)
   _ <- semi
-  pure $ RevertStatement i (OrderedArgs e) a  
+  pure $ RevertStatement i e a  
+
+--[ fmap NamedArgs . braces $ commaSep $ do
+ --       fieldName <- identifier
+   --     void colon -- haha
+       -- fieldExpr <- expression
+     --   return (fieldName, fieldExpr)
+   -- , OrderedArgs <$> commaSep expression
+   -- ]
+  -- return $ flip (FunctionCall a) args
+
 
 --ForStatement = 'for' '(' (SimpleStatement)? ';' (Expression)? ';' (ExpressionStatement)? ')' Statement
 
