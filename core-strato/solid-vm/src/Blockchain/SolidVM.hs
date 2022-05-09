@@ -1665,6 +1665,7 @@ expToVar' (CC.FunctionCall _ e args) = do
             let address = namedAccountToAccount (from ^. accountChainId) address'
             success <- case argVals of
               OrderedVals [SInteger amount] -> do
+                when (amount > 2300) $ error ((show amount) ++ " is greater than the 2300 wei transfer limit")
                 pay "built-in transfer function" from address amount
               _ -> return False
             return . Constant $ SBool success
