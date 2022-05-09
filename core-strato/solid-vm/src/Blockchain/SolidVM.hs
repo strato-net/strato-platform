@@ -1343,7 +1343,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
           Just as -> return $ Constant $ SInteger $ addressStateBalance as
           _ -> return $ Constant $ SInteger 0 
         
-      (SAccount a_ , "chainId") -> do
+      (SAccount a _, "chainId") -> do
         contract' <- getCurrentContract
         case CC._vmVersion contract' == "svm3.2" of
           True ->
