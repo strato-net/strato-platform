@@ -57,7 +57,6 @@ structOrEnum = do
 -- | Parses an entire Solidity contract
 solidityContract :: SolidityParser SourceUnit
 solidityContract = do
-  --maybeEnumsOrStructs <- optionMaybe $ many (enumDeclaration <|> structDeclaration)
   ~(a, (kind, contractName', baseConstrs)) <- withPosition $ do
     kind <- (reserved "contract" >> return Xabi.ContractKind)
           <|> (reserved "interface" >> return Xabi.InterfaceKind)
@@ -78,9 +77,6 @@ solidityContract = do
   let ctorList = [(Text.pack n, c) | (n, ConstructorDeclaration c) <- declarations]
   let events = [(Text.pack n, e) | (n, EventDeclaration e) <- declarations]
   let using = [(Text.pack n, u) | (n, UsingDeclaration u) <- declarations]
-  --let enumsOrStructs = case (maybeEnumsOrStructs) of
-  --      Nothing -> []
-  --      Just x -> [(Text.pack name, enum) | (name, EnumDeclaration enum) <- x] ++ [(Text.pack name, struct) | (name, StructDeclaration struct) <- x]
   allCtors <- if length ctorList > 1
                   then fail "multiple constructors defined"
                   else return . Map.fromList $ ctorList
@@ -95,7 +91,6 @@ solidityContract = do
                Map.fromList $
                [ (Text.pack name, enum) | (name, EnumDeclaration enum) <- declarations]
                ++ [ (Text.pack name, struct) | (name, StructDeclaration struct) <- declarations]
-               -- ++ enumsOrStructs
              , xabiModifiers = Map.fromList [(Text.pack name, modifier) | (name, ModifierDeclaration modifier) <- declarations]
              , xabiEvents = Map.fromList events
              , xabiKind = kind
