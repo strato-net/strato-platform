@@ -4,7 +4,6 @@
 {-# LANGUAGE TypeOperators     #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeApplications  #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 {-# OPTIONS_GHC -fno-warn-missing-fields #-}
@@ -38,7 +37,6 @@ import Text.RawString.QQ
 
 import Control.Monad.Change.Alter
 import Blockchain.SolidVM.CodeCollectionDB as CCDB
-import Control.Monad.Change.Alter
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.DataDefs (BlockData(..))
 import Blockchain.Data.ExecResults

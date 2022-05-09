@@ -1282,12 +1282,6 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
           ps -> do
             addr <- accountOnUnspecifiedChain <$> getCurrentAccount
             return $ Constant $ SContractFunction (Just $ CC._contractName $ last ps) addr method
-
-      -- (a@(SArray _ _), "push") -> return $ Constant $ SPush a (Just var)
-
-      -- (a@(SAccount _), "transfer") -> do
-
-      (SAccountTransfer account amount, "transfer") -> return $ Constant $ SAccountTransfer account amount
       
       (SAccount a, "codehash") -> do
         -- Get the chainId for the account
