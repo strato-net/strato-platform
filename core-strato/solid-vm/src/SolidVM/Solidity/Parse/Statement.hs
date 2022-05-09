@@ -122,16 +122,6 @@ revertStatement = try $ do
   _ <- semi
   pure $ RevertStatement i e a  
 
---[ fmap NamedArgs . braces $ commaSep $ do
- --       fieldName <- identifier
-   --     void colon -- haha
-       -- fieldExpr <- expression
-     --   return (fieldName, fieldExpr)
-   -- , OrderedArgs <$> commaSep expression
-   -- ]
-  -- return $ flip (FunctionCall a) args
-
-
 --ForStatement = 'for' '(' (SimpleStatement)? ';' (Expression)? ';' (ExpressionStatement)? ')' Statement
 
 location :: SolidityParser (Maybe Location)
