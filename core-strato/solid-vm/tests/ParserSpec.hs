@@ -84,7 +84,6 @@ spec = do
                       VariableDefinition [VarDefEntry Nothing Nothing "x" (),
                                           VarDefEntry Nothing Nothing "y" ()] $ Just $
                       TupleExpression () $ map (\n -> Just (NumberLiteral () n Nothing)) [7, 3])
-                 , ("(uint z, , uint w) = (3, true, 7);" , AssemblyStatement $ MloadAdd32 "dst" "src")
                  , ("(z, w) = (q, r);", SimpleStatement $ ExpressionStatement
                       $ Binary () "=" (TupleExpression () $ map (Just . Variable ()) ["z", "w"])
                                    (TupleExpression () $ map (Just . Variable ()) ["q", "r"]))

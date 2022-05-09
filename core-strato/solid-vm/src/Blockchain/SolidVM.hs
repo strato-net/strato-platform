@@ -885,9 +885,10 @@ runStatement s@(CC.SimpleStatement (CC.VariableDefinition entries maybeExpressio
       nonBlanks' <- forM nonBlanks $ \(t, n, v) -> do
         v' <- getVar v
         return (t, n, v')
-      forM_ nonBlanks' $ \(theType', name', value') -> do
-        --typeError "VariableDefinition expected a tuple" (value', theType', name')
-        addLocalVariable theType' name' value'
+      forM_ nonBlanks' $ \(theType', name', v) -> do
+        logAssigningVariable v
+        addLocalVariable theType' name' v
+
 
 
     _ -> typeError "VariableDefinition expected a tuple" value
