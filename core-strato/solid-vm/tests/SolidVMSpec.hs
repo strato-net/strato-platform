@@ -3117,7 +3117,7 @@ contract qq{
     }
 }|]
     -- Get the contract's account
-    [ BAccount a ] <- getFields ["a"]
+    [ BAccount a _] <- getFields ["a"]
     -- Set the balance
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 13 })
     -- Check return of balance
@@ -3154,7 +3154,7 @@ contract qq{
     }
 }|]
     -- Get the contract's accounts
-    [ BAccount a, BAccount b, BAccount c ] <- getFields ["a", "b", "c"]
+    [ BAccount a _, BAccount b _, BAccount c _] <- getFields ["a", "b", "c"]
     -- Adjust the preset balances
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 14 })
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs { addressStateBalance = 13 })
@@ -3196,7 +3196,7 @@ contract qq{
     }
 }|]
     -- Get the contract's accounts
-    [ BAccount a, BAccount b, BAccount c ] <- getFields ["a", "b", "c"]
+    [ BAccount a _, BAccount b _, BAccount c _ ] <- getFields ["a", "b", "c"]
     -- Adjust the preset balances
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 14 })
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs { addressStateBalance = 13 })
@@ -3239,7 +3239,7 @@ contract qq{
     }
 }|]
     -- Get the contract's accounts
-    [ BAccount a, BAccount b, BAccount c ] <- getFields ["a", "b", "c"]
+    [ BAccount a _, BAccount b _, BAccount c _ ] <- getFields ["a", "b", "c"]
     -- Adjust the preset balances
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 13000 })
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs { addressStateBalance = 13000 })
@@ -3287,7 +3287,7 @@ contract qq{
   }
 }|]
     -- Get the contract's account
-    [ BAccount a ] <- getFields ["a"]
+    [ BAccount a _ ] <- getFields ["a"]
     -- Set the balance
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 13 })
     -- Check return of balance
@@ -3383,8 +3383,8 @@ contract qq{
   }
 }|]
     -- Get both of the contracts
-    [ BAccount a ] <- getFields ["a"]
-    [ BAccount b ] <- getFields ["b"]
+    [ BAccount a _] <- getFields ["a"]
+    [ BAccount b _chainIdInfo] <- getFields ["b"]
     -- Set the balance and instantiate both of the accounts the accounts
     -- Account a should start with 13 and b should have 0 at the start.
     -- The transfer member should be able to send the balance of to account b
