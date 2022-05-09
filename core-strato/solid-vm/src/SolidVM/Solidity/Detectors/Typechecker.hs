@@ -515,7 +515,9 @@ typecheckMember (Static e@(SVMType.Enum _ enum mNames) x) n = do
              , " is not an element of "
              , enum
              ]) <$ x
-typecheckMember (Static (SVMType.Account) x) "transfer" = pure $ Static (SVMType.Int Nothing Nothing) x
+-- typecheckMember (Static (SVMType.Array t _) x) "push" = pure $ Function (Static t x) (Product [] x) x
+
+typecheckMember (Static (SVMType.Account) x) "transfer" = pure $ Function (Static (SVMType.Int Nothing Nothing) x) (Product [] x) x
 typecheckMember (Static (SVMType.Account) x) "chainId" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Account) x) "balance" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Account) x) "code" = pure $ Static (SVMType.Bytes Nothing Nothing) x

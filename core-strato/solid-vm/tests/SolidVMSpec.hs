@@ -31,7 +31,7 @@ import Data.Text.Encoding
 import Data.Time.Clock.POSIX
 import HFlags
 import Numeric
-import Test.Hspec (hspec, Spec, describe, fit, it, xit, pendingWith, anyException, shouldThrow, anyErrorCall, Selector)
+import Test.Hspec (hspec, Spec, describe, it, xit, pendingWith, anyException, shouldThrow, anyErrorCall, Selector)
 import Test.Hspec.Expectations.Lifted
 import Text.Printf
 import Text.RawString.QQ
@@ -3086,32 +3086,73 @@ contract qq {
       , BBool True
       , BDefault
       ]
-  
-  fit "can tranfer from one account to another account using the address's transfer member" . runTest $ do
+
+  it "won't transfer when there is not anything to transfer between account" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
 contract qq{
-  account a1;
-  account a2;
-  string ch1;
-  string ch2;
-  bool successful;
+  account a;
+  uint bal;
   constructor() public {
-    a1 = account(0xdeadbeef, 0xfeedbeef);
-    a2 = account(0x123, "main");
+    a = account(this);
   }
-  function transferTen() internal pure
-    returns (string successful){
-      if (a1.balance < 10 && a2.balance >= 10) {
-        successful = a1.transfer(10); 
-      } else {
-        successful = false;
-      }
-      return successful;
+  function myTransfer() internal pure
+    returns (uint){
+      a.transfer(13);
+      bal = a.balance;
+      return bal;
     }
 }|]
-    getFields ["successful"] `shouldReturn`
-      [ BBool True]
+    -- Get the contract's account
+    [ BAccount a ] <- getFields ["a"]
+    -- Set the balance
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 13 })
+    -- Check return of balance
+    void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a) 
+    getFields ["bal"] `shouldReturn` [ BInteger 13 ]
+
+  it "can handle a three account transfer (only transfer from `this` account into only one account, leaving the third account alone)" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract Test {
+  constructor(){}
+}
+pragma solidvm 3.2;
+contract qq{
+  account a;
+  account b;
+  account c;
+  uint bala;
+  uint balb;
+  uint balc;
+  constructor() public {
+    Test t = new Test();
+    a = account(this);
+    b = account(0xdeadbeef);
+    c = account(t);
+  }
+  function myTransfer() internal pure
+    returns (uint, uint, uint){
+      b.transfer(13);
+      bala = a.balance;
+      balb = b.balance;
+      balc = c.balance;
+      return (bala, balb, balc);
+    }
+}|]
+    -- Get the contract's accounts
+    [ BAccount a, BAccount b, BAccount c ] <- getFields ["a", "b", "c"]
+    -- Adjust the preset balances
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 14 })
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs { addressStateBalance = 13 })
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs { addressStateBalance = 13 })
+    -- Check return of balance
+    void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a) 
+    getFields ["bala", "balb", "balc"] `shouldReturn` 
+      [ BInteger 1,
+        BInteger 26,
+        BInteger 13 ]
+
   it "can get the chainId from the account type" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
@@ -3225,31 +3266,39 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString contract]
 
-  fit "can trasnfer value from account a to account b" . runTest $ do
+  it "can transfer value from account a to account b" . runTest $ do
     -- Post contract
     runBS [r|
 pragma solidvm 3.2;
 contract qq{
   account a;
   account b;
-  uint bal;
+  uint bala;
+  uint balb;
   constructor() public {
     a = account(this);
+    b = account(0xdeadbeef);
   }
   function myBalance() {
     //from the account address "a" transfer funds to the account address "b"
       //the full balance from account a
-    a(b).transfer(a.balance);
-    bal = b.balance;
+    b.transfer(13);
+    bala = a.balance;
+    balb = b.balance;
   }
 }|]
-    -- Get the contract's account
+    -- Get both of the contracts
     [ BAccount a ] <- getFields ["a"]
-    -- Set the balance
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 13 })
+    [ BAccount b ] <- getFields ["b"]
+    -- Set the balance and instantiate both of the accounts the accounts
+    -- Account a should start with 13 and b should have 0 at the start.
+    -- The transfer member should be able to send the balance of to account b
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 14 })
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs { addressStateBalance = 0 })
+
     -- Check return of balance
     void $ call2 "myBalance" "()" (namedAccountToAccount Nothing a) 
-    getFields ["bal"] `shouldReturn` [ BInteger 13 ]
+    getFields ["bala", "balb"] `shouldReturn` [ BInteger 1, BInteger 13  ]
 
   it "can't assign a value to an unallocated index in an array" $ (runTest (runBS [r|
 pragma solidvm 3.0;
