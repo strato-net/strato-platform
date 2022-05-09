@@ -47,7 +47,7 @@ instance ToSchema IndexedType where
   declareNamedSchema proxy = genericDeclareNamedSchema defaultSchemaOptions proxy
     & mapped.name ?~ "Solidity type"
     & mapped.schema.description ?~ "Represents a soldity type"
-    & mapped.schema.example ?~ toJSON (IndexedType 10 (Mapping (Just False) Account (Bytes Nothing Nothing)))
+    & mapped.schema.example ?~ toJSON (IndexedType 10 (Mapping (Just False) (Account False) (Bytes Nothing Nothing)))
 
 data VarType =
   VarType
@@ -112,4 +112,4 @@ instance ToSchema FieldType  where
   declareNamedSchema proxy = genericDeclareNamedSchema defaultSchemaOptions proxy
     & mapped.name ?~ "FieldType"
     & mapped.schema.description ?~ "Represents a Solidity Field Type"
-    & mapped.schema.example ?~ toJSON (FieldType 32 Account)
+    & mapped.schema.example ?~ toJSON (FieldType 32 (Account False))

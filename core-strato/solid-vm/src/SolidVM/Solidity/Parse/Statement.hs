@@ -277,6 +277,7 @@ primaryExpression = do
   (uncurry Variable <$> res "msg")
     <|> (uncurry Variable <$> res "address")
     <|> (uncurry Variable <$> res "account")
+    <|> (uncurry Variable <$> res "payable")
     <|> (uncurry Variable <$> res "bool")
     <|> (uncurry Variable <$> res "this")
     <|> (uncurry Variable <$> res "block")
