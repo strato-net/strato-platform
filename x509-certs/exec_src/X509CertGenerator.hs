@@ -123,6 +123,6 @@ main = do
   
   -- generate and write cert
   flip runReaderT optKey $ do
-    cert <- makeSignedCert issuer optSubjectInfo
+    cert <- makeSignedCert optIssuerCert issuer optSubjectInfo
     liftIO $ B.writeFile "outputCert.pem" $ certToBytes $ cert
     liftIO $ putStrLn "Done. Cert was written to outputCert.pem"

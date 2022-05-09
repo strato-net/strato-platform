@@ -187,8 +187,12 @@ bsToCert bs =
 
 
 
-makeSignedCert :: (MonadIO m, HasVault m) => Issuer -> Subject -> m (X509Certificate)
-makeSignedCert iss sub = makeCert iss sub >>= signCert >>= return . X509Certificate . CertificateChain . (\x -> [x])
+makeSignedCert :: (MonadIO m, HasVault m) => Maybe X509Certificate -> Issuer -> Subject -> m (X509Certificate)
+makeSignedCert parentCerts iss sub = makeCert iss sub >>= signCert >>= return . X509Certificate . CertificateChain . (\x -> x:parentCerts' parentCerts)
+  where parentCerts' :: Maybe X509Certificate -> [SignedCertificate]
+        parentCerts' (Just (X509Certificate (CertificateChain cs))) = cs
+        parentCerts' Nothing = []
+
 
 signCert :: (MonadIO m, HasVault m) => Certificate -> m (SignedCertificate)
 signCert cert = objectToSignedExactF (ecdsaWithSHA256) cert

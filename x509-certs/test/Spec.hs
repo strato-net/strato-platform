@@ -49,23 +49,23 @@ spec = do
       certPub `shouldBe` PubKeyEC exPub
       inPub `shouldBe` pub
     it "can do JSON encoding roundtrips" $ do
-      cert <- flip runReaderT priv $ makeSignedCert iss sub
+      cert <- flip runReaderT priv $ makeSignedCert Nothing iss sub
       Ae.decode (Ae.encode sub) `shouldBe` Just sub
       Ae.decode (Ae.encode cert) `shouldBe` Just cert 
     it "can do PEM encoding roundtrips" $ do
-      cert <- flip runReaderT priv $ makeSignedCert iss sub
+      cert <- flip runReaderT priv $ makeSignedCert Nothing iss sub
       Right cert `shouldBe` bsToCert (certToBytes cert)
     it "can do RLP encoding roundtrips" $ do
-      cert <- flip runReaderT priv $ makeSignedCert iss sub
+      cert <- flip runReaderT priv $ makeSignedCert Nothing iss sub
       let rlp = rlpEncode cert
       rlpDecode rlp `shouldBe` cert
       rlpEncode cert `shouldBe` rlp
     it "can verify cert signatures" $ do
-      (X509Certificate (CertificateChain (cert:_))) <- flip runReaderT priv $ makeSignedCert iss sub
+      (X509Certificate (CertificateChain (cert:_))) <- flip runReaderT priv $ makeSignedCert Nothing iss sub
       let sigVerification = verifySignedSignature (coerce cert) (certPubKey $ getCertificate $ coerce cert)
       sigVerification `shouldBe` SignaturePass
     it "can reject invalid signatures" $ do
-      (X509Certificate (CertificateChain (cert:_))) <- flip runReaderT priv $ makeSignedCert iss sub
+      (X509Certificate (CertificateChain (cert:_))) <- flip runReaderT priv $ makeSignedCert Nothing iss sub
       fakePriv <- newPrivateKey
       let fakeSerialPub = SerializedPoint $ exportPublicKey False (derivePublicKey fakePriv)
           fakePub = PubKeyEC $ PubKeyEC_Named SEC_p256k1 fakeSerialPub
