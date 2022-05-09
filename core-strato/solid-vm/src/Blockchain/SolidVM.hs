@@ -1697,36 +1697,6 @@ expToVar' (CC.FunctionCall _ e args) = do
 
           Constant (SPush theArray mvar) -> Builtins.push theArray mvar argVals
 
-          -- Constant (SContractItem address' "transfer") -> do
-          --   from <- getCurrentAccount
-          --   let address = namedAccountToAccount (from ^. accountChainId) address'
-          --   success <- case argVals of
-          --     OrderedVals [SInteger amount] -> do
-          --       pay "built-in transfer function" from address amount
-          --     _ -> return False
-          --   return . Constant $ SBool success
-
-          Constant (SAccountTransfer toAddress amount) -> do
-            --Make sure that the transfer amount does not exceed 2300 (This is a standard solidity rule)
-            when (amount > 2300) $ error "Cannot transfer more than 2300 wei"
-            from <- getCurrentAccount
-            success <- pay "member transfer function" from toAddress amount
-            if success 
-              then return $ Constant $ SBool success
-              else error "Payment Error"
-            -- case success
-              -- SBool -> do
-                -- return success
-              -- _ -> throw "Unknown payment error"
-            -- when (not success) $ throw "Transfer not successful"
-            
-            -- else return $ throw "Was not able to transfer to the account."
-            
-            -- from <- getCurrentAccount
-
-            -- let address = namedAccountToAccount (from ^. accountChainId) address'
-            -- pay "built-in transfer function" getCurrentAccount toAddress amount;
-
           Constant SHexDecodeAndTrim ->
               case argVals of
                 -- bytes should already be hex decoded when appropriate

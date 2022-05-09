@@ -3195,7 +3195,7 @@ contract qq{
         BInteger 13,
         BInteger 13 ]
 
-  it "cannot use the transfer function for more than 2300 wei" . runTest $ do
+  it "cannot use the transfer function for more than 2300 wei" $ runTest (do 
     runBS [r|
 pragma solidvm 3.2;
 contract Test {
@@ -3209,6 +3209,7 @@ contract qq{
   uint bala;
   uint balb;
   uint balc;
+  bool success;
   constructor() public {
     Test t = new Test();
     a = account(this);
@@ -3216,8 +3217,8 @@ contract qq{
     c = account(t);
   }
   function myTransfer() internal pure
-    returns (uint, uint, uint){
-      b.transfer(10000);
+    returns (uint, uint, uint){     
+      b.transfer(10000); 
       bala = a.balance;
       balb = b.balance;
       balc = c.balance;
@@ -3231,11 +3232,8 @@ contract qq{
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs { addressStateBalance = 13000 })
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs { addressStateBalance = 13000 })
     -- Check return of balance
-    void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a) 
-    getFields ["bala", "balb", "balc"] `shouldReturn` 
-      [ BInteger 13000,
-        BInteger 13000,
-        BInteger 13000 ]
+    (void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a))) `shouldThrow` anyException
+    -- "hello" `shouldBe` "Hello"
 
   it "can get the chainId from the account type" . runTest $ do
     runBS [r|
