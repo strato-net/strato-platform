@@ -369,11 +369,11 @@ getVariableOfName name = do
 
       maybeBuiltinFunction :: Maybe Variable
       maybeBuiltinFunction = toMaybe (name `elem` ["address", "account", "uint", "int", "bool", "byte", "bytes"
-                                                  , "string", "keccak256"
+                                                  , "string", "keccak256", "payable"
                                                   , "require", "revert", "assert", "sha3"
                                                   , "sha256", "ecrecover", "addmod", "mulmod"
                                                   , "selfdestruct", "suicide", "bytes32ToString"
-                                                  , "registerCert", "getUserCert", "parseCert"]) $
+                                                  , "registerCert", "getUserCert", "parseCert", "verifyCert", "verifySignature"]) $
         t "builtin function" $ Constant $ SBuiltinFunction name Nothing
 
       maybeBuiltinVariable :: Maybe Variable
@@ -410,7 +410,7 @@ getVariableOfName name = do
         else Nothing
 
       maybeThis :: Maybe Variable
-      maybeThis = toMaybe (name == "this") . t "this" . Constant . SAccount . accountOnUnspecifiedChain $ currentAccount currentCallInfo
+      maybeThis = toMaybe (name == "this") . t "this" . Constant . (flip (SAccount . accountOnUnspecifiedChain) False) $ currentAccount currentCallInfo
 
 
 
@@ -561,8 +561,8 @@ getCurrentCodeCollection = do
 
 hintFromType :: MonadSM m => SVMType.Type -> m BasicType
 hintFromType = \case
- SVMType.Address{} -> return TAccount
- SVMType.Account{} -> return TAccount
+ SVMType.Address _-> return TAccount
+ SVMType.Account _-> return TAccount
  SVMType.Bool{} -> return TBool
  SVMType.Bytes{} -> return TString
  SVMType.Int{} -> return TInteger

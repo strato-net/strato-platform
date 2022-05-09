@@ -69,8 +69,8 @@ showType (SVMType.String _) = "string"
 showType (SVMType.Bytes _ b) = "bytes"
                     <> (maybe "" (T.pack . show) b)
 showType SVMType.Bool = "bool"
-showType SVMType.Address = "address"
-showType SVMType.Account = "account"
+showType (SVMType.Address _) = "address"
+showType (SVMType.Account _) = "account"
 showType (SVMType.Label s) = "label " <> T.pack s
 showType (SVMType.Struct _ n) = "struct " <> n
 showType (SVMType.Enum _ n _) = "enum " <> n
@@ -212,10 +212,17 @@ boolType' :: SourceAnnotation Text -> Type'
 boolType' = Static SVMType.Bool
 
 addressType' :: SourceAnnotation Text -> Type'
-addressType' = Static SVMType.Address
+addressType' = Static $ SVMType.Address False
+
+--AddressPayableType' :: SourceAnnotation Text -> Type'
+--AddressPayableType' = Static $ SVMType.Address True
+
 
 accountType' :: SourceAnnotation Text -> Type'
-accountType' = Static SVMType.Account
+accountType' = Static $ SVMType.Account False
+
+--accountPayableType' :: SourceAnnotation Text -> Type'
+--accountPayableType' = Static $ SVMType.Account True
 
 enumType' :: SourceAnnotation Text -> Type'
 enumType' = Static (SVMType.Enum Nothing "" Nothing)
@@ -379,10 +386,10 @@ typecheckStatic (SVMType.Bytes d1 b1) (SVMType.Bytes d2 b2) =
            (Just a, Just b) | a /= b -> Left "Mismatched length between bytes values"
            _ -> Right $ SVMType.Bytes (d1 <|> d2) (b1 <|> b2)
 typecheckStatic SVMType.Bool SVMType.Bool = Right SVMType.Bool
-typecheckStatic SVMType.Address SVMType.Address = Right SVMType.Account
-typecheckStatic SVMType.Address SVMType.Account = Right SVMType.Account
-typecheckStatic SVMType.Account SVMType.Address = Right SVMType.Account
-typecheckStatic SVMType.Account SVMType.Account = Right SVMType.Account
+typecheckStatic (SVMType.Address a) (SVMType.Address b) = Right $ SVMType.Account (a && b)
+typecheckStatic (SVMType.Address a) (SVMType.Account b) = Right $ SVMType.Account (a && b)
+typecheckStatic (SVMType.Account a) (SVMType.Address b) = Right $ SVMType.Account (a && b)
+typecheckStatic (SVMType.Account a) (SVMType.Account b) = Right $ SVMType.Account (a && b)
 typecheckStatic (SVMType.Label a) (SVMType.Label b) =
   if a == b || a == "" || b == ""
     then Right (SVMType.Label $ string' [a, b])
@@ -482,8 +489,8 @@ typecheckMember (Static (SVMType.Array _ _) x) n = pure . bottom $ ("Unknown mem
 typecheckMember (Static (SVMType.Bytes _ _) x) "length" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Label "Util") x) "bytes32ToString" = pure $ Function (Static (SVMType.Bytes Nothing (Just 32)) x) (Static (SVMType.String Nothing) x) x
 typecheckMember (Static (SVMType.Label "Util") x) "b32" = pure $ Function (Static (SVMType.Bytes Nothing (Just 32)) x) (Static (SVMType.Bytes Nothing (Just 32)) x) x
-typecheckMember (Static (SVMType.Label "msg") x) "sender" = pure $ Static SVMType.Account x
-typecheckMember (Static (SVMType.Label "tx") x) "origin" = pure $ Static SVMType.Account x
+typecheckMember (Static (SVMType.Label "msg") x) "sender" = pure $ Static (SVMType.Account False) x 
+typecheckMember (Static (SVMType.Label "tx") x) "origin" = pure $ Static (SVMType.Account False) x 
 typecheckMember (Static (SVMType.Label "tx") x) "username" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.Label "tx") x) "organization" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.Label "tx") x) "group" = pure $ Static (SVMType.String Nothing) x
@@ -515,10 +522,10 @@ typecheckMember (Static e@(SVMType.Enum _ enum mNames) x) n = do
              , " is not an element of "
              , enum
              ]) <$ x
-typecheckMember (Static (SVMType.Account) x) "chainId" = pure $ Static (SVMType.Int Nothing Nothing) x
-typecheckMember (Static (SVMType.Account) x) "balance" = pure $ Static (SVMType.Int Nothing Nothing) x
-typecheckMember (Static (SVMType.Account) x) "code" = pure $ Static (SVMType.Bytes Nothing Nothing) x
-typecheckMember (Static (SVMType.Account) x) "codehash" = pure $ Static (SVMType.String Nothing) x
+typecheckMember (Static (SVMType.Account _) x) "chainId" = pure $ Static (SVMType.Int Nothing Nothing) x
+typecheckMember (Static (SVMType.Account _) x) "balance" = pure $ Static (SVMType.Int Nothing Nothing) x
+typecheckMember (Static (SVMType.Account _) x) "code" = pure $ Static (SVMType.Bytes Nothing Nothing) x
+typecheckMember (Static (SVMType.Account _) x) "codehash" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.Struct _ struct) x) n = do
   names <- M.fromList <$> lookupStruct struct
   pure $ case M.lookup n names of
@@ -752,14 +759,23 @@ assertArgs x = boolType' x
 registerCertArgs :: SourceAnnotation Text -> Type'
 registerCertArgs x = stringType' x
 
+verifyCertArgs :: SourceAnnotation Text -> Type'
+verifyCertArgs x = Product [stringType' x, stringType' x] x
+
+verifySignatureArgs :: SourceAnnotation Text -> Type'
+verifySignatureArgs x = Product [stringType' x, stringType' x, stringType' x] x
+
 getUserCertArgs :: SourceAnnotation Text -> Type'
 getUserCertArgs x = accountType' x
+
+payableArgs :: SourceAnnotation Text -> Type'
+payableArgs x = accountType' x
 
 parseCertArgs :: SourceAnnotation Text -> Type'
 parseCertArgs x = stringType' x
 
 getVarType' :: String -> SourceAnnotation Text -> SSS Type'
-getVarType' "this" ctx = pure $ Static SVMType.Account ctx
+getVarType' "this" ctx = pure $ Static (SVMType.Account False) ctx
 getVarType' s@('u':'i':'n':'t':n) ctx = case n of
   [] -> pure $ Function (intArgs ctx) (Static (SVMType.Int (Just False) Nothing) ctx) ctx
   _ -> case readMaybe n of
@@ -770,8 +786,8 @@ getVarType' s@('i':'n':'t':n) ctx = case n of
   _ -> case readMaybe n of
     Just n' -> pure $ Function (intArgs ctx) (Static (SVMType.Int (Just True) (Just n')) ctx) ctx
     Nothing -> getVarTypeByName' s ctx
-getVarType' "address" ctx =  pure $ Function (addressArgs ctx) (Static SVMType.Account ctx) ctx
-getVarType' "account" ctx =  pure $ Function (accountArgs ctx) (Static SVMType.Account ctx) ctx
+getVarType' "address" ctx =  pure $ Function (addressArgs ctx) (Static (SVMType.Account False) ctx) ctx
+getVarType' "account" ctx =  pure $ Function (accountArgs ctx) (Static (SVMType.Account False) ctx) ctx
 getVarType' "string" ctx =  pure $ Function (stringArgs ctx) (stringType' ctx) ctx
 getVarType' "bool" ctx =  pure $ Function (boolArgs ctx) (boolType' ctx) ctx
 getVarType' s@('b':'y':'t':'e':'s':n) ctx = case n of
@@ -785,8 +801,11 @@ getVarType' "identity" ctx =  pure $ Function (topType' ctx) (topType' ctx) ctx
 getVarType' "keccak256" ctx =  pure $ Function (keccak256Args ctx) (stringType' ctx) ctx
 getVarType' "require" ctx =  pure $ Function (requireArgs ctx) (Product [] ctx) ctx
 getVarType' "assert" ctx =  pure $ Function (assertArgs ctx) (Product [] ctx) ctx
-getVarType' "registerCert" ctx =  pure $ Function (registerCertArgs ctx) (Product [] ctx) ctx
+getVarType' "registerCert" ctx =  pure $ Function (registerCertArgs ctx) (accountType' ctx) ctx
+getVarType' "verifyCert" ctx =  pure $ Function (verifyCertArgs ctx) (boolType' ctx) ctx
+getVarType' "verifySignature" ctx =  pure $ Function (verifySignatureArgs ctx) (boolType' ctx) ctx
 getVarType' "getUserCert" ctx =  pure $ Function (getUserCertArgs ctx) (certType' ctx) ctx
+getVarType' "payable" ctx =  pure $ Function (payableArgs ctx) (Static (SVMType.Account True) ctx) ctx
 getVarType' "parseCert" ctx =  pure $ Function (parseCertArgs ctx) (certType' ctx) ctx
 getVarType' "Util" ctx = pure $ Static (SVMType.Label "Util") ctx
 getVarType' "msg" ctx = pure $ Static (SVMType.Label "msg") ctx
@@ -835,7 +854,7 @@ getVarTypeByName' name ctx = do
                 let ctrct = Static (SVMType.Contract $ T.pack name) ctx
                     lbl = Static (SVMType.Label name) ctx
                  in Sum $ ctrct :|
-                        [Function (Sum (Static SVMType.Account ctx :| [ctrct, lbl]))
+                        [Function (Sum (Static (SVMType.Account False) ctx :| [ctrct, lbl]))
                            ctrct
                            ctx]
               Nothing -> bottom $ ("Unknown variable: " <> T.pack name) <$ ctx

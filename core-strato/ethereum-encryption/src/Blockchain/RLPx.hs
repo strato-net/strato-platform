@@ -179,36 +179,39 @@ ethCryptAcceptOld otherPoint hsBytes eciesMsgIBytes = do
     let otherNonce = B.take 32 $ B.drop 161 $ eciesMsgIBytes
         msg = word256ToBytes $ bytesToWord256 sharedKey `xor` bytesToWord256 otherNonce
         extSig = importSignature $ B.take 65 eciesMsgIBytes
-        otherEphemeral = secPubKeyToPoint $
+    case extSig of 
+      Left err -> error err
+      Right sig -> do
+        let otherEphemeral = secPubKeyToPoint $
                             fromMaybe (error "malformed signature in tcpHandshakeServer") $
-                            recoverPub extSig msg
-    
-    ephemeralPriv <- liftIO $ newPrivateKey
-    let myEphemeral = secPubKeyToPoint $ derivePublicKey ephemeralPriv
-        myNonce = 25 :: Word256
-        ackMsg = AckMessage { ackEphemeralPubKey=myEphemeral, ackNonce=myNonce, ackKnownPeer=False }
-        cryptSecret = deriveSharedKey ephemeralPriv (pointToSecPubKey otherPoint)
-    eciesMsgOBytes <- fmap BL.toStrict $ ECIES.encrypt cryptSecret myEphemeral (BL.toStrict $ encode $ ackMsg) B.empty
+                            recoverPub sig msg
 
-    yield $ eciesMsgOBytes
+        ephemeralPriv <- liftIO $ newPrivateKey
+        let myEphemeral = secPubKeyToPoint $ derivePublicKey ephemeralPriv
+            myNonce = 25 :: Word256
+            ackMsg = AckMessage { ackEphemeralPubKey=myEphemeral, ackNonce=myNonce, ackKnownPeer=False }
+            cryptSecret = deriveSharedKey ephemeralPriv (pointToSecPubKey otherPoint)
+        eciesMsgOBytes <- fmap BL.toStrict $ ECIES.encrypt cryptSecret myEphemeral (BL.toStrict $ encode $ ackMsg) B.empty
 
-    let SharedKey ephemeralSharedSecret = deriveSharedKey ephemeralPriv $ pointToSecPubKey otherEphemeral
-        myNonceBS = word256ToBytes myNonce
-        frameDecKey = otherNonce `add`
-                        myNonceBS `add`
-                        ephemeralSharedSecret `add`
-                        ephemeralSharedSecret
-        macEncKey = frameDecKey `add` ephemeralSharedSecret
+        yield $ eciesMsgOBytes
 
-    return $ Just (
-      EthCryptState { --encrypt
-         aesState = AES.AESCTRState (initAES frameDecKey) (aesIV_ $ B.replicate 16 0) 0,
-         mac=hashUpdate (hashInitWith Keccak_256) $ (macEncKey `bXor` otherNonce) `B.append` eciesMsgOBytes,
-         key=macEncKey
-         },
-      EthCryptState { --decrypt
-        aesState = AES.AESCTRState (initAES frameDecKey) (aesIV_ $ B.replicate 16 0) 0,
-        mac=hashUpdate (hashInitWith Keccak_256) $ (macEncKey `bXor` myNonceBS) `B.append` (BL.toStrict hsBytes),
-        key=macEncKey
-        }
-      )
+        let SharedKey ephemeralSharedSecret = deriveSharedKey ephemeralPriv $ pointToSecPubKey otherEphemeral
+            myNonceBS = word256ToBytes myNonce
+            frameDecKey = otherNonce `add`
+                            myNonceBS `add`
+                            ephemeralSharedSecret `add`
+                            ephemeralSharedSecret
+            macEncKey = frameDecKey `add` ephemeralSharedSecret
+
+        return $ Just (
+          EthCryptState { --encrypt
+            aesState = AES.AESCTRState (initAES frameDecKey) (aesIV_ $ B.replicate 16 0) 0,
+            mac=hashUpdate (hashInitWith Keccak_256) $ (macEncKey `bXor` otherNonce) `B.append` eciesMsgOBytes,
+            key=macEncKey
+            },
+          EthCryptState { --decrypt
+            aesState = AES.AESCTRState (initAES frameDecKey) (aesIV_ $ B.replicate 16 0) 0,
+            mac=hashUpdate (hashInitWith Keccak_256) $ (macEncKey `bXor` myNonceBS) `B.append` (BL.toStrict hsBytes),
+            key=macEncKey
+            }
+          )
