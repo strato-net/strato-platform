@@ -35,7 +35,7 @@ import           Text.Format
 data BasicValue = BInteger !Integer
                 | BString !B.ByteString
                 | BBool !Bool
-                | BAccount !NamedAccount
+                | BAccount !NamedAccount Bool
                 | BEnumVal !T.Text !T.Text !Word32
                 | BContract !T.Text !NamedAccount
                   -- The sole purpose of this sentinel is to make slipstream reserve
@@ -48,7 +48,7 @@ isDefault :: BasicValue -> Bool
 isDefault (BInteger i)     = i == 0
 isDefault (BString bs)     = B.null bs
 isDefault (BBool b)        = not b
-isDefault (BAccount a)     = a == unspecifiedChain 0x0
+isDefault (BAccount a b)     = a == unspecifiedChain 0x0 && b == False
 isDefault (BEnumVal _ _ w) = w == 0
 isDefault (BContract _ a)  = a == unspecifiedChain 0x0
 isDefault BMappingSentinel = False
@@ -59,7 +59,7 @@ instance Format BasicValue where
   format (BString s) = ('"':) . (++"\"") $ UTF8.toString s
   format (BBool True) = "true"
   format (BBool False) = "false"
-  format (BAccount a) = "account(" ++ show a ++ ")"
+  format (BAccount a b) = "account(" ++ show a ++ ")" ++ (if b then " payable" else "")
   format (BEnumVal n1 n2 _) = T.unpack n1 ++ "." ++ T.unpack n2
   format (BContract n a) = T.unpack n ++ "(" ++ format a ++ ")"
   format BMappingSentinel = "<MappingSentinel>"
@@ -259,7 +259,7 @@ instance RLPSerializable BasicValue where
     BInteger n -> RLPArray [RLPScalar 0, rlpEncode n]
     BString t -> RLPArray [RLPScalar 1, rlpEncode t]
     BBool b -> RLPArray [RLPScalar 2, rlpEncode b]
-    BAccount a -> RLPArray [RLPScalar 3, rlpEncode a]
+    BAccount a b -> RLPArray [RLPScalar 3, rlpEncode a, rlpEncode b]
     BContract n a -> RLPArray [RLPScalar 4, rlpEncode n, rlpEncode a]
     BEnumVal a b c -> RLPArray [RLPScalar 5, rlpEncode a, rlpEncode b, rlpEncode c]
     BMappingSentinel -> RLPArray [RLPScalar 6]
@@ -268,7 +268,7 @@ instance RLPSerializable BasicValue where
       (0, [f]) -> BInteger $ rlpDecode f
       (1, [f]) -> BString $ rlpDecode f
       (2, [f]) -> BBool $ rlpDecode f
-      (3, [f]) -> BAccount $ rlpDecode f
+      (3, [f, b']) -> BAccount (rlpDecode f) (rlpDecode b')
       (4, [f, a']) -> BContract (rlpDecode f) (rlpDecode a')
       (5, [f, s', c']) -> BEnumVal (rlpDecode f) (rlpDecode s') (rlpDecode c')
       (6, []) -> BMappingSentinel

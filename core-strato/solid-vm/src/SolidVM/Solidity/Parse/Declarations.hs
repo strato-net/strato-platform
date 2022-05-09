@@ -216,6 +216,7 @@ public keywords =
         [KPublic] -> return True
         _ -> return False
 
+
 -- | Parses the declaration part of a variable definition, which is
 -- everything except possibly the initializer and semicolon.  Necessary
 -- because these kinds of expressions also appear in struct definitions and
@@ -241,7 +242,6 @@ simpleVariableDeclaration = do
     then return (variableName, ConstantDeclaration $ SolidVM.ConstantDecl variableType isPublic (fromMaybe (parseError "constants must be initialized" variableName) value) ctx)
     else return (variableName, VariableDeclaration $ SolidVM.VariableDecl variableType isPublic value ctx)
 
-{- Functions and function-like -}
 
 -- | Parses a function definition.
 --

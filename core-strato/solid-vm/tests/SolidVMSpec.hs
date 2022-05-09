@@ -315,7 +315,7 @@ getFields2 :: [BC.ByteString] -> ContextM [BasicValue]
 getFields2 = getAll2 . map (\t -> [Field t])
 
 bAddress :: Address -> BasicValue
-bAddress = BAccount . unspecifiedChain
+bAddress = ((flip BAccount) False) . unspecifiedChain
 
 bContract :: T.Text -> Address -> BasicValue
 bContract t a =
@@ -336,7 +336,7 @@ bAccount a =
   let u = accountOnUnspecifiedChain a
    in if u == unspecifiedChain 0
         then BDefault
-        else BAccount u
+        else (BAccount u False)
 
 iAddress :: Address -> IndexType
 iAddress = IAccount . unspecifiedChain
@@ -1308,6 +1308,21 @@ contract qq {
   }
 }|]
     getFields ["x"] `shouldReturn` [bContract "X" 0xdeadbeef]
+
+  it "can parse account payable type" . runTest $ do
+    runBS [r|
+contract qq {
+  account y;
+  account payable x;
+  bool z;
+  
+  constructor() public {
+    y = msg.sender;
+    x = payable(y);
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BAccount (NamedAccount 0xdeadbeef UnspecifiedChain) True]
+  
 
   it "can call methods of superclasses" . runTest $ do
     runBS [r|
@@ -3039,12 +3054,12 @@ contract qq {
   }
 }|]
     getFields ["sce", "scm", "scu", "sde", "sdm", "sdu"] `shouldReturn`
-      [ BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xfeedbeef))
-      , BAccount (NamedAccount 0xdeadbeef MainChain)
-      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain)
-      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain)
-      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain)
-      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain)
+      [ BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xfeedbeef)) False
+      , BAccount (NamedAccount 0xdeadbeef MainChain) False
+      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain) False
+      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain) False
+      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain) False
+      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain) False
       ]
   
   it "can cast strings to chainIds" . runTest $ do
@@ -3061,9 +3076,9 @@ contract qq {
   }
 }|]
     getFields ["sce", "scm", "scu"] `shouldReturn`
-      [ BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xfeedbeef))
-      , BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xfeedb33f))
-      , BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xf33dbeef))
+      [ BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xfeedbeef)) False
+      , BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xfeedb33f)) False
+      , BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xf33dbeef)) False
       ]
 
   it "can cast strings to bool" . runTest $ do
