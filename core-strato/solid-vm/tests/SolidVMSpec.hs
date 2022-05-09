@@ -3367,3 +3367,33 @@ contract qq {
     isValid = verifySignature(msgHash, signature, pubkey);
   }
 }|]) `shouldThrow` anyMalformedDataError
+
+
+  it "can properly preform complex tuple destructuring" . runTest $ do
+    runBS [r|
+contract qq{
+    uint index;
+    uint xr;
+    uint yr;
+    function f() public pure returns (uint, bool, uint) {
+        return (7, true, 2);
+    }
+
+    constructor() public {
+        // Variables declared with type and assigned from the returned tuple,
+        // not all elements have to be specified (but the number must match).
+        //(uint x, , uint y) = f();
+        uint x = 7;
+        uint y = 2;
+        // Common trick to swap values -- does not work for non-value storage types.
+        (x, y) = (y, x);
+        // Components can be left out (also for variable declarations).
+        //(index, , ) = f(); // Sets the index to 7
+        xr = x;
+        yr = y;
+        
+        //(xr, yr) = (x, y);
+        return;
+    }
+}|]
+    getFields ["xr", "yr"] `shouldReturn` [ BInteger 2, BInteger 7 ]

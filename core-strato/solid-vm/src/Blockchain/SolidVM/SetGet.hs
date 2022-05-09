@@ -164,6 +164,9 @@ setVal dst@(SReference addressedPath@(AccountPath addr path)) src = do
   putSolidStorageKeyVal' svm3_0 addr path basicSrc
 
 
+setVal (SNULL) _ = return ()
+
+
 setVal dst src = typeError "unknown case called in setVal:" ("src = " ++ show src ++ ", dst = " ++ show dst)
 
   

@@ -127,9 +127,21 @@ variableDefinitionStatement = do
       [ reserved "var" >> fmap (:[]) (varDefEntry (return Nothing))
       , reserved "var" >> parens (commaSep1 $ option BlankEntry $ varDefEntry (return Nothing))
       , (:[]) <$> varDefEntry (Just <$> simpleTypeExpression)
-      , parens (commaSep1 $ varDefEntry (Just <$> simpleTypeExpression))
+      , parens (commaSep1 $ option BlankEntry $ varDefEntry (Just <$> simpleTypeExpression))
+      --, parens (commaSep1 $ varDefEntry (optionMaybe simpleTypeExpression))
+      --, (\x -> case x of Just x -> x; Nothing -> VarDefEntry Nothing Nothing "" ()) <$> parens (commaSep1 $ optionMaybe $ varDefEntry (Just <$> simpleTypeExpression))
       ]
   VariableDefinition vardefs <$> optionMaybe (reservedOp "=" >> expression)
+
+{-{ vardefType :: Maybe Type
+                                  , _vardefLocation :: Maybe Location
+                                  , vardefName :: String
+                                  , vardefContext :: a
+                                  } deriving (Show, Eq, Generic, Functor)
+-}
+
+
+
 
 expression :: SolidityParser Expression
 expression =
