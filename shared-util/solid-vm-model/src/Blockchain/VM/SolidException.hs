@@ -27,6 +27,7 @@ module Blockchain.VM.SolidException
   , invalidCertificate
   , malformedData
   , tooMuchGas
+  , paymentError
   ) where
 
 import Control.DeepSeq
