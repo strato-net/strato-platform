@@ -1677,6 +1677,16 @@ expToVar' (CC.FunctionCall _ e args) = do
               _ -> return False
             return . Constant $ SBool success
 
+          Constant (SContractItem address' "send") -> do
+            from <- getCurrentAccount
+            let address = namedAccountToAccount (from ^. accountChainId) address'
+            success <- case argVals of
+              OrderedVals [SInteger amount] -> do
+                when (amount > 2300) $ return False
+                return $ pay "built-in transfer function" from address amount
+              _ -> return False
+            return . Constant $ SBool success
+
           Constant (SContractItem address' itemName) -> do
 
             from <- getCurrentAccount
