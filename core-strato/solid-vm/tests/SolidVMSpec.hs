@@ -3371,6 +3371,7 @@ contract qq {
 
   it "can properly preform complex tuple destructuring" . runTest $ do
     runBS [r|
+pragma solidvm 3.2;
 contract qq{
     uint index;
     uint xr;
@@ -3387,7 +3388,6 @@ contract qq{
         (x, y) = (y, x);
         // Components can be left out (also for variable declarations).
         (index, , ) = f(); // Sets the index to 7
-        
         (xr, yr) = (x, y);
         return;
     }
