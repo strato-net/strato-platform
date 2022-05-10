@@ -1282,7 +1282,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
           ps -> do
             addr <- accountOnUnspecifiedChain <$> getCurrentAccount
             return $ Constant $ SContractFunction (Just $ CC._contractName $ last ps) addr method
-      
+  
       (SAccount a _, "codehash") -> do
         -- Get the chainId for the account
         cid <- case (a ^. namedAccountChainId) of 
@@ -1299,8 +1299,9 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
         resolvedCodeHash <- resolveCodePtr cid codeHash'
         case resolvedCodeHash of
           Just (SolidVMCode _ ch') -> return (Constant $ SString . keccak256ToHex $ ch')
-          _ -> error "Missing codehash"
-      
+          Just cp -> missingCodeCollection "Account is not a SolidVM contract" (format cp)
+          Nothing -> missingCodeCollection "Could not resolve code pointer for account" (format realAccount)
+ 
       (SAccount a _, "code") -> do
         -- Get the code at the address
         cid <- case (a ^. namedAccountChainId) of 
@@ -1317,12 +1318,13 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
         resolvedCodeHash <- resolveCodePtr cid codeHash'
         let ch' = case resolvedCodeHash of
               Just (SolidVMCode _ ch1') -> ch1' 
-              _ -> error "Missing codehash"
+              Just cp -> missingCodeCollection "Account is not a SolidVM contract" (format cp)
+              Nothing -> missingCodeCollection "Could not resolve code pointer for account" (format realAccount)
         -- Find the code using the codehash
         cd <- A.lookup (A.Proxy @DBCode) ch'
         let cd' = case cd of
               Just (_,bs) -> bs
-              _ -> error "Missing code"
+              Nothing -> missingCodeCollection "Could not locate SolidVM code collection at account" (format realAccount)
         let decodeCD = DT.decodeUtf8 cd'
         -- Format the result  
         return $ Constant $ SString $ T.unpack decodeCD
