@@ -1691,7 +1691,8 @@ expToVar' (CC.FunctionCall _ e args) = do
               OrderedVals [SContract contract from] -> do
                 return $ callWrapper from address contract Nothing False Nothing
               _ -> return Nothing
-            return . Constant $ SBool success
+              -- V.fromList vars is a place holder please change
+            return Constant $ STuple $ V.fromList vars
 
           Constant (SContractItem address' itemName) -> do
 
