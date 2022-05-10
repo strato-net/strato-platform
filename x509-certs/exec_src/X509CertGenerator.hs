@@ -17,7 +17,6 @@ import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Char8              as C8
 import           Data.Either
 import           Data.Foldable                      (foldlM)
-import           Data.Maybe
 import           System.Console.GetOpt
 import           System.Environment
 
