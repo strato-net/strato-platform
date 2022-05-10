@@ -1664,7 +1664,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                 when (amount > 2300) $ tooMuchGas "2300" (show amount)
                 when (not (pay "built-in transfer function" from address amount)) $
                   PaymentError (show amount) (show address)
-              _ -> PaymentError (show amount) (show address)
+              _ -> PaymentError "unknown" (show address)
             return
 
           Constant (SContractItem address' "send") -> do
@@ -1677,14 +1677,20 @@ expToVar' (CC.FunctionCall _ e args) = do
               _ -> return False
             return . Constant $ SBool success
 
-          Constant (SContractItem address' "send") -> do
+--call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' metadata = do
+-- callWrapper from to mContract functionName isRCC argExps  = do
+--isRCC should be false (Is runChainConstructors)
+-- blockData should be given given (payload)
+-- codeAddress get from 'this'
+-- sender get from 'this'
+
+          Constant (SContractItem address' "call") -> do
             from <- getCurrentAccount
             let address = namedAccountToAccount (from ^. accountChainId) address'
-            success <- case argVals of
-              OrderedVals [SInteger amount] -> do
-                when (amount > 2300) $ return False
-                return $ pay "built-in transfer function" from address amount
-              _ -> return False
+            returnVal <- case argVals of 
+              OrderedVals [SContract contract] -> do
+                return $ callWraper from address contract Nothing False Nothing
+              _ -> return Nothing
             return . Constant $ SBool success
 
           Constant (SContractItem address' itemName) -> do
