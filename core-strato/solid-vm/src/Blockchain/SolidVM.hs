@@ -1300,7 +1300,20 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
         let address = namedAccountToAccount (from ^. accountChainId) addr
         result <- callWrapper from address Nothing itemName False (CC.OrderedArgs [])  
         return . Constant . fromMaybe SNULL $ result
-
+      (SContractItem a _, "chainId") -> do
+        contract' <- getCurrentContract
+        case CC._vmVersion contract' == "svm3.2" of
+          True ->
+            case (a ^. namedAccountChainId) of
+              UnspecifiedChain -> do 
+                cid2 <- view accountChainId <$> getCurrentAccount
+                case cid2 of
+                  Nothing -> return $ Constant $ SInteger 0 
+                  Just cid3 -> return $ Constant $ intBuiltin $ flip (:) [] $ SString $ B.foldr showHex "" $ word256ToBytes cid3
+              MainChain ->  return $ Constant $ SInteger 0 
+              ExplicitChain cid -> return $ Constant $ intBuiltin $ flip (:) [] $ SString $ B.foldr showHex "" $ word256ToBytes cid
+          False ->
+            typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ (show (val, name)))
       (SContract _ a, funcName) -> return $ Constant $ SContractFunction Nothing a funcName
       (r@(SReference _), "push") -> return $ Constant $ SPush r Nothing
         {-

@@ -119,7 +119,15 @@ main = do
           , issUnit       = subUnit optSubjectInfo
           }
         Just cert -> 
-          head $ fromMaybe (error "missing commonName or orgName in issuer cert") (getCertIssuer cert)
+          let subject = listToMaybe =<< getCertSubject cert
+          in case subject of
+            Just (Subject{..}) -> Issuer
+                { issCommonName = subCommonName
+                , issCountry    = subCountry
+                , issOrg        = subOrg
+                , issUnit       = subUnit
+                } 
+            _ -> error "missing commonName or orgName in issuer cert"
   
   -- generate and write cert
   flip runReaderT optKey $ do

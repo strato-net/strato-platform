@@ -330,7 +330,7 @@ verifyCert pkey (X509Certificate (CertificateChain [c])) =
     Just sig -> verifySig pkey sig mesgBS
 verifyCert pkey (X509Certificate (CertificateChain (c:c':cs))) = 
   and [
-      getCertIssuer (X509Certificate (CertificateChain [c])) `issSubEq` getCertSubject (X509Certificate (CertificateChain [c]))
+      getCertIssuer (X509Certificate (CertificateChain [c])) `issSubEq` getCertSubject (X509Certificate (CertificateChain [c']))
     , c `signedBy` c'
     , verifyCert pkey (X509Certificate (CertificateChain (c':cs)))
   ]
@@ -374,7 +374,7 @@ verifyCertM pkey (X509Certificate (CertificateChain (c:c':cs))) = do
   rec <- verifyCertM pkey (X509Certificate (CertificateChain (c':cs)))
   sig <- c `signedBy` c'
   return $ and [
-        getCertIssuer (X509Certificate (CertificateChain [c])) `issSubEq` getCertSubject (X509Certificate (CertificateChain [c]))
+        getCertIssuer (X509Certificate (CertificateChain [c])) `issSubEq` getCertSubject (X509Certificate (CertificateChain [c']))
       , sig
       , rec
     ]
