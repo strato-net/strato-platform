@@ -100,6 +100,7 @@ import qualified Text.Colors                          as C
 import           Text.Format
 import           Text.Tools
 
+import qualified Data.Text.Encoding                   as DT
 
 import qualified SolidVM.Model.CodeCollection as CC
 
@@ -113,7 +114,7 @@ import           SolidVM.Solidity.Parse.Statement
 import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpression)
 
 import           UnliftIO                             hiding (assert)
-
+ 
 -- | Copying from Data.List.Extra, since our version of the extra library seems to not contain it.
 -- | A total variant of the list index function `(!!)`.
 --
@@ -1281,6 +1282,67 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
           ps -> do
             addr <- accountOnUnspecifiedChain <$> getCurrentAccount
             return $ Constant $ SContractFunction (Just $ CC._contractName $ last ps) addr method
+      (SAccount a _, "codehash") -> do
+        -- Get the chainId for the account
+        cid <- case (a ^. namedAccountChainId) of 
+          UnspecifiedChain -> do
+            cid1 <- view accountChainId <$> getCurrentAccount
+            case cid1 of
+              Nothing -> return Nothing
+              Just cid2 -> return $ Just cid2
+          MainChain -> return Nothing
+          ExplicitChain cid -> return $ Just cid
+        let realAccount = namedAccountToAccount cid a
+        -- Retreive and resolve the codehash
+        codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) realAccount
+        resolvedCodeHash <- resolveCodePtr cid codeHash'
+        case resolvedCodeHash of
+          Just (SolidVMCode _ ch') -> return (Constant $ SString . keccak256ToHex $ ch')
+          Just cp -> missingCodeCollection "Account is not a SolidVM contract" (format cp)
+          Nothing -> missingCodeCollection "Could not resolve code pointer for account" (format realAccount)
+      
+      (SAccount a _, "code") -> do
+        -- Get the code at the address
+        cid <- case (a ^. namedAccountChainId) of 
+          UnspecifiedChain -> do
+            cid1 <- view accountChainId <$> getCurrentAccount
+            case cid1 of
+              Nothing -> return Nothing
+              Just cid2 -> return $ Just cid2
+          MainChain -> return Nothing
+          ExplicitChain cid -> return $ Just cid
+        let realAccount = namedAccountToAccount cid a
+        -- Retreive and resolve the codehash
+        codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) realAccount
+        resolvedCodeHash <- resolveCodePtr cid codeHash'
+        let ch' = case resolvedCodeHash of
+              Just (SolidVMCode _ ch1') -> ch1' 
+              Just cp -> missingCodeCollection "Account is not a SolidVM contract" (format cp)
+              Nothing -> missingCodeCollection "Could not resolve code pointer for account" (format realAccount)
+        -- Find the code using the codehash
+        cd <- A.lookup (A.Proxy @DBCode) ch'
+        let cd' = case cd of
+              Just (_,bs) -> bs
+              Nothing -> missingCodeCollection "Could not locate SolidVM code collection at account" (format realAccount)
+        let decodeCD = DT.decodeUtf8 cd'
+        -- Format the result  
+        return $ Constant $ SString $ T.unpack decodeCD
+
+      (SAccount a _, "balance") -> do 
+        cid <- case (a ^. namedAccountChainId) of 
+          UnspecifiedChain -> do
+            cid1 <- view accountChainId <$> getCurrentAccount
+            case cid1 of
+              Nothing -> return Nothing
+              Just cid2 -> return $ Just cid2
+          MainChain -> return Nothing
+          ExplicitChain cid -> return $ Just cid
+        let realAccount = namedAccountToAccount cid a
+        bal <- A.lookup (A.Proxy @AddressState) realAccount
+        case bal of
+          Just as -> return $ Constant $ SInteger $ addressStateBalance as
+          _ -> return $ Constant $ SInteger 0 
+        
       (SAccount a _, "chainId") -> do
         contract' <- getCurrentContract
         case CC._vmVersion contract' == "svm3.2" of

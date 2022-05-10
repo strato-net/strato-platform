@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeApplications  #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 {-# OPTIONS_GHC -fno-warn-missing-fields #-}
@@ -33,7 +34,9 @@ import Test.Hspec.Expectations.Lifted
 import Text.Printf
 import Text.RawString.QQ
 
+import Control.Monad.Change.Alter
 import Blockchain.SolidVM.CodeCollectionDB as CCDB
+import Blockchain.Data.AddressStateDB
 import Blockchain.Data.DataDefs (BlockData(..))
 import Blockchain.Data.ExecResults
 import Blockchain.Data.RLP
@@ -3119,6 +3122,94 @@ contract qq {
       , BDefault
       , BDefault
       ]
+  it "can get the balance from an address" . runTest $ do
+    -- Post contract
+    runBS [r|
+pragma solidvm 3.2;
+contract qq{
+  account a;
+  uint bal;
+  constructor() public {
+    a = account(this);
+  }
+  function myBalance() {
+    bal = a.balance;
+  }
+}|]
+    -- Get the contract's account
+    [ BAccount a _ ] <- getFields ["a"]
+    -- Set the balance
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 13 })
+    -- Check return of balance
+    void $ call2 "myBalance" "()" (namedAccountToAccount Nothing a) 
+    getFields ["bal"] `shouldReturn` [ BInteger 13 ]
+  it "can get the codehash from an address" . runTest $ do
+    let contract = [r|
+pragma solidvm 3.2;
+contract Test {
+  constructor(){}
+}
+
+pragma solidvm 3.2;
+contract qq{
+  string codeHashTest;
+  constructor() public {
+    Test t = new Test();
+    codeHashTest = account(t).codehash;
+  }
+}|]
+    runBS contract
+    getFields ["codeHashTest", "codeHashTest"] `shouldReturn`
+      [ BString $ BC.pack $ keccak256ToHex $ hash $ UTF8.fromString contract
+      , BString "a37c4f1c44888f20d2b8dad57919efe0d6aec401ff8af47180e07e0b32096086" ]
+
+  it "can the codehash from this an address" . runTest $ do
+    let contract = [r|
+pragma solidvm 3.2;
+contract qq{
+  string codeHashTest;
+  constructor() public {
+    codeHashTest = account(this).codehash;
+  }
+}|]
+    runBS contract
+    getFields ["codeHashTest", "codeHashTest"] `shouldReturn`
+      [ BString $ BC.pack $  keccak256ToHex $ hash $ UTF8.fromString contract 
+      , BString "657f5687fe89bd0bd3cee84e83c306c65458c0b13d13991087f9a7330474f2d8" ]
+
+  it "can get the code from an address" . runTest $ do
+    let contract :: String
+        contract = [r|
+pragma solidvm 3.2;
+contract Test {
+  constructor(){}
+}
+
+pragma solidvm 3.2;
+contract qq{
+  string codeTest;
+  constructor() public {
+    Test t = new Test();
+    codeTest = account(t).code;
+  }
+}|]
+    runBS contract
+    getFields ["codeTest"] `shouldReturn`
+      [ BString $ UTF8.fromString contract]
+
+  it "can get the current contract code" . runTest $ do
+    let contract :: String
+        contract = [r|
+pragma solidvm 3.2;
+contract qq{
+  string codeTest;
+  constructor() public {
+    codeTest = account(this).code;
+  }
+}|]
+    runBS contract
+    getFields ["codeTest"] `shouldReturn`
+      [ BString $ UTF8.fromString contract]
 
   it "can't assign a value to an unallocated index in an array" $ (runTest (runBS [r|
 pragma solidvm 3.0;
