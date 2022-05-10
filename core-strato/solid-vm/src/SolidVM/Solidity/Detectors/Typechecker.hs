@@ -109,7 +109,7 @@ showType' (Function a r _) =
            ]
 
 varDefsToType' :: Annotated VarDefEntryF -> Type' -> Type'
-varDefsToType' BlankEntry t                   = Product [topType' (topContext t), t] emptyAnnotation
+varDefsToType' BlankEntry t                   = Product [topType' (context' t), t] (context' t)
 varDefsToType' VarDefEntry{..} t | vardefType == Nothing = t
 varDefsToType' VarDefEntry{..} (Top _ _)      = Static (fromJust vardefType) vardefContext
 varDefsToType' VarDefEntry{..} t@(Static _ _) = Product [Static (fromJust vardefType) vardefContext, t] vardefContext
@@ -1020,11 +1020,3 @@ tcExpr (ArrayExpression x es) = do
     _ -> t'
 tcExpr (Variable x name) = getVarType' name x
 tcExpr (ObjectLiteral x _) = pure . bottom $ "Cannot use object literals within contract definitions" <$ x
-
-{-
-  14) SolidVM can properly preform complex tuple destructuring
-       uncaught exception: ErrorCall
-       Product {productTypes = [Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 14, column 10) - (line 14, column 16): "" },Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 14, column 20) - (line 14, column 26): "" }], productContext = (line 14, column 10) - (line 14, column 16): "" }
-       CallStack (from HasCallStack):
-
-       -}
