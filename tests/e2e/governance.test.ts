@@ -93,12 +93,17 @@ describe("Create Chain", function() {
 
     await rest.call(alice, {contract: gov, method: addName, args, chainid: chainId}, options);
 
+    const action = rest.getChain(ouser1, chainId, options);
+    const addPredicate = (ci) => ci.info.members.length === 3
+    const removePredicate = (ci) => ci.info.members.length === 2
+    await util.until(addPredicate, action, options)
     const chainInfo1 = await rest.getChain(ouser1, chainId, options);
     console.log('###CHAININFO###',chainInfo1);
     assert.deepEqual(chainInfo1.info.members.length, 3, "member should be added");
 
     await rest.call(alice, {contract: gov, method: removeName, args, chainid: chainId}, options);
 
+    await util.until(removePredicate, action, options)
     const chainInfo2 = await rest.getChain(ouser1, chainId, options);
     console.log('###CHAININFO###',chainInfo2);
     assert.deepEqual(chainInfo2.info.members.length, 2, "member should be removed");
