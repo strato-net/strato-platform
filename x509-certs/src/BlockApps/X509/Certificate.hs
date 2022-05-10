@@ -19,7 +19,9 @@ module BlockApps.X509.Certificate (
   verifyCertM,
   makeSignedCert,
   getCertSubject,
-  getCertIssuer
+  getCertSubjects,
+  getCertIssuer,
+  getCertIssuers
  ) where
 
 
@@ -282,9 +284,13 @@ getCertPub :: Subject -> PubKey
 getCertPub = serializeAndWrap . subPub
 
 
+-- Get the (first) subject of the certificate
+getCertSubject :: X509Certificate -> Maybe Subject
+getCertSubject cert = listToMaybe =<< getCertSubjects cert
+
 -- without cn and org, subject and issuer are invalid, but the other fields can be Nothing
-getCertSubject :: X509Certificate -> Maybe [Subject]
-getCertSubject (X509Certificate (CertificateChain certs)) = for certs $ \cert -> do
+getCertSubjects :: X509Certificate -> Maybe [Subject]
+getCertSubjects (X509Certificate (CertificateChain certs)) = for certs $ \cert -> do
   pubKey <- unserializeAndUnwrap . certPubKey $ getCertificate cert
   cn     <- extractDn cert DnCommonName
   org    <- extractDn cert DnOrganization
@@ -297,8 +303,12 @@ getCertSubject (X509Certificate (CertificateChain certs)) = for certs $ \cert ->
   where extractDn :: SignedCertificate -> DnElement -> Maybe String
         extractDn cert dn = fmap fromASN1CS . getDnElement dn . certSubjectDN $ getCertificate cert   
 
-getCertIssuer :: X509Certificate -> Maybe [Issuer]
-getCertIssuer (X509Certificate (CertificateChain certs)) = for certs $ \cert -> do
+
+getCertIssuer :: X509Certificate -> Maybe Issuer
+getCertIssuer cert = listToMaybe =<< getCertIssuers cert
+
+getCertIssuers :: X509Certificate -> Maybe [Issuer]
+getCertIssuers (X509Certificate (CertificateChain certs)) = for certs $ \cert -> do
   cn     <- extractDn cert DnCommonName
   org    <- extractDn cert DnOrganization
   return $ Issuer { issCommonName = cn
@@ -344,7 +354,7 @@ verifyCert pkey (X509Certificate (CertificateChain (c:c':cs))) =
             Nothing -> False
             Just sc'pkey -> verifyCert sc'pkey (X509Certificate (CertificateChain [sc]))
           where sc'pubKey :: Maybe PublicKey
-                sc'pubKey = fmap subPub $ listToMaybe =<< getCertSubject (X509Certificate (CertificateChain [sc']))
+                sc'pubKey = fmap subPub $ getCertSubject (X509Certificate (CertificateChain [sc']))
 
 verifyBlockApps :: X509Certificate -> Bool 
 verifyBlockApps = verifyCert rootPubKey
@@ -388,6 +398,6 @@ verifyCertM pkey (X509Certificate (CertificateChain (c:c':cs))) = do
             Nothing -> pure False
             Just sc'pkey -> verifyCertM sc'pkey (X509Certificate (CertificateChain [sc]))
           where sc'pubKey :: Maybe PublicKey
-                sc'pubKey = fmap subPub $ listToMaybe =<< getCertSubject (X509Certificate (CertificateChain [sc']))
+                sc'pubKey = fmap subPub $ getCertSubject (X509Certificate (CertificateChain [sc']))
 
   

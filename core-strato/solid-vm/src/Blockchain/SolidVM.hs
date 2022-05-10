@@ -428,7 +428,7 @@ setCreator creator contract cntrct blockNumber = do
   maybeCertLevelDB <- x509CertDBGet $ creatorAddress
   let maybeCertBlockDB = M.lookup creatorAddress x509s'
       maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
-      _org = fromMaybe "" $ fmap subOrg $ listToMaybe =<< getCertSubject =<< maybeCert
+      _org = fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
   case maybeCertBlockDB of
     (Just _) -> onTraced $ liftIO $ putStrLn $ C.green "setCreator/versioning ---> Cache hit for x509 cert"
 
@@ -484,7 +484,7 @@ getOrg caller vers = do
         maybeCertLevelDB <- x509CertDBGet $ _accountAddress caller
         let maybeCertBlockDB = M.lookup (_accountAddress caller) x509s'
             maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
-        let org' = fromMaybe "" $ fmap subOrg $ listToMaybe =<< getCertSubject =<< maybeCert
+        let org' = fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
         liftIO $ putStrLn $ "getOrg/versioning ---> They are a user of org " ++ (show org')
         return org'
       x -> do
@@ -1235,19 +1235,19 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
                                                 maybeCertLevelDB <- x509CertDBGet $ _accountAddress $ Env.origin env'
                                                 let maybeCertBlockDB = M.lookup (_accountAddress $ Env.origin env') x509s
                                                     maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
-                                                return . Constant . SString . fromMaybe "" . fmap subCommonName $ listToMaybe =<< getCertSubject =<< maybeCert
+                                                return . Constant . SString . fromMaybe "" . fmap subCommonName $ getCertSubject =<< maybeCert
       (SBuiltinVariable "tx", "organization") -> do env' <- getEnv
                                                     x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
                                                     maybeCertLevelDB <- x509CertDBGet $ _accountAddress $ Env.origin env'
                                                     let maybeCertBlockDB = M.lookup (_accountAddress $ Env.origin env') x509s
                                                         maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
-                                                    return . Constant . SString . fromMaybe "" . fmap subOrg $ listToMaybe =<< getCertSubject =<< maybeCert
+                                                    return . Constant . SString . fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
       (SBuiltinVariable "tx", "group") -> do env' <- getEnv
                                              x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
                                              maybeCertLevelDB <- x509CertDBGet $ _accountAddress $ Env.origin env'
                                              let maybeCertBlockDB = M.lookup (_accountAddress $ Env.origin env') x509s
                                                  maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
-                                             return . Constant . SString . fromMaybe "" $ subUnit =<< listToMaybe =<< getCertSubject =<< maybeCert
+                                             return . Constant . SString . fromMaybe "" $ subUnit =<< getCertSubject =<< maybeCert
       (SStruct _ theMap, fieldName) -> case M.lookup fieldName theMap of
           Nothing -> missingField "struct member access" fieldName
           Just v -> return v
@@ -1811,7 +1811,7 @@ callBuiltin rc@"registerCert" [SAccount a, SString cert] _ = do
                 x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
                 let theAddress = _accountAddress $ namedAccountToAccount Nothing a
                 Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.insert theAddress x509Cert x509s
-                onTraced $ liftIO $ putStrLn $ "    registering cert to address: " ++ format theAddress ++ " as " ++ show (fmap subCommonName $ listToMaybe =<< getCertSubject x509Cert)
+                onTraced $ liftIO $ putStrLn $ "    registering cert to address: " ++ format theAddress ++ " as " ++ show (fmap subCommonName $ getCertSubject x509Cert)
                 return SNULL
 
 callBuiltin rc'@("registerCert") [SString cert] _ = do
@@ -1830,7 +1830,7 @@ callBuiltin rc'@("registerCert") [SString cert] _ = do
               if not $ verifyBlockApps x509Cert 
                 then invalidCertificate "Certificate is not signed by the BlockApps Root Certificate" (getCertIssuer x509Cert)
                 else do
-                  let mSubject = listToMaybe =<< getCertSubject x509Cert
+                  let mSubject = getCertSubject x509Cert
                   case mSubject of 
                     Nothing -> invalidCertificate "No or invalid subject" x509Cert
                     (Just subject) -> do
@@ -1903,7 +1903,7 @@ certificateMap :: Maybe String -> Value
 certificateMap maybeCert = case maybeCert of
     Nothing -> SMap stringToString emptyCertMap
     Just cert -> SMap stringToString (fromMaybe emptyCertMap $ fmap (certMap cert) (subject cert))
-    where subject cert = listToMaybe =<< getCertSubject =<< (eitherToMaybe . bsToCert . BC.pack $ cert)
+    where subject cert = getCertSubject =<< (eitherToMaybe . bsToCert . BC.pack $ cert)
           certMap cert sub = M.fromList [ (SString "commonName", Constant . SString $ subCommonName sub)
                                    , (SString "country", Constant . SString $ fromMaybe "" $ subCountry sub)
                                    , (SString "organization", Constant . SString $ subOrg sub)

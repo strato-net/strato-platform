@@ -111,23 +111,20 @@ main = do
 -------------------------------------- GENERATE CERT ---------------------------------------
 --------------------------------------------------------------------------------------------
 
-  let issuer = case optIssuerCert of
-        Nothing -> Issuer
+  let issuer = case (optIssuerCert, getCertSubject =<< optIssuerCert) of
+        (Nothing, _) -> Issuer
           { issCommonName = subCommonName optSubjectInfo
           , issCountry    = subCountry optSubjectInfo
           , issOrg        = subOrg optSubjectInfo
           , issUnit       = subUnit optSubjectInfo
           }
-        Just cert -> 
-          let subject = listToMaybe =<< getCertSubject cert
-          in case subject of
-            Just (Subject{..}) -> Issuer
-                { issCommonName = subCommonName
-                , issCountry    = subCountry
-                , issOrg        = subOrg
-                , issUnit       = subUnit
-                } 
-            _ -> error "missing commonName or orgName in issuer cert"
+        (Just _, Just (Subject{..})) -> Issuer
+          { issCommonName = subCommonName
+          , issCountry    = subCountry
+          , issOrg        = subOrg
+          , issUnit       = subUnit
+          } 
+        _ -> error "missing commonName or orgName in issuer cert"
   
   -- generate and write cert
   flip runReaderT optKey $ do
