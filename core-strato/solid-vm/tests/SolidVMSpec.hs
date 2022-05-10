@@ -1,6 +1,8 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TypeOperators     #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications  #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -108,6 +110,10 @@ anyInvalidCertError _ = False
 anyMalformedDataError :: Selector HandledException
 anyMalformedDataError (HE Blockchain.SolidVM.Exception.MalformedData{}) = True
 anyMalformedDataError _ = False
+
+anyTooMuchGasError :: Selector HandledException
+anyTooMuchGasError (HE Blockchain.SolidVM.Exception.TooMuchGas{}) = True
+anyTooMuchGasError _ = False
 
 failedRequirementMsg :: String -> Selector HandledException
 failedRequirementMsg str (HE (Require (Just msg))) = str == msg
@@ -3098,6 +3104,155 @@ contract qq {
       , BBool True
       , BDefault
       ]
+
+  it "won't transfer when there is not anything to transfer between account" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq{
+  account a;
+  uint bal;
+  constructor() public {
+    a = account(this);
+  }
+  function myTransfer() internal pure
+    returns (uint){
+      a.transfer(13);
+      bal = a.balance;
+      return bal;
+    }
+}|]
+    -- Get the contract's account
+    [ BAccount a _] <- getFields ["a"]
+    -- Set the balance
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 13 })
+    -- Check return of balance
+    void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a) 
+    getFields ["bal"] `shouldReturn` [ BInteger 13 ]
+
+  it "can handle a three account transfer (only transfer from `this` account into only one account, leaving the third account alone)" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract Test {
+  constructor(){}
+}
+pragma solidvm 3.2;
+contract qq{
+  account a;
+  account b;
+  account c;
+  uint bala;
+  uint balb;
+  uint balc;
+  constructor() public {
+    Test t = new Test();
+    a = account(this);
+    b = account(0xdeadbeef);
+    c = account(t);
+  }
+  function myTransfer() internal pure
+    returns (uint, uint, uint){
+      b.transfer(13);
+      bala = a.balance;
+      balb = b.balance;
+      balc = c.balance;
+      return (bala, balb, balc);
+    }
+}|]
+    -- Get the contract's accounts
+    [ BAccount a _, BAccount b _, BAccount c _] <- getFields ["a", "b", "c"]
+    -- Adjust the preset balances
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 14 })
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs { addressStateBalance = 13 })
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs { addressStateBalance = 13 })
+    -- Check return of balance
+    void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a) 
+    getFields ["bala", "balb", "balc"] `shouldReturn` 
+      [ BInteger 1,
+        BInteger 26,
+        BInteger 13 ]
+
+  it "cannot over transfer from an account." . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract Test {
+  constructor(){}
+}
+pragma solidvm 3.2;
+contract qq{
+  account a;
+  account b;
+  account c;
+  uint bala;
+  uint balb;
+  uint balc;
+  constructor() public {
+    Test t = new Test();
+    a = account(this);
+    b = account(0xdeadbeef);
+    c = account(t);
+  }
+  function myTransfer() internal pure
+    returns (uint, uint, uint){
+      b.transfer(1300);
+      bala = a.balance;
+      balb = b.balance;
+      balc = c.balance;
+      return (bala, balb, balc);
+    }
+}|]
+    -- Get the contract's accounts
+    [ BAccount a _, BAccount b _, BAccount c _ ] <- getFields ["a", "b", "c"]
+    -- Adjust the preset balances
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 14 })
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs { addressStateBalance = 13 })
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs { addressStateBalance = 13 })
+    -- Check return of balance
+    void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a) 
+    getFields ["bala", "balb", "balc"] `shouldReturn` 
+      [ BInteger 14,
+        BInteger 13,
+        BInteger 13 ]
+
+  it "cannot use the transfer function for more than 2300 wei" $ runTest (do 
+    runBS [r|
+pragma solidvm 3.2;
+contract Test {
+  constructor(){}
+}
+pragma solidvm 3.2;
+contract qq{
+  account a;
+  account b;
+  account c;
+  uint bala;
+  uint balb;
+  uint balc;
+  bool success;
+  constructor() public {
+    Test t = new Test();
+    a = account(this);
+    b = account(0xdeadbeef);
+    c = account(t);
+  }
+  function myTransfer() internal pure
+    returns (uint, uint, uint){     
+      b.transfer(10000); 
+      bala = a.balance;
+      balb = b.balance;
+      balc = c.balance;
+      return (bala, balb, balc);
+    }
+}|]
+    -- Get the contract's accounts
+    [ BAccount a _, BAccount b _, BAccount c _ ] <- getFields ["a", "b", "c"]
+    -- Adjust the preset balances
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 13000 })
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs { addressStateBalance = 13000 })
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs { addressStateBalance = 13000 })
+    -- Check return of balance
+    (void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a))) `shouldThrow` anyTooMuchGasError
+    -- "hello" `shouldBe` "Hello"
+
   it "can get the chainId from the account type" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
@@ -3210,6 +3365,40 @@ contract qq{
     runBS contract
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString contract]
+
+  it "can transfer value from account a to account b" . runTest $ do
+    -- Post contract
+    runBS [r|
+pragma solidvm 3.2;
+contract qq{
+  account a;
+  account b;
+  uint bala;
+  uint balb;
+  constructor() public {
+    a = account(this);
+    b = account(0xdeadbeef);
+  }
+  function myBalance() {
+    //from the account address "a" transfer funds to the account address "b"
+      //the full balance from account a
+    b.transfer(13);
+    bala = a.balance;
+    balb = b.balance;
+  }
+}|]
+    -- Get both of the contracts
+    [ BAccount a _] <- getFields ["a"]
+    [ BAccount b _chainIdInfo] <- getFields ["b"]
+    -- Set the balance and instantiate both of the accounts the accounts
+    -- Account a should start with 13 and b should have 0 at the start.
+    -- The transfer member should be able to send the balance of to account b
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 14 })
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs { addressStateBalance = 0 })
+
+    -- Check return of balance
+    void $ call2 "myBalance" "()" (namedAccountToAccount Nothing a) 
+    getFields ["bala", "balb"] `shouldReturn` [ BInteger 1, BInteger 13  ]
 
   it "can't assign a value to an unallocated index in an array" $ (runTest (runBS [r|
 pragma solidvm 3.0;

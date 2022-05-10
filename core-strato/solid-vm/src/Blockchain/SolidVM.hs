@@ -1282,6 +1282,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
           ps -> do
             addr <- accountOnUnspecifiedChain <$> getCurrentAccount
             return $ Constant $ SContractFunction (Just $ CC._contractName $ last ps) addr method
+  
       (SAccount a _, "codehash") -> do
         -- Get the chainId for the account
         cid <- case (a ^. namedAccountChainId) of 
@@ -1300,7 +1301,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
           Just (SolidVMCode _ ch') -> return (Constant $ SString . keccak256ToHex $ ch')
           Just cp -> missingCodeCollection "Account is not a SolidVM contract" (format cp)
           Nothing -> missingCodeCollection "Could not resolve code pointer for account" (format realAccount)
-      
+ 
       (SAccount a _, "code") -> do
         -- Get the code at the address
         cid <- case (a ^. namedAccountChainId) of 
@@ -1660,6 +1661,7 @@ expToVar' (CC.FunctionCall _ e args) = do
             let address = namedAccountToAccount (from ^. accountChainId) address'
             success <- case argVals of
               OrderedVals [SInteger amount] -> do
+                when (amount > 2300) $ tooMuchGas "2300" (show amount)
                 pay "built-in transfer function" from address amount
               _ -> return False
             return . Constant $ SBool success
