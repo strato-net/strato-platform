@@ -920,6 +920,10 @@ statementHelper (Return mExpr x) = do
 statementHelper (Throw x) = pure $ topType' x
 statementHelper (EmitStatement _ vals x) =
   reduceType' x <$> traverse (tcExpr . snd) vals
+statementHelper (RevertStatement _ (NamedArgs vals) x) =
+  reduceType' x <$> traverse (tcExpr . snd) vals
+statementHelper (RevertStatement _ (OrderedArgs vals) x) =
+  reduceType' x <$> traverse tcExpr vals
 statementHelper (AssemblyStatement _ x) = pure $ topType' x
 statementHelper (SimpleStatement stmt x) = simpleStatementHelper x stmt
 
