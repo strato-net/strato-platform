@@ -1,7 +1,10 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TypeOperators     #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeApplications  #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 {-# OPTIONS_GHC -fno-warn-missing-fields #-}
@@ -33,7 +36,9 @@ import Test.Hspec.Expectations.Lifted
 import Text.Printf
 import Text.RawString.QQ
 
+import Control.Monad.Change.Alter
 import Blockchain.SolidVM.CodeCollectionDB as CCDB
+import Blockchain.Data.AddressStateDB
 import Blockchain.Data.DataDefs (BlockData(..))
 import Blockchain.Data.ExecResults
 import Blockchain.Data.RLP
@@ -105,6 +110,10 @@ anyInvalidCertError _ = False
 anyMalformedDataError :: Selector HandledException
 anyMalformedDataError (HE Blockchain.SolidVM.Exception.MalformedData{}) = True
 anyMalformedDataError _ = False
+
+anyTooMuchGasError :: Selector HandledException
+anyTooMuchGasError (HE Blockchain.SolidVM.Exception.TooMuchGas{}) = True
+anyTooMuchGasError _ = False
 
 failedRequirementMsg :: String -> Selector HandledException
 failedRequirementMsg str (HE (Require (Just msg))) = str == msg
@@ -311,7 +320,7 @@ getFields2 :: [BC.ByteString] -> ContextM [BasicValue]
 getFields2 = getAll2 . map (\t -> [Field t])
 
 bAddress :: Address -> BasicValue
-bAddress = BAccount . unspecifiedChain
+bAddress = ((flip BAccount) False) . unspecifiedChain
 
 bContract :: T.Text -> Address -> BasicValue
 bContract t a =
@@ -332,7 +341,7 @@ bAccount a =
   let u = accountOnUnspecifiedChain a
    in if u == unspecifiedChain 0
         then BDefault
-        else BAccount u
+        else (BAccount u False)
 
 iAddress :: Address -> IndexType
 iAddress = IAccount . unspecifiedChain
@@ -1304,6 +1313,21 @@ contract qq {
   }
 }|]
     getFields ["x"] `shouldReturn` [bContract "X" 0xdeadbeef]
+
+  it "can parse account payable type" . runTest $ do
+    runBS [r|
+contract qq {
+  account y;
+  account payable x;
+  bool z;
+  
+  constructor() public {
+    y = msg.sender;
+    x = payable(y);
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BAccount (NamedAccount 0xdeadbeef UnspecifiedChain) True]
+  
 
   it "can call methods of superclasses" . runTest $ do
     runBS [r|
@@ -3035,12 +3059,12 @@ contract qq {
   }
 }|]
     getFields ["sce", "scm", "scu", "sde", "sdm", "sdu"] `shouldReturn`
-      [ BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xfeedbeef))
-      , BAccount (NamedAccount 0xdeadbeef MainChain)
-      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain)
-      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain)
-      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain)
-      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain)
+      [ BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xfeedbeef)) False
+      , BAccount (NamedAccount 0xdeadbeef MainChain) False
+      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain) False
+      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain) False
+      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain) False
+      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain) False
       ]
   
   it "can cast strings to chainIds" . runTest $ do
@@ -3057,9 +3081,9 @@ contract qq {
   }
 }|]
     getFields ["sce", "scm", "scu"] `shouldReturn`
-      [ BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xfeedbeef))
-      , BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xfeedb33f))
-      , BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xf33dbeef))
+      [ BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xfeedbeef)) False
+      , BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xfeedb33f)) False
+      , BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xf33dbeef)) False
       ]
 
   it "can cast strings to bool" . runTest $ do
@@ -3080,6 +3104,155 @@ contract qq {
       , BBool True
       , BDefault
       ]
+
+  it "won't transfer when there is not anything to transfer between account" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq{
+  account a;
+  uint bal;
+  constructor() public {
+    a = account(this);
+  }
+  function myTransfer() internal pure
+    returns (uint){
+      a.transfer(13);
+      bal = a.balance;
+      return bal;
+    }
+}|]
+    -- Get the contract's account
+    [ BAccount a _] <- getFields ["a"]
+    -- Set the balance
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 13 })
+    -- Check return of balance
+    void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a) 
+    getFields ["bal"] `shouldReturn` [ BInteger 13 ]
+
+  it "can handle a three account transfer (only transfer from `this` account into only one account, leaving the third account alone)" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract Test {
+  constructor(){}
+}
+pragma solidvm 3.2;
+contract qq{
+  account a;
+  account b;
+  account c;
+  uint bala;
+  uint balb;
+  uint balc;
+  constructor() public {
+    Test t = new Test();
+    a = account(this);
+    b = account(0xdeadbeef);
+    c = account(t);
+  }
+  function myTransfer() internal pure
+    returns (uint, uint, uint){
+      b.transfer(13);
+      bala = a.balance;
+      balb = b.balance;
+      balc = c.balance;
+      return (bala, balb, balc);
+    }
+}|]
+    -- Get the contract's accounts
+    [ BAccount a _, BAccount b _, BAccount c _] <- getFields ["a", "b", "c"]
+    -- Adjust the preset balances
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 14 })
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs { addressStateBalance = 13 })
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs { addressStateBalance = 13 })
+    -- Check return of balance
+    void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a) 
+    getFields ["bala", "balb", "balc"] `shouldReturn` 
+      [ BInteger 1,
+        BInteger 26,
+        BInteger 13 ]
+
+  it "cannot over transfer from an account." . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract Test {
+  constructor(){}
+}
+pragma solidvm 3.2;
+contract qq{
+  account a;
+  account b;
+  account c;
+  uint bala;
+  uint balb;
+  uint balc;
+  constructor() public {
+    Test t = new Test();
+    a = account(this);
+    b = account(0xdeadbeef);
+    c = account(t);
+  }
+  function myTransfer() internal pure
+    returns (uint, uint, uint){
+      b.transfer(1300);
+      bala = a.balance;
+      balb = b.balance;
+      balc = c.balance;
+      return (bala, balb, balc);
+    }
+}|]
+    -- Get the contract's accounts
+    [ BAccount a _, BAccount b _, BAccount c _ ] <- getFields ["a", "b", "c"]
+    -- Adjust the preset balances
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 14 })
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs { addressStateBalance = 13 })
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs { addressStateBalance = 13 })
+    -- Check return of balance
+    void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a) 
+    getFields ["bala", "balb", "balc"] `shouldReturn` 
+      [ BInteger 14,
+        BInteger 13,
+        BInteger 13 ]
+
+  it "cannot use the transfer function for more than 2300 wei" $ runTest (do 
+    runBS [r|
+pragma solidvm 3.2;
+contract Test {
+  constructor(){}
+}
+pragma solidvm 3.2;
+contract qq{
+  account a;
+  account b;
+  account c;
+  uint bala;
+  uint balb;
+  uint balc;
+  bool success;
+  constructor() public {
+    Test t = new Test();
+    a = account(this);
+    b = account(0xdeadbeef);
+    c = account(t);
+  }
+  function myTransfer() internal pure
+    returns (uint, uint, uint){     
+      b.transfer(10000); 
+      bala = a.balance;
+      balb = b.balance;
+      balc = c.balance;
+      return (bala, balb, balc);
+    }
+}|]
+    -- Get the contract's accounts
+    [ BAccount a _, BAccount b _, BAccount c _ ] <- getFields ["a", "b", "c"]
+    -- Adjust the preset balances
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 13000 })
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs { addressStateBalance = 13000 })
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs { addressStateBalance = 13000 })
+    -- Check return of balance
+    (void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a))) `shouldThrow` anyTooMuchGasError
+    -- "hello" `shouldBe` "Hello"
+
   it "can get the chainId from the account type" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
@@ -3104,6 +3277,128 @@ contract qq {
       , BDefault
       , BDefault
       ]
+  it "can get the balance from an address" . runTest $ do
+    -- Post contract
+    runBS [r|
+pragma solidvm 3.2;
+contract qq{
+  account a;
+  uint bal;
+  constructor() public {
+    a = account(this);
+  }
+  function myBalance() {
+    bal = a.balance;
+  }
+}|]
+    -- Get the contract's account
+    [ BAccount a _ ] <- getFields ["a"]
+    -- Set the balance
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 13 })
+    -- Check return of balance
+    void $ call2 "myBalance" "()" (namedAccountToAccount Nothing a) 
+    getFields ["bal"] `shouldReturn` [ BInteger 13 ]
+  it "can get the codehash from an address" . runTest $ do
+    let contract = [r|
+pragma solidvm 3.2;
+contract Test {
+  constructor(){}
+}
+
+pragma solidvm 3.2;
+contract qq{
+  string codeHashTest;
+  constructor() public {
+    Test t = new Test();
+    codeHashTest = account(t).codehash;
+  }
+}|]
+    runBS contract
+    getFields ["codeHashTest", "codeHashTest"] `shouldReturn`
+      [ BString $ BC.pack $ keccak256ToHex $ hash $ UTF8.fromString contract
+      , BString "a37c4f1c44888f20d2b8dad57919efe0d6aec401ff8af47180e07e0b32096086" ]
+
+  it "can the codehash from this an address" . runTest $ do
+    let contract = [r|
+pragma solidvm 3.2;
+contract qq{
+  string codeHashTest;
+  constructor() public {
+    codeHashTest = account(this).codehash;
+  }
+}|]
+    runBS contract
+    getFields ["codeHashTest", "codeHashTest"] `shouldReturn`
+      [ BString $ BC.pack $  keccak256ToHex $ hash $ UTF8.fromString contract 
+      , BString "657f5687fe89bd0bd3cee84e83c306c65458c0b13d13991087f9a7330474f2d8" ]
+
+  it "can get the code from an address" . runTest $ do
+    let contract :: String
+        contract = [r|
+pragma solidvm 3.2;
+contract Test {
+  constructor(){}
+}
+
+pragma solidvm 3.2;
+contract qq{
+  string codeTest;
+  constructor() public {
+    Test t = new Test();
+    codeTest = account(t).code;
+  }
+}|]
+    runBS contract
+    getFields ["codeTest"] `shouldReturn`
+      [ BString $ UTF8.fromString contract]
+
+  it "can get the current contract code" . runTest $ do
+    let contract :: String
+        contract = [r|
+pragma solidvm 3.2;
+contract qq{
+  string codeTest;
+  constructor() public {
+    codeTest = account(this).code;
+  }
+}|]
+    runBS contract
+    getFields ["codeTest"] `shouldReturn`
+      [ BString $ UTF8.fromString contract]
+
+  it "can transfer value from account a to account b" . runTest $ do
+    -- Post contract
+    runBS [r|
+pragma solidvm 3.2;
+contract qq{
+  account a;
+  account b;
+  uint bala;
+  uint balb;
+  constructor() public {
+    a = account(this);
+    b = account(0xdeadbeef);
+  }
+  function myBalance() {
+    //from the account address "a" transfer funds to the account address "b"
+      //the full balance from account a
+    b.transfer(13);
+    bala = a.balance;
+    balb = b.balance;
+  }
+}|]
+    -- Get both of the contracts
+    [ BAccount a _] <- getFields ["a"]
+    [ BAccount b _chainIdInfo] <- getFields ["b"]
+    -- Set the balance and instantiate both of the accounts the accounts
+    -- Account a should start with 13 and b should have 0 at the start.
+    -- The transfer member should be able to send the balance of to account b
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 14 })
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs { addressStateBalance = 0 })
+
+    -- Check return of balance
+    void $ call2 "myBalance" "()" (namedAccountToAccount Nothing a) 
+    getFields ["bala", "balb"] `shouldReturn` [ BInteger 1, BInteger 13  ]
 
   it "can't assign a value to an unallocated index in an array" $ (runTest (runBS [r|
 pragma solidvm 3.0;
@@ -3367,7 +3662,6 @@ contract qq {
     isValid = verifySignature(msgHash, signature, pubkey);
   }
 }|]) `shouldThrow` anyMalformedDataError
-
 
   it "can properly preform complex tuple destructuring" . runTest $ do
     runBS [r|

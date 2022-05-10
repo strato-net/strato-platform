@@ -29,6 +29,7 @@ statementCrawler = \case
   Continue _ -> ["Continue"]
   Throw _ -> ["Throw"]
   EmitStatement _ evts _ ->  "EmitStatement":concatMap (expressionCrawler . snd) evts
+  RevertStatement _ _ _ -> ["RevertStatement"] -- :concatMap (expressionCrawler) args
   SimpleStatement st _ -> simpleStatementCrawler st
   Return mExpr _ -> "Return":maybe [] expressionCrawler mExpr
   DoWhileStatement blk test _ -> "DoWhileStatement"
