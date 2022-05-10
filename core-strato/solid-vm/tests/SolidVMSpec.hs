@@ -3137,7 +3137,7 @@ contract qq{
   }
 }|]
     -- Get the contract's account
-    [ BAccount a ] <- getFields ["a"]
+    [ BAccount a _ ] <- getFields ["a"]
     -- Set the balance
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 13 })
     -- Check return of balance
