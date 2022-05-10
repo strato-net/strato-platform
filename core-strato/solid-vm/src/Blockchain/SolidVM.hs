@@ -657,7 +657,7 @@ callWrapper from to mContract functionName isRCC argExps  = do
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) to
 
-  liftIO $ putStrLn $ "callWraper/versioning --->  we are calling " ++ (CC._contractName contract) ++ 
+  liftIO $ putStrLn $ "callWrapper/versioning --->  we are calling " ++ (CC._contractName contract) ++ 
         " in app " ++ (show parentName) ++ " of org " ++ show org
 
 
@@ -1688,8 +1688,8 @@ expToVar' (CC.FunctionCall _ e args) = do
             from <- getCurrentAccount
             let address = namedAccountToAccount (from ^. accountChainId) address'
             returnVal <- case argVals of 
-              OrderedVals [SContract contract] -> do
-                return $ callWraper from address contract Nothing False Nothing
+              OrderedVals [SContract contract from] -> do
+                return $ callWrapper from address contract Nothing False Nothing
               _ -> return Nothing
             return . Constant $ SBool success
 
