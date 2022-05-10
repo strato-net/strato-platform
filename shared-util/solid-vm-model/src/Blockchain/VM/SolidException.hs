@@ -60,6 +60,7 @@ data SolidException = TypeError String String
                     | InvalidCertificate String String
                     | MalformedData String String
                     | TooMuchGas String String
+                    | PaymentError String String
                     deriving (Eq, Exception, Generic, NFData, ToJSON, FromJSON)
 
 instance Show SolidException where
@@ -90,6 +91,7 @@ showSolidException (InvalidWrite a b) = printf "invalid write: %s: %s" a b
 showSolidException (InvalidCertificate a b) = printf "invalid certificate: %s: %s" a b
 showSolidException (MalformedData a b) = printf "Malformed data: %s: %s" a b
 showSolidException (TooMuchGas a b) = printf "The gas limit is %s, but was given %s instead." a b
+showSolidException (PaymentError a b) = printf "There was an error sending %s wei to the following address: %s" a b
 
 
 toThrower :: (Show v) => (String -> String -> SolidException) -> String -> v -> a
@@ -166,3 +168,6 @@ malformedData = toThrower MalformedData
 
 tooMuchGas :: (Show v) => String -> v -> a
 tooMuchGas = toThrower TooMuchGas
+
+paymentError :: (Show v) => String -> v -> a
+paymentError = toThrower PaymentError

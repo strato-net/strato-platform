@@ -1662,6 +1662,17 @@ expToVar' (CC.FunctionCall _ e args) = do
             success <- case argVals of
               OrderedVals [SInteger amount] -> do
                 when (amount > 2300) $ tooMuchGas "2300" (show amount)
+                when (not (pay "built-in transfer function" from address amount)) $
+                  PaymentError (show amount) (show address)
+              _ -> PaymentError (show amount) (show address)
+            return
+
+          Constant (SContractItem address' "send") -> do
+            from <- getCurrentAccount
+            let address = namedAccountToAccount (from ^. accountChainId) address'
+            success <- case argVals of
+              OrderedVals [SInteger amount] -> do
+                when (amount > 2300) $ tooMuchGas "2300" (show amount)
                 pay "built-in transfer function" from address amount
               _ -> return False
             return . Constant $ SBool success
