@@ -1699,7 +1699,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                   _ -> paymentError (show amount) (show address)
               _ -> paymentError "unknown" (show address)
 
-          Constant (SContractFunction contractName' address' "send") -> do
+          Constant (SContractFunction _ address' "send") -> do
             from <- getCurrentAccount
             let address = namedAccountToAccount (from ^. accountChainId) address'
             success <- case argVals of

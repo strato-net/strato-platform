@@ -115,6 +115,10 @@ anyTooMuchGasError :: Selector HandledException
 anyTooMuchGasError (HE Blockchain.SolidVM.Exception.TooMuchGas{}) = True
 anyTooMuchGasError _ = False
 
+anyPaymentError :: Selector HandledException
+anyPaymentError (HE Blockchain.SolidVM.Exception.PaymentError{}) = True
+anyPaymentError _ = False
+
 failedRequirementMsg :: String -> Selector HandledException
 failedRequirementMsg str (HE (Require (Just msg))) = str == msg
 failedRequirementMsg _   _                         = False
@@ -3171,7 +3175,7 @@ contract qq{
         BInteger 26,
         BInteger 13 ]
 
-  it "cannot over transfer from an account." . runTest $ do
+  it "cannot over transfer from an account." $ runTest (do
     runBS [r|
 pragma solidvm 3.2;
 contract Test {
@@ -3207,11 +3211,7 @@ contract qq{
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs { addressStateBalance = 13 })
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs { addressStateBalance = 13 })
     -- Check return of balance
-    void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a) 
-    getFields ["bala", "balb", "balc"] `shouldReturn` 
-      [ BInteger 14,
-        BInteger 13,
-        BInteger 13 ]
+    (void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a))) `shouldThrow` anyPaymentError
 
   it "cannot use the transfer function for more than 2300 wei" $ runTest (do 
     runBS [r|
