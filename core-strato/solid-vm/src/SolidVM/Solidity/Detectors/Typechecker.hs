@@ -523,8 +523,10 @@ typecheckMember (Static e@(SVMType.Enum _ enum mNames) x) n = do
              , enum
              ]) <$ x
 
+-- Function: argType, returnType, contextType
+-- Static: argType, ContextType
 typecheckMember (Static (SVMType.Account _) x) "transfer" = pure $ Function (Static (SVMType.Int Nothing Nothing) x) (Product [] x) x
-typecheckMember (Static (SVMType.Account _) x) "send" = pure $ Function (Static (SVMType.Bool) x) (Product [] x) x
+typecheckMember (Static (SVMType.Account _) x) "send" = pure $ Function (Static (SVMType.Int Nothing Nothing) x) (Static (SVMType.Bool) x) x
 typecheckMember (Static (SVMType.Account _) x) "call" = pure $ Function (Static (SVMType.Bool) x) (Product [] x) x
 typecheckMember (Static (SVMType.Account _) x) "balance" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Account _) x) "code" = pure $ Static (SVMType.Bytes Nothing Nothing) x
