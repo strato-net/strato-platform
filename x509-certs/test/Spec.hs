@@ -71,3 +71,52 @@ spec = do
           fakePub = PubKeyEC $ PubKeyEC_Named SEC_p256k1 fakeSerialPub
           sigVerification = verifySignedSignature (coerce cert) fakePub
       sigVerification `shouldBe` SignatureFailed SignatureInvalid
+    it "can verify chained certificates" $ do
+      -- Create certificate one
+      priv1 <- newPrivateKey
+      let iss0 = iss
+          pub1 = derivePublicKey priv1
+          sub1 = Subject "a" "15" (Just "44") (Just "17") pub1
+          iss1 = (\(Subject a b c d _) -> Issuer a b c d) sub1
+      cert1 <- flip runReaderT priv $ makeSignedCert Nothing iss0 sub1
+
+      -- Create certificate two
+      priv2 <- newPrivateKey
+      let pub2 = derivePublicKey priv2
+          sub2 = Subject "y" "6" (Just "1") (Just "10") pub2
+          iss2 = (\(Subject a b c d _) -> Issuer a b c d) sub2
+      cert2 <- flip runReaderT priv1 $ makeSignedCert (Just cert1) iss1 sub2
+
+      -- Create certificate three
+      priv3 <- newPrivateKey
+      let pub3 = derivePublicKey priv3
+          sub3 = Subject "z" "7" (Just "2") (Just "11") pub3
+      cert3 <- flip runReaderT priv2 $ makeSignedCert (Just cert2) iss2 sub3
+
+      verifyCert pub cert3 `shouldBe` True
+    it "can reject invalid chained certificates" $ do
+      fakePriv <- newPrivateKey
+
+      -- Create certificate one using the fake private key
+      priv1 <- newPrivateKey
+      let iss0 = iss
+          pub1 = derivePublicKey priv1
+          sub1 = Subject "a" "15" (Just "44") (Just "17") pub1
+          iss1 = (\(Subject a b c d _) -> Issuer a b c d) sub1
+      cert1 <- flip runReaderT fakePriv $ makeSignedCert Nothing iss0 sub1
+
+      -- Create certificate two
+      priv2 <- newPrivateKey
+      let pub2 = derivePublicKey priv2
+          sub2 = Subject "y" "6" (Just "1") (Just "10") pub2
+          iss2 = (\(Subject a b c d _) -> Issuer a b c d) sub2
+      cert2 <- flip runReaderT priv1 $ makeSignedCert (Just cert1) iss1 sub2
+
+      -- Create certificate three
+      priv3 <- newPrivateKey
+      let pub3 = derivePublicKey priv3
+          sub3 = Subject "z" "7" (Just "2") (Just "11") pub3
+      cert3 <- flip runReaderT priv2 $ makeSignedCert (Just cert2) iss2 sub3
+      
+      verifyCert pub cert3 `shouldBe` False
+
