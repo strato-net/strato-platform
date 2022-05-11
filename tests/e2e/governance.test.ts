@@ -93,7 +93,7 @@ describe("Create Chain", function() {
 
     await rest.call(alice, {contract: gov, method: addName, args, chainid: chainId}, options);
 
-    const action = rest.getChain(ouser1, chainId, options);
+    const action = (opts) => rest.getChain(ouser1, chainId, opts);
     const addPredicate = (ci) => ci.info.members.length === 3
     const removePredicate = (ci) => ci.info.members.length === 2
     await util.until(addPredicate, action, options)
