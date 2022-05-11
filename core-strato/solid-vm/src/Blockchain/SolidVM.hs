@@ -628,6 +628,37 @@ expressionType (CC.ArrayExpression _ xs) = SVMType.Array (expressionType (head x
 
 expressionType ex = typeError "Cannot deduce a type from" (ex, ex)
 
+-- call :: SolidVMBase m
+--      => Bool
+--      -> Bool
+--      -> Bool
+--      -> Bool
+--      -> S.Set Account
+--      -> BlockData
+--      -> Int
+--      -> Account
+--      -> Account
+--      -> Account
+--      -> Word256
+--      -> Word256
+--      -> B.ByteString
+--      -> Gas
+--      -> Account
+--      -> Keccak256
+--      -> Maybe Word256
+--      -> Maybe (M.Map T.Text T.Text)
+--      -> m ExecResults
+-- --call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDepth receiveAddress
+-- --     (Address codeAddress) sender value gasPrice theData availableGas origin txHash chainId metadata =
+-- call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' metadata = do
+
+-- callMember :: MonadSM m => Account -> Account -> B.ByteString -> (Bool, m ExecResults)
+-- callMember from to payload = do
+--   let fromChain = from ^. accountChainId
+--       toChain = to ^. accountChainId
+--   isAccessibleChain <- toChain `isAncestorChainOf` fromChain
+--   unless isAccessibleChain $ inaccessibleChain "Inaccessible chain violation" $ "from: " ++ show from ++ ", to: " ++ show to
+
 
 callWrapper :: MonadSM m => Account -> Account -> Maybe String -> String -> Bool -> CC.ArgList -> m (Maybe Value)
 callWrapper from to mContract functionName isRCC argExps  = do
@@ -1659,21 +1690,24 @@ expToVar' (CC.FunctionCall _ e args) = do
           Constant (SContractItem address' "transfer") -> do
             from <- getCurrentAccount
             let address = namedAccountToAccount (from ^. accountChainId) address'
-            success <- case argVals of
+            case argVals of
               OrderedVals [SInteger amount] -> do
                 when (amount > 2300) $ tooMuchGas "2300" (show amount)
-                when (not (pay "built-in transfer function" from address amount)) $
-                  PaymentError (show amount) (show address)
-              _ -> PaymentError "unknown" (show address)
-            return
+                res <- pay "built-in transfer function" from address amount
+                case res of
+                  True -> return Constant $ SNULL
+                  _ -> paymentError (show amount) (show address)
+              _ -> paymentError "unknown" (show address)
 
-          Constant (SContractItem address' "send") -> do
+          Constant (SContractFunction contractName' address' "send") -> do
             from <- getCurrentAccount
             let address = namedAccountToAccount (from ^. accountChainId) address'
             success <- case argVals of
               OrderedVals [SInteger amount] -> do
-                when (amount > 2300) $ return False
-                return $ pay "built-in transfer function" from address amount
+                if (amount > 2300) then 
+                  return False
+                else pay "built-in transfer function" from address amount
+                -- when (amount > 2300) $ return False
               _ -> return False
             return . Constant $ SBool success
 
@@ -1684,15 +1718,15 @@ expToVar' (CC.FunctionCall _ e args) = do
 -- codeAddress get from 'this'
 -- sender get from 'this'
 
-          Constant (SContractItem address' "call") -> do
-            from <- getCurrentAccount
-            let address = namedAccountToAccount (from ^. accountChainId) address'
-            returnVal <- case argVals of 
-              OrderedVals [SContract contract from] -> do
-                return $ callWrapper from address contract Nothing False Nothing
-              _ -> return Nothing
-              -- V.fromList vars is a place holder please change
-            return Constant $ STuple $ V.fromList vars
+          -- Constant (SContractItem address' "call") -> do
+          --   from <- getCurrentAccount
+          --   let address = namedAccountToAccount (from ^. accountChainId) address'
+          --   returnVal <- case argVals of 
+          --     OrderedVals [SContract contract from] -> do
+          --       return $ callWrapper from address contract Nothing False Nothing
+          --     _ -> return Nothing
+          --     -- V.fromList vars is a place holder please change
+          --   return Constant $ STuple $ V.fromList vars
 
           Constant (SContractItem address' itemName) -> do
 
