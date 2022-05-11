@@ -109,7 +109,7 @@ showType' (Function a r _) =
            ]
 
 varDefsToType' :: Annotated VarDefEntryF -> Type' -> Type'
-varDefsToType' BlankEntry t                   = t
+varDefsToType' BlankEntry t                   = Product [topType' (context' t), t] (context' t)
 varDefsToType' VarDefEntry{..} t | vardefType == Nothing = t
 varDefsToType' VarDefEntry{..} (Top _ _)      = Static (fromJust vardefType) vardefContext
 varDefsToType' VarDefEntry{..} t@(Static _ _) = Product [Static (fromJust vardefType) vardefContext, t] vardefContext
