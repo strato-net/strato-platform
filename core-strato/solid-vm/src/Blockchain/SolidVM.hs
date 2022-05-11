@@ -1695,7 +1695,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                 when (amount > 2300) $ tooMuchGas "2300" (show amount)
                 res <- pay "built-in transfer function" from address amount
                 case res of
-                  True -> return Constant $ SNULL
+                  True -> return $ Constant SNULL
                   _ -> paymentError (show amount) (show address)
               _ -> paymentError "unknown" (show address)
 
