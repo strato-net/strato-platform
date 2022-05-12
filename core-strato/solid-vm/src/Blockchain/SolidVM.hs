@@ -1389,6 +1389,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
               ExplicitChain cid -> return $ Constant $ intBuiltin $ flip (:) [] $ SString $ B.foldr showHex "" $ word256ToBytes cid
           False ->
             typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ (show (val, name)))
+      
       (SAccount addr _, itemName) -> do --return $ Constant $ SContractItem addr itemName
         from <- getCurrentAccount
         let address = namedAccountToAccount (from ^. accountChainId) addr
@@ -1699,6 +1700,8 @@ expToVar' (CC.FunctionCall _ e args) = do
                   _ -> paymentError (show amount) (show address)
               _ -> paymentError "unknown" (show address)
 
+
+
           Constant (SContractItem address' "send") -> do
             from <- getCurrentAccount
             let address = namedAccountToAccount (from ^. accountChainId) address'
@@ -1714,22 +1717,45 @@ expToVar' (CC.FunctionCall _ e args) = do
               _ -> return False
             return . Constant $ SBool success
 
---call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' metadata = do
--- callWrapper from to mContract functionName isRCC argExps  = do
---isRCC should be false (Is runChainConstructors)
--- blockData should be given given (payload)
--- codeAddress get from 'this'
--- sender get from 'this'
+-- call :: SolidVMBase m
+--      => Bool
+--      -> Bool
+--      -> Bool
+--      -> Bool
+--      -> S.Set Account
+--      -> BlockData
+--      -> Int
+--      -> Account
+--      -> Account
+--      -> Account
+--      -> Word256
+--      -> Word256
+--      -> B.ByteString
+--      -> Gas
+--      -> Account
+--      -> Keccak256
+--      -> Maybe Word256
+--      -> Maybe (M.Map T.Text T.Text)
+--      -> m ExecResults
+-- --call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDepth receiveAddress
+-- --     (Address codeAddress) sender value gasPrice theData availableGas origin txHash chainId metadata =
 
-          -- Constant (SContractItem address' "call") -> do
-          --   from <- getCurrentAccount
-          --   let address = namedAccountToAccount (from ^. accountChainId) address'
-          --   returnVal <- case argVals of 
-          --     OrderedVals [SContract contract from] -> do
-          --       return $ callWrapper from address contract Nothing False Nothing
-          --     _ -> return Nothing
-          --     -- V.fromList vars is a place holder please change
-          --   return Constant $ STuple $ V.fromList vars
+
+          Constant (SContractItem address' "call") -> do
+            from <- getCurrentAccount
+            -- Get current contract information
+            contract <- getCurrentContract
+            -- Get the name of the current contract
+            contractName <- CC._contractName contract
+            let address = namedAccountToAccount (from ^. accountChainId) address'
+            let codeAddress = namedAccountToAccount (contract ^. accountChainId) address'
+            -- codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) realAccount
+            execResults <- case argVals of 
+              OrderedVals [SBytes payload] -> do
+                -- need to add fill in the parameters for the callWrapper
+                return $ BSS.toShort <$> callWrapper
+              _ -> return Nothing
+            return $ Constant $ erReturnVal execResults
 
           Constant (SContractItem address' itemName) -> do
 
