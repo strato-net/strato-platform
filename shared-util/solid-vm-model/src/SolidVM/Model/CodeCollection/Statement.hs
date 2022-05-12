@@ -32,6 +32,7 @@ import SolidVM.Model.Type
 
 data StatementF a =
   IfStatement (ExpressionF a) [StatementF a] (Maybe [StatementF a]) a -- if then else
+  | UncheckedStatement (ExpressionF a) [StatementF a] a
   | WhileStatement (ExpressionF a) [StatementF a] a
   | ForStatement (Maybe (SimpleStatementF a)) (Maybe (ExpressionF a)) (Maybe (ExpressionF a)) [StatementF a] a
   | Block a
@@ -47,6 +48,7 @@ data StatementF a =
   deriving (Show, Eq, Generic, Functor, ToJSON, FromJSON)
 
 extractStatement :: StatementF a -> a
+extractStatement (UncheckedStatement _ _ a) = a
 extractStatement (IfStatement _ _ _ a) = a
 extractStatement (WhileStatement _ _ a) = a
 extractStatement (ForStatement _ _ _ _ a) = a
@@ -129,6 +131,7 @@ data ExpressionF a =
   | ArrayExpression a [(ExpressionF a)]
   | Variable a String 
   | ObjectLiteral a (Map.Map T.Text (ExpressionF a))
+  | Unchecked a (ExpressionF a)
   deriving (Show, Eq, Generic, Functor)
 
 extractExpression :: ExpressionF a -> a
@@ -148,6 +151,7 @@ extractExpression (TupleExpression a _) = a
 extractExpression (ArrayExpression a _) = a
 extractExpression (Variable a _) = a
 extractExpression (ObjectLiteral a _) = a
+extractExpression (Unchecked a _) = a
 
 type Expression = Positioned ExpressionF
 
