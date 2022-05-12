@@ -31,7 +31,7 @@ import Data.Text.Encoding
 import Data.Time.Clock.POSIX
 import HFlags
 import Numeric
-import Test.Hspec (hspec, Spec, describe, fit, it, xit, pendingWith, anyException, shouldThrow, anyErrorCall, Selector)
+import Test.Hspec (hspec, Spec, describe, it, xit, pendingWith, anyException, shouldThrow, anyErrorCall, Selector)
 import Test.Hspec.Expectations.Lifted
 import Text.Printf
 import Text.RawString.QQ
@@ -3109,7 +3109,7 @@ contract qq {
       , BDefault
       ]
 
-  fit "won't transfer when there is not anything to transfer between account" . runTest $ do
+  it "won't transfer when there is not anything to transfer between account" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
 contract qq{
@@ -3133,7 +3133,7 @@ contract qq{
     void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a) 
     getFields ["bal"] `shouldReturn` [ BInteger 13 ]
 
-  fit "won't send when there is not anything to send between account" . runTest $ do
+  it "will not over send (send when there is not enough gas)" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
 contract qq{
@@ -3144,10 +3144,35 @@ contract qq{
     a = account(this);
   }
   function mySend() internal pure
-    returns (uint){
+    returns (uint, bool){
       success = a.send(13);
       bal = a.balance;
-      return bal;
+      return (bal, success);
+    }
+}|]
+    -- Get the contract's account
+    [ BAccount a _] <- getFields ["a"]
+    -- Set the balance
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 7 })
+    -- Check return of balance
+    void $ call2 "mySend" "()" (namedAccountToAccount Nothing a) 
+    getFields ["success", "bal"] `shouldReturn` [ BDefault, BInteger 7 ]
+
+  it "will allow for sending to self" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq{
+  account a;
+  uint bal;
+  bool success;
+  constructor() public {
+    a = account(this);
+  }
+  function mySend() internal pure
+    returns (uint, bool){
+      success = a.send(13);
+      bal = a.balance;
+      return (bal, success);
     }
 }|]
     -- Get the contract's account
@@ -3156,9 +3181,34 @@ contract qq{
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 13 })
     -- Check return of balance
     void $ call2 "mySend" "()" (namedAccountToAccount Nothing a) 
-    getFields ["success", "bal"] `shouldReturn` [ BBool False, BInteger 13 ]
+    getFields ["success", "bal"] `shouldReturn` [ BBool True, BInteger 13 ]
 
-  fit "can handle a three account transfer (only transfer from `this` account into only one account, leaving the third account alone)" . runTest $ do
+  it "won't send when there is not anything to send between account" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq{
+  account a;
+  uint bal;
+  bool success;
+  constructor() public {
+    a = account(this);
+  }
+  function mySend() internal pure
+    returns (uint, bool){
+      success = a.send(13);
+      bal = a.balance;
+      return (bal, success);
+    }
+}|]
+    -- Get the contract's account
+    [ BAccount a _] <- getFields ["a"]
+    -- Set the balance
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 0 })
+    -- Check return of balance
+    void $ call2 "mySend" "()" (namedAccountToAccount Nothing a) 
+    getFields ["success", "bal"] `shouldReturn` [ BDefault, BDefault ]
+
+  it "can handle a three account transfer (only transfer from `this` account into only one account, leaving the third account alone)" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
 contract Test {
@@ -3200,7 +3250,7 @@ contract qq{
         BInteger 26,
         BInteger 13 ]
 
-  fit "can handle a three account send (only send from `this` account into only one account, leaving the third account alone)" . runTest $ do
+  it "can handle a three account send (only send from `this` account into only one account, leaving the third account alone)" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
 contract Test {
@@ -3240,7 +3290,7 @@ contract qq{
     void $ call2 "mySend" "()" (namedAccountToAccount Nothing a) 
     getFields ["success", "bala", "balb", "balc"] `shouldReturn` [ BBool True, BInteger 1, BInteger 26, BInteger 13 ]
 
-  fit "cannot over transfer from an account." $ runTest (do
+  it "cannot over transfer from an account." $ runTest (do
     runBS [r|
 pragma solidvm 3.2;
 contract Test {
@@ -3278,7 +3328,7 @@ contract qq{
     -- Check return of balance
     (void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a))) `shouldThrow` anyPaymentError
 
-  fit "cannot over send from an account." . runTest $ do
+  it "cannot over send from an account." . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
 contract Test {
@@ -3317,13 +3367,13 @@ contract qq{
     -- Check return of balance
     void $ call2 "mySend" "()" (namedAccountToAccount Nothing a)
     getFields [ "success", "bala", "balb", "balc"] `shouldReturn` 
-      [ BBool False,
+      [ BDefault,
         BInteger 14, 
         BInteger 13,
         BInteger 13 ]
 
 
-  fit "cannot use the transfer function for more than 2300 wei" $ runTest (do 
+  it "cannot use the transfer function for more than 2300 wei" $ runTest (do 
     runBS [r|
 pragma solidvm 3.2;
 contract Test {
@@ -3362,8 +3412,7 @@ contract qq{
     -- Check return of balance
     (void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a))) `shouldThrow` anyTooMuchGasError 
 
-
-  fit "cannot use the send function for more than 2300 wei" . runTest $ do 
+  it "cannot use the send function for more than 2300 wei" . runTest $ do 
     runBS [r|
 pragma solidvm 3.2;
 contract Test {
@@ -3384,13 +3433,13 @@ contract qq{
     b = account(0xdeadbeef);
     c = account(t);
   }
-  function myTransfer() internal pure
-    returns (uint, uint, uint){     
-      b.transfer(10000); 
+  function mySend() internal pure
+    returns (bool, uint, uint, uint){     
+      success = b.send(10000); 
       bala = a.balance;
       balb = b.balance;
       balc = c.balance;
-      return (bala, balb, balc);
+      return (success, bala, balb, balc);
     }
 }|]
     -- Get the contract's accounts
@@ -3400,13 +3449,12 @@ contract qq{
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs { addressStateBalance = 13000 })
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs { addressStateBalance = 13000 })
     -- Check return of balance
-    void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a) 
+    void $ call2 "mySend" "()" (namedAccountToAccount Nothing a)
     getFields [ "success", "bala", "balb", "balc"] `shouldReturn` 
-      [BBool False, 
-       BInteger 13000, 
-       BInteger 13000, 
-       BInteger 13000]
-
+      [ BDefault,
+        BInteger 13000, 
+        BInteger 13000,
+        BInteger 13000 ]
 
   it "can get the chainId from the account type" . runTest $ do
     runBS [r|
@@ -3521,7 +3569,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString contract]
 
-  fit "can transfer value from account a to account b" . runTest $ do
+  it "can transfer value from account a to account b" . runTest $ do
     -- Post contract
     runBS [r|
 pragma solidvm 3.2;

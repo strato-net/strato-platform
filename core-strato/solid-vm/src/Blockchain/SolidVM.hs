@@ -1699,15 +1699,18 @@ expToVar' (CC.FunctionCall _ e args) = do
                   _ -> paymentError (show amount) (show address)
               _ -> paymentError "unknown" (show address)
 
-          Constant (SContractFunction _ address' "send") -> do
+          Constant (SContractItem address' "send") -> do
             from <- getCurrentAccount
             let address = namedAccountToAccount (from ^. accountChainId) address'
             success <- case argVals of
               OrderedVals [SInteger amount] -> do
                 if (amount > 2300) then 
                   return False
-                else pay "built-in transfer function" from address amount
-                -- when (amount > 2300) $ return False
+                else do
+                  res <- pay "built-in send function" from address amount
+                  case res of 
+                    True -> return True
+                    _ -> return False
               _ -> return False
             return . Constant $ SBool success
 
