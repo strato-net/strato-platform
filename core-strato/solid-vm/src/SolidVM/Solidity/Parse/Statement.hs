@@ -23,6 +23,7 @@ statements = braces $ many statement
 statement :: SolidityParser Statement
 statement = do
   ifStatement
+  <|> uncheckedStatement
   <|> whileStatement
   <|> doWhileStatement
   <|> forStatement
@@ -67,6 +68,12 @@ ifStatement = do
     elseStatement <- optionMaybe (reserved "else" >> (fmap (:[]) statement <|> statements))
     pure (e,s,elseStatement)
   pure $ IfStatement i t e a
+
+uncheckedStatement :: SolidityParser Statement
+uncheckedStatement = do
+  ~(a, (e, s)) <- withPosition $ do
+    -- TBD
+  pure $ WhileStatement e s a
 
 whileStatement :: SolidityParser Statement
 whileStatement = do
