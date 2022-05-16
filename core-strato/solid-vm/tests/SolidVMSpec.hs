@@ -3109,14 +3109,16 @@ contract qq {
       , BDefault
       ]
 
-  fit "can use the call member function" . runTest $ do
+  xit "can use the call member function" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
 contract qq{
   account a;
+  account payable aPay;
   uint bal;
   constructor() public {
     a = account(this);
+    aPay = payable(a);
   }
   function myTransfer() internal pure
     returns (uint){
@@ -3133,19 +3135,21 @@ contract qq{
     void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a) 
     getFields ["bal"] `shouldReturn` [ BInteger 13 ]
 
-  it "won't transfer when there is not anything to transfer between account" . runTest $ do
+  it "will not transfer when there is not anything to transfer between account" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
 contract qq{
   account a;
+  account payable aPay;
   uint bal;
   constructor() public {
     a = account(this);
+    aPay = payable(a);
   }
   function myTransfer() internal pure
     returns (uint){
-      a.transfer(13);
-      bal = a.balance;
+      aPay.transfer(13);
+      bal = aPay.balance;
       return bal;
     }
 }|]
@@ -3162,15 +3166,17 @@ contract qq{
 pragma solidvm 3.2;
 contract qq{
   account a;
+  account payable aPay;
   uint bal;
   bool success;
   constructor() public {
     a = account(this);
+    aPay = payable(a);
   }
   function mySend() internal pure
     returns (uint, bool){
-      success = a.send(13);
-      bal = a.balance;
+      success = aPay.send(13);
+      bal = aPay.balance;
       return (bal, success);
     }
 }|]
@@ -3187,15 +3193,17 @@ contract qq{
 pragma solidvm 3.2;
 contract qq{
   account a;
+  account payable aPay;
   uint bal;
   bool success;
   constructor() public {
     a = account(this);
+    aPay = payable(a);
   }
   function mySend() internal pure
     returns (uint, bool){
-      success = a.send(13);
-      bal = a.balance;
+      success = aPay.send(13);
+      bal = aPay.balance;
       return (bal, success);
     }
 }|]
@@ -3207,7 +3215,34 @@ contract qq{
     void $ call2 "mySend" "()" (namedAccountToAccount Nothing a) 
     getFields ["success", "bal"] `shouldReturn` [ BBool True, BInteger 13 ]
 
-  it "won't send when there is not anything to send between account" . runTest $ do
+  it "will not send when there is not anything to send between account" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq{
+  account a;
+  account payable aPay;
+  uint bal;
+  bool success;
+  constructor() public {
+    a = account(this);
+    aPay = payable(a);
+  }
+  function mySend() internal pure
+    returns (uint, bool){
+      success = aPay.send(13);
+      bal = aPay.balance;
+      return (bal, success);
+    }
+}|]
+    -- Get the contract's account
+    [ BAccount a _] <- getFields ["a"]
+    -- Set the balance
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 0 })
+    -- Check return of balance
+    void $ call2 "mySend" "()" (namedAccountToAccount Nothing a) 
+    getFields ["success", "bal"] `shouldReturn` [ BDefault, BDefault ]
+
+  it "cannot send to a non account payable type" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
 contract qq{
@@ -3227,7 +3262,32 @@ contract qq{
     -- Get the contract's account
     [ BAccount a _] <- getFields ["a"]
     -- Set the balance
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 0 })
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 26 })
+    -- Check return of balance
+    void $ call2 "mySend" "()" (namedAccountToAccount Nothing a) 
+    getFields ["success", "bal"] `shouldReturn` [ BDefault, BDefault ]
+
+  it "cannot transfer for non account payable types" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq{
+  account a;
+  uint bal;
+  bool success;
+  constructor() public {
+    a = account(this);
+  }
+  function myTransfer() internal pure
+    returns (uint, bool){
+      success = a.transfer(13);
+      bal = a.balance;
+      return (bal, success);
+    }
+}|]
+    -- Get the contract's account
+    [ BAccount a _] <- getFields ["a"]
+    -- Set the balance
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 26 })
     -- Check return of balance
     void $ call2 "mySend" "()" (namedAccountToAccount Nothing a) 
     getFields ["success", "bal"] `shouldReturn` [ BDefault, BDefault ]
@@ -3241,23 +3301,29 @@ contract Test {
 pragma solidvm 3.2;
 contract qq{
   account a;
+  account payable aPay;
   account b;
+  account payable bPay;
   account c;
+  account payable cPay;
   uint bala;
   uint balb;
   uint balc;
   constructor() public {
     Test t = new Test();
     a = account(this);
+    aPay = payable(a);
     b = account(0xdeadbeef);
+    bPay = payable(b);
     c = account(t);
+    cPay = payable(c);
   }
   function myTransfer() internal pure
     returns (uint, uint, uint){
-      b.transfer(13);
-      bala = a.balance;
-      balb = b.balance;
-      balc = c.balance;
+      bPay.transfer(13);
+      bala = aPay.balance;
+      balb = bPay.balance;
+      balc = cPay.balance;
       return (bala, balb, balc);
     }
 }|]
@@ -3283,8 +3349,11 @@ contract Test {
 pragma solidvm 3.2;
 contract qq{
   account a;
+  account payable aPay;
   account b;
+  account payable bPay;
   account c;
+  account payable cPay;
   uint bala;
   uint balb;
   uint balc;
@@ -3292,15 +3361,18 @@ contract qq{
   constructor() public {
     Test t = new Test();
     a = account(this);
+    aPay = payable(a);
     b = account(0xdeadbeef);
+    bPay = payable(b);
     c = account(t);
+    cPay = payable(c);
   }
   function mySend() internal pure
     returns (bool, uint, uint, uint){
-      success = b.send(13);
-      bala = a.balance;
-      balb = b.balance;
-      balc = c.balance;
+      success = bPay.send(13);
+      bala = aPay.balance;
+      balb = bPay.balance;
+      balc = cPay.balance;
       return (success, bala, balb, balc);
     }
 }|]
@@ -3323,23 +3395,29 @@ contract Test {
 pragma solidvm 3.2;
 contract qq{
   account a;
+  account payable aPay;
   account b;
+  account payable bPay;
   account c;
+  account payable cPay;
   uint bala;
   uint balb;
   uint balc;
   constructor() public {
     Test t = new Test();
     a = account(this);
+    aPay = payable(a);
     b = account(0xdeadbeef);
+    bPay = payable(b);
     c = account(t);
+    cPay = account(c);
   }
   function myTransfer() internal pure
     returns (uint, uint, uint){
-      b.transfer(1300);
-      bala = a.balance;
-      balb = b.balance;
-      balc = c.balance;
+      bPay.transfer(1300);
+      bala = aPay.balance;
+      balb = bPay.balance;
+      balc = cPay.balance;
       return (bala, balb, balc);
     }
 }|]
@@ -3361,8 +3439,11 @@ contract Test {
 pragma solidvm 3.2;
 contract qq{
   account a;
+  account payable aPay;
   account b;
+  account payable bPay;
   account c;
+  account payable cPay;
   uint bala;
   uint balb;
   uint balc;
@@ -3370,15 +3451,18 @@ contract qq{
   constructor() public {
     Test t = new Test();
     a = account(this);
+    aPay = payable(a);
     b = account(0xdeadbeef);
+    bPay = payable(b);
     c = account(t);
+    cPay = payable(c);
   }
   function mySend() internal pure
     returns (uint, uint, uint){
-      success = b.send(1300);
-      bala = a.balance;
-      balb = b.balance;
-      balc = c.balance;
+      success = bPay.send(1300);
+      bala = aPay.balance;
+      balb = bPay.balance;
+      balc = cPay.balance;
       return (bala, balb, balc);
     }
 }|]
@@ -3406,8 +3490,11 @@ contract Test {
 pragma solidvm 3.2;
 contract qq{
   account a;
+  account payable aPay;
   account b;
+  account payable bPay;
   account c;
+  account payable cPay;
   uint bala;
   uint balb;
   uint balc;
@@ -3415,15 +3502,18 @@ contract qq{
   constructor() public {
     Test t = new Test();
     a = account(this);
+    aPay = payable(a);
     b = account(0xdeadbeef);
+    bPay = payable(b);
     c = account(t);
+    cPay = payable(c);
   }
   function myTransfer() internal pure
     returns (uint, uint, uint){     
-      b.transfer(10000); 
-      bala = a.balance;
-      balb = b.balance;
-      balc = c.balance;
+      bPay.transfer(10000); 
+      bala = aPay.balance;
+      balb = bPay.balance;
+      balc = cPay.balance;
       return (bala, balb, balc);
     }
 }|]
@@ -3445,8 +3535,11 @@ contract Test {
 pragma solidvm 3.2;
 contract qq{
   account a;
+  account payable aPay;
   account b;
+  account payable bPay;
   account c;
+  account payable cPay;
   uint bala;
   uint balb;
   uint balc;
@@ -3454,15 +3547,18 @@ contract qq{
   constructor() public {
     Test t = new Test();
     a = account(this);
+    aPay = payable(a);
     b = account(0xdeadbeef);
+    bPay = payable(b);
     c = account(t);
+    cPay = payable(c);
   }
   function mySend() internal pure
     returns (bool, uint, uint, uint){     
-      success = b.send(10000); 
-      bala = a.balance;
-      balb = b.balance;
-      balc = c.balance;
+      success = bPay.send(10000); 
+      bala = aPay.balance;
+      balb = bPay.balance;
+      balc = cPay.balance;
       return (success, bala, balb, balc);
     }
 }|]
@@ -3599,19 +3695,23 @@ contract qq{
 pragma solidvm 3.2;
 contract qq{
   account a;
+  account payable aPay;
   account b;
+  account payable bPay;
   uint bala;
   uint balb;
   constructor() public {
     a = account(this);
+    aPay = payable(a);
     b = account(0xdeadbeef);
+    bPay = payable(b);
   }
   function myBalance() {
     //from the account address "a" transfer funds to the account address "b"
       //the full balance from account a
-    b.transfer(13);
-    bala = a.balance;
-    balb = b.balance;
+    bPay.transfer(13);
+    bala = aPay.balance;
+    balb = bPay.balance;
   }
 }|]
     -- Get both of the contracts
