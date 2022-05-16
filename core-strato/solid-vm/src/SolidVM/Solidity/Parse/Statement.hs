@@ -150,7 +150,7 @@ variableDefinitionStatement = do
       [ reserved "var" >> fmap (:[]) (varDefEntry (return Nothing))
       , reserved "var" >> parens (commaSep1 $ option BlankEntry $ varDefEntry (return Nothing))
       , (:[]) <$> varDefEntry (Just <$> simpleTypeExpression)
-      , parens (commaSep1 $ varDefEntry (Just <$> simpleTypeExpression))
+      , parens (commaSep1 $ option BlankEntry $ varDefEntry (Just <$> simpleTypeExpression))
       ]
   VariableDefinition vardefs <$> optionMaybe (reservedOp "=" >> expression)
 
