@@ -3242,7 +3242,7 @@ contract qq{
     void $ call2 "mySend" "()" (namedAccountToAccount Nothing a) 
     getFields ["success", "bal"] `shouldReturn` [ BDefault, BDefault ]
 
-  it "cannot send to a non account payable type" . runTest $ do
+  it "cannot send to a non account payable type" $ runTest (do
     runBS [r|
 pragma solidvm 3.2;
 contract qq{
@@ -3264,10 +3264,9 @@ contract qq{
     -- Set the balance
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 26 })
     -- Check return of balance
-    void $ call2 "mySend" "()" (namedAccountToAccount Nothing a) 
-    getFields ["success", "bal"] `shouldReturn` [ BDefault, BDefault ]
+    (void $ call2 "mySend" "()" (namedAccountToAccount Nothing a))) `shouldThrow` anyTypeError 
 
-  it "cannot transfer for non account payable types" . runTest $ do
+  it "cannot transfer for non account payable types" $ runTest (do
     runBS [r|
 pragma solidvm 3.2;
 contract qq{
@@ -3289,8 +3288,7 @@ contract qq{
     -- Set the balance
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 26 })
     -- Check return of balance
-    void $ call2 "mySend" "()" (namedAccountToAccount Nothing a) 
-    getFields ["success", "bal"] `shouldReturn` [ BDefault, BDefault ]
+    (void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a))) `shouldThrow` anyTypeError
 
   it "can handle a three account transfer (only transfer from `this` account into only one account, leaving the third account alone)" . runTest $ do
     runBS [r|
