@@ -1390,6 +1390,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
           False ->
             typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ (show (val, name)))
       
+      ---------------------
       (SAccount addr _, itemName) -> do --return $ Constant $ SContractItem addr itemName
         from <- getCurrentAccount
         let address = namedAccountToAccount (from ^. accountChainId) addr
@@ -1397,6 +1398,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
         return . Constant . fromMaybe SNULL $ result
 
       (SContract _ a, funcName) -> return $ Constant $ SContractFunction Nothing a funcName
+      (r@(SReference _), "call") -> return $ Constant $ SCall r Nothing
       (r@(SReference _), "push") -> return $ Constant $ SPush r Nothing
         {-
         contract' <- getCurrentContract
@@ -1404,6 +1406,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
           then return $ Constant $ SPush r Nothing
           else typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ show r) -}
       (a@(SArray _ _), "push") -> return $ Constant $ SPush a (Just var)
+      (a@(SCall _ _), "call") -> return $ Constant $ SCall a (Just var)
       (SArray _ theVector, "length") -> return $ Constant $ SInteger $ fromIntegral $ V.length theVector
       (SString s, "length") -> return . Constant . SInteger . fromIntegral $ length s
       (SReference apt, "length") -> do
@@ -1720,40 +1723,29 @@ expToVar' (CC.FunctionCall _ e args) = do
 -- callWrapper :: MonadSM m => Account -> Account -> Maybe String -> String -> Bool -> CC.ArgList -> m (Maybe Value)
 -- callWrapper from to mContract functionName isRCC argExps  = do
 
-
--- runTheCall :: MonadS/M m
---            => Account
---            -> CC.Contract
---            -> String
---            -> Keccak256
---            -> CC.CodeCollection
---            -> CC.Func
---            -> ValList
---            -> Bool
---            -> m (Maybe Value)
--- runTheCall address' contract' funcName hsh cc theFunction argVals ro = do
-
-          -- Constant (SContractItem payload "call") -> do
+          -- Constant (SContractFunction name address' functionName) -> do
           --   from <- getCurrentAccount
-          --   let to = namedAccountToAccount (fromAddress ^. accountChainId) toAddress'
-          --   --TODO: change the payload to get needed information to run the runTheCall command
-          --   mContract
-          --   functionName
-          --   isRCC
-          --   argExps
-          --   -- Get current contract information
-          --   contract <- getCurrentContract
-          --   -- Get the name of the current contract
-          --   contractName <- CC._contractName contract
           --   let address = namedAccountToAccount (from ^. accountChainId) address'
-          --   let codeAddress = namedAccountToAccount (contract ^. accountChainId) address'
-          --   -- codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) realAccount
-          --   execResults <- case argVals of 
-          --     OrderedVals [SBytes payload] -> do
-          --       -- need to add fill in the parameters for the callWrapper
-          --       return $ BSS.toShort <$> callWrapper from 
-          --     _ -> return Nothing
-          --   return $ Constant $ erReturnVal execResults
+          --   result <- callWrapper from address name functionName False args 
+          --   return . Constant . fromMaybe SNULL $ result
+
+          -- return . Constant . fromMaybe SNULL $ result
+
+          -- Constant (SCall (SContractFunction name address' funcName)  "call") -> do
+          --   from <- getCurrentAccount
+          --   -- Get current contract information
+          --   contract' <- getCurrentContract
+          --   let address = namedAccountToAccount (from ^. accountChainId) address'
+          --   res <- callWrapper from address name funcName False (CC.OrderedArgs []) 
+          --   case res of
+          --     Just v -> return $ Constant $ v
+          --     Nothing -> return $ Constant SNULL
+          --   -- execResults <- case argVals of 
+          --   --   OrderedVals [SBytes payload] -> do
+          --   --     -- need to add fill in the parameters for the callWrapper
+          --   --     return $ callWrapper from address' name funcName False (CC.OrderedArgs [])
+          --   --   _ -> return Nothing
+          --   -- return . Constant . erReturnVal execResults
 
           Constant (SContractItem address' itemName) -> do
             from <- getCurrentAccount
@@ -1912,6 +1904,7 @@ callBuiltin "byte"  vs _ = typeError "byte cast" vs
 callBuiltin "uint" args _ = return $ intBuiltin args
 callBuiltin "int" args _ = return $ intBuiltin args
 callBuiltin "push" [v] (Just o) = typeError "push (called as func, not as method)" (v, o)
+callBuiltin "call" [v] (Just o) = typeError "call (called as a function, not as a method)" (v, o)
 callBuiltin "identity" [v] Nothing = return v
 callBuiltin "keccak256" args Nothing = do
   let allStrings [] = True

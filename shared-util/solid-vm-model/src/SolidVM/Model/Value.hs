@@ -120,7 +120,7 @@ data Value =
   -- | STransfer Value (Maybe Variable) 
   -- | SDelegateCall Value (Maybe Variable)
   -- | SStaticCall Value (Maybe Variable)
-  -- | SCall Value (Maybe Variable)
+  | SCall Value (Maybe Variable)
   | SNULL
   | SReference AccountPath  -- An alias to an existing variable, so that modifications
                               -- can be canonicalized
