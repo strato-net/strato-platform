@@ -72,8 +72,8 @@ ifStatement = do
 uncheckedStatement :: SolidityParser Statement
 uncheckedStatement = do
   ~(a, (e, s)) <- withPosition $ do
-    -- TBD
-  pure $ WhileStatement e s a
+    pure (e,s)
+  pure $ UncheckedStatement e s a
 
 whileStatement :: SolidityParser Statement
 whileStatement = do
@@ -270,12 +270,6 @@ Expression
   | Expression ('=' | '|=' | '^=' | '&=' | '<<=' | '>>=' | '+=' | '-=' | '*=' | '/=' | '%=') Expression
   | PrimaryExpression
 -}
-
-
-
-
-
-
 
 primaryExpression :: SolidityParser Expression
 primaryExpression = do
