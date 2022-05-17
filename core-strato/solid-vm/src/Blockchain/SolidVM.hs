@@ -1688,7 +1688,9 @@ expToVar' (CC.FunctionCall _ e args) = do
                 return $ Constant $ SContract contractName' $ addr
               _ -> typeError "contract variable creation" argVals
 
-          --Transfer wei, throw error on failure no return on success 
+          -- Transfer wei, throw error on failure no return on success 
+          -- TODO: When gas gets more implemented ensure that this function does not
+          --       consume more than 2300 gas
           Constant (SContractItem address' "transfer") -> do
             from <- getCurrentAccount
             let address = namedAccountToAccount (from ^. accountChainId) address'
@@ -1700,16 +1702,19 @@ expToVar' (CC.FunctionCall _ e args) = do
                   _ -> paymentError (show amount) (show address)
               _ -> paymentError "unknown" (show address)
 
-          --Send Wei return bool on failure or success
+          -- Send Wei return bool on failure or success
+          -- TODO: When gas gets more implemented ensure that this function does not
+          --       consume more than 2300 gas
           Constant (SContractItem address' "send") -> do
             from <- getCurrentAccount
             let address = namedAccountToAccount (from ^. accountChainId) address'
             success <- case argVals of
               OrderedVals [SInteger amount] -> do
                 res <- pay "built-in send function" from address amount
-                  case res of 
-                    True -> return True
-                    _ -> return False
+                case res of 
+                  True -> return True
+                  _ -> return False
+              _ -> return False
             return . Constant $ SBool success
 
 -- callWrapper :: MonadSM m => Account -> Account -> Maybe String -> String -> Bool -> CC.ArgList -> m (Maybe Value)
@@ -1751,14 +1756,12 @@ expToVar' (CC.FunctionCall _ e args) = do
           --   return $ Constant $ erReturnVal execResults
 
           Constant (SContractItem address' itemName) -> do
-
             from <- getCurrentAccount
             let address = namedAccountToAccount (from ^. accountChainId) address'
             result <- callWrapper from address Nothing itemName False args 
             return . Constant . fromMaybe SNULL $ result
 
           Constant (SContractFunction name address' functionName) -> do
-
             from <- getCurrentAccount
             let address = namedAccountToAccount (from ^. accountChainId) address'
             result <- callWrapper from address name functionName False args 
