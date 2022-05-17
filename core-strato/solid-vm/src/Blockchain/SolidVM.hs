@@ -1688,13 +1688,12 @@ expToVar' (CC.FunctionCall _ e args) = do
                 return $ Constant $ SContract contractName' $ addr
               _ -> typeError "contract variable creation" argVals
 
-          --send wei, throw error on failure no return on success 
+          --Transfer wei, throw error on failure no return on success 
           Constant (SContractItem address' "transfer") -> do
             from <- getCurrentAccount
             let address = namedAccountToAccount (from ^. accountChainId) address'
             case argVals of
               OrderedVals [SInteger amount] -> do
-                when (amount > 2300) $ tooMuchGas "2300" (show amount)
                 res <- pay "built-in transfer function" from address amount
                 case res of
                   True -> return $ Constant SNULL
@@ -1707,14 +1706,10 @@ expToVar' (CC.FunctionCall _ e args) = do
             let address = namedAccountToAccount (from ^. accountChainId) address'
             success <- case argVals of
               OrderedVals [SInteger amount] -> do
-                if (amount > 2300) then 
-                  return False
-                else do
-                  res <- pay "built-in send function" from address amount
+                res <- pay "built-in send function" from address amount
                   case res of 
                     True -> return True
                     _ -> return False
-              _ -> return False
             return . Constant $ SBool success
 
 -- callWrapper :: MonadSM m => Account -> Account -> Maybe String -> String -> Bool -> CC.ArgList -> m (Maybe Value)
