@@ -167,6 +167,40 @@ expression =
     [Postfix (do
                  ~(a, (e1, e2)) <- withPosition $ do
                    reservedOp "?"
+                   e1 <- expressionNoCons
+                   reservedOp ":"
+                   e2 <- expression
+                   pure (e1, e2)
+                 pure (\e -> Ternary (extractExpression e <> a) e e1 e2)
+             )],
+    [binary "=", binary "|=", binary "^=", binary "&=", binary "<<=", binary ">>=", binary "+=", binary "-=", binary "*=", binary "/=", binary "%="],
+    [binary "&&"],
+    [binary "||"],
+    [binary ":"]
+  ]
+  (tuple <|> array <|> primaryExpression)
+
+
+expressionNoCons :: SolidityParser Expression
+expressionNoCons =
+  buildExpressionParser
+  [
+    [postfix $ choice [functionCall, memberAccess, arrayIndex]],
+    [Postfix (PlusPlus <$> position (reservedOp "++"))],
+    [Postfix (MinusMinus <$> position (reservedOp "--"))],
+    [prefix "!", prefix "~", prefix "delete", prefix "++", prefix "--", prefix "+", prefix "-"],
+    [binary "**"],
+    [binary "*", binary "/", binary "%"],
+    [binary "+", binary "-"],
+    [binary "<<", binary ">>"],
+    [binary "&"],
+    [binary "^"],
+    [binary "|"],
+    [binary "==", binary "!="],
+    [binary "<", binary ">", binary "<=", binary ">="],
+    [Postfix (do
+                 ~(a, (e1, e2)) <- withPosition $ do
+                   reservedOp "?"
                    e1 <- expression
                    reservedOp ":"
                    e2 <- expression

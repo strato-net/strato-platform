@@ -35,6 +35,7 @@ spec = do
                 , ("x + y", Binary () "+" (Variable () "x") (Variable () "y"))
                 , ("x ** y", Binary () "**" (Variable () "x") (Variable () "y"))
                 , ("x[q]", IndexAccess () (Variable () "x") (Just $ Variable () "q"))
+                , ("x[5 : 6]", IndexAccess () (Variable () "x") (Just $ Binary () ":" (NumberLiteral () 5 Nothing) (NumberLiteral () 6 Nothing)))
                 , ("x[a][b][c]", IndexAccess () (
                                    IndexAccess () (
                                      IndexAccess ()
@@ -87,6 +88,10 @@ spec = do
                  , ("(z, w) = (q, r);", SimpleStatement $ ExpressionStatement
                       $ Binary () "=" (TupleExpression () $ map (Just . Variable ()) ["z", "w"])
                                    (TupleExpression () $ map (Just . Variable ()) ["q", "r"]))
+                 , ("b = a[1:3];", SimpleStatement $ ExpressionStatement
+                      $ Binary () "=" (Variable () "b")
+                                   (IndexAccess () (Variable () "a")
+                                                (Just $ Binary () ":" (NumberLiteral () 1 Nothing) (NumberLiteral () 3 Nothing))))
                  , ("(z, ) = (q, r);", SimpleStatement $ ExpressionStatement
                       $ Binary () "=" (TupleExpression () $ [Just $ Variable () "z", Nothing])
                                    (TupleExpression () $ map (Just . Variable ()) ["q", "r"]))
@@ -110,3 +115,5 @@ spec = do
     let fcases = ["assembly {}", "assembly { dst := mload(src) }", "assembly { dst := add(src, 32) }"]
     forM_ fcases $ \input -> do
       it ("cannot parse " ++ input) $ parseStatement input `shouldSatisfy` isLeft
+
+

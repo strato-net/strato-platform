@@ -744,9 +744,6 @@ runStatement (CC.SimpleStatement (CC.ExpressionStatement (CC.PlusPlus e))) = do
   return Nothing
 -}
 
-
-
--- Assignment to an index into an array or mapping
 runStatement st@(CC.SimpleStatement (CC.ExpressionStatement (CC.Binary _ "=" dst@(CC.IndexAccess _ parent (Just indExp)) src)) pos) = do
   solidVMBreakpoint pos
   srcVar <- expToVar src
@@ -1421,27 +1418,54 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
 expToVar' x@(CC.IndexAccess _ _ (Nothing)) = missingField "index value cannot be empty" (unparseExpression x)
 
 -- TODO(tim): When this is a string constant, we can index into the string directly for SInteger
-expToVar' x@(CC.IndexAccess _ parent (Just mIndex)) = do
-  var <- expToVar parent
 
-  case var of
-    (Constant (SReference _)) -> Constant . SReference <$> expToPath x
---    (Constant (SArray theType theVector)) -> do
-    _ -> do
-      theIndex <- getVar =<< expToVar mIndex
-      val <- getVar var
-      case (val, theIndex) of
-        (SArray _ theVector, SInteger i) -> do
-          if (fromIntegral i) >= length theVector then
-            indexOutOfBounds ("index value was " ++ (show i) ++ ", but the array length was " ++ (show $ length theVector)) $ unparseExpression x
-          else
-            return $ theVector V.! fromIntegral i
-        (SMap _ theMap, _) -> do maybe (indexOutOfBounds ("index value was " ++ (show theIndex) ++ ", but the valid indexes were " ++ (show $ M.keys theMap)) $ unparseExpression x)
-                                               return
-                                               (theMap M.!? theIndex)
-        (SReference _, _) -> Constant . SReference <$> expToPath x
+expToVar' x@(CC.IndexAccess pos1 parent (Just mIndex)) = do
+  case (mIndex) of
+    (CC.Binary pos2 ":" lhs rhs) -> do
+      var <- expToVar parent
+      lhsInt <- getVar =<< expToVar lhs
+      rhsInt <- getVar =<< expToVar rhs
+      case (lhsInt, rhsInt) of
+        (SInteger lhsInt', SInteger rhsInt') -> do
+          let lhsInt'' = fromIntegral lhsInt'
+          let rhsInt'' = fromIntegral rhsInt'
+          let rangeOfIndexesToGet = [lhsInt' .. (rhsInt' - 1)]
+          when ((lhsInt'' < 0) || (rhsInt'' < 0)) $ indexOutOfBounds ("index range was [" ++ (show lhsInt'') ++ " : " ++ (show rhsInt'') ++ "]") $ unparseExpression x
+          typeOfArr <- getValueType =<< (expToPath (CC.IndexAccess pos1 parent (Just (CC.NumberLiteral pos2 (head rangeOfIndexesToGet) Nothing))))
+          case var of
+            (Constant (SReference _)) -> do
+              listForReturn <- mapM (\idx -> (Constant . SReference <$> expToPath (CC.IndexAccess pos1 parent (Just (CC.NumberLiteral pos2 idx Nothing))))) rangeOfIndexesToGet
+              return . Constant . SArray (basicTypeToSVMType typeOfArr) $ V.fromList listForReturn
+            _ -> do
+              val <- getVar var
+              case val of
+                (SArray theType theVector) -> do
+                  if (lhsInt'' < 0) || (rhsInt'' < 0) || (lhsInt'' >= V.length theVector) || (rhsInt'' >= V.length theVector)
+                    then indexOutOfBounds ("index range was [" ++ (show lhsInt'') ++ " : " ++ (show rhsInt'') ++ "], but the array length was " ++ (show $ length theVector)) $ unparseExpression x
+                    else do
+                      let theVector' = V.fromList $ map (\i -> theVector V.! (fromIntegral i)) rangeOfIndexesToGet
+                      return . Constant . SArray theType $ theVector'
+                _ -> typeError "unsupported type for index splicing" $ unparseExpression x
         _ -> typeError "unsupported types for index access" $ unparseExpression x
---    _ -> error $ "unknown case in expToVar' for IndexAccess: " ++ show var
+    _ -> do
+      var <- expToVar parent
+      case var of
+        (Constant (SReference _)) -> Constant . SReference <$> expToPath x
+        _ -> do
+          theIndex <- getVar =<< expToVar mIndex
+          val <- getVar var
+          case (val, theIndex) of
+            (SArray _ theVector, SInteger i) -> do
+              if (fromIntegral i) >= length theVector then
+                indexOutOfBounds ("index value was " ++ (show i) ++ ", but the array length was " ++ (show $ length theVector)) $ unparseExpression x
+              else
+                return $ theVector V.! fromIntegral i
+            (SMap _ theMap, _) -> do maybe (indexOutOfBounds ("index value was " ++ (show theIndex) ++ ", but the valid indexes were " ++ (show $ M.keys theMap)) $ unparseExpression x)
+                                                  return
+                                                  (theMap M.!? theIndex)
+            (SReference _, _) -> Constant . SReference <$> expToPath x
+            _ -> typeError "unsupported types for index access" $ unparseExpression x
+    --    _ -> error $ "unknown case in expToVar' for IndexAccess: " ++ show var
 
 
 expToVar' (CC.Binary _ "+" expr1 expr2) = expToVarAdd expr1 expr2
@@ -2283,3 +2307,17 @@ encodeVector v = do
       val' -> do
         bs <- encodeForReturn val'
         return (headers `B.append` bs, strings)
+
+basicTypeToSVMType :: BasicType -> SVMType.Type
+basicTypeToSVMType basic = case basic of
+  TBool -> SVMType.Bool
+  TInteger -> SVMType.Int Nothing Nothing
+  TAccount -> SVMType.Account False
+  TString -> SVMType.String Nothing
+  TEnumVal s -> SVMType.Enum Nothing (T.pack s) Nothing
+  TContract s-> SVMType.Contract $ T.pack s
+  TStruct _ _ -> typeError "TStruct" basic
+  TComplex -> typeError "TComplex" basic
+  Todo s -> typeError "todo " $ T.pack s
+
+

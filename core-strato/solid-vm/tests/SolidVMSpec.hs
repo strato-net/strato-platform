@@ -3662,3 +3662,62 @@ contract qq {
     isValid = verifySignature(msgHash, signature, pubkey);
   }
 }|]) `shouldThrow` anyMalformedDataError
+
+
+  it "can declare multidimensional arrays" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+  uint[2][2] a = [ [1, 2], [3, 4] ];
+  uint b;
+  uint c;
+  
+  constructor () {
+    a[0][0] = 5;
+    a[0][1] = 6;
+    a[1][0] = 7;
+    a[1][1] = 8;
+    b = a[0][0];
+    c = a[1][1];
+  }
+}|]
+    getFields ["b", "c"] `shouldReturn` [ BInteger 5, BInteger 8 ] 
+
+  it "can declare multidimensional arrays with empty elements" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+  uint[2][2] a = [ [], [] ];
+  uint b;
+  uint c;
+
+  constructor () {
+    a[0][0] = 5;
+    a[0][1] = 6;
+    a[1][0] = 7;
+    a[1][1] = 8;
+    b = a[0][0];
+    c = a[0][1];
+
+  }
+}|]
+    getFields ["b", "c"] `shouldReturn` [ BInteger 5, BInteger 6 ]
+
+  it "can splice a list of uints" . runTest $ do
+    runBS [r|
+contract qq {
+  uint[] a = [1, 2, 3, 4, 5];
+  
+  uint[] b;
+  uint c;
+  uint d;
+  constructor () {
+    b = a[2:4];
+    c = b[0];
+    d = b[1];
+  }
+}|];
+    getFields ["c", "d"] `shouldReturn` [ BInteger 3 ,BInteger 4 ]
+
+
+    
