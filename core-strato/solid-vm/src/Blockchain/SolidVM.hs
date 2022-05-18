@@ -13,6 +13,7 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.SolidVM
@@ -42,6 +43,7 @@ import qualified Data.ByteString.Short                as BSS
 import qualified Data.ByteString.UTF8                 as UTF8
 import           Data.ByteString.Internal             (c2w)
 import           Data.Char                            as CHAR
+import           Data.Default
 import           Data.Either.Extra                    (eitherToMaybe)
 import           Data.List
 import qualified Data.Map                             as M
@@ -58,6 +60,7 @@ import           Data.Traversable
 import qualified Data.Vector as V
 import           Debugger
 import           GHC.Exts                             hiding (breakpoint)
+import           GHC.Generics
 import           Text.Parsec                          (runParser)
 import           Text.Printf
 import           Text.Read (readMaybe)
@@ -82,6 +85,7 @@ import           Blockchain.SolidVM.Metrics
 import           Blockchain.SolidVM.SetGet
 import           Blockchain.SolidVM.SM
 import           Blockchain.SolidVM.TraceTools
+-- import qualified Blockchain.SolidVM.Simple            as Simp
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord()
@@ -102,7 +106,7 @@ import           Text.Tools
 
 import qualified Data.Text.Encoding                   as DT
 
-import qualified SolidVM.Model.CodeCollection as CC
+import qualified SolidVM.Model.CodeCollection         as CC
 
 import           Numeric  (showHex)
 
@@ -419,6 +423,61 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' cha
       erNewX509Certs = x509s
       }
 
+data SolidVMTxArgs = SolidVMTxArgs
+  { _argsBlockData :: BlockData
+  , _argsSender    :: Account
+  , _argsOrigin    :: Account
+  , _argsTxHash    :: Keccak256
+  , _argsChainId   :: Maybe Word256
+  , _argsMetadata  :: Maybe (M.Map T.Text T.Text)
+  } deriving (Eq, Show, Generic)
+makeLenses ''SolidVMTxArgs
+
+instance Default SolidVMTxArgs where
+  def = SolidVMTxArgs
+    defaultBlockData
+    (Account 0 Nothing)
+    (Account 0 Nothing)
+    emptyHash
+    Nothing
+    Nothing
+
+data SolidVMCallArgs = SolidVMCallArgs
+  { _callCodeAddress :: Account
+  , _callArgs        :: SolidVMTxArgs
+  } deriving (Eq, Show, Generic)
+makeLenses ''SolidVMCallArgs
+
+instance Default SolidVMCallArgs where
+  def = SolidVMCallArgs
+    (Account 0 Nothing)
+    def
+
+callErr :: String -> a
+callErr = err "call"
+
+callMember :: SolidVMBase m
+     => SolidVMCallArgs
+     -> m ExecResults
+callMember s = call
+  (callErr "isRunningTests'")
+  (callErr "isHomestead")
+  (callErr "noValueTransfer")
+  False
+  (callErr "preExistingSuicideList")
+  (s ^. callArgs . argsBlockData)
+  (callErr "callDepth")
+  (callErr "receiveAddress")
+  (s ^. callCodeAddress)
+  (s ^. callArgs . argsSender)
+  (callErr "value")
+  (callErr "gasPrice")
+  (callErr "theData")
+  (callErr "availableGas")
+  (s ^. callArgs . argsOrigin)
+  (s ^. callArgs . argsTxHash)
+  (s ^. callArgs . argsChainId)
+  (s ^. callArgs . argsMetadata)
 
 -- set the hidden ":creator" field
 setCreator :: MonadSM m => Account -> Account -> CC.Contract -> Integer -> m ()
@@ -1406,7 +1465,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
           then return $ Constant $ SPush r Nothing
           else typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ show r) -}
       (a@(SArray _ _), "push") -> return $ Constant $ SPush a (Just var)
-      (a@(SCall _ _), "call") -> return $ Constant $ SCall a (Just var)
+      (a@(SContract _ _), "call") -> return $ Constant $ SCall a (Just var)
       (SArray _ theVector, "length") -> return $ Constant $ SInteger $ fromIntegral $ V.length theVector
       (SString s, "length") -> return . Constant . SInteger . fromIntegral $ length s
       (SReference apt, "length") -> do
@@ -1771,6 +1830,8 @@ expToVar' (CC.FunctionCall _ e args) = do
               _ -> typeError "called enum constructor with improper args" argVals
 
           Constant (SPush theArray mvar) -> Builtins.push theArray mvar argVals
+
+          Constant (SCall _ _) -> callMember argVals
 
           Constant SHexDecodeAndTrim ->
               case argVals of
