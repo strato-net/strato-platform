@@ -68,12 +68,12 @@ get_solcs:
 			cp ${TMPDIR}/solc-0.4 ${FAKEROOT}/usr/local/bin ;\
 			cp ${TMPDIR}/solc-0.5 ${FAKEROOT}/usr/local/bin ;\
 			cp -fr ${TMPDIR}/license* ${FAKEROOT} ;\
-			ln -f ${TMPDIR}/solc-0.4 ${TMPDIR}/solc ;\
 			ln -f ${FAKEROOT}/usr/local/bin/solc-0.4 ${FAKEROOT}/usr/local/bin/solc \
 		" ;\
 	fi
 
 build_buildbase: get_solcs
+  mkdir -p ${TMPDIR}
 	cp -f Dockerfile.buildbase ${TMPDIR}
 	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=strato-buildbase:${STACK_RESOLVER} -f ${TMPDIR}/Dockerfile.buildbase ${TMPDIR}
 
