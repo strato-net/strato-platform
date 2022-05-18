@@ -73,7 +73,7 @@ get_solcs:
 	fi
 
 build_buildbase: get_solcs
-  mkdir -p ${TMPDIR}
+	mkdir -p ${TMPDIR}
 	cp -f Dockerfile.buildbase ${TMPDIR}
 	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=strato-buildbase:${STACK_RESOLVER} -f ${TMPDIR}/Dockerfile.buildbase ${TMPDIR}
 
