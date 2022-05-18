@@ -872,15 +872,22 @@ runStatement s@(CC.SimpleStatement (CC.VariableDefinition entries maybeExpressio
   let ensureType :: Maybe SVMType.Type -> SVMType.Type
       ensureType = fromMaybe (todo "type inference not implemented" s)
 
+
   case (entries, value) of
     ([CC.VarDefEntry mType _ name _], _) -> addLocalVariable (ensureType mType) name value
     ([CC.BlankEntry], _) -> parseError "cannot declare single nameless variable" s
     (_, STuple variables) -> do
       checkArity "var declaration tuple" (V.length variables) (length entries)
       let nonBlanks = [(ensureType t, n, v) | (CC.VarDefEntry t _ n _, v) <- zip entries $ V.toList variables]
-      forM_ nonBlanks $ \(theType', name', variable') -> do
-        value' <- getVar variable'
-        addLocalVariable theType' name' value'
+      --We get the values first so in the case of (x,y) = (y,x) we can still set the variables to the correct values
+      nonBlanks' <- forM nonBlanks $ \(t, n, v) -> do
+        v' <- getVar v
+        return (t, n, v')
+      forM_ nonBlanks' $ \(theType', name', v) -> do
+        logAssigningVariable v
+        addLocalVariable theType' name' v
+
+
 
     _ -> typeError "VariableDefinition expected a tuple" value
 
