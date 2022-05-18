@@ -31,7 +31,7 @@ import Data.Text.Encoding
 import Data.Time.Clock.POSIX
 import HFlags
 import Numeric
-import Test.Hspec (hspec, Spec, describe, fit, it, xit, pendingWith, anyException, shouldThrow, anyErrorCall, Selector)
+import Test.Hspec (hspec, Spec, describe, it, it, xit, pendingWith, anyException, shouldThrow, anyErrorCall, Selector)
 import Test.Hspec.Expectations.Lifted
 import Text.Printf
 import Text.RawString.QQ
@@ -3108,32 +3108,6 @@ contract qq {
       , BBool True
       , BDefault
       ]
-
-  fit "can use the call member function" . runTest $ do
-    runBS [r|
-pragma solidvm 3.2;
-contract qq{
-  account a;
-  account payable aPay;
-  uint bal;
-  constructor() public {
-    a = account(this);
-    aPay = payable(a);
-  }
-  function myTransfer() internal pure
-    returns (uint){
-      a.call(13);
-      bal = a.balance;
-      return bal;
-    }
-}|]
-    -- Get the contract's account
-    [ BAccount a _] <- getFields ["a"]
-    -- Set the balance
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 13 })
-    -- Check return of balance
-    void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a) 
-    getFields ["bal"] `shouldReturn` [ BInteger 13 ]
 
   it "will not transfer when there is not anything to transfer between account" . runTest $ do
     runBS [r|

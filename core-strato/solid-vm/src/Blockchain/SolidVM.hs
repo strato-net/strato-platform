@@ -13,7 +13,6 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.SolidVM
@@ -43,7 +42,6 @@ import qualified Data.ByteString.Short                as BSS
 import qualified Data.ByteString.UTF8                 as UTF8
 import           Data.ByteString.Internal             (c2w)
 import           Data.Char                            as CHAR
-import           Data.Default
 import           Data.Either.Extra                    (eitherToMaybe)
 import           Data.List
 import qualified Data.Map                             as M
@@ -60,7 +58,6 @@ import           Data.Traversable
 import qualified Data.Vector as V
 import           Debugger
 import           GHC.Exts                             hiding (breakpoint)
-import           GHC.Generics
 import           Text.Parsec                          (runParser)
 import           Text.Printf
 import           Text.Read (readMaybe)
@@ -85,7 +82,6 @@ import           Blockchain.SolidVM.Metrics
 import           Blockchain.SolidVM.SetGet
 import           Blockchain.SolidVM.SM
 import           Blockchain.SolidVM.TraceTools
--- import qualified Blockchain.SolidVM.Simple            as Simp
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord()
@@ -423,61 +419,6 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' cha
       erNewX509Certs = x509s
       }
 
-data SolidVMTxArgs = SolidVMTxArgs
-  { _argsBlockData :: BlockData
-  , _argsSender    :: Account
-  , _argsOrigin    :: Account
-  , _argsTxHash    :: Keccak256
-  , _argsChainId   :: Maybe Word256
-  , _argsMetadata  :: Maybe (M.Map T.Text T.Text)
-  } deriving (Eq, Show, Generic)
-makeLenses ''SolidVMTxArgs
-
-instance Default SolidVMTxArgs where
-  def = SolidVMTxArgs
-    defaultBlockData
-    (Account 0 Nothing)
-    (Account 0 Nothing)
-    emptyHash
-    Nothing
-    Nothing
-
-data SolidVMCallArgs = SolidVMCallArgs
-  { _callCodeAddress :: Account
-  , _callArgs        :: SolidVMTxArgs
-  } deriving (Eq, Show, Generic)
-makeLenses ''SolidVMCallArgs
-
-instance Default SolidVMCallArgs where
-  def = SolidVMCallArgs
-    (Account 0 Nothing)
-    def
-
-callErr :: String -> a
-callErr = err "call"
-
-callMember :: SolidVMBase m
-     => SolidVMCallArgs
-     -> m ExecResults
-callMember s = call
-  (callErr "isRunningTests'")
-  (callErr "isHomestead")
-  (callErr "noValueTransfer")
-  False
-  (callErr "preExistingSuicideList")
-  (s ^. callArgs . argsBlockData)
-  (callErr "callDepth")
-  (callErr "receiveAddress")
-  (s ^. callCodeAddress)
-  (s ^. callArgs . argsSender)
-  (callErr "value")
-  (callErr "gasPrice")
-  (callErr "theData")
-  (callErr "availableGas")
-  (s ^. callArgs . argsOrigin)
-  (s ^. callArgs . argsTxHash)
-  (s ^. callArgs . argsChainId)
-  (s ^. callArgs . argsMetadata)
 
 -- set the hidden ":creator" field
 setCreator :: MonadSM m => Account -> Account -> CC.Contract -> Integer -> m ()
@@ -686,37 +627,6 @@ expressionType (CC.StringLiteral _ _) = SVMType.String $ Just True
 expressionType (CC.ArrayExpression _ xs) = SVMType.Array (expressionType (head xs)) Nothing
 
 expressionType ex = typeError "Cannot deduce a type from" (ex, ex)
-
--- call :: SolidVMBase m
---      => Bool
---      -> Bool
---      -> Bool
---      -> Bool
---      -> S.Set Account
---      -> BlockData
---      -> Int
---      -> Account
---      -> Account
---      -> Account
---      -> Word256
---      -> Word256
---      -> B.ByteString
---      -> Gas
---      -> Account
---      -> Keccak256
---      -> Maybe Word256
---      -> Maybe (M.Map T.Text T.Text)
---      -> m ExecResults
--- --call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDepth receiveAddress
--- --     (Address codeAddress) sender value gasPrice theData availableGas origin txHash chainId metadata =
--- call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' chainId' metadata = do
-
--- callMember :: MonadSM m => Account -> Account -> B.ByteString -> (Bool, m ExecResults)
--- callMember from to payload = do
---   let fromChain = from ^. accountChainId
---       toChain = to ^. accountChainId
---   isAccessibleChain <- toChain `isAncestorChainOf` fromChain
---   unless isAccessibleChain $ inaccessibleChain "Inaccessible chain violation" $ "from: " ++ show from ++ ", to: " ++ show to
 
 
 callWrapper  :: MonadSM m => Account -> Account -> Maybe String -> String -> Bool -> CC.ArgList -> m (Maybe Value)
@@ -1448,8 +1358,6 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
               ExplicitChain cid -> return $ Constant $ intBuiltin $ flip (:) [] $ SString $ B.foldr showHex "" $ word256ToBytes cid
           False ->
             typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ (show (val, name)))
-      
-      ---------------------
       (SAccount addr _, itemName) -> do --return $ Constant $ SContractItem addr itemName
         from <- getCurrentAccount
         let address = namedAccountToAccount (from ^. accountChainId) addr
@@ -1457,7 +1365,6 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
         return . Constant . fromMaybe SNULL $ result
 
       (SContract _ a, funcName) -> return $ Constant $ SContractFunction Nothing a funcName
-      (r@(SReference _), "call") -> return $ Constant $ SCall r Nothing
       (r@(SReference _), "push") -> return $ Constant $ SPush r Nothing
         {-
         contract' <- getCurrentContract
@@ -1465,7 +1372,6 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
           then return $ Constant $ SPush r Nothing
           else typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ show r) -}
       (a@(SArray _ _), "push") -> return $ Constant $ SPush a (Just var)
-      (a@(SContract _ _), "call") -> return $ Constant $ SCall a (Just var)
       (SArray _ theVector, "length") -> return $ Constant $ SInteger $ fromIntegral $ V.length theVector
       (SString s, "length") -> return . Constant . SInteger . fromIntegral $ length s
       (SReference apt, "length") -> do
@@ -1779,33 +1685,6 @@ expToVar' (CC.FunctionCall _ e args) = do
               _ -> return False
             return . Constant $ SBool success
 
--- callWrapper :: MonadSM m => Account -> Account -> Maybe String -> String -> Bool -> CC.ArgList -> m (Maybe Value)
--- callWrapper from to mContract functionName isRCC argExps  = do
-
-          -- Constant (SContractFunction name address' functionName) -> do
-          --   from <- getCurrentAccount
-          --   let address = namedAccountToAccount (from ^. accountChainId) address'
-          --   result <- callWrapper from address name functionName False args 
-          --   return . Constant . fromMaybe SNULL $ result
-
-          -- return . Constant . fromMaybe SNULL $ result
-
-          -- Constant (SCall (SContractFunction name address' funcName)  "call") -> do
-          --   from <- getCurrentAccount
-          --   -- Get current contract information
-          --   contract' <- getCurrentContract
-          --   let address = namedAccountToAccount (from ^. accountChainId) address'
-          --   res <- callWrapper from address name funcName False (CC.OrderedArgs []) 
-          --   case res of
-          --     Just v -> return $ Constant $ v
-          --     Nothing -> return $ Constant SNULL
-          --   -- execResults <- case argVals of 
-          --   --   OrderedVals [SBytes payload] -> do
-          --   --     -- need to add fill in the parameters for the callWrapper
-          --   --     return $ callWrapper from address' name funcName False (CC.OrderedArgs [])
-          --   --   _ -> return Nothing
-          --   -- return . Constant . erReturnVal execResults
-
           Constant (SContractItem address' itemName) -> do
             from <- getCurrentAccount
             let address = namedAccountToAccount (from ^. accountChainId) address'
@@ -1830,8 +1709,6 @@ expToVar' (CC.FunctionCall _ e args) = do
               _ -> typeError "called enum constructor with improper args" argVals
 
           Constant (SPush theArray mvar) -> Builtins.push theArray mvar argVals
-
-          Constant (SCall _ _) -> callMember argVals
 
           Constant SHexDecodeAndTrim ->
               case argVals of
