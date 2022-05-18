@@ -72,7 +72,8 @@ ifStatement = do
 uncheckedStatement :: SolidityParser Statement
 uncheckedStatement = do
   ~(a, (e, s)) <- withPosition $ do
-    pure (e,s)
+    reserved "unchecked"
+    statements
   pure $ UncheckedStatement e s a
 
 whileStatement :: SolidityParser Statement
