@@ -3109,7 +3109,7 @@ contract qq {
       , BDefault
       ]
 
-  xit "can use the call member function" . runTest $ do
+  fit "can use the call member function" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
 contract qq{
