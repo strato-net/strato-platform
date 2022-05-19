@@ -123,7 +123,7 @@ sender :: Account
 sender = Account 0xdeadbeef Nothing
 
 privateChainAcc :: Account 
-privateChainAcc = Account 0xdeadbeee (Just 0x776622233444)
+privateChainAcc = Account 0xdeadbeef (Just 0x776622233444)
 
 rootAcc :: Account 
 rootAcc = Account (fromPublicKey X509.rootPubKey) Nothing
@@ -206,6 +206,41 @@ runArgsWithSender acc args bs = do
 
   newAddress <- getNewAddress acc
   er <- SVM.create isTest isHomestead suicides blockData callDepth sender origin
+          value gasPrice availableGas newAddress code txHash chainId metadata
+  rethrowEx er
+  return er
+
+runArgsWithOrigin :: Account -> Account -> T.Text -> String -> ContextM ExecResults
+runArgsWithOrigin orig acc args bs = do
+  let code = Code $ UTF8.fromString bs
+      isTest = error "TODO: isTest"
+      isHomestead = error "TODO: isHomestead"
+      suicides = error "TODO: suicides"
+      blockData = BlockData { blockDataParentHash = unsafeCreateKeccak256FromWord256 0x0
+                            , blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0x0
+                            , blockDataCoinbase = Address 0x0
+                            , blockDataStateRoot = ""
+                            , blockDataTransactionsRoot = ""
+                            , blockDataReceiptsRoot = ""
+                            , blockDataLogBloom = ""
+                            , blockDataDifficulty = 900
+                            , blockDataNumber = 8033
+                            , blockDataGasLimit = 1000000
+                            , blockDataGasUsed = 10000
+                            , blockDataExtraData = ""
+                            , blockDataNonce = 22
+                            , blockDataMixHash = unsafeCreateKeccak256FromWord256 0x0
+                            , blockDataTimestamp = posixSecondsToUTCTime 0x4000 }
+      callDepth = 0
+      value = error "TODO: value"
+      gasPrice = error "TODO: gasPrice"
+      availableGas = error "TODO: availableGas"
+      txHash = unsafeCreateKeccak256FromWord256 0x776622233444
+      chainId = Nothing
+      metadata = Just $ M.fromList [("name",  "qq"), ("args", args)]
+
+  newAddress <- getNewAddress acc
+  er <- SVM.create isTest isHomestead suicides blockData callDepth sender orig
           value gasPrice availableGas newAddress code txHash chainId metadata
   rethrowEx er
   return er
@@ -3172,57 +3207,21 @@ contract qq {
       , BString "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEGOKeu5dSCBFHVQuy/q1A8BeTb99G83tD\nVecvHHne6sKfmBZN1AIjhpHGKO22vBfdq3dMn/QBqb2TdR9w3WvMXQ==\n-----END PUBLIC KEY-----\n"
       ]
 
---   it "can post a X509 certificate and grab cert fields" . runTest $ do
---     runBS [r|
--- contract qq {
---     account myAccount = account(tx.origin, "main");
-    
---     string myNewCertificate = "-----BEGIN CERTIFICATE-----\nMIIBiDCCAS2gAwIBAgIQCgO76hC29iXEFXJNco5ekjAMBggqhkjOPQQDAgUAMEYx\nDDAKBgNVBAMMA2RhbjEMMAoGA1UEBgwDVVNBMRIwEAYDVQQKDAlibG9ja2FwcHMx\nFDASBgNVBAsMC2VuZ2luZWVyaW5nMB4XDTIxMDMxODE1NDgwN1oXDTIyMDMxODE1\nNDgwN1owRjEMMAoGA1UEAwwDZGFuMQwwCgYDVQQGDANVU0ExEjAQBgNVBAoMCWJs\nb2NrYXBwczEUMBIGA1UECwwLZW5naW5lZXJpbmcwVjAQBgcqhkjOPQIBBgUrgQQA\nCgNCAAQY4p67l1IIEUdVC7L+rUDwF5Nv30bze0NV5y8ced7qwp+YFk3UAiOGkcYo\n7ba8F92rd0yf9AGpvZN1H3Dda8xdMAwGCCqGSM49BAMCBQADRwAwRAIgbKXO8tZ5\noPhBusPQFkNEQDnLO/MRru4KjtCpPnVb5sACIE0TwBJ7yeIGuPc/8G50/858Pf3a\n0t1hHbhYnJarPkNA\n-----END CERTIFICATE-----";
-
---     string myUsername          = "";
---     string myOrganization      = "";
---     string myGroup             = "";
-    
---     string myCommonName   = "";
---     string myCountry      = "";
---     string myOrganization = "";
---     string myGroup        = "";
---     string myPublicKey    = "";
---     string myCertificate  = "";
-
---     constructor() {
---         registerCert(myAccount, myNewCertificate); 
-
---         myUsername     = tx.username;
---         myOrganization = tx.organization;
---         myGroup        = tx.group;
-        
---         myCommonName   = getUserCert(myAccount)["commonName"];
---         myCountry      = getUserCert(myAccount)["country"];
---         myOrganization = getUserCert(myAccount)["organization"];
---         myGroup        = getUserCert(myAccount)["group"];
---         myPublicKey    = getUserCert(myAccount)["publicKey"];
---         myCertificate  = getUserCert(myAccount)["certString"];
---     }
--- }|]
---     getFields ["myUsername", "myOrganization", "myGroup", "myCommonName", "myCountry", "myOrganization", "myGroup", "myPublicKey", "myCertificate"] `shouldReturn`
---       [ BString "dan"
---       , BString "blockapps"
---       , BString "engineering"
---       , BString "dan"
---       , BString "USA"
---       , BString "blockapps"
---       , BString "engineering"
---       , BString "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEGOKeu5dSCBFHVQuy/q1A8BeTb99G83tD\nVecvHHne6sKfmBZN1AIjhpHGKO22vBfdq3dMn/QBqb2TdR9w3WvMXQ==\n-----END PUBLIC KEY-----\n"
---       , BString "-----BEGIN CERTIFICATE-----\nMIIBiDCCAS2gAwIBAgIQCgO76hC29iXEFXJNco5ekjAMBggqhkjOPQQDAgUAMEYx\nDDAKBgNVBAMMA2RhbjEMMAoGA1UEBgwDVVNBMRIwEAYDVQQKDAlibG9ja2FwcHMx\nFDASBgNVBAsMC2VuZ2luZWVyaW5nMB4XDTIxMDMxODE1NDgwN1oXDTIyMDMxODE1\nNDgwN1owRjEMMAoGA1UEAwwDZGFuMQwwCgYDVQQGDANVU0ExEjAQBgNVBAoMCWJs\nb2NrYXBwczEUMBIGA1UECwwLZW5naW5lZXJpbmcwVjAQBgcqhkjOPQIBBgUrgQQA\nCgNCAAQY4p67l1IIEUdVC7L+rUDwF5Nv30bze0NV5y8ced7qwp+YFk3UAiOGkcYo\n7ba8F92rd0yf9AGpvZN1H3Dda8xdMAwGCCqGSM49BAMCBQADRwAwRAIgbKXO8tZ5\noPhBusPQFkNEQDnLO/MRru4KjtCpPnVb5sACIE0TwBJ7yeIGuPc/8G50/858Pf3a\n0t1hHbhYnJarPkNA\n-----END CERTIFICATE-----\n"
---       ]
-
-
-  it "can only post X509 certificates to the address of the public key" . runTest $ do
+  it "only a contract posted by the root user can call registerCert" $ (runTest $ do
     runBS [r|
 pragma solidvm 3.2;
 contract qq {
-    account public certAddr = account(0x74f014FEF932D2728c6c7E2B4d3B88ac37A7E1d0);
+    string public myCertificate = "-----BEGIN CERTIFICATE-----\nMIIBjjCCATKgAwIBAgIRANJH2FERGO/3JvoPHo52I3IwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyNTE0NTIwMloXDTIzMDQy\nNTE0NTIwMlowSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANIADBFAiEA\n9sjaARt+VEUCjZv3NAuEENoD744fZIuuUTt6qwM7fKQCIDLp02y/lSHtLfOOgCW5\n40qEIDYu2UO1JqSuyGvIUOoc\n-----END CERTIFICATE-----";
+    constructor() {
+        registerCert(myCertificate);
+    }
+}|]) `shouldThrow` anyInvalidWriteError
+
+  it "can only post X509 certificates to the address of the public key" . runTest $ do
+    void $ runArgsWithOrigin rootAcc sender "()" [r|
+pragma solidvm 3.2;
+contract qq {
+    account public certAddr = account(0x74f014FEF932D2728c6c7E2B4d3B88ac37A7E1d0, "main");
     string public myCertificate = "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----";
     string public certName;
     string public certOrg;
@@ -3230,7 +3229,6 @@ contract qq {
         registerCert(myCertificate);
         certName = getUserCert(certAddr)["commonName"];
         certOrg = getUserCert(certAddr)["organization"];
-
     }
 }|]
     getFields ["certName", "certOrg"] `shouldReturn`
@@ -3239,7 +3237,7 @@ contract qq {
       ]
 
   it "cannot post X509 certificates not signed by the BlockApps private key" $ (runTest $ do
-    runBS [r|
+    void $ runArgsWithOrigin rootAcc sender "()" [r|
 pragma solidvm 3.2;
 contract qq {
     account public certAddr = account(0xe79beda3078bcb66524f91f74de982d2fcc89287);
@@ -3253,8 +3251,8 @@ contract qq {
     }
 }|]) `shouldThrow` anyInvalidCertError
 
-  it "can't register a x509 certificate on a private chain" $ (runTest $ do
-    void $ runArgsWithSender privateChainAcc "()" [r|
+  it "cannot register a x509 certificate on a private chain" $ (runTest $ do
+    void $ runArgsWithOrigin rootAcc privateChainAcc "()" [r|
 pragma solidvm 3.2;
 contract qq {
     account myAccount = account("deadbeef:feedbeef");
@@ -3291,6 +3289,52 @@ contract qq {
       }
   }|])) `shouldThrow` anyUnknownFunc
 
+  it "can get a users cert" . runTest $ do
+    void $ runArgsWithOrigin rootAcc sender "()" [r|
+pragma solidvm 3.2;
+contract qq {
+    account myAccount = account(0x74f014FEF932D2728c6c7E2B4d3B88ac37A7E1d0);
+    
+    string myNewCertificate = "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----";
+
+    string myUsername          = "";
+    string myOrganization      = "";
+    string myGroup             = "";
+    
+    string myCommonName   = "";
+    string myCountry      = "";
+    string myOrganization = "";
+    string myGroup        = "";
+    string myPublicKey    = "";
+    string myCertificate  = "";
+
+    constructor() {
+        registerCert(myNewCertificate); 
+
+        myUsername     = tx.username;
+        myOrganization = tx.organization;
+        myGroup        = tx.group;
+        
+        myCommonName   = getUserCert(myAccount)["commonName"];
+        myCountry      = getUserCert(myAccount)["country"];
+        myOrganization = getUserCert(myAccount)["organization"];
+        myGroup        = getUserCert(myAccount)["group"];
+        myPublicKey    = getUserCert(myAccount)["publicKey"];
+        myCertificate  = getUserCert(myAccount)["certString"];
+    }
+}|]
+    getFields ["myUsername", "myOrganization", "myGroup", "myCommonName", "myCountry", "myOrganization", "myGroup", "myPublicKey", "myCertificate"] `shouldReturn`
+      [ BString "Admin"
+      , BString "BlockApps"
+      , BString "Engineering"
+      , BString "Admin"
+      , BString "USA"
+      , BString "BlockApps"
+      , BString "Engineering"
+      , BString "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEUhJR4x+wZiX+xZK2m/pwN40cvCS0UA7Z\n0DB7sny5ZnNLw43JgKz0URDY2yYOPkhoIApxFK9UU3Bc4BRANDWmdQ==\n-----END PUBLIC KEY-----\n"
+      , BString "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----\n"
+      ]
+    
   it "can call builtin function verifyCert" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
