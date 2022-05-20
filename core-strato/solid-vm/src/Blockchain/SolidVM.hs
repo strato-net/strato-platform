@@ -1304,7 +1304,6 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
         let address = namedAccountToAccount (from ^. accountChainId) addr
         result <- callWrapper from address Nothing itemName False (CC.OrderedArgs [])  
         return . Constant . fromMaybe SNULL $ result
-
       (SContract _ a, funcName) -> return $ Constant $ SContractFunction Nothing a funcName
       (r@(SReference _), "push") -> return $ Constant $ SPush r Nothing
         {-
@@ -1817,8 +1816,10 @@ callBuiltin rc'@("registerCert") [SString cert] _ = do
         Account{..} -> do
           mCreatorAddress <- getSolidStorageKeyVal' curAccount $ MS.StoragePath [MS.Field ":creatorAddress"]
           case mCreatorAddress of
-            (MS.BAccount creatorAddress) -> do
-              if ((_namedAccountAddress creatorAddress) /= rootAddress) then invalidWrite "Only a function in a contract posted by the BlockApps Root Address may call registerCert" curAccount
+            (MS.BAccount creatorAccount) -> do
+              onTraced $ liftIO $ putStrLn $ "    Creator Address: " <> (show $ _namedAccountAddress creatorAccount)
+              onTraced $ liftIO $ putStrLn $ "    Root Address: " <> (show rootAddress)
+              if ((_namedAccountAddress creatorAccount) /= rootAddress) then invalidWrite "Only a function in a contract posted by the BlockApps Root Address may call registerCert" creatorAccount
               else do
                 let ex509Cert = bsToCert . BC.pack $ cert
                 case ex509Cert of 
