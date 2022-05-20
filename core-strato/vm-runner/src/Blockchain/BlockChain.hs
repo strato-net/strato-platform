@@ -244,7 +244,7 @@ addBlockTransactions :: (VMBase m, Bagger.MonadBagger m, MonadMonitor m) => Outp
 addBlockTransactions OutputBlock{obBlockData = bd, obReceiptTransactions = transactions} = do
   $logDebugS "addBlockTransactions" . T.pack $ "All transactions: " ++ show transactions
   $logDebugS "addBlockTransactions" . T.pack $ "AnchorChains: " ++ show (map (otAnchorChain &&& txType) transactions)
-  let txs = filter ((/= PrivateHash) . txType)
+  let txs = filter (\t -> (txType t /= PrivateHash) || (isJust $ otPrivatePayload t))
           $ filter (isAnchored . otAnchorChain) transactions
   -- TODO: Run the checks Bagger does reject invalid transactions for private chains
   addTransactions bd txs
@@ -265,7 +265,8 @@ addTransactions blockData txs =
 
   where
     go _ [] trrs _ = return $ DL.toList trrs
-    go blockGas (t@OutputTx{otBaseTx=bt}:rest) trrs x509s = do
+    go blockGas (t:rest) trrs x509s = do
+      let bt = fromMaybe (otBaseTx t) (otPrivatePayload t)
       flushMemAddressStateTxToBlockDB
       flushMemStorageTxDBToBlockDB
       beforeMap <- getAddressStateTxDBMap
@@ -303,7 +304,8 @@ mineTransactions bd remGas otxs = do
   
 mineTransactions' :: (VMBase m, MonadMonitor m) => BlockData -> Integer -> DL.DList TxRunResult -> [OutputTx] -> m Bagger.TxMiningResult
 mineTransactions' _ remGas ran [] = return $ Bagger.TxMiningResult Nothing (DL.toList ran) [] remGas
-mineTransactions' header remGas ran unran@(tx@OutputTx{otBaseTx=bt}:txs) = do
+mineTransactions' header remGas ran unran@(tx:txs) = do
+    let bt = fromMaybe (otBaseTx tx) (otPrivatePayload tx)
     beforeMap <- getAddressStateTxDBMap
     beforeX509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
     (!time', !result) <- timeIt . runExceptT $ addTransaction Nothing False header remGas tx
@@ -333,13 +335,14 @@ addTransaction :: (VMBase m, MonadMonitor m)
                -> Integer
                -> OutputTx
                -> ExceptT TransactionFailureCause m ExecResults
-addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSigner=tAddr} = do
+addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx{otSigner=tAddr} = do
 
     nonceValid <- lift $ isNonceValid t
 
     let isHomestead   = blockIsHomestead $ blockDataNumber b
         intrinsicGas' = intrinsicGas isHomestead t
         tAcct = Account tAddr chainId
+        bt = fromMaybe (otBaseTx t) (otPrivatePayload t)
 
     when flags_debug $ do
         $logDebugS "addTx" . T.pack $ "bytes cost: " ++ show (gTXDATAZERO * fromIntegral (zeroBytesLength t) + gTXDATANONZERO * (fromIntegral (codeOrDataLength t) - fromIntegral (zeroBytesLength t)))
@@ -415,78 +418,80 @@ runCodeForTransaction :: VMBase m
                       -> Account
                       -> OutputTx
                       -> ExceptT TransactionFailureCause m ExecResults
-runCodeForTransaction isRunningTests' isHomestead b availableGas tAcct OutputTx{otBaseTx=ut} | isContractCreationTX ut = do
-  when flags_debug $ $logInfoS "runCodeForTransaction" "runCodeForTransaction: ContractCreationTX"
+runCodeForTransaction isRunningTests' isHomestead b availableGas tAcct t =
+  let ut = fromMaybe (otBaseTx t) (otPrivatePayload t)
+   in if isContractCreationTX ut
+        then do
+          when flags_debug $ $logInfoS "runCodeForTransaction" "runCodeForTransaction: ContractCreationTX"
 
-  let create =
-        case join $ fmap (M.lookup "VM") $ transactionMetadata ut of
-          Just "EVM" -> EVM.create
-          Just "SolidVM" -> SolidVM.create
-          Nothing -> EVM.create --EVM is the default
-          Just vmName -> -- Return a dummy VM that just complains that the requested VM doesn't exist
-            \_ _ _ _ _ _ _ _ _ ag _ _ _ _ _ ->
-                         return $ evmErrorResults (toInteger ag) (UnsupportedVM vmName)
+          let create =
+                case join $ fmap (M.lookup "VM") $ transactionMetadata ut of
+                  Just "EVM" -> EVM.create
+                  Just "SolidVM" -> SolidVM.create
+                  Nothing -> EVM.create --EVM is the default
+                  Just vmName -> -- Return a dummy VM that just complains that the requested VM doesn't exist
+                    \_ _ _ _ _ _ _ _ _ ag _ _ _ _ _ ->
+                                 return $ evmErrorResults (toInteger ag) (UnsupportedVM vmName)
 
-  --TODO- The new address state should be created in the VM itself....  Currently the EVM doesn't do this (and could be cleaned up by doing so), SolidVM does do this.  I will calculate this value here, but then ignore the value in SolidVM (and recalculate it there).  Eventually this should be moved into the EVM also
-  nonce <- lift $ addressStateNonce <$> A.lookupWithDefault (Proxy @AddressState) tAcct
-  let newAddress = getNewAddress_unsafe (tAcct ^. accountAddress) (nonce-1) --nonce has already been incremented, so subtract 1 here to get the proper value (this is directly specified in the yellowpaper)
-      newAccount = Account newAddress (txChainId ut)
+          --TODO- The new address state should be created in the VM itself....  Currently the EVM doesn't do this (and could be cleaned up by doing so), SolidVM does do this.  I will calculate this value here, but then ignore the value in SolidVM (and recalculate it there).  Eventually this should be moved into the EVM also
+          nonce <- lift $ addressStateNonce <$> A.lookupWithDefault (Proxy @AddressState) tAcct
+          let newAddress = getNewAddress_unsafe (tAcct ^. accountAddress) (nonce-1) --nonce has already been incremented, so subtract 1 here to get the proper value (this is directly specified in the yellowpaper)
+              newAccount = Account newAddress (txChainId ut)
 
-  lift $ create isRunningTests'
-           isHomestead
-           S.empty
-           b
-           0
-           tAcct
-           tAcct
-           (transactionValue ut)
-           (fromInteger $ transactionGasPrice ut)
-           availableGas
-           newAccount
-           (transactionInit ut)
-           (txHash ut)
-           (txChainId ut)
-           (txMetadata ut)
+          lift $ create isRunningTests'
+                   isHomestead
+                   S.empty
+                   b
+                   0
+                   tAcct
+                   tAcct
+                   (transactionValue ut)
+                   (fromInteger $ transactionGasPrice ut)
+                   availableGas
+                   newAccount
+                   (transactionInit ut)
+                   (txHash ut)
+                   (txChainId ut)
+                   (txMetadata ut)
+        else do
+          when flags_debug $ $logInfoS "runCodeForTransaction"  $ T.pack $ "runCodeForTransaction: MessageTX caller: " ++ format tAcct ++ ", address: " ++ format (transactionTo ut)
 
-runCodeForTransaction isRunningTests' isHomestead b availableGas tAcct o@OutputTx{otBaseTx=ut} = do --MessageTX
-  when flags_debug $ $logInfoS "runCodeForTransaction"  $ T.pack $ "runCodeForTransaction: MessageTX caller: " ++ format tAcct ++ ", address: " ++ format (transactionTo ut)
+          let owner = Account (transactionTo ut) (txChainId ut)
 
-  let owner = Account (transactionTo ut) (txChainId ut)
+          codeHash <- lift $ addressStateCodeHash <$> A.lookupWithDefault (Proxy @AddressState) owner
+          resolvedCodeHash <- lift $ resolveCodePtr (owner ^. accountChainId) codeHash
 
-  codeHash <- lift $ addressStateCodeHash <$> A.lookupWithDefault (Proxy @AddressState) owner
-  resolvedCodeHash <- lift $ resolveCodePtr (owner ^. accountChainId) codeHash
+          let eCall =
+                case codeHash of
+                  EVMCode _ -> Right EVM.call
+                  SolidVMCode _ _ ->  Right SolidVM.call
+                  CodeAtAccount acct name -> case resolvedCodeHash of
+                    Just (EVMCode _) -> Right EVM.call
+                    Just (SolidVMCode _ _) -> Right SolidVM.call
+                    Just (CodeAtAccount acct' name') -> Left (acct', name')
+                    Nothing -> Left (acct, name)
 
-  let eCall =
-        case codeHash of
-          EVMCode _ -> Right EVM.call
-          SolidVMCode _ _ ->  Right SolidVM.call
-          CodeAtAccount acct name -> case resolvedCodeHash of
-            Just (EVMCode _) -> Right EVM.call
-            Just (SolidVMCode _ _) -> Right SolidVM.call
-            Just (CodeAtAccount acct' name') -> Left (acct', name')
-            Nothing -> Left (acct, name)
-
-  case eCall of
-    Left (acct, name) -> throwE $ TFCodeCollectionNotFound acct name o
-    Right call -> lift $
-      call isRunningTests'
-        isHomestead
-        False
-        False
-        S.empty
-        b
-        0
-        owner
-        owner
-        tAcct
-        (fromInteger $ transactionValue ut)
-        (fromInteger $ transactionGasPrice ut)
-        (transactionData ut)
-        (fromIntegral availableGas)
-        tAcct
-        (txHash ut)
-        (txChainId ut)
-        (txMetadata ut)
+          case eCall of
+            Left (acct, name) -> throwE $ TFCodeCollectionNotFound acct name t
+            Right call -> lift $
+              call isRunningTests'
+                isHomestead
+                False
+                False
+                S.empty
+                b
+                0
+                owner
+                owner
+                tAcct
+                (fromInteger $ transactionValue ut)
+                (fromInteger $ transactionGasPrice ut)
+                (transactionData ut)
+                (fromIntegral availableGas)
+                tAcct
+                (txHash ut)
+                (txChainId ut)
+                (txMetadata ut)
 
 ----------------
 
