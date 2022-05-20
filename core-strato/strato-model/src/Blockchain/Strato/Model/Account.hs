@@ -10,6 +10,7 @@
 
 module Blockchain.Strato.Model.Account
     ( Account(..)
+    , AccountPayable
     , accountChainId
     , accountAddress
     , OnNamedChain(..)
@@ -54,6 +55,7 @@ import           Text.Format
 import           Text.Read (readMaybe)
 import           Text.ShortDescription
 
+type AccountPayable = Account --type synonym, irrelevant at runtime, but matters for typechecking during complilation
 
 data Account = Account
   { _accountAddress :: Address

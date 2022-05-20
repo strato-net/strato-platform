@@ -68,7 +68,7 @@ solidityLanguage = javaStyle {
      "uint", "int", "bytes", "byte", "real", "ureal", "string",
      "address", --"send", "balance",
      "enum", "struct", "mapping", "var",
-     "function", "returns", "return", "modifier", "payable",
+     "function", "returns", "return", "modifier", "revert",
      "delete", "constant", "storage", "memory", "calldata",
      "if", "else", "while", "for", "break", "continue",
      "call", "callcode", "length", "sha3", "sha256", "ripemd160", "ecrecover",

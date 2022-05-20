@@ -129,6 +129,7 @@ tests:
       - HUnit
       - lens
       - merkle-patricia-db
+      - monad-alter
       - parsec
       - raw-strings-qq
       - solid-vm

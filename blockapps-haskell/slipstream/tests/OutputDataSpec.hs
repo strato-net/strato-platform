@@ -335,7 +335,7 @@ spec = do
                 ])
             ]
           }, createDummyContract [
-                     ("addr", SVMType.Address)
+                     ("addr", SVMType.Address False)
                    , ("boolean", SVMType.Bool)
                    , ("contract", SVMType.Contract "")
                    , ("number", SVMType.Int Nothing Nothing)
@@ -470,7 +470,7 @@ spec = do
                    ("isIterable", SVMType.Bool),
                    ("keyMap", SVMType.Mapping Nothing (SVMType.Bytes Nothing Nothing)
                               (SVMType.Int Nothing Nothing)),
-                   ("owner", SVMType.Account),
+                   ("owner", (SVMType.Account False)),
                    ("values", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                  ]
                 )
@@ -514,7 +514,7 @@ spec = do
                 ])
             ]
           }, createDummyContract [
-               ("addr", SVMType.Address)
+               ("addr", SVMType.Address False)
              , ("boolean", SVMType.Bool)
              , ("contract", SVMType.Contract "")
              , ("number", SVMType.Int Nothing Nothing)
