@@ -21,6 +21,7 @@ module SolidVM.Model.Value (
 import           Control.Lens ((.~))
 import           Control.Monad (forM, when)
 import           Control.Monad.IO.Class
+import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Base16 as B16
@@ -129,6 +130,7 @@ data Value =
   | SMappingSentinel
   | SBreak
   | SContinue
+  | SBytes ByteString
   deriving (Show)
 
 --TODO- Remove this sloppy half-measure of Ord, Eq definitions once we move to Solidity static typing

@@ -102,7 +102,7 @@ import           Text.Tools
 
 import qualified Data.Text.Encoding                   as DT
 
-import qualified SolidVM.Model.CodeCollection as CC
+import qualified SolidVM.Model.CodeCollection         as CC
 
 import           Numeric  (showHex)
 
@@ -629,7 +629,7 @@ expressionType (CC.ArrayExpression _ xs) = SVMType.Array (expressionType (head x
 expressionType ex = typeError "Cannot deduce a type from" (ex, ex)
 
 
-callWrapper :: MonadSM m => Account -> Account -> Maybe String -> String -> Bool -> CC.ArgList -> m (Maybe Value)
+callWrapper  :: MonadSM m => Account -> Account -> Maybe String -> String -> Bool -> CC.ArgList -> m (Maybe Value)
 callWrapper from to mContract functionName isRCC argExps  = do
   let fromChain = from ^. accountChainId
       toChain = to ^. accountChainId
@@ -657,7 +657,7 @@ callWrapper from to mContract functionName isRCC argExps  = do
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) to
 
-  liftIO $ putStrLn $ "callWraper/versioning --->  we are calling " ++ (CC._contractName contract) ++ 
+  liftIO $ putStrLn $ "callWrapper/versioning --->  we are calling " ++ (CC._contractName contract) ++ 
         " in app " ++ (show parentName) ++ " of org " ++ show org
 
 
@@ -1663,25 +1663,42 @@ expToVar' (CC.FunctionCall _ e args) = do
                 return $ Constant $ SContract contractName' $ addr
               _ -> typeError "contract variable creation" argVals
 
+          -- Transfer wei, throw error on failure no return on success 
+          -- TODO: When gas gets more implemented ensure that this function does not
+          --       consume more than 2300 gas
           Constant (SContractItem address' "transfer") -> do
+            from <- getCurrentAccount
+            let address = namedAccountToAccount (from ^. accountChainId) address'
+            case argVals of
+              OrderedVals [SInteger amount] -> do
+                res <- pay "built-in transfer function" from address amount
+                case res of
+                  True -> return $ Constant SNULL
+                  _ -> paymentError (show amount) (show address)
+              _ -> paymentError "unknown" (show address)
+
+          -- Send Wei return bool on failure or success
+          -- TODO: When gas gets more implemented ensure that this function does not
+          --       consume more than 2300 gas
+          Constant (SContractItem address' "send") -> do
             from <- getCurrentAccount
             let address = namedAccountToAccount (from ^. accountChainId) address'
             success <- case argVals of
               OrderedVals [SInteger amount] -> do
-                when (amount > 2300) $ tooMuchGas "2300" (show amount)
-                pay "built-in transfer function" from address amount
+                res <- pay "built-in send function" from address amount
+                case res of 
+                  True -> return True
+                  _ -> return False
               _ -> return False
             return . Constant $ SBool success
 
           Constant (SContractItem address' itemName) -> do
-
             from <- getCurrentAccount
             let address = namedAccountToAccount (from ^. accountChainId) address'
             result <- callWrapper from address Nothing itemName False args 
             return . Constant . fromMaybe SNULL $ result
 
           Constant (SContractFunction name address' functionName) -> do
-
             from <- getCurrentAccount
             let address = namedAccountToAccount (from ^. accountChainId) address'
             result <- callWrapper from address name functionName False args 
@@ -1832,6 +1849,7 @@ callBuiltin "byte"  vs _ = typeError "byte cast" vs
 callBuiltin "uint" args _ = return $ intBuiltin args
 callBuiltin "int" args _ = return $ intBuiltin args
 callBuiltin "push" [v] (Just o) = typeError "push (called as func, not as method)" (v, o)
+callBuiltin "call" [v] (Just o) = typeError "call (called as a function, not as a method)" (v, o)
 callBuiltin "identity" [v] Nothing = return v
 callBuiltin "keccak256" args Nothing = do
   let allStrings [] = True
