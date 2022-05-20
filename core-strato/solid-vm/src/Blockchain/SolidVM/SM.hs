@@ -30,6 +30,7 @@ module Blockchain.SolidVM.SM (
   getCurrentCallInfo,
   getCurrentCallInfoIfExists,
   getCurrentContract,
+  getCurrentChainId,
   getCurrentFunctionName,
   getCurrentCodeCollection,
   getEnv,
@@ -524,6 +525,13 @@ getCurrentAccount = do
   case cs of
     (currentCallInfo:_) -> return $ currentAccount currentCallInfo
     _ -> internalError "getCurrentAccount called with an empty stack" ()
+
+getCurrentChainId :: MonadSM m => m (Maybe Word256)
+getCurrentChainId = do
+  cs <- Mod.get (Mod.Proxy @[CallInfo])
+  case cs of
+    (currentCallInfo:_) -> return $ _accountChainId $ currentAccount currentCallInfo
+    _ -> internalError "getCurrentChainId called with an empty stack" ()
 
 
 getCurrentFunctionName :: MonadSM m => m String

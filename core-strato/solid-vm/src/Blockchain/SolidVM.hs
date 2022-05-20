@@ -104,8 +104,6 @@ import qualified Data.Text.Encoding                   as DT
 
 import qualified SolidVM.Model.CodeCollection         as CC
 
-import           Numeric  (showHex)
-
 import qualified SolidVM.Model.Storable as MS
 import qualified SolidVM.Model.Type as SVMType
 import           SolidVM.Model.Value
@@ -1353,18 +1351,17 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
         
       (SAccount a _, "chainId") -> do
         contract' <- getCurrentContract
-        case CC._vmVersion contract' == "svm3.2" of
-          True ->
-            case (a ^. namedAccountChainId) of
-              UnspecifiedChain -> do 
-                cid2 <- view accountChainId <$> getCurrentAccount
-                case cid2 of
-                  Nothing -> return $ Constant $ SInteger 0 
-                  Just cid3 -> return $ Constant $ intBuiltin $ flip (:) [] $ SString $ B.foldr showHex "" $ word256ToBytes cid3
-              MainChain ->  return $ Constant $ SInteger 0 
-              ExplicitChain cid -> return $ Constant $ intBuiltin $ flip (:) [] $ SString $ B.foldr showHex "" $ word256ToBytes cid
-          False ->
-            typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ (show (val, name)))
+        if CC._vmVersion contract' /= "svm3.2" then do
+          typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ (show (val, name)))
+        else do
+          case (a ^. namedAccountChainId) of
+            UnspecifiedChain -> do 
+              curCid <- view accountChainId <$> getCurrentAccount
+              case curCid of
+                Nothing -> return $ Constant $ SInteger 0 
+                Just cid -> return $ Constant $ SInteger $ fromIntegral cid
+            MainChain ->  return $ Constant $ SInteger 0 
+            ExplicitChain cid -> return $ Constant $ SInteger $ fromIntegral cid
       (SAccount addr _, itemName) -> do --return $ Constant $ SContractItem addr itemName
         from <- getCurrentAccount
         let address = namedAccountToAccount (from ^. accountChainId) addr

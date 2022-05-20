@@ -3459,23 +3459,22 @@ contract qq {
   account a1;
   account a2;
   account a3;
+  account a4;
   uint cid1;
   uint cid2;
   uint cid3;
+  uint cid4;
   constructor() public {
     a1 = account(0xdeadbeef, 0xfeedbeef);
     a2 = account(0x123, "main");    
     a3 = account(0x124);
+    a4 = account(0xdeadbeef, "0xdeadbeef");
     cid1 = a1.chainId;
     cid2 = a2.chainId;
     cid3 = a3.chainId;
+    cid4 = a4.chainId;
   }
 }|]
-    getFields ["cid1", "cid2", "cid3"] `shouldReturn`
-      [ BInteger 0xfeedbeef
-      , BDefault
-      , BDefault
-      ]
   it "can get the balance from an address" . runTest $ do
     -- Post contract
     runBS [r|
