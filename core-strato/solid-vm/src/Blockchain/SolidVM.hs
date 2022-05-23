@@ -1372,18 +1372,17 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
         return . Constant . fromMaybe SNULL $ result
       (SContractItem a _, "chainId") -> do
         contract' <- getCurrentContract
-        case CC._vmVersion contract' == "svm3.2" of
-          True ->
-            case (a ^. namedAccountChainId) of
-              UnspecifiedChain -> do 
-                cid2 <- view accountChainId <$> getCurrentAccount
-                case cid2 of
-                  Nothing -> return $ Constant $ SInteger 0 
-                  Just cid3 -> return $ Constant $ intBuiltin $ flip (:) [] $ SString $ B.foldr showHex "" $ word256ToBytes cid3
-              MainChain ->  return $ Constant $ SInteger 0 
-              ExplicitChain cid -> return $ Constant $ intBuiltin $ flip (:) [] $ SString $ B.foldr showHex "" $ word256ToBytes cid
-          False ->
-            typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ (show (val, name)))
+        if CC._vmVersion contract' /= "svm3.2" then do
+          typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ (show (val, name)))
+        else do
+          case (a ^. namedAccountChainId) of
+            UnspecifiedChain -> do 
+              curCid <- view accountChainId <$> getCurrentAccount
+              case curCid of
+                Nothing -> return $ Constant $ SInteger 0 
+                Just cid -> return $ Constant $ SInteger $ fromIntegral cid
+            MainChain ->  return $ Constant $ SInteger 0 
+            ExplicitChain cid -> return $ Constant $ SInteger $ fromIntegral cid
       (SContract _ a, funcName) -> return $ Constant $ SContractFunction Nothing a funcName
       (r@(SReference _), "push") -> return $ Constant $ SPush r Nothing
         {-
