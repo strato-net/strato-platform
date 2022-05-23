@@ -1280,6 +1280,12 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
 
       (SBuiltinVariable "block", "number") -> (Constant . SInteger . blockDataNumber . Env.blockHeader) <$> getEnv
 
+      (SBuiltinVariable "block", "coinbase") -> (Constant . ((flip SAccount) True) . (accountToNamedAccount chainId) . ((flip Account) Nothing) . blockDataCoinbase . Env.blockHeader) <$> getEnv
+
+      (SBuiltinVariable "block", "difficulty") -> (Constant . SInteger . blockDataDifficulty . Env.blockHeader) <$> getEnv
+
+      (SBuiltinVariable "block", "gaslimit") -> (Constant . SInteger . blockDataGasLimit . Env.blockHeader) <$> getEnv
+
       (SBuiltinVariable "super", method) -> do
         ctract <- getCurrentContract
         (_, cc) <- getCurrentCodeCollection
