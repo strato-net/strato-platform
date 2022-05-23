@@ -3476,6 +3476,25 @@ contract qq {
       , BDefault
       , BDefault
       ]
+  it "can get the chainId directly from the account constructor" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+  uint a1;
+  uint a2;
+  uint a3;
+  uint a4;
+  uint a5;
+  constructor() public {
+    a1 = account(0xdeadbeef, 0xfeedbeef).chainId;
+    a2 = account(0x123, "main").chainId;
+    a3 = account(0x124, "self").chainId;
+    a4 = account(0x125).chainId;
+    a5 = account(this, "self").chainId;
+  }
+}|]
+    getFields ["a1", "a2", "a3", "a4", "a5"] `shouldReturn`
+      [ BInteger 0xfeedbeef, BDefault, BDefault, BDefault, BDefault ]
   it "can get the balance from an address" . runTest $ do
     -- Post contract
     runBS [r|
