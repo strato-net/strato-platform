@@ -71,6 +71,7 @@ data Options = Options
   , optChainId       :: Maybe ChainId
   , optFunctionName  :: Maybe String
   , optFunctionArgs  :: Maybe [String]
+  , optMetadata      :: M.Map T.Text T.Text
   , optNonce         :: Nonce
   , optValue         :: Wei
   , optKey           :: PrivateKey
@@ -88,6 +89,7 @@ defaultOptions = Options
   , optChainId      = Nothing
   , optFunctionName = Nothing
   , optFunctionArgs = Nothing
+  , optMetadata     = M.empty
   , optNonce        = Nonce 0
   , optValue        = Wei 0
   , optKey          = throw $ userError "give me a private key with which to sign the TX" 
@@ -166,6 +168,20 @@ options =
             Just r -> return opts{optFunctionArgs = Just (splitOn "," r)}
        ) "(String,String,etc.)")
     "The comma-separated args of the contract function/constructor you want to call" 
+  , Option ['d'] ["metadata"]
+      (OptArg
+       (\md opts -> 
+          case md of
+            Nothing -> return opts
+            Just metadata -> do
+              let mp = M.fromList $ map (\el ->
+                          let (k:xs) = splitOn ":" el
+                          in
+                            (T.pack k, T.pack $ head xs)
+                        ) $ splitOn "," metadata
+              return opts{optMetadata = mp}
+       ) "Key:Value,Key:Value")
+    "The key-values of the transaction metadata" 
   , Option ['n'] ["nonce"]
       (ReqArg
        (\n opts -> do 
@@ -261,10 +277,8 @@ main = do
                         , Code $ B.empty
                         )
         _ -> error "a logical impossibility! We parsed this TX as a GENESIS tx???"
- 
+  let metadata' = M.union metadata optMetadata
 
-
-       
   -- create the unsigned transaction
   let unsignedTx = UnsignedTransaction
         { unsignedTransactionNonce      = optNonce
@@ -293,7 +307,7 @@ main = do
           r
           s
           (if optOmitV then Nothing else Just v)
-          (Just metadata)
+          (Just metadata')
   
   
   putStrLn $ "Transaction Hash: " ++ format txHash
