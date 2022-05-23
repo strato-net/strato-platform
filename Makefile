@@ -75,6 +75,7 @@ get_solcs:
 build_buildbase: get_solcs
 	mkdir -p ${TMPDIR}
 	cp -f Dockerfile.buildbase ${TMPDIR}
+	ln -f ${FAKEROOT}/usr/local/bin/solc ${TMPDIR}/solc
 	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=strato-buildbase:${STACK_RESOLVER} -f ${TMPDIR}/Dockerfile.buildbase ${TMPDIR}
 
 build_common: get_solcs build_buildbase
