@@ -16,7 +16,6 @@ $(info REPO_URL is "${REPO_URL}" (${REPO}))
 STACK_RESOLVER=$(shell cat stack.yaml | grep "resolver:" | awk '{print $$2}')
 TMPDIR=/tmp/$(shell whoami)/strato-docker-dummy
 FAKEROOT=$(shell pwd)/.docker-work
-BLOCDIR=${FAKEROOT}/bloc
 STRATODIR=${FAKEROOT}/strato
 VAULTDIR=${FAKEROOT}/vault-wrapper
 
@@ -65,9 +64,9 @@ get_solcs:
 			mkdir -p ${TMPDIR} ${FAKEROOT}/usr/local/bin ;\
 			blockapps-haskell/pull_solc.sh 0.4.25 ${TMPDIR}/solc-0.4 ${TMPDIR}/license-solc-0.4 ;\
 			blockapps-haskell/pull_solc.sh 0.5.2 ${TMPDIR}/solc-0.5 ${TMPDIR}/license-solc-0.5 ;\
+			cp -fr ${TMPDIR}/license* ${FAKEROOT} ;\
 			cp ${TMPDIR}/solc-0.4 ${FAKEROOT}/usr/local/bin ;\
 			cp ${TMPDIR}/solc-0.5 ${FAKEROOT}/usr/local/bin ;\
-			cp -fr ${TMPDIR}/license* ${FAKEROOT} ;\
 			ln -f ${FAKEROOT}/usr/local/bin/solc-0.4 ${FAKEROOT}/usr/local/bin/solc \
 		" ;\
 	fi
@@ -75,12 +74,10 @@ get_solcs:
 build_buildbase: get_solcs
 	mkdir -p ${TMPDIR}
 	cp -f Dockerfile.buildbase ${TMPDIR}
-	ln -f ${FAKEROOT}/usr/local/bin/solc ${TMPDIR}/solc
 	docker build --build-arg STACK_RESOLVER=${STACK_RESOLVER} --tag=strato-buildbase:${STACK_RESOLVER} -f ${TMPDIR}/Dockerfile.buildbase ${TMPDIR}
 
 build_common: get_solcs build_buildbase
 	@echo building haskell libraries and creating directories
-	mkdir -p ${FAKEROOT}/bloc
 	mkdir -p ${FAKEROOT}/strato
 	mkdir -p ${FAKEROOT}/vault-wrapper
 	stack build \
@@ -89,7 +86,6 @@ build_common: get_solcs build_buildbase
 
 build_common_profiled: get_solcs build_buildbase
 	@echo building haskell libraries and creating directories
-	mkdir -p ${FAKEROOT}/bloc
 	mkdir -p ${FAKEROOT}/strato
 	mkdir -p ${FAKEROOT}/vault-wrapper
 	stack build \
