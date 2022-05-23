@@ -165,7 +165,7 @@ options =
             Nothing -> return opts
             Just r -> return opts{optFunctionArgs = Just (splitOn "," r)}
        ) "(String,String,etc.)")
-    "The comma-separated args of the contract function you want to call" 
+    "The comma-separated args of the contract function/constructor you want to call" 
   , Option ['n'] ["nonce"]
       (ReqArg
        (\n opts -> do 
@@ -216,7 +216,8 @@ postRawTransaction :: Maybe T.Text -> Maybe ChainId -> Bool -> PostBlocTransacti
 postRawTransaction = client (Proxy @ PostBlocTransactionRaw)
 
 
-
+makeArgs :: [String] -> String
+makeArgs as = "(" ++ (intercalate "," as) ++ ")"
 
 
 main :: IO ()
@@ -236,9 +237,15 @@ main = do
  
         CONTRACT -> case (optSourceCode, optContractName) of 
           (Just src, Just name) -> 
-            ( M.fromList $ [("VM", "SolidVM"), ("name", T.pack name)] 
-            , Code $ T.encodeUtf8 $ serializeSourceMap src
-            )
+            let baseTup@(md,cd) = (M.fromList $ [
+                                    ("VM", "SolidVM")
+                                  , ("name", T.pack name)
+                                  ] 
+                                  , Code $ T.encodeUtf8 $ serializeSourceMap src
+                                  )
+            in case optFunctionArgs of 
+              Nothing -> baseTup
+              Just args -> (M.insert "args" (T.pack $ makeArgs args) md, cd)
           _ -> throw $ userError "source code or contract name not given for contract creation"
 
         FUNCTION -> do 
@@ -246,15 +253,13 @@ main = do
             Nothing -> throw $ userError "need a function name to call a function!"
             Just name -> case optFunctionArgs of
               Nothing -> (M.fromList $ [("VM", "SolidVM")], Code $ B.empty)
-              Just lst -> 
-                let argMd = "(" ++ (intercalate "," lst) ++ ")"
-                in (M.fromList $
-                      [ ("VM", "SolidVM")
-                      , ("funcName", T.pack name)
-                      , ("args", T.pack argMd)
-                      ]
-                   , Code $ B.empty
-                   )
+              Just args -> (M.fromList $
+                            [ ("VM", "SolidVM")
+                            , ("funcName", T.pack name)
+                            , ("args", T.pack $ makeArgs args)
+                            ]
+                        , Code $ B.empty
+                        )
         _ -> error "a logical impossibility! We parsed this TX as a GENESIS tx???"
  
 
