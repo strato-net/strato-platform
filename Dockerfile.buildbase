@@ -21,7 +21,3 @@ RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 8B1DA6120C2BF624 &&
     make install && \
     cd .. && \
     rm -rf secp256k1 
-
-# package the pre-built solc (e.g. required for 'stack test blockapps-bloc22-server')
-COPY ./solc /usr/local/bin/
-COPY ./solc-0.5 /usr/local/bin
