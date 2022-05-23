@@ -1831,7 +1831,10 @@ callBuiltin rc'@("registerCert") [SString cert] _ = do
           mCreatorAddress <- getSolidStorageKeyVal' curAccount $ MS.StoragePath [MS.Field ":creatorAddress"]
           case mCreatorAddress of
             (MS.BAccount creatorAddress) -> do
-              if ((_namedAccountAddress creatorAddress) /= rootAddress) then invalidWrite "Only a function in a contract posted by the BlockApps Root Address may call registerCert" curAccount
+              onTraced $ liftIO $ putStrLn $ "   Here is my creatorAddress " <> show $ _namedAccountAddress creatorAddress
+              onTraced $ liftIO $ putStrLn $ "   Here is my rootAddress " <> show rootAddress
+              onTraced $ liftIO $ putStrLn $ "   Here is my currentAccount " <> show curAccount
+              if ((_namedAccountAddress creatorAddress) /= rootAddress) then invalidWrite "Only a function in a contract posted by the BlockApps Root Address may call registerCert" creatorAddress
               else do
                 let ex509Cert = bsToCert . BC.pack $ cert
                 case ex509Cert of 
