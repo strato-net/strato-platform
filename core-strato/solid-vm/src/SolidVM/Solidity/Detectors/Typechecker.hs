@@ -940,6 +940,8 @@ statementHelper (RevertStatement _ (NamedArgs vals) x) =
   reduceType' x <$> traverse (tcExpr . snd) vals
 statementHelper (RevertStatement _ (OrderedArgs vals) x) =
   reduceType' x <$> traverse tcExpr vals
+statementHelper (UncheckedStatement body x) =
+  statementsHelper' x body
 statementHelper (AssemblyStatement _ x) = pure $ topType' x
 statementHelper (SimpleStatement stmt x) = simpleStatementHelper x stmt
 
