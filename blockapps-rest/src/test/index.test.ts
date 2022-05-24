@@ -418,7 +418,7 @@ describe("history", function() {
       {
         ...options,
         query: {
-          x: `eq.${snd}`,
+          x: `eq.${scd}`,
           address: `eq.${contract.address}`
         }
       }
