@@ -1,0 +1,1 @@
+contract SimpleStorage{ uint x; function get() returns (uint) { return x; } function set(uint _x) { x = _x; } }
