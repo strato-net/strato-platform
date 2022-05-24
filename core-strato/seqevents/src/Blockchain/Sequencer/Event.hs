@@ -13,7 +13,7 @@ import           Data.Aeson                                hiding (encode)
 import           Data.Binary
 import           Data.Data
 import           Data.List                                 (intercalate)
-import           Data.Maybe                                (fromJust, isNothing)
+import           Data.Maybe                                (fromJust, fromMaybe, isNothing)
 import           Test.QuickCheck
 import           Test.QuickCheck.Arbitrary.Generic
 
@@ -384,6 +384,11 @@ outputBlockHash = blockHeaderHash . obBlockData
 
 outputBlockToBlock :: OutputBlock -> BDB.Block
 outputBlockToBlock OutputBlock{obBlockData=bd,obReceiptTransactions=txs,obBlockUncles=us}= BDB.Block bd (otBaseTx <$> txs) us
+
+outputBlockToBlockRetainPayloads :: OutputBlock -> BDB.Block
+outputBlockToBlockRetainPayloads OutputBlock{obBlockData=bd,obReceiptTransactions=txs,obBlockUncles=us} =
+  let payload t = fromMaybe (otBaseTx t) (otPrivatePayload t)
+   in BDB.Block bd (payload <$> txs) us
 
 quarryBlockToOutputBlock :: Monad m => (Keccak256 -> m (Maybe Word256)) -> BDB.Block -> m OutputBlock
 quarryBlockToOutputBlock f BDB.Block{BDB.blockBlockData=bd,BDB.blockReceiptTransactions=txs,BDB.blockBlockUncles=us} = do

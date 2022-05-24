@@ -416,6 +416,7 @@ hydratePrivateHashes chainF b = do
                                 , " where it will fail."
                                 ]
                           let tx' = tx{ otAnchorChain = AnchoredPrivate cId
+                                      , otSigner = otSigner ptx
                                       , otPrivatePayload = Just $ otBaseTx ptx
                                       }
                           return (tx', st)

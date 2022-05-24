@@ -497,26 +497,34 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAcct t =
 
 
 codeOrDataLength :: OutputTx -> Int
-codeOrDataLength OutputTx{otBaseTx=bt} | isMessageTX bt = B.length $ transactionData bt
-codeOrDataLength OutputTx{otBaseTx=bt} = codeLength $ transactionInit bt --is ContractCreationTX
+codeOrDataLength t =
+  let bt = fromMaybe (otBaseTx t) (otPrivatePayload t)
+   in if isMessageTX bt
+        then B.length $ transactionData bt
+        else codeLength $ transactionInit bt --is ContractCreationTX
 
 zeroBytesLength :: OutputTx -> Int
-zeroBytesLength OutputTx{otBaseTx=bt} | isMessageTX bt = length $ filter (==0) $ B.unpack $ transactionData bt
-zeroBytesLength OutputTx{otBaseTx=bt} = length $ filter (==0) $ B.unpack codeBytes' --is ContractCreationTX
-                  where
-                    codeBytes' = case transactionInit bt of
-                      Code cb -> cb
-                      PtrToCode _ -> "" -- TODO: lookup code?
+zeroBytesLength t =
+  let bt = fromMaybe (otBaseTx t) (otPrivatePayload t)
+   in if isMessageTX bt
+        then length $ filter (==0) $ B.unpack $ transactionData bt
+        else length $ filter (==0) $ B.unpack $ codeBytes' bt --is ContractCreationTX
+  where
+    codeBytes' bt = case transactionInit bt of
+      Code cb -> cb
+      PtrToCode _ -> "" -- TODO: lookup code?
 
 calculateIntrinsicGas' :: Integer -> OutputTx -> Gas
 calculateIntrinsicGas' blockNum = intrinsicGas (blockIsHomestead blockNum)
 
 intrinsicGas :: Bool -> OutputTx -> Gas
-intrinsicGas isHomestead t@OutputTx{otBaseTx=bt} = gTXDATAZERO * zeroLen + gTXDATANONZERO * (fromIntegral (codeOrDataLength t) - zeroLen) + txCost bt
-    where
-      zeroLen = fromIntegral $ zeroBytesLength t
-      txCost t' | isMessageTX t' = gTX
-      txCost _  = if isHomestead then gCREATETX else gTX
+intrinsicGas isHomestead t =
+  let bt = fromMaybe (otBaseTx t) (otPrivatePayload t)
+   in gTXDATAZERO * zeroLen + gTXDATANONZERO * (fromIntegral (codeOrDataLength t) - zeroLen) + txCost bt
+  where
+    zeroLen = fromIntegral $ zeroBytesLength t
+    txCost t' | isMessageTX t' = gTX
+    txCost _  = if isHomestead then gCREATETX else gTX
 
 setNewAddresses :: VMBase m => TxRunResult -> m TxRunResult
 setNewAddresses trr@(TxRunResult _ result _ before after _) = do
@@ -542,8 +550,9 @@ outputTransactionResult :: VMBase m
                         -> (BlockData -> Keccak256)
                         -> TxRunResult
                         -> ConduitT a VmOutEvent m ()
-outputTransactionResult b hashFunction (TxRunResult OutputTx{otHash=theHash, otBaseTx=t} result deltaT beforeMap afterMap newAddresses) = do
-  let (txrStatus, message, gasRemaining) =
+outputTransactionResult b hashFunction (TxRunResult ot@OutputTx{otHash=theHash} result deltaT beforeMap afterMap newAddresses) = do
+  let t = fromMaybe (otBaseTx ot) (otPrivatePayload ot)
+      (txrStatus, message, gasRemaining) =
         case result of
           Left err -> let fmt = format err in (Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt), fmt, 0) -- TODO Also include the trace
           Right r  -> case erException r of
@@ -599,8 +608,9 @@ multilineLog source theLines = do
 
 printTransactionMessage::MonadLogger m=>
                          OutputTx->Either TransactionFailureCause ExecResults->NominalDiffTime->Maybe Word256 ->  m ()
-printTransactionMessage OutputTx{otSigner=tAddr, otBaseTx=baseTx, otHash=theHash} (Left errMsg) deltaT cid = do
-  let tNonce = transactionNonce baseTx
+printTransactionMessage ot@OutputTx{otSigner=tAddr, otHash=theHash} (Left errMsg) deltaT cid = do
+  let baseTx = fromMaybe (otBaseTx ot) (otPrivatePayload ot)
+      tNonce = transactionNonce baseTx
   multilineLog "printTx/err" $ boringBox
     [ "Adding transaction signed by: " ++ format tAddr
     , "Tx hash:  " ++ format theHash
@@ -610,8 +620,9 @@ printTransactionMessage OutputTx{otSigner=tAddr, otBaseTx=baseTx, otHash=theHash
     , "t = " ++ printf "%.5f" (realToFrac deltaT::Double) ++ "s"
     ]
 
-printTransactionMessage OutputTx{otBaseTx=t, otSigner=tAddr, otHash=theHash} (Right results) deltaT cid = do
-    let tNonce = transactionNonce t
+printTransactionMessage ot@OutputTx{otSigner=tAddr, otHash=theHash} (Right results) deltaT cid = do
+    let t = fromMaybe (otBaseTx ot) (otPrivatePayload ot)
+        tNonce = transactionNonce t
         extra =
           if isMessageTX t
           then ""
@@ -636,6 +647,7 @@ indexMaybe (_:rest) i = indexMaybe rest (i-1)
 
 replaceBestIfBetter :: (VMBase m, Bagger.MonadBagger m) => OutputBlock -> m (Bool, M.Map Word256 (Integer, Keccak256), (Keccak256, Integer, Integer))
 replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obReceiptTransactions=txs, obBlockUncles=uncles} = do
+    let txPayloads = (\t -> fromMaybe (otBaseTx t) (otPrivatePayload t)) <$> txs
     bbi <- getContextBestBlockInfo
 
     case bbi of
@@ -655,7 +667,7 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obRe
                             || (newNumber > oldNumber)
                             || ((newNumber == oldNumber) && (td > oldBestDifficulty))
                             || ((newNumber == oldNumber) && (td == oldBestDifficulty) && (newTxCount > oldTxCount))
-            ranPriv = M.fromSet (const (newNumber, bH)) . S.fromList . catMaybes $ map txChainId txs
+            ranPriv = M.fromSet (const (newNumber, bH)) . S.fromList . catMaybes $ map txChainId txPayloads
 
         $logInfoS "replaceBestIfBetter" . T.pack $ "shouldReplace = " ++ show shouldReplace ++ ", newNumber = " ++ show newNumber ++ ", oldBestNumber = " ++ show (blockDataNumber oldBestBlock)
 

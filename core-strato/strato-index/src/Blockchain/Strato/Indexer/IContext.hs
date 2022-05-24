@@ -95,11 +95,11 @@ instance (Word256 `A.Alters` API ChainInfo) IContextM where
 instance (Keccak256 `A.Alters` API OutputBlock) IContextM where
   lookup     _ _          = liftIO . throwIO $ Lookup "API" "Keccak256" "OutputBlock"
   delete     _ _          = liftIO . throwIO $ Delete "API" "Keccak256" "OutputBlock"
-  insert     _ _ (API ob) = void . lift $ putBlocks [(outputBlockToBlock ob, obTotalDifficulty ob)] False
+  insert     _ _ (API ob) = void . lift $ putBlocks [(outputBlockToBlockRetainPayloads ob, obTotalDifficulty ob)] False
   insertMany _            = void
                           . lift
                           . flip putBlocks False
-                          . map ((outputBlockToBlock &&& obTotalDifficulty) . unAPI)
+                          . map ((outputBlockToBlockRetainPayloads &&& obTotalDifficulty) . unAPI)
                           . M.elems
 
 instance (Keccak256 `A.Alters` P2P (Private (Word256, OutputTx))) IContextM where
