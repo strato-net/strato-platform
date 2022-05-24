@@ -1,14 +1,9 @@
 def cleanNode(wipeVault = null) {
-  sh "sudo rm -rf strato-getting-started"
-  unstash 'stratoGettingStarted'
-  dir("strato-getting-started") {
-    if (wipeVault) {
-      sh "sudo ./strato --wipe"
-    } else {
-      sh "sudo ./strato --drop-chains"
-    }
-  }
+  // Cleanup STRATO and volumes
+  sh 'sudo docker rm -f $(sudo docker ps -aq) || true'
+  sh 'sudo docker system prune -f --volumes || true'
 }
+
 
 /*
 rootNodeAddress: null for root node or public address of root node for secondary nodes
@@ -38,10 +33,10 @@ def deployStrato(rootNodeAddress, nodeData) {
         EXT_STORAGE_S3_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} \\
         EXT_STORAGE_S3_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} \\
         OAUTH_ENABLED=true \\
-        OAUTH_DISCOVERY_URL=${nodeData.OAUTH_DISCOVERY_URL} \\
+        OAUTH_DISCOVERY_URL=${nodeData.BEANSTALK.OAUTH_DISCOVERY_URL} \\
         OAUTH_JWT_USERNAME_PROPERTY=preferred_username \\
-        OAUTH_CLIENT_ID=${nodeData.OAUTH_CLIENT_ID} \\
-        OAUTH_CLIENT_SECRET=${nodeData.OAUTH_CLIENT_SECRET} \\
+        OAUTH_CLIENT_ID=${nodeData.BEANSTALK.OAUTH_CLIENT_ID} \\
+        OAUTH_CLIENT_SECRET=${nodeData.BEANSTALK.OAUTH_CLIENT_SECRET} \\
         PASSWORD=123 \\
         networkID=6362114497604426682320467570452839978259656275586344308 \\
         ssl=true \\
@@ -124,9 +119,9 @@ export SERVER_IP='${nodeData.IP}'
 export NODE_LABEL='node${nodeData.NUMBER}'
 export NODE_PUBLIC_KEY='${publicKey}'
 export OAUTH_APP_TOKEN_COOKIE_NAME='${authCookieName}'
-export OAUTH_OPENID_DISCOVERY_URL='${nodeData.OAUTH_DISCOVERY_URL}'
-export OAUTH_CLIENT_ID='${nodeData.OAUTH_CLIENT_ID}'
-export OAUTH_CLIENT_SECRET='${nodeData.OAUTH_CLIENT_SECRET}'
+export OAUTH_OPENID_DISCOVERY_URL='${nodeData.BEANSTALK.OAUTH_DISCOVERY_URL}'
+export OAUTH_CLIENT_ID='${nodeData.BEANSTALK.OAUTH_CLIENT_ID}'
+export OAUTH_CLIENT_SECRET='${nodeData.BEANSTALK.OAUTH_CLIENT_SECRET}'
 export OAUTH_TOKEN_USERNAME_PROPERTY='preferred_username'
 export OAUTH_TOKEN_USERNAME_PROPERTY_SERVICE_FLOW='preferred_username'
 export STRATO_NODE_PROTOCOL='https'
@@ -222,9 +217,9 @@ export SERVER_IP='${nodeData.IP}'
 export NODE_LABEL='node${nodeData.NUMBER}'
 export NODE_PUBLIC_KEY='${publicKey}'
 export OAUTH_APP_TOKEN_COOKIE_NAME='${authCookieName}'
-export OAUTH_OPENID_DISCOVERY_URL='${nodeData.OAUTH_DISCOVERY_URL}'
-export OAUTH_CLIENT_ID='${nodeData.OAUTH_CLIENT_ID}'
-export OAUTH_CLIENT_SECRET='${nodeData.OAUTH_CLIENT_SECRET}'
+export OAUTH_OPENID_DISCOVERY_URL='${nodeData.BEANSTALK.OAUTH_DISCOVERY_URL}'
+export OAUTH_CLIENT_ID='${nodeData.BEANSTALK.OAUTH_CLIENT_ID}'
+export OAUTH_CLIENT_SECRET='${nodeData.BEANSTALK.OAUTH_CLIENT_SECRET}'
 export OAUTH_TOKEN_USERNAME_PROPERTY='preferred_username'
 export OAUTH_TOKEN_USERNAME_PROPERTY_SERVICE_FLOW='preferred_username'
 export STRATO_NODE_PROTOCOL='https'
@@ -280,8 +275,8 @@ docker-compose up -d --build
 
         createBeanstalkUser("${nodeData.HOST}", "${serviceToken}", "${authCookieName}")
 
-        if ("${nodeData.ROLE}" != "") {
-          requestMembership("${serviceToken}", "${nodeData.ROLE}")
+        if ("${nodeData.BEANSTALK.ROLE}" != "") {
+          requestMembership("${serviceToken}", "${nodeData.BEANSTALK.ROLE}")
         }
       }
     }
@@ -290,8 +285,8 @@ docker-compose up -d --build
 
 def getServiceToken(nodeData) {
   script {
-    def b64string = sh(returnStdout: true, script: "python -c \"import base64; print(base64.b64encode('${nodeData.OAUTH_CLIENT_ID}:${nodeData.OAUTH_CLIENT_SECRET}'))\"").trim()
-    def tokenEndpoint = sh(returnStdout: true, script: "curl -s  ${nodeData.OAUTH_DISCOVERY_URL} | jq .token_endpoint | tr -d '\"'").trim()
+    def b64string = sh(returnStdout: true, script: "python -c \"import base64; print(base64.b64encode('${nodeData.BEANSTALK.OAUTH_CLIENT_ID}:${nodeData.BEANSTALK.OAUTH_CLIENT_SECRET}'))\"").trim()
+    def tokenEndpoint = sh(returnStdout: true, script: "curl -s  ${nodeData.BEANSTALK.OAUTH_DISCOVERY_URL} | jq .token_endpoint | tr -d '\"'").trim()
     def serviceToken = sh(
         returnStdout: true,
         script: "curl -s -X POST '${tokenEndpoint}' " +
@@ -357,6 +352,50 @@ def approveAllMemberships() {
       done <<< '''${membershipRequests}'''
     """
   }
+}
+
+def runMonitor() {
+    def runCommand = """#!/bin/bash
+        sudo \\
+        ssl=true \\
+        sslCertFileType=pem \\
+        OAUTH_ENABLED=true \\
+        OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \\
+        OAUTH_CLIENT_ID=dev \\
+        OAUTH_CLIENT_SECRET=d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f \\
+        docker-compose up -d"""
+    writeFile file:"run.sh", text: """${runCommand}"""
+    def initialNodes = """
+        module.exports = [
+          {
+            ip: '54.243.143.176:8080',
+            host: 'engineering.stratoid.blockapps.net:8080',
+            protocol: 'https',
+            internal: true,
+            description: 'devnet-node1',
+            oAuthInfo: {
+              enabled: true,
+              discovery_url: 'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
+              client_id: 'dev',
+              client_secret: 'd5e67b8c-4fbf-42c6-a8d9-29a4dd13575f'
+              //scope: 'optional'
+            }
+          },
+          {
+            ip: '3.81.197.53:8080',
+            host: 'multinode101.ci.blockapps.net:8080/',
+            protocol: 'https',
+            internal: true,
+            description: 'multinode101',
+            oAuthInfo: {
+              enabled: true,
+              discovery_url: 'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
+              client_id: 'dev',
+              client_secret: 'd5e67b8c-4fbf-42c6-a8d9-29a4dd13575f'
+              //scope: 'optional'
+            }
+          }
+        ];"""
 }
 
 return this
