@@ -296,7 +296,7 @@ def createTestChain():
         "members": [
                 {
                     "address": node_addr,
-                    "enode": "enode://{node_pubkey}@{node_ip_addr}30303".format(node_pubkey, node_ip_addr),
+                    "enode": "enode://{}@{}:30303".format(node_pubkey, node_ip_addr),
                 }
             ],
         "src": "pragma solidity ^0.4.24;\n \ncontract AutoApprove { \n event MemberAdded (address member, string enode); \n event MemberRemoved (address member); \n \n function voteToAdd(address m, string e) { \n emit MemberAdded(m,e); \n } \n \n function voteToRemove(address m) { \n emit MemberRemoved(m); \n } \n}",
@@ -318,7 +318,7 @@ def getLatestBlockNumber():
 #   -a, --amount <int> : amount of blocks to generate
 #   -t, --target <int> : target a certain chain length
 #   -k, --kill         : kills the script if still generating blocks
-#   -p, --private      : puts all transactions
+#   -p, --private      : puts all transactions in a private chain
 
 def main():
     CHAIN_ID = None
