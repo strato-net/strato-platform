@@ -342,25 +342,26 @@ def main():
             if currArg in ("-p", "--private"):
                 CHAIN_ID = createTestChain()            
 
-            if currArg in ("-k", "--kill"):
-                active_pid = os.environ["SYNC_SPEED_TEST_SCRIPT_PID"]
-                if active_pid:
-                    os.kill(int(active_pid), signal.SIGKILL)
-                return True
+#            if currArg in ("-k", "--kill"):
+#                active_pid = os.environ["SYNC_SPEED_TEST_SCRIPT_PID"]
+#                if active_pid:
+#                    os.kill(int(active_pid), signal.SIGKILL)
+#                return True
 
     except getopt.error as e:
         print(str(e))
 
     # Necessary for ./syncTest --kill 
-    os.environ["SYNC_SPEED_TEST_SCRIPT_PID"] = str(os.getpid())
-
+    # os.environ["SYNC_SPEED_TEST_SCRIPT_PID"] = str(os.getpid())
+    
     print('Simulating blockchain...')
     testSetup(testChainId=CHAIN_ID)
 
     RESOLVE     = True # True if you want to wait for transactions to resolve and not DDoS it
-    BLOCK_COUNTER = getLatestBlockNumber()
+    BLOCK_COUNTER = 0
 
     while BLOCK_COUNTER <= BLOCK_LIMIT:
+        BLOCK_COUNTER = getLatestBlockNumber()
         new_block = generateTransactionBatch(chainId=CHAIN_ID, batchSize=20)
         POSTtoBlockchain(new_block, resolve=RESOLVE)
         print('Transaction posted... Amount resolved:', len(new_block["txs"]))
