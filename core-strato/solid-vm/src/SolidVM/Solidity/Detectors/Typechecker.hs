@@ -496,6 +496,9 @@ typecheckMember (Static (SVMType.Label "tx") x) "organization" = pure $ Static (
 typecheckMember (Static (SVMType.Label "tx") x) "group" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.Label "block") x) "timestamp" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Label "block") x) "number" = pure $ Static (SVMType.Int Nothing Nothing) x
+typecheckMember (Static (SVMType.Label "block") x) "coinbase" = pure $ Static (SVMType.Account True) x
+typecheckMember (Static (SVMType.Label "block") x) "difficulty" = pure $ Static (SVMType.Int Nothing Nothing) x
+typecheckMember (Static (SVMType.Label "block") x) "gaslimit" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Label "super") x) method = do
   ctract <- asks contract
   cc <- asks codeCollection
