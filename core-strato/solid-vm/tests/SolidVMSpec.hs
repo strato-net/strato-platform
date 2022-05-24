@@ -31,7 +31,7 @@ import Data.Text.Encoding
 import Data.Time.Clock.POSIX
 import HFlags
 import Numeric
-import Test.Hspec (hspec, Spec, describe, it, xit, pendingWith, anyException, shouldThrow, anyErrorCall, Selector)
+import Test.Hspec (hspec, Spec, describe, it, it, xit, pendingWith, anyException, shouldThrow, anyErrorCall, Selector)
 import Test.Hspec.Expectations.Lifted
 import Text.Printf
 import Text.RawString.QQ
@@ -114,6 +114,10 @@ anyMalformedDataError _ = False
 anyTooMuchGasError :: Selector HandledException
 anyTooMuchGasError (HE Blockchain.SolidVM.Exception.TooMuchGas{}) = True
 anyTooMuchGasError _ = False
+
+anyPaymentError :: Selector HandledException
+anyPaymentError (HE Blockchain.SolidVM.Exception.PaymentError{}) = True
+anyPaymentError _ = False
 
 failedRequirementMsg :: String -> Selector HandledException
 failedRequirementMsg str (HE (Require (Just msg))) = str == msg
@@ -3105,19 +3109,21 @@ contract qq {
       , BDefault
       ]
 
-  it "won't transfer when there is not anything to transfer between account" . runTest $ do
+  it "will not transfer when there is not anything to transfer between account" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
 contract qq{
   account a;
+  account payable aPay;
   uint bal;
   constructor() public {
     a = account(this);
+    aPay = payable(a);
   }
   function myTransfer() internal pure
     returns (uint){
-      a.transfer(13);
-      bal = a.balance;
+      aPay.transfer(13);
+      bal = aPay.balance;
       return bal;
     }
 }|]
@@ -3129,6 +3135,135 @@ contract qq{
     void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a) 
     getFields ["bal"] `shouldReturn` [ BInteger 13 ]
 
+  it "will not over send (send when there is not enough gas)" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq{
+  account a;
+  account payable aPay;
+  uint bal;
+  bool success;
+  constructor() public {
+    a = account(this);
+    aPay = payable(a);
+  }
+  function mySend() internal pure
+    returns (uint, bool){
+      success = aPay.send(13);
+      bal = aPay.balance;
+      return (bal, success);
+    }
+}|]
+    -- Get the contract's account
+    [ BAccount a _] <- getFields ["a"]
+    -- Set the balance
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 7 })
+    -- Check return of balance
+    void $ call2 "mySend" "()" (namedAccountToAccount Nothing a) 
+    getFields ["success", "bal"] `shouldReturn` [ BDefault, BInteger 7 ]
+
+  it "will allow for sending to self" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq{
+  account a;
+  account payable aPay;
+  uint bal;
+  bool success;
+  constructor() public {
+    a = account(this);
+    aPay = payable(a);
+  }
+  function mySend() internal pure
+    returns (uint, bool){
+      success = aPay.send(13);
+      bal = aPay.balance;
+      return (bal, success);
+    }
+}|]
+    -- Get the contract's account
+    [ BAccount a _] <- getFields ["a"]
+    -- Set the balance
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 13 })
+    -- Check return of balance
+    void $ call2 "mySend" "()" (namedAccountToAccount Nothing a) 
+    getFields ["success", "bal"] `shouldReturn` [ BBool True, BInteger 13 ]
+
+  it "will not send when there is not anything to send between account" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq{
+  account a;
+  account payable aPay;
+  uint bal;
+  bool success;
+  constructor() public {
+    a = account(this);
+    aPay = payable(a);
+  }
+  function mySend() internal pure
+    returns (uint, bool){
+      success = aPay.send(13);
+      bal = aPay.balance;
+      return (bal, success);
+    }
+}|]
+    -- Get the contract's account
+    [ BAccount a _] <- getFields ["a"]
+    -- Set the balance
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 0 })
+    -- Check return of balance
+    void $ call2 "mySend" "()" (namedAccountToAccount Nothing a) 
+    getFields ["success", "bal"] `shouldReturn` [ BDefault, BDefault ]
+
+  it "cannot send to a non account payable type" $ runTest (do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq{
+  account a;
+  uint bal;
+  bool success;
+  constructor() public {
+    a = account(this);
+  }
+  function mySend() internal pure
+    returns (uint, bool){
+      success = a.send(13);
+      bal = a.balance;
+      return (bal, success);
+    }
+}|]
+    -- Get the contract's account
+    [ BAccount a _] <- getFields ["a"]
+    -- Set the balance
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 26 })
+    -- Check return of balance
+    (void $ call2 "mySend" "()" (namedAccountToAccount Nothing a))) `shouldThrow` anyTypeError 
+
+  it "cannot transfer for non account payable types" $ runTest (do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq{
+  account a;
+  uint bal;
+  bool success;
+  constructor() public {
+    a = account(this);
+  }
+  function myTransfer() internal pure
+    returns (uint, bool){
+      success = a.transfer(13);
+      bal = a.balance;
+      return (bal, success);
+    }
+}|]
+    -- Get the contract's account
+    [ BAccount a _] <- getFields ["a"]
+    -- Set the balance
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 26 })
+    -- Check return of balance
+    (void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a))) `shouldThrow` anyTypeError
+
   it "can handle a three account transfer (only transfer from `this` account into only one account, leaving the third account alone)" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
@@ -3138,23 +3273,29 @@ contract Test {
 pragma solidvm 3.2;
 contract qq{
   account a;
+  account payable aPay;
   account b;
+  account payable bPay;
   account c;
+  account payable cPay;
   uint bala;
   uint balb;
   uint balc;
   constructor() public {
     Test t = new Test();
     a = account(this);
+    aPay = payable(a);
     b = account(0xdeadbeef);
+    bPay = payable(b);
     c = account(t);
+    cPay = payable(c);
   }
   function myTransfer() internal pure
     returns (uint, uint, uint){
-      b.transfer(13);
-      bala = a.balance;
-      balb = b.balance;
-      balc = c.balance;
+      bPay.transfer(13);
+      bala = aPay.balance;
+      balb = bPay.balance;
+      balc = cPay.balance;
       return (bala, balb, balc);
     }
 }|]
@@ -3171,7 +3312,7 @@ contract qq{
         BInteger 26,
         BInteger 13 ]
 
-  it "cannot over transfer from an account." . runTest $ do
+  it "can handle a three account send (only send from `this` account into only one account, leaving the third account alone)" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
 contract Test {
@@ -3180,23 +3321,75 @@ contract Test {
 pragma solidvm 3.2;
 contract qq{
   account a;
+  account payable aPay;
   account b;
+  account payable bPay;
   account c;
+  account payable cPay;
+  uint bala;
+  uint balb;
+  uint balc;
+  bool success;
+  constructor() public {
+    Test t = new Test();
+    a = account(this);
+    aPay = payable(a);
+    b = account(0xdeadbeef);
+    bPay = payable(b);
+    c = account(t);
+    cPay = payable(c);
+  }
+  function mySend() internal pure
+    returns (bool, uint, uint, uint){
+      success = bPay.send(13);
+      bala = aPay.balance;
+      balb = bPay.balance;
+      balc = cPay.balance;
+      return (success, bala, balb, balc);
+    }
+}|]
+    -- Get the contract's accounts
+    [ BAccount a _, BAccount b _, BAccount c _ ] <- getFields ["a", "b", "c"]
+    -- Adjust the preset balances
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 14 })
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs { addressStateBalance = 13 })
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs { addressStateBalance = 13 })
+    -- Check return of balance
+    void $ call2 "mySend" "()" (namedAccountToAccount Nothing a) 
+    getFields ["success", "bala", "balb", "balc"] `shouldReturn` [ BBool True, BInteger 1, BInteger 26, BInteger 13 ]
+
+  it "cannot over transfer from an account." $ runTest (do
+    runBS [r|
+pragma solidvm 3.2;
+contract Test {
+  constructor(){}
+}
+pragma solidvm 3.2;
+contract qq{
+  account a;
+  account payable aPay;
+  account b;
+  account payable bPay;
+  account c;
+  account payable cPay;
   uint bala;
   uint balb;
   uint balc;
   constructor() public {
     Test t = new Test();
     a = account(this);
+    aPay = payable(a);
     b = account(0xdeadbeef);
+    bPay = payable(b);
     c = account(t);
+    cPay = account(c);
   }
   function myTransfer() internal pure
     returns (uint, uint, uint){
-      b.transfer(1300);
-      bala = a.balance;
-      balb = b.balance;
-      balc = c.balance;
+      bPay.transfer(1300);
+      bala = aPay.balance;
+      balb = bPay.balance;
+      balc = cPay.balance;
       return (bala, balb, balc);
     }
 }|]
@@ -3207,13 +3400,9 @@ contract qq{
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs { addressStateBalance = 13 })
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs { addressStateBalance = 13 })
     -- Check return of balance
-    void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a) 
-    getFields ["bala", "balb", "balc"] `shouldReturn` 
-      [ BInteger 14,
-        BInteger 13,
-        BInteger 13 ]
+    (void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a))) `shouldThrow` anyPaymentError
 
-  it "cannot use the transfer function for more than 2300 wei" $ runTest (do 
+  it "cannot over send from an account." . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
 contract Test {
@@ -3222,8 +3411,11 @@ contract Test {
 pragma solidvm 3.2;
 contract qq{
   account a;
+  account payable aPay;
   account b;
+  account payable bPay;
   account c;
+  account payable cPay;
   uint bala;
   uint balb;
   uint balc;
@@ -3231,27 +3423,34 @@ contract qq{
   constructor() public {
     Test t = new Test();
     a = account(this);
+    aPay = payable(a);
     b = account(0xdeadbeef);
+    bPay = payable(b);
     c = account(t);
+    cPay = payable(c);
   }
-  function myTransfer() internal pure
-    returns (uint, uint, uint){     
-      b.transfer(10000); 
-      bala = a.balance;
-      balb = b.balance;
-      balc = c.balance;
+  function mySend() internal pure
+    returns (uint, uint, uint){
+      success = bPay.send(1300);
+      bala = aPay.balance;
+      balb = bPay.balance;
+      balc = cPay.balance;
       return (bala, balb, balc);
     }
 }|]
     -- Get the contract's accounts
     [ BAccount a _, BAccount b _, BAccount c _ ] <- getFields ["a", "b", "c"]
     -- Adjust the preset balances
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 13000 })
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs { addressStateBalance = 13000 })
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs { addressStateBalance = 13000 })
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 14 })
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs { addressStateBalance = 13 })
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs { addressStateBalance = 13 })
     -- Check return of balance
-    (void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a))) `shouldThrow` anyTooMuchGasError
-    -- "hello" `shouldBe` "Hello"
+    void $ call2 "mySend" "()" (namedAccountToAccount Nothing a)
+    getFields [ "success", "bala", "balb", "balc"] `shouldReturn` 
+      [ BDefault,
+        BInteger 14, 
+        BInteger 13,
+        BInteger 13 ]
 
   it "can get the chainId from the account type" . runTest $ do
     runBS [r|
@@ -3372,19 +3571,23 @@ contract qq{
 pragma solidvm 3.2;
 contract qq{
   account a;
+  account payable aPay;
   account b;
+  account payable bPay;
   uint bala;
   uint balb;
   constructor() public {
     a = account(this);
+    aPay = payable(a);
     b = account(0xdeadbeef);
+    bPay = payable(b);
   }
   function myBalance() {
     //from the account address "a" transfer funds to the account address "b"
       //the full balance from account a
-    b.transfer(13);
-    bala = a.balance;
-    balb = b.balance;
+    bPay.transfer(13);
+    bala = aPay.balance;
+    balb = bPay.balance;
   }
 }|]
     -- Get both of the contracts
