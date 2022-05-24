@@ -5,15 +5,22 @@ pipeline {
 
     stages {
         stage('Init') {
-            echo "init"
+            steps {
+                echo "init"
+            }
+
         }
 
         stage('Test') {
-            echo "test"
+            steps {
+                echo "test"
+            }
         }
 
         stage('Record') {
-            echo "record"
+            steps {
+                echo "record"
+            }
         }
 
     }
