@@ -776,6 +776,12 @@ verifySignatureArgs x = Product [stringType' x, stringType' x, stringType' x] x
 getUserCertArgs :: SourceAnnotation Text -> Type'
 getUserCertArgs x = accountType' x
 
+mulmodArgs  :: SourceAnnotation Text -> Type'
+mulmodArgs x = Product [intType' x, intType' x, intType' x] x
+
+addmodArgs  :: SourceAnnotation Text -> Type'
+addmodArgs x = Product [intType' x, intType' x, intType' x] x
+
 payableArgs :: SourceAnnotation Text -> Type'
 payableArgs x = accountType' x
 
@@ -813,6 +819,8 @@ getVarType' "registerCert" ctx =  pure $ Function (registerCertArgs ctx) (accoun
 getVarType' "verifyCert" ctx =  pure $ Function (verifyCertArgs ctx) (boolType' ctx) ctx
 getVarType' "verifySignature" ctx =  pure $ Function (verifySignatureArgs ctx) (boolType' ctx) ctx
 getVarType' "getUserCert" ctx =  pure $ Function (getUserCertArgs ctx) (certType' ctx) ctx
+getVarType' "addmod" ctx =  pure $ Function (addmodArgs ctx) (intType' ctx) ctx
+getVarType' "mulmod" ctx =  pure $ Function (mulmodArgs ctx) (intType' ctx) ctx
 getVarType' "payable" ctx =  pure $ Function (payableArgs ctx) (Static (SVMType.Account True) ctx) ctx
 getVarType' "parseCert" ctx =  pure $ Function (parseCertArgs ctx) (certType' ctx) ctx
 getVarType' "Util" ctx = pure $ Static (SVMType.Label "Util") ctx
