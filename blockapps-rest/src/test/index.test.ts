@@ -396,19 +396,34 @@ describe("history", function() {
     const result = await rest.call(admin, callArgs, options);
     console.log(result);
 
+      
     const contractHistory = await rest.searchUntil(
+      admin,
+      { name: `history@TestHistory` },
+      (r) => r.length > 1,
+      {
+        ...options,
+        query: {
+          address: `eq.${contract.address}`
+        }
+      }
+    );
+    assert.isArray(contractHistory);
+    assert.equal(contractHistory.length, 2);
+
+    const filteredContractHistory = await rest.searchUntil(
       admin,
       { name: `history@TestHistory` },
       (r) => r.length > 0,
       {
         ...options,
         query: {
-          x: `eq.${fst}`,
+          x: `eq.${snd}`,
           address: `eq.${contract.address}`
         }
       }
     );
-    assert.isArray(contractHistory);
-    assert.equal(contractHistory.length, 1);
+    assert.isArray(filteredContractHistory);
+    assert.equal(filteredContractHistory.length, 1);
   });
 });
