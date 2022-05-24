@@ -3890,3 +3890,27 @@ contract qq{
     }
 }|]
     getFields ["index","xr", "yr"] `shouldReturn` [BInteger 7, BInteger 2, BInteger 7 ]
+
+
+  it "can use the builtin addmod function" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq{
+    uint x;
+    constructor() public returns (uint) {
+        x = addmod(8, 2, 3);
+    }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 1]
+
+  it "can use the builtin mulmod function" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq{
+    uint x;
+    constructor() public returns (uint) {
+        x = mulmod(7, 2, 3);
+    }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 2]
+
