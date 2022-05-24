@@ -1,6 +1,6 @@
 pipeline {
     agent {
-        label "multinode-102"
+        label "test-multinode102"
     }
 
     stages {
