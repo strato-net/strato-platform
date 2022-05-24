@@ -177,12 +177,12 @@ pipeline {
                     }
                 }
             }
-
+        }
         stage('Beanstalk Load Test - Deploy SGS boot') {
             // agent { label "test-multinode101" } // is default
             steps { 
                 script {
-                rootNodeAddress = lib.deployStrato(null, NODE_DATA.NODE1) 
+                rootNodeAddress = lib.deployStratoWithApp(null, NODE_DATA.NODE1, 'beanstalk') 
                 }
             }            
         }
@@ -193,7 +193,7 @@ pipeline {
                     agent { label "test-multinode102" }
                     steps {
                         script {
-                            node2Address = lib.deployStrato(rootNodeAddress, NODE_DATA.NODE2)
+                            node2Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE2, 'beanstalk')
                         }
                     }
                 }
@@ -201,7 +201,7 @@ pipeline {
                     agent { label "test-multinode103" }
                     steps {
                         script {
-                            node3Address = lib.deployStrato(rootNodeAddress, NODE_DATA.NODE3)
+                            node3Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE3, 'beanstalk')
                         }
                     }
                 }
@@ -209,7 +209,7 @@ pipeline {
                     agent { label "test-multinode104" }
                     steps {
                         script {
-                            node4Address = lib.deployStrato(rootNodeAddress, NODE_DATA.NODE4)
+                            node4Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE4, 'beanstalk')
                         }
                     }
                 }
@@ -217,7 +217,7 @@ pipeline {
                     agent { label "test-multinode301" }
                     steps {
                         script {
-                            node5Address = lib.deployStrato(rootNodeAddress, NODE_DATA.NODE5)
+                            node5Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE5, 'beanstalk')
                         }
                     }
                 }
@@ -225,7 +225,7 @@ pipeline {
                     agent { label "test-multinode302" }
                     steps {
                         script {
-                            node6Address = lib.deployStrato(rootNodeAddress, NODE_DATA.NODE6)
+                            node6Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE6, 'beanstalk')
                         }
                     }
                 }
@@ -233,7 +233,7 @@ pipeline {
                     agent { label "test-multinode303" }
                     steps {
                         script {
-                            node7Address = lib.deployStrato(rootNodeAddress, NODE_DATA.NODE7)
+                            node7Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE7, 'beanstalk')
                         }
                     }
                 }
@@ -241,7 +241,7 @@ pipeline {
                     agent { label "test-multinode304" }
                     steps {
                         script {
-                            node8Address = lib.deployStrato(rootNodeAddress, NODE_DATA.NODE8)
+                            node8Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE8, 'beanstalk')
                         }
                     }
                 }
@@ -372,6 +372,35 @@ pipeline {
         }
 
         /* Write set up stage to clone monitor repo */
+        stage ('Single Node Sync with Devnet - Clean Node') {
+             // agent { label "multinode101" } // is default
+            steps { 
+                script {
+                    lib.cleanNode()
+                }
+            }
+        }
+
+        stage ('Single Node Sync with Devnet - Deploy Node') {
+            steps {
+                script {
+                    rootNodeAddress = lib.deployStrato(NODE_DATA.NODE1)
+                }
+            }
+        }
+        stage('Single Node Sync with Devnet - Deploy Monitor') {
+            steps {
+                withCredentials([
+                    usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME'),
+                ]) {
+                    script {
+                        sh "rm -rf monitor"
+                        sh "git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/monitor/"
+                        lib.runMonitor()
+                    }
+                }
+            }
+        }
     }
 }
 
