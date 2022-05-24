@@ -134,4 +134,4 @@ main = do
   flip runReaderT optKey $ do
     cert <- makeSignedCert issuer optSubjectInfo
     liftIO $ B.writeFile optOutputName $ certToBytes $ cert
-    liftIO $ putStrLn "Done. Cert was written to " ++ optOutputName
+    liftIO $ putStrLn $ "Done. Cert was written to " ++ optOutputName
