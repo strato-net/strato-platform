@@ -282,6 +282,7 @@ def createTestChain():
     node_details = requests.get(KEY_API, headers=headers).json()
     node_addr = node_details["address"]
     node_pubkey = node_details["pubkey"]
+    node_ip_addr = requests.get('https://api.ipify.org').content.decode('utf8')
 
     CHAIN_CREATION_API = "http://strato:3000/bloc/v2.2/chain"
     payload = {
@@ -295,8 +296,7 @@ def createTestChain():
         "members": [
                 {
                     "address": node_addr,
-                    # TODO: change this to a dynamic IP (grab from OS)
-                    "enode": "enode://" + node_pubkey + "@172.31.25.22:30303",
+                    "enode": "enode://{node_pubkey}@{node_ip_addr}30303".format(node_pubkey, node_ip_addr),
                 }
             ],
         "src": "pragma solidity ^0.4.24;\n \ncontract AutoApprove { \n event MemberAdded (address member, string enode); \n event MemberRemoved (address member); \n \n function voteToAdd(address m, string e) { \n emit MemberAdded(m,e); \n } \n \n function voteToRemove(address m) { \n emit MemberRemoved(m); \n } \n}",

@@ -1,0 +1,20 @@
+pipeline {
+    agent {
+        label "multinode-102"
+    }
+
+    stages {
+        stage('Init') {
+
+        }
+
+        stage('Test') {
+
+        }
+
+        stage('Record') {
+
+        }
+
+    }
+}
