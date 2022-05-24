@@ -399,7 +399,7 @@ describe("history", function() {
     const contractHistory = await rest.searchUntil(
       admin,
       { name: `history@TestHistory` },
-      (r) => r.length > 0,
+      (r) => r.length > 1,
       {
         ...options,
         query: {
@@ -409,6 +409,6 @@ describe("history", function() {
       }
     );
     assert.isArray(contractHistory);
-    assert.equal(contractHistory.length, 1);
+    assert.equal(contractHistory.length, 2);
   });
 });
