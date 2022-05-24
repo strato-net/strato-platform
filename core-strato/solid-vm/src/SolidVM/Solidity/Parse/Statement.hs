@@ -23,7 +23,6 @@ statements = braces $ many statement
 statement :: SolidityParser Statement
 statement = do
   ifStatement
-  <|> uncheckedStatement
   <|> whileStatement
   <|> doWhileStatement
   <|> forStatement
@@ -51,6 +50,7 @@ statement = do
   <|> (reserved "assembly" >> inlineAssembly)
   <|> ((\(a,e) -> SimpleStatement (ExpressionStatement e) a) <$> ((withPosition expression) <* semi))
   <|> revertStatement
+  <|> uncheckedStatement
 
 {-
 Statement = IfStatement | WhileStatement | ForStatement | Block | InlineAssemblyStatement |
@@ -71,10 +71,10 @@ ifStatement = do
 
 uncheckedStatement :: SolidityParser Statement
 uncheckedStatement = do
-  ~(a, (e, s)) <- withPosition $ do
+  ~(a, s) <- withPosition $ do
     reserved "unchecked"
     statements
-  pure $ UncheckedStatement e s a
+  pure $ UncheckedStatement s a
 
 whileStatement :: SolidityParser Statement
 whileStatement = do

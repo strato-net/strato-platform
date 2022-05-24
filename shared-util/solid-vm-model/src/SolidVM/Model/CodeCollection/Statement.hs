@@ -32,7 +32,6 @@ import SolidVM.Model.Type
 
 data StatementF a =
   IfStatement (ExpressionF a) [StatementF a] (Maybe [StatementF a]) a -- if then else
-  | UncheckedStatement (ExpressionF a b c) [StatementF a b c] a b c
   | WhileStatement (ExpressionF a) [StatementF a] a
   | ForStatement (Maybe (SimpleStatementF a)) (Maybe (ExpressionF a)) (Maybe (ExpressionF a)) [StatementF a] a
   | Block a
@@ -45,10 +44,10 @@ data StatementF a =
   | AssemblyStatement InlineAssembly a
   | SimpleStatement (SimpleStatementF a) a
   | RevertStatement (Maybe String) (ArgListF a) a
+  | UncheckedStatement [StatementF a] a
   deriving (Show, Eq, Generic, Functor, ToJSON, FromJSON)
 
 extractStatement :: StatementF a -> a
-extractStatement (UncheckedStatement _ _ a) = a
 extractStatement (IfStatement _ _ _ a) = a
 extractStatement (WhileStatement _ _ a) = a
 extractStatement (ForStatement _ _ _ _ a) = a
@@ -62,6 +61,7 @@ extractStatement (EmitStatement _ _ a) = a
 extractStatement (AssemblyStatement _ a) = a
 extractStatement (SimpleStatement _ a) = a
 extractStatement (RevertStatement _ _ a) = a
+extractStatement (UncheckedStatement _ a) = a
 
 type Statement = Positioned StatementF
 

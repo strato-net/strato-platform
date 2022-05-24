@@ -1036,6 +1036,9 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
         addEvent $ Event org parentName (CC._contractName curCnct) account eventName pairs
         return Nothing
 
+runStatement (CC.UncheckedStatement code pos) = do
+  solidVMBreakpoint pos
+  withUncheckedCallInfo $ runStatements code
 
 runStatement x = unknownStatement "unknown statement in call to runStatement: " (show x)
 

@@ -23,8 +23,10 @@ module Blockchain.SolidVM.SM (
   getCurrentAccount,
   addCallInfo,
   dupCallInfo,
+  uncheckedCallInfo,
   popCallInfo,
   withTempCallInfo,
+  withUncheckedCallInfo,
   getLocal,
   setLocal,
   getCurrentCallInfo,
@@ -106,6 +108,7 @@ data CallInfo = CallInfo
   , collectionHash      :: Keccak256
   , localVariables      :: Map String (SVMType.Type, Variable)
   , readOnly            :: Bool
+  , isUncheckedSection  :: Bool -- TODO: Perform overflow/underflow checks for all arithmetic operations and revert if so, use this flag to disable checks
   , currentSourcePos    :: Maybe SourcePosition
   } deriving (Show)
 
@@ -479,6 +482,7 @@ addCallInfo a c fn hsh cc initialLocalVariables ro = do
           collectionHash=hsh,
           localVariables=initialLocalVariables,
           readOnly=ro,
+          isUncheckedSection=False, -- The rationale here is that unchecked sections only apply to the current stack frame
           currentSourcePos=Nothing
         }
 
@@ -489,6 +493,11 @@ dupCallInfo ro = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
   [] -> internalError "dupCallInfo was called on an already empty stack" ()
   (ci:rest) -> pure $ ci{readOnly=ro}:ci:rest
 
+uncheckedCallInfo :: MonadSM m => m ()
+uncheckedCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
+  [] -> internalError "uncheckedCallInfo was called on an already empty stack" ()
+  (ci:rest) -> pure $ ci{isUncheckedSection=True}:ci:rest
+
 popCallInfo :: MonadSM m => m ()
 popCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
   [] -> internalError "popCallInfo was called on an already empty stack" ()
@@ -497,6 +506,13 @@ popCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
 withTempCallInfo :: MonadSM m => Bool -> m a -> m a
 withTempCallInfo ro f = do
   dupCallInfo ro
+  result <- f
+  popCallInfo
+  pure result
+
+withUncheckedCallInfo :: MonadSM m => m a -> m a
+withUncheckedCallInfo f = do
+  uncheckedCallInfo
   result <- f
   popCallInfo
   pure result
