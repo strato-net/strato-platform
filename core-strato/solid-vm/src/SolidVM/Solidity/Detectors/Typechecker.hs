@@ -523,7 +523,10 @@ typecheckMember (Static e@(SVMType.Enum _ enum mNames) x) n = do
              , enum
              ]) <$ x
 
-typecheckMember (Static (SVMType.Account _) x) "transfer" = pure $ Function (Static (SVMType.Int Nothing Nothing) x) (Product [] x) x
+-- Function: argType, returnType, contextType
+-- Static: argType, ContextType
+typecheckMember (Static (SVMType.Account True ) x) "transfer" = pure $ Function (Static (SVMType.Int Nothing Nothing) x) (Product [] x) x
+typecheckMember (Static (SVMType.Account True ) x) "send" = pure $ Function (Static (SVMType.Int Nothing Nothing) x) (Static (SVMType.Bool) x) x
 typecheckMember (Static (SVMType.Account _) x) "balance" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Account _) x) "code" = pure $ Static (SVMType.Bytes Nothing Nothing) x
 typecheckMember (Static (SVMType.Account _) x) "codehash" = pure $ Static (SVMType.String Nothing) x
@@ -770,6 +773,12 @@ verifySignatureArgs x = Product [stringType' x, stringType' x, stringType' x] x
 getUserCertArgs :: SourceAnnotation Text -> Type'
 getUserCertArgs x = accountType' x
 
+mulmodArgs  :: SourceAnnotation Text -> Type'
+mulmodArgs x = Product [intType' x, intType' x, intType' x] x
+
+addmodArgs  :: SourceAnnotation Text -> Type'
+addmodArgs x = Product [intType' x, intType' x, intType' x] x
+
 payableArgs :: SourceAnnotation Text -> Type'
 payableArgs x = accountType' x
 
@@ -807,6 +816,8 @@ getVarType' "registerCert" ctx =  pure $ Function (registerCertArgs ctx) (accoun
 getVarType' "verifyCert" ctx =  pure $ Function (verifyCertArgs ctx) (boolType' ctx) ctx
 getVarType' "verifySignature" ctx =  pure $ Function (verifySignatureArgs ctx) (boolType' ctx) ctx
 getVarType' "getUserCert" ctx =  pure $ Function (getUserCertArgs ctx) (certType' ctx) ctx
+getVarType' "addmod" ctx =  pure $ Function (addmodArgs ctx) (intType' ctx) ctx
+getVarType' "mulmod" ctx =  pure $ Function (mulmodArgs ctx) (intType' ctx) ctx
 getVarType' "payable" ctx =  pure $ Function (payableArgs ctx) (Static (SVMType.Account True) ctx) ctx
 getVarType' "parseCert" ctx =  pure $ Function (parseCertArgs ctx) (certType' ctx) ctx
 getVarType' "Util" ctx = pure $ Static (SVMType.Label "Util") ctx
@@ -929,6 +940,8 @@ statementHelper (RevertStatement _ (NamedArgs vals) x) =
   reduceType' x <$> traverse (tcExpr . snd) vals
 statementHelper (RevertStatement _ (OrderedArgs vals) x) =
   reduceType' x <$> traverse tcExpr vals
+statementHelper (UncheckedStatement body x) =
+  statementsHelper' x body
 statementHelper (AssemblyStatement _ x) = pure $ topType' x
 statementHelper (SimpleStatement stmt x) = simpleStatementHelper x stmt
 
