@@ -50,6 +50,7 @@ statement = do
   <|> (reserved "assembly" >> inlineAssembly)
   <|> ((\(a,e) -> SimpleStatement (ExpressionStatement e) a) <$> ((withPosition expression) <* semi))
   <|> revertStatement
+  <|> uncheckedStatement
 
 {-
 Statement = IfStatement | WhileStatement | ForStatement | Block | InlineAssemblyStatement |
@@ -67,6 +68,13 @@ ifStatement = do
     elseStatement <- optionMaybe (reserved "else" >> (fmap (:[]) statement <|> statements))
     pure (e,s,elseStatement)
   pure $ IfStatement i t e a
+
+uncheckedStatement :: SolidityParser Statement
+uncheckedStatement = do
+  ~(a, s) <- withPosition $ do
+    reserved "unchecked"
+    statements
+  pure $ UncheckedStatement s a
 
 whileStatement :: SolidityParser Statement
 whileStatement = do
@@ -263,12 +271,6 @@ Expression
   | Expression ('=' | '|=' | '^=' | '&=' | '<<=' | '>>=' | '+=' | '-=' | '*=' | '/=' | '%=') Expression
   | PrimaryExpression
 -}
-
-
-
-
-
-
 
 primaryExpression :: SolidityParser Expression
 primaryExpression = do

@@ -3459,23 +3459,22 @@ contract qq {
   account a1;
   account a2;
   account a3;
+  account a4;
   uint cid1;
   uint cid2;
   uint cid3;
+  uint cid4;
   constructor() public {
     a1 = account(0xdeadbeef, 0xfeedbeef);
     a2 = account(0x123, "main");    
     a3 = account(0x124);
+    a4 = account(0xdeadbeef, "0xdeadbeef");
     cid1 = a1.chainId;
     cid2 = a2.chainId;
     cid3 = a3.chainId;
+    cid4 = a4.chainId;
   }
 }|]
-    getFields ["cid1", "cid2", "cid3"] `shouldReturn`
-      [ BInteger 0xfeedbeef
-      , BDefault
-      , BDefault
-      ]
   it "can get the balance from an address" . runTest $ do
     -- Post contract
     runBS [r|
@@ -3890,3 +3889,45 @@ contract qq{
     }
 }|]
     getFields ["index","xr", "yr"] `shouldReturn` [BInteger 7, BInteger 2, BInteger 7 ]
+
+  it "can use the attributes of the block variable e.g. block.coinbase, block.timestamp, block.number, block.difficulty and block.gaslimit" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq{
+  uint blockNumber;
+  account payable a1;
+  uint timestamp;
+  uint gaslimit;
+  uint diff;
+  constructor() public {
+    blockNumber = block.number;
+    a1 = block.coinbase;
+    timestamp = block.timestamp;
+    gaslimit = block.gaslimit;
+    diff = block.difficulty;
+    return;        
+  }
+}|]
+    getFields ["blockNumber", "a1", "timestamp", "gaslimit", "diff"] `shouldReturn` [BInteger 8033, (BAccount (NamedAccount 0x0 UnspecifiedChain) True), BInteger 16384, BInteger 1000000, BInteger 900]
+
+  it "can use the builtin addmod function" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq{
+    uint x;
+    constructor() public returns (uint) {
+        x = addmod(8, 2, 3);
+    }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 1]
+
+  it "can use the builtin mulmod function" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq{
+    uint x;
+    constructor() public returns (uint) {
+        x = mulmod(7, 2, 3);
+    }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 2]

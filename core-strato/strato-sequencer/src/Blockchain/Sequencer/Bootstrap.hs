@@ -55,6 +55,7 @@ bootstrapSequencer Block{blockBlockData = bd,
                    , otBaseTx = t
                    , otHash   = TX.transactionHash t
                    , otAnchorChain = Public
+                   , otPrivatePayload = Nothing
                    }
   initLevelDB :: CablePackage -> IO ()
   initLevelDB pkg = do

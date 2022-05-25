@@ -116,6 +116,8 @@ statementHelper (RevertStatement _ (OrderedArgs vals) _) =
   concat <$> traverse expressionHelper vals
 statementHelper (RevertStatement _ (NamedArgs vals) _) =
   concat <$> traverse (expressionHelper . snd) vals
+statementHelper (UncheckedStatement body _) =
+  statementsHelper' body
 statementHelper (AssemblyStatement _ x) = asks mutability >>= \case
   Nothing -> pure []
   Just Payable -> pure []
