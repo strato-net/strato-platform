@@ -201,6 +201,8 @@ unparseStatementWith f (RevertStatement customErr (OrderedArgs argList) a) =
 
 unparseStatementWith f (RevertStatement customErr (NamedArgs argList) a) = 
     f a $ "revert " ++ fromMaybe "" customErr ++ "(" ++ (List.intercalate ", " (map (unparseExpression . snd) argList)) ++ ");\n"
+unparseStatementWith f (UncheckedStatement code a) = f a $
+  "unchecked {\n" ++ tab (unlines $ map (unparseStatementWith f) code) ++ "\n}"
 
 -- unparseStatementWith _ x = internalError "missing case in call to unparseStatementWith" $ show x
 
