@@ -13,6 +13,7 @@ import           Data.IORef
 import           Data.Maybe                          (fromMaybe, isNothing)
 import           Data.Time.Clock.POSIX
 import qualified Data.Map                            as M
+import           Data.Maybe                          (isJust)
 import           Data.ByteString.Base16              as B16
 import           Numeric                             (showHex)
 
@@ -166,8 +167,8 @@ feedBackOutputsToInput = map rebox
     where rebox (VmTx ts t) = IETx ts $ unboxTx t
           rebox (VmBlock (OutputBlock origin _ header txs uncles)) = IEBlock $ IngestBlock origin header (unboxBlockTx <$> txs) uncles
           rebox x = error $ "why are we testing against " ++ show x
-          unboxTx (OutputTx origin _ _ _ base) = IngestTx origin base
-          unboxBlockTx (OutputTx _ _ _ _ base) = base
+          unboxTx (OutputTx origin _ _ _ base _) = IngestTx origin base
+          unboxBlockTx (OutputTx _ _ _ _ base _) = base
 
 mkBlk :: Keccak256 -> Integer -> SequencerM Block
 mkBlk parent num = do
@@ -488,8 +489,10 @@ spec = do
         BatchSeqEvent{..} <- runBatch $ checkForUnseq [IETx 0 (IngestTx TO.Morphism hashTx)]
         let txs = [tx | VmTx _ tx <- _toVm]
         map txType txs `shouldBe` [PrivateHash]
+        map (isJust . otPrivatePayload) txs `shouldBe` [False]
         let txs' = [tx | P2pTx tx <- _toP2p]
         map txType txs' `shouldBe` [PrivateHash]
+        map (isJust . otPrivatePayload) txs' `shouldBe` [False]
 
       it "should forward a private transaction hash only once" . runTestM $ do
         th <- fmap Keccak256.hash . liftIO $ getEntropy 32
@@ -499,8 +502,10 @@ spec = do
         BatchSeqEvent{..} <- runBatch $ checkForUnseq [ietx,ietx]
         let txs = [tx | VmTx _ tx <- _toVm]
         map txType txs `shouldBe` [PrivateHash]
+        map (isJust . otPrivatePayload) txs `shouldBe` [False]
         let txs' = [tx | P2pTx tx <- _toP2p]
         map txType txs' `shouldBe` [PrivateHash]
+        map (isJust . otPrivatePayload) txs' `shouldBe` [False]
 
       it "should create a PrivateHashTX for a private transaction" . runTestM $ do
         BatchSeqEvent{..} <- runBatch $ do
@@ -508,8 +513,10 @@ spec = do
           checkForUnseq [IETx 0 (IngestTx TO.API tx1)]
         let txs = [tx | VmTx _ tx <- _toVm]
         map txType txs `shouldBe` [PrivateHash]
+        map (isJust . otPrivatePayload) txs `shouldBe` [False]
         let txs' = [tx | P2pTx tx <- _toP2p]
         map txType txs' `shouldBe` [Message, PrivateHash]
+        map (isJust . otPrivatePayload) txs' `shouldBe` [False, False]
 
       it "should run Blockstanbul with private transactions" . runPBFTTestMWithGenesis $ \h -> do
         let iev = iev1' h
@@ -520,7 +527,7 @@ spec = do
         let bs = [b | P2pBlockstanbul (WireMessage _ (Preprepare _ b)) <- _toP2p]
         map (map txType . blockReceiptTransactions) bs `shouldBe` [[PrivateHash]]
         let obs = [b | VmBlock b <- _toVm]
-        map (map txType . obReceiptTransactions) obs `shouldBe` [[Message]]
+        map (map (fmap txType . otPrivatePayload) . obReceiptTransactions) obs `shouldBe` [[Just Message]]
 
       it "should run Blockstanbul with delayed private transactions" . runPBFTTestMWithGenesis $ \h -> do
         let iev = iev1' h
@@ -533,7 +540,7 @@ spec = do
         map (map txType . blockReceiptTransactions) bs `shouldBe` [[PrivateHash]]
         b2 <- runBatch $ checkForUnseq [IETx 0 (IngestTx TO.Morphism tx1)]
         let obs' = [b | VmBlock b <- _toVm b2]
-        map (map txType . obReceiptTransactions) obs' `shouldBe` [[Message]]
+        map (map (fmap txType . otPrivatePayload) . obReceiptTransactions) obs' `shouldBe` [[Just Message]]
 
       it "should not split up block when all chains are known" . runPBFTTestMWithGenesis $ \h -> do
         let iev = iev2' h
@@ -545,8 +552,8 @@ spec = do
         let bs = [b | P2pBlockstanbul (WireMessage _ (Preprepare _ b)) <- _toP2p]
         map (map txType . blockReceiptTransactions) bs `shouldBe` [[PrivateHash, PrivateHash]]
         let obs = [b | VmBlock b <- _toVm]
-        map (map txType . obReceiptTransactions) obs `shouldBe`
-          [[Message,Message]]
+        map (map (fmap txType . otPrivatePayload) . obReceiptTransactions) obs `shouldBe`
+          [[Just Message, Just Message]]
 
       it "should split up block when chain infos are delayed" . runPBFTTestMWithGenesis $ \h -> do
         let iev = iev2' h
@@ -560,7 +567,9 @@ spec = do
         map (map txType . obReceiptTransactions) obs `shouldBe` [[PrivateHash,PrivateHash]]
         b2 <- runBatch $ checkForUnseq [chainDetails1, chainDetails2]
         let obs' = [b | VmBlock b <- _toVm b2]
-        map (map txType . obReceiptTransactions) obs' `shouldBe` [[Message, PrivateHash],[Message, Message]]
+        map (map txType . obReceiptTransactions) obs' `shouldBe` [[PrivateHash, PrivateHash],[PrivateHash, PrivateHash]]
+        map (map (fmap txType . otPrivatePayload) . obReceiptTransactions) obs' `shouldBe`
+          [[Just Message, Nothing], [Just Message, Just Message]]
 
       it "should split up block when chain infos are staggered" . runPBFTTestMWithGenesis $ \h -> do
         let iev = iev2' h
@@ -572,10 +581,14 @@ spec = do
         map (map txType . obReceiptTransactions) obs `shouldBe` [[PrivateHash,PrivateHash]]
         b2 <- runBatch $ checkForUnseq [chainDetails1]
         let obs' = [b | VmBlock b <- _toVm b2]
-        map (map txType . obReceiptTransactions) obs' `shouldBe` [[Message, PrivateHash]]
+        map (map txType . obReceiptTransactions) obs' `shouldBe` [[PrivateHash, PrivateHash]]
+        map (map (fmap txType . otPrivatePayload) . obReceiptTransactions) obs' `shouldBe`
+          [[Just Message, Nothing]]
         b3 <- runBatch $ checkForUnseq [chainDetails2]
         let obs'' = [b | VmBlock b <- _toVm b3]
-        map (map txType . obReceiptTransactions) obs'' `shouldBe` [[Message, Message]]
+        map (map txType . obReceiptTransactions) obs'' `shouldBe` [[PrivateHash, PrivateHash]]
+        map (map (fmap txType . otPrivatePayload) . obReceiptTransactions) obs'' `shouldBe`
+          [[Just Message, Just Message]]
 
       it "should hydrate child chain transaction when parent chain is known" . runPBFTTestMWithGenesis $ \h -> do
         let iev = iev4' h
@@ -584,7 +597,9 @@ spec = do
         let bs = [b | P2pBlockstanbul (WireMessage _ (Preprepare _ b)) <- _toP2p b1]
         map (map txType . blockReceiptTransactions) bs `shouldBe` [[PrivateHash]]
         let obs = [b | VmBlock b <- _toVm b1]
-        map (map txType . obReceiptTransactions) obs `shouldBe` [[Message]]
+        map (map txType . obReceiptTransactions) obs `shouldBe` [[PrivateHash]]
+        map (map (fmap txType . otPrivatePayload) . obReceiptTransactions) obs `shouldBe`
+          [[Just Message]]
 
       it "should withhold child chain transactions when parent chain is missing" . runPBFTTestMWithGenesis $ \h -> do
         let iev = iev3' h
@@ -599,7 +614,9 @@ spec = do
         map (map txType . obReceiptTransactions) obs' `shouldBe` []
         b3 <- runBatch $ checkForUnseq [chainDetails1]
         let obs'' = [b | VmBlock b <- _toVm b3]
-        map (map txType . obReceiptTransactions) obs'' `shouldBe` [[Message, PrivateHash], [Message, Message]]
+        map (map txType . obReceiptTransactions) obs'' `shouldBe` [[PrivateHash, PrivateHash], [PrivateHash, PrivateHash]]
+        map (map (fmap txType . otPrivatePayload) . obReceiptTransactions) obs'' `shouldBe`
+          [[Just Message, Nothing], [Just Message, Just Message]]
 
       it "should withhold child chain transactions when parent chain is missing even when there are no transactions on the parent chain" . runPBFTTestMWithGenesis $ \h -> do
         let iev = iev4' h
@@ -614,7 +631,9 @@ spec = do
         map (map txType . obReceiptTransactions) obs' `shouldBe` []
         b3 <- runBatch $ checkForUnseq [chainDetails1]
         let obs'' = [b | VmBlock b <- _toVm b3]
-        map (map txType . obReceiptTransactions) obs'' `shouldBe` [[Message]]
+        map (map txType . obReceiptTransactions) obs'' `shouldBe` [[PrivateHash]]
+        map (map (fmap txType . otPrivatePayload) . obReceiptTransactions) obs'' `shouldBe`
+          [[Just Message]]
 
       it "should withhold child chain transactions when parent chain parent chain transactions are missing" . runPBFTTestMWithGenesis $ \h -> do
         let b5' = makeBlockWithTransactions [hashTx1]
@@ -645,7 +664,9 @@ spec = do
         map (map txType . obReceiptTransactions) obs' `shouldBe` [[PrivateHash]]
         b3 <- runBatch $ checkForUnseq [ietx tx1]
         let obs'' = [b | VmBlock b <- _toVm b3]
-        map (map txType . obReceiptTransactions) obs'' `shouldBe` [[Message], [Message]]
+        map (map txType . obReceiptTransactions) obs'' `shouldBe` [[PrivateHash], [PrivateHash]]
+        map (map (fmap txType . otPrivatePayload) . obReceiptTransactions) obs'' `shouldBe`
+          [[Just Message], [Just Message]]
 
       it "should withhold child chain transactions when parent chain parent chain info is missing" . runPBFTTestMWithGenesis $ \h -> do
         let b5' = makeBlockWithTransactions [hashTx1]
@@ -676,7 +697,9 @@ spec = do
         map (map txType . obReceiptTransactions) obs' `shouldBe` [[PrivateHash]]
         b3 <- runBatch $ checkForUnseq [chainDetails1]
         let obs'' = [b | VmBlock b <- _toVm b3]
-        map (map txType . obReceiptTransactions) obs'' `shouldBe` [[Message], [Message]]
+        map (map txType . obReceiptTransactions) obs'' `shouldBe` [[PrivateHash], [PrivateHash]]
+        map (map (fmap txType . otPrivatePayload) . obReceiptTransactions) obs'' `shouldBe`
+          [[Just Message], [Just Message]]
 
       it "should re-run blocks when chain info is delayed" . runPBFTTestMWithGenesis $ \h -> do
         let iev = iev1' h
@@ -693,7 +716,9 @@ spec = do
         txHashes `shouldBe` S.singleton (txHash tx1)
         b3 <- runBatch $ checkForUnseq [ietx tx1]
         let obs'' = [b | VmBlock b <- _toVm b3]
-        map (map txType . obReceiptTransactions) obs'' `shouldBe` [[Message]]
+        map (map txType . obReceiptTransactions) obs'' `shouldBe` [[PrivateHash]]
+        map (map (fmap txType . otPrivatePayload) . obReceiptTransactions) obs'' `shouldBe`
+          [[Just Message]]
 
       it "should emit chain info when creation block has already been emitted" . runPBFTTestMWithGenesis $ \h -> do
         let cInfo' = getChainInfo "emittable"
