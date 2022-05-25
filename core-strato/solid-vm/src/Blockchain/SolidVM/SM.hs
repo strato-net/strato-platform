@@ -23,13 +23,16 @@ module Blockchain.SolidVM.SM (
   getCurrentAccount,
   addCallInfo,
   dupCallInfo,
+  uncheckedCallInfo,
   popCallInfo,
   withTempCallInfo,
+  withUncheckedCallInfo,
   getLocal,
   setLocal,
   getCurrentCallInfo,
   getCurrentCallInfoIfExists,
   getCurrentContract,
+  getCurrentChainId,
   getCurrentFunctionName,
   getCurrentCodeCollection,
   getEnv,
@@ -106,6 +109,7 @@ data CallInfo = CallInfo
   , collectionHash      :: Keccak256
   , localVariables      :: Map String (SVMType.Type, Variable)
   , readOnly            :: Bool
+  , isUncheckedSection  :: Bool -- TODO: Perform overflow/underflow checks for all arithmetic operations and revert if so, use this flag to disable checks
   , currentSourcePos    :: Maybe SourcePosition
   } deriving (Show)
 
@@ -369,7 +373,7 @@ getVariableOfName name = do
 
       maybeBuiltinFunction :: Maybe Variable
       maybeBuiltinFunction = toMaybe (name `elem` ["address", "account", "uint", "int", "bool", "byte", "bytes"
-                                                  , "string", "keccak256"
+                                                  , "string", "keccak256", "payable"
                                                   , "require", "revert", "assert", "sha3"
                                                   , "sha256", "ecrecover", "addmod", "mulmod"
                                                   , "selfdestruct", "suicide", "bytes32ToString"
@@ -410,7 +414,7 @@ getVariableOfName name = do
         else Nothing
 
       maybeThis :: Maybe Variable
-      maybeThis = toMaybe (name == "this") . t "this" . Constant . SAccount . accountOnUnspecifiedChain $ currentAccount currentCallInfo
+      maybeThis = toMaybe (name == "this") . t "this" . Constant . (flip (SAccount . accountOnUnspecifiedChain) False) $ currentAccount currentCallInfo
 
 
 
@@ -479,6 +483,7 @@ addCallInfo a c fn hsh cc initialLocalVariables ro = do
           collectionHash=hsh,
           localVariables=initialLocalVariables,
           readOnly=ro,
+          isUncheckedSection=False, -- The rationale here is that unchecked sections only apply to the current stack frame
           currentSourcePos=Nothing
         }
 
@@ -489,6 +494,11 @@ dupCallInfo ro = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
   [] -> internalError "dupCallInfo was called on an already empty stack" ()
   (ci:rest) -> pure $ ci{readOnly=ro}:ci:rest
 
+uncheckedCallInfo :: MonadSM m => m ()
+uncheckedCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
+  [] -> internalError "uncheckedCallInfo was called on an already empty stack" ()
+  (ci:rest) -> pure $ ci{isUncheckedSection=True}:ci:rest
+
 popCallInfo :: MonadSM m => m ()
 popCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
   [] -> internalError "popCallInfo was called on an already empty stack" ()
@@ -497,6 +507,13 @@ popCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
 withTempCallInfo :: MonadSM m => Bool -> m a -> m a
 withTempCallInfo ro f = do
   dupCallInfo ro
+  result <- f
+  popCallInfo
+  pure result
+
+withUncheckedCallInfo :: MonadSM m => m a -> m a
+withUncheckedCallInfo f = do
+  uncheckedCallInfo
   result <- f
   popCallInfo
   pure result
@@ -524,6 +541,13 @@ getCurrentAccount = do
   case cs of
     (currentCallInfo:_) -> return $ currentAccount currentCallInfo
     _ -> internalError "getCurrentAccount called with an empty stack" ()
+
+getCurrentChainId :: MonadSM m => m (Maybe Word256)
+getCurrentChainId = do
+  cs <- Mod.get (Mod.Proxy @[CallInfo])
+  case cs of
+    (currentCallInfo:_) -> return $ _accountChainId $ currentAccount currentCallInfo
+    _ -> internalError "getCurrentChainId called with an empty stack" ()
 
 
 getCurrentFunctionName :: MonadSM m => m String
@@ -561,8 +585,8 @@ getCurrentCodeCollection = do
 
 hintFromType :: MonadSM m => SVMType.Type -> m BasicType
 hintFromType = \case
- SVMType.Address{} -> return TAccount
- SVMType.Account{} -> return TAccount
+ SVMType.Address _-> return TAccount
+ SVMType.Account _-> return TAccount
  SVMType.Bool{} -> return TBool
  SVMType.Bytes{} -> return TString
  SVMType.Int{} -> return TInteger

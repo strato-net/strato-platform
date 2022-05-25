@@ -51,6 +51,12 @@ statementHelper (Return mExpr _) =
 statementHelper (Throw _) = []
 statementHelper (EmitStatement _ vals _) =
   concatMap (expressionHelper . snd) vals
+statementHelper (RevertStatement _ (OrderedArgs vals) _) =
+  concatMap expressionHelper vals
+statementHelper (RevertStatement _ (NamedArgs vals) _) =
+  concatMap (expressionHelper . snd) vals
+statementHelper (UncheckedStatement body _) =
+  concat $ statementHelper <$> body
 statementHelper (AssemblyStatement _ _) = []
 statementHelper (SimpleStatement stmt _) = simpleStatementHelper stmt
 

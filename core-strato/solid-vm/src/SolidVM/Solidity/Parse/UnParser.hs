@@ -98,8 +98,8 @@ unparseVarType (SVMType.Int Nothing (Just n)) = "uint" <> show (8*n)
 unparseVarType (SVMType.Int Nothing Nothing) = "uint"
 unparseVarType (SVMType.Bool) = "bool"
 unparseVarType (SVMType.String _) = "string"
-unparseVarType (SVMType.Address) = "address"
-unparseVarType (SVMType.Account) = "account"
+unparseVarType (SVMType.Address _) = "address"
+unparseVarType (SVMType.Account _) = "account"
 unparseVarType (SVMType.Bytes (Just True) _ ) = "bytes"
 unparseVarType (SVMType.Bytes Nothing (Just bytes) ) = "bytes" <> (show bytes)
 unparseVarType (SVMType.Label str) = str
@@ -195,6 +195,14 @@ unparseStatementWith f (EmitStatement eventName extups a) =
     expVals = map (unparseExpression . snd) extups
   in
     f a $ "emit " ++ eventName ++ "(" ++ (List.intercalate ", " expVals) ++ ");"
+
+unparseStatementWith f (RevertStatement customErr (OrderedArgs argList) a) = 
+    f a $ "revert " ++ fromMaybe "" customErr ++ "(" ++ (List.intercalate ", " (map unparseExpression argList)) ++ ");\n"
+
+unparseStatementWith f (RevertStatement customErr (NamedArgs argList) a) = 
+    f a $ "revert " ++ fromMaybe "" customErr ++ "(" ++ (List.intercalate ", " (map (unparseExpression . snd) argList)) ++ ");\n"
+unparseStatementWith f (UncheckedStatement code a) = f a $
+  "unchecked {\n" ++ tab (unlines $ map (unparseStatementWith f) code) ++ "\n}"
 
 -- unparseStatementWith _ x = internalError "missing case in call to unparseStatementWith" $ show x
 

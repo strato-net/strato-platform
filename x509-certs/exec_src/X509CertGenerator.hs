@@ -44,6 +44,7 @@ data Options = Options
   { optIssuerCert    :: Maybe X509Certificate
   , optSubjectInfo   :: Subject
   , optKey           :: PrivateKey
+  , optOutputName    :: String
   } deriving Show
 
 defaultOptions :: Options
@@ -51,6 +52,7 @@ defaultOptions = Options
   { optIssuerCert  = Nothing
   , optSubjectInfo = throw $ userError "Give me a subject JSON file"
   , optKey         = throw $ userError "Give me a private key PEM file"
+  , optOutputName  = "OutputCert.pem" 
   }
 
 options :: [OptDescr (Options -> IO Options)]
@@ -86,6 +88,13 @@ options =
             Right pkey -> return opts{optKey = pkey}
        ) "SecKey")
     "The .pem filepath of the private key with which to sign the certificate"
+  , Option ['o'] ["output"]
+      (OptArg
+       (\mOut opts -> case mOut of 
+           Nothing -> return opts
+           Just fileName -> return opts{optOutputName = fileName}
+       ) "OutputName")
+   "The .pem filepath to write the created cert to. If not provided, this will be written to ./outputCert.pem"
   ]
 
 helpMessage :: String
@@ -128,5 +137,5 @@ main = do
   -- generate and write cert
   flip runReaderT optKey $ do
     cert <- makeSignedCert optIssuerCert issuer optSubjectInfo
-    liftIO $ B.writeFile "outputCert.pem" $ certToBytes $ cert
-    liftIO $ putStrLn "Done. Cert was written to outputCert.pem"
+    liftIO $ B.writeFile optOutputName $ certToBytes $ cert
+    liftIO $ putStrLn $ "Done. Cert was written to " ++ optOutputName

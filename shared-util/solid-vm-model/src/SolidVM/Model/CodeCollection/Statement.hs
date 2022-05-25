@@ -43,6 +43,8 @@ data StatementF a =
   | EmitStatement String [(Maybe String, (ExpressionF a))] a
   | AssemblyStatement InlineAssembly a
   | SimpleStatement (SimpleStatementF a) a
+  | RevertStatement (Maybe String) (ArgListF a) a
+  | UncheckedStatement [StatementF a] a
   deriving (Show, Eq, Generic, Functor, ToJSON, FromJSON)
 
 extractStatement :: StatementF a -> a
@@ -58,6 +60,8 @@ extractStatement (Throw a) = a
 extractStatement (EmitStatement _ _ a) = a
 extractStatement (AssemblyStatement _ a) = a
 extractStatement (SimpleStatement _ a) = a
+extractStatement (RevertStatement _ _ a) = a
+extractStatement (UncheckedStatement _ a) = a
 
 type Statement = Positioned StatementF
 

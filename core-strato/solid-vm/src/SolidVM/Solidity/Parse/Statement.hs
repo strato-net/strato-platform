@@ -49,13 +49,13 @@ statement = do
   <|> (Break <$> (position (reserved "break") <* semi))
   <|> (reserved "assembly" >> inlineAssembly)
   <|> ((\(a,e) -> SimpleStatement (ExpressionStatement e) a) <$> ((withPosition expression) <* semi))
-
-
+  <|> revertStatement
+  <|> uncheckedStatement
 
 {-
 Statement = IfStatement | WhileStatement | ForStatement | Block | InlineAssemblyStatement |
             ( DoWhileStatement | PlaceholderStatement | Continue | Break | Return |
-              Throw | EmitStatement | SimpleStatement ) ';'
+              Throw | EmitStatement | RevertStatement | SimpleStatement ) ';'
 -}
 
 
@@ -68,6 +68,13 @@ ifStatement = do
     elseStatement <- optionMaybe (reserved "else" >> (fmap (:[]) statement <|> statements))
     pure (e,s,elseStatement)
   pure $ IfStatement i t e a
+
+uncheckedStatement :: SolidityParser Statement
+uncheckedStatement = do
+  ~(a, s) <- withPosition $ do
+    reserved "unchecked"
+    statements
+  pure $ UncheckedStatement s a
 
 whileStatement :: SolidityParser Statement
 whileStatement = do
@@ -104,7 +111,24 @@ forStatement = do
     pure (v1, v2, v3, s)
   pure $ ForStatement v1 v2 v3 s a
 
-
+-- revert("foo") <|> revert({x: y, q: z})
+revertStatement :: SolidityParser Statement
+revertStatement = try $ do
+  ~(a, (i, e)) <- withPosition $ do
+    reserved "revert"
+    i <- optionMaybe identifier
+    e <- parens $ choice 
+      [
+        fmap NamedArgs . braces $ commaSep $ do
+          fieldName <- identifier
+          void colon -- lol
+          fieldExpr <- expression
+          return (fieldName, fieldExpr)
+        , OrderedArgs <$> commaSep expression
+      ]
+    pure (i, e)
+  _ <- semi
+  pure $ RevertStatement i e a  
 
 --ForStatement = 'for' '(' (SimpleStatement)? ';' (Expression)? ';' (ExpressionStatement)? ')' Statement
 
@@ -127,7 +151,7 @@ variableDefinitionStatement = do
       [ reserved "var" >> fmap (:[]) (varDefEntry (return Nothing))
       , reserved "var" >> parens (commaSep1 $ option BlankEntry $ varDefEntry (return Nothing))
       , (:[]) <$> varDefEntry (Just <$> simpleTypeExpression)
-      , parens (commaSep1 $ varDefEntry (Just <$> simpleTypeExpression))
+      , parens (commaSep1 $ option BlankEntry $ varDefEntry (Just <$> simpleTypeExpression))
       ]
   VariableDefinition vardefs <$> optionMaybe (reservedOp "=" >> expression)
 
@@ -248,12 +272,6 @@ Expression
   | PrimaryExpression
 -}
 
-
-
-
-
-
-
 primaryExpression :: SolidityParser Expression
 primaryExpression = do
   let res' a b = withPosition $ b <$ reserved a
@@ -261,6 +279,7 @@ primaryExpression = do
   (uncurry Variable <$> res "msg")
     <|> (uncurry Variable <$> res "address")
     <|> (uncurry Variable <$> res "account")
+    <|> (uncurry Variable <$> res "payable")
     <|> (uncurry Variable <$> res "bool")
     <|> (uncurry Variable <$> res "this")
     <|> (uncurry Variable <$> res "block")

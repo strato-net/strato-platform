@@ -75,7 +75,7 @@ fromBasic = \case
   MS.BInteger i -> SInteger i
   MS.BString s -> SString . BC.unpack $ s
   MS.BBool b -> SBool b
-  MS.BAccount a -> SAccount a
+  MS.BAccount a b -> SAccount a b
   MS.BContract n a -> SContract (T.unpack n) a
   MS.BEnumVal k v num -> SEnumVal (T.unpack k) (T.unpack v) num
   MS.BMappingSentinel -> SMappingSentinel
@@ -86,7 +86,7 @@ findDefault = \case
   TInteger -> SInteger 0
   TString -> SString ""
   TBool -> SBool False
-  TAccount -> SAccount $ unspecifiedChain 0x0
+  TAccount -> (SAccount $ unspecifiedChain 0x0) False
   TContract n -> SContract n $ unspecifiedChain 0x0
   TEnumVal n -> SEnumVal n (todo "findDefault/enumval" n) 0x0
   TStruct n fs -> todo "findDefault/struct" (n, fs)
@@ -98,7 +98,7 @@ toBasic = \case
   SInteger i -> MS.BInteger i
   SString s -> MS.BString (BC.pack s)
   SBool b -> MS.BBool b
-  SAccount a -> MS.BAccount a
+  SAccount a b -> MS.BAccount a b
   SContract n a -> MS.BContract (T.pack n) a
   SEnumVal k t num -> MS.BEnumVal (T.pack k) (T.pack t) num
   SMappingSentinel -> MS.BMappingSentinel
@@ -142,10 +142,14 @@ setVal (STuple dstVector) (STuple srcVector) =
   if V.length dstVector /= V.length srcVector
   then typeError "you are trying to set the value of a tuple to another tuple of the wrong length:\n" (show dstVector ++ "\n" ++ show srcVector)
   else do
-    forM_ (V.zip dstVector srcVector) $ \(dstItem, srcItemVar) -> do
+    let zipped = V.zip dstVector srcVector
+    --We get the values first so in the case of (x,y) = (y,x) we can still set the variables to the correct values
+    zipped' <- forM zipped $ \(dstItem, srcItemVar) -> do
       srcItemVal <- getVar srcItemVar
+      return (dstItem, srcItemVal)
+    forM_ zipped' $ \(dstItem, srcItemVal) -> do
       setVar dstItem srcItemVal
-    
+   
 setVal dst@(SReference addressedPath@(AccountPath addr path)) src = do
   ro <- readOnly <$> getCurrentCallInfo
   when ro $ invalidWrite "Invalid write during read-only access" $ "src: " ++ show src ++ ", dst: " ++ show dst
@@ -162,6 +166,9 @@ setVal dst@(SReference addressedPath@(AccountPath addr path)) src = do
   contract <- getCurrentContract
   let svm3_0 = CC._vmVersion contract == "svm3.0" || CC._vmVersion contract == "svm3.2"
   putSolidStorageKeyVal' svm3_0 addr path basicSrc
+
+
+setVal (SNULL) _ = return ()
 
 
 setVal dst src = typeError "unknown case called in setVal:" ("src = " ++ show src ++ ", dst = " ++ show dst)
@@ -343,7 +350,7 @@ showSM (SString v) = return v
 showSM (SBool v) = return $ show v
 showSM (SEnumVal enumName valName num) = return
     $ printf "%s.%s (= %x)" enumName valName num
-showSM (SAccount a) = return $ show a
+showSM (SAccount a _) = return $ show a
 showSM (STuple v) = do
   vals <- mapM getVar (V.toList v)
   strings <- forM vals showSM

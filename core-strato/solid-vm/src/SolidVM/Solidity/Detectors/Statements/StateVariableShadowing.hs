@@ -44,6 +44,9 @@ statementHelper _ (Break _) = []
 statementHelper _ (Return _ _) = []
 statementHelper _ (Throw _) = []
 statementHelper _ (EmitStatement _ _ _) = []
+statementHelper _ (RevertStatement _ _ _) = []
+statementHelper vars (UncheckedStatement body _) =
+  concat $ statementHelper vars <$> body
 statementHelper _ (AssemblyStatement _ _) = []
 statementHelper vars (SimpleStatement stmt _) = simpleStatementHelper vars stmt
 
