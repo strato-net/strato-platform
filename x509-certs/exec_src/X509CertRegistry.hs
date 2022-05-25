@@ -168,6 +168,8 @@ contract CertificateRegistry {
     mapping(account => uint) certificatesMap;
     
     constructor(string rootCert) {
+        require(account(this, "self").chainId == 0, "You must post this contract on the main chain!");
+
         // Register the root certificate
         account newAccount = registerCert(rootCert);
         
