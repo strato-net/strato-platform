@@ -69,7 +69,6 @@ parseSourceWithAnnotations = withAnnotations . parseSource
 compileSourceNoInheritance :: Map T.Text T.Text -> Either ParseTypeCheckOrSolidVMError CodeCollection
 compileSourceNoInheritance initCodeMap = do
   let getNamedContracts sourceUnits structsOrEnumsMap = do
---        sourceUnits <- parseSource fileName src
         let pragmas = \case
               Pragma _ n v -> Just (n, v)
               _ -> Nothing

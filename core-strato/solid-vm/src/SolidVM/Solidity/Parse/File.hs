@@ -19,7 +19,6 @@ import           Data.SemVer
 import qualified Data.Text                             as T
 import           GHC.Generics
 import           Text.Parsec
---import           Data.Map                              as Map
 
 
 import           SolidVM.Solidity.Parse.Declarations
@@ -27,7 +26,6 @@ import           SolidVM.Solidity.Parse.Imports
 import           SolidVM.Solidity.Parse.Lexer
 import           SolidVM.Solidity.Parse.ParserTypes
 import           SolidVM.Solidity.Parse.Pragmas
---import           SolidVM.Solidity.Xabi (XabiF (..))
 
 
 newtype File = File {
