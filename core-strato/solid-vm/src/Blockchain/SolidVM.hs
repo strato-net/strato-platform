@@ -919,12 +919,16 @@ runStatement (CC.WhileStatement condition code pos) = do
 
       -- TODO: this can loop infinitely
 
-runStatement (CC.DoWhileStatement code condition pos) = do
+runStatement x@(CC.DoWhileStatement code condition pos) = do
   solidVMBreakpoint pos
-  doWhile (getBool =<< expToVar condition) $ do
-      onTraced $ withSrcPos pos $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
-      result <- runStatements code
-      return result
+  cntrct <- getCurrentContract
+  if ( (CC._vmVersion cntrct) /= "svm3.2") then 
+    unknownStatement "unknown statement in call to runStatement: " (show x)
+  else do
+    doWhile (getBool =<< expToVar condition) $ do
+        onTraced $ withSrcPos pos $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
+        result <- runStatements code
+        return result
 
       -- TODO: this can loop infinitely
 
