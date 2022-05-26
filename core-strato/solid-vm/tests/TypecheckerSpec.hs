@@ -641,3 +641,21 @@ contract qq {
 
 }|]
     in length anns `shouldBe` 1
+  it "can typecheck account(this, \"self\").chainId" $
+    let anns = runTypechecker [r|
+pragma solidvm 3.2;
+contract qq {
+  uint a1;
+  uint a2;
+  uint a3;
+  uint a4;
+  uint a5;
+  constructor() public {
+    a1 = account(0xdeadbeef, 0xfeedbeef).chainId;
+    a2 = account(0x123, "main").chainId;
+    a3 = account(0x124, "self").chainId;
+    a4 = account(0x125).chainId;
+    a5 = account(this, "self").chainId;
+  }
+}|]
+    in length anns `shouldBe` 0
