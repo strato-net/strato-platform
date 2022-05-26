@@ -68,7 +68,7 @@ parseSourceWithAnnotations = withAnnotations . parseSource
 
 compileSourceNoInheritance :: Map T.Text T.Text -> Either ParseTypeCheckOrSolidVMError CodeCollection
 compileSourceNoInheritance initCodeMap = do
-  let getNamedContracts sourceUnits structsOrEnumsMap = do
+  let getNamedContracts sourceUnits structsOrEnumsMap constantsMap = do
         let pragmas = \case
               Pragma _ n v -> Just (n, v)
               _ -> Nothing
@@ -76,7 +76,7 @@ compileSourceNoInheritance initCodeMap = do
         fmap catMaybes . for sourceUnits $ \case
           NamedXabi name ((Xabi funcs constrs vars consts types mods evs kind using ctx), parents') -> do
             ctrct <- first SVMEx
-                   $ xabiToContract (T.unpack name) (map T.unpack parents') vmVersion' (Xabi funcs constrs vars consts (M.union types structsOrEnumsMap) mods evs kind using ctx)
+                   $ xabiToContract (T.unpack name) (map T.unpack parents') vmVersion' (Xabi funcs constrs vars (M.union consts constantsMap) (M.union types structsOrEnumsMap) mods evs kind using ctx)
             pure $ Just (T.unpack name, ctrct)
           _ -> pure Nothing
       throwDuplicate (cName, contract) m = case M.lookup cName m of
@@ -87,7 +87,8 @@ compileSourceNoInheritance initCodeMap = do
   sUnits <-  mapM (uncurry parseSource) (M.toList initCodeMap)
   let sUnits' = concat sUnits
   let flsoeMap = M.fromList $ catMaybes $ map (\x -> case x of FileLevelSructOrEnum y -> Just y; _ -> Nothing) sUnits'
-  allContracts <- (getNamedContracts sUnits' flsoeMap)
+  let flconstMap = M.fromList $ catMaybes $ map (\x -> case x of FileLevelConstant y -> Just y; _ -> Nothing) sUnits'
+  allContracts <- (getNamedContracts sUnits' flsoeMap flconstMap)
   deduplicatedContracts <- foldrM throwDuplicate M.empty allContracts
   pure $ CodeCollection {
     _contracts = deduplicatedContracts

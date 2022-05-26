@@ -3972,3 +3972,13 @@ contract qq {
     return p.x;
   }
 }|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 1)
+
+  it "can declare constants at the file level" . runTest $ do
+    runCall "a" "()" [r|
+pragma solidvm 3.2;
+uint constant X = 1;
+contract qq {
+  function a() public returns (uint) {
+    return X;
+  }
+}|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 1)
