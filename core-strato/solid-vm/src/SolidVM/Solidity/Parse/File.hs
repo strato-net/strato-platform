@@ -19,6 +19,7 @@ import           Data.SemVer
 import qualified Data.Text                             as T
 import           GHC.Generics
 import           Text.Parsec
+--import           Data.Map                              as Map
 
 
 import           SolidVM.Solidity.Parse.Declarations
@@ -26,22 +27,24 @@ import           SolidVM.Solidity.Parse.Imports
 import           SolidVM.Solidity.Parse.Lexer
 import           SolidVM.Solidity.Parse.ParserTypes
 import           SolidVM.Solidity.Parse.Pragmas
+--import           SolidVM.Solidity.Xabi (XabiF (..))
 
 
 newtype File = File {
   unsourceUnits :: [SourceUnit]
 } deriving (Show, Generic)
 
+
 solidityFile :: SolidityParser File
 solidityFile = do
   whiteSpace
-  units <- many (solidityPragma <|> solidityImport <|> solidityContract)
+  units <- many (solidityPragma <|> solidityImport <|> solidityContract <|> structOrEnum)
   eof
   return . File $ units
 
 
 decideVersion :: File -> SolcVersion
-decideVersion = maximum . (ZeroPointFour:) . mapMaybe go . unsourceUnits
+decideVersion = maximum . (ZeroPointFour:) . Data.Maybe.mapMaybe go . unsourceUnits
   where go :: SourceUnit -> Maybe SolcVersion
         go (Pragma _ pragmaName rest) = do
           guard $ pragmaName == "solidity"
