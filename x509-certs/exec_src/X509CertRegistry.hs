@@ -126,7 +126,8 @@ optionsToTX priv cert nonce =
         rr
         s
         (Just v)
-        (Just $ M.fromList $ [("VM", "SolidVM"), ("name", "CertificateRegistry"), ("args", T.pack $ "(" <> show (certToBytes cert) <> ")")])
+        (Just $ M.fromList $ [("VM", "SolidVM"), ("name", "CertificateRegistry"), 
+            ("history", "Certificate"), ("args", T.pack $ "(" <> show (certToBytes cert) <> ")")])
 
 
 certificateRegistryContract :: T.Text
