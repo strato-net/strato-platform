@@ -36,6 +36,7 @@ unparseSourceUnit :: SourceUnit -> String
 unparseSourceUnit (Pragma _ ident contents) = "pragma " ++ ident ++ " " ++ contents ++ ";\n"
 unparseSourceUnit (Import _ path) = "import \"" ++ Text.unpack path ++ "\";\n"
 unparseSourceUnit (FileLevelSructOrEnum x) = unparseTypes x
+unparseSourceUnit (FileLevelConstant x) = unparseConstant x
 unparseSourceUnit (NamedXabi name (contract,inherited)) =
      (case xabiKind contract of
         ContractKind -> "contract "
