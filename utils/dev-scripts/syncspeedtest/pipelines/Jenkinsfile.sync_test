@@ -7,9 +7,8 @@ pipeline {
         stage('Init') {
             steps {
                 script {
-                    lib = load("${env.WORKSPACE}/pipelines/Jenkinsfile.sync_library")
-                    NODE_DATA = load("${env.WORKSPACE}/pipelines/Jenkinsfile.sync_config")
-                    deployStrato(NODE_DATA.NODE2)
+                    lib = load("~/strato-platform/pipelines/Jenkinsfile.sync_library")
+                    NODE_DATA = load("~/strato-platform/Jenkinsfile.sync_config")
                 }
             }
         }
@@ -17,6 +16,8 @@ pipeline {
         stage('Test') {
             steps {
                 echo "test"
+                deployStrato(NODE_DATA.NODE2)
+
                 // begin running data extraction script(s)
             }
         }
