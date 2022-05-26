@@ -16,8 +16,8 @@ pipeline {
         stage('Test') {
             steps {
                 echo "test"
-                deployStrato(NODE_DATA.NODE2)
-
+                lib.deployStrato(NODE_DATA.NODE2)
+                echo "end"
                 // begin running data extraction script(s)
             }
         }
