@@ -7,8 +7,8 @@ pipeline {
         stage('Init') {
             steps {
                 script {
-                    lib = load("~/strato-platform/pipelines/Jenkinsfile.sync_library")
-                    NODE_DATA = load("~/strato-platform/Jenkinsfile.sync_config")
+                    lib = load("${env.WORKSPACE}/Jenkinsfile.sync_library")
+                    NODE_DATA = load("${env.WORKSPACE}/Jenkinsfile.sync_config")
                 }
             }
         }
