@@ -1,0 +1,88 @@
+pipeline {
+    agent {
+        label "test-multinode102"
+    }
+
+    stages {
+        stage('Init') {
+            steps {
+                script {
+                    lib = load("${env.WORKSPACE}/pipelines/Jenkinsfile.sync_library")
+                    NODE_DATA = load("${env.WORKSPACE}/pipelines/Jenkinsfile.sync_config")
+                    deployStrato(NODE_DATA.NODE2)
+                }
+            }
+        }
+
+        stage('Test') {
+            steps {
+                echo "test"
+                // begin running data extraction script(s)
+            }
+        }
+    }
+}
+
+def runAppBackendTestContainer(nodeData) {
+  script {
+    def publicKey = sh(
+        returnStdout: true,
+        script: "sudo docker exec strato_strato_1 bash -c \"curl -s GET http://vault-wrapper:8000/strato/v2.3/key -H \\\"X-USER-UNIQUE-NAME: user1@blockapps.net\\\" | python3 -c \\\"import sys, json; print(json.load(sys.stdin)['pubkey'])\\\"\""
+    ).trim()
+    echo "publicKey from strato-gs run script: ${publicKey}"
+    sh 'rm -f run-backendtest.sh'
+
+    //sh 'echo "members: []" > server/config/boot_members.yaml' // for potential future use 
+
+    sh 'sudo docker-compose build backend'
+
+    writeFile file: "run-backendtest.sh", text: """#!/bin/bash
+set -e
+export IS_BOOTNODE='true'
+export API_DEBUG='false'
+export SERVER_HOST='https://${nodeData.HOST}'
+export SERVER_IP='${nodeData.IP}'
+export NODE_LABEL='node${nodeData.NUMBER}'
+export NODE_PUBLIC_KEY='${publicKey}'
+export OAUTH_OPENID_DISCOVERY_URL='${nodeData.OAUTH_DISCOVERY_URL}'
+export OAUTH_CLIENT_ID='${nodeData.OAUTH_CLIENT_ID}'
+export OAUTH_CLIENT_SECRET='${nodeData.OAUTH_CLIENT_SECRET}'
+export STRATO_NODE_HOST='${nodeData.HOST}:8080'
+export STRATO_LOCAL_IP='172.17.0.1'
+sed -i '/restart:/d' docker-compose.yml
+    """
+
+    cleanupTestContainers()
+    sh 'sudo bash run-backendtest.sh'
+    waitForHealthyBackendTestContainer()
+  }
+}
+
+def cleanupTestContainers() {
+  sh "sudo docker-compose -p ${dcProjectName} down -v -t 0  --remove-orphans"
+}
+
+def waitForHealthyBackendTestContainer() {
+  script {
+    echo "Waiting for the upbring backend test container to become healthy..."
+    for (int i = 0; i < 100; i++) {
+      if (sh(returnStdout: true, script: "sudo docker-compose -p ${dcProjectName} --log-level ERROR ps | grep '(healthy)' | wc -l").trim() == "1") {
+        saveTestContainerLogsToArtifacts()
+        return true
+      } else {
+        sh "sudo docker logs --tail=10 ${dcProjectName}_backend_1"
+        sleep 2
+      }
+    }
+    saveTestContainerLogsToArtifacts()
+    error ("Failed to get upbring backend test container healthy")
+  }
+}
+
+def saveTestContainerLogsToArtifacts() {
+  def dapp_logs_dir = "${env.NODE_NAME}__dapp_test_docker_logs"
+  sh "rm -rf ${dapp_logs_dir} && mkdir -p ${dapp_logs_dir}"
+  sh "bash -c 'sudo docker ps > ${dapp_logs_dir}/docker_ps.log 2>&1' || true"
+  sh "bash -c 'sudo docker logs ${dcProjectName}_backend_1 > ${dapp_logs_dir}/${dcProjectName}_backend_1.log 2>&1' || true"
+  archiveArtifacts artifacts: "${dapp_logs_dir}/**", fingerprint: true
+}
