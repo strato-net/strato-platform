@@ -11,7 +11,7 @@ def cleanNode(wipeVault = null) {
 
 def deployStrato(nodeData) {
   echo "Wiping STRATO"
-  cleanNode()
+  // cleanNode()
 
   echo "Downloading repos"
   sh "sudo rm -rf strato-getting-started"
