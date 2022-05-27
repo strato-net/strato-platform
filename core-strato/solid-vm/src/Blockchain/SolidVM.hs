@@ -1735,7 +1735,7 @@ evaluateAccountMember a _ "balance" = do
 evaluateAccountMember a _ "chainId" = do 
   contract' <- getCurrentContract
   if CC._vmVersion contract' /= "svm3.2"
-    then typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ (show (val, name)))
+    then typeError "illegal member access: svm3.2 required to use .chainId member" ("parsed as " ++ (show (a, "chainId")))
     else case (a ^. namedAccountChainId) of
             UnspecifiedChain -> do 
               curCid <- view accountChainId <$> getCurrentAccount
