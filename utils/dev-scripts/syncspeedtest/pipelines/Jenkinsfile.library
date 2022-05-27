@@ -42,7 +42,7 @@ def deployStrato(nodeData) {
 
       echo "Deploying STRATO"
       writeFile file:"run.sh", text: """${runCommand}"""
-      sh "chmod +x run.sh"
+      sh "chmod +x ./run.sh"
       sh "sudo ./run.sh"
 
     sh "until curl --silent localhost:8080; do sleep 1; done"
