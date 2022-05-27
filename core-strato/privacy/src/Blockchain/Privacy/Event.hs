@@ -415,8 +415,11 @@ hydratePrivateHashes chainF b = do
                                 , " but still sending transaction to the VM,"
                                 , " where it will fail."
                                 ]
-                          let ptx' = ptx{otAnchorChain = AnchoredPrivate cId}
-                          return (ptx', st)
+                          let tx' = tx{ otAnchorChain = AnchoredPrivate cId
+                                      , otSigner = otSigner ptx
+                                      , otPrivatePayload = Just $ otBaseTx ptx
+                                      }
+                          return (tx', st)
 
   -- we have to filter out lingering transactions that weren't initially discluded,
   -- but were discluded by a subsequent missing transcation

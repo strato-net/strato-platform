@@ -104,8 +104,6 @@ import qualified Data.Text.Encoding                   as DT
 
 import qualified SolidVM.Model.CodeCollection         as CC
 
-import           Numeric  (showHex)
-
 import qualified SolidVM.Model.Storable as MS
 import qualified SolidVM.Model.Type as SVMType
 import           SolidVM.Model.Value
@@ -925,12 +923,16 @@ runStatement (CC.WhileStatement condition code pos) = do
 
       -- TODO: this can loop infinitely
 
-runStatement (CC.DoWhileStatement code condition pos) = do
+runStatement x@(CC.DoWhileStatement code condition pos) = do
   solidVMBreakpoint pos
-  doWhile (getBool =<< expToVar condition) $ do
-      onTraced $ withSrcPos pos $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
-      result <- runStatements code
-      return result
+  cntrct <- getCurrentContract
+  if ( (CC._vmVersion cntrct) /= "svm3.2") then 
+    unknownStatement "unknown statement in call to runStatement: " (show x)
+  else do
+    doWhile (getBool =<< expToVar condition) $ do
+        onTraced $ withSrcPos pos $ C.red "^^^^^^^^^^^^^^^^^^^^ loopy! "
+        result <- runStatements code
+        return result
 
       -- TODO: this can loop infinitely
 
@@ -1040,6 +1042,9 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
         addEvent $ Event org parentName (CC._contractName curCnct) account eventName pairs
         return Nothing
 
+runStatement (CC.UncheckedStatement code pos) = do
+  solidVMBreakpoint pos
+  withUncheckedCallInfo $ runStatements code
 
 runStatement x = unknownStatement "unknown statement in call to runStatement: " (show x)
 
@@ -1284,6 +1289,12 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
 
       (SBuiltinVariable "block", "number") -> (Constant . SInteger . blockDataNumber . Env.blockHeader) <$> getEnv
 
+      (SBuiltinVariable "block", "coinbase") -> (Constant . ((flip SAccount) True) . (accountToNamedAccount chainId) . ((flip Account) Nothing) . blockDataCoinbase . Env.blockHeader) <$> getEnv
+
+      (SBuiltinVariable "block", "difficulty") -> (Constant . SInteger . blockDataDifficulty . Env.blockHeader) <$> getEnv
+
+      (SBuiltinVariable "block", "gaslimit") -> (Constant . SInteger . blockDataGasLimit . Env.blockHeader) <$> getEnv
+
       (SBuiltinVariable "super", method) -> do
         ctract <- getCurrentContract
         (_, cc) <- getCurrentCodeCollection
@@ -1357,18 +1368,17 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
         
       (SAccount a _, "chainId") -> do
         contract' <- getCurrentContract
-        case CC._vmVersion contract' == "svm3.2" of
-          True ->
-            case (a ^. namedAccountChainId) of
-              UnspecifiedChain -> do 
-                cid2 <- view accountChainId <$> getCurrentAccount
-                case cid2 of
-                  Nothing -> return $ Constant $ SInteger 0 
-                  Just cid3 -> return $ Constant $ intBuiltin $ flip (:) [] $ SString $ B.foldr showHex "" $ word256ToBytes cid3
-              MainChain ->  return $ Constant $ SInteger 0 
-              ExplicitChain cid -> return $ Constant $ intBuiltin $ flip (:) [] $ SString $ B.foldr showHex "" $ word256ToBytes cid
-          False ->
-            typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ (show (val, name)))
+        if CC._vmVersion contract' /= "svm3.2" then do
+          typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ (show (val, name)))
+        else do
+          case (a ^. namedAccountChainId) of
+            UnspecifiedChain -> do 
+              curCid <- view accountChainId <$> getCurrentAccount
+              case curCid of
+                Nothing -> return $ Constant $ SInteger 0 
+                Just cid -> return $ Constant $ SInteger $ fromIntegral cid
+            MainChain ->  return $ Constant $ SInteger 0 
+            ExplicitChain cid -> return $ Constant $ SInteger $ fromIntegral cid
       (SAccount addr _, itemName) -> do --return $ Constant $ SContractItem addr itemName
         from <- getCurrentAccount
         let address = namedAccountToAccount (from ^. accountChainId) addr
@@ -1842,6 +1852,8 @@ callBuiltin "account" [(SAccount a _), SString ('0':'x':xs)] _ = return . ((flip
     hexChar ch = fromMaybe (invalidArguments "illegal character in chainId hexstring" [ch]) $ elemIndex ch "0123456789ABCDEF"
     base16ToIntegral = foldl' (\n c -> 16*n + (hexChar $ CHAR.toUpper c)) 0 
 callBuiltin "account" [(SAccount _ _) , SString b] _ = invalidArguments "the chainId string must be a hexString beggining with \"0x\" " b
+callBuiltin "addmod" [SInteger a, SInteger b, SInteger c] _ = return . SInteger $ (a + b) `mod` c
+callBuiltin "mulmod" [SInteger a, SInteger b, SInteger c] _ = return . SInteger $ (a * b) `mod` c
 callBuiltin "account" vs _ = typeError "account cast" vs
 callBuiltin "bool" [SBool b] _ = return $ SBool b
 callBuiltin "bool" [SString "true"] _ = return $ SBool True

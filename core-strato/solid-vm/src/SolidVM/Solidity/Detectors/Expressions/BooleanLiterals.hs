@@ -56,6 +56,8 @@ statementHelper (RevertStatement _ (OrderedArgs vals) _) =
   concatMap expressionHelper vals
 statementHelper (RevertStatement _ (NamedArgs vals) _) =
   concatMap (expressionHelper . snd) vals
+statementHelper (UncheckedStatement body _) =
+  concat $ statementHelper <$> body
 
 
 statementHelper (AssemblyStatement _ _) = []

@@ -9,6 +9,7 @@ module Blockchain.Verifier (
 
 import           Control.Monad
 import qualified Control.Monad.Change.Alter                  as A
+import           Data.Maybe                                  (fromMaybe)
 
 import           Blockchain.Constants
 import           Blockchain.Data.AddressStateDB
@@ -126,6 +127,7 @@ checkValidity isHomestead parentBSum b = do
 -}
 
 isNonceValid :: (Account `A.Alters` AddressState) f => OutputTx -> f Bool
-isNonceValid OutputTx{otBaseTx=base, otSigner=txAddr} =
-  let tNonce = transactionNonce base
+isNonceValid ot@OutputTx{otSigner=txAddr} =
+  let base = fromMaybe (otBaseTx ot) (otPrivatePayload ot)
+      tNonce = transactionNonce base
    in (== tNonce) . addressStateNonce <$> A.lookupWithDefault A.Proxy (Account txAddr (txChainId base))

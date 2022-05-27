@@ -27,6 +27,7 @@ import Data.Coerce
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Text as T
+import Data.Char
 import Data.Text.Encoding
 import Data.Time.Clock.POSIX
 import HFlags
@@ -3494,23 +3495,22 @@ contract qq {
   account a1;
   account a2;
   account a3;
+  account a4;
   uint cid1;
   uint cid2;
   uint cid3;
+  uint cid4;
   constructor() public {
     a1 = account(0xdeadbeef, 0xfeedbeef);
     a2 = account(0x123, "main");    
     a3 = account(0x124);
+    a4 = account(0xdeadbeef, "0xdeadbeef");
     cid1 = a1.chainId;
     cid2 = a2.chainId;
     cid3 = a3.chainId;
+    cid4 = a4.chainId;
   }
 }|]
-    getFields ["cid1", "cid2", "cid3"] `shouldReturn`
-      [ BInteger 0xfeedbeef
-      , BDefault
-      , BDefault
-      ]
   it "can get the balance from an address" . runTest $ do
     -- Post contract
     runBS [r|
@@ -3857,6 +3857,66 @@ contract qq {
     }
 }|])) `shouldThrow` anyMalformedDataError
 
+  it "verifyCert succeeds with a chained cert" . runTest $ do
+    let cert = T.pack $ filter (\c -> not (isSpace c) || c == ' ') [r|-----BEGIN CERTIFICATE-----\nMIIBgzCCASegAwIBAgIQ
+JN1cZoLJ4yhjGrEHRxzPNDAMBggqhkjOPQQDAgUAMEMx\nDjAMBgNVBAMMBUNOT25lMREwDwYDVQQKDAhDTk9uZU9yZzEQMA4GA1UECwwHT25l\nVW5pdDE
+MMAoGA1UEBgwDVVNBMB4XDTIyMDUxMDE5MTcwMloXDTIzMDUxMDE5MTcw\nMlowQzEOMAwGA1UEAwwFQ05Ud28xETAPBgNVBAoMCENOVHdvT3JnMRAwDgYD
+VQQL\nDAdUd29Vbml0MQwwCgYDVQQGDANVU0EwVjAQBgcqhkjOPQIBBgUrgQQACgNCAATk\niocODuRYeg5AZT80BwIAdH+ScbFdsUG9xhjOfG82c4TeuCM
+soUslu4JsvL6MfaV8\nU7l8Lw0M6yiTGb0DPveZMAwGCCqGSM49BAMCBQADSAAwRQIhAKr7MLKSXJ1bOpGO\nfbLV+n+dzQjd2gQXXqP0OMIIDjuGAiBaea
+dbSMOTJRYIJ4PV9C0oyyk/Xrvv4/R/\nEyun8du+BQ==\n-----END CERTIFICATE-----\n-----BEGIN CERTIFICATE-----\nMIIBiTCCAS2gAwIBA
+gIRAN7G0Wzu8Z4GkKgUUNkz4kEwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdp
+bmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDUxMDE5MTY1OVoXDTIzMDUx\nMDE5MTY1OVowQzEOMAwGA1UEAwwFQ05PbmUxETAPBgNVBAoMCENOT25lT
+3JnMRAw\nDgYDVQQLDAdPbmVVbml0MQwwCgYDVQQGDANVU0EwVjAQBgcqhkjOPQIBBgUrgQQA\nCgNCAARaBoYAP4TNHMD7Nkgs8PNHMMmJRF9Nhhn89iPH
+bppw4AooeNfoeQ1SVWAn\nQ3/Wh4w9hGFeba0MaBm3pVtLWJ/zMAwGCCqGSM49BAMCBQADSAAwRQIhAPmPkkFv\n5nGnvprxgxOqW9xQiuCdTzBSTGELvlz
+we2CIAiBFjj1qyTywdRej7fSOfG9il421\ndB2DWeHbCK7C6S6PvQ==\n-----END CERTIFICATE-----\n-----BEGIN CERTIFICATE-----\nMIIBjT
+CCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQ
+LDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBA
+oMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6c
+DeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf
+2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----|]
+        contract = T.unpack $ T.replace "$CERT" cert [r|
+pragma solidvm 3.2;
+contract qq {
+    bool isValid = false;
+    constructor() {
+      string cert = "$CERT";
+      string pubkey = "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEUhJR4x+wZiX+xZK2m/pwN40cvCS0UA7Z\n0DB7sny5ZnNLw43JgKz0URDY2yYOPkhoIApxFK9UU3Bc4BRANDWmdQ==\n-----END PUBLIC KEY-----";
+      isValid = verifyCert(cert, pubkey);
+    }
+}|] 
+    runBS contract
+    getFields ["isValid"] `shouldReturn` [ BBool True ]
+
+  it "verifyCert fails with a chained cert and the wrong public key" . runTest $ do
+    let cert = T.pack $ filter (\c -> not (isSpace c) || c == ' ') [r|-----BEGIN CERTIFICATE-----\nMIIBgzCCASegAwIBAgIQ
+JN1cZoLJ4yhjGrEHRxzPNDAMBggqhkjOPQQDAgUAMEMx\nDjAMBgNVBAMMBUNOT25lMREwDwYDVQQKDAhDTk9uZU9yZzEQMA4GA1UECwwHT25l\nVW5pdDE
+MMAoGA1UEBgwDVVNBMB4XDTIyMDUxMDE5MTcwMloXDTIzMDUxMDE5MTcw\nMlowQzEOMAwGA1UEAwwFQ05Ud28xETAPBgNVBAoMCENOVHdvT3JnMRAwDgYD
+VQQL\nDAdUd29Vbml0MQwwCgYDVQQGDANVU0EwVjAQBgcqhkjOPQIBBgUrgQQACgNCAATk\niocODuRYeg5AZT80BwIAdH+ScbFdsUG9xhjOfG82c4TeuCM
+soUslu4JsvL6MfaV8\nU7l8Lw0M6yiTGb0DPveZMAwGCCqGSM49BAMCBQADSAAwRQIhAKr7MLKSXJ1bOpGO\nfbLV+n+dzQjd2gQXXqP0OMIIDjuGAiBaea
+dbSMOTJRYIJ4PV9C0oyyk/Xrvv4/R/\nEyun8du+BQ==\n-----END CERTIFICATE-----\n-----BEGIN CERTIFICATE-----\nMIIBiTCCAS2gAwIBA
+gIRAN7G0Wzu8Z4GkKgUUNkz4kEwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdp
+bmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDUxMDE5MTY1OVoXDTIzMDUx\nMDE5MTY1OVowQzEOMAwGA1UEAwwFQ05PbmUxETAPBgNVBAoMCENOT25lT
+3JnMRAw\nDgYDVQQLDAdPbmVVbml0MQwwCgYDVQQGDANVU0EwVjAQBgcqhkjOPQIBBgUrgQQA\nCgNCAARaBoYAP4TNHMD7Nkgs8PNHMMmJRF9Nhhn89iPH
+bppw4AooeNfoeQ1SVWAn\nQ3/Wh4w9hGFeba0MaBm3pVtLWJ/zMAwGCCqGSM49BAMCBQADSAAwRQIhAPmPkkFv\n5nGnvprxgxOqW9xQiuCdTzBSTGELvlz
+we2CIAiBFjj1qyTywdRej7fSOfG9il421\ndB2DWeHbCK7C6S6PvQ==\n-----END CERTIFICATE-----\n-----BEGIN CERTIFICATE-----\nMIIBjT
+CCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQ
+LDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBA
+oMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6c
+DeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf
+2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----|]
+        contract = T.unpack $ T.replace "$CERT" cert [r|
+pragma solidvm 3.2;
+contract qq {
+    bool isValid = false;
+    constructor() {
+      string cert = "$CERT";
+      string pubkey = "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEAlGfMOmhI+AjQlfxve8YoEXhZErFdkCx\nc8OkTB1TP6giwof4fWG+Fua8b2W0YjOQkrQojwnKbBDt3CQeqU+bPA==\n-----END PUBLIC KEY-----";
+      isValid = verifyCert(cert, pubkey);
+    }
+}|] 
+    runBS contract
+    getFields ["isValid"] `shouldReturn` [ BDefault ]
+
   it "can call builtin function verifySignature" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
@@ -3934,3 +3994,96 @@ contract qq{
     }
 }|]
     getFields ["index","xr", "yr"] `shouldReturn` [BInteger 7, BInteger 2, BInteger 7 ]
+
+  it "can use the attributes of the block variable e.g. block.coinbase, block.timestamp, block.number, block.difficulty and block.gaslimit" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq{
+  uint blockNumber;
+  account payable a1;
+  uint timestamp;
+  uint gaslimit;
+  uint diff;
+  constructor() public {
+    blockNumber = block.number;
+    a1 = block.coinbase;
+    timestamp = block.timestamp;
+    gaslimit = block.gaslimit;
+    diff = block.difficulty;
+    return;        
+  }
+}|]
+    getFields ["blockNumber", "a1", "timestamp", "gaslimit", "diff"] `shouldReturn` [BInteger 8033, (BAccount (NamedAccount 0x0 UnspecifiedChain) True), BInteger 16384, BInteger 1000000, BInteger 900]
+
+  it "can use the builtin addmod function" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq{
+    uint x;
+    constructor() public returns (uint) {
+        x = addmod(8, 2, 3);
+    }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 1]
+
+  it "can use the builtin mulmod function" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq{
+    uint x;
+    constructor() public returns (uint) {
+        x = mulmod(7, 2, 3);
+    }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 2]
+
+
+  it "can declare enums at the file level" . runTest $ do
+    runCall "a" "()" [r|
+pragma solidvm 3.2;
+enum Color { red, green, blue }
+contract A {
+    function value() public returns (uint) {
+        return 0xa;
+    }
+}
+
+enum Letter { a, b, c }
+contract B {
+    function value() public returns (uint) {
+        return 0xb;
+    }
+}
+contract qq {
+  function a() public returns (Letter) {
+    return Letter.c;
+  }
+}
+
+|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 2)
+
+  it "can declare structs at the file level" . runTest $ do
+    runCall "a" "()" [r|
+pragma solidvm 3.2;
+struct Point {
+  uint x;
+  uint y;
+}
+contract qq {
+  function a() public returns (uint) {
+    Point p;
+    p.x = 1;
+    p.y = 2;
+    return p.x;
+  }
+}|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 1)
+
+  it "can declare constants at the file level" . runTest $ do
+    runCall "a" "()" [r|
+pragma solidvm 3.2;
+uint constant X = 1;
+contract qq {
+  function a() public returns (uint) {
+    return X;
+  }
+}|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 1)

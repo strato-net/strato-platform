@@ -35,6 +35,8 @@ unparse (File units) = List.concat $ List.map unparseSourceUnit units
 unparseSourceUnit :: SourceUnit -> String
 unparseSourceUnit (Pragma _ ident contents) = "pragma " ++ ident ++ " " ++ contents ++ ";\n"
 unparseSourceUnit (Import _ path) = "import \"" ++ Text.unpack path ++ "\";\n"
+unparseSourceUnit (FileLevelSructOrEnum x) = unparseTypes x
+unparseSourceUnit (FileLevelConstant x) = unparseConstant x
 unparseSourceUnit (NamedXabi name (contract,inherited)) =
      (case xabiKind contract of
         ContractKind -> "contract "
@@ -201,6 +203,8 @@ unparseStatementWith f (RevertStatement customErr (OrderedArgs argList) a) =
 
 unparseStatementWith f (RevertStatement customErr (NamedArgs argList) a) = 
     f a $ "revert " ++ fromMaybe "" customErr ++ "(" ++ (List.intercalate ", " (map (unparseExpression . snd) argList)) ++ ");\n"
+unparseStatementWith f (UncheckedStatement code a) = f a $
+  "unchecked {\n" ++ tab (unlines $ map (unparseStatementWith f) code) ++ "\n}"
 
 -- unparseStatementWith _ x = internalError "missing case in call to unparseStatementWith" $ show x
 
