@@ -445,7 +445,7 @@ setCreator creator contract cntrct blockNumber = do
       hasSvm3_2 = CC._vmVersion cntrct == "svm3.2"
   when hasSvm3_2 $ do
     liftIO $ putStrLn $ "setCreator/address ---> Setting creatorAddress to: " ++ show creator 
-    putSolidStorageKeyVal' hasSvm3_2 contract (MS.StoragePath [MS.Field ":creatorAddress"]) (MS.BAccount $ accountToNamedAccount' creator)
+    putSolidStorageKeyVal' hasSvm3_2 contract (MS.StoragePath [MS.Field ":creatorAddress"]) (MS.BAccount (accountToNamedAccount' creator) False)
   let putCreatorField org = do
         liftIO $ putStrLn $ "setCreator/versioning ---> setting the org as " ++ (show org)
         putSolidStorageKeyVal' (hasSvm3_0 || hasSvm3_2) contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack org)
@@ -1917,7 +1917,7 @@ callBuiltin rc'@("registerCert") [SString cert] _ = do
         Account{..} -> do
           mCreatorAddress <- getSolidStorageKeyVal' curAccount $ MS.StoragePath [MS.Field ":creatorAddress"]
           case mCreatorAddress of
-            (MS.BAccount creatorAccount) -> do
+            (MS.BAccount creatorAccount _) -> do
               onTraced $ liftIO $ putStrLn $ "    Creator Address: " <> (show $ _namedAccountAddress creatorAccount)
               onTraced $ liftIO $ putStrLn $ "    Root Address: " <> (show rootAddress)
               if ((_namedAccountAddress creatorAccount) /= rootAddress) then invalidWrite "Only a function in a contract posted by the BlockApps Root Address may call registerCert" creatorAccount
@@ -1938,9 +1938,9 @@ callBuiltin rc'@("registerCert") [SString cert] _ = do
                               format subjectAddress ++ " as Common Name:" ++ show (subCommonName subject) ++ "; Organization: " ++ show (subOrg subject)
                             x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
                             Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.insert subjectAddress x509Cert x509s
-                            return $ SAccount (NamedAccount subjectAddress UnspecifiedChain)
+                            return $ SAccount (NamedAccount subjectAddress UnspecifiedChain) False
             typ -> internalError "creatorAddress field has not been set or is not an account type" typ
-callBuiltin "getUserCert" [SAccount a] _ = do
+callBuiltin "getUserCert" [SAccount a _] _ = do
   x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
   maybeCertLevelDB <- x509CertDBGet $ _namedAccountAddress a
   let maybeCertBlockDB = M.lookup (_namedAccountAddress a) x509s
