@@ -15,10 +15,12 @@ pipeline {
 
         stage('Test') {
             steps {
-                echo "test"
-                lib.deployStrato(NODE_DATA.NODE2)
-                echo "end"
+              script {
+                  echo "test"
+                  lib.deployStrato(NODE_DATA.NODE2)
+                  echo "end"
                 // begin running data extraction script(s)
+              }
             }
         }
     }
