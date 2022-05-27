@@ -16,7 +16,6 @@ def deployStrato(nodeData) {
   echo "Downloading repos"
   sh "sudo rm -rf strato-getting-started"
   sh "sudo git clone https://github.com/blockapps/strato-getting-started.git"
-  sh "sudo git clone -b STRATO-2528-sync-speed-testing https://github.com/blockapps/strato-platform.git" // need to remove -b branch when merged to develop
   dir("strato-getting-started") {
     def runCommand
       if (nodeData.NETWORK_ID) {
