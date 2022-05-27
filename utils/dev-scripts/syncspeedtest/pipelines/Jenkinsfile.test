@@ -8,7 +8,7 @@ pipeline {
             steps {
                 script {
                     lib = load("${env.WORKSPACE}/utils/dev-scripts/syncspeedtest/pipelines/Jenkinsfile.library")
-                    NODE_DATA = load("${env.WORKSPACE}/utils/dev-scripts/syncspeedtest/pipelines/Jenkinsfile.config")
+                    NODE_DATA = load("${env.WORKSPACE}/utils/dev-scripts/syncspeedtest/pipelines/Jenkinsfile.config").NODE_DATA
                 }
             }
         }
