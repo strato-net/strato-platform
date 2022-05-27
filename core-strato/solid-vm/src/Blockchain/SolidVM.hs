@@ -1297,9 +1297,9 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
             addr <- accountOnUnspecifiedChain <$> getCurrentAccount
             return $ Constant $ SContractFunction (Just $ CC._contractName $ last ps) addr method
   
-      (SAccount a _, name) -> evaluateAccountMember a False name
-      (SContractItem a _, name) -> evaluateAccountMember a False name
-      (SContract _ a, name) -> evaluateAccountMember a True name
+      (SAccount a _, memberName) -> evaluateAccountMember a False memberName
+      (SContractItem a _, memberName) -> evaluateAccountMember a False memberName
+      (SContract _ a, memberName) -> evaluateAccountMember a True memberName
       (r@(SReference _), "push") -> return $ Constant $ SPush r Nothing
         {-
         contract' <- getCurrentContract
@@ -1735,7 +1735,7 @@ evaluateAccountMember a _ "balance" = do
 evaluateAccountMember a _ "chainId" = do 
   contract' <- getCurrentContract
   if CC._vmVersion contract' /= "svm3.2"
-    then typeError "illegal member access: svm3.2 required to use .chainId member" ("parsed as " ++ (show (a, "chainId")))
+    then typeError "illegal member access: svm3.2 required to use .chainId member" ("parsed as " ++ show a ++ ".chainId")
     else case (a ^. namedAccountChainId) of
             UnspecifiedChain -> do 
               curCid <- view accountChainId <$> getCurrentAccount
