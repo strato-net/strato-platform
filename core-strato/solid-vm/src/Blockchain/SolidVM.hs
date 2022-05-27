@@ -1707,14 +1707,14 @@ evaluateAccountMember a _ "code" = do
   codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) realAccount
   resolvedCodeHash <- resolveCodePtr cid codeHash'
   let ch' = case resolvedCodeHash of
-      Just (SolidVMCode _ ch1') -> ch1' 
-      Just cp -> missingCodeCollection "Account is not a SolidVM contract" (format cp)
-      Nothing -> missingCodeCollection "Could not resolve code pointer for account" (format realAccount)
+              Just (SolidVMCode _ ch1') -> ch1' 
+              Just cp -> missingCodeCollection "Account is not a SolidVM contract" (format cp)
+              Nothing -> missingCodeCollection "Could not resolve code pointer for account" (format realAccount)
   -- Find the code using the codehash
   cd <- A.lookup (A.Proxy @DBCode) ch'
   let cd' = case cd of
-      Just (_,bs) -> bs
-      Nothing -> missingCodeCollection "Could not locate SolidVM code collection at account" (format realAccount)
+              Just (_,bs) -> bs
+              Nothing -> missingCodeCollection "Could not locate SolidVM code collection at account" (format realAccount)
   let decodeCD = DT.decodeUtf8 cd'
   -- Format the result  
   return $ Constant $ SString $ T.unpack decodeCD
