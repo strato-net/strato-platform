@@ -2284,15 +2284,15 @@ encodeForReturn (SString s) = do
 -- Value: |offset_str1|encoded_int|offset_str2|str1EncLen|   str1Enc  |str2EncLen|   str2Enc  |
 
 -- This is a hacky way to encode arrays, only works for returning just the array
-encodeForReturn x@(SArray _ items) = do
-  contract' <- getCurrentContract
-  if CC._vmVersion contract' == "svm3.2" 
-    then do
-      let encLen = word256ToBytes $ fromIntegral $ (V.length items)
-      bs <- encodeVector items
-      return $ (word256ToBytes $ fromIntegral (32::Integer)) `B.append` (encLen `B.append` bs)
-    else
-      todo "Please use pragma solidvm 3.2 or greater to access array encoding for return " x
+encodeForReturn (SArray _ items) = do
+  let encLen = word256ToBytes $ fromIntegral $ (V.length items)
+  bs <- encodeVector items
+  return $ (word256ToBytes $ fromIntegral (32::Integer)) `B.append` (encLen `B.append` bs)
+  -- contract' <- getCurrentContract
+  -- if CC._vmVersion contract' == "svm3.2" 
+  --   then do
+  --   else
+  --     todo "Please use pragma solidvm 3.2 or greater to access array encoding for return " x
 
 encodeForReturn (STuple items) = encodeVector items
 
