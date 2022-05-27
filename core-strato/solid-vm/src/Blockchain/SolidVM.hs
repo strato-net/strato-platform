@@ -1297,9 +1297,9 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
             addr <- accountOnUnspecifiedChain <$> getCurrentAccount
             return $ Constant $ SContractFunction (Just $ CC._contractName $ last ps) addr method
   
-      (SAccount a _, memberName) -> evaluateAccountMember a False memberName
-      (SContractItem a _, memberName) -> evaluateAccountMember a False memberName
-      (SContract _ a, memberName) -> evaluateAccountMember a True memberName
+      (SAccount a _, n) -> evaluateAccountMember a False n
+      (SContractItem a _, n) -> evaluateAccountMember a False n
+      (SContract _ a, n) -> evaluateAccountMember a True n
       (r@(SReference _), "push") -> return $ Constant $ SPush r Nothing
         {-
         contract' <- getCurrentContract
