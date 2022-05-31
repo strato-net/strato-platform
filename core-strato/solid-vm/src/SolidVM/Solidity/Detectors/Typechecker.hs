@@ -277,7 +277,7 @@ context' Static{..}        = staticContext
 context' Product{..}       = productContext
 context' Function{..}      = functionContext
 context' (Sum (a :| _))    = context' a
-context' (MultiVariate _ _)  = error "context' MultiVariate"
+context' (MultiVariate _ _)  = multiVariateContext
 
 
 typecheck' :: Monad m => (SourceAnnotation Text -> String -> Type -> m Type') -> Type' -> Type' -> m Type'
