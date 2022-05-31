@@ -441,15 +441,19 @@ setCreator creator contract cntrct blockNumber = do
 
     Nothing -> liftIO $ putStrLn $ C.red $ "setCreator/versioning ---> No cert found for " ++ (format creator)
   
-  let hasSvm3_0 = CC._vmVersion cntrct == "svm3.0" || CC._vmVersion cntrct == "svm3.2"
+  let hasSvm3_0 = CC._vmVersion cntrct == "svm3.0"
+      hasSvm3_2 = CC._vmVersion cntrct == "svm3.2"
+  when hasSvm3_2 $ do
+    liftIO $ putStrLn $ "setCreator/address ---> Setting creatorAddress to: " ++ show creator 
+    putSolidStorageKeyVal' hasSvm3_2 contract (MS.StoragePath [MS.Field ":creatorAddress"]) (MS.BAccount (accountToNamedAccount' creator) False)
   let putCreatorField org = do
         liftIO $ putStrLn $ "setCreator/versioning ---> setting the org as " ++ (show org)
-        putSolidStorageKeyVal' hasSvm3_0 contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack org)
+        putSolidStorageKeyVal' (hasSvm3_0 || hasSvm3_2) contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack org)
 
   if _org /= "" then putCreatorField _org else do
       liftIO $ putStrLn $ C.red $ "Ignoring creator field for empty org field"
 
-      -- hardcoded delete storage value if on the very bad, not good block
+      -- hardcoded delete storage value if on the very bad, no good block
       when (blockNumber == 287472 && computeNetworkID == 30460620967655047776835626356) $ do
         liftIO $ putStrLn $ "DEVNET EXCEPTION Deleting \":creator\" field."
         deleteSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":creator"])
@@ -1380,7 +1384,6 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
         let address = namedAccountToAccount (from ^. accountChainId) addr
         result <- callWrapper from address Nothing itemName False (CC.OrderedArgs [])  
         return . Constant . fromMaybe SNULL $ result
-
       (SContract _ a, funcName) -> return $ Constant $ SContractFunction Nothing a funcName
       (r@(SReference _), "push") -> return $ Constant $ SPush r Nothing
         {-
@@ -1904,32 +1907,40 @@ callBuiltin rc@("registerCert") [(SAccount a _), SString cert] _ = do
 
 callBuiltin rc'@("registerCert") [SString cert] _ = do
   contract' <- getCurrentContract
+  let rootAddress = fromPublicKey rootPubKey
   if CC._vmVersion contract' /= "svm3.2" 
     then unknownFunction "callBuiltin" rc'
     else do
       curAccount <- getCurrentAccount
-      case _accountChainId curAccount of
-        Just cid -> invalidWrite "Cannot register X.509 certificates on private chains" cid
-        Nothing -> do
-          let ex509Cert = bsToCert . BC.pack $ cert
-          case ex509Cert of 
-            Left q -> invalidCertificate "Could not parse X.509 certificate" q
-            Right x509Cert -> do
-              if not $ verifyBlockApps x509Cert 
-                then invalidCertificate "Certificate is not signed by the BlockApps Root Certificate" (getCertIssuer x509Cert)
-                else do
-                  let mSubject = getCertSubject x509Cert
-                  case mSubject of 
-                    Nothing -> invalidCertificate "No or invalid subject" x509Cert
-                    (Just subject) -> do
-                      let subjectAddress = fromPublicKey $ subPub subject
-                      onTraced $ liftIO $ putStrLn $ "    Registering cert to address derived from the subject's public key: " ++ 
-                        format subjectAddress ++ " as Common Name:" ++ show (subCommonName subject) ++ "; Organization: " ++ show (subOrg subject)
-                      x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-                      Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.insert subjectAddress x509Cert x509s
-                      return $ SAccount (NamedAccount subjectAddress UnspecifiedChain) (False)
-
-callBuiltin "getUserCert" [(SAccount a _)] _ = do
+      case curAccount of
+        Account{_accountChainId=Just cid} -> invalidWrite "Cannot register X.509 certificates on private chains" cid
+        Account{..} -> do
+          mCreatorAddress <- getSolidStorageKeyVal' curAccount $ MS.StoragePath [MS.Field ":creatorAddress"]
+          case mCreatorAddress of
+            (MS.BAccount creatorAccount _) -> do
+              onTraced $ liftIO $ putStrLn $ "    Creator Address: " <> (show $ _namedAccountAddress creatorAccount)
+              onTraced $ liftIO $ putStrLn $ "    Root Address: " <> (show rootAddress)
+              if ((_namedAccountAddress creatorAccount) /= rootAddress) then invalidWrite "Only a function in a contract posted by the BlockApps Root Address may call registerCert" creatorAccount
+              else do
+                let ex509Cert = bsToCert . BC.pack $ cert
+                case ex509Cert of 
+                  Left q -> invalidCertificate "Could not parse X.509 certificate" q
+                  Right x509Cert -> do
+                    if not $ verifyBlockApps x509Cert 
+                      then invalidCertificate "Certificate is not signed by the BlockApps Root Certificate" (getCertIssuer x509Cert)
+                      else do
+                        let mSubject = getCertSubject x509Cert
+                        case mSubject of 
+                          Nothing -> invalidCertificate "No or invalid subject" x509Cert
+                          (Just subject) -> do
+                            let subjectAddress = fromPublicKey $ subPub subject
+                            onTraced $ liftIO $ putStrLn $ "    Registering cert to address derived from the subject's public key: " ++ 
+                              format subjectAddress ++ " as Common Name:" ++ show (subCommonName subject) ++ "; Organization: " ++ show (subOrg subject)
+                            x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
+                            Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.insert subjectAddress x509Cert x509s
+                            return $ SAccount (NamedAccount subjectAddress UnspecifiedChain) False
+            typ -> internalError "creatorAddress field has not been set or is not an account type" typ
+callBuiltin "getUserCert" [SAccount a _] _ = do
   x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
   maybeCertLevelDB <- x509CertDBGet $ _namedAccountAddress a
   let maybeCertBlockDB = M.lookup (_namedAccountAddress a) x509s
