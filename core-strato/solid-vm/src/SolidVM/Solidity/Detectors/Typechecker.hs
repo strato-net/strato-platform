@@ -51,6 +51,9 @@ data TypeF' a = Top { topName :: (S.Set String)
               | Product { productTypes :: [TypeF' a]
                         , productContext :: a
                         }
+              | MultiVariate { multiVariateType :: (TypeF' a)
+                             , multiVariateContext :: a
+                             }
               | Sum { sumTypes :: NonEmpty (TypeF' a)
                     }
               | Function { functionArgType :: TypeF' a
@@ -107,6 +110,11 @@ showType' (Function a r _) =
            , " returns "
            , showType' r
            ]
+showType' (MultiVariate a _) = T.concat
+                              [ "("
+                              , showType' a
+                              , ")"
+                              ]
 
 varDefsToType' :: Annotated VarDefEntryF -> Type' -> Type'
 varDefsToType' BlankEntry t                   = Product [topType' (context' t), t] (context' t)
@@ -269,6 +277,7 @@ context' Static{..}        = staticContext
 context' Product{..}       = productContext
 context' Function{..}      = functionContext
 context' (Sum (a :| _))    = context' a
+context' (MultiVariate _ _)  = error "context' MultiVariate"
 
 
 typecheck' :: Monad m => (SourceAnnotation Text -> String -> Type -> m Type') -> Type' -> Type' -> m Type'
@@ -289,6 +298,9 @@ typecheck' f r1 r2 = case (r1, r2) of
   (Product t1 x, Product t2 _) -> typecheckProduct f x t1 t2
   (Product [a] _, b) -> typecheck' f a b
   (a, Product [b] _) -> typecheck' f a b
+  (MultiVariate a _, MultiVariate b _) -> typecheck' f a b
+  (MultiVariate a _, Product xs x) -> typecheckProduct f x xs (replicate (length xs) a)
+  (Product xs x, MultiVariate a _) -> typecheckProduct f x xs (replicate (length xs) a)
   (Function a1 v1 x, Function a2 v2 _) -> do
     a <- typecheck' f a1 a2
     v <- typecheck' f v1 v2
@@ -489,6 +501,7 @@ typecheckMember (Static (SVMType.Array _ _) x) n = pure . bottom $ ("Unknown mem
 typecheckMember (Static (SVMType.Bytes _ _) x) "length" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Label "Util") x) "bytes32ToString" = pure $ Function (Static (SVMType.Bytes Nothing (Just 32)) x) (Static (SVMType.String Nothing) x) x
 typecheckMember (Static (SVMType.Label "Util") x) "b32" = pure $ Function (Static (SVMType.Bytes Nothing (Just 32)) x) (Static (SVMType.Bytes Nothing (Just 32)) x) x
+typecheckMember (Static (SVMType.Label "string") x) "concat" = pure $ Function (stringConcatArgs x) (Static (SVMType.String Nothing) x) x
 typecheckMember (Static (SVMType.Label "msg") x) "sender" = pure $ Static (SVMType.Account False) x 
 typecheckMember (Static (SVMType.Label "tx") x) "origin" = pure $ Static (SVMType.Account False) x 
 typecheckMember (Static (SVMType.Label "tx") x) "username" = pure $ Static (SVMType.String Nothing) x
@@ -712,6 +725,7 @@ intArgs x = Sum $ enumType' x :|
                 , stringType' x
                 ]
 
+
 stringArgs :: SourceAnnotation Text -> Type'
 stringArgs x = Sum $ stringType' x :|
                    [ addressType' x
@@ -755,6 +769,11 @@ byteArgs x = intType' x
 
 keccak256Args :: SourceAnnotation Text -> Type'
 keccak256Args x = stringType' x
+
+
+--This function should have multivariate type that represents any amount of string types
+stringConcatArgs :: SourceAnnotation Text -> Type'
+stringConcatArgs x = MultiVariate (stringType' x) x
 
 requireArgs :: SourceAnnotation Text -> Type'
 requireArgs x = Sum $ boolType' x :|
@@ -802,7 +821,8 @@ getVarType' s@('i':'n':'t':n) ctx = case n of
     Nothing -> getVarTypeByName' s ctx
 getVarType' "address" ctx =  pure $ Function (addressArgs ctx) (Static (SVMType.Account False) ctx) ctx
 getVarType' "account" ctx =  pure $ Function (accountArgs ctx) (Static (SVMType.Account False) ctx) ctx
-getVarType' "string" ctx =  pure $ Function (stringArgs ctx) (stringType' ctx) ctx
+--This is either the string() function or the string.member() function
+getVarType' "string" ctx =  pure $ Sum $ (Function (stringArgs ctx) (stringType' ctx) ctx) :| [Static (SVMType.Label "string") ctx]
 getVarType' "bool" ctx =  pure $ Function (boolArgs ctx) (boolType' ctx) ctx
 getVarType' s@('b':'y':'t':'e':'s':n) ctx = case n of
   [] -> pure $ Function (byteArgs ctx) (Static (SVMType.Bytes Nothing Nothing) ctx) ctx

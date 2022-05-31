@@ -4043,3 +4043,18 @@ contract qq {
     return X;
   }
 }|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 1)
+
+  it "can use string.concat(x,y) to concatenate any amount of strings" . runTest $ do
+    runCall "a" "()" [r|
+pragma solidvm 3.2;
+contract qq {
+  function a() public {
+    string x = "hello";
+    string y = "world";
+    string z = " and friends";
+    string s = string.concat(x, y);
+    string w = string.concat(x, y, z);
+    assert(s == "helloworld");
+    assert(w == "helloworld and friends");
+  }
+}|] 
