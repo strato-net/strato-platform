@@ -15,7 +15,7 @@ def deployStrato(nodeData) {
 
   echo "Downloading repos"
   sh "sudo rm -rf strato-getting-started"
-  sh "sudo git clone https://github.com/blockapps/strato-getting-started.git"
+  sh "git clone https://github.com/blockapps/strato-getting-started.git"
   dir("strato-getting-started") {
     def runCommand
       if (nodeData.NETWORK_ID) {
