@@ -277,7 +277,7 @@ context' Static{..}        = staticContext
 context' Product{..}       = productContext
 context' Function{..}      = functionContext
 context' (Sum (a :| _))    = context' a
-context' (MultiVariate _ _)  = multiVariateContext
+context' MultiVariate{..}  = multiVariateContext
 
 
 typecheck' :: Monad m => (SourceAnnotation Text -> String -> Type -> m Type') -> Type' -> Type' -> m Type'
@@ -301,6 +301,8 @@ typecheck' f r1 r2 = case (r1, r2) of
   (MultiVariate a _, MultiVariate b _) -> typecheck' f a b
   (MultiVariate a _, Product xs x) -> typecheckProduct f x xs (replicate (length xs) a)
   (Product xs x, MultiVariate a _) -> typecheckProduct f x xs (replicate (length xs) a)
+  (MultiVariate a _, b) -> typecheck' f a b
+  (a, MultiVariate b _) -> typecheck' f a b
   (Function a1 v1 x, Function a2 v2 _) -> do
     a <- typecheck' f a1 a2
     v <- typecheck' f v1 v2
