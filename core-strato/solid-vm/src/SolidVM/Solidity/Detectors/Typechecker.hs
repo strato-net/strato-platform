@@ -768,8 +768,7 @@ byteArgs :: SourceAnnotation Text -> Type'
 byteArgs x = intType' x
 
 keccak256Args :: SourceAnnotation Text -> Type'
-keccak256Args x = stringType' x
-
+keccak256Args x = MultiVariate (stringType' x) x
 
 --This function should have multivariate type that represents any amount of string types
 stringConcatArgs :: SourceAnnotation Text -> Type'
