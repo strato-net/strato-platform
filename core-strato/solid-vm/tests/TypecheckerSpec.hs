@@ -641,3 +641,26 @@ contract qq {
 
 }|]
     in length anns `shouldBe` 1
+
+  it "can use the string.concat(x,y) function and succeeds when the types are strings" $
+    let anns = runTypechecker [r|
+contract A {
+  function f() {
+    string x = "hello";
+    string y = "world";
+    string z = string.concat(x,y);
+  }
+}
+|]
+    in length anns `shouldBe` 0
+
+  it "can use the string.concat(x,y) function and fails when the types are not strings" $
+    let anns = runTypechecker [r|
+contract A {
+  function f() {
+    string x = "hello";
+    string z = string.concat(x,7);
+  }
+}
+|]
+    in length anns `shouldBe` 1

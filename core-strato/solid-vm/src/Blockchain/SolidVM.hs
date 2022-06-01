@@ -1235,6 +1235,9 @@ expToVar' (CC.MemberAccess _ (CC.Variable _ "Util") "bytes32ToString") = do
 expToVar' (CC.MemberAccess _ (CC.Variable _ "Util") "b32") = do --TODO- remove this hardcoded case
   return $ Constant $ SBuiltinFunction "identity" Nothing
 
+expToVar' (CC.MemberAccess _ (CC.Variable _ "string") "concat") = do
+  return $ Constant $ SStringConcat 
+
 expToVar' x@(CC.MemberAccess _ expr name) = do
   var <- expToVar expr
   val <- getVar var
@@ -1734,6 +1737,15 @@ expToVar' (CC.FunctionCall _ e args) = do
               _ -> typeError "called enum constructor with improper args" argVals
 
           Constant (SPush theArray mvar) -> Builtins.push theArray mvar argVals
+
+          Constant SStringConcat -> do
+            case argVals of
+              OrderedVals xs -> do
+                when (any (\x -> case x of
+                                  (SString _) -> False
+                                  _ -> True) xs) $ typeError "string concat" argVals
+                return $ Constant $ SString $ concatMap (\x -> case x of (SString s) -> s; _ -> "") xs
+              _ -> typeError "called string concat with improper args" argVals
 
           Constant SHexDecodeAndTrim ->
               case argVals of

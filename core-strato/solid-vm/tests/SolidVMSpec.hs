@@ -4124,3 +4124,26 @@ contract qq {
   }
 }|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 1)
 
+  it "can use string.concat(x,y) to concatenate any amount of strings" . runTest $ do
+    runCall "a" "()" [r|
+pragma solidvm 3.2;
+contract qq {
+  function a() public {
+    string x = "hello";
+    string y = "world";
+    string z = " and friends";
+    string s = string.concat(x, y);
+    string w = string.concat(x, y, z);
+    assert(s == "helloworld");
+    assert(w == "helloworld and friends");
+  }
+}|] 
+
+  it "can use the builtin keccak256 function with any amount of string arguments" . runTest $ do
+    runCall "a" "()" [r|
+pragma solidvm 3.2;
+contract qq {
+  function a() public returns (bytes32) {
+    return keccak256("hello", "world");
+  }
+}|] `shouldReturn` Just "\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL \NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL1\195\186&\195\155|\194\168^\194\173\&9\194\146\SYN\195\167\195\134\&1k\195\133\SO\195\146C\194\147\195\131\DC2+X'5\195\167\195\179\194\176\195\185\ESC\194\147\195\176"
