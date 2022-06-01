@@ -126,6 +126,7 @@ data Value =
                               -- can be canonicalized
   | SHexDecodeAndTrim -- Hack to implement blockapps-sol's bytes32ToString without
                       -- supporting indexing into bytes32s.
+  | SStringConcat -- for easy concat of multiple arguments
   | SAddressToAscii -- Hack to implement addressToAsciiString without supporting indexing into bytes
   | SMappingSentinel
   | SBreak
