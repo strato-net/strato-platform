@@ -26,7 +26,6 @@ def deployStrato(nodeData) {
       } 
 
       echo "Deploying STRATO"
-      sh "sudo ./strato --wipe"
       writeFile file:"run.sh", text: """${runCommand}"""
       sh "chmod +x ./run.sh"
       sh "sudo ./run.sh"
