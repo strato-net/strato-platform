@@ -26,6 +26,7 @@ def deployStrato(nodeData) {
       } 
 
       echo "Deploying STRATO"
+      sh "./strato --wipe"
       writeFile file:"run.sh", text: """${runCommand}"""
       sh "chmod +x ./run.sh"
       sh "sudo ./run.sh"
@@ -51,7 +52,7 @@ def deployStrato(nodeData) {
 
 
 def runTests() {
-  sh "sudo rm -rf strato-getting-started"
+  sh "sudo rm -rf strato-platform"
   sh "git clone https://github.com/blockapps/strato-platform.git"
   dir('strato-platform/utils/dev-scripts/syncspeedtest') {
     sh "sudo chmod +x ./getSyncData.sh"
