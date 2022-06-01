@@ -9,6 +9,7 @@ def deployStrato(nodeData) {
           currentBuild.result = 'FAILURE'
           sh "exit 1"
         }
+        echo "${nodeData.VALIDATORS}"
         runCommand = """#!/bin/bash
         ./strato --compose
         ./strato --wipe
@@ -27,6 +28,7 @@ def deployStrato(nodeData) {
       } 
 
       echo "Deploying STRATO"
+      echo "${runCommand}"
       writeFile file:"run.sh", text: """${runCommand}"""
       sh "chmod +x ./run.sh"
       sh "sudo ./run.sh"
