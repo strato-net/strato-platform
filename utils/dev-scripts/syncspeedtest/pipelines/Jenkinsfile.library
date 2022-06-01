@@ -54,13 +54,18 @@ def deployStrato(nodeData) {
 
 
 def runTests() {
-  sh "sudo rm -rf strato-platform"
-  sh "git clone https://github.com/blockapps/strato-platform.git"
-  dir('strato-platform/utils/dev-scripts/syncspeedtest') {
-    sh "sudo chmod +x ./getSyncData.sh"
-    echo "Running tests..."
-    sh "sudo ./getSyncData.sh"
-    archiveArtifacts artifacts: '**/*.txt', fingerprint: true
+  withCredentials([
+      usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME'),
+  ]) {
+    sh "sudo rm -rf strato-platform"
+    sh "git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-platform -b STRATO-2528-sync-speed-testing"
+    dir('strato-platform/utils/dev-scripts/syncspeedtest') {
+      sh "sudo chmod +x ./getSyncData.sh"
+      echo "Running tests..."
+      sh "sudo ./getSyncData.sh"
+      archiveArtifacts artifacts: '**/*.txt', fingerprint: true
+
+    }
   }
 }
 
