@@ -58,8 +58,9 @@ def runTests() {
   sh "git clone https://github.com/blockapps/strato-platform.git"
   dir('strato-platform/utils/dev-scripts/syncspeedtest') {
     sh "sudo chmod +x ./getSyncData.sh"
+    echo "Running tests..."
     sh "sudo ./getSyncData.sh"
-    archiveArtifacts artifacts: 'logs/*.txt', fingerprint: true
+    archiveArtifacts artifacts: '**/*.txt', fingerprint: true
   }
 }
 
