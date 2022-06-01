@@ -4113,3 +4113,14 @@ contract qq {
   }
 }|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 1)
 
+  it "can set values in a mapping that's a contract variable" . runTest $ do
+    runCall "a" "()" [r|
+pragma solidvm 3.2;
+contract qq {
+  mapping(int => bool) flags;
+  function a() public returns (bool) {
+    flags[1] = true;
+    return flags[1];
+  }
+}|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 1)
+
