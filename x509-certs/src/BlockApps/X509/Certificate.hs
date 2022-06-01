@@ -19,7 +19,9 @@ module BlockApps.X509.Certificate (
   verifyCertM,
   makeSignedCert,
   getCertSubject,
-  getCertIssuer
+  getCertSubjects,
+  getCertIssuer,
+  getCertIssuers
  ) where
 
 
@@ -29,6 +31,7 @@ import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.Address
 import           BlockApps.X509.Keys
 import           Control.DeepSeq
+import           Control.Monad
 import           Control.Monad.IO.Class
 import           Crypto.Random.Entropy
 import           Crypto.Hash
@@ -45,11 +48,13 @@ import qualified Data.ByteString.Char8              as C8
 import qualified Data.ByteString.Base16             as B16
 import qualified Data.ByteString.Short              as BSS
 
+import           Data.Functor
 import           Data.Either
 import           Data.Maybe
 import           Data.PEM
 import qualified Data.Text                      as T
 import           Data.X509
+import           Data.Traversable
 import           Time.Types
 import           Time.System
 import qualified Text.Colors       as CL
@@ -65,11 +70,16 @@ import           Text.Format
 
 
 
-newtype X509Certificate = X509Certificate SignedCertificate deriving (Show, Eq)
+newtype X509Certificate = X509Certificate CertificateChain deriving (Show, Eq)
 
 instance NFData X509Certificate where
     rnf (X509Certificate cert) = cert `seq` ()
 
+signedsToX509 :: [SignedCertificate] -> X509Certificate
+signedsToX509 = X509Certificate . CertificateChain
+
+x509ToSigneds :: X509Certificate -> [SignedCertificate]
+x509ToSigneds (X509Certificate (CertificateChain cs)) = cs
 
 data Issuer = Issuer
   {
@@ -93,6 +103,9 @@ data Subject = Subject
 instance Format Subject where
   format = CL.blue . show
 
+issuerEqSubject :: Issuer -> Subject -> Bool
+issuerEqSubject Issuer{..} Subject{..} = 
+  (issCommonName, issOrg, issUnit, issCountry) == (subCommonName, subOrg, subUnit, subCountry)
 
 instance ToJSON Subject where
   toJSON (Subject cn o ou c pub) = 
@@ -155,13 +168,11 @@ rootCert = let eCert = bsToCert $ C8.pack $ unlines
 ----------------------------------------------------------------------------------------------
 --------------------------------------- IMPORT/EXPORT ----------------------------------------
 ----------------------------------------------------------------------------------------------
-
-
 certToBytes :: X509Certificate -> B.ByteString
-certToBytes = pemWriteBS . certToPem
+certToBytes cert = C8.concat $ pemWriteBS . signedCertToPem <$> x509ToSigneds cert
 
-certToPem :: X509Certificate -> PEM
-certToPem (X509Certificate cert) = PEM 
+signedCertToPem :: SignedCertificate -> PEM
+signedCertToPem cert = PEM 
   { pemName = "CERTIFICATE"
   , pemHeader = []
   , pemContent = encodeSignedObject cert
@@ -173,9 +184,9 @@ bsToCert bs =
   case (pemParseBS bs) of
     Left str -> Left str
     Right [] -> Left "nothing parsed...but no errors?"
-    Right (pem:_) -> 
-      case (decodeSignedCertificate $ pemContent pem) of
-        Left str -> Left str
+    Right pems -> 
+      case (decodeCertificateChain $ CertificateChainRaw $ pemContent <$> pems) of
+        Left (i, str) -> Left $ str <> " : cert " <> show i
         Right cert -> Right $ X509Certificate cert
 
 
@@ -186,8 +197,9 @@ bsToCert bs =
 
 
 
-makeSignedCert :: (MonadIO m, HasVault m) => Issuer -> Subject -> m (X509Certificate)
-makeSignedCert iss sub = makeCert iss sub >>= signCert >>= return . X509Certificate
+makeSignedCert :: (MonadIO m, HasVault m) => Maybe X509Certificate -> Issuer -> Subject -> m (X509Certificate)
+makeSignedCert parentCert iss sub = makeCert iss sub >>= signCert >>= return . X509Certificate . CertificateChain . (:(join . maybeToList $ x509ToSigneds <$> parentCert))
+
 
 signCert :: (MonadIO m, HasVault m) => Certificate -> m (SignedCertificate)
 signCert cert = objectToSignedExactF (ecdsaWithSHA256) cert
@@ -277,32 +289,40 @@ getCertPub :: Subject -> PubKey
 getCertPub = serializeAndWrap . subPub
 
 
--- without cn and org, subject and issuer are invalid, but the other fields can be Nothing
+-- Get the (first) subject of the certificate
 getCertSubject :: X509Certificate -> Maybe Subject
-getCertSubject (X509Certificate cert) = do
+getCertSubject cert = listToMaybe =<< getCertSubjects cert
+
+-- without cn and org, subject and issuer are invalid, but the other fields can be Nothing
+getCertSubjects :: X509Certificate -> Maybe [Subject]
+getCertSubjects certs = for (x509ToSigneds certs) $ \cert -> do
   pubKey <- unserializeAndUnwrap . certPubKey $ getCertificate cert
-  cn     <- extractDn DnCommonName
-  org    <- extractDn DnOrganization
+  cn     <- extractDn cert DnCommonName
+  org    <- extractDn cert DnOrganization
   return $ Subject { subCommonName = cn
                    , subOrg        = org
-                   , subUnit       = extractDn DnOrganizationUnit
-                   , subCountry    = extractDn DnCountry
+                   , subUnit       = extractDn cert DnOrganizationUnit
+                   , subCountry    = extractDn cert DnCountry
                    , subPub        = pubKey 
                    }
-  where extractDn :: DnElement -> Maybe String
-        extractDn dn = fmap fromASN1CS . getDnElement dn . certSubjectDN $ getCertificate cert   
+  where extractDn :: SignedCertificate -> DnElement -> Maybe String
+        extractDn cert dn = fmap fromASN1CS . getDnElement dn . certSubjectDN $ getCertificate cert   
+
 
 getCertIssuer :: X509Certificate -> Maybe Issuer
-getCertIssuer (X509Certificate cert) = do
-  cn     <- extractDn DnCommonName
-  org    <- extractDn DnOrganization
+getCertIssuer cert = listToMaybe =<< getCertIssuers cert
+
+getCertIssuers :: X509Certificate -> Maybe [Issuer]
+getCertIssuers certs = for (x509ToSigneds certs) $ \cert -> do
+  cn     <- extractDn cert DnCommonName
+  org    <- extractDn cert DnOrganization
   return $ Issuer { issCommonName = cn
                   , issOrg        = org
-                  , issUnit       = extractDn DnOrganizationUnit 
-                  , issCountry    = extractDn DnCountry
+                  , issUnit       = extractDn cert DnOrganizationUnit 
+                  , issCountry    = extractDn cert DnCountry
                   }
-  where extractDn :: DnElement -> Maybe String
-        extractDn dn = fmap fromASN1CS . getDnElement dn . certIssuerDN $ getCertificate cert
+  where extractDn :: SignedCertificate -> DnElement -> Maybe String
+        extractDn cert dn = fmap fromASN1CS . getDnElement dn . certIssuerDN $ getCertificate cert
 
 
 --------------------------------------------------------------------------------------------
@@ -310,35 +330,51 @@ getCertIssuer (X509Certificate cert) = do
 --------------------------------------------------------------------------------------------
 
 -- Verify that a cert was signed by given public key
+-- We perform a chain validation and expect pkey to be our trust anchor. The process is 
+-- combersomly detailed in RFC 5280 section 6
+-- The first certificate in X509Certificate is the target cert, and the last one is the
+-- the trust anchor (the one signed by the public key)
 verifyCert :: PublicKey -> X509Certificate -> Bool
-verifyCert pkey (X509Certificate signedCert) = 
-  let signed = getSigned signedCert
-      mesgBS = B.pack $ BA.unpack $ hashWith CH.SHA256 (getSignedData signedCert)
+verifyCert pkey (X509Certificate (CertificateChain cs)) = verifyCertChain pkey cs
+
+verifyCertChain :: PublicKey -> [SignedCertificate] -> Bool
+verifyCertChain _ [] = False
+verifyCertChain pkey [c] = 
+  let signed = getSigned c
+      mesgBS = B.pack $ BA.unpack $ hashWith CH.SHA256 (getSignedData c)
   in
   case importSignature' $ signedSignature signed of 
     Nothing -> False
     Just sig -> verifySig pkey sig mesgBS
+verifyCertChain pkey (c:c':cs) = issuerMatchesSubject c c' && signedBy c c' && verifyCertChain pkey (c':cs)
+
+-- Verify that c's issuer match c''s subject
+issuerMatchesSubject :: SignedCertificate -> SignedCertificate -> Bool
+issuerMatchesSubject c c' = fromMaybe False $ issuerEqSubject <$> getCertIssuer (signedsToX509 [c]) <*> getCertSubject (signedsToX509 [c'])
+
+-- Verify that c signed by c'
+signedBy :: SignedCertificate -> SignedCertificate -> Bool
+signedBy c c' = fromMaybe False $ (\k -> verifyCertChain k [c]) . subPub <$> getCertSubject (signedsToX509 [c'])
 
 verifyBlockApps :: X509Certificate -> Bool 
 verifyBlockApps = verifyCert rootPubKey
 
 verifyCertM :: MonadIO m => PublicKey -> X509Certificate -> m Bool
-verifyCertM pkey cert@(X509Certificate signedCert) = do
-  let signed    = getSigned signedCert
-      mesgBS    = B.pack $ BA.unpack $ hashWith CH.SHA256 (getSignedData signedCert)
-      signature@(Signature (SEC.CompactRecSig r s _)) = fromMaybe (error "Could not decode signature from DER format") (importSignature' $ signedSignature signed)
-      isValid   = verifySig pkey signature mesgBS
-  liftIO $ putStrLn $ format (getCertIssuer cert)
-  liftIO $ putStrLn $ "Signature:"
-  liftIO $ putStrLn $ "   R: " ++ (show $ B16.encode $ BSS.fromShort r)
-  liftIO $ putStrLn $ "   S: " ++ (show $ B16.encode $ BSS.fromShort s)
-  liftIO $ putStrLn $ "Signature (DER Encoding): " ++ (show $ B16.encode $ signedSignature signed )
-  liftIO $ putStrLn $ "Certificate Hash: " ++ (show $ B16.encode mesgBS)
+verifyCertM pkey (X509Certificate (CertificateChain cs)) = mapM_ printCertDetails cs $> verifyCertChain pkey cs
+  where printCertDetails :: MonadIO m => SignedCertificate -> m ()
+        printCertDetails c = do
+          let signed    = getSigned c
+              mesgBS    = B.pack $ BA.unpack $ hashWith CH.SHA256 (getSignedData c)
+              (Signature (SEC.CompactRecSig r s _)) = fromMaybe (error "Could not decode signature from DER format") (importSignature' $ signedSignature signed)
+          liftIO $ putStrLn $ format (getCertIssuer $ signedsToX509 [c])
+          liftIO $ putStrLn $ "Signature:"
+          liftIO $ putStrLn $ "   R: " ++ (show $ B16.encode $ BSS.fromShort r)
+          liftIO $ putStrLn $ "   S: " ++ (show $ B16.encode $ BSS.fromShort s)
+          liftIO $ putStrLn $ "Signature (DER Encoding): " ++ (show $ B16.encode $ signedSignature signed )
+          liftIO $ putStrLn $ "Certificate Hash: " ++ (show $ B16.encode mesgBS)
   
-  case getCertSubject cert of 
-    Nothing -> liftIO $ putStrLn $ "No Subject"
-    Just subject -> do 
-      liftIO $ putStrLn $ format subject
-      liftIO $ putStrLn $ "Subject Address: " ++ (format $ fromPublicKey $ subPub subject) 
-  return isValid
-  
+          case getCertSubject $ signedsToX509 [c] of 
+            Nothing -> liftIO $ putStrLn $ "No Subject"
+            Just subject -> do
+              liftIO $ putStrLn $ format subject
+              liftIO $ putStrLn $ "Subject Address: " ++ (format $ fromPublicKey $ subPub subject) 

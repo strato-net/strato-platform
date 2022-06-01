@@ -17,7 +17,6 @@ import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Char8              as C8
 import           Data.Either
 import           Data.Foldable                      (foldlM)
-import           Data.Maybe
 import           System.Console.GetOpt
 import           System.Environment
 
@@ -120,18 +119,23 @@ main = do
 -------------------------------------- GENERATE CERT ---------------------------------------
 --------------------------------------------------------------------------------------------
 
-  let issuer = case optIssuerCert of
-        Nothing -> Issuer
+  let issuer = case (optIssuerCert, getCertSubject =<< optIssuerCert) of
+        (Nothing, _) -> Issuer
           { issCommonName = subCommonName optSubjectInfo
           , issCountry    = subCountry optSubjectInfo
           , issOrg        = subOrg optSubjectInfo
           , issUnit       = subUnit optSubjectInfo
           }
-        Just cert -> 
-          fromMaybe (error "missing commonName or orgName in issuer cert") (getCertIssuer cert)
+        (Just _, Just (Subject{..})) -> Issuer
+          { issCommonName = subCommonName
+          , issCountry    = subCountry
+          , issOrg        = subOrg
+          , issUnit       = subUnit
+          } 
+        _ -> error "missing commonName or orgName in issuer cert"
   
   -- generate and write cert
   flip runReaderT optKey $ do
-    cert <- makeSignedCert issuer optSubjectInfo
+    cert <- makeSignedCert optIssuerCert issuer optSubjectInfo
     liftIO $ B.writeFile optOutputName $ certToBytes $ cert
     liftIO $ putStrLn $ "Done. Cert was written to " ++ optOutputName

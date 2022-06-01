@@ -77,6 +77,25 @@ executables:
       - bytestring
       - strato-model
       - x509-certs
+  x509-certificate-registry:
+    source-dirs: exec_src/
+    main: X509CertRegistry.hs
+    other-modules: []
+    dependencies:
+      - aeson
+      - bloc2api
+      - blockapps-data
+      - blockapps-ethereum
+      - bytestring
+      - containers
+      - http-client
+      - optparse-applicative
+      - raw-strings-qq
+      - servant-client
+      - source-tools
+      - strato-model
+      - text
+      - x509-certs
 
 tests:
   x509-test:

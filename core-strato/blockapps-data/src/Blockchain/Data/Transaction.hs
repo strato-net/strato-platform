@@ -24,7 +24,8 @@ module Blockchain.Data.Transaction (
   isContractCreationTX,
   whoSignedThisTransaction,
   transactionHash,
-  partialTransactionHash
+  partialTransactionHash,
+  getSigVals
   ) where
 
 import           Control.Monad.IO.Class
