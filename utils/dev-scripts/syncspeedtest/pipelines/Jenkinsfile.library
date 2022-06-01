@@ -2,6 +2,7 @@ def deployStrato(nodeData) {
   sh "sudo rm -rf strato-getting-started"
   sh "git clone https://github.com/blockapps/strato-getting-started.git"
   dir("strato-getting-started") {
+    sh "./strato --wipe"
     def runCommand
       if (nodeData.NETWORK_ID) {
         if (nodeData.BOOTNODE_IP == null || nodeData.VALIDATORS == null) {
@@ -55,7 +56,7 @@ def runTests() {
   sh "git clone https://github.com/blockapps/strato-platform.git"
   dir('strato-platform/utils/dev-scripts/syncspeedtest') {
     sh "sudo chmod +x ./getSyncData.sh"
-    sh "./getSyncData.sh"
+    sh "sudo ./getSyncData.sh"
     archiveArtifacts artifacts: 'logs/*.txt', fingerprint: true
   }
 }
