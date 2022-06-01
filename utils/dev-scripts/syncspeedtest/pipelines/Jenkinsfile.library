@@ -21,8 +21,8 @@ def deployStrato(nodeData) {
         networkID="${nodeData.NETWORK_ID}" \\
         NODE_HOST="${nodeData.HOST}:${nodeData.PORT}" \\
         HTTP_PORT="${nodeData.PORT}" \\
-        validators="${nodeData.VALIDATORS}"\\
-        BOOT_NODE_IP="${nodeData.BOOTNODE_IP}"\\
+        validators="${nodeData.VALIDATORS}" \\
+        BOOT_NODE_IP="${nodeData.BOOTNODE_IP}" \\
         ./strato --blockstanbul
         """
       } 
