@@ -13,7 +13,7 @@ do
 	vmDebug=true \
 	wsDebug=true \
 	svmTrace=true \
-	BOOT_NODE_IP='18.235.213.241' \
+	BOOT_NODE_IP='3.81.197.53' \
 	networkID=1720007323 \
 	validators='["9db9b9a5045f24912ece22bbdbeca1bc2884f3f7"]' \
 	blockstanbulAdmins='["9db9b9a5045f24912ece22bbdbeca1bc2884f3f7"]' \
