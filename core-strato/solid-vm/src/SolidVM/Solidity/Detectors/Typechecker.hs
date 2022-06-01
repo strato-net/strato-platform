@@ -559,6 +559,11 @@ typecheckMember (Static (SVMType.Struct _ struct) x) n = do
       , " is not a field of "
       , struct
       ]) <$ x
+-- I'm intentionally leaving out send and transfer for Contract types, since we don't have a payable flag for them yet
+typecheckMember (Static (SVMType.Contract _) x) "balance" = pure $ Static (SVMType.Int Nothing Nothing) x
+typecheckMember (Static (SVMType.Contract _) x) "code" = pure $ Static (SVMType.Bytes Nothing Nothing) x
+typecheckMember (Static (SVMType.Contract _) x) "codehash" = pure $ Static (SVMType.String Nothing) x
+typecheckMember (Static (SVMType.Contract _) x) "chainId" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Contract c) x) n = lookupContractFunction x c n
 typecheckMember (Static (SVMType.Label c') x) n = do
   let c = T.pack c'
