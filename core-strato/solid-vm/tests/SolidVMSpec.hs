@@ -4087,3 +4087,29 @@ contract qq {
     return X;
   }
 }|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 1)
+
+  it "can set values in a mapping that's a member of a struct" . runTest $ do
+    runCall "a" "()" [r|
+pragma solidvm 3.2;
+contract qq {
+  struct Data {
+    mapping(uint => bool) flags;
+  }
+  function a() public returns (bool) {
+    Data d;
+    d.flags[1] = true;
+    return d.flags[1];
+  }
+}|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 1)
+
+  it "can set values in a mapping that's a local variable" . runTest $ do
+    runCall "a" "()" [r|
+pragma solidvm 3.2;
+contract qq {
+  function a() public returns (bool) {
+    mapping(int => bool) flags;
+    flags[1] = true;
+    return flags[1];
+  }
+}|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 1)
+

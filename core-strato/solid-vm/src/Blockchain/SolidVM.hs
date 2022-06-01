@@ -775,6 +775,11 @@ runStatement st@(CC.SimpleStatement (CC.ExpressionStatement (CC.Binary _ "=" dst
           setVar pVar (SArray typ newVec)
           return Nothing
         _ -> typeError ("array index value (" ++ (show indVal) ++ ") is not an integer") (unparseStatement st)
+    SMap typ theMap -> do
+      theIndex <- getVar =<< expToVar indExp
+      let newMap = M.insert theIndex srcVar theMap
+      setVar pVar (SMap typ newMap)
+      return Nothing
     _ -> do -- If it's a mapping, (expToVar dst) IS a reference, so we can set directly to it
       dstVar <- expToVar dst
       setVar dstVar srcVal
@@ -2299,15 +2304,15 @@ encodeForReturn (SString s) = do
 -- Value: |offset_str1|encoded_int|offset_str2|str1EncLen|   str1Enc  |str2EncLen|   str2Enc  |
 
 -- This is a hacky way to encode arrays, only works for returning just the array
-encodeForReturn (SArray _ items) = do
-  let encLen = word256ToBytes $ fromIntegral $ (V.length items)
-  bs <- encodeVector items
-  return $ (word256ToBytes $ fromIntegral (32::Integer)) `B.append` (encLen `B.append` bs)
-  -- contract' <- getCurrentContract
-  -- if CC._vmVersion contract' == "svm3.2" 
-  --   then do
-  --   else
-  --     todo "Please use pragma solidvm 3.2 or greater to access array encoding for return " x
+encodeForReturn x@(SArray _ items) = do
+  contract' <- getCurrentContract
+  if CC._vmVersion contract' == "svm3.2" 
+    then do
+      let encLen = word256ToBytes $ fromIntegral $ (V.length items)
+      bs <- encodeVector items
+      return $ (word256ToBytes $ fromIntegral (32::Integer)) `B.append` (encLen `B.append` bs)
+    else
+      todo "Please use pragma solidvm 3.2 or greater to access array encoding for return " x
 
 encodeForReturn (STuple items) = encodeVector items
 
