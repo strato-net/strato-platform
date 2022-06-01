@@ -2,7 +2,9 @@ def deployStrato(nodeData) {
   sh "sudo rm -rf strato-getting-started"
   sh "git clone https://github.com/blockapps/strato-getting-started.git"
   dir("strato-getting-started") {
+    sh "./strato --compose"
     sh "./strato --wipe"
+
     def runCommand
       if (nodeData.NETWORK_ID) {
         if (nodeData.BOOTNODE_IP == null || nodeData.VALIDATORS == null) {
