@@ -2,9 +2,6 @@ def deployStrato(nodeData) {
   sh "sudo rm -rf strato-getting-started"
   sh "git clone https://github.com/blockapps/strato-getting-started.git"
   dir("strato-getting-started") {
-    sh "./strato --compose"
-    sh "./strato --wipe"
-
     def runCommand
       if (nodeData.NETWORK_ID) {
         if (nodeData.BOOTNODE_IP == null || nodeData.VALIDATORS == null) {
@@ -13,6 +10,7 @@ def deployStrato(nodeData) {
           sh "exit 1"
         }
         runCommand = """#!/bin/bash
+        ./strato --compose
         ./strato --wipe
         sudo \\
         OAUTH_DISCOVERY_URL=${nodeData.OAUTH_DISCOVERY_URL} \\
