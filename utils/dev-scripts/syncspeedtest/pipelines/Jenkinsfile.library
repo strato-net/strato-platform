@@ -60,7 +60,7 @@ def runTests() {
   sh "sudo docker exec strato_strato_1 bash -c 'pip3 install requests'"
 
   dir('strato-getting-started') {
-    sh "./strato --drop-chain"
+    sh "./strato --drop-chains"
     sh "sudo ./run.sh"
   }
 
