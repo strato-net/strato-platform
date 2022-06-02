@@ -54,10 +54,10 @@ def deployStrato(nodeData) {
 
 
 def runTests() {
-  sh "docker exec -it strato_strato_1 bash -c 'apt-get update'"
-  sh "docker exec -it strato_strato_1 bash -c 'apt-get install python3-pip'"
-  sh "docker exec -it strato_strato_1 bash -c 'pip3 install --upgrade pip'"
-  sh "docker exec -it strato_strato_1 bash -c 'pip3 install requests'"
+  sh "sudo docker exec -it strato_strato_1 bash -c 'apt-get update'"
+  sh "sudo docker exec -it strato_strato_1 bash -c 'apt-get install python3-pip'"
+  sh "sudo docker exec -it strato_strato_1 bash -c 'pip3 install --upgrade pip'"
+  sh "sudo docker exec -it strato_strato_1 bash -c 'pip3 install requests'"
 
   dir('strato-getting-started') {
     sh "./strato --drop-chain"
@@ -72,14 +72,14 @@ def runTests() {
     dir('strato-platform/utils/dev-scripts/syncspeedtest') {
       echo "Running tests..."
       // Set up logs folder
-      sh "docker exec -it strato_strato_1 bash -c 'mkdir /var/lib/strato/logs'"
-      sh "docker cp ./getEntireLogs.py strato_strato_1:/var/lib/strato/logs"
-      sh "docker exec -it strato_strato_1 bash -c 'python3 /var/lib/strato/logs/getEntireLogs.py'"
+      sh "sudo docker exec -it strato_strato_1 bash -c 'mkdir /var/lib/strato/logs'"
+      sh "sudo docker cp ./getEntireLogs.py strato_strato_1:/var/lib/strato/logs"
+      sh "sudo docker exec -it strato_strato_1 bash -c 'python3 /var/lib/strato/logs/getEntireLogs.py'"
 
       // Copy log files from docker container to host
-      sh "docker cp strato_strato_1:/var/lib/strato/logs/myVmRunnerLog.txt ./"
-      sh "docker cp strato_strato_1:/var/lib/strato/logs/mySequencerLog.txt ./"
-      sh "docker cp strato_strato_1:/var/lib/strato/logs/myP2pLog.txt ./"
+      sh "sudo docker cp strato_strato_1:/var/lib/strato/logs/myVmRunnerLog.txt ./"
+      sh "sudo docker cp strato_strato_1:/var/lib/strato/logs/mySequencerLog.txt ./"
+      sh "sudo docker cp strato_strato_1:/var/lib/strato/logs/myP2pLog.txt ./"
 
       archiveArtifacts artifacts: '**/*.txt', fingerprint: true
       echo "Logs archived"
