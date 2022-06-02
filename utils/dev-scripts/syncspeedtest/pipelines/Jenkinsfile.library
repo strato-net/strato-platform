@@ -80,7 +80,7 @@ def runTests() {
       sh "sudo docker cp strato_strato_1:/var/lib/strato/logs/mySequencerLog.txt ./"
       sh "sudo docker cp strato_strato_1:/var/lib/strato/logs/myP2pLog.txt ./"
 
-      archiveArtifacts artifacts: '**/*.txt', fingerprint: true
+      archiveArtifacts artifacts: './*.txt', fingerprint: true
       echo "Logs archived"
     }
   }
