@@ -182,7 +182,7 @@ def makeData(linesVmRunner, linesSequencer, linesP2p):
 
 
 count = 0
-while count < 285000:#currentBlockNumber < 270000:
+while count < 30000:#currentBlockNumber < 270000:
     file1 = open('vm-runner', 'r')
     
     #Get vm-runner log as an array of string lines
@@ -250,10 +250,3 @@ while count < 285000:#currentBlockNumber < 270000:
 
     time.sleep(15)
 
-
-#cities = pd.DataFrame([blocks, timeItTooks, numberOfTrans, timeStamps], columns=['AtBlock', 'timeItTookSeconds', 'NumberOfTX', 'timeStamp'])
-
-#cities.to_csv('private277only.csv')
-#pd.DataFrame(data).to_csv('private277only.csv')
-#private277 =  pd.DataFrame(data)
-#print(private277.head)
