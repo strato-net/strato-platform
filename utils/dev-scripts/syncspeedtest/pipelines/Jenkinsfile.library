@@ -72,7 +72,6 @@ def runTests() {
     dir('strato-platform/utils/dev-scripts/syncspeedtest') {
       echo "Running tests..."
       // Set up logs folder
-      sh "sudo docker exec strato_strato_1 bash -c 'mkdir /var/lib/strato/logs'"
       sh "sudo docker cp ./getEntireLogs.py strato_strato_1:/var/lib/strato/logs"
       sh "sudo docker exec strato_strato_1 bash -c 'python3 /var/lib/strato/logs/getEntireLogs.py'"
 
