@@ -54,8 +54,8 @@ def deployStrato(nodeData) {
 
 
 def runTests() {
-  sh "docker exec -it strato_strato_1 bash -c 'apt-get update -y'"
-  sh "docker exec -it strato_strato_1 bash -c 'apt-get install python3-pip  -y'"
+  sh "docker exec -it strato_strato_1 bash -c 'apt-get update'"
+  sh "docker exec -it strato_strato_1 bash -c 'apt-get install python3-pip'"
   sh "docker exec -it strato_strato_1 bash -c 'pip3 install --upgrade pip'"
   sh "docker exec -it strato_strato_1 bash -c 'pip3 install requests'"
 
