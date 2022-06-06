@@ -196,7 +196,7 @@ fromBasic = \case
   BBool b -> SimpleValue $ ValueBool b
   BInteger n -> SimpleValue $! valueInt n
   BString bs -> SimpleValue $! valueBytes bs
-  BAccount a _ -> SimpleValue $! ValueAccount a
+  BAccount a -> SimpleValue $! ValueAccount a
   BContract _ c -> ValueContract c
   BEnumVal tipe name num -> ValueEnum tipe name (fromIntegral num)
 
