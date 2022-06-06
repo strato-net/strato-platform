@@ -30,7 +30,7 @@ import           Blockchain.Util
 import           Blockchain.ExtWord
 import qualified Text.Colors                  as CL
 import           Text.Format
-
+import           BlockApps.X509
 data Capability = ETH Integer               -- | Base Ethereum P2P protocol
                 | IST Integer               -- | Istanbul/Blockstanbul/PBFT messages.
                 | UNKNOWNCAP String Integer -- ¯\_(ツ)_/¯
@@ -151,13 +151,26 @@ instance RLPSerializable TransactionRequest where
 
 data Message =
   --p2p wire protocol
-  Hello { version::Int, clientId::String, capability::[Capability], port::Int, nodeId::Point } |
+  Hello {
+    version::Int, 
+    clientId::String,
+    capability::[Capability],
+    port::Int, 
+    nodeId::Point
+  } |
   Disconnect TerminationReason |
   Ping |
   Pong |
 
   --ethereum wire protocol
-  Status { protocolVersion::Int, networkID::Integer, totalDifficulty::Integer, latestHash::Keccak256, genesisHash:: Keccak256 } |
+  Status { 
+    protocolVersion::Int, 
+    networkID::Integer, 
+    totalDifficulty::Integer, 
+    latestHash::Keccak256, 
+    genesisHash:: Keccak256,
+    rootCerts :: [X509Certificate]
+    } |
   NewBlockHashes [(Keccak256, Int)] |
   Transactions [Transaction] |
   GetBlockHeaders {block::BlockHashOrNumber, maxHeaders::Int, skip::Int, direction::Direction} |
@@ -186,13 +199,14 @@ instance Format Message where
   format Pong = CL.blue "Pong"
 
   --ethereum wire protocol
-  format Status{ protocolVersion=ver, networkID=nID, totalDifficulty=d, latestHash=lh, genesisHash=gh } =
+  format Status{ protocolVersion=ver, networkID=nID, totalDifficulty=d, latestHash=lh, genesisHash=gh, rootCerts = rcs} =
     CL.blue "Status" ++
       "    protocolVersion: " ++ show ver ++ "\n" ++
       "    networkID: " ++ show nID ++ "\n" ++
       "    totalDifficulty: " ++ show d ++ "\n" ++
       "    latestHash: " ++ format lh ++ "\n" ++
-      "    genesisHash: " ++ format gh
+      "    genesisHash: " ++ format gh ++ "\n" ++
+      "    rootCerts: " ++ show rcs
 
   format (NewBlockHashes items) = CL.blue "NewBlockHashes"  ++ tab("\n" ++ intercalate "\n    " ((\(hash', number') -> "(" ++ format hash' ++ ", " ++ show number' ++ ")") <$> items))
   format (Transactions transactions) =
@@ -245,13 +259,14 @@ obj2WireMessage 0x1 (RLPArray [reason]) =
 obj2WireMessage 0x2 (RLPArray []) = Ping
 obj2WireMessage 0x2 (RLPArray [RLPArray []]) = Ping
 obj2WireMessage 0x3 (RLPArray []) = Pong
-obj2WireMessage 0x10 (RLPArray [ver, nID, d, lh, gh]) =
+obj2WireMessage 0x10 (RLPArray [ver, nID, d, lh, gh, rcs]) =
     Status {
   protocolVersion=fromInteger $ rlpDecode ver,
   networkID = fromInteger $ rlpDecode nID,
   totalDifficulty = rlpDecode d,
   latestHash=rlpDecode lh,
-  genesisHash=rlpDecode gh
+  genesisHash=rlpDecode gh,
+  rootCerts=rlpDecode rcs
 }
 
 obj2WireMessage 0x11 (RLPArray items) =
@@ -304,8 +319,8 @@ wireMessage2Obj Hello { version = ver,
 wireMessage2Obj (Disconnect reason) = (0x1, RLPArray [rlpEncode $ terminationReasonToNumber reason])
 wireMessage2Obj Ping = (0x2, RLPArray [])
 wireMessage2Obj Pong = (0x3, RLPArray [])
-wireMessage2Obj (Status ver nID d lh gh) =
-    (0x10, RLPArray [rlpEncode $ toInteger ver, rlpEncode $ toInteger nID, rlpEncode d, rlpEncode lh, rlpEncode gh])
+wireMessage2Obj (Status ver nID d lh gh rcs) =
+    (0x10, RLPArray [rlpEncode $ toInteger ver, rlpEncode $ toInteger nID, rlpEncode d, rlpEncode lh, rlpEncode gh, rlpEncode rcs])
 wireMessage2Obj (NewBlockHashes items) =
   (0x11, RLPArray $ map (\(b, n) -> RLPArray [rlpEncode b, rlpEncode $ toInteger n]) items)
 wireMessage2Obj (GetBlockHeaders b max' skip' direction') =

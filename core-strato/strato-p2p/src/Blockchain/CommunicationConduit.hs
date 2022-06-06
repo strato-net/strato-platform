@@ -61,8 +61,11 @@ import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.TimerSource
 import           Blockchain.Util
 import           Blockchain.Watchdog
+import           BlockApps.X509
 
-
+-- This is a placeholder until the root certs can be held in a proper database
+rootCerts' :: [X509Certificate] 
+rootCerts' = [rootCert]
 
 ethVersion :: Int
 ethVersion = 62
@@ -164,14 +167,16 @@ handleMsgClientConduit myId peer = do
                 networkID       = computeNetworkID,
                 totalDifficulty = fromIntegral tdiff,
                 latestHash      = bHash,
-                genesisHash     = genHash
+                genesisHash     = genHash,
+                rootCerts       = rootCerts'
               })
         other -> assertHandshake other
     awaitMsg >>= \case
-        Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash, networkID=networkID'} -> do
+        Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash, networkID=networkID', rootCerts=rcs} -> do
                 (GenesisBlockHash genHash) <- lift $ Mod.access (Mod.Proxy @GenesisBlockHash)
                 when (peerGH /= genHash) $ throwIO WrongGenesisBlock
                 when (networkID' /= computeNetworkID) $ error "networkID mismatch"
+                when (rcs /= rootCerts') $ error "rootCerts mismatch"
                 -- we set to 0 cause we dont necessarily know the number yet
                 lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
                 (BestBlockNumber lastBlockNumber) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
@@ -202,12 +207,14 @@ handleMsgServerConduit myPubkey peer = do
             yield $ Right helloMsg'
         other -> assertHandshake $ other
     awaitMsg >>= \case
-        Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash, networkID=networkID'} -> do
+        Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash, networkID=networkID', rootCerts=rcs} -> do
             $logInfoS "serverHandshake/Status{}" "received status"
             yield =<< lift (Mod.get (Mod.Proxy @BestBlock) >>= \(BestBlock bHash _ tdiff) -> do
               (GenesisBlockHash genHash) <- Mod.access (Mod.Proxy @GenesisBlockHash)
               when (genHash /= peerGH) $ error "peer has a different genesis block than we do!"
               when (networkID' /= computeNetworkID) $ error "networkID mismatch"
+              when (rcs /= rootCerts') $ error "rootCerts mismatch"
+
               -- we set to 0 cause we dont necessarily know the number yet
               Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
               return $ Right Status {
@@ -215,7 +222,8 @@ handleMsgServerConduit myPubkey peer = do
                   networkID = computeNetworkID,
                   totalDifficulty = fromIntegral tdiff,
                   latestHash = bHash,
-                  genesisHash = genHash
+                  genesisHash = genHash,
+                  rootCerts= rootCerts'
               })
         other -> assertHandshake other
     handleEvents peer .| filterMC (either (const $ return True) checkOutbound)
