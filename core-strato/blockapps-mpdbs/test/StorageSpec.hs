@@ -226,7 +226,7 @@ storageSpec = do
     solidIdTest "0"               (MS.BInteger 0)
     solidIdTest "empty string"    (MS.BString "")
     solidIdTest "False"           (MS.BBool False)
-    solidIdTest "zero account"    (MS.BAccount (unspecifiedChain 0) False)
+    solidIdTest "zero account"    (MS.BAccount (unspecifiedChain 0))
     solidIdTest "zero enum value" (MS.BEnumVal "myEnum" "myEnumKey" 0)
     solidIdTest "zero contract"   (MS.BContract "MyContractName" $ unspecifiedChain 0)
     solidIdTest "BDefault"        (MS.BDefault)

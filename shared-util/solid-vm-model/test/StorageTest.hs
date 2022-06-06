@@ -95,9 +95,9 @@ spec = do
       let examples = [ BInteger 3399293429
                      , BString "This is text"
                      , BBool True
-                     , BAccount (unspecifiedChain 0x23421421421341232341bbbb) False
-                     , BAccount (mainChain 0x23421421421341232341bbbb) False
-                     , BAccount (explicitChain 0x23421421421341232341bbbb 0xdeadbeefd00d) False
+                     , BAccount (unspecifiedChain 0x23421421421341232341bbbb) 
+                     , BAccount (mainChain 0x23421421421341232341bbbb) 
+                     , BAccount (explicitChain 0x23421421421341232341bbbb 0xdeadbeefd00d) 
                      , BContract "Wings!" (unspecifiedChain 0xdeadbeef)
                      , BContract "Wings!" (mainChain 0xdeadbeef)
                      , BContract "Wings!" (explicitChain 0xdeadbeef 0x1234567890)
