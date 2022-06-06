@@ -96,7 +96,7 @@ entryPoint (Options privPath certPath nonce) = do
             putStrLn $ "\n\nTransaction result: " <> show result
 
             let oops = error "We did not successfully post the CertificateRegistry!"
-                strToAddr x =  fromMaybe oops (stringAddress $ take 40 x)
+                strToAddr x = fromMaybe oops . stringAddress . T.unpack . head . T.splitOn "," $ T.pack x
                 addr = case result of
                     (Right (BlocTxResult (BlocTransactionResult {blocTransactionStatus=Success, 
                         blocTransactionTxResult=Just (DD.TransactionResult{..})}))) -> strToAddr transactionResultContractsCreated
