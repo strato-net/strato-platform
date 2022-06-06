@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
 
 import           Data.Proxy
@@ -7,12 +8,13 @@ import           Text.Read
 import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Lazy                 as BL
 import qualified Data.Map.Strict                      as M
+import           Data.Maybe
 import qualified Data.Text                            as T
 import qualified Data.Text.Encoding                   as T
 
 import           Data.Source.Map
 import           Network.HTTP.Client                  (newManager, defaultManagerSettings)
-import           Options.Applicative
+import           Options.Applicative                  hiding (Success)
 import           Options.Applicative                  as Opt (value)
 import           Servant.Client
 import           Text.RawString.QQ
@@ -21,6 +23,7 @@ import qualified Data.Aeson                           as Ae
 import           BlockApps.Bloc22.API
 import           BlockApps.Ethereum
 import           BlockApps.X509 
+import qualified Blockchain.Data.DataDefs             as DD
 import           Blockchain.Data.Transaction
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
@@ -80,7 +83,7 @@ entryPoint (Options privPath certPath nonce) = do
         (Right _, Left s') -> putStrLn $ "Oh no! The certificate couldn't be parsed! " <> s'
         (Right priv, Right cert) -> do
             let request = optionsToTX priv cert nonce
-            putStrLn "We will make the following request:\n"
+            putStrLn "We will make the following request to CertificateRegistry:\n"
             BL.putStr $ Ae.encode request
 
             -- setup servant client
@@ -92,6 +95,19 @@ entryPoint (Options privPath certPath nonce) = do
             result <- runClientM (postRawTransaction Nothing Nothing True request) clientEnv
             putStrLn $ "\n\nTransaction result: " <> show result
 
+            let oops = error "We did not successfully post the CertificateRegistry!"
+                strToAddr x =  fromMaybe oops (stringAddress $ take 40 x)
+                addr = case result of
+                    (Right (BlocTxResult (BlocTransactionResult {blocTransactionStatus=Success, 
+                        blocTransactionTxResult=Just (DD.TransactionResult{..})}))) -> strToAddr transactionResultContractsCreated
+                    _ -> oops
+            let request' = initializeCertificateRegistryTX priv addr $ succ nonce
+            putStrLn "\n\nWe will make the following request to initializeCertificateRegistry of CertificateRegistry:\n"
+            BL.putStr $ Ae.encode request'
+
+            -- post initializeCertificateRegistry
+            result' <- runClientM (postRawTransaction Nothing Nothing True request') clientEnv
+            putStrLn $ "\n\nTransaction result: " <> show result'
 
 -- servant client for the endpoint
 postRawTransaction :: Maybe T.Text -> Maybe ChainId -> Bool -> PostBlocTransactionRawRequest
@@ -130,6 +146,34 @@ optionsToTX priv cert nonce =
             ("history", "Certificate"), ("args", T.pack $ "(" <> show (certToBytes cert) <> ")")])
 
 
+initializeCertificateRegistryTX :: PrivateKey -> Address -> Nonce -> PostBlocTransactionRawRequest
+initializeCertificateRegistryTX priv addr nonce =
+    let unsignedTx = UnsignedTransaction
+            { unsignedTransactionNonce      = nonce
+            , unsignedTransactionGasPrice   = Wei 10000        -- default val
+            , unsignedTransactionGasLimit   = Gas 29000000000  -- default val
+            , unsignedTransactionTo         = Just addr
+            , unsignedTransactionValue      = Wei 0 
+            , unsignedTransactionInitOrData = Code $ B.empty
+            , unsignedTransactionChainId    = Nothing
+            }
+        txHash = rlpHash unsignedTx
+        sig = signMsg priv txHash
+        (rr,s,v) = getSigVals sig
+    in PostBlocTransactionRawRequest
+        (fromPrivateKey priv)
+        (unsignedTransactionNonce unsignedTx)
+        (unsignedTransactionGasPrice unsignedTx)
+        (unsignedTransactionGasLimit unsignedTx)
+        (unsignedTransactionTo unsignedTx)
+        (unsignedTransactionValue unsignedTx)
+        (unsignedTransactionInitOrData unsignedTx)
+        (unsignedTransactionChainId unsignedTx)
+        rr
+        s
+        (Just v)
+        (Just $ M.fromList [("VM", "SolidVM"), ("funcName", "initializeCertificateRegistry"), ("args", "()")])
+
 certificateRegistryContract :: T.Text
 certificateRegistryContract = [r|
 pragma solidvm 3.2;
@@ -167,9 +211,19 @@ contract CertificateRegistry {
     // Solidity mappings are non-iterable.
     Certificate[] certificates;
     mapping(account => uint) certificatesMap;
+
+    string rootCert;
+    bool initialized;
     
-    constructor(string rootCert) {
+    constructor(string _rootCert) {
         require(account(this, "self").chainId == 0, "You must post this contract on the main chain!");
+
+        rootCert = _rootCert;
+        initialized = false;
+    }
+
+    function initializeCertificateRegistry() returns (int) {
+        require(!initialized, "The CertificateRegistry has already been initialized!");
 
         // Register the root certificate
         account newAccount = registerCert(rootCert);
@@ -178,9 +232,11 @@ contract CertificateRegistry {
         Certificate c = new Certificate(newAccount, rootCert);
         certificates.push(c);
         certificatesMap[newAccount] = certificates.length;
+        initialized = true;
     }
     
     function registerCertificate(string newCertificateString) returns (int) {
+        require(initialized, "You must first initialize with initializeCertificateRegistry!");
 
         // Register the certificate into LevelDB
         account newAccount = registerCert(newCertificateString);
