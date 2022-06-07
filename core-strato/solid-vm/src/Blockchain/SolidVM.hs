@@ -1963,7 +1963,67 @@ callBuiltin rc'@("registerCert") [SString cert] _ = do
                             Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.insert subjectAddress x509Cert x509s
                             return $ SAccount (NamedAccount subjectAddress UnspecifiedChain) False
             typ -> internalError "creatorAddress field has not been set or is not an account type" typ
+
+-- Cert string, contract type
+callBuiltin rc''@("registerCert") [SString cert, (SContract "Certificate" na)] _ = do
+  contract' <- getCurrentContract
+  let rootAddress = fromPublicKey rootPubKey
+  if CC._vmVersion contract' /= "svm3.2" 
+    then unknownFunction "callBuiltin" rc''
+    else do
+      curAccount <- getCurrentAccount
+      case curAccount of
+        Account{_accountChainId=Just cid} -> invalidWrite "Cannot register X.509 certificates on private chains" cid
+        Account{..} -> do
+          mCreatorAddress <- getSolidStorageKeyVal' curAccount $ MS.StoragePath [MS.Field ":creatorAddress"]
+          case mCreatorAddress of
+            (MS.BAccount creatorAccount _) -> do
+              onTraced $ liftIO $ putStrLn $ "    Creator Address: " <> (show $ _namedAccountAddress creatorAccount)
+              onTraced $ liftIO $ putStrLn $ "    Root Address: " <> (show rootAddress)
+              if ((_namedAccountAddress creatorAccount) /= rootAddress) then invalidWrite "Only a function in a contract posted by the BlockApps Root Address may call registerCert" creatorAccount
+              else do
+                let ex509Cert = bsToCert . BC.pack $ cert
+                case ex509Cert of 
+                  Left q -> invalidCertificate "Could not parse X.509 certificate" q
+                  Right x509Cert -> do
+                    if not $ verifyBlockApps x509Cert 
+                      then invalidCertificate "Certificate is not signed by the BlockApps Root Certificate" (getCertIssuer x509Cert)
+                      else do
+                        let mSubject = getCertSubject x509Cert
+                        case mSubject of 
+                          Nothing -> invalidCertificate "No or invalid subject" x509Cert
+                          (Just subject) -> do
+                            let subjectAddress = fromPublicKey $ subPub subject
+                            onTraced $ liftIO $ putStrLn $ "    Registering cert to address derived from the subject's public key: " ++ 
+                              format subjectAddress ++ " as Common Name:" ++ show (subCommonName subject) ++ "; Organization: " ++ show (subOrg subject)
+                            
+                            org <- getOrg curAccount (contract' ^. CC.vmVersion) -- the org of the app
+         
+                            parentName <- fromMaybeM (return "") $ runMaybeT 
+                                $   pure curAccount
+                                >>= MaybeT . A.lookup (A.Proxy @AddressState)
+                                >>= pure  .  addressStateCodeHash
+                                >>= MaybeT . resolveCodePtrParent (curAccount ^. accountChainId)
+                                >>= (\case     
+                                        SolidVMCode name _ | name /= (CC._contractName contract') -> pure name
+                                        _                                                    -> pure "")
+                            
+                            -- TODO remove leveldb insert
+                            x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
+                            Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.insert subjectAddress x509Cert x509s
+                            
+                            addEvent $ Event org parentName (CC._contractName contract') curAccount "CertificateRegistered" [("userAddress", show subjectAddress), ("contractAddress", show (_namedAccountAddress na))]
+                            
+                            liftIO $ putStrLn $ "Emit Event/versioning ---> we are emitting event CertificateRegistered" ++ 
+                                " in contract " ++ (CC._contractName curCnct) ++ " in app " ++ (show parentName) ++ 
+                                " of org " ++ show org
+                            
+                            return $ SAccount (NamedAccount subjectAddress UnspecifiedChain) False
+            typ -> internalError "creatorAddress field has not been set or is not an account type" typ
+
+
 callBuiltin "getUserCert" [SAccount a _] _ = do
+  -- TODO remove level db check, use redis instead
   x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
   maybeCertLevelDB <- x509CertDBGet $ _namedAccountAddress a
   let maybeCertBlockDB = M.lookup (_namedAccountAddress a) x509s
@@ -2031,6 +2091,7 @@ certificateMap maybeCert = case maybeCert of
                                    , (SString "organization", Constant . SString $ subOrg sub)
                                    , (SString "group", Constant . SString $ fromMaybe "" $ subUnit sub)
                                    , (SString "publicKey", Constant . SString $ BC.unpack $ pubToBytes $ subPub sub)
+                                   , (SString "userAddress", Constant . SString $ show $ fromPublicKey $ subPub sub)
                                    , (SString "certString", Constant . SString $ cert)
                                    ]
           emptyCertMap = M.fromList [ (SString "commonName", Constant . SString $ "")
@@ -2038,6 +2099,7 @@ certificateMap maybeCert = case maybeCert of
                              , (SString "organization", Constant . SString $ "")
                              , (SString "group", Constant . SString $ "")
                              , (SString "publicKey", Constant . SString $ "")
+                             , (SString "userAddress", Constant . SString $ "")
                              , (SString "certString", Constant . SString $ "")
                              ]
           stringToString = SVMType.Mapping { SVMType.dynamic = Nothing

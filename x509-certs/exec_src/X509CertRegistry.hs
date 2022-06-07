@@ -33,6 +33,7 @@ import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Nonce
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.Wei
+import           Blockchain.Data.DataDefs     (TransactionResult(..))      
 
 -- | The command line options
 data Options 
@@ -93,7 +94,22 @@ entryPoint (Options privPath certPath nonce) = do
 
             -- post it
             result <- runClientM (postRawTransaction Nothing Nothing True request) clientEnv
-            putStrLn $ "\n\nTransaction result: " <> show result
+            -- register the root certs bc orgs of contracts created in the constructor are not supported
+            case result of 
+                Right (BlocTxResult (BlocTransactionResult{
+                    blocTransactionTxResult=Just (TransactionResult{
+                        transactionResultContractsCreated=as
+                        })
+                    }))-> do
+                            let addr = (stringAddress $ T.unpack $ head (T.splitOn "," $ T.pack as))
+                                request' = createFuncTx priv addr cert (nonce + 1) 
+                            result' <- runClientM (postRawTransaction Nothing Nothing True request') clientEnv
+                            case result' of 
+                                Right suc -> putStrLn $ "Registered Root Certs: " <> show suc
+                                Left err -> putStrLn $ "Could not register Root Certs: " <> show err
+
+                e -> putStrLn $ "Could not post Certificate Registry Dapp: " <> show e
+            -- putStrLn $ "\n\nTransaction result: " <> show result
 
             let oops = error "We did not successfully post the CertificateRegistry!"
                 strToAddr x = fromMaybe oops . stringAddress . T.unpack . head . T.splitOn "," $ T.pack x
@@ -116,7 +132,7 @@ postRawTransaction = client (Proxy @ PostBlocTransactionRaw)
 
 
 -- Convert the parsed and retrieved options into a raw transaction request
-optionsToTX :: PrivateKey -> X509Certificate -> Nonce -> PostBlocTransactionRawRequest
+optionsToTX :: PrivateKey -> X509 Certificate -> Nonce -> PostBlocTransactionRawRequest
 optionsToTX priv cert nonce = 
     let unsignedTx = UnsignedTransaction
             { unsignedTransactionNonce      = nonce
@@ -143,8 +159,36 @@ optionsToTX priv cert nonce =
         s
         (Just v)
         (Just $ M.fromList $ [("VM", "SolidVM"), ("name", "CertificateRegistry"), 
-            ("history", "Certificate"), ("args", T.pack $ "(" <> show (certToBytes cert) <> ")")])
+            ("history", "Certificate"), ("args", T.pack $ "()")])
 
+createFuncTx :: PrivateKey -> Maybe Address -> X509Certificate -> Nonce -> PostBlocTransactionRawRequest
+createFuncTx priv addr cert nonce = 
+    let unsignedTx = UnsignedTransaction
+            { unsignedTransactionNonce      = nonce
+            , unsignedTransactionGasPrice   = Wei 10000        -- default val
+            , unsignedTransactionGasLimit   = Gas 29000000000  -- default val
+            , unsignedTransactionTo         = addr
+            , unsignedTransactionValue      = Wei 0 
+            , unsignedTransactionInitOrData = Code $ B.empty
+            , unsignedTransactionChainId    = Nothing
+            }
+        txHash = rlpHash unsignedTx
+        sig = signMsg priv txHash
+        (rr,s,v) = getSigVals sig
+    in PostBlocTransactionRawRequest
+        (fromPrivateKey priv)
+        (unsignedTransactionNonce unsignedTx)
+        (unsignedTransactionGasPrice unsignedTx)
+        (unsignedTransactionGasLimit unsignedTx)
+        (unsignedTransactionTo unsignedTx)
+        (unsignedTransactionValue unsignedTx)
+        (unsignedTransactionInitOrData unsignedTx)
+        (unsignedTransactionChainId unsignedTx)
+        rr
+        s
+        (Just v)
+        (Just $ M.fromList $ [("VM", "SolidVM"), ("funcName", "registerCertificate"), 
+             ("args", T.pack $ "("<> show (certToBytes cert) <> ")"), ("history", "Certificate")])
 
 initializeCertificateRegistryTX :: PrivateKey -> Address -> Nonce -> PostBlocTransactionRawRequest
 initializeCertificateRegistryTX priv addr nonce =
@@ -190,15 +234,16 @@ contract Certificate {
     string publicKey;
     string certificateString;
 
-    constructor(account _newAccount, string _certificateString) {
+    constructor(string _certificateString) {
         owner = msg.sender;
 
-        certificateHolder = _newAccount;
-
         mapping(string => string) parsedCert = parseCert(_certificateString);
+
+        certificateHolder = parsedCert["userAddress"];
         commonName = parsedCert["commonName"];
         organization = parsedCert["organization"];
         group = parsedCert["group"];
+        country = parsedCert["country"];
         publicKey = parsedCert["publicKey"];
         certificateString = parsedCert["certString"];
     }
@@ -206,6 +251,8 @@ contract Certificate {
 
 pragma solidvm 3.2;
 contract CertificateRegistry {
+    // Declare the event that gets silently emitted when a certificate is registered
+    event CertificateRegistered(address userAddress, address contractAddress);
     // The registry maintains a list and mapping of all the certificates
     // We need the extra array in order for us to iterate through our certificates.
     // Solidity mappings are non-iterable.
@@ -213,23 +260,25 @@ contract CertificateRegistry {
     mapping(account => uint) certificatesMap;
 
     string rootCert;
+    string rootPubKey;
     bool initialized;
     
     constructor(string _rootCert) {
         require(account(this, "self").chainId == 0, "You must post this contract on the main chain!");
 
         rootCert = _rootCert;
+        rootPubKey = parseCert(_rootCert)["publicKey"];
         initialized = false;
     }
 
     function initializeCertificateRegistry() returns (int) {
         require(!initialized, "The CertificateRegistry has already been initialized!");
 
-        // Register the root certificate
-        account newAccount = registerCert(rootCert);
-        
         // Create the Certificate record
-        Certificate c = new Certificate(newAccount, rootCert);
+        Certificate c = new Certificate(rootCert);
+
+        // Register the root certificate andemit event
+        registerCert(rootCert, c);
         certificates.push(c);
         certificatesMap[newAccount] = certificates.length;
         initialized = true;
@@ -237,14 +286,16 @@ contract CertificateRegistry {
     
     function registerCertificate(string newCertificateString) returns (int) {
         require(initialized, "You must first initialize with initializeCertificateRegistry!");
-
-        // Register the certificate into LevelDB
-        account newAccount = registerCert(newCertificateString);
+        require(verifyCert(newCertificateString, rootPubKey), "The cert being registered is not verified in the chain of trust");
         
         // Create the new Certificate record
-        Certificate c = new Certificate(newAccount, newCertificateString);
+        Certificate c = new Certificate(newCertificateString);
+        
+        // Register the certificate into LevelDB and emit event
+        registerCert(newCertificateString, c);
+
         certificates.push(c);
-        certificatesMap[newAccount] = certificates.length;
+        certificatesMap[userAccount] = certificates.length;
         
         return 200; // 200 = HTTP Status OK
     }
