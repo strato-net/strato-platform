@@ -168,6 +168,15 @@ data Message =
     networkID::Integer, 
     totalDifficulty::Integer, 
     latestHash::Keccak256, 
+    genesisHash:: Keccak256
+    } |
+-- TODO remove distinction between new status messages and old ones once entire protocol is complete
+
+  NewStatus { 
+    protocolVersion::Int, 
+    networkID::Integer, 
+    totalDifficulty::Integer, 
+    latestHash::Keccak256, 
     genesisHash:: Keccak256,
     rootCerts :: [X509Certificate]
     } |
@@ -199,7 +208,16 @@ instance Format Message where
   format Pong = CL.blue "Pong"
 
   --ethereum wire protocol
-  format Status{ protocolVersion=ver, networkID=nID, totalDifficulty=d, latestHash=lh, genesisHash=gh, rootCerts = rcs} =
+  format Status{ protocolVersion=ver, networkID=nID, totalDifficulty=d, latestHash=lh, genesisHash=gh} =
+    CL.blue "Status" ++
+      "    protocolVersion: " ++ show ver ++ "\n" ++
+      "    networkID: " ++ show nID ++ "\n" ++
+      "    totalDifficulty: " ++ show d ++ "\n" ++
+      "    latestHash: " ++ format lh ++ "\n" ++
+      "    genesisHash: " ++ format gh
+      
+-- TODO remove distinction between new status messages and old ones once entire protocol is complete
+  format NewStatus{ protocolVersion=ver, networkID=nID, totalDifficulty=d, latestHash=lh, genesisHash=gh, rootCerts = rcs} =
     CL.blue "Status" ++
       "    protocolVersion: " ++ show ver ++ "\n" ++
       "    networkID: " ++ show nID ++ "\n" ++
@@ -259,15 +277,24 @@ obj2WireMessage 0x1 (RLPArray [reason]) =
 obj2WireMessage 0x2 (RLPArray []) = Ping
 obj2WireMessage 0x2 (RLPArray [RLPArray []]) = Ping
 obj2WireMessage 0x3 (RLPArray []) = Pong
+-- TODO remove distinction between new status messages and old ones once entire protocol is complete
 obj2WireMessage 0x10 (RLPArray [ver, nID, d, lh, gh, rcs]) =
+    NewStatus {
+      protocolVersion=fromInteger $ rlpDecode ver,
+      networkID = fromInteger $ rlpDecode nID,
+      totalDifficulty = rlpDecode d,
+      latestHash=rlpDecode lh,
+      genesisHash=rlpDecode gh,
+      rootCerts=rlpDecode rcs
+    }
+obj2WireMessage 0x10 (RLPArray [ver, nID, d, lh, gh]) =
     Status {
-  protocolVersion=fromInteger $ rlpDecode ver,
-  networkID = fromInteger $ rlpDecode nID,
-  totalDifficulty = rlpDecode d,
-  latestHash=rlpDecode lh,
-  genesisHash=rlpDecode gh,
-  rootCerts=rlpDecode rcs
-}
+      protocolVersion=fromInteger $ rlpDecode ver,
+      networkID = fromInteger $ rlpDecode nID,
+      totalDifficulty = rlpDecode d,
+      latestHash=rlpDecode lh,
+      genesisHash=rlpDecode gh
+    }
 
 obj2WireMessage 0x11 (RLPArray items) =
   NewBlockHashes $ (\(RLPArray [hash', number']) -> (rlpDecode hash', fromInteger $ rlpDecode number')) <$> items
@@ -319,7 +346,10 @@ wireMessage2Obj Hello { version = ver,
 wireMessage2Obj (Disconnect reason) = (0x1, RLPArray [rlpEncode $ terminationReasonToNumber reason])
 wireMessage2Obj Ping = (0x2, RLPArray [])
 wireMessage2Obj Pong = (0x3, RLPArray [])
-wireMessage2Obj (Status ver nID d lh gh rcs) =
+wireMessage2Obj (Status ver nID d lh gh) =
+    (0x10, RLPArray [rlpEncode $ toInteger ver, rlpEncode $ toInteger nID, rlpEncode d, rlpEncode lh, rlpEncode gh])
+-- TODO remove distinction between new status messages and old ones once entire protocol is complete
+wireMessage2Obj (NewStatus ver nID d lh gh rcs) =
     (0x10, RLPArray [rlpEncode $ toInteger ver, rlpEncode $ toInteger nID, rlpEncode d, rlpEncode lh, rlpEncode gh, rlpEncode rcs])
 wireMessage2Obj (NewBlockHashes items) =
   (0x11, RLPArray $ map (\(b, n) -> RLPArray [rlpEncode b, rlpEncode $ toInteger n]) items)

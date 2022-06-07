@@ -31,6 +31,8 @@ defineFlag "vaultWrapperUrl" ("http://vault-wrapper:8000/strato/v2.3" :: String)
 defineFlag "txGossipFanout" (-1::Int) "Maxmimum number of peers to forward transactions to. Only\
                                       \ applicable for transactions received from peers, not\
                                       \ originating on this node."
+-- TODO remove distinction between new status messages and old ones once entire protocol is complete
+defineFlag "useNodeCerts" (False :: Bool) "Use new node certificate checking protocol"
 
 defineEQFlag "privateChainAuthorizationMode" [| FlexibleAuth :: AuthorizationMode |] "AUTHORIZATIONMODE"
     "Describes the policy for sharing private chain data. By default, it only checks that the ip address\

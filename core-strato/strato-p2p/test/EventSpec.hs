@@ -51,7 +51,7 @@ import qualified Blockchain.Data.TXOrigin              as Origin
 import           Blockchain.Data.Wire
 import           Blockchain.Event
 import           Blockchain.ExtWord
-import           Blockchain.Options                    (AuthorizationMode(..))
+import           Blockchain.Options                    
 import           Blockchain.Output
 import           Blockchain.Privacy
 import qualified Blockchain.Sequencer                  as Seq
