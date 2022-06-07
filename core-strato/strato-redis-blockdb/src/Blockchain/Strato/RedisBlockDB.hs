@@ -15,6 +15,7 @@ module Blockchain.Strato.RedisBlockDB
     , getChainInfo, putChainInfo
     , getChainMembers, putChainMembers
     , addChainMember, removeChainMember
+    , registerCertificate
     , getChainTxsInBlock, putChainTxsInBlock, addChainTxsInBlock
     , getIPChains, addIPChain, removeIPChain
     , getOrgIdChains, addOrgIdChain, removeOrgIdChain
@@ -103,6 +104,7 @@ inNamespace ns k = ns' `S8.append` toKey k
             PrivateTxsInBlocks  -> "pb:"
             PrivateIPChains     -> "pic:"
             PrivateOrgIdChains  -> "poc:"
+            X509Certificates    -> "x509:"
 
 findNamespace :: S8.ByteString -> BlockDBNamespace
 findNamespace key = case S8.takeWhile (/= ':') key of
@@ -119,6 +121,7 @@ findNamespace key = case S8.takeWhile (/= ':') key of
   "pb" -> PrivateTxsInBlocks
   "pic" -> PrivateIPChains
   "poc" -> PrivateOrgIdChains
+  "x509" -> X509Certificates
   wut -> error $ "unknown namespace: " ++ show wut
 
 getChainInfo :: Word256
@@ -194,6 +197,14 @@ removeChainMember cId address = do
             Compose (removeOrgIdChain (unOrgId $ pubKey enode) cId)
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Error" ++ e)
+
+registerCertificate :: Address -> Address -> Redis (Either Reply Status)
+registerCertificate userAddress contractAddress = do
+    res <- multiExec $ set (inNamespace X509Certificates $ toKey userAddress) (toValue contractAddress)
+    case res of
+        TxSuccess _ -> pure $ Right Ok
+        TxAborted -> pure . Left $ SingleLine (S8.pack $ "registerCertificate - Aborted")
+        TxError e -> pure . Left $ SingleLine (S8.pack $ "registerCertificate - Error" <> e)
 
 getChainTxsInBlock :: Keccak256
                    -> Redis (M.Map Word256 [Keccak256])
