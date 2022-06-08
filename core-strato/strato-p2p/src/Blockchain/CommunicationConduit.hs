@@ -187,7 +187,7 @@ handleMsgClientConduit myId peer = do
                 (GenesisBlockHash genHash) <- lift $ Mod.access (Mod.Proxy @GenesisBlockHash)
                 when (peerGH /= genHash) $ throwIO WrongGenesisBlock
                 when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch networkID' computeNetworkID
-                when (rcs /= rootCerts') $ throwIO RootCertificateMismatch
+                when (S.difference rcs rootCerts' /= S.empty) $ throwIO RootCertificateMismatch
                 -- we set to 0 cause we dont necessarily know the number yet
                 lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
                 (BestBlockNumber lastBlockNumber) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
@@ -237,7 +237,7 @@ handleMsgServerConduit myPubkey peer = do
               (GenesisBlockHash genHash) <- Mod.access (Mod.Proxy @GenesisBlockHash)
               when (genHash /= peerGH) $ throwIO WrongGenesisBlock
               when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch networkID' computeNetworkID
-              when (rcs /= rootCerts') $ throwIO RootCertificateMismatch
+              when (S.difference rcs rootCerts' /= S.empty) $ throwIO RootCertificateMismatch
 
               -- we set to 0 cause we dont necessarily know the number yet
               Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
