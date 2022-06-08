@@ -3796,9 +3796,9 @@ contract qq {
           registerCert(certAddr, myCertificate);
           certPubKey = getUserCert(certAddr)["publicKey"];
       }
-  }|])) `shouldThrow` anyTypeError
+  }|])) `shouldThrow` anyUnknownFunc
 
-  it "cannot use new registerCert on solidvm < 3.2" $ (runTest $ do
+  it "cannot use new registerCert(string _cert) on solidvm < 3.2" $ (runTest $ do
       (runBS [r|
   contract qq {
       account public certAddr = account(0x622EB3792DaA3d3770E3D27D02e53755408aE00b);
@@ -3809,7 +3809,52 @@ contract qq {
           certPubKey = getUserCert(certAddr)["publicKey"];
       }
   }|])) `shouldThrow` anyUnknownFunc
-
+  
+  it "cannot use new registerCert(string _cert, Certificate c) on solidvm < 3.2" $ (runTest $ do
+      (runBS [r|
+  contract Certificate {
+    string name;
+    constructor(string _name) {
+      name = _name;
+    }
+  }
+  contract qq {
+      account public certAddr = account(0x622EB3792DaA3d3770E3D27D02e53755408aE00b);
+      string public myCertificate = "-----BEGIN CERTIFICATE-----\nMIIBizCCAS+gAwIBAgIQejfmUC0VeygSTQ0htwpDbzAMBggqhkjOPQQDAgUAMEcx\nDTALBgNVBAMMBFRyb3kxEjAQBgNVBAoMCUJsb2NrYXBwczEUMBIGA1UECwwLRW5n\naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTAeFw0yMjA0MTQyMTI4NDdaFw0yMzA0MTQy\nMTI4NDdaMEcxDTALBgNVBAMMBFRyb3kxEjAQBgNVBAoMCUJsb2NrYXBwczEUMBIG\nA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEGBSuB\nBAAKA0IABCSwiVfrLj1MCa+1bcBXOnGhnLxS5DYo3/1udE/LYFi2hFgDCPQxKYqP\n7LmHV2W35B3ZZw5SQVf1FxjWE0tZqswwDAYIKoZIzj0EAwIFAANIADBFAiEAvbGZ\nqma5fKnHnzpGCI5lc4VYdHBfgqfG7CwqJ5ii66YCIFUT+eXA1fS9q4/jJ+eULQwH\neXbEHHtO6nBOorRsoG3H\n-----END CERTIFICATE-----";
+      string public certPubKey;
+      constructor() {
+          Certificate c = new Certificate("foo");
+          registerCert(myCertificate, c);
+          certPubKey = getUserCert(certAddr)["publicKey"];
+      }
+  }|])) `shouldThrow` anyInvalidWriteError
+  
+  it "can only post X509 certificates to the address of the public key" . runTest $ do
+    void $ runArgsWithOrigin rootAcc sender "()" [r|
+pragma solidvm 3.2;
+contract Certificate {
+    string name;
+    constructor(string _name) {
+      name = _name;
+    }
+  }
+contract qq {
+    event CertificateRegistered(address userAddress, address contractAddress);
+    account public certAddr = account(0x74f014FEF932D2728c6c7E2B4d3B88ac37A7E1d0, "main");
+    string public myCertificate = "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----";
+    string public certName;
+    string public certOrg;
+    constructor() {
+        Certificate c = new Certificate("foo");
+        registerCert(myCertificate, c);
+        certName = getUserCert(certAddr)["commonName"];
+        certOrg = getUserCert(certAddr)["organization"];
+    }
+}|]
+    getFields ["certName", "certOrg"] `shouldReturn`
+      [ BString "Admin",
+        BString "BlockApps"
+      ]
   it "can get a users cert" . runTest $ do
     void $ runArgsWithOrigin rootAcc sender "()" [r|
 pragma solidvm 3.2;
@@ -3855,7 +3900,9 @@ contract qq {
       , BString "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEUhJR4x+wZiX+xZK2m/pwN40cvCS0UA7Z\n0DB7sny5ZnNLw43JgKz0URDY2yYOPkhoIApxFK9UU3Bc4BRANDWmdQ==\n-----END PUBLIC KEY-----\n"
       , BString "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----\n"
       ]
-    
+  -- TODO change test to use new vm version once it is decided on
+
+
   it "can call builtin function verifyCert" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
