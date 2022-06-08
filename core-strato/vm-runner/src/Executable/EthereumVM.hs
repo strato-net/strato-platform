@@ -322,6 +322,7 @@ runChainConstructors cId cInfo = do
           (MaybeT $ pure $ M.lookup hsh codeHashMap) <|>
             MaybeT (fmap (T.pack . BC.unpack . snd) <$> getCode hsh)
         pure $ Just (a,msrc)
+      sender = Account (fromMaybe 0 $ whoSignedThisChainInfo cInfo) $ Just cId
 
   actions <- fmap catMaybes . for (accountInfo $ chainInfo cInfo) $ \aInfo -> do
     addrSrc <- case aInfo of
@@ -353,12 +354,12 @@ runChainConstructors cId cInfo = do
          0 --callDepth
          (Account 0 $ Just cId) --receiveAddress
          (Account addr $ Just cId) --codeAddress
-         (Account 0 $ Just cId) --sender
+         sender
          0 --value
          1 --gasPrice
          ""
          1000000000000 --availableGas
-         (Account 0 $ Just cId)
+         sender
          (Keccak256.unsafeCreateKeccak256FromWord256 0)
          (Just cId)
          (Just $ M.fromList $

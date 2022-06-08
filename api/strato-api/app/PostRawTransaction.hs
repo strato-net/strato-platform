@@ -7,7 +7,7 @@ module Main where
 
 
 import           BlockApps.Bloc22.API
-import           BlockApps.Bloc22.Server.Transaction
+import           BlockApps.Bloc22.Server.Utils
 import           BlockApps.Ethereum
 -- import           BlockApps.Solidity.Parse.Parser     (parseXabi)
 -- import           BlockApps.Solidity.Type

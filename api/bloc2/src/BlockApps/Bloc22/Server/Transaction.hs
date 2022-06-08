@@ -16,7 +16,6 @@ module BlockApps.Bloc22.Server.Transaction (
   postBlocTransaction,
   postBlocTransactionRaw,
   postBlocTransactionParallel,
-  getSigVals
   ) where
 
 
@@ -91,7 +90,7 @@ import           Blockchain.Data.TXOrigin
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address  hiding (unAddress)
 import           Blockchain.Strato.Model.Code
-import           Blockchain.Strato.Model.ExtendedWord   (Word256, bytesToWord256, word256ToBytes)
+import           Blockchain.Strato.Model.ExtendedWord   (Word256, word256ToBytes)
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Keccak256  hiding (rlpHash)
 import           Blockchain.Strato.Model.Nonce
@@ -402,7 +401,7 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
                 chainInputSrcMap :: ChainInput -> Maybe SourceMap
                 chainInputSrcMap p = join $ liftA2 Map.lookup (chaininputContract p) msrcs
                 hydrate p = p{ chaininputSrc = fromMaybe mempty $ chainInputSrc p <|> chainInputSrcMap p }
-            fmap (fmap BlocChainResult) . postChainInfos $ hydrate <$> chainInputs
+            fmap (fmap BlocChainResult) . postChainInfos (Just userName) $ hydrate <$> chainInputs
   where fromTransfer = \case
           BlocTransfer t -> return t
           _ -> throwIO $ UserError "Could not decode transfer arguments from body"
@@ -415,16 +414,6 @@ postBlocTransaction' cacheNonce mUserName chainId resolve (PostBlocTransactionRe
         fromGenesis = \case
           BlocGenesis f -> return f
           _ -> throwIO $ UserError "Could not decode function arguments from body"
-
-
-
--- so we can convert R and S from the signature, and add 27 to V, per
--- Ethereum protocol (and backwards compatibility)
-getSigVals :: Signature -> (Word256, Word256, Word8)
-getSigVals (Signature (S.CompactRecSig r s v)) =
-  let convert = bytesToWord256 . BSS.fromShort
-  in (convert r, convert s, v + 0x1b)
-
 
 callSignature :: (MonadIO m, MonadLogger m, HasVault m) =>
                  Text -> UnsignedTransaction -> m Transaction
