@@ -64,8 +64,8 @@ import           Blockchain.Watchdog
 import           BlockApps.X509
 
 -- This is a placeholder until the root certs can be held in a proper database
-rootCerts' :: [X509Certificate] 
-rootCerts' = [rootCert]
+rootCerts' :: S.Set X509Certificate 
+rootCerts' = S.fromList [rootCert] 
 
 ethVersion :: Int
 ethVersion = 62
@@ -186,8 +186,8 @@ handleMsgClientConduit myId peer = do
         Just NewStatus{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash, networkID=networkID', rootCerts=rcs} -> do
                 (GenesisBlockHash genHash) <- lift $ Mod.access (Mod.Proxy @GenesisBlockHash)
                 when (peerGH /= genHash) $ throwIO WrongGenesisBlock
-                when (networkID' /= computeNetworkID) $ error "networkID mismatch"
-                when (rcs /= rootCerts') $ error "rootCerts mismatch"
+                when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch networkID' computeNetworkID
+                when (rcs /= rootCerts') $ throwIO RootCertificateMismatch
                 -- we set to 0 cause we dont necessarily know the number yet
                 lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
                 (BestBlockNumber lastBlockNumber) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
@@ -199,7 +199,7 @@ handleMsgClientConduit myId peer = do
         Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash, networkID=networkID'} -> do
                 (GenesisBlockHash genHash) <- lift $ Mod.access (Mod.Proxy @GenesisBlockHash)
                 when (peerGH /= genHash) $ throwIO WrongGenesisBlock
-                when (networkID' /= computeNetworkID) $ error "networkID mismatch"
+                when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch networkID' computeNetworkID
                 -- we set to 0 cause we dont necessarily know the number yet
                 lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
                 (BestBlockNumber lastBlockNumber) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
@@ -235,9 +235,9 @@ handleMsgServerConduit myPubkey peer = do
             $logInfoS "serverHandshake/Status{}" "received status"
             yield =<< lift (Mod.get (Mod.Proxy @BestBlock) >>= \(BestBlock bHash _ tdiff) -> do
               (GenesisBlockHash genHash) <- Mod.access (Mod.Proxy @GenesisBlockHash)
-              when (genHash /= peerGH) $ error "peer has a different genesis block than we do!"
-              when (networkID' /= computeNetworkID) $ error "networkID mismatch"
-              when (rcs /= rootCerts') $ error "rootCerts mismatch"
+              when (genHash /= peerGH) $ throwIO WrongGenesisBlock
+              when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch networkID' computeNetworkID
+              when (rcs /= rootCerts') $ throwIO RootCertificateMismatch
 
               -- we set to 0 cause we dont necessarily know the number yet
               Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
@@ -253,8 +253,8 @@ handleMsgServerConduit myPubkey peer = do
             $logInfoS "serverHandshake/Status{}" "received status"
             yield =<< lift (Mod.get (Mod.Proxy @BestBlock) >>= \(BestBlock bHash _ tdiff) -> do
               (GenesisBlockHash genHash) <- Mod.access (Mod.Proxy @GenesisBlockHash)
-              when (genHash /= peerGH) $ error "peer has a different genesis block than we do!"
-              when (networkID' /= computeNetworkID) $ error "networkID mismatch"
+              when (genHash /= peerGH) $ throwIO WrongGenesisBlock
+              when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch networkID' computeNetworkID
 
               -- we set to 0 cause we dont necessarily know the number yet
               Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD

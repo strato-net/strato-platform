@@ -15,6 +15,7 @@ module Blockchain.Data.Wire (
 import           Crypto.Types.PubKey.ECC
 import qualified Data.ByteString              as B
 import           Data.List
+import qualified Data.Set                     as S
 import           Data.Word
 import           Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 
@@ -178,7 +179,7 @@ data Message =
     totalDifficulty::Integer, 
     latestHash::Keccak256, 
     genesisHash:: Keccak256,
-    rootCerts :: [X509Certificate]
+    rootCerts :: S.Set X509Certificate
     } |
   NewBlockHashes [(Keccak256, Int)] |
   Transactions [Transaction] |
