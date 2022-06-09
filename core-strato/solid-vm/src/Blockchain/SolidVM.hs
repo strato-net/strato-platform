@@ -445,7 +445,7 @@ setCreator creator contract cntrct blockNumber = do
       hasSvm3_2 = CC._vmVersion cntrct == "svm3.2"
   when hasSvm3_2 $ do
     liftIO $ putStrLn $ "setCreator/address ---> Setting creatorAddress to: " ++ show creator 
-    putSolidStorageKeyVal' hasSvm3_2 contract (MS.StoragePath [MS.Field ":creatorAddress"]) (MS.BAccount (accountToNamedAccount' creator) False)
+    putSolidStorageKeyVal' hasSvm3_2 contract (MS.StoragePath [MS.Field ":creatorAddress"]) (MS.BAccount (accountToNamedAccount' creator))
   let putCreatorField org = do
         liftIO $ putStrLn $ "setCreator/versioning ---> setting the org as " ++ (show org)
         putSolidStorageKeyVal' (hasSvm3_0 || hasSvm3_2) contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack org)
@@ -1940,7 +1940,7 @@ callBuiltin rc'@("registerCert") [SString cert] _ = do
         Account{..} -> do
           mCreatorAddress <- getSolidStorageKeyVal' curAccount $ MS.StoragePath [MS.Field ":creatorAddress"]
           case mCreatorAddress of
-            (MS.BAccount creatorAccount _) -> do
+            (MS.BAccount creatorAccount) -> do
               onTraced $ liftIO $ putStrLn $ "    Creator Address: " <> (show $ _namedAccountAddress creatorAccount)
               onTraced $ liftIO $ putStrLn $ "    Root Address: " <> (show rootAddress)
               if ((_namedAccountAddress creatorAccount) /= rootAddress) then invalidWrite "Only a function in a contract posted by the BlockApps Root Address may call registerCert" creatorAccount

@@ -360,7 +360,7 @@ getFields2 :: [BC.ByteString] -> ContextM [BasicValue]
 getFields2 = getAll2 . map (\t -> [Field t])
 
 bAddress :: Address -> BasicValue
-bAddress = ((flip BAccount) False) . unspecifiedChain
+bAddress = BAccount . unspecifiedChain
 
 bContract :: T.Text -> Address -> BasicValue
 bContract t a =
@@ -381,7 +381,7 @@ bAccount a =
   let u = accountOnUnspecifiedChain a
    in if u == unspecifiedChain 0
         then BDefault
-        else (BAccount u False)
+        else (BAccount u)
 
 iAddress :: Address -> IndexType
 iAddress = IAccount . unspecifiedChain
@@ -1354,7 +1354,9 @@ contract qq {
 }|]
     getFields ["x"] `shouldReturn` [bContract "X" 0xdeadbeef]
 
-  it "can parse account payable type" . runTest $ do
+
+-- This test only works when BAccount has the payable flag
+  {-it "can parse account payable type" . runTest $ do
     runBS [r|
 contract qq {
   account y;
@@ -1366,8 +1368,8 @@ contract qq {
     x = payable(y);
   }
 }|]
-    getFields ["x"] `shouldReturn` [BAccount (NamedAccount 0xdeadbeef UnspecifiedChain) True]
-  
+    getFields ["x"] `shouldReturn` [BAccount (NamedAccount 0xdeadbeef UnspecifiedChain)]
+  -}
 
   it "can call methods of superclasses" . runTest $ do
     runBS [r|
@@ -3099,12 +3101,12 @@ contract qq {
   }
 }|]
     getFields ["sce", "scm", "scu", "sde", "sdm", "sdu"] `shouldReturn`
-      [ BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xfeedbeef)) False
-      , BAccount (NamedAccount 0xdeadbeef MainChain) False
-      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain) False
-      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain) False
-      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain) False
-      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain) False
+      [ BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xfeedbeef)) 
+      , BAccount (NamedAccount 0xdeadbeef MainChain) 
+      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain) 
+      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain) 
+      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain) 
+      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain) 
       ]
   
   it "can cast strings to chainIds" . runTest $ do
@@ -3121,9 +3123,9 @@ contract qq {
   }
 }|]
     getFields ["sce", "scm", "scu"] `shouldReturn`
-      [ BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xfeedbeef)) False
-      , BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xfeedb33f)) False
-      , BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xf33dbeef)) False
+      [ BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xfeedbeef)) 
+      , BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xfeedb33f)) 
+      , BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xf33dbeef)) 
       ]
 
   it "can cast strings to bool" . runTest $ do
@@ -3164,7 +3166,7 @@ contract qq{
     }
 }|]
     -- Get the contract's account
-    [ BAccount a _] <- getFields ["a"]
+    [ BAccount a] <- getFields ["a"]
     -- Set the balance
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 13 })
     -- Check return of balance
@@ -3191,7 +3193,7 @@ contract qq{
     }
 }|]
     -- Get the contract's account
-    [ BAccount a _] <- getFields ["a"]
+    [ BAccount a] <- getFields ["a"]
     -- Set the balance
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 7 })
     -- Check return of balance
@@ -3218,7 +3220,7 @@ contract qq{
     }
 }|]
     -- Get the contract's account
-    [ BAccount a _] <- getFields ["a"]
+    [ BAccount a] <- getFields ["a"]
     -- Set the balance
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 13 })
     -- Check return of balance
@@ -3245,7 +3247,7 @@ contract qq{
     }
 }|]
     -- Get the contract's account
-    [ BAccount a _] <- getFields ["a"]
+    [ BAccount a] <- getFields ["a"]
     -- Set the balance
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 0 })
     -- Check return of balance
@@ -3270,7 +3272,7 @@ contract qq{
     }
 }|]
     -- Get the contract's account
-    [ BAccount a _] <- getFields ["a"]
+    [ BAccount a] <- getFields ["a"]
     -- Set the balance
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 26 })
     -- Check return of balance
@@ -3294,7 +3296,7 @@ contract qq{
     }
 }|]
     -- Get the contract's account
-    [ BAccount a _] <- getFields ["a"]
+    [ BAccount a] <- getFields ["a"]
     -- Set the balance
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 26 })
     -- Check return of balance
@@ -3336,7 +3338,7 @@ contract qq{
     }
 }|]
     -- Get the contract's accounts
-    [ BAccount a _, BAccount b _, BAccount c _] <- getFields ["a", "b", "c"]
+    [ BAccount a, BAccount b, BAccount c] <- getFields ["a", "b", "c"]
     -- Adjust the preset balances
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 14 })
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs { addressStateBalance = 13 })
@@ -3385,7 +3387,7 @@ contract qq{
     }
 }|]
     -- Get the contract's accounts
-    [ BAccount a _, BAccount b _, BAccount c _ ] <- getFields ["a", "b", "c"]
+    [ BAccount a, BAccount b, BAccount c] <- getFields ["a", "b", "c"]
     -- Adjust the preset balances
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 14 })
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs { addressStateBalance = 13 })
@@ -3430,7 +3432,7 @@ contract qq{
     }
 }|]
     -- Get the contract's accounts
-    [ BAccount a _, BAccount b _, BAccount c _ ] <- getFields ["a", "b", "c"]
+    [ BAccount a, BAccount b, BAccount c] <- getFields ["a", "b", "c"]
     -- Adjust the preset balances
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 14 })
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs { addressStateBalance = 13 })
@@ -3475,7 +3477,7 @@ contract qq{
     }
 }|]
     -- Get the contract's accounts
-    [ BAccount a _, BAccount b _, BAccount c _ ] <- getFields ["a", "b", "c"]
+    [ BAccount a, BAccount b, BAccount c] <- getFields ["a", "b", "c"]
     -- Adjust the preset balances
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 14 })
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs { addressStateBalance = 13 })
@@ -3550,7 +3552,7 @@ contract qq{
   }
 }|]
     -- Get the contract's account
-    [ BAccount a _ ] <- getFields ["a"]
+    [ BAccount a] <- getFields ["a"]
     -- Set the balance
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 13 })
     -- Check return of balance
@@ -3650,8 +3652,8 @@ contract qq{
   }
 }|]
     -- Get both of the contracts
-    [ BAccount a _] <- getFields ["a"]
-    [ BAccount b _chainIdInfo] <- getFields ["b"]
+    [ BAccount a] <- getFields ["a"]
+    [ BAccount b] <- getFields ["b"]
     -- Set the balance and instantiate both of the accounts the accounts
     -- Account a should start with 13 and b should have 0 at the start.
     -- The transfer member should be able to send the balance of to account b
@@ -4084,7 +4086,7 @@ contract qq{
     return;        
   }
 }|]
-    getFields ["blockNumber", "a1", "timestamp", "gaslimit", "diff"] `shouldReturn` [BInteger 8033, (BAccount (NamedAccount 0x0 UnspecifiedChain) True), BInteger 16384, BInteger 1000000, BInteger 900]
+    getFields ["blockNumber", "a1", "timestamp", "gaslimit", "diff"] `shouldReturn` [BInteger 8033, BDefault, BInteger 16384, BInteger 1000000, BInteger 900]
 
   it "can use the builtin addmod function" . runTest $ do
     runBS [r|
