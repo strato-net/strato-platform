@@ -79,6 +79,7 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
+import           Blockchain.DB.SubscriptionsDB
 import           Blockchain.DB.X509CertDB
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
@@ -154,6 +155,7 @@ type MonadSM m = ( (Account `A.Alters` AddressState) m
                  , HasMemAddressStateDB m
                  , HasMemRawStorageDB m
                  , Mod.Accessible Env.Environment m
+                 , Mod.Accessible CurrentBlockHash m
                  , Mod.Modifiable (M.Map Address X509Certificate) m
                  , Mod.Modifiable MemDBs m
                  , Mod.Modifiable Env.Sender m
@@ -161,6 +163,7 @@ type MonadSM m = ( (Account `A.Alters` AddressState) m
                  , Mod.Modifiable Action m
                  , Mod.Modifiable (Q.Seq Event) m
                  , Mod.Modifiable (Maybe DebugSettings) m
+                 , Mod.Modifiable SubscriptionsRoot m
                  , MonadIO m --todo: remove
                  , MonadCatch m
                  , MonadLogger m
@@ -215,6 +218,13 @@ instance (Maybe Word256 `A.Alters` MP.StateRoot) m
 instance Monad m => Mod.Modifiable CurrentBlockHash (SM m) where
   get _    = fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0) . _currentBlock <$> Mod.get (Mod.Proxy @MemDBs)
   put _ md = Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ currentBlock ?= md
+
+instance Monad m => Mod.Accessible CurrentBlockHash (SM m) where
+  access _ = fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0) . _currentBlock <$> Mod.get (Mod.Proxy @MemDBs)
+
+instance (Monad m, Mod.Modifiable SubscriptionsRoot m) => Mod.Modifiable SubscriptionsRoot (SM m) where
+  get   = lift . Mod.get
+  put p = lift . Mod.put p
 
 instance A.Selectable (Maybe Word256) ParentChainId m => A.Selectable (Maybe Word256) ParentChainId (SM m) where
   select p = lift . A.select p

@@ -11,6 +11,9 @@
 
 module Blockchain.DB.SubscriptionsDB
   ( SubscriptionsRoot(..)
+  , Subscription(..)
+  , EventSource(..)
+  , SubscriptionsList(..)
   , bootstrapSubscriptionsDB
   , putBlockHeaderInSubscriptionsDB
   , migrateBlockHeaderSubscriptions

@@ -69,6 +69,7 @@ import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.ModifyStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StorageDB
+import           Blockchain.DB.SubscriptionsDB
 import           Blockchain.DB.X509CertDB
 import           Blockchain.EVM.Code
 import qualified Blockchain.EVM                          as EVM
@@ -203,6 +204,7 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
         Just cr -> $logDebugS "addBlock" $ T.pack $ "Old chain root: " ++ format cr
 
     putBlockHeaderInChainDB bd
+    putBlockHeaderInSubscriptionsDB bd
 
     when flags_debug $ do
       bhr' <- Mod.get (Proxy @BlockHashRoot)

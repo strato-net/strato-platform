@@ -51,6 +51,7 @@ import           Blockchain.Data.DataDefs              (blockDataExtraData, bloc
 import           Blockchain.Data.GenesisBlock
 import           Blockchain.DB.BlockSummaryDB
 import           Blockchain.DB.ChainDB
+import           Blockchain.DB.SubscriptionsDB
 import           Blockchain.EthConf
 import           Blockchain.Event
 import           Blockchain.JsonRpcCommand
@@ -103,6 +104,7 @@ ethereumVM d = void . execContextM d $ do
 
     putContextBestBlockInfo cpBBI
     Mod.put Proxy $ BlockHashRoot cpSR
+    void $ bootstrapSubscriptionsDB cpHash
 
     Bagger.processNewBestBlock cpHash cpHead [] -- bootstrap Bagger with genesis block
 
