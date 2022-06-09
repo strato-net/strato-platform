@@ -9,11 +9,18 @@ import qualified Data.ByteString        as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8  as BC
 import qualified Data.NibbleString      as N
+import qualified Data.Text              as T
 
 import           Numeric
 
 class Format a where
   format::a->String
+
+instance Format String where
+  format = id
+
+instance Format T.Text where
+  format = T.unpack
 
 instance Format B.ByteString where
   format = BC.unpack . B16.encode
