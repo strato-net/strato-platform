@@ -65,7 +65,6 @@ import           Text.Read (readMaybe)
 
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.ChainInfo
-import           Blockchain.Data.Code
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.ExecResults
 import qualified Blockchain.Database.MerklePatricia   as MP
@@ -84,6 +83,7 @@ import           Blockchain.SolidVM.SM
 import           Blockchain.SolidVM.TraceTools
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.ExtendedWord()
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Event

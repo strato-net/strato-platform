@@ -41,7 +41,6 @@ import           Data.Time.Clock
 import           Data.Word
 import qualified Database.Persist.Postgresql    as SQL
 
-import           Blockchain.Data.Code
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RawTransaction
 import           Blockchain.Data.RLP
@@ -51,6 +50,7 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.Secp256k1 as EC

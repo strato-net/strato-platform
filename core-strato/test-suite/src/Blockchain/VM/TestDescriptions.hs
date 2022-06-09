@@ -26,9 +26,9 @@ import           Data.Time.Clock.POSIX
 import           GHC.Generics              hiding (to)
 import           Numeric
 
-import           Blockchain.Data.Code
 import           Blockchain.EVM.VMState
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 

@@ -27,10 +27,10 @@ import           Data.Text.Encoding           (decodeUtf8, encodeUtf8)
 import           Database.Persist.TH
 import           GHC.Generics
 
-import           Blockchain.Data.Code
 import           Blockchain.Data.RLP
 import           Blockchain.Util
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.ExtendedWord (Word256)
 import           Blockchain.Strato.Model.Keccak256
 import qualified Text.Colors                  as CL

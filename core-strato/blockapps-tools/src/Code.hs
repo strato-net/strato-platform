@@ -1,5 +1,5 @@
 module Code where
-import           Blockchain.Data.Code
+import           Blockchain.Strato.Model.Code
 import           DumpLevelDB
 
 
