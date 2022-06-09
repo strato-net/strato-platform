@@ -119,6 +119,7 @@ import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
+import           Blockchain.DB.SubscriptionsDB
 import           Blockchain.DB.X509CertDB
 import           Blockchain.EthConf
 import           Blockchain.ExtWord
@@ -202,6 +203,7 @@ type VMBase m = ( MonadIO m
                 , Mod.Modifiable GenesisRoot m
                 , Mod.Modifiable BestBlockRoot m
                 , Mod.Modifiable CurrentBlockHash m
+                , Mod.Modifiable SubscriptionsRoot m
                 , HasMemAddressStateDB m
                 , A.Selectable (Maybe Word256) ParentChainId m
                 , (Maybe Word256 `A.Alters` MP.StateRoot) m
@@ -340,6 +342,9 @@ vmGenesisRootKey = "genesis_root"
 vmBestBlockRootKey :: B.ByteString
 vmBestBlockRootKey = "best_block_root"
 
+vmSubscriptionsRootKey :: B.ByteString
+vmSubscriptionsRootKey = "subscriptions_root"
+
 instance Mod.Modifiable BlockHashRoot ContextM where
   get _ = do
     db <- getStateDB
@@ -363,6 +368,14 @@ instance Mod.Modifiable BestBlockRoot ContextM where
   put _ (BestBlockRoot (MP.StateRoot sr)) = do
     db <- getStateDB
     DB.put db def vmBestBlockRootKey sr
+
+instance Mod.Modifiable SubscriptionsRoot ContextM where
+  get _ = do
+    db <- getStateDB
+    SubscriptionsRoot . maybe MP.emptyTriePtr MP.StateRoot <$> DB.get db def vmSubscriptionsRootKey
+  put _ (SubscriptionsRoot (MP.StateRoot sr)) = do
+    db <- getStateDB
+    DB.put db def vmSubscriptionsRootKey sr
 
 instance Mod.Modifiable K.KafkaState ContextM where
   get _    = readIORef =<< view (dbs . kafkaState)

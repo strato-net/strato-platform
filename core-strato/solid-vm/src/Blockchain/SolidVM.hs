@@ -72,7 +72,9 @@ import           Blockchain.DB.CodeDB
 import           Blockchain.DB.ModifyStateDB          (pay)
 import           Blockchain.DB.X509CertDB
 import           Blockchain.DB.SolidStorageDB
+import           Blockchain.DB.SubscriptionsDB
 import           Blockchain.ExtWord
+import           Blockchain.Output
 import qualified Blockchain.SolidVM.Builtins          as Builtins
 import           Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.SolidVM.Environment       as Env
@@ -1017,7 +1019,8 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
   curInfo <- getCurrentCallInfo
   curCnct <- getCurrentContract
   let evs = CC._events curCnct
-      mEv = M.lookup (T.pack eventName) evs
+      tEventName = T.pack eventName
+      mEv = M.lookup tEventName evs
   case mEv of
     Nothing ->
       missingType "no corresponding event has been declared for the following emit statement: " (unparseStatement st)
@@ -1045,6 +1048,17 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
               " of org " ++ show org
 
         addEvent $ Event org parentName (CC._contractName curCnct) account eventName pairs
+        acct <- getCurrentAccount
+        let args = CC.OrderedArgs $ snd <$> exptups
+            e = EventSource (acct, tEventName)
+        bHash <- unCurrentBlockHash <$> Mod.access (Mod.Proxy @CurrentBlockHash)
+        void . traverseSubscriptionList e bHash $ \s@(Subscription (callbackAcct, fName)) -> do
+          isAncestor <- (acct ^. accountChainId) `isAncestorChainOf` (callbackAcct ^. accountChainId)
+          if isAncestor
+            then do
+              $logDebugS "runStatement/EmitStatement" . T.pack $ "Running callback for " ++ format e ++ " at " ++ format s
+              void $ callWrapper acct callbackAcct Nothing (T.unpack fName) False args 
+            else $logWarnS "runStatement/EmitStatement" . T.pack $ "Inaccessible chain registered callback for " ++ format e ++ " at " ++ format s
         return Nothing
 
 runStatement (CC.UncheckedStatement code pos) = do

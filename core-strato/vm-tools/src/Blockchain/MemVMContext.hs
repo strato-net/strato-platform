@@ -47,6 +47,7 @@ import           Blockchain.DB.CodeDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB
+import           Blockchain.DB.SubscriptionsDB
 import           Blockchain.DB.X509CertDB
 import           Blockchain.ExtWord
 import           Blockchain.Strato.Model.Account
@@ -79,6 +80,7 @@ data MemContextDBs = MemContextDBs
   , _blockHashRoot  :: BlockHashRoot
   , _genesisRoot    :: GenesisRoot
   , _bestBlockRoot  :: BestBlockRoot
+  , _subscriptionsRoot :: SubscriptionsRoot
   , _worldBestBlock :: Maybe WorldBestBlock
   } deriving (Generic)
 makeLenses ''MemContextDBs
@@ -212,6 +214,10 @@ instance Mod.Modifiable BestBlockRoot MemContextM where
   get _     = dbsGets $ view bestBlockRoot
   put _ bbr = dbsModify' $ bestBlockRoot .~ bbr
 
+instance Mod.Modifiable SubscriptionsRoot MemContextM where
+  get _     = dbsGets $ view subscriptionsRoot
+  put _ bbr = dbsModify' $ subscriptionsRoot .~ bbr
+
 instance Mod.Modifiable CurrentBlockHash MemContextM where
   get _    = fmap (fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0)) . gets $ view $ memDBs . currentBlock
   put _ bh = modify $ memDBs . currentBlock ?~ bh
@@ -313,6 +319,7 @@ runMemContextM = runMemContextMWith cdbs
           , _blockHashRoot  = BlockHashRoot MP.emptyTriePtr
           , _genesisRoot    = GenesisRoot MP.emptyTriePtr
           , _bestBlockRoot  = BestBlockRoot MP.emptyTriePtr
+          , _subscriptionsRoot = SubscriptionsRoot MP.emptyTriePtr
           , _worldBestBlock = Nothing
           }
 
