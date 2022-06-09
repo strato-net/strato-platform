@@ -1975,7 +1975,7 @@ callBuiltin "registerCert" [SString cert, (SContract "Certificate" na)] _ = do
     -- eventually use a new solidvm version here :)
     ( "svm3.2", 
       Account{_accountChainId=Nothing}, 
-      MS.BAccount creatorAddress _,
+      MS.BAccount creatorAddress,
       Right x509Cert
       ) | (_namedAccountAddress creatorAddress) == rootAddress -> do
         onTraced $ liftIO $ putStrLn $ "    Contract Creator Address: " <> (show $ creatorAddress)
