@@ -60,3 +60,13 @@ executables:
       - hflags
       - strato-index
     other-modules: []
+
+tests:
+  strato-index-test:
+    source-dirs: test/
+    main: Spec.hs
+    dependencies:
+    - blockapps-data
+    - blockapps-datadefs
+    - hspec
+    - strato-index

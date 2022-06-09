@@ -105,6 +105,7 @@ data TxrResult = AddMember (Either String (Word256, Address, Enode))
                | PutLogDB LogDB
                | PutEventDB EventDB
                | PutTxResult TransactionResult
+               deriving (Show, Eq)
 
 indexEventToTxrResults :: IndexEvent -> [TxrResult]
 indexEventToTxrResults = \case
