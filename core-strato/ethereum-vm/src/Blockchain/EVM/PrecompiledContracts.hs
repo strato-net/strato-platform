@@ -14,9 +14,9 @@ import qualified Data.ByteString            as B
 import qualified Data.ByteString.Lazy       as BL
 import qualified Data.ByteString.Short      as Short
 
-import           Blockchain.Data.Address
 import           Blockchain.Data.Code
 import           Blockchain.EVM.OpcodePrices
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Gas
 import qualified Blockchain.Strato.Model.Secp256k1 as EC
 import           Blockchain.Util

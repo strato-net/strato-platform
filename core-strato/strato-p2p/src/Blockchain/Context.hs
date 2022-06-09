@@ -73,7 +73,6 @@ import           Data.Time.Clock
 import           GHC.Exts                              (Constraint)
 
 import           Blockchain.Blockstanbul               (WireMessage)
-import           Blockchain.Data.Address
 import           Blockchain.Data.Block
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
@@ -88,6 +87,7 @@ import           Blockchain.Sequencer.Event
 import qualified Blockchain.Sequencer.Kafka            as SK
 
 import           Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Stream.VMOutput            ( HasVMOutputsSink(..)

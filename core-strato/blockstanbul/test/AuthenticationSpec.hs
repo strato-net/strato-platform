@@ -17,9 +17,9 @@ import           Test.Hspec
 import           Test.QuickCheck
 
 import           Blockchain.Blockstanbul.Authentication
-import           Blockchain.Data.Address
 import           Blockchain.Data.Block
 import           Blockchain.Data.DataDefs
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1

@@ -17,7 +17,6 @@ import           Data.Word
 import           Data.Bits (shiftL, shiftR)
 import           Numeric
 
-import           Blockchain.Data.Address
 import           Blockchain.Data.Block
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RLP
@@ -27,6 +26,7 @@ import           Blockchain.ExtWord
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Util
 
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
 
 import qualified Text.Colors                        as CL

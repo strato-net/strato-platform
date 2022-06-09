@@ -37,7 +37,6 @@ import           GHC.Generics
 import           Prometheus
 
 import           Blockchain.Bagger.BaggerState      (defaultBaggerState)
-import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.Block
 import           Blockchain.Data.BlockSummary
@@ -51,6 +50,7 @@ import           Blockchain.DB.StateDB
 import           Blockchain.DB.X509CertDB
 import           Blockchain.ExtWord
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.TxRunResultCache        as TRC
 import           Blockchain.VMContext               ( CurrentBlockHash(..)

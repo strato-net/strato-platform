@@ -3,12 +3,12 @@ module Blockchain.Sequencer.BinaryInstances() where
 
 import           Data.Binary
 
-import           Blockchain.Data.Address     ()
 import qualified Blockchain.Data.ChainInfo   as CI
 import           Blockchain.Data.TXOrigin    ()
 import           GHC.Generics                ()
 
 import           Blockchain.ExtWord          ()
+import           Blockchain.Strato.Model.Address   ()
 import           Blockchain.Strato.Model.Keccak256 ()
 
 import           Data.ByteString             ()

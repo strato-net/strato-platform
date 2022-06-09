@@ -29,12 +29,12 @@ import           Numeric.Natural
 import           Servant
 import           Servant.Client
 
-import           Blockchain.Data.Address
 import           Blockchain.Data.Block
 import           Blockchain.Data.Json
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Keccak256 hiding (hash)
 

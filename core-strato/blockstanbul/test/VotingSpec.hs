@@ -3,8 +3,8 @@ module VotingSpec where
 import Data.Map
 import Test.Hspec
 
-import Blockchain.Data.Address
 import Blockchain.Blockstanbul.Voting
+import Blockchain.Strato.Model.Address
 
 testUpdate :: [Address]
 testUpdate = updateValidator [Address 0x23451,Address 0x43123,Address 0x323] (fromList[(Address 0x23450,fromList[(Address 0x43123,True),(Address 0x323,True),(Address 0x23451,True)])])

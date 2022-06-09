@@ -41,7 +41,6 @@ import           Data.Time.Clock
 import           Data.Word
 import qualified Database.Persist.Postgresql    as SQL
 
-import           Blockchain.Data.Address
 import           Blockchain.Data.Code
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RawTransaction
@@ -50,6 +49,7 @@ import           Blockchain.Data.TransactionDef
 import           Blockchain.Data.TXOrigin
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256

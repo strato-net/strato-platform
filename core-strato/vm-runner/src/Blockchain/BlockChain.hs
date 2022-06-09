@@ -50,7 +50,6 @@ import           Text.PrettyPrint.ANSI.Leijen            (pretty)
 import           Text.Printf
 import           UnliftIO.IORef
 
-import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.Code
@@ -90,6 +89,7 @@ import           Blockchain.VMOptions
 import qualified Blockchain.Bagger                       as Bagger
 import           Blockchain.Bagger.Transactions
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256

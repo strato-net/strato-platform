@@ -21,12 +21,12 @@ import           Data.Word
 import           GHC.Generics
 import           Numeric
 
-import           Blockchain.Data.Address
 import           Blockchain.Data.Block
 import           Blockchain.Data.Code
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class        (blockHeaderHash)
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.ExtendedWord (Word256)
