@@ -16,6 +16,7 @@ module BlockApps.Bloc22.Server.Chain where
 import           Control.Lens                      ((?~), at)
 import           Control.Monad                     (when, unless)
 import qualified Control.Monad.Change.Alter        as A
+import           Control.Monad.Composable.Vault
 import           Crypto.Random.Entropy
 import qualified Data.ByteString.Base16            as B16
 import qualified Data.Map.Ordered                  as OMap
@@ -39,7 +40,7 @@ import           BlockApps.Solidity.Type
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Server.TransactionResult  (constructArgValuesAndSource)
-import           BlockApps.Bloc22.Server.Utils              (waitFor)
+import           BlockApps.Bloc22.Server.Utils              (waitFor, getSigVals)
 import           BlockApps.XAbiConverter                    (xAbiToContract)
 
 import           Blockchain.Data.AddressStateDB
@@ -55,6 +56,8 @@ import           Control.Monad.Composable.BlocSQL
 import           Control.Monad.Composable.SQL
 import           Handlers.Chain
 import           SQLM
+import           Strato.Strato23.Client
+import           Strato.Strato23.API.Types
 
 import           UnliftIO
 
@@ -85,9 +88,10 @@ createChainInfo :: ( MonadIO m
                    , MonadLogger m
                    , HasBlocSQL m
                    , HasBlocEnv m
+                   , HasVault m
                    )
-                => Keccak256 -> ChainInput -> m ChainInfo
-createChainInfo creationBlockHash (ChainInput src mCodePtr cname lbl balances chaininputArgs members pChain mmd _) = do
+                => Text -> Keccak256 -> ChainInput -> m ChainInfo
+createChainInfo userName creationBlockHash (ChainInput src mCodePtr cname lbl balances chaininputArgs members pChain mmd _) = do
   when (null members) $ throwIO $ UserError "Private chains must include at least one member"
   when (sum (nmap2' balances) == 0) $ throwIO $ UserError "At least one account must have a non-zero balance"
 
@@ -140,7 +144,7 @@ createChainInfo creationBlockHash (ChainInput src mCodePtr cname lbl balances ch
                            | otherwise = Just $ NonContract a b
       nonContractAcctInfo = catMaybes $ nmap maybeNonContract balances
       acctInfo = cAcctInfo ++ nonContractAcctInfo
-      chainInfo = ChainInfo
+      unsigned =
         (UnsignedChainInfo lbl
                            acctInfo
                            codeInfo
@@ -150,7 +154,10 @@ createChainInfo creationBlockHash (ChainInput src mCodePtr cname lbl balances ch
                            nonce
                            metaData
         )
-        Nothing
+      msgHash = keccak256ToByteString $ rlpHash unsigned
+  sig <- blocVaultWrapper $ postSignature userName (MsgHash msgHash)
+  let (r, s, v) = getSigVals sig
+      chainInfo = ChainInfo unsigned (Just $ ChainSignature r s v)
   return chainInfo
 
 withLastBlockHash :: (MonadIO m, MonadUnliftIO m, HasSQL m) =>
@@ -179,18 +186,21 @@ postChainInfo :: ( MonadIO m
                  , HasBlocSQL m
                  , HasBlocEnv m
                  , HasSQL m
+                 , HasVault m
                  )
-              => ChainInput -> m ChainId
-postChainInfo chainInput = withLastBlockHash $ \bHash -> do
-  evmCompatibleOn <- fmap evmCompatible getBlocEnv
-  if evmCompatibleOn
-      then throwIO $ UserError $ Text.pack "Error: EVM Compatibility flag is On. This feature cannot be used."
-  else do
-      chainInfo' <- createChainInfo bHash chainInput
-      chainId <- CORE.postChain chainInfo'
-      let isAsync = fromMaybe False $ chaininputAsync chainInput
-      unless isAsync $ waitForChainInfo chainId
-      return chainId
+              => Maybe Text -> ChainInput -> m ChainId
+postChainInfo mUserName chainInput = case mUserName of
+  Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-UNIQUE-NAME in the header"
+  Just userName -> withLastBlockHash $ \bHash -> do
+    evmCompatibleOn <- fmap evmCompatible getBlocEnv
+    if evmCompatibleOn
+        then throwIO $ UserError $ Text.pack "Error: EVM Compatibility flag is On. This feature cannot be used."
+    else do
+        chainInfo' <- createChainInfo userName bHash chainInput
+        chainId <- CORE.postChain chainInfo'
+        let isAsync = fromMaybe False $ chaininputAsync chainInput
+        unless isAsync $ waitForChainInfo chainId
+        return chainId
 
 postChainInfos :: ( MonadIO m
                   , A.Selectable Account AddressState m
@@ -199,15 +209,18 @@ postChainInfos :: ( MonadIO m
                   , HasBlocSQL m
                   , HasSQL m
                   , HasBlocEnv m
+                  , HasVault m
                   )
-               => [ChainInput] -> m [ChainId]
-postChainInfos chainInputs = withLastBlockHash $ \bHash -> do
-  chainInfos <- traverse (createChainInfo bHash) chainInputs
-  chainIds <- postChains chainInfos
-  let asyncInputs = fromMaybe False . chaininputAsync <$> chainInputs
-      asyncChains = map snd . filter (not . fst) $ zip asyncInputs chainIds
-  unless (null asyncChains) $ waitForChainInfos asyncChains
-  return chainIds
+               => Maybe Text -> [ChainInput] -> m [ChainId]
+postChainInfos mUserName chainInputs = case mUserName of
+  Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-UNIQUE-NAME in the header"
+  Just userName -> withLastBlockHash $ \bHash -> do
+    chainInfos <- traverse (createChainInfo userName bHash) chainInputs
+    chainIds <- postChains chainInfos
+    let asyncInputs = fromMaybe False . chaininputAsync <$> chainInputs
+        asyncChains = map snd . filter (not . fst) $ zip asyncInputs chainIds
+    unless (null asyncChains) $ waitForChainInfos asyncChains
+    return chainIds
 
 waitForChainInfo :: (MonadLogger m, Selectable ChainId ChainInfo m,
                      HasSQL m) =>
