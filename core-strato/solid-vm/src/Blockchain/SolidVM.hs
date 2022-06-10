@@ -1963,7 +1963,71 @@ callBuiltin rc'@("registerCert") [SString cert] _ = do
                             Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.insert subjectAddress x509Cert x509s
                             return $ SAccount (NamedAccount subjectAddress UnspecifiedChain) False
             typ -> internalError "creatorAddress field has not been set or is not an account type" typ
+
+-- Cert string, contract type
+callBuiltin "registerCert" [SString cert, (SContract "Certificate" na)] _ = do
+  curContract <- getCurrentContract
+  curAccount <- getCurrentAccount
+  mCreatorAddress <- getSolidStorageKeyVal' curAccount $ MS.StoragePath [MS.Field ":creatorAddress"]
+  let rootAddress = fromPublicKey rootPubKey
+      ex509Cert = bsToCert . BC.pack $ cert
+  case (curContract ^. CC.vmVersion, curAccount, mCreatorAddress, ex509Cert) of 
+    -- eventually use a new solidvm version here :)
+    ( "svm3.2", 
+      Account{_accountChainId=Nothing}, 
+      MS.BAccount creatorAddress,
+      Right x509Cert
+      ) | (_namedAccountAddress creatorAddress) == rootAddress -> do
+        onTraced $ liftIO $ putStrLn $ "    Contract Creator Address: " <> (show $ creatorAddress)
+        onTraced $ liftIO $ putStrLn $ "    Root Address: " <> (show rootAddress)
+        if not $ verifyBlockApps x509Cert 
+          then invalidCertificate "Certificate is not signed by the BlockApps Root Certificate" (getCertIssuer x509Cert)
+          else do
+            let mSubject = getCertSubject x509Cert
+            case mSubject of 
+              Nothing -> invalidCertificate "No or invalid subject" x509Cert
+              (Just subject) -> do
+                let subjectAddress = fromPublicKey $ subPub subject
+                onTraced $ liftIO $ putStrLn $ "    Registering cert to address derived from the subject's public key: " ++ 
+                  format subjectAddress ++ " as Common Name:" ++ show (subCommonName subject) ++ "; Organization: " ++ show (subOrg subject)
+                
+                org <- getOrg curAccount (curContract ^. CC.vmVersion) -- the org of the app
+
+                parentName <- fromMaybeM (return "") $ runMaybeT 
+                    $   pure curAccount
+                    >>= MaybeT . A.lookup (A.Proxy @AddressState)
+                    >>= pure  .  addressStateCodeHash
+                    >>= MaybeT . resolveCodePtrParent (curAccount ^. accountChainId)
+                    >>= (\case     
+                            SolidVMCode name _ | name /= (CC._contractName curContract) -> pure name
+                            _                                                    -> pure "")
+                
+                -- TODO remove leveldb insert
+                x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
+                Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.insert subjectAddress x509Cert x509s
+                
+                addEvent $ Event org parentName (CC._contractName curContract) curAccount "CertificateRegistered" [
+                      ("userAddress", show subjectAddress)
+                    , ("contractAddress", show (_namedAccountAddress na))
+                    ]
+                
+                liftIO $ putStrLn $ "Emit Event/identity ---> we are emitting event CertificateRegistered" ++ 
+                    " in contract " ++ (CC._contractName curContract) ++ " in app " ++ (show parentName) ++ 
+                    " of org " ++ show org
+                
+                return $ SAccount (NamedAccount subjectAddress UnspecifiedChain) False
+
+    (vmVersion, acc, caddr, ccert) -> do
+      invalidWrite ("Cannot call registerCertificate here: " <> (T.unpack $ T.intercalate "\n" (map T.pack [
+        show vmVersion
+        , show acc
+        , show caddr
+        , show ccert
+        ]))) vmVersion
+
+
 callBuiltin "getUserCert" [SAccount a _] _ = do
+  -- TODO remove level db check, use redis instead
   x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
   maybeCertLevelDB <- x509CertDBGet $ _namedAccountAddress a
   let maybeCertBlockDB = M.lookup (_namedAccountAddress a) x509s
@@ -1974,8 +2038,8 @@ callBuiltin "getUserCert" [SAccount a _] _ = do
 -- Expects the public key to be in PEM format
 -- Raises an error if it can't parse either argument, however perhaps that should't happen...
 callBuiltin vc@"verifyCert" [SString cert, SString pubkey] _ = do
-  contract' <- getCurrentContract
-  if CC._vmVersion contract' == "svm3.2" then do
+  curContract <- getCurrentContract
+  if CC._vmVersion curContract == "svm3.2" then do
     let ex509Cert = bsToCert . BC.pack $ cert
     let ePublicKey = bsToPub $ BC.pack pubkey
     case (ex509Cert, ePublicKey) of 
@@ -1994,8 +2058,8 @@ callBuiltin vc@"verifyCert" [SString cert, SString pubkey] _ = do
 -- Expects the public key to be in PEM format
 -- Raises an error if it can't parse either argument, however perhaps that should't happen...
 callBuiltin vs@"verifySignature" [SString msg, SString signature, SString pubkey] _ = do
-  contract' <- getCurrentContract
-  if CC._vmVersion contract' == "svm3.2" then do
+  curContract <- getCurrentContract
+  if CC._vmVersion curContract == "svm3.2" then do
     let eMesgBs = B16.decode $ BC.pack msg 
     case eMesgBs of 
       (mesgBs, "") -> do
@@ -2031,6 +2095,7 @@ certificateMap maybeCert = case maybeCert of
                                    , (SString "organization", Constant . SString $ subOrg sub)
                                    , (SString "group", Constant . SString $ fromMaybe "" $ subUnit sub)
                                    , (SString "publicKey", Constant . SString $ BC.unpack $ pubToBytes $ subPub sub)
+                                   , (SString "userAddress", Constant . SString $ show $ fromPublicKey $ subPub sub)
                                    , (SString "certString", Constant . SString $ cert)
                                    ]
           emptyCertMap = M.fromList [ (SString "commonName", Constant . SString $ "")
@@ -2038,6 +2103,7 @@ certificateMap maybeCert = case maybeCert of
                              , (SString "organization", Constant . SString $ "")
                              , (SString "group", Constant . SString $ "")
                              , (SString "publicKey", Constant . SString $ "")
+                             , (SString "userAddress", Constant . SString $ "")
                              , (SString "certString", Constant . SString $ "")
                              ]
           stringToString = SVMType.Mapping { SVMType.dynamic = Nothing

@@ -790,7 +790,10 @@ assertArgs :: SourceAnnotation Text -> Type'
 assertArgs x = boolType' x
 
 registerCertArgs :: SourceAnnotation Text -> Type'
-registerCertArgs x = stringType' x
+registerCertArgs x = Sum $ stringType' x :| 
+                        [ Product [stringType' x, contractType' x] x
+                        , Product [accountType' x, stringType' x] x
+                        ]
 
 verifyCertArgs :: SourceAnnotation Text -> Type'
 verifyCertArgs x = Product [stringType' x, stringType' x] x
