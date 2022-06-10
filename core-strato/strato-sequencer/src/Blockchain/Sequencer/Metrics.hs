@@ -137,6 +137,13 @@ chainIdRegistrySize = unsafeRegister
             . gauge
             $ Info "chain_id_registry" "Size count for private chain chain id registry"
 
+{-# NOINLINE blockNumberRegistrySize #-}
+blockNumberRegistrySize :: Vector Text Gauge
+blockNumberRegistrySize = unsafeRegister
+            . vector "block_number_registry"
+            . gauge
+            $ Info "block_number_registry" "Size count for private chain block number registry"
+
 {-# NOINLINE getChainsDbSize #-}
 getChainsDbSize :: Vector Text Gauge
 getChainsDbSize = unsafeRegister
