@@ -11,11 +11,11 @@ import           Data.Time.Clock
 import qualified Database.Persist.Postgresql  as SQL
 import           System.FilePath
 
-import           Blockchain.Data.Code
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
 import           Blockchain.DB.SQLDB          (runSqlPool, createPostgresqlPool)
 import           Blockchain.EthConf
+import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.Secp256k1
 
 retrievePrvKey :: FilePath -> IO (Maybe PrivateKey)

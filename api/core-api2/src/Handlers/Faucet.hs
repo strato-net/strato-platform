@@ -38,8 +38,6 @@ import           System.IO.Unsafe
 import           Text.Printf
 
 import           Blockchain.Constants
-import           Blockchain.Data.Address
-import           Blockchain.Data.Code
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
@@ -48,7 +46,9 @@ import           Blockchain.EthConf             (runKafkaConfigured)
 import           Blockchain.Output
 import           Blockchain.Sequencer.Event     (IngestEvent (IETx), IngestTx (..))
 import           Blockchain.Sequencer.Kafka     (writeUnseqEvents)
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Util                (getCurrentMicrotime)

@@ -15,7 +15,6 @@ library:
   - attoparsec
   - base16-bytestring
   - binary
-  - blockapps-data
   - bytestring
   - containers
   - cryptonite

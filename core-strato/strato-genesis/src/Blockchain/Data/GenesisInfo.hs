@@ -21,10 +21,10 @@ import qualified Data.JsonStream.Parser             as JS
 import           Data.Time
 import           Data.Word
 
-import           Blockchain.Data.Address
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.ArbitraryInstances ()
 import           Blockchain.Database.MerklePatricia
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256
 
 

@@ -6,8 +6,8 @@ import qualified Data.IntSet                  as I
 import           Numeric
 import           Text.PrettyPrint.ANSI.Leijen
 
-import           Blockchain.Data.Code
 import           Blockchain.EVM.Opcodes
+import           Blockchain.Strato.Model.Code
 import           Blockchain.Util
 
 import           Text.Format

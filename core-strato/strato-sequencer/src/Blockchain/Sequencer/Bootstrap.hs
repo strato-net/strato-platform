@@ -7,7 +7,6 @@ import qualified Control.Monad.Change.Alter as A
 import qualified Data.ByteString.Char8 as C8
 
 import           Blockchain.Constants
-import           Blockchain.Data.Address
 import           Blockchain.Data.Block
 import           Blockchain.Data.DataDefs
 import           Blockchain.EthConf as EC
@@ -24,6 +23,7 @@ import           Blockchain.Sequencer.DB.DependentBlockDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Gregor
 import           Blockchain.Sequencer.Monad
+import           Blockchain.Strato.Model.Address
 
 import           Network.HTTP.Client        (newManager, defaultManagerSettings)
 import           Servant.Client

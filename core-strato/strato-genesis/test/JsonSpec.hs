@@ -10,10 +10,10 @@ import qualified Data.ByteString.Base16 as B16
 import qualified Data.JsonStream.Parser               as JS
 
 
-import Blockchain.Data.Address
 import Blockchain.Data.ChainInfo
 import Blockchain.Data.GenesisInfo
 import Blockchain.Database.MerklePatricia.StateRoot
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256
 

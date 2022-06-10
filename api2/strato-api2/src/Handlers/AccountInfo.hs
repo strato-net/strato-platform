@@ -32,10 +32,10 @@ import           Servant.Client
 --import           Servant.Swagger.Tags
 
 
-import           Blockchain.Data.Address
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json
 import           Blockchain.DB.SQLDB
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Keccak256
 

@@ -51,10 +51,8 @@ import           UnliftIO
 
 
 
-import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockSummary
-import           Blockchain.Data.Code
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.ExecResults
 import           Blockchain.Data.Log
@@ -67,6 +65,8 @@ import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB
 import           Blockchain.ExtWord
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Stream.Action           as Action
 import           Blockchain.Util

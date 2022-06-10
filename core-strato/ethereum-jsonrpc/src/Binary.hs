@@ -11,7 +11,7 @@ import qualified Data.ByteString.Base16  as B16
 import qualified Data.ByteString.Char8   as BC
 import qualified Data.ByteString.Lazy    as BL
 
-import           Blockchain.Data.Address
+import           Blockchain.Strato.Model.Address
 
 strToAddress::String->Either String Address
 strToAddress ('0':'x':val) =

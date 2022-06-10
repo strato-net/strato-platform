@@ -22,7 +22,6 @@ import           Data.Word
 import           Test.Hspec
 import           Test.Hspec.Runner
 
-import           Blockchain.Data.Address
 import           Blockchain.Data.ArbitraryInstances()
 import           Blockchain.Data.BlockHeader
 import           Blockchain.Data.ChainInfo
@@ -30,6 +29,7 @@ import           Blockchain.Data.DataDefs        (BlockData)
 import           Blockchain.Data.Enode
 import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Code

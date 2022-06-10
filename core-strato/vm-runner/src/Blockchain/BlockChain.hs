@@ -50,10 +50,8 @@ import           Text.PrettyPrint.ANSI.Leijen            (pretty)
 import           Text.Printf
 import           UnliftIO.IORef
 
-import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockSummary
-import           Blockchain.Data.Code
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.ExecResults
 import           Blockchain.Data.Log
@@ -78,6 +76,7 @@ import           Blockchain.ExtWord
 import           Blockchain.Output
 import           Blockchain.Sequencer.Event
 import qualified Blockchain.SolidVM                      as SolidVM
+import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.TheDAOFork
 import           Blockchain.Verifier
@@ -90,6 +89,7 @@ import           Blockchain.VMOptions
 import qualified Blockchain.Bagger                       as Bagger
 import           Blockchain.Bagger.Transactions
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256

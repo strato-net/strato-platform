@@ -37,7 +37,6 @@ import           Blockchain.Blockstanbul.EventLoop
 import qualified Blockchain.Blockstanbul.HTTPAdmin as API
 import           Blockchain.Blockstanbul.Messages hiding (round)
 import           Blockchain.Blockstanbul.StateMachine
-import           Blockchain.Data.Address
 import           Blockchain.Data.Block
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
@@ -55,6 +54,7 @@ import           Blockchain.Sequencer.DB.GetTransactionsDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Monad
 import           Blockchain.Sequencer.OrderValidator
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256

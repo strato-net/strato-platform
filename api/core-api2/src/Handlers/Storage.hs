@@ -32,10 +32,10 @@ import           MaybeNamed
 import           Servant
 import           Servant.Client
 
-import           Blockchain.Data.Address
 import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
 import           Blockchain.SolidVM.Model
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 
 import           Control.Monad.Composable.SQL

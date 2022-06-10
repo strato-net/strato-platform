@@ -37,10 +37,10 @@ import           Data.Word
 import           Numeric
 import           Text.Printf
 
-import           Blockchain.Data.Address
 import           Blockchain.Data.RLP
 import           Blockchain.SolidVM.Exception
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Address
 
 
 import qualified SolidVM.Model.CodeCollection            as CC
