@@ -31,6 +31,7 @@ import qualified Data.Map                           as M
 import           Data.Maybe                         (fromMaybe)
 import qualified Data.NibbleString                  as N
 import qualified Data.Sequence                      as Q
+import qualified Data.Set                           as S
 import           Data.Traversable                   (for)
 import           Debugger
 import           GHC.Generics
@@ -336,6 +337,7 @@ runMemContextMWith cdbs dSettings f = do
         , _storageBlockMap = M.empty
         , _stateRoots      = M.empty
         , _currentBlock    = Nothing
+        , _callbackChains  = S.empty
         }
       cstate = ContextState
         { _memDBs            = cmemDBs

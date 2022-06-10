@@ -46,6 +46,7 @@ import           Blockchain.DB.ChainDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.ModifyStateDB
 import           Blockchain.DB.StorageDB
+import           Blockchain.DB.SubscriptionsDB
 import           Blockchain.Database.MerklePatricia (StateRoot (..))
 import qualified Blockchain.EthConf                 as Conf
 import           Blockchain.ExtWord
@@ -249,6 +250,7 @@ processNewBestBlock bh bd txShas = do
                                        }
     putBaggerState $ state { B.seen = S.empty, B.miningCache = newMiningCache }
     migrateBlockHeader bd baggerBlockHash
+    migrateBlockHeaderSubscriptions bd baggerBlockHash
     withBagger $ do
       demoteUnexecutables
       promoteExecutables
