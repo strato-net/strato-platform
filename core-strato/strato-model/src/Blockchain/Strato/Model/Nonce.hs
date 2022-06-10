@@ -19,7 +19,7 @@ import           Blockchain.Strato.Model.ExtendedWord
 
 newtype Nonce = Nonce Word256
                deriving (Eq, Show, Generic)
-               deriving newtype (Num, Ord, Bounded)
+               deriving newtype (Num, Ord, Enum, Bounded)
                deriving anyclass (NFData)
 
 instance ToJSON Nonce where
