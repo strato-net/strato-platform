@@ -264,6 +264,11 @@ instance MonadIO m => (Word256 `A.Alters` ChainIdEntry) (MonadTest m) where
   insert = genericTestInsert $ sequencerContext . chainIdRegistry
   delete = genericTestDelete $ sequencerContext . chainIdRegistry
 
+instance MonadIO m => (Integer `A.Alters` Keccak256) (MonadTest m) where
+  lookup = genericTestLookup $ sequencerContext . blockNumberRegistry
+  insert = genericTestInsert $ sequencerContext . blockNumberRegistry
+  delete = genericTestDelete $ sequencerContext . blockNumberRegistry
+
 instance MonadIO m => (Keccak256 `A.Alters` DBDB.DependentBlockEntry) (MonadTest m) where
   lookup _ k = use $ sequencerContext . dbeRegistry . at k
   insert _ k v = sequencerContext . dbeRegistry . at k ?= v
@@ -368,6 +373,7 @@ newSequencerContext bc = do
       , _txHashRegistry      = M.empty
       , _chainHashRegistry   = M.empty
       , _chainIdRegistry     = M.empty
+      , _blockNumberRegistry = M.empty
       , _getChainsDB         = emptyGetChainsDB
       , _getTransactionsDB   = emptyGetTransactionsDB
       , _ldbBatchOps         = Q.empty

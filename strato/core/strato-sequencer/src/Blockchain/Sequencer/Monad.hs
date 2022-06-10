@@ -54,6 +54,7 @@ module Blockchain.Sequencer.Monad
   , txHashRegistry
   , chainHashRegistry
   , chainIdRegistry
+  , blockNumberRegistry
   , getChainsDB
   , getTransactionsDB
   , ldbBatchOps
@@ -129,6 +130,7 @@ data SequencerContext = SequencerContext
   , _txHashRegistry      :: !(Map Keccak256 (Modification OutputTx))
   , _chainHashRegistry   :: !(Map Keccak256 (Modification ChainHashEntry))
   , _chainIdRegistry     :: !(Map Word256 (Modification ChainIdEntry))
+  , _blockNumberRegistry :: !(Map Integer (Modification Keccak256))
   , _getChainsDB         :: !GetChainsDB
   , _getTransactionsDB   :: !GetTransactionsDB
   , _ldbBatchOps         :: !(Q.Seq LDB.BatchOp)
@@ -225,6 +227,10 @@ instance HasNamespace ChainHashEntry where
 instance HasNamespace ChainIdEntry where
   type NSKey ChainIdEntry = Word256
   namespace _ = "ci:"
+
+instance HasNamespace Keccak256 where
+  type NSKey Keccak256 = Integer
+  namespace _ = "bn:"
 
 lookupInLDB :: (Binary a, HasNamespace a, MonadIO m, Mod.Accessible LDB.DB m)
             => Mod.Proxy a -> NSKey a -> m (Maybe a)
@@ -336,6 +342,17 @@ instance (Word256 `A.Alters` ChainIdEntry) SequencerM where
     sz <- M.size <$> use chainIdRegistry
     liftIO $ withLabel chainIdRegistrySize "chain_id_registry" (flip setGauge (fromIntegral sz))
 
+instance (Integer `A.Alters` Keccak256) SequencerM where
+  lookup = genericLookupSequencer blockNumberRegistry
+  insert p k v = do
+    genericInsertSequencer blockNumberRegistry p k v
+    sz <- M.size <$> use blockNumberRegistry
+    liftIO $ withLabel blockNumberRegistrySize "block_number_registry" (flip setGauge (fromIntegral sz))
+  delete p k = do
+    genericDeleteSequencer blockNumberRegistry p k
+    sz <- M.size <$> use blockNumberRegistry
+    liftIO $ withLabel blockNumberRegistrySize "block_number_registry" (flip setGauge (fromIntegral sz))
+
 instance (Keccak256 `A.Alters` DependentBlockEntry) SequencerM where
   lookup _ k = do
     mv <- use $ dbeRegistry . at k
@@ -431,6 +448,7 @@ prunePrivacyDBs = do
   prune txHashRegistry
   prune chainHashRegistry
   prune chainIdRegistry
+  prune blockNumberRegistry
   setTo initialEmittedBlockCache emittedBlockRegistry
   where prune = setTo M.empty
         setTo s r = modify' $ r .~ s
@@ -454,6 +472,7 @@ runSequencerM c mbc m = do
             , _txHashRegistry      = M.empty
             , _chainHashRegistry   = M.empty
             , _chainIdRegistry     = M.empty
+            , _blockNumberRegistry = M.empty
             , _getChainsDB         = emptyGetChainsDB
             , _getTransactionsDB   = emptyGetTransactionsDB
             , _ldbBatchOps         = Q.empty

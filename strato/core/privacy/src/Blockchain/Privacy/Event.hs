@@ -59,6 +59,7 @@ type HasPrivacyRegistries m = ( (Keccak256 `Alters` OutputBlock) m
                               , (Keccak256 `Alters` OutputTx) m
                               , (Keccak256 `Alters` ChainHashEntry) m
                               , (Word256 `Alters` ChainIdEntry) m
+                              , (Integer `Alters` Keccak256) m -- Block number to block hash
                               , Selectable (Maybe Word256) ParentChainId m
                               )
 
@@ -259,45 +260,35 @@ runBlocks :: ( MonadLogger m
              , HasFullPrivacy m
              )
           => Word256 -> m [OutputBlock]
-runBlocks chainId = go Nothing
+runBlocks chainId = getAllBlocksToRun chainId >>= \btr ->
+  fmap (fromMaybe []) . traverse go $
+    if S.null btr
+      then Nothing
+      else Just $ S.elemAt 0 btr
   where
-    go mPreviousBlock = do
-      btr <- getAllBlocksToRun chainId
-      if S.null btr
-        then return []
-        else do
-          let b0 = S.elemAt 0 btr
-          if Just b0 == mPreviousBlock
-            then do
-              $logWarnS "Privacy/runBlocks" . T.pack $ concat
-                [ "Failed to clear previous block from cache: "
-                , format b0
-                , ". Breaking to prevent infinite loop."
-                , " This probably means this node was removed from the private chain "
-                , format chainId
-                , "."
-                ]
-              pure []
-            else do
-              mBlock <- lookup (Proxy @OutputBlock) (_bhash b0)
-              fmap (fromMaybe [] . join) . for mBlock $ \block -> do
-                mHydrated <- hydratePrivateHashes (Just chainId) block
-                for mHydrated $ \b -> do
-                  logFF "Privacy/runBlocks" $ concat
-                    [ "blocksToRun deleting "
-                    , format b0
-                    , " for private chain "
-                    , format chainId
-                    , " and its ancestors."
-                    ]
-                  let chainIds = S.toList
-                               . (S.\\ (S.singleton Nothing))
-                               . S.fromList
-                               . (Just chainId :) -- It's possible that there aren't any transactions with this chainId in the block
-                               $ txChainId <$> obReceiptTransactions b
-                  for_ chainIds $ \(Just cId) -> forAncestorChains cId . flip (adjustStatefully_ (Proxy @ChainIdEntry)) $
-                    blocksToRun %= S.delete b0
-                  (b:) <$> go (Just b0)
+    go b0 = do
+      mBlock <- lookup (Proxy @OutputBlock) (_bhash b0)
+      fmap (fromMaybe [] . join) . for mBlock $ \block -> do
+        mHydrated <- hydratePrivateHashes (Just chainId) block
+        for mHydrated $ \b -> do
+          logFF "Privacy/runBlocks" $ concat
+            [ "blocksToRun deleting "
+            , format b0
+            , " for private chain "
+            , format chainId
+            , " and its ancestors."
+            ]
+          let chainIds = S.toList
+                       . (S.\\ (S.singleton Nothing))
+                       . S.fromList
+                       . (Just chainId :) -- It's possible that there aren't any transactions with this chainId in the block
+                       $ txChainId <$> obReceiptTransactions b
+          for_ chainIds $ \(Just cId) -> forAncestorChains cId . flip (adjustStatefully_ (Proxy @ChainIdEntry)) $
+            blocksToRun %= S.delete b0
+          let nextBlockNum = _bordering b0 + 1
+          lookup (Proxy @Keccak256) nextBlockNum >>= \case
+            Nothing -> pure [b]
+            Just bHash -> (b:) <$> go (BlockInfo bHash nextBlockNum)
 
 hasAllAncestorChains :: (Word256 `Alters` ChainIdEntry) m
                      => Maybe Word256 -> m Bool
@@ -341,6 +332,7 @@ hydratePrivateHashes chainF b = do
       bHash = blockHeaderHash $ blockHeader b
       bOrdering = blockOrdering b
       bInfo = BlockInfo bHash bOrdering
+  insert (Proxy @Keccak256) bOrdering bHash
   when (any isPrivateHashTX $ blockTransactions b) $
     insert (Proxy @OutputBlock) bHash b
   let discluded cs cid = foldrM (\x y -> if y then pure y else x `isAncestorChainOf` cid) False (S.elems cs)
