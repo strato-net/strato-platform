@@ -230,15 +230,18 @@ contract CertificateRegistry {
     function initializeCertificateRegistry() returns (int) {
         require(!initialized, "The CertificateRegistry has already been initialized!");
         require(verifyCert(rootCert, rootPubKey), "The cert being registered is not verified in the chain of trust");
-
+        
         // Create the Certificate record
         Certificate c = new Certificate(rootCert);
 
-        // Register the root certificate andemit event
+        // Register the root certificate and emit event
         account newAccount = registerCert(rootCert, c);
+        
         certificates.push(c);
         certificatesMap[newAccount] = certificates.length;
         initialized = true;
+        
+        return 200;
     }
     
     function registerCertificate(string newCertificateString) returns (int) {
@@ -255,5 +258,13 @@ contract CertificateRegistry {
         certificatesMap[userAccount] = certificates.length;
         
         return 200; // 200 = HTTP Status OK
+    }
+    
+    function getCertByAddress(address _address) returns (Certificate) {
+        return getCertByAccount(account(_address));
+    }
+    
+    function getCertByAccount(account _account) returns (Certificate) {
+        return certificates[certificatesMap[_account]];
     }
 }|]
