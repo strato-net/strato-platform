@@ -19,7 +19,7 @@ import                 Data.Maybe
 
 import                 Blockchain.Data.PubKey
 import qualified       Blockchain.ECIES            as ECIES
-import                 Blockchain.ExtWord
+import                 Blockchain.Strato.Model.ExtendedWord
 import                 Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
 import                 Blockchain.Strato.Model.Secp256k1
 

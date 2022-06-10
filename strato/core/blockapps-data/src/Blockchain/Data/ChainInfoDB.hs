@@ -23,13 +23,13 @@ import qualified Database.Esqueleto                 as E
 import           Database.Persist                   hiding (get)
 
 import           Blockchain.Data.ChainInfo
-import           Blockchain.ExtWord                 (Word256)
 import           Blockchain.TypeLits
 import           Blockchain.DB.SQLDB
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Enode
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.ExtendedWord (Word256)
 
 getChainInfo :: HasSQLDB m => ChainId -> m (Maybe (NamedTuple "id" "info" ChainId ChainInfo))
 getChainInfo (ChainId chainId) = do

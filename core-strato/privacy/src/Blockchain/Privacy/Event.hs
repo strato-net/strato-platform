@@ -30,13 +30,13 @@ module Blockchain.Privacy.Event
 
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.TransactionDef (formatChainId)
-import           Blockchain.ExtWord
 import           Blockchain.Output
 import           Blockchain.Privacy.Monad
 import           Blockchain.Privacy.Metrics
 import           Blockchain.Sequencer.Event
-import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.Strato.Model.Keccak256
 import           Control.Lens
 import           Control.Monad
 import           Control.Monad.Change.Alter

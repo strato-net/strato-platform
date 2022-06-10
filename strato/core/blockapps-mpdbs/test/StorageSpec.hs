@@ -40,10 +40,10 @@ import Blockchain.DB.RawStorageDB
 import Blockchain.DB.SolidStorageDB
 import Blockchain.DB.X509CertDB
 import Blockchain.DB.StorageDB
-import Blockchain.ExtWord
 import Blockchain.Output
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import qualified Data.NibbleString as N
 import qualified SolidVM.Model.Storable as MS

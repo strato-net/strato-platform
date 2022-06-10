@@ -12,7 +12,6 @@ library:
     - blockapps-data
     - blockapps-datadefs
     - blockapps-mpdbs
-    - blockapps-util
     - bytestring
     - common-log
     - containers

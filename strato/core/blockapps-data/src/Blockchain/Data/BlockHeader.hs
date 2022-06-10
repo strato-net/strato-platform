@@ -22,12 +22,12 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RLP
 import           Blockchain.Data.Transaction
 import qualified Blockchain.Database.MerklePatricia as MP
-import           Blockchain.ExtWord
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Util
 
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.ExtendedWord
 
 import qualified Text.Colors                        as CL
 import           Text.Format

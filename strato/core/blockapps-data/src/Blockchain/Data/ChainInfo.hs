@@ -36,12 +36,12 @@ import           Test.QuickCheck.Instances.ByteString  ()
 import           Test.QuickCheck.Arbitrary.Generic
 import           Test.QuickCheck.Instances.Text        ()
 
-import           Blockchain.ExtWord
 import           Blockchain.Data.Enode
 import           Blockchain.Data.RLP
 import           Blockchain.MiscJSON()
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.CodePtr
+import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.Secp256k1    as EC
 import           Blockchain.TypeLits

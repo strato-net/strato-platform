@@ -39,10 +39,10 @@ import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>))
 import           Blockchain.Data.ChainInfo          (ParentChainId, isAncestorChainOf)
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
-import           Blockchain.ExtWord
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.CodePtr
+import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Util
 import qualified Text.Colors                        as CL
 import           Text.Format

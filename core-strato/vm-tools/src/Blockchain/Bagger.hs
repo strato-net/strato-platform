@@ -48,11 +48,11 @@ import           Blockchain.DB.ModifyStateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.Database.MerklePatricia (StateRoot (..))
 import qualified Blockchain.EthConf                 as Conf
-import           Blockchain.ExtWord
 import           Blockchain.Sequencer.Event         (OutputBlock (..), OutputTx (..))
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Timing
 import qualified Blockchain.TxRunResultCache        as TRC

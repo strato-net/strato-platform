@@ -63,9 +63,9 @@ import qualified Blockchain.Data.TXOrigin              as Origin
 import           Blockchain.Data.Wire
 import           Blockchain.EventModel
 import           Blockchain.EventException
-import           Blockchain.ExtWord
 import           Blockchain.Options
 import           Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Util
 import           Blockchain.Verification

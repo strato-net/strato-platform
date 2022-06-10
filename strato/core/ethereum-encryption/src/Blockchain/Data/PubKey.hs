@@ -19,7 +19,7 @@ import           Data.Maybe
 import           Data.Word
 
 import           Blockchain.Data.RLP
-import           Blockchain.ExtWord
+import           Blockchain.Strato.Model.ExtendedWord
 import qualified Blockchain.Strato.Model.Secp256k1          as Secp256k1
 import qualified Text.Colors               as CL
 import           Text.Format

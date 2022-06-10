@@ -5,7 +5,7 @@
 
 module Blockchain.Sequencer.DB.GetChainsDB where
 
-import           Blockchain.ExtWord           (Word256)
+import           Blockchain.Strato.Model.ExtendedWord (Word256)
 import           Control.Monad.Change.Modify
 import qualified Data.Set                     as S
 

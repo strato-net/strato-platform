@@ -42,8 +42,8 @@ import           System.Timeout
 
 import           Blockchain.Data.PubKey
 import           Blockchain.Data.RLP
-import           Blockchain.ExtWord
 import           Blockchain.Strato.Discovery.P2PUtil   (DiscoverException (..))
+import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256           
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Util

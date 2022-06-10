@@ -27,7 +27,7 @@ import           Blockchain.Data.RLP
 import           Blockchain.Data.Transaction
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Util
-import           Blockchain.ExtWord
+import           Blockchain.Strato.Model.ExtendedWord
 import qualified Text.Colors                  as CL
 import           Text.Format
 

@@ -29,7 +29,6 @@ import qualified Blockchain.Data.LogDB              as LogDB
 import           Blockchain.Data.TransactionDef     (formatChainId)
 --import qualified Blockchain.Data.TransactionResult  as TxrDB
 import           Blockchain.EthConf                 (lookupConsumerGroup)
-import           Blockchain.ExtWord
 
 import           Blockchain.Output
 import           Blockchain.Sequencer.Event
@@ -38,6 +37,7 @@ import           Blockchain.Strato.Indexer.IContext
 import           Blockchain.Strato.Indexer.Kafka
 import           Blockchain.Strato.Indexer.Model
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import           Blockchain.Util                    (byteString2Integer)

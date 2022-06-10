@@ -25,13 +25,13 @@ import           Blockchain.Data.Json
 import           Blockchain.Data.RLP
 import qualified Blockchain.Data.Transaction               as TX
 import qualified Blockchain.Data.TXOrigin                  as TO
-import           Blockchain.ExtWord                        (Word256)
 
 import qualified GHC.Generics                              as GHCG
 
 import qualified Blockchain.Strato.Model.Address           as A
 import           Blockchain.Strato.Model.Class
-import           Blockchain.Strato.Model.Keccak256               (Keccak256)
+import           Blockchain.Strato.Model.ExtendedWord      (Word256)
+import           Blockchain.Strato.Model.Keccak256         (Keccak256)
 import           Blockchain.Util
 
 import qualified Blockchain.Blockstanbul                   as PBFT

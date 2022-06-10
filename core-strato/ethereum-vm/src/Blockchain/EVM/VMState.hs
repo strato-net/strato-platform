@@ -31,9 +31,9 @@ import           GHC.Generics
 import           Blockchain.Data.Log
 import           Blockchain.EVM.Environment
 import qualified Blockchain.EVM.MutableStack as MS
-import           Blockchain.ExtWord
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Stream.Action     (Action)
 import qualified Blockchain.Stream.Action     as Action

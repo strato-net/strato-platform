@@ -52,10 +52,10 @@ import           Blockchain.EVM.Code
 import           Blockchain.EVM.Environment
 import           Blockchain.EVM.VMM (readGasRemaining)
 import           Blockchain.EVM.VMState
-import           Blockchain.ExtWord
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Code
+import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Util
 import           Blockchain.VMContext

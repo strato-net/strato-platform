@@ -17,7 +17,7 @@ import           Data.Maybe
 import           Data.Word
 import           Numeric
 
-import           Blockchain.ExtWord
+import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Util
 
 import           Data.Time.Clock.POSIX    (POSIXTime, getPOSIXTime)

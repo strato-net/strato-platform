@@ -46,8 +46,8 @@ import           Test.QuickCheck.Instances.ByteString  ()
 import           Text.Regex
 
 import           Blockchain.Data.RLP
-import           Blockchain.ExtWord
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 
 import qualified LabeledError

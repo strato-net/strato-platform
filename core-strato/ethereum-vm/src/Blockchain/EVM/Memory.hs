@@ -35,7 +35,7 @@ import           System.Exit
 import           Blockchain.EVM.OpcodePrices
 import           Blockchain.EVM.VMM
 import           Blockchain.EVM.VMState
-import           Blockchain.ExtWord
+import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.VM.VMException
 
 import qualified Text.Colors                  as CL

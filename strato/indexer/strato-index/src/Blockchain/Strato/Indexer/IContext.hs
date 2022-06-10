@@ -42,7 +42,6 @@ import           Blockchain.Data.Transaction     (insertTX)
 import           Blockchain.DBM
 import           Blockchain.DB.SQLDB
 import           Blockchain.EthConf
-import           Blockchain.ExtWord
 import qualified Blockchain.Strato.RedisBlockDB  as RBDB
 import qualified Database.Redis                  as Redis
 
@@ -52,6 +51,7 @@ import           Network.Kafka.Protocol
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Indexer.Kafka
 import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 
 newtype IConfig = IConfig { contextSQLDB :: SQLDB }

@@ -8,9 +8,9 @@ module Blockchain.Privacy.Monad where
 
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.RLP
-import           Blockchain.ExtWord            (Word256)
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.ExtendedWord (Word256)
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Util
 import           Control.Lens

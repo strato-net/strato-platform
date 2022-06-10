@@ -50,7 +50,6 @@ import           Blockchain.Data.TransactionDef
 import qualified Blockchain.Data.TXOrigin              as Origin
 import           Blockchain.Data.Wire
 import           Blockchain.Event
-import           Blockchain.ExtWord
 import           Blockchain.Options                    (AuthorizationMode(..))
 import           Blockchain.Output
 import           Blockchain.Privacy
@@ -64,6 +63,7 @@ import           Blockchain.Sequencer.Monad
 
 import qualified Blockchain.Strato.Discovery.Data.Peer as DataPeer
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256     (Keccak256, zeroHash)
 import           Blockchain.Strato.Model.Secp256k1
 

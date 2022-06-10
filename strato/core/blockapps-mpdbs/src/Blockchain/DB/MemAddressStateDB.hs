@@ -27,9 +27,9 @@ import           Blockchain.Data.AddressStateDB
 import qualified Blockchain.DB.AddressStateDB   as DB
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.StateDB
-import           Blockchain.ExtWord
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ExtendedWord
 import           Text.Format
 
 data AddressStateModification = ASModification AddressState | ASDeleted deriving (Show, Eq, Generic)

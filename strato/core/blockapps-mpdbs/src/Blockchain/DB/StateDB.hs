@@ -8,11 +8,12 @@
 module Blockchain.DB.StateDB where
 
 import           Prelude hiding (lookup)
-import qualified Blockchain.Database.MerklePatricia as MP
-import           Blockchain.ExtWord
 import           Control.DeepSeq
 import           Control.Monad.Change
 import qualified Database.LevelDB                   as DB
+
+import qualified Blockchain.Database.MerklePatricia as MP
+import           Blockchain.Strato.Model.ExtendedWord
 
 type StateDB = DB.DB
 

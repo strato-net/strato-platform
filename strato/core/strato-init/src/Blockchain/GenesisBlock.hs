@@ -47,7 +47,6 @@ import qualified Blockchain.DB.MemAddressStateDB              as Mem
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
-import           Blockchain.ExtWord
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Stream.Action                     as A
 import           Blockchain.Stream.VMEvent
@@ -76,6 +75,7 @@ import qualified Blockchain.Strato.Indexer.Model      as IdxModel
 import qualified Blockchain.Strato.Model.Account      as Ac
 import qualified Blockchain.Strato.Model.Address      as Ad
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.ExtendedWord
 import qualified Blockchain.Strato.RedisBlockDB       as RBDB
 
 import           Text.Format

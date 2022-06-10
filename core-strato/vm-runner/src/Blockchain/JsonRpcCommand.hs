@@ -28,11 +28,11 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.EthConf
-import           Blockchain.ExtWord
 import           Blockchain.KafkaTopics
 import           Blockchain.Output
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.ExtendedWord
 
 -- TODO: Add private chain functionality to JSON RPC commands
 

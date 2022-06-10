@@ -27,9 +27,9 @@ import                 Blockchain.Data.RLP
 import qualified       Blockchain.ECIES                  as ECIES
 import                 Blockchain.Error
 import                 Blockchain.EthEncryptionException
-import                 Blockchain.ExtWord
 import                 Blockchain.Frame
 import                 Blockchain.Handshake
+import                 Blockchain.Strato.Model.ExtendedWord
 import                 Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
 import                 Blockchain.Strato.Model.Secp256k1
 

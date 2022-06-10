@@ -35,11 +35,11 @@ import           BlockApps.Solidity.ArgValue
 
 import           Blockchain.Data.ArbitraryInstances ()
 import           Blockchain.Data.Enode
-import           Blockchain.ExtWord
 import           Blockchain.TypeLits
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.CodePtr
+import           Blockchain.Strato.Model.ExtendedWord
 import           Data.Source.Map
 
 --------------------------------------------------------------------------------

@@ -46,7 +46,6 @@ import qualified Blockchain.DB.MemAddressStateDB      as Mem
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
-import           Blockchain.ExtWord
 import           Blockchain.Output
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Stream.Action             as A
@@ -58,7 +57,7 @@ import           Blockchain.Strato.StateDiff.Database
 
 import           Blockchain.Strato.Model.Account
 import qualified Blockchain.Strato.Model.Address      as Ad
-import qualified Blockchain.Strato.Model.ExtendedWord as Ext
+import           Blockchain.Strato.Model.ExtendedWord
 
 import           Text.Format
 
@@ -76,7 +75,7 @@ putStorageTrie :: ( MonadLogger m
                   , HasMemStorageDB m
                   , (Account `A.Alters` AddressState) m
                   ) =>
-                  Account -> [(Ext.Word256, Ext.Word256)] -> m ()
+                  Account -> [(Word256, Word256)] -> m ()
 putStorageTrie account slots = do
     mapM_ (uncurry $ putStorageKeyVal' account) slots
     flushMemStorageDB
@@ -274,7 +273,7 @@ initializeChainDBs :: ( MonadLogger m
                       , (Account `A.Alters` AddressState) m
                       , A.Selectable (Maybe Word256) ParentChainId m
                       )
-                   => Maybe Ext.Word256
+                   => Maybe Word256
                    -> ChainInfo
                    -> m ()
 initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) = do

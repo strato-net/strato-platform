@@ -6,8 +6,8 @@ module Blockchain.Strato.Indexer.Model
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs                (LogDB, EventDB, TransactionResult)
 import           Blockchain.Data.TransactionResultStatus
-import           Blockchain.ExtWord                      (Word256)
 import           Blockchain.Sequencer.Event
+import           Blockchain.Strato.Model.ExtendedWord    (Word256)
 import           Blockchain.Strato.Model.Keccak256
 import           Data.Binary
 

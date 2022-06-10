@@ -40,11 +40,11 @@ import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Enode
 import           Blockchain.EthConf                    (lookupRedisBlockDBConfig)
-import           Blockchain.ExtWord                    (Word256)
 import           Blockchain.Output
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.ExtendedWord  (Word256)
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.RedisBlockDB.Models as Models
 import           Blockchain.Util                       (partitionWith)

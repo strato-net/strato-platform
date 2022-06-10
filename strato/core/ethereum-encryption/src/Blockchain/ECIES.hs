@@ -22,7 +22,7 @@ import                 Data.HMAC
 import                 System.Entropy
 
 import                 Blockchain.Data.PubKey
-import                 Blockchain.ExtWord
+import                 Blockchain.Strato.Model.ExtendedWord
 import                 Blockchain.Strato.Model.Secp256k1
 
 theCurve :: Curve

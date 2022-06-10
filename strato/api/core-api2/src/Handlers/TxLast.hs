@@ -21,8 +21,8 @@ import           Servant.Client
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json
 import           Blockchain.DB.SQLDB
-import           Blockchain.ExtWord
 import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.ExtendedWord
 
 import           Control.Monad.Composable.SQL
 
