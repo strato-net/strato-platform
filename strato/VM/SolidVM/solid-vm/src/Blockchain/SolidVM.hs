@@ -661,13 +661,16 @@ expressionType (CC.ArrayExpression _ xs) = SVMType.Array (expressionType (head x
 
 expressionType ex = typeError "Cannot deduce a type from" (ex, ex)
 
+callWrapper :: MonadSM m => Account -> Account -> Maybe String -> String -> Bool -> CC.ArgList -> m (Maybe Value)
+callWrapper = callWrapper' False
 
-callWrapper  :: MonadSM m => Account -> Account -> Maybe String -> String -> Bool -> CC.ArgList -> m (Maybe Value)
-callWrapper from to mContract functionName isRCC argExps  = do
+callWrapper' :: MonadSM m => Bool -> Account -> Account -> Maybe String -> String -> Bool -> CC.ArgList -> m (Maybe Value)
+callWrapper' isCallback from to mContract functionName isRCC argExps  = do
   let fromChain = from ^. accountChainId
       toChain = to ^. accountChainId
-  isAccessibleChain <- toChain `isAncestorChainOf` fromChain
-  unless isAccessibleChain $ inaccessibleChain "Inaccessible chain violation" $ "from: " ++ show from ++ ", to: " ++ show to
+  unless isCallback $ do
+    isAccessibleChain <- toChain `isAncestorChainOf` fromChain
+    unless isAccessibleChain $ inaccessibleChain "Inaccessible chain violation" $ "from: " ++ show from ++ ", to: " ++ show to
 
   (contract', hsh, cc) <- getCodeAndCollection to
   parentName <- fromMaybeM (return "") $ runMaybeT
@@ -706,7 +709,9 @@ callWrapper from to mContract functionName isRCC argExps  = do
             mCallInfo <- getCurrentCallInfoIfExists
             let ro = case mCallInfo of
                        Nothing -> False
-                       Just ci -> if fromChain == toChain then readOnly ci else True
+                       Just ci -> if isCallback
+                                    then False
+                                    else if fromChain == toChain then readOnly ci else True
             let f' = (if from == to then id else pushSender from) $ runTheCall to contract functionName hsh cc theFunction args' ro
             return (f', args')
           _ -> do --Maybe the function is actually a getter
@@ -1103,13 +1108,28 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
         let args = CC.OrderedArgs $ snd <$> exptups
             e = EventSource (acct, tEventName)
         bHash <- unCurrentBlockHash <$> Mod.access (Mod.Proxy @CurrentBlockHash)
-        void . traverseSubscriptionList e bHash $ \s@(Subscription (callbackAcct, fName)) -> do
-          isAncestor <- (acct ^. accountChainId) `isAncestorChainOf` (callbackAcct ^. accountChainId)
+        cbChains <- fmap (S.fromList . catMaybes) . traverseSubscriptionList e bHash $ \s@(Subscription (callbackAcct, fName)) -> do
+          let callbackChain = callbackAcct ^. accountChainId
+          isAncestor <- (acct ^. accountChainId) `isAncestorChainOf` callbackChain
           if isAncestor
             then do
               $logDebugS "runStatement/EmitStatement" . T.pack $ "Running callback for " ++ format e ++ " at " ++ format s
-              void $ callWrapper acct callbackAcct Nothing (T.unpack fName) False args 
-            else $logWarnS "runStatement/EmitStatement" . T.pack $ "Inaccessible chain registered callback for " ++ format e ++ " at " ++ format s
+              eErr <- EUnsafe.try . void $ callWrapper' True acct callbackAcct Nothing (T.unpack fName) False args 
+              case eErr of
+                Right _ -> pure ()
+                Left err -> $logErrorS "runStatement/EmitStatement" . T.pack $ concat
+                              [ "Exception while running callback for "
+                              , format e
+                              , " at "
+                              , format s
+                              , ": "
+                              , show (err :: SolidException)
+                              ]
+              pure callbackChain
+            else do
+              $logErrorS "runStatement/EmitStatement" . T.pack $ "Inaccessible chain registered callback for " ++ format e ++ " at " ++ format s
+              pure Nothing
+        Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ callbackChains %= flip S.union cbChains
         return Nothing
 
 runStatement (CC.UncheckedStatement code pos) = do
@@ -2175,6 +2195,22 @@ callBuiltin vs@"verifySignature" [SString msg, SString signature, SString pubkey
   else unknownFunction "callBuiltin" vs
   
 callBuiltin "parseCert" [SString cert] _ = return $ certificateMap (Just cert)
+callBuiltin "subscribe" [SAccount namedA _, SString eventName, SString callbackName] _ = do
+  acct <- getCurrentAccount
+  bHash <- unCurrentBlockHash <$> Mod.access (Mod.Proxy @CurrentBlockHash)
+  let a = namedAccountToAccount (acct ^. accountChainId) namedA
+      e = EventSource (a, T.pack eventName)
+      c = Subscription (acct, T.pack callbackName)
+  subscribe e c bHash
+  pure SNULL
+callBuiltin "unsubscribe" [SAccount namedA _, SString eventName, SString callbackName] _ = do
+  acct <- getCurrentAccount
+  bHash <- unCurrentBlockHash <$> Mod.access (Mod.Proxy @CurrentBlockHash)
+  let a = namedAccountToAccount (acct ^. accountChainId) namedA
+      e = EventSource (a, T.pack eventName)
+      c = Subscription (acct, T.pack callbackName)
+  unsubscribe e c bHash
+  pure SNULL
 
 callBuiltin x _ _ = unknownFunction "callBuiltin" x
 

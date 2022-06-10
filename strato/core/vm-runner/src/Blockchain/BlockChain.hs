@@ -655,6 +655,7 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obRe
     case bbi of
       Unspecified -> error $ "Trying to replace an Unspecified Best Block"
       ContextBestBlockInfo (oldBestSha, oldBestBlock, oldBestDifficulty, oldTxCount, _) -> do
+        cbChains <- _callbackChains <$> Mod.get (Mod.Proxy @MemDBs)
 
         let newNumber     = blockDataNumber bd
             newStateRoot  = blockDataStateRoot bd
@@ -669,7 +670,9 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obRe
                             || (newNumber > oldNumber)
                             || ((newNumber == oldNumber) && (td > oldBestDifficulty))
                             || ((newNumber == oldNumber) && (td == oldBestDifficulty) && (newTxCount > oldTxCount))
-            ranPriv = M.fromSet (const (newNumber, bH)) . S.fromList . catMaybes $ map txChainId txPayloads
+            ranPrivTxSet = S.fromList . catMaybes $ map txChainId txPayloads
+            allChainsRun = ranPrivTxSet <> cbChains
+            ranPriv = M.fromSet (const (newNumber, bH)) allChainsRun
 
         $logInfoS "replaceBestIfBetter" . T.pack $ "shouldReplace = " ++ show shouldReplace ++ ", newNumber = " ++ show newNumber ++ ", oldBestNumber = " ++ show (blockDataNumber oldBestBlock)
 

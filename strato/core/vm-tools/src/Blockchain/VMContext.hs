@@ -40,6 +40,7 @@ module Blockchain.VMContext
     , storageBlockMap
     , stateRoots
     , currentBlock
+    , callbackChains
     , memDBs
     , baggerState
     , bestBlockInfo
@@ -85,6 +86,7 @@ import qualified Data.Map                           as M
 import           Data.Maybe                         (fromMaybe)
 import qualified Data.NibbleString                  as N
 import qualified Data.Sequence                      as Q
+import qualified Data.Set                           as S
 import           Data.Word
 import qualified Data.Text                          as T
 import           Data.Traversable                   (for)
@@ -166,6 +168,7 @@ data MemDBs = MemDBs
   , _storageBlockMap :: M.Map (Account, B.ByteString) B.ByteString
   , _stateRoots      :: M.Map (Keccak256, Maybe Word256) MP.StateRoot
   , _currentBlock    :: Maybe CurrentBlockHash
+  , _callbackChains  :: S.Set Word256
   } deriving (Generic, NFData, Show)
 makeLenses ''MemDBs
 
@@ -527,6 +530,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
             , _storageBlockMap = M.empty
             , _stateRoots      = M.empty
             , _currentBlock    = Nothing
+            , _callbackChains  = S.empty
             }
 
       cstate <- newIORef $ ContextState
@@ -592,6 +596,7 @@ runContextM dSettings f = do
             , _storageBlockMap = M.empty
             , _stateRoots      = M.empty
             , _currentBlock    = Nothing
+            , _callbackChains  = S.empty
             }
 
       cstate <- newIORef $ ContextState

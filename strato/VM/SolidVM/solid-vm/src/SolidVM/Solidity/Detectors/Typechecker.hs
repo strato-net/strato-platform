@@ -816,6 +816,9 @@ payableArgs x = accountType' x
 parseCertArgs :: SourceAnnotation Text -> Type'
 parseCertArgs x = stringType' x
 
+subscribeArgs  :: SourceAnnotation Text -> Type'
+subscribeArgs x = Product [accountType' x, stringType' x, stringType' x] x
+
 getVarType' :: String -> SourceAnnotation Text -> SSS Type'
 getVarType' "this" ctx = pure $ Static (SVMType.Account False) ctx
 getVarType' s@('u':'i':'n':'t':n) ctx = case n of
@@ -852,6 +855,8 @@ getVarType' "addmod" ctx =  pure $ Function (addmodArgs ctx) (intType' ctx) ctx
 getVarType' "mulmod" ctx =  pure $ Function (mulmodArgs ctx) (intType' ctx) ctx
 getVarType' "payable" ctx =  pure $ Function (payableArgs ctx) (Static (SVMType.Account True) ctx) ctx
 getVarType' "parseCert" ctx =  pure $ Function (parseCertArgs ctx) (certType' ctx) ctx
+getVarType' "subscribe" ctx =  pure $ Function (subscribeArgs ctx) (Product [] ctx) ctx
+getVarType' "unsubscribe" ctx =  pure $ Function (subscribeArgs ctx) (Product [] ctx) ctx
 getVarType' "Util" ctx = pure $ Static (SVMType.Label "Util") ctx
 getVarType' "msg" ctx = pure $ Static (SVMType.Label "msg") ctx
 getVarType' "tx" ctx = pure $ Static (SVMType.Label "tx") ctx
