@@ -36,7 +36,6 @@ import           Test.Hspec.Expectations.Lifted
 import           Blockchain.BlockChain
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.Block
-import           Blockchain.Data.Code
 import           Blockchain.Data.DataDefs                    (BlockData(..))
 import           Blockchain.Data.ExecResults
 import           Blockchain.Data.RLP
@@ -56,6 +55,7 @@ import           Blockchain.EVM.VMState
 import           Blockchain.ExtWord
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Util
 import           Blockchain.VMContext

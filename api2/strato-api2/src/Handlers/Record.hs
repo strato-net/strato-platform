@@ -26,8 +26,8 @@ import           Servant
 import           Servant.Swagger.Tags
 
 
-import           Blockchain.Data.Address
 import           Blockchain.Data.Json          ()
+import           Blockchain.Strato.Model.Address
 --import           Blockchain.Strato.Model.Keccak256   hiding (hash)
 
 

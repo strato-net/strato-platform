@@ -16,10 +16,10 @@ import Data.Maybe
 
 import Blockchain.Blockstanbul
 import Blockchain.Data.Block
-import Blockchain.Data.Code
 import Blockchain.Data.Json
 import Blockchain.Data.TransactionDef
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.Secp256k1
 
 eitherGenesis :: Either String [Block]

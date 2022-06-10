@@ -6,10 +6,10 @@ module Blockchain.TheDAOFork where
 import           Control.Monad
 import           Control.Monad.Change.Alter
 
-import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.DB.HashDB
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Address
 
 addresses::[Account]
 addresses = map (flip Account Nothing)

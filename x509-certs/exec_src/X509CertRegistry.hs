@@ -190,15 +190,16 @@ contract Certificate {
     string publicKey;
     string certificateString;
 
-    constructor(account _newAccount, string _certificateString) {
+    constructor(string _certificateString) {
         owner = msg.sender;
 
-        certificateHolder = _newAccount;
-
         mapping(string => string) parsedCert = parseCert(_certificateString);
+
+        certificateHolder = account(parsedCert["userAddress"]);
         commonName = parsedCert["commonName"];
         organization = parsedCert["organization"];
         group = parsedCert["group"];
+        country = parsedCert["country"];
         publicKey = parsedCert["publicKey"];
         certificateString = parsedCert["certString"];
     }
@@ -206,6 +207,8 @@ contract Certificate {
 
 pragma solidvm 3.2;
 contract CertificateRegistry {
+    // Declare the event that gets silently emitted when a certificate is registered
+    event CertificateRegistered(address userAddress, address contractAddress);
     // The registry maintains a list and mapping of all the certificates
     // We need the extra array in order for us to iterate through our certificates.
     // Solidity mappings are non-iterable.
@@ -213,6 +216,7 @@ contract CertificateRegistry {
     mapping(account => uint) certificatesMap;
 
     string rootCert;
+    string rootPubKey;
     bool initialized;
 
     event CertificateRegistered(address userAddress, address contractAddress);
@@ -221,35 +225,50 @@ contract CertificateRegistry {
         require(account(this, "self").chainId == 0, "You must post this contract on the main chain!");
 
         rootCert = _rootCert;
+        rootPubKey = parseCert(_rootCert)["publicKey"];
         initialized = false;
     }
 
     function initializeCertificateRegistry() returns (int) {
         require(!initialized, "The CertificateRegistry has already been initialized!");
-
-        // Register the root certificate
-        account newAccount = registerCert(rootCert);
+        require(verifyCert(rootCert, rootPubKey), "The cert being registered is not verified in the chain of trust");
         
         // Create the Certificate record
-        Certificate c = new Certificate(newAccount, rootCert);
+        Certificate c = new Certificate(rootCert);
+
+        // Register the root certificate and emit event
+        account newAccount = registerCert(rootCert, c);
+        
         certificates.push(c);
         certificatesMap[newAccount] = certificates.length;
         initialized = true;
 
         emit CertificateRegistered(address(0xdeadbeef), address(c));
+        
+        return 200;
     }
     
     function registerCertificate(string newCertificateString) returns (int) {
         require(initialized, "You must first initialize with initializeCertificateRegistry!");
-
-        // Register the certificate into LevelDB
-        account newAccount = registerCert(newCertificateString);
+        require(verifyCert(newCertificateString, rootPubKey), "The cert being registered is not verified in the chain of trust");
         
         // Create the new Certificate record
-        Certificate c = new Certificate(newAccount, newCertificateString);
+        Certificate c = new Certificate(newCertificateString);
+        
+        // Register the certificate into LevelDB and emit event
+        account userAccount = registerCert(newCertificateString, c);
+
         certificates.push(c);
-        certificatesMap[newAccount] = certificates.length;
+        certificatesMap[userAccount] = certificates.length;
         
         return 200; // 200 = HTTP Status OK
+    }
+    
+    function getCertByAddress(address _address) returns (Certificate) {
+        return getCertByAccount(account(_address));
+    }
+    
+    function getCertByAccount(account _account) returns (Certificate) {
+        return certificates[certificatesMap[_account]];
     }
 }|]

@@ -17,9 +17,9 @@ import qualified Data.ByteString.Lazy        as BL
 
 import           System.Directory
 
-import           Blockchain.Data.Address
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.GenesisInfo
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Secp256k1
 
 bigBalance::Integer

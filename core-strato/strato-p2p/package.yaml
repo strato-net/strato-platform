@@ -34,7 +34,6 @@ library:
     - alarmclock
     - ansi-wl-pprint
     - base16-bytestring
-    - blockapps-data
     - blockapps-datadefs
     - blockapps-util
     - blockapps-vault-wrapper-api

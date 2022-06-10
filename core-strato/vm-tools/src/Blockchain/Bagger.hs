@@ -34,7 +34,6 @@ import           Blockapps.Crossmon
 
 import qualified Blockchain.Bagger.BaggerState      as B
 import           Blockchain.Bagger.Transactions
-import           Blockchain.Data.Address
 import qualified Blockchain.Data.AddressStateDB     as DD
 --import           Blockchain.Data.Block
 import           Blockchain.Data.BlockHeader        (txsLen2ExtraData)
@@ -52,6 +51,7 @@ import qualified Blockchain.EthConf                 as Conf
 import           Blockchain.ExtWord
 import           Blockchain.Sequencer.Event         (OutputBlock (..), OutputTx (..))
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Timing

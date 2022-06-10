@@ -1,9 +1,9 @@
 module Blockchain.Blockstanbul.Voting where
 
-import Blockchain.Data.Address
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader as BH
 import Blockchain.Data.DataDefs
+import Blockchain.Strato.Model.Address
 import Data.Map as M
 import Data.List as L
 

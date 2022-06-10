@@ -19,10 +19,10 @@ import           Blockchain.Bagger.Transactions
 import           Blockchain.Bagger.TransactionList
 import           Blockchain.Sequencer.Event         (OutputTx (..))
 
-import           Blockchain.Data.Address
 import qualified Blockchain.Data.DataDefs           as DD
 import qualified Blockchain.Data.TransactionDef     as TD
 import           Blockchain.Database.MerklePatricia (StateRoot (..), blankStateRoot)
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256
 
 {-# NOINLINE upsertPT #-}

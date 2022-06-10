@@ -17,7 +17,6 @@ import           Data.Maybe                                (fromJust, fromMaybe,
 import           Test.QuickCheck
 import           Test.QuickCheck.Arbitrary.Generic
 
-import qualified Blockchain.Data.Address                   as A
 import qualified Blockchain.Data.Block                     as BDB
 import qualified Blockchain.Data.DataDefs                  as DD
 import           Blockchain.Data.ChainInfo
@@ -30,6 +29,7 @@ import           Blockchain.ExtWord                        (Word256)
 
 import qualified GHC.Generics                              as GHCG
 
+import qualified Blockchain.Strato.Model.Address           as A
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256               (Keccak256)
 import           Blockchain.Util

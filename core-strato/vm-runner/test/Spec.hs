@@ -24,13 +24,13 @@ import           Blockchain.Data.AddressStateDB
 import qualified Blockchain.Data.Block as BDB
 import           Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.CodeDB
-import           Blockchain.Data.Code
 import           Blockchain.Data.ExecResults
 import           Blockchain.EVM
 import qualified Blockchain.EVM.MutableStack as MS
 import           Blockchain.EVM.Opcodes
 import           Blockchain.Output
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.VMContext

@@ -97,6 +97,7 @@ executables:
       - strato-model
       - text
       - x509-certs
+      - blockapps-datadefs
 
 tests:
   x509-test:

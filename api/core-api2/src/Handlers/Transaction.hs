@@ -44,7 +44,6 @@ import           Servant.Client
 import           System.Clock
 import           Text.Format
 
-import           Blockchain.Data.Address
 import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
 import           Blockchain.Output
@@ -56,6 +55,7 @@ import           Blockchain.Data.TXOrigin
 import           Blockchain.EthConf          (runKafkaConfigured)
 import           Blockchain.Sequencer.Event  (IngestEvent (IETx), IngestTx (..))
 import           Blockchain.Sequencer.Kafka  (writeUnseqEvents)
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Util             (getCurrentMicrotime)
 
 import           Control.Monad.Composable.SQL

@@ -103,7 +103,6 @@ import           Prometheus
 import           Blockchain.Bagger.BaggerState      (BaggerState, defaultBaggerState)
 import           Blockchain.Blockstanbul.Authentication as Auth
 import           Blockchain.Constants
-import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.Block
 import           Blockchain.Data.BlockSummary
@@ -124,6 +123,7 @@ import           Blockchain.DB.X509CertDB
 import           Blockchain.EthConf
 import           Blockchain.ExtWord
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models
