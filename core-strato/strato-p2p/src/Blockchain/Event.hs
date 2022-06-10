@@ -123,6 +123,8 @@ handleEvents :: MonadP2P m => PPeer -> ConduitM Event (Either P2PCNC Message) m 
 handleEvents peer = awaitForever $ \case
     MsgEvt Hello{}  -> error "A hello message appeared after the handshake"
     MsgEvt Status{} -> error "A status message appeared after the handshake"
+-- TODO remove distinction between new status messages and old ones once entire protocol is complete
+    MsgEvt NewStatus{} -> error "A new status message appeared after the handshake"
     MsgEvt Ping     -> yieldR Pong
 
     MsgEvt (Transactions txs) -> do

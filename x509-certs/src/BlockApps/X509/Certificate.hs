@@ -48,6 +48,7 @@ import qualified Data.ByteString.Char8              as C8
 import qualified Data.ByteString.Base16             as B16
 import qualified Data.ByteString.Short              as BSS
 
+import qualified Data.Set                           as S
 import           Data.Functor
 import           Data.Either
 import           Data.Maybe
@@ -69,8 +70,10 @@ import           Text.Format
 -----------------------------------------------------------------------------------------------
 
 
-
 newtype X509Certificate = X509Certificate CertificateChain deriving (Show, Eq)
+
+instance Ord X509Certificate where
+    compare a b = compare (certToBytes a) (certToBytes b)
 
 instance NFData X509Certificate where
     rnf (X509Certificate cert) = cert `seq` ()
@@ -133,6 +136,12 @@ instance RLPSerializable X509Certificate where
   
   rlpDecode (RLPString str) = fromRight (error "failed to rlpDecode cert") $ bsToCert str
   rlpDecode x = error $ "rlpDecode for SignedCertificate failed: expected RLPString, got " ++ show x
+
+instance RLPSerializable (S.Set X509Certificate) where
+  rlpEncode s = RLPArray $ rlpEncode <$> (S.toList s)
+  
+  rlpDecode (RLPArray cs) = S.fromList (rlpDecode <$> cs)
+  rlpDecode x = error $ "rlpDecode for SignedCertificate Set failed: expected RLPArray, got " ++ show x
 
 instance ToJSON X509Certificate where
   toJSON = String . T.pack . C8.unpack . certToBytes

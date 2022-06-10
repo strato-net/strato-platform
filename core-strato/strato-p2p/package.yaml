@@ -24,6 +24,7 @@ executables:
       - strato-p2p
       - wai-middleware-prometheus
       - warp
+      - x509-certs
       
 library:
   source-dirs: src
@@ -89,6 +90,7 @@ library:
     - unliftio
     - vm-tools
     - warp
+    - x509-certs
 
 
 tests:
