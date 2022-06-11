@@ -52,10 +52,10 @@ packages:
 - strato/vault/client
 - strato/vault/server
 
+- strato/VM/EVM/evm-solidity
 - strato/VM/vrun
 
 - blockapps-haskell/ethereum
-- blockapps-haskell/solidity
 - blockapps-haskell/strato/api
 
 - core-strato/debugger/
