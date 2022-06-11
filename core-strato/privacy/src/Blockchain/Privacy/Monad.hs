@@ -12,7 +12,6 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ExtendedWord (Word256)
 import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Util
 import           Control.Lens
 import           Data.Aeson
 import           Data.Binary
@@ -26,6 +25,7 @@ import qualified Data.Set                      as S
 import           GHC.Generics
 import qualified Text.Colors                   as CL
 import           Text.Format
+import           Text.Tools
 
 data CircularBuffer a = CircularBuffer
   { _capacity :: Int
@@ -50,9 +50,9 @@ instance Format a => Format (CircularBuffer a) where
   format CircularBuffer{..} = unlines
     [ "CircularBuffer"
     , "--------------"
-    , tab $ "Capacity: " ++ show _capacity
-    , tab $ "Size:     " ++ show _size
-    , tab $ "Queue:    " ++ format (toList _queue)
+    , tab' $ "Capacity: " ++ show _capacity
+    , tab' $ "Size:     " ++ show _size
+    , tab' $ "Queue:    " ++ format (toList _queue)
     ]
 
 data BlockInfo = BlockInfo
@@ -68,8 +68,8 @@ instance Format BlockInfo where
   format BlockInfo{..} = unlines
     [ "BlockInfo"
     , "---------"
-    , tab $ "Block hash:     " ++ format _bhash
-    , tab $ "Block ordering: " ++ show _bordering
+    , tab' $ "Block hash:     " ++ format _bhash
+    , tab' $ "Block ordering: " ++ show _bordering
     ]
 
 instance Ord BlockInfo where
@@ -91,8 +91,8 @@ instance Format EmittedBlock where
   format EmittedBlock{..} = unlines
     [ "EmittedBlock"
     , "---------"
-    , tab $ "Emitted:          " ++ show _emitted
-    , tab $ "Dependent chains: " ++ show _blockDependentChains
+    , tab' $ "Emitted:          " ++ show _emitted
+    , tab' $ "Dependent chains: " ++ show _blockDependentChains
     ]
 
 data ChainHashEntry = ChainHashEntry
@@ -115,9 +115,9 @@ instance Format ChainHashEntry where
   format ChainHashEntry{..} = unlines
     [ "ChainHashEntry"
     , "--------------"
-    , tab $ "Used:      " ++ show _used
-    , tab $ "On chain:  " ++ CL.yellow (format _onChainId)
-    , tab $ "In blocks: " ++ format (toList _inBlocks)
+    , tab' $ "Used:      " ++ show _used
+    , tab' $ "On chain:  " ++ CL.yellow (format _onChainId)
+    , tab' $ "In blocks: " ++ format (toList _inBlocks)
     ]
 
 chainHashEntryUsed :: ChainHashEntry
@@ -147,10 +147,10 @@ instance Format ChainIdEntry where
   format ChainIdEntry{..} = unlines
     [ "ChainIdEntry"
     , "------------"
-    , tab $ "Chain info:"
-    , tab $ format _chainIdInfo
-    , tab $ "Chain hashes:  " ++ format _chainHashes
-    , tab $ "Blocks to run: " ++ format (toList _blocksToRun)
+    , tab' $ "Chain info:"
+    , tab' $ format _chainIdInfo
+    , tab' $ "Chain hashes:  " ++ format _chainHashes
+    , tab' $ "Blocks to run: " ++ format (toList _blocksToRun)
     ]
 
 class HasPrivateHashDB m where

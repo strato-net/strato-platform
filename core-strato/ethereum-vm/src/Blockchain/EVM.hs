@@ -69,7 +69,6 @@ import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Stream.Action           as Action
-import           Blockchain.Util
 import           Blockchain.EVM.Code
 import           Blockchain.EVM.Environment
 import           Blockchain.EVM.Memory
@@ -79,6 +78,7 @@ import           Blockchain.EVM.Opcodes
 import           Blockchain.EVM.PrecompiledContracts
 import           Blockchain.EVM.VMM
 import           Blockchain.EVM.VMState
+import           Blockchain.Util
 import           Blockchain.VMContext
 import           Blockchain.VMMetrics
 import           Blockchain.VM.VMException
@@ -86,6 +86,7 @@ import           Blockchain.VMOptions
 
 import qualified Text.Colors                        as CL
 import           Text.Format
+import           Text.Tools
 
 type EVMBase m = VMBase m
 
@@ -100,6 +101,16 @@ word2562Bool::Word256->Bool
 word2562Bool 1 = True
 word2562Bool _ = False
 -}
+
+safeTake::Word256->B.ByteString->B.ByteString
+safeTake i _ | i > 0x7fffffffffffffff = error "error in call to safeTake: string too long"
+safeTake i s | i > fromIntegral (B.length s) = s `B.append` B.replicate (fromIntegral i - B.length s) 0
+safeTake i s = B.take (fromIntegral i) s
+
+safeDrop::Word256->B.ByteString->B.ByteString
+safeDrop i s | i > fromIntegral (B.length s) = B.empty
+safeDrop i _ | i > 0x7fffffffffffffff = error "error in call to safeDrop: string too long"
+safeDrop i s = B.drop (fromIntegral i) s
 
 binaryAction :: EVMBase m => (Word256 -> Word256 -> Word256) -> VMM m ()
 binaryAction act = do
@@ -901,6 +912,32 @@ printTrace op gasBefore pcBefore stateAfter = do
   $logInfoS "printTrace" . T.pack $ unlines (map (\(k, v) -> "0x" ++ showHexU (byteString2Integer $ nibbleString2ByteString k) ++ ": 0x" ++ showHexU (fromIntegral v)) kvs)
 -}
 
+{-
+showHex4 :: Word256 -> String
+showHex4 i = replicate (4 - length rawOutput) '0' ++ rawOutput
+    where rawOutput = showHex i ""
+
+showHexU :: Integer -> String
+showHexU = map toUpper . flip showHex ""
+
+showWord8::Word8->Char
+showWord8 c | c >= 32 && c < 127 = w2c c
+showWord8 _ = '?'
+
+showMem::Int->[Word8]->String
+showMem _ x | length x > 1000 = " mem size greater than 1000 bytes"
+showMem _ [] = ""
+showMem p (v1:v2:v3:v4:v5:v6:v7:v8:rest) =
+    padZeros 4 (showHex p "") ++ " "
+             ++ [showWord8 v1] ++ [showWord8 v2] ++ [showWord8 v3] ++ [showWord8 v4]
+             ++ [showWord8 v5] ++ [showWord8 v6] ++ [showWord8 v7] ++ [showWord8 v8] ++ " "
+             ++ padZeros 2 (showHex v1 "") ++ " " ++ padZeros 2 (showHex v2 "") ++ " " ++ padZeros 2 (showHex v3 "") ++ " " ++ padZeros 2 (showHex v4 "") ++ " "
+             ++ padZeros 2 (showHex v5 "") ++ " " ++ padZeros 2 (showHex v6 "") ++ " " ++ padZeros 2 (showHex v7 "") ++ " " ++ padZeros 2 (showHex v8 "") ++ "\n"
+             ++ showMem (p+8) rest
+showMem p x = padZeros 4 (showHex p "") ++ " " ++ (showWord8 <$> x) ++ " " ++ unwords (padZeros 2 . flip showHex "" <$> x)
+
+-}
+
 {-# INLINE runCode #-}
 runCode :: EVMBase m => VMM m ()
 runCode = do
@@ -1001,7 +1038,7 @@ runCodeFromStart = do
   code <- getEnvVar envCode
 
   when flags_debug $
-     $logInfoS "runCodeFromStart" . T.pack $ "running code: " ++ tab (CL.magenta ("\n" ++ showCode 0 code))
+     $logInfoS "runCodeFromStart" . T.pack $ "running code: " ++ tab' (CL.magenta ("\n" ++ showCode 0 code))
 
   case parseTraceFlag flags_trace of
     Fast -> runCodeFast
@@ -1014,7 +1051,7 @@ runPrecompiled :: EVMBase m => PrecompiledCode -> VMM m ()
 runPrecompiled precompiled = do
   when flags_debug $
      $logInfoS "runPrecompiled" . T.pack $ "running precompiled code: "
-       ++ tab (CL.magenta ("\n" ++ show precompiled))
+       ++ tab' (CL.magenta ("\n" ++ show precompiled))
 
   theData <- getEnvVar envInputData
   let (gas, ret) = callPrecompiledContract precompiled theData

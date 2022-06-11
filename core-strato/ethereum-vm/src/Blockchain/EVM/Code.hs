@@ -8,7 +8,6 @@ import           Text.PrettyPrint.ANSI.Leijen
 
 import           Blockchain.EVM.Opcodes
 import           Blockchain.Strato.Model.Code
-import           Blockchain.Util
 
 import           Text.Format
 
@@ -16,6 +15,10 @@ import           Text.Format
 getOperationAt::Code->CodePointer->(Operation, CodePointer)
 getOperationAt (Code bytes) p        = opCode2Op bytes p
 getOperationAt _ _ = error "getOperationAt: called with PtrToCode"
+
+safeIntDrop :: Int -> B.ByteString -> B.ByteString
+safeIntDrop i s | i > B.length s = B.empty
+safeIntDrop i s = B.drop i s
 
 showCode::CodePointer->Code->String
 showCode _ (Code bytes) | B.null bytes = ""
