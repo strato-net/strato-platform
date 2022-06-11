@@ -8,8 +8,8 @@ build-type: Simple
 
 dependencies:
   - base
-  - blockapps-solidity
   - containers
+  - evm-solidity
   - text
   - utf8-string
 

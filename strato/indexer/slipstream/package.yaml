@@ -33,7 +33,6 @@ library:
     - blockapps-data
     - blockapps-datadefs
     - blockapps-mpdbs
-    - blockapps-solidity
     - blockapps-util
     - bloomfilter
     - classy-prelude
@@ -43,6 +42,7 @@ library:
     - core-api2
     - cross-monitoring
     - deepseq
+    - evm-solidity
     - extra
     - format
     - lens
@@ -105,11 +105,11 @@ tests:
       - aeson
       - aeson-qq
       - base16-bytestring
-      - blockapps-solidity
       - bytestring
       - classy-prelude
       - conduit
       - containers
+      - evm-solidity
       - hflags
       - hspec
       - hspec-expectations-lifted

@@ -23,12 +23,12 @@ library:
   - blockapps-data
   - blockapps-datadefs
   - blockapps-ethereum
-  - blockapps-solidity
   - blockapps-strato-api
   - blockapps-util
   - bytestring
   - containers
   - cryptonite
+  - evm-solidity
   - generic-random
   - gitrev
   - http-api-data

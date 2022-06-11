@@ -1,4 +1,4 @@
-name: blockapps-solidity
+name: evm-solidity
 version: 0.1.0.0
 synopsis: Solidity datatypes
 description: Solidity datatypes
@@ -57,7 +57,7 @@ tests:
     source-dirs: test/
     dependencies:
      - aeson-qq
-     - blockapps-solidity
      - blockapps-strato-api
+     - evm-solidity
      - hspec
      - raw-strings-qq
