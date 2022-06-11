@@ -32,7 +32,6 @@ import qualified Blockchain.Strato.Model.Address           as A
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ExtendedWord      (Word256)
 import           Blockchain.Strato.Model.Keccak256         (Keccak256)
-import           Blockchain.Util
 
 import qualified Blockchain.Blockstanbul                   as PBFT
 import qualified Blockchain.Blockstanbul.HTTPAdmin         as PBFT
@@ -43,8 +42,11 @@ import qualified Data.ByteString.Lazy                      as B
 
 import           Blockchain.Sequencer.BinaryInstances      ()
 
+import           Blockchain.Util
+
 import qualified Text.Colors                               as CL
 import           Text.Format
+import           Text.Tools
 
 data AnchorChain = Public
                  | UnknownPrivate       -- TODO: It's possible these two aren't needed,
@@ -447,14 +449,14 @@ instance Format IngestBlock where
                          , ibBlockUncles         = uncles
                          } =
         CL.blue ("Block #" ++ show (DD.blockDataNumber bd)) ++ " (via " ++ format origin ++ ") " ++
-        tab (format (ingestBlockHash b) ++ "\n" ++
+        tab' (format (ingestBlockHash b) ++ "\n" ++
              format bd ++
              (if null receipts
               then "        (no transactions)\n"
-              else tab (show $ length receipts)) ++
+              else tab' (show $ length receipts)) ++
              (if null uncles
               then "        (no uncles)"
-              else tab (show $ length uncles)))
+              else tab' (show $ length uncles)))
 
 instance Format OutputBlock where
     format b@OutputBlock { obOrigin              = origin
@@ -464,14 +466,14 @@ instance Format OutputBlock where
                          , obBlockUncles         = uncles
                          } =
         CL.blue ("OutputBlock #" ++ show (DD.blockDataNumber bd) ++ "; total diff " ++ show totDiff) ++ " (via " ++ format origin ++ ") " ++
-        tab (format (outputBlockHash b) ++ "\n" ++
+        tab' (format (outputBlockHash b) ++ "\n" ++
              format bd ++
              (if null receipts
               then "        (no transactions)\n"
-              else tab (show $ length receipts)) ++
+              else tab' (show $ length receipts)) ++
              (if null uncles
               then "        (no uncles)"
-              else tab (show $ length uncles)))
+              else tab' (show $ length uncles)))
 
 instance Format OutputTx where
     format OutputTx{ otOrigin = origin
@@ -480,13 +482,13 @@ instance Format OutputTx where
                    , otBaseTx = base
                    } =
            CL.red("OutputTx from address " ++ format signer ++ " on chain " ++ show anchor)
-                ++ tab (" via " ++ format origin ++ "\n" ++ format (txHash base))
+                ++ tab' (" via " ++ format origin ++ "\n" ++ format (txHash base))
 
 instance Format IngestTx where
     format IngestTx{ itOrigin      = origin
                    , itTransaction = base
                    } =
-           CL.red("IngestTx via " ++ format origin ++ "\n" ++ tab (format $ txHash base))
+           CL.red("IngestTx via " ++ format origin ++ "\n" ++ tab' (format $ txHash base))
 
 -- todo: can we get away with this? seems like there'd be overhead recomputing
 -- todo: otSigner

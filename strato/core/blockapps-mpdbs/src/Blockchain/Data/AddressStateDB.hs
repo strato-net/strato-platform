@@ -43,9 +43,9 @@ import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.ExtendedWord
-import           Blockchain.Util
 import qualified Text.Colors                        as CL
 import           Text.Format
+import           Text.Tools
 
 data AddressState =
   AddressState{
@@ -67,7 +67,7 @@ instance Default AddressState where
 instance Format AddressState where
   format a =
     CL.blue "AddressState" ++
-    tab("\nnonce: " ++ showHex (addressStateNonce a) "" ++
+    tab'("\nnonce: " ++ showHex (addressStateNonce a) "" ++
         "\nbalance: " ++ show (toInteger $ addressStateBalance a) ++
         "\ncontractRoot: " ++ format (addressStateContractRoot a) ++
         "\ncodeHash: " ++ format (addressStateCodeHash a) ++

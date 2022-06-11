@@ -23,7 +23,6 @@ import           Blockchain.Data.RLP
 import           Blockchain.Data.Transaction
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Util
 
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
@@ -31,6 +30,7 @@ import           Blockchain.Strato.Model.ExtendedWord
 
 import qualified Text.Colors                        as CL
 import           Text.Format
+import           Text.Tools
 
 data BlockHeader =
   BlockHeader {
@@ -54,7 +54,7 @@ data BlockHeader =
 instance Format BlockHeader where
   format header@(BlockHeader ph oh b sr tr rr _ d number' gl gu ts ed _ nonce') =
     CL.blue ("BlockHeader #" ++ show number') ++ " " ++ format (headerHash header) ++
-    tab ("\nparentHash: " ++ format ph ++ "\n" ++
+    tab' ("\nparentHash: " ++ format ph ++ "\n" ++
          "ommersHash: " ++ format oh ++
          (if oh == hash (B.pack [0xc0]) then " (the empty array)\n" else "\n") ++
          "beneficiary: " ++ format b ++ "\n" ++

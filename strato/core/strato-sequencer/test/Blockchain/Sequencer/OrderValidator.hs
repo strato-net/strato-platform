@@ -13,10 +13,9 @@ import qualified Blockchain.Sequencer.Event as SE
 import           Blockchain.Strato.Model.Class (blockHeaderHash)
 import           Blockchain.Strato.Model.Keccak256
 
-import           Blockchain.Util            (tab)
-
 import qualified Text.Colors                as CL
 import           Text.Format
+import           Text.Tools                 (tab')
 
 class Show t => OrderValidateable t where
     getBlockHash   :: t -> Keccak256
@@ -49,7 +48,7 @@ instance (OrderValidateable t) => Format (OrderValidatorState t) where
     format (OrderValidatorState sb usb rs) =
         if (isValid' rs) then CL.green body else CL.red body
             where body =    ("runState -> " ++ (show rs) ++ "\n")
-                         ++ tab ("seenBlocks   -> " ++ (show sb)  ++ "\n"
+                         ++ tab' ("seenBlocks   -> " ++ (show sb)  ++ "\n"
                              ++  "unseenBlocks -> " ++ (show usb) ++ "\n")
 
 runValidatorM :: OrderValidateable gb => OrderValidatorM ts a -> gb -> [ts] -> IO (OrderValidatorState ts)

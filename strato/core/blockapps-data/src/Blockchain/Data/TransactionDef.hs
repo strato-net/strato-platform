@@ -28,7 +28,6 @@ import           Database.Persist.TH
 import           GHC.Generics
 
 import           Blockchain.Data.RLP
-import           Blockchain.Util
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.ExtendedWord (Word256)
@@ -36,7 +35,7 @@ import           Blockchain.Strato.Model.Keccak256
 import qualified Text.Colors                  as CL
 import           Text.Format
 import           Text.ShortDescription
-import           Text.Tools                   (shorten)
+import           Text.Tools                   (shorten, tab')
 
 derivePersistField "Transaction"
 
@@ -83,7 +82,7 @@ formatChainId = \case
 instance Format Transaction where
   format PrivateHashTX{transactionTxHash=h, transactionChainHash=ch} =
     CL.blue "Private Transaction Hash" ++
-    tab (
+    tab' (
       "\n" ++
       "Transaction Hash:       " ++ CL.yellow (format h) ++ "\n" ++
       "Transaction Chain Hash: " ++ CL.yellow (format ch) ++ "\n")
@@ -98,7 +97,7 @@ instance Format Transaction where
              , transactionMetadata=md
              } =
     CL.blue "Message Transaction" ++
-    tab (
+    tab' (
       "\n" ++
       "tNonce: " ++ show n ++ "\n" ++
       "gasPrice: " ++ show gp ++ "\n" ++
@@ -119,7 +118,7 @@ instance Format Transaction where
              , transactionMetadata=md
              } =
     CL.blue "Contract Creation Transaction" ++
-    tab (
+    tab' (
       "\n" ++
       "tNonce: " ++ show n ++ "\n" ++
       "gasPrice: " ++ show gp ++ "\n" ++

@@ -1,6 +1,14 @@
 
-
-module Text.Tools where
+module Text.Tools (
+  box,
+  boringBox,
+  grayBox,
+  setTitle,
+  shorten,
+  tab,
+  tab',
+  wrap
+  ) where
 
 import Text.Colors as C
 
@@ -41,6 +49,7 @@ boringBox strings = unlines $
 tab::String->String
 tab s = ' ':' ':' ':' ':tab' s
 
+-- This is a second version of "tab" that skips the first line
 tab'::String->String
 tab' []          = []
 tab' ('\n':rest) = '\n':' ':' ':' ':' ':tab' rest

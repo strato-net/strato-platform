@@ -26,10 +26,10 @@ import           Blockchain.Data.PubKey       ()
 import           Blockchain.Data.RLP
 import           Blockchain.Data.Transaction
 import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Util
 import           Blockchain.Strato.Model.ExtendedWord
 import qualified Text.Colors                  as CL
 import           Text.Format
+import           Text.Tools
 
 data Capability = ETH Integer               -- | Base Ethereum P2P protocol
                 | IST Integer               -- | Istanbul/Blockstanbul/PBFT messages.
@@ -196,24 +196,24 @@ instance Format Message where
 
   format (NewBlockHashes items) = CL.blue "NewBlockHashes"  ++ tab("\n" ++ intercalate "\n    " ((\(hash', number') -> "(" ++ format hash' ++ ", " ++ show number' ++ ")") <$> items))
   format (Transactions transactions) =
-    CL.blue "Transactions:\n    " ++ tab (intercalate "\n    " (format <$> transactions))
+    CL.blue "Transactions:\n    " ++ tab' (intercalate "\n    " (format <$> transactions))
   format (GetBlockHeaders b max' skip' direction') =
     CL.blue "GetBlockHeaders" ++ " (max: " ++ show max' ++ ", " ++ show direction' ++ ", skip " ++ show skip' ++ "): "
     ++ format b
   format (BlockHeaders headers) = CL.blue "BlockHeaders:"
-                                  ++ tab ("\n" ++ unlines (format <$> headers))
+                                  ++ tab' ("\n" ++ unlines (format <$> headers))
   format (GetBlockBodies hashes) =
     CL.blue "GetBlockBodies" ++ " (" ++ show (length hashes) ++ " hashes):"
-    ++ tab ("\n" ++ unlines (format <$> hashes))
+    ++ tab' ("\n" ++ unlines (format <$> hashes))
   format (BlockBodies bodies) =
     CL.blue "BlockBodies:"
-    ++ tab ("\n" ++ unlines (formatBody <$> bodies))
+    ++ tab' ("\n" ++ unlines (formatBody <$> bodies))
     where
-      formatBody (transactions, uncles) = "BlockBody:" ++ tab (formatTransactions transactions ++ formatUncles uncles)
+      formatBody (transactions, uncles) = "BlockBody:" ++ tab' (formatTransactions transactions ++ formatUncles uncles)
       formatTransactions []           = "No transactions, "
-      formatTransactions transactions = "\nTransactions:" ++ tab ("\n" ++ unlines (map format transactions))
+      formatTransactions transactions = "\nTransactions:" ++ tab' ("\n" ++ unlines (map format transactions))
       formatUncles []     = "No uncles"
-      formatUncles uncles = "\nUncles:" ++ tab ("\n" ++ unlines (map format uncles))
+      formatUncles uncles = "\nUncles:" ++ tab' ("\n" ++ unlines (map format uncles))
   format (NewBlock b d) = CL.blue "NewBlock (" ++ show d ++ "):"  ++ tab("\n" ++ format b)
 
   format (Blockstanbul msg) = CL.blue "Blockstanbul\n" ++ "  msg: " ++ PBFT.shortFormat msg

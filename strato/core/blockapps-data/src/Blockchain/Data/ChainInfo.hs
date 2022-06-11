@@ -45,7 +45,6 @@ import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.Secp256k1    as EC
 import           Blockchain.TypeLits
-import           Blockchain.Util
 
 import           Data.Aeson
 import qualified Data.ByteString                      as B
@@ -67,6 +66,7 @@ import           Numeric                              (showHex)
 import           Text.Format
 
 import qualified Text.Colors                          as CL
+import           Text.Tools
 
 newtype ParentChainId = ParentChainId { unParentChainId :: Maybe Word256 }
 
@@ -80,9 +80,9 @@ instance Format CodeInfo where
   format CodeInfo{..} = unlines
     [ "CodeInfo"
     , "--------"
-    , tab $ "Name:   " ++ show codeInfoName
-    , tab $ "Source: " ++ show codeInfoSource
-    , tab $ "Code:   " ++ show (decodeUtf8 $ B16.encode codeInfoCode)
+    , tab' $ "Name:   " ++ show codeInfoName
+    , tab' $ "Source: " ++ show codeInfoSource
+    , tab' $ "Code:   " ++ show (decodeUtf8 $ B16.encode codeInfoCode)
     ]
 
 instance FromJSON CodeInfo where
@@ -133,23 +133,23 @@ instance Format AccountInfo where
   format (NonContract addr nonce) = unlines
     [ "AccountInfo - NonContract"
     , "-------------------------"
-    , tab $ "Address: " ++ format addr
-    , tab $ "Nonce:   " ++ show nonce
+    , tab' $ "Address: " ++ format addr
+    , tab' $ "Nonce:   " ++ show nonce
     ]
   format (ContractNoStorage addr nonce ch) = unlines
     [ "AccountInfo - ContractNoStorage"
     , "-------------------------"
-    , tab $ "Address:   " ++ format addr
-    , tab $ "Nonce:     " ++ show nonce
-    , tab $ "Code hash: " ++ format ch
+    , tab' $ "Address:   " ++ format addr
+    , tab' $ "Nonce:     " ++ show nonce
+    , tab' $ "Code hash: " ++ format ch
     ]
   format (ContractWithStorage addr nonce ch s) = unlines
     [ "AccountInfo - ContractWithStorage"
     , "-------------------------"
-    , tab $ "Address:   " ++ format addr
-    , tab $ "Nonce:     " ++ show nonce
-    , tab $ "Code hash: " ++ format ch
-    , tab $ "Storage:   " ++ show s
+    , tab' $ "Address:   " ++ format addr
+    , tab' $ "Nonce:     " ++ show nonce
+    , tab' $ "Code hash: " ++ format ch
+    , tab' $ "Storage:   " ++ show s
     ]
 
 instance FromJSON AccountInfo where
@@ -227,9 +227,9 @@ instance Format ChainSignature where
   format (ChainSignature r s v) = unlines
     [ "ChainSignature"
     , "--------------"
-    , tab $ "r: " ++ CL.yellow (format r)
-    , tab $ "s: " ++ CL.yellow (format s)
-    , tab $ "v: " ++ showHex v "0x"
+    , tab' $ "r: " ++ CL.yellow (format r)
+    , tab' $ "s: " ++ CL.yellow (format s)
+    , tab' $ "v: " ++ showHex v "0x"
     ]
 
 instance FromJSON ChainSignature where
@@ -297,14 +297,14 @@ instance Show UnsignedChainInfo where
   show UnsignedChainInfo{..} = unlines
     [ "UnsignedChainInfo"
     , "-----------------"
-    , tab $ "Label:          " ++ show chainLabel
-    , tab $ "Account info:   " ++ format accountInfo
-    , tab $ "Code info:      " ++ show (codeInfoName <$> codeInfo)
-    , tab $ "Members:        " ++ show members
-    , tab $ "Parent chain:   " ++ CL.yellow (format parentChain)
-    , tab $ "Creation block: " ++ format creationBlock
-    , tab $ "Nonce:          " ++ CL.yellow (format chainNonce)
-    , tab $ "Metadata:       " ++ show (M.keys chainMetadata)
+    , tab' $ "Label:          " ++ show chainLabel
+    , tab' $ "Account info:   " ++ format accountInfo
+    , tab' $ "Code info:      " ++ show (codeInfoName <$> codeInfo)
+    , tab' $ "Members:        " ++ show members
+    , tab' $ "Parent chain:   " ++ CL.yellow (format parentChain)
+    , tab' $ "Creation block: " ++ format creationBlock
+    , tab' $ "Nonce:          " ++ CL.yellow (format chainNonce)
+    , tab' $ "Metadata:       " ++ show (M.keys chainMetadata)
     ]
 
 instance Format UnsignedChainInfo where
@@ -319,8 +319,8 @@ instance Format ChainInfo where
   format ChainInfo{..} = unlines
     [ "ChainInfo"
     , "-----------------"
-    , tab $ format chainSignature
-    , tab $ format chainInfo
+    , tab' $ format chainSignature
+    , tab' $ format chainInfo
     ]
 
 instance FromJSON ChainInfo where

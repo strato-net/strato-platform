@@ -37,7 +37,8 @@ import Blockchain.Data.RLP
 import Blockchain.Data.Transaction
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.Util
+
+import Text.Tools
 
 data Block =
   Block{
@@ -57,14 +58,14 @@ setBlockNo n blk = blk{blockBlockData = (blockBlockData blk){blockDataNumber = n
 instance Format Block where
   format b@Block{blockBlockData=bd, blockReceiptTransactions=receipts, blockBlockUncles=uncles} =
     CL.blue ("Block #" ++ show (blockDataNumber bd)) ++ " " ++
-    tab (format (blockHash b) ++ "\n" ++
+    tab' (format (blockHash b) ++ "\n" ++
          format bd ++
          (if null receipts
           then "        (no transactions)\n"
-          else tab (intercalate "\n    " (format <$> receipts))) ++
+          else tab' (intercalate "\n    " (format <$> receipts))) ++
          (if null uncles
           then "        (no uncles)"
-          else tab ("Uncles:" ++ tab ("\n" ++ intercalate "\n    " (format <$> uncles)))))
+          else tab' ("Uncles:" ++ tab' ("\n" ++ intercalate "\n    " (format <$> uncles)))))
 
 instance RLPSerializable Block where
   rlpDecode (RLPArray [bd, RLPArray transactionReceipts, RLPArray uncles]) =
