@@ -154,7 +154,7 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
           bootstrapGenesisBlock hsh difficulty
           A.insert (A.Proxy @EmittedBlock) hsh alreadyEmittedBlock
     fromLeft (error "webserver completed") <$>
-      race (runNoLoggingT (runSequencerM cfg mCtx (boot >> m)))
+      race (runLoggingT (runSequencerM cfg mCtx (boot >> m)))
            ( run testWebserverPort
                . logStdoutDev
                . prometheus def
@@ -695,11 +695,13 @@ spec = do
         map (map txType . blockReceiptTransactions) bs' `shouldBe` [[PrivateHash]]
         let obs' = [b | VmBlock b <- _toVm b2]
         map (map txType . obReceiptTransactions) obs' `shouldBe` [[PrivateHash]]
+        map (map (fmap txType . otPrivatePayload) . obReceiptTransactions) obs' `shouldBe`
+          [[Nothing]]
         b3 <- runBatch $ checkForUnseq [chainDetails1]
         let obs'' = [b | VmBlock b <- _toVm b3]
-        map (map txType . obReceiptTransactions) obs'' `shouldBe` [[PrivateHash], [PrivateHash]]
+        map (map txType . obReceiptTransactions) obs'' `shouldBe` [[PrivateHash], [PrivateHash], [PrivateHash]]
         map (map (fmap txType . otPrivatePayload) . obReceiptTransactions) obs'' `shouldBe`
-          [[Just Message], [Just Message]]
+          [[Just Message], [Nothing], [Just Message]]
 
       it "should re-run blocks when chain info is delayed" . runPBFTTestMWithGenesis $ \h -> do
         let iev = iev1' h
