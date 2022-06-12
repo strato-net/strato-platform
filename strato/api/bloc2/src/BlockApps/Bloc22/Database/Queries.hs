@@ -55,6 +55,7 @@ import           System.Clock
 import           Text.Format
 import           UnliftIO
 
+import           BlockApps.Bloc22.API.AbiBin     (AbiBin(..))
 import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Bloc22.Database.Tables
 import           BlockApps.Bloc22.Database.Solc
@@ -63,7 +64,6 @@ import           BlockApps.Bloc22.Server.Utils
 import           BlockApps.SolidityVarReader     (byteStringToWord256, word256ToByteString)
 import           BlockApps.Solidity.Parse.Parser
 import           BlockApps.Solidity.Xabi
-import           BlockApps.Strato.Types
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId

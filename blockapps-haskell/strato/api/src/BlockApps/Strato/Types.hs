@@ -1,17 +1,12 @@
-{-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE DeriveAnyClass        #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
 
-{-# OPTIONS_GHC -fno-warn-missing-methods #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-
 
 --{-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
 
@@ -19,14 +14,12 @@ module BlockApps.Strato.Types
   (
     Storage (..)
   , StorageKV (..)
-  , AbiBin (..)
   ) where
 
 import           Control.Monad
 import           Data.Aeson
 import           Data.Aeson.Types
 import           Data.Swagger
-import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
 import           GHC.Generics
 import           Servant.API
@@ -42,8 +35,6 @@ import           Blockchain.Strato.Model.ExtendedWord
 
 instance (ToHttpApiData a) => ToHttpApiData [a] where
   toUrlPiece = Text.pack . show . map toUrlPiece
-
-instance ToSchema AbiBin
 
 instance FromHttpApiData Word256 where
   parseUrlPiece text = case readMaybe (Text.unpack text) of
@@ -87,21 +78,3 @@ instance ToJSON Storage where
                   Just c_id' -> ["chain_id" .= c_id']
     in object $ a:t:k:v:c_id
 
-data AbiBin = AbiBin
-  { abi        :: Text
-  , bin        :: Text
-  , binRuntime :: Text
-  } deriving (Eq,Show,Generic)
-
-instance FromJSON AbiBin where
-  parseJSON = withObject "AbiBin" $ \obj -> AbiBin
-    <$> obj .: "abi"
-    <*> obj .: "bin"
-    <*> obj .: "bin-runtime"
-
-instance ToJSON AbiBin where
-  toJSON AbiBin{..} = object
-    [ "abi" .= abi
-    , "bin" .= bin
-    , "bin-runtime" .= binRuntime
-    ]

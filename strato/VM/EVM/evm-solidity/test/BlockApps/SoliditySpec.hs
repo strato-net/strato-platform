@@ -15,7 +15,6 @@ import BlockApps.Solidity.TypeDefs
 import BlockApps.Solidity.Value
 import BlockApps.Solidity.Xabi
 import BlockApps.SolidityVarReader
-import BlockApps.Strato.Types()
 import Test.QuickCheck
 
 spec :: Spec

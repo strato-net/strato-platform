@@ -19,7 +19,7 @@ import Text.RawString.QQ
 import BlockApps.SolidVMStorageDecoder
 import BlockApps.Solidity.SolidityValue
 import BlockApps.Solidity.Value as V
-import BlockApps.Strato.Types
+import BlockApps.Strato.Types (Storage(..), StorageKV(..))
 import Blockchain.SolidVM.Model
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Account
