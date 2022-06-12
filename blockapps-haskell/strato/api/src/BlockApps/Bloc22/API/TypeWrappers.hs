@@ -14,14 +14,41 @@ import           Data.Swagger
 import           Data.Swagger.Internal.Schema (named)
 import           Data.Word
 import qualified Generic.Random               as GR
+import           Generic.Random
 import           GHC.Generics
+import           Numeric
 import           Numeric.Natural
 import           Test.QuickCheck
 import           Text.Read
+import           Text.Read.Lex
 
-
-import           BlockApps.Ethereum
 import           Blockchain.Strato.Model.ExtendedWord
+
+
+newtype Hex n = Hex { unHex :: n } deriving (Eq, Generic, Ord)
+
+instance (Integral n, Show n) => Show (Hex n) where
+  show (Hex n) = showHex (toInteger n) ""
+
+instance (Eq n, Num n) => Read (Hex n) where
+  readPrec = Hex <$> readP_to_Prec (const readHexP)
+  --I'm not sure what `d` precision parameter is used for
+
+instance Num n => FromJSON (Hex n) where
+  parseJSON value = do
+    string <- parseJSON value
+    case fmap fromInteger (readMaybe ("0x" ++ string)) of
+      Nothing -> fail $ "not hex encoded: " ++ string
+      Just n  -> return $ Hex n
+
+instance (Integral n, Show n) => ToJSON (Hex n) where
+  toJSON = toJSON . show
+
+instance Arbitrary x => Arbitrary (Hex x) where
+  arbitrary = genericArbitrary uniform
+
+
+
 
 {-
 instance ToSchema (Hex Word160) where

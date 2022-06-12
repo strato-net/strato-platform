@@ -15,7 +15,6 @@ import           Test.QuickCheck.Instances ()
 import           Text.Read
 
 import           Blockchain.SolidVM.Model
-import           BlockApps.Ethereum
 import           BlockApps.Strato.Types
 import           BlockApps.Bloc22.API.TypeWrappers
 
@@ -23,6 +22,9 @@ spec :: Spec
 spec = modifyMaxSuccess (const 10) $ do
   describe "Strung" $
     prop "has inverse JSON decode/encode" $ jsonProp @ (Strung Integer)
+  describe "Hex" $ do
+    prop "has inverse JSON decode/encode" $ jsonProp @ (Hex Word)
+    prop "has inverse read/show" $ readShowProp @ (Hex Word)    
   describe "Storage" $ do
     prop "has inverse JSON decode/encode" $ jsonProp @ Storage
 

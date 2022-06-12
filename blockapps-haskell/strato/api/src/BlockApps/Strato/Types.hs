@@ -37,8 +37,7 @@ import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
 import           Text.Read
 -- TODO: Unify Bloch and Strato transactions
-import           BlockApps.Bloc22.API.TypeWrappers ()
-import           BlockApps.Ethereum
+import           BlockApps.Bloc22.API.TypeWrappers
 import           Blockchain.SolidVM.Model
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId

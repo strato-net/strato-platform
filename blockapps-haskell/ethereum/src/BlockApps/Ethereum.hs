@@ -16,14 +16,12 @@
 
 module BlockApps.Ethereum
   ( -- Number type reexports
-    Hex (..)
-  , Transaction (..)
+    Transaction (..)
   , UnsignedTransaction (..)
   , rlpHash
   ) where
 
 import           Control.DeepSeq (NFData)
-import           Data.Aeson             hiding (Array, String)
 import           Data.ByteString        (ByteString)
 import qualified Data.ByteString.Char8  as Char8
 import           Data.Map.Strict        (Map)
@@ -36,11 +34,8 @@ import qualified Data.Text              as Text
 import           Data.Word
 import           Generic.Random
 import           GHC.Generics
-import           Numeric
 import           Test.QuickCheck        hiding ((.&.))
 import           Test.QuickCheck.Instances    ()
-import           Text.Read              hiding (String)
-import           Text.Read.Lex
 
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
@@ -51,29 +46,6 @@ import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Keccak256   hiding (rlpHash)
 import           Blockchain.Strato.Model.Nonce
 import           Blockchain.Strato.Model.Wei
-
-newtype Hex n = Hex { unHex :: n } deriving (Eq, Generic, Ord)
-
-instance (Integral n, Show n) => Show (Hex n) where
-  show (Hex n) = showHex (toInteger n) ""
-
-instance (Eq n, Num n) => Read (Hex n) where
-  readPrec = Hex <$> readP_to_Prec (const readHexP)
-  --I'm not sure what `d` precision parameter is used for
-
-instance Num n => FromJSON (Hex n) where
-  parseJSON value = do
-    string <- parseJSON value
-    case fmap fromInteger (readMaybe ("0x" ++ string)) of
-      Nothing -> fail $ "not hex encoded: " ++ string
-      Just n  -> return $ Hex n
-
-instance (Integral n, Show n) => ToJSON (Hex n) where
-  toJSON = toJSON . show
-
-instance Arbitrary x => Arbitrary (Hex x) where
-  arbitrary = genericArbitrary uniform
-
 
 instance RLPEncodable CodePtr where
   rlpEncode (EVMCode codeHash) = rlpEncode codeHash

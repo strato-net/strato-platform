@@ -12,7 +12,6 @@ import Text.Read
 import Web.FormUrlEncoded
 import Web.HttpApiData
 
-import BlockApps.Ethereum
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256 hiding (hash)
@@ -30,10 +29,6 @@ spec = modifyMaxSuccess (const 10) $ do
       encode (0x0 :: Word256) `shouldBe` "\"0000000000000000000000000000000000000000000000000000000000000000\""
       encode (0x7 :: Word256) `shouldBe` "\"0000000000000000000000000000000000000000000000000000000000000007\""
       encode (0x45 :: Word256) `shouldBe` "\"0000000000000000000000000000000000000000000000000000000000000045\""
-
-  describe "Hex" $ do
-    prop "has inverse JSON decode/encode" $ jsonProp @ (Hex Word)
-    prop "has inverse read/show" $ readShowProp @ (Hex Word)
 
   describe "Address" $ do
     prop "has inverse JSON decode/encode" $ jsonProp @ Address
