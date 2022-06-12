@@ -45,7 +45,6 @@ import           Data.Word
 import           Text.Printf
 import           Text.Read
 
-import           BlockApps.Ethereum
 import           BlockApps.Solidity.ArgValue
 import           BlockApps.Solidity.Contract
 import           BlockApps.Solidity.SolidityValue
@@ -65,6 +64,9 @@ data SolidityDecodingException = EnumOutOfBounds Text Int
                                deriving Show
 
 instance Exception SolidityDecodingException
+
+lastWord64 :: Word256 -> Word64
+lastWord64 x = fromIntegral (x .&. 0xffffffffffffffff)
 
 valueToSolidityValue::Value->SolidityValue
 valueToSolidityValue = \case

@@ -27,13 +27,10 @@ library:
   - binary
   - bytestring
   - containers
-  - http-api-data
   - lens
   - servant
   - servant-docs
   - swagger2
-  - time
-  - unordered-containers
 
 tests:
   blockapps-strato-api-test:

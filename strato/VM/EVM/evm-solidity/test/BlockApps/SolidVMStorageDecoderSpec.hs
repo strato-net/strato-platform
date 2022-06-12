@@ -21,6 +21,7 @@ import BlockApps.Solidity.SolidityValue
 import BlockApps.Solidity.Value as V
 import BlockApps.Strato.Types
 import Blockchain.SolidVM.Model
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Account
 import SolidVM.Model.Storable
 

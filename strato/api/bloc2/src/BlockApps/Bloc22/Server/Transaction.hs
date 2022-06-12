@@ -81,7 +81,7 @@ import           BlockApps.Solidity.Type
 import           BlockApps.Solidity.Value
 import           BlockApps.Solidity.Xabi
 import qualified BlockApps.Solidity.Xabi.Type      as Xabi
-import           BlockApps.Strato.Types            hiding (Account, Transaction (..), TransactionResult(..))
+import           BlockApps.Strato.Types
 import           BlockApps.XAbiConverter
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.DataDefs
@@ -89,6 +89,7 @@ import           Blockchain.Data.Json
 import           Blockchain.Data.TXOrigin
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address  hiding (unAddress)
+import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.ExtendedWord   (Word256, word256ToBytes)
 import           Blockchain.Strato.Model.Gas

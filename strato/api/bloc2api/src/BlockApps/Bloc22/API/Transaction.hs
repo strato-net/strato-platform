@@ -36,8 +36,10 @@ import           BlockApps.Bloc22.API.SwaggerSchema
 import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Solidity.ArgValue
-import           BlockApps.Strato.Types            hiding (TransactionResult)
+import           BlockApps.Strato.Types
   
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.ExtendedWord   (Word256)
 import           Blockchain.Strato.Model.Gas
