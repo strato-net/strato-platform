@@ -32,11 +32,11 @@ import           Servant.Docs
 import           Test.QuickCheck                    hiding (Success)
 
 import           BlockApps.Bloc22.API.Chain
+import           BlockApps.Bloc22.API.TypeWrappers
 import           BlockApps.Bloc22.API.SwaggerSchema
 import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Solidity.ArgValue
-import           BlockApps.Strato.Types
   
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId

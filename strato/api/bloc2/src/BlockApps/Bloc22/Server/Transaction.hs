@@ -63,6 +63,7 @@ import           UnliftIO
 
 import           BlockApps.Bloc22.API.Chain
 import           BlockApps.Bloc22.API.Transaction
+import           BlockApps.Bloc22.API.TypeWrappers
 import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Bloc22.Database.Queries  (getContractDetailsForContract)
@@ -81,7 +82,6 @@ import           BlockApps.Solidity.Type
 import           BlockApps.Solidity.Value
 import           BlockApps.Solidity.Xabi
 import qualified BlockApps.Solidity.Xabi.Type      as Xabi
-import           BlockApps.Strato.Types
 import           BlockApps.XAbiConverter
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.DataDefs

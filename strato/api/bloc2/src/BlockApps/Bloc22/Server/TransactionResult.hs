@@ -74,7 +74,8 @@ import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.Keccak256
-import qualified BlockApps.Strato.Types as Deprecated
+import qualified BlockApps.Bloc22.API.DeprecatedPostTransaction as Deprecated
+import           BlockApps.Bloc22.API.TypeWrappers
 import           Control.Monad.Composable.BlocSQL
 import           Control.Monad.Composable.SQL
 import           SQLM
@@ -207,7 +208,7 @@ rawTx2PostTx RawTransaction{..} = Deprecated.PostTransaction
   , Deprecated.posttransactionGasPrice = fromInteger rawTransactionGasPrice
   , Deprecated.posttransactionTo = rawTransactionToAddress
   , Deprecated.posttransactionFrom = rawTransactionFromAddress
-  , Deprecated.posttransactionValue = Deprecated.Strung $ fromInteger rawTransactionValue
+  , Deprecated.posttransactionValue = Strung $ fromInteger rawTransactionValue
   , Deprecated.posttransactionR = Hex $ fromInteger rawTransactionR
   , Deprecated.posttransactionS = Hex $ fromInteger rawTransactionS
   , Deprecated.posttransactionV = Hex rawTransactionV

@@ -17,6 +17,7 @@ import           Text.Read
 import           Blockchain.SolidVM.Model
 import           BlockApps.Ethereum
 import           BlockApps.Strato.Types
+import           BlockApps.Bloc22.API.TypeWrappers
 
 spec :: Spec
 spec = modifyMaxSuccess (const 10) $ do

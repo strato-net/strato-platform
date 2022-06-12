@@ -55,14 +55,14 @@ import           Servant.API
 import           Servant.Docs
 import           Test.QuickCheck                    hiding (Success,Failure)
 
+import qualified BlockApps.Bloc22.API.DeprecatedPostTransaction as Deprecated
 import           BlockApps.Bloc22.API.SwaggerSchema
+import           BlockApps.Bloc22.API.TypeWrappers
 import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Ethereum
 import           BlockApps.Solidity.ArgValue
 import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Xabi
-import           BlockApps.Strato.Types (Strung(..))
-import qualified BlockApps.Strato.Types as Deprecated
 
 import           Blockchain.Data.TransactionResult
 import           Blockchain.Strato.Model.Account
