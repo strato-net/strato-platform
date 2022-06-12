@@ -22,16 +22,13 @@ module BlockApps.Strato.Types
   , AbiBin (..)
   ) where
 
-import           Control.Lens                 ((&), (?~))
 import           Control.Monad
 import           Data.Aeson
 import           Data.Aeson.Types
 import           Data.Swagger
-import           Data.Swagger.Internal.Schema (named)
 import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
 import           GHC.Generics
-import           Numeric
 import           Servant.API
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
@@ -46,17 +43,7 @@ import           Blockchain.Strato.Model.ExtendedWord
 instance (ToHttpApiData a) => ToHttpApiData [a] where
   toUrlPiece = Text.pack . show . map toUrlPiece
 
-instance ToSchema Word160 where
-  declareNamedSchema = const . pure $ named "Word160" binarySchema
--- add min max
-
 instance ToSchema AbiBin
-
-instance ToParamSchema Word256 where
-  toParamSchema _ = mempty & type_ ?~ SwaggerString
-
-instance ToHttpApiData Word256 where
-  toUrlPiece = Text.pack . ("0x" ++ ) . flip showHex ""
 
 instance FromHttpApiData Word256 where
   parseUrlPiece text = case readMaybe (Text.unpack text) of

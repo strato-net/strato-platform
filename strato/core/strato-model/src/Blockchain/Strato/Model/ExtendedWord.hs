@@ -30,6 +30,7 @@ import qualified Data.ByteString.Char8     as BC
 import           Data.Ix
 import qualified Data.Primitive.ByteArray  as PBA
 import           Data.Swagger              hiding (Format, format)
+import           Data.Swagger.Internal.Schema (named)
 import qualified Data.Text                 as T
 import           Foreign.ForeignPtr
 import           Foreign.Ptr
@@ -175,6 +176,12 @@ instance ToSchema Word256 where
         & example ?~ "ec41a0a4da1f33ee9a757f4fd27c2a1a57313353375860388c66edc562ddc781"
         & description ?~ "Fixed-size words of 256 bits" )
 
+instance ToParamSchema Word256 where
+  toParamSchema _ = mempty & type_ ?~ SwaggerString
+
+instance ToHttpApiData Word256 where
+  toUrlPiece = T.pack . ("0x" ++ ) . flip showHex ""
+
 instance Ix Word256 where
     range (x, y) | x == y = [x]
     range (x, y) = x:range (x+1, y)
@@ -230,3 +237,8 @@ instance Ae.ToJSONKey Word256 where
 
 instance Ae.FromJSONKey Word256 where
     fromJSONKey = Ae.FromJSONKeyTextParser (Ae.parseJSON . Ae.String)
+
+instance ToSchema Word160 where
+  declareNamedSchema = const . pure $ named "Word160" binarySchema
+-- add min max
+
