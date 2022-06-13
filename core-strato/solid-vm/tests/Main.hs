@@ -11,6 +11,8 @@ import qualified Spec
 import qualified DetectorsSpec
 import qualified TypecheckerSpec
 import qualified FuzzerSpec
+import qualified ParserSpec
+import qualified PragmaSpec
 
 predicate :: Path -> Bool
 predicate (_, _) = True
@@ -23,3 +25,6 @@ main = do
   hspecWith (configAddFilter predicate defaultConfig) DetectorsSpec.spec
   hspecWith (configAddFilter predicate defaultConfig) TypecheckerSpec.spec
   hspecWith (configAddFilter predicate defaultConfig) FuzzerSpec.spec
+  hspecWith (configAddFilter predicate defaultConfig) ParserSpec.spec
+  hspecWith (configAddFilter predicate defaultConfig) PragmaSpec.spec
+
