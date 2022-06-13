@@ -1,68 +1,78 @@
 packages:
-- api/bloc2
-- api/bloc2api
-- api/core-api2
-- api/strato-api
-- api2/strato-api2
-- composable-monads/bloc-sql-monad
-- composable-monads/core-api-monad
-- composable-monads/kafka-monad
-- composable-monads/sql-monad
-- composable-monads/vault-monad
+- strato/api/bloc2
+- strato/api/bloc2api
+- strato/api/core-api2
+- strato/api/ethereum-jsonrpc
+- strato/api/strato-api
+- strato/api2/strato-api2
+
+- strato/core/blockapps-data
+- strato/core/blockapps-datadefs
+- strato/core/blockapps-mpdbs
+- strato/core/blockstanbul
+- strato/core/ethereum-discovery
+- strato/core/ethereum-encryption
+- strato/core/fast-keccak256
+- strato/core/fastMP
+- strato/core/merkle-patricia-db
+- strato/core/miner-ethash
+- strato/core/seqevents
+- strato/core/strato-adit
+- strato/core/strato-conf
+- strato/core/strato-genesis
+- strato/core/strato-init
+- strato/core/strato-model
+- strato/core/strato-networks
+- strato/core/strato-p2p
+- strato/core/strato-redis-blockdb
+- strato/core/strato-sequencer
+- strato/core/strato-statediff
+
+- strato/indexer/slipstream
+- strato/indexer/strato-index
+
+- strato/libs/clockwork
+- strato/libs/common-log
+- strato/libs/composable-monads/bloc-sql-monad
+- strato/libs/composable-monads/core-api-monad
+- strato/libs/composable-monads/kafka-monad
+- strato/libs/composable-monads/sql-monad
+- strato/libs/composable-monads/vault-monad
+- strato/libs/ethereum-rlp
+- strato/libs/format
+- strato/libs/milena
+- strato/libs/monad-alter
+
+- strato/test-suite
+
+- strato/tools/blockapps-tools
+- strato/tools/x509-certs
+
+- strato/vault/api
+- strato/vault/client
+- strato/vault/server
+
+- strato/VM/EVM/evm-solidity
+- strato/VM/vrun
+
 - blockapps-haskell/ethereum
-- blockapps-haskell/slipstream
-- blockapps-haskell/solidity
 - blockapps-haskell/strato/api
-- blockapps-haskell/vault-wrapper/api
-- blockapps-haskell/vault-wrapper/client
-- blockapps-haskell/vault-wrapper/server
-- core-strato/milena/
-- core-strato/strato-conf/
-- core-strato/miner-ethash/
-- core-strato/merkle-patricia-db/
-- core-strato/blockapps-data/
-- core-strato/blockapps-datadefs/
-- core-strato/blockapps-mpdbs/
+
 - core-strato/debugger/
-- core-strato/fast-keccak256/
-- core-strato/strato-init/
-- core-strato/ethereum-discovery/
-- core-strato/ethereum-encryption/
 - core-strato/vm-runner/
 - core-strato/vm-tools/
 - core-strato/ethereum-vm/
 - core-strato/blockapps-util/
-- core-strato/blockapps-tools/
-- core-strato/vrun/
-- core-strato/seqevents/
 - core-strato/solid-vm/
-- core-strato/strato-adit/
-- core-strato/strato-genesis/
-- core-strato/strato-index/
-- core-strato/strato-networks/
-- core-strato/strato-sequencer/
-- core-strato/ethereum-jsonrpc/
-- core-strato/strato-model/
-- core-strato/strato-p2p/
-- core-strato/strato-redis-blockdb/
-- core-strato/strato-statediff/
-- core-strato/test-suite/
 - core-strato/blockapps-haskoin/
-- core-strato/ethereum-rlp/
-- core-strato/blockstanbul/
 - core-strato/privacy/
-- core-strato/fastMP/
-- monad-alter/
+
 - shared-util/blockapps-init/
-- shared-util/common-log/
 - shared-util/cross-monitoring/
-- shared-util/format
 - shared-util/labeled-error/
 - shared-util/solid-vm-model/
 - shared-util/source-tools/
-- clockwork
 - logserver
-- x509-certs/
 
 extra-deps:
 - Crypto-4.2.5.1@sha256:52275a055f4adf7c488260fb9fae60d03679632e64d3c8fc69d8b5951e8129cc,3688

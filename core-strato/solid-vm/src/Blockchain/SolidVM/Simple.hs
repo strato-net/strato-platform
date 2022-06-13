@@ -27,7 +27,7 @@ module Blockchain.SolidVM.Simple
   , module Blockchain.Strato.Model.Code
   , module Blockchain.Data.DataDefs
   , module Blockchain.Data.ExecResults
-  , module Blockchain.ExtWord
+  , module Blockchain.Strato.Model.ExtendedWord
   , module Blockchain.Strato.Model.Account
   , module Blockchain.Strato.Model.Keccak256
   , module Blockchain.VM.SolidException
@@ -43,10 +43,10 @@ import           GHC.Generics
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.ExecResults
 import qualified Blockchain.Database.MerklePatricia as MP
-import           Blockchain.ExtWord
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Code
+import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.SolidVM                as SolidVM
 import           Blockchain.VM.SolidException

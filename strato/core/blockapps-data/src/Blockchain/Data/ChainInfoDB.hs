@@ -1,0 +1,200 @@
+{-# OPTIONS -fno-warn-missing-methods #-}
+{-# OPTIONS -fno-warn-orphans         #-}
+{-# LANGUAGE DataKinds                #-}
+{-# LANGUAGE FlexibleContexts         #-}
+{-# LANGUAGE FlexibleInstances        #-}
+{-# LANGUAGE OverloadedStrings        #-}
+{-# LANGUAGE RecordWildCards          #-}
+{-# LANGUAGE ScopedTypeVariables      #-}
+{-# LANGUAGE TypeApplications         #-}
+{-# LANGUAGE TypeOperators            #-}
+
+module Blockchain.Data.ChainInfoDB where
+
+import           Control.Arrow                      ((&&&))
+import           Control.Monad                      (when)
+import           Blockchain.Output
+import           Data.Foldable                      (traverse_)
+import qualified Data.Map                           as M        (fromList, toList)
+import           Data.Maybe
+import qualified Data.Text                          as T
+
+import qualified Database.Esqueleto                 as E
+import           Database.Persist                   hiding (get)
+
+import           Blockchain.Data.ChainInfo
+import           Blockchain.TypeLits
+import           Blockchain.DB.SQLDB
+import           Blockchain.Data.DataDefs
+import           Blockchain.Data.Enode
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.ExtendedWord (Word256)
+
+getChainInfo :: HasSQLDB m => ChainId -> m (Maybe (NamedTuple "id" "info" ChainId ChainInfo))
+getChainInfo (ChainId chainId) = do
+  sqlQuery $ do
+    entChainInfos <- E.select . E.from $ \cRef -> do
+      E.where_ (cRef E.^. ChainInfoRefChainId E.==. E.val chainId)
+      return cRef
+    case entChainInfos of
+      []  -> return Nothing
+      (cInfo:_) -> do
+          let chainInfoRefId = entityKey cInfo
+          let ChainInfoRef{..} = entityVal cInfo
+          members <- E.select . E.from $ \mRef -> do
+            E.where_ (mRef E.^. ChainMemberRefChainInfoId E.==. E.val chainInfoRefId)
+            return mRef
+          --accts <- E.select . E.from $ \abRef -> do
+            --E.where_ (abRef E.^. ChainAccountBalanceRefChainInfoId E.==. E.val chainInfoRefId)
+            --return abRef
+          aInfos <- E.select . E.from $ \aiRef -> do
+            E.where_ (aiRef E.^. AccountInfoRefChainInfoId E.==. E.val chainInfoRefId)
+            return aiRef
+          cInfos <- E.select . E.from $ \ciRef -> do
+            E.where_ (ciRef E.^. CodeInfoRefChainInfoId E.==. E.val chainInfoRefId)
+            return ciRef
+          mds <- E.select . E.from $ \cmdRef -> do
+            E.where_ (cmdRef E.^. ChainMetadataRefChainInfoId E.==. E.val chainInfoRefId)
+            return cmdRef
+          sig <- fmap listToMaybe . E.select . E.from $ \csRef -> do
+            E.where_ (csRef E.^. ChainSignatureRefChainInfoId E.==. E.val chainInfoRefId)
+            return csRef
+          return . Just . NamedTuple @"id" @"info" $
+            ( ChainId chainId
+            , ChainInfo
+               (UnsignedChainInfo
+                 (T.pack chainInfoRefChainLabel)
+                 (map ai aInfos)
+                 (map ci cInfos)
+                 (M.fromList (map makePairs members))
+                 chainInfoRefParentChain
+                 chainInfoRefCreationBlock
+                 chainInfoRefChainNonce
+                 (M.fromList $ map md mds)
+               )
+               (fmap csig sig)
+            )
+          where makePairs = (chainMemberRefAddress &&& (readEnode . chainMemberRefName)) . entityVal
+                ai = \aInfo ->
+                        let AccountInfoRef{..} = entityVal aInfo
+                            acc | isNothing accountInfoRefCodeHash
+                                    = NonContract
+                                        accountInfoRefAddress
+                                        accountInfoRefBalance
+                                | isNothing accountInfoRefMap
+                                    = ContractNoStorage
+                                        accountInfoRefAddress
+                                        accountInfoRefBalance
+                                        (fromJust accountInfoRefCodeHash)
+                                | otherwise
+                                    = ContractWithStorage
+                                        accountInfoRefAddress
+                                        accountInfoRefBalance
+                                        (fromJust accountInfoRefCodeHash)
+                                        (fromJust accountInfoRefMap)
+                         in acc
+                ci = \codeInfo ->
+                        let CodeInfoRef{..} = entityVal codeInfo
+                         in CodeInfo
+                              codeInfoRefEvmByteCode
+                              (T.pack codeInfoRefContractCode)
+                              (fmap T.pack codeInfoRefContractName)
+                md = \metadata ->
+                        let ChainMetadataRef{..} = entityVal metadata
+                         in (T.pack chainMetadataRefKey, T.pack chainMetadataRefValue)
+                csig = \sig ->
+                          let ChainSignatureRef{..} = entityVal sig
+                           in ChainSignature
+                                (fromInteger chainSignatureRefR)
+                                (fromInteger chainSignatureRefS)
+                                chainSignatureRefV
+
+getChainInfos :: HasSQLDB m => [ChainId] -> m (NamedMap "id" "info" ChainId ChainInfo)
+getChainInfos chainIds = do
+  cids <- case chainIds of
+              [] -> do
+                  sqlQuery $ do
+                      chains <- E.select . E.from $ \cRef -> do
+                          return cRef
+                      case chains of
+                          [] -> return []
+                          cs -> return $ map (ChainId . chainInfoRefChainId . E.entityVal) cs
+              cIds -> return cIds
+  chainInfos <- mapM getChainInfo cids
+  let cInfos = sequence $ filter isJust chainInfos
+  case cInfos of
+      Nothing -> return []
+      Just cis -> return cis
+
+putChainInfo :: HasSQLDB m => ChainId -> ChainInfo -> m (Key ChainInfoRef)
+putChainInfo (ChainId chainId) (ChainInfo UnsignedChainInfo{..} csig) = do
+  sqlQuery $ do
+    let chainInfoRef = ChainInfoRef chainId
+                                    (T.unpack chainLabel)
+                                    parentChain
+                                    creationBlock
+                                    chainNonce
+    cirId <- E.insert chainInfoRef
+    insertMany_ $ map (parseAInfo cirId) accountInfo
+    insertMany_ $ map (parseCInfo cirId) codeInfo
+    insertMany_ $ map (parseMember cirId) (M.toList members)
+    insertMany_ $ map (parseMetadata cirId) (M.toList chainMetadata)
+    traverse_ insert_ $ fmap (parseSignature cirId) csig
+    return cirId
+      where
+        parseAInfo chid aInfo =
+          case aInfo of
+            NonContract a i -> AccountInfoRef chid a i Nothing Nothing
+            ContractNoStorage a i h -> AccountInfoRef chid a i (Just h) Nothing
+            ContractWithStorage a i h tup -> AccountInfoRef chid a i (Just h) (Just tup)
+        parseCInfo ch (CodeInfo bc cc cn)  =
+          CodeInfoRef ch bc (T.unpack cc) (fmap T.unpack cn)
+        parseMember chi (ad, en) =
+          ChainMemberRef chi (showEnode en) ad
+        parseMetadata chi (k, v) =
+          ChainMetadataRef chi (T.unpack k) (T.unpack v)
+        parseSignature chi ChainSignature{..} =
+          ChainSignatureRef
+            chi
+            (toInteger chainR)
+            (toInteger chainS)
+            chainV
+
+addMember :: HasSQLDB m => Word256 -> Address -> String -> m ()
+addMember chainId address enode = do
+  sqlQuery $ do
+    entChainInfos <- E.select . E.from $ \cRef -> do
+      E.where_ (cRef E.^. ChainInfoRefChainId E.==. E.val chainId)
+      return cRef
+    case entChainInfos of
+      []  -> return ()
+      (cInfo:_) -> do
+          let chainInfoRefId = entityKey cInfo
+          let ChainInfoRef{..} = entityVal cInfo
+          members <- E.select . E.from $ \mRef -> do
+            E.where_ (mRef E.^. ChainMemberRefChainInfoId E.==. E.val chainInfoRefId)
+            return mRef
+          when (null $ filter ((== address) . chainMemberRefAddress . E.entityVal) members) $ do
+            insertMany_ [ChainMemberRef chainInfoRefId enode address]
+
+removeMember :: HasSQLDB m => Word256 -> Address -> m ()
+removeMember chainId address = do
+  sqlQuery $ do
+    entChainInfos <- E.select . E.from $ \cRef -> do
+      E.where_ (cRef E.^. ChainInfoRefChainId E.==. E.val chainId)
+      return cRef
+    case entChainInfos of
+      []  -> return ()
+      (cInfo:_) -> do
+          let chainInfoRefId = entityKey cInfo
+          let ChainInfoRef{..} = entityVal cInfo
+          member <- E.select . E.from $ \mRef -> do
+            E.where_ ((mRef E.^. ChainMemberRefChainInfoId E.==. E.val chainInfoRefId)
+                      E.&&. (mRef E.^. ChainMemberRefAddress E.==. E.val address))
+            return mRef
+          when (not $ null member) $ do
+            delete . entityKey $ head member
+
+terminateChain :: MonadLogger m => Word256 -> m ()
+terminateChain _ = $logWarnS "ChainInfoDB" "TODO(dustin): terminate chains"

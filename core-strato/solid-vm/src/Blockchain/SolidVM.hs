@@ -72,7 +72,6 @@ import           Blockchain.DB.CodeDB
 import           Blockchain.DB.ModifyStateDB          (pay)
 import           Blockchain.DB.X509CertDB
 import           Blockchain.DB.SolidStorageDB
-import           Blockchain.ExtWord
 import qualified Blockchain.SolidVM.Builtins          as Builtins
 import           Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.SolidVM.Environment       as Env
@@ -84,7 +83,7 @@ import           Blockchain.SolidVM.TraceTools
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Code
-import           Blockchain.Strato.Model.ExtendedWord()
+import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Event
 import           Blockchain.Strato.Model.Keccak256

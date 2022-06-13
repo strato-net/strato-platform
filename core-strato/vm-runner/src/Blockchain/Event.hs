@@ -20,11 +20,11 @@ module Blockchain.Event
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
 import           Blockchain.DB.MemAddressStateDB
-import           Blockchain.ExtWord
 import           Blockchain.Sequencer.Event
-import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Indexer.Model    (IndexEvent (..))
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.StateDiff
 import           Blockchain.Stream.Action           (Action)

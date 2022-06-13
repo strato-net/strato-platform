@@ -96,7 +96,7 @@ strato: build_common
 
 vault-wrapper: build_common
 	@echo Now building vault-wrapper...
-	cp blockapps-haskell/vault-wrapper/doit.sh ${VAULTDIR}
+	cp strato/vault/doit.sh ${VAULTDIR}
 	docker build --target vault-wrapper --tag ${REPO_URL}vault-wrapper:${VERSION} --file Dockerfile.multi ${FAKEROOT}
 
 docker-compose:

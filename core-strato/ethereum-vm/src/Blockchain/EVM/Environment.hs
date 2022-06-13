@@ -7,9 +7,9 @@ import qualified Data.ByteString            as B
 import           GHC.Generics
 
 import           Blockchain.Data.DataDefs
-import           Blockchain.ExtWord
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Code
+import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import           Data.Map.Strict            (Map)
 import qualified Data.IntSet                as I

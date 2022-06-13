@@ -1,0 +1,66 @@
+name: evm-solidity
+version: 0.1.0.0
+synopsis: Solidity datatypes
+description: Solidity datatypes
+author: Eitan Chatav
+maintainer: eitan@blockapps.net
+copyright: 2016 BlockApps
+category: Web
+build-type: Simple
+
+ghc-options: -Wall -Werror
+
+dependencies:
+  - base
+  - aeson
+  - base16-bytestring
+  - bimap
+  - bytestring
+  - containers
+  - ordered-containers
+  - parsec
+  - QuickCheck
+  - solid-vm-model
+  - strato-model
+  - text
+  - unordered-containers
+  - vector
+  - utf8-string
+
+library:
+  source-dirs: src/
+  dependencies:
+  - aeson-casing
+  - binary
+  - blockapps-ethereum
+  - classy-prelude
+  - cryptonite
+  - deepseq
+  - extra
+  - generic-random
+  - hashable
+  - http-api-data
+  - lens
+  - memory
+  - mtl
+  - quickcheck-instances
+  - semver-range
+  - servant
+  - servant-docs
+  - source-tools
+  - swagger2
+
+
+tests:
+  blockapps-solidity-test:
+    main: Main.hs
+    source-dirs: test/
+    dependencies:
+     - aeson-qq
+     - blockapps-strato-api
+     - evm-solidity
+     - hspec
+     - quickcheck-instances
+     - raw-strings-qq
+     - servant
+     - swagger2

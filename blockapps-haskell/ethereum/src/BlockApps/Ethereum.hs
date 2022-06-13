@@ -16,20 +16,12 @@
 
 module BlockApps.Ethereum
   ( -- Number type reexports
-    lastWord64
-  , Hex (..)
-  , Transaction (..)
+    Transaction (..)
   , UnsignedTransaction (..)
   , rlpHash
-  , CodeInfo (..)
-  , AccountInfo (..)
   ) where
 
-import           Control.Lens.Operators
 import           Control.DeepSeq (NFData)
-import           Data.Aeson             hiding (Array, String)
-import qualified Data.Aeson             as Aeson
-import           Data.Bits
 import           Data.ByteString        (ByteString)
 import qualified Data.ByteString.Char8  as Char8
 import           Data.Map.Strict        (Map)
@@ -37,17 +29,13 @@ import qualified Data.Map.Strict        as M
 import           Data.Maybe
 import           Data.RLP
 import qualified Data.RLP               as RLP (RLPObject(..))
-import           Data.Swagger
 import           Data.Text              (Text)
 import qualified Data.Text              as Text
 import           Data.Word
 import           Generic.Random
 import           GHC.Generics
-import           Numeric
 import           Test.QuickCheck        hiding ((.&.))
 import           Test.QuickCheck.Instances    ()
-import           Text.Read              hiding (String)
-import           Text.Read.Lex
 
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
@@ -58,40 +46,6 @@ import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Keccak256   hiding (rlpHash)
 import           Blockchain.Strato.Model.Nonce
 import           Blockchain.Strato.Model.Wei
-
-lastWord64 :: Word256 -> Word64
-lastWord64 x = fromIntegral (x .&. 0xffffffffffffffff)
-
-newtype Hex n = Hex { unHex :: n } deriving (Eq, Generic, Ord)
-
-instance (Integral n, Show n) => Show (Hex n) where
-  show (Hex n) = showHex (toInteger n) ""
-
-instance (Eq n, Num n) => Read (Hex n) where
-  readPrec = Hex <$> readP_to_Prec (const readHexP)
-  --I'm not sure what `d` precision parameter is used for
-
-instance Num n => FromJSON (Hex n) where
-  parseJSON value = do
-    string <- parseJSON value
-    case fmap fromInteger (readMaybe ("0x" ++ string)) of
-      Nothing -> fail $ "not hex encoded: " ++ string
-      Just n  -> return $ Hex n
-
-instance (Integral n, Show n) => ToJSON (Hex n) where
-  toJSON = toJSON . show
-
-instance Arbitrary x => Arbitrary (Hex x) where
-  arbitrary = genericArbitrary uniform
-
-
-padZeros :: Int -> String -> String
-padZeros n string = replicate (n - length string) '0' ++ string
-
-show256 :: Word256 -> String
-show256 = padZeros 64 . flip showHex ""
-
-
 
 instance RLPEncodable CodePtr where
   rlpEncode (EVMCode codeHash) = rlpEncode codeHash
@@ -219,87 +173,3 @@ rlpHash
   . hash
   . packRLP
   . rlpEncode
-
-{-
--- | Yellow Paper (82)
-newAccountAddress :: Transaction -> Address
-newAccountAddress Transaction{..}
-  = keccak256Address $ rlpSerialize (transactionTo, transactionNonce)
--}
-
-data CodeInfo = CodeInfo
-  { codeInfoCode   :: Text
-  , codeInfoSource :: Text
-  , codeInfoName   :: Text
-  } deriving (Show, Read, Eq, Generic)
-
-instance FromJSON CodeInfo where
-  parseJSON (Object o) =
-    CodeInfo
-    <$> o .: "code"
-    <*> o .: "src"
-    <*> o .: "name"
-  parseJSON _ = error "parseJSON CodeInfo: expected Object"
-
-instance ToJSON CodeInfo where
-  toJSON (CodeInfo bs s1 s2) = object
-    [ "code" Aeson..= bs
-    , "src"  Aeson..= s1
-    , "name" Aeson..= s2
-    ]
-
-instance ToSchema CodeInfo where
-  declareNamedSchema _ = return $
-    NamedSchema (Just "CodeInfo")
-      ( mempty
-        & type_ ?~ SwaggerInteger
-        & example ?~ toJSON (CodeInfo "ContractBin" "ContractSrc" "ContractName")
-        & description ?~ "Code Info" )
-
-data AccountInfo = NonContract Address Integer
-                 | ContractNoStorage Address Integer CodePtr
-                 | ContractWithStorage Address Integer CodePtr (Map Word256 Word256)
-   deriving (Show, Eq, Generic)
-
-instance ToJSON AccountInfo where
-  toJSON (NonContract a b) = object
-    [ "address" Aeson..= a
-    , "balance" Aeson..= b
-    ]
-  toJSON (ContractNoStorage a b c) = object
-    [ "address" Aeson..= a
-    , "balance" Aeson..= b
-    , "codeHash" Aeson..= c
-    ]
-  toJSON (ContractWithStorage a b c s) = object
-    [ "address" Aeson..= a
-    , "balance" Aeson..= b
-    , "codeHash" Aeson..= c
-    , "storage" Aeson..= (map (\(w1,w2) -> (show256 w1, show256 w2)) $ M.toList s) -- TODO(dustin): This Hex newtype doesn't seem to work for tuples :/
-    ]
-
-instance FromJSON AccountInfo where
-  parseJSON (Object o) = do
-    a <- (o .: "address")
-    b <- (o .: "balance")
-    mc <- (o .:? "codeHash")
-    case mc of
-      Nothing -> return $ NonContract a b
-      Just c -> do
-        ms <- (o .:? "storage")
-        case ms of
-          Nothing -> return $ ContractNoStorage a b c
-          Just s' -> do
-            let s = M.fromList $ map (\(h1,h2) -> (unHex h1, unHex h2)) s'
-            return $ ContractWithStorage a b c s
-  parseJSON o = error $ "parseJSON AccountInfo: Expected object, got: " ++ show o
-
-instance ToSchema AccountInfo where
-  declareNamedSchema _ = return $
-    NamedSchema (Just "AccountInfo")
-      ( mempty
-        & type_ ?~ SwaggerInteger
-        & example ?~ toJSON (NonContract (Address 0x5815b9975001135697b5739956b9a6c87f1c575c) (20000000 :: Integer))
-        & description ?~ "Account Info" )
-
-

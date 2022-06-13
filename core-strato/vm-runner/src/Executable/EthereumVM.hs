@@ -53,12 +53,12 @@ import           Blockchain.DB.BlockSummaryDB
 import           Blockchain.DB.ChainDB
 import           Blockchain.EthConf
 import           Blockchain.Event
-import           Blockchain.ExtWord
 import           Blockchain.JsonRpcCommand
 import qualified Blockchain.MilenaTools                as K
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Kafka
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Stream.UnminedBlock        (produceUnminedBlocksM)
 import           Blockchain.Stream.VMEvent
 import           Blockchain.VMContext
