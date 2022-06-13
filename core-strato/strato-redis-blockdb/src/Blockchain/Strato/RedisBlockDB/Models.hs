@@ -7,8 +7,10 @@
 {-# OPTIONS -fno-warn-redundant-constraints #-}
 module Blockchain.Strato.RedisBlockDB.Models where
 
+import           Data.Binary
 import qualified Data.ByteString.Base16        as SB16
 import qualified Data.ByteString.Char8         as S8
+import           Data.ByteString.Lazy          (toStrict, fromStrict)
 import           Data.List                     (intercalate)
 import qualified Data.Map.Strict               as M
 import qualified Data.Set                      as S
@@ -38,6 +40,7 @@ data BlockDBNamespace = Headers
                       | PrivateTxsInBlocks
                       | PrivateIPChains
                       | PrivateOrgIdChains
+                      | X509Certificates
     deriving (Eq, Read, Show)
 
 class RedisDBKeyable k where
@@ -67,6 +70,13 @@ instance RedisDBKeyable Keccak256 where
 instance RedisDBValuable Keccak256 where
     toValue   = S8.pack . keccak256ToHex
     fromValue = keccak256FromHex . S8.unpack
+
+instance RedisDBKeyable Address where
+    toKey = toStrict . encode
+
+instance RedisDBValuable Address where
+    toValue   = toKey
+    fromValue = decode . fromStrict
 
 instance RedisDBKeyable Word256 where
     toKey = word256ToBytes
@@ -158,5 +168,6 @@ displayForNamespace ns input = case ns of
     PrivateTxsInBlocks -> let RedisChainTxsInBlocks ctibs = fromValue input in show ctibs
     PrivateIPChains -> let RedisIPChains ipcs = fromValue input in format (S.toList ipcs)
     PrivateOrgIdChains -> let RedisOrgIdChains oics = fromValue input in format (S.toList oics)
+    X509Certificates -> format (fromValue input :: Address)
   where
     readSHA = let x = fromValue input in format (keccak256ToWord256 x)

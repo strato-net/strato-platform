@@ -218,7 +218,9 @@ contract CertificateRegistry {
     string rootCert;
     string rootPubKey;
     bool initialized;
-    
+
+    event CertificateRegistered(address userAddress, address contractAddress);
+
     constructor(string _rootCert) {
         require(account(this, "self").chainId == 0, "You must post this contract on the main chain!");
 
@@ -240,6 +242,8 @@ contract CertificateRegistry {
         certificates.push(c);
         certificatesMap[newAccount] = certificates.length;
         initialized = true;
+
+        emit CertificateRegistered(address(0xdeadbeef), address(c));
         
         return 200;
     }

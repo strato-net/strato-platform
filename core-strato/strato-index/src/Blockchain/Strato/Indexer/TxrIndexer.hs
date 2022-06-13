@@ -78,6 +78,15 @@ doRemoveMember chainId address = do
   lift $ removeMember chainId address
   void . RBDB.withRedisBlockDB $ RBDB.removeChainMember chainId address
 
+doRegisterCertificate :: Address -> Address -> IContextM ()
+doRegisterCertificate userAddress contractAddress = do
+  logF [ "Registering X.509 Certificate -- userAddress: " 
+       , format userAddress
+       , "; contractAddress: "
+       , format contractAddress
+       ]
+  void . RBDB.withRedisBlockDB $ RBDB.registerCertificate userAddress contractAddress
+
 txrIndexer :: LoggingT IO ()
 txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
     $logInfoS "txrIndexer" "About to fetch IndexEvents"
@@ -91,10 +100,12 @@ txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
 
 data TxrResult = AddMember (Either String (Word256, Address, Enode))
                | RemoveMember (Either String (Word256, Address))
+               | RegisterCertificate (Either String (Address, Address))
                | TerminateChain (Either String Word256)
                | PutLogDB LogDB
                | PutEventDB EventDB
                | PutTxResult TransactionResult
+               deriving (Show, Eq)
 
 indexEventToTxrResults :: IndexEvent -> [TxrResult]
 indexEventToTxrResults = \case
@@ -114,9 +125,9 @@ indexEventToTxrResults = \case
          in Just . RemoveMember $ Right (chainId, address)
       Just x | x == keccak256ToWord256 terminateTopic -> Just . TerminateChain $ Right chainId
       _ -> Nothing
-  EventDBEntry ev -> (:) (PutEventDB ev) . maybeToList $ eventDBChainId ev >>= \chainId ->
-     case (eventDBName ev, eventDBArgs ev) of
-      ("MemberAdded", [addressStr, enodeStr]) -> case stringAddress addressStr of
+  EventDBEntry ev -> (:) (PutEventDB ev) . maybeToList $
+     case (eventDBChainId ev, eventDBName ev, eventDBArgs ev) of
+      (Just chainId, "MemberAdded", [addressStr, enodeStr]) -> case stringAddress addressStr of
         Nothing -> Just . AddMember . Left $ "failed to parse address for MemberAdded event: " ++ addressStr
         Just address ->
           --TODO: we don't need this powerful of an evaluation, we just need to improve `readEnode`
@@ -124,9 +135,14 @@ indexEventToTxrResults = \case
            in case eNode of
             Left err -> Just . AddMember . Left $ "failed to parse enode" ++ show err
             Right enode -> Just . AddMember $ Right (chainId, address, enode)
-      ("MemberRemoved", [addressStr]) -> case stringAddress addressStr of
+      (Just chainId, "MemberRemoved", [addressStr]) -> case stringAddress addressStr of
         Nothing -> Just . RemoveMember . Left $ "failed to parse address for MemberRemoved event: " ++ addressStr
         Just address -> Just . RemoveMember $ Right (chainId, address)
+      (Nothing, "CertificateRegistered", [userAddress, contractAddress]) -> case (stringAddress userAddress, stringAddress contractAddress) of
+        (Nothing, Nothing) -> Just . RegisterCertificate . Left $ "failed to parse userAddress and contractAddress for CertificateRegistered event: " <> userAddress <> "; " <> contractAddress
+        (Nothing, Just _) -> Just . RegisterCertificate . Left $ "failed to parse userAddress for CertificateRegistered event: " <> userAddress <> "; " <> contractAddress
+        (Just _, Nothing) -> Just . RegisterCertificate . Left $ "failed to parse contractAddress for CertificateRegistered event: " <> userAddress <> "; " <> contractAddress
+        (Just uAddr, Just cAddr) ->  Just . RegisterCertificate $ Right (uAddr, cAddr)
       _ -> Nothing
   TxResult r -> [PutTxResult r]
   _ -> []
@@ -138,6 +154,9 @@ txrResultHandler = \case
     Left err -> $logErrorS "txrIndexer" $ T.pack err
   RemoveMember e -> case e of
     Right (chainId, address) -> doRemoveMember chainId address
+    Left err -> $logErrorS "txrIndexer" $ T.pack err
+  RegisterCertificate e -> case e of
+    Right (userAddress, contractAddress) -> doRegisterCertificate userAddress contractAddress
     Left err -> $logErrorS "txrIndexer" $ T.pack err
   TerminateChain e -> case e of
     Right chainId -> lift $ terminateChain chainId
