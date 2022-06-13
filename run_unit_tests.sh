@@ -23,6 +23,7 @@ stack test -j1 \
       merkle-patricia-db \
       solid-vm \
       strato-genesis \
+      strato-index \
       strato-init \
       strato-model \
       strato-p2p \

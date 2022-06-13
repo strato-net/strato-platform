@@ -17,6 +17,7 @@ library:
   dependencies:
   - QuickCheck
   - base16-bytestring
+  - binary
   - blockapps-util
   - bytestring
   - ethereum-rlp

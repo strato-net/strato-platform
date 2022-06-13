@@ -50,6 +50,7 @@ import           Blockchain.Data.TransactionDef
 import qualified Blockchain.Data.TXOrigin              as Origin
 import           Blockchain.Data.Wire
 import           Blockchain.Event
+import           Blockchain.ExtWord
 import           Blockchain.Options                    (AuthorizationMode(..))
 import           Blockchain.Output
 import           Blockchain.Privacy
