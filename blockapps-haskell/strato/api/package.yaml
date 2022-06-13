@@ -17,12 +17,10 @@ dependencies:
   - QuickCheck
   - quickcheck-instances
   - strato-model
-  - text
 
 library:
   source-dirs: src/
   dependencies:
-  - servant
   - swagger2
 
 tests:
@@ -30,6 +28,5 @@ tests:
     main: Spec.hs
     source-dirs: test/
     dependencies:
-      - aeson-qq
       - blockapps-strato-api
       - hspec

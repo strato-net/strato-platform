@@ -10,7 +10,7 @@
 
 --{-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
 
-module BlockApps.Strato.Types
+module BlockApps.Strato.DeprecatedStorage
   (
     Storage (..)
   , StorageKV (..)

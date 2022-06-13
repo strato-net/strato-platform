@@ -60,4 +60,7 @@ tests:
      - blockapps-strato-api
      - evm-solidity
      - hspec
+     - quickcheck-instances
      - raw-strings-qq
+     - servant
+     - swagger2
