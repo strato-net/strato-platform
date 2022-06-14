@@ -28,7 +28,7 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Util
+import           Blockchain.Strato.Model.Util
 import           Blockchain.Verification
 import           Blockchain.VMOptions
 

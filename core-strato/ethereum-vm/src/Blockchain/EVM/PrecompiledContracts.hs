@@ -19,7 +19,7 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.Gas
 import qualified Blockchain.Strato.Model.Secp256k1 as EC
-import           Blockchain.Util
+import           Blockchain.Strato.Model.Util
 
 
 --import Debug.Trace

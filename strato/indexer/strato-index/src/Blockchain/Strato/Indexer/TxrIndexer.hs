@@ -39,8 +39,8 @@ import           Blockchain.Strato.Indexer.Model
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Util       (byteString2Integer)
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
-import           Blockchain.Util                    (byteString2Integer)
 
 import           System.IO.Unsafe                   (unsafePerformIO)
 import           Text.Format

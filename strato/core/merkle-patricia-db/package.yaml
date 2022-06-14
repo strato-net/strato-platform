@@ -42,6 +42,7 @@ tests:
       - hspec
       - hspec-contrib
       - merkle-patricia-db
+      - strato-model
 
 benchmarks:
   mpbench:

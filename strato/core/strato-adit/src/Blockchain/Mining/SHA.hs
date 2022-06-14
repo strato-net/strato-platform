@@ -11,7 +11,7 @@ import           System.Random
 import           Blockchain.Data.Block
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RLP
-import           Blockchain.Util
+import           Blockchain.Strato.Model.Util
 
 import           Blockchain.Mining
 

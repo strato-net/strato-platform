@@ -24,7 +24,7 @@ import qualified Database.LevelDB                            as DB
 import           Prelude                                     hiding (lookup)
 
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
-import           Blockchain.Util
+import           Blockchain.Strato.Model.Util
 import qualified Data.NibbleString                           as N
 
 newtype HashDB = HashDB { unHashDB :: DB.DB }

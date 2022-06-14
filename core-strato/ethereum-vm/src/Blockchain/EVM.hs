@@ -78,7 +78,7 @@ import           Blockchain.EVM.Opcodes
 import           Blockchain.EVM.PrecompiledContracts
 import           Blockchain.EVM.VMM
 import           Blockchain.EVM.VMState
-import           Blockchain.Util
+import           Blockchain.Strato.Model.Util
 import           Blockchain.VMContext
 import           Blockchain.VMMetrics
 import           Blockchain.VM.VMException

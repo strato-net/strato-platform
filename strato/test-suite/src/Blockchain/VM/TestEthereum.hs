@@ -57,7 +57,7 @@ import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Util
+import           Blockchain.Strato.Model.Util
 import           Blockchain.VMContext
 import           Blockchain.VM.VMException
 

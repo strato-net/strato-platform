@@ -4,14 +4,11 @@
 
 module Blockchain.Util
   ( module Blockchain.Util
-  , module Blockchain.Strato.Model.Util
   ) where
 
 import           Data.Data
 import qualified Data.Map.Strict          as M
 import           Data.Maybe
-
-import           Blockchain.Strato.Model.Util
 
 import           Data.Time.Clock.POSIX    (POSIXTime, getPOSIXTime)
 

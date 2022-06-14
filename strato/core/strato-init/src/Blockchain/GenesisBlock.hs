@@ -49,10 +49,10 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Util
 import qualified Blockchain.Stream.Action                     as A
 import           Blockchain.Stream.VMEvent
 import           Blockchain.Stream.VMOutput
-import           Blockchain.Util
 
 
 import           Blockchain.Strato.StateDiff          hiding (StateDiff (chainId, blockHash, stateRoot))
