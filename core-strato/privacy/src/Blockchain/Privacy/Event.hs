@@ -28,9 +28,9 @@ module Blockchain.Privacy.Event
   , isPrivateChainTX
   ) where
 
+import           BlockApps.Logging
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.TransactionDef (formatChainId)
-import           Blockchain.Output
 import           Blockchain.Privacy.Monad
 import           Blockchain.Privacy.Metrics
 import           Blockchain.Sequencer.Event

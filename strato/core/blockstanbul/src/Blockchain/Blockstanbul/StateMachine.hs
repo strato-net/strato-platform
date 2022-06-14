@@ -21,10 +21,10 @@ import           Text.Printf
 import           Text.Format
 
 
+import           BlockApps.Logging
 import           Blockchain.Blockstanbul.Messages
 import           Blockchain.Data.Block
 import           Blockchain.Data.DataDefs
-import           Blockchain.Output
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1

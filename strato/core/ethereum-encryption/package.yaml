@@ -22,6 +22,7 @@ library:
   - blockapps-util
   - bytestring
   - cipher-aes
+  - common-log
   - conduit
   - conduit-extra
   - crypto-pubkey

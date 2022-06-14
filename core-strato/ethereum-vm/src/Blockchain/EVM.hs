@@ -27,7 +27,6 @@ import qualified Control.Monad.Change.Alter         as A
 import qualified Control.Monad.Change.Modify        as Mod
 import           Control.Monad.Extra
 import           Control.Monad.IO.Class
-import           Blockchain.Output
 import           Control.Monad.Reader
 import           Data.Bits
 import qualified Data.ByteString                    as B
@@ -51,6 +50,7 @@ import           UnliftIO
 
 
 
+import           BlockApps.Logging
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.DataDefs

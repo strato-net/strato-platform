@@ -46,6 +46,7 @@ library:
     - binary
     - blockapps-mpdbs
     - bytestring
+    - common-log
     - conduit
     - cross-monitoring
     - data-default
@@ -98,6 +99,7 @@ tests:
       - base16-bytestring
       - blockapps-haskoin
       - bytestring
+      - common-log
       - hspec
       - hspec-expectations-lifted
       - vm-tools

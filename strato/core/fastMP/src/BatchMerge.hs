@@ -13,7 +13,7 @@ import           Control.Monad.Loops
 import           Data.Maybe
 import qualified Data.NibbleString as N
 
-import           Blockchain.Output
+import           BlockApps.Logging
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import qualified Blockchain.Database.MerklePatricia.NodeData as MP

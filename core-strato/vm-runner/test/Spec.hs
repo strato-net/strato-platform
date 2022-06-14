@@ -18,6 +18,7 @@ import qualified Data.ByteString.Short   as BSS
 import           Data.Maybe
 import qualified Data.Set                as S
 
+import           BlockApps.Logging
 import           Blockchain.BlockChain (compactDiffs)
 import qualified Blockchain.Blockstanbul.BenchmarkLib as BML
 import           Blockchain.Data.AddressStateDB
@@ -28,7 +29,6 @@ import           Blockchain.Data.ExecResults
 import           Blockchain.EVM
 import qualified Blockchain.EVM.MutableStack as MS
 import           Blockchain.EVM.Opcodes
-import           Blockchain.Output
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.Keccak256

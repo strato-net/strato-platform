@@ -10,7 +10,6 @@ import Control.Lens hiding (view)
 import Control.Monad hiding (sequence)
 import Control.Monad.Extra (whenM)
 import Control.Monad.Trans.Except
-import Blockchain.Output
 import Control.Monad.State.Class
 import Crypto.Random.Entropy (getEntropy)
 import qualified Data.Map.Strict as M
@@ -23,6 +22,7 @@ import System.Exit
 import Text.Printf
 
 import Blockapps.Crossmon
+import BlockApps.Logging
 
 import Blockchain.Data.Block
 import Blockchain.Data.DataDefs

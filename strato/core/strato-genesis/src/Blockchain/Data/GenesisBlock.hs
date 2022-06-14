@@ -32,6 +32,8 @@ import           Data.Time.Clock.POSIX
 import qualified Data.Sequence                        as S
 import           Numeric
 
+import           BlockApps.Logging
+
 import           Blockchain.Database.MerklePatricia
 
 import           Blockchain.Data.AddressStateDB
@@ -46,7 +48,6 @@ import qualified Blockchain.DB.MemAddressStateDB      as Mem
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
-import           Blockchain.Output
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Stream.Action             as A
 import           Blockchain.Stream.VMEvent

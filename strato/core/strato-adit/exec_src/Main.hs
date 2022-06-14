@@ -2,8 +2,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 import           BlockApps.Init
+import           BlockApps.Logging
 import           Blockchain.Mining.Options ()
-import           Blockchain.Output
 
 import           HFlags
 

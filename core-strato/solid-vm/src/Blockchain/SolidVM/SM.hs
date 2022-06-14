@@ -71,6 +71,7 @@ import qualified Data.Text as T
 import           Data.Text.Encoding(encodeUtf8,decodeUtf8)
 import           Debugger
 
+import           BlockApps.Logging
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.RLP
@@ -79,7 +80,6 @@ import           Blockchain.DB.CodeDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.X509CertDB
-import           Blockchain.Output
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class

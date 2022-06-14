@@ -44,9 +44,9 @@ import           Servant.Client
 import           System.Clock
 import           Text.Format
 
+import           BlockApps.Logging
 import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
-import           Blockchain.Output
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Keccak256 hiding (hash)
 import           Blockchain.Data.Json

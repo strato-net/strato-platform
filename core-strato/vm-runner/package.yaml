@@ -26,6 +26,7 @@ library:
   - blockapps-mpdbs
   - blockapps-util
   - bytestring
+  - common-log
   - conduit
   - containers
   - cross-monitoring
@@ -66,6 +67,7 @@ executables:
       - async
       - blockapps-init
       - blockapps-util
+      - common-log
       - containers
       - debugger
       - hflags
@@ -93,6 +95,7 @@ tests:
       - blockapps-mpdbs
       - blockapps-util
       - bytestring
+      - common-log
       - containers
       - ethereum-vm
       - hflags

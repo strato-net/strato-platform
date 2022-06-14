@@ -44,7 +44,7 @@ import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.StateDB
-import           Blockchain.Output
+import           BlockApps.Logging
 import qualified Data.NibbleString                           as N
 
 import BatchMerge

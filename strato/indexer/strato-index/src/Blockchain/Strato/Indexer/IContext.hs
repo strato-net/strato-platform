@@ -26,13 +26,13 @@ import qualified Control.Monad.Change.Alter      as A
 import qualified Control.Monad.Change.Modify     as Mod
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class       (lift)
-import           Blockchain.Output
 import           Control.Monad.Trans.Resource
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.State
 import qualified Data.Map.Strict                 as M
 import qualified Data.Text                       as T
 
+import           BlockApps.Logging
 import           Blockchain.Data.Block           (BestBlock(..), Private(..))
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.ChainInfo

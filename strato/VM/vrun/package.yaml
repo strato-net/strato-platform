@@ -23,6 +23,7 @@ dependencies:
 - blockapps-mpdbs
 - blockapps-util
 - bytestring
+- common-log
 - hflags
 - merkle-patricia-db
 - prometheus-client

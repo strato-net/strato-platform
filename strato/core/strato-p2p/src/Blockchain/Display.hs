@@ -7,9 +7,9 @@ module Blockchain.Display (
   ) where
 
 
-import           Blockchain.Output
 import qualified Data.Text                   as T
 
+import           BlockApps.Logging
 
 import           Blockchain.Data.BlockHeader
 import           Blockchain.Data.Wire

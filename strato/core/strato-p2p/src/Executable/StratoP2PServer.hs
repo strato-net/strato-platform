@@ -30,10 +30,10 @@ import           Network.Socket
 import           Network.Wai.Handler.Warp.Internal     (setSocketCloseOnExec)
 import           UnliftIO
 
+import           BlockApps.Logging
 import           Blockchain.Data.PubKey                (secPubKeyToPoint)
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Options
-import           Blockchain.Output
 import           Blockchain.P2PUtil
 import           Blockchain.SeqEventNotify
 import           Blockchain.Sequencer.Event

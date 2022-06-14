@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 import           BlockApps.Init
-import           Blockchain.Output
+import           BlockApps.Logging
 import           Blockchain.Strato.Indexer.TxrIndexer
 import           HFlags
 

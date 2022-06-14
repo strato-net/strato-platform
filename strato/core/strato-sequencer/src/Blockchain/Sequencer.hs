@@ -19,7 +19,6 @@ import           Conduit
 import           Control.Concurrent                        hiding (yield)
 import           Control.Concurrent.STM.TQueue
 import           Control.Concurrent.STM.TBQueue
-import           Blockchain.Output
 import           Control.Lens
 import qualified Control.Monad.Change.Alter                as A
 import qualified Control.Monad.Change.Modify               as Mod
@@ -37,6 +36,7 @@ import           Data.Time.Clock
 import           Prometheus                                as P
 import           Text.Printf
 
+import           BlockApps.Logging
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin         as API
 import           Blockchain.Privacy

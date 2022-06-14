@@ -27,6 +27,7 @@ library:
     - blockstanbul
     - bytestring
     - clock
+    - common-log
     - conduit
     - data-default
     - directory
@@ -71,6 +72,7 @@ executables:
       - blockapps-vault-wrapper-client
       - blockstanbul
       - bytestring
+      - common-log
       - extra
       - hflags
       - http-client
@@ -117,6 +119,7 @@ tests:
       - blockstanbul
       - bytestring
       - classy-prelude
+      - common-log
       - conduit
       - containers
       - directory

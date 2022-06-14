@@ -16,7 +16,6 @@ import Control.DeepSeq
 import Control.Exception
 import Control.Lens ((^.))
 import Control.Monad
-import Blockchain.Output
 import Control.Monad.IO.Class
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Short as SB
@@ -38,6 +37,7 @@ import Text.Printf
 import Text.RawString.QQ
 
 import Control.Monad.Change.Alter
+import BlockApps.Logging
 import Blockchain.SolidVM.CodeCollectionDB as CCDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.DataDefs (BlockData(..))

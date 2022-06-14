@@ -91,11 +91,11 @@ import qualified Data.Text                                 as T
 import           Data.Time.Clock
 import qualified Database.LevelDB                          as LDB
 
+import           BlockApps.Logging
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin
 import           Blockchain.Constants
 import           Blockchain.Data.ChainInfo
-import           Blockchain.Output
 import           Blockchain.Privacy
 import           Blockchain.Sequencer.CablePackage
 import           Blockchain.Sequencer.DB.DependentBlockDB

@@ -41,7 +41,6 @@ import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Enode
 import           Blockchain.EthConf                    (lookupRedisBlockDBConfig)
-import           Blockchain.Output
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
@@ -65,6 +64,8 @@ import qualified Data.Set                              as S
 import qualified Data.Text                             as T
 import           Database.Redis
 import           System.Random                         (randomIO)
+
+import           BlockApps.Logging
 
 newtype RedisConnection = RedisConnection { unRedisConnection :: Connection }
 

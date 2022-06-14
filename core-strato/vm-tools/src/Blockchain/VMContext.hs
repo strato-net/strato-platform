@@ -77,7 +77,6 @@ import           Control.Monad.Catch                (MonadCatch)
 import qualified Control.Monad.Change.Alter         as A
 import qualified Control.Monad.Change.Modify        as Mod
 import           Control.Monad.IO.Class
-import           Blockchain.Output
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString                    as B
@@ -100,6 +99,7 @@ import           System.Directory
 import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>), (</>))
 import           Prometheus
 
+import           BlockApps.Logging
 import           Blockchain.Bagger.BaggerState      (BaggerState, defaultBaggerState)
 import           Blockchain.Blockstanbul.Authentication as Auth
 import           Blockchain.Constants

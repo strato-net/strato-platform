@@ -26,6 +26,7 @@ library:
   - bytestring
   - bytestring-arbitrary
   - clock
+  - common-log
   - containers
   - data-default
   - deepseq

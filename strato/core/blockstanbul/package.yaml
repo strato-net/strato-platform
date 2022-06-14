@@ -17,6 +17,7 @@ library:
   - blockapps-haskoin
   - blockapps-util
   - bytestring
+  - common-log
   - conduit
   - containers
   - cross-monitoring
@@ -76,6 +77,7 @@ tests:
       - blockapps-util
       - blockstanbul
       - bytestring
+      - common-log
       - containers
       - cryptonite
       - ethereum-encryption

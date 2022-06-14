@@ -50,6 +50,7 @@ import           Text.PrettyPrint.ANSI.Leijen            (pretty)
 import           Text.Printf
 import           UnliftIO.IORef
 
+import           BlockApps.Logging
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.DataDefs
@@ -72,7 +73,6 @@ import           Blockchain.DB.X509CertDB
 import           Blockchain.EVM.Code
 import qualified Blockchain.EVM                          as EVM
 import           Blockchain.Event
-import           Blockchain.Output
 import           Blockchain.Sequencer.Event
 import qualified Blockchain.SolidVM                      as SolidVM
 import           Blockchain.Strato.Model.Code

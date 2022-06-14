@@ -20,7 +20,6 @@ import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
 import           Control.Monad.Trans.Maybe
 import qualified Blockchain.Database.MerklePatricia    as MP
-import           Blockchain.Output
 import qualified Data.ByteString                       as BS
 import qualified Data.ByteString.Char8                 as BC
 import           Data.Conduit.List                     (fold)
@@ -42,6 +41,7 @@ import           Text.Printf
 import           Util                                  hiding (intercalate)
 
 import           Blockapps.Crossmon
+import           BlockApps.Logging
 import           Blockchain.BlockChain
 import           Blockchain.Data.Block                 (BestBlock(..), WorldBestBlock(..))
 import           Blockchain.Data.BlockHeader           (extraData2TxsLen)

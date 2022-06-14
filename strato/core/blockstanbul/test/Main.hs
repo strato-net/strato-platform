@@ -2,11 +2,12 @@
 {-# OPTIONS_GHC -fno-warn-overlapping-patterns #-}
 module Main where
 
-import Blockchain.Output() -- For --minLogLevel
 import Control.Monad
 import HFlags
 import Test.Hspec.Runner
 import qualified Spec
+
+import BlockApps.Logging() -- For --minLogLevel
 
 predicate :: Path -> Bool
 predicate (_, _) = True

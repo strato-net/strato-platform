@@ -41,6 +41,7 @@ import           UnliftIO.Concurrent                   hiding (yield)
 import           UnliftIO.Exception
 import           UnliftIO.STM
 
+import           BlockApps.Logging
 import           Blockchain.Constants                  hiding (ethVersion)
 import           Blockchain.Context                    hiding (Inbound, Outbound)
 import           Blockchain.Data.Block
@@ -54,7 +55,6 @@ import           Blockchain.ExtMergeSources
 import           Blockchain.Frame
 import           Blockchain.Metrics
 import           Blockchain.Options
-import           Blockchain.Output
 import           Blockchain.Participation
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer

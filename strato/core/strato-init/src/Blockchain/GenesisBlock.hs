@@ -12,7 +12,6 @@ module Blockchain.GenesisBlock (
 
 
 import           Control.Monad
-import           Blockchain.Output
 import           Control.Monad.Change.Alter                   (Alters)
 import           Control.Monad.Change.Modify                  (Accessible)
 import           Control.Monad.IO.Class
@@ -28,6 +27,8 @@ import           Data.Text                                    (Text)
 import qualified Data.Text                                    as T
 import qualified Data.Sequence                                as S
 import           System.Directory
+
+import           BlockApps.Logging
 
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.Block

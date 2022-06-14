@@ -1,9 +1,9 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-import Blockchain.Output
 import Control.Monad.Trans.State.Lazy
 
+import BlockApps.Logging
 import Blockchain.Blockstanbul
 import Blockchain.Blockstanbul.BenchmarkLib
 

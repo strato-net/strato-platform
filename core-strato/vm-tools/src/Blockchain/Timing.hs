@@ -5,12 +5,13 @@ module Blockchain.Timing where
 
 import           Control.Monad
 import           Control.Monad.IO.Class
-import           Blockchain.Output
 import qualified Data.Text                               as T
 import           Data.Time.Clock
 import           Data.Time.Clock.POSIX
 import           Prometheus
 import           Text.Printf
+
+import           BlockApps.Logging
 
 timeIt :: MonadIO m => m a -> m (NominalDiffTime, a)
 timeIt f = do

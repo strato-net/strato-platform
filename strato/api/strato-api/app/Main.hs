@@ -14,7 +14,6 @@
 module Main where
 
 import           Prelude hiding (lookup)
-import           Blockchain.Output
 import           Control.Lens.Operators
 import           Control.Monad.Change.Alter
 import           Control.Monad.Trans.Class
@@ -51,6 +50,7 @@ import           BlockApps.Bloc22.Server
 import           BlockApps.Bloc22.Server.BlocOptions    ()
 import           BlockApps.Bloc22.Server.Utils          (toMaybe)
 import           BlockApps.Init
+import           BlockApps.Logging
 import           BlockApps.Solidity.Xabi
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.ChainId

@@ -32,13 +32,13 @@ import           Network.Kafka
 import           Network.Kafka.Producer
 import           Network.Kafka.Protocol      hiding (Key)
 
+import           BlockApps.Logging
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Block
 import           Blockchain.Data.RLP
 import           Blockchain.EthConf
 import           Blockchain.KafkaTopics
 import           Blockchain.MilenaTools
-import           Blockchain.Output
 import           Blockchain.Stream.Raw
 import           Text.Format
 

@@ -24,7 +24,6 @@ import qualified Network.Socket.ByteString             as NB
 import           Control.Error                         (note)
 import           Control.Exception
 import           Control.Monad.IO.Class
-import           Blockchain.Output
 import           Crypto.Types.PubKey.ECC
 import           Data.Binary
 import           Data.Bits
@@ -40,6 +39,7 @@ import           Numeric
 import           System.Endian
 import           System.Timeout
 
+import           BlockApps.Logging
 import           Blockchain.Data.PubKey
 import           Blockchain.Data.RLP
 import           Blockchain.Strato.Discovery.P2PUtil   (DiscoverException (..))

@@ -13,7 +13,6 @@ module Blockchain.Strato.Discovery.UDPServer
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
-import           Blockchain.Output
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Resource
 import qualified Crypto.Types.PubKey.ECC                 as ECC
@@ -30,6 +29,7 @@ import           System.Entropy
 import           System.Random
 import           System.Timeout
 
+import           BlockApps.Logging
 import           Blockchain.Data.PubKey
 import           Blockchain.DB.SQLDB
 import           Blockchain.EthConf

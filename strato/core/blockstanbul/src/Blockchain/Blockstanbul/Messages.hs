@@ -25,12 +25,12 @@ import Test.QuickCheck
 import Test.QuickCheck.Arbitrary.Generic
 import Text.Printf
 
+import BlockApps.Logging
 import qualified Blockchain.Blockstanbul.HTTPAdmin as HA
 import Blockchain.Data.RLP
 import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.Block
 import Blockchain.Data.DataDefs
-import Blockchain.Output
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class (blockHash)
 import Blockchain.Strato.Model.Keccak256

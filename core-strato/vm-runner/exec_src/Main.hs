@@ -14,7 +14,7 @@ import           Network.Wai.Handler.Warp
 import           HFlags
 
 import           BlockApps.Init
-import           Blockchain.Output
+import           BlockApps.Logging
 import           Blockchain.VMOptions() -- HFlags
 import           Executable.EthereumVM
 import           Executable.EVMFlags() -- HFlags

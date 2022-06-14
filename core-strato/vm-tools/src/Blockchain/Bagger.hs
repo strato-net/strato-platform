@@ -17,7 +17,6 @@ import qualified Control.Monad.Change.Modify        as Mod
 import           Control.Monad.Extra
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Except
-import           Blockchain.Output
 import           Control.Monad.Trans.Class          (lift)
 import qualified Data.ByteString.Short              as BSS
 import qualified Data.DList                         as DL
@@ -29,6 +28,7 @@ import qualified Data.Set                           as S
 import           Data.Word
 import           Numeric                            (readHex)
 
+import           BlockApps.Logging
 import           Blockchain.Constants
 import           Blockapps.Crossmon
 

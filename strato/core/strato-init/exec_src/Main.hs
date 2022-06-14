@@ -2,9 +2,9 @@
 
 import           HFlags
 
+import           BlockApps.Logging() -- Import the --minLogLevel flag
 import           Blockchain.Setup
 import           Blockchain.Init.Options (flags_genesisBlockName)
-import           Blockchain.Output() -- Import the --minLogLevel flag
 
 main::IO ()
 main = do

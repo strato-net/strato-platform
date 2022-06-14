@@ -24,6 +24,7 @@ library:
   dependencies:
     - ansi-wl-pprint
     - blockapps-util
+    - common-log
     - conduit
     - containers
     - data-default

@@ -3,10 +3,10 @@
 {-# LANGUAGE TemplateHaskell   #-}
 
 import           Control.Monad
-import           Blockchain.Output
 import           HFlags
 import           System.Directory
 
+import           BlockApps.Logging
 import           Blockchain.VM.TestEthereum
 import           Blockchain.VMContext
 import           Blockchain.VMOptions       ()

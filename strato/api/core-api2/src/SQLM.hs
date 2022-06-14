@@ -12,7 +12,6 @@
 
 module SQLM where
 
-import           Blockchain.Output
 import qualified Data.Aeson                  as JSON
 import qualified Data.ByteString.Lazy.Char8  as BLC
 import qualified Data.HashMap.Lazy           as HashMap
@@ -26,6 +25,8 @@ import qualified Servant                     as SERVANT (ServerError)
 import           Servant.Client
 import           Text.Printf
 import           UnliftIO
+
+import           BlockApps.Logging
 
 data ApiError
   = NoFilterError String

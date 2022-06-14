@@ -19,6 +19,7 @@ dependencies:
   - blockapps-util
   - bytestring
   - clockwork
+  - common-log
   - containers
   - cpu
   - cryptohash

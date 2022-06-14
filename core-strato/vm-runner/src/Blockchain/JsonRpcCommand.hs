@@ -20,6 +20,7 @@ import qualified Data.Text                       as T
 import           Network.Kafka
 import           Network.Kafka.Producer
 
+import           BlockApps.Logging
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.DataDefs
 import           Blockchain.DB.CodeDB
@@ -29,7 +30,6 @@ import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.EthConf
 import           Blockchain.KafkaTopics
-import           Blockchain.Output
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.ExtendedWord

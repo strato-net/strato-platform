@@ -16,6 +16,7 @@ module Blockchain.DB.SolidStorageDB (
 
 import           Control.Monad.Change.Alter                  (Alters)
 import           Data.Bifunctor                              (second)
+import           BlockApps.Logging
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia          as MP
@@ -23,7 +24,6 @@ import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB
-import           Blockchain.Output
 import           Blockchain.Strato.Model.Account
 import           SolidVM.Model.Storable
 

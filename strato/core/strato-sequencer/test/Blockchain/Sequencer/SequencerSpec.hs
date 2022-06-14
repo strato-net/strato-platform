@@ -30,6 +30,7 @@ import           Control.Monad.IO.Class              (liftIO)
 import           Control.Concurrent.Async             as Async
 import           Control.Monad.Reader
 import           Control.Monad.State.Class
+import           BlockApps.Logging
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.Authentication
 import           Blockchain.Blockstanbul.BenchmarkLib (makeBlock, makeBlockWithTransactions)
@@ -44,7 +45,6 @@ import           Blockchain.Data.RLP
 import           Blockchain.Data.Transaction         (createChainMessageTX)
 import           Blockchain.Data.TransactionDef
 import qualified Blockchain.Data.TXOrigin as TO
-import           Blockchain.Output
 import           Blockchain.Privacy.Monad
 import           Blockchain.Sequencer
 import           Blockchain.Sequencer.CablePackage

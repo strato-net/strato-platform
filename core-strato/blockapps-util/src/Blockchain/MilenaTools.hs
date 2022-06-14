@@ -8,7 +8,6 @@
 
 module Blockchain.MilenaTools where
 
-import           Blockchain.Output
 import           Control.Concurrent     (threadDelay)
 import qualified Control.Monad.Change.Modify as Mod
 import           Control.Monad.IO.Class      (MonadIO, liftIO)
@@ -22,6 +21,8 @@ import           Network.Kafka
 import           Network.Kafka.Protocol
 import           Prelude
 -- import Control.Monad.Reader (Monad)
+
+import           BlockApps.Logging
 
 _kMetadata::Metadata->KafkaString
 _kMetadata (Metadata x) = x

@@ -10,8 +10,8 @@ module SolidVM.Solidity.Fuzzer
   , module SolidVM.Solidity.Fuzzer.Types
   ) where
 
+import           BlockApps.Logging
 import           Blockchain.MemVMContext
-import           Blockchain.Output
 import           Blockchain.SolidVM.Simple
 import           Blockchain.Strato.Model.Address
 import           Control.Lens

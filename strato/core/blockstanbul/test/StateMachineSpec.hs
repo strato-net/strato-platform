@@ -14,7 +14,6 @@ import           Control.Lens               hiding (view)
 import qualified Control.Lens               as L
 import           Control.Monad              hiding (sequence)
 import           Control.Monad.IO.Class
-import           Blockchain.Output
 import           Control.Monad.Trans.State
 import qualified Data.ByteString            as BS
 import qualified Data.ByteString.Base16     as B16
@@ -26,6 +25,7 @@ import qualified Data.Set                   as S
 import           Data.Word
 import           Prelude                    hiding (round, sequence)
 
+import BlockApps.Logging
 import Blockchain.Data.ArbitraryInstances()
 import Blockchain.Data.Block
 import Blockchain.Data.DataDefs

@@ -19,7 +19,6 @@ module Blockchain.EVM.Memory (
   ) where
 
 import           Control.Monad
-import           Blockchain.Output
 import           Control.Monad.Trans
 import qualified Data.ByteString              as B
 import qualified Data.ByteString.Internal              as BI
@@ -32,6 +31,7 @@ import           Data.Word
 import           Foreign
 import           System.Exit
 
+import           BlockApps.Logging
 import           Blockchain.EVM.OpcodePrices
 import           Blockchain.EVM.VMM
 import           Blockchain.EVM.VMState

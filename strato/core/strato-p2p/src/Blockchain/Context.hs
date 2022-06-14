@@ -60,7 +60,6 @@ import           Control.Concurrent
 import           Control.Lens                          hiding (Context)
 import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
-import           Blockchain.Output
 import           Control.Monad.Reader
 import           Data.Default
 import           Data.Foldable                         (toList)
@@ -71,6 +70,8 @@ import qualified Data.Set.Ordered                      as S
 import qualified Data.Text                             as T
 import           Data.Time.Clock
 import           GHC.Exts                              (Constraint)
+
+import           BlockApps.Logging
 
 import           Blockchain.Blockstanbul               (WireMessage)
 import           Blockchain.Data.Block

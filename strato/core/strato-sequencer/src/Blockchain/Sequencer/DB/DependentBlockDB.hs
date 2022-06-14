@@ -17,8 +17,8 @@ import qualified Database.LevelDB             as LDB
 import qualified GHC.Generics                 as GHCG
 import           Prelude                      hiding (lookup)
 
+import           BlockApps.Logging
 import           Blockchain.Data.DataDefs
-import           Blockchain.Output
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Keccak256
 

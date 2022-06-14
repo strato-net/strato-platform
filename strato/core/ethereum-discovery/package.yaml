@@ -30,6 +30,7 @@ library:
     - blockapps-vault-wrapper-client
     - bytestring
     - classy-prelude
+    - common-log
     - cpu
     - crypto-pubkey-types
     - either
@@ -66,6 +67,7 @@ executables:
     dependencies:
       - blockapps-init
       - blockapps-util
+      - common-log
       - ethereum-discovery
       - hflags
 

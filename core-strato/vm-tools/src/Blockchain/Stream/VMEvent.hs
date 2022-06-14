@@ -39,6 +39,7 @@ import           Network.Kafka
 import           Network.Kafka.Producer
 import           Network.Kafka.Protocol      hiding (Key)
 
+import           BlockApps.Logging
 import           Blockchain.Data.TransactionResult
 import           Blockchain.EthConf
 import           Blockchain.Strato.Model.CodePtr
@@ -46,7 +47,6 @@ import           Blockchain.Strato.Model.Event
 import           Blockchain.Stream.Action (Action)
 import           Blockchain.KafkaTopics
 import           Blockchain.MilenaTools
-import           Blockchain.Output
 import           Blockchain.Stream.Raw
 import           Text.Format
 import           Text.Tools

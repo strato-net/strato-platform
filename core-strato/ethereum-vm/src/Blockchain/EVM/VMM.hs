@@ -64,6 +64,7 @@ import qualified Data.NibbleString                  as N
 import qualified Data.Set                           as S
 import           MonadUtils
 
+import           BlockApps.Logging
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.Log
@@ -76,7 +77,6 @@ import           Blockchain.DB.StorageDB
 import           Blockchain.EVM.Environment
 import qualified Blockchain.EVM.MutableStack as MS
 import           Blockchain.EVM.VMState
-import           Blockchain.Output
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord

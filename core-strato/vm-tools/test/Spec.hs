@@ -16,11 +16,11 @@ import           Test.Hspec (hspec, describe, Spec)
 import qualified Test.Hspec                         as HS
 import           Test.Hspec.Expectations.Lifted
 
+import BlockApps.Logging
 import Blockchain.Blockstanbul.Authentication
 import Blockchain.Blockstanbul.BenchmarkLib
 import Blockchain.Data.Block
 import Blockchain.Data.DataDefs
-import Blockchain.Output
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.VMContext

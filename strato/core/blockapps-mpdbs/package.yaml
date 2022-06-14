@@ -24,6 +24,7 @@ library:
   - blockapps-data
   - blockapps-util
   - bytestring
+  - common-log
   - containers
   - data-default
   - deepseq
@@ -53,6 +54,7 @@ tests:
       - blockapps-util
       - blockapps-data
       - bytestring
+      - common-log
       - containers
       - deepseq
       - directory

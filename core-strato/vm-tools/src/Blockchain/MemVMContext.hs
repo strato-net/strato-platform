@@ -24,7 +24,6 @@ import           Control.Lens
 import qualified Control.Monad.Change.Alter         as A
 import qualified Control.Monad.Change.Modify        as Mod
 import           Control.Monad.IO.Class
-import           Blockchain.Output
 import           Control.Monad.Reader
 import qualified Data.ByteString                    as B
 import qualified Data.Map                           as M
@@ -36,6 +35,7 @@ import           Debugger
 import           GHC.Generics
 import           Prometheus
 
+import           BlockApps.Logging
 import           Blockchain.Bagger.BaggerState      (defaultBaggerState)
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.Block

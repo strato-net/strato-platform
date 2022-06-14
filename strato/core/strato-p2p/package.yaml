@@ -7,6 +7,7 @@ synopsis: a microservice that handles peer to peer connections for strato
 dependencies:
   - base
   - blockapps-data
+  - common-log
 
 ghc-options: -Wall -threaded
 

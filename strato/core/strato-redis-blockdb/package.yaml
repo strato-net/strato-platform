@@ -20,6 +20,7 @@ library:
   - binary
   - blockapps-util
   - bytestring
+  - common-log
   - ethereum-rlp
   - format
   - hedis

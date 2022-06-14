@@ -29,6 +29,7 @@ executables:
     - bytestring
     - cache
     - clock
+    - common-log
     - core-api-monad
     - core-api2
     - evm-solidity
@@ -59,6 +60,9 @@ executables:
     source-dirs:         app
     other-modules:
     - SelectAccessible
+    dependencies:
+    - common-log
+
 
   post-raw-transaction:
     main:                PostRawTransaction.hs

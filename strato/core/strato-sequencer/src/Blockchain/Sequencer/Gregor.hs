@@ -40,10 +40,10 @@ import qualified Prometheus as P
 import           System.IO.Unsafe
 import           UnliftIO.STM
 
+import           BlockApps.Logging
 import           Blockchain.Blockstanbul (Checkpoint(..), decodeCheckpoint, encodeCheckpoint)
 import qualified Blockchain.EthConf                        as EC
 import qualified Blockchain.MilenaTools     as K
-import           Blockchain.Output
 import           Blockchain.Sequencer.CablePackage
 import           Blockchain.Sequencer.Event
 import qualified Blockchain.Sequencer.Kafka as SK

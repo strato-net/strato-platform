@@ -7,7 +7,6 @@
 {-# LANGUAGE TemplateHaskell       #-}
 module Executable.AditM where
 
-import           Blockchain.Output
 import qualified Control.Monad.Change.Modify  as Mod
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
@@ -15,6 +14,7 @@ import           Control.Lens
 import qualified Data.Set as S
 import           Data.Time.Clock
 
+import           BlockApps.Logging
 import           Blockchain.EthConf           (mkConfiguredKafkaState)
 import           Network.Kafka
 

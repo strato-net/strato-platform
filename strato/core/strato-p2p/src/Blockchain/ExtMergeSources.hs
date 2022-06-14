@@ -20,7 +20,7 @@ import           UnliftIO.Concurrent
 import           UnliftIO.Exception
 import           UnliftIO.STM
 
-import           Blockchain.Output
+import           BlockApps.Logging
 
 mergeSourcesByForce :: (MonadLogger mi, MonadResource mi, MonadUnliftIO mi, MonadIO mo)
                     => [ConduitM () a mi ()] -- sources to merge

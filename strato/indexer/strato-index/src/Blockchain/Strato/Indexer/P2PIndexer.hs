@@ -10,7 +10,6 @@ import           Control.Arrow                      ((&&&))
 import           Control.Monad
 import qualified Control.Monad.Change.Alter         as A
 import qualified Control.Monad.Change.Modify        as Mod
-import           Blockchain.Output
 import           Data.Maybe                         (fromJust)
 import qualified Data.Map.Strict                    as M
 import qualified Data.Text                          as T
@@ -18,6 +17,7 @@ import           Network.Kafka
 import           Blockchain.MilenaTools
 import           Network.Kafka.Protocol
 
+import           BlockApps.Logging
 import           Blockchain.Data.Block              (BestBlock(..), Private(..))
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Enode              (ChainMembers(..))

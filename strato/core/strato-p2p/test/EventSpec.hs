@@ -34,6 +34,7 @@ import qualified Data.Sequence                         as Q
 import           Data.Text (Text)
 import           Text.Printf
 
+import           BlockApps.Logging
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin
 import           Blockchain.Blockstanbul.Messages      (round)
@@ -51,7 +52,6 @@ import qualified Blockchain.Data.TXOrigin              as Origin
 import           Blockchain.Data.Wire
 import           Blockchain.Event
 import           Blockchain.Options                    (AuthorizationMode(..))
-import           Blockchain.Output
 import           Blockchain.Privacy
 import qualified Blockchain.Sequencer                  as Seq
 import qualified Blockchain.Sequencer.DB.DependentBlockDB as DBDB

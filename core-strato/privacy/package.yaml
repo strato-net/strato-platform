@@ -11,6 +11,7 @@ library:
     - binary
     - blockapps-data
     - blockapps-util
+    - common-log
     - containers
     - data-default
     - ethereum-rlp

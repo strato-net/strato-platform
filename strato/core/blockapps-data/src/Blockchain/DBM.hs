@@ -11,7 +11,7 @@ module Blockchain.DBM (
 
 import           Control.Monad.IO.Unlift
 
-import           Blockchain.Output            (runNoLoggingT)
+import           BlockApps.Logging            (runNoLoggingT)
 
 import           Blockchain.DB.SQLDB
 import           Blockchain.EthConf
