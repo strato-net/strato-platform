@@ -44,7 +44,6 @@ import           SolidVM.Model.CodeCollection
 import           SolidVM.Solidity.Parse.Declarations
 import           SolidVM.Solidity.Parse.File
 import           SolidVM.Solidity.Detectors.Typechecker as TC
-import           SolidVM.Solidity.Xabi (XabiF (..)) 
 
 data ParseTypeCheckOrSolidVMError = PEx ParseError
                          | TCEx [SourceAnnotation T.Text]
@@ -68,15 +67,16 @@ parseSourceWithAnnotations = withAnnotations . parseSource
 
 compileSourceNoInheritance :: Map T.Text T.Text -> Either ParseTypeCheckOrSolidVMError CodeCollection
 compileSourceNoInheritance initCodeMap = do
-  let getNamedContracts sourceUnits structsOrEnumsMap = do
+  let getNamedContracts fileName src = do
+        sourceUnits <- parseSource fileName src
         let pragmas = \case
               Pragma _ n v -> Just (n, v)
               _ -> Nothing
             vmVersion' = if (Just ("solidvm","3.2")) `elem` (pragmas <$> sourceUnits) then "svm3.2" else (if (Just ("solidvm","3.0")) `elem` (pragmas <$> sourceUnits) then "svm3.0" else "")
         fmap catMaybes . for sourceUnits $ \case
-          NamedXabi name ((Xabi funcs constrs vars consts types mods evs kind using ctx), parents') -> do
+          NamedXabi name (xabi, parents') -> do
             ctrct <- first SVMEx
-                   $ xabiToContract (T.unpack name) (map T.unpack parents') vmVersion' (Xabi funcs constrs vars consts (M.union types structsOrEnumsMap) mods evs kind using ctx)
+                   $ xabiToContract (T.unpack name) (map T.unpack parents') vmVersion' xabi
             pure $ Just (T.unpack name, ctrct)
           _ -> pure Nothing
       throwDuplicate (cName, contract) m = case M.lookup cName m of
@@ -84,10 +84,7 @@ compileSourceNoInheritance initCodeMap = do
         Just _ ->  Left . PEx
                  $ newErrorMessage (Message $ "Duplicate contract found: " ++ cName)
                                    (fromSourcePosition $ _sourceAnnotationStart $ _contractContext contract)
-  sUnits <-  mapM (uncurry parseSource) (M.toList initCodeMap)
-  let sUnits' = concat sUnits
-  let flsoeMap = M.fromList $ catMaybes $ map (\x -> case x of FileLevelSructOrEnum y -> Just y; _ -> Nothing) sUnits'
-  allContracts <- (getNamedContracts sUnits' flsoeMap)
+  allContracts <- fmap concat . traverse (uncurry getNamedContracts) $ M.toList initCodeMap
   deduplicatedContracts <- foldrM throwDuplicate M.empty allContracts
   pure $ CodeCollection {
     _contracts = deduplicatedContracts

@@ -4107,57 +4107,6 @@ contract qq{
 }|]
     getFields ["x"] `shouldReturn` [BInteger 2]
 
-
-  it "can declare enums at the file level" . runTest $ do
-    runCall "a" "()" [r|
-pragma solidvm 3.2;
-enum Color { red, green, blue }
-contract A {
-    function value() public returns (uint) {
-        return 0xa;
-    }
-}
-
-enum Letter { a, b, c }
-contract B {
-    function value() public returns (uint) {
-        return 0xb;
-    }
-}
-contract qq {
-  function a() public returns (Letter) {
-    return Letter.c;
-  }
-}
-
-|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 2)
-
-  it "can declare structs at the file level" . runTest $ do
-    runCall "a" "()" [r|
-pragma solidvm 3.2;
-struct Point {
-  uint x;
-  uint y;
-}
-contract qq {
-  function a() public returns (uint) {
-    Point p;
-    p.x = 1;
-    p.y = 2;
-    return p.x;
-  }
-}|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 1)
-
-  it "can declare constants at the file level" . runTest $ do
-    runCall "a" "()" [r|
-pragma solidvm 3.2;
-uint constant X = 1;
-contract qq {
-  function a() public returns (uint) {
-    return X;
-  }
-}|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 1)
-
   it "can set values in a mapping that's a member of a struct" . runTest $ do
     runCall "a" "()" [r|
 pragma solidvm 3.2;

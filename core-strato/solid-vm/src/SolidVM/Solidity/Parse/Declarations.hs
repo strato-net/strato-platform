@@ -38,9 +38,7 @@ import           Blockchain.VM.SolidException
 
 data SourceUnitF a = Pragma a Identifier String
                    | Import a Text.Text
-                   | FileLevelSructOrEnum (Text.Text, SolidVM.Def)
                    | NamedXabi Text.Text (XabiF a, [Text.Text])
---                   | FileLevelConstant Text.Text SolidVM.Def
                    deriving (Eq, Show, Generic, Functor)
 
 type SourceUnit = Positioned SourceUnitF
@@ -179,17 +177,6 @@ enumDeclaration = do
         SolidVM.context = a
         }
     )
-
-structOrEnum :: SolidityParser SourceUnit
-structOrEnum = do
-  enumOrStruct <- (enumDeclaration <|> structDeclaration)
-  let enumOrStructForReturn = case enumOrStruct of
-        (name, StructDeclaration struct) -> (Text.pack name, struct)
-        (name, EnumDeclaration enum) -> (Text.pack name, enum)
-        _ -> error "structOrEnum: unexpected"
-  return $ FileLevelSructOrEnum enumOrStructForReturn
-
-
 
 usingDeclaration :: SolidityParser (String, Declaration)
 usingDeclaration = do
