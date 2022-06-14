@@ -729,11 +729,11 @@ contract qq {
    uint address;
 }|]) `shouldThrow` anyParseError
 
-    it "throw an error when there is an 'chainId' variable name" $ runTest (do
-      runBS [r|
-contract qq {
-   uint chainId;
-}|]) `shouldThrow` anyParseError
+--     it "throw an error when there is an 'chainId' variable name" $ runTest (do
+--       runBS [r|
+-- contract qq {
+--    uint chainId;
+-- }|]) `shouldThrow` anyParseError
 
     it "throw an error when there is an 'record_id' variable name" $ runTest (do
       runBS [r|
