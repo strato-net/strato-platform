@@ -17,8 +17,8 @@ import qualified Blockchain.Data.TXOrigin as TXO
 import Blockchain.EthConf
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
+import Blockchain.Strato.Model.MicroTime (getCurrentMicrotime)
 import Blockchain.TypeLits
-import Blockchain.Util (getCurrentMicrotime)
 
 insertSeq :: IngestEvent -> IO ()
 insertSeq iev = do

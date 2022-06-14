@@ -16,24 +16,14 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin           ()
 import           Blockchain.Database.MerklePatricia
+import           Blockchain.Strato.Model.PositiveInteger
 import           Blockchain.Strato.Model.Secp256k1            ()
-import           Blockchain.Util
 
-instance Arbitrary Microtime where
-    arbitrary = (Microtime . unboxPI) <$> (arbitrary :: Gen PositiveInteger)
-
-data PositiveInteger = PositiveInteger Integer deriving (Eq, Ord, Show, Read)
-unboxPI :: PositiveInteger -> Integer
-unboxPI (PositiveInteger n) = n
-positiveIntegerMax :: Integer
-positiveIntegerMax = 99999999
 {-
 data HaskoinPrvKey = HaskoinPrvKey H.PrvKey
 unboxPK :: HaskoinPrvKey -> H.PrvKey
 unboxPK (HaskoinPrvKey pk) = pk
 -}
-instance Arbitrary PositiveInteger where
-    arbitrary = PositiveInteger . abs <$> arbitrary
 
 instance Arbitrary BlockData where
     arbitrary = do

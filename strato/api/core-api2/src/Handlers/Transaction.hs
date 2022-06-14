@@ -56,7 +56,7 @@ import           Blockchain.EthConf          (runKafkaConfigured)
 import           Blockchain.Sequencer.Event  (IngestEvent (IETx), IngestTx (..))
 import           Blockchain.Sequencer.Kafka  (writeUnseqEvents)
 import           Blockchain.Strato.Model.Address
-import           Blockchain.Util             (getCurrentMicrotime)
+import           Blockchain.Strato.Model.MicroTime  (getCurrentMicrotime)
 
 import           Control.Monad.Composable.SQL
 

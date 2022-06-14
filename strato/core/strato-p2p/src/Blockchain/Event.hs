@@ -67,7 +67,7 @@ import           Blockchain.Options
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Util
+import           Blockchain.Strato.Model.MicroTime
 import           Blockchain.Verification
 
 import           Blockchain.Sequencer.Event

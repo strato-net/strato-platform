@@ -59,6 +59,7 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Kafka
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.Strato.Model.MicroTime
 import           Blockchain.Stream.UnminedBlock        (produceUnminedBlocksM)
 import           Blockchain.Stream.VMEvent
 import           Blockchain.VMContext
@@ -87,7 +88,6 @@ import           Blockchain.Strato.StateDiff.Database  (commitSqlDiffs)
 import           Blockchain.Stream.Action              (Action)
 import qualified Blockchain.Stream.Action              as Action
 import           Blockchain.Timing
-import           Blockchain.Util
 
 import qualified Text.Colors                           as CL
 import           Text.Format                           (format)

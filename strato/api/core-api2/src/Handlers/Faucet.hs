@@ -50,8 +50,8 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.MicroTime   (getCurrentMicrotime)
 import           Blockchain.Strato.Model.Secp256k1
-import           Blockchain.Util                (getCurrentMicrotime)
 import           Control.Monad.Composable.SQL
 
 import           Text.Format

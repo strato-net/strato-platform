@@ -6,13 +6,8 @@ module Blockchain.Util
   ( module Blockchain.Util
   ) where
 
-import           Data.Data
 import qualified Data.Map.Strict          as M
 import           Data.Maybe
-
-import           Data.Time.Clock.POSIX    (POSIXTime, getPOSIXTime)
-
-import qualified Data.Binary              as Binary
 
 toMaybe :: Eq a => a -> a -> Maybe a
 toMaybe a b = if a == b then Nothing else Just b
@@ -29,19 +24,4 @@ splitWith f = foldr agg []
            in if fa == k
                 then (k, a:as):kas'
                 else (fa, [a]):kas
-
-newtype Microtime = Microtime Integer deriving (Read, Show, Eq, Ord, Num, Enum, Real, Integral, Data, Typeable)
-
-posixTimeToMicrotime :: POSIXTime -> Microtime
-posixTimeToMicrotime = Microtime . round . (* 1000000)
-
-secondsToMicrotime :: Integer -> Microtime
-secondsToMicrotime = Microtime . (* 1000000)
-
-getCurrentMicrotime :: IO Microtime
-getCurrentMicrotime = posixTimeToMicrotime <$> getPOSIXTime
-
-instance Binary.Binary Microtime where
-    get = Microtime <$> Binary.get
-    put (Microtime a) = Binary.put a
 
