@@ -41,18 +41,6 @@ spec = do
       pragmaParse "pragma typecheck;" `shouldSatisfy` isLeft
     it "shoudl fail without a ;" $
       pragmaParse "pragma solc 0.4.8" `shouldSatisfy` isLeft
-    it "should pass with arbitrary text" $
-      pragmaParse "pragma randident don't fsck with my t3xt !!;" `shouldBe` 
-        Right (Pragma dummyAnnotation "randident" "don't fsck with my t3xt !!")
-    it "should fail without an identifier" $
-      pragmaParse "pragma;" `shouldSatisfy` isLeft
-    it "should fail without contents" $
-      pragmaParse "pragma ident  ;" `shouldSatisfy` isLeft
-    it "shoudl fail without a ;" $
-      pragmaParse "pragma solc 0.4.8" `shouldSatisfy` isLeft
-    it "should pass with arbitrary text" $
-      pragmaParse "pragma randident don't fsck with my t3xt !!;" `shouldBe`
-        Right (Pragma dummyAnnotation "randident" "don't fsck with my t3xt !!")
 
   let findVer = fmap (decideVersion . File . (:[])) . pragmaParse
   describe "Version Decision" $ do

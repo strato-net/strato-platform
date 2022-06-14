@@ -829,18 +829,6 @@ contract qq {
 }|]
     getAll [ [Field "y" ]] `shouldReturn` [BDefault]
 
-  it "can map index with uninitialized strings 3.0" . runTest $ do
-    runBS [r|
-contract qq {
-  mapping(string => address) xs;
-  address y;
-  constructor() {
-    string idx;
-    y = xs[idx];
-  }
-}|]
-    getFields ["y"] `shouldReturn` [BDefault]
-
   it "can map index with uninitialized strings 3.2" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
@@ -853,38 +841,6 @@ contract qq {
   }
 }|]
     getFields ["y"] `shouldReturn` [BDefault]
-
-  it "can do the thing I want strings" . runTest $ do
-    runBS [r|
-pragma solidvm 3.2;
-contract qq {
-  mapping(string => address) xs;
-  address y;
-  constructor() {
-    string idx;
-    idx = "test";
-    xs[idx] = address(0x1234567890123456789012345678901234567890);
-    y = xs[idx];
-  }
-}|]
-    getFields ["y"] `shouldReturn` [BDefault]
-
-  it "can do the thing I want strings" . runTest $ do
-    runBS [r|
-pragma solidvm 3.0;
-contract qq {
-  mapping(string => address) xs;
-  address y;
-  constructor() {
-    string idx;
-    idx = "test";
-    xs[idx] = address(0x1234567890123456789012345678901234567890);
-    y = xs[idx];
-  }
-}|]
-    getFields ["y"] `shouldReturn` [BDefault]
-
-
 
   it "can access fields of structs from arrays" . runTest $ do
     runBS [r|
