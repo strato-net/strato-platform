@@ -77,6 +77,7 @@ solidityLanguage = javaStyle {
      "msg", --"data", "gas", "sender", "value",
      "tx", --"gasprice", "origin",
      "wei", "finney", "szabo", "ether",
+     "account", "block_number", "block_timestamp", "block_hash",
      "seconds", "minutes", "hours", "days", "weeks", "years"
      ],
   P.reservedOpNames = [
