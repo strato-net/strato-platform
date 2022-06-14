@@ -46,6 +46,8 @@ packages:
 - strato/libs/logserver
 - strato/libs/milena
 - strato/libs/monad-alter
+- strato/libs/prometheus/blockapps-init/
+- strato/libs/prometheus/cross-monitoring/
 
 - strato/test-suite
 
@@ -69,8 +71,6 @@ packages:
 - core-strato/blockapps-util/
 - core-strato/solid-vm/
 
-- shared-util/blockapps-init/
-- shared-util/cross-monitoring/
 - shared-util/solid-vm-model/
 
 extra-deps:
