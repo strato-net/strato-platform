@@ -43,6 +43,7 @@ packages:
 - strato/libs/ethereum-rlp
 - strato/libs/format
 - strato/libs/labeled-error
+- strato/libs/logserver
 - strato/libs/milena
 - strato/libs/monad-alter
 
@@ -71,7 +72,6 @@ packages:
 - shared-util/blockapps-init/
 - shared-util/cross-monitoring/
 - shared-util/solid-vm-model/
-- logserver
 
 extra-deps:
 - Crypto-4.2.5.1@sha256:52275a055f4adf7c488260fb9fae60d03679632e64d3c8fc69d8b5951e8129cc,3688
