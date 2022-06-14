@@ -24,7 +24,6 @@ library:
   - blockapps-data
   - blockapps-datadefs
   - blockapps-ethereum
-  - blockapps-strato-api
   - blockapps-util
   - bytestring
   - containers

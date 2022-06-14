@@ -34,7 +34,6 @@ stack test -j1 \
       x509-certs \
       blockapps-ethereum \
       evm-solidity \
-      blockapps-strato-api \
       bloc2api \
       blockapps-vault-wrapper-server \
       slipstream \

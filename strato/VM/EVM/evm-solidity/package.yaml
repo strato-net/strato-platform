@@ -57,7 +57,6 @@ tests:
     source-dirs: test/
     dependencies:
      - aeson-qq
-     - blockapps-strato-api
      - evm-solidity
      - generic-random
      - hspec

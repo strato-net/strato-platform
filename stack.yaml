@@ -56,7 +56,6 @@ packages:
 - strato/VM/vrun
 
 - blockapps-haskell/ethereum
-- blockapps-haskell/strato/api
 
 - core-strato/debugger/
 - core-strato/vm-runner/
