@@ -45,3 +45,12 @@ library:
   - swagger2
   - text
 
+tests:
+  blockapps-strato-api-test:
+    main: Spec.hs
+    source-dirs: test/
+    dependencies:
+      - bloc2api
+      - hspec
+      - QuickCheck
+      - quickcheck-instances

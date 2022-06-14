@@ -23,10 +23,3 @@ library:
   dependencies:
   - swagger2
 
-tests:
-  blockapps-strato-api-test:
-    main: Spec.hs
-    source-dirs: test/
-    dependencies:
-      - blockapps-strato-api
-      - hspec

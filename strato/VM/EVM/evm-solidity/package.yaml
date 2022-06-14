@@ -59,6 +59,7 @@ tests:
      - aeson-qq
      - blockapps-strato-api
      - evm-solidity
+     - generic-random
      - hspec
      - quickcheck-instances
      - raw-strings-qq
