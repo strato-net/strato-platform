@@ -22,7 +22,6 @@ library:
   - base16-bytestring
   - binary
   - blockapps-datadefs
-  - blockapps-util
   - bytestring
   - bytestring-arbitrary
   - clock
@@ -60,6 +59,7 @@ library:
   - text
   - time
   - transformers
+  - type-lits
   - unliftio
   - unliftio-core
   - vector

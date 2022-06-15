@@ -51,6 +51,7 @@ packages:
 - strato/libs/monad-alter
 - strato/libs/prometheus/blockapps-init/
 - strato/libs/prometheus/cross-monitoring/
+- strato/libs/type-lits
 
 - strato/test-suite
 

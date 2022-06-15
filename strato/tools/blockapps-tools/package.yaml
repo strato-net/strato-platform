@@ -25,7 +25,6 @@ library:
     - blockapps-haskoin
     - blockapps-mpdbs
     - blockapps-privacy
-    - blockapps-util
     - blockstanbul
     - bytestring
     - common-log
@@ -61,6 +60,7 @@ library:
     - text
     - time
     - transformers
+    - type-lits
     - unliftio
     - vm-tools
 

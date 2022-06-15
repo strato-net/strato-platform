@@ -23,7 +23,6 @@ library:
   - binary
   - blockapps-data
   - blockapps-datadefs
-  - blockapps-util
   - bytestring
   - containers
   - cryptonite
@@ -42,6 +41,7 @@ library:
   - strato-model
   - swagger2
   - text
+  - type-lits
 
 tests:
   blockapps-strato-api-test:
