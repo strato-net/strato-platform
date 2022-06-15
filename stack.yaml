@@ -67,8 +67,6 @@ packages:
 - strato/VM/SolidVM/source-tools
 - strato/VM/vrun
 
-- blockapps-haskell/ethereum
-
 - core-strato/blockapps-util/
 - core-strato/solid-vm/
 

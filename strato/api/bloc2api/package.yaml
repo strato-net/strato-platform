@@ -23,7 +23,6 @@ library:
   - binary
   - blockapps-data
   - blockapps-datadefs
-  - blockapps-ethereum
   - blockapps-util
   - bytestring
   - containers

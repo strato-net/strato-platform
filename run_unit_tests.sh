@@ -32,7 +32,6 @@ stack test -j1 \
       vm-runner \
       vm-tools \
       x509-certs \
-      blockapps-ethereum \
       evm-solidity \
       bloc2api \
       blockapps-vault-wrapper-server \

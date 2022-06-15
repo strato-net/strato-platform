@@ -23,7 +23,6 @@ library:
     - bloc2api
     - blockapps-data
     - blockapps-datadefs
-    - blockapps-ethereum
     - blockapps-mpdbs
     - blockapps-util
     - blockapps-vault-wrapper-api

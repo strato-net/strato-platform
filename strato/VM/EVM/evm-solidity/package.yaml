@@ -32,7 +32,6 @@ library:
   dependencies:
   - aeson-casing
   - binary
-  - blockapps-ethereum
   - classy-prelude
   - cryptonite
   - deepseq
