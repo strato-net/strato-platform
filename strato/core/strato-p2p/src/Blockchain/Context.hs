@@ -104,7 +104,6 @@ import qualified Database.Persist.Sql                  as SQL
 import qualified Database.Redis                        as Redis
 import qualified Network.Kafka                         as K
 import qualified Blockchain.MilenaTools                as K
-import           Blockchain.Util                       (toMaybe)
 import           Network.HTTP.Client                    (newManager, defaultManagerSettings)
 import           Servant.Client
 import qualified Strato.Strato23.API                   as VC
@@ -523,3 +522,7 @@ withActivePeer :: ( MonadUnliftIO m
 withActivePeer p = bracket a b . const
   where a   = A.insert (Proxy @ActivityState) (pPeerIp p, pPeerTcpPort p) Active
         b _ = A.insert (Proxy @ActivityState) (pPeerIp p, pPeerTcpPort p) Inactive
+
+toMaybe :: Eq a => a -> a -> Maybe a
+toMaybe a b = if a == b then Nothing else Just b
+

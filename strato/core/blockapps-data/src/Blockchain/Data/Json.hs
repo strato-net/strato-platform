@@ -31,7 +31,6 @@ import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.ExtendedWord (Word256)
 import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Util                      (toMaybe)
 
 import qualified LabeledError
 
@@ -65,7 +64,7 @@ instance ToJSON RawTransaction' where
           , "transactionType" .= (show $ rawTransactionSemantics rt)
           , "timestamp" .= t
           , "origin" .= o
-          ] ++ (("chainId" .=) <$> maybeToList (ChainId <$> toMaybe 0 cid))
+          ] ++ (("chainId" .=) <$> maybeToList (ChainId <$> if (0==cid) then Nothing else Just cid))
             ++ (("metadata" .=) <$> maybeToList (M.fromList <$> md))
     toJSON (RawTransaction' rt@(RawTransaction t fa non gp gl Nothing val cod cid r s v md bn h o) next) =
         object $
@@ -84,7 +83,7 @@ instance ToJSON RawTransaction' where
           , "transactionType" .= (show $ rawTransactionSemantics rt)
           , "timestamp" .= t
           , "origin" .= o
-          ] ++ (("chainId" .=) <$> maybeToList (ChainId <$> toMaybe 0 cid))
+          ] ++ (("chainId" .=) <$> maybeToList (ChainId <$> if (0==cid) then Nothing else Just cid))
             ++ (("metadata" .=) <$> maybeToList (M.fromList <$> md))
 
 parseHexStr :: (Integral a) => Parser String -> Parser a
