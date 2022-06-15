@@ -32,17 +32,16 @@ newtype File = File {
   unsourceUnits :: [SourceUnit]
 } deriving (Show, Generic)
 
-
 solidityFile :: SolidityParser File
 solidityFile = do
   whiteSpace
-  units <- many (solidityPragma <|> solidityImport <|> solidityContract <|> structOrEnum <|> fileLevelConstantDeclaration)
+  units <- many (solidityPragma <|> solidityImport <|> solidityContract)
   eof
   return . File $ units
 
 
 decideVersion :: File -> SolcVersion
-decideVersion = maximum . (ZeroPointFour:) . Data.Maybe.mapMaybe go . unsourceUnits
+decideVersion = maximum . (ZeroPointFour:) . mapMaybe go . unsourceUnits
   where go :: SourceUnit -> Maybe SolcVersion
         go (Pragma _ pragmaName rest) = do
           guard $ pragmaName == "solidity"

@@ -682,6 +682,77 @@ contract qq {
   }
 }|]) `shouldThrow` failedRequirementNoMsg
 
+    it "throw an error when there is an 'block_timestamp' variable name" $ runTest (do
+      runBS [r|
+contract qq {
+   string block_timestamp;
+   constructor()
+   {
+      block_timestamp = "hello";
+   }
+}|]) `shouldThrow` anyParseError
+
+    it "throw an error when there is an 'block_hash' variable name" $ runTest (do
+      runBS [r|
+contract qq {
+   string block_hash;
+   constructor()
+   {
+      block_hash = "hello";
+   }
+}|]) `shouldThrow` anyParseError
+
+    it "throw an error when there is an 'block_number' variable name" $ runTest (do
+      runBS [r|
+contract qq {
+   string block_number;
+   constructor()
+   {
+      block_number = "hello";
+   }
+}|]) `shouldThrow` anyParseError
+
+    it "throw an error when there is an 'account' variable name" $ runTest (do
+      runBS [r|
+contract qq {
+   function f();
+   string account;
+   constructor()
+   {
+      account = "hello";
+   }
+}|]) `shouldThrow` anyParseError
+
+    it "throw an error when there is an 'address' variable name" $ runTest (do
+      runBS [r|
+contract qq {
+   uint address;
+}|]) `shouldThrow` anyParseError
+
+--     it "throw an error when there is an 'chainId' variable name" $ runTest (do
+--       runBS [r|
+-- contract qq {
+--    uint chainId;
+-- }|]) `shouldThrow` anyParseError
+
+    it "throw an error when there is an 'record_id' variable name" $ runTest (do
+      runBS [r|
+contract qq {
+   uint record_id;
+}|]) `shouldThrow` anyParseError
+
+    it "throw an error when there is an 'transaction_hash' variable name" $ runTest (do
+      runBS [r|
+contract qq {
+   uint transaction_hash;
+}|]) `shouldThrow` anyParseError
+
+    it "throw an error when there is an 'transaction_sender' variable name" $ runTest (do
+      runBS [r|
+contract qq {
+   uint transaction_sender;
+}|]) `shouldThrow` anyParseError
+
     it "can multiline require" . runTest $ do
       runBS [r|
 contract qq {
@@ -829,12 +900,12 @@ contract qq {
 }|]
     getAll [ [Field "y" ]] `shouldReturn` [BDefault]
 
-  it "can map index with uninitialized strings" . runTest $ do
+  it "can map index with uninitialized strings 3.2" . runTest $ do
     runBS [r|
-pragma solidvm 3.0;
+pragma solidvm 3.2;
 contract qq {
-  mapping(string => uint) xs;
-  uint y;
+  mapping(string => address) xs;
+  address y;
   constructor() {
     string idx;
     y = xs[idx];
@@ -4110,57 +4181,6 @@ contract qq{
 }|]
     getFields ["x"] `shouldReturn` [BInteger 2]
 
-
-  it "can declare enums at the file level" . runTest $ do
-    runCall "a" "()" [r|
-pragma solidvm 3.2;
-enum Color { red, green, blue }
-contract A {
-    function value() public returns (uint) {
-        return 0xa;
-    }
-}
-
-enum Letter { a, b, c }
-contract B {
-    function value() public returns (uint) {
-        return 0xb;
-    }
-}
-contract qq {
-  function a() public returns (Letter) {
-    return Letter.c;
-  }
-}
-
-|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 2)
-
-  it "can declare structs at the file level" . runTest $ do
-    runCall "a" "()" [r|
-pragma solidvm 3.2;
-struct Point {
-  uint x;
-  uint y;
-}
-contract qq {
-  function a() public returns (uint) {
-    Point p;
-    p.x = 1;
-    p.y = 2;
-    return p.x;
-  }
-}|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 1)
-
-  it "can declare constants at the file level" . runTest $ do
-    runCall "a" "()" [r|
-pragma solidvm 3.2;
-uint constant X = 1;
-contract qq {
-  function a() public returns (uint) {
-    return X;
-  }
-}|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 1)
-
   it "can set values in a mapping that's a member of a struct" . runTest $ do
     runCall "a" "()" [r|
 pragma solidvm 3.2;
@@ -4220,3 +4240,12 @@ contract qq {
     return keccak256("hello", "world");
   }
 }|] `shouldReturn` Just "\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL \NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL1\195\186&\195\155|\194\168^\194\173\&9\194\146\SYN\195\167\195\134\&1k\195\133\SO\195\146C\194\147\195\131\DC2+X'5\195\167\195\179\194\176\195\185\ESC\194\147\195\176"
+
+  it "cant use  a commented pragma" . runTest $ do
+    runCall "a" "()" [r|
+//pragma solidvm 3.2;
+contract qq {
+  function a() public returns (string) {
+    return 2;
+  }
+}|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 2)
