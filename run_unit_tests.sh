@@ -40,6 +40,12 @@ stack test -j1 \
       blockapps-privacy \
       seqevents \
       debugger \
-      ./shared-util/
+      blockapps-init \
+      common-log \
+      cross-monitoring \
+      format \
+      labeled-error \
+      solid-vm-model \
+      source-tools
 
 stack bench vm-runner
