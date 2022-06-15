@@ -200,12 +200,19 @@ function newnode {
       runBackgroundProcess strato-api2 --gasOn=$gasOn +RTS -N1 >> logs/strato-api2 2>&1
   fi
 
+  if [ "${evmCompatible}" = true ]; then
+      echo "EVM Compatibility mode is on, so Slipstream EVM contract indexing is being turned on."
+      indexFlag=true
+  else 
+      indexFlag=${indexEVM}
+  fi
+  
   SLIPSTREAM_CMD="slipstream --pghost=${postgres_host} --pgport=${postgres_port} \
     --pguser=${postgres_user} --password=${postgres_password} --database=${postgres_slipstream_db} \
     --stratourl=${stratoRoot} --vaultwrapperurl=${vaultWrapperRoot}  \
-    --kafkahost=${kafkaHost} --kafkaport=${kafkaPort} --minLogLevel=${slipMinLogLevel} --indexEVM=${indexEVM}"
+    --kafkahost=${kafkaHost} --kafkaport=${kafkaPort} --minLogLevel=${slipMinLogLevel} --indexEVM=$indexFlag"
 
-  if [ ${SLIPSTREAM_OPTIONAL} = true ]; then
+  if [ "${SLIPSTREAM_OPTIONAL}" = true ]; then
       $SLIPSTREAM_CMD &>> logs/slipstream &
   else
       runBackgroundProcess $SLIPSTREAM_CMD &>> logs/slipstream
@@ -400,12 +407,8 @@ setEnv svmTrace ${svmTrace:-false}
 setEnv diffPublish true
 
 setEnv evmCompatible ${EVM_COMPATIBLE:-false}
-if [ "${evmCompatible}" = true ]
-then
-  setEnv indexEVM true
-else
-  setEnv indexEVM ${indexEVM:-false}
-fi
+setEnv indexEVM ${indexEVM:-false}
+
 setEnv evmDebugMode false
 setEnv evmTraceMode false
 
