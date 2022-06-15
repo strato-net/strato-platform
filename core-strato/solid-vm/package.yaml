@@ -38,6 +38,8 @@ library:
     - SolidVM.Solidity.Parse.File
     - SolidVM.Solidity.Parse.Lexer
     - SolidVM.Solidity.Parse.Statement
+    - SolidVM.Solidity.Parse.Pragmas
+    - SolidVM.Solidity.Parse.ParserTypes
     - SolidVM.Solidity.Parse.UnParser
     - SolidVM.Solidity.Parse.Declarations
     - SolidVM.Solidity.SourceTools

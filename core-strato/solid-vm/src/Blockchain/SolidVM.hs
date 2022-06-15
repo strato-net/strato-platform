@@ -443,10 +443,10 @@ setCreator creator contract cntrct blockNumber = do
   let hasSvm3_0 = CC._vmVersion cntrct == "svm3.0"
       hasSvm3_2 = CC._vmVersion cntrct == "svm3.2"
   when hasSvm3_2 $ do
-    liftIO $ putStrLn $ "setCreator/address ---> Setting creatorAddress to: " ++ show creator 
+    liftIO $ putStrLn $ "setCreator/address ---> Setting creatorAddress to: " ++ show creator ++ " solidVM version: " ++ (show $ CC._vmVersion cntrct)
     putSolidStorageKeyVal' hasSvm3_2 contract (MS.StoragePath [MS.Field ":creatorAddress"]) (MS.BAccount (accountToNamedAccount' creator))
   let putCreatorField org = do
-        liftIO $ putStrLn $ "setCreator/versioning ---> setting the org as " ++ (show org)
+        liftIO $ putStrLn $ "setCreator/versioning ---> setting the org as " ++ (show org) ++ " solidVM version: " ++ (show $ CC._vmVersion cntrct)
         putSolidStorageKeyVal' (hasSvm3_0 || hasSvm3_2) contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack org)
 
   if _org /= "" then putCreatorField _org else do
@@ -566,25 +566,54 @@ logFunctionCall args address contract functionName f = do
 
 
 argsToVals :: MonadSM m => CC.Contract -> CC.Func -> CC.ArgList -> m ValList
-argsToVals ctract fn args =
-  case args of
-    CC.OrderedArgs xs -> do
-      when (length xs /= length orderedTypes) $ invalidArguments "arity mismatch" (xs, orderedTypes)
-      OrderedVals <$> zipWithM eval orderedTypes xs
-    CC.NamedArgs xs -> NamedVals . M.toList <$> do
-      let strTypes = M.mapKeys (T.unpack . fromMaybe "") $ M.fromList $ CC.funcArgs fn
-      M.mergeA (M.mapMissing $ curry $ invalidArguments "missing argument")
-               (M.mapMissing $ curry $ invalidArguments "extra argument")
-               (M.zipWithAMatched $ \_k t x -> eval (CC.indexedTypeType t) x)
-               strTypes
-               $ M.fromList xs
+argsToVals ctract fn args = 
+  if CC._vmVersion ctract == "svm3.2" 
+    then 
+      case args of
+        CC.OrderedArgs xs -> do
+          when (length xs /= length orderedTypes) $ invalidArguments "arity mismatch" (xs, orderedTypes)
+          OrderedVals <$> zipWithM eval32 orderedTypes xs
+        CC.NamedArgs xs -> NamedVals . M.toList <$> do
+          let strTypes = M.mapKeys (T.unpack . fromMaybe "") $ M.fromList $ CC.funcArgs fn
+          M.mergeA (M.mapMissing $ curry $ invalidArguments "missing argument")
+                  (M.mapMissing $ curry $ invalidArguments "extra argument")
+                  (M.zipWithAMatched $ \_k t x -> eval32 (CC.indexedTypeType t) x)
+                  strTypes
+                  $ M.fromList xs
+    else
+      case args of
+        CC.OrderedArgs xs -> do
+          when (length xs /= length orderedTypes) $ invalidArguments "arity mismatch" (xs, orderedTypes)
+          OrderedVals <$> zipWithM eval orderedTypes xs
+        CC.NamedArgs xs -> NamedVals . M.toList <$> do
+          let strTypes = M.mapKeys (T.unpack . fromMaybe "") $ M.fromList $ CC.funcArgs fn
+          M.mergeA (M.mapMissing $ curry $ invalidArguments "missing argument")
+                  (M.mapMissing $ curry $ invalidArguments "extra argument")
+                  (M.zipWithAMatched $ \_k t x -> eval (CC.indexedTypeType t) x)
+                  strTypes
+                  $ M.fromList xs
 
   where orderedTypes :: [SVMType.Type]
         orderedTypes = map CC.indexedTypeType
                      . map snd $ CC.funcArgs fn
 
         eval :: MonadSM m => SVMType.Type -> CC.Expression -> m Value
-        eval t x = do
+        eval t x = case x of
+           CC.NumberLiteral _ n Nothing -> return . coerceType ctract t $ SInteger n
+           CC.NumberLiteral _ n (Just nu) -> todo "Number literal with units" (n, nu)
+           CC.BoolLiteral _ b -> return . coerceType ctract t $ SBool b
+           CC.StringLiteral _ s -> return . coerceType ctract t $ SString s
+           CC.ArrayExpression _ as -> case t of
+              SVMType.Array{SVMType.entry=t'} ->
+                SArray t . V.fromList <$> mapM (fmap Constant . eval t') as
+              _ -> typeError "array literal for non array" (t, x)
+           -- This is something of a hack, where if an incoming value is not one
+           -- of the accepted literals, assume that this is not the context of
+           -- evaluating external arguments.
+           _ -> getVar =<< expToVar x
+
+        eval32 :: MonadSM m => SVMType.Type -> CC.Expression -> m Value
+        eval32 t x = do
           case x of
             CC.NumberLiteral _ n Nothing   -> return . coerceType ctract t $ SInteger n
             CC.NumberLiteral _ n (Just nu) -> todo "Number literal with units" (n, nu)
@@ -619,7 +648,7 @@ argsToVals ctract fn args =
                                   Left err -> typeError (show err) (k, t)
               _ -> typeError "Object Literal for non-object like argument type" (t, x)
             _                               -> getVar =<< expToVar x
-  
+
 -- Crude type coercion of expressions
 expressionType :: CC.Expression -> SVMType.Type
 expressionType (CC.BoolLiteral _ _ ) = SVMType.Bool
