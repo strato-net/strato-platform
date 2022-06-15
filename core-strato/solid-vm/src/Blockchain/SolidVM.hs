@@ -764,27 +764,43 @@ runStatement st@(CC.SimpleStatement (CC.ExpressionStatement (CC.Binary _ "=" dst
   -- If it's an array, calling (expToVar dst) gives us
   -- the value at the index, NOT a reference that we can
   -- assign to....so we need to make a new vector and reset the whole array
-  case pVal of
-    SArray typ fs -> do
-      indVal <- getVar =<< expToVar indExp
-      case indVal of
-        SInteger ind -> do
-          when ((ind >= toInteger (V.length fs) || 0 > ind)) (invalidWrite "Cannot assign a value outside the allocated space for an array" (unparseStatement st))
-          let newVec = fs V.// [(fromIntegral ind, srcVar)]
-          setVar pVar (SArray typ newVec)
+  if CC._vmVersion cntrct == "svm3.2"
+    then do
+      case pVal of
+        SArray typ fs -> do
+          indVal <- getVar =<< expToVar indExp
+          case indVal of
+            SInteger ind -> do
+              when ((ind >= toInteger (V.length fs) || 0 > ind)) (invalidWrite "Cannot assign a value outside the allocated space for an array" (unparseStatement st))
+              let newVec = fs V.// [(fromIntegral ind, srcVar)]
+              setVar pVar (SArray typ newVec)
+              return Nothing
+            _ -> typeError ("array index value (" ++ (show indVal) ++ ") is not an integer") (unparseStatement st)
+        SMap typ theMap -> do
+          theIndex <- getVar =<< expToVar indExp
+          let newMap = M.insert theIndex srcVar theMap
+          setVar pVar (SMap typ newMap)
           return Nothing
-        _ -> typeError ("array index value (" ++ (show indVal) ++ ") is not an integer") (unparseStatement st)
-    SMap typ theMap -> do
-      theIndex <- getVar =<< expToVar indExp
-      let newMap = M.insert theIndex srcVar theMap
-      setVar pVar (SMap typ newMap)
-      return Nothing
-    _ -> do -- If it's a mapping, (expToVar dst) IS a reference, so we can set directly to it
-      dstVar <- expToVar dst
-      setVar dstVar srcVal
-      return Nothing
-
-
+        _ -> do -- If it's a mapping, (expToVar dst) IS a reference, so we can set directly to it
+          dstVar <- expToVar dst
+          setVar dstVar srcVal
+          return Nothing
+    else do 
+      case pVal of
+        SArray typ fs -> do
+          indVal <- getVar =<< expToVar indExp
+          case indVal of
+            SInteger ind -> do
+              when ((ind >= toInteger (V.length fs) || 0 > ind)) (invalidWrite "Cannot assign a value outside the allocated space for an array" (unparseStatement st))
+              let newVec = fs V.// [(fromIntegral ind, srcVar)]
+              setVar pVar (SArray typ newVec)
+              return Nothing
+            _ -> typeError ("array index value (" ++ (show indVal) ++ ") is not an integer") (unparseStatement st)
+        _ -> do -- If it's a mapping, (expToVar dst) IS a reference, so we can set directly to it
+          dstVar <- expToVar dst
+          setVar dstVar srcVal
+          return Nothing
+  
 runStatement st@(CC.SimpleStatement (CC.ExpressionStatement (CC.Binary _ "=" (CC.IndexAccess _ _ Nothing) _)) pos) = do
   solidVMBreakpoint pos
   missingField "index value cannot be empty" (unparseStatement st)
@@ -803,6 +819,7 @@ runStatement (CC.SimpleStatement (CC.ExpressionStatement (CC.Binary _ "=" dst sr
     withSrcPos pos $ "    Setting: " ++ unparseExpression dst ++ " = " ++ valString
 
   return Nothing
+
 
 {-  
   case e1 of
@@ -888,15 +905,20 @@ runStatement s@(CC.SimpleStatement (CC.VariableDefinition entries maybeExpressio
     (_, STuple variables) -> do
       checkArity "var declaration tuple" (V.length variables) (length entries)
       let nonBlanks = [(ensureType t, n, v) | (CC.VarDefEntry t _ n _, v) <- zip entries $ V.toList variables]
-      --We get the values first so in the case of (x,y) = (y,x) we can still set the variables to the correct values
-      nonBlanks' <- forM nonBlanks $ \(t, n, v) -> do
-        v' <- getVar v
-        return (t, n, v')
-      forM_ nonBlanks' $ \(theType', name', v) -> do
-        logAssigningVariable v
-        addLocalVariable theType' name' v
-
-
+      ctrct <- getCurrentContract
+      if CC._vmVersion ctrct == "svm3.2"
+        then do
+          --We get the values first so in the case of (x,y) = (y,x) we can still set the variables to the correct values
+          nonBlanks' <- forM nonBlanks $ \(t, n, v) -> do
+            v' <- getVar v
+            return (t, n, v')
+          forM_ nonBlanks' $ \(theType', name', v) -> do
+            logAssigningVariable v
+            addLocalVariable theType' name' v
+        else do
+          forM_ nonBlanks $ \(theType', name', variable') -> do
+            value' <- getVar variable'
+            addLocalVariable theType' name' value'
 
     _ -> typeError "VariableDefinition expected a tuple" value
 
@@ -1241,6 +1263,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
   var <- expToVar expr
   val <- getVar var
   chainId <- view accountChainId <$> getCurrentAccount
+  contract'' <- getCurrentContract
 
   case (val, name) of
 --    Constant c -> case (c, name) of
@@ -1296,12 +1319,22 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
 
       (SBuiltinVariable "block", "number") -> (Constant . SInteger . blockDataNumber . Env.blockHeader) <$> getEnv
 
-      (SBuiltinVariable "block", "coinbase") -> (Constant . ((flip SAccount) True) . (accountToNamedAccount chainId) . ((flip Account) Nothing) . blockDataCoinbase . Env.blockHeader) <$> getEnv
+      m@(SBuiltinVariable "block", "coinbase") ->
+        if CC._vmVersion contract'' == "svm3.2"
+          then (Constant . ((flip SAccount) True) . (accountToNamedAccount chainId) . ((flip Account) Nothing) . blockDataCoinbase . Env.blockHeader) <$> getEnv
+          else typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ show m)
+        
 
-      (SBuiltinVariable "block", "difficulty") -> (Constant . SInteger . blockDataDifficulty . Env.blockHeader) <$> getEnv
+      m@(SBuiltinVariable "block", "difficulty") -> 
+        if CC._vmVersion contract'' == "svm3.2"
+          then (Constant . SInteger . blockDataDifficulty . Env.blockHeader) <$> getEnv
+          else typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ show m)
 
-      (SBuiltinVariable "block", "gaslimit") -> (Constant . SInteger . blockDataGasLimit . Env.blockHeader) <$> getEnv
-
+      m@(SBuiltinVariable "block", "gaslimit") -> 
+        if CC._vmVersion contract'' == "svm3.2"
+          then (Constant . SInteger . blockDataGasLimit . Env.blockHeader) <$> getEnv
+          else typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ show m)
+        
       (SBuiltinVariable "super", method) -> do
         ctract <- getCurrentContract
         (_, cc) <- getCurrentCodeCollection
@@ -1858,7 +1891,13 @@ callBuiltin "account" [SInteger a, SString "self"] _                 = unspecifi
 callBuiltin "account" [SInteger a, SString "parent"] _               = unspecifiedChain (fromIntegral a) `castToAncestor` 1
 callBuiltin "account" [SInteger a, SString "grandparent"] _          = unspecifiedChain (fromIntegral a) `castToAncestor` 2
 callBuiltin "account" [SInteger a, SString "ancestor", SInteger n] _ = unspecifiedChain (fromIntegral a) `castToAncestor` n
-callBuiltin "account" [SInteger a, SString ('0':'x':xs)] _ = return . ((flip SAccount) False) $ explicitChain (fromIntegral a) (fromIntegral $ base16ToIntegral xs)
+callBuiltin "account" [SInteger a, SString ('0':'x':xs)] _ = do
+  contract' <- getCurrentContract
+  if CC._vmVersion contract' == "svm3.2" 
+    then 
+      return . ((flip SAccount) False) $ explicitChain (fromIntegral a) (fromIntegral $ base16ToIntegral xs)
+    else
+      return . ((flip SAccount) False) $ explicitChain (fromIntegral a) (fromIntegral $ base16ToIntegral xs)
   where
     hexChar ch = fromMaybe (invalidArguments "illegal character in chainId hexstring" [ch]) $ elemIndex ch "0123456789ABCDEF"
     base16ToIntegral = foldl' (\n c -> 16*n + (hexChar $ CHAR.toUpper c)) 0
@@ -1874,8 +1913,17 @@ callBuiltin "account" [(SAccount a _), SString ('0':'x':xs)] _ = return . ((flip
     hexChar ch = fromMaybe (invalidArguments "illegal character in chainId hexstring" [ch]) $ elemIndex ch "0123456789ABCDEF"
     base16ToIntegral = foldl' (\n c -> 16*n + (hexChar $ CHAR.toUpper c)) 0 
 callBuiltin "account" [(SAccount _ _) , SString b] _ = invalidArguments "the chainId string must be a hexString beggining with \"0x\" " b
-callBuiltin "addmod" [SInteger a, SInteger b, SInteger c] _ = return . SInteger $ (a + b) `mod` c
-callBuiltin "mulmod" [SInteger a, SInteger b, SInteger c] _ = return . SInteger $ (a * b) `mod` c
+callBuiltin am@("addmod") [SInteger a, SInteger b, SInteger c] _ = do 
+  contract' <- getCurrentContract
+  if CC._vmVersion contract' == "svm3.2"
+    then return . SInteger $ (a + b) `mod` c
+    else unknownFunction "callBuiltin" am
+callBuiltin mm@("mulmod") [SInteger a, SInteger b, SInteger c] _ = do 
+  contract' <- getCurrentContract
+  if CC._vmVersion contract' == "svm3.2"
+    then return . SInteger $ (a * b) `mod` c
+    else unknownFunction "callBuiltin" mm
+  
 callBuiltin "account" vs _ = typeError "account cast" vs
 callBuiltin "bool" [SBool b] _ = return $ SBool b
 callBuiltin "bool" [SString "true"] _ = return $ SBool True
@@ -1898,7 +1946,11 @@ callBuiltin "keccak256" args Nothing = do
   case allStrings args of
     False -> invalidArguments "cannot use a non string arguments in keccak256" args
     True ->  return . SString . BC.unpack . keccak256ToByteString . hash . BC.pack $ customConcat args
-callBuiltin "payable" [SAccount a _] _ = return $ SAccount a True
+callBuiltin pb@("payable") [SAccount a _] _ = do 
+  contract' <- getCurrentContract
+  if CC._vmVersion contract' == "svm3.2"
+    then return $ SAccount a True
+    else unknownFunction "callBuiltin" pb
 callBuiltin "require" (SBool cond :msg) Nothing = do
   case msg of
     [] -> require cond Nothing

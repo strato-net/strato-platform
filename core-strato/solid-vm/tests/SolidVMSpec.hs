@@ -682,6 +682,77 @@ contract qq {
   }
 }|]) `shouldThrow` failedRequirementNoMsg
 
+    it "throw an error when there is an 'block_timestamp' variable name" $ runTest (do
+      runBS [r|
+contract qq {
+   string block_timestamp;
+   constructor()
+   {
+      block_timestamp = "hello";
+   }
+}|]) `shouldThrow` anyParseError
+
+    it "throw an error when there is an 'block_hash' variable name" $ runTest (do
+      runBS [r|
+contract qq {
+   string block_hash;
+   constructor()
+   {
+      block_hash = "hello";
+   }
+}|]) `shouldThrow` anyParseError
+
+    it "throw an error when there is an 'block_number' variable name" $ runTest (do
+      runBS [r|
+contract qq {
+   string block_number;
+   constructor()
+   {
+      block_number = "hello";
+   }
+}|]) `shouldThrow` anyParseError
+
+    it "throw an error when there is an 'account' variable name" $ runTest (do
+      runBS [r|
+contract qq {
+   function f();
+   string account;
+   constructor()
+   {
+      account = "hello";
+   }
+}|]) `shouldThrow` anyParseError
+
+    it "throw an error when there is an 'address' variable name" $ runTest (do
+      runBS [r|
+contract qq {
+   uint address;
+}|]) `shouldThrow` anyParseError
+
+--     it "throw an error when there is an 'chainId' variable name" $ runTest (do
+--       runBS [r|
+-- contract qq {
+--    uint chainId;
+-- }|]) `shouldThrow` anyParseError
+
+    it "throw an error when there is an 'record_id' variable name" $ runTest (do
+      runBS [r|
+contract qq {
+   uint record_id;
+}|]) `shouldThrow` anyParseError
+
+    it "throw an error when there is an 'transaction_hash' variable name" $ runTest (do
+      runBS [r|
+contract qq {
+   uint transaction_hash;
+}|]) `shouldThrow` anyParseError
+
+    it "throw an error when there is an 'transaction_sender' variable name" $ runTest (do
+      runBS [r|
+contract qq {
+   uint transaction_sender;
+}|]) `shouldThrow` anyParseError
+
     it "can multiline require" . runTest $ do
       runBS [r|
 contract qq {
