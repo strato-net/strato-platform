@@ -18,7 +18,6 @@ library:
   - QuickCheck
   - base16-bytestring
   - binary
-  - blockapps-util
   - bytestring
   - common-log
   - ethereum-rlp
@@ -28,6 +27,7 @@ library:
   - lens-family-th
   - monad-alter
   - mtl
+  - partitioner
   - random
   - seqevents
   - strato-conf

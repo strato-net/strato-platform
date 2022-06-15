@@ -19,7 +19,6 @@ library:
   - base16-bytestring
   - binary
   - blockapps-haskoin
-  - blockapps-util
   - bytestring
   - cipher-aes
   - common-log

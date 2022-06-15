@@ -1,8 +1,8 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE DeriveDataTypeable         #-}
-{-# LANGUAGE NoDeriveAnyClass #-}
+--{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+--{-# LANGUAGE DeriveDataTypeable         #-}
+--{-# LANGUAGE NoDeriveAnyClass #-}
 
-module Blockchain.Util where
+module Blockchain.Partitioner where
 
 import qualified Data.Map.Strict          as M
 import           Data.Maybe

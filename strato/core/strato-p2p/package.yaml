@@ -105,7 +105,6 @@ tests:
       - blockapps-data
       - blockapps-datadefs
       - blockapps-privacy
-      - blockapps-util
       - blockstanbul
       - bytestring
       - conduit

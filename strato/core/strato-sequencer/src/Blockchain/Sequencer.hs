@@ -58,11 +58,11 @@ import qualified Blockchain.Data.TransactionDef            as TD
 import qualified Blockchain.Data.TXOrigin                  as TO
 import qualified Blockchain.Data.RLP                       as RL
 
+import           Blockchain.Partitioner
 import           Blockchain.Strato.Model.Class             as BDB
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 
-import           Blockchain.Util
 import qualified Text.Colors                               as CL
 import           Text.Format
 

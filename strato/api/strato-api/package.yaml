@@ -4,7 +4,6 @@ dependencies:
 - base
 - bloc-sql-monad
 - bloc2
-- blockapps-util
 - hflags
 - monad-alter
 - mtl

@@ -24,7 +24,6 @@ library:
   - blockapps-data
   - blockapps-datadefs
   - blockapps-mpdbs
-  - blockapps-util
   - bytestring
   - common-log
   - conduit
@@ -94,7 +93,6 @@ tests:
       - base16-bytestring
       - blockapps-data
       - blockapps-mpdbs
-      - blockapps-util
       - bytestring
       - common-log
       - containers

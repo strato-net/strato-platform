@@ -22,7 +22,6 @@ library:
   - base16-bytestring
   - binary
   - blockapps-data
-  - blockapps-util
   - bytestring
   - common-log
   - containers
@@ -51,7 +50,6 @@ tests:
     main: Main.hs
     dependencies:
       - blockapps-mpdbs
-      - blockapps-util
       - blockapps-data
       - bytestring
       - common-log

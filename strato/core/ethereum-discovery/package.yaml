@@ -25,7 +25,6 @@ library:
     - blockapps-data
     - blockapps-datadefs
     - blockapps-haskoin
-    - blockapps-util
     - blockapps-vault-wrapper-api
     - blockapps-vault-wrapper-client
     - bytestring
@@ -66,7 +65,6 @@ executables:
     main:             Main.hs
     dependencies:
       - blockapps-init
-      - blockapps-util
       - common-log
       - ethereum-discovery
       - hflags

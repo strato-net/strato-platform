@@ -49,6 +49,7 @@ packages:
 - strato/libs/kafka/milena
 - strato/libs/kafka/milena-tools
 - strato/libs/monad-alter
+- strato/libs/partitioner
 - strato/libs/prometheus/blockapps-init/
 - strato/libs/prometheus/cross-monitoring/
 - strato/libs/type-lits
@@ -69,9 +70,6 @@ packages:
 - strato/VM/SolidVM/solid-vm-model
 - strato/VM/SolidVM/source-tools
 - strato/VM/vrun
-
-- core-strato/blockapps-util/
-
 
 extra-deps:
 - Crypto-4.2.5.1@sha256:52275a055f4adf7c488260fb9fae60d03679632e64d3c8fc69d8b5951e8129cc,3688

@@ -15,7 +15,6 @@ library:
   - blockapps-data
   - blockapps-datadefs
   - blockapps-haskoin
-  - blockapps-util
   - bytestring
   - common-log
   - conduit
@@ -74,7 +73,6 @@ tests:
       - blockapps-data
       - blockapps-datadefs
       - blockapps-haskoin
-      - blockapps-util
       - blockstanbul
       - bytestring
       - common-log
@@ -96,7 +94,6 @@ benchmarks:
     source-dirs: bench/
     main: OneNode.hs
     dependencies:
-      - blockapps-util
       - blockstanbul
       - criterion
       - transformers

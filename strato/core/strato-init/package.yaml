@@ -77,7 +77,6 @@ executables:
     source-dirs: exec_src/
     main: Main.hs
     dependencies:
-      - blockapps-util
       - common-log
       - hflags
       - strato-init

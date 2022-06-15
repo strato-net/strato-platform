@@ -19,7 +19,6 @@ library:
     - blockapps-datadefs
     - blockapps-haskoin
     - blockapps-mpdbs
-    - blockapps-util
     - bytestring
     - common-log
     - containers
@@ -50,7 +49,6 @@ tests:
     main: TestMain.hs
     dependencies:
       - aeson
-      - blockapps-util
       - bytestring
       - common-log
       - containers
