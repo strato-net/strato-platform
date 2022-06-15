@@ -124,6 +124,7 @@ tests:
     main: Spec.hs
     dependencies:
       - base16-bytestring
+      - blockapps-data
       - blockapps-ethereum
       - blockapps-haskoin
       - blockapps-vault-wrapper-server

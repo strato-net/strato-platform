@@ -30,9 +30,9 @@ import           Servant.Docs
 import           Test.QuickCheck                    hiding (Success,Failure)
 
 import           BlockApps.Bloc22.API.SwaggerSchema
-import           BlockApps.Ethereum                 ()
 import           BlockApps.Solidity.ArgValue
 
+import           Blockchain.Data.AlternateTransaction ()
 import           Blockchain.Data.ArbitraryInstances ()
 import           Blockchain.Data.Enode
 import           Blockchain.TypeLits

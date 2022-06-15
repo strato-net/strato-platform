@@ -14,7 +14,7 @@
 -- {-# OPTIONS -fno-warn-unused-top-binds #-}
 -- {-# OPTIONS -fno-warn-unused-imports #-}
 
-module BlockApps.Ethereum
+module Blockchain.Data.AlternateTransaction
   ( -- Number type reexports
     Transaction (..)
   , UnsignedTransaction (..)

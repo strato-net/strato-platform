@@ -49,6 +49,7 @@ library:
   - persistent-template
   - quickcheck-instances
   - regex-compat
+  - relapse
   - resourcet
   - secp256k1-haskell # remove
   - servant-docs
@@ -85,6 +86,7 @@ tests:
       - bytestring
       - containers
       - ethereum-rlp
+      - http-api-data
       - hspec
       - persistent
       - secp256k1-haskell

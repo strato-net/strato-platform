@@ -19,7 +19,7 @@ import           System.IO.Unsafe
 
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Secp256k1
-import qualified BlockApps.Ethereum                    as E
+import qualified Blockchain.Data.AlternateTransaction as E
 import           Clockwork
 
 

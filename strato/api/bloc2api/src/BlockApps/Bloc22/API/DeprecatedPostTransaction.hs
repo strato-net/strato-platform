@@ -21,7 +21,7 @@ import           Numeric.Natural
 import           Test.QuickCheck
 
 import           BlockApps.Bloc22.API.TypeWrappers
-import           BlockApps.Ethereum           ()
+import           Blockchain.Data.AlternateTransaction ()
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Keccak256

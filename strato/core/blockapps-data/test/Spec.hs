@@ -2,6 +2,10 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -fno-warn-overlapping-patterns #-}
 
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE TypeApplications #-}
+
+
 import           Control.Monad
 import qualified Crypto.Secp256k1                as SEC
 import           Data.Aeson
@@ -20,6 +24,7 @@ import qualified Data.Vector                     as V
 import           Database.Persist.Sql
 import           Data.Word
 import           Test.Hspec
+import           Test.Hspec.QuickCheck
 import           Test.Hspec.Runner
 
 import           Blockchain.Data.ArbitraryInstances()
@@ -40,6 +45,13 @@ import           Blockchain.Data.Json
 import           Blockchain.Data.Transaction
 
 import           Test.QuickCheck
+
+import Web.FormUrlEncoded
+import Web.HttpApiData
+
+--import Control.Applicative (liftA2)
+--import Text.Read hiding (String)
+
 
 predicate :: Path -> Bool
 predicate (_, _) = True
@@ -106,6 +118,56 @@ main = hspecWith (configAddFilter predicate defaultConfig) $ do
     eventualFromIdempotency
     directComparison
     sigRecovery
+
+  describe "Word256" $ do
+    it "shows correctly" $ do
+      show (0x0 :: Word256) `shouldBe` "0"
+      show (0x7 :: Word256) `shouldBe` "7"
+      show (0x45 :: Word256) `shouldBe` "69"
+
+    it "renders json correctly" $ do
+      encode (0x0 :: Word256) `shouldBe` "\"0000000000000000000000000000000000000000000000000000000000000000\""
+      encode (0x7 :: Word256) `shouldBe` "\"0000000000000000000000000000000000000000000000000000000000000007\""
+      encode (0x45 :: Word256) `shouldBe` "\"0000000000000000000000000000000000000000000000000000000000000045\""
+
+  describe "Address" $ do
+    prop "has inverse JSON decode/encode" $ jsonProp @ Address
+    prop "has inverse HTTP Api Data decode/encode" $ httpApiDataProp @ Address
+    prop "has inverse Form Url decode/encode" $ formProp @ Address
+    prop "has inverse String decode/encode" $ \ address ->
+      stringAddress (formatAddressWithoutColor address) === Just address
+
+  describe "Keccak256" $ do
+    prop "has inverse JSON decode/encode" $ jsonProp @ Keccak256
+    prop "has inverse HTTP Api Data decode/encode" $
+      httpApiDataProp @ Keccak256
+    prop "has inverse Form Url decode/encode" $ formProp @ Keccak256
+    prop "has inverse String decode/encode" $ \ hash' ->
+      stringKeccak256 (formatKeccak256WithoutColor hash') === Just hash'
+
+
+-- helpers
+    
+jsonProp :: (Eq x, Show x, FromJSON x, ToJSON x) => x -> Property
+jsonProp x = decode (encode x) === Just x
+
+{-  
+readShowProp :: (Eq x, Read x, Show x) => x -> Property
+readShowProp = liftA2 (===) (readMaybe . show) Just
+-}
+
+httpApiDataProp
+  :: (Eq x, Show x, FromHttpApiData x, ToHttpApiData x) => x -> Property
+httpApiDataProp x =
+  parseQueryParam (toQueryParam x) === Right x
+  .&&. parseUrlPiece (toUrlPiece x) === Right x
+  .&&. parseHeader (toHeader x) === Right x
+  
+formProp :: (Eq x, Show x, FromForm x, ToForm x) => x -> Property
+formProp x = fromForm (toForm x) === Right x
+                                                                                                                                                                                        
+
+
 
 rlpRT :: (RLPSerializable a) => a -> a
 rlpRT = rlpDecode . rlpDeserialize . rlpSerialize . rlpEncode
