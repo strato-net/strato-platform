@@ -677,3 +677,12 @@ writeSeqP2pEvents :: [P2pEvent] -> SequencerM ()
 writeSeqP2pEvents events = do
     ch <- asks (seqP2PEvents . cablePackage)
     atomically . mapM_ (writeTQueue ch) $ events
+
+splitWith :: Eq k => (a -> k) -> [a] -> [(k, [a])]
+splitWith f = foldr agg []
+  where agg a [] = [(f a, [a])]
+        agg a kas@((k, as):kas') =
+          let fa = f a
+           in if fa == k
+                then (k, a:as):kas'
+                else (fa, [a]):kas

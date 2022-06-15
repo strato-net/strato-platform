@@ -2,9 +2,7 @@
 {-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE NoDeriveAnyClass #-}
 
-module Blockchain.Util
-  ( module Blockchain.Util
-  ) where
+module Blockchain.Util where
 
 import qualified Data.Map.Strict          as M
 import           Data.Maybe
@@ -15,13 +13,4 @@ toMaybe a b = if a == b then Nothing else Just b
 partitionWith :: Ord k => (a -> k) -> [a] -> [(k, [a])]
 partitionWith f = M.toList . foldr builder M.empty
   where builder a = M.alter (Just . (a:) . fromMaybe []) (f a)
-
-splitWith :: Eq k => (a -> k) -> [a] -> [(k, [a])]
-splitWith f = foldr agg []
-  where agg a [] = [(f a, [a])]
-        agg a kas@((k, as):kas') =
-          let fa = f a
-           in if fa == k
-                then (k, a:as):kas'
-                else (fa, [a]):kas
 
