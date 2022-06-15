@@ -4,12 +4,13 @@
 module Blockchain.Sequencer.Metrics where
 
 import Control.Monad.IO.Class
-import Blockchain.Output
 import Control.Monad.Trans.Resource
 import Data.Ratio ((%))
 import Data.Text
 import Prometheus
 import System.Clock (Clock(..), diffTimeSpec, getTime, toNanoSecs)
+
+import BlockApps.Logging
 
 seqLdbBatchWrites :: Counter
 seqLdbBatchWrites = unsafeRegister $ counter (Info "seq_ldb_batch_writes" "Sequencer counter for ldb batch writes")

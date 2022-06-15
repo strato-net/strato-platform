@@ -23,10 +23,7 @@ library:
     - bloc2api
     - blockapps-data
     - blockapps-datadefs
-    - blockapps-ethereum
     - blockapps-mpdbs
-    - blockapps-strato-api
-    - blockapps-util
     - blockapps-vault-wrapper-api
     - blockapps-vault-wrapper-client
     - bytestring
@@ -78,6 +75,7 @@ library:
     - temporary
     - time
     - transformers
+    - type-lits
     - unliftio
     - unliftio-core
     - unordered-containers

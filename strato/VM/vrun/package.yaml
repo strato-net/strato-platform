@@ -21,8 +21,8 @@ dependencies:
 - blockapps-datadefs
 - blockapps-haskoin
 - blockapps-mpdbs
-- blockapps-util
 - bytestring
+- common-log
 - hflags
 - merkle-patricia-db
 - prometheus-client

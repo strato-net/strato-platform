@@ -10,11 +10,11 @@ import qualified Data.ByteString.Lazy                        as BL
 import           Data.Maybe
 import           Data.Time.Clock.POSIX
 import           Control.Monad.IO.Class
-import           Blockchain.Output
 import           Control.Monad.Trans.Except
 import           HFlags
 import           Prometheus
 
+import           BlockApps.Logging
 import           Blockchain.BlockChain
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.DataDefs

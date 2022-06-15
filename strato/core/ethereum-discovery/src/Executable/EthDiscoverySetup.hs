@@ -6,10 +6,10 @@ module Executable.EthDiscoverySetup (
 
 import           Control.Monad
 import           Control.Monad.IO.Unlift
-import           Blockchain.Output
 import qualified Data.Text                             as T
 import           Database.Persist.Postgresql
 
+import           BlockApps.Logging
 import           Blockchain.EthConf
 import           Blockchain.Strato.Discovery.Data.Peer
 

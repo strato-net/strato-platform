@@ -86,7 +86,6 @@ executables:
       - bloc2api
       - blockapps-data
       - blockapps-datadefs
-      - blockapps-ethereum
       - bytestring
       - containers
       - http-client

@@ -54,7 +54,6 @@ import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.Secp256k1 as EC
-import           Blockchain.Util
 
 import qualified Crypto.Secp256k1 as SEC
 
@@ -133,11 +132,11 @@ instance TransactionLike Transaction where
 
 rawTX2TX :: RawTransaction -> Transaction
 rawTX2TX (RawTransaction _ _ nonce' gp gl (Just to') val (Code dat) cid r s v md _ _ _) =
-  MessageTX nonce' gp gl to' val dat (toMaybe 0 cid) r s v (M.fromList <$> md)
+  MessageTX nonce' gp gl to' val dat (if (0==cid) then Nothing else Just cid) r s v (M.fromList <$> md)
 rawTX2TX (RawTransaction _ _ 0 0 0 Nothing 0 init' 0 h ch 0 Nothing _ _ _) | init' == Code B.empty =
   PrivateHashTX (unsafeCreateKeccak256FromWord256 $ fromInteger h) (unsafeCreateKeccak256FromWord256 $ fromInteger ch)
 rawTX2TX (RawTransaction _ _ nonce' gp gl Nothing val init' cid r s v md _ _ _) =
-  ContractCreationTX nonce' gp gl val init' (toMaybe 0 cid) r s v (M.fromList <$> md)
+  ContractCreationTX nonce' gp gl val init' (if (0==cid) then Nothing else Just cid) r s v (M.fromList <$> md)
 rawTX2TX rt = error $ "rawTX2TX: " ++ show rt
 
 txAndTime2RawTX :: TXOrigin -> Transaction -> Integer -> UTCTime -> RawTransaction

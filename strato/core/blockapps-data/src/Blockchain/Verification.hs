@@ -16,7 +16,7 @@ import qualified Blockchain.Database.MerklePatricia             as MP
 import           Blockchain.Database.MerklePatricia.InternalMem
 import           Blockchain.Database.MerklePatriciaMem
 import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Util
+import           Blockchain.Strato.Model.Util
 
 import           Data.Functor.Identity
 

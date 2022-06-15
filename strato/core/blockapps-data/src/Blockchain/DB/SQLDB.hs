@@ -18,7 +18,6 @@ import           Control.DeepSeq
 import           Control.Monad.Change.Modify  (Accessible(..), Proxy(..))
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
-import           Blockchain.Output            (MonadLogger, runNoLoggingT)
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Resource
 import           qualified Database.Persist.Sql as SQL
@@ -27,6 +26,7 @@ import           qualified Database.Persist.Postgresql as PSQL
 import           Data.IORef
 import           System.IO.Unsafe             (unsafePerformIO)
 
+import           BlockApps.Logging            (MonadLogger, runNoLoggingT)
 import           Blockchain.EthConf           (connStr)
 
 newtype SQLDB = SQLDB { unSQLDB :: SQL.ConnectionPool }

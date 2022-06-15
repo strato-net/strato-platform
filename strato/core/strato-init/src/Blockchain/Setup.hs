@@ -29,6 +29,7 @@ import           System.Exit
 import           System.FilePath
 import           Turtle (chmod, roo, fromText)
 
+import           BlockApps.Logging
 import           Blockchain.Constants
 import           Blockchain.Data.Blockchain         as Blockchain
 import qualified Blockchain.Data.DataDefs           as DataDefs
@@ -40,7 +41,6 @@ import           Blockchain.Init.Monad
 import           Blockchain.Init.Options
 import           Blockchain.KafkaTopics
 import qualified Blockchain.Network                 as Net
-import           Blockchain.Output
 import           Blockchain.Strato.Model.Address
 
 import qualified Executable.EthDiscoverySetup       as EthDiscovery

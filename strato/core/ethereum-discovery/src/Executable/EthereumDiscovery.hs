@@ -6,12 +6,12 @@ module Executable.EthereumDiscovery (
   ) where
 
 import           Control.Monad.IO.Class
-import           Blockchain.Output
 import           Control.Monad.Trans.Resource
 import qualified Data.Text                               as T
 import qualified Network.Socket                          as S
 import           UnliftIO.Exception
 
+import           BlockApps.Logging
 import           Blockchain.EthConf
 import           Blockchain.Strato.Discovery.ContextLite
 import           Blockchain.Strato.Discovery.UDPServer

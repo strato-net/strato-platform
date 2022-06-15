@@ -37,7 +37,7 @@ import           Blockchain.DB.StateDB
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
-import           Blockchain.Util
+import           Blockchain.Strato.Model.Util
 
 import qualified Data.ByteString                             as B
 import qualified Data.ByteString.Base16                      as B16

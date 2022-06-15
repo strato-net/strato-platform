@@ -12,7 +12,6 @@ module Executable.StratoAdit (
 
 import           Control.Monad
 import           Control.Monad.Except
-import           Blockchain.Output
 import           Control.Monad.State
 import qualified Data.Text                      as T
 import           Network.Kafka
@@ -24,6 +23,7 @@ import           Text.PrettyPrint.ANSI.Leijen   hiding ((<$>))
 import           UnliftIO.Concurrent
 import           UnliftIO.STM
 
+import           BlockApps.Logging
 import           Blockchain.Data.Block
 import           Blockchain.Data.DataDefs
 import qualified Blockchain.Data.TXOrigin       as TO

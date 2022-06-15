@@ -15,7 +15,6 @@ import           Control.Lens ((^.))
 import           Control.Monad
 import qualified Control.Monad.Change.Alter                  as A
 import           Control.Monad.IO.Class
-import           Blockchain.Output
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Except
 import           Data.Aeson
@@ -33,6 +32,7 @@ import           Numeric
 import           Text.PrettyPrint.ANSI.Leijen                hiding ((<$>), (</>))
 import           Test.Hspec.Expectations.Lifted
 
+import           BlockApps.Logging
 import           Blockchain.BlockChain
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.Block
@@ -57,7 +57,7 @@ import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Util
+import           Blockchain.Strato.Model.Util
 import           Blockchain.VMContext
 import           Blockchain.VM.VMException
 

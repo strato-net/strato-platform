@@ -32,6 +32,7 @@ import Test.Hspec (Spec, describe, it)
 import Test.Hspec.Expectations.Lifted
 import UnliftIO.Exception
 
+import BlockApps.Logging
 import Blockchain.Data.ChainInfo
 import Blockchain.Data.AddressStateDB
 import Blockchain.DB.HashDB
@@ -40,7 +41,6 @@ import Blockchain.DB.RawStorageDB
 import Blockchain.DB.SolidStorageDB
 import Blockchain.DB.X509CertDB
 import Blockchain.DB.StorageDB
-import Blockchain.Output
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord

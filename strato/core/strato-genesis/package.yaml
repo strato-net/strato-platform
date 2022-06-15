@@ -21,7 +21,7 @@ library:
       - blockapps-datadefs
       - blockapps-haskoin
       - blockapps-mpdbs
-      - blockapps-util
+      - common-log
       - containers
       - crypto-api
       - directory

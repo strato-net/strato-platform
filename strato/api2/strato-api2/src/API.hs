@@ -7,7 +7,6 @@ module API where
 import           Data.Proxy
 import           Servant
 
-import           Blockchain.Output
 import           Control.Monad.Composable.SQL    hiding (SQLM)
 --import qualified Handlers.AccountInfo            as Account
 import qualified Handlers.Log                    as Log
@@ -21,6 +20,7 @@ import qualified Handlers.Cert                    as Cert
 import qualified Handlers.App                     as App
 import qualified Handlers.Record                  as Record
 
+import           BlockApps.Logging
 
 type API =
   "api" :> "v2.0" :>

@@ -12,7 +12,7 @@ import           Blockchain.Database.MerklePatricia
 import           Blockchain.Database.MerklePatricia.Internal
 import           Blockchain.Database.MerklePatricia.InternalMem
 import           Blockchain.Database.MerklePatriciaMem
-import           Blockchain.Util
+import           Blockchain.Strato.Model.Util
 import           Control.Monad.Change.Alter
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Resource

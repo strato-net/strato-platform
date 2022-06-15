@@ -42,9 +42,9 @@ import           Servant.Client
 import           System.Clock
 import           Text.Format
 
+import           BlockApps.Logging
 import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
-import           Blockchain.Output
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Keccak256 hiding (hash)
@@ -54,7 +54,7 @@ import           Blockchain.Data.TXOrigin
 import           Blockchain.EthConf          (runKafkaConfigured)
 import           Blockchain.Sequencer.Event  (IngestEvent (IETx), IngestTx (..))
 import           Blockchain.Sequencer.Kafka  (writeUnseqEvents)
-import           Blockchain.Util             (getCurrentMicrotime)
+import           Blockchain.Strato.Model.MicroTime  (getCurrentMicrotime)
 
 import           Control.Monad.Composable.SQL
 

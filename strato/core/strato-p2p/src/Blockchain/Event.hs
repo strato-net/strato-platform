@@ -24,7 +24,6 @@ import           Control.Monad.Change.Alter
 import           Control.Monad.Change.Modify           hiding (get, put, yield, awaitForever)
 import qualified Control.Monad.Change.Modify           as Mod (get, put)
 import           Control.Monad.IO.Class
-import           Blockchain.Output
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import           Data.Conduit
@@ -48,6 +47,7 @@ import           System.Random
 import           Text.Printf
 import           UnliftIO.Exception
 
+import           BlockApps.Logging
 import           Blockchain.Blockstanbul               (blockstanbulSender, WireMessage)
 import           Blockchain.Context
 import           Blockchain.Data.Block
@@ -67,7 +67,7 @@ import           Blockchain.Options
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Util
+import           Blockchain.Strato.Model.MicroTime
 import           Blockchain.Verification
 
 import           Blockchain.Sequencer.Event

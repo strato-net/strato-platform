@@ -37,21 +37,21 @@ import           Servant.Multipart
 import           System.IO.Unsafe
 import           Text.Printf
 
+import           BlockApps.Logging
 import           Blockchain.Constants
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
 import           Blockchain.DB.SQLDB
 import           Blockchain.EthConf             (runKafkaConfigured)
-import           Blockchain.Output
 import           Blockchain.Sequencer.Event     (IngestEvent (IETx), IngestTx (..))
 import           Blockchain.Sequencer.Kafka     (writeUnseqEvents)
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.MicroTime   (getCurrentMicrotime)
 import           Blockchain.Strato.Model.Secp256k1
-import           Blockchain.Util                (getCurrentMicrotime)
 import           Control.Monad.Composable.SQL
 
 import           Text.Format

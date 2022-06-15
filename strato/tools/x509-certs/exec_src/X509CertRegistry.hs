@@ -21,8 +21,8 @@ import           Text.RawString.QQ
 import qualified Data.Aeson                           as Ae
 
 import           BlockApps.Bloc22.API
-import           BlockApps.Ethereum
 import           BlockApps.X509 
+import           Blockchain.Data.AlternateTransaction
 import qualified Blockchain.Data.DataDefs             as DD
 import           Blockchain.Data.Transaction
 import           Blockchain.Strato.Model.Address

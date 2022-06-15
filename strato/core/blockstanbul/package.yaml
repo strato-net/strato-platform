@@ -15,8 +15,8 @@ library:
   - blockapps-data
   - blockapps-datadefs
   - blockapps-haskoin
-  - blockapps-util
   - bytestring
+  - common-log
   - conduit
   - containers
   - cross-monitoring
@@ -73,9 +73,9 @@ tests:
       - blockapps-data
       - blockapps-datadefs
       - blockapps-haskoin
-      - blockapps-util
       - blockstanbul
       - bytestring
+      - common-log
       - containers
       - cryptonite
       - ethereum-encryption
@@ -94,7 +94,6 @@ benchmarks:
     source-dirs: bench/
     main: OneNode.hs
     dependencies:
-      - blockapps-util
       - blockstanbul
       - criterion
       - transformers

@@ -18,9 +18,9 @@ library:
   - blockapps-data
   - blockapps-datadefs
   - blockapps-haskoin
-  - blockapps-util
   - bytestring
   - clock
+  - common-log
   - conduit
   - containers
   - deepseq
@@ -50,6 +50,7 @@ library:
   - template-haskell
   - text
   - transformers
+  - type-lits
   - unliftio
   - unordered-containers
 

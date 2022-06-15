@@ -33,7 +33,6 @@ library:
     - blockapps-data
     - blockapps-datadefs
     - blockapps-mpdbs
-    - blockapps-util
     - bloomfilter
     - classy-prelude
     - conduit
@@ -49,6 +48,7 @@ library:
     - lifted-base
     - lrucache
     - milena
+    - milena-tools
     - monad-alter
     - monad-control
     - mtl

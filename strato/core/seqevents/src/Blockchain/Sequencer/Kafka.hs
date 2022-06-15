@@ -33,8 +33,8 @@ import           Blockchain.KafkaTopics     (lookupTopic)
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Kafka.Metrics
 import           Blockchain.Strato.Model.ExtendedWord  (Word256)
+import           Blockchain.Strato.Model.MicroTime
 import           Blockchain.Stream.Raw
-import           Blockchain.Util
 
 import qualified Data.ByteString.Lazy       as BL
 import qualified Network.Kafka              as K

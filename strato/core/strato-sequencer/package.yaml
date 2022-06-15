@@ -27,6 +27,7 @@ library:
     - blockstanbul
     - bytestring
     - clock
+    - common-log
     - conduit
     - data-default
     - directory
@@ -48,10 +49,11 @@ library:
     - servant-client
     - text
     - time
-    - blockapps-util
     - classy-prelude
     - containers
+    - milena-tools
     - mtl
+    - partitioner
     - resourcet
     - stm-chans
     - transformers
@@ -66,11 +68,11 @@ executables:
       - async
       - blockapps-data
       - blockapps-init
-      - blockapps-util
       - blockapps-vault-wrapper-api
       - blockapps-vault-wrapper-client
       - blockstanbul
       - bytestring
+      - common-log
       - extra
       - hflags
       - http-client
@@ -113,10 +115,10 @@ tests:
       - blockapps-datadefs
       - blockapps-haskoin
       - blockapps-privacy
-      - blockapps-util
       - blockstanbul
       - bytestring
       - classy-prelude
+      - common-log
       - conduit
       - containers
       - directory
@@ -154,7 +156,6 @@ benchmarks:
       - strato-sequencer
       - criterion
       - blockapps-data
-      - blockapps-util
       - classy-prelude
       - containers
       - mtl

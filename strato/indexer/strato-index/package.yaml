@@ -8,7 +8,7 @@ ghc-options: -threaded -rtsopts -with-rtsopts=-N
 
 dependencies:
   - base
-  - blockapps-util
+  - milena-tools
 
 library:
   source-dirs: src/
@@ -17,6 +17,7 @@ library:
   - blockapps-data
   - blockapps-datadefs
   - bytestring
+  - common-log
   - conduit
   - containers
   - deepseq
@@ -39,6 +40,7 @@ executables:
     source-dirs: exec_src
     dependencies:
       - blockapps-init
+      - common-log
       - hflags
       - strato-index
     other-modules: []
@@ -48,6 +50,7 @@ executables:
     source-dirs: exec_src
     dependencies:
       - blockapps-init
+      - common-log
       - hflags
       - strato-index
     other-modules: []
@@ -57,6 +60,7 @@ executables:
     source-dirs: exec_src/
     dependencies:
       - blockapps-init
+      - common-log
       - hflags
       - strato-index
     other-modules: []

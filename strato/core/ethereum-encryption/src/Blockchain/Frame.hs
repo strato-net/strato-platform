@@ -10,12 +10,12 @@ module Blockchain.Frame
   , cbSafeTake
   ) where
 
+import              BlockApps.Logging
 import qualified    Blockchain.AESCTR                 as AES
 import              Blockchain.Error
 import              Blockchain.EthEncryptionException
 import              Control.Exception.Lifted
 import              Control.Monad
-import              Blockchain.Output
 import "cipher-aes" Crypto.Cipher.AES
 import "cryptonite" Crypto.Hash                       (Context, hashUpdate, hashFinalize)
 import              Crypto.Hash.Algorithms            (Keccak_256)

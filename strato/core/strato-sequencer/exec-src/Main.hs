@@ -17,12 +17,12 @@ import           HFlags
 import           Safe
 
 import           BlockApps.Init
+import           BlockApps.Logging
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin
 import           Blockchain.Strato.Model.Address
 import qualified Blockchain.EthConf         as EC
 import qualified Blockchain.Network         as Net
-import           Blockchain.Output
 import           Blockchain.Sequencer
 import           Blockchain.Sequencer.Gregor
 import           Blockchain.Sequencer.Monad

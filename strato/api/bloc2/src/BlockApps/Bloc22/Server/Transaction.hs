@@ -71,7 +71,6 @@ import           BlockApps.Bloc22.Monad
 import           BlockApps.Bloc22.Server.Chain
 import           BlockApps.Bloc22.Server.TransactionResult     hiding (constructArgValuesAndSource)
 import           BlockApps.Bloc22.Server.Utils
-import           BlockApps.Ethereum
 import           BlockApps.Logging
 import           BlockApps.Solidity.ArgValue
 import           BlockApps.Solidity.Contract()
@@ -84,6 +83,7 @@ import           BlockApps.Solidity.Xabi
 import qualified BlockApps.Solidity.Xabi.Type      as Xabi
 import           BlockApps.XAbiConverter
 import           Blockchain.Data.AddressStateDB
+import           Blockchain.Data.AlternateTransaction
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json
 import           Blockchain.Data.TXOrigin

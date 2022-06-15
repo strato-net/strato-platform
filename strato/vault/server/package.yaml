@@ -27,7 +27,6 @@ dependencies:
 library:
   source-dirs: src
   dependencies:
-    - blockapps-ethereum
     - base16-bytestring
     - bytestring
     - cache
@@ -124,7 +123,7 @@ tests:
     main: Spec.hs
     dependencies:
       - base16-bytestring
-      - blockapps-ethereum
+      - blockapps-data
       - blockapps-haskoin
       - blockapps-vault-wrapper-server
       - bytestring

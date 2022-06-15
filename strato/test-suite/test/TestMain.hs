@@ -12,7 +12,7 @@ import           Executable.EVMFlags            ()
 import           HFlags
 import           System.Directory
 
-import           Blockchain.Output
+import           BlockApps.Logging
 import qualified Blockchain.VM.TestDescriptions as TD
 import           Blockchain.VM.TestEthereum
 import           Blockchain.VM.TestFiles

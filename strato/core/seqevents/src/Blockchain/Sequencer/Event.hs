@@ -32,6 +32,7 @@ import qualified Blockchain.Strato.Model.Address           as A
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ExtendedWord      (Word256)
 import           Blockchain.Strato.Model.Keccak256         (Keccak256)
+import           Blockchain.Strato.Model.MicroTime
 
 import qualified Blockchain.Blockstanbul                   as PBFT
 import qualified Blockchain.Blockstanbul.HTTPAdmin         as PBFT
@@ -41,8 +42,6 @@ import qualified Data.ByteString                           as BS
 import qualified Data.ByteString.Lazy                      as B
 
 import           Blockchain.Sequencer.BinaryInstances      ()
-
-import           Blockchain.Util
 
 import qualified Text.Colors                               as CL
 import           Text.Format

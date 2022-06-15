@@ -16,6 +16,7 @@ packages:
 - strato/core/fastMP
 - strato/core/merkle-patricia-db
 - strato/core/miner-ethash
+- strato/core/privacy
 - strato/core/seqevents
 - strato/core/strato-adit
 - strato/core/strato-conf
@@ -27,10 +28,13 @@ packages:
 - strato/core/strato-redis-blockdb
 - strato/core/strato-sequencer
 - strato/core/strato-statediff
+- strato/core/vm-runner/
+- strato/core/vm-tools/
 
 - strato/indexer/slipstream
 - strato/indexer/strato-index
 
+- strato/libs/blockapps-haskoin/
 - strato/libs/clockwork
 - strato/libs/common-log
 - strato/libs/composable-monads/bloc-sql-monad
@@ -40,8 +44,15 @@ packages:
 - strato/libs/composable-monads/vault-monad
 - strato/libs/ethereum-rlp
 - strato/libs/format
-- strato/libs/milena
+- strato/libs/labeled-error
+- strato/libs/logserver
+- strato/libs/kafka/milena
+- strato/libs/kafka/milena-tools
 - strato/libs/monad-alter
+- strato/libs/partitioner
+- strato/libs/prometheus/blockapps-init/
+- strato/libs/prometheus/cross-monitoring/
+- strato/libs/type-lits
 
 - strato/test-suite
 
@@ -52,27 +63,13 @@ packages:
 - strato/vault/client
 - strato/vault/server
 
+- strato/VM/EVM/ethereum-vm/
 - strato/VM/EVM/evm-solidity
+- strato/VM/SolidVM/debugger/
+- strato/VM/SolidVM/solid-vm/
+- strato/VM/SolidVM/solid-vm-model
+- strato/VM/SolidVM/source-tools
 - strato/VM/vrun
-
-- blockapps-haskell/ethereum
-- blockapps-haskell/strato/api
-
-- core-strato/debugger/
-- core-strato/vm-runner/
-- core-strato/vm-tools/
-- core-strato/ethereum-vm/
-- core-strato/blockapps-util/
-- core-strato/solid-vm/
-- core-strato/blockapps-haskoin/
-- core-strato/privacy/
-
-- shared-util/blockapps-init/
-- shared-util/cross-monitoring/
-- shared-util/labeled-error/
-- shared-util/solid-vm-model/
-- shared-util/source-tools/
-- logserver
 
 extra-deps:
 - Crypto-4.2.5.1@sha256:52275a055f4adf7c488260fb9fae60d03679632e64d3c8fc69d8b5951e8129cc,3688

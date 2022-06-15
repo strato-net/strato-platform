@@ -24,7 +24,7 @@ import           UnliftIO                        hiding (Handler)
 
 
 import           API
-import           Blockchain.Output
+import           BlockApps.Logging
 import           BlockApps.Init
 import           Control.Monad.Composable.SQL    hiding (SQLM)
 import           Control.Monad.Composable.Vault  hiding (httpManager)

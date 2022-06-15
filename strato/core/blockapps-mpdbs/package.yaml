@@ -22,8 +22,8 @@ library:
   - base16-bytestring
   - binary
   - blockapps-data
-  - blockapps-util
   - bytestring
+  - common-log
   - containers
   - data-default
   - deepseq
@@ -50,9 +50,9 @@ tests:
     main: Main.hs
     dependencies:
       - blockapps-mpdbs
-      - blockapps-util
       - blockapps-data
       - bytestring
+      - common-log
       - containers
       - deepseq
       - directory

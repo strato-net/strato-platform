@@ -8,13 +8,13 @@ module Main where
 
 import           BlockApps.Bloc22.API
 import           BlockApps.Bloc22.Server.Utils
-import           BlockApps.Ethereum
 -- import           BlockApps.Solidity.Parse.Parser     (parseXabi)
 -- import           BlockApps.Solidity.Type
 -- import           BlockApps.XAbiConverter             (funcToType)
 import           BlockApps.X509
 
 
+import           Blockchain.Data.AlternateTransaction
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Code

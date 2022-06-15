@@ -36,11 +36,11 @@ import qualified Data.Text                      as T
 import           Servant
 import           Servant.Client
 
+import           BlockApps.Logging
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.ChainInfoDB
 import           Blockchain.Data.TXOrigin
 import           Blockchain.EthConf             (runKafkaConfigured)
-import           Blockchain.Output
 import           Blockchain.Sequencer.Event     (IngestEvent (IEGenesis), IngestGenesis (..))
 import           Blockchain.Sequencer.Kafka     (writeUnseqEvents)
 import           Blockchain.Strato.Model.ChainId

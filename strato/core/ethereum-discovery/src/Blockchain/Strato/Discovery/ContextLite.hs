@@ -19,7 +19,7 @@ module Blockchain.Strato.Discovery.ContextLite
 
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
-import           Blockchain.Output
+import           BlockApps.Logging
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Model.Secp256k1
 import           Control.Concurrent                    (threadDelay)

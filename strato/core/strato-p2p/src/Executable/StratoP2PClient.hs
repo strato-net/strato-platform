@@ -36,6 +36,7 @@ import qualified Data.Text                             as T
 import           Data.Traversable                      (for)
 import           UnliftIO
 
+import           BlockApps.Logging
 import           Blockchain.CommunicationConduit
 import           Blockchain.Context
 import           Blockchain.Data.PubKey                (secPubKeyToPoint)
@@ -43,7 +44,6 @@ import           Blockchain.EthEncryptionException
 import           Blockchain.EventException
 import           Blockchain.Metrics
 import           Blockchain.Options
-import           Blockchain.Output
 import           Blockchain.P2PRPC
 import           Blockchain.SeqEventNotify
 import           Blockchain.Sequencer.Event

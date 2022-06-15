@@ -18,6 +18,7 @@ import qualified Data.NibbleString                  as N
 import qualified Database.Redis                     as Redis
 import qualified Database.LevelDB                   as DB
 
+import           BlockApps.Logging
 import           Blockchain.Constants
 import           Blockchain.Data.AddressStateDB
 import qualified Blockchain.Database.MerklePatricia as MP
@@ -29,7 +30,6 @@ import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.EthConf (lookupRedisBlockDBConfig, connStr)
-import           Blockchain.Output
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import           Blockchain.Strato.Model.Account

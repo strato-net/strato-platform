@@ -18,8 +18,8 @@ import qualified Data.NibbleString as N
 import qualified Data.Text as T
 import qualified Database.LevelDB as LDB
 
+import BlockApps.Logging
 import Blockchain.Data.RLP
-import Blockchain.Output
 import Text.PrettyPrint.ANSI.Leijen                 hiding ((<$>))
 
 import           Blockchain.Database.MerklePatricia          ()

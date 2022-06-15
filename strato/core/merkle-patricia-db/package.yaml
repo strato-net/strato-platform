@@ -38,10 +38,10 @@ tests:
     main:        MerklePatriciaSpec.hs
     dependencies:
       - HUnit
-      - blockapps-util
       - hspec
       - hspec-contrib
       - merkle-patricia-db
+      - strato-model
 
 benchmarks:
   mpbench:

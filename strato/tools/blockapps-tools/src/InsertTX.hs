@@ -3,7 +3,6 @@
 module InsertTX where
 
 import           Control.Monad
-import           Blockchain.Output
 import qualified Data.Binary                  as BN
 import qualified Data.ByteString              as B
 import qualified Data.ByteString.Lazy         as BL
@@ -11,6 +10,7 @@ import           Data.Time.Clock
 import qualified Database.Persist.Postgresql  as SQL
 import           System.FilePath
 
+import           BlockApps.Logging
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
 import           Blockchain.DB.SQLDB          (runSqlPool, createPostgresqlPool)

@@ -32,15 +32,19 @@ stack test -j1 \
       vm-runner \
       vm-tools \
       x509-certs \
-      blockapps-ethereum \
       evm-solidity \
-      blockapps-strato-api \
       bloc2api \
       blockapps-vault-wrapper-server \
       slipstream \
       blockapps-privacy \
       seqevents \
       debugger \
-      ./shared-util/
+      blockapps-init \
+      common-log \
+      cross-monitoring \
+      format \
+      labeled-error \
+      solid-vm-model \
+      source-tools
 
 stack bench vm-runner

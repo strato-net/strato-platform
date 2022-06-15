@@ -26,7 +26,7 @@ import           Database.Persist.Postgresql hiding (get)
 import           Database.Persist.TH
 
 import           Control.Monad.IO.Unlift
-import           Blockchain.Output           (runNoLoggingT, LoggingT)
+import           BlockApps.Logging           (runNoLoggingT, LoggingT)
 import           Control.Monad.Trans.Reader
 
 import           Blockchain.DB.SQLDB         (runPostgresConn)

@@ -14,12 +14,12 @@ import           Conduit
 import           Control.Monad.Change.Modify (Modifiable(..))
 import           Control.Monad
 import qualified Control.Monad.Trans.State.Strict as State
-import           Blockchain.Output
 import qualified Data.Text                   as T
 import qualified Network.Kafka               as K
 import qualified Blockchain.MilenaTools      as K
 import qualified Network.Kafka.Protocol      as KP
 
+import           BlockApps.Logging
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Kafka (readSeqP2pEvents, seqP2pEventsTopicName)
 

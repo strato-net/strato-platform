@@ -21,6 +21,7 @@ import           Network.Kafka
 import           Blockchain.MilenaTools
 import           Network.Kafka.Protocol
 
+import           BlockApps.Logging
 import           Blockchain.Data.ChainInfoDB        (addMember, removeMember, terminateChain)
 import           Blockchain.Data.DataDefs           (LogDB (..), EventDB (..), TransactionResult (..))
 import           Blockchain.Data.Enode
@@ -30,7 +31,6 @@ import           Blockchain.Data.TransactionDef     (formatChainId)
 --import qualified Blockchain.Data.TransactionResult  as TxrDB
 import           Blockchain.EthConf                 (lookupConsumerGroup)
 
-import           Blockchain.Output
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Kafka
 import           Blockchain.Strato.Indexer.IContext
@@ -39,8 +39,8 @@ import           Blockchain.Strato.Indexer.Model
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Util       (byteString2Integer)
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
-import           Blockchain.Util                    (byteString2Integer)
 
 import           System.IO.Unsafe                   (unsafePerformIO)
 import           Text.Format

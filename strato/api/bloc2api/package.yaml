@@ -23,9 +23,6 @@ library:
   - binary
   - blockapps-data
   - blockapps-datadefs
-  - blockapps-ethereum
-  - blockapps-strato-api
-  - blockapps-util
   - bytestring
   - containers
   - cryptonite
@@ -44,4 +41,14 @@ library:
   - strato-model
   - swagger2
   - text
+  - type-lits
 
+tests:
+  blockapps-strato-api-test:
+    main: Spec.hs
+    source-dirs: test/
+    dependencies:
+      - bloc2api
+      - hspec
+      - QuickCheck
+      - quickcheck-instances

@@ -5,8 +5,8 @@ import           HFlags
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.Prometheus
 
+import           BlockApps.Logging
 import           Blockchain.Options
-import           Blockchain.Output
 import           Blockchain.Participation (p2pApp, setParticipationMode)
 import           Blockchain.Strato.Discovery.Data.Peer (resetPeers)
 import           Executable.StratoP2PClient

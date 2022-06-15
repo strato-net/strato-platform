@@ -41,14 +41,13 @@ import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Enode
 import           Blockchain.EthConf                    (lookupRedisBlockDBConfig)
-import           Blockchain.Output
+import           Blockchain.Partitioner                (partitionWith)
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ExtendedWord  (Word256)
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.RedisBlockDB.Models as Models
-import           Blockchain.Util                       (partitionWith)
 
 import           Control.Arrow                         ((&&&), (***), second)
 import           Control.Concurrent                    (threadDelay)
@@ -65,6 +64,8 @@ import qualified Data.Set                              as S
 import qualified Data.Text                             as T
 import           Database.Redis
 import           System.Random                         (randomIO)
+
+import           BlockApps.Logging
 
 newtype RedisConnection = RedisConnection { unRedisConnection :: Connection }
 

@@ -19,9 +19,9 @@ library:
   - base16-bytestring
   - binary
   - blockapps-haskoin
-  - blockapps-util
   - bytestring
   - cipher-aes
+  - common-log
   - conduit
   - conduit-extra
   - crypto-pubkey
@@ -34,6 +34,7 @@ library:
   - memory
   - mtl
   - strato-model
+  - unix
 
 
 #temporarily removing this test while I decide if it is still needed

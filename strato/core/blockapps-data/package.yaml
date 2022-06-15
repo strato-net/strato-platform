@@ -22,10 +22,10 @@ library:
   - base16-bytestring
   - binary
   - blockapps-datadefs
-  - blockapps-util
   - bytestring
   - bytestring-arbitrary
   - clock
+  - common-log
   - containers
   - data-default
   - deepseq
@@ -40,6 +40,7 @@ library:
   - lens
   - merkle-patricia-db
   - milena
+  - milena-tools
   - monad-alter
   - mtl
   - network
@@ -48,6 +49,7 @@ library:
   - persistent-template
   - quickcheck-instances
   - regex-compat
+  - relapse
   - resourcet
   - secp256k1-haskell # remove
   - servant-docs
@@ -57,6 +59,7 @@ library:
   - text
   - time
   - transformers
+  - type-lits
   - unliftio
   - unliftio-core
   - vector
@@ -84,6 +87,7 @@ tests:
       - bytestring
       - containers
       - ethereum-rlp
+      - http-api-data
       - hspec
       - persistent
       - secp256k1-haskell

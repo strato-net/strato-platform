@@ -8,8 +8,8 @@ ghc-options: -Wall -O2
 
 dependencies:
   - base
-  - blockapps-util
   - hflags
+  - milena-tools
 
 other-extensions: OverloadedStrings
 
@@ -22,6 +22,7 @@ library:
     - blockapps-data
     - blockapps-datadefs
     - bytestring
+    - common-log
     - containers
     - cryptohash
     - ethereum-discovery
@@ -49,4 +50,5 @@ executables:
     source-dirs:      exec_src
     dependencies:
       - blockapps-init
+      - common-log
       - strato-adit

@@ -19,7 +19,6 @@ import           Conduit
 import           Control.Concurrent                        hiding (yield)
 import           Control.Concurrent.STM.TQueue
 import           Control.Concurrent.STM.TBQueue
-import           Blockchain.Output
 import           Control.Lens
 import qualified Control.Monad.Change.Alter                as A
 import qualified Control.Monad.Change.Modify               as Mod
@@ -37,6 +36,7 @@ import           Data.Time.Clock
 import           Prometheus                                as P
 import           Text.Printf
 
+import           BlockApps.Logging
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin         as API
 import           Blockchain.Privacy
@@ -58,11 +58,11 @@ import qualified Blockchain.Data.TransactionDef            as TD
 import qualified Blockchain.Data.TXOrigin                  as TO
 import qualified Blockchain.Data.RLP                       as RL
 
+import           Blockchain.Partitioner
 import           Blockchain.Strato.Model.Class             as BDB
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 
-import           Blockchain.Util
 import qualified Text.Colors                               as CL
 import           Text.Format
 
@@ -677,3 +677,12 @@ writeSeqP2pEvents :: [P2pEvent] -> SequencerM ()
 writeSeqP2pEvents events = do
     ch <- asks (seqP2PEvents . cablePackage)
     atomically . mapM_ (writeTQueue ch) $ events
+
+splitWith :: Eq k => (a -> k) -> [a] -> [(k, [a])]
+splitWith f = foldr agg []
+  where agg a [] = [(f a, [a])]
+        agg a kas@((k, as):kas') =
+          let fa = f a
+           in if fa == k
+                then (k, a:as):kas'
+                else (fa, [a]):kas

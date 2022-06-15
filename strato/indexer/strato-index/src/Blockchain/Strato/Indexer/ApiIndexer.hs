@@ -14,7 +14,6 @@ module Blockchain.Strato.Indexer.ApiIndexer
 import           Control.Arrow                      ((&&&))
 import           Control.Monad
 import qualified Control.Monad.Change.Alter         as A
-import           Blockchain.Output
 import qualified Data.ByteString.Char8              as S8
 import qualified Data.Map.Strict                    as M
 import qualified Data.Text                          as T
@@ -22,6 +21,7 @@ import           Network.Kafka
 import           Blockchain.MilenaTools
 import           Network.Kafka.Protocol
 
+import           BlockApps.Logging
 import           Blockchain.Data.ChainInfo
 import           Blockchain.EthConf                 (lookupConsumerGroup)
 import           Blockchain.Strato.Indexer.IContext

@@ -12,7 +12,6 @@ module Blockchain.GenesisBlock (
 
 
 import           Control.Monad
-import           Blockchain.Output
 import           Control.Monad.Change.Alter                   (Alters)
 import           Control.Monad.Change.Modify                  (Accessible)
 import           Control.Monad.IO.Class
@@ -28,6 +27,8 @@ import           Data.Text                                    (Text)
 import qualified Data.Text                                    as T
 import qualified Data.Sequence                                as S
 import           System.Directory
+
+import           BlockApps.Logging
 
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.Block
@@ -48,10 +49,10 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Util
 import qualified Blockchain.Stream.Action                     as A
 import           Blockchain.Stream.VMEvent
 import           Blockchain.Stream.VMOutput
-import           Blockchain.Util
 
 
 import           Blockchain.Strato.StateDiff          hiding (StateDiff (chainId, blockHash, stateRoot))

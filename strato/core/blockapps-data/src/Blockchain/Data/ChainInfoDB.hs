@@ -13,7 +13,6 @@ module Blockchain.Data.ChainInfoDB where
 
 import           Control.Arrow                      ((&&&))
 import           Control.Monad                      (when)
-import           Blockchain.Output
 import           Data.Foldable                      (traverse_)
 import qualified Data.Map                           as M        (fromList, toList)
 import           Data.Maybe
@@ -22,6 +21,7 @@ import qualified Data.Text                          as T
 import qualified Database.Esqueleto                 as E
 import           Database.Persist                   hiding (get)
 
+import           BlockApps.Logging
 import           Blockchain.Data.ChainInfo
 import           Blockchain.TypeLits
 import           Blockchain.DB.SQLDB

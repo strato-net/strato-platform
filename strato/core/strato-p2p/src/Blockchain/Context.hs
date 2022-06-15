@@ -60,7 +60,6 @@ import           Control.Concurrent
 import           Control.Lens                          hiding (Context)
 import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
-import           Blockchain.Output
 import           Control.Monad.Reader
 import           Data.Default
 import           Data.Foldable                         (toList)
@@ -71,6 +70,8 @@ import qualified Data.Set.Ordered                      as S
 import qualified Data.Text                             as T
 import           Data.Time.Clock
 import           GHC.Exts                              (Constraint)
+
+import           BlockApps.Logging
 
 import           Blockchain.Blockstanbul               (WireMessage)
 import           Blockchain.Data.Block
@@ -103,7 +104,6 @@ import qualified Database.Persist.Sql                  as SQL
 import qualified Database.Redis                        as Redis
 import qualified Network.Kafka                         as K
 import qualified Blockchain.MilenaTools                as K
-import           Blockchain.Util                       (toMaybe)
 import           Network.HTTP.Client                    (newManager, defaultManagerSettings)
 import           Servant.Client
 import qualified Strato.Strato23.API                   as VC
@@ -522,3 +522,7 @@ withActivePeer :: ( MonadUnliftIO m
 withActivePeer p = bracket a b . const
   where a   = A.insert (Proxy @ActivityState) (pPeerIp p, pPeerTcpPort p) Active
         b _ = A.insert (Proxy @ActivityState) (pPeerIp p, pPeerTcpPort p) Inactive
+
+toMaybe :: Eq a => a -> a -> Maybe a
+toMaybe a b = if a == b then Nothing else Just b
+
