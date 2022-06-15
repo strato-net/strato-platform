@@ -10,11 +10,11 @@ dependencies:
   - base
   - blockapps-data
   - blockapps-datadefs
-  - blockapps-util
   - blockstanbul
   - containers
   - exceptions
   - hflags
+  - milena-tools
   - strato-conf
   - strato-model
 

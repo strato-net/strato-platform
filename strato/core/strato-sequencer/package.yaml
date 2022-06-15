@@ -52,6 +52,7 @@ library:
     - blockapps-util
     - classy-prelude
     - containers
+    - milena-tools
     - mtl
     - resourcet
     - stm-chans

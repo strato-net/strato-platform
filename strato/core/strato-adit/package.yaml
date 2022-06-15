@@ -8,8 +8,8 @@ ghc-options: -Wall -O2
 
 dependencies:
   - base
-  - blockapps-util
   - hflags
+  - milena-tools
 
 other-extensions: OverloadedStrings
 

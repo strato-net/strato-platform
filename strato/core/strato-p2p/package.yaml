@@ -17,10 +17,10 @@ executables:
     main: StratoP2PMain.hs
     dependencies:
       - blockapps-init
-      - blockapps-util
       - ethereum-discovery
       - hflags
       - lifted-async
+      - milena-tools
       - ordered-containers
       - strato-p2p
       - wai-middleware-prometheus
@@ -37,7 +37,6 @@ library:
     - ansi-wl-pprint
     - base16-bytestring
     - blockapps-datadefs
-    - blockapps-util
     - blockapps-vault-wrapper-api
     - blockapps-vault-wrapper-client
     - blockstanbul
@@ -66,6 +65,7 @@ library:
     - lens
     - lifted-base
     - milena
+    - milena-tools
     - monad-alter
     - monadIO
     - mtl

@@ -43,6 +43,7 @@ library:
     - memory
     - merkle-patricia-db
     - milena
+    - milena-tools
     - monad-alter
     - monad-loops
     - nibblestring

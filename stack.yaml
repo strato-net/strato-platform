@@ -46,7 +46,8 @@ packages:
 - strato/libs/format
 - strato/libs/labeled-error
 - strato/libs/logserver
-- strato/libs/milena
+- strato/libs/kafka/milena
+- strato/libs/kafka/milena-tools
 - strato/libs/monad-alter
 - strato/libs/prometheus/blockapps-init/
 - strato/libs/prometheus/cross-monitoring/

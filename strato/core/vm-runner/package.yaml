@@ -39,6 +39,7 @@ library:
   - lens
   - merkle-patricia-db
   - milena
+  - milena-tools
   - monad-alter
   - mtl
   - prometheus-client
@@ -66,11 +67,11 @@ executables:
       - aeson
       - async
       - blockapps-init
-      - blockapps-util
       - common-log
       - containers
       - debugger
       - hflags
+      - milena-tools
       - servant-server
       - solid-vm
       - source-tools

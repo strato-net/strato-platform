@@ -22,7 +22,6 @@ library:
   - blockapps-datadefs
   - blockapps-haskoin
   - blockapps-mpdbs
-  - blockapps-util
   - blockapps-vault-wrapper-api
   - blockapps-vault-wrapper-client
   - bytestring
@@ -47,6 +46,7 @@ library:
   - leveldb-haskell
   - merkle-patricia-db
   - milena
+  - milena-tools
   - monad-alter
   - nibblestring
   - persistent-postgresql
