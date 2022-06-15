@@ -63,12 +63,12 @@ packages:
 - strato/VM/EVM/ethereum-vm/
 - strato/VM/EVM/evm-solidity
 - strato/VM/SolidVM/debugger/
+- strato/VM/SolidVM/solid-vm/
 - strato/VM/SolidVM/solid-vm-model
 - strato/VM/SolidVM/source-tools
 - strato/VM/vrun
 
 - core-strato/blockapps-util/
-- core-strato/solid-vm/
 
 
 extra-deps:
