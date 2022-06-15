@@ -73,7 +73,6 @@ import           Blockchain.DB.ModifyStateDB          (pay)
 import           Blockchain.DB.X509CertDB
 import           Blockchain.DB.SolidStorageDB
 import           Blockchain.DB.SubscriptionsDB
-import           Blockchain.ExtWord
 import           Blockchain.Output
 import qualified Blockchain.SolidVM.Builtins          as Builtins
 import           Blockchain.SolidVM.CodeCollectionDB
