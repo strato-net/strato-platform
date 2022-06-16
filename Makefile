@@ -13,7 +13,7 @@ ifeq ($(REPO_URL),EMPTY)
 endif
 $(info REPO_URL is "${REPO_URL}" (${REPO}))
 
-STACK_RESOLVER=$(shell cat stack.yaml | grep "resolver:" | awk '{print $$2}')
+STACK_RESOLVER=$(shell cat strato/stack.yaml | grep "resolver:" | awk '{print $$2}')
 FAKEROOT=$(shell pwd)/.docker-work
 STRATODIR=${FAKEROOT}/strato
 VAULTDIR=${FAKEROOT}/vault-wrapper
@@ -76,7 +76,7 @@ build_common: get_solcs build_buildbase
 	@echo building haskell libraries and creating directories
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
-	stack build \
+	cd strato && stack build \
 		--test --no-run-tests \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
 
@@ -84,7 +84,7 @@ build_common_profiled: get_solcs build_buildbase
 	@echo building haskell libraries and creating directories
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
-	stack build \
+	cd strato && stack build \
 		--profile --work-dir .stack-work-profile \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
 
