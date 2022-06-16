@@ -62,7 +62,7 @@ import           Text.Parsec                          (runParser)
 import           Text.Printf
 import           Text.Read (readMaybe)
 
-
+import           BlockApps.Logging
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
@@ -73,7 +73,6 @@ import           Blockchain.DB.ModifyStateDB          (pay)
 import           Blockchain.DB.X509CertDB
 import           Blockchain.DB.SolidStorageDB
 import           Blockchain.DB.SubscriptionsDB
-import           Blockchain.Output
 import qualified Blockchain.SolidVM.Builtins          as Builtins
 import           Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.SolidVM.Environment       as Env
