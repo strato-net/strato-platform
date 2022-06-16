@@ -90,8 +90,8 @@ build_common_profiled: get_solcs build_buildbase
 
 strato: build_common
 	@echo Now building core-strato...
-	cp -fr core-strato/licenses ${STRATODIR}
-	cp core-strato/doit.sh ${STRATODIR}
+	cp -fr strato/licenses ${STRATODIR}
+	cp strato/doit.sh ${STRATODIR}
 	docker build --target strato --tag ${REPO_URL}strato:${VERSION} --file Dockerfile.multi ${FAKEROOT}
 
 vault-wrapper: build_common
@@ -107,8 +107,8 @@ docker-compose:
 	awk '/build: ./{getline} 1' docker-compose.push.yml > docker-compose.yml
 
 docker-build:
-	cp -fr core-strato/licenses ${STRATODIR}
-	cp core-strato/doit.sh ${STRATODIR}
+	cp -fr strato/licenses ${STRATODIR}
+	cp strato/doit.sh ${STRATODIR}
 	docker build --target strato --tag ${REPO_URL}strato:${VERSION} --file Dockerfile.multi ${FAKEROOT}
 
 test:
