@@ -62,8 +62,8 @@ get_solcs:
 	@if [ ! -f "${FAKEROOT}/usr/local/bin/solc" ]; then\
 		bash -c "\
 			mkdir -p ${FAKEROOT}/usr/local/bin ;\
-			blockapps-haskell/pull_solc.sh 0.4.25 ${FAKEROOT}/usr/local/bin/solc-0.4 ${FAKEROOT}/license-solc-0.4 ;\
-			blockapps-haskell/pull_solc.sh 0.5.2 ${FAKEROOT}/usr/local/bin/solc-0.5 ${FAKEROOT}/license-solc-0.5 ;\
+			strato/pull_solc.sh 0.4.25 ${FAKEROOT}/usr/local/bin/solc-0.4 ${FAKEROOT}/license-solc-0.4 ;\
+			strato/pull_solc.sh 0.5.2 ${FAKEROOT}/usr/local/bin/solc-0.5 ${FAKEROOT}/license-solc-0.5 ;\
 			ln -f ${FAKEROOT}/usr/local/bin/solc-0.4 ${FAKEROOT}/usr/local/bin/solc \
 		" ;\
 	fi
