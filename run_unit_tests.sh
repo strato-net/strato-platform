@@ -10,6 +10,8 @@ declare -i RESULT=0
 REDIS=$(docker run -d -p 2023:6379 redis:3.2 redis-server --appendonly yes)	
 trap "docker rm -f ${REDIS}" EXIT
 
+cd strato
+
 stack test -j1 \
       blockapps-data \
       blockapps-mpdbs \

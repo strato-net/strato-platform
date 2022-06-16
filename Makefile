@@ -13,7 +13,7 @@ ifeq ($(REPO_URL),EMPTY)
 endif
 $(info REPO_URL is "${REPO_URL}" (${REPO}))
 
-STACK_RESOLVER=$(shell cat stack.yaml | grep "resolver:" | awk '{print $$2}')
+STACK_RESOLVER=$(shell cat strato/stack.yaml | grep "resolver:" | awk '{print $$2}')
 FAKEROOT=$(shell pwd)/.docker-work
 STRATODIR=${FAKEROOT}/strato
 VAULTDIR=${FAKEROOT}/vault-wrapper
@@ -62,8 +62,8 @@ get_solcs:
 	@if [ ! -f "${FAKEROOT}/usr/local/bin/solc" ]; then\
 		bash -c "\
 			mkdir -p ${FAKEROOT}/usr/local/bin ;\
-			blockapps-haskell/pull_solc.sh 0.4.25 ${FAKEROOT}/usr/local/bin/solc-0.4 ${FAKEROOT}/license-solc-0.4 ;\
-			blockapps-haskell/pull_solc.sh 0.5.2 ${FAKEROOT}/usr/local/bin/solc-0.5 ${FAKEROOT}/license-solc-0.5 ;\
+			strato/pull_solc.sh 0.4.25 ${FAKEROOT}/usr/local/bin/solc-0.4 ${FAKEROOT}/license-solc-0.4 ;\
+			strato/pull_solc.sh 0.5.2 ${FAKEROOT}/usr/local/bin/solc-0.5 ${FAKEROOT}/license-solc-0.5 ;\
 			ln -f ${FAKEROOT}/usr/local/bin/solc-0.4 ${FAKEROOT}/usr/local/bin/solc \
 		" ;\
 	fi
@@ -76,7 +76,7 @@ build_common: get_solcs build_buildbase
 	@echo building haskell libraries and creating directories
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
-	stack build \
+	cd strato && stack build \
 		--test --no-run-tests \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
 
@@ -84,14 +84,14 @@ build_common_profiled: get_solcs build_buildbase
 	@echo building haskell libraries and creating directories
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
-	stack build \
+	cd strato && stack build \
 		--profile --work-dir .stack-work-profile \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
 
 strato: build_common
 	@echo Now building core-strato...
-	cp -fr core-strato/licenses ${STRATODIR}
-	cp core-strato/doit.sh ${STRATODIR}
+	cp -fr strato/licenses ${STRATODIR}
+	cp strato/doit.sh ${STRATODIR}
 	docker build --target strato --tag ${REPO_URL}strato:${VERSION} --file Dockerfile.multi ${FAKEROOT}
 
 vault-wrapper: build_common
@@ -107,8 +107,8 @@ docker-compose:
 	awk '/build: ./{getline} 1' docker-compose.push.yml > docker-compose.yml
 
 docker-build:
-	cp -fr core-strato/licenses ${STRATODIR}
-	cp core-strato/doit.sh ${STRATODIR}
+	cp -fr strato/licenses ${STRATODIR}
+	cp strato/doit.sh ${STRATODIR}
 	docker build --target strato --tag ${REPO_URL}strato:${VERSION} --file Dockerfile.multi ${FAKEROOT}
 
 test:
