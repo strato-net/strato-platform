@@ -64,7 +64,7 @@ import qualified SolidVM.Model.Type         as SVMType
 
 
 crashOnSQLError :: Bool
-crashOnSQLError = True
+crashOnSQLError = False
 
 
 tableSeparator :: Text
