@@ -35,13 +35,6 @@ library:
     - SolidVM.Solidity.Detectors.Variables.StateVariables
     - SolidVM.Solidity.Fuzzer
     - SolidVM.Solidity.Fuzzer.Types
-    - SolidVM.Solidity.Parse.File
-    - SolidVM.Solidity.Parse.Lexer
-    - SolidVM.Solidity.Parse.Statement
-    - SolidVM.Solidity.Parse.Pragmas
-    - SolidVM.Solidity.Parse.ParserTypes
-    - SolidVM.Solidity.Parse.UnParser
-    - SolidVM.Solidity.Parse.Declarations
     - SolidVM.Solidity.SourceTools
   ghc-options: -Wall -O2
   dependencies:
@@ -77,6 +70,7 @@ library:
   - semver-range
   - servant-server
   - solid-vm-model
+  - solid-vm-parser
   - source-tools
   - strato-model
   - swagger2
@@ -90,16 +84,6 @@ library:
 
 
 executables:
-  parse-solidvm:
-    source-dirs: exec_src
-    other-modules: []
-    main: Parse.hs
-    dependencies:
-      - parsec
-      - solid-vm
-
-    ghc-options: -Wall -O2 -threaded -rtsopts
-
   exprs-needed:
     source-dirs: exec_src
     other-modules: []
@@ -109,6 +93,7 @@ executables:
       - parsec
       - solid-vm
       - solid-vm-model
+      - solid-vm-parser
       - text
 
 tests:
@@ -136,6 +121,7 @@ tests:
       - raw-strings-qq
       - solid-vm
       - solid-vm-model
+      - solid-vm-parser
       - source-tools
       - strato-model
       - text

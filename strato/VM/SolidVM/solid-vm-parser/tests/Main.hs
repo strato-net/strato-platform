@@ -17,3 +17,4 @@ main :: IO ()
 main = do
   void $ $initHFlags "solid vm spec"
   hspecWith (configAddFilter predicate defaultConfig) Spec.spec
+

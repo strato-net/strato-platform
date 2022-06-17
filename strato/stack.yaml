@@ -50,8 +50,8 @@ packages:
 - libs/kafka/milena-tools
 - libs/monad-alter
 - libs/partitioner
-- libs/prometheus/blockapps-init/
-- libs/prometheus/cross-monitoring/
+- libs/prometheus/blockapps-init
+- libs/prometheus/cross-monitoring
 - libs/type-lits
 
 - test-suite
@@ -63,11 +63,12 @@ packages:
 - vault/client
 - vault/server
 
-- VM/EVM/ethereum-vm/
+- VM/EVM/ethereum-vm
 - VM/EVM/evm-solidity
-- VM/SolidVM/debugger/
-- VM/SolidVM/solid-vm/
+- VM/SolidVM/debugger
+- VM/SolidVM/solid-vm
 - VM/SolidVM/solid-vm-model
+- VM/SolidVM/solid-vm-parser
 - VM/SolidVM/source-tools
 - VM/vrun
 

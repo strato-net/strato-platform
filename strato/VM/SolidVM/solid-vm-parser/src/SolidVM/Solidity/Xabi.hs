@@ -6,6 +6,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 
+{-# OPTIONS -fno-warn-unused-top-binds #-}
+
 module SolidVM.Solidity.Xabi (
   XabiF(..),
   Xabi,
