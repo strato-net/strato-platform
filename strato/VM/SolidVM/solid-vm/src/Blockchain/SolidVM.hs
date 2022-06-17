@@ -1319,11 +1319,11 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
                                                         maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
                                                     return . Constant . SString . fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
       (SBuiltinVariable "tx", "organizationalUnit") -> do env' <- getEnv
-                                             x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-                                             maybeCertLevelDB <- x509CertDBGet $ _accountAddress $ Env.origin env'
-                                             let maybeCertBlockDB = M.lookup (_accountAddress $ Env.origin env') x509s
-                                                 maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
-                                             return . Constant . SString . fromMaybe "" $ subUnit =<< getCertSubject =<< maybeCert
+                                                          x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
+                                                          maybeCertLevelDB <- x509CertDBGet $ _accountAddress $ Env.origin env'
+                                                          let maybeCertBlockDB = M.lookup (_accountAddress $ Env.origin env') x509s
+                                                              maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
+                                                          return . Constant . SString . fromMaybe "" $ subUnit =<< getCertSubject =<< maybeCert
       (SStruct _ theMap, fieldName) -> case M.lookup fieldName theMap of
           Nothing -> missingField "struct member access" fieldName
           Just v -> return v
