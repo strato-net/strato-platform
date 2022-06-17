@@ -443,7 +443,7 @@ contract A {
     address b = tx.origin;
     string u = tx.username;
     string o = tx.organization;
-    string g = tx.group;
+    string g = tx.organizationalUnit;
     uint t = block.timestamp;
     uint n = block.number;
   }
@@ -458,7 +458,7 @@ contract A {
     uint b = tx.origin;
     address u = tx.username;
     bool o = tx.organization;
-    uint g = tx.group;
+    uint g = tx.organizationalUnit;
     string t = block.timestamp;
     address n = block.number;
   }

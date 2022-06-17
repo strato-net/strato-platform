@@ -3779,21 +3779,21 @@ contract qq {
 
     string myNewCertificate = "-----BEGIN CERTIFICATE-----\nMIIBiDCCAS2gAwIBAgIQCgO76hC29iXEFXJNco5ekjAMBggqhkjOPQQDAgUAMEYx\nDDAKBgNVBAMMA2RhbjEMMAoGA1UEBgwDVVNBMRIwEAYDVQQKDAlibG9ja2FwcHMx\nFDASBgNVBAsMC2VuZ2luZWVyaW5nMB4XDTIxMDMxODE1NDgwN1oXDTIyMDMxODE1\nNDgwN1owRjEMMAoGA1UEAwwDZGFuMQwwCgYDVQQGDANVU0ExEjAQBgNVBAoMCWJs\nb2NrYXBwczEUMBIGA1UECwwLZW5naW5lZXJpbmcwVjAQBgcqhkjOPQIBBgUrgQQA\nCgNCAAQY4p67l1IIEUdVC7L+rUDwF5Nv30bze0NV5y8ced7qwp+YFk3UAiOGkcYo\n7ba8F92rd0yf9AGpvZN1H3Dda8xdMAwGCCqGSM49BAMCBQADRwAwRAIgbKXO8tZ5\noPhBusPQFkNEQDnLO/MRru4KjtCpPnVb5sACIE0TwBJ7yeIGuPc/8G50/858Pf3a\n0t1hHbhYnJarPkNA\n-----END CERTIFICATE-----";
 
-    string myCommonName   = "";
-    string myCountry      = "";
-    string myOrganization = "";
-    string myGroup        = "";
-    string myPublicKey    = "";
+    string myCommonName         = "";
+    string myCountry            = "";
+    string myOrganization       = "";
+    string myOrganizationalUnit = "";
+    string myPublicKey          = "";
 
     constructor() {
-        myCommonName   = parseCert(myNewCertificate)["commonName"];
-        myCountry      = parseCert(myNewCertificate)["country"];
-        myOrganization = parseCert(myNewCertificate)["organization"];
-        myGroup        = parseCert(myNewCertificate)["group"];
-        myPublicKey    = parseCert(myNewCertificate)["publicKey"];
+        myCommonName          = parseCert(myNewCertificate)["commonName"];
+        myCountry             = parseCert(myNewCertificate)["country"];
+        myOrganization        = parseCert(myNewCertificate)["organization"];
+        myOrganizationalUnit  = parseCert(myNewCertificate)["organizationalUnit"];
+        myPublicKey           = parseCert(myNewCertificate)["publicKey"];
     }
 }|]
-    getFields ["myCommonName", "myCountry", "myOrganization", "myGroup", "myPublicKey"] `shouldReturn`
+    getFields ["myCommonName", "myCountry", "myOrganization", "myOrganizationalUnit", "myPublicKey"] `shouldReturn`
       [ BString "dan"
       , BString "USA"
       , BString "blockapps"
@@ -3936,33 +3936,33 @@ contract qq {
     
     string myNewCertificate = "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----";
 
-    string myUsername          = "";
-    string myOrganization      = "";
-    string myGroup             = "";
+    string myUsername            = "";
+    string myOrganization        = "";
+    string myOrganizationalUnit  = "";
     
-    string myCommonName   = "";
-    string myCountry      = "";
-    string myOrganization = "";
-    string myGroup        = "";
-    string myPublicKey    = "";
-    string myCertificate  = "";
+    string myCommonName         = "";
+    string myCountry            = "";
+    string myOrganization       = "";
+    string myOrganizationalUnit = "";
+    string myPublicKey          = "";
+    string myCertificate        = "";
 
     constructor() {
         registerCert(myNewCertificate); 
 
         myUsername     = tx.username;
         myOrganization = tx.organization;
-        myGroup        = tx.group;
+        myOrganizationalUnit  = tx.organizationalUnit;
         
-        myCommonName   = getUserCert(myAccount)["commonName"];
-        myCountry      = getUserCert(myAccount)["country"];
-        myOrganization = getUserCert(myAccount)["organization"];
-        myGroup        = getUserCert(myAccount)["group"];
-        myPublicKey    = getUserCert(myAccount)["publicKey"];
-        myCertificate  = getUserCert(myAccount)["certString"];
+        myCommonName          = getUserCert(myAccount)["commonName"];
+        myCountry             = getUserCert(myAccount)["country"];
+        myOrganization        = getUserCert(myAccount)["organization"];
+        myOrganizationalUnit  = getUserCert(myAccount)["organizationalUnit"];
+        myPublicKey           = getUserCert(myAccount)["publicKey"];
+        myCertificate         = getUserCert(myAccount)["certString"];
     }
 }|]
-    getFields ["myUsername", "myOrganization", "myGroup", "myCommonName", "myCountry", "myOrganization", "myGroup", "myPublicKey", "myCertificate"] `shouldReturn`
+    getFields ["myUsername", "myOrganization", "myOrganizationalUnit", "myCommonName", "myCountry", "myOrganization", "myOrganizationalUnit", "myPublicKey", "myCertificate"] `shouldReturn`
       [ BString "Admin"
       , BString "BlockApps"
       , BString "Engineering"
