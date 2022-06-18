@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
-module DetectorsSpec where
+module StaticAnalysisSpec where
 
 import           Blockchain.SolidVM.CodeCollectionDB
 import qualified Data.Map as M
