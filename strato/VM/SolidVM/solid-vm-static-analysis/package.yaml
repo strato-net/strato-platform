@@ -1,0 +1,32 @@
+name: solid-vm-static-analysis
+
+dependencies:
+  - base
+
+library:
+  source-dirs: src/
+  exposed-modules:
+    - SolidVM.Solidity.Detectors
+    - SolidVM.Solidity.Detectors.Contracts.ParentConstructors
+    - SolidVM.Solidity.Detectors.Expressions.BooleanLiterals
+    - SolidVM.Solidity.Detectors.Expressions.DivideBeforeMultiply
+    - SolidVM.Solidity.Detectors.Pragmas.IncorrectSolidityVersion
+    - SolidVM.Solidity.Detectors.Functions.ConstantFunctions
+    - SolidVM.Solidity.Detectors.Functions.Unimplemented.Continue
+    - SolidVM.Solidity.Detectors.Functions.Unimplemented.Modifiers
+    - SolidVM.Solidity.Detectors.Statements.StateVariableShadowing
+    - SolidVM.Solidity.Detectors.Statements.UninitializedLocalVariables
+    - SolidVM.Solidity.Detectors.Statements.WriteAfterWrite
+    - SolidVM.Solidity.Detectors.Typechecker
+    - SolidVM.Solidity.Detectors.Types
+    - SolidVM.Solidity.Detectors.Variables.StateVariables
+  ghc-options: -Wall -O2
+  dependencies:
+  - containers
+  - lens
+  - mtl
+  - solid-vm-model
+  - solid-vm-parser
+  - source-tools
+  - text
+  - transformers

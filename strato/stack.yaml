@@ -67,8 +67,10 @@ packages:
 - VM/EVM/evm-solidity
 - VM/SolidVM/debugger
 - VM/SolidVM/solid-vm
+- VM/SolidVM/solid-vm-fuzzer
 - VM/SolidVM/solid-vm-model
 - VM/SolidVM/solid-vm-parser
+- VM/SolidVM/solid-vm-static-analysis
 - VM/SolidVM/source-tools
 - VM/vrun
 

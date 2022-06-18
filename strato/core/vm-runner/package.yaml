@@ -73,6 +73,7 @@ executables:
       - milena-tools
       - servant-server
       - solid-vm
+      - solid-vm-fuzzer
       - source-tools
       - strato-conf
       - text
