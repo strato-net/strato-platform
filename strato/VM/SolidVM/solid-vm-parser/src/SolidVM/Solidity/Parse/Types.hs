@@ -33,7 +33,7 @@ simpleType =
   bytes' <|>
   intSuffixed "uint"  (SVMType.Int (Just False)) <|>
   intSuffixed "int"  (SVMType.Int (Just True)) <|>
-  SVMType.Label <$>
+  SVMType.UnknownLabel <$>
     choice [
       identifier,
       concat <$> sequence [identifier, dot, identifier]

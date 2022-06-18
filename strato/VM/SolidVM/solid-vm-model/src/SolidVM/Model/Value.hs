@@ -226,7 +226,7 @@ defaultValue _ (SVMType.Address _) = (SAccount $ unspecifiedChain (Address 0)) F
 defaultValue _ (SVMType.Account _) = (SAccount $ unspecifiedChain (Address 0)) False
 defaultValue _ (SVMType.String _) = SString ""
 defaultValue _ (SVMType.Bytes _ _) = SString ""
-defaultValue ctract (SVMType.Label name) = fromMaybe (SContract name $ unspecifiedChain 0x0) $ asum
+defaultValue ctract (SVMType.UnknownLabel name) = fromMaybe (SContract name $ unspecifiedChain 0x0) $ asum
   [ do
       ns <- M.lookup name $ CC._enums ctract
       val <- listToMaybe $ fst ns
@@ -250,7 +250,7 @@ createDefaultValue _ (SVMType.Address _) = return $ (SAccount $ unspecifiedChain
 createDefaultValue _ (SVMType.Account _) = return $ (SAccount $ unspecifiedChain (Address 0)) False
 createDefaultValue _ (SVMType.String _) = return $ SString ""
 createDefaultValue _ (SVMType.Bytes _ _) = return $ SString ""
-createDefaultValue ctract (SVMType.Label name) =
+createDefaultValue ctract (SVMType.UnknownLabel name) =
   case (M.lookup name $ CC._enums ctract, M.lookup name $ CC._structs ctract) of
     (Just ((val:_), _), _) -> return $ SEnumVal name val 0x0
     (Nothing, Just sdef) -> do
@@ -277,7 +277,7 @@ castToInt (SInteger i) = i
 castToInt s = typeError "castToInt" s
 -}
 
--- Typos are the possible values that a CC.Label
+-- Typos are the possible values that a CC.UnknownLabel
 -- is able to resolve to
 data Typo = StructTypo [(T.Text, CC.FieldType)]
           | EnumTypo [String]

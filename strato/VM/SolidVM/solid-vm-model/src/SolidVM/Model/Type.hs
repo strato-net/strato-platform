@@ -14,6 +14,9 @@ import qualified Generic.Random            as GR
 import           GHC.Generics
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances ()
+
+import           SolidVM.Model.Label
+
 typeAesonOptions::Options
 typeAesonOptions=defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="type"}}
 
@@ -25,7 +28,7 @@ data Type
   | Bool
   | Address {isPayable :: Bool}
   | Account {isPayable :: Bool}
-  | Label String
+  | UnknownLabel Label
   | Struct { bytes::Maybe Int32, typedef::Text}
   | Enum { bytes::Maybe Int32, typedef::Text, names::Maybe [Text]}
   | Array { entry:: Type, length :: Maybe Word }
