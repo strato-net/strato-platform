@@ -1,7 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-module SolidVM.Solidity.Detectors.Contracts.ParentConstructors
+module SolidVM.Solidity.StaticAnalysis.Contracts.ParentConstructors
   ( detector
   ) where
 
@@ -14,7 +14,7 @@ import qualified Data.Set        as S
 import           Data.Text       (Text)
 import qualified Data.Text       as T
 
-import           SolidVM.Solidity.Detectors.Types
+import           SolidVM.Solidity.StaticAnalysis.Types
 
 
 

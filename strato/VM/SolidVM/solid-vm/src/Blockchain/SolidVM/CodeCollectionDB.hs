@@ -43,7 +43,7 @@ import           SolidVM.CodeCollectionTools
 import           SolidVM.Model.CodeCollection
 import           SolidVM.Solidity.Parse.Declarations
 import           SolidVM.Solidity.Parse.File
-import           SolidVM.Solidity.Detectors.Typechecker as TC
+import           SolidVM.Solidity.StaticAnalysis.Typechecker as TC
 
 data ParseTypeCheckOrSolidVMError = PEx ParseError
                          | TCEx [SourceAnnotation T.Text]

@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-module SolidVM.Solidity.Detectors.Expressions.DivideBeforeMultiply
+module SolidVM.Solidity.StaticAnalysis.Expressions.DivideBeforeMultiply
   ( detector
   ) where
 
@@ -9,7 +9,7 @@ import           Data.Maybe      (maybeToList)
 import           Data.Source
 import           Data.Text       (Text)
 import           SolidVM.Model.CodeCollection
-import           SolidVM.Solidity.Detectors.Types
+import           SolidVM.Solidity.StaticAnalysis.Types
 
 -- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]
 detector :: CompilerDetector

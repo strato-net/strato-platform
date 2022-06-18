@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-module SolidVM.Solidity.Detectors.Statements.WriteAfterWrite
+module SolidVM.Solidity.StaticAnalysis.Statements.WriteAfterWrite
   ( detector
   ) where
 
@@ -11,7 +11,7 @@ import           Data.Maybe      (maybeToList)
 import           Data.Source
 import           Data.Text       (Text)
 import           SolidVM.Model.CodeCollection
-import           SolidVM.Solidity.Detectors.Types
+import           SolidVM.Solidity.StaticAnalysis.Types
 
 type SSS = State (M.Map String (SourceAnnotation ()))
 

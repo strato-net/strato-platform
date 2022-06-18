@@ -1,4 +1,4 @@
-module SolidVM.Solidity.Detectors 
+module SolidVM.Solidity.StaticAnalysis 
   ( runDetectors
   ) where
 
@@ -7,20 +7,20 @@ import           Data.Source
 import           Data.Text                                                         (Text)
 import           SolidVM.Model.CodeCollection
 import           SolidVM.Solidity.Parse.Declarations                               (SourceUnit)
-import qualified SolidVM.Solidity.Detectors.Trivial                                as Trivial
-import qualified SolidVM.Solidity.Detectors.Contracts.ParentConstructors           as ParentConstructors
-import           SolidVM.Solidity.Detectors.Types
-import qualified SolidVM.Solidity.Detectors.Typechecker                            as Typechecker
-import qualified SolidVM.Solidity.Detectors.Expressions.BooleanLiterals            as BooleanLiterals
-import qualified SolidVM.Solidity.Detectors.Expressions.DivideBeforeMultiply       as DivideBeforeMultiply
-import qualified SolidVM.Solidity.Detectors.Pragmas.IncorrectSolidityVersion       as IncorrectSolidityVersion
-import qualified SolidVM.Solidity.Detectors.Functions.ConstantFunctions            as ConstantFunctions
-import qualified SolidVM.Solidity.Detectors.Functions.Unimplemented.Continue       as Continue
-import qualified SolidVM.Solidity.Detectors.Functions.Unimplemented.Modifiers      as Modifiers
-import qualified SolidVM.Solidity.Detectors.Statements.StateVariableShadowing      as StateVariableShadowing
-import qualified SolidVM.Solidity.Detectors.Statements.UninitializedLocalVariables as UninitializedLocalVariables
-import qualified SolidVM.Solidity.Detectors.Statements.WriteAfterWrite             as WriteAfterWrite
-import qualified SolidVM.Solidity.Detectors.Variables.StateVariables               as StateVariables
+import qualified SolidVM.Solidity.StaticAnalysis.Trivial                                as Trivial
+import qualified SolidVM.Solidity.StaticAnalysis.Contracts.ParentConstructors           as ParentConstructors
+import           SolidVM.Solidity.StaticAnalysis.Types
+import qualified SolidVM.Solidity.StaticAnalysis.Typechecker                            as Typechecker
+import qualified SolidVM.Solidity.StaticAnalysis.Expressions.BooleanLiterals            as BooleanLiterals
+import qualified SolidVM.Solidity.StaticAnalysis.Expressions.DivideBeforeMultiply       as DivideBeforeMultiply
+import qualified SolidVM.Solidity.StaticAnalysis.Pragmas.IncorrectSolidityVersion       as IncorrectSolidityVersion
+import qualified SolidVM.Solidity.StaticAnalysis.Functions.ConstantFunctions            as ConstantFunctions
+import qualified SolidVM.Solidity.StaticAnalysis.Functions.Unimplemented.Continue       as Continue
+import qualified SolidVM.Solidity.StaticAnalysis.Functions.Unimplemented.Modifiers      as Modifiers
+import qualified SolidVM.Solidity.StaticAnalysis.Statements.StateVariableShadowing      as StateVariableShadowing
+import qualified SolidVM.Solidity.StaticAnalysis.Statements.UninitializedLocalVariables as UninitializedLocalVariables
+import qualified SolidVM.Solidity.StaticAnalysis.Statements.WriteAfterWrite             as WriteAfterWrite
+import qualified SolidVM.Solidity.StaticAnalysis.Variables.StateVariables               as StateVariables
 
 parserDetectors :: [ParserDetector]
 parserDetectors = [ IncorrectSolidityVersion.detector

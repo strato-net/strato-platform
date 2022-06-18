@@ -14,7 +14,7 @@ import           Debugger
 import           GHC.Generics
 import           Servant
 import           SolidVM.Model.CodeCollection
-import           SolidVM.Solidity.Detectors
+import           SolidVM.Solidity.StaticAnalysis
 import           SolidVM.Solidity.Fuzzer
 
 data SourceTools = SourceTools

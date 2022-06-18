@@ -11,7 +11,7 @@ import System.Environment
 import System.Exit
 import Text.Parsec (runParser)
 import Text.Printf
-import SolidVM.Solidity.Detectors.Typechecker as TC
+import SolidVM.Solidity.StaticAnalysis.Typechecker as TC
 
 
 import SolidVM.CodeCollectionTools

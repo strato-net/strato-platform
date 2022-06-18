@@ -6,20 +6,20 @@ dependencies:
 library:
   source-dirs: src/
   exposed-modules:
-    - SolidVM.Solidity.Detectors
-    - SolidVM.Solidity.Detectors.Contracts.ParentConstructors
-    - SolidVM.Solidity.Detectors.Expressions.BooleanLiterals
-    - SolidVM.Solidity.Detectors.Expressions.DivideBeforeMultiply
-    - SolidVM.Solidity.Detectors.Pragmas.IncorrectSolidityVersion
-    - SolidVM.Solidity.Detectors.Functions.ConstantFunctions
-    - SolidVM.Solidity.Detectors.Functions.Unimplemented.Continue
-    - SolidVM.Solidity.Detectors.Functions.Unimplemented.Modifiers
-    - SolidVM.Solidity.Detectors.Statements.StateVariableShadowing
-    - SolidVM.Solidity.Detectors.Statements.UninitializedLocalVariables
-    - SolidVM.Solidity.Detectors.Statements.WriteAfterWrite
-    - SolidVM.Solidity.Detectors.Typechecker
-    - SolidVM.Solidity.Detectors.Types
-    - SolidVM.Solidity.Detectors.Variables.StateVariables
+    - SolidVM.Solidity.StaticAnalysis
+    - SolidVM.Solidity.StaticAnalysis.Contracts.ParentConstructors
+    - SolidVM.Solidity.StaticAnalysis.Expressions.BooleanLiterals
+    - SolidVM.Solidity.StaticAnalysis.Expressions.DivideBeforeMultiply
+    - SolidVM.Solidity.StaticAnalysis.Pragmas.IncorrectSolidityVersion
+    - SolidVM.Solidity.StaticAnalysis.Functions.ConstantFunctions
+    - SolidVM.Solidity.StaticAnalysis.Functions.Unimplemented.Continue
+    - SolidVM.Solidity.StaticAnalysis.Functions.Unimplemented.Modifiers
+    - SolidVM.Solidity.StaticAnalysis.Statements.StateVariableShadowing
+    - SolidVM.Solidity.StaticAnalysis.Statements.UninitializedLocalVariables
+    - SolidVM.Solidity.StaticAnalysis.Statements.WriteAfterWrite
+    - SolidVM.Solidity.StaticAnalysis.Typechecker
+    - SolidVM.Solidity.StaticAnalysis.Types
+    - SolidVM.Solidity.StaticAnalysis.Variables.StateVariables
   ghc-options: -Wall -O2
   dependencies:
   - containers

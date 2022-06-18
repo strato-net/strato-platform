@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-module SolidVM.Solidity.Detectors.Statements.UninitializedLocalVariables
+module SolidVM.Solidity.StaticAnalysis.Statements.UninitializedLocalVariables
   ( detector
   ) where
 
@@ -8,7 +8,7 @@ import qualified Data.Map.Strict as M
 import           Data.Source
 import           Data.Text       (Text)
 import           SolidVM.Model.CodeCollection
-import           SolidVM.Solidity.Detectors.Types
+import           SolidVM.Solidity.StaticAnalysis.Types
 
 -- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]
 detector :: CompilerDetector

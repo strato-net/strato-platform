@@ -8,18 +8,18 @@ import qualified Data.Map as M
 import           Data.Source
 import           Data.Text (Text)
 import qualified Data.Text as T
-import qualified SolidVM.Solidity.Detectors.Contracts.ParentConstructors           as ParentConstructors
--- import qualified SolidVM.Solidity.Detectors.Typechecker                            as Typechecker
-import qualified SolidVM.Solidity.Detectors.Expressions.BooleanLiterals            as BooleanLiterals
-import qualified SolidVM.Solidity.Detectors.Expressions.DivideBeforeMultiply       as DivideBeforeMultiply
-import qualified SolidVM.Solidity.Detectors.Pragmas.IncorrectSolidityVersion       as IncorrectSolidityVersion
-import qualified SolidVM.Solidity.Detectors.Functions.ConstantFunctions            as ConstantFunctions
-import qualified SolidVM.Solidity.Detectors.Functions.Unimplemented.Modifiers      as Modifiers
-import qualified SolidVM.Solidity.Detectors.Statements.StateVariableShadowing      as StateVariableShadowing
-import qualified SolidVM.Solidity.Detectors.Statements.UninitializedLocalVariables as UninitializedLocalVariables
-import qualified SolidVM.Solidity.Detectors.Statements.WriteAfterWrite             as WriteAfterWrite
-import           SolidVM.Solidity.Detectors.Types
-import qualified SolidVM.Solidity.Detectors.Variables.StateVariables               as StateVariables
+import qualified SolidVM.Solidity.StaticAnalysis.Contracts.ParentConstructors           as ParentConstructors
+-- import qualified SolidVM.Solidity.StaticAnalysis.Typechecker                            as Typechecker
+import qualified SolidVM.Solidity.StaticAnalysis.Expressions.BooleanLiterals            as BooleanLiterals
+import qualified SolidVM.Solidity.StaticAnalysis.Expressions.DivideBeforeMultiply       as DivideBeforeMultiply
+import qualified SolidVM.Solidity.StaticAnalysis.Pragmas.IncorrectSolidityVersion       as IncorrectSolidityVersion
+import qualified SolidVM.Solidity.StaticAnalysis.Functions.ConstantFunctions            as ConstantFunctions
+import qualified SolidVM.Solidity.StaticAnalysis.Functions.Unimplemented.Modifiers      as Modifiers
+import qualified SolidVM.Solidity.StaticAnalysis.Statements.StateVariableShadowing      as StateVariableShadowing
+import qualified SolidVM.Solidity.StaticAnalysis.Statements.UninitializedLocalVariables as UninitializedLocalVariables
+import qualified SolidVM.Solidity.StaticAnalysis.Statements.WriteAfterWrite             as WriteAfterWrite
+import           SolidVM.Solidity.StaticAnalysis.Types
+import qualified SolidVM.Solidity.StaticAnalysis.Variables.StateVariables               as StateVariables
 import           Test.Hspec
 import           Text.RawString.QQ
 

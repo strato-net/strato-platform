@@ -3,7 +3,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-module SolidVM.Solidity.Detectors.Typechecker
+module SolidVM.Solidity.StaticAnalysis.Typechecker
   ( detector
   ) where
 
@@ -24,7 +24,7 @@ import           Data.Text       (Text)
 import qualified Data.Text       as T
 import           Data.Traversable (for)
 import           SolidVM.Model.CodeCollection
-import           SolidVM.Solidity.Detectors.Types
+import           SolidVM.Solidity.StaticAnalysis.Types
 import           SolidVM.Model.Type (Type)
 import qualified SolidVM.Model.Type as SVMType
 import           Text.Read (readMaybe)

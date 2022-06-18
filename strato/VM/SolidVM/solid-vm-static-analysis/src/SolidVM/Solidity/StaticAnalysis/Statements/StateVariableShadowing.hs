@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-module SolidVM.Solidity.Detectors.Statements.StateVariableShadowing
+module SolidVM.Solidity.StaticAnalysis.Statements.StateVariableShadowing
   ( detector
   ) where
 
@@ -10,7 +10,7 @@ import           Data.Source
 import qualified Data.Text       as T
 import           Data.Text       (Text)
 import           SolidVM.Model.CodeCollection
-import           SolidVM.Solidity.Detectors.Types
+import           SolidVM.Solidity.StaticAnalysis.Types
 
 -- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]
 detector :: CompilerDetector

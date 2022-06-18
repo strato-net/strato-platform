@@ -1,7 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-module SolidVM.Solidity.Detectors.Functions.ConstantFunctions
+module SolidVM.Solidity.StaticAnalysis.Functions.ConstantFunctions
   ( detector
   ) where
 
@@ -19,7 +19,7 @@ import qualified Data.Text       as T
 import           SolidVM.Model.CodeCollection
 import           SolidVM.Model.Type                     (Type)
 import qualified SolidVM.Model.Type                     as SVMType
-import           SolidVM.Solidity.Detectors.Types
+import           SolidVM.Solidity.StaticAnalysis.Types
 
 data R = R
   { mutability :: Maybe StateMutability

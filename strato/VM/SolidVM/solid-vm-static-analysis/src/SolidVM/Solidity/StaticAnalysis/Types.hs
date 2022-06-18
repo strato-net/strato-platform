@@ -1,5 +1,5 @@
 
-module SolidVM.Solidity.Detectors.Types where
+module SolidVM.Solidity.StaticAnalysis.Types where
 
 import Data.Source
 import qualified Data.Text as T

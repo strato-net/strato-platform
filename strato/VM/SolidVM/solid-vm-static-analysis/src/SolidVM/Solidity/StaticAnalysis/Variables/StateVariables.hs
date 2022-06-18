@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
-module SolidVM.Solidity.Detectors.Variables.StateVariables
+module SolidVM.Solidity.StaticAnalysis.Variables.StateVariables
   ( detector
   ) where
 
@@ -16,7 +16,7 @@ import           Data.Text           (Text)
 import qualified Data.Text           as T
 import           SolidVM.Model.CodeCollection
 import qualified SolidVM.Model.Type as SVMType
-import           SolidVM.Solidity.Detectors.Types
+import           SolidVM.Solidity.StaticAnalysis.Types
 
 type StateVars = M.Map Text (Bool, Bool, VariableDecl)
 type LocalVars = [M.Map String (SourceAnnotation ())]
