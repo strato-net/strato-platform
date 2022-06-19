@@ -131,7 +131,7 @@ data ExpressionF a =
   | TupleExpression a [Maybe (ExpressionF a)]
   | ArrayExpression a [(ExpressionF a)]
   | Variable a Label 
-  | ObjectLiteral a (Map.Map T.Text (ExpressionF a))
+  | ObjectLiteral a (Map.Map Label (ExpressionF a))
   deriving (Show, Eq, Generic, Functor)
 
 extractExpression :: ExpressionF a -> a

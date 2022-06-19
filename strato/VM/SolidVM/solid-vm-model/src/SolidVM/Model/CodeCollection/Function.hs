@@ -66,7 +66,7 @@ instance ToSchema StateMutability where
     & mapped.schema.example ?~ toJSON View
 
 data FuncF a = Func
-  { funcArgs :: [(Maybe Text, SolidVM.IndexedType)]
+  { funcArgs :: [(Maybe Label, SolidVM.IndexedType)]
   , funcVals :: [(Maybe Text, SolidVM.IndexedType)]
   , funcStateMutability :: Maybe StateMutability
 

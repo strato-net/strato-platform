@@ -659,7 +659,7 @@ functionHelper cc c f@Func{..} = case funcContents of
         args = (\(it,n) -> ( n
                            , VarDefEntry (Just $ indexedTypeType it) Nothing n funcContext
                            ))
-           <$> (map (fmap textToLabel) . catMaybes $ sequence . swap <$> funcArgs)
+           <$> (catMaybes $ sequence . swap <$> funcArgs)
         vals = (\(it,n) -> ( n
                            , VarDefEntry (Just $ indexedTypeType it) Nothing n funcContext
                            ))

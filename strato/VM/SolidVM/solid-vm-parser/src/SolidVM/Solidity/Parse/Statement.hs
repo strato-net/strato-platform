@@ -246,7 +246,7 @@ objectE = do
             k <- many1 (noneOf ":")
             void colon
             v <- expression
-            return (T.pack $ init . tail $ show k, v) -- get rid of the surrounding quotes
+            return (stringToLabel $ init . tail $ show k, v) -- get rid of the surrounding quotes
 {-
 // Precedence by order (see github.com/ethereum/solidity/pull/732)
 Expression

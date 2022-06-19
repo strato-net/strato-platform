@@ -12,6 +12,8 @@ import Data.Source.Position
 import qualified BlockApps.Solidity.Xabi      as OLDXABI
 import qualified BlockApps.Solidity.Xabi.Type as OLDXABI
 
+import SolidVM.Model.Label
+
 import SelectAccessible                         ()
 
 import SolidVM.Model.CodeCollection hiding (contractName, events)
@@ -57,7 +59,7 @@ evmTypeToType (OLDXABI.Bytes x y) = SVMType.Bytes x y
 evmTypeToType OLDXABI.Bool = SVMType.Bool
 evmTypeToType OLDXABI.Address = SVMType.Address False
 evmTypeToType OLDXABI.Account = SVMType.Account False
-evmTypeToType (OLDXABI.UnknownLabel x) = SVMType.UnknownLabel x
+evmTypeToType (OLDXABI.UnknownLabel x) = SVMType.UnknownLabel $ stringToLabel x
 evmTypeToType (OLDXABI.Struct x y) = SVMType.Struct x y
 evmTypeToType (OLDXABI.Enum x y z) = SVMType.Enum x y z
 evmTypeToType (OLDXABI.Array x y) = SVMType.Array (evmTypeToType x) y

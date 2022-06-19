@@ -121,7 +121,7 @@ unparseCtor f = Text.unpack $ "constructor" <> unparseFuncWithoutName f
 unparseFuncWithoutName :: Func -> Text
 unparseFuncWithoutName Func{..} =
        "("
-    <> Text.intercalate ", " (List.map unparseArgs (sortWith (indexedTypeIndex . snd) $ map (\(maybeName, v) -> (fromMaybe "" maybeName , v)) funcArgs))
+    <> Text.intercalate ", " (List.map unparseArgs (sortWith (indexedTypeIndex . snd) $ map (\(maybeName, v) -> (fromMaybe "" $ fmap labelToText maybeName , v)) funcArgs))
     <> ") "
     <> case funcStateMutability of
         Just sm -> tShow sm <> " "
@@ -256,7 +256,7 @@ unparseExpression (FunctionCall _ e args) =
 unparseExpression (Ternary _ x y z) = unparseExpression x ++ "?" ++ unparseExpression y ++ ":" ++ unparseExpression z
 unparseExpression (NewExpression _ x) = "new " ++ unparseVarType x
 unparseExpression (ArrayExpression _ xs) = "[" ++ List.intercalate "," (map unparseExpression xs) ++ "]"
-unparseExpression (ObjectLiteral _ m) = "{" ++ List.intercalate ",\n" [concat ["\t", Text.unpack k, ":", unparseExpression v]  | (k, v) <- Map.toList m] ++ "}"
+unparseExpression (ObjectLiteral _ m) = "{" ++ List.intercalate ",\n" [concat ["\t", labelToString k, ":", unparseExpression v]  | (k, v) <- Map.toList m] ++ "}"
 unparseExpression x = internalError "missing case in call to unparseExpression" $ show x
 
 unparseModifier :: (Text, ModifierF a) -> String
