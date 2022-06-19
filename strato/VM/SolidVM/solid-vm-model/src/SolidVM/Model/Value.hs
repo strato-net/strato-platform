@@ -102,19 +102,19 @@ data Value =
    -- This is a payable account, which means it can use .transfer() , .send() , .call() , .delegatecall() and .staticcall()
   | SEnum Label
   | SEnumVal Label Label Word32
-  | SStructDef String
-  | SStruct Label (Map String Variable)
+  | SStructDef Label
+  | SStruct Label (Map Label Variable)
   | STuple (Vector Variable)
   | SArray SVMType.Type (Vector Variable)
   | SMap SVMType.Type (Map Value Variable)
-  | SFunction String CC.Func
-  | SBuiltinFunction String (Maybe Value)
-  | SBuiltinVariable String
+  | SFunction Label CC.Func
+  | SBuiltinFunction Label (Maybe Value)
+  | SBuiltinVariable Label
   | SSetterGetter String (Maybe Value)
-  | SContractDef String
-  | SContractItem NamedAccount String
+  | SContractDef Label
+  | SContractItem NamedAccount Label
   | SContract Label NamedAccount
-  | SContractFunction (Maybe String) NamedAccount String -- contractName, address, functionName
+  | SContractFunction (Maybe Label) NamedAccount Label -- contractName, address, functionName
   | SPush Value (Maybe Variable)-- The array function
   -- | SSend Value (Maybe Variable) 
   -- | STransfer Value (Maybe Variable) 
@@ -235,7 +235,7 @@ defaultValue ctract (SVMType.UnknownLabel name) = fromMaybe (SContract name $ un
     sdef' <- M.lookup name $ CC._structs ctract
     let initializeField = Constant . defaultValue ctract . CC.fieldTypeType
         sdef = (\(a,b,_) -> (a,b)) <$> sdef'
-    return . SStruct name . M.map initializeField . M.mapKeys T.unpack . M.fromList $ sdef
+    return . SStruct name . M.map initializeField . M.mapKeys textToLabel . M.fromList $ sdef
   ]
 
 defaultValue _ x = todo "defaultValue" x
@@ -258,7 +258,7 @@ createDefaultValue ctract (SVMType.UnknownLabel name) =
         forM sdef $ \(n, itemType, _) -> do
           itemVal <- createDefaultValue ctract $ CC.fieldTypeType itemType
           itemVar <- createVar itemVal
-          return (T.unpack n, itemVar)
+          return (textToLabel n, itemVar)
       return $ SStruct name $ M.fromList items
     _ -> return $ SContract name (unspecifiedChain 0x0)
 
@@ -280,8 +280,8 @@ castToInt s = typeError "castToInt" s
 -- Typos are the possible values that a CC.UnknownLabel
 -- is able to resolve to
 data Typo = StructTypo [(T.Text, CC.FieldType)]
-          | EnumTypo [String]
-          | ContractTypo String
+          | EnumTypo [Label]
+          | ContractTypo Label
           deriving (Show)
 
 -- BasicTypes are approximately what can be stored, but more exactly
@@ -289,13 +289,13 @@ data Typo = StructTypo [(T.Text, CC.FieldType)]
 -- Even though structs cannot be stored directly, the operator=
 -- simulates their appearance by retrieving theh individual fields.
 data BasicType = TInteger | TString | TBool | TAccount
-               | TEnumVal String | TContract String
-               | TStruct String [(B.ByteString, BasicType)]
+               | TEnumVal Label | TContract Label
+               | TStruct Label [(B.ByteString, BasicType)]
                | TComplex
                | Todo String
                deriving (Show, Eq)
 
 -- Evaluated ArgLists
 data ValList = OrderedVals [Value]
-             | NamedVals [(String, Value)]
+             | NamedVals [(Label, Value)]
              deriving (Show, Eq)

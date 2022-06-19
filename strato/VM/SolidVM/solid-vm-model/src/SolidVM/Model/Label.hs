@@ -4,6 +4,7 @@ module SolidVM.Model.Label where
 import Data.Text (Text)
 import qualified Data.Text as T
 
+
 type Label = String
 
 labelToString :: Label -> String

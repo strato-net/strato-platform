@@ -10,6 +10,7 @@ import qualified Data.Map                       as M
 
 import           Blockchain.SolidVM.SM
 import           Blockchain.SolidVM.SetGet
+import           SolidVM.Model.Label
 import           Text.Format
 import           Text.Tools
 
@@ -20,7 +21,7 @@ showVariables ci = do
   forM (M.toList $ localVariables ci) $ \(name, (_, var)) -> do
     val <- getVar var
     valueString <- showSM val
-    return $ "    \"" ++ name ++ "\": " ++ valueString
+    return $ "    \"" ++ labelToString name ++ "\": " ++ valueString
 
   
 getFullStackTrace :: MonadSM m => [CallInfo] -> m [String]
@@ -29,7 +30,7 @@ getFullStackTrace theCallStack = do
     forM theCallStack $ \slice -> do
       varString <- showVariables slice
   
-      return $ ("-----[variables for " ++ format (currentAccount slice) ++ "/" ++ currentFunctionName slice ++ "]----------------")
+      return $ ("-----[variables for " ++ format (currentAccount slice) ++ "/" ++ labelToString (currentFunctionName slice) ++ "]----------------")
         : varString
 
   return $ concat sliceStrings

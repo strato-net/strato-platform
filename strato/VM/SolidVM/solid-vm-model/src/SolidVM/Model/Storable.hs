@@ -19,7 +19,6 @@ import qualified Data.ByteString.UTF8   as UTF8
 import           Data.Char
 import           Data.Hashable
 import           Data.Scientific (isInteger, toBoundedInteger)
-import qualified Data.Text as T
 import           Foreign.Ptr
 import           Foreign.Storable
 import           GHC.Generics
@@ -30,14 +29,15 @@ import           Blockchain.SolidVM.Model
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
+import           SolidVM.Model.Label
 import           Text.Format
 
 data BasicValue = BInteger !Integer
                 | BString !B.ByteString
                 | BBool !Bool
                 | BAccount !NamedAccount 
-                | BEnumVal !T.Text !T.Text !Word32
-                | BContract !T.Text !NamedAccount
+                | BEnumVal !Label !Label !Word32
+                | BContract !Label !NamedAccount
                   -- The sole purpose of this sentinel is to make slipstream reserve
                   -- a column for this mapping
                 | BMappingSentinel
@@ -60,8 +60,8 @@ instance Format BasicValue where
   format (BBool True) = "true"
   format (BBool False) = "false"
   format (BAccount a) = "account(" ++ show a ++ ")"
-  format (BEnumVal n1 n2 _) = T.unpack n1 ++ "." ++ T.unpack n2
-  format (BContract n a) = T.unpack n ++ "(" ++ format a ++ ")"
+  format (BEnumVal n1 n2 _) = labelToString n1 ++ "." ++ labelToString n2
+  format (BContract n a) = labelToString n ++ "(" ++ format a ++ ")"
   format BMappingSentinel = "<MappingSentinel>"
   format BDefault = "<unknown>"
 

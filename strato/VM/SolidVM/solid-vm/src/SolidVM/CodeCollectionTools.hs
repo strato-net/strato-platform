@@ -14,12 +14,12 @@ import Control.Lens
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Source
-import qualified Data.Text as T
 
 import           Blockchain.SolidVM.Exception
 
 import           SolidVM.Model.CodeCollection
 import qualified SolidVM.Model.CodeCollection.Def as Def
+import           SolidVM.Model.Label
 import qualified SolidVM.Model.Type               as SVMType
 
 import           SolidVM.Solidity.Xabi
@@ -27,7 +27,7 @@ import qualified SolidVM.Solidity.Xabi as Xabi
 
 type SolidEither = Either (Positioned ((,) SolidException))
 
-xabiToContract :: String -> [String] -> String -> Xabi -> SolidEither Contract
+xabiToContract :: Label -> [Label] -> String -> Xabi -> SolidEither Contract
 xabiToContract contractName' parents' vmVersion' xabi = do
   validateXabi xabi
   constr <- case M.toList $ Xabi.xabiConstr xabi of
@@ -39,12 +39,12 @@ xabiToContract contractName' parents' vmVersion' xabi = do
   pure Contract {
   _contractName = contractName',
   _parents = parents',
-  _storageDefs = M.fromList $ M.toList $ Xabi.xabiVars xabi,
-  _constants = M.fromList $ map (\(k,v) -> (T.unpack k, v)) $ M.toList $ Xabi.xabiConstants xabi,
-  _enums = M.fromList [(T.unpack name, (map T.unpack vals, a)) | (name, Def.Enum vals _ a) <- M.toList $ Xabi.xabiTypes xabi],
-  _structs = M.fromList [(T.unpack name, (\(k,v) -> (k,v,a)) <$> vals) | (name, Def.Struct vals _ a) <- M.toList $ Xabi.xabiTypes xabi],
+  _storageDefs = Xabi.xabiVars xabi,
+  _constants = M.mapKeys textToLabel $ Xabi.xabiConstants xabi,
+  _enums = M.fromList [(textToLabel name, (vals, a)) | (name, Def.Enum vals _ a) <- M.toList $ Xabi.xabiTypes xabi],
+  _structs = M.fromList [(textToLabel name, (\(k,v) -> (k,v,a)) <$> vals) | (name, Def.Struct vals _ a) <- M.toList $ Xabi.xabiTypes xabi],
   _events = Xabi.xabiEvents xabi,
-  _functions = M.fromList $ map (\(k,v) -> (T.unpack k, v)) $ M.toList $ Xabi.xabiFuncs xabi,
+  _functions = M.mapKeys textToLabel $ Xabi.xabiFuncs xabi,
   _constructor = constr,
   _vmVersion = vmVersion',
   _contractContext = Xabi.xabiContext xabi
@@ -99,14 +99,14 @@ resolveLabelsInContract :: CodeCollection -> Contract -> Contract
 resolveLabelsInContract cc c =
   c{_storageDefs=fmap (resolveLabelsInDef (cc^.contracts) (c^.enums) (c^.structs)) $ c^.storageDefs}
 
-resolveLabelsInDef :: Map String Contract -> Map String a -> Map String b -> VariableDecl -> VariableDecl
+resolveLabelsInDef :: Map Label Contract -> Map Label a -> Map Label b -> VariableDecl -> VariableDecl
 resolveLabelsInDef contractDefs enumDefs structDefs x@VariableDecl{varType=SVMType.UnknownLabel labelName} =
   case (labelName `M.member` contractDefs,
         labelName `M.member` structDefs,
         labelName `M.member` enumDefs) of
-    (_, True, _) -> x{varType=SVMType.Enum Nothing (T.pack labelName) Nothing}
-    (_, _, True) -> x{varType=SVMType.Struct Nothing (T.pack labelName)}
-    (True, _, _) -> x{varType=SVMType.Contract $ T.pack labelName}
+    (_, True, _) -> x{varType=SVMType.Enum Nothing (labelToText labelName) Nothing}
+    (_, _, True) -> x{varType=SVMType.Struct Nothing (labelToText labelName)}
+    (True, _, _) -> x{varType=SVMType.Contract $ labelToText labelName}
     _ -> x{varType=SVMType.UnknownLabel labelName}
     -- _ -> error $ "unknown label in call to resolveLabelsInDef: " ++ labelName
 resolveLabelsInDef _ _ _ x = x

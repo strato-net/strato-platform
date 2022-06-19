@@ -157,7 +157,7 @@ type Expression = Positioned ExpressionF
 instance ToJSON a => ToJSON (ExpressionF a)
 instance FromJSON a => FromJSON (ExpressionF a)
 
-data ArgListF a = OrderedArgs [ExpressionF a] | NamedArgs [(String, (ExpressionF a))] deriving (Show, Eq, Generic, Functor)
+data ArgListF a = OrderedArgs [ExpressionF a] | NamedArgs [(Label, (ExpressionF a))] deriving (Show, Eq, Generic, Functor)
 
 type ArgList = Positioned ArgListF
 

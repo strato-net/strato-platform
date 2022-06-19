@@ -121,7 +121,7 @@ revertStatement = try $ do
     e <- parens $ choice 
       [
         fmap NamedArgs . braces $ commaSep $ do
-          fieldName <- identifier
+          fieldName <- fmap stringToLabel identifier
           void colon -- lol
           fieldExpr <- expression
           return (fieldName, fieldExpr)
@@ -192,7 +192,7 @@ functionCall :: SolidityParser (Expression -> Expression)
 functionCall = do
   ~(a, args) <- withPosition $ parens $ choice
     [ fmap NamedArgs . braces $ commaSep $ do
-        fieldName <- identifier
+        fieldName <- fmap stringToLabel identifier
         void colon -- haha
         fieldExpr <- expression
         return (fieldName, fieldExpr)

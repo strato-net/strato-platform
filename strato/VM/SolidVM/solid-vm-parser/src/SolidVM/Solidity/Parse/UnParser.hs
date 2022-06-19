@@ -289,7 +289,7 @@ unparseTypes (name, SolidVM.Enum {names=names'}) =
   Text.unpack $ "enum "
              <> name
              <> " {\n      "
-             <> Text.intercalate ",\n      " names'
+             <> Text.intercalate ",\n      " (map labelToText names')
              <> "\n    }"
 unparseTypes (name, SolidVM.Struct {fields=fields'}) =
   Text.unpack $ "struct "

@@ -95,6 +95,7 @@ import           Blockchain.VMOptions
 import           Blockchain.DB.StateDB
 
 import qualified SolidVM.Model.CodeCollection as CC
+import           SolidVM.Model.Label
 import qualified SolidVM.Model.Type as SVMType
 import qualified SolidVM.Model.Storable as MS
 import           SolidVM.Model.Value
@@ -102,12 +103,12 @@ import           SolidVM.Model.Value
 import           UnliftIO
 
 data CallInfo = CallInfo
-  { currentFunctionName :: String
+  { currentFunctionName :: Label
   , currentAccount      :: Account
   , currentContract     :: CC.Contract
   , codeCollection      :: CC.CodeCollection
   , collectionHash      :: Keccak256
-  , localVariables      :: Map String (SVMType.Type, Variable)
+  , localVariables      :: Map Label (SVMType.Type, Variable)
   , readOnly            :: Bool
   , isUncheckedSection  :: Bool -- TODO: Perform overflow/underflow checks for all arithmetic operations and revert if so, use this flag to disable checks
   , currentSourcePos    :: Maybe SourcePosition
@@ -356,7 +357,7 @@ toMaybe True x = Just x
 toMaybe False _ = Nothing
 
 
-getVariableOfName :: MonadSM m => String -> m Variable
+getVariableOfName :: MonadSM m => Label -> m Variable
 getVariableOfName name = do
   cStack <- Mod.get (Mod.Proxy @[CallInfo])
   let currentCallInfo =
@@ -407,10 +408,10 @@ getVariableOfName name = do
       maybeStorageItem :: Maybe Variable
       maybeStorageItem =
         -- TODO(tim): This might just be restricted to a field name
-        if T.pack name `elem` M.keys (currentContract currentCallInfo^.CC.storageDefs)
+        if labelToText name `elem` M.keys (currentContract currentCallInfo^.CC.storageDefs)
         then Just . Constant . SReference $ AccountPath
                 (currentAccount currentCallInfo)
-                (MS.singleton $ BC.pack name)
+                (MS.singleton $ BC.pack $ labelToString name)
         else Nothing
 
       maybeThis :: Maybe Variable
@@ -447,7 +448,7 @@ getVariableOfName name = do
       , unknownVariable "getVariableOfName" name
       ]
 
-getTypeOfName' :: String -> CC.CodeCollection -> Typo
+getTypeOfName' :: Label -> CC.CodeCollection -> Typo
 getTypeOfName' s (CC.CodeCollection ccs) =
   let lookInContract :: CC.Contract -> [Typo]
       lookInContract (CC.Contract{..}) = catMaybes
@@ -459,7 +460,7 @@ getTypeOfName' s (CC.CodeCollection ccs) =
         [] -> internalError "getTypeOfName" s
         (typo:_) -> typo
 
-getTypeOfName :: MonadSM m => String -> m Typo
+getTypeOfName :: MonadSM m => Label -> m Typo
 getTypeOfName s = getTypeOfName' s . codeCollection <$> getCurrentCallInfo
 
 
@@ -467,10 +468,10 @@ getTypeOfName s = getTypeOfName' s . codeCollection <$> getCurrentCallInfo
 addCallInfo :: MonadSM m
             => Account
             -> CC.Contract
-            -> String
+            -> Label
             -> Keccak256
             -> CC.CodeCollection
-            -> Map String (SVMType.Type, Variable)
+            -> Map Label (SVMType.Type, Variable)
             -> Bool
             -> m ()
 addCallInfo a c fn hsh cc initialLocalVariables ro = do
@@ -550,7 +551,7 @@ getCurrentChainId = do
     _ -> internalError "getCurrentChainId called with an empty stack" ()
 
 
-getCurrentFunctionName :: MonadSM m => m String
+getCurrentFunctionName :: MonadSM m => m Label
 getCurrentFunctionName = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
@@ -558,12 +559,12 @@ getCurrentFunctionName = do
     _ -> internalError "getCurrentFunctionName called with an empty stack" ()
 
 
-getLocal :: MonadSM m => String -> m (Maybe Variable)
+getLocal :: MonadSM m => Label -> m (Maybe Variable)
 getLocal name = do
   currentCallInfo <- getCurrentCallInfo
   return $ fmap snd $ M.lookup name $ localVariables currentCallInfo
 
-setLocal :: MonadSM m => String -> Variable -> m ()
+setLocal :: MonadSM m => Label -> Variable -> m ()
 setLocal name val = do
   stack <- Mod.get (Mod.Proxy @[CallInfo])
   let (info, rest) = case stack of

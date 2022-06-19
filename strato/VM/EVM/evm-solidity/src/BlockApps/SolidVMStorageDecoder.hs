@@ -32,6 +32,7 @@ import Text.Printf
 import BlockApps.Solidity.SolidityValue
 import BlockApps.Solidity.Value as V
 import Blockchain.SolidVM.Model
+import SolidVM.Model.Label
 import SolidVM.Model.Storable
 
 decodeSolidVMValues :: [(HexStorage, HexStorage)] -> [(T.Text, SolidityValue)]
@@ -198,7 +199,7 @@ fromBasic = \case
   BString bs -> SimpleValue $! valueBytes bs
   BAccount a -> SimpleValue $! ValueAccount a
   BContract _ c -> ValueContract c
-  BEnumVal tipe name num -> ValueEnum tipe name (fromIntegral num)
+  BEnumVal tipe name num -> ValueEnum (labelToText tipe) (labelToText name) (fromIntegral num)
 
   BMappingSentinel -> ValueMapping M.empty
   BDefault -> SimpleValue $ ValueAddress 0x0

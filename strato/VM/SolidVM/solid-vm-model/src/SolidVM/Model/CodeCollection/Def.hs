@@ -18,13 +18,14 @@ import           GHC.Generics
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
 
-
 import qualified SolidVM.Model.CodeCollection.VarDef as SolidVM
+import           SolidVM.Model.Label
+
 
 defAesonOptions :: Options
 defAesonOptions = defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="type"}}
 
-data DefF a = Enum { names::[Text], bytes::Word, context :: a}
+data DefF a = Enum { names::[Label], bytes::Word, context :: a}
             | Struct { fields::[(Text, SolidVM.FieldType)], bytes::Word, context :: a}
             | Contract { bytes::Word, context :: a}
          deriving (Eq, Show, Generic, Functor)

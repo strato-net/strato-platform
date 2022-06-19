@@ -173,7 +173,7 @@ enumDeclaration = do
     (
       enumName,
       EnumDeclaration SolidVM.Enum {
-        SolidVM.names = map Text.pack enumFields,
+        SolidVM.names = map stringToLabel enumFields,
         SolidVM.bytes = 0,
         SolidVM.context = a
         }
