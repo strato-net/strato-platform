@@ -344,7 +344,7 @@ contractToEventTables (org, app, name) c =
           eventOrganization = org,
           eventApplication  = app,
           eventContractName = name,
-          eventName = eName,
+          eventName = labelToText eName,
           eventFields = map fst $ eventLogs fields
         }
   

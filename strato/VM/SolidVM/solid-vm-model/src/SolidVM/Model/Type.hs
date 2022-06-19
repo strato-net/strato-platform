@@ -9,7 +9,6 @@ import           Control.Lens              (mapped, (&), (?~))
 import           Data.Aeson
 import           Data.Int                  (Int32)
 import           Data.Swagger
-import           Data.Text                 (Text)
 import qualified Generic.Random            as GR
 import           GHC.Generics
 import           Test.QuickCheck
@@ -29,10 +28,10 @@ data Type
   | Address {isPayable :: Bool}
   | Account {isPayable :: Bool}
   | UnknownLabel Label
-  | Struct { bytes::Maybe Int32, typedef::Text}
-  | Enum { bytes::Maybe Int32, typedef::Text, names::Maybe [Text]}
+  | Struct { bytes::Maybe Int32, typedef::Label}
+  | Enum { bytes::Maybe Int32, typedef::Label, names::Maybe [Label]}
   | Array { entry:: Type, length :: Maybe Word }
-  | Contract {typedef::Text}
+  | Contract {typedef::Label}
   | Mapping {dynamic::Maybe Bool, key::Type, value::Type}
   deriving (Eq, Show, Generic)
 

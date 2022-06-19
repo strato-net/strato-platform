@@ -168,7 +168,7 @@ withSrcPos pos str = liftIO . putStrLn $ concat
 variableSet :: MonadSM m => m VariableSet
 variableSet = do
   cis <- Mod.get (Mod.Proxy @[CallInfo])
-  let textSet = S.fromList . map labelToText . M.keys
+  let textSet = S.fromList . M.keys
       varNames = case cis of
         [] -> S.empty
         (ci:_) -> textSet $ localVariables ci
@@ -177,7 +177,7 @@ variableSet = do
   ~(contract, _, _) <- getCodeAndCollection acct
   let stateVars = S.fromList $ M.keys $ contract ^. CC.storageDefs
       globals = M.singleton "State Variables" stateVars
-  pure . VariableSet $ locals <> globals
+  pure . VariableSet $ fmap (S.map labelToText) $ locals <> globals
 
 instance MonadSM m => Mod.Accessible VariableSet m where
   access _ = variableSet
@@ -709,7 +709,7 @@ callWrapper from to mContract functionName isRCC argExps  = do
             let f' = (if from == to then id else pushSender from) $ runTheCall to contract functionName hsh cc theFunction args' ro
             return (f', args')
           _ -> do --Maybe the function is actually a getter
-            case (M.lookup (labelToText functionName) $ contract^.CC.storageDefs,isSvm3_2) of
+            case (M.lookup functionName $ contract^.CC.storageDefs,isSvm3_2) of
               (Just _, True) -> do 
                   liftIO $ putStrLn ("callWrapper/getter " ++ labelToString functionName) 
                   addCallInfo to contract functionName hsh cc M.empty True
@@ -738,7 +738,7 @@ callWrapper from to mContract functionName isRCC argExps  = do
       case theType of
         SVMType.Mapping _ _ _-> return ()
         SVMType.Array _ _-> return ()
-        _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ T.unpack n]) MS.BDefault)
+        _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) MS.BDefault)
   logFunctionCall args to contract functionName f
 
 
@@ -1069,7 +1069,7 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
   curInfo <- getCurrentCallInfo
   curCnct <- getCurrentContract
   let evs = CC._events curCnct
-      mEv = M.lookup (T.pack eventName) evs
+      mEv = M.lookup (stringToLabel eventName) evs
   case mEv of
     Nothing ->
       missingType "no corresponding event has been declared for the following emit statement: " (unparseStatement st)
@@ -1658,7 +1658,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                      $ M.lookup structName $ contract'^.CC.structs
             return . Constant . SStruct structName . fmap Constant . M.fromList $
               case argVals of
-                OrderedVals as -> zip (map (textToLabel . (\(a,_,_) -> a)) vals) as
+                OrderedVals as -> zip (map (\(a,_,_) -> a) vals) as
                 NamedVals ns -> ns
 
           Constant (SContractDef contractName') -> do
@@ -2289,14 +2289,14 @@ runTheConstructors from to hsh cc contractName' argExps = do
 
   forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _) <- M.toList $ contract'^.CC.storageDefs] $ \(n, e) -> do
     v <- expToVar e
-    setVar (Constant (SReference (AccountPath to $ MS.StoragePath [MS.Field $ BC.pack $ T.unpack n]))) =<< getVar v
+    setVar (Constant (SReference (AccountPath to $ MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v
 
   forM_ [(n, theType) | (n, CC.VariableDecl theType _ Nothing _) <- M.toList $ contract'^.CC.storageDefs] $ \(n, theType) -> do
     case theType of
       SVMType.Mapping _ _ _-> return ()
       SVMType.Array _ _-> return ()
-      SVMType.Bool -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ T.unpack n]) $ MS.BBool False
-      _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ T.unpack n]) MS.BDefault
+      SVMType.Bool -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) $ MS.BBool False
+      _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) MS.BDefault
 
   forM_ (reverse $ contract'^.CC.parents) $ \parent -> do
     let args = CC.OrderedArgs

@@ -408,7 +408,7 @@ getVariableOfName name = do
       maybeStorageItem :: Maybe Variable
       maybeStorageItem =
         -- TODO(tim): This might just be restricted to a field name
-        if labelToText name `elem` M.keys (currentContract currentCallInfo^.CC.storageDefs)
+        if name `elem` M.keys (currentContract currentCallInfo^.CC.storageDefs)
         then Just . Constant . SReference $ AccountPath
                 (currentAccount currentCallInfo)
                 (MS.singleton $ BC.pack $ labelToString name)
@@ -598,15 +598,15 @@ hintFromType = \case
      ContractTypo{} -> return $ TContract s
      EnumTypo{} -> return $ TEnumVal s
      StructTypo fs -> do
-       let upgrade :: MonadSM m => (T.Text, CC.FieldType) -> m (B.ByteString , BasicType)
-           upgrade = mapM (hintFromType . CC.fieldTypeType) . first encodeUtf8
+       let upgrade :: MonadSM m => (Label, CC.FieldType) -> m (B.ByteString , BasicType)
+           upgrade = mapM (hintFromType . CC.fieldTypeType) . first (encodeUtf8 . labelToText)
        TStruct s <$> mapM upgrade fs
  SVMType.Array{} -> return TComplex
  SVMType.Mapping{} -> return TComplex
  tt'' -> todo "hintFromType" tt''
 
 getXabiType' :: B.ByteString -> CallInfo -> Maybe SVMType.Type
-getXabiType' field callInfo = M.lookup (T.pack $ BC.unpack field)
+getXabiType' field callInfo = M.lookup (stringToLabel $ BC.unpack field)
                             . fmap CC.varType
                             . CC._storageDefs
                             . currentContract
@@ -649,7 +649,7 @@ getXabiValueType (AccountPath loc path) = do
            let t' = getTypeOfName' s ccs
             in case (x, t') of
                  (MS.Field n, StructTypo fs) ->
-                   let mt'' = lookup (decodeUtf8 n) fs
+                   let mt'' = lookup (textToLabel $ decodeUtf8 n) fs
                     in case mt'' of
                         Just t'' -> CC.fieldTypeType t''
                         Nothing -> missingField "field not present in struct definition" $ show (n, fs)

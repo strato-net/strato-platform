@@ -21,12 +21,12 @@ contractHelper :: Contract -> [SourceAnnotation Text]
 contractHelper Contract{..} =
   concat $ functionHelper _storageDefs <$> maybeToList _constructor ++ M.elems _functions
 
-functionHelper :: M.Map Text VariableDecl -> Func -> [SourceAnnotation Text]
+functionHelper :: M.Map Label VariableDecl -> Func -> [SourceAnnotation Text]
 functionHelper vars Func{..} = case funcContents of
   Nothing -> []
   Just stmts -> concat $ statementHelper vars <$> stmts
 
-statementHelper :: M.Map Text VariableDecl -> Statement -> [SourceAnnotation Text]
+statementHelper :: M.Map Label VariableDecl -> Statement -> [SourceAnnotation Text]
 statementHelper vars (IfStatement _ thens mElse _) =
   let ts = concat $ statementHelper vars <$> thens
       es = concat $ maybe [] (map $ statementHelper vars) mElse
@@ -51,7 +51,7 @@ statementHelper vars (UncheckedStatement body _) =
 statementHelper _ (AssemblyStatement _ _) = []
 statementHelper vars (SimpleStatement stmt _) = simpleStatementHelper vars stmt
 
-simpleStatementHelper :: M.Map Text VariableDecl
+simpleStatementHelper :: M.Map Label VariableDecl
                       -> SimpleStatement
                       -> [SourceAnnotation Text]
 simpleStatementHelper _ (ExpressionStatement _) = []
@@ -59,7 +59,7 @@ simpleStatementHelper vars (VariableDefinition entries _) =
   catMaybes $ lookupVar <$> entries
   where
     lookupVar BlankEntry = Nothing
-    lookupVar v = applyWarning v <$> M.lookup (labelToText $ vardefName v) vars
+    lookupVar v = applyWarning v <$> M.lookup (vardefName v) vars
     applyWarning local state =
       let statePos = _sourceAnnotationStart $ varContext state
           statePosStr = concat

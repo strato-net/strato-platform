@@ -51,8 +51,8 @@ solidityContract = do
     kind <- (reserved "contract" >> return Xabi.ContractKind)
           <|> (reserved "interface" >> return Xabi.InterfaceKind)
           <|> (reserved "library" >> return Xabi.LibraryKind)
-    contractName' <- identifier
-    setContractName contractName'
+    contractName' <- fmap stringToLabel identifier
+    setContractName $ labelToString contractName'
     baseConstrs <- option [] $ do
       reserved "is"
       commaSep1 $ do
@@ -63,25 +63,25 @@ solidityContract = do
   declarations <-
     braces (many solidityDeclaration)
 
-  let allFunctions = Map.fromList [ (Text.pack n, f) | (n, FuncDeclaration f) <- declarations]
-  let ctorList = [(Text.pack n, c) | (n, ConstructorDeclaration c) <- declarations]
-  let events = [(Text.pack n, e) | (n, EventDeclaration e) <- declarations]
+  let allFunctions = Map.fromList [ (stringToLabel n, f) | (n, FuncDeclaration f) <- declarations]
+  let ctorList = [(stringToLabel n, c) | (n, ConstructorDeclaration c) <- declarations]
+  let events = [(stringToLabel n, e) | (n, EventDeclaration e) <- declarations]
   let using = [(Text.pack n, u) | (n, UsingDeclaration u) <- declarations]
   allCtors <- if length ctorList > 1
                   then fail "multiple constructors defined"
                   else return . Map.fromList $ ctorList
 
-  return $ NamedXabi (Text.pack contractName') (
+  return $ NamedXabi (labelToText contractName') (
         Xabi { xabiFuncs = allFunctions
              , xabiConstr = allCtors
 --             , xabiVars = variables declarations
-             , xabiVars = Map.fromList [(Text.pack n, varDecl) | (n, VariableDeclaration varDecl) <- declarations]
-             , xabiConstants = Map.fromList [(Text.pack n, constDecl) | (n, ConstantDeclaration constDecl) <- declarations]
+             , xabiVars = Map.fromList [(stringToLabel n, varDecl) | (n, VariableDeclaration varDecl) <- declarations]
+             , xabiConstants = Map.fromList [(stringToLabel n, constDecl) | (n, ConstantDeclaration constDecl) <- declarations]
              , xabiTypes =
                Map.fromList $
-               [ (Text.pack name, enum) | (name, EnumDeclaration enum) <- declarations]
-               ++ [ (Text.pack name, struct) | (name, StructDeclaration struct) <- declarations]
-             , xabiModifiers = Map.fromList [(Text.pack name, modifier) | (name, ModifierDeclaration modifier) <- declarations]
+               [ (stringToLabel name, enum) | (name, EnumDeclaration enum) <- declarations]
+               ++ [ (stringToLabel name, struct) | (name, StructDeclaration struct) <- declarations]
+             , xabiModifiers = Map.fromList [(stringToLabel name, modifier) | (name, ModifierDeclaration modifier) <- declarations]
              , xabiEvents = Map.fromList events
              , xabiKind = kind
              , xabiUsing = Map.fromList using
@@ -155,7 +155,7 @@ structDeclaration = do
       structName,
       StructDeclaration SolidVM.Struct{
         SolidVM.fields =
-           zipWith (\(n, v) i -> (Text.pack n, SolidVM.FieldType i v)) structFields [0..],
+           zipWith (\(n, v) i -> (stringToLabel n, SolidVM.FieldType i v)) structFields [0..],
         SolidVM.bytes = 0,
         SolidVM.context = a
         }

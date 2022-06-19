@@ -40,11 +40,11 @@ xabiToContract contractName' parents' vmVersion' xabi = do
   _contractName = contractName',
   _parents = parents',
   _storageDefs = Xabi.xabiVars xabi,
-  _constants = M.mapKeys textToLabel $ Xabi.xabiConstants xabi,
-  _enums = M.fromList [(textToLabel name, (vals, a)) | (name, Def.Enum vals _ a) <- M.toList $ Xabi.xabiTypes xabi],
-  _structs = M.fromList [(textToLabel name, (\(k,v) -> (k,v,a)) <$> vals) | (name, Def.Struct vals _ a) <- M.toList $ Xabi.xabiTypes xabi],
+  _constants = Xabi.xabiConstants xabi,
+  _enums = M.fromList [(name, (vals, a)) | (name, Def.Enum vals _ a) <- M.toList $ Xabi.xabiTypes xabi],
+  _structs = M.fromList [(name, (\(k,v) -> (k,v,a)) <$> vals) | (name, Def.Struct vals _ a) <- M.toList $ Xabi.xabiTypes xabi],
   _events = Xabi.xabiEvents xabi,
-  _functions = M.mapKeys textToLabel $ Xabi.xabiFuncs xabi,
+  _functions = Xabi.xabiFuncs xabi,
   _constructor = constr,
   _vmVersion = vmVersion',
   _contractContext = Xabi.xabiContext xabi
@@ -104,9 +104,9 @@ resolveLabelsInDef contractDefs enumDefs structDefs x@VariableDecl{varType=SVMTy
   case (labelName `M.member` contractDefs,
         labelName `M.member` structDefs,
         labelName `M.member` enumDefs) of
-    (_, True, _) -> x{varType=SVMType.Enum Nothing (labelToText labelName) Nothing}
-    (_, _, True) -> x{varType=SVMType.Struct Nothing (labelToText labelName)}
-    (True, _, _) -> x{varType=SVMType.Contract $ labelToText labelName}
+    (_, True, _) -> x{varType=SVMType.Enum Nothing labelName Nothing}
+    (_, _, True) -> x{varType=SVMType.Struct Nothing labelName}
+    (True, _, _) -> x{varType=SVMType.Contract labelName}
     _ -> x{varType=SVMType.UnknownLabel labelName}
     -- _ -> error $ "unknown label in call to resolveLabelsInDef: " ++ labelName
 resolveLabelsInDef _ _ _ x = x

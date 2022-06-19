@@ -12,7 +12,6 @@ import           Control.Lens                 (mapped, (&), (?~))
 import           Data.Aeson
 import           Data.Source
 import           Data.Swagger
-import           Data.Text                    (Text)
 import qualified Generic.Random               as GR
 import           GHC.Generics
 import           Test.QuickCheck
@@ -26,7 +25,7 @@ defAesonOptions :: Options
 defAesonOptions = defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="type"}}
 
 data DefF a = Enum { names::[Label], bytes::Word, context :: a}
-            | Struct { fields::[(Text, SolidVM.FieldType)], bytes::Word, context :: a}
+            | Struct { fields::[(Label, SolidVM.FieldType)], bytes::Word, context :: a}
             | Contract { bytes::Word, context :: a}
          deriving (Eq, Show, Generic, Functor)
 

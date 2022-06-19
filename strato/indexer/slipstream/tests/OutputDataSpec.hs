@@ -31,6 +31,7 @@ import Slipstream.OutputData
 import Slipstream.SolidityValue
 
 import SolidVM.Model.CodeCollection hiding (contractName, contracts)
+import SolidVM.Model.Label
 import qualified SolidVM.Model.Type as SVMType
 
 addr :: Address -> V.Value
@@ -609,7 +610,7 @@ createDummyContract v =
       _contractName=undefined,
       _parents=undefined,
       _constants=undefined,
-      _storageDefs=M.fromList $ map (fmap createVariableDecl) v,
+      _storageDefs=M.mapKeys textToLabel $ M.fromList $ map (fmap createVariableDecl) v,
       _enums=undefined,
       _structs=undefined,
       _events=undefined,

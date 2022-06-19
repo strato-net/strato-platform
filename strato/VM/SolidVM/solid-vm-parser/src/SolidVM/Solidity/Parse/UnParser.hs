@@ -57,7 +57,7 @@ unparseSourceUnit (NamedXabi name (contract,inherited)) =
   <> concatMap (("\n    " <>) . unparseFunc) (Map.toList $ xabiFuncs contract)
   <> "\n}"
 
-unparseVar :: (Text, VariableDecl) -> String
+unparseVar :: (Label, VariableDecl) -> String
 unparseVar (name, (VariableDecl theType isPublic maybeExpression _)) =
      unparseVarType (theType)
   <> " "
@@ -65,14 +65,14 @@ unparseVar (name, (VariableDecl theType isPublic maybeExpression _)) =
        then "public "
        else ""
      )
-  <> Text.unpack name
+  <> labelToString name
   <> (case maybeExpression of
         Nothing -> ""
         Just value -> " = " ++ unparseExpression value
      )
   <> ";"
 
-unparseConstant :: (Text, ConstantDecl) -> String
+unparseConstant :: (Label, ConstantDecl) -> String
 unparseConstant (name, (ConstantDecl theType isPublic expression _)) =
      unparseVarType (theType)
   <> " "
@@ -86,7 +86,7 @@ unparseConstant (name, (ConstantDecl theType isPublic expression _)) =
         Just False -> "private "
      ) -}
   <>  "constant "
-  <> Text.unpack name
+  <> labelToString name
   <> (" = " ++ unparseExpression expression)
   <> ";"
 
@@ -104,16 +104,16 @@ unparseVarType (SVMType.Account _) = "account"
 unparseVarType (SVMType.Bytes (Just True) _ ) = "bytes"
 unparseVarType (SVMType.Bytes Nothing (Just bytes) ) = "bytes" <> (show bytes)
 unparseVarType (SVMType.UnknownLabel str) = labelToString str
-unparseVarType (SVMType.Enum _ name _) = Text.unpack name
+unparseVarType (SVMType.Enum _ name _) = labelToString name
 unparseVarType (SVMType.Array t (Just n)) = (unparseVarType t) <> "[" <> show n <> "]"
 unparseVarType (SVMType.Array t Nothing) = (unparseVarType t) <> "[]"
 unparseVarType (SVMType.Mapping _ key val) = "mapping (" <> (unparseVarType key) <> " => " <> (unparseVarType val) <> ")"
-unparseVarType (SVMType.Contract contractName') = Text.unpack contractName'
-unparseVarType (SVMType.Struct _ n) = "struct " ++ Text.unpack n
+unparseVarType (SVMType.Contract contractName') = labelToString contractName'
+unparseVarType (SVMType.Struct _ n) = "struct " ++ labelToString n
 unparseVarType _ = "TYPE_NOT_IMPLEMENED"
 
-unparseFunc :: (Text, Func) -> String
-unparseFunc (name, f) = Text.unpack $ "function " <> name <> unparseFuncWithoutName f
+unparseFunc :: (Label, Func) -> String
+unparseFunc (name, f) = Text.unpack $ "function " <> labelToText name <> unparseFuncWithoutName f
 
 unparseCtor :: Func -> String
 unparseCtor f = Text.unpack $ "constructor" <> unparseFuncWithoutName f
@@ -259,10 +259,10 @@ unparseExpression (ArrayExpression _ xs) = "[" ++ List.intercalate "," (map unpa
 unparseExpression (ObjectLiteral _ m) = "{" ++ List.intercalate ",\n" [concat ["\t", labelToString k, ":", unparseExpression v]  | (k, v) <- Map.toList m] ++ "}"
 unparseExpression x = internalError "missing case in call to unparseExpression" $ show x
 
-unparseModifier :: (Text, ModifierF a) -> String
+unparseModifier :: (Label, ModifierF a) -> String
 unparseModifier (name, Modifier{..}) = Text.unpack $
      "modifier "
-  <> name
+  <> labelToText name
   <> "("
   <> Text.intercalate ", " (List.map unparseArgs (Map.toList modifierArgs))
   <> ") {\n        "
@@ -271,10 +271,10 @@ unparseModifier (name, Modifier{..}) = Text.unpack $
        Nothing -> ""
   <> "}"
 
-unparseEvent :: (Text, EventF a) -> String
+unparseEvent :: (Label, EventF a) -> String
 unparseEvent (name, Event{..}) = Text.unpack $
      "event "
-  <> name
+  <> labelToText name
   <> "(\n    "
   <> Text.intercalate ",\n    " (List.map unparseArgs eventLogs)
   <> ")"
@@ -284,16 +284,16 @@ unparseEvent (name, Event{..}) = Text.unpack $
 unparseUsing :: (Text, UsingF a) -> String
 unparseUsing (name, Using body _) = Text.unpack . mconcat $ ["using ", name, " ", Text.pack body, ";\n"]
 
-unparseTypes :: (Text, SolidVM.DefF a) -> String
+unparseTypes :: (Label, SolidVM.DefF a) -> String
 unparseTypes (name, SolidVM.Enum {names=names'}) =
   Text.unpack $ "enum "
-             <> name
+             <> labelToText name
              <> " {\n      "
              <> Text.intercalate ",\n      " (map labelToText names')
              <> "\n    }"
 unparseTypes (name, SolidVM.Struct {fields=fields'}) =
   Text.unpack $ "struct "
-             <> name
+             <> labelToText name
              <> " {\n      "
              <> (Text.intercalate "\n      "
                 . map unparseField
@@ -303,7 +303,7 @@ unparseTypes (name, SolidVM.Struct {fields=fields'}) =
              <> "\n    }"
   where unparseField (fieldName, fieldType) = (Text.pack . unparseVarType $ fieldTypeType fieldType)
                                            <> " "
-                                           <> fieldName
+                                           <> labelToText fieldName
                                            <> ";"
 unparseTypes (_name, _def) = ""
 

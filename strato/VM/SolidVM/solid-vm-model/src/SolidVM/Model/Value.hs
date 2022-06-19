@@ -30,7 +30,6 @@ import           Data.IORef
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Maybe (fromMaybe, listToMaybe)
-import qualified Data.Text as T
 import           Data.Vector (Vector)
 import qualified Data.Vector as V
 import           Data.Word
@@ -235,7 +234,7 @@ defaultValue ctract (SVMType.UnknownLabel name) = fromMaybe (SContract name $ un
     sdef' <- M.lookup name $ CC._structs ctract
     let initializeField = Constant . defaultValue ctract . CC.fieldTypeType
         sdef = (\(a,b,_) -> (a,b)) <$> sdef'
-    return . SStruct name . M.map initializeField . M.mapKeys textToLabel . M.fromList $ sdef
+    return . SStruct name . M.map initializeField . M.fromList $ sdef
   ]
 
 defaultValue _ x = todo "defaultValue" x
@@ -258,7 +257,7 @@ createDefaultValue ctract (SVMType.UnknownLabel name) =
         forM sdef $ \(n, itemType, _) -> do
           itemVal <- createDefaultValue ctract $ CC.fieldTypeType itemType
           itemVar <- createVar itemVal
-          return (textToLabel n, itemVar)
+          return (n, itemVar)
       return $ SStruct name $ M.fromList items
     _ -> return $ SContract name (unspecifiedChain 0x0)
 
@@ -279,7 +278,7 @@ castToInt s = typeError "castToInt" s
 
 -- Typos are the possible values that a CC.UnknownLabel
 -- is able to resolve to
-data Typo = StructTypo [(T.Text, CC.FieldType)]
+data Typo = StructTypo [(Label, CC.FieldType)]
           | EnumTypo [Label]
           | ContractTypo Label
           deriving (Show)

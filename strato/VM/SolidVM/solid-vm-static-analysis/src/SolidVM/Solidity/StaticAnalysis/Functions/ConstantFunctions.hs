@@ -24,7 +24,7 @@ import           SolidVM.Solidity.StaticAnalysis.Types
 
 data R = R
   { mutability :: Maybe StateMutability
-  , stateVars  :: M.Map Text VariableDecl
+  , stateVars  :: M.Map Label VariableDecl
   , codeCollection :: CodeCollection
   , contract :: Contract
   }
@@ -44,7 +44,7 @@ contractHelper cc c@Contract{..} =
       funcAnns = functionHelper cc c _storageDefs <$> M.elems funcsAndConstr
    in concat $ varAnns ++ funcAnns
 
-functionHelper :: CodeCollection -> Contract -> M.Map Text VariableDecl -> Func -> [SourceAnnotation Text]
+functionHelper :: CodeCollection -> Contract -> M.Map Label VariableDecl -> Func -> [SourceAnnotation Text]
 functionHelper cc c stateVariables Func{..} = case funcContents of
   Nothing -> []
   Just stmts ->
@@ -187,7 +187,7 @@ ccVarHelper :: CodeCollection
             -> [SourceAnnotation Text]
 ccVarHelper CodeCollection{..} varName x = generateAnn varName x $ M.foldMapWithKey findVars _contracts
   where findVars cName Contract{..} =
-          maybeToList $ (cName <$ M.lookup (labelToText varName) _storageDefs)
+          maybeToList $ (cName <$ M.lookup varName _storageDefs)
                     <|> (cName <$ M.lookup varName _constants)
 
 ccMemberAccessHelper :: CodeCollection
@@ -204,7 +204,7 @@ ccMemberAccessHelper CodeCollection{..} c varName fieldName x =
           maybeToList $ (cName <$ M.lookup varName _enums)
                     <|> (cName <$ M.lookup varName _structs)
         findDefs = (fst <$> M.lookup varName (_enums c))
-               <|> (map (\(a,_,_) -> textToLabel a) <$> M.lookup varName (_structs c))
+               <|> (map (\(a,_,_) -> a) <$> M.lookup varName (_structs c))
         fullName = labelToText varName <> "." <> labelToText fieldName
 
 ccTypeHelper :: CodeCollection
@@ -220,7 +220,7 @@ ccTypeHelper CodeCollection{..} c x (SVMType.UnknownLabel typeName) =
           maybeToList $ (cName <$ M.lookup typeName _enums)
                     <|> (cName <$ M.lookup typeName _structs)
         findDefs = (fst <$> M.lookup typeName (_enums c))
-               <|> (map (\(a,_,_) -> textToLabel a) <$> M.lookup typeName (_structs c))
+               <|> (map (\(a,_,_) -> a) <$> M.lookup typeName (_structs c))
 ccTypeHelper _ _ _ _ = []
 
 localVarReadHelper :: Label -> SourceAnnotation () -> SSS [SourceAnnotation Text]
@@ -230,7 +230,7 @@ localVarReadHelper name x = do
     then pure []
     else do
       ~R{..} <- ask
-      case M.lookup (labelToText name) stateVars of
+      case M.lookup name stateVars of
         Nothing -> pure $ ccVarHelper codeCollection name x
         Just _ -> case mutability of
           Just Pure ->
@@ -248,7 +248,7 @@ localVarWriteHelper name x = do
     then pure []
     else do
       ~R{..} <- ask
-      case M.lookup (labelToText name) stateVars of
+      case M.lookup name stateVars of
         Nothing -> pure $ ccVarHelper codeCollection name x
         Just _ -> case mutability of
           Nothing -> pure []
