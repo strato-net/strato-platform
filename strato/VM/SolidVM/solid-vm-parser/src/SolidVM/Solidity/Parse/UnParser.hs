@@ -17,6 +17,7 @@ import           Text.Printf
 
 import           SolidVM.Model.CodeCollection
 import qualified SolidVM.Model.CodeCollection.Def as SolidVM
+import           SolidVM.Model.Label
 import           SolidVM.Model.Type (Type)
 import qualified SolidVM.Model.Type as SVMType
 import           SolidVM.Solidity.Parse.Declarations
@@ -102,7 +103,7 @@ unparseVarType (SVMType.Address _) = "address"
 unparseVarType (SVMType.Account _) = "account"
 unparseVarType (SVMType.Bytes (Just True) _ ) = "bytes"
 unparseVarType (SVMType.Bytes Nothing (Just bytes) ) = "bytes" <> (show bytes)
-unparseVarType (SVMType.UnknownLabel str) = str
+unparseVarType (SVMType.UnknownLabel str) = labelToString str
 unparseVarType (SVMType.Enum _ name _) = Text.unpack name
 unparseVarType (SVMType.Array t (Just n)) = (unparseVarType t) <> "[" <> show n <> "]"
 unparseVarType (SVMType.Array t Nothing) = (unparseVarType t) <> "[]"
@@ -216,7 +217,7 @@ unparseVarDefEntry (VarDefEntry maybeType maybeLoc theName _) =
                       Nothing -> " "
                       Just Memory -> " memory "
                       Just Storage -> " storage "
-  in typeString ++ locString ++ theName
+  in typeString ++ locString ++ labelToString theName
 
 
 
@@ -239,8 +240,8 @@ unparseExpression (MinusMinus _ v) = unparseExpression v ++ "--"
 unparseExpression (Unitary _ op v) = op ++ unparseExpression v
 unparseExpression (Binary _ op v1 v2) =
   unparseExpression v1 ++ " " ++ op ++ " " ++ unparseExpression v2
-unparseExpression (Variable _ name) = name
-unparseExpression (MemberAccess _ e name) = unparseExpression e ++ "." ++ name
+unparseExpression (Variable _ name) = labelToString name
+unparseExpression (MemberAccess _ e name) = unparseExpression e ++ "." ++ labelToString name
 unparseExpression (NumberLiteral _ x Nothing) = show x
 unparseExpression (BoolLiteral _ False) = "false"
 unparseExpression (BoolLiteral _ True) = "true"

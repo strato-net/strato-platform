@@ -13,13 +13,13 @@ import qualified Data.Map.Strict     as M
 import           Data.Maybe          (isJust, maybeToList)
 import           Data.Source
 import           Data.Text           (Text)
-import qualified Data.Text           as T
 import           SolidVM.Model.CodeCollection
+import           SolidVM.Model.Label
 import qualified SolidVM.Model.Type as SVMType
 import           SolidVM.Solidity.StaticAnalysis.Types
 
 type StateVars = M.Map Text (Bool, Bool, VariableDecl)
-type LocalVars = [M.Map String (SourceAnnotation ())]
+type LocalVars = [M.Map Label (SourceAnnotation ())]
 type SSS = State (StateVars, LocalVars)
 
 -- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]
@@ -57,12 +57,12 @@ statementsHelper ss = do
   modify $ fmap tail
   pure anns
 
-isLocalVariable :: String -> SSS Bool
+isLocalVariable :: Label -> SSS Bool
 isLocalVariable name = foldr lookupVar False <$> gets snd
   where lookupVar _ True = True
         lookupVar m _    = isJust $ M.lookup name m
 
-pushLocalVariable :: String -> SourceAnnotation () -> SSS ()
+pushLocalVariable :: Label -> SourceAnnotation () -> SSS ()
 pushLocalVariable name decl = modify . fmap $ \case
   [] -> error "This can't happen by the laws of physics"
   (x:xs) -> (M.insert name decl x):xs
@@ -116,18 +116,18 @@ simpleStatementHelper (VariableDefinition vdefs mExpr) = do
 simpleStatementHelper (ExpressionStatement expr) =
   expressionHelper expr
 
-stateVarReadHelper :: String -> SourceAnnotation () -> SSS [SourceAnnotation Text]
+stateVarReadHelper :: Label -> SourceAnnotation () -> SSS [SourceAnnotation Text]
 stateVarReadHelper name _ = do
   isLocal <- isLocalVariable name
   unless isLocal $
-    id . _1 . at (T.pack name) . _Just . _1 .= True
+    id . _1 . at (labelToText name) . _Just . _1 .= True
   pure [] -- don't @ me
 
-stateVarWriteHelper :: String -> SourceAnnotation () -> SSS [SourceAnnotation Text]
+stateVarWriteHelper :: Label -> SourceAnnotation () -> SSS [SourceAnnotation Text]
 stateVarWriteHelper name _ = do
   isLocal <- isLocalVariable name
   unless isLocal $
-    id . _1 . at (T.pack name) . _Just . _2 .= True
+    id . _1 . at (labelToText name) . _Just . _2 .= True
   pure [] -- don't @ me
 
 expressionHelper :: Expression -> SSS [SourceAnnotation Text]

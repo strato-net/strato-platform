@@ -30,6 +30,7 @@ import           Test.QuickCheck.Instances    ()
 
 import           SolidVM.Model.CodeCollection.Statement
 import qualified SolidVM.Model.CodeCollection.VarDef  as SolidVM
+import           SolidVM.Model.Label
 
 data StateMutability = Pure | Constant | View | Payable deriving (Eq, Ord, Show, Generic)
 
@@ -74,7 +75,7 @@ data FuncF a = Func
   -- relevance when constructing from the db.
   , funcContents :: Maybe [StatementF a]
   , funcVisibility :: Maybe Visibility
-  , funcConstructorCalls :: Map String [(ExpressionF a)]
+  , funcConstructorCalls :: Map Label [(ExpressionF a)]
   , funcModifiers :: Maybe [String]
   , funcContext :: a
   } deriving (Eq,Show,Generic, Functor)

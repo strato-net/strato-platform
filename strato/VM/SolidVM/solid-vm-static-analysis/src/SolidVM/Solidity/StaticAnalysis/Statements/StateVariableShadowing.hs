@@ -10,6 +10,7 @@ import           Data.Source
 import qualified Data.Text       as T
 import           Data.Text       (Text)
 import           SolidVM.Model.CodeCollection
+import           SolidVM.Model.Label
 import           SolidVM.Solidity.StaticAnalysis.Types
 
 -- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]
@@ -58,7 +59,7 @@ simpleStatementHelper vars (VariableDefinition entries _) =
   catMaybes $ lookupVar <$> entries
   where
     lookupVar BlankEntry = Nothing
-    lookupVar v = applyWarning v <$> M.lookup (T.pack $ vardefName v) vars
+    lookupVar v = applyWarning v <$> M.lookup (labelToText $ vardefName v) vars
     applyWarning local state =
       let statePos = _sourceAnnotationStart $ varContext state
           statePosStr = concat
@@ -68,10 +69,10 @@ simpleStatementHelper vars (VariableDefinition entries _) =
             , ", column "
             , show $ _sourcePositionColumn statePos
             ]
-          msg = T.pack $ concat
+          msg = T.concat
             [ "Local variable shadowing state variable. "
-            , vardefName local
+            , labelToText $ vardefName local
             , " shadows the variable defined at "
-            , statePosStr
+            , T.pack statePosStr
             ]
        in const msg <$> vardefContext local

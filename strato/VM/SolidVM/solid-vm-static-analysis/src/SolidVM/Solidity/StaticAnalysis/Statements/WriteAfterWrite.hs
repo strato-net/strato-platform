@@ -11,9 +11,10 @@ import           Data.Maybe      (maybeToList)
 import           Data.Source
 import           Data.Text       (Text)
 import           SolidVM.Model.CodeCollection
+import           SolidVM.Model.Label
 import           SolidVM.Solidity.StaticAnalysis.Types
 
-type SSS = State (M.Map String (SourceAnnotation ()))
+type SSS = State (M.Map Label (SourceAnnotation ()))
 
 -- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]
 detector :: CompilerDetector

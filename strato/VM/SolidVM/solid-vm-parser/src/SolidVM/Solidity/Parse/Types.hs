@@ -14,6 +14,7 @@ import           SolidVM.Solidity.Parse.Expression
 import           SolidVM.Solidity.Parse.Lexer
 import           SolidVM.Solidity.Parse.ParserTypes
 
+import           SolidVM.Model.Label
 import qualified SolidVM.Model.Type         as SVMType
 
 -- | A type expression is either a composite type (arrays and mappings) or
@@ -33,7 +34,7 @@ simpleType =
   bytes' <|>
   intSuffixed "uint"  (SVMType.Int (Just False)) <|>
   intSuffixed "int"  (SVMType.Int (Just True)) <|>
-  SVMType.UnknownLabel <$>
+  SVMType.UnknownLabel . stringToLabel <$>
     choice [
       identifier,
       concat <$> sequence [identifier, dot, identifier]

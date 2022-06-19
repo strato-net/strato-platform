@@ -25,6 +25,7 @@ import qualified Data.Text       as T
 import           Data.Traversable (for)
 import           SolidVM.Model.CodeCollection
 import           SolidVM.Solidity.StaticAnalysis.Types
+import           SolidVM.Model.Label
 import           SolidVM.Model.Type (Type)
 import qualified SolidVM.Model.Type as SVMType
 import           Text.Read (readMaybe)
@@ -39,9 +40,9 @@ data R = R
   , contract :: Annotated ContractF
   , function :: Maybe (Annotated FuncF)
   }
-type SSS = StateT (NonEmpty (Maybe Type', M.Map String (Annotated VarDefEntryF))) (Reader R)
+type SSS = StateT (NonEmpty (Maybe Type', M.Map Label (Annotated VarDefEntryF))) (Reader R)
 
-data TypeF' a = Top { topName :: (S.Set String)
+data TypeF' a = Top { topName :: (S.Set Label)
                     , topContext :: a
                     }
               | Bottom (NonEmpty a)
@@ -74,7 +75,7 @@ showType (SVMType.Bytes _ b) = "bytes"
 showType SVMType.Bool = "bool"
 showType (SVMType.Address _) = "address"
 showType (SVMType.Account _) = "account"
-showType (SVMType.UnknownLabel s) = "label " <> T.pack s
+showType (SVMType.UnknownLabel s) = "label " <> labelToText s
 showType (SVMType.Struct _ n) = "struct " <> n
 showType (SVMType.Enum _ n _) = "enum " <> n
 showType (SVMType.Array t l) = T.concat
@@ -129,12 +130,12 @@ varDefsToType' VarDefEntry{..} _              = bottom $ "Could not match variab
 lookupEnum :: Text -> SSS [Text]
 lookupEnum name = do
   c <- asks contract
-  pure . fmap T.pack . maybe [] fst $ M.lookup (T.unpack name) (_enums c)
+  pure . fmap labelToText . maybe [] fst $ M.lookup (textToLabel name) (_enums c)
 
 lookupStruct :: Text -> SSS [(Text, Type)]
 lookupStruct name = do
   c <- asks contract
-  let str = fromMaybe [] $ M.lookup (T.unpack name) (_structs c)
+  let str = fromMaybe [] $ M.lookup (textToLabel name) (_structs c)
   pure $ f <$> str
   where f (t, ft, _) = (t, fieldTypeType ft)
 
@@ -142,10 +143,10 @@ lookupContractFunction :: SourceAnnotation Text -> Text -> Text -> SSS Type'
 lookupContractFunction x cName fName = do
   --liftIO $ putStrLn $ C.green ("lookupContractFunction " ++ (show cName) ++ " " ++ (show fName))
   ~CodeCollection{..} <- asks codeCollection
-  case M.lookup (T.unpack cName) _contracts of
+  case M.lookup (textToLabel cName) _contracts of
     Nothing -> pure . bottom $ ("Unknown contract: " <> cName) <$ x
-    Just c -> case M.lookup (T.unpack fName) (_functions c) of
-      Nothing -> case M.lookup (T.unpack fName) (_constants c) of
+    Just c -> case M.lookup (textToLabel fName) (_functions c) of
+      Nothing -> case M.lookup (textToLabel fName) (_constants c) of
         Nothing -> case M.lookup fName (_storageDefs c) of
           Nothing -> pure . bottom $ (T.concat
             [ "Unknown contract function: "
@@ -280,7 +281,7 @@ context' (Sum (a :| _))    = context' a
 context' MultiVariate{..}  = multiVariateContext
 
 
-typecheck' :: Monad m => (SourceAnnotation Text -> String -> Type -> m Type') -> Type' -> Type' -> m Type'
+typecheck' :: Monad m => (SourceAnnotation Text -> Label -> Type -> m Type') -> Type' -> Type' -> m Type'
 typecheck' f r1 r2 = case (r1, r2) of
   (Bottom e1, Bottom e2) -> pure $ Bottom (e1 <> e2)
   (Bottom e, _) -> pure $ Bottom e
@@ -340,7 +341,7 @@ ma !> mb = do
   pure $ const' b a
 infixl 5 !>
 
-typecheckProduct :: Monad m => (SourceAnnotation Text -> String -> Type -> m Type') -> SourceAnnotation Text -> [Type'] -> [Type'] -> m Type'
+typecheckProduct :: Monad m => (SourceAnnotation Text -> Label -> Type -> m Type') -> SourceAnnotation Text -> [Type'] -> [Type'] -> m Type'
 typecheckProduct f c t1 t2 = typecheckProduct' (Product t1 c) (Product t2 c) t1 t2
   where
     typecheckProduct' _ _ []     []     = pure $ Product [] c
@@ -408,14 +409,14 @@ typecheckStatic (SVMType.UnknownLabel a) (SVMType.UnknownLabel b) =
   if a == b || a == "" || b == ""
     then Right (SVMType.UnknownLabel $ string' [a, b])
     else Left $ "Type mismatch: labels "
-             <> T.pack a
+             <> labelToText a
              <> " and "
-             <> T.pack b
+             <> labelToText b
              <> " do not match."
 typecheckStatic (SVMType.UnknownLabel a) b@SVMType.Struct{} =
-  typecheckStatic (SVMType.Struct Nothing (T.pack a)) b
+  typecheckStatic (SVMType.Struct Nothing $ labelToText a) b
 typecheckStatic a@SVMType.Struct{} (SVMType.UnknownLabel b) =
-  typecheckStatic a (SVMType.Struct Nothing (T.pack b))
+  typecheckStatic a (SVMType.Struct Nothing $ labelToText b)
 typecheckStatic (SVMType.Struct b1 t1) (SVMType.Struct b2 t2) =
   case (b1, b2) of
     (Just a, Just b) | a /= b -> Left "Mismatched byte sizes between struct types"
@@ -428,9 +429,9 @@ typecheckStatic (SVMType.Struct b1 t1) (SVMType.Struct b2 t2) =
                  <> t2
                  <> " do not match."
 typecheckStatic (SVMType.UnknownLabel a) b@SVMType.Enum{} =
-  typecheckStatic (SVMType.Enum Nothing (T.pack a) Nothing) b
+  typecheckStatic (SVMType.Enum Nothing (labelToText a) Nothing) b
 typecheckStatic a@SVMType.Enum{} (SVMType.UnknownLabel b) =
-  typecheckStatic a (SVMType.Enum Nothing (T.pack b) Nothing)
+  typecheckStatic a (SVMType.Enum Nothing (labelToText b) Nothing)
 typecheckStatic (SVMType.Enum b1 t1 n1) (SVMType.Enum b2 t2 n2) =
   case (b1, b2) of
     (Just a, Just b) | a /= b -> Left "Mismatched byte sizes between enum types"
@@ -449,9 +450,9 @@ typecheckStatic (SVMType.Array t1 l1) (SVMType.Array t2 l2) = do
     (Just a, Just b) | a /= b -> Left "Mismatched length between array values"
     _ -> Right $ SVMType.Array e (l1 <|> l2)
 typecheckStatic (SVMType.UnknownLabel a) b@SVMType.Contract{} =
-  typecheckStatic (SVMType.Contract (T.pack a)) b
+  typecheckStatic (SVMType.Contract $ labelToText a) b
 typecheckStatic a@SVMType.Contract{} (SVMType.UnknownLabel b) =
-  typecheckStatic a (SVMType.Contract (T.pack b))
+  typecheckStatic a (SVMType.Contract $ labelToText b)
 typecheckStatic (SVMType.Contract a) (SVMType.Contract b) =
   if a == b || a == "" || b == ""
     then Right (SVMType.Contract $ string' [a, b])
@@ -517,12 +518,11 @@ typecheckMember (Static (SVMType.UnknownLabel "block") x) "gaslimit" = pure $ St
 typecheckMember (Static (SVMType.UnknownLabel "super") x) method = do
   ctract <- asks contract
   cc <- asks codeCollection
-  let method' = T.unpack method
   case getParents ((fmap $ const ()) <$> cc) ((fmap $ const ()) <$> ctract) of
     Left _ -> pure . bottom $ "Contract has missing parents" <$ x
-    Right parents' -> case filter (elem method' . M.keys .  _functions) parents' of
+    Right parents' -> case filter (elem (textToLabel method) . M.keys .  _functions) parents' of
       [] -> pure . bottom $ "cannot use super without a parent contract" <$ x
-      ps -> case M.lookup method' . _functions $ last ps of
+      ps -> case M.lookup (textToLabel method) . _functions $ last ps of
         Nothing -> pure . bottom $ ("super does not have a function called " <> method) <$ x
         Just Func{..} ->
           let fArgs = flip Product x $ flip Static x . indexedTypeType . snd <$> funcArgs
@@ -565,19 +565,18 @@ typecheckMember (Static (SVMType.Contract _) x) "code" = pure $ Static (SVMType.
 typecheckMember (Static (SVMType.Contract _) x) "codehash" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.Contract _) x) "chainId" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Contract c) x) n = lookupContractFunction x c n
-typecheckMember (Static (SVMType.UnknownLabel c') x) n = do
-  let c = T.pack c'
-  e <- typecheckMember (Static (SVMType.Enum Nothing c Nothing) x) n
+typecheckMember (Static (SVMType.UnknownLabel c) x) n = do
+  e <- typecheckMember (Static (SVMType.Enum Nothing (labelToText c) Nothing) x) n
   case e of
     Bottom _ -> do
-      s <- typecheckMember (Static (SVMType.Struct Nothing c) x) n
+      s <- typecheckMember (Static (SVMType.Struct Nothing $ labelToText c) x) n
       case s of
         Bottom _ -> do
-          f <- typecheckMember (Static (SVMType.Contract c) x) n
+          f <- typecheckMember (Static (SVMType.Contract $ labelToText c) x) n
           case f of
             Bottom _ -> pure . bottom $ (T.concat
               [ "Missing label: "
-              , c
+              , labelToText c
               , (T.pack (show f))
               , " is not a known enum, struct, or contract."
               ]) <$ x
@@ -589,7 +588,7 @@ typecheckMember x n = pure . bottom $ ("Unknown member: " <> showType' x <> "." 
 getConstructorType' :: MonadReader R m => SourceAnnotation Text -> Text -> m Type'
 getConstructorType' x l = do
   ~CodeCollection{..} <- asks codeCollection
-  case M.lookup (T.unpack l) _contracts of
+  case M.lookup (textToLabel l) _contracts of
     Nothing -> pure . bottom $ ("Unknown contract: " <> l) <$ x
     Just c -> case _constructor c of
       Nothing -> pure $ Function (Product [] x) (Static (SVMType.Contract l) x) x
@@ -660,15 +659,15 @@ functionHelper cc c f@Func{..} = case funcContents of
         args = (\(it,n) -> ( n
                            , VarDefEntry (Just $ indexedTypeType it) Nothing n funcContext
                            ))
-           <$> (map (fmap T.unpack) . catMaybes $ sequence . swap <$> funcArgs)
+           <$> (map (fmap textToLabel) . catMaybes $ sequence . swap <$> funcArgs)
         vals = (\(it,n) -> ( n
                            , VarDefEntry (Just $ indexedTypeType it) Nothing n funcContext
                            ))
-           <$> (map (fmap T.unpack) . catMaybes $ sequence . swap <$> funcVals)
+           <$> (map (fmap textToLabel) . catMaybes $ sequence . swap <$> funcVals)
         argVals = M.fromList $ args ++ vals
      in runReader (statementsHelper argVals stmts) r
 
-statementsHelper :: (M.Map String (Annotated VarDefEntryF))
+statementsHelper :: (M.Map Label (Annotated VarDefEntryF))
                  -> [Annotated StatementF]
                  -> Reader R Type'
 statementsHelper args ss = do
@@ -681,10 +680,9 @@ statementsHelper args ss = do
       let x = funcContext f
       ~(ts', s) <- flip runStateT ((Nothing, args) :| []) $ do
         cCalls <- for (M.assocs $ funcConstructorCalls f) $ \(cName, exprs) -> do
-          let cName' = T.pack cName
-              constructorArgs = getConstructorType' x cName'
+          let constructorArgs = getConstructorType' x $ labelToText cName
               givenArgs = flip Product x <$> traverse tcExpr exprs
-              givenFunc = (\t-> Function t (Static (SVMType.Contract cName') x) x) <$> givenArgs
+              givenFunc = (\t-> Function t (Static (SVMType.Contract $ labelToText cName) x) x) <$> givenArgs
           constructorArgs <~> givenFunc
         stmts' <- traverse statementHelper ss
         pure $ concat [stmts', cCalls]
@@ -822,12 +820,12 @@ getVarType' s@('u':'i':'n':'t':n) ctx = case n of
   [] -> pure $ Function (intArgs ctx) (Static (SVMType.Int (Just False) Nothing) ctx) ctx
   _ -> case readMaybe n of
     Just n' -> pure $ Function (intArgs ctx) (Static (SVMType.Int (Just False) (Just n')) ctx) ctx
-    Nothing -> getVarTypeByName' s ctx
+    Nothing -> getVarTypeByName' (stringToLabel s) ctx
 getVarType' s@('i':'n':'t':n) ctx = case n of
   [] -> pure $ Function (intArgs ctx) (Static (SVMType.Int (Just True) Nothing) ctx) ctx
   _ -> case readMaybe n of
     Just n' -> pure $ Function (intArgs ctx) (Static (SVMType.Int (Just True) (Just n')) ctx) ctx
-    Nothing -> getVarTypeByName' s ctx
+    Nothing -> getVarTypeByName' (stringToLabel s) ctx
 getVarType' "address" ctx =  pure $ Function (addressArgs ctx) (Static (SVMType.Account False) ctx) ctx
 getVarType' "account" ctx =  pure $ Function (accountArgs ctx) (Static (SVMType.Account False) ctx) ctx
 --This is either the string() function or the string.member() function
@@ -837,7 +835,7 @@ getVarType' s@('b':'y':'t':'e':'s':n) ctx = case n of
   [] -> pure $ Function (byteArgs ctx) (Static (SVMType.Bytes Nothing Nothing) ctx) ctx
   _ -> case readMaybe n of
     Just n' -> pure $ Function (byteArgs ctx) (Static (SVMType.Bytes Nothing (Just n')) ctx) ctx
-    Nothing -> getVarTypeByName' s ctx
+    Nothing -> getVarTypeByName' (stringToLabel s) ctx
 getVarType' "byte" ctx =  pure $ Function (byteArgs ctx) (intType' ctx) ctx
 getVarType' "push" ctx =  pure $ Function (topType' ctx) (Product [] ctx) ctx
 getVarType' "identity" ctx =  pure $ Function (topType' ctx) (topType' ctx) ctx
@@ -857,9 +855,9 @@ getVarType' "msg" ctx = pure $ Static (SVMType.UnknownLabel "msg") ctx
 getVarType' "tx" ctx = pure $ Static (SVMType.UnknownLabel "tx") ctx
 getVarType' "block" ctx = pure $ Static (SVMType.UnknownLabel "block") ctx
 getVarType' "super" ctx = pure $ Static (SVMType.UnknownLabel "super") ctx
-getVarType' name ctx = getVarTypeByName' name ctx
+getVarType' name ctx = getVarTypeByName' (stringToLabel name) ctx
   
-getVarTypeByName' :: String -> SourceAnnotation Text -> SSS Type'
+getVarTypeByName' :: Label -> SourceAnnotation Text -> SSS Type'
 getVarTypeByName' name ctx = do
   mVar <- foldr (lookupVar . snd) Nothing <$> get
   case mVar of
@@ -869,10 +867,10 @@ getVarTypeByName' name ctx = do
       Nothing -> pure $ Top (S.singleton name) ctx
     Nothing -> do
       c <- asks contract
-      let mVarDecl = ((varType &&& const ctx) <$> M.lookup (T.pack name) (_storageDefs c))
+      let mVarDecl = ((varType &&& const ctx) <$> M.lookup (labelToText name) (_storageDefs c))
                  <|> ((constType &&& const ctx) <$> M.lookup name (_constants c))
-                 <|> (const (SVMType.Enum Nothing (T.pack name) Nothing, ctx) <$> M.lookup name (_enums c))
-                 <|> (const (SVMType.Struct Nothing (T.pack name), ctx) <$> M.lookup name (_structs c))
+                 <|> (const (SVMType.Enum Nothing (labelToText name) Nothing, ctx) <$> M.lookup name (_enums c))
+                 <|> (const (SVMType.Struct Nothing (labelToText name), ctx) <$> M.lookup name (_structs c))
       case mVarDecl of
         Just (e@(SVMType.Enum{}), ctx') -> pure . Sum $
           (Static e ctx') :|
@@ -896,31 +894,31 @@ getVarTypeByName' name ctx = do
             cc <- asks codeCollection
             pure $ case M.lookup name $ _contracts cc of
               Just _->
-                let ctrct = Static (SVMType.Contract $ T.pack name) ctx
+                let ctrct = Static (SVMType.Contract $ labelToText name) ctx
                     lbl = Static (SVMType.UnknownLabel name) ctx
                  in Sum $ ctrct :|
                         [Function (Sum (Static (SVMType.Account False) ctx :| [ctrct, lbl]))
                            ctrct
                            ctx]
-              Nothing -> bottom $ ("Unknown variable: " <> T.pack name) <$ ctx
+              Nothing -> bottom $ ("Unknown variable: " <> labelToText name) <$ ctx
             
   where lookupVar m Nothing = M.lookup name m
         lookupVar _ t       = t
 
-setVarType' :: SourceAnnotation Text -> String -> Type -> SSS Type'
+setVarType' :: SourceAnnotation Text -> Label -> Type -> SSS Type'
 setVarType' ctx name ty = state setType'
   where setType' (m:|ms) = case M.lookup name $ snd m of
           Nothing -> case ms of
-            [] -> (bottom $ ("Unknown variable: " <> T.pack name) <$ ctx, m:|[])
+            [] -> (bottom $ ("Unknown variable: " <> labelToText name) <$ ctx, m:|[])
             (r:est) -> NE.cons m <$> setType' (r:|est)
-          Just BlankEntry -> (bottom $ ("Variable listed as BlankEntry: " <> T.pack name) <$ ctx, m:|ms)
+          Just BlankEntry -> (bottom $ ("Variable listed as BlankEntry: " <> labelToText name) <$ ctx, m:|ms)
           Just t@VarDefEntry{..} -> case vardefType of
             Nothing ->
               let t' = t{vardefType = Just ty}
                in (Static ty ctx, (M.insert name t' <$> m) :| ms)
             Just ty' -> case typecheckStatic ty ty' of
               Right ty'' -> (Static ty'' ctx, m:|ms)
-              Left e -> (bottom $ ("Variable " <> T.pack name <> " being updated with wrong type: " <> e) <$ ctx, m:|ms)
+              Left e -> (bottom $ ("Variable " <> labelToText name <> " being updated with wrong type: " <> e) <$ ctx, m:|ms)
 
 pushLocalVariable :: Annotated VarDefEntryF -> SSS ()
 pushLocalVariable BlankEntry = pure ()
@@ -1048,7 +1046,7 @@ tcExpr (MinusMinus x a) = do
   intType' x ~> tcExpr a
 tcExpr (NewExpression x b@SVMType.Bytes{}) = pure $ Static b x
 tcExpr (NewExpression x a@SVMType.Array{}) = pure $ Static a x
-tcExpr (NewExpression x (SVMType.UnknownLabel l)) = getConstructorType' x $ T.pack l
+tcExpr (NewExpression x (SVMType.UnknownLabel l)) = getConstructorType' x $ labelToText l
 tcExpr (NewExpression x (SVMType.Contract l)) = getConstructorType' x l
 tcExpr (NewExpression x t) = pure . bottom $ ("Cannot use keyword 'new' in conjuction with type " <> showType t) <$ x
 tcExpr (IndexAccess _ a (Just b)) = do
@@ -1058,7 +1056,7 @@ tcExpr (IndexAccess _ a (Just b)) = do
 tcExpr (IndexAccess _ a Nothing) = tcExpr a
 tcExpr (MemberAccess _ a fieldName) = do
   t <- tcExpr a
-  typecheckMember t (T.pack fieldName)
+  typecheckMember t $ labelToText fieldName
 tcExpr (FunctionCall x expr args) = do
   e <- tcExpr expr
   a <- case args of
@@ -1083,5 +1081,5 @@ tcExpr (ArrayExpression x es) = do
   pure $ case t' of
     (Static t _) -> Static (SVMType.Array t Nothing) x
     _ -> t'
-tcExpr (Variable x name) = getVarType' name x
+tcExpr (Variable x name) = getVarType' (labelToString name) x
 tcExpr (ObjectLiteral x _) = pure . bottom $ "Cannot use object literals within contract definitions" <$ x

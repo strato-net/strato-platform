@@ -24,6 +24,7 @@ import           Text.Printf                          (printf)
 
 import qualified SolidVM.Model.CodeCollection              as SolidVM
 import qualified SolidVM.Model.CodeCollection.Def          as SolidVM
+import           SolidVM.Model.Label
 import qualified SolidVM.Model.Type                        as SVMType
 
 import           SolidVM.Solidity.Parse.Statement
@@ -372,10 +373,10 @@ tupleDeclaration = parens $ commaSep $ do
 data FuncModifiers = ReturnsMod [(Text, SVMType.Type)]
                    | VisibilityMod SolidVM.Visibility
                    | MutabilityMod SolidVM.StateMutability
-                   | ConstructorCallMod (String, [SolidVM.Expression])
+                   | ConstructorCallMod (Label, [SolidVM.Expression])
                    | OtherMod String
 
-functionModifiers :: SolidityParser ([(Text, SVMType.Type)], SolidVM.Visibility, Maybe SolidVM.StateMutability, [(String, [SolidVM.Expression])], [String])
+functionModifiers :: SolidityParser ([(Text, SVMType.Type)], SolidVM.Visibility, Maybe SolidVM.StateMutability, [(Label, [SolidVM.Expression])], [String])
 functionModifiers = do
   vals <- many $ (ReturnsMod <$> returnModifier)
              <|>  (VisibilityMod <$> visibilityModifier)
@@ -407,7 +408,7 @@ functionModifiers = do
       <|> (reserved "payable"  >> return SolidVM.Payable)
       )
     constructorCallModifiers = do
-      name <- identifier
+      name <- stringToLabel <$> identifier
       exps <- parens $ commaSep expression
       return (name, exps)
     otherModifiers = do

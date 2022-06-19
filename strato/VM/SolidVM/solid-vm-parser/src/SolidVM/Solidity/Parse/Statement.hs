@@ -12,6 +12,7 @@ import           Text.Parsec
 import           Text.Parsec.Expr
 
 import           SolidVM.Model.CodeCollection.Statement
+import           SolidVM.Model.Label
 import           SolidVM.Model.Type
 import           SolidVM.Solidity.Parse.Lexer
 import           SolidVM.Solidity.Parse.ParserTypes
@@ -139,7 +140,7 @@ location = optionMaybe $ asum [ reserved "memory" >> return Memory
 
 varDefEntry :: SolidityParser (Maybe Type) -> SolidityParser VarDefEntry
 varDefEntry tpar = do
-  ~(a, (t,l,i)) <- withPosition $ liftM3 (,,) tpar location identifier
+  ~(a, (t,l,i)) <- withPosition $ liftM3 (,,) tpar location $ fmap stringToLabel identifier
   pure $ VarDefEntry t l i a
 
 variableDefinitionStatement :: SolidityParser SimpleStatement
@@ -219,10 +220,10 @@ postfix :: Stream s m t =>
            ParsecT s u m (a -> a) -> Operator s u m a
 postfix p = Postfix . chainl1 p $ return (flip (.))
 
-memberName :: SolidityParser String
+memberName :: SolidityParser Label
 memberName = do
-  (reserved "length" >> return "length")
-  <|> identifier
+  (reserved "length" >> return (stringToLabel "length"))
+  <|> fmap stringToLabel identifier
 
 tuple :: SolidityParser Expression -- includes the case of a 1-tuple, ie- parens...  but just returns as a simple expression
 tuple = do
@@ -276,23 +277,24 @@ primaryExpression :: SolidityParser Expression
 primaryExpression = do
   let res' a b = withPosition $ b <$ reserved a
       res  a   = res' a a
-  (uncurry Variable <$> res "msg")
-    <|> (uncurry Variable <$> res "address")
-    <|> (uncurry Variable <$> res "account")
-    <|> (uncurry Variable <$> res "payable")
-    <|> (uncurry Variable <$> res "bool")
-    <|> (uncurry Variable <$> res "this")
-    <|> (uncurry Variable <$> res "block")
-    <|> (uncurry Variable <$> res "tx")
-    <|> (uncurry Variable <$> res "uint")
-    <|> (uncurry Variable <$> res "int")
-    <|> (uncurry Variable <$> res "byte")
-    <|> (uncurry Variable <$> res "bytes")
-    <|> (uncurry Variable <$> res "string")
+      
+  (uncurry Variable . fmap stringToLabel <$> res "msg")
+    <|> (uncurry Variable . fmap stringToLabel <$> res "address")
+    <|> (uncurry Variable . fmap stringToLabel <$> res "account")
+    <|> (uncurry Variable . fmap stringToLabel <$> res "payable")
+    <|> (uncurry Variable . fmap stringToLabel <$> res "bool")
+    <|> (uncurry Variable . fmap stringToLabel <$> res "this")
+    <|> (uncurry Variable . fmap stringToLabel <$> res "block")
+    <|> (uncurry Variable . fmap stringToLabel <$> res "tx")
+    <|> (uncurry Variable . fmap stringToLabel <$> res "uint")
+    <|> (uncurry Variable . fmap stringToLabel <$> res "int")
+    <|> (uncurry Variable . fmap stringToLabel <$> res "byte")
+    <|> (uncurry Variable . fmap stringToLabel <$> res "bytes")
+    <|> (uncurry Variable . fmap stringToLabel <$> res "string")
     <|> (uncurry BoolLiteral <$> res' "false" False)
     <|> (uncurry BoolLiteral <$> res' "true" True)
     <|> (uncurry NewExpression <$> withPosition (reserved "new" >> simpleTypeExpression))
-    <|> (uncurry Variable <$> withPosition identifier)
+    <|> (uncurry Variable <$> withPosition (stringToLabel <$> identifier))
     <|> (do 
             ~(a, (val, nu)) <- withPosition $ do
               val <- integer

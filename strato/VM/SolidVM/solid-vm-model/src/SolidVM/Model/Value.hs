@@ -44,9 +44,9 @@ import           Blockchain.Strato.Model.Address
 
 
 import qualified SolidVM.Model.CodeCollection            as CC
+import           SolidVM.Model.Label
 import qualified SolidVM.Model.Storable                  as MS
 import qualified SolidVM.Model.Type                      as SVMType
-
 
 
 data IndexType = ArrayIndex | MapBoolIndex | MapAccountIndex | MapIntIndex | MapStringIndex deriving (Show, Eq)
@@ -100,10 +100,10 @@ data Value =
   | SBool Bool
   | SAccount NamedAccount Bool --isPayable
    -- This is a payable account, which means it can use .transfer() , .send() , .call() , .delegatecall() and .staticcall()
-  | SEnum String
-  | SEnumVal String String Word32
+  | SEnum Label
+  | SEnumVal Label Label Word32
   | SStructDef String
-  | SStruct String (Map String Variable)
+  | SStruct Label (Map String Variable)
   | STuple (Vector Variable)
   | SArray SVMType.Type (Vector Variable)
   | SMap SVMType.Type (Map Value Variable)
@@ -113,7 +113,7 @@ data Value =
   | SSetterGetter String (Maybe Value)
   | SContractDef String
   | SContractItem NamedAccount String
-  | SContract String NamedAccount
+  | SContract Label NamedAccount
   | SContractFunction (Maybe String) NamedAccount String -- contractName, address, functionName
   | SPush Value (Maybe Variable)-- The array function
   -- | SSend Value (Maybe Variable) 
