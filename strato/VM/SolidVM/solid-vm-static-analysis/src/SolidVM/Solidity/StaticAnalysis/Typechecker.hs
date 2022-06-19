@@ -663,7 +663,7 @@ functionHelper cc c f@Func{..} = case funcContents of
         vals = (\(it,n) -> ( n
                            , VarDefEntry (Just $ indexedTypeType it) Nothing n funcContext
                            ))
-           <$> (map (fmap textToLabel) . catMaybes $ sequence . swap <$> funcVals)
+           <$> (catMaybes $ sequence . swap <$> funcVals)
         argVals = M.fromList $ args ++ vals
      in runReader (statementsHelper argVals stmts) r
 

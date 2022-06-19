@@ -274,7 +274,7 @@ functionXabi = do
   return SolidVM.Func{
         SolidVM.funcArgs = map (\(k, v) -> (fmap textToLabel k, v)) $
            zipWith (\x i -> fmap (SolidVM.IndexedType i) (nameUnnamed x)) functionArgs [0..]
-      , SolidVM.funcVals =
+      , SolidVM.funcVals = map (\(k, v) -> (fmap textToLabel k, v)) $
            zipWith (\v i -> fmap (SolidVM.IndexedType i) (nameUnnamed v)) functionRet [0..]
       , SolidVM.funcContents = contents
       , SolidVM.funcVisibility = Just visibility

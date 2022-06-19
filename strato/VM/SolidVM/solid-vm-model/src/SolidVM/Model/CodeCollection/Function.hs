@@ -67,7 +67,7 @@ instance ToSchema StateMutability where
 
 data FuncF a = Func
   { funcArgs :: [(Maybe Label, SolidVM.IndexedType)]
-  , funcVals :: [(Maybe Text, SolidVM.IndexedType)]
+  , funcVals :: [(Maybe Label, SolidVM.IndexedType)]
   , funcStateMutability :: Maybe StateMutability
 
   -- These Values are only used for parsing and unparsing solidity.

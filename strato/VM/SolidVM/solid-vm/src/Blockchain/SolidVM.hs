@@ -2352,7 +2352,7 @@ runTheCall :: MonadSM m
            -> Bool
            -> m (Maybe Value)
 runTheCall address' contract' funcName hsh cc theFunction argVals ro = do
-  let returns = [(textToLabel n, (t, defaultValue contract' t)) | (Just n, CC.IndexedType _ t) <- CC.funcVals theFunction]
+  let returns = [(n, (t, defaultValue contract' t)) | (Just n, CC.IndexedType _ t) <- CC.funcVals theFunction]
       args = case argVals of
         OrderedVals vs -> let argMeta = 
                                 map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t))

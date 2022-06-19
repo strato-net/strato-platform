@@ -140,7 +140,7 @@ unparseFuncWithoutName Func{..} =
         [] -> ""
         vals ->
               "returns ("
-          <> Text.intercalate ", " (List.map unparseVals $ map (\(maybeName, v) -> (fromMaybe "" maybeName , v)) vals)
+          <> Text.intercalate ", " (List.map unparseVals $ map (\(maybeName, v) -> (fromMaybe "" $ fmap labelToText maybeName , v)) vals)
           <> ") "
     <> "{\n        "
     <> case funcContents of

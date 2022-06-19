@@ -53,7 +53,7 @@ functionHelper cc c stateVariables Func{..} = case funcContents of
         valTypes = indexedTypeType . snd <$> funcVals
         typeAnns = ccTypeHelper cc c funcContext <$> argTypes ++ valTypes
         argNames = catMaybes $ fst <$> funcArgs
-        valNames = textToLabel <$> (catMaybes $ fst <$> funcVals)
+        valNames = catMaybes $ fst <$> funcVals
         names = M.fromList $ zip (argNames ++ valNames) (repeat funcContext)
         nameAnns = runReader (statementsHelper names stmts) r
      in concat $ nameAnns : typeAnns
