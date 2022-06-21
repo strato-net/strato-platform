@@ -349,7 +349,7 @@ showSM (SInteger v) = return $ show v
 showSM (SString v) = return v
 showSM (SBool v) = return $ show v
 showSM (SEnumVal enumName valName num) = return
-    $ printf "%s.%s (= %x)" enumName valName num
+    $ printf "%s.%s (= %x)" (labelToText enumName) (labelToText valName) num
 showSM (SAccount a _) = return $ show a
 showSM (STuple v) = do
   vals <- mapM getVar (V.toList v)

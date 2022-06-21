@@ -1640,7 +1640,7 @@ expToVar' (CC.FunctionCall _ e args) = do
 
           Constant (SBuiltinFunction name o) -> case argVals of
             OrderedVals vs -> Constant <$> callBuiltin name vs o
-            NamedVals{} -> invalidArguments (printf "expToVar'/builtinfunction: cannot used namedvals with builtin %s" name) argVals
+            NamedVals{} -> invalidArguments (printf "expToVar'/builtinfunction: cannot used namedvals with builtin %s" $ labelToText name) argVals
 
 
           Constant (SFunction funcName func) -> do

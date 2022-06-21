@@ -251,7 +251,7 @@ unparseExpression (IndexAccess _ e maybeVal) = unparseExpression e ++ "[" ++ fro
 unparseExpression (FunctionCall _ e args) =
     let shownArgs = case args of
                       OrderedArgs xs -> List.intercalate "," $ map unparseExpression xs
-                      NamedArgs xs -> "{" ++ List.intercalate "," (map (\(n, x) -> printf "%s:%s" n $ unparseExpression x) xs) ++ "}"
+                      NamedArgs xs -> "{" ++ List.intercalate "," (map (\(n, x) -> printf "%s:%s" (labelToText n) $ unparseExpression x) xs) ++ "}"
     in unparseExpression e ++ "(" ++ shownArgs ++ ")"
 unparseExpression (Ternary _ x y z) = unparseExpression x ++ "?" ++ unparseExpression y ++ ":" ++ unparseExpression z
 unparseExpression (NewExpression _ x) = "new " ++ unparseVarType x
