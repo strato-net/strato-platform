@@ -89,7 +89,7 @@ class OAuthUtil {
       });
       const response = await discoveryClient
             .get("/")
-            .then((res: any) => response.data)
+            .then((res: any) => res.data)
       this.openIdConfig = JSON.parse(response);
       this.jwtAlgorithm = this.openIdConfig.id_token_signing_alg_values_supported;
       this.issuer = this.openIdConfig.issuer;
@@ -102,7 +102,7 @@ class OAuthUtil {
         });
         const keyResponse = await jwksClient
             .get("/")
-            .then((res: any) => response.data)
+            .then((res: any) => res.data)
         this.keys = JSON.parse(keyResponse).keys;
       }
     } catch (error) {
