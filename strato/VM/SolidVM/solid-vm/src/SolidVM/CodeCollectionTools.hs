@@ -19,7 +19,7 @@ import           Blockchain.SolidVM.Exception
 
 import           SolidVM.Model.CodeCollection
 import qualified SolidVM.Model.CodeCollection.Def as Def
-import           SolidVM.Model.Label
+import           SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type               as SVMType
 
 import           SolidVM.Solidity.Xabi
@@ -27,7 +27,7 @@ import qualified SolidVM.Solidity.Xabi as Xabi
 
 type SolidEither = Either (Positioned ((,) SolidException))
 
-xabiToContract :: Label -> [Label] -> String -> Xabi -> SolidEither Contract
+xabiToContract :: SolidString -> [SolidString] -> String -> Xabi -> SolidEither Contract
 xabiToContract contractName' parents' vmVersion' xabi = do
   validateXabi xabi
   constr <- case M.toList $ Xabi.xabiConstr xabi of
@@ -99,7 +99,7 @@ resolveLabelsInContract :: CodeCollection -> Contract -> Contract
 resolveLabelsInContract cc c =
   c{_storageDefs=fmap (resolveLabelsInDef (cc^.contracts) (c^.enums) (c^.structs)) $ c^.storageDefs}
 
-resolveLabelsInDef :: Map Label Contract -> Map Label a -> Map Label b -> VariableDecl -> VariableDecl
+resolveLabelsInDef :: Map SolidString Contract -> Map SolidString a -> Map SolidString b -> VariableDecl -> VariableDecl
 resolveLabelsInDef contractDefs enumDefs structDefs x@VariableDecl{varType=SVMType.UnknownLabel labelName} =
   case (labelName `M.member` contractDefs,
         labelName `M.member` structDefs,

@@ -17,18 +17,18 @@ import           Data.Source
 import           Data.Text       (Text)
 import qualified Data.Text       as T
 import           SolidVM.Model.CodeCollection
-import           SolidVM.Model.Label
+import           SolidVM.Model.SolidString
 import           SolidVM.Model.Type                     (Type)
 import qualified SolidVM.Model.Type                     as SVMType
 import           SolidVM.Solidity.StaticAnalysis.Types
 
 data R = R
   { mutability :: Maybe StateMutability
-  , stateVars  :: M.Map Label VariableDecl
+  , stateVars  :: M.Map SolidString VariableDecl
   , codeCollection :: CodeCollection
   , contract :: Contract
   }
-type SSS = StateT [M.Map Label (SourceAnnotation ())] (Reader R)
+type SSS = StateT [M.Map SolidString (SourceAnnotation ())] (Reader R)
 
 -- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]
 detector :: CompilerDetector
@@ -44,7 +44,7 @@ contractHelper cc c@Contract{..} =
       funcAnns = functionHelper cc c _storageDefs <$> M.elems funcsAndConstr
    in concat $ varAnns ++ funcAnns
 
-functionHelper :: CodeCollection -> Contract -> M.Map Label VariableDecl -> Func -> [SourceAnnotation Text]
+functionHelper :: CodeCollection -> Contract -> M.Map SolidString VariableDecl -> Func -> [SourceAnnotation Text]
 functionHelper cc c stateVariables Func{..} = case funcContents of
   Nothing -> []
   Just stmts ->
@@ -58,7 +58,7 @@ functionHelper cc c stateVariables Func{..} = case funcContents of
         nameAnns = runReader (statementsHelper names stmts) r
      in concat $ nameAnns : typeAnns
 
-statementsHelper :: (M.Map Label (SourceAnnotation ()))
+statementsHelper :: (M.Map SolidString (SourceAnnotation ()))
                  -> [Statement]
                  -> Reader R [SourceAnnotation Text]
 statementsHelper args ss = concat <$> evalStateT (traverse statementHelper ss) [args]
@@ -70,12 +70,12 @@ statementsHelper' ss = do
   modify tail
   pure anns
 
-isLocalVariable :: Label -> SSS Bool
+isLocalVariable :: SolidString -> SSS Bool
 isLocalVariable name = foldr lookupVar False <$> get
   where lookupVar _ True = True
         lookupVar m _    = isJust $ M.lookup name m
 
-pushLocalVariable :: Label -> SourceAnnotation () -> SSS ()
+pushLocalVariable :: SolidString -> SourceAnnotation () -> SSS ()
 pushLocalVariable name decl = modify $ \case
   [] -> error "This can't happen by the laws of physics"
   (x:xs) -> (M.insert name decl x):xs
@@ -143,7 +143,7 @@ simpleStatementHelper (VariableDefinition vdefs mExpr) = do
 simpleStatementHelper (ExpressionStatement expr) =
   expressionHelper expr
 
-generateAnn :: Label -> SourceAnnotation () -> [Label] -> [SourceAnnotation Text]
+generateAnn :: SolidString -> SourceAnnotation () -> [SolidString] -> [SourceAnnotation Text]
 generateAnn varName x = \case
   [] -> []
   (c:[]) ->
@@ -182,7 +182,7 @@ generateAnn varName x = \case
      in [msg <$ x]
 
 ccVarHelper :: CodeCollection
-            -> Label
+            -> SolidString
             -> SourceAnnotation ()
             -> [SourceAnnotation Text]
 ccVarHelper CodeCollection{..} varName x = generateAnn varName x $ M.foldMapWithKey findVars _contracts
@@ -192,8 +192,8 @@ ccVarHelper CodeCollection{..} varName x = generateAnn varName x $ M.foldMapWith
 
 ccMemberAccessHelper :: CodeCollection
                      -> Contract
-                     -> Label
-                     -> Label
+                     -> SolidString
+                     -> SolidString
                      -> SourceAnnotation ()
                      -> [SourceAnnotation Text]
 ccMemberAccessHelper CodeCollection{..} c varName fieldName x =
@@ -223,7 +223,7 @@ ccTypeHelper CodeCollection{..} c x (SVMType.UnknownLabel typeName) =
                <|> (map (\(a,_,_) -> a) <$> M.lookup typeName (_structs c))
 ccTypeHelper _ _ _ _ = []
 
-localVarReadHelper :: Label -> SourceAnnotation () -> SSS [SourceAnnotation Text]
+localVarReadHelper :: SolidString -> SourceAnnotation () -> SSS [SourceAnnotation Text]
 localVarReadHelper name x = do
   isLocal <- isLocalVariable name
   if isLocal
@@ -241,7 +241,7 @@ localVarReadHelper name x = do
              in pure [msg <$ x]
           _ -> pure []
 
-localVarWriteHelper :: Label -> SourceAnnotation () -> SSS [SourceAnnotation Text]
+localVarWriteHelper :: SolidString -> SourceAnnotation () -> SSS [SourceAnnotation Text]
 localVarWriteHelper name x = do
   isLocal <- isLocalVariable name
   if isLocal

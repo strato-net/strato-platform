@@ -31,7 +31,7 @@ import Slipstream.OutputData
 import Slipstream.SolidityValue
 
 import SolidVM.Model.CodeCollection hiding (contractName, contracts)
-import SolidVM.Model.Label
+import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type as SVMType
 
 addr :: Address -> V.Value

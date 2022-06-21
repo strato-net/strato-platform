@@ -14,12 +14,12 @@ import           Data.Maybe          (isJust, maybeToList)
 import           Data.Source
 import           Data.Text           (Text)
 import           SolidVM.Model.CodeCollection
-import           SolidVM.Model.Label
+import           SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type as SVMType
 import           SolidVM.Solidity.StaticAnalysis.Types
 
-type StateVars = M.Map Label (Bool, Bool, VariableDecl)
-type LocalVars = [M.Map Label (SourceAnnotation ())]
+type StateVars = M.Map SolidString (Bool, Bool, VariableDecl)
+type LocalVars = [M.Map SolidString (SourceAnnotation ())]
 type SSS = State (StateVars, LocalVars)
 
 -- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]
@@ -57,12 +57,12 @@ statementsHelper ss = do
   modify $ fmap tail
   pure anns
 
-isLocalVariable :: Label -> SSS Bool
+isLocalVariable :: SolidString -> SSS Bool
 isLocalVariable name = foldr lookupVar False <$> gets snd
   where lookupVar _ True = True
         lookupVar m _    = isJust $ M.lookup name m
 
-pushLocalVariable :: Label -> SourceAnnotation () -> SSS ()
+pushLocalVariable :: SolidString -> SourceAnnotation () -> SSS ()
 pushLocalVariable name decl = modify . fmap $ \case
   [] -> error "This can't happen by the laws of physics"
   (x:xs) -> (M.insert name decl x):xs
@@ -116,14 +116,14 @@ simpleStatementHelper (VariableDefinition vdefs mExpr) = do
 simpleStatementHelper (ExpressionStatement expr) =
   expressionHelper expr
 
-stateVarReadHelper :: Label -> SourceAnnotation () -> SSS [SourceAnnotation Text]
+stateVarReadHelper :: SolidString -> SourceAnnotation () -> SSS [SourceAnnotation Text]
 stateVarReadHelper name _ = do
   isLocal <- isLocalVariable name
   unless isLocal $
     id . _1 . at name . _Just . _1 .= True
   pure [] -- don't @ me
 
-stateVarWriteHelper :: Label -> SourceAnnotation () -> SSS [SourceAnnotation Text]
+stateVarWriteHelper :: SolidString -> SourceAnnotation () -> SSS [SourceAnnotation Text]
 stateVarWriteHelper name _ = do
   isLocal <- isLocalVariable name
   unless isLocal $

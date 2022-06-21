@@ -95,7 +95,7 @@ import           Blockchain.VMOptions
 import           Blockchain.DB.StateDB
 
 import qualified SolidVM.Model.CodeCollection as CC
-import           SolidVM.Model.Label
+import           SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type as SVMType
 import qualified SolidVM.Model.Storable as MS
 import           SolidVM.Model.Value
@@ -103,12 +103,12 @@ import           SolidVM.Model.Value
 import           UnliftIO
 
 data CallInfo = CallInfo
-  { currentFunctionName :: Label
+  { currentFunctionName :: SolidString
   , currentAccount      :: Account
   , currentContract     :: CC.Contract
   , codeCollection      :: CC.CodeCollection
   , collectionHash      :: Keccak256
-  , localVariables      :: Map Label (SVMType.Type, Variable)
+  , localVariables      :: Map SolidString (SVMType.Type, Variable)
   , readOnly            :: Bool
   , isUncheckedSection  :: Bool -- TODO: Perform overflow/underflow checks for all arithmetic operations and revert if so, use this flag to disable checks
   , currentSourcePos    :: Maybe SourcePosition
@@ -357,7 +357,7 @@ toMaybe True x = Just x
 toMaybe False _ = Nothing
 
 
-getVariableOfName :: MonadSM m => Label -> m Variable
+getVariableOfName :: MonadSM m => SolidString -> m Variable
 getVariableOfName name = do
   cStack <- Mod.get (Mod.Proxy @[CallInfo])
   let currentCallInfo =
@@ -448,7 +448,7 @@ getVariableOfName name = do
       , unknownVariable "getVariableOfName" name
       ]
 
-getTypeOfName' :: Label -> CC.CodeCollection -> Typo
+getTypeOfName' :: SolidString -> CC.CodeCollection -> Typo
 getTypeOfName' s (CC.CodeCollection ccs) =
   let lookInContract :: CC.Contract -> [Typo]
       lookInContract (CC.Contract{..}) = catMaybes
@@ -460,7 +460,7 @@ getTypeOfName' s (CC.CodeCollection ccs) =
         [] -> internalError "getTypeOfName" s
         (typo:_) -> typo
 
-getTypeOfName :: MonadSM m => Label -> m Typo
+getTypeOfName :: MonadSM m => SolidString -> m Typo
 getTypeOfName s = getTypeOfName' s . codeCollection <$> getCurrentCallInfo
 
 
@@ -468,10 +468,10 @@ getTypeOfName s = getTypeOfName' s . codeCollection <$> getCurrentCallInfo
 addCallInfo :: MonadSM m
             => Account
             -> CC.Contract
-            -> Label
+            -> SolidString
             -> Keccak256
             -> CC.CodeCollection
-            -> Map Label (SVMType.Type, Variable)
+            -> Map SolidString (SVMType.Type, Variable)
             -> Bool
             -> m ()
 addCallInfo a c fn hsh cc initialLocalVariables ro = do
@@ -551,7 +551,7 @@ getCurrentChainId = do
     _ -> internalError "getCurrentChainId called with an empty stack" ()
 
 
-getCurrentFunctionName :: MonadSM m => m Label
+getCurrentFunctionName :: MonadSM m => m SolidString
 getCurrentFunctionName = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
@@ -559,12 +559,12 @@ getCurrentFunctionName = do
     _ -> internalError "getCurrentFunctionName called with an empty stack" ()
 
 
-getLocal :: MonadSM m => Label -> m (Maybe Variable)
+getLocal :: MonadSM m => SolidString -> m (Maybe Variable)
 getLocal name = do
   currentCallInfo <- getCurrentCallInfo
   return $ fmap snd $ M.lookup name $ localVariables currentCallInfo
 
-setLocal :: MonadSM m => Label -> Variable -> m ()
+setLocal :: MonadSM m => SolidString -> Variable -> m ()
 setLocal name val = do
   stack <- Mod.get (Mod.Proxy @[CallInfo])
   let (info, rest) = case stack of
@@ -598,7 +598,7 @@ hintFromType = \case
      ContractTypo{} -> return $ TContract s
      EnumTypo{} -> return $ TEnumVal s
      StructTypo fs -> do
-       let upgrade :: MonadSM m => (Label, CC.FieldType) -> m (B.ByteString , BasicType)
+       let upgrade :: MonadSM m => (SolidString, CC.FieldType) -> m (B.ByteString , BasicType)
            upgrade = mapM (hintFromType . CC.fieldTypeType) . first (encodeUtf8 . labelToText)
        TStruct s <$> mapM upgrade fs
  SVMType.Array{} -> return TComplex

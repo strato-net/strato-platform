@@ -17,7 +17,7 @@ import           Text.Printf
 
 import           SolidVM.Model.CodeCollection
 import qualified SolidVM.Model.CodeCollection.Def as SolidVM
-import           SolidVM.Model.Label
+import           SolidVM.Model.SolidString
 import           SolidVM.Model.Type (Type)
 import qualified SolidVM.Model.Type as SVMType
 import           SolidVM.Solidity.Parse.Declarations
@@ -57,7 +57,7 @@ unparseSourceUnit (NamedXabi name (contract,inherited)) =
   <> concatMap (("\n    " <>) . unparseFunc) (Map.toList $ xabiFuncs contract)
   <> "\n}"
 
-unparseVar :: (Label, VariableDecl) -> String
+unparseVar :: (SolidString, VariableDecl) -> String
 unparseVar (name, (VariableDecl theType isPublic maybeExpression _)) =
      unparseVarType (theType)
   <> " "
@@ -72,7 +72,7 @@ unparseVar (name, (VariableDecl theType isPublic maybeExpression _)) =
      )
   <> ";"
 
-unparseConstant :: (Label, ConstantDecl) -> String
+unparseConstant :: (SolidString, ConstantDecl) -> String
 unparseConstant (name, (ConstantDecl theType isPublic expression _)) =
      unparseVarType (theType)
   <> " "
@@ -112,7 +112,7 @@ unparseVarType (SVMType.Contract contractName') = labelToString contractName'
 unparseVarType (SVMType.Struct _ n) = "struct " ++ labelToString n
 unparseVarType _ = "TYPE_NOT_IMPLEMENED"
 
-unparseFunc :: (Label, Func) -> String
+unparseFunc :: (SolidString, Func) -> String
 unparseFunc (name, f) = Text.unpack $ "function " <> labelToText name <> unparseFuncWithoutName f
 
 unparseCtor :: Func -> String
@@ -259,7 +259,7 @@ unparseExpression (ArrayExpression _ xs) = "[" ++ List.intercalate "," (map unpa
 unparseExpression (ObjectLiteral _ m) = "{" ++ List.intercalate ",\n" [concat ["\t", labelToString k, ":", unparseExpression v]  | (k, v) <- Map.toList m] ++ "}"
 unparseExpression x = internalError "missing case in call to unparseExpression" $ show x
 
-unparseModifier :: (Label, ModifierF a) -> String
+unparseModifier :: (SolidString, ModifierF a) -> String
 unparseModifier (name, Modifier{..}) = Text.unpack $
      "modifier "
   <> labelToText name
@@ -271,7 +271,7 @@ unparseModifier (name, Modifier{..}) = Text.unpack $
        Nothing -> ""
   <> "}"
 
-unparseEvent :: (Label, EventF a) -> String
+unparseEvent :: (SolidString, EventF a) -> String
 unparseEvent (name, Event{..}) = Text.unpack $
      "event "
   <> labelToText name
@@ -284,7 +284,7 @@ unparseEvent (name, Event{..}) = Text.unpack $
 unparseUsing :: (Text, UsingF a) -> String
 unparseUsing (name, Using body _) = Text.unpack . mconcat $ ["using ", name, " ", Text.pack body, ";\n"]
 
-unparseTypes :: (Label, SolidVM.DefF a) -> String
+unparseTypes :: (SolidString, SolidVM.DefF a) -> String
 unparseTypes (name, SolidVM.Enum {names=names'}) =
   Text.unpack $ "enum "
              <> labelToText name

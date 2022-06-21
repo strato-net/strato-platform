@@ -30,7 +30,7 @@ import           Test.QuickCheck.Instances    ()
 
 import           SolidVM.Model.CodeCollection.Statement
 import qualified SolidVM.Model.CodeCollection.VarDef  as SolidVM
-import           SolidVM.Model.Label
+import           SolidVM.Model.SolidString
 
 data StateMutability = Pure | Constant | View | Payable deriving (Eq, Ord, Show, Generic)
 
@@ -66,8 +66,8 @@ instance ToSchema StateMutability where
     & mapped.schema.example ?~ toJSON View
 
 data FuncF a = Func
-  { funcArgs :: [(Maybe Label, SolidVM.IndexedType)]
-  , funcVals :: [(Maybe Label, SolidVM.IndexedType)]
+  { funcArgs :: [(Maybe SolidString, SolidVM.IndexedType)]
+  , funcVals :: [(Maybe SolidString, SolidVM.IndexedType)]
   , funcStateMutability :: Maybe StateMutability
 
   -- These Values are only used for parsing and unparsing solidity.
@@ -75,7 +75,7 @@ data FuncF a = Func
   -- relevance when constructing from the db.
   , funcContents :: Maybe [StatementF a]
   , funcVisibility :: Maybe Visibility
-  , funcConstructorCalls :: Map Label [(ExpressionF a)]
+  , funcConstructorCalls :: Map SolidString [(ExpressionF a)]
   , funcModifiers :: Maybe [String]
   , funcContext :: a
   } deriving (Eq,Show,Generic, Functor)

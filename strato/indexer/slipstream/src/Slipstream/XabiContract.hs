@@ -12,7 +12,7 @@ import Data.Source.Position
 import qualified BlockApps.Solidity.Xabi      as OLDXABI
 import qualified BlockApps.Solidity.Xabi.Type as OLDXABI
 
-import SolidVM.Model.Label
+import SolidVM.Model.SolidString
 
 import SelectAccessible                         ()
 

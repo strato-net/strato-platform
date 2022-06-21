@@ -32,7 +32,7 @@ import Text.Printf
 import BlockApps.Solidity.SolidityValue
 import BlockApps.Solidity.Value as V
 import Blockchain.SolidVM.Model
-import SolidVM.Model.Label
+--import SolidVM.Model.SolidString
 import SolidVM.Model.Storable
 
 decodeSolidVMValues :: [(HexStorage, HexStorage)] -> [(T.Text, SolidityValue)]

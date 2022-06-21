@@ -25,7 +25,7 @@ import qualified Data.Text       as T
 import           Data.Traversable (for)
 import           SolidVM.Model.CodeCollection
 import           SolidVM.Solidity.StaticAnalysis.Types
-import           SolidVM.Model.Label
+import           SolidVM.Model.SolidString
 import           SolidVM.Model.Type (Type)
 import qualified SolidVM.Model.Type as SVMType
 import           Text.Read (readMaybe)
@@ -40,9 +40,9 @@ data R = R
   , contract :: Annotated ContractF
   , function :: Maybe (Annotated FuncF)
   }
-type SSS = StateT (NonEmpty (Maybe Type', M.Map Label (Annotated VarDefEntryF))) (Reader R)
+type SSS = StateT (NonEmpty (Maybe Type', M.Map SolidString (Annotated VarDefEntryF))) (Reader R)
 
-data TypeF' a = Top { topName :: (S.Set Label)
+data TypeF' a = Top { topName :: (S.Set SolidString)
                     , topContext :: a
                     }
               | Bottom (NonEmpty a)
@@ -127,19 +127,19 @@ varDefsToType' VarDefEntry{..} (Product ts _) = Product (Static (fromJust vardef
 varDefsToType' VarDefEntry{..} (Bottom es)    = Bottom es
 varDefsToType' VarDefEntry{..} _              = bottom $ "Could not match variable definition with function type" <$ vardefContext
 
-lookupEnum :: Label -> SSS [Label]
+lookupEnum :: SolidString -> SSS [SolidString]
 lookupEnum name = do
   c <- asks contract
   pure . maybe [] fst $ M.lookup name (_enums c)
 
-lookupStruct :: Label -> SSS [(Label, Type)]
+lookupStruct :: SolidString -> SSS [(SolidString, Type)]
 lookupStruct name = do
   c <- asks contract
   let str = fromMaybe [] $ M.lookup name (_structs c)
   pure $ f <$> str
   where f (t, ft, _) = (t, fieldTypeType ft)
 
-lookupContractFunction :: SourceAnnotation Text -> Label -> Label -> SSS Type'
+lookupContractFunction :: SourceAnnotation Text -> SolidString -> SolidString -> SSS Type'
 lookupContractFunction x cName fName = do
   --liftIO $ putStrLn $ C.green ("lookupContractFunction " ++ (show cName) ++ " " ++ (show fName))
   ~CodeCollection{..} <- asks codeCollection
@@ -281,7 +281,7 @@ context' (Sum (a :| _))    = context' a
 context' MultiVariate{..}  = multiVariateContext
 
 
-typecheck' :: Monad m => (SourceAnnotation Text -> Label -> Type -> m Type') -> Type' -> Type' -> m Type'
+typecheck' :: Monad m => (SourceAnnotation Text -> SolidString -> Type -> m Type') -> Type' -> Type' -> m Type'
 typecheck' f r1 r2 = case (r1, r2) of
   (Bottom e1, Bottom e2) -> pure $ Bottom (e1 <> e2)
   (Bottom e, _) -> pure $ Bottom e
@@ -341,7 +341,7 @@ ma !> mb = do
   pure $ const' b a
 infixl 5 !>
 
-typecheckProduct :: Monad m => (SourceAnnotation Text -> Label -> Type -> m Type') -> SourceAnnotation Text -> [Type'] -> [Type'] -> m Type'
+typecheckProduct :: Monad m => (SourceAnnotation Text -> SolidString -> Type -> m Type') -> SourceAnnotation Text -> [Type'] -> [Type'] -> m Type'
 typecheckProduct f c t1 t2 = typecheckProduct' (Product t1 c) (Product t2 c) t1 t2
   where
     typecheckProduct' _ _ []     []     = pure $ Product [] c
@@ -495,7 +495,7 @@ typecheckIndex x y = pure . bottom $
   , "."
   ]) <$ (context' x <> context' y)
 
-typecheckMember :: Type' -> Label -> SSS Type'
+typecheckMember :: Type' -> SolidString -> SSS Type'
 typecheckMember (Bottom es) _ = pure $ Bottom es
 typecheckMember (Sum ts'@(t :| _)) n = pickType' (context' t) <$> traverse (flip typecheckMember n) (NE.toList ts')
 typecheckMember (Static (SVMType.Array _ _) x) "length" = pure $ Static (SVMType.Int Nothing Nothing) x
@@ -585,7 +585,7 @@ typecheckMember (Static (SVMType.UnknownLabel c) x) n = do
     t -> pure t
 typecheckMember x n = pure . bottom $ ("Unknown member: " <> showType' x <> "." <> labelToText n) <$ context' x
 
-getConstructorType' :: MonadReader R m => SourceAnnotation Text -> Label -> m Type'
+getConstructorType' :: MonadReader R m => SourceAnnotation Text -> SolidString -> m Type'
 getConstructorType' x l = do
   ~CodeCollection{..} <- asks codeCollection
   case M.lookup l _contracts of
@@ -667,7 +667,7 @@ functionHelper cc c f@Func{..} = case funcContents of
         argVals = M.fromList $ args ++ vals
      in runReader (statementsHelper argVals stmts) r
 
-statementsHelper :: (M.Map Label (Annotated VarDefEntryF))
+statementsHelper :: (M.Map SolidString (Annotated VarDefEntryF))
                  -> [Annotated StatementF]
                  -> Reader R Type'
 statementsHelper args ss = do
@@ -857,7 +857,7 @@ getVarType' "block" ctx = pure $ Static (SVMType.UnknownLabel "block") ctx
 getVarType' "super" ctx = pure $ Static (SVMType.UnknownLabel "super") ctx
 getVarType' name ctx = getVarTypeByName' (stringToLabel name) ctx
   
-getVarTypeByName' :: Label -> SourceAnnotation Text -> SSS Type'
+getVarTypeByName' :: SolidString -> SourceAnnotation Text -> SSS Type'
 getVarTypeByName' name ctx = do
   mVar <- foldr (lookupVar . snd) Nothing <$> get
   case mVar of
@@ -905,7 +905,7 @@ getVarTypeByName' name ctx = do
   where lookupVar m Nothing = M.lookup name m
         lookupVar _ t       = t
 
-setVarType' :: SourceAnnotation Text -> Label -> Type -> SSS Type'
+setVarType' :: SourceAnnotation Text -> SolidString -> Type -> SSS Type'
 setVarType' ctx name ty = state setType'
   where setType' (m:|ms) = case M.lookup name $ snd m of
           Nothing -> case ms of

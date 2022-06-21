@@ -40,11 +40,11 @@ import           SolidVM.Model.CodeCollection.Statement
 --import           SolidVM.Model.CodeCollection.Type
 import           SolidVM.Model.CodeCollection.VarDef
 import           SolidVM.Model.CodeCollection.VariableDecl
-import           SolidVM.Model.Label
+import           SolidVM.Model.SolidString
 
 data CodeCollectionF a =
   CodeCollection {
-    _contracts :: Map Label (ContractF a)
+    _contracts :: Map SolidString (ContractF a)
   } deriving (Show, Generic, Functor)
 
 instance ToJSON a => ToJSON (CodeCollectionF a)

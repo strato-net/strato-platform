@@ -23,7 +23,7 @@ import BlockApps.Strato.DeprecatedStorage (Storage(..), StorageKV(..))
 import Blockchain.SolidVM.Model
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Account
-import SolidVM.Model.Label
+import SolidVM.Model.SolidString
 import SolidVM.Model.Storable
 
 forceParse :: B.ByteString -> StoragePath

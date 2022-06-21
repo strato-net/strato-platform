@@ -29,15 +29,15 @@ import           Blockchain.SolidVM.Model
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
-import           SolidVM.Model.Label
+import           SolidVM.Model.SolidString
 import           Text.Format
 
 data BasicValue = BInteger !Integer
                 | BString !B.ByteString
                 | BBool !Bool
                 | BAccount !NamedAccount 
-                | BEnumVal !Label !Label !Word32
-                | BContract !Label !NamedAccount
+                | BEnumVal !SolidString !SolidString !Word32
+                | BContract !SolidString !NamedAccount
                   -- The sole purpose of this sentinel is to make slipstream reserve
                   -- a column for this mapping
                 | BMappingSentinel

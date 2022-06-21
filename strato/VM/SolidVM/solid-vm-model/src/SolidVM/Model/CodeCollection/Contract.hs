@@ -29,18 +29,18 @@ import qualified SolidVM.Model.CodeCollection.Event as SolidVM
 import           SolidVM.Model.CodeCollection.Function
 import qualified SolidVM.Model.CodeCollection.VarDef as SolidVM
 import           SolidVM.Model.CodeCollection.VariableDecl
-import           SolidVM.Model.Label
+import           SolidVM.Model.SolidString
 
 data ContractF a =
   Contract {
-    _contractName :: Label,
-    _parents :: [Label],
-    _constants :: Map Label (ConstantDeclF a),
-    _storageDefs :: Map Label (VariableDeclF a),
-    _enums :: Map Label ([Label], a),
-    _structs :: Map Label [(Label, SolidVM.FieldType, a)],
-    _events :: Map Label (SolidVM.EventF a),
-    _functions :: Map Label (FuncF a),
+    _contractName :: SolidString,
+    _parents :: [SolidString],
+    _constants :: Map SolidString (ConstantDeclF a),
+    _storageDefs :: Map SolidString (VariableDeclF a),
+    _enums :: Map SolidString ([SolidString], a),
+    _structs :: Map SolidString [(SolidString, SolidVM.FieldType, a)],
+    _events :: Map SolidString (SolidVM.EventF a),
+    _functions :: Map SolidString (FuncF a),
     _constructor :: Maybe (FuncF a),
     _vmVersion :: String,
     _contractContext :: a

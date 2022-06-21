@@ -60,7 +60,7 @@ import           Slipstream.Options
 import           Slipstream.SolidityValue
 
 import           SolidVM.Model.CodeCollection              hiding (contractName, contracts, events)
-import           SolidVM.Model.Label
+import           SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type         as SVMType
 
 

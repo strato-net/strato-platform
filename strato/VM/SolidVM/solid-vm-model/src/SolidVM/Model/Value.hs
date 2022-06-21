@@ -43,7 +43,7 @@ import           Blockchain.Strato.Model.Address
 
 
 import qualified SolidVM.Model.CodeCollection            as CC
-import           SolidVM.Model.Label
+import           SolidVM.Model.SolidString
 import qualified SolidVM.Model.Storable                  as MS
 import qualified SolidVM.Model.Type                      as SVMType
 
@@ -99,21 +99,21 @@ data Value =
   | SBool Bool
   | SAccount NamedAccount Bool --isPayable
    -- This is a payable account, which means it can use .transfer() , .send() , .call() , .delegatecall() and .staticcall()
-  | SEnum Label
-  | SEnumVal Label Label Word32
-  | SStructDef Label
-  | SStruct Label (Map Label Variable)
+  | SEnum SolidString
+  | SEnumVal SolidString SolidString Word32
+  | SStructDef SolidString
+  | SStruct SolidString (Map SolidString Variable)
   | STuple (Vector Variable)
   | SArray SVMType.Type (Vector Variable)
   | SMap SVMType.Type (Map Value Variable)
-  | SFunction Label CC.Func
-  | SBuiltinFunction Label (Maybe Value)
-  | SBuiltinVariable Label
+  | SFunction SolidString CC.Func
+  | SBuiltinFunction SolidString (Maybe Value)
+  | SBuiltinVariable SolidString
   | SSetterGetter String (Maybe Value)
-  | SContractDef Label
-  | SContractItem NamedAccount Label
-  | SContract Label NamedAccount
-  | SContractFunction (Maybe Label) NamedAccount Label -- contractName, address, functionName
+  | SContractDef SolidString
+  | SContractItem NamedAccount SolidString
+  | SContract SolidString NamedAccount
+  | SContractFunction (Maybe SolidString) NamedAccount SolidString -- contractName, address, functionName
   | SPush Value (Maybe Variable)-- The array function
   -- | SSend Value (Maybe Variable) 
   -- | STransfer Value (Maybe Variable) 
@@ -278,9 +278,9 @@ castToInt s = typeError "castToInt" s
 
 -- Typos are the possible values that a CC.UnknownLabel
 -- is able to resolve to
-data Typo = StructTypo [(Label, CC.FieldType)]
-          | EnumTypo [Label]
-          | ContractTypo Label
+data Typo = StructTypo [(SolidString, CC.FieldType)]
+          | EnumTypo [SolidString]
+          | ContractTypo SolidString
           deriving (Show)
 
 -- BasicTypes are approximately what can be stored, but more exactly
@@ -288,13 +288,13 @@ data Typo = StructTypo [(Label, CC.FieldType)]
 -- Even though structs cannot be stored directly, the operator=
 -- simulates their appearance by retrieving theh individual fields.
 data BasicType = TInteger | TString | TBool | TAccount
-               | TEnumVal Label | TContract Label
-               | TStruct Label [(B.ByteString, BasicType)]
+               | TEnumVal SolidString | TContract SolidString
+               | TStruct SolidString [(B.ByteString, BasicType)]
                | TComplex
                | Todo String
                deriving (Show, Eq)
 
 -- Evaluated ArgLists
 data ValList = OrderedVals [Value]
-             | NamedVals [(Label, Value)]
+             | NamedVals [(SolidString, Value)]
              deriving (Show, Eq)

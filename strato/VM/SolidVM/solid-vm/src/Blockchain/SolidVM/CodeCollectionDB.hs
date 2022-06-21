@@ -41,7 +41,7 @@ import           Blockchain.Strato.Model.Keccak256
 
 import           SolidVM.CodeCollectionTools
 import           SolidVM.Model.CodeCollection
-import           SolidVM.Model.Label
+import           SolidVM.Model.SolidString
 import           SolidVM.Solidity.Parse.Declarations
 import           SolidVM.Solidity.Parse.File
 import           SolidVM.Solidity.StaticAnalysis.Typechecker as TC
@@ -68,7 +68,7 @@ parseSourceWithAnnotations = withAnnotations . parseSource
 
 compileSourceNoInheritance :: Map T.Text T.Text -> Either ParseTypeCheckOrSolidVMError CodeCollection
 compileSourceNoInheritance initCodeMap = do
-  let getNamedContracts :: T.Text -> T.Text -> Either ParseTypeCheckOrSolidVMError [(Label, Contract)]
+  let getNamedContracts :: T.Text -> T.Text -> Either ParseTypeCheckOrSolidVMError [(SolidString, Contract)]
       getNamedContracts fileName src = do
         sourceUnits <- parseSource fileName src
         let pragmas = \case
@@ -82,7 +82,7 @@ compileSourceNoInheritance initCodeMap = do
             pure $ Just (textToLabel name, ctrct)
           _ -> pure Nothing
 
-      throwDuplicate :: (Label, Contract) -> Map Label Contract -> Either ParseTypeCheckOrSolidVMError (Map Label Contract)
+      throwDuplicate :: (SolidString, Contract) -> Map SolidString Contract -> Either ParseTypeCheckOrSolidVMError (Map SolidString Contract)
       throwDuplicate (cName, contract) m = case M.lookup cName m of
         Nothing -> pure $ M.insert cName contract m
         Just _ ->  Left . PEx
@@ -90,7 +90,7 @@ compileSourceNoInheritance initCodeMap = do
                                    (fromSourcePosition $ _sourceAnnotationStart $ _contractContext contract)
                                            
   allContracts <- fmap concat . traverse (uncurry getNamedContracts) $ M.toList initCodeMap
-  deduplicatedContracts <- foldrM throwDuplicate M.empty (allContracts :: [(Label, Contract)])
+  deduplicatedContracts <- foldrM throwDuplicate M.empty (allContracts :: [(SolidString, Contract)])
   pure $ CodeCollection {
     _contracts = deduplicatedContracts
   }

@@ -13,13 +13,13 @@ import           Data.Source
 import           Data.Text (Text)
 import           GHC.Generics
 
-import           SolidVM.Model.Label
+import           SolidVM.Model.SolidString
 
 data FuzzerArgs = FuzzerArgs
   { _fuzzerArgsSrc :: SourceMap
-  , _fuzzerArgsContractName :: Label
+  , _fuzzerArgsContractName :: SolidString
   , _fuzzerArgsCreateArgs :: Text
-  , _fuzzerArgsFuncName :: Label
+  , _fuzzerArgsFuncName :: SolidString
   , _fuzzerArgsCallArgs :: Text
   , _fuzzerArgsMaxRuns :: Maybe Integer
   } deriving (Eq, Show, Generic, ToJSON, FromJSON)
@@ -28,14 +28,14 @@ makeLenses ''FuzzerArgs
 type FuzzerM = ReaderT FuzzerArgs MemContextM
 
 data FuzzerTx = FuzzerTx
-  { _fuzzerTxFuncName :: Label
+  { _fuzzerTxFuncName :: SolidString
   , _fuzzerTxArgs     :: Text
   } deriving (Eq, Show, Generic, ToJSON, FromJSON)
 makeLenses ''FuzzerTx
 
 data FuzzerFailureDetails = FuzzerFailureDetails
    { _failureContractAddress :: Account
-   , _failureContractName :: Label
+   , _failureContractName :: SolidString
    , _failureCreateArgs :: Text
    , _failureTxs :: [FuzzerTx]
    } deriving (Eq, Show, Generic, ToJSON, FromJSON)

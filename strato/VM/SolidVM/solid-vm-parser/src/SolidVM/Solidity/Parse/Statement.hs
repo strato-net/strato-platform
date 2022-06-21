@@ -12,7 +12,7 @@ import           Text.Parsec
 import           Text.Parsec.Expr
 
 import           SolidVM.Model.CodeCollection.Statement
-import           SolidVM.Model.Label
+import           SolidVM.Model.SolidString
 import           SolidVM.Model.Type
 import           SolidVM.Solidity.Parse.Lexer
 import           SolidVM.Solidity.Parse.ParserTypes
@@ -220,7 +220,7 @@ postfix :: Stream s m t =>
            ParsecT s u m (a -> a) -> Operator s u m a
 postfix p = Postfix . chainl1 p $ return (flip (.))
 
-memberName :: SolidityParser Label
+memberName :: SolidityParser SolidString
 memberName = do
   (reserved "length" >> return (stringToLabel "length"))
   <|> fmap stringToLabel identifier

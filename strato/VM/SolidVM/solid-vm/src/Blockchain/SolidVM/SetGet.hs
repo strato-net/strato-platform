@@ -43,7 +43,7 @@ import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.SM
 import           Blockchain.Strato.Model.Account
 import qualified SolidVM.Model.CodeCollection as CC
-import           SolidVM.Model.Label
+import           SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type as SVMType
 import qualified SolidVM.Model.Storable as MS
 import           SolidVM.Model.Value

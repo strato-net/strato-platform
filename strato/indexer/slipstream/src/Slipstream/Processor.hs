@@ -89,7 +89,7 @@ import Slipstream.Options
 
 import SolidVM.CodeCollectionTools
 import SolidVM.Model.CodeCollection hiding (contractName)
-import SolidVM.Model.Label
+import SolidVM.Model.SolidString
 
 import Text.Format
 
@@ -367,7 +367,7 @@ getCodeCollection' :: MonadIO m => Bool -> CodePtr -> Text -> m CodeCollection
 getCodeCollection' True = getCodeCollection (Map.fromList . map (\(x, y) -> (textToLabel x, xabiToPartialContract y)) )
 getCodeCollection' False = getCodeCollection (const Map.empty)
 
-getCodeCollection :: MonadIO m => ([(Text, OLD.Xabi)] -> Map.Map Label Contract) -> CodePtr -> Text -> m CodeCollection
+getCodeCollection :: MonadIO m => ([(Text, OLD.Xabi)] -> Map.Map SolidString Contract) -> CodePtr -> Text -> m CodeCollection
 getCodeCollection f cp ccString = do
   let initList =
         case Aeson.decodeStrict $ encodeUtf8 ccString of

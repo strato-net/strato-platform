@@ -6,7 +6,7 @@ module SolidVM.Solidity.StaticAnalysis.Contracts.ParentConstructors
   ) where
 
 import           SolidVM.Model.CodeCollection
-import           SolidVM.Model.Label
+import           SolidVM.Model.SolidString
 import           Data.Functor  ((<&>))
 import qualified Data.Map.Strict as M
 import           Data.Maybe      (fromMaybe)
@@ -22,7 +22,7 @@ import           SolidVM.Solidity.StaticAnalysis.Types
 detector :: CompilerDetector
 detector cc@CodeCollection{..} = M.foldMapWithKey (contractHelper cc) _contracts
 
-contractHelper :: CodeCollection -> Label -> Contract -> [SourceAnnotation Text]
+contractHelper :: CodeCollection -> SolidString -> Contract -> [SourceAnnotation Text]
 contractHelper cc cName c = fromMaybe [] $ _constructor c <&> \constr ->
   let parentSet = S.fromList $ _parents c
       constrCalls = funcConstructorCalls constr

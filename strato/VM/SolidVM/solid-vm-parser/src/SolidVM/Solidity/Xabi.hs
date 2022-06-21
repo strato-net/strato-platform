@@ -38,7 +38,7 @@ import           SolidVM.Model.CodeCollection.Event
 import           SolidVM.Model.CodeCollection.Function
 import           SolidVM.Model.CodeCollection.VariableDecl
 import qualified SolidVM.Model.CodeCollection.Def  as SolidVM
-import           SolidVM.Model.Label
+import           SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type as SVMType
 import qualified SolidVM.Model.CodeCollection.VarDef  as SolidVM
 
@@ -58,13 +58,13 @@ instance ToSchema XabiKind where
     & mapped.schema.example ?~ toJSON ContractKind
 
 data XabiF a = Xabi
-  { xabiFuncs     :: Map Label (FuncF a)
-  , xabiConstr    :: Map Label (FuncF a)
-  , xabiVars      :: Map Label (VariableDeclF a)
-  , xabiConstants :: Map Label (ConstantDeclF a)
-  , xabiTypes     :: Map Label SolidVM.Def
-  , xabiModifiers :: Map Label (ModifierF a)
-  , xabiEvents    :: Map Label (EventF a)
+  { xabiFuncs     :: Map SolidString (FuncF a)
+  , xabiConstr    :: Map SolidString (FuncF a)
+  , xabiVars      :: Map SolidString (VariableDeclF a)
+  , xabiConstants :: Map SolidString (ConstantDeclF a)
+  , xabiTypes     :: Map SolidString SolidVM.Def
+  , xabiModifiers :: Map SolidString (ModifierF a)
+  , xabiEvents    :: Map SolidString (EventF a)
   , xabiKind      :: XabiKind
   , xabiUsing     :: Map Text (UsingF a)
   , xabiContext   :: a

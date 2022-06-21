@@ -16,7 +16,7 @@ import SolidVM.Solidity.StaticAnalysis.Typechecker as TC
 
 import SolidVM.CodeCollectionTools
 import SolidVM.Model.CodeCollection
-import SolidVM.Model.Label
+import SolidVM.Model.SolidString
 import SolidVM.Solidity.Parse.Declarations
 import SolidVM.Solidity.Parse.File
 

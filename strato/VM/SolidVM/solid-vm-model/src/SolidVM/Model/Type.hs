@@ -14,7 +14,7 @@ import           GHC.Generics
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances ()
 
-import           SolidVM.Model.Label
+import           SolidVM.Model.SolidString
 
 typeAesonOptions::Options
 typeAesonOptions=defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="type"}}
@@ -27,11 +27,11 @@ data Type
   | Bool
   | Address {isPayable :: Bool}
   | Account {isPayable :: Bool}
-  | UnknownLabel Label
-  | Struct { bytes::Maybe Int32, typedef::Label}
-  | Enum { bytes::Maybe Int32, typedef::Label, names::Maybe [Label]}
+  | UnknownLabel SolidString
+  | Struct { bytes::Maybe Int32, typedef::SolidString}
+  | Enum { bytes::Maybe Int32, typedef::SolidString, names::Maybe [SolidString]}
   | Array { entry:: Type, length :: Maybe Word }
-  | Contract {typedef::Label}
+  | Contract {typedef::SolidString}
   | Mapping {dynamic::Maybe Bool, key::Type, value::Type}
   deriving (Eq, Show, Generic)
 

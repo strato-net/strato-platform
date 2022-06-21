@@ -14,7 +14,7 @@ import           SolidVM.Solidity.Parse.Expression
 import           SolidVM.Solidity.Parse.Lexer
 import           SolidVM.Solidity.Parse.ParserTypes
 
-import           SolidVM.Model.Label
+import           SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type         as SVMType
 
 -- | A type expression is either a composite type (arrays and mappings) or

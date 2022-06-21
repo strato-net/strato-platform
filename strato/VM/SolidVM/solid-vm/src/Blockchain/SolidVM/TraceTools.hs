@@ -10,7 +10,7 @@ import qualified Data.Map                       as M
 
 import           Blockchain.SolidVM.SM
 import           Blockchain.SolidVM.SetGet
-import           SolidVM.Model.Label
+import           SolidVM.Model.SolidString
 import           Text.Format
 import           Text.Tools
 

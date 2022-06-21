@@ -29,7 +29,7 @@ import qualified Data.Text as T
 import           Data.Traversable (for)
 import           Debugger
 import           SolidVM.Model.CodeCollection
-import           SolidVM.Model.Label
+import           SolidVM.Model.SolidString
 import           SolidVM.Model.Type (Type)
 import qualified SolidVM.Model.Type as SVMType
 import           SolidVM.Solidity.Fuzzer.Types
@@ -74,7 +74,7 @@ runFuzzer dSettings compile src = flip (either $ pure . map (FuzzerFailure Nothi
              | propertyPrefix `T.isPrefixOf` labelToText fName -> (:[]) <$> prop cName fName f
              | otherwise -> pure []
 
-test :: Label -> Label -> Func -> FuzzerM FuzzerResult
+test :: SolidString -> SolidString -> Func -> FuzzerM FuzzerResult
 test cName fName f = case (funcVisibility f, funcArgs f, funcVals f) of
   (Just External, [], [(_, IndexedType _ SVMType.Bool)]) -> flip local (runFuzzerOnce $ funcContext f)
     $ (fuzzerArgsContractName .~ cName)
@@ -111,7 +111,7 @@ generateArgString = fmap (\t -> "(" <> T.intercalate "," t <> ")") . traverse ge
         generateArg (SVMType.Contract _) = ("0x" <>) . T.pack . show <$> (generate arbitrary :: IO Account)
         generateArg (SVMType.Mapping _ _ _) = pure "<mapping>" --haha lol
 
-prop :: Label -> Label -> Func -> FuzzerM FuzzerResult
+prop :: SolidString -> SolidString -> Func -> FuzzerM FuzzerResult
 prop cName fName f = case (funcVisibility f, funcArgs f, funcVals f) of
   (Just External, (_:_), [(_, IndexedType _ SVMType.Bool)]) -> flip local runProp
     $ (fuzzerArgsContractName .~ cName)
