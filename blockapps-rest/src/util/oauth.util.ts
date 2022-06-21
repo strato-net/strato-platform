@@ -74,10 +74,6 @@ class OAuthUtil {
     this.servicePassword = oauthConfig.servicePassword;
     const url_split = this.openIdDiscoveryUrl.split("/");
     this.tokenHost = url_split[0] + "//" + url_split[2];
-    this.RestClient = axios.create({
-      baseURL: this.openIdDiscoveryUrl,
-      withCredentials: false
-    });
   }
 
   /**
