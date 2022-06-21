@@ -9,11 +9,13 @@ import           Control.Lens              (mapped, (&), (?~))
 import           Data.Aeson
 import           Data.Int                  (Int32)
 import           Data.Swagger
-import           Data.Text                 (Text)
 import qualified Generic.Random            as GR
 import           GHC.Generics
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances ()
+
+import           SolidVM.Model.SolidString
+
 typeAesonOptions::Options
 typeAesonOptions=defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="type"}}
 
@@ -25,11 +27,11 @@ data Type
   | Bool
   | Address {isPayable :: Bool}
   | Account {isPayable :: Bool}
-  | Label String
-  | Struct { bytes::Maybe Int32, typedef::Text}
-  | Enum { bytes::Maybe Int32, typedef::Text, names::Maybe [Text]}
+  | UnknownLabel SolidString
+  | Struct { bytes::Maybe Int32, typedef::SolidString}
+  | Enum { bytes::Maybe Int32, typedef::SolidString, names::Maybe [SolidString]}
   | Array { entry:: Type, length :: Maybe Word }
-  | Contract {typedef::Text}
+  | Contract {typedef::SolidString}
   | Mapping {dynamic::Maybe Bool, key::Type, value::Type}
   deriving (Eq, Show, Generic)
 

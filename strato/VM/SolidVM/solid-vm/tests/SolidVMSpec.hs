@@ -58,6 +58,7 @@ import qualified Blockchain.Stream.Action as Action
 import Blockchain.VMContext
 import Executable.EVMFlags() -- for HFlags
 import Blockchain.VMOptions() -- for HFlags
+import SolidVM.Model.SolidString
 import SolidVM.Model.Storable as MS
 import Blockchain.DB.X509CertDB as X509
 -- The newtype distinguishes uncaught SolidExceptions and
@@ -362,14 +363,14 @@ getFields2 = getAll2 . map (\t -> [Field t])
 bAddress :: Address -> BasicValue
 bAddress = BAccount . unspecifiedChain
 
-bContract :: T.Text -> Address -> BasicValue
+bContract :: SolidString -> Address -> BasicValue
 bContract t a =
   let u = unspecifiedChain a
    in if u == unspecifiedChain 0
         then BDefault
         else BContract t u
 
-bContract' :: T.Text -> Account -> BasicValue
+bContract' :: SolidString -> Account -> BasicValue
 bContract' t a =
   let u = accountOnUnspecifiedChain a
    in if u == unspecifiedChain 0

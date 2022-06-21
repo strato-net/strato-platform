@@ -23,6 +23,7 @@ import BlockApps.Strato.DeprecatedStorage (Storage(..), StorageKV(..))
 import Blockchain.SolidVM.Model
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Account
+import SolidVM.Model.SolidString
 import SolidVM.Model.Storable
 
 forceParse :: B.ByteString -> StoragePath
@@ -56,7 +57,7 @@ bAccountPayable :: Address -> BasicValue
 bAccountPayable = BAccount . unspecifiedChain
 
 bContract :: Text -> Address -> BasicValue
-bContract t = BContract t . unspecifiedChain
+bContract t = BContract (textToLabel t) . unspecifiedChain
 
 spec :: Spec
 spec = do

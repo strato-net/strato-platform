@@ -998,10 +998,10 @@ getSolidityType _  Xabi.Account            = Right . SimpleType $ TypeAccount
 getSolidityType _ (Xabi.Struct _ name)     = Right $ TypeStruct name
 getSolidityType _ (Xabi.Enum _ name _)     = Right $ TypeEnum name
 getSolidityType _ (Xabi.Contract name)     = Right $ TypeContract name
-getSolidityType (ArgInt _) (Xabi.Label _)  = Right $ SimpleType typeUInt -- since Enums are converted to Ints
-getSolidityType (ArgString _) (Xabi.Label s)  = Right $ TypeEnum $ Text.pack s
-getSolidityType (ArgObject _) (Xabi.Label s)  = Right $ TypeStruct $ Text.pack s --interpret an object strictly as a struct
-getSolidityType av (Xabi.Label _)             = Left $ Text.pack $ "Expected a string, int, or object, but recieved: " ++ show av
+getSolidityType (ArgInt _) (Xabi.UnknownLabel _)  = Right $ SimpleType typeUInt -- since Enums are converted to Ints
+getSolidityType (ArgString _) (Xabi.UnknownLabel s)  = Right $ TypeEnum $ Text.pack s
+getSolidityType (ArgObject _) (Xabi.UnknownLabel s)  = Right $ TypeStruct $ Text.pack s --interpret an object strictly as a struct
+getSolidityType av (Xabi.UnknownLabel _)             = Left $ Text.pack $ "Expected a string, int, or object, but recieved: " ++ show av
 getSolidityType (ArgArray v) (Xabi.Array typ len)     = 
   let arrType = case len of
         Just l -> TypeArrayFixed l
