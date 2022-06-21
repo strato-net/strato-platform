@@ -2,8 +2,8 @@ import * as jwt from "jsonwebtoken";
 import * as simpleOauth from "simple-oauth2";
 import { OAuthClient, AccessToken } from "simple-oauth2";
 import * as unixTime from "unix-time";
-import request from "sync-request";
 import * as getPem from "rsa-pem-from-mod-exp";
+import axios from "axios";
 import "@babel/polyfill";
 import { OAuthUser } from "../types";
 
@@ -74,6 +74,10 @@ class OAuthUtil {
     this.servicePassword = oauthConfig.servicePassword;
     const url_split = this.openIdDiscoveryUrl.split("/");
     this.tokenHost = url_split[0] + "//" + url_split[2];
+    this.RestClient = axios.create({
+      baseURL: this.openIdDiscoveryUrl,
+      withCredentials: false
+    });
   }
 
   /**
@@ -81,18 +85,28 @@ class OAuthUtil {
    * any public keys that maybe used to sign tokens
    * @method{getOpenIdConfig}
    */
-  getOpenIdConfig() {
+  async getOpenIdConfig() {
     try {
-      const response = request("GET", this.openIdDiscoveryUrl).getBody("utf8");
+      const discoveryClient = axios.create({
+        baseURL: this.openIdDiscoveryUrl,
+        withCredentials: false
+      });
+      const response = await discoveryClient
+            .get("/")
+            .then((res: any) => response.data)
       this.openIdConfig = JSON.parse(response);
       this.jwtAlgorithm = this.openIdConfig.id_token_signing_alg_values_supported;
       this.issuer = this.openIdConfig.issuer;
       this.logOutUrl = this.openIdConfig.end_session_endpoint;
 
       if (this.openIdConfig.jwks_uri) {
-        const keyResponse = request("GET", this.openIdConfig.jwks_uri).getBody(
-          "utf8"
-        );
+        const jwksClient = axios.create({
+          baseURL: this.openIdConfig.jwks_uri,
+          withCredentials: false
+        });
+        const keyResponse = await jwksClient
+            .get("/")
+            .then((res: any) => response.data)
         this.keys = JSON.parse(keyResponse).keys;
       }
     } catch (error) {
