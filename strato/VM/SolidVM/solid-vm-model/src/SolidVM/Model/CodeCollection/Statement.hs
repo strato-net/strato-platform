@@ -28,6 +28,7 @@ import Data.Source
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
 import GHC.Generics
+import SolidVM.Model.SolidString
 import SolidVM.Model.Type
 
 data StatementF a =
@@ -73,7 +74,7 @@ instance FromJSON Location
 data VarDefEntryF a = BlankEntry
                     | VarDefEntry { vardefType :: Maybe Type
                                   , _vardefLocation :: Maybe Location
-                                  , vardefName :: String
+                                  , vardefName :: SolidString
                                   , vardefContext :: a
                                   } deriving (Show, Eq, Generic, Functor)
 
@@ -119,7 +120,7 @@ data ExpressionF a =
   | MinusMinus a (ExpressionF a)
   | NewExpression a Type
   | IndexAccess a (ExpressionF a) (Maybe (ExpressionF a))
-  | MemberAccess a (ExpressionF a) String -- ie- "x.y"
+  | MemberAccess a (ExpressionF a) SolidString -- ie- "x.y"
   | FunctionCall a (ExpressionF a) (ArgListF a)
   | Unitary a String (ExpressionF a)
   | Binary a String (ExpressionF a) (ExpressionF a)
@@ -129,8 +130,8 @@ data ExpressionF a =
   | StringLiteral a String
   | TupleExpression a [Maybe (ExpressionF a)]
   | ArrayExpression a [(ExpressionF a)]
-  | Variable a String 
-  | ObjectLiteral a (Map.Map T.Text (ExpressionF a))
+  | Variable a SolidString 
+  | ObjectLiteral a (Map.Map SolidString (ExpressionF a))
   deriving (Show, Eq, Generic, Functor)
 
 extractExpression :: ExpressionF a -> a
@@ -156,7 +157,7 @@ type Expression = Positioned ExpressionF
 instance ToJSON a => ToJSON (ExpressionF a)
 instance FromJSON a => FromJSON (ExpressionF a)
 
-data ArgListF a = OrderedArgs [ExpressionF a] | NamedArgs [(String, (ExpressionF a))] deriving (Show, Eq, Generic, Functor)
+data ArgListF a = OrderedArgs [ExpressionF a] | NamedArgs [(SolidString, (ExpressionF a))] deriving (Show, Eq, Generic, Functor)
 
 type ArgList = Positioned ArgListF
 

@@ -41,7 +41,7 @@ describe("Concurrent uploads", function() {
   it('should create multiple contracts and see them all in cirrus', async function () {
     this.timeout(config.timeout);
     const user_name= 'multi_contract' + util.uid();
-    const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
+    const oauth:oauthUtil = await oauthUtil.init(config.nodes[0].oauth);
     let accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
     let ouser:OAuthUser = {token: accessToken.token.access_token};
     const user = await rest.createUser(ouser, options);

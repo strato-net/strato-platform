@@ -28,7 +28,7 @@ simpleType =
   bytes' <|>
   intSuffixed "uint"  (Xabitype.Int (Just False)) <|>
   intSuffixed "int"  (Xabitype.Int (Just True)) <|>
-  Xabitype.Label <$>
+  Xabitype.UnknownLabel <$>
     choice [
       identifier,
       concat <$> sequence [identifier, dot, identifier]

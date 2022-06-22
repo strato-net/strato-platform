@@ -662,7 +662,7 @@ async function createContractListResolve(user, pendingTxResultList, options:Opti
  * @example
  *
  * // Initialize ba-rest oaut-utility
- * const oauth = oauthUtil.init(globalConfig.nodes[0].oauth);
+ * const oauth = await oauthUtil.init(globalConfig.nodes[0].oauth);
  *
  * // Get token using client-credential flow
  * const tokenResponse = await oauth.getAccessTokenByClientSecret();
@@ -690,7 +690,7 @@ async function getKey(user, options:Options) {
  * @example
  *
  * // Initialize ba-rest oaut-utility
- * const oauth = oauthUtil.init(globalConfig.nodes[0].oauth);
+ * const oauth = await oauthUtil.init(globalConfig.nodes[0].oauth);
  *
  * // Get token using client-credential flow
  * const tokenResponse = await oauth.getAccessTokenByClientSecret();
@@ -717,7 +717,7 @@ async function createKey(user, options:Options) {
  * @example
  *
  * // Initialize ba-rest oaut-utility
- * const oauth = oauthUtil.init(globalConfig.nodes[0].oauth);
+ * const oauth = await oauthUtil.init(globalConfig.nodes[0].oauth);
  *
  * // Get token using client-credential flow
  * const tokenResponse = await oauth.getAccessTokenByClientSecret();
