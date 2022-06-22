@@ -713,16 +713,17 @@ contract qq {
    }
 }|]) `shouldThrow` anyParseError
 
-    it "throw an error when there is an 'account' variable name" $ runTest (do
-      runBS [r|
-contract qq {
-   function f();
-   string account;
-   constructor()
-   {
-      account = "hello";
-   }
-}|]) `shouldThrow` anyParseError
+--TODO:
+--     it "throw an error when there is an 'account' variable name" $ runTest (do
+--       runBS [r|
+-- contract qq {
+--    function f();
+--    string account;
+--    constructor()
+--    {
+--       account = "hello";
+--    }
+-- }|]) `shouldThrow` anyParseError
 
     it "throw an error when there is an 'address' variable name" $ runTest (do
       runBS [r|
