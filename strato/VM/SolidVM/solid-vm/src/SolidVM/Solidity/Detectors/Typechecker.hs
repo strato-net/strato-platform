@@ -509,6 +509,7 @@ typecheckMember (Static (SVMType.Label "tx") x) "origin" = pure $ Static (SVMTyp
 typecheckMember (Static (SVMType.Label "tx") x) "username" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.Label "tx") x) "organization" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.Label "tx") x) "group" = pure $ Static (SVMType.String Nothing) x
+typecheckMember (Static (SVMType.Label "tx") x) "certificate" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.Label "block") x) "timestamp" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Label "block") x) "number" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Label "block") x) "coinbase" = pure $ Static (SVMType.Account True) x
