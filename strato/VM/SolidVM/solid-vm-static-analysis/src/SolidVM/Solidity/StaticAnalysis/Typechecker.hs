@@ -502,23 +502,6 @@ typecheckMember (Static (SVMType.Array _ _) x) "length" = pure $ Static (SVMType
 typecheckMember (Static (SVMType.Array t _) x) "push" = pure $ Function (Static t x) (Product [] x) x
 typecheckMember (Static (SVMType.Array _ _) x) n = pure . bottom $ ("Unknown member of SVMType.Array: " <> labelToText n) <$ x
 typecheckMember (Static (SVMType.Bytes _ _) x) "length" = pure $ Static (SVMType.Int Nothing Nothing) x
-<<<<<<< HEAD:strato/VM/SolidVM/solid-vm/src/SolidVM/Solidity/Detectors/Typechecker.hs
-typecheckMember (Static (SVMType.Label "Util") x) "bytes32ToString" = pure $ Function (Static (SVMType.Bytes Nothing (Just 32)) x) (Static (SVMType.String Nothing) x) x
-typecheckMember (Static (SVMType.Label "Util") x) "b32" = pure $ Function (Static (SVMType.Bytes Nothing (Just 32)) x) (Static (SVMType.Bytes Nothing (Just 32)) x) x
-typecheckMember (Static (SVMType.Label "string") x) "concat" = pure $ Function (stringConcatArgs x) (Static (SVMType.String Nothing) x) x
-typecheckMember (Static (SVMType.Label "msg") x) "sender" = pure $ Static (SVMType.Account False) x 
-typecheckMember (Static (SVMType.Label "tx") x) "origin" = pure $ Static (SVMType.Account False) x 
-typecheckMember (Static (SVMType.Label "tx") x) "username" = pure $ Static (SVMType.String Nothing) x
-typecheckMember (Static (SVMType.Label "tx") x) "organization" = pure $ Static (SVMType.String Nothing) x
-typecheckMember (Static (SVMType.Label "tx") x) "group" = pure $ Static (SVMType.String Nothing) x
-typecheckMember (Static (SVMType.Label "tx") x) "certificate" = pure $ Static (SVMType.String Nothing) x
-typecheckMember (Static (SVMType.Label "block") x) "timestamp" = pure $ Static (SVMType.Int Nothing Nothing) x
-typecheckMember (Static (SVMType.Label "block") x) "number" = pure $ Static (SVMType.Int Nothing Nothing) x
-typecheckMember (Static (SVMType.Label "block") x) "coinbase" = pure $ Static (SVMType.Account True) x
-typecheckMember (Static (SVMType.Label "block") x) "difficulty" = pure $ Static (SVMType.Int Nothing Nothing) x
-typecheckMember (Static (SVMType.Label "block") x) "gaslimit" = pure $ Static (SVMType.Int Nothing Nothing) x
-typecheckMember (Static (SVMType.Label "super") x) method = do
-=======
 typecheckMember (Static (SVMType.UnknownLabel "Util") x) "bytes32ToString" = pure $ Function (Static (SVMType.Bytes Nothing (Just 32)) x) (Static (SVMType.String Nothing) x) x
 typecheckMember (Static (SVMType.UnknownLabel "Util") x) "b32" = pure $ Function (Static (SVMType.Bytes Nothing (Just 32)) x) (Static (SVMType.Bytes Nothing (Just 32)) x) x
 typecheckMember (Static (SVMType.UnknownLabel "string") x) "concat" = pure $ Function (stringConcatArgs x) (Static (SVMType.String Nothing) x) x
@@ -534,7 +517,6 @@ typecheckMember (Static (SVMType.UnknownLabel "block") x) "coinbase" = pure $ St
 typecheckMember (Static (SVMType.UnknownLabel "block") x) "difficulty" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "block") x) "gaslimit" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "super") x) method = do
->>>>>>> develop:strato/VM/SolidVM/solid-vm-static-analysis/src/SolidVM/Solidity/StaticAnalysis/Typechecker.hs
   ctract <- asks contract
   cc <- asks codeCollection
   case getParents ((fmap $ const ()) <$> cc) ((fmap $ const ()) <$> ctract) of
