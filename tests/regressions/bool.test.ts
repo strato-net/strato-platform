@@ -34,7 +34,7 @@ describe.skip('bool data type', function () {
   var contract;
 
   before(async() => {
-    const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
+    const oauth:oauthUtil = await oauthUtil.init(config.nodes[0].oauth);
     let ouser:OAuthUser = await oauth.getAccessTokenByClientSecret();
     adminUser = await rest.createUser(ouser, options);
     contract = await rest.createContract(adminUser, {name: contractName, source: await importer.combine(contractFilename), args: constructorArgs}, options);
@@ -156,7 +156,7 @@ describe('enum data type: illegal values:', function () {
   var contract;
 
   before(async() => {
-    const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
+    const oauth:oauthUtil = await oauthUtil.init(config.nodes[0].oauth);
     let ouser:OAuthUser = await oauth.getAccessTokenByClientSecret();
     adminUser = await rest.createUser(ouser, options);
     contract = await rest.createContract(adminUser, {name: contractName, source: await importer.combine(contractFilename), args: constructorArgs}, options);
@@ -222,7 +222,7 @@ describe.skip('enum data type: legal values:', function () {
   var contract;
 
   before(async() => {
-    const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
+    const oauth:oauthUtil = await oauthUtil.init(config.nodes[0].oauth);
     let ouser:OAuthUser = await oauth.getAccessTokenByClientSecret();
     adminUser = await rest.createUser(ouser, options);
     contract = await rest.createContract(adminUser, {name: contractName, source: await importer.combine(contractFilename), args: constructorArgs}, options);

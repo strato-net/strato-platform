@@ -47,7 +47,7 @@ describe('Strato Load Test', function() {
 
   before(async() => {
     console.log(`Creating admin user and contract`);
-    const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
+    const oauth:oauthUtil = await oauthUtil.init(config.nodes[0].oauth);
     let ouser:OAuthUser = await oauth.getAccessTokenByClientSecret();
     admin = await rest.createUser(ouser, options);
     console.log(`User: ${admin.name} @ ${admin.address}`);

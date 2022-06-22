@@ -28,7 +28,7 @@ let options:Options={config}
 config.apiDebug = true;
 
 async function upload(name:string, source:string, options:Options):Promise<[BlockChainUser, Contract]> {
-  const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
+  const oauth:oauthUtil = await oauthUtil.init(config.nodes[0].oauth);
   const accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
   const ouser:OAuthUser = {token: accessToken.token.access_token};
   const user = await rest.createUser(ouser, options);

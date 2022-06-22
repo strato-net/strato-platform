@@ -27,7 +27,7 @@ describe("Create User", function() {
   this.timeout(config.timeout);
   
   before(async () => {
-    const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
+    const oauth:oauthUtil = await oauthUtil.init(config.nodes[0].oauth);
     ouser = await oauth.getAccessTokenByClientSecret();
   });
 
