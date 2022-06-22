@@ -29,7 +29,7 @@ describe('ImportAndUpload - smoke', function() {
   var alice;
 
   before(async() => {
-    const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
+    const oauth:oauthUtil = await oauthUtil.init(config.nodes[0].oauth);
     let ouser:OAuthUser = await oauth.getAccessTokenByClientSecret();
     alice = await rest.createUser(ouser, options);
   })
@@ -52,7 +52,7 @@ describe('ImportAndUpload - regular', function() {
   var alice;
 
   before(async() => {
-    const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
+    const oauth:oauthUtil = await oauthUtil.init(config.nodes[0].oauth);
     let ouser:OAuthUser = await oauth.getAccessTokenByClientSecret();
     alice = await rest.createUser(ouser, options);
   })
@@ -76,7 +76,7 @@ describe('ImportAndUpload - transitive', function() {
   var alice;
 
   before(async() => {
-    const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
+    const oauth:oauthUtil = await oauthUtil.init(config.nodes[0].oauth);
     let ouser:OAuthUser = await oauth.getAccessTokenByClientSecret();
     alice = await rest.createUser(ouser, options);
   })
@@ -100,7 +100,7 @@ describe('ImportAndUpload - relative', function() {
   var alice;
 
   before(async() => {
-    const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
+    const oauth:oauthUtil = await oauthUtil.init(config.nodes[0].oauth);
     let ouser:OAuthUser = await oauth.getAccessTokenByClientSecret();
     alice = await rest.createUser(ouser, options);
   })
@@ -142,7 +142,7 @@ describe('ImportAndUpload - circular', function() {
 
   before(async() => {
     /* CREATE USER */
-    const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
+    const oauth:oauthUtil = await oauthUtil.init(config.nodes[0].oauth);
     let ouser:OAuthUser = await oauth.getAccessTokenByClientSecret();
     alice = await rest.createUser(ouser, options);
   });
