@@ -1,5 +1,10 @@
 ## RELEASE NOTES
 
+### Version 8.2.0
+
+- Removed sync-request dependency in favor of axios
+- Made oauthUtil.init an async function
+
 ### Version 8.1.1
 
 - Export type definitions so they are more easily available to TypeScript developers.

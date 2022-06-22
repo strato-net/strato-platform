@@ -90,7 +90,7 @@ class OAuthUtil {
       const response = await discoveryClient
             .get("/")
             .then((res: any) => res.data)
-      this.openIdConfig = JSON.parse(response);
+      this.openIdConfig = response;
       this.jwtAlgorithm = this.openIdConfig.id_token_signing_alg_values_supported;
       this.issuer = this.openIdConfig.issuer;
       this.logOutUrl = this.openIdConfig.end_session_endpoint;
@@ -103,7 +103,7 @@ class OAuthUtil {
         const keyResponse = await jwksClient
             .get("/")
             .then((res: any) => res.data)
-        this.keys = JSON.parse(keyResponse).keys;
+        this.keys = keyResponse.keys;
       }
     } catch (error) {
       throw error;
@@ -116,10 +116,10 @@ class OAuthUtil {
    * @param oauthConfig
    * @returns o an instance of the OAuthUtil
    */
-  static init(oauthConfig:OAuthConfig) {
+  static async init(oauthConfig:OAuthConfig) {
     try {
       const o = new OAuthUtil(oauthConfig);
-      o.getOpenIdConfig();
+      await o.getOpenIdConfig();
       // get tokenHost
 
       const credentials = {
