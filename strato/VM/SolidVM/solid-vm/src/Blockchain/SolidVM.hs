@@ -2019,7 +2019,7 @@ callBuiltin rc'@("registerCert") [SString cert] _ = do
       curAccount <- getCurrentAccount
       case curAccount of
         Account{_accountChainId=Just cid} -> invalidWrite "Cannot register X.509 certificates on private chains" cid
-        Account{..} -> do
+        Account{} -> do
           mCreatorAddress <- getSolidStorageKeyVal' curAccount $ MS.StoragePath [MS.Field ":creatorAddress"]
           case mCreatorAddress of
             (MS.BAccount creatorAccount) -> do

@@ -84,5 +84,5 @@ remoteSetParticipationMode :: ParticipationMode -> IO ()
 remoteSetParticipationMode mode = do
   mgr <- newManager defaultManagerSettings
   let url = BaseUrl Http "localhost" 10248 ""
-  eRes <- runClientM (postParticipationMode mode) $ ClientEnv mgr url Nothing
+  eRes <- runClientM (postParticipationMode mode) $ mkClientEnv mgr url
   either (die . show) (printf "Participation mode set to: %s\n" . show) eRes

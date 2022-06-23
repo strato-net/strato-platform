@@ -10,7 +10,7 @@ import qualified Data.ByteString.Char8              as C8
 import           Data.Either
 import           Data.Maybe
 import qualified Data.Text                          as T
-import           Opaleye.RunQuery
+import           Opaleye.RunSelect
 
 
 import           Blockchain.Strato.Model.Address
@@ -44,7 +44,7 @@ main = do
   putStrLn $ "here is the key I will insert: " ++ testKeyBS
   
   -- lookup SecretBox.key in messages table to encrypt the key
-  (mMsgLst :: [(B.ByteString, SB.Nonce, B.ByteString)]) <- runQuery conn VQ.getMessageQuery
+  (mMsgLst :: [(B.ByteString, SB.Nonce, B.ByteString)]) <- runSelect conn VQ.getMessageQuery
   case mMsgLst of
     [] -> error "message table is empty, so the password must not be set. Aborting..."
     [(msgSalt, msgNonce, ciphertext)] -> do 

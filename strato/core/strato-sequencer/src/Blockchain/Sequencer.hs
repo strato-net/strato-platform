@@ -109,7 +109,7 @@ emptyBatchSeqEvent = BatchSeqEvent [] [] []
 
 batchSeqEvents :: [SeqEvent] -> BatchSeqEvent
 batchSeqEvents = foldr f emptyBatchSeqEvent
-  where f e b@BatchSeqEvent{..} = case e of
+  where f e b = case e of
           ToVm v -> (toVm %~ (v:)) b
           ToP2p p -> (toP2p %~ (p:)) b
           ToUnseq u -> (toUnseq %~ (u:)) b
@@ -593,7 +593,7 @@ transformGenesis chains = forM_ chains $ \ig -> do
             ]
           Just pChain -> A.repsert_ (A.Proxy @ChainIdEntry) pChain $ \case
                Nothing -> pure $ ChainIdEntry Nothing emptyCircularBuffer S.empty $ M.singleton chainId cInfo
-               Just cie@ChainIdEntry{..} -> pure $ cie & chainDependentChains %~ M.insert chainId cInfo
+               Just cie@ChainIdEntry{} -> pure $ cie & chainDependentChains %~ M.insert chainId cInfo
 
 splitEvents :: ( MonadLogger m
                , MonadMonitor m

@@ -190,7 +190,7 @@ vaultQuery
 vaultQuery q = do
   traverse_ (logDebugCS callStack . Text.pack) (showSql q)
   pool <- asks dbPool
-  withResource pool $ (\conn -> liftIO $ runQuery conn q)
+  withResource pool $ (\conn -> liftIO $ runSelect conn q)
 
 vaultQueryMaybe
   :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y)

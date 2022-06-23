@@ -103,7 +103,7 @@ getNodeKey :: IO (VC.PublicKey, Address)
 getNodeKey = do
   mgr <- newManager defaultManagerSettings
   vaultWrapperUrl <- parseBaseUrl flags_vaultWrapperUrl 
-  let clientEnv = ClientEnv mgr vaultWrapperUrl Nothing
+  let clientEnv = mkClientEnv mgr vaultWrapperUrl
   putStrLn "asking vault-wrapper for the node's key, or to create one, if it does not exist"
   ak <- waitOnVault clientEnv $ runClientM (getKey (T.pack "nodekey") Nothing) clientEnv
   return (VC.unPubKey ak, VC.unAddress ak)
