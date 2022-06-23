@@ -156,6 +156,14 @@ async function getContracts(user:OAuthUser, chainId, options:Options) {
   return get(url, endpoint, setAuthHeaders(user, options));
 }
 
+async function getContractsXabi(user:OAuthUser, name, address, chainId, options:Options) {
+  const url = getNodeUrl(options);
+  const urlParams = { name, address };
+  const xabiOptions = { ...options, chainIds: [chainId] };
+  const endpoint = constructEndpoint(Endpoint.CONTRACTS_XABI, xabiOptions, urlParams);
+  return get(url, endpoint, setAuthHeaders(user, options));
+}
+
 async function getState(user:OAuthUser, contract, options:Options) {
   const url = getNodeUrl(options);
   const urlParams = {
@@ -501,6 +509,7 @@ export default {
   fill,
   blocResults,
   getContracts,
+  getContractsXabi,
   getState,
   getCallArgs,
   call,

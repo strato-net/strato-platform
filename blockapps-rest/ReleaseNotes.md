@@ -4,6 +4,7 @@
 
 - Removed sync-request dependency in favor of axios
 - Made oauthUtil.init an async function
+- Expose getContractsXabi endpoint
 
 ### Version 8.1.1
 

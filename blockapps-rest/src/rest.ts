@@ -779,6 +779,21 @@ async function getContracts(user:OAuthUser, chainId, options:Options) {
 
 /**
  * @static
+ * This call gets the xabi for a particular deployed contract
+ *
+ * @param {module:rest~User} user This must contain the token for the user
+ * @param name The name of the contract to query.
+ * @param addresss The address of the contract to query.
+ * @param chainId The chainId of the contract to query.
+ * @param {module:rest~Options} options This identifies the options and configurations for this call
+ * @returns {Object} Returns an object with the contract source, code pointer info, and xabi
+ */
+async function getContractsXabi(user:OAuthUser, name, address, chainId, options:Options) {
+  return api.getContractsXabi(user, name, address, chainId, options);
+}
+
+/**
+ * @static
  * This call gets the state of a STRATO smart contract
  * @example
  *
@@ -1714,6 +1729,7 @@ export default {
   createContractList,
   getBlocResults,
   getContracts,
+  getContractsXabi,
   getState,
   getArray,
   call,

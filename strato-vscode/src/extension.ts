@@ -9,6 +9,9 @@ import { NodesProvider } from './nodes';
 import { ProjectActionProvider } from './project';
 import { activateStratoDebug } from './activateStratoDebug';
 import { subscribeToDocumentChanges } from './diagnostics';
+import { rest } from 'blockapps-rest';
+import { getApplicationUser } from './auth';
+import getConfig from './load.config';
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
@@ -125,6 +128,41 @@ export async function activate(context: vscode.ExtensionContext) {
 	vscode.commands.registerCommand('contracts.refreshEntry', () =>
 		contractsProvider.refresh()
 	);
+	vscode.commands.registerCommand('contracts.callFunction', async (element) => {
+		const { nodeId, item } = element;
+		const { chainId, contractName, contractAddress, variableName } = item;
+    const user = await getApplicationUser(nodeId);
+    const config = getConfig() || {}
+		const nodeOptions = { config, node: nodeId };
+    const { xabi } = await rest.getContractsXabi(user, contractName, contractAddress, chainId, nodeOptions);
+		const func = ((xabi || {}).funcs || {})[variableName]
+		if (variableName && variableName !== 'constructor' && func) {
+			const argNames = Object.keys(func.args || {});
+			let args = {}
+			for (let i = 0; i < argNames.length; i++) {
+		    const argInput = await vscode.window.showInputBox({
+		      placeHolder: '',
+		      prompt: `Enter a value for ${argNames[i]}: `
+		    });
+				args = { ...args, [argNames[i]]: argInput }
+			}
+			try {
+			const contract = { name: contractName, address: contractAddress }
+      const callArgs = {
+				contract,
+				args,
+				method: variableName,
+				chainid: chainId
+			}
+			const res = await rest.call( user, callArgs, nodeOptions);
+			vscode.window.showInformationMessage(`${res}`);
+			} catch (e) {
+			  vscode.window.showErrorMessage(`${e}`);
+			}
+		} else {
+			vscode.window.showErrorMessage(`Could not find a function called ${variableName} in ${contractName} at address ${contractAddress} on chain ${chainId} on node ${nodeId}.`);
+		}
+	});
 	vscode.window.registerTreeDataProvider(
 		'contracts',
 		contractsProvider
