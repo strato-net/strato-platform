@@ -3938,10 +3938,10 @@ contract qq {
     
     string myNewCertificate = "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----";
 
-    string myUsername          = "";
-    string myOrganization      = "";
-    string myGroup             = "";
-    
+    string myUsername     = "";
+    string myOrganization = "";
+    string myGroup        = "";
+    string certificate    = "";
     string myCommonName   = "";
     string myCountry      = "";
     string myOrganization = "";
@@ -3955,7 +3955,7 @@ contract qq {
         myUsername     = tx.username;
         myOrganization = tx.organization;
         myGroup        = tx.group;
-        
+        certificate    = tx.certificate;
         myCommonName   = getUserCert(myAccount)["commonName"];
         myCountry      = getUserCert(myAccount)["country"];
         myOrganization = getUserCert(myAccount)["organization"];
@@ -3964,10 +3964,11 @@ contract qq {
         myCertificate  = getUserCert(myAccount)["certString"];
     }
 }|]
-    getFields ["myUsername", "myOrganization", "myGroup", "myCommonName", "myCountry", "myOrganization", "myGroup", "myPublicKey", "myCertificate"] `shouldReturn`
+    getFields ["myUsername", "myOrganization", "myGroup", "certificate","myCommonName", "myCountry", "myOrganization", "myGroup", "myPublicKey", "myCertificate"] `shouldReturn`
       [ BString "Admin"
       , BString "BlockApps"
       , BString "Engineering"
+      , BString "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----\n"
       , BString "Admin"
       , BString "USA"
       , BString "BlockApps"
