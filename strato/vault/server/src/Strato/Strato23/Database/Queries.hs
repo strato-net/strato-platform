@@ -33,20 +33,20 @@ import           Strato.Strato23.Database.Tables
 
 countUsers :: T.Text -> Query (Column PGInt8)
 countUsers username = aggregate countStar $ proc () -> do
-  (_, name, _, _, _, _, _) <- queryTable usersTable -< ()
-  restrict -< name .== constant username
+  (_, name, _, _, _, _, _) <- selectTable usersTable -< ()
+  restrict -< name .== toFields username
 
 
 getUserKeyQuery :: T.Text -> Query (Column PGBytea, Column PGBytea, Column PGBytea, Column PGBytea)
 getUserKeyQuery username = proc () -> do
-  (_, name, salt, nonce, _, encSecPrvKey, address) <- queryTable usersTable -< ()
-  restrict -< name .== constant username
+  (_, name, salt, nonce, _, encSecPrvKey, address) <- selectTable usersTable -< ()
+  restrict -< name .== toFields username
   returnA -< (salt, nonce, encSecPrvKey, address)
 
 getUserByAddress :: Address -> Query (Column PGText)
 getUserByAddress qaddr = proc () -> do
-  (_, name, _, _, _, _, taddr) <- queryTable usersTable -< ()
-  restrict -< taddr .== constant qaddr
+  (_, name, _, _, _, _, taddr) <- selectTable usersTable -< ()
+  restrict -< taddr .== toFields qaddr
   returnA -< name
 
 getUserAddresses :: Maybe Int -> Maybe Int -> Query (Column PGText, Column PGBytea)
@@ -58,28 +58,33 @@ getUserAddresses mOffset mLimit = maybe id limit mLimit
 
 postUserKeyQuery :: T.Text -> KeyStore -> Connection -> IO Bool
 postUserKeyQuery userName KeyStore{..} conn = do
-  (userIds :: [Int32]) <- runQuery conn $ proc () -> do
-    (userId,name,_,_,_,_,_) <- queryTable usersTable -< ()
-    restrict -< name .== constant userName
+  (userIds :: [Int32]) <- runSelect conn $ proc () -> do
+    (userId,name,_,_,_,_,_) <- selectTable usersTable -< ()
+    restrict -< name .== toFields userName
     returnA -< userId
   case listToMaybe userIds of
     Just _ -> return False
     Nothing -> do
-      void $ runInsertMany conn usersTable [
-        ( Nothing
-        , constant userName
-        , constant keystoreSalt
-        , constant keystoreAcctNonce
-        , constant keystoreAcctEncSecKey
-        , constant keystoreAcctEncSecKey
-        , constant keystoreAcctAddress
-        )]
+      void $ runInsert_ conn Insert {
+        iTable=usersTable,
+        iRows=[
+            ( Nothing
+            , toFields userName
+            , toFields keystoreSalt
+            , toFields keystoreAcctNonce
+            , toFields keystoreAcctEncSecKey
+            , toFields keystoreAcctEncSecKey
+            , toFields keystoreAcctAddress
+            )],
+        iReturning=rCount,
+        iOnConflict=Nothing
+        }
       return True
 
 getMessageQuery :: Query (Column PGBytea, Column PGBytea, Column PGBytea)
 getMessageQuery = proc () -> do
-  (id', salt, nonce, enc_msg) <- queryTable messageTable -< ()
-  restrict -< id' .== constant (1 :: Int)
+  (id', salt, nonce, enc_msg) <- selectTable messageTable -< ()
+  restrict -< id' .== toFields (1 :: Int)
   returnA -< (salt, nonce, enc_msg)
 
 postMessageQuery :: ByteString
@@ -88,27 +93,32 @@ postMessageQuery :: ByteString
                  -> Connection
                  -> IO Bool
 postMessageQuery salt nonce message conn = do
-  (mesg :: [(ByteString, SecretBox.Nonce, ByteString)]) <- runQuery conn getMessageQuery
+  (mesg :: [(ByteString, SecretBox.Nonce, ByteString)]) <- runSelect conn getMessageQuery
   case mesg of
     (_:_) -> return False
-    [] -> True <$ runInsertMany conn messageTable [
-                    ( Nothing
-                    , constant salt
-                    , constant nonce
-                    , constant message
-                    )]
+    [] -> True <$ runInsert_ conn Insert {
+      iTable=messageTable,
+      iRows=[
+          ( Nothing
+          , toFields salt
+          , toFields nonce
+          , toFields message
+          )],
+      iReturning=rCount,
+      iOnConflict=Nothing
+      }
 
 instance QueryRunnerColumnDefault PGBytea Address where
   queryRunnerColumnDefault = queryRunnerColumn id
     (fromMaybe (error "could not decode address") . stringAddress . C8.unpack)
     queryRunnerColumnDefault
-instance Default Constant Address (Column PGBytea) where
+instance Default ToFields Address (Column PGBytea) where
   def = lmap (C8.pack . formatAddressWithoutColor) def
 
 instance QueryRunnerColumnDefault PGBytea SecretBox.Nonce where
   queryRunnerColumnDefault = queryRunnerColumn id
     (fromMaybe (error "could not decode nonce") . Saltine.decode)
     queryRunnerColumnDefault
-instance Default Constant SecretBox.Nonce (Column PGBytea) where
+instance Default ToFields SecretBox.Nonce (Column PGBytea) where
   def = lmap Saltine.encode def
 

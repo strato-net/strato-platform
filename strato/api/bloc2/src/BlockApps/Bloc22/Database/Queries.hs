@@ -82,8 +82,8 @@ contractBySourceHash
   => Keccak256
   -> m (Maybe SourceMap)
 contractBySourceHash srcHash = fmap (fmap deserializeSourceMap . listToMaybe) . blocQuery $ proc () -> do
-  (_,sh,src) <- queryTable contractsSourceTable -< ()
-  restrict -< sh .== constant srcHash
+  (_,sh,src) <- selectTable contractsSourceTable -< ()
+  restrict -< sh .== toFields srcHash
   returnA -< (src)
 
 insertContractSourceQuery
@@ -94,19 +94,24 @@ insertContractSourceQuery
 insertContractSourceQuery srcHash src' = do
   let src = serializeSourceMap src'
   void . blocModify $ \ conn ->
-    runInsertMany conn contractsSourceTable [
+    runInsert_ conn $ Insert {
+    iTable=contractsSourceTable,
+    iRows=[
       ( Nothing
-      , constant srcHash
-      , constant src
-      )]
+      , toFields srcHash
+      , toFields src
+      )],
+    iReturning=rCount,
+    iOnConflict=Nothing
+    }
 
 evmContractByCodeHash
   :: (MonadLogger m, HasBlocSQL m)
   => Keccak256
   -> m [(Text, Keccak256)]
 evmContractByCodeHash codeHash = blocQuery $ proc () -> do
-  (_,ch,name,sh) <- queryTable evmContractNameTable -< ()
-  restrict -< ch .== constant codeHash
+  (_,ch,name,sh) <- selectTable evmContractNameTable -< ()
+  restrict -< ch .== toFields codeHash
   returnA -< (name,sh)
 
 evmCodeHashByName
@@ -114,8 +119,8 @@ evmCodeHashByName
   => Text
   -> m [Keccak256]
 evmCodeHashByName cName = blocQuery $ proc () -> do
-  (_,ch,name,_) <- queryTable evmContractNameTable -< ()
-  restrict -< name .== constant cName
+  (_,ch,name,_) <- selectTable evmContractNameTable -< ()
+  restrict -< name .== toFields cName
   returnA -< ch
 
 insertEvmContractNameQuery
@@ -126,12 +131,17 @@ insertEvmContractNameQuery
   -> m ()
 insertEvmContractNameQuery codeHash cName srcHash = do
   void . blocModify $ \ conn ->
-    runInsertMany conn evmContractNameTable [
+    runInsert_ conn $ Insert {
+    iTable=evmContractNameTable,
+    iRows=[
       ( Nothing
-      , constant codeHash
-      , constant cName
-      , constant srcHash
-      )]
+      , toFields codeHash
+      , toFields cName
+      , toFields srcHash
+      )],
+    iReturning=rCount,
+    iOnConflict=Nothing
+    }
 
 insertContractDetailsQuery 
   :: (A.Alters Keccak256 SourceMap m)
@@ -334,7 +344,7 @@ instance QueryRunnerColumnDefault PGBytea Address where
   queryRunnerColumnDefault = queryRunnerColumn id
     (Address . bytesToWord160 . B.unpack)
     queryRunnerColumnDefault
-instance Default Constant Address (Column PGBytea) where
+instance Default ToFields Address (Column PGBytea) where
   def = lmap getBytes def
     where
       getBytes (Address x) = B.pack . word160ToBytes $ x
@@ -343,12 +353,12 @@ instance QueryRunnerColumnDefault PGBytea SecretBox.Nonce where
   queryRunnerColumnDefault = queryRunnerColumn id
     (fromMaybe (error "could not decode nonce") . Saltine.decode)
     queryRunnerColumnDefault
-instance Default Constant SecretBox.Nonce (Column PGBytea) where
+instance Default ToFields SecretBox.Nonce (Column PGBytea) where
   def = lmap Saltine.encode def
-instance Default Constant UserName (Column PGText) where
+instance Default ToFields UserName (Column PGText) where
   def = lmap getUserName def
 
-instance Default Constant StateMutability (Column PGText) where
+instance Default ToFields StateMutability (Column PGText) where
   def = lmap tShow def
 
 instance QueryRunnerColumnDefault PGText StateMutability where
@@ -364,7 +374,7 @@ instance QueryRunnerColumnDefault PGBytea Keccak256 where
       toKecc
         = unsafeCreateKeccak256FromByteString
 
-instance Default Constant Keccak256 (Column PGBytea) where
+instance Default ToFields Keccak256 (Column PGBytea) where
   def = lmap keccak256ToByteString def
 
 instance QueryRunnerColumnDefault PGBytea CodePtr where
@@ -376,7 +386,7 @@ instance QueryRunnerColumnDefault PGBytea CodePtr where
         = fromRight (error "could not decode CodePtr")
         . rlpDeserialize
 
-instance Default Constant CodePtr (Column PGBytea) where
+instance Default ToFields CodePtr (Column PGBytea) where
   def = lmap rlpSerialize def
 
 instance QueryRunnerColumnDefault PGBytea (Maybe ChainId) where
@@ -392,7 +402,7 @@ instance QueryRunnerColumnDefault PGBytea (Maybe ChainId) where
                . byteStringToWord256
                $ bs
 
-instance Default Constant (Maybe ChainId) (Column PGBytea) where
+instance Default ToFields (Maybe ChainId) (Column PGBytea) where
   def = lmap fromChainId def
         where fromChainId = \case
                 Nothing -> B.empty
