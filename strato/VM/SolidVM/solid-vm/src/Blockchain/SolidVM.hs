@@ -1320,12 +1320,12 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
                                                     let maybeCertBlockDB = M.lookup (_accountAddress $ Env.origin env') x509s
                                                         maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
                                                     return . Constant . SString . fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
-      (SBuiltinVariable "tx", "group") -> do env' <- getEnv
-                                             x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-                                             maybeCertLevelDB <- x509CertDBGet $ _accountAddress $ Env.origin env'
-                                             let maybeCertBlockDB = M.lookup (_accountAddress $ Env.origin env') x509s
-                                                 maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
-                                             return . Constant . SString . fromMaybe "" $ subUnit =<< getCertSubject =<< maybeCert
+      (SBuiltinVariable "tx", "organizationalUnit") -> do env' <- getEnv
+                                                          x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
+                                                          maybeCertLevelDB <- x509CertDBGet $ _accountAddress $ Env.origin env'
+                                                          let maybeCertBlockDB = M.lookup (_accountAddress $ Env.origin env') x509s
+                                                              maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
+                                                          return . Constant . SString . fromMaybe "" $ subUnit =<< getCertSubject =<< maybeCert
       (SBuiltinVariable "tx", "certificate") -> do env' <- getEnv
                                                    x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
                                                    maybeCertLevelDB <- x509CertDBGet $ _accountAddress $ Env.origin env'
@@ -2181,7 +2181,7 @@ certificateMap maybeCert = case maybeCert of
           certMap cert sub = M.fromList [ (SString "commonName", Constant . SString $ subCommonName sub)
                                    , (SString "country", Constant . SString $ fromMaybe "" $ subCountry sub)
                                    , (SString "organization", Constant . SString $ subOrg sub)
-                                   , (SString "group", Constant . SString $ fromMaybe "" $ subUnit sub)
+                                   , (SString "organizationalUnit", Constant . SString $ fromMaybe "" $ subUnit sub)
                                    , (SString "publicKey", Constant . SString $ BC.unpack $ pubToBytes $ subPub sub)
                                    , (SString "userAddress", Constant . SString $ show $ fromPublicKey $ subPub sub)
                                    , (SString "certString", Constant . SString $ cert)
@@ -2189,7 +2189,7 @@ certificateMap maybeCert = case maybeCert of
           emptyCertMap = M.fromList [ (SString "commonName", Constant . SString $ "")
                              , (SString "country", Constant . SString $ "")
                              , (SString "organization", Constant . SString $ "")
-                             , (SString "group", Constant . SString $ "")
+                             , (SString "organizationalUnit", Constant . SString $ "")
                              , (SString "publicKey", Constant . SString $ "")
                              , (SString "userAddress", Constant . SString $ "")
                              , (SString "certString", Constant . SString $ "")

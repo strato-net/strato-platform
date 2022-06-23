@@ -186,7 +186,7 @@ contract Certificate {
     string commonName;
     string country;
     string organization;
-    string group;
+    string organizationalUnit;
     string publicKey;
     string certificateString;
 
@@ -198,7 +198,7 @@ contract Certificate {
         certificateHolder = account(parsedCert["userAddress"]);
         commonName = parsedCert["commonName"];
         organization = parsedCert["organization"];
-        group = parsedCert["group"];
+        organizationalUnit = parsedCert["organizationalUnit"];
         country = parsedCert["country"];
         publicKey = parsedCert["publicKey"];
         certificateString = parsedCert["certString"];
