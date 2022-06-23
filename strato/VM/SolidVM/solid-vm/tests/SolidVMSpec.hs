@@ -3946,7 +3946,6 @@ contract qq {
     string myCommonName   = "";
     string myCountry      = "";
     string myOrganization = "";
-    string myGroup        = "";
     string myPublicKey    = "";
     string myCertificate  = "";
 
