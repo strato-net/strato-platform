@@ -35,8 +35,8 @@ import           Control.Monad.Trans.Except
 import qualified Crypto.Saltine.Class            as Saltine
 import qualified Crypto.Saltine.Core.SecretBox   as SecretBox
 import           Data.Aeson                      (Result(..), fromJSON)
-import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString                 as B
+import qualified Data.ByteString.Char8           as BC
 import qualified Data.Cache                      as Cache
 import           Data.Either                     (fromRight)
 import           Data.Foldable                   (for_)
@@ -50,10 +50,13 @@ import           Data.Text                       (Text)
 import qualified Data.Text                       as Text
 import qualified Data.Text.Encoding              as Text
 import           Data.Traversable                (for)
-import           Opaleye                         hiding (not, null, index)
+import           Database.PostgreSQL.Simple.FromField hiding (name, format)
+import           Opaleye                         hiding (not, null, index, FromField)
 import           System.Clock
 import           Text.Format
 import           UnliftIO
+
+
 
 import           BlockApps.Bloc22.API.AbiBin     (AbiBin(..))
 import           BlockApps.Bloc22.API.Utils
@@ -340,19 +343,27 @@ createMetadataNoCompile sourceList = do
   A.insert (A.Proxy @SourceMap) srcHash sourceList
   pure details
 
-instance QueryRunnerColumnDefault PGBytea Address where
-  queryRunnerColumnDefault = queryRunnerColumn id
-    (Address . bytesToWord160 . B.unpack)
-    queryRunnerColumnDefault
+instance DefaultFromField PGBytea Address where
+  defaultFromField = fromPGSFromField
+
+instance FromField Address where
+  fromField f mdata = do
+    theByteString <- fromField f mdata
+    return $ Address $ bytesToWord160 $ B.unpack theByteString
+
 instance Default ToFields Address (Column PGBytea) where
   def = lmap getBytes def
     where
       getBytes (Address x) = B.pack . word160ToBytes $ x
 
-instance QueryRunnerColumnDefault PGBytea SecretBox.Nonce where
-  queryRunnerColumnDefault = queryRunnerColumn id
-    (fromMaybe (error "could not decode nonce") . Saltine.decode)
-    queryRunnerColumnDefault
+instance DefaultFromField PGBytea SecretBox.Nonce where
+  defaultFromField = fromPGSFromField
+
+instance FromField SecretBox.Nonce where
+  fromField f mdata = do
+    theByteString <- fromField f mdata
+    return $ fromMaybe (error $ "could not decode address: " ++ show theByteString) $ Saltine.decode theByteString
+
 instance Default ToFields SecretBox.Nonce (Column PGBytea) where
   def = lmap Saltine.encode def
 instance Default ToFields UserName (Column PGText) where
@@ -361,46 +372,43 @@ instance Default ToFields UserName (Column PGText) where
 instance Default ToFields StateMutability (Column PGText) where
   def = lmap tShow def
 
-instance QueryRunnerColumnDefault PGText StateMutability where
-  queryRunnerColumnDefault = queryRunnerColumn id
-    (fromMaybe (error "could not decode mutability") . tRead)
-    queryRunnerColumnDefault
+instance DefaultFromField PGText StateMutability where
+  defaultFromField = fromPGSFromField
 
-instance QueryRunnerColumnDefault PGBytea Keccak256 where
-  queryRunnerColumnDefault =
-    queryRunnerColumn id toKecc queryRunnerColumnDefault
-    where
-      toKecc :: ByteString -> Keccak256
-      toKecc
-        = unsafeCreateKeccak256FromByteString
+instance FromField StateMutability where
+  fromField f mdata = do
+    theByteString <- fromField f mdata
+    return $ fromMaybe (error $ "could not decode mutability: " ++ show theByteString) $ tRead $ Text.pack $ BC.unpack theByteString
+
+instance DefaultFromField PGBytea Keccak256 where
+  defaultFromField = fromPGSFromField
+
+instance FromField Keccak256 where
+  fromField f mdata = do
+    theByteString <- fromField f mdata
+    return $ unsafeCreateKeccak256FromByteString theByteString
 
 instance Default ToFields Keccak256 (Column PGBytea) where
   def = lmap keccak256ToByteString def
 
-instance QueryRunnerColumnDefault PGBytea CodePtr where
-  queryRunnerColumnDefault =
-    queryRunnerColumn id toCodePtr queryRunnerColumnDefault
-    where
-      toCodePtr :: ByteString -> CodePtr
-      toCodePtr
-        = fromRight (error "could not decode CodePtr")
-        . rlpDeserialize
+instance DefaultFromField PGBytea CodePtr where
+  defaultFromField = fromPGSFromField
+
+instance FromField CodePtr where
+  fromField f mdata = do
+    theByteString <- fromField f mdata
+    return $ fromRight (error $ "could not decode CodePtr: " ++ show theByteString) $ rlpDeserialize theByteString
 
 instance Default ToFields CodePtr (Column PGBytea) where
   def = lmap rlpSerialize def
 
-instance QueryRunnerColumnDefault PGBytea (Maybe ChainId) where
-  queryRunnerColumnDefault =
-    queryRunnerColumn id toChainId queryRunnerColumnDefault
-    where
-      toChainId :: ByteString -> Maybe ChainId
-      toChainId bs
-        = if B.null bs
-            then Nothing
-            else Just
-               . ChainId
-               . byteStringToWord256
-               $ bs
+instance DefaultFromField PGBytea (Maybe ChainId) where
+  defaultFromField = fromPGSFromField
+
+instance FromField ChainId where
+  fromField f mdata = do
+    theByteString <- fromField f mdata
+    return $ ChainId $ byteStringToWord256 theByteString
 
 instance Default ToFields (Maybe ChainId) (Column PGBytea) where
   def = lmap fromChainId def

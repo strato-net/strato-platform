@@ -22,7 +22,8 @@ import           Data.Profunctor
 import           Data.Profunctor.Product.Default
 import qualified Data.Text                       as T
 import           Database.PostgreSQL.Simple      (Connection)
-import           Opaleye                         hiding (not, null, index)
+import           Database.PostgreSQL.Simple.FromField hiding (name)
+import           Opaleye                         hiding (not, null, index, FromField)
 
 import           Blockchain.Strato.Model.Address
 
@@ -108,17 +109,25 @@ postMessageQuery salt nonce message conn = do
       iOnConflict=Nothing
       }
 
-instance QueryRunnerColumnDefault PGBytea Address where
-  queryRunnerColumnDefault = queryRunnerColumn id
-    (fromMaybe (error "could not decode address") . stringAddress . C8.unpack)
-    queryRunnerColumnDefault
+instance DefaultFromField PGBytea Address where
+  defaultFromField = fromPGSFromField
+
+instance FromField Address where
+  fromField f mdata = do
+    theByteString <- fromField f mdata
+    return $ fromMaybe (error $ "could not decode address: " ++ show theByteString) $ stringAddress $ C8.unpack theByteString
+
 instance Default ToFields Address (Column PGBytea) where
   def = lmap (C8.pack . formatAddressWithoutColor) def
 
-instance QueryRunnerColumnDefault PGBytea SecretBox.Nonce where
-  queryRunnerColumnDefault = queryRunnerColumn id
-    (fromMaybe (error "could not decode nonce") . Saltine.decode)
-    queryRunnerColumnDefault
+instance DefaultFromField PGBytea SecretBox.Nonce where
+  defaultFromField = fromPGSFromField
+
+instance FromField SecretBox.Nonce where
+  fromField f theData = do
+    theByteString <- fromField f theData
+    return $ fromMaybe (error $ "Saltine.decode failed for: " ++ show theByteString) $ Saltine.decode theByteString
+
 instance Default ToFields SecretBox.Nonce (Column PGBytea) where
   def = lmap Saltine.encode def
 
