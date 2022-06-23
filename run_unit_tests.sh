@@ -24,6 +24,8 @@ stack test -j1 \
       fast-keccak256 \
       merkle-patricia-db \
       solid-vm \
+      solid-vm-model \
+      solid-vm-parser \
       strato-genesis \
       strato-index \
       strato-init \
@@ -46,7 +48,6 @@ stack test -j1 \
       cross-monitoring \
       format \
       labeled-error \
-      solid-vm-model \
       source-tools
 
 stack bench vm-runner

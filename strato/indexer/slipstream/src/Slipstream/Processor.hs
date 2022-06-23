@@ -89,6 +89,7 @@ import Slipstream.Options
 
 import SolidVM.CodeCollectionTools
 import SolidVM.Model.CodeCollection hiding (contractName)
+import SolidVM.Model.SolidString
 
 import Text.Format
 
@@ -343,7 +344,7 @@ contractToEventTables (org, app, name) c =
           eventOrganization = org,
           eventApplication  = app,
           eventContractName = name,
-          eventName = eName,
+          eventName = labelToText eName,
           eventFields = map fst $ eventLogs fields
         }
   
@@ -363,10 +364,10 @@ parseEvents :: [VMEvent] -> [Action.Event]
 parseEvents events' = [a | EventEmitted a <- events']
 
 getCodeCollection' :: MonadIO m => Bool -> CodePtr -> Text -> m CodeCollection
-getCodeCollection' True = getCodeCollection (Map.fromList . map (\(x, y) -> (T.unpack x, xabiToPartialContract y)) )
+getCodeCollection' True = getCodeCollection (Map.fromList . map (\(x, y) -> (textToLabel x, xabiToPartialContract y)) )
 getCodeCollection' False = getCodeCollection (const Map.empty)
 
-getCodeCollection :: MonadIO m => ([(Text, OLD.Xabi)] -> Map.Map String Contract) -> CodePtr -> Text -> m CodeCollection
+getCodeCollection :: MonadIO m => ([(Text, OLD.Xabi)] -> Map.Map SolidString Contract) -> CodePtr -> Text -> m CodeCollection
 getCodeCollection f cp ccString = do
   let initList =
         case Aeson.decodeStrict $ encodeUtf8 ccString of
@@ -447,7 +448,7 @@ processTheMessages env sqlEnv conn g messages = do
 
 
     deferredForeignKeys <- fmap concat $ forM (Map.toList $ cc^.contracts) $ \(nameString, c) -> do
-      let n = T.pack nameString
+      let n = labelToText nameString
     
       let htn = historyTableName o a n
           historyTableNames = map (historyTableName o a) hl 

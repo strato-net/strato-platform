@@ -108,7 +108,7 @@ spec = do
       let eRes = showError $ runParser functionModifiers "" "" "returns (ErrorCodes, ProjectState) {}"
       printLeft eRes
       let Right (rets, _, _, _) = eRes
-          expected = [("",Label "ErrorCodes"),("",Label "ProjectState")]
+          expected = [("",UnknownLabel "ErrorCodes"),("",UnknownLabel "ProjectState")]
       rets `shouldBe` expected
     it "should parse a function with nested comments" $ do
       let functionString = "function nestedComments(uint a)\n    { /*\n      /* nested comment\n    */\n    }"

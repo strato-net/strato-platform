@@ -8,7 +8,7 @@ import qualified Data.Map as M
 import           Data.Source
 import           Data.Text (Text)
 import qualified Data.Text as T
-import qualified SolidVM.Solidity.Detectors.Typechecker                            as Typechecker
+import qualified SolidVM.Solidity.StaticAnalysis.Typechecker                            as Typechecker
 import           Test.Hspec
 import           Text.RawString.QQ
 

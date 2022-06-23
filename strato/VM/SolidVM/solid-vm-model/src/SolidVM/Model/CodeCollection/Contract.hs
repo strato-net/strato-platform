@@ -22,7 +22,6 @@ import Control.Lens
 import Data.Aeson as A
 import Data.Map (Map)
 import Data.Source
-import qualified Data.Text as T
 import GHC.Generics
 
 import           SolidVM.Model.CodeCollection.ConstantDecl
@@ -30,17 +29,18 @@ import qualified SolidVM.Model.CodeCollection.Event as SolidVM
 import           SolidVM.Model.CodeCollection.Function
 import qualified SolidVM.Model.CodeCollection.VarDef as SolidVM
 import           SolidVM.Model.CodeCollection.VariableDecl
+import           SolidVM.Model.SolidString
 
 data ContractF a =
   Contract {
-    _contractName :: String,
-    _parents :: [String],
-    _constants :: Map String (ConstantDeclF a),
-    _storageDefs :: Map T.Text (VariableDeclF a),
-    _enums :: Map String ([String], a),
-    _structs :: Map String [(T.Text, SolidVM.FieldType, a)],
-    _events :: Map T.Text (SolidVM.EventF a),
-    _functions :: Map String (FuncF a),
+    _contractName :: SolidString,
+    _parents :: [SolidString],
+    _constants :: Map SolidString (ConstantDeclF a),
+    _storageDefs :: Map SolidString (VariableDeclF a),
+    _enums :: Map SolidString ([SolidString], a),
+    _structs :: Map SolidString [(SolidString, SolidVM.FieldType, a)],
+    _events :: Map SolidString (SolidVM.EventF a),
+    _functions :: Map SolidString (FuncF a),
     _constructor :: Maybe (FuncF a),
     _vmVersion :: String,
     _contractContext :: a

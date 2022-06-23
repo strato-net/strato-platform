@@ -71,7 +71,7 @@ xabiTypeToType xabi Xabi.Array { Xabi.entry=var, Xabi.length=(Just l)} =
 xabiTypeToType xabi Xabi.Array { Xabi.entry=var, Xabi.length=Nothing} =
   TypeArrayDynamic <$> xabiTypeToType xabi var
 xabiTypeToType _ Xabi.Contract { Xabi.typedef=name } = return $ TypeContract name
-xabiTypeToType xabi (Xabi.Label name) =
+xabiTypeToType xabi (Xabi.UnknownLabel name) =
   case Map.lookup (Text.pack name) (xabiTypes xabi) of
    Nothing -> Left $ "Contract is using a label that has not been defined as an enum, struct, or contract: " ++ name ++ "\navailable names: " ++ show (map fst $ Map.toList $ xabiTypes xabi)
    Just (XabiDef.Enum _ _) -> return $ TypeEnum $ Text.pack name

@@ -297,7 +297,7 @@ instance Show UnsignedChainInfo where
   show UnsignedChainInfo{..} = unlines
     [ "UnsignedChainInfo"
     , "-----------------"
-    , tab' $ "Label:          " ++ show chainLabel
+    , tab' $ "SolidString:          " ++ show chainLabel
     , tab' $ "Account info:   " ++ format accountInfo
     , tab' $ "Code info:      " ++ show (codeInfoName <$> codeInfo)
     , tab' $ "Members:        " ++ show members

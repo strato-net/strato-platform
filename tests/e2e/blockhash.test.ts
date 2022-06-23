@@ -30,7 +30,7 @@ let options:Options = {config: {...config, VM: "EVM"}};
 describe('Using blockhash', function () {
   it('should upload a contract that uses blockhash', async () => {
 
-    const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
+    const oauth:oauthUtil = await oauthUtil.init(config.nodes[0].oauth);
 
     let accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
     const ouser:OAuthUser = {token: accessToken.token.access_token};

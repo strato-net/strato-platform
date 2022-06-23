@@ -11,11 +11,12 @@ import System.Environment
 import System.Exit
 import Text.Parsec (runParser)
 import Text.Printf
-import SolidVM.Solidity.Detectors.Typechecker as TC
+import SolidVM.Solidity.StaticAnalysis.Typechecker as TC
 
 
 import SolidVM.CodeCollectionTools
 import SolidVM.Model.CodeCollection
+import SolidVM.Model.SolidString
 import SolidVM.Solidity.Parse.Declarations
 import SolidVM.Solidity.Parse.File
 
@@ -114,7 +115,7 @@ main = do
         Pragma _ n v -> Just (n, v)
         _ -> Nothing
   let vmVersion' = if (Just ("solidvm","3.2")) `elem` (pragmas <$> parsedFile) then "svm3.2" else (if (Just ("solidvm","3.0")) `elem` (pragmas <$> parsedFile) then "svm3.0" else "")
-      namedContracts = [(T.unpack name, either (throw . fst) id $ xabiToContract (T.unpack name) (map T.unpack parents') vmVersion' xabi)
+      namedContracts = [(textToLabel name, either (throw . fst) id $ xabiToContract (textToLabel name) (map textToLabel parents') vmVersion' xabi)
                        | NamedXabi name (xabi, parents') <- parsedFile]
       cc = CodeCollection $ M.fromList namedContracts
       typecheck = if vmVersion' == "svm3.2" then TC.detector cc else []

@@ -35,7 +35,6 @@ import qualified Data.ByteString.UTF8  as UTF8
 import           Data.Foldable (for_)
 import           Data.List
 import qualified Data.Map as M
-import qualified Data.Text as T
 import qualified Data.Vector as V
 import           Text.Printf
 
@@ -44,6 +43,7 @@ import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.SM
 import           Blockchain.Strato.Model.Account
 import qualified SolidVM.Model.CodeCollection as CC
+import           SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type as SVMType
 import qualified SolidVM.Model.Storable as MS
 import           SolidVM.Model.Value
@@ -76,8 +76,8 @@ fromBasic = \case
   MS.BString s -> SString . BC.unpack $ s
   MS.BBool b -> SBool b
   MS.BAccount a -> SAccount a False
-  MS.BContract n a -> SContract (T.unpack n) a
-  MS.BEnumVal k v num -> SEnumVal (T.unpack k) (T.unpack v) num
+  MS.BContract n a -> SContract n a
+  MS.BEnumVal k v num -> SEnumVal k v num
   MS.BMappingSentinel -> SMappingSentinel
   MS.BDefault -> internalError "fromBasic: should never decode" MS.BDefault
 
@@ -99,8 +99,8 @@ toBasic = \case
   SString s -> MS.BString (BC.pack s)
   SBool b -> MS.BBool b
   SAccount a _ -> MS.BAccount a
-  SContract n a -> MS.BContract (T.pack n) a
-  SEnumVal k t num -> MS.BEnumVal (T.pack k) (T.pack t) num
+  SContract n a -> MS.BContract n a
+  SEnumVal k t num -> MS.BEnumVal k t num
   SMappingSentinel -> MS.BMappingSentinel
   x -> typeError "non basic solidity type cannot be stored atomically: " (show x)
 
@@ -127,7 +127,7 @@ setVal (SReference dst) (SReference src) = do
 
 setVal (SReference dst) (SStruct _ fs) = do
   forM_ (M.toList fs) $ \(f, var) -> do
-    setVal (SReference $ dst `apSnoc` MS.Field (BC.pack f)) =<< weakGetVar var
+    setVal (SReference $ dst `apSnoc` MS.Field (BC.pack $ labelToString f)) =<< weakGetVar var
 
 setVal (SReference dst) (SArray _ fs) = do
   let len = length fs
@@ -365,8 +365,8 @@ showSM (SStruct name m) = do
       val <- getVar var
       valString <- showSM val
       return (n, valString)
-  return $ name ++ "{"
-                ++ intercalate ", " (map (\(n, v) -> n ++ ": " ++ v) valStrings)
+  return $ labelToString name ++ "{"
+                ++ intercalate ", " (map (\(n, v) -> labelToString n ++ ": " ++ v) valStrings)
                 ++ "}"
 showSM (SMap _ m) = do
   valStrings <-
@@ -379,7 +379,7 @@ showSM (SMap _ m) = do
            ++ intercalate ", " (map (\(k, v) -> k ++ ": " ++ v) valStrings)
            ++ "}"
 showSM (SContract name address) = do
-  return $ "Contract: " ++ name ++ "/" ++ format address
+  return $ "Contract: " ++ labelToString name ++ "/" ++ format address
 showSM (SReference apt) = return $ "<reference to " ++ show apt ++ ">"
 showSM (SBuiltinVariable x) = return $ "<built-in " ++ show x ++ ">"
 showSM (SContractFunction maybeContractName address functionName ) = do
@@ -388,5 +388,5 @@ showSM (SContractFunction maybeContractName address functionName ) = do
     Nothing -> do
       contract <- getCurrentContract
       return $ CC._contractName contract
-  return $ "Contract function: " ++ contractName ++ "/" ++ format address ++ "." ++ functionName
+  return $ "Contract function: " ++ labelToString contractName ++ "/" ++ format address ++ "." ++ labelToString functionName
 showSM x = todo "showSM called for unsupported value: " x
