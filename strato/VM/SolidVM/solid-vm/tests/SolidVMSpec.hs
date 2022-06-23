@@ -3946,6 +3946,7 @@ contract qq {
     string myCommonName   = "";
     string myCountry      = "";
     string myOrganization = "";
+    string myOrganizationalUnit  = "";
     string myPublicKey    = "";
     string myCertificate  = "";
 
@@ -3954,8 +3955,8 @@ contract qq {
 
         myUsername     = tx.username;
         myOrganization = tx.organization;
-
-        myGroup        = tx.group;
+        myOrganizationalUnit = tx.organizationalUnit;
+	
         certificate    = tx.certificate;
         myCommonName   = getUserCert(myAccount)["commonName"];
         myCountry      = getUserCert(myAccount)["country"];
@@ -3965,7 +3966,7 @@ contract qq {
         myCertificate  = getUserCert(myAccount)["certString"];
     }
 }|]
-    getFields ["myUsername", "myOrganization", "myGroup", "certificate","myCommonName", "myCountry", "myOrganization", "myGroup", "myPublicKey", "myCertificate"] `shouldReturn`
+    getFields ["myUsername", "myOrganization", "myOrganizationalUnit", "certificate","myCommonName", "myCountry", "myOrganization", "myOrganizationalUnit", "myPublicKey", "myCertificate"] `shouldReturn`
       [ BString "Admin"
       , BString "BlockApps"
       , BString "Engineering"
