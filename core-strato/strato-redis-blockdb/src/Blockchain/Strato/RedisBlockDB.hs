@@ -15,6 +15,7 @@ module Blockchain.Strato.RedisBlockDB
     , getChainInfo, putChainInfo
     , getChainMembers, putChainMembers
     , addChainMember, removeChainMember
+    , registerCertificate, lookupCertificate
     , getChainTxsInBlock, putChainTxsInBlock, addChainTxsInBlock
     , getIPChains, addIPChain, removeIPChain
     , getOrgIdChains, addOrgIdChain, removeOrgIdChain
@@ -194,6 +195,19 @@ removeChainMember cId address = do
             Compose (removeOrgIdChain (unOrgId $ pubKey enode) cId)
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Error" ++ e)
+
+registerCertificate :: Address -> Address -> Redis (Either Reply Status)
+registerCertificate userAddress contractAddress = do
+    res <- multiExec $ set (inNamespace X509Certificates $ toKey userAddress) (toValue contractAddress)
+    case res of
+        TxSuccess _ -> pure $ Right Ok
+        TxAborted -> pure . Left $ SingleLine (S8.pack $ "registerCertificate - Aborted")
+        TxError e -> pure . Left $ SingleLine (S8.pack $ "registerCertificate - Error" <> e)
+
+lookupCertificate :: Address -> Redis (Maybe Address)
+lookupCertificate a = getInNamespace X509Certificates a <&> \case
+    Right (Just b) -> Just $ fromValue b
+    _              -> Nothing
 
 getChainTxsInBlock :: Keccak256
                    -> Redis (M.Map Word256 [Keccak256])

@@ -56,7 +56,7 @@ import           Blockchain.TCPClientWithTimeout
 import qualified Text.Colors                           as C
 import           Text.Format
 
-runPeer :: (MonadIO m, MonadLogger m, MonadUnliftIO m)
+runPeer :: (MonadIO m, MonadLogger m, MonadUnliftIO m, MonadResource m)
         => IORef (S.OSet Keccak256)
         -> PPeer
         -> BC.ByteString -- otherServiceCommHost
@@ -128,7 +128,7 @@ runEthClientConduit peer peerSource peerSink seqSource unseqSink peerStr = do
                   .| peerSink
 
 
-runPeerInList :: (MonadIO m, MonadLogger m, MonadUnliftIO m)
+runPeerInList :: (MonadIO m, MonadLogger m, MonadUnliftIO m, MonadResource m)
               => IORef (S.OSet Keccak256)
               -> PPeer
               -> BC.ByteString
@@ -168,7 +168,7 @@ stratoP2PClient wireMessagesRef = do
         unless isRunning $ do
           (liftIO (SSem.tryWait sem)) >>= \case
             Nothing -> return ()
-            Just _  -> void . forkIO . runLoggingT $ do
+            Just _  -> void . forkIO . runLoggingT . runResourceT $ do
               result <- try $ runPeerInList wireMessagesRef p osch oscp
               liftIO (SSem.signal sem)
               handleRunPeerResult p result

@@ -97,6 +97,7 @@ data TestContext = TestContext
   , _orgIdChainsMap        :: Map OrgId OrgIdChains
   , _shaChainTxsInBlockMap :: Map Keccak256 ChainTxsInBlock
   , _chainMembersMap       :: Map Word256 ChainMembers
+  , _mockX509RedisDB       :: Map Address Address
   , _chainInfoMap          :: Map Word256 ChainInfo
   , _privateTxMap          :: Map Keccak256 (Private (Word256, OutputTx))
   , _genesisBlockHash      :: GenesisBlockHash
@@ -152,6 +153,9 @@ instance MonadIO m => A.Selectable Keccak256 ChainTxsInBlock (MonadTest m) where
 
 instance MonadIO m => A.Selectable Word256 ChainMembers (MonadTest m) where
   select _ cid = M.lookup cid <$> use chainMembersMap
+
+instance MonadIO m => A.Selectable Address Address (MonadTest m) where
+  select _ addr = M.lookup addr <$> use mockX509RedisDB
 
 instance MonadIO m => A.Selectable Word256 ChainInfo (MonadTest m) where
   select _ cid = M.lookup cid <$> use chainInfoMap
@@ -396,6 +400,7 @@ testContext wireMessagesRef prv ctx = TestContext
   , _orgIdChainsMap        = M.empty
   , _shaChainTxsInBlockMap = M.empty
   , _chainMembersMap       = M.empty
+  , _mockX509RedisDB       = M.empty
   , _chainInfoMap          = M.empty
   , _privateTxMap          = M.empty
   , _genesisBlockHash      = GenesisBlockHash zeroHash

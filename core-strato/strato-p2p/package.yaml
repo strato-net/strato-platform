@@ -21,6 +21,7 @@ executables:
       - hflags
       - lifted-async
       - ordered-containers
+      - resourcet
       - strato-p2p
       - wai-middleware-prometheus
       - warp
@@ -36,6 +37,7 @@ library:
     - ansi-wl-pprint
     - base16-bytestring
     - blockapps-datadefs
+    - blockapps-mpdbs
     - blockapps-util
     - blockapps-vault-wrapper-api
     - blockapps-vault-wrapper-client
@@ -63,8 +65,10 @@ library:
     - json-rpc-server
     - json-rpc-client
     - lens
+    - leveldb-haskell
     - lifted-base
     - milena
+    - merkle-patricia-db
     - monad-alter
     - monadIO
     - mtl

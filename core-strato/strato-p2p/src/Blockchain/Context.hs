@@ -62,8 +62,10 @@ import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
 import           Blockchain.Output
 import           Control.Monad.Reader
+import qualified Data.ByteString                       as BS
 import           Data.Default
 import           Data.Foldable                         (toList)
+import           Data.Functor.Compose
 import qualified Data.Map.Strict                       as M
 import           Data.Maybe
 import           Data.Proxy
@@ -73,14 +75,25 @@ import           Data.Time.Clock
 import           GHC.Exts                              (Constraint)
 
 import           Blockchain.Blockstanbul               (WireMessage)
+import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.Block
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Enode
+import           Blockchain.Data.RLP
+import qualified Blockchain.Database.MerklePatricia    as MP
+import           Blockchain.DB.AddressStateDB
 import           Blockchain.DB.DetailsDB
+import           Blockchain.DB.RawStorageDB
+import           Blockchain.DB.StateDB
+import           Blockchain.Strato.Model.Account
+
+import qualified Database.LevelDB                      as DB
+
+import           Blockchain.Constants
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
-import           Blockchain.EthConf
+import           Blockchain.EthConf                    hiding (path)
 import           Blockchain.ExtWord
 import           Blockchain.Options
 import           Blockchain.Sequencer.Event
@@ -140,6 +153,8 @@ newtype Outbound a = Outbound { unOutbound :: a }
 
 data Config = Config
   { configSQLDB              :: SQLDB
+  , configStateDB            :: StateDB
+  , configStateRoots         :: IORef (M.Map (Maybe Word256) MP.StateRoot)
   , configRedisBlockDB       :: RBDB.RedisConnection
   , configUnseqSink          :: forall m . (MonadIO m, MonadLogger m, Mod.Modifiable K.KafkaState m) => [IngestEvent] -> m ()
   , configVmEventsSink       :: forall m . (MonadIO m, MonadLogger m, Mod.Modifiable K.KafkaState m) => [VMOutput] -> m ()
@@ -245,6 +260,32 @@ instance MonadIO m => A.Selectable Word256 ChainMembers (ReaderT Config m) where
     case allChainMembers of
       [] -> pure $ ChainMembers M.empty
       _ -> pure . ChainMembers $ foldr1 M.intersection allChainMembers
+
+-- TODO Remove these instances
+-- These five instances are created for the A.Selectable Address [T.Text] instance
+-- Ideally we would not create these instances. But these instances are easy.
+instance MonadIO m => A.Selectable Address Address (ReaderT Config m) where
+  select _ = RBDB.withRedisBlockDB . RBDB.lookupCertificate
+instance MonadIO m => (Maybe Word256 `A.Alters` MP.StateRoot) (ReaderT Config m) where
+  lookup _ k = fmap (M.lookup k) $ liftIO . readIORef =<< asks configStateRoots
+instance MonadIO m => (Account `A.Alters` AddressState) (ReaderT Config m) where
+  lookup _ = getAddressStateMaybe
+instance MonadIO m => (MP.StateRoot `A.Alters` MP.NodeData) (ReaderT Config m) where
+  lookup _ = MP.genericLookupDB $ asks configStateDB
+instance MonadIO m => (RawStorageKey `A.Selectable` RawStorageValue) (ReaderT Config m) where
+  select _ = getRawStorageKeyValDBMaybe
+
+-- Lookup the certificate data by the address
+instance MonadIO m => A.Selectable Address [T.Text] (ReaderT Config m) where
+  select _ k = do
+    certAddress <- A.select (A.Proxy @Address) k
+    case certAddress of
+      Nothing -> return Nothing
+      Just address -> getCompose $ traverse (Compose . lookupVal address) fields
+    where 
+      lookupVal addr s = fmap (rlpDecode . rlpDeserialize) <$> A.select (A.Proxy @RawStorageValue) ((Account addr Nothing, s) :: RawStorageKey)
+      fields :: [BS.ByteString]
+      fields = ["commonName", "country", "organization", "group", "publicKey", "certificateString"]
 
 instance MonadIO m => A.Selectable Word256 ChainInfo (ReaderT Config m) where
   select _ = RBDB.withRedisBlockDB . RBDB.getChainInfo
@@ -427,6 +468,7 @@ type MonadP2P m = ( MonadIO m
                        , '(Word256, ChainMembers)
                        , '(Word256, ChainInfo)
                        , '(Keccak256, Private (Word256, OutputTx))
+                       , '(Address, Address)
                        ] m
                   , All2 '[A.Alters]
                       '[ '(Keccak256, BlockData)
@@ -467,10 +509,14 @@ runContextM r = void . runResourceT . flip runReaderT r
 
 initConfig :: ( MonadLogger m
               , MonadUnliftIO m
+              , MonadResource m
               )
            => IORef (S.OSet Keccak256) -> Int -> m Config
 initConfig wireMessagesRef maxHeaders = do
   dbs <- openDBs
+  let open path = DB.open (".ethereumH" ++ path) DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
+  sdb <- open stateDBPath
+  srRef <- liftIO $ newIORef M.empty
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
   vaultClient <- do
     mgr <- liftIO $ newManager defaultManagerSettings
@@ -480,6 +526,8 @@ initConfig wireMessagesRef maxHeaders = do
   initState <- newIORef initContext
   return $ Config
     { configSQLDB = sqlDB' dbs
+    , configStateDB = sdb
+    , configStateRoots = srRef
     , configRedisBlockDB = RBDB.RedisConnection redisBDBPool
     , configUnseqSink = void . K.withKafkaRetry1s . SK.writeUnseqEvents
     , configVmEventsSink = void . produceVMOutputsM

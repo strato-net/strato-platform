@@ -18,6 +18,7 @@ module Blockchain.DB.RawStorageDB
   , genericLookupWithDefaultRawStorageDB
   , putRawStorageKeyVal'
   , getRawStorageKeyVal'
+  , getRawStorageKeyValDBMaybe
   , getAllRawStorageKeyVals'
   , deleteRawStorageKey'
   , flushMemRawStorageTxDBToBlockDB

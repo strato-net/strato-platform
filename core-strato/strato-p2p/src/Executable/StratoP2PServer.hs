@@ -41,7 +41,7 @@ import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Model.Keccak256
 import qualified Text.Colors                           as C
 
-runEthServer :: (MonadIO m, MonadLogger m, MonadUnliftIO m)
+runEthServer :: (MonadIO m, MonadLogger m, MonadUnliftIO m, MonadResource m)
              => IORef (S.OSet Keccak256)
              -> Int
              -> m ()
@@ -108,7 +108,7 @@ runEthServerConduit p peerSource peerSink seqSource unseqSink peerStr = do
                   .| eventSink
                   .| peerSink
 
-stratoP2PServer :: IORef (S.OSet Keccak256) -> LoggingT IO ()
+stratoP2PServer :: IORef (S.OSet Keccak256) -> ResourceT (LoggingT IO) ()
 stratoP2PServer wireMessagesRef = do
 
   $logInfoS "stratoP2PServer" $ T.pack $ "connect address: " ++ flags_address

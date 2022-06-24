@@ -34,7 +34,7 @@ loopbackEvents = unsafeRegister
 recordEvent :: MonadIO m => T.Text -> m ()
 recordEvent lab = liftIO $ withLabel loopbackEvents lab incCounter
 
-stratoP2PLoopback :: IORef (S.OSet Keccak256) -> LoggingT IO ()
+stratoP2PLoopback :: IORef (S.OSet Keccak256) -> ResourceT (LoggingT IO) ()
 stratoP2PLoopback wireMessagesRef = do
   $logInfoS "stratoP2PLoopback" "Reflecting PBFT back to unseq since 2019"
   cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
