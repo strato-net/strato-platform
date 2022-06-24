@@ -6,6 +6,7 @@
 -- Description: Parsers for top-level Solidity declarations
 -- Maintainer: Ryan Reich <ryan@blockapps.net
 -- Maintainer: Charles Crain <charles@blockapps.net>
+-- Maintainer: Steven Glasford <steven_glasford@blockapps.net>
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 module SolidVM.Solidity.Parse.Declarations where
 
