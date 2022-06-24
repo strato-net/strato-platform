@@ -45,13 +45,17 @@ data SourceUnitF a = Pragma a Identifier String
 type SourceUnit = Positioned SourceUnitF
 
 -- | Parses an entire Solidity contract
-solidityContract :: SolidityParser SourceUnit
-solidityContract = do
+solidityContract :: String -> SolidityParser SourceUnit
+solidityContract pragmaVersion = do
   ~(a, (kind, contractName', baseConstrs)) <- withPosition $ do
     kind <- (reserved "contract" >> return Xabi.ContractKind)
           <|> (reserved "interface" >> return Xabi.InterfaceKind)
           <|> (reserved "library" >> return Xabi.LibraryKind)
-    contractName' <- fmap stringToLabel identifier
+    --TODO: not sure if this is the correct way to isolate the identifier
+    contractNameCheck <- identifier
+    contractName' <- fmap stringToLabel (case (isReservedWord pragmaVersion contractNameCheck) of 
+                                          True -> reservedWordError pragmaVersion contractNameCheck
+                                          False -> identifier)
     setContractName $ labelToString contractName'
     baseConstrs <- option [] $ do
       reserved "is"
@@ -61,7 +65,7 @@ solidityContract = do
         return (name, consArgs)
     pure (kind, contractName', baseConstrs)
   declarations <-
-    braces (many solidityDeclaration)
+    braces $ many (solidityDeclaration pragmaVersion)
 
   let allFunctions = Map.fromList [ (stringToLabel n, f) | (n, FuncDeclaration f) <- declarations]
   let ctorList = [(stringToLabel n, c) | (n, ConstructorDeclaration c) <- declarations]
@@ -128,26 +132,26 @@ data Declaration =
 
 -- | Parses anything that a contract can declare at the top level: new types,
 -- variables, functions primarily, also events and function modifiers.
-solidityDeclaration :: SolidityParser (String, Declaration)
-solidityDeclaration =
-  structDeclaration <|>
+solidityDeclaration :: String -> SolidityParser (String, Declaration)
+solidityDeclaration pragmaVersion =
+  structDeclaration pragmaVersion <|>
   enumDeclaration <|>
   usingDeclaration <|>
-  functionDeclaration <|>
+  functionDeclaration pragmaVersion <|>
   modifierDeclaration <|>
   eventDeclaration <|>
-  variableDeclaration
+  variableDeclaration pragmaVersion
 
 {- New types -}
 
 -- | Parses a struct definition
-structDeclaration :: SolidityParser (String, Declaration)
-structDeclaration = do
+structDeclaration :: String -> SolidityParser (String, Declaration)
+structDeclaration pragmaVersion = do
   ~(a, (structName, structFields)) <- withPosition $ do
     reserved "struct"
     structName <- identifier
     structFields <- braces $ many1 $ do
-      (fieldName, VariableDeclaration (SolidVM.VariableDecl decl _ _ _)) <- simpleVariableDeclaration
+      (fieldName, VariableDeclaration (SolidVM.VariableDecl decl _ _ _)) <- simpleVariableDeclaration pragmaVersion
       return (fieldName, decl)
     pure (structName, structFields)
   return
@@ -196,8 +200,8 @@ usingDeclaration = do
 {- Variables -}
 
 -- | Parses a variable definition
-variableDeclaration :: SolidityParser (String, Declaration)
-variableDeclaration = simpleVariableDeclaration
+variableDeclaration :: String -> SolidityParser (String, Declaration)
+variableDeclaration pragmaVersion = simpleVariableDeclaration pragmaVersion
 
 data StateVariableKeyword = KConstant | KPublic | KPrivate | KInternal
   deriving (Eq, Show, Enum, Ord)
@@ -222,8 +226,8 @@ public keywords =
 -- everything except possibly the initializer and semicolon.  Necessary
 -- because these kinds of expressions also appear in struct definitions and
 -- function arguments.
-simpleVariableDeclaration :: SolidityParser (String, Declaration) -- , Maybe Expression)
-simpleVariableDeclaration = do
+simpleVariableDeclaration :: String -> SolidityParser (String, Declaration) -- , Maybe Expression)
+simpleVariableDeclaration pragmaVersion = do
   start <- getSourcePosition
   variableType <- simpleTypeExpression
   -- We have to remember which variables are "public", because they
@@ -231,7 +235,12 @@ simpleVariableDeclaration = do
   keywords <- many stateVariableKeyword
   let isConstant = KConstant `elem` keywords
   isPublic <- public keywords
-  variableName <- identifier
+  -- check to see if the "account" variable is being used
+  variableNameCheck <- identifier
+  variableName <- do
+    case (isReservedWord pragmaVersion variableNameCheck) of 
+      True -> reservedWordError pragmaVersion variableNameCheck
+      False -> identifier
   value <- optionMaybe $ do
     reservedOp "="
     expression
@@ -246,10 +255,14 @@ simpleVariableDeclaration = do
 
 -- | Parses a function definition.
 --
-functionDeclaration :: SolidityParser (String, Declaration)
-functionDeclaration = do
+functionDeclaration :: String -> SolidityParser (String, Declaration)
+functionDeclaration pragmaVersion = do
   ~(a, (functionName, xabi')) <- withPosition $ do
-    functionName <- (reserved "function" >> fromMaybe "" <$> optionMaybe identifier) <|>
+    functionName <- (reserved "function" >> fromMaybe "" <$> optionMaybe ( do 
+                      functionNameCheck <- identifier
+                      case (isReservedWord pragmaVersion functionNameCheck) of
+                        True -> reservedWordError pragmaVersion functionNameCheck
+                        False -> identifier)) <|>
                     -- Starting with 0.4.22, constructor() <mods> { <body> } is
                     -- the preferred syntax for defining a constructor
                     (reserved "constructor" >> getContractName)
@@ -283,7 +296,6 @@ functionXabi = do
       , SolidVM.funcModifiers = Just modifiers
       , SolidVM.funcContext = ctx
       }
-
 
 eventDeclaration :: SolidityParser (String, Declaration)
 eventDeclaration = do
@@ -495,3 +507,13 @@ inCommentSingle
   <?> "end of comment"
   where
     startEnd   = nub (commentEnd solidityLanguage ++ commentStart solidityLanguage)
+
+--To make a new reserved word with a specific pragma version please add to the following function list
+isReservedWord :: String -> String -> Bool
+isReservedWord pragmaVersion reservedWord = do
+  case pragmaVersion of
+    "svm3.2" -> do 
+      case reservedWord of
+        "account" -> True
+        _ -> False
+    _ -> False

@@ -32,13 +32,34 @@ newtype File = File {
   unsourceUnits :: [SourceUnit]
 } deriving (Show, Generic)
 
+parsedUnits :: String -> SolidityParser SourceUnit
+parsedUnits pragmaVersion = do
+  units <- many (pragmaUnit <|>
+                 solidityImport <|> 
+                 solidityContract pragmaVersion)
+  return units
+
+pragmaUnitString :: SolidityParser (SourceUnit, String)
+pragmaUnitString = solidityPragma
+
+pragmaUnit :: SolidityParser SourceUnit
+pragmaUnit = do
+  (pragmaUnit, pragmaVersion) <- pragmaUnitString
+  units <- parsedUnits pragmaVersion
+  biggerUnits <- many (pragmaUnit <|> units)
+  return biggerUnits
+
 solidityFile :: SolidityParser File
 solidityFile = do
   whiteSpace
-  units <- many (solidityPragma <|> solidityImport <|> solidityContract)
+  -- units <- many (solidityPragma <|> solidityImport <|> (solidityContract pragmaVersion))
+  units <- many (pragmaUnit <|>
+                 solidityImport <|>
+                 solidityContract "")
+  --               (do (pragma, pragmaVersion) <- solidityPragma; return (solidityContract pragmaVersion)) <|> 
+                --  solidityContract "")
   eof
   return . File $ units
-
 
 decideVersion :: File -> SolcVersion
 decideVersion = maximum . (ZeroPointFour:) . mapMaybe go . unsourceUnits
