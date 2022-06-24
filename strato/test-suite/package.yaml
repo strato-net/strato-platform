@@ -1,0 +1,81 @@
+name:                test-suite
+version:             0.1.0.0
+author:              jamshid
+maintainer:          jamshid
+build-type:          Simple
+
+dependencies:
+  - base
+
+ghc-options: -Wall -Werror -threaded
+
+library:
+  source-dirs: src/
+  dependencies:
+    - aeson
+    - ansi-wl-pprint
+    - base16-bytestring
+    - blockapps-data
+    - blockapps-datadefs
+    - blockapps-haskoin
+    - blockapps-mpdbs
+    - bytestring
+    - common-log
+    - containers
+    - ethereum-rlp
+    - ethereum-vm
+    - format
+    - hflags
+    - hspec-expectations-lifted
+    - lens
+    - merkle-patricia-db
+    - monad-alter
+    - mtl
+    - strato-model
+    - seqevents
+    - text
+    - time
+    - transformers
+    - unboxed-ref
+    - unliftio
+    - unordered-containers
+    - vm-runner
+    - vm-tools
+
+tests:
+  vm-tests:
+    source-dirs:
+      - test/
+    main: TestMain.hs
+    dependencies:
+      - aeson
+      - bytestring
+      - common-log
+      - containers
+      - directory
+      - hflags
+      - test-suite
+      - vm-tools
+
+    other-modules: []
+
+  unittests:
+    source-dirs: test
+    main: UnitTest.hs
+    dependencies:
+      - aeson
+      - bytestring
+      - containers
+      - hspec
+      - interpolatedstring-perl6
+      - strato-model
+      - test-suite
+      - time
+    other-modules: []
+
+  test-suite:
+    source-dirs: test
+    main: Spec.hs
+    other-modules: []
+    dependencies:
+      - hspec

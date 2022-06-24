@@ -1,0 +1,54 @@
+name:                strato-adit
+version:             0.1.0.0
+author:              Kristoffer Josefsson
+maintainer:          kristoffer@blockapps.net
+build-type:          Simple
+
+ghc-options: -Wall -O2
+
+dependencies:
+  - base
+  - hflags
+  - milena-tools
+
+other-extensions: OverloadedStrings
+
+library:
+  source-dirs: src
+  other-modules:
+    - Executable.AditM
+  dependencies:
+    - ansi-wl-pprint
+    - blockapps-data
+    - blockapps-datadefs
+    - bytestring
+    - common-log
+    - containers
+    - cryptohash
+    - ethereum-discovery
+    - ethereum-rlp
+    - format
+    - lens
+    - milena
+    - monad-alter
+    - mtl
+    - normaldistribution
+    - random
+    - resourcet
+    - seqevents
+    - stm
+    - strato-conf
+    - strato-model
+    - text
+    - time
+    - unliftio
+
+
+executables:
+  strato-adit:
+    main:             Main.hs
+    source-dirs:      exec_src
+    dependencies:
+      - blockapps-init
+      - common-log
+      - strato-adit

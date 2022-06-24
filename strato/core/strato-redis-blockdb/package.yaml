@@ -1,0 +1,72 @@
+name:                strato-redis-blockdb
+version:             0.1.0.0
+author:              BlockApps
+maintainer:          blockapps
+build-type:          Simple
+description:         Functions to operate against the Redis-backed BlockDB
+
+dependencies:
+  - base
+  - blockapps-data
+  - blockapps-datadefs
+  - containers
+
+library:
+  source-dirs: src
+  ghc-options: -Wall -Werror -O2
+  dependencies:
+  - QuickCheck
+  - base16-bytestring
+  - binary
+  - bytestring
+  - common-log
+  - ethereum-rlp
+  - format
+  - hedis
+  - lens-family
+  - lens-family-th
+  - monad-alter
+  - mtl
+  - partitioner
+  - random
+  - seqevents
+  - strato-conf
+  - strato-model
+  - text
+  
+# I am removing this executable because the package `diagrams-html5` has not been upgraded, and
+# won't work with newer stack lts' versions.
+# I don't think anyone uses this package (I asked on slack, no one knew what it is)....  If I
+# am wrong, uncomment this and find a replacement for `diagrams-html5`
+#executables:
+#  strato-redis-viz:
+#    main: Viz.hs
+#    source-dirs:
+#      - exec_src/
+#    dependencies:
+#      - diagrams-contrib
+#      - diagrams-html5
+#      - diagrams-lib
+#      - optparse-applicative
+#      - strato-redis-blockdb
+#    ghc-options: -threaded -Wall -Werror
+
+
+tests:
+  strato-redis-blockdb-test:
+    source-dirs: test
+    main: Test.hs
+    dependencies:
+      - QuickCheck
+      - containers
+      - format
+      - hedis
+      - HUnit
+      - hspec
+      - hspec-core
+      - lens-family
+      - seqevents
+      - strato-model
+      - strato-redis-blockdb
+    # We use -O0 here, since GHC takes *very* long to compile so many constants
+    ghc-options: -O0 -Wall -rtsopts -fno-warn-unused-do-bind

@@ -1,0 +1,214 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeOperators #-}
+
+--TODO : Take this next line out
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
+module Blockchain.Data.AddressStateDB (
+  AddressState(..),
+  CodePtr(..),
+  blankAddressState,
+  resolveCodePtr,
+  unsafeResolveCodePtr,
+  unsafeResolveCodePtrSelect,
+  resolveCodePtrParent,
+  codePtrToSHA,
+  resolvedCodePtrToSHA,
+  codePtrToCodeKind,
+  unsafeCodePtrToCodeKind,
+  getAppAccount
+) where
+
+import           Prelude hiding (lookup)
+import           Control.Lens                       ((^.))
+import           Control.Monad
+import           Control.Monad.Change.Alter
+import           Data.Default
+import           Data.Maybe                         (maybeToList)
+import qualified Data.Set                           as Set
+
+import           Control.DeepSeq
+import           GHC.Generics
+import           Numeric
+import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>))
+
+import           Blockchain.Data.ChainInfo          (ParentChainId, isAncestorChainOf)
+import           Blockchain.Data.RLP
+import qualified Blockchain.Database.MerklePatricia as MP
+import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.CodePtr
+import           Blockchain.Strato.Model.ExtendedWord
+import qualified Text.Colors                        as CL
+import           Text.Format
+import           Text.Tools
+
+data AddressState =
+  AddressState{
+    addressStateNonce::Integer,
+    addressStateBalance::Integer,
+    addressStateContractRoot::MP.StateRoot,
+    addressStateCodeHash::CodePtr,
+    addressStateChainId::Maybe Word256
+    } deriving (Eq, Generic, Read, Show)
+
+instance NFData AddressState
+
+blankAddressState:: AddressState
+blankAddressState = AddressState { addressStateNonce=0, addressStateBalance=0, addressStateContractRoot=MP.emptyTriePtr, addressStateCodeHash=EVMCode $ hash "" , addressStateChainId = Nothing}
+
+instance Default AddressState where
+  def = blankAddressState
+
+instance Format AddressState where
+  format a =
+    CL.blue "AddressState" ++
+    tab'("\nnonce: " ++ showHex (addressStateNonce a) "" ++
+        "\nbalance: " ++ show (toInteger $ addressStateBalance a) ++
+        "\ncontractRoot: " ++ format (addressStateContractRoot a) ++
+        "\ncodeHash: " ++ format (addressStateCodeHash a) ++
+        "\nchainId: " ++ (show $ fmap (flip showHex "") (addressStateChainId a)))
+
+instance RLPSerializable AddressState where
+  rlpEncode a | addressStateBalance a < 0 = error $ "Error in cal to rlpEncode for AddressState: AddressState has negative balance: " ++ format a
+  rlpEncode a = RLPArray $ [
+    rlpEncode $ toInteger $ addressStateNonce a,
+    rlpEncode $ toInteger $ addressStateBalance a,
+    rlpEncode $ addressStateContractRoot a,
+    rlpEncode $ addressStateCodeHash a
+    ] ++ (maybeToList . fmap rlpEncode $ addressStateChainId a)
+
+  rlpDecode (RLPArray [n, b, cr, ch, cid]) =
+    AddressState {
+      addressStateNonce=fromInteger $ rlpDecode n,
+      addressStateBalance=fromInteger $ rlpDecode b,
+      addressStateContractRoot=rlpDecode cr,
+      addressStateCodeHash=rlpDecode ch,
+      addressStateChainId = Just $ rlpDecode cid
+      }
+  rlpDecode (RLPArray [n, b, cr, ch]) =
+    AddressState {
+      addressStateNonce=fromInteger $ rlpDecode n,
+      addressStateBalance=fromInteger $ rlpDecode b,
+      addressStateContractRoot=rlpDecode cr,
+      addressStateCodeHash=rlpDecode ch,
+      addressStateChainId = Nothing
+      }
+  rlpDecode x = error $ "Missing case in rlpDecode for AddressState: " ++ show (pretty x)
+{-- TODO: 
+    resolveCodePtr fails when there is a circular reference of code pointers on the same chain
+    possible solution is to have a helper function that keeps track of all previously visited codepointers and termiantes if it visits the same one twice (aka cycle detection)
+--}
+resolveCodePtr' :: ( Selectable (Maybe Word256) ParentChainId m
+                  , (Account `Alters` AddressState) m
+                  )
+               => Set.Set CodePtr -> Maybe Word256 -> CodePtr -> m (Maybe CodePtr)
+resolveCodePtr' visited chainId (CodeAtAccount acct name) = do
+  lookup Proxy acct >>= \case
+    Nothing -> pure Nothing
+    Just AddressState{..} -> do
+      let codeAccountChainId = (acct ^. accountChainId)
+      isAccessibleChain <- codeAccountChainId `isAncestorChainOf` chainId
+      if isAccessibleChain && (Set.notMember addressStateCodeHash visited)
+        then resolveCodePtr' (Set.insert addressStateCodeHash visited) codeAccountChainId addressStateCodeHash >>= \case
+          Just e@(EVMCode _) -> pure $ Just e
+          Just (SolidVMCode _ d) -> pure . Just $ SolidVMCode name d
+          _ -> pure Nothing
+        else pure Nothing
+resolveCodePtr' _ cid cp = resolveCodePtr cid cp
+   
+resolveCodePtr :: ( Selectable (Maybe Word256) ParentChainId m
+                  , (Account `Alters` AddressState) m
+                  )
+               => Maybe Word256 -> CodePtr -> m (Maybe CodePtr)
+resolveCodePtr chainId coa@(CodeAtAccount _ _) = resolveCodePtr' Set.empty chainId coa
+
+-- for solidVM/EVM code
+resolveCodePtr _ cp = pure $ Just cp
+
+unsafeResolveCodePtr :: (Account `Alters` AddressState) m => CodePtr -> m (Maybe CodePtr)
+unsafeResolveCodePtr (CodeAtAccount acct name) = lookup Proxy acct >>= \case
+  Nothing -> pure Nothing
+  Just AddressState{..} -> unsafeResolveCodePtr addressStateCodeHash >>= \case
+    Just e@(EVMCode _) -> pure $ Just e
+    Just (SolidVMCode _ d) -> pure . Just $ SolidVMCode name d
+    _ -> pure Nothing
+unsafeResolveCodePtr codePtr = pure $ Just codePtr
+
+-- TODO: Remove this when Selectable is a superclass of Alters
+unsafeResolveCodePtrSelect :: Selectable Account AddressState m => CodePtr -> m (Maybe CodePtr)
+unsafeResolveCodePtrSelect (CodeAtAccount acct name) = select Proxy acct >>= \case
+  Nothing -> pure Nothing
+  Just AddressState{..} -> unsafeResolveCodePtrSelect addressStateCodeHash >>= \case
+    Just e@(EVMCode _) -> pure $ Just e
+    Just (SolidVMCode _ d) -> pure . Just $ SolidVMCode name d
+    _ -> pure Nothing
+unsafeResolveCodePtrSelect codePtr = pure $ Just codePtr
+
+resolveCodePtrParent :: ( Selectable (Maybe Word256) ParentChainId m
+                        , (Account `Alters` AddressState) m
+                        )
+                        => Maybe Word256 -> CodePtr -> m (Maybe CodePtr)
+resolveCodePtrParent chainId cp@(CodeAtAccount acct _) = do
+  isAccessibleChain <- (acct ^. accountChainId) `isAncestorChainOf` chainId
+  if isAccessibleChain
+    then unsafeResolveCodePtrParent cp
+    else pure Nothing
+resolveCodePtrParent _ cp = unsafeResolveCodePtrParent cp
+
+unsafeResolveCodePtrParent :: (Account `Alters` AddressState) m => CodePtr -> m (Maybe CodePtr)
+unsafeResolveCodePtrParent (CodeAtAccount acct _) = lookup Proxy acct >>= \case
+  Nothing -> pure Nothing
+  Just AddressState{..} -> unsafeResolveCodePtrParent addressStateCodeHash >>= \case
+    Just e@(EVMCode _) -> pure $ Just e
+    Just (SolidVMCode name' d) -> pure . Just $ SolidVMCode name' d
+    _ -> pure Nothing
+unsafeResolveCodePtrParent codePtr = pure $ Just codePtr
+
+codePtrToSHA :: ( Selectable (Maybe Word256) ParentChainId m
+                , (Account `Alters` AddressState) m
+                )
+             => Maybe Word256 -> CodePtr -> m (Maybe Keccak256)
+codePtrToSHA chainId = resolveCodePtr chainId >=> \case
+  Just (EVMCode hsh) -> pure $ Just hsh
+  Just (SolidVMCode _ hsh) -> pure $ Just hsh
+  _ -> pure Nothing -- CodeAtAccount cannot happen here
+
+resolvedCodePtrToSHA :: CodePtr -> Keccak256
+resolvedCodePtrToSHA (EVMCode hsh) = hsh
+resolvedCodePtrToSHA (SolidVMCode _ hsh) = hsh
+resolvedCodePtrToSHA _ = emptyHash
+
+codePtrToCodeKind :: ( Selectable (Maybe Word256) ParentChainId m
+                     , (Account `Alters` AddressState) m
+                     )
+                  => Maybe Word256 -> CodePtr -> m CodeKind
+codePtrToCodeKind chainId = resolveCodePtr chainId >=> \case
+  Just (SolidVMCode _ _) -> pure SolidVM
+  _ -> pure EVM -- TODO: should this return (Maybe CodeKind)?
+
+unsafeCodePtrToCodeKind :: (Account `Alters` AddressState) m => CodePtr -> m CodeKind
+unsafeCodePtrToCodeKind = unsafeResolveCodePtr >=> \case
+  Just (SolidVMCode _ _) -> pure SolidVM
+  _ -> pure EVM -- TODO: should this return (Maybe CodeKind)?
+
+
+getAppAccount :: ( Selectable (Maybe Word256) ParentChainId m
+                 , (Account `Alters` AddressState) m
+                 )
+              => Maybe Word256 -> Account -> m (Maybe Account)
+getAppAccount chainId acct = do
+  lookup Proxy acct >>= \case
+    Nothing -> pure Nothing
+    Just AddressState{..} -> do
+      let codeAccountChainId = (acct ^. accountChainId)
+      isAccessibleChain <- codeAccountChainId `isAncestorChainOf` chainId
+      if isAccessibleChain
+        then case addressStateCodeHash of
+          (CodeAtAccount pAcct _) -> getAppAccount codeAccountChainId pAcct
+          _-> pure $ Just acct
+        else pure Nothing

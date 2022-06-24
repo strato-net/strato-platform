@@ -1,0 +1,99 @@
+name: blockstanbul
+ghc-options: -Wall -Werror
+
+dependencies:
+  - base
+
+
+library:
+  source-dirs: src/
+  dependencies:
+  - QuickCheck
+  - aeson
+  - base16-bytestring
+  - binary
+  - blockapps-data
+  - blockapps-datadefs
+  - blockapps-haskoin
+  - bytestring
+  - common-log
+  - conduit
+  - containers
+  - cross-monitoring
+  - cryptonite
+  - data-default
+  - deepseq
+  - ethereum-encryption
+  - ethereum-rlp
+  - extra
+  - format
+  - generic-arbitrary
+  - http-client
+  - lens
+  - mtl
+  - prometheus-client
+  - servant-client
+  - servant-server
+  - stm
+  - strato-model
+  - text
+  - transformers
+  - unliftio
+  - wai
+
+executables:
+  blockstanbul-vote:
+    source-dirs: exec-src/
+    main: Main.hs
+    other-modules: []
+    dependencies:
+      - blockapps-vault-wrapper-api
+      - blockapps-vault-wrapper-client
+      - blockstanbul
+      - base16-bytestring
+      - base64-bytestring
+      - bytestring
+      - http-client
+      - http-conduit
+      - http-types
+      - ethereum-rlp
+      - extra
+      - servant-client
+      - split
+      - strato-model
+      - text
+
+tests:
+  blockstanbul-test:
+    main: Main.hs
+    source-dirs: test/
+    dependencies:
+      - QuickCheck
+      - base16-bytestring
+      - blockapps-data
+      - blockapps-datadefs
+      - blockapps-haskoin
+      - blockstanbul
+      - bytestring
+      - common-log
+      - containers
+      - cryptonite
+      - ethereum-encryption
+      - ethereum-rlp
+      - hflags
+      - hspec
+      - hspec-expectations-lifted
+      - lens
+      - strato-model
+      - time
+      - transformers
+
+
+benchmarks:
+  one-node:
+    source-dirs: bench/
+    main: OneNode.hs
+    dependencies:
+      - blockstanbul
+      - criterion
+      - transformers

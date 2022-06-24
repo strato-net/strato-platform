@@ -107,7 +107,7 @@ describe('Solid VM: Contract uploads', function() {
   this.timeout(config.timeout);
   
   before(async () => {
-    const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
+    const oauth:oauthUtil = await oauthUtil.init(config.nodes[0].oauth);
     const accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
     const ouser:OAuthUser = {token: accessToken.token.access_token};
     user = await rest.createUser(ouser, options);

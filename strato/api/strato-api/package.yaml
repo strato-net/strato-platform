@@ -1,0 +1,84 @@
+name:                strato-api
+
+dependencies:
+- base
+- bloc-sql-monad
+- bloc2
+- hflags
+- monad-alter
+- mtl
+- postgresql-simple
+- transformers
+- source-tools
+
+executables:
+  strato-api:
+    main:                Main.hs
+    source-dirs:         app
+    other-modules:
+    - Options
+    - SelectAccessible
+    dependencies:
+    - aeson
+    - bloc2api
+    - blockapps-data
+    - blockapps-datadefs
+    - blockapps-mpdbs
+    - blockapps-init
+    - bytestring
+    - cache
+    - clock
+    - common-log
+    - core-api-monad
+    - core-api2
+    - evm-solidity
+    - format
+    - http-types
+    - insert-ordered-containers
+    - lens
+    - monad-control
+    - servant-multipart
+    - servant-server
+    - servant-swagger
+    - servant-swagger-ui
+    - sql-monad
+    - strato-model
+    - swagger2
+    - text
+    - unliftio
+    - vault-monad
+    - wai
+    - wai-cors
+    - wai-extra
+    - wai-middleware-prometheus
+    - warp
+    ghc-options: -threaded
+
+  strato-api-init:
+    main:                StratoAPIInit.hs
+    source-dirs:         app
+    other-modules:
+    - SelectAccessible
+    dependencies:
+    - common-log
+
+
+  post-raw-transaction:
+    main:                PostRawTransaction.hs
+    source-dirs:         app
+    other-modules:
+    - Options
+    dependencies:
+    - aeson
+    - bloc2api
+    - blockapps-data
+    - blockapps-datadefs
+    - bytestring
+    - containers
+    - format
+    - http-client
+    - servant-client
+    - split
+    - strato-model
+    - text
+    - x509-certs

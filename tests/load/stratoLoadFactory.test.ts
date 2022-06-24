@@ -45,7 +45,7 @@ describe('Throughput - upload', function () {
 
   before(async() => {
     console.log(`Creating admin user and contract`);
-    const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
+    const oauth:oauthUtil = await oauthUtil.init(config.nodes[0].oauth);
     let ouser:OAuthUser = await oauth.getAccessTokenByClientSecret();
     admin = await rest.createUser(ouser, options);
     theContract = <Contract> await rest.createContract(admin, {name: factoryContractName, source: await importer.combine(factoryContractFilename), args: {}}, {...options, isAsync: false, config: {...options.config, VM: "SolidVM"}});
