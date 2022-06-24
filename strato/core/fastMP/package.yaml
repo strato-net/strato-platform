@@ -50,6 +50,7 @@ executables:
     dependencies:
       - conduit
       - fastMP
+      - labeled-error
       - monad-alter
       - transformers
     ghc-options:
@@ -63,6 +64,7 @@ executables:
     dependencies:
       - conduit
       - fastMP
+      - labeled-error
     ghc-options:
     - -threaded
     - -rtsopts

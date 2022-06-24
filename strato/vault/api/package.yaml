@@ -29,6 +29,7 @@ library:
   - base16-bytestring
   - bytestring
   - cryptonite
+  - labeled-error
   - lens
   - saltine
   - secp256k1-haskell

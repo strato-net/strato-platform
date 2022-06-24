@@ -18,7 +18,7 @@ import qualified Data.Map                           as M        (fromList, toLis
 import           Data.Maybe
 import qualified Data.Text                          as T
 
-import qualified Database.Esqueleto                 as E
+import qualified Database.Esqueleto.Legacy          as E
 import           Database.Persist                   hiding (get)
 
 import           BlockApps.Logging

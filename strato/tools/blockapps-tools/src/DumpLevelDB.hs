@@ -15,6 +15,8 @@ import qualified Database.LevelDB             as DB
 import           System.FilePath
 import           Text.PrettyPrint.ANSI.Leijen hiding ((<$>), (</>))
 
+import qualified LabeledError
+
 --import Debug.Trace
 
 instance Pretty B.ByteString where
@@ -50,7 +52,7 @@ showKeyVal f dbType dbName maybeKey = do
     case maybeKey of
       Nothing -> showAllKeyVal db f
       Just key -> do
-                   maybeVal <- DB.get db def $ fst $ B16.decode $ BC.pack key
+                   maybeVal <- DB.get db def $ LabeledError.b16Decode "showKeyVal" $ BC.pack key
                    case maybeVal of
                      Nothing  -> error $ "Missing value in database: " ++ show key
                      Just val -> liftIO $ putStrLn $ f val

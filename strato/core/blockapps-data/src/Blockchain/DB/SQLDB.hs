@@ -18,6 +18,7 @@ import           Control.DeepSeq
 import           Control.Monad.Change.Modify  (Accessible(..), Proxy(..))
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
+import           Control.Monad.Logger         (MonadLoggerIO)
 import           Control.Monad.Trans.Reader
 import           Control.Monad.Trans.Resource
 import           qualified Database.Persist.Sql as SQL
@@ -26,7 +27,7 @@ import           qualified Database.Persist.Postgresql as PSQL
 import           Data.IORef
 import           System.IO.Unsafe             (unsafePerformIO)
 
-import           BlockApps.Logging            (MonadLogger, runNoLoggingT)
+import           BlockApps.Logging            (runNoLoggingT)
 import           Blockchain.EthConf           (connStr)
 
 newtype SQLDB = SQLDB { unSQLDB :: SQL.ConnectionPool }
@@ -42,13 +43,13 @@ sqlQuery q = runResourceT . SQL.runSqlPool q . unSQLDB =<< access Proxy
 runSqlPool :: MonadUnliftIO m => SQL.SqlPersistT (ResourceT m) a -> SQLDB -> m a
 runSqlPool q = runResourceT . SQL.runSqlPool q . unSQLDB
 
-runPostgresConn :: (MonadUnliftIO m, MonadLogger m, backend ~ SQL.SqlBackend)
+runPostgresConn :: (MonadUnliftIO m, MonadLoggerIO m, backend ~ SQL.SqlBackend)
                 => PSQL.ConnectionString
                 -> ReaderT backend m a
                 -> m a
 runPostgresConn pgConn = PSQL.withPostgresqlConn pgConn . runReaderT
 
-createPostgresqlPool :: (MonadUnliftIO m, MonadLogger m)
+createPostgresqlPool :: (MonadUnliftIO m, MonadLoggerIO m)
                      => PSQL.ConnectionString -> Int -> m SQLDB
 createPostgresqlPool cString n = SQLDB <$> PSQL.createPostgresqlPool cString n
 

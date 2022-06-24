@@ -30,6 +30,7 @@ library:
   - exceptions
   - extra
   - format
+  - labeled-error
   - lens
   - memory
   - merkle-patricia-db
@@ -82,6 +83,7 @@ tests:
       - hflags
       - hspec
       - hspec-expectations-lifted
+      - labeled-error
       - lens
       - merkle-patricia-db
       - monad-alter

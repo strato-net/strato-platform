@@ -45,6 +45,7 @@ library:
     - monad-alter
     - mtl
     - network-uri
+    - persistent
     - persistent-postgresql
     - persistent-template
     - prometheus-client

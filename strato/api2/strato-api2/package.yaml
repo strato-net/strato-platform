@@ -32,6 +32,7 @@ library:
     - format
     - http-types
     - insert-ordered-containers
+    - labeled-error
     - persistent-postgresql
     - process
     - QuickCheck

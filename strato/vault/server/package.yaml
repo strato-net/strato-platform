@@ -131,5 +131,6 @@ tests:
       - clockwork
       - cryptonite
       - hspec
+      - labeled-error
       - secp256k1-haskell
       - strato-model

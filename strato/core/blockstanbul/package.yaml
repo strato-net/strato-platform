@@ -29,6 +29,7 @@ library:
   - format
   - generic-arbitrary
   - http-client
+  - labeled-error
   - lens
   - mtl
   - prometheus-client
@@ -83,6 +84,7 @@ tests:
       - hflags
       - hspec
       - hspec-expectations-lifted
+      - labeled-error
       - lens
       - strato-model
       - time

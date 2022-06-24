@@ -42,6 +42,7 @@ library:
   - milena
   - milena-tools
   - monad-alter
+  - monad-logger
   - mtl
   - network
   - persistent
@@ -89,6 +90,7 @@ tests:
       - ethereum-rlp
       - http-api-data
       - hspec
+      - labeled-error
       - persistent
       - secp256k1-haskell
       - strato-model

@@ -33,6 +33,7 @@ library:
   - hflags
   - http-api-data
   - http-types
+  - labeled-error
   - lens
   - monad-alter
   - monad-logger

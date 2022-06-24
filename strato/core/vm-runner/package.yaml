@@ -101,6 +101,7 @@ tests:
       - hflags
       - hspec
       - hspec-expectations-lifted
+      - labeled-error
       - merkle-patricia-db
       - monad-alter
       - strato-conf

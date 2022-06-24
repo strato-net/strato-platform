@@ -117,6 +117,7 @@ tests:
       - bytestring
       - hspec
       - json-stream
+      - labeled-error
       - merkle-patricia-db
       - strato-genesis
       - strato-model
