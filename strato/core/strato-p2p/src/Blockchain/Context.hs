@@ -475,7 +475,7 @@ initConfig wireMessagesRef maxHeaders = do
   vaultClient <- do
     mgr <- liftIO $ newManager defaultManagerSettings
     url <- liftIO $ parseBaseUrl flags_vaultWrapperUrl
-    return $ ClientEnv mgr url Nothing
+    return $ mkClientEnv mgr url
 
   initState <- newIORef initContext
   return $ Config

@@ -171,7 +171,6 @@ addMember chainId address enode = do
       []  -> return ()
       (cInfo:_) -> do
           let chainInfoRefId = entityKey cInfo
-          let ChainInfoRef{..} = entityVal cInfo
           members <- E.select . E.from $ \mRef -> do
             E.where_ (mRef E.^. ChainMemberRefChainInfoId E.==. E.val chainInfoRefId)
             return mRef
@@ -188,7 +187,6 @@ removeMember chainId address = do
       []  -> return ()
       (cInfo:_) -> do
           let chainInfoRefId = entityKey cInfo
-          let ChainInfoRef{..} = entityVal cInfo
           member <- E.select . E.from $ \mRef -> do
             E.where_ ((mRef E.^. ChainMemberRefChainInfoId E.==. E.val chainInfoRefId)
                       E.&&. (mRef E.^. ChainMemberRefAddress E.==. E.val address))

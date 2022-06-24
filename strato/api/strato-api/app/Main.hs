@@ -268,12 +268,12 @@ app blocEnv sqlEnv blocSQLEnv theDoc =
 
 
 addPathsTo404 :: Middleware
-addPathsTo404 baseApp req respond =
+addPathsTo404 baseApp req respond' =
   baseApp req $ \response -> do
     if responseStatus response /= status404
-    then respond response
+    then respond' response
     else
-      respond $ responseLBS notFound404 [("Content-Type", "text/plain")] $ BLC.pack
+      respond' $ responseLBS notFound404 [("Content-Type", "text/plain")] $ BLC.pack
         $ "There is no content at: \"" ++ BC.unpack (requestMethod req) ++ " " ++ BC.unpack (rawPathInfo req) ++ "\""
         ++ "\nHere are the available routes:" ++ tab ("\n" ++ unlines allPaths) ++ "\n"
       where

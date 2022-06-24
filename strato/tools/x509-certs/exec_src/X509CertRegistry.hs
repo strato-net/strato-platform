@@ -89,7 +89,7 @@ entryPoint (Options privPath certPath nonce) = do
             -- setup servant client
             mgr <- newManager defaultManagerSettings
             stratoURL <- parseBaseUrl "http://strato:3000/bloc/v2.2"
-            let clientEnv = ClientEnv mgr stratoURL Nothing
+            let clientEnv = mkClientEnv mgr stratoURL
 
             -- post it
             result <- runClientM (postRawTransaction Nothing Nothing True request) clientEnv
