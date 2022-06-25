@@ -44,6 +44,7 @@ library:
   - servant-client
   - servant-client-core
   - servant-multipart
+  - servant-multipart-client  
 #  - servant-swagger-tags
   - sql-monad
   - strato-model
