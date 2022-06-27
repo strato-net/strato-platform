@@ -16,13 +16,19 @@ export class ContractsProvider implements vscode.TreeDataProvider<ContractTreeIt
       switch(element.itemType) {
         case 'node': {
           const chains = await this.getChains(element.nodeId);
-          const items = chains.map((e) => new ContractTreeItem('chainId', {chainId: e.id, label: `⛓ ${e.info.label}`, description: `${e.id ? e.id : ''}`, tooltip: `${e.info.label}${e.id ? `:${e.id}` : ''}`}, element.nodeId, vscode.TreeItemCollapsibleState.Collapsed))
+          const compareFn = (a,b) => {
+            if (!a.id) return -1;
+            if (!b.id) return 1;
+            return a.info.label.localeCompare(b.info.label)
+          }
+          const items = chains.sort(compareFn).map((e) => new ContractTreeItem('chainId', {chainId: e.id, label: `⛓ ${e.info.label}`, description: `${e.id ? e.id : ''}`, tooltip: `${e.info.label}${e.id ? `:${e.id}` : ''}`}, element.nodeId, vscode.TreeItemCollapsibleState.Collapsed))
           return Promise.resolve(items);
         }
         case 'chainId': {
           const chainId = element.item.chainId;
           const contracts = await this.getContracts(chainId, element.nodeId);
-          const items = Object.entries(contracts).map((e) => new ContractTreeItem('contractName', {contractName: e[0], chainId, contracts: e[1], label: `${e[0]}`, tooltip: `${e[0]}`}, element.nodeId, vscode.TreeItemCollapsibleState.Collapsed));
+          const compareFn = (a,b) => a[0].localeCompare(b[0])
+          const items = Object.entries(contracts).sort(compareFn).map((e) => new ContractTreeItem('contractName', {contractName: e[0], chainId, contracts: e[1], label: `${e[0]}`, tooltip: `${e[0]}`}, element.nodeId, vscode.TreeItemCollapsibleState.Collapsed));
           return Promise.resolve(items);
         }
         case 'contractName': {
@@ -134,7 +140,7 @@ class ContractTreeItem extends vscode.TreeItem {
       && _item.description.slice(0,8) === 'function'
       ) {
       this.contextValue = 'function';
-    }
+    } else this.contextValue = _itemType;
   }
 
   iconPath = {

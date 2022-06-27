@@ -529,6 +529,18 @@ async function compileContracts(user, contracts, options:Options) {
   }
 }
 
+async function postContractsXabi(user, src: string, options:Options) {
+  try {
+    return await api.postContractsXabi(user, src, options);
+  } catch (err) {
+    throw new RestError(
+      RestStatus.BAD_REQUEST,
+      err.response.statusText || err.response || err,
+      err.response.data || err.response || err
+    );
+  }
+}
+
 // =====================================================================
 //   contract
 // =====================================================================
@@ -788,8 +800,8 @@ async function getContracts(user:OAuthUser, chainId, options:Options) {
  * @param {module:rest~Options} options This identifies the options and configurations for this call
  * @returns {Object} Returns an object with the contract source, code pointer info, and xabi
  */
-async function getContractsXabi(user:OAuthUser, name, address, chainId, options:Options) {
-  return api.getContractsXabi(user, name, address, chainId, options);
+async function getContractsContract(user:OAuthUser, name, address, chainId, options:Options) {
+  return api.getContractsContract(user, name, address, chainId, options);
 }
 
 /**
@@ -1725,11 +1737,12 @@ export default {
   getVersion,
   createUser,
   compileContracts,
+  postContractsXabi,
   createContract,
   createContractList,
   getBlocResults,
   getContracts,
-  getContractsXabi,
+  getContractsContract,
   getState,
   getArray,
   call,

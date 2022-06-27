@@ -75,6 +75,12 @@ async function compileContracts(user:OAuthUser, contracts:ContractDefinition[], 
   return post(url, endpoint, body, setAuthHeaders(user, options));
 }
 
+async function postContractsXabi(user:OAuthUser, src:string, options:Options) {
+  const url = getNodeUrl(options);
+  const endpoint = constructEndpoint(Endpoint.XABI, options);
+  return post(url, endpoint, src, setAuthHeaders(user, options));
+}
+
 async function createContract(user, contract:ContractDefinition, options:Options) {
   const tx = getCreateArgs(contract, options);
   const body = {
@@ -156,11 +162,11 @@ async function getContracts(user:OAuthUser, chainId, options:Options) {
   return get(url, endpoint, setAuthHeaders(user, options));
 }
 
-async function getContractsXabi(user:OAuthUser, name, address, chainId, options:Options) {
+async function getContractsContract(user:OAuthUser, name, address, chainId, options:Options) {
   const url = getNodeUrl(options);
   const urlParams = { name, address };
   const xabiOptions = { ...options, chainIds: [chainId] };
-  const endpoint = constructEndpoint(Endpoint.CONTRACTS_XABI, xabiOptions, urlParams);
+  const endpoint = constructEndpoint(Endpoint.CONTRACTS_CONTRACT, xabiOptions, urlParams);
   return get(url, endpoint, setAuthHeaders(user, options));
 }
 
@@ -504,12 +510,13 @@ export default {
   createUser,
   getCreateArgs,
   compileContracts,
+  postContractsXabi,
   createContract,
   createContractList,
   fill,
   blocResults,
   getContracts,
-  getContractsXabi,
+  getContractsContract,
   getState,
   getCallArgs,
   call,
