@@ -20,7 +20,6 @@ library:
     - binary
     - blockapps-data
     - blockapps-datadefs
-    - blockapps-haskoin
     - blockapps-privacy
     - blockapps-vault-wrapper-api
     - blockapps-vault-wrapper-client
@@ -57,7 +56,6 @@ library:
     - partitioner
     - resourcet
     - stm-chans
-    - transformers
     - unliftio
 
 executables:
@@ -114,7 +112,6 @@ tests:
       - base16-bytestring
       - blockapps-data
       - blockapps-datadefs
-      - blockapps-haskoin
       - blockapps-privacy
       - blockstanbul
       - bytestring
@@ -143,7 +140,6 @@ tests:
       - strato-model
       - strato-sequencer
       - time
-      - transformers
       - unliftio
       - wai-extra
       - wai-middleware-prometheus
@@ -156,12 +152,10 @@ benchmarks:
     dependencies:
       - blockstanbul
       - strato-sequencer
-      - criterion
       - blockapps-data
       - classy-prelude
       - containers
       - mtl
       - resourcet
       - stm-chans
-      - transformers
       - unliftio

@@ -40,7 +40,6 @@ library:
   - nibblestring
   - solid-vm-model
   - strato-model
-  - text
   - transformers
   - x509-certs
 
@@ -69,5 +68,4 @@ tests:
       - transformers
       - unix
       - unliftio
-      - vm-tools
     ghc-options: -Wall -Werror -threaded -rtsopts -with-rtsopts=-N

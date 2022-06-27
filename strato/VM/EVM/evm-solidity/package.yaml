@@ -25,20 +25,17 @@ dependencies:
   - text
   - unordered-containers
   - vector
-  - utf8-string
 
 library:
   source-dirs: src/
   dependencies:
   - aeson-casing
   - binary
-  - classy-prelude
   - cryptonite
   - deepseq
   - extra
   - generic-random
   - hashable
-  - http-api-data
   - lens
   - memory
   - mtl

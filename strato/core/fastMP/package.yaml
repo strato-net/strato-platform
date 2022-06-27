@@ -25,8 +25,6 @@ library:
     - ansi-wl-pprint
     - common-log
     - conduit
-    - containers
-    - data-default
     - monad-alter
     - monad-loops
     - strato-model

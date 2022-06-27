@@ -22,7 +22,6 @@ library:
   - bytestring
   - common-log
   - containers
-  - cryptonite
   - data-default
   - debugger
   - deepseq
@@ -103,6 +102,5 @@ benchmarks:
       source-dirs: bench/
       main: CodeBench.hs
       dependencies:
-        - criterion
         - file-embed
         - solid-vm

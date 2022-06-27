@@ -18,11 +18,9 @@ library:
     - aeson
     - ansi-wl-pprint
     - base16-bytestring
-    - base64-bytestring
     - binary
     - blockapps-data
     - blockapps-datadefs
-    - blockapps-haskoin
     - blockapps-mpdbs
     - blockapps-privacy
     - blockstanbul
@@ -31,7 +29,6 @@ library:
     - conduit
     - data-default
     - ethereum-discovery
-    - ethereum-encryption
     - ethereum-rlp
     - filepath
     - format

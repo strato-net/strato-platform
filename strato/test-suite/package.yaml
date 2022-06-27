@@ -17,7 +17,6 @@ library:
     - base16-bytestring
     - blockapps-data
     - blockapps-datadefs
-    - blockapps-haskoin
     - blockapps-mpdbs
     - bytestring
     - common-log

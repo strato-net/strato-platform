@@ -32,7 +32,6 @@ library:
   - labeled-error
   - lens
   - saltine
-  - secp256k1-haskell
   - servant
   - servant-server
   - strato-model

@@ -27,7 +27,6 @@ dependencies:
 library:
   source-dirs: src
   dependencies:
-    - base16-bytestring
     - bytestring
     - cache
     - clock
@@ -47,7 +46,6 @@ library:
     - unliftio
     - resource-pool
     - secp256k1-haskell == 0.2.0
-    - servant
     - servant-server
     - text
 
@@ -65,10 +63,8 @@ executables:
       - hflags
       - http-client
       - resource-pool
-      - servant
       - servant-options
       - servant-server
-      - wai
       - wai-cors
       - wai-extra
       - wai-middleware-prometheus
@@ -122,12 +118,9 @@ tests:
     source-dirs: test/
     main: Spec.hs
     dependencies:
-      - base16-bytestring
       - blockapps-data
-      - blockapps-haskoin
       - blockapps-vault-wrapper-server
       - bytestring
-      - ethereum-encryption
       - clockwork
       - cryptonite
       - hspec

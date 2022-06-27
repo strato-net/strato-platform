@@ -44,7 +44,6 @@ library:
   - prometheus-client
   - seqevents
   - solid-vm
-  - split
   - strato-adit
   - strato-conf
   - strato-genesis
@@ -63,7 +62,6 @@ executables:
     source-dirs: exec_src
     main: Main.hs
     dependencies:
-      - aeson
       - async
       - blockapps-init
       - common-log
@@ -71,10 +69,8 @@ executables:
       - debugger
       - hflags
       - milena-tools
-      - servant-server
       - solid-vm
       - solid-vm-fuzzer
-      - source-tools
       - strato-conf
       - text
       - transformers
@@ -83,7 +79,6 @@ executables:
       - vm-tools
       - wai-middleware-prometheus
       - warp
-      - websockets
     ghc-options: -Wall -O2 -threaded -rtsopts -fprof-auto
 
 tests:
@@ -117,15 +112,11 @@ benchmarks:
     other-modules: []
     dependencies:
       - bytestring
-      - blockapps-haskoin
       - containers
-      - criterion
       - deepseq
       - ethereum-vm
-      - hashable
       - strato-model
       - vector
-      - unordered-containers
 
   extractbench:
     source-dirs: bench/
@@ -133,5 +124,4 @@ benchmarks:
     other-modules: []
     dependencies:
       - bytestring
-      - criterion
       - ethereum-vm

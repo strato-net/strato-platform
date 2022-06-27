@@ -17,7 +17,6 @@ library:
   ghc-options: -Wall -O2
   dependencies:
     - aeson
-    - base16-bytestring
     - blockapps-data
     - blockapps-datadefs
     - bytestring

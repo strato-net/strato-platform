@@ -28,7 +28,6 @@ library:
   - QuickCheck
   - quickcheck-instances
   - scientific
-  - servant-docs
   - source-tools
   - strato-model
   - swagger2
@@ -59,7 +58,6 @@ benchmarks:
       - binary
       - bytestring
       - cereal
-      - criterion
       - ethereum-rlp
       - solid-vm-model
       - strato-model
