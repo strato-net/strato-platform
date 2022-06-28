@@ -621,12 +621,12 @@ argsToVals ctract fn args =
                   where go (k, v) = do
                                   let tp = expressionType v
                                   v' <- eval tp v
-                                  return $ (T.unpack k, Constant v')
+                                  return $ (k, Constant v')
                 (SVMType.Mapping _ keyType valueType) -> do
                   m <- mapM go $ M.toList mp
                   return $ SMap valueType $ M.fromList m
                   where go (k, v) = do
-                                  let !maybeExp = runParser literal "" "" (T.unpack k)
+                                  let !maybeExp = runParser literal "" "" k
                                   case maybeExp of 
                                     Right ex -> do
                                       k' <- eval keyType ex
@@ -658,7 +658,7 @@ argsToVals ctract fn args =
                 where go (k, v) = do
                                 let tp = expressionType v
                                 v' <- eval32 tp v
-                                return $ (T.unpack k, Constant v')
+                                return $ (k, Constant v')
               (SVMType.Mapping _ keyType valueType) -> do
                 m <- mapM go $ M.toList mp
                 return $ SMap valueType $ M.fromList m
