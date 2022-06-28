@@ -614,7 +614,7 @@ argsToVals ctract fn args =
             -- evaluating external arguments.
             CC.ObjectLiteral _ mp -> do
               case t of
-                SVMType.Label l -> do
+                SVMType.UnknownLabel l -> do
                   let ls = M.toList mp
                   m <- mapM go ls
                   return $ SStruct l $ M.fromList m
