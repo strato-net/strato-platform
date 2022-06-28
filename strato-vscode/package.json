@@ -4,8 +4,8 @@
 	"displayName": "STRATO",
 	"description": "VSCode Integration for BlockApps STRATO",
 	"icon": "resources/balogo.png",
-	"version": "0.1.24",
-	"repository": "https://github.com/blockapps/strato-platform/strato-vscode",
+	"version": "0.1.26",
+	"repository": "https://github.com/blockapps/strato-platform/strato-vscode-images",
 	"engines": {
 		"vscode": "^1.53.0"
 	},

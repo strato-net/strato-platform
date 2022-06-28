@@ -5,8 +5,8 @@ This extension interfaces with a running STRATO node using STRATO's API and a de
 ## Customize Commands in Extension Settings
 The scripts run for various commands (such as **Create Project**, **Deploy Project**, etc.) can be found and modified by clicking **File -> Preferences -> Settings** and then navigating to **Extensions -> STRATO**.  
 
-![Navigate to settings](docs/vscode-settings.png)
-![Navigate to extension](docs/vscode-extension.png)
+![Navigate to settings](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/vscode-settings.png)
+![Navigate to extension](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/vscode-extension.png)
 
 Below is a list of the default scripts for each command:  
 **Create Project**
@@ -104,7 +104,7 @@ nodes:
 
 ## Deployment
 This will list the Deployments of the Dapp and give information about the Dapp such as the `address`, `chainID`, `block_hash`, etc.
-![Deployments Tree View](docs/deployments.png)
+![Deployments Tree View](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/deployments.png)
 
 ## Debugger Setup
 **NOTE: The following are required in order to use the debugger:**
@@ -115,68 +115,68 @@ To set the Debugger up, click on the icon for **Run and Debug**. Click the dropd
 
 
 In the dropdown, select **Add Configuration...**, which will open the `launch.json` file with a dropdown.   
-![Add confugration](docs/add_configuration.png)
+![Add confugration](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/add_configuration.png)
 
 Click **Debug SolidVM** in the dropdown.   
-![Debug SolidVM](docs/launch_json.png)
-![Configuration Set](docs/strato_launch.png)
+![Debug SolidVM](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/launch_json.png)
+![Configuration Set](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/strato_launch.png)
 
 Go to the box with the green arrow once again and make sure **Debug SolidVM** is selected from the dropdown. Click the green play button itself, which should start the debugger.  
-![Run and Debug SolidVM](docs/debug_solidvm.png)
-![Press Play](docs/press_play.png)
+![Run and Debug SolidVM](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/debug_solidvm.png)
+![Press Play](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/press_play.png)
 
 ## Extension Settings
 Below is an explanation of each setting for the STRATO VSCode extension. To change the settings for the STRATO VSCode extension, navigate to File > Preferences > Settings, and select Extensions > STRATO.
-![File > Preferences > Settings](docs/file_preferences_settings.png)
-![Extensions > STRATO](docs/extensions_strato.png)
+![File > Preferences > Settings](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/file_preferences_settings.png)
+![Extensions > STRATO](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/extensions_strato.png)
 
 ### Auto Fuzz
-![Auto Fuzz](docs/auto_fuzz.png)
+![Auto Fuzz](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/auto_fuzz.png)
 
 The `Auto Fuzz` setting tells the extension whether to automatically run the SolidVM code fuzzing tool after the user stops typing. Since the tool can take a long time to complete, disabling this option may be desirable in projects with many unit and/or property tests.
 
 ### Config File
-![Config File](docs/config_file.png)
+![Config File](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/config_file.png)
 
 The `Config File` setting is the filename of the YAML file used to store the current project's configuration. The YAML file includes information such as a list of node URLs, OAuth credentials, and project preferences. Most of the STRATO extension's functionality depends on this value being set correctly. Typically, the project's YAML configuration is stored at "server/config.yaml", so the `Config File` setting should be "config.yaml".
 
 ### Config Path
-![Config Path](docs/config_path.png)
+![Config Path](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/config_path.png)
 
 The `Config Path` setting is the directory path of the YAML file used to store the current project's configuration. The YAML file includes information such as a list of node URLs, OAuth credentials, and project preferences. Most of the STRATO extension's functionality depends on this value being set correctly. Typically, the project's YAML configuration is stored at "server/config.yaml", so the `Config Path` setting should be "server". The extension automatically adds the "/" between "server" and "config.yaml" when creating the full filepath of the config file.
 
 ### Create Project Command
-![Create Project Command](docs/create_project_command.png)
+![Create Project Command](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/create_project_command.png)
 
 The `Create Project Command` setting is a shell script that is responsible for cloning and installing a new project in a given directory. The script takes a single parameter, a directory path, which can be accessed using "$1" in the script. The directory path is entered by the user when creating a new project, along with a test node URL and production node URL. By default, the script clones the traceability-framework repo from BlockApps' GitHub, and installs both the server and ui projects from yarn.
 
 ### Deploy Project Command
-![Deploy Project Command](docs/deploy_project_command.png)
+![Deploy Project Command](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/deploy_project_command.png)
 
 The `Deploy Project Command` setting is a shell script that is responsible for deploying a new instance of a project to a running STRATO network. The script takes no parameters.
 
 ### Run Server Command
-![Run Server Command](docs/run_server_command.png)
+![Run Server Command](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/run_server_command.png)
 
 The `Run Server Command` setting is a shell script that is responsible for running an instance of the project's server, connected to a running STRATO network. The script takes no parameters.
 
 ### Run UI Command
-![Run UI Command](docs/run_ui_command.png)
+![Run UI Command](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/run_ui_command.png)
 
 The `Run Server Command` setting is a shell script that is responsible for running an instance of the project's UI, connected to a running STRATO network. The script takes no parameters.
 
 ### Server Path
-![Server Path](docs/server_path.png)
+![Server Path](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/server_path.png)
 
 The `Server Path` setting is the path to the directory containing the project's server code. This setting is used by the test tools to combine Solidity files together to send to STRATO.
 
 ### Test Server Command
-![Test Server Command](docs/test_server_command.png)
+![Test Server Command](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/test_server_command.png)
 
 The `Test Server Command` setting is a shell script that is responsible for running project's server test suite. The script takes no parameters.
 
 ### Test UI Command
-![Test UI Command](docs/test_ui_command.png)
+![Test UI Command](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/test_ui_command.png)
 
 The `Test UI Command` setting is a shell script that is responsible for running project's UI test suite. The script takes no parameters.
 
