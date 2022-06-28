@@ -658,7 +658,7 @@ argsToVals ctract fn args =
                 where go (k, v) = do
                                 let tp = expressionType v
                                 v' <- eval32 tp v
-                                return $ (k, Constant v')
+                                return $ (T.unpack k, Constant v')
               (SVMType.Mapping _ keyType valueType) -> do
                 m <- mapM go $ M.toList mp
                 return $ SMap valueType $ M.fromList m
