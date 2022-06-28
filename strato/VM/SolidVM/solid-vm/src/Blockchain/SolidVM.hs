@@ -95,6 +95,7 @@ import qualified Blockchain.Stream.Action             as Action
 
 import           Blockchain.VMContext
 import           Blockchain.VMOptions
+import qualified LabeledError
 import qualified Text.Colors                          as C
 import           Text.Format
 import           Text.Tools
@@ -1912,7 +1913,7 @@ intBuiltin [SEnumVal _ _ enumNum] = SInteger $ fromIntegral enumNum
 intBuiltin [SInteger n] = SInteger n
 intBuiltin [SString hex] =
   case B16.decode (BC.pack hex) of
-    (l, "") -> let zeros = 32 - B.length l
+    Right l -> let zeros = 32 - B.length l
                in SInteger . fromIntegral . bytesToWord256 $ B.replicate zeros 0x0 <> l
     _ -> typeError "numeric cast - not a hex string" hex
 intBuiltin args = typeError "numeric cast - invalid args" args
@@ -2173,10 +2174,10 @@ callBuiltin vs@"verifySignature" [SString msg, SString signature, SString pubkey
   if CC._vmVersion curContract == "svm3.2" then do
     let eMesgBs = B16.decode $ BC.pack msg 
     case eMesgBs of 
-      (mesgBs, "") -> do
+      Right mesgBs -> do
         if ((BC.length mesgBs) /= 32) then malformedData "Message hash is not 32 bytes" msg
         else do
-          let mSignature = SEC.importSignature' $ fst $ B16.decode $ BC.pack signature
+          let mSignature = SEC.importSignature' $ LabeledError.b16Decode "callBuiltin" $ BC.pack signature
           let ePublicKey = bsToPub $ BC.pack pubkey
           case (mSignature, ePublicKey) of 
             (Nothing, _) -> malformedData "Could not parse EC Signature " signature
@@ -2187,7 +2188,7 @@ callBuiltin vs@"verifySignature" [SString msg, SString signature, SString pubkey
                 C.green "The signature is valid."
                 else C.red "The signature is invalid")
               return $ SBool isValid
-      (_, err) -> malformedData "Could not decode hex string" err
+      Left err -> malformedData "Could not decode hex string" err
   else unknownFunction "callBuiltin" vs
   
 callBuiltin "parseCert" [SString cert] _ = return $ certificateMap (Just cert)

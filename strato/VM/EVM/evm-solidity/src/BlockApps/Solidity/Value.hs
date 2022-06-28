@@ -305,17 +305,12 @@ textToSimpleValue str = \case
       Just x -> return x
     readBytes :: Integer -> Either Text ByteString
     readBytes n =
-      let
-        (bytes', leftover) = Base16.decode (Text.encodeUtf8 str)
-      in
-        if leftover /= ByteString.empty || ByteString.length bytes' /= fromInteger n
-          then Left $ "textToSimpleValue: could not decode as statically sized bytes: " <> str <> ", expected a Base16 encoded string of length " <> Text.pack (show $ 2 * n) <> ", which represents a bytestring of length " <> Text.pack (show n)
-          else return bytes'
+      case Base16.decode (Text.encodeUtf8 str) of
+        Right bytes' | ByteString.length bytes' == fromInteger n -> return bytes'
+        _ -> Left $ "textToSimpleValue: could not decode as statically sized bytes: " <> str <> ", expected a Base16 encoded string of length " <> Text.pack (show $ 2 * n) <> ", which represents a bytestring of length " <> Text.pack (show n)
+
     readBytesDyn :: Either Text ByteString
     readBytesDyn =
-      let
-        (bytes', leftover) = Base16.decode (Text.encodeUtf8 str)
-      in
-        if leftover /= ByteString.empty
-          then Left $ "textToSimpleValue: could not decode as dynamically sized bytes: " <> str
-          else return bytes'
+      case Base16.decode (Text.encodeUtf8 str) of
+        Right val -> return val
+        _ -> Left $ "textToSimpleValue: could not decode as dynamically sized bytes: " <> str

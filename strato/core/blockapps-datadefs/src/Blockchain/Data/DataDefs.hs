@@ -27,7 +27,6 @@ import           Control.DeepSeq
 import           Control.Lens
 import           Control.Monad.Trans.Class (lift)
 
-import           Database.Persist
 import           Database.Persist.Quasi
 import           Database.Persist.Sql
 import           Database.Persist.TH
@@ -62,9 +61,6 @@ import           Blockchain.Data.RLP
 import           Blockchain.Data.TransactionResultStatus
 import           Blockchain.Data.TXOrigin
 import           Blockchain.MiscJSON                     ()
-
-entityDefs :: [EntityDef]
-entityDefs = $(persistFileWith lowerCaseSettings "src/Blockchain/Data/DataDefs.txt")
 
 share [mkPersist sqlSettings, mkMigrate "migrateAuto"]  -- annoying: postgres doesn't like tables called user
     $(persistFileWith lowerCaseSettings "src/Blockchain/Data/DataDefs.txt")

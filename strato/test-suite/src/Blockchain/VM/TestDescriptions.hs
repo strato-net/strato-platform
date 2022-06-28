@@ -32,6 +32,8 @@ import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 
+import qualified LabeledError
+
 data Env =
   Env {
     currentCoinbase   ::  Account,
@@ -154,7 +156,7 @@ sloppyParseHexNumber x =
 sloppyParseHexByteString  ::  T.Text->B.ByteString
 sloppyParseHexByteString x =
   case B16.decode $ BC.pack x' of
-   (val, "") -> val
+   Right val -> val
    _         -> error $ "bad value passed to sloppyParseHexNumber: " ++ show x
   where
     x' = removeOptional0x $ T.unpack x
@@ -225,11 +227,11 @@ instance FromJSON DebugCallCreate where
       debugCallCreate' d v2 gasLimit val = DebugCallCreate (sloppyParseHexByteString d) v2 (read gasLimit) (read val)
   parseJSON x = error $ "Wrong format when trying to parse CallCreate from JSON: " ++ show x
 
-b16_decode_optional0x  ::  B.ByteString->(B.ByteString, B.ByteString)
+b16_decode_optional0x  ::  B.ByteString->B.ByteString
 b16_decode_optional0x x =
   case BC.unpack x of
-    ('0':'x':rest) -> B16.decode $ BC.pack rest
-    _              -> B16.decode x
+    ('0':'x':rest) -> LabeledError.b16Decode "b16_decode_optional0x" $ BC.pack rest
+    _              -> LabeledError.b16Decode "b16_decode_optional0x" x
 
 instance FromJSON RawData where
   parseJSON =
@@ -237,4 +239,4 @@ instance FromJSON RawData where
     pure . string2RawData . T.unpack
     where
       string2RawData  ::  String->RawData
-      string2RawData x = RawData . fst . b16_decode_optional0x . BC.pack $ x
+      string2RawData x = RawData . b16_decode_optional0x . BC.pack $ x

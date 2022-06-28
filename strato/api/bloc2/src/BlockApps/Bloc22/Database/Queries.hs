@@ -168,12 +168,12 @@ getContractDetailsByCodeHash :: ( A.Selectable Account AddressState m
                              => CodePtr -> m (Either Text ContractDetails)
 getContractDetailsByCodeHash codePtr = do
   srcCache <- fmap globalCodePtrCache getBlocEnv
-  now <- liftIO $ getTime Monotonic
-  let later = (now +) <$> Cache.defaultExpiration srcCache
+  now' <- liftIO $ getTime Monotonic
+  let later = (now' +) <$> Cache.defaultExpiration srcCache
   mCachedDetails <- atomically $ do
-    Cache.purgeExpiredSTM srcCache now -- todo: this should probably go somewhere else, like a worker thread,
+    Cache.purgeExpiredSTM srcCache now' -- todo: this should probably go somewhere else, like a worker thread,
                                        --       but we need this to prevent the cache growing unboundedly
-    r <- Cache.lookupSTM True codePtr srcCache now
+    r <- Cache.lookupSTM True codePtr srcCache now'
     for_ r $ \v -> Cache.insertSTM codePtr v srcCache later -- refresh to timestamp of this item
     pure r
 
@@ -225,12 +225,12 @@ getContractDetailsForContract theVM src mContract = do
   let shouldCompile = if theVM == "EVM" then Do Compile else Don't Compile
       cacheKey = (theVM, src)
   srcCache <- fmap globalSourceCache getBlocEnv
-  now <- liftIO $ getTime Monotonic
-  let later = (now +) <$> Cache.defaultExpiration srcCache
+  now' <- liftIO $ getTime Monotonic
+  let later = (now' +) <$> Cache.defaultExpiration srcCache
   mCachedDetails <- atomically $ do
-    Cache.purgeExpiredSTM srcCache now -- todo: this should probably go somewhere else, like a worker thread,
+    Cache.purgeExpiredSTM srcCache now' -- todo: this should probably go somewhere else, like a worker thread,
                                        --       but we need this to prevent the cache growing unboundedly
-    r <- Cache.lookupSTM True cacheKey srcCache now
+    r <- Cache.lookupSTM True cacheKey srcCache now'
     for_ r $ \v -> Cache.insertSTM cacheKey v srcCache later -- refresh to timestamp of this item
     pure r
 

@@ -20,12 +20,10 @@ executables:
       - ethereum-discovery
       - hflags
       - lifted-async
-      - milena-tools
       - ordered-containers
       - strato-p2p
       - wai-middleware-prometheus
       - warp
-      - x509-certs
       
 library:
   source-dirs: src
@@ -41,7 +39,6 @@ library:
     - blockapps-vault-wrapper-client
     - blockstanbul
     - bytestring
-    - common-log
     - conduit
     - conduit-extra
     - containers
@@ -102,7 +99,6 @@ tests:
     dependencies:
       - QuickCheck
       - base16-bytestring
-      - blockapps-data
       - blockapps-datadefs
       - blockapps-privacy
       - blockstanbul

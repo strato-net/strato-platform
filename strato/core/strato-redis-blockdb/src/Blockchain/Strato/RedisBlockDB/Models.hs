@@ -61,7 +61,7 @@ instance RedisDBKeyable S8.ByteString where
 instance RedisDBValuable S8.ByteString where
     toValue   = SB16.encode
     fromValue x = case SB16.decode x of
-        (v, "") -> v
+        Right v -> v
         _       -> error "leftovers in base16 decode"
 
 instance RedisDBKeyable Keccak256 where

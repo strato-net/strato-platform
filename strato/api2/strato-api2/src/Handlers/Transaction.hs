@@ -34,7 +34,7 @@ import           Data.Conduit.Combinators    (yieldMany)
 import           Data.List
 import           Data.Maybe
 import qualified Data.Text                   as T
-import qualified Database.Esqueleto          as E
+import qualified Database.Esqueleto.Legacy          as E
 import           MaybeNamed
 import           Numeric.Natural
 import           Servant

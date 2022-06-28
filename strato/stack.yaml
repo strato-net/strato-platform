@@ -49,9 +49,11 @@ packages:
 - libs/kafka/milena
 - libs/kafka/milena-tools
 - libs/monad-alter
+- libs/nibblestring
 - libs/partitioner
 - libs/prometheus/blockapps-init
 - libs/prometheus/cross-monitoring
+- libs/secp256k1-haskell
 - libs/type-lits
 
 - test-suite
@@ -84,14 +86,12 @@ extra-deps:
 - json-rpc-server-0.2.6.0@sha256:be5f936ab08e837fc17de6fc6ea0766e6e6b40676707e63333f3caf7e459e231,3585
 - json-stream-0.4.4.1@sha256:272cd4aed5d0d9c97978620c1435cd91acaa39c8bddb28cbace9284f58ddc364,4985
 - monadIO-0.11.1.0@sha256:2407c8aee3a74f3eba897f7c87f702f502394aec8cd412f3d2334cc353f54f13,964
-- nibblestring-0.0.3@sha256:aaf68a1c89cff51b628d4825d9e4caab2f8bbdf767a36ef05090b4d719cf295b,1660
 - normaldistribution-1.1.0.3@sha256:2615b784c4112cbf6ffa0e2b55b76790290a9b9dff18a05d8c89aa374b213477,2160
 - semver-range-0.2.8@sha256:44918080c220cf67b6e7c8ad16f01f3cfe1ac69d4f72e528e84d566348bb23c3,1941
 - servant-mock-0.8.7@sha256:64cb3e52bbd51ab6cb25e3f412a99ea712c6c26f1efd117f01a8d1664df49c67,2306
+- servant-multipart-client-0.12.1@sha256:fdaeea6a7e3b5459321520606a5dc0be55e16ebc3abe245fddb14df8a34a08cb,1976
 - servant-options-0.1.0.0@sha256:39f50166a68006250e79370372f553ca476f14d06d93fa0c401050253aeba803,914
 - servant-swagger-tags-0.1.0.1@sha256:2d743e9ad1cfcca537acc99e0b97e0e4feda3b5c842937dbf5895261e3105bf1,1094
-- wai-middleware-prometheus-1.0.0.1@sha256:dad84de519f8602884a54645a6c4d2ef20125e2745c99cad8add65e2bda26b7c,1316
-- secp256k1-haskell-0.2.0@sha256:142c43f1d8612b351d0b3b96d13eb437ffbb728adf0aaac58d57cada9a14adee,2342
 
 
 #- git: https://github.com/blockapps/milena
@@ -102,7 +102,7 @@ flags:
     ecdh: true
     recovery: true
 
-resolver: lts-17.2 #also duplicated in docker section below
+resolver: lts-18.8 #also duplicated in docker section below
 compiler-check: newer-minor
 extra-include-dirs:
 - /usr/local/include
@@ -119,7 +119,7 @@ ghc-options:
 
 docker:
   enable: true
-  image: "strato-buildbase:lts-17.2"
+  image: "strato-buildbase:lts-18.8"
   set-user: true
   run-args: ["--ulimit=nofile=60000"]
 

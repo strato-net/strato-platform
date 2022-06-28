@@ -17,7 +17,7 @@ module Handlers.Stats (
 import           Control.Monad.Change.Modify
 import           Data.Aeson
 import           Data.Swagger
-import qualified Database.Esqueleto            as E
+import qualified Database.Esqueleto.Legacy     as E
 import           Servant
 
 import           Blockchain.Data.DataDefs

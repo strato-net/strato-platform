@@ -11,7 +11,6 @@ dependencies:
   - containers
   - evm-solidity
   - text
-  - utf8-string
 
 library:
   source-dirs: src/
@@ -28,7 +27,6 @@ library:
     - blockapps-vault-wrapper-client
     - bytestring
     - cache
-    - classy-prelude
     - clock
     - common-log
     - conduit
@@ -37,19 +35,15 @@ library:
     - cryptonite
     - directory
     - esqueleto
-    - ethereum-rlp
     - extra
     - filepath
     - format
     - hashable
     - hflags
-    - http-client
-    - http-types
     - insert-ordered-containers
+    - labeled-error
     - lens
-    - memory
     - monad-alter
-    - monad-control
     - monad-logger
     - mtl
     - opaleye
@@ -62,7 +56,6 @@ library:
     - resource-pool
     - saltine
     - secp256k1-haskell
-    - servant
     - servant-client
     - servant-server
     - servant-swagger
@@ -77,8 +70,6 @@ library:
     - transformers
     - type-lits
     - unliftio
-    - unliftio-core
-    - unordered-containers
     - vault-monad
     - vector
 

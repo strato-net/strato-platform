@@ -61,6 +61,9 @@ import Blockchain.VMOptions() -- for HFlags
 import SolidVM.Model.SolidString
 import SolidVM.Model.Storable as MS
 import Blockchain.DB.X509CertDB as X509
+
+import qualified LabeledError
+
 -- The newtype distinguishes uncaught SolidExceptions and
 -- those that are returned in ExecResults
 newtype HandledException = HE SolidException deriving (Show, Exception)
@@ -513,8 +516,8 @@ spec = do
       getFields ["buf1", "buf2", "hash1", "hash2"] `shouldReturn`
         [ BString (B.replicate 32 0xfe)
         , BString (BC.replicate 32 'x')
-        , BString (fst $ B16.decode "59c3290d81fbdfe9ce1ffd3df2b61185e3089df0e3c49e0918e82a60acbed75a")
-        , BString (fst $ B16.decode "5601c4475f2f6aa73d6a70a56f9c756f24d211a914cc7aff3fb80d2d8741c868")
+        , BString (LabeledError.b16Decode "SolidVMSpec.hs" "59c3290d81fbdfe9ce1ffd3df2b61185e3089df0e3c49e0918e82a60acbed75a")
+        , BString (LabeledError.b16Decode "SolidVMSpec.hs" "5601c4475f2f6aa73d6a70a56f9c756f24d211a914cc7aff3fb80d2d8741c868")
         ]
 
     it "can hash multiple arguments" . runTest $ do
@@ -1741,7 +1744,7 @@ contract qq {
     return (k, k);
   }
 }|]
-    let (kBS, "") = B16.decode "0123456789abcdef0123456789abcdef"
+    let Right kBS = B16.decode "0123456789abcdef0123456789abcdef"
         zero = B.replicate 16 0
     er `shouldBe` Just (SB.toShort $ zero <> kBS <> zero <> kBS)
 
@@ -2039,7 +2042,7 @@ contract qq {
     getFields ["s"] `shouldReturn` [BString "Will the real "]
 
   it "can return an address" . runTest $ do
-    let want' = fst . B16.decode . BC.pack $ showHex (sender ^. accountAddress) ""
+    let want' = LabeledError.b16Decode "SolidVMSpec.hs" . BC.pack $ showHex (sender ^. accountAddress) ""
         want = B.replicate (32 - B.length want') 0x0 <> want'
     runCall "a" "()" [r|
 contract qq {

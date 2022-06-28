@@ -7,6 +7,5 @@ library:
     - aeson
     - bifunctors
     - comonad
-    - containers
     - QuickCheck
     - text

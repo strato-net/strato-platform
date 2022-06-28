@@ -25,7 +25,6 @@ import qualified Control.Monad.Change.Modify               as Mod
 import           Control.Monad.Reader
 
 import           Data.ByteString.Char8                     (pack)
-import           Data.ByteString.Base16                    as B16
 import           Data.Foldable
 import qualified Data.Map.Strict                           as M
 import           Data.Maybe
@@ -62,6 +61,8 @@ import           Blockchain.Partitioner
 import           Blockchain.Strato.Model.Class             as BDB
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
+
+import qualified LabeledError
 
 import qualified Text.Colors                               as CL
 import           Text.Format
@@ -223,8 +224,7 @@ checkForVotes crs = do
         translate br =
           let extsign = RL.rlpDecode
                       . RL.rlpDeserialize
-                      . fst
-                      . B16.decode
+                      . LabeledError.b16Decode "checkForVotes"
                       . pack
                       . API.signature $ br
               bauth = MsgAuth { sender = API.sender br, signature = extsign}

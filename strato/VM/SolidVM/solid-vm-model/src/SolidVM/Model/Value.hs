@@ -188,7 +188,7 @@ coerceType ct xt = \case
     SString s -> case xt of
       SVMType.String{} -> SString s
       SVMType.Bytes{} -> case B16.decode (BC.pack s) of
-                        (bs, "") -> SString . BC.unpack $ B.takeWhile (/=0) bs
+                        Right bs -> SString . BC.unpack $ B.takeWhile (/=0) bs
                         _ -> SString s
       _ -> typeError "string literal must be string or bytes" (xt, s)
     v -> v
