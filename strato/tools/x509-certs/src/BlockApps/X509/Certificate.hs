@@ -295,7 +295,7 @@ getValidity = do
   return (curDate, endDate)
 
   getParentUserAddress :: X509Certificate -> Maybe Address
-  getParentUserAddress (X509Certificate (CertificateChain (_:c2:_))) = fmap (fromPublicKey . subPub) (getCertSubject (X509Certificate (CertificateChain [x2])))
+  getParentUserAddress (X509Certificate (CertificateChain (_:c2:_))) = fmap (fromPublicKey . subPub) (getCertSubject (X509Certificate (CertificateChain [c2])))
   getParentUserAddress _ = Nothing
 
 getCertPub :: Subject -> PubKey
