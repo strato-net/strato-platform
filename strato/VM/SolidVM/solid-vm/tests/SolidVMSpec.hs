@@ -61,6 +61,9 @@ import Blockchain.VMOptions() -- for HFlags
 import SolidVM.Model.SolidString
 import SolidVM.Model.Storable as MS
 import Blockchain.DB.X509CertDB as X509
+import Data.ByteString (putStr)
+import GHC.TypeLits (ErrorMessage(Text))
+import qualified Control.Exception as Blockchain.SolidVM
 -- The newtype distinguishes uncaught SolidExceptions and
 -- those that are returned in ExecResults
 newtype HandledException = HE SolidException deriving (Show, Exception)
@@ -84,6 +87,10 @@ anyTypeError _ = False
 anyInvalidWriteError :: Selector HandledException
 anyInvalidWriteError (HE Blockchain.SolidVM.Exception.InvalidWrite{}) = True
 anyInvalidWriteError _ = False
+
+anyInvalidArgumentsError :: Selector HandledException
+anyInvalidArgumentsError (HE Blockchain.SolidVM.Exception.InvalidArguments{}) = True
+anyInvalidArgumentsError _ = False
 
 anyInternalError :: Selector HandledException
 anyInternalError (HE Blockchain.SolidVM.Exception.InternalError{}) = True
@@ -4251,3 +4258,12 @@ contract qq {
     return 2;
   }
 }|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 2)
+
+  it "cannot allow negative block number" $ runTest (do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+  constructor() public returns (bytes32) {
+    return blockhash(-1);
+  }
+}|]) `shouldThrow` anyInvalidArgumentsError
