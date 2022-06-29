@@ -45,6 +45,7 @@ statementHelper (DoWhileStatement body cond _) =
       bs = concat $ statementHelper <$> body
    in concat [bs, cs]
 statementHelper (Continue _) = []
+statementHelper (ModifierExecutor _) = []
 statementHelper (Break _) = []
 statementHelper (Return (Just (BoolLiteral _ _)) _) = []
 statementHelper (Return mExpr _) =

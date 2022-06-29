@@ -965,6 +965,7 @@ statementHelper (Return mExpr x) = do
         _ -> (ret, locals) :| rest
       pure t'
 statementHelper (Throw x) = pure $ topType' x
+statementHelper (ModifierExecutor x) = pure $ topType' x
 statementHelper (EmitStatement _ vals x) =
   reduceType' x <$> traverse (tcExpr . snd) vals
 statementHelper (RevertStatement _ (NamedArgs vals) x) =

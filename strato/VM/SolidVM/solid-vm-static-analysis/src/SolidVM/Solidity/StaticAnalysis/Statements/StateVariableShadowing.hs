@@ -42,6 +42,7 @@ statementHelper vars (DoWhileStatement body _ _) =
   concat $ statementHelper vars <$> body
 statementHelper _ (Continue _) = []
 statementHelper _ (Break _) = []
+statementHelper _ (ModifierExecutor _) = []
 statementHelper _ (Return _ _) = []
 statementHelper _ (Throw _) = []
 statementHelper _ (EmitStatement _ _ _) = []

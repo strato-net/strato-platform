@@ -25,6 +25,7 @@ module SolidVM.Model.CodeCollection.Statement
 
 import Data.Aeson
 import Data.Source
+--import Data.Swagger
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
 import GHC.Generics
@@ -41,12 +42,36 @@ data StatementF a =
   | Break a
   | Return (Maybe (ExpressionF a)) a
   | Throw a
+  | ModifierExecutor a
   | EmitStatement String [(Maybe String, (ExpressionF a))] a
   | AssemblyStatement InlineAssembly a
   | SimpleStatement (SimpleStatementF a) a
   | RevertStatement (Maybe String) (ArgListF a) a
   | UncheckedStatement [StatementF a] a
   deriving (Show, Eq, Generic, Functor, ToJSON, FromJSON)
+
+
+
+{-
+instance ToSchema Modifier where
+  declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
+    & mapped.name ?~ "Function Modifier"
+    & mapped.schema.description ?~ "Xabi Function Modifier"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex :: ModifierF ()
+      ex = Modifier
+        { modifierArgs = Map.fromList [("userAddress", SolidVM.IndexedType {indexedTypeIndex = 0, indexedTypeType = SVMType.Int {signed = Just False, bytes = Just 32}})]
+        , modifierSelector = "0adfe412"
+        , modifierVals = Map.fromList [("#0",SolidVM.IndexedType {indexedTypeIndex = 0, indexedTypeType = SVMType.Int {signed = Just False, bytes = Just 32}})]
+        , modifierContents = Nothing
+        , modifierExecutor = True
+        , modifierContext = ()
+        }
+
+
+-}
+
 
 extractStatement :: StatementF a -> a
 extractStatement (IfStatement _ _ _ a) = a
@@ -63,6 +88,7 @@ extractStatement (AssemblyStatement _ a) = a
 extractStatement (SimpleStatement _ a) = a
 extractStatement (RevertStatement _ _ a) = a
 extractStatement (UncheckedStatement _ a) = a
+extractStatement (ModifierExecutor a) = a
 
 type Statement = Positioned StatementF
 

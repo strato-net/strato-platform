@@ -40,6 +40,7 @@ import           Blockchain.VM.SolidException
 data SourceUnitF a = Pragma a Identifier String
                    | Import a Text.Text
                    | NamedXabi Text.Text (XabiF a, [Text.Text])
+                   | DummySourceUnit
                    deriving (Eq, Show, Generic, Functor)
 
 type SourceUnit = Positioned SourceUnitF
@@ -123,6 +124,7 @@ data Declaration =
   | EventDeclaration SolidVM.Event
   | VariableDeclaration SolidVM.VariableDecl
   | ConstantDeclaration SolidVM.ConstantDecl
+  | DummyDeclaration
 --  | VariableDeclaration SVMType.Type Bool Bool (Maybe Expression)
   deriving (Eq, Show)
 
@@ -320,7 +322,8 @@ modifierDeclaration = do
   name <- identifier
   args <- option [] tupleDeclaration
 --  defn <- bracedCode
-  contents <- bracedCode
+--  maybe here we should try to parse the _; statement, to see whether it is prefix or postfix
+  contents <- Just <$> statements <|> (reservedOp ";" >> return Nothing)
   end <- getSourcePosition
   let ctx = SourceAnnotation start end ()
       nameUnnamed (_name,ty) i = if Text.null _name then (Text.pack ('#' : show i),ty) else (_name,ty)
@@ -333,7 +336,8 @@ modifierDeclaration = do
              zipWith (\x i -> fmap (SolidVM.IndexedType i) (nameUnnamed x i)) args [0..]
       , Xabi.modifierSelector = Text.pack name -- ? -- undefined -- :: Text
       , Xabi.modifierVals = Map.fromList [] -- undefined -- :: Map Text SolidVM.IndexedType
-      , Xabi.modifierContents = if null contents then Nothing else Just $ Text.pack contents
+      , Xabi.modifierContents = contents
+      , Xabi.modifierExecutor = True
       , Xabi.modifierContext = ctx
 --        objName = name,
 --        objValueType = NoValue,
@@ -381,8 +385,8 @@ functionModifiers = do
   vals <- many $ (ReturnsMod <$> returnModifier)
              <|>  (VisibilityMod <$> visibilityModifier)
              <|>  (MutabilityMod <$> mutabilityModifier)
-             <|>  (ConstructorCallMod <$> constructorCallModifiers)
-             <|>  (OtherMod <$> otherModifiers)
+             <|>  (try (ConstructorCallMod <$> constructorCallModifiers))
+             <|>  (OtherMod <$> otherModifiers)-- (lookAhead (reserved "{"))
   return $ formatVals vals
   where
     formatVals vals =
@@ -407,14 +411,14 @@ functionModifiers = do
       <|> (reserved "view"     >> return SolidVM.View)
       <|> (reserved "payable"  >> return SolidVM.Payable)
       )
-    constructorCallModifiers = do
+    constructorCallModifiers = do 
       name <- stringToLabel <$> identifier
       exps <- parens $ commaSep expression
-      return (name, exps)
+      return (name, exps) 
     otherModifiers = do
-      name <- identifier
-      args <- optionMaybe parensCode
-      return $ name ++ maybe "" (\s -> "(" ++ s ++ ")") args
+      name <- stringToLabel <$> identifier
+      --args <- optionMaybe parensCode
+      return $ name -- ++ maybe "" (\s -> "(" ++ s ++ ")") args
 
 -- | A common pattern: code enclosed in braces, allowing nested braces.
 bracedCode :: SolidityParser String
@@ -425,6 +429,7 @@ bracedCode = braces . fmap concat . many $
     <|> do
         innerBraces <- bracedCode
         return $ "{" ++ innerBraces ++ "}"
+
 
 -- | Parses arguments and their types in parentheses.
 parensCode :: SolidityParser String

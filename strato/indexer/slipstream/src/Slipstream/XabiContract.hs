@@ -35,6 +35,7 @@ xabiToPartialContract xabi =
     _events=M.mapKeys textToLabel $ fmap evmEventToEvent $ OLDXABI.xabiEvents xabi,
     _functions=error "_functions undefined",
     _constructor=error "_constructor undefined",
+    _modifiers=error "_modifiers undefined",
     _vmVersion=error "_vmVersion undefined",
     _contractContext=error "_contractContext undefined"
     }

@@ -24,11 +24,9 @@ import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
 import           Data.Aeson.Types
 import           Data.Map.Strict              (Map)
-import qualified Data.Map.Strict              as Map
 import           Data.Source
 import           Data.Swagger
 import           Data.Text                    (Text)
-import qualified Generic.Random               as GR
 import           GHC.Generics
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
@@ -39,8 +37,6 @@ import           SolidVM.Model.CodeCollection.Function
 import           SolidVM.Model.CodeCollection.VariableDecl
 import qualified SolidVM.Model.CodeCollection.Def  as SolidVM
 import           SolidVM.Model.SolidString
-import qualified SolidVM.Model.Type as SVMType
-import qualified SolidVM.Model.CodeCollection.VarDef  as SolidVM
 
 data XabiKind = ContractKind
               | InterfaceKind
@@ -50,6 +46,7 @@ instance ToJSON XabiKind where
 instance FromJSON XabiKind where
 instance Arbitrary XabiKind where
   arbitrary = elements [ContractKind, InterfaceKind, LibraryKind]
+
 
 instance ToSchema XabiKind where
   declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
@@ -71,40 +68,22 @@ data XabiF a = Xabi
   } deriving (Eq,Show,Generic, Functor)
 
 type Xabi = Positioned XabiF
+{-}
+data FuncF a = Func
+  { funcArgs :: [(Maybe SolidString, SolidVM.IndexedType)]
+  , funcVals :: [(Maybe SolidString, SolidVM.IndexedType)]
+  , funcStateMutability :: Maybe StateMutability
 
-data ModifierF a = Modifier
-  { modifierArgs     :: Map Text SolidVM.IndexedType
-  , modifierSelector :: Text
-  , modifierVals     :: Map Text SolidVM.IndexedType
-  , modifierContents :: Maybe Text
-  , modifierContext  :: a
+  -- These Values are only used for parsing and unparsing solidity.
+  -- This data will not be stored in the db and will have no
+  -- relevance when constructing from the db.
+  , funcContents :: Maybe [StatementF a]
+  , funcVisibility :: Maybe Visibility
+  , funcConstructorCalls :: Map SolidString [(ExpressionF a)]
+  , funcModifiers :: Maybe [String]
+  , funcContext :: a
   } deriving (Eq,Show,Generic, Functor)
-
-type Modifier = Positioned ModifierF
-
-instance ToJSON a => ToJSON (ModifierF a) where
-  toJSON = genericToJSON (aesonPrefix camelCase)
-
-instance FromJSON a => FromJSON (ModifierF a) where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
-
-instance Arbitrary a => Arbitrary (ModifierF a) where
-  arbitrary = GR.genericArbitrary GR.uniform
-
-instance ToSchema Modifier where
-  declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
-    & mapped.name ?~ "Function Modifier"
-    & mapped.schema.description ?~ "Xabi Function Modifier"
-    & mapped.schema.example ?~ toJSON ex
-    where
-      ex :: ModifierF ()
-      ex = Modifier
-        { modifierArgs = Map.fromList [("userAddress", SolidVM.IndexedType {indexedTypeIndex = 0, indexedTypeType = SVMType.Int {signed = Just False, bytes = Just 32}})]
-        , modifierSelector = "0adfe412"
-        , modifierVals = Map.fromList [("#0",SolidVM.IndexedType {indexedTypeIndex = 0, indexedTypeType = SVMType.Int {signed = Just False, bytes = Just 32}})]
-        , modifierContents = Nothing
-        , modifierContext = ()
-        }
+-}
 
 data UsingF a = Using String a deriving (Eq,Show,Generic, Functor)
 

@@ -30,6 +30,7 @@ statementHelper (ForStatement _ _ _ body _) = concat $ statementHelper <$> body
 statementHelper (Block _) = []
 statementHelper (DoWhileStatement body _ _) = concat $ statementHelper <$> body
 statementHelper (Continue _) = []
+statementHelper (ModifierExecutor _) = []
 statementHelper (Break _) = []
 statementHelper (Return _ _) = []
 statementHelper (Throw _) = []

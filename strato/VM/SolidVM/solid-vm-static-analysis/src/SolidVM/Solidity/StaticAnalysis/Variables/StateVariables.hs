@@ -94,6 +94,7 @@ statementHelper (DoWhileStatement body cond _) = do
   bs <- statementsHelper body
   pure $ concat [bs, cs]
 statementHelper (Continue _) = pure []
+statementHelper (ModifierExecutor _) = pure []
 statementHelper (Break _) = pure []
 statementHelper (Return mExpr _) =
   maybe (pure []) expressionHelper mExpr

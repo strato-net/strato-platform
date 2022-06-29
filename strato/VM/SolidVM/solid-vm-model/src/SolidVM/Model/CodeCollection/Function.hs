@@ -11,6 +11,8 @@ module SolidVM.Model.CodeCollection.Function (
   Func,
   StateMutability(..),
   Visibility(..),
+  ModifierF(..),
+  Modifier,
   tShow,
   tRead
   ) where
@@ -27,6 +29,8 @@ import qualified Generic.Random               as GR
 import           GHC.Generics
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
+--import qualified Data.Map.Strict              as Map
+--import qualified SolidVM.Model.Type as SVMType
 
 import           SolidVM.Model.CodeCollection.Statement
 import qualified SolidVM.Model.CodeCollection.VarDef  as SolidVM
@@ -104,6 +108,42 @@ instance ToSchema Visibility where
       ex = Public
 
 
+--data ModifierExecutor = PrefixExecutor | PostfixExecutor deriving (Eq,Show,Generic)
+
+data ModifierF a = Modifier
+  { modifierArgs     :: Map Text SolidVM.IndexedType
+  , modifierSelector :: Text
+  , modifierVals     :: Map Text SolidVM.IndexedType
+  , modifierContents :: Maybe [StatementF a]
+  , modifierExecutor :: Bool --ModifierExecutor True for PrefixExecutor, False for PostfixExecutor
+  , modifierContext  :: a
+  } deriving (Eq,Show,Generic, Functor)
+
+type Modifier = Positioned ModifierF
+
+instance ToJSON a => ToJSON (ModifierF a) where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+
+instance FromJSON a => FromJSON (ModifierF a) where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+
+{-
+instance ToSchema Modifier where
+  declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
+    & mapped.name ?~ "Function Modifier"
+    & mapped.schema.description ?~ "Xabi Function Modifier"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex :: ModifierF ()
+      ex = Modifier
+        { modifierArgs = Map.fromList [("userAddress", SolidVM.IndexedType {indexedTypeIndex = 0, indexedTypeType = SVMType.Int {signed = Just False, bytes = Just 32}})]
+        , modifierSelector = "0adfe412"
+        , modifierVals = Map.fromList [("#0",SolidVM.IndexedType {indexedTypeIndex = 0, indexedTypeType = SVMType.Int {signed = Just False, bytes = Just 32}})]
+        , modifierContents = Nothing
+        , modifierExecutor = True
+        , modifierContext = ()
+        }
+-}
 --------------------------------------------------------------------------------
 
 soliditySchemaOptions :: SchemaOptions
