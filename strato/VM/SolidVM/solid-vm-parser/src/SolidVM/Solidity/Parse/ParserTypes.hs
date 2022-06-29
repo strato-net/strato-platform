@@ -21,12 +21,12 @@ type FileName = SourceName
 type Identifier = String
 -- | Names of contracts.  They have to be the same as identifiers because
 -- contracts can also be types.
-type ContractName = Identifier
+type Name = Identifier
 -- | We parse directly from the textual source, without pre-lexing.
 type PragmaVersion = Identifier
 
--- Add new type that stores both the ContractName and the PragmaVersion.
-type ContractState = (ContractName, PragmaVersion)
+-- Add new type that stores both the contract's name and the PragmaVersion.
+type ContractName = (Name, PragmaVersion)
 
 type SourceCode = String
 -- | A parser of source code whose state is the name of the current
@@ -34,13 +34,13 @@ type SourceCode = String
 type SolidityParser = Parsec SourceCode ContractState
 
 -- | When starting a new contract
-setContractState :: ContractState -> SolidityParser ()
-setContractState = setState
+setContractName :: ContractName -> SolidityParser ()
+setContractName = setState
 
 -- | There are a few context-sensitive constructs in Solidity, for example
 -- constructors and pragma versions.
-getContractState :: SolidityParser ContractState
-getContractState = getState
+getContractName :: SolidityParser ContractName
+getContractName = getState
 
 -- | Not actually used.
 type SolidityValue = String
