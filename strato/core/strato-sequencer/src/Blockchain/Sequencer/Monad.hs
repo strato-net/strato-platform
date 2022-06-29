@@ -77,7 +77,6 @@ import           Control.Monad.State
 
 import           Data.Binary
 import qualified Data.ByteString                           as B
-import qualified Data.ByteString.Base16                    as B16
 import qualified Data.ByteString.Char8                     as C8
 import qualified Data.ByteString.Lazy                      as BL
 import           Data.Conduit.TMChan
@@ -108,6 +107,7 @@ import           Blockchain.Sequencer.Metrics
 import           Blockchain.Strato.Model.ExtendedWord      (Word256)
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
+import qualified LabeledError
 import           Prometheus
 import           System.Directory                          (createDirectoryIfMissing)
 import           Text.Format
@@ -414,7 +414,7 @@ instance HasBlockstanbulContext SequencerM where
 -- I know, it's ugly...the SequencerSpec test uses SequencerM itself, so this was a lot 
 -- easier than making a whole new SequencerM definition just to get a different HasVault instance
 testPriv :: PrivateKey
-testPriv = fromMaybe (error "could not import private key") (importPrivateKey (fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"))
+testPriv = fromMaybe (error "could not import private key") (importPrivateKey (LabeledError.b16Decode "testPriv" $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"))
 
 instance HasVault SequencerM where
   sign mesg = do

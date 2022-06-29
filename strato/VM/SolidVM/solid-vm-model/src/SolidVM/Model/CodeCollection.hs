@@ -40,10 +40,11 @@ import           SolidVM.Model.CodeCollection.Statement
 --import           SolidVM.Model.CodeCollection.Type
 import           SolidVM.Model.CodeCollection.VarDef
 import           SolidVM.Model.CodeCollection.VariableDecl
+import           SolidVM.Model.SolidString
 
 data CodeCollectionF a =
   CodeCollection {
-    _contracts :: Map String (ContractF a)
+    _contracts :: Map SolidString (ContractF a)
   } deriving (Show, Generic, Functor)
 
 instance ToJSON a => ToJSON (CodeCollectionF a)
@@ -57,7 +58,7 @@ type SolidEither = Either (Positioned ((,) SolidException))
 
 getParents :: CodeCollection -> Contract -> SolidEither [Contract]
 getParents cc c =
-  let toErr x p = maybe (Left ( InternalError "contract parent does not exist" p
+  let toErr x p = maybe (Left ( InternalError "contract parent does not exist" (labelToString p)
                               , x
                               ))
                         Right

@@ -17,7 +17,6 @@ library:
   ghc-options: -Wall -O2
   dependencies:
     - aeson
-    - base16-bytestring
     - blockapps-data
     - blockapps-datadefs
     - bytestring
@@ -32,6 +31,7 @@ library:
     - format
     - http-types
     - insert-ordered-containers
+    - labeled-error
     - persistent-postgresql
     - process
     - QuickCheck

@@ -28,7 +28,7 @@ data Type
   | Bool
   | Address
   | Account
-  | Label String
+  | UnknownLabel String
   | Struct { bytes::Maybe Int32, typedef::Text}
   | Enum { bytes::Maybe Int32, typedef::Text, names::Maybe [Text]}
   | Array { entry:: Type, length :: Maybe Word }

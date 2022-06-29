@@ -30,7 +30,6 @@ import           Data.IORef
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Maybe (fromMaybe, listToMaybe)
-import qualified Data.Text as T
 import           Data.Vector (Vector)
 import qualified Data.Vector as V
 import           Data.Word
@@ -44,9 +43,9 @@ import           Blockchain.Strato.Model.Address
 
 
 import qualified SolidVM.Model.CodeCollection            as CC
+import           SolidVM.Model.SolidString
 import qualified SolidVM.Model.Storable                  as MS
 import qualified SolidVM.Model.Type                      as SVMType
-
 
 
 data IndexType = ArrayIndex | MapBoolIndex | MapAccountIndex | MapIntIndex | MapStringIndex deriving (Show, Eq)
@@ -100,21 +99,21 @@ data Value =
   | SBool Bool
   | SAccount NamedAccount Bool --isPayable
    -- This is a payable account, which means it can use .transfer() , .send() , .call() , .delegatecall() and .staticcall()
-  | SEnum String
-  | SEnumVal String String Word32
-  | SStructDef String
-  | SStruct String (Map String Variable)
+  | SEnum SolidString
+  | SEnumVal SolidString SolidString Word32
+  | SStructDef SolidString
+  | SStruct SolidString (Map SolidString Variable)
   | STuple (Vector Variable)
   | SArray SVMType.Type (Vector Variable)
   | SMap SVMType.Type (Map Value Variable)
-  | SFunction String CC.Func
-  | SBuiltinFunction String (Maybe Value)
-  | SBuiltinVariable String
+  | SFunction SolidString CC.Func
+  | SBuiltinFunction SolidString (Maybe Value)
+  | SBuiltinVariable SolidString
   | SSetterGetter String (Maybe Value)
-  | SContractDef String
-  | SContractItem NamedAccount String
-  | SContract String NamedAccount
-  | SContractFunction (Maybe String) NamedAccount String -- contractName, address, functionName
+  | SContractDef SolidString
+  | SContractItem NamedAccount SolidString
+  | SContract SolidString NamedAccount
+  | SContractFunction (Maybe SolidString) NamedAccount SolidString -- contractName, address, functionName
   | SPush Value (Maybe Variable)-- The array function
   -- | SSend Value (Maybe Variable) 
   -- | STransfer Value (Maybe Variable) 
@@ -189,7 +188,7 @@ coerceType ct xt = \case
     SString s -> case xt of
       SVMType.String{} -> SString s
       SVMType.Bytes{} -> case B16.decode (BC.pack s) of
-                        (bs, "") -> SString . BC.unpack $ B.takeWhile (/=0) bs
+                        Right bs -> SString . BC.unpack $ B.takeWhile (/=0) bs
                         _ -> SString s
       _ -> typeError "string literal must be string or bytes" (xt, s)
     v -> v
@@ -226,7 +225,7 @@ defaultValue _ (SVMType.Address _) = (SAccount $ unspecifiedChain (Address 0)) F
 defaultValue _ (SVMType.Account _) = (SAccount $ unspecifiedChain (Address 0)) False
 defaultValue _ (SVMType.String _) = SString ""
 defaultValue _ (SVMType.Bytes _ _) = SString ""
-defaultValue ctract (SVMType.Label name) = fromMaybe (SContract name $ unspecifiedChain 0x0) $ asum
+defaultValue ctract (SVMType.UnknownLabel name) = fromMaybe (SContract name $ unspecifiedChain 0x0) $ asum
   [ do
       ns <- M.lookup name $ CC._enums ctract
       val <- listToMaybe $ fst ns
@@ -235,7 +234,7 @@ defaultValue ctract (SVMType.Label name) = fromMaybe (SContract name $ unspecifi
     sdef' <- M.lookup name $ CC._structs ctract
     let initializeField = Constant . defaultValue ctract . CC.fieldTypeType
         sdef = (\(a,b,_) -> (a,b)) <$> sdef'
-    return . SStruct name . M.map initializeField . M.mapKeys T.unpack . M.fromList $ sdef
+    return . SStruct name . M.map initializeField . M.fromList $ sdef
   ]
 
 defaultValue _ x = todo "defaultValue" x
@@ -250,7 +249,7 @@ createDefaultValue _ (SVMType.Address _) = return $ (SAccount $ unspecifiedChain
 createDefaultValue _ (SVMType.Account _) = return $ (SAccount $ unspecifiedChain (Address 0)) False
 createDefaultValue _ (SVMType.String _) = return $ SString ""
 createDefaultValue _ (SVMType.Bytes _ _) = return $ SString ""
-createDefaultValue ctract (SVMType.Label name) =
+createDefaultValue ctract (SVMType.UnknownLabel name) =
   case (M.lookup name $ CC._enums ctract, M.lookup name $ CC._structs ctract) of
     (Just ((val:_), _), _) -> return $ SEnumVal name val 0x0
     (Nothing, Just sdef) -> do
@@ -258,7 +257,7 @@ createDefaultValue ctract (SVMType.Label name) =
         forM sdef $ \(n, itemType, _) -> do
           itemVal <- createDefaultValue ctract $ CC.fieldTypeType itemType
           itemVar <- createVar itemVal
-          return (T.unpack n, itemVar)
+          return (n, itemVar)
       return $ SStruct name $ M.fromList items
     _ -> return $ SContract name (unspecifiedChain 0x0)
 
@@ -277,11 +276,11 @@ castToInt (SInteger i) = i
 castToInt s = typeError "castToInt" s
 -}
 
--- Typos are the possible values that a CC.Label
+-- Typos are the possible values that a CC.UnknownLabel
 -- is able to resolve to
-data Typo = StructTypo [(T.Text, CC.FieldType)]
-          | EnumTypo [String]
-          | ContractTypo String
+data Typo = StructTypo [(SolidString, CC.FieldType)]
+          | EnumTypo [SolidString]
+          | ContractTypo SolidString
           deriving (Show)
 
 -- BasicTypes are approximately what can be stored, but more exactly
@@ -289,13 +288,13 @@ data Typo = StructTypo [(T.Text, CC.FieldType)]
 -- Even though structs cannot be stored directly, the operator=
 -- simulates their appearance by retrieving theh individual fields.
 data BasicType = TInteger | TString | TBool | TAccount
-               | TEnumVal String | TContract String
-               | TStruct String [(B.ByteString, BasicType)]
+               | TEnumVal SolidString | TContract SolidString
+               | TStruct SolidString [(B.ByteString, BasicType)]
                | TComplex
                | Todo String
                deriving (Show, Eq)
 
 -- Evaluated ArgLists
 data ValList = OrderedVals [Value]
-             | NamedVals [(String, Value)]
+             | NamedVals [(SolidString, Value)]
              deriving (Show, Eq)

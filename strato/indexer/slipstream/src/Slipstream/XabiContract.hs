@@ -6,11 +6,13 @@ module Slipstream.XabiContract (
   ) where
 
 
-
+import qualified Data.Map as M
 import Data.Source.Annotation
 import Data.Source.Position
 import qualified BlockApps.Solidity.Xabi      as OLDXABI
 import qualified BlockApps.Solidity.Xabi.Type as OLDXABI
+
+import SolidVM.Model.SolidString
 
 import SelectAccessible                         ()
 
@@ -27,10 +29,10 @@ xabiToPartialContract xabi =
     _contractName=error "_contractName undefined",
     _parents=error "_parents undefined",
     _constants=error "_constants undefined",
-    _storageDefs=fmap varTypeToVariableDecl $ OLDXABI.xabiVars xabi,
+    _storageDefs=M.mapKeys textToLabel $ fmap varTypeToVariableDecl $ OLDXABI.xabiVars xabi,
     _enums=error "_enums undefined",
     _structs=error "_structs undefined",
-    _events=fmap evmEventToEvent $ OLDXABI.xabiEvents xabi,
+    _events=M.mapKeys textToLabel $ fmap evmEventToEvent $ OLDXABI.xabiEvents xabi,
     _functions=error "_functions undefined",
     _constructor=error "_constructor undefined",
     _vmVersion=error "_vmVersion undefined",
@@ -57,11 +59,11 @@ evmTypeToType (OLDXABI.Bytes x y) = SVMType.Bytes x y
 evmTypeToType OLDXABI.Bool = SVMType.Bool
 evmTypeToType OLDXABI.Address = SVMType.Address False
 evmTypeToType OLDXABI.Account = SVMType.Account False
-evmTypeToType (OLDXABI.Label x) = SVMType.Label x
-evmTypeToType (OLDXABI.Struct x y) = SVMType.Struct x y
-evmTypeToType (OLDXABI.Enum x y z) = SVMType.Enum x y z
+evmTypeToType (OLDXABI.UnknownLabel x) = SVMType.UnknownLabel $ stringToLabel x
+evmTypeToType (OLDXABI.Struct x y) = SVMType.Struct x $ textToLabel y
+evmTypeToType (OLDXABI.Enum x y z) = SVMType.Enum x (textToLabel y) $ fmap (map textToLabel) z
 evmTypeToType (OLDXABI.Array x y) = SVMType.Array (evmTypeToType x) y
-evmTypeToType (OLDXABI.Contract x) = SVMType.Contract x
+evmTypeToType (OLDXABI.Contract x) = SVMType.Contract $ textToLabel x
 evmTypeToType (OLDXABI.Mapping x y z) = SVMType.Mapping x (evmTypeToType y) (evmTypeToType z)
 
 varTypeToVariableDecl :: OLDXABI.VarType -> VariableDeclF (SourceAnnotation ())

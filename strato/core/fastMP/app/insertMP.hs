@@ -4,7 +4,6 @@
 --import Control.Monad.IO.Class
 import Control.Monad.Change.Alter
 import Control.Monad.Trans.Reader
-import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.NibbleString as N
 import qualified Database.LevelDB as LDB
@@ -12,6 +11,7 @@ import qualified Database.LevelDB as LDB
 import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
+import qualified LabeledError
 import Text.Format
 
 import FastMP()
@@ -34,7 +34,7 @@ insertKVs sr (x:rest) = do
 main :: IO ()
 main = do
   c <- fmap (map BC.words . BC.lines) $ BC.getContents
-  let input = map (\[x, y] -> KV (map c2n $ BC.unpack x) $ Right (RLPString . fst . B16.decode $ y)) c
+  let input = map (\[x, y] -> KV (map c2n $ BC.unpack x) $ Right (RLPString . LabeledError.b16Decode "insertMP.hs" $ y)) c
 
   sr'  <- LDB.runResourceT $ do
     ldb <- LDB.open "abcd" LDB.defaultOptions{LDB.createIfMissing=True}

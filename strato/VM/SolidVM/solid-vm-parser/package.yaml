@@ -1,0 +1,59 @@
+name: solid-vm-parser
+
+dependencies:
+  - base
+
+library:
+  source-dirs: src/
+  exposed-modules:
+    - SolidVM.Solidity.Parse.File
+    - SolidVM.Solidity.Parse.Lexer
+    - SolidVM.Solidity.Parse.Statement
+    - SolidVM.Solidity.Parse.Pragmas
+    - SolidVM.Solidity.Parse.ParserTypes
+    - SolidVM.Solidity.Parse.UnParser
+    - SolidVM.Solidity.Parse.Declarations
+    - SolidVM.Solidity.Xabi
+  ghc-options: -Wall -O2
+  dependencies:
+  - aeson
+  - aeson-casing
+  - bytestring
+  - containers
+  - extra
+  - generic-random
+  - lens
+  - parsec
+  - QuickCheck
+  - quickcheck-instances
+  - semver-range
+  - solid-vm-model
+  - source-tools
+  - swagger2
+  - text
+
+
+executables:
+  parse-solidvm:
+    source-dirs: exec_src
+    other-modules: []
+    main: Parse.hs
+    dependencies:
+      - parsec
+      - solid-vm-parser
+    ghc-options: -Wall -O2 -threaded -rtsopts
+
+tests:
+  solid-vm-spec:
+    source-dirs: tests/
+    main: Main.hs
+    dependencies:
+      - hflags
+      - hspec
+      - HUnit
+      - parsec
+      - raw-strings-qq
+      - solid-vm-model
+      - solid-vm-parser
+      - source-tools
+      - vm-tools

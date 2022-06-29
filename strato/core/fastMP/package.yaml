@@ -25,8 +25,6 @@ library:
     - ansi-wl-pprint
     - common-log
     - conduit
-    - containers
-    - data-default
     - monad-alter
     - monad-loops
     - strato-model
@@ -50,6 +48,7 @@ executables:
     dependencies:
       - conduit
       - fastMP
+      - labeled-error
       - monad-alter
       - transformers
     ghc-options:
@@ -63,6 +62,7 @@ executables:
     dependencies:
       - conduit
       - fastMP
+      - labeled-error
     ghc-options:
     - -threaded
     - -rtsopts

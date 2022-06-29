@@ -41,9 +41,10 @@ import           Blockchain.Strato.Model.Keccak256
 
 import           SolidVM.CodeCollectionTools
 import           SolidVM.Model.CodeCollection
+import           SolidVM.Model.SolidString
 import           SolidVM.Solidity.Parse.Declarations
 import           SolidVM.Solidity.Parse.File
-import           SolidVM.Solidity.Detectors.Typechecker as TC
+import           SolidVM.Solidity.StaticAnalysis.Typechecker as TC
 
 data ParseTypeCheckOrSolidVMError = PEx ParseError
                          | TCEx [SourceAnnotation T.Text]
@@ -67,7 +68,8 @@ parseSourceWithAnnotations = withAnnotations . parseSource
 
 compileSourceNoInheritance :: Map T.Text T.Text -> Either ParseTypeCheckOrSolidVMError CodeCollection
 compileSourceNoInheritance initCodeMap = do
-  let getNamedContracts fileName src = do
+  let getNamedContracts :: T.Text -> T.Text -> Either ParseTypeCheckOrSolidVMError [(SolidString, Contract)]
+      getNamedContracts fileName src = do
         sourceUnits <- parseSource fileName src
         let pragmas = \case
               Pragma _ n v -> Just (n, v)
@@ -76,16 +78,19 @@ compileSourceNoInheritance initCodeMap = do
         fmap catMaybes . for sourceUnits $ \case
           NamedXabi name (xabi, parents') -> do
             ctrct <- first SVMEx
-                   $ xabiToContract (T.unpack name) (map T.unpack parents') vmVersion' xabi
-            pure $ Just (T.unpack name, ctrct)
+                   $ xabiToContract (textToLabel name) (map textToLabel parents') vmVersion' xabi
+            pure $ Just (textToLabel name, ctrct)
           _ -> pure Nothing
+
+      throwDuplicate :: (SolidString, Contract) -> Map SolidString Contract -> Either ParseTypeCheckOrSolidVMError (Map SolidString Contract)
       throwDuplicate (cName, contract) m = case M.lookup cName m of
         Nothing -> pure $ M.insert cName contract m
         Just _ ->  Left . PEx
-                 $ newErrorMessage (Message $ "Duplicate contract found: " ++ cName)
+                 $ newErrorMessage (Message $ "Duplicate contract found: " ++ labelToString cName)
                                    (fromSourcePosition $ _sourceAnnotationStart $ _contractContext contract)
+                                           
   allContracts <- fmap concat . traverse (uncurry getNamedContracts) $ M.toList initCodeMap
-  deduplicatedContracts <- foldrM throwDuplicate M.empty allContracts
+  deduplicatedContracts <- foldrM throwDuplicate M.empty (allContracts :: [(SolidString, Contract)])
   pure $ CodeCollection {
     _contracts = deduplicatedContracts
   }

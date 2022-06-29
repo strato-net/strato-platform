@@ -60,11 +60,12 @@ import           Slipstream.Options
 import           Slipstream.SolidityValue
 
 import           SolidVM.Model.CodeCollection              hiding (contractName, contracts, events)
+import           SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type         as SVMType
 
 
 crashOnSQLError :: Bool
-crashOnSQLError = True
+crashOnSQLError = False
 
 
 tableSeparator :: Text
@@ -285,8 +286,8 @@ getDeferredForeignKeys tableName c o a =
   flip map [(theName, x) | (theName, VariableDecl{varType=SVMType.Contract x}) <- (Map.toList $ c^.storageDefs)] $ \(theName, x) -> 
     ForeignKeyInfo {
       tableName=tableName,
-      columnName=theName,
-      foreignTableName=indexTableName o a x
+      columnName=labelToText theName,
+      foreignTableName=indexTableName o a $ labelToText x
       }
 
 createIndexTable :: OutputM m
@@ -305,7 +306,7 @@ createIndexTable globalsIORef contract (o, a, n) = do
   else do
     incNumTables
     yield $ createIndexTableQuery contract (o, a, n)
-    let list = tableColumns $ Map.toList $ contract^.storageDefs
+    let list = tableColumns $ map (\(x, y) -> (labelToText x, y)) $ Map.toList $ contract^.storageDefs
     setTableCreated globalsIORef tableName list
     return $ getDeferredForeignKeys tableName contract o a
 
@@ -324,7 +325,7 @@ createHistoryTable globalsIORef contract (o, a, n) = do
     incNumHistoryTables
     yield $ createHistoryTableQuery contract (o, a, n)
     yieldMany $ addHistoryUnique (o, a, n)
-    let list = tableColumns $ Map.toList $ contract^.storageDefs
+    let list = tableColumns $ map (\(x, y) -> (labelToText x, y)) $ Map.toList $ contract^.storageDefs
     setTableCreated globalsIORef tableName list
 
 
@@ -364,7 +365,7 @@ expandContractTable globalsIORef contract tableName = do
           ]
       return []
     Just cols -> do
-      let list = Map.toList $ contract^.storageDefs
+      let list = Map.toList $ Map.mapKeys labelToText $ contract^.storageDefs
           difference new old = filter ((`notElem` old) . fst) new
           extras = difference list (partialParseTableColumns cols)
           extraTableColumns = tableColumns extras
@@ -387,7 +388,7 @@ expandContractTable globalsIORef contract tableName = do
               tableName = tableName,
               columnName = colName,
               foreignTableName = let a' = case a of; "" -> n; _ -> a
-                                 in indexTableName o a' foreignName
+                                 in indexTableName o a' $ labelToText foreignName
               }
           _ -> []
         
@@ -464,7 +465,7 @@ createIndexTableQuery contract (o, a, n) =
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
         , csv $ ["record_id text", "address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
-               "block_number text", "transaction_hash text", "transaction_sender text"] ++ tableColumns list
+               "block_number text", "transaction_hash text", "transaction_sender text"] ++ tableColumns (map (\(x, y) -> (labelToText x, y)) list)
         , ",\n  PRIMARY KEY (record_id) );"
         ]
 
@@ -476,7 +477,7 @@ createHistoryTableQuery contract (o, a, n) =
         [ "CREATE TABLE IF NOT EXISTS ", tableNameToDoubleQuoteText tableName, " ("
         , csv $ ["record_id text", "address text NOT NULL", "\"chainId\" text NOT NULL", "block_hash text NOT NULL", "block_timestamp text",
                  "block_number text", "transaction_hash text NOT NULL", "transaction_sender text"]
-                 ++ tableColumns list
+                 ++ tableColumns (map (\(x, y) -> (labelToText x, y)) list)
         , ");"
         ]
 
@@ -730,8 +731,8 @@ solidityTypeToSQLType VariableDecl{varType=SVMType.Address _} = Just "text"
 solidityTypeToSQLType VariableDecl{varType=SVMType.Account _} = Just "text"
 solidityTypeToSQLType VariableDecl{varType=SVMType.Array _ _} = Nothing -- Just "jsonb"
 solidityTypeToSQLType VariableDecl{varType=SVMType.Mapping _ _ _} = Nothing -- Just "jsonb"
-solidityTypeToSQLType VariableDecl{varType=SVMType.Label _} = Just "text"
---solidityTypeToSQLType VariableDecl{varType=SVMType.Label x} = Just $ "text references " <> T.pack x <> "(id)"
+solidityTypeToSQLType VariableDecl{varType=SVMType.UnknownLabel _} = Just "text"
+--solidityTypeToSQLType VariableDecl{varType=SVMType.UnknownLabel x} = Just $ "text references " <> T.pack x <> "(id)"
 solidityTypeToSQLType VariableDecl{varType=SVMType.Struct _ _} = Just "jsonb"
 solidityTypeToSQLType VariableDecl{varType=SVMType.Enum _ _ _} = Just "text"
 solidityTypeToSQLType VariableDecl{varType=SVMType.Contract _} = Just "text"

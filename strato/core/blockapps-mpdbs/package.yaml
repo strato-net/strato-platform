@@ -69,5 +69,4 @@ tests:
       - transformers
       - unix
       - unliftio
-      - vm-tools
     ghc-options: -Wall -Werror -threaded -rtsopts -with-rtsopts=-N

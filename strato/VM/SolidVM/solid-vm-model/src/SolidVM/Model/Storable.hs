@@ -14,12 +14,10 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Internal as BI
 import qualified Data.ByteString.Unsafe as BU
 import qualified Data.ByteString.Char8 as C8
-import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.UTF8   as UTF8
 import           Data.Char
 import           Data.Hashable
 import           Data.Scientific (isInteger, toBoundedInteger)
-import qualified Data.Text as T
 import           Foreign.Ptr
 import           Foreign.Storable
 import           GHC.Generics
@@ -30,14 +28,16 @@ import           Blockchain.SolidVM.Model
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
+import qualified LabeledError
+import           SolidVM.Model.SolidString
 import           Text.Format
 
 data BasicValue = BInteger !Integer
                 | BString !B.ByteString
                 | BBool !Bool
                 | BAccount !NamedAccount 
-                | BEnumVal !T.Text !T.Text !Word32
-                | BContract !T.Text !NamedAccount
+                | BEnumVal !SolidString !SolidString !Word32
+                | BContract !SolidString !NamedAccount
                   -- The sole purpose of this sentinel is to make slipstream reserve
                   -- a column for this mapping
                 | BMappingSentinel
@@ -60,8 +60,8 @@ instance Format BasicValue where
   format (BBool True) = "true"
   format (BBool False) = "false"
   format (BAccount a) = "account(" ++ show a ++ ")"
-  format (BEnumVal n1 n2 _) = T.unpack n1 ++ "." ++ T.unpack n2
-  format (BContract n a) = T.unpack n ++ "(" ++ format a ++ ")"
+  format (BEnumVal n1 n2 _) = labelToString n1 ++ "." ++ labelToString n2
+  format (BContract n a) = labelToString n ++ "(" ++ format a ++ ")"
   format BMappingSentinel = "<MappingSentinel>"
   format BDefault = "<unknown>"
 
@@ -168,7 +168,7 @@ parseMapIndex = do
       mChain <- case w82c <$> mColon of
         Just ':' -> do
           _ <- string ":"
-          (MainChain <$ string "main") <|> (ExplicitChain . bytesToWord256 . fst . B16.decode <$> Atto.take 64) <?> "parseMapIndex"
+          (MainChain <$ string "main") <|> (ExplicitChain . bytesToWord256 . LabeledError.b16Decode "parseMapIndex"  <$> Atto.take 64) <?> "parseMapIndex"
         _ -> pure UnspecifiedChain
       IAccount <$> either fail (return . flip NamedAccount mChain) eAddress
     '"' -> do

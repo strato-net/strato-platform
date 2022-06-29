@@ -35,8 +35,8 @@ import           Control.Monad.Trans.Except
 import qualified Crypto.Saltine.Class            as Saltine
 import qualified Crypto.Saltine.Core.SecretBox   as SecretBox
 import           Data.Aeson                      (Result(..), fromJSON)
-import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString                 as B
+import qualified Data.ByteString.Char8           as BC
 import qualified Data.Cache                      as Cache
 import           Data.Either                     (fromRight)
 import           Data.Foldable                   (for_)
@@ -50,10 +50,13 @@ import           Data.Text                       (Text)
 import qualified Data.Text                       as Text
 import qualified Data.Text.Encoding              as Text
 import           Data.Traversable                (for)
-import           Opaleye                         hiding (not, null, index)
+import           Database.PostgreSQL.Simple.FromField hiding (name, format)
+import           Opaleye                         hiding (not, null, index, FromField)
 import           System.Clock
 import           Text.Format
 import           UnliftIO
+
+
 
 import           BlockApps.Bloc22.API.AbiBin     (AbiBin(..))
 import           BlockApps.Bloc22.API.Utils
@@ -82,8 +85,8 @@ contractBySourceHash
   => Keccak256
   -> m (Maybe SourceMap)
 contractBySourceHash srcHash = fmap (fmap deserializeSourceMap . listToMaybe) . blocQuery $ proc () -> do
-  (_,sh,src) <- queryTable contractsSourceTable -< ()
-  restrict -< sh .== constant srcHash
+  (_,sh,src) <- selectTable contractsSourceTable -< ()
+  restrict -< sh .== toFields srcHash
   returnA -< (src)
 
 insertContractSourceQuery
@@ -94,19 +97,24 @@ insertContractSourceQuery
 insertContractSourceQuery srcHash src' = do
   let src = serializeSourceMap src'
   void . blocModify $ \ conn ->
-    runInsertMany conn contractsSourceTable [
+    runInsert_ conn $ Insert {
+    iTable=contractsSourceTable,
+    iRows=[
       ( Nothing
-      , constant srcHash
-      , constant src
-      )]
+      , toFields srcHash
+      , toFields src
+      )],
+    iReturning=rCount,
+    iOnConflict=Nothing
+    }
 
 evmContractByCodeHash
   :: (MonadLogger m, HasBlocSQL m)
   => Keccak256
   -> m [(Text, Keccak256)]
 evmContractByCodeHash codeHash = blocQuery $ proc () -> do
-  (_,ch,name,sh) <- queryTable evmContractNameTable -< ()
-  restrict -< ch .== constant codeHash
+  (_,ch,name,sh) <- selectTable evmContractNameTable -< ()
+  restrict -< ch .== toFields codeHash
   returnA -< (name,sh)
 
 evmCodeHashByName
@@ -114,8 +122,8 @@ evmCodeHashByName
   => Text
   -> m [Keccak256]
 evmCodeHashByName cName = blocQuery $ proc () -> do
-  (_,ch,name,_) <- queryTable evmContractNameTable -< ()
-  restrict -< name .== constant cName
+  (_,ch,name,_) <- selectTable evmContractNameTable -< ()
+  restrict -< name .== toFields cName
   returnA -< ch
 
 insertEvmContractNameQuery
@@ -126,12 +134,17 @@ insertEvmContractNameQuery
   -> m ()
 insertEvmContractNameQuery codeHash cName srcHash = do
   void . blocModify $ \ conn ->
-    runInsertMany conn evmContractNameTable [
+    runInsert_ conn $ Insert {
+    iTable=evmContractNameTable,
+    iRows=[
       ( Nothing
-      , constant codeHash
-      , constant cName
-      , constant srcHash
-      )]
+      , toFields codeHash
+      , toFields cName
+      , toFields srcHash
+      )],
+    iReturning=rCount,
+    iOnConflict=Nothing
+    }
 
 insertContractDetailsQuery 
   :: (A.Alters Keccak256 SourceMap m)
@@ -155,12 +168,12 @@ getContractDetailsByCodeHash :: ( A.Selectable Account AddressState m
                              => CodePtr -> m (Either Text ContractDetails)
 getContractDetailsByCodeHash codePtr = do
   srcCache <- fmap globalCodePtrCache getBlocEnv
-  now <- liftIO $ getTime Monotonic
-  let later = (now +) <$> Cache.defaultExpiration srcCache
+  now' <- liftIO $ getTime Monotonic
+  let later = (now' +) <$> Cache.defaultExpiration srcCache
   mCachedDetails <- atomically $ do
-    Cache.purgeExpiredSTM srcCache now -- todo: this should probably go somewhere else, like a worker thread,
+    Cache.purgeExpiredSTM srcCache now' -- todo: this should probably go somewhere else, like a worker thread,
                                        --       but we need this to prevent the cache growing unboundedly
-    r <- Cache.lookupSTM True codePtr srcCache now
+    r <- Cache.lookupSTM True codePtr srcCache now'
     for_ r $ \v -> Cache.insertSTM codePtr v srcCache later -- refresh to timestamp of this item
     pure r
 
@@ -212,12 +225,12 @@ getContractDetailsForContract theVM src mContract = do
   let shouldCompile = if theVM == "EVM" then Do Compile else Don't Compile
       cacheKey = (theVM, src)
   srcCache <- fmap globalSourceCache getBlocEnv
-  now <- liftIO $ getTime Monotonic
-  let later = (now +) <$> Cache.defaultExpiration srcCache
+  now' <- liftIO $ getTime Monotonic
+  let later = (now' +) <$> Cache.defaultExpiration srcCache
   mCachedDetails <- atomically $ do
-    Cache.purgeExpiredSTM srcCache now -- todo: this should probably go somewhere else, like a worker thread,
+    Cache.purgeExpiredSTM srcCache now' -- todo: this should probably go somewhere else, like a worker thread,
                                        --       but we need this to prevent the cache growing unboundedly
-    r <- Cache.lookupSTM True cacheKey srcCache now
+    r <- Cache.lookupSTM True cacheKey srcCache now'
     for_ r $ \v -> Cache.insertSTM cacheKey v srcCache later -- refresh to timestamp of this item
     pure r
 
@@ -330,69 +343,74 @@ createMetadataNoCompile sourceList = do
   A.insert (A.Proxy @SourceMap) srcHash sourceList
   pure details
 
-instance QueryRunnerColumnDefault PGBytea Address where
-  queryRunnerColumnDefault = queryRunnerColumn id
-    (Address . bytesToWord160 . B.unpack)
-    queryRunnerColumnDefault
-instance Default Constant Address (Column PGBytea) where
+instance DefaultFromField PGBytea Address where
+  defaultFromField = fromPGSFromField
+
+instance FromField Address where
+  fromField f mdata = do
+    theByteString <- fromField f mdata
+    return $ Address $ bytesToWord160 $ B.unpack theByteString
+
+instance Default ToFields Address (Column PGBytea) where
   def = lmap getBytes def
     where
       getBytes (Address x) = B.pack . word160ToBytes $ x
 
-instance QueryRunnerColumnDefault PGBytea SecretBox.Nonce where
-  queryRunnerColumnDefault = queryRunnerColumn id
-    (fromMaybe (error "could not decode nonce") . Saltine.decode)
-    queryRunnerColumnDefault
-instance Default Constant SecretBox.Nonce (Column PGBytea) where
+instance DefaultFromField PGBytea SecretBox.Nonce where
+  defaultFromField = fromPGSFromField
+
+instance FromField SecretBox.Nonce where
+  fromField f mdata = do
+    theByteString <- fromField f mdata
+    return $ fromMaybe (error $ "could not decode address: " ++ show theByteString) $ Saltine.decode theByteString
+
+instance Default ToFields SecretBox.Nonce (Column PGBytea) where
   def = lmap Saltine.encode def
-instance Default Constant UserName (Column PGText) where
+instance Default ToFields UserName (Column PGText) where
   def = lmap getUserName def
 
-instance Default Constant StateMutability (Column PGText) where
+instance Default ToFields StateMutability (Column PGText) where
   def = lmap tShow def
 
-instance QueryRunnerColumnDefault PGText StateMutability where
-  queryRunnerColumnDefault = queryRunnerColumn id
-    (fromMaybe (error "could not decode mutability") . tRead)
-    queryRunnerColumnDefault
+instance DefaultFromField PGText StateMutability where
+  defaultFromField = fromPGSFromField
 
-instance QueryRunnerColumnDefault PGBytea Keccak256 where
-  queryRunnerColumnDefault =
-    queryRunnerColumn id toKecc queryRunnerColumnDefault
-    where
-      toKecc :: ByteString -> Keccak256
-      toKecc
-        = unsafeCreateKeccak256FromByteString
+instance FromField StateMutability where
+  fromField f mdata = do
+    theByteString <- fromField f mdata
+    return $ fromMaybe (error $ "could not decode mutability: " ++ show theByteString) $ tRead $ Text.pack $ BC.unpack theByteString
 
-instance Default Constant Keccak256 (Column PGBytea) where
+instance DefaultFromField PGBytea Keccak256 where
+  defaultFromField = fromPGSFromField
+
+instance FromField Keccak256 where
+  fromField f mdata = do
+    theByteString <- fromField f mdata
+    return $ unsafeCreateKeccak256FromByteString theByteString
+
+instance Default ToFields Keccak256 (Column PGBytea) where
   def = lmap keccak256ToByteString def
 
-instance QueryRunnerColumnDefault PGBytea CodePtr where
-  queryRunnerColumnDefault =
-    queryRunnerColumn id toCodePtr queryRunnerColumnDefault
-    where
-      toCodePtr :: ByteString -> CodePtr
-      toCodePtr
-        = fromRight (error "could not decode CodePtr")
-        . rlpDeserialize
+instance DefaultFromField PGBytea CodePtr where
+  defaultFromField = fromPGSFromField
 
-instance Default Constant CodePtr (Column PGBytea) where
+instance FromField CodePtr where
+  fromField f mdata = do
+    theByteString <- fromField f mdata
+    return $ fromRight (error $ "could not decode CodePtr: " ++ show theByteString) $ rlpDeserialize theByteString
+
+instance Default ToFields CodePtr (Column PGBytea) where
   def = lmap rlpSerialize def
 
-instance QueryRunnerColumnDefault PGBytea (Maybe ChainId) where
-  queryRunnerColumnDefault =
-    queryRunnerColumn id toChainId queryRunnerColumnDefault
-    where
-      toChainId :: ByteString -> Maybe ChainId
-      toChainId bs
-        = if B.null bs
-            then Nothing
-            else Just
-               . ChainId
-               . byteStringToWord256
-               $ bs
+instance DefaultFromField PGBytea (Maybe ChainId) where
+  defaultFromField = fromPGSFromField
 
-instance Default Constant (Maybe ChainId) (Column PGBytea) where
+instance FromField ChainId where
+  fromField f mdata = do
+    theByteString <- fromField f mdata
+    return $ ChainId $ byteStringToWord256 theByteString
+
+instance Default ToFields (Maybe ChainId) (Column PGBytea) where
   def = lmap fromChainId def
         where fromChainId = \case
                 Nothing -> B.empty

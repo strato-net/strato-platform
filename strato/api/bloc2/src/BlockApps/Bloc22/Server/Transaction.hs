@@ -55,7 +55,7 @@ import qualified Data.Text                         as Text
 import qualified Data.Text.Encoding                as Text
 import           Data.Time.Clock
 import           Data.Word
-import qualified Database.Esqueleto                as E
+import qualified Database.Esqueleto.Legacy                as E
 import qualified Blockchain.DB.SQLDB               as SQLDB
 import           System.Clock
 import           UnliftIO
@@ -486,10 +486,14 @@ postUsersContractEVM' cacheNonce ContractParameters{..} userName = blocTransacti
   (cName,ContractDetails{..}) <- getContractDetailsForContract "EVM" src contract >>= \case
     Nothing -> throwIO $ UserError "You need to supply at least one contract in the source"
     Just x -> pure x
-  let
-    (bin,leftOver) = Base16.decode $ Text.encodeUtf8 contractdetailsBin
-    metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("src", serializeSourceMap contractdetailsSrc),("name", cName)]
-  unless (ByteString.null leftOver) $ throwIO $ AnError "Couldn't decode binary"
+
+  bin <-
+    case Base16.decode $ Text.encodeUtf8 contractdetailsBin of
+      Right val -> return val
+      _ -> throwIO $ AnError "Couldn't decode binary"
+
+  let metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("src", serializeSourceMap contractdetailsSrc),("name", cName)]
+  
   let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi
   argsBin <- constructArgValues args xabiArgs
   tx <- signAndPrepare userName fromAddr metadata' $
@@ -613,8 +617,11 @@ postUsersUploadListEVM' cacheNonce ContractListParameters{..} userName = do
       let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi
       argsBin <- lift $ constructArgValues (Just args) xabiArgs
       let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("src", serializeSourceMap src),("name",name)]
-          (bin,leftOver) = Base16.decode $ Text.encodeUtf8 contractdetailsBin
-      unless (ByteString.null leftOver) $ throwIO $ AnError "Couldn't decode binary"
+      bin <-
+        case Base16.decode $ Text.encodeUtf8 contractdetailsBin of
+          Right val -> return val
+          _ -> throwIO $ AnError "Couldn't decode binary"
+
       tx <- lift . signAndPrepare userName fromAddr metadata' $
           TransactionHeader
             Nothing
@@ -998,10 +1005,10 @@ getSolidityType _  Xabi.Account            = Right . SimpleType $ TypeAccount
 getSolidityType _ (Xabi.Struct _ name)     = Right $ TypeStruct name
 getSolidityType _ (Xabi.Enum _ name _)     = Right $ TypeEnum name
 getSolidityType _ (Xabi.Contract name)     = Right $ TypeContract name
-getSolidityType (ArgInt _) (Xabi.Label _)  = Right $ SimpleType typeUInt -- since Enums are converted to Ints
-getSolidityType (ArgString _) (Xabi.Label s)  = Right $ TypeEnum $ Text.pack s
-getSolidityType (ArgObject _) (Xabi.Label s)  = Right $ TypeStruct $ Text.pack s --interpret an object strictly as a struct
-getSolidityType av (Xabi.Label _)             = Left $ Text.pack $ "Expected a string, int, or object, but recieved: " ++ show av
+getSolidityType (ArgInt _) (Xabi.UnknownLabel _)  = Right $ SimpleType typeUInt -- since Enums are converted to Ints
+getSolidityType (ArgString _) (Xabi.UnknownLabel s)  = Right $ TypeEnum $ Text.pack s
+getSolidityType (ArgObject _) (Xabi.UnknownLabel s)  = Right $ TypeStruct $ Text.pack s --interpret an object strictly as a struct
+getSolidityType av (Xabi.UnknownLabel _)             = Left $ Text.pack $ "Expected a string, int, or object, but recieved: " ++ show av
 getSolidityType (ArgArray v) (Xabi.Array typ len)     = 
   let arrType = case len of
         Just l -> TypeArrayFixed l

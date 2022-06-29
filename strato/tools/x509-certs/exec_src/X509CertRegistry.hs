@@ -89,7 +89,7 @@ entryPoint (Options privPath certPath nonce) = do
             -- setup servant client
             mgr <- newManager defaultManagerSettings
             stratoURL <- parseBaseUrl "http://strato:3000/bloc/v2.2"
-            let clientEnv = ClientEnv mgr stratoURL Nothing
+            let clientEnv = mkClientEnv mgr stratoURL
 
             -- post it
             result <- runClientM (postRawTransaction Nothing Nothing True request) clientEnv
@@ -186,7 +186,7 @@ contract Certificate {
     string commonName;
     string country;
     string organization;
-    string group;
+    string organizationalUnit;
     string publicKey;
     string certificateString;
 
@@ -198,7 +198,7 @@ contract Certificate {
         certificateHolder = account(parsedCert["userAddress"]);
         commonName = parsedCert["commonName"];
         organization = parsedCert["organization"];
-        group = parsedCert["group"];
+        organizationalUnit = parsedCert["organizationalUnit"];
         country = parsedCert["country"];
         publicKey = parsedCert["publicKey"];
         certificateString = parsedCert["certString"];

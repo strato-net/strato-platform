@@ -42,7 +42,7 @@ instance ToHttpApiData HexStorage where
 
 instance FromHttpApiData HexStorage where
   parseQueryParam t = case B16.decode (encodeUtf8 t) of
-    (hs, "") -> pure $ HexStorage hs
+    Right hs -> pure $ HexStorage hs
     _ -> Left $ "non-hex string passed off as hex: " `T.append` t
 
 instance ToSchema HexStorage where
@@ -53,7 +53,7 @@ instance ToJSON HexStorage where
 
 instance FromJSON HexStorage where
   parseJSON (String t) = case B16.decode (encodeUtf8 t) of
-    (hs, "") -> return $ HexStorage hs
+    Right hs -> return $ HexStorage hs
     _ -> fail $ "non-hex string passed off as hex: " ++ show t
   parseJSON x = typeMismatch "HexStorage" x
 

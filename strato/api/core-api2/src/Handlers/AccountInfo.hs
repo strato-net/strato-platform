@@ -16,13 +16,12 @@ module Handlers.AccountInfo where
 
 import           Control.Monad.Change.Alter
 import           Control.Lens
-import           Data.ByteString.Base16      as B16
 import qualified Data.ByteString.Char8       as BC
 import           Data.List
 import           Data.Maybe
 import           Data.Text                   (Text)
 import qualified Data.Text                   as T
-import qualified Database.Esqueleto          as E
+import qualified Database.Esqueleto.Legacy          as E
 import           Numeric.Natural
 import           Servant
 import           Servant.Client
@@ -37,6 +36,8 @@ import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Keccak256
 
 import           Control.Monad.Composable.SQL
+
+import qualified LabeledError
 
 import           Settings
 import           SQLM
@@ -228,5 +229,5 @@ accountQueryParams = [ "address",
                      ]
 
 toCode :: Text -> BC.ByteString
-toCode v = fst $ B16.decode $ BC.pack $ (T.unpack v)
+toCode v = LabeledError.b16Decode "toCode" $ BC.pack $ (T.unpack v)
 

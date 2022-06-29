@@ -9,7 +9,6 @@ library:
   dependencies:
   - monad-alter
   - mtl
-  - persistent
   - postgresql-simple
   - resource-pool
   - unliftio

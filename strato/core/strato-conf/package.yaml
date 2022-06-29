@@ -9,16 +9,12 @@ library:
   dependencies:
     - base
     - bytestring
-    - directory
-    - filepath
-    - hflags
-    - network
-    - yaml
-    - postgresql-simple
     - containers
-    - file-embed
+    - hedis
+    - hflags
     - milena
     - mtl
-    - transformers
-    - hedis
+    - postgresql-simple
     - swagger2
+    - transformers
+    - yaml

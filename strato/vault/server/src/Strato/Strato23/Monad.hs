@@ -43,8 +43,14 @@ dbErrorToUserError = flip catch $ \case
                        DBError msg -> throwIO (UserError msg)
                        err         -> throwIO err
 
-toUserError :: MonadUnliftIO m => Text -> m a -> m a
-toUserError msg = flip catch (\(_ :: SomeException) -> throwIO $ UserError msg)
+toUserError :: (MonadUnliftIO m, MonadLogger m) => Text -> m a -> m a
+toUserError msg = flip catch $ reportAndConvertError msg
+  where
+    reportAndConvertError :: (MonadIO m, MonadLogger m) =>
+                             Text -> SomeException -> m a
+    reportAndConvertError msg' e = do
+      $logErrorS "toUserError" $ Text.pack $ "Internal Error: " ++ show e
+      throwIO $ UserError msg'
 
 --prettyCallStack' is the same idea as prettyCallStack, but with formatting more suitable for out project.  In particular, package names a very mangled by stack, making prettyCallStack unreadable.
 prettyCallStack'::CallStack->String
@@ -190,7 +196,7 @@ vaultQuery
 vaultQuery q = do
   traverse_ (logDebugCS callStack . Text.pack) (showSql q)
   pool <- asks dbPool
-  withResource pool $ (\conn -> liftIO $ runQuery conn q)
+  withResource pool $ (\conn -> liftIO $ runSelect conn q)
 
 vaultQueryMaybe
   :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y)

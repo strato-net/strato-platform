@@ -32,7 +32,6 @@ library:
     - base16-bytestring
     - binary
     - bytestring-arbitrary
-    - classy-prelude
     - conduit
     - containers
     - cpu
@@ -50,12 +49,10 @@ library:
     - labeled-error
     - lens
     - memory
-    - monad-alter
     - nibblestring
     - quickcheck-instances
     - path-pieces
     - persistent
-    - persistent-template
     - primitive
     - relapse           # remove this
     - secp256k1-haskell
@@ -66,7 +63,6 @@ library:
     - text
     - time
     - transformers
-    - unordered-containers
 
 tests:
   strato-model-tests:
@@ -79,11 +75,9 @@ tests:
       - base16-bytestring
       - binary
       - cryptonite
-      - crypto-pubkey
-      - crypto-pubkey-types
-      - ethereum-encryption
       - ethereum-rlp
       - integer-gmp
+      - labeled-error
       - persistent
       - secp256k1-haskell
       - strato-model
@@ -98,8 +92,5 @@ benchmarks:
     main: Word256Bench.hs
     dependencies:
       - strato-model
-      - criterion
-
-
 
 
