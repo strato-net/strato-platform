@@ -1958,7 +1958,7 @@ callBuiltin mm@("mulmod") [SInteger a, SInteger b, SInteger c] _ = do
     else unknownFunction "callBuiltin" mm
   
 callBuiltin "blockhash" [SInteger blockNum] _ = do
-  when (blockNum<=0) (invalidArguments "Does not Exist" [blockNum])
+  when (blockNum<0) (invalidArguments "Does not Exist" [blockNum])
   env' <- getEnv
   let curBlock = Env.blockHeader env'
   maybeTheHash  <- getBlockHashWithNumber blockNum (blockDataParentHash curBlock)
