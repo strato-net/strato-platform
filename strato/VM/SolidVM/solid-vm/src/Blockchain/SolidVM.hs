@@ -14,6 +14,8 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use if" #-}
 
 module Blockchain.SolidVM
   ( SolidVMBase
@@ -1955,6 +1957,15 @@ callBuiltin mm@("mulmod") [SInteger a, SInteger b, SInteger c] _ = do
     then return . SInteger $ (a * b) `mod` c
     else unknownFunction "callBuiltin" mm
   
+callBuiltin "blockhash" [SInteger blockNum] _ = do
+  when (blockNum<=0) (invalidArguments "Does not Exist" [blockNum])
+  env' <- getEnv
+  let curBlock = Env.blockHeader env'
+  maybeTheHash  <- getBlockHashWithNumber blockNum (blockDataParentHash curBlock)
+  --theHash :: Maybe Keccak256
+  maybe (invalidArguments "the block number given does not exist" [blockNum]) (return . SString . BC.unpack . keccak256ToByteString) maybeTheHash
+            
+
 callBuiltin "account" vs _ = typeError "account cast" vs
 callBuiltin "bool" [SBool b] _ = return $ SBool b
 callBuiltin "bool" [SString "true"] _ = return $ SBool True
