@@ -181,6 +181,8 @@ contract Certificate {
     address owner;  // The CertificateRegistery Contract
 
     account certificateHolder;
+    account parent; 
+    account[] children;
 
     // Store all the fields of a certificate in a Cirrus record
     string commonName;
@@ -189,6 +191,7 @@ contract Certificate {
     string organizationalUnit;
     string publicKey;
     string certificateString;
+    bool   isValid;
 
     constructor(string _certificateString) {
         owner = msg.sender;
@@ -197,11 +200,21 @@ contract Certificate {
 
         certificateHolder = account(parsedCert["userAddress"]);
         commonName = parsedCert["commonName"];
+        country = parsedCert["country"];
         organization = parsedCert["organization"];
         organizationalUnit = parsedCert["organizationalUnit"];
-        country = parsedCert["country"];
         publicKey = parsedCert["publicKey"];
         certificateString = parsedCert["certString"];
+        isValid = true;
+        parent = account(parsedCert["parent"]);
+        if (parent != 0x0) {
+            Certificate parentContract = Certificate(parent);
+            parentContract.addChild(this);    
+        }
+    }
+
+    function addChild(account _child) {
+        children.push[_child];
     }
 }
 

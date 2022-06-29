@@ -19,6 +19,8 @@ module BlockApps.X509.Certificate (
   verifyBlockApps,
   verifyCertM,
   makeSignedCert,
+
+  getParentUserAddress,
   getCertSubject,
   getCertSubjects,
   getCertIssuer,
@@ -293,7 +295,9 @@ getValidity = do
       endDate = DateTime dt{dateYear=(dateYear dt) + 1} tm -- all certs are valid for a year
   return (curDate, endDate)
 
-
+getParentUserAddress :: X509Certificate -> Maybe Address
+getParentUserAddress (X509Certificate (CertificateChain (_:c2:_))) = fmap (fromPublicKey . subPub) (getCertSubject (X509Certificate (CertificateChain [c2])))
+getParentUserAddress _ = Nothing
 
 getCertPub :: Subject -> PubKey
 getCertPub = serializeAndWrap . subPub
