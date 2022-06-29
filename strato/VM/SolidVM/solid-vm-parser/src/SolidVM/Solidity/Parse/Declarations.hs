@@ -10,6 +10,7 @@
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 module SolidVM.Solidity.Parse.Declarations where
 
+import           Control.Monad                     (when)
 import           Data.List
 import qualified Data.Map as Map
 import           Data.Maybe
@@ -46,17 +47,17 @@ data SourceUnitF a = Pragma a Identifier String
 type SourceUnit = Positioned SourceUnitF
 
 -- | Parses an entire Solidity contract
-solidityContract :: String -> SolidityParser SourceUnit
-solidityContract pragmaVersion = do
+solidityContract :: SolidityParser SourceUnit
+solidityContract = do
   ~(a, (kind, contractName', baseConstrs)) <- withPosition $ do
     kind <- (reserved "contract" >> return Xabi.ContractKind)
           <|> (reserved "interface" >> return Xabi.InterfaceKind)
           <|> (reserved "library" >> return Xabi.LibraryKind)
     --TODO: not sure if this is the correct way to isolate the identifier
-    contractNameCheck <- identifier
-    contractName' <- fmap stringToLabel (case (isReservedWord pragmaVersion contractNameCheck) of 
-                                          True -> reservedWordError pragmaVersion contractNameCheck
-                                          False -> identifier)
+    resWord <- identifier
+    pragmaVersion' <- getPragmaVersion
+    when (isReservedWord pragmaVersion' resWord) $ reservedWordError pragmaVersion' resWord
+    contractName' <- fmap stringToLabel identifier
     setContractName $ labelToString contractName'
     baseConstrs <- option [] $ do
       reserved "is"
@@ -66,7 +67,7 @@ solidityContract pragmaVersion = do
         return (name, consArgs)
     pure (kind, contractName', baseConstrs)
   declarations <-
-    braces $ many (solidityDeclaration pragmaVersion)
+    braces (many solidityDeclaration)
 
   let allFunctions = Map.fromList [ (stringToLabel n, f) | (n, FuncDeclaration f) <- declarations]
   let ctorList = [(stringToLabel n, c) | (n, ConstructorDeclaration c) <- declarations]
@@ -133,26 +134,26 @@ data Declaration =
 
 -- | Parses anything that a contract can declare at the top level: new types,
 -- variables, functions primarily, also events and function modifiers.
-solidityDeclaration :: String -> SolidityParser (String, Declaration)
-solidityDeclaration pragmaVersion =
-  structDeclaration pragmaVersion <|>
+solidityDeclaration :: SolidityParser (String, Declaration)
+solidityDeclaration =
+  structDeclaration <|>
   enumDeclaration <|>
   usingDeclaration <|>
-  functionDeclaration pragmaVersion <|>
+  functionDeclaration <|>
   modifierDeclaration <|>
   eventDeclaration <|>
-  variableDeclaration pragmaVersion
+  variableDeclaration
 
 {- New types -}
 
 -- | Parses a struct definition
-structDeclaration :: String -> SolidityParser (String, Declaration)
-structDeclaration pragmaVersion = do
+structDeclaration :: SolidityParser (String, Declaration)
+structDeclaration = do
   ~(a, (structName, structFields)) <- withPosition $ do
     reserved "struct"
     structName <- identifier
     structFields <- braces $ many1 $ do
-      (fieldName, VariableDeclaration (SolidVM.VariableDecl decl _ _ _)) <- simpleVariableDeclaration pragmaVersion
+      (fieldName, VariableDeclaration (SolidVM.VariableDecl decl _ _ _)) <- simpleVariableDeclaration
       return (fieldName, decl)
     pure (structName, structFields)
   return
@@ -201,8 +202,8 @@ usingDeclaration = do
 {- Variables -}
 
 -- | Parses a variable definition
-variableDeclaration :: String -> SolidityParser (String, Declaration)
-variableDeclaration pragmaVersion = simpleVariableDeclaration pragmaVersion
+variableDeclaration :: SolidityParser (String, Declaration)
+variableDeclaration = simpleVariableDeclaration
 
 data StateVariableKeyword = KConstant | KPublic | KPrivate | KInternal
   deriving (Eq, Show, Enum, Ord)
@@ -227,8 +228,8 @@ public keywords =
 -- everything except possibly the initializer and semicolon.  Necessary
 -- because these kinds of expressions also appear in struct definitions and
 -- function arguments.
-simpleVariableDeclaration :: String -> SolidityParser (String, Declaration) -- , Maybe Expression)
-simpleVariableDeclaration pragmaVersion = do
+simpleVariableDeclaration :: SolidityParser (String, Declaration) -- , Maybe Expression)
+simpleVariableDeclaration = do
   start <- getSourcePosition
   variableType <- simpleTypeExpression
   -- We have to remember which variables are "public", because they
@@ -236,11 +237,12 @@ simpleVariableDeclaration pragmaVersion = do
   keywords <- many stateVariableKeyword
   let isConstant = KConstant `elem` keywords
   isPublic <- public keywords
+  resWord <- identifier
+  pragmaVersion' <- getPragmaVersion
   -- check to see if the "account" variable is being used
-  variableNameCheck <- identifier
   variableName <- do
-    case (isReservedWord pragmaVersion variableNameCheck) of 
-      True -> reservedWordError pragmaVersion variableNameCheck
+    case (isReservedWord pragmaVersion' resWord) of 
+      True -> reservedWordError pragmaVersion' resWord
       False -> identifier
   value <- optionMaybe $ do
     reservedOp "="
@@ -256,13 +258,14 @@ simpleVariableDeclaration pragmaVersion = do
 
 -- | Parses a function definition.
 --
-functionDeclaration :: String -> SolidityParser (String, Declaration)
-functionDeclaration pragmaVersion = do
+functionDeclaration :: SolidityParser (String, Declaration)
+functionDeclaration = do
   ~(a, (functionName, xabi')) <- withPosition $ do
+    pragmaVersion' <- getPragmaVersion
+    resWord <- identifier
     functionName <- (reserved "function" >> fromMaybe "" <$> optionMaybe ( do 
-                      functionNameCheck <- identifier
-                      case (isReservedWord pragmaVersion functionNameCheck) of
-                        True -> reservedWordError pragmaVersion functionNameCheck
+                      case (isReservedWord pragmaVersion' resWord) of
+                        True -> reservedWordError pragmaVersion' resWord
                         False -> identifier)) <|>
                     -- Starting with 0.4.22, constructor() <mods> { <body> } is
                     -- the preferred syntax for defining a constructor
@@ -511,8 +514,8 @@ inCommentSingle
 
 --To make a new reserved word with a specific pragma version please add to the following function list
 isReservedWord :: String -> String -> Bool
-isReservedWord pragmaVersion reservedWord = do
-  case pragmaVersion of
+isReservedWord pragmaVersion' reservedWord = do
+  case pragmaVersion' of
     "svm3.2" -> do 
       case reservedWord of
         "account" -> True

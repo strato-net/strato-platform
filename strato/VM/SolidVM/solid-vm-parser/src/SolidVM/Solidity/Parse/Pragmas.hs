@@ -13,12 +13,14 @@ import           SolidVM.Solidity.Parse.Declarations
 import           SolidVM.Solidity.Parse.Lexer
 import           SolidVM.Solidity.Parse.ParserTypes
 
-solidityPragma :: SolidityParser (SourceUnit, String)
+solidityPragma :: SolidityParser SourceUnit
 solidityPragma = do
   ~(a, (pragmaName, rest)) <- withPosition $ do
     reserved "pragma"
     pragmaName <- identifier
+    --allow for saving the pragma version so it can be used elsewhere
+    setPragmaVersion pragmaName
     rest <- many1 (noneOf ";")
     semi
     pure (pragmaName, rest)
-  return $ (Pragma a pragmaName rest, pragmaName)
+  return $ Pragma a pragmaName rest
