@@ -31,7 +31,7 @@ type ContractName = (Name, PragmaVersion)
 type SourceCode = String
 -- | A parser of source code whose state is the name of the current
 -- contract.
-type SolidityParser = Parsec SourceCode ContractState
+type SolidityParser = Parsec SourceCode ContractName
 
 -- | When starting a new contract
 setContractName :: ContractName -> SolidityParser ()
