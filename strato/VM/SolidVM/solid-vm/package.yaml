@@ -22,7 +22,6 @@ library:
   - bytestring
   - common-log
   - containers
-  - cryptonite
   - data-default
   - debugger
   - deepseq
@@ -30,6 +29,7 @@ library:
   - exceptions
   - extra
   - format
+  - labeled-error
   - lens
   - memory
   - merkle-patricia-db
@@ -82,6 +82,7 @@ tests:
       - hflags
       - hspec
       - hspec-expectations-lifted
+      - labeled-error
       - lens
       - merkle-patricia-db
       - monad-alter
@@ -101,6 +102,5 @@ benchmarks:
       source-dirs: bench/
       main: CodeBench.hs
       dependencies:
-        - criterion
         - file-embed
         - solid-vm

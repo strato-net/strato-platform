@@ -22,6 +22,7 @@ import Data.Bits
 import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as B16
+import qualified Data.ByteString.Char8 as BC
 import qualified Data.List as List
 import qualified Data.HashMap.Strict as HM
 import Data.Scientific (floatingOrInteger)
@@ -163,10 +164,12 @@ insertContracts :: [[(Word256, Word256)]] -> Text -> Text -> BS.ByteString -> Ad
 insertContracts slotss name src code start gi =
   let initialAccounts = genesisInfoAccountInfo gi
       initialCode = genesisInfoCodeInfo gi
-      (decoded, extra) = B16.decode code
-      codeHash = if extra /= "" && extra /= "\n"
-                   then error ("bytecode not encoded in base16:" ++ show code)
-                   else KECCAK256.hash decoded
+      codeWithoutNewline = if BC.last code == '\n' then BC.init code else code
+      decoded =
+        case B16.decode codeWithoutNewline of
+          Right v -> v
+          _ -> error ("bytecode not encoded in base16:" ++ show code)
+      codeHash = KECCAK256.hash decoded
       mkContract (addr, slots) = ContractWithStorage addr 0 (EVMCode codeHash) slots
       addrs = map (start+) [0..]
       addrsAndSlots = zip addrs slotss

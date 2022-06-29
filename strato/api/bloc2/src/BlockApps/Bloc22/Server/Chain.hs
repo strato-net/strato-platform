@@ -18,7 +18,6 @@ import           Control.Monad                     (when, unless)
 import qualified Control.Monad.Change.Alter        as A
 import           Control.Monad.Composable.Vault
 import           Crypto.Random.Entropy
-import qualified Data.ByteString.Base16            as B16
 import qualified Data.Map.Ordered                  as OMap
 import qualified Data.Map.Strict                   as Map
 import           Data.Maybe                        (catMaybes, fromMaybe, listToMaybe)
@@ -27,7 +26,7 @@ import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
 import           Data.Text.Encoding                (encodeUtf8)
 import qualified Data.Vector                       as V
-import qualified Database.Esqueleto as E
+import qualified Database.Esqueleto.Legacy as E
 
 import           BlockApps.Bloc22.API.Chain
 import           BlockApps.Bloc22.Monad
@@ -55,6 +54,7 @@ import           Control.Monad.Change.Alter
 import           Control.Monad.Composable.BlocSQL
 import           Control.Monad.Composable.SQL
 import           Handlers.Chain
+import qualified LabeledError
 import           SQLM
 import           Strato.Strato23.Client
 import           Strato.Strato23.API.Types
@@ -129,7 +129,7 @@ createChainInfo userName creationBlockHash (ChainInput src mCodePtr cname lbl ba
               _ -> throwIO . UserError . Text.pack $ "Unknown VM: " ++ show theVM
 
           let contractAcctInfo = ContractWithStorage governanceAddress govBal contractHash storage
-              b' = fst . B16.decode $ encodeUtf8 b
+              b' = LabeledError.b16Decode "createChainInfo" $ encodeUtf8 b
               jsrc = serializeSourceMap src
               codeInfo' = [CodeInfo b' jsrc $ Just contractdetailsName]
           md' <- case theVM of

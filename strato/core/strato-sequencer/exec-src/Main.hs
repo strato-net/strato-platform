@@ -79,7 +79,7 @@ main = do
   -- setup the connection with vault-wrapper
   mgr <- newManager defaultManagerSettings
   vaultWrapperUrl <- parseBaseUrl flags_vaultWrapperUrl
-  let clientEnv = ClientEnv mgr vaultWrapperUrl Nothing
+  let clientEnv = mkClientEnv mgr vaultWrapperUrl
   
   selfAddress <- do
     addrAndKey <- waitOnVault $ runClientM (VC.getKey (T.pack "nodekey") Nothing) clientEnv

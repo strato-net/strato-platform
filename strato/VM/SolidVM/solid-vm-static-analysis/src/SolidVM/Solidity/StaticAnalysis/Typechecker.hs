@@ -124,7 +124,7 @@ varDefsToType' VarDefEntry{..} (Top _ _)      = Static (fromJust vardefType) var
 varDefsToType' VarDefEntry{..} t@(Static _ _) = Product [Static (fromJust vardefType) vardefContext, t] vardefContext
 varDefsToType' VarDefEntry{..} t@(Sum _)      = Product [Static (fromJust vardefType) vardefContext, t] vardefContext
 varDefsToType' VarDefEntry{..} (Product ts _) = Product (Static (fromJust vardefType) vardefContext : ts) vardefContext
-varDefsToType' VarDefEntry{..} (Bottom es)    = Bottom es
+varDefsToType' VarDefEntry{} (Bottom es)    = Bottom es
 varDefsToType' VarDefEntry{..} _              = bottom $ "Could not match variable definition with function type" <$ vardefContext
 
 lookupEnum :: SolidString -> SSS [SolidString]

@@ -51,8 +51,8 @@ instance PersistFieldSql CodeKind where
 instance PersistField HexStorage where
   toPersistValue (HexStorage hs) = PersistText . decodeUtf8 . B16.encode $ hs
   fromPersistValue (PersistText t) = case B16.decode (encodeUtf8 t) of
-    (h, "") -> Right $ HexStorage h
-    (_, _) -> Left $ T.pack $ "Invalid hex text: " ++ show t
+    Right h -> Right $ HexStorage h
+    _ -> Left $ T.pack $ "Invalid hex text: " ++ show t
   fromPersistValue x = Left $ T.pack $ "PersistField HexStorage: expected varchar: " ++ (show x)
 
 instance PersistFieldSql HexStorage where
@@ -76,7 +76,7 @@ instance PersistFieldSql Word512 where
 
 instance PersistField StateRoot where
   toPersistValue (StateRoot s) = PersistText . decodeUtf8 . B16.encode $ s
-  fromPersistValue (PersistText s) = Right . StateRoot . fst . B16.decode . encodeUtf8 $ s
+  fromPersistValue (PersistText s) = Right . StateRoot . LabeledError.b16Decode "PersistField<StateRoot>" . encodeUtf8 $ s
   fromPersistValue _               = Left $ "StateRoot must be persisted as PersistText"
 
 instance PersistFieldSql StateRoot where

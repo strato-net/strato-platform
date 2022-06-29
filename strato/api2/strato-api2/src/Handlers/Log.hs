@@ -15,7 +15,7 @@ module Handlers.Log (
 import           Control.Monad.Change.Alter
 import           Data.List
 import           Data.Maybe
-import qualified Database.Esqueleto            as E
+import qualified Database.Esqueleto.Legacy            as E
 import           Servant
 import           Servant.Swagger.Tags
 

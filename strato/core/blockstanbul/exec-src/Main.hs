@@ -37,7 +37,7 @@ instance HasVault IO where
   sign bs = do
     mgr <- newManager defaultManagerSettings
     url <- parseBaseUrl "http://vault-wrapper:8000/strato/v2.3"
-    eSig <- runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash bs)) (ClientEnv mgr url Nothing)
+    eSig <- runClientM (VC.postSignature (T.pack "nodekey") (VC.MsgHash bs)) (mkClientEnv mgr url)
     case eSig of
       Left err -> die $ "failed to get message signature from the admin node's vault: " ++ show err
       Right sig -> return sig
@@ -115,7 +115,7 @@ main = do
   mgr <- newManager defaultManagerSettings
   vaultUrl <- parseBaseUrl "http://vault-wrapper:8000/strato/v2.3"
   optSender <- do 
-    eAdAndKey <- runClientM (VC.getKey (T.pack "nodekey") Nothing) (ClientEnv mgr vaultUrl Nothing)
+    eAdAndKey <- runClientM (VC.getKey (T.pack "nodekey") Nothing) (mkClientEnv mgr vaultUrl)
     case eAdAndKey of
       Left err -> die $ "failed to get address from the admin node's vault: " ++ show err
       Right adAndKey -> return $ VC.unAddress adAndKey

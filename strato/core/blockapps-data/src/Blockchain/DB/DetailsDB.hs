@@ -7,7 +7,7 @@ module Blockchain.DB.DetailsDB (
   ) where
 
 import           Data.Maybe
-import qualified Database.Esqueleto       as E
+import qualified Database.Esqueleto.Legacy as E
 
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.DataDefs

@@ -21,7 +21,6 @@ module BlockApps.Bloc22.Server.Utils
 import           Control.Concurrent               (threadDelay)
 import           Control.Monad                    (forM, unless, when)
 import qualified Crypto.Secp256k1                 as S
-import qualified Data.ByteString.Base16           as BS16
 import qualified Data.ByteString.Short            as BSS
 import qualified Data.Map.Strict                  as M
 import           Data.Maybe
@@ -44,6 +43,7 @@ import           Control.Monad.Composable.SQL
 
 import           Handlers.BatchTransactionResult
 import           Handlers.Transaction
+import qualified LabeledError
 import qualified MaybeNamed
 import           SQLM
 import           Strato.Strato23.API.Types
@@ -79,7 +79,7 @@ emptyTxParams :: TxParams
 emptyTxParams = TxParams Nothing Nothing Nothing
 
 binRuntimeToCodeHash :: Text.Text -> Keccak256
-binRuntimeToCodeHash = hash . fst . BS16.decode . Text.encodeUtf8
+binRuntimeToCodeHash = hash . LabeledError.b16Decode "binRuntimeToCodeHash" . Text.encodeUtf8
 
 partitionWith :: Ord k => (a -> k) -> [a] -> [(k, [a])]
 partitionWith f = map (fmap (map snd)) . indexedPartitionWith f

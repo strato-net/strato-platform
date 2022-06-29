@@ -11,8 +11,8 @@ schemaVersionTable :: Table
   , Column PGInt4
   )
 schemaVersionTable = Table "vault_wrapper_schema_version" $ p2
-  ( optional "id"
-  , required "schema_version"
+  ( optionalTableField "id"
+  , requiredTableField "schema_version"
   )
 
 usersTable :: Table
@@ -33,13 +33,13 @@ usersTable :: Table
   , Column PGBytea
   )
 usersTable = Table "users" $ p7
-  ( optional "id"
-  , required "x_user_unique_name"
-  , required "salt"
-  , required "nonce"
-  , required "enc_sec_key"
-  , required "enc_sec_prv_key"
-  , required "address"
+  ( optionalTableField "id"
+  , requiredTableField "x_user_unique_name"
+  , requiredTableField "salt"
+  , requiredTableField "nonce"
+  , requiredTableField "enc_sec_key"
+  , requiredTableField "enc_sec_prv_key"
+  , requiredTableField "address"
   )
 
 messageTable :: Table
@@ -54,8 +54,8 @@ messageTable :: Table
   , Column PGBytea
   )
 messageTable = Table "message" $ p4
-  ( optional "id"
-  , required "salt"
-  , required "nonce"
-  , required "enc_msg"
+  ( optionalTableField "id"
+  , requiredTableField "salt"
+  , requiredTableField "nonce"
+  , requiredTableField "enc_msg"
   )

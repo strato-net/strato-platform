@@ -58,10 +58,8 @@ library:
     - network 
     - random >=1.0 && <1.2
     - resource-pool >=0.2.3.2 && <0.3
-    - semigroups >=0.16.2.2 && <0.19
     - transformers >=0.3 && <0.6
     - zlib >=0.6.1.2 && <0.7
-    - utf8-string
 
 tests:
   test:
@@ -75,10 +73,8 @@ tests:
       - milena
       - mtl
       - network
-      - QuickCheck
       - bytestring
       - lens
-      - semigroups
       - tasty
       - tasty-hspec
       - tasty-quickcheck

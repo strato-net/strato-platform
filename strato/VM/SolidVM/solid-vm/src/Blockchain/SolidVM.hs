@@ -95,6 +95,7 @@ import qualified Blockchain.Stream.Action             as Action
 
 import           Blockchain.VMContext
 import           Blockchain.VMOptions
+import qualified LabeledError
 import qualified Text.Colors                          as C
 import           Text.Format
 import           Text.Tools
@@ -599,19 +600,42 @@ argsToVals ctract fn args =
                      . map snd $ CC.funcArgs fn
 
         eval :: MonadSM m => SVMType.Type -> CC.Expression -> m Value
-        eval t x = case x of
-           CC.NumberLiteral _ n Nothing -> return . coerceType ctract t $ SInteger n
-           CC.NumberLiteral _ n (Just nu) -> todo "Number literal with units" (n, nu)
-           CC.BoolLiteral _ b -> return . coerceType ctract t $ SBool b
-           CC.StringLiteral _ s -> return . coerceType ctract t $ SString s
-           CC.ArrayExpression _ as -> case t of
-              SVMType.Array{SVMType.entry=t'} ->
-                SArray t . V.fromList <$> mapM (fmap Constant . eval t') as
-              _ -> typeError "array literal for non array" (t, x)
-           -- This is something of a hack, where if an incoming value is not one
-           -- of the accepted literals, assume that this is not the context of
-           -- evaluating external arguments.
-           _ -> getVar =<< expToVar x
+        eval t x = do
+          case x of
+            CC.NumberLiteral _ n Nothing -> return . coerceType ctract t $ SInteger n
+            CC.NumberLiteral _ n (Just nu) -> todo "Number literal with units" (n, nu)
+            CC.BoolLiteral _ b -> return . coerceType ctract t $ SBool b
+            CC.StringLiteral _ s -> return . coerceType ctract t $ SString s
+            CC.ArrayExpression _ as -> case t of
+                SVMType.Array{SVMType.entry=t'} ->
+                  SArray t . V.fromList <$> mapM (fmap Constant . eval t') as
+                _ -> typeError "array literal for non array" (t, x)
+            -- This is something of a hack, where if an incoming value is not one
+            -- of the accepted literals, assume that this is not the context of
+            -- evaluating external arguments.
+            CC.ObjectLiteral _ mp -> do
+              case t of
+                SVMType.UnknownLabel l -> do
+                  let ls = M.toList mp
+                  m <- mapM go ls
+                  return $ SStruct l $ M.fromList m
+                  where go (k, v) = do
+                                  let tp = expressionType v
+                                  v' <- eval tp v
+                                  return $ (k, Constant v')
+                (SVMType.Mapping _ keyType valueType) -> do
+                  m <- mapM go $ M.toList mp
+                  return $ SMap valueType $ M.fromList m
+                  where go (k, v) = do
+                                  let !maybeExp = runParser literal "" "" k
+                                  case maybeExp of 
+                                    Right ex -> do
+                                      k' <- eval keyType ex
+                                      v' <- eval valueType v
+                                      return (k', Constant v')
+                                    Left err -> typeError (show err) (k, t)
+                _ -> typeError "Object Literal for non-object like argument type" (t, x)
+            _ -> getVar =<< expToVar x
 
         eval32 :: MonadSM m => SVMType.Type -> CC.Expression -> m Value
         eval32 t x = do
@@ -634,7 +658,7 @@ argsToVals ctract fn args =
                 return $ SStruct l $ M.fromList m
                 where go (k, v) = do
                                 let tp = expressionType v
-                                v' <- eval tp v
+                                v' <- eval32 tp v
                                 return $ (k, Constant v')
               (SVMType.Mapping _ keyType valueType) -> do
                 m <- mapM go $ M.toList mp
@@ -644,8 +668,8 @@ argsToVals ctract fn args =
                                 let !maybeExp = runParser literal "" "" (labelToString k)
                                 case maybeExp of
                                   Right ex -> do
-                                    k' <- eval keyType ex
-                                    v' <- eval valueType v
+                                    k' <- eval32 keyType ex
+                                    v' <- eval32 valueType v
                                     return (k', Constant v')
                                   Left err -> typeError (show err) (k, t)
               _ -> typeError "Object Literal for non-object like argument type" (t, x)
@@ -1889,7 +1913,7 @@ intBuiltin [SEnumVal _ _ enumNum] = SInteger $ fromIntegral enumNum
 intBuiltin [SInteger n] = SInteger n
 intBuiltin [SString hex] =
   case B16.decode (BC.pack hex) of
-    (l, "") -> let zeros = 32 - B.length l
+    Right l -> let zeros = 32 - B.length l
                in SInteger . fromIntegral . bytesToWord256 $ B.replicate zeros 0x0 <> l
     _ -> typeError "numeric cast - not a hex string" hex
 intBuiltin args = typeError "numeric cast - invalid args" args
@@ -2025,7 +2049,7 @@ callBuiltin rc'@("registerCert") [SString cert] _ = do
       curAccount <- getCurrentAccount
       case curAccount of
         Account{_accountChainId=Just cid} -> invalidWrite "Cannot register X.509 certificates on private chains" cid
-        Account{..} -> do
+        Account{} -> do
           mCreatorAddress <- getSolidStorageKeyVal' curAccount $ MS.StoragePath [MS.Field ":creatorAddress"]
           case mCreatorAddress of
             (MS.BAccount creatorAccount) -> do
@@ -2148,12 +2172,12 @@ callBuiltin vc@"verifyCert" [SString cert, SString pubkey] _ = do
 callBuiltin vs@"verifySignature" [SString msg, SString signature, SString pubkey] _ = do
   curContract <- getCurrentContract
   if CC._vmVersion curContract == "svm3.2" then do
-    let eMesgBs = B16.decode $ BC.pack msg
-    case eMesgBs of
-      (mesgBs, "") -> do
+    let eMesgBs = B16.decode $ BC.pack msg 
+    case eMesgBs of 
+      Right mesgBs -> do
         if ((BC.length mesgBs) /= 32) then malformedData "Message hash is not 32 bytes" msg
         else do
-          let mSignature = SEC.importSignature' $ fst $ B16.decode $ BC.pack signature
+          let mSignature = SEC.importSignature' $ LabeledError.b16Decode "callBuiltin" $ BC.pack signature
           let ePublicKey = bsToPub $ BC.pack pubkey
           case (mSignature, ePublicKey) of
             (Nothing, _) -> malformedData "Could not parse EC Signature " signature
@@ -2164,7 +2188,7 @@ callBuiltin vs@"verifySignature" [SString msg, SString signature, SString pubkey
                 C.green "The signature is valid."
                 else C.red "The signature is invalid")
               return $ SBool isValid
-      (_, err) -> malformedData "Could not decode hex string" err
+      Left err -> malformedData "Could not decode hex string" err
   else unknownFunction "callBuiltin" vs
 
 callBuiltin "parseCert" [SString cert] _ = return $ certificateMap (Just cert)
