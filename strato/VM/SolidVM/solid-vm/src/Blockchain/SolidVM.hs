@@ -95,6 +95,7 @@ import qualified Blockchain.Stream.Action             as Action
 
 import           Blockchain.VMContext
 import           Blockchain.VMOptions
+import qualified Crypto.Hash.SHA256                   as SHA256
 import qualified LabeledError
 import qualified Text.Colors                          as C
 import           Text.Format
@@ -2007,6 +2008,16 @@ callBuiltin "keccak256" args Nothing = do
   case allStrings args of
     False -> invalidArguments "cannot use a non string arguments in keccak256" args
     True ->  return . SString . BC.unpack . keccak256ToByteString . hash . BC.pack $ customConcat args
+callBuiltin "sha256" args Nothing = do
+  let allStrings [] = True
+      allStrings ((SString _):xs) = True && (allStrings xs)
+      allStrings _ = False
+      customConcat [] = ""
+      customConcat ((SString str):ys) = str ++ customConcat ys
+      customConcat _ = invalidArguments "cannot use a non string arguments in sha256" args
+  case allStrings args of
+    False -> invalidArguments "cannot use a non string arguments in sha256" args
+    True ->  return . SString . BC.unpack . SHA256.hash . BC.pack $ customConcat args
 callBuiltin pb@("payable") [SAccount a _] _ = do 
   contract' <- getCurrentContract
   if CC._vmVersion contract' == "svm3.2"

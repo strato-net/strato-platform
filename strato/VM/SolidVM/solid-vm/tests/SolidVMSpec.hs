@@ -4257,3 +4257,16 @@ contract qq {
     return 2;
   }
 }|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 2)
+
+  it "can use builtin sha256 function" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+  bytes32 hsh;
+  constructor() public {
+    string username = "uname";
+    hsh = sha256(username);
+  }
+}
+|]
+    getFields ["hsh"] `shouldReturn` [BString $ word256ToBytes 0x5C0BE87ED7434D69005F8BBD84CAD8AE6ABFD49121B4AAEEB4C1F4A2E2987711]
