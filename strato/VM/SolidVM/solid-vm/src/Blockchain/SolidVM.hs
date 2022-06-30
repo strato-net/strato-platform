@@ -95,6 +95,7 @@ import qualified Blockchain.Stream.Action             as Action
 
 import           Blockchain.VMContext
 import           Blockchain.VMOptions
+import qualified Crypto.Hash.RIPEMD160                as RIPEMD160
 import qualified Crypto.Hash.SHA256                   as SHA256
 import qualified LabeledError
 import qualified Text.Colors                          as C
@@ -2018,6 +2019,16 @@ callBuiltin "sha256" args Nothing = do
   case allStrings args of
     False -> invalidArguments "cannot use a non string arguments in sha256" args
     True ->  return . SString . BC.unpack . SHA256.hash . BC.pack $ customConcat args
+callBuiltin "ripemd160" args Nothing = do
+  let allStrings [] = True
+      allStrings ((SString _):xs) = True && (allStrings xs)
+      allStrings _ = False
+      customConcat [] = ""
+      customConcat ((SString str):ys) = str ++ customConcat ys
+      customConcat _ = invalidArguments "cannot use a non string arguments in ripemd160" args
+  case allStrings args of
+    False -> invalidArguments "cannot use a non string arguments in ripemd160" args
+    True ->  return . SString . BC.unpack . RIPEMD160.hash . BC.pack $ customConcat args
 callBuiltin pb@("payable") [SAccount a _] _ = do 
   contract' <- getCurrentContract
   if CC._vmVersion contract' == "svm3.2"
