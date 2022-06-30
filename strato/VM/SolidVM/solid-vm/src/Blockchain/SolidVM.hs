@@ -2209,6 +2209,7 @@ certificateMap maybeCert = case maybeCert of
                                    , (SString "publicKey", Constant . SString $ BC.unpack $ pubToBytes $ subPub sub)
                                    , (SString "userAddress", Constant . SString $ show $ fromPublicKey $ subPub sub)
                                    , (SString "certString", Constant . SString $ cert)
+                                   , (SString "parent", Constant . SString $ maybe "" show (getParentUserAddress =<< (eitherToMaybe . bsToCert . BC.pack $ cert)))
                                    ]
           emptyCertMap = M.fromList [ (SString "commonName", Constant . SString $ "")
                              , (SString "country", Constant . SString $ "")
@@ -2217,6 +2218,7 @@ certificateMap maybeCert = case maybeCert of
                              , (SString "publicKey", Constant . SString $ "")
                              , (SString "userAddress", Constant . SString $ "")
                              , (SString "certString", Constant . SString $ "")
+                             , (SString "parent", Constant . SString $ "")
                              ]
           stringToString = SVMType.Mapping { SVMType.dynamic = Nothing
                                         , SVMType.key = SVMType.String Nothing
