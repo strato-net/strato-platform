@@ -297,11 +297,22 @@ primaryExpression = do
     <|> (uncurry Variable <$> withPosition (stringToLabel <$> identifier))
     <|> (do 
             ~(a, (val, nu)) <- withPosition $ do
-              val <- integer
+              val <- scientificInteger
               nu <- optionMaybe numberUnit
               pure (val, nu)
             pure $ NumberLiteral a val nu)
     <|> (uncurry StringLiteral <$> withPosition stringLiteral)
+
+scientific :: SolidityParser Integer
+scientific = do 
+    leftVal <- integer
+    _ <- symbol "e" 
+    rightVal <- integer
+    pure $ leftVal * (10 ^ rightVal)
+
+scientificInteger :: SolidityParser Integer
+scientificInteger = do
+  (try scientific) <|> integer
 
 numberUnit :: SolidityParser NumberUnit
 numberUnit = do
