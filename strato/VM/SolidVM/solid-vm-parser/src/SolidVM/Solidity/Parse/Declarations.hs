@@ -53,11 +53,10 @@ solidityContract = do
     kind <- (reserved "contract" >> return Xabi.ContractKind)
           <|> (reserved "interface" >> return Xabi.InterfaceKind)
           <|> (reserved "library" >> return Xabi.LibraryKind)
-    --TODO: not sure if this is the correct way to isolate the identifier
-    resWord <- identifier
-    pragmaVersion' <- getPragmaVersion
-    when (isReservedWord pragmaVersion' resWord) $ reservedWordError pragmaVersion' resWord
+
     contractName' <- fmap stringToLabel identifier
+    pragmaVersion' <- getPragmaVersion
+    when (isReservedWord pragmaVersion' contractName') $ reservedWordError pragmaVersion' contractName'
     setContractName $ labelToString contractName'
     baseConstrs <- option [] $ do
       reserved "is"
@@ -237,13 +236,11 @@ simpleVariableDeclaration = do
   keywords <- many stateVariableKeyword
   let isConstant = KConstant `elem` keywords
   isPublic <- public keywords
-  resWord <- identifier
-  pragmaVersion' <- getPragmaVersion
   -- check to see if the "account" variable is being used
-  variableName <- do
-    case (isReservedWord pragmaVersion' resWord) of 
-      True -> reservedWordError pragmaVersion' resWord
-      False -> identifier
+  variableName <- identifier
+  pragmaVersion' <- getPragmaVersion
+  when (isReservedWord pragmaVersion' variableName) $ reservedWordError pragmaVersion' variableName
+  -- variableName <- resWord
   value <- optionMaybe $ do
     reservedOp "="
     expression
@@ -262,14 +259,16 @@ functionDeclaration :: SolidityParser (String, Declaration)
 functionDeclaration = do
   ~(a, (functionName, xabi')) <- withPosition $ do
     pragmaVersion' <- getPragmaVersion
-    resWord <- identifier
-    functionName <- (reserved "function" >> fromMaybe "" <$> optionMaybe ( do 
-                      case (isReservedWord pragmaVersion' resWord) of
-                        True -> reservedWordError pragmaVersion' resWord
-                        False -> identifier)) <|>
+    -- let resWord = identifier
+    -- resWord' <- identifier
+    -- when (isReservedWord pragmaVersion' resWord') $
+    --   reservedWordError pragmaVersion' resWord'
+    functionName <- (reserved "function" >> fromMaybe "" <$> optionMaybe identifier)  <|>
                     -- Starting with 0.4.22, constructor() <mods> { <body> } is
                     -- the preferred syntax for defining a constructor
                     (reserved "constructor" >> getContractName)
+    -- Throw an error if the function name is part of secondary reservered words.
+    when (isReservedWord pragmaVersion' functionName) $ reservedWordError pragmaVersion' functionName
     xabi <- functionXabi
     pure (functionName, xabi)
   cName <- getContractName
@@ -514,9 +513,9 @@ inCommentSingle
 
 --To make a new reserved word with a specific pragma version please add to the following function list
 isReservedWord :: String -> String -> Bool
-isReservedWord pragmaVersion' reservedWord = do
-  case pragmaVersion' of
-    "svm3.2" -> do 
+isReservedWord version reservedWord = do
+  case version of
+    "3.2" -> do 
       case reservedWord of
         "account" -> True
         _ -> False
