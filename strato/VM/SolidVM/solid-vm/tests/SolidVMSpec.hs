@@ -31,7 +31,7 @@ import Data.Text.Encoding
 import Data.Time.Clock.POSIX
 import HFlags
 import Numeric
-import Test.Hspec (hspec, Spec, describe, it, it, xit, pendingWith, anyException, shouldThrow, anyErrorCall, Selector)
+import Test.Hspec (hspec, Spec, describe, it, fit, xit, pendingWith, anyException, shouldThrow, anyErrorCall, Selector)
 import Test.Hspec.Expectations.Lifted
 import Text.Printf
 import Text.RawString.QQ
@@ -121,17 +121,21 @@ anyPaymentError :: Selector HandledException
 anyPaymentError (HE Blockchain.SolidVM.Exception.PaymentError{}) = True
 anyPaymentError _ = False
 
+anyReservedWordError :: Selector HandledException
+anyReservedWordError (HE Blockchain.SolidVM.Exception.ReservedWordError{}) = True
+anyReservedWordError _ = False
+
 failedRequirementMsg :: String -> Selector HandledException
 failedRequirementMsg str (HE (Require (Just msg))) = str == msg
-failedRequirementMsg _   _                         = False
+failedRequirementMsg _ _ = False
 
 failedRequirementNoMsg :: Selector HandledException
 failedRequirementNoMsg (HE (Require Nothing)) = True
-failedRequirementNoMsg _                      = False
+failedRequirementNoMsg _ = False
 
 failedAssertion :: Selector HandledException
 failedAssertion (HE Assert) = True
-failedAssertion _           = False
+failedAssertion _ = False
 
 sender :: Account
 sender = Account 0xdeadbeef Nothing
@@ -2415,6 +2419,28 @@ contract qq {
 contract qq {
   function f() public {}
 }|]) `shouldThrow` anyParseError
+
+  it "throw an error when the 'account' reserved word is for a variable name." $ runTest (do
+      runBS [r|
+pragma solidvm 3.2;
+contract A {
+  uint account;
+}|]) `shouldThrow` anyReservedWordError
+
+  it "throw an error when the 'account' reserved word is for a variable name." $ runTest (do
+      runBS [r|
+pragma solidvm 3.2;
+contract A {
+  uint account;
+}|]) `shouldThrow` anyReservedWordError
+
+  it "throw an error when the 'account' reserved word is used for a function name." $ runTest (do
+      runBS [r|
+pragma solidvm 3.2;
+contract A {
+  function account() {
+  }
+}|]) `shouldThrow` anyReservedWordError
 
   it "catches missing function errors" $
     (runTest $ runCall "f" "()" [r|contract qq {}|]) `shouldThrow` anyUnknownFunc

@@ -19,8 +19,8 @@ solidityPragma = do
     reserved "pragma"
     pragmaName <- identifier
     --allow for saving the pragma version so it can be used elsewhere
-    setPragmaVersion pragmaName
     rest <- many1 (noneOf ";")
+    setPragmaVersion rest
     semi
     pure (pragmaName, rest)
   return $ Pragma a pragmaName rest
