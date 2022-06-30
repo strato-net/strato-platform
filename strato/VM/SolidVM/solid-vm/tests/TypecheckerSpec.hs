@@ -443,7 +443,8 @@ contract A {
     address b = tx.origin;
     string u = tx.username;
     string o = tx.organization;
-    string g = tx.group;
+    string g = tx.organizationalUnit;
+    string c = tx.certificate;
     uint t = block.timestamp;
     uint n = block.number;
   }
@@ -458,13 +459,14 @@ contract A {
     uint b = tx.origin;
     address u = tx.username;
     bool o = tx.organization;
-    uint g = tx.group;
+    uint g = tx.organizationalUnit;
+    uint c = tx.certificate;
     string t = block.timestamp;
     address n = block.number;
   }
 }
 |]
-     in length anns `shouldBe` 7
+     in length anns `shouldBe` 8
   it "can call super on parent contract functions" $
     let anns = runTypechecker [r|
 contract A {

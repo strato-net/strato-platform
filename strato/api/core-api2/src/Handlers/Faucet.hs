@@ -29,11 +29,12 @@ import           Data.Conduit
 import           Data.Maybe
 import           Data.Text                             (Text)
 import qualified Data.Text                             as T
-import qualified Database.Esqueleto                    as E
+import qualified Database.Esqueleto.Legacy             as E
 import           Numeric
 import           Servant
 import           Servant.Client
 import           Servant.Multipart
+import           Servant.Multipart.Client              ()
 import           System.IO.Unsafe
 import           Text.Printf
 

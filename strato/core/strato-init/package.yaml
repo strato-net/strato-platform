@@ -17,10 +17,8 @@ library:
   dependencies:
   - aeson
   - base16-bytestring
-  - base64-bytestring
   - blockapps-data
   - blockapps-datadefs
-  - blockapps-haskoin
   - blockapps-mpdbs
   - blockapps-vault-wrapper-api
   - blockapps-vault-wrapper-client
@@ -33,7 +31,6 @@ library:
   - entropy
   - ethereum-discovery
   - ethereum-rlp
-  - extra
   - file-embed
   - filepath
   - format
@@ -51,10 +48,8 @@ library:
   - nibblestring
   - persistent-postgresql
   - resourcet
-  - secp256k1-haskell
   - seqevents
   - servant-client
-  - split
   - strato-conf
   - strato-genesis
   - strato-index
@@ -117,6 +112,7 @@ tests:
       - bytestring
       - hspec
       - json-stream
+      - labeled-error
       - merkle-patricia-db
       - strato-genesis
       - strato-model

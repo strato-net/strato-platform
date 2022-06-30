@@ -170,17 +170,11 @@ argValueToSimpleValue theType argVal = case theType of
   where
     readBytes :: Integer -> Text -> Either Text ByteString
     readBytes n str =
-      let
-        (bytes', leftover) = Base16.decode (Text.encodeUtf8 str)
-      in
-        if leftover /= ByteString.empty || ByteString.length bytes' /= fromInteger n
-          then Left $ "argValueToSimpleValue: could not decode as statically sized bytes: " <> str <> ", expected a Base16 encoded string of length " <> Text.pack (show $ 2 * n) <> ", which represents a bytestring of length " <> Text.pack (show n)
-          else return bytes'
+      case Base16.decode (Text.encodeUtf8 str) of
+        Right bytes' | ByteString.length bytes' == fromInteger n -> return bytes'
+        _ -> Left $ "argValueToSimpleValue: could not decode as statically sized bytes: " <> str <> ", expected a Base16 encoded string of length " <> Text.pack (show $ 2 * n) <> ", which represents a bytestring of length " <> Text.pack (show n)
     readBytesDyn :: Text -> Either Text ByteString
     readBytesDyn str =
-      let
-        (bytes', leftover) = Base16.decode (Text.encodeUtf8 str)
-      in
-        if leftover /= ByteString.empty
-          then Left $ "argValueToSimpleValue: could not decode as dynamically sized bytes: " <> str
-          else return bytes'
+      case Base16.decode (Text.encodeUtf8 str) of
+        Right bytes' -> return bytes'
+        _ -> Left $ "argValueToSimpleValue: could not decode as dynamically sized bytes: " <> str

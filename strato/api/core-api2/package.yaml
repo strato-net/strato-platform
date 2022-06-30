@@ -2,7 +2,6 @@ name:                core-api2
 
 dependencies:
 - base
-- persistent
 - persistent-postgresql
 - servant-server
 - strato-conf
@@ -12,12 +11,9 @@ library:
   source-dirs: src
   dependencies:
   - aeson
-  - base16-bytestring
   - base64-bytestring
-  - binary
   - blockapps-data
   - blockapps-datadefs
-  - blockapps-haskoin
   - bytestring
   - clock
   - common-log
@@ -30,19 +26,17 @@ library:
   - extra
   - filepath
   - format
-  - hflags
-  - http-api-data
   - http-types
+  - labeled-error
   - lens
   - monad-alter
-  - monad-logger
   - mtl
   - process
   - QuickCheck
   - seqevents
   - servant-client
-  - servant-client-core
   - servant-multipart
+  - servant-multipart-client  
 #  - servant-swagger-tags
   - sql-monad
   - strato-model

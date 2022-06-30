@@ -17,7 +17,7 @@ module Handlers.TransactionResult
 
 import           Control.Monad.Change.Alter
 import           Data.Maybe
-import qualified Database.Esqueleto          as E
+import qualified Database.Esqueleto.Legacy         as E
 import           Servant
 import           Servant.Client
 

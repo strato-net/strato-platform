@@ -124,7 +124,7 @@ varDefsToType' VarDefEntry{..} (Top _ _)      = Static (fromJust vardefType) var
 varDefsToType' VarDefEntry{..} t@(Static _ _) = Product [Static (fromJust vardefType) vardefContext, t] vardefContext
 varDefsToType' VarDefEntry{..} t@(Sum _)      = Product [Static (fromJust vardefType) vardefContext, t] vardefContext
 varDefsToType' VarDefEntry{..} (Product ts _) = Product (Static (fromJust vardefType) vardefContext : ts) vardefContext
-varDefsToType' VarDefEntry{..} (Bottom es)    = Bottom es
+varDefsToType' VarDefEntry{} (Bottom es)    = Bottom es
 varDefsToType' VarDefEntry{..} _              = bottom $ "Could not match variable definition with function type" <$ vardefContext
 
 lookupEnum :: SolidString -> SSS [SolidString]
@@ -509,7 +509,8 @@ typecheckMember (Static (SVMType.UnknownLabel "msg") x) "sender" = pure $ Static
 typecheckMember (Static (SVMType.UnknownLabel "tx") x) "origin" = pure $ Static (SVMType.Account False) x 
 typecheckMember (Static (SVMType.UnknownLabel "tx") x) "username" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "tx") x) "organization" = pure $ Static (SVMType.String Nothing) x
-typecheckMember (Static (SVMType.UnknownLabel "tx") x) "group" = pure $ Static (SVMType.String Nothing) x
+typecheckMember (Static (SVMType.UnknownLabel "tx") x) "organizationalUnit" = pure $ Static (SVMType.String Nothing) x
+typecheckMember (Static (SVMType.UnknownLabel "tx") x) "certificate" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "block") x) "timestamp" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "block") x) "number" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "block") x) "coinbase" = pure $ Static (SVMType.Account True) x

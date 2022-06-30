@@ -16,7 +16,7 @@ module Handlers.BlkLast
 import           Control.Arrow                ((&&&), (***))
 import           Data.Int
 import qualified Data.Map as Map
-import qualified Database.Esqueleto as E
+import qualified Database.Esqueleto.Legacy as E
 import           Servant
 import           Servant.Client
 

@@ -46,7 +46,6 @@ default-extensions:
 dependencies:
   - base
   - bytestring
-  - utf8-string
 
 library:
   source-dirs: library/
@@ -76,8 +75,6 @@ benchmarks:
     other-modules: []
     dependencies:
       - ethereum-rlp
-      - criterion
-      - random-bytestring
   zipbench:
     source-dirs: bench/
     main: ZipBench.hs
@@ -85,5 +82,4 @@ benchmarks:
     dependencies:
       - base16-bytestring
       - ethereum-rlp
-      - criterion
       - zlib

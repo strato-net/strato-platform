@@ -11,7 +11,6 @@ import           Data.Aeson.QQ
 import qualified Data.Bits                          as Bits
 import           Data.Binary
 import qualified Data.ByteString                    as B
-import qualified Data.ByteString.Base16             as B16
 import qualified Data.ByteString.Char8              as C8
 import           Data.Maybe
 import qualified Data.Text                          as T
@@ -28,7 +27,8 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Strato.Model.Secp256k1  as SEC 
+import           Blockchain.Strato.Model.Secp256k1  as SEC
+import qualified LabeledError
 import           Network.Haskoin.Crypto.BigWord     (BigWord(..))
 
 
@@ -53,7 +53,7 @@ spec = do
 
     it "works on mid size" $
       replicateM_ 1000 $
-        word256ToBytes 0x60646359b0ecaf704caa6f35 `shouldBe` fst (B16.decode
+        word256ToBytes 0x60646359b0ecaf704caa6f35 `shouldBe` (LabeledError.b16Decode "strato-model/Spec.hs"
               "000000000000000000000000000000000000000060646359b0ecaf704caa6f35")
     it "works on max" $
       word256ToBytes 0xffeeddccbbaa99887766554433221100ffeeddccbbaa99887766554433221100 `shouldBe`
@@ -131,7 +131,7 @@ spec = do
         `shouldBe` Right (EVMCode $ unsafeCreateKeccak256FromWord256 codeHashWord)
 
   describe "secp256k1 operations (using secp256k1-haskell)" $ do
-    let mPrv = importPrivateKey $ fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"
+    let mPrv = importPrivateKey $ LabeledError.b16Decode "strato-model/Spec.hs" $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"
         prv = fromMaybe (error "could not import private key") mPrv
         pub = derivePublicKey prv 
         mesg = keccak256ToByteString $ hash $ C8.pack "hey guys!" 
@@ -171,7 +171,7 @@ spec = do
     -- It can verify signatures given a message and key
     
     it "can generate ECDH shared secret" $ do
-      let mOtherPriv = importPrivateKey (fst $ B16.decode $ C8.pack $ "2d5daffcc515a23155bc5b5d21f852ab2554e6cae0351c5561b44fad6931f62d")
+      let mOtherPriv = importPrivateKey (LabeledError.b16Decode "strato-model/Spec.hs" $ C8.pack $ "2d5daffcc515a23155bc5b5d21f852ab2554e6cae0351c5561b44fad6931f62d")
           otherPriv = fromMaybe (error "could not import the other priv key") mOtherPriv
           otherPub = derivePublicKey otherPriv
           sec1 = deriveSharedKey prv otherPub

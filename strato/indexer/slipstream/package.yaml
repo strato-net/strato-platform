@@ -18,7 +18,6 @@ dependencies:
   - kafka-monad
   - raw-strings-qq
   - resourcet
-  - semigroups
   - sql-monad
   - text
   - transformers
@@ -45,27 +44,20 @@ library:
     - extra
     - format
     - lens
-    - lifted-base
     - lrucache
     - milena
     - milena-tools
     - monad-alter
-    - monad-control
     - mtl
-    - network
-    - ordered-containers
     - persistent
-    - persistent-template
     - postgresql-typed
     - prometheus-client
     - QuickCheck
-    - retry
     - solid-vm
     - solid-vm-model
     - scientific
     - source-tools
     - strato-model
-    - template-haskell
     - time
     - unliftio
     - unliftio-core
@@ -84,15 +76,10 @@ executables:
       - cache
       - clock
       - hflags
-      - http-client
       - milena
       - persistent-postgresql
-      - postgresql-simple
       - postgresql-typed
-      - resource-pool
-      - servant-client
       - slipstream
-      - template-haskell
       - wai-middleware-prometheus
       - warp
 
@@ -113,6 +100,7 @@ tests:
       - hflags
       - hspec
       - hspec-expectations-lifted
+      - labeled-error
       - persistent
       - persistent-sqlite
       - QuickCheck
@@ -123,5 +111,4 @@ tests:
       - text
       - time
       - unliftio
-      - vector
       - vm-tools

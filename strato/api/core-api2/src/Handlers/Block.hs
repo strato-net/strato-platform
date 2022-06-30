@@ -23,7 +23,7 @@ import qualified Data.Map                    as Map
 import           Data.Maybe
 import           Data.Text                   (Text)
 import qualified Data.Text                   as T
-import qualified Database.Esqueleto as E
+import qualified Database.Esqueleto.Legacy as E
 import           Database.Persist.Postgresql
 import           Numeric.Natural
 import           Servant

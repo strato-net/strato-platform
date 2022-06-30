@@ -16,7 +16,6 @@ import           GHC.Generics (Generic)
 import           Data.Aeson
 import           Data.Aeson.Casing (aesonDrop, camelCase)
 import qualified Data.ByteString                    as B
-import qualified Data.ByteString.Base16             as B16
 import qualified Data.JsonStream.Parser             as JS
 import           Data.Time
 import           Data.Word
@@ -27,6 +26,7 @@ import           Blockchain.Database.MerklePatricia
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256
 
+import qualified LabeledError
 
 data GenesisInfo =
   GenesisInfo {
@@ -49,7 +49,7 @@ data GenesisInfo =
 } deriving (Show, Read, Eq, Generic)
 
 nullStateRoot :: StateRoot
-nullStateRoot = StateRoot . fst . B16.decode $
+nullStateRoot = StateRoot . LabeledError.b16Decode "nullStateRoot" $
     "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"
 
 defaultGenesisInfo :: GenesisInfo
