@@ -1,0 +1,23 @@
+name: common-log
+
+dependencies:
+  - base
+  - text
+  - time
+
+library:
+  source-dirs: src
+  dependencies:
+    - bytestring
+    - global-lock
+    - hflags
+    - monad-logger
+    - template-haskell
+
+tests:
+  common-log-test:
+    main: LogSpec.hs
+    source-dirs: test/
+    dependencies:
+      - common-log
+      - hspec

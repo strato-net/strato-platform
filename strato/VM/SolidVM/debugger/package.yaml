@@ -1,0 +1,47 @@
+name: debugger
+version: 0.0.1
+build-type: Simple
+author: Dustin Norwood
+maintainer:    dustin@blockapps.net
+synopsis: A debugging API that can be hooked in to any Haskell project
+category:      Debuggers
+description:
+    A debugging API that can be hooked in to any Haskell project
+
+dependencies:
+  - base
+
+library:
+  source-dirs: src/
+  exposed-modules:
+    - Debugger
+    - Debugger.Options
+  ghc-options: -Wall -O2
+  dependencies:
+  - QuickCheck
+  - aeson
+  - async
+  - containers
+  - deepseq
+  - hflags
+  - monad-alter
+  - parsec
+  - QuickCheck
+  - quickcheck-instances
+  - servant-server
+  - source-tools
+  - text
+  - unliftio
+  - warp
+  - websockets
+
+tests:
+  debugger-spec:
+    source-dirs: tests/
+    main: Main.hs
+    dependencies:
+      - aeson
+      - debugger
+      - hflags
+      - hspec
+      - QuickCheck

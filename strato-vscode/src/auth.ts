@@ -27,7 +27,7 @@ export async function getApplicationUser(mNodeId?: number): Promise<any> {
   const nodeId = mNodeId || 0
   const nodeOauth = nodes[nodeId].oauth
   try {
-    const oauth = oauthUtil.init(nodeOauth)
+    const oauth = await oauthUtil.init(nodeOauth)
     const { applicationUserName = 'APP_USER' } = config
     // const { clientId, clientSecret, scope } = oauth
     var req = {

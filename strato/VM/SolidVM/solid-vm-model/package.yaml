@@ -1,0 +1,63 @@
+name: solid-vm-model
+
+dependencies:
+  - base
+
+default-extensions:
+  - BangPatterns
+  - OverloadedStrings
+
+library:
+  source-dirs: src/
+  dependencies:
+  - aeson
+  - aeson-casing
+  - attoparsec
+  - base16-bytestring
+  - binary
+  - bytestring
+  - containers
+  - cryptonite
+  - deepseq
+  - ethereum-rlp
+  - format
+  - generic-random
+  - hashable
+  - labeled-error
+  - lens
+  - QuickCheck
+  - quickcheck-instances
+  - scientific
+  - source-tools
+  - strato-model
+  - swagger2
+  - text
+  - unordered-containers
+  - utf8-string
+  - vector
+
+tests:
+  storage-test:
+    source-dirs: test/
+    main: StorageTest.hs
+    other-modules: []
+    dependencies:
+      - bytestring
+      - ethereum-rlp
+      - hspec
+      - solid-vm-model
+      - strato-model
+      - unliftio
+
+benchmarks:
+  storage-bench:
+    source-dirs: bench/
+    main: StorageBench.hs
+    other-modules: []
+    dependencies:
+      - binary
+      - bytestring
+      - cereal
+      - ethereum-rlp
+      - solid-vm-model
+      - strato-model

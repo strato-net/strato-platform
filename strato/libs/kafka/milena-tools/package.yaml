@@ -1,0 +1,12 @@
+name:                milena-tools
+
+library:
+  source-dirs: src
+  dependencies:
+    - base
+    - common-log
+    - milena
+    - monad-alter
+    - mtl
+    - text
+    - transformers

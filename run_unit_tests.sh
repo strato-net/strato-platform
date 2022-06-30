@@ -10,6 +10,8 @@ declare -i RESULT=0
 REDIS=$(docker run -d -p 2023:6379 redis:3.2 redis-server --appendonly yes)	
 trap "docker rm -f ${REDIS}" EXIT
 
+cd strato
+
 stack test -j1 \
       blockapps-data \
       blockapps-mpdbs \
@@ -22,7 +24,10 @@ stack test -j1 \
       fast-keccak256 \
       merkle-patricia-db \
       solid-vm \
+      solid-vm-model \
+      solid-vm-parser \
       strato-genesis \
+      strato-index \
       strato-init \
       strato-model \
       strato-p2p \
@@ -31,15 +36,18 @@ stack test -j1 \
       vm-runner \
       vm-tools \
       x509-certs \
-      blockapps-ethereum \
-      blockapps-solidity \
-      blockapps-strato-api \
+      evm-solidity \
       bloc2api \
       blockapps-vault-wrapper-server \
       slipstream \
       blockapps-privacy \
       seqevents \
       debugger \
-      ./shared-util/
+      blockapps-init \
+      common-log \
+      cross-monitoring \
+      format \
+      labeled-error \
+      source-tools
 
 stack bench vm-runner

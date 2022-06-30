@@ -1,0 +1,173 @@
+{-# LANGUAGE DeriveFunctor              #-}
+{-# LANGUAGE DerivingStrategies         #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE TypeSynonymInstances       #-}
+{-# OPTIONS -fno-warn-redundant-constraints #-}
+module Blockchain.Strato.RedisBlockDB.Models where
+
+import           Data.Binary
+import qualified Data.ByteString.Base16        as SB16
+import qualified Data.ByteString.Char8         as S8
+import           Data.ByteString.Lazy          (toStrict, fromStrict)
+import           Data.List                     (intercalate)
+import qualified Data.Map.Strict               as M
+import qualified Data.Set                      as S
+
+import qualified Blockchain.Data.BlockHeader   as BHD
+import           Blockchain.Data.ChainInfo
+import           Blockchain.Data.Enode
+import           Blockchain.Data.RLP
+import qualified Blockchain.Data.Transaction   as TXD
+import           Blockchain.Data.TransactionDef (formatChainId)
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.Strato.Model.Keccak256
+import           Text.Format
+
+data BlockDBNamespace = Headers
+                      | Transactions
+                      | Numbers
+                      | Uncles
+                      | Parent
+                      | Children
+                      | Canonical
+                      | PrivateChainInfo
+                      | PrivateChainMembers
+                      | PrivateTransactions
+                      | PrivateTxsInBlocks
+                      | PrivateIPChains
+                      | PrivateOrgIdChains
+                      | X509Certificates
+    deriving (Eq, Read, Show)
+
+class RedisDBKeyable k where
+    toKey :: k -> S8.ByteString
+
+class RedisDBValuable v where
+    toValue   :: v -> S8.ByteString
+    fromValue :: S8.ByteString -> v
+
+instance RedisDBValuable Bool where
+    toValue True = S8.singleton 't'
+    toValue False = S8.empty
+    fromValue = not . S8.null
+
+instance RedisDBKeyable S8.ByteString where
+    toKey = SB16.encode
+
+instance RedisDBValuable S8.ByteString where
+    toValue   = SB16.encode
+    fromValue x = case SB16.decode x of
+        Right v -> v
+        _       -> error "leftovers in base16 decode"
+
+instance RedisDBKeyable Keccak256 where
+    toKey = S8.pack . keccak256ToHex
+
+instance RedisDBValuable Keccak256 where
+    toValue   = S8.pack . keccak256ToHex
+    fromValue = keccak256FromHex . S8.unpack
+
+instance RedisDBKeyable Address where
+    toKey = toStrict . encode
+
+instance RedisDBValuable Address where
+    toValue   = toKey
+    fromValue = decode . fromStrict
+
+instance RedisDBKeyable Word256 where
+    toKey = word256ToBytes
+
+instance RedisDBValuable RedisChainInfo where
+    toValue   = rlpSerialize . rlpEncode
+    fromValue = rlpDecode . rlpDeserialize
+
+instance RedisDBValuable RedisChainMembers where
+    toValue   = rlpSerialize . rlpEncode
+    fromValue = rlpDecode . rlpDeserialize
+
+instance RedisDBValuable RedisChainTxsInBlocks where
+    toValue   = rlpSerialize . rlpEncode
+    fromValue = rlpDecode . rlpDeserialize
+
+instance RedisDBKeyable IPAddress where
+    toKey = S8.pack . showIP
+
+instance RedisDBValuable RedisIPChains where
+    toValue   = rlpSerialize . rlpEncode
+    fromValue = rlpDecode . rlpDeserialize
+
+instance RedisDBValuable RedisOrgIdChains where
+    toValue   = rlpSerialize . rlpEncode
+    fromValue = rlpDecode . rlpDeserialize
+
+instance RedisDBKeyable Integer where
+    toKey = S8.pack . show
+
+instance RedisDBValuable RedisHeader where
+    toValue   = rlpSerialize . rlpEncode
+    fromValue = RedisHeader . rlpDecode . rlpDeserialize
+
+instance RedisDBValuable RedisTx where
+    toValue   = rlpSerialize . rlpEncode
+    fromValue = rlpDecode . rlpDeserialize
+
+instance (RLPSerializable a) => RedisDBValuable [a] where
+    toValue         = rlpSerialize . RLPArray . fmap rlpEncode
+    fromValue bytes = let (RLPArray elems) = rlpDeserialize bytes in rlpDecode <$> elems
+
+instance (RLPSerializable a, RLPSerializable b) => RedisDBValuable (a,b) where
+    toValue (a,b)   = rlpSerialize $ RLPArray [rlpEncode a, rlpEncode b]
+    fromValue bytes = let (RLPArray [a,b]) = rlpDeserialize bytes in (rlpDecode a, rlpDecode b)
+
+newtype RedisHeader    = RedisHeader   BHD.BlockHeader deriving newtype (Eq, Read, Show, RLPSerializable, BlockHeaderLike)
+newtype RedisTx        = RedisTx       TXD.Transaction deriving newtype (Eq, Read, Show, RLPSerializable, TransactionLike)
+newtype RedisTxs       = RedisTxs      [RedisTx]       deriving newtype (Eq, Read, Show, RedisDBValuable)
+newtype RedisUncles    = RedisUncles   [RedisHeader]   deriving newtype (Eq, Read, Show, RedisDBValuable)
+newtype RedisChainInfo = RedisChainInfo ChainInfo      deriving newtype (Eq, Show, RLPSerializable)
+newtype RedisChainMembers = RedisChainMembers (M.Map Address Enode) deriving newtype (Eq, Show, RLPSerializable)
+newtype RedisChainTxsInBlocks = RedisChainTxsInBlocks (M.Map Word256 [Keccak256]) deriving newtype (Eq, Show, RLPSerializable)
+newtype RedisIPChains = RedisIPChains (S.Set Word256) deriving (Eq, Show)
+newtype RedisOrgIdChains = RedisOrgIdChains (S.Set Word256) deriving (Eq, Show)
+
+instance RLPSerializable RedisIPChains where
+  rlpEncode (RedisIPChains s) = rlpEncode $ S.toList s
+  rlpDecode = RedisIPChains . S.fromList . rlpDecode
+
+instance RLPSerializable RedisOrgIdChains where
+  rlpEncode (RedisOrgIdChains s) = rlpEncode $ S.toList s
+  rlpDecode = RedisOrgIdChains . S.fromList . rlpDecode
+
+data RedisBestBlock = RedisBestBlock { bestBlockHash            :: Keccak256
+                                     , bestBlockNumber          :: Integer          -- todo: BlockNumber
+                                     , bestBlockTotalDifficulty :: Integer -- todo: TotalDifficulty
+                                     } deriving (Eq, Read, Show)
+
+instance RedisDBValuable RedisBestBlock where
+    toValue = rlpSerialize . wrap
+        where wrap (RedisBestBlock sha num total) = RLPArray [rlpEncode sha, rlpEncode num, rlpEncode total]
+    fromValue = unwrap . rlpDeserialize
+        where unwrap (RLPArray [sha, num, total]) = RedisBestBlock (rlpDecode sha) (rlpDecode num) (rlpDecode total)
+              unwrap _                            = error "we are clearly incapable of humane exception handling"
+
+displayForNamespace :: BlockDBNamespace -> S8.ByteString -> String
+displayForNamespace ns input = case ns of
+    Numbers -> readSHA
+    Children -> readSHA
+    Canonical -> readSHA
+    Parent -> readSHA
+    Headers -> let RedisHeader hdr = fromValue input in format hdr
+    Transactions -> let RedisTxs txs = fromValue input in intercalate "\n" [format tx | RedisTx tx <- txs]
+    Uncles -> let RedisUncles us = fromValue input in show us
+    PrivateChainInfo -> let RedisChainInfo info = fromValue input in show info
+    PrivateChainMembers -> let RedisChainMembers mems = fromValue input in show mems
+    PrivateTransactions -> let (anchor, RedisTx tx) = fromValue input in formatChainId (Just anchor) ++ format tx
+    PrivateTxsInBlocks -> let RedisChainTxsInBlocks ctibs = fromValue input in show ctibs
+    PrivateIPChains -> let RedisIPChains ipcs = fromValue input in format (S.toList ipcs)
+    PrivateOrgIdChains -> let RedisOrgIdChains oics = fromValue input in format (S.toList oics)
+    X509Certificates -> format (fromValue input :: Address)
+  where
+    readSHA = let x = fromValue input in format (keccak256ToWord256 x)

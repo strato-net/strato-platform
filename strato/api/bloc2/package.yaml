@@ -1,0 +1,84 @@
+name: bloc2
+version: 0.1.0.0
+synopsis: Bloc microservice
+description: Bloc microservice
+category: Web
+build-type: Simple
+
+
+dependencies:
+  - base
+  - containers
+  - evm-solidity
+  - text
+
+library:
+  source-dirs: src/
+  ghc-options: -Wall -Werror -fsimpl-tick-factor=15000
+  dependencies:
+    - aeson
+    - base16-bytestring
+    - bloc-sql-monad
+    - bloc2api
+    - blockapps-data
+    - blockapps-datadefs
+    - blockapps-mpdbs
+    - blockapps-vault-wrapper-api
+    - blockapps-vault-wrapper-client
+    - bytestring
+    - cache
+    - clock
+    - common-log
+    - conduit
+    - core-api-monad
+    - core-api2
+    - cryptonite
+    - directory
+    - esqueleto
+    - extra
+    - filepath
+    - format
+    - hashable
+    - hflags
+    - insert-ordered-containers
+    - labeled-error
+    - lens
+    - monad-alter
+    - monad-logger
+    - mtl
+    - opaleye
+    - ordered-containers
+    - postgresql-simple
+    - process
+    - product-profunctors
+    - profunctors
+    - relapse
+    - resource-pool
+    - saltine
+    - secp256k1-haskell
+    - servant-client
+    - servant-server
+    - servant-swagger
+    - source-tools
+    - sql-monad
+    - stm-conduit
+    - strato-model
+    - strato-redis-blockdb
+    - swagger2
+    - temporary
+    - time
+    - transformers
+    - type-lits
+    - unliftio
+    - vault-monad
+    - vector
+
+tests:
+  blockapps-bloc22-server-test:
+    source-dirs: test/
+    main: Spec.hs
+    ghc-options: -Wall -Werror
+    dependencies:
+      - bloc2
+      - hspec
+      - parsec

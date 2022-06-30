@@ -1,0 +1,35 @@
+name: seqevents
+
+dependencies:
+  - base
+  - binary
+  - blockapps-data
+  - blockapps-datadefs
+  - QuickCheck
+
+library:
+  source-dirs: src/
+  dependencies:
+    - aeson
+    - blockstanbul
+    - bytestring
+    - conduit
+    - deepseq
+    - ethereum-rlp
+    - format
+    - generic-arbitrary
+    - lens
+    - milena
+    - monad-alter
+    - prometheus-client
+    - strato-conf
+    - strato-model
+    - text
+
+tests:
+  seqevents-spec:
+    source-dirs: test/
+    main: EventSpec.hs
+    dependencies:
+      - hspec
+      - seqevents

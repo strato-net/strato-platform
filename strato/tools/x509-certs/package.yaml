@@ -1,0 +1,110 @@
+name: x509-certs
+version: 0.0.1
+build-type: Simple
+author: dpmesko
+maintainer:   daniel@blockapps.net
+synopsis: A Haskell x509 certificate generator
+category:      Data Structures
+description:
+    A Haskell x509 certificate generator
+
+dependencies:
+  - base >= 4 && < 5
+
+
+ghc-options: -Wall -Werror
+
+
+library:
+  source-dirs: src
+  ghc-options: -Wall -O2 
+  dependencies:
+  - aeson
+  - asn1-encoding
+  - asn1-types
+  - base16-bytestring
+  - bytestring
+  - containers
+  - cryptonite
+  - deepseq
+  - ethereum-rlp
+  - hourglass
+  - memory
+  - pem
+  - text
+  - format
+  - transformers
+  - secp256k1-haskell
+  - strato-model
+  - x509
+  - x509-validation
+  - deepseq
+#  - x509-store
+#  - x509-util
+
+
+executables:
+  x509-generator:
+    source-dirs: exec_src/
+    main: X509CertGenerator.hs
+    other-modules: []
+    dependencies:
+      - aeson
+      - bytestring
+      - cryptonite
+      - strato-model
+      - transformers
+      - x509-certs
+  
+  x509-keygen:
+    source-dirs: exec_src/
+    main: X509Keygen.hs
+    other-modules: []
+    dependencies:
+      - aeson
+      - bytestring
+      - strato-model
+      - x509-certs
+  x509-info:
+    source-dirs: exec_src/
+    main: X509CertInfo.hs
+    other-modules: []
+    dependencies:
+      - aeson
+      - bytestring
+      - strato-model
+      - x509-certs
+  x509-certificate-registry:
+    source-dirs: exec_src/
+    main: X509CertRegistry.hs
+    other-modules: []
+    dependencies:
+      - aeson
+      - bloc2api
+      - blockapps-data
+      - blockapps-datadefs
+      - bytestring
+      - containers
+      - http-client
+      - optparse-applicative
+      - raw-strings-qq
+      - servant-client
+      - source-tools
+      - strato-model
+      - text
+      - x509-certs
+      - blockapps-datadefs
+
+tests:
+  x509-test:
+    main: Spec.hs
+    source-dirs: test/
+    dependencies:
+      - x509-certs
+      - aeson
+      - bytestring
+      - cryptonite
+      - ethereum-rlp
+      - hspec
+      - strato-model
+      - transformers

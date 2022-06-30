@@ -1,0 +1,119 @@
+name: strato-init
+version: 0.0.1
+build-type: Simple
+author: Jamshid
+maintainer: jamshidnh@gmail.com
+synopsis: A tool to setup the DBs for a Strato instance
+category: Data Structures
+description: A tool to setup the DBs for a Strato instance
+
+ghc-options: -Wall -O2 -threaded
+
+dependencies:
+  - base
+
+library:
+  source-dirs: src/
+  dependencies:
+  - aeson
+  - base16-bytestring
+  - blockapps-data
+  - blockapps-datadefs
+  - blockapps-mpdbs
+  - blockapps-vault-wrapper-api
+  - blockapps-vault-wrapper-client
+  - bytestring
+  - common-log
+  - conduit
+  - containers
+  - directory
+  - either
+  - entropy
+  - ethereum-discovery
+  - ethereum-rlp
+  - file-embed
+  - filepath
+  - format
+  - hedis
+  - hflags
+  - http-client
+  - http-types
+  - json-stream
+  - lens
+  - leveldb-haskell
+  - merkle-patricia-db
+  - milena
+  - milena-tools
+  - monad-alter
+  - nibblestring
+  - persistent-postgresql
+  - resourcet
+  - seqevents
+  - servant-client
+  - strato-conf
+  - strato-genesis
+  - strato-index
+  - strato-model
+  - strato-networks
+  - strato-redis-blockdb
+  - strato-sequencer
+  - strato-statediff
+  - temporary
+  - text
+  - transformers
+  - turtle
+  - unliftio
+  - unliftio-core
+  - vm-tools
+  - yaml
+
+executables:
+  strato-setup:
+    source-dirs: exec_src/
+    main: Main.hs
+    dependencies:
+      - common-log
+      - hflags
+      - strato-init
+    other-modules: []
+
+  tabula-rasa:
+    source-dirs: exec_src/
+    main: TabulaRasa.hs
+    dependencies:
+      - common-log
+      - hflags
+      - strato-init
+
+    other-modules: []
+
+  from-restore:
+    source-dirs: exec_src/
+    main: FromRestore.hs
+    other-modules: []
+
+  init-worker:
+    source-dirs: exec_src/
+    main: InitWorker.hs
+    dependencies:
+      - common-log
+      - hflags
+      - strato-init
+    other-modules: []
+
+tests:
+  strato-init-test:
+    source-dirs: test/
+    main: Main.hs
+    dependencies:
+      - aeson
+      - base16-bytestring
+      - blockapps-data
+      - bytestring
+      - hspec
+      - json-stream
+      - labeled-error
+      - merkle-patricia-db
+      - strato-genesis
+      - strato-model
+      - time

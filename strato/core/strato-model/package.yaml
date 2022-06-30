@@ -1,0 +1,96 @@
+name:                strato-model
+version:             0.1.0.0
+author:              BlockApps
+maintainer:          blockapps
+build-type:          Simple
+
+dependencies:
+  - base
+  - blockapps-haskoin
+  - bytestring
+
+
+
+
+ghc-options: -Wall -Werror -fno-warn-warnings-deprecations
+
+library:
+  source-dirs: src
+  default-extensions:
+    - MultiParamTypeClasses
+    - FlexibleContexts
+    - FlexibleInstances
+    - GeneralizedNewtypeDeriving
+    - GADTs
+    - RecordWildCards
+    - FunctionalDependencies
+  dependencies:
+    - QuickCheck
+    - aeson
+    - ansi-wl-pprint
+    - asn1-types
+    - base16-bytestring
+    - binary
+    - bytestring-arbitrary
+    - conduit
+    - containers
+    - cpu
+    - cryptonite
+    - data-default
+    - deepseq
+    - ethereum-rlp
+    - extra
+    - fast-keccak256
+    - format
+    - generic-arbitrary
+    - hashable
+    - http-api-data
+    - integer-gmp
+    - labeled-error
+    - lens
+    - memory
+    - nibblestring
+    - quickcheck-instances
+    - path-pieces
+    - persistent
+    - primitive
+    - relapse           # remove this
+    - secp256k1-haskell
+    - servant
+    - servant-docs
+    - servant-server
+    - swagger2
+    - text
+    - time
+    - transformers
+
+tests:
+  strato-model-tests:
+    source-dirs: test/
+    main: Spec.hs
+    ghc-options: -dynamic # this flag is the result of two weeks I spent trying to link secp256k1_ecdh
+    dependencies:
+      - aeson
+      - aeson-qq
+      - base16-bytestring
+      - binary
+      - cryptonite
+      - ethereum-rlp
+      - integer-gmp
+      - labeled-error
+      - persistent
+      - secp256k1-haskell
+      - strato-model
+      - text
+      - hspec
+      - QuickCheck
+
+
+benchmarks:
+  word256:
+    source-dirs: bench/
+    main: Word256Bench.hs
+    dependencies:
+      - strato-model
+
+

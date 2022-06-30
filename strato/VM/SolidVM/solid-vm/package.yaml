@@ -1,0 +1,106 @@
+name: solid-vm
+
+dependencies:
+  - base
+
+library:
+  source-dirs: src/
+  exposed-modules:
+    - Blockchain.SolidVM
+    - Blockchain.SolidVM.Simple
+    - Blockchain.SolidVM.SM
+    - Blockchain.SolidVM.CodeCollectionDB
+    - SolidVM.CodeCollectionTools
+  ghc-options: -Wall -O2
+  dependencies:
+  - aeson
+  - base16-bytestring
+  - binary
+  - blockapps-data
+  - blockapps-datadefs
+  - blockapps-mpdbs
+  - bytestring
+  - common-log
+  - containers
+  - data-default
+  - debugger
+  - deepseq
+  - ethereum-rlp
+  - exceptions
+  - extra
+  - format
+  - labeled-error
+  - lens
+  - memory
+  - merkle-patricia-db
+  - monad-alter
+  - nibblestring
+  - parsec
+  - prometheus-client
+  - solid-vm-model
+  - solid-vm-parser
+  - solid-vm-static-analysis
+  - source-tools
+  - strato-model
+  - text
+  - time
+  - transformers
+  - unliftio
+  - utf8-string
+  - vector
+  - vm-tools
+
+
+executables:
+  exprs-needed:
+    source-dirs: exec_src
+    other-modules: []
+    main: ExprsNeeded.hs
+    dependencies:
+      - containers
+      - parsec
+      - solid-vm
+      - solid-vm-model
+      - solid-vm-parser
+      - solid-vm-static-analysis
+      - text
+
+tests:
+  solid-vm-spec:
+    source-dirs: tests/
+    main: Main.hs
+    dependencies:
+      - async
+      - base16-bytestring
+      - blockapps-datadefs
+      - blockapps-mpdbs
+      - bytestring
+      - common-log
+      - containers
+      - deepseq
+      - ethereum-rlp
+      - hflags
+      - hspec
+      - hspec-expectations-lifted
+      - labeled-error
+      - lens
+      - merkle-patricia-db
+      - monad-alter
+      - raw-strings-qq
+      - solid-vm
+      - solid-vm-model
+      - solid-vm-static-analysis
+      - source-tools
+      - strato-model
+      - text
+      - time
+      - vm-tools
+      - utf8-string
+
+benchmarks:
+    codebench:
+      source-dirs: bench/
+      main: CodeBench.hs
+      dependencies:
+        - file-embed
+        - solid-vm

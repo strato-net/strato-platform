@@ -1,0 +1,99 @@
+name: vm-tools
+version: 0.0.4
+build-type: Simple
+author: Jamshid
+maintainer:    jamshidnh@gmail.com
+synopsis: types and tools needed to write a VM for Strato
+category:      Data Structures
+
+dependencies:
+  - base
+  - blockapps-data
+  - blockapps-datadefs
+  - blockstanbul
+  - containers
+  - exceptions
+  - hflags
+  - milena-tools
+  - strato-conf
+  - strato-model
+
+library:
+  source-dirs: src/
+  exposed-modules:
+    - Blockchain.Bagger
+    - Blockchain.Bagger.BaggerState
+    - Blockchain.Bagger.Transactions
+    - Blockchain.Data.BlockSummary
+    - Blockchain.Data.ExecResults
+    - Blockchain.DB.BlockSummaryDB
+    - Blockchain.DB.ModifyStateDB
+    - Blockchain.Stream.Action
+    - Blockchain.Stream.VMEvent
+    - Blockchain.Stream.VMOutput
+    - Blockchain.Timing
+    - Blockchain.TxRunResultCache
+    - Blockchain.MemVMContext
+    - Blockchain.VMContext
+    - Blockchain.VMOptions
+    - Blockchain.VM.VMException
+    - Blockchain.VMMetrics
+    - Executable.EVMFlags
+  ghc-options: -Wall -O2
+  dependencies:
+    - aeson
+    - ansi-wl-pprint
+    - binary
+    - blockapps-mpdbs
+    - bytestring
+    - common-log
+    - conduit
+    - cross-monitoring
+    - data-default
+    - debugger
+    - deepseq
+    - directory
+    - dlist
+    - ethereum-rlp
+    - exceptions
+    - extra
+    - format
+    - generic-arbitrary
+    - hedis
+    - lens
+    - leveldb-haskell
+    - lrucache
+    - merkle-patricia-db
+    - milena
+    - monad-alter
+    - mtl
+    - nibblestring
+    - persistent-sqlite
+    - prometheus-client
+    - QuickCheck
+    - quickcheck-instances
+    - resourcet
+    - seqevents
+    - solid-vm-model
+    - strato-adit
+    - strato-redis-blockdb
+    - text
+    - time
+    - transformers
+    - unliftio
+    - unordered-containers
+    - x509-certs
+
+
+
+tests:
+  contextm-test:
+    source-dirs: test/
+    main: Spec.hs
+    dependencies:
+      - bytestring
+      - common-log
+      - labeled-error
+      - hspec
+      - hspec-expectations-lifted
+      - vm-tools

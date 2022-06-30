@@ -18,8 +18,6 @@ if (!process.env.USER_TOKEN) {
 
 const config = factory.getTestConfig();
 
-const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
-
 const fixtures = factory.getTestFixtures();
 
 describe("contracts", function() {
@@ -28,7 +26,7 @@ describe("contracts", function() {
   const options:Options = { config };
 
   before(async () => {
-    const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
+    const oauth:oauthUtil = await oauthUtil.init(config.nodes[0].oauth);
     let accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
     const userArgs:OAuthUser = { token: accessToken.token.access_token };
     admin = await factory.createAdmin(userArgs, options);
@@ -112,6 +110,7 @@ describe("state", function() {
   const options:Options = { config };
 
   before(async () => {
+    const oauth:oauthUtil = await oauthUtil.init(config.nodes[0].oauth);
     let accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
     const userArgs = { token: accessToken.token.access_token };
     admin = await factory.createAdmin(userArgs, options);
@@ -210,6 +209,7 @@ describe("call", function() {
   const var2 = 5678;
 
   before(async () => {
+    const oauth:oauthUtil = await oauthUtil.init(config.nodes[0].oauth);
     let accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
     const userArgs = { token: accessToken.token.access_token };
     admin = await factory.createAdmin(userArgs, options);
@@ -291,9 +291,10 @@ describe("auth user", function() {
   const options:Options = { config };
 
   let user:OAuthUser;
+  let oauth:oauthUtil;
 
   before(async () => {
-    const oauth:oauthUtil = oauthUtil.init(config.nodes[0].oauth);
+    oauth = await oauthUtil.init(config.nodes[0].oauth);
     let accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
     user = { token: accessToken.token.access_token };
   });
@@ -354,6 +355,7 @@ describe("history", function() {
   const options:Options = { config };
 
   before(async () => {
+    const oauth:oauthUtil = await oauthUtil.init(config.nodes[0].oauth);
     let accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
     const userArgs = { token: accessToken.token.access_token };
     admin = await factory.createAdmin(userArgs, options);
@@ -362,7 +364,7 @@ describe("history", function() {
   it("test history", async () => {
     const filename = `${fixtures}/TestHistory.sol`;
     const fst = Math.floor(Math.random() * 100)
-    const scd = Math.floor(Math.random() * 100)
+    const scd = fst + 1
     const contractArgs = {
       name: "TestHistory",
       source: fsUtil.get(filename),
@@ -396,19 +398,34 @@ describe("history", function() {
     const result = await rest.call(admin, callArgs, options);
     console.log(result);
 
+      
     const contractHistory = await rest.searchUntil(
+      admin,
+      { name: `history@TestHistory` },
+      (r) => r.length > 1,
+      {
+        ...options,
+        query: {
+          address: `eq.${contract.address}`
+        }
+      }
+    );
+    assert.isArray(contractHistory);
+    assert.equal(contractHistory.length, 2);
+
+    const filteredContractHistory = await rest.searchUntil(
       admin,
       { name: `history@TestHistory` },
       (r) => r.length > 0,
       {
         ...options,
         query: {
-          x: `eq.${fst}`,
+          x: `eq.${scd}`,
           address: `eq.${contract.address}`
         }
       }
     );
-    assert.isArray(contractHistory);
-    assert.equal(contractHistory.length, 1);
+    assert.isArray(filteredContractHistory);
+    assert.equal(filteredContractHistory.length, 1);
   });
 });

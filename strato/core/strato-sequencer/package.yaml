@@ -1,0 +1,161 @@
+name:                strato-sequencer
+version:             0.1.0.0
+author:              Ilya Ostrovskiy
+maintainer:          ilya@blockapps.net
+copyright:           2016 BlockApps Inc
+category:            Blockchain
+build-type:          Simple
+
+
+dependencies:
+  - base
+
+ghc-options: -Wall -O2 -threaded -rtsopts -fprof-auto
+
+library:
+  source-dirs:     src
+  dependencies:
+    - alarmclock
+    - base16-bytestring
+    - binary
+    - blockapps-data
+    - blockapps-datadefs
+    - blockapps-privacy
+    - blockapps-vault-wrapper-api
+    - blockapps-vault-wrapper-client
+    - blockstanbul
+    - bytestring
+    - clock
+    - common-log
+    - conduit
+    - data-default
+    - directory
+    - ethereum-rlp
+    - extra
+    - format
+    - http-client
+    - labeled-error
+    - lens
+    - leveldb-haskell
+    - lifted-async
+    - milena
+    - monad-alter
+    - prometheus-client
+    - seqevents
+    - stm
+    - stm-conduit
+    - strato-conf
+    - strato-model
+    - servant-client
+    - text
+    - time
+    - classy-prelude
+    - containers
+    - milena-tools
+    - mtl
+    - partitioner
+    - resourcet
+    - stm-chans
+    - unliftio
+
+executables:
+  strato-sequencer:
+    source-dirs:      exec-src
+    main:             Main.hs
+    dependencies:
+      - aeson
+      - async
+      - blockapps-data
+      - blockapps-init
+      - blockapps-vault-wrapper-api
+      - blockapps-vault-wrapper-client
+      - blockstanbul
+      - bytestring
+      - common-log
+      - extra
+      - hflags
+      - http-client
+      - milena
+      - prometheus-client
+      - safe
+      - seqevents
+      - servant-client
+      - stm
+      - stm-chans
+      - strato-conf
+      - strato-model
+      - strato-networks
+      - strato-sequencer
+      - text
+      - wai-middleware-prometheus
+      - warp
+    other-modules: [Flags]
+
+  forced-config-change:
+    source-dirs: exec-src
+    main: ForcedConfigChange.hs
+    other-modules: []
+    dependencies:
+      - blockstanbul
+      - hflags
+      - milena
+      - seqevents
+      - strato-conf
+
+tests:
+  strato-sequencer-spec:
+    source-dirs:   test
+    main:          Main.hs
+    ghc-options: -threaded
+    dependencies:
+      - async
+      - base16-bytestring
+      - blockapps-data
+      - blockapps-datadefs
+      - blockapps-privacy
+      - blockstanbul
+      - bytestring
+      - classy-prelude
+      - common-log
+      - conduit
+      - containers
+      - directory
+      - entropy
+      - ethereum-rlp
+      - format
+      - hflags
+      - hspec
+      - hspec-contrib
+      - hspec-core
+      - hspec-expectations-lifted
+      - HUnit
+      - labeled-error
+      - monad-alter
+      - mtl
+      - QuickCheck
+      - seqevents
+      - servant-client
+      - stm
+      - stm-chans
+      - strato-model
+      - strato-sequencer
+      - time
+      - unliftio
+      - wai-extra
+      - wai-middleware-prometheus
+      - warp
+
+benchmarks:
+  send-to-blockstanbul:
+    source-dirs: bench/
+    main: BlockstanbulSend.hs
+    dependencies:
+      - blockstanbul
+      - strato-sequencer
+      - blockapps-data
+      - classy-prelude
+      - containers
+      - mtl
+      - resourcet
+      - stm-chans
+      - unliftio

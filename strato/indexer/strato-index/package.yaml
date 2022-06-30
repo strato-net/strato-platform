@@ -1,0 +1,75 @@
+name:        strato-index
+author:      Jamshid
+copyright:   2016 Blockapps
+description: Please see README.md
+version:     0.1.0.0
+
+ghc-options: -threaded -rtsopts -with-rtsopts=-N
+
+dependencies:
+  - base
+  - milena-tools
+
+library:
+  source-dirs: src/
+  dependencies:
+  - binary
+  - blockapps-data
+  - blockapps-datadefs
+  - bytestring
+  - common-log
+  - conduit
+  - containers
+  - deepseq
+  - format
+  - hedis
+  - milena
+  - monad-alter
+  - resourcet
+  - seqevents
+  - strato-conf
+  - strato-model
+  - strato-redis-blockdb
+  - text
+  - transformers
+
+executables:
+  strato-api-indexer:
+    main: ApiIndexerMain.hs
+    source-dirs: exec_src
+    dependencies:
+      - blockapps-init
+      - common-log
+      - hflags
+      - strato-index
+    other-modules: []
+
+  strato-p2p-indexer:
+    main: P2PIndexerMain.hs
+    source-dirs: exec_src
+    dependencies:
+      - blockapps-init
+      - common-log
+      - hflags
+      - strato-index
+    other-modules: []
+
+  strato-txr-indexer:
+    main: TxrIndexerMain.hs
+    source-dirs: exec_src/
+    dependencies:
+      - blockapps-init
+      - common-log
+      - hflags
+      - strato-index
+    other-modules: []
+
+tests:
+  strato-index-test:
+    source-dirs: test/
+    main: Spec.hs
+    dependencies:
+    - blockapps-data
+    - blockapps-datadefs
+    - hspec
+    - strato-index

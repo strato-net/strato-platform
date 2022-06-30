@@ -1,0 +1,42 @@
+name: solid-vm-fuzzer
+
+dependencies:
+  - base
+
+library:
+  source-dirs: src/
+  exposed-modules:
+    - SolidVM.Solidity.Fuzzer
+    - SolidVM.Solidity.Fuzzer.Types
+    - SolidVM.Solidity.SourceTools
+  ghc-options: -Wall -O2
+  dependencies:
+  - aeson
+  - bytestring
+  - common-log
+  - containers
+  - debugger
+  - lens
+  - QuickCheck
+  - servant-server
+  - solid-vm
+  - solid-vm-model
+  - solid-vm-static-analysis
+  - source-tools
+  - strato-model
+  - text
+  - transformers
+  - vm-tools
+
+tests:
+  solid-vm-spec:
+    source-dirs: tests/
+    main: Main.hs
+    dependencies:
+      - hflags
+      - hspec
+      - raw-strings-qq
+      - solid-vm-fuzzer
+      - source-tools
+      - text
+      - vm-tools

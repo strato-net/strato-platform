@@ -1,0 +1,129 @@
+name:                blockapps-vault-wrapper-server
+version:             0.1.0.0
+github:              "githubuser/vault-wrapper"
+author:              "Author name here"
+maintainer:          "example@example.com"
+copyright:           "2018 Author name here"
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on GitHub at <https://github.com/githubuser/server#readme>
+
+dependencies:
+- base
+- blockapps-vault-wrapper-api
+- common-log
+- postgresql-simple
+
+library:
+  source-dirs: src
+  dependencies:
+    - bytestring
+    - cache
+    - clock
+    - cryptonite
+    - http-client
+    - lens
+    - monad-control
+    - mtl
+    - opaleye
+    - product-profunctors
+    - profunctors
+    - saltine
+    - servant-swagger
+    - strato-model
+    - swagger2
+    - transformers
+    - unliftio
+    - resource-pool
+    - secp256k1-haskell == 0.2.0
+    - servant-server
+    - text
+
+
+executables:
+  blockapps-vault-wrapper-server:
+    source-dirs: app
+    main: Main.hs
+    other-modules: [Options]
+    dependencies:
+      - blockapps-vault-wrapper-server
+      - blockapps-init
+      - cache
+      - clock
+      - hflags
+      - http-client
+      - resource-pool
+      - servant-options
+      - servant-server
+      - wai-cors
+      - wai-extra
+      - wai-middleware-prometheus
+      - warp
+    ghc-options: -threaded
+      
+  migrate-keys:
+    source-dirs: app
+    main: MigrateKeys.hs
+    other-modules: [Options]
+    dependencies:
+      - blockapps-vault-wrapper-server
+      - bytestring
+      - csv
+      - hflags
+      - lens
+      - opaleye
+      - text
+
+  migrate-nodekey:
+    source-dirs: app
+    main: MigrateNodeKey.hs
+    other-modules: [Options]
+    dependencies:
+      - blockapps-vault-wrapper-server
+      - base64-bytestring
+      - bytestring
+      - cryptonite
+      - hflags
+      - opaleye
+      - saltine
+      - strato-model
+      - text
+
+  migrate-salt:
+    source-dirs: app
+    main: MigrateSalt.hs
+    other-modules: [Options]
+    dependencies:
+      - blockapps-vault-wrapper-server
+      - bytestring
+      - hflags
+      - lens
+      - opaleye
+      - saltine
+      - strato-model
+      - text
+
+tests:
+  vault-wrapper-spec:
+    source-dirs: test/
+    main: Spec.hs
+    dependencies:
+      - blockapps-data
+      - blockapps-vault-wrapper-server
+      - bytestring
+      - clockwork
+      - cryptonite
+      - hspec
+      - labeled-error
+      - secp256k1-haskell
+      - strato-model
