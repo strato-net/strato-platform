@@ -4285,3 +4285,15 @@ contract qq {
 }
 |]
     getFields ["hsh"] `shouldReturn` [BString $ word256ToBytes 0x5C0BE87ED7434D69005F8BBD84CAD8AE6ABFD49121B4AAEEB4C1F4A2E2987711]
+    
+  it "can use the builtin ripemd160 function" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+  bytes20 hsh;
+  constructor() public {
+    string username = "uname";
+    hsh = ripemd160(username);
+  }
+}|]
+    getFields ["hsh"] `shouldReturn` [BString $ B.pack $ word160ToBytes 0x63f4a6f6005b0ded8c5fc7e62ddf2550e9320410]
