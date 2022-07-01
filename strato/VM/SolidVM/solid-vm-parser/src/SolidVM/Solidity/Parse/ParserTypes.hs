@@ -20,15 +20,14 @@ import           Text.Parsec
 type FileName = SourceName
 -- | Names of types, variables, functions, etc. in Solidity code.
 type Identifier = String
--- | Names of contracts.  They have to be the same as identifiers because
--- contracts can also be types.
-type Name = Identifier
+
 -- | We parse directly from the textual source, without pre-lexing.
 
 -- Store the pragma version to allow for different things to happen when the pragma is different
 type PragmaVersion = Identifier
 
---Store the contract's actual name
+-- | Names of contracts.  They have to be the same as identifiers because
+-- contracts can also be types.
 type ContractName = Identifier
 
 type SourceCode = String
