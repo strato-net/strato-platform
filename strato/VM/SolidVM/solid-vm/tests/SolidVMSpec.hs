@@ -4308,3 +4308,20 @@ contract qq{
   }
 }|]
     getFields ["mynum"] `shouldReturn` [BInteger 1000000000000]
+
+  it "can use ether number unit suffixes" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq{
+  uint weiUnit;
+  uint szaboUnit;
+  uint finneyUnit;
+  uint etherUnit;
+  constructor() public {
+    weiUnit = 2 wei;
+    szaboUnit = 2 szabo;
+    finneyUnit = 2 finney;
+    etherUnit = 2 ether;
+  }
+}|]
+    getFields ["weiUnit", "szaboUnit", "finneyUnit", "etherUnit"] `shouldReturn` [BInteger 2, BInteger 2000000000000, BInteger 2000000000000000, BInteger 2000000000000000000]

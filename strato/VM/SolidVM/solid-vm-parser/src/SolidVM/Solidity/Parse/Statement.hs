@@ -318,7 +318,7 @@ numberUnit :: SolidityParser NumberUnit
 numberUnit = do
   (reserved "wei" >> return Wei)
     <|> (reserved "szabo" >> return Szabo)
-    <|> (reserved "finny" >> return Finney)
+    <|> (reserved "finney" >> return Finney)
     <|> (reserved "ether" >> return Ether)
 
 parseArgs :: SolidityParser [Expression]
