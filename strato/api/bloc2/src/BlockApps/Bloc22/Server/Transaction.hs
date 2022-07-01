@@ -55,7 +55,7 @@ import qualified Data.Text                         as Text
 import qualified Data.Text.Encoding                as Text
 import           Data.Time.Clock
 import           Data.Word
-import qualified Database.Esqueleto                as E
+import qualified Database.Esqueleto.Legacy                as E
 import qualified Blockchain.DB.SQLDB               as SQLDB
 import           System.Clock
 import           UnliftIO
@@ -486,10 +486,14 @@ postUsersContractEVM' cacheNonce ContractParameters{..} userName = blocTransacti
   (cName,ContractDetails{..}) <- getContractDetailsForContract "EVM" src contract >>= \case
     Nothing -> throwIO $ UserError "You need to supply at least one contract in the source"
     Just x -> pure x
-  let
-    (bin,leftOver) = Base16.decode $ Text.encodeUtf8 contractdetailsBin
-    metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("src", serializeSourceMap contractdetailsSrc),("name", cName)]
-  unless (ByteString.null leftOver) $ throwIO $ AnError "Couldn't decode binary"
+
+  bin <-
+    case Base16.decode $ Text.encodeUtf8 contractdetailsBin of
+      Right val -> return val
+      _ -> throwIO $ AnError "Couldn't decode binary"
+
+  let metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("src", serializeSourceMap contractdetailsSrc),("name", cName)]
+  
   let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi
   argsBin <- constructArgValues args xabiArgs
   tx <- signAndPrepare userName fromAddr metadata' $
@@ -613,8 +617,11 @@ postUsersUploadListEVM' cacheNonce ContractListParameters{..} userName = do
       let xabiArgs = maybe Map.empty funcArgs $ xabiConstr contractdetailsXabi
       argsBin <- lift $ constructArgValues (Just args) xabiArgs
       let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("src", serializeSourceMap src),("name",name)]
-          (bin,leftOver) = Base16.decode $ Text.encodeUtf8 contractdetailsBin
-      unless (ByteString.null leftOver) $ throwIO $ AnError "Couldn't decode binary"
+      bin <-
+        case Base16.decode $ Text.encodeUtf8 contractdetailsBin of
+          Right val -> return val
+          _ -> throwIO $ AnError "Couldn't decode binary"
+
       tx <- lift . signAndPrepare userName fromAddr metadata' $
           TransactionHeader
             Nothing

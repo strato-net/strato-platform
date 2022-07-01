@@ -17,7 +17,7 @@ strToAddress::String->Either String Address
 strToAddress ('0':'x':val) =
   case (odd $ length val, B16.decode $ BC.pack val) of
    (True, _) -> Left "hex string has odd length"
-   (False, (b, "")) ->
+   (False, Right b) ->
      case decodeOrFail $ BL.fromStrict b of
       Left (_, _, e)         -> Left e
       Right ("", _, address) -> Right address
@@ -29,6 +29,6 @@ strToByteString::String->Either String B.ByteString
 strToByteString ('0':'x':val) =
   case (odd $ length val, B16.decode $ BC.pack val) of
    (True, _)        -> Left "hex string has odd length"
-   (False, (b, "")) -> Right b
+   (False, Right b) -> Right b
    _                -> Left "invalid hex"
 strToByteString _ = Left "missing 0x prefix for hex data"

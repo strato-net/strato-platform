@@ -57,8 +57,7 @@ import qualified Text.Colors                      as CL
 import           Text.Format
 
 import           Blockchain.Data.RLP
-
-
+import qualified LabeledError
 
 -- This module is a wrapper for Crypto.Secp256k1, with
 -- all the extra instances we need
@@ -120,7 +119,7 @@ instance ToJSON PrivateKey where
   toJSON = String . T.pack . C8.unpack . B16.encode . exportPrivateKey
 
 instance FromJSON PrivateKey where
-  parseJSON (String str) = maybe err pure $ importPrivateKey $ fst $ B16.decode $ C8.pack $ T.unpack str
+  parseJSON (String str) = maybe err pure $ importPrivateKey $ LabeledError.b16Decode "FromJSON<PrivateKey>" $ C8.pack $ T.unpack str
     where err = fail $ "parseJSON for PrivateKey failed to read " ++ T.unpack str
   parseJSON x = fail $ "parseJSON for PrivateKey: expected string, got " ++ show x
 
@@ -153,7 +152,7 @@ instance ToJSON PublicKey where
   toJSON = String . T.pack . C8.unpack . B16.encode . exportPublicKey False
 
 instance FromJSON PublicKey where
-  parseJSON (String str) = maybe err pure $ importPublicKey $ fst $ B16.decode $ C8.pack $ T.unpack str
+  parseJSON (String str) = maybe err pure $ importPublicKey $ LabeledError.b16Decode "FromJSON<PublicKey>" $ C8.pack $ T.unpack str
     where err = fail $ "parseJSON for PublicKey failed to read " ++ T.unpack str
   parseJSON x = fail $ "parseJSON for PublicKey: expected string, got " ++ show x
 
@@ -168,7 +167,7 @@ instance ToJSON SharedKey where
   toJSON = String . T.pack . C8.unpack . B16.encode . coerce
 
 instance FromJSON SharedKey where
-  parseJSON (String str) = return $ SharedKey $ fst $ B16.decode $ C8.pack $ T.unpack str
+  parseJSON (String str) = return $ SharedKey $ LabeledError.b16Decode "FromJSON<SharedKey>" $ C8.pack $ T.unpack str
   parseJSON x = fail $ "parseJSON failed for SharedKey: expected string, got " ++ show x
 
 instance ToSchema SharedKey where
@@ -259,7 +258,7 @@ instance FromJSON Signature where
     s <- o .: "s"
     v <- o .: "v"
     return $ Signature $ S.CompactRecSig (dec r) (dec s) v
-      where dec = BSS.toShort . fst . B16.decode . C8.pack . T.unpack
+      where dec = BSS.toShort . LabeledError.b16Decode "FromJSON<Signature>" . C8.pack . T.unpack
   parseJSON o = fail $ "parseJSON Signature failed: expected object, got: " ++ show o
 
 instance ToSchema Signature where

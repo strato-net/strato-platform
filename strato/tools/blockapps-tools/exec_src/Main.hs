@@ -4,7 +4,6 @@
 {-# OPTIONS_GHC -Wall #-}
 
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Base16             as B16
 import qualified Data.ByteString.Char8              as BC
 import           Data.Int
 import           System.Console.CmdArgs
@@ -44,6 +43,8 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256 hiding (hash)
+
+import qualified LabeledError
 
 data Options = State{root::String, db::String}
              | Block{hash::String, db::String}
@@ -401,7 +402,7 @@ main = do
 -------------------
 
 run::Options->IO ()
-run State{..}                  = let sr = MP.StateRoot $ fst $ B16.decode $ BC.pack root in State.doit db sr
+run State{..}                  = let sr = MP.StateRoot $ LabeledError.b16Decode "queryStrato/run" $ BC.pack root in State.doit db sr
 run DumpRedis{..}              = dumpRedis databaseNumber
 run CanonRedis{..}             = canonRedis ipAddress start range
 run Block{..}                  = Block.doit db hash
@@ -410,8 +411,8 @@ run Hash{..}                   = Hash.doit db hash
 run Code{..}                   = Code.doit db hash
 run Raw{..}                    = Raw.doit filename
 run RLP{..}                    = RLP.doit filename
-run RawMP{..}                  = RawMP.doit filename (MP.StateRoot . fst . B16.decode $ BC.pack stateRoot)
-run FRawMP{..}                 = FRawMP.doit filename (MP.StateRoot . fst . B16.decode $ BC.pack stateRoot)
+run RawMP{..}                  = RawMP.doit filename (MP.StateRoot . LabeledError.b16Decode "queryStrato/run" $ BC.pack stateRoot)
+run FRawMP{..}                 = FRawMP.doit filename (MP.StateRoot . LabeledError.b16Decode "queryStrato/run" $ BC.pack stateRoot)
 run DumpKafkaSequencer{..}     = dumpKafkaSequencer (fromIntegral startingBlock)
 run DumpKafkaSequencerVM{..}   = dumpKafkaSequencerVM (fromIntegral startingBlock)
 run DumpKafkaSequencerP2P{..}  = dumpKafkaSequencerP2P (fromIntegral startingBlock)
@@ -430,7 +431,7 @@ run Checkpoints{..}            = case operation of
 run AskForBlocks{..}           = insertP2P (P2pAskForBlocks startBlock endBlock peer)
 run PushBlocks{..}             = insertP2P (P2pPushBlocks startBlock endBlock peer)
 run AskForTxs                  = insertP2P . P2pGetTx
-                                           . map (unsafeCreateKeccak256FromByteString . fst . B16.decode)
+                                           . map (unsafeCreateKeccak256FromByteString . LabeledError.b16Decode "queryStrato/run")
                                            . filter (not . B.null)
                                            . BC.split '\n' =<< B.getContents
 run RSVP{..}                   = rsvp chainId memberId address

@@ -23,7 +23,7 @@ import qualified Blockchain.Database.MerklePatricia as MP
 decodeKV :: [ByteString] -> ([N.Nibble], MP.Val)
 decodeKV [k, x] =
   case B16.decode x of
-    (v, "") -> (map c2n $ BC.unpack k, RLPString v)
+    Right v -> (map c2n $ BC.unpack k, RLPString v)
     _ -> error $ "you are trying to decode a value that is not base16 encoded: " ++ show x
 decodeKV x = error $ "input format not correct: " ++ show x
 

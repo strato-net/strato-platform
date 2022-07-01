@@ -6,7 +6,6 @@ import Data.Aeson
 import Data.Time.Clock
 import Data.Time.Calendar
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Base16 as B16
 import qualified Data.JsonStream.Parser               as JS
 
 
@@ -16,6 +15,8 @@ import Blockchain.Database.MerklePatricia.StateRoot
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256
+
+import qualified LabeledError
 
 spec :: Spec
 spec = do
@@ -96,9 +97,9 @@ spec = do
                        (EVMCode $ unsafeCreateKeccak256FromWord256 0xed92eeba73797150099ef9035b92e3bc3a3cd3b18da36f51385910726606e1f1)
               ],
             genesisInfoCodeInfo = [],
-            genesisInfoTransactionRoot = StateRoot . fst . B16.decode $
+            genesisInfoTransactionRoot = StateRoot . LabeledError.b16Decode "JsonSpec.hs" $
               "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
-            genesisInfoReceiptsRoot =  StateRoot . fst . B16.decode $
+            genesisInfoReceiptsRoot =  StateRoot . LabeledError.b16Decode "JsonSpec.hs" $
               "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
             genesisInfoLogBloom = BS.replicate 256 0,
             genesisInfoDifficulty = 8192,
@@ -148,9 +149,9 @@ spec = do
                        (EVMCode $ unsafeCreateKeccak256FromWord256 0xed92eeba73797150099ef9035b92e3bc3a3cd3b18da36f51385910726606e1f1)
               ],
             genesisInfoCodeInfo = [],
-            genesisInfoTransactionRoot = StateRoot . fst . B16.decode $
+            genesisInfoTransactionRoot = StateRoot . LabeledError.b16Decode "JsonSpec.hs" $
               "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
-            genesisInfoReceiptsRoot =  StateRoot . fst . B16.decode $
+            genesisInfoReceiptsRoot =  StateRoot . LabeledError.b16Decode "JsonSpec.hs" $
               "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
             genesisInfoLogBloom = BS.replicate 256 0,
             genesisInfoDifficulty = 8192,

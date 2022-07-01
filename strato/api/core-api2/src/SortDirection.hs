@@ -5,7 +5,7 @@ module SortDirection where
 import           Control.Lens.Operators
 import           Data.Swagger
 import qualified Data.Text                   as T
-import qualified Database.Esqueleto as E
+import qualified Database.Esqueleto.Legacy as E
 import           Database.Persist.Postgresql
 import           Servant
 

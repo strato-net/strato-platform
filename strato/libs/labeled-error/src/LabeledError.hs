@@ -5,6 +5,8 @@ import           Data.Bifunctor (first)
 import           Prelude hiding (head, tail)
 import qualified Prelude
 
+import Data.ByteString (ByteString)
+import qualified Data.ByteString.Base16 as B16
 import Data.Maybe
 import Text.Read
 
@@ -21,3 +23,9 @@ head _ x = Prelude.head x
 tail :: String -> [a] -> [a]
 tail label [] = error $ "[" ++ label ++ "]: 'tail' was called on an empty list"
 tail _ x = Prelude.tail x
+
+b16Decode :: String -> ByteString -> ByteString
+b16Decode label input =
+  case B16.decode input of
+    Right val -> val
+    _ -> error $ "[" ++ label ++ "]: 'b16Decode' was called on invalid data"

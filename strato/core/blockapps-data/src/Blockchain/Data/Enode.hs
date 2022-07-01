@@ -193,10 +193,10 @@ readEnodeOrFail input =
           pubkey = if publen >= 128
                      then pubkey'
                      else replicate (128 - publen) '0' <> pubkey'
-          ~(oId, rest) = B16.decode $ C8.pack pubkey
-      orgId <- if B.null rest
-        then pure $ OrgId oId
-        else Left $ "Failed on parsing OrdId: " ++ pubkey
+      orgId <-
+        case B16.decode $ C8.pack pubkey of
+          Right oId -> pure $ OrgId oId
+          _ -> Left $ "Failed on parsing OrdId: " ++ pubkey
       ipAddr <- readEitherIP ip
       tcp <- LabeledError.readEither "Enode/readEnodeOrFail" port'
       udp <- case discport of

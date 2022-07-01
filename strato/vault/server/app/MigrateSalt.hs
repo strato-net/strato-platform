@@ -34,8 +34,8 @@ import           Options
 
 
 getUsersQuery :: Connection -> IO [(Int32, B.ByteString, SB.Nonce, B.ByteString)] 
-getUsersQuery conn = runQuery conn $ proc () -> do
-  (userId, _, salt, nonce, _, encKey, _) <- queryTable usersTable -< ()
+getUsersQuery conn = runSelect conn $ proc () -> do
+  (userId, _, salt, nonce, _, encKey, _) <- selectTable usersTable -< ()
   returnA -< (userId, salt, nonce, encKey)
 
 
@@ -56,7 +56,7 @@ main = do
   let pw = VC.textPassword $ T.pack flags_pw
   
   -- create the Secretbox.key from the pw and salt/nonce/ciphertext in messages table
-  (mMsgLst :: [(B.ByteString, SB.Nonce, B.ByteString)]) <- runQuery conn VQ.getMessageQuery
+  (mMsgLst :: [(B.ByteString, SB.Nonce, B.ByteString)]) <- runSelect conn VQ.getMessageQuery
   pwKey <- case mMsgLst of
     [] -> error "message table is empty, so the password must not be set. Aborting..."
     [(msgSalt, msgNonce, ciphertext)] -> do
@@ -87,8 +87,8 @@ main = do
   -- update all the rows with the new encrypted keys
   rowsChanged <- return . sum =<< mapM (\(newKey, rowId) -> runUpdate_ conn $ Update
                                    { uTable = usersTable
-                                   , uUpdateWith = updateEasy (set _6 (constant newKey))
-                                   , uWhere = views _1 (.== constant rowId)
+                                   , uUpdateWith = updateEasy (set _6 (toFields newKey))
+                                   , uWhere = views _1 (.== toFields rowId)
                                    , uReturning = rCount
                                    }) idsAndNewEncKeys
 

@@ -25,7 +25,6 @@ library:
   - hedis
   - milena
   - monad-alter
-  - persistent-postgresql
   - resourcet
   - seqevents
   - strato-conf

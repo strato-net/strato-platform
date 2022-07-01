@@ -2,18 +2,18 @@
 --import Control.Monad
 --import Control.Monad.Trans.Class
 --import Control.Monad.IO.Class
-import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import Data.Conduit
 import Data.Conduit.List (sourceList)
 import qualified Database.LevelDB as LDB
 
+import qualified LabeledError
 import LevelDBTools
 
 main :: IO ()
 main = do
   c <- fmap (map BC.words . BC.lines) $ BC.getContents
-  let input = map (\[x, y] -> (LevelKV (fst $ B16.decode x) (fst $ B16.decode y))) c
+  let input = map (\[x, y] -> (LevelKV (LabeledError.b16Decode "insertLDB.hs" x) (LabeledError.b16Decode "insertLDB.hs" y))) c
 
 
 

@@ -91,7 +91,7 @@ blocQuery :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y, Has
 blocQuery q = do
   traverse_ (logInfoCS callStack . Text.pack) (showSql q)
   BlocSQLEnv pool <- access Proxy
-  liftIO $ withResource pool $ liftIO . flip runQuery q
+  liftIO $ withResource pool $ liftIO . flip runSelect q
 
 blocQueryMaybe
   :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y,
@@ -143,7 +143,7 @@ blocStrato client' = do
   logInfoCS callStack "Querying Strato"
   CoreAPIData url mgr <- access Proxy
   resultEither <-
-    liftIO $ runClientM client' (ClientEnv mgr url Nothing)
+    liftIO $ runClientM client' (mkClientEnv mgr url)
   either (blocError . StratoError) return resultEither
 
 blocVaultWrapper :: (MonadIO m, MonadLogger m, HasVault m, HasCallStack) =>
@@ -152,7 +152,7 @@ blocVaultWrapper client' = do
   logInfoCS callStack "Querying Vault Wrapper"
   VaultData url mgr <- access Proxy
   resultEither <-
-    liftIO $ runClientM client' (ClientEnv mgr url Nothing)
+    liftIO $ runClientM client' (mkClientEnv mgr url)
   either (blocError . VaultWrapperError) return resultEither
 
 blocMaybe :: MonadIO m => Text -> Maybe x -> m x

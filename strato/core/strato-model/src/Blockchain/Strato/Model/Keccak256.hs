@@ -59,6 +59,7 @@ import              FastKeccak256
 import              Blockchain.Data.RLP
 import              Blockchain.Strato.Model.ExtendedWord
 import              Blockchain.Strato.Model.Util
+import qualified    LabeledError
 import qualified    Text.Colors                          as CL
 import              Text.Format
 
@@ -108,7 +109,7 @@ instance Ae.ToJSON Keccak256 where
 instance Ae.FromJSON Keccak256 where
   parseJSON = Ae.withText "Keccak256" $ \t ->
     case B16.decode $ BC.pack $ T.unpack t of
-      (val, "") -> pure $ Keccak256 val
+      Right val -> pure $ Keccak256 val
       _ -> fail $ "error parsing Keccak256: " ++ show t
 
 instance Ae.ToJSONKey Keccak256 where
@@ -122,7 +123,7 @@ instance PersistField Keccak256 where
   toPersistValue (Keccak256 i) = PersistText . T.pack $ BC.unpack $ B16.encode i
   fromPersistValue (PersistText s) =
     case B16.decode $ BC.pack $ T.unpack s of
-      (val, "") -> Right $ Keccak256 val
+      Right val -> Right $ Keccak256 val
       _ -> Left $ T.pack $ "unable to parse Keccak256: " ++ show s
 
 
@@ -138,12 +139,12 @@ keccak256ToHex (Keccak256 sha) = BC.unpack $ B16.encode sha
 
 -- todo: this shouldn't be partial... ever...
 keccak256FromHex :: String -> Keccak256
-keccak256FromHex = Keccak256 . fst . B16.decode . BC.pack . padZeros 64
+keccak256FromHex = Keccak256 . LabeledError.b16Decode "keccak256FromHex" . BC.pack . padZeros 64
 
 stringKeccak256 :: String -> Maybe Keccak256
 stringKeccak256 string =
   case B16.decode $ BC.pack (padZeros 64 string) of
-    (x, "") -> Just $ Keccak256 x
+    Right x -> Just $ Keccak256 x
     _ -> Nothing
 
 
@@ -187,7 +188,7 @@ instance PathPiece Keccak256 where
   toPathPiece = T.pack . show
   fromPathPiece t =
     case B16.decode $ BC.pack $ T.unpack t of
-      (x, "") -> Just $ Keccak256 x
+      Right x -> Just $ Keccak256 x
       _         -> Nothing
 
 instance ToHttpApiData Keccak256 where
@@ -202,7 +203,7 @@ instance FromHttpApiData Keccak256 where
 instance MimeUnrender PlainText Keccak256 where
   mimeUnrender _ v =
     case B16.decode $ BLC.toStrict v of
-      (bytes, "") -> Right $ Keccak256 bytes
+      Right bytes -> Right $ Keccak256 bytes
       _ -> Left "Couldn't read Keccak"
 
 instance MimeRender PlainText Keccak256 where

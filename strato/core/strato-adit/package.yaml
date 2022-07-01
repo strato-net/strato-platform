@@ -36,7 +36,6 @@ library:
     - random
     - resourcet
     - seqevents
-    - stm
     - strato-conf
     - strato-model
     - text

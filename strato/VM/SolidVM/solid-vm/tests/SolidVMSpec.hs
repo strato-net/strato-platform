@@ -61,6 +61,11 @@ import Blockchain.VMOptions() -- for HFlags
 import SolidVM.Model.SolidString
 import SolidVM.Model.Storable as MS
 import Blockchain.DB.X509CertDB as X509
+import Data.ByteString (putStr)
+import GHC.TypeLits (ErrorMessage(Text))
+import qualified Control.Exception as Blockchain.SolidVM
+import qualified LabeledError
+
 -- The newtype distinguishes uncaught SolidExceptions and
 -- those that are returned in ExecResults
 newtype HandledException = HE SolidException deriving (Show, Exception)
@@ -84,6 +89,10 @@ anyTypeError _ = False
 anyInvalidWriteError :: Selector HandledException
 anyInvalidWriteError (HE Blockchain.SolidVM.Exception.InvalidWrite{}) = True
 anyInvalidWriteError _ = False
+
+anyInvalidArgumentsError :: Selector HandledException
+anyInvalidArgumentsError (HE Blockchain.SolidVM.Exception.InvalidArguments{}) = True
+anyInvalidArgumentsError _ = False
 
 anyInternalError :: Selector HandledException
 anyInternalError (HE Blockchain.SolidVM.Exception.InternalError{}) = True
@@ -517,8 +526,8 @@ spec = do
       getFields ["buf1", "buf2", "hash1", "hash2"] `shouldReturn`
         [ BString (B.replicate 32 0xfe)
         , BString (BC.replicate 32 'x')
-        , BString (fst $ B16.decode "59c3290d81fbdfe9ce1ffd3df2b61185e3089df0e3c49e0918e82a60acbed75a")
-        , BString (fst $ B16.decode "5601c4475f2f6aa73d6a70a56f9c756f24d211a914cc7aff3fb80d2d8741c868")
+        , BString (LabeledError.b16Decode "SolidVMSpec.hs" "59c3290d81fbdfe9ce1ffd3df2b61185e3089df0e3c49e0918e82a60acbed75a")
+        , BString (LabeledError.b16Decode "SolidVMSpec.hs" "5601c4475f2f6aa73d6a70a56f9c756f24d211a914cc7aff3fb80d2d8741c868")
         ]
 
     it "can hash multiple arguments" . runTest $ do
@@ -1745,7 +1754,7 @@ contract qq {
     return (k, k);
   }
 }|]
-    let (kBS, "") = B16.decode "0123456789abcdef0123456789abcdef"
+    let Right kBS = B16.decode "0123456789abcdef0123456789abcdef"
         zero = B.replicate 16 0
     er `shouldBe` Just (SB.toShort $ zero <> kBS <> zero <> kBS)
 
@@ -2043,7 +2052,7 @@ contract qq {
     getFields ["s"] `shouldReturn` [BString "Will the real "]
 
   it "can return an address" . runTest $ do
-    let want' = fst . B16.decode . BC.pack $ showHex (sender ^. accountAddress) ""
+    let want' = LabeledError.b16Decode "SolidVMSpec.hs" . BC.pack $ showHex (sender ^. accountAddress) ""
         want = B.replicate (32 - B.length want') 0x0 <> want'
     runCall "a" "()" [r|
 contract qq {
@@ -3807,21 +3816,21 @@ contract qq {
 
     string myNewCertificate = "-----BEGIN CERTIFICATE-----\nMIIBiDCCAS2gAwIBAgIQCgO76hC29iXEFXJNco5ekjAMBggqhkjOPQQDAgUAMEYx\nDDAKBgNVBAMMA2RhbjEMMAoGA1UEBgwDVVNBMRIwEAYDVQQKDAlibG9ja2FwcHMx\nFDASBgNVBAsMC2VuZ2luZWVyaW5nMB4XDTIxMDMxODE1NDgwN1oXDTIyMDMxODE1\nNDgwN1owRjEMMAoGA1UEAwwDZGFuMQwwCgYDVQQGDANVU0ExEjAQBgNVBAoMCWJs\nb2NrYXBwczEUMBIGA1UECwwLZW5naW5lZXJpbmcwVjAQBgcqhkjOPQIBBgUrgQQA\nCgNCAAQY4p67l1IIEUdVC7L+rUDwF5Nv30bze0NV5y8ced7qwp+YFk3UAiOGkcYo\n7ba8F92rd0yf9AGpvZN1H3Dda8xdMAwGCCqGSM49BAMCBQADRwAwRAIgbKXO8tZ5\noPhBusPQFkNEQDnLO/MRru4KjtCpPnVb5sACIE0TwBJ7yeIGuPc/8G50/858Pf3a\n0t1hHbhYnJarPkNA\n-----END CERTIFICATE-----";
 
-    string myCommonName   = "";
-    string myCountry      = "";
-    string myOrganization = "";
-    string myGroup        = "";
-    string myPublicKey    = "";
+    string myCommonName         = "";
+    string myCountry            = "";
+    string myOrganization       = "";
+    string myOrganizationalUnit = "";
+    string myPublicKey          = "";
 
     constructor() {
-        myCommonName   = parseCert(myNewCertificate)["commonName"];
-        myCountry      = parseCert(myNewCertificate)["country"];
-        myOrganization = parseCert(myNewCertificate)["organization"];
-        myGroup        = parseCert(myNewCertificate)["group"];
-        myPublicKey    = parseCert(myNewCertificate)["publicKey"];
+        myCommonName          = parseCert(myNewCertificate)["commonName"];
+        myCountry             = parseCert(myNewCertificate)["country"];
+        myOrganization        = parseCert(myNewCertificate)["organization"];
+        myOrganizationalUnit  = parseCert(myNewCertificate)["organizationalUnit"];
+        myPublicKey           = parseCert(myNewCertificate)["publicKey"];
     }
 }|]
-    getFields ["myCommonName", "myCountry", "myOrganization", "myGroup", "myPublicKey"] `shouldReturn`
+    getFields ["myCommonName", "myCountry", "myOrganization", "myOrganizationalUnit", "myPublicKey"] `shouldReturn`
       [ BString "dan"
       , BString "USA"
       , BString "blockapps"
@@ -3964,14 +3973,15 @@ contract qq {
     
     string myNewCertificate = "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----";
 
-    string myUsername          = "";
-    string myOrganization      = "";
-    string myGroup             = "";
-    
+
+    string myUsername     = "";
+    string myOrganization = "";
+    string myOrganizationalUnit  = "";
+    string certificate    = "";
     string myCommonName   = "";
     string myCountry      = "";
     string myOrganization = "";
-    string myGroup        = "";
+    string myOrganizationalUnit  = "";
     string myPublicKey    = "";
     string myCertificate  = "";
 
@@ -3980,20 +3990,22 @@ contract qq {
 
         myUsername     = tx.username;
         myOrganization = tx.organization;
-        myGroup        = tx.group;
-        
+        myOrganizationalUnit = tx.organizationalUnit;
+	
+        certificate    = tx.certificate;
         myCommonName   = getUserCert(myAccount)["commonName"];
         myCountry      = getUserCert(myAccount)["country"];
         myOrganization = getUserCert(myAccount)["organization"];
-        myGroup        = getUserCert(myAccount)["group"];
+        myOrganizationalUnit  = getUserCert(myAccount)["organizationalUnit"];
         myPublicKey    = getUserCert(myAccount)["publicKey"];
         myCertificate  = getUserCert(myAccount)["certString"];
     }
 }|]
-    getFields ["myUsername", "myOrganization", "myGroup", "myCommonName", "myCountry", "myOrganization", "myGroup", "myPublicKey", "myCertificate"] `shouldReturn`
+    getFields ["myUsername", "myOrganization", "myOrganizationalUnit", "certificate","myCommonName", "myCountry", "myOrganization", "myOrganizationalUnit", "myPublicKey", "myCertificate"] `shouldReturn`
       [ BString "Admin"
       , BString "BlockApps"
       , BString "Engineering"
+      , BString "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----\n"
       , BString "Admin"
       , BString "USA"
       , BString "BlockApps"
@@ -4277,3 +4289,25 @@ contract qq {
     return 2;
   }
 }|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 2)
+
+  it "cannot allow negative block number" $ runTest (do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+  constructor() public returns (bytes32) {
+    return blockhash(-1);
+  }
+}|]) `shouldThrow` anyInvalidArgumentsError
+
+  it "can use builtin sha256 function" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+  bytes32 hsh;
+  constructor() public {
+    string username = "uname";
+    hsh = sha256(username);
+  }
+}
+|]
+    getFields ["hsh"] `shouldReturn` [BString $ word256ToBytes 0x5C0BE87ED7434D69005F8BBD84CAD8AE6ABFD49121B4AAEEB4C1F4A2E2987711]
