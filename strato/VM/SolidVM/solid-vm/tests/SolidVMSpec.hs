@@ -3787,6 +3787,7 @@ contract qq {
     string myCommonName         = "";
     string myCountry            = "";
     string myOrganization       = "";
+    string myGroup              = "";
     string myOrganizationalUnit = "";
     string myPublicKey          = "";
 
@@ -3794,10 +3795,19 @@ contract qq {
         myCommonName          = parseCert(myNewCertificate)["commonName"];
         myCountry             = parseCert(myNewCertificate)["country"];
         myOrganization        = parseCert(myNewCertificate)["organization"];
+        myGroup               = parseCert(myNewCertificate)["group"];
         myOrganizationalUnit  = parseCert(myNewCertificate)["organizationalUnit"];
         myPublicKey           = parseCert(myNewCertificate)["publicKey"];
     }
 }|]
+    getFields ["myCommonName", "myCountry", "myOrganization", "myGroup", "myPublicKey"] `shouldReturn`
+      [ BString "dan"
+      , BString "USA"
+      , BString "blockapps"
+      , BString "engineering"
+      , BString "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEGOKeu5dSCBFHVQuy/q1A8BeTb99G83tD\nVecvHHne6sKfmBZN1AIjhpHGKO22vBfdq3dMn/QBqb2TdR9w3WvMXQ==\n-----END PUBLIC KEY-----\n"
+      ]
+
     getFields ["myCommonName", "myCountry", "myOrganization", "myOrganizationalUnit", "myPublicKey"] `shouldReturn`
       [ BString "dan"
       , BString "USA"
@@ -3944,11 +3954,13 @@ contract qq {
 
     string myUsername     = "";
     string myOrganization = "";
+    string myGroup        = "";
     string myOrganizationalUnit  = "";
     string certificate    = "";
     string myCommonName   = "";
     string myCountry      = "";
     string myOrganization = "";
+    string myGroup        = "";
     string myOrganizationalUnit  = "";
     string myPublicKey    = "";
     string myCertificate  = "";
@@ -3958,17 +3970,31 @@ contract qq {
 
         myUsername     = tx.username;
         myOrganization = tx.organization;
+        myGroup        = tx.group;
         myOrganizationalUnit = tx.organizationalUnit;
 	
         certificate    = tx.certificate;
         myCommonName   = getUserCert(myAccount)["commonName"];
         myCountry      = getUserCert(myAccount)["country"];
         myOrganization = getUserCert(myAccount)["organization"];
+        myGroup        = getUserCert(myAccount)["group"];
         myOrganizationalUnit  = getUserCert(myAccount)["organizationalUnit"];
         myPublicKey    = getUserCert(myAccount)["publicKey"];
         myCertificate  = getUserCert(myAccount)["certString"];
     }
 }|]
+    getFields ["myUsername", "myOrganization", "myGroup", "certificate","myCommonName", "myCountry", "myOrganization", "myGroup", "myPublicKey", "myCertificate"] `shouldReturn`
+      [ BString "Admin"
+      , BString "BlockApps"
+      , BString "Engineering"
+      , BString "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----\n"
+      , BString "Admin"
+      , BString "USA"
+      , BString "BlockApps"
+      , BString "Engineering"
+      , BString "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEUhJR4x+wZiX+xZK2m/pwN40cvCS0UA7Z\n0DB7sny5ZnNLw43JgKz0URDY2yYOPkhoIApxFK9UU3Bc4BRANDWmdQ==\n-----END PUBLIC KEY-----\n"
+      , BString "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----\n"
+      ]
     getFields ["myUsername", "myOrganization", "myOrganizationalUnit", "certificate","myCommonName", "myCountry", "myOrganization", "myOrganizationalUnit", "myPublicKey", "myCertificate"] `shouldReturn`
       [ BString "Admin"
       , BString "BlockApps"
