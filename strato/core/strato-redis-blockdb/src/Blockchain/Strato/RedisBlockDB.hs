@@ -3,6 +3,7 @@
 {-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeApplications      #-}
@@ -37,6 +38,7 @@ module Blockchain.Strato.RedisBlockDB
     , getSyncStatus, putSyncStatus
     ) where
 
+import           BlockApps.X509.Certificate
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Enode
@@ -199,9 +201,9 @@ removeChainMember cId address = do
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Error" ++ e)
 
-registerCertificate :: Address -> Address -> Redis (Either Reply Status)
-registerCertificate userAddress contractAddress = do
-    res <- multiExec $ set (inNamespace X509Certificates $ toKey userAddress) (toValue contractAddress)
+registerCertificate :: Address -> X509CertInfoState -> Redis (Either Reply Status)
+registerCertificate userAddress x509CertInfoState = do
+    res <- multiExec $ set (inNamespace X509Certificates $ toKey userAddress) (toValue x509CertInfoState)
     case res of
         TxSuccess _ -> pure $ Right Ok
         TxAborted -> pure . Left $ SingleLine (S8.pack $ "registerCertificate - Aborted")
