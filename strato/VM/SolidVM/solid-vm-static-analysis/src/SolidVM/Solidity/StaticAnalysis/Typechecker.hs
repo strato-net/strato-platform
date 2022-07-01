@@ -779,6 +779,9 @@ keccak256Args x = MultiVariate (stringType' x) x
 sha256Args :: SourceAnnotation Text -> Type'
 sha256Args x = MultiVariate (stringType' x) x
 
+ripemd160Args :: SourceAnnotation Text -> Type'
+ripemd160Args x = MultiVariate (stringType' x) x
+
 --This function should have multivariate type that represents any amount of string types
 stringConcatArgs :: SourceAnnotation Text -> Type'
 stringConcatArgs x = MultiVariate (stringType' x) x
@@ -848,6 +851,7 @@ getVarType' "push" ctx =  pure $ Function (topType' ctx) (Product [] ctx) ctx
 getVarType' "identity" ctx =  pure $ Function (topType' ctx) (topType' ctx) ctx
 getVarType' "keccak256" ctx =  pure $ Function (keccak256Args ctx) (stringType' ctx) ctx
 getVarType' "sha256" ctx =  pure $ Function (sha256Args ctx) (stringType' ctx) ctx
+getVarType' "ripemd160" ctx =  pure $ Function (ripemd160Args ctx) (stringType' ctx) ctx
 getVarType' "require" ctx =  pure $ Function (requireArgs ctx) (Product [] ctx) ctx
 getVarType' "assert" ctx =  pure $ Function (assertArgs ctx) (Product [] ctx) ctx
 getVarType' "registerCert" ctx =  pure $ Function (registerCertArgs ctx) (accountType' ctx) ctx
