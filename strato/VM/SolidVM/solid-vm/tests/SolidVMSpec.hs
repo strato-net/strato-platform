@@ -2436,11 +2436,11 @@ contract A {
   uint account;
 }|]) `shouldThrow` anyReservedWordError
 
-  it "throw an error when the 'account' reserved word is for a variable name." $ runTest (do
+  it "throw an error when the 'account' reserved word is for a contract name." $ runTest (do
       runBS [r|
 pragma solidvm 3.2;
-contract A {
-  uint account;
+contract account {
+  uint a;
 }|]) `shouldThrow` anyReservedWordError
 
   it "throw an error when the 'account' reserved word is used for a function name." $ runTest (do

@@ -53,8 +53,8 @@ solidityContract = do
     kind <- (reserved "contract" >> return Xabi.ContractKind)
           <|> (reserved "interface" >> return Xabi.InterfaceKind)
           <|> (reserved "library" >> return Xabi.LibraryKind)
-
     contractName' <- fmap stringToLabel identifier
+    --Throw an error if 'account' is used.
     pragmaVersion' <- getPragmaVersion
     when (isReservedWord pragmaVersion' contractName') $ reservedWordError pragmaVersion' contractName'
     setContractName $ labelToString contractName'
@@ -240,7 +240,6 @@ simpleVariableDeclaration = do
   variableName <- identifier
   pragmaVersion' <- getPragmaVersion
   when (isReservedWord pragmaVersion' variableName) $ reservedWordError pragmaVersion' variableName
-  -- variableName <- resWord
   value <- optionMaybe $ do
     reservedOp "="
     expression
@@ -258,16 +257,12 @@ simpleVariableDeclaration = do
 functionDeclaration :: SolidityParser (String, Declaration)
 functionDeclaration = do
   ~(a, (functionName, xabi')) <- withPosition $ do
-    pragmaVersion' <- getPragmaVersion
-    -- let resWord = identifier
-    -- resWord' <- identifier
-    -- when (isReservedWord pragmaVersion' resWord') $
-    --   reservedWordError pragmaVersion' resWord'
     functionName <- (reserved "function" >> fromMaybe "" <$> optionMaybe identifier)  <|>
                     -- Starting with 0.4.22, constructor() <mods> { <body> } is
                     -- the preferred syntax for defining a constructor
                     (reserved "constructor" >> getContractName)
     -- Throw an error if the function name is part of secondary reservered words.
+    pragmaVersion' <- getPragmaVersion
     when (isReservedWord pragmaVersion' functionName) $ reservedWordError pragmaVersion' functionName
     xabi <- functionXabi
     pure (functionName, xabi)
@@ -511,7 +506,8 @@ inCommentSingle
   where
     startEnd   = nub (commentEnd solidityLanguage ++ commentStart solidityLanguage)
 
---To make a new reserved word with a specific pragma version please add to the following function list
+--To make a new reserved word with a specific pragma version please add to the following function list, 
+  -- This assumes that only the solidvm pragma name is used. Please change if new pragmaNames are added.
 isReservedWord :: String -> String -> Bool
 isReservedWord version reservedWord = do
   case version of
