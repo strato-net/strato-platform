@@ -258,7 +258,7 @@ contract CertificateRegistry {
         certificatesMap[newAccount] = certificates.length;
         initialized = true;
 
-        emit CertificateRegistered(address(0xdeadbeef), address(c));
+        emit CertificateRegistered(rootCert);
         
         return 200;
     }
@@ -276,6 +276,8 @@ contract CertificateRegistry {
         certificates.push(c);
         certificatesMap[userAccount] = certificates.length;
         
+        emit CertificateRegistered(newCertificateString);
+
         return 200; // 200 = HTTP Status OK
     }
     

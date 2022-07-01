@@ -23,6 +23,7 @@ library:
   - asn1-encoding
   - asn1-types
   - base16-bytestring
+  - binary
   - bytestring
   - containers
   - cryptonite
