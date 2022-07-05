@@ -24,6 +24,7 @@ module SolidVM.Solidity.Parse.Lexer (
   colon,
   comma,
   braces,
+  symbol,
   solidityLanguage,
   whiteSpace
   ) where
@@ -44,6 +45,7 @@ natural = P.natural solidityLexer
 integer = P.integer solidityLexer
 braces = P.braces solidityLexer
 parens = P.parens solidityLexer
+symbol = P.symbol solidityLexer
 brackets = P.brackets solidityLexer
 comma = P.comma solidityLexer
 commaSep = P.commaSep solidityLexer

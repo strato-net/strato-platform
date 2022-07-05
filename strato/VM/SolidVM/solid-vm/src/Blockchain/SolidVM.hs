@@ -608,7 +608,11 @@ argsToVals ctract fn args =
         eval t x = do
           case x of
             CC.NumberLiteral _ n Nothing -> return . coerceType ctract t $ SInteger n
-            CC.NumberLiteral _ n (Just nu) -> todo "Number literal with units" (n, nu)
+            CC.NumberLiteral _ n (Just nu) -> case nu of
+              CC.Wei -> return . coerceType ctract t $ SInteger n
+              CC.Szabo -> return . coerceType ctract t $ SInteger (n * (10 ^ (12 :: Integer)))
+              CC.Finney -> return . coerceType ctract t $ SInteger (n * (10 ^ (15 :: Integer))) 
+              CC.Ether -> return . coerceType ctract t $ SInteger (n * (10 ^ (18 :: Integer))) 
             CC.BoolLiteral _ b -> return . coerceType ctract t $ SBool b
             CC.StringLiteral _ s -> return . coerceType ctract t $ SString s
             CC.ArrayExpression _ as -> case t of
@@ -646,7 +650,11 @@ argsToVals ctract fn args =
         eval32 t x = do
           case x of
             CC.NumberLiteral _ n Nothing   -> return . coerceType ctract t $ SInteger n
-            CC.NumberLiteral _ n (Just nu) -> todo "Number literal with units" (n, nu)
+            CC.NumberLiteral _ n (Just nu) -> case nu of
+              CC.Wei -> return . coerceType ctract t $ SInteger n
+              CC.Szabo -> return . coerceType ctract t $ SInteger (n * (10 ^ (12 :: Integer)))
+              CC.Finney -> return . coerceType ctract t $ SInteger (n * (10 ^ (15 :: Integer))) 
+              CC.Ether -> return . coerceType ctract t $ SInteger (n * (10 ^ (18 :: Integer)))
             CC.BoolLiteral _ b             -> return . coerceType ctract t $ SBool b
             CC.StringLiteral _ s           -> return . coerceType ctract t $ SString s
             CC.ArrayExpression _ as        -> case t of
@@ -1250,6 +1258,11 @@ expToVar x = do
 
 expToVar' :: MonadSM m => CC.Expression -> m Variable
 expToVar' (CC.NumberLiteral _ v Nothing) = return . Constant $ SInteger v
+expToVar' (CC.NumberLiteral _ v (Just nu)) = case nu of
+  CC.Wei -> return . Constant $ SInteger v
+  CC.Szabo -> return . Constant $ SInteger (v * (10 ^ (12 :: Integer)))
+  CC.Finney -> return . Constant $ SInteger (v * (10 ^ (15 :: Integer))) 
+  CC.Ether -> return . Constant $ SInteger (v * (10 ^ (18 :: Integer)))
 expToVar' (CC.StringLiteral _ s) = return $ Constant $ SString s
 expToVar' (CC.BoolLiteral _ b) = return $ Constant $ SBool b
 expToVar' (CC.Variable _ "bytes32ToString") = return $ Constant $ SHexDecodeAndTrim
@@ -1349,6 +1362,12 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
                                                     let maybeCertBlockDB = M.lookup (_accountAddress $ Env.origin env') x509s
                                                         maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
                                                     return . Constant . SString . fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
+      (SBuiltinVariable "tx", "group") -> do env' <- getEnv
+                                             x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
+                                             maybeCertLevelDB <- x509CertDBGet $ _accountAddress $ Env.origin env'
+                                             let maybeCertBlockDB = M.lookup (_accountAddress $ Env.origin env') x509s
+                                                 maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
+                                             return . Constant . SString . fromMaybe "" $ subUnit =<< getCertSubject =<< maybeCert
       (SBuiltinVariable "tx", "organizationalUnit") -> do env' <- getEnv
                                                           x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
                                                           maybeCertLevelDB <- x509CertDBGet $ _accountAddress $ Env.origin env'
@@ -2239,6 +2258,7 @@ certificateMap maybeCert = case maybeCert of
           certMap cert sub = M.fromList [ (SString "commonName", Constant . SString $ subCommonName sub)
                                    , (SString "country", Constant . SString $ fromMaybe "" $ subCountry sub)
                                    , (SString "organization", Constant . SString $ subOrg sub)
+                                   , (SString "group", Constant . SString $ fromMaybe "" $ subUnit sub)
                                    , (SString "organizationalUnit", Constant . SString $ fromMaybe "" $ subUnit sub)
                                    , (SString "publicKey", Constant . SString $ BC.unpack $ pubToBytes $ subPub sub)
                                    , (SString "userAddress", Constant . SString $ show $ fromPublicKey $ subPub sub)
@@ -2248,6 +2268,7 @@ certificateMap maybeCert = case maybeCert of
           emptyCertMap = M.fromList [ (SString "commonName", Constant . SString $ "")
                              , (SString "country", Constant . SString $ "")
                              , (SString "organization", Constant . SString $ "")
+                             , (SString "group", Constant . SString $ "")
                              , (SString "organizationalUnit", Constant . SString $ "")
                              , (SString "publicKey", Constant . SString $ "")
                              , (SString "userAddress", Constant . SString $ "")
