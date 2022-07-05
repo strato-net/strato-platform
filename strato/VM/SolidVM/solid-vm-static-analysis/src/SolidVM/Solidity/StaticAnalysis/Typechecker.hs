@@ -509,6 +509,7 @@ typecheckMember (Static (SVMType.UnknownLabel "msg") x) "sender" = pure $ Static
 typecheckMember (Static (SVMType.UnknownLabel "tx") x) "origin" = pure $ Static (SVMType.Account False) x 
 typecheckMember (Static (SVMType.UnknownLabel "tx") x) "username" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "tx") x) "organization" = pure $ Static (SVMType.String Nothing) x
+typecheckMember (Static (SVMType.UnknownLabel "tx") x) "group" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "tx") x) "organizationalUnit" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "tx") x) "certificate" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "block") x) "timestamp" = pure $ Static (SVMType.Int Nothing Nothing) x
@@ -776,6 +777,12 @@ byteArgs x = intType' x
 keccak256Args :: SourceAnnotation Text -> Type'
 keccak256Args x = MultiVariate (stringType' x) x
 
+sha256Args :: SourceAnnotation Text -> Type'
+sha256Args x = MultiVariate (stringType' x) x
+
+ripemd160Args :: SourceAnnotation Text -> Type'
+ripemd160Args x = MultiVariate (stringType' x) x
+
 --This function should have multivariate type that represents any amount of string types
 stringConcatArgs :: SourceAnnotation Text -> Type'
 stringConcatArgs x = MultiVariate (stringType' x) x
@@ -805,6 +812,9 @@ getUserCertArgs x = accountType' x
 
 mulmodArgs  :: SourceAnnotation Text -> Type'
 mulmodArgs x = Product [intType' x, intType' x, intType' x] x
+
+blockhashArgs :: SourceAnnotation Text -> Type'
+blockhashArgs x = intType' x
 
 addmodArgs  :: SourceAnnotation Text -> Type'
 addmodArgs x = Product [intType' x, intType' x, intType' x] x
@@ -841,6 +851,8 @@ getVarType' "byte" ctx =  pure $ Function (byteArgs ctx) (intType' ctx) ctx
 getVarType' "push" ctx =  pure $ Function (topType' ctx) (Product [] ctx) ctx
 getVarType' "identity" ctx =  pure $ Function (topType' ctx) (topType' ctx) ctx
 getVarType' "keccak256" ctx =  pure $ Function (keccak256Args ctx) (stringType' ctx) ctx
+getVarType' "sha256" ctx =  pure $ Function (sha256Args ctx) (stringType' ctx) ctx
+getVarType' "ripemd160" ctx =  pure $ Function (ripemd160Args ctx) (stringType' ctx) ctx
 getVarType' "require" ctx =  pure $ Function (requireArgs ctx) (Product [] ctx) ctx
 getVarType' "assert" ctx =  pure $ Function (assertArgs ctx) (Product [] ctx) ctx
 getVarType' "registerCert" ctx =  pure $ Function (registerCertArgs ctx) (accountType' ctx) ctx
@@ -850,6 +862,7 @@ getVarType' "getUserCert" ctx =  pure $ Function (getUserCertArgs ctx) (certType
 getVarType' "addmod" ctx =  pure $ Function (addmodArgs ctx) (intType' ctx) ctx
 getVarType' "mulmod" ctx =  pure $ Function (mulmodArgs ctx) (intType' ctx) ctx
 getVarType' "payable" ctx =  pure $ Function (payableArgs ctx) (Static (SVMType.Account True) ctx) ctx
+getVarType' "blockhash" ctx = pure $ Function (blockhashArgs ctx) (stringType' ctx) ctx
 getVarType' "parseCert" ctx =  pure $ Function (parseCertArgs ctx) (certType' ctx) ctx
 getVarType' "Util" ctx = pure $ Static (SVMType.UnknownLabel "Util") ctx
 getVarType' "msg" ctx = pure $ Static (SVMType.UnknownLabel "msg") ctx
