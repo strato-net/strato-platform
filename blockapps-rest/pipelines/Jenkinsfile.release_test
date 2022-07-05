@@ -404,7 +404,56 @@ pipeline {
         /* TODO: Write Network Sync to Devnet */
 
 
+        /* UPGRADABILITY TESTS */
 
+        /* Basic (simple) upgrade + sync */
+
+
+        /* Upgrade with single node chain data */
+        stage('Upgrade w/ node chain data - Clean all nodes') {
+            parallel {
+                stage('Clean test-multinode101') {
+                    // agent { label "test-multinode101" } // is default
+                    steps { 
+                        script {
+                            lib.cleanNode()
+                        }
+                    }
+                }
+                stage('Clean test-multinode102') {
+                    agent { label "test-multinode102" }
+                    steps { 
+                        script {
+                            lib.cleanNode()
+                        }
+                    }
+                }
+                stage('Clean test-multinode103') {
+                agent { label "test-multinode103" }
+                    steps { 
+                        script {
+                            lib.cleanNode()
+                        }
+                    }
+                }
+                stage('Clean test-multinode104') {
+                agent { label "test-multinode104" }
+                    steps { 
+                        script {
+                            lib.cleanNode()
+                        }
+                    }
+                }
+                stage('Clean additional-node301') {
+                agent { label "test-multinode301" }
+                    steps { 
+                        script {
+                            lib.cleanNode()
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
