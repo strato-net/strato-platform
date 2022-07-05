@@ -782,6 +782,9 @@ sha256Args x = MultiVariate (stringType' x) x
 ripemd160Args :: SourceAnnotation Text -> Type'
 ripemd160Args x = MultiVariate (stringType' x) x
 
+selfdestructArgs :: SourceAnnotation Text -> Type' 
+selfdestructArgs x = addressType' x
+
 --This function should have multivariate type that represents any amount of string types
 stringConcatArgs :: SourceAnnotation Text -> Type'
 stringConcatArgs x = MultiVariate (stringType' x) x
@@ -852,6 +855,7 @@ getVarType' "identity" ctx =  pure $ Function (topType' ctx) (topType' ctx) ctx
 getVarType' "keccak256" ctx =  pure $ Function (keccak256Args ctx) (stringType' ctx) ctx
 getVarType' "sha256" ctx =  pure $ Function (sha256Args ctx) (stringType' ctx) ctx
 getVarType' "ripemd160" ctx =  pure $ Function (ripemd160Args ctx) (stringType' ctx) ctx
+getVarType' "selfdestruct" ctx = pure $ Function (selfdestructArgs ctx) (addressType' ctx) ctx 
 getVarType' "require" ctx =  pure $ Function (requireArgs ctx) (Product [] ctx) ctx
 getVarType' "assert" ctx =  pure $ Function (assertArgs ctx) (Product [] ctx) ctx
 getVarType' "registerCert" ctx =  pure $ Function (registerCertArgs ctx) (accountType' ctx) ctx
