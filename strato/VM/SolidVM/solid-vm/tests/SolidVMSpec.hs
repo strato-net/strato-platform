@@ -4297,3 +4297,34 @@ contract qq {
   }
 }|]
     getFields ["hsh"] `shouldReturn` [BString $ B.pack $ word160ToBytes 0x63f4a6f6005b0ded8c5fc7e62ddf2550e9320410]
+
+ it "can use the selfdestruct function" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+  account contract';
+  account owner;
+  account payable ownerPay;
+  uint contractBalance;
+  uint ownerBalance;
+  bool success;
+  constructor() public {
+    owner = account(this);
+    ownerPay = payable(owner);
+  }
+
+  function selfDestructThis() public returns (bool, uint, uint) {
+    success = selfdestruct(ownerPay);
+    contractBalance = this.balance;
+    ownerBalance = ownerPay.balance;
+    return (success, contractBalance, ownerBalance);
+  } 
+}|]
+    -- Get the contract's accounts
+    [ BAccount contract', BAccount owner] <- getFields ["contract'", "owner"]
+    -- Adjust the preset balances
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing contract') (\as -> pure $ as { addressStateBalance = 14 })
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing owner) (\bs -> pure $ bs { addressStateBalance = 10 })
+    -- Check return of balance
+    void $ call2 "selfDestructThis" "()" (namedAccountToAccount Nothing contract') 
+    getFields ["success", "contractBalance", "ownerBalance"] `shouldReturn` [ BBool True, BInteger 0, BInteger 24 ]
