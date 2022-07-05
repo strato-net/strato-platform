@@ -31,7 +31,7 @@ import Data.Text.Encoding
 import Data.Time.Clock.POSIX
 import HFlags
 import Numeric
-import Test.Hspec (hspec, Spec, describe, it, it, xit, pendingWith, anyException, shouldThrow, anyErrorCall, Selector)
+import Test.Hspec (hspec, Spec, describe, fit, it, xit, pendingWith, anyException, shouldThrow, anyErrorCall, Selector)
 import Test.Hspec.Expectations.Lifted
 import Text.Printf
 import Text.RawString.QQ
@@ -130,17 +130,21 @@ anyPaymentError :: Selector HandledException
 anyPaymentError (HE Blockchain.SolidVM.Exception.PaymentError{}) = True
 anyPaymentError _ = False
 
+anyReservedWordError :: Selector HandledException
+anyReservedWordError (HE Blockchain.SolidVM.Exception.ReservedWordError{}) = True
+anyReservedWordError _ = False
+
 failedRequirementMsg :: String -> Selector HandledException
 failedRequirementMsg str (HE (Require (Just msg))) = str == msg
-failedRequirementMsg _   _                         = False
+failedRequirementMsg _ _ = False
 
 failedRequirementNoMsg :: Selector HandledException
 failedRequirementNoMsg (HE (Require Nothing)) = True
-failedRequirementNoMsg _                      = False
+failedRequirementNoMsg _ = False
 
 failedAssertion :: Selector HandledException
 failedAssertion (HE Assert) = True
-failedAssertion _           = False
+failedAssertion _ = False
 
 sender :: Account
 sender = Account 0xdeadbeef Nothing
@@ -722,29 +726,12 @@ contract qq {
    }
 }|]) `shouldThrow` anyParseError
 
---TODO:
---     it "throw an error when there is an 'account' variable name" $ runTest (do
---       runBS [r|
--- contract qq {
---    function f();
---    string account;
---    constructor()
---    {
---       account = "hello";
---    }
--- }|]) `shouldThrow` anyParseError
 
     it "throw an error when there is an 'address' variable name" $ runTest (do
       runBS [r|
 contract qq {
    uint address;
 }|]) `shouldThrow` anyParseError
-
---     it "throw an error when there is an 'chainId' variable name" $ runTest (do
---       runBS [r|
--- contract qq {
---    uint chainId;
--- }|]) `shouldThrow` anyParseError
 
     it "throw an error when there is an 'record_id' variable name" $ runTest (do
       runBS [r|
@@ -2424,6 +2411,28 @@ contract qq {
 contract qq {
   function f() public {}
 }|]) `shouldThrow` anyParseError
+
+  it "throw an error when the 'account' reserved word is for a variable name." $ runTest (do
+      runBS [r|
+pragma solidvm 3.2;
+contract A {
+  uint account;
+}|]) `shouldThrow` anyReservedWordError
+
+  it "throw an error when the 'account' reserved word is for a contract name." $ runTest (do
+      runBS [r|
+pragma solidvm 3.2;
+contract account {
+  uint a;
+}|]) `shouldThrow` anyReservedWordError
+
+  it "throw an error when the 'account' reserved word is used for a function name." $ runTest (do
+      runBS [r|
+pragma solidvm 3.2;
+contract A {
+  function account() {
+  }
+}|]) `shouldThrow` anyReservedWordError
 
   it "catches missing function errors" $
     (runTest $ runCall "f" "()" [r|contract qq {}|]) `shouldThrow` anyUnknownFunc
@@ -4324,6 +4333,27 @@ contract qq {
 }|]
     getFields ["hsh"] `shouldReturn` [BString $ B.pack $ word160ToBytes 0x63f4a6f6005b0ded8c5fc7e62ddf2550e9320410]
 
+  it "throw an error when the 'account' reserved word is for a variable name." $ runTest (do
+      runBS [r|
+pragma solidvm 3.2;
+contract A {
+  uint account;
+}|]) `shouldThrow` anyReservedWordError
+
+  it "throw an error when the 'account' reserved word is for a contract name." $ runTest (do
+      runBS [r|
+pragma solidvm 3.2;
+contract account {
+  uint a;
+}|]) `shouldThrow` anyReservedWordError
+
+  it "throw an error when the 'account' reserved word is used for a function name." $ runTest (do
+      runBS [r|
+pragma solidvm 3.2;
+contract A {
+  function account() {
+  }
+}|]) `shouldThrow` anyReservedWordError
   it "can use 1e_ notation to get a number" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
