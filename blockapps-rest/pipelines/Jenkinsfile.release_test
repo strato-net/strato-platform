@@ -68,41 +68,41 @@ pipeline {
                         sh "git clone -b develop https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/beanstalk/"
                         lib = load("${env.WORKSPACE}/pipelines/Jenkinsfile.library")
                         NODE_DATA = load("${env.WORKSPACE}/pipelines/Jenkinsfile.dev_config").NODE_DATA
-                        dir('strato-getting-started') {
-                            script {
-                                if (env.STRATO_BUILD == 'latest') {
-                                    sh 'sudo ./strato --compose'
-                                } else {
-                                    if (env.STRATO_BUILD.contains(".")) {
-                                        sh "curl -s -L https://github.com/blockapps/strato-getting-started/releases/${env.STRATO_BUILD} | egrep -o '/blockapps/strato-getting-started/releases/download/.*/docker-compose.yml' | wget --base=http://github.com/ -i - -O docker-compose.yml"
-                                    } else {
-                                        if (!env.STRATO_BUILD.contains("/")) {
-                                            echo "Unexpected STRATO_BUILD format: ${env.STRATO_BUILD}"
-                                            currentBuild.result = 'FAILURE'
-                                            sh "exit 1"
-                                        }
-                                        def (AUTOBUILD_JOB_BRANCH_NAME, AUTOBUILD_JOB_BUILD_NUMBER) = "${env.STRATO_BUILD}".tokenize( '/' )
+                        // dir('strato-getting-started') {
+                        //     script {
+                        //         if (env.STRATO_BUILD == 'latest') {
+                        //             sh 'sudo ./strato --compose'
+                        //         } else {
+                        //             if (env.STRATO_BUILD.contains(".")) {
+                        //                 sh "curl -s -L https://github.com/blockapps/strato-getting-started/releases/${env.STRATO_BUILD} | egrep -o '/blockapps/strato-getting-started/releases/download/.*/docker-compose.yml' | wget --base=http://github.com/ -i - -O docker-compose.yml"
+                        //             } else {
+                        //                 if (!env.STRATO_BUILD.contains("/")) {
+                        //                     echo "Unexpected STRATO_BUILD format: ${env.STRATO_BUILD}"
+                        //                     currentBuild.result = 'FAILURE'
+                        //                     sh "exit 1"
+                        //                 }
+                        //                 def (AUTOBUILD_JOB_BRANCH_NAME, AUTOBUILD_JOB_BUILD_NUMBER) = "${env.STRATO_BUILD}".tokenize( '/' )
                                         
-                                        // Fetching artifact from STRATO_autobuild multibranch job
-                                        step([
-                                            $class: 'CopyArtifact',
-                                            fingerprintArtifacts: true,
-                                            flatten: true,
-                                            projectName: "STRATO_autobuild/${AUTOBUILD_JOB_BRANCH_NAME}",
-                                            selector: [$class: 'SpecificBuildSelector', buildNumber: "${AUTOBUILD_JOB_BUILD_NUMBER}"],
-                                            filter: "docker-compose.yml",
-                                            target: '.',
-                                            optional: false
-                                        ])
-                                    }
-                                }
-                            }
-                            withCredentials([
-                                usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
-                            ]) {
-                                sh "sudo docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000"
-                            }
-                        }
+                        //                 // Fetching artifact from STRATO_autobuild multibranch job
+                        //                 step([
+                        //                     $class: 'CopyArtifact',
+                        //                     fingerprintArtifacts: true,
+                        //                     flatten: true,
+                        //                     projectName: "STRATO_autobuild/${AUTOBUILD_JOB_BRANCH_NAME}",
+                        //                     selector: [$class: 'SpecificBuildSelector', buildNumber: "${AUTOBUILD_JOB_BUILD_NUMBER}"],
+                        //                     filter: "docker-compose.yml",
+                        //                     target: '.',
+                        //                     optional: false
+                        //                 ])
+                        //             }
+                        //         }
+                        //     }
+                        //     withCredentials([
+                        //         usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
+                        //     ]) {
+                        //         sh "sudo docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000"
+                        //     }
+                        // }
                     }
                 }
             }
@@ -182,7 +182,7 @@ pipeline {
             // agent { label "test-multinode101" } // is default
             steps { 
                 script {
-                rootNodeAddress = lib.deployStratoWithApp(null, NODE_DATA.NODE1, 'beanstalk') 
+                rootNodeAddress = lib.deployStratoWithApp(null, NODE_DATA.NODE1, 'beanstalk', false) 
                 }
             }            
         }
@@ -193,7 +193,7 @@ pipeline {
                     agent { label "test-multinode102" }
                     steps {
                         script {
-                            node2Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE2, 'beanstalk')
+                            node2Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE2, 'beanstalk', false)
                         }
                     }
                 }
@@ -201,7 +201,7 @@ pipeline {
                     agent { label "test-multinode103" }
                     steps {
                         script {
-                            node3Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE3, 'beanstalk')
+                            node3Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE3, 'beanstalk', false)
                         }
                     }
                 }
@@ -209,7 +209,7 @@ pipeline {
                     agent { label "test-multinode104" }
                     steps {
                         script {
-                            node4Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE4, 'beanstalk')
+                            node4Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE4, 'beanstalk', false)
                         }
                     }
                 }
@@ -217,7 +217,7 @@ pipeline {
                     agent { label "test-multinode301" }
                     steps {
                         script {
-                            node5Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE5, 'beanstalk')
+                            node5Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE5, 'beanstalk', false)
                         }
                     }
                 }
@@ -225,7 +225,7 @@ pipeline {
                     agent { label "test-multinode302" }
                     steps {
                         script {
-                            node6Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE6, 'beanstalk')
+                            node6Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE6, 'beanstalk', false)
                         }
                     }
                 }
@@ -233,7 +233,7 @@ pipeline {
                     agent { label "test-multinode303" }
                     steps {
                         script {
-                            node7Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE7, 'beanstalk')
+                            node7Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE7, 'beanstalk', false)
                         }
                     }
                 }
@@ -241,7 +241,7 @@ pipeline {
                     agent { label "test-multinode304" }
                     steps {
                         script {
-                            node8Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE8, 'beanstalk')
+                            node8Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE8, 'beanstalk', false)
                         }
                     }
                 }
@@ -371,7 +371,6 @@ pipeline {
             }
         }
 
-        /* Write set up stage to clone monitor repo */
         stage ('Single Node Sync with Devnet - Clean Node') {
              // agent { label "multinode101" } // is default
             steps { 
@@ -396,11 +395,16 @@ pipeline {
                     script {
                         sh "rm -rf monitor"
                         sh "git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/monitor/"
-                        lib.runMonitor()
+                        lib.runMonitor(NODE_DATA.NODE1)
                     }
                 }
             }
         }
+
+        /* TODO: Write Network Sync to Devnet */
+
+
+
     }
 }
 

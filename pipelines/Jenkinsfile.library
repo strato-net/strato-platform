@@ -88,9 +88,17 @@ def deployStrato(nodeData) {
 /*
 rootNodeAddress: null for root node or public address of root node for secondary nodes
  */
-def deployStratoWithApp(rootNodeAddress, nodeData, appName) {
+def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelease) {
   sh "sudo rm -rf strato-getting-started"
-  unstash 'stratoGettingStarted'
+  if(useLatestStratoRelease) {
+    withCredentials([
+        usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME'),
+    ]) {
+      sh "git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-getting-started.git"
+    }
+  } else {
+    unstash 'stratoGettingStarted'
+  }
   dir("strato-getting-started") {
     sh "sudo chmod 777 ~/letsencrypt-ssl/*"
     sh "cp ~/letsencrypt-ssl/server.pem ssl/certs/"
@@ -99,6 +107,9 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName) {
         usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
     ]) {
       sh "sudo docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000"
+    }
+    if(useLatestStratoRelease) {
+      sh "./strato --compose"
     }
     sh "sudo ./strato --pull"
 
@@ -445,6 +456,11 @@ def approveAllMemberships() {
 }
 
 def runMonitor(nodeData) {
+  withCredentials([
+      usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME'),
+  ]) {
+    sh "rm -rf monitor"
+    sh " git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/monitor.git"
     def runCommand = """#!/bin/bash
         sudo \\
         ssl=true \\
@@ -492,6 +508,7 @@ def runMonitor(nodeData) {
     sh "cp ~/letsencrypt-ssl/server.pem ssl/certs/"
     sh "cp ~/letsencrypt-ssl/server.key ssl/private/"
     sh 'sudo bash run.sh'
+  }
 }
 
 def waitForHealthySync(MONITOR_DATA) {
