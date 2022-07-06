@@ -4346,7 +4346,7 @@ contract qq {
   string oldCodeHash;
   string newCodeHash;
   bool success;
-  
+
   constructor() public {
     contract' = account(this);
     contractPay = payable(contract');
@@ -4371,12 +4371,12 @@ contract qq {
     -- Check return of balance
     void $ call2 "selfDestructThis" "()" (namedAccountToAccount Nothing contract') 
     getFields ["success", "contractBalance", "ownerBalance", "oldCodeHash", "newCodeHash"] `shouldReturn` 
-    [ BBool True
-    , BDefault
-    , BInteger 24
-    , BString $ BC.pack $ keccak256ToHex $ hash $ UTF8.fromString contract
-    , BString "0000000000000000000000000000000000000000000000000000000000000000" 
-    ]
+      [ BBool True
+      , BDefault
+      , BInteger 24
+      , BString $ BC.pack $ keccak256ToHex $ hash $ UTF8.fromString contract
+      , BString "0000000000000000000000000000000000000000000000000000000000000000" 
+      ]
   
   it "throw an error when the 'account' reserved word is for a variable name." $ runTest (do
       runBS [r|
