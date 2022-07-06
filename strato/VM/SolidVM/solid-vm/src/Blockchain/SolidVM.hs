@@ -114,6 +114,7 @@ import qualified SolidVM.Model.Type as SVMType
 import           SolidVM.Model.Value
 
 import           SolidVM.Solidity.Parse.Statement
+import           SolidVM.Solidity.Parse.ParserTypes
 import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpression)
 
 import           UnliftIO                             hiding (assert)
@@ -194,7 +195,7 @@ instance MonadSM m => Mod.Accessible [SourcePosition] m where
 
 runExpr :: MonadSM m => EvaluationRequest -> m EvaluationResponse
 runExpr exprText = withoutDebugging . withTempCallInfo True $ do -- TODO: allow write access once we figure out how to discard changes
-  let eExpr = runParser expression "" "" (T.unpack exprText)
+  let eExpr = runParser expression (ParserState "" "") "" (T.unpack exprText)
   case eExpr of
     Left pe -> pure . Left . T.pack $ show pe
     Right expr -> do
@@ -259,7 +260,7 @@ create _ _ _ blockData _ sender' origin' _ _ _ newAddress code txHash' chainId' 
 
     let maybeArgString = M.lookup "args" =<< metadata
         argString = maybe "()" T.unpack maybeArgString
-        maybeArgs = runParser parseArgs "" "" argString
+        maybeArgs = runParser parseArgs (ParserState "" "") "" argString
         !args = either (parseError "create arguments") CC.OrderedArgs maybeArgs
 
     (hsh, cc) <- codeCollectionFromSource initCode
@@ -398,7 +399,7 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' cha
         !funcName = textToLabel $ fromMaybe (missingField "TX is missing a metadata parameter called 'funcName'" $ show metadata) maybeFuncName
         maybeArgString = M.lookup "args" =<< metadata
         !argString = T.unpack $ fromMaybe (missingField "TX is missing metadata parameter called 'args'" $ show metadata) maybeArgString
-        maybeArgs = runParser parseArgs "" "" argString
+        maybeArgs = runParser parseArgs (ParserState "" "") "" argString
         !args = either (parseError "call arguments") CC.OrderedArgs maybeArgs
 
     returnVal <- mapM encodeForReturn =<< callWrapper sender' codeAddress Nothing funcName isRCC args
@@ -607,7 +608,11 @@ argsToVals ctract fn args =
         eval t x = do
           case x of
             CC.NumberLiteral _ n Nothing -> return . coerceType ctract t $ SInteger n
-            CC.NumberLiteral _ n (Just nu) -> todo "Number literal with units" (n, nu)
+            CC.NumberLiteral _ n (Just nu) -> case nu of
+              CC.Wei -> return . coerceType ctract t $ SInteger n
+              CC.Szabo -> return . coerceType ctract t $ SInteger (n * (10 ^ (12 :: Integer)))
+              CC.Finney -> return . coerceType ctract t $ SInteger (n * (10 ^ (15 :: Integer))) 
+              CC.Ether -> return . coerceType ctract t $ SInteger (n * (10 ^ (18 :: Integer))) 
             CC.BoolLiteral _ b -> return . coerceType ctract t $ SBool b
             CC.StringLiteral _ s -> return . coerceType ctract t $ SString s
             CC.ArrayExpression _ as -> case t of
@@ -631,7 +636,7 @@ argsToVals ctract fn args =
                   m <- mapM go $ M.toList mp
                   return $ SMap valueType $ M.fromList m
                   where go (k, v) = do
-                                  let !maybeExp = runParser literal "" "" k
+                                  let !maybeExp = runParser literal (ParserState "" "") "" k
                                   case maybeExp of 
                                     Right ex -> do
                                       k' <- eval keyType ex
@@ -645,7 +650,11 @@ argsToVals ctract fn args =
         eval32 t x = do
           case x of
             CC.NumberLiteral _ n Nothing   -> return . coerceType ctract t $ SInteger n
-            CC.NumberLiteral _ n (Just nu) -> todo "Number literal with units" (n, nu)
+            CC.NumberLiteral _ n (Just nu) -> case nu of
+              CC.Wei -> return . coerceType ctract t $ SInteger n
+              CC.Szabo -> return . coerceType ctract t $ SInteger (n * (10 ^ (12 :: Integer)))
+              CC.Finney -> return . coerceType ctract t $ SInteger (n * (10 ^ (15 :: Integer))) 
+              CC.Ether -> return . coerceType ctract t $ SInteger (n * (10 ^ (18 :: Integer)))
             CC.BoolLiteral _ b             -> return . coerceType ctract t $ SBool b
             CC.StringLiteral _ s           -> return . coerceType ctract t $ SString s
             CC.ArrayExpression _ as        -> case t of
@@ -669,7 +678,7 @@ argsToVals ctract fn args =
                 return $ SMap valueType $ M.fromList m
                 where --go :: (SolidString, CC.Expression) -> (SolidString, (Value, Variable))
                       go (k, v) = do
-                                let !maybeExp = runParser literal "" "" (labelToString k)
+                                let !maybeExp = runParser literal (ParserState "" "") "" (labelToString k)
                                 case maybeExp of 
                                   Right ex -> do
                                     k' <- eval32 keyType ex
@@ -1249,6 +1258,11 @@ expToVar x = do
 
 expToVar' :: MonadSM m => CC.Expression -> m Variable
 expToVar' (CC.NumberLiteral _ v Nothing) = return . Constant $ SInteger v
+expToVar' (CC.NumberLiteral _ v (Just nu)) = case nu of
+  CC.Wei -> return . Constant $ SInteger v
+  CC.Szabo -> return . Constant $ SInteger (v * (10 ^ (12 :: Integer)))
+  CC.Finney -> return . Constant $ SInteger (v * (10 ^ (15 :: Integer))) 
+  CC.Ether -> return . Constant $ SInteger (v * (10 ^ (18 :: Integer)))
 expToVar' (CC.StringLiteral _ s) = return $ Constant $ SString s
 expToVar' (CC.BoolLiteral _ b) = return $ Constant $ SBool b
 expToVar' (CC.Variable _ "bytes32ToString") = return $ Constant $ SHexDecodeAndTrim
@@ -1348,6 +1362,12 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
                                                     let maybeCertBlockDB = M.lookup (_accountAddress $ Env.origin env') x509s
                                                         maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
                                                     return . Constant . SString . fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
+      (SBuiltinVariable "tx", "group") -> do env' <- getEnv
+                                             x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
+                                             maybeCertLevelDB <- x509CertDBGet $ _accountAddress $ Env.origin env'
+                                             let maybeCertBlockDB = M.lookup (_accountAddress $ Env.origin env') x509s
+                                                 maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
+                                             return . Constant . SString . fromMaybe "" $ subUnit =<< getCertSubject =<< maybeCert
       (SBuiltinVariable "tx", "organizationalUnit") -> do env' <- getEnv
                                                           x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
                                                           maybeCertLevelDB <- x509CertDBGet $ _accountAddress $ Env.origin env'
@@ -2247,6 +2267,7 @@ certificateMap maybeCert = case maybeCert of
           certMap cert sub = M.fromList [ (SString "commonName", Constant . SString $ subCommonName sub)
                                    , (SString "country", Constant . SString $ fromMaybe "" $ subCountry sub)
                                    , (SString "organization", Constant . SString $ subOrg sub)
+                                   , (SString "group", Constant . SString $ fromMaybe "" $ subUnit sub)
                                    , (SString "organizationalUnit", Constant . SString $ fromMaybe "" $ subUnit sub)
                                    , (SString "publicKey", Constant . SString $ BC.unpack $ pubToBytes $ subPub sub)
                                    , (SString "userAddress", Constant . SString $ show $ fromPublicKey $ subPub sub)
@@ -2256,6 +2277,7 @@ certificateMap maybeCert = case maybeCert of
           emptyCertMap = M.fromList [ (SString "commonName", Constant . SString $ "")
                              , (SString "country", Constant . SString $ "")
                              , (SString "organization", Constant . SString $ "")
+                             , (SString "group", Constant . SString $ "")
                              , (SString "organizationalUnit", Constant . SString $ "")
                              , (SString "publicKey", Constant . SString $ "")
                              , (SString "userAddress", Constant . SString $ "")

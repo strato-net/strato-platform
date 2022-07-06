@@ -188,6 +188,7 @@ contract Certificate {
     string commonName;
     string country;
     string organization;
+    string group;
     string organizationalUnit;
     string publicKey;
     string certificateString;
@@ -201,6 +202,7 @@ contract Certificate {
         certificateHolder = account(parsedCert["userAddress"]);
         commonName = parsedCert["commonName"];
         organization = parsedCert["organization"];
+        group = parsedCert["group"];
         organizationalUnit = parsedCert["organizationalUnit"];
         country = parsedCert["country"];
         publicKey = parsedCert["publicKey"];
@@ -256,7 +258,7 @@ contract CertificateRegistry {
         certificatesMap[newAccount] = certificates.length;
         initialized = true;
 
-        emit CertificateRegistered(address(0xdeadbeef), address(c));
+        emit CertificateRegistered(rootCert);
         
         return 200;
     }
@@ -274,6 +276,8 @@ contract CertificateRegistry {
         certificates.push(c);
         certificatesMap[userAccount] = certificates.length;
         
+        emit CertificateRegistered(newCertificateString);
+
         return 200; // 200 = HTTP Status OK
     }
     

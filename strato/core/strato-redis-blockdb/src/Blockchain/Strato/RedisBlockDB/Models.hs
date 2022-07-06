@@ -15,6 +15,7 @@ import           Data.List                     (intercalate)
 import qualified Data.Map.Strict               as M
 import qualified Data.Set                      as S
 
+import           BlockApps.X509.Certificate
 import qualified Blockchain.Data.BlockHeader   as BHD
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Enode
@@ -76,6 +77,10 @@ instance RedisDBKeyable Address where
 
 instance RedisDBValuable Address where
     toValue   = toKey
+    fromValue = decode . fromStrict
+
+instance RedisDBValuable X509CertInfoState where
+    toValue = toStrict . encode
     fromValue = decode . fromStrict
 
 instance RedisDBKeyable Word256 where

@@ -1,3 +1,4 @@
+{-# LANGUAGE RecordWildCards            #-}
 -- |
 -- Module: ParserTypes
 -- Description: Types used throughout solidity-abi, primarily the ones
@@ -19,24 +20,58 @@ import           Text.Parsec
 type FileName = SourceName
 -- | Names of types, variables, functions, etc. in Solidity code.
 type Identifier = String
+
+-- | We parse directly from the textual source, without pre-lexing.
+
+-- Store the pragma version to allow for different things to happen when the pragma is different
+type PragmaVersion = Identifier
+
 -- | Names of contracts.  They have to be the same as identifiers because
 -- contracts can also be types.
 type ContractName = Identifier
--- | We parse directly from the textual source, without pre-lexing.
 
 type SourceCode = String
 -- | A parser of source code whose state is the name of the current
 -- contract.
-type SolidityParser = Parsec SourceCode ContractName
 
--- | When starting a new contract
+data ParserState = ParserState 
+    { contractName :: ContractName
+    , pragmaVersion :: PragmaVersion 
+    }
+-- TODO: add lenses to make the referencing and changing of the parser state faster
+
+type SolidityParser = Parsec SourceCode ParserState
+
+--given inputs set the parser state
+setParserState :: ParserState -> SolidityParser ()
+setParserState ParserState{..} = putState $ ParserState {
+      contractName = contractName
+    , pragmaVersion = pragmaVersion
+    }
+
+--Change the Pragma Version of the ParserState with a given input
+setPragmaVersion :: PragmaVersion -> SolidityParser ()
+-- Given a new pragma version replace the old parser State with a new one with an updated pragma version.
+setPragmaVersion p = 
+    do ParserState{..} <- getState
+       putState (ParserState contractName p)
+
+--Change the contract name of the ParserState with a given input
 setContractName :: ContractName -> SolidityParser ()
-setContractName = setState
+-- Given a new contract name replace the old parser State with a new one with an updated contract name.
+setContractName cn = 
+    do ParserState{..} <- getState
+       putState (ParserState cn pragmaVersion)
 
--- | There are a few context-sensitive constructs in Solidity, for example
--- constructors.
+-- Get the contract name from the parser state
 getContractName :: SolidityParser ContractName
-getContractName = getState
+--If other items are added to the ParserState, this is very similar to how one adds
+-- more get information functions.
+getContractName = contractName <$> getState
+
+-- Get the pragmaVersion from the parser state
+getPragmaVersion :: SolidityParser PragmaVersion
+getPragmaVersion = pragmaVersion <$> getState
 
 -- | Not actually used.
 type SolidityValue = String

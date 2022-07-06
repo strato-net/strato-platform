@@ -31,7 +31,7 @@ import Data.Text.Encoding
 import Data.Time.Clock.POSIX
 import HFlags
 import Numeric
-import Test.Hspec (hspec, Spec, describe, it, it, xit, pendingWith, anyException, shouldThrow, anyErrorCall, Selector)
+import Test.Hspec (hspec, Spec, describe, fit, it, xit, pendingWith, anyException, shouldThrow, anyErrorCall, Selector)
 import Test.Hspec.Expectations.Lifted
 import Text.Printf
 import Text.RawString.QQ
@@ -130,17 +130,21 @@ anyPaymentError :: Selector HandledException
 anyPaymentError (HE Blockchain.SolidVM.Exception.PaymentError{}) = True
 anyPaymentError _ = False
 
+anyReservedWordError :: Selector HandledException
+anyReservedWordError (HE Blockchain.SolidVM.Exception.ReservedWordError{}) = True
+anyReservedWordError _ = False
+
 failedRequirementMsg :: String -> Selector HandledException
 failedRequirementMsg str (HE (Require (Just msg))) = str == msg
-failedRequirementMsg _   _                         = False
+failedRequirementMsg _ _ = False
 
 failedRequirementNoMsg :: Selector HandledException
 failedRequirementNoMsg (HE (Require Nothing)) = True
-failedRequirementNoMsg _                      = False
+failedRequirementNoMsg _ = False
 
 failedAssertion :: Selector HandledException
 failedAssertion (HE Assert) = True
-failedAssertion _           = False
+failedAssertion _ = False
 
 sender :: Account
 sender = Account 0xdeadbeef Nothing
@@ -722,29 +726,12 @@ contract qq {
    }
 }|]) `shouldThrow` anyParseError
 
---TODO:
---     it "throw an error when there is an 'account' variable name" $ runTest (do
---       runBS [r|
--- contract qq {
---    function f();
---    string account;
---    constructor()
---    {
---       account = "hello";
---    }
--- }|]) `shouldThrow` anyParseError
 
     it "throw an error when there is an 'address' variable name" $ runTest (do
       runBS [r|
 contract qq {
    uint address;
 }|]) `shouldThrow` anyParseError
-
---     it "throw an error when there is an 'chainId' variable name" $ runTest (do
---       runBS [r|
--- contract qq {
---    uint chainId;
--- }|]) `shouldThrow` anyParseError
 
     it "throw an error when there is an 'record_id' variable name" $ runTest (do
       runBS [r|
@@ -2425,6 +2412,28 @@ contract qq {
   function f() public {}
 }|]) `shouldThrow` anyParseError
 
+  it "throw an error when the 'account' reserved word is for a variable name." $ runTest (do
+      runBS [r|
+pragma solidvm 3.2;
+contract A {
+  uint account;
+}|]) `shouldThrow` anyReservedWordError
+
+  it "throw an error when the 'account' reserved word is for a contract name." $ runTest (do
+      runBS [r|
+pragma solidvm 3.2;
+contract account {
+  uint a;
+}|]) `shouldThrow` anyReservedWordError
+
+  it "throw an error when the 'account' reserved word is used for a function name." $ runTest (do
+      runBS [r|
+pragma solidvm 3.2;
+contract A {
+  function account() {
+  }
+}|]) `shouldThrow` anyReservedWordError
+
   it "catches missing function errors" $
     (runTest $ runCall "f" "()" [r|contract qq {}|]) `shouldThrow` anyUnknownFunc
 
@@ -3793,6 +3802,7 @@ contract qq {
     string myCommonName         = "";
     string myCountry            = "";
     string myOrganization       = "";
+    string myGroup              = "";
     string myOrganizationalUnit = "";
     string myPublicKey          = "";
 
@@ -3800,10 +3810,19 @@ contract qq {
         myCommonName          = parseCert(myNewCertificate)["commonName"];
         myCountry             = parseCert(myNewCertificate)["country"];
         myOrganization        = parseCert(myNewCertificate)["organization"];
+        myGroup               = parseCert(myNewCertificate)["group"];
         myOrganizationalUnit  = parseCert(myNewCertificate)["organizationalUnit"];
         myPublicKey           = parseCert(myNewCertificate)["publicKey"];
     }
 }|]
+    getFields ["myCommonName", "myCountry", "myOrganization", "myGroup", "myPublicKey"] `shouldReturn`
+      [ BString "dan"
+      , BString "USA"
+      , BString "blockapps"
+      , BString "engineering"
+      , BString "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEGOKeu5dSCBFHVQuy/q1A8BeTb99G83tD\nVecvHHne6sKfmBZN1AIjhpHGKO22vBfdq3dMn/QBqb2TdR9w3WvMXQ==\n-----END PUBLIC KEY-----\n"
+      ]
+
     getFields ["myCommonName", "myCountry", "myOrganization", "myOrganizationalUnit", "myPublicKey"] `shouldReturn`
       [ BString "dan"
       , BString "USA"
@@ -3950,11 +3969,13 @@ contract qq {
 
     string myUsername     = "";
     string myOrganization = "";
+    string myGroup        = "";
     string myOrganizationalUnit  = "";
     string certificate    = "";
     string myCommonName   = "";
     string myCountry      = "";
     string myOrganization = "";
+    string myGroup        = "";
     string myOrganizationalUnit  = "";
     string myPublicKey    = "";
     string myCertificate  = "";
@@ -3964,17 +3985,31 @@ contract qq {
 
         myUsername     = tx.username;
         myOrganization = tx.organization;
+        myGroup        = tx.group;
         myOrganizationalUnit = tx.organizationalUnit;
 	
         certificate    = tx.certificate;
         myCommonName   = getUserCert(myAccount)["commonName"];
         myCountry      = getUserCert(myAccount)["country"];
         myOrganization = getUserCert(myAccount)["organization"];
+        myGroup        = getUserCert(myAccount)["group"];
         myOrganizationalUnit  = getUserCert(myAccount)["organizationalUnit"];
         myPublicKey    = getUserCert(myAccount)["publicKey"];
         myCertificate  = getUserCert(myAccount)["certString"];
     }
 }|]
+    getFields ["myUsername", "myOrganization", "myGroup", "certificate","myCommonName", "myCountry", "myOrganization", "myGroup", "myPublicKey", "myCertificate"] `shouldReturn`
+      [ BString "Admin"
+      , BString "BlockApps"
+      , BString "Engineering"
+      , BString "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----\n"
+      , BString "Admin"
+      , BString "USA"
+      , BString "BlockApps"
+      , BString "Engineering"
+      , BString "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEUhJR4x+wZiX+xZK2m/pwN40cvCS0UA7Z\n0DB7sny5ZnNLw43JgKz0URDY2yYOPkhoIApxFK9UU3Bc4BRANDWmdQ==\n-----END PUBLIC KEY-----\n"
+      , BString "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----\n"
+      ]
     getFields ["myUsername", "myOrganization", "myOrganizationalUnit", "certificate","myCommonName", "myCountry", "myOrganization", "myOrganizationalUnit", "myPublicKey", "myCertificate"] `shouldReturn`
       [ BString "Admin"
       , BString "BlockApps"
@@ -4311,6 +4346,7 @@ contract qq {
   string oldCodeHash;
   string newCodeHash;
   bool success;
+  
   constructor() public {
     contract' = account(this);
     contractPay = payable(contract');
@@ -4334,4 +4370,59 @@ contract qq {
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing owner) (\bs -> pure $ bs { addressStateBalance = 10 })
     -- Check return of balance
     void $ call2 "selfDestructThis" "()" (namedAccountToAccount Nothing contract') 
-    getFields ["success", "contractBalance", "ownerBalance", "oldCodeHash", "newCodeHash"] `shouldReturn` [ BBool True, BDefault, BInteger 24, BString $ BC.pack $ keccak256ToHex $ hash $ UTF8.fromString contract, BString "0000000000000000000000000000000000000000000000000000000000000000" ]
+    getFields ["success", "contractBalance", "ownerBalance", "oldCodeHash", "newCodeHash"] `shouldReturn` 
+    [ BBool True
+    , BDefault
+    , BInteger 24
+    , BString $ BC.pack $ keccak256ToHex $ hash $ UTF8.fromString contract
+    , BString "0000000000000000000000000000000000000000000000000000000000000000" 
+    ]
+  
+  it "throw an error when the 'account' reserved word is for a variable name." $ runTest (do
+      runBS [r|
+pragma solidvm 3.2;
+contract A {
+  uint account;
+}|]) `shouldThrow` anyReservedWordError
+
+  it "throw an error when the 'account' reserved word is for a contract name." $ runTest (do
+      runBS [r|
+pragma solidvm 3.2;
+contract account {
+  uint a;
+}|]) `shouldThrow` anyReservedWordError
+
+  it "throw an error when the 'account' reserved word is used for a function name." $ runTest (do
+      runBS [r|
+pragma solidvm 3.2;
+contract A {
+  function account() {
+  }
+}|]) `shouldThrow` anyReservedWordError
+  it "can use 1e_ notation to get a number" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq{
+  uint mynum;
+  constructor() public {
+    mynum = 1e12;
+  }
+}|]
+    getFields ["mynum"] `shouldReturn` [BInteger 1000000000000]
+
+  it "can use ether number unit suffixes" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq{
+  uint weiUnit;
+  uint szaboUnit;
+  uint finneyUnit;
+  uint etherUnit;
+  constructor() public {
+    weiUnit = 2 wei;
+    szaboUnit = 2 szabo;
+    finneyUnit = 2 finney;
+    etherUnit = 2 ether;
+  }
+}|]
+    getFields ["weiUnit", "szaboUnit", "finneyUnit", "etherUnit"] `shouldReturn` [BInteger 2, BInteger 2000000000000, BInteger 2000000000000000, BInteger 2000000000000000000]
