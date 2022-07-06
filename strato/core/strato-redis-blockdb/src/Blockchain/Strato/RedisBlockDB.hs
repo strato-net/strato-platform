@@ -144,7 +144,7 @@ putChainInfo cId cInfo = do
     res <- multiExec $ setnx (inNamespace PrivateChainInfo cId) (toValue rChain)
     case res of
         TxSuccess _ -> pure $ Right Ok
-        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putChainInfo - Aborted")
+        TxAborted   -> pure . Left $ SingleLine (S8.pack "putChainInfo - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "putChainInfo - Error" ++ e)
 
 getChainMembers :: Word256
@@ -166,7 +166,7 @@ putChainMembers cId mems = do
         TxSuccess _ -> fmap (foldl' (>>) (Right Ok)) . forM (M.elems mems) $ \e -> getCompose $
           Compose (addIPChain (ipAddress e) cId) *>
           Compose (addOrgIdChain (unOrgId $ pubKey e) cId)
-        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putChainMembers - Aborted")
+        TxAborted   -> pure . Left $ SingleLine (S8.pack "putChainMembers - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "putChainMembers - Error" ++ e)
 
 addChainMember :: Word256
@@ -181,7 +181,7 @@ addChainMember cId address enode = do
         TxSuccess _ -> getCompose $
           Compose (addIPChain (ipAddress enode) cId) *>
           Compose (addOrgIdChain (unOrgId $ pubKey enode) cId)
-        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addChainMember - Aborted")
+        TxAborted   -> pure . Left $ SingleLine (S8.pack "addChainMember - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "addChainMember - Error" ++ e)
 
 removeChainMember :: Word256
@@ -198,16 +198,39 @@ removeChainMember cId address = do
           Just enode -> getCompose $
             Compose (removeIPChain (ipAddress enode) cId) *>
             Compose (removeOrgIdChain (unOrgId $ pubKey enode) cId)
-        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Aborted")
+        TxAborted   -> pure . Left $ SingleLine (S8.pack "removeChainMember - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Error" ++ e)
 
 registerCertificate :: Address -> X509CertInfoState -> Redis (Either Reply Status)
 registerCertificate userAddress x509CertInfoState = do
     res <- multiExec $ set (inNamespace X509Certificates $ toKey userAddress) (toValue x509CertInfoState)
-    case res of
+    _ <- case res of
         TxSuccess _ -> pure $ Right Ok
-        TxAborted -> pure . Left $ SingleLine (S8.pack $ "registerCertificate - Aborted")
+        TxAborted -> pure . Left $ SingleLine (S8.pack "registerCertificate - Aborted")
         TxError e -> pure . Left $ SingleLine (S8.pack $ "registerCertificate - Error" <> e)
+        
+    let maybeParent = getParentUserAddress $ certificate x509CertInfoState
+    case maybeParent of
+        Nothing -> pure . Left $ SingleLine (S8.pack "registerCertificate - No Parent")
+        Just parentAddr -> do
+                mCertInfoState <- getCertificate parentAddr
+                case mCertInfoState of
+                    Nothing -> pure . Left $ SingleLine (S8.pack "registerCertificate - No Parent Certificate")
+                    Just certInfoState -> do
+                        let newChildren = children certInfoState ++ [userAddress]
+                        let newParentInfoState = X509CertInfoState {userAddress = parentAddr, certificate = certificate certInfoState, isValid = isValid certInfoState, children = newChildren}
+                        res' <- multiExec $ set (inNamespace X509Certificates $ toKey parentAddr) (toValue newParentInfoState)
+                        case res' of
+                            TxSuccess _ -> pure $ Right Ok
+                            TxAborted -> pure . Left $ SingleLine (S8.pack "registerCertificate - Aborted adding children")
+                            TxError e -> pure . Left $ SingleLine (S8.pack $ "registerCertificate - Error adding children" <> e)
+
+getCertificate :: Address -> Redis (Maybe X509CertInfoState)
+getCertificate userAddress = getInNamespace X509Certificates userAddress >>= \case ---or inNamespace?
+        Left _          -> return Nothing
+        Right Nothing   -> return Nothing
+        Right (Just state) -> let certInfoState = fromValue state
+                              in return (Just certInfoState)
 
 getChainTxsInBlock :: Keccak256
                    -> Redis (M.Map Word256 [Keccak256])
@@ -226,7 +249,7 @@ putChainTxsInBlock bHash chainIdTxHashMap = do
     res <- multiExec $ set (inNamespace PrivateTxsInBlocks bHash) (toValue rmems)
     case res of
         TxSuccess _ -> pure $ Right Ok
-        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putChainTxsInBlock - Aborted")
+        TxAborted   -> pure . Left $ SingleLine (S8.pack "putChainTxsInBlock - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "putChainTxsInBlock - Error" ++ e)
 
 addChainTxsInBlock :: Keccak256
@@ -239,7 +262,7 @@ addChainTxsInBlock bHash cId shas = do
     res <- multiExec $ set (inNamespace PrivateTxsInBlocks bHash) (toValue mems')
     case res of
         TxSuccess _ -> pure $ Right Ok
-        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addChainTxsInBlock - Aborted")
+        TxAborted   -> pure . Left $ SingleLine (S8.pack "addChainTxsInBlock - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "addChainTxsInBlock - Error" ++ e)
 
 getIPChains :: IPAddress
@@ -258,7 +281,7 @@ addIPChain ip cId = do
     res <- multiExec $ set (inNamespace PrivateIPChains ip) (toValue chains')
     case res of
         TxSuccess _ -> pure $ Right Ok
-        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addIPChain - Aborted")
+        TxAborted   -> pure . Left $ SingleLine (S8.pack "addIPChain - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "addIPChain - Error" ++ e)
 
 removeIPChain :: IPAddress
@@ -270,7 +293,7 @@ removeIPChain ip cId = do
     res <- multiExec $ set (inNamespace PrivateIPChains ip) (toValue chains')
     case res of
         TxSuccess _ -> pure $ Right Ok
-        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeIPChain - Aborted")
+        TxAborted   -> pure . Left $ SingleLine (S8.pack "removeIPChain - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeIPChain - Error" ++ e)
 
 getOrgIdChains :: S8.ByteString
@@ -289,7 +312,7 @@ addOrgIdChain ip cId = do
     res <- multiExec $ set (inNamespace PrivateOrgIdChains ip) (toValue chains')
     case res of
         TxSuccess _ -> pure $ Right Ok
-        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addOrgIdChain - Aborted")
+        TxAborted   -> pure . Left $ SingleLine (S8.pack "addOrgIdChain - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "addOrgIdChain - Error" ++ e)
 
 removeOrgIdChain :: S8.ByteString
@@ -301,7 +324,7 @@ removeOrgIdChain ip cId = do
     res <- multiExec $ set (inNamespace PrivateOrgIdChains ip) (toValue chains')
     case res of
         TxSuccess _ -> pure $ Right Ok
-        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeOrgIdChain - Aborted")
+        TxAborted   -> pure . Left $ SingleLine (S8.pack "removeOrgIdChain - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeOrgIdChain - Error" ++ e)
 
 bestBlockInfoKey :: S8.ByteString
@@ -376,7 +399,7 @@ addPrivateTransactions ptxs = do
        $ map (inNamespace PrivateTransactions *** toValue) ptxs
   case res of
       TxSuccess _ -> pure $ Right Ok
-      TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addPrivateTransactions - Aborted")
+      TxAborted   -> pure . Left $ SingleLine (S8.pack "addPrivateTransactions - Aborted")
       TxError e   -> pure . Left $ SingleLine (S8.pack $ "addPrivateTransactions - Error" ++ e)
 
 getUncles :: Keccak256
@@ -449,7 +472,7 @@ getCanonicalChain :: Integer
                   -> Int
                   -> Redis [Keccak256]
 getCanonicalChain start limit = do
-    let chain = forM (take (limit) [start..]) getCanonical
+    let chain = forM (take limit [start..]) getCanonical
     catMaybes <$> chain
 
 getZippedCanonicalChain :: (Keccak256 -> Redis (Maybe t))
@@ -530,7 +553,7 @@ insertHeader sha h = do
         sadd (inNamespace Numbers number') [toValue sha]
     case res of
         TxSuccess _ -> pure $ Right Ok
-        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "insertHeader - Aborted")
+        TxAborted   -> pure . Left $ SingleLine (S8.pack "insertHeader - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "insertHeader - Error" ++ e)
 
 insertHeaders :: M.Map Keccak256 BlockData
@@ -539,7 +562,7 @@ insertHeaders = sequenceA . M.mapWithKey insertHeader
 
 deleteHeader :: Keccak256
              -> Redis (Either Reply Status)
-deleteHeader _ = pure . Left $ SingleLine (S8.pack $ "deleteHeader - Not Implemented")
+deleteHeader _ = pure . Left $ SingleLine (S8.pack "deleteHeader - Not Implemented")
 
 deleteHeaders :: Traversable t
               => t Keccak256
@@ -573,7 +596,7 @@ insertBlock sha b = do
         inNS'   = flip inNamespace sha
     unless (null ptxs) $ do
       void . addPrivateTransactions $
-        map (txHash &&& ((fromJust . txAnchorChain) &&& id)) ptxs
+        map (txHash &&& (fromJust . txAnchorChain) &&& id) ptxs
       forM_ (partitionWith txAnchorChain ptxs) $ \(cId, ptxs') ->
                          --  ^-- already filtered on (isJust . txChainId)
         addChainTxsInBlock sha (fromJust cId) $ map txHash ptxs'
@@ -596,7 +619,7 @@ insertBlocks = sequenceA . M.mapWithKey insertBlock
 
 deleteBlock :: Keccak256
             -> Redis (Either Reply Status)
-deleteBlock _ = pure . Left $ SingleLine (S8.pack $ "deleteBlock - Not Implemented")
+deleteBlock _ = pure . Left $ SingleLine (S8.pack "deleteBlock - Not Implemented")
 
 deleteBlocks :: Traversable t
              => t Keccak256
@@ -621,7 +644,7 @@ putBestBlockInfo newSha newNumber newTDiff = do
                     --liftIO . putStrLn $ "Updates: \n" ++ unlines ((\(x, y) -> show (keccak256ToHex x, y)) <$> updates)
                     --liftIO . putStrLn $ "Deletions: \n" ++ show deletions
                   res <- multiExec $ do
-                      forM_ updates $ \(sha, num) -> set (inNamespace Canonical $ num) (toValue sha)
+                      forM_ updates $ \(sha, num) -> set (inNamespace Canonical num) (toValue sha)
                       unless (null deletions) . void . del $ inNamespace Canonical . toKey <$> deletions
                       forceBestBlockInfo newSha newNumber newTDiff
                   checkAndUpdateSyncStatus
@@ -634,7 +657,7 @@ commonAncestorHelper :: Integer -> Integer
                      -> Keccak256     -> Keccak256
                      -> Redis (Either Reply ([(Keccak256, Integer)], [Integer])) -- ([Updates], [Deletions])
 commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] (S.fromList [oldSha', newSha'])
-        where helper (oldSha:[]) (newSha:[]) _ | oldSha == newSha = return $ Right ([], [])
+        where helper [oldSha] [newSha] _ | oldSha == newSha = return $ Right ([], [])
               helper (_:(oldSha'':_)) (_:(newSha'':ns)) _ | oldSha'' == newSha'' = complete oldSha'' (mkParentChain newSha'' ns)
               helper oldShaChain newShaChain seen = do
                 let oldSha = head oldShaChain
@@ -642,7 +665,7 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
                 newParent <- (\x -> fromMaybe x <$> getParent x) newSha
                 oldParent <- (\x -> fromMaybe x <$> getParent x) oldSha
                 let ps = [newParent, oldParent]
-                let seen' = foldl' (flip S.insert) seen (filter (/= (unsafeCreateKeccak256FromWord256 0)) ps) -- todo double S.insert is probably more optimal
+                let seen' = foldl' (flip S.insert) seen (filter (/= unsafeCreateKeccak256FromWord256 0) ps) -- todo double S.insert is probably more optimal
                 if newParent `S.member` seen
                 then complete newParent (mkParentChain newParent newShaChain)
                 else if oldParent `S.member` seen
@@ -663,7 +686,7 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
 
               complete :: Keccak256 -> [Keccak256] -> Redis (Either Reply ([(Keccak256, Integer)], [Integer]))
               complete lca newShaChain = getHeader lca >>= \case
-                      Nothing -> if lca /= (unsafeCreateKeccak256FromWord256 0) -- genesis block is sha 0
+                      Nothing -> if lca /= unsafeCreateKeccak256FromWord256 0 -- genesis block is sha 0
                                      then return . Left . SingleLine . S8.pack $
                                               "Could not get ancestor header for Keccak256 " ++ keccak256ToHex lca
                                      else complete (head newShaChain) newShaChain
@@ -691,7 +714,7 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
 
 -- | Used to seed the first bestBlock, e.g. genesis block in strato-setup
 forceBestBlockInfo :: RedisCtx m f => Keccak256 -> Integer -> Integer -> m (f Status)
-forceBestBlockInfo sha i j = do
+forceBestBlockInfo sha i j =
         forceBestBlockInfo' bestBlockInfoKey (RedisBestBlock sha i j) --`totalRecall` (,,)
 
 forceBestBlockInfo' :: RedisCtx m f => S8.ByteString -> RedisBestBlock -> m (f Status)
@@ -767,7 +790,7 @@ updateWorldBestBlockInfo sha num tdiff = withRetryCount 0
               maybeLockID <- acquireWorldBestBlockRedlock defaultRedlockTTL
               case maybeLockID of
                   Left err -> do
-                      when (theRetryCount /= 0 && (theRetryCount `mod` 5) == 0) $ do
+                      when (theRetryCount /= 0 && theRetryCount `mod` 5 == 0) $ do
                           liftLog $ $logWarnS "updateWorldBestBlockInfo" . T.pack $ "Could not acquire redlock after " ++ show theRetryCount ++ " attempts, will retry; " ++ show err
                           liftIO $ threadDelay defaultRedlockBackoff -- todo make backoff a factor instead of a fixed backoff
                       withRetryCount $ theRetryCount + 1
@@ -807,7 +830,7 @@ checkAndUpdateSyncStatus = do
     worldBestBlock <- getWorldBestBlockInfo
     let nodeTotalDiff  = bestBlockTotalDifficulty <$> nodeBestBlock
         worldTotalDiff = bestBlockTotalDifficulty <$> worldBestBlock
-    
+
     case (status, nodeTotalDiff, worldTotalDiff) of
         (Just False, Just ntd, Just wtd) -> when (ntd >= wtd) (void $ putSyncStatus True)
         (Nothing,    Just ntd, Just wtd) -> void $ putSyncStatus (ntd >= wtd)
