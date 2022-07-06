@@ -4298,28 +4298,35 @@ contract qq {
 }|]
     getFields ["hsh"] `shouldReturn` [BString $ B.pack $ word160ToBytes 0x63f4a6f6005b0ded8c5fc7e62ddf2550e9320410]
 
- it "can use the selfdestruct function" . runTest $ do
-    runBS [r|
+  it "can use the selfdestruct function" . runTest $ do
+    let contract = [r|
 pragma solidvm 3.2;
 contract qq {
   account contract';
+  account payable contractPay;
   account owner;
   account payable ownerPay;
   uint contractBalance;
   uint ownerBalance;
+  string oldCodeHash;
+  string newCodeHash;
   bool success;
   constructor() public {
-    owner = account(this);
+    contract' = account(this);
+    contractPay = payable(contract');
+    owner = account(0xdeadbeef);
     ownerPay = payable(owner);
+    oldCodeHash = account(this).codehash;
   }
 
-  function selfDestructThis() public returns (bool, uint, uint) {
+  function selfDestructThis() internal {
     success = selfdestruct(ownerPay);
-    contractBalance = this.balance;
+    contractBalance = contractPay.balance;
     ownerBalance = ownerPay.balance;
-    return (success, contractBalance, ownerBalance);
+    newCodeHash = account(this).codehash;
   } 
 }|]
+    runBS contract
     -- Get the contract's accounts
     [ BAccount contract', BAccount owner] <- getFields ["contract'", "owner"]
     -- Adjust the preset balances
@@ -4327,4 +4334,4 @@ contract qq {
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing owner) (\bs -> pure $ bs { addressStateBalance = 10 })
     -- Check return of balance
     void $ call2 "selfDestructThis" "()" (namedAccountToAccount Nothing contract') 
-    getFields ["success", "contractBalance", "ownerBalance"] `shouldReturn` [ BBool True, BInteger 0, BInteger 24 ]
+    getFields ["success", "contractBalance", "ownerBalance", "oldCodeHash", "newCodeHash"] `shouldReturn` [ BBool True, BDefault, BInteger 24, BString $ BC.pack $ keccak256ToHex $ hash $ UTF8.fromString contract, BString "0000000000000000000000000000000000000000000000000000000000000000" ]
