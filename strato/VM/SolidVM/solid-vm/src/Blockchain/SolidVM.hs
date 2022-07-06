@@ -2023,6 +2023,7 @@ callBuiltin "selfdestruct" [SAccount a _] _ = do
   _destroyRes <- A.adjustWithDefault_ (A.Proxy @AddressState) contract' $ \newAddressState ->
     pure newAddressState{ addressStateCodeHash = SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0}
   sendRes <- pay "selfdestruct function" contract' (namedAccountToAccount Nothing a) contractBalance
+  _purgeRes <- purgeStorageMap contract'
   case sendRes of
     True -> return $ SBool True
     _ -> return $ SBool False
