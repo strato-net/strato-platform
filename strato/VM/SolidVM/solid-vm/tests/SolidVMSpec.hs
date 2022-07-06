@@ -4341,25 +4341,16 @@ contract qq {
   account payable contractPay;
   account owner;
   account payable ownerPay;
-  uint contractBalance;
-  uint ownerBalance;
-  string oldCodeHash;
-  string newCodeHash;
-  bool success;
 
   constructor() public {
     contract' = account(this);
     contractPay = payable(contract');
     owner = account(0xdeadbeef);
     ownerPay = payable(owner);
-    oldCodeHash = account(this).codehash;
   }
 
   function selfDestructThis() internal {
-    success = selfdestruct(ownerPay);
-    contractBalance = contractPay.balance;
-    ownerBalance = ownerPay.balance;
-    newCodeHash = account(this).codehash;
+    selfdestruct(ownerPay);
   } 
 }|]
     runBS contract
@@ -4370,12 +4361,11 @@ contract qq {
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing owner) (\bs -> pure $ bs { addressStateBalance = 10 })
     -- Check return of balance
     void $ call2 "selfDestructThis" "()" (namedAccountToAccount Nothing contract') 
-    getFields ["success", "contractBalance", "ownerBalance", "oldCodeHash", "newCodeHash"] `shouldReturn` 
-      [ BBool True
+    getFields ["contract'", "contractPay", "owner", "ownerPay"] `shouldReturn` 
+      [ BDefault
       , BDefault
-      , BInteger 24
-      , BString $ BC.pack $ keccak256ToHex $ hash $ UTF8.fromString contract
-      , BString "0000000000000000000000000000000000000000000000000000000000000000" 
+      , BDefault
+      , BDefault
       ]
   
   it "throw an error when the 'account' reserved word is for a variable name." $ runTest (do
