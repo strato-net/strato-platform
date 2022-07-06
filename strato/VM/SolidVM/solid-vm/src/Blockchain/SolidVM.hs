@@ -2024,9 +2024,7 @@ callBuiltin "selfdestruct" [SAccount a _] _ = do
     pure newAddressState{ addressStateCodeHash = SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0}
   sendRes <- pay "selfdestruct function" contract' (namedAccountToAccount Nothing a) contractBalance
   _purgeRes <- purgeStorageMap contract'
-  case sendRes of
-    True -> return $ SBool True
-    _ -> return $ SBool False
+  return $ SBool sendRes
 
 callBuiltin "account" vs _ = typeError "account cast" vs
 callBuiltin "bool" [SBool b] _ = return $ SBool b
