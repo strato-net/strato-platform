@@ -4381,3 +4381,27 @@ contract qq{
   }
 }|]
     getFields ["weiUnit", "szaboUnit", "finneyUnit", "etherUnit"] `shouldReturn` [BInteger 2, BInteger 2000000000000, BInteger 2000000000000000, BInteger 2000000000000000000]
+
+  it "can create salted contract" . runTest $ do
+    runBS [r|
+contract X {
+  uint public y;
+  string public z;
+
+  constructor(uint _y, string _z) public {
+    y = _y;
+    z = _z;
+  }
+}
+
+contract qq {
+  X public x;
+  bytes32 salt;
+  constructor() public {
+    salt = "0x10000000000000000000000000000000";
+    x = new X{salt: salt}({_z: "ok", _y: 0x777777});
+  }
+}|]
+    getFields ["x"] `shouldReturn` [bContract' "X" recursiveAddr]
+    mapM (getSolidStorageKeyVal' recursiveAddr) [MS.singleton "y", MS.singleton "z"]
+      `shouldReturn` [BInteger 0x777777, BString "ok"]
