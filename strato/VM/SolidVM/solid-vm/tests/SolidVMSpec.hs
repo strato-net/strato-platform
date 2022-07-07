@@ -4333,6 +4333,41 @@ contract qq {
 }|]
     getFields ["hsh"] `shouldReturn` [BString $ B.pack $ word160ToBytes 0x63f4a6f6005b0ded8c5fc7e62ddf2550e9320410]
 
+  it "can use the selfdestruct function" . runTest $ do
+    let contract = [r|
+pragma solidvm 3.2;
+contract qq {
+  account contract';
+  account payable contractPay;
+  account owner;
+  account payable ownerPay;
+
+  constructor() public {
+    contract' = account(this);
+    contractPay = payable(contract');
+    owner = account(0xdeadbeef);
+    ownerPay = payable(owner);
+  }
+
+  function selfDestructThis() internal {
+    selfdestruct(ownerPay);
+  } 
+}|]
+    runBS contract
+    -- Get the contract's accounts
+    [ BAccount contract', BAccount owner] <- getFields ["contract'", "owner"]
+    -- Adjust the preset balances
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing contract') (\as -> pure $ as { addressStateBalance = 14 })
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing owner) (\bs -> pure $ bs { addressStateBalance = 10 })
+    -- Check return of balance
+    void $ call2 "selfDestructThis" "()" (namedAccountToAccount Nothing contract') 
+    getFields ["contract'", "contractPay", "owner", "ownerPay"] `shouldReturn` 
+      [ BDefault
+      , BDefault
+      , BDefault
+      , BDefault
+      ]
+  
   it "throw an error when the 'account' reserved word is for a variable name." $ runTest (do
       runBS [r|
 pragma solidvm 3.2;
