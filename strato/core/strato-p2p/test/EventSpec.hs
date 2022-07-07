@@ -35,6 +35,7 @@ import           Data.Text (Text)
 import           Text.Printf
 
 import           BlockApps.Logging
+import           BlockApps.X509.Certificate
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin
 import           Blockchain.Blockstanbul.Messages      (round)
@@ -99,6 +100,7 @@ data TestContext = TestContext
   , _chainMembersMap       :: Map Word256 ChainMembers
   , _chainInfoMap          :: Map Word256 ChainInfo
   , _privateTxMap          :: Map Keccak256 (Private (Word256, OutputTx))
+  , _x509Map               :: Map Address X509CertInfoState
   , _genesisBlockHash      :: GenesisBlockHash
   , _bestBlockNumber       :: BestBlockNumber
   , _stringPPeerMap        :: Map String DataPeer.PPeer
@@ -158,6 +160,9 @@ instance MonadIO m => A.Selectable Word256 ChainInfo (MonadTest m) where
 
 instance MonadIO m => A.Selectable Keccak256 (Private (Word256, OutputTx)) (MonadTest m) where
   select _ tx = M.lookup tx <$> use privateTxMap
+
+instance MonadIO m => A.Selectable Address X509CertInfoState (MonadTest m) where
+  select _ addr = M.lookup addr <$> use x509Map
 
 instance MonadIO m => Mod.Accessible GenesisBlockHash (MonadTest m) where
   access _ = use genesisBlockHash
@@ -398,6 +403,7 @@ testContext wireMessagesRef prv ctx = TestContext
   , _chainMembersMap       = M.empty
   , _chainInfoMap          = M.empty
   , _privateTxMap          = M.empty
+  , _x509Map               = M.empty
   , _genesisBlockHash      = GenesisBlockHash zeroHash
   , _bestBlockNumber       = BestBlockNumber 0
   , _stringPPeerMap        = M.empty

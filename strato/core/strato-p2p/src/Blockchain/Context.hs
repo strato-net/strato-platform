@@ -253,8 +253,9 @@ instance MonadIO m => A.Selectable Word256 ChainInfo (ReaderT Config m) where
 instance MonadIO m => A.Selectable Keccak256 (Private (Word256, OutputTx)) (ReaderT Config m) where
   select _ = fmap (fmap Private) . RBDB.withRedisBlockDB . RBDB.getPrivateTransactions
 
+--Allow for getting the X509 certificate of a peer.
 instance MonadIO m => A.Selectable Address X509CertInfoState (ReaderT Config m) where
-  select _ = fmap X509CertInfoState . RBDB.withRedisBlockDB . RBDB.getX509CertInfo
+  select _ = RBDB.withRedisBlockDB . RBDB.getCertificate
 
 instance MonadIO m => (Keccak256 `A.Alters` OutputBlock) (ReaderT Config m) where
   lookup _     = RBDB.withRedisBlockDB . RBDB.getBlock
