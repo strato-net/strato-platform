@@ -719,7 +719,7 @@ pipeline {
             }
         }
         stage ('Dropping Chains test-multinode303') {
-            agent { label "multinode1303" } // is default
+            agent { label "multinode303" } // is default
             steps {
                 dir('strato-getting-started') {
                     script {
