@@ -4368,7 +4368,7 @@ contract qq{
     getFields ["mynum"] `shouldReturn` [BInteger 3]
 
   it "can use a try catch statment to catch a divide by zero error the Solidity Way (trademark very much in effect)" . runTest $ do
-    runBS [r|
+    runBS [r| 
 contract Divisor {
   function doTheDivide() public returns (uint) {
     return (1 / 0);
