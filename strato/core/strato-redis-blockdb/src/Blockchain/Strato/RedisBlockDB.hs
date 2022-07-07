@@ -144,7 +144,7 @@ putChainInfo cId cInfo = do
     res <- multiExec $ setnx (inNamespace PrivateChainInfo cId) (toValue rChain)
     case res of
         TxSuccess _ -> pure $ Right Ok
-        TxAborted   -> pure . Left $ SingleLine (S8.pack "putChainInfo - Aborted")
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putChainInfo - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "putChainInfo - Error" ++ e)
 
 getChainMembers :: Word256
@@ -166,7 +166,7 @@ putChainMembers cId mems = do
         TxSuccess _ -> fmap (foldl' (>>) (Right Ok)) . forM (M.elems mems) $ \e -> getCompose $
           Compose (addIPChain (ipAddress e) cId) *>
           Compose (addOrgIdChain (unOrgId $ pubKey e) cId)
-        TxAborted   -> pure . Left $ SingleLine (S8.pack "putChainMembers - Aborted")
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putChainMembers - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "putChainMembers - Error" ++ e)
 
 addChainMember :: Word256
@@ -181,7 +181,7 @@ addChainMember cId address enode = do
         TxSuccess _ -> getCompose $
           Compose (addIPChain (ipAddress enode) cId) *>
           Compose (addOrgIdChain (unOrgId $ pubKey enode) cId)
-        TxAborted   -> pure . Left $ SingleLine (S8.pack "addChainMember - Aborted")
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addChainMember - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "addChainMember - Error" ++ e)
 
 removeChainMember :: Word256
@@ -198,7 +198,7 @@ removeChainMember cId address = do
           Just enode -> getCompose $
             Compose (removeIPChain (ipAddress enode) cId) *>
             Compose (removeOrgIdChain (unOrgId $ pubKey enode) cId)
-        TxAborted   -> pure . Left $ SingleLine (S8.pack "removeChainMember - Aborted")
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Error" ++ e)
 
 registerCertificate :: Address -> X509CertInfoState -> Redis (Either Reply Status)
@@ -206,9 +206,9 @@ registerCertificate userAddress x509CertInfoState = do
     res <- multiExec $ set (inNamespace X509Certificates $ toKey userAddress) (toValue x509CertInfoState)
     _ <- case res of
         TxSuccess _ -> pure $ Right Ok
-        TxAborted -> pure . Left $ SingleLine (S8.pack "registerCertificate - Aborted")
+        TxAborted -> pure . Left $ SingleLine (S8.pack $ "registerCertificate - Aborted")
         TxError e -> pure . Left $ SingleLine (S8.pack $ "registerCertificate - Error" <> e)
-        
+
     let maybeParent = getParentUserAddress $ certificate x509CertInfoState
     case maybeParent of
         Nothing -> pure . Left $ SingleLine (S8.pack "registerCertificate - No Parent")
@@ -249,7 +249,7 @@ putChainTxsInBlock bHash chainIdTxHashMap = do
     res <- multiExec $ set (inNamespace PrivateTxsInBlocks bHash) (toValue rmems)
     case res of
         TxSuccess _ -> pure $ Right Ok
-        TxAborted   -> pure . Left $ SingleLine (S8.pack "putChainTxsInBlock - Aborted")
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putChainTxsInBlock - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "putChainTxsInBlock - Error" ++ e)
 
 addChainTxsInBlock :: Keccak256
@@ -262,7 +262,7 @@ addChainTxsInBlock bHash cId shas = do
     res <- multiExec $ set (inNamespace PrivateTxsInBlocks bHash) (toValue mems')
     case res of
         TxSuccess _ -> pure $ Right Ok
-        TxAborted   -> pure . Left $ SingleLine (S8.pack "addChainTxsInBlock - Aborted")
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addChainTxsInBlock - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "addChainTxsInBlock - Error" ++ e)
 
 getIPChains :: IPAddress
@@ -281,7 +281,7 @@ addIPChain ip cId = do
     res <- multiExec $ set (inNamespace PrivateIPChains ip) (toValue chains')
     case res of
         TxSuccess _ -> pure $ Right Ok
-        TxAborted   -> pure . Left $ SingleLine (S8.pack "addIPChain - Aborted")
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addIPChain - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "addIPChain - Error" ++ e)
 
 removeIPChain :: IPAddress
@@ -293,7 +293,7 @@ removeIPChain ip cId = do
     res <- multiExec $ set (inNamespace PrivateIPChains ip) (toValue chains')
     case res of
         TxSuccess _ -> pure $ Right Ok
-        TxAborted   -> pure . Left $ SingleLine (S8.pack "removeIPChain - Aborted")
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeIPChain - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeIPChain - Error" ++ e)
 
 getOrgIdChains :: S8.ByteString
@@ -312,7 +312,7 @@ addOrgIdChain ip cId = do
     res <- multiExec $ set (inNamespace PrivateOrgIdChains ip) (toValue chains')
     case res of
         TxSuccess _ -> pure $ Right Ok
-        TxAborted   -> pure . Left $ SingleLine (S8.pack "addOrgIdChain - Aborted")
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addOrgIdChain - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "addOrgIdChain - Error" ++ e)
 
 removeOrgIdChain :: S8.ByteString
@@ -324,7 +324,7 @@ removeOrgIdChain ip cId = do
     res <- multiExec $ set (inNamespace PrivateOrgIdChains ip) (toValue chains')
     case res of
         TxSuccess _ -> pure $ Right Ok
-        TxAborted   -> pure . Left $ SingleLine (S8.pack "removeOrgIdChain - Aborted")
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeOrgIdChain - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeOrgIdChain - Error" ++ e)
 
 bestBlockInfoKey :: S8.ByteString
@@ -399,7 +399,7 @@ addPrivateTransactions ptxs = do
        $ map (inNamespace PrivateTransactions *** toValue) ptxs
   case res of
       TxSuccess _ -> pure $ Right Ok
-      TxAborted   -> pure . Left $ SingleLine (S8.pack "addPrivateTransactions - Aborted")
+      TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addPrivateTransactions - Aborted")
       TxError e   -> pure . Left $ SingleLine (S8.pack $ "addPrivateTransactions - Error" ++ e)
 
 getUncles :: Keccak256
@@ -472,7 +472,7 @@ getCanonicalChain :: Integer
                   -> Int
                   -> Redis [Keccak256]
 getCanonicalChain start limit = do
-    let chain = forM (take limit [start..]) getCanonical
+    let chain = forM (take (limit) [start..]) getCanonical
     catMaybes <$> chain
 
 getZippedCanonicalChain :: (Keccak256 -> Redis (Maybe t))
@@ -553,7 +553,7 @@ insertHeader sha h = do
         sadd (inNamespace Numbers number') [toValue sha]
     case res of
         TxSuccess _ -> pure $ Right Ok
-        TxAborted   -> pure . Left $ SingleLine (S8.pack "insertHeader - Aborted")
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "insertHeader - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "insertHeader - Error" ++ e)
 
 insertHeaders :: M.Map Keccak256 BlockData
@@ -596,7 +596,7 @@ insertBlock sha b = do
         inNS'   = flip inNamespace sha
     unless (null ptxs) $ do
       void . addPrivateTransactions $
-        map (txHash &&& (fromJust . txAnchorChain) &&& id) ptxs
+        map (txHash &&& ((fromJust . txAnchorChain) &&& id)) ptxs
       forM_ (partitionWith txAnchorChain ptxs) $ \(cId, ptxs') ->
                          --  ^-- already filtered on (isJust . txChainId)
         addChainTxsInBlock sha (fromJust cId) $ map txHash ptxs'
@@ -619,7 +619,7 @@ insertBlocks = sequenceA . M.mapWithKey insertBlock
 
 deleteBlock :: Keccak256
             -> Redis (Either Reply Status)
-deleteBlock _ = pure . Left $ SingleLine (S8.pack "deleteBlock - Not Implemented")
+deleteBlock _ = pure . Left $ SingleLine (S8.pack $ "deleteBlock - Not Implemented")
 
 deleteBlocks :: Traversable t
              => t Keccak256
@@ -644,7 +644,7 @@ putBestBlockInfo newSha newNumber newTDiff = do
                     --liftIO . putStrLn $ "Updates: \n" ++ unlines ((\(x, y) -> show (keccak256ToHex x, y)) <$> updates)
                     --liftIO . putStrLn $ "Deletions: \n" ++ show deletions
                   res <- multiExec $ do
-                      forM_ updates $ \(sha, num) -> set (inNamespace Canonical num) (toValue sha)
+                      forM_ updates $ \(sha, num) -> set (inNamespace Canonical $ num) (toValue sha)
                       unless (null deletions) . void . del $ inNamespace Canonical . toKey <$> deletions
                       forceBestBlockInfo newSha newNumber newTDiff
                   checkAndUpdateSyncStatus
