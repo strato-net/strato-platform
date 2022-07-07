@@ -898,22 +898,38 @@ pipeline {
             parallel {
                 stage('Sync multinode101') {
                     // agent { label "multinode101" } // is default
-                    lib.deployStrato(NODE_DATA.NODE1)
+                    steps {
+                        script {
+                            lib.deployStrato(NODE_DATA.NODE1)
+                        }
+                    } 
                 }
 
                 stage('Sync multinode102') {
                     agent { label "multinode102" }
-                    lib.deployStrato(NODE_DATA.NODE2)
+                    steps {
+                        script {
+                            lib.deployStrato(NODE_DATA.NODE2)
+                        }
+                    }
                 }
 
                 stage('Sync multinode103') {
                     agent { label "multinode102" }
-                    lib.deployStrato(NODE_DATA.NODE3)
+                    steps {
+                        script {
+                            lib.deployStrato(NODE_DATA.NODE3)
+                        }
+                    }
                 }
 
                 stage('Sync multinode104') {
                     agent { label "multinode104" }
-                    lib.deployStrato(NODE_DATA.NODE4)
+                    steps {
+                        script {
+                            lib.deployStrato(NODE_DATA.NODE4)
+                        }
+                    }
                 }
             }
         }
