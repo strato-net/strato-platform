@@ -829,8 +829,6 @@ pipeline {
                 }
             }
         }
-    }
-}
 
         /* Write set up stage to clone monitor repo */
         stage ('Single Node Sync with Devnet - Clean Node') {
@@ -918,8 +916,6 @@ pipeline {
                 }
             }
         }
-
-        /* Basic (simple) upgrade + sync Test*/
         
     }
 }
