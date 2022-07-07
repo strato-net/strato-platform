@@ -948,6 +948,15 @@ statementHelper (IfStatement cond thens mElse x) = do
   ts <- statementsHelper' x thens
   es <- statementsHelper' x $ fromMaybe [] mElse
   pure $ reduceType' x [cs, ts, es]
+statementHelper (TryCatchStatement tryStatmenets catchMap x) = do
+  ts <- statementsHelper' x tryStatmenets
+  es <- statementsHelper' x (concatMap snd (M.toList catchMap))
+  pure $ reduceType' x [ts, es]
+statementHelper (SolidityTryCatchStatement expr _ successStatements catchMap x) = do
+  cs <- tcExpr expr
+  ts <- statementsHelper' x successStatements
+  es <- statementsHelper' x (concatMap (snd . snd) (M.toList catchMap))
+  pure $ reduceType' x [cs, ts, es]
 statementHelper (WhileStatement cond body x) = do
   cs <- tcExpr cond
   bs <- statementsHelper' x body

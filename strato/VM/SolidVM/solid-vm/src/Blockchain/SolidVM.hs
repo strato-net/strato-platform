@@ -991,6 +991,41 @@ runStatement s@(CC.SimpleStatement (CC.VariableDefinition entries maybeExpressio
 
   return Nothing
 
+runStatement (CC.SolidityTryCatchStatement tryExpression returnsDecl statementsForSuccess catchBlockMap _) = do
+  mRes <- EUnsafe.try $ do
+    expResultVal <- getVar =<< expToVar tryExpression
+    return expResultVal
+  case mRes of
+    Left ex -> do
+      res1 <- solidityExceptionHandler catchBlockMap ex
+      return res1
+    Right aRealVal -> do
+      case returnsDecl of
+        Nothing -> do
+          sfsRes <- runStatements statementsForSuccess
+          return $ sfsRes
+        Just xs -> do
+          case aRealVal of
+            STuple vecOfVars -> do
+              let vars = V.toList vecOfVars
+              if length vars /= length returnsDecl
+                then typeError "try/catch statement expected a tuple of the same length as the returns statement" (tryExpression, aRealVal)
+                else do
+                  forM_ (zip vars xs) $ \(var, (name, ty)) -> do
+                    val <- getVar var 
+                    addLocalVariable ty name val
+                  sfsRes' <- runStatements statementsForSuccess
+                  return sfsRes'
+            _ -> typeError "try/catch statement expected a tuple" (tryExpression, aRealVal)
+
+runStatement (CC.TryCatchStatement tryBlock catchBlockMap _) = do 
+  mRes <- EUnsafe.try (runStatements tryBlock)
+  case mRes of
+    Left ex -> do
+      res1 <- solidVMExceptionHandler catchBlockMap ex
+      return res1
+    Right res -> return res
+
 runStatement (CC.IfStatement condition code' maybeElseCode pos) = do
   solidVMBreakpoint pos
   conditionResult <- getBool =<< expToVar condition
@@ -2588,3 +2623,486 @@ encodeVector v = do
       val' -> do
         bs <- encodeForReturn val'
         return (headers `B.append` bs, strings)
+
+{- BEN WILL REFACTOR THIS -}
+solidityExceptionHandler :: MonadSM m => (M.Map String (Maybe (String, SVMType.Type), [CC.Statement])) -> SolidException -> m (Maybe Value)
+solidityExceptionHandler catchBlockMap ex = do
+  case ex of
+    (InternalError s1 s2) -> do
+      case M.lookup "Panic" catchBlockMap of
+        Nothing -> do
+          case M.lookup "Nill" catchBlockMap of 
+            Nothing -> internalError s1 s2
+            Just (_, stmts) -> do
+              res' <-  runStatements stmts
+              return res'
+        Just (mVar, block) -> do
+          case mVar of 
+            Nothing -> do
+              res' <-  runStatements block
+              return res'
+            Just (varName, varType) -> do
+              addLocalVariable varType varName (SInteger 1)
+              res <- runStatements block
+              return res
+    (TypeError s1 s2) -> do
+      case M.lookup "Panic" catchBlockMap of
+        Nothing -> do
+          case M.lookup "Nill" catchBlockMap of 
+            Nothing -> typeError s1 s2
+            Just (_, stmts) -> do
+              res' <-  runStatements stmts
+              return res'
+        Just (mVar, block) -> do
+          case mVar of 
+            Nothing -> do
+              res' <- runStatements block
+              return res'
+            Just (varName, varType) -> do
+              addLocalVariable varType varName (SInteger 2)
+              res <- runStatements block
+              return res
+    (InvalidArguments s1 s2) -> do
+      case M.lookup "Panic" catchBlockMap of
+        Nothing -> do
+          case M.lookup "Nill" catchBlockMap of 
+            Nothing -> invalidArguments s1 s2
+            Just (_, stmts) -> do
+              res' <-  runStatements stmts
+              return res'
+        Just (mVar, block) -> do
+          case mVar of 
+            Nothing -> do
+              res' <-  runStatements block
+              return res'
+            Just (varName, varType) -> do
+              addLocalVariable varType varName (SInteger 3)
+              res <- runStatements block
+              return res
+    (IndexOutOfBounds s1 s2) -> do
+      case M.lookup "Panic" catchBlockMap of
+        Nothing -> do
+          case M.lookup "Nill" catchBlockMap of 
+            Nothing -> indexOutOfBounds s1 s2
+            Just (_, stmts) -> do
+              res' <-  runStatements stmts
+              return res'
+        Just (mVar, block) -> do
+          case mVar of 
+            Nothing -> do
+              res' <-  runStatements block
+              return res'
+            Just (varName, varType) -> do
+              addLocalVariable varType varName (SInteger 4)
+              res <- runStatements block
+              return res
+    (TODO s1 s2) -> do
+      case M.lookup "Panic" catchBlockMap of
+        Nothing -> do
+          case M.lookup "Nill" catchBlockMap of 
+            Nothing -> todo s1 s2
+            Just (_, stmts) -> do
+              res' <-  runStatements stmts
+              return res'
+        Just (mVar, block) -> do
+          case mVar of 
+            Nothing -> do
+              res' <-  runStatements block
+              return res'
+            Just (varName, varType) -> do
+              addLocalVariable varType varName (SInteger 5)
+              res <- runStatements block
+              return res
+    (MissingField s1 s2) -> do
+      case M.lookup "Panic" catchBlockMap of
+        Nothing -> do
+          case M.lookup "Nill" catchBlockMap of 
+            Nothing -> missingField s1 s2
+            Just (_, stmts) -> do
+              res' <-  runStatements stmts
+              return res'
+        Just (mVar, block) -> do
+          case mVar of 
+            Nothing -> do
+              res' <-  runStatements block
+              return res'
+            Just (varName, varType) -> do
+              addLocalVariable varType varName (SInteger 6)
+              res <- runStatements block
+              return res
+    (MissingType s1 s2) -> do
+      case M.lookup "Panic" catchBlockMap of
+        Nothing -> do
+          case M.lookup "Nill" catchBlockMap of 
+            Nothing -> missingType s1 s2
+            Just (_, stmts) -> do
+              res' <-  runStatements stmts
+              return res'
+        Just (mVar, block) -> do
+          case mVar of 
+            Nothing -> do
+              res' <-  runStatements block
+              return res'
+            Just (varName, varType) -> do
+              addLocalVariable varType varName (SInteger 7)
+              res <- runStatements block
+              return res
+    (DuplicateDefinition s1 s2) -> do
+      case M.lookup "Panic" catchBlockMap of
+        Nothing -> do
+          case M.lookup "Nill" catchBlockMap of 
+            Nothing -> duplicateDefinition s1 s2
+            Just (_, stmts) -> do
+              res' <-  runStatements stmts
+              return res'
+        Just (mVar, block) -> do
+          case mVar of 
+            Nothing -> do
+              res' <-  runStatements block
+              return res'
+            Just (varName, varType) -> do
+              addLocalVariable varType varName (SInteger 8)
+              res <- runStatements block
+              return res
+    (ArityMismatch s1 i1 i2) -> do
+      case M.lookup "Panic" catchBlockMap of
+        Nothing -> do
+          case M.lookup "Nill" catchBlockMap of 
+            Nothing -> arityMismatch s1 i1 i2
+            Just (_, stmts) -> do
+              res' <-  runStatements stmts
+              return res'
+        Just (mVar, block) -> do
+          case mVar of 
+            Nothing -> do
+              res' <-  runStatements block
+              return res'
+            Just (varName, varType) -> do
+              addLocalVariable varType varName (SInteger 9)
+              res <- runStatements block
+              return res
+    (UnknownFunction s1 s2) -> do
+      case M.lookup "Panic" catchBlockMap of
+        Nothing -> do
+          case M.lookup "Nill" catchBlockMap of 
+            Nothing -> unknownFunction s1 s2
+            Just (_, stmts) -> do
+              res' <-  runStatements stmts
+              return res'
+        Just (mVar, block) -> do
+          case mVar of 
+            Nothing -> do
+              res' <-  runStatements block
+              return res'
+            Just (varName, varType) -> do
+              addLocalVariable varType varName (SInteger 10)
+              res <- runStatements block
+              return res
+    (UnknownVariable s1 s2) -> do
+      case M.lookup "Panic" catchBlockMap of
+        Nothing -> do
+          case M.lookup "Nill" catchBlockMap of 
+            Nothing -> unknownVariable s1 s2
+            Just (_, stmts) -> do
+              res' <-  runStatements stmts
+              return res'
+        Just (mVar, block) -> do
+          case mVar of 
+            Nothing -> do
+              res' <-  runStatements block
+              return res'
+            Just (varName, varType) -> do
+              addLocalVariable varType varName (SInteger 11)
+              res <- runStatements block
+              return res
+    (DivideByZero s1) -> do
+      case M.lookup "Panic" catchBlockMap of
+        Nothing -> do
+          case M.lookup "Nill" catchBlockMap of 
+            Nothing -> divideByZero s1
+            Just (_, stmts) -> do
+              res' <-  runStatements stmts
+              return res'
+        Just (mVar, block) -> do
+          case mVar of 
+            Nothing -> do
+              res' <-  runStatements block
+              return res'
+            Just (varName, varType) -> do
+              addLocalVariable varType varName (SInteger 12)
+              res <- runStatements block
+              return res
+    (Require s1) -> do
+      case M.lookup "Error" catchBlockMap of
+        Nothing -> do
+          case M.lookup "Nill" catchBlockMap of 
+            Nothing -> do
+              _ <- require False s1
+              return Nothing
+            Just (_, stmts) -> do
+              res' <-  runStatements stmts
+              return res'
+        Just (mVar, block) -> do
+          case mVar of 
+            Nothing -> do
+              res' <-  runStatements block
+              return res'
+            Just (varName, varType) -> do
+              addLocalVariable varType varName (SString (fromMaybe "Require Error" s1))
+              res <- runStatements block
+              return res
+    (Assert) -> do
+      case M.lookup "Error" catchBlockMap of
+        Nothing -> do
+          case M.lookup "Nill" catchBlockMap of 
+            Nothing -> do
+              _ <- assert False
+              return Nothing
+            Just (_, stmts) -> do
+              res' <-  runStatements stmts
+              return res'
+        Just (mVar, block) -> do
+          case mVar of 
+            Nothing -> do
+              res' <-  runStatements block
+              return res'
+            Just (varName, varType) -> do
+              addLocalVariable varType varName (SString "Assertion Error")
+              res <- runStatements block
+              return res
+    (MissingCodeCollection s1 s2) -> do
+      case M.lookup "Panic" catchBlockMap of
+        Nothing -> do
+          case M.lookup "Nill" catchBlockMap of 
+            Nothing -> missingCodeCollection s1 s2
+            Just (_, stmts) -> do
+              res' <-  runStatements stmts
+              return res'
+        Just (mVar, block) -> do
+          case mVar of 
+            Nothing -> do
+              res' <-  runStatements block
+              return res'
+            Just (varName, varType) -> do
+              addLocalVariable varType varName (SInteger 13)
+              res <- runStatements block
+              return res
+    (InaccessibleChain s1 s2) -> do
+      case M.lookup "Panic" catchBlockMap of
+        Nothing -> do
+          case M.lookup "Nill" catchBlockMap of 
+            Nothing -> inaccessibleChain s1 s2
+            Just (_, stmts) -> do
+              res' <-  runStatements stmts
+              return res'
+        Just (mVar, block) -> do
+          case mVar of 
+            Nothing -> do
+              res' <-  runStatements block
+              return res'
+            Just (varName, varType) -> do
+              addLocalVariable varType varName (SInteger 14)
+              res <- runStatements block
+              return res
+    (InvalidWrite s1 s2) -> do
+      case M.lookup "Panic" catchBlockMap of
+        Nothing -> do
+          case M.lookup "Nill" catchBlockMap of 
+            Nothing -> invalidWrite s1 s2
+            Just (_, stmts) -> do
+              res' <-  runStatements stmts
+              return res'
+        Just (mVar, block) -> do
+          case mVar of 
+            Nothing -> do
+              res' <-  runStatements block
+              return res'
+            Just (varName, varType) -> do
+              addLocalVariable varType varName (SInteger 15)
+              res <- runStatements block
+              return res
+    (InvalidCertificate s1 s2) -> do
+      case M.lookup "Panic" catchBlockMap of
+        Nothing -> do
+          case M.lookup "Nill" catchBlockMap of 
+            Nothing -> invalidCertificate s1 s2
+            Just (_, stmts) -> do
+              res' <-  runStatements stmts
+              return res'
+        Just (mVar, block) -> do
+          case mVar of 
+            Nothing -> do
+              res' <-  runStatements block
+              return res'
+            Just (varName, varType) -> do 
+              addLocalVariable varType varName (SInteger 16)
+              res <- runStatements block
+              return res
+    (MalformedData s1 s2) -> do
+      case M.lookup "Panic" catchBlockMap of
+        Nothing -> do
+          case M.lookup "Nill" catchBlockMap of 
+            Nothing -> malformedData s1 s2
+            Just (_, stmts) -> do
+              res' <-  runStatements stmts
+              return res'
+        Just (mVar, block) -> do
+          case mVar of 
+            Nothing -> do
+              res' <-  runStatements block
+              return res'
+            Just (varName, varType) -> do
+              addLocalVariable varType varName (SInteger 17)
+              res <- runStatements block
+              return res
+    (TooMuchGas s1 s2) -> do
+      case M.lookup "Panic" catchBlockMap of
+        Nothing -> do
+          case M.lookup "Nill" catchBlockMap of 
+            Nothing -> tooMuchGas s1 s2
+            Just (_, stmts) -> do
+              res' <-  runStatements stmts
+              return res'
+        Just (mVar, block) -> do
+          case mVar of 
+            Nothing -> do
+              res' <-  runStatements block
+              return res'
+            Just (varName, varType) -> do
+              addLocalVariable varType varName (SInteger 18)
+              res <- runStatements block
+              return res
+    (PaymentError s1 s2) -> do
+      case M.lookup "Panic" catchBlockMap of
+        Nothing -> do
+          case M.lookup "Nill" catchBlockMap of 
+            Nothing -> paymentError s1 s2
+            Just (_, stmts) -> do
+              res' <-  runStatements stmts
+              return res'
+        Just (mVar, block) -> do
+          case mVar of 
+            Nothing -> do
+              res' <- runStatements block
+              return res'
+            Just (varName, varType) -> do
+              addLocalVariable varType varName (SInteger 19)
+              res <- runStatements block
+              return res
+    _ -> error "unhandled solid exception" (show ex)
+
+solidVMExceptionHandler :: (MonadSM m) => (M.Map String [CC.Statement]) -> SolidException -> m (Maybe Value)
+solidVMExceptionHandler catchBlockMap ex = case ex of
+    (InternalError s1 s2) -> do
+      case M.lookup "InternalError" catchBlockMap of
+        Nothing -> internalError s1 s2
+        Just block -> do
+          res <- runStatements block
+          return res
+    (InvalidArguments s1 s2) -> 
+      case M.lookup "InvalidArguments" catchBlockMap of
+        Nothing -> invalidArguments s1 s2
+        Just block -> do
+          res <- runStatements block
+          return res
+    (IndexOutOfBounds s1 s2) -> 
+      case M.lookup "IndexOutOfBounds" catchBlockMap of
+        Nothing -> indexOutOfBounds s1 s2
+        Just block -> do
+          res <- runStatements block
+          return res
+    (ParseError s1 s2) -> 
+      case M.lookup "ParseError" catchBlockMap of
+        Nothing -> parseError s1 s2
+        Just block -> do
+          res <- runStatements block
+          return res
+    (Require s1) -> 
+      case M.lookup "Require" catchBlockMap of
+        Nothing -> do 
+          _ <- require False s1
+          return Nothing
+        Just block -> do
+          res <- runStatements block
+          return res
+    (Assert) -> 
+      case M.lookup "Assert" catchBlockMap of
+        Nothing -> do
+          _ <- assert False
+          return Nothing
+        Just block -> do
+          res <- runStatements block
+          return res
+    (UnknownFunction s1 s2) -> 
+      case M.lookup "UnknownFunction" catchBlockMap of
+        Nothing -> unknownFunction s1 s2
+        Just block -> do
+          res <- runStatements block
+          return res
+    (UnknownConstant s1 s2) -> 
+      case M.lookup "UnknownConstant" catchBlockMap of
+        Nothing -> unknownConstant s1 s2
+        Just block -> do
+          res <- runStatements block
+          return res
+    (UnknownVariable s1 s2) -> 
+      case M.lookup "UnknownVariable" catchBlockMap of
+        Nothing -> unknownVariable s1 s2
+        Just block -> do
+          res <- runStatements block
+          return res
+    (UnknownStatement s1 s2) -> 
+      case M.lookup "UnknownStatement" catchBlockMap of
+        Nothing -> unknownStatement s1 s2
+        Just block -> do
+          res <- runStatements block
+          return res
+    (DivideByZero s1) -> 
+      case M.lookup "DivideByZero" catchBlockMap of
+        Nothing -> divideByZero s1
+        Just block -> do
+          res <- runStatements block
+          return res
+    (MissingCodeCollection s1 s2) -> 
+      case M.lookup "MissingCodeCollection" catchBlockMap of
+        Nothing -> missingCodeCollection s1 s2
+        Just block -> do
+          res <- runStatements block
+          return res
+    (InaccessibleChain s1 s2) -> 
+      case M.lookup "InaccessibleChain" catchBlockMap of
+        Nothing -> inaccessibleChain s1 s2
+        Just block -> do
+          res <- runStatements block
+          return res
+    (InvalidWrite s1 s2) -> 
+      case M.lookup "InvalidWrite" catchBlockMap of
+        Nothing -> invalidWrite s1 s2
+        Just block -> do
+          res <- runStatements block
+          return res
+    (InvalidCertificate s1 s2) -> 
+      case M.lookup "InvalidCertificate" catchBlockMap of
+        Nothing -> invalidCertificate s1 s2
+        Just block -> do
+          res <- runStatements block
+          return res
+    (MalformedData s1 s2) -> 
+      case M.lookup "MalformedData" catchBlockMap of
+        Nothing -> malformedData s1 s2
+        Just block -> do
+          res <- runStatements block
+          return res
+    (TooMuchGas s1 s2) -> 
+      case M.lookup "TooMuchGas" catchBlockMap of
+        Nothing -> tooMuchGas s1 s2
+        Just block -> do
+          res <- runStatements block
+          return res
+    (PaymentError s1 s2) ->
+      case M.lookup "PaymentError" catchBlockMap of
+        Nothing -> paymentError s1 s2
+        Just block -> do
+          res <- runStatements block
+          return res
+    _ -> error "unhandled solid exception" (show ex)
