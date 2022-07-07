@@ -14,11 +14,12 @@ import SolidVM.Model.Type
 import SolidVM.Solidity.Parse.Lexer
 import SolidVM.Solidity.Parse.Statement
 import SolidVM.Solidity.Parse.UnParser
+import SolidVM.Solidity.Parse.ParserTypes 
 
 spec :: Spec
 spec = do
   describe "String lexing" $ do
-    let parseStr = runParser (stringLiteral <* eof) "" ""
+    let parseStr = runParser (stringLiteral <* eof) (ParserState "" "") ""
         cases = [ ([r|"ok"|], "ok")
                 , ([r|"ok" |], "ok")
                 ]
@@ -26,7 +27,7 @@ spec = do
       it ("can parse " ++ show input) $ parseStr input `shouldBe` Right want
 
   describe "Expression parsing" $ do
-    let parseExpr = fmap (fmap (const ())) . runParser expression "" ""
+    let parseExpr = fmap (fmap (const ())) . runParser expression (ParserState "" "") ""
         cases = [ ("x++", PlusPlus () (Variable () "x"))
                 , ("++x", Unitary () "++" (Variable () "x"))
                 , ("--x", Unitary () "--" (Variable () "x"))
@@ -73,7 +74,7 @@ spec = do
         assertEqual input (Right want) (parseExpr input)
 
   describe "Statement parsing" $ do
-    let parseStatement = fmap (fmap (const ())) . runParser statement "" ""
+    let parseStatement = fmap (fmap (const ())) . runParser statement (ParserState "" "") ""
         scases = [ ("x++;", SimpleStatement $ ExpressionStatement $ PlusPlus () $ Variable () "x")
                  , ("assembly { dst := mload(add(src, 32)) }",
                       AssemblyStatement $ MloadAdd32 "dst" "src")

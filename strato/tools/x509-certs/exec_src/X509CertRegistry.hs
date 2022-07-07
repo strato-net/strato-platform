@@ -218,6 +218,27 @@ contract Certificate {
     function addChild(account _child){
         children.push[_child];
     }
+    
+    function isChild(pCert) returns bool {
+        mapping(string => string) parsedCert = parseCert(certificateString);
+        if(parent != 0x0 && pCert == Certificate(account(parsedCert["parent"]))){
+            return true;
+        }
+        if(parent != 0x0){
+            Certificate parentContract = Certificate(account(parsedCert["parent"]));
+            return parentContract.isChild(pCert);
+        }
+        return false;
+    }
+    
+    function revoke() {
+        require(msg.sender,owner,"You don't have permission to call revoke!");
+        isValid = false;
+        for (uint i = 0; i < children.length; ++i) {
+           Certificate child = Certificate(children[i]);
+           child.revoke();
+        }
+    }
 }
 
 pragma solidvm 3.2;
@@ -287,5 +308,12 @@ contract CertificateRegistry {
     
     function getCertByAccount(account _account) returns (Certificate) {
         return certificates[certificatesMap[_account]];
+    }
+    
+    function revokeCert(address certAddr){
+        Certificate mycert = Certificate(certAddr);
+        if (myCert.isChild(tx.certificate)) {
+            myCert.revoke();
+        }
     }
 }|]
