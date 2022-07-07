@@ -13,51 +13,52 @@ pipeline {
         )
     }
 
-    stage('Prep') {
-      steps {
-        sh "sudo rm -rf strato-getting-started"
-        sh "git clone https://github.com/blockapps/strato-getting-started"
-        dir('strato-getting-started') {
-          script {
-            if (env.STRATO_BUILD == 'latest') {
-              sh 'sudo ./strato --compose'
-            } else {
-              if (env.STRATO_BUILD.contains(".")) {
-                sh "curl -s -L https://github.com/blockapps/strato-getting-started/releases/${env.STRATO_BUILD} | egrep -o '/blockapps/strato-getting-started/releases/download/.*/docker-compose.yml' | wget --base=http://github.com/ -i - -O docker-compose.yml"
-              } else {
-                if (!env.STRATO_BUILD.contains("/")) {
-                  echo "Unexpected STRATO_BUILD format: ${env.STRATO_BUILD}"
-                  currentBuild.result = 'FAILURE'
-                  sh "exit 1"
-                }
-                def (AUTOBUILD_JOB_BRANCH_NAME, AUTOBUILD_JOB_BUILD_NUMBER) = "${env.STRATO_BUILD}".tokenize( '/' )
-                
-                // Fetching artifact from STRATO_autobuild multibranch job
-                step([
-                    $class: 'CopyArtifact',
-                    fingerprintArtifacts: true,
-                    flatten: true,
-                    projectName: "STRATO_autobuild/${AUTOBUILD_JOB_BRANCH_NAME}",
-                    selector: [$class: 'SpecificBuildSelector', buildNumber: "${AUTOBUILD_JOB_BUILD_NUMBER}"],
-                    filter: "docker-compose.yml",
-                    target: '.',
-                    optional: false
-                ])
-                
-              }
-            }
-          }
-          withCredentials([
-              usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
-          ]) {
-            sh "sudo docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000"
-          }
-        }
-        stash includes: 'strato-getting-started/**', name: 'stratoGettingStarted'
-      }
-    }
-
     stages {
+        stage('Prep') {
+            steps {
+                sh "sudo rm -rf strato-getting-started"
+                sh "git clone https://github.com/blockapps/strato-getting-started"
+                dir('strato-getting-started') {
+                    script {
+                        if (env.STRATO_BUILD == 'latest') {
+                            sh 'sudo ./strato --compose'
+                            }
+                        else {
+                            if (env.STRATO_BUILD.contains(".")) {
+                                sh "curl -s -L https://github.com/blockapps/strato-getting-started/releases/${env.STRATO_BUILD} | egrep -o '/blockapps/strato-getting-started/releases/download/.*/docker-compose.yml' | wget --base=http://github.com/ -i - -O docker-compose.yml"
+                                }
+                            else {
+                                if (!env.STRATO_BUILD.contains("/")) {
+                                    echo "Unexpected STRATO_BUILD format: ${env.STRATO_BUILD}"
+                                    currentBuild.result = 'FAILURE'
+                                    sh "exit 1"
+                                    }
+                                def (AUTOBUILD_JOB_BRANCH_NAME, AUTOBUILD_JOB_BUILD_NUMBER) = "${env.STRATO_BUILD}".tokenize( '/' )
+                
+                                // Fetching artifact from STRATO_autobuild multibranch job
+                                step([
+                                    $class: 'CopyArtifact',
+                                    fingerprintArtifacts: true,
+                                    flatten: true,
+                                    projectName: "STRATO_autobuild/${AUTOBUILD_JOB_BRANCH_NAME}",
+                                    selector: [$class: 'SpecificBuildSelector', buildNumber: "${AUTOBUILD_JOB_BUILD_NUMBER}"],
+                                    filter: "docker-compose.yml",
+                                    target: '.',
+                                    optional: false
+                                ])
+                                }
+                            }
+                        }
+                    withCredentials([
+                        usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
+                    ]) {
+                        sh "sudo docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000"
+                        }
+                    }
+                stash includes: 'strato-getting-started/**', name: 'stratoGettingStarted'
+            }
+        }
+
         stage('Init') {
             steps {
                 withCredentials([
