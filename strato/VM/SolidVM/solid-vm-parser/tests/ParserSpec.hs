@@ -101,9 +101,6 @@ spec = do
                  , ("var x = [];", SimpleStatement $
                       VariableDefinition [VarDefEntry Nothing Nothing "x" ()] $ Just $
                       ArrayExpression () [])
-                 , ("type(C).runTimeCode;", SimpleStatement $
-                      VariableDefinition [VarDefEntry Nothing Nothing "C" ()] $ Just $
-                      MemberAccess () (Variable () "type") "runTimeCode")
                   , ("revert f(x, y);", RevertStatement (Just "f") (OrderedArgs [(Variable () "x"), (Variable () "y")]) )
                   , ("revert(\"e\");", RevertStatement (Nothing) (OrderedArgs [StringLiteral () "e"]) )
                   , ("revert f({ x: y , q: z });",  RevertStatement (Just "f") (NamedArgs [("x", Variable () "y"), ("q", Variable () "z")]) )
