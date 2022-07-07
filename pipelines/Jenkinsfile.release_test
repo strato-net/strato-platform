@@ -664,7 +664,7 @@ pipeline {
             }
         }
         stage ('Dropping Chains test-multinode102') {
-            // agent { label "multinode101" } // is default
+            agent { label "multinode102" } // is default
             steps {
                 dir('strato-getting-started') {
                     script {
@@ -675,7 +675,7 @@ pipeline {
             }
         }
         stage ('Dropping Chains test-multinode103') {
-            // agent { label "multinode101" } // is default
+            agent { label "multinode103" } // is default
             steps {
                 dir('strato-getting-started') {
                     script {
@@ -686,7 +686,7 @@ pipeline {
             }
         }
         stage ('Dropping Chains test-multinode104') {
-            // agent { label "multinode101" } // is default
+            agent { label "multinode104" } // is default
             steps {
                 dir('strato-getting-started') {
                     script {
@@ -697,7 +697,7 @@ pipeline {
             }
         }
         stage ('Dropping Chains test-multinode301') {
-            // agent { label "multinode101" } // is default
+            agent { label "multinode301" } // is default
             steps {
                 dir('strato-getting-started') {
                     script {
@@ -708,7 +708,7 @@ pipeline {
             }
         }
         stage ('Dropping Chains test-multinode302') {
-            // agent { label "multinode101" } // is default
+            agent { label "multinode302" } // is default
             steps {
                 dir('strato-getting-started') {
                     script {
@@ -719,7 +719,7 @@ pipeline {
             }
         }
         stage ('Dropping Chains test-multinode303') {
-            // agent { label "multinode101" } // is default
+            agent { label "multinode1303" } // is default
             steps {
                 dir('strato-getting-started') {
                     script {
@@ -730,7 +730,7 @@ pipeline {
             }
         }
         stage ('Dropping Chains test-multinode304') {
-            // agent { label "multinode101" } // is default
+            agent { label "multinode304" } // is default
             steps {
                 dir('strato-getting-started') {
                     script {
