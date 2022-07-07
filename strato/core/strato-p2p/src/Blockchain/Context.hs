@@ -100,6 +100,7 @@ import           Blockchain.Stream.VMOutput            ( HasVMOutputsSink(..)
 
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models (RedisBestBlock(..))
+import           BlockApps.X509.Certificate
 import qualified Database.Persist.Sql                  as SQL
 import qualified Database.Redis                        as Redis
 import qualified Network.Kafka                         as K
