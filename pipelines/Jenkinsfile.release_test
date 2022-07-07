@@ -641,7 +641,7 @@ pipeline {
                 }
             }
         }
-        stage('Single Node Sync with Devnet - Deploy Monitor') {
+        stage('Single Node Sync with Devnet for Upgradability Sync Test - Deploy Monitor') {
             steps {
                 withCredentials([
                     usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME'),
@@ -904,7 +904,6 @@ pipeline {
                         }
                     } 
                 }
-
                 stage('Sync multinode102') {
                     agent { label "multinode102" }
                     steps {
@@ -913,7 +912,6 @@ pipeline {
                         }
                     }
                 }
-
                 stage('Sync multinode103') {
                     agent { label "multinode102" }
                     steps {
@@ -922,7 +920,6 @@ pipeline {
                         }
                     }
                 }
-
                 stage('Sync multinode104') {
                     agent { label "multinode104" }
                     steps {
