@@ -208,7 +208,7 @@ registerCertificate userAddress x509CertInfoState = do
         TxSuccess _ -> pure $ Right Ok
         TxAborted -> pure . Left $ SingleLine (S8.pack $ "registerCertificate - Aborted")
         TxError e -> pure . Left $ SingleLine (S8.pack $ "registerCertificate - Error" <> e)
-
+    
     let maybeParent = getParentUserAddress $ certificate x509CertInfoState
     case maybeParent of
         Nothing -> pure . Left $ SingleLine (S8.pack "registerCertificate - No Parent")
@@ -217,8 +217,8 @@ registerCertificate userAddress x509CertInfoState = do
                 case mCertInfoState of
                     Nothing -> pure . Left $ SingleLine (S8.pack "registerCertificate - No Parent Certificate")
                     Just certInfoState -> do
-                        let newChildren = children certInfoState ++ [userAddress]
-                        let newParentInfoState = X509CertInfoState {userAddress = parentAddr, certificate = certificate certInfoState, isValid = isValid certInfoState, children = newChildren}
+                        let newChildren = userAddress : children certInfoState
+                        let newParentInfoState = certInfoState{children  = newChildren}
                         res' <- multiExec $ set (inNamespace X509Certificates $ toKey parentAddr) (toValue newParentInfoState)
                         case res' of
                             TxSuccess _ -> pure $ Right Ok
