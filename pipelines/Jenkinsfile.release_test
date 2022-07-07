@@ -640,15 +640,12 @@ pipeline {
                 }
             }
         }
-
         stage('Single Node Sync with Devnet - Deploy Monitor') {
             steps {
                 withCredentials([
                     usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME'),
                 ]) {
                     script {
-                        sh "rm -rf monitor"
-                        sh "git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/monitor/"
                         lib.runMonitor(NODE_DATA.NODE1, 'upgrade8Nodes')
                     }
                 }
@@ -662,9 +659,7 @@ pipeline {
                 dir('strato-getting-started') {
                     script {
                         sh 'sudo ./strato ----drop-chains'
-                        lib.waitForHealthySync(NODE_DATA.MONITOR)
                     }
-
                 }
             }
         }
@@ -674,7 +669,6 @@ pipeline {
                 dir('strato-getting-started') {
                     script {
                         sh 'sudo ./strato ----drop-chains'
-                        lib.waitForHealthySync(NODE_DATA.MONITOR)
                     }
 
                 }
@@ -686,7 +680,6 @@ pipeline {
                 dir('strato-getting-started') {
                     script {
                         sh 'sudo ./strato ----drop-chains'
-                        lib.waitForHealthySync(NODE_DATA.MONITOR)
                     }
 
                 }
@@ -698,7 +691,6 @@ pipeline {
                 dir('strato-getting-started') {
                     script {
                         sh 'sudo ./strato ----drop-chains'
-                        lib.waitForHealthySync(NODE_DATA.MONITOR)
                     }
 
                 }
@@ -710,7 +702,6 @@ pipeline {
                 dir('strato-getting-started') {
                     script {
                         sh 'sudo ./strato ----drop-chains'
-                        lib.waitForHealthySync(NODE_DATA.MONITOR)
                     }
 
                 }
@@ -722,7 +713,6 @@ pipeline {
                 dir('strato-getting-started') {
                     script {
                         sh 'sudo ./strato ----drop-chains'
-                        lib.waitForHealthySync(NODE_DATA.MONITOR)
                     }
 
                 }
@@ -734,7 +724,6 @@ pipeline {
                 dir('strato-getting-started') {
                     script {
                         sh 'sudo ./strato ----drop-chains'
-                        lib.waitForHealthySync(NODE_DATA.MONITOR)
                     }
 
                 }
@@ -746,115 +735,118 @@ pipeline {
                 dir('strato-getting-started') {
                     script {
                         sh 'sudo ./strato ----drop-chains'
-                        lib.waitForHealthySync(NODE_DATA.MONITOR)
                     }
-
                 }
             }
         }
 
-        /* Run App All Nodes*/
-        stage('Beanstalk Load Test - Clean all nodes') {
-            parallel {
-                stage('Clean test-multinode101') {
-                    // agent { label "test-multinode101" } // is default
-                    steps {
-                        dir('strato-getting-started') {
-                            script {
-                                sh 'sudo ./run.sh'
-                                sh 'until curl --silent localhost:8080; do sleep 1; done'
-                                sh 'sudo docker ps'
-                                }
-                            }
-                        }
+        /* Reboot All Nodes*/
+        stage('Reboot test-multinode101') {
+            // agent { label "test-multinode101" } // is default
+            steps {
+                dir('strato-getting-started') {
+                    script {
+                        sh 'sudo ./run.sh'
+                        sh 'until curl --silent localhost:8080; do sleep 1; done'
+                        sh 'sudo docker ps'
+                        lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
                     }
-                stage('Clean test-multinode102') {
-                    agent { label "test-multinode102" }
-                    steps {
-                        dir('strato-getting-started') {
-                            script {
-                                sh 'sudo ./run.sh'
-                                sh 'until curl --silent localhost:8080; do sleep 1; done'
-                                sh 'sudo docker ps'
-                                }
-                            }
-                        }
-                    }
-                stage('Clean test-multinode103') {
-                    agent { label "test-multinode103" }
-                    steps {
-                        dir('strato-getting-started') {
-                            script {
-                                sh 'sudo ./run.sh'
-                                sh 'until curl --silent localhost:8080; do sleep 1; done'
-                                sh 'sudo docker ps'
-                                }
-                            }
-                        }
-                    }
-                stage('Clean test-multinode104') {
-                    agent { label "test-multinode104" }
-                    steps {
-                        dir('strato-getting-started') {
-                            script {
-                                sh 'sudo ./run.sh'
-                                sh 'until curl --silent localhost:8080; do sleep 1; done'
-                                sh 'sudo docker ps'
-                                }
-                            }
-                        }
-                    }
-
-                stage('Clean test-multinode301') {
-                    agent { label "test-multinode301" }
-                    steps {
-                        dir('strato-getting-started') {
-                            script {
-                                sh 'sudo ./run.sh'
-                                sh 'until curl --silent localhost:8080; do sleep 1; done'
-                                sh 'sudo docker ps'
-                                }
-                            }
-                        }
-                    }
-                stage('Clean test-multinode302') {
-                    agent { label "test-multinode302" }
-                    steps {
-                        dir('strato-getting-started') {
-                            script {
-                                sh 'sudo ./run.sh'
-                                sh 'until curl --silent localhost:8080; do sleep 1; done'
-                                sh 'sudo docker ps'
-                                }
-                            }
-                        }
-                    }
-                stage('Clean test-multinode303') {
-                    agent { label "test-multinode303" }
-                    steps {
-                        dir('strato-getting-started') {
-                            script {
-                                sh 'sudo ./run.sh'
-                                sh 'until curl --silent localhost:8080; do sleep 1; done'
-                                sh 'sudo docker ps'
-                                }
-                            }
-                        }
-                    }
-                stage('Clean test-multinode304') {
-                    agent { label "test-multinode304" }
-                    steps {
-                        dir('strato-getting-started') {
-                            script {
-                                sh 'sudo ./run.sh'
-                                sh 'until curl --silent localhost:8080; do sleep 1; done'
-                                sh 'sudo docker ps'
-                                }
-                            }
-                        }
-                    }
+                }
             }
         }
+        stage('Reboot test-multinode102') {
+            agent { label "test-multinode102" }
+            steps {
+                dir('strato-getting-started') {
+                    script {
+                        sh 'sudo ./run.sh'
+                        sh 'until curl --silent localhost:8080; do sleep 1; done'
+                        sh 'sudo docker ps'
+                        lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
+                    }
+                }
+            }
+        }
+        stage('Reboot test-multinode103') {
+            agent { label "test-multinode103" }
+            steps {
+                dir('strato-getting-started') {
+                    script {
+                        sh 'sudo ./run.sh'
+                        sh 'until curl --silent localhost:8080; do sleep 1; done'
+                        sh 'sudo docker ps'
+                        lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
+                    }
+                }
+            }
+        }
+        stage('Reboot test-multinode104') {
+            agent { label "test-multinode104" }
+            steps {
+                dir('strato-getting-started') {
+                    script {
+                        sh 'sudo ./run.sh'
+                        sh 'until curl --silent localhost:8080; do sleep 1; done'
+                        sh 'sudo docker ps'
+                        lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
+                    }
+                }
+            }
+        }
+        stage('Reboot test-multinode301') {
+            agent { label "test-multinode301" }
+            steps {
+                dir('strato-getting-started') {
+                    script {
+                        sh 'sudo ./run.sh'
+                        sh 'until curl --silent localhost:8080; do sleep 1; done'
+                        sh 'sudo docker ps'
+                        lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
+                    }
+                }
+            }
+        }
+        stage('Reboot test-multinode302') {
+            agent { label "test-multinode302" }
+            steps {
+                dir('strato-getting-started') {
+                    script {
+                        sh 'sudo ./run.sh'
+                        sh 'until curl --silent localhost:8080; do sleep 1; done'
+                        sh 'sudo docker ps'
+                        lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
+                    }
+                }
+            }
+        }
+        stage('Reboot test-multinode303') {
+            agent { label "test-multinode303" }
+            steps {
+                dir('strato-getting-started') {
+                    script {
+                        sh 'sudo ./run.sh'
+                        sh 'until curl --silent localhost:8080; do sleep 1; done'
+                        sh 'sudo docker ps'
+                        lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
+                    }
+                }
+            }
+        }
+        stage('Reboot test-multinode304') {
+            agent { label "test-multinode304" }
+            steps {
+                dir('strato-getting-started') {
+                    script {
+                        sh 'sudo ./run.sh'
+                        sh 'until curl --silent localhost:8080; do sleep 1; done'
+                        sh 'sudo docker ps'
+                        lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
+                    }
+                }
+            }
+        }
+    }
+}
 
         /* Write set up stage to clone monitor repo */
         stage ('Single Node Sync with Devnet - Clean Node') {
