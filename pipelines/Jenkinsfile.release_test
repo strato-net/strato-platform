@@ -182,7 +182,7 @@ pipeline {
             // agent { label "test-multinode101" } // is default
             steps { 
                 script {
-                rootNodeAddress = lib.deployStratoWithApp(null, NODE_DATA.NODE1, 'beanstalk') 
+                rootNodeAddress = lib.deployStratoWithApp(null, NODE_DATA.NODE1, 'beanstalk', false)
                 }
             }            
         }
@@ -193,7 +193,7 @@ pipeline {
                     agent { label "test-multinode102" }
                     steps {
                         script {
-                            node2Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE2, 'beanstalk')
+                            node2Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE2, 'beanstalk', false)
                         }
                     }
                 }
@@ -201,7 +201,7 @@ pipeline {
                     agent { label "test-multinode103" }
                     steps {
                         script {
-                            node3Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE3, 'beanstalk')
+                            node3Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE3, 'beanstalk', false)
                         }
                     }
                 }
@@ -209,7 +209,7 @@ pipeline {
                     agent { label "test-multinode104" }
                     steps {
                         script {
-                            node4Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE4, 'beanstalk')
+                            node4Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE4, 'beanstalk', false)
                         }
                     }
                 }
@@ -217,7 +217,7 @@ pipeline {
                     agent { label "test-multinode301" }
                     steps {
                         script {
-                            node5Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE5, 'beanstalk')
+                            node5Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE5, 'beanstalk', false)
                         }
                     }
                 }
@@ -225,7 +225,7 @@ pipeline {
                     agent { label "test-multinode302" }
                     steps {
                         script {
-                            node6Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE6, 'beanstalk')
+                            node6Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE6, 'beanstalk', false)
                         }
                     }
                 }
@@ -233,7 +233,7 @@ pipeline {
                     agent { label "test-multinode303" }
                     steps {
                         script {
-                            node7Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE7, 'beanstalk')
+                            node7Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE7, 'beanstalk', false)
                         }
                     }
                 }
@@ -241,7 +241,7 @@ pipeline {
                     agent { label "test-multinode304" }
                     steps {
                         script {
-                            node8Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE8, 'beanstalk')
+                            node8Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE8, 'beanstalk', false)
                         }
                     }
                 }
@@ -744,104 +744,88 @@ pipeline {
         stage('Reboot test-multinode101') {
             // agent { label "test-multinode101" } // is default
             steps {
-                dir('strato-getting-started') {
-                    script {
-                        sh 'sudo ./run.sh'
-                        sh 'until curl --silent localhost:8080; do sleep 1; done'
-                        sh 'sudo docker ps'
-                        lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
-                    }
+                script {
+                    lib.deployStratoWithApp(null, NODE_DATA.NODE1, 'beanstalk', false)
+                    sh 'until curl --silent localhost:8080; do sleep 1; done'
+                    sh 'sudo docker ps'
+                    lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
                 }
             }
         }
         stage('Reboot test-multinode102') {
             agent { label "test-multinode102" }
             steps {
-                dir('strato-getting-started') {
-                    script {
-                        sh 'sudo ./run.sh'
-                        sh 'until curl --silent localhost:8080; do sleep 1; done'
-                        sh 'sudo docker ps'
-                        lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
-                    }
+                script {
+                    lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE2, 'beanstalk', false)
+                    sh 'until curl --silent localhost:8080; do sleep 1; done'
+                    sh 'sudo docker ps'
+                    lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
                 }
             }
         }
         stage('Reboot test-multinode103') {
             agent { label "test-multinode103" }
             steps {
-                dir('strato-getting-started') {
-                    script {
-                        sh 'sudo ./run.sh'
-                        sh 'until curl --silent localhost:8080; do sleep 1; done'
-                        sh 'sudo docker ps'
-                        lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
-                    }
+                script {
+                    lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE3, 'beanstalk', false)
+                    sh 'until curl --silent localhost:8080; do sleep 1; done'
+                    sh 'sudo docker ps'
+                    lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
                 }
             }
         }
         stage('Reboot test-multinode104') {
             agent { label "test-multinode104" }
             steps {
-                dir('strato-getting-started') {
-                    script {
-                        sh 'sudo ./run.sh'
-                        sh 'until curl --silent localhost:8080; do sleep 1; done'
-                        sh 'sudo docker ps'
-                        lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
-                    }
+                script {
+                    lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE4, 'beanstalk', false)
+                    sh 'until curl --silent localhost:8080; do sleep 1; done'
+                    sh 'sudo docker ps'
+                    lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
                 }
             }
         }
         stage('Reboot test-multinode301') {
             agent { label "test-multinode301" }
             steps {
-                dir('strato-getting-started') {
-                    script {
-                        sh 'sudo ./run.sh'
-                        sh 'until curl --silent localhost:8080; do sleep 1; done'
-                        sh 'sudo docker ps'
-                        lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
-                    }
+                script {
+                    lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE5, 'beanstalk', false)
+                    sh 'until curl --silent localhost:8080; do sleep 1; done'
+                    sh 'sudo docker ps'
+                    lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
                 }
             }
         }
         stage('Reboot test-multinode302') {
             agent { label "test-multinode302" }
             steps {
-                dir('strato-getting-started') {
-                    script {
-                        sh 'sudo ./run.sh'
-                        sh 'until curl --silent localhost:8080; do sleep 1; done'
-                        sh 'sudo docker ps'
-                        lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
-                    }
+                script {
+                    lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE6, 'beanstalk', false)
+                    sh 'until curl --silent localhost:8080; do sleep 1; done'
+                    sh 'sudo docker ps'
+                    lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
                 }
             }
         }
         stage('Reboot test-multinode303') {
             agent { label "test-multinode303" }
             steps {
-                dir('strato-getting-started') {
-                    script {
-                        sh 'sudo ./run.sh'
-                        sh 'until curl --silent localhost:8080; do sleep 1; done'
-                        sh 'sudo docker ps'
-                        lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
-                    }
+                script {
+                    lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE7, 'beanstalk', false)
+                    sh 'until curl --silent localhost:8080; do sleep 1; done'
+                    sh 'sudo docker ps'
+                    lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
                 }
             }
         }
         stage('Reboot test-multinode304') {
             agent { label "test-multinode304" }
             steps {
-                dir('strato-getting-started') {
-                    script {
-                        sh 'sudo ./run.sh'
-                        sh 'until curl --silent localhost:8080; do sleep 1; done'
-                        sh 'sudo docker ps'
-                        lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
-                    }
+                script {
+                    lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE8, 'beanstalk', false)
+                    sh 'until curl --silent localhost:8080; do sleep 1; done'
+                    sh 'sudo docker ps'
+                    lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
                 }
             }
         }
