@@ -2625,146 +2625,60 @@ encodeVector v = do
         bs <- encodeForReturn val'
         return (headers `B.append` bs, strings)
 
+
+
+
+
+
+
+
+
 {- BEN WILL REFACTOR THIS -}
 solidityExceptionHandler :: MonadSM m => (M.Map String (Maybe (String, SVMType.Type), [CC.Statement])) -> SolidException -> m (Maybe Value)
 solidityExceptionHandler catchBlockMap ex = do
+  let solidityExceptionHandlerHelper cbm s1 s2 errCode errFunc = do
+        case M.lookup "Panic" cbm of
+          Nothing -> do
+            case M.lookup "Nill" cbm of 
+              Nothing -> errFunc s1 s2
+              Just (_, stmts) -> do
+                res' <-  runStatements stmts
+                return res'
+          Just (mVar, block) -> do
+            case mVar of 
+              Nothing -> do
+                res' <-  runStatements block
+                return res'
+              Just (varName, varType) -> do
+                addLocalVariable varType varName (SInteger errCode)
+                res <- runStatements block
+                return res
+                
   case ex of
     (InternalError s1 s2) -> do
-      case M.lookup "Panic" catchBlockMap of
-        Nothing -> do
-          case M.lookup "Nill" catchBlockMap of 
-            Nothing -> internalError s1 s2
-            Just (_, stmts) -> do
-              res' <-  runStatements stmts
-              return res'
-        Just (mVar, block) -> do
-          case mVar of 
-            Nothing -> do
-              res' <-  runStatements block
-              return res'
-            Just (varName, varType) -> do
-              addLocalVariable varType varName (SInteger 1)
-              res <- runStatements block
-              return res
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 1 internalError
+      return res
     (TypeError s1 s2) -> do
-      case M.lookup "Panic" catchBlockMap of
-        Nothing -> do
-          case M.lookup "Nill" catchBlockMap of 
-            Nothing -> typeError s1 s2
-            Just (_, stmts) -> do
-              res' <-  runStatements stmts
-              return res'
-        Just (mVar, block) -> do
-          case mVar of 
-            Nothing -> do
-              res' <- runStatements block
-              return res'
-            Just (varName, varType) -> do
-              addLocalVariable varType varName (SInteger 2)
-              res <- runStatements block
-              return res
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 2 typeError
+      return res
     (InvalidArguments s1 s2) -> do
-      case M.lookup "Panic" catchBlockMap of
-        Nothing -> do
-          case M.lookup "Nill" catchBlockMap of 
-            Nothing -> invalidArguments s1 s2
-            Just (_, stmts) -> do
-              res' <-  runStatements stmts
-              return res'
-        Just (mVar, block) -> do
-          case mVar of 
-            Nothing -> do
-              res' <-  runStatements block
-              return res'
-            Just (varName, varType) -> do
-              addLocalVariable varType varName (SInteger 3)
-              res <- runStatements block
-              return res
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 3 invalidArguments
+      return res
     (IndexOutOfBounds s1 s2) -> do
-      case M.lookup "Panic" catchBlockMap of
-        Nothing -> do
-          case M.lookup "Nill" catchBlockMap of 
-            Nothing -> indexOutOfBounds s1 s2
-            Just (_, stmts) -> do
-              res' <-  runStatements stmts
-              return res'
-        Just (mVar, block) -> do
-          case mVar of 
-            Nothing -> do
-              res' <-  runStatements block
-              return res'
-            Just (varName, varType) -> do
-              addLocalVariable varType varName (SInteger 4)
-              res <- runStatements block
-              return res
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 4 indexOutOfBounds
+      return res
     (TODO s1 s2) -> do
-      case M.lookup "Panic" catchBlockMap of
-        Nothing -> do
-          case M.lookup "Nill" catchBlockMap of 
-            Nothing -> todo s1 s2
-            Just (_, stmts) -> do
-              res' <-  runStatements stmts
-              return res'
-        Just (mVar, block) -> do
-          case mVar of 
-            Nothing -> do
-              res' <-  runStatements block
-              return res'
-            Just (varName, varType) -> do
-              addLocalVariable varType varName (SInteger 5)
-              res <- runStatements block
-              return res
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 5 todo
+      return res
     (MissingField s1 s2) -> do
-      case M.lookup "Panic" catchBlockMap of
-        Nothing -> do
-          case M.lookup "Nill" catchBlockMap of 
-            Nothing -> missingField s1 s2
-            Just (_, stmts) -> do
-              res' <-  runStatements stmts
-              return res'
-        Just (mVar, block) -> do
-          case mVar of 
-            Nothing -> do
-              res' <-  runStatements block
-              return res'
-            Just (varName, varType) -> do
-              addLocalVariable varType varName (SInteger 6)
-              res <- runStatements block
-              return res
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 6 missingField
+      return res
     (MissingType s1 s2) -> do
-      case M.lookup "Panic" catchBlockMap of
-        Nothing -> do
-          case M.lookup "Nill" catchBlockMap of 
-            Nothing -> missingType s1 s2
-            Just (_, stmts) -> do
-              res' <-  runStatements stmts
-              return res'
-        Just (mVar, block) -> do
-          case mVar of 
-            Nothing -> do
-              res' <-  runStatements block
-              return res'
-            Just (varName, varType) -> do
-              addLocalVariable varType varName (SInteger 7)
-              res <- runStatements block
-              return res
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 7 missingType
+      return res
     (DuplicateDefinition s1 s2) -> do
-      case M.lookup "Panic" catchBlockMap of
-        Nothing -> do
-          case M.lookup "Nill" catchBlockMap of 
-            Nothing -> duplicateDefinition s1 s2
-            Just (_, stmts) -> do
-              res' <-  runStatements stmts
-              return res'
-        Just (mVar, block) -> do
-          case mVar of 
-            Nothing -> do
-              res' <-  runStatements block
-              return res'
-            Just (varName, varType) -> do
-              addLocalVariable varType varName (SInteger 8)
-              res <- runStatements block
-              return res
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 8 duplicateDefinition
+      return res
     (ArityMismatch s1 i1 i2) -> do
       case M.lookup "Panic" catchBlockMap of
         Nothing -> do
@@ -2783,39 +2697,11 @@ solidityExceptionHandler catchBlockMap ex = do
               res <- runStatements block
               return res
     (UnknownFunction s1 s2) -> do
-      case M.lookup "Panic" catchBlockMap of
-        Nothing -> do
-          case M.lookup "Nill" catchBlockMap of 
-            Nothing -> unknownFunction s1 s2
-            Just (_, stmts) -> do
-              res' <-  runStatements stmts
-              return res'
-        Just (mVar, block) -> do
-          case mVar of 
-            Nothing -> do
-              res' <-  runStatements block
-              return res'
-            Just (varName, varType) -> do
-              addLocalVariable varType varName (SInteger 10)
-              res <- runStatements block
-              return res
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 10 unknownFunction
+      return res
     (UnknownVariable s1 s2) -> do
-      case M.lookup "Panic" catchBlockMap of
-        Nothing -> do
-          case M.lookup "Nill" catchBlockMap of 
-            Nothing -> unknownVariable s1 s2
-            Just (_, stmts) -> do
-              res' <-  runStatements stmts
-              return res'
-        Just (mVar, block) -> do
-          case mVar of 
-            Nothing -> do
-              res' <-  runStatements block
-              return res'
-            Just (varName, varType) -> do
-              addLocalVariable varType varName (SInteger 11)
-              res <- runStatements block
-              return res
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 11 unknownVariable
+      return res
     (DivideByZero s1) -> do
       case M.lookup "Panic" catchBlockMap of
         Nothing -> do
@@ -2872,192 +2758,38 @@ solidityExceptionHandler catchBlockMap ex = do
               res <- runStatements block
               return res
     (MissingCodeCollection s1 s2) -> do
-      case M.lookup "Panic" catchBlockMap of
-        Nothing -> do
-          case M.lookup "Nill" catchBlockMap of 
-            Nothing -> missingCodeCollection s1 s2
-            Just (_, stmts) -> do
-              res' <-  runStatements stmts
-              return res'
-        Just (mVar, block) -> do
-          case mVar of 
-            Nothing -> do
-              res' <-  runStatements block
-              return res'
-            Just (varName, varType) -> do
-              addLocalVariable varType varName (SInteger 13)
-              res <- runStatements block
-              return res
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 13 missingCodeCollection
+      return res
     (InaccessibleChain s1 s2) -> do
-      case M.lookup "Panic" catchBlockMap of
-        Nothing -> do
-          case M.lookup "Nill" catchBlockMap of 
-            Nothing -> inaccessibleChain s1 s2
-            Just (_, stmts) -> do
-              res' <-  runStatements stmts
-              return res'
-        Just (mVar, block) -> do
-          case mVar of 
-            Nothing -> do
-              res' <-  runStatements block
-              return res'
-            Just (varName, varType) -> do
-              addLocalVariable varType varName (SInteger 14)
-              res <- runStatements block
-              return res
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 14 inaccessibleChain
+      return res
     (InvalidWrite s1 s2) -> do
-      case M.lookup "Panic" catchBlockMap of
-        Nothing -> do
-          case M.lookup "Nill" catchBlockMap of 
-            Nothing -> invalidWrite s1 s2
-            Just (_, stmts) -> do
-              res' <-  runStatements stmts
-              return res'
-        Just (mVar, block) -> do
-          case mVar of 
-            Nothing -> do
-              res' <-  runStatements block
-              return res'
-            Just (varName, varType) -> do
-              addLocalVariable varType varName (SInteger 15)
-              res <- runStatements block
-              return res
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 15 invalidWrite
+      return res
     (InvalidCertificate s1 s2) -> do
-      case M.lookup "Panic" catchBlockMap of
-        Nothing -> do
-          case M.lookup "Nill" catchBlockMap of 
-            Nothing -> invalidCertificate s1 s2
-            Just (_, stmts) -> do
-              res' <-  runStatements stmts
-              return res'
-        Just (mVar, block) -> do
-          case mVar of 
-            Nothing -> do
-              res' <-  runStatements block
-              return res'
-            Just (varName, varType) -> do 
-              addLocalVariable varType varName (SInteger 16)
-              res <- runStatements block
-              return res
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 16 invalidCertificate
+      return res
     (MalformedData s1 s2) -> do
-      case M.lookup "Panic" catchBlockMap of
-        Nothing -> do
-          case M.lookup "Nill" catchBlockMap of 
-            Nothing -> malformedData s1 s2
-            Just (_, stmts) -> do
-              res' <-  runStatements stmts
-              return res'
-        Just (mVar, block) -> do
-          case mVar of 
-            Nothing -> do
-              res' <-  runStatements block
-              return res'
-            Just (varName, varType) -> do
-              addLocalVariable varType varName (SInteger 17)
-              res <- runStatements block
-              return res
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 17 malformedData
+      return res
     (TooMuchGas s1 s2) -> do
-      case M.lookup "Panic" catchBlockMap of
-        Nothing -> do
-          case M.lookup "Nill" catchBlockMap of 
-            Nothing -> tooMuchGas s1 s2
-            Just (_, stmts) -> do
-              res' <-  runStatements stmts
-              return res'
-        Just (mVar, block) -> do
-          case mVar of 
-            Nothing -> do
-              res' <-  runStatements block
-              return res'
-            Just (varName, varType) -> do
-              addLocalVariable varType varName (SInteger 18)
-              res <- runStatements block
-              return res
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 18 tooMuchGas
+      return res
     (PaymentError s1 s2) -> do
-      case M.lookup "Panic" catchBlockMap of
-        Nothing -> do
-          case M.lookup "Nill" catchBlockMap of 
-            Nothing -> paymentError s1 s2
-            Just (_, stmts) -> do
-              res' <-  runStatements stmts
-              return res'
-        Just (mVar, block) -> do
-          case mVar of 
-            Nothing -> do
-              res' <- runStatements block
-              return res'
-            Just (varName, varType) -> do
-              addLocalVariable varType varName (SInteger 19)
-              res <- runStatements block
-              return res
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 19 paymentError
+      return res
     (ParseError s1 s2) -> do
-      case M.lookup "Panic" catchBlockMap of
-        Nothing -> do
-          case M.lookup "Nill" catchBlockMap of 
-            Nothing -> parseError s1 s2
-            Just (_, stmts) -> do
-              res' <- runStatements stmts
-              return res'
-        Just (mVar, block) -> do
-          case mVar of 
-            Nothing -> do
-              res' <- runStatements block
-              return res'
-            Just (varName, varType) -> do
-              addLocalVariable varType varName (SInteger 20)
-              res <- runStatements block
-              return res
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 20 parseError
+      return res
     (UnknownConstant s1 s2) -> do
-      case M.lookup "Panic" catchBlockMap of
-        Nothing -> do
-          case M.lookup "Nill" catchBlockMap of 
-            Nothing -> unknownConstant s1 s2
-            Just (_, stmts) -> do
-              res' <- runStatements stmts
-              return res'
-        Just (mVar, block) -> do
-          case mVar of 
-            Nothing -> do
-              res' <- runStatements block
-              return res'
-            Just (varName, varType) -> do
-              addLocalVariable varType varName (SInteger 21)
-              res <- runStatements block
-              return res
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 21 unknownConstant
+      return res
     (UnknownStatement s1 s2) -> do
-      case M.lookup "Panic" catchBlockMap of
-        Nothing -> do
-          case M.lookup "Nill" catchBlockMap of 
-            Nothing -> unknownStatement s1 s2
-            Just (_, stmts) -> do
-              res' <- runStatements stmts
-              return res'
-        Just (mVar, block) -> do
-          case mVar of 
-            Nothing -> do
-              res' <- runStatements block
-              return res'
-            Just (varName, varType) -> do
-              addLocalVariable varType varName (SInteger 22)
-              res <- runStatements block
-              return res
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 22 unknownStatement
+      return res
     (ReservedWordError s1 s2) -> do
-      case M.lookup "Panic" catchBlockMap of
-        Nothing -> do
-          case M.lookup "Nill" catchBlockMap of 
-            Nothing -> reservedWordError s1 s2
-            Just (_, stmts) -> do
-              res' <- runStatements stmts
-              return res'
-        Just (mVar, block) -> do
-          case mVar of 
-            Nothing -> do
-              res' <- runStatements block
-              return res'
-            Just (varName, varType) -> do
-              addLocalVariable varType varName (SInteger 23)
-              res <- runStatements block
-              return res
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 23 reservedWordError
+      return res
 
 solidVMExceptionHandler :: (MonadSM m) => (M.Map String [CC.Statement]) -> SolidException -> m (Maybe Value)
 solidVMExceptionHandler catchBlockMap ex = case ex of
