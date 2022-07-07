@@ -653,6 +653,7 @@ pipeline {
         }
 
         /* Dropping Chains */
+        /* Reboot All Nodes*/
         stage ('Dropping Chains test-multinode101') {
             // agent { label "multinode101" } // is default
             steps {
@@ -663,84 +664,6 @@ pipeline {
                 }
             }
         }
-        stage ('Dropping Chains test-multinode102') {
-            agent { label "multinode102" } // is default
-            steps {
-                dir('strato-getting-started') {
-                    script {
-                        sh 'sudo ./strato ----drop-chains'
-                    }
-
-                }
-            }
-        }
-        stage ('Dropping Chains test-multinode103') {
-            agent { label "multinode103" } // is default
-            steps {
-                dir('strato-getting-started') {
-                    script {
-                        sh 'sudo ./strato ----drop-chains'
-                    }
-
-                }
-            }
-        }
-        stage ('Dropping Chains test-multinode104') {
-            agent { label "multinode104" } // is default
-            steps {
-                dir('strato-getting-started') {
-                    script {
-                        sh 'sudo ./strato ----drop-chains'
-                    }
-
-                }
-            }
-        }
-        stage ('Dropping Chains test-multinode301') {
-            agent { label "multinode301" } // is default
-            steps {
-                dir('strato-getting-started') {
-                    script {
-                        sh 'sudo ./strato ----drop-chains'
-                    }
-
-                }
-            }
-        }
-        stage ('Dropping Chains test-multinode302') {
-            agent { label "multinode302" } // is default
-            steps {
-                dir('strato-getting-started') {
-                    script {
-                        sh 'sudo ./strato ----drop-chains'
-                    }
-
-                }
-            }
-        }
-        stage ('Dropping Chains test-multinode303') {
-            agent { label "multinode303" } // is default
-            steps {
-                dir('strato-getting-started') {
-                    script {
-                        sh 'sudo ./strato ----drop-chains'
-                    }
-
-                }
-            }
-        }
-        stage ('Dropping Chains test-multinode304') {
-            agent { label "multinode304" } // is default
-            steps {
-                dir('strato-getting-started') {
-                    script {
-                        sh 'sudo ./strato ----drop-chains'
-                    }
-                }
-            }
-        }
-
-        /* Reboot All Nodes*/
         stage('Reboot test-multinode101') {
             // agent { label "test-multinode101" } // is default
             steps {
@@ -749,6 +672,18 @@ pipeline {
                     sh 'until curl --silent localhost:8080; do sleep 1; done'
                     sh 'sudo docker ps'
                     lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
+                }
+            }
+        }
+
+        stage ('Dropping Chains test-multinode102') {
+            agent { label "multinode102" } // is default
+            steps {
+                dir('strato-getting-started') {
+                    script {
+                        sh 'sudo ./strato ----drop-chains'
+                    }
+
                 }
             }
         }
@@ -763,6 +698,17 @@ pipeline {
                 }
             }
         }
+        stage ('Dropping Chains test-multinode103') {
+            agent { label "multinode103" } // is default
+            steps {
+                dir('strato-getting-started') {
+                    script {
+                        sh 'sudo ./strato ----drop-chains'
+                    }
+
+                }
+            }
+        }
         stage('Reboot test-multinode103') {
             agent { label "test-multinode103" }
             steps {
@@ -771,6 +717,17 @@ pipeline {
                     sh 'until curl --silent localhost:8080; do sleep 1; done'
                     sh 'sudo docker ps'
                     lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
+                }
+            }
+        }
+        stage ('Dropping Chains test-multinode104') {
+            agent { label "multinode104" } // is default
+            steps {
+                dir('strato-getting-started') {
+                    script {
+                        sh 'sudo ./strato ----drop-chains'
+                    }
+
                 }
             }
         }
@@ -785,6 +742,17 @@ pipeline {
                 }
             }
         }
+        stage ('Dropping Chains test-multinode301') {
+            agent { label "multinode301" } // is default
+            steps {
+                dir('strato-getting-started') {
+                    script {
+                        sh 'sudo ./strato ----drop-chains'
+                    }
+
+                }
+            }
+        }
         stage('Reboot test-multinode301') {
             agent { label "test-multinode301" }
             steps {
@@ -793,6 +761,17 @@ pipeline {
                     sh 'until curl --silent localhost:8080; do sleep 1; done'
                     sh 'sudo docker ps'
                     lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
+                }
+            }
+        }
+        stage ('Dropping Chains test-multinode302') {
+            agent { label "multinode302" } // is default
+            steps {
+                dir('strato-getting-started') {
+                    script {
+                        sh 'sudo ./strato ----drop-chains'
+                    }
+
                 }
             }
         }
@@ -807,6 +786,17 @@ pipeline {
                 }
             }
         }
+        stage ('Dropping Chains test-multinode303') {
+            agent { label "multinode303" } // is default
+            steps {
+                dir('strato-getting-started') {
+                    script {
+                        sh 'sudo ./strato ----drop-chains'
+                    }
+
+                }
+            }
+        }
         stage('Reboot test-multinode303') {
             agent { label "test-multinode303" }
             steps {
@@ -815,6 +805,16 @@ pipeline {
                     sh 'until curl --silent localhost:8080; do sleep 1; done'
                     sh 'sudo docker ps'
                     lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
+                }
+            }
+        }
+        stage ('Dropping Chains test-multinode304') {
+            agent { label "multinode304" } // is default
+            steps {
+                dir('strato-getting-started') {
+                    script {
+                        sh 'sudo ./strato ----drop-chains'
+                    }
                 }
             }
         }
