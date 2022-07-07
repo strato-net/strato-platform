@@ -641,7 +641,7 @@ pipeline {
                 }
             }
         }
-        stage('Single Node Sync with Devnet for Upgradability Sync Test - Deploy Monitor') {
+        stage('Upgradability Sync Test - Deploy Monitor') {
             steps {
                 withCredentials([
                     usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME'),
@@ -874,10 +874,12 @@ pipeline {
         /* Stability Test - Restart Node */
         stage('Restart Node after Devnet Sync') {
             steps {
-                dir('strato-getting-started') {
-                    sh 'sudo ./strato --stop'
-                    sh 'sudo ./strato --start'
-                    sh 'PASSWORD=123 ./strato --set-password'
+                script {
+                    dir('strato-getting-started') {
+                        sh 'sudo ./strato --stop'
+                        sh 'sudo ./strato --start'
+                        sh 'PASSWORD=123 ./strato --set-password'
+                    }
                 }
             }
         }
