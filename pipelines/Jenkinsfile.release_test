@@ -874,8 +874,8 @@ pipeline {
         /* Stability Test - Restart Node */
         stage('Restart Node after Devnet Sync') {
             steps {
-                script {
-                    dir('strato-getting-started') {
+                dir('strato-getting-started') {
+                    script {
                         sh 'sudo ./strato --stop'
                         sh 'sudo ./strato --start'
                         sh 'PASSWORD=123 ./strato --set-password'
