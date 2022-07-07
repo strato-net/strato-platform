@@ -3041,6 +3041,23 @@ solidityExceptionHandler catchBlockMap ex = do
               addLocalVariable varType varName (SInteger 22)
               res <- runStatements block
               return res
+    (ReservedWordError s1 s2) -> do
+      case M.lookup "Panic" catchBlockMap of
+        Nothing -> do
+          case M.lookup "Nill" catchBlockMap of 
+            Nothing -> reservedWordError s1 s2
+            Just (_, stmts) -> do
+              res' <- runStatements stmts
+              return res'
+        Just (mVar, block) -> do
+          case mVar of 
+            Nothing -> do
+              res' <- runStatements block
+              return res'
+            Just (varName, varType) -> do
+              addLocalVariable varType varName (SInteger 23)
+              res <- runStatements block
+              return res
 
 solidVMExceptionHandler :: (MonadSM m) => (M.Map String [CC.Statement]) -> SolidException -> m (Maybe Value)
 solidVMExceptionHandler catchBlockMap ex = case ex of
@@ -3156,4 +3173,6 @@ solidVMExceptionHandler catchBlockMap ex = case ex of
         Just block -> do
           res <- runStatements block
           return res
+    
     _ -> error "unhandled solid exception" (show ex)
+
