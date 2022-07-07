@@ -164,6 +164,11 @@ instance MonadIO m => A.Selectable Keccak256 (Private (Word256, OutputTx)) (Mona
 instance MonadIO m => A.Selectable Address X509CertInfoState (MonadTest m) where
   select _ addr = M.lookup addr <$> use x509Map
 
+instance MonadIO m => (Address `A.Alters` X509CertInfoState) (MonadTest m) where
+  lookup _ k   = M.lookup k <$> use x509Map
+  insert _ k v = x509Map %= M.insert k v
+  delete _ k   = x509Map %= M.delete k
+
 instance MonadIO m => Mod.Accessible GenesisBlockHash (MonadTest m) where
   access _ = use genesisBlockHash
 
