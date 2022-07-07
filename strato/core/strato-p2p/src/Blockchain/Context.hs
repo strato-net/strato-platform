@@ -427,6 +427,7 @@ type MonadP2P m = ( MonadIO m
                        , '(Word256, ChainMembers)
                        , '(Word256, ChainInfo)
                        , '(Keccak256, Private (Word256, OutputTx))
+                       , '(Address, X509CertInfoState)
                        ] m
                   , All2 '[A.Alters]
                       '[ '(Keccak256, BlockData)
