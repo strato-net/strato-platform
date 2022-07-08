@@ -6,7 +6,7 @@ def cleanOldWorkspaces(Integer olderThanNumDays = 5) {
         script: "df | grep /datadrive | awk '{print \$3}'"
     ).trim()
 
-    echo "diskspaceAvailableBefore=$diskspaceAvailableBefore KB"
+    echo "diskspaceAvailableBefore=$diskspaceAvailableBefore kilobytes"
     
     // `stack purge` in every jenkins workspace directory that was not updated for at least $olderThanNumDays days and is not a @tmp dir.
     sh """
@@ -47,10 +47,10 @@ def cleanOldWorkspaces(Integer olderThanNumDays = 5) {
         script: "df | grep /datadrive | awk '{print \$3}'"
     ).trim()
 
-    echo "diskspaceAvailableAfter=$diskspaceAvailableAfter KB"
+    echo "diskspaceAvailableAfter=$diskspaceAvailableAfter kilobytes"
     
-    // Return the number of megabytes freed:
-    return (diskspaceAvailableBefore - diskspaceAvailableAfter) / 1024
+    // Return the number of kilobytes freed:
+    return diskspaceAvailableBefore - diskspaceAvailableAfter
   }
 }
 
@@ -79,7 +79,7 @@ pipeline {
           steps {
             script {
               def diskspaceFreed = cleanOldWorkspaces(5)
-              echo "Diskspace freed on test1: $diskspaceFreed MB"
+              echo "Diskspace freed on test1: $diskspaceFreed kilobytes"
             }
           }
         }
@@ -98,7 +98,7 @@ pipeline {
           steps {
             script {
               def diskspaceFreed = cleanOldWorkspaces(5)
-              echo "Diskspace freed on test2: $diskspaceFreed MB"
+              echo "Diskspace freed on test2: $diskspaceFreed kilobytes"
             }
           }
         }
@@ -117,7 +117,7 @@ pipeline {
           steps {
             script {
               def diskspaceFreed = cleanOldWorkspaces(5)
-              echo "Diskspace freed on test3: $diskspaceFreed MB"
+              echo "Diskspace freed on test3: $diskspaceFreed kilobytes"
             }
           }
         }
@@ -136,7 +136,7 @@ pipeline {
           steps {
             script {
               def diskspaceFreed = cleanOldWorkspaces(5)
-              echo "Diskspace freed on test4: $diskspaceFreed MB"
+              echo "Diskspace freed on test4: $diskspaceFreed kilobytes"
             }
           }
         }
@@ -155,7 +155,7 @@ pipeline {
           steps {
             script {
               def diskspaceFreed = cleanOldWorkspaces(5)
-              echo "Diskspace freed on test5: $diskspaceFreed MB"
+              echo "Diskspace freed on test5: $diskspaceFreed kilobytes"
             }
           }
         }
