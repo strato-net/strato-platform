@@ -28,7 +28,7 @@ import           Data.Default                          (def)
 import           Data.Foldable                         (for_, toList)
 import           Data.Map.Strict                       (Map)
 import qualified Data.Map.Strict                       as M
-import           Data.Maybe
+-- import           Data.Maybe
 import qualified Data.Set                              as Set
 import qualified Data.Set.Ordered                      as S
 import qualified Data.Sequence                         as Q
@@ -73,7 +73,7 @@ import qualified Blockchain.Strato.Model.Secp256k1     as SEC
 import           Executable.StratoP2PClient
 import           Executable.StratoP2PServer
 
-import qualified LabeledError
+-- import qualified LabeledError
 
 import           Test.Hspec
 import qualified Test.Hspec.Expectations.Lifted        as L
@@ -321,18 +321,23 @@ instance MonadIO m => HasBlockstanbulContext (MonadTest m) where
   getBlockstanbulContext = use $ sequencerContext . blockstanbulContext
   putBlockstanbulContext = assign (sequencerContext . blockstanbulContext . _Just)
 
--- instance MonadIO m => HasVault (MonadTest m) where
---   sign bs = do
---     pk <- use prvKey
---     return $ signMsg pk bs
+-- instance Monad m => HasVault (MonadTest m) where
+--   sign bs = return $ signMsg private bs
+--   getPub = error "called getPub, but this should never happen"
+--   getShared _ = error "called getShared, but this should never happen"
+
+instance MonadIO m => HasVault (MonadTest m) where
+  sign bs = do
+    pk <- use prvKey
+    return $ signMsg pk bs
   
---   getPub = do
---     pk <- use prvKey
---     return $ derivePublicKey pk
+  getPub = do
+    pk <- use prvKey
+    return $ derivePublicKey pk
   
---   getShared pub = do
---     pk <- use prvKey
---     return $ deriveSharedKey pk pub
+  getShared pub = do
+    pk <- use prvKey
+    return $ deriveSharedKey pk pub
 
 instance MonadIO m => (Keccak256 `A.Alters` (A.Proxy (Inbound WireMessage))) (MonadTest m) where
   lookup _  k = do
@@ -358,13 +363,8 @@ instance MonadIO m => ((Text, Keccak256) `A.Alters` (A.Proxy (Outbound WireMessa
   delete _ k = outboundPbftMessages %= S.delete k
 
 
-private :: PrivateKey
-private = fromMaybe (error "could not import private key") (importPrivateKey (LabeledError.b16Decode "private" $ BC.pack "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866")) 
-
-instance HasVault (MonadTest m) where
-  sign bs = return $ signMsg private bs
-  getPub = error "called getPub, but this should never happen"
-  getShared _ = error "called getShared, but this should never happen"
+-- private :: PrivateKey
+-- private = fromMaybe (error "could not import private key") (importPrivateKey (LabeledError.b16Decode "private" $ BC.pack "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866")) 
 
 startingCheckpoint :: [Address] -> Checkpoint
 startingCheckpoint as = def{checkpointValidators = as}
@@ -569,7 +569,7 @@ makeValidators = map (fromPrivateKey . _p2pPeerPrivKey)
 --         toIP = L.intersperse '.' . map show
 --         generateThem = toIP <$> ips (galois 1)
 
-makeDummyCert :: (MonadIO m, SEC.HasVault m) => SEC.PublicKey -> m X509Certificate
+makeDummyCert :: (MonadIO m, HasVault m) => SEC.PublicKey -> m X509Certificate
 makeDummyCert nodeKey = do
   let iss = Issuer {
               issCommonName = "", 
@@ -595,9 +595,9 @@ spec = do
       let unseqSink = (unseqEvents %=) . (++)
       server <- createPeer unseqSink "server" "1.2.3.4"
       client <- createPeer unseqSink "client" "5.6.7.8"
-      let clientPubKey = derivePublicKey $ _p2pPeerPrivKey client 
-      dummyClientCert <- makeDummyCert clientPubKey
-      A.insert (A.Proxy @X509CertInfoState) (fromPublicKey clientPubKey) (X509CertInfoState (fromPublicKey clientPubKey) dummyClientCert True [])
+      -- let clientPubKey = derivePublicKey $ _p2pPeerPrivKey client 
+      -- dummyClientCert <- liftIO $ makeDummyCert clientPubKey
+      -- A.insert (A.Proxy @X509CertInfoState) (fromPublicKey clientPubKey) (X509CertInfoState (fromPublicKey clientPubKey) dummyClientCert True [])
       let validatorAddresses = makeValidators [server, client]
       connection <- createConnection server client
       let clearChainId tx = case tx of
@@ -612,6 +612,25 @@ spec = do
       _unseqEvents serverCtx `shouldBe` []
       let clientTxs = [t | IETx _ (IngestTx _ t) <- _unseqEvents clientCtx]
       clientTxs `shouldBe` [otBaseTx otx]
+
+    it "a client without a valid certificate should fail and nothing should be returned." $ do
+      let unseqSink = (unseqEvents %=) . (++)
+      server <- createPeer unseqSink "server" "1.2.3.4"
+      client <- createPeer unseqSink "client" "5.6.7.8"
+      let validatorAddresses = makeValidators [server, client]
+      connection <- createConnection server client
+      let clearChainId tx = case tx of
+            MessageTX{} -> tx{transactionChainId = Nothing}
+            ContractCreationTX{} -> tx{transactionChainId = Nothing}
+            PrivateHashTX{} -> tx
+      otx <- (\o -> o{otBaseTx = clearChainId (otBaseTx o), otOrigin = Origin.API}) <$> liftIO (generate arbitrary)
+      let runForTwoSeconds pk wmr = execTestPeer pk wmr validatorAddresses . timeout 2000000
+          run = runConnectionWith runForTwoSeconds connection
+          postTx = threadDelay 500000 >> (atomically $ writeTMChan (_p2pPeerSeqSource server) (P2pTx otx))
+      ((_, serverCtx), (_, clientCtx)) <- fst <$> concurrently run postTx
+      _unseqEvents serverCtx `shouldBe` []
+      let clientTxs = [t | IETx _ (IngestTx _ t) <- _unseqEvents clientCtx]
+      clientTxs `shouldBe` []
 
     it "should update the round number on every node in the network" $ do
       let unseqSink = (unseqEvents %=) . (++)
