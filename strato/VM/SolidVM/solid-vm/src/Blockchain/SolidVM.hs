@@ -624,7 +624,7 @@ argsToVals ctract fn args =
             -- evaluating external arguments.
             CC.ObjectLiteral _ mp -> do
               case t of
-                SVMType.UnknownLabel l -> do
+                SVMType.UnknownLabel l _ -> do
                   let ls = M.toList mp
                   m <- mapM go ls
                   return $ SStruct l $ M.fromList m
@@ -665,7 +665,7 @@ argsToVals ctract fn args =
               -- of the accepted literals, assume that this is not the context of
               -- evaluating external arguments.
             CC.ObjectLiteral _ mp          -> case t of
-              SVMType.UnknownLabel l -> do
+              SVMType.UnknownLabel l _ -> do
                 let ls = M.toList mp :: [(SolidString, CC.Expression)]
                 m <- mapM go ls
                 return $ SStruct l $ M.fromList m
@@ -1640,7 +1640,7 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.Array {SVMType.entry=t
 expToVar' x@(CC.FunctionCall _ (CC.NewExpression _ (SVMType.Array{})) CC.NamedArgs{}) =
   typeError "cannot create new array with named arguments" x
 
-expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractName')) args) = do
+expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractName' _)) args) = do
   ro <- readOnly <$> getCurrentCallInfo
   when ro $ invalidWrite "Invalid contract creation during read-only access" $ "contractName: " ++ show contractName' ++ ", args: " ++ show args
   creator <- getCurrentAccount

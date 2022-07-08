@@ -35,15 +35,15 @@ simpleType =
   intSuffixed "int"  (SVMType.Int (Just True)) <|>
   choice [optionParser, unknownLabelParser, unknownLabelMemberParser]
   where
-    optionParser = do
-      name <- identifier
+    optionParser = try $ do
+      name <- choice [identifier, concat <$> sequence[identifier, dot, identifier]]
       salt <- braces $ do 
         reserved "salt"
         colon
         s <- bytes'
         return s
       return $ SVMType.UnknownLabel name (Just salt)
-    unknownLabelParser = do
+    unknownLabelParser = try $ do
       name <- identifier
       return $ SVMType.UnknownLabel name Nothing
     unknownLabelMemberParser = do
