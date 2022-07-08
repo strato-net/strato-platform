@@ -28,6 +28,7 @@ import           Data.Default                          (def)
 import           Data.Foldable                         (for_, toList)
 import           Data.Map.Strict                       (Map)
 import qualified Data.Map.Strict                       as M
+import           Data.Maybe
 import qualified Data.Set                              as Set
 import qualified Data.Set.Ordered                      as S
 import qualified Data.Sequence                         as Q
@@ -67,10 +68,12 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256     (Keccak256, zeroHash)
 import           Blockchain.Strato.Model.Secp256k1
+import qualified Blockchain.Strato.Model.Secp256k1     as SEC
 
 import           Executable.StratoP2PClient
 import           Executable.StratoP2PServer
 
+import qualified LabeledError
 
 import           Test.Hspec
 import qualified Test.Hspec.Expectations.Lifted        as L
@@ -318,18 +321,18 @@ instance MonadIO m => HasBlockstanbulContext (MonadTest m) where
   getBlockstanbulContext = use $ sequencerContext . blockstanbulContext
   putBlockstanbulContext = assign (sequencerContext . blockstanbulContext . _Just)
 
-instance MonadIO m => HasVault (MonadTest m) where
-  sign bs = do
-    pk <- use prvKey
-    return $ signMsg pk bs
+-- instance MonadIO m => HasVault (MonadTest m) where
+--   sign bs = do
+--     pk <- use prvKey
+--     return $ signMsg pk bs
   
-  getPub = do
-    pk <- use prvKey
-    return $ derivePublicKey pk
+--   getPub = do
+--     pk <- use prvKey
+--     return $ derivePublicKey pk
   
-  getShared pub = do
-    pk <- use prvKey
-    return $ deriveSharedKey pk pub
+--   getShared pub = do
+--     pk <- use prvKey
+--     return $ deriveSharedKey pk pub
 
 instance MonadIO m => (Keccak256 `A.Alters` (A.Proxy (Inbound WireMessage))) (MonadTest m) where
   lookup _  k = do
@@ -353,6 +356,15 @@ instance MonadIO m => ((Text, Keccak256) `A.Alters` (A.Proxy (Outbound WireMessa
         wms'' = wms' S.>| k
     assign outboundPbftMessages wms''
   delete _ k = outboundPbftMessages %= S.delete k
+
+
+private :: PrivateKey
+private = fromMaybe (error "could not import private key") (importPrivateKey (LabeledError.b16Decode "private" $ BC.pack "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866")) 
+
+instance HasVault (MonadTest m) where
+  sign bs = return $ signMsg private bs
+  getPub = error "called getPub, but this should never happen"
+  getShared _ = error "called getShared, but this should never happen"
 
 startingCheckpoint :: [Address] -> Checkpoint
 startingCheckpoint as = def{checkpointValidators = as}
@@ -556,7 +568,26 @@ makeValidators = map (fromPrivateKey . _p2pPeerPrivKey)
 --         ips xs = take 4 xs : ips (drop 4 xs)
 --         toIP = L.intersperse '.' . map show
 --         generateThem = toIP <$> ips (galois 1)
-                          
+
+makeDummyCert :: (MonadIO m, SEC.HasVault m) => SEC.PublicKey -> m X509Certificate
+makeDummyCert nodeKey = do
+  let iss = Issuer {
+              issCommonName = "", 
+              issOrg = "",
+              issUnit    = Nothing, 
+              issCountry = Nothing
+            }
+      sub = Subject {
+              subCommonName = "",
+              subOrg = "",
+              subUnit    = Nothing,
+              subCountry = Nothing,
+              subPub = nodeKey
+            }
+  unsignedCert <- makeCert iss sub 
+  signedCert <- signCert unsignedCert 
+  return $ signedsToX509 [signedCert]
+
 spec :: Spec
 spec = do
   describe "network simulation" $ do
@@ -564,6 +595,9 @@ spec = do
       let unseqSink = (unseqEvents %=) . (++)
       server <- createPeer unseqSink "server" "1.2.3.4"
       client <- createPeer unseqSink "client" "5.6.7.8"
+      let clientPubKey = derivePublicKey $ _p2pPeerPrivKey client 
+      dummyClientCert <- makeDummyCert clientPubKey
+      A.insert (A.Proxy @X509CertInfoState) (fromPublicKey clientPubKey) (X509CertInfoState (fromPublicKey clientPubKey) dummyClientCert True [])
       let validatorAddresses = makeValidators [server, client]
       connection <- createConnection server client
       let clearChainId tx = case tx of

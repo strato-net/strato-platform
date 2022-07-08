@@ -110,6 +110,7 @@ tests:
       - hflags
       - hspec
       - hspec-expectations-lifted
+      - labeled-error
       - lens
       - monad-alter
       - mtl

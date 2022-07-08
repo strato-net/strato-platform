@@ -17,6 +17,8 @@ module BlockApps.X509.Certificate (
   certToBytes,
   bsToCert,
   makeCert,
+  signCert,
+  signedsToX509,
   verifyCert,
   verifyCertAgainstCerts,
   verifyBlockApps,
