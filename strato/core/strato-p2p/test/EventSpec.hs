@@ -1,3 +1,4 @@
+-- {-# LANGUAGE BlockArguments        #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE LambdaCase            #-}
@@ -165,6 +166,7 @@ instance MonadIO m => A.Selectable Keccak256 (Private (Word256, OutputTx)) (Mona
   select _ tx = M.lookup tx <$> use privateTxMap
 
 instance MonadIO m => A.Selectable Address X509CertInfoState (MonadTest m) where
+  -- select _ addr = X509CertInfoState addr exampleCert True []
   select _ addr = M.lookup addr <$> use x509Map
 
 instance MonadIO m => (Address `A.Alters` X509CertInfoState) (MonadTest m) where
@@ -321,11 +323,6 @@ instance MonadIO m => HasBlockstanbulContext (MonadTest m) where
   getBlockstanbulContext = use $ sequencerContext . blockstanbulContext
   putBlockstanbulContext = assign (sequencerContext . blockstanbulContext . _Just)
 
--- instance Monad m => HasVault (MonadTest m) where
---   sign bs = return $ signMsg private bs
---   getPub = error "called getPub, but this should never happen"
---   getShared _ = error "called getShared, but this should never happen"
-
 instance MonadIO m => HasVault (MonadTest m) where
   sign bs = do
     pk <- use prvKey
@@ -361,10 +358,6 @@ instance MonadIO m => ((Text, Keccak256) `A.Alters` (A.Proxy (Outbound WireMessa
         wms'' = wms' S.>| k
     assign outboundPbftMessages wms''
   delete _ k = outboundPbftMessages %= S.delete k
-
-
--- private :: PrivateKey
--- private = fromMaybe (error "could not import private key") (importPrivateKey (LabeledError.b16Decode "private" $ BC.pack "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866")) 
 
 startingCheckpoint :: [Address] -> Checkpoint
 startingCheckpoint as = def{checkpointValidators = as}
@@ -569,25 +562,6 @@ makeValidators = map (fromPrivateKey . _p2pPeerPrivKey)
 --         toIP = L.intersperse '.' . map show
 --         generateThem = toIP <$> ips (galois 1)
 
-makeDummyCert :: (MonadIO m, HasVault m) => SEC.PublicKey -> m X509Certificate
-makeDummyCert nodeKey = do
-  let iss = Issuer {
-              issCommonName = "", 
-              issOrg = "",
-              issUnit    = Nothing, 
-              issCountry = Nothing
-            }
-      sub = Subject {
-              subCommonName = "",
-              subOrg = "",
-              subUnit    = Nothing,
-              subCountry = Nothing,
-              subPub = nodeKey
-            }
-  unsignedCert <- makeCert iss sub 
-  signedCert <- signCert unsignedCert 
-  return $ signedsToX509 [signedCert]
-
 spec :: Spec
 spec = do
   describe "network simulation" $ do
@@ -595,9 +569,7 @@ spec = do
       let unseqSink = (unseqEvents %=) . (++)
       server <- createPeer unseqSink "server" "1.2.3.4"
       client <- createPeer unseqSink "client" "5.6.7.8"
-      -- let clientPubKey = derivePublicKey $ _p2pPeerPrivKey client 
-      -- dummyClientCert <- liftIO $ makeDummyCert clientPubKey
-      -- A.insert (A.Proxy @X509CertInfoState) (fromPublicKey clientPubKey) (X509CertInfoState (fromPublicKey clientPubKey) dummyClientCert True [])
+      let clientUserAddress = fromPublicKey . derivePublicKey $ _p2pPeerPrivKey client 
       let validatorAddresses = makeValidators [server, client]
       connection <- createConnection server client
       let clearChainId tx = case tx of
@@ -605,7 +577,8 @@ spec = do
             ContractCreationTX{} -> tx{transactionChainId = Nothing}
             PrivateHashTX{} -> tx
       otx <- (\o -> o{otBaseTx = clearChainId (otBaseTx o), otOrigin = Origin.API}) <$> liftIO (generate arbitrary)
-      let runForTwoSeconds pk wmr = execTestPeer pk wmr validatorAddresses . timeout 2000000
+      let insertClientCert = A.insert (A.Proxy @X509CertInfoState) clientUserAddress (X509CertInfoState clientUserAddress (error "X509 cert unavailable") True [])
+          runForTwoSeconds pk wmr = execTestPeer pk wmr validatorAddresses . timeout 2000000 . (insertClientCert >>)
           run = runConnectionWith runForTwoSeconds connection
           postTx = threadDelay 500000 >> (atomically $ writeTMChan (_p2pPeerSeqSource server) (P2pTx otx))
       ((_, serverCtx), (_, clientCtx)) <- fst <$> concurrently run postTx
@@ -655,10 +628,12 @@ spec = do
         , (peers !! 1, peers !! 4)
         , (peers !! 1, peers !! 5)
         ]
-      let validators' = take 2 peers
+      let userAddresses = fromPublicKey . derivePublicKey . _p2pPeerPrivKey <$> peers
+          insertManyCerts = mapM (\ua -> A.insert (A.Proxy @X509CertInfoState) ua (X509CertInfoState ua (error "X509 cert unavailable") True [])) userAddresses
+          validators' = take 2 peers
           validatorAddresses = makeValidators validators'
           runForTwoSeconds :: PrivateKey -> WMRef -> TestContextM a -> IO TestContext
-          runForTwoSeconds pk wmr = fmap snd . execTestPeer pk wmr validatorAddresses . timeout 2000000
+          runForTwoSeconds pk wmr = fmap snd . execTestPeer pk wmr validatorAddresses . timeout 2000000 . (insertManyCerts >>)
           runSequencers = mapConcurrently (\p -> runForTwoSeconds (_p2pPeerPrivKey p) (_p2pPeerWireMessageRef p) (_p2pPeerSequencer p)) peers
           runConnections = mapConcurrently (runConnectionWith runForTwoSeconds) connections
           postTimeout = do
@@ -680,17 +655,19 @@ spec = do
         , (peers !! 0, peers !! 2)
         , (peers !! 1, peers !! 2)
         ]
-      let validators' = peers
+      let userAddresses = fromPublicKey . derivePublicKey . _p2pPeerPrivKey <$> peers
+          insertManyCerts = mapM (\ua -> A.insert (A.Proxy @X509CertInfoState) ua (X509CertInfoState ua (error "X509 cert unavailable") True [])) userAddresses
+          validators' = peers
           primaryValidators = [head validators']
           secondaryValidators = tail validators'
           primaryValidatorAddresses = makeValidators primaryValidators
           validatorAddresses = makeValidators validators'
           runForTwoSecondsPrimary :: Word256 -> PrivateKey -> WMRef -> TestContextM a -> IO TestContext
-          runForTwoSecondsPrimary n pk wmr = fmap snd . execTestPeerOnRound n pk wmr primaryValidatorAddresses . timeout 2000000
+          runForTwoSecondsPrimary n pk wmr = fmap snd . execTestPeerOnRound n pk wmr primaryValidatorAddresses . timeout 2000000 . (insertManyCerts >>)
           runForTwoSecondsSecondary :: Word256 -> PrivateKey -> WMRef -> TestContextM a -> IO TestContext
-          runForTwoSecondsSecondary n pk wmr = fmap snd . execTestPeerOnRound n pk wmr validatorAddresses . timeout 2000000
+          runForTwoSecondsSecondary n pk wmr = fmap snd . execTestPeerOnRound n pk wmr validatorAddresses . timeout 2000000 . (insertManyCerts >>)
           runForTwoSecondsWithContext :: TestContext -> TestContextM a -> IO TestContext
-          runForTwoSecondsWithContext ctx = fmap snd . flip execTestPeerWithContext ctx . timeout 2000000
+          runForTwoSecondsWithContext ctx = fmap snd . flip execTestPeerWithContext ctx . timeout 2000000 . (insertManyCerts >>)
           runSequencersPrimary1 = mapConcurrently (\p -> runForTwoSecondsPrimary 0 (_p2pPeerPrivKey p) (_p2pPeerWireMessageRef p) (_p2pPeerSequencer p)) primaryValidators
           runSequencersSecondary = mapConcurrently (\p -> runForTwoSecondsSecondary 1000 (_p2pPeerPrivKey p) (_p2pPeerWireMessageRef p) (_p2pPeerSequencer p)) secondaryValidators
           runSequencers1 = concurrently runSequencersPrimary1 runSequencersSecondary
