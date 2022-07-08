@@ -3,7 +3,7 @@ def cleanOldWorkspaces(Integer olderThanNumDays = 5) {
   script {
     def diskspaceAvailableBefore = sh(
         returnStdout: true,
-        script: "df | grep /datadrive | awk '{print \$3}'"
+        script: "df | grep /datadrive | awk '{print \$4}'"
     ).trim()
 
     echo "diskspaceAvailableBefore=$diskspaceAvailableBefore kilobytes"
@@ -44,13 +44,13 @@ def cleanOldWorkspaces(Integer olderThanNumDays = 5) {
 
     def diskspaceAvailableAfter = sh(
         returnStdout: true,
-        script: "df | grep /datadrive | awk '{print \$3}'"
+        script: "df | grep /datadrive | awk '{print \$4}'"
     ).trim()
 
     echo "diskspaceAvailableAfter=$diskspaceAvailableAfter kilobytes"
     
     // Return the number of kilobytes freed:
-    return diskspaceAvailableBefore - diskspaceAvailableAfter
+    return diskspaceAvailableAfter - diskspaceAvailableBefore
   }
 }
 
