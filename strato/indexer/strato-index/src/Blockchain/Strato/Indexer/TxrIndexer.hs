@@ -83,12 +83,20 @@ doRemoveMember chainId address = do
 
 doRegisterCertificate :: Address -> X509CertInfoState -> IContextM ()
 doRegisterCertificate userAddress x509CertInfoState = do
-  logF [ "Registering X.509 Certificate -- key/userAddress: " 
+  logF [ "Registering X.509 Certificate -- key/userAddress: "
        , format userAddress
        , "; value/x509CertInfoState: "
        , format x509CertInfoState
        ]
   void . RBDB.withRedisBlockDB $ RBDB.registerCertificate userAddress x509CertInfoState
+
+doRevokeCertificate :: Address -> IContextM ()
+doRevokeCertificate userAddress = do
+  logF [ "Revoking X.509 Certificate -- key/userAddress: "
+        , format userAddress
+        ]
+  void . RBDB.withRedisBlockDB $ RBDB.revokeCertificate userAddress
+
 
 txrIndexer :: LoggingT IO ()
 txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
@@ -104,6 +112,7 @@ txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
 data TxrResult = AddMember (Either String (Word256, Address, Enode))
                | RemoveMember (Either String (Word256, Address))
                | RegisterCertificate (Either String (Address, X509CertInfoState))
+               | CertificateRevoked (Either String Address)
                | TerminateChain (Either String Word256)
                | PutLogDB LogDB
                | PutEventDB EventDB
@@ -141,14 +150,19 @@ indexEventToTxrResults = \case
       (Just chainId, "MemberRemoved", [addressStr]) -> case stringAddress addressStr of
         Nothing -> Just . RemoveMember . Left $ "failed to parse address for MemberRemoved event: " ++ addressStr
         Just address -> Just . RemoveMember $ Right (chainId, address)
-      (Nothing, "CertificateRegistered", [certString]) -> 
+      (Nothing, "CertificateRegistered", [certString]) ->
         let cert = bsToCert . C8.pack $ certString
             userAddress = fmap (fromPublicKey . subPub) $ getCertSubject =<< eitherToMaybe cert
-        in case (cert, userAddress) of 
+        in case (cert, userAddress) of
             (Left s, Nothing) -> Just . RegisterCertificate . Left $ "Failed to parse the certString for the CertificateRegistered event: " <> s
             (Left s, Just ua) -> Just . RegisterCertificate . Left $ "Failed to parse the certString for the CertificateRegistered event: " <> s <> "; " <> show ua
             (Right s, Nothing) -> Just . RegisterCertificate . Left $ "Failed to parse the certString's userAddress for the CertificateRegistered event: " <> show s
             (Right c, Just ua) -> Just . RegisterCertificate . Right $ (ua, X509CertInfoState{userAddress=ua, certificate=c, isValid=True, children=[]})
+      (Nothing, "CertificateRevoked", [certString]) ->
+        let userAddress = stringAddress certString
+        in case userAddress of
+            Nothing -> Just . CertificateRevoked . Left $ "Failed to parse the certString for the CertificateRevoked event: " <> certString
+            Just ua -> Just . CertificateRevoked . Right $ ua
       _ -> Nothing
   TxResult r -> [PutTxResult r]
   _ -> []
@@ -163,6 +177,9 @@ txrResultHandler = \case
     Left err -> $logErrorS "txrIndexer" $ T.pack err
   RegisterCertificate e -> case e of
     Right (ua, certInfoState) -> doRegisterCertificate ua certInfoState
+    Left err -> $logErrorS "txrIndexer" $ T.pack err
+  CertificateRevoked e -> case e of
+    Right address -> doRevokeCertificate address
     Left err -> $logErrorS "txrIndexer" $ T.pack err
   TerminateChain e -> case e of
     Right chainId -> lift $ terminateChain chainId
