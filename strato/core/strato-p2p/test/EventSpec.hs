@@ -69,7 +69,7 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256     (Keccak256, zeroHash)
 import           Blockchain.Strato.Model.Secp256k1
-import qualified Blockchain.Strato.Model.Secp256k1     as SEC
+-- import qualified Blockchain.Strato.Model.Secp256k1     as SEC
 
 import           Executable.StratoP2PClient
 import           Executable.StratoP2PServer
