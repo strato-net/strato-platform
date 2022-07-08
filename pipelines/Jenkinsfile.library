@@ -181,7 +181,7 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
   }
 }
 
-def runAppBootNode(nodeData, wipeApp = null, refspec = null, postgresViewsPrefix = null) {
+def runAppBootNode(nodeData, wipeApp = null, refspec = null, postgresViewsPrefix = null, appName) {
   withCredentials([
       usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME'),
       usernamePassword(credentialsId: 'beanstalk-staging-azuread-credentials-integration-server', passwordVariable: 'AZUREAD_INTSERVER_CLIENT_SECRET', usernameVariable: 'AZUREAD_INTSERVER_CLIENT_ID'),
@@ -210,7 +210,8 @@ def runAppBootNode(nodeData, wipeApp = null, refspec = null, postgresViewsPrefix
         echo "publicKey from strato-gs run script: ${publicKey}"
         sh 'rm -f run-app.sh'
         def authCookieName = "beanstalk-dev${nodeData.NUMBER}-auth"
-        writeFile file: "run-app.sh", text: """#!/bin/bash
+        if(appName = 'beanstalk') {
+          writeFile file: "run-app.sh", text: """#!/bin/bash
 set -e
 
 export IS_BOOTNODE='true'
@@ -245,7 +246,37 @@ export AWS_SQS_URL='https://sqs.us-east-1.amazonaws.com/406773134706/beanstalk-i
 #CUSTOM_NPM_SCRIPT__OPTIONAL
 
 docker-compose up -d --build
-        """
+          """
+        } else {
+          writeFile file: "run-app.sh", text: """#!/bin/bash
+set -e
+
+export IS_BOOTNODE='true'
+export API_DEBUG='false'
+export SERVER_HOST='https://${nodeData.HOST}'
+export SERVER_IP='${nodeData.IP}'
+export NODE_LABEL='node${nodeData.NUMBER}'
+export NODE_PUBLIC_KEY='${publicKey}'
+export OAUTH_APP_TOKEN_COOKIE_NAME='th-demo-tech'
+export OAUTH_OPENID_DISCOVERY_URL='${nodeData.TRACE_HARVEST.OAUTH_DISCOVERY_URL}'
+export OAUTH_CLIENT_ID='${nodeData.TRACE_HARVEST.OAUTH_CLIENT_ID}'
+export OAUTH_CLIENT_SECRET='${nodeData.TRACE_HARVEST.OAUTH_CLIENT_SECRET}'
+export OAUTH_TOKEN_USERNAME_PROPERTY='preferred_username'
+export OAUTH_TOKEN_USERNAME_PROPERTY_SERVICE_FLOW='preferred_username'
+export STRATO_NODE_PROTOCOL='https'
+export STRATO_NODE_HOST='${nodeData.HOST}:8080'
+export STRATO_LOCAL_IP='172.17.0.1'
+export SSL=true
+export SSL_CERT_TYPE=pem
+export INT_SERVER_URL='https://fake-url
+export INT_SERVER_OAUTH_OPENID_DISCOVERY_URL='https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration'
+export INT_SERVER_OAUTH_CLIENT_ID='dev'
+export INT_SERVER_OAUTH_CLIENT_SECRET='d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f'
+export INT_SERVER_OAUTH_SCOPE='openid email'
+
+docker-compose up -d --build
+          """
+        }
         if (postgresViewsPrefix) {
           sh "sed -i 's/#POSTGRES_VIEWS_PREFIX_PLACHOLDER__OPTIONAL/export POSTGRES_VIEWS_PREFIX=${postgresViewsPrefix}/g' run-app.sh"
         }
