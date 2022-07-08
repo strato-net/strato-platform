@@ -249,7 +249,7 @@ pipeline {
             }
         }
 
-        stage ('Beanstalk Load Test -  Run app on bootnode') {
+        stage ('Beanstalk Load Test -  Run beanstalk app on bootnode') {
             // agent { label "multinode101" } // is default
             steps {
                 script {
@@ -831,7 +831,174 @@ pipeline {
             }
         }
 
-        /* Write set up stage to clone monitor repo */
+        /* Upgrade with single node chain data */
+        stage('Upgrade w/ node chain data - Clean all nodes') {
+            parallel {
+                stage('Clean test-multinode101') {
+                    // agent { label "test-multinode101" } // is default
+                    steps { 
+                        script {
+                            lib.cleanNode()
+                        }
+                    }
+                }
+                stage('Clean test-multinode102') {
+                    agent { label "test-multinode102" }
+                    steps { 
+                        script {
+                            lib.cleanNode()
+                        }
+                    }
+                }
+                stage('Clean test-multinode103') {
+                agent { label "test-multinode103" }
+                    steps { 
+                        script {
+                            lib.cleanNode()
+                        }
+                    }
+                }
+                stage('Clean test-multinode104') {
+                agent { label "test-multinode104" }
+                    steps { 
+                        script {
+                            lib.cleanNode()
+                        }
+                    }
+                }
+                stage('Clean additional-node301') {
+                agent { label "test-multinode301" }
+                    steps { 
+                        script {
+                            lib.cleanNode()
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Upgrade w/ node chain data - Deploy SGS boot') {    
+            // agent { label "test-multinode101" } // is default
+            steps { 
+                script {
+                    rootNodeAddress = lib.deployStratoWithApp(null, NODE_DATA.NODE1, 'beanstalk', true) 
+                }
+            }            
+        }
+
+        stage('Upgrade w/ node chain data - Launch other nodes') {
+            parallel {
+                stage('Deploy SGS multinode102') {
+                    agent { label "test-multinode102" }
+                    steps {
+                        script {
+                            node2Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE2, 'beanstalk', true)
+                        }
+                    }
+                }
+                stage('Deploy SGS multinode103') {
+                    agent { label "test-multinode103" }
+                    steps {
+                        script {
+                            node3Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE3, 'beanstalk', true)
+                        }
+                    }
+                }
+                stage('Deploy SGS multinode104') {
+                    agent { label "test-multinode104" }
+                    steps {
+                        script {
+                            node4Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE4, 'beanstalk', true)
+                        }
+                    }
+                }
+            }
+        }
+
+        stage ('Upgrade w/ node chain data -  Vote in secondary nodes') {
+            // agent { label "multinode101" } // is default
+            steps {
+                dir('strato-getting-started') {
+                    script{
+                        sh "sudo ./strato.sh --blockstanbul-vote --recipient=${node2Address} --nonce=100 --nodes=${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT} --https"
+                        sleep(time:10,unit:"SECONDS")
+                        sh "sudo ./strato.sh --blockstanbul-vote --recipient=${node3Address} --nonce=150 --nodes=${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT},${NODE_DATA.NODE2.HOST}:${NODE_DATA.NODE2.PORT} --https"
+                        sleep(time:10,unit:"SECONDS")
+                        sh "sudo ./strato.sh --blockstanbul-vote --recipient=${node4Address} --nonce=200 --nodes=${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT},${NODE_DATA.NODE2.HOST}:${NODE_DATA.NODE2.PORT},${NODE_DATA.NODE3.HOST}:${NODE_DATA.NODE3.PORT} --https"
+                        sleep(time:10,unit:"SECONDS")
+                        sh '''
+                        set -x
+                        counter=0
+                        until [ "$counter" -eq "4" ]
+                        do
+                            voteList=$(sudo docker exec -i strato_strato_1 bash -c "tail -n 100 logs/strato-sequencer | grep showctx/validators | tail -n 1 | cut -d '|' -f 4 ")
+                            counter=$(echo "$voteList" | jq ". | length")
+                            echo $counter
+                        done
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage ('Upgrade w/ node chain data - Run traceharvest app on bootnode') {
+            // agent { label "multinode101" } // is default
+            steps {
+                script {
+                    lib.runAppBootNode(NODE_DATA.NODE1, true, null, null, 'traceharvest')
+                }
+            }
+        }
+
+        stage ('Upgrade w/ node chain data - Create Private Chains') {
+            // agent { label "multinode101" } // is default
+            steps {
+                script {
+                    sh "createChains=$(sudo docker exec beanstalk_backend_1 npm run deploy:csv)"
+                    sh "export -f createChains"
+                    sh "timeout 60s bash -c createChains"
+                }
+            }
+        }
+
+        stage ('Upgrade w/ node chain data - Check the number of chains') {
+            // agent { label "multinode101" } // is default
+            steps {
+                script {
+                    def numOfPrivChains = sh(
+                        returnStdout: true,
+                        script: "sudo docker exec strato_postgres_1 psql -U postgres -d `sudo docker exec strato_postgres_1 psql -U postgres -t -c \"select datname from pg_database where datname like '%eth_%';\" | tr -d \"[:space:]\"` -c \"with m as (select chain_info_id, substring(name from position('@' in name)) as node_name from chain_member_ref), n as (select chain_info_id, node_name from m group by (chain_info_id, node_name)), o as (select chain_info_id, count(*) from n group by chain_info_id) select i.chain_id from chain_info_ref i inner join o on i.id = o.chain_info_id where o.count = 1;\""
+                    ).trim()
+                    // TO DO: Write if statement to check the numOfPrivChains is greater than 0
+                    // TO DO: After the check, grab the chain ID for one of the private chains.
+                }
+            }
+        }
+
+        stage('Upgrade w/ node chain data - Deploy SGS multinode301') {
+            agent { label "test-multinode301" }
+            steps {
+                script {
+                    lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE5, 'beanstalk', false)
+                }
+            }
+        }
+
+        stage('Upgrade w/ node chain data - Add new node to private chain') {
+            agent { label "test-multinode101" }
+            steps {
+                script {
+                    def accessToken = sh(
+                        returnStdout: true,
+                        script: "curl -s -X POST 'https://keycloak.blockapps.net/auth/realms/traceharvest-demo-tech/protocol/openid-connect/token' -H 'Content-Type: application/x-www-form-urlencoded' -H 'Authorization: Basic dGhkZW1vLXRlY2g6ZjY3Y2I0MWMtMGFjMC00N2FjLWE1OWYtMmFkZWQxN2IwMzI1' --data-urlencode 'grant_type=password' --data-urlencode 'username=tech1' --data-urlencode 'password=123'"
+                    ).trim()
+
+                    sh "curl -X POST -H \"Authorization: Bearer ${accessToken}\" -H \"Accept: application/json\" \"https://multinode101.ci.blockapps.net:8080/strato/v2.3/key\""
+                }
+            }
+        }
+
+        /* DEVNET SYNC TESTS */
         stage ('Single Node Sync with Devnet - Clean Node') {
              // agent { label "multinode101" } // is default
             steps { 
@@ -857,16 +1024,16 @@ pipeline {
                     script {
                         sh "rm -rf monitor"
                         sh "git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/monitor/"
-                        lib.runMonitor()
+                        lib.runMonitor(NODE_DATA.NODE1)
                     }
                 }
             }
         }
 
-        stage('Single Node Sync with Devnet - Wait For Single Node to Sync') {
+        stage('Single Node Sync with Devnet - Wait for Healthy Network') {
             steps {
                 script {
-                    lib.waitForHealthySync(NODE_DATA.MONITOR)
+                    lib.waitForHealthySync(NODE_DATA.LOAD_TEST_HEALTH_URL)
                 }
             }
         }
