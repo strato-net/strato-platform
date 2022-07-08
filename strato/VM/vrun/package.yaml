@@ -22,9 +22,12 @@ dependencies:
 - blockapps-mpdbs
 - bytestring
 - common-log
+- containers
+- format
 - hflags
 - merkle-patricia-db
 - prometheus-client
+- solid-vm
 - strato-model
 - seqevents
 - time

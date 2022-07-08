@@ -6,21 +6,24 @@
 module Main where
 
 import qualified Data.ByteString                             as B
-import qualified Data.ByteString.Lazy                        as BL
+--import qualified Data.ByteString.Lazy                        as BL
+import qualified Data.Map                                    as M
 import           Data.Maybe
 import           Data.Time.Clock.POSIX
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Except
 import           HFlags
-import           Prometheus
+--import           Prometheus
 
 import           BlockApps.Logging
+import           Blockchain.Bagger.Transactions
 import           Blockchain.BlockChain
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.DataDefs
+--import           Blockchain.Data.ExecResults
 import           Blockchain.Data.Transaction
 import qualified Blockchain.Data.TXOrigin                    as TO
-import qualified Blockchain.Database.MerklePatricia      as MP
+import qualified Blockchain.Database.MerklePatricia          as MP
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.StateDB
 import           Blockchain.Sequencer.Event
@@ -33,9 +36,20 @@ import           Blockchain.VMContext
 import           Blockchain.VMOptions       ()
 import           Executable.EVMFlags        ()
 
+import qualified Blockchain.SolidVM as SolidVM
+
+import           Text.Format
+
+isSVM :: Bool
+isSVM = True
+
 main :: IO ()
 main = do
-  _ <- $initHFlags "The Ethereum Test program"
+  args <- $initHFlags "The Ethereum Test program"
+
+  let filename = case args of
+                   [v] -> v
+                   _ -> error "you need to supply one filename"
 
   let secretKey = fromJust . importPrivateKey $ B.pack [0,0,0,0,0,0,0,0,
                                                         0,0,0,0,0,0,0,0,
@@ -93,16 +107,34 @@ main = do
         addressStateChainId=Nothing
       }
 
-    runExceptT $ addTransaction Nothing True blockData 10000000000000000000000000000 signedTransaction
+    if isSVM
+      then do
+      codeString <- liftIO $ B.readFile filename
+      fmap Right $
+        SolidVM.create
+                (error "undefined: isRunningTests'")
+                (error "undefined: isHomestead")
+                (error "undefined: preExistingSuicideList")
+                blockData
+                (error "undefined: callDepth")
+                (Account (Address 0) Nothing) -- sender
+                (Account (Address 0) Nothing) -- origin
+                (error "undefined: value")
+                (error "undefined: gasPrice")
+                (error "undefined: availableGas")
+                (Account (Address 0) Nothing) -- newAddress
+                (Code codeString) -- code
+                emptyHash -- txHash
+                Nothing -- chainId
+                (Just $ M.fromList [("name", "fred")]) -- medadata
+      else runExceptT $ addTransaction Nothing True blockData 10000000000000000000000000000 signedTransaction
 
   case result of
-    Left e -> putStrLn $ show e
-    Right r -> putStrLn $ "vrun: " ++ show r
-  BL.putStr =<< exportMetricsAsText
+    Left e -> putStrLn $ show (e::TransactionFailureCause)
+    Right r -> putStrLn $ "\n===============================================\n" ++ format r
+
+--  BL.putStr =<< exportMetricsAsText
 
 
 txToOutputTx :: Transaction -> OutputTx
 txToOutputTx = fromJust . wrapTransactionUnanchored . IngestTx TO.Direct
-
-
-
