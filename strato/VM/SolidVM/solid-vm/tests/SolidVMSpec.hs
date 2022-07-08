@@ -4394,3 +4394,44 @@ contract qq {
   }
 }|]
     getFields ["x"] `shouldReturn` [BInteger 5]
+
+
+  it "can use a modifier  that takes arguments as part of a function" . runTest $ do
+    runCall "a" "()" [r|
+pragma solidvm 3.2;
+contract qq {
+  uint x = 3;
+  modifier myModifier(uint _x) {  
+    require(_x == 3 , string.concat('x is not 3 : ', string(_x)));
+    x = 4;
+    _;
+    require(x == 5 , 'x is not 5');
+  }
+
+  function a() public myModifier(3) {
+    x = 5;
+    return;
+  }
+}|] `shouldReturn` Nothing
+
+{-
+
+  it "can use a modifier that takes in arguments" . runTest $ do
+    runBS [r|
+contract qq {
+  uint x = 3;
+  modifier myModifier(uint _x) {  
+    require(_x == 3 , string.concat('x is not 3 : ', string(_x)));
+    x = 4;
+    _;
+    require(x == 5 , 'x is not 5');
+  }
+
+  constructor() public myModifier(3) {
+    x = 5;
+    return;
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 5]
+
+-}

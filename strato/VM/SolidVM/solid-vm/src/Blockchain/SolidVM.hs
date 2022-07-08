@@ -567,9 +567,8 @@ logFunctionCall args address contract functionName f = do
 
 
 
-{-
-argsToValsMods :: MonadSM m => CC.Contract -> CC.Func -> CC.ArgList -> m ValList
-argsToValsMods ctract mod args = 
+argsToValsModifiers :: MonadSM m => CC.Contract -> CC.Modifier -> CC.ArgList -> m ValList
+argsToValsModifiers ctract md args = 
   if CC._vmVersion ctract == "svm3.2" 
     then 
       case args of
@@ -577,7 +576,7 @@ argsToValsMods ctract mod args =
           when (length xs /= length orderedTypes) $ invalidArguments "arity mismatch" (xs, orderedTypes)
           OrderedVals <$> zipWithM eval32 orderedTypes xs
         CC.NamedArgs xs -> NamedVals . M.toList <$> do
-          let strTypes = M.mapKeys (fromMaybe "") $ M.fromList $ CC.funcArgs fn
+          let strTypes = M.mapKeys (T.unpack) $ CC.modifierArgs md
           M.mergeA (M.mapMissing $ curry $ invalidArguments "missing argument")
                   (M.mapMissing $ curry $ invalidArguments "extra argument")
                   (M.zipWithAMatched $ \_k t x -> eval32 (CC.indexedTypeType t) x)
@@ -589,7 +588,7 @@ argsToValsMods ctract mod args =
           when (length xs /= length orderedTypes) $ invalidArguments "arity mismatch" (xs, orderedTypes)
           OrderedVals <$> zipWithM eval orderedTypes xs
         CC.NamedArgs xs -> NamedVals . M.toList <$> do
-          let strTypes = M.mapKeys (fromMaybe "") $ M.fromList $ CC.funcArgs fn
+          let strTypes = M.mapKeys (T.unpack) $ CC.modifierArgs md
           M.mergeA (M.mapMissing $ curry $ invalidArguments "missing argument")
                   (M.mapMissing $ curry $ invalidArguments "extra argument")
                   (M.zipWithAMatched $ \_k t x -> eval (CC.indexedTypeType t) x)
@@ -598,7 +597,7 @@ argsToValsMods ctract mod args =
 
   where orderedTypes :: [SVMType.Type]
         orderedTypes = map CC.indexedTypeType
-                     . map snd $ CC.funcArgs fn
+                     . map snd $ M.toList $ CC.modifierArgs md
 
         eval :: MonadSM m => SVMType.Type -> CC.Expression -> m Value
         eval t x = case x of
@@ -652,22 +651,6 @@ argsToValsMods ctract mod args =
                                   Left err -> typeError (show err) (k, t)
               _ -> typeError "Object Literal for non-object like argument type" (t, x)
             _                               -> getVar =<< expToVar x
-
-
-
-
-
--}
-
-
-
-
-
-
-
-
-
-
 
 argsToVals :: MonadSM m => CC.Contract -> CC.Func -> CC.ArgList -> m ValList
 argsToVals ctract fn args = 
@@ -1722,6 +1705,7 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.Array {SVMType.entry=t
 expToVar' x@(CC.FunctionCall _ (CC.NewExpression _ (SVMType.Array{})) CC.NamedArgs{}) =
   typeError "cannot create new array with named arguments" x
 
+
 expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractName')) args) = do
   ro <- readOnly <$> getCurrentCallInfo
   when ro $ invalidWrite "Invalid contract creation during read-only access" $ "contractName: " ++ show contractName' ++ ", args: " ++ show args
@@ -2453,16 +2437,19 @@ runTheConstructors from to hsh cc contractName' argExps = do
       Just theFunction -> do
         --argVals <- forM argExps evaluate
         --_ <- call' address contract' theFunction argVals
-        let theModifierNames = fromMaybe [] (CC.funcModifiers theFunction) 
-        theModifiers <- forM theModifierNames $ \name -> do
+        let theModifierNames =  map fst $ (CC.funcModifiers theFunction) 
+        !theModifiers' <- forM theModifierNames $ \name -> do
           case M.lookup name (contract'^.CC.modifiers) of
             Just theModifier -> do
               --args' <- argsToVals contract' theModifier argExps
-              return theModifier
-            Nothing -> missingField "modifier not found" name
+              return $ Just theModifier
+            Nothing -> do
+              if name `elem` contract'^.CC.parents then return Nothing else (missingField "modifier not found" name)
+        let theModifiers = catMaybes theModifiers'
         !commands <- case CC.funcContents theFunction of
           Nothing -> missingField "contract constructor has been declared but not defined" contractName'
           Just cms -> pure cms
+       -- let modifierArgs = map CC.modifierArgs theModifiers
         let !modContentsList = map (\m -> fromMaybe (missingField "Function call: Modifier has been declared but not defined" m) (CC.modifierContents m)) theModifiers
         let isNotModExec = \case
               CC.ModifierExecutor _ -> False
@@ -2510,7 +2497,45 @@ runTheCall :: MonadSM m
            -> m (Maybe Value)
 runTheCall address' contract' funcName hsh cc theFunction argVals ro = do
   let returns = [(n, (t, defaultValue contract' t)) | (Just n, CC.IndexedType _ t) <- CC.funcVals theFunction]
-      args = case argVals of
+      theModifierNames = map fst $ (CC.funcModifiers theFunction) 
+     
+  theModifiers <- forM theModifierNames $ \name -> do
+    case M.lookup name (contract'^.CC.modifiers) of
+      Just theModifier -> do
+        return theModifier
+      Nothing -> missingField "modifier not found" name
+
+-- 
+
+
+
+--  let matchTheArgValues :: (SolidString, [(ExpressionF a)]) -> [Modifier] -> (Modifer, [Value])
+
+
+  matchedArgvals <- forM theModifiers $ \modi -> do
+    let margList = CC.OrderedArgs 
+            . fromMaybe []
+            $ M.lookup (T.unpack (CC.modifierSelector modi)) $ M.fromList $ CC.funcModifiers theFunction
+    margVals <- argsToValsModifiers contract' modi margList
+    case margVals of
+      OrderedVals vs -> do
+        let argMeta = map (\(n, CC.IndexedType _ t) -> (n, t)) $ M.toList $ CC.modifierArgs modi
+        return (zipWith (\(n, t) v -> (n, (t, v))) argMeta vs)
+      NamedVals ns -> do
+        let strTypes = M.fromList $ map (\(theName, y) -> (theName, y)) $ M.toList $ CC.modifierArgs modi
+            typeAndVal = M.merge (M.mapMissing (curry $ invalidArguments "missing argument"))
+                                 (M.mapMissing (curry $ invalidArguments "extra argument"))
+                                 (M.zipWithMatched $ \_k t v -> (t, v))
+                                 strTypes
+                                 $ M.mapKeys T.pack $ M.fromList ns
+            -- These probably don't need to be sorted by argument index, as they are turned into a map
+            -- when added to the call info.
+            sortedArgs = map snd . sortWith fst
+                      . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
+                      $ M.toList typeAndVal
+        return sortedArgs
+
+  let args = case argVals of
         OrderedVals vs -> let argMeta = 
                                 map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t))
                                 $ CC.funcArgs theFunction
@@ -2528,27 +2553,8 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro = do
                          . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
                          $ M.toList typeAndVal
           in sortedArgs
-      locals = args ++ returns
-      theModifierNames = fromMaybe [] (CC.funcModifiers theFunction) 
 
-{-
-data ModifierF a = Modifier
-  { modifierArgs     :: Map Text SolidVM.IndexedType
-  , modifierSelector :: Text
-  , modifierVals     :: Map Text SolidVM.IndexedType
-  , modifierContents :: Maybe Text
-  , modifierContext  :: a
-  } deriving (Eq,Show,Generic, Functor)
-
--}
-
-  theModifiers <- forM theModifierNames $ \name -> do
-    case M.lookup name (contract'^.CC.modifiers) of
-      Just theModifier -> do
-        
-        --args' <- argsToVals contract' theModifier argExps
-        return theModifier
-      Nothing -> missingField "modifier not found" name
+      locals = args ++ returns ++ (map (\(x,y) -> (T.unpack x, y)) (concat matchedArgvals)) --modArgsToBeLocals
 
   onTraced $ do
     liftIO $ putStrLn $ "            args: " ++ show (map fst args)
