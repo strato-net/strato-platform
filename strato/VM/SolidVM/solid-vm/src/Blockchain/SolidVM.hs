@@ -157,11 +157,10 @@ onTracedSM cntrct m = do
                     ++ labelToString (CC._contractName cntrct) ++ " uses "  ++ (show (CC._vmVersion cntrct))
 
 withSrcPos :: MonadIO m => SourceAnnotation () -> String -> m ()
-withSrcPos pos str = liftIO . putStrLn $ concat
-  [ show $ _sourceAnnotationStart pos
-  , ": "
-  , str
-  ]
+withSrcPos pos str = do
+  let start = _sourceAnnotationStart pos
+      filename = start^.sourcePositionName
+  liftIO . putStrLn $ "[" ++ (if null filename then "" else filename ++ ":") ++ show (start^.sourcePositionLine) ++ "," ++ show (start^.sourcePositionColumn) ++ "]:" ++ str
 
 -- TODO: I'm putting all of these instances related to debugging here,
 --       but they should really go in SM.hs
