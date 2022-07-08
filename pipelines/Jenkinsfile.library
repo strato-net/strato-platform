@@ -486,7 +486,7 @@ def approveAllMemberships() {
   }
 }
 
-def runMonitor(nodeData) {
+def runMonitor(nodeData, upgrade8Nodes) {
   withCredentials([
       usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME'),
   ]) {
@@ -503,37 +503,158 @@ def runMonitor(nodeData) {
         docker-compose up -d"""
     writeFile file:"run.sh", text: """${runCommand}"""
 
-    def initialNodes = """
-        module.exports = [
-          {
-            ip: '54.243.143.176:8080',
-            host: 'engineering.stratoid.blockapps.net:8080',
-            protocol: 'https',
-            internal: true,
-            description: 'devnet-node1',
-            oAuthInfo: {
-              enabled: true,
-              discovery_url: 'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
-              client_id: 'dev',
-              client_secret: 'd5e67b8c-4fbf-42c6-a8d9-29a4dd13575f'
-              //scope: 'optional'
+
+    if(upgrade8Nodes=='upgrade8Nodes') {
+      def initialNodes = """
+          module.exports = [
+            {
+              ip: '3.81.197.53:8080',
+              host: 'multinode101.ci.blockapps.net:8080',
+              protocol: 'https',
+              internal: true,
+              description: 'multinode101',
+              oAuthInfo: {
+                enabled: true,
+                discovery_url: 'https://keycloak.blockapps.net/auth/realms/beanstalk/.well-known/openid-configuration',
+                client_id: 'beanstalk-internal-nodes',
+                client_secret: '5b9130e0-01c7-4c8c-b281-882e143a244b'
+                //scope: 'optional'
+              }
+            },
+            {
+              ip: '18.235.213.241:8080',
+              host: 'multinode102.ci.blockapps.net:8080',
+              protocol: 'https',
+              internal: true,
+              description: 'multinode102',
+              oAuthInfo: {
+                enabled: true,
+                discovery_url: 'https://keycloak.blockapps.net/auth/realms/beanstalk/.well-known/openid-configuration',
+                client_id: 'beanstalk-internal-nodes',
+                client_secret: '5b9130e0-01c7-4c8c-b281-882e143a244b'
+                //scope: 'optional'
+              }
+            },
+            {
+              ip: '3.209.126.162:8080',
+              host: 'multinode103.ci.blockapps.net:8080',
+              protocol: 'https',
+              internal: true,
+              description: 'multinode103',
+              oAuthInfo: {
+                enabled: true,
+                discovery_url: 'https://keycloak.blockapps.net/auth/realms/beanstalk/.well-known/openid-configuration',
+                client_id: 'beanstalk-internal-nodes',
+                client_secret: '5b9130e0-01c7-4c8c-b281-882e143a244b'
+                //scope: 'optional'
+              }
+            },
+            {
+              ip: '34.237.166.201:8080',
+              host: 'multinode104.ci.blockapps.net:8080',
+              protocol: 'https',
+              internal: true,
+              description: 'multinode104',
+              oAuthInfo: {
+                enabled: true,
+                discovery_url: 'https://keycloak.blockapps.net/auth/realms/beanstalk/.well-known/openid-configuration',
+                client_id: 'beanstalk-internal-nodes',
+                client_secret: '5b9130e0-01c7-4c8c-b281-882e143a244b'
+                //scope: 'optional'
+              }
+            },
+            {
+              ip: '3.95.216.65:8080',
+              host: 'multinode301.ci.blockapps.net:8080',
+              protocol: 'https',
+              internal: true,
+              description: 'multinode301',
+              oAuthInfo: {
+                enabled: true,
+                discovery_url: 'https://keycloak.blockapps.net/auth/realms/beanstalk/.well-known/openid-configuration',
+                client_id: 'beanstalk-internal-nodes',
+                client_secret: '5b9130e0-01c7-4c8c-b281-882e143a244b'
+                //scope: 'optional'
+              }
+            },
+            {
+              ip: '54.226.159.165:8080',
+              host: 'multinode302.ci.blockapps.net:8080',
+              protocol: 'https',
+              internal: true,
+              description: 'multinode302',
+              oAuthInfo: {
+                enabled: true,
+                discovery_url: 'https://keycloak.blockapps.net/auth/realms/beanstalk/.well-known/openid-configuration',
+                client_id: 'beanstalk-internal-nodes',
+                client_secret: '5b9130e0-01c7-4c8c-b281-882e143a244b'
+                //scope: 'optional'
+              }
+            },
+            {
+              ip: '52.23.161.240:8080',
+              host: 'multinode303.ci.blockapps.net:8080',
+              protocol: 'https',
+              internal: true,
+              description: 'multinode303',
+              oAuthInfo: {
+                enabled: true,
+                discovery_url: 'https://keycloak.blockapps.net/auth/realms/beanstalk/.well-known/openid-configuration',
+                client_id: 'beanstalk-internal-nodes',
+                client_secret: '5b9130e0-01c7-4c8c-b281-882e143a244b'
+                //scope: 'optional'
+              }
+            },
+            {
+              ip: '18.213.3.139:8080',
+              host: 'multinode304.ci.blockapps.net:8080',
+              protocol: 'https',
+              internal: true,
+              description: 'multinode304',
+              oAuthInfo: {
+                enabled: true,
+                discovery_url: 'https://keycloak.blockapps.net/auth/realms/beanstalk/.well-known/openid-configuration',
+                client_id: 'beanstalk-internal-nodes',
+                client_secret: '5b9130e0-01c7-4c8c-b281-882e143a244b'
+                //scope: 'optional'
+              }
             }
-          },
-          {
-            ip: '${nodeData.IP}:${nodeData.PORT}',
-            host: '${nodeData.HOST}:${nodeData.PORT}',
-            protocol: 'https',
-            internal: true,
-            description: '${nodeData.HOST}',
-            oAuthInfo: {
-              enabled: true,
-              discovery_url: '${nodeData.OAUTH_DISCOVERY_URL}',
-              client_id: '${nodeData.OAUTH_CLIENT_ID}',
-              client_secret: '${nodeData.OAUTH_CLIENT_SECRET}'
-              //scope: 'optional'
+          ];"""     
+
+    } else {
+      def initialNodes = """
+          module.exports = [
+            {
+              ip: '54.243.143.176:8080',
+              host: 'engineering.stratoid.blockapps.net:8080',
+              protocol: 'https',
+              internal: true,
+              description: 'devnet-node1',
+              oAuthInfo: {
+                enabled: true,
+                discovery_url: 'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
+                client_id: 'dev',
+                client_secret: 'd5e67b8c-4fbf-42c6-a8d9-29a4dd13575f'
+                //scope: 'optional'
+              }
+            },
+            {
+              ip: '${nodeData.IP}:${nodeData.PORT}',
+              host: '${nodeData.HOST}:${nodeData.PORT}',
+              protocol: 'https',
+              internal: true,
+              description: '${nodeData.HOST}',
+              oAuthInfo: {
+                enabled: true,
+                discovery_url: '${nodeData.OAUTH_DISCOVERY_URL}',
+                client_id: '${nodeData.OAUTH_CLIENT_ID}',
+                client_secret: '${nodeData.OAUTH_CLIENT_SECRET}'
+                //scope: 'optional'
+              }
             }
-          }
-        ];"""
+          ];"""
+
+    }
     writeFile file:"backend/config/initial-nodes.js", text: """${initialNodes}"""
 
     sh "cp ~/letsencrypt-ssl/server.pem ssl/certs/"
