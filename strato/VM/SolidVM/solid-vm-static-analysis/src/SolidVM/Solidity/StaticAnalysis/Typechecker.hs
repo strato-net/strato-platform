@@ -24,6 +24,7 @@ import           Data.Text       (Text)
 import qualified Data.Text       as T
 import           Data.Traversable (for)
 import           SolidVM.Model.CodeCollection
+import qualified SolidVM.Model.CodeCollection.Contract as Con
 import           SolidVM.Solidity.StaticAnalysis.Types
 import           SolidVM.Model.SolidString
 import           SolidVM.Model.Type (Type)
@@ -587,15 +588,25 @@ typecheckMember (Static (SVMType.UnknownLabel c) x) n = do
 typecheckMember x n = pure . bottom $ ("Unknown member: " <> showType' x <> "." <> labelToText n) <$ context' x
 
 getConstructorType' :: MonadReader R m => SourceAnnotation Text -> SolidString -> m Type'
-getConstructorType' x l = do
+getConstructorType' x l  = do
   ~CodeCollection{..} <- asks codeCollection
   case M.lookup l _contracts of
-    Nothing -> pure . bottom $ ("Unknown contract: " <> labelToText l) <$ x
+    Nothing -> do
+      --look through all the contracts get the _modifiers maps and check to see if l is a key in there
+      
+      let allModifierMap =  M.unions $ map ((Con._modifiers) . snd) (M.toList _contracts)
+      case M.lookup l allModifierMap of
+        Nothing -> pure . bottom $ ("Unknown Contract or Modifier: " <> labelToText l) <$ x
+        Just _ -> pure $ Top (S.singleton l) x
+
     Just c -> case _constructor c of
       Nothing -> pure $ Function (Product [] x) (Static (SVMType.Contract l) x) x
       Just Func{..} ->
         let fArgs = flip Product x $ flip Static x . indexedTypeType . snd <$> funcArgs
          in pure $ Function fArgs (Static (SVMType.Contract l) x) x
+
+
+
 
 getTypeErrors :: Type' -> [SourceAnnotation Text]
 getTypeErrors (Bottom ts) = NE.toList ts
@@ -681,7 +692,7 @@ statementsHelper args ss = do
       let x = funcContext f
       ~(ts', s) <- flip runStateT ((Nothing, args) :| []) $ do
         cCalls <- for (M.assocs $ funcConstructorCalls f) $ \(cName, exprs) -> do
-          let constructorArgs = getConstructorType' x cName
+          let constructorArgs = getConstructorType' x cName 
               givenArgs = flip Product x <$> traverse tcExpr exprs
               givenFunc = (\t-> Function t (Static (SVMType.Contract cName) x) x) <$> givenArgs
           constructorArgs <~> givenFunc

@@ -131,7 +131,7 @@ solidityDeclaration =
                 , ("int x = 0;", DummyDeclaration)
                 , ("function a() public myModifier returns (bool) {\nx = 5;\nreturn true;\n}" , DummyDeclaration)
                 , ("constructor() public returns (bool) {\nreturn true;\n}" , DummyDeclaration)
-                , ("contract qq {\nuint x;\nmodifier myModifier() {\n require(false, 'bigTest');\n\n}\nconstructor() myModifier public returns (bool) {\nx = 5;\nreturn true;\n}\n}", DummyDeclaration)
+                , ("contract qq {\nuint x;\nmodifier myModifier() {\n require(false, 'bigTest');\n\n}\nconstructor() myModifier(3) public returns (bool) {\nx = 5;\nreturn true;\n}\n}", DummyDeclaration)
                 , ("modifier myModifier() {\n require(false, 'bigTest');\n_;\n}", DummyDeclaration)
                 ]
     forM_ cases $ \(input, want) -> do
@@ -140,13 +140,12 @@ solidityDeclaration =
 
 --function a() public myModifier returns (bool) {
 
-
-
+--(NamedXabi "qq" (Xabi {xabiFuncs = fromList [("theFUNCTIONISHERE",Func {funcArgs = [], funcVals = [(Nothing,IndexedType {indexedTypeIndex = 0, indexedTypeType = Bool})], funcStateMutability = Nothing, funcContents = Just [SimpleStatement (ExpressionStatement (Binary (line 7, column 7) - (line 7, column 9): ()  "=" (Variable (line 7, column 5) - (line 7, column 7): ()  "x") (NumberLiteral (line 7, column 9) - (line 7, column 10): ()  5 Nothing))) (line 7, column 5) - (line 7, column 10): () ,Return (Just (BoolLiteral (line 8, column 12) - (line 8, column 16): ()  True)) (line 8, column 5) - (line 8, column 16): () ], funcVisibility = Just Public, funcConstructorCalls = fromList [("myModifier",[])], funcModifiers = fromList [("myModifier",[])], funcContext = (line 6, column 3) - (line 6, column 65): () })], xabiConstr = fromList [], xabiVars = fromList [("x",VariableDecl {varType = Int {signed = Just False, bytes = Nothing}, varIsPublic = False, varInitialVal = Nothing, varContext = (line 2, column 3) - (line 2, column 9): () })], xabiConstants = fromList [], xabiTypes = fromList [], xabiModifiers = fromList [("myModifier",Modifier {modifierArgs = fromList [], modifierSelector = "myModifier", modifierVals = fromList [], modifierContents = Just [SimpleStatement (ExpressionStatement (FunctionCall (line 4, column 14) - (line 4, column 32): ()  (Variable (line 4, column 7) - (line 4, column 14): ()  "require") (OrderedArgs [BoolLiteral (line 4, column 15) - (line 4, column 20): ()  False,StringLiteral (line 4, column 22) - (line 4, column 31): ()  "bigTest"]))) (line 4, column 7) - (line 4, column 32): () ], modifierExecutor = True, modifierContext = (line 3, column 3) - (line 6, column 3): () })], xabiEvents = fromList [], xabiKind = ContractKind, xabiUsing = fromList [], xabiContext = (line 1, column 1) - (line 1, column 13): () },[]))
 
 
   describe "Contract Parsing" $ do
     let parseContract = runParser solidityContract "" ""
-        cases = [ ("contract qq {\n  uint x;\n  modifier myModifier() {\n      require(false, 'bigTest');\n  }\n  function theFUNCTIONISHERE() public myModifier returns (bool) {\n    x = 5;\n    return true;\n  }\n}" , DummySourceUnit)
+        cases = [ ("contract qq {\n  uint x = 3;\n  modifier myModifier(uint _x) {\n      require(_x == 3 , string.concat('x is not 3 : ', string(_x)));\n    x = 4;    _;\n    require(x == 5 , 'x is not 5');\n  }\n\n  constructor() public myModifier(3) {\n    x = 5;\n    return;\n  }\n}\n" , DummySourceUnit)
                 --, ("contract qq {\n  uint x;\n  modifier myModifier() {\n      require(false, 'bigTest');\n  }\n  function a() public myModifier() returns (bool) {\n    x = 5;\n    return true;\n  }\n}" , DummySourceUnit)
                 ]
     forM_ cases $ \(input, want) -> do

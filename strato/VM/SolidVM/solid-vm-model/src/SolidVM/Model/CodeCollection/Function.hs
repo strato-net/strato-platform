@@ -80,7 +80,7 @@ data FuncF a = Func
   , funcContents :: Maybe [StatementF a]
   , funcVisibility :: Maybe Visibility
   , funcConstructorCalls :: Map SolidString [(ExpressionF a)]
-  , funcModifiers :: Maybe [String]
+  , funcModifiers :: [(SolidString, [(ExpressionF a)])]
   , funcContext :: a
   } deriving (Eq,Show,Generic, Functor)
 

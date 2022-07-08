@@ -268,7 +268,7 @@ functionXabi :: SolidityParser SolidVM.Func
 functionXabi = do
   start <- getSourcePosition
   functionArgs <- tupleDeclaration
-  (functionRet, visibility, mutability, constructorCalls, modifiers) <- functionModifiers
+  (functionRet, visibility, mutability, funcConstructorCallsOrModifiers) <- functionModifiers
   end <- getSourcePosition
   contents <- Just <$> statements <|> (reservedOp ";" >> return Nothing)
   let nameUnnamed (name,ty) = if Text.null name then (Nothing, ty) else (Just name,ty)
@@ -281,8 +281,8 @@ functionXabi = do
       , SolidVM.funcContents = contents
       , SolidVM.funcVisibility = Just visibility
       , SolidVM.funcStateMutability = mutability
-      , SolidVM.funcConstructorCalls = Map.fromList constructorCalls
-      , SolidVM.funcModifiers = Just modifiers
+      , SolidVM.funcConstructorCalls = Map.fromList funcConstructorCallsOrModifiers
+      , SolidVM.funcModifiers = funcConstructorCallsOrModifiers
       , SolidVM.funcContext = ctx
       }
 
@@ -336,7 +336,7 @@ modifierDeclaration = do
              zipWith (\x i -> fmap (SolidVM.IndexedType i) (nameUnnamed x i)) args [0..]
       , Xabi.modifierSelector = Text.pack name -- ? -- undefined -- :: Text
       , Xabi.modifierVals = Map.fromList [] -- undefined -- :: Map Text SolidVM.IndexedType
-      , Xabi.modifierContents = contents
+      , Xabi.modifierContents = contents -- :: Maybe [Statement]
       , Xabi.modifierExecutor = True
       , Xabi.modifierContext = ctx
 --        objName = name,
@@ -377,25 +377,25 @@ tupleDeclaration = parens $ commaSep $ do
 data FuncModifiers = ReturnsMod [(Text, SVMType.Type)]
                    | VisibilityMod SolidVM.Visibility
                    | MutabilityMod SolidVM.StateMutability
-                   | ConstructorCallMod (SolidString, [SolidVM.Expression])
-                   | OtherMod String
+                   | ConstructorCallModsOrOtherMod (SolidString, [SolidVM.Expression])
+--                   | OtherMod String
 
-functionModifiers :: SolidityParser ([(Text, SVMType.Type)], SolidVM.Visibility, Maybe SolidVM.StateMutability, [(SolidString, [SolidVM.Expression])], [String])
+functionModifiers :: SolidityParser ([(Text, SVMType.Type)], SolidVM.Visibility, Maybe SolidVM.StateMutability, [(SolidString, [SolidVM.Expression])])
 functionModifiers = do
   vals <- many $ (ReturnsMod <$> returnModifier)
              <|>  (VisibilityMod <$> visibilityModifier)
              <|>  (MutabilityMod <$> mutabilityModifier)
-             <|>  (try (ConstructorCallMod <$> constructorCallModifiers))
-             <|>  (OtherMod <$> otherModifiers)-- (lookAhead (reserved "{"))
+             <|>  (ConstructorCallModsOrOtherMod <$> constructorCallModifiersOrOtherModifiers)
+--             <|>  (OtherMod <$> otherModifiers)-- (lookAhead (reserved "{"))
   return $ formatVals vals
   where
     formatVals vals =
       let returns = concat [v | ReturnsMod v <- vals]
           visibility = fromMaybe SolidVM.Public $ listToMaybe [v | VisibilityMod v <- vals]
           mutability = listToMaybe [v | MutabilityMod v <- vals]
-          otherMods = [v | OtherMod v <- vals]
-          constructorCallMods = [v | ConstructorCallMod v <- vals]
-      in (returns, visibility, mutability, constructorCallMods, otherMods)
+      --    otherMods = [v | OtherMod v <- vals]
+          constructorCallModsOrOtherMods = [v | ConstructorCallModsOrOtherMod v <- vals]
+      in (returns, visibility, mutability, constructorCallModsOrOtherMods)
     returnModifier =
       reserved "returns" >> tupleDeclaration
     visibilityModifier =
@@ -411,16 +411,24 @@ functionModifiers = do
       <|> (reserved "view"     >> return SolidVM.View)
       <|> (reserved "payable"  >> return SolidVM.Payable)
       )
-    constructorCallModifiers = do 
+    constructorCallModifiersOrOtherModifiers = do 
       name <- stringToLabel <$> identifier
-      exps <- parens $ commaSep expression
-      return (name, exps) 
+      exps <- optionMaybe (parens $ commaSep expression)
+      return (name, fromMaybe [] exps) 
+    {-
     otherModifiers = do
       name <- stringToLabel <$> identifier
       --args <- optionMaybe parensCode
       return $ name -- ++ maybe "" (\s -> "(" ++ s ++ ")") args
-
+    -}
 -- | A common pattern: code enclosed in braces, allowing nested braces.
+
+
+
+
+
+
+
 bracedCode :: SolidityParser String
 bracedCode = braces . fmap concat . many $
         (show <$> try stringLiteral)
