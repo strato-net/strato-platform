@@ -50,7 +50,7 @@ def cleanOldWorkspaces(Integer olderThanNumDays = 5) {
     echo "diskspaceAvailableAfter=$diskspaceAvailableAfter kilobytes"
     
     // Return the number of kilobytes freed:
-    return diskspaceAvailableAfter - diskspaceAvailableBefore
+    return diskspaceAvailableAfter.toInteger() - diskspaceAvailableBefore.toInteger()
   }
 }
 
