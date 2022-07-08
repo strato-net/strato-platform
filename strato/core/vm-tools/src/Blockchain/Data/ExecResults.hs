@@ -28,6 +28,9 @@ import           Blockchain.VMOptions
 
 import           BlockApps.X509.Certificate
 
+import           Text.Format
+import           Text.Tools
+
 data ExecResults =
   ExecResults {
     erRemainingTxGas     :: Integer,
@@ -43,6 +46,22 @@ data ExecResults =
     erKind               :: CodeKind,
     erNewX509Certs       :: M.Map Address X509Certificate
     } deriving (Eq, Show, Generic)
+
+instance Format ExecResults where
+  format v =
+      "ExecResults:"
+      ++ "\n  erRemainingTxGas: " ++ show (erRemainingTxGas v)
+      ++ "\n  erRefund: " ++ show (erRefund v)
+      ++ "\n  erReturnVal: " ++ show (erReturnVal v)
+      ++ "\n  erTrace: " ++ show (erTrace v)
+      ++ "\n  erLogs: " ++ show (erLogs v)
+      ++ "\n  erEvents: " ++ format (erEvents v)
+      ++ "\n  erNewContractAccount: " ++ format (erNewContractAccount v)
+      ++ "\n  erSuicideList: " ++ show (erSuicideList v)
+      ++ "\n  erAction:\n" ++ tab (tab (format (erAction v)))
+      ++ "\n  erException: " ++ show (erException v)
+      ++ "\n  erKind: " ++ show (erKind v)
+      ++ "\n  erNewX509Certs: " ++ show (erNewX509Certs v)
 
 instance NFData ExecResults
 
