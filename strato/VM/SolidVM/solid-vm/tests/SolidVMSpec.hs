@@ -4396,10 +4396,10 @@ contract X {
 
 contract qq {
   X public x;
-  bytes32 salt;
+  bytes32 salt';
   constructor() public {
-    salt = "0x10000000000000000000000000000000";
-    x = new X{salt: salt}({_z: "ok", _y: 0x777777});
+    salt' = "0x10000000000000000000000000000000";
+    x = new X{salt: salt'}({_z: "ok", _y: 0x777777});
   }
 }|]
     getFields ["x"] `shouldReturn` [bContract' "X" recursiveAddr]
