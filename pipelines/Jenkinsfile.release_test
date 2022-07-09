@@ -183,7 +183,7 @@ pipeline {
             // agent { label "test-multinode101" } // is default
             steps { 
                 script {
-                rootNodeAddress = lib.deployStratoWithApp(null, NODE_DATA.NODE1, 'beanstalk', false)
+                    rootNodeAddress = lib.deployStratoWithApp(null, NODE_DATA.NODE1, 'beanstalk', false)
                 }
             }            
         }
@@ -669,7 +669,7 @@ pipeline {
             // agent { label "test-multinode101" } // is default
             steps {
                 script {
-                    lib.deployStratoWithApp(null, NODE_DATA.NODE1, 'beanstalk', false)
+                    rootNodeAddress=lib.deployStratoWithApp(null, NODE_DATA.NODE1, 'beanstalk', false)
                     sh 'until curl --silent localhost:8080; do sleep 1; done'
                     sh 'sudo docker ps'
                     lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
@@ -945,7 +945,7 @@ pipeline {
             // agent { label "multinode101" } // is default
             steps {
                 script {
-                    lib.runAppBootNode(NODE_DATA.NODE1, true, null, null, 'traceharvest')
+                    rootNodeAddress = lib.runAppBootNode(NODE_DATA.NODE1, true, null, null, 'traceharvest')
                 }
             }
         }
@@ -967,9 +967,12 @@ pipeline {
                 script {
                     def numOfPrivChains = sh(
                         returnStdout: true,
-                        script: "sudo docker exec strato_postgres_1 psql -U postgres -d `sudo docker exec strato_postgres_1 psql -U postgres -t -c \"select datname from pg_database where datname like '%eth_%';\" | tr -d \"[:space:]\"` -c \"with m as (select chain_info_id, substring(name from position('@' in name)) as node_name from chain_member_ref), n as (select chain_info_id, node_name from m group by (chain_info_id, node_name)), o as (select chain_info_id, count(*) from n group by chain_info_id) select i.chain_id from chain_info_ref i inner join o on i.id = o.chain_info_id where o.count = 1;\""
+                        script: "sudo docker exec strato_postgres_1 psql -U postgres -d `sudo docker exec strato_postgres_1 psql -U postgres -t -c \"select datname from pg_database where datname like '%eth_%';\" | tr -d \"[:space:]\"` -c \"with m as (select chain_info_id, substring(name from position('@' in name)) as node_name from chain_member_ref), n as (select chain_info_id, node_name from m group by (chain_info_id, node_name)), o as (select chain_info_id, count(*) from n group by chain_info_id) select i.chain_id from chain_info_ref i inner join o on i.id = o.chain_info_id where o.count = 1;\" | tr -d -c 0-9"
                     ).trim()
-                    // TO DO: Write if statement to check the numOfPrivChains is greater than 0
+
+                    if(numOfPrivChains == '0') {
+                        assert condition : "Build failed to create private chains "
+                    }
                     // TO DO: After the check, grab the chain ID for one of the private chains.
                 }
             }
@@ -979,7 +982,8 @@ pipeline {
             agent { label "test-multinode301" }
             steps {
                 script {
-                    lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE5, 'beanstalk', false)
+                    node5Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE5, 'beanstalk', false)
+                    node5Pubkey = readFile(file: 'publicKey')
                 }
             }
         }
@@ -994,7 +998,112 @@ pipeline {
                     ).trim()
 
                     sh "curl -X POST -H \"Authorization: Bearer ${accessToken}\" -H \"Accept: application/json\" \"https://multinode101.ci.blockapps.net:8080/strato/v2.3/key\""
+                    sh "curl -s -X POST 'https://multinode101.ci.blockapps.net:8080/strato/v2.3/transaction/parallel?resolve=true' -H 'Authorization: Bearer <access_token>' \
+                        -H 'Content-Type: application/json' --data-raw '{
+                        \"txs\": [
+                            {
+                            \"payload\": {
+                        \"contractName\": \"Governance\",
+                        \"contractAddress\": \"0000000000000000000000000000000000000100\",
+                        \"method\": \"addMember\",
+                        \"args\": {
+                            \"_member\": \"${node5Address}\",
+                            \"_enode\": \"enode://${node5Pubkey}@${NODE_DATA.NODE5.IP}:30303\"
+                        },
+                        \"chainid\": \"<chain_id_of_one_of_private_chains_from_previous_step>\"
+                            },
+                            \"type\": \"FUNCTION\"
+                            }
+                        ]
+                        }'"
                 }
+            }
+        }
+
+        stage('Upgrade w/ node chain data - Check if Node 5 was added to Chain') {
+            agent { label "test-multinode301" }
+            steps {
+                script {
+                    /* Will need to edit the command to get the count and not numbers inside the chain hash */
+                    def numOfPrivChains = sh(
+                        returnStdout: true,
+                        script: "sudo docker exec strato_postgres_1 psql -U postgres -d `sudo docker exec strato_postgres_1 psql -U postgres -t -c \"select datname from pg_database where datname like '%eth_%';\" | tr -d \"[:space:]\"` -c \"with m as (select chain_info_id, substring(name from position('@' in name)) as node_name from chain_member_ref), n as (select chain_info_id, node_name from m group by (chain_info_id, node_name)), o as (select chain_info_id, count(*) from n group by chain_info_id) select i.chain_id from chain_info_ref i inner join o on i.id = o.chain_info_id where o.count = 2;\" | tr -d -c 0-9"
+                    ).trim()
+
+                    /* Add if statement check to make sure there is 1 private chain */
+                }
+            }
+        }
+
+        stage('Upgrade w/ node chain data - Upgrade Node 4') {
+            agent { label "test-multinode104" }
+            steps {
+                dir('strato-getting-started') {
+                    script {
+                        sh 'sudo ./strato ----drop-chains'
+                        lib.deployStratoWithApp(null, NODE_DATA.NODE4, 'beanstalk', false)
+                        sh 'until curl --silent localhost:8080; do sleep 1; done'
+                        sh 'sudo docker ps'
+                        lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
+                    }
+                }
+            }
+        }
+
+        stage('Upgrade w/ node chain data - Upgrade Node 3') {
+            agent { label "test-multinode103" }
+            steps {
+                dir('strato-getting-started') {
+                    script {
+                        sh 'sudo ./strato ----drop-chains'
+                        lib.deployStratoWithApp(null, NODE_DATA.NODE3, 'beanstalk', false)
+                        sh 'until curl --silent localhost:8080; do sleep 1; done'
+                        sh 'sudo docker ps'
+                        lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
+                    }
+                }
+            }
+        }
+
+        stage('Upgrade w/ node chain data - Upgrade Node 2') {
+            agent { label "test-multinode102" }
+            steps {
+                dir('strato-getting-started') {
+                    script {
+                        sh 'sudo ./strato ----drop-chains'
+                        lib.deployStratoWithApp(null, NODE_DATA.NODE2, 'beanstalk', false)
+                        sh 'until curl --silent localhost:8080; do sleep 1; done'
+                        sh 'sudo docker ps'
+                        lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
+                    }
+                }
+            }
+        }
+
+        stage('Upgrade w/ node chain data - Upgrade Node 1') {
+            agent { label "test-multinode101" }
+            steps {
+                dir('strato-getting-started') {
+                    script {
+                        sh 'sudo ./strato ----drop-chains'
+                        lib.deployStratoWithApp(null, NODE_DATA.NODE1, 'beanstalk', false)
+                        sh 'until curl --silent localhost:8080; do sleep 1; done'
+                        sh 'sudo docker ps'
+                        lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
+                    }
+                }
+            }
+        }
+
+        stage('Upgrade w/ node chain data - Confirm Chain Sync was Successful') {
+            steps {
+                /* Will need to edit the command to get the count and not numbers inside the chain hash */
+                def numOfPrivChains = sh(
+                    returnStdout: true,
+                    script: "sudo docker exec strato_postgres_1 psql -U postgres -d `sudo docker exec strato_postgres_1 psql -U postgres -t -c \"select datname from pg_database where datname like '%eth_%';\" | tr -d \"[:space:]\"` -c \"with m as (select chain_info_id, substring(name from position('@' in name)) as node_name from chain_member_ref), n as (select chain_info_id, node_name from m group by (chain_info_id, node_name)), o as (select chain_info_id, count(*) from n group by chain_info_id) select i.chain_id from chain_info_ref i inner join o on i.id = o.chain_info_id where o.count = 2;\" | tr -d -c 0-9"
+                ).trim()
+
+                /* Add if statement check to make sure there is 1 private chain */
             }
         }
 
