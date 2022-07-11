@@ -117,9 +117,9 @@ getBlocTransactionResult' hashes@(txh:_) resolve =
       $logDebugLS "getBlocTransactionResult'/results" results
       case results of 
         [] -> throwIO $ AnError "Empty list provided: results is empty"
-        _ -> case filter ((== Success) . blocTransactionStatus) results of
+        (fstResult:_) -> case filter ((== Success) . blocTransactionStatus) results of
           (winner:_) -> return winner
-          [] -> return $ BlocTransactionResult Failure emptyHash Nothing Nothing 
+          [] -> return $ fstResult
         
     else return $ BlocTransactionResult Pending txh Nothing Nothing
 
