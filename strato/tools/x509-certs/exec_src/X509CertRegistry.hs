@@ -256,6 +256,7 @@ contract CertificateRegistry {
     bool initialized;
 
     event CertificateRegistered(address userAddress, address contractAddress);
+    event CertificateRevoked(address userAddress);
 
     constructor(string _rootCert) {
         require(account(this, "self").chainId == 0, "You must post this contract on the main chain!");
@@ -315,5 +316,6 @@ contract CertificateRegistry {
         if (myCert.isChild(tx.certificate)) {
             myCert.revoke();
         }
+        emit CertificateRevoked(certAddr);
     }
 }|]
