@@ -223,16 +223,10 @@ handleMsgServerConduit myPubkey peer = do
     $logDebugS "handleMsgServerConduit" $ T.pack $ "about to parse message"
     awaitMsg >>= \case
         Just clientHello@Hello{} -> do
-            -- Check if pub key is okay
-              -- Get userAddress from pubKey
             let userAddress' = fromPublicKey (pointToSecPubKey $ nodeId clientHello)
             -- Lookup in Redis with userAddress, isValid Field
             clientCertDetails <- lift $ A.select (A.Proxy @X509CertInfoState) userAddress'
-            -- Get the boolean value isValid from clientCertDetails
-            -- clientCertDetails :: Maybe X509CertInfoState
-            -- isValid :: X509CertInfoState -> Bool
-            -- fmap :: Functor f => (a -> b) -> f a -> f b
-            -- fmap isValid clientCertDetails :: Maybe Bool
+            -- Throw error if the cert is not valid.
             unless (fromMaybe False (fmap isValid clientCertDetails)) $ throwIO $ InvalidClientCert
             $logInfoS "handshake/Hello{}" "received hello"
             let helloMsg' = Hello {
