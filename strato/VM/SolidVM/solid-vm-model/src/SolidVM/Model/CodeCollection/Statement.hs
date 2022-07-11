@@ -32,6 +32,8 @@ import GHC.Generics
 import SolidVM.Model.SolidString
 import SolidVM.Model.Type
 
+
+
 data StatementF a =
   IfStatement (ExpressionF a) [StatementF a] (Maybe [StatementF a]) a -- if then else
   | WhileStatement (ExpressionF a) [StatementF a] a
@@ -48,6 +50,8 @@ data StatementF a =
   | SimpleStatement (SimpleStatementF a) a
   | RevertStatement (Maybe String) (ArgListF a) a
   | UncheckedStatement [StatementF a] a
+  | SolidityTryCatchStatement (ExpressionF a) (Maybe [(String, Type)]) [StatementF a] (Map.Map String (Maybe (String, Type), [StatementF a])) a
+  | TryCatchStatement [StatementF a] (Map.Map String [StatementF a]) a
   deriving (Show, Eq, Generic, Functor, ToJSON, FromJSON)
 
 
@@ -89,6 +93,9 @@ extractStatement (SimpleStatement _ a) = a
 extractStatement (RevertStatement _ _ a) = a
 extractStatement (UncheckedStatement _ a) = a
 extractStatement (ModifierExecutor a) = a
+extractStatement (TryCatchStatement _ _ a) = a
+extractStatement (SolidityTryCatchStatement _ _ _ _ a) = a
+
 
 type Statement = Positioned StatementF
 

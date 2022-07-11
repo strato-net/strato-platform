@@ -4597,3 +4597,60 @@ contract qq{
   }
 }|]
     getFields ["weiUnit", "szaboUnit", "finneyUnit", "etherUnit"] `shouldReturn` [BInteger 2, BInteger 2000000000000, BInteger 2000000000000000, BInteger 2000000000000000000]
+
+  it "can use a try catch statment to catch a divide by zero error the SolidVM Way (trademark pending)" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq{
+  uint mynum = 5;
+  constructor() public {
+    try {
+      mynum = 1 / 0;
+    } catch DivideByZero {
+      mynum = 3;
+    }
+  }
+}|]
+    getFields ["mynum"] `shouldReturn` [BInteger 3]
+
+  it "can use a try catch statment to catch a divide by zero error the Solidity Way (trademark very much in effect)" . runTest $ do
+    runBS [r| 
+pragma solidvm 3.2;
+contract Divisor {
+  function doTheDivide() public returns (uint) {
+    return (1 / 0);
+  }
+}
+
+contract qq {
+  uint myNum = 5;
+  uint otherNum = 7;
+  uint errorCount = 0;
+  constructor() public returns (uint,bool) {
+    Divisor d =  new Divisor();
+    try d.doTheDivide() returns (uint v) {
+          return (v, true);
+        } catch Error(string memory amsg) { 
+            // This is executed in case
+            // revert was called inside getData
+            // and a reason string was provided.
+            errorCount++;
+            return (0, false);
+        } catch Panic(uint errCode) {
+            // This is executed in case of a panic,
+            // i.e. a serious error like division by zero
+            // or overflow. The error code can be used
+            // to determine the kind of error.
+            errorCount++;
+            myNum = 3;
+            otherNum = errCode;
+            return (0, false);
+        } catch (bytes bigTest) {
+            // This is executed in case revert() was used.
+            errorCount++;
+            return (0, false);
+        }
+  }
+}|]
+    getFields ["myNum", "otherNum", "errorCount"] `shouldReturn` [BInteger 3, BInteger 12, BInteger 1]
+
