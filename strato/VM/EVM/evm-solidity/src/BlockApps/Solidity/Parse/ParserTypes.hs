@@ -3,6 +3,7 @@
 -- Description: Types used throughout solidity-abi, primarily the ones
 --   containing the structure of a parsed contract.
 -- Maintainer: Ryan Reich <ryan@blockapps.net>
+-- Maintainer: Steven Glasford <steven_glasford@blockapps.net>
 module BlockApps.Solidity.Parse.ParserTypes where
 
 import           Control.Monad

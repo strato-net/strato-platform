@@ -37,7 +37,10 @@ main :: IO ()
 main = do
   _ <- $initHFlags "The Ethereum Test program"
 
-  let secretKey = fromJust . importPrivateKey $ B.pack [0x12, 0x34]
+  let secretKey = fromJust . importPrivateKey $ B.pack [0,0,0,0,0,0,0,0,
+                                                        0,0,0,0,0,0,0,0,
+                                                        0,0,0,0,0,0,0,0,
+                                                        0,0,0,0,0,0, 0x12, 0x34]
       rep = B.concat . replicate 100000 . B.pack
       jumpAll = B.replicate 1000000 0x5b
       pushOnes = rep [0x60, 0xf2, 0x50]

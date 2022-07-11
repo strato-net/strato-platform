@@ -10,5 +10,4 @@ library:
   - http-client
   - monad-alter
   - mtl
-  - persistent
   - servant-client

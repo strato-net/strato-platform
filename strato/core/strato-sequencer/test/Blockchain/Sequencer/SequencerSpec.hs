@@ -62,6 +62,7 @@ import qualified Blockchain.Strato.Model.Keccak256         as Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 import qualified Data.ByteString.Char8               as C8
 import qualified Data.Set                            as S
+import qualified LabeledError
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.RequestLogger
 import           Network.Wai.Middleware.Prometheus
@@ -94,7 +95,7 @@ dedupWindow = 100
 -- NOTE: this is (and must be) the same as "testPriv" from Monad.hs....used by the 
 -- HasVault instance so we can make Blockstanbul message signatures without a vault client
 myPriv :: PrivateKey
-myPriv = fromMaybe (error "could not import private key") (importPrivateKey (fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"))
+myPriv = fromMaybe (error "could not import private key") (importPrivateKey (LabeledError.b16Decode "myPriv" $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"))
 
 runTestM :: SequencerM a -> IO ()
 runTestM m = do

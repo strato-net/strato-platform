@@ -13,9 +13,9 @@ contractsSourceTable :: Table
   , Column PGText
   )
 contractsSourceTable = Table "contracts_source" $ p3
-  ( optional "id"
-  , required "src_hash"
-  , required "src"
+  ( optionalTableField "id"
+  , requiredTableField "src_hash"
+  , requiredTableField "src"
   )
 
 evmContractNameTable :: Table
@@ -30,8 +30,8 @@ evmContractNameTable :: Table
   , Column PGBytea
   )
 evmContractNameTable = Table "evm_contract_name" $ p4
-  ( optional "id"
-  , required "code_hash"
-  , required "contract_name"
-  , required "src_hash"
+  ( optionalTableField "id"
+  , requiredTableField "code_hash"
+  , requiredTableField "contract_name"
+  , requiredTableField "src_hash"
   )

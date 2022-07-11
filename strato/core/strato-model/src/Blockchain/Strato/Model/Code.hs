@@ -19,6 +19,7 @@ import           Data.Aeson
 
 import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.CodePtr
+import qualified LabeledError
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances()
 
@@ -53,7 +54,7 @@ instance ToJSON Code where
   toJSON (PtrToCode codePtr) = toJSON codePtr
 
 instance FromJSON Code where
-  parseJSON (String text) = return . Code . fst . B16.decode . encodeUtf8 . drop0x $ text
+  parseJSON (String text) = return . Code . LabeledError.b16Decode "FromJSON<Code>" . encodeUtf8 . drop0x $ text
     where drop0x :: T.Text -> T.Text
           drop0x t = if "0x" `T.isPrefixOf` t
                        then T.drop 2 t

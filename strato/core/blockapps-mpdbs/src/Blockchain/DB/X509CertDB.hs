@@ -29,6 +29,7 @@ module Blockchain.DB.X509CertDB (
   , genericDeleteX509CertDB
   , x509CertDBPut
   , x509CertDBGet
+  , getParentUserAddress
   ) where
 
 

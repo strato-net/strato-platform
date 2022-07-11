@@ -23,8 +23,8 @@ library:
   - asn1-encoding
   - asn1-types
   - base16-bytestring
+  - binary
   - bytestring
-  - cereal
   - containers
   - cryptonite
   - deepseq
@@ -32,10 +32,8 @@ library:
   - hourglass
   - memory
   - pem
-  - random
   - text
   - format
-  - time
   - transformers
   - secp256k1-haskell
   - strato-model
@@ -111,4 +109,3 @@ tests:
       - hspec
       - strato-model
       - transformers
-      - QuickCheck

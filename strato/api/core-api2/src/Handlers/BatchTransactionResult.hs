@@ -18,7 +18,7 @@ module Handlers.BatchTransactionResult
 
 import           Control.Monad.Change.Alter
 import qualified Data.Map.Strict     as M
-import qualified Database.Esqueleto  as E
+import qualified Database.Esqueleto.Legacy  as E
 import           Servant
 import           Servant.Client
 

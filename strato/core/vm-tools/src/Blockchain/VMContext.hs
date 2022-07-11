@@ -539,7 +539,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
       cstate' <- readIORef cstate
       return (a, cstate')
 
-runContextM :: (MonadIO m, MonadUnliftIO m, MonadLogger m)
+runContextM :: (MonadIO m, MonadUnliftIO m, MonadLoggerIO m)
             => Maybe DebugSettings
             -> ReaderT Context (ResourceT m) a
             -> m (a, ContextState)
@@ -602,13 +602,13 @@ runContextM dSettings f = do
       return (a, cstate')
 
 
-evalContextM :: (MonadIO m, MonadUnliftIO m, MonadLogger m)
+evalContextM :: (MonadIO m, MonadUnliftIO m, MonadLoggerIO m)
              => Maybe DebugSettings
              -> ReaderT Context (ResourceT m) a
              -> m a
 evalContextM d f = fst <$> runContextM d f
 
-execContextM :: (MonadIO m, MonadUnliftIO m, MonadLogger m)
+execContextM :: (MonadIO m, MonadUnliftIO m, MonadLoggerIO m)
              => Maybe DebugSettings
              -> ReaderT Context (ResourceT m) a
              -> m ContextState

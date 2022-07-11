@@ -89,7 +89,7 @@ entryPoint (Options privPath certPath nonce) = do
             -- setup servant client
             mgr <- newManager defaultManagerSettings
             stratoURL <- parseBaseUrl "http://strato:3000/bloc/v2.2"
-            let clientEnv = ClientEnv mgr stratoURL Nothing
+            let clientEnv = mkClientEnv mgr stratoURL
 
             -- post it
             result <- runClientM (postRawTransaction Nothing Nothing True request) clientEnv
@@ -181,14 +181,18 @@ contract Certificate {
     address owner;  // The CertificateRegistery Contract
 
     account certificateHolder;
-
+    account parent;
+    account[] children;
+    
     // Store all the fields of a certificate in a Cirrus record
     string commonName;
     string country;
     string organization;
+    string group;
     string organizationalUnit;
     string publicKey;
     string certificateString;
+    bool isValid;
 
     constructor(string _certificateString) {
         owner = msg.sender;
@@ -198,10 +202,42 @@ contract Certificate {
         certificateHolder = account(parsedCert["userAddress"]);
         commonName = parsedCert["commonName"];
         organization = parsedCert["organization"];
+        group = parsedCert["group"];
         organizationalUnit = parsedCert["organizationalUnit"];
         country = parsedCert["country"];
         publicKey = parsedCert["publicKey"];
         certificateString = parsedCert["certString"];
+        isValid = true;
+        parent = account(parsedCert["parent"]);
+        if (parent != 0x0){
+            Certificate parentContract = Certificate(parent);
+            parentContract.addChild(this);    
+        }
+    }
+    
+    function addChild(account _child){
+        children.push[_child];
+    }
+    
+    function isChild(pCert) returns bool {
+        mapping(string => string) parsedCert = parseCert(certificateString);
+        if(parent != 0x0 && pCert == Certificate(account(parsedCert["parent"]))){
+            return true;
+        }
+        if(parent != 0x0){
+            Certificate parentContract = Certificate(account(parsedCert["parent"]));
+            return parentContract.isChild(pCert);
+        }
+        return false;
+    }
+    
+    function revoke() {
+        require(msg.sender,owner,"You don't have permission to call revoke!");
+        isValid = false;
+        for (uint i = 0; i < children.length; ++i) {
+           Certificate child = Certificate(children[i]);
+           child.revoke();
+        }
     }
 }
 
@@ -243,7 +279,7 @@ contract CertificateRegistry {
         certificatesMap[newAccount] = certificates.length;
         initialized = true;
 
-        emit CertificateRegistered(address(0xdeadbeef), address(c));
+        emit CertificateRegistered(rootCert);
         
         return 200;
     }
@@ -261,6 +297,8 @@ contract CertificateRegistry {
         certificates.push(c);
         certificatesMap[userAccount] = certificates.length;
         
+        emit CertificateRegistered(newCertificateString);
+
         return 200; // 200 = HTTP Status OK
     }
     
@@ -270,5 +308,12 @@ contract CertificateRegistry {
     
     function getCertByAccount(account _account) returns (Certificate) {
         return certificates[certificatesMap[_account]];
+    }
+    
+    function revokeCert(address certAddr){
+        Certificate mycert = Certificate(certAddr);
+        if (myCert.isChild(tx.certificate)) {
+            myCert.revoke();
+        }
     }
 }|]

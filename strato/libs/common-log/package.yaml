@@ -9,7 +9,6 @@ library:
   source-dirs: src
   dependencies:
     - bytestring
-    - fast-logger
     - global-lock
     - hflags
     - monad-logger

@@ -377,7 +377,7 @@ hydratePrivateHashes chainF b = do
                 Nothing -> do
                   notHydrating "we don't have the info for its chain"
                   return (tx, st)
-                Just ChainIdEntry{..} -> do
+                Just ChainIdEntry{} -> do
                   allBlocksToRun <- getAllBlocksToRun cId
                   if not (S.null allBlocksToRun || (_bhash $ S.elemAt 0 allBlocksToRun) == bHash)
                     then do

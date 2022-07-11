@@ -25,7 +25,7 @@ import           Control.Monad.Change.Alter
 import           Data.Aeson
 import           Data.Maybe
 import           Data.Swagger            hiding (name)
-import qualified Database.Esqueleto      as E
+import qualified Database.Esqueleto.Legacy      as E
 import           Database.Persist.Postgresql
 import           GHC.Generics
 import           MaybeNamed

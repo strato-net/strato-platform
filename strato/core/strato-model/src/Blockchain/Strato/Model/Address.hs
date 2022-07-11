@@ -57,6 +57,7 @@ import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.Util
 import qualified Data.NibbleString                    as N
 import qualified Data.RLP                             as RLP2
+import qualified LabeledError
 import qualified Text.Colors       as CL
 import           Text.Format
 import           Text.ShortDescription
@@ -181,7 +182,7 @@ instance ToCapture (Capture "contractAddress" Address) where
   toCapture _ = DocCapture "contractAddress" "an Ethereum address"
 
 instance RLP2.RLPEncodable Address where
-  rlpEncode addr = RLP2.rlpEncode . fst . B16.decode . BC.pack $ formatAddressWithoutColor addr
+  rlpEncode addr = RLP2.rlpEncode . LabeledError.b16Decode "RLPEncodable<Address>" . BC.pack $ formatAddressWithoutColor addr
   rlpDecode obj = Address . fromInteger <$> RLP2.rlpDecode obj
 
 instance RLP2.RLPEncodable (Maybe Address) where
@@ -248,10 +249,10 @@ addressToHex = B16.encode . BL.toStrict . encode
 
 addressFromHex :: B.ByteString -> Either String Address
 addressFromHex hex = case B16.decode hex of
-                     (h, "") -> case decodeOrFail (BL.fromStrict h) of
+                     Right h -> case decodeOrFail (BL.fromStrict h) of
                                   Right (_, _, a) -> return a
                                   Left (_, _, mesg) -> Left $ "cannot decode address: " ++ mesg
-                     (_, _) -> Left $ "invalid hex address: " ++ show hex
+                     _ -> Left $ "invalid hex address: " ++ show hex
 
 instance Arbitrary Address where
   arbitrary = Address <$> arbitrary

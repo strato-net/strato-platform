@@ -71,5 +71,5 @@ toKafkaMetadata = KP.Metadata . KP.KString . B16.encode . rlpSerialize . rlpEnco
 fromKafkaMetadata :: KP.Metadata -> EVMCheckpoint
 fromKafkaMetadata = rlpDecode . rlpDeserialize . decode' . KP._kString . KP._kMetadata
     where decode' = B16.decode >>> \case
-                        (result, "") -> result
+                        Right result -> result
                         _ -> error "Couldn't completely Base16 decode a string!"

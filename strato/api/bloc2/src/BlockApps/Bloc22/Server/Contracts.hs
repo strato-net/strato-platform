@@ -132,7 +132,7 @@ getContractsContract name addr chainId = do
     }
   case mAddrStateRef of
     Nothing -> throwIO err
-    Just (AddressStateRef' a@AddressStateRef{..} _) -> case addressStateRefCodePtr a of
+    Just (AddressStateRef' a@AddressStateRef{} _) -> case addressStateRefCodePtr a of
       Nothing -> throwIO err
       Just cp -> getContractDetailsByCodeHash cp >>= \case
         Left e -> throwIO $ UserError e
@@ -277,7 +277,7 @@ getContractsDetails' contractAddress chainId = do
     }
   case mAddrStateRef of
     Nothing -> throwIO err
-    Just (AddressStateRef' a@AddressStateRef{..} _) -> case addressStateRefCodePtr a of
+    Just (AddressStateRef' a@AddressStateRef{} _) -> case addressStateRefCodePtr a of
       Nothing -> throwIO err
       Just cp -> getContractDetailsByCodeHash cp >>= \case
         Left e -> throwIO $ UserError e

@@ -18,7 +18,6 @@ executables:
       - blockapps-data
       - bytestring
       - containers
-      - blockapps-haskoin
       - http-client
       - http-types
       - json-rpc-server

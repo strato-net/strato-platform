@@ -5,6 +5,7 @@
 -- Description: Parses anything that can appear at the top level of
 --   a Solidity source file
 -- Maintainer: Ryan Reich <ryan@blockapps.net>
+-- Maintainer: Steven Glasford <steven_glasford@blockapps.net>
 --
 -- Currently does contracts and pragmas.  In the future should also handle
 -- imports.
@@ -27,7 +28,6 @@ import           SolidVM.Solidity.Parse.Lexer
 import           SolidVM.Solidity.Parse.ParserTypes
 import           SolidVM.Solidity.Parse.Pragmas
 
-
 newtype File = File {
   unsourceUnits :: [SourceUnit]
 } deriving (Show, Generic)
@@ -38,7 +38,6 @@ solidityFile = do
   units <- many (solidityPragma <|> solidityImport <|> solidityContract)
   eof
   return . File $ units
-
 
 decideVersion :: File -> SolcVersion
 decideVersion = maximum . (ZeroPointFour:) . mapMaybe go . unsourceUnits

@@ -26,12 +26,12 @@ spec = do
                 event = EventDB (Just chainId) "MemberRemoved" [show addr]
             in indexEventToTxrResults (EventDBEntry event)
                 `shouldBe` [PutEventDB event, RemoveMember $ Right (chainId, addr)]
-        it "Index EventDBEntry for CertificateRegistered" $
-            let uAddr = fromInteger 0x1234
-                cAddr = fromInteger 0x5678
-                event = EventDB Nothing "CertificateRegistered" [show uAddr, show cAddr]
-            in indexEventToTxrResults (EventDBEntry event)
-                `shouldBe` [PutEventDB event, RegisterCertificate $ Right (uAddr, cAddr)]
+        -- it "Index EventDBEntry for CertificateRegistered" $
+        --     let uAddr = fromInteger 0x1234
+        --         cAddr = fromInteger 0x5678
+        --         event = EventDB Nothing "CertificateRegistered" [show uAddr, show cAddr]
+        --     in indexEventToTxrResults (EventDBEntry event)
+        --         `shouldBe` [PutEventDB event, RegisterCertificate $ Right (uAddr, cAddr)]
         it "Index EventDBEntry for non-special event" $
             let chainId = fromInteger 0x480244
                 event = EventDB (Just chainId) "NotSpecial" ["48193"]
