@@ -963,6 +963,26 @@ statementHelper (IfStatement cond thens mElse x) = do
   ts <- statementsHelper' x thens
   es <- statementsHelper' x $ fromMaybe [] mElse
   pure $ reduceType' x [cs, ts, es]
+statementHelper (TryCatchStatement tryStatmenets catchMap x) = do
+  ts <- statementsHelper' x tryStatmenets
+  es <- statementsHelper' x (concatMap snd (M.toList catchMap))
+  pure $ reduceType' x [ts, es]
+statementHelper (SolidityTryCatchStatement expr mtpl successStatements catchMap x) = do
+  cs <- tcExpr expr
+  
+  let errValsToVarDefs :: [Maybe (String, SVMType.Type)] -> [Annotated VarDefEntryF]
+      errValsToVarDefs [] = []
+      errValsToVarDefs (Nothing : xs) = errValsToVarDefs xs
+      errValsToVarDefs ((Just (name, ty)):xs) = (VarDefEntry (Just ty) Nothing name x) : (errValsToVarDefs xs)
+      successValsToVarDefs :: Maybe [(String, SVMType.Type)] -> [Annotated VarDefEntryF]
+      successValsToVarDefs Nothing = []
+      successValsToVarDefs (Just xs) = errValsToVarDefs $ map Just xs
+  let localVarDefs =  (errValsToVarDefs $ (map (fst . snd) (M.toList catchMap))) ++ successValsToVarDefs mtpl
+  pushLocalVariables localVarDefs
+  
+  ts <- statementsHelper' x successStatements
+  es <- statementsHelper' x (concatMap (snd . snd) (M.toList catchMap))
+  pure $ reduceType' x [cs, ts, es]
 statementHelper (WhileStatement cond body x) = do
   cs <- tcExpr cond
   bs <- statementsHelper' x body
