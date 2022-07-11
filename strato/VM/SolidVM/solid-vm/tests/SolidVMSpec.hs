@@ -2372,8 +2372,8 @@ contract qq {
     getFields ["a"] `shouldReturn` [bAddress 74]
 
   it "can have a for loop with no fields" . runTest $ do
-    liftIO $ pendingWith "re-fix loops"
     runBS [r|
+pragma solidvm 3.2;
 contract qq {
   uint i;
   constructor() public {

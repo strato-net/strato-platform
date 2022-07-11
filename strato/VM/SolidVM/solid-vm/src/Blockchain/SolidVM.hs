@@ -1081,7 +1081,7 @@ runStatement (CC.ForStatement maybeInitStatement maybeConditionExp maybeLoopExp 
   let loopExp =
         case maybeLoopExp of
           Just x -> x
-          Nothing -> todo "loop expressions" loopExp
+          Nothing -> (CC.NumberLiteral pos 1 Nothing)
 
   let condition = getBool =<< expToVar conditionExp
 
