@@ -35,6 +35,7 @@ import           Control.Monad.IO.Class
 import qualified Control.Monad.Catch                  as EUnsafe
 import           Control.Monad.Trans.Maybe
 import           Data.Bits
+import           Data.Typeable
 import           Data.Bool                            (bool)
 import           Data.ByteString                      (ByteString)
 import qualified Data.ByteString                      as B
@@ -1453,9 +1454,19 @@ expToVar' x@(CC.IndexAccess _ parent (Just mIndex)) = do
             indexOutOfBounds ("index value was " ++ (show i) ++ ", but the array length was " ++ (show $ length theVector)) $ unparseExpression x
           else
             return $ theVector V.! fromIntegral i
-        (SMap _ theMap, _) -> do maybe (indexOutOfBounds ("index value was " ++ (show theIndex) ++ ", but the valid indexes were " ++ (show $ M.keys theMap)) $ unparseExpression x)
-                                               return
-                                               (theMap M.!? theIndex)
+        (SMap _ theMap, _) -> do 
+                                case theMap M.!? theIndex of
+                                  Just v -> return v
+                                  Nothing -> do
+                                    let theType =   typeOf theIndex
+                                    let typeArray = [(typeOf ("test"::[Char])), (typeOf (1 :: Integer)), (typeOf (True::Bool))]
+                                    let typeNum = theType `elemIndex` typeArray
+                                    case typeNum of
+                                      Just 0 -> return $ Constant $ SString ""
+                                      Just 1 -> return $ Constant $ SInteger 0
+                                      Just 2 -> return $ Constant $ SBool False
+                                      _ -> internalError "Type of Mapping not found" (show theType)
+
         (SReference _, _) -> Constant . SReference <$> expToPath x
         _ -> typeError "unsupported types for index access" $ unparseExpression x
 --    _ -> error $ "unknown case in expToVar' for IndexAccess: " ++ show var
