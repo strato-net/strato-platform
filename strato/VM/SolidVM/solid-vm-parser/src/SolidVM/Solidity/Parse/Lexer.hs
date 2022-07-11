@@ -24,6 +24,7 @@ module SolidVM.Solidity.Parse.Lexer (
   colon,
   comma,
   braces,
+  symbol,
   solidityLanguage,
   whiteSpace
   ) where
@@ -44,6 +45,7 @@ natural = P.natural solidityLexer
 integer = P.integer solidityLexer
 braces = P.braces solidityLexer
 parens = P.parens solidityLexer
+symbol = P.symbol solidityLexer
 brackets = P.brackets solidityLexer
 comma = P.comma solidityLexer
 commaSep = P.commaSep solidityLexer
@@ -71,7 +73,7 @@ solidityLanguage = javaStyle {
      "function", "returns", "return", "modifier", "revert",
      "delete", "constant", "storage", "memory", "calldata",
      "if", "else", "while", "for", "break", "continue",
-     "call", "callcode", "length", "sha3", "sha256", "ripemd160", "ecrecover",
+     "call", "callcode", "length", "sha3", "ecrecover",
      "suicide", "this",
      "block", --"coinbase", "difficulty", "gaslimit", "number", "blockhash", "timestamp", "now"
      "msg", --"data", "gas", "sender", "value",

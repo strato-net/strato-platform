@@ -8,7 +8,6 @@ module AuthenticationSpec where
 
 import           Control.Lens
 import qualified Data.ByteString            as B
-import qualified Data.ByteString.Base16     as B16
 import qualified Data.ByteString.Char8      as C8
 import           Data.Maybe
 import qualified Data.Set                   as S
@@ -25,6 +24,7 @@ import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.StateRoot
 
+import qualified LabeledError
 
 testBlock :: Block
 testBlock =
@@ -32,9 +32,9 @@ testBlock =
       blockDataParentHash = unsafeCreateKeccak256FromWord256 0x0,
       blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347,
       blockDataCoinbase = Address 0x0,
-      blockDataStateRoot = StateRoot . fst . B16.decode $ "0000000000000000000000000000000000000000000000000000000000000000",
-      blockDataTransactionsRoot = StateRoot . fst .B16.decode $ "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
-      blockDataReceiptsRoot = StateRoot . fst . B16.decode $ "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+      blockDataStateRoot = StateRoot . LabeledError.b16Decode "testBlock" $ "0000000000000000000000000000000000000000000000000000000000000000",
+      blockDataTransactionsRoot = StateRoot . LabeledError.b16Decode "testBlock" $ "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+      blockDataReceiptsRoot = StateRoot . LabeledError.b16Decode "testBlock" $ "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
       blockDataLogBloom = B.replicate 256 0,
       blockDataDifficulty = 0,
       blockDataNumber = 40,
@@ -51,7 +51,7 @@ testValidators :: [Address]
 testValidators = [Address 0x101, Address 0xaaa]
 
 private :: PrivateKey
-private = fromMaybe (error "could not import private key") (importPrivateKey (fst $ B16.decode $ C8.pack "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866")) 
+private = fromMaybe (error "could not import private key") (importPrivateKey (LabeledError.b16Decode "private" $ C8.pack "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866")) 
 
 
 
@@ -152,7 +152,7 @@ spec = do
       got `shouldBe` Left "not enough commit seals (have 0 out of 1)"
 
     it "Rejects a block with an unknown seal" $ do
-      let mFakeKey = importPrivateKey (fst $ B16.decode $ C8.pack $ "2d5daffcc515a23155bc5b5d21f852ab2554e6cae0351c5561b44fad6931f62d")
+      let mFakeKey = importPrivateKey (LabeledError.b16Decode "blockstanbul/AuthenticationSpec.hs" $ C8.pack $ "2d5daffcc515a23155bc5b5d21f852ab2554e6cae0351c5561b44fad6931f62d")
           fakeKey = fromMaybe (error "could not import fake key") mFakeKey
           vals = S.fromList $ map fromPrivateKey [private]
           blk'' = addValidators vals testBlock

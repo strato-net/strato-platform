@@ -28,8 +28,8 @@ import Strato.Strato23.Server.Password
 
 getUserOldKeyQuery :: T.Text -> Query (Column PGBytea, Column PGBytea, Column PGBytea, Column PGBytea)
 getUserOldKeyQuery username = proc () -> do
-  (_, name, salt, nonce, encSecKey, _, address) <- queryTable TS.usersTable -< ()
-  restrict -< name .== constant username
+  (_, name, salt, nonce, encSecKey, _, address) <- selectTable TS.usersTable -< ()
+  restrict -< name .== toFields username
   returnA -< (salt, nonce, encSecKey, address)
 
 q1 :: IO [a] -> IO a
@@ -61,7 +61,7 @@ main = do
           [""] -> return ()
           [user, subject] -> do
             let oldPassword = Password $ C8.pack subject
-            (salt, nonce, oldkey, addr) <- q1 . runQuery conn . getUserOldKeyQuery $ T.pack user
+            (salt, nonce, oldkey, addr) <- q1 . runSelect conn . getUserOldKeyQuery $ T.pack user
             newKey <- either die return $ reencryptKey
                                              (getKeyFromPasswordAndSalt oldPassword salt)
                                              (getKeyFromPasswordAndSalt newPassword salt)
@@ -70,8 +70,8 @@ main = do
                                    { uTable = TS.usersTable
                                    -- Note: These lenses are 1-indexed. Its not a huge problem to set enc_key again,
                                    -- but it might be confusing why enc_sec_key is not being set.
-                                   , uUpdateWith = updateEasy (set _6 (constant newKey))
-                                   , uWhere = views _2 (.== constant (T.pack user))
+                                   , uUpdateWith = updateEasy (set _6 (toFields newKey))
+                                   , uWhere = views _2 (.== toFields (T.pack user))
                                    , uReturning = rCount
                                    }
           other -> die $ printf "reverting: unanticipated input row: %s" (show other)

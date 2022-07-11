@@ -17,7 +17,6 @@ dependencies:
   - resourcet
   - strato-model
   - transformers
-  - utf8-string
 
 library:
   source-dirs: src
@@ -49,7 +48,6 @@ benchmarks:
     source-dirs: bench/
     dependencies:
       - bytestring
-      - criterion
       - deepseq
       - directory
       - merkle-patricia-db

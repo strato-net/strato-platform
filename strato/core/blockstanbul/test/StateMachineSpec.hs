@@ -16,7 +16,6 @@ import           Control.Monad              hiding (sequence)
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.State
 import qualified Data.ByteString            as BS
-import qualified Data.ByteString.Base16     as B16
 import qualified Data.ByteString.Char8      as C8
 import           Data.List
 import qualified Data.Map                   as M
@@ -40,10 +39,11 @@ import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
 
+import qualified LabeledError
 
 
 myPriv :: PrivateKey
-myPriv = fromMaybe (error "could not import private key") (importPrivateKey (fst $ B16.decode $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"))
+myPriv = fromMaybe (error "could not import private key") (importPrivateKey (LabeledError.b16Decode "myPriv" $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"))
 
 
 testContext :: BlockstanbulContext

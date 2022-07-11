@@ -44,6 +44,8 @@ module Blockchain.SolidVM.SM (
   pushSender,
   initializeAction,
   markDiffForAction,
+  getBlockHashWithNumber,
+  getBSum,
   addEvent
   ) where
 
@@ -60,6 +62,9 @@ import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.UTF8  as UTF8
+import           Prelude                            hiding (EQ, GT, LT)
+import qualified Prelude                            as Ordering (Ordering (..))
+
 --import           Data.IORef
 import           Data.Map (Map)
 import qualified Data.Map as M
@@ -95,6 +100,8 @@ import           Blockchain.VMOptions
 import           Blockchain.DB.StateDB
 
 import qualified SolidVM.Model.CodeCollection as CC
+import           Blockchain.Data.BlockSummary 
+import           Text.Format
 import           SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type as SVMType
 import qualified SolidVM.Model.Storable as MS
@@ -149,6 +156,7 @@ type SM m = StateT SState m
 type MonadSM m = ( (Account `A.Alters` AddressState) m
                  , HasStateDB m
                  , (Keccak256 `A.Alters` DBCode) m
+                 , (Keccak256 `A.Alters` BlockSummary) m
                  , HasX509CertDB m
                  , A.Selectable (Maybe Word256) ParentChainId m
                  , HasRawStorageDB m
@@ -219,6 +227,11 @@ instance Monad m => Mod.Modifiable CurrentBlockHash (SM m) where
 
 instance A.Selectable (Maybe Word256) ParentChainId m => A.Selectable (Maybe Word256) ParentChainId (SM m) where
   select p = lift . A.select p
+
+instance (Keccak256 `A.Alters` BlockSummary) m => (Keccak256 `A.Alters` BlockSummary) (SM m) where
+  lookup p   = lift . A.lookup p
+  insert p k = lift . A.insert p k
+  delete p   = lift . A.delete p
 
 instance (MP.StateRoot `A.Alters` MP.NodeData) m => (MP.StateRoot `A.Alters` MP.NodeData) (SM m) where
   lookup p   = lift . A.lookup p
@@ -374,9 +387,9 @@ getVariableOfName name = do
 
       maybeBuiltinFunction :: Maybe Variable
       maybeBuiltinFunction = toMaybe (name `elem` ["address", "account", "uint", "int", "bool", "byte", "bytes"
-                                                  , "string", "keccak256", "payable"
+                                                  , "string", "keccak256", "ripemd160", "payable"
                                                   , "require", "revert", "assert", "sha3"
-                                                  , "sha256", "ecrecover", "addmod", "mulmod"
+                                                  , "sha256", "ecrecover", "blockhash","addmod", "mulmod"
                                                   , "selfdestruct", "suicide", "bytes32ToString"
                                                   , "registerCert", "getUserCert", "parseCert", "verifyCert", "verifySignature"]) $
         t "builtin function" $ Constant $ SBuiltinFunction name Nothing
@@ -686,3 +699,17 @@ markDiffForAction owner key' val' = do
 
 addEvent :: Mod.Modifiable (Q.Seq Event) m => Event -> m ()
 addEvent newEvent = Mod.modify_ (Mod.Proxy @(Q.Seq Event)) $ pure . (Q.|> newEvent)
+
+getBlockHashWithNumber :: MonadSM m => Integer -> Keccak256 -> m (Maybe Keccak256)
+getBlockHashWithNumber num h = do
+  $logInfoS "getBlockHashWithNumber" . T.pack $ "calling getBSum with " ++ format h
+  bSum <- getBSum h
+  case num `compare` bSumNumber bSum of
+   Ordering.LT -> getBlockHashWithNumber num $ bSumParentHash bSum
+   Ordering.EQ -> return $ Just h
+   Ordering.GT -> return Nothing
+
+getBSum :: (Keccak256 `A.Alters` BlockSummary) m => Keccak256 -> m BlockSummary
+getBSum bh =
+  fromMaybe (error $ "missing value in block summary DB: " ++ format bh) <$>
+    A.lookup (A.Proxy @BlockSummary) bh

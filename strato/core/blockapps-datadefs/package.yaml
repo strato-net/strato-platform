@@ -16,7 +16,6 @@ dependencies:
   - labeled-error
   - lens
   - persistent
-  - persistent-template
   - QuickCheck
   - strato-model
   - swagger2

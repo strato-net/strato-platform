@@ -353,7 +353,7 @@ decodeValuesFromList
   -> Bool
   -> [Text]
   -> [(Text, Value)]
-decodeValuesFromList typeDefs' struct'@Struct{..} storage offset ofs cnt len varNames =
+decodeValuesFromList typeDefs' struct' storage offset ofs cnt len varNames =
   flip zipMaybe varNames (decodeValue typeDefs' storage offset struct' ofs cnt len)
   where
     zipMaybe :: (a -> Maybe b) -> [a] -> [(a,b)]
@@ -545,7 +545,7 @@ encodeValues
   -> Word256
   -> [(Text,ArgValue)]
   -> Either Text (Map Word256 Word256)
-encodeValues typeDefs' struct'@Struct{..} offset vars =
+encodeValues typeDefs' struct' offset vars =
   zipMapMaybe (uncurry $ encodeValue typeDefs' offset struct') vars Map.empty
   where
     zipMapMaybe _ [] m = Right m

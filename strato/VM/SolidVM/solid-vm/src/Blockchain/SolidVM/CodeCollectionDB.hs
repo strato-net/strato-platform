@@ -44,6 +44,7 @@ import           SolidVM.Model.CodeCollection
 import           SolidVM.Model.SolidString
 import           SolidVM.Solidity.Parse.Declarations
 import           SolidVM.Solidity.Parse.File
+import           SolidVM.Solidity.Parse.ParserTypes
 import           SolidVM.Solidity.StaticAnalysis.Typechecker as TC
 
 data ParseTypeCheckOrSolidVMError = PEx ParseError
@@ -61,7 +62,7 @@ withAnnotations f = first unwind . f
         unwind (TCEx errs) = errs
 
 parseSource :: T.Text -> T.Text -> Either ParseTypeCheckOrSolidVMError [SourceUnit]
-parseSource fileName src = bimap PEx unsourceUnits $ runParser solidityFile "" (T.unpack fileName) (T.unpack src)
+parseSource fileName src = bimap PEx unsourceUnits $ runParser solidityFile (ParserState "" "") (T.unpack fileName) (T.unpack src)
 
 parseSourceWithAnnotations :: T.Text -> T.Text -> Either [SourceAnnotation T.Text] [SourceUnit]
 parseSourceWithAnnotations = withAnnotations . parseSource

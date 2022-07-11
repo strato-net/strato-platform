@@ -4,7 +4,7 @@ module BlockApps.Bloc22.API
   ( BlocAPI
   , markdownBloc
   , layoutBloc
-  , mockBloc
+--  , mockBloc
   , blocApi
   , module BlockApps.Bloc22.API.Git
   , module BlockApps.Bloc22.API.Users
@@ -17,7 +17,7 @@ import           Data.Proxy
 import           Data.Text
 import           Servant
 import           Servant.Docs
-import           Servant.Mock
+--import           Servant.Mock
 
 import           BlockApps.Bloc22.API.Chain
 import           BlockApps.Bloc22.API.Contracts
@@ -64,8 +64,8 @@ markdownBloc = markdown $ docs blocApi
 layoutBloc :: Text
 layoutBloc = layout blocApi
 
-mockBloc :: Server BlocAPI
-mockBloc = mock blocApi Proxy
+--mockBloc :: Server BlocAPI
+--mockBloc = mock blocApi (Proxy::Proxy [Int])
 
 blocApi :: Proxy BlocAPI
 blocApi = Proxy
