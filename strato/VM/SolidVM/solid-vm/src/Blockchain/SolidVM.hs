@@ -648,7 +648,7 @@ argsToValsModifiers ctract md args =
                 return $ SMap valueType $ M.fromList m
                 where --go :: (SolidString, CC.Expression) -> (SolidString, (Value, Variable))
                       go (k, v) = do
-                                let !maybeExp = runParser literal "" "" (labelToString k)
+                                let !maybeExp = runParser literal (ParserState "" "") "" (labelToString k)
                                 case maybeExp of 
                                   Right ex -> do
                                     k' <- eval keyType ex
@@ -2981,6 +2981,9 @@ solidityExceptionHandler catchBlockMap ex = do
       return res
     (ReservedWordError s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 23 reservedWordError
+      return res
+    (ModifierError s1 s2) -> do
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 24 modifierError
       return res
 
 solidVMExceptionHandler :: (MonadSM m) => (M.Map String [CC.Statement]) -> SolidException -> m (Maybe Value)
