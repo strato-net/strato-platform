@@ -68,22 +68,6 @@ data XabiF a = Xabi
   } deriving (Eq,Show,Generic, Functor)
 
 type Xabi = Positioned XabiF
-{-}
-data FuncF a = Func
-  { funcArgs :: [(Maybe SolidString, SolidVM.IndexedType)]
-  , funcVals :: [(Maybe SolidString, SolidVM.IndexedType)]
-  , funcStateMutability :: Maybe StateMutability
-
-  -- These Values are only used for parsing and unparsing solidity.
-  -- This data will not be stored in the db and will have no
-  -- relevance when constructing from the db.
-  , funcContents :: Maybe [StatementF a]
-  , funcVisibility :: Maybe Visibility
-  , funcConstructorCalls :: Map SolidString [(ExpressionF a)]
-  , funcModifiers :: Maybe [String]
-  , funcContext :: a
-  } deriving (Eq,Show,Generic, Functor)
--}
 
 data UsingF a = Using String a deriving (Eq,Show,Generic, Functor)
 

@@ -1025,10 +1025,6 @@ runStatement (CC.SimpleStatement (CC.ExpressionStatement (CC.Binary _ "=" dst sr
               setVar v1 $ coerceType ctract ty value'
 -}
 
---SimpleStatement (ExpressionStatement (Variable (line 3, column 1) - (line 3, column 2): ()  "_"))
---runStatement (CC.SimpleStatement (CC.ExpressionStatement (Variable _ "_")) pos)
-
-
 
 
 runStatement (CC.SimpleStatement (CC.ExpressionStatement e) pos) = do
@@ -2447,7 +2443,7 @@ data Func = Func
   -- relevance when constructing from the db.
   , funcContents :: Maybe [Statement]
   , funcVisibility :: Maybe Visibility
-  , funcModifiers :: Maybe [String]
+  , funcModifiers :: [(SolidString, [(ExpressionF a)])]
   } deriving (Eq,Show,Generic)
 
 -}
@@ -2627,13 +2623,6 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro = do
         return theModifier
       Nothing -> missingField "modifier not found" name
 
--- 
-
-
-
---  let matchTheArgValues :: (SolidString, [(ExpressionF a)]) -> [Modifier] -> (Modifer, [Value])
-
-
   matchedArgvals <- forM theModifiers $ \modi -> do
     let margList = CC.OrderedArgs 
             . fromMaybe []
@@ -2688,9 +2677,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro = do
       return (n, (t, newVar))
 
   addCallInfo address' contract' funcName hsh cc (M.fromList localVars) ro -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
---  forM_ locals $ \(n, (_, v)) -> do
---    liftIO $ putStrLn "need to initialize the storage 2"
---    initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack n) v
+
   let !commands = fromMaybe (missingField "Function call: function has been declared but not defined" funcName) $ CC.funcContents theFunction
   let modContentsList = map (\m -> fromMaybe (missingField "Function call: Modifier has been declared but not defined" m) (CC.modifierContents m)) theModifiers
   let isNotModExec = \case

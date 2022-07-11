@@ -30,7 +30,6 @@ import qualified SolidVM.Model.CodeCollection.Event as SolidVM
 import           SolidVM.Model.CodeCollection.Function
 import qualified SolidVM.Model.CodeCollection.VarDef as SolidVM
 import           SolidVM.Model.CodeCollection.VariableDecl
---import qualified SolidVM.Solidity.Xabi 
 import           SolidVM.Model.SolidString
 
 data ContractF a =

@@ -53,10 +53,8 @@ statement = do
   <|> (Continue <$> (position (reserved "continue") <* semi))
   <|> (Break <$> (position (reserved "break") <* semi))
   <|> (reserved "assembly" >> inlineAssembly)
-  <|> (ModifierExecutor <$> (position (reserved "_") <* semi))
-
+  <|> (ModifierExecutor <$> (position (reserved "_") <* semi))   -- This parses the "_;" statement, which is used to signify when in a modifier the function should run
   <|> ((\(a,e) -> SimpleStatement (ExpressionStatement e) a) <$> ((withPosition expression) <* semi))
-  -- This parses the "_;" statement, which is used to signify when in a modifier the function should run
   <|> revertStatement
   <|> uncheckedStatement
 
@@ -65,7 +63,6 @@ Statement = IfStatement | WhileStatement | ForStatement | Block | InlineAssembly
             ( DoWhileStatement | PlaceholderStatement | Continue | Break | Return |
               Throw | EmitStatement | RevertStatement | SimpleStatement ) ';'
 -}
-
 
 
 solidityTryCatchStatement :: SolidityParser Statement
@@ -190,19 +187,6 @@ revertStatement = try $ do
     pure (i, e)
   _ <- semi
   pure $ RevertStatement i e a  
-
---ForStatement = 'for' '(' (SimpleStatement)? ';' (Expression)? ';' (ExpressionStatement)? ')' Statement
-
--- parse the "_;" which is the ModifierExecutor statemnt
---modifierExecutor :: SolidityParser Statement
---modifierExecutor = do
---  _ <- position (reserved "_")
---  _ <- semi
---  pure ModifierExecutor
-
-
-
-
 
 
 location :: SolidityParser (Maybe Location)
@@ -407,8 +391,6 @@ literal = asum
         , uncurry ArrayExpression <$> withPosition (brackets $ commaSep literal)
         , objectE
         ]
-
---parse a _; statement that ends a modifier block
 
 inlineAssembly :: SolidityParser Statement
 inlineAssembly = do

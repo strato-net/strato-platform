@@ -331,8 +331,6 @@ modifierDeclaration = do
   reserved "modifier"
   name <- identifier
   args <- option [] tupleDeclaration
---  defn <- bracedCode
---  maybe here we should try to parse the _; statement, to see whether it is prefix or postfix
   contents <- Just <$> statements <|> (reservedOp ";" >> return Nothing)
   end <- getSourcePosition
   let ctx = SourceAnnotation start end ()
@@ -347,13 +345,7 @@ modifierDeclaration = do
       , Xabi.modifierSelector = Text.pack name -- ? -- undefined -- :: Text
       , Xabi.modifierVals = Map.fromList [] -- undefined -- :: Map Text SolidVM.IndexedType
       , Xabi.modifierContents = contents -- :: Maybe [Statement]
-      , Xabi.modifierExecutor = True
       , Xabi.modifierContext = ctx
---        objName = name,
---        objValueType = NoValue,
---        objArgType = args,
---        objDefn = defn,
---        objIsPublic = False -- We only care about public variables
       }
     )
 
@@ -425,20 +417,8 @@ functionModifiers = do
       name <- stringToLabel <$> identifier
       exps <- optionMaybe (parens $ commaSep expression)
       return (name, fromMaybe [] exps) 
-    {-
-    otherModifiers = do
-      name <- stringToLabel <$> identifier
-      --args <- optionMaybe parensCode
-      return $ name -- ++ maybe "" (\s -> "(" ++ s ++ ")") args
-    -}
+
 -- | A common pattern: code enclosed in braces, allowing nested braces.
-
-
-
-
-
-
-
 bracedCode :: SolidityParser String
 bracedCode = braces . fmap concat . many $
         (show <$> try stringLiteral)
@@ -447,7 +427,6 @@ bracedCode = braces . fmap concat . many $
     <|> do
         innerBraces <- bracedCode
         return $ "{" ++ innerBraces ++ "}"
-
 
 -- | Parses arguments and their types in parentheses.
 parensCode :: SolidityParser String

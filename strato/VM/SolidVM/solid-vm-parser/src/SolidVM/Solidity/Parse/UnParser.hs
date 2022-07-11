@@ -133,10 +133,10 @@ unparseFuncWithoutName Func{..} =
         Just Internal -> "internal "
         Just External -> "external "
         _ -> ""
---    <> case funcModifiers of
---        Just [] -> ""
---        Just xs -> Text.pack $ List.intercalate " " xs <> " "
---        _ -> ""
+    <> case funcModifiers of
+        [] -> ""
+        xs ->
+          "modifiers " <> (Text.intercalate ", " (map Text.pack (map (\(name, args) -> labelToString name <> Text.unpack ("(" <> Text.intercalate ", " (map Text.pack (map unparseExpression args)) <> ")")) xs))) <> " "
     <> case funcVals of
         [] -> ""
         vals ->
