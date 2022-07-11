@@ -51,6 +51,9 @@ statementCrawler = \case
                                     ++ maybe [] expressionCrawler mTest
                                     ++ maybe [] expressionCrawler mInc
                                     ++ concatMap statementCrawler blk
+  TryCatchStatement _ _ _ -> ["TryCatchStatement"]
+  SolidityTryCatchStatement _ _ _ _ _ -> ["SolidityTryCatchStatement"]
+
 
 expressionCrawler :: ExpressionF a -> [T.Text]
 expressionCrawler = \case

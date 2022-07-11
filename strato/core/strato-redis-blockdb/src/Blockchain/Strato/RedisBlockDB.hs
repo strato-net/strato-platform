@@ -16,7 +16,8 @@ module Blockchain.Strato.RedisBlockDB
     , getChainInfo, putChainInfo
     , getChainMembers, putChainMembers
     , addChainMember, removeChainMember
-    , registerCertificate, getCertificate
+    , registerCertificate
+    , revokeCertificate
     , getChainTxsInBlock, putChainTxsInBlock, addChainTxsInBlock
     , getIPChains, addIPChain, removeIPChain
     , getOrgIdChains, addOrgIdChain, removeOrgIdChain
@@ -61,7 +62,7 @@ import           Data.Foldable                         (foldl')
 import           Data.Functor                          ((<&>))
 import           Data.Functor.Compose
 import qualified Data.Map.Strict                       as M
-import           Data.Maybe                            (catMaybes, fromJust, fromMaybe, isJust, isNothing)
+import           Data.Maybe                            (catMaybes, fromJust, fromMaybe, isJust, isNothing, listToMaybe)
 import qualified Data.Set                              as S
 import qualified Data.Text                             as T
 import           Database.Redis
@@ -225,6 +226,22 @@ registerCertificate userAddress x509CertInfoState = do
                             TxAborted -> pure . Left $ SingleLine (S8.pack "registerCertificate - Aborted adding children")
                             TxError e -> pure . Left $ SingleLine (S8.pack $ "registerCertificate - Error adding children" <> e)
 
+revokeCertificate :: Address -> Redis (Either Reply Status)                            
+revokeCertificate userAddress = do
+    mCertInfoState <- getCertificate userAddress
+    case mCertInfoState of
+        Nothing ->  pure . Left $ SingleLine (S8.pack "registerCertificate - userAddress invalid")
+        Just certInfoState -> do
+            let newInfoState = certInfoState{isValid  = False}
+            res <- multiExec $ set (inNamespace X509Certificates $ toKey userAddress) (toValue newInfoState)
+            case res of
+                TxSuccess _ -> do
+                        res2 <- mapM revokeCertificate (children certInfoState)
+                        pure $ fmap (fromMaybe Ok . listToMaybe) (sequenceA res2)
+                TxAborted -> pure . Left $ SingleLine (S8.pack "registerCertificate - Aborted revoking cert")
+                TxError e -> pure . Left $ SingleLine (S8.pack $ "registerCertificate - Error revoking cert" <> e)
+                        
+                
 getCertificate :: Address -> Redis (Maybe X509CertInfoState)
 getCertificate userAddress = getInNamespace X509Certificates userAddress >>= \case ---or inNamespace?
         Left _          -> return Nothing
