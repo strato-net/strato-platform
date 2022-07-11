@@ -51,7 +51,6 @@ data SolidException = TypeError String String
                     | ArityMismatch String Int Int
                     | ParseError String String
                     | Require (Maybe String)
-                    | RequireFromMod String (Maybe String)
                     | ModifierError String String
                     | Assert
                     | UnknownFunction String String
@@ -84,8 +83,6 @@ showSolidException (ParseError m v) = printf "parse error: %s: %s" m v
 showSolidException (ModifierError m v) = printf "modifier error: %s: %s" m v
 showSolidException (Require Nothing) = printf "solidity require failed"
 showSolidException (Require (Just m)) = printf "solidity require failed: %s" m
-showSolidException (RequireFromMod modName Nothing) = printf "solidity require from modifier: %s failed" modName
-showSolidException (RequireFromMod modName (Just m)) = printf "solidity require from modifier: %s failed: %s" modName m
 showSolidException Assert = printf "solidity assert failed"
 showSolidException (TODO m v) = printf "Unimplemented feature in SolidVM: %s: %s" m v
 showSolidException (TypeError a b) = printf "type error: %s: %s" a b
