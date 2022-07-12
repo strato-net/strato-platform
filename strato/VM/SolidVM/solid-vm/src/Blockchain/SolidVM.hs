@@ -2497,7 +2497,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
                                         $ CC._constructor contract')
                                   argExps
   let einval = invalidArguments "named arguments to contract without constructor" (contractName', argVals)
-
+  let svm3_2 = CC._vmVersion contract' == "svm3.2"
   zipped <-
     case argVals of
       OrderedVals vals ->
@@ -2546,10 +2546,6 @@ runTheConstructors from to hsh cc contractName' argExps = do
     runTheConstructors from to hsh cc parent args
 
 
-
-
-
-
   _ <-
     case contract'^.CC.constructor of
       Just theFunction -> do
@@ -2562,7 +2558,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
               --args' <- argsToVals contract' theModifier argExps
               return $ Just theModifier
             Nothing -> do
-              if name `elem` contract'^.CC.parents then return Nothing else (missingField "modifier not found" name)
+              if name `elem` contract'^.CC.parents then return Nothing else (if svm3_2 then (missingField "modifier not found" name) else return Nothing)
         let theModifiers = catMaybes theModifiers'
         !commands <- case CC.funcContents theFunction of
           Nothing -> missingField "contract constructor has been declared but not defined" contractName'
@@ -2616,13 +2612,13 @@ runTheCall :: MonadSM m
 runTheCall address' contract' funcName hsh cc theFunction argVals ro = do
   let returns = [(n, (t, defaultValue contract' t)) | (Just n, CC.IndexedType _ t) <- CC.funcVals theFunction]
       theModifierNames = map fst $ (CC.funcModifiers theFunction) 
-     
-  theModifiers <- forM theModifierNames $ \name -> do
+      svm3_2 = CC._vmVersion contract' == "svm3.2"
+  theModifiers' <- forM theModifierNames $ \name -> do
     case M.lookup name (contract'^.CC.modifiers) of
       Just theModifier -> do
-        return theModifier
-      Nothing -> missingField "modifier not found" name
-
+        return $ Just theModifier
+      Nothing -> if name `elem` contract' ^. CC.parents then return Nothing else (if svm3_2 then (missingField "modifier not found" name) else return Nothing)
+  let !theModifiers = catMaybes theModifiers'
   matchedArgvals <- forM theModifiers $ \modi -> do
     let margList = CC.OrderedArgs 
             . fromMaybe []
