@@ -253,7 +253,7 @@ pipeline {
             // agent { label "multinode101" } // is default
             steps {
                 script {
-                    lib.runAppBootNode(NODE_DATA.NODE1)
+                    lib.runAppBootNode(NODE_DATA.NODE1, null, null, null, 'beanstalk')
                 }
             }
         }
@@ -297,7 +297,7 @@ pipeline {
                 agent { label "multinode102" }
                 steps {
                     script {
-                    lib.runAppSecondaryNode(NODE_DATA.NODE2)
+                    lib.runAppSecondaryNode(NODE_DATA.NODE2, null, null, null, 'beanstalk')
                     }
                 }
                 }
@@ -305,7 +305,7 @@ pipeline {
                 agent { label "multinode103" }
                 steps {
                     script{
-                    lib.runAppSecondaryNode(NODE_DATA.NODE3)
+                    lib.runAppSecondaryNode(NODE_DATA.NODE3, null, null, null, 'beanstalk')
                     }
                 }
                 }
@@ -313,7 +313,7 @@ pipeline {
                 agent { label "multinode104" }
                 steps {
                     script {
-                    lib.runAppSecondaryNode(NODE_DATA.NODE4)
+                    lib.runAppSecondaryNode(NODE_DATA.NODE4, null, null, null, 'beanstalk')
                     }
                 }
                 }
@@ -321,7 +321,7 @@ pipeline {
                 agent { label "multinode301" }
                 steps {
                     script {
-                    lib.runAppSecondaryNode(NODE_DATA.NODE5)
+                    lib.runAppSecondaryNode(NODE_DATA.NODE5, null, null, null, 'beanstalk')
                     }
                 }
                 }
@@ -329,7 +329,7 @@ pipeline {
                 agent { label "multinode302" }
                     steps {
                         script {
-                            lib.runAppSecondaryNode(NODE_DATA.NODE6)
+                            lib.runAppSecondaryNode(NODE_DATA.NODE6, null, null, null, 'beanstalk')
                         }
                     }
                 }
@@ -337,7 +337,7 @@ pipeline {
                     agent { label "multinode303" }
                     steps {
                         script { 
-                            lib.runAppSecondaryNode(NODE_DATA.NODE7)
+                            lib.runAppSecondaryNode(NODE_DATA.NODE7, null, null, null, 'beanstalk')
                         }
                     }
                 }
@@ -345,7 +345,7 @@ pipeline {
                     agent { label "multinode304" }
                     steps {
                         script {
-                            lib.runAppSecondaryNode(NODE_DATA.NODE8)
+                            lib.runAppSecondaryNode(NODE_DATA.NODE8, null, null, null, 'beanstalk')
                         }
                     }
                 }
@@ -521,7 +521,7 @@ pipeline {
             // agent { label "multinode101" } // is default
             steps {
                 script {
-                    lib.runAppBootNode(NODE_DATA.NODE1)
+                    lib.runAppBootNode(NODE_DATA.NODE1, null, null, null, 'beanstalk')
                 }
             }
         }
@@ -567,7 +567,7 @@ pipeline {
                 agent { label "multinode102" }
                 steps {
                     script {
-                    lib.runAppSecondaryNode(NODE_DATA.NODE2)
+                    lib.runAppSecondaryNode(NODE_DATA.NODE2, null, null, null, 'beanstalk')
                     }
                 }
                 }
@@ -575,7 +575,7 @@ pipeline {
                 agent { label "multinode103" }
                 steps {
                     script{
-                    lib.runAppSecondaryNode(NODE_DATA.NODE3)
+                    lib.runAppSecondaryNode(NODE_DATA.NODE3, null, null, null, 'beanstalk')
                     }
                 }
                 }
@@ -583,7 +583,7 @@ pipeline {
                 agent { label "multinode104" }
                 steps {
                     script {
-                    lib.runAppSecondaryNode(NODE_DATA.NODE4)
+                    lib.runAppSecondaryNode(NODE_DATA.NODE4, null, null, null, 'beanstalk')
                     }
                 }
                 }
@@ -591,7 +591,7 @@ pipeline {
                 agent { label "multinode301" }
                 steps {
                     script {
-                    lib.runAppSecondaryNode(NODE_DATA.NODE5)
+                    lib.runAppSecondaryNode(NODE_DATA.NODE5, null, null, null, 'beanstalk')
                     }
                 }
                 }
@@ -599,7 +599,7 @@ pipeline {
                 agent { label "multinode302" }
                     steps {
                         script {
-                            lib.runAppSecondaryNode(NODE_DATA.NODE6)
+                            lib.runAppSecondaryNode(NODE_DATA.NODE6, null, null, null, 'beanstalk')
                         }
                     }
                 }
@@ -607,7 +607,7 @@ pipeline {
                     agent { label "multinode303" }
                     steps {
                         script {
-                            lib.runAppSecondaryNode(NODE_DATA.NODE7)
+                            lib.runAppSecondaryNode(NODE_DATA.NODE7, null, null, null, 'beanstalk')
                         }
                     }
                 }
@@ -615,7 +615,7 @@ pipeline {
                     agent { label "multinode304" }
                     steps {
                         script {
-                            lib.runAppSecondaryNode(NODE_DATA.NODE8)
+                            lib.runAppSecondaryNode(NODE_DATA.NODE8, null, null, null, 'beanstalk')
                         }
                     }
                 }
@@ -835,7 +835,7 @@ pipeline {
             // agent { label "multinode101" } // is default
             steps {
                 script {
-                    lib.runAppBootNode(NODE_DATA.NODE1)
+                    lib.runAppBootNode(NODE_DATA.NODE1, null, null, null, 'beanstalk')
                 }
             }
         }
@@ -846,7 +846,7 @@ pipeline {
                 agent { label "multinode102" }
                 steps {
                     script {
-                    lib.runAppSecondaryNode(NODE_DATA.NODE2)
+                    lib.runAppSecondaryNode(NODE_DATA.NODE2, null, null, null, 'beanstalk')
                     }
                 }
                 }
@@ -854,7 +854,7 @@ pipeline {
                 agent { label "multinode103" }
                 steps {
                     script{
-                    lib.runAppSecondaryNode(NODE_DATA.NODE3)
+                    lib.runAppSecondaryNode(NODE_DATA.NODE3, null, null, null, 'beanstalk')
                     }
                 }
                 }
@@ -862,7 +862,7 @@ pipeline {
                 agent { label "multinode104" }
                 steps {
                     script {
-                    lib.runAppSecondaryNode(NODE_DATA.NODE4)
+                    lib.runAppSecondaryNode(NODE_DATA.NODE4, null, null, null, 'beanstalk')
                     }
                 }
                 }
@@ -870,7 +870,7 @@ pipeline {
                 agent { label "multinode301" }
                 steps {
                     script {
-                    lib.runAppSecondaryNode(NODE_DATA.NODE5)
+                    lib.runAppSecondaryNode(NODE_DATA.NODE5, null, null, null, 'beanstalk')
                     }
                 }
                 }
@@ -878,7 +878,7 @@ pipeline {
                 agent { label "multinode302" }
                     steps {
                         script {
-                            lib.runAppSecondaryNode(NODE_DATA.NODE6)
+                            lib.runAppSecondaryNode(NODE_DATA.NODE6, null, null, null, 'beanstalk')
                         }
                     }
                 }
@@ -886,7 +886,7 @@ pipeline {
                     agent { label "multinode303" }
                     steps {
                         script {
-                            lib.runAppSecondaryNode(NODE_DATA.NODE7)
+                            lib.runAppSecondaryNode(NODE_DATA.NODE7, null, null, null, 'beanstalk')
                         }
                     }
                 }
@@ -894,7 +894,7 @@ pipeline {
                     agent { label "multinode304" }
                     steps {
                         script {
-                            lib.runAppSecondaryNode(NODE_DATA.NODE8)
+                            lib.runAppSecondaryNode(NODE_DATA.NODE8, null, null, null, 'beanstalk')
                         }
                     }
                 }
@@ -909,14 +909,14 @@ pipeline {
                     sh '''
                     set -x
                     ADDRESS = $(curl -X 'GET' \
-                        'https://{INSERT URL}:8080/cirrus/search/Attribute' \
+                        'https://multinode101.ci.blockapps.net:8080/cirrus/search/Attribute' \
                         -H "Authorization: Bearer $SERVICE_TOKEN"  \
                         -H 'accept: application/json;charset=utf-8' \
                         -H 'Content-Type: application/json;charset=utf-8') \
                         | jq '.address'
                     curl -X 'POST' \
-                        'https://{PLACE NODE URL HERE}:8080/strato/v2.3/transaction/parallel?resolve=true' \
-                        -H "Authorization: Bearer {PLACE SERVICE TOKEN HERE}"  \
+                        'https://multinode101.ci.blockapps.net:8080/strato/v2.3/transaction/parallel?resolve=true' \
+                        -H "Authorization: Bearer $SERVICE_TOKEN"  \
                         -H 'accept: application/json;charset=utf-8' \
                         -H 'Content-Type: application/json;charset=utf-8' \
                         -d '{
