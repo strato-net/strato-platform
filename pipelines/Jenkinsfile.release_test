@@ -660,7 +660,7 @@ pipeline {
             steps {
                 dir('strato-getting-started') {
                     script {
-                        sh 'sudo ./strato ----drop-chains'
+                        sh 'sudo ./strato --drop-chains'
                     }
                 }
             }
@@ -682,7 +682,7 @@ pipeline {
             steps {
                 dir('strato-getting-started') {
                     script {
-                        sh 'sudo ./strato ----drop-chains'
+                        sh 'sudo ./strato --drop-chains'
                     }
 
                 }
@@ -704,7 +704,7 @@ pipeline {
             steps {
                 dir('strato-getting-started') {
                     script {
-                        sh 'sudo ./strato ----drop-chains'
+                        sh 'sudo ./strato --drop-chains'
                     }
 
                 }
@@ -726,7 +726,7 @@ pipeline {
             steps {
                 dir('strato-getting-started') {
                     script {
-                        sh 'sudo ./strato ----drop-chains'
+                        sh 'sudo ./strato --drop-chains'
                     }
 
                 }
@@ -748,7 +748,7 @@ pipeline {
             steps {
                 dir('strato-getting-started') {
                     script {
-                        sh 'sudo ./strato ----drop-chains'
+                        sh 'sudo ./strato --drop-chains'
                     }
 
                 }
@@ -770,7 +770,7 @@ pipeline {
             steps {
                 dir('strato-getting-started') {
                     script {
-                        sh 'sudo ./strato ----drop-chains'
+                        sh 'sudo ./strato --drop-chains'
                     }
 
                 }
@@ -792,7 +792,7 @@ pipeline {
             steps {
                 dir('strato-getting-started') {
                     script {
-                        sh 'sudo ./strato ----drop-chains'
+                        sh 'sudo ./strato --drop-chains'
                     }
 
                 }
@@ -814,7 +814,7 @@ pipeline {
             steps {
                 dir('strato-getting-started') {
                     script {
-                        sh 'sudo ./strato ----drop-chains'
+                        sh 'sudo ./strato --drop-chains'
                     }
                 }
             }
@@ -1154,7 +1154,7 @@ pipeline {
             steps {
                 dir('strato-getting-started') {
                     script {
-                        sh 'sudo ./strato ----drop-chains'
+                        sh 'sudo ./strato --drop-chains'
                         lib.deployStratoWithApp(null, NODE_DATA.NODE4, 'beanstalk', false)
                         sh 'until curl --silent localhost:8080; do sleep 1; done'
                         sh 'sudo docker ps'
@@ -1169,7 +1169,7 @@ pipeline {
             steps {
                 dir('strato-getting-started') {
                     script {
-                        sh 'sudo ./strato ----drop-chains'
+                        sh 'sudo ./strato --drop-chains'
                         lib.deployStratoWithApp(null, NODE_DATA.NODE3, 'beanstalk', false)
                         sh 'until curl --silent localhost:8080; do sleep 1; done'
                         sh 'sudo docker ps'
@@ -1184,7 +1184,7 @@ pipeline {
             steps {
                 dir('strato-getting-started') {
                     script {
-                        sh 'sudo ./strato ----drop-chains'
+                        sh 'sudo ./strato --drop-chains'
                         lib.deployStratoWithApp(null, NODE_DATA.NODE2, 'beanstalk', false)
                         sh 'until curl --silent localhost:8080; do sleep 1; done'
                         sh 'sudo docker ps'
@@ -1199,7 +1199,7 @@ pipeline {
             steps {
                 dir('strato-getting-started') {
                     script {
-                        sh 'sudo ./strato ----drop-chains'
+                        sh 'sudo ./strato --drop-chains'
                         lib.deployStratoWithApp(null, NODE_DATA.NODE1, 'beanstalk', false)
                         sh 'until curl --silent localhost:8080; do sleep 1; done'
                         sh 'sudo docker ps'
