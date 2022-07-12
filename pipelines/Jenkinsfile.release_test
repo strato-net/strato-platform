@@ -1143,11 +1143,13 @@ pipeline {
                     ).trim()
 
                     if(numOfPrivChains == 0) {
-                        assert condition : "Build failed to create private chains"
+                        assert condition : "Build failed to add Node 5 to private chain"
                     }
                 }
             }
         }
+
+        /* TO DO: Redeploy monitor so that it only displays multinode101-104*/
 
         stage('Upgrade w/ node chain data - Upgrade Node 4') {
             agent { label "test-multinode104" }
@@ -1217,8 +1219,145 @@ pipeline {
                 ).trim()
 
                 if(numOfPrivChains != 1) {
-                    assert condition : "Build failed to create private chains"
+                    assert condition : "Build failed to sync private chains"
                 }
+            }
+        }
+
+        /* Add/Remove Node on an Upgraded Network */
+
+        /* TO DO: Add multinode301 to the monitor. Redeploy the monitor. */
+
+        stage('Add/Remove Node on an Upgraded Network - Vote in 5th Node') {
+            // agent { label "multinode101" } // is default
+            steps {
+                dir('strato-getting-started') {
+                    script{
+                        sh "sudo ./strato.sh --blockstanbul-vote --recipient=${node5Address} --nonce=250 --nodes=${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT},${NODE_DATA.NODE2.HOST}:${NODE_DATA.NODE2.PORT},${NODE_DATA.NODE3.HOST}:${NODE_DATA.NODE3.PORT},${NODE_DATA.NODE4.HOST}:${NODE_DATA.NODE4.PORT} --https"
+                        sleep(time:10,unit:"SECONDS")
+                        sh '''
+                        set -x
+                        counter=0
+                        until [ "$counter" -eq "5" ]
+                        do
+                            voteList=$(sudo docker exec -i strato_strato_1 bash -c "tail -n 100 logs/strato-sequencer | grep showctx/validators | tail -n 1 | cut -d '|' -f 4 ")
+                            counter=$(echo "$voteList" | jq ". | length")
+                            echo $counter
+                        done
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Add/Remove Node on an Upgraded Network - Confirm the 5th Node was Voted In on Another Node') {
+            agent { label "multinode103" }
+            steps {
+                dir('strato-getting-started') {
+                    script {
+                        sh '''
+                        set -x
+                        counter=0
+                        until [ "$counter" -eq "5" ]
+                        do
+                            voteList=$(sudo docker exec -i strato_strato_1 bash -c "tail -n 100 logs/strato-sequencer | grep showctx/validators | tail -n 1 | cut -d '|' -f 4 ")
+                            counter=$(echo "$voteList" | jq ". | length")
+                            echo $counter
+                        done
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Add/Remove Node on an Upgraded Network - Confirm the New Node Accepts Transactions and Syncs') {
+            agent { label "multinode301" }
+            steps {
+                def accessToken = sh(
+                    returnStdout: true,
+                    script: "curl -s -X POST 'https://keycloak.blockapps.net/auth/realms/traceharvest-demo-tech/protocol/openid-connect/token' -H 'Content-Type: application/x-www-form-urlencoded' -H 'Authorization: Basic dGhkZW1vLXRlY2g6ZjY3Y2I0MWMtMGFjMC00N2FjLWE1OWYtMmFkZWQxN2IwMzI1' --data-urlencode 'grant_type=password' --data-urlencode 'username=tech1' --data-urlencode 'password=1234' | jq -r .access_token"
+                ).trim()
+                def createUser = sh(
+                    returnStdout: true,
+                    script: "curl -X POST -H \"Authorization: Bearer ${accessToken}\" -H \"Accept: application/json\" \"https://multinode301.ci.blockapps.net:8080/strato/v2.3/key\""
+                ).trim()
+                def txResponse = sh(
+                    returnStdout: true,
+                    script: "curl 'https://multinode301.ci.blockapps.net:8080/strato/v2.3/transaction?resolve=true' \
+                        -X 'POST' \
+                        -H \"Authorization: Bearer ${accessToken}\"  \
+                        -H 'Accept: application/json;charset=utf-8' \
+                        -H 'Content-Type: application/json' \
+                        --data-binary '{\"txs\":[{\"payload\":{\"contract\":\"SimpleStorage\",\"src\":\"pragma solidvm 3.0; contract SimpleStorage {\n  uint storedData;\n\n  function SimpleStorage() {\n    storedData = 1;\n  }\n\n  function set(uint x) {\n    storedData = x;\n  }\n\n  function get() constant returns (uint) {\n    return storedData;\n  }\n}\n\",\"args\":{},\"metadata\":{\"VM\":\"SolidVM\",\"history\":\"SimpleStorage\",\"index\":\"SimpleStorage\"}},\"type\":\"CONTRACT\"}]}' | grep Success"
+                ).trim()
+                if(txResponse != 'Success') {
+                    assert condition : "Build failed to accept new Transaction"
+                }
+
+                lib.waitForHealthySync(NODE_DATA.LOAD_TEST_HEALTH_URL)
+            }
+        }
+
+        stage('Add/Remove Node on an Upgraded Network - Vote Out and Remove Node from Network') {
+            steps {
+                dir('strato-getting-started') {
+                    script{
+                        sh "sudo ./strato.sh --blockstanbul-vote --remove --recipient=${node2Address} --nonce=300 --nodes=${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT},${NODE_DATA.NODE5.HOST}:${NODE_DATA.NODE5.PORT},${NODE_DATA.NODE3.HOST}:${NODE_DATA.NODE3.PORT},${NODE_DATA.NODE4.HOST}:${NODE_DATA.NODE4.PORT} --https"
+                        sleep(time:10,unit:"SECONDS")
+                        sh '''
+                        set -x
+                        counter=0
+                        until [ "$counter" -eq "4" ]
+                        do
+                            voteList=$(sudo docker exec -i strato_strato_1 bash -c "tail -n 100 logs/strato-sequencer | grep showctx/validators | tail -n 1 | cut -d '|' -f 4 ")
+                            counter=$(echo "$voteList" | jq ". | length")
+                            echo $counter
+                        done
+                        '''
+                    }
+                }
+                def accessToken = sh(
+                    returnStdout: true,
+                    script: "curl -s -X POST 'https://keycloak.blockapps.net/auth/realms/traceharvest-demo-tech/protocol/openid-connect/token' -H 'Content-Type: application/x-www-form-urlencoded' -H 'Authorization: Basic dGhkZW1vLXRlY2g6ZjY3Y2I0MWMtMGFjMC00N2FjLWE1OWYtMmFkZWQxN2IwMzI1' --data-urlencode 'grant_type=password' --data-urlencode 'username=tech1' --data-urlencode 'password=1234' | jq -r .access_token"
+                ).trim()  
+                def createUser = sh(
+                    returnStdout: true,
+                    script: "curl -X POST -H \"Authorization: Bearer ${accessToken}\" -H \"Accept: application/json\" \"https://multinode101.ci.blockapps.net:8080/strato/v2.3/key\""
+                ).trim()
+                lib.waitForHealthySync(NODE_DATA.LOAD_TEST_HEALTH_URL)            
+            }
+        }
+
+        stage('Add/Remove Node on an Upgraded Network - Shut off voted out node') {
+            agent { label "multinode102" }
+            steps {
+                script {
+                    lib.cleanNode()
+                }
+            }
+        }
+
+        stage('Add/Remove Node on an Upgraded Network - Confirm Network Syncs after Voted out Node shuts off') {
+            steps {
+
+                def accessToken = sh(
+                    returnStdout: true,
+                    script: "curl -s -X POST 'https://keycloak.blockapps.net/auth/realms/traceharvest-demo-tech/protocol/openid-connect/token' -H 'Content-Type: application/x-www-form-urlencoded' -H 'Authorization: Basic dGhkZW1vLXRlY2g6ZjY3Y2I0MWMtMGFjMC00N2FjLWE1OWYtMmFkZWQxN2IwMzI1' --data-urlencode 'grant_type=password' --data-urlencode 'username=tech1' --data-urlencode 'password=1234' | jq -r .access_token"
+                ).trim()  
+                def txResponse = sh(
+                    returnStdout: true,
+                    script: "curl 'https://multinode101.ci.blockapps.net:8080/strato/v2.3/transaction?resolve=true' \
+                        -X 'POST' \
+                        -H \"Authorization: Bearer ${accessToken}\"  \
+                        -H 'Accept: application/json;charset=utf-8' \
+                        -H 'Content-Type: application/json' \
+                        --data-binary '{\"txs\":[{\"payload\":{\"contract\":\"SimpleStorage\",\"src\":\"pragma solidvm 3.0; contract SimpleStorage {\n  uint storedData;\n\n  function SimpleStorage() {\n    storedData = 1;\n  }\n\n  function set(uint x) {\n    storedData = x;\n  }\n\n  function get() constant returns (uint) {\n    return storedData;\n  }\n}\n\",\"args\":{},\"metadata\":{\"VM\":\"SolidVM\",\"history\":\"SimpleStorage\",\"index\":\"SimpleStorage\"}},\"type\":\"CONTRACT\"}]}' | grep Success"
+                ).trim()
+                if(txResponse != 'Success') {
+                    assert condition : "Build failed to accept new Transaction"
+                }
+
+                lib.waitForHealthySync(NODE_DATA.LOAD_TEST_HEALTH_URL)          
             }
         }
 
