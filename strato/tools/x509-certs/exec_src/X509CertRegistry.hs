@@ -21,7 +21,7 @@ import           Text.RawString.QQ
 import qualified Data.Aeson                           as Ae
 
 import           BlockApps.Bloc22.API
-import           BlockApps.X509 
+import           BlockApps.X509
 import           Blockchain.Data.AlternateTransaction
 import qualified Blockchain.Data.DataDefs             as DD
 import           Blockchain.Data.Transaction
@@ -35,17 +35,17 @@ import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.Wei
 
 -- | The command line options
-data Options 
+data Options
     = Options
         FilePath            -- ^ The private key of the node
-        (Maybe FilePath)    -- ^ The root X509 ceritificate
+        [FilePath]          -- ^ The root X509 ceritificates
         Nonce               -- ^ The transaction's nonce
 
 main :: IO ()
 main = execParser opts >>= entryPoint
     where opts = info (helper <*> parseOptions)
-                    ( fullDesc 
-                        <> header "Post the CertificateRegistry contract" 
+                    ( fullDesc
+                        <> header "Post the CertificateRegistry contract"
                         <> progDesc "The CertificateRegistry contract is used to register X509 certificates to the network" )
 
 
@@ -53,12 +53,12 @@ parseNonce :: ReadM Nonce
 parseNonce = maybeReader (\s -> Nonce <$> (readMaybe s :: Maybe Word256))
 
 parseOptions :: Parser Options
-parseOptions = Options 
+parseOptions = Options
     <$> strOption
           ( long "priv"
          <> metavar "FILE"
          <> help "The PEM encoded root private key." )
-    <*> optional (strOption
+    <*> some (strOption
           ( long "cert"
          <> metavar "FILE"
          <> help "The PEM encoded root X509 certificate for the network. By default this will be the BlockApps root certificate." ))
@@ -71,18 +71,20 @@ parseOptions = Options
 
 
 entryPoint :: Options -> IO ()
-entryPoint (Options privPath certPath nonce) = do
+entryPoint (Options privPath certPaths nonce) = do
     eitherPriv <- bsToPriv <$> B.readFile privPath
-    eitherCert <- case certPath of
-        Nothing -> return $ Right rootCert
-        Just path -> bsToCert <$> B.readFile path
+    eitherCerts <- case certPaths of
+        [] -> return $ Left "Oh no! You didn't give me a cert!"
+        a -> do x509s <- traverse B.readFile a
+                let eitherListCerts = fmap bsToCert x509s
+                return $ sequenceA eitherListCerts
 
-    case (eitherPriv, eitherCert) of 
+    case (eitherPriv, eitherCerts) of
         (Left s,  Left s') -> putStrLn $ "Oh no! The private key and certificate couldn't be parsed! " <> s <> "; " <> s'
         (Left s,  Right _) -> putStrLn $ "Oh no! The private key couldn't be parsed! " <> s
         (Right _, Left s') -> putStrLn $ "Oh no! The certificate couldn't be parsed! " <> s'
-        (Right priv, Right cert) -> do
-            let request = optionsToTX priv cert nonce
+        (Right priv, Right certs) -> do
+            let request = optionsToTX priv nonce
             putStrLn "We will make the following request to CertificateRegistry:\n"
             BL.putStr $ Ae.encode request
 
@@ -98,10 +100,10 @@ entryPoint (Options privPath certPath nonce) = do
             let oops = error "We did not successfully post the CertificateRegistry!"
                 strToAddr x = fromMaybe oops . stringAddress . T.unpack . head . T.splitOn "," $ T.pack x
                 addr = case result of
-                    (Right (BlocTxResult (BlocTransactionResult {blocTransactionStatus=Success, 
-                        blocTransactionTxResult=Just (DD.TransactionResult{..})}))) -> strToAddr transactionResultContractsCreated
+                    (Right (BlocTxResult BlocTransactionResult {blocTransactionStatus=Success,
+                        blocTransactionTxResult=Just DD.TransactionResult{..}})) -> strToAddr transactionResultContractsCreated
                     _ -> oops
-            let request' = initializeCertificateRegistryTX priv addr $ succ nonce
+            let request' = initializeCertificateRegistryTX priv addr certs $ succ nonce
             putStrLn "\n\nWe will make the following request to initializeCertificateRegistry of CertificateRegistry:\n"
             BL.putStr $ Ae.encode request'
 
@@ -116,14 +118,14 @@ postRawTransaction = client (Proxy @ PostBlocTransactionRaw)
 
 
 -- Convert the parsed and retrieved options into a raw transaction request
-optionsToTX :: PrivateKey -> X509Certificate -> Nonce -> PostBlocTransactionRawRequest
-optionsToTX priv cert nonce = 
+optionsToTX :: PrivateKey -> Nonce -> PostBlocTransactionRawRequest
+optionsToTX priv nonce =
     let unsignedTx = UnsignedTransaction
             { unsignedTransactionNonce      = nonce
             , unsignedTransactionGasPrice   = Wei 10000        -- default val
             , unsignedTransactionGasLimit   = Gas 29000000000  -- default val
             , unsignedTransactionTo         = Nothing
-            , unsignedTransactionValue      = Wei 0 
+            , unsignedTransactionValue      = Wei 0
             , unsignedTransactionInitOrData = Code $ T.encodeUtf8 $ serializeSourceMap $ namedSource "" certificateRegistryContract
             , unsignedTransactionChainId    = Nothing
             }
@@ -142,18 +144,18 @@ optionsToTX priv cert nonce =
         rr
         s
         (Just v)
-        (Just $ M.fromList $ [("VM", "SolidVM"), ("name", "CertificateRegistry"), 
-            ("history", "Certificate"), ("args", T.pack $ "(" <> show (certToBytes cert) <> ")")])
+        (Just $ M.fromList $ [("VM", "SolidVM"), ("name", "CertificateRegistry"),
+            ("history", "Certificate"), ("args", "()") ])
 
 
-initializeCertificateRegistryTX :: PrivateKey -> Address -> Nonce -> PostBlocTransactionRawRequest
-initializeCertificateRegistryTX priv addr nonce =
+initializeCertificateRegistryTX :: PrivateKey -> Address -> [X509Certificate] ->Nonce -> PostBlocTransactionRawRequest
+initializeCertificateRegistryTX priv addr certs nonce =
     let unsignedTx = UnsignedTransaction
             { unsignedTransactionNonce      = nonce
             , unsignedTransactionGasPrice   = Wei 10000        -- default val
             , unsignedTransactionGasLimit   = Gas 29000000000  -- default val
             , unsignedTransactionTo         = Just addr
-            , unsignedTransactionValue      = Wei 0 
+            , unsignedTransactionValue      = Wei 0
             , unsignedTransactionInitOrData = Code $ B.empty
             , unsignedTransactionChainId    = Nothing
             }
@@ -172,7 +174,7 @@ initializeCertificateRegistryTX priv addr nonce =
         rr
         s
         (Just v)
-        (Just $ M.fromList [("VM", "SolidVM"), ("funcName", "initializeCertificateRegistry"), ("args", "()")])
+        (Just $ M.fromList [("VM", "SolidVM"), ("funcName", "initializeCertificateRegistry"), ("args", T.pack $ "(" <> show (fmap certToBytes certs) <> ")")])
 
 certificateRegistryContract :: T.Text
 certificateRegistryContract = [r|
@@ -180,9 +182,9 @@ pragma solidvm 3.2;
 contract Certificate {
     address owner;  // The CertificateRegistery Contract
 
-    account certificateHolder;
-    account parent;
-    account[] children;
+    address public userAddress;
+    address parent;
+    address[] children;
     
     // Store all the fields of a certificate in a Cirrus record
     string commonName;
@@ -190,16 +192,16 @@ contract Certificate {
     string organization;
     string group;
     string organizationalUnit;
-    string publicKey;
+    string public publicKey;
     string certificateString;
-    bool isValid;
+    bool public isValid;
 
     constructor(string _certificateString) {
         owner = msg.sender;
 
         mapping(string => string) parsedCert = parseCert(_certificateString);
 
-        certificateHolder = account(parsedCert["userAddress"]);
+        userAddress = address(parsedCert["userAddress"]);
         commonName = parsedCert["commonName"];
         organization = parsedCert["organization"];
         group = parsedCert["group"];
@@ -208,31 +210,31 @@ contract Certificate {
         publicKey = parsedCert["publicKey"];
         certificateString = parsedCert["certString"];
         isValid = true;
-        parent = account(parsedCert["parent"]);
-        if (parent != 0x0){
+        parent = address(parsedCert["parent"]);
+        if (parent != address(0x0)){
             Certificate parentContract = Certificate(parent);
             parentContract.addChild(this);    
         }
     }
     
-    function addChild(account _child){
-        children.push[_child];
+    function addChild(address _child){
+        children.push(_child);
     }
     
-    function isChild(pCert) returns bool {
+    function isChild(string pCert) returns (bool) {
         mapping(string => string) parsedCert = parseCert(certificateString);
-        if(parent != 0x0 && pCert == Certificate(account(parsedCert["parent"]))){
+        if(parent != address(0x0) && pCert == parsedCert["parent"]){
             return true;
         }
-        if(parent != 0x0){
-            Certificate parentContract = Certificate(account(parsedCert["parent"]));
+        if(parent != address(0x0)){
+            Certificate parentContract = Certificate(address(parsedCert["parent"]));
             return parentContract.isChild(pCert);
         }
         return false;
     }
     
     function revoke() {
-        require(msg.sender,owner,"You don't have permission to call revoke!");
+        require(msg.sender == owner,"You don't have permission to call revoke!");
         isValid = false;
         for (uint i = 0; i < children.length; ++i) {
            Certificate child = Certificate(children[i]);
@@ -249,70 +251,69 @@ contract CertificateRegistry {
     // We need the extra array in order for us to iterate through our certificates.
     // Solidity mappings are non-iterable.
     Certificate[] certificates;
-    mapping(account => uint) certificatesMap;
+    mapping(address => uint) certificatesMap;
 
-    string rootCert;
-    string rootPubKey;
     bool initialized;
 
     event CertificateRegistered(address userAddress, address contractAddress);
     event CertificateRevoked(address userAddress);
+    event CertificateRegistryInitialized();
 
-    constructor(string _rootCert) {
+    constructor() {
         require(account(this, "self").chainId == 0, "You must post this contract on the main chain!");
-
-        rootCert = _rootCert;
-        rootPubKey = parseCert(_rootCert)["publicKey"];
+        
         initialized = false;
     }
 
-    function initializeCertificateRegistry() returns (int) {
-        require(!initialized, "The CertificateRegistry has already been initialized!");
-        require(verifyCert(rootCert, rootPubKey), "The cert being registered is not verified in the chain of trust");
+    function initializeCertificateRegistry(string[] _rootCerts) returns (int) {
+        require(!initialized, "The CertificateRegistry has already been initialized!");        
         
-        // Create the Certificate record
-        Certificate c = new Certificate(rootCert);
-
-        // Register the root certificate and emit event
-        account newAccount = registerCert(rootCert, c);
+        for (uint i=0; i < _rootCerts.length; i = i + 1) {
+            // Create the Certificate record
+            Certificate c = new Certificate(_rootCerts[i]);
+            // Register the root certificates and emit event
+            certificates.push(c);
+            certificatesMap[c.userAddress()] = certificates.length;
+            emit CertificateRegistered(_rootCerts[i]);
+        }
         
-        certificates.push(c);
-        certificatesMap[newAccount] = certificates.length;
         initialized = true;
-
-        emit CertificateRegistered(rootCert);
+        emit CertificateRegistryInitialized();
         
         return 200;
     }
     
     function registerCertificate(string newCertificateString) returns (int) {
         require(initialized, "You must first initialize with initializeCertificateRegistry!");
-        require(verifyCert(newCertificateString, rootPubKey), "The cert being registered is not verified in the chain of trust");
         
-        // Create the new Certificate record
-        Certificate c = new Certificate(newCertificateString);
+        mapping(string => string) parsedCert = parseCert(newCertificateString);
+        address parent = address(parsedCert["parent"]);
+        Certificate parentContract = Certificate(parent);
         
-        // Register the certificate into LevelDB and emit event
-        account userAccount = registerCert(newCertificateString, c);
-
-        certificates.push(c);
-        certificatesMap[userAccount] = certificates.length;
-        
-        emit CertificateRegistered(newCertificateString);
-
-        return 200; // 200 = HTTP Status OK
+        if (parentContract.isValid() && verifyCert(newCertificateString, parentContract.publicKey())){
+            // Create the new Certificate record
+            Certificate c = new Certificate(newCertificateString);
+    
+            certificates.push(c);
+            certificatesMap[c.userAddress()] = certificates.length;
+            
+            emit CertificateRegistered(newCertificateString);
+    
+            return 200; // 200 = HTTP Status OK
+        }
+        return 400;
     }
     
     function getCertByAddress(address _address) returns (Certificate) {
         return getCertByAccount(account(_address));
     }
     
-    function getCertByAccount(account _account) returns (Certificate) {
+    function getCertByAccount(address _account) returns (Certificate) {
         return certificates[certificatesMap[_account]];
     }
     
     function revokeCert(address certAddr){
-        Certificate mycert = Certificate(certAddr);
+        Certificate myCert = Certificate(certAddr);
         if (myCert.isChild(tx.certificate)) {
             myCert.revoke();
         }
