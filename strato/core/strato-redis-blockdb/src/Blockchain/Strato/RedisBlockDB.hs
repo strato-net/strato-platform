@@ -9,7 +9,6 @@
 {-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeOperators         #-}
 {-# OPTIONS -fno-warn-orphans #-}
-{-# LANGUAGE BlockArguments #-}
 
 module Blockchain.Strato.RedisBlockDB
     ( RedisConnection(..), inNamespace, findNamespace, runStratoRedisIO
