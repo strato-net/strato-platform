@@ -163,10 +163,10 @@ indexEventToTxrResults = \case
             (Left s, Just ua) -> Just . RegisterCertificate . Left $ "Failed to parse the certString for the CertificateRegistered event: " <> s <> "; " <> show ua
             (Right s, Nothing) -> Just . RegisterCertificate . Left $ "Failed to parse the certString's userAddress for the CertificateRegistered event: " <> show s
             (Right c, Just ua) -> Just . RegisterCertificate . Right $ (ua, X509CertInfoState{userAddress=ua, certificate=c, isValid=True, children=[]})
-      (Nothing, "CertificateRevoked", [certString]) ->
-        let userAddress = stringAddress certString
-        in case userAddress of
-            Nothing -> Just . CertificateRevoked . Left $ "Failed to parse the certString for the CertificateRevoked event: " <> certString
+      (Nothing, "CertificateRevoked", [userAddress]) ->
+        let userAddress' = stringAddress userAddress
+        in case userAddress' of
+            Nothing -> Just . CertificateRevoked . Left $ "Failed to parse the certString for the CertificateRevoked event: " <> userAddress
             Just ua -> Just . CertificateRevoked . Right $ ua
       (Nothing, "CertificateRegistryInitialized", []) -> Just . CertificateRegistryInitialized . Right $ ()
       _ -> Nothing
@@ -185,7 +185,7 @@ txrResultHandler = \case
     Right (ua, certInfoState) -> doRegisterCertificate ua certInfoState
     Left err -> $logErrorS "txrIndexer" $ T.pack err
   CertificateRevoked e -> case e of
-    Right address -> doRevokeCertificate address
+    Right userAddress -> doRevokeCertificate userAddress
     Left err -> $logErrorS "txrIndexer" $ T.pack err
   CertificateRegistryInitialized e -> case e of
     Right _ -> doCertificateRegistryInitialized

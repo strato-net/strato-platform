@@ -312,11 +312,11 @@ contract CertificateRegistry {
         return certificates[certificatesMap[_account]];
     }
     
-    function revokeCert(address certAddr){
-        Certificate myCert = Certificate(certAddr);
+    function revokeCert(address userAddress){
+        Certificate myCert = Certificate(userAddress);
         if (myCert.isChild(tx.certificate)) {
             myCert.revoke();
         }
-        emit CertificateRevoked(certAddr);
+        emit CertificateRevoked(userAddress);
     }
 }|]
