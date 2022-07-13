@@ -27,7 +27,7 @@ data Type
   | Bool
   | Address {isPayable :: Bool}
   | Account {isPayable :: Bool}
-  | UnknownLabel SolidString (Maybe Type)
+  | UnknownLabel SolidString (Maybe SolidString)
   | Struct { bytes::Maybe Int32, typedef::SolidString}
   | Enum { bytes::Maybe Int32, typedef::SolidString, names::Maybe [SolidString]}
   | Array { entry:: Type, length :: Maybe Word }

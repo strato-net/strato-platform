@@ -16,6 +16,7 @@ import           SolidVM.Solidity.Parse.ParserTypes
 
 import qualified SolidVM.Model.Type         as SVMType
 
+
 -- | A type expression is either a composite type (arrays and mappings) or
 -- a simple type (builtins and user-defined names)
 simpleTypeExpression :: SolidityParser SVMType.Type
@@ -35,18 +36,22 @@ simpleType =
   intSuffixed "int"  (SVMType.Int (Just True)) <|>
   choice [optionParser, unknownLabelParser, unknownLabelMemberParser]
   where
-    optionParser = try $ do
-      name <- choice [identifier, concat <$> sequence[identifier, dot, identifier]]
+    optionParser =  try $ do
+      name <- identifier
       salt <- braces $ do 
         reserved "salt"
         colon
-        s <- bytes'
+        let myReallyGoodParser = do    
+              myStr <- stringLiteral
+              return ("\"" ++ myStr ++ "\"")
+
+        s <- identifier <|> myReallyGoodParser  
         return s
-      return $ SVMType.UnknownLabel name (Just salt)
+      return $ SVMType.UnknownLabel name $ Just salt
     unknownLabelParser = try $ do
       name <- identifier
       return $ SVMType.UnknownLabel name Nothing
-    unknownLabelMemberParser = do
+    unknownLabelMemberParser = try $ do
       name <- concat <$> sequence[identifier, dot, identifier]
       return $ SVMType.UnknownLabel name Nothing
     simple name nameType = do
