@@ -17,6 +17,8 @@ module Blockchain.Strato.RedisBlockDB
     , getChainMembers, putChainMembers
     , addChainMember, removeChainMember
     , registerCertificate
+    , revokeCertificate
+    , getInitializeCertificateRegistry, initializeCertificateRegistry 
     , getChainTxsInBlock, putChainTxsInBlock, addChainTxsInBlock
     , getIPChains, addIPChain, removeIPChain
     , getOrgIdChains, addOrgIdChain, removeOrgIdChain
@@ -61,7 +63,7 @@ import           Data.Foldable                         (foldl')
 import           Data.Functor                          ((<&>))
 import           Data.Functor.Compose
 import qualified Data.Map.Strict                       as M
-import           Data.Maybe                            (catMaybes, fromJust, fromMaybe, isJust, isNothing)
+import           Data.Maybe                            (catMaybes, fromJust, fromMaybe, isJust, isNothing, listToMaybe)
 import qualified Data.Set                              as S
 import qualified Data.Text                             as T
 import           Database.Redis
@@ -108,6 +110,7 @@ inNamespace ns k = ns' `S8.append` toKey k
             PrivateIPChains     -> "pic:"
             PrivateOrgIdChains  -> "poc:"
             X509Certificates    -> "x509:"
+            X509Initialized     -> "x509init:"
 
 findNamespace :: S8.ByteString -> BlockDBNamespace
 findNamespace key = case S8.takeWhile (/= ':') key of
@@ -125,6 +128,7 @@ findNamespace key = case S8.takeWhile (/= ':') key of
   "pic" -> PrivateIPChains
   "poc" -> PrivateOrgIdChains
   "x509" -> X509Certificates
+  "x509init:" -> X509Initialized
   wut -> error $ "unknown namespace: " ++ show wut
 
 getChainInfo :: Word256
@@ -202,12 +206,82 @@ removeChainMember cId address = do
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Error" ++ e)
 
 registerCertificate :: Address -> X509CertInfoState -> Redis (Either Reply Status)
-registerCertificate userAddress x509CertInfoState = do
-    res <- multiExec $ set (inNamespace X509Certificates $ toKey userAddress) (toValue x509CertInfoState)
-    case res of
-        TxSuccess _ -> pure $ Right Ok
-        TxAborted -> pure . Left $ SingleLine (S8.pack $ "registerCertificate - Aborted")
-        TxError e -> pure . Left $ SingleLine (S8.pack $ "registerCertificate - Error" <> e)
+registerCertificate userAddr x509CertInfoState = do
+    status <- getInitializeCertificateRegistry
+    let maybeParent = getParentUserAddress $ certificate x509CertInfoState
+    certInfoState' <- case maybeParent of
+        Just parentAddr -> do
+            mCertInfoState <- getCertificate parentAddr
+            case mCertInfoState of
+                Nothing -> pure Nothing
+                Just certInfoState -> pure $ Just certInfoState
+        Nothing -> pure Nothing
+        
+    let parentCertIsValid = fmap isValid certInfoState'
+        parentIsValid = fromMaybe False parentCertIsValid
+    
+    if not status || (status && parentIsValid)
+        then do
+            res <- multiExec $ set (inNamespace X509Certificates $ toKey userAddr) (toValue x509CertInfoState)
+            _ <- case res of
+                TxSuccess _ -> pure $ Right Ok
+                TxAborted -> pure . Left $ SingleLine (S8.pack $ "registerCertificate - Aborted")
+                TxError e -> pure . Left $ SingleLine (S8.pack $ "registerCertificate - Error" <> e)
+            
+            case certInfoState' of 
+                Nothing -> pure . Left $ SingleLine (S8.pack "registerCertificate - No Parent")
+                Just certInfoState -> do
+                    let newChildren = userAddr : children certInfoState
+                    let newParentInfoState = certInfoState{children  = newChildren}
+                    let parentAddr = userAddress certInfoState
+                    res' <- multiExec $ set (inNamespace X509Certificates $ toKey parentAddr) (toValue newParentInfoState)
+                    case res' of
+                        TxSuccess _ -> pure $ Right Ok
+                        TxAborted -> pure . Left $ SingleLine (S8.pack "registerCertificate - Aborted adding children")
+                        TxError e -> pure . Left $ SingleLine (S8.pack $ "registerCertificate - Error adding children" <> e)
+        else pure . Left $ SingleLine (S8.pack "registerCertificate - Parent not valid")
+                    
+
+revokeCertificate :: Address -> Redis (Either Reply Status)
+revokeCertificate userAddress = do
+    mCertInfoState <- getCertificate userAddress
+    case mCertInfoState of
+        Nothing ->  pure . Left $ SingleLine (S8.pack "registerCertificate - userAddress invalid")
+        Just certInfoState -> do
+            let newInfoState = certInfoState{isValid  = False}
+            res <- multiExec $ set (inNamespace X509Certificates $ toKey userAddress) (toValue newInfoState)
+            case res of
+                TxSuccess _ -> do
+                        res2 <- mapM revokeCertificate (children certInfoState)
+                        pure $ fmap (fromMaybe Ok . listToMaybe) (sequenceA res2)
+                TxAborted -> pure . Left $ SingleLine (S8.pack "registerCertificate - Aborted revoking cert")
+                TxError e -> pure . Left $ SingleLine (S8.pack $ "registerCertificate - Error revoking cert" <> e)
+                
+initializeCertificateRegistry :: Redis (Either Reply Status)
+initializeCertificateRegistry = do
+    status <- getInitializeCertificateRegistry
+    if not status
+        then do
+            res <- multiExec $ set (inNamespace X509Initialized ("initialized" :: S8.ByteString)) (toValue True)
+            case res of
+                TxSuccess _ -> pure $ Right Ok
+                TxAborted -> pure . Left $ SingleLine (S8.pack "initializeCertificateRegistry - Aborted initializing certificate")
+                TxError e -> pure . Left $ SingleLine (S8.pack $ "initializeCertificateRegistry - Error initializing certificate" <> e)
+        else pure . Left $ SingleLine (S8.pack "initializeCertificateRegistry - Aborted already initialized")
+
+getInitializeCertificateRegistry :: Redis Bool
+getInitializeCertificateRegistry = getInNamespace X509Initialized ("initialized" :: S8.ByteString) >>= \case
+        Left _          -> return False
+        Right Nothing   -> return False
+        Right (Just state) -> return (fromValue state)
+
+
+getCertificate :: Address -> Redis (Maybe X509CertInfoState)
+getCertificate userAddress = getInNamespace X509Certificates userAddress >>= \case
+        Left _          -> return Nothing
+        Right Nothing   -> return Nothing
+        Right (Just state) -> let certInfoState = fromValue state
+                              in return (Just certInfoState)
 
 getChainTxsInBlock :: Keccak256
                    -> Redis (M.Map Word256 [Keccak256])
@@ -539,7 +613,7 @@ insertHeaders = sequenceA . M.mapWithKey insertHeader
 
 deleteHeader :: Keccak256
              -> Redis (Either Reply Status)
-deleteHeader _ = pure . Left $ SingleLine (S8.pack $ "deleteHeader - Not Implemented")
+deleteHeader _ = pure . Left $ SingleLine (S8.pack "deleteHeader - Not Implemented")
 
 deleteHeaders :: Traversable t
               => t Keccak256
@@ -634,7 +708,7 @@ commonAncestorHelper :: Integer -> Integer
                      -> Keccak256     -> Keccak256
                      -> Redis (Either Reply ([(Keccak256, Integer)], [Integer])) -- ([Updates], [Deletions])
 commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] (S.fromList [oldSha', newSha'])
-        where helper (oldSha:[]) (newSha:[]) _ | oldSha == newSha = return $ Right ([], [])
+        where helper [oldSha] [newSha] _ | oldSha == newSha = return $ Right ([], [])
               helper (_:(oldSha'':_)) (_:(newSha'':ns)) _ | oldSha'' == newSha'' = complete oldSha'' (mkParentChain newSha'' ns)
               helper oldShaChain newShaChain seen = do
                 let oldSha = head oldShaChain
@@ -642,7 +716,7 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
                 newParent <- (\x -> fromMaybe x <$> getParent x) newSha
                 oldParent <- (\x -> fromMaybe x <$> getParent x) oldSha
                 let ps = [newParent, oldParent]
-                let seen' = foldl' (flip S.insert) seen (filter (/= (unsafeCreateKeccak256FromWord256 0)) ps) -- todo double S.insert is probably more optimal
+                let seen' = foldl' (flip S.insert) seen (filter (/= unsafeCreateKeccak256FromWord256 0) ps) -- todo double S.insert is probably more optimal
                 if newParent `S.member` seen
                 then complete newParent (mkParentChain newParent newShaChain)
                 else if oldParent `S.member` seen
@@ -663,7 +737,7 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
 
               complete :: Keccak256 -> [Keccak256] -> Redis (Either Reply ([(Keccak256, Integer)], [Integer]))
               complete lca newShaChain = getHeader lca >>= \case
-                      Nothing -> if lca /= (unsafeCreateKeccak256FromWord256 0) -- genesis block is sha 0
+                      Nothing -> if lca /= unsafeCreateKeccak256FromWord256 0 -- genesis block is sha 0
                                      then return . Left . SingleLine . S8.pack $
                                               "Could not get ancestor header for Keccak256 " ++ keccak256ToHex lca
                                      else complete (head newShaChain) newShaChain
@@ -691,7 +765,7 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
 
 -- | Used to seed the first bestBlock, e.g. genesis block in strato-setup
 forceBestBlockInfo :: RedisCtx m f => Keccak256 -> Integer -> Integer -> m (f Status)
-forceBestBlockInfo sha i j = do
+forceBestBlockInfo sha i j =
         forceBestBlockInfo' bestBlockInfoKey (RedisBestBlock sha i j) --`totalRecall` (,,)
 
 forceBestBlockInfo' :: RedisCtx m f => S8.ByteString -> RedisBestBlock -> m (f Status)
@@ -767,7 +841,7 @@ updateWorldBestBlockInfo sha num tdiff = withRetryCount 0
               maybeLockID <- acquireWorldBestBlockRedlock defaultRedlockTTL
               case maybeLockID of
                   Left err -> do
-                      when (theRetryCount /= 0 && (theRetryCount `mod` 5) == 0) $ do
+                      when (theRetryCount /= 0 && theRetryCount `mod` 5 == 0) $ do
                           liftLog $ $logWarnS "updateWorldBestBlockInfo" . T.pack $ "Could not acquire redlock after " ++ show theRetryCount ++ " attempts, will retry; " ++ show err
                           liftIO $ threadDelay defaultRedlockBackoff -- todo make backoff a factor instead of a fixed backoff
                       withRetryCount $ theRetryCount + 1
@@ -807,7 +881,7 @@ checkAndUpdateSyncStatus = do
     worldBestBlock <- getWorldBestBlockInfo
     let nodeTotalDiff  = bestBlockTotalDifficulty <$> nodeBestBlock
         worldTotalDiff = bestBlockTotalDifficulty <$> worldBestBlock
-    
+
     case (status, nodeTotalDiff, worldTotalDiff) of
         (Just False, Just ntd, Just wtd) -> when (ntd >= wtd) (void $ putSyncStatus True)
         (Nothing,    Just ntd, Just wtd) -> void $ putSyncStatus (ntd >= wtd)

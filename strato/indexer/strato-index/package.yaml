@@ -73,5 +73,7 @@ tests:
     dependencies:
     - blockapps-data
     - blockapps-datadefs
+    - bytestring
     - hspec
     - strato-index
+    - x509-certs

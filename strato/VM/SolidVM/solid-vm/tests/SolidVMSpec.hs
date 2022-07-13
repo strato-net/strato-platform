@@ -2372,8 +2372,8 @@ contract qq {
     getFields ["a"] `shouldReturn` [bAddress 74]
 
   it "can have a for loop with no fields" . runTest $ do
-    liftIO $ pendingWith "re-fix loops"
     runBS [r|
+pragma solidvm 3.2;
 contract qq {
   uint i;
   constructor() public {
@@ -4333,6 +4333,41 @@ contract qq {
 }|]
     getFields ["hsh"] `shouldReturn` [BString $ B.pack $ word160ToBytes 0x63f4a6f6005b0ded8c5fc7e62ddf2550e9320410]
 
+  it "can use the selfdestruct function" . runTest $ do
+    let contract = [r|
+pragma solidvm 3.2;
+contract qq {
+  account contract';
+  account payable contractPay;
+  account owner;
+  account payable ownerPay;
+
+  constructor() public {
+    contract' = account(this);
+    contractPay = payable(contract');
+    owner = account(0xdeadbeef);
+    ownerPay = payable(owner);
+  }
+
+  function selfDestructThis() internal {
+    selfdestruct(ownerPay);
+  } 
+}|]
+    runBS contract
+    -- Get the contract's accounts
+    [ BAccount contract', BAccount owner] <- getFields ["contract'", "owner"]
+    -- Adjust the preset balances
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing contract') (\as -> pure $ as { addressStateBalance = 14 })
+    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing owner) (\bs -> pure $ bs { addressStateBalance = 10 })
+    -- Check return of balance
+    void $ call2 "selfDestructThis" "()" (namedAccountToAccount Nothing contract') 
+    getFields ["contract'", "contractPay", "owner", "ownerPay"] `shouldReturn` 
+      [ BDefault
+      , BDefault
+      , BDefault
+      , BDefault
+      ]
+  
   it "throw an error when the 'account' reserved word is for a variable name." $ runTest (do
       runBS [r|
 pragma solidvm 3.2;
@@ -4410,4 +4445,60 @@ contract qq {
       , bContract "Y" 0x3911f467237f82a56973a5f4d87aa67107479626
       , bContract "X" 0x33945db5a537463004fbed0bde21ac30d46ad052
       ]
+      
+  it "can use a try catch statment to catch a divide by zero error the SolidVM Way (trademark pending)" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq{
+  uint mynum = 5;
+  constructor() public {
+    try {
+      mynum = 1 / 0;
+    } catch DivideByZero {
+      mynum = 3;
+    }
+  }
+}|]
+    getFields ["mynum"] `shouldReturn` [BInteger 3]
+
+  it "can use a try catch statment to catch a divide by zero error the Solidity Way (trademark very much in effect)" . runTest $ do
+    runBS [r| 
+pragma solidvm 3.2;
+contract Divisor {
+  function doTheDivide() public returns (uint) {
+    return (1 / 0);
+  }
+}
+
+contract qq {
+  uint myNum = 5;
+  uint otherNum = 7;
+  uint errorCount = 0;
+  constructor() public returns (uint,bool) {
+    Divisor d =  new Divisor();
+    try d.doTheDivide() returns (uint v) {
+          return (v, true);
+        } catch Error(string memory amsg) { 
+            // This is executed in case
+            // revert was called inside getData
+            // and a reason string was provided.
+            errorCount++;
+            return (0, false);
+        } catch Panic(uint errCode) {
+            // This is executed in case of a panic,
+            // i.e. a serious error like division by zero
+            // or overflow. The error code can be used
+            // to determine the kind of error.
+            errorCount++;
+            myNum = 3;
+            otherNum = errCode;
+            return (0, false);
+        } catch (bytes bigTest) {
+            // This is executed in case revert() was used.
+            errorCount++;
+            return (0, false);
+        }
+  }
+}|]
+    getFields ["myNum", "otherNum", "errorCount"] `shouldReturn` [BInteger 3, BInteger 12, BInteger 1]
 
