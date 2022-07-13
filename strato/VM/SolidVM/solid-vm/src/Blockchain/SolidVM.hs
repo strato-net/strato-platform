@@ -2254,7 +2254,7 @@ callBuiltin vc@"verifyCert" [SString cert, SString pubkey] _ = do
       (Left q, _) -> invalidCertificate "Could not parse X.509 certificate" q
       (_, Left r) -> malformedData "Could not parse public key" r
       (Right x509Cert, Right publicKey) -> do
-        let isValid = verifyCert publicKey x509Cert
+        let isValid = verifyCertSignedBy publicKey x509Cert
         onTraced $ liftIO $ putStrLn $ (if isValid then 
                 C.green "The certificate is valid."
                 else C.red "The certificate is invalid")
