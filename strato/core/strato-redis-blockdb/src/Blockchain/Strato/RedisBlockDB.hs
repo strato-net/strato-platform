@@ -218,7 +218,10 @@ registerCertificate userAddr x509CertInfoState = do
                 Just certInfoState -> pure $ Just certInfoState
         Nothing -> pure Nothing
         
-    if not status
+    let parentCertIsValid = fmap isValid certInfoState'
+        parentIsValid = fromMaybe False parentCertIsValid
+    
+    if not status || (status && parentIsValid)
         then do
             res <- multiExec $ set (inNamespace X509Certificates $ toKey userAddr) (toValue x509CertInfoState)
             _ <- case res of
@@ -237,27 +240,7 @@ registerCertificate userAddr x509CertInfoState = do
                         TxSuccess _ -> pure $ Right Ok
                         TxAborted -> pure . Left $ SingleLine (S8.pack "registerCertificate - Aborted adding children")
                         TxError e -> pure . Left $ SingleLine (S8.pack $ "registerCertificate - Error adding children" <> e)
-        else do
-            case certInfoState' of 
-                Nothing -> pure . Left $ SingleLine (S8.pack "registerCertificate - No Parent")
-                Just certInfoState -> do
-                    if isValid certInfoState
-                        then do
-                            res <- multiExec $ set (inNamespace X509Certificates $ toKey userAddr) (toValue x509CertInfoState)
-                            _ <- case res of
-                                TxSuccess _ -> pure $ Right Ok
-                                TxAborted -> pure . Left $ SingleLine (S8.pack $ "registerCertificate - Aborted")
-                                TxError e -> pure . Left $ SingleLine (S8.pack $ "registerCertificate - Error" <> e)
-
-                            let newChildren = userAddr : children certInfoState
-                            let newParentInfoState = certInfoState{children  = newChildren}
-                            let parentAddr = userAddress certInfoState
-                            res' <- multiExec $ set (inNamespace X509Certificates $ toKey parentAddr) (toValue newParentInfoState)
-                            case res' of
-                                TxSuccess _ -> pure $ Right Ok
-                                TxAborted -> pure . Left $ SingleLine (S8.pack "registerCertificate - Aborted adding children")
-                                TxError e -> pure . Left $ SingleLine (S8.pack $ "registerCertificate - Error adding children" <> e)
-                    else pure . Left $ SingleLine (S8.pack "registerCertificate - Parent not valid")
+        else pure . Left $ SingleLine (S8.pack "registerCertificate - Parent not valid")
                     
 
 revokeCertificate :: Address -> Redis (Either Reply Status)
