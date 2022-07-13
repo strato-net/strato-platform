@@ -235,11 +235,12 @@ getNewAddress_unsafe a n =
     let theHash = SHA.hash $ rlpSerialize $ RLPArray [rlpEncode a, rlpEncode n]
     in decode $ BL.drop 12 $ encode theHash
 
--- Construct salted contract addresses using the solidity CREATE2 method:
--- new_address = hash(0xFF, sender, salt, bytecode) 
-getNewAddressWithSalt_unsafe :: Address -> RLPObject -> B.ByteString -> Address
-getNewAddressWithSalt_unsafe a s h =
-  let theHash = SHA.hash $ rlpSerialize $ RLPArray [rlpEncode (255 :: Integer), rlpEncode a, s, rlpEncode h]
+-- Construct salted contract addresses using a version of the solidity CREATE2 method:
+-- Original -> new_address = hash(0xFF, sender, salt, bytecode) 
+-- Current  -> new_address = hash(0xFF, sender, salt, contract_name, codecollection_hash)
+getNewAddressWithSalt_unsafe :: Address -> RLPObject -> String -> B.ByteString -> Address
+getNewAddressWithSalt_unsafe a s c h =
+  let theHash = SHA.hash $ rlpSerialize $ RLPArray [rlpEncode (255 :: Integer), rlpEncode a, s, rlpEncode c, rlpEncode h]
   in decode $ BL.drop 12 $ encode theHash
 
 addressAsNibbleString::Address->N.NibbleString

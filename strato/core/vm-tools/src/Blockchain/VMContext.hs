@@ -632,15 +632,15 @@ getNewAddress account = do
   incrementNonce account
   return $ (accountAddress .~ newAddress) account
 
-getNewAddressWithSalt :: (MonadIO m, (Account `A.Alters` AddressState) m) => Account -> Value -> Keccak256 -> m Account
-getNewAddressWithSalt account salt hsh = do
+getNewAddressWithSalt :: (MonadIO m, (Account `A.Alters` AddressState) m) => Account -> Value -> String -> Keccak256 -> m Account
+getNewAddressWithSalt account salt cname hsh = do
   nonce <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy account
   when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ show (pretty account) ++ ", nonce=" ++ show nonce
-  let theSaltEncoded = case salt of
+  let rlpEncodedSalt = case salt of
           (SInteger i) -> rlpEncode i
           (SString s) -> rlpEncode s
           _ -> invalidArguments "big major bad" salt
-  let newAddress = getNewAddressWithSalt_unsafe (account ^. accountAddress) theSaltEncoded $ keccak256ToByteString hsh
+  let newAddress = getNewAddressWithSalt_unsafe (account ^. accountAddress) rlpEncodedSalt cname $ keccak256ToByteString hsh
   incrementNonce account
   return $ (accountAddress .~ newAddress) account
 

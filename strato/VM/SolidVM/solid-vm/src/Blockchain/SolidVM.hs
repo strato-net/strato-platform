@@ -114,6 +114,7 @@ import qualified SolidVM.Model.Type as SVMType
 import           SolidVM.Model.Value
 
 import           SolidVM.Solidity.Parse.Statement
+import           SolidVM.Solidity.Parse.Lexer         (stringLiteral)
 import           SolidVM.Solidity.Parse.ParserTypes
 import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpression)
 
@@ -1640,7 +1641,7 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.Array {SVMType.entry=t
 expToVar' x@(CC.FunctionCall _ (CC.NewExpression _ (SVMType.Array{})) CC.NamedArgs{}) =
   typeError "cannot create new array with named arguments" x
 
-expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractName' _)) args) = do
+expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractName' Nothing)) args) = do
   ro <- readOnly <$> getCurrentCallInfo
   when ro $ invalidWrite "Invalid contract creation during read-only access" $ "contractName: " ++ show contractName' ++ ", args: " ++ show args
   creator <- getCurrentAccount
@@ -1651,6 +1652,35 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   return $ Constant $ SContract contractName' $ accountOnUnspecifiedChain
     $ fromMaybe (internalError "a call to create did not create an address" execResults)
     $  erNewContractAccount execResults
+
+expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractName' (Just saltExpressionText))) args) = do
+  ro <- readOnly <$> getCurrentCallInfo
+  when ro $ invalidWrite "Invalid contract creation during read-only access" $ "contractName: " ++ show contractName' ++ ", args: " ++ show args
+  creator <- getCurrentAccount
+  (hsh, cc) <- getCurrentCodeCollection
+  let contractNameString = labelToString contractName'
+  salt <- saltTextToValue saltExpressionText
+  newAddress <- getNewAddressWithSalt creator salt contractNameString hsh
+  x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
+  execResults <- create' creator newAddress hsh cc contractName' args x509s'
+  return $ Constant $ SContract contractName' $ accountOnUnspecifiedChain
+    $ fromMaybe (internalError "a call to create did not create an address" execResults)
+    $  erNewContractAccount execResults
+  where
+    saltTextToValue saltText = do
+      let stringParser = do
+            ~(a, str) <- withPosition $ do
+              s <- stringLiteral
+              return s
+            return $ CC.StringLiteral a str
+      let saltExpression = runParser (stringParser <|> expression) (ParserState "" "") "" (saltText)
+      saltValue <- do
+        case saltExpression of
+          Left pe -> invalidArguments "big bad sad" pe
+          Right expr -> do
+            s <- getVar =<< expToVar expr
+            return s
+      return saltValue
 
 expToVar' (CC.FunctionCall _ e args) = do
   case e of -- FunctionCall Special Case when calling a function via Member Access
