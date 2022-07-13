@@ -86,6 +86,10 @@ showType (SVMType.Array t l) = T.concat
                      ]
 showType (SVMType.Contract n) = "contract " <> labelToText n
 showType (SVMType.Mapping _ k v) = "mapping (" <> showType k <> " => " <> showType v <> ")"
+showType (SVMType.Fixed s b) = (if fromMaybe False s then "u" else "")
+                  <> "fixed"
+                  <> (maybe "" (T.pack . show) b)
+
 
 showType' :: Type' -> Text
 showType' (Top _ _)  = "var"

@@ -7,12 +7,15 @@ module SolidVM.Solidity.Parse.Types where
 
 import           Control.Monad
 import           Data.List
+import           Data.Int                  (Int32)
 
 import           Text.Parsec
+import           Text.Read (readMaybe)
 
 import           SolidVM.Solidity.Parse.Expression
 import           SolidVM.Solidity.Parse.Lexer
 import           SolidVM.Solidity.Parse.ParserTypes
+
 
 import           SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type         as SVMType
@@ -34,6 +37,8 @@ simpleType =
   bytes' <|>
   intSuffixed "uint"  (SVMType.Int (Just False)) <|>
   intSuffixed "int"  (SVMType.Int (Just True)) <|>
+  fixedSuffixed "fixed" (SVMType.Fixed (Just True)) <|> -- fixed256x10 ->   
+  fixedSuffixed "ufixed" (SVMType.Fixed (Just False)) <|>
   SVMType.UnknownLabel . stringToLabel <$>
     choice [
       identifier,
@@ -49,7 +54,6 @@ simpleType =
       lexeme (try $ do
          let base = "bytes"
          chars <- many1 alphaNum
-         
          when (not (base `isPrefixOf` chars)) $ fail "missing 'bytes'"
 
          size <-
@@ -66,18 +70,43 @@ simpleType =
       chars <- many1 alphaNum
 
       when (not (base `isPrefixOf` chars)) $ fail "missing base"
-
       number <-
             case reads (drop (length base) chars) of
               [] -> return Nothing
               [(number, "")] -> do
                 when (not $ number `elem` [8, 16 .. 256]) $ fail "invalid size"
-                return $ Just $ number `quot` 8 -- in bytes
+                return $ Just $ number `quot` 8 --   bytes
               _ ->  fail "invalid size"
 
       return $ baseType number
 
--- | Parses array types, allowing arithmetic expressions to specify the
+
+    fixedSuffixed base baseType = lexeme $ try $ do
+      chars <- many1 alphaNum
+      unless (base `isPrefixOf` chars) $ fail "missing base" -- make this return 128, 18 default
+      decimals <- do
+        let afterFixed = (drop (length base) chars)
+        case afterFixed of -- | fixed128  x18 -> 128x18
+          "" -> return Nothing
+          xs -> do --splitAt :: [a] -> a ([a],[a]) --128x56 
+            let mySplitFunc fs theMatch = mySplitFuncHelper ([],fs) theMatch
+                mySplitFuncHelper (as,[]) _ = (as,[])
+                mySplitFuncHelper (as,(y:ys)) z = case y == z of 
+                  True -> (as, ys)
+                  False -> mySplitFuncHelper ((as++[y]),ys) z
+
+            let theSplit = xs `mySplitFunc` 'x'
+            when (null(fst theSplit) || null (snd theSplit)) $ fail "big bad"
+            let n1 = readMaybe (fst theSplit) :: Maybe Int32
+            let n2 = readMaybe (snd theSplit) :: Maybe Int32
+            case (n1,n2) of
+              (Just x, Just y) -> do
+                when (not (x `elem` [8,16..256]) || not (y `elem` [0..80])) $ fail "invalid fixed sizes"
+                return $ Just (x,y)
+              _ -> return Nothing
+                 -- | ("128x18", "")    
+      return $ baseType decimals 
+
 -- array length so long as they only reference explicit numbers.  Note that
 -- for nested arrays, we have 'T[n][m] = (T[n])[m]' rather than '(T[m])[n]'
 -- as in C.

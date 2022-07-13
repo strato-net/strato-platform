@@ -95,10 +95,10 @@ spec = do
                  , ("var (a, b, , );", SimpleStatement $
                       VariableDefinition [VarDefEntry Nothing Nothing "a" (), VarDefEntry Nothing Nothing "b" (), BlankEntry, BlankEntry]
                       Nothing)
-                 , ("var x = [7, 3];", SimpleStatement $
+                 , ("uint256 x = 6;", SimpleStatement $
                       VariableDefinition [VarDefEntry Nothing Nothing "x" ()] $ Just $
                       ArrayExpression () $ map (\n -> NumberLiteral () n Nothing) [7, 3])
-                 , ("var x = [];", SimpleStatement $
+                 , ("fixed x = 5;", SimpleStatement $
                       VariableDefinition [VarDefEntry Nothing Nothing "x" ()] $ Just $
                       ArrayExpression () [])
                   , ("revert f(x, y);", RevertStatement (Just "f") (OrderedArgs [(Variable () "x"), (Variable () "y")]) )
