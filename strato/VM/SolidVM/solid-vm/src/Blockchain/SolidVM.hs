@@ -2242,7 +2242,9 @@ callBuiltin "getUserCert" [SAccount a _] _ = do
       maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
   return $ certificateMap (fmap (BC.unpack . certToBytes) maybeCert)
 
--- SolidVM built in function that verifies a cert is signed by a given key
+-- SolidVM built in function that verifies that the root cert is signed by the key
+-- verifyCert checks that the root of a chained cert is signed by the public key.
+-- But verifyCertSignedBy checks that the target of a chained cert is signed by the public key.
 -- Expects the public key to be in PEM format
 -- Raises an error if it can't parse either argument, however perhaps that should't happen...
 callBuiltin vc@"verifyCert" [SString cert, SString pubkey] _ = do
@@ -2255,6 +2257,27 @@ callBuiltin vc@"verifyCert" [SString cert, SString pubkey] _ = do
       (_, Left r) -> malformedData "Could not parse public key" r
       (Right x509Cert, Right publicKey) -> do
         let isValid = verifyCert publicKey x509Cert
+        onTraced $ liftIO $ putStrLn $ (if isValid then 
+                C.green "The certificate is valid."
+                else C.red "The certificate is invalid")
+        return $ SBool isValid
+  else unknownFunction "callBuiltin" vc
+
+-- SolidVM built in function that verifies a cert that if it's signed by a given key
+-- verifyCert checks that the root of a chained cert is signed by the public key.
+-- But verifyCertSignedBy checks that the target of a chained cert is signed by the public key.
+-- Expects the public key to be in PEM format
+-- Raises an error if it can't parse either argument, however perhaps that should't happen...
+callBuiltin vc@"verifyCertSignedBy" [SString cert, SString pubkey] _ = do
+  curContract <- getCurrentContract
+  if CC._vmVersion curContract == "svm3.2" then do
+    let ex509Cert = bsToCert . BC.pack $ cert
+    let ePublicKey = bsToPub $ BC.pack pubkey
+    case (ex509Cert, ePublicKey) of 
+      (Left q, _) -> invalidCertificate "Could not parse X.509 certificate" q
+      (_, Left r) -> malformedData "Could not parse public key" r
+      (Right x509Cert, Right publicKey) -> do
+        let isValid = verifyCertSignedBy publicKey x509Cert
         onTraced $ liftIO $ putStrLn $ (if isValid then 
                 C.green "The certificate is valid."
                 else C.red "The certificate is invalid")
