@@ -36,6 +36,7 @@ unparse (File units) = List.concat $ List.map unparseSourceUnit units
 unparseSourceUnit :: SourceUnit -> String
 unparseSourceUnit (Pragma _ ident contents) = "pragma " ++ ident ++ " " ++ contents ++ ";\n"
 unparseSourceUnit (Import _ path) = "import \"" ++ Text.unpack path ++ "\";\n"
+unparseSourceUnit (DummySourceUnit) = "DummySourceUnit"
 unparseSourceUnit (NamedXabi name (contract,inherited)) =
      (case xabiKind contract of
         ContractKind -> "contract "
@@ -133,9 +134,9 @@ unparseFuncWithoutName Func{..} =
         Just External -> "external "
         _ -> ""
     <> case funcModifiers of
-        Just [] -> ""
-        Just xs -> Text.pack $ List.intercalate " " xs <> " "
-        _ -> ""
+        [] -> ""
+        xs ->
+          "modifiers " <> (Text.intercalate ", " (map Text.pack (map (\(name, args) -> labelToString name <> Text.unpack ("(" <> Text.intercalate ", " (map Text.pack (map unparseExpression args)) <> ")")) xs))) <> " "
     <> case funcVals of
         [] -> ""
         vals ->
@@ -186,6 +187,7 @@ unparseStatementWith f (ForStatement v1 v2 v3 s a) = f a $ concat
 unparseStatementWith f (Return Nothing a) = f a $ "return;"
 unparseStatementWith f (Return (Just e) a) = f a $ "return " ++ unparseExpression e ++ ";"
 unparseStatementWith f (Break a) = f a $ "break;"
+unparseStatementWith f (ModifierExecutor a) = f a $ "_;"
 unparseStatementWith f (Continue a) = f a $ "continue;"
 unparseStatementWith f (Throw a) = f a $ "throw;"
 unparseStatementWith f (Block a) = f a $ "{ }"
@@ -263,7 +265,7 @@ unparseExpression (ArrayExpression _ xs) = "[" ++ List.intercalate "," (map unpa
 unparseExpression (ObjectLiteral _ m) = "{" ++ List.intercalate ",\n" [concat ["\t", labelToString k, ":", unparseExpression v]  | (k, v) <- Map.toList m] ++ "}"
 unparseExpression x = internalError "missing case in call to unparseExpression" $ show x
 
-unparseModifier :: (SolidString, ModifierF a) -> String
+unparseModifier :: Show a => (SolidString, ModifierF a) -> String
 unparseModifier (name, Modifier{..}) = Text.unpack $
      "modifier "
   <> labelToText name
@@ -271,8 +273,8 @@ unparseModifier (name, Modifier{..}) = Text.unpack $
   <> Text.intercalate ", " (List.map unparseArgs (Map.toList modifierArgs))
   <> ") {\n        "
   <> case modifierContents of
-       Just contents -> contents --(Text.concat . Text.lines $ contents)
-       Nothing -> ""
+        Just contents -> Text.pack $ tab . tab $ unlines $ map unparseStatement contents --(Text.concat . Text.lines $ contents)
+        Nothing -> ""
   <> "}"
 
 unparseEvent :: (SolidString, EventF a) -> String

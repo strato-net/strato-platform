@@ -401,7 +401,7 @@ getVariableOfName name = do
                                                   , "require", "revert", "assert", "sha3"
                                                   , "sha256", "ecrecover", "blockhash","addmod", "mulmod"
                                                   , "selfdestruct", "suicide", "bytes32ToString"
-                                                  , "registerCert", "getUserCert", "parseCert", "verifyCert", "verifySignature"
+                                                  , "registerCert", "getUserCert", "parseCert", "verifyCert", "verifyCertSignedBy", "verifySignature"
                                                   , "subscribe", "unsubscribe"]) $
         t "builtin function" $ Constant $ SBuiltinFunction name Nothing
 
