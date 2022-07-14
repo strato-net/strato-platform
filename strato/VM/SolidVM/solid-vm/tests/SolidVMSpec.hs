@@ -4532,15 +4532,15 @@ contract qq {
 pragma solidvm 3.2;
 
 function sum(uint[] memory arr) pure returns (uint s) {
-  for (uint i = 0; i < arr.length; i++) 
+  for (uint i = 0; i < arr.length; i++) {
     s += arr[i];
+  }
 }
 
 contract qq{
   uint myNum;
-  uint myArr[3];
+  uint[] myArr = [1,2,3];
   constructor() public {
-    myArr = [1, 2, 3];
     myNum = sum(myArr);
   }
 }|]
