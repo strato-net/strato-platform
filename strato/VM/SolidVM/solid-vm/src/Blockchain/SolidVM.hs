@@ -114,6 +114,7 @@ import qualified SolidVM.Model.Type as SVMType
 import           SolidVM.Model.Value
 
 import           SolidVM.Solidity.Parse.Statement
+import           SolidVM.Solidity.Parse.Lexer         (stringLiteral)
 import           SolidVM.Solidity.Parse.ParserTypes
 import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpression)
 
@@ -710,7 +711,7 @@ argsToVals ctract fn args =
             -- evaluating external arguments.
             CC.ObjectLiteral _ mp -> do
               case t of
-                SVMType.UnknownLabel l -> do
+                SVMType.UnknownLabel l _ -> do
                   let ls = M.toList mp
                   m <- mapM go ls
                   return $ SStruct l $ M.fromList m
@@ -751,7 +752,7 @@ argsToVals ctract fn args =
               -- of the accepted literals, assume that this is not the context of
               -- evaluating external arguments.
             CC.ObjectLiteral _ mp          -> case t of
-              SVMType.UnknownLabel l -> do
+              SVMType.UnknownLabel l _ -> do
                 let ls = M.toList mp :: [(SolidString, CC.Expression)]
                 m <- mapM go ls
                 return $ SStruct l $ M.fromList m
@@ -1184,7 +1185,7 @@ runStatement (CC.ForStatement maybeInitStatement maybeConditionExp maybeLoopExp 
   let loopExp =
         case maybeLoopExp of
           Just x -> x
-          Nothing -> todo "loop expressions" loopExp
+          Nothing -> (CC.NumberLiteral pos 1 Nothing)
 
   let condition = getBool =<< expToVar conditionExp
 
@@ -1782,8 +1783,7 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.Array {SVMType.entry=t
 expToVar' x@(CC.FunctionCall _ (CC.NewExpression _ (SVMType.Array{})) CC.NamedArgs{}) =
   typeError "cannot create new array with named arguments" x
 
-
-expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractName')) args) = do
+expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractName' Nothing)) args) = do
   ro <- readOnly <$> getCurrentCallInfo
   when ro $ invalidWrite "Invalid contract creation during read-only access" $ "contractName: " ++ show contractName' ++ ", args: " ++ show args
   creator <- getCurrentAccount
@@ -1794,6 +1794,35 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   return $ Constant $ SContract contractName' $ accountOnUnspecifiedChain
     $ fromMaybe (internalError "a call to create did not create an address" execResults)
     $  erNewContractAccount execResults
+
+expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractName' (Just saltExpressionText))) args) = do
+  ro <- readOnly <$> getCurrentCallInfo
+  when ro $ invalidWrite "Invalid contract creation during read-only access" $ "contractName: " ++ show contractName' ++ ", args: " ++ show args
+  creator <- getCurrentAccount
+  (hsh, cc) <- getCurrentCodeCollection
+  let contractNameString = labelToString contractName'
+  salt <- saltTextToValue saltExpressionText
+  newAddress <- getNewAddressWithSalt creator salt contractNameString hsh
+  x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
+  execResults <- create' creator newAddress hsh cc contractName' args x509s'
+  return $ Constant $ SContract contractName' $ accountOnUnspecifiedChain
+    $ fromMaybe (internalError "a call to create did not create an address" execResults)
+    $  erNewContractAccount execResults
+  where
+    saltTextToValue saltText = do
+      let stringParser = do
+            ~(a, str) <- withPosition $ do
+              s <- stringLiteral
+              return s
+            return $ CC.StringLiteral a str
+      let saltExpression = runParser (stringParser <|> expression) (ParserState "" "") "" (saltText)
+      saltValue <- do
+        case saltExpression of
+          Left pe -> invalidArguments "big bad sad" pe
+          Right expr -> do
+            s <- getVar =<< expToVar expr
+            return s
+      return saltValue
 
 expToVar' (CC.FunctionCall _ e args) = do
   case e of -- FunctionCall Special Case when calling a function via Member Access
@@ -2353,7 +2382,9 @@ callBuiltin "getUserCert" [SAccount a _] _ = do
       maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
   return $ certificateMap (fmap (BC.unpack . certToBytes) maybeCert)
 
--- SolidVM built in function that verifies a cert is signed by a given key
+-- SolidVM built in function that verifies that the root cert is signed by the key
+-- verifyCert checks that the root of a chained cert is signed by the public key.
+-- But verifyCertSignedBy checks that the target of a chained cert is signed by the public key.
 -- Expects the public key to be in PEM format
 -- Raises an error if it can't parse either argument, however perhaps that should't happen...
 callBuiltin vc@"verifyCert" [SString cert, SString pubkey] _ = do
@@ -2366,6 +2397,27 @@ callBuiltin vc@"verifyCert" [SString cert, SString pubkey] _ = do
       (_, Left r) -> malformedData "Could not parse public key" r
       (Right x509Cert, Right publicKey) -> do
         let isValid = verifyCert publicKey x509Cert
+        onTraced $ liftIO $ putStrLn $ (if isValid then 
+                C.green "The certificate is valid."
+                else C.red "The certificate is invalid")
+        return $ SBool isValid
+  else unknownFunction "callBuiltin" vc
+
+-- SolidVM built in function that verifies a cert that if it's signed by a given key
+-- verifyCert checks that the root of a chained cert is signed by the public key.
+-- But verifyCertSignedBy checks that the target of a chained cert is signed by the public key.
+-- Expects the public key to be in PEM format
+-- Raises an error if it can't parse either argument, however perhaps that should't happen...
+callBuiltin vc@"verifyCertSignedBy" [SString cert, SString pubkey] _ = do
+  curContract <- getCurrentContract
+  if CC._vmVersion curContract == "svm3.2" then do
+    let ex509Cert = bsToCert . BC.pack $ cert
+    let ePublicKey = bsToPub $ BC.pack pubkey
+    case (ex509Cert, ePublicKey) of 
+      (Left q, _) -> invalidCertificate "Could not parse X.509 certificate" q
+      (_, Left r) -> malformedData "Could not parse public key" r
+      (Right x509Cert, Right publicKey) -> do
+        let isValid = verifyCertSignedBy publicKey x509Cert
         onTraced $ liftIO $ putStrLn $ (if isValid then 
                 C.green "The certificate is valid."
                 else C.red "The certificate is invalid")
