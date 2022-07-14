@@ -914,6 +914,12 @@ pipeline {
                         -H 'accept: application/json;charset=utf-8' \
                         -H 'Content-Type: application/json;charset=utf-8') \
                         | jq '.address'
+                    CURRENT_BLOCK_NUMBER = $(curl -X 'GET' \
+                        'https://multinode101.ci.blockapps.net:8080/cirrus/search/Attribute' \
+                        -H "Authorization: Bearer $SERVICE_TOKEN"  \
+                        -H 'accept: application/json;charset=utf-8' \
+                        -H 'Content-Type: application/json;charset=utf-8') \
+                        | jq '.block_number'
                     curl -X 'POST' \
                         'https://multinode101.ci.blockapps.net:8080/strato/v2.3/transaction/parallel?resolve=true' \
                         -H "Authorization: Bearer $SERVICE_TOKEN"  \
@@ -934,7 +940,14 @@ pipeline {
                             "txParams": {
                                 "gasLimit": 32100000000,
                                 "gasPrice": 1
-                            }}'
+                            }}' && exit 1
+                    NEW_BLOCK_NUMBER = $(curl -X 'GET' \
+                        'https://multinode101.ci.blockapps.net:8080/cirrus/search/Attribute' \
+                        -H "Authorization: Bearer $SERVICE_TOKEN"  \
+                        -H 'accept: application/json;charset=utf-8' \
+                        -H 'Content-Type: application/json;charset=utf-8') \
+                        | jq '.block_number'
+                    if [ $NEW_BLOCK_NUMBER -ne $((CURRENT_BLOCK_NUMBER+1)) ]; then exit 1; fi
                     '''
                 }
             }
