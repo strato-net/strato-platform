@@ -103,7 +103,7 @@ unparseVarType (SVMType.Address _) = "address"
 unparseVarType (SVMType.Account _) = "account"
 unparseVarType (SVMType.Bytes (Just True) _ ) = "bytes"
 unparseVarType (SVMType.Bytes Nothing (Just bytes) ) = "bytes" <> (show bytes)
-unparseVarType (SVMType.UnknownLabel str) = labelToString str
+unparseVarType (SVMType.UnknownLabel str _) = labelToString str
 unparseVarType (SVMType.Enum _ name _) = labelToString name
 unparseVarType (SVMType.Array t (Just n)) = (unparseVarType t) <> "[" <> show n <> "]"
 unparseVarType (SVMType.Array t Nothing) = (unparseVarType t) <> "[]"
@@ -205,6 +205,10 @@ unparseStatementWith f (RevertStatement customErr (NamedArgs argList) a) =
 unparseStatementWith f (UncheckedStatement code a) = f a $
   "unchecked {\n" ++ tab (unlines $ map (unparseStatementWith f) code) ++ "\n}"
 
+unparseStatementWith f (TryCatchStatement tryBlock catchBlockMap a) = f a $
+  "try {\n" ++ tab (unlines $ map (unparseStatementWith f) tryBlock) ++ "\n}" ++ " catch " ++ (List.intercalate " " (map (\(name, block) -> "catch " ++ name ++ " {\n" ++ tab (unlines $ map (unparseStatementWith f) block) ++ "\n}") (Map.toList catchBlockMap)))
+unparseStatementWith f (SolidityTryCatchStatement expr mtpl tryBlock catchBlockMap a) = f a $
+  "try " ++ unparseExpression expr ++ " " ++  (show (fromMaybe [] mtpl)) ++ " {\n" ++ tab (unlines $ map (unparseStatementWith f) tryBlock) ++ "\n}" ++ " catch " ++ show (Map.toList catchBlockMap)
 -- unparseStatementWith _ x = internalError "missing case in call to unparseStatementWith" $ show x
 
 unparseVarDefEntry :: VarDefEntryF a -> String

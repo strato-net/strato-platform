@@ -15,6 +15,7 @@ import           Data.List                     (intercalate)
 import qualified Data.Map.Strict               as M
 import qualified Data.Set                      as S
 
+import           BlockApps.X509.Certificate
 import qualified Blockchain.Data.BlockHeader   as BHD
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Enode
@@ -41,6 +42,7 @@ data BlockDBNamespace = Headers
                       | PrivateIPChains
                       | PrivateOrgIdChains
                       | X509Certificates
+                      | X509Initialized
     deriving (Eq, Read, Show)
 
 class RedisDBKeyable k where
@@ -76,6 +78,10 @@ instance RedisDBKeyable Address where
 
 instance RedisDBValuable Address where
     toValue   = toKey
+    fromValue = decode . fromStrict
+
+instance RedisDBValuable X509CertInfoState where
+    toValue = toStrict . encode
     fromValue = decode . fromStrict
 
 instance RedisDBKeyable Word256 where
@@ -169,5 +175,6 @@ displayForNamespace ns input = case ns of
     PrivateIPChains -> let RedisIPChains ipcs = fromValue input in format (S.toList ipcs)
     PrivateOrgIdChains -> let RedisOrgIdChains oics = fromValue input in format (S.toList oics)
     X509Certificates -> format (fromValue input :: Address)
+    X509Initialized -> format input
   where
     readSHA = let x = fromValue input in format (keccak256ToWord256 x)

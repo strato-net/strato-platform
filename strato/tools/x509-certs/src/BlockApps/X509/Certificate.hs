@@ -1,6 +1,8 @@
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveGeneric      #-}
 -- {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -8,6 +10,7 @@
 
 module BlockApps.X509.Certificate (
   X509Certificate(..),
+  X509CertInfoState(..),
   Issuer(..),
   Subject(..),
   rootCert,
@@ -16,13 +19,15 @@ module BlockApps.X509.Certificate (
   makeCert,
   verifyCert,
   verifyCertAgainstCerts,
+  verifyCertSignedBy,
   verifyBlockApps,
   verifyCertM,
   makeSignedCert,
   getCertSubject,
   getCertSubjects,
   getCertIssuer,
-  getCertIssuers
+  getCertIssuers,
+  getParentUserAddress
  ) where
 
 
@@ -42,12 +47,15 @@ import qualified Crypto.Secp256k1                   as SEC
 import           Data.Aeson
 import           Data.ASN1.OID
 import           Data.ASN1.Types.String
+import           Data.Binary
 import           Data.Bits
 import qualified Data.ByteArray                     as BA
 import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Char8              as C8
 import qualified Data.ByteString.Base16             as B16
 import qualified Data.ByteString.Short              as BSS
+
+import           GHC.Generics
 
 import qualified Data.Set                           as S
 import           Data.Functor
@@ -78,6 +86,23 @@ instance Ord X509Certificate where
 
 instance NFData X509Certificate where
     rnf (X509Certificate cert) = cert `seq` ()
+
+instance Binary X509Certificate where
+  put = (put :: C8.ByteString -> Put) <$> certToBytes
+  get = (fromRight (error "The certificate couldn't be decoded") . bsToCert) <$> (get :: Get C8.ByteString)   
+
+-- | The information we store in Redis DB. We store the information of the certificate, as well
+-- as the two state values `isValid` and `children`. We keep `userAddress` around for convenience,
+-- as parsing the X509Certificate is non-deterministic.
+data X509CertInfoState = X509CertInfoState
+  { userAddress :: Address   -- ^ The hash of the public key converted into an address
+  , certificate :: X509Certificate
+  , isValid :: Bool         -- ^ Non-revoked = true, revoked = false
+  , children :: [Address]   -- ^ The "userAddress" of the children of the certificate
+  } deriving (Show, Eq, Generic, Binary)
+
+instance Format X509CertInfoState where
+  format = show
 
 signedsToX509 :: [SignedCertificate] -> X509Certificate
 signedsToX509 = X509Certificate . CertificateChain
@@ -293,7 +318,9 @@ getValidity = do
       endDate = DateTime dt{dateYear=(dateYear dt) + 1} tm -- all certs are valid for a year
   return (curDate, endDate)
 
-
+getParentUserAddress :: X509Certificate -> Maybe Address
+getParentUserAddress (X509Certificate (CertificateChain (_:c2:_))) = fmap (fromPublicKey . subPub) (getCertSubject (X509Certificate (CertificateChain [c2])))
+getParentUserAddress _ = Nothing
 
 getCertPub :: Subject -> PubKey
 getCertPub = serializeAndWrap . subPub
@@ -350,6 +377,16 @@ verifyCertAgainstCerts certs cert =  any (`verifyCert` cert) pkeys
 
 verifyCert :: PublicKey -> X509Certificate -> Bool
 verifyCert pkey (X509Certificate (CertificateChain cs)) = verifyCertChain pkey cs
+
+verifyCertSignedBy :: PublicKey -> X509Certificate -> Bool
+verifyCertSignedBy pkey (X509Certificate (CertificateChain (c:_))) = 
+  let signed = getSigned c
+      mesgBS = B.pack $ BA.unpack $ hashWith CH.SHA256 (getSignedData c)
+  in
+  case importSignature' $ signedSignature signed of
+    Nothing -> False
+    Just sig -> verifySig pkey sig mesgBS
+verifyCertSignedBy _ _ = False ---error ("Cannot verify cert " <> show cs <> " against " <> show pkey)
 
 verifyCertChain :: PublicKey -> [SignedCertificate] -> Bool
 verifyCertChain _ [] = False

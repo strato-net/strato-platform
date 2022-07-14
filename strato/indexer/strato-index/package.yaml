@@ -21,6 +21,7 @@ library:
   - conduit
   - containers
   - deepseq
+  - extra
   - format
   - hedis
   - milena
@@ -32,6 +33,7 @@ library:
   - strato-redis-blockdb
   - text
   - transformers
+  - x509-certs
 
 executables:
   strato-api-indexer:
@@ -71,5 +73,7 @@ tests:
     dependencies:
     - blockapps-data
     - blockapps-datadefs
+    - bytestring
     - hspec
     - strato-index
+    - x509-certs

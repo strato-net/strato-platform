@@ -20,6 +20,7 @@ module Blockchain.DB.X509CertDB (
   , pubToBytes
   , bsToPub
   , verifyCert
+  , verifyCertSignedBy
   , verifyBlockApps
   , X509CertDB(..)
   , HasX509CertDB
@@ -29,6 +30,7 @@ module Blockchain.DB.X509CertDB (
   , genericDeleteX509CertDB
   , x509CertDBPut
   , x509CertDBGet
+  , getParentUserAddress
   ) where
 
 

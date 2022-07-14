@@ -91,6 +91,15 @@ statementHelper (IfStatement cond thens mElse _) = do
   ts <- statementsHelper' thens
   es <- maybe (pure []) statementsHelper' mElse
   pure $ concat [cs, ts, es]
+statementHelper (TryCatchStatement try catchMap _) = do
+  ts <- statementsHelper' try
+  cs <- statementsHelper' (concatMap snd (M.toList catchMap))
+  pure $ concat [ts, cs]
+statementHelper (SolidityTryCatchStatement expr _ successStatements catchMap _) = do
+  cs <- expressionHelper expr
+  ts <- statementsHelper' successStatements
+  es <- statementsHelper' (concatMap (snd . snd) (M.toList catchMap))
+  pure $ concat [cs, ts, es]
 statementHelper (WhileStatement cond body _) = do
   cs <- expressionHelper cond
   bs <- statementsHelper' body
@@ -212,7 +221,7 @@ ccTypeHelper :: CodeCollection
              -> SourceAnnotation ()
              -> Type
              -> [SourceAnnotation Text]
-ccTypeHelper CodeCollection{..} c x (SVMType.UnknownLabel typeName) =
+ccTypeHelper CodeCollection{..} c x (SVMType.UnknownLabel typeName _) =
   if isJust findDefs
     then []
     else generateAnn typeName x $ M.foldMapWithKey findVars _contracts
