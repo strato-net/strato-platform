@@ -222,7 +222,7 @@ ccTypeHelper :: CodeCollection
              -> SourceAnnotation ()
              -> Type
              -> [SourceAnnotation Text]
-ccTypeHelper CodeCollection{..} c x (SVMType.UnknownLabel typeName) =
+ccTypeHelper CodeCollection{..} c x (SVMType.UnknownLabel typeName _) =
   if isJust findDefs
     then []
     else generateAnn typeName x $ M.foldMapWithKey findVars _contracts

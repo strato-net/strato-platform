@@ -15,6 +15,7 @@ module Blockchain.Strato.Model.Address
       formatAddressWithoutColor,
       stringAddress,
       getNewAddress_unsafe,
+      getNewAddressWithSalt_unsafe,
       addressAsNibbleString, addressFromNibbleString,
       addressToHex, addressFromHex,
       unAddress
@@ -233,6 +234,14 @@ getNewAddress_unsafe ::Address->Integer->Address
 getNewAddress_unsafe a n =
     let theHash = SHA.hash $ rlpSerialize $ RLPArray [rlpEncode a, rlpEncode n]
     in decode $ BL.drop 12 $ encode theHash
+
+-- Construct salted contract addresses using a version of the solidity CREATE2 method:
+-- Original -> new_address = hash(0xFF, sender, salt, bytecode) 
+-- Current  -> new_address = hash(0xFF, sender, salt, contract_name, codecollection_hash)
+getNewAddressWithSalt_unsafe :: Address -> RLPObject -> String -> B.ByteString -> Address
+getNewAddressWithSalt_unsafe a s c h =
+  let theHash = SHA.hash $ rlpSerialize $ RLPArray [rlpEncode (255 :: Integer), rlpEncode a, s, rlpEncode c, rlpEncode h]
+  in decode $ BL.drop 12 $ encode theHash
 
 addressAsNibbleString::Address->N.NibbleString
 addressAsNibbleString (Address s) =

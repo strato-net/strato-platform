@@ -605,7 +605,7 @@ hintFromType = \case
  SVMType.Bytes{} -> return TString
  SVMType.Int{} -> return TInteger
  SVMType.String{} -> return TString
- SVMType.UnknownLabel s -> do
+ SVMType.UnknownLabel s _ -> do
    t' <- getTypeOfName s
    case t' of
      ContractTypo{} -> return $ TContract s
@@ -658,7 +658,7 @@ getXabiValueType (AccountPath loc path) = do
          SVMType.String{} -> case x of
            MS.Field "length" -> SVMType.Int{signed=Just True, bytes=Nothing}
            _ -> typeError "non-length attribute of string" x
-         SVMType.UnknownLabel s ->
+         SVMType.UnknownLabel s _->
            let t' = getTypeOfName' s ccs
             in case (x, t') of
                  (MS.Field n, StructTypo fs) ->

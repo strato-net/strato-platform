@@ -106,13 +106,13 @@ resolveLabelsInContract cc c =
   c{_storageDefs=fmap (resolveLabelsInDef (cc^.contracts) (c^.enums) (c^.structs)) $ c^.storageDefs}
 
 resolveLabelsInDef :: Map SolidString Contract -> Map SolidString a -> Map SolidString b -> VariableDecl -> VariableDecl
-resolveLabelsInDef contractDefs enumDefs structDefs x@VariableDecl{varType=SVMType.UnknownLabel labelName} =
+resolveLabelsInDef contractDefs enumDefs structDefs x@VariableDecl{varType=SVMType.UnknownLabel labelName _} =
   case (labelName `M.member` contractDefs,
         labelName `M.member` structDefs,
         labelName `M.member` enumDefs) of
     (_, True, _) -> x{varType=SVMType.Enum Nothing labelName Nothing}
     (_, _, True) -> x{varType=SVMType.Struct Nothing labelName}
     (True, _, _) -> x{varType=SVMType.Contract labelName}
-    _ -> x{varType=SVMType.UnknownLabel labelName}
+    _ -> x{varType=SVMType.UnknownLabel labelName Nothing}
     -- _ -> error $ "unknown label in call to resolveLabelsInDef: " ++ labelName
 resolveLabelsInDef _ _ _ x = x
