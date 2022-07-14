@@ -565,14 +565,13 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx{otHash=theHash} 
       etherUsed = gasUsed * fromInteger (transactionGasPrice t)
 
   when flags_createTransactionResults $ do
-    let chainId = txChainId t
-        beforeAddresses = S.fromList [ x | (x, ASModification _) <-  M.toList beforeMap ]
+    let beforeAddresses = S.fromList [ x | (x, ASModification _) <-  M.toList beforeMap ]
         beforeDeletes = S.fromList [ x | (x, ASDeleted) <-  M.toList beforeMap ]
         afterAddresses = S.fromList [ x | (x, ASModification _) <-  M.toList afterMap ]
         afterDeletes = S.fromList [ x | (x, ASDeleted) <-  M.toList afterMap ]
         ranBlockHash = hashFunction b
-        mkLogEntry Log{..} = LogDB ranBlockHash theHash chainId (account ^. accountAddress) (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
-        mkEventEntry Event{..} = EventDB chainId evName $ map snd evArgs -- drop the field names, only slipstream needs them
+        mkLogEntry Log{..} = LogDB ranBlockHash theHash (account ^. accountChainId) (account ^. accountAddress) (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
+        mkEventEntry Event{..} = EventDB (evContractAccount ^. accountChainId) evName $ map snd evArgs -- drop the field names, only slipstream needs them
         (!response, theTrace', theLogs, theEvents) =
           case result of
             Left _ -> (BSS.empty, [], [], []) --TODO keep the trace when the run fails
