@@ -595,7 +595,7 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx{otHash=theHash} 
                              , transactionResultNewStorage       = ""
                              , transactionResultDeletedStorage   = ""
                              , transactionResultStatus           = Just txrStatus
-                             , transactionResultChainId          = chainId
+                             , transactionResultChainId          = txChainId t
                              , transactionResultKind             = erKind <$> eitherToMaybe result
                              }
     when flags_diffPublish $ do
