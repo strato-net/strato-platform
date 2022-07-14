@@ -253,7 +253,7 @@ pipeline {
             // agent { label "multinode101" } // is default
             steps {
                 script {
-                    lib.runAppBootNode(NODE_DATA.NODE1)
+                    lib.runAppBootNode(NODE_DATA.NODE1, null, null, null, 'beanstalk')
                 }
             }
         }
@@ -297,7 +297,7 @@ pipeline {
                 agent { label "multinode102" }
                 steps {
                     script {
-                    lib.runAppSecondaryNode(NODE_DATA.NODE2)
+                    lib.runAppSecondaryNode(NODE_DATA.NODE2, null, null, null, 'beanstalk')
                     }
                 }
                 }
@@ -305,7 +305,7 @@ pipeline {
                 agent { label "multinode103" }
                 steps {
                     script{
-                    lib.runAppSecondaryNode(NODE_DATA.NODE3)
+                    lib.runAppSecondaryNode(NODE_DATA.NODE3, null, null, null, 'beanstalk')
                     }
                 }
                 }
@@ -313,7 +313,7 @@ pipeline {
                 agent { label "multinode104" }
                 steps {
                     script {
-                    lib.runAppSecondaryNode(NODE_DATA.NODE4)
+                    lib.runAppSecondaryNode(NODE_DATA.NODE4, null, null, null, 'beanstalk')
                     }
                 }
                 }
@@ -321,7 +321,7 @@ pipeline {
                 agent { label "multinode301" }
                 steps {
                     script {
-                    lib.runAppSecondaryNode(NODE_DATA.NODE5)
+                    lib.runAppSecondaryNode(NODE_DATA.NODE5, null, null, null, 'beanstalk')
                     }
                 }
                 }
@@ -329,7 +329,7 @@ pipeline {
                 agent { label "multinode302" }
                     steps {
                         script {
-                            lib.runAppSecondaryNode(NODE_DATA.NODE6)
+                            lib.runAppSecondaryNode(NODE_DATA.NODE6, null, null, null, 'beanstalk')
                         }
                     }
                 }
@@ -337,7 +337,7 @@ pipeline {
                     agent { label "multinode303" }
                     steps {
                         script { 
-                            lib.runAppSecondaryNode(NODE_DATA.NODE7)
+                            lib.runAppSecondaryNode(NODE_DATA.NODE7, null, null, null, 'beanstalk')
                         }
                     }
                 }
@@ -345,7 +345,7 @@ pipeline {
                     agent { label "multinode304" }
                     steps {
                         script {
-                            lib.runAppSecondaryNode(NODE_DATA.NODE8)
+                            lib.runAppSecondaryNode(NODE_DATA.NODE8, null, null, null, 'beanstalk')
                         }
                     }
                 }
@@ -521,7 +521,7 @@ pipeline {
             // agent { label "multinode101" } // is default
             steps {
                 script {
-                    lib.runAppBootNode(NODE_DATA.NODE1)
+                    lib.runAppBootNode(NODE_DATA.NODE1, null, null, null, 'beanstalk')
                 }
             }
         }
@@ -567,7 +567,7 @@ pipeline {
                 agent { label "multinode102" }
                 steps {
                     script {
-                    lib.runAppSecondaryNode(NODE_DATA.NODE2)
+                    lib.runAppSecondaryNode(NODE_DATA.NODE2, null, null, null, 'beanstalk')
                     }
                 }
                 }
@@ -575,7 +575,7 @@ pipeline {
                 agent { label "multinode103" }
                 steps {
                     script{
-                    lib.runAppSecondaryNode(NODE_DATA.NODE3)
+                    lib.runAppSecondaryNode(NODE_DATA.NODE3, null, null, null, 'beanstalk')
                     }
                 }
                 }
@@ -583,7 +583,7 @@ pipeline {
                 agent { label "multinode104" }
                 steps {
                     script {
-                    lib.runAppSecondaryNode(NODE_DATA.NODE4)
+                    lib.runAppSecondaryNode(NODE_DATA.NODE4, null, null, null, 'beanstalk')
                     }
                 }
                 }
@@ -591,7 +591,7 @@ pipeline {
                 agent { label "multinode301" }
                 steps {
                     script {
-                    lib.runAppSecondaryNode(NODE_DATA.NODE5)
+                    lib.runAppSecondaryNode(NODE_DATA.NODE5, null, null, null, 'beanstalk')
                     }
                 }
                 }
@@ -599,7 +599,7 @@ pipeline {
                 agent { label "multinode302" }
                     steps {
                         script {
-                            lib.runAppSecondaryNode(NODE_DATA.NODE6)
+                            lib.runAppSecondaryNode(NODE_DATA.NODE6, null, null, null, 'beanstalk')
                         }
                     }
                 }
@@ -607,7 +607,7 @@ pipeline {
                     agent { label "multinode303" }
                     steps {
                         script {
-                            lib.runAppSecondaryNode(NODE_DATA.NODE7)
+                            lib.runAppSecondaryNode(NODE_DATA.NODE7, null, null, null, 'beanstalk')
                         }
                     }
                 }
@@ -615,7 +615,7 @@ pipeline {
                     agent { label "multinode304" }
                     steps {
                         script {
-                            lib.runAppSecondaryNode(NODE_DATA.NODE8)
+                            lib.runAppSecondaryNode(NODE_DATA.NODE8, null, null, null, 'beanstalk')
                         }
                     }
                 }
@@ -660,7 +660,7 @@ pipeline {
             steps {
                 dir('strato-getting-started') {
                     script {
-                        sh 'sudo ./strato ----drop-chains'
+                        sh 'sudo ./strato --drop-chains'
                     }
                 }
             }
@@ -682,7 +682,7 @@ pipeline {
             steps {
                 dir('strato-getting-started') {
                     script {
-                        sh 'sudo ./strato ----drop-chains'
+                        sh 'sudo ./strato --drop-chains'
                     }
 
                 }
@@ -704,7 +704,7 @@ pipeline {
             steps {
                 dir('strato-getting-started') {
                     script {
-                        sh 'sudo ./strato ----drop-chains'
+                        sh 'sudo ./strato --drop-chains'
                     }
 
                 }
@@ -726,7 +726,7 @@ pipeline {
             steps {
                 dir('strato-getting-started') {
                     script {
-                        sh 'sudo ./strato ----drop-chains'
+                        sh 'sudo ./strato --drop-chains'
                     }
 
                 }
@@ -748,7 +748,7 @@ pipeline {
             steps {
                 dir('strato-getting-started') {
                     script {
-                        sh 'sudo ./strato ----drop-chains'
+                        sh 'sudo ./strato --drop-chains'
                     }
 
                 }
@@ -770,7 +770,7 @@ pipeline {
             steps {
                 dir('strato-getting-started') {
                     script {
-                        sh 'sudo ./strato ----drop-chains'
+                        sh 'sudo ./strato --drop-chains'
                     }
 
                 }
@@ -792,7 +792,7 @@ pipeline {
             steps {
                 dir('strato-getting-started') {
                     script {
-                        sh 'sudo ./strato ----drop-chains'
+                        sh 'sudo ./strato --drop-chains'
                     }
 
                 }
@@ -814,7 +814,7 @@ pipeline {
             steps {
                 dir('strato-getting-started') {
                     script {
-                        sh 'sudo ./strato ----drop-chains'
+                        sh 'sudo ./strato --drop-chains'
                     }
                 }
             }
@@ -827,6 +827,115 @@ pipeline {
                     sh 'until curl --silent localhost:8080; do sleep 1; done'
                     sh 'sudo docker ps'
                     lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
+                }
+            }
+        }
+
+        stage ('Redeployed Contract Test -  Run beanstalk app on bootnode') {
+            // agent { label "multinode101" } // is default
+            steps {
+                script {
+                    lib.runAppBootNode(NODE_DATA.NODE1, null, null, null, 'beanstalk')
+                }
+            }
+        }
+
+        stage ('Redeployed Contract Test - Run app on secondary nodes') {
+            parallel {
+                stage('Run app on multinode102') {
+                agent { label "multinode102" }
+                steps {
+                    script {
+                    lib.runAppSecondaryNode(NODE_DATA.NODE2, null, null, null, 'beanstalk')
+                    }
+                }
+                }
+                stage('Run app on multinode103') {
+                agent { label "multinode103" }
+                steps {
+                    script{
+                    lib.runAppSecondaryNode(NODE_DATA.NODE3, null, null, null, 'beanstalk')
+                    }
+                }
+                }
+                stage('Run app on multinode104') {
+                agent { label "multinode104" }
+                steps {
+                    script {
+                    lib.runAppSecondaryNode(NODE_DATA.NODE4, null, null, null, 'beanstalk')
+                    }
+                }
+                }
+                stage('Run app on multinode301') {
+                agent { label "multinode301" }
+                steps {
+                    script {
+                    lib.runAppSecondaryNode(NODE_DATA.NODE5, null, null, null, 'beanstalk')
+                    }
+                }
+                }
+                stage('Run app on multinode302') {
+                agent { label "multinode302" }
+                    steps {
+                        script {
+                            lib.runAppSecondaryNode(NODE_DATA.NODE6, null, null, null, 'beanstalk')
+                        }
+                    }
+                }
+                stage('Run app on multinode303') {
+                    agent { label "multinode303" }
+                    steps {
+                        script {
+                            lib.runAppSecondaryNode(NODE_DATA.NODE7, null, null, null, 'beanstalk')
+                        }
+                    }
+                }
+                stage('Run app on multinode304') {
+                    agent { label "multinode304" }
+                    steps {
+                        script {
+                            lib.runAppSecondaryNode(NODE_DATA.NODE8, null, null, null, 'beanstalk')
+                        }
+                    }
+                }
+            }
+        }
+
+        stage ('Redeployed Contract Test') {
+            // agent { label "multinode101" } // is default
+            steps {
+                script {
+                    SERVICE_TOKEN = lib.getServiceToken(NODE_DATA.NODE1)
+                    sh '''
+                    set -x
+                    ADDRESS = $(curl -X 'GET' \
+                        'https://multinode101.ci.blockapps.net:8080/cirrus/search/Attribute' \
+                        -H "Authorization: Bearer $SERVICE_TOKEN"  \
+                        -H 'accept: application/json;charset=utf-8' \
+                        -H 'Content-Type: application/json;charset=utf-8') \
+                        | jq '.address'
+                    curl -X 'POST' \
+                        'https://multinode101.ci.blockapps.net:8080/strato/v2.3/transaction/parallel?resolve=true' \
+                        -H "Authorization: Bearer $SERVICE_TOKEN"  \
+                        -H 'accept: application/json;charset=utf-8' \
+                        -H 'Content-Type: application/json;charset=utf-8' \
+                        -d '{
+                            "txs": [
+                                    {
+                                        "payload": {
+                                            "contractName": "Attribute",
+                                            "contractAddress": $ADDRESS",
+                                            "method": "deleteContract",
+                                            "args": {}
+                                        },
+                                        "type": "FUNCTION"
+                                    }
+                                   ],
+                            "txParams": {
+                                "gasLimit": 32100000000,
+                                "gasPrice": 1
+                            }}'
+                    '''
                 }
             }
         }
@@ -1047,7 +1156,7 @@ pipeline {
             steps {
                 dir('strato-getting-started') {
                     script {
-                        sh 'sudo ./strato ----drop-chains'
+                        sh 'sudo ./strato --drop-chains'
                         lib.deployStratoWithApp(null, NODE_DATA.NODE4, 'beanstalk', false)
                         sh 'until curl --silent localhost:8080; do sleep 1; done'
                         sh 'sudo docker ps'
@@ -1062,7 +1171,7 @@ pipeline {
             steps {
                 dir('strato-getting-started') {
                     script {
-                        sh 'sudo ./strato ----drop-chains'
+                        sh 'sudo ./strato --drop-chains'
                         lib.deployStratoWithApp(null, NODE_DATA.NODE3, 'beanstalk', false)
                         sh 'until curl --silent localhost:8080; do sleep 1; done'
                         sh 'sudo docker ps'
@@ -1077,7 +1186,7 @@ pipeline {
             steps {
                 dir('strato-getting-started') {
                     script {
-                        sh 'sudo ./strato ----drop-chains'
+                        sh 'sudo ./strato --drop-chains'
                         lib.deployStratoWithApp(null, NODE_DATA.NODE2, 'beanstalk', false)
                         sh 'until curl --silent localhost:8080; do sleep 1; done'
                         sh 'sudo docker ps'
@@ -1092,7 +1201,7 @@ pipeline {
             steps {
                 dir('strato-getting-started') {
                     script {
-                        sh 'sudo ./strato ----drop-chains'
+                        sh 'sudo ./strato --drop-chains'
                         lib.deployStratoWithApp(null, NODE_DATA.NODE1, 'beanstalk', false)
                         sh 'until curl --silent localhost:8080; do sleep 1; done'
                         sh 'sudo docker ps'
