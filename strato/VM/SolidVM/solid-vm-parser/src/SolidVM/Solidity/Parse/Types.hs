@@ -86,14 +86,12 @@ simpleType =
       unless (base `isPrefixOf` chars) $ fail "missing base" -- make this return 128, 18 default
       decimals <- do
         let afterFixed = (drop (length base) chars)
-        case afterFixed of -- | fixed128  x18 -> 128x18
+        case afterFixed of
           "" -> return Nothing
-          xs -> do --splitAt :: [a] -> a ([a],[a]) --128x56 
+          xs -> do
             let mySplitFunc fs theMatch = mySplitFuncHelper ([],fs) theMatch
                 mySplitFuncHelper (as,[]) _ = (as,[])
-                mySplitFuncHelper (as,(y:ys)) z = case y == z of 
-                  True -> (as, ys)
-                  False -> mySplitFuncHelper ((as++[y]),ys) z
+                mySplitFuncHelper (as,y:ys) z = if y == z then (as, ys) else mySplitFuncHelper (as++[y],ys) z
 
             let theSplit = xs `mySplitFunc` 'x'
             when (null(fst theSplit) || null (snd theSplit)) $ fail "big bad"
@@ -101,11 +99,10 @@ simpleType =
             let n2 = readMaybe (snd theSplit) :: Maybe Int32
             case (n1,n2) of
               (Just x, Just y) -> do
-                when (not (x `elem` [8,16..256]) || not (y `elem` [0..80])) $ fail "invalid fixed sizes"
+                when (notElem x [8,16..256] || notElem y [0..80]) $ fail "invalid fixed sizes"
                 return $ Just (x,y)
-              _ -> return Nothing
-                 -- | ("128x18", "")    
-      return $ baseType decimals 
+              _ -> return Nothing    
+      return $ baseType decimals
 
 -- array length so long as they only reference explicit numbers.  Note that
 -- for nested arrays, we have 'T[n][m] = (T[n])[m]' rather than '(T[m])[n]'

@@ -88,7 +88,7 @@ showType (SVMType.Contract n) = "contract " <> labelToText n
 showType (SVMType.Mapping _ k v) = "mapping (" <> showType k <> " => " <> showType v <> ")"
 showType (SVMType.Fixed s b) = (if fromMaybe False s then "u" else "")
                   <> "fixed"
-                  <> (maybe "" (T.pack . show) b)
+                  <> maybe "" (T.pack . show) b
 
 
 showType' :: Type' -> Text
@@ -394,6 +394,12 @@ typecheckStatic (SVMType.Int s1 b1) (SVMType.Int s2 b2) =
     _ -> case (b1, b2) of
            (Just a, Just b) | a /= b -> Left "Mismatched length between integer values"
            _ -> Right $ SVMType.Int (s1 <|> s2) (b1 <|> b2)
+typecheckStatic (SVMType.Fixed s1 d1) (SVMType.Fixed s2 d2) =
+  case(s1, s2) of
+    (Just a, Just b) | a /= b -> Left "Mismatched dynamicity between fixed-point values"
+    _ -> case(d1, d2) of
+      (Just a, Just b) | a /= b -> Left "Mismatched dynamicity between fixed-point values"
+      _ ->  Right $ SVMType.Fixed (s1 <|> s2) (d1 <|> d2)
 typecheckStatic (SVMType.String d1) (SVMType.String d2) =
   case (d1, d2) of
     (Just a, Just b) | a /= b -> Left "Mismatched dynamicity between string values"
@@ -509,8 +515,8 @@ typecheckMember (Static (SVMType.Bytes _ _) x) "length" = pure $ Static (SVMType
 typecheckMember (Static (SVMType.UnknownLabel "Util") x) "bytes32ToString" = pure $ Function (Static (SVMType.Bytes Nothing (Just 32)) x) (Static (SVMType.String Nothing) x) x
 typecheckMember (Static (SVMType.UnknownLabel "Util") x) "b32" = pure $ Function (Static (SVMType.Bytes Nothing (Just 32)) x) (Static (SVMType.Bytes Nothing (Just 32)) x) x
 typecheckMember (Static (SVMType.UnknownLabel "string") x) "concat" = pure $ Function (stringConcatArgs x) (Static (SVMType.String Nothing) x) x
-typecheckMember (Static (SVMType.UnknownLabel "msg") x) "sender" = pure $ Static (SVMType.Account False) x 
-typecheckMember (Static (SVMType.UnknownLabel "tx") x) "origin" = pure $ Static (SVMType.Account False) x 
+typecheckMember (Static (SVMType.UnknownLabel "msg") x) "sender" = pure $ Static (SVMType.Account False) x
+typecheckMember (Static (SVMType.UnknownLabel "tx") x) "origin" = pure $ Static (SVMType.Account False) x
 typecheckMember (Static (SVMType.UnknownLabel "tx") x) "username" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "tx") x) "organization" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "tx") x) "group" = pure $ Static (SVMType.String Nothing) x
@@ -624,7 +630,7 @@ detector cc =
 contractHelper :: Annotated CodeCollectionF
                -> Annotated ContractF
                -> Type'
-contractHelper cc c = 
+contractHelper cc c =
   let constr = maybe M.empty (M.singleton "constructor") $ _constructor c
       funcsAndConstr = constr <> _functions c
       varTypes' = reduceType' (_contractContext c) $ varDeclHelper cc c <$> M.elems (_storageDefs c)
@@ -800,7 +806,7 @@ assertArgs :: SourceAnnotation Text -> Type'
 assertArgs x = boolType' x
 
 registerCertArgs :: SourceAnnotation Text -> Type'
-registerCertArgs x = Sum $ stringType' x :| 
+registerCertArgs x = Sum $ stringType' x :|
                         [ Product [stringType' x, contractType' x] x
                         , Product [accountType' x, stringType' x] x
                         ]
@@ -860,7 +866,7 @@ getVarType' "identity" ctx =  pure $ Function (topType' ctx) (topType' ctx) ctx
 getVarType' "keccak256" ctx =  pure $ Function (keccak256Args ctx) (stringType' ctx) ctx
 getVarType' "sha256" ctx =  pure $ Function (sha256Args ctx) (stringType' ctx) ctx
 getVarType' "ripemd160" ctx =  pure $ Function (ripemd160Args ctx) (stringType' ctx) ctx
-getVarType' "selfdestruct" ctx = pure $ Function (selfdestructArgs ctx) (boolType' ctx) ctx 
+getVarType' "selfdestruct" ctx = pure $ Function (selfdestructArgs ctx) (boolType' ctx) ctx
 getVarType' "require" ctx =  pure $ Function (requireArgs ctx) (Product [] ctx) ctx
 getVarType' "assert" ctx =  pure $ Function (assertArgs ctx) (Product [] ctx) ctx
 getVarType' "registerCert" ctx =  pure $ Function (registerCertArgs ctx) (accountType' ctx) ctx
@@ -878,7 +884,7 @@ getVarType' "tx" ctx = pure $ Static (SVMType.UnknownLabel "tx") ctx
 getVarType' "block" ctx = pure $ Static (SVMType.UnknownLabel "block") ctx
 getVarType' "super" ctx = pure $ Static (SVMType.UnknownLabel "super") ctx
 getVarType' name ctx = getVarTypeByName' (stringToLabel name) ctx
-  
+
 getVarTypeByName' :: SolidString -> SourceAnnotation Text -> SSS Type'
 getVarTypeByName' name ctx = do
   mVar <- foldr (lookupVar . snd) Nothing <$> get
@@ -923,7 +929,7 @@ getVarTypeByName' name ctx = do
                            ctrct
                            ctx]
               Nothing -> bottom $ ("Unknown variable: " <> labelToText name) <$ ctx
-            
+
   where lookupVar m Nothing = M.lookup name m
         lookupVar _ t       = t
 
@@ -962,7 +968,7 @@ statementHelper (TryCatchStatement tryStatmenets catchMap x) = do
   pure $ reduceType' x [ts, es]
 statementHelper (SolidityTryCatchStatement expr mtpl successStatements catchMap x) = do
   cs <- tcExpr expr
-  
+
   let errValsToVarDefs :: [Maybe (String, SVMType.Type)] -> [Annotated VarDefEntryF]
       errValsToVarDefs [] = []
       errValsToVarDefs (Nothing : xs) = errValsToVarDefs xs
@@ -972,7 +978,7 @@ statementHelper (SolidityTryCatchStatement expr mtpl successStatements catchMap 
       successValsToVarDefs (Just xs) = errValsToVarDefs $ map Just xs
   let localVarDefs =  (errValsToVarDefs $ (map (fst . snd) (M.toList catchMap))) ++ successValsToVarDefs mtpl
   pushLocalVariables localVarDefs
-  
+
   ts <- statementsHelper' x successStatements
   es <- statementsHelper' x (concatMap (snd . snd) (M.toList catchMap))
   pure $ reduceType' x [cs, ts, es]
@@ -1082,7 +1088,7 @@ tcExpr (Binary x "<=" a b) =
   intType' x ~> tcExpr a <~> tcExpr b !> pure (boolType' x)
 tcExpr (Binary _ _ a b) =
   tcExpr a <~> tcExpr b
-tcExpr (PlusPlus x a) = 
+tcExpr (PlusPlus x a) =
   intType' x ~> tcExpr a
 tcExpr (MinusMinus x a) = do
   intType' x ~> tcExpr a
