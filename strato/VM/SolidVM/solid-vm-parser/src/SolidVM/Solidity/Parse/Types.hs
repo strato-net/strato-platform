@@ -83,25 +83,25 @@ simpleType =
 
     fixedSuffixed base baseType = lexeme $ try $ do
       chars <- many1 alphaNum
-      unless (base `isPrefixOf` chars) $ fail "missing base" -- make this return 128, 18 default
+      unless (base `isPrefixOf` chars) $ fail "missing base"
       decimals <- do
-        let afterFixed = (drop (length base) chars)
+        let afterFixed = drop (length base) chars
         case afterFixed of
-          "" -> return Nothing
+          "" -> return $ Just (128 :: Int32, 18 :: Int32)
           xs -> do
             let mySplitFunc fs theMatch = mySplitFuncHelper ([],fs) theMatch
                 mySplitFuncHelper (as,[]) _ = (as,[])
                 mySplitFuncHelper (as,y:ys) z = if y == z then (as, ys) else mySplitFuncHelper (as++[y],ys) z
 
             let theSplit = xs `mySplitFunc` 'x'
-            when (null(fst theSplit) || null (snd theSplit)) $ fail "big bad"
+            when (null(fst theSplit) || null (snd theSplit)) $ fail "missing an additional argument"
             let n1 = readMaybe (fst theSplit) :: Maybe Int32
             let n2 = readMaybe (snd theSplit) :: Maybe Int32
             case (n1,n2) of
               (Just x, Just y) -> do
                 when (notElem x [8,16..256] || notElem y [0..80]) $ fail "invalid fixed sizes"
                 return $ Just (x,y)
-              _ -> return Nothing    
+              _ -> return Nothing
       return $ baseType decimals
 
 -- array length so long as they only reference explicit numbers.  Note that
