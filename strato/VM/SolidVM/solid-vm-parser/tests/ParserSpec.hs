@@ -79,7 +79,7 @@ spec = do
                  , ("assembly { dst := mload(add(src, 32)) }",
                       AssemblyStatement $ MloadAdd32 "dst" "src")
                  , ("Nom storage nom = ns[10];", SimpleStatement $
-                      VariableDefinition [VarDefEntry (Just $ UnknownLabel "Nom") (Just Storage) "nom" ()] $ Just $
+                      VariableDefinition [VarDefEntry (Just $ UnknownLabel "Nom" Nothing) (Just Storage) "nom" ()] $ Just $
                       IndexAccess () (Variable () "ns") (Just $ NumberLiteral () 10 Nothing))
                  , ("var (x, y) = (7, 3);", SimpleStatement $
                       VariableDefinition [VarDefEntry Nothing Nothing "x" (),
