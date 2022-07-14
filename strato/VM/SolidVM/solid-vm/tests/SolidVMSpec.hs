@@ -4308,6 +4308,31 @@ contract qq {
   }
 }|]) `shouldThrow` anyInvalidArgumentsError
 
+  it "return default value for index not present" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+  
+  mapping(uint=>bool) booleanTest;
+  mapping(uint=>uint) integerTest;
+  mapping(uint=>string) stringTest;
+
+  bool x;
+  uint y;
+  string z;
+  
+  constructor() {
+    booleanTest[1] = true;
+    integerTest[1] = 1;
+    stringTest[1] = "testing";
+
+    x = booleanTest[9];
+    y = integerTest[9];
+    z = stringTest[9];
+  }
+}|]
+    getFields ["x","y","z"] `shouldReturn` [BDefault, BDefault, BDefault]
+
   it "can use builtin sha256 function" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
@@ -4520,3 +4545,4 @@ contract qq{
   }
 }|]
     getFields ["myNum"] `shouldReturn` [BInteger 6]
+
