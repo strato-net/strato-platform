@@ -4502,3 +4502,21 @@ contract qq {
 }|]
     getFields ["myNum", "otherNum", "errorCount"] `shouldReturn` [BInteger 3, BInteger 12, BInteger 1]
 
+  it "can use free functions" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+
+function sum(uint[] memory arr) pure returns (uint s) {
+  for (uint i = 0; i < arr.length; i++) 
+    s += arr[i];
+}
+
+contract qq{
+  uint myNum;
+  uint myArr[3];
+  constructor() public {
+    myArr = [1, 2, 3];
+    myNum = sum(myArr);
+  }
+}|]
+    getFields ["myNum"] `shouldReturn` [BInteger 6]
