@@ -245,8 +245,6 @@ contract Certificate {
 
 pragma solidvm 3.2;
 contract CertificateRegistry {
-    // Declare the event that gets silently emitted when a certificate is registered
-    event CertificateRegistered(address userAddress, address contractAddress);
     // The registry maintains a list and mapping of all the certificates
     // We need the extra array in order for us to iterate through our certificates.
     // Solidity mappings are non-iterable.
@@ -255,7 +253,7 @@ contract CertificateRegistry {
 
     bool initialized;
 
-    event CertificateRegistered(address userAddress, address contractAddress);
+    event CertificateRegistered(string certificate);
     event CertificateRevoked(address userAddress);
     event CertificateRegistryInitialized();
 
@@ -268,7 +266,7 @@ contract CertificateRegistry {
     function initializeCertificateRegistry(string[] _rootCerts) returns (int) {
         require(!initialized, "The CertificateRegistry has already been initialized!");        
         
-        for (uint i=0; i < _rootCerts.length; i = i + 1) {
+        for (uint i=0; i < _rootCerts.length; i += 1) {
             // Create the Certificate record
             Certificate c = new Certificate(_rootCerts[i]);
             // Register the root certificates and emit event
