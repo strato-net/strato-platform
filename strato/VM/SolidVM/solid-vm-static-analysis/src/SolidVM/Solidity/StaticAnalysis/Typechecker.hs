@@ -73,6 +73,9 @@ showType (SVMType.Int s b) = (if fromMaybe False s then "u" else "")
 showType (SVMType.String _) = "string"
 showType (SVMType.Bytes _ b) = "bytes"
                     <> (maybe "" (T.pack . show) b)
+showType (SVMType.Fixed s b) = (if fromMaybe False s then "u" else "")
+                  <> "fixed"
+                  <> maybe "" (T.pack . show) b
 showType SVMType.Bool = "bool"
 showType (SVMType.Address _) = "address"
 showType (SVMType.Account _) = "account"
@@ -401,6 +404,12 @@ typecheckStatic (SVMType.Bytes d1 b1) (SVMType.Bytes d2 b2) =
     _ -> case (b1, b2) of
            (Just a, Just b) | a /= b -> Left "Mismatched length between bytes values"
            _ -> Right $ SVMType.Bytes (d1 <|> d2) (b1 <|> b2)
+typecheckStatic (SVMType.Fixed s1 d1) (SVMType.Fixed s2 d2) =
+  case(s1, s2) of
+    (Just a, Just b) | a /= b -> Left "Mismatched dynamicity between fixed-point values"
+    _ -> case(d1, d2) of
+      (Just a, Just b) | a /= b -> Left "Mismatched dynamicity between fixed-point values"
+      _ ->  Right $ SVMType.Fixed (s1 <|> s2) (d1 <|> d2)
 typecheckStatic SVMType.Bool SVMType.Bool = Right SVMType.Bool
 typecheckStatic (SVMType.Address a) (SVMType.Address b) = Right $ SVMType.Account (a && b)
 typecheckStatic (SVMType.Address a) (SVMType.Account b) = Right $ SVMType.Account (a && b)

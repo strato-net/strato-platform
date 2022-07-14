@@ -97,6 +97,7 @@ generateArgString = fmap (\t -> "(" <> T.intercalate "," t <> ")") . traverse ge
   where generateArg (SVMType.Int _ _) = T.pack . show . abs <$> (generate arbitrary :: IO Integer)
         generateArg (SVMType.String _) = (\t -> "\"" <> t <> "\"") . escapeText <$> generate arbitrary
         generateArg (SVMType.Bytes _ _) = (\t -> "\"" <> t <> "\"") . escapeText <$> generate arbitrary
+        generateArg (SVMType.Fixed _ _) = T.pack . show . abs <$> (generate arbitrary :: IO Double)
         generateArg SVMType.Bool = bool "false" "true" <$> (generate arbitrary :: IO Bool)
         generateArg (SVMType.Address _) = ("0x" <>) . T.pack . show <$> (generate arbitrary :: IO Address)
         generateArg (SVMType.Account _) = ("0x" <>) . T.pack . show <$> (generate arbitrary :: IO Account)
