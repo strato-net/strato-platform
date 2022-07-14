@@ -29,6 +29,7 @@ statementCrawler = \case
   Block _ -> ["Block"]
   Break _ -> ["Break"]
   Continue _ -> ["Continue"]
+  ModifierExecutor _ -> ["ModifierExecutor"]
   Throw _ -> ["Throw"]
   EmitStatement _ evts _ ->  "EmitStatement":concatMap (expressionCrawler . snd) evts
   RevertStatement _ _ _ -> ["RevertStatement"] -- :concatMap (expressionCrawler) args

@@ -171,7 +171,8 @@ setVal dst@(SReference addressedPath@(AccountPath addr path)) src = do
 setVal (SNULL) _ = return ()
 
 
-setVal dst src = typeError "unknown case called in setVal:" ("src = " ++ show src ++ ", dst = " ++ show dst)
+
+setVal dst src = typeError "unknown case called in setVal (Probably tried to change the value of a constant):" ("src = " ++ show src ++ ", dst = " ++ show dst)
 
   
 {-

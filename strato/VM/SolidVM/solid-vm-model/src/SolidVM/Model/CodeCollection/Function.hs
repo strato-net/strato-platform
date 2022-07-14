@@ -11,6 +11,8 @@ module SolidVM.Model.CodeCollection.Function (
   Func,
   StateMutability(..),
   Visibility(..),
+  ModifierF(..),
+  Modifier,
   tShow,
   tRead
   ) where
@@ -27,7 +29,6 @@ import qualified Generic.Random               as GR
 import           GHC.Generics
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
-
 import           SolidVM.Model.CodeCollection.Statement
 import qualified SolidVM.Model.CodeCollection.VarDef  as SolidVM
 import           SolidVM.Model.SolidString
@@ -76,7 +77,7 @@ data FuncF a = Func
   , funcContents :: Maybe [StatementF a]
   , funcVisibility :: Maybe Visibility
   , funcConstructorCalls :: Map SolidString [(ExpressionF a)]
-  , funcModifiers :: Maybe [String]
+  , funcModifiers :: [(SolidString, [(ExpressionF a)])]
   , funcContext :: a
   } deriving (Eq,Show,Generic, Functor)
 
@@ -102,6 +103,23 @@ instance ToSchema Visibility where
     where
       ex :: Visibility
       ex = Public
+
+
+
+data ModifierF a = Modifier
+  { modifierArgs     :: Map Text SolidVM.IndexedType
+  , modifierSelector :: Text
+  , modifierContents :: Maybe [StatementF a]
+  , modifierContext  :: a
+  } deriving (Eq,Show,Generic, Functor)
+
+type Modifier = Positioned ModifierF
+
+instance ToJSON a => ToJSON (ModifierF a) where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+
+instance FromJSON a => FromJSON (ModifierF a) where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
 
 
 --------------------------------------------------------------------------------
