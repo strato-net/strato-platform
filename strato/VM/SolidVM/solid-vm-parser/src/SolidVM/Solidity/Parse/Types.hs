@@ -25,7 +25,6 @@ import qualified SolidVM.Model.Type         as SVMType
 simpleTypeExpression :: SolidityParser SVMType.Type
 simpleTypeExpression = try arrayType <|> simpleType <|> mappingType
 
--- | Parses builtins and user-defined names
 simpleType :: SolidityParser SVMType.Type
 simpleType =
   simple "bool" SVMType.Bool <|>
@@ -75,7 +74,7 @@ simpleType =
               [] -> return Nothing
               [(number, "")] -> do
                 when (not $ number `elem` [8, 16 .. 256]) $ fail "invalid size"
-                return $ Just $ number `quot` 8 --   bytes
+                return $ Just $ number `quot` 8 -- in bytes
               _ ->  fail "invalid size"
 
       return $ baseType number
@@ -104,6 +103,7 @@ simpleType =
               _ -> return Nothing
       return $ baseType decimals
 
+-- | Parses builtins and user-defined names
 -- array length so long as they only reference explicit numbers.  Note that
 -- for nested arrays, we have 'T[n][m] = (T[n])[m]' rather than '(T[m])[n]'
 -- as in C.
