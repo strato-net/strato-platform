@@ -636,7 +636,7 @@ argsToValsModifiers ctract md args =
               -- of the accepted literals, assume that this is not the context of
               -- evaluating external arguments.
             CC.ObjectLiteral _ mp          -> case t of
-              SVMType.UnknownLabel l -> do
+              SVMType.UnknownLabel l _ -> do
                 let ls = M.toList mp :: [(SolidString, CC.Expression)]
                 m <- mapM go ls
                 return $ SStruct l $ M.fromList m
