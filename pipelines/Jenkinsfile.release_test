@@ -642,14 +642,11 @@ pipeline {
             }
         }
         stage('Upgradability Sync Test - Deploy Monitor') {
+            agent { label "multinode305" }
             steps {
-                withCredentials([
-                    usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME'),
-                ]) {
-                    script {
-                        lib.runMonitor(NODE_DATA.NODE1, 'upgrade8Nodes')
-                    }
-                }
+                script {
+                    lib.runMonitor(NODE_DATA.NODE1, 'upgrade8Nodes')
+                }                
             }
         }
 
@@ -744,7 +741,7 @@ pipeline {
             }
         }
         stage ('Dropping Chains test-multinode301') {
-            agent { label "multinode301" } // is default
+            agent { label "multinode301" }
             steps {
                 dir('strato-getting-started') {
                     script {
@@ -766,7 +763,7 @@ pipeline {
             }
         }
         stage ('Dropping Chains test-multinode302') {
-            agent { label "multinode302" } // is default
+            agent { label "multinode302" } 
             steps {
                 dir('strato-getting-started') {
                     script {
@@ -788,7 +785,7 @@ pipeline {
             }
         }
         stage ('Dropping Chains test-multinode303') {
-            agent { label "multinode303" } // is default
+            agent { label "multinode303" }
             steps {
                 dir('strato-getting-started') {
                     script {
@@ -810,7 +807,7 @@ pipeline {
             }
         }
         stage ('Dropping Chains test-multinode304') {
-            agent { label "multinode304" } // is default
+            agent { label "multinode304" } 
             steps {
                 dir('strato-getting-started') {
                     script {
@@ -1090,7 +1087,7 @@ pipeline {
             agent { label "test-multinode301" }
             steps {
                 script {
-                    node5Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE5, 'beanstalk', false)
+                    node5Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE5, 'traceharvest', false)
                     node5Pubkey = readFile(file: 'publicKey')
                 }
             }
@@ -1149,7 +1146,14 @@ pipeline {
             }
         }
 
-        /* TO DO: Redeploy monitor so that it only displays multinode101-104*/
+        stage('Upgrade w/ node chain data - Deploy Monitor') {
+            agent { label "multinode305" }
+            steps {
+                script {
+                    lib.runMonitor(NODE_DATA.NODE1, 'nodeChainUpgrade')
+                }                
+            }
+        }
 
         stage('Upgrade w/ node chain data - Upgrade Node 4') {
             agent { label "test-multinode104" }
@@ -1225,8 +1229,6 @@ pipeline {
         }
 
         /* Add/Remove Node on an Upgraded Network */
-
-        /* TO DO: Add multinode301 to the monitor. Redeploy the monitor. */
 
         stage('Add/Remove Node on an Upgraded Network - Vote in 5th Node') {
             // agent { label "multinode101" } // is default
@@ -1337,6 +1339,15 @@ pipeline {
             }
         }
 
+        stage('Add/Remove Node on an Upgraded Network - Redeploy Monitor w/ 4 nodes') {
+            agent { label "multinode305" }
+            steps {
+                script {
+                    lib.runMonitor(NODE_DATA.NODE1, 'removedChainUpgrade')
+                }                
+            }
+        }
+
         stage('Add/Remove Node on an Upgraded Network - Confirm Network Syncs after Voted out Node shuts off') {
             steps {
                 def accessToken = sh(
@@ -1433,7 +1444,7 @@ pipeline {
                     script {
                         sh "rm -rf monitor"
                         sh "git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/monitor/"
-                        lib.runMonitor(NODE_DATA.NODE1)
+                        lib.runMonitor(NODE_DATA.NODE1, null)
                     }
                 }
             }
@@ -1470,7 +1481,14 @@ pipeline {
 
         /* Performance Test - Sync Network to Devnet */
 
-        // TODO: Write function to redeploy monitor with config pointing to strato-devel realm and associated client ids and secrets
+        stage('Add/Remove Node on an Upgraded Network - Redeploy Monitor w/ 4 nodes') {
+            agent { label "multinode305" }
+            steps {
+                script {
+                    lib.runMonitor(NODE_DATA.NODE1, 'networkSynctoDevnet')
+                }                
+            }
+        }
 
         stage('Sync Network To Devnet') {
             parallel {
