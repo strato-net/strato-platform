@@ -68,7 +68,6 @@ library:
     - monad-alter
     - mtl
     - nibblestring
-    - persistent-postgresql
     - persistent-sqlite
     - prometheus-client
     - QuickCheck
@@ -76,16 +75,12 @@ library:
     - resourcet
     - seqevents
     - solid-vm-model
-    - split
     - strato-adit
-    - strato-index
     - strato-redis-blockdb
     - text
-    - temporary
     - time
     - transformers
     - unliftio
-    - unliftio-core
     - unordered-containers
     - x509-certs
 
@@ -96,10 +91,9 @@ tests:
     source-dirs: test/
     main: Spec.hs
     dependencies:
-      - base16-bytestring
-      - blockapps-haskoin
       - bytestring
       - common-log
+      - labeled-error
       - hspec
       - hspec-expectations-lifted
       - vm-tools

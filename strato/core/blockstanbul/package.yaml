@@ -14,7 +14,6 @@ library:
   - binary
   - blockapps-data
   - blockapps-datadefs
-  - blockapps-haskoin
   - bytestring
   - common-log
   - conduit
@@ -23,23 +22,21 @@ library:
   - cryptonite
   - data-default
   - deepseq
-  - ethereum-encryption
   - ethereum-rlp
   - extra
   - format
   - generic-arbitrary
   - http-client
+  - labeled-error
   - lens
   - mtl
   - prometheus-client
   - servant-client
   - servant-server
-  - stm
   - strato-model
   - text
   - transformers
   - unliftio
-  - wai
 
 executables:
   blockstanbul-vote:
@@ -51,7 +48,6 @@ executables:
       - blockapps-vault-wrapper-client
       - blockstanbul
       - base16-bytestring
-      - base64-bytestring
       - bytestring
       - http-client
       - http-conduit
@@ -72,17 +68,16 @@ tests:
       - base16-bytestring
       - blockapps-data
       - blockapps-datadefs
-      - blockapps-haskoin
       - blockstanbul
       - bytestring
       - common-log
       - containers
       - cryptonite
-      - ethereum-encryption
       - ethereum-rlp
       - hflags
       - hspec
       - hspec-expectations-lifted
+      - labeled-error
       - lens
       - strato-model
       - time
@@ -95,5 +90,4 @@ benchmarks:
     main: OneNode.hs
     dependencies:
       - blockstanbul
-      - criterion
       - transformers

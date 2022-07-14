@@ -24,11 +24,9 @@ library:
     - binary
     - blockapps-data
     - blockapps-datadefs
-    - blockapps-haskoin
     - blockapps-vault-wrapper-api
     - blockapps-vault-wrapper-client
     - bytestring
-    - classy-prelude
     - common-log
     - cpu
     - crypto-pubkey-types
@@ -45,8 +43,8 @@ library:
     - monad-alter
     - mtl
     - network-uri
+    - persistent
     - persistent-postgresql
-    - persistent-template
     - prometheus-client
     - random
     - resourcet

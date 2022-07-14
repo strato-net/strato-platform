@@ -6,9 +6,11 @@
 -- Description: Parsers for top-level Solidity declarations
 -- Maintainer: Ryan Reich <ryan@blockapps.net
 -- Maintainer: Charles Crain <charles@blockapps.net>
+-- Maintainer: Steven Glasford <steven_glasford@blockapps.net>
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 module SolidVM.Solidity.Parse.Declarations where
 
+import           Control.Monad                     (when)
 import           Data.List
 import qualified Data.Map as Map
 import           Data.Maybe
@@ -52,6 +54,9 @@ solidityContract = do
           <|> (reserved "interface" >> return Xabi.InterfaceKind)
           <|> (reserved "library" >> return Xabi.LibraryKind)
     contractName' <- fmap stringToLabel identifier
+    --Throw an error if 'account' is used.
+    pragmaVersion' <- getPragmaVersion
+    when (isReservedWord pragmaVersion' contractName') $ reservedWordError pragmaVersion' contractName'
     setContractName $ labelToString contractName'
     baseConstrs <- option [] $ do
       reserved "is"
@@ -231,7 +236,10 @@ simpleVariableDeclaration = do
   keywords <- many stateVariableKeyword
   let isConstant = KConstant `elem` keywords
   isPublic <- public keywords
+  -- check to see if the "account" variable is being used
   variableName <- identifier
+  pragmaVersion' <- getPragmaVersion
+  when (isReservedWord pragmaVersion' variableName) $ reservedWordError pragmaVersion' variableName
   value <- optionMaybe $ do
     reservedOp "="
     expression
@@ -249,10 +257,13 @@ simpleVariableDeclaration = do
 functionDeclaration :: SolidityParser (String, Declaration)
 functionDeclaration = do
   ~(a, (functionName, xabi')) <- withPosition $ do
-    functionName <- (reserved "function" >> fromMaybe "" <$> optionMaybe identifier) <|>
+    functionName <- (reserved "function" >> fromMaybe "" <$> optionMaybe identifier)  <|>
                     -- Starting with 0.4.22, constructor() <mods> { <body> } is
                     -- the preferred syntax for defining a constructor
                     (reserved "constructor" >> getContractName)
+    -- Throw an error if the function name is part of secondary reservered words.
+    pragmaVersion' <- getPragmaVersion
+    when (isReservedWord pragmaVersion' functionName) $ reservedWordError pragmaVersion' functionName
     xabi <- functionXabi
     pure (functionName, xabi)
   cName <- getContractName
@@ -283,7 +294,6 @@ functionXabi = do
       , SolidVM.funcModifiers = Just modifiers
       , SolidVM.funcContext = ctx
       }
-
 
 eventDeclaration :: SolidityParser (String, Declaration)
 eventDeclaration = do
@@ -495,3 +505,14 @@ inCommentSingle
   <?> "end of comment"
   where
     startEnd   = nub (commentEnd solidityLanguage ++ commentStart solidityLanguage)
+
+--To make a new reserved word with a specific pragma version please add to the following function list, 
+  -- This assumes that only the solidvm pragma name is used. Please change if new pragmaNames are added.
+isReservedWord :: String -> String -> Bool
+isReservedWord version reservedWord = do
+  case version of
+    "3.2" -> do 
+      case reservedWord of
+        "account" -> True
+        _ -> False
+    _ -> False

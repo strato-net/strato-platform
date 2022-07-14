@@ -13,7 +13,7 @@ import           BlockApps.Logging
 import           Blockchain.EthConf
 import           Blockchain.Strato.Discovery.Data.Peer
 
-setup :: (MonadLogger m, MonadUnliftIO m) => Maybe [String] -> m ()
+setup :: (MonadLoggerIO m, MonadUnliftIO m) => Maybe [String] -> m ()
 setup maybeStratoNodes = do
   withPostgresqlConn connStr $ runSqlConn $ do
     runMigration migrateAll

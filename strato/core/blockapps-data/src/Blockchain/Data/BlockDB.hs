@@ -11,7 +11,7 @@ module Blockchain.Data.BlockDB (
   putBlocks
 ) where
 
-import qualified Database.Esqueleto                 as E
+import qualified Database.Esqueleto.Legacy          as E
 import           Database.Persist                   hiding (get)
 import qualified Database.Persist.Postgresql        as SQL
 
