@@ -45,11 +45,17 @@ xabiToContract contractName' parents' vmVersion' xabi = do
   _structs = M.fromList [(name, (\(k,v) -> (k,v,a)) <$> vals) | (name, Def.Struct vals _ a) <- M.toList $ Xabi.xabiTypes xabi],
   _events = Xabi.xabiEvents xabi,
   _functions = Xabi.xabiFuncs xabi,
+  _modifiers = Xabi.xabiModifiers xabi,
   _constructor = constr,
   _vmVersion = vmVersion',
   _contractContext = Xabi.xabiContext xabi
   }
 
+
+validateXabi :: Xabi -> SolidEither ()
+validateXabi _ = Right ()
+
+{-
 validateXabi :: Xabi -> SolidEither ()
 validateXabi Xabi{xabiModifiers=mx, xabiContext=ctx} =
   case M.size mx of
@@ -57,7 +63,7 @@ validateXabi Xabi{xabiModifiers=mx, xabiContext=ctx} =
       _ -> Left $ ( TODO "modifiers not supported by solidvm" (show mx)
                   , ctx
                   )
-
+-}
 
 applyInheritance :: CodeCollection -> SolidEither CodeCollection
 applyInheritance cc = do

@@ -13,6 +13,7 @@ module SolidVM.Model.CodeCollection.Contract (
   structs,
   events,
   functions,
+  modifiers,
   constructor,
   vmVersion,
   contractContext
@@ -42,6 +43,7 @@ data ContractF a =
     _events :: Map SolidString (SolidVM.EventF a),
     _functions :: Map SolidString (FuncF a),
     _constructor :: Maybe (FuncF a),
+    _modifiers :: Map SolidString (ModifierF a),
     _vmVersion :: String,
     _contractContext :: a
   } deriving (Show, Generic, Functor)

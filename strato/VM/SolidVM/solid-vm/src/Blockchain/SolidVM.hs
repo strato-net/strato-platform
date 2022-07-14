@@ -574,6 +574,92 @@ logFunctionCall args address contract functionName f = do
   return result
 
 
+
+argsToValsModifiers :: MonadSM m => CC.Contract -> CC.Modifier -> CC.ArgList -> m ValList
+argsToValsModifiers ctract md args = 
+  if CC._vmVersion ctract == "svm3.2" 
+    then 
+      case args of
+        CC.OrderedArgs xs -> do
+          when (length xs /= length orderedTypes) $ invalidArguments "arity mismatch" (xs, orderedTypes)
+          OrderedVals <$> zipWithM eval32 orderedTypes xs
+        CC.NamedArgs xs -> NamedVals . M.toList <$> do
+          let strTypes = M.mapKeys (T.unpack) $ CC.modifierArgs md
+          M.mergeA (M.mapMissing $ curry $ invalidArguments "missing argument")
+                  (M.mapMissing $ curry $ invalidArguments "extra argument")
+                  (M.zipWithAMatched $ \_k t x -> eval32 (CC.indexedTypeType t) x)
+                  strTypes
+                  $ M.fromList xs
+    else
+      case args of
+        CC.OrderedArgs xs -> do
+          when (length xs /= length orderedTypes) $ invalidArguments "arity mismatch" (xs, orderedTypes)
+          OrderedVals <$> zipWithM eval orderedTypes xs
+        CC.NamedArgs xs -> NamedVals . M.toList <$> do
+          let strTypes = M.mapKeys (T.unpack) $ CC.modifierArgs md
+          M.mergeA (M.mapMissing $ curry $ invalidArguments "missing argument")
+                  (M.mapMissing $ curry $ invalidArguments "extra argument")
+                  (M.zipWithAMatched $ \_k t x -> eval (CC.indexedTypeType t) x)
+                  strTypes
+                  $ M.fromList xs
+
+  where orderedTypes :: [SVMType.Type]
+        orderedTypes = map CC.indexedTypeType
+                     . map snd $ M.toList $ CC.modifierArgs md
+
+        eval :: MonadSM m => SVMType.Type -> CC.Expression -> m Value
+        eval t x = case x of
+           CC.NumberLiteral _ n Nothing -> return . coerceType ctract t $ SInteger n
+           CC.NumberLiteral _ n (Just nu) -> todo "Number literal with units" (n, nu)
+           CC.BoolLiteral _ b -> return . coerceType ctract t $ SBool b
+           CC.StringLiteral _ s -> return . coerceType ctract t $ SString s
+           CC.ArrayExpression _ as -> case t of
+              SVMType.Array{SVMType.entry=t'} ->
+                SArray t . V.fromList <$> mapM (fmap Constant . eval t') as
+              _ -> typeError "array literal for non array" (t, x)
+           -- This is something of a hack, where if an incoming value is not one
+           -- of the accepted literals, assume that this is not the context of
+           -- evaluating external arguments.
+           _ -> getVar =<< expToVar x
+
+        eval32 :: MonadSM m => SVMType.Type -> CC.Expression -> m Value
+        eval32 t x = do
+          case x of
+            CC.NumberLiteral _ n Nothing   -> return . coerceType ctract t $ SInteger n
+            CC.NumberLiteral _ n (Just nu) -> todo "Number literal with units" (n, nu)
+            CC.BoolLiteral _ b             -> return . coerceType ctract t $ SBool b
+            CC.StringLiteral _ s           -> return . coerceType ctract t $ SString s
+            CC.ArrayExpression _ as        -> case t of
+              SVMType.Array{SVMType.entry=t'} ->
+                SArray t . V.fromList <$> mapM (fmap Constant . eval t') as
+              _ -> typeError "array literal for non array" (t, x)
+              -- This is something of a hack, where if an incoming value is not one
+              -- of the accepted literals, assume that this is not the context of
+              -- evaluating external arguments.
+            CC.ObjectLiteral _ mp          -> case t of
+              SVMType.UnknownLabel l _ -> do
+                let ls = M.toList mp :: [(SolidString, CC.Expression)]
+                m <- mapM go ls
+                return $ SStruct l $ M.fromList m
+                where go (k, v) = do
+                                let tp = expressionType v
+                                v' <- eval tp v
+                                return $ (k, Constant v')
+              (SVMType.Mapping _ keyType valueType) -> do
+                m <- mapM go $ M.toList mp
+                return $ SMap valueType $ M.fromList m
+                where --go :: (SolidString, CC.Expression) -> (SolidString, (Value, Variable))
+                      go (k, v) = do
+                                let !maybeExp = runParser literal (ParserState "" "") "" (labelToString k)
+                                case maybeExp of 
+                                  Right ex -> do
+                                    k' <- eval keyType ex
+                                    v' <- eval valueType v
+                                    return (k', Constant v')
+                                  Left err -> typeError (show err) (k, t)
+              _ -> typeError "Object Literal for non-object like argument type" (t, x)
+            _                               -> getVar =<< expToVar x
+
 argsToVals :: MonadSM m => CC.Contract -> CC.Func -> CC.ArgList -> m ValList
 argsToVals ctract fn args = 
   if CC._vmVersion ctract == "svm3.2" 
@@ -781,6 +867,19 @@ callWrapper from to mContract functionName isRCC argExps  = do
   logFunctionCall args to contract functionName f
 
 
+runStatements' :: MonadSM m => [CC.Statement] -> m (Maybe Value)
+runStatements' [] = return Nothing
+runStatements' (s:rest) = do
+  onTraced $ do
+    when False printFullStackTrace -- Too verbose, only turn on by hand when needed
+    funcName <- getCurrentFunctionName
+    liftIO $ putStrLn $ C.green $ labelToString funcName ++ "> " ++ unparseStatement s
+  ret <- runStatement s 
+  case ret of
+    Nothing -> runStatements rest
+    _ -> modifierError "you cannot return a value as part of a modifier" (s)
+    
+
 runStatements :: MonadSM m => [CC.Statement] -> m (Maybe Value)
 runStatements [] = return Nothing
 runStatements (s:rest) = do
@@ -927,6 +1026,9 @@ runStatement (CC.SimpleStatement (CC.ExpressionStatement (CC.Binary _ "=" dst sr
               logAssigningVariable value'
               setVar v1 $ coerceType ctract ty value'
 -}
+
+
+
 runStatement (CC.SimpleStatement (CC.ExpressionStatement e) pos) = do
   solidVMBreakpoint pos
   _ <- getVar =<< expToVar e
@@ -993,6 +1095,7 @@ runStatement s@(CC.SimpleStatement (CC.VariableDefinition entries maybeExpressio
     _ -> typeError "VariableDefinition expected a tuple" value
 
   return Nothing
+
 
 runStatement (CC.SolidityTryCatchStatement tryExpression returnsDecl statementsForSuccess catchBlockMap _) = do
   mRes <- EUnsafe.try $ do
@@ -1176,6 +1279,10 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
 runStatement (CC.UncheckedStatement code pos) = do
   solidVMBreakpoint pos
   withUncheckedCallInfo $ runStatements code
+
+--runs the "_;" operator in a modifier statement
+runStatement (CC.ModifierExecutor _) = do
+  return Nothing
 
 runStatement x = unknownStatement "unknown statement in call to runStatement: " (show x)
 
@@ -2177,6 +2284,9 @@ callBuiltin rc@("registerCert") [(SAccount a _), SString cert] _ = do
                 onTraced $ liftIO $ putStrLn $ "    registering cert to address: " ++ format theAddress ++ " as " ++ show (fmap subCommonName $ getCertSubject x509Cert)
                 return SNULL
 
+
+
+
 callBuiltin rc'@("registerCert") [SString cert] _ = do
   contract' <- getCurrentContract
   let rootAddress = fromPublicKey rootPubKey
@@ -2396,7 +2506,7 @@ data Func = Func
   -- relevance when constructing from the db.
   , funcContents :: Maybe [Statement]
   , funcVisibility :: Maybe Visibility
-  , funcModifiers :: Maybe [String]
+  , funcModifiers :: [(SolidString, [(ExpressionF a)])]
   } deriving (Eq,Show,Generic)
 
 -}
@@ -2450,7 +2560,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
                                         $ CC._constructor contract')
                                   argExps
   let einval = invalidArguments "named arguments to contract without constructor" (contractName', argVals)
-
+  let svm3_2 = CC._vmVersion contract' == "svm3.2"
   zipped <-
     case argVals of
       OrderedVals vals ->
@@ -2504,11 +2614,28 @@ runTheConstructors from to hsh cc contractName' argExps = do
       Just theFunction -> do
         --argVals <- forM argExps evaluate
         --_ <- call' address contract' theFunction argVals
-        commands <- case CC.funcContents theFunction of
+        let theModifierNames =  map fst $ (CC.funcModifiers theFunction) 
+        !theModifiers' <- forM theModifierNames $ \name -> do
+          case M.lookup name (contract'^.CC.modifiers) of
+            Just theModifier -> do
+              --args' <- argsToVals contract' theModifier argExps
+              return $ Just theModifier
+            Nothing -> do
+              if name `elem` contract'^.CC.parents then return Nothing else (if svm3_2 then (missingField "modifier not found" name) else return Nothing)
+        let theModifiers = catMaybes theModifiers'
+        !commands <- case CC.funcContents theFunction of
           Nothing -> missingField "contract constructor has been declared but not defined" contractName'
           Just cms -> pure cms
-
+       -- let modifierArgs = map CC.modifierArgs theModifiers
+        let !modContentsList = map (\m -> fromMaybe (missingField "Function call: Modifier has been declared but not defined" m) (CC.modifierContents m)) theModifiers
+        let isNotModExec = \case
+              CC.ModifierExecutor _ -> False
+              _ -> True
+        let (lhs,rhs) = foldr (\(a,b) (c,d) -> (a++c,b++d)) ([],[]) (map (span isNotModExec) modContentsList)
+        logVals lhs rhs
+        _ <- runStatements' lhs
         _ <- pushSender from $ runStatements commands
+        _ <- runStatements' rhs
         return ()
 
       Nothing -> return ()
@@ -2547,7 +2674,38 @@ runTheCall :: MonadSM m
            -> m (Maybe Value)
 runTheCall address' contract' funcName hsh cc theFunction argVals ro = do
   let returns = [(n, (t, defaultValue contract' t)) | (Just n, CC.IndexedType _ t) <- CC.funcVals theFunction]
-      args = case argVals of
+      theModifierNames = map fst $ (CC.funcModifiers theFunction) 
+      svm3_2 = CC._vmVersion contract' == "svm3.2"
+  theModifiers' <- forM theModifierNames $ \name -> do
+    case M.lookup name (contract'^.CC.modifiers) of
+      Just theModifier -> do
+        return $ Just theModifier
+      Nothing -> if name `elem` contract' ^. CC.parents then return Nothing else (if svm3_2 then (missingField "modifier not found" name) else return Nothing)
+  let !theModifiers = catMaybes theModifiers'
+  matchedArgvals <- forM theModifiers $ \modi -> do
+    let margList = CC.OrderedArgs 
+            . fromMaybe []
+            $ M.lookup (T.unpack (CC.modifierSelector modi)) $ M.fromList $ CC.funcModifiers theFunction
+    margVals <- argsToValsModifiers contract' modi margList
+    case margVals of
+      OrderedVals vs -> do
+        let argMeta = map (\(n, CC.IndexedType _ t) -> (n, t)) $ M.toList $ CC.modifierArgs modi
+        return (zipWith (\(n, t) v -> (n, (t, v))) argMeta vs)
+      NamedVals ns -> do
+        let strTypes = M.fromList $ map (\(theName, y) -> (theName, y)) $ M.toList $ CC.modifierArgs modi
+            typeAndVal = M.merge (M.mapMissing (curry $ invalidArguments "missing argument"))
+                                 (M.mapMissing (curry $ invalidArguments "extra argument"))
+                                 (M.zipWithMatched $ \_k t v -> (t, v))
+                                 strTypes
+                                 $ M.mapKeys T.pack $ M.fromList ns
+            -- These probably don't need to be sorted by argument index, as they are turned into a map
+            -- when added to the call info.
+            sortedArgs = map snd . sortWith fst
+                      . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
+                      $ M.toList typeAndVal
+        return sortedArgs
+
+  let args = case argVals of
         OrderedVals vs -> let argMeta = 
                                 map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t))
                                 $ CC.funcArgs theFunction
@@ -2565,7 +2723,8 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro = do
                          . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
                          $ M.toList typeAndVal
           in sortedArgs
-      locals = args ++ returns
+
+      locals = args ++ returns ++ (map (\(x,y) -> (T.unpack x, y)) (concat matchedArgvals)) --modArgsToBeLocals
 
   onTraced $ do
     liftIO $ putStrLn $ "            args: " ++ show (map fst args)
@@ -2577,11 +2736,18 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro = do
       return (n, (t, newVar))
 
   addCallInfo address' contract' funcName hsh cc (M.fromList localVars) ro -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
---  forM_ locals $ \(n, (_, v)) -> do
---    liftIO $ putStrLn "need to initialize the storage 2"
---    initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack n) v
+
   let !commands = fromMaybe (missingField "Function call: function has been declared but not defined" funcName) $ CC.funcContents theFunction
-  val <- runStatements commands
+  let modContentsList = map (\m -> fromMaybe (missingField "Function call: Modifier has been declared but not defined" m) (CC.modifierContents m)) theModifiers
+  let isNotModExec = \case
+              CC.ModifierExecutor _ -> False
+              _ -> True
+  let (lhs,rhs) = foldr (\(a,b) (c,d) -> (a++c,b++d)) ([],[]) (map (span isNotModExec) modContentsList)
+  logVals lhs rhs
+  _ <- runStatements' lhs
+  val   <- runStatements commands
+  _ <- runStatements' rhs
+
   let findNamedReturns = do
         case returns of
           [] -> return Nothing
@@ -2861,6 +3027,9 @@ solidityExceptionHandler catchBlockMap ex = do
       return res
     (ReservedWordError s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 23 reservedWordError
+      return res
+    (ModifierError s1 s2) -> do
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 24 modifierError
       return res
 
 solidVMExceptionHandler :: (MonadSM m) => (M.Map String [CC.Statement]) -> SolidException -> m (Maybe Value)
