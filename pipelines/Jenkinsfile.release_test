@@ -367,7 +367,7 @@ pipeline {
                     if (params.DEBUG_MODE) {
                         sh 'until [ -f /home/ubuntu/step2 ]; do sleep 5; echo "wait for file /home/ubuntu/step2 to be created by user"; done; echo "File found - continuing."'
                     }
-                    runBeanstalkLoadTest()
+                    lib.runBeanstalkLoadTest(${params.BEANSTALK_LOADTEST_BATCH_SIZE}, ${params.BEANSTALK_LOADTEST_BATCH_COUNT})
                 }
             }
         }
@@ -637,7 +637,7 @@ pipeline {
                     if (params.DEBUG_MODE) {
                         sh 'until [ -f /home/ubuntu/step2 ]; do sleep 5; echo "wait for file /home/ubuntu/step2 to be created by user"; done; echo "File found - continuing."'
                     }
-                    runBeanstalkLoadTest()
+                    lib.runBeanstalkLoadTest(${params.BEANSTALK_LOADTEST_BATCH_SIZE}, ${params.BEANSTALK_LOADTEST_BATCH_COUNT})
                 }
             }
         }
@@ -1528,61 +1528,4 @@ pipeline {
         }
         
     }
-}
-
-def runBeanstalkLoadTest() {
-  checkUnhealthyContainers()
-  sleep(time:5,unit:"SECONDS") // let the updates related to transactions just posted get to the monitor and potentially flip it to unhealthy before we check for the first time
-  sh "sudo docker exec beanstalk_backend_1 bash -c \"cp /config/config.yaml config/generated.config.yaml && echo \\\"batchSize: ${params.BEANSTALK_LOADTEST_BATCH_SIZE}\\\">>config/generated.config.yaml && echo \\\"batchCount: ${params.BEANSTALK_LOADTEST_BATCH_COUNT}\\\">>config/generated.config.yaml && SERVER=generated yarn test:agreement:load\""
-  sleep(time:5,unit:"SECONDS") // we wait some time to make sure nothing crashed yet and before starting monitoring the network health to see when blocks stop being created and network is healthy
-  checkUnhealthyContainers()
-  waitForCirrus()
-}
-
-def checkUnhealthyContainers() {
-  sh 'if bash -c "docker ps | grep unhealthy"; then exit 43; else echo "all containers are healthy"; fi'
-}
-
-def waitForHealthyNetwork() {
-  // TODO: the monitor deployment should be a part of the pipeline
-  // TODO: also check if the number of private chains is same as on another tech node (monitor should provide hooks for that)
-  def secondsForEachAgreement = "10"
-  sh """
-    set -x
-    waitForContinousHealth() {
-      isNowHealthy() {
-        if [ "\$(curl -s https://multinode305.ci.blockapps.net/health | jq .needsAttention)" = "false" ]; then exit 0; else exit 1; fi
-      }
-      if \$(isNowHealthy); then
-        sleep 5
-        if \$(isNowHealthy); then
-          sleep 5
-          if \$(isNowHealthy); then
-            exit 0
-          else exit 1
-          fi
-        else exit 1
-        fi
-      else exit 1
-      fi
-    }
-    counter=0
-    until \$(waitForContinousHealth)
-    do 
-      # wait for (batchSize x batchCount x secondsForEachAgreement) seconds:
-      if [ "\$counter" -gt \$(expr ${env.BEANSTALK_LOADTEST_BATCH_SIZE} \\* ${env.BEANSTALK_LOADTEST_BATCH_COUNT} \\* ${secondsForEachAgreement}) ]
-      then
-        echo "STRATO network took too long to become healthy! Apparently something went wrong with load test."
-        exit 73
-      fi
-      echo 'Waiting for network to become healthy...'
-      counter=\$((counter+1))
-      sleep 1
-    done
-  """
-}
-
-def waitForCirrus() {
-  // TODO: Ideally - make a direct check if cirrus still has data to index and is active. For now, just let it rest for some time to make sure cirrus has enough time to finish indexing once all blocks are created:
-  sleep(time:180,unit:"SECONDS")
 }

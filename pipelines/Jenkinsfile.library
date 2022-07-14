@@ -897,6 +897,24 @@ def waitForHealthySync(MONITOR_DATA) {
   }
 }
 
+def runBeanstalkLoadTest(loadTestBatchSize, loadTestBatchCount) {
+  checkUnhealthyContainers()
+  sleep(time:5,unit:"SECONDS") // let the updates related to transactions just posted get to the monitor and potentially flip it to unhealthy before we check for the first time
+  sh "sudo docker exec beanstalk_backend_1 bash -c \"cp /config/config.yaml config/generated.config.yaml && echo \\\"batchSize: ${loadTestBatchSize}\\\">>config/generated.config.yaml && echo \\\"batchCount: ${loadTestBatchCount}\\\">>config/generated.config.yaml && SERVER=generated yarn test:agreement:load\""
+  sleep(time:5,unit:"SECONDS") // we wait some time to make sure nothing crashed yet and before starting monitoring the network health to see when blocks stop being created and network is healthy
+  checkUnhealthyContainers()
+  waitForCirrus()
+}
+
+def checkUnhealthyContainers() {
+  sh 'if bash -c "docker ps | grep unhealthy"; then exit 43; else echo "all containers are healthy"; fi'
+}
+
+def waitForCirrus() {
+  // TODO: Ideally - make a direct check if cirrus still has data to index and is active. For now, just let it rest for some time to make sure cirrus has enough time to finish indexing once all blocks are created:
+  sleep(time:180,unit:"SECONDS")
+}
+
 /* HOLD OFF ON X509 TESTS */
 // def postSimpleStorage(nodeData, accessToken) {
 //   script {
