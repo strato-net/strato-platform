@@ -2,8 +2,12 @@
 
 module TxrIndexerSpec where
 
+import qualified Data.ByteString.Char8              as C8
+import           Data.Either
+
 import           Test.Hspec
 
+import           BlockApps.X509.Certificate
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Enode
 import           Blockchain.Strato.Indexer.Model
@@ -26,12 +30,34 @@ spec = do
                 event = EventDB (Just chainId) "MemberRemoved" [show addr]
             in indexEventToTxrResults (EventDBEntry event)
                 `shouldBe` [PutEventDB event, RemoveMember $ Right (chainId, addr)]
-        -- it "Index EventDBEntry for CertificateRegistered" $
-        --     let uAddr = fromInteger 0x1234
-        --         cAddr = fromInteger 0x5678
-        --         event = EventDB Nothing "CertificateRegistered" [show uAddr, show cAddr]
-        --     in indexEventToTxrResults (EventDBEntry event)
-        --         `shouldBe` [PutEventDB event, RegisterCertificate $ Right (uAddr, cAddr)]
+        it "Index EventDBEntry for CertificateRegistered" $
+            let certString = unlines
+                    [ "-----BEGIN CERTIFICATE-----"
+                    , "MIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI"
+                    , "MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF"
+                    , "bmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy"
+                    , "MDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU"
+                    , "MBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG"
+                    , "BSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs"
+                    , "9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8"
+                    , "R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n"
+                    , "N8txKc8G9R27ZYAUuz15zF0="
+                    , "-----END CERTIFICATE-----"
+                    ]
+                event = EventDB Nothing "CertificateRegistered" [certString]
+                parsedCert = fromRight (error "Couldn't parse certString") $ bsToCert $ C8.pack $ certString
+                addr = fromInteger 0x74f014fef932d2728c6c7e2b4d3b88ac37a7e1d0
+            in indexEventToTxrResults (EventDBEntry event)
+                `shouldBe` [PutEventDB event, RegisterCertificate $ Right (addr, X509CertInfoState{userAddress=addr, certificate=parsedCert, isValid=True, children=[]})]
+        it "Index EventDB for CertificateRevoked" $
+            let userAddr = fromInteger 0x489384
+                event = EventDB Nothing "CertificateRevoked" [show userAddr]
+            in indexEventToTxrResults (EventDBEntry event)
+                `shouldBe` [PutEventDB event, CertificateRevoked . Right $ userAddr]
+        it "Index EventDB for CertificateRegistryInitialized" $
+            let event = EventDB Nothing "CertificateRegistryInitialized" []
+            in indexEventToTxrResults (EventDBEntry event)
+                `shouldBe` [PutEventDB event, CertificateRegistryInitialized . Right $ ()]
         it "Index EventDBEntry for non-special event" $
             let chainId = fromInteger 0x480244
                 event = EventDB (Just chainId) "NotSpecial" ["48193"]

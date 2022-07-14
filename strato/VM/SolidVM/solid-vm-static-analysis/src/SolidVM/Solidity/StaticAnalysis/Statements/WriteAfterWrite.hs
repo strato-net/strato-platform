@@ -91,6 +91,7 @@ statementHelper (SolidityTryCatchStatement expr _ successStatements catchMap _) 
     statementsHelper' cas
   pure $ concat [e, ss, (concat css)]
 statementHelper (Continue _) = pure []
+statementHelper (ModifierExecutor _) = pure []
 statementHelper (Break _) = pure []
 statementHelper (Return mExpr _) =
   maybe (pure []) expressionHelper mExpr

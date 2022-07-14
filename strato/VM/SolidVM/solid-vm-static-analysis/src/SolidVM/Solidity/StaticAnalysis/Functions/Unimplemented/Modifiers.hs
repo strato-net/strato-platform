@@ -20,5 +20,4 @@ contractHelper Contract{..} = concat $ functionHelper <$> maybeToList _construct
 
 functionHelper :: Func -> [SourceAnnotation Text]
 functionHelper Func{..} = case funcModifiers of
-  Just (_:_) -> ["Custom modifiers are unsupported in SolidVM." <$ funcContext]
-  _ -> []
+  _ -> ["Custom modifiers are unsupported in SolidVM." <$ funcContext]
