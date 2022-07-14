@@ -109,7 +109,6 @@ instance ToSchema Visibility where
 data ModifierF a = Modifier
   { modifierArgs     :: Map Text SolidVM.IndexedType
   , modifierSelector :: Text
-  , modifierVals     :: Map Text SolidVM.IndexedType
   , modifierContents :: Maybe [StatementF a]
   , modifierContext  :: a
   } deriving (Eq,Show,Generic, Functor)
