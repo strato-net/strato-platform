@@ -645,7 +645,7 @@ contractHelper cc c =
       funcsAndConstr = constr <> _functions c
       varTypes' = reduceType' (_contractContext c) $ varDeclHelper cc c <$> M.elems (_storageDefs c)
       constTypes' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_constants c)
-      funcTypes' = reduceType' (_contractContext c) $ functionHelper cc c <$> M.elems funcsAndConstr
+      funcTypes' = reduceType' (_contractContext c) $ uncurry (functionHelper cc c) <$> M.toList funcsAndConstr
    in reduceType' (_contractContext c) [varTypes', constTypes', funcTypes']
 
 varDeclHelper :: Annotated CodeCollectionF
@@ -671,23 +671,43 @@ constDeclHelper cc c ConstantDecl{..} =
 
 functionHelper :: Annotated CodeCollectionF
                -> Annotated ContractF
+               -> String
                -> Annotated FuncF
                -> Type'
-functionHelper cc c f@Func{..} = case funcContents of
+functionHelper cc c funcName f@Func{..} = case funcContents of
   Nothing -> Function (Product [] funcContext) (Product [] funcContext) funcContext
   Just stmts ->
-    let r = R cc c (Just f)
-        swap = uncurry $ flip (,)
-        args = (\(it,n) -> ( n
-                           , VarDefEntry (Just $ indexedTypeType it) Nothing n funcContext
-                           ))
-           <$> (catMaybes $ sequence . swap <$> funcArgs)
-        vals = (\(it,n) -> ( n
-                           , VarDefEntry (Just $ indexedTypeType it) Nothing n funcContext
-                           ))
-           <$> (catMaybes $ sequence . swap <$> funcVals)
-        argVals = M.fromList $ args ++ vals
-     in runReader (statementsHelper argVals stmts) r
+    if funcName == "receive"
+      then case (funcArgs, funcVals, funcStateMutability, funcVisibility) of
+        ([], [], Payable, External) -> let r = R cc c (Just f)
+                                            swap = uncurry $ flip (,)
+                                            args = (\(it,n) -> ( n
+                                                              , VarDefEntry (Just $ indexedTypeType it) Nothing n funcContext
+                                                              ))
+                                              <$> (catMaybes $ sequence . swap <$> funcArgs)
+                                            vals = (\(it,n) -> ( n
+                                                              , VarDefEntry (Just $ indexedTypeType it) Nothing n funcContext
+                                                              ))
+                                              <$> (catMaybes $ sequence . swap <$> funcVals)
+                                            argVals = M.fromList $ args ++ vals
+                                        in runReader (statementsHelper argVals stmts) r
+        (fArg, [], _, _) -> throw bottom fArg
+        ([], fVal, _, _) -> throw bottom fVal 
+        (_, _, fMut, _) -> throw bottom tShow fMut
+        (_, _, _, fVis) -> throw bottom tShow fVis
+    else
+      let r = R cc c (Just f)
+          swap = uncurry $ flip (,)
+          args = (\(it,n) -> ( n
+                            , VarDefEntry (Just $ indexedTypeType it) Nothing n funcContext
+                            ))
+            <$> (catMaybes $ sequence . swap <$> funcArgs)
+          vals = (\(it,n) -> ( n
+                            , VarDefEntry (Just $ indexedTypeType it) Nothing n funcContext
+                            ))
+            <$> (catMaybes $ sequence . swap <$> funcVals)
+          argVals = M.fromList $ args ++ vals
+      in runReader (statementsHelper argVals stmts) r
 
 statementsHelper :: (M.Map SolidString (Annotated VarDefEntryF))
                  -> [Annotated StatementF]

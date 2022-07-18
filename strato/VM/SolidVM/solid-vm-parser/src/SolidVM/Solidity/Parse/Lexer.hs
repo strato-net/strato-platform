@@ -82,7 +82,8 @@ solidityLanguage = javaStyle {
      "seconds", "minutes", "hours", "days", "weeks", "years",
      --The following are protected as they are also names for cirrus columns
      "block_number", "block_timestamp", "block_hash",
-     "record_id", "transaction_hash", "transaction_sender"
+     "record_id", "transaction_hash", "transaction_sender",
+     "receive"
      ],
   P.reservedOpNames = [
     "!", "&&", "||", "==", "!=",
