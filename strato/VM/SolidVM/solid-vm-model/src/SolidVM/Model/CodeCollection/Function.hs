@@ -98,7 +98,8 @@ tShow' Public = "public"
 tShow' Internal = "internal"
 tShow' External = "external"
 
-instance ToJSON Visibility
+instance ToJSON Visibility where
+  toJSON = String . tShow'
 instance FromJSON Visibility
 instance Arbitrary Visibility where arbitrary = GR.genericArbitrary GR.uniform
 instance ToSchema Visibility where
