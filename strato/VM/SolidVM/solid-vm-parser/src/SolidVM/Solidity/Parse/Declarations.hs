@@ -42,6 +42,7 @@ import           Blockchain.VM.SolidException
 data SourceUnitF a = Pragma a Identifier String
                    | Import a Text.Text
                    | NamedXabi Text.Text (XabiF a, [Text.Text])
+                   | FreeFunc String SolidVM.Func
                    deriving (Eq, Show, Generic, Functor)
 
 type SourceUnit = Positioned SourceUnitF
@@ -116,7 +117,24 @@ solidityContract = do
 
 --        visibility isPub = if isPub then Just True else Nothing
 
-
+-- | Parses a free function
+solidityFreeFunction :: SolidityParser SourceUnit
+solidityFreeFunction = do
+  (fname, fdec) <- solidityDeclaration
+  func <- do
+    case fdec of
+      FuncDeclaration a -> return a  
+      _ -> internalError "Not a function declaration" fdec
+  return $ FreeFunc fname $ SolidVM.Func 
+    { SolidVM.funcArgs = SolidVM.funcArgs func
+    , SolidVM.funcVals = SolidVM.funcVals func
+    , SolidVM.funcStateMutability = SolidVM.funcStateMutability func
+    , SolidVM.funcContents = SolidVM.funcContents func
+    , SolidVM.funcVisibility = Just SolidVM.Internal
+    , SolidVM.funcConstructorCalls = SolidVM.funcConstructorCalls func
+    , SolidVM.funcModifiers = SolidVM.funcModifiers func
+    , SolidVM.funcContext = SolidVM.funcContext func
+    }
 
 data Declaration =
   FuncDeclaration SolidVM.Func
