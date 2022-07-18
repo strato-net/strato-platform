@@ -14,6 +14,7 @@ import           Text.Parsec.Expr
 import           SolidVM.Model.CodeCollection.Statement
 import           SolidVM.Model.SolidString
 import           SolidVM.Model.Type
+import qualified SolidVM.Model.Type as SVMType
 import           SolidVM.Solidity.Parse.Lexer
 import           SolidVM.Solidity.Parse.ParserTypes
 import           SolidVM.Solidity.Parse.Types
@@ -25,6 +26,9 @@ statement :: SolidityParser Statement
 statement = do
   ifStatement
   <|> whileStatement
+  <|> (do
+    reserved "try"
+    (solidityTryCatchStatement <|> tryCatchStatement)) -- hack to get it to differentiate between the two before parsing to avoid ambiguity
   <|> doWhileStatement
   <|> forStatement
   <|> (do
@@ -49,6 +53,7 @@ statement = do
   <|> (Continue <$> (position (reserved "continue") <* semi))
   <|> (Break <$> (position (reserved "break") <* semi))
   <|> (reserved "assembly" >> inlineAssembly)
+  <|> (ModifierExecutor <$> (position (reserved "_") <* semi))   -- This parses the "_;" statement, which is used to signify when in a modifier the function should run
   <|> ((\(a,e) -> SimpleStatement (ExpressionStatement e) a) <$> ((withPosition expression) <* semi))
   <|> revertStatement
   <|> uncheckedStatement
@@ -59,6 +64,58 @@ Statement = IfStatement | WhileStatement | ForStatement | Block | InlineAssembly
               Throw | EmitStatement | RevertStatement | SimpleStatement ) ';'
 -}
 
+
+solidityTryCatchStatement :: SolidityParser Statement
+solidityTryCatchStatement = do
+  ~(a, (tryExpression, returnsDecl, statementsForSuccess, catchArr)) <- withPosition $ do
+--    reserved "try"
+    e <- expression
+    mReturns <- optionMaybe $ do
+      reserved "returns"
+      tp <- tupleDeclaration'
+      pure tp
+    sms <- statements
+    catchs <- many1 $ do
+      reserved "catch"
+      mIdent <- optionMaybe identifier
+      mtps <- optionMaybe tupleDeclaration'
+      ss <- statements
+      (i,tps) <- case (mIdent, mtps) of 
+        (Just "Error" , Just [(a,b)] ) -> if (case b of (SVMType.String _) -> True; _ -> False;) then pure ("Error", Just (a,b) ) else fail "'Error' catch statement parameter type must be string"
+        (Just "Error" , Just xs ) -> if Prelude.length xs < 2 then pure ("Error", Nothing) else fail "'Error' catch statement must only have one or zero parameters"
+        (Just "Error" , Nothing ) -> pure ("Error", Nothing)
+        (Just "Panic" , Just [(a,b)] ) -> if (case b of (SVMType.Int _ _) -> True; _ -> False;) then pure ("Panic", Just (a,b)) else fail "'Panic' catch statement parameter type must be uint"
+        (Just "Panic" , Just xs ) -> if Prelude.length xs < 2 then pure ("Panic", Nothing) else fail "'Panic' catch statement must only have one or zero parameters"
+        (Just "Panic" , Nothing ) -> pure ("Panic", Nothing)
+        (Nothing , Just [(a,b)] ) -> if (case b of (SVMType.Bytes _ _) -> True; _ -> False;) then pure ("Nill", Just (a,b)) else fail "the empty catch statement parameter type must be bytes"
+        (Nothing , Just xs ) -> if Prelude.length xs < 2 then pure ("Nill", Nothing) else fail "the empty catch statement must only have one or zero parameters"
+        (Nothing , Nothing ) -> pure ("Nill", Nothing)
+        _ -> fail "catch statement must have a valid identifier such as 'Error' or 'Panic'"
+      pure (i, (tps, ss))
+    pure (e, mReturns, sms, catchs)
+  pure $ SolidityTryCatchStatement tryExpression returnsDecl statementsForSuccess (Map.fromList catchArr) a
+
+tupleDeclaration' :: SolidityParser [(String, SVMType.Type)]
+tupleDeclaration' = parens $ commaSep $ do
+  partType <- simpleTypeExpression
+  optional $ reserved "indexed" <|>
+             reserved "storage" <|>
+             reserved "memory"
+  partName <- option "" identifier
+  return (partName, partType)
+
+tryCatchStatement :: SolidityParser Statement
+tryCatchStatement = do
+    ~(a, (test1, test2)) <- withPosition $ do
+--      reserved "try"
+      s <- statements
+      catchs <- many1 $ do
+        reserved "catch"
+        ident <- identifier
+        ss <- statements
+        pure (ident, ss)
+      pure (s, catchs)
+    pure $ TryCatchStatement test1 (Map.fromList test2) a
 
 ifStatement :: SolidityParser Statement
 ifStatement = do
@@ -131,7 +188,6 @@ revertStatement = try $ do
   _ <- semi
   pure $ RevertStatement i e a  
 
---ForStatement = 'for' '(' (SimpleStatement)? ';' (Expression)? ';' (ExpressionStatement)? ')' Statement
 
 location :: SolidityParser (Maybe Location)
 location = optionMaybe $ asum [ reserved "memory" >> return Memory

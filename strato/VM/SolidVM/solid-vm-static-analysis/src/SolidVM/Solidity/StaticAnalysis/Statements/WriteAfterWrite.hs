@@ -67,7 +67,31 @@ statementHelper (DoWhileStatement body cond _) = do
   bs <- statementsHelper' body
   put M.empty
   pure $ concat [bs, cs]
+statementHelper (TryCatchStatement body catches _) = do
+  s <- get
+  bs <- statementsHelper' body
+  sTry <- get
+  put $ M.intersection s sTry
+  css <- forM (M.toList catches) $ \(_, cas) -> do
+    sCatch <- get
+    put $ M.intersection s sCatch
+    statementsHelper' cas
+  pure $ concat [bs, (concat css)]
+statementHelper (SolidityTryCatchStatement expr _ successStatements catchMap _) = do
+  s <- get
+  e <- expressionHelper expr
+  sTry <- get
+  put $ M.intersection s sTry
+  ss <- statementsHelper' successStatements
+  sCatch <- get
+  put $ M.intersection s sCatch
+  css <- forM (M.toList catchMap) $ \(_, (_, cas)) -> do
+    sCatch' <- get
+    put $ M.intersection s sCatch'
+    statementsHelper' cas
+  pure $ concat [e, ss, (concat css)]
 statementHelper (Continue _) = pure []
+statementHelper (ModifierExecutor _) = pure []
 statementHelper (Break _) = pure []
 statementHelper (Return mExpr _) =
   maybe (pure []) expressionHelper mExpr
@@ -82,6 +106,7 @@ statementHelper (UncheckedStatement body _) =
   statementsHelper' body
 statementHelper (AssemblyStatement _ _) = pure []
 statementHelper (SimpleStatement stmt _) = simpleStatementHelper stmt
+
 
 simpleStatementHelper :: SimpleStatement -> SSS [SourceAnnotation Text]
 simpleStatementHelper (VariableDefinition vs mExpr) = case mExpr of

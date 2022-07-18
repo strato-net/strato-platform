@@ -114,10 +114,13 @@ getBlocTransactionResult' hashes@(txh:_) resolve =
     then do
       promises <- forM hashes $ \h -> async (getBlocTransactionResult h True)
       results <- mapM wait promises
-      $logDebugLS "getBlockTransactionResult'/results" results
-      case filter ((== Success) . blocTransactionStatus) results of
-        (winner:_) -> return winner
-        [] -> return $ head results
+      $logDebugLS "getBlocTransactionResult'/results" results
+      case results of 
+        [] -> throwIO $ AnError "Empty list provided: results is empty"
+        (fstResult:_) -> case filter ((== Success) . blocTransactionStatus) results of
+          (winner:_) -> return winner
+          [] -> return $ fstResult
+        
     else return $ BlocTransactionResult Pending txh Nothing Nothing
 
 getBlocTransactionResult :: ( MonadIO m

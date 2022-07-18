@@ -42,6 +42,7 @@ data BlockDBNamespace = Headers
                       | PrivateIPChains
                       | PrivateOrgIdChains
                       | X509Certificates
+                      | X509Initialized
     deriving (Eq, Read, Show)
 
 class RedisDBKeyable k where
@@ -174,5 +175,6 @@ displayForNamespace ns input = case ns of
     PrivateIPChains -> let RedisIPChains ipcs = fromValue input in format (S.toList ipcs)
     PrivateOrgIdChains -> let RedisOrgIdChains oics = fromValue input in format (S.toList oics)
     X509Certificates -> format (fromValue input :: Address)
+    X509Initialized -> format input
   where
     readSHA = let x = fromValue input in format (keccak256ToWord256 x)
