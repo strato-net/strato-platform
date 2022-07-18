@@ -4797,4 +4797,22 @@ contract qq {
 }|]
     getFields ["myNum", "otherNum", "errorCount"] `shouldReturn` [BInteger 3, BInteger 12, BInteger 1]
 
+  it "allows overloading functions" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq{
+  uint myNum = 0;
+  constructor() public {
+    addToNum(1);
+    addToNum(1, 2);
+  }
 
+  function addToNum(uint x) {
+    myNum += x;
+  }
+
+  function addToNum(uint x, uint y) {
+    myNum += x + y;
+  }
+}|]
+    getFields ["myNum"] `shouldReturn` [BInteger 4]
