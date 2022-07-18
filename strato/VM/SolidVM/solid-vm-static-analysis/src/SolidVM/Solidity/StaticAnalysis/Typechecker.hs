@@ -691,10 +691,22 @@ functionHelper cc c funcName f@Func{..} = case funcContents of
                                               <$> (catMaybes $ sequence . swap <$> funcVals)
                                             argVals = M.fromList $ args ++ vals
                                         in runReader (statementsHelper argVals stmts) r
-        (fArg, [], _, _) -> throw bottom fArg
-        ([], fVal, _, _) -> throw bottom fVal 
-        (_, _, fMut, _) -> throw bottom tShow fMut
-        (_, _, _, fVis) -> throw bottom tShow fVis
+        (fArg, _, _, _) -> bottom  $ (T.concat
+                          [ "Function `receive` must take no arguments, but has been given "
+                          , T.pack $ show fArg
+                          ]) <$ funcContext
+        (_, fVal, _, _) -> bottom $ (T.concat
+                          [ "Function `receive` must have no return values, but has been given "
+                          , T.pack $ show fVal 
+                          ]) <$ funcContext 
+        (_, _, fMut, _) -> bottom $ (T.concat
+                           [ "Function `receive` must be of Payable state mutability, but has not been declared so "
+                           , tShow fMut
+                           ]) <$ funcContext 
+        (_, _, _, fVis) -> bottom $ (T.concat 
+                           [ "Function `receive` must be of External visibility, but has not been declared so "
+                           , tShow' fVis
+                           ]) <$ funcContext
     else
       let r = R cc c (Just f)
           swap = uncurry $ flip (,)

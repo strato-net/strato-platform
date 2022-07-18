@@ -92,6 +92,12 @@ data Visibility = Private
                 | External
   deriving (Eq,Show,Generic)
 
+tShow' :: Visibility -> Text
+tShow' Private = "private"
+tShow' Public = "public"
+tShow' Internal = "internal"
+tShow' External = "external"
+
 instance ToJSON Visibility
 instance FromJSON Visibility
 instance Arbitrary Visibility where arbitrary = GR.genericArbitrary GR.uniform
