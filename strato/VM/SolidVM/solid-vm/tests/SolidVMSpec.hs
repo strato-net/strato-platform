@@ -3979,7 +3979,7 @@ contract qq {
       ]
   it "can get a users cert" . runTest $ do
     void $ runArgsWithOrigin rootAcc sender "()" [r|
-pragma solidvm 3.2;
+pragma solidvm 3.3;
 contract qq {
     account myAccount = account(0x74f014FEF932D2728c6c7E2B4d3B88ac37A7E1d0);
     
