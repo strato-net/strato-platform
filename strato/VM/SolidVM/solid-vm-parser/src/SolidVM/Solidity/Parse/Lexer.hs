@@ -63,7 +63,7 @@ solidityLexer = P.makeTokenParser solidityLanguage
 
 solidityLanguage = javaStyle {
   P.reservedNames = [
-     "pragma", "import", "library", "using",
+     "pragma", "import", "library", "using", "salt",
      "contract", "is", "public", "internal", "private", "external", "import", "payable",
      "event", "indexed", "anonymous",
      "bool", "true", "false",
@@ -82,7 +82,8 @@ solidityLanguage = javaStyle {
      "seconds", "minutes", "hours", "days", "weeks", "years",
      --The following are protected as they are also names for cirrus columns
      "block_number", "block_timestamp", "block_hash",
-     "record_id", "transaction_hash", "transaction_sender"
+     "record_id", "transaction_hash", "transaction_sender",
+     "receive"
      ],
   P.reservedOpNames = [
     "!", "&&", "||", "==", "!=",

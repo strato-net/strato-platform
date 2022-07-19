@@ -130,6 +130,11 @@ anyPaymentError :: Selector HandledException
 anyPaymentError (HE Blockchain.SolidVM.Exception.PaymentError{}) = True
 anyPaymentError _ = False
 
+
+anyModifierError :: Selector HandledException
+anyModifierError (HE Blockchain.SolidVM.Exception.ModifierError{}) = True
+anyModifierError _ = False
+
 anyReservedWordError :: Selector HandledException
 anyReservedWordError (HE Blockchain.SolidVM.Exception.ReservedWordError{}) = True
 anyReservedWordError _ = False
@@ -2372,8 +2377,8 @@ contract qq {
     getFields ["a"] `shouldReturn` [bAddress 74]
 
   it "can have a for loop with no fields" . runTest $ do
-    liftIO $ pendingWith "re-fix loops"
     runBS [r|
+pragma solidvm 3.2;
 contract qq {
   uint i;
   constructor() public {
@@ -2401,8 +2406,8 @@ contract qq {
 }|]
     getFields ["i"] `shouldReturn` [BInteger 8]
 
-  it "rejects modifiers" $ (runTest $ runBS [r| contract qq { modifier m() { _; } }|])
-    `shouldThrow` anyTODO
+  it "can accept modifiers" $ (runTest $ runBS [r| contract qq { modifier m() { _; } }|])
+    `shouldReturn` ()
 
   it "catches parse errors" $ (runTest $ runBS [r| contract { |]) `shouldThrow` anyParseError
 
@@ -3628,6 +3633,8 @@ contract qq {
 }|]
     getFields ["a1", "a2", "a3", "a4", "a5"] `shouldReturn`
       [ BInteger 0xfeedbeef, BDefault, BDefault, BDefault, BDefault ]
+
+
   it "can get the balance from an address" . runTest $ do
     -- Post contract
     runBS [r|
@@ -4109,6 +4116,95 @@ contract qq {
 }|] 
     runBS contract
     getFields ["isValid"] `shouldReturn` [ BDefault ]
+    
+    
+  it "can call builtin function verifyCertSignedBy" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+    bool isValid = false;
+    constructor() {
+      string cert = "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----";
+      string pubkey = "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEUhJR4x+wZiX+xZK2m/pwN40cvCS0UA7Z\n0DB7sny5ZnNLw43JgKz0URDY2yYOPkhoIApxFK9UU3Bc4BRANDWmdQ==\n-----END PUBLIC KEY-----";
+      isValid = verifyCertSignedBy(cert, pubkey);
+    }
+}|] 
+    getFields ["isValid"] `shouldReturn` [ BBool True ]
+    
+  it "verifyCertSignedBy fails for hex-encoded public keys" $ (runTest $ do
+    (runBS [r|
+pragma solidvm 3.2;
+contract qq {
+  bool isValid = false;
+    constructor () {
+      string cert = "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----";
+      string pubkey = "04521251e31fb06625fec592b69bfa70378d1cbc24b4500ed9d0307bb27cb966734bc38dc980acf45110d8db260e3e4868200a7114af5453705ce014403435a675";
+      isValid = verifyCertSignedBy(cert, pubkey);
+    }
+}|])) `shouldThrow` anyMalformedDataError
+
+
+
+  it "verifyCertSignedBy succeeds with a chained cert" . runTest $ do
+    let cert = T.pack $ filter (\c -> not (isSpace c) || c == ' ') [r|-----BEGIN CERTIFICATE-----\nMIIBgzCCASegAwIBAgIQ
+JN1cZoLJ4yhjGrEHRxzPNDAMBggqhkjOPQQDAgUAMEMx\nDjAMBgNVBAMMBUNOT25lMREwDwYDVQQKDAhDTk9uZU9yZzEQMA4GA1UECwwHT25l\nVW5pdDE
+MMAoGA1UEBgwDVVNBMB4XDTIyMDUxMDE5MTcwMloXDTIzMDUxMDE5MTcw\nMlowQzEOMAwGA1UEAwwFQ05Ud28xETAPBgNVBAoMCENOVHdvT3JnMRAwDgYD
+VQQL\nDAdUd29Vbml0MQwwCgYDVQQGDANVU0EwVjAQBgcqhkjOPQIBBgUrgQQACgNCAATk\niocODuRYeg5AZT80BwIAdH+ScbFdsUG9xhjOfG82c4TeuCM
+soUslu4JsvL6MfaV8\nU7l8Lw0M6yiTGb0DPveZMAwGCCqGSM49BAMCBQADSAAwRQIhAKr7MLKSXJ1bOpGO\nfbLV+n+dzQjd2gQXXqP0OMIIDjuGAiBaea
+dbSMOTJRYIJ4PV9C0oyyk/Xrvv4/R/\nEyun8du+BQ==\n-----END CERTIFICATE-----\n-----BEGIN CERTIFICATE-----\nMIIBiTCCAS2gAwIBA
+gIRAN7G0Wzu8Z4GkKgUUNkz4kEwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdp
+bmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDUxMDE5MTY1OVoXDTIzMDUx\nMDE5MTY1OVowQzEOMAwGA1UEAwwFQ05PbmUxETAPBgNVBAoMCENOT25lT
+3JnMRAw\nDgYDVQQLDAdPbmVVbml0MQwwCgYDVQQGDANVU0EwVjAQBgcqhkjOPQIBBgUrgQQA\nCgNCAARaBoYAP4TNHMD7Nkgs8PNHMMmJRF9Nhhn89iPH
+bppw4AooeNfoeQ1SVWAn\nQ3/Wh4w9hGFeba0MaBm3pVtLWJ/zMAwGCCqGSM49BAMCBQADSAAwRQIhAPmPkkFv\n5nGnvprxgxOqW9xQiuCdTzBSTGELvlz
+we2CIAiBFjj1qyTywdRej7fSOfG9il421\ndB2DWeHbCK7C6S6PvQ==\n-----END CERTIFICATE-----\n-----BEGIN CERTIFICATE-----\nMIIBjT
+CCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQ
+LDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBA
+oMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6c
+DeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf
+2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----|]
+        contract = T.unpack $ T.replace "$CERT" cert [r|
+pragma solidvm 3.2;
+contract qq {
+  bool isValid = false;
+  constructor() {
+    string cert = "$CERT";
+    string pubkey = "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEWgaGAD+EzRzA+zZILPDzRzDJiURfTYYZ\n/PYjx26acOAKKHjX6HkNUlVgJ0N/1oeMPYRhXm2tDGgZt6VbS1if8w==\n-----END PUBLIC KEY-----";
+    isValid = verifyCertSignedBy(cert, pubkey);
+  }
+}|] 
+    runBS contract
+    getFields ["isValid"] `shouldReturn` [ BBool True ]
+  
+  
+  it "verifyCertSignedBy fails with a chained cert and the wrong public key" . runTest $ do
+    let cert = T.pack $ filter (\c -> not (isSpace c) || c == ' ') [r|-----BEGIN CERTIFICATE-----\nMIIBgzCCASegAwIBAgIQ
+JN1cZoLJ4yhjGrEHRxzPNDAMBggqhkjOPQQDAgUAMEMx\nDjAMBgNVBAMMBUNOT25lMREwDwYDVQQKDAhDTk9uZU9yZzEQMA4GA1UECwwHT25l\nVW5pdDE
+MMAoGA1UEBgwDVVNBMB4XDTIyMDUxMDE5MTcwMloXDTIzMDUxMDE5MTcw\nMlowQzEOMAwGA1UEAwwFQ05Ud28xETAPBgNVBAoMCENOVHdvT3JnMRAwDgYD
+VQQL\nDAdUd29Vbml0MQwwCgYDVQQGDANVU0EwVjAQBgcqhkjOPQIBBgUrgQQACgNCAATk\niocODuRYeg5AZT80BwIAdH+ScbFdsUG9xhjOfG82c4TeuCM
+soUslu4JsvL6MfaV8\nU7l8Lw0M6yiTGb0DPveZMAwGCCqGSM49BAMCBQADSAAwRQIhAKr7MLKSXJ1bOpGO\nfbLV+n+dzQjd2gQXXqP0OMIIDjuGAiBaea
+dbSMOTJRYIJ4PV9C0oyyk/Xrvv4/R/\nEyun8du+BQ==\n-----END CERTIFICATE-----\n-----BEGIN CERTIFICATE-----\nMIIBiTCCAS2gAwIBA
+gIRAN7G0Wzu8Z4GkKgUUNkz4kEwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdp
+bmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDUxMDE5MTY1OVoXDTIzMDUx\nMDE5MTY1OVowQzEOMAwGA1UEAwwFQ05PbmUxETAPBgNVBAoMCENOT25lT
+3JnMRAw\nDgYDVQQLDAdPbmVVbml0MQwwCgYDVQQGDANVU0EwVjAQBgcqhkjOPQIBBgUrgQQA\nCgNCAARaBoYAP4TNHMD7Nkgs8PNHMMmJRF9Nhhn89iPH
+bppw4AooeNfoeQ1SVWAn\nQ3/Wh4w9hGFeba0MaBm3pVtLWJ/zMAwGCCqGSM49BAMCBQADSAAwRQIhAPmPkkFv\n5nGnvprxgxOqW9xQiuCdTzBSTGELvlz
+we2CIAiBFjj1qyTywdRej7fSOfG9il421\ndB2DWeHbCK7C6S6PvQ==\n-----END CERTIFICATE-----\n-----BEGIN CERTIFICATE-----\nMIIBjT
+CCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQ
+LDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBA
+oMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6c
+DeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf
+2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----|]
+        contract = T.unpack $ T.replace "$CERT" cert [r|
+pragma solidvm 3.2;
+contract qq {
+    bool isValid = false;
+    constructor() {
+      string cert = "$CERT";
+      string pubkey = "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEAlGfMOmhI+AjQlfxve8YoEXhZErFdkCx\nc8OkTB1TP6giwof4fWG+Fua8b2W0YjOQkrQojwnKbBDt3CQeqU+bPA==\n-----END PUBLIC KEY-----";
+      isValid = verifyCertSignedBy(cert, pubkey);
+    }
+}|] 
+    runBS contract
+    getFields ["isValid"] `shouldReturn` [ BDefault ]
 
   it "can call builtin function verifySignature" . runTest $ do
     runBS [r|
@@ -4299,6 +4395,180 @@ contract qq {
   }
 }|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 2)
 
+  it "can declare a custom modifier and use it in a contract" $ (runTest $ do
+    (runBS [r|
+pragma solidvm 3.2;
+contract qq {
+  modifier myModifier() {  // line 4
+    require(false);
+    _;
+
+  }
+
+  constructor() public myModifier returns (bool) {
+    return true;
+  }
+}|])) `shouldThrow` failedRequirementNoMsg
+
+
+  it "can declare a custom modifier and use it in a contract" $ (runTest $ do
+    (runBS [r|
+pragma solidvm 3.2;
+contract qq {
+  modifier myModifier() {  // line 4
+    return 7;
+    require(false);
+    _;
+
+  }
+
+  constructor() public myModifier returns (bool) {
+    return true;
+  }
+}|])) `shouldThrow` anyModifierError
+
+
+
+  it "can use a modifier as part of a function" . runTest $ do
+    runCall "decrement" "(1)" [r|
+pragma solidvm 3.2;
+contract qq {
+    // We will use these variables to demonstrate how to use
+    // modifiers.
+    address public host;
+    uint public x = 10;
+    bool public locked;
+
+    constructor() public {
+        // Set the transaction sender as the Host of the contract.
+        host = msg.sender;
+    }
+
+    modifier onlyHost() {
+        require(msg.sender == host, "Not Host");
+        
+        _;
+    }
+
+   //Inputs can be passed to a modiier
+    modifier validAddress(address _addr) {
+        require(_addr != address(0), "Not valid address");
+        _;
+    }
+
+    function changeHost(address _newHost) public onlyHost {
+        host = _newHost;
+    }
+
+    // Modifiers can be called before and / or after a function.
+    // This modifier prevents a function from being called while
+    // it is still executing.
+    modifier noReentrancy() {
+        require(!locked, "No reentrancy");
+
+        locked = true;
+        _;
+        locked = false;
+    }
+
+    function decrement(uint i) public noReentrancy returns (uint) {
+        x -= i;
+
+        if (i > 1) {
+          decrement(i - 1);
+        }
+    }
+
+}|] `shouldReturn` Nothing
+
+
+
+
+  it "can use a modifier and require something after and before the function is run" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+  uint x = 3;
+  modifier myModifier() {  
+    require(x == 3 , string.concat('x is not 3 : ', string(x)));
+    x = 4;
+    _;
+    require(x == 5 , 'x is not 5');
+  }
+
+  constructor() public myModifier {
+    x = 5;
+    return;
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 5]
+
+  it "can use a modifier multiple modifiers and they occur in order" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+  uint x = 3;
+  modifier myModifier() {  
+    require(x == 3 , string.concat('x is not 3 : ', string(x)));
+    x = 4;
+    _;
+    require(x == 5 , 'x is not 5');
+  }
+
+  modifier anotherModifier() {
+    require(x == 4 , string.concat('x is not 4 : ', string(x)));
+    _;
+    require(x == 5 , 'x is not 5');
+  }
+
+  constructor() public myModifier anotherModifier {
+    x = x + 1;
+    return;
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 5]
+
+
+  it "can use a modifier  that takes arguments as part of a function" . runTest $ do
+    runCall "a" "()" [r|
+pragma solidvm 3.2;
+contract qq {
+  uint x = 3;
+  modifier myModifier(uint _x) {  
+    require(_x == 3 , string.concat('x is not 3 : ', string(_x)));
+    x = 4;
+    _;
+    require(x == 5 , 'x is not 5');
+  }
+
+  function a() public myModifier(3) {
+    x = 5;
+    return;
+  }
+}|] `shouldReturn` Nothing
+
+{-
+
+  it "can use a modifier that takes in arguments" . runTest $ do
+    runBS [r|
+contract qq {
+  uint x = 3;
+  modifier myModifier(uint _x) {  
+    require(_x == 3 , string.concat('x is not 3 : ', string(_x)));
+    x = 4;
+    _;
+    require(x == 5 , 'x is not 5');
+  }
+
+  constructor() public myModifier(3) {
+    x = 5;
+    return;
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 5]
+
+-}
+
   it "cannot allow negative block number" $ runTest (do
     runBS [r|
 pragma solidvm 3.2;
@@ -4307,6 +4577,31 @@ contract qq {
     return blockhash(-1);
   }
 }|]) `shouldThrow` anyInvalidArgumentsError
+
+  it "return default value for index not present" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+  
+  mapping(uint=>bool) booleanTest;
+  mapping(uint=>uint) integerTest;
+  mapping(uint=>string) stringTest;
+
+  bool x;
+  uint y;
+  string z;
+  
+  constructor() {
+    booleanTest[1] = true;
+    integerTest[1] = 1;
+    stringTest[1] = "testing";
+
+    x = booleanTest[9];
+    y = integerTest[9];
+    z = stringTest[9];
+  }
+}|]
+    getFields ["x","y","z"] `shouldReturn` [BDefault, BDefault, BDefault]
 
   it "can use builtin sha256 function" . runTest $ do
     runBS [r|
@@ -4417,6 +4712,35 @@ contract qq{
 }|]
     getFields ["weiUnit", "szaboUnit", "finneyUnit", "etherUnit"] `shouldReturn` [BInteger 2, BInteger 2000000000000, BInteger 2000000000000000, BInteger 2000000000000000000]
 
+  it "can create salted contract" . runTest $ do
+    runBS [r|
+contract X {
+  string public xNum;
+}
+
+contract Y {
+  uint public yNum;
+}
+
+contract qq {
+  X public x;
+  Y public y;
+  X public z;
+  bytes32 salt';
+  constructor() public {
+    salt' = 0x12345678;
+    x = new X{salt: salt'}();
+    y = new Y{salt: salt'}();
+    z = new X{salt: "something"}();
+
+  }
+}|]
+    getFields ["x", "y", "z"] `shouldReturn` 
+      [ bContract "X" 0x1e9abebf7e4e73283a531d44a33f7eb6371cf820
+      , bContract "Y" 0x3911f467237f82a56973a5f4d87aa67107479626
+      , bContract "X" 0x33945db5a537463004fbed0bde21ac30d46ad052
+      ]
+      
   it "can use a try catch statment to catch a divide by zero error the SolidVM Way (trademark pending)" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
@@ -4472,4 +4796,5 @@ contract qq {
   }
 }|]
     getFields ["myNum", "otherNum", "errorCount"] `shouldReturn` [BInteger 3, BInteger 12, BInteger 1]
+
 

@@ -13,8 +13,37 @@ import SolidVM.Model.CodeCollection.Statement
 import SolidVM.Model.Type
 import SolidVM.Solidity.Parse.Lexer
 import SolidVM.Solidity.Parse.Statement
+--import SolidVM.Solidity.Parse.Declarations
+--import SolidVM.Model.CodeCollection.Def as Def
 import SolidVM.Solidity.Parse.UnParser
 import SolidVM.Solidity.Parse.ParserTypes 
+
+import           Data.Source.Annotation as SA 
+import           Data.Source.Position as SP
+
+
+dummyAnnotation :: SA.SourceAnnotation ()
+dummyAnnotation =
+  SA.SourceAnnotation
+  {
+    SA._sourceAnnotationStart=SP.SourcePosition {
+      SP._sourcePositionName="",
+      SP._sourcePositionLine=0,
+      SP._sourcePositionColumn=0
+      },
+    SA._sourceAnnotationEnd=SP.SourcePosition {
+      SP._sourcePositionName="",
+        SP._sourcePositionLine=0,
+        SP._sourcePositionColumn=0
+      },
+    SA._sourceAnnotationAnnotation = ()
+  }
+
+
+
+
+
+
 
 spec :: Spec
 spec = do
@@ -73,13 +102,50 @@ spec = do
       forM_ fcases $ \(input, want) -> do
         assertEqual input (Right want) (parseExpr input)
 
+
+{-
+------------------------------------------------------------------------------------------------------------------------------------------------
+   DECLARATIONS AND CONTRACT PARSERS, These will always fail, but are super useful for testing what the contract or declaration is parsing to.
+   to use, just uncomment 
+  --import SolidVM.Solidity.Parse.Declarations
+  --import SolidVM.Model.CodeCollection.Def as Def
+  at the top of the file, and then uncomment the test, and put in your desired declaration or contract and it will print out the parsed contract or declaration.
+
+-------------------------------------------------------------------------------------------------------------------------------------------------
+-}
+{-
+  describe "Declaration parsing" $ do
+    let parseDecl = runParser solidityDeclaration "" ""
+        cases = [ ("int x;", EnumDeclaration $ Def.Enum [] (fromInteger 2) dummyAnnotation)
+                , ("int x = 0;", DummyDeclaration)
+                , ("function a() public myModifier returns (bool) {\nx = 5;\nreturn true;\n}" , DummyDeclaration)
+                , ("constructor() public returns (bool) {\nreturn true;\n}" , DummyDeclaration)
+                , ("contract qq {\nuint x;\nmodifier myModifier() {\n require(false, 'bigTest');\n\n}\nconstructor() myModifier(3) public returns (bool) {\nx = 5;\nreturn true;\n}\n}", DummyDeclaration)
+                , ("modifier myModifier() {\n require(false, 'bigTest');\n_;\n}", DummyDeclaration)
+                , ("SimpleStorage myContract = new SimpleStorage();", DummyDeclaration)
+                ]
+    forM_ cases $ \(input, want) -> do
+      it ("can parse " ++ input) $ parseDecl input `shouldBe` Right ((show want), want)
+
+
+--"contract qq {\n  uint x = 3;\n  modifier myModifier(uint _x) {\n      require(_x == 3 , string.concat('x is not 3 : ', string(_x)));\n    x = 4;    _;\n    require(x == 5 , 'x is not 5');\n  }\n\n  constructor() public myModifier(3) {\n    x = 5;\n    return;\n  }\n}\n"
+  describe "Contract Parsing" $ do
+    let parseContract = runParser solidityContract "" ""
+        cases = [ ( "contract qq {\n  uint constant c = 2022;\n  constructor() public\n {\n    c = 666;\n  }\n}", DummySourceUnit)
+                --, ("contract qq {\n  uint x;\n  modifier myModifier() {\n      require(false, 'bigTest');\n  }\n  function a() public myModifier() returns (bool) {\n    x = 5;\n    return true;\n  }\n}" , DummySourceUnit)
+                ]
+    forM_ cases $ \(input, want) -> do
+      it ("can parse " ++ input) $ parseContract input `shouldBe` Right want
+
+-}
+
   describe "Statement parsing" $ do
     let parseStatement = fmap (fmap (const ())) . runParser statement (ParserState "" "") ""
         scases = [ ("x++;", SimpleStatement $ ExpressionStatement $ PlusPlus () $ Variable () "x")
                  , ("assembly { dst := mload(add(src, 32)) }",
                       AssemblyStatement $ MloadAdd32 "dst" "src")
                  , ("Nom storage nom = ns[10];", SimpleStatement $
-                      VariableDefinition [VarDefEntry (Just $ UnknownLabel "Nom") (Just Storage) "nom" ()] $ Just $
+                      VariableDefinition [VarDefEntry (Just $ UnknownLabel "Nom" Nothing) (Just Storage) "nom" ()] $ Just $
                       IndexAccess () (Variable () "ns") (Just $ NumberLiteral () 10 Nothing))
                  , ("var (x, y) = (7, 3);", SimpleStatement $
                       VariableDefinition [VarDefEntry Nothing Nothing "x" (),

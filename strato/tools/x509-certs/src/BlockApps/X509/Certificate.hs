@@ -21,6 +21,7 @@ module BlockApps.X509.Certificate (
   signedsToX509,
   verifyCert,
   verifyCertAgainstCerts,
+  verifyCertSignedBy,
   verifyBlockApps,
   verifyCertM,
   makeSignedCert,
@@ -378,6 +379,16 @@ verifyCertAgainstCerts certs cert =  any (`verifyCert` cert) pkeys
 
 verifyCert :: PublicKey -> X509Certificate -> Bool
 verifyCert pkey (X509Certificate (CertificateChain cs)) = verifyCertChain pkey cs
+
+verifyCertSignedBy :: PublicKey -> X509Certificate -> Bool
+verifyCertSignedBy pkey (X509Certificate (CertificateChain (c:_))) = 
+  let signed = getSigned c
+      mesgBS = B.pack $ BA.unpack $ hashWith CH.SHA256 (getSignedData c)
+  in
+  case importSignature' $ signedSignature signed of
+    Nothing -> False
+    Just sig -> verifySig pkey sig mesgBS
+verifyCertSignedBy _ _ = False ---error ("Cannot verify cert " <> show cs <> " against " <> show pkey)
 
 verifyCertChain :: PublicKey -> [SignedCertificate] -> Bool
 verifyCertChain _ [] = False
