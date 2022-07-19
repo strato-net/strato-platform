@@ -908,19 +908,75 @@ pipeline {
                     SERVICE_TOKEN = lib.getServiceToken(NODE_DATA.NODE1)
                     sh '''
                     set -x
-                    ADDRESS = $(curl -X 'GET' \
+
+                    FIRST_CONTRACT_ADDRESS=$(curl 'https://multinode101.ci.blockapps.net:8080/strato/v2.3/transaction?resolve=true' \
+                        -X 'POST' \
+                        -H "Authorization: Bearer $SERVICE_TOKEN"  \
+                        -H 'Accept: application/json;charset=utf-8' \
+                        -H 'Content-Type: application/json' \
+                        --data-binary '{
+                            "txs":[{
+                                "payload":{
+                                    "contract":"SimpleStorage",
+                                    "src":"pragma solidvm 3.0; contract SimpleStorage {\n  uint storedData;\n\n  function SimpleStorage() {\n    storedData = 1;\n  }\n\n  function set(uint x) {\n    storedData = x;\n  }\n\n  function get() constant returns (uint) {\n    return storedData;\n  }\n}\n",
+                                    "args":{},
+                                    "metadata":{
+                                        "VM":"SolidVM",
+                                        "history":"SimpleStorage",
+                                        "index":"SimpleStorage"
+                                    }
+                                },
+                                "type":"CONTRACT"
+                            }]
+                        }' \
+                        | jq '.[] | .txResult."contractsCreated"')
+
+                    SECOND_CONTRACT_ADDRESS=$(curl 'https://multinode101.ci.blockapps.net:8080/strato/v2.3/transaction?resolve=true' \
+                        -X 'POST' \
+                        -H "Authorization: Bearer $SERVICE_TOKEN"  \
+                        -H 'Accept: application/json;charset=utf-8' \
+                        -H 'Content-Type: application/json' \
+                        --data-binary '{
+                            "txs":[{
+                                "payload":{
+                                    "contract":"SimpleStorage",
+                                    "src":"pragma solidvm 3.0; contract SimpleStorage {\n  uint storedData;\n\n  function SimpleStorage() {\n    storedData = 1;\n  }\n\n  function set(uint x) {\n    storedData = x;\n  }\n\n  function get() constant returns (uint) {\n    return storedData;\n  }\n}\n",
+                                    "args":{},
+                                    "metadata":{
+                                        "VM":"SolidVM",
+                                        "history":"SimpleStorage",
+                                        "index":"SimpleStorage"
+                                    }
+                                },
+                                "type":"CONTRACT"
+                            }]
+                        }' \
+                        | jq '.[] | .txResult."contractsCreated"')
+
+                    FIRST_BLOCK_NUMBER=$(curl -X 'GET' \
+                        "https://multinode101.ci.blockapps.net:8080/cirrus/search/SimpleStorage?address=eq.$FIRST_CONTRACT_ADDRESS" \
+                        -H "Authorization: Bearer $SERVICE_TOKEN"  \
+                        -H 'accept: application/json;charset=utf-8' \
+                        -H 'Content-Type: application/json;charset=utf-8' \
+                        | jq '.[] | .block_number')
+
+                    SECOND_BLOCK_NUMBER=$(curl -X 'GET' \
+                        "https://multinode101.ci.blockapps.net:8080/cirrus/search/SimpleStorage?address=eq.$SECOND_CONTRACT_ADDRESS" \
+                        -H "Authorization: Bearer $SERVICE_TOKEN"  \
+                        -H 'accept: application/json;charset=utf-8' \
+                        -H 'Content-Type: application/json;charset=utf-8' \
+                        | jq '.[] | .block_number')
+
+                    if [ $SECOND_BLOCK_NUMBER -ne $((FIRST_BLOCK_NUMBER+1)) ]; then exit 1; fi
+
+                    ATTRIBUTE_CONTRACT_ADDRESS=$(curl -X 'GET' \
                         'https://multinode101.ci.blockapps.net:8080/cirrus/search/Attribute' \
                         -H "Authorization: Bearer $SERVICE_TOKEN"  \
                         -H 'accept: application/json;charset=utf-8' \
-                        -H 'Content-Type: application/json;charset=utf-8') \
-                        | jq '.address'
-                    CURRENT_BLOCK_NUMBER = $(curl -X 'GET' \
-                        'https://multinode101.ci.blockapps.net:8080/cirrus/search/Attribute' \
-                        -H "Authorization: Bearer $SERVICE_TOKEN"  \
-                        -H 'accept: application/json;charset=utf-8' \
-                        -H 'Content-Type: application/json;charset=utf-8') \
-                        | jq '.block_number'
-                    NEW_BLOCK_NUMBER =$(curl -X 'POST' \
+                        -H 'Content-Type: application/json;charset=utf-8' \
+                        | jq '.[0] | .address')
+
+                    response=$(curl -X 'POST' \
                         'https://multinode101.ci.blockapps.net:8080/strato/v2.3/transaction/parallel?resolve=true' \
                         -H "Authorization: Bearer $SERVICE_TOKEN"  \
                         -H 'accept: application/json;charset=utf-8' \
@@ -930,7 +986,7 @@ pipeline {
                                     {
                                         "payload": {
                                             "contractName": "Attribute",
-                                            "contractAddress": $ADDRESS",
+                                            "contractAddress": $ATTRIBUTE_CONTRACT_ADDRESS",
                                             "method": "deleteContract",
                                             "args": {}
                                         },
@@ -940,9 +996,10 @@ pipeline {
                             "txParams": {
                                 "gasLimit": 32100000000,
                                 "gasPrice": 1
-                            }}') \
-                            | jq '.block_number'
-                    if [ $NEW_BLOCK_NUMBER -ne $((CURRENT_BLOCK_NUMBER+1)) ]; then exit 1; fi
+                            }}')
+                    if [[ $response != *"Only the attribute's owner can delete the attribute"* ]]; then
+                      exit 1
+                    fi
                     '''
                 }
             }
