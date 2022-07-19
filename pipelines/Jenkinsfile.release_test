@@ -11,6 +11,8 @@ pipeline {
             ' - "X.Y.Z" (i.e. "7.5.0") - for specific public release version\n' +
             ' - "branch_name/build_number" (i.e. "develop/206") - for the custom build of STRATO_autobuild multibranch job in Jenkins.'
         )
+        string(name: 'BEANSTALK_LOADTEST_BATCH_SIZE', defaultValue: '25', description: 'Number of agreements in a single batch in load test')
+        string(name: 'BEANSTALK_LOADTEST_BATCH_COUNT', defaultValue: '5', description: 'Number of batches to create in load test')
     }
 
     stages {
@@ -68,42 +70,7 @@ pipeline {
                         sh "rm -rf beanstalk"
                         sh "git clone -b develop https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/beanstalk/"
                         lib = load("${env.WORKSPACE}/pipelines/Jenkinsfile.library")
-                        NODE_DATA = load("${env.WORKSPACE}/pipelines/Jenkinsfile.dev_config").NODE_DATA
-                        // dir('strato-getting-started') {
-                        //     script {
-                        //         if (env.STRATO_BUILD == 'latest') {
-                        //             sh 'sudo ./strato --compose'
-                        //         } else {
-                        //             if (env.STRATO_BUILD.contains(".")) {
-                        //                 sh "curl -s -L https://github.com/blockapps/strato-getting-started/releases/${env.STRATO_BUILD} | egrep -o '/blockapps/strato-getting-started/releases/download/.*/docker-compose.yml' | wget --base=http://github.com/ -i - -O docker-compose.yml"
-                        //             } else {
-                        //                 if (!env.STRATO_BUILD.contains("/")) {
-                        //                     echo "Unexpected STRATO_BUILD format: ${env.STRATO_BUILD}"
-                        //                     currentBuild.result = 'FAILURE'
-                        //                     sh "exit 1"
-                        //                 }
-                        //                 def (AUTOBUILD_JOB_BRANCH_NAME, AUTOBUILD_JOB_BUILD_NUMBER) = "${env.STRATO_BUILD}".tokenize( '/' )
-                                        
-                        //                 // Fetching artifact from STRATO_autobuild multibranch job
-                        //                 step([
-                        //                     $class: 'CopyArtifact',
-                        //                     fingerprintArtifacts: true,
-                        //                     flatten: true,
-                        //                     projectName: "STRATO_autobuild/${AUTOBUILD_JOB_BRANCH_NAME}",
-                        //                     selector: [$class: 'SpecificBuildSelector', buildNumber: "${AUTOBUILD_JOB_BUILD_NUMBER}"],
-                        //                     filter: "docker-compose.yml",
-                        //                     target: '.',
-                        //                     optional: false
-                        //                 ])
-                        //             }
-                        //         }
-                        //     }
-                        //     withCredentials([
-                        //         usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
-                        //     ]) {
-                        //         sh "sudo docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000"
-                        //     }
-                        // }
+                        NODE_DATA = load("${env.WORKSPACE}/pipelines/Jenkinsfile.release_config").NODE_DATA
                     }
                 }
             }
@@ -1107,8 +1074,8 @@ pipeline {
                         script: "sudo docker exec strato_postgres_1 psql -U postgres -d `sudo docker exec strato_postgres_1 psql -U postgres -t -c \"select datname from pg_database where datname like '%eth_%';\" | tr -d \"[:space:]\"` -t -c \"select chain_id from chain_info_ref limit 1;\""
                     ).trim()
 
-                    sh "curl -X POST -H \"Authorization: Bearer ${accessToken}\" -H \"Accept: application/json\" \"https://multinode101.ci.blockapps.net:8080/strato/v2.3/key\""
-                    sh "curl -s -X POST 'https://multinode101.ci.blockapps.net:8080/strato/v2.3/transaction/parallel?resolve=true' -H 'Authorization: Bearer <access_token>' \
+                    sh "curl -X POST -H \"Authorization: Bearer ${accessToken}\" -H \"Accept: application/json\" \"https://${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT}/strato/v2.3/key\""
+                    sh "curl -s -X POST 'https://${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT}/strato/v2.3/transaction/parallel?resolve=true' -H 'Authorization: Bearer <access_token>' \
                         -H 'Content-Type: application/json' --data-raw '{
                         \"txs\": [
                             {
@@ -1281,11 +1248,11 @@ pipeline {
                 ).trim()
                 def createUser = sh(
                     returnStdout: true,
-                    script: "curl -X POST -H \"Authorization: Bearer ${accessToken}\" -H \"Accept: application/json\" \"https://multinode301.ci.blockapps.net:8080/strato/v2.3/key\""
+                    script: "curl -X POST -H \"Authorization: Bearer ${accessToken}\" -H \"Accept: application/json\" \"https://${NODE_DATA.NODE5.HOST}:${NODE_DATA.NODE5.PORT}/strato/v2.3/key\""
                 ).trim()
                 def txResponse = sh(
                     returnStdout: true,
-                    script: "curl 'https://multinode301.ci.blockapps.net:8080/strato/v2.3/transaction?resolve=true' \
+                    script: "curl 'https://${NODE_DATA.NODE5.HOST}:${NODE_DATA.NODE5.PORT}/strato/v2.3/transaction?resolve=true' \
                         -X 'POST' \
                         -H \"Authorization: Bearer ${accessToken}\"  \
                         -H 'Accept: application/json;charset=utf-8' \
@@ -1324,7 +1291,7 @@ pipeline {
                 ).trim()  
                 def createUser = sh(
                     returnStdout: true,
-                    script: "curl -X POST -H \"Authorization: Bearer ${accessToken}\" -H \"Accept: application/json\" \"https://multinode101.ci.blockapps.net:8080/strato/v2.3/key\""
+                    script: "curl -X POST -H \"Authorization: Bearer ${accessToken}\" -H \"Accept: application/json\" \"https://${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT}/strato/v2.3/key\""
                 ).trim()
                 lib.waitForHealthySync(NODE_DATA.LOAD_TEST_HEALTH_URL)            
             }
@@ -1356,7 +1323,7 @@ pipeline {
                 ).trim()  
                 def txResponse = sh(
                     returnStdout: true,
-                    script: "curl 'https://multinode101.ci.blockapps.net:8080/strato/v2.3/transaction?resolve=true' \
+                    script: "curl 'https://${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT}/strato/v2.3/transaction?resolve=true' \
                         -X 'POST' \
                         -H \"Authorization: Bearer ${accessToken}\"  \
                         -H 'Accept: application/json;charset=utf-8' \
@@ -1411,7 +1378,7 @@ pipeline {
         //             ).trim()  
         //             def createUser = sh(
         //                 returnStdout: true,
-        //                 script: "curl -X POST -H \"Authorization: Bearer ${accessToken}\" -H \"Accept: application/json\" \"https://multinode101.ci.blockapps.net:8080/strato/v2.3/key\""
+        //                 script: "curl -X POST -H \"Authorization: Bearer ${accessToken}\" -H \"Accept: application/json\" \"https://${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT}/strato/v2.3/key\""
         //             ).trim()
 
         //         }
