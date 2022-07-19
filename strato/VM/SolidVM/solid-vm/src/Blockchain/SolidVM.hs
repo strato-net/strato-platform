@@ -1104,39 +1104,47 @@ runStatement s@(CC.SimpleStatement (CC.VariableDefinition entries maybeExpressio
 
 
 runStatement (CC.SolidityTryCatchStatement tryExpression returnsDecl statementsForSuccess catchBlockMap _) = do
-  mRes <- EUnsafe.try $ do
-    expResultVal <- getVar =<< expToVar tryExpression
-    return expResultVal
-  case mRes of
-    Left ex -> do
-      res1 <- solidityExceptionHandler catchBlockMap ex
-      return res1
-    Right aRealVal -> do
-      case returnsDecl of
-        Nothing -> do
-          sfsRes <- runStatements statementsForSuccess
-          return $ sfsRes
-        Just xs -> do
-          case aRealVal of
-            STuple vecOfVars -> do
-              let vars = V.toList vecOfVars
-              if length vars /= length returnsDecl
-                then typeError "try/catch statement expected a tuple of the same length as the returns statement" (tryExpression, aRealVal)
-                else do
-                  forM_ (zip vars xs) $ \(var, (name, ty)) -> do
-                    val <- getVar var 
-                    addLocalVariable ty name val
-                  sfsRes' <- runStatements statementsForSuccess
-                  return sfsRes'
-            _ -> typeError "try/catch statement expected a tuple" (tryExpression, aRealVal)
+  ctract <- getCurrentContract
+  if (CC._vmVersion ctract /= "svm3.3")
+    then unknownStatement "Try/Catch statements are not supported below pragma solidvm 3.3" tryExpression
+    else do
+      mRes <- EUnsafe.try $ do
+        expResultVal <- getVar =<< expToVar tryExpression
+        return expResultVal
+      case mRes of
+        Left ex -> do
+          res1 <- solidityExceptionHandler catchBlockMap ex
+          return res1
+        Right aRealVal -> do
+          case returnsDecl of
+            Nothing -> do
+              sfsRes <- runStatements statementsForSuccess
+              return $ sfsRes
+            Just xs -> do
+              case aRealVal of
+                STuple vecOfVars -> do
+                  let vars = V.toList vecOfVars
+                  if length vars /= length returnsDecl
+                    then typeError "try/catch statement expected a tuple of the same length as the returns statement" (tryExpression, aRealVal)
+                    else do
+                      forM_ (zip vars xs) $ \(var, (name, ty)) -> do
+                        val <- getVar var 
+                        addLocalVariable ty name val
+                      sfsRes' <- runStatements statementsForSuccess
+                      return sfsRes'
+                _ -> typeError "try/catch statement expected a tuple" (tryExpression, aRealVal)
 
 runStatement (CC.TryCatchStatement tryBlock catchBlockMap _) = do 
-  mRes <- EUnsafe.try (runStatements tryBlock)
-  case mRes of
-    Left ex -> do
-      res1 <- solidVMExceptionHandler catchBlockMap ex
-      return res1
-    Right res -> return res
+  ctract <- getCurrentContract
+  if (CC._vmVersion ctract /= "svm3.3")
+    then unknownStatement "Try/Catch statements are not supported below pragma solidvm 3.3" tryBlock
+    else do
+      mRes <- EUnsafe.try (runStatements tryBlock)
+      case mRes of
+        Left ex -> do
+          res1 <- solidVMExceptionHandler catchBlockMap ex
+          return res1
+        Right res -> return res
 
 runStatement (CC.IfStatement condition code' maybeElseCode pos) = do
   solidVMBreakpoint pos
