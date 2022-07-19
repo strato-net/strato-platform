@@ -212,36 +212,23 @@ contract Certificate {
         isValid = true;
         parent = address(parsedCert["parent"]);
         children = [];
-        // if (parent != address(0x0)){
-        //     address parentUserAddress = address(parsedCert["parent"]);
-        //     Certificate parentContract = certificates[certificatesMap[parentUserAddress]-1];
-
-            
-        //     Certificate parentContract = Certificate(parent);
-        //     parentContract.addChild(this);    
-        // }
     }
     
     function addChild(address _child) public {
         children.push(_child);
     }
     
-    // function isChild(string pCert) returns (bool) {
-    //     mapping(string => string) parsedCert = parseCert(certificateString);
-    //     if(parent != address(0x0) && pCert == parsedCert["parent"]){
-    //         return true;
-    //     }
-    //     if(parent != address(0x0)){
-    //         Certificate parentContract = Certificate(address(parsedCert["parent"]));
-    //         return parentContract.isChild(pCert);
-    //     }
-    //     return false;
-    // }
-    
-    function revoke() public {
-        require(msg.sender == owner,"You don't have permission to call revoke!");
-        
+    function revoke() public returns (int){
+        require(msg.sender == owner,"You don't have permission to CALL revoke!");
+
         isValid = false;
+        return children.length;
+    }
+    
+    function getChild(int index) public returns (address){
+        require(msg.sender == owner,"You don't have permission to get children!");
+        
+        return children[index];
     }
 }
 
@@ -289,9 +276,8 @@ contract CertificateRegistry {
         mapping(string => string) parsedCert = parseCert(newCertificateString);
         address parentUserAddress = address(parsedCert["parent"]);
         Certificate parentContract = certificates[certificatesMap[parentUserAddress]-1];
-        bool test1 = parentContract.isValid();
-        bool test2 = verifyCertSignedBy(newCertificateString, parentContract.publicKey());
-        if (test1 && test2){
+        
+        if (parentContract.isValid() && verifyCertSignedBy(newCertificateString, parentContract.publicKey())){
             // Create the new Certificate record
             Certificate c = new Certificate(newCertificateString);
 
@@ -314,35 +300,32 @@ contract CertificateRegistry {
     }
     
     function getCertByAccount(address _account) returns (Certificate) {
-        return certificates[certificatesMap[_account]];
+        return certificates[certificatesMap[_account]-1];
     }
     
     function revokeCert(address userAddress){
         Certificate myCert = certificates[certificatesMap[userAddress]-1];
-        //require(isChild(tx.certificate, myCert), "You don't have permission to revoke!");
+        require(isChild(tx.certificate, myCert.userAddress()), "You don't have permission to revoke!");
 
-        myCert.revoke();
-        address[] myCertsChildren = myCert.children();
-        address firstChild = myCertsChildren[0];
-        revokeCert(firstChild);
-        // for (uint i = 0; i < myCert.children().length; i += 1) {
-        //    revokeCert(myCert.children()[i]);
-        // }
+        int childrenLength = myCert.revoke();
+        for (int i = 0; i < childrenLength; i += 1) {
+            revokeCert(myCert.getChild(i));
+        }
+        
         emit CertificateRevoked(userAddress);
     }
-    function isChild(string pCert, Certificate myCert) returns (bool) {
-        //mapping(string => string) parsedCert = parseCert(myCert.certificateString());
+    
+    function isChild(string pCert, address certUserAddress) returns (bool) {
+        Certificate myCert = certificates[certificatesMap[certUserAddress]-1];
         address parentUserAddress = myCert.parent();
-        bool test1 = (myCert.parent() != address(0x0));
-        bool test2 = (pCert == certificates[certificatesMap[parentUserAddress]-1].certificateString());
-        if(test1 && test2){
+        if(myCert.parent() != address(0x0) && pCert == certificates[certificatesMap[parentUserAddress]-1].certificateString()){
             return true;
         }
+        
         if(myCert.parent() != address(0x0)){
-            //address parentUserAddress = address(parsedCert["parent"]);
-            Certificate parentContract = certificates[certificatesMap[parentUserAddress]-1];
-            return isChild(pCert, parentContract);
+            return isChild(pCert, parentUserAddress);
         }
+        
         return false;
     }
 }|]
