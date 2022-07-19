@@ -53,11 +53,7 @@ instance Format BlockValidityError where
 
 checkParentChildValidity :: (MonadFail m)
                          => Bool -> OutputBlock -> BlockSummary -> m ()
-checkParentChildValidity isHomestead OutputBlock{obBlockData=c} parentBSum = do
-    let nextDifficulty' = if isHomestead then homesteadNextDifficulty flags_difficultyBomb else nextDifficulty flags_difficultyBomb
-    let calcNextDiff = nextDifficulty' flags_testnet (bSumNumber parentBSum) (bSumDifficulty parentBSum) (bSumTimestamp parentBSum) (blockDataTimestamp c)
-    unless (blockDataDifficulty c >= calcNextDiff)
-             $ fail $ "Block difficulty is wrong: got " ++ show (blockDataDifficulty c) ++ ", expected " ++ show calcNextDiff
+checkParentChildValidity _ OutputBlock{obBlockData=c} parentBSum = do
     unless (blockDataNumber c == bSumNumber parentBSum + 1)
              $ fail $ "Block number is wrong: got " ++ show (blockDataNumber c) ++ ", expected " ++ show (bSumNumber parentBSum + 1)
     unless (blockDataGasLimit c <= bSumGasLimit parentBSum +  nextGasLimitDelta (bSumGasLimit parentBSum))
