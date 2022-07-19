@@ -25,11 +25,14 @@ module SolidVM.Model.CodeCollection.Statement
 
 import Data.Aeson
 import Data.Source
+--import Data.Swagger
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
 import GHC.Generics
 import SolidVM.Model.SolidString
 import SolidVM.Model.Type
+
+
 
 data StatementF a =
   IfStatement (ExpressionF a) [StatementF a] (Maybe [StatementF a]) a -- if then else
@@ -41,12 +44,16 @@ data StatementF a =
   | Break a
   | Return (Maybe (ExpressionF a)) a
   | Throw a
+  | ModifierExecutor a
   | EmitStatement String [(Maybe String, (ExpressionF a))] a
   | AssemblyStatement InlineAssembly a
   | SimpleStatement (SimpleStatementF a) a
   | RevertStatement (Maybe String) (ArgListF a) a
   | UncheckedStatement [StatementF a] a
+  | SolidityTryCatchStatement (ExpressionF a) (Maybe [(String, Type)]) [StatementF a] (Map.Map String (Maybe (String, Type), [StatementF a])) a
+  | TryCatchStatement [StatementF a] (Map.Map String [StatementF a]) a
   deriving (Show, Eq, Generic, Functor, ToJSON, FromJSON)
+
 
 extractStatement :: StatementF a -> a
 extractStatement (IfStatement _ _ _ a) = a
@@ -63,6 +70,9 @@ extractStatement (AssemblyStatement _ a) = a
 extractStatement (SimpleStatement _ a) = a
 extractStatement (RevertStatement _ _ a) = a
 extractStatement (UncheckedStatement _ a) = a
+extractStatement (ModifierExecutor a) = a
+extractStatement (TryCatchStatement _ _ a) = a
+extractStatement (SolidityTryCatchStatement _ _ _ _ a) = a
 
 type Statement = Positioned StatementF
 

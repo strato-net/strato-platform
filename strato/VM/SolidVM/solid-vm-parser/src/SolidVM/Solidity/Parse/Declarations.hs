@@ -6,9 +6,11 @@
 -- Description: Parsers for top-level Solidity declarations
 -- Maintainer: Ryan Reich <ryan@blockapps.net
 -- Maintainer: Charles Crain <charles@blockapps.net>
+-- Maintainer: Steven Glasford <steven_glasford@blockapps.net>
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 module SolidVM.Solidity.Parse.Declarations where
 
+import           Control.Monad                     (when)
 import           Data.List
 import qualified Data.Map as Map
 import           Data.Maybe
@@ -40,6 +42,7 @@ import           Blockchain.VM.SolidException
 data SourceUnitF a = Pragma a Identifier String
                    | Import a Text.Text
                    | NamedXabi Text.Text (XabiF a, [Text.Text])
+                   | DummySourceUnit
                    deriving (Eq, Show, Generic, Functor)
 
 type SourceUnit = Positioned SourceUnitF
@@ -52,6 +55,9 @@ solidityContract = do
           <|> (reserved "interface" >> return Xabi.InterfaceKind)
           <|> (reserved "library" >> return Xabi.LibraryKind)
     contractName' <- fmap stringToLabel identifier
+    --Throw an error if 'account' is used.
+    pragmaVersion' <- getPragmaVersion
+    when (isReservedWord pragmaVersion' contractName') $ reservedWordError pragmaVersion' contractName'
     setContractName $ labelToString contractName'
     baseConstrs <- option [] $ do
       reserved "is"
@@ -123,6 +129,7 @@ data Declaration =
   | EventDeclaration SolidVM.Event
   | VariableDeclaration SolidVM.VariableDecl
   | ConstantDeclaration SolidVM.ConstantDecl
+  | DummyDeclaration
 --  | VariableDeclaration SVMType.Type Bool Bool (Maybe Expression)
   deriving (Eq, Show)
 
@@ -231,7 +238,10 @@ simpleVariableDeclaration = do
   keywords <- many stateVariableKeyword
   let isConstant = KConstant `elem` keywords
   isPublic <- public keywords
+  -- check to see if the "account" variable is being used
   variableName <- identifier
+  pragmaVersion' <- getPragmaVersion
+  when (isReservedWord pragmaVersion' variableName) $ reservedWordError pragmaVersion' variableName
   value <- optionMaybe $ do
     reservedOp "="
     expression
@@ -249,10 +259,15 @@ simpleVariableDeclaration = do
 functionDeclaration :: SolidityParser (String, Declaration)
 functionDeclaration = do
   ~(a, (functionName, xabi')) <- withPosition $ do
-    functionName <- (reserved "function" >> fromMaybe "" <$> optionMaybe identifier) <|>
+    functionName <- (reserved "function" >> fromMaybe "" <$> optionMaybe identifier)  <|>
                     -- Starting with 0.4.22, constructor() <mods> { <body> } is
                     -- the preferred syntax for defining a constructor
-                    (reserved "constructor" >> getContractName)
+                    (reserved "constructor" >> getContractName) <|>
+                    ("receive" <$ reserved "receive")
+
+    -- Throw an error if the function name is part of secondary reservered words.
+    pragmaVersion' <- getPragmaVersion
+    when (isReservedWord pragmaVersion' functionName) $ reservedWordError pragmaVersion' functionName
     xabi <- functionXabi
     pure (functionName, xabi)
   cName <- getContractName
@@ -266,7 +281,7 @@ functionXabi :: SolidityParser SolidVM.Func
 functionXabi = do
   start <- getSourcePosition
   functionArgs <- tupleDeclaration
-  (functionRet, visibility, mutability, constructorCalls, modifiers) <- functionModifiers
+  (functionRet, visibility, mutability, funcConstructorCallsOrModifiers) <- functionModifiers
   end <- getSourcePosition
   contents <- Just <$> statements <|> (reservedOp ";" >> return Nothing)
   let nameUnnamed (name,ty) = if Text.null name then (Nothing, ty) else (Just name,ty)
@@ -279,11 +294,10 @@ functionXabi = do
       , SolidVM.funcContents = contents
       , SolidVM.funcVisibility = Just visibility
       , SolidVM.funcStateMutability = mutability
-      , SolidVM.funcConstructorCalls = Map.fromList constructorCalls
-      , SolidVM.funcModifiers = Just modifiers
+      , SolidVM.funcConstructorCalls = Map.fromList funcConstructorCallsOrModifiers
+      , SolidVM.funcModifiers = funcConstructorCallsOrModifiers
       , SolidVM.funcContext = ctx
       }
-
 
 eventDeclaration :: SolidityParser (String, Declaration)
 eventDeclaration = do
@@ -319,8 +333,7 @@ modifierDeclaration = do
   reserved "modifier"
   name <- identifier
   args <- option [] tupleDeclaration
---  defn <- bracedCode
-  contents <- bracedCode
+  contents <- Just <$> statements <|> (reservedOp ";" >> return Nothing)
   end <- getSourcePosition
   let ctx = SourceAnnotation start end ()
       nameUnnamed (_name,ty) i = if Text.null _name then (Text.pack ('#' : show i),ty) else (_name,ty)
@@ -332,14 +345,8 @@ modifierDeclaration = do
            Map.fromList $
              zipWith (\x i -> fmap (SolidVM.IndexedType i) (nameUnnamed x i)) args [0..]
       , Xabi.modifierSelector = Text.pack name -- ? -- undefined -- :: Text
-      , Xabi.modifierVals = Map.fromList [] -- undefined -- :: Map Text SolidVM.IndexedType
-      , Xabi.modifierContents = if null contents then Nothing else Just $ Text.pack contents
+      , Xabi.modifierContents = contents -- :: Maybe [Statement]
       , Xabi.modifierContext = ctx
---        objName = name,
---        objValueType = NoValue,
---        objArgType = args,
---        objDefn = defn,
---        objIsPublic = False -- We only care about public variables
       }
     )
 
@@ -373,25 +380,25 @@ tupleDeclaration = parens $ commaSep $ do
 data FuncModifiers = ReturnsMod [(Text, SVMType.Type)]
                    | VisibilityMod SolidVM.Visibility
                    | MutabilityMod SolidVM.StateMutability
-                   | ConstructorCallMod (SolidString, [SolidVM.Expression])
-                   | OtherMod String
+                   | ConstructorCallModsOrOtherMod (SolidString, [SolidVM.Expression])
+--                   | OtherMod String
 
-functionModifiers :: SolidityParser ([(Text, SVMType.Type)], SolidVM.Visibility, Maybe SolidVM.StateMutability, [(SolidString, [SolidVM.Expression])], [String])
+functionModifiers :: SolidityParser ([(Text, SVMType.Type)], SolidVM.Visibility, Maybe SolidVM.StateMutability, [(SolidString, [SolidVM.Expression])])
 functionModifiers = do
   vals <- many $ (ReturnsMod <$> returnModifier)
              <|>  (VisibilityMod <$> visibilityModifier)
              <|>  (MutabilityMod <$> mutabilityModifier)
-             <|>  (ConstructorCallMod <$> constructorCallModifiers)
-             <|>  (OtherMod <$> otherModifiers)
+             <|>  (ConstructorCallModsOrOtherMod <$> constructorCallModifiersOrOtherModifiers)
+--             <|>  (OtherMod <$> otherModifiers)-- (lookAhead (reserved "{"))
   return $ formatVals vals
   where
     formatVals vals =
       let returns = concat [v | ReturnsMod v <- vals]
           visibility = fromMaybe SolidVM.Public $ listToMaybe [v | VisibilityMod v <- vals]
           mutability = listToMaybe [v | MutabilityMod v <- vals]
-          otherMods = [v | OtherMod v <- vals]
-          constructorCallMods = [v | ConstructorCallMod v <- vals]
-      in (returns, visibility, mutability, constructorCallMods, otherMods)
+      --    otherMods = [v | OtherMod v <- vals]
+          constructorCallModsOrOtherMods = [v | ConstructorCallModsOrOtherMod v <- vals]
+      in (returns, visibility, mutability, constructorCallModsOrOtherMods)
     returnModifier =
       reserved "returns" >> tupleDeclaration
     visibilityModifier =
@@ -407,14 +414,10 @@ functionModifiers = do
       <|> (reserved "view"     >> return SolidVM.View)
       <|> (reserved "payable"  >> return SolidVM.Payable)
       )
-    constructorCallModifiers = do
+    constructorCallModifiersOrOtherModifiers = do 
       name <- stringToLabel <$> identifier
-      exps <- parens $ commaSep expression
-      return (name, exps)
-    otherModifiers = do
-      name <- identifier
-      args <- optionMaybe parensCode
-      return $ name ++ maybe "" (\s -> "(" ++ s ++ ")") args
+      exps <- optionMaybe (parens $ commaSep expression)
+      return (name, fromMaybe [] exps) 
 
 -- | A common pattern: code enclosed in braces, allowing nested braces.
 bracedCode :: SolidityParser String
@@ -495,3 +498,14 @@ inCommentSingle
   <?> "end of comment"
   where
     startEnd   = nub (commentEnd solidityLanguage ++ commentStart solidityLanguage)
+
+--To make a new reserved word with a specific pragma version please add to the following function list, 
+  -- This assumes that only the solidvm pragma name is used. Please change if new pragmaNames are added.
+isReservedWord :: String -> String -> Bool
+isReservedWord version reservedWord = do
+  case version of
+    "3.2" -> do 
+      case reservedWord of
+        "account" -> True
+        _ -> False
+    _ -> False

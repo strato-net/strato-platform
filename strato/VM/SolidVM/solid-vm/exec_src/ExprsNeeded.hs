@@ -19,6 +19,7 @@ import SolidVM.Model.CodeCollection
 import SolidVM.Model.SolidString
 import SolidVM.Solidity.Parse.Declarations
 import SolidVM.Solidity.Parse.File
+import SolidVM.Solidity.Parse.ParserTypes
 
 
 
@@ -28,6 +29,7 @@ statementCrawler = \case
   Block _ -> ["Block"]
   Break _ -> ["Break"]
   Continue _ -> ["Continue"]
+  ModifierExecutor _ -> ["ModifierExecutor"]
   Throw _ -> ["Throw"]
   EmitStatement _ evts _ ->  "EmitStatement":concatMap (expressionCrawler . snd) evts
   RevertStatement _ _ _ -> ["RevertStatement"] -- :concatMap (expressionCrawler) args
@@ -50,6 +52,9 @@ statementCrawler = \case
                                     ++ maybe [] expressionCrawler mTest
                                     ++ maybe [] expressionCrawler mInc
                                     ++ concatMap statementCrawler blk
+  TryCatchStatement _ _ _ -> ["TryCatchStatement"]
+  SolidityTryCatchStatement _ _ _ _ _ -> ["SolidityTryCatchStatement"]
+
 
 expressionCrawler :: ExpressionF a -> [T.Text]
 expressionCrawler = \case
@@ -110,7 +115,7 @@ main = do
     (fn:_) -> return fn
   contents <- readFile filename
   File parsedFile <- either (die . show) return
-              $ runParser solidityFile "" "" contents
+              $ runParser solidityFile (ParserState "" "") "" contents
   let pragmas = \case
         Pragma _ n v -> Just (n, v)
         _ -> Nothing
