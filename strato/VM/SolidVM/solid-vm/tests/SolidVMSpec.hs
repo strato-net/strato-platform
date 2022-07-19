@@ -703,33 +703,39 @@ contract qq {
 
     it "throw an error when there is an 'block_timestamp' variable name" $ runTest (do
       runBS [r|
+pragma solidvm 3.3;
+
 contract qq {
    string block_timestamp;
    constructor()
    {
       block_timestamp = "hello";
    }
-}|]) `shouldThrow` anyParseError
+}|]) `shouldThrow` anyReservedWordError
 
     it "throw an error when there is an 'block_hash' variable name" $ runTest (do
       runBS [r|
+pragma solidvm 3.3;
+
 contract qq {
    string block_hash;
    constructor()
    {
       block_hash = "hello";
    }
-}|]) `shouldThrow` anyParseError
+}|]) `shouldThrow` anyReservedWordError
 
     it "throw an error when there is an 'block_number' variable name" $ runTest (do
       runBS [r|
+pragma solidvm 3.3;
+
 contract qq {
    string block_number;
    constructor()
    {
       block_number = "hello";
    }
-}|]) `shouldThrow` anyParseError
+}|]) `shouldThrow` anyReservedWordError
 
 
     it "throw an error when there is an 'address' variable name" $ runTest (do
@@ -740,21 +746,27 @@ contract qq {
 
     it "throw an error when there is an 'record_id' variable name" $ runTest (do
       runBS [r|
+pragma solidvm 3.3;
+
 contract qq {
    uint record_id;
-}|]) `shouldThrow` anyParseError
+}|]) `shouldThrow` anyReservedWordError
 
     it "throw an error when there is an 'transaction_hash' variable name" $ runTest (do
       runBS [r|
+pragma solidvm 3.3;
+
 contract qq {
    uint transaction_hash;
-}|]) `shouldThrow` anyParseError
+}|]) `shouldThrow` anyReservedWordError
 
     it "throw an error when there is an 'transaction_sender' variable name" $ runTest (do
       runBS [r|
+pragma solidvm 3.3;
+
 contract qq {
    uint transaction_sender;
-}|]) `shouldThrow` anyParseError
+}|]) `shouldThrow` anyReservedWordError
 
     it "can multiline require" . runTest $ do
       runBS [r|
@@ -4571,7 +4583,7 @@ contract qq {
 
   it "cannot allow negative block number" $ runTest (do
     runBS [r|
-pragma solidvm 3.2;
+pragma solidvm 3.3;
 contract qq {
   constructor() public returns (bytes32) {
     return blockhash(-1);
@@ -4605,7 +4617,7 @@ contract qq {
 
   it "can use builtin sha256 function" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+pragma solidvm 3.3;
 contract qq {
   bytes32 hsh;
   constructor() public {
@@ -4618,7 +4630,7 @@ contract qq {
     
   it "can use the builtin ripemd160 function" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+pragma solidvm 3.3;
 contract qq {
   bytes20 hsh;
   constructor() public {
@@ -4630,7 +4642,7 @@ contract qq {
 
   it "can use the selfdestruct function" . runTest $ do
     let contract = [r|
-pragma solidvm 3.2;
+pragma solidvm 3.3;
 contract qq {
   account contract';
   account payable contractPay;
@@ -4697,7 +4709,7 @@ contract qq{
 
   it "can use ether number unit suffixes" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+pragma solidvm 3.3;
 contract qq{
   uint weiUnit;
   uint szaboUnit;
