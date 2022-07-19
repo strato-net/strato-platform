@@ -13,7 +13,6 @@ import           Data.Maybe                                  (fromMaybe)
 
 import           Blockchain.Constants
 import           Blockchain.Data.AddressStateDB
-import           Blockchain.Data.Block
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RLP
