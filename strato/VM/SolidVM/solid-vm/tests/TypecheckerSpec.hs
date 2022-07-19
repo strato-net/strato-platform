@@ -685,3 +685,44 @@ contract A {
 }
 |]
     in length anns `shouldBe` 1
+
+  it "can use the receive() function and succeeds when there are no arguments, return values, and is Payable and External" $
+    let anns = runTypechecker [r|
+contract A {
+  receive() external payable {
+  }
+}
+|]
+    in length anns `shouldBe` 0
+
+  it "can throw exceptions when for receive() function there are arguments, return values, function keyword, and not declared as payable and external" $
+    let anns = runTypechecker [r|
+contract A {
+  function receive(uint i) returns (uint) {
+    return i;
+  }
+}
+|]
+    in length anns `shouldBe` 4
+
+  it "can use the fallback() function and succeeds when there are no arguments, return values, and is External" $
+    let anns = runTypechecker [r|
+contract A {
+  fallback() external payable {
+  }
+}
+|]
+    in length anns `shouldBe` 0
+
+  it "can throw exceptions when for fallback() function there are arguments, return values, function keyword, and not declared as External" $
+    let anns = runTypechecker [r|
+contract A {
+  function fallback(uint i) internal returns (uint) {
+    return i;
+  }
+}
+|]
+    in length anns `shouldBe` 4
+
+
+
