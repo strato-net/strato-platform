@@ -263,7 +263,7 @@ functionDeclaration = do
                     -- Starting with 0.4.22, constructor() <mods> { <body> } is
                     -- the preferred syntax for defining a constructor
                     (reserved "constructor" >> getContractName) <|>
-                    (reserved "receive" $> "receive")
+                    ("receive" <$ reserved "receive")
 
     -- Throw an error if the function name is part of secondary reservered words.
     pragmaVersion' <- getPragmaVersion
