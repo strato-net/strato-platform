@@ -262,7 +262,9 @@ functionDeclaration = do
     functionName <- (reserved "function" >> fromMaybe "" <$> optionMaybe identifier)  <|>
                     -- Starting with 0.4.22, constructor() <mods> { <body> } is
                     -- the preferred syntax for defining a constructor
-                    (reserved "constructor" >> getContractName)
+                    (reserved "constructor" >> getContractName) <|>
+                    ("receive" <$ reserved "receive")
+
     -- Throw an error if the function name is part of secondary reservered words.
     pragmaVersion' <- getPragmaVersion
     when (isReservedWord pragmaVersion' functionName) $ reservedWordError pragmaVersion' functionName
