@@ -79,11 +79,11 @@ solidityLanguage = javaStyle {
      "msg", --"data", "gas", "sender", "value",
      "tx", --"gasprice", "origin",
      "wei", "finney", "szabo", "ether",
-     "seconds", "minutes", "hours", "days", "weeks", "years",
+     "seconds", "minutes", "hours", "days", "weeks", "years"
      --The following are protected as they are also names for cirrus columns
-     "block_number", "block_timestamp", "block_hash",
-     "record_id", "transaction_hash", "transaction_sender"
-     ],
+    --"block_number", "block_timestamp", "block_hash",
+    --"record_id", "transaction_hash", "transaction_sender"
+    ],
   P.reservedOpNames = [
     "!", "&&", "||", "==", "!=",
     "<=", ">=", "<", ">", "&", "|", "^", "~", "+", "*", "-", "/"," %", "**",

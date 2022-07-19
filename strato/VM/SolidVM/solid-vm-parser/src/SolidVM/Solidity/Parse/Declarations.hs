@@ -506,4 +506,13 @@ isReservedWord version reservedWord = do
       case reservedWord of
         "account" -> True
         _ -> False
+    "3.3" -> do
+      case reservedWord of
+        "block_number" -> True
+        "block_timestamp" -> True
+        "block_hash" -> True
+        "record_id" -> True
+        "transaction_hash" -> True
+        "transaction_sender" -> True
+        _ -> isReservedWord "3.2" reservedWord
     _ -> False
