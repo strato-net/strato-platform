@@ -14,6 +14,7 @@ module SolidVM.Model.CodeCollection.Function (
   ModifierF(..),
   Modifier,
   tShow,
+  tShow',
   tRead
   ) where
 
