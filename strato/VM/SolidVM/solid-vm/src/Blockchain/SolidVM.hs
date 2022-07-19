@@ -2657,31 +2657,47 @@ runTheConstructors from to hsh cc contractName' argExps = do
   _ <-
     case contract'^.CC.constructor of
       Just theFunction -> do
-        --argVals <- forM argExps evaluate
-        --_ <- call' address contract' theFunction argVals
-        let theModifierNames =  map fst $ (CC.funcModifiers theFunction) 
-        !theModifiers' <- forM theModifierNames $ \name -> do
-          case M.lookup name (contract'^.CC.modifiers) of
-            Just theModifier -> do
-              --args' <- argsToVals contract' theModifier argExps
-              return $ Just theModifier
-            Nothing -> do
-              if name `elem` contract'^.CC.parents then return Nothing else (if (svm3_2 || svm3_3) then (missingField "modifier not found" name) else return Nothing)
-        let theModifiers = catMaybes theModifiers'
-        !commands <- case CC.funcContents theFunction of
-          Nothing -> missingField "contract constructor has been declared but not defined" contractName'
-          Just cms -> pure cms
-       -- let modifierArgs = map CC.modifierArgs theModifiers
-        let !modContentsList = map (\m -> fromMaybe (missingField "Function call: Modifier has been declared but not defined" m) (CC.modifierContents m)) theModifiers
-        let isNotModExec = \case
-              CC.ModifierExecutor _ -> False
-              _ -> True
-        let (lhs,rhs) = foldr (\(a,b) (c,d) -> (a++c,b++d)) ([],[]) (map (span isNotModExec) modContentsList)
-        logVals lhs rhs
-        _ <- runStatements' lhs
-        _ <- pushSender from $ runStatements commands
-        _ <- runStatements' rhs
-        return ()
+        if (CC._vmVersion contract' == "svm3.3")
+          then do
+            --argVals <- forM argExps evaluate
+            --_ <- call' address contract' theFunction argVals
+            let theModifierNames =  map fst $ (CC.funcModifiers theFunction) 
+            !theModifiers' <- forM theModifierNames $ \name -> do
+              case M.lookup name (contract'^.CC.modifiers) of
+                Just theModifier -> do
+                  --args' <- argsToVals contract' theModifier argExps
+                  return $ Just theModifier
+                Nothing -> do
+                  if name `elem` contract'^.CC.parents then return Nothing else (if (svm3_2 || svm3_3) then (missingField "modifier not found" name) else return Nothing)
+            let theModifiers = catMaybes theModifiers'
+            !commands <- case CC.funcContents theFunction of
+              Nothing -> missingField "contract constructor has been declared but not defined" contractName'
+              Just cms -> pure cms
+          -- let modifierArgs = map CC.modifierArgs theModifiers
+            let !modContentsList = map (\m -> fromMaybe (missingField "Function call: Modifier has been declared but not defined" m) (CC.modifierContents m)) theModifiers
+            let isNotModExec = \case
+                  CC.ModifierExecutor _ -> False
+                  _ -> True
+            let (lhs,rhs) = foldr (\(a,b) (c,d) -> (a++c,b++d)) ([],[]) (map (span isNotModExec) modContentsList)
+            logVals lhs rhs
+            _ <- runStatements' lhs
+            _ <- pushSender from $ runStatements commands
+            _ <- runStatements' rhs
+            return ()
+          else do
+            let theModifierNames =  map fst $ (CC.funcModifiers theFunction) 
+            !_ <- forM theModifierNames $ \name -> do
+              case M.lookup name (contract'^.CC.modifiers) of
+                Just _ -> do
+                  --args' <- argsToVals contract' theModifier argExps
+                  unknownStatement "modifiers are not supported below pragma solidvm 3.3" name
+                Nothing -> do
+                  return Nothing
+            commands <- case CC.funcContents theFunction of
+              Nothing -> missingField "contract constructor has been declared but not defined" contractName'
+              Just cms -> pure cms
+            _ <- pushSender from $ runStatements commands
+            return ()
 
       Nothing -> return ()
 
@@ -2720,105 +2736,173 @@ runTheCall :: MonadSM m
 runTheCall address' contract' funcName hsh cc theFunction argVals ro = do
   let returns = [(n, (t, defaultValue contract' t)) | (Just n, CC.IndexedType _ t) <- CC.funcVals theFunction]
       theModifierNames = map fst $ (CC.funcModifiers theFunction) 
-      svm3_2 = CC._vmVersion contract' == "svm3.2"
       svm3_3 = CC._vmVersion contract' == "svm3.3"
-  theModifiers' <- forM theModifierNames $ \name -> do
-    case M.lookup name (contract'^.CC.modifiers) of
-      Just theModifier -> do
-        return $ Just theModifier
-      Nothing -> if name `elem` contract' ^. CC.parents then return Nothing else (if (svm3_2 || svm3_3) then (missingField "modifier not found" name) else return Nothing)
-  let !theModifiers = catMaybes theModifiers'
-  matchedArgvals <- forM theModifiers $ \modi -> do
-    let margList = CC.OrderedArgs 
-            . fromMaybe []
-            $ M.lookup (T.unpack (CC.modifierSelector modi)) $ M.fromList $ CC.funcModifiers theFunction
-    margVals <- argsToValsModifiers contract' modi margList
-    case margVals of
-      OrderedVals vs -> do
-        let argMeta = map (\(n, CC.IndexedType _ t) -> (n, t)) $ M.toList $ CC.modifierArgs modi
-        return (zipWith (\(n, t) v -> (n, (t, v))) argMeta vs)
-      NamedVals ns -> do
-        let strTypes = M.fromList $ map (\(theName, y) -> (theName, y)) $ M.toList $ CC.modifierArgs modi
-            typeAndVal = M.merge (M.mapMissing (curry $ invalidArguments "missing argument"))
-                                 (M.mapMissing (curry $ invalidArguments "extra argument"))
-                                 (M.zipWithMatched $ \_k t v -> (t, v))
-                                 strTypes
-                                 $ M.mapKeys T.pack $ M.fromList ns
-            -- These probably don't need to be sorted by argument index, as they are turned into a map
-            -- when added to the call info.
-            sortedArgs = map snd . sortWith fst
-                      . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
-                      $ M.toList typeAndVal
-        return sortedArgs
 
-  let args = case argVals of
-        OrderedVals vs -> let argMeta = 
-                                map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t))
-                                $ CC.funcArgs theFunction
-                          in zipWith (\(n, t) v -> (n, (t, v))) argMeta vs
-        NamedVals ns ->
-          let strTypes = M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ CC.funcArgs theFunction
-              typeAndVal = M.merge (M.mapMissing (curry $ invalidArguments "missing argument"))
-                                   (M.mapMissing (curry $ invalidArguments "extra argument"))
-                                   (M.zipWithMatched $ \_k t v -> (t, v))
-                                   strTypes
-                                   $ M.fromList ns
-              -- These probably don't need to be sorted by argument index, as they are turned into a map
-              -- when added to the call info.
-              sortedArgs = map snd . sortWith fst
-                         . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
-                         $ M.toList typeAndVal
-          in sortedArgs
+  if (CC._vmVersion contract' /= "svm3.3")
+    then do
+      _ <- forM theModifierNames $ \name -> do
+        case M.lookup name (contract'^.CC.modifiers) of
+          Just _ -> unknownStatement "modifiers are not supported below pragma solidvm 3.3" name
+          Nothing -> return Nothing
+      let args = case argVals of
+            OrderedVals vs -> let argMeta = 
+                                    map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t))
+                                    $ CC.funcArgs theFunction
+                              in zipWith (\(n, t) v -> (n, (t, v))) argMeta vs
+            NamedVals ns ->
+              let strTypes = M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ CC.funcArgs theFunction
+                  typeAndVal = M.merge (M.mapMissing (curry $ invalidArguments "missing argument"))
+                                      (M.mapMissing (curry $ invalidArguments "extra argument"))
+                                      (M.zipWithMatched $ \_k t v -> (t, v))
+                                      strTypes
+                                      $ M.fromList ns
+                  -- These probably don't need to be sorted by argument index, as they are turned into a map
+                  -- when added to the call info.
+                  sortedArgs = map snd . sortWith fst
+                            . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
+                            $ M.toList typeAndVal
+              in sortedArgs
 
-      locals = args ++ returns ++ (map (\(x,y) -> (T.unpack x, y)) (concat matchedArgvals)) --modArgsToBeLocals
+          locals = args ++ returns
 
-  onTraced $ do
-    liftIO $ putStrLn $ "            args: " ++ show (map fst args)
-    when (not $ null returns) $ liftIO $ putStrLn $ "    named return: " ++ show (map fst returns)
+      onTraced $ do
+        liftIO $ putStrLn $ "            args: " ++ show (map fst args)
+        when (not $ null returns) $ liftIO $ putStrLn $ "    named return: " ++ show (map fst returns)
 
-  localVars <-
-    forM locals $ \(n, (t, v)) -> do
-      newVar <- liftIO $ fmap Variable $ newIORef v
-      return (n, (t, newVar))
+      localVars <-
+        forM locals $ \(n, (t, v)) -> do
+          newVar <- liftIO $ fmap Variable $ newIORef v
+          return (n, (t, newVar))
 
-  addCallInfo address' contract' funcName hsh cc (M.fromList localVars) ro -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
+      addCallInfo address' contract' funcName hsh cc (M.fromList localVars) ro -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
 
-  let !commands = fromMaybe (missingField "Function call: function has been declared but not defined" funcName) $ CC.funcContents theFunction
-  let modContentsList = map (\m -> fromMaybe (missingField "Function call: Modifier has been declared but not defined" m) (CC.modifierContents m)) theModifiers
-  let isNotModExec = \case
-              CC.ModifierExecutor _ -> False
-              _ -> True
-  let (lhs,rhs) = foldr (\(a,b) (c,d) -> (a++c,b++d)) ([],[]) (map (span isNotModExec) modContentsList)
-  logVals lhs rhs
-  _ <- runStatements' lhs
-  val   <- runStatements commands
-  _ <- runStatements' rhs
+      let !commands = fromMaybe (missingField "Function call: function has been declared but not defined" funcName) $ CC.funcContents theFunction
+      val <- runStatements commands
+      let findNamedReturns = do
+            case returns of
+              [] -> return Nothing
+              [(name,_)] -> do -- We have to break this up because
+                              -- SolidVM cannot distinguish between
+                              -- a value and single-tupled value
+                currentCallInfo <- getCurrentCallInfo
+                let mReturnVar = M.lookup name $ localVariables currentCallInfo
+                case mReturnVar of
+                  Nothing -> unknownVariable "findNamedReturns" name
+                  Just returnVar -> Just <$> getVar (snd returnVar)
+              xs -> Just . STuple . V.fromList <$> do
+                currentCallInfo <- getCurrentCallInfo
+                for (fst <$> xs) $ \name -> do
+                  let mReturnVar = M.lookup name $ localVariables currentCallInfo
+                  case mReturnVar of
+                    Nothing -> unknownVariable "findNamedReturns" name
+                    Just returnVar -> Constant <$> getVar (snd returnVar)
 
-  let findNamedReturns = do
-        case returns of
-          [] -> return Nothing
-          [(name,_)] -> do -- We have to break this up because
-                           -- SolidVM cannot distinguish between
-                           -- a value and single-tupled value
-            currentCallInfo <- getCurrentCallInfo
-            let mReturnVar = M.lookup name $ localVariables currentCallInfo
-            case mReturnVar of
-              Nothing -> unknownVariable "findNamedReturns" name
-              Just returnVar -> Just <$> getVar (snd returnVar)
-          xs -> Just . STuple . V.fromList <$> do
-            currentCallInfo <- getCurrentCallInfo
-            for (fst <$> xs) $ \name -> do
-              let mReturnVar = M.lookup name $ localVariables currentCallInfo
-              case mReturnVar of
-                Nothing -> unknownVariable "findNamedReturns" name
-                Just returnVar -> Constant <$> getVar (snd returnVar)
-  val' <- case val of
-             Nothing -> findNamedReturns
-             Just SNULL -> findNamedReturns
-             Just{} -> return val
-  popCallInfo
+      val' <- case val of
+                Nothing -> findNamedReturns
+                Just SNULL -> findNamedReturns
+                Just{} -> return val
+      popCallInfo
+      return val' 
+      
+    else do
 
-  return val'
+      theModifiers' <- forM theModifierNames $ \name -> do
+        case M.lookup name (contract'^.CC.modifiers) of
+          Just theModifier -> do
+            return $ Just theModifier
+          Nothing -> if name `elem` contract' ^. CC.parents then return Nothing else (if (svm3_3) then (missingField "modifier not found" name) else return Nothing)
+      let !theModifiers = catMaybes theModifiers'
+      matchedArgvals <- forM theModifiers $ \modi -> do
+        let margList = CC.OrderedArgs 
+                . fromMaybe []
+                $ M.lookup (T.unpack (CC.modifierSelector modi)) $ M.fromList $ CC.funcModifiers theFunction
+        margVals <- argsToValsModifiers contract' modi margList
+        case margVals of
+          OrderedVals vs -> do
+            let argMeta = map (\(n, CC.IndexedType _ t) -> (n, t)) $ M.toList $ CC.modifierArgs modi
+            return (zipWith (\(n, t) v -> (n, (t, v))) argMeta vs)
+          NamedVals ns -> do
+            let strTypes = M.fromList $ map (\(theName, y) -> (theName, y)) $ M.toList $ CC.modifierArgs modi
+                typeAndVal = M.merge (M.mapMissing (curry $ invalidArguments "missing argument"))
+                                    (M.mapMissing (curry $ invalidArguments "extra argument"))
+                                    (M.zipWithMatched $ \_k t v -> (t, v))
+                                    strTypes
+                                    $ M.mapKeys T.pack $ M.fromList ns
+                -- These probably don't need to be sorted by argument index, as they are turned into a map
+                -- when added to the call info.
+                sortedArgs = map snd . sortWith fst
+                          . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
+                          $ M.toList typeAndVal
+            return sortedArgs
+
+      let args = case argVals of
+            OrderedVals vs -> let argMeta = 
+                                    map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t))
+                                    $ CC.funcArgs theFunction
+                              in zipWith (\(n, t) v -> (n, (t, v))) argMeta vs
+            NamedVals ns ->
+              let strTypes = M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ CC.funcArgs theFunction
+                  typeAndVal = M.merge (M.mapMissing (curry $ invalidArguments "missing argument"))
+                                      (M.mapMissing (curry $ invalidArguments "extra argument"))
+                                      (M.zipWithMatched $ \_k t v -> (t, v))
+                                      strTypes
+                                      $ M.fromList ns
+                  -- These probably don't need to be sorted by argument index, as they are turned into a map
+                  -- when added to the call info.
+                  sortedArgs = map snd . sortWith fst
+                            . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
+                            $ M.toList typeAndVal
+              in sortedArgs
+
+          locals = args ++ returns ++ (map (\(x,y) -> (T.unpack x, y)) (concat matchedArgvals)) --modArgsToBeLocals
+
+      onTraced $ do
+        liftIO $ putStrLn $ "            args: " ++ show (map fst args)
+        when (not $ null returns) $ liftIO $ putStrLn $ "    named return: " ++ show (map fst returns)
+
+      localVars <-
+        forM locals $ \(n, (t, v)) -> do
+          newVar <- liftIO $ fmap Variable $ newIORef v
+          return (n, (t, newVar))
+
+      addCallInfo address' contract' funcName hsh cc (M.fromList localVars) ro -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
+
+      let !commands = fromMaybe (missingField "Function call: function has been declared but not defined" funcName) $ CC.funcContents theFunction
+      let modContentsList = map (\m -> fromMaybe (missingField "Function call: Modifier has been declared but not defined" m) (CC.modifierContents m)) theModifiers
+      let isNotModExec = \case
+                  CC.ModifierExecutor _ -> False
+                  _ -> True
+      let (lhs,rhs) = foldr (\(a,b) (c,d) -> (a++c,b++d)) ([],[]) (map (span isNotModExec) modContentsList)
+      logVals lhs rhs
+      _ <- runStatements' lhs
+      val   <- runStatements commands
+      _ <- runStatements' rhs
+
+      let findNamedReturns = do
+            case returns of
+              [] -> return Nothing
+              [(name,_)] -> do -- We have to break this up because
+                              -- SolidVM cannot distinguish between
+                              -- a value and single-tupled value
+                currentCallInfo <- getCurrentCallInfo
+                let mReturnVar = M.lookup name $ localVariables currentCallInfo
+                case mReturnVar of
+                  Nothing -> unknownVariable "findNamedReturns" name
+                  Just returnVar -> Just <$> getVar (snd returnVar)
+              xs -> Just . STuple . V.fromList <$> do
+                currentCallInfo <- getCurrentCallInfo
+                for (fst <$> xs) $ \name -> do
+                  let mReturnVar = M.lookup name $ localVariables currentCallInfo
+                  case mReturnVar of
+                    Nothing -> unknownVariable "findNamedReturns" name
+                    Just returnVar -> Constant <$> getVar (snd returnVar)
+      val' <- case val of
+                Nothing -> findNamedReturns
+                Just SNULL -> findNamedReturns
+                Just{} -> return val
+      popCallInfo
+
+      return val'
 
 
 

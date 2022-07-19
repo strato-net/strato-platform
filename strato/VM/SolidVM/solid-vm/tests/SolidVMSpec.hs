@@ -4409,7 +4409,7 @@ contract qq {
 
   it "can declare a custom modifier and use it in a contract" $ (runTest $ do
     (runBS [r|
-pragma solidvm 3.2;
+pragma solidvm 3.3;
 contract qq {
   modifier myModifier() {  // line 4
     require(false);
@@ -4425,7 +4425,7 @@ contract qq {
 
   it "can declare a custom modifier and use it in a contract" $ (runTest $ do
     (runBS [r|
-pragma solidvm 3.2;
+pragma solidvm 3.3;
 contract qq {
   modifier myModifier() {  // line 4
     return 7;
@@ -4443,7 +4443,7 @@ contract qq {
 
   it "can use a modifier as part of a function" . runTest $ do
     runCall "decrement" "(1)" [r|
-pragma solidvm 3.2;
+pragma solidvm 3.3;
 contract qq {
     // We will use these variables to demonstrate how to use
     // modifiers.
@@ -4498,7 +4498,7 @@ contract qq {
 
   it "can use a modifier and require something after and before the function is run" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+pragma solidvm 3.3;
 contract qq {
   uint x = 3;
   modifier myModifier() {  
@@ -4517,7 +4517,7 @@ contract qq {
 
   it "can use a modifier multiple modifiers and they occur in order" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+pragma solidvm 3.3;
 contract qq {
   uint x = 3;
   modifier myModifier() {  
@@ -4543,7 +4543,7 @@ contract qq {
 
   it "can use a modifier  that takes arguments as part of a function" . runTest $ do
     runCall "a" "()" [r|
-pragma solidvm 3.2;
+pragma solidvm 3.3;
 contract qq {
   uint x = 3;
   modifier myModifier(uint _x) {  
