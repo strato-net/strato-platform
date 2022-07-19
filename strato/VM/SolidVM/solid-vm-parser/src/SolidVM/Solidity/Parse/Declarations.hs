@@ -514,5 +514,6 @@ isReservedWord version reservedWord = do
         "record_id" -> True
         "transaction_hash" -> True
         "transaction_sender" -> True
+        "salt" -> True
         _ -> isReservedWord "3.2" reservedWord
     _ -> False

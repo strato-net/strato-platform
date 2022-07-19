@@ -4726,6 +4726,7 @@ contract qq{
 
   it "can create salted contract" . runTest $ do
     runBS [r|
+pragma solidvm 3.3;
 contract X {
   string public xNum;
 }
@@ -4740,7 +4741,7 @@ contract qq {
   X public z;
   bytes32 salt';
   constructor() public {
-    salt' = 0x12345678;
+    salt' = "salt";
     x = new X{salt: salt'}();
     y = new Y{salt: salt'}();
     z = new X{salt: "something"}();
@@ -4748,9 +4749,9 @@ contract qq {
   }
 }|]
     getFields ["x", "y", "z"] `shouldReturn` 
-      [ bContract "X" 0x1e9abebf7e4e73283a531d44a33f7eb6371cf820
-      , bContract "Y" 0x3911f467237f82a56973a5f4d87aa67107479626
-      , bContract "X" 0x33945db5a537463004fbed0bde21ac30d46ad052
+      [ bContract "X" 0x2facc7c9bda88a8261d4ed20fab790a017f52ca0
+      , bContract "Y" 0x43fb24796bed33a219bef6919a82c4929dd7899d
+      , bContract "X" 0x58d79e1e4170a7d37980fdcd7f660e3504ad67c5
       ]
       
   it "can use a try catch statment to catch a divide by zero error the SolidVM Way (trademark pending)" . runTest $ do
