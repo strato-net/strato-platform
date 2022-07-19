@@ -680,16 +680,16 @@ functionHelper cc c funcName f@Func{..} = case funcContents of
     if funcName == "receive"
       then case (funcArgs, funcVals, funcStateMutability, funcVisibility) of
         ([], [], Payable, External) -> let r = R cc c (Just f)
-                                            swap = uncurry $ flip (,)
-                                            args = (\(it,n) -> ( n
+                                           swap = uncurry $ flip (,)
+                                           args = (\(it,n) -> ( n
                                                               , VarDefEntry (Just $ indexedTypeType it) Nothing n funcContext
                                                               ))
                                               <$> (catMaybes $ sequence . swap <$> funcArgs)
-                                            vals = (\(it,n) -> ( n
+                                           vals = (\(it,n) -> ( n
                                                               , VarDefEntry (Just $ indexedTypeType it) Nothing n funcContext
                                                               ))
                                               <$> (catMaybes $ sequence . swap <$> funcVals)
-                                            argVals = M.fromList $ args ++ vals
+                                           argVals = M.fromList $ args ++ vals
                                         in runReader (statementsHelper argVals stmts) r
         (fArg, _, _, _) -> bottom  $ (T.concat
                           [ "Function `receive` must take no arguments, but has been given "
