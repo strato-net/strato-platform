@@ -16,7 +16,7 @@ import           Data.Functor.Identity (runIdentity)
 import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as M
-import           Data.Maybe      --(catMaybes, fromJust, fromMaybe, isJust)
+import           Data.Maybe      (catMaybes, fromJust, fromMaybe)
 import qualified Data.Set        as S
 import           Data.Source
 import           Data.String     (IsString, fromString)

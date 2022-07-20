@@ -865,13 +865,11 @@ callWrapper from to mContract functionName isRCC argExps  = do
               Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName)-}
 
   when isRCC (
-    forM_ [(n, theType, isImmutable) | (n, CC.VariableDecl theType _ Nothing _ isImmutable) <- M.toList $ contract'^.CC.storageDefs] $ \(n, theType, isImmutable) -> do
-      if isImmutable
-        then return ()
-        else case theType of
-          SVMType.Mapping _ _ _-> return ()
-          SVMType.Array _ _-> return ()
-          _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) MS.BDefault)
+    forM_ [(n, theType) | (n, CC.VariableDecl theType _ Nothing _ _) <- M.toList $ contract'^.CC.storageDefs] $ \(n, theType) -> do
+      case theType of
+        SVMType.Mapping _ _ _-> return ()
+        SVMType.Array _ _-> return ()
+        _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) MS.BDefault)
   logFunctionCall args to contract functionName f
 
 
