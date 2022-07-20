@@ -522,7 +522,5 @@ isReservedWord version reservedWord = do
         "transaction_hash" -> True
         "transaction_sender" -> True
         "salt" -> True
-        "receive" -> True
-        "fallback" -> True
         _ -> isReservedWord "3.2" reservedWord
     _ -> False
