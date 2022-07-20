@@ -16,6 +16,7 @@ module Blockchain.Strato.RedisBlockDB
     , getChainInfo, putChainInfo
     , getChainMembers, putChainMembers
     , addChainMember, removeChainMember
+    , getCertificate
     , registerCertificate
     , revokeCertificate
     , getInitializeCertificateRegistry, initializeCertificateRegistry 
