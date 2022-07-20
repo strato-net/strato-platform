@@ -330,26 +330,30 @@ eventDeclaration = do
 -- that use modifiers.
 modifierDeclaration :: SolidityParser (String, Declaration)
 modifierDeclaration = do
+  pragmaVersion' <- getPragmaVersion
   start <- getSourcePosition
   reserved "modifier"
   name <- identifier
-  args <- option [] tupleDeclaration
-  contents <- Just <$> statements <|> (reservedOp ";" >> return Nothing)
-  end <- getSourcePosition
-  let ctx = SourceAnnotation start end ()
-      nameUnnamed (_name,ty) i = if Text.null _name then (Text.pack ('#' : show i),ty) else (_name,ty)
-  return
-    (
-      name,
-      ModifierDeclaration Xabi.Modifier{
-        Xabi.modifierArgs = -- undefined args -- :: Map Text SolidVM.IndexedType
-           Map.fromList $
-             zipWith (\x i -> fmap (SolidVM.IndexedType i) (nameUnnamed x i)) args [0..]
-      , Xabi.modifierSelector = Text.pack name -- ? -- undefined -- :: Text
-      , Xabi.modifierContents = contents -- :: Maybe [Statement]
-      , Xabi.modifierContext = ctx
-      }
-    )
+  if pragmaVersion' /= "3.3"
+    then unknownStatement "modifiers are not supported below pragma solidvm 3.3" name
+    else do
+      args <- option [] tupleDeclaration
+      contents <- Just <$> statements <|> (reservedOp ";" >> return Nothing)
+      end <- getSourcePosition
+      let ctx = SourceAnnotation start end ()
+          nameUnnamed (_name,ty) i = if Text.null _name then (Text.pack ('#' : show i),ty) else (_name,ty)
+      return
+        (
+          name,
+          ModifierDeclaration Xabi.Modifier{
+            Xabi.modifierArgs = -- undefined args -- :: Map Text SolidVM.IndexedType
+              Map.fromList $
+                zipWith (\x i -> fmap (SolidVM.IndexedType i) (nameUnnamed x i)) args [0..]
+          , Xabi.modifierSelector = Text.pack name -- ? -- undefined -- :: Text
+          , Xabi.modifierContents = contents -- :: Maybe [Statement]
+          , Xabi.modifierContext = ctx
+          }
+        )
 
 {- Not really declarations -}
 
@@ -509,4 +513,14 @@ isReservedWord version reservedWord = do
       case reservedWord of
         "account" -> True
         _ -> False
+    "3.3" -> do
+      case reservedWord of
+        "block_number" -> True
+        "block_timestamp" -> True
+        "block_hash" -> True
+        "record_id" -> True
+        "transaction_hash" -> True
+        "transaction_sender" -> True
+        "salt" -> True
+        _ -> isReservedWord "3.2" reservedWord
     _ -> False
