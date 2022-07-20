@@ -42,6 +42,7 @@ import           Blockchain.VM.SolidException
 data SourceUnitF a = Pragma a Identifier String
                    | Import a Text.Text
                    | NamedXabi Text.Text (XabiF a, [Text.Text])
+                   | DummySourceUnit
                    deriving (Eq, Show, Generic, Functor)
 
 type SourceUnit = Positioned SourceUnitF
@@ -128,6 +129,7 @@ data Declaration =
   | EventDeclaration SolidVM.Event
   | VariableDeclaration SolidVM.VariableDecl
   | ConstantDeclaration SolidVM.ConstantDecl
+  | DummyDeclaration
 --  | VariableDeclaration SVMType.Type Bool Bool (Maybe Expression)
   deriving (Eq, Show)
 
@@ -262,7 +264,10 @@ functionDeclaration = do
     functionName <- (reserved "function" >> fromMaybe "" <$> optionMaybe identifier)  <|>
                     -- Starting with 0.4.22, constructor() <mods> { <body> } is
                     -- the preferred syntax for defining a constructor
-                    (reserved "constructor" >> getContractName)
+                    (reserved "constructor" >> getContractName) <|>
+                    ("receive" <$ reserved "receive") <|>
+                    ("fallback" <$ reserved "fallback")
+
     -- Throw an error if the function name is part of secondary reservered words.
     pragmaVersion' <- getPragmaVersion
     when (isReservedWord pragmaVersion' functionName) $ reservedWordError pragmaVersion' functionName
@@ -279,7 +284,7 @@ functionXabi :: SolidityParser SolidVM.Func
 functionXabi = do
   start <- getSourcePosition
   functionArgs <- tupleDeclaration
-  (functionRet, visibility, mutability, constructorCalls, modifiers) <- functionModifiers
+  (functionRet, visibility, mutability, funcConstructorCallsOrModifiers) <- functionModifiers
   end <- getSourcePosition
   contents <- Just <$> statements <|> (reservedOp ";" >> return Nothing)
   let nameUnnamed (name,ty) = if Text.null name then (Nothing, ty) else (Just name,ty)
@@ -292,8 +297,8 @@ functionXabi = do
       , SolidVM.funcContents = contents
       , SolidVM.funcVisibility = Just visibility
       , SolidVM.funcStateMutability = mutability
-      , SolidVM.funcConstructorCalls = Map.fromList constructorCalls
-      , SolidVM.funcModifiers = Just modifiers
+      , SolidVM.funcConstructorCalls = Map.fromList funcConstructorCallsOrModifiers
+      , SolidVM.funcModifiers = funcConstructorCallsOrModifiers
       , SolidVM.funcContext = ctx
       }
 
@@ -327,33 +332,30 @@ eventDeclaration = do
 -- that use modifiers.
 modifierDeclaration :: SolidityParser (String, Declaration)
 modifierDeclaration = do
+  pragmaVersion' <- getPragmaVersion
   start <- getSourcePosition
   reserved "modifier"
   name <- identifier
-  args <- option [] tupleDeclaration
---  defn <- bracedCode
-  contents <- bracedCode
-  end <- getSourcePosition
-  let ctx = SourceAnnotation start end ()
-      nameUnnamed (_name,ty) i = if Text.null _name then (Text.pack ('#' : show i),ty) else (_name,ty)
-  return
-    (
-      name,
-      ModifierDeclaration Xabi.Modifier{
-        Xabi.modifierArgs = -- undefined args -- :: Map Text SolidVM.IndexedType
-           Map.fromList $
-             zipWith (\x i -> fmap (SolidVM.IndexedType i) (nameUnnamed x i)) args [0..]
-      , Xabi.modifierSelector = Text.pack name -- ? -- undefined -- :: Text
-      , Xabi.modifierVals = Map.fromList [] -- undefined -- :: Map Text SolidVM.IndexedType
-      , Xabi.modifierContents = if null contents then Nothing else Just $ Text.pack contents
-      , Xabi.modifierContext = ctx
---        objName = name,
---        objValueType = NoValue,
---        objArgType = args,
---        objDefn = defn,
---        objIsPublic = False -- We only care about public variables
-      }
-    )
+  if pragmaVersion' /= "3.3"
+    then unknownStatement "modifiers are not supported below pragma solidvm 3.3" name
+    else do
+      args <- option [] tupleDeclaration
+      contents <- Just <$> statements <|> (reservedOp ";" >> return Nothing)
+      end <- getSourcePosition
+      let ctx = SourceAnnotation start end ()
+          nameUnnamed (_name,ty) i = if Text.null _name then (Text.pack ('#' : show i),ty) else (_name,ty)
+      return
+        (
+          name,
+          ModifierDeclaration Xabi.Modifier{
+            Xabi.modifierArgs = -- undefined args -- :: Map Text SolidVM.IndexedType
+              Map.fromList $
+                zipWith (\x i -> fmap (SolidVM.IndexedType i) (nameUnnamed x i)) args [0..]
+          , Xabi.modifierSelector = Text.pack name -- ? -- undefined -- :: Text
+          , Xabi.modifierContents = contents -- :: Maybe [Statement]
+          , Xabi.modifierContext = ctx
+          }
+        )
 
 {- Not really declarations -}
 
@@ -385,25 +387,25 @@ tupleDeclaration = parens $ commaSep $ do
 data FuncModifiers = ReturnsMod [(Text, SVMType.Type)]
                    | VisibilityMod SolidVM.Visibility
                    | MutabilityMod SolidVM.StateMutability
-                   | ConstructorCallMod (SolidString, [SolidVM.Expression])
-                   | OtherMod String
+                   | ConstructorCallModsOrOtherMod (SolidString, [SolidVM.Expression])
+--                   | OtherMod String
 
-functionModifiers :: SolidityParser ([(Text, SVMType.Type)], SolidVM.Visibility, Maybe SolidVM.StateMutability, [(SolidString, [SolidVM.Expression])], [String])
+functionModifiers :: SolidityParser ([(Text, SVMType.Type)], SolidVM.Visibility, Maybe SolidVM.StateMutability, [(SolidString, [SolidVM.Expression])])
 functionModifiers = do
   vals <- many $ (ReturnsMod <$> returnModifier)
              <|>  (VisibilityMod <$> visibilityModifier)
              <|>  (MutabilityMod <$> mutabilityModifier)
-             <|>  (ConstructorCallMod <$> constructorCallModifiers)
-             <|>  (OtherMod <$> otherModifiers)
+             <|>  (ConstructorCallModsOrOtherMod <$> constructorCallModifiersOrOtherModifiers)
+--             <|>  (OtherMod <$> otherModifiers)-- (lookAhead (reserved "{"))
   return $ formatVals vals
   where
     formatVals vals =
       let returns = concat [v | ReturnsMod v <- vals]
           visibility = fromMaybe SolidVM.Public $ listToMaybe [v | VisibilityMod v <- vals]
           mutability = listToMaybe [v | MutabilityMod v <- vals]
-          otherMods = [v | OtherMod v <- vals]
-          constructorCallMods = [v | ConstructorCallMod v <- vals]
-      in (returns, visibility, mutability, constructorCallMods, otherMods)
+      --    otherMods = [v | OtherMod v <- vals]
+          constructorCallModsOrOtherMods = [v | ConstructorCallModsOrOtherMod v <- vals]
+      in (returns, visibility, mutability, constructorCallModsOrOtherMods)
     returnModifier =
       reserved "returns" >> tupleDeclaration
     visibilityModifier =
@@ -419,14 +421,10 @@ functionModifiers = do
       <|> (reserved "view"     >> return SolidVM.View)
       <|> (reserved "payable"  >> return SolidVM.Payable)
       )
-    constructorCallModifiers = do
+    constructorCallModifiersOrOtherModifiers = do 
       name <- stringToLabel <$> identifier
-      exps <- parens $ commaSep expression
-      return (name, exps)
-    otherModifiers = do
-      name <- identifier
-      args <- optionMaybe parensCode
-      return $ name ++ maybe "" (\s -> "(" ++ s ++ ")") args
+      exps <- optionMaybe (parens $ commaSep expression)
+      return (name, fromMaybe [] exps) 
 
 -- | A common pattern: code enclosed in braces, allowing nested braces.
 bracedCode :: SolidityParser String
@@ -517,4 +515,14 @@ isReservedWord version reservedWord = do
       case reservedWord of
         "account" -> True
         _ -> False
+    "3.3" -> do
+      case reservedWord of
+        "block_number" -> True
+        "block_timestamp" -> True
+        "block_hash" -> True
+        "record_id" -> True
+        "transaction_hash" -> True
+        "transaction_sender" -> True
+        "salt" -> True
+        _ -> isReservedWord "3.2" reservedWord
     _ -> False

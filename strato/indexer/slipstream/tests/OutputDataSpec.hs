@@ -616,6 +616,7 @@ createDummyContract v =
       _events=undefined,
       _functions=undefined,
       _constructor=undefined,
+      _modifiers=undefined,
       _vmVersion=undefined,
       _contractContext=undefined
     }

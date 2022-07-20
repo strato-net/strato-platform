@@ -29,6 +29,7 @@ statementCrawler = \case
   Block _ -> ["Block"]
   Break _ -> ["Break"]
   Continue _ -> ["Continue"]
+  ModifierExecutor _ -> ["ModifierExecutor"]
   Throw _ -> ["Throw"]
   EmitStatement _ evts _ ->  "EmitStatement":concatMap (expressionCrawler . snd) evts
   RevertStatement _ _ _ -> ["RevertStatement"] -- :concatMap (expressionCrawler) args
@@ -51,6 +52,9 @@ statementCrawler = \case
                                     ++ maybe [] expressionCrawler mTest
                                     ++ maybe [] expressionCrawler mInc
                                     ++ concatMap statementCrawler blk
+  TryCatchStatement _ _ _ -> ["TryCatchStatement"]
+  SolidityTryCatchStatement _ _ _ _ _ -> ["SolidityTryCatchStatement"]
+
 
 expressionCrawler :: ExpressionF a -> [T.Text]
 expressionCrawler = \case
@@ -115,11 +119,11 @@ main = do
   let pragmas = \case
         Pragma _ n v -> Just (n, v)
         _ -> Nothing
-  let vmVersion' = if (Just ("solidvm","3.2")) `elem` (pragmas <$> parsedFile) then "svm3.2" else (if (Just ("solidvm","3.0")) `elem` (pragmas <$> parsedFile) then "svm3.0" else "")
+  let vmVersion' = if (Just ("solidvm","3.3")) `elem` (pragmas <$> parsedFile) then "svm3.3" else (if (Just ("solidvm","3.2")) `elem` (pragmas <$> parsedFile) then "svm3.2" else (if (Just ("solidvm","3.0")) `elem` (pragmas <$> parsedFile) then "svm3.0" else ""))
       namedContracts = [(textToLabel name, either (throw . fst) id $ xabiToContract (textToLabel name) (map textToLabel parents') vmVersion' xabi)
                        | NamedXabi name (xabi, parents') <- parsedFile]
       cc = CodeCollection $ M.fromList namedContracts
-      typecheck = if vmVersion' == "svm3.2" then TC.detector cc else []
+      typecheck = if (vmVersion' == "svm3.2" || vmVersion' == "svm3.3") then TC.detector cc else []
       nodes = codeCollectionCrawler cc
   putStrLn (show typecheck) --when (not null typecheck)
   mapM_ (putStrLn . T.unpack) nodes

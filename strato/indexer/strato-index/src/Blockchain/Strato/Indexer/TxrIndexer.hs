@@ -83,12 +83,24 @@ doRemoveMember chainId address = do
 
 doRegisterCertificate :: Address -> X509CertInfoState -> IContextM ()
 doRegisterCertificate userAddress x509CertInfoState = do
-  logF [ "Registering X.509 Certificate -- key/userAddress: " 
+  logF [ "Registering X.509 Certificate -- key/userAddress: "
        , format userAddress
        , "; value/x509CertInfoState: "
        , format x509CertInfoState
        ]
   void . RBDB.withRedisBlockDB $ RBDB.registerCertificate userAddress x509CertInfoState
+
+doRevokeCertificate :: Address -> IContextM ()
+doRevokeCertificate userAddress = do
+  logF [ "Revoking X.509 Certificate -- key/userAddress: "
+        , format userAddress
+        ]
+  void . RBDB.withRedisBlockDB $ RBDB.revokeCertificate userAddress
+
+doCertificateRegistryInitialized :: IContextM ()
+doCertificateRegistryInitialized = do
+  logF [ "Initializing Certificate Registry"]
+  void . RBDB.withRedisBlockDB $ RBDB.initializeCertificateRegistry
 
 txrIndexer :: LoggingT IO ()
 txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
@@ -104,6 +116,8 @@ txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
 data TxrResult = AddMember (Either String (Word256, Address, Enode))
                | RemoveMember (Either String (Word256, Address))
                | RegisterCertificate (Either String (Address, X509CertInfoState))
+               | CertificateRevoked (Either String Address)
+               | CertificateRegistryInitialized (Either String ())
                | TerminateChain (Either String Word256)
                | PutLogDB LogDB
                | PutEventDB EventDB
@@ -141,14 +155,20 @@ indexEventToTxrResults = \case
       (Just chainId, "MemberRemoved", [addressStr]) -> case stringAddress addressStr of
         Nothing -> Just . RemoveMember . Left $ "failed to parse address for MemberRemoved event: " ++ addressStr
         Just address -> Just . RemoveMember $ Right (chainId, address)
-      (Nothing, "CertificateRegistered", [certString]) -> 
+      (Nothing, "CertificateRegistered", [certString]) ->
         let cert = bsToCert . C8.pack $ certString
             userAddress = fmap (fromPublicKey . subPub) $ getCertSubject =<< eitherToMaybe cert
-        in case (cert, userAddress) of 
+        in case (cert, userAddress) of
             (Left s, Nothing) -> Just . RegisterCertificate . Left $ "Failed to parse the certString for the CertificateRegistered event: " <> s
             (Left s, Just ua) -> Just . RegisterCertificate . Left $ "Failed to parse the certString for the CertificateRegistered event: " <> s <> "; " <> show ua
             (Right s, Nothing) -> Just . RegisterCertificate . Left $ "Failed to parse the certString's userAddress for the CertificateRegistered event: " <> show s
             (Right c, Just ua) -> Just . RegisterCertificate . Right $ (ua, X509CertInfoState{userAddress=ua, certificate=c, isValid=True, children=[]})
+      (Nothing, "CertificateRevoked", [userAddress]) ->
+        let userAddress' = stringAddress userAddress
+        in case userAddress' of
+            Nothing -> Just . CertificateRevoked . Left $ "Failed to parse the certString for the CertificateRevoked event: " <> userAddress
+            Just ua -> Just . CertificateRevoked . Right $ ua
+      (Nothing, "CertificateRegistryInitialized", []) -> Just . CertificateRegistryInitialized . Right $ ()
       _ -> Nothing
   TxResult r -> [PutTxResult r]
   _ -> []
@@ -164,6 +184,12 @@ txrResultHandler = \case
   RegisterCertificate e -> case e of
     Right (ua, certInfoState) -> doRegisterCertificate ua certInfoState
     Left err -> $logErrorS "txrIndexer" $ T.pack err
+  CertificateRevoked e -> case e of
+    Right userAddress -> doRevokeCertificate userAddress
+    Left err -> $logErrorS "txrIndexer" $ T.pack err
+  CertificateRegistryInitialized e -> case e of
+    Right _ -> doCertificateRegistryInitialized
+    Left err  -> $logErrorS "txrIndexer whaaat?" $ T.pack err
   TerminateChain e -> case e of
     Right chainId -> lift $ terminateChain chainId
     Left err -> $logErrorS "txrIndexer" $ T.pack err

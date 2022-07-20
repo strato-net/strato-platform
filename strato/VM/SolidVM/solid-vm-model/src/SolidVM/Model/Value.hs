@@ -204,7 +204,7 @@ valEquals ct lhs rhs = case (lhs, rhs) of
   (SEnumVal e1 _ n1, SEnumVal e2 _ n2) -> e1 == e2 && n1 == n2
   (SContract _ a1, SAccount a2 _) -> a1 == a2
   (SAccount a1 _, SContract _ a2) -> a1 == a2
-  (SContract _ a1, SContract _ a2) ->  if ((CC._vmVersion ct == "svm3.0") || (CC._vmVersion ct == "svm3.2")) then (a1 == a2) else todo "unsupported type combination in valEquals: " (lhs, rhs)
+  (SContract _ a1, SContract _ a2) ->  if ((CC._vmVersion ct == "svm3.0") || (CC._vmVersion ct == "svm3.2") || (CC._vmVersion ct == "svm3.3")) then (a1 == a2) else todo "unsupported type combination in valEquals: " (lhs, rhs)
   (SBuiltinVariable v1, SBuiltinVariable v2) ->
     todo "comparison of builtin vars requires evaluation: " (v1, v2)
   _ -> todo "unsupported type combination in valEquals: " (lhs, rhs)
@@ -225,7 +225,7 @@ defaultValue _ (SVMType.Address _) = (SAccount $ unspecifiedChain (Address 0)) F
 defaultValue _ (SVMType.Account _) = (SAccount $ unspecifiedChain (Address 0)) False
 defaultValue _ (SVMType.String _) = SString ""
 defaultValue _ (SVMType.Bytes _ _) = SString ""
-defaultValue ctract (SVMType.UnknownLabel name) = fromMaybe (SContract name $ unspecifiedChain 0x0) $ asum
+defaultValue ctract (SVMType.UnknownLabel name _) = fromMaybe (SContract name $ unspecifiedChain 0x0) $ asum
   [ do
       ns <- M.lookup name $ CC._enums ctract
       val <- listToMaybe $ fst ns
@@ -249,7 +249,7 @@ createDefaultValue _ (SVMType.Address _) = return $ (SAccount $ unspecifiedChain
 createDefaultValue _ (SVMType.Account _) = return $ (SAccount $ unspecifiedChain (Address 0)) False
 createDefaultValue _ (SVMType.String _) = return $ SString ""
 createDefaultValue _ (SVMType.Bytes _ _) = return $ SString ""
-createDefaultValue ctract (SVMType.UnknownLabel name) =
+createDefaultValue ctract (SVMType.UnknownLabel name _) =
   case (M.lookup name $ CC._enums ctract, M.lookup name $ CC._structs ctract) of
     (Just ((val:_), _), _) -> return $ SEnumVal name val 0x0
     (Nothing, Just sdef) -> do

@@ -28,6 +28,15 @@ statementHelper (IfStatement _ thens mElse _) =
   let ts = concat $ statementHelper <$> thens
       es = concat $ maybe [] (map statementHelper) mElse
    in concat [ts, es]
+statementHelper (TryCatchStatement statements catches _) =
+  let ts = concat $ statementHelper <$> statements
+      cs = concat $ statementHelper <$> concatMap snd (M.toList catches)
+   in concat [ts, cs]
+statementHelper (SolidityTryCatchStatement _ _ successStatements catchesMap _) =
+  let ts = concat $ statementHelper <$> successStatements
+      cs = concat $ statementHelper <$> (concatMap (snd . snd) (M.toList catchesMap))
+   in concat [ts, cs]
+
 statementHelper (WhileStatement _ body _) =
   concat $ statementHelper <$> body
 statementHelper (ForStatement mInit _ _ body a) =
@@ -38,6 +47,7 @@ statementHelper (Block _) = []
 statementHelper (DoWhileStatement body _ _) =
   concat $ statementHelper <$> body
 statementHelper (Continue _) = []
+statementHelper (ModifierExecutor _) = []
 statementHelper (Break _) = []
 statementHelper (Return _ _) = []
 statementHelper (Throw _) = []

@@ -16,6 +16,7 @@ module Blockchain.VM.SolidException
   , parseError
   , require
   , assert
+  , modifierError
   , unknownFunction
   , unknownConstant
   , unknownVariable
@@ -51,6 +52,7 @@ data SolidException = TypeError String String
                     | ArityMismatch String Int Int
                     | ParseError String String
                     | Require (Maybe String)
+                    | ModifierError String String
                     | Assert
                     | UnknownFunction String String
                     | UnknownConstant String String
@@ -80,6 +82,7 @@ showSolidException (MissingField m v) = printf "missing field: %s: %s" m v
 showSolidException (MissingType m v) = printf "missing type: %s: %s" m v
 showSolidException (DuplicateDefinition m v) = printf "duplicate definition: %s: %s" m v
 showSolidException (ParseError m v) = printf "parse error: %s: %s" m v
+showSolidException (ModifierError m v) = printf "modifier error: %s: %s" m v
 showSolidException (Require Nothing) = printf "solidity require failed"
 showSolidException (Require (Just m)) = printf "solidity require failed: %s" m
 showSolidException Assert = printf "solidity assert failed"
@@ -156,6 +159,9 @@ unknownStatement = toThrower UnknownStatement
 
 divideByZero :: (Show v) => v -> a
 divideByZero x = throw $ DivideByZero (show x)
+
+modifierError :: (Show v) => String -> v -> a
+modifierError = toThrower ModifierError
 
 missingCodeCollection :: (Show v) => String -> v -> a
 missingCodeCollection = toThrower MissingCodeCollection

@@ -20,6 +20,7 @@ module Blockchain.DB.X509CertDB (
   , pubToBytes
   , bsToPub
   , verifyCert
+  , verifyCertSignedBy
   , verifyBlockApps
   , X509CertDB(..)
   , HasX509CertDB

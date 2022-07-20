@@ -712,6 +712,23 @@ contract qq {
 }
 |]
     in length anns `shouldBe` 1
+  it "can have the receive() function and succeeds when there are no arguments, no return values, and is Payable and External" $
+    let anns = runTypechecker [r|
+contract A {
+  receive() external payable {
+  }
+}
+|]
+    in length anns `shouldBe` 0
+  it "can throw exception when receive() function has arguments" $
+    let anns = runTypechecker [r|
+contract A {
+  receive(uint i) external payable {
+    uint x = i;
+  }
+}
+|]
+    in length anns `shouldBe` 1
   it "can assign a value to a declared unassigned immutable within the constructor" $
     let anns = runTypechecker [r|
 pragma solidvm 3.2;
@@ -745,6 +762,32 @@ contract qq {
   constructor() public {
     d = g;
   } 
+
+  it "can throw exception when receive() function has return values" $
+    let anns = runTypechecker [r|
+contract A {
+  receive() external payable returns (uint) {
+    uint x = 5;
+    return x;
+  }
+}
+|]
+    in length anns `shouldBe` 1
+
+  it "can throw exception when receive() function is not external" $
+    let anns = runTypechecker [r|
+contract A {
+  receive() internal payable {
+  }
+}
+|]
+    in length anns `shouldBe` 1
+
+  it "can throw exception when receive() function is not payable" $
+    let anns = runTypechecker [r|
+contract A {
+  receive() external {
+  }
 }
 |]
     in length anns `shouldBe` 1
@@ -760,11 +803,33 @@ contract qq {
   }
   function alterConstants(){
     x = 13;
+  it "can throw exception when receive() function is decalred with function keyword" $
+    let anns = runTypechecker [r|
+contract A {
+  function receive() external payable {
   }
 }
 |]
     in length anns `shouldBe` 1
 
+  it "can have the fallback() function and succeeds when there are no arguments, no return values, and is External" $
+    let anns = runTypechecker [r|
+contract A {
+  fallback() external payable {
+  }
+}
+|]
+    in length anns `shouldBe` 0
+
+  it "can throw exception when fallback() function has arguments" $
+    let anns = runTypechecker [r|
+contract A {
+  fallback(uint i) external payable {
+    uint x = i;
+  }
+}
+|]
+    in length anns `shouldBe` 1
 
   it "can use an immutable within a function" $
     let anns = runTypechecker [r|
@@ -782,3 +847,39 @@ contract qq {
 }
 |]
     in length anns `shouldBe` 0
+  it "can throw exception when fallback() function has return values" $
+    let anns = runTypechecker [r|
+contract A {
+  fallback() external payable returns (uint) {
+    uint x = 5;
+    return x;
+  }
+}
+|]
+    in length anns `shouldBe` 1
+
+  it "can throw exception when fallback() function is not external" $
+    let anns = runTypechecker [r|
+contract A {
+   fallback() internal payable {
+  }
+}
+|]
+    in length anns `shouldBe` 1
+
+  it "can throw exception when fallback() function is declared with function keyword" $
+    let anns = runTypechecker [r|
+contract A {
+   function fallback() external payable {
+  }
+}
+|]
+    in length anns `shouldBe` 1
+
+
+
+
+
+
+
+

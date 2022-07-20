@@ -24,10 +24,11 @@ data Type
   = Int {signed::Maybe Bool, bytes::Maybe Int32}
   | String {dynamic::Maybe Bool}
   | Bytes {dynamic::Maybe Bool, bytes:: Maybe Int32}
+  | Fixed {signed::Maybe Bool, decimals::Maybe (Int32,Int32)}
   | Bool
   | Address {isPayable :: Bool}
   | Account {isPayable :: Bool}
-  | UnknownLabel SolidString
+  | UnknownLabel SolidString (Maybe SolidString)
   | Struct { bytes::Maybe Int32, typedef::SolidString}
   | Enum { bytes::Maybe Int32, typedef::SolidString, names::Maybe [SolidString]}
   | Array { entry:: Type, length :: Maybe Word }

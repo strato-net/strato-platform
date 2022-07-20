@@ -13,10 +13,10 @@ export class ProjectActionProvider implements vscode.TreeDataProvider<ProjectAct
       return Promise.resolve([])
     } else {
       return Promise.resolve([
-        new ProjectAction('Create Project', { title: 'Create Project', command: 'strato-vscode.createProject'}),
-        new ProjectAction('Deploy Project', { title: 'Deploy Project', command: 'strato-vscode.deployProject'}),
-        new ProjectAction('Run Project', { title: 'Run Project', command: 'strato-vscode.runServer'}),
-        new ProjectAction('Test Project', { title: 'Test Project', command: 'strato-vscode.testServer'})
+        new ProjectAction('➕ Create Project', { title: 'Create Project', command: 'strato-vscode.createProject'}),
+        new ProjectAction('🚀 Deploy Project', { title: 'Deploy Project', command: 'strato-vscode.deployProject'}),
+        new ProjectAction('▶ Run Project', { title: 'Run Project', command: 'strato-vscode.runServer'}),
+        new ProjectAction('🔨 Test Project', { title: 'Test Project', command: 'strato-vscode.testServer'})
       ])
     }
   }

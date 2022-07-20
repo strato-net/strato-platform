@@ -4,11 +4,14 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { ContractsProvider } from './contracts';
-import { DeploymentsProvider } from './deployments';
+import { CirrusProvider } from './cirrus';
 import { NodesProvider } from './nodes';
 import { ProjectActionProvider } from './project';
 import { activateStratoDebug } from './activateStratoDebug';
 import { subscribeToDocumentChanges } from './diagnostics';
+import { rest, importer } from 'blockapps-rest';
+import { getApplicationUser } from './auth';
+import getConfig from './load.config';
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
@@ -125,18 +128,192 @@ export async function activate(context: vscode.ExtensionContext) {
 	vscode.commands.registerCommand('contracts.refreshEntry', () =>
 		contractsProvider.refresh()
 	);
+	vscode.commands.registerCommand('contracts.createChain', async (element) => {
+		const { nodeId } = element;
+    const user = await getApplicationUser(nodeId);
+    const config = getConfig() || {};
+		const nodeOptions = { config, node: nodeId };
+    const userAddress = await rest.getKey(user, nodeOptions);
+		if (vscode.window.activeTextEditor) {
+		  const doc = vscode.window.activeTextEditor.document;
+      if (doc.uri.path.slice(-4) === '.sol') {
+        let src:any = doc.getText();
+  		  let srcMap = {}
+        const folders = vscode.workspace.workspaceFolders || [];
+        if (folders.length > 0) {
+          const serverPath: string = vscode.workspace.getConfiguration().get('strato-vscode.serverPath') || '';
+          const currentFolder = folders[0]
+  		    const folder = currentFolder.uri.path;
+          // eslint-disable-next-line import/no-mutable-exports
+          const dirPath = `${folder}/${serverPath}`
+          srcMap = await importer.combine(doc.uri.path, true, dirPath);
+          srcMap[importer.getShortName(doc.uri.path)] = doc.getText();
+  		  	src = Object.values(srcMap).reduce((str, fileContents) => `${str}\n${fileContents}`, '');
+        }
+  			try {
+    		  const chainLabel = await vscode.window.showInputBox({
+    		    placeHolder: '',
+    		    prompt: `Enter a value for the chain label: `
+    		  });
+  				if (!chainLabel) return;
+          const { src: xabis } = await rest.postContractsXabi(user, { src }, nodeOptions);
+    		  const xabiKeys = Object.keys(xabis);
+    		  const items = xabiKeys.map((x) => ({ label: x }))
+    		  const quickPickOption = await vscode.window.showQuickPick(items, {
+    		    placeHolder: 'Pick a contract to use as the chain\'s governance contract',
+    		  });
+  				if (!quickPickOption) return;
+  				const contractName = quickPickOption ? quickPickOption.label : xabiKeys[0] || '';
+    		  const govXabi = xabis[contractName] || {};
+    		  let args = {}
+    		  if (govXabi.constr) {
+    		  	const constr = govXabi.constr;
+    		  	const argNames = Object.keys(constr.args || {});
+    		  	for (let i = 0; i < argNames.length; i++) {
+    		      const argInput = await vscode.window.showInputBox({
+    		        placeHolder: '',
+    		        prompt: `Enter a value for ${argNames[i]}: `
+    		      });
+  				    if (!argInput) return;
+    		  		args = { ...args, [argNames[i]]: argInput }
+    		  	}
+    		  }
+          const chainArgs = {
+  		    	label: chainLabel,
+  		    	src: srcMap,
+  		    	args,
+  		    	members: [{"address": userAddress, "enode": "enode://abcd@1.2.3.4:30303"}],
+  		    	balances: [{"address": userAddress, "balance": 100000000000000}],
+  		    }
+  				const contract = { name: contractName }
+  		    const res = await rest.createChain(user, chainArgs, contract, nodeOptions);
+  		    vscode.window.showInformationMessage(`${res}`);
+			  } catch (e) {
+  	  	  vscode.window.showErrorMessage(`${e}`);
+				}
+			} else {
+  		  vscode.window.showErrorMessage(`Please open a Solidity file to begin creating a private chain.`);
+			}
+		} else {
+  		vscode.window.showErrorMessage(`No active text editor found. Please open a Solidity file.`);
+		}
+	});
+	vscode.commands.registerCommand('contracts.uploadContract', async (element) => {
+		const { nodeId, item } = element;
+		const { chainId } = item;
+    const user = await getApplicationUser(nodeId);
+    const config = getConfig() || {};
+		const nodeOptions = { config, node: nodeId };
+		if (vscode.window.activeTextEditor) {
+		  const doc = vscode.window.activeTextEditor.document;
+      if (doc.uri.path.slice(-4) === '.sol') {
+        let src:any = doc.getText();
+		    let srcMap = {}
+        const folders = vscode.workspace.workspaceFolders || [];
+        if (folders.length > 0) {
+          const serverPath: string = vscode.workspace.getConfiguration().get('strato-vscode.serverPath') || '';
+          const currentFolder = folders[0]
+		      const folder = currentFolder.uri.path;
+          // eslint-disable-next-line import/no-mutable-exports
+          const dirPath = `${folder}/${serverPath}`
+          srcMap = await importer.combine(doc.uri.path, true, dirPath);
+          srcMap[importer.getShortName(doc.uri.path)] = doc.getText();
+		    	src = Object.values(srcMap).reduce((str, fileContents) => `${str}\n${fileContents}`, '');
+        }
+			  try {
+          const { src: xabis } = await rest.postContractsXabi(user, { src }, nodeOptions);
+  	  	  const xabiKeys = Object.keys(xabis);
+  	  	  const items = xabiKeys.map((x) => ({ label: x }))
+  	  	  const quickPickOption = await vscode.window.showQuickPick(items, {
+  	  	    placeHolder: 'Pick a contract to upload',
+  	  	  });
+			  	if (!quickPickOption) return;
+			  	const contractName = quickPickOption ? quickPickOption.label : xabiKeys[0] || '';
+  	  	  const govXabi = xabis[contractName] || {};
+  	  	  let args = {}
+  	  	  if (govXabi.constr) {
+  	  	  	const constr = govXabi.constr;
+  	  	  	const argNames = Object.keys(constr.args || {});
+  	  	  	for (let i = 0; i < argNames.length; i++) {
+  	  	      const argInput = await vscode.window.showInputBox({
+  	  	        placeHolder: '',
+  	  	        prompt: `Enter a value for ${argNames[i]}: `
+  	  	      });
+			  	    if (!argInput) return;
+  	  	  		args = { ...args, [argNames[i]]: argInput }
+  	  	  	}
+  	  	  }
+          const uploadArgs = {
+		      	source: srcMap,
+		      	args,
+			  		name: contractName,
+			  		chainid: chainId,
+		      }
+		      const res = await rest.createContract(user, uploadArgs, nodeOptions);
+		      vscode.window.showInformationMessage(`${res}`);
+			  } catch (e) {
+  	  	  vscode.window.showErrorMessage(`${e}`);
+			  }
+			} else {
+  		  vscode.window.showErrorMessage(`Please open a Solidity file to begin uploading a contract.`);
+			}
+		} else {
+  		vscode.window.showErrorMessage(`No active text editor found. Please open a Solidity file.`);
+		}
+	});
+	vscode.commands.registerCommand('contracts.callFunction', async (element) => {
+		const { nodeId, item } = element;
+		const { chainId, contractName, contractAddress, variableName } = item;
+    const user = await getApplicationUser(nodeId);
+    const config = getConfig() || {}
+		const nodeOptions = { config, node: nodeId };
+    const { xabi } = await rest.getContractsContract(user, contractName, contractAddress, chainId, nodeOptions);
+		const func = ((xabi || {}).funcs || {})[variableName]
+		if (variableName && variableName !== 'constructor' && func) {
+			const argNames = Object.keys(func.args || {});
+			let args = {}
+			for (let i = 0; i < argNames.length; i++) {
+		    const argInput = await vscode.window.showInputBox({
+		      placeHolder: '',
+		      prompt: `Enter a value for ${argNames[i]}: `
+		    });
+				if (!argInput) return;
+				args = { ...args, [argNames[i]]: argInput }
+			}
+			try {
+			const contract = { name: contractName, address: contractAddress }
+      const callArgs = {
+				contract,
+				args,
+				method: variableName,
+				chainid: chainId
+			}
+			const res = await rest.call( user, callArgs, nodeOptions);
+			vscode.window.showInformationMessage(`${res}`);
+			} catch (e) {
+			  vscode.window.showErrorMessage(`${e}`);
+			}
+		} else {
+			vscode.window.showErrorMessage(`Could not find a function called ${variableName} in ${contractName} at address ${contractAddress} on chain ${chainId} on node ${nodeId}.`);
+		}
+	});
 	vscode.window.registerTreeDataProvider(
 		'contracts',
 		contractsProvider
 	)
-	const deploymentsProvider = new DeploymentsProvider();
-	vscode.window.registerTreeDataProvider('deployments', deploymentsProvider);
-	vscode.commands.registerCommand('deployments.refreshEntry', () =>
-		deploymentsProvider.refresh()
-	);
+	const cirrusProvider = new CirrusProvider();
+	vscode.window.registerTreeDataProvider('cirrus', cirrusProvider);
+	vscode.commands.registerCommand('cirrus.queryCirrus', async () => {
+		const argInput = await vscode.window.showInputBox({
+		  placeHolder: '',
+		  prompt: `Enter cirrus query`
+		});
+		if (!argInput) return;
+		cirrusProvider.query(argInput);
+	});
 	vscode.window.registerTreeDataProvider(
-		'deployments',
-		deploymentsProvider
+		'cirrus',
+		cirrusProvider
 	)
 	const nodesProvider = new NodesProvider();
 	vscode.window.registerTreeDataProvider('nodes', nodesProvider);
