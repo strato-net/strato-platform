@@ -152,7 +152,7 @@ structDeclaration = do
     reserved "struct"
     structName <- identifier
     structFields <- braces $ many1 $ do
-      (fieldName, VariableDeclaration (SolidVM.VariableDecl decl _ _ _)) <- simpleVariableDeclaration
+      (fieldName, VariableDeclaration (SolidVM.VariableDecl decl _ _ _ _)) <- simpleVariableDeclaration
       return (fieldName, decl)
     pure (structName, structFields)
   return
@@ -204,19 +204,20 @@ usingDeclaration = do
 variableDeclaration :: SolidityParser (String, Declaration)
 variableDeclaration = simpleVariableDeclaration
 
-data StateVariableKeyword = KConstant | KPublic | KPrivate | KInternal
+data StateVariableKeyword = KConstant | KPublic | KPrivate | KInternal | KImmutable
   deriving (Eq, Show, Enum, Ord)
 
 stateVariableKeyword :: SolidityParser StateVariableKeyword
 stateVariableKeyword =
      (try (reserved "constant") >> return KConstant) <|>
+     (try (reserved "immutable") >> return KImmutable) <|>
      (try (reserved "public") >> return KPublic) <|>
      (try (reserved "private") >> return KPrivate) <|>
      (try (reserved "internal") >> return KInternal)
 
 public :: [StateVariableKeyword] -> SolidityParser Bool
 public keywords =
-  let visibilities = nub . filter (/= KConstant) $ keywords
+  let visibilities = nub . filter (\x -> (x /= KConstant) && (x /= KImmutable) ) $ keywords
   in case visibilities of
         (v1:v2:_) -> fail $ printf "multiple visibilities declared: %s vs %s" (show v1) (show v2)
         [KPublic] -> return True
@@ -234,7 +235,6 @@ simpleVariableDeclaration = do
   -- We have to remember which variables are "public", because they
   -- generate accessor functions
   keywords <- many stateVariableKeyword
-  let isConstant = KConstant `elem` keywords
   isPublic <- public keywords
   -- check to see if the "account" variable is being used
   variableName <- identifier
@@ -246,11 +246,13 @@ simpleVariableDeclaration = do
   end <- getSourcePosition
   semi
   let ctx = SourceAnnotation start end ()
-
+  let isImmutable  = KImmutable  `elem` keywords
+  let isConstant   = KConstant  `elem` keywords
   if isConstant
     then return (variableName, ConstantDeclaration $ SolidVM.ConstantDecl variableType isPublic (fromMaybe (parseError "constants must be initialized" variableName) value) ctx)
-    else return (variableName, VariableDeclaration $ SolidVM.VariableDecl variableType isPublic value ctx)
-
+    else if isImmutable
+      then return (variableName, VariableDeclaration $ SolidVM.VariableDecl variableType isPublic value ctx True)
+      else return (variableName, VariableDeclaration $ SolidVM.VariableDecl variableType isPublic value ctx False)
 
 -- | Parses a function definition.
 --
@@ -264,13 +266,13 @@ functionDeclaration = do
     -- Throw an error if the function name is part of secondary reservered words.
     pragmaVersion' <- getPragmaVersion
     when (isReservedWord pragmaVersion' functionName) $ reservedWordError pragmaVersion' functionName
-    xabi <- functionXabi
+    xabi <- functionXabi 
     pure (functionName, xabi)
   cName <- getContractName
   let xabi = xabi'{SolidVM.funcContext = a <> SolidVM.funcContext xabi'}
       tipe = if cName == functionName
-                then ConstructorDeclaration
-                else FuncDeclaration
+                then ConstructorDeclaration 
+                else FuncDeclaration 
   return (functionName, tipe xabi)
 
 functionXabi :: SolidityParser SolidVM.Func

@@ -22,7 +22,7 @@ statements :: SolidityParser [Statement]
 statements = braces $ many statement
 
 statement :: SolidityParser Statement
-statement = do
+statement =
   ifStatement
   <|> whileStatement
   <|> doWhileStatement
@@ -118,7 +118,7 @@ revertStatement = try $ do
   ~(a, (i, e)) <- withPosition $ do
     reserved "revert"
     i <- optionMaybe identifier
-    e <- parens $ choice 
+    e <- parens $ choice
       [
         fmap NamedArgs . braces $ commaSep $ do
           fieldName <- fmap stringToLabel identifier
@@ -347,7 +347,7 @@ inlineAssembly = do
       match "add"
       parens $ do
         src <- identifier
-        void $ comma
+        void comma
         match "32"
         return src
     return $ MloadAdd32 (T.pack dst) (T.pack src)

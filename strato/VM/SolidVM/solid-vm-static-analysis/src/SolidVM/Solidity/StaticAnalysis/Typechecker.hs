@@ -16,7 +16,7 @@ import           Data.Functor.Identity (runIdentity)
 import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as M
-import           Data.Maybe      (catMaybes, fromJust, fromMaybe)
+import           Data.Maybe      --(catMaybes, fromJust, fromMaybe, isJust)
 import qualified Data.Set        as S
 import           Data.Source
 import           Data.String     (IsString, fromString)
@@ -39,6 +39,8 @@ data R = R
   { codeCollection :: Annotated CodeCollectionF
   , contract :: Annotated ContractF
   , function :: Maybe (Annotated FuncF)
+  , funcNamee :: String
+  , immutableValNames :: [(String, Bool)]
   }
 type SSS = StateT (NonEmpty (Maybe Type', M.Map SolidString (Annotated VarDefEntryF))) (Reader R)
 
@@ -625,7 +627,7 @@ contractHelper cc c =
       funcsAndConstr = constr <> _functions c
       varTypes' = reduceType' (_contractContext c) $ varDeclHelper cc c <$> M.elems (_storageDefs c)
       constTypes' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_constants c)
-      funcTypes' = reduceType' (_contractContext c) $ functionHelper cc c <$> M.elems funcsAndConstr
+      funcTypes' = reduceType' (_contractContext c) $ uncurry (functionHelper cc c) <$> M.toList funcsAndConstr 
    in reduceType' (_contractContext c) [varTypes', constTypes', funcTypes']
 
 varDeclHelper :: Annotated CodeCollectionF
@@ -637,7 +639,7 @@ varDeclHelper cc c VariableDecl{..} =
    in case varInitialVal of
         Nothing -> ty
         Just e ->
-          let r = R cc c Nothing
+          let r = R cc c Nothing "Nothing" []
            in runReader (evalStateT (ty ~> tcExpr e) ((Nothing, M.empty) :| [])) r
 
 constDeclHelper :: Annotated CodeCollectionF
@@ -646,17 +648,18 @@ constDeclHelper :: Annotated CodeCollectionF
                 -> Type'
 constDeclHelper cc c ConstantDecl{..} =
   let ty = Static constType constContext
-      r = R cc c Nothing
+      r = R cc c Nothing "Nothing" []
    in runReader (evalStateT (ty ~> tcExpr constInitialVal) ((Nothing, M.empty) :| [])) r
 
 functionHelper :: Annotated CodeCollectionF
                -> Annotated ContractF
+               -> String 
                -> Annotated FuncF
                -> Type'
-functionHelper cc c f@Func{..} = case funcContents of
+functionHelper cc c fName f@Func{..} = case funcContents of
   Nothing -> Function (Product [] funcContext) (Product [] funcContext) funcContext
   Just stmts ->
-    let r = R cc c (Just f)
+    let r = R cc c (Just f) fName (map (\(nameOfVar, varDecl) -> (nameOfVar, Nothing /= varInitialVal varDecl) ) (filter (\(_, varDecl) ->  (isImmutable varDecl ) ) (M.toList $ _storageDefs c) )) -- (if (_constructor c /= Nothing) then " " else  "constructor") --getImmutableVar --(show (maybe M.empty (M.singleton "constructor") $ _constructor c)) --"Function helper work?"
         swap = uncurry $ flip (,)
         args = (\(it,n) -> ( n
                            , VarDefEntry (Just $ indexedTypeType it) Nothing n funcContext
@@ -997,6 +1000,18 @@ simpleStatementHelper x (VariableDefinition vdefs mExpr) = do
 simpleStatementHelper _ (ExpressionStatement expr) =
   tcExpr expr
 
+checkIfImmuteOperationValid :: Annotated ExpressionF  ->  SSS Type'
+checkIfImmuteOperationValid (Variable y a)  = do 
+  thisFuncName  <- asks funcNamee
+  lstImmutNames <- asks immutableValNames
+  let namesOfImmutesOnly = map (\x -> fst x) lstImmutNames
+  let notConstructAndImmuteAissgnedValue = ( thisFuncName /= "constructor") && (a  `elem` namesOfImmutesOnly)
+  let constructorAndImmuteValueOverwritten = ( thisFuncName == "constructor") && ( (a, True)  `elem` lstImmutNames)
+  if notConstructAndImmuteAissgnedValue || constructorAndImmuteValueOverwritten
+    then pure . bottom $ "Immutable assignment error at" <$  y 
+    else tcExpr (Variable y a)
+checkIfImmuteOperationValid a = tcExpr a
+
 tcExpr :: Annotated ExpressionF -> SSS Type'
 tcExpr (Binary x "+" a b) =
   sumType' (intType' x) (stringType' x)  ~> tcExpr a <~> tcExpr b
@@ -1021,15 +1036,15 @@ tcExpr (Binary x "<<" a b) =
 tcExpr (Binary x ">>" a b) =
   intType' x ~> tcExpr a <~> tcExpr b
 tcExpr (Binary x "+=" a b) =
-  sumType' (intType' x) (stringType' x)  ~> tcExpr a <~> tcExpr b
+  sumType' (intType' x) (stringType' x)  ~> (checkIfImmuteOperationValid a) <~> tcExpr b
 tcExpr (Binary x "-=" a b) =
-  intType' x ~> tcExpr a <~> tcExpr b
+  intType' x ~> (checkIfImmuteOperationValid a) <~> tcExpr b
 tcExpr (Binary x "*=" a b) =
-  intType' x ~> tcExpr a <~> tcExpr b
+  intType' x ~> (checkIfImmuteOperationValid a) <~> tcExpr b
 tcExpr (Binary x "/=" a b) =
-  intType' x ~> tcExpr a <~> tcExpr b
+  intType' x ~> (checkIfImmuteOperationValid a) <~> tcExpr b
 tcExpr (Binary x "%=" a b) =
-  intType' x ~> tcExpr a <~> tcExpr b
+  intType' x ~> (checkIfImmuteOperationValid a) <~> tcExpr b
 tcExpr (Binary x "|=" a b) =
   intType' x ~> tcExpr a <~> tcExpr b
 tcExpr (Binary x "&=" a b) =
@@ -1052,8 +1067,10 @@ tcExpr (Binary x ">=" a b) =
   intType' x ~> tcExpr a <~> tcExpr b !> pure (boolType' x)
 tcExpr (Binary x "<=" a b) =
   intType' x ~> tcExpr a <~> tcExpr b !> pure (boolType' x)
-tcExpr (Binary _ _ a b) =
-  tcExpr a <~> tcExpr b
+tcExpr (Binary _ "=" a b) =
+  (checkIfImmuteOperationValid a) <~> tcExpr b
+tcExpr (Binary _ _ a b) = 
+  (tcExpr a <~> tcExpr b)
 tcExpr (PlusPlus x a) = 
   intType' x ~> tcExpr a
 tcExpr (MinusMinus x a) = do

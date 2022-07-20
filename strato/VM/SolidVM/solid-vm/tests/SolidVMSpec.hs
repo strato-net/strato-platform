@@ -134,6 +134,10 @@ anyReservedWordError :: Selector HandledException
 anyReservedWordError (HE Blockchain.SolidVM.Exception.ReservedWordError{}) = True
 anyReservedWordError _ = False
 
+anyImmutableError :: Selector HandledException
+anyImmutableError (HE Blockchain.SolidVM.Exception.ImmutableError{}) = True
+anyImmutableError _ = False
+
 failedRequirementMsg :: String -> Selector HandledException
 failedRequirementMsg str (HE (Require (Just msg))) = str == msg
 failedRequirementMsg _ _ = False
@@ -4381,3 +4385,109 @@ contract qq{
   }
 }|]
     getFields ["weiUnit", "szaboUnit", "finneyUnit", "etherUnit"] `shouldReturn` [BInteger 2, BInteger 2000000000000, BInteger 2000000000000000, BInteger 2000000000000000000]
+
+  it "TEST -1 can assign an a constant at contract level"  . runTest $ do
+    runBS [r|
+contract qq {
+  uint constant c = 2022;
+  constructor() public {
+  }
+}|] 
+    getFields ["c"] `shouldReturn` [BDefault] --- Wait does this return BDefault or Int?
+
+  it "--Test 1 can assign an immutable" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+  uint t1a = 2022;
+  uint immutable t1x = 2022;
+  constructor() public {
+  }
+}|]
+    getFields ["t1a", "t1x"] `shouldReturn` [BInteger 2022, BInteger 2022]
+
+  it "--Test 2 can assign an already declared, but unassigned immutable in a constructor" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+  uint immutable t2a;
+  uint t2x = 2022;
+  constructor() public {
+    t2a = t2x;
+  }
+}|]
+    getFields ["t2a", "t2x"] `shouldReturn` [BInteger 2022, BInteger 2022]
+
+--   fit "--Test 2 can assign an immutable in a constructor, and at creation" . runTest $ do
+--     runBS [r|
+-- pragma solidvm 3.2;
+-- contract qq {
+--   uint g = 2022;
+--   uint immutable d;
+--   constructor() public {
+--     d = g;
+--   }
+-- }|] 
+--     getFields ["d", "g"] `shouldReturn` [BInteger 2022, BInteger 2022]
+
+  it "--Test 4 cannot assign immutable variable more than once" $ runTest (do
+      runBS [r|
+
+contract qq {
+  uint c = 2022;
+  uint immutable x = c;
+  x = 12;
+  constructor() public {
+  }
+}|]) `shouldThrow` anyParseError
+
+
+--   fit "--Test 666 cannot assign an immutable variable in function" $ runTest (do
+--       runBS [r|
+-- contract qq {
+--   account a;
+--   uint c = 2022;
+--   constructor() {
+--     a = account(this);
+--   }
+--   function alterConstants(){
+--     x = 13;
+--   }
+--   uint immutable x =c;
+-- }|]) `shouldThrow` anyImmutableError
+
+-- fit "--Test 6 cannot assign an immutable variable in function" $ runTest (do
+--       runBS [r|
+-- contract qq {
+--   account a;
+--   uint c = 2022;
+ 
+--   constructor() {
+--     a = account(this);
+--   }
+--   function alterConstants(){
+--     x = 13;
+--   }
+--    uint immutable x =c;
+-- }|]) `shouldThrow` anyImmutableError
+-- --     -- Check return of balance
+--     [ BAccount a] <- getFields ["a"]
+--     void $ call2 "alterConstants" "()" (namedAccountToAccount Nothing a) 
+--     getFields ["c", "x"] `shouldReturn` [BInteger 2022, BInteger 13]
+   -- Should throw error 
+  --Test 6
+--   fit "--Test 6  cannot reassign an immutable in function" $ runTest (do
+--       runBS [r|
+--   contract qq {
+--     uint public immutable x;
+--     uint public y;
+  
+--     constructor() public {
+--       x = 2;
+--       y = 3;
+--     }
+--     function myTransfer() returns (uint) {
+--         x = 3;
+--         return x;
+--     }
+-- }|]) `shouldThrow` anyImmutableError 

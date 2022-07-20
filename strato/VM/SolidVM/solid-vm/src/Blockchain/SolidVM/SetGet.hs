@@ -168,6 +168,8 @@ setVal dst@(SReference addressedPath@(AccountPath addr path)) src = do
   putSolidStorageKeyVal' svm3_0 addr path basicSrc
 
 
+setVal (SInteger dst) (SInteger _) = immutableError "Cannot assign immutable or constants after assigned ->" dst -- typeError "Cannot assign immutables after assigned" ("src = " ++ show src ++ ", dst = " ++ show dst)
+
 setVal (SNULL) _ = return ()
 
 
