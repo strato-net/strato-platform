@@ -4417,7 +4417,176 @@ contract qq {
     return 2;
   }
 }|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 2)
+  it "can declare a custom modifier and use it in a contract" $ (runTest $ do
+    (runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  modifier myModifier() {  // line 4
+    require(false);
+    _;
 
+  }
+
+  constructor() public myModifier returns (bool) {
+    return true;
+  }
+}|])) `shouldThrow` failedRequirementNoMsg
+
+
+  it "can declare a custom modifier and use it in a contract" $ (runTest $ do
+    (runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  modifier myModifier() {  // line 4
+    return 7;
+    require(false);
+    _;
+
+  }
+
+  constructor() public myModifier returns (bool) {
+    return true;
+  }
+}|])) `shouldThrow` anyModifierError
+
+
+
+  it "can use a modifier as part of a function" . runTest $ do
+    runCall "decrement" "(1)" [r|
+pragma solidvm 3.3;
+contract qq {
+    // We will use these variables to demonstrate how to use
+    // modifiers.
+    address public host;
+    uint public x = 10;
+    bool public locked;
+
+    constructor() public {
+        // Set the transaction sender as the Host of the contract.
+        host = msg.sender;
+    }
+
+    modifier onlyHost() {
+        require(msg.sender == host, "Not Host");
+
+        _;
+    }
+
+   //Inputs can be passed to a modiier
+    modifier validAddress(address _addr) {
+        require(_addr != address(0), "Not valid address");
+        _;
+    }
+
+    function changeHost(address _newHost) public onlyHost {
+        host = _newHost;
+    }
+
+    // Modifiers can be called before and / or after a function.
+    // This modifier prevents a function from being called while
+    // it is still executing.
+    modifier noReentrancy() {
+        require(!locked, "No reentrancy");
+
+        locked = true;
+        _;
+        locked = false;
+    }
+
+    function decrement(uint i) public noReentrancy returns (uint) {
+        x -= i;
+
+        if (i > 1) {
+          decrement(i - 1);
+        }
+    }
+
+}|] `shouldReturn` Nothing
+
+
+
+
+  it "can use a modifier and require something after and before the function is run" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  uint x = 3;
+  modifier myModifier() {  
+    require(x == 3 , string.concat('x is not 3 : ', string(x)));
+    x = 4;
+    _;
+    require(x == 5 , 'x is not 5');
+  }
+
+  constructor() public myModifier {
+    x = 5;
+    return;
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 5]
+
+  it "can use a modifier multiple modifiers and they occur in order" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  uint x = 3;
+  modifier myModifier() {  
+    require(x == 3 , string.concat('x is not 3 : ', string(x)));
+    x = 4;
+    _;
+    require(x == 5 , 'x is not 5');
+  }
+
+  modifier anotherModifier() {
+    require(x == 4 , string.concat('x is not 4 : ', string(x)));
+    _;
+    require(x == 5 , 'x is not 5');
+  }
+
+  constructor() public myModifier anotherModifier {
+    x = x + 1;
+    return;
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 5]
+
+
+  it "can use a modifier  that takes arguments as part of a function" . runTest $ do
+    runCall "a" "()" [r|
+pragma solidvm 3.3;
+contract qq {
+  uint x = 3;
+  modifier myModifier(uint _x) {  
+    require(_x == 3 , string.concat('x is not 3 : ', string(_x)));
+    x = 4;
+    _;
+    require(x == 5 , 'x is not 5');
+  }
+
+  function a() public myModifier(3) {
+    x = 5;
+    return;
+  }
+}|] `shouldReturn` Nothing
+
+{-
+  it "can use a modifier that takes in arguments" . runTest $ do
+    runBS [r|
+contract qq {
+  uint x = 3;
+  modifier myModifier(uint _x) {  
+    require(_x == 3 , string.concat('x is not 3 : ', string(_x)));
+    x = 4;
+    _;
+    require(x == 5 , 'x is not 5');
+  }
+  constructor() public myModifier(3) {
+    x = 5;
+    return;
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BInteger 5]
+-}
   it "cannot allow negative block number" $ runTest (do
     runBS [r|
 pragma solidvm 3.3;
@@ -4439,7 +4608,32 @@ contract qq {
 }
 |]
     getFields ["hsh"] `shouldReturn` [BString $ word256ToBytes 0x5C0BE87ED7434D69005F8BBD84CAD8AE6ABFD49121B4AAEEB4C1F4A2E2987711]
-    
+  it "return default value for index not present" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+
+  mapping(uint=>bool) booleanTest;
+  mapping(uint=>uint) integerTest;
+  mapping(uint=>string) stringTest;
+
+  bool x;
+  uint y;
+  string z;
+
+  constructor() {
+    booleanTest[1] = true;
+    integerTest[1] = 1;
+    stringTest[1] = "testing";
+
+    x = booleanTest[9];
+    y = integerTest[9];
+    z = stringTest[9];
+  }
+}|]
+    getFields ["x","y","z"] `shouldReturn` [BDefault, BDefault, BDefault]
+
+
   it "can use the builtin ripemd160 function" . runTest $ do
     runBS [r|
 pragma solidvm 3.3;
