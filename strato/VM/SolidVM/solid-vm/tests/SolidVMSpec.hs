@@ -2418,8 +2418,14 @@ contract qq {
 }|]
     getFields ["i"] `shouldReturn` [BInteger 8]
 
-  it "can accept modifiers" $ (runTest $ runBS [r| contract qq { modifier m() { _; } }|])
-    `shouldReturn` ()
+  it "can accept modifiers" $ runTest (do
+      runBS [r| 
+  pragma solidvm 3.3; 
+  contract qq { 
+    modifier m() {
+       _; 
+      } 
+}|]) `shouldReturn` ()
 
   it "catches parse errors" $ (runTest $ runBS [r| contract { |]) `shouldThrow` anyParseError
 
@@ -3814,6 +3820,7 @@ contract qq {
 
   it "can parse an X509 certificate" . runTest $ do
     runBS [r|
+pragma solidvm 3.3;
 contract qq {
 
     string myNewCertificate = "-----BEGIN CERTIFICATE-----\nMIIBiDCCAS2gAwIBAgIQCgO76hC29iXEFXJNco5ekjAMBggqhkjOPQQDAgUAMEYx\nDDAKBgNVBAMMA2RhbjEMMAoGA1UEBgwDVVNBMRIwEAYDVQQKDAlibG9ja2FwcHMx\nFDASBgNVBAsMC2VuZ2luZWVyaW5nMB4XDTIxMDMxODE1NDgwN1oXDTIyMDMxODE1\nNDgwN1owRjEMMAoGA1UEAwwDZGFuMQwwCgYDVQQGDANVU0ExEjAQBgNVBAoMCWJs\nb2NrYXBwczEUMBIGA1UECwwLZW5naW5lZXJpbmcwVjAQBgcqhkjOPQIBBgUrgQQA\nCgNCAAQY4p67l1IIEUdVC7L+rUDwF5Nv30bze0NV5y8ced7qwp+YFk3UAiOGkcYo\n7ba8F92rd0yf9AGpvZN1H3Dda8xdMAwGCCqGSM49BAMCBQADRwAwRAIgbKXO8tZ5\noPhBusPQFkNEQDnLO/MRru4KjtCpPnVb5sACIE0TwBJ7yeIGuPc/8G50/858Pf3a\n0t1hHbhYnJarPkNA\n-----END CERTIFICATE-----";

@@ -2430,12 +2430,13 @@ callBuiltin "registerCert" [SString cert, (SContract "Certificate" na)] _ = do
 
 
 callBuiltin "getUserCert" [SAccount a _] _ = do
+  curContract <- getCurrentContract
   -- TODO remove level db check, use redis instead
   x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
   maybeCertLevelDB <- x509CertDBGet $ _namedAccountAddress a
   let maybeCertBlockDB = M.lookup (_namedAccountAddress a) x509s
       maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
-  return $ certificateMap (fmap (BC.unpack . certToBytes) maybeCert)
+  return $ certificateMap (fmap (BC.unpack . certToBytes) maybeCert) curContract
 
 -- SolidVM built in function that verifies that the root cert is signed by the key
 -- verifyCert checks that the root of a chained cert is signed by the public key.
@@ -2505,37 +2506,60 @@ callBuiltin vs@"verifySignature" [SString msg, SString signature, SString pubkey
       Left err -> malformedData "Could not decode hex string" err
   else unknownFunction "callBuiltin" vs
   
-callBuiltin "parseCert" [SString cert] _ = return $ certificateMap (Just cert)
+callBuiltin "parseCert" [SString cert] _ = do
+  curContract <- getCurrentContract
+  return $ certificateMap (Just cert) curContract
 
 callBuiltin x _ _ = unknownFunction "callBuiltin" x
 
 
 
-certificateMap :: Maybe String -> Value
-certificateMap maybeCert = case maybeCert of
-    Nothing -> SMap stringToString emptyCertMap
-    Just cert -> SMap stringToString (fromMaybe emptyCertMap $ fmap (certMap cert) (subject cert))
+certificateMap :: Maybe String -> CC.Contract -> Value
+certificateMap maybeCert cntrct = 
+    case maybeCert of
+      Nothing -> SMap stringToString emptyCertMap
+      Just cert -> SMap stringToString (fromMaybe emptyCertMap $ fmap (certMap cert) (subject cert))
     where subject cert = getCertSubject =<< (eitherToMaybe . bsToCert . BC.pack $ cert)
-          certMap cert sub = M.fromList [ (SString "commonName", Constant . SString $ subCommonName sub)
-                                   , (SString "country", Constant . SString $ fromMaybe "" $ subCountry sub)
-                                   , (SString "organization", Constant . SString $ subOrg sub)
-                                   , (SString "group", Constant . SString $ fromMaybe "" $ subUnit sub)
-                                   , (SString "organizationalUnit", Constant . SString $ fromMaybe "" $ subUnit sub)
-                                   , (SString "publicKey", Constant . SString $ BC.unpack $ pubToBytes $ subPub sub)
-                                   , (SString "userAddress", Constant . SString $ show $ fromPublicKey $ subPub sub)
-                                   , (SString "certString", Constant . SString $ cert)
-                                   , (SString "parent", Constant . SString $ maybe "0" show (getParentUserAddress =<< (eitherToMaybe . bsToCert . BC.pack $ cert)))
-                                   ]
-          emptyCertMap = M.fromList [ (SString "commonName", Constant . SString $ "")
-                             , (SString "country", Constant . SString $ "")
-                             , (SString "organization", Constant . SString $ "")
-                             , (SString "group", Constant . SString $ "")
-                             , (SString "organizationalUnit", Constant . SString $ "")
-                             , (SString "publicKey", Constant . SString $ "")
-                             , (SString "userAddress", Constant . SString $ "")
-                             , (SString "certString", Constant . SString $ "")
-                             , (SString "parent", Constant . SString $ "")
-                             ]
+          certMap cert sub = if (CC._vmVersion cntrct == "svm3.3")
+                              then M.fromList [ (SString "commonName", Constant . SString $ subCommonName sub)
+                                              , (SString "country", Constant . SString $ fromMaybe "" $ subCountry sub)
+                                              , (SString "organization", Constant . SString $ subOrg sub)
+                                              , (SString "group", Constant . SString $ fromMaybe "" $ subUnit sub)
+                                              , (SString "organizationalUnit", Constant . SString $ fromMaybe "" $ subUnit sub)
+                                              , (SString "publicKey", Constant . SString $ BC.unpack $ pubToBytes $ subPub sub)
+                                              , (SString "userAddress", Constant . SString $ show $ fromPublicKey $ subPub sub)
+                                              , (SString "certString", Constant . SString $ cert)
+                                              , (SString "parent", Constant . SString $ maybe "0" show (getParentUserAddress =<< (eitherToMaybe . bsToCert . BC.pack $ cert)))
+                                              ]
+                              else M.fromList [ (SString "commonName", Constant . SString $ subCommonName sub)
+                                              , (SString "country", Constant . SString $ fromMaybe "" $ subCountry sub)
+                                              , (SString "organization", Constant . SString $ subOrg sub)
+                                              , (SString "group", Constant . SString $ fromMaybe "" $ subUnit sub)
+                                              , (SString "publicKey", Constant . SString $ BC.unpack $ pubToBytes $ subPub sub)
+                                              , (SString "userAddress", Constant . SString $ show $ fromPublicKey $ subPub sub)
+                                              , (SString "certString", Constant . SString $ cert)
+                                              , (SString "parent", Constant . SString $ maybe "0" show (getParentUserAddress =<< (eitherToMaybe . bsToCert . BC.pack $ cert)))
+                                              ]
+          emptyCertMap = if (CC._vmVersion cntrct == "svm3.3")
+                          then M.fromList [ (SString "commonName", Constant . SString $ "")
+                                          , (SString "country", Constant . SString $ "")
+                                          , (SString "organization", Constant . SString $ "")
+                                          , (SString "group", Constant . SString $ "")
+                                          , (SString "organizationalUnit", Constant . SString $ "")
+                                          , (SString "publicKey", Constant . SString $ "")
+                                          , (SString "userAddress", Constant . SString $ "")
+                                          , (SString "certString", Constant . SString $ "")
+                                          , (SString "parent", Constant . SString $ "")
+                                          ]
+                          else M.fromList [ (SString "commonName", Constant . SString $ "")
+                                          , (SString "country", Constant . SString $ "")
+                                          , (SString "organization", Constant . SString $ "")
+                                          , (SString "group", Constant . SString $ "")
+                                          , (SString "publicKey", Constant . SString $ "")
+                                          , (SString "userAddress", Constant . SString $ "")
+                                          , (SString "certString", Constant . SString $ "")
+                                          , (SString "parent", Constant . SString $ "")
+                                          ]
           stringToString = SVMType.Mapping { SVMType.dynamic = Nothing
                                         , SVMType.key = SVMType.String Nothing
                                         , SVMType.value = SVMType.String Nothing }
