@@ -26,7 +26,7 @@ pipeline {
                             sh 'sudo ./strato --compose'
                             }
                         else {
-                            if (env.STRATO_BUILD.contains(".")) {
+                            if (env.STRATO_BUILD.contains(".") && !env.STRATO_BUILD.contains("/")) {
                                 sh "curl -s -L https://github.com/blockapps/strato-getting-started/releases/${env.STRATO_BUILD} | egrep -o '/blockapps/strato-getting-started/releases/download/.*/docker-compose.yml' | wget --base=http://github.com/ -i - -O docker-compose.yml"
                                 }
                             else {
