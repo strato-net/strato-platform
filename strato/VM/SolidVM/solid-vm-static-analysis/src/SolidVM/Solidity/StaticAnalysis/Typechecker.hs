@@ -1098,14 +1098,17 @@ simpleStatementHelper _ (ExpressionStatement expr) =
 
 checkIfImmuteOperationValid :: Annotated ExpressionF  ->  SSS Type'
 checkIfImmuteOperationValid (Variable y a)  = do 
-  thisFuncName  <- asks functName
   lstImmutNames <- asks immutableValNames
-  let namesOfImmutesOnly = map (\x -> fst x) lstImmutNames
-  let notConstructAndImmuteAissgnedValue = ( thisFuncName /= "constructor") && (a  `elem` namesOfImmutesOnly)
-  let constructorAndImmuteValueOverwritten = ( thisFuncName == "constructor") && ( (a, True)  `elem` lstImmutNames)
-  if notConstructAndImmuteAissgnedValue || constructorAndImmuteValueOverwritten
-    then pure . bottom $ "Immutable assignment error at" <$  y 
-    else tcExpr (Variable y a)
+  if null lstImmutNames
+    then tcExpr (Variable y a)
+    else do
+      thisFuncName  <- asks functName
+      let namesOfImmutesOnly = map (\x -> fst x) lstImmutNames
+      let notConstructAndImmuteAissgnedValue = ( thisFuncName /= "constructor") && (a  `elem` namesOfImmutesOnly)
+      let constructorAndImmuteValueOverwritten = ( thisFuncName == "constructor") && ( (a, True)  `elem` lstImmutNames)
+      if notConstructAndImmuteAissgnedValue || constructorAndImmuteValueOverwritten
+      then pure . bottom $ "Immutable assignment error at" <$  y 
+      else tcExpr (Variable y a)
 checkIfImmuteOperationValid a = tcExpr a
 
 tcExpr :: Annotated ExpressionF -> SSS Type'
