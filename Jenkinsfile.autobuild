@@ -42,7 +42,7 @@ pipeline {
             withCredentials([
                 usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER')
             ]) {
-              archiveArtifacts artifacts: "docker-compose.yml"
+              //archiveArtifacts artifacts: "docker-compose.yml"
               sh '''#!/bin/bash -le
                 set -x
                 
