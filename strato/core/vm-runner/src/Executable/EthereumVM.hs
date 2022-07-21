@@ -367,6 +367,7 @@ runChainConstructors cId cInfo = do
          (Just $ M.fromList $
            [ ("args", fromMaybe "()" (M.lookup "args" . chainMetadata $ chainInfo cInfo))
            , ("funcName", "<constructor>")
+           , ("history", fromMaybe "" (M.lookup "history" . chainMetadata $ chainInfo cInfo))
            ]
            ++ case ms of Nothing -> []; Just s -> [("src", s)])
 
