@@ -22,13 +22,7 @@ pipeline {
 
     stage('Build') {
       steps {
-        sh 'rm -rf .docker-work'
-        sh 'REPO=private make all'
-        sh 'rm -rf .docker-work'
-        dir ('blockapps-rest') {
-          sh 'yarn install --pure-lockfile'
-          sh 'yarn build'
-        }
+        echo 'skipped'
       }
     }
 
@@ -37,41 +31,6 @@ pipeline {
       steps {
           sh '''#!/bin/bash -le
             set -x
-            rm -rf strato-getting-started
-            git clone https://github.com/blockapps/strato-getting-started
-            cp docker-compose.yml strato-getting-started/
-            cd strato-getting-started
-            export NODE_HOST=$(</host)
-            export genesis=smokeTest
-            export BLOC_DEBUG=true
-            export SLIPSTREAM_OPTIONAL=false
-            export OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration
-            export OAUTH_CLIENT_ID=dev
-            export OAUTH_CLIENT_SECRET=d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f
-            export PASSWORD=123
-            ./strato --single
-            docker ps
-            # Few quick tests
-            check_availability() {
-              counter=0
-              until curl --silent --fail --location ${NODE_HOST}/health | jq .healthInfo.isHealthy | grep true
-              do
-                if [[ "$counter" -gt 120 ]]; then
-                  echo "STRATO node took longer than 2 minutes to initialize! aborting."
-                  exit 73
-                fi
-                echo "waiting for STRATO health endpoint to be available through nginx"
-                counter=$((counter+1))
-                sleep 1
-              done
-              echo "STRATO health endpoint is available through nginx - node is running"
-            }
-            check_availability
-            echo "Restarting docker containers to simulate computer restart..."
-            docker-compose -p strato --log-level ERROR stop
-            docker-compose -p strato --log-level ERROR start
-            PASSWORD=${PASSWORD} ./strato --set-password
-            check_availability
           '''
       }
     }
@@ -86,8 +45,7 @@ pipeline {
               archiveArtifacts artifacts: "docker-compose.yml"
               sh '''#!/bin/bash -le
                 set -x
-                docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
-                docker-compose --log-level ERROR -f docker-compose.push.yml push 2>&1
+                
               '''
             }
           },
@@ -95,17 +53,14 @@ pipeline {
           'Apex tests': {
             sh '''#!/bin/bash -le
               set -x
-              echo "Running apex unit tests"
-              APEX_CONTAINER=$(docker ps --format '{{.Names}}' | grep apex_1)
-              docker exec -t -e NODE_ENV=test "$APEX_CONTAINER" ./run-tests.sh
+             
             '''
           },
 
           'Strato unit tests': {
             sh '''#!/bin/bash -le
               set -x
-              echo "Running unit tests"
-              ./run_unit_tests.sh
+              
             '''
           },
 /*
@@ -161,9 +116,7 @@ pipeline {
           'SMD tests': {
             sh '''#!/bin/bash -le
               set -x
-              echo 'Running SMD tests'
-              cd smd-ui
-              docker build -f Dockerfile.test .
+             
             '''
           },
 
@@ -174,19 +127,6 @@ pipeline {
 
               sh '''#!/bin/bash -le
                 set -x
-                # Re-cloning the repo might be redundant but we'll follow same approach as other tests. And the docker rebuild should be quick with docker layer caches.
-                rm -rf strato-api-tests
-                git clone -b develop https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git
-                cd strato-api-tests
-                # git checkout strato-2483-registercert-caller # Replace with custom branch here if made changes to API and strato-api-tests repo code
-                docker build --tag strato-api-tests .
-                docker run \
-                  -e OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \
-                  -e OAUTH_CLIENT_ID=dev \
-                  -e OAUTH_CLIENT_SECRET=d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f \
-                  -e STRATO_NODE_URL=http://172.17.0.1:80 \
-                  -e DEBUG_LOG=false \
-                  strato-api-tests
               '''
             }
           },
@@ -194,18 +134,13 @@ pipeline {
           'BA-Rest Tests': {
             sh '''#!/bin/bash -le
               set -x
-              echo "Running ba-rest E2E tests"
-              cd blockapps-rest
-              DOCKER_HOST=172.17.0.1 # on "Docker for Mac" use "docker.for.mac.localhost" special reserved ip instead
-              docker build -f Dockerfile.test --build-arg host=${DOCKER_HOST} --no-cache .
             '''
           },
 
           'Integration tests' : {
             dir ('tests') {
-              sh 'rm -rf node_modules'
-              sh 'npm install'
-              sh 'npm run test'
+              echo 'skipped'
+              currentBuild.result = 'UNSTABLE'
             }
           },
         )
@@ -215,37 +150,37 @@ pipeline {
   }
 
   post {
-    always {
-      dir ('strato-getting-started') {
-        sh 'rm -rf strato_logs*'
-        sh './fetchlogs --as-dir'
-        archiveArtifacts artifacts: 'strato_logs/**', fingerprint: true
-      }
-    }
+//    always {
+//      dir ('strato-getting-started') {
+//        sh 'rm -rf strato_logs*'
+//        sh './fetchlogs --as-dir'
+//        archiveArtifacts artifacts: 'strato_logs/**', fingerprint: true
+//      }
+//    }
+//
+//    success {
+//      slackSend (
+//        color: 'good',
+//        message: "Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL}) on node ${env.NODE_NAME}"
+//      )
+//    }
 
-    success {
-      slackSend (
-        color: 'good',
-        message: "Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL}) on node ${env.NODE_NAME}"
-      )
-    }
-
-    failure {
-      slackSend (
-        color: 'danger',
-        message: "Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL} on node ${env.NODE_NAME})"
-      )
-
-
-      script {
-        if (env.BRANCH_NAME == 'develop') {
-          slackSend(
-              channel: '#engineering',
-              color: 'danger',
-              message: "Develop branch build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL} on node ${env.NODE_NAME})"
-          )
-        }
-      }
-    }
+//    failure {
+//      slackSend (
+//        color: 'danger',
+//        message: "Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL} on node ${env.NODE_NAME})"
+//      )
+//
+//
+//      script {
+//        if (env.BRANCH_NAME == 'develop') {
+//          slackSend(
+//              channel: '#engineering',
+//              color: 'danger',
+//              message: "Develop branch build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL} on node ${env.NODE_NAME})"
+//          )
+//        }
+//      }
+//    }
   }
 }
