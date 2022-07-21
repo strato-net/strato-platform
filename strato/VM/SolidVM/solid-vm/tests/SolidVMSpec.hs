@@ -4841,7 +4841,7 @@ contract qq is Validator {
   }
 }
 |]
-    getFields ["empty_is_empty", "nonempty_is_empty"] `shouldReturn` [BBool True, BDefault]
+    getFields ["empty_is_empty", "nonempty_is_empty"] `shouldReturn` [BBool True, BBool False]
 
 
   it "can run this for loop and increment the counter" . runTest $ do
