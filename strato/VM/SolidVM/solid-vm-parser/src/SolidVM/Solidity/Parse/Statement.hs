@@ -92,7 +92,7 @@ solidityTryCatchStatement = do
         (Nothing , Nothing ) -> pure ("Nill", Nothing)
         _ -> fail "catch statement must have a valid identifier such as 'Error' or 'Panic'"
       pure (i, (tps, ss))
-    pure (e, mReturns, sms, catchs)s
+    pure (e, mReturns, sms, catchs)
   pure $ SolidityTryCatchStatement tryExpression returnsDecl statementsForSuccess (Map.fromList catchArr) a
 
 tupleDeclaration' :: SolidityParser [(String, SVMType.Type)]
