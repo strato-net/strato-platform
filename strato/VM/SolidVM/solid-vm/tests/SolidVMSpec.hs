@@ -4844,3 +4844,15 @@ contract qq is Validator {
     getFields ["empty_is_empty", "nonempty_is_empty"] `shouldReturn` [BBool True, BDefault]
 
 
+  it "can run this for loop and increment the counter" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq{
+  uint mynum = 0;
+  constructor() public {
+    for (uint i=0; i < 10; i = i + 1) {
+      mynum = i;
+    }
+  }
+}|]
+    getFields ["mynum"] `shouldReturn` [BInteger 9]
