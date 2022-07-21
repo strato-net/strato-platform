@@ -4805,6 +4805,7 @@ contract qq{
   constructor() public {
     addToNum(1);
     addToNum(1, 2);
+    addToNum(1, 2, 3);
   }
 
   function addToNum(uint x) {
@@ -4814,5 +4815,9 @@ contract qq{
   function addToNum(uint x, uint y) {
     myNum += x + y;
   }
+
+  function addToNum(uint x, uint y, uint z) {
+    myNum += x + y + z;
+  }
 }|]
-    getFields ["myNum"] `shouldReturn` [BInteger 4]
+    getFields ["myNum"] `shouldReturn` [BInteger 8]
