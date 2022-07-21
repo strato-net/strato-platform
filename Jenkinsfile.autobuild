@@ -140,7 +140,9 @@ pipeline {
           'Integration tests' : {
             dir ('tests') {
               echo 'skipped'
-              currentBuild.result = 'UNSTABLE'
+              script {
+                currentBuild.result = 'UNSTABLE'
+              }
             }
           },
         )
