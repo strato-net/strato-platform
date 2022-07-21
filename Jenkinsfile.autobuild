@@ -149,7 +149,7 @@ pipeline {
 
   }
 
-  post {
+//  post {
 //    always {
 //      dir ('strato-getting-started') {
 //        sh 'rm -rf strato_logs*'
@@ -182,5 +182,5 @@ pipeline {
 //        }
 //      }
 //    }
-  }
+//  }
 }
