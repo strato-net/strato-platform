@@ -192,6 +192,7 @@ revertStatement = try $ do
 location :: SolidityParser (Maybe Location)
 location = optionMaybe $ asum [ reserved "memory" >> return Memory
                               , reserved "storage" >> return Storage
+                              , reserved "calldata" >> return Calldata 
                               ]
 
 varDefEntry :: SolidityParser (Maybe Type) -> SolidityParser VarDefEntry
