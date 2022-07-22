@@ -7,7 +7,6 @@ module SolidVM.Solidity.StaticAnalysis.Typechecker
   ( detector
   ) where
 
--- import           Blockchain.SolidVM.Exception
 import           Control.Applicative ((<|>))
 import           Control.Arrow ((&&&))
 import           Control.Monad.Reader
@@ -192,9 +191,6 @@ productType' x ts = case reduceType' x ts of
   Bottom es -> Bottom es
   _ -> Product ts x
 
--- argTypes = Product {productTypes = [Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" }], productContext = (line 6, column 5) - (line 6, column 13): "" }
--- valTypes = Product {productTypes = [], productContext = (line 6, column 5) - (line 6, column 13): "" }
--- overloads = [Function {functionArgType = Product {productTypes = [Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" },Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" }], productContext = (line 6, column 5) - (line 6, column 13): "" }, functionReturnType = Product {productTypes = [], productContext = (line 6, column 5) - (line 6, column 13): "" }, functionContext = (line 16, column 3) - (line 16, column 37): "" , functionOverloads = []},Function {functionArgType = Product {productTypes = [Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" },Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" },Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" }], productContext = (line 6, column 5) - (line 6, column 13): "" }, functionReturnType = Product {productTypes = [], productContext = (line 6, column 5) - (line 6, column 13): "" }, functionContext = (line 20, column 3) - (line 20, column 45): "" , functionOverloads = []}]
 apply' :: Type' -> Type' -> [Type'] -> Type' -> SSS Type'
 apply' argTypes valTypes overloads args = do
   p <- typecheck argTypes args
@@ -205,8 +201,6 @@ apply' argTypes valTypes overloads args = do
                         (x:xs) -> apply' (functionArgType x) (functionReturnType x) xs args
     _ -> pure $ valTypes
 
--- e = Function {functionArgType = Product {productTypes = [Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" }], productContext = (line 6, column 5) - (line 6, column 13): "" }, functionReturnType = Product {productTypes = [], productContext = (line 6, column 5) - (line 6, column 13): "" }, functionContext = (line 6, column 5) - (line 6, column 13): "" , functionOverloads = [Function {functionArgType = Product {productTypes = [Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" },Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" }], productContext = (line 6, column 5) - (line 6, column 13): "" }, functionReturnType = Product {productTypes = [], productContext = (line 6, column 5) - (line 6, column 13): "" }, functionContext = (line 16, column 3) - (line 16, column 37): "" , functionOverloads = []},Function {functionArgType = Product {productTypes = [Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" },Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" },Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" }], productContext = (line 6, column 5) - (line 6, column 13): "" }, functionReturnType = Product {productTypes = [], productContext = (line 6, column 5) - (line 6, column 13): "" }, functionContext = (line 20, column 3) - (line 20, column 45): "" , functionOverloads = []}]}
--- a = Product {productTypes = [Static {staticType = Int {signed = Nothing, bytes = Nothing}, staticContext = (line 6, column 14) - (line 6, column 15): "" },Static {staticType = Int {signed = Nothing, bytes = Nothing}, staticContext = (line 6, column 17) - (line 6, column 18): "" }], productContext = (line 6, column 13) - (line 6, column 19): "" }
 apply :: Type' -> Type' -> SSS Type'
 apply (Bottom es) (Bottom ess) = pure $ Bottom (es <> ess)
 apply (Bottom es) _            = pure $ Bottom es
@@ -908,7 +902,6 @@ getVarType' "block" ctx = pure $ Static (SVMType.UnknownLabel "block" Nothing) c
 getVarType' "super" ctx = pure $ Static (SVMType.UnknownLabel "super" Nothing) ctx
 getVarType' name ctx = getVarTypeByName' (stringToLabel name) ctx
 
--- sssssssssss
 getVarTypeByName' :: SolidString -> SourceAnnotation Text -> SSS Type'
 getVarTypeByName' name ctx = do
   mVar <- foldr (lookupVar . snd) Nothing <$> get
@@ -1136,9 +1129,6 @@ tcExpr (IndexAccess _ a Nothing) = tcExpr a
 tcExpr (MemberAccess _ a fieldName) = do
   t <- tcExpr a
   typecheckMember t fieldName
--- e = Function {functionArgType = Product {productTypes = [Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" }], productContext = (line 6, column 5) - (line 6, column 13): "" }, functionReturnType = Product {productTypes = [], productContext = (line 6, column 5) - (line 6, column 13): "" }, functionContext = (line 6, column 5) - (line 6, column 13): "" , functionOverloads = [Function {functionArgType = Product {productTypes = [Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" },Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" }], productContext = (line 6, column 5) - (line 6, column 13): "" }, functionReturnType = Product {productTypes = [], productContext = (line 6, column 5) - (line 6, column 13): "" }, functionContext = (line 16, column 3) - (line 16, column 37): "" , functionOverloads = []},Function {functionArgType = Product {productTypes = [Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" },Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" },Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" }], productContext = (line 6, column 5) - (line 6, column 13): "" }, functionReturnType = Product {productTypes = [], productContext = (line 6, column 5) - (line 6, column 13): "" }, functionContext = (line 20, column 3) - (line 20, column 45): "" , functionOverloads = []}]}
--- a = Product {productTypes = [Static {staticType = Int {signed = Nothing, bytes = Nothing}, staticContext = (line 6, column 14) - (line 6, column 15): "" },Static {staticType = Int {signed = Nothing, bytes = Nothing}, staticContext = (line 6, column 17) - (line 6, column 18): "" }], productContext = (line 6, column 13) - (line 6, column 19): "" }
--- expr = Variable (line 6, column 5) - (line 6, column 13): ""  "addToNum"
 tcExpr (FunctionCall x expr args) = do
   e <- tcExpr expr
   a <- case args of
