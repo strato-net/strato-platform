@@ -7,6 +7,7 @@ module SolidVM.Solidity.StaticAnalysis.Typechecker
   ( detector
   ) where
 
+-- import           Blockchain.SolidVM.Exception
 import           Control.Applicative ((<|>))
 import           Control.Arrow ((&&&))
 import           Control.Monad.Reader
@@ -61,6 +62,7 @@ data TypeF' a = Top { topName :: (S.Set SolidString)
               | Function { functionArgType :: TypeF' a
                          , functionReturnType :: TypeF' a
                          , functionContext :: a
+                         , functionOverloads :: [TypeF' a]
                          }
   deriving (Eq, Show, Functor)
 
@@ -105,11 +107,11 @@ showType' (Sum ts) = T.concat
                        , T.intercalate " | " $ showType' <$> NE.toList ts
                        , ")"
                        ]
-showType' (Function a (Product [] _) _) =
+showType' (Function a (Product [] _) _ _) =
   T.concat [ "function "
            , showType' a
            ]
-showType' (Function a r _) =
+showType' (Function a r _ _) =
   T.concat [ "function ("
            , showType' a
            , " returns "
@@ -160,7 +162,7 @@ lookupContractFunction x cName fName = do
             ]) <$ x
           Just VariableDecl{..} ->
             if varIsPublic
-              then pure $ Function (Product [] x) (Static varType x) x
+              then pure $ Function (Product [] x) (Static varType x) x []
               else pure . bottom $ (T.concat
                 [ "Contract variable "
                 , labelToText cName
@@ -181,7 +183,7 @@ lookupContractFunction x cName fName = do
           ]) <$ x
         _ -> let fArgs = flip Product x $ flip Static x . indexedTypeType . snd <$> funcArgs
                  fRets = flip Product x $ flip Static x . indexedTypeType . snd <$> funcVals
-              in pure $ Function fArgs fRets x
+              in pure $ Function fArgs fRets x []
 
 productType' :: SourceAnnotation Text -> [Type'] -> Type'
 productType' _ [Bottom es] = Bottom es
@@ -190,21 +192,28 @@ productType' x ts = case reduceType' x ts of
   Bottom es -> Bottom es
   _ -> Product ts x
 
-apply' :: Type' -> Type' -> Type' -> SSS Type'
-apply' argTypes valTypes args = do
+-- argTypes = Product {productTypes = [Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" }], productContext = (line 6, column 5) - (line 6, column 13): "" }
+-- valTypes = Product {productTypes = [], productContext = (line 6, column 5) - (line 6, column 13): "" }
+-- overloads = [Function {functionArgType = Product {productTypes = [Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" },Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" }], productContext = (line 6, column 5) - (line 6, column 13): "" }, functionReturnType = Product {productTypes = [], productContext = (line 6, column 5) - (line 6, column 13): "" }, functionContext = (line 16, column 3) - (line 16, column 37): "" , functionOverloads = []},Function {functionArgType = Product {productTypes = [Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" },Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" },Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" }], productContext = (line 6, column 5) - (line 6, column 13): "" }, functionReturnType = Product {productTypes = [], productContext = (line 6, column 5) - (line 6, column 13): "" }, functionContext = (line 20, column 3) - (line 20, column 45): "" , functionOverloads = []}]
+apply' :: Type' -> Type' -> [Type'] -> Type' -> SSS Type'
+apply' argTypes valTypes overloads args = do
   p <- typecheck argTypes args
-  pure $ case (p, valTypes) of
-    (Bottom es, Bottom ess) -> Bottom (es <> ess)
-    (Bottom es, _) -> Bottom es
-    _ -> valTypes
+  case (p, valTypes) of
+    (Bottom es, Bottom ess) -> pure $ Bottom (es <> ess)
+    (Bottom es, _) -> case overloads of
+                        [] -> pure $ Bottom es
+                        (x:xs) -> apply' (functionArgType x) (functionReturnType x) xs args
+    _ -> pure $ valTypes
 
+-- e = Function {functionArgType = Product {productTypes = [Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" }], productContext = (line 6, column 5) - (line 6, column 13): "" }, functionReturnType = Product {productTypes = [], productContext = (line 6, column 5) - (line 6, column 13): "" }, functionContext = (line 6, column 5) - (line 6, column 13): "" , functionOverloads = [Function {functionArgType = Product {productTypes = [Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" },Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" }], productContext = (line 6, column 5) - (line 6, column 13): "" }, functionReturnType = Product {productTypes = [], productContext = (line 6, column 5) - (line 6, column 13): "" }, functionContext = (line 16, column 3) - (line 16, column 37): "" , functionOverloads = []},Function {functionArgType = Product {productTypes = [Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" },Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" },Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" }], productContext = (line 6, column 5) - (line 6, column 13): "" }, functionReturnType = Product {productTypes = [], productContext = (line 6, column 5) - (line 6, column 13): "" }, functionContext = (line 20, column 3) - (line 20, column 45): "" , functionOverloads = []}]}
+-- a = Product {productTypes = [Static {staticType = Int {signed = Nothing, bytes = Nothing}, staticContext = (line 6, column 14) - (line 6, column 15): "" },Static {staticType = Int {signed = Nothing, bytes = Nothing}, staticContext = (line 6, column 17) - (line 6, column 18): "" }], productContext = (line 6, column 13) - (line 6, column 19): "" }
 apply :: Type' -> Type' -> SSS Type'
 apply (Bottom es) (Bottom ess) = pure $ Bottom (es <> ess)
 apply (Bottom es) _            = pure $ Bottom es
 apply _ (Bottom ess)           = pure $ Bottom ess
-apply (Function argTypes valTypes _) args = apply' argTypes valTypes args
+apply (Function argTypes valTypes _ overloads) args = apply' argTypes valTypes overloads args
 apply (Sum types@(t :| _)) args =
-  let isFunction (Function _ _ _) = True
+  let isFunction (Function _ _ _ _) = True
       isFunction _ = False
    in pickType' (context' t) <$> traverse (flip apply args) (filter isFunction $ NE.toList types)
 apply x _ = pure . bottom $ "trying to apply function to a non-function type" <$ context' x
@@ -308,14 +317,14 @@ typecheck' f r1 r2 = case (r1, r2) of
   (Product xs x, MultiVariate a _) -> typecheckProduct f x xs (replicate (length xs) a)
   (MultiVariate a _, b) -> typecheck' f a b
   (a, MultiVariate b _) -> typecheck' f a b
-  (Function a1 v1 x, Function a2 v2 _) -> do
+  (Function a1 v1 x _, Function a2 v2 _ _) -> do
     a <- typecheck' f a1 a2
     v <- typecheck' f v1 v2
     pure $ case (a, v) of
       (Bottom es, Bottom ess) -> Bottom (es <> ess)
       (Bottom es, _) -> Bottom es
       (_, Bottom ess) -> Bottom ess
-      _ -> Function a v x
+      _ -> Function a v x []
   (a, b) -> pure . bottom $ (T.concat
               [ "could not match types "
               , showType' a
@@ -509,12 +518,12 @@ typecheckMember :: Type' -> SolidString -> SSS Type'
 typecheckMember (Bottom es) _ = pure $ Bottom es
 typecheckMember (Sum ts'@(t :| _)) n = pickType' (context' t) <$> traverse (flip typecheckMember n) (NE.toList ts')
 typecheckMember (Static (SVMType.Array _ _) x) "length" = pure $ Static (SVMType.Int Nothing Nothing) x
-typecheckMember (Static (SVMType.Array t _) x) "push" = pure $ Function (Static t x) (Product [] x) x
+typecheckMember (Static (SVMType.Array t _) x) "push" = pure $ Function (Static t x) (Product [] x) x []
 typecheckMember (Static (SVMType.Array _ _) x) n = pure . bottom $ ("Unknown member of SVMType.Array: " <> labelToText n) <$ x
 typecheckMember (Static (SVMType.Bytes _ _) x) "length" = pure $ Static (SVMType.Int Nothing Nothing) x
-typecheckMember (Static (SVMType.UnknownLabel "Util" Nothing) x) "bytes32ToString" = pure $ Function (Static (SVMType.Bytes Nothing (Just 32)) x) (Static (SVMType.String Nothing) x) x
-typecheckMember (Static (SVMType.UnknownLabel "Util" Nothing) x) "b32" = pure $ Function (Static (SVMType.Bytes Nothing (Just 32)) x) (Static (SVMType.Bytes Nothing (Just 32)) x) x
-typecheckMember (Static (SVMType.UnknownLabel "string" Nothing) x) "concat" = pure $ Function (stringConcatArgs x) (Static (SVMType.String Nothing) x) x
+typecheckMember (Static (SVMType.UnknownLabel "Util" Nothing) x) "bytes32ToString" = pure $ Function (Static (SVMType.Bytes Nothing (Just 32)) x) (Static (SVMType.String Nothing) x) x []
+typecheckMember (Static (SVMType.UnknownLabel "Util" Nothing) x) "b32" = pure $ Function (Static (SVMType.Bytes Nothing (Just 32)) x) (Static (SVMType.Bytes Nothing (Just 32)) x) x []
+typecheckMember (Static (SVMType.UnknownLabel "string" Nothing) x) "concat" = pure $ Function (stringConcatArgs x) (Static (SVMType.String Nothing) x) x []
 typecheckMember (Static (SVMType.UnknownLabel "msg" Nothing) x) "sender" = pure $ Static (SVMType.Account False) x 
 typecheckMember (Static (SVMType.UnknownLabel "tx" Nothing) x) "origin" = pure $ Static (SVMType.Account False) x 
 typecheckMember (Static (SVMType.UnknownLabel "tx" Nothing) x) "username" = pure $ Static (SVMType.String Nothing) x
@@ -539,7 +548,7 @@ typecheckMember (Static (SVMType.UnknownLabel "super" Nothing) x) method = do
         Just Func{..} ->
           let fArgs = flip Product x $ flip Static x . indexedTypeType . snd <$> funcArgs
               fRets = flip Product x $ flip Static x . indexedTypeType . snd <$> funcVals
-           in pure $ Function fArgs fRets x
+           in pure $ Function fArgs fRets x []
 typecheckMember (Static e@(SVMType.Enum _ enum mNames) x) n = do
   names <- case mNames of
     Just names -> pure names
@@ -555,8 +564,8 @@ typecheckMember (Static e@(SVMType.Enum _ enum mNames) x) n = do
 
 -- Function: argType, returnType, contextType
 -- Static: argType, ContextType
-typecheckMember (Static (SVMType.Account True ) x) "transfer" = pure $ Function (Static (SVMType.Int Nothing Nothing) x) (Product [] x) x
-typecheckMember (Static (SVMType.Account True ) x) "send" = pure $ Function (Static (SVMType.Int Nothing Nothing) x) (Static (SVMType.Bool) x) x
+typecheckMember (Static (SVMType.Account True ) x) "transfer" = pure $ Function (Static (SVMType.Int Nothing Nothing) x) (Product [] x) x []
+typecheckMember (Static (SVMType.Account True ) x) "send" = pure $ Function (Static (SVMType.Int Nothing Nothing) x) (Static (SVMType.Bool) x) x []
 typecheckMember (Static (SVMType.Account _) x) "balance" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Account _) x) "code" = pure $ Static (SVMType.Bytes Nothing Nothing) x
 typecheckMember (Static (SVMType.Account _) x) "codehash" = pure $ Static (SVMType.String Nothing) x
@@ -610,10 +619,10 @@ getConstructorType' x l  = do
         Just _ -> pure $ Top (S.singleton l) x
 
     Just c -> case _constructor c of
-      Nothing -> pure $ Function (Product [] x) (Static (SVMType.Contract l) x) x
+      Nothing -> pure $ Function (Product [] x) (Static (SVMType.Contract l) x) x []
       Just Func{..} ->
         let fArgs = flip Product x $ flip Static x . indexedTypeType . snd <$> funcArgs
-         in pure $ Function fArgs (Static (SVMType.Contract l) x) x
+         in pure $ Function fArgs (Static (SVMType.Contract l) x) x []
 
 
 
@@ -674,7 +683,7 @@ functionHelper :: Annotated CodeCollectionF
                -> Annotated FuncF
                -> Type'
 functionHelper cc c f@Func{..} = case funcContents of
-  Nothing -> Function (Product [] funcContext) (Product [] funcContext) funcContext
+  Nothing -> Function (Product [] funcContext) (Product [] funcContext) funcContext []
   Just stmts ->
     let r = R cc c (Just f)
         swap = uncurry $ flip (,)
@@ -704,7 +713,7 @@ statementsHelper args ss = do
         cCalls <- for (M.assocs $ funcConstructorCalls f) $ \(cName, exprs) -> do
           let constructorArgs = getConstructorType' x cName 
               givenArgs = flip Product x <$> traverse tcExpr exprs
-              givenFunc = (\t-> Function t (Static (SVMType.Contract cName) x) x) <$> givenArgs
+              givenFunc = (\t-> Function t (Static (SVMType.Contract cName) x) x []) <$> givenArgs
           constructorArgs <~> givenFunc
         stmts' <- traverse statementHelper ss
         pure $ concat [stmts', cCalls]
@@ -854,51 +863,52 @@ parseCertArgs x = stringType' x
 getVarType' :: String -> SourceAnnotation Text -> SSS Type'
 getVarType' "this" ctx = pure $ Static (SVMType.Account False) ctx
 getVarType' s@('u':'i':'n':'t':n) ctx = case n of
-  [] -> pure $ Function (intArgs ctx) (Static (SVMType.Int (Just False) Nothing) ctx) ctx
+  [] -> pure $ Function (intArgs ctx) (Static (SVMType.Int (Just False) Nothing) ctx) ctx []
   _ -> case readMaybe n of
-    Just n' -> pure $ Function (intArgs ctx) (Static (SVMType.Int (Just False) (Just n')) ctx) ctx
+    Just n' -> pure $ Function (intArgs ctx) (Static (SVMType.Int (Just False) (Just n')) ctx) ctx []
     Nothing -> getVarTypeByName' (stringToLabel s) ctx
 getVarType' s@('i':'n':'t':n) ctx = case n of
-  [] -> pure $ Function (intArgs ctx) (Static (SVMType.Int (Just True) Nothing) ctx) ctx
+  [] -> pure $ Function (intArgs ctx) (Static (SVMType.Int (Just True) Nothing) ctx) ctx []
   _ -> case readMaybe n of
-    Just n' -> pure $ Function (intArgs ctx) (Static (SVMType.Int (Just True) (Just n')) ctx) ctx
+    Just n' -> pure $ Function (intArgs ctx) (Static (SVMType.Int (Just True) (Just n')) ctx) ctx []
     Nothing -> getVarTypeByName' (stringToLabel s) ctx
-getVarType' "address" ctx =  pure $ Function (addressArgs ctx) (Static (SVMType.Account False) ctx) ctx
-getVarType' "account" ctx =  pure $ Function (accountArgs ctx) (Static (SVMType.Account False) ctx) ctx
+getVarType' "address" ctx =  pure $ Function (addressArgs ctx) (Static (SVMType.Account False) ctx) ctx []
+getVarType' "account" ctx =  pure $ Function (accountArgs ctx) (Static (SVMType.Account False) ctx) ctx []
 --This is either the string() function or the string.member() function
-getVarType' "string" ctx =  pure $ Sum $ (Function (stringArgs ctx) (stringType' ctx) ctx) :| [Static (SVMType.UnknownLabel "string" Nothing) ctx]
-getVarType' "bool" ctx =  pure $ Function (boolArgs ctx) (boolType' ctx) ctx
+getVarType' "string" ctx =  pure $ Sum $ (Function (stringArgs ctx) (stringType' ctx) ctx []) :| [Static (SVMType.UnknownLabel "string" Nothing) ctx]
+getVarType' "bool" ctx =  pure $ Function (boolArgs ctx) (boolType' ctx) ctx []
 getVarType' s@('b':'y':'t':'e':'s':n) ctx = case n of
-  [] -> pure $ Function (byteArgs ctx) (Static (SVMType.Bytes Nothing Nothing) ctx) ctx
+  [] -> pure $ Function (byteArgs ctx) (Static (SVMType.Bytes Nothing Nothing) ctx) ctx []
   _ -> case readMaybe n of
-    Just n' -> pure $ Function (byteArgs ctx) (Static (SVMType.Bytes Nothing (Just n')) ctx) ctx
+    Just n' -> pure $ Function (byteArgs ctx) (Static (SVMType.Bytes Nothing (Just n')) ctx) ctx []
     Nothing -> getVarTypeByName' (stringToLabel s) ctx
-getVarType' "byte" ctx =  pure $ Function (byteArgs ctx) (intType' ctx) ctx
-getVarType' "push" ctx =  pure $ Function (topType' ctx) (Product [] ctx) ctx
-getVarType' "identity" ctx =  pure $ Function (topType' ctx) (topType' ctx) ctx
-getVarType' "keccak256" ctx =  pure $ Function (keccak256Args ctx) (stringType' ctx) ctx
-getVarType' "sha256" ctx =  pure $ Function (sha256Args ctx) (stringType' ctx) ctx
-getVarType' "ripemd160" ctx =  pure $ Function (ripemd160Args ctx) (stringType' ctx) ctx
-getVarType' "selfdestruct" ctx = pure $ Function (selfdestructArgs ctx) (boolType' ctx) ctx 
-getVarType' "require" ctx =  pure $ Function (requireArgs ctx) (Product [] ctx) ctx
-getVarType' "assert" ctx =  pure $ Function (assertArgs ctx) (Product [] ctx) ctx
-getVarType' "registerCert" ctx =  pure $ Function (registerCertArgs ctx) (accountType' ctx) ctx
-getVarType' "verifyCert" ctx =  pure $ Function (verifyCertArgs ctx) (boolType' ctx) ctx
-getVarType' "verifyCertSignedBy" ctx =  pure $ Function (verifyCertSignedByArgs ctx) (boolType' ctx) ctx
-getVarType' "verifySignature" ctx =  pure $ Function (verifySignatureArgs ctx) (boolType' ctx) ctx
-getVarType' "getUserCert" ctx =  pure $ Function (getUserCertArgs ctx) (certType' ctx) ctx
-getVarType' "addmod" ctx =  pure $ Function (addmodArgs ctx) (intType' ctx) ctx
-getVarType' "mulmod" ctx =  pure $ Function (mulmodArgs ctx) (intType' ctx) ctx
-getVarType' "payable" ctx =  pure $ Function (payableArgs ctx) (Static (SVMType.Account True) ctx) ctx
-getVarType' "blockhash" ctx = pure $ Function (blockhashArgs ctx) (stringType' ctx) ctx
-getVarType' "parseCert" ctx =  pure $ Function (parseCertArgs ctx) (certType' ctx) ctx
+getVarType' "byte" ctx =  pure $ Function (byteArgs ctx) (intType' ctx) ctx []
+getVarType' "push" ctx =  pure $ Function (topType' ctx) (Product [] ctx) ctx []
+getVarType' "identity" ctx =  pure $ Function (topType' ctx) (topType' ctx) ctx []
+getVarType' "keccak256" ctx =  pure $ Function (keccak256Args ctx) (stringType' ctx) ctx []
+getVarType' "sha256" ctx =  pure $ Function (sha256Args ctx) (stringType' ctx) ctx []
+getVarType' "ripemd160" ctx =  pure $ Function (ripemd160Args ctx) (stringType' ctx) ctx []
+getVarType' "selfdestruct" ctx = pure $ Function (selfdestructArgs ctx) (boolType' ctx) ctx  []
+getVarType' "require" ctx =  pure $ Function (requireArgs ctx) (Product [] ctx) ctx []
+getVarType' "assert" ctx =  pure $ Function (assertArgs ctx) (Product [] ctx) ctx []
+getVarType' "registerCert" ctx =  pure $ Function (registerCertArgs ctx) (accountType' ctx) ctx []
+getVarType' "verifyCert" ctx =  pure $ Function (verifyCertArgs ctx) (boolType' ctx) ctx []
+getVarType' "verifyCertSignedBy" ctx =  pure $ Function (verifyCertSignedByArgs ctx) (boolType' ctx) ctx []
+getVarType' "verifySignature" ctx =  pure $ Function (verifySignatureArgs ctx) (boolType' ctx) ctx []
+getVarType' "getUserCert" ctx =  pure $ Function (getUserCertArgs ctx) (certType' ctx) ctx []
+getVarType' "addmod" ctx =  pure $ Function (addmodArgs ctx) (intType' ctx) ctx []
+getVarType' "mulmod" ctx =  pure $ Function (mulmodArgs ctx) (intType' ctx) ctx []
+getVarType' "payable" ctx =  pure $ Function (payableArgs ctx) (Static (SVMType.Account True) ctx) ctx []
+getVarType' "blockhash" ctx = pure $ Function (blockhashArgs ctx) (stringType' ctx) ctx []
+getVarType' "parseCert" ctx =  pure $ Function (parseCertArgs ctx) (certType' ctx) ctx []
 getVarType' "Util" ctx = pure $ Static (SVMType.UnknownLabel "Util" Nothing) ctx
 getVarType' "msg" ctx = pure $ Static (SVMType.UnknownLabel "msg" Nothing) ctx
 getVarType' "tx" ctx = pure $ Static (SVMType.UnknownLabel "tx" Nothing) ctx
 getVarType' "block" ctx = pure $ Static (SVMType.UnknownLabel "block" Nothing) ctx
 getVarType' "super" ctx = pure $ Static (SVMType.UnknownLabel "super" Nothing) ctx
 getVarType' name ctx = getVarTypeByName' (stringToLabel name) ctx
-  
+
+-- sssssssssss
 getVarTypeByName' :: SolidString -> SourceAnnotation Text -> SSS Type'
 getVarTypeByName' name ctx = do
   mVar <- foldr (lookupVar . snd) Nothing <$> get
@@ -916,22 +926,22 @@ getVarTypeByName' name ctx = do
       case mVarDecl of
         Just (e@(SVMType.Enum{}), ctx') -> pure . Sum $
           (Static e ctx') :|
-          [ Function (Static e ctx') (Static e ctx') ctx'
-          , Function (intType' ctx') (Static e ctx') ctx'
+          [ Function (Static e ctx') (Static e ctx') ctx' []
+          , Function (intType' ctx') (Static e ctx') ctx' []
           ]
         Just (s@(SVMType.Struct _ struct), ctx') -> do
           fields <- fmap snd <$> lookupStruct struct
           let fArgs = flip Product ctx $ flip Static ctx <$> fields
           pure . Sum $
             (Static s ctx') :|
-            [ Function fArgs (Static s ctx') ctx'
+            [ Function fArgs (Static s ctx') ctx' []
             ]
         Just (t, ctx') -> pure $ Static t ctx'
         Nothing -> case M.lookup name $ _functions c of
           Just Func{..} ->
             let fArgs = flip Product ctx $ flip Static ctx . indexedTypeType . snd <$> funcArgs
                 fRets = flip Product ctx $ flip Static ctx . indexedTypeType . snd <$> funcVals
-             in pure $ Function fArgs fRets ctx
+             in pure $ Function fArgs fRets ctx $ fmap buildStuff funcOverload
           Nothing -> do
             cc <- asks codeCollection
             pure $ case M.lookup name $ _contracts cc of
@@ -941,11 +951,17 @@ getVarTypeByName' name ctx = do
                  in Sum $ ctrct :|
                         [Function (Sum (Static (SVMType.Account False) ctx :| [ctrct, lbl]))
                            ctrct
-                           ctx]
+                           ctx
+                           []]
               Nothing -> bottom $ ("Unknown variable: " <> labelToText name) <$ ctx
             
   where lookupVar m Nothing = M.lookup name m
         lookupVar _ t       = t
+        buildStuff item = Function { functionArgType = flip Product ctx $ flip Static ctx . indexedTypeType . snd <$> funcArgs item
+                                   , functionReturnType = flip Product ctx $ flip Static ctx . indexedTypeType . snd <$> funcVals item
+                                   , functionContext = funcContext item
+                                   , functionOverloads = []
+                                   }
 
 setVarType' :: SourceAnnotation Text -> SolidString -> Type -> SSS Type'
 setVarType' ctx name ty = state setType'
@@ -1120,6 +1136,9 @@ tcExpr (IndexAccess _ a Nothing) = tcExpr a
 tcExpr (MemberAccess _ a fieldName) = do
   t <- tcExpr a
   typecheckMember t fieldName
+-- e = Function {functionArgType = Product {productTypes = [Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" }], productContext = (line 6, column 5) - (line 6, column 13): "" }, functionReturnType = Product {productTypes = [], productContext = (line 6, column 5) - (line 6, column 13): "" }, functionContext = (line 6, column 5) - (line 6, column 13): "" , functionOverloads = [Function {functionArgType = Product {productTypes = [Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" },Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" }], productContext = (line 6, column 5) - (line 6, column 13): "" }, functionReturnType = Product {productTypes = [], productContext = (line 6, column 5) - (line 6, column 13): "" }, functionContext = (line 16, column 3) - (line 16, column 37): "" , functionOverloads = []},Function {functionArgType = Product {productTypes = [Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" },Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" },Static {staticType = Int {signed = Just False, bytes = Nothing}, staticContext = (line 6, column 5) - (line 6, column 13): "" }], productContext = (line 6, column 5) - (line 6, column 13): "" }, functionReturnType = Product {productTypes = [], productContext = (line 6, column 5) - (line 6, column 13): "" }, functionContext = (line 20, column 3) - (line 20, column 45): "" , functionOverloads = []}]}
+-- a = Product {productTypes = [Static {staticType = Int {signed = Nothing, bytes = Nothing}, staticContext = (line 6, column 14) - (line 6, column 15): "" },Static {staticType = Int {signed = Nothing, bytes = Nothing}, staticContext = (line 6, column 17) - (line 6, column 18): "" }], productContext = (line 6, column 13) - (line 6, column 19): "" }
+-- expr = Variable (line 6, column 5) - (line 6, column 13): ""  "addToNum"
 tcExpr (FunctionCall x expr args) = do
   e <- tcExpr expr
   a <- case args of

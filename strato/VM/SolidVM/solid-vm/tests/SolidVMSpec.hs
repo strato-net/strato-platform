@@ -4803,6 +4803,7 @@ pragma solidvm 3.2;
 contract qq{
   uint myNum = 0;
   constructor() public {
+    addToNum(1, 2);
     addToNum(1);
     addToNum(1, 2);
     addToNum(1, 2, 3);

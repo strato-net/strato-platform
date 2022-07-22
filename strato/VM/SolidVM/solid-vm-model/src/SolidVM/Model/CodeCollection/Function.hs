@@ -79,7 +79,7 @@ data FuncF a = Func
   , funcConstructorCalls :: Map SolidString [(ExpressionF a)]
   , funcModifiers :: [(SolidString, [(ExpressionF a)])]
   , funcContext :: a
-  , funcOverload :: [Func]
+  , funcOverload :: [FuncF a]
   } deriving (Eq,Show,Generic, Functor)
 
 instance ToJSON a => ToJSON (FuncF a)
