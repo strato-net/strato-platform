@@ -100,7 +100,8 @@ tupleDeclaration' = parens $ commaSep $ do
   partType <- simpleTypeExpression
   optional $ reserved "indexed" <|>
              reserved "storage" <|>
-             reserved "memory"
+             reserved "memory" <|>
+             reserved "calldata"
   partName <- option "" identifier
   return (partName, partType)
 
@@ -192,6 +193,7 @@ revertStatement = try $ do
 location :: SolidityParser (Maybe Location)
 location = optionMaybe $ asum [ reserved "memory" >> return Memory
                               , reserved "storage" >> return Storage
+                              , reserved "calldata" >> return Calldata 
                               ]
 
 varDefEntry :: SolidityParser (Maybe Type) -> SolidityParser VarDefEntry

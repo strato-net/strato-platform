@@ -14,6 +14,7 @@ module SolidVM.Model.CodeCollection.Function (
   ModifierF(..),
   Modifier,
   tShow,
+  tShow',
   tRead
   ) where
 
@@ -93,7 +94,14 @@ data Visibility = Private
                 | External
   deriving (Eq,Show,Generic)
 
-instance ToJSON Visibility
+tShow' :: Visibility -> Text
+tShow' Private = "private"
+tShow' Public = "public"
+tShow' Internal = "internal"
+tShow' External = "external"
+
+instance ToJSON Visibility where
+  toJSON = String . tShow'
 instance FromJSON Visibility
 instance Arbitrary Visibility where arbitrary = GR.genericArbitrary GR.uniform
 instance ToSchema Visibility where
