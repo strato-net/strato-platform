@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 
-module Main where
+module Main (main) where
 
 import qualified Data.ByteString                             as B
 import qualified Data.Map                                    as M
@@ -25,11 +25,10 @@ import           Executable.EVMFlags        ()
 
 import qualified Blockchain.SolidVM as SolidVM
 import           EVMRunner
+import           VRunOptions
+import           VM
 
 import           Text.Format
-
-isSVM :: Bool
-isSVM = True
 
 main :: IO ()
 main = do
@@ -43,11 +42,11 @@ main = do
     MP.initializeBlank
     setStateDBStateRoot Nothing MP.emptyTriePtr
 
-    if isSVM
-      then do
-      codeString <- liftIO $ B.readFile filename
-      fmap Right $
-        SolidVM.create
+    case flags_vm of
+      SolidVM -> do
+        codeString <- liftIO $ B.readFile filename
+        fmap Right $
+          SolidVM.create
                 (error "undefined: isRunningTests'")
                 (error "undefined: isHomestead")
                 (error "undefined: preExistingSuicideList")
@@ -63,7 +62,8 @@ main = do
                 emptyHash -- txHash
                 Nothing -- chainId
                 (Just $ M.fromList [("name", "fred")]) -- medadata
-      else runEVM dummyBlockData
+      SolidVM2022 -> error "SolidVM2022 not yet implemented"
+      EVM -> runEVM dummyBlockData
 
   case result of
     Left e -> putStrLn $ show (e::TransactionFailureCause)
