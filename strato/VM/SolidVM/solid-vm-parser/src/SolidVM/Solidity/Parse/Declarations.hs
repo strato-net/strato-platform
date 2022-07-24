@@ -252,9 +252,7 @@ simpleVariableDeclaration = do
   let isConstant   = KConstant  `elem` keywords
   if isConstant
     then return (variableName, ConstantDeclaration $ SolidVM.ConstantDecl variableType isPublic (fromMaybe (parseError "constants must be initialized" variableName) value) ctx)
-    else if isImmutable
-      then return (variableName, VariableDeclaration $ SolidVM.VariableDecl variableType isPublic value ctx True)
-      else return (variableName, VariableDeclaration $ SolidVM.VariableDecl variableType isPublic value ctx False)
+    else return (variableName, VariableDeclaration $ SolidVM.VariableDecl variableType isPublic value ctx isImmutable)
 
 -- | Parses a function definition.
 --

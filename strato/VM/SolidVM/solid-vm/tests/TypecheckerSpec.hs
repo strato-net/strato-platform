@@ -729,18 +729,7 @@ contract A {
 }
 |]
     in length anns `shouldBe` 1
-  it "can assign a value to a declared unassigned immutable within the constructor" $
-    let anns = runTypechecker [r|
-pragma solidvm 3.2;
-contract qq {
-  uint g = 2022;
-  uint immutable d;
-  constructor() public {
-    d = g;
-  }
-}
-|]
-    in length anns `shouldBe` 0
+  
   it "can assign a value to a declared unassigned immutable within the constructor" $
     let anns = runTypechecker [r|
 pragma solidvm 3.2;
@@ -762,7 +751,8 @@ contract qq {
   constructor() public {
     d = g;
   } 
-
+}|]
+    in length anns `shouldBe` 1
   it "can throw exception when receive() function has return values" $
     let anns = runTypechecker [r|
 contract A {
@@ -803,6 +793,10 @@ contract qq {
   }
   function alterConstants(){
     x = 13;
+  }
+}|]
+    in length anns `shouldBe` 1
+
   it "can throw exception when receive() function is decalred with function keyword" $
     let anns = runTypechecker [r|
 contract A {

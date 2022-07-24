@@ -4596,18 +4596,6 @@ contract qq {
   }
 }|]) `shouldThrow` anyInvalidArgumentsError
 
-  it "can use builtin sha256 function" . runTest $ do
-    runBS [r|
-pragma solidvm 3.3;
-contract qq {
-  bytes32 hsh;
-  constructor() public {
-    string username = "uname";
-    hsh = sha256(username);
-  }
-}
-|]
-    getFields ["hsh"] `shouldReturn` [BString $ word256ToBytes 0x5C0BE87ED7434D69005F8BBD84CAD8AE6ABFD49121B4AAEEB4C1F4A2E2987711]
   it "return default value for index not present" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
@@ -4772,17 +4760,6 @@ contract qq {
   }
 }|]
     getFields ["t2a", "t2x"] `shouldReturn` [BInteger 2022, BInteger 2022]
-
-  it "cannot assign immutable variable more than once" $ runTest (do
-      runBS [r|
-
-contract qq {
-  uint c = 2022;
-  uint immutable x = c;
-  x = 12;
-  constructor() public {
-  }
-}|]) `shouldThrow` anyParseError
 
   it "can create salted contract" . runTest $ do
     runBS [r|
