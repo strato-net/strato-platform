@@ -881,7 +881,7 @@ pipeline {
                         returnStdout: true,
                         script: "curl -X 'GET' \
                         'https://${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT}/cirrus/search/Attribute' \
-                        -H "Authorization: Bearer $SERVICE_TOKEN"  \
+                        -H "Authorization: Bearer ${SERVICE_TOKEN}"  \
                         -H 'accept: application/json;charset=utf-8' \
                         -H 'Content-Type: application/json;charset=utf-8' \
                         | jq '.[0] | .address'"
