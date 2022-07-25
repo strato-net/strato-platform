@@ -946,7 +946,7 @@ pipeline {
                     }
                 }
             }
-        }
+        }*/
 
         stage('Upgrade w/ node chain data - Deploy SGS boot') {    
             // agent { label "test-multinode101" } // is default
@@ -1062,7 +1062,7 @@ pipeline {
             }
         }
 
-        stage('Upgrade w/ node chain data - Add new node to private chain') {
+        /*stage('Upgrade w/ node chain data - Add new node to private chain') {
             agent { label "test-multinode101" }
             steps {
                 script {
@@ -1097,7 +1097,7 @@ pipeline {
                         }'"""
                 }
             }
-        }
+        }*/
 
         stage('Upgrade w/ node chain data - Check if Node 5 was added to Chain') {
             agent { label "test-multinode301" }
@@ -1243,7 +1243,7 @@ pipeline {
             }
         }
 
-        stage('Add/Remove Node on an Upgraded Network - Confirm the New Node Accepts Transactions and Syncs') {
+        /*stage('Add/Remove Node on an Upgraded Network - Confirm the New Node Accepts Transactions and Syncs') {
             agent { label "multinode301" }
             steps {
                 script {
@@ -1271,9 +1271,9 @@ pipeline {
                     lib.waitForHealthySync(NODE_DATA.LOAD_TEST_HEALTH_URL)
                 }
             }
-        }
+        }*/
 
-        stage('Add/Remove Node on an Upgraded Network - Vote Out and Remove Node from Network') {
+        /*stage('Add/Remove Node on an Upgraded Network - Vote Out and Remove Node from Network') {
             steps {
                 dir('strato-getting-started') {
                     script{
@@ -1303,7 +1303,7 @@ pipeline {
                     lib.waitForHealthySync(NODE_DATA.LOAD_TEST_HEALTH_URL)
                 }       
             }
-        }
+        }*/
 
         stage('Add/Remove Node on an Upgraded Network - Shut off voted out node') {
             agent { label "multinode102" }
@@ -1323,7 +1323,7 @@ pipeline {
             }
         }
 
-        stage('Add/Remove Node on an Upgraded Network - Confirm Network Syncs after Voted out Node shuts off') {
+        /*stage('Add/Remove Node on an Upgraded Network - Confirm Network Syncs after Voted out Node shuts off') {
             steps {
                 script {
                     def accessToken = sh(
@@ -1346,7 +1346,7 @@ pipeline {
                     lib.waitForHealthySync(NODE_DATA.LOAD_TEST_HEALTH_URL)
                 }      
             }
-        }
+        }*/
 
         /* X509 REGRESSION TESTS - ON HOLD*/
 
