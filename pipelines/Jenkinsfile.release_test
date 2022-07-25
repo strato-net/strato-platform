@@ -1092,9 +1092,13 @@ pipeline {
             // agent { label "multinode101" } // is default
             steps {
                 script {
-                    sh "createChains=$(sudo docker exec beanstalk_backend_1 npm run deploy:csv)"
-                    sh "export -f createChains"
-                    sh "timeout 60s bash -c createChains"
+                    def createChains = sh(
+                        returnStdout: true,
+                        script: "sudo timeout 60s docker exec beanstalk_backend_1 npm run deploy:csv"
+                    ).trim
+                    // sh "createChains=$(sudo docker exec beanstalk_backend_1 npm run deploy:csv)"
+                    // sh "export -f createChains"
+                    // sh "timeout 60s bash -c createChains"
                 }
             }
         }
