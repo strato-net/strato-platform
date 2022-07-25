@@ -96,8 +96,16 @@ solidityContract = do
         map (Text.pack . fst) baseConstrs
       )
   where
-    parseOverloads _ new old = old{SolidVM.funcOverload = SolidVM.funcOverload old ++ [new]}
-
+    parseOverloads _ new old = do
+      let oldParamTypes = fmap getVarType $ SolidVM.funcArgs old
+          newParamTypes = fmap getVarType $ SolidVM.funcArgs new
+      if (oldParamTypes == newParamTypes)
+        then invalidArguments ("Function is already defined with similar params.") $ SolidVM.funcArgs old
+        else
+          old{SolidVM.funcOverload = SolidVM.funcOverload old ++ [new]}
+      where
+        getVarType argDec = case argDec of
+          (_, vt) -> vt
 
 
 --  where -- constants = byMutability True (repeat 0)

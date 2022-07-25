@@ -1916,35 +1916,12 @@ expToVar' (CC.FunctionCall _ e args) = do
             contract' <- getCurrentContract
             address <- getCurrentAccount
             (hsh, cc) <- getCurrentCodeCollection
-            -- func = Func {funcArgs = [(Just "x",IndexedType {indexedTypeIndex = 0, indexedTypeType = Int {signed = Just False, bytes = Nothing}})], funcVals = [], funcStateMutability = Nothing, funcContents = Just [SimpleStatement (ExpressionStatement (Binary (line 13, column 11) - (line 13, column 14): ()  "+=" (Variable (line 13, column 5) - (line 13, column 11): ()  "myNum") (Variable (line 13, column 14) - (line 13, column 15): ()  "x"))) (line 13, column 5) - (line 13, column 15): () ], funcVisibility = Just Public, funcConstructorCalls = fromList [], funcModifiers = [], funcContext = (line 12, column 3) - (line 12, column 29): () , funcOverload = [Func {funcArgs = [(Just "x",IndexedType {indexedTypeIndex = 0, indexedTypeType = Int {signed = Just False, bytes = Nothing}}),(Just "y",IndexedType {indexedTypeIndex = 1, indexedTypeType = Int {signed = Just False, bytes = Nothing}})], funcVals = [], funcStateMutability = Nothing, funcContents = Just [SimpleStatement (ExpressionStatement (Binary (line 17, column 11) - (line 17, column 14): ()  "+=" (Variable (line 17, column 5) - (line 17, column 11): ()  "myNum") (Binary (line 17, column 16) - (line 17, column 18): ()  "+" (Variable (line 17, column 14) - (line 17, column 16): ()  "x") (Variable (line 17, column 18) - (line 17, column 19): ()  "y")))) (line 17, column 5) - (line 17, column 19): () ], funcVisibility = Just Public, funcConstructorCalls = fromList [], funcModifiers = [], funcContext = (line 16, column 3) - (line 16, column 37): () , funcOverload = []},Func {funcArgs = [(Just "x",IndexedType {indexedTypeIndex = 0, indexedTypeType = Int {signed = Just False, bytes = Nothing}}),(Just "y",IndexedType {indexedTypeIndex = 1, indexedTypeType = Int {signed = Just False, bytes = Nothing}}),(Just "z",IndexedType {indexedTypeIndex = 2, indexedTypeType = Int {signed = Just False, bytes = Nothing}})], funcVals = [], funcStateMutability = Nothing, funcContents = Just [SimpleStatement (ExpressionStatement (Binary (line 21, column 11) - (line 21, column 14): ()  "+=" (Variable (line 21, column 5) - (line 21, column 11): ()  "myNum") (Binary (line 21, column 20) - (line 21, column 22): ()  "+" (Binary (line 21, column 16) - (line 21, column 18): ()  "+" (Variable (line 21, column 14) - (line 21, column 16): ()  "x") (Variable (line 21, column 18) - (line 21, column 20): ()  "y")) (Variable (line 21, column 22) - (line 21, column 23): ()  "z")))) (line 21, column 5) - (line 21, column 23): () ], funcVisibility = Just Public, funcConstructorCalls = fromList [], funcModifiers = [], funcContext = (line 20, column 3) - (line 20, column 45): () , funcOverload = []}]}
-            -- argVals = OrderedVals [SInteger 1,SInteger 2]
-            -- mapArgs = [("x",(Int {signed = Just False, bytes = Nothing},SInteger 1)),("y",(Int {signed = Just False, bytes = Nothing},SInteger 2))]
-            -- funcArgs = [(Just "x",IndexedType {indexedTypeIndex = 0, indexedTypeType = Int {signed = Just False, bytes = Nothing}})]
-            -- args = OrderedArgs [NumberLiteral (line 6, column 14) - (line 6, column 15): ()  1 Nothing,NumberLiteral (line 6, column 17) - (line 6, column 18): ()  2 Nothing]
-            -- let mapArgs = case argVals of
-            --       OrderedVals vs -> let argMeta = 
-            --                               map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t))
-            --                               $ CC.funcArgs func
-            --                         in zipWith (\(n, t) v -> (n, (t, v))) argMeta vs
-            --       NamedVals ns ->
-            --         let strTypes = M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ CC.funcArgs func
-            --             typeAndVal = M.merge (M.mapMissing (curry $ invalidArguments "missing argument"))
-            --                                 (M.mapMissing (curry $ invalidArguments "extra argument"))
-            --                                 (M.zipWithMatched $ \_k t v -> (t, v))
-            --                                 strTypes
-            --                                 $ M.fromList ns
-            --             -- These probably don't need to be sorted by argument index, as they are turned into a map
-            --             -- when added to the call info.
-            --             sortedArgs = map snd . sortWith fst
-            --                       . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
-            --                       $ M.toList typeAndVal
-            --         in sortedArgs
-            -- when (True) (internalError "either this works or something's really stinky" mapArgs)
 
             let matchingFuncOverloads = filter overloadFilter $ CC.funcOverload func
+            -- when (funcName == "addToNum") (internalError "Hey Siri, please tell me what's wrong with me." matchingFuncOverload)
             res <- case matchingFuncOverloads of
               [] -> runTheCall address contract' funcName hsh cc func argVals ro
-              _ -> runTheCall address contract' funcName hsh cc (head matchingFuncOverloads) argVals ro
+              _ -> runTheCall address contract' funcName hsh cc (head matchingFuncOverload) argVals ro
             return . Constant . fromMaybe SNULL $ res
             where
               something theFunc = case argVals of

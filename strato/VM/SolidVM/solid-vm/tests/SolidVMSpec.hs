@@ -4865,7 +4865,7 @@ contract qq{
 }|]
     getFields ["myNum"] `shouldReturn` [BInteger 8]
     
-  it "should catch invalid function overloads" . runTest $ do
+  it "should catch invalid function overloads" $ runTest (do
     runBS [r|
 pragma solidvm 3.3;
 contract qq{
@@ -4878,11 +4878,10 @@ contract qq{
     myNum += x - y;
   }
 
-  function addToNum(uint x, uint y) {
-    myNum += x + y;
+  function addToNum(uint a, uint b) {
+    myNum += a + b;
   }
-}|]
-    getFields ["myNum"] `shouldReturn` [BInteger 8]
+}|]) `shouldThrow` anyInvalidArgumentsError
 
   it "can pass calldata arguments and use calldata variables" . runTest $ do
     runBS [r|
