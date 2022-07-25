@@ -893,21 +893,7 @@ pipeline {
                         -H \"Authorization: Bearer ${SERVICE_TOKEN}\"  \
                         -H 'Accept: application/json;charset=utf-8' \
                         -H 'Content-Type: application/json;charset=utf-8' \
-                        -d '{\"txs\": [
-                                    {
-                                        \"payload\": {
-                                            \"contractName\": \"Attribute\",
-                                            \"contractAddress\": "${ATTRIBUTE_CONTRACT_ADDRESS}",
-                                            \"method\": \"deleteContract\",
-                                            \"args\": {}
-                                        },
-                                        \"type\": \"FUNCTION\"
-                                    }
-                                   ],
-                            "txParams": {
-                                "gasLimit": 32100000000,
-                                "gasPrice": 1
-                            }}'"
+                        -d '{\"txs\": [{\"payload\": {\"contractName\": \"Attribute\",\"contractAddress\": "${ATTRIBUTE_CONTRACT_ADDRESS}",\"method\": \"deleteContract\",\"args\": {}},\"type\": \"FUNCTION\"}],\"txParams\": {\"gasLimit\": 32100000000,\"gasPrice\": 1}}'"
                         ).trim()
                     if (!response.contains("Only the attribute's owner can delete the attribute")) {
                         sh 'exit 1'
