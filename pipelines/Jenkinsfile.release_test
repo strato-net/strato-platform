@@ -886,7 +886,7 @@ pipeline {
                         -H 'Content-Type: application/json;charset=utf-8' \
                         | jq '.[0] | .address')
 
-                    response=${(curl -X 'POST' \
+                    response=$(curl -X 'POST' \
                         'https://${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT}/strato/v2.3/transaction/parallel?resolve=true' \
                         -H "Authorization: Bearer $SERVICE_TOKEN"  \
                         -H 'accept: application/json;charset=utf-8' \
@@ -906,7 +906,7 @@ pipeline {
                             "txParams": {
                                 "gasLimit": 32100000000,
                                 "gasPrice": 1
-                            }}')}
+                            }}')
                     if [[ $response != *"Only the attribute's owner can delete the attribute"* ]]; then
                       exit 1
                     fi
