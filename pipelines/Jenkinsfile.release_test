@@ -804,7 +804,7 @@ pipeline {
             }
         }
 
-        stage ('Redeployed Contract Test - Run app on secondary nodes') {
+        /*stage ('Redeployed Contract Test - Run app on secondary nodes') {
             parallel {
                 stage('Run app on multinode102') {
                 agent { label "multinode102" }
