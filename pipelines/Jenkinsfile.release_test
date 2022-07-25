@@ -879,16 +879,16 @@ pipeline {
                     }
                     def ATTRIBUTE_CONTRACT_ADDRESS = sh(
                         returnStdout: true,
-                        script: curl -X 'GET' \
+                        script: "curl -X 'GET' \
                         'https://${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT}/cirrus/search/Attribute' \
                         -H "Authorization: Bearer $SERVICE_TOKEN"  \
                         -H 'accept: application/json;charset=utf-8' \
                         -H 'Content-Type: application/json;charset=utf-8' \
-                        | jq '.[0] | .address'
+                        | jq '.[0] | .address'"
                         ).trim()
                     def response = sh(
                         returnStdout: true,
-                        script: curl -X 'POST' \
+                        script: "curl -X 'POST' \
                         'https://${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT}/strato/v2.3/transaction/parallel?resolve=true' \
                         -H "Authorization: Bearer $SERVICE_TOKEN"  \
                         -H 'accept: application/json;charset=utf-8' \
@@ -908,7 +908,7 @@ pipeline {
                             "txParams": {
                                 "gasLimit": 32100000000,
                                 "gasPrice": 1
-                            }}'
+                            }}'"
                         ).trim()
                     if (!response.contains("Only the attribute's owner can delete the attribute")) {
                         sh 'exit 1'
