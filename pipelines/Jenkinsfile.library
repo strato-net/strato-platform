@@ -4,6 +4,7 @@ def cleanNode(wipeVault = null) {
   sh 'sudo docker system prune -f --volumes || true'
 }
 
+/*
 def deployStrato(nodeData) {
   sh "sudo rm -rf strato-getting-started"
   unstash 'stratoGettingStarted'
@@ -84,10 +85,13 @@ def deployStrato(nodeData) {
     return nodeAddress
   }
 }
+*/
 
 /*
 rootNodeAddress: null for root node or public address of root node for secondary nodes
  */
+
+/*
 def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelease) {
   sh "sudo rm -rf strato-getting-started"
   if(useLatestStratoRelease) {
@@ -180,7 +184,9 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
     return nodeAddress
   }
 }
+*/
 
+/*
 def runAppBootNode(nodeData, wipeApp = null, refspec = null, postgresViewsPrefix = null, appName) {
   withCredentials([
       usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME'),
@@ -308,6 +314,7 @@ docker-compose up -d --build
     }
   }
 }
+*/
 
 def runAppSecondaryNode(nodeData, wipeApp = null, refspec = null, postgresViewsPrefix = null) {
   withCredentials([
