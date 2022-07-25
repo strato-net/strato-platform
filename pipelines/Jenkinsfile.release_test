@@ -957,7 +957,7 @@ pipeline {
             }            
         }
 
-        stage('Upgrade w/ node chain data - Launch other nodes') {
+        /*stage('Upgrade w/ node chain data - Launch other nodes') {
             parallel {
                 stage('Deploy SGS multinode102') {
                     agent { label "test-multinode102" }
@@ -1201,7 +1201,7 @@ pipeline {
 
         /* Add/Remove Node on an Upgraded Network */
 
-        stage('Add/Remove Node on an Upgraded Network - Vote in 5th Node') {
+        /*stage('Add/Remove Node on an Upgraded Network - Vote in 5th Node') {
             // agent { label "multinode101" } // is default
             steps {
                 dir('strato-getting-started') {
@@ -1467,7 +1467,7 @@ pipeline {
             }
         }
 
-        stage('Sync Network To Devnet') {
+        /*stage('Sync Network To Devnet') {
             parallel {
                 stage('Sync multinode101') {
                     // agent { label "multinode101" } // is default
