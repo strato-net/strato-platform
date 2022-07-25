@@ -4817,9 +4817,9 @@ contract qq {
 }|]
     getFields ["myNum", "otherNum", "errorCount"] `shouldReturn` [BInteger 3, BInteger 12, BInteger 1]
 
-  it "allows overloading functions" . runTest $ do
+  it "allows overloading functions with different number of parameters" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+pragma solidvm 3.3;
 contract qq{
   uint myNum = 0;
   constructor() public {
@@ -4829,20 +4829,61 @@ contract qq{
     addToNum(1, 2, 3);
   }
 
-  function addToNum(uint x) {
-    myNum += x;
-  }
-
   function addToNum(uint x, uint y) {
     myNum += x + y;
+  }
+
+  function addToNum(uint x) {
+    myNum += x;
   }
 
   function addToNum(uint x, uint y, uint z) {
     myNum += x + y + z;
   }
 }|]
+    getFields ["myNum"] `shouldReturn` [BInteger 13]
+
+  it "allows overloading functions with same number of parameters" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq{
+  uint myNum = 0;
+  bool status = true;
+  constructor() public {
+    addToNum(1, false);
+    addToNum(1, 2);
+  }
+
+  function addToNum(uint x, uint y) {
+    myNum += x;
+    status = y;
+  }
+
+  function addToNum(uint x, bool y) {
+    myNum += x + y;
+  }
+}|]
     getFields ["myNum"] `shouldReturn` [BInteger 8]
     
+  it "should catch invalid function overloads" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq{
+  uint myNum = 0;
+  constructor() public {
+    addToNum(1, 2);
+  }
+
+  function addToNum(uint x, uint y) {
+    myNum += x - y;
+  }
+
+  function addToNum(uint x, uint y) {
+    myNum += x + y;
+  }
+}|]
+    getFields ["myNum"] `shouldReturn` [BInteger 8]
+
   it "can pass calldata arguments and use calldata variables" . runTest $ do
     runBS [r|
 
