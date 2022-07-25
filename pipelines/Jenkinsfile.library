@@ -316,6 +316,7 @@ docker-compose up -d --build
 }
 */
 
+/*
 def runAppSecondaryNode(nodeData, wipeApp = null, refspec = null, postgresViewsPrefix = null) {
   withCredentials([
       usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME'),
@@ -421,6 +422,7 @@ docker-compose up -d --build
     }
   }
 }
+*/
 
 def getServiceToken(nodeData) {
   script {
