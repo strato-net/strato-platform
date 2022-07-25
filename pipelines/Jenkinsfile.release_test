@@ -865,7 +865,7 @@ pipeline {
             }
         }
 
-        stage ('Redeployed Contract Test') {
+        /*stage ('Redeployed Contract Test') {
             // agent { label "multinode101" } // is default
             steps {
                 script {
@@ -900,7 +900,7 @@ pipeline {
                     }
                 }
             }
-        }
+        }*/
 
         /* Upgrade with single node chain data */
         stage('Upgrade w/ node chain data - Clean all nodes') {
