@@ -903,7 +903,7 @@ pipeline {
         }*/
 
         /* Upgrade with single node chain data */
-        stage('Upgrade w/ node chain data - Clean all nodes') {
+        /*stage('Upgrade w/ node chain data - Clean all nodes') {
             parallel {
                 stage('Clean test-multinode101') {
                     // agent { label "test-multinode101" } // is default
