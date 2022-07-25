@@ -931,7 +931,7 @@ def waitForCirrus() {
 //   }
 // }
 
-def createContractAndGetContractAddress(NODE_HOST, NODE_PORT) {
+def createContractAndGetContractAddress(NODE_HOST, NODE_PORT, SERVICE_TOKEN) {
  script {
   CONTRACT_ADDRESS=$(curl "https://${NODE_HOST}:${NODE_PORT}/strato/v2.3/transaction?resolve=true" \
     -X 'POST' \
@@ -958,7 +958,7 @@ def createContractAndGetContractAddress(NODE_HOST, NODE_PORT) {
  }
 }
 
-def getContractBlockNumber(NODE_HOST, NODE_PORT, CONTRACT_ADDRESS) {
+def getContractBlockNumber(NODE_HOST, NODE_PORT, CONTRACT_ADDRESS, SERVICE_TOKEN) {
  script {
   BLOCK_NUMBER=$(curl -X 'GET' \
     "https://${NODE_HOST}:${NODE_PORT}/cirrus/search/SimpleStorage?address=eq.${CONTRACT_ADDRESS}" \

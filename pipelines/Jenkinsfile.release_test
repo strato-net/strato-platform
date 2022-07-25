@@ -870,10 +870,10 @@ pipeline {
             steps {
                 script {
                     SERVICE_TOKEN = lib.getServiceToken(NODE_DATA.NODE1)
-                    FIRST_CONTRACT_ADDRESS = lib.createContractAndGetContractAddress(NODE_DATA.NODE1.HOST, NODE_DATA.NODE1.PORT)
-                    SECOND_CONTRACT_ADDRESS = lib.createContractAndGetContractAddress(NODE_DATA.NODE1.HOST, NODE_DATA.NODE1.PORT)
-                    FIRST_BLOCK_NUMBER = lib.getContractBlockNumber(NODE_DATA.NODE1.HOST, NODE_DATA.NODE1.PORT, FIRST_CONTRACT_ADDRESS)
-                    SECOND_BLOCK_NUMBER = lib.getContractBlockNumber(NODE_DATA.NODE1.HOST, NODE_DATA.NODE1.PORT, SECOND_CONTRACT_ADDRESS)
+                    FIRST_CONTRACT_ADDRESS = lib.createContractAndGetContractAddress(NODE_DATA.NODE1.HOST, NODE_DATA.NODE1.PORT, SERVICE_TOKEN)
+                    SECOND_CONTRACT_ADDRESS = lib.createContractAndGetContractAddress(NODE_DATA.NODE1.HOST, NODE_DATA.NODE1.PORT, SERVICE_TOKEN)
+                    FIRST_BLOCK_NUMBER = lib.getContractBlockNumber(NODE_DATA.NODE1.HOST, NODE_DATA.NODE1.PORT, FIRST_CONTRACT_ADDRESS, SERVICE_TOKEN)
+                    SECOND_BLOCK_NUMBER = lib.getContractBlockNumber(NODE_DATA.NODE1.HOST, NODE_DATA.NODE1.PORT, SECOND_CONTRACT_ADDRESS, SERVICE_TOKEN)
                     if (SECOND_BLOCK_NUMBER != FIRST_BLOCK_NUMBER+1) {
                         sh 'exit 1'
                     }
