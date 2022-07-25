@@ -1253,13 +1253,15 @@ pipeline {
 
         stage('Upgrade w/ node chain data - Confirm Chain Sync was Successful') {
             steps {
-                def numOfPrivChains = sh(
-                    returnStdout: true,
+                script{
+                    def numOfPrivChains = sh(
+                        returnStdout: true,
                         script: "sudo docker exec strato_postgres_1 psql -U postgres -d `sudo docker exec strato_postgres_1 psql -U postgres -t -c \"select datname from pg_database where datname like '%eth_%';\" | tr -d \"[:space:]\"` -t -c \"select count(*) from chain_info_ref;\" | tr -d -c 0-9"
-                ).trim()
+                    ).trim()
 
-                if(numOfPrivChains != 1) {
-                    assert condition : "Build failed to sync private chains"
+                    if(numOfPrivChains != 1) {
+                        assert condition : "Build failed to sync private chains"
+                    }
                 }
             }
         }
@@ -1311,28 +1313,30 @@ pipeline {
         stage('Add/Remove Node on an Upgraded Network - Confirm the New Node Accepts Transactions and Syncs') {
             agent { label "multinode301" }
             steps {
-                def accessToken = sh(
-                    returnStdout: true,
-                    script: "curl -s -X POST 'https://keycloak.blockapps.net/auth/realms/traceharvest-demo-tech/protocol/openid-connect/token' -H 'Content-Type: application/x-www-form-urlencoded' -H 'Authorization: Basic dGhkZW1vLXRlY2g6ZjY3Y2I0MWMtMGFjMC00N2FjLWE1OWYtMmFkZWQxN2IwMzI1' --data-urlencode 'grant_type=password' --data-urlencode 'username=tech1' --data-urlencode 'password=1234' | jq -r .access_token"
-                ).trim()
-                def createUser = sh(
-                    returnStdout: true,
-                    script: "curl -X POST -H \"Authorization: Bearer ${accessToken}\" -H \"Accept: application/json\" \"https://${NODE_DATA.NODE5.HOST}:${NODE_DATA.NODE5.PORT}/strato/v2.3/key\""
-                ).trim()
-                def txResponse = sh(
-                    returnStdout: true,
-                    script: "curl 'https://${NODE_DATA.NODE5.HOST}:${NODE_DATA.NODE5.PORT}/strato/v2.3/transaction?resolve=true' \
-                        -X 'POST' \
-                        -H \"Authorization: Bearer ${accessToken}\"  \
-                        -H 'Accept: application/json;charset=utf-8' \
-                        -H 'Content-Type: application/json' \
-                        --data-binary '{\"txs\":[{\"payload\":{\"contract\":\"SimpleStorage\",\"src\":\"pragma solidvm 3.0; contract SimpleStorage {\n  uint storedData;\n\n  function SimpleStorage() {\n    storedData = 1;\n  }\n\n  function set(uint x) {\n    storedData = x;\n  }\n\n  function get() constant returns (uint) {\n    return storedData;\n  }\n}\n\",\"args\":{},\"metadata\":{\"VM\":\"SolidVM\",\"history\":\"SimpleStorage\",\"index\":\"SimpleStorage\"}},\"type\":\"CONTRACT\"}]}' | grep Success"
-                ).trim()
-                if(txResponse != 'Success') {
-                    assert condition : "Build failed to accept new Transaction"
-                }
+                script {
+                    def accessToken = sh(
+                        returnStdout: true,
+                        script: "curl -s -X POST 'https://keycloak.blockapps.net/auth/realms/traceharvest-demo-tech/protocol/openid-connect/token' -H 'Content-Type: application/x-www-form-urlencoded' -H 'Authorization: Basic dGhkZW1vLXRlY2g6ZjY3Y2I0MWMtMGFjMC00N2FjLWE1OWYtMmFkZWQxN2IwMzI1' --data-urlencode 'grant_type=password' --data-urlencode 'username=tech1' --data-urlencode 'password=1234' | jq -r .access_token"
+                    ).trim()
+                    def createUser = sh(
+                        returnStdout: true,
+                        script: "curl -X POST -H \"Authorization: Bearer ${accessToken}\" -H \"Accept: application/json\" \"https://${NODE_DATA.NODE5.HOST}:${NODE_DATA.NODE5.PORT}/strato/v2.3/key\""
+                    ).trim()
+                    def txResponse = sh(
+                        returnStdout: true,
+                        script: "curl 'https://${NODE_DATA.NODE5.HOST}:${NODE_DATA.NODE5.PORT}/strato/v2.3/transaction?resolve=true' \
+                            -X 'POST' \
+                            -H \"Authorization: Bearer ${accessToken}\"  \
+                            -H 'Accept: application/json;charset=utf-8' \
+                            -H 'Content-Type: application/json' \
+                            --data-binary '{\"txs\":[{\"payload\":{\"contract\":\"SimpleStorage\",\"src\":\"pragma solidvm 3.0; contract SimpleStorage {\n  uint storedData;\n\n  function SimpleStorage() {\n    storedData = 1;\n  }\n\n  function set(uint x) {\n    storedData = x;\n  }\n\n  function get() constant returns (uint) {\n    return storedData;\n  }\n}\n\",\"args\":{},\"metadata\":{\"VM\":\"SolidVM\",\"history\":\"SimpleStorage\",\"index\":\"SimpleStorage\"}},\"type\":\"CONTRACT\"}]}' | grep Success"
+                    ).trim()
+                    if(txResponse != 'Success') {
+                        assert condition : "Build failed to accept new Transaction"
+                    }
 
-                lib.waitForHealthySync(NODE_DATA.LOAD_TEST_HEALTH_URL)
+                    lib.waitForHealthySync(NODE_DATA.LOAD_TEST_HEALTH_URL)
+                }
             }
         }
 
@@ -1354,15 +1358,17 @@ pipeline {
                         '''
                     }
                 }
-                def accessToken = sh(
-                    returnStdout: true,
-                    script: "curl -s -X POST 'https://keycloak.blockapps.net/auth/realms/traceharvest-demo-tech/protocol/openid-connect/token' -H 'Content-Type: application/x-www-form-urlencoded' -H 'Authorization: Basic dGhkZW1vLXRlY2g6ZjY3Y2I0MWMtMGFjMC00N2FjLWE1OWYtMmFkZWQxN2IwMzI1' --data-urlencode 'grant_type=password' --data-urlencode 'username=tech1' --data-urlencode 'password=1234' | jq -r .access_token"
-                ).trim()  
-                def createUser = sh(
-                    returnStdout: true,
-                    script: "curl -X POST -H \"Authorization: Bearer ${accessToken}\" -H \"Accept: application/json\" \"https://${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT}/strato/v2.3/key\""
-                ).trim()
-                lib.waitForHealthySync(NODE_DATA.LOAD_TEST_HEALTH_URL)            
+                script {
+                    def accessToken = sh(
+                        returnStdout: true,
+                        script: "curl -s -X POST 'https://keycloak.blockapps.net/auth/realms/traceharvest-demo-tech/protocol/openid-connect/token' -H 'Content-Type: application/x-www-form-urlencoded' -H 'Authorization: Basic dGhkZW1vLXRlY2g6ZjY3Y2I0MWMtMGFjMC00N2FjLWE1OWYtMmFkZWQxN2IwMzI1' --data-urlencode 'grant_type=password' --data-urlencode 'username=tech1' --data-urlencode 'password=1234' | jq -r .access_token"
+                    ).trim()  
+                    def createUser = sh(
+                        returnStdout: true,
+                        script: "curl -X POST -H \"Authorization: Bearer ${accessToken}\" -H \"Accept: application/json\" \"https://${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT}/strato/v2.3/key\""
+                    ).trim()
+                    lib.waitForHealthySync(NODE_DATA.LOAD_TEST_HEALTH_URL)
+                }       
             }
         }
 
@@ -1386,24 +1392,26 @@ pipeline {
 
         stage('Add/Remove Node on an Upgraded Network - Confirm Network Syncs after Voted out Node shuts off') {
             steps {
-                def accessToken = sh(
-                    returnStdout: true,
-                    script: "curl -s -X POST 'https://keycloak.blockapps.net/auth/realms/traceharvest-demo-tech/protocol/openid-connect/token' -H 'Content-Type: application/x-www-form-urlencoded' -H 'Authorization: Basic dGhkZW1vLXRlY2g6ZjY3Y2I0MWMtMGFjMC00N2FjLWE1OWYtMmFkZWQxN2IwMzI1' --data-urlencode 'grant_type=password' --data-urlencode 'username=tech1' --data-urlencode 'password=1234' | jq -r .access_token"
-                ).trim()  
-                def txResponse = sh(
-                    returnStdout: true,
-                    script: "curl 'https://${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT}/strato/v2.3/transaction?resolve=true' \
-                        -X 'POST' \
-                        -H \"Authorization: Bearer ${accessToken}\"  \
-                        -H 'Accept: application/json;charset=utf-8' \
-                        -H 'Content-Type: application/json' \
-                        --data-binary '{\"txs\":[{\"payload\":{\"contract\":\"SimpleStorage\",\"src\":\"pragma solidvm 3.0; contract SimpleStorage {\n  uint storedData;\n\n  function SimpleStorage() {\n    storedData = 1;\n  }\n\n  function set(uint x) {\n    storedData = x;\n  }\n\n  function get() constant returns (uint) {\n    return storedData;\n  }\n}\n\",\"args\":{},\"metadata\":{\"VM\":\"SolidVM\",\"history\":\"SimpleStorage\",\"index\":\"SimpleStorage\"}},\"type\":\"CONTRACT\"}]}' | grep Success"
-                ).trim()
-                if(txResponse != 'Success') {
-                    assert condition : "Build failed to accept new Transaction"
-                }
+                script {
+                    def accessToken = sh(
+                        returnStdout: true,
+                        script: "curl -s -X POST 'https://keycloak.blockapps.net/auth/realms/traceharvest-demo-tech/protocol/openid-connect/token' -H 'Content-Type: application/x-www-form-urlencoded' -H 'Authorization: Basic dGhkZW1vLXRlY2g6ZjY3Y2I0MWMtMGFjMC00N2FjLWE1OWYtMmFkZWQxN2IwMzI1' --data-urlencode 'grant_type=password' --data-urlencode 'username=tech1' --data-urlencode 'password=1234' | jq -r .access_token"
+                    ).trim()  
+                    def txResponse = sh(
+                        returnStdout: true,
+                        script: "curl 'https://${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT}/strato/v2.3/transaction?resolve=true' \
+                            -X 'POST' \
+                            -H \"Authorization: Bearer ${accessToken}\"  \
+                            -H 'Accept: application/json;charset=utf-8' \
+                            -H 'Content-Type: application/json' \
+                            --data-binary '{\"txs\":[{\"payload\":{\"contract\":\"SimpleStorage\",\"src\":\"pragma solidvm 3.0; contract SimpleStorage {\n  uint storedData;\n\n  function SimpleStorage() {\n    storedData = 1;\n  }\n\n  function set(uint x) {\n    storedData = x;\n  }\n\n  function get() constant returns (uint) {\n    return storedData;\n  }\n}\n\",\"args\":{},\"metadata\":{\"VM\":\"SolidVM\",\"history\":\"SimpleStorage\",\"index\":\"SimpleStorage\"}},\"type\":\"CONTRACT\"}]}' | grep Success"
+                    ).trim()
+                    if(txResponse != 'Success') {
+                        assert condition : "Build failed to accept new Transaction"
+                    }
 
-                lib.waitForHealthySync(NODE_DATA.LOAD_TEST_HEALTH_URL)          
+                    lib.waitForHealthySync(NODE_DATA.LOAD_TEST_HEALTH_URL)
+                }      
             }
         }
 
