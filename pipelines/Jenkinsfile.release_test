@@ -1348,53 +1348,6 @@ pipeline {
             }
         }*/
 
-        /* X509 REGRESSION TESTS - ON HOLD*/
-
-        // stage('x509 - Clean Nodes') {
-        //     parallel {
-        //         stage('Clean test-multinode101') {
-        //             // agent { label "test-multinode101" } // is default
-        //             steps { 
-        //                 script {
-        //                     lib.cleanNode()
-        //                 }
-        //             }
-        //         }
-        //         stage('Clean test-multinode102') {
-        //             agent { label "test-multinode102" }
-        //             steps { 
-        //                 script {
-        //                     lib.cleanNode()
-        //                 }
-        //             }
-        //         }
-        //     }
-        // }
-
-        // stage('x509 Posting a certificate associates a user with an organization - Start Node') {
-        //     steps {
-        //         script {
-        //             rootNodeAddress = lib.deployStratoWithApp(null, NODE_DATA.NODE1, 'beanstalk', true) 
-        //         }
-        //     }
-        // }
-
-        // stage('x509 Posting a certificate associates a user with an organization - Upload Simple Storage') {
-        //     steps {
-        //         script {
-        //             def accessToken = sh(
-        //             returnStdout: true,
-        //             script: "curl -s -X POST 'https://keycloak.blockapps.net/auth/realms/beanstalk/protocol/openid-connect/token' -H 'Content-Type: application/x-www-form-urlencoded' -H 'Authorization: Basic ZGV2OjFkMmU5NzRhLTc0ZmUtNDhkOS1iNzI5LTFkZTk0Y2M5NWExZQ==' --data-urlencode 'grant_type=password' --data-urlencode 'username=grower' --data-urlencode 'password=1234' | jq -r .access_token"
-        //             ).trim()  
-        //             def createUser = sh(
-        //                 returnStdout: true,
-        //                 script: "curl -X POST -H \"Authorization: Bearer ${accessToken}\" -H \"Accept: application/json\" \"https://${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT}/strato/v2.3/key\""
-        //             ).trim()
-
-        //         }
-        //     }
-        // }
-
         /* DEVNET SYNC TESTS */
         stage ('Single Node Sync with Devnet - Clean Node') {
              // agent { label "multinode101" } // is default
@@ -1466,43 +1419,6 @@ pipeline {
                 }                
             }
         }
-
-        /*stage('Sync Network To Devnet') {
-            parallel {
-                stage('Sync multinode101') {
-                    // agent { label "multinode101" } // is default
-                    steps {
-                        script {
-                            lib.deployStrato(NODE_DATA.NODE1)
-                        }
-                    } 
-                }
-                stage('Sync multinode102') {
-                    agent { label "multinode102" }
-                    steps {
-                        script {
-                            lib.deployStrato(NODE_DATA.NODE2)
-                        }
-                    }
-                }
-                stage('Sync multinode103') {
-                    agent { label "multinode102" }
-                    steps {
-                        script {
-                            lib.deployStrato(NODE_DATA.NODE3)
-                        }
-                    }
-                }
-                stage('Sync multinode104') {
-                    agent { label "multinode104" }
-                    steps {
-                        script {
-                            lib.deployStrato(NODE_DATA.NODE4)
-                        }
-                    }
-                }
-            }
-        }*/
         
     }
 }
