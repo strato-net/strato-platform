@@ -865,26 +865,6 @@ pipeline {
             }
         }
 
-
-
-        stage('Upgrade w/ node chain data - Confirm Chain Sync was Successful') {
-            steps {
-                script{
-                    def numOfPrivChains = sh(
-                        returnStdout: true,
-                        script: "sudo docker exec strato_postgres_1 psql -U postgres -d `sudo docker exec strato_postgres_1 psql -U postgres -t -c \"select datname from pg_database where datname like '%eth_%';\" | tr -d \"[:space:]\"` -t -c \"select count(*) from chain_info_ref;\" | tr -d -c 0-9"
-                    ).trim()
-
-                    if(numOfPrivChains != 1) {
-                        assert condition : "Build failed to sync private chains"
-                    }
-                }
-            }
-        }
-
-
-
-
         stage ('Redeployed Contract Test') {
             // agent { label "multinode101" } // is default
             steps {
@@ -897,14 +877,18 @@ pipeline {
                     if (SECOND_BLOCK_NUMBER != FIRST_BLOCK_NUMBER+1) {
                         sh 'exit 1'
                     }
-                    def ATTRIBUTE_CONTRACT_ADDRESS = sh(curl -X 'GET' \
+                    def ATTRIBUTE_CONTRACT_ADDRESS = sh(
+                        returnStdout: true,
+                        script: curl -X 'GET' \
                         'https://${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT}/cirrus/search/Attribute' \
                         -H "Authorization: Bearer $SERVICE_TOKEN"  \
                         -H 'accept: application/json;charset=utf-8' \
                         -H 'Content-Type: application/json;charset=utf-8' \
                         | jq '.[0] | .address'
                         ).trim()
-                    def response = sh(curl -X 'POST' \
+                    def response = sh(
+                        returnStdout: true,
+                        script: curl -X 'POST' \
                         'https://${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT}/strato/v2.3/transaction/parallel?resolve=true' \
                         -H "Authorization: Bearer $SERVICE_TOKEN"  \
                         -H 'accept: application/json;charset=utf-8' \
