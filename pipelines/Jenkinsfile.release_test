@@ -877,7 +877,7 @@ pipeline {
                     sh """
                     set -x
 
-                    if [ $SECOND_BLOCK_NUMBER -ne ${((FIRST_BLOCK_NUMBER+1))} ]; then exit 1; fi
+                    if [ $SECOND_BLOCK_NUMBER -ne \$((FIRST_BLOCK_NUMBER+1)) ]; then exit 1; fi
 
                     ATTRIBUTE_CONTRACT_ADDRESS=$(curl -X 'GET' \
                         'https://${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT}/cirrus/search/Attribute' \
