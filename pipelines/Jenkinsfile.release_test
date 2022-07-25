@@ -1525,7 +1525,7 @@ pipeline {
 
         /* Performance Test - Sync Network to Devnet */
 
-        stage('Add/Remove Node on an Upgraded Network - Redeploy Monitor w/ 4 nodes') {
+        stage('Sync Network To Devnet - Redeploy Monitor w/ 4 nodes') {
             agent { label "multinode305" }
             steps {
                 script {
