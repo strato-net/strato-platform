@@ -1144,7 +1144,7 @@ pipeline {
                     ).trim()
 
                     sh "curl -X POST -H \"Authorization: Bearer ${accessToken}\" -H \"Accept: application/json\" \"https://${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT}/strato/v2.3/key\""
-                    sh "curl -s -X POST 'https://${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT}/strato/v2.3/transaction/parallel?resolve=true' -H 'Authorization: Bearer ${accessToken}' \
+                    sh """curl -s -X POST 'https://${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT}/strato/v2.3/transaction/parallel?resolve=true' -H 'Authorization: Bearer ${accessToken}' \
                         -H 'Content-Type: application/json' --data-raw '{
                         \"txs\": [
                             {
@@ -1161,7 +1161,7 @@ pipeline {
                             \"type\": \"FUNCTION\"
                             }
                         ]
-                        }'"
+                        }'"""
                 }
             }
         }
