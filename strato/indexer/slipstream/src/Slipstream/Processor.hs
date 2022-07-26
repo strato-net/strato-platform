@@ -252,7 +252,7 @@ getEVMDetailsForRow row = liftM2 (<|>)
   --         $logInfoS "adjustGlobals" . T.pack $ "Adding to globals for " ++ T.unpack k ++ ": " ++ show codePtr
   --         lift $ f gref $ historyTableName (actionOrganization row) (actionApplication row) (OLD.contractdetailsName details')
   -- TODO: ideally we check if these flags are in the metadata BEFORE we get the detailsMap
-  
+
 -- adjustSolidVMGlobals :: ( MonadIO m
 --                  , MonadLogger m
 --                  , HasBlocSQL m
@@ -335,7 +335,7 @@ rowToHistories gref abiid row actions cont oldState = do
 --       , eventName = name
 --       , eventFields = map fst $ OLD.eventLogs event
 --       }
-      
+
 contractToEventTables :: (Text, Text, Text) -> Contract -> [EventTable]
 contractToEventTables (org, app, name) c =
   flip map (Map.toList $ c^.events) $
@@ -347,7 +347,7 @@ contractToEventTables (org, app, name) c =
           eventName = labelToText eName,
           eventFields = map fst $ eventLogs fields
         }
-  
+
 -- Prioritizing with-source actions prevents the issue where updates to contracts
 -- at different addresses are lost because the schema has not been seen yet.
 withSourceFirst :: (a, [AggregateAction]) -> Down Bool
@@ -363,11 +363,11 @@ parseActions events' =
 parseEvents :: [VMEvent] -> [Action.Event]
 parseEvents events' = [a | EventEmitted a <- events']
 
-getCodeCollection' :: MonadIO m => Bool -> CodePtr -> Text -> m CodeCollection
-getCodeCollection' True = getCodeCollection (Map.fromList . map (\(x, y) -> (textToLabel x, xabiToPartialContract y)) )
+getCodeCollection' :: MonadIO m => Bool -> CodePtr -> Text -> m (Either String CodeCollection)
+getCodeCollection' True = getCodeCollection (Map.fromList . map (\(x, y) -> (textToLabel x, xabiToPartialContract y)))
 getCodeCollection' False = getCodeCollection (const Map.empty)
 
-getCodeCollection :: MonadIO m => ([(Text, OLD.Xabi)] -> Map.Map SolidString Contract) -> CodePtr -> Text -> m CodeCollection
+getCodeCollection :: MonadIO m => ([(Text, OLD.Xabi)] -> Map.Map SolidString Contract) -> CodePtr -> Text -> m (Either String CodeCollection)
 getCodeCollection f cp ccString = do
   let initList =
         case Aeson.decodeStrict $ encodeUtf8 ccString of
@@ -381,20 +381,20 @@ getCodeCollection f cp ccString = do
 
   case cp of
     SolidVMCode _ _ ->
-      case fmap resolveLabels $ compileSource $ Map.fromList initList of
-        Left e -> error $ "failed parse: "  ++ show e --return $ CodeCollection Map.empty
-        Right v -> return v
+      case fmap resolveLabels $ compileSource False $ Map.fromList initList of
+        Left e -> return $ Left $ "failed parse: "  ++ show e --- return $ CodeCollection Map.empty
+        Right v -> return $ Right v
     EVMCode _ ->
       case parseXabi "--" $ T.unpack $ sourceBlob $ SourceMap initList of
         Left e ->
           --return $ CodeCollection Map.empty
-          error $ "failed EVM parse: " ++ show e ++ "\n" ++ T.unpack ccString
-        Right v -> return $ CodeCollection $ f $ snd v
-    CodeAtAccount _ _ -> error "Cannot compile or parse code at account"
+          return $ Left $ "failed EVM parse: " ++ show e ++ "\n" ++ T.unpack ccString
+        Right v -> return $ Right $ CodeCollection $ f $ snd v
+    CodeAtAccount _ _ -> return $ Left "Cannot compile or parse code at account"
 
 getEVMInserts :: (
-  MonadIO m, 
-  MonadUnliftIO m, 
+  MonadIO m,
+  MonadUnliftIO m,
   MonadLogger m,
   Accessible BlocEnv m,
   HasBlocSQL m,
@@ -441,45 +441,55 @@ processTheMessages env sqlEnv conn g messages = do
       getCC = getCodeCollection' flags_indexEVM
       evmInsertsF = if flags_indexEVM then getEVMInserts else getInsertsIgnoreEVM
 
-  fkeys <- forM creates $ \(ccString, cp, o, a, hl) -> do
-    cc <- getCC cp ccString
+  -- forM :: [a] -> (a -> m b) -> m [b]
+  -- forM :: [a] -> (a -> m (Either b c)) -> m [Either b c]
+  -- m [c]
+  fkeys' <- forM creates $ \(ccString, cp, o, a, hl) -> do
+    cc' <- getCC cp ccString
+    case cc' of
+      Right cc -> do 
+              $logInfoS "processTheMessages" $ "CodeCollection Added: " <> T.pack (format cp) <> ", contracts = " <> T.pack (show $ Map.keys $ cc^.contracts)
 
-    $logInfoS "processTheMessages" $ "CodeCollection Added: " <> T.pack (format cp) <> ", contracts = " <> T.pack (show $ Map.keys $ cc^.contracts)
 
+              deferredForeignKeys <- fmap concat $ forM (Map.toList $ cc^.contracts) $ \(nameString, c) -> do
+                let n = labelToText nameString
 
-    deferredForeignKeys <- fmap concat $ forM (Map.toList $ cc^.contracts) $ \(nameString, c) -> do
-      let n = labelToText nameString
-    
-      let htn = historyTableName o a n
-          historyTableNames = map (historyTableName o a) hl 
-          historyEnabled = htn `elem` historyTableNames
-      $logInfoS "processTheMessages/historyTableNames" $ T.pack $ show historyTableNames 
+                let htn = historyTableName o a n
+                    historyTableNames = map (historyTableName o a) hl
+                    historyEnabled = htn `elem` historyTableNames
+                $logInfoS "processTheMessages/historyTableNames" $ T.pack $ show historyTableNames
 
-      -- If the table name is found in globals, then keep history as it is, otherwise set it to respective value from this creation
-      historyStatus <- historyStatusCreated g htn
-      when (not historyStatus) $ do
-        -- history status is not defined, so set it to whether or not this is found in the history list
-        setHistoryTable g htn historyEnabled
+                -- If the table name is found in globals, then keep history as it is, otherwise set it to respective value from this creation
+                historyStatus <- historyStatusCreated g htn
+                when (not historyStatus) $ do
+                  -- history status is not defined, so set it to whether or not this is found in the history list
+                  setHistoryTable g htn historyEnabled
 
-      hasHistoryTable <- isHistoric g htn
-      
-      $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o <> ", app=" <> a <> ", name=" <> n <> " (fields: " <> T.pack (show $ Map.toList $ fmap varType $ c^.storageDefs) <> ")" <> if hasHistoryTable then " HAS HISTORY TABLE" else ""
-      let nameParts = (o, a, n)
+                hasHistoryTable <- isHistoric g htn
 
-      deferredForeignKeys <- outputData conn $ createExpandIndexTable g c nameParts
+                $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o <> ", app=" <> a <> ", name=" <> n <> " (fields: " <> T.pack (show $ Map.toList $ fmap varType $ c^.storageDefs) <> ")" <> if hasHistoryTable then " HAS HISTORY TABLE" else ""
+                let nameParts = (o, a, n)
 
-      when hasHistoryTable $
-        outputData conn $ createExpandHistoryTable g c nameParts
+                deferredForeignKeys <- outputData conn $ createExpandIndexTable g c nameParts
 
-      outputData conn . createEventTables g $ contractToEventTables nameParts c
+                when hasHistoryTable $
+                  outputData conn $ createExpandHistoryTable g c nameParts
 
-      return deferredForeignKeys
+                outputData conn . createEventTables g $ contractToEventTables nameParts c
 
-    forM_ deferredForeignKeys $ \deferredForeignKey -> do
-      outputData conn $ createForeignIndexesForJoins deferredForeignKey
-    
-    pure deferredForeignKeys
+                return deferredForeignKeys
 
+              forM_ deferredForeignKeys $ \deferredForeignKey -> do
+                outputData conn $ createForeignIndexesForJoins deferredForeignKey
+
+              pure $ Right deferredForeignKeys -- Either String String
+              
+      Left cc -> do 
+        $logInfoS "processTheMessages" $ T.pack cc
+        pure $ Left cc -- Either String String
+  
+  let fkeys = rights fkeys'
+  
   inserts <- enterBloc2 env sqlEnv $ do
     forM changes $ \(acct,actions) -> do
       let row = combineActions actions
@@ -490,11 +500,11 @@ processTheMessages env sqlEnv conn g messages = do
 
       case actionStorage row of
         Action.EVMDiff{} -> evmInsertsF g row actions acct
-        Action.SolidVMDiff{} -> do    
+        Action.SolidVMDiff{} -> do
           void . runMaybeT $ do
               src <- lookupT "src" $ actionMetadata row
               lift $ insertContractDetailsQuery (deserializeSourceMap src)
-            
+
           let cid = maybe "" (T.pack . chainIdString . ChainId) $ (actionAccount row ^. accountChainId)
               (SolidVMCode name _) = actionCodeHash row
               abiid = ABIID {
@@ -524,12 +534,12 @@ processTheMessages env sqlEnv conn g messages = do
 
   forM_ insertsByCodeHash $ \ins -> do
     unless (null ins) $ insertForeignKeys conn $ map indexInsert ins
-  
+
   when ((length creates > 0) && any (\k -> length k > 0) fkeys) $ do
     $logDebugLS "processTheMessages" $ T.pack $ "Updating PostgREST schema cache for " ++ show (sum $ map length fkeys) ++ " foreign key relationships"
     notifyPostgREST conn
-  
-  when (length events' > 0) $ 
+
+  when (length events' > 0) $
     outputData conn $ insertExpandEventTables g events'
 
   $logInfoS "processTheMessages" . T.pack $ "Inserting " ++ show (length transactionResults) ++ " transaction results"
