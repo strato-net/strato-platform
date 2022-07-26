@@ -1789,6 +1789,30 @@ expToVar' (CC.FunctionCall _ e args) = do
               _ -> return False
             return . Constant $ SBool success
 
+          Constant (SContractItem address' "send") -> do
+            cid <- case (a ^. namedAccountChainId) of 
+              UnspecifiedChain -> do
+                cid1 <- view accountChainId <$> getCurrentAccount
+                case cid1 of
+                  Nothing -> return Nothing
+                  Just cid2 -> return $ Just cid2
+              MainChain -> return Nothing
+              ExplicitChain cid -> return $ Just cid
+            let realAccount = namedAccountToAccount cid a
+            -- Retreive and resolve the codehash
+            codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) realAccount
+            resolvedCodeHash <- resolveCodePtr cid codeHash'
+            let ch' = case resolvedCodeHash of
+                        Just (SolidVMCode _ ch1') -> ch1' 
+                        Just cp -> missingCodeCollection "Account is not a SolidVM contract" (format cp)
+                        Nothing -> missingCodeCollection "Could not resolve code pointer for account" (format realAccount)
+            -- Find the code using the codehash
+            cd <- A.lookup (A.Proxy @DBCode) ch'
+            let cd' = case cd of
+                        Just (_,bs) -> bs
+                        Nothing -> missingCodeCollection "Could not locate SolidVM code collection at account" (format realAccount)
+            let decodeCD = DT.decodeUtf8 cd'
+
           Constant (SContractItem address' itemName) -> do
             from <- getCurrentAccount
             let address = namedAccountToAccount (from ^. accountChainId) address'
