@@ -1820,6 +1820,7 @@ expToVar' (CC.FunctionCall _ e args) = do
               --get the location of just the code of the contract
               let (startLine, startColumn) = contract ^. CC.contractContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
               let (endLine, endColumn) = contract ^. CC.contractContext ^. sourceAnnotationEnd & (_sourcePositionLine &&& _sourcePositionColumn)
+
             else do
               let code = case searchTerms of
                             Just terms -> searchCode cd' terms
@@ -2955,3 +2956,8 @@ solidVMExceptionHandler catchBlockMap ex = case ex of
     
     _ -> error "unhandled solid exception" (show ex)
 
+mapOnLast :: (a -> a) -> [a] -> [a]
+mapOnLast f = foldr step []
+  where step :: a -> [a] -> [a]
+        step x [] = [f x]
+        step x xs = x : xs
