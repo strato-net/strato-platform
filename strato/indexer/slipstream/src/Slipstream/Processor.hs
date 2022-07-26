@@ -381,7 +381,7 @@ getCodeCollection f cp ccString = do
 
   case cp of
     SolidVMCode _ _ ->
-      case fmap resolveLabels $ compileSource True $ Map.fromList initList of
+      case fmap resolveLabels $ compileSource False $ Map.fromList initList of
         Left e -> return $ Left $ "failed parse: "  ++ show e --- return $ CodeCollection Map.empty
         Right v -> return $ Right v
     EVMCode _ ->

@@ -28,7 +28,7 @@ forSource detector c = case parseSourceWithAnnotations "" $ T.pack c of
   Right cc -> detector cc
 
 forContract :: CompilerDetector -> String -> [SourceAnnotation Text]
-forContract detector c = case compileSourceWithAnnotations False (M.fromList [("",T.pack c)]) of
+forContract detector c = case compileSourceWithAnnotations True (M.fromList [("",T.pack c)]) of
   Left anns -> anns
   Right cc -> detector cc
 
