@@ -16,6 +16,68 @@ pipeline {
     }
 
     stages {
+
+        /* Run App Secondary Nodes */
+        stage ('Upgradability Sync Test - Run app on secondary nodes') {
+            parallel {
+                stage('Run app on multinode102') {
+                agent { label "multinode102" }
+                steps {
+                    script {
+                    lib.runAppSecondaryNode(NODE_DATA.NODE2, null, null, null, 'beanstalk')
+                    }
+                }
+                }
+                stage('Run app on multinode103') {
+                agent { label "multinode103" }
+                steps {
+                    script{
+                    lib.runAppSecondaryNode(NODE_DATA.NODE3, null, null, null, 'beanstalk')
+                    }
+                }
+                }
+                stage('Run app on multinode104') {
+                agent { label "multinode104" }
+                steps {
+                    script {
+                    lib.runAppSecondaryNode(NODE_DATA.NODE4, null, null, null, 'beanstalk')
+                    }
+                }
+                }
+                stage('Run app on multinode301') {
+                agent { label "multinode301" }
+                steps {
+                    script {
+                    lib.runAppSecondaryNode(NODE_DATA.NODE5, null, null, null, 'beanstalk')
+                    }
+                }
+                }
+                stage('Run app on multinode302') {
+                agent { label "multinode302" }
+                    steps {
+                        script {
+                            lib.runAppSecondaryNode(NODE_DATA.NODE6, null, null, null, 'beanstalk')
+                        }
+                    }
+                }
+                stage('Run app on multinode303') {
+                    agent { label "multinode303" }
+                    steps {
+                        script {
+                            lib.runAppSecondaryNode(NODE_DATA.NODE7, null, null, null, 'beanstalk')
+                        }
+                    }
+                }
+                stage('Run app on multinode304') {
+                    agent { label "multinode304" }
+                    steps {
+                        script {
+                            lib.runAppSecondaryNode(NODE_DATA.NODE8, null, null, null, 'beanstalk')
+                        }
+                    }
+                }
+            }
+        }
     
         stage ('Upgradability Sync Test - Approve memberships of secondary nodes') {
             // agent { label "multinode101" } // is default
