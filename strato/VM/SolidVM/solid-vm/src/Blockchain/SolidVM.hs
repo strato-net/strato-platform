@@ -265,7 +265,7 @@ create _ _ _ blockData _ sender' origin' _ _ _ newAddress code txHash' chainId' 
         maybeArgs = runParser parseArgs (ParserState "" "") "" argString
         !args = either (parseError "create arguments") CC.OrderedArgs maybeArgs
 
-    (hsh, cc) <- codeCollectionFromSource initCode
+    (hsh, cc) <- codeCollectionFromSource True initCode
     create' sender' newAddress hsh cc contractName' args x509s
 
 create' :: MonadSM m => Account -> Account -> Keccak256 -> CC.CodeCollection -> SolidString -> CC.ArgList -> M.Map Address X509Certificate -> m ExecResults
@@ -539,7 +539,7 @@ getCodeAndCollection address' = do
     (contractName', ch, cc) <-
       case resolvedCodeHash of
         Just (SolidVMCode cn ch') -> do
-          cc' <- codeCollectionFromHash ch'
+          cc' <- codeCollectionFromHash True ch'
           return (stringToLabel cn, ch', cc')
         Just ch -> internalError "SolidVM for non-solidvm code" (format ch)
         Nothing -> missingCodeCollection "SolidVM for non-existent code" (format codeHash)
