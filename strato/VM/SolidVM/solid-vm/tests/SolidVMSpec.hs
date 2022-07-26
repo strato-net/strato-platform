@@ -4856,3 +4856,16 @@ contract qq{
   }
 }|]
     getFields ["mynum"] `shouldReturn` [BInteger 9]
+
+  it "can use msg.data" . runTest $ do
+    runBS [r|
+contract qq {
+  string s;
+  function a(uint _a, string _b, bool _c) pure returns (string) {
+    return msg.data;
+  }
+  constructor() {
+    s = a(10, "hey", false);
+  }
+}|]
+    getFields ["s"] `shouldReturn` [BString "(10, \"hey\", False"]

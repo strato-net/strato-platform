@@ -1511,6 +1511,14 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
                          (name `elemIndex` fst enumVals)
         return $ Constant $ SEnumVal enumName name num
       (SBuiltinVariable "msg", "sender") -> (Constant . ((flip SAccount) False) . accountToNamedAccount chainId . Env.sender) <$> getEnv
+      (SBuiltinVariable "msg", "data") -> let env' = getEnv
+                                              metadata =  Env.metadata env'
+                                              maybeArgString = M.lookup "args" =<< metadata
+                                          in Constant . SString . fromMaybe "" . maybeArgString 
+     {- (SBuiltinVariable "msg", "sig") -> let env' = getEnv
+                                             metadata = Env.metadata env'
+                                             maybeFuncName = M.lookup "funcName" =<< metadata
+                                         in Constant . SString . fromMaybe "" . keccak256() -}
       (SBuiltinVariable "tx", "origin") -> (Constant . ((flip SAccount) False) . accountToNamedAccount chainId . Env.origin) <$> getEnv
       (SBuiltinVariable "tx", "username") -> do env' <- getEnv
                                                 x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
