@@ -1811,13 +1811,22 @@ expToVar' (CC.FunctionCall _ e args) = do
             let cd' = case cd of
                         Just (_,bs) -> bs
                         Nothing -> missingCodeCollection "Could not locate SolidVM code collection at account" (format realAccount)
-            searchTerm <- case argVals of
-              OrderedVals [SString term] -> do
-                res <- term
-                case res of 
-                  True -> return True
-                  _ -> return False
-              _ -> return False
+            (searchTerms, isBlank) <- case argVals of
+              NamedVals [SString arguments] -> (arguments, True)
+              _ -> return (Nothing, False) 
+            --get the contract information
+            (contract, _, _) <- getCodeAndCollection realAccount
+            if (isBlank) then do
+              --get the location of just the code of the contract
+              let (startLine, startColumn) = contract ^. CC.contractContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
+              let (endLine, endColumn) = contract ^. CC.contractContext ^. sourceAnnotationEnd & (_sourcePositionLine &&& _sourcePositionColumn)
+            else do
+              let code = case searchTerms of
+                            Just terms -> searchCode cd' terms
+                            Nothing -> cd'
+              return $ Constant $ SString $ BC.pack $ show code
+            --Find the specific piece of code and return it
+            --First see if there was anything that was inputted in the argument list
 
           Constant (SContractItem address' itemName) -> do
             from <- getCurrentAccount
