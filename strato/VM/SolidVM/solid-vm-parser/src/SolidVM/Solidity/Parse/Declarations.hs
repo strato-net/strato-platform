@@ -70,6 +70,7 @@ solidityContract = do
     braces (many solidityDeclaration)
 
   let allFunctions = Map.fromListWithKey parseOverloads [ (stringToLabel n, f) | (n, FuncDeclaration f) <- declarations]
+  -- when (True) (internalError "IT'S MORBIN TIME" allFunctions)
   let ctorList = [(stringToLabel n, c) | (n, ConstructorDeclaration c) <- declarations]
   let events = [(stringToLabel n, e) | (n, EventDeclaration e) <- declarations]
   let using = [(Text.pack n, u) | (n, UsingDeclaration u) <- declarations]

@@ -4823,7 +4823,6 @@ pragma solidvm 3.3;
 contract qq{
   uint myNum = 0;
   constructor() public {
-    addToNum(1, 2);
     addToNum(1);
     addToNum(1, 2);
     addToNum(1, 2, 3);
@@ -4841,29 +4840,40 @@ contract qq{
     myNum += x + y + z;
   }
 }|]
-    getFields ["myNum"] `shouldReturn` [BInteger 13]
+    getFields ["myNum"] `shouldReturn` [BInteger 10]
 
   it "allows overloading functions with same number of parameters" . runTest $ do
     runBS [r|
 pragma solidvm 3.3;
 contract qq{
   uint myNum = 0;
-  bool status = true;
+  string myString = "";
+  bool myStatus = false;
   constructor() public {
-    addToNum(1, false);
-    addToNum(1, 2);
+    addToNum(0, randomFunc(3));
+    addToNum(1, "hi");
+    addToNum(1, true);
+  }
+
+  function randomFunc(uint x) public returns (uint){
+    return x;
   }
 
   function addToNum(uint x, uint y) {
-    myNum += x;
-    status = y;
+    myNum += x + y;
   }
 
   function addToNum(uint x, bool y) {
-    myNum += x + y;
+    myNum += x;
+    myStatus = y;
+  }
+
+  function addToNum(uint x, string z) {
+    myNum += x;
+    myString = z;
   }
 }|]
-    getFields ["myNum"] `shouldReturn` [BInteger 8]
+    getFields ["myNum", "myString", "myStatus"] `shouldReturn` [BInteger 5, BString "hi", BBool True]
     
   it "should catch invalid function overloads" $ runTest (do
     runBS [r|

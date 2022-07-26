@@ -1881,9 +1881,9 @@ expToVar' (CC.FunctionCall _ e args) = do
         argVals <- case args of
                         CC.OrderedArgs as -> OrderedVals <$> mapM (getVar <=< expToVar) as
                         CC.NamedArgs ns -> NamedVals <$> mapM (mapM $ getVar <=< expToVar) ns
-        let argsToList = case args of
-              CC.OrderedArgs es -> es
-              _ -> []
+        let argCount = case args of
+                        CC.OrderedArgs as -> length as
+                        CC.NamedArgs ns -> length ns
         case var of
           Constant (SReference (AccountPath address (MS.StoragePath pieces))) -> do
             val' <- getVar $ Constant $ SReference $ AccountPath address $MS.StoragePath $ init pieces
@@ -1916,15 +1916,44 @@ expToVar' (CC.FunctionCall _ e args) = do
             contract' <- getCurrentContract
             address <- getCurrentAccount
             (hsh, cc) <- getCurrentCodeCollection
-
-            let matchingFuncOverloads = filter overloadFilter $ CC.funcOverload func
-            -- when (funcName == "addToNum") (internalError "Hey Siri, please tell me what's wrong with me." matchingFuncOverload)
-            res <- case matchingFuncOverloads of
-              [] -> runTheCall address contract' funcName hsh cc func argVals ro
-              _ -> runTheCall address contract' funcName hsh cc (head matchingFuncOverload) argVals ro
-            return . Constant . fromMaybe SNULL $ res
+            if (CC._vmVersion contract' /= "svm3.3")
+              then do
+                res <- runTheCall address contract' funcName hsh cc func argVals ro
+                return . Constant . fromMaybe SNULL $ res
+              else do
+                let matchingFuncOverload = filter checkArgToFunc $ CC.funcOverload func
+                res <- case matchingFuncOverload of
+                        [] -> runTheCall address contract' funcName hsh cc func argVals ro
+                        _ -> runTheCall address contract' funcName hsh cc (head matchingFuncOverload) argVals ro
+                return . Constant . fromMaybe SNULL $ res
             where
-              something theFunc = case argVals of
+              compareArgTypes :: [(Maybe SolidString, CC.IndexedType)] -> [Bool]
+              compareArgTypes functionArgs = do
+                argPairs <- case argVals of
+                  OrderedVals ov -> forM (zip ov functionArgs) $ \(v1, (_, t)) -> do
+                                      case (v1, t) of
+                                        _ -> pure $ (v1, t)
+                  NamedVals _ -> []
+                doTypesMatch <- fmap testTypes argPairs
+                pure $ doTypesMatch
+                where
+                  testTypes :: (Value, CC.IndexedType) -> Bool
+                  testTypes (v1, t) = 
+                    case (v1, (CC.indexedTypeType t)) of
+                      (SInteger _, SVMType.Int _ _) -> True 
+                      (SString _, SVMType.String _) -> True
+                      (SString _, SVMType.Bytes _ _) -> True
+                      (SBool _, SVMType.Bool) -> True
+                      (SAccount _ _, SVMType.Address _) -> True
+                      (SAccount _ _, SVMType.Account _) -> True
+                      (SEnumVal _ _ _, SVMType.UnknownLabel _ _) -> True
+                      (SStruct _ _, SVMType.UnknownLabel _ _) -> True
+                      (SContract _ _, SVMType.UnknownLabel _ _) -> True
+                      (SArray _ _, SVMType.Array _ _) -> True
+                      (SMap _ _, SVMType.Mapping _ _ _) -> True
+                      _ -> False
+              mapArgs :: CC.FuncF a -> [(String, (SVMType.Type, Value))]
+              mapArgs theFunc = case argVals of
                 OrderedVals vs -> let argMeta = 
                                         map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t))
                                         $ CC.funcArgs theFunc
@@ -1942,7 +1971,10 @@ expToVar' (CC.FunctionCall _ e args) = do
                                 . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
                                 $ M.toList typeAndVal
                   in sortedArgs
-              overloadFilter tf = ((length $ something tf) == (length $ CC.funcArgs tf)) && ((length $ something tf) == (length $ argsToList))
+              checkArgToFunc :: CC.FuncF a -> Bool
+              checkArgToFunc tf = ((length $ mapArgs tf) == (length $ CC.funcArgs tf)) 
+                && ((length $ mapArgs tf) == (argCount)) 
+                && (all (== True) $ compareArgTypes $ CC.funcArgs tf)
 
           Constant (SStructDef structName) -> do
             contract' <- getCurrentContract
