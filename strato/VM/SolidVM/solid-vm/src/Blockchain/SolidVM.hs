@@ -1789,7 +1789,7 @@ expToVar' (CC.FunctionCall _ e args) = do
               _ -> return False
             return . Constant $ SBool success
 
-          Constant (SContractItem address' "send") -> do
+          Constant (SContractItem address' "code") -> do
             cid <- case (a ^. namedAccountChainId) of 
               UnspecifiedChain -> do
                 cid1 <- view accountChainId <$> getCurrentAccount
@@ -1811,7 +1811,13 @@ expToVar' (CC.FunctionCall _ e args) = do
             let cd' = case cd of
                         Just (_,bs) -> bs
                         Nothing -> missingCodeCollection "Could not locate SolidVM code collection at account" (format realAccount)
-            let decodeCD = DT.decodeUtf8 cd'
+            searchTerm <- case argVals of
+              OrderedVals [SString term] -> do
+                res <- term
+                case res of 
+                  True -> return True
+                  _ -> return False
+              _ -> return False
 
           Constant (SContractItem address' itemName) -> do
             from <- getCurrentAccount
