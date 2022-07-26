@@ -4,8 +4,8 @@
 	"displayName": "STRATO",
 	"description": "VSCode Integration for BlockApps STRATO",
 	"icon": "resources/balogo.png",
-	"version": "0.1.20",
-  "repository":"https://github.com/blockapps/strato-platform/strato-vscode",
+	"version": "0.1.26",
+	"repository": "https://github.com/blockapps/strato-platform/strato-vscode-images",
 	"engines": {
 		"vscode": "^1.53.0"
 	},
@@ -23,8 +23,8 @@
 		"onCommand:strato-vscode.testUI",
 		"onView:project-management",
 		"onView:contracts",
-		"onView:deployments",
 		"onView:nodes",
+		"onView:cirrus",
 		"onCommand:extension.strato-debug.debugEditorContents"
 	],
 	"main": "./out/extension.js",
@@ -115,9 +115,24 @@
 				"icon": "$(refresh)"
 			},
 			{
-				"command": "deployments.refreshEntry",
-				"title": "Refresh",
-				"icon": "$(refresh)"
+				"command": "contracts.createChain",
+				"title": "Create Private Chain",
+				"icon": "$(add)"
+			},
+			{
+				"command": "contracts.uploadContract",
+				"title": "Upload Contract",
+				"icon": "$(add)"
+			},
+			{
+				"command": "contracts.callFunction",
+				"title": "Call Function",
+				"icon": "$(play)"
+			},
+			{
+				"command": "cirrus.queryCirrus",
+				"title": "Search",
+				"icon": "$(search)"
 			},
 			{
 				"command": "nodes.refreshEntry",
@@ -210,14 +225,31 @@
 					"group": "navigation"
 				},
 				{
-					"command": "deployments.refreshEntry",
-					"when": "view == deployments",
+					"command": "cirrus.queryCirrus",
+					"when": "view == cirrus",
 					"group": "navigation"
 				},
 				{
 					"command": "nodes.refreshEntry",
 					"when": "view == nodes",
 					"group": "navigation"
+				}
+			],
+			"view/item/context": [
+				{
+					"command": "contracts.createChain",
+					"when": "view == contracts && viewItem == node",
+					"group": "inline"
+				},
+				{
+					"command": "contracts.uploadContract",
+					"when": "view == contracts && viewItem == chainId",
+					"group": "inline"
+				},
+				{
+					"command": "contracts.callFunction",
+					"when": "view == contracts && viewItem == function",
+					"group": "inline"
 				}
 			]
 		},
@@ -241,8 +273,8 @@
 					"name": "Nodes"
 				},
 				{
-					"id": "deployments",
-					"name": "Deployments"
+					"id": "cirrus",
+					"name": "Cirrus"
 				},
 				{
 					"id": "contracts",
@@ -260,9 +292,9 @@
 		"test": "node ./out/test/runTest.js"
 	},
 	"dependencies": {
+		"await-notify": "1.0.1",
 		"blockapps-rest": "../blockapps-rest",
 		"js-yaml": "^4.0.0",
-		"await-notify": "1.0.1",
 		"vscode-debugadapter": "^1.43.0",
 		"ws": "^7.4.2"
 	},

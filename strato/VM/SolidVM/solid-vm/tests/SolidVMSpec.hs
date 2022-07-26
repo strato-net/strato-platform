@@ -703,33 +703,39 @@ contract qq {
 
     it "throw an error when there is an 'block_timestamp' variable name" $ runTest (do
       runBS [r|
+pragma solidvm 3.3;
+
 contract qq {
    string block_timestamp;
    constructor()
    {
       block_timestamp = "hello";
    }
-}|]) `shouldThrow` anyParseError
+}|]) `shouldThrow` anyReservedWordError
 
     it "throw an error when there is an 'block_hash' variable name" $ runTest (do
       runBS [r|
+pragma solidvm 3.3;
+
 contract qq {
    string block_hash;
    constructor()
    {
       block_hash = "hello";
    }
-}|]) `shouldThrow` anyParseError
+}|]) `shouldThrow` anyReservedWordError
 
     it "throw an error when there is an 'block_number' variable name" $ runTest (do
       runBS [r|
+pragma solidvm 3.3;
+
 contract qq {
    string block_number;
    constructor()
    {
       block_number = "hello";
    }
-}|]) `shouldThrow` anyParseError
+}|]) `shouldThrow` anyReservedWordError
 
 
     it "throw an error when there is an 'address' variable name" $ runTest (do
@@ -740,21 +746,27 @@ contract qq {
 
     it "throw an error when there is an 'record_id' variable name" $ runTest (do
       runBS [r|
+pragma solidvm 3.3;
+
 contract qq {
    uint record_id;
-}|]) `shouldThrow` anyParseError
+}|]) `shouldThrow` anyReservedWordError
 
     it "throw an error when there is an 'transaction_hash' variable name" $ runTest (do
       runBS [r|
+pragma solidvm 3.3;
+
 contract qq {
    uint transaction_hash;
-}|]) `shouldThrow` anyParseError
+}|]) `shouldThrow` anyReservedWordError
 
     it "throw an error when there is an 'transaction_sender' variable name" $ runTest (do
       runBS [r|
+pragma solidvm 3.3;
+
 contract qq {
    uint transaction_sender;
-}|]) `shouldThrow` anyParseError
+}|]) `shouldThrow` anyReservedWordError
 
     it "can multiline require" . runTest $ do
       runBS [r|
@@ -2406,8 +2418,14 @@ contract qq {
 }|]
     getFields ["i"] `shouldReturn` [BInteger 8]
 
-  it "can accept modifiers" $ (runTest $ runBS [r| contract qq { modifier m() { _; } }|])
-    `shouldReturn` ()
+  it "can accept modifiers" $ runTest (do
+      runBS [r| 
+  pragma solidvm 3.3; 
+  contract qq { 
+    modifier m() {
+       _; 
+      } 
+}|]) `shouldReturn` ()
 
   it "catches parse errors" $ (runTest $ runBS [r| contract { |]) `shouldThrow` anyParseError
 
@@ -3802,6 +3820,7 @@ contract qq {
 
   it "can parse an X509 certificate" . runTest $ do
     runBS [r|
+pragma solidvm 3.3;
 contract qq {
 
     string myNewCertificate = "-----BEGIN CERTIFICATE-----\nMIIBiDCCAS2gAwIBAgIQCgO76hC29iXEFXJNco5ekjAMBggqhkjOPQQDAgUAMEYx\nDDAKBgNVBAMMA2RhbjEMMAoGA1UEBgwDVVNBMRIwEAYDVQQKDAlibG9ja2FwcHMx\nFDASBgNVBAsMC2VuZ2luZWVyaW5nMB4XDTIxMDMxODE1NDgwN1oXDTIyMDMxODE1\nNDgwN1owRjEMMAoGA1UEAwwDZGFuMQwwCgYDVQQGDANVU0ExEjAQBgNVBAoMCWJs\nb2NrYXBwczEUMBIGA1UECwwLZW5naW5lZXJpbmcwVjAQBgcqhkjOPQIBBgUrgQQA\nCgNCAAQY4p67l1IIEUdVC7L+rUDwF5Nv30bze0NV5y8ced7qwp+YFk3UAiOGkcYo\n7ba8F92rd0yf9AGpvZN1H3Dda8xdMAwGCCqGSM49BAMCBQADRwAwRAIgbKXO8tZ5\noPhBusPQFkNEQDnLO/MRru4KjtCpPnVb5sACIE0TwBJ7yeIGuPc/8G50/858Pf3a\n0t1hHbhYnJarPkNA\n-----END CERTIFICATE-----";
@@ -3967,7 +3986,7 @@ contract qq {
       ]
   it "can get a users cert" . runTest $ do
     void $ runArgsWithOrigin rootAcc sender "()" [r|
-pragma solidvm 3.2;
+pragma solidvm 3.3;
 contract qq {
     account myAccount = account(0x74f014FEF932D2728c6c7E2B4d3B88ac37A7E1d0);
     
@@ -4397,7 +4416,7 @@ contract qq {
 
   it "can declare a custom modifier and use it in a contract" $ (runTest $ do
     (runBS [r|
-pragma solidvm 3.2;
+pragma solidvm 3.3;
 contract qq {
   modifier myModifier() {  // line 4
     require(false);
@@ -4413,7 +4432,7 @@ contract qq {
 
   it "can declare a custom modifier and use it in a contract" $ (runTest $ do
     (runBS [r|
-pragma solidvm 3.2;
+pragma solidvm 3.3;
 contract qq {
   modifier myModifier() {  // line 4
     return 7;
@@ -4431,7 +4450,7 @@ contract qq {
 
   it "can use a modifier as part of a function" . runTest $ do
     runCall "decrement" "(1)" [r|
-pragma solidvm 3.2;
+pragma solidvm 3.3;
 contract qq {
     // We will use these variables to demonstrate how to use
     // modifiers.
@@ -4486,7 +4505,7 @@ contract qq {
 
   it "can use a modifier and require something after and before the function is run" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+pragma solidvm 3.3;
 contract qq {
   uint x = 3;
   modifier myModifier() {  
@@ -4505,7 +4524,7 @@ contract qq {
 
   it "can use a modifier multiple modifiers and they occur in order" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+pragma solidvm 3.3;
 contract qq {
   uint x = 3;
   modifier myModifier() {  
@@ -4531,7 +4550,7 @@ contract qq {
 
   it "can use a modifier  that takes arguments as part of a function" . runTest $ do
     runCall "a" "()" [r|
-pragma solidvm 3.2;
+pragma solidvm 3.3;
 contract qq {
   uint x = 3;
   modifier myModifier(uint _x) {  
@@ -4571,7 +4590,7 @@ contract qq {
 
   it "cannot allow negative block number" $ runTest (do
     runBS [r|
-pragma solidvm 3.2;
+pragma solidvm 3.3;
 contract qq {
   constructor() public returns (bytes32) {
     return blockhash(-1);
@@ -4605,7 +4624,7 @@ contract qq {
 
   it "can use builtin sha256 function" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+pragma solidvm 3.3;
 contract qq {
   bytes32 hsh;
   constructor() public {
@@ -4618,7 +4637,7 @@ contract qq {
     
   it "can use the builtin ripemd160 function" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+pragma solidvm 3.3;
 contract qq {
   bytes20 hsh;
   constructor() public {
@@ -4630,7 +4649,7 @@ contract qq {
 
   it "can use the selfdestruct function" . runTest $ do
     let contract = [r|
-pragma solidvm 3.2;
+pragma solidvm 3.3;
 contract qq {
   account contract';
   account payable contractPay;
@@ -4697,7 +4716,7 @@ contract qq{
 
   it "can use ether number unit suffixes" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+pragma solidvm 3.3;
 contract qq{
   uint weiUnit;
   uint szaboUnit;
@@ -4714,6 +4733,7 @@ contract qq{
 
   it "can create salted contract" . runTest $ do
     runBS [r|
+pragma solidvm 3.3;
 contract X {
   string public xNum;
 }
@@ -4728,7 +4748,7 @@ contract qq {
   X public z;
   bytes32 salt';
   constructor() public {
-    salt' = 0x12345678;
+    salt' = "salt";
     x = new X{salt: salt'}();
     y = new Y{salt: salt'}();
     z = new X{salt: "something"}();
@@ -4736,14 +4756,14 @@ contract qq {
   }
 }|]
     getFields ["x", "y", "z"] `shouldReturn` 
-      [ bContract "X" 0x1e9abebf7e4e73283a531d44a33f7eb6371cf820
-      , bContract "Y" 0x3911f467237f82a56973a5f4d87aa67107479626
-      , bContract "X" 0x33945db5a537463004fbed0bde21ac30d46ad052
+      [ bContract "X" 0x2facc7c9bda88a8261d4ed20fab790a017f52ca0
+      , bContract "Y" 0x43fb24796bed33a219bef6919a82c4929dd7899d
+      , bContract "X" 0x58d79e1e4170a7d37980fdcd7f660e3504ad67c5
       ]
       
   it "can use a try catch statment to catch a divide by zero error the SolidVM Way (trademark pending)" . runTest $ do
     runBS [r|
-pragma solidvm 3.2;
+pragma solidvm 3.3;
 contract qq{
   uint mynum = 5;
   constructor() public {
@@ -4758,7 +4778,7 @@ contract qq{
 
   it "can use a try catch statment to catch a divide by zero error the Solidity Way (trademark very much in effect)" . runTest $ do
     runBS [r| 
-pragma solidvm 3.2;
+pragma solidvm 3.3;
 contract Divisor {
   function doTheDivide() public returns (uint) {
     return (1 / 0);
@@ -4798,3 +4818,41 @@ contract qq {
     getFields ["myNum", "otherNum", "errorCount"] `shouldReturn` [BInteger 3, BInteger 12, BInteger 1]
 
 
+  it "can pass calldata arguments and use calldata variables" . runTest $ do
+    runBS [r|
+
+contract Validator {
+  function isEmptyArray(bytes32[] calldata _arr) pure internal returns (bool) {
+    return _arr.length == 0;
+  }
+}
+
+contract qq is Validator {
+  bool public empty_is_empty;
+  bool public nonempty_is_empty;
+  uint public nonempty_length;
+  constructor() public {
+    bytes32[] calldata empty;
+    empty_is_empty = isEmptyArray(empty);
+
+    bytes32[] calldata nonempty = new bytes32[](1);
+    nonempty_is_empty = isEmptyArray(nonempty);
+
+  }
+}
+|]
+    getFields ["empty_is_empty", "nonempty_is_empty"] `shouldReturn` [BBool True, BBool False]
+
+
+  it "can run this for loop and increment the counter" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq{
+  uint mynum = 0;
+  constructor() public {
+    for (uint i=0; i < 10; i = i + 1) {
+      mynum = i;
+    }
+  }
+}|]
+    getFields ["mynum"] `shouldReturn` [BInteger 9]

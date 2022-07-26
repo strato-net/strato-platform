@@ -164,7 +164,7 @@ setVal dst@(SReference addressedPath@(AccountPath addr path)) src = do
                         _         -> toBasic src
   markDiffForAction addr path basicSrc
   contract <- getCurrentContract
-  let svm3_0 = CC._vmVersion contract == "svm3.0" || CC._vmVersion contract == "svm3.2"
+  let svm3_0 = CC._vmVersion contract == "svm3.0" || CC._vmVersion contract == "svm3.2" || CC._vmVersion contract == "svm3.3"
   putSolidStorageKeyVal' svm3_0 addr path basicSrc
 
 
@@ -235,7 +235,7 @@ getVar (Constant (SReference addressedPath@(AccountPath addr key))) = do
 
 getVar (Constant (SStruct s ma)) = do
   cntrct <- getCurrentContract
-  if ( not (CC._vmVersion cntrct == "svm3.2") ) then return (SStruct s ma) else do
+  if ( not (CC._vmVersion cntrct == "svm3.2" || CC._vmVersion cntrct == "svm3.3") ) then return (SStruct s ma) else do
     resolved <- mapM (\var -> do
         v <- getVar var
         return $ Constant v
@@ -244,7 +244,7 @@ getVar (Constant (SStruct s ma)) = do
 
 getVar (Constant (SArray typ vc)) = do
   cntrct <- getCurrentContract
-  if ( not (CC._vmVersion cntrct == "svm3.2")) then return (SArray typ vc) else do
+  if ( not (CC._vmVersion cntrct == "svm3.2" || CC._vmVersion cntrct == "svm3.3")) then return (SArray typ vc) else do
     resolved <- V.mapM (\var -> do
         v <- getVar var
         return $ Constant v
@@ -253,7 +253,7 @@ getVar (Constant (SArray typ vc)) = do
 
 getVar (Constant (STuple vct)) = do
   cntrct <- getCurrentContract
-  if (not (CC._vmVersion cntrct == "svm3.2")) then return (STuple vct) else do
+  if (not (CC._vmVersion cntrct == "svm3.2" || CC._vmVersion cntrct == "svm3.3")) then return (STuple vct) else do
     resolved <- V.mapM (\var -> do
         v <- getVar var
         return $ Constant v
@@ -262,7 +262,7 @@ getVar (Constant (STuple vct)) = do
   
 getVar (Constant (SMap ty mp)) = do
   cntrct <- getCurrentContract
-  if ( not (CC._vmVersion cntrct == "svm3.2")) then return (SMap ty mp) else do
+  if ( not (CC._vmVersion cntrct == "svm3.2" || CC._vmVersion cntrct == "svm3.3")) then return (SMap ty mp) else do
     resolved <- mapM (\var -> do
         v <- getVar var
         return $ Constant v
@@ -271,7 +271,7 @@ getVar (Constant (SMap ty mp)) = do
 
 getVar (Constant (SPush v (Just var))) = do
   cntrct <- getCurrentContract
-  if ( not (CC._vmVersion cntrct == "svm3.2")) then return (SPush v (Just var)) else do
+  if ( not (CC._vmVersion cntrct == "svm3.2" || CC._vmVersion cntrct == "svm3.3")) then return (SPush v (Just var)) else do
     resolved <- getVar var
     return $ SPush v (Just $ Constant resolved)
 
@@ -310,7 +310,7 @@ deleteVar (Constant (SReference a@(AccountPath addr path))) = do
       when ro $ invalidWrite "Invalid delete during read-only access" $ "addr: " ++ show addr ++ ", path: " ++ show path
       markDiffForAction addr path $ MS.BDefault
       contract <- getCurrentContract
-      let svm3_0 = CC._vmVersion contract == "svm3.0" || CC._vmVersion contract == "svm3.2"
+      let svm3_0 = CC._vmVersion contract == "svm3.0" || CC._vmVersion contract == "svm3.2" || CC._vmVersion contract == "svm3.3"
       putSolidStorageKeyVal' svm3_0 addr path $ MS.BDefault
 
 deleteVar v = todo "deleteVar not yet supported for local variables" $ show v
