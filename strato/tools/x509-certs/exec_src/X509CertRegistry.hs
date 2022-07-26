@@ -178,7 +178,7 @@ initializeCertificateRegistryTX priv addr certs nonce =
 
 certificateRegistryContract :: T.Text
 certificateRegistryContract = [r|
-pragma solidvm 3.2;
+pragma solidvm 3.3;
 contract Certificate {
     address owner;  // The CertificateRegistery Contract
 
@@ -232,7 +232,7 @@ contract Certificate {
     }
 }
 
-pragma solidvm 3.2;
+pragma solidvm 3.3;
 contract CertificateRegistry {
     // The registry maintains a list and mapping of all the certificates
     // We need the extra array in order for us to iterate through our certificates.
