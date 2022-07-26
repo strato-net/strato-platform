@@ -23,7 +23,6 @@ solidityPragma = do
     rest <- many1 (noneOf ";")
     -- Modify the state of the parser to change the pragma version if a new version is found
     modifyState(\s -> s { pragmaVersion = rest })
-    -- setPragmaVersion rest
     semi
     pure (pragmaName, rest)
   return $ Pragma a pragmaName rest
