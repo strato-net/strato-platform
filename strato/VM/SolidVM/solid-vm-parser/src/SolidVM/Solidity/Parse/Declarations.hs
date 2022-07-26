@@ -58,7 +58,7 @@ solidityContract = do
     --Throw an error if 'account' is used.
     pragmaVersion' <- getPragmaVersion
     when (isReservedWord pragmaVersion' contractName') $ reservedWordError pragmaVersion' contractName'
-    setContractName $ labelToString contractName'
+    modifyState(\s -> s { contractName = (labelToString contractName') })
     baseConstrs <- option [] $ do
       reserved "is"
       commaSep1 $ do
