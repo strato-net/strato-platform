@@ -41,67 +41,6 @@ pipeline {
             }            
         }
 
-        stage('Beanstalk Load Test - Launch other nodes') {
-            parallel {
-                stage('Deploy SGS multinode102') {
-                    agent { label "test-multinode102" }
-                    steps {
-                        script {
-                            node2Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE2, 'beanstalk', false)
-                        }
-                    }
-                }
-                stage('Deploy SGS multinode103') {
-                    agent { label "test-multinode103" }
-                    steps {
-                        script {
-                            node3Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE3, 'beanstalk', false)
-                        }
-                    }
-                }
-                stage('Deploy SGS multinode104') {
-                    agent { label "test-multinode104" }
-                    steps {
-                        script {
-                            node4Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE4, 'beanstalk', false)
-                        }
-                    }
-                }
-                stage('Deploy SGS multinode301') {
-                    agent { label "test-multinode301" }
-                    steps {
-                        script {
-                            node5Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE5, 'beanstalk', false)
-                        }
-                    }
-                }
-                stage('Deploy SGS multinode302') {
-                    agent { label "test-multinode302" }
-                    steps {
-                        script {
-                            node6Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE6, 'beanstalk', false)
-                        }
-                    }
-                }
-                stage('Deploy SGS multinode303') {
-                    agent { label "test-multinode303" }
-                    steps {
-                        script {
-                            node7Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE7, 'beanstalk', false)
-                        }
-                    }
-                }
-                stage('Deploy SGS multinode304') {
-                    agent { label "test-multinode304" }
-                    steps {
-                        script {
-                            node8Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE8, 'beanstalk', false)
-                        }
-                    }
-                }
-            }
-        }
-
         stage ('Beanstalk Load Test -  Run beanstalk app on bootnode') {
             // agent { label "multinode101" } // is default
             steps {
