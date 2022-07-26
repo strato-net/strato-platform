@@ -75,7 +75,7 @@ compileSourceNoInheritance initCodeMap = do
         let pragmas = \case
               Pragma _ n v -> Just (n, v)
               _ -> Nothing
-            vmVersion' = if (Just ("solidvm","3.2")) `elem` (pragmas <$> sourceUnits) then "svm3.2" else (if (Just ("solidvm","3.0")) `elem` (pragmas <$> sourceUnits) then "svm3.0" else "")
+            vmVersion' = if (Just ("solidvm","3.3")) `elem` (pragmas <$> sourceUnits) then "svm3.3" else (if (Just ("solidvm","3.2")) `elem` (pragmas <$> sourceUnits) then "svm3.2" else (if (Just ("solidvm","3.0")) `elem` (pragmas <$> sourceUnits) then "svm3.0" else ""))
         fmap catMaybes . for sourceUnits $ \case
           NamedXabi name (xabi, parents') -> do
             ctrct <- first SVMEx
@@ -102,11 +102,17 @@ hasSvm3_2 cc = any (=="svm3.2") vmVers
     contractList = map snd $ M.toList (cc ^. contracts )
     vmVers = map (^. vmVersion ) contractList
 
+hasSvm3_3 :: CodeCollection -> Bool
+hasSvm3_3 cc = any (=="svm3.3") vmVers
+  where
+    contractList = map snd $ M.toList (cc ^. contracts )
+    vmVers = map (^. vmVersion ) contractList
+
 compileSource :: Map T.Text T.Text -> Either ParseTypeCheckOrSolidVMError CodeCollection
 compileSource mTT = do
   let applyInheritanceE = first SVMEx . applyInheritance
   case ((applyInheritanceE <=< compileSourceNoInheritance) mTT) of   
-    Right cc -> if hasSvm3_2 cc then typeCheckDetector cc else Right cc
+    Right cc -> if ((hasSvm3_2 cc) || (hasSvm3_3 cc)) then typeCheckDetector cc else Right cc
     Left x -> Left x
     where 
       typeCheckDetector ecc = case TC.detector ecc of

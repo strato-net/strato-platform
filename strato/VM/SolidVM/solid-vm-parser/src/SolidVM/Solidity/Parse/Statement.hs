@@ -53,6 +53,7 @@ statement = do
   <|> (Continue <$> (position (reserved "continue") <* semi))
   <|> (Break <$> (position (reserved "break") <* semi))
   <|> (reserved "assembly" >> inlineAssembly)
+  <|> (ModifierExecutor <$> (position (reserved "_") <* semi))   -- This parses the "_;" statement, which is used to signify when in a modifier the function should run
   <|> ((\(a,e) -> SimpleStatement (ExpressionStatement e) a) <$> ((withPosition expression) <* semi))
   <|> revertStatement
   <|> uncheckedStatement
@@ -99,7 +100,8 @@ tupleDeclaration' = parens $ commaSep $ do
   partType <- simpleTypeExpression
   optional $ reserved "indexed" <|>
              reserved "storage" <|>
-             reserved "memory"
+             reserved "memory" <|>
+             reserved "calldata"
   partName <- option "" identifier
   return (partName, partType)
 
@@ -187,11 +189,11 @@ revertStatement = try $ do
   _ <- semi
   pure $ RevertStatement i e a  
 
---ForStatement = 'for' '(' (SimpleStatement)? ';' (Expression)? ';' (ExpressionStatement)? ')' Statement
 
 location :: SolidityParser (Maybe Location)
 location = optionMaybe $ asum [ reserved "memory" >> return Memory
                               , reserved "storage" >> return Storage
+                              , reserved "calldata" >> return Calldata 
                               ]
 
 varDefEntry :: SolidityParser (Maybe Type) -> SolidityParser VarDefEntry
