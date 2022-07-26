@@ -1816,16 +1816,23 @@ expToVar' (CC.FunctionCall _ e args) = do
               _ -> return (Nothing, False) 
             --get the contract information
             (contract, _, _) <- getCodeAndCollection realAccount
-            if (isBlank) then do
+            result <- if (isBlank) then do
               --get the location of just the code of the contract
               let (startLine, startColumn) = contract ^. CC.contractContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
               let (endLine, endColumn) = contract ^. CC.contractContext ^. sourceAnnotationEnd & (_sourcePositionLine &&& _sourcePositionColumn)
-
+              --get the lines of the code
+              let bandwidth = take startLine (drop endLine cd')
+              --Trim the front and add the front again 
+                  trimFront = (take startColumn (head bandwidth)) ++ tail bandwidth
+              --Trim up the back 
+                  final = mapOnLast (drop endColumn) trimFront
+              --return only the contract code
+              pure final
             else do
               let code = case searchTerms of
                             Just terms -> searchCode cd' terms
                             Nothing -> cd'
-              return $ Constant $ SString $ BC.pack $ show code
+              return $ Constant $ SString $ BC.pack $ show result
             --Find the specific piece of code and return it
             --First see if there was anything that was inputted in the argument list
 
