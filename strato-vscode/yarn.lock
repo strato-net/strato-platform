@@ -411,7 +411,7 @@ binary@~0.3.0:
     chainsaw "~0.1.0"
 
 blockapps-rest@../blockapps-rest:
-  version "8.1.1"
+  version "8.2.0"
   dependencies:
     "@babel/polyfill" "^7.8.3"
     "@solidity-parser/parser" "^0.14.1"

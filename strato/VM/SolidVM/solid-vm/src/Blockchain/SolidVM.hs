@@ -2019,6 +2019,70 @@ expToVar' (CC.FunctionCall _ e args) = do
 SimpleStatement (ExpressionStatement (Binary "=" (Variable "tickets") (FunctionCall (NewExpression (SolidString "Hashmap")) [])))
 -}
 
+expToVar' ep@(CC.Binary _ "=" dst@(CC.IndexAccess _ parent (Just indExp)) src) = do
+  srcVar <- expToVar src
+  srcVal <- getVar srcVar
+
+
+  pVar <- expToVar parent
+  pVal <- weakGetVar pVar
+
+  cntrct <- getCurrentContract
+
+  -- If it's an array, calling (expToVar dst) gives us
+  -- the value at the index, NOT a reference that we can
+  -- assign to....so we need to make a new vector and reset the whole array
+  if (CC._vmVersion cntrct == "svm3.2" || CC._vmVersion cntrct == "svm3.3")
+    then do
+      case pVal of
+        SArray typ fs -> do
+          indVal <- getVar =<< expToVar indExp
+          case indVal of
+            SInteger ind -> do
+              when ((ind >= toInteger (V.length fs) || 0 > ind)) (invalidWrite "Cannot assign a value outside the allocated space for an array" (unparseExpression ep))
+              let newVec = fs V.// [(fromIntegral ind, srcVar)]
+              setVar pVar (SArray typ newVec)
+              return $ Constant $ SBool True
+            _ -> typeError ("array index value (" ++ (show indVal) ++ ") is not an integer") (unparseExpression ep)
+        SMap typ theMap -> do
+          theIndex <- getVar =<< expToVar indExp
+          let newMap = M.insert theIndex srcVar theMap
+          setVar pVar (SMap typ newMap)
+          return $ Constant $ SBool True
+        _ -> do -- If it's a mapping, (expToVar dst) IS a reference, so we can set directly to it
+          dstVar <- expToVar dst
+          setVar dstVar srcVal
+          return $ Constant srcVal
+    else do 
+      case pVal of
+        SArray typ fs -> do
+          indVal <- getVar =<< expToVar indExp
+          case indVal of
+            SInteger ind -> do
+              when ((ind >= toInteger (V.length fs) || 0 > ind)) (invalidWrite "Cannot assign a value outside the allocated space for an array" (unparseExpression ep))
+              let newVec = fs V.// [(fromIntegral ind, srcVar)]
+              setVar pVar (SArray typ newVec)
+              return $ Constant $ SBool True
+            _ -> typeError ("array index value (" ++ (show indVal) ++ ") is not an integer") (unparseExpression ep)
+        _ -> do -- If it's a mapping, (expToVar dst) IS a reference, so we can set directly to it
+          dstVar <- expToVar dst
+          setVar dstVar srcVal
+          return $ Constant srcVal
+  
+expToVar' ep@(CC.Binary _ "=" (CC.IndexAccess _ _ Nothing) _) = do
+  missingField "index value cannot be empty" (unparseExpression ep)
+
+
+
+expToVar' (CC.Binary _ "=" dst src) = do
+  srcVal <- getVar =<< expToVar src
+  dstVar <- expToVar dst
+
+  setVar dstVar srcVal
+  
+  return $ Constant srcVal
+
+
 expToVar' x = todo "expToVar/unhandled" x
 
 --------------
