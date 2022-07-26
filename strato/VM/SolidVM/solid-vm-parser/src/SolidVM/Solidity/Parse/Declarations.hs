@@ -364,8 +364,7 @@ tupleDeclaration = parens $ commaSep $ do
   partType <- simpleTypeExpression
   optional $ reserved "indexed" <|>
              reserved "storage" <|>
-             reserved "memory" <|>
-             reserved "calldata"
+             reserved "memory"
   partName <- option "" identifier
   return (Text.pack partName, partType)
 

@@ -223,7 +223,6 @@ unparseVarDefEntry (VarDefEntry maybeType maybeLoc theName _) =
                       Nothing -> " "
                       Just Memory -> " memory "
                       Just Storage -> " storage "
-                      Just Calldata -> " calldata "
   in typeString ++ locString ++ labelToString theName
 
 

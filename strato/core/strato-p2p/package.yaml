@@ -110,7 +110,6 @@ tests:
       - hflags
       - hspec
       - hspec-expectations-lifted
-      - labeled-error
       - lens
       - monad-alter
       - mtl
@@ -123,4 +122,5 @@ tests:
       - strato-sequencer
       - text
       - unliftio
-      - x509-certs
+
+      
