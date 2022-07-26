@@ -61,7 +61,7 @@ defaultSourceTools dSettings =
   let parse = fmap concat
             . traverse (uncurry parseSourceWithAnnotations)
             . unSourceMap
-      compile = compileSourceWithAnnotations True
+      compile = compileSourceWithAnnotations False
               . M.fromList
               . unSourceMap
       analyze = runDetectors parse compile id
