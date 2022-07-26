@@ -431,11 +431,9 @@ handleEvents peer = awaitForever $ \case
               ]
             lift $ insert (Proxy @(Proxy (Outbound WireMessage))) (pPeerIp peer, msgHash) Proxy
             yieldR outbound
-      P2pAskForBlocks start _ p -> do
-        ss <- lift $ shouldSendToPeer p
-        when ss $ do
-          $logDebugS "handleEvents/P2pAskForBlocks" . T.pack $ "syncFetch: " ++ show start
-          syncFetch Forward start
+      P2pAskForBlocks start _ _ -> do
+        $logDebugS "handleEvents/P2pAskForBlocks" . T.pack $ "syncFetch: " ++ show start
+        syncFetch Forward start
       P2pPushBlocks start end p -> do
         ss <- lift $ shouldSendToPeer p
         when ss $ do
