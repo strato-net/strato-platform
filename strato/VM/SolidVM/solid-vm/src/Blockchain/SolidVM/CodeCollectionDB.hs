@@ -123,8 +123,8 @@ compileSource check mTT = do
 compileSourceWithAnnotations :: Bool -> Map T.Text T.Text -> Either [SourceAnnotation T.Text] CodeCollection
 compileSourceWithAnnotations check = withAnnotations (compileSource check)
 
-codeCollectionFromSource :: (MonadIO m, HasCodeDB m) => B.ByteString -> m (Keccak256, CodeCollection)
-codeCollectionFromSource initCode = do
+codeCollectionFromSource :: (MonadIO m, HasCodeDB m) => Bool -> B.ByteString -> m (Keccak256, CodeCollection)
+codeCollectionFromSource typecheck initCode = do
   let initList = case Aeson.decode $ BL.fromStrict initCode of
         Just l -> l
         Nothing -> case Aeson.decode $ BL.fromStrict initCode of
@@ -143,7 +143,7 @@ codeCollectionFromSource initCode = do
     Nothing -> do
       recordCacheEvent StorageWrite
       hsh' <- addCode SolidVM canonicalInitCode
-      let ecc = compileSource True initMap
+      let ecc = compileSource typecheck initMap
           cc = case ecc of
                  Right a -> a
                  Left (PEx p) -> parseError "codeCollectionFromSource" p
@@ -154,8 +154,8 @@ codeCollectionFromSource initCode = do
       liftIO $ writeIORef unsafeCodeMapIORef codeMap'
       return $ assert (hsh == hsh') (hsh, cc)
 
-codeCollectionFromHash :: (MonadIO m, HasCodeDB m) => Keccak256 -> m CodeCollection
-codeCollectionFromHash hsh = do
+codeCollectionFromHash :: (MonadIO m, HasCodeDB m) => Bool -> Keccak256 -> m CodeCollection
+codeCollectionFromHash typecheck hsh = do
   codeMap <- liftIO $ readIORef unsafeCodeMapIORef
   case M.lookup hsh codeMap of
     Just cc -> do
@@ -169,7 +169,7 @@ codeCollectionFromHash hsh = do
           let initMap = case Aeson.decode $ BL.fromStrict initCode of
                   Just l -> M.fromList l
                   Nothing -> M.singleton T.empty (decodeUtf8 initCode)
-          let ecc = compileSource True initMap
+          let ecc = compileSource typecheck initMap
               cc = case ecc of
                      Right a -> a
                      Left (PEx p) -> parseError "codeCollectionFromHash" p

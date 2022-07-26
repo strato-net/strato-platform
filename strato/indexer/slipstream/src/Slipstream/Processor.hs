@@ -441,9 +441,6 @@ processTheMessages env sqlEnv conn g messages = do
       getCC = getCodeCollection' flags_indexEVM
       evmInsertsF = if flags_indexEVM then getEVMInserts else getInsertsIgnoreEVM
 
-  -- forM :: [a] -> (a -> m b) -> m [b]
-  -- forM :: [a] -> (a -> m (Either b c)) -> m [Either b c]
-  -- m [c]
   fkeys' <- forM creates $ \(ccString, cp, o, a, hl) -> do
     cc' <- getCC cp ccString
     case cc' of
@@ -482,11 +479,11 @@ processTheMessages env sqlEnv conn g messages = do
               forM_ deferredForeignKeys $ \deferredForeignKey -> do
                 outputData conn $ createForeignIndexesForJoins deferredForeignKey
 
-              pure $ Right deferredForeignKeys -- Either String String
+              pure $ Right deferredForeignKeys 
               
       Left cc -> do 
         $logInfoS "processTheMessages" $ T.pack cc
-        pure $ Left cc -- Either String String
+        pure $ Left cc 
   
   let fkeys = rights fkeys'
   
