@@ -121,7 +121,7 @@ compileSource typeCheck mTT = do
         xs -> Left $ TCEx xs
 
 compileSourceWithAnnotations :: Bool -> Map T.Text T.Text -> Either [SourceAnnotation T.Text] CodeCollection
-compileSourceWithAnnotations check = withAnnotations (compileSource check)
+compileSourceWithAnnotations typeCheck = withAnnotations (compileSource typeCheck)
 
 codeCollectionFromSource :: (MonadIO m, HasCodeDB m) => Bool -> B.ByteString -> m (Keccak256, CodeCollection)
 codeCollectionFromSource typeCheck initCode = do
