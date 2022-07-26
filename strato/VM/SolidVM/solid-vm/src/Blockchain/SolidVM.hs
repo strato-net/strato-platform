@@ -1812,8 +1812,8 @@ expToVar' (CC.FunctionCall _ e args) = do
                         Just (_,bs) -> bs
                         Nothing -> missingCodeCollection "Could not locate SolidVM code collection at account" (format realAccount)
             (searchTerms, isBlank) <- case argVals of
-              NamedVals [SString arguments] -> (arguments, True)
-              _ -> return (Nothing, False) 
+              NamedVals [SString arguments] -> (arguments, False)
+              _ -> return (Nothing, True) 
             --get the contract information
             (contract, _, _) <- getCodeAndCollection realAccount
             result <- if (isBlank) then do
@@ -1829,6 +1829,18 @@ expToVar' (CC.FunctionCall _ e args) = do
               --return only the contract code
               pure final
             else do
+              --Search the full contract go through sequentially
+              (startLine, startColumn) <- contract ^.. CC.constContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
+                                                     . CC.contractContext ^. sourceAnnotationEnd & (_sourcePositionLine &&& _sourcePositionColumn)
+                                                     . CC.storageDefsContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
+                                                     . CC.enumsContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
+                                                     . CC.structsContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
+                                                     . CC.eventsContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
+                                                     . CC.functionsContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
+                                                     . CC.constructorContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
+
+
+
               let code = case searchTerms of
                             Just terms -> searchCode cd' terms
                             Nothing -> cd'
