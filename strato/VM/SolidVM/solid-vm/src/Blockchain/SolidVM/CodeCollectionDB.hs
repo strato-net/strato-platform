@@ -49,7 +49,7 @@ import           SolidVM.Solidity.StaticAnalysis.Typechecker as TC
 
 data ParseTypeCheckOrSolidVMError = PEx ParseError
                          | TCEx [SourceAnnotation T.Text]
-                         | SVMEx (Positioned ((,) SolidException)) deriving (Show) 
+                         | SVMEx (Positioned ((,) SolidException)) deriving (Show)
 
 {-# NOINLINE unsafeCodeMapIORef #-}
 unsafeCodeMapIORef :: IORef (Map Keccak256 CodeCollection)
@@ -89,7 +89,7 @@ compileSourceNoInheritance initCodeMap = do
         Just _ ->  Left . PEx
                  $ newErrorMessage (Message $ "Duplicate contract found: " ++ labelToString cName)
                                    (fromSourcePosition $ _sourceAnnotationStart $ _contractContext contract)
-                                           
+
   allContracts <- fmap concat . traverse (uncurry getNamedContracts) $ M.toList initCodeMap
   deduplicatedContracts <- foldrM throwDuplicate M.empty (allContracts :: [(SolidString, Contract)])
   pure $ CodeCollection {
@@ -107,20 +107,21 @@ hasSvm3_3 cc = any (=="svm3.3") vmVers
   where
     contractList = map snd $ M.toList (cc ^. contracts )
     vmVers = map (^. vmVersion ) contractList
-
-compileSource :: Map T.Text T.Text -> Either ParseTypeCheckOrSolidVMError CodeCollection
-compileSource mTT = do
+    
+--- add bool if slipstream, false not run typecheckdetector!
+compileSource :: Bool -> Map T.Text T.Text-> Either ParseTypeCheckOrSolidVMError CodeCollection
+compileSource check mTT = do
   let applyInheritanceE = first SVMEx . applyInheritance
-  case ((applyInheritanceE <=< compileSourceNoInheritance) mTT) of   
-    Right cc -> if ((hasSvm3_2 cc) || (hasSvm3_3 cc)) then typeCheckDetector cc else Right cc
+  case (applyInheritanceE <=< compileSourceNoInheritance) mTT of
+    Right cc -> do if not check && (hasSvm3_2 cc || hasSvm3_3 cc) then typeCheckDetector cc else Right cc
     Left x -> Left x
-    where 
+    where
       typeCheckDetector ecc = case TC.detector ecc of
         [] -> Right ecc
         xs -> Left $ TCEx xs
 
-compileSourceWithAnnotations :: Map T.Text T.Text -> Either [SourceAnnotation T.Text] CodeCollection
-compileSourceWithAnnotations = withAnnotations compileSource 
+compileSourceWithAnnotations :: Bool -> Map T.Text T.Text -> Either [SourceAnnotation T.Text] CodeCollection
+compileSourceWithAnnotations check = withAnnotations (compileSource check)
 
 codeCollectionFromSource :: (MonadIO m, HasCodeDB m) => B.ByteString -> m (Keccak256, CodeCollection)
 codeCollectionFromSource initCode = do
@@ -142,7 +143,7 @@ codeCollectionFromSource initCode = do
     Nothing -> do
       recordCacheEvent StorageWrite
       hsh' <- addCode SolidVM canonicalInitCode
-      let ecc = compileSource initMap
+      let ecc = compileSource True initMap
           cc = case ecc of
                  Right a -> a
                  Left (PEx p) -> parseError "codeCollectionFromSource" p
@@ -168,7 +169,7 @@ codeCollectionFromHash hsh = do
           let initMap = case Aeson.decode $ BL.fromStrict initCode of
                   Just l -> M.fromList l
                   Nothing -> M.singleton T.empty (decodeUtf8 initCode)
-          let ecc = compileSource initMap
+          let ecc = compileSource True initMap
               cc = case ecc of
                      Right a -> a
                      Left (PEx p) -> parseError "codeCollectionFromHash" p

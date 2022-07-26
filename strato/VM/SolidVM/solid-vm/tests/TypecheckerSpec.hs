@@ -13,7 +13,7 @@ import           Test.Hspec
 import           Text.RawString.QQ
 
 runTypechecker :: String -> [SourceAnnotation Text]
-runTypechecker c = case compileSourceWithAnnotations (M.fromList [("",T.pack c)]) of
+runTypechecker c = case compileSourceWithAnnotations False (M.fromList [("",T.pack c)]) of
   Left anns -> anns
   Right cc -> Typechecker.detector cc
 

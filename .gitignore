@@ -6,5 +6,8 @@
 docker-compose.push.yml
 docker-compose.yml
 stack.yaml.lock
+configurationCache.log
+dryrun.log
+targets.log
 *.cabal
 *~
