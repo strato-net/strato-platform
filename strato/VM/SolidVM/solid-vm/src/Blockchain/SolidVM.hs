@@ -1922,36 +1922,37 @@ expToVar' (CC.FunctionCall _ e args) = do
                 return . Constant . fromMaybe SNULL $ res
               else do
                 let matchingFuncOverload = filter checkArgToFunc $ CC.funcOverload func
+                -- when (True) (internalError "IT'S MORBIN TIME" matchingFuncOverload)
                 res <- case matchingFuncOverload of
                         [] -> runTheCall address contract' funcName hsh cc func argVals ro
                         _ -> runTheCall address contract' funcName hsh cc (head matchingFuncOverload) argVals ro
                 return . Constant . fromMaybe SNULL $ res
             where
-              compareArgTypes :: [(Maybe SolidString, CC.IndexedType)] -> [Bool]
-              compareArgTypes functionArgs = do
-                argPairs <- case argVals of
-                  OrderedVals ov -> forM (zip ov functionArgs) $ \(v1, (_, t)) -> do
-                                      case (v1, t) of
-                                        _ -> pure $ (v1, t)
-                  NamedVals _ -> []
-                doTypesMatch <- fmap testTypes argPairs
-                pure $ doTypesMatch
+              compareArgNameAndTypes :: [(Maybe SolidString, Value, Maybe SolidString, CC.IndexedType)] -> Bool
+              compareArgNameAndTypes argPairs = all (== True) $ fmap testNameAndTypes argPairs
                 where
-                  testTypes :: (Value, CC.IndexedType) -> Bool
-                  testTypes (v1, t) = 
-                    case (v1, (CC.indexedTypeType t)) of
-                      (SInteger _, SVMType.Int _ _) -> True 
-                      (SString _, SVMType.String _) -> True
-                      (SString _, SVMType.Bytes _ _) -> True
-                      (SBool _, SVMType.Bool) -> True
-                      (SAccount _ _, SVMType.Address _) -> True
-                      (SAccount _ _, SVMType.Account _) -> True
-                      (SEnumVal _ _ _, SVMType.UnknownLabel _ _) -> True
-                      (SStruct _ _, SVMType.UnknownLabel _ _) -> True
-                      (SContract _ _, SVMType.UnknownLabel _ _) -> True
-                      (SArray _ _, SVMType.Array _ _) -> True
-                      (SMap _ _, SVMType.Mapping _ _ _) -> True
-                      _ -> False
+                  testNameAndTypes :: (Maybe SolidString, Value, Maybe SolidString, CC.IndexedType) -> Bool
+                  testNameAndTypes (n1, v1, n2, t) = 
+                    if (n1 == n2) 
+                      then do
+                        case (v1, (CC.indexedTypeType t)) of
+                          (SInteger _, SVMType.Int _ _) -> True
+                          (SString _, SVMType.String _) -> True
+                          (SString _, SVMType.Bytes _ _) -> True
+                          (SBool _, SVMType.Bool) -> True
+                          (SAccount _ _, SVMType.Address _) -> True
+                          (SAccount _ _, SVMType.Account _) -> True
+                          (SEnumVal _ _ _, SVMType.UnknownLabel _ _) -> True
+                          (SStruct _ _, SVMType.UnknownLabel _ _) -> True
+                          (SContract _ _, SVMType.UnknownLabel _ _) -> True
+                          (SArray _ _, SVMType.Array _ _) -> True
+                          (SMap _ _, SVMType.Mapping _ _ _) -> True
+                          _ -> False
+                      else False
+              generateArgPairs :: [(Maybe SolidString, CC.IndexedType)] -> [(Maybe SolidString, Value, Maybe SolidString, CC.IndexedType)]
+              generateArgPairs functionArgs = case argVals of
+                  OrderedVals ov -> concatMap (\(v1, (Just n, t)) -> [(Just n, v1, Just n, t)]) (zip ov functionArgs)
+                  NamedVals nv -> concatMap (\((s1, t1), (Just s2, t2)) -> [(Just s1, t1, Just s2, t2)]) (zip nv functionArgs)
               mapArgs :: CC.FuncF a -> [(String, (SVMType.Type, Value))]
               mapArgs theFunc = case argVals of
                 OrderedVals vs -> let argMeta = 
@@ -1960,8 +1961,8 @@ expToVar' (CC.FunctionCall _ e args) = do
                                   in zipWith (\(n, t) v -> (n, (t, v))) argMeta vs
                 NamedVals ns ->
                   let strTypes = M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ CC.funcArgs theFunc
-                      typeAndVal = M.merge (M.mapMissing (curry $ invalidArguments "missing argument"))
-                                          (M.mapMissing (curry $ invalidArguments "extra argument"))
+                      typeAndVal = M.merge (M.dropMissing)
+                                          (M.dropMissing)
                                           (M.zipWithMatched $ \_k t v -> (t, v))
                                           strTypes
                                           $ M.fromList ns
@@ -1972,9 +1973,13 @@ expToVar' (CC.FunctionCall _ e args) = do
                                 $ M.toList typeAndVal
                   in sortedArgs
               checkArgToFunc :: CC.FuncF a -> Bool
-              checkArgToFunc tf = ((length $ mapArgs tf) == (length $ CC.funcArgs tf)) 
-                && ((length $ mapArgs tf) == (argCount)) 
-                && (all (== True) $ compareArgTypes $ CC.funcArgs tf)
+              checkArgToFunc tf = ((argPairLength) == (length $ CC.funcArgs tf)) 
+                                  && ((argPairLength) == (argCount))
+                                  && (compareArgNameAndTypes argPairing)
+                                  where
+                                    argPairing = generateArgPairs $ CC.funcArgs tf
+                                    -- argPairLength is a one to one mapping of input args to function args
+                                    argPairLength = length $ mapArgs tf
 
           Constant (SStructDef structName) -> do
             contract' <- getCurrentContract
