@@ -243,16 +243,7 @@ pipeline {
                         sh "sudo ./strato.sh --blockstanbul-vote --recipient=${node7Address} --nonce=350 --nodes=${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT},${NODE_DATA.NODE2.HOST}:${NODE_DATA.NODE2.PORT},${NODE_DATA.NODE3.HOST}:${NODE_DATA.NODE3.PORT},${NODE_DATA.NODE4.HOST}:${NODE_DATA.NODE4.PORT},${NODE_DATA.NODE5.HOST}:${NODE_DATA.NODE5.PORT},${NODE_DATA.NODE6.HOST}:${NODE_DATA.NODE6.PORT} --https"
                         sleep(time:10,unit:"SECONDS")
                         sh "sudo ./strato.sh --blockstanbul-vote --recipient=${node8Address} --nonce=400 --nodes=${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT},${NODE_DATA.NODE2.HOST}:${NODE_DATA.NODE2.PORT},${NODE_DATA.NODE3.HOST}:${NODE_DATA.NODE3.PORT},${NODE_DATA.NODE4.HOST}:${NODE_DATA.NODE4.PORT},${NODE_DATA.NODE5.HOST}:${NODE_DATA.NODE5.PORT},${NODE_DATA.NODE6.HOST}:${NODE_DATA.NODE6.PORT},${NODE_DATA.NODE7.HOST}:${NODE_DATA.NODE7.PORT} --https"
-                        sh '''
-                        set -x
-                        counter=0
-                        until [ "$counter" -eq "8" ]
-                        do
-                            voteList=$(sudo docker exec -i strato_strato_1 bash -c "tail -n 100 logs/strato-sequencer | grep showctx/validators | tail -n 1 | cut -d '|' -f 4 ")
-                            counter=$(echo "$voteList" | jq ". | length")
-                            echo $counter
-                        done
-                        '''
+                        lib.waitForVoteListValidators("8")
                     }
                 }
             }
@@ -512,16 +503,7 @@ pipeline {
                         sh "sudo ./strato.sh --blockstanbul-vote --recipient=${node7Address} --nonce=350 --nodes=${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT},${NODE_DATA.NODE2.HOST}:${NODE_DATA.NODE2.PORT},${NODE_DATA.NODE3.HOST}:${NODE_DATA.NODE3.PORT},${NODE_DATA.NODE4.HOST}:${NODE_DATA.NODE4.PORT},${NODE_DATA.NODE5.HOST}:${NODE_DATA.NODE5.PORT},${NODE_DATA.NODE6.HOST}:${NODE_DATA.NODE6.PORT} --https"
                         sleep(time:10,unit:"SECONDS")
                         sh "sudo ./strato.sh --blockstanbul-vote --recipient=${node8Address} --nonce=400 --nodes=${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT},${NODE_DATA.NODE2.HOST}:${NODE_DATA.NODE2.PORT},${NODE_DATA.NODE3.HOST}:${NODE_DATA.NODE3.PORT},${NODE_DATA.NODE4.HOST}:${NODE_DATA.NODE4.PORT},${NODE_DATA.NODE5.HOST}:${NODE_DATA.NODE5.PORT},${NODE_DATA.NODE6.HOST}:${NODE_DATA.NODE6.PORT},${NODE_DATA.NODE7.HOST}:${NODE_DATA.NODE7.PORT} --https"
-                        sh '''
-                        set -x
-                        counter=0
-                        until [ "$counter" -eq "8" ]
-                        do
-                            voteList=$(sudo docker exec -i strato_strato_1 bash -c "tail -n 100 logs/strato-sequencer | grep showctx/validators | tail -n 1 | cut -d '|' -f 4 ")
-                            counter=$(echo "$voteList" | jq ". | length")
-                            echo $counter
-                        done
-                        '''
+                        lib.waitForVoteListValidators("8")
                     }
                 }
             }
@@ -997,16 +979,7 @@ pipeline {
                         sleep(time:10,unit:"SECONDS")
                         sh "sudo ./strato.sh --blockstanbul-vote --recipient=${node4Address} --nonce=200 --nodes=${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT},${NODE_DATA.NODE2.HOST}:${NODE_DATA.NODE2.PORT},${NODE_DATA.NODE3.HOST}:${NODE_DATA.NODE3.PORT} --https"
                         sleep(time:10,unit:"SECONDS")
-                        sh '''
-                        set -x
-                        counter=0
-                        until [ "$counter" -eq "4" ]
-                        do
-                            voteList=$(sudo docker exec -i strato_strato_1 bash -c "tail -n 100 logs/strato-sequencer | grep showctx/validators | tail -n 1 | cut -d '|' -f 4 ")
-                            counter=$(echo "$voteList" | jq ". | length")
-                            echo $counter
-                        done
-                        '''
+                        lib.waitForVoteListValidators("4")
                     }
                 }
             }
@@ -1208,16 +1181,7 @@ pipeline {
                     script{
                         sh "sudo ./strato.sh --blockstanbul-vote --recipient=${node5Address} --nonce=250 --nodes=${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT},${NODE_DATA.NODE2.HOST}:${NODE_DATA.NODE2.PORT},${NODE_DATA.NODE3.HOST}:${NODE_DATA.NODE3.PORT},${NODE_DATA.NODE4.HOST}:${NODE_DATA.NODE4.PORT} --https"
                         sleep(time:10,unit:"SECONDS")
-                        sh '''
-                        set -x
-                        counter=0
-                        until [ "$counter" -eq "5" ]
-                        do
-                            voteList=$(sudo docker exec -i strato_strato_1 bash -c "tail -n 100 logs/strato-sequencer | grep showctx/validators | tail -n 1 | cut -d '|' -f 4 ")
-                            counter=$(echo "$voteList" | jq ". | length")
-                            echo $counter
-                        done
-                        '''
+                        lib.waitForVoteListValidators("5")
                     }
                 }
             }
@@ -1228,16 +1192,7 @@ pipeline {
             steps {
                 dir('strato-getting-started') {
                     script {
-                        sh '''
-                        set -x
-                        counter=0
-                        until [ "$counter" -eq "5" ]
-                        do
-                            voteList=$(sudo docker exec -i strato_strato_1 bash -c "tail -n 100 logs/strato-sequencer | grep showctx/validators | tail -n 1 | cut -d '|' -f 4 ")
-                            counter=$(echo "$voteList" | jq ". | length")
-                            echo $counter
-                        done
-                        '''
+                        lib.waitForVoteListValidators("5")
                     }
                 }
             }
@@ -1279,16 +1234,7 @@ pipeline {
                     script{
                         sh "sudo ./strato.sh --blockstanbul-vote --remove --recipient=${node2Address} --nonce=300 --nodes=${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT},${NODE_DATA.NODE5.HOST}:${NODE_DATA.NODE5.PORT},${NODE_DATA.NODE3.HOST}:${NODE_DATA.NODE3.PORT},${NODE_DATA.NODE4.HOST}:${NODE_DATA.NODE4.PORT} --https"
                         sleep(time:10,unit:"SECONDS")
-                        sh '''
-                        set -x
-                        counter=0
-                        until [ "$counter" -eq "4" ]
-                        do
-                            voteList=$(sudo docker exec -i strato_strato_1 bash -c "tail -n 100 logs/strato-sequencer | grep showctx/validators | tail -n 1 | cut -d '|' -f 4 ")
-                            counter=$(echo "$voteList" | jq ". | length")
-                            echo $counter
-                        done
-                        '''
+                        lib.waitForVoteListValidators("4")
                     }
                 }
                 script {
