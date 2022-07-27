@@ -227,7 +227,11 @@ handleMsgServerConduit myPubkey peer = do
             -- Lookup in Redis with userAddress, isValid Field
             clientCertDetails <- lift $ A.select (A.Proxy @X509CertInfoState) userAddress'
             -- Throw error if the cert is not valid.
-            unless (fromMaybe False (fmap isValid clientCertDetails)) $ throwIO $ InvalidClientCert
+            unless (fromMaybe False (fmap isValid clientCertDetails)) $
+              do $logInfoS "handleMsgService/Hello{}" $ T.pack $ show clientHello
+                 $logInfoS "handleMsgService/Hello{}" $ T.pack $ show userAddress'
+                 $logInfoS "handleMsgService/Hello{}" $ T.pack $ show clientCertDetails
+                 throwIO InvalidClientCert
             $logInfoS "handshake/Hello{}" "received hello"
             let helloMsg' = Hello {
                 version = 4,
