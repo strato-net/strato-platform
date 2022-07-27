@@ -129,7 +129,7 @@ findNamespace key = case S8.takeWhile (/= ':') key of
   "pic" -> PrivateIPChains
   "poc" -> PrivateOrgIdChains
   "x509" -> X509Certificates
-  "x509init:" -> X509Initialized
+  "x509init" -> X509Initialized --- Might be an error here!
   wut -> error $ "unknown namespace: " ++ show wut
 
 getChainInfo :: Word256
