@@ -225,7 +225,7 @@ expression =
     [binary "**"],
     [binary "*", binary "/", binary "%"],
     [binary "+", binary "-"],
-    [binary "<<", binary ">>"],
+    [binary "<<", binary ">>", binary ">>>"],
     [binary "&"],
     [binary "^"],
     [binary "|"],

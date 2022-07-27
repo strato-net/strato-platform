@@ -300,6 +300,14 @@ expressionHelper (Binary y "|=" (Variable x name) b) = do
   ann <- localVarWriteHelper name (x <> y)
   bs <- expressionHelper b
   pure $ concat [ann, bs]
+expressionHelper (Binary y ">>=" (Variable x name) b) = do
+  ann <- localVarWriteHelper name (x <> y)
+  bs <- expressionHelper b
+  pure $ concat [ann, bs]
+expressionHelper (Binary y "<<=" (Variable x name) b) = do
+  ann <- localVarWriteHelper name (x <> y)
+  bs <- expressionHelper b
+  pure $ concat [ann, bs]
 expressionHelper (Binary y "&=" (Variable x name) b) = do
   ann <- localVarWriteHelper name (x <> y)
   bs <- expressionHelper b
