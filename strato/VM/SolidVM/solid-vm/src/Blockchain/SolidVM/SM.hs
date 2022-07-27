@@ -406,7 +406,7 @@ getVariableOfName name = do
       maybeConstant = fmap (t "constant constant" . Constant) $ do
         let ctract = currentContract currentCallInfo
         CC.ConstantDecl{..} <- M.lookup name $ ctract ^. CC.constants
-        return $ coerceType ctract constType $ case constInitialVal of
+        return $ coerceType ctract _constType $ case _constInitialVal of
                                             CC.NumberLiteral _ x _ -> SInteger x
                                             x -> todo "constant initial val" x
 
