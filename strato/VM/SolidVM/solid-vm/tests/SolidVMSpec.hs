@@ -4846,3 +4846,43 @@ contract qq {
   }
 }|]
     getFields ["myNum", "otherNum", "errorCount"] `shouldReturn` [BInteger 3, BInteger 12, BInteger 1]
+
+
+  it "can pass calldata arguments and use calldata variables" . runTest $ do
+    runBS [r|
+
+contract Validator {
+  function isEmptyArray(bytes32[] calldata _arr) pure internal returns (bool) {
+    return _arr.length == 0;
+  }
+}
+
+contract qq is Validator {
+  bool public empty_is_empty;
+  bool public nonempty_is_empty;
+  uint public nonempty_length;
+  constructor() public {
+    bytes32[] calldata empty;
+    empty_is_empty = isEmptyArray(empty);
+
+    bytes32[] calldata nonempty = new bytes32[](1);
+    nonempty_is_empty = isEmptyArray(nonempty);
+
+  }
+}
+|]
+    getFields ["empty_is_empty", "nonempty_is_empty"] `shouldReturn` [BBool True, BBool False]
+
+
+  it "can run this for loop and increment the counter" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq{
+  uint mynum = 0;
+  constructor() public {
+    for (uint i=0; i < 10; i = i + 1) {
+      mynum = i;
+    }
+  }
+}|]
+    getFields ["mynum"] `shouldReturn` [BInteger 9]
