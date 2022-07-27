@@ -1,5 +1,5 @@
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveFunctor   #-}
+{-# LANGUAGE DeriveGeneric   #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module SolidVM.Model.CodeCollection.Contract (
