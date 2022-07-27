@@ -24,6 +24,7 @@ import           Blockchain.VMOptions       ()
 import           Executable.EVMFlags        ()
 
 import qualified Blockchain.SolidVM as SolidVM
+import qualified Blockchain.SolidVM2022 as SolidVM2022
 import           EVMRunner
 import           VRunOptions
 import           VM
@@ -62,7 +63,25 @@ main = do
                 emptyHash -- txHash
                 Nothing -- chainId
                 (Just $ M.fromList [("name", "fred")]) -- medadata
-      SolidVM2022 -> error "SolidVM2022 not yet implemented"
+      SolidVM2022 -> do
+        codeString <- liftIO $ B.readFile filename
+        fmap Right $
+          liftIO $ SolidVM2022.create
+                (error "undefined: isRunningTests'")
+                (error "undefined: isHomestead")
+                (error "undefined: preExistingSuicideList")
+                dummyBlockData
+                (error "undefined: callDepth")
+                (Account (Address 0) Nothing) -- sender
+                (Account (Address 0) Nothing) -- origin
+                (error "undefined: value")
+                (error "undefined: gasPrice")
+                (error "undefined: availableGas")
+                (Account (Address 0) Nothing) -- newAddress
+                (Code codeString) -- code
+                emptyHash -- txHash
+                Nothing -- chainId
+                (Just $ M.fromList [("name", "fred")]) -- medadata
       EVM -> runEVM dummyBlockData
 
   case result of

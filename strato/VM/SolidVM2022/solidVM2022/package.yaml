@@ -1,0 +1,16 @@
+name:                solidVM2022
+
+dependencies:
+- base
+- blockapps-datadefs
+- bytestring
+- containers
+- format
+- ghc
+- parsec
+- strato-model
+- text
+- vm-tools
+
+library:
+  source-dirs: src
