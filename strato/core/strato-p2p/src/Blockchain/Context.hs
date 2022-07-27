@@ -257,6 +257,9 @@ instance MonadIO m => A.Selectable Keccak256 (Private (Word256, OutputTx)) (Read
 instance MonadIO m => A.Selectable Address X509CertInfoState (ReaderT Config m) where
   select _ = RBDB.withRedisBlockDB . RBDB.getCertificate
 
+instance MonadIO m => A.Selectable Address (Either String X509CertInfoState) (ReaderT Config m) where
+  select _ = RBDB.withRedisBlockDB . RBDB.getCertificateE
+
 instance MonadIO m => (Keccak256 `A.Alters` OutputBlock) (ReaderT Config m) where
   lookup _     = RBDB.withRedisBlockDB . RBDB.getBlock
   insert _ k v = void . RBDB.withRedisBlockDB $ RBDB.insertBlock k v
@@ -433,6 +436,7 @@ type MonadP2P m = ( MonadIO m
                        , '(Word256, ChainInfo)
                        , '(Keccak256, Private (Word256, OutputTx))
                        , '(Address, X509CertInfoState)
+                       , '(Address, Either String X509CertInfoState)
                        ] m
                   , All2 '[A.Alters]
                       '[ '(Keccak256, BlockData)

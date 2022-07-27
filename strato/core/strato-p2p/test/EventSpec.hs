@@ -169,6 +169,10 @@ instance MonadIO m => A.Selectable Address X509CertInfoState (MonadTest m) where
   -- select _ addr = X509CertInfoState addr exampleCert True []
   select _ addr = M.lookup addr <$> use x509Map
 
+instance MonadIO m => A.Selectable Address (Either String X509CertInfoState) (MonadTest m) where
+  -- select _ addr = X509CertInfoState addr exampleCert True []
+  select = undefined
+
 instance MonadIO m => (Address `A.Alters` X509CertInfoState) (MonadTest m) where
   lookup _ k   = M.lookup k <$> use x509Map
   insert _ k v = x509Map %= M.insert k v

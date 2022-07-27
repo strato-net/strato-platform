@@ -17,6 +17,7 @@ module Blockchain.Strato.RedisBlockDB
     , getChainMembers, putChainMembers
     , addChainMember, removeChainMember
     , getCertificate
+    , getCertificateE
     , registerCertificate
     , revokeCertificate
     , getInitializeCertificateRegistry, initializeCertificateRegistry 
@@ -283,6 +284,14 @@ getCertificate userAddress = getInNamespace X509Certificates userAddress >>= \ca
         Right Nothing   -> return Nothing
         Right (Just state) -> let certInfoState = fromValue state
                               in return (Just certInfoState)
+
+getCertificateE :: Address -> Redis (Maybe (Either String X509CertInfoState))
+getCertificateE userAddress = getInNamespace X509Certificates userAddress >>= \case
+        Left e          -> return $ Just $ Left $ "getCertificate: Redis error We did not find " <> show userAddress <> " our error " <> show e
+        Right Nothing   -> return $ Just $ Left $ "getCertificate: We did not find " <> show userAddress
+        Right (Just state) -> let certInfoState = fromValue state
+                              in return (Just $ Right certInfoState)
+
 
 getChainTxsInBlock :: Keccak256
                    -> Redis (M.Map Word256 [Keccak256])
