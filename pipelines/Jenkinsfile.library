@@ -934,27 +934,27 @@ def waitForCirrus() {
 def createContractAndGetContractAddress(NODE_HOST, NODE_PORT, SERVICE_TOKEN) {
  def CONTRACT_ADDRESS = sh(
   returnStdout: true,
-  script: curl "https://${NODE_HOST}:${NODE_PORT}/strato/v2.3/transaction?resolve=true" \
+  script: "curl \"https://${NODE_HOST}:${NODE_PORT}/strato/v2.3/transaction?resolve=true\" \
     -X 'POST' \
-    -H "Authorization: Bearer $SERVICE_TOKEN"  \
+    -H \"Authorization: Bearer ${SERVICE_TOKEN}\"  \
     -H 'Accept: application/json;charset=utf-8' \
     -H 'Content-Type: application/json' \
     --data-binary '{
-      "txs":[{
-        "payload":{
-          "contract":"SimpleStorage",
-          "src":"pragma solidvm 3.0; contract SimpleStorage {\n  uint storedData;\n\n  function SimpleStorage() {\n    storedData = 1;\n  }\n\n  function set(uint x) {\n    storedData = x;\n  }\n\n  function get() constant returns (uint) {\n    return storedData;\n  }\n}\n",
-          "args":{},
-          "metadata":{
-            "VM":"SolidVM",
-            "history":"SimpleStorage",
-            "index":"SimpleStorage"
+      \"txs\":[{
+        \"payload\":{
+          \"contract\":\"SimpleStorage\",
+          \"src\":"pragma solidvm 3.0; contract SimpleStorage {\n  uint storedData;\n\n  function SimpleStorage() {\n    storedData = 1;\n  }\n\n  function set(uint x) {\n    storedData = x;\n  }\n\n  function get() constant returns (uint) {\n    return storedData;\n  }\n}\n",
+          \"args\":{},
+          \"metadata\":{
+            \"VM\":\"SolidVM\",
+            \"history\":\"SimpleStorage\",
+            \"index\":\"SimpleStorage\"
           }
         },
-        "type":"CONTRACT"
+        \"type\":\"CONTRACT\"
       }]
     }' \
-    | jq '.[] | .txResult."contractsCreated"'
+    | jq '.[] | .txResult.\"contractsCreated\"'"
   ).trim()
   return CONTRACT_ADDRESS
  }
@@ -963,12 +963,12 @@ def createContractAndGetContractAddress(NODE_HOST, NODE_PORT, SERVICE_TOKEN) {
 def getContractBlockNumber(NODE_HOST, NODE_PORT, CONTRACT_ADDRESS, SERVICE_TOKEN) {
  def BLOCK_NUMBER = sh(
   returnStdout: true,
-  script: curl -X 'GET' \
-    "https://${NODE_HOST}:${NODE_PORT}/cirrus/search/SimpleStorage?address=eq.${CONTRACT_ADDRESS}" \
-    -H "Authorization: Bearer $SERVICE_TOKEN"  \
-    -H 'accept: application/json;charset=utf-8' \
+  script: "curl -X 'GET' \
+    \"https://${NODE_HOST}:${NODE_PORT}/cirrus/search/SimpleStorage?address=eq.${CONTRACT_ADDRESS}\" \
+    -H \"Authorization: Bearer ${SERVICE_TOKEN}\"  \
+    -H 'Accept: application/json;charset=utf-8' \
     -H 'Content-Type: application/json;charset=utf-8' \
-    | jq '.[] | .block_number'
+    | jq '.[] | .block_number'"
   ).trim()
   return BLOCK_NUMBER
  }
