@@ -1838,7 +1838,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                                                      . CC.eventsContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
                                                      . CC.functionsContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
                                                      . CC.constructorContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
-
+                                                    
 
 
               let code = case searchTerms of
