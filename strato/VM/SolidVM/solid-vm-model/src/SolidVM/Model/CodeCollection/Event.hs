@@ -1,12 +1,17 @@
 {-# LANGUAGE DeriveFunctor     #-}
 {-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE TemplateHaskell   #-}
 
 module SolidVM.Model.CodeCollection.Event
   (
     EventF(..),
-    Event
+    Event,
+    eventAnonymous,
+    eventLogs,
+    eventContext
   ) where
 
+import           Control.Lens                hiding ((.=))
 import           Data.Aeson
 import           Data.Aeson.Types
 import           Data.Source
@@ -19,18 +24,19 @@ import           Test.QuickCheck.Instances    ()
 import qualified SolidVM.Model.CodeCollection.VarDef  as SolidVM
 
 data EventF a = Event
-  { eventAnonymous :: Bool
-  , eventLogs :: [(Text, SolidVM.IndexedType)]
-  , eventContext :: a
+  { _eventAnonymous :: Bool
+  , _eventLogs :: [(Text, SolidVM.IndexedType)]
+  , _eventContext :: a
   } deriving (Eq,Show,Generic, Functor)
+makeLenses ''EventF
 
 type Event = Positioned EventF
 
 instance ToJSON a => ToJSON (EventF a) where
   toJSON e = object [
-      "anonymous" .= eventAnonymous e
-    , "logs" .= eventLogs e
-    , "context" .= eventContext e
+      "anonymous" .= _eventAnonymous e
+    , "logs" .= _eventLogs e
+    , "context" .= _eventContext e
     ]
 
 instance FromJSON a => FromJSON (EventF a) where

@@ -48,7 +48,7 @@ contractHelper Contract{..} =
    in M.foldMapWithKey findStateAnns stateVariables'
 
 functionHelper :: Func -> SSS [SourceAnnotation Text]
-functionHelper Func{..} = maybe (pure []) statementsHelper funcContents
+functionHelper Func{..} = maybe (pure []) statementsHelper _funcContents
 
 statementsHelper :: [Statement] -> SSS [SourceAnnotation Text]
 statementsHelper ss = do

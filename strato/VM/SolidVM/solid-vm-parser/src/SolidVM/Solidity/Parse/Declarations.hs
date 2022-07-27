@@ -267,7 +267,7 @@ functionDeclaration = do
     xabi <- functionXabi
     pure (functionName, xabi)
   cName <- getContractName
-  let xabi = xabi'{SolidVM.funcContext = a <> SolidVM.funcContext xabi'}
+  let xabi = xabi'{SolidVM._funcContext = a <> SolidVM._funcContext xabi'}
       tipe = if cName == functionName
                 then ConstructorDeclaration
                 else FuncDeclaration
@@ -282,17 +282,18 @@ functionXabi = do
   contents <- Just <$> statements <|> (reservedOp ";" >> return Nothing)
   let nameUnnamed (name,ty) = if Text.null name then (Nothing, ty) else (Just name,ty)
       ctx = SourceAnnotation start end ()
+  -- TODO: use Lenses instead?
   return SolidVM.Func{
-        SolidVM.funcArgs = map (\(k, v) -> (fmap textToLabel k, v)) $
+        SolidVM._funcArgs = map (\(k, v) -> (fmap textToLabel k, v)) $
            zipWith (\x i -> fmap (SolidVM.IndexedType i) (nameUnnamed x)) functionArgs [0..]
-      , SolidVM.funcVals = map (\(k, v) -> (fmap textToLabel k, v)) $
+      , SolidVM._funcVals = map (\(k, v) -> (fmap textToLabel k, v)) $
            zipWith (\v i -> fmap (SolidVM.IndexedType i) (nameUnnamed v)) functionRet [0..]
-      , SolidVM.funcContents = contents
-      , SolidVM.funcVisibility = Just visibility
-      , SolidVM.funcStateMutability = mutability
-      , SolidVM.funcConstructorCalls = Map.fromList constructorCalls
-      , SolidVM.funcModifiers = Just modifiers
-      , SolidVM.funcContext = ctx
+      , SolidVM._funcContents = contents
+      , SolidVM._funcVisibility = Just visibility
+      , SolidVM._funcStateMutability = mutability
+      , SolidVM._funcConstructorCalls = Map.fromList constructorCalls
+      , SolidVM._funcModifiers = Just modifiers
+      , SolidVM._funcContext = ctx
       }
 
 eventDeclaration :: SolidityParser (String, Declaration)
@@ -308,10 +309,11 @@ eventDeclaration = do
   return
     (
       name,
+      --TODO: use lenses?
       EventDeclaration SolidVM.Event{
-          SolidVM.eventAnonymous = anon
-        , SolidVM.eventLogs = zipWith (\i -> fmap (SolidVM.IndexedType i)) [0..] logs
-        , SolidVM.eventContext = ctx
+          SolidVM._eventAnonymous = anon
+        , SolidVM._eventLogs = zipWith (\i -> fmap (SolidVM.IndexedType i)) [0..] logs
+        , SolidVM._eventContext = ctx
 --         objName = name,
 --         objValueType = NoValue,
 --         objArgType = logs,

@@ -1832,13 +1832,18 @@ expToVar' (CC.FunctionCall _ e args) = do
               --Search the full contract go through sequentially
               (startLine, startColumn) <- contract ^.. CC.constContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
                                                      . CC.contractContext ^. sourceAnnotationEnd & (_sourcePositionLine &&& _sourcePositionColumn)
-                                                     . CC.storageDefsContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
+                                                     -- storageDefs
+                                                     . CC.varContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
+                                                     -- enums
                                                      . CC.enumsContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
+                                                     -- structs
                                                      . CC.structsContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
-                                                     . CC.eventsContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
-                                                     . CC.functionsContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
-                                                     . CC.constructorContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
-                                                    
+                                                     -- events
+                                                     . CC.eventContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
+                                                     --functions
+                                                     . CC.funcContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
+                                                     -- constructor
+                                                     -- . CC.constructorContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)                                                    
 
 
               let code = case searchTerms of

@@ -121,29 +121,29 @@ unparseCtor f = Text.unpack $ "constructor" <> unparseFuncWithoutName f
 unparseFuncWithoutName :: Func -> Text
 unparseFuncWithoutName Func{..} =
        "("
-    <> Text.intercalate ", " (List.map unparseArgs (sortWith (indexedTypeIndex . snd) $ map (\(maybeName, v) -> (fromMaybe "" $ fmap labelToText maybeName , v)) funcArgs))
+    <> Text.intercalate ", " (List.map unparseArgs (sortWith (indexedTypeIndex . snd) $ map (\(maybeName, v) -> (fromMaybe "" $ fmap labelToText maybeName , v)) _funcArgs))
     <> ") "
-    <> case funcStateMutability of
+    <> case _funcStateMutability of
         Just sm -> tShow sm <> " "
         Nothing -> ""
-    <> case funcVisibility of
+    <> case _funcVisibility of
         Just Private -> "private "
         Just Public -> "public "
         Just Internal -> "internal "
         Just External -> "external "
         _ -> ""
-    <> case funcModifiers of
+    <> case _funcModifiers of
         Just [] -> ""
         Just xs -> Text.pack $ List.intercalate " " xs <> " "
         _ -> ""
-    <> case funcVals of
+    <> case _funcVals of
         [] -> ""
         vals ->
               "returns ("
           <> Text.intercalate ", " (List.map unparseVals $ map (\(maybeName, v) -> (fromMaybe "" $ fmap labelToText maybeName , v)) vals)
           <> ") "
     <> "{\n        "
-    <> case funcContents of
+    <> case _funcContents of
         Just contents -> Text.pack $ tab . tab $ unlines $ map unparseStatement contents --(Text.concat . Text.lines $ contents)
         Nothing -> ""
     <> "}"
@@ -280,9 +280,9 @@ unparseEvent (name, Event{..}) = Text.unpack $
      "event "
   <> labelToText name
   <> "(\n    "
-  <> Text.intercalate ",\n    " (List.map unparseArgs eventLogs)
+  <> Text.intercalate ",\n    " (List.map unparseArgs _eventLogs)
   <> ")"
-  <> (if eventAnonymous then "anonymous" else "")
+  <> (if _eventAnonymous then "anonymous" else "")
   <> ";"
 
 unparseUsing :: (Text, UsingF a) -> String

@@ -5,6 +5,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE TemplateHaskell   #-}
 
 module SolidVM.Model.CodeCollection.Function (
   FuncF(..),
@@ -12,10 +13,18 @@ module SolidVM.Model.CodeCollection.Function (
   StateMutability(..),
   Visibility(..),
   tShow,
-  tRead
+  tRead,
+  funcArgs,
+  funcVals,
+  funcStateMutability,
+  funcContents,
+  funcVisibility,
+  funcConstructorCalls,
+  funcModifiers,
+  funcContext
   ) where
 
-import           Control.Lens                 (mapped, (&), (?~))
+import           Control.Lens                 (mapped, (&), (?~), makeLenses)
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
@@ -66,18 +75,18 @@ instance ToSchema StateMutability where
     & mapped.schema.example ?~ toJSON View
 
 data FuncF a = Func
-  { funcArgs :: [(Maybe SolidString, SolidVM.IndexedType)]
-  , funcVals :: [(Maybe SolidString, SolidVM.IndexedType)]
-  , funcStateMutability :: Maybe StateMutability
+  { _funcArgs :: [(Maybe SolidString, SolidVM.IndexedType)]
+  , _funcVals :: [(Maybe SolidString, SolidVM.IndexedType)]
+  , _funcStateMutability :: Maybe StateMutability
 
   -- These Values are only used for parsing and unparsing solidity.
   -- This data will not be stored in the db and will have no
   -- relevance when constructing from the db.
-  , funcContents :: Maybe [StatementF a]
-  , funcVisibility :: Maybe Visibility
-  , funcConstructorCalls :: Map SolidString [(ExpressionF a)]
-  , funcModifiers :: Maybe [String]
-  , funcContext :: a
+  , _funcContents :: Maybe [StatementF a]
+  , _funcVisibility :: Maybe Visibility
+  , _funcConstructorCalls :: Map SolidString [(ExpressionF a)]
+  , _funcModifiers :: Maybe [String]
+  , _funcContext :: a
   } deriving (Eq,Show,Generic, Functor)
 
 instance ToJSON a => ToJSON (FuncF a)
@@ -103,7 +112,6 @@ instance ToSchema Visibility where
       ex :: Visibility
       ex = Public
 
-
 --------------------------------------------------------------------------------
 
 soliditySchemaOptions :: SchemaOptions
@@ -114,3 +122,5 @@ soliditySchemaOptions = SchemaOptions
   , allNullaryToStringTag = True
   , unwrapUnaryRecords = True
   }
+
+makeLenses ''FuncF

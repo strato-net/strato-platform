@@ -164,8 +164,8 @@ lookupContractFunction x cName fName = do
                 , labelToText fName
                 , " is not public."
                 ]) <$ x
-        Just ConstantDecl{..} -> pure $ Static constType x
-      Just Func{..} -> case funcVisibility of
+        Just ConstantDecl{..} -> pure $ Static _constType x
+      Just Func{..} -> case _funcVisibility of
         Just v | v == Internal || v == Private -> pure . bottom $ (T.concat
           [ "Function "
           , labelToText cName
@@ -175,8 +175,8 @@ lookupContractFunction x cName fName = do
           , T.pack $ show v
           , " so it cannot be called externally."
           ]) <$ x
-        _ -> let fArgs = flip Product x $ flip Static x . indexedTypeType . snd <$> funcArgs
-                 fRets = flip Product x $ flip Static x . indexedTypeType . snd <$> funcVals
+        _ -> let fArgs = flip Product x $ flip Static x . indexedTypeType . snd <$> _funcArgs
+                 fRets = flip Product x $ flip Static x . indexedTypeType . snd <$> _funcVals
               in pure $ Function fArgs fRets x
 
 productType' :: SourceAnnotation Text -> [Type'] -> Type'
@@ -527,8 +527,8 @@ typecheckMember (Static (SVMType.UnknownLabel "super") x) method = do
       ps -> case M.lookup method . _functions $ last ps of
         Nothing -> pure . bottom $ ("super does not have a function called " <> labelToText method) <$ x
         Just Func{..} ->
-          let fArgs = flip Product x $ flip Static x . indexedTypeType . snd <$> funcArgs
-              fRets = flip Product x $ flip Static x . indexedTypeType . snd <$> funcVals
+          let fArgs = flip Product x $ flip Static x . indexedTypeType . snd <$> _funcArgs
+              fRets = flip Product x $ flip Static x . indexedTypeType . snd <$> _funcVals
            in pure $ Function fArgs fRets x
 typecheckMember (Static e@(SVMType.Enum _ enum mNames) x) n = do
   names <- case mNames of
@@ -547,9 +547,9 @@ typecheckMember (Static e@(SVMType.Enum _ enum mNames) x) n = do
 -- Static: argType, ContextType
 typecheckMember (Static (SVMType.Account True ) x) "transfer" = pure $ Function (Static (SVMType.Int Nothing Nothing) x) (Product [] x) x
 typecheckMember (Static (SVMType.Account True ) x) "send" = pure $ Function (Static (SVMType.Int Nothing Nothing) x) (Static (SVMType.Bool) x) x
-typecheckMember (Static (SVMType.Account True ) x) "code" = pure $ Function (Static (SVMType.String Nothing Nothing) x) (Static (SVMType.String Nothing Nothing) x) x
+typecheckMember (Static (SVMType.Account True ) x) "code" = pure $ Function (Static (SVMType.String Nothing) x) (Static (SVMType.String Nothing) x) x
 typecheckMember (Static (SVMType.Account _) x) "balance" = pure $ Static (SVMType.Int Nothing Nothing) x
-typecheckMember (Static (SVMType.Account _) x) "code" = pure $ Static (SVMType.Bytes Nothing Nothing) x
+-- typecheckMember (Static (SVMType.Account _) x) "code" = pure $ Static (SVMType.Bytes Nothing Nothing) x
 typecheckMember (Static (SVMType.Account _) x) "codehash" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.Account _) x) "chainId" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Struct _ struct) x) n = do
@@ -596,7 +596,7 @@ getConstructorType' x l = do
     Just c -> case _constructor c of
       Nothing -> pure $ Function (Product [] x) (Static (SVMType.Contract l) x) x
       Just Func{..} ->
-        let fArgs = flip Product x $ flip Static x . indexedTypeType . snd <$> funcArgs
+        let fArgs = flip Product x $ flip Static x . indexedTypeType . snd <$> _funcArgs
          in pure $ Function fArgs (Static (SVMType.Contract l) x) x
 
 getTypeErrors :: Type' -> [SourceAnnotation Text]
@@ -646,27 +646,27 @@ constDeclHelper :: Annotated CodeCollectionF
                 -> Annotated ConstantDeclF
                 -> Type'
 constDeclHelper cc c ConstantDecl{..} =
-  let ty = Static constType constContext
+  let ty = Static _constType _constContext
       r = R cc c Nothing
-   in runReader (evalStateT (ty ~> tcExpr constInitialVal) ((Nothing, M.empty) :| [])) r
+   in runReader (evalStateT (ty ~> tcExpr _constInitialVal) ((Nothing, M.empty) :| [])) r
 
 functionHelper :: Annotated CodeCollectionF
                -> Annotated ContractF
                -> Annotated FuncF
                -> Type'
-functionHelper cc c f@Func{..} = case funcContents of
-  Nothing -> Function (Product [] funcContext) (Product [] funcContext) funcContext
+functionHelper cc c f@Func{..} = case _funcContents of
+  Nothing -> Function (Product [] _funcContext) (Product [] _funcContext) _funcContext
   Just stmts ->
     let r = R cc c (Just f)
         swap = uncurry $ flip (,)
         args = (\(it,n) -> ( n
-                           , VarDefEntry (Just $ indexedTypeType it) Nothing n funcContext
+                           , VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
                            ))
-           <$> (catMaybes $ sequence . swap <$> funcArgs)
+           <$> (catMaybes $ sequence . swap <$> _funcArgs)
         vals = (\(it,n) -> ( n
-                           , VarDefEntry (Just $ indexedTypeType it) Nothing n funcContext
+                           , VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
                            ))
-           <$> (catMaybes $ sequence . swap <$> funcVals)
+           <$> (catMaybes $ sequence . swap <$> _funcVals)
         argVals = M.fromList $ args ++ vals
      in runReader (statementsHelper argVals stmts) r
 
@@ -680,9 +680,9 @@ statementsHelper args ss = do
       x <- asks $ _contractContext . contract
       pure . bottom $ "Cannot use keyword 'return' outside of a function" <$ x
     Just f -> do
-      let x = funcContext f
+      let x = _funcContext f
       ~(ts', s) <- flip runStateT ((Nothing, args) :| []) $ do
-        cCalls <- for (M.assocs $ funcConstructorCalls f) $ \(cName, exprs) -> do
+        cCalls <- for (M.assocs $ _funcConstructorCalls f) $ \(cName, exprs) -> do
           let constructorArgs = getConstructorType' x cName
               givenArgs = flip Product x <$> traverse tcExpr exprs
               givenFunc = (\t-> Function t (Static (SVMType.Contract cName) x) x) <$> givenArgs
@@ -887,7 +887,7 @@ getVarTypeByName' name ctx = do
     Nothing -> do
       c <- asks contract
       let mVarDecl = ((varType &&& const ctx) <$> M.lookup name (_storageDefs c))
-                 <|> ((constType &&& const ctx) <$> M.lookup name (_constants c))
+                 <|> ((_constType &&& const ctx) <$> M.lookup name (_constants c))
                  <|> (const (SVMType.Enum Nothing name Nothing, ctx) <$> M.lookup name (_enums c))
                  <|> (const (SVMType.Struct Nothing name, ctx) <$> M.lookup name (_structs c))
       case mVarDecl of
@@ -906,8 +906,8 @@ getVarTypeByName' name ctx = do
         Just (t, ctx') -> pure $ Static t ctx'
         Nothing -> case M.lookup name $ _functions c of
           Just Func{..} ->
-            let fArgs = flip Product ctx $ flip Static ctx . indexedTypeType . snd <$> funcArgs
-                fRets = flip Product ctx $ flip Static ctx . indexedTypeType . snd <$> funcVals
+            let fArgs = flip Product ctx $ flip Static ctx . indexedTypeType . snd <$> _funcArgs
+                fRets = flip Product ctx $ flip Static ctx . indexedTypeType . snd <$> _funcVals
              in pure $ Function fArgs fRets ctx
           Nothing -> do
             cc <- asks codeCollection
@@ -995,7 +995,7 @@ statementHelper (Return mExpr x) = do
   case mf of
     Nothing -> pure . bottom $ "Cannot use keyword 'return' outside of a function" <$ x
     Just f -> do
-      let fRets = flip Product x $ flip Static x . indexedTypeType . snd <$> funcVals f
+      let fRets = flip Product x $ flip Static x . indexedTypeType . snd <$> _funcVals f
       t' <- fRets ~> maybe (pure $ Product [] x) tcExpr mExpr
       modify $ \((ret, locals) :| rest) -> case ret of
         Nothing -> (Just t', locals) :| rest

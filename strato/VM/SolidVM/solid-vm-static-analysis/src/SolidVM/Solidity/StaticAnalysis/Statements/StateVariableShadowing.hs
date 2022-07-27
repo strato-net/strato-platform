@@ -22,7 +22,7 @@ contractHelper Contract{..} =
   concat $ functionHelper _storageDefs <$> maybeToList _constructor ++ M.elems _functions
 
 functionHelper :: M.Map SolidString VariableDecl -> Func -> [SourceAnnotation Text]
-functionHelper vars Func{..} = case funcContents of
+functionHelper vars Func{..} = case _funcContents of
   Nothing -> []
   Just stmts -> concat $ statementHelper vars <$> stmts
 
