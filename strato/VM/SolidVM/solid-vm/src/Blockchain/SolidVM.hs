@@ -2985,3 +2985,28 @@ mapOnLast f = foldr step []
   where step :: a -> [a] -> [a]
         step x [] = [f x]
         step x xs = x : xs
+
+mapOnLast :: Foldable f => (a -> a) -> f a -> [a]
+mapOnLast f = foldr step []
+  where step :: a -> [a] -> [a]
+        step x [] = [f x]
+        step x xs = x : xs
+
+mapOnLast' :: (a -> a) -> [a] -> [a]
+mapOnLast' f = unfoldr step 
+  where step :: [a] -> Maybe (a, [a])
+        step [] = Nothing
+        step [x] = Just (f x, [])
+        step (x:xs) = Just (x, xs)
+
+mapOnLast'' :: (a -> a) -> [a] -> [a]
+mapOnLast'' f = unfoldr step 
+  where step :: [a] -> Maybe (a, [a])
+        step [] = Nothing
+        step [x] = Just (f x, [])
+        step (x:xs) = Just (x, xs)
+
+
+-- mapOnLast'' :: (a -> a) -> [a] -> [a]
+-- mapOnLast'' f = foldMap step
+--   where step :: a -> m 
