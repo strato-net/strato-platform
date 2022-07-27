@@ -28,7 +28,7 @@ module Blockchain.VM.SolidException
   , malformedData
   , tooMuchGas
   , paymentError
-  , reservedWordError,
+  , reservedWordError
   , tooManyResultsError
   ) where
 
