@@ -982,7 +982,7 @@ getVarTypeByName' name ctx = do
           Just Func{..} ->
             let fArgs = flip Product ctx $ flip Static ctx . indexedTypeType . snd <$> funcArgs
                 fRets = flip Product ctx $ flip Static ctx . indexedTypeType . snd <$> funcVals
-             in pure $ Function fArgs fRets ctx $ fmap buildStuff funcOverload
+             in pure $ Function fArgs fRets ctx $ fmap buildOverloads funcOverload
           Nothing -> do
             cc <- asks codeCollection
             pure $ case M.lookup name $ _contracts cc of
@@ -998,9 +998,9 @@ getVarTypeByName' name ctx = do
             
   where lookupVar m Nothing = M.lookup name m
         lookupVar _ t       = t
-        buildStuff item = Function { functionArgType = flip Product ctx $ flip Static ctx . indexedTypeType . snd <$> funcArgs item
-                                   , functionReturnType = flip Product ctx $ flip Static ctx . indexedTypeType . snd <$> funcVals item
-                                   , functionContext = funcContext item
+        buildOverloads overloadFunc = Function { functionArgType = flip Product ctx $ flip Static ctx . indexedTypeType . snd <$> funcArgs overloadFunc
+                                   , functionReturnType = flip Product ctx $ flip Static ctx . indexedTypeType . snd <$> funcVals overloadFunc
+                                   , functionContext = funcContext overloadFunc
                                    , functionOverloads = []
                                    }
 
