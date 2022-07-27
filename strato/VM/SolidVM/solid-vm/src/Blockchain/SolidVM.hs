@@ -1816,39 +1816,54 @@ expToVar' (CC.FunctionCall _ e args) = do
               _ -> return (Nothing, True) 
             --get the contract information
             (contract, _, _) <- getCodeAndCollection realAccount
-            result <- if (isBlank) then do
-              --get the location of just the code of the contract
-              let (startLine, startColumn) = contract ^. CC.contractContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
-              let (endLine, endColumn) = contract ^. CC.contractContext ^. sourceAnnotationEnd & (_sourcePositionLine &&& _sourcePositionColumn)
-              --get the lines of the code
-              let bandwidth = take startLine (drop endLine cd')
-              --Trim the front and add the front again 
-                  trimFront = (take startColumn (head bandwidth)) ++ tail bandwidth
-              --Trim up the back 
-                  final = mapOnLast (drop endColumn) trimFront
-              --return only the contract code
-              pure final
-            else do
+            (sl, sc, el, ec) <- if (isBlank) then do
+                --get the location of just the code of the contract
+                let (startLine, startColumn) = contract ^. CC.contractContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
+                let (endLine, endColumn) = contract ^. CC.contractContext ^. sourceAnnotationEnd & (_sourcePositionLine &&& _sourcePositionColumn)
+                pure (startLine, startColumn, endLine, endColumn)
+              else do
               --Search the full contract go through sequentially
-              (startLine, startColumn) <- contract ^.. CC.constContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
-                                                     . CC.contractContext ^. sourceAnnotationEnd & (_sourcePositionLine &&& _sourcePositionColumn)
-                                                     -- storageDefs
-                                                     . CC.varContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
-                                                     -- enums
-                                                     . CC.enumsContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
-                                                     -- structs
-                                                     . CC.structsContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
-                                                     -- events
-                                                     . CC.eventContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
-                                                     --functions
-                                                     . CC.funcContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
-                                                     -- constructor
-                                                     -- . CC.constructorContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)                                                    
+                (startLine, startColumn) <-  contract ^.. CC.constContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
+                                                        . CC.contractContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
+                                                        -- storageDefs
+                                                        . CC.varContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
+                                                        -- enums TODO:go through the enums
+                                                        --  . CC.enumsContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
+                                                        -- structs TODO: go through the structs
+                                                        --  . CC.structsContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
+                                                        -- events
+                                                        . CC.eventContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
+                                                        --functions
+                                                        . CC.funcContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
+                                                           -- constructor
+                                                           -- . CC.constructorContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)                                                       -- destructor            
+                (endLine, endColumn) <-  contract ^.. CC.constContext ^. sourceAnnotationEnd & (_sourcePositionLine &&& _sourcePositionColumn)
+                                                    . CC.contractContext ^. sourceAnnotationEnd & (_sourcePositionLine &&& _sourcePositionColumn)
+                                                    -- storageDefs
+                                                    . CC.varContext ^. sourceAnnotationEnd & (_sourcePositionLine &&& _sourcePositionColumn)
+                                                    -- enums TODO:go through the enums
+                                                    --  . CC.enumsContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
+                                                    -- structs TODO: go through the structs
+                                                    --  . CC.structsContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
+                                                    -- events
+                                                    . CC.eventContext ^. sourceAnnotationEnd & (_sourcePositionLine &&& _sourcePositionColumn)
+                                                    --functions
+                                                    . CC.funcContext ^. sourceAnnotationEnd & (_sourcePositionLine &&& _sourcePositionColumn)
+                                                    -- constructor
+                                                    -- . CC.constructorContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)                                       
 
-
-              let code = case searchTerms of
-                            Just terms -> searchCode cd' terms
-                            Nothing -> cd'
+                result <- (startLine, startColumn, endLine, endColumn)
+                pure result
+                -- let code = case searchTerms of
+                --             Just terms -> searchCode cd' terms
+                --             Nothing -> cd'
+                              --get the lines of the code
+              let bandwidth = take sl (drop el cd')
+              --Trim the front and add the front again 
+                  trimFront = (take sc (head bandwidth)) ++ tail bandwidth
+              --Trim up the back 
+                  final = mapOnLast (drop ec) trimFront
+              --return only the contract code
               return $ Constant $ SString $ BC.pack $ show result
             --Find the specific piece of code and return it
             --First see if there was anything that was inputted in the argument list
@@ -2986,8 +3001,8 @@ mapOnLast f = foldr step []
         step x [] = [f x]
         step x xs = x : xs
 
-mapOnLast :: Foldable f => (a -> a) -> f a -> [a]
-mapOnLast f = foldr step []
+mapOnLast1 :: Foldable f => (a -> a) -> f a -> [a]
+mapOnLast1 f = foldr step []
   where step :: a -> [a] -> [a]
         step x [] = [f x]
         step x xs = x : xs
