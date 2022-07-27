@@ -151,6 +151,9 @@ expressionHelper (Binary y "&=" (Variable x name) b) = do
 expressionHelper (Binary y "^=" (Variable x name) b) = do
   modify $ M.insert name (x <> y)
   expressionHelper b
+expressionHelper (Binary y ">>>=" (Variable x name) b) = do
+  modify $ M.insert name (x <> y)
+  expressionHelper b
 expressionHelper (Binary y ">>=" (Variable x name) b) = do
   modify $ M.insert name (x <> y)
   expressionHelper b

@@ -1119,6 +1119,8 @@ tcExpr (Binary x ">>" a b) =
   intType' x ~> tcExpr a <~> tcExpr b
 tcExpr (Binary x ">>>" a b) =
   intType' x ~> tcExpr a <~> tcExpr b
+tcExpr (Binary x ">>>=" a b) =
+  intType' x ~> tcExpr a <~> tcExpr b
 tcExpr (Binary x ">>=" a b) =
   intType' x ~> tcExpr a <~> tcExpr b
 tcExpr (Binary x "<<=" a b) =

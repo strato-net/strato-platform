@@ -240,7 +240,7 @@ expression =
                    pure (e1, e2)
                  pure (\e -> Ternary (extractExpression e <> a) e e1 e2)
              )],
-    [binary "=", binary "|=", binary "^=", binary "&=", binary "<<=", binary ">>=", binary "+=", binary "-=", binary "*=", binary "/=", binary "%="],
+    [binary "=", binary "|=", binary "^=", binary "&=", binary "<<=", binary ">>=", binary ">>>=", binary "+=", binary "-=", binary "*=", binary "/=", binary "%="],
     [binary "&&"],
     [binary "||"]
   ]

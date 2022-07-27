@@ -4877,11 +4877,15 @@ contract qq {
     runBS [r|
 pragma solidvm 3.3;
 contract qq {
-  int result1 =0;
-  int result2 =0; 
+  int result1 = 0;
+  int result2 = 0;
+  int result3 = -2;
+  int result4 = 24; 
   constructor() {
     result1 += -2 >>> 254;
-    result2 += 12 >>> 1; 
+    result2 += 12 >>> 1;
+    result3 >>>= 255;
+    result4 >>>= 1; 
   }
 }|]
-    getFields ["result1", "result2"] `shouldReturn` [BInteger 3, BInteger 6]
+    getFields ["result1", "result2", "result3", "result4"] `shouldReturn` [BInteger 3, BInteger 6, BInteger 1, BInteger 12]
