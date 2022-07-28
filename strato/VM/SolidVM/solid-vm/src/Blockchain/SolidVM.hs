@@ -1819,11 +1819,15 @@ expToVar' (CC.FunctionCall _ e args) = do
             searchTerms <- case argVals of
                 OrderedVals [SString arguments] -> Just arguments
                 _ -> Nothing
-
+            numberOfSearchTerms <- case searchTerms of
+              Nothing -> return 0
+              Just searchTerms -> return $ length searchTerms
+            when (numberOfSearchTerms > maxNumberOfSearchTerms) $ tooManyCooks maxNumberOfSearchTerms numberOfSearchTerms
+            searchTerm <- head searchTerms
             --get the contract information
             (contract, _, _) <- getCodeAndCollection realAccount
             --get the position of the searched item if something was wanting to be searched
-            piece <- case searchTerms of 
+            piece <- case searchTerm of 
               --get the location of just the code of the contract
               Nothing -> do
                 let (startLine, startColumn) = contract ^. CC.contractContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
@@ -1831,7 +1835,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                 pure (startLine, startColumn, endLine, endColumn)
               _ -> do
               --Search the full contract go through sequentially
-                list <- contract ^.. traverse . filter ()
+                list <- contract ^.. traverse . filtered (== searchTerms)
 
                 -- start <- contract ^.. CC.contractContext ^. sourceAnnotationStart ^. (_sourcePositionLine &&& _sourcePositionColumn) . folded . filtered (if ((labelToString (contract ^. CC.contractName)) == searchTerms) then True else False)
                  
