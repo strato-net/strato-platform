@@ -73,6 +73,8 @@ import           System.Random                         (randomIO)
 
 import           BlockApps.Logging
 
+import Debug.Trace
+
 newtype RedisConnection = RedisConnection { unRedisConnection :: Connection }
 
 -- todo: move this somewhere?
@@ -222,6 +224,28 @@ registerCertificate userAddr x509CertInfoState = do
     let parentCertIsValid = fmap isValid certInfoState'
         parentIsValid = fromMaybe False parentCertIsValid
     
+    traceM "============ BELOW I AM SHOWING MY `registerCertificate` STUFF"
+    traceShowM userAddr
+    traceShowM x509CertInfoState
+    traceShowM status
+    traceShowM maybeParent
+    traceShowM certInfoState'
+    traceShowM parentCertIsValid
+    traceShowM parentIsValid
+    traceM "============ ABOVE I AM SHOWING MY `registerCertificate` STUFF"
+
+    liftIO $ do
+        putStrLn "============ BELOW I AM SHOWING MY `registerCertificate` STUFF2"
+        print userAddr >> putStrLn ""
+        print x509CertInfoState >> putStrLn ""
+        print status >> putStrLn ""
+        print maybeParent >> putStrLn ""
+        print certInfoState' >> putStrLn ""
+        print parentCertIsValid >> putStrLn ""
+        print parentIsValid >> putStrLn ""
+        putStrLn "============ ABOVE I AM SHOWING MY `registerCertificate` STUFF2"
+
+
     if not status || (status && parentIsValid)
         then do
             res <- multiExec $ set (inNamespace X509Certificates $ toKey userAddr) (toValue x509CertInfoState)
