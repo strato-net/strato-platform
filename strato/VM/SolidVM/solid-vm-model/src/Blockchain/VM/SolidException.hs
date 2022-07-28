@@ -66,7 +66,7 @@ data SolidException = TypeError String String
                     | TooMuchGas String String
                     | PaymentError String String
                     | ReservedWordError String String
-                    | TooManyResultsError String String
+                    | TooManyResultsError String Int Int
                     | TooManyCooks Int Int
                     deriving (Eq, Exception, Generic, NFData, ToJSON, FromJSON)
 
@@ -100,7 +100,7 @@ showSolidException (MalformedData a b) = printf "Malformed data: %s: %s" a b
 showSolidException (TooMuchGas a b) = printf "The gas limit is %s, but was given %s instead." a b
 showSolidException (PaymentError a b) = printf "There was an error sending %s wei to the following address: %s" a b
 showSolidException (ReservedWordError a b) = printf "%s is a reserved word in version %s and up." b a
-showSolidException (TooManyResultsError a b) = printf "Too many results returned from input %s: found %s entries (should be 1)." a b
+showSolidException (TooManyResultsError a b c) = printf "Too many results returned from input %s: found %d entries (should be %d)." a b c
 showSolidException (TooManyCooks a b) = printf "Too many arguments were given, expected %d argument/s, but received %d arguments." a b
 
 toThrower :: (Show v) => (String -> String -> SolidException) -> String -> v -> a
@@ -184,8 +184,8 @@ paymentError = toThrower PaymentError
 reservedWordError :: (Show v) => String -> v -> a
 reservedWordError = toThrower ReservedWordError
 
-tooManyResultsError :: (Show v) => String -> v -> a
-tooManyResultsError = toThrower TooManyResultsError
+tooManyResultsError :: String -> Int -> Int -> a
+tooManyResultsError word got expected = throw $ TooManyResultsError word got expected
 
 tooManyCooks :: Int -> Int -> a
 tooManyCooks expected got = throw $ TooManyCooks expected got
