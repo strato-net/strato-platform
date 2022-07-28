@@ -38,6 +38,8 @@ data ContractF a =
     _constants :: Map SolidString (ConstantDeclF a),
     _storageDefs :: Map SolidString (VariableDeclF a),
     _enums :: Map SolidString ([SolidString], a),
+    --TODO: Add source annotation for the entire struct, not just the individual variables inside it
+    -- _structs :: Map SolidString ([(SolidString, SolidVM.FieldType, a)], a),
     _structs :: Map SolidString [(SolidString, SolidVM.FieldType, a)],
     _events :: Map SolidString (SolidVM.EventF a),
     _functions :: Map SolidString (FuncF a),
