@@ -40,6 +40,8 @@ data R = R
   { codeCollection :: Annotated CodeCollectionF
   , contract :: Annotated ContractF
   , function :: Maybe (Annotated FuncF)
+  , functName :: String
+  , immutableValNames :: [(String, Bool)]
   }
 type SSS = StateT (NonEmpty (Maybe Type', M.Map SolidString (Annotated VarDefEntryF))) (Reader R)
 
@@ -645,7 +647,7 @@ contractHelper cc c =
       funcsAndConstr = constr <> _functions c
       varTypes' = reduceType' (_contractContext c) $ varDeclHelper cc c <$> M.elems (_storageDefs c)
       constTypes' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_constants c)
-      funcTypes' = reduceType' (_contractContext c) $ uncurry (functionHelper cc c) <$> M.toList funcsAndConstr
+      funcTypes' = reduceType' (_contractContext c) $ uncurry (functionHelper cc c) <$> M.toList funcsAndConstr 
    in reduceType' (_contractContext c) [varTypes', constTypes', funcTypes']
 
 varDeclHelper :: Annotated CodeCollectionF
@@ -657,7 +659,7 @@ varDeclHelper cc c VariableDecl{..} =
    in case varInitialVal of
         Nothing -> ty
         Just e ->
-          let r = R cc c Nothing
+          let r = R cc c Nothing "Nothing" []
            in runReader (evalStateT (ty ~> tcExpr e) ((Nothing, M.empty) :| [])) r
 
 constDeclHelper :: Annotated CodeCollectionF
@@ -666,12 +668,12 @@ constDeclHelper :: Annotated CodeCollectionF
                 -> Type'
 constDeclHelper cc c ConstantDecl{..} =
   let ty = Static constType constContext
-      r = R cc c Nothing
+      r = R cc c Nothing "Nothing" []
    in runReader (evalStateT (ty ~> tcExpr constInitialVal) ((Nothing, M.empty) :| [])) r
 
 functionHelper :: Annotated CodeCollectionF
                -> Annotated ContractF
-               -> String
+               -> String 
                -> Annotated FuncF
                -> Type'
 functionHelper cc c funcName f@Func{..} = case funcContents of
@@ -679,7 +681,7 @@ functionHelper cc c funcName f@Func{..} = case funcContents of
   Just stmts ->
     if funcName == "receive"
       then case (funcArgs, funcVals, funcStateMutability, funcVisibility) of
-        ([], [], Just Payable, Just External) -> let r = R cc c (Just f)
+        ([], [], Just Payable, Just External) -> let r = R cc c (Just f) funcName (map (\(nameOfVar, varDecl) -> (nameOfVar, Nothing /= varInitialVal varDecl) ) (filter (\(_, varDecl) ->  (isImmutable varDecl ) ) (M.toList $ _storageDefs c)))
                                                      swap = uncurry $ flip (,)
                                                      args = (\(it,n) -> ( n
                                                                         , VarDefEntry (Just $ indexedTypeType it) Nothing n funcContext
@@ -701,8 +703,8 @@ functionHelper cc c funcName f@Func{..} = case funcContents of
                           ]) <$ funcContext 
         _ -> bottom $ "Function `receive` must be External and Payable, but has not been declared so " <$ funcContext
     else if funcName == "fallback"
-      then case (funcArgs, funcVals, funcVisibility) of
-        ([], [], Just External) -> let r = R cc c (Just f)
+      then case (funcArgs, funcVals, funcVisibility) of 
+        ([], [], Just External) -> let r = R cc c (Just f) funcName (map (\(nameOfVar, varDecl) -> (nameOfVar, Nothing /= varInitialVal varDecl) ) (filter (\(_, varDecl) ->  (isImmutable varDecl ) ) (M.toList $ _storageDefs c)))
                                        swap = uncurry $ flip (,)
                                        args = (\(it,n) -> ( n
                                                             , VarDefEntry (Just $ indexedTypeType it) Nothing n funcContext
@@ -724,7 +726,7 @@ functionHelper cc c funcName f@Func{..} = case funcContents of
                           ]) <$ funcContext 
         _ -> bottom $ "Function `fallback` must be External, but has not been declared so " <$ funcContext
       else
-        let r = R cc c (Just f)
+        let r = R cc c (Just f) funcName (map (\(nameOfVar, varDecl) -> (nameOfVar, Nothing /= varInitialVal varDecl) ) (filter (\(_, varDecl) ->  (isImmutable varDecl ) ) (M.toList $ _storageDefs c)))
             swap = uncurry $ flip (,)
             args = (\(it,n) -> ( n
                               , VarDefEntry (Just $ indexedTypeType it) Nothing n funcContext
@@ -1094,6 +1096,21 @@ simpleStatementHelper x (VariableDefinition vdefs mExpr) = do
 simpleStatementHelper _ (ExpressionStatement expr) =
   tcExpr expr
 
+checkIfImmuteOperationValid :: Annotated ExpressionF  ->  SSS Type'
+checkIfImmuteOperationValid (Variable y a)  = do 
+  lstImmutNames <- asks immutableValNames
+  if null lstImmutNames
+    then tcExpr (Variable y a)
+    else do
+      thisFuncName  <- asks functName
+      let namesOfImmutesOnly = map (\x -> fst x) lstImmutNames
+      let notConstructAndImmuteAissgnedValue = ( thisFuncName /= "constructor") && (a  `elem` namesOfImmutesOnly)
+      let constructorAndImmuteValueOverwritten = ( thisFuncName == "constructor") && ( (a, True)  `elem` lstImmutNames)
+      if notConstructAndImmuteAissgnedValue || constructorAndImmuteValueOverwritten
+      then pure . bottom $ "Immutable assignment error at" <$  y 
+      else tcExpr (Variable y a)
+checkIfImmuteOperationValid a = tcExpr a
+
 tcExpr :: Annotated ExpressionF -> SSS Type'
 tcExpr (Binary x "+" a b) =
   sumType' (intType' x) (stringType' x)  ~> tcExpr a <~> tcExpr b
@@ -1118,15 +1135,15 @@ tcExpr (Binary x "<<" a b) =
 tcExpr (Binary x ">>" a b) =
   intType' x ~> tcExpr a <~> tcExpr b
 tcExpr (Binary x "+=" a b) =
-  sumType' (intType' x) (stringType' x)  ~> tcExpr a <~> tcExpr b
+  sumType' (intType' x) (stringType' x)  ~> (checkIfImmuteOperationValid a) <~> tcExpr b
 tcExpr (Binary x "-=" a b) =
-  intType' x ~> tcExpr a <~> tcExpr b
+  intType' x ~> (checkIfImmuteOperationValid a) <~> tcExpr b
 tcExpr (Binary x "*=" a b) =
-  intType' x ~> tcExpr a <~> tcExpr b
+  intType' x ~> (checkIfImmuteOperationValid a) <~> tcExpr b
 tcExpr (Binary x "/=" a b) =
-  intType' x ~> tcExpr a <~> tcExpr b
+  intType' x ~> (checkIfImmuteOperationValid a) <~> tcExpr b
 tcExpr (Binary x "%=" a b) =
-  intType' x ~> tcExpr a <~> tcExpr b
+  intType' x ~> (checkIfImmuteOperationValid a) <~> tcExpr b
 tcExpr (Binary x "|=" a b) =
   intType' x ~> tcExpr a <~> tcExpr b
 tcExpr (Binary x "&=" a b) =
@@ -1149,8 +1166,10 @@ tcExpr (Binary x ">=" a b) =
   intType' x ~> tcExpr a <~> tcExpr b !> pure (boolType' x)
 tcExpr (Binary x "<=" a b) =
   intType' x ~> tcExpr a <~> tcExpr b !> pure (boolType' x)
-tcExpr (Binary _ _ a b) =
-  tcExpr a <~> tcExpr b
+tcExpr (Binary _ "=" a b) =
+  (checkIfImmuteOperationValid a) <~> tcExpr b
+tcExpr (Binary _ _ a b) = 
+  (tcExpr a <~> tcExpr b)
 tcExpr (PlusPlus x a) = 
   intType' x ~> tcExpr a
 tcExpr (MinusMinus x a) = do
