@@ -1793,6 +1793,7 @@ expToVar' (CC.FunctionCall _ e args) = do
 
           Constant (SContractItem address' "code") -> do
             let maxNumberOfSearchTerms = 1
+            let maxNumberOfFinds = 1
             cid <- case (address' ^. namedAccountChainId) of 
               UnspecifiedChain -> do
                 cid1 <- view accountChainId <$> getCurrentAccount
@@ -1827,18 +1828,53 @@ expToVar' (CC.FunctionCall _ e args) = do
             --get the contract information
             (contract, _, _) <- getCodeAndCollection realAccount
             --get the position of the searched item if something was wanting to be searched
-            tempSearchTerm <- "myFunction"
-            piece <- case tempSearchTerm of 
+            let tempSearchTerm = "myFunction"
+            anno <- case tempSearchTerm of 
               --get the location of just the code of the contract
-              Nothing -> do
-                let (startLine, startColumn) = contract ^. CC.contractContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
-                let (endLine, endColumn) = contract ^. CC.contractContext ^. sourceAnnotationEnd & (_sourcePositionLine &&& _sourcePositionColumn)
-                pure (startLine, startColumn, endLine, endColumn)
+              Nothing -> (contract ^. CC.contractContext, False)
+                -- let (startLine, startColumn) = contract ^. CC.contractContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
+                -- let (endLine, endColumn) = contract ^. CC.contractContext ^. sourceAnnotationEnd & (_sourcePositionLine &&& _sourcePositionColumn)
+                -- pure (startLine, startColumn, endLine, endColumn)
               _ -> do
               --Search the full contract go through sequentially
-                list <- contract ^.. traverse . filtered (== tempSearchTerm)
+                -- get the source annotation list for all of the pieces of the contract
+                -- list <- contract ^.. traverse
+                --check to see if the item can be the search term
+                -- Check the contractName
+                let contrAnno = when ((contract ^. CC.contractName) == "myFunction") $ contract ^. CC.contractContext
+                -- Check the constants
+                let constAnno = fmap (^. CC.constContext) ((contract ^. CC.constants) M.!? "myFunction")
+                -- Check the storageDefs
+                let storjAnno = fmap (^. CC.varContext) ((contract ^. CC.storageDefs) M.!? "myFunction")
+                -- Check the enums
+                let enumAnno = snd  <$> ((contract ^. CC.enums) M.!? "myFunction")
+                -- Check the structs TODO: implement this, will need to change the structs to include a source annotation
+                -- let structAnno = (\(_,_,a) -> a) <$> ((contract ^. CC.structs) M.!? "myFunction")
+                -- Check the events
+                let eventAnno = fmap (^. CC.eventContext) ((contract ^. CC.events) M.!? "myFunction")
+                -- Check the functions
+                let funcAnno = fmap (^. CC.funcContext) ((contract ^. CC.functions) M.!? "myFunction")
 
-                -- start <- contract ^.. CC.contractContext ^. sourceAnnotationStart ^. (_sourcePositionLine &&& _sourcePositionColumn) . folded . filtered (if ((labelToString (contract ^. CC.contractName)) == searchTerms) then True else False)
+                let sourceAnnos :: [SourceAnnotation ()]
+                    sourceAnnos = catMaybes [contrAnno, constAnno, storjAnno, enumAnno, eventAnno, funcAnno] -- structAnno]
+                
+                numFound <- length sourceAnnos
+                --mark down if nothing was found
+                pos <- case numFound of 
+                  0 -> Nothing
+                  -- Return the position of the found item
+                  1 -> head sourceAnnos
+                  _ -> tooManyResultsError searchTerm numFound maxNumberOfFinds
+                pure pos
+                -- start <- contract ^.. CC.constants
+                --                     . CC.storageDefs
+                --                     . CC.enums
+                --                     . CC.structs
+                --                     . CC.events
+                --                     . CC.functions
+                --                     . contractName
+                --                     . folded . filtered (\n -> n == searchTerm)
+                -- -- CC.contractContext ^. sourceAnnotationStart ^. (_sourcePositionLine &&& _sourcePositionColumn) . folded . filtered (if ((labelToString (contract ^. CC.contractName)) == searchTerms) then True else False)
                  
                 --                     . CC.constants ^. CC.constContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn) . folded . filtered (if CC.constants == searchTerms then True else False)
                 --                     -- . CC.contractContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
@@ -1871,19 +1907,8 @@ expToVar' (CC.FunctionCall _ e args) = do
                 --                     -- constructor
                 --                     -- . CC.constructorContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)                                       
 
-
-
-                pure (0,0,0,0)
-
-            let bandwidth = take sl (drop el cd')
-            --Trim the front and add the front again 
-                trimFront = (take sc (head bandwidth)) ++ tail bandwidth
-            --Trim up the back 
-                final = mapOnLast (drop ec) trimFront
             --return only the contract code
-            pure $ Constant $ SString $ BC.pack $ show final
-            --Find the specific piece of code and return it
-            --First see if there was anything that was inputted in the argument list
+            pure $ Constant $ SString $ BC.pack $ show $ trimCodeCollection cd' anno
 
           Constant (SContractItem address' itemName) -> do
             from <- getCurrentAccount
@@ -2886,8 +2911,8 @@ solidityExceptionHandler catchBlockMap ex = do
     (ReservedWordError s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 23 reservedWordError
       return res
-    (TooManyResultsError s1 s2) -> do
-      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 24 tooManyResultsError
+    (TooManyResultsError s1 s2 s3) -> do
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 s3 24 tooManyResultsError
       return res
     (TooManyCooks s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 25 tooManyCooks
@@ -3007,9 +3032,9 @@ solidVMExceptionHandler catchBlockMap ex = case ex of
         Just block -> do
           res <- runStatements block
           return res
-    (TooManyResultsError s1 s2) -> 
+    (TooManyResultsError s1 s2 s3) -> 
       case M.lookup "TooManyResultsError" catchBlockMap of
-        Nothing -> tooManyResultsError s1 s2
+        Nothing -> tooManyResultsError s1 s2 s3
         Just block -> do
           res <- runStatements block
           return res
@@ -3052,3 +3077,18 @@ mapOnLast f = foldr step []
 -- mapOnLast'' :: (a -> a) -> [a] -> [a]
 -- mapOnLast'' f = foldMap step
 --   where step :: a -> m 
+
+getPositionFromSourceAnnotation :: SourceAnnotation a -> (Int, Int, Int, Int)
+getPositionFromSourceAnnotation sa = (sa ^. sourceAnnotationStart ^. sourcePositionLine,
+                                      sa ^. sourceAnnotationStart ^. sourcePositionColumn,
+                                      sa ^. sourceAnnotationEnd ^. sourcePositionLine,
+                                      sa ^. sourceAnnotationEnd ^. sourcePositionColumn)
+
+trimCodeCollection :: String -> SourceAnnotation a -> String
+trimCodeCollection cc sa = do
+  --get the band of code form the beginning to the end
+  let (startLine, startColumn, endLine, endColumn) = getPositionFromSourceAnnotation sa
+  let bandwidth = take startLine (drop endLine (lines cc))
+      trimFront = (take startColumn (head bandwidth)) ++ tail bandwidth 
+      final = mapOnLast (drop endColumn) trimFront
+  pure $ unlines final
