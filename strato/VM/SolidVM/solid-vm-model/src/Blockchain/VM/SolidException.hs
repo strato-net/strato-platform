@@ -101,7 +101,7 @@ showSolidException (TooMuchGas a b) = printf "The gas limit is %s, but was given
 showSolidException (PaymentError a b) = printf "There was an error sending %s wei to the following address: %s" a b
 showSolidException (ReservedWordError a b) = printf "%s is a reserved word in version %s and up." b a
 showSolidException (TooManyResultsError a b) = printf "Too many results returned from input %s: found %s entries (should be 1)." a b
-showSolidException (TooManyCooks a b) = printf "Too many arguments were given, expected %s argument/s, but received %s arguments." a b
+showSolidException (TooManyCooks a b) = printf "Too many arguments were given, expected %d argument/s, but received %d arguments." a b
 
 toThrower :: (Show v) => (String -> String -> SolidException) -> String -> v -> a
 toThrower cont msg = throw . cont msg . show
