@@ -69,7 +69,7 @@ simpleStatementHelper vars (VariableDefinition entries _) =
     lookupVar BlankEntry = Nothing
     lookupVar v = applyWarning v <$> M.lookup (vardefName v) vars
     applyWarning local state =
-      let statePos = _sourceAnnotationStart $ varContext state
+      let statePos = _sourceAnnotationStart $ _varContext state
           statePosStr = concat
             [ _sourcePositionName statePos
             , ", line "

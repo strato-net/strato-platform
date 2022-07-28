@@ -155,8 +155,8 @@ lookupContractFunction x cName fName = do
             , labelToText fName
             ]) <$ x
           Just VariableDecl{..} ->
-            if varIsPublic
-              then pure $ Function (Product [] x) (Static varType x) x
+            if _varIsPublic
+              then pure $ Function (Product [] x) (Static _varType x) x
               else pure . bottom $ (T.concat
                 [ "Contract variable "
                 , labelToText cName
@@ -634,8 +634,8 @@ varDeclHelper :: Annotated CodeCollectionF
               -> Annotated VariableDeclF
               -> Type'
 varDeclHelper cc c VariableDecl{..} =
-  let ty = Static varType varContext
-   in case varInitialVal of
+  let ty = Static _varType _varContext
+   in case _varInitialVal of
         Nothing -> ty
         Just e ->
           let r = R cc c Nothing
@@ -886,7 +886,7 @@ getVarTypeByName' name ctx = do
       Nothing -> pure $ Top (S.singleton name) ctx
     Nothing -> do
       c <- asks contract
-      let mVarDecl = ((varType &&& const ctx) <$> M.lookup name (_storageDefs c))
+      let mVarDecl = ((_varType &&& const ctx) <$> M.lookup name (_storageDefs c))
                  <|> ((_constType &&& const ctx) <$> M.lookup name (_constants c))
                  <|> (const (SVMType.Enum Nothing name Nothing, ctx) <$> M.lookup name (_enums c))
                  <|> (const (SVMType.Struct Nothing name, ctx) <$> M.lookup name (_structs c))

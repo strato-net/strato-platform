@@ -38,7 +38,7 @@ contractHelper :: CodeCollection -> Contract -> [SourceAnnotation Text]
 contractHelper cc c@Contract{..} = 
   let constr = maybe M.empty (M.singleton "constructor") _constructor
       funcsAndConstr = constr <> _functions
-      varTypes = (varContext &&& varType) <$> M.elems _storageDefs
+      varTypes = (_varContext &&& _varType) <$> M.elems _storageDefs
       constTypes = (_constContext &&& _constType) <$> M.elems _constants
       varAnns = uncurry (ccTypeHelper cc c) <$> varTypes ++ constTypes
       funcAnns = functionHelper cc c _storageDefs <$> M.elems funcsAndConstr

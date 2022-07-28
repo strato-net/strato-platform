@@ -620,7 +620,7 @@ hintFromType = \case
 
 getXabiType' :: B.ByteString -> CallInfo -> Maybe SVMType.Type
 getXabiType' field callInfo = M.lookup (stringToLabel $ BC.unpack field)
-                            . fmap CC.varType
+                            . fmap CC._varType
                             . CC._storageDefs
                             . currentContract
                             $ callInfo
