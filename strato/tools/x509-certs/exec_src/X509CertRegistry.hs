@@ -185,6 +185,7 @@ contract Certificate {
     address public userAddress;
     address public parent;
     address[] public children;
+
     
     // Store all the fields of a certificate in a Cirrus record
     string commonName;
@@ -195,6 +196,7 @@ contract Certificate {
     string public publicKey;
     string public certificateString;
     bool public isValid;
+    int expirationDate;
 
     constructor(string _certificateString) {
         owner = msg.sender;
