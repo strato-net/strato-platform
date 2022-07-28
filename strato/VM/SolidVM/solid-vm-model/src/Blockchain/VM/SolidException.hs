@@ -67,7 +67,7 @@ data SolidException = TypeError String String
                     | PaymentError String String
                     | ReservedWordError String String
                     | TooManyResultsError String String
-                    | TooManyCooks String String
+                    | TooManyCooks Int Int
                     deriving (Eq, Exception, Generic, NFData, ToJSON, FromJSON)
 
 instance Show SolidException where
@@ -187,5 +187,5 @@ reservedWordError = toThrower ReservedWordError
 tooManyResultsError :: (Show v) => String -> v -> a
 tooManyResultsError = toThrower TooManyResultsError
 
-tooManyCooks :: (Show v) => String -> v -> a
-tooManyCooks = toThrower TooManyCooks
+tooManyCooks :: Int -> Int -> a
+tooManyCooks expected got = throw $ TooManyCooks expected got
