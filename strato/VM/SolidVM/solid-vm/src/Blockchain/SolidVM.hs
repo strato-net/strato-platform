@@ -1831,7 +1831,7 @@ expToVar' (CC.FunctionCall _ e args) = do
             let tempSearchTerm = "myFunction"
             anno <- case tempSearchTerm of 
               --get the location of just the code of the contract
-              Nothing -> (contract ^. CC.contractContext, False)
+              Nothing -> contract ^. CC.contractContext
                 -- let (startLine, startColumn) = contract ^. CC.contractContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
                 -- let (endLine, endColumn) = contract ^. CC.contractContext ^. sourceAnnotationEnd & (_sourcePositionLine &&& _sourcePositionColumn)
                 -- pure (startLine, startColumn, endLine, endColumn)
@@ -1861,54 +1861,15 @@ expToVar' (CC.FunctionCall _ e args) = do
                 numFound <- length sourceAnnos
                 --mark down if nothing was found
                 pos <- case numFound of 
-                  0 -> Nothing
+                  0 -> Nothing --TODO: add warning that nothing was found and the piece of code is redundant
                   -- Return the position of the found item
                   1 -> head sourceAnnos
                   _ -> tooManyResultsError searchTerm numFound maxNumberOfFinds
                 pure pos
-                -- start <- contract ^.. CC.constants
-                --                     . CC.storageDefs
-                --                     . CC.enums
-                --                     . CC.structs
-                --                     . CC.events
-                --                     . CC.functions
-                --                     . contractName
-                --                     . folded . filtered (\n -> n == searchTerm)
-                -- -- CC.contractContext ^. sourceAnnotationStart ^. (_sourcePositionLine &&& _sourcePositionColumn) . folded . filtered (if ((labelToString (contract ^. CC.contractName)) == searchTerms) then True else False)
-                 
-                --                     . CC.constants ^. CC.constContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn) . folded . filtered (if CC.constants == searchTerms then True else False)
-                --                     -- . CC.contractContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
-                --                     -- storageDefs
-                --                     . CC.varContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
-                --                     -- enums TODO:go through the enums
-                --                     --  . CC.enumsContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
-                --                     -- structs TODO: go through the structs
-                --                     --  . CC.structsContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
-                --                     -- events
-                --                     . CC.eventContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
-                --                     --functions
-                --                     . CC.funcContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
-                --                         -- constructor
-                --                         -- . CC.constructorContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)   
-                                     
-                -- when (length start > 1) $ tooManyResultsError searchTerms (length start)                               -- destructor            
-                -- end <-   contract ^.. CC.constContext ^. sourceAnnotationEnd & (_sourcePositionLine &&& _sourcePositionColumn)
-                --                     . CC.contractContext ^. sourceAnnotationEnd & (_sourcePositionLine &&& _sourcePositionColumn)
-                --                     -- storageDefs
-                --                     . CC.varContext ^. sourceAnnotationEnd & (_sourcePositionLine &&& _sourcePositionColumn)
-                --                     -- enums TODO:go through the enums
-                --                     --  . CC.enumsContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
-                --                     -- structs TODO: go through the structs
-                --                     --  . CC.structsContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
-                --                     -- events
-                --                     . CC.eventContext ^. sourceAnnotationEnd & (_sourcePositionLine &&& _sourcePositionColumn)
-                --                     --functions
-                --                     . CC.funcContext ^. sourceAnnotationEnd & (_sourcePositionLine &&& _sourcePositionColumn)
-                --                     -- constructor
-                --                     -- . CC.constructorContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)                                       
 
             --return only the contract code
-            pure $ Constant $ SString $ BC.pack $ show $ trimCodeCollection cd' anno
+            result <- trimCodeCollection cd' anno
+            pure $ Constant $ SString $ BC.pack $ show result
 
           Constant (SContractItem address' itemName) -> do
             from <- getCurrentAccount
