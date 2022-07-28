@@ -210,7 +210,7 @@ def runAppBootNode(nodeData, wipeApp = null, refspec = null, postgresViewsPrefix
         echo "publicKey from strato-gs run script: ${publicKey}"
         sh 'rm -f run-app.sh'
         def authCookieName = "beanstalk-dev${nodeData.NUMBER}-auth"
-        if(appName = 'beanstalk') {
+        if(appName == 'beanstalk') {
           writeFile file: "run-app.sh", text: """#!/bin/bash
 set -e
 
