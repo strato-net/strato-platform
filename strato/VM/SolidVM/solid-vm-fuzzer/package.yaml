@@ -21,6 +21,7 @@ library:
   - servant-server
   - solid-vm
   - solid-vm-model
+  - solid-vm-parser
   - solid-vm-static-analysis
   - source-tools
   - strato-model

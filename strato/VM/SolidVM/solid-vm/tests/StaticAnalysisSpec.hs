@@ -8,6 +8,7 @@ import qualified Data.Map as M
 import           Data.Source
 import           Data.Text (Text)
 import qualified Data.Text as T
+import           SolidVM.Solidity.Parse
 import qualified SolidVM.Solidity.StaticAnalysis.Contracts.ParentConstructors           as ParentConstructors
 -- import qualified SolidVM.Solidity.StaticAnalysis.Typechecker                            as Typechecker
 import qualified SolidVM.Solidity.StaticAnalysis.Expressions.BooleanLiterals            as BooleanLiterals

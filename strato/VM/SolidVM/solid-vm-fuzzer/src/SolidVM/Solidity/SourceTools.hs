@@ -14,8 +14,9 @@ import           Debugger
 import           GHC.Generics
 import           Servant
 import           SolidVM.Model.CodeCollection
-import           SolidVM.Solidity.StaticAnalysis
 import           SolidVM.Solidity.Fuzzer
+import           SolidVM.Solidity.Parse
+import           SolidVM.Solidity.StaticAnalysis
 
 data SourceTools = SourceTools
   { parser   :: SourceMap -> Either [SourceAnnotation Text] CodeCollection

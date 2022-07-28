@@ -3,11 +3,8 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
 module Blockchain.SolidVM.CodeCollectionDB
-  ( ParseTypeCheckOrSolidVMError(..)
-  , parseSource
-  , parseSourceWithAnnotations
-  , compileSourceNoInheritance
-  , compileSource
+  ( 
+    compileSource
   , compileSourceWithAnnotations
   , codeCollectionFromSource
   , codeCollectionFromHash
@@ -18,38 +15,25 @@ import           Control.Monad                        ((<=<))
 import           Control.Monad.IO.Class
 import           Control.Lens                         hiding (assign, from, to, bimap, Context)
 import qualified Data.Aeson                           as Aeson
-import           Data.Bifunctor                       (bimap, first)
+import           Data.Bifunctor                       (first)
 import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Lazy                 as BL
-import           Data.Foldable                        (foldrM)
 import           Data.IORef
 import           Data.Map                             (Map)
 import qualified Data.Map                             as M
-import           Data.Maybe                           (catMaybes)
 import           Data.Source
 import qualified Data.Text                            as T
 import           Data.Text.Encoding                   (decodeUtf8, encodeUtf8)
-import           Data.Traversable                     (for)
 import           System.IO.Unsafe
-import           Text.Parsec                          (runParser)
-import           Text.Parsec.Error
 
 import           Blockchain.DB.CodeDB
 import           Blockchain.SolidVM.Exception         hiding (assert)
 import           Blockchain.SolidVM.Metrics
 import           Blockchain.Strato.Model.Keccak256
 
-import           SolidVM.CodeCollectionTools
 import           SolidVM.Model.CodeCollection
-import           SolidVM.Model.SolidString
-import           SolidVM.Solidity.Parse.Declarations
-import           SolidVM.Solidity.Parse.File
-import           SolidVM.Solidity.Parse.ParserTypes
+import           SolidVM.Solidity.Parse
 import           SolidVM.Solidity.StaticAnalysis.Typechecker as TC
-
-data ParseTypeCheckOrSolidVMError = PEx ParseError
-                         | TCEx [SourceAnnotation T.Text]
-                         | SVMEx (Positioned ((,) SolidException)) deriving (Show) 
 
 {-# NOINLINE unsafeCodeMapIORef #-}
 unsafeCodeMapIORef :: IORef (Map Keccak256 CodeCollection)
@@ -60,41 +44,6 @@ withAnnotations f = first unwind . f
   where unwind (PEx pe) = [parseErrorToAnnotation pe]
         unwind (SVMEx (e,x)) = [T.pack (show e) <$ x]
         unwind (TCEx errs) = errs
-
-parseSource :: T.Text -> T.Text -> Either ParseTypeCheckOrSolidVMError [SourceUnit]
-parseSource fileName src = bimap PEx unsourceUnits $ runParser solidityFile (ParserState "" "") (T.unpack fileName) (T.unpack src)
-
-parseSourceWithAnnotations :: T.Text -> T.Text -> Either [SourceAnnotation T.Text] [SourceUnit]
-parseSourceWithAnnotations = withAnnotations . parseSource
-
-compileSourceNoInheritance :: Map T.Text T.Text -> Either ParseTypeCheckOrSolidVMError CodeCollection
-compileSourceNoInheritance initCodeMap = do
-  let getNamedContracts :: T.Text -> T.Text -> Either ParseTypeCheckOrSolidVMError [(SolidString, Contract)]
-      getNamedContracts fileName src = do
-        sourceUnits <- parseSource fileName src
-        let pragmas = \case
-              Pragma _ n v -> Just (n, v)
-              _ -> Nothing
-            vmVersion' = if (Just ("solidvm","3.2")) `elem` (pragmas <$> sourceUnits) then "svm3.2" else (if (Just ("solidvm","3.0")) `elem` (pragmas <$> sourceUnits) then "svm3.0" else "")
-        fmap catMaybes . for sourceUnits $ \case
-          NamedXabi name (xabi, parents') -> do
-            ctrct <- first SVMEx
-                   $ xabiToContract (textToLabel name) (map textToLabel parents') vmVersion' xabi
-            pure $ Just (textToLabel name, ctrct)
-          _ -> pure Nothing
-
-      throwDuplicate :: (SolidString, Contract) -> Map SolidString Contract -> Either ParseTypeCheckOrSolidVMError (Map SolidString Contract)
-      throwDuplicate (cName, contract) m = case M.lookup cName m of
-        Nothing -> pure $ M.insert cName contract m
-        Just _ ->  Left . PEx
-                 $ newErrorMessage (Message $ "Duplicate contract found: " ++ labelToString cName)
-                                   (fromSourcePosition $ _sourceAnnotationStart $ _contractContext contract)
-                                           
-  allContracts <- fmap concat . traverse (uncurry getNamedContracts) $ M.toList initCodeMap
-  deduplicatedContracts <- foldrM throwDuplicate M.empty (allContracts :: [(SolidString, Contract)])
-  pure $ CodeCollection {
-    _contracts = deduplicatedContracts
-  }
 
 hasSvm3_2 :: CodeCollection -> Bool
 hasSvm3_2 cc = any (=="svm3.2") vmVers

@@ -6,6 +6,7 @@ dependencies:
 library:
   source-dirs: src/
   exposed-modules:
+    - SolidVM.Solidity.Parse
     - SolidVM.Solidity.Parse.File
     - SolidVM.Solidity.Parse.Lexer
     - SolidVM.Solidity.Parse.Statement
@@ -18,6 +19,7 @@ library:
   dependencies:
   - aeson
   - aeson-casing
+  - blockapps-mpdbs
   - bytestring
   - containers
   - extra
@@ -29,6 +31,7 @@ library:
   - semver-range
   - solid-vm-model
   - source-tools
+  - strato-model
   - swagger2
   - text
 

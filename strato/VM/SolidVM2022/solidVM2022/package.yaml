@@ -8,6 +8,7 @@ dependencies:
 - format
 - ghc
 - parsec
+- solid-vm-parser
 - strato-model
 - text
 - vm-tools

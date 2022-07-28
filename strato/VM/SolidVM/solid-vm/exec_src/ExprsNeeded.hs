@@ -14,9 +14,9 @@ import Text.Printf
 import SolidVM.Solidity.StaticAnalysis.Typechecker as TC
 
 
-import SolidVM.CodeCollectionTools
 import SolidVM.Model.CodeCollection
 import SolidVM.Model.SolidString
+import SolidVM.Solidity.Parse
 import SolidVM.Solidity.Parse.Declarations
 import SolidVM.Solidity.Parse.File
 import SolidVM.Solidity.Parse.ParserTypes

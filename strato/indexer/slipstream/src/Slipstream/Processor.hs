@@ -87,9 +87,9 @@ import Slipstream.OutputData
 import Slipstream.XabiContract
 import Slipstream.Options
 
-import SolidVM.CodeCollectionTools
 import SolidVM.Model.CodeCollection hiding (contractName)
 import SolidVM.Model.SolidString
+import SolidVM.Solidity.Parse
 
 import Text.Format
 

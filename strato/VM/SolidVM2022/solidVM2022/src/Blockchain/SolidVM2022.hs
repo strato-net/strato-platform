@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 
 module Blockchain.SolidVM2022 (
   create
@@ -10,6 +11,7 @@ import qualified Data.Map as Map
 import Data.Maybe
 import Data.IORef
 import Data.Text (Text)
+import qualified Data.Text as Text
 import qualified Data.Set as Set
 import Text.Parsec
 
@@ -30,12 +32,13 @@ import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Type (Type)
 import qualified Blockchain.Type as Type
+import SolidVM.Solidity.Parse
 
 import Text.Format
 
 createVariable :: Type -> IO Variable
 createVariable Type.Integer = fmap Variable $ newIORef (0::Integer)
-createVariable Type.String = fmap Variable $ newIORef ""
+createVariable Type.String = fmap Variable $ newIORef (""::String)
 createVariable Type.Address = fmap Variable $ newIORef $ Address 0x0
 
 createVariables :: [AST1.VariableDefinition] -> IO (Map String Variable)
@@ -82,6 +85,12 @@ create _ _ _ _ _ _ _ _ _ _ _ theCode _ _ _ = do
 
   --  let sourceCode = "contract someContract { function abcd { } }"
 
+  let sourceUnitsOrError = compileSourceNoInheritance $ Map.fromList [("", Text.pack $ BC.unpack $ sourceCode)]
+
+  case sourceUnitsOrError of
+    Left e -> error $ show e
+    Right sourceUnits -> putStrLn $ "CodeCollection: " ++ show sourceUnits
+  
   let contract =
         case parse parseContract "<builtin>" (BC.unpack sourceCode) of
           Left e -> error $ show e

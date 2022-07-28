@@ -10,7 +10,6 @@ library:
     - Blockchain.SolidVM.Simple
     - Blockchain.SolidVM.SM
     - Blockchain.SolidVM.CodeCollectionDB
-    - SolidVM.CodeCollectionTools
   ghc-options: -Wall -O2
   dependencies:
   - aeson
@@ -90,6 +89,7 @@ tests:
       - raw-strings-qq
       - solid-vm
       - solid-vm-model
+      - solid-vm-parser
       - solid-vm-static-analysis
       - source-tools
       - strato-model

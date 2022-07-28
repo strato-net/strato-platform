@@ -55,6 +55,7 @@ library:
     - QuickCheck
     - solid-vm
     - solid-vm-model
+    - solid-vm-parser
     - scientific
     - source-tools
     - strato-model
