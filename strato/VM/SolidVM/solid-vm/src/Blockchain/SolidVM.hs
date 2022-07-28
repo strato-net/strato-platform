@@ -1827,7 +1827,8 @@ expToVar' (CC.FunctionCall _ e args) = do
             --get the contract information
             (contract, _, _) <- getCodeAndCollection realAccount
             --get the position of the searched item if something was wanting to be searched
-            piece <- case searchTerm of 
+            tempSearchTerm <- "myFunction"
+            piece <- case tempSearchTerm of 
               --get the location of just the code of the contract
               Nothing -> do
                 let (startLine, startColumn) = contract ^. CC.contractContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
@@ -1835,7 +1836,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                 pure (startLine, startColumn, endLine, endColumn)
               _ -> do
               --Search the full contract go through sequentially
-                list <- contract ^.. traverse . filtered (== searchTerms)
+                list <- contract ^.. traverse . filtered (== tempSearchTerm)
 
                 -- start <- contract ^.. CC.contractContext ^. sourceAnnotationStart ^. (_sourcePositionLine &&& _sourcePositionColumn) . folded . filtered (if ((labelToString (contract ^. CC.contractName)) == searchTerms) then True else False)
                  
