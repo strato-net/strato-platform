@@ -69,7 +69,7 @@ solidityContract = do
   declarations <-
     braces (many solidityDeclaration)
 
-  let allFunctions = Map.fromList [ (stringToLabel n, f) | (n, FuncDeclaration f) <- declarations]
+  let allFunctions = Map.fromListWithKey parseOverloads [ (stringToLabel n, f) | (n, FuncDeclaration f) <- declarations]
   let ctorList = [(stringToLabel n, c) | (n, ConstructorDeclaration c) <- declarations]
   let events = [(stringToLabel n, e) | (n, EventDeclaration e) <- declarations]
   let using = [(Text.pack n, u) | (n, UsingDeclaration u) <- declarations]
@@ -95,6 +95,18 @@ solidityContract = do
            },
         map (Text.pack . fst) baseConstrs
       )
+  where
+    parseOverloads _ new old = do
+      let oldParamTypes = fmap getVarType $ SolidVM.funcArgs old
+          newParamTypes = fmap getVarType $ SolidVM.funcArgs new
+      if (oldParamTypes == newParamTypes)
+        then invalidArguments ("Function is already defined with similar params.") $ SolidVM.funcArgs old
+        else
+          old{SolidVM.funcOverload = SolidVM.funcOverload old ++ [new]}
+      where
+        getVarType argDec = case argDec of
+          (_, vt) -> vt
+
 
 --  where -- constants = byMutability True (repeat 0)
 
@@ -298,6 +310,7 @@ functionXabi = do
       , SolidVM.funcConstructorCalls = Map.fromList funcConstructorCallsOrModifiers
       , SolidVM.funcModifiers = funcConstructorCallsOrModifiers
       , SolidVM.funcContext = ctx
+      , SolidVM.funcOverload = []
       }
 
 eventDeclaration :: SolidityParser (String, Declaration)

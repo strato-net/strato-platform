@@ -4847,6 +4847,82 @@ contract qq {
 }|]
     getFields ["myNum", "otherNum", "errorCount"] `shouldReturn` [BInteger 3, BInteger 12, BInteger 1]
 
+  it "allows overloading functions with different number of parameters" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq{
+  uint myNum = 0;
+  constructor() public {
+    addToNum({x: 1, y: 2});
+    addToNum(1);
+    addToNum(1, 2);
+    addToNum(1, 2, 3);
+  }
+
+  function addToNum(uint x, uint y) {
+    myNum += x + y;
+  }
+
+  function addToNum(uint x) {
+    myNum += x;
+  }
+
+  function addToNum(uint x, uint y, uint z) {
+    myNum += x + y + z;
+  }
+}|]
+    getFields ["myNum"] `shouldReturn` [BInteger 13]
+
+  it "allows overloading functions with same number of parameters" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq{
+  uint myNum = 0;
+  string myString = "";
+  bool myStatus = false;
+  constructor() public {
+    addToNum({x: 1, y: true});
+    addToNum(0, randomFunc(3));
+    addToNum(1, "hi");
+  }
+
+  function randomFunc(uint x) public returns (uint){
+    return x;
+  }
+
+  function addToNum(uint x, uint y) {
+    myNum += x + y;
+  }
+
+  function addToNum(uint x, bool y) {
+    myNum += x;
+    myStatus = y;
+  }
+
+  function addToNum(uint x, string z) {
+    myNum += x;
+    myString = z;
+  }
+}|]
+    getFields ["myNum", "myString", "myStatus"] `shouldReturn` [BInteger 5, BString "hi", BBool True]
+    
+  it "should catch invalid function overloads" $ runTest (do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq{
+  uint myNum = 0;
+  constructor() public {
+    addToNum(1, 2);
+  }
+
+  function addToNum(uint x, uint y) {
+    myNum += x - y;
+  }
+
+  function addToNum(uint a, uint b) {
+    myNum += a + b;
+  }
+}|]) `shouldThrow` anyInvalidArgumentsError
 
   it "can pass calldata arguments and use calldata variables" . runTest $ do
     runBS [r|
