@@ -215,10 +215,14 @@ registerCertificate userAddr x509CertInfoState = do
     let maybeParent = getParentUserAddress $ certificate x509CertInfoState
     certInfoState' <- case maybeParent of
         Just parentAddr -> do
-            mCertInfoState <- getCertificate parentAddr
+            mCertInfoState <- getCertificateE parentAddr
             case mCertInfoState of
-                Nothing -> pure Nothing
-                Just certInfoState -> pure $ Just certInfoState
+                Just (Right c) -> pure $ Just c
+                e -> do
+                    traceM "============ BELOW I AM SHOWING MY `registerCertificate` STUFF3"
+                    traceShowM e
+                    traceM "============ BELOW I AM SHOWING MY `registerCertificate` STUFF3"
+                    pure Nothing
         Nothing -> pure Nothing
         
     let parentCertIsValid = fmap isValid certInfoState'
@@ -233,18 +237,6 @@ registerCertificate userAddr x509CertInfoState = do
     traceShowM parentCertIsValid
     traceShowM parentIsValid
     traceM "============ ABOVE I AM SHOWING MY `registerCertificate` STUFF"
-
-    liftIO $ do
-        putStrLn "============ BELOW I AM SHOWING MY `registerCertificate` STUFF2"
-        print userAddr >> putStrLn ""
-        print x509CertInfoState >> putStrLn ""
-        print status >> putStrLn ""
-        print maybeParent >> putStrLn ""
-        print certInfoState' >> putStrLn ""
-        print parentCertIsValid >> putStrLn ""
-        print parentIsValid >> putStrLn ""
-        putStrLn "============ ABOVE I AM SHOWING MY `registerCertificate` STUFF2"
-
 
     if not status || (status && parentIsValid)
         then do
