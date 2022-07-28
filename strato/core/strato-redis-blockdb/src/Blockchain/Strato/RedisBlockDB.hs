@@ -98,7 +98,7 @@ inNamespace :: RedisDBKeyable k
             => BlockDBNamespace
             -> k
             -> S8.ByteString
-inNamespace ns k = ns' `S8.append` toKey k
+inNamespace ns k = ns' <> toKey k
     where ns' = case ns of
             Headers             -> "h:"
             Transactions        -> "t:"

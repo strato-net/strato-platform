@@ -17,6 +17,7 @@ import qualified Data.ByteString.Lazy               as BL
 import           Data.Either.Extra                  (eitherToMaybe)
 import qualified Data.List                          as List
 import           Data.Maybe                         (maybeToList)
+import qualified Data.String                        as Str
 import qualified Data.Text                          as T
 import           Data.Text.Encoding                 (decodeUtf8)
 import           Network.Kafka
@@ -156,7 +157,7 @@ indexEventToTxrResults = \case
         Nothing -> Just . RemoveMember . Left $ "failed to parse address for MemberRemoved event: " ++ addressStr
         Just address -> Just . RemoveMember $ Right (chainId, address)
       (Nothing, "CertificateRegistered", [certString]) ->
-        let cert = bsToCert . C8.pack $ certString
+        let cert = bsToCert . Str.fromString $ certString
             userAddress = fmap (fromPublicKey . subPub) $ getCertSubject =<< eitherToMaybe cert
         in case (cert, userAddress) of
             (Left s, Nothing) -> Just . RegisterCertificate . Left $ "Failed to parse the certString for the CertificateRegistered event: " <> s
