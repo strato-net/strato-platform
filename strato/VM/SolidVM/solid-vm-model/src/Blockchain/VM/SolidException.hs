@@ -30,6 +30,7 @@ module Blockchain.VM.SolidException
   , paymentError
   , reservedWordError
   , tooManyResultsError
+  , tooManyCooks
   ) where
 
 import Control.DeepSeq
@@ -66,6 +67,7 @@ data SolidException = TypeError String String
                     | PaymentError String String
                     | ReservedWordError String String
                     | TooManyResultsError String String
+                    | TooManyCooks String String
                     deriving (Eq, Exception, Generic, NFData, ToJSON, FromJSON)
 
 instance Show SolidException where
@@ -98,7 +100,8 @@ showSolidException (MalformedData a b) = printf "Malformed data: %s: %s" a b
 showSolidException (TooMuchGas a b) = printf "The gas limit is %s, but was given %s instead." a b
 showSolidException (PaymentError a b) = printf "There was an error sending %s wei to the following address: %s" a b
 showSolidException (ReservedWordError a b) = printf "%s is a reserved word in version %s and up." b a
-showSolidException (TooManyResultsError a b) = printf "Too many results returned from input %s: found %s entries (should be 1)" a b
+showSolidException (TooManyResultsError a b) = printf "Too many results returned from input %s: found %s entries (should be 1)." a b
+showSolidException (TooManyCooks a b) = printf "Too many arguments were given, expected %s argument/s, but received %s arguments." a b
 
 toThrower :: (Show v) => (String -> String -> SolidException) -> String -> v -> a
 toThrower cont msg = throw . cont msg . show
@@ -183,3 +186,6 @@ reservedWordError = toThrower ReservedWordError
 
 tooManyResultsError :: (Show v) => String -> v -> a
 tooManyResultsError = toThrower TooManyResultsError
+
+tooManyCooks :: (Show v) => String -> v -> a
+tooManyCooks = toThrower TooManyCooks

@@ -23,9 +23,11 @@ module Blockchain.SolidVM
   , create
   ) where
 
+import           Control.Arrow                        ((&&&))
 import           Control.DeepSeq                      (force)
 import           Control.Exception                    (throw)
 import           Control.Lens hiding (assign, from, to, Context)
+import           Control.Lens.Traversal
 import           Control.Applicative
 import           Control.Monad
 import           Control.Monad.Extra                  (fromMaybeM)
@@ -1814,8 +1816,10 @@ expToVar' (CC.FunctionCall _ e args) = do
             let decodeCD = DT.decodeUtf8 cd'
             --Get the search term from the input
             (searchTerms, isBlank) <- case argVals of
-              NamedVals [SString arguments] -> (arguments, False)
+              NamedVals arguments -> return (arguments, False)
               _ -> return (Nothing, True) 
+            when (length searchTerms > 1) $ 
+            (searchTerm,_) <- searchTerms
             --get the contract information
             (contract, _, _) <- getCodeAndCollection realAccount
             --get the position of the searched item if something was wanting to be searched
@@ -1826,8 +1830,10 @@ expToVar' (CC.FunctionCall _ e args) = do
                 pure (startLine, startColumn, endLine, endColumn)
               else do
               --Search the full contract go through sequentially
-                start <- contract ^.. CC.constContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
-                                    . CC.contractContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
+                start <- contract ^.. CC.contractContext ^. sourceAnnotationStart ^. (_sourcePositionLine &&& _sourcePositionColumn) . folded . filtered (if contractName == searchTerms then True else False)
+                 
+                                    . CC.constants ^. CC.constContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn) . folded . filtered (if CC.constants == searchTerms then True else False)
+                                    -- . CC.contractContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
                                     -- storageDefs
                                     . CC.varContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
                                     -- enums TODO:go through the enums
@@ -1840,7 +1846,8 @@ expToVar' (CC.FunctionCall _ e args) = do
                                     . CC.funcContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)
                                         -- constructor
                                         -- . CC.constructorContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)   
-                                    -- %~                                                     -- destructor            
+                                     
+                when (length start > 1) $ tooManyResultsError searchTerms (length start)                               -- destructor            
                 end <-   contract ^.. CC.constContext ^. sourceAnnotationEnd & (_sourcePositionLine &&& _sourcePositionColumn)
                                     . CC.contractContext ^. sourceAnnotationEnd & (_sourcePositionLine &&& _sourcePositionColumn)
                                     -- storageDefs
@@ -1855,15 +1862,16 @@ expToVar' (CC.FunctionCall _ e args) = do
                                     . CC.funcContext ^. sourceAnnotationEnd & (_sourcePositionLine &&& _sourcePositionColumn)
                                     -- constructor
                                     -- . CC.constructorContext ^. sourceAnnotationStart & (_sourcePositionLine &&& _sourcePositionColumn)                                       
+                -- when (length piece > 1) $ tooManyResultsError (show piece)
 
-                result <- (startLine, startColumn, endLine, endColumn)
-                pure result
+                -- result <- (startLine, startColumn, endLine, endColumn)
+                pure (0,0,0,0)
                 -- let code = case searchTerms of
                 --             Just terms -> searchCode cd' terms
                 --             Nothing -> cd'
                               --get the lines of the code
             --throw error if more than a single item is returned from the search
-            when (length piece > 1) $ tooManyResultsError (show piece)
+
             let bandwidth = take sl (drop el cd')
             --Trim the front and add the front again 
                 trimFront = (take sc (head bandwidth)) ++ tail bandwidth
@@ -2886,6 +2894,9 @@ solidityExceptionHandler catchBlockMap ex = do
     (TooManyResultsError s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 24 tooManyResultsError
       return res
+    (TooManyCooks s1 s2) -> do
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 25 tooManyCooks
+      return res
 
 solidVMExceptionHandler :: (MonadSM m) => (M.Map String [CC.Statement]) -> SolidException -> m (Maybe Value)
 solidVMExceptionHandler catchBlockMap ex = case ex of
@@ -3004,6 +3015,12 @@ solidVMExceptionHandler catchBlockMap ex = case ex of
     (TooManyResultsError s1 s2) -> 
       case M.lookup "TooManyResultsError" catchBlockMap of
         Nothing -> tooManyResultsError s1 s2
+        Just block -> do
+          res <- runStatements block
+          return res
+    (TooManyCooks s1 s2) ->
+      case M.lookup "TooManyCooks" catchBlockMap of
+        Nothing -> tooManyCooks s1 s2
         Just block -> do
           res <- runStatements block
           return res
