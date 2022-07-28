@@ -1793,7 +1793,6 @@ expToVar' (CC.FunctionCall _ e args) = do
 
           Constant (SContractItem address' "code") -> do
             let maxNumberOfSearchTerms = 1
-            let maxNumberOfFinds = 1
             cid <- case (address' ^. namedAccountChainId) of 
               UnspecifiedChain -> do
                 cid1 <- view accountChainId <$> getCurrentAccount
@@ -1864,7 +1863,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                   0 -> Nothing --TODO: add warning that nothing was found and the piece of code is redundant
                   -- Return the position of the found item
                   1 -> head sourceAnnos
-                  _ -> tooManyResultsError searchTerm numFound maxNumberOfFinds
+                  _ -> tooManyResultsError searchTerm numFound
                 pure pos
 
             --return only the contract code
@@ -2872,8 +2871,8 @@ solidityExceptionHandler catchBlockMap ex = do
     (ReservedWordError s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 23 reservedWordError
       return res
-    (TooManyResultsError s1 s2 s3) -> do
-      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 s3 24 tooManyResultsError
+    (TooManyResultsError s1 s2) -> do
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 24 tooManyResultsError
       return res
     (TooManyCooks s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 25 tooManyCooks
@@ -2993,9 +2992,9 @@ solidVMExceptionHandler catchBlockMap ex = case ex of
         Just block -> do
           res <- runStatements block
           return res
-    (TooManyResultsError s1 s2 s3) -> 
+    (TooManyResultsError s1 s2) -> 
       case M.lookup "TooManyResultsError" catchBlockMap of
-        Nothing -> tooManyResultsError s1 s2 s3
+        Nothing -> tooManyResultsError s1 s2
         Just block -> do
           res <- runStatements block
           return res
