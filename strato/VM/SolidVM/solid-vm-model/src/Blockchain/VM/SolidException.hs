@@ -184,7 +184,7 @@ paymentError = toThrower PaymentError
 reservedWordError :: (Show v) => String -> v -> a
 reservedWordError = toThrower ReservedWordError
 
-tooManyResultsError :: String -> Int -> Int -> a
+tooManyResultsError :: String -> Int -> a
 tooManyResultsError word got = throw $ TooManyResultsError word got
 
 tooManyCooks :: Int -> Int -> a
