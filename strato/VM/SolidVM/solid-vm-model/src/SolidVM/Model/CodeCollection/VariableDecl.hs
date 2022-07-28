@@ -5,12 +5,18 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module SolidVM.Model.CodeCollection.VariableDecl (
   VariableDeclF(..),
-  VariableDecl
+  VariableDecl,
+  varType,
+  varIsPublic,
+  varInitialVal,
+  varContext
   ) where
 
+import           Control.Lens
 import           Data.Aeson
 import           Data.Source
 import           GHC.Generics
@@ -20,11 +26,12 @@ import           SolidVM.Model.CodeCollection.Statement
 import qualified SolidVM.Model.Type as SVMType hiding (Enum)
 
 data VariableDeclF a = VariableDecl
-  { varType       :: SVMType.Type
-  , varIsPublic   :: Bool
-  , varInitialVal :: Maybe (ExpressionF a)
-  , varContext    :: a
+  { _varType       :: SVMType.Type
+  , _varIsPublic   :: Bool
+  , _varInitialVal :: Maybe (ExpressionF a)
+  , _varContext    :: a
   } deriving (Show, Eq, Generic, Functor)
+makeLenses ''VariableDeclF
 
 instance ToJSON a => ToJSON (VariableDeclF a)
 instance FromJSON a => FromJSON (VariableDeclF a)
