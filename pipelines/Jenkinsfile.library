@@ -957,7 +957,6 @@ def getContractBlockNumber(NODE_HOST, NODE_PORT, CONTRACT_ADDRESS, SERVICE_TOKEN
   ).trim()
   return BLOCK_NUMBER
  }
-}
 
 def waitForVoteListValidators(total_votes) {
   script {
