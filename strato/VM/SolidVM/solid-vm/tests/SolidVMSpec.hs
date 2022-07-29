@@ -3755,11 +3755,20 @@ contract qq{
 }|]
     runBS contract
     getFields ["codeTest"] `shouldReturn`
-      [ BString $ UTF8.fromString contract]
+      [ BDefault ]
 
   fit "Can get the contract if supplied to the item" . runTest $ do
-    let contract :: String
-        contract = [r|
+    let contractqq :: String
+        contractqq = [r| 
+        contract qq{
+  string codeTest;
+  constructor() public {
+    Test t = new Test();
+    codeTest = account(t).code("qq");
+  }
+}|]
+        collection :: String
+        collection = [r|
 pragma solidvm 3.2;
 contract Test {
   constructor(){}
@@ -3773,9 +3782,9 @@ contract qq{
     codeTest = account(t).code("qq");
   }
 }|]
-    runBS contract
+    runBS collection
     getFields ["codeTest"] `shouldReturn`
-      [ BString $ UTF8.fromString contract]
+      [ BString $ UTF8.fromString contractqq]
 
   fit "Can find a function within a codeCollection" . runTest $ do
     let contract :: String
@@ -3793,7 +3802,7 @@ contract qq{
     codeTest = account(t).code("qq");
   }
 
-  function myFunction() {
+  function myFunction() public returns (uint) {
     return 13;
   }
 }|]
@@ -3817,7 +3826,7 @@ contract qq{
     codeTest = account(t).code("qq");
   }
 
-  function myFunction() {
+  function myFunction() public returns (uint) {
     return 13;
   }
 }|]
@@ -3841,7 +3850,7 @@ contract qq{
     codeTest = account(t).code("qq");
   }
 
-  function myFunction() {
+  function myFunction() public returns (uint) {
     return 13;
   }
 }|]
