@@ -23,11 +23,9 @@ module Blockchain.SolidVM
   , create
   ) where
 
-import           Control.Arrow                        ((&&&))
 import           Control.DeepSeq                      (force)
 import           Control.Exception                    (throw)
 import           Control.Lens hiding (assign, from, to, Context)
-import           Control.Lens.Traversal
 import           Control.Applicative
 import           Control.Monad
 import           Control.Monad.Extra                  (fromMaybeM)
@@ -106,7 +104,7 @@ import qualified Text.Colors                          as C
 import           Text.Format
 import           Text.Tools
 
-import qualified Data.Text.Encoding                   as DT
+-- import qualified Data.Text.Encoding                   as DT
 
 import qualified SolidVM.Model.CodeCollection         as CC
 
@@ -1700,6 +1698,7 @@ expToVar' (CC.FunctionCall _ e args) = do
         _ -> regularFunctionCall Nothing
     _ -> regularFunctionCall Nothing
     where 
+      regularFunctionCall :: MonadSM m => Maybe (m Variable) -> m Variable
       regularFunctionCall mSCI = do 
         var <- case mSCI of
           Just sci -> sci
@@ -1792,39 +1791,30 @@ expToVar' (CC.FunctionCall _ e args) = do
             return . Constant $ SBool success
 
           Constant (SContractItem address' "code") -> do
-            --TODO: allow for finding multiple items in the future (this functionality can be conducted using the multiple code calls)
-            let maxNumberOfSearchTerms = 1
-            --Get and resolve the chain id of the piece of code that is wanted
-            cid <- case (address' ^. namedAccountChainId) of 
-              UnspecifiedChain -> do
-                cid1 <- view accountChainId <$> getCurrentAccount
-                case cid1 of
-                  Nothing -> return Nothing
-                  Just cid2 -> return $ Just cid2
-              MainChain -> return Nothing
-              ExplicitChain cid -> return $ Just cid
-            let realAccount = namedAccountToAccount cid address'
+            --TODO: allow for finding multiple items in the future (this functionality can be conducted using the multiple code calls, currently)
+            from <- getCurrentAccount
+            let address = namedAccountToAccount (from ^. accountChainId) address'
             -- Retreive and resolve the codehash
-            codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) realAccount
-            resolvedCodeHash <- resolveCodePtr cid codeHash'
+            codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) address
+            resolvedCodeHash <- resolveCodePtr (from ^. accountChainId) codeHash'
             let ch' = case resolvedCodeHash of
                         Just (SolidVMCode _ ch1') -> ch1' 
                         Just cp -> missingCodeCollection "Account is not a SolidVM contract" (format cp)
-                        Nothing -> missingCodeCollection "Could not resolve code pointer for account" (format realAccount)
+                        Nothing -> missingCodeCollection "Could not resolve code pointer for account" (format address)
             -- Find and resolve the body of the code using the codehash
             cd <- A.lookup (A.Proxy @DBCode) ch'
             let cd' = case cd of
                         Just (_,bs) -> bs
-                        Nothing -> missingCodeCollection "Could not locate SolidVM code collection at account" (format realAccount)
+                        Nothing -> missingCodeCollection "Could not locate SolidVM code collection at account" (format address)
             --convert the code into a string to manipulate
-            let decodeCD = DT.decodeUtf8 cd'
+            -- let decodeCD = DT.decodeUtf8 cd'
             --Get the search term from the input
             searchTerms <- case argVals of
                 -- catch only the SStrings
                 OrderedVals [SString arguments] -> pure $ Just arguments
-                _ -> Nothing
+                _ -> pure $ Nothing
             --get only the contract and its collection of sourceAnnotation contained in the ContractF type.
-            (contract, _, _) <- getCodeAndCollection realAccount
+            (contract, _, _) <- getCodeAndCollection address
             --get the position of the searched item if something was wanting to be searched
             let anno :: [SourceAnnotation ()]
                 anno = 
@@ -1852,13 +1842,13 @@ expToVar' (CC.FunctionCall _ e args) = do
 
             --Check if anything was found with the search
             case anno of 
-              [] -> Nothing --TODO: add warning that nothing was found and the piece of code is redundant
+              [] -> pure $ Constant SNULL --TODO: add warning that nothing was found and the piece of code is redundant
               -- Return the position of the found item
               [a] -> let result = trimCodeCollection (BC.unpack cd') a
-                     in return $ Constant $ SString result
+                     in pure . Constant $ SString result
               as -> case searchTerms of
                       Nothing -> generalMetaProgrammingError "<address>.code(<stuff>)" searchTerms
-                      Just searchTerm -> tooManyResultsError searchTerm (length anno)
+                      Just searchTerm -> tooManyResultsError searchTerm (length as)
 
           Constant (SContractItem address' itemName) -> do
             from <- getCurrentAccount
