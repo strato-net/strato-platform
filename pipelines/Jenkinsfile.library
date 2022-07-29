@@ -944,7 +944,6 @@ def createContractAndGetContractAddress(NODE_HOST, NODE_PORT, SERVICE_TOKEN) {
   ).trim()
   return CONTRACT_ADDRESS
  }
-}
 
 def getContractBlockNumber(NODE_HOST, NODE_PORT, CONTRACT_ADDRESS, SERVICE_TOKEN) {
  def BLOCK_NUMBER = sh(
