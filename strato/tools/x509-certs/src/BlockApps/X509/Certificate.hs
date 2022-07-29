@@ -25,6 +25,7 @@ module BlockApps.X509.Certificate (
   makeSignedCert,
   getCertSubject,
   getCertSubjects,
+  getCertValidity,
   getCertIssuer,
   getCertIssuers,
   getParentUserAddress
@@ -341,10 +342,17 @@ getCertSubjects certs = for (x509ToSigneds certs) $ \cert -> do
                    , subUnit       = extractDn cert DnOrganizationUnit
                    , subCountry    = extractDn cert DnCountry
                    , subPub        = pubKey
+                   --Should exp date be placed here "expirationDate = snd certValidity?" , troy sujested a name change to getCertInfo 
                    }
   where extractDn :: SignedCertificate -> DnElement -> Maybe String
         extractDn cert dn = fmap fromASN1CS . getDnElement dn . certSubjectDN $ getCertificate cert
 
+
+getCertValidity :: X509Certificate -> (DateTime, DateTime)
+getCertValidity (X509Certificate (CertificateChain (SignedExact cert):_))) = certValidity cert
+
+--To write this function we need to convert our X509Certificate into a Certificate to use the certValidity function?
+-- using c :: SignedExact Certificate ? location of this function? only mentioned in this file?
 
 getCertIssuer :: X509Certificate -> Maybe Issuer
 getCertIssuer cert = listToMaybe =<< getCertIssuers cert

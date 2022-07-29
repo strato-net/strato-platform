@@ -2584,7 +2584,8 @@ certificateMap maybeCert cntrct =
       Nothing -> SMap stringToString emptyCertMap
       Just cert -> SMap stringToString (fromMaybe emptyCertMap $ fmap (certMap cert) (subject cert))
     where subject cert = getCertSubject =<< (eitherToMaybe . bsToCert . BC.pack $ cert)
-          certMap cert sub = if (CC._vmVersion cntrct == "svm3.3")
+          rawCert cert = eitherToMaybe . bsToCert . BC.pack $ cert
+          certMap cert sub  = if (CC._vmVersion cntrct == "svm3.3")
                               then M.fromList [ (SString "commonName", Constant . SString $ subCommonName sub)
                                               , (SString "country", Constant . SString $ fromMaybe "" $ subCountry sub)
                                               , (SString "organization", Constant . SString $ subOrg sub)
@@ -2593,6 +2594,7 @@ certificateMap maybeCert cntrct =
                                               , (SString "publicKey", Constant . SString $ BC.unpack $ pubToBytes $ subPub sub)
                                               , (SString "userAddress", Constant . SString $ show $ fromPublicKey $ subPub sub)
                                               , (SString "certString", Constant . SString $ cert)
+                                              , (SString "expirationDate", Constant . SString $ show . timeGetElapsed . snd . getCertValidity $ rawCert cert)
                                               , (SString "parent", Constant . SString $ maybe "0" show (getParentUserAddress =<< (eitherToMaybe . bsToCert . BC.pack $ cert)))
                                               ]
                               else M.fromList [ (SString "commonName", Constant . SString $ subCommonName sub)
@@ -2613,6 +2615,7 @@ certificateMap maybeCert cntrct =
                                           , (SString "publicKey", Constant . SString $ "")
                                           , (SString "userAddress", Constant . SString $ "")
                                           , (SString "certString", Constant . SString $ "")
+                                          , (SString "expirationDate", Constant . SString $ "")
                                           , (SString "parent", Constant . SString $ "")
                                           ]
                           else M.fromList [ (SString "commonName", Constant . SString $ "")
