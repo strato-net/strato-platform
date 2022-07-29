@@ -1819,18 +1819,19 @@ expToVar' (CC.FunctionCall _ e args) = do
             --convert the code into a string to manipulate
             let decodeCD = DT.decodeUtf8 cd'
             --Get the search term from the input
-            searchTerm <- case argVals of
-                OrderedVals [SString arguments] -> Just arguments
+            searchTerms <- case argVals of
+                -- catch only the SStrings
+                OrderedVals [SString arguments] -> pure $ Just arguments
                 _ -> Nothing
             --get only the contract and its collection of sourceAnnotation contained in the ContractF type.
             (contract, _, _) <- getCodeAndCollection realAccount
             --get the position of the searched item if something was wanting to be searched
             let anno :: [SourceAnnotation ()]
                 anno = 
-                  case searchTerm of 
+                  case searchTerms of 
                     --get the location of just the code of the contract, if nothing is inputted in the contract then focus on just the contract itself
                     Nothing -> [contract ^. CC.contractContext]
-                    _ ->
+                    Just searchTerm ->
                     --Search the full contract for the search term, retrieving the sourceAnnotation of the part that was found
                       -- Check the contractName
                       let contrAnno = if ((contract ^. CC.contractName) == searchTerm) then Just (contract ^. CC.contractContext) else Nothing
@@ -1855,7 +1856,9 @@ expToVar' (CC.FunctionCall _ e args) = do
               -- Return the position of the found item
               [a] -> let result = trimCodeCollection (BC.unpack cd') a
                      in return $ Constant $ SString result
-              as -> tooManyResultsError searchTerm (length anno)
+              as -> case searchTerms of
+                      Nothing -> generalMetaProgrammingError "<address>.code(<stuff>)" searchTerm-- TODO: return error if the contract was not found, this means nothing was given and no contract was found with the address
+                      Just searchTerm -> tooManyResultsError searchTerm (length anno)
 
           Constant (SContractItem address' itemName) -> do
             from <- getCurrentAccount
@@ -2864,6 +2867,9 @@ solidityExceptionHandler catchBlockMap ex = do
     (TooManyCooks s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 25 tooManyCooks
       return res
+    (GeneralMetaProgrammingError s1 s2) -> do
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 26 generalMetaProgrammingError
+      return res
 
 solidVMExceptionHandler :: (MonadSM m) => (M.Map String [CC.Statement]) -> SolidException -> m (Maybe Value)
 solidVMExceptionHandler catchBlockMap ex = case ex of
@@ -2988,6 +2994,12 @@ solidVMExceptionHandler catchBlockMap ex = case ex of
     (TooManyCooks s1 s2) ->
       case M.lookup "TooManyCooks" catchBlockMap of
         Nothing -> tooManyCooks s1 s2
+        Just block -> do
+          res <- runStatements block
+          return res
+    (GeneralMetaProgrammingError s1 s2) ->
+      case M.lookup "GeneralMetaProgrammingError" catchBlockMap of
+        Nothing -> generalMetaProgrammingError s1 s2
         Just block -> do
           res <- runStatements block
           return res
