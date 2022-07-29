@@ -68,8 +68,8 @@ import           BlockApps.X509
 
 
 -- This is a placeholder until the root certs can be held in a proper database
-rootCerts' :: S.Set X509Certificate 
-rootCerts' = S.fromList [rootCert] 
+rootCerts' :: S.Set X509Certificate
+rootCerts' = S.fromList [rootCert]
 
 ethVersion :: Int
 ethVersion = 62
@@ -220,19 +220,14 @@ handleMsgServerConduit :: MonadP2P m
                        -> PPeer
                        -> ConduitM Event (Either P2PCNC Message) m ()
 handleMsgServerConduit myPubkey peer = do
-    $logDebugS "handleMsgServerConduit" $ T.pack $ "about to parse message"
+    $logDebugS "handleMsgServerConduit" $ T.pack "about to parse message"
     awaitMsg >>= \case
         Just clientHello@Hello{} -> do
             let userAddress' = fromPublicKey (pointToSecPubKey $ nodeId clientHello)
             -- Lookup in Redis with userAddress, isValid Field
-            clientCertDetailsE <- lift $ A.select (A.Proxy @(Either String X509CertInfoState)) userAddress'
+            clientCertDetails <- lift $ A.select (A.Proxy @X509CertInfoState) userAddress'
             -- Throw error if the cert is not valid.
-            $logInfoS "handleMsgService/Hello{}" $ T.pack $ show clientHello
-            $logInfoS "handleMsgService/Hello{}" $ T.pack $ show userAddress'
-            $logInfoS "handleMsgService/Hello{}" $ T.pack $ show clientCertDetailsE
-            case clientCertDetailsE of
-              Just (Right _) -> pure ()
-              _ -> throwIO InvalidClientCert
+            unless (maybe False isValid clientCertDetails) $ throwIO InvalidClientCert
             $logInfoS "handshake/Hello{}" "received hello"
             let helloMsg' = Hello {
                 version = 4,

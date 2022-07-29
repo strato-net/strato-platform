@@ -17,7 +17,6 @@ module Blockchain.Strato.RedisBlockDB
     , getChainMembers, putChainMembers
     , addChainMember, removeChainMember
     , getCertificate
-    , getCertificateE
     , registerCertificate
     , revokeCertificate
     , getInitializeCertificateRegistry, initializeCertificateRegistry 
@@ -72,8 +71,6 @@ import           Database.Redis
 import           System.Random                         (randomIO)
 
 import           BlockApps.Logging
-
-import Debug.Trace
 
 newtype RedisConnection = RedisConnection { unRedisConnection :: Connection }
 
@@ -215,30 +212,14 @@ registerCertificate userAddr x509CertInfoState = do
     let maybeParent = getParentUserAddress $ certificate x509CertInfoState
     certInfoState' <- case maybeParent of
         Just parentAddr -> do
-            mCertInfoState <- getCertificateE parentAddr
+            mCertInfoState <- getCertificate parentAddr
             case mCertInfoState of
-                Just (Right c) -> pure $ Just c
-                e -> do
-                    traceM "============ BELOW I AM SHOWING MY `registerCertificate` STUFF3"
-                    traceShowM $ toKey parentAddr
-                    traceShowM e
-                    traceM "============ BELOW I AM SHOWING MY `registerCertificate` STUFF3"
-                    pure Nothing
+                Nothing -> pure Nothing
+                Just certInfoState -> pure $ Just certInfoState
         Nothing -> pure Nothing
         
     let parentCertIsValid = fmap isValid certInfoState'
         parentIsValid = fromMaybe False parentCertIsValid
-    
-    traceM "============ BELOW I AM SHOWING MY `registerCertificate` STUFF"
-    traceShowM userAddr
-    traceShowM $ toKey userAddr
-    traceShowM x509CertInfoState
-    traceShowM status
-    traceShowM maybeParent
-    traceShowM certInfoState'
-    traceShowM parentCertIsValid
-    traceShowM parentIsValid
-    traceM "============ ABOVE I AM SHOWING MY `registerCertificate` STUFF"
 
     if not status || (status && parentIsValid)
         then do
@@ -302,14 +283,6 @@ getCertificate userAddress = getInNamespace X509Certificates userAddress >>= \ca
         Right Nothing   -> return Nothing
         Right (Just state) -> let certInfoState = fromValue state
                               in return (Just certInfoState)
-
-getCertificateE :: Address -> Redis (Maybe (Either String X509CertInfoState))
-getCertificateE userAddress = getInNamespace X509Certificates userAddress >>= \case
-        Left e          -> return $ Just $ Left $ "getCertificate: Redis error We did not find " <> show userAddress <> " our error " <> show e
-        Right Nothing   -> return $ Just $ Left $ "getCertificate: We did not find " <> show userAddress
-        Right (Just state) -> let certInfoState = fromValue state
-                              in return (Just $ Right certInfoState)
-
 
 getChainTxsInBlock :: Keccak256
                    -> Redis (M.Map Word256 [Keccak256])
