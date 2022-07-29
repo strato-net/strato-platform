@@ -1857,7 +1857,7 @@ expToVar' (CC.FunctionCall _ e args) = do
               [a] -> let result = trimCodeCollection (BC.unpack cd') a
                      in return $ Constant $ SString result
               as -> case searchTerms of
-                      Nothing -> generalMetaProgrammingError "<address>.code(<stuff>)" searchTerm-- TODO: return error if the contract was not found, this means nothing was given and no contract was found with the address
+                      Nothing -> generalMetaProgrammingError "<address>.code(<stuff>)" searchTerms
                       Just searchTerm -> tooManyResultsError searchTerm (length anno)
 
           Constant (SContractItem address' itemName) -> do
