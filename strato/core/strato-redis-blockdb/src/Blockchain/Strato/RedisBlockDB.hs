@@ -242,7 +242,7 @@ registerCertificate userAddr x509CertInfoState = do
 
     if not status || (status && parentIsValid)
         then do
-            res <- multiExec $ set (inNamespace X509Certificates $ toKey userAddr) (toValue x509CertInfoState)
+            res <- multiExec $ set (inNamespace X509Certificates userAddr) (toValue x509CertInfoState)
             _ <- case res of
                 TxSuccess _ -> pure $ Right Ok
                 TxAborted -> pure . Left $ SingleLine (S8.pack $ "registerCertificate - Aborted")
@@ -254,7 +254,7 @@ registerCertificate userAddr x509CertInfoState = do
                     let newChildren = userAddr : children certInfoState
                     let newParentInfoState = certInfoState{children  = newChildren}
                     let parentAddr = userAddress certInfoState
-                    res' <- multiExec $ set (inNamespace X509Certificates $ toKey parentAddr) (toValue newParentInfoState)
+                    res' <- multiExec $ set (inNamespace X509Certificates parentAddr) (toValue newParentInfoState)
                     case res' of
                         TxSuccess _ -> pure $ Right Ok
                         TxAborted -> pure . Left $ SingleLine (S8.pack "registerCertificate - Aborted adding children")
@@ -269,7 +269,7 @@ revokeCertificate userAddress = do
         Nothing ->  pure . Left $ SingleLine (S8.pack "registerCertificate - userAddress invalid")
         Just certInfoState -> do
             let newInfoState = certInfoState{isValid  = False}
-            res <- multiExec $ set (inNamespace X509Certificates $ toKey userAddress) (toValue newInfoState)
+            res <- multiExec $ set (inNamespace X509Certificates userAddress) (toValue newInfoState)
             case res of
                 TxSuccess _ -> do
                         res2 <- mapM revokeCertificate (children certInfoState)
