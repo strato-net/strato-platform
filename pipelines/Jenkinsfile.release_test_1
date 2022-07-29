@@ -245,7 +245,7 @@ pipeline {
                         sh "sudo ./strato.sh --blockstanbul-vote --recipient=${node7Address} --nonce=350 --nodes=${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT},${NODE_DATA.NODE2.HOST}:${NODE_DATA.NODE2.PORT},${NODE_DATA.NODE3.HOST}:${NODE_DATA.NODE3.PORT},${NODE_DATA.NODE4.HOST}:${NODE_DATA.NODE4.PORT},${NODE_DATA.NODE5.HOST}:${NODE_DATA.NODE5.PORT},${NODE_DATA.NODE6.HOST}:${NODE_DATA.NODE6.PORT} --https"
                         sleep(time:10,unit:"SECONDS")
                         sh "sudo ./strato.sh --blockstanbul-vote --recipient=${node8Address} --nonce=400 --nodes=${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT},${NODE_DATA.NODE2.HOST}:${NODE_DATA.NODE2.PORT},${NODE_DATA.NODE3.HOST}:${NODE_DATA.NODE3.PORT},${NODE_DATA.NODE4.HOST}:${NODE_DATA.NODE4.PORT},${NODE_DATA.NODE5.HOST}:${NODE_DATA.NODE5.PORT},${NODE_DATA.NODE6.HOST}:${NODE_DATA.NODE6.PORT},${NODE_DATA.NODE7.HOST}:${NODE_DATA.NODE7.PORT} --https"
-                        lib.waitForVoteListValidators("8")
+                        lib.waitForVoteListValidators(8)
                     }
                 }
             }
