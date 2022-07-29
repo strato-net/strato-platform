@@ -120,6 +120,8 @@ import           SolidVM.Solidity.Parse.ParserTypes
 import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpression)
 
 import           UnliftIO                             hiding (assert)
+
+
  
 -- | Copying from Data.List.Extra, since our version of the extra library seems to not contain it.
 -- | A total variant of the list index function `(!!)`.
@@ -2594,7 +2596,7 @@ certificateMap maybeCert cntrct =
                                               , (SString "publicKey", Constant . SString $ BC.unpack $ pubToBytes $ subPub sub)
                                               , (SString "userAddress", Constant . SString $ show $ fromPublicKey $ subPub sub)
                                               , (SString "certString", Constant . SString $ cert)
-                                              , (SString "expirationDate", Constant . SString $ show . timeGetElapsed . snd . getCertValidity $ rawCert cert)
+                                              , (SString "expirationDate", Constant . SString $ fromMaybe "" $ dateTimeToString . snd . getCertValidity <$> rawCert cert)
                                               , (SString "parent", Constant . SString $ maybe "0" show (getParentUserAddress =<< (eitherToMaybe . bsToCert . BC.pack $ cert)))
                                               ]
                               else M.fromList [ (SString "commonName", Constant . SString $ subCommonName sub)
