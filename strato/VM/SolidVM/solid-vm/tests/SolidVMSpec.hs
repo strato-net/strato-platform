@@ -3683,7 +3683,7 @@ contract qq{
       [ BString $ BC.pack $  keccak256ToHex $ hash $ UTF8.fromString contract 
       , BString "657f5687fe89bd0bd3cee84e83c306c65458c0b13d13991087f9a7330474f2d8" ]
 
-  it "can get the code from an address" . runTest $ do
+  fit "can get the code from an address without adding anything to the function code" . runTest $ do
     let contract :: String
         contract = [r|
 pragma solidvm 3.2;
@@ -3703,7 +3703,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString contract]
 
-  it "can get the current contract code" . runTest $ do
+  fit "can get the current contract code without supplying anything to the code" . runTest $ do
     let contract :: String
         contract = [r|
 pragma solidvm 3.2;
@@ -3711,6 +3711,138 @@ contract qq{
   string codeTest;
   constructor() public {
     codeTest = account(this).code;
+  }
+}|]
+    runBS contract
+    getFields ["codeTest"] `shouldReturn`
+      [ BString $ UTF8.fromString contract]
+
+  fit "can get just the contract from an address with nothing in the function" . runTest $ do
+    let contract :: String
+        contract = [r|
+pragma solidvm 3.2;
+contract Test {
+  constructor(){}
+}
+
+pragma solidvm 3.2;
+contract qq{
+  string codeTest;
+  constructor() public {
+    Test t = new Test();
+    codeTest = account(t).code();
+  }
+}|]
+    runBS contract
+    getFields ["codeTest"] `shouldReturn`
+      [ BString $ UTF8.fromString contract]
+
+  fit "Can throw an error if nothing is found in the code collection" . runTest $ do
+    let contract :: String
+        contract = [r|
+pragma solidvm 3.2;
+contract Test {
+  constructor(){}
+}
+
+pragma solidvm 3.2;
+contract qq{
+  string codeTest;
+  constructor() public {
+    Test t = new Test();
+    codeTest = account(t).code("nothing");
+  }
+}|]
+    runBS contract
+    getFields ["codeTest"] `shouldReturn`
+      [ BString $ UTF8.fromString contract]
+
+  fit "Can get the contract if supplied to the item" . runTest $ do
+    let contract :: String
+        contract = [r|
+pragma solidvm 3.2;
+contract Test {
+  constructor(){}
+}
+
+pragma solidvm 3.2;
+contract qq{
+  string codeTest;
+  constructor() public {
+    Test t = new Test();
+    codeTest = account(t).code("qq");
+  }
+}|]
+    runBS contract
+    getFields ["codeTest"] `shouldReturn`
+      [ BString $ UTF8.fromString contract]
+
+  fit "Can find a function within a codeCollection" . runTest $ do
+    let contract :: String
+        contract = [r|
+pragma solidvm 3.2;
+contract Test {
+  constructor(){}
+}
+
+pragma solidvm 3.2;
+contract qq{
+  string codeTest;
+  constructor() public {
+    Test t = new Test();
+    codeTest = account(t).code("qq");
+  }
+
+  function myFunction() {
+    return 13;
+  }
+}|]
+    runBS contract
+    getFields ["codeTest"] `shouldReturn`
+      [ BString $ UTF8.fromString contract]
+
+  fit "Can get just the contract if empty string is fed to the code function." . runTest $ do
+    let contract :: String
+        contract = [r|
+pragma solidvm 3.2;
+contract Test {
+  constructor(){}
+}
+
+pragma solidvm 3.2;
+contract qq{
+  string codeTest;
+  constructor() public {
+    Test t = new Test();
+    codeTest = account(t).code("qq");
+  }
+
+  function myFunction() {
+    return 13;
+  }
+}|]
+    runBS contract
+    getFields ["codeTest"] `shouldReturn`
+      [ BString $ UTF8.fromString contract]
+
+  fit "Can throw an error if more than one item is given to the code member function." . runTest $ do
+    let contract :: String
+        contract = [r|
+pragma solidvm 3.2;
+contract Test {
+  constructor(){}
+}
+
+pragma solidvm 3.2;
+contract qq{
+  string codeTest;
+  constructor() public {
+    Test t = new Test();
+    codeTest = account(t).code("qq");
+  }
+
+  function myFunction() {
+    return 13;
   }
 }|]
     runBS contract
