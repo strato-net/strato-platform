@@ -1812,6 +1812,7 @@ expToVar' (CC.FunctionCall _ e args) = do
             searchTerms <- case argVals of
                 -- catch only the SStrings
                 OrderedVals [SString arguments] -> pure $ Just arguments
+                NamedVals [SString arguments] -> pure $ Just arguments
                 _ -> pure $ Nothing
             --get only the contract and its collection of sourceAnnotation contained in the ContractF type.
             (contract, _, _) <- getCodeAndCollection address
