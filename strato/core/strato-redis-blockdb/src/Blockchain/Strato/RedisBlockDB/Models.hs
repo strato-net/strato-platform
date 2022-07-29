@@ -74,11 +74,11 @@ instance RedisDBValuable Keccak256 where
     fromValue = keccak256FromHex . S8.unpack
 
 instance RedisDBKeyable Address where
-    toKey = toStrict . encode
+    toKey = SB16.encode . toStrict . encode
 
 instance RedisDBValuable Address where
     toValue   = toKey
-    fromValue = decode . fromStrict
+    fromValue = decode . fromStrict . SB16.decodeLenient
 
 instance RedisDBValuable X509CertInfoState where
     toValue = toStrict . encode
