@@ -31,6 +31,7 @@ module Blockchain.VM.SolidException
   , reservedWordError
   , tooManyResultsError
   , tooManyCooks
+  , generalMetaProgrammingError
   ) where
 
 import Control.DeepSeq
