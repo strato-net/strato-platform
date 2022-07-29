@@ -104,8 +104,6 @@ import qualified Text.Colors                          as C
 import           Text.Format
 import           Text.Tools
 
--- import qualified Data.Text.Encoding                   as DT
-
 import qualified SolidVM.Model.CodeCollection         as CC
 
 import           SolidVM.Model.SolidString
