@@ -220,6 +220,7 @@ registerCertificate userAddr x509CertInfoState = do
                 Just (Right c) -> pure $ Just c
                 e -> do
                     traceM "============ BELOW I AM SHOWING MY `registerCertificate` STUFF3"
+                    traceShowM $ toKey parentAddr
                     traceShowM e
                     traceM "============ BELOW I AM SHOWING MY `registerCertificate` STUFF3"
                     pure Nothing
@@ -230,6 +231,7 @@ registerCertificate userAddr x509CertInfoState = do
     
     traceM "============ BELOW I AM SHOWING MY `registerCertificate` STUFF"
     traceShowM userAddr
+    traceShowM $ toKey userAddr
     traceShowM x509CertInfoState
     traceShowM status
     traceShowM maybeParent
