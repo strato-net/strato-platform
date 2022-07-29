@@ -117,7 +117,7 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
         usernamePassword(credentialsId: 'aws-s3-test-bucket-access-user', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
         usernamePassword(credentialsId: 'beanstalk-internal-nodes-keycloak-client', passwordVariable: 'BEANSTALK_INTERNAL_KEYCLOAK_CLIENT_SECRET', usernameVariable: 'BEANSTALK_INTERNAL_KEYCLOAK_CLIENT_ID')
     ]) {
-      let clientID, clientSecret, oauthDiscovery
+      def clientID, clientSecret, oauthDiscovery
       if(appName == 'beanstalk') {
         clientID = nodeData.BEANSTALK.OAUTH_CLIENT_ID
         clientSecret = nodeData.BEANSTALK.OAUTH_CLIENT_SECRET
