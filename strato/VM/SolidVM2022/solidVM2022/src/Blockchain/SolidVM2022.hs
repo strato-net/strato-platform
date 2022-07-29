@@ -4,6 +4,7 @@ module Blockchain.SolidVM2022 (
   create
   ) where
 
+import Control.Lens
 import Control.Monad
 import qualified Data.ByteString.Char8 as BC
 import Data.Map (Map)
@@ -13,7 +14,7 @@ import Data.IORef
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Set as Set
-import Text.Parsec
+--import Text.Parsec
 
 import qualified Blockchain.AST1 as AST1
 import qualified Blockchain.AST1.Contract as AST1
@@ -23,7 +24,7 @@ import Blockchain.Compiler
 import Blockchain.Contract
 import Blockchain.Data.DataDefs
 import Blockchain.Data.ExecResults
-import Blockchain.Parser
+--import Blockchain.Parser
 import Blockchain.SolidVM.Model
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Code
@@ -32,6 +33,7 @@ import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Type (Type)
 import qualified Blockchain.Type as Type
+import qualified SolidVM.Model.CodeCollection as AST0
 import SolidVM.Solidity.Parse
 
 import Text.Format
@@ -85,17 +87,21 @@ create _ _ _ _ _ _ _ _ _ _ _ theCode _ _ _ = do
 
   --  let sourceCode = "contract someContract { function abcd { } }"
 
-  let sourceUnitsOrError = compileSourceNoInheritance $ Map.fromList [("", Text.pack $ BC.unpack $ sourceCode)]
+  let ccOrError = compileSourceNoInheritance $ Map.fromList [("", Text.pack $ BC.unpack $ sourceCode)]
 
-  case sourceUnitsOrError of
-    Left e -> error $ show e
-    Right sourceUnits -> putStrLn $ "CodeCollection: " ++ show sourceUnits
-  
+  let cc =
+        case ccOrError of
+          Left e -> error $ show e
+          Right v -> v
+
+  let contract = convertContract(fromMaybe (error "no contract named SomeContract") $ Map.lookup "SomeContract" (cc^.AST0.contracts))
+{-  
   let contract =
         case parse parseContract "<builtin>" (BC.unpack sourceCode) of
           Left e -> error $ show e
           Right v -> v
-
+-}
+  
   let ast1 = AST1.code $ fromMaybe (error "missing function in contract") $ Map.lookup "abcd" $ AST1.functions contract
 
   putStrLn $ " Compiling code:\n" ++ unlines (map (("  - " ++) . format) ast1)
@@ -133,3 +139,37 @@ create _ _ _ _ _ _ _ _ _ _ _ theCode _ _ _ = do
       SolidVM
       Map.empty
     
+
+
+
+
+
+
+convertContract :: AST0.Contract -> AST1.Contract
+convertContract (AST0.Contract {AST0._functions=fs}) =
+  AST1.Contract "SomeContract" $ fmap convertFunction fs
+
+convertFunction :: AST0.Func -> AST1.FunctionDefinition
+convertFunction AST0.Func{AST0.funcContents=Just statements} =
+  AST1.FunctionDefinition {AST1.code=map convertStatement statements}
+convertFunction _ = error "function needs statements"
+
+convertStatement :: AST0.Statement -> AST1.Statement
+convertStatement (AST0.SimpleStatement (AST0.ExpressionStatement (AST0.Binary _ "=" l r)) _) = AST1.Assign (convertExpression l) (convertExpression r)
+convertStatement (AST0.SimpleStatement (AST0.ExpressionStatement e) _) = AST1.ExpressionStatement $ convertExpression e
+--  AST1.ExpressionStatement (AST1.Function name $ map convertExpression args)
+
+
+--convertStatement (AST0.SimpleStatement (AST0.ExpressionStatement x) _) = error $ "function name: " ++ show x
+
+convertStatement x = error $ "unhandled case in convertStatement: " ++ show x
+
+convertExpression :: AST0.Expression -> AST1.Expression
+convertExpression (AST0.NumberLiteral _ x _) = AST1.Integer x
+convertExpression (AST0.StringLiteral _ x) = AST1.String x
+convertExpression (AST0.Variable _ name) = AST1.Variable name
+convertExpression (AST0.Binary _ "+" l r) = AST1.Function "plus" [convertExpression l, convertExpression r]
+convertExpression (AST0.FunctionCall _ (AST0.Variable _ name) (AST0.OrderedArgs args)) = AST1.Function name $ map convertExpression args
+convertExpression (AST0.MemberAccess _ e "length") = AST1.Function "length" [convertExpression e]
+convertExpression x = error $ "unsupported case in convertExpression: " ++ show x
+

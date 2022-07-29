@@ -7,7 +7,9 @@ dependencies:
 - containers
 - format
 - ghc
+- lens
 - parsec
+- solid-vm-model
 - solid-vm-parser
 - strato-model
 - text
