@@ -104,6 +104,8 @@ import qualified Text.Colors                          as C
 import           Text.Format
 import           Text.Tools
 
+import qualified Data.Text.Encoding                   as DT
+
 import qualified SolidVM.Model.CodeCollection         as CC
 
 import           SolidVM.Model.SolidString
@@ -1840,7 +1842,7 @@ expToVar' (CC.FunctionCall _ e args) = do
 
             --Check if anything was found with the search
             case anno of 
-              [] -> pure $ Constant SNULL --TODO: add warning that nothing was found and the piece of code is redundant
+              [] -> pure . Constant $ SString "" --TODO: add warning that nothing was found and the piece of code is redundant
               -- Return the position of the found item
               [a] -> let result = trimCodeCollection (BC.unpack cd') a
                      in pure . Constant $ SString result
@@ -1929,32 +1931,32 @@ evaluateAccountMember a _ "codehash" = do
     Just (SolidVMCode _ ch') -> return (Constant $ SString . keccak256ToHex $ ch')
     Just cp -> missingCodeCollection "Account is not a SolidVM contract" (format cp)
     Nothing -> missingCodeCollection "Could not resolve code pointer for account" (format realAccount)
--- evaluateAccountMember a _ "code" = do 
---   -- Get the code at the address
---   cid <- case (a ^. namedAccountChainId) of 
---     UnspecifiedChain -> do
---       cid1 <- view accountChainId <$> getCurrentAccount
---       case cid1 of
---         Nothing -> return Nothing
---         Just cid2 -> return $ Just cid2
---     MainChain -> return Nothing
---     ExplicitChain cid -> return $ Just cid
---   let realAccount = namedAccountToAccount cid a
---   -- Retreive and resolve the codehash
---   codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) realAccount
---   resolvedCodeHash <- resolveCodePtr cid codeHash'
---   let ch' = case resolvedCodeHash of
---               Just (SolidVMCode _ ch1') -> ch1' 
---               Just cp -> missingCodeCollection "Account is not a SolidVM contract" (format cp)
---               Nothing -> missingCodeCollection "Could not resolve code pointer for account" (format realAccount)
---   -- Find the code using the codehash
---   cd <- A.lookup (A.Proxy @DBCode) ch'
---   let cd' = case cd of
---               Just (_,bs) -> bs
---               Nothing -> missingCodeCollection "Could not locate SolidVM code collection at account" (format realAccount)
---   let decodeCD = DT.decodeUtf8 cd'
---   -- Format the result  
---   return $ Constant $ SString $ T.unpack decodeCD
+evaluateAccountMember a _ "code" = do 
+  -- Get the code at the address
+  cid <- case (a ^. namedAccountChainId) of 
+    UnspecifiedChain -> do
+      cid1 <- view accountChainId <$> getCurrentAccount
+      case cid1 of
+        Nothing -> return Nothing
+        Just cid2 -> return $ Just cid2
+    MainChain -> return Nothing
+    ExplicitChain cid -> return $ Just cid
+  let realAccount = namedAccountToAccount cid a
+  -- Retreive and resolve the codehash
+  codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) realAccount
+  resolvedCodeHash <- resolveCodePtr cid codeHash'
+  let ch' = case resolvedCodeHash of
+              Just (SolidVMCode _ ch1') -> ch1' 
+              Just cp -> missingCodeCollection "Account is not a SolidVM contract" (format cp)
+              Nothing -> missingCodeCollection "Could not resolve code pointer for account" (format realAccount)
+  -- Find the code using the codehash
+  cd <- A.lookup (A.Proxy @DBCode) ch'
+  let cd' = case cd of
+              Just (_,bs) -> bs
+              Nothing -> missingCodeCollection "Could not locate SolidVM code collection at account" (format realAccount)
+  let decodeCD = DT.decodeUtf8 cd'
+  -- Format the result  
+  return $ Constant $ SString $ T.unpack decodeCD
 evaluateAccountMember a _ "balance" = do 
   cid <- case (a ^. namedAccountChainId) of 
     UnspecifiedChain -> do
