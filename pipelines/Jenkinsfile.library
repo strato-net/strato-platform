@@ -934,7 +934,7 @@ def waitForCirrus() {
 def createContractAndGetContractAddress(NODE_HOST, NODE_PORT, SERVICE_TOKEN) {
  def CONTRACT_ADDRESS = sh(
   returnStdout: true,
-  script: "curl \"https://${NODE_HOST}:${NODE_PORT}/strato/v2.3/transaction?resolve=true\" \
+  script: "curl 'https://${NODE_HOST}:${NODE_PORT}/strato/v2.3/transaction?resolve=true' \
     -X 'POST' \
     -H \"Authorization: Bearer ${SERVICE_TOKEN}\"  \
     -H 'Accept: application/json;charset=utf-8' \
