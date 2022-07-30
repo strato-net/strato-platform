@@ -36,8 +36,6 @@ import qualified Blockchain.Type as Type
 import qualified SolidVM.Model.CodeCollection as AST0
 import SolidVM.Solidity.Parse
 
-import Text.Format
-
 createVariable :: Type -> IO Variable
 createVariable Type.Integer = fmap Variable $ newIORef (0::Integer)
 createVariable Type.String = fmap Variable $ newIORef (""::String)
@@ -83,10 +81,6 @@ create _ _ _ _ _ _ _ _ _ _ _ theCode _ _ _ = do
 
   globals <- createVariables variableDefs
   
---  sourceCode <- readFile "test.sol"
-
-  --  let sourceCode = "contract someContract { function abcd { } }"
-
   let ccOrError = compileSourceNoInheritance $ Map.fromList [("", Text.pack $ BC.unpack $ sourceCode)]
 
   let cc =
@@ -94,7 +88,7 @@ create _ _ _ _ _ _ _ _ _ _ _ theCode _ _ _ = do
           Left e -> error $ show e
           Right v -> v
 
-  let contract = convertContract(fromMaybe (error "no contract named SomeContract") $ Map.lookup "SomeContract" (cc^.AST0.contracts))
+  let contract1 = convertContract(fromMaybe (error "no contract named SomeContract") $ Map.lookup "SomeContract" (cc^.AST0.contracts))
 {-  
   let contract =
         case parse parseContract "<builtin>" (BC.unpack sourceCode) of
@@ -102,27 +96,18 @@ create _ _ _ _ _ _ _ _ _ _ _ theCode _ _ _ = do
           Right v -> v
 -}
   
-  let ast1 = AST1.code $ fromMaybe (error "missing function in contract") $ Map.lookup "abcd" $ AST1.functions contract
-
-  putStrLn $ " Compiling code:\n" ++ unlines (map (("  - " ++) . format) ast1)
-
-  let ast2 =
-        case compile1 globals ast1 of
+  let c =
+        case compile =<< compile1 globals contract1 of
           Left e -> error $ "compile1 error: " ++ e
           Right val -> val
 
-  putStrLn $ " Compiling code:\n" ++ unlines (map (("  - " ++ ). show) ast2)
-
   () <-
-    case compile ast2 of
-      Left e -> error $ "compiler error: " ++ e
-      Right c ->
-        case Map.lookup "constructor" $ functions c of
-          Nothing -> error "missing constructor"
-          Just f -> do
-            case getGetter f of
-              Left e -> error $ "can't run the constructor: " ++ show e
-              Right doit -> doit
+    case Map.lookup "abcd" $ functions c of
+      Nothing -> error "missing function abcd"
+      Just f -> do
+        case getGetter f of
+          Left e -> error $ "can't run the constructor: " ++ show e
+          Right doit -> doit
 
   return $
     ExecResults

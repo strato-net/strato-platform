@@ -7,12 +7,24 @@ import qualified Data.Map as Map
 
 
 import qualified Blockchain.AST1 as AST1
+import qualified Blockchain.AST1.Contract as AST1
+import qualified Blockchain.AST1.FunctionDefinition as AST1
 import qualified Blockchain.AST2 as AST2
+import qualified Blockchain.AST2.Contract as AST2
+import qualified Blockchain.AST2.FunctionDefinition as AST2
 import Blockchain.Contract
 
-compile1 :: Map String AST2.Variable -> [AST1.Statement] -> Either String [AST2.Statement]
-compile1 globals statements = 
-  forM statements $ compileStatement1 globals
+compile1 :: Map String AST2.Variable -> AST1.Contract -> Either String AST2.Contract
+compile1 globals contract = do
+  functions2 <-
+    forM (AST1.functions contract) $ \f -> do
+      compiledStatements <- forM (AST1.code f) $ compileStatement1 globals
+      return $ AST2.FunctionDefinition compiledStatements
+
+  return $ AST2.Contract {
+    AST2.name = AST1.name contract,
+    AST2.functions = functions2
+  }
 
 compileStatement1 :: Map String AST2.Variable -> AST1.Statement -> Either String AST2.Statement
 compileStatement1 globals (AST1.Assign lexp1 rexp1) = do
@@ -47,11 +59,14 @@ compileSingleLine (AST2.ExpressionStatement e) = do
     _ <- getter :: IO AST2.Value
     return ()
 
-compile :: [AST2.Statement] -> Either String Contract
-compile lines' = do
-  compiledFunction <- compileLines lines'
-  let x = AST2.Function compiledFunction [] :: AST2.Function (IO ())
-  return $ Contract $ Map.singleton "constructor" $ AST2.AnyFunction x
+compile :: AST2.Contract -> Either String Contract
+compile contract = do
+  functions' <-
+    forM (AST2.functions contract) $ \f -> do
+      compiledFunction <- compileLines $ AST2.code f
+      return (AST2.Function compiledFunction [] :: AST2.Function (IO ()))
+
+  return $ Contract $ fmap AST2.AnyFunction functions'
 
 compileLines :: [AST2.Statement] -> Either String (IO ())
 compileLines [] = return (return ())
