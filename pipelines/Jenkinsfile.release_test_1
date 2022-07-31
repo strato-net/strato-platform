@@ -254,12 +254,12 @@ pipeline {
         stage ('Beanstalk Load Test - Run app on secondary nodes') {
             parallel {
                 stage('Run app on multinode102') {
-                agent { label "multinode102" }
-                steps {
-                    script {
-                    lib.runAppSecondaryNode(NODE_DATA.NODE2, null, null, null, 'beanstalk')
+                    agent { label "multinode102" }
+                    steps {
+                        script {
+                            lib.runAppSecondaryNode(NODE_DATA.NODE2, null, null, null, 'beanstalk')
+                        }
                     }
-                }
                 }
                 stage('Run app on multinode103') {
                 agent { label "multinode103" }
