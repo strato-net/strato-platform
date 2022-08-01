@@ -4546,3 +4546,32 @@ contract qq{
 }|]
     getFields ["myNum"] `shouldReturn` [BInteger 6]
 
+  it "can overload free functions" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+
+function sum(uint[] memory arr) pure returns (uint s) {
+  for (uint i = 0; i < arr.length; i++) {
+    s += arr[i];
+  }
+}
+
+function sum(string[] memory arr) pure returns (string s) {
+  s = "";
+  for (uint i = 0; i < arr.length; i++) {
+    s += arr[i];
+  }
+}
+
+contract qq{
+  uint myNum;
+  string myString;
+  uint[] myArr = [1,2,3];
+  string[] otherArr = ["hello", " ", "world"];
+  constructor() public {
+    myNum = sum(myArr);
+    myString = sum(otherArr);
+  }
+}|]
+    getFields ["myNum", "myString"] `shouldReturn` [BInteger 6, BString "hello world"]
+
