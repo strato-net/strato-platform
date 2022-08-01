@@ -22,7 +22,6 @@ module Blockchain.SolidVM
   , call
   , create
   ) where
-
 import           Control.DeepSeq                      (force)
 import           Control.Exception                    (throw)
 import           Control.Lens hiding (assign, from, to, Context)
@@ -2000,8 +1999,8 @@ callBuiltin "keccak256" args Nothing = do
     True ->  return . SString . BC.unpack . keccak256ToByteString . hash . BC.pack $ customConcat args
 callBuiltin "ecrecover" [SString h, SInteger r, SInteger s, SInteger v] _ = do
   let intHash = intBuiltin [SString h]
-  byteStringHash <- encodeForReturn intHash
-  let theSignerAddress = whoSignedThisTransactionEcrecover byteStringHash r s v
+  bytestringHash <- encodeForReturn intHash
+  let theSignerAddress = whoSignedThisTransactionEcrecover (unsafeCreateKeccak256FromByteString bytestringHash) r s v
   let theZero ::  Integer
       theZero = 0
   case theSignerAddress of
