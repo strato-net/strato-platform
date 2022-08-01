@@ -96,10 +96,7 @@ create _ _ _ _ _ _ _ _ _ _ _ theCode _ _ _ = do
           Right v -> v
 -}
   
-  let c =
-        case compile =<< compile1 globals contract1 of
-          Left e -> error $ "compile1 error: " ++ e
-          Right val -> val
+  let c = compile $ compile1 c globals contract1
 
   () <-
     case Map.lookup "abcd" $ functions c of

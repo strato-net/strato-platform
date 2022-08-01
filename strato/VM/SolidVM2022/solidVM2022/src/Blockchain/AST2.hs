@@ -36,15 +36,19 @@ instance Show (Function a) where
 
 data PartiallyAppliedFunction a = PartiallyAppliedFunction a [Expression]
 
-instance SolidType (Function (IO a)) a where
+instance NamedType a => SolidType (Function (IO a)) a where
   getGetter (Function f []) = return f
   getGetter _ = Left "too many parameters"
   
-instance SolidType (Function (IO a)) b where
-  getGetter (Function _ []) = Left "type mismatch"
+instance (NamedType a, Show a) => SolidType (Function (IO a)) Value where
+  getGetter (Function f []) = return $ fmap Value f
+  getGetter _ = error $ "poppy: " ++ typename (undefined :: a)
+  
+instance (NamedType a, NamedType b) => SolidType (Function (IO a)) b where
+  getGetter (Function _ []) = Left $ "type mismatch: function returns: " ++ show (typename (undefined :: a)) ++ ", expected: " ++ show (typename (undefined ::b))
   getGetter _ = Left "too many parameters"
   
-instance (SolidType Expression a, SolidType (PartiallyAppliedFunction (IO b)) (IO c)) =>
+instance (NamedType c, SolidType Expression a, SolidType (PartiallyAppliedFunction (IO b)) (IO c)) =>
          SolidType (Function (a->b)) c  where
   getGetter (Function f (first:rest)) = do
     firstGetter <- getGetter first
@@ -85,7 +89,41 @@ data Expression =
   | EVariable Variable
   | EFunction AnyFunction
 
-class SolidType a b where
+class NamedType a where
+  typename :: a -> String
+
+instance NamedType String where
+  typename _ = "String"
+
+instance NamedType AnyFunction where
+  typename _ = "AnyFunction"
+
+instance NamedType Value where
+  typename _ = "Value"
+
+instance NamedType Integer where
+  typename _ = "Integer"
+
+instance NamedType Address where
+  typename _ = "Address"
+
+instance NamedType Expression where
+  typename _ = "Expression"
+
+instance NamedType (PartiallyAppliedFunction a) where
+  typename _ = "PartiallyAppliedFunction"
+
+instance NamedType (IO a) where
+  typename _ = "IO a"
+
+instance NamedType () where
+  typename _ = "()"
+
+instance NamedType (Function a) where
+  typename _ = "Function"
+
+
+class (NamedType a, NamedType b) => SolidType a b where
   getGetter :: a -> Either String (IO b)
 
 instance SolidType Expression Integer where
