@@ -27,7 +27,8 @@ module BlockApps.X509.Certificate (
   getCertSubjects,
   getCertIssuer,
   getCertIssuers,
-  getParentUserAddress
+  getParentUserAddress,
+  getValidity
  ) where
 
 

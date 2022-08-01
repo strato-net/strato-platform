@@ -6,6 +6,7 @@ import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.Secp256k1
 import           BlockApps.X509
 
+import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Reader
 import           Crypto.PubKey.ECC.Types
 import qualified Data.Aeson                           as Ae
@@ -21,7 +22,7 @@ type TestCertM = ReaderT PrivateKey IO
 instance HasVault TestCertM where
   getPub = error "we never call getPub with this tool"
   getShared _ = error "we never call getShared with this tool"
-  sign bs = ask >>= return . flip signMsg bs 
+  sign bs = ask >>= return . flip signMsg bs
 
 
 main :: IO ()
@@ -30,10 +31,10 @@ main = hspec spec
 
 spec :: Spec
 spec = do
-  describe "x509 certificates" $ do 
+  describe "x509 certificates" $ do
     priv <- runIO newPrivateKey
     let pub = derivePublicKey priv
-        iss = Issuer "x" "5" (Just "0") (Just "9") 
+        iss = Issuer "x" "5" (Just "0") (Just "9")
         sub = Subject "x" "5" (Just "0") (Just "9") pub
 
     it "can do serialization roundtrips on pubkeys" $ do
@@ -46,7 +47,7 @@ spec = do
             PubKeyEC (PubKeyEC_Named SEC_p256k1 serialPoint) -> serialPoint
             _ -> error "wrong pubkey type in cert, should be secp256k1 named"
           exPub = PubKeyEC_Named SEC_p256k1 (SerializedPoint $ exportPublicKey False pub)
-          inPub = fromMaybe (error "could not import pubkey from cert") (importPublicKey (coerce certPubSerialPoint)) 
+          inPub = fromMaybe (error "could not import pubkey from cert") (importPublicKey (coerce certPubSerialPoint))
       certPub `shouldBe` PubKeyEC exPub
       inPub `shouldBe` pub
     it "makeCert can use dateTime" $ do
@@ -56,12 +57,12 @@ spec = do
       b `shouldBe` fromMaybe (error "Date in makeCert didn't return properly") date
     it "makeCert bad dateTime" $ do
       exprDate <- snd . certValidity <$> makeCert (timeParse ISO8601_Date "2020-18-50") iss sub
-      oneYearFromNow <- snd <$> getValidity
-      dtDate exprDate `shouldBe` dtDate getValidity
+      oneYearFromNow <- snd <$> liftIO getValidity
+      dtDate exprDate `shouldBe` dtDate oneYearFromNow
     it "can do JSON encoding roundtrips" $ do
       cert <- flip runReaderT priv $ makeSignedCert Nothing Nothing iss sub
       Ae.decode (Ae.encode sub) `shouldBe` Just sub
-      Ae.decode (Ae.encode cert) `shouldBe` Just cert 
+      Ae.decode (Ae.encode cert) `shouldBe` Just cert
     it "can do PEM encoding roundtrips" $ do
       cert <- flip runReaderT priv $ makeSignedCert Nothing Nothing iss sub
       Right cert `shouldBe` bsToCert (certToBytes cert)
@@ -127,6 +128,6 @@ spec = do
       let pub3 = derivePublicKey priv3
           sub3 = Subject "z" "7" (Just "2") (Just "11") pub3
       cert3 <- flip runReaderT priv2 $ makeSignedCert Nothing (Just cert2) iss2 sub3
-      
+
       verifyCert pub cert3 `shouldBe` False
 
