@@ -121,7 +121,8 @@ main = do
   let vmVersion' = if (Just ("solidvm","3.2")) `elem` (pragmas <$> parsedFile) then "svm3.2" else (if (Just ("solidvm","3.0")) `elem` (pragmas <$> parsedFile) then "svm3.0" else "")
       namedContracts = [(textToLabel name, either (throw . fst) id $ xabiToContract (textToLabel name) (map textToLabel parents') vmVersion' xabi)
                        | NamedXabi name (xabi, parents') <- parsedFile]
-      cc = CodeCollection $ M.fromList namedContracts
+      freeFunctions = [(name, fdec) | FreeFunc name fdec <- parsedFile]
+      cc = CodeCollection (M.fromList freeFunctions) $ M.fromList namedContracts
       typecheck = if vmVersion' == "svm3.2" then TC.detector cc else []
       nodes = codeCollectionCrawler cc
   putStrLn (show typecheck) --when (not null typecheck)

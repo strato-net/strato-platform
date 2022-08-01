@@ -7,6 +7,7 @@ module SolidVM.Solidity.StaticAnalysis.Typechecker
   ( detector
   ) where
 
+-- import           Blockchain.SolidVM.Exception
 import           Control.Applicative ((<|>))
 import           Control.Arrow ((&&&))
 import           Control.Monad.Reader
@@ -918,7 +919,13 @@ getVarTypeByName' name ctx = do
                         [Function (Sum (Static (SVMType.Account False) ctx :| [ctrct, lbl]))
                            ctrct
                            ctx]
-              Nothing -> bottom $ ("Unknown variable: " <> labelToText name) <$ ctx
+              Nothing -> do
+                case M.lookup name $ _freeFuncs cc of
+                    Just Func{..} ->
+                      let fArgs = flip Product ctx $ flip Static ctx . indexedTypeType . snd <$> funcArgs
+                          fRets = flip Product ctx $ flip Static ctx . indexedTypeType . snd <$> funcVals
+                      in Function fArgs fRets ctx
+                    Nothing -> bottom $ ("Unknown variable: " <> labelToText name) <$ ctx
             
   where lookupVar m Nothing = M.lookup name m
         lookupVar _ t       = t

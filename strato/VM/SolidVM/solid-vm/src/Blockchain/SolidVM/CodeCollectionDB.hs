@@ -89,10 +89,27 @@ compileSourceNoInheritance initCodeMap = do
         Just _ ->  Left . PEx
                  $ newErrorMessage (Message $ "Duplicate contract found: " ++ labelToString cName)
                                    (fromSourcePosition $ _sourceAnnotationStart $ _contractContext contract)
+
+      getFreeFunctions :: T.Text -> T.Text -> Either ParseTypeCheckOrSolidVMError [(SolidString, Func)]
+      getFreeFunctions fileName src = do
+        sourceUnits <- parseSource fileName src
+        fmap catMaybes . for sourceUnits $ \case
+          FreeFunc name fdec -> pure $ Just (name, fdec)
+          _ -> pure Nothing
+      
+      throwDuplicateFunction :: (SolidString, Func) -> Map SolidString Func -> Either ParseTypeCheckOrSolidVMError (Map SolidString Func)
+      throwDuplicateFunction (fname, func) m = case M.lookup fname m of
+        Nothing -> pure $ M.insert fname func m 
+        Just _ -> Left . PEx
+                  $ newErrorMessage (Message $ "Duplicate function found: " ++ labelToString fname)
+                                    (fromSourcePosition $ _sourceAnnotationStart $ funcContext func)
                                            
   allContracts <- fmap concat . traverse (uncurry getNamedContracts) $ M.toList initCodeMap
   deduplicatedContracts <- foldrM throwDuplicate M.empty (allContracts :: [(SolidString, Contract)])
+  allFreeFunctions <- fmap concat . traverse (uncurry getFreeFunctions) $ M.toList initCodeMap
+  deduplicatedFreeFunctions <- foldrM throwDuplicateFunction M.empty (allFreeFunctions :: [(SolidString, Func)])
   pure $ CodeCollection {
+    _freeFuncs = deduplicatedFreeFunctions,
     _contracts = deduplicatedContracts
   }
 

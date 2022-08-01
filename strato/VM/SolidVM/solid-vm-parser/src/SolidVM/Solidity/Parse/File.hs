@@ -51,27 +51,3 @@ decideVersion = maximum . (ZeroPointFour:) . mapMaybe go . unsourceUnits
           guard $ any (matchesSimple rng) possibilities
           return ZeroPointFive
         go _ = Nothing
-
-{-
-("doTheDivide", 
-  Func{ funcArgs = []
-      , funcVals = [(Nothing,IndexedType {indexedTypeIndex = 0, indexedTypeType = Int {signed = Just False, bytes = Nothing}})]
-      , funcStateMutability = Nothing
-      , funcContents = Just [Return (Just (Binary (line 5, column 15) - (line 5, column 17): ()  "/" (NumberLiteral (line 5, column 13) - (line 5, column 15): ()  1 Nothing) (NumberLiteral (line 5, column 17) - (line 5, column 18): ()  0 Nothing))) (line 5, column 5) - (line 5, column 19): () ]
-      , funcVisibility = Just Public
-      , funcConstructorCalls = fromList []
-      , funcModifiers = Just []
-      , funcContext = (line 4, column 3) - (line 4, column 48): () 
-  }
-)
-
-("sum",
-  Func {funcArgs = [(Just "arr",IndexedType {indexedTypeIndex = 0, indexedTypeType = Array {entry = Int {signed = Just False, bytes = Nothing}, length = Nothing}})]
-        , funcVals = [(Just "s",IndexedType {indexedTypeIndex = 0, indexedTypeType = Int {signed = Just False, bytes = Nothing}})]
-        , funcStateMutability = Just Pure
-        , funcContents = Just [ForStatement (Just (VariableDefinition [VarDefEntry {vardefType = Just (Int {signed = Just False, bytes = Nothing}), _vardefLocation = Nothing, vardefName = "i", vardefContext = (line 5, column 8) - (line 5, column 15): () }] (Just (NumberLiteral (line 5, column 17) - (line 5, column 18): ()  0 Nothing)))) (Just (Binary (line 5, column 22) - (line 5, column 24): ()  "<" (Variable (line 5, column 20) - (line 5, column 22): ()  "i") (MemberAccess (line 5, column 27) - (line 5, column 34): ()  (Variable (line 5, column 24) - (line 5, column 27): ()  "arr") "length"))) (Just (PlusPlus (line 5, column 37) - (line 5, column 39): ()  (Variable (line 5, column 36) - (line 5, column 37): ()  "i"))) [SimpleStatement (ExpressionStatement (Binary (line 6, column 7) - (line 6, column 10): ()  "+=" (Variable (line 6, column 5) - (line 6, column 7): ()  "s") (IndexAccess (line 6, column 13) - (line 6, column 16): ()  (Variable (line 6, column 10) - (line 6, column 13): ()  "arr") (Just (Variable (line 6, column 14) - (line 6, column 15): ()  "i"))))) (line 6, column 5) - (line 6, column 16): () ] (line 5, column 3) - (line 8, column 1): () ]
-        , funcVisibility = Just Public
-        , funcConstructorCalls = fromList []
-        , funcModifiers = Just []
-        , funcContext = (line 4, column 1) - (line 4, column 55): () }
--}

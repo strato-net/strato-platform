@@ -385,6 +385,16 @@ getVariableOfName name = do
   let maybeContractFunction :: Maybe Variable
       maybeContractFunction = fmap (t "constant function" . Constant . SFunction name) $ M.lookup name $ currentContract currentCallInfo^.CC.functions
 
+      getFreeFuncDef :: CC.Func
+      getFreeFuncDef = case M.lookup name $ codeCollection currentCallInfo^.CC.freeFuncs of
+        Just func -> func
+        Nothing -> internalError "Free function definition missing" name 
+
+      maybeFreeFunction :: Maybe Variable
+      maybeFreeFunction = toMaybe (name `elem` M.keys (codeCollection currentCallInfo^.CC.freeFuncs)) $
+        t "free function" $ Constant $ SFunction name getFreeFuncDef
+
+
       maybeBuiltinFunction :: Maybe Variable
       maybeBuiltinFunction = toMaybe (name `elem` ["address", "account", "uint", "int", "bool", "byte", "bytes"
                                                   , "string", "keccak256", "ripemd160", "payable"
@@ -451,6 +461,7 @@ getVariableOfName name = do
       [ maybeLocalValue
       , maybeStorageItem
       , maybeContractFunction
+      , maybeFreeFunction
       , maybeBuiltinFunction
       , maybeBuiltinVariable
       , maybeEnum
@@ -462,7 +473,7 @@ getVariableOfName name = do
       ]
 
 getTypeOfName' :: SolidString -> CC.CodeCollection -> Typo
-getTypeOfName' s (CC.CodeCollection ccs) =
+getTypeOfName' s (CC.CodeCollection _ ccs) =
   let lookInContract :: CC.Contract -> [Typo]
       lookInContract (CC.Contract{..}) = catMaybes
         [ fmap StructTypo (fmap (\(a,b,_) -> (a,b)) <$> M.lookup s _structs)
