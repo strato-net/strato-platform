@@ -49,9 +49,12 @@ import           Data.List
 import qualified Data.Map                             as M
 import qualified Data.Map.Merge.Lazy                  as M
 import           Data.Maybe
+-- import           Data.Monoid
+import           Data.Semigroup
 import qualified Data.Sequence                        as Q
 import qualified Data.Set                             as S
 import           Data.Source
+-- import           Data.Source.Position
 import qualified Data.Text                            as T
 import qualified Data.Text.Encoding                   as TE
 --import qualified Data.List                            as List
@@ -115,7 +118,7 @@ import           SolidVM.Model.Value
 
 import           SolidVM.Solidity.Parse.Statement
 import           SolidVM.Solidity.Parse.ParserTypes
-import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpression, unparseFunc)
+import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpression)--, unparseFunc)
 
 import           UnliftIO                             hiding (assert)
  
@@ -1817,45 +1820,45 @@ expToVar' (CC.FunctionCall _ e args) = do
             --get only the contract and its collection of sourceAnnotation contained in the ContractF type.
             (contract, _, _) <- getCodeAndCollection address
             --get the position of the searched item if something was wanting to be searched
-            let anno :: [SourceAnnotation ()]
+            let anno :: [(Int, Int, Int, Int)]
                 anno = 
                   case (fromMaybe "" searchTerms) of 
                     --get the location of just the code of the contract, if nothing is inputted in the contract then focus on just the contract itself
-                    "" -> [contract ^. CC.contractContext]
+                    "" -> [getPositionFromSourceAnnotation (contract ^. CC.contractContext)]
                     term ->
                     --Search the full contract for the search term, retrieving the sourceAnnotation of the part that was found
                       -- Check the contractName
-                      let contrAnno = if ((contract ^. CC.contractName) == term) then  Just (contract ^. CC.contractContext) else Nothing
+                      let contrAnno = if ((contract ^. CC.contractName) == term) then  Just (getPositionFromSourceAnnotation (contract ^. CC.contractContext)) else Nothing
                       -- Check the constants
-                          constAnno = fmap (^. CC.constContext) ((contract ^. CC.constants) M.!? term)
-                      -- Check the storageDefs
-                          storjAnno = fmap (^. CC.varContext) ((contract ^. CC.storageDefs) M.!? term)
-                      -- Check the enums
-                          enumAnno = snd  <$> ((contract ^. CC.enums) M.!? term)
-                      -- Check the structs TODO: implement this, will need to change the structs to include a source annotation
-                      -- let structAnno = (\(_,_,a) -> a) <$> ((contract ^. CC.structs) M.!? "myFunction")
-                      -- Check the events
-                          eventAnno = fmap (^. CC.eventContext) ((contract ^. CC.events) M.!? term)
-                            -- let mEventf = (contract ^. CC.events) M.!? term
-                            --     val = case mEventf of
-                            --       Just eventf -> foldMap mon eventf
-                            --         where mon sa = 
+                      --     constAnno = fmap (^. CC.constContext) ((contract ^. CC.constants) M.!? term)
+                      -- -- Check the storageDefs
+                      --     storjAnno = fmap (^. CC.varContext) ((contract ^. CC.storageDefs) M.!? term)
+                      -- -- Check the enums
+                      --     enumAnno = snd  <$> ((contract ^. CC.enums) M.!? term)
+                      -- -- Check the structs TODO: implement this, will need to change the structs to include a source annotation
+                      -- -- let structAnno = (\(_,_,a) -> a) <$> ((contract ^. CC.structs) M.!? "myFunction")
+                      -- -- Check the events
+                      --     eventAnno = fmap (^. CC.eventContext) ((contract ^. CC.events) M.!? term)
+                      --       -- let mEventf = (contract ^. CC.events) M.!? term
+                      --       --     val = case mEventf of
+                      --       --       Just eventf -> foldMap mon eventf
+                      --       --         where mon sa = 
                             
                       -- Check the functions
                           funcAnno = 
                             let mFuncf = (contract ^. CC.functions) M.!? term
-                                val = case mfuncf of
+                                val = case mFuncf of
                                   Just funcf -> foldMap mon funcf
                                     where mon sa = 
                                       let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
                                       in Just (Min (sl, sc), Max (el, ec))
                                   Nothing -> Nothing
                             in case val of
-                                  Just (Min (sl, sc), Max (el, ec)) -> Just (makeSourceAnnotation sl sc el ec)
+                                  Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
                                   Nothing -> Nothing 
                               -- fmap (unparseFunc ()) ((contract ^. CC.functions) M.!? term)
                       --Remove all of the items that were found to contain nothing, this should leave just the items that we found
-                      in catMaybes [contrAnno, constAnno, storjAnno, enumAnno, eventAnno, funcAnno] -- structAnno]
+                      in catMaybes [contrAnno, funcAnno] --, constAnno, storjAnno, enumAnno, eventAnno] -- structAnno]
             -- let posit = getPositionFromSourceAnnotation <$> anno
             --     contents = contract ^. CC.functions 
 
@@ -1878,9 +1881,9 @@ expToVar' (CC.FunctionCall _ e args) = do
             case anno of 
               [] -> pure . Constant $ SString $ "ghgh" --TODO: add warning that nothing was found and the piece of code is redundant
               -- Return the position of the found item
-              [a] -> let  (sl, sc, el, ec) = getPositionFromSourceAnnotation a
-                          trim = trimCodeCollection (BC.unpack cd') a
-                          result = trim ++ (show sl) ++ ":" ++ (show sc) ++ "-" ++ (show el) ++ ":" ++ (show ec)
+              [a] -> let (sl, sc, el, ec) = a
+                         trim = trimCodeCollection (BC.unpack cd') a
+                         result = trim ++ (show sl) ++ ":" ++ (show sc) ++ "-" ++ (show el) ++ ":" ++ (show ec)
                      in pure . Constant $ SString (result)
               as -> case searchTerms of
                       Nothing -> generalMetaProgrammingError "<address>.code(<stuff>)" searchTerms
@@ -3052,27 +3055,20 @@ getPositionFromSourceAnnotation sa = (sa ^. sourceAnnotationStart ^. sourcePosit
                                       sa ^. sourceAnnotationEnd ^. sourcePositionColumn)
 
 --If given a string and a SourceAnnotation, trim the string to be within the SourceAnnotation
-trimCodeCollection :: String -> SourceAnnotation a -> String
+trimCodeCollection :: String -> (Int, Int, Int, Int) -> String
 trimCodeCollection cc sa = unlines final
-  where (startLine, startColumn, endLine, endColumn) = getPositionFromSourceAnnotation sa
+  where (startLine, startColumn, endLine, endColumn) = sa
         bandwidth = drop (startLine - 1) (take endLine (lines cc))
         trimBack = mapOnLast (take endColumn) bandwidth 
         final = mapOnFirst (drop $ startColumn - 1) trimBack
 
-makeSourceAnnotation :: (Int, Int, Int, Int) -> SourceAnnotation a
-makeSourceAnnotation (startLine, startColumn, endLine, endColumn) = 
-  SourceAnnotation
-  {
-    _sourceAnnotationStart=SourcePosition {
-      _sourcePositionName="",
-      _sourcePositionLine= startLine, 
-      _sourcePositionColumn= startColumn
-      },
-    _sourceAnnotationEnd=SourcePosition {
-      _sourcePositionName="",
-        _sourcePositionLine= endLine,
-        _sourcePositionColumn= endColumn
-      },
-    _sourceAnnotationAnnotation = ()
-  }
+-- makeSourceAnnotation :: (Int, Int, Int, Int) -> SourceAnnotation a
+-- makeSourceAnnotation (startLine, startColumn, endLine, endColumn) =
+--   let start = SourcePosition startLine startColumn
+--       end = SourcePosition endLine endColumn 
+--   in SourceAnnotation
+--     {
+--       start,
+--       end
+--     }
   
