@@ -1,11 +1,13 @@
-{-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE DeriveAnyClass    #-}
-{-# LANGUAGE DeriveFunctor     #-}
-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
-{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE DataKinds          #-}
+{-# LANGUAGE DeriveAnyClass     #-}
+{-# LANGUAGE DeriveFunctor      #-}
+{-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE RecordWildCards    #-}
+{-# LANGUAGE TemplateHaskell    #-}
+{-# LANGUAGE DeriveFoldable     #-}
+{-# LANGUAGE DeriveTraversable  #-}
 
 module SolidVM.Model.CodeCollection.Function (
   FuncF(..),
@@ -28,6 +30,7 @@ import           Control.Lens                 (mapped, (&), (?~), makeLenses)
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
+import           Data.Foldable
 import           Data.Map.Strict              (Map)
 import           Data.Source
 import           Data.Swagger
@@ -87,12 +90,12 @@ data FuncF a = Func
   , _funcConstructorCalls :: Map SolidString [(ExpressionF a)]
   , _funcModifiers :: Maybe [String]
   , _funcContext :: a
-  } deriving (Eq,Show,Generic, Functor)
+  } deriving (Eq, Show, Generic, Functor, Foldable, Traversable)
 
 instance ToJSON a => ToJSON (FuncF a)
 instance FromJSON a => FromJSON (FuncF a)
 
-type Func = Positioned FuncF
+type Func = Positioned FuncF 
 
 data Visibility = Private
                 | Public
