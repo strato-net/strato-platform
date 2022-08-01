@@ -55,7 +55,9 @@ spec = do
       let (_,b) = certValidity cert
       b `shouldBe` fromMaybe (error "Date in makeCert didn't return properly") date
     it "makeCert bad dateTime" $ do
-      makeCert (timeParse ISO8601_Date "2020-18-50") iss sub `shouldThrow` anyException
+      exprDate <- snd . certValidity <$> makeCert (timeParse ISO8601_Date "2020-18-50") iss sub
+      oneYearFromNow <- snd <$> getValidity
+      dtDate exprDate `shouldBe` dtDate getValidity
     it "can do JSON encoding roundtrips" $ do
       cert <- flip runReaderT priv $ makeSignedCert Nothing Nothing iss sub
       Ae.decode (Ae.encode sub) `shouldBe` Just sub
