@@ -1880,9 +1880,8 @@ expToVar' (CC.FunctionCall _ e args) = do
             case anno of 
               [] -> pure . Constant $ SString $ "ghgh" --TODO: add warning that nothing was found and the piece of code is redundant
               -- Return the position of the found item
-              [a] -> let (sl, sc, el, ec) = a
-                         trim = trimCodeCollection (BC.unpack cd') a
-                         result = trim ++ (show sl) ++ ":" ++ (show sc) ++ "-" ++ (show el) ++ ":" ++ (show ec)
+              [a] -> let trim = trimCodeCollection (BC.unpack cd') a
+                         result = trim
                      in pure . Constant $ SString (result)
               as -> case searchTerms of
                       Nothing -> generalMetaProgrammingError "<address>.code(<stuff>)" searchTerms
