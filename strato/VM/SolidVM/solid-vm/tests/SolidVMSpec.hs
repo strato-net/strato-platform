@@ -3787,6 +3787,40 @@ contract qq{
       [ BString $ UTF8.fromString contractqq]
 
   fit "Can find a function within a codeCollection" . runTest $ do
+    let myFunxion :: String
+        myFunxion = [r|function myFunction() public returns (uint) {
+    return 13;
+  }
+|]
+        contract :: String
+        contract = [r|
+pragma solidvm 3.2;
+contract Test {
+  constructor(){}
+}
+
+pragma solidvm 3.2;
+contract qq{
+  string codeTest;
+  constructor() public {
+    Test t = new Test();
+    codeTest = account(this).code("myFunction");
+  }
+
+  function myFunction() public returns (uint) {
+    uint x = 13;
+    uint y = 13;
+    uint z = x + y;
+    uint w = z + 13;
+    uint u = w + 13;
+    return u;
+  }
+}|]
+    runBS contract
+    getFields ["codeTest"] `shouldReturn`
+      [ BString $ UTF8.fromString myFunxion]
+
+  it "Can get just the contract if empty string is fed to the code function." . runTest $ do
     let contract :: String
         contract = [r|
 pragma solidvm 3.2;
@@ -3799,7 +3833,7 @@ contract qq{
   string codeTest;
   constructor() public {
     Test t = new Test();
-    codeTest = account(t).code("qq");
+    codeTest = account(t).code("");
   }
 
   function myFunction() public returns (uint) {
@@ -3810,9 +3844,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString contract]
 
-  fit "Can get just the contract if empty string is fed to the code function." . runTest $ do
-    let contract :: String
-        contract = [r|
+  fit "Can throw an error if more than one item is given to the code member function." $ (runTest (runBS [r|
 pragma solidvm 3.2;
 contract Test {
   constructor(){}
@@ -3823,40 +3855,31 @@ contract qq{
   string codeTest;
   constructor() public {
     Test t = new Test();
-    codeTest = account(t).code("qq");
+    codeTest = account(t).code("one", "two");
   }
 
   function myFunction() public returns (uint) {
     return 13;
   }
-}|]
-    runBS contract
-    getFields ["codeTest"] `shouldReturn`
-      [ BString $ UTF8.fromString contract]
+}|])) `shouldThrow` anyTypeError
 
-  fit "Can throw an error if more than one item is given to the code member function." . runTest $ do
-    let contract :: String
-        contract = [r|
-pragma solidvm 3.2;
-contract Test {
-  constructor(){}
-}
-
-pragma solidvm 3.2;
-contract qq{
-  string codeTest;
-  constructor() public {
-    Test t = new Test();
-    codeTest = account(t).code("qq");
+  it "can't assign a value to an unallocated index in an array" $ (runTest (runBS [r|
+pragma solidvm 3.0;
+contract qq {
+  uint z;
+  uint[] x;
+  uint[] myVar;
+  constructor() {
+    myVar = f();
+    z = myVar[0];
   }
-
-  function myFunction() public returns (uint) {
-    return 13;
+  function f() returns (uint[]) {
+    // assignment of first value
+    uint[] x;
+    x[0] = 1;
+    return x;
   }
-}|]
-    runBS contract
-    getFields ["codeTest"] `shouldReturn`
-      [ BString $ UTF8.fromString contract]
+  }|])) `shouldThrow` anyInvalidWriteError
 
   it "can transfer value from account a to account b" . runTest $ do
     -- Post contract
