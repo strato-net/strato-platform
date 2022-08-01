@@ -142,6 +142,7 @@ data ExpressionF a =
   | ArrayExpression a [(ExpressionF a)]
   | Variable a SolidString 
   | ObjectLiteral a (Map.Map SolidString (ExpressionF a))
+  | HexaLiteral a SolidString -- if type clash remove ie hex"0F3A"
   deriving (Show, Eq, Generic, Functor)
 
 extractExpression :: ExpressionF a -> a
@@ -160,6 +161,7 @@ extractExpression (StringLiteral a _) = a
 extractExpression (TupleExpression a _) = a
 extractExpression (ArrayExpression a _) = a
 extractExpression (Variable a _) = a
+extractExpression (HexaLiteral a _) = a
 extractExpression (ObjectLiteral a _) = a
 
 type Expression = Positioned ExpressionF

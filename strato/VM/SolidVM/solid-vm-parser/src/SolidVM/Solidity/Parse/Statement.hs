@@ -352,6 +352,7 @@ primaryExpression = do
     <|> (uncurry BoolLiteral <$> res' "false" False)
     <|> (uncurry BoolLiteral <$> res' "true" True)
     <|> (uncurry NewExpression <$> withPosition (reserved "new" >> simpleTypeExpression))
+    <|> myHexParser
     <|> (uncurry Variable <$> withPosition (stringToLabel <$> identifier))
     <|> (do 
             ~(a, (val, nu)) <- withPosition $ do
@@ -360,6 +361,15 @@ primaryExpression = do
               pure (val, nu)
             pure $ NumberLiteral a val nu)
     <|> (uncurry StringLiteral <$> withPosition stringLiteral)
+
+myHexParser :: SolidityParser Expression
+myHexParser = do
+  ~(a,val) <- withPosition $ do
+    reservedOp "hex"
+    val' <- between (symbol "\'") (symbol "\'") $ many1 hexDigit
+    when(Prelude.length val' `mod` 2/=0) $ fail "hex digit must be even number"
+    pure val' --if conditions clear apply parser to both values? 
+  return $ HexaLiteral a val
 
 scientific :: SolidityParser Integer
 scientific = do 

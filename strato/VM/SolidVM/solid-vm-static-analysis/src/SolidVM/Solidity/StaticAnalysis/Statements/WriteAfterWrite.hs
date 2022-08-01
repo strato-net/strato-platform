@@ -179,6 +179,7 @@ expressionHelper (Ternary _ a b c) = concat <$> traverse expressionHelper [a, b,
 expressionHelper (BoolLiteral _ _) = pure []
 expressionHelper (NumberLiteral _ _ _) = pure []
 expressionHelper (StringLiteral _ _) = pure []
+expressionHelper (HexaLiteral _ _) = pure []
 expressionHelper (TupleExpression _ es) =
   concat <$> traverse (maybe (pure []) expressionHelper) es
 expressionHelper (ArrayExpression _ es) = concat <$> traverse expressionHelper es

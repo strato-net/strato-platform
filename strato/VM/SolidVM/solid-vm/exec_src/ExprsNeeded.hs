@@ -78,6 +78,7 @@ expressionCrawler = \case
     expr <- [cond, thn, els]
     expressionCrawler expr
   BoolLiteral{} -> ["BoolLiteral"]
+  HexaLiteral{} -> ["HexaLiteral"]
   NumberLiteral{} -> ["NumberLiteral"]
   StringLiteral{} -> ["StringLiteral"]
   TupleExpression _ subexprs -> "TupleExpression" : do

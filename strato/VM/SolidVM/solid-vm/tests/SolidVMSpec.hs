@@ -1934,6 +1934,29 @@ contract qq {
 }|]
     getFields ["x"] `shouldReturn` [BInteger 887242634]
 
+  it "can use named return values" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  string x;
+  constructor() public {
+    x = hex'AF32';
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BString "AF32"]
+
+  it "should not compute remote arguments" $ runTest (do
+    runCall "func" "()" [r|
+contract qq {
+  string x;
+  function func() public returns (string) {
+    x = hex'AF3';
+  }
+}|]) `shouldThrow` anyParseError
+
+
+
+
   it "can return and used named returns" . runTest $ do
     runBS [r|
 contract qq {

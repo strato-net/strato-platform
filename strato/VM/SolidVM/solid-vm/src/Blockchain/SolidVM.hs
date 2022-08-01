@@ -1428,6 +1428,7 @@ expToVar' (CC.NumberLiteral _ v (Just nu)) = do
     else unknownStatement "Unit suffixes are not supported below pragma solidvm 3.3" (v, nu)
 expToVar' (CC.StringLiteral _ s) = return $ Constant $ SString s
 expToVar' (CC.BoolLiteral _ b) = return $ Constant $ SBool b
+expToVar' (CC.HexaLiteral _ a) = return $ Constant $ SString a 
 expToVar' (CC.Variable _ "bytes32ToString") = return $ Constant $ SHexDecodeAndTrim
 expToVar' (CC.Variable _ "addressToAsciiString") = return $ Constant SAddressToAscii
 expToVar' (CC.Variable _ "bytes") = do --TODO- remove this hardcoded case
