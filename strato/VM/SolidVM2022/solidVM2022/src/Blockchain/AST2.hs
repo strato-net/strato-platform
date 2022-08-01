@@ -40,9 +40,9 @@ instance NamedType a => SolidType (Function (IO a)) a where
   getGetter (Function f []) = return f
   getGetter _ = Left "too many parameters"
   
-instance (NamedType a, Show a) => SolidType (Function (IO a)) Value where
+instance (Show a) => SolidType (Function (IO a)) Value where
   getGetter (Function f []) = return $ fmap Value f
-  getGetter _ = error $ "poppy: " ++ typename (undefined :: a)
+  getGetter _ = Left "too many parameters"
   
 instance (NamedType a, NamedType b) => SolidType (Function (IO a)) b where
   getGetter (Function _ []) = Left $ "type mismatch: function returns: " ++ show (typename (undefined :: a)) ++ ", expected: " ++ show (typename (undefined ::b))
