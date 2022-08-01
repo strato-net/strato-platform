@@ -1934,7 +1934,7 @@ contract qq {
 }|]
     getFields ["x"] `shouldReturn` [BInteger 887242634]
 
-  it "can use named return values" . runTest $ do
+  it "can use hexadecimal string literals" . runTest $ do
     runBS [r|
 pragma solidvm 3.3;
 contract qq {
@@ -1944,17 +1944,26 @@ contract qq {
   }
 }|]
     getFields ["x"] `shouldReturn` [BString "AF32"]
+  
+  it "can use hexadecimal string literals double quotes" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  string x;
+  constructor() public {
+    x = hex"AF32";
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BString "AF32"]
 
-  it "should not compute remote arguments" $ runTest (do
+  it "should not allow an odd amount in a string literal" $ runTest (do
     runCall "func" "()" [r|
 contract qq {
   string x;
   function func() public returns (string) {
-    x = hex'AF3';
+    x = hex"AF3";
   }
 }|]) `shouldThrow` anyParseError
-
-
 
 
   it "can return and used named returns" . runTest $ do
@@ -4929,6 +4938,7 @@ contract qq{
 }|]
     getFields ["myNum", "myString", "myStatus"] `shouldReturn` [BInteger 5, BString "hi", BBool True]
     
+    
   it "should catch invalid function overloads" $ runTest (do
     runBS [r|
 pragma solidvm 3.3;
@@ -4946,6 +4956,7 @@ contract qq{
     myNum += a + b;
   }
 }|]) `shouldThrow` anyInvalidArgumentsError
+
 
   it "can pass calldata arguments and use calldata variables" . runTest $ do
     runBS [r|

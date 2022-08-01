@@ -66,6 +66,7 @@ spec = do
                 , ("x ** y", Binary () "**" (Variable () "x") (Variable () "y"))
                 , ("x[q]", IndexAccess () (Variable () "x") (Just $ Variable () "q"))
                 , ("hex'4F9A'", HexaLiteral () "4F9A")
+                , ("hex"4F9A"", HexaLiteral () "4F9A")
                 , ("x[a][b][c]", IndexAccess () (
                                    IndexAccess () (
                                      IndexAccess ()

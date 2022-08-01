@@ -366,9 +366,9 @@ myHexParser :: SolidityParser Expression
 myHexParser = do
   ~(a,val) <- withPosition $ do
     reservedOp "hex"
-    val' <- between (symbol "\'") (symbol "\'") $ many1 hexDigit
+    val' <- (between (symbol "\'") (symbol "\'") $ many1 hexDigit)  <|>  (between (symbol "\"") (symbol "\"") $ many1 hexDigit)               --make this work with double quotes as well
     when(Prelude.length val' `mod` 2/=0) $ fail "hex digit must be even number"
-    pure val' --if conditions clear apply parser to both values? 
+    pure val'
   return $ HexaLiteral a val
 
 scientific :: SolidityParser Integer
