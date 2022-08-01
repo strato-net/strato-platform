@@ -58,6 +58,7 @@ import           Conduit
 import           Control.Applicative
 import           Control.Concurrent
 import           Control.Lens                          hiding (Context)
+import           Control.Arrow                         ((&&&))
 import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
 import           Control.Monad.Reader
@@ -224,6 +225,13 @@ instance MonadIO m => A.Selectable OrgId OrgIdChains (ReaderT Config m) where
                       . RBDB.getOrgIdChains
                       . unOrgId
 
+instance MonadIO m => A.Selectable (OrgName, OrgUnit) OrgNameChains (ReaderT Config m) where
+  select p ip = A.selectWithDefault p ip <&> toMaybe def
+  selectWithDefault _ = fmap OrgNameChains
+                      . RBDB.withRedisBlockDB
+                      . RBDB.getOrgNameChains
+                      . (unOrgName . fst &&& unOrgUnit . snd)
+                      
 instance MonadIO m => A.Selectable Keccak256 ChainTxsInBlock (ReaderT Config m) where
   select p sha = A.selectWithDefault p sha <&> toMaybe def
   selectWithDefault _ = fmap ChainTxsInBlock
@@ -423,6 +431,7 @@ type MonadP2P m = ( MonadIO m
                       '[ '(Integer, Canonical BlockData)
                        , '(IPAddress, IPChains)
                        , '(OrgId, OrgIdChains)
+                       , '((OrgName, OrgUnit), OrgNameChains)
                        , '(Keccak256, ChainTxsInBlock)
                        , '(Word256, ChainMembers)
                        , '(Word256, ChainInfo)

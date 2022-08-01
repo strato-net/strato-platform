@@ -95,6 +95,7 @@ data TestContext = TestContext
   , _canonicalBlockDataMap :: Map Integer (Canonical DataDefs.BlockData)
   , _ipAddressIpChainsMap  :: Map IPAddress IPChains
   , _orgIdChainsMap        :: Map OrgId OrgIdChains
+  , _orgNameChainsMap      :: Map (OrgName, OrgUnit) OrgNameChains
   , _shaChainTxsInBlockMap :: Map Keccak256 ChainTxsInBlock
   , _chainMembersMap       :: Map Word256 ChainMembers
   , _chainInfoMap          :: Map Word256 ChainInfo
@@ -147,6 +148,8 @@ instance MonadIO m => A.Selectable IPAddress IPChains (MonadTest m) where
 instance MonadIO m => A.Selectable OrgId OrgIdChains (MonadTest m) where
   select _ ip = M.lookup ip <$> use orgIdChainsMap
 
+instance MonadIO m => A.Selectable (OrgName, OrgUnit) OrgNameChains (MonadTest m) where
+  select _ ip = M.lookup ip <$> use orgNameChainsMap
 instance MonadIO m => A.Selectable Keccak256 ChainTxsInBlock (MonadTest m) where
   select _ sha = M.lookup sha <$> use shaChainTxsInBlockMap
 
@@ -394,6 +397,7 @@ testContext wireMessagesRef prv ctx = TestContext
   , _canonicalBlockDataMap = M.empty
   , _ipAddressIpChainsMap  = M.empty
   , _orgIdChainsMap        = M.empty
+  , _orgNameChainsMap      = M.empty
   , _shaChainTxsInBlockMap = M.empty
   , _chainMembersMap       = M.empty
   , _chainInfoMap          = M.empty

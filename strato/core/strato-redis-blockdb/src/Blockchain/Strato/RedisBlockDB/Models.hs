@@ -41,6 +41,7 @@ data BlockDBNamespace = Headers
                       | PrivateTxsInBlocks
                       | PrivateIPChains
                       | PrivateOrgIdChains
+                      | PrivateOrgNameChains
                       | X509Certificates
                       | X509Initialized
     deriving (Eq, Read, Show)
@@ -59,6 +60,13 @@ instance RedisDBValuable Bool where
 
 instance RedisDBKeyable S8.ByteString where
     toKey = SB16.encode
+
+instance RedisDBKeyable (S8.ByteString, Maybe S8.ByteString) where
+    toKey (n, u) = SB16.encode $ S8.concat [n, maybeOrgUnit]
+        where
+            maybeOrgUnit = case u of
+                Nothing -> S8.pack ""
+                Just x  -> S8.concat [S8.pack "/", x] 
 
 instance RedisDBValuable S8.ByteString where
     toValue   = SB16.encode
@@ -110,6 +118,10 @@ instance RedisDBValuable RedisOrgIdChains where
     toValue   = rlpSerialize . rlpEncode
     fromValue = rlpDecode . rlpDeserialize
 
+instance RedisDBValuable RedisOrgNameChains where
+    toValue   = rlpSerialize . rlpEncode
+    fromValue = rlpDecode . rlpDeserialize
+
 instance RedisDBKeyable Integer where
     toKey = S8.pack . show
 
@@ -138,6 +150,7 @@ newtype RedisChainMembers = RedisChainMembers (M.Map Address Enode) deriving new
 newtype RedisChainTxsInBlocks = RedisChainTxsInBlocks (M.Map Word256 [Keccak256]) deriving newtype (Eq, Show, RLPSerializable)
 newtype RedisIPChains = RedisIPChains (S.Set Word256) deriving (Eq, Show)
 newtype RedisOrgIdChains = RedisOrgIdChains (S.Set Word256) deriving (Eq, Show)
+newtype RedisOrgNameChains = RedisOrgNameChains (S.Set Word256) deriving (Eq, Show)
 
 instance RLPSerializable RedisIPChains where
   rlpEncode (RedisIPChains s) = rlpEncode $ S.toList s
@@ -146,6 +159,10 @@ instance RLPSerializable RedisIPChains where
 instance RLPSerializable RedisOrgIdChains where
   rlpEncode (RedisOrgIdChains s) = rlpEncode $ S.toList s
   rlpDecode = RedisOrgIdChains . S.fromList . rlpDecode
+
+instance RLPSerializable RedisOrgNameChains where
+  rlpEncode (RedisOrgNameChains s) = rlpEncode $ S.toList s
+  rlpDecode = RedisOrgNameChains . S.fromList . rlpDecode
 
 data RedisBestBlock = RedisBestBlock { bestBlockHash            :: Keccak256
                                      , bestBlockNumber          :: Integer          -- todo: BlockNumber
@@ -174,6 +191,7 @@ displayForNamespace ns input = case ns of
     PrivateTxsInBlocks -> let RedisChainTxsInBlocks ctibs = fromValue input in show ctibs
     PrivateIPChains -> let RedisIPChains ipcs = fromValue input in format (S.toList ipcs)
     PrivateOrgIdChains -> let RedisOrgIdChains oics = fromValue input in format (S.toList oics)
+    PrivateOrgNameChains -> let RedisOrgNameChains oncs = fromValue input in format (S.toList oncs)
     X509Certificates -> format (fromValue input :: Address)
     X509Initialized -> format input
   where

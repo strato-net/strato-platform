@@ -21,6 +21,7 @@ module Blockchain.Strato.RedisBlockDB
     , getInitializeCertificateRegistry, initializeCertificateRegistry 
     , getChainTxsInBlock, putChainTxsInBlock, addChainTxsInBlock
     , getIPChains, addIPChain, removeIPChain
+    , getOrgNameChains, addOrgNameChain, removeOrgNameChain
     , getOrgIdChains, addOrgIdChain, removeOrgIdChain
     , getHeader, getHeaders, getHeadersByNumber, getHeadersByNumbers
     , getBlock,  getBlocks,  getBlocksByNumber,  getBlocksByNumbers
@@ -96,21 +97,22 @@ inNamespace :: RedisDBKeyable k
             -> S8.ByteString
 inNamespace ns k = ns' `S8.append` toKey k
     where ns' = case ns of
-            Headers             -> "h:"
-            Transactions        -> "t:"
-            Numbers             -> "n:"
-            Uncles              -> "u:"
-            Parent              -> "p:"
-            Children            -> "c:"
-            Canonical           -> "q:"
-            PrivateChainInfo    -> "x:"
-            PrivateChainMembers -> "m:"
-            PrivateTransactions -> "pt:"
-            PrivateTxsInBlocks  -> "pb:"
-            PrivateIPChains     -> "pic:"
-            PrivateOrgIdChains  -> "poc:"
-            X509Certificates    -> "x509:"
-            X509Initialized     -> "x509init:"
+            Headers              -> "h:"
+            Transactions         -> "t:"
+            Numbers              -> "n:"
+            Uncles               -> "u:"
+            Parent               -> "p:"
+            Children             -> "c:"
+            Canonical            -> "q:"
+            PrivateChainInfo     -> "x:"
+            PrivateChainMembers  -> "m:"
+            PrivateTransactions  -> "pt:"
+            PrivateTxsInBlocks   -> "pb:"
+            PrivateIPChains      -> "pic:"
+            PrivateOrgIdChains   -> "poc:"
+            PrivateOrgNameChains -> "pnc:"
+            X509Certificates     -> "x509:"
+            X509Initialized      -> "x509init:"
 
 findNamespace :: S8.ByteString -> BlockDBNamespace
 findNamespace key = case S8.takeWhile (/= ':') key of
@@ -127,6 +129,7 @@ findNamespace key = case S8.takeWhile (/= ':') key of
   "pb" -> PrivateTxsInBlocks
   "pic" -> PrivateIPChains
   "poc" -> PrivateOrgIdChains
+  "pnc" -> PrivateOrgNameChains
   "x509" -> X509Certificates
   "x509init:" -> X509Initialized
   wut -> error $ "unknown namespace: " ++ show wut
@@ -377,6 +380,37 @@ removeOrgIdChain ip cId = do
         TxSuccess _ -> pure $ Right Ok
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeOrgIdChain - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeOrgIdChain - Error" ++ e)
+
+getOrgNameChains :: (S8.ByteString, Maybe S8.ByteString)
+                 -> Redis (S.Set Word256)
+getOrgNameChains org = getInNamespace PrivateOrgNameChains org <&> \case
+    Right (Just rchains) -> let RedisOrgNameChains chains = fromValue rchains
+                            in chains
+    _                    -> S.empty
+    
+addOrgNameChain :: (S8.ByteString, Maybe S8.ByteString)
+                -> Word256
+                -> Redis (Either Reply Status)
+addOrgNameChain org cId = do
+    chains <- getOrgNameChains org
+    let chains' = RedisOrgNameChains $ S.insert cId chains
+    res <- multiExec $ set (inNamespace PrivateOrgNameChains org) (toValue chains')
+    case res of 
+        TxSuccess _ -> pure $ Right Ok
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addOrgNameChain - Aborted")
+        TxError e   -> pure . Left $ SingleLine (S8.pack $ "addOrgNameChain - Error" ++ e)
+    
+removeOrgNameChain :: (S8.ByteString, Maybe S8.ByteString)
+                   -> Word256  
+                   -> Redis (Either Reply Status)
+removeOrgNameChain org cId = do
+    chains <- getOrgNameChains org
+    let chains' = RedisOrgNameChains $ S.delete cId chains
+    res <- multiExec $ set (inNamespace PrivateOrgNameChains org) (toValue chains')
+    case res of 
+        TxSuccess _ -> pure $ Right Ok
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeOrgNameChain - Aborted")
+        TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeOrgNameChain - Error" ++ e)
 
 bestBlockInfoKey :: S8.ByteString
 bestBlockInfoKey = S8.pack "<best>"
