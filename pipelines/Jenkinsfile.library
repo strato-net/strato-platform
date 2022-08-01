@@ -8,7 +8,7 @@ def deployStrato(nodeData) {
   sh "sudo rm -rf strato-getting-started"
   unstash 'stratoGettingStarted'
   dir("strato-getting-started") {
-    sh "sudo chmod 777 /datadrive/letsencrypt-ssl/*"
+    sh "sudo chmod 777 ~/letsencrypt-ssl/*"
     sh "cp ~/letsencrypt-ssl/server.pem ssl/certs/"
     sh "cp ~/letsencrypt-ssl/server.key ssl/private/"
     withCredentials([
