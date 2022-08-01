@@ -3789,9 +3789,12 @@ contract qq{
   fit "Can find a function within a codeCollection" . runTest $ do
     let myFunxion :: String
         myFunxion = [r|function myFunction() public returns (uint) {
-    return 13;
-  }
-|]
+    uint x = 13;
+    uint y = 13;
+    uint z = x + y;
+    uint w = z + 13;
+    uint u = w + 13;
+    return u;}|]
         contract :: String
         contract = [r|
 pragma solidvm 3.2;
