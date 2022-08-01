@@ -4292,3 +4292,15 @@ contract qq {
   }
 }|]
     getFields ["x","y","z"] `shouldReturn` [BDefault, BDefault, BDefault]
+
+  it "returns owner's address for valid ecrecover call" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+  
+  address addr;
+  constructor() {
+  addr = ecrecover("3a5d3354533658145308bb0d64dbc1508fc09cdfb776fbd3ef69c5733efff993",62426968875534762403852209127290402186903754337050088741962154937967930754218,50195776013273436178497944053297375925820829706569486652594540226567378884053,27);
+  }
+}|]
+    getFields ["addr"] `shouldReturn` [BAccount (NamedAccount 0xd65ffbac8f82a2ece5434b61deef7c0157aed576 UnspecifiedChain)]
