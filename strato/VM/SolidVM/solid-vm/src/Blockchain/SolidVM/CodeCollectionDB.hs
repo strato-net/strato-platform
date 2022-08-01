@@ -49,7 +49,7 @@ import           SolidVM.Solidity.StaticAnalysis.Typechecker as TC
 
 data ParseTypeCheckOrSolidVMError = PEx ParseError
                          | TCEx [SourceAnnotation T.Text]
-                         | SVMEx (Positioned ((,) SolidException)) deriving (Show) 
+                         | SVMEx (Positioned ((,) SolidException)) deriving (Show)
 
 {-# NOINLINE unsafeCodeMapIORef #-}
 unsafeCodeMapIORef :: IORef (Map Keccak256 CodeCollection)
@@ -75,7 +75,7 @@ compileSourceNoInheritance initCodeMap = do
         let pragmas = \case
               Pragma _ n v -> Just (n, v)
               _ -> Nothing
-            vmVersion' = if (Just ("solidvm","3.2")) `elem` (pragmas <$> sourceUnits) then "svm3.2" else (if (Just ("solidvm","3.0")) `elem` (pragmas <$> sourceUnits) then "svm3.0" else "")
+            vmVersion' = if (Just ("solidvm","3.3")) `elem` (pragmas <$> sourceUnits) then "svm3.3" else (if (Just ("solidvm","3.2")) `elem` (pragmas <$> sourceUnits) then "svm3.2" else (if (Just ("solidvm","3.0")) `elem` (pragmas <$> sourceUnits) then "svm3.0" else ""))
         fmap catMaybes . for sourceUnits $ \case
           NamedXabi name (xabi, parents') -> do
             ctrct <- first SVMEx
@@ -119,22 +119,29 @@ hasSvm3_2 cc = any (=="svm3.2") vmVers
     contractList = map snd $ M.toList (cc ^. contracts )
     vmVers = map (^. vmVersion ) contractList
 
-compileSource :: Map T.Text T.Text -> Either ParseTypeCheckOrSolidVMError CodeCollection
-compileSource mTT = do
+hasSvm3_3 :: CodeCollection -> Bool
+hasSvm3_3 cc = any (=="svm3.3") vmVers
+  where
+    contractList = map snd $ M.toList (cc ^. contracts )
+    vmVers = map (^. vmVersion ) contractList
+    
+--- Don't typecheck in Slipstream!!!
+compileSource :: Bool -> Map T.Text T.Text-> Either ParseTypeCheckOrSolidVMError CodeCollection
+compileSource typeCheck mTT = do
   let applyInheritanceE = first SVMEx . applyInheritance
-  case ((applyInheritanceE <=< compileSourceNoInheritance) mTT) of   
-    Right cc -> if hasSvm3_2 cc then typeCheckDetector cc else Right cc
+  case (applyInheritanceE <=< compileSourceNoInheritance) mTT of
+    Right cc -> do if typeCheck && (hasSvm3_2 cc || hasSvm3_3 cc) then typeCheckDetector cc else Right cc
     Left x -> Left x
-    where 
+    where
       typeCheckDetector ecc = case TC.detector ecc of
         [] -> Right ecc
         xs -> Left $ TCEx xs
 
-compileSourceWithAnnotations :: Map T.Text T.Text -> Either [SourceAnnotation T.Text] CodeCollection
-compileSourceWithAnnotations = withAnnotations compileSource 
+compileSourceWithAnnotations :: Bool -> Map T.Text T.Text -> Either [SourceAnnotation T.Text] CodeCollection
+compileSourceWithAnnotations typeCheck = withAnnotations (compileSource typeCheck)
 
-codeCollectionFromSource :: (MonadIO m, HasCodeDB m) => B.ByteString -> m (Keccak256, CodeCollection)
-codeCollectionFromSource initCode = do
+codeCollectionFromSource :: (MonadIO m, HasCodeDB m) => Bool -> B.ByteString -> m (Keccak256, CodeCollection)
+codeCollectionFromSource typeCheck initCode = do
   let initList = case Aeson.decode $ BL.fromStrict initCode of
         Just l -> l
         Nothing -> case Aeson.decode $ BL.fromStrict initCode of
@@ -153,7 +160,7 @@ codeCollectionFromSource initCode = do
     Nothing -> do
       recordCacheEvent StorageWrite
       hsh' <- addCode SolidVM canonicalInitCode
-      let ecc = compileSource initMap
+      let ecc = compileSource typeCheck initMap
           cc = case ecc of
                  Right a -> a
                  Left (PEx p) -> parseError "codeCollectionFromSource" p
@@ -164,8 +171,8 @@ codeCollectionFromSource initCode = do
       liftIO $ writeIORef unsafeCodeMapIORef codeMap'
       return $ assert (hsh == hsh') (hsh, cc)
 
-codeCollectionFromHash :: (MonadIO m, HasCodeDB m) => Keccak256 -> m CodeCollection
-codeCollectionFromHash hsh = do
+codeCollectionFromHash :: (MonadIO m, HasCodeDB m) => Bool -> Keccak256 -> m CodeCollection
+codeCollectionFromHash typeCheck hsh = do
   codeMap <- liftIO $ readIORef unsafeCodeMapIORef
   case M.lookup hsh codeMap of
     Just cc -> do
@@ -179,7 +186,7 @@ codeCollectionFromHash hsh = do
           let initMap = case Aeson.decode $ BL.fromStrict initCode of
                   Just l -> M.fromList l
                   Nothing -> M.singleton T.empty (decodeUtf8 initCode)
-          let ecc = compileSource initMap
+          let ecc = compileSource typeCheck initMap
               cc = case ecc of
                      Right a -> a
                      Left (PEx p) -> parseError "codeCollectionFromHash" p
