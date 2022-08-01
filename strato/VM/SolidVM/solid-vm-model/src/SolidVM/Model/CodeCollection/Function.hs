@@ -30,7 +30,6 @@ import           Control.Lens                 (mapped, (&), (?~), makeLenses)
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
-import           Data.Foldable
 import           Data.Map.Strict              (Map)
 import           Data.Source
 import           Data.Swagger
