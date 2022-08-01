@@ -1849,9 +1849,8 @@ expToVar' (CC.FunctionCall _ e args) = do
                             let mFuncf = (contract ^. CC.functions) M.!? term
                                 val = case mFuncf of
                                   Just funcf -> foldMap mon funcf
-                                    where mon sa = 
-                                      let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
-                                      in Just (Min (sl, sc), Max (el, ec))
+                                    where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
+                                                   in Just (Min (sl, sc), Max (el, ec))
                                   Nothing -> Nothing
                             in case val of
                                   Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
