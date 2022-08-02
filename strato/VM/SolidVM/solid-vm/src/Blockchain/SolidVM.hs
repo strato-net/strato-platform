@@ -23,6 +23,7 @@ module Blockchain.SolidVM
   , create
   ) where
 
+
 import           Control.DeepSeq                      (force)
 import           Control.Exception                    (throw)
 import           Control.Lens hiding (assign, from, to, Context)
@@ -119,7 +120,9 @@ import           SolidVM.Solidity.Parse.Lexer         (stringLiteral)
 import           SolidVM.Solidity.Parse.ParserTypes
 import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpression)
 
+import           Network.Haskoin.Crypto.BigWord()
 import           UnliftIO                             hiding (assert)
+
 
 -- | Copying from Data.List.Extra, since our version of the extra library seems to not contain it.
 -- | A total variant of the list index function `(!!)`.
@@ -1484,6 +1487,9 @@ expToVar' (CC.Binary _ "%=" lhs rhs) = binopAssign rem lhs rhs
 expToVar' (CC.Binary _ "|=" lhs rhs) = binopAssign (.|.) lhs rhs
 expToVar' (CC.Binary _ "&=" lhs rhs) = binopAssign (.&.) lhs rhs
 expToVar' (CC.Binary _ "^=" lhs rhs) = binopAssign xor lhs rhs
+expToVar' (CC.Binary _ ">>=" lhs rhs)= binopAssign (\x i -> x `shiftR` fromInteger i) lhs rhs
+expToVar' (CC.Binary _ "<<=" lhs rhs)= binopAssign (\x i -> x `shiftL` fromInteger i) lhs rhs
+expToVar' (CC.Binary _ ">>>=" lhs rhs)= binopAssign (\x i -> fromInteger ( toInteger ( (fromInteger x) ::Word256) ) `shiftR` fromInteger i ) lhs rhs
 
 expToVar' (CC.MemberAccess _ (CC.Variable _ "Util") "bytes32ToString") = do
   return $ Constant $ SHexDecodeAndTrim
@@ -1706,6 +1712,7 @@ expToVar' (CC.Binary _ "^" expr1 expr2) = expToVarInteger expr1 xor expr2 SInteg
 expToVar' (CC.Binary _ "**" expr1 expr2) = expToVarInteger expr1 (^) expr2 SInteger
 expToVar' (CC.Binary _ "<<" expr1 expr2) = expToVarInteger expr1 (\x i -> x `shift` fromInteger i) expr2 SInteger
 expToVar' (CC.Binary _ ">>" expr1 expr2) = expToVarInteger expr1 (\x i -> x `shiftR` fromInteger i) expr2 SInteger
+expToVar' (CC.Binary _ ">>>" expr1 expr2) = expToVarInteger expr1 (\x i -> fromInteger ( toInteger ( (fromInteger x) ::Word256) ) `shiftR` fromInteger i ) expr2 SInteger
 
 expToVar' (CC.Unitary _ "!" expr) = do
   (Constant . SBool . not) <$> (getBool =<< expToVar expr)
@@ -2652,7 +2659,8 @@ certificateMap maybeCert cntrct =
       Nothing -> SMap stringToString emptyCertMap
       Just cert -> SMap stringToString (fromMaybe emptyCertMap $ fmap (certMap cert) (subject cert))
     where subject cert = getCertSubject =<< (eitherToMaybe . bsToCert . BC.pack $ cert)
-          certMap cert sub = if (CC._vmVersion cntrct == "svm3.3")
+          rawCert cert = eitherToMaybe . bsToCert . BC.pack $ cert
+          certMap cert sub  = if (CC._vmVersion cntrct == "svm3.3")
                               then M.fromList [ (SString "commonName", Constant . SString $ subCommonName sub)
                                               , (SString "country", Constant . SString $ fromMaybe "" $ subCountry sub)
                                               , (SString "organization", Constant . SString $ subOrg sub)
@@ -2661,6 +2669,7 @@ certificateMap maybeCert cntrct =
                                               , (SString "publicKey", Constant . SString $ BC.unpack $ pubToBytes $ subPub sub)
                                               , (SString "userAddress", Constant . SString $ show $ fromPublicKey $ subPub sub)
                                               , (SString "certString", Constant . SString $ cert)
+                                              , (SString "expirationDate", Constant . SString $ fromMaybe "" $ dateTimeToString . snd . getCertValidity <$> rawCert cert)
                                               , (SString "parent", Constant . SString $ maybe "0" show (getParentUserAddress =<< (eitherToMaybe . bsToCert . BC.pack $ cert)))
                                               ]
                               else M.fromList [ (SString "commonName", Constant . SString $ subCommonName sub)
@@ -2681,6 +2690,7 @@ certificateMap maybeCert cntrct =
                                           , (SString "publicKey", Constant . SString $ "")
                                           , (SString "userAddress", Constant . SString $ "")
                                           , (SString "certString", Constant . SString $ "")
+                                          , (SString "expirationDate", Constant . SString $ "")
                                           , (SString "parent", Constant . SString $ "")
                                           ]
                           else M.fromList [ (SString "commonName", Constant . SString $ "")
