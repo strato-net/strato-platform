@@ -1876,16 +1876,24 @@ expToVar' (CC.FunctionCall _ e args) = do
                             in case val of
                                   Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
                                   Nothing -> Nothing
-                      -- -- Check the enums
-                      --     enumAnno = snd  <$> ((contract ^. CC.enums) M.!? term)
                       -- -- Check the structs TODO: implement this, will need to change the structs to include a source annotation
                       -- -- let structAnno = (\(_,_,a) -> a) <$> ((contract ^. CC.structs) M.!? "myFunction")
                       -- -- Check the events
-                      --     eventAnno = fmap (^. CC.eventContext) ((contract ^. CC.events) M.!? term)
-                      --       -- let mEventf = (contract ^. CC.events) M.!? term
-                      --       --     val = case mEventf of
-                      --       --       Just eventf -> foldMap mon eventf
-                      --       --         where mon sa = 
+                          eventAnno =                             
+                            let mEvent = (contract ^. CC.events) M.!? term
+                                val = case mEvent of
+                                  Just eventf -> foldMap mon eventf
+                                    where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
+                                                   in Just (Min (sl, sc), Max (el, ec))
+                                  Nothing -> Nothing
+                            in case val of
+                                  Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
+                                  Nothing -> Nothing
+                            
+                            -- let mEventf = (contract ^. CC.events) M.!? term
+                            --     val = case mEventf of
+                            --       Just eventf -> foldMap mon eventf
+                            --         where mon sa = 
                             
                       -- Check the functions
                           funcAnno = 
@@ -1900,7 +1908,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                                   Nothing -> Nothing 
                               -- fmap (unparseFunc ()) ((contract ^. CC.functions) M.!? term)
                       --Remove all of the items that were found to contain nothing, this should leave just the items that we found
-                      in catMaybes [contrAnno, funcAnno, constAnno, storjAnno, enumAnno]--, eventAnno] -- structAnno]
+                      in catMaybes [contrAnno, funcAnno, constAnno, storjAnno, enumAnno, eventAnno] -- structAnno]
             -- let posit = getPositionFromSourceAnnotation <$> anno
             --     contents = contract ^. CC.functions 
 
