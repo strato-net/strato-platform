@@ -3709,7 +3709,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
-  fit "can get the code for a contract if supplied an empty string" . runTest $ do
+  it "can get the code for a contract if supplied an empty string" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|contract qq{
   string codeTest;
