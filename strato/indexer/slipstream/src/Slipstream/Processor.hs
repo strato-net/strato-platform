@@ -389,7 +389,7 @@ getCodeCollection f cp ccString = do
         Left e ->
           --return $ CodeCollection Map.empty
           return $ Left $ "failed EVM parse: " ++ show e ++ "\n" ++ T.unpack ccString
-        Right v -> return $ Right $ CodeCollection $ f $ snd v
+        Right v -> return $ Right $ (flip CodeCollection) Map.empty $ f $ snd v
     CodeAtAccount _ _ -> return $ Left "Cannot compile or parse code at account"
 
 getEVMInserts :: (

@@ -405,7 +405,8 @@ getVariableOfName name = do
       maybeConstant :: Maybe Variable
       maybeConstant = fmap (t "constant constant" . Constant) $ do
         let ctract = currentContract currentCallInfo
-        CC.ConstantDecl{..} <- M.lookup name $ ctract ^. CC.constants
+        let constMap = (codeCollection currentCallInfo) ^. CC.flConstants
+        CC.ConstantDecl{..} <- M.lookup name $ (ctract ^. CC.constants) `M.union` constMap
         return $ coerceType ctract constType $ case constInitialVal of
                                             CC.NumberLiteral _ x _ -> SInteger x
                                             x -> todo "constant initial val" x
@@ -462,7 +463,7 @@ getVariableOfName name = do
       ]
 
 getTypeOfName' :: SolidString -> CC.CodeCollection -> Typo
-getTypeOfName' s (CC.CodeCollection ccs) =
+getTypeOfName' s (CC.CodeCollection ccs _) =
   let lookInContract :: CC.Contract -> [Typo]
       lookInContract (CC.Contract{..}) = catMaybes
         [ fmap StructTypo (fmap (\(a,b,_) -> (a,b)) <$> M.lookup s _structs)

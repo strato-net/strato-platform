@@ -42,6 +42,7 @@ import           Blockchain.VM.SolidException
 data SourceUnitF a = Pragma a Identifier String
                    | Import a Text.Text
                    | NamedXabi Text.Text (XabiF a, [Text.Text])
+                   | FLConstant Text.Text SolidVM.ConstantDecl
                    | DummySourceUnit
                    deriving (Eq, Show, Generic, Functor)
 
@@ -223,6 +224,33 @@ public keywords =
         (v1:v2:_) -> fail $ printf "multiple visibilities declared: %s vs %s" (show v1) (show v2)
         [KPublic] -> return True
         _ -> return False
+
+
+solidityFLConstant :: SolidityParser SourceUnit
+solidityFLConstant = do
+  start <- getSourcePosition
+  variableType <- simpleTypeExpression
+  -- We have to remember which variables are "public", because they
+  -- generate accessor functions
+  keywords <- many stateVariableKeyword
+  let isConstant = KConstant `elem` keywords
+  isPublic <- public keywords
+  -- check to see if the "account" variable is being used
+  variableName <- identifier
+  pragmaVersion' <- getPragmaVersion
+  when (isReservedWord pragmaVersion' variableName) $ reservedWordError pragmaVersion' variableName
+  value <- optionMaybe $ do
+    reservedOp "="
+    expression
+  end <- getSourcePosition
+  semi
+  let ctx = SourceAnnotation start end ()
+
+  if isConstant
+    then return $ FLConstant (labelToText variableName) (SolidVM.ConstantDecl variableType isPublic (fromMaybe (parseError "constants must be initialized" variableName) value) ctx)
+    else fail "only constants can be declared in the top level"
+
+
 
 
 -- | Parses the declaration part of a variable definition, which is

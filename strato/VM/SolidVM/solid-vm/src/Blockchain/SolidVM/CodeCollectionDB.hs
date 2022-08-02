@@ -46,10 +46,13 @@ import           SolidVM.Solidity.Parse.Declarations
 import           SolidVM.Solidity.Parse.File
 import           SolidVM.Solidity.Parse.ParserTypes
 import           SolidVM.Solidity.StaticAnalysis.Typechecker as TC
+--import           SolidVM.Model.CodeCollection.ConstantDecl
 
 data ParseTypeCheckOrSolidVMError = PEx ParseError
                          | TCEx [SourceAnnotation T.Text]
                          | SVMEx (Positioned ((,) SolidException)) deriving (Show)
+
+data SUnitIntermediary = Con Contract | FLC ConstantDecl
 
 {-# NOINLINE unsafeCodeMapIORef #-}
 unsafeCodeMapIORef :: IORef (Map Keccak256 CodeCollection)
@@ -69,8 +72,8 @@ parseSourceWithAnnotations = withAnnotations . parseSource
 
 compileSourceNoInheritance :: Map T.Text T.Text -> Either ParseTypeCheckOrSolidVMError CodeCollection
 compileSourceNoInheritance initCodeMap = do
-  let getNamedContracts :: T.Text -> T.Text -> Either ParseTypeCheckOrSolidVMError [(SolidString, Contract)]
-      getNamedContracts fileName src = do
+  let getNamedSUnits :: T.Text -> T.Text -> Either ParseTypeCheckOrSolidVMError [(SolidString, SUnitIntermediary)]
+      getNamedSUnits fileName src = do
         sourceUnits <- parseSource fileName src
         let pragmas = \case
               Pragma _ n v -> Just (n, v)
@@ -80,20 +83,30 @@ compileSourceNoInheritance initCodeMap = do
           NamedXabi name (xabi, parents') -> do
             ctrct <- first SVMEx
                    $ xabiToContract (textToLabel name) (map textToLabel parents') vmVersion' xabi
-            pure $ Just (textToLabel name, ctrct)
+            pure $ Just $ (textToLabel name, Con ctrct)
+          FLConstant name cnst' -> do
+            let cnst = cnst'
+            pure $ Just $ (textToLabel name, FLC cnst)
           _ -> pure Nothing
-
+      sUnitSorter :: [(SolidString, SUnitIntermediary)] ->  ([(SolidString, ConstantDecl)], [(SolidString, Contract)])
+      sUnitSorter = foldr (\(name, sUnit) (cs, cs2) -> case sUnit of
+        Con ctrct -> (cs, (name, ctrct):cs2)
+        FLC cnst -> ((name, cnst):cs, cs2)
+        ) ([], [])
       throwDuplicate :: (SolidString, Contract) -> Map SolidString Contract -> Either ParseTypeCheckOrSolidVMError (Map SolidString Contract)
-      throwDuplicate (cName, contract) m = case M.lookup cName m of
-        Nothing -> pure $ M.insert cName contract m
+      throwDuplicate (cName, unit) m = case M.lookup cName m of
+        Nothing -> pure $ M.insert cName unit m
         Just _ ->  Left . PEx
-                 $ newErrorMessage (Message $ "Duplicate contract found: " ++ labelToString cName)
-                                   (fromSourcePosition $ _sourceAnnotationStart $ _contractContext contract)
+                 $ newErrorMessage (Message $ "Duplicate unit found: " ++ labelToString cName)
+                                   (fromSourcePosition $ _sourceAnnotationStart $ _contractContext unit)
 
-  allContracts <- fmap concat . traverse (uncurry getNamedContracts) $ M.toList initCodeMap
-  deduplicatedContracts <- foldrM throwDuplicate M.empty (allContracts :: [(SolidString, Contract)])
+  allSUnits <- fmap concat . traverse (uncurry getNamedSUnits) $ M.toList initCodeMap
+  let (allConstants, allContracts) = sUnitSorter allSUnits
+  deduplicatedContracts <- foldrM throwDuplicate M.empty allContracts
+
   pure $ CodeCollection {
-    _contracts = deduplicatedContracts
+    _contracts = deduplicatedContracts,
+    _flConstants = M.fromList allConstants
   }
 
 hasSvm3_2 :: CodeCollection -> Bool

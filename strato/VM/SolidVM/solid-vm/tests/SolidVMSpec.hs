@@ -4856,3 +4856,18 @@ contract qq{
   }
 }|]
     getFields ["mynum"] `shouldReturn` [BInteger 9]
+
+  it "can declare a constant at the file level and use it" . runTest $ do
+    runBS [r|
+//pragma solidvm 3.3;
+uint constant myconst = 5;
+contract qq{
+  uint mynum = myconst;
+  constructor() public {
+    mynum = myconst;
+  }
+}|]
+    getFields ["mynum"] `shouldReturn` [BInteger 5]
+
+
+
