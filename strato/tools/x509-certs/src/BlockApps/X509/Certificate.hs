@@ -341,7 +341,6 @@ getCertSubjects certs = for (x509ToSigneds certs) $ \cert -> do
                    , subUnit       = extractDn cert DnOrganizationUnit
                    , subCountry    = extractDn cert DnCountry
                    , subPub        = pubKey
-                   --Should exp date be placed here "expirationDate = snd certValidity?" , troy sujested a name change to getCertInfo 
                    }
   where extractDn :: SignedCertificate -> DnElement -> Maybe String
         extractDn cert dn = fmap fromASN1CS . getDnElement dn . certSubjectDN $ getCertificate cert
