@@ -1836,7 +1836,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                           
                     term ->
                     --Search the full contract for the search term, retrieving the sourceAnnotation of the part that was found
-                      -- Check the contractName
+                      -- Check for and get the different parts of the contract
                       let contrAnno = if ((contract ^. CC.contractName) == term) then 
                               let val = foldMap mon contract
                                           where mon sa  = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
@@ -1844,8 +1844,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                               in case val of 
                                 Just (Min (sl, sc), Max(el,ec)) -> Just (sl, sc, el, ec)
                                 Nothing -> Nothing 
-                          else Nothing
-                      -- Check the constants
+                            else Nothing
                           constAnno =                             
                             let mConstf = (contract ^. CC.constants) M.!? term
                                 val = case mConstf of
@@ -1876,7 +1875,6 @@ expToVar' (CC.FunctionCall _ e args) = do
                             in case val of
                                   Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
                                   Nothing -> Nothing
-
                           structAnno = 
                             let mStruct = (contract ^. CC.structs) M.!? term
                                 val = case mStruct of
@@ -1887,9 +1885,6 @@ expToVar' (CC.FunctionCall _ e args) = do
                             in case val of
                                   Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
                                   Nothing -> Nothing
-                      -- -- Check the structs TODO: implement this, will need to change the structs to include a source annotation
-                      -- -- let structAnno = (\(_,_,a) -> a) <$> ((contract ^. CC.structs) M.!? "myFunction")
-                      -- -- Check the events
                           eventAnno =                             
                             let mEvent = (contract ^. CC.events) M.!? term
                                 val = case mEvent of
@@ -1900,12 +1895,6 @@ expToVar' (CC.FunctionCall _ e args) = do
                             in case val of
                                   Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
                                   Nothing -> Nothing
-                            
-                            -- let mEventf = (contract ^. CC.events) M.!? term
-                            --     val = case mEventf of
-                            --       Just eventf -> foldMap mon eventf
-                            --         where mon sa = 
-                      -- Check the functions
                           funcAnno = 
                             let mFuncf = (contract ^. CC.functions) M.!? term
                                 val = case mFuncf of
@@ -1919,24 +1908,6 @@ expToVar' (CC.FunctionCall _ e args) = do
                               -- fmap (unparseFunc ()) ((contract ^. CC.functions) M.!? term)
                       --Remove all of the items that were found to contain nothing, this should leave just the items that we found
                       in catMaybes [contrAnno, funcAnno, constAnno, storjAnno, enumAnno, eventAnno, structAnno]
-            -- let posit = getPositionFromSourceAnnotation <$> anno
-            --     contents = contract ^. CC.functions 
-
-
-                -- bandwidth = drop startLine (take endLine liney)
-
-  --           trimCodeCollection cc sa = unlines final
-  -- where (startLine, startColumn, endLine, endColumn) = getPositionFromSourceAnnotation sa
-  --       bandwidth = drop startLine (take endLine (lines cc))
-  --       trimBack = mapOnLast (take endColumn) bandwidth 
-  --       final = mapOnFirst (drop startColumn) trimBack
-
-            --Check if anything was found with the search
-            -- liftIO $ do
-            --   print ("+++++++++++++++++++++" :: String)
-            --   print posit
-            --   print contents
-            --   print ("+++++++++++++++++++++" :: String)
 
             case anno of 
               [] -> pure . Constant $ SString $ "" --TODO: add warning that nothing was found and the piece of code is redundant
@@ -2031,32 +2002,32 @@ evaluateAccountMember a _ "codehash" = do
     Just (SolidVMCode _ ch') -> return (Constant $ SString . keccak256ToHex $ ch')
     Just cp -> missingCodeCollection "Account is not a SolidVM contract" (format cp)
     Nothing -> missingCodeCollection "Could not resolve code pointer for account" (format realAccount)
--- evaluateAccountMember a _ "code" = do 
---   -- Get the code at the address
---   cid <- case (a ^. namedAccountChainId) of 
---     UnspecifiedChain -> do
---       cid1 <- view accountChainId <$> getCurrentAccount
---       case cid1 of
---         Nothing -> return Nothing
---         Just cid2 -> return $ Just cid2
---     MainChain -> return Nothing
---     ExplicitChain cid -> return $ Just cid
---   let realAccount = namedAccountToAccount cid a
---   -- Retreive and resolve the codehash
---   codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) realAccount
---   resolvedCodeHash <- resolveCodePtr cid codeHash'
---   let ch' = case resolvedCodeHash of
---               Just (SolidVMCode _ ch1') -> ch1' 
---               Just cp -> missingCodeCollection "Account is not a SolidVM contract" (format cp)
---               Nothing -> missingCodeCollection "Could not resolve code pointer for account" (format realAccount)
---   -- Find the code using the codehash
---   cd <- A.lookup (A.Proxy @DBCode) ch'
---   let cd' = case cd of
---               Just (_,bs) -> bs
---               Nothing -> missingCodeCollection "Could not locate SolidVM code collection at account" (format realAccount)
---   let decodeCD = DT.decodeUtf8 cd'
---   -- Format the result  
---   return $ Constant $ SString $ T.unpack decodeCD
+evaluateAccountMember a _ "code" = do 
+  -- Get the code at the address
+  cid <- case (a ^. namedAccountChainId) of 
+    UnspecifiedChain -> do
+      cid1 <- view accountChainId <$> getCurrentAccount
+      case cid1 of
+        Nothing -> return Nothing
+        Just cid2 -> return $ Just cid2
+    MainChain -> return Nothing
+    ExplicitChain cid -> return $ Just cid
+  let realAccount = namedAccountToAccount cid a
+  -- Retreive and resolve the codehash
+  codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) realAccount
+  resolvedCodeHash <- resolveCodePtr cid codeHash'
+  let ch' = case resolvedCodeHash of
+              Just (SolidVMCode _ ch1') -> ch1' 
+              Just cp -> missingCodeCollection "Account is not a SolidVM contract" (format cp)
+              Nothing -> missingCodeCollection "Could not resolve code pointer for account" (format realAccount)
+  -- Find the code using the codehash
+  cd <- A.lookup (A.Proxy @DBCode) ch'
+  let cd' = case cd of
+              Just (_,bs) -> bs
+              Nothing -> missingCodeCollection "Could not locate SolidVM code collection at account" (format realAccount)
+  let decodeCD = TE.decodeUtf8 cd'
+  -- Format the result  
+  return $ Constant $ SString $ T.unpack decodeCD
 evaluateAccountMember a _ "balance" = do 
   cid <- case (a ^. namedAccountChainId) of 
     UnspecifiedChain -> do

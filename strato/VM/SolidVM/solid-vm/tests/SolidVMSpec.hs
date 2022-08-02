@@ -3683,7 +3683,7 @@ contract qq{
       [ BString $ BC.pack $  keccak256ToHex $ hash $ UTF8.fromString contract 
       , BString "657f5687fe89bd0bd3cee84e83c306c65458c0b13d13991087f9a7330474f2d8" ]
 
-  fit "can get events from the '.code' function" . runTest $ do
+  it "can get events from the '.code' function" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|event x(uint v);|]
         contract :: String
@@ -3699,22 +3699,15 @@ contract qq{
   event x(uint v);
   constructor() public {
     emit x(13);
-    codeTest = account(this).code("x");
+    codeTest = account(this).searchcode("x");
   }
 }|]
     runBS contract
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
-  fit "can get the code from an address without adding anything to function 'code' body" . runTest $ do
-    let codeSnippet :: String
-        codeSnippet = [r|contract qq{
-  string codeTest;
-  constructor() public {
-    codeTest = account(this).code;
-  }
-}|]
-        contract :: String
+  fit "can get an error if nothing is supplied to the code search" . runTest $ do
+    let contract :: String
         contract = [r|
 pragma solidvm 3.2;
 contract Test {
@@ -3725,7 +3718,7 @@ pragma solidvm 3.2;
 contract qq{
   string codeTest;
   constructor() public {
-    codeTest = account(this).code();
+    codeTest = account(this).searchcode();
   }
 }|]
     runBS contract
@@ -3737,7 +3730,7 @@ contract qq{
         codeSnippet = [r|contract qq{
   string codeTest;
   constructor() public {
-    codeTest = account(this).code("");
+    codeTest = account(this).searchcode("");
   }
 }|]
         contract :: String
@@ -3751,7 +3744,7 @@ pragma solidvm 3.2;
 contract qq{
   string codeTest;
   constructor() public {
-    codeTest = account(this).code("");
+    codeTest = account(this).searchcode("");
   }
 }|]
     runBS contract
@@ -3781,7 +3774,7 @@ contract qq {
     return uint(defaultChoice);
   }
   constructor() public {
-    codeTest = account(this).code("FreshJuiceSize");
+    codeTest = account(this).searchcode("FreshJuiceSize");
   }
 }|]
     runBS contract
@@ -3804,7 +3797,7 @@ contract qq{
   string codeTest;
   uint public testVar = 13*56-3+8/158*8*555*65+65-65-65+59/65-8;
   constructor() public {
-    codeTest = account(this).code("testVar");
+    codeTest = account(this).searchcode("testVar");
     testVar = 5;
   }
 }|]
@@ -3829,7 +3822,7 @@ contract qq{
   uint constant public testConst = 13*56-3+8/158*8*555*65+65-65-65+59/65-8;
   uint testVar;
   constructor() public {
-    codeTest = account(this).code("testConst");
+    codeTest = account(this).searchcode("testConst");
     testVar = testConst;
   }
 }|]
@@ -3839,7 +3832,14 @@ contract qq{
 
   fit "can get the current contract code without supplying anything to the code" . runTest $ do
     let codeSnippet :: String
-        codeSnippet = [r|contract qq{
+        codeSnippet = [r|
+pragma solidvm 3.2;
+contract Test {
+  constructor(){}
+}
+
+pragma solidvm 3.2;
+contract qq{
   string codeTest;
   constructor() public {
     codeTest = account(this).code;
@@ -3876,7 +3876,7 @@ contract qq{
   string codeTest;
   constructor() public {
     Test t = new Test();
-    codeTest = account(t).code("nothing");
+    codeTest = account(t).searchcode("nothing");
   }
 }|]
     runBS contract
@@ -3889,7 +3889,7 @@ contract qq{
   string codeTest;
   constructor() public {
     Test t = new Test();
-    codeTest = account(this).code("qq");
+    codeTest = account(this).searchcode("qq");
   }
 }|]
         collection :: String
@@ -3904,7 +3904,7 @@ contract qq{
   string codeTest;
   constructor() public {
     Test t = new Test();
-    codeTest = account(this).code("qq");
+    codeTest = account(this).searchcode("qq");
   }
 }|]
     runBS collection
@@ -3951,7 +3951,7 @@ contract qq{
   string codeTest;
   constructor() public {
     Test t = new Test();
-    codeTest = account(t).code("");
+    codeTest = account(t).searchcode("");
   }
 
   function myFunction() public returns (uint) {
@@ -3973,7 +3973,7 @@ contract qq{
   string codeTest;
   constructor() public {
     Test t = new Test();
-    codeTest = account(t).code("one", "two");
+    codeTest = account(t).searchcode("one", "two");
   }
 
   function myFunction() public returns (uint) {
