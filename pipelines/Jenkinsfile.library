@@ -505,9 +505,9 @@ def runMonitor(nodeData, nodeConfig) {
         docker-compose up -d"""
     writeFile file:"run.sh", text: """${runCommand}"""
 
-
+    def initialNodes
     if(nodeConfig == 'upgrade8Nodes') {
-      def initialNodes = """
+      initialNodes = """
           module.exports = [
             {
               ip: '3.81.197.53:8080',
@@ -624,7 +624,7 @@ def runMonitor(nodeData, nodeConfig) {
           ];"""     
 
     } else if (nodeConfig == 'nodeChainUpgrade') {
-      def initialNodes = """
+      initialNodes = """
           module.exports = [
             {
               ip: '3.81.197.53:8080',
@@ -698,7 +698,7 @@ def runMonitor(nodeData, nodeConfig) {
             }
           ];"""     
     } else if (nodeConfig == 'removedChainUpgrade') {
-      def initialNodes = """
+      initialNodes = """
           module.exports = [
             {
               ip: '3.81.197.53:8080',
@@ -758,7 +758,7 @@ def runMonitor(nodeData, nodeConfig) {
             }
           ];"""     
     } else if (nodeConfig == 'networkSynctoDevnet') {
-      def initialNodes = """
+      initialNodes = """
           module.exports = [
             {
               ip: '54.243.143.176:8080',
@@ -832,7 +832,7 @@ def runMonitor(nodeData, nodeConfig) {
             },
           ];"""
     } else {
-      def initialNodes = """
+      initialNodes = """
           module.exports = [
             {
               ip: '54.243.143.176:8080',
@@ -864,7 +864,7 @@ def runMonitor(nodeData, nodeConfig) {
             }
           ];"""
     }
-    writeFile file:"backend/config/initial-nodes.js", text: "${initialNodes}"
+    writeFile file:"backend/config/initial-nodes.js", text: """${initialNodes}"""
 
     sh "cp ~/letsencrypt-ssl/server.pem ssl/certs/"
     sh "cp ~/letsencrypt-ssl/server.key ssl/private/"
