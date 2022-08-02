@@ -866,9 +866,12 @@ def runMonitor(nodeData, nodeConfig) {
     }
     writeFile file:"backend/config/initial-nodes.js", text: """${initialNodes}"""
 
-    sh "cp ~/letsencrypt-ssl/server.pem ssl/certs/"
-    sh "cp ~/letsencrypt-ssl/server.key ssl/private/"
-    sh 'sudo bash run.sh'
+    dir("monitor") {
+      sh "cp ~/letsencrypt-ssl/server.pem ssl/certs/"
+      sh "cp ~/letsencrypt-ssl/server.key ssl/private/"
+      sh 'sudo bash run.sh'
+    }
+
   }
 }
 
