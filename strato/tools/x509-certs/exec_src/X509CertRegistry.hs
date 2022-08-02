@@ -212,7 +212,6 @@ contract Certificate {
         publicKey = parsedCert["publicKey"];
         certificateString = parsedCert["certString"];
         isValid = true;
-        expirationDate = stringToUint(parsedCert["expirationDate"]);
         parent = address(parsedCert["parent"]);
         children = [];
     }

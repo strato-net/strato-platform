@@ -25,7 +25,6 @@ module BlockApps.X509.Certificate (
   makeSignedCert,
   getCertSubject,
   getCertSubjects,
-  getCertValidity,
   getCertIssuer,
   getCertIssuers,
   getParentUserAddress,
@@ -350,14 +349,6 @@ getCertSubjects certs = for (x509ToSigneds certs) $ \cert -> do
   where extractDn :: SignedCertificate -> DnElement -> Maybe String
         extractDn cert dn = fmap fromASN1CS . getDnElement dn . certSubjectDN $ getCertificate cert
 
-
-getCertValidity :: X509Certificate -> (DateTime, DateTime)
-getCertValidity (X509Certificate (CertificateChain (c:_)))= certValidity cert
-  where (Signed cert _ _) = getSigned c 
-getCertValidity (X509Certificate (_))= error "Cannot get the validity period of an empty certificate" 
-
---To write this function we need to convert our X509Certificate into a Certificate to use the certValidity function?
--- using c :: SignedExact Certificate ? location of this function? only mentioned in this file?
 
 getCertIssuer :: X509Certificate -> Maybe Issuer
 getCertIssuer cert = listToMaybe =<< getCertIssuers cert
