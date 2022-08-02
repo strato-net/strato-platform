@@ -1867,9 +1867,20 @@ expToVar' (CC.FunctionCall _ e args) = do
                                   Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
                                   Nothing -> Nothing
                           enumAnno =                             
-                            let mEnum = snd  <$> ((contract ^. CC.enums) M.!? term)
+                            let mEnum = snd <$> ((contract ^. CC.enums) M.!? term)
                                 val = case mEnum of
                                   Just enumf -> mon enumf
+                                    where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
+                                                   in Just (Min (sl, sc), Max (el, ec))
+                                  Nothing -> Nothing
+                            in case val of
+                                  Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
+                                  Nothing -> Nothing
+
+                          structAnno = 
+                            let mStruct = (contract ^. CC.structs) M.!? term
+                                val = case mStruct of
+                                  Just structf -> foldMap mon ((\(_,_,s) -> s)  <$> structf)
                                     where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
                                                    in Just (Min (sl, sc), Max (el, ec))
                                   Nothing -> Nothing
@@ -1894,7 +1905,6 @@ expToVar' (CC.FunctionCall _ e args) = do
                             --     val = case mEventf of
                             --       Just eventf -> foldMap mon eventf
                             --         where mon sa = 
-                            
                       -- Check the functions
                           funcAnno = 
                             let mFuncf = (contract ^. CC.functions) M.!? term
@@ -1908,7 +1918,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                                   Nothing -> Nothing 
                               -- fmap (unparseFunc ()) ((contract ^. CC.functions) M.!? term)
                       --Remove all of the items that were found to contain nothing, this should leave just the items that we found
-                      in catMaybes [contrAnno, funcAnno, constAnno, storjAnno, enumAnno, eventAnno] -- structAnno]
+                      in catMaybes [contrAnno, funcAnno, constAnno, storjAnno, enumAnno, eventAnno, structAnno]
             -- let posit = getPositionFromSourceAnnotation <$> anno
             --     contents = contract ^. CC.functions 
 
