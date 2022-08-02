@@ -55,8 +55,8 @@ spec = do
       cert <- makeCert date iss sub
       let (_,b) = certValidity cert
       b `shouldBe` fromMaybe (error "Date in makeCert didn't return properly") date
-    it "makeCert bad dateTime" $ do
-      exprDate <- snd . certValidity <$> makeCert (timeParse ISO8601_Date "2020-18-50") iss sub
+    it "makeCert defaults to one year" $ do
+      exprDate <- snd . certValidity <$> makeCert Nothing iss sub
       oneYearFromNow <- snd <$> liftIO getValidity
       dtDate exprDate `shouldBe` dtDate oneYearFromNow
     it "can do JSON encoding roundtrips" $ do
