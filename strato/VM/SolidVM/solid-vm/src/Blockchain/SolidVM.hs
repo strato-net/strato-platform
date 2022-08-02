@@ -28,7 +28,7 @@ import           Control.Exception                    (throw)
 import           Control.Lens hiding (assign, from, to, Context)
 import           Control.Applicative
 import           Control.Monad
-import           Control.Monad.Extra                  (fromMaybeM)
+import           Control.Monad.Extra                  (fromMaybeM, findM)
 import qualified Control.Monad.Change.Alter           as A
 import qualified Control.Monad.Change.Modify          as Mod
 import           Control.Monad.IO.Class
@@ -1910,7 +1910,6 @@ expToVar' (CC.FunctionCall _ e args) = do
             OrderedVals vs -> Constant <$> callBuiltin name vs o
             NamedVals{} -> invalidArguments (printf "expToVar'/builtinfunction: cannot used namedvals with builtin %s" name) argVals
 
-
           Constant (SFunction funcName func) -> do
             ro <- readOnly <$> getCurrentCallInfo
             contract' <- getCurrentContract
@@ -1921,34 +1920,47 @@ expToVar' (CC.FunctionCall _ e args) = do
                 res <- runTheCall address contract' funcName hsh cc func argVals ro
                 return . Constant . fromMaybe SNULL $ res
               else do
-                let matchingFuncOverload = filter checkArgToFunc $ CC.funcOverload func
+                matchingFuncOverload <- findM findOverload $ CC.funcOverload func
                 -- when (True) (internalError "IT'S MORBIN TIME" matchingFuncOverload)
                 res <- case matchingFuncOverload of
-                        [] -> runTheCall address contract' funcName hsh cc func argVals ro
-                        _ -> runTheCall address contract' funcName hsh cc (head matchingFuncOverload) argVals ro
+                        Nothing -> runTheCall address contract' funcName hsh cc func argVals ro
+                        Just mo -> runTheCall address contract' funcName hsh cc mo argVals ro
                 return . Constant . fromMaybe SNULL $ res
             where
-              compareArgNameAndTypes :: [(Maybe SolidString, Value, Maybe SolidString, CC.IndexedType)] -> Bool
-              compareArgNameAndTypes argPairs = all (== True) $ fmap testNameAndTypes argPairs
-                where
-                  testNameAndTypes :: (Maybe SolidString, Value, Maybe SolidString, CC.IndexedType) -> Bool
-                  testNameAndTypes (n1, v1, n2, t) = 
-                    if (n1 == n2) 
-                      then do
-                        case (v1, (CC.indexedTypeType t)) of
-                          (SInteger _, SVMType.Int _ _) -> True
-                          (SString _, SVMType.String _) -> True
-                          (SString _, SVMType.Bytes _ _) -> True
-                          (SBool _, SVMType.Bool) -> True
-                          (SAccount _ _, SVMType.Address _) -> True
-                          (SAccount _ _, SVMType.Account _) -> True
-                          (SEnumVal _ _ _, SVMType.UnknownLabel _ _) -> True
-                          (SStruct _ _, SVMType.UnknownLabel _ _) -> True
-                          (SContract _ _, SVMType.UnknownLabel _ _) -> True
-                          (SArray _ _, SVMType.Array _ _) -> True
-                          (SMap _ _, SVMType.Mapping _ _ _) -> True
-                          _ -> False
-                      else False
+              findOverload :: MonadSM m => CC.Func -> m Bool
+              findOverload tf = do
+                let argPairing = generateArgPairs $ CC.funcArgs tf
+                    argPairLength = length $ mapArgs tf
+                doArgsMatch <- mapM testNameAndTypes argPairing
+                pure $ ((argPairLength) == (length $ CC.funcArgs tf)) 
+                           && ((argPairLength) == (argCount))
+                           && (all (== True) doArgsMatch)
+              testNameAndTypes :: MonadSM m => (Maybe SolidString, Value, Maybe SolidString, CC.IndexedType) -> m Bool
+              testNameAndTypes (n1, v1, n2, t) = 
+                if (n1 == n2) 
+                  then do
+                    -- These cases might not be all inclusive of all valid combinations.
+                    case (v1, (CC.indexedTypeType t)) of
+                      (SInteger _, SVMType.Int _ _) -> pure $ True
+                      (SString _, SVMType.String _) -> pure $ True
+                      (SString _, SVMType.Bytes _ _) -> pure $ True
+                      (SBool _, SVMType.Bool) -> pure $ True
+                      (SAccount _ _, SVMType.Address _) -> pure $ True
+                      (SAccount _ _, SVMType.Account _) -> pure $ True
+                      (SStruct _ _, SVMType.UnknownLabel _ _) -> pure $ True
+                      (SContract x _, SVMType.UnknownLabel y _) -> pure $ x == y
+                      (SArray x _, SVMType.Array y _) -> pure $ x == y
+                      (SReference addressedPath, _) -> do
+                        refType <- getXabiValueType addressedPath
+                        if (refType == (CC.indexedTypeType t))
+                          then pure $ True
+                          else 
+                            case (refType, (CC.indexedTypeType t)) of
+                              (SVMType.UnknownLabel x _, SVMType.UnknownLabel y _) -> pure $ x == y
+                              (SVMType.Array x _, SVMType.Array y _) -> pure $ x == y 
+                              _ -> pure $ False
+                      _ -> pure $ False
+                  else pure $ False
               generateArgPairs :: [(Maybe SolidString, CC.IndexedType)] -> [(Maybe SolidString, Value, Maybe SolidString, CC.IndexedType)]
               generateArgPairs functionArgs = case argVals of
                   OrderedVals ov -> concatMap (\(v1, (Just n, t)) -> [(Just n, v1, Just n, t)]) (zip ov functionArgs)
@@ -1972,14 +1984,6 @@ expToVar' (CC.FunctionCall _ e args) = do
                                 . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
                                 $ M.toList typeAndVal
                   in sortedArgs
-              checkArgToFunc :: CC.FuncF a -> Bool
-              checkArgToFunc tf = ((argPairLength) == (length $ CC.funcArgs tf)) 
-                                  && ((argPairLength) == (argCount))
-                                  && (compareArgNameAndTypes argPairing)
-                                  where
-                                    argPairing = generateArgPairs $ CC.funcArgs tf
-                                    -- argPairLength is a one to one mapping of input args to function args
-                                    argPairLength = length $ mapArgs tf
 
           Constant (SStructDef structName) -> do
             contract' <- getCurrentContract
