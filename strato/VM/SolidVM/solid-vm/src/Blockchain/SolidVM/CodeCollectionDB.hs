@@ -100,9 +100,15 @@ compileSourceNoInheritance initCodeMap = do
       throwDuplicateFunction :: (SolidString, Func) -> Map SolidString Func -> Either ParseTypeCheckOrSolidVMError (Map SolidString Func)
       throwDuplicateFunction (fname, func) m = case M.lookup fname m of
         Nothing -> pure $ M.insert fname func m 
-        Just _ -> Left . PEx
-                  $ newErrorMessage (Message $ "Duplicate function found: " ++ labelToString fname)
-                                    (fromSourcePosition $ _sourceAnnotationStart $ funcContext func)
+        Just fdec -> do
+          let oldParamTypes = fmap snd $ funcArgs fdec
+              newParamTypes = fmap snd $ funcArgs func
+              overloadParamTypes = concatMap (\x -> [fmap snd $ funcArgs x]) $ funcOverload fdec
+          if ((oldParamTypes == newParamTypes) || (newParamTypes `elem` overloadParamTypes))
+            then Left . PEx $ newErrorMessage (Message $ "Free function could not be overloaded: " ++ labelToString fname)
+                                              (fromSourcePosition $ _sourceAnnotationStart $ funcContext func)
+            else do
+              pure $ M.insert fname (fdec{funcOverload = funcOverload fdec ++ [func]}) m
                                            
   allContracts <- fmap concat . traverse (uncurry getNamedContracts) $ M.toList initCodeMap
   deduplicatedContracts <- foldrM throwDuplicate M.empty (allContracts :: [(SolidString, Contract)])

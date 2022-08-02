@@ -1002,7 +1002,7 @@ getVarTypeByName' name ctx = do
                     Just Func{..} ->
                       let fArgs = flip Product ctx $ flip Static ctx . indexedTypeType . snd <$> funcArgs
                           fRets = flip Product ctx $ flip Static ctx . indexedTypeType . snd <$> funcVals
-                      in Function fArgs fRets ctx
+                      in Function fArgs fRets ctx $ fmap buildOverloads funcOverload
                     Nothing -> bottom $ ("Unknown variable: " <> labelToText name) <$ ctx
             
   where lookupVar m Nothing = M.lookup name m
