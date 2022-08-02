@@ -27,8 +27,7 @@ module BlockApps.X509.Certificate (
   getCertSubjects,
   getCertIssuer,
   getCertIssuers,
-  getParentUserAddress,
-  dateTimeToString
+  getParentUserAddress
  ) where
 
 
@@ -66,7 +65,7 @@ import           Data.PEM
 import qualified Data.Text                      as T
 import           Data.X509
 import           Data.Traversable
-import           Data.Hourglass
+import           Time.Types
 import           Time.System
 import qualified Text.Colors       as CL
 import           Text.Format
@@ -319,9 +318,6 @@ getValidity = do
       endDate = DateTime dt{dateYear=(dateYear dt) + 1} tm -- all certs are valid for a year
   return (curDate, endDate)
 
-dateTimeToString :: DateTime -> String
-dateTimeToString = show . timeGetElapsed 
-
 getParentUserAddress :: X509Certificate -> Maybe Address
 getParentUserAddress (X509Certificate (CertificateChain (_:c2:_))) = fmap (fromPublicKey . subPub) (getCertSubject (X509Certificate (CertificateChain [c2])))
 getParentUserAddress _ = Nothing
@@ -345,6 +341,7 @@ getCertSubjects certs = for (x509ToSigneds certs) $ \cert -> do
                    , subUnit       = extractDn cert DnOrganizationUnit
                    , subCountry    = extractDn cert DnCountry
                    , subPub        = pubKey
+                   --Should exp date be placed here "expirationDate = snd certValidity?" , troy sujested a name change to getCertInfo 
                    }
   where extractDn :: SignedCertificate -> DnElement -> Maybe String
         extractDn cert dn = fmap fromASN1CS . getDnElement dn . certSubjectDN $ getCertificate cert

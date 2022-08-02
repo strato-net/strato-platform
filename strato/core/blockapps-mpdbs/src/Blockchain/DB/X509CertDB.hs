@@ -31,8 +31,6 @@ module Blockchain.DB.X509CertDB (
   , x509CertDBPut
   , x509CertDBGet
   , getParentUserAddress
-  , getCertValidity
-  , dateTimeToString
   ) where
 
 

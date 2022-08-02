@@ -120,8 +120,12 @@ import           SolidVM.Solidity.Parse.ParserTypes
 import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpression)
 
 import           UnliftIO                             hiding (assert)
+<<<<<<< HEAD
 
 
+=======
+ 
+>>>>>>> parent of 48422b555... Finished adding the expiration date field to smart contracts
 -- | Copying from Data.List.Extra, since our version of the extra library seems to not contain it.
 -- | A total variant of the list index function `(!!)`.
 --
