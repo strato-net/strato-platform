@@ -1828,7 +1828,14 @@ expToVar' (CC.FunctionCall _ e args) = do
                     term ->
                     --Search the full contract for the search term, retrieving the sourceAnnotation of the part that was found
                       -- Check the contractName
-                      let contrAnno = if ((contract ^. CC.contractName) == term) then  Just (getPositionFromSourceAnnotation (contract ^. CC.contractContext)) else Nothing
+                      let contrAnno = if ((contract ^. CC.contractName) == term) then 
+                              let val = foldMap mon contract
+                                          where mon sa  = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
+                                                          in Just (Min (sl, sc), Max(el,ec))
+                              in case val of 
+                                Just (Min (sl, sc), Max(el,ec)) -> Just (sl, sc, el, ec)
+                                Nothing -> Nothing 
+                          else Nothing
                       -- Check the constants
                       --     constAnno = fmap (^. CC.constContext) ((contract ^. CC.constants) M.!? term)
                       -- -- Check the storageDefs
@@ -1878,9 +1885,11 @@ expToVar' (CC.FunctionCall _ e args) = do
             --   print ("+++++++++++++++++++++" :: String)
 
             case anno of 
-              [] -> pure . Constant $ SString $ "ghgh" --TODO: add warning that nothing was found and the piece of code is redundant
+              [] -> pure . Constant $ SString $ "" --TODO: add warning that nothing was found and the piece of code is redundant
               -- Return the position of the found item
               [a] -> let trim = trimCodeCollection (BC.unpack cd') a
+                         --The unparser adds a ending curly brace to the end of the code, which is refelctected here.
+                         --TODO: Add a final '}' to the end of a function if it is missing. Contracts do not need this
                          result = trim
                      in pure . Constant $ SString (result)
               as -> case searchTerms of

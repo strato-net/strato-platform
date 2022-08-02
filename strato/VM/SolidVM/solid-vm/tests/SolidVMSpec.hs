@@ -3683,8 +3683,15 @@ contract qq{
       [ BString $ BC.pack $  keccak256ToHex $ hash $ UTF8.fromString contract 
       , BString "657f5687fe89bd0bd3cee84e83c306c65458c0b13d13991087f9a7330474f2d8" ]
 
-  fit "can get the code from an address without adding anything to the function code" . runTest $ do
-    let contract :: String
+  fit "can get the code from an address without adding anything to function 'code' body" . runTest $ do
+    let codeSnippet :: String
+        codeSnippet = [r|contract qq{
+  string codeTest;
+  constructor() public {
+    codeTest = account(this).code;
+  }
+}|]
+        contract :: String
         contract = [r|
 pragma solidvm 3.2;
 contract Test {
@@ -3695,17 +3702,28 @@ pragma solidvm 3.2;
 contract qq{
   string codeTest;
   constructor() public {
-    Test t = new Test();
-    codeTest = account(t).code;
+    codeTest = account(this).code();
   }
 }|]
     runBS contract
     getFields ["codeTest"] `shouldReturn`
-      [ BString $ UTF8.fromString contract]
+      [ BString $ UTF8.fromString codeSnippet]
 
   fit "can get the current contract code without supplying anything to the code" . runTest $ do
-    let contract :: String
+    let codeSnippet :: String
+        codeSnippet = [r|contract qq{
+  string codeTest;
+  constructor() public {
+    codeTest = account(this).code;
+  }
+}|]
+        contract :: String
         contract = [r|
+pragma solidvm 3.2;
+contract Test {
+  constructor(){}
+}
+
 pragma solidvm 3.2;
 contract qq{
   string codeTest;
@@ -3715,29 +3733,9 @@ contract qq{
 }|]
     runBS contract
     getFields ["codeTest"] `shouldReturn`
-      [ BString $ UTF8.fromString contract]
+      [ BString $ UTF8.fromString codeSnippet]
 
-  fit "can get just the contract from an address with nothing in the function" . runTest $ do
-    let contract :: String
-        contract = [r|
-pragma solidvm 3.2;
-contract Test {
-  constructor(){}
-}
-
-pragma solidvm 3.2;
-contract qq{
-  string codeTest;
-  constructor() public {
-    Test t = new Test();
-    codeTest = account(t).code();
-  }
-}|]
-    runBS contract
-    getFields ["codeTest"] `shouldReturn`
-      [ BString $ UTF8.fromString contract]
-
-  fit "Can throw an error if nothing is found in the code collection" . runTest $ do
+  it "Code won't return anything if the thing is not in the file" . runTest $ do
     let contract :: String
         contract = [r|
 pragma solidvm 3.2;
@@ -3757,14 +3755,13 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BDefault ]
 
-  fit "Can get the contract if supplied to the item" . runTest $ do
+  fit "Can search for the contract in a given file using the search procedure" . runTest $ do
     let contractqq :: String
-        contractqq = [r| 
-        contract qq{
+        contractqq = [r|contract qq{
   string codeTest;
   constructor() public {
     Test t = new Test();
-    codeTest = account(t).code("qq");
+    codeTest = account(this).code("qq");
   }
 }|]
         collection :: String
@@ -3779,14 +3776,14 @@ contract qq{
   string codeTest;
   constructor() public {
     Test t = new Test();
-    codeTest = account(t).code("qq");
+    codeTest = account(this).code("qq");
   }
 }|]
     runBS collection
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString contractqq]
 
-  fit "Can find a function within a codeCollection" . runTest $ do
+  it "Can find a function within a codeCollection" . runTest $ do
     let myFunxion :: String
         myFunxion = [r|function myFunction() public returns (uint) {
     uint x = 13;
@@ -3794,24 +3791,14 @@ contract qq{
     uint z = x + y;
     uint w = z + 13;
     uint u = w + 13;
-    return u;}|]
+    return u;
+}|]
         contract :: String
         contract = [r|
 pragma solidvm 3.2;
 contract Test {
   constructor(){}
 }
-
-pragma solidvm 3.2;
-contract qq{
-  string codeTest;
-  constructor() public {
-    Test t = new Test();
-    codeTest = account(this).code("myFunction");
-  }
-
-  function myFunction() public returns (uint) {
-    uint x = 13;
     uint y = 13;
     uint z = x + y;
     uint w = z + 13;
@@ -3847,7 +3834,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString contract]
 
-  fit "Can throw an error if more than one item is given to the code member function." $ (runTest (runBS [r|
+  it "Can throw an error if more than one item is given to the code member function." $ (runTest (runBS [r|
 pragma solidvm 3.2;
 contract Test {
   constructor(){}
