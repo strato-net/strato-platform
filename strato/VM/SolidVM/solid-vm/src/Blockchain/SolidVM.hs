@@ -1856,7 +1856,16 @@ expToVar' (CC.FunctionCall _ e args) = do
                             in case val of
                                   Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
                                   Nothing -> Nothing
-
+                          storjAnno =                             
+                            let mStorj = (contract ^. CC.storageDefs) M.!? term
+                                val = case mStorj of
+                                  Just storjf -> foldMap mon storjf
+                                    where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
+                                                   in Just (Min (sl, sc), Max (el, ec))
+                                  Nothing -> Nothing
+                            in case val of
+                                  Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
+                                  Nothing -> Nothing
                       -- -- Check the storageDefs
                       --     storjAnno = fmap (^. CC.varContext) ((contract ^. CC.storageDefs) M.!? term)
                       -- -- Check the enums
@@ -1883,7 +1892,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                                   Nothing -> Nothing 
                               -- fmap (unparseFunc ()) ((contract ^. CC.functions) M.!? term)
                       --Remove all of the items that were found to contain nothing, this should leave just the items that we found
-                      in catMaybes [contrAnno, funcAnno, constAnno]--, storjAnno, enumAnno, eventAnno] -- structAnno]
+                      in catMaybes [contrAnno, funcAnno, constAnno, storjAnno]--, enumAnno, eventAnno] -- structAnno]
             -- let posit = getPositionFromSourceAnnotation <$> anno
             --     contents = contract ^. CC.functions 
 
