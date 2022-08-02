@@ -1143,6 +1143,14 @@ tcExpr (Binary x "<<" a b) =
   intType' x ~> tcExpr a <~> tcExpr b
 tcExpr (Binary x ">>" a b) =
   intType' x ~> tcExpr a <~> tcExpr b
+tcExpr (Binary x ">>>" a b) =
+  intType' x ~> tcExpr a <~> tcExpr b
+tcExpr (Binary x ">>>=" a b) =
+  intType' x ~> tcExpr a <~> tcExpr b
+tcExpr (Binary x ">>=" a b) =
+  intType' x ~> tcExpr a <~> tcExpr b
+tcExpr (Binary x "<<=" a b) =
+  intType' x ~> tcExpr a <~> tcExpr b
 tcExpr (Binary x "+=" a b) =
   sumType' (intType' x) (stringType' x)  ~> (checkIfImmuteOperationValid a) <~> tcExpr b
 tcExpr (Binary x "-=" a b) =

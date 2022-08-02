@@ -27,7 +27,8 @@ module BlockApps.X509.Certificate (
   getCertSubjects,
   getCertIssuer,
   getCertIssuers,
-  getParentUserAddress
+  getParentUserAddress,
+  getValidity
  ) where
 
 
@@ -89,7 +90,7 @@ instance NFData X509Certificate where
 
 instance Binary X509Certificate where
   put = (put :: C8.ByteString -> Put) <$> certToBytes
-  get = (fromRight (error "The certificate couldn't be decoded") . bsToCert) <$> (get :: Get C8.ByteString)   
+  get = (fromRight (error "The certificate couldn't be decoded") . bsToCert) <$> (get :: Get C8.ByteString)
 
 -- | The information we store in Redis DB. We store the information of the certificate, as well
 -- as the two state values `isValid` and `children`. We keep `userAddress` around for convenience,
@@ -232,20 +233,25 @@ bsToCert bs =
 
 
 
-makeSignedCert :: (MonadIO m, HasVault m) => Maybe X509Certificate -> Issuer -> Subject -> m (X509Certificate)
-makeSignedCert parentCert iss sub = makeCert iss sub >>= signCert >>= return . X509Certificate . CertificateChain . (:(join . maybeToList $ x509ToSigneds <$> parentCert))
+makeSignedCert :: (MonadIO m, HasVault m) => Maybe DateTime -> Maybe X509Certificate -> Issuer -> Subject -> m (X509Certificate)
+makeSignedCert mDateTime parentCert iss sub = makeCert mDateTime iss sub >>= signCert >>= return . X509Certificate . CertificateChain . (:(join . maybeToList $ x509ToSigneds <$> parentCert))
 
 
 signCert :: (MonadIO m, HasVault m) => Certificate -> m (SignedCertificate)
 signCert cert = objectToSignedExactF (ecdsaWithSHA256) cert
 
-makeCert :: MonadIO m => Issuer -> Subject -> m (Certificate)
-makeCert iss sub = do
+makeCert :: MonadIO m => Maybe DateTime -> Issuer -> Subject -> m (Certificate)
+makeCert mDateTime iss sub = do
   serial' <- liftIO $ getEntropy 16
   let fromBytes = B.foldl' (\a b -> a `shiftL` 8 .|. fromIntegral b) 0
       serial = fromBytes serial'
 
-  validity <- liftIO getValidity
+  validity <- case mDateTime of
+    Nothing -> liftIO getValidity
+    Just dateTime -> do
+      (DateTime dt tm') <- liftIO dateCurrent
+      let curDate@(DateTime _ _) = DateTime dt tm'{todNSec = 0}
+      return (curDate, dateTime)
 
 
   return Certificate {
@@ -379,7 +385,7 @@ verifyCert :: PublicKey -> X509Certificate -> Bool
 verifyCert pkey (X509Certificate (CertificateChain cs)) = verifyCertChain pkey cs
 
 verifyCertSignedBy :: PublicKey -> X509Certificate -> Bool
-verifyCertSignedBy pkey (X509Certificate (CertificateChain (c:_))) = 
+verifyCertSignedBy pkey (X509Certificate (CertificateChain (c:_))) =
   let signed = getSigned c
       mesgBS = B.pack $ BA.unpack $ hashWith CH.SHA256 (getSignedData c)
   in
