@@ -56,6 +56,7 @@ executables:
       - strato-model
       - transformers
       - x509-certs
+      - hourglass
   
   x509-keygen:
     source-dirs: exec_src/
@@ -109,3 +110,4 @@ tests:
       - hspec
       - strato-model
       - transformers
+      - hourglass
