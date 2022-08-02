@@ -70,7 +70,7 @@ solidityContract = do
   declarations <-
     braces (many solidityDeclaration)
 
-  let allFunctions = Map.fromListWithKey parseOverloads [ (stringToLabel n, f) | (n, FuncDeclaration f) <- declarations]
+  let allFunctions = Map.fromListWith parseOverloads [ (stringToLabel n, f) | (n, FuncDeclaration f) <- declarations]
   let ctorList = [(stringToLabel n, c) | (n, ConstructorDeclaration c) <- declarations]
   let events = [(stringToLabel n, e) | (n, EventDeclaration e) <- declarations]
   let using = [(Text.pack n, u) | (n, UsingDeclaration u) <- declarations]
@@ -97,16 +97,15 @@ solidityContract = do
         map (Text.pack . fst) baseConstrs
       )
   where
-    parseOverloads _ new old = do
-      let oldParamTypes = fmap getVarType $ SolidVM.funcArgs old
-          newParamTypes = fmap getVarType $ SolidVM.funcArgs new
-      if (oldParamTypes == newParamTypes)
-        then invalidArguments ("Function is already defined with similar params.") $ SolidVM.funcArgs old
+    parseOverloads :: SolidVM.Func -> SolidVM.Func -> SolidVM.Func
+    parseOverloads new old = do
+      let oldParamTypes = fmap snd $ SolidVM.funcArgs old
+          newParamTypes = fmap snd $ SolidVM.funcArgs new
+          overloadParamTypes = concatMap (\x -> [fmap snd $ SolidVM.funcArgs x]) $ SolidVM.funcOverload old
+      if ((oldParamTypes == newParamTypes) || (newParamTypes `elem` overloadParamTypes))
+        then invalidArguments ("Function is already defined with similar params.") $ SolidVM.funcArgs new
         else
           old{SolidVM.funcOverload = SolidVM.funcOverload old ++ [new]}
-      where
-        getVarType argDec = case argDec of
-          (_, vt) -> vt
 
 
 --  where -- constants = byMutability True (repeat 0)
@@ -147,6 +146,7 @@ solidityFreeFunction = do
     , SolidVM.funcConstructorCalls = SolidVM.funcConstructorCalls func
     , SolidVM.funcModifiers = SolidVM.funcModifiers func
     , SolidVM.funcContext = SolidVM.funcContext func
+    , SolidVM.funcOverload = SolidVM.funcOverload func
     }
 
 data Declaration =

@@ -4847,53 +4847,6 @@ contract qq {
 }|]
     getFields ["myNum", "otherNum", "errorCount"] `shouldReturn` [BInteger 3, BInteger 12, BInteger 1]
 
-  it "can use free functions" . runTest $ do
-    runBS [r|
-pragma solidvm 3.2;
-
-function sum(uint[] memory arr) pure returns (uint s) {
-  for (uint i = 0; i < arr.length; i++) {
-    s += arr[i];
-  }
-}
-
-contract qq{
-  uint myNum;
-  uint[] myArr = [1,2,3];
-  constructor() public {
-    myNum = sum(myArr);
-  }
-}|]
-    getFields ["myNum"] `shouldReturn` [BInteger 6]
-
-  it "can overload free functions" . runTest $ do
-    runBS [r|
-pragma solidvm 3.2;
-
-function sum(uint[] memory arr) pure returns (uint s) {
-  for (uint i = 0; i < arr.length; i++) {
-    s += arr[i];
-  }
-}
-
-function sum(string[] memory arr) pure returns (string s) {
-  s = "";
-  for (uint i = 0; i < arr.length; i++) {
-    s += arr[i];
-  }
-}
-
-contract qq{
-  uint myNum;
-  string myString;
-  uint[] myArr = [1,2,3];
-  string[] otherArr = ["hello", " ", "world"];
-  constructor() public {
-    myNum = sum(myArr);
-    myString = sum(otherArr);
-  }
-}|]
-    getFields ["myNum", "myString"] `shouldReturn` [BInteger 6, BString "hello world"]
   it "allows overloading functions with different number of parameters" . runTest $ do
     runBS [r|
 pragma solidvm 3.3;
@@ -5009,3 +4962,72 @@ contract qq{
   }
 }|]
     getFields ["mynum"] `shouldReturn` [BInteger 9]
+
+  it "can use free functions" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+
+function sum(uint[] memory arr) pure returns (uint s) {
+  for (uint i = 0; i < arr.length; i++) {
+    s += arr[i];
+  }
+}
+
+contract qq{
+  uint myNum;
+  uint[] myArr = [1,2,3];
+  constructor() public {
+    myNum = sum(myArr);
+  }
+}|]
+    getFields ["myNum"] `shouldReturn` [BInteger 6]
+
+  it "can overload free functions" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+
+function sum(uint[] memory arr) pure returns (uint s) {
+  for (uint i = 0; i < arr.length; i++) {
+    s += arr[i];
+  }
+}
+
+function sum(uint a, uint b) pure returns (uint c) {
+  c = a + b;
+}
+
+contract qq{
+  uint myNum;
+  uint otherNum;
+  uint[] myArr = [1,2,3];
+  constructor() public {
+    myNum = sum(myArr);
+    otherNum = sum(4, 5);
+  }
+}|]
+    getFields ["myNum", "otherNum"] `shouldReturn` [BInteger 6, BInteger 9]
+
+  it "cannot overload free functions with same types and same number of parameters" $ runTest (do
+    runBS [r|
+pragma solidvm 3.3;
+
+function sum(uint[] memory arr) pure returns (uint s) {
+  for (uint i = 0; i < arr.length; i++) {
+    s += arr[i];
+  }
+}
+
+function sum(uint[] memory arr) pure returns (uint s) {
+  for (uint i = 0; i < arr.length; i++) {
+    s += arr[i];
+  }
+}
+
+contract qq{
+  uint myNum;
+  uint[] myArr = [1,2,3];
+  constructor() public {
+    myNum = sum(myArr);
+  }
+}|]) `shouldThrow` anyParseError
+    
