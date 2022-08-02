@@ -1943,7 +1943,7 @@ contract qq {
     x = hex'AF32';
   }
 }|]
-    getFields ["x"] `shouldReturn` [BString "AF32"]
+    getFields ["x"] `shouldReturn` [BString "\194\175\&2"]
   
   it "can use hexadecimal string literals double quotes" . runTest $ do
     runBS [r|
@@ -1951,10 +1951,10 @@ pragma solidvm 3.3;
 contract qq {
   string x;
   constructor() public {
-    x = hex"AF32";
+    x = hex"68656c6c6f";
   }
 }|]
-    getFields ["x"] `shouldReturn` [BString "AF32"]
+    getFields ["x"] `shouldReturn` [BString "hello"]
 
   it "should not allow an odd amount in a string literal" $ runTest (do
     runCall "func" "()" [r|
@@ -1965,6 +1965,17 @@ contract qq {
   }
 }|]) `shouldThrow` anyParseError
 
+
+  it "parser can accept variable names without consuming hex" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  string hexString;
+  constructor() public {
+    hexString = hex"1234";
+  }
+}|]
+    getFields ["hexString"] `shouldReturn` [BString "\DC24"]
 
   it "can return and used named returns" . runTest $ do
     runBS [r|

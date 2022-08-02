@@ -363,7 +363,7 @@ primaryExpression = do
     <|> (uncurry StringLiteral <$> withPosition stringLiteral)
 
 myHexParser :: SolidityParser Expression
-myHexParser = do
+myHexParser = try $ do
   ~(a,val) <- withPosition $ do
     reservedOp "hex"
     val' <- (between (symbol "\'") (symbol "\'") $ many1 hexDigit)  <|>  (between (symbol "\"") (symbol "\"") $ many1 hexDigit)               --make this work with double quotes as well
