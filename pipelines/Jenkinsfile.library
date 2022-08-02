@@ -963,7 +963,7 @@ def waitForVoteListValidators(total_votes) {
     sh '''
     set -x
     counter=0
-    until [ $counter -eq $total_votes ]; do
+    until [ $counter -eq ${total_votes} ]; do
       voteList=$(sudo docker exec -i strato_strato_1 bash -c "tail -n 100 logs/strato-sequencer | grep showctx/validators | tail -n 1 | cut -d '|' -f 4 ")
       counter=$(echo "$voteList" | jq ". | length")
       echo $counter
