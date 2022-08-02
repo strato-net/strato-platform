@@ -6,6 +6,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE DeriveFoldable    #-}
+{-# LANGUAGE DeriveTraversable #-}
+
 
 module SolidVM.Model.CodeCollection.ConstantDecl (
   ConstantDeclF(..),
@@ -30,7 +33,7 @@ data ConstantDeclF a = ConstantDecl
   , _constIsPublic   :: Bool
   , _constInitialVal :: (ExpressionF a)
   , _constContext    :: a
-  } deriving (Show, Eq, Generic, Functor)
+  } deriving (Show, Eq, Generic, Functor, Foldable, Traversable)
 
 makeLenses ''ConstantDeclF
 

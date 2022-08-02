@@ -1,6 +1,8 @@
 {-# LANGUAGE DeriveFunctor     #-}
 {-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE DeriveFoldable    #-}
+{-# LANGUAGE DeriveTraversable #-}
 
 module SolidVM.Model.CodeCollection.Event
   (
@@ -27,7 +29,7 @@ data EventF a = Event
   { _eventAnonymous :: Bool
   , _eventLogs :: [(Text, SolidVM.IndexedType)]
   , _eventContext :: a
-  } deriving (Eq,Show,Generic, Functor)
+  } deriving (Eq,Show,Generic, Functor, Foldable, Traversable)
 makeLenses ''EventF
 
 type Event = Positioned EventF

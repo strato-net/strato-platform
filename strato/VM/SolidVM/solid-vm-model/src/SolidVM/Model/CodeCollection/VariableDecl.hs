@@ -5,7 +5,9 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE DeriveFoldable    #-}
+{-# LANGUAGE DeriveTraversable #-}
 
 module SolidVM.Model.CodeCollection.VariableDecl (
   VariableDeclF(..),
@@ -30,7 +32,7 @@ data VariableDeclF a = VariableDecl
   , _varIsPublic   :: Bool
   , _varInitialVal :: Maybe (ExpressionF a)
   , _varContext    :: a
-  } deriving (Show, Eq, Generic, Functor)
+  } deriving (Show, Eq, Generic, Functor, Foldable, Traversable)
 makeLenses ''VariableDeclF
 
 instance ToJSON a => ToJSON (VariableDeclF a)
