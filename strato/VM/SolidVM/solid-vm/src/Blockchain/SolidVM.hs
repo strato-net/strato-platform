@@ -1846,7 +1846,17 @@ expToVar' (CC.FunctionCall _ e args) = do
                                 Nothing -> Nothing 
                           else Nothing
                       -- Check the constants
-                      --     constAnno = fmap (^. CC.constContext) ((contract ^. CC.constants) M.!? term)
+                          constAnno =                             
+                            let mConstf = (contract ^. CC.constants) M.!? term
+                                val = case mConstf of
+                                  Just constf -> foldMap mon constf
+                                    where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
+                                                   in Just (Min (sl, sc), Max (el, ec))
+                                  Nothing -> Nothing
+                            in case val of
+                                  Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
+                                  Nothing -> Nothing
+
                       -- -- Check the storageDefs
                       --     storjAnno = fmap (^. CC.varContext) ((contract ^. CC.storageDefs) M.!? term)
                       -- -- Check the enums
@@ -1873,7 +1883,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                                   Nothing -> Nothing 
                               -- fmap (unparseFunc ()) ((contract ^. CC.functions) M.!? term)
                       --Remove all of the items that were found to contain nothing, this should leave just the items that we found
-                      in catMaybes [contrAnno, funcAnno] --, constAnno, storjAnno, enumAnno, eventAnno] -- structAnno]
+                      in catMaybes [contrAnno, funcAnno, constAnno]--, storjAnno, enumAnno, eventAnno] -- structAnno]
             -- let posit = getPositionFromSourceAnnotation <$> anno
             --     contents = contract ^. CC.functions 
 
