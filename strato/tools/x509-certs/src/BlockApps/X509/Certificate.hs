@@ -25,9 +25,11 @@ module BlockApps.X509.Certificate (
   makeSignedCert,
   getCertSubject,
   getCertSubjects,
+  getCertValidity,
   getCertIssuer,
   getCertIssuers,
   getParentUserAddress,
+  dateTimeToString,
   getValidity
  ) where
 
@@ -66,7 +68,7 @@ import           Data.PEM
 import qualified Data.Text                      as T
 import           Data.X509
 import           Data.Traversable
-import           Time.Types
+import           Data.Hourglass
 import           Time.System
 import qualified Text.Colors       as CL
 import           Text.Format
@@ -324,6 +326,9 @@ getValidity = do
       endDate = DateTime dt{dateYear=(dateYear dt) + 1} tm -- all certs are valid for a year
   return (curDate, endDate)
 
+dateTimeToString :: DateTime -> String
+dateTimeToString = show . timeGetElapsed 
+
 getParentUserAddress :: X509Certificate -> Maybe Address
 getParentUserAddress (X509Certificate (CertificateChain (_:c2:_))) = fmap (fromPublicKey . subPub) (getCertSubject (X509Certificate (CertificateChain [c2])))
 getParentUserAddress _ = Nothing
@@ -351,6 +356,14 @@ getCertSubjects certs = for (x509ToSigneds certs) $ \cert -> do
   where extractDn :: SignedCertificate -> DnElement -> Maybe String
         extractDn cert dn = fmap fromASN1CS . getDnElement dn . certSubjectDN $ getCertificate cert
 
+
+getCertValidity :: X509Certificate -> (DateTime, DateTime)
+getCertValidity (X509Certificate (CertificateChain (c:_)))= certValidity cert
+  where (Signed cert _ _) = getSigned c 
+getCertValidity (X509Certificate (_))= error "Cannot get the validity period of an empty certificate" 
+
+--To write this function we need to convert our X509Certificate into a Certificate to use the certValidity function?
+-- using c :: SignedExact Certificate ? location of this function? only mentioned in this file?
 
 getCertIssuer :: X509Certificate -> Maybe Issuer
 getCertIssuer cert = listToMaybe =<< getCertIssuers cert
