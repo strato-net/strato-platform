@@ -149,7 +149,7 @@ expressionHelper (Binary y "+=" (Variable x name) b) = do
   ann <- stateVarWriteHelper name (x <> y)
   bs <- expressionHelper b
   pure $ concat [ann, bs]
-expressionHelper (Binary y "-=" (Variable x name) b) = do
+expressionHelper (Binary y "-=" (Variable x name) b) = do 
   ann <- stateVarWriteHelper name (x <> y)
   bs <- expressionHelper b
   pure $ concat [ann, bs]
@@ -166,6 +166,18 @@ expressionHelper (Binary y "%=" (Variable x name) b) = do
   bs <- expressionHelper b
   pure $ concat [ann, bs]
 expressionHelper (Binary y "|=" (Variable x name) b) = do
+  ann <- stateVarWriteHelper name (x <> y)
+  bs <- expressionHelper b
+  pure $ concat [ann, bs]
+expressionHelper (Binary y ">>>=" (Variable x name) b) = do
+  ann <- stateVarWriteHelper name (x <> y)
+  bs <- expressionHelper b
+  pure $ concat [ann, bs]
+expressionHelper (Binary y ">>=" (Variable x name) b) = do
+  ann <- stateVarWriteHelper name (x <> y)
+  bs <- expressionHelper b
+  pure $ concat [ann, bs]
+expressionHelper (Binary y "<<=" (Variable x name) b) = do
   ann <- stateVarWriteHelper name (x <> y)
   bs <- expressionHelper b
   pure $ concat [ann, bs]
