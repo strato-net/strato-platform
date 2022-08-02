@@ -3709,6 +3709,32 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
+  fit "can get the code for a contract if supplied an empty string" . runTest $ do
+    let codeSnippet :: String
+        codeSnippet = [r|contract qq{
+  string codeTest;
+  constructor() public {
+    codeTest = account(this).code;
+  }
+}|]
+        contract :: String
+        contract = [r|
+pragma solidvm 3.2;
+contract Test {
+  constructor(){}
+}
+
+pragma solidvm 3.2;
+contract qq{
+  string codeTest;
+  constructor() public {
+    codeTest = account(this).code("");
+  }
+}|]
+    runBS contract
+    getFields ["codeTest"] `shouldReturn`
+      [ BString $ UTF8.fromString codeSnippet]
+
   fit "can get the current contract code without supplying anything to the code" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|contract qq{
@@ -3755,7 +3781,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BDefault ]
 
-  fit "Can search for the contract in a given file using the search procedure" . runTest $ do
+  it "Can search for the contract in a given file using the search procedure" . runTest $ do
     let contractqq :: String
         contractqq = [r|contract qq{
   string codeTest;

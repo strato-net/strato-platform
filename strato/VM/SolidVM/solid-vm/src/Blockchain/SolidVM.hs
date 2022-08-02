@@ -1824,7 +1824,16 @@ expToVar' (CC.FunctionCall _ e args) = do
                 anno = 
                   case (fromMaybe "" searchTerms) of 
                     --get the location of just the code of the contract, if nothing is inputted in the contract then focus on just the contract itself
-                    "" -> [getPositionFromSourceAnnotation (contract ^. CC.contractContext)]
+                    "" -> let val = foldMap mon contract
+                                          where mon sa  = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
+                                                          in (Min (sl, sc), Max(el, ec))
+                              -- tup = case val of
+                              --         Just (Min (sl, sc), Max(el,ec)) -> Just (sl, sc, el, ec)
+                              --         Nothing -> Nothing  
+                              (Min (slt, sct), Max(elt, ect)) = val
+                              (startLine, startCol, endLine, endCol) = (slt, sct, elt, ect)
+                          in [(startLine, startCol, endLine, endCol)]
+                          
                     term ->
                     --Search the full contract for the search term, retrieving the sourceAnnotation of the part that was found
                       -- Check the contractName
