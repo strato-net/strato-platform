@@ -5032,7 +5032,7 @@ contract qq{
 }|]) `shouldThrow` anyParseError
     
   
-  fit "should bitshift assign" . runTest $ do
+  it "should bitshift assign" . runTest $ do
     runBS [r|
 pragma solidvm 3.3;
 contract qq {
@@ -5048,7 +5048,7 @@ contract qq {
 }|]
     getFields ["haskell", "solidty", "solid"] `shouldReturn` [BInteger 4, BInteger 1, BInteger (-2)]
 
-  fit "can unsigned bit shift" . runTest $ do
+  it "can unsigned bit shift" . runTest $ do
     runBS [r|
 pragma solidvm 3.3;
 contract qq {
