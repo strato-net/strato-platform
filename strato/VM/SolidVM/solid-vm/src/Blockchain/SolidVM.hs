@@ -23,6 +23,7 @@ module Blockchain.SolidVM
   , create
   ) where
 
+
 import           Control.DeepSeq                      (force)
 import           Control.Exception                    (throw)
 import           Control.Lens hiding (assign, from, to, Context)
@@ -119,6 +120,7 @@ import           SolidVM.Solidity.Parse.Lexer         (stringLiteral)
 import           SolidVM.Solidity.Parse.ParserTypes
 import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpression)
 
+import           Network.Haskoin.Crypto.BigWord()
 import           UnliftIO                             hiding (assert)
  
 -- | Copying from Data.List.Extra, since our version of the extra library seems to not contain it.
@@ -1485,6 +1487,9 @@ expToVar' (CC.Binary _ "%=" lhs rhs) = binopAssign rem lhs rhs
 expToVar' (CC.Binary _ "|=" lhs rhs) = binopAssign (.|.) lhs rhs
 expToVar' (CC.Binary _ "&=" lhs rhs) = binopAssign (.&.) lhs rhs
 expToVar' (CC.Binary _ "^=" lhs rhs) = binopAssign xor lhs rhs
+expToVar' (CC.Binary _ ">>=" lhs rhs)= binopAssign (\x i -> x `shiftR` fromInteger i) lhs rhs
+expToVar' (CC.Binary _ "<<=" lhs rhs)= binopAssign (\x i -> x `shiftL` fromInteger i) lhs rhs
+expToVar' (CC.Binary _ ">>>=" lhs rhs)= binopAssign (\x i -> fromInteger ( toInteger ( (fromInteger x) ::Word256) ) `shiftR` fromInteger i ) lhs rhs
 
 expToVar' (CC.MemberAccess _ (CC.Variable _ "Util") "bytes32ToString") = do
   return $ Constant $ SHexDecodeAndTrim
@@ -1707,6 +1712,7 @@ expToVar' (CC.Binary _ "^" expr1 expr2) = expToVarInteger expr1 xor expr2 SInteg
 expToVar' (CC.Binary _ "**" expr1 expr2) = expToVarInteger expr1 (^) expr2 SInteger
 expToVar' (CC.Binary _ "<<" expr1 expr2) = expToVarInteger expr1 (\x i -> x `shift` fromInteger i) expr2 SInteger
 expToVar' (CC.Binary _ ">>" expr1 expr2) = expToVarInteger expr1 (\x i -> x `shiftR` fromInteger i) expr2 SInteger
+expToVar' (CC.Binary _ ">>>" expr1 expr2) = expToVarInteger expr1 (\x i -> fromInteger ( toInteger ( (fromInteger x) ::Word256) ) `shiftR` fromInteger i ) expr2 SInteger
 
 expToVar' (CC.Unitary _ "!" expr) = do
   (Constant . SBool . not) <$> (getBool =<< expToVar expr)

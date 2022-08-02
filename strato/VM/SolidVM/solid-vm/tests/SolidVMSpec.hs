@@ -5007,3 +5007,36 @@ contract qq{
   }
 }|]
     getFields ["mynum"] `shouldReturn` [BInteger 9]
+  
+  fit "should bitshift assign" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  int solidty = 3;  //  00000000000000000000000000000101
+  int haskell = 1; //  00000000000000000000000000000010
+  int solid = -5; //  11111111111111111111111111111011
+  constructor() {
+    solid >>= 2;
+    solidty >>= 1;
+    haskell <<= 2;
+
+  }
+}|]
+    getFields ["haskell", "solidty", "solid"] `shouldReturn` [BInteger 4, BInteger 1, BInteger (-2)]
+
+  fit "can unsigned bit shift" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  int result1 = 0;
+  int result2 = 0;
+  int result3 = -2;
+  int result4 = 24; 
+  constructor() {
+    result1 += -2 >>> 254;
+    result2 += 12 >>> 1;
+    result3 >>>= 255;
+    result4 >>>= 1; 
+  }
+}|]
+    getFields ["result1", "result2", "result3", "result4"] `shouldReturn` [BInteger 3, BInteger 6, BInteger 1, BInteger 12]
