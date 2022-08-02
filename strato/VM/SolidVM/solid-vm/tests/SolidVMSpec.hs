@@ -3683,6 +3683,29 @@ contract qq{
       [ BString $ BC.pack $  keccak256ToHex $ hash $ UTF8.fromString contract 
       , BString "657f5687fe89bd0bd3cee84e83c306c65458c0b13d13991087f9a7330474f2d8" ]
 
+  fit "can get events from the '.code' function" . runTest $ do
+    let codeSnippet :: String
+        codeSnippet = [r|event x(uint v);|]
+        contract :: String
+        contract = [r|
+pragma solidvm 3.2;
+contract Test {
+  constructor(){}
+}
+
+pragma solidvm 3.2;
+contract qq{
+  string codeTest;
+  event x(uint v);
+  constructor() public {
+    emit x(13);
+    codeTest = account(this).code("x");
+  }
+}|]
+    runBS contract
+    getFields ["codeTest"] `shouldReturn`
+      [ BString $ UTF8.fromString codeSnippet]
+
   fit "can get the code from an address without adding anything to function 'code' body" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|contract qq{
