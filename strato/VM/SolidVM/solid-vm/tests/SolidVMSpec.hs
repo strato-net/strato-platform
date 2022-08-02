@@ -3735,6 +3735,29 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
+  fit "can search for a constant and get its initial code." . runTest $ do
+    let codeSnippet :: String
+        codeSnippet = [r|uint constant public testConst = 13*56-3+8/158*8*555*65+65-65-65+59/65-8;
+|]
+        contract :: String
+        contract = [r|
+pragma solidvm 3.2;
+contract Test {
+  constructor(){}
+}
+
+pragma solidvm 3.2;
+contract qq{
+  string codeTest;
+  uint constant public testConst = 13*56-3+8/158*8*555*65+65-65-65+59/65-8;
+  constructor() public {
+    codeTest = account(this).code("testConst");
+  }
+}|]
+    runBS contract
+    getFields ["codeTest"] `shouldReturn`
+      [ BString $ UTF8.fromString codeSnippet]
+
   fit "can get the current contract code without supplying anything to the code" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|contract qq{
