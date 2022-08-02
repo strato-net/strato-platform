@@ -2,6 +2,7 @@ name: solid-vm
 
 dependencies:
   - base
+  - blockapps-haskoin
 
 library:
   source-dirs: src/
