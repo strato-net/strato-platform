@@ -3714,7 +3714,7 @@ contract qq{
         codeSnippet = [r|contract qq{
   string codeTest;
   constructor() public {
-    codeTest = account(this).code;
+    codeTest = account(this).code("");
   }
 }|]
         contract :: String
