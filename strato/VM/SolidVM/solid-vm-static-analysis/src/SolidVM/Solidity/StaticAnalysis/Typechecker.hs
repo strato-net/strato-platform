@@ -549,7 +549,8 @@ typecheckMember (Static (SVMType.Account True ) x) "transfer" = pure $ Function 
 typecheckMember (Static (SVMType.Account True ) x) "send" = pure $ Function (Static (SVMType.Int Nothing Nothing) x) (Static (SVMType.Bool) x) x
 typecheckMember (Static (SVMType.Account _) x) "searchcode" = pure $ Function (Static (SVMType.String Nothing) x) (Static (SVMType.String Nothing) x) x
 typecheckMember (Static (SVMType.Account _) x) "balance" = pure $ Static (SVMType.Int Nothing Nothing) x
-typecheckMember (Static (SVMType.Account _) x) "code" = pure $ Static (SVMType.Bytes Nothing Nothing) x
+typecheckMember (Static (SVMType.Contract _) x) "code" = pure $ Product [Static (SVMType.Bytes Nothing Nothing) x,
+                                                                         Function (Static (SVMType.String Nothing) x) (Static (SVMType.String Nothing) x) x] x
 typecheckMember (Static (SVMType.Account _) x) "codehash" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.Account _) x) "chainId" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Struct _ struct) x) n = do
@@ -564,8 +565,9 @@ typecheckMember (Static (SVMType.Struct _ struct) x) n = do
       ]) <$ x
 -- I'm intentionally leaving out send and transfer for Contract types, since we don't have a payable flag for them yet
 typecheckMember (Static (SVMType.Contract _) x) "balance" = pure $ Static (SVMType.Int Nothing Nothing) x
-typecheckMember (Static (SVMType.Contract _) x) "code" = pure $ Static (SVMType.Bytes Nothing Nothing) x
-typecheckMember (Static (SVMType.Contract _) x) "searchcode" = pure $ Function (Static (SVMType.String Nothing) x) (Static (SVMType.String Nothing) x) x
+typecheckMember (Static (SVMType.Contract _) x) "code" = pure $ Product [Static (SVMType.Bytes Nothing Nothing) x,
+                                                                         Function (Static (SVMType.String Nothing) x) (Static (SVMType.String Nothing) x) x] x
+-- typecheckMember (Static (SVMType.Contract _) x) "searchcode" = pure $ Function (Static (SVMType.String Nothing) x) (Static (SVMType.String Nothing) x) x
 typecheckMember (Static (SVMType.Contract _) x) "codehash" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.Contract _) x) "chainId" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Contract c) x) n = lookupContractFunction x c n

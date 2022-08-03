@@ -3699,38 +3699,38 @@ contract qq{
   event x(uint v);
   constructor() public {
     emit x(13);
-    codeTest = account(this).searchcode("x");
+    codeTest = account(this).code("x");
   }
 }|]
     runBS contract
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
-  fit "can get an error if nothing is supplied to the code search" . runTest $ do
-    let contract :: String
-        contract = [r|
-pragma solidvm 3.2;
-contract Test {
-  constructor(){}
-}
+--   fit "can get an error if nothing is supplied to the code search" . runTest $ do
+--     let contract :: String
+--         contract = [r|
+-- pragma solidvm 3.2;
+-- contract Test {
+--   constructor(){}
+-- }
 
-pragma solidvm 3.2;
-contract qq{
-  string codeTest;
-  constructor() public {
-    codeTest = account(this).searchcode();
-  }
-}|]
-    runBS contract
-    getFields ["codeTest"] `shouldReturn`
-      [ BString $ UTF8.fromString codeSnippet]
+-- pragma solidvm 3.2;
+-- contract qq{
+--   string codeTest;
+--   constructor() public {
+--     codeTest = account(this).code();
+--   }
+-- }|]
+--     runBS contract
+--     getFields ["codeTest"] `shouldReturn`
+--       [ BString $ UTF8.fromString codeSnippet]
 
   it "can get the code for a contract if supplied an empty string" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|contract qq{
   string codeTest;
   constructor() public {
-    codeTest = account(this).searchcode("");
+    codeTest = account(this).code("");
   }
 }|]
         contract :: String
@@ -3744,7 +3744,7 @@ pragma solidvm 3.2;
 contract qq{
   string codeTest;
   constructor() public {
-    codeTest = account(this).searchcode("");
+    codeTest = account(this).code("");
   }
 }|]
     runBS contract
@@ -3774,7 +3774,7 @@ contract qq {
     return uint(defaultChoice);
   }
   constructor() public {
-    codeTest = account(this).searchcode("FreshJuiceSize");
+    codeTest = account(this).code("FreshJuiceSize");
   }
 }|]
     runBS contract
@@ -3797,7 +3797,7 @@ contract qq{
   string codeTest;
   uint public testVar = 13*56-3+8/158*8*555*65+65-65-65+59/65-8;
   constructor() public {
-    codeTest = account(this).searchcode("testVar");
+    codeTest = account(this).code("testVar");
     testVar = 5;
   }
 }|]
@@ -3807,7 +3807,7 @@ contract qq{
 
   it "can search for a constant and get its initial code." . runTest $ do
     let codeSnippet :: String
-        codeSnippet = [r|uint constant public testConst = 13*56-3+8/158*8*555*65+65-65-65+59/65-8;
+        codeSnippet = [r|uint constant public testConst = 136546546541654654324765441651684354646468435468;
 |]
         contract :: String
         contract = [r|
@@ -3819,10 +3819,10 @@ contract Test {
 pragma solidvm 3.2;
 contract qq{
   string codeTest;
-  uint constant public testConst = 13*56-3+8/158*8*555*65+65-65-65+59/65-8;
+  uint constant public testConst = 136546546541654654324765441651684354646468435468;
   uint testVar;
   constructor() public {
-    codeTest = account(this).searchcode("testConst");
+    codeTest = account(this).code("testConst");
     testVar = testConst;
   }
 }|]
@@ -3830,7 +3830,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
-  fit "can get the current contract code without supplying anything to the code" . runTest $ do
+  it "can get the current contract code without supplying anything to the code" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|
 pragma solidvm 3.2;
@@ -3876,7 +3876,7 @@ contract qq{
   string codeTest;
   constructor() public {
     Test t = new Test();
-    codeTest = account(t).searchcode("nothing");
+    codeTest = account(t).code("nothing");
   }
 }|]
     runBS contract
@@ -3889,7 +3889,7 @@ contract qq{
   string codeTest;
   constructor() public {
     Test t = new Test();
-    codeTest = account(this).searchcode("qq");
+    codeTest = account(this).code("qq");
   }
 }|]
         collection :: String
@@ -3904,7 +3904,7 @@ contract qq{
   string codeTest;
   constructor() public {
     Test t = new Test();
-    codeTest = account(this).searchcode("qq");
+    codeTest = account(this).code("qq");
   }
 }|]
     runBS collection
@@ -3924,9 +3924,14 @@ contract qq{
         contract :: String
         contract = [r|
 pragma solidvm 3.2;
-contract Test {
-  constructor(){}
-}
+contract qq {
+  string codeTest;
+  constructor(){
+    codeTest = account(this).code("myFunction");
+  }
+
+  function myFunction() public returns (uint) {
+    uint x = 13;
     uint y = 13;
     uint z = x + y;
     uint w = z + 13;
@@ -3939,7 +3944,11 @@ contract Test {
       [ BString $ UTF8.fromString myFunxion]
 
   it "Can get just the contract if empty string is fed to the code function." . runTest $ do
-    let contract :: String
+    let codeSnippet :: String
+        codeSnippet = [r|contract Test {
+  constructor(){}
+}|]
+        contract :: String
         contract = [r|
 pragma solidvm 3.2;
 contract Test {
@@ -3951,7 +3960,7 @@ contract qq{
   string codeTest;
   constructor() public {
     Test t = new Test();
-    codeTest = account(t).searchcode("");
+    codeTest = account(t).code("");
   }
 
   function myFunction() public returns (uint) {
@@ -3960,7 +3969,7 @@ contract qq{
 }|]
     runBS contract
     getFields ["codeTest"] `shouldReturn`
-      [ BString $ UTF8.fromString contract]
+      [ BString $ UTF8.fromString codeSnippet]
 
   it "Can throw an error if more than one item is given to the code member function." $ (runTest (runBS [r|
 pragma solidvm 3.2;
@@ -3973,7 +3982,7 @@ contract qq{
   string codeTest;
   constructor() public {
     Test t = new Test();
-    codeTest = account(t).searchcode("one", "two");
+    codeTest = account(t).code("one", "two");
   }
 
   function myFunction() public returns (uint) {
