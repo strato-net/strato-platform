@@ -4859,7 +4859,7 @@ contract qq{
 
   it "can declare a constant at the file level and use it" . runTest $ do
     runBS [r|
-//pragma solidvm 3.3;
+pragma solidvm 3.3;
 uint constant myconst = 5;
 contract qq{
   uint mynum = myconst;
@@ -4871,3 +4871,44 @@ contract qq{
 
 
 
+  it "can declare enums at the file level" . runTest $ do
+    runCall "a" "()" [r|
+pragma solidvm 3.3;
+enum Color { red, green, blue }
+contract A {
+    function value() public returns (uint) {
+        return 0xa;
+    }
+}
+
+enum Letter { a, b, c }
+contract B {
+    function value() public returns (uint) {
+        return 0xb;
+    }
+}
+contract qq {
+  function a() public returns (Letter) {
+    return Letter.c;
+  }
+}
+
+|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 2)
+
+  it "can declare structs at the file level" . runTest $ do
+    runCall "a" "()" [r|
+pragma solidvm 3.3;
+
+struct Point {
+  uint x;
+  uint y;
+}
+
+contract qq {
+  function a() public returns (uint) {
+    Point p;
+    p.x = 1;
+    p.y = 2;
+    return p.x;
+  }
+}|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 1)

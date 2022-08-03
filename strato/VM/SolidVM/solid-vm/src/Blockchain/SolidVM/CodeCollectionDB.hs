@@ -39,6 +39,7 @@ import           Blockchain.SolidVM.Exception         hiding (assert)
 import           Blockchain.SolidVM.Metrics
 import           Blockchain.Strato.Model.Keccak256
 
+import qualified SolidVM.Model.CodeCollection.Def as Def
 import           SolidVM.CodeCollectionTools
 import           SolidVM.Model.CodeCollection
 import           SolidVM.Model.SolidString
@@ -52,7 +53,7 @@ data ParseTypeCheckOrSolidVMError = PEx ParseError
                          | TCEx [SourceAnnotation T.Text]
                          | SVMEx (Positioned ((,) SolidException)) deriving (Show)
 
-data SUnitIntermediary = Con Contract | FLC ConstantDecl
+data SUnitIntermediary = Con Contract | FLC ConstantDecl | FLS Def.Def | FLE Def.Def
 
 {-# NOINLINE unsafeCodeMapIORef #-}
 unsafeCodeMapIORef :: IORef (Map Keccak256 CodeCollection)
@@ -84,15 +85,22 @@ compileSourceNoInheritance initCodeMap = do
             ctrct <- first SVMEx
                    $ xabiToContract (textToLabel name) (map textToLabel parents') vmVersion' xabi
             pure $ Just $ (textToLabel name, Con ctrct)
-          FLConstant name cnst' -> do
-            let cnst = cnst'
+          FLConstant name cnst -> do
             pure $ Just $ (textToLabel name, FLC cnst)
+          FLStruct name fls -> do
+            pure $ Just $ (textToLabel name, FLS fls)
+          FLEnum name fle -> do
+            pure $ Just $ (textToLabel name, FLE fle)
           _ -> pure Nothing
-      sUnitSorter :: [(SolidString, SUnitIntermediary)] ->  ([(SolidString, ConstantDecl)], [(SolidString, Contract)])
-      sUnitSorter = foldr (\(name, sUnit) (cs, cs2) -> case sUnit of
-        Con ctrct -> (cs, (name, ctrct):cs2)
-        FLC cnst -> ((name, cnst):cs, cs2)
-        ) ([], [])
+--      sUnitSorter :: [(SolidString, SUnitIntermediary)] ->  ([(SolidString, ConstantDecl)], [(SolidString, Contract)], [(SolidString, ([SolidString], a))], [(SolidString, [(SolidString, FieldType, a)])])
+      sUnitSorter = foldr (\(name, sUnit) (cs, cs2, cs3, cs4) -> case sUnit of
+        Con ctrct -> (cs, (name, ctrct):cs2, cs3, cs4)
+        FLC cnst -> ((name, cnst):cs, cs2, cs3, cs4)
+        FLE (Def.Enum vals _ a) -> (cs, cs2, (name, (vals, a)):cs3, cs4)
+        FLS (Def.Struct vals _ a) -> (cs, cs2, cs3, (name, (\(k,v) -> (k,v,a)) <$> vals):cs4) --conversion to match struct form
+        FLE y -> parseError "FLE non Enum should be impossible"   (show y)
+        FLS x -> parseError "FLS non Struct should be impossible" (show x)
+        ) ([], [], [], [])
       throwDuplicate :: (SolidString, Contract) -> Map SolidString Contract -> Either ParseTypeCheckOrSolidVMError (Map SolidString Contract)
       throwDuplicate (cName, unit) m = case M.lookup cName m of
         Nothing -> pure $ M.insert cName unit m
@@ -101,12 +109,13 @@ compileSourceNoInheritance initCodeMap = do
                                    (fromSourcePosition $ _sourceAnnotationStart $ _contractContext unit)
 
   allSUnits <- fmap concat . traverse (uncurry getNamedSUnits) $ M.toList initCodeMap
-  let (allConstants, allContracts) = sUnitSorter allSUnits
+  let (allConstants, allContracts, allEnums, allStructs) = sUnitSorter allSUnits
   deduplicatedContracts <- foldrM throwDuplicate M.empty allContracts
-
   pure $ CodeCollection {
     _contracts = deduplicatedContracts,
-    _flConstants = M.fromList allConstants
+    _flConstants = M.fromList allConstants,
+    _flEnums = M.fromList allEnums,
+    _flStructs = M.fromList allStructs
   }
 
 hasSvm3_2 :: CodeCollection -> Bool

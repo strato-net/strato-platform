@@ -43,6 +43,8 @@ data SourceUnitF a = Pragma a Identifier String
                    | Import a Text.Text
                    | NamedXabi Text.Text (XabiF a, [Text.Text])
                    | FLConstant Text.Text SolidVM.ConstantDecl
+                   | FLStruct Text.Text SolidVM.Def
+                   | FLEnum Text.Text SolidVM.Def
                    | DummySourceUnit
                    deriving (Eq, Show, Generic, Functor)
 
@@ -168,6 +170,43 @@ structDeclaration = do
         SolidVM.context = a
         }
     )
+
+solidityFLStruct :: SolidityParser SourceUnit
+solidityFLStruct = do
+  ~(a, (structName, structFields)) <- withPosition $ do
+    reserved "struct"
+    structName <- identifier
+    structFields <- braces $ many1 $ do
+      (fieldName, VariableDeclaration (SolidVM.VariableDecl decl _ _ _)) <- simpleVariableDeclaration
+      return (fieldName, decl)
+    pure (structName, structFields)
+  return $ FLStruct (Text.pack structName) (SolidVM.Struct{ SolidVM.fields = zipWith (\(n, v) i -> (stringToLabel n, SolidVM.FieldType i v)) structFields [0..], SolidVM.bytes = 0, SolidVM.context = a})
+    -- (
+    --   structName,
+    --   StructDeclaration SolidVM.Struct{
+    --     SolidVM.fields =
+    --        zipWith (\(n, v) i -> (stringToLabel n, SolidVM.FieldType i v)) structFields [0..],
+    --     SolidVM.bytes = 0,
+    --     SolidVM.context = a
+    --     }
+    -- )
+
+solidityFLEnum :: SolidityParser SourceUnit
+solidityFLEnum = do
+  ~(a, (enumName, enumFields)) <- withPosition $ do
+    reserved "enum"
+    enumName <- identifier
+    enumFields <- braces $ commaSep1 identifier
+    pure (enumName, enumFields)
+  return $ FLEnum (Text.pack enumName) (SolidVM.Enum {SolidVM.names = map stringToLabel enumFields, SolidVM.bytes = 0, SolidVM.context = a})
+    -- (
+    --   enumName,
+    --   EnumDeclaration SolidVM.Enum {
+    --     SolidVM.names = map stringToLabel enumFields,
+    --     SolidVM.bytes = 0,
+    --     SolidVM.context = a
+    --     }
+    -- )
 
 -- | Parses an enum definition
 enumDeclaration :: SolidityParser (String, Declaration)
