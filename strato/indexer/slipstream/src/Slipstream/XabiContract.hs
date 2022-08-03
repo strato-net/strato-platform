@@ -73,7 +73,8 @@ varTypeToVariableDecl x =
   varType=evmTypeToType $ OLDXABI.varTypeType x,
   varIsPublic=False,
   varInitialVal=Nothing,
-  varContext=dummyAnnotation
+  varContext=dummyAnnotation,
+  isImmutable=False
   }
 
 dummyAnnotation :: SourceAnnotation ()
