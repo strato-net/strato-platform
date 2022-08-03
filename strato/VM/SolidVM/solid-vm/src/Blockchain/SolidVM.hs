@@ -1819,6 +1819,9 @@ expToVar' (CC.FunctionCall _ e args) = do
                 _ -> pure $ Nothing
             --get only the contract and its collection of sourceAnnotation contained in the ContractF type.
             (contract, _, _) <- getCodeAndCollection address
+            liftIO $ do print ("++++++++++++++++++++++++" :: String)
+                        print searchTerms
+                        print ("++++++++++++++++++++++++" :: String)
             --get the position of the searched item if something was wanting to be searched
             let anno :: [(Int, Int, Int, Int)]
                 anno = 
