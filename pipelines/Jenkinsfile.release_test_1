@@ -339,6 +339,15 @@ pipeline {
             }
         }
 
+        stage('Wait for Network to Sync with Devnet') {
+            agent { label "multinode305" }
+            steps {
+                script {
+                    lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
+                }
+            }
+        }
+
         stage ('Beanstalk load test') {
             // agent { label "multinode101" } // is default
             steps {
