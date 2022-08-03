@@ -1922,20 +1922,38 @@ expToVar' (CC.FunctionCall _ e args) = do
             contract' <- getCurrentContract
             address <- getCurrentAccount
             (hsh, cc) <- getCurrentCodeCollection
+            -- let isFreeFunction = case M.lookup funcName $ cc^.CC.flFuncs of
+            --       Just _ -> True
+            --       Nothing -> False
             if (CC._vmVersion contract' /= "svm3.3")
               then do
                 res <- runTheCall address contract' funcName hsh cc func argVals ro
                 return . Constant . fromMaybe SNULL $ res
               else do
-                matchingFuncOverload <- findM findOverload $ CC.funcOverload func
+                matchingFuncOverload <- findM testMatch $ CC.funcOverload func
                 -- when (True) (internalError "IT'S MORBIN TIME" matchingFuncOverload)
-                res <- case matchingFuncOverload of
+                res <- do
+                  case M.lookup funcName $ cc^.CC.flFuncs of
+                    Just ff -> do
+                      matchingFreeFuncOverload <- findM testMatch $ CC.funcOverload ff
+                      doesOriginalMatch <- testMatch func
+                      if (doesOriginalMatch)
+                        then do
+                          case matchingFuncOverload of
+                            Nothing -> runTheCall address contract' funcName hsh cc func argVals ro
+                            Just mo -> runTheCall address contract' funcName hsh cc mo argVals ro
+                        else do
+                          case matchingFreeFuncOverload of
+                            Nothing -> runTheCall address contract' funcName hsh cc ff argVals ro
+                            Just mo -> runTheCall address contract' funcName hsh cc mo argVals ro
+                    Nothing -> do
+                      case matchingFuncOverload of
                         Nothing -> runTheCall address contract' funcName hsh cc func argVals ro
                         Just mo -> runTheCall address contract' funcName hsh cc mo argVals ro
                 return . Constant . fromMaybe SNULL $ res
             where
-              findOverload :: MonadSM m => CC.Func -> m Bool
-              findOverload tf = do
+              testMatch :: MonadSM m => CC.Func -> m Bool
+              testMatch tf = do
                 let argPairing = generateArgPairs $ CC.funcArgs tf
                     argPairLength = length $ mapArgs tf
                 doArgsMatch <- mapM testNameAndTypes argPairing
