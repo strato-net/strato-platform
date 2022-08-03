@@ -7,7 +7,7 @@
 module SolidVM.Model.CodeCollection (
   CodeCollectionF(..),
   CodeCollection,
-  freeFuncs,
+  flFuncs,
   contracts,
   getParents,
   
@@ -45,7 +45,7 @@ import           SolidVM.Model.SolidString
 
 data CodeCollectionF a =
   CodeCollection {
-    _freeFuncs :: Map SolidString (FuncF a),
+    _flFuncs :: Map SolidString (FuncF a),
     _contracts :: Map SolidString (ContractF a)
   } deriving (Show, Generic, Functor)
 

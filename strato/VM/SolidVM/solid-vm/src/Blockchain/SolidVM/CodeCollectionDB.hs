@@ -94,7 +94,7 @@ compileSourceNoInheritance initCodeMap = do
       getFreeFunctions fileName src = do
         sourceUnits <- parseSource fileName src
         fmap catMaybes . for sourceUnits $ \case
-          FreeFunc name fdec -> pure $ Just (name, fdec)
+          FLFunc name fdec -> pure $ Just (name, fdec)
           _ -> pure Nothing
       
       throwDuplicateFunction :: (SolidString, Func) -> Map SolidString Func -> Either ParseTypeCheckOrSolidVMError (Map SolidString Func)
@@ -115,7 +115,7 @@ compileSourceNoInheritance initCodeMap = do
   allFreeFunctions <- fmap concat . traverse (uncurry getFreeFunctions) $ M.toList initCodeMap
   deduplicatedFreeFunctions <- foldrM throwDuplicateFunction M.empty (allFreeFunctions :: [(SolidString, Func)])
   pure $ CodeCollection {
-    _freeFuncs = deduplicatedFreeFunctions,
+    _flFuncs = deduplicatedFreeFunctions,
     _contracts = deduplicatedContracts
   }
 

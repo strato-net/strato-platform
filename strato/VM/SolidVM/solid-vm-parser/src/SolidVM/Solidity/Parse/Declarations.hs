@@ -42,7 +42,7 @@ import           Blockchain.VM.SolidException
 data SourceUnitF a = Pragma a Identifier String
                    | Import a Text.Text
                    | NamedXabi Text.Text (XabiF a, [Text.Text])
-                   | FreeFunc String SolidVM.Func
+                   | FLFunc String SolidVM.Func
                    | DummySourceUnit
                    deriving (Eq, Show, Generic, Functor)
 
@@ -68,7 +68,7 @@ solidityContract = do
         return (name, consArgs)
     pure (kind, contractName', baseConstrs)
   declarations <-
-    braces (many solidityDeclaration)
+    braces (many $ solidityDeclaration False)
 
   let allFunctions = Map.fromListWith parseOverloads [ (stringToLabel n, f) | (n, FuncDeclaration f) <- declarations]
   let ctorList = [(stringToLabel n, c) | (n, ConstructorDeclaration c) <- declarations]
@@ -132,21 +132,18 @@ solidityContract = do
 -- | Parses a free function
 solidityFreeFunction :: SolidityParser SourceUnit
 solidityFreeFunction = do
-  (fname, fdec) <- solidityDeclaration
-  func <- do
-    case fdec of
-      FuncDeclaration a -> return a  
-      _ -> internalError "Not a function declaration" fdec
-  return $ FreeFunc fname $ SolidVM.Func 
-    { SolidVM.funcArgs = SolidVM.funcArgs func
-    , SolidVM.funcVals = SolidVM.funcVals func
-    , SolidVM.funcStateMutability = SolidVM.funcStateMutability func
-    , SolidVM.funcContents = SolidVM.funcContents func
-    , SolidVM.funcVisibility = Just SolidVM.Internal
-    , SolidVM.funcConstructorCalls = SolidVM.funcConstructorCalls func
-    , SolidVM.funcModifiers = SolidVM.funcModifiers func
-    , SolidVM.funcContext = SolidVM.funcContext func
-    , SolidVM.funcOverload = SolidVM.funcOverload func
+  (fname, (FuncDeclaration a)) <- functionDeclaration True
+  when (SolidVM.funcVisibility a /= Just SolidVM.Internal) $ fail "Free functions always have implicit Internal visibility."
+  return $ FLFunc fname $ SolidVM.Func 
+    { SolidVM.funcArgs = SolidVM.funcArgs a
+    , SolidVM.funcVals = SolidVM.funcVals a
+    , SolidVM.funcStateMutability = SolidVM.funcStateMutability a
+    , SolidVM.funcContents = SolidVM.funcContents a
+    , SolidVM.funcVisibility = SolidVM.funcVisibility a
+    , SolidVM.funcConstructorCalls = SolidVM.funcConstructorCalls a
+    , SolidVM.funcModifiers = SolidVM.funcModifiers a
+    , SolidVM.funcContext = SolidVM.funcContext a
+    , SolidVM.funcOverload = SolidVM.funcOverload a
     }
 
 data Declaration =
@@ -165,12 +162,12 @@ data Declaration =
 
 -- | Parses anything that a contract can declare at the top level: new types,
 -- variables, functions primarily, also events and function modifiers.
-solidityDeclaration :: SolidityParser (String, Declaration)
-solidityDeclaration =
+solidityDeclaration :: Bool -> SolidityParser (String, Declaration)
+solidityDeclaration free =
   structDeclaration <|>
   enumDeclaration <|>
   usingDeclaration <|>
-  functionDeclaration <|>
+  functionDeclaration free <|>
   modifierDeclaration <|>
   eventDeclaration <|>
   variableDeclaration
@@ -286,8 +283,8 @@ simpleVariableDeclaration = do
 
 -- | Parses a function definition.
 --
-functionDeclaration :: SolidityParser (String, Declaration)
-functionDeclaration = do
+functionDeclaration :: Bool -> SolidityParser (String, Declaration)
+functionDeclaration free = do
   ~(a, (functionName, xabi')) <- withPosition $ do
     functionName <- (reserved "function" >> fromMaybe "" <$> optionMaybe identifier)  <|>
                     -- Starting with 0.4.22, constructor() <mods> { <body> } is
@@ -299,7 +296,7 @@ functionDeclaration = do
     -- Throw an error if the function name is part of secondary reservered words.
     pragmaVersion' <- getPragmaVersion
     when (isReservedWord pragmaVersion' functionName) $ reservedWordError pragmaVersion' functionName
-    xabi <- functionXabi 
+    xabi <- functionXabi free
     pure (functionName, xabi)
   cName <- getContractName
   let xabi = xabi'{SolidVM.funcContext = a <> SolidVM.funcContext xabi'}
@@ -308,11 +305,11 @@ functionDeclaration = do
                 else FuncDeclaration 
   return (functionName, tipe xabi)
 
-functionXabi :: SolidityParser SolidVM.Func
-functionXabi = do
+functionXabi :: Bool -> SolidityParser SolidVM.Func
+functionXabi free = do
   start <- getSourcePosition
   functionArgs <- tupleDeclaration
-  (functionRet, visibility, mutability, funcConstructorCallsOrModifiers) <- functionModifiers
+  (functionRet, visibility, freevisibility, mutability, funcConstructorCallsOrModifiers) <- functionModifiers
   end <- getSourcePosition
   contents <- Just <$> statements <|> (reservedOp ";" >> return Nothing)
   let nameUnnamed (name,ty) = if Text.null name then (Nothing, ty) else (Just name,ty)
@@ -323,7 +320,7 @@ functionXabi = do
       , SolidVM.funcVals = map (\(k, v) -> (fmap textToLabel k, v)) $
            zipWith (\v i -> fmap (SolidVM.IndexedType i) (nameUnnamed v)) functionRet [0..]
       , SolidVM.funcContents = contents
-      , SolidVM.funcVisibility = Just visibility
+      , SolidVM.funcVisibility = if (free) then Just freevisibility else Just visibility
       , SolidVM.funcStateMutability = mutability
       , SolidVM.funcConstructorCalls = Map.fromList funcConstructorCallsOrModifiers
       , SolidVM.funcModifiers = funcConstructorCallsOrModifiers
@@ -420,7 +417,7 @@ data FuncModifiers = ReturnsMod [(Text, SVMType.Type)]
                    | ConstructorCallModsOrOtherMod (SolidString, [SolidVM.Expression])
 --                   | OtherMod String
 
-functionModifiers :: SolidityParser ([(Text, SVMType.Type)], SolidVM.Visibility, Maybe SolidVM.StateMutability, [(SolidString, [SolidVM.Expression])])
+functionModifiers :: SolidityParser ([(Text, SVMType.Type)], SolidVM.Visibility, SolidVM.Visibility, Maybe SolidVM.StateMutability, [(SolidString, [SolidVM.Expression])])
 functionModifiers = do
   vals <- many $ (ReturnsMod <$> returnModifier)
              <|>  (VisibilityMod <$> visibilityModifier)
@@ -432,10 +429,11 @@ functionModifiers = do
     formatVals vals =
       let returns = concat [v | ReturnsMod v <- vals]
           visibility = fromMaybe SolidVM.Public $ listToMaybe [v | VisibilityMod v <- vals]
+          freevisibility = fromMaybe SolidVM.Internal $ listToMaybe [v | VisibilityMod v <- vals]
           mutability = listToMaybe [v | MutabilityMod v <- vals]
       --    otherMods = [v | OtherMod v <- vals]
           constructorCallModsOrOtherMods = [v | ConstructorCallModsOrOtherMod v <- vals]
-      in (returns, visibility, mutability, constructorCallModsOrOtherMods)
+      in (returns, visibility, freevisibility, mutability, constructorCallModsOrOtherMods)
     returnModifier =
       reserved "returns" >> tupleDeclaration
     visibilityModifier =

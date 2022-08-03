@@ -51,6 +51,7 @@ module Blockchain.SolidVM.SM (
 
 import           Control.Applicative ((<|>))
 import           Control.Lens hiding (Context)
+-- import           Control.Monad (when)
 import           Control.Monad.Catch (MonadCatch)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
@@ -385,15 +386,8 @@ getVariableOfName name = do
   let maybeContractFunction :: Maybe Variable
       maybeContractFunction = fmap (t "constant function" . Constant . SFunction name) $ M.lookup name $ currentContract currentCallInfo^.CC.functions
 
-      getFreeFuncDef :: CC.Func
-      getFreeFuncDef = case M.lookup name $ codeCollection currentCallInfo^.CC.freeFuncs of
-        Just func -> func
-        Nothing -> internalError "Free function definition missing" name 
-
       maybeFreeFunction :: Maybe Variable
-      maybeFreeFunction = toMaybe (name `elem` M.keys (codeCollection currentCallInfo^.CC.freeFuncs)) $
-        t "free function" $ Constant $ SFunction name getFreeFuncDef
-
+      maybeFreeFunction = fmap (t "free function" . Constant . SFunction name) $ M.lookup name $ codeCollection currentCallInfo^.CC.flFuncs
 
       maybeBuiltinFunction :: Maybe Variable
       maybeBuiltinFunction = toMaybe (name `elem` ["address", "account", "uint", "int", "bool", "byte", "bytes"
