@@ -8,7 +8,7 @@ def deployStrato(nodeData) {
   sh "sudo rm -rf strato-getting-started"
   unstash 'stratoGettingStarted'
   dir("strato-getting-started") {
-    sh "sudo chmod 777 /datadrive/letsencrypt-ssl/*"
+    sh "sudo chmod 777 ~/letsencrypt-ssl/*"
     sh "cp ~/letsencrypt-ssl/server.pem ssl/certs/"
     sh "cp ~/letsencrypt-ssl/server.key ssl/private/"
     withCredentials([
@@ -117,7 +117,7 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
         usernamePassword(credentialsId: 'aws-s3-test-bucket-access-user', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
         usernamePassword(credentialsId: 'beanstalk-internal-nodes-keycloak-client', passwordVariable: 'BEANSTALK_INTERNAL_KEYCLOAK_CLIENT_SECRET', usernameVariable: 'BEANSTALK_INTERNAL_KEYCLOAK_CLIENT_ID')
     ]) {
-      let clientID, clientSecret, oauthDiscovery
+      def clientID, clientSecret, oauthDiscovery
       if(appName == 'beanstalk') {
         clientID = nodeData.BEANSTALK.OAUTH_CLIENT_ID
         clientSecret = nodeData.BEANSTALK.OAUTH_CLIENT_SECRET
@@ -210,7 +210,7 @@ def runAppBootNode(nodeData, wipeApp = null, refspec = null, postgresViewsPrefix
         echo "publicKey from strato-gs run script: ${publicKey}"
         sh 'rm -f run-app.sh'
         def authCookieName = "beanstalk-dev${nodeData.NUMBER}-auth"
-        if(appName = 'beanstalk') {
+        if(appName == 'beanstalk') {
           writeFile file: "run-app.sh", text: """#!/bin/bash
 set -e
 
@@ -503,11 +503,14 @@ def runMonitor(nodeData, nodeConfig) {
         OAUTH_CLIENT_ID=dev \\
         OAUTH_CLIENT_SECRET=d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f \\
         docker-compose up -d"""
-    writeFile file:"run.sh", text: """${runCommand}"""
 
+    dir("monitor") {
+      writeFile file:"run.sh", text: """${runCommand}"""
+    }
 
+    def initialNodes
     if(nodeConfig == 'upgrade8Nodes') {
-      def initialNodes = """
+      initialNodes = """
           module.exports = [
             {
               ip: '3.81.197.53:8080',
@@ -624,7 +627,7 @@ def runMonitor(nodeData, nodeConfig) {
           ];"""     
 
     } else if (nodeConfig == 'nodeChainUpgrade') {
-      def initialNodes = """
+      initialNodes = """
           module.exports = [
             {
               ip: '3.81.197.53:8080',
@@ -698,7 +701,7 @@ def runMonitor(nodeData, nodeConfig) {
             }
           ];"""     
     } else if (nodeConfig == 'removedChainUpgrade') {
-      def initialNodes = """
+      initialNodes = """
           module.exports = [
             {
               ip: '3.81.197.53:8080',
@@ -758,7 +761,7 @@ def runMonitor(nodeData, nodeConfig) {
             }
           ];"""     
     } else if (nodeConfig == 'networkSynctoDevnet') {
-      def initialNodes = """
+      initialNodes = """
           module.exports = [
             {
               ip: '54.243.143.176:8080',
@@ -832,7 +835,7 @@ def runMonitor(nodeData, nodeConfig) {
             },
           ];"""
     } else {
-      def initialNodes = """
+      initialNodes = """
           module.exports = [
             {
               ip: '54.243.143.176:8080',
@@ -864,28 +867,30 @@ def runMonitor(nodeData, nodeConfig) {
             }
           ];"""
     }
-    writeFile file:"backend/config/initial-nodes.js", text: """${initialNodes}"""
+    dir("monitor") {
+      writeFile file:"backend/config/initial-nodes.js", text: """${initialNodes}"""
+      sh "cp ~/letsencrypt-ssl/server.pem ssl/certs/"
+      sh "cp ~/letsencrypt-ssl/server.key ssl/private/"
+      sh 'sudo bash run.sh'
+    }
 
-    sh "cp ~/letsencrypt-ssl/server.pem ssl/certs/"
-    sh "cp ~/letsencrypt-ssl/server.key ssl/private/"
-    sh 'sudo bash run.sh'
   }
 }
 
-def waitForHealthySync(MONITOR_DATA) {
+def waitForHealthySync(NODE_MONITOR_HEALTH_URL) {
   script {
     echo "Waiting for network nodes to be in-sync and healthy..."
-    for (int i = 0; i < 3000; i++) {
-      if (sh(returnStatus: true, script: "curl --silent ${MONITOR_DATA.DEVNET_SYNC_HEALTH_URL} | grep '\"needsAttention\":false'") != 0) {
+    for (int i = 0; i < 6000; i++) {
+      if (sh(returnStatus: true, script: "curl --silent ${NODE_MONITOR_HEALTH_URL} | grep '\"needsAttention\":false'") != 0) {
         sleep 2
       } else {
         // If healthy - check in few seconds again to make sure it wasn't temporary while syncned to the same block number. Monitor should probably be handling this itself in the future before showing network healthy.
         sleep 20
-        if (sh(returnStatus: true, script: "curl --silent ${MONITOR_DATA.DEVNET_SYNC_HEALTH_URL} | grep '\"needsAttention\":false'") != 0) {
+        if (sh(returnStatus: true, script: "curl --silent ${NODE_MONITOR_HEALTH_URL} | grep '\"needsAttention\":false'") != 0) {
           sleep 2
         } else {
           sleep 20
-          if (sh(returnStatus: true, script: "curl --silent ${MONITOR_DATA.DEVNET_SYNC_HEALTH_URL} | grep '\"needsAttention\":false'") != 0) {
+          if (sh(returnStatus: true, script: "curl --silent ${NODE_MONITOR_HEALTH_URL} | grep '\"needsAttention\":false'") != 0) {
             sleep 2
           } else {
             return true
@@ -934,31 +939,16 @@ def waitForCirrus() {
 def createContractAndGetContractAddress(NODE_HOST, NODE_PORT, SERVICE_TOKEN) {
  def CONTRACT_ADDRESS = sh(
   returnStdout: true,
-  script: "curl \"https://${NODE_HOST}:${NODE_PORT}/strato/v2.3/transaction?resolve=true\" \
+  script: "curl 'https://${NODE_HOST}:${NODE_PORT}/strato/v2.3/transaction?resolve=true' \
     -X 'POST' \
     -H \"Authorization: Bearer ${SERVICE_TOKEN}\"  \
     -H 'Accept: application/json;charset=utf-8' \
     -H 'Content-Type: application/json' \
-    --data-binary '{
-      \"txs\":[{
-        \"payload\":{
-          \"contract\":\"SimpleStorage\",
-          \"src\":"pragma solidvm 3.0; contract SimpleStorage {\n  uint storedData;\n\n  function SimpleStorage() {\n    storedData = 1;\n  }\n\n  function set(uint x) {\n    storedData = x;\n  }\n\n  function get() constant returns (uint) {\n    return storedData;\n  }\n}\n",
-          \"args\":{},
-          \"metadata\":{
-            \"VM\":\"SolidVM\",
-            \"history\":\"SimpleStorage\",
-            \"index\":\"SimpleStorage\"
-          }
-        },
-        \"type\":\"CONTRACT\"
-      }]
-    }' \
+    --data-binary '{\"txs\":[{\"payload\":{\"contract\":\"SimpleStorage\",\"src\":\"pragma solidvm 3.0; contract SimpleStorage {\n  uint storedData;\n\n  function SimpleStorage() {\n    storedData = 1;\n  }\n\n  function set(uint x) {\n    storedData = x;\n  }\n\n  function get() constant returns (uint) {\n    return storedData;\n  }\n}\n\",\"args\":{},\"metadata\":{\"VM\":\"SolidVM\",\"history\":\"SimpleStorage\",\"index\":\"SimpleStorage\"}},\"type\":\"CONTRACT\"}]}' \
     | jq '.[] | .txResult.\"contractsCreated\"'"
   ).trim()
   return CONTRACT_ADDRESS
  }
-}
 
 def getContractBlockNumber(NODE_HOST, NODE_PORT, CONTRACT_ADDRESS, SERVICE_TOKEN) {
  def BLOCK_NUMBER = sh(
@@ -972,20 +962,5 @@ def getContractBlockNumber(NODE_HOST, NODE_PORT, CONTRACT_ADDRESS, SERVICE_TOKEN
   ).trim()
   return BLOCK_NUMBER
  }
-}
 
-def waitForVoteListValidators(total_votes) {
-  script {
-    sh '''
-    set -x
-    counter=0
-    until [ "$counter" -eq $total_votes ]
-    do
-      voteList=$(sudo docker exec -i strato_strato_1 bash -c "tail -n 100 logs/strato-sequencer | grep showctx/validators | tail -n 1 | cut -d '|' -f 4 ")
-      counter=$(echo "$voteList" | jq ". | length")
-      echo $counter
-    done
-    '''
-  }
-}
 return this
