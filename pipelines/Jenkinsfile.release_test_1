@@ -148,71 +148,11 @@ pipeline {
             }
         }
 
-        stage('Run Monitor on 8 Nodes') {
-            parallel {
-                stage('Deploy Monitor multinode101') {
-                    // agent { label "test-multinode101" } // is default
-                    steps {
-                        script {
-                            lib.runMonitor(NODE_DATA.NODE1, 'upgrade8Nodes')
-                        }
-                    }
-                }
-                stage('Deploy Monitor multinode102') {
-                    agent { label "test-multinode102" }
-                    steps {
-                        script {
-                           lib.runMonitor(NODE_DATA.NODE2, 'upgrade8Nodes')
-                        }
-                    }
-                }
-                stage('Deploy Monitor multinode103') {
-                    agent { label "test-multinode103" }
-                    steps {
-                        script {
-                            lib.runMonitor(NODE_DATA.NODE3, 'upgrade8Nodes')
-                        }
-                    }
-                }
-                stage('Deploy Monitor multinode104') {
-                    agent { label "test-multinode104" }
-                    steps {
-                        script {
-                            lib.runMonitor(NODE_DATA.NODE4, 'upgrade8Nodes')
-                        }
-                    }
-                }
-                stage('Deploy Monitor multinode301') {
-                    agent { label "test-multinode301" }
-                    steps {
-                        script {
-                            lib.runMonitor(NODE_DATA.NODE5, 'upgrade8Nodes')
-                        }
-                    }
-                }
-                stage('Deploy Monitor multinode302') {
-                    agent { label "test-multinode302" }
-                    steps {
-                        script {
-                            lib.runMonitor(NODE_DATA.NODE6, 'upgrade8Nodes')
-                        }
-                    }
-                }
-                stage('Deploy Monitor multinode303') {
-                    agent { label "test-multinode303" }
-                    steps {
-                        script {
-                            lib.runMonitor(NODE_DATA.NODE7, 'upgrade8Nodes')
-                        }
-                    }
-                }
-                stage('Deploy Monitor multinode304') {
-                    agent { label "test-multinode304" }
-                    steps {
-                        script {
-                            lib.runMonitor(NODE_DATA.NODE8, 'upgrade8Nodes')
-                        }
-                    }
+        stage('Beanstalk Load Test - Run Monitor on 8 nodes') {
+            agent { label "multinode305" }
+            steps {
+                script {
+                    lib.runMonitor(NODE_DATA.NODE1, 'upgrade8Nodes')
                 }
             }
         }
@@ -603,6 +543,15 @@ pipeline {
                 }
             }
         }
-        
+
+        stage('Wait for Network to Sync with Devnet') {
+            agent { label "multinode305" }
+            steps {
+                script {
+                    lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
+                }
+            }
+        }
+
     }
 }
