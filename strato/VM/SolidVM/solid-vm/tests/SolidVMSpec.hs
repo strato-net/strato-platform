@@ -24,8 +24,10 @@ import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.UTF8   as UTF8
 import Data.Coerce
 import qualified Data.Map as M
+import Data.Maybe
 import qualified Data.Set as S
 import qualified Data.Text as T
+import qualified Data.List as L
 import Data.Char
 import Data.Text.Encoding
 import Data.Time.Clock.POSIX
@@ -4859,13 +4861,36 @@ contract qq{
 
   it "can use msg.data" . runTest $ do
     runBS [r|
-contract qq {
-  string s;
-  function a(uint _a, string _b, bool _c) pure returns (string) {
+contract X {
+  function func2(uint _a, string _b, bool _c) pure public returns (string) {
     return msg.data;
   }
+}
+
+contract qq {
+  string s;
   constructor() {
-    s = a(10, "hey", false);
+    X x = new X();
+    s = x.func2(10, "hey", false);
   }
 }|]
-    getFields ["s"] `shouldReturn` [BString "(10, \"hey\", False"]
+    getFields ["s"] `shouldReturn` [BString "(10, hey, False)"]
+
+  it "can use msg.sig" . runTest $ do
+    runBS [r|
+contract X {
+  function func2(uint _a, string _b, bool _c) pure public returns (bytes4) {
+    return msg.sig;
+  }
+}
+
+contract qq {
+  bytes4 ss;
+  constructor() {
+    X x = new X();
+    ss = x.func2(10, "hey", false);
+  }
+}|]
+    let calldataHash = fromMaybe emptyHash $ stringKeccak256 "func2(uint,string,bool)"
+    getFields ["ss"] `shouldReturn` [BString $ BC.pack $ L.take 8 $ keccak256ToHex calldataHash ]
+

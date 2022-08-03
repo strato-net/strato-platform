@@ -117,7 +117,7 @@ import           SolidVM.Model.Value
 import           SolidVM.Solidity.Parse.Statement
 import           SolidVM.Solidity.Parse.Lexer         (stringLiteral)
 import           SolidVM.Solidity.Parse.ParserTypes
-import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpression)
+import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpression, unparseVarType)
 
 import           UnliftIO                             hiding (assert)
  
@@ -1511,14 +1511,21 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
                          (name `elemIndex` fst enumVals)
         return $ Constant $ SEnumVal enumName name num
       (SBuiltinVariable "msg", "sender") -> (Constant . ((flip SAccount) False) . accountToNamedAccount chainId . Env.sender) <$> getEnv
-      (SBuiltinVariable "msg", "data") -> let env' = getEnv
-                                              metadata =  Env.metadata env'
-                                              maybeArgString = M.lookup "args" =<< metadata
-                                          in Constant . SString . fromMaybe "" . maybeArgString 
-     {- (SBuiltinVariable "msg", "sig") -> let env' = getEnv
-                                             metadata = Env.metadata env'
-                                             maybeFuncName = M.lookup "funcName" =<< metadata
-                                         in Constant . SString . fromMaybe "" . keccak256() -}
+      (SBuiltinVariable "msg", "data") -> do contract' <- getCurrentContract
+                                             functionName <- getCurrentFunctionName
+                                             callInfo <- getCurrentCallInfo
+                                             let argList = maybe [] CC.funcArgs $ contract' ^. CC.functions . at functionName
+                                                 localVars = localVariables callInfo
+                                             argVals <- forM argList (\(n,_) -> getVar . snd $ localVars M.! (fromMaybe "" n))
+                                             argsToStr <- fmap (intercalate ", ") $ forM argVals showSM
+                                             return . Constant . SString $ "("++argsToStr++")"
+      (SBuiltinVariable "msg", "sig") -> do functionName <- getCurrentFunctionName
+                                            contract' <- getCurrentContract
+                                            let argList = maybe [] CC.funcArgs $ contract' ^. CC.functions . at functionName
+                                                argTypesList = map (\(_, CC.IndexedType _ t) -> t) argList
+                                                argString = labelToString functionName++"("++intercalate "," (map unparseVarType argTypesList)++")"
+                                                calldataHash = fromMaybe emptyHash $ stringKeccak256 argString
+                                            return . Constant . SString $ take 8 $ keccak256ToHex calldataHash 
       (SBuiltinVariable "tx", "origin") -> (Constant . ((flip SAccount) False) . accountToNamedAccount chainId . Env.origin) <$> getEnv
       (SBuiltinVariable "tx", "username") -> do env' <- getEnv
                                                 x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
