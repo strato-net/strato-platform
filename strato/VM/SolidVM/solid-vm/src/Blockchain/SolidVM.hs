@@ -1060,11 +1060,12 @@ runStatement s@(CC.SimpleStatement (CC.VariableDefinition entries maybeExpressio
   let singleType = case entries of
                       [e] -> fromMaybe (todo "type inference not implemented" s) $ CC.vardefType e
                       _ -> todo "could not evaluate expression without tuple type" s
+  (_, cc) <- getCurrentCodeCollection
   !value <-
     case maybeExpression of
       Nothing -> do
         ctract <- getCurrentContract
-        createDefaultValue ctract singleType
+        createDefaultValue cc ctract singleType
       Just e -> do
         rhs <- weakGetVar =<< expToVar e
         case (maybeLoc, rhs) of
@@ -1516,11 +1517,19 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
       (SEnum enumName, _) -> do
         contract' <- getCurrentContract
         let maybeEnumValues = M.lookup enumName $ contract' ^. CC.enums
-            !enumVals = fromMaybe (missingType "Enum nonexistent type" enumName) maybeEnumValues
-            !num = maybe (missingType "Enum nonexistent member" (enumName, name))
-                         fromIntegral
-                         (name `elemIndex` fst enumVals)
-        return $ Constant $ SEnumVal enumName name num
+        case maybeEnumValues of
+          Nothing -> do
+            cc <- getCurrentCodeCollection
+            let maybeEnumValues' = M.lookup enumName $ (snd cc) ^. CC.flEnums
+                !enumVals' = fromMaybe (missingType "Enum nonexistent type" enumName) maybeEnumValues'
+                !num' = maybe (missingType "Enum nonexistent member" (enumName, name)) fromIntegral (name `elemIndex` fst enumVals')
+            return $ Constant $ SEnumVal enumName name num'
+          Just enumVals -> do
+            let !num = maybe (missingType "Enum nonexistent member" (enumName, name)) fromIntegral (name `elemIndex` fst enumVals)
+            return $ Constant $ SEnumVal enumName name num
+
+
+        
       (SBuiltinVariable "msg", "sender") -> (Constant . ((flip SAccount) False) . accountToNamedAccount chainId . Env.sender) <$> getEnv
       (SBuiltinVariable "tx", "origin") -> (Constant . ((flip SAccount) False) . accountToNamedAccount chainId . Env.origin) <$> getEnv
       (SBuiltinVariable "tx", "username") -> do env' <- getEnv
@@ -1574,7 +1583,9 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
             addr <- accountOnUnspecifiedChain <$> getCurrentAccount
             return $ Constant $ SContractFunction (Just contractName') addr constName
           else case constName `M.lookup` CC._constants cont of
-                  Nothing -> unknownConstant "constant member access" (contractName', constName)
+                  Nothing -> case constName `M.lookup` (cc ^. CC.flConstants) of 
+                    Just (CC.ConstantDecl _ _ constExp _) -> expToVar constExp
+                    Nothing -> unknownConstant "constant member access" (contractName', constName)
                   Just (CC.ConstantDecl _ _ constExp _) -> expToVar constExp
 
       (SBuiltinVariable "block", "timestamp") -> do
@@ -1995,12 +2006,19 @@ expToVar' (CC.FunctionCall _ e args) = do
 
           Constant (SStructDef structName) -> do
             contract' <- getCurrentContract
-            let !vals = fromMaybe (missingType "struct constructor not found" structName)
-                     $ M.lookup structName $ contract'^.CC.structs
-            return . Constant . SStruct structName . fmap Constant . M.fromList $
-              case argVals of
-                OrderedVals as -> zip (map (\(a,_,_) -> a) vals) as
-                NamedVals ns -> ns
+            case M.lookup structName $ contract'^.CC.structs of 
+              Just vals -> do
+                return . Constant . SStruct structName . fmap Constant . M.fromList $
+                  case argVals of
+                    OrderedVals as -> zip (map (\(a,_,_) -> a) vals) as
+                    NamedVals ns -> ns
+              Nothing -> do
+                cc <- getCurrentCodeCollection
+                let !vals' = fromMaybe (missingType "struct constructor not found" structName) $ M.lookup structName $ (snd cc) ^. CC.flStructs        
+                return . Constant . SStruct structName . fmap Constant . M.fromList $
+                  case argVals of
+                    OrderedVals as -> zip (map (\(a,_,_) -> a) vals') as
+                    NamedVals ns -> ns
 
           Constant (SContractDef contractName') -> do
             case argVals of
@@ -2057,11 +2075,18 @@ expToVar' (CC.FunctionCall _ e args) = do
             case argVals of
               OrderedVals [SInteger i] -> do
                 c <- getCurrentContract
-                let !theEnum = fromMaybe (missingType "enum constructor" enumName)
-                            $ M.lookup enumName $ c^.CC.enums
-                case fst theEnum !? fromInteger i of
-                  Nothing -> typeError "enum val out of range" argVals
-                  Just enumVal -> pure . Constant . SEnumVal enumName enumVal $ fromInteger i
+                case M.lookup enumName $ c^.CC.enums  of 
+                  Just theEnum -> do
+                    case fst theEnum !? fromInteger i of
+                      Nothing -> typeError "enum val out of range" argVals
+                      Just enumVal -> pure . Constant . SEnumVal enumName enumVal $ fromInteger i
+                  Nothing -> do
+                    (_, cc) <- getCurrentCodeCollection                            
+                    let !theEnum' = fromMaybe (missingType "enum constructor" enumName)
+                                $ M.lookup enumName $ cc ^.CC.flEnums
+                    case fst theEnum' !? fromInteger i of
+                      Nothing -> typeError "enum val out of range" argVals
+                      Just enumVal -> pure . Constant . SEnumVal enumName enumVal $ fromInteger i
               _ -> typeError "called enum constructor with improper args" argVals
 
           Constant (SPush theArray mvar) -> Builtins.push theArray mvar argVals

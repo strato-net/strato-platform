@@ -399,19 +399,20 @@ getVariableOfName name = do
         t "builtin variable" $ Constant $ SBuiltinVariable name
 
       maybeEnum :: Maybe Variable
-      maybeEnum = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.CC.enums)) $
+      maybeEnum = toMaybe (name `elem` M.keys (currentContract currentCallInfo ^.CC.enums) || name `elem` M.keys (codeCollection currentCallInfo^.CC.flEnums)) $
         t "enum" $ Constant $ SEnum name
 
       maybeConstant :: Maybe Variable
       maybeConstant = fmap (t "constant constant" . Constant) $ do
         let ctract = currentContract currentCallInfo
-        CC.ConstantDecl{..} <- M.lookup name $ ctract ^. CC.constants
+        let constMap = (codeCollection currentCallInfo) ^. CC.flConstants
+        CC.ConstantDecl{..} <- M.lookup name $ (ctract ^. CC.constants) `M.union` constMap
         return $ coerceType ctract constType $ case constInitialVal of
                                             CC.NumberLiteral _ x _ -> SInteger x
                                             x -> todo "constant initial val" x
 
       maybeStructDef :: Maybe Variable
-      maybeStructDef = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.CC.structs)) $
+      maybeStructDef = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.CC.structs) || name `elem` M.keys (codeCollection currentCallInfo^.CC.flStructs)) $
         t "struct def" $ Constant $ SStructDef name
 
       maybeContract :: Maybe Variable
@@ -462,11 +463,13 @@ getVariableOfName name = do
       ]
 
 getTypeOfName' :: SolidString -> CC.CodeCollection -> Typo
-getTypeOfName' s (CC.CodeCollection ccs) =
+getTypeOfName' s (CC.CodeCollection ccs _ enms strcts) =
   let lookInContract :: CC.Contract -> [Typo]
       lookInContract (CC.Contract{..}) = catMaybes
         [ fmap StructTypo (fmap (\(a,b,_) -> (a,b)) <$> M.lookup s _structs)
         , fmap EnumTypo (fst <$> M.lookup s _enums)
+        , fmap StructTypo (fmap (\(a,b,_) -> (a,b)) <$> M.lookup s strcts)
+        , fmap EnumTypo (fst <$> M.lookup s enms)
         ]
       ctrs = map ContractTypo $ M.keys ccs
    in case concatMap lookInContract ccs ++ ctrs of

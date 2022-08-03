@@ -4962,8 +4962,64 @@ contract qq{
   }
 }|]
     getFields ["mynum"] `shouldReturn` [BInteger 9]
-  
-  fit "should bitshift assign" . runTest $ do
+
+  it "can declare a constant at the file level and use it" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+uint constant myconst = 5;
+contract qq{
+  uint mynum = myconst;
+  constructor() public {
+    mynum = myconst;
+  }
+}|]
+    getFields ["mynum"] `shouldReturn` [BInteger 5]
+
+
+
+  it "can declare enums at the file level" . runTest $ do
+    runCall "a" "()" [r|
+pragma solidvm 3.3;
+enum Color { red, green, blue }
+contract A {
+    function value() public returns (uint) {
+        return 0xa;
+    }
+}
+
+enum Letter { a, b, c }
+contract B {
+    function value() public returns (uint) {
+        return 0xb;
+    }
+}
+contract qq {
+  function a() public returns (Letter) {
+    return Letter.c;
+  }
+}
+
+|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 2)
+
+  it "can declare structs at the file level" . runTest $ do
+    runCall "a" "()" [r|
+pragma solidvm 3.3;
+
+struct Point {
+  uint x;
+  uint y;
+}
+
+contract qq {
+  function a() public returns (uint) {
+    Point p;
+    p.x = 1;
+    p.y = 2;
+    return p.x;
+  }
+}|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 1)
+
+  it "should bitshift assign" . runTest $ do
     runBS [r|
 pragma solidvm 3.3;
 contract qq {
@@ -4979,7 +5035,7 @@ contract qq {
 }|]
     getFields ["haskell", "solidty", "solid"] `shouldReturn` [BInteger 4, BInteger 1, BInteger (-2)]
 
-  fit "can unsigned bit shift" . runTest $ do
+  it "can unsigned bit shift" . runTest $ do
     runBS [r|
 pragma solidvm 3.3;
 contract qq {
@@ -4995,3 +5051,4 @@ contract qq {
   }
 }|]
     getFields ["result1", "result2", "result3", "result4"] `shouldReturn` [BInteger 3, BInteger 6, BInteger 1, BInteger 12]
+

@@ -136,13 +136,15 @@ varDefsToType' VarDefEntry{..} _              = bottom $ "Could not match variab
 
 lookupEnum :: SolidString -> SSS [SolidString]
 lookupEnum name = do
+  cc <- asks codeCollection
   c <- asks contract
-  pure . maybe [] fst $ M.lookup name (_enums c)
+  pure . maybe [] fst $ msum [(M.lookup name (_enums c)), (M.lookup name (_flEnums cc))]
 
 lookupStruct :: SolidString -> SSS [(SolidString, Type)]
 lookupStruct name = do
+  cc <- asks codeCollection
   c <- asks contract
-  let str = fromMaybe [] $ M.lookup name (_structs c)
+  let str = fromMaybe [] $ msum [(M.lookup name (_structs c))  ,(M.lookup name (_flStructs cc))]
   pure $ f <$> str
   where f (t, ft, _) = (t, fieldTypeType ft)
 
@@ -650,8 +652,9 @@ contractHelper cc c =
       funcsAndConstr = constr <> _functions c
       varTypes' = reduceType' (_contractContext c) $ varDeclHelper cc c <$> M.elems (_storageDefs c)
       constTypes' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_constants c)
-      funcTypes' = reduceType' (_contractContext c) $ uncurry (functionHelper cc c) <$> M.toList funcsAndConstr 
-   in reduceType' (_contractContext c) [varTypes', constTypes', funcTypes']
+      constTypes'' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_flConstants cc)
+      funcTypes' = reduceType' (_contractContext c) $ uncurry (functionHelper cc c) <$> M.toList funcsAndConstr
+   in reduceType' (_contractContext c) [varTypes', constTypes', funcTypes', constTypes'']
 
 varDeclHelper :: Annotated CodeCollectionF
               -> Annotated ContractF
@@ -962,9 +965,13 @@ getVarTypeByName' name ctx = do
       Nothing -> pure $ Top (S.singleton name) ctx
     Nothing -> do
       c <- asks contract
+      cc <- asks codeCollection
       let mVarDecl = ((varType &&& const ctx) <$> M.lookup name (_storageDefs c))
                  <|> ((constType &&& const ctx) <$> M.lookup name (_constants c))
+                 <|> ((constType &&& const ctx) <$> M.lookup name (_flConstants cc))
                  <|> (const (SVMType.Enum Nothing name Nothing, ctx) <$> M.lookup name (_enums c))
+                 <|> (const (SVMType.Enum Nothing name Nothing, ctx) <$> M.lookup name (_flEnums cc))
+                 <|> (const (SVMType.Struct Nothing name, ctx) <$> M.lookup name (_flStructs cc))
                  <|> (const (SVMType.Struct Nothing name, ctx) <$> M.lookup name (_structs c))
       case mVarDecl of
         Just (e@(SVMType.Enum{}), ctx') -> pure . Sum $
@@ -986,7 +993,6 @@ getVarTypeByName' name ctx = do
                 fRets = flip Product ctx $ flip Static ctx . indexedTypeType . snd <$> funcVals
              in pure $ Function fArgs fRets ctx $ fmap buildOverloads funcOverload
           Nothing -> do
-            cc <- asks codeCollection
             pure $ case M.lookup name $ _contracts cc of
               Just _->
                 let ctrct = Static (SVMType.Contract name) ctx

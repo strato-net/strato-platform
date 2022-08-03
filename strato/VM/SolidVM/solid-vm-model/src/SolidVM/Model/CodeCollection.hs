@@ -9,6 +9,9 @@ module SolidVM.Model.CodeCollection (
   CodeCollection,
   contracts,
   getParents,
+  flConstants,
+  flStructs,
+  flEnums,  
   
   module SolidVM.Model.CodeCollection.Contract,
   --module SolidVM.Model.CodeCollection.Def,
@@ -42,9 +45,14 @@ import           SolidVM.Model.CodeCollection.VarDef
 import           SolidVM.Model.CodeCollection.VariableDecl
 import           SolidVM.Model.SolidString
 
+
 data CodeCollectionF a =
   CodeCollection {
-    _contracts :: Map SolidString (ContractF a)
+    _contracts :: Map SolidString (ContractF a),
+    _flConstants ::  Map SolidString (ConstantDeclF a),
+    _flEnums :: Map SolidString ([SolidString], a),
+    _flStructs :: Map SolidString [(SolidString, FieldType, a)]
+
   } deriving (Show, Generic, Functor)
 
 instance ToJSON a => ToJSON (CodeCollectionF a)
