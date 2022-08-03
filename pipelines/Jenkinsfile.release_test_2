@@ -1002,7 +1002,7 @@ pipeline {
                         assert condition : "Build failed to accept new Transaction"
                     }
 
-                    lib.waitForHealthySync(NODE_DATA.LOAD_TEST_HEALTH_URL)
+                    lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
                 }
             }
         }
@@ -1034,7 +1034,7 @@ pipeline {
                         returnStdout: true,
                         script: "curl -X POST -H \"Authorization: Bearer ${accessToken}\" -H \"Accept: application/json\" \"https://${NODE_DATA.NODE1.HOST}:${NODE_DATA.NODE1.PORT}/strato/v2.3/key\""
                     ).trim()
-                    lib.waitForHealthySync(NODE_DATA.LOAD_TEST_HEALTH_URL)
+                    lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
                 }       
             }
         }
@@ -1077,7 +1077,7 @@ pipeline {
                         assert condition : "Build failed to accept new Transaction"
                     }
 
-                    lib.waitForHealthySync(NODE_DATA.LOAD_TEST_HEALTH_URL)
+                    lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
                 }      
             }
         }

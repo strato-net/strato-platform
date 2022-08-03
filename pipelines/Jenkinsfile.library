@@ -877,20 +877,20 @@ def runMonitor(nodeData, nodeConfig) {
   }
 }
 
-def waitForHealthySync(MONITOR_DATA) {
+def waitForHealthySync(NODE_MONITOR_HEALTH_URL) {
   script {
     echo "Waiting for network nodes to be in-sync and healthy..."
     for (int i = 0; i < 6000; i++) {
-      if (sh(returnStatus: true, script: "curl --silent ${MONITOR_DATA.DEVNET_SYNC_HEALTH_URL} | grep '\"needsAttention\":false'") != 0) {
+      if (sh(returnStatus: true, script: "curl --silent ${NODE_MONITOR_HEALTH_URL} | grep '\"needsAttention\":false'") != 0) {
         sleep 2
       } else {
         // If healthy - check in few seconds again to make sure it wasn't temporary while syncned to the same block number. Monitor should probably be handling this itself in the future before showing network healthy.
         sleep 20
-        if (sh(returnStatus: true, script: "curl --silent ${MONITOR_DATA.DEVNET_SYNC_HEALTH_URL} | grep '\"needsAttention\":false'") != 0) {
+        if (sh(returnStatus: true, script: "curl --silent ${NODE_MONITOR_HEALTH_URL} | grep '\"needsAttention\":false'") != 0) {
           sleep 2
         } else {
           sleep 20
-          if (sh(returnStatus: true, script: "curl --silent ${MONITOR_DATA.DEVNET_SYNC_HEALTH_URL} | grep '\"needsAttention\":false'") != 0) {
+          if (sh(returnStatus: true, script: "curl --silent ${NODE_MONITOR_HEALTH_URL} | grep '\"needsAttention\":false'") != 0) {
             sleep 2
           } else {
             return true
