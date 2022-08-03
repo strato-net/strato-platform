@@ -12,8 +12,10 @@ import Text.RawString.QQ
 import SolidVM.Model.CodeCollection.Statement
 import SolidVM.Model.Type
 import SolidVM.Solidity.Parse.Lexer
-import SolidVM.Solidity.Parse.Statement
-import SolidVM.Solidity.Parse.Declarations
+
+-- import SolidVM.Solidity.Parse.Statement
+-- import SolidVM.Solidity.Parse.Declarations
+
 import SolidVM.Model.CodeCollection.Def as Def
 import SolidVM.Solidity.Parse.UnParser
 import SolidVM.Solidity.Parse.ParserTypes 
@@ -114,18 +116,18 @@ spec = do
 -------------------------------------------------------------------------------------------------------------------------------------------------
 -}
 
-  describe "Declaration parsing" $ do
-    let parseDecl = runParser solidityDeclaration (ParserState "" "") ""
-        cases = [ ("int x;", EnumDeclaration $ Def.Enum [] (fromInteger 2) dummyAnnotation)
-                , ("string[] data = ['a', 'b', 'c'];", DummyDeclaration)
-                -- , ("function a() public myModifier returns (bool) {\nx = 5;\nreturn true;\n}" , DummyDeclaration)
-                -- , ("constructor() public returns (bool) {\nreturn true;\n}" , DummyDeclaration)
-                -- , ("contract qq {\nuint x;\nmodifier myModifier() {\n require(false, 'bigTest');\n\n}\nconstructor() myModifier(3) public returns (bool) {\nx = 5;\nreturn true;\n}\n}", DummyDeclaration)
-                -- , ("modifier myModifier() {\n require(false, 'bigTest');\n_;\n}", DummyDeclaration)
-                -- , ("SimpleStorage myContract = new SimpleStorage();", DummyDeclaration)
-                ]
-    forM_ cases $ \(input, want) -> do
-      it ("can parse " ++ input) $ parseDecl input `shouldBe` Right ((show want), want)
+  -- describe "Declaration parsing" $ do
+  --   let parseDecl = runParser solidityDeclaration (ParserState "" "") ""
+  --       cases = [ ("int x;", EnumDeclaration $ Def.Enum [] (fromInteger 2) dummyAnnotation)
+  --               , ("string[] data = ['a', 'b', 'c'];", DummyDeclaration)
+  --               -- , ("function a() public myModifier returns (bool) {\nx = 5;\nreturn true;\n}" , DummyDeclaration)
+  --               -- , ("constructor() public returns (bool) {\nreturn true;\n}" , DummyDeclaration)
+  --               -- , ("contract qq {\nuint x;\nmodifier myModifier() {\n require(false, 'bigTest');\n\n}\nconstructor() myModifier(3) public returns (bool) {\nx = 5;\nreturn true;\n}\n}", DummyDeclaration)
+  --               -- , ("modifier myModifier() {\n require(false, 'bigTest');\n_;\n}", DummyDeclaration)
+  --               -- , ("SimpleStorage myContract = new SimpleStorage();", DummyDeclaration)
+  --               ]
+  --   forM_ cases $ \(input, want) -> do
+  --     it ("can parse " ++ input) $ parseDecl input `shouldBe` Right ((show want), want)
 {-}
 
 --"contract qq {\n  uint x = 3;\n  modifier myModifier(uint _x) {\n      require(_x == 3 , string.concat('x is not 3 : ', string(_x)));\n    x = 4;    _;\n    require(x == 5 , 'x is not 5');\n  }\n\n  constructor() public myModifier(3) {\n    x = 5;\n    return;\n  }\n}\n"
