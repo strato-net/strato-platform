@@ -148,6 +148,15 @@ pipeline {
             }
         }
 
+        stage('Beanstalk Load Test - Run Monitor on 8 nodes') {
+            agent { label "multinode305" }
+            steps {
+                script {
+                    lib.runMonitor(NODE_DATA.NODE1, 'upgrade8Nodes')
+                }
+            }
+        }
+
         stage('Beanstalk Load Test - Deploy SGS boot') {
             // agent { label "test-multinode101" } // is default
             steps { 
@@ -452,6 +461,42 @@ pipeline {
         }
 
         /* Performance Test - Sync Network to Devnet */
+        stage('Clean 4 nodes') {
+            parallel {
+                stage('Clean test-multinode101') {
+                    // agent { label "test-multinode101" } // is default
+                    steps {
+                        script {
+                            lib.cleanNode()
+                        }
+                    }
+                }
+                stage('Clean test-multinode102') {
+                    agent { label "test-multinode102" }
+                    steps {
+                        script {
+                            lib.cleanNode()
+                        }
+                    }
+                }
+                stage('Clean test-multinode103') {
+                    agent { label "test-multinode103" }
+                    steps {
+                        script {
+                            lib.cleanNode()
+                        }
+                    }
+                }
+                stage('Clean test-multinode104') {
+                    agent { label "test-multinode104" }
+                    steps {
+                        script {
+                            lib.cleanNode()
+                        }
+                    }
+                }
+            }
+        }
 
         stage('Sync Network To Devnet - Redeploy Monitor w/ 4 nodes') {
             agent { label "multinode305" }
@@ -498,6 +543,15 @@ pipeline {
                 }
             }
         }
-        
+
+        stage('Wait for Network to Sync with Devnet') {
+            agent { label "multinode305" }
+            steps {
+                script {
+                    lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
+                }
+            }
+        }
+
     }
 }
