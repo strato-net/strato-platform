@@ -498,15 +498,6 @@ pipeline {
                 }
             }
         }
-
-        /* EXECUTE SECOND PIPELINE*/
-        stage('Executing second pipeline') {
-            steps {
-                build job: 'RELEASE_test-suite-2',
-                propagate: true,
-                wait: true
-            }
-        }
         
     }
 }
