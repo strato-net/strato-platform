@@ -424,7 +424,7 @@ pipeline {
         stage('Single Node Sync with Devnet - Wait for Healthy Network') {
             steps {
                 script {
-                    lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
+                    lib.waitForHealthySync(NODE_DATA.MONITOR)
                 }
             }
         }
