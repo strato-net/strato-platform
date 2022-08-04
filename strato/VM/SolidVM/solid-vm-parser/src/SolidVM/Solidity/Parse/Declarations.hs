@@ -420,8 +420,10 @@ functionModifiers = do
       <|> (reserved "payable"  >> return SolidVM.Payable)
       )
     constructorCallModifiersOrOtherModifiers = do 
+      pVersion <- getPragmaVersion
       name <- stringToLabel <$> identifier
       exps <- optionMaybe (parens $ commaSep expression)
+      when ((pVersion == "3.0" || pVersion == "") && isNothing exps) $ fail "modifiers are not supported below pragma solidvm 3.0"
       return (name, fromMaybe [] exps) 
 
 -- | A common pattern: code enclosed in braces, allowing nested braces.
