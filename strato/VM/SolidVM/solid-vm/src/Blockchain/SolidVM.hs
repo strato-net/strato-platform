@@ -1938,9 +1938,6 @@ expToVar' (CC.FunctionCall _ e args) = do
             contract' <- getCurrentContract
             address <- getCurrentAccount
             (hsh, cc) <- getCurrentCodeCollection
-            -- let isFreeFunction = case M.lookup funcName $ cc^.CC.flFuncs of
-            --       Just _ -> True
-            --       Nothing -> False
             if (CC._vmVersion contract' /= "svm3.3")
               then do
                 res <- runTheCall address contract' funcName hsh cc func argVals ro False
