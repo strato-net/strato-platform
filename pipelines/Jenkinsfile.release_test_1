@@ -535,7 +535,7 @@ pipeline {
                     }
                 }
                 stage('Sync multinode103') {
-                    agent { label "multinode102" }
+                    agent { label "multinode103" }
                     steps {
                         script {
                             lib.deployStrato(NODE_DATA.NODE3)
