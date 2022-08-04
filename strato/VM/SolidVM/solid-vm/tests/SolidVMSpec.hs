@@ -3942,6 +3942,40 @@ contract qq {
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString myContract]
 
+  fit "can properly add the final } to a contract with a constructor but information after the constructor using the code member function" . runTest $ do
+    let myContract :: String
+        myContract = [r|contract Test {
+  uint sixtyNine = 69;
+  uint weed = 11;
+  constructor () {
+    weed = 420;
+  }
+  uint seventyNine = 79;
+}|]
+        contract :: String
+        contract = [r|
+pragma solidvm 3.3;
+contract Test {
+  uint sixtyNine = 69;
+  uint weed = 11;
+  constructor () {
+    weed = 420;
+  }
+  uint seventyNine = 79;
+}
+
+pragma solidvm 3.3;
+contract qq {
+  string codeTest;
+  constructor(){
+    Test t = new Test();
+    codeTest = account(t).code("Test");
+  }
+}|]
+    runBS contract
+    getFields ["codeTest"] `shouldReturn`
+      [ BString $ UTF8.fromString myContract]
+
   fit "Can find a function within a codeCollection" . runTest $ do
     let myFunxion :: String
         myFunxion = [r|function myFunction() public returns (uint) {
