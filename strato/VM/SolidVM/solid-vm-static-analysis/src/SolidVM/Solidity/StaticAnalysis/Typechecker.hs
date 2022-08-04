@@ -549,7 +549,7 @@ typecheckMember (Static (SVMType.Account True ) x) "transfer" = pure $ Function 
 typecheckMember (Static (SVMType.Account True ) x) "send" = pure $ Function (Static (SVMType.Int Nothing Nothing) x) (Static (SVMType.Bool) x) x
 typecheckMember (Static (SVMType.Account _) x) "searchcode" = pure $ Function (Static (SVMType.String Nothing) x) (Static (SVMType.String Nothing) x) x
 typecheckMember (Static (SVMType.Account _) x) "balance" = pure $ Static (SVMType.Int Nothing Nothing) x
-typecheckMember (Static (SVMType.Contract _) x) "code" = pure $ codeAccountArgs x
+typecheckMember (Static (SVMType.Account _) x) "code" = pure $ codeAccountArgs x
 typecheckMember (Static (SVMType.Account _) x) "codehash" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.Account _) x) "chainId" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Struct _ struct) x) n = do
@@ -592,9 +592,11 @@ typecheckMember x n = pure . bottom $ ("Unknown member: " <> showType' x <> "." 
 
 codeAccountArgs :: SourceAnnotation Text -> Type'
 --Make the default an empty string being inputed, otherwise if it has () at the end then allow for both () and ("something")
-codeAccountArgs x = Sum $ (Static (SVMType.Bytes Nothing Nothing) x) :|
+codeAccountArgs x = Sum $ (Product [] x) :|
                     [ Product [] x
-                    , Function (Static (SVMType.String Nothing) x) (Static (SVMType.String Nothing) x) x ]
+                    , Function (Static (SVMType.String Nothing) x) (Static (SVMType.String Nothing) x) x
+                    , Static (SVMType.String Nothing) x
+                    ]
 
 getConstructorType' :: MonadReader R m => SourceAnnotation Text -> SolidString -> m Type'
 getConstructorType' x l = do
