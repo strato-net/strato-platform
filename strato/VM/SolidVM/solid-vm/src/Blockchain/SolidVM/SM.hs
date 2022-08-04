@@ -51,7 +51,6 @@ module Blockchain.SolidVM.SM (
 
 import           Control.Applicative ((<|>))
 import           Control.Lens hiding (Context)
--- import           Control.Monad (when)
 import           Control.Monad.Catch (MonadCatch)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
@@ -120,6 +119,7 @@ data CallInfo = CallInfo
   , readOnly            :: Bool
   , isUncheckedSection  :: Bool -- TODO: Perform overflow/underflow checks for all arithmetic operations and revert if so, use this flag to disable checks
   , currentSourcePos    :: Maybe SourcePosition
+  , isFreeFunction      :: Bool
   } deriving (Show)
 
 {-
@@ -377,7 +377,22 @@ getVariableOfName name = do
   let currentCallInfo =
         case cStack of
           [] -> internalError "getVariableValue called with an empty stack" name
-          (x:_) -> x
+          (x:_) -> if (isFreeFunction x)
+                    then x { currentContract = CC.Contract { CC._contractName = currentContract x^.CC.contractName
+                                                ,  CC._parents = currentContract x^.CC.parents
+                                                ,  CC._constants = M.fromList []
+                                                ,  CC._storageDefs = M.fromList []
+                                                ,  CC._enums = M.fromList []
+                                                ,  CC._structs = M.fromList []
+                                                ,  CC._events = M.fromList []
+                                                ,  CC._functions = M.fromList []
+                                                ,  CC._constructor = currentContract x^.CC.constructor
+                                                ,  CC._modifiers = M.fromList []
+                                                ,  CC._vmVersion = currentContract x^.CC.vmVersion
+                                                ,  CC._contractContext = currentContract x^.CC.contractContext
+                                                } 
+                              }
+                    else x
       vars = localVariables currentCallInfo
       t s v = ('x':s, v) `seq` v
 
@@ -491,8 +506,9 @@ addCallInfo :: MonadSM m
             -> CC.CodeCollection
             -> Map SolidString (SVMType.Type, Variable)
             -> Bool
+            -> Bool
             -> m ()
-addCallInfo a c fn hsh cc initialLocalVariables ro = do
+addCallInfo a c fn hsh cc initialLocalVariables ro ff = do
   let newCallInfo =
         CallInfo {
           currentFunctionName=fn,
@@ -503,7 +519,8 @@ addCallInfo a c fn hsh cc initialLocalVariables ro = do
           localVariables=initialLocalVariables,
           readOnly=ro,
           isUncheckedSection=False, -- The rationale here is that unchecked sections only apply to the current stack frame
-          currentSourcePos=Nothing
+          currentSourcePos=Nothing,
+          isFreeFunction=ff
         }
 
   Mod.modify_ (Mod.Proxy @[CallInfo]) $ pure . (newCallInfo:)

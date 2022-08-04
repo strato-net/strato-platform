@@ -143,6 +143,7 @@ solidityFreeFunction = do
     , SolidVM.funcConstructorCalls = SolidVM.funcConstructorCalls a
     , SolidVM.funcModifiers = SolidVM.funcModifiers a
     , SolidVM.funcContext = SolidVM.funcContext a
+    , SolidVM.funcIsFree = True
     , SolidVM.funcOverload = SolidVM.funcOverload a
     }
 
@@ -325,6 +326,7 @@ functionXabi free = do
       , SolidVM.funcConstructorCalls = Map.fromList funcConstructorCallsOrModifiers
       , SolidVM.funcModifiers = funcConstructorCallsOrModifiers
       , SolidVM.funcContext = ctx
+      , SolidVM.funcIsFree = False
       , SolidVM.funcOverload = []
       }
 
