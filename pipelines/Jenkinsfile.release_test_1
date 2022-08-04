@@ -339,7 +339,7 @@ pipeline {
             }
         }
 
-        stage('Wait for Network to Sync with Devnet') {
+        stage('Beanstalk Load Test - Wait for Network to Sync with Devnet') {
             agent { label "multinode305" }
             steps {
                 script {
@@ -553,7 +553,7 @@ pipeline {
             }
         }
 
-        stage('Wait for Network to Sync with Devnet') {
+        stage('Performance Test - Wait for Network to Sync with Devnet') {
             agent { label "multinode305" }
             steps {
                 script {
