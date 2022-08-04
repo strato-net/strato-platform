@@ -43,6 +43,9 @@ data SourceUnitF a = Pragma a Identifier String
                    | Import a Text.Text
                    | NamedXabi Text.Text (XabiF a, [Text.Text])
                    | FLFunc String SolidVM.Func
+                   | FLConstant Text.Text SolidVM.ConstantDecl
+                   | FLStruct Text.Text SolidVM.Def
+                   | FLEnum Text.Text SolidVM.Def
                    | DummySourceUnit
                    deriving (Eq, Show, Generic, Functor)
 
@@ -196,6 +199,43 @@ structDeclaration = do
         }
     )
 
+solidityFLStruct :: SolidityParser SourceUnit
+solidityFLStruct = do
+  ~(a, (structName, structFields)) <- withPosition $ do
+    reserved "struct"
+    structName <- identifier
+    structFields <- braces $ many1 $ do
+      (fieldName, VariableDeclaration (SolidVM.VariableDecl decl _ _ _ _)) <- simpleVariableDeclaration
+      return (fieldName, decl)
+    pure (structName, structFields)
+  return $ FLStruct (Text.pack structName) (SolidVM.Struct{ SolidVM.fields = zipWith (\(n, v) i -> (stringToLabel n, SolidVM.FieldType i v)) structFields [0..], SolidVM.bytes = 0, SolidVM.context = a})
+    -- (
+    --   structName,
+    --   StructDeclaration SolidVM.Struct{
+    --     SolidVM.fields =
+    --        zipWith (\(n, v) i -> (stringToLabel n, SolidVM.FieldType i v)) structFields [0..],
+    --     SolidVM.bytes = 0,
+    --     SolidVM.context = a
+    --     }
+    -- )
+
+solidityFLEnum :: SolidityParser SourceUnit
+solidityFLEnum = do
+  ~(a, (enumName, enumFields)) <- withPosition $ do
+    reserved "enum"
+    enumName <- identifier
+    enumFields <- braces $ commaSep1 identifier
+    pure (enumName, enumFields)
+  return $ FLEnum (Text.pack enumName) (SolidVM.Enum {SolidVM.names = map stringToLabel enumFields, SolidVM.bytes = 0, SolidVM.context = a})
+    -- (
+    --   enumName,
+    --   EnumDeclaration SolidVM.Enum {
+    --     SolidVM.names = map stringToLabel enumFields,
+    --     SolidVM.bytes = 0,
+    --     SolidVM.context = a
+    --     }
+    -- )
+
 -- | Parses an enum definition
 enumDeclaration :: SolidityParser (String, Declaration)
 enumDeclaration = do
@@ -252,6 +292,33 @@ public keywords =
         (v1:v2:_) -> fail $ printf "multiple visibilities declared: %s vs %s" (show v1) (show v2)
         [KPublic] -> return True
         _ -> return False
+
+
+solidityFLConstant :: SolidityParser SourceUnit
+solidityFLConstant = do
+  start <- getSourcePosition
+  variableType <- simpleTypeExpression
+  -- We have to remember which variables are "public", because they
+  -- generate accessor functions
+  keywords <- many stateVariableKeyword
+  let isConstant = KConstant `elem` keywords
+  isPublic <- public keywords
+  -- check to see if the "account" variable is being used
+  variableName <- identifier
+  pragmaVersion' <- getPragmaVersion
+  when (isReservedWord pragmaVersion' variableName) $ reservedWordError pragmaVersion' variableName
+  value <- optionMaybe $ do
+    reservedOp "="
+    expression
+  end <- getSourcePosition
+  semi
+  let ctx = SourceAnnotation start end ()
+
+  if isConstant
+    then return $ FLConstant (labelToText variableName) (SolidVM.ConstantDecl variableType isPublic (fromMaybe (parseError "constants must be initialized" variableName) value) ctx)
+    else fail "only constants can be declared in the top level"
+
+
 
 
 -- | Parses the declaration part of a variable definition, which is

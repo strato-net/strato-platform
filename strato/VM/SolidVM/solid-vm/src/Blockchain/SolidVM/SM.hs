@@ -380,14 +380,14 @@ getVariableOfName name = do
           (x:_) -> if (isFreeFunction x)
                     then x { currentContract = CC.Contract { CC._contractName = currentContract x^.CC.contractName
                                                 ,  CC._parents = currentContract x^.CC.parents
-                                                ,  CC._constants = M.fromList []
-                                                ,  CC._storageDefs = M.fromList []
-                                                ,  CC._enums = M.fromList []
-                                                ,  CC._structs = M.fromList []
-                                                ,  CC._events = M.fromList []
-                                                ,  CC._functions = M.fromList []
+                                                ,  CC._constants = M.empty
+                                                ,  CC._storageDefs = M.empty
+                                                ,  CC._enums = M.empty
+                                                ,  CC._structs = M.empty
+                                                ,  CC._events = M.empty
+                                                ,  CC._functions = M.empty
                                                 ,  CC._constructor = currentContract x^.CC.constructor
-                                                ,  CC._modifiers = M.fromList []
+                                                ,  CC._modifiers = M.empty
                                                 ,  CC._vmVersion = currentContract x^.CC.vmVersion
                                                 ,  CC._contractContext = currentContract x^.CC.contractContext
                                                 } 
@@ -418,19 +418,20 @@ getVariableOfName name = do
         t "builtin variable" $ Constant $ SBuiltinVariable name
 
       maybeEnum :: Maybe Variable
-      maybeEnum = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.CC.enums)) $
+      maybeEnum = toMaybe (name `elem` M.keys (currentContract currentCallInfo ^.CC.enums) || name `elem` M.keys (codeCollection currentCallInfo^.CC.flEnums)) $
         t "enum" $ Constant $ SEnum name
 
       maybeConstant :: Maybe Variable
       maybeConstant = fmap (t "constant constant" . Constant) $ do
         let ctract = currentContract currentCallInfo
-        CC.ConstantDecl{..} <- M.lookup name $ ctract ^. CC.constants
+        let constMap = (codeCollection currentCallInfo) ^. CC.flConstants
+        CC.ConstantDecl{..} <- M.lookup name $ (ctract ^. CC.constants) `M.union` constMap
         return $ coerceType ctract constType $ case constInitialVal of
                                             CC.NumberLiteral _ x _ -> SInteger x
                                             x -> todo "constant initial val" x
 
       maybeStructDef :: Maybe Variable
-      maybeStructDef = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.CC.structs)) $
+      maybeStructDef = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.CC.structs) || name `elem` M.keys (codeCollection currentCallInfo^.CC.flStructs)) $
         t "struct def" $ Constant $ SStructDef name
 
       maybeContract :: Maybe Variable
@@ -482,11 +483,13 @@ getVariableOfName name = do
       ]
 
 getTypeOfName' :: SolidString -> CC.CodeCollection -> Typo
-getTypeOfName' s (CC.CodeCollection _ ccs) =
+getTypeOfName' s (CC.CodeCollection ccs _ _ enms strcts) =
   let lookInContract :: CC.Contract -> [Typo]
       lookInContract (CC.Contract{..}) = catMaybes
         [ fmap StructTypo (fmap (\(a,b,_) -> (a,b)) <$> M.lookup s _structs)
         , fmap EnumTypo (fst <$> M.lookup s _enums)
+        , fmap StructTypo (fmap (\(a,b,_) -> (a,b)) <$> M.lookup s strcts)
+        , fmap EnumTypo (fst <$> M.lookup s enms)
         ]
       ctrs = map ContractTypo $ M.keys ccs
    in case concatMap lookInContract ccs ++ ctrs of
