@@ -868,7 +868,7 @@ callWrapper from to mContract functionName isRCC argExps  = do
               Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName)-}
               
   when isRCC (do
-                addCallInfo to contract' (stringToLabel $ labelToString (contract'^.CC.contractName) ++ " constructor") hsh cc M.empty False
+                addCallInfo to contract' (stringToLabel $ labelToString (contract'^.CC.contractName) ++ " constructor") hsh cc M.empty False False
                 forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _ _) <- M.toList $ contract'^.CC.storageDefs] $ \(n, e) -> do
                   v <- expToVar e
                   setVar (Constant (SReference (AccountPath to $ MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v

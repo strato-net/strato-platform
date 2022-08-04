@@ -988,7 +988,6 @@ getVarTypeByName' name ctx = do
             ]
         Just (t, ctx') -> pure $ Static t ctx'
         Nothing -> do
-          cc <- asks codeCollection
           case M.lookup name $ _functions c of
             Just theFunc->
               let fArgs = flip Product ctx $ flip Static ctx . indexedTypeType . snd <$> funcArgs theFunc
