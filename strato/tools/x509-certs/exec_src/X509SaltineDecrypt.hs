@@ -4,6 +4,7 @@ import           Data.String
 import           Data.ByteString                    (ByteString)
 import           Options.Applicative
 import qualified Data.ByteString.Base16             as B16
+import qualified Data.ByteString.Char8              as C8
 import qualified Crypto.Saltine.Class               as CS             
 import qualified Crypto.Saltine.Core.SecretBox      as CS
 
@@ -14,8 +15,8 @@ data Options = Options {
     salt :: ByteString ,
     nonce :: CS.Nonce ,
     password :: Password,
-    cypherText :: ByteString
-} 
+    ciphertext :: ByteString
+} deriving (Show)
 
 main :: IO ()
 main = execParser opts >>= entryPoint
@@ -53,19 +54,17 @@ parseOptions = Options
          <> metavar "STRING"
          <> help "The password of the cypher text" )
     <*> option parseHexBS
-           ( long "cypherText"
+           ( long "ciphertext"
           <> metavar "HEX"
           <> help "The cypher text")
-    
 
 
-
+-- $ x509-saltine-decrypt
+-- Decryptin failed!
 entryPoint :: Options -> IO ()
-entryPoint o = print $ entryPointPure o 
+entryPoint = putStrLn . maybe "Failed to decrypt the ciphertext!" C8.unpack . entryPointPure
+
 
 
 entryPointPure :: Options -> Maybe ByteString
-entryPointPure Options{..} = decrypt (getKeyFromPasswordAndSalt password salt) nonce cypherText 
-
-
-
+entryPointPure Options{..} = B16.encode <$> decrypt (getKeyFromPasswordAndSalt password salt) nonce ciphertext
