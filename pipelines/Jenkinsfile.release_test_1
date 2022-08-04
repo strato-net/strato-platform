@@ -422,8 +422,6 @@ pipeline {
                     usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME'),
                 ]) {
                     script {
-                        sh "rm -rf monitor"
-                        sh "git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/monitor/"
                         lib.runMonitor(NODE_DATA.NODE1, null)
                     }
                 }

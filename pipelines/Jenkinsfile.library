@@ -494,6 +494,9 @@ def runMonitor(nodeData, nodeConfig) {
   ]) {
     sh "rm -rf monitor"
     sh " git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/monitor.git"
+    dir ("monitor") {
+      sh "docker-compose down -vt0"
+    }
     def runCommand = """#!/bin/bash
         sudo \\
         ssl=true \\
