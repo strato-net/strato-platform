@@ -23,6 +23,7 @@ module Blockchain.SolidVM
   , create
   ) where
 
+
 import           Control.DeepSeq                      (force)
 import           Control.Exception                    (throw)
 import           Control.Lens hiding (assign, from, to, Context)
@@ -119,8 +120,10 @@ import           SolidVM.Solidity.Parse.Lexer         (stringLiteral)
 import           SolidVM.Solidity.Parse.ParserTypes
 import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpression, unparseVarType)
 
+import           Network.Haskoin.Crypto.BigWord()
 import           UnliftIO                             hiding (assert)
- 
+
+
 -- | Copying from Data.List.Extra, since our version of the extra library seems to not contain it.
 -- | A total variant of the list index function `(!!)`.
 --
@@ -265,7 +268,7 @@ create _ _ _ blockData _ sender' origin' _ _ _ newAddress code txHash' chainId' 
         maybeArgs = runParser parseArgs (ParserState "" "") "" argString
         !args = either (parseError "create arguments") CC.OrderedArgs maybeArgs
 
-    (hsh, cc) <- codeCollectionFromSource initCode
+    (hsh, cc) <- codeCollectionFromSource True initCode
     create' sender' newAddress hsh cc contractName' args x509s
 
 create' :: MonadSM m => Account -> Account -> Keccak256 -> CC.CodeCollection -> SolidString -> CC.ArgList -> M.Map Address X509Certificate -> m ExecResults
@@ -539,7 +542,7 @@ getCodeAndCollection address' = do
     (contractName', ch, cc) <-
       case resolvedCodeHash of
         Just (SolidVMCode cn ch') -> do
-          cc' <- codeCollectionFromHash ch'
+          cc' <- codeCollectionFromHash True ch'
           return (stringToLabel cn, ch', cc')
         Just ch -> internalError "SolidVM for non-solidvm code" (format ch)
         Nothing -> missingCodeCollection "SolidVM for non-existent code" (format codeHash)
@@ -863,15 +866,20 @@ callWrapper from to mContract functionName isRCC argExps  = do
                 popCallInfo
                 return (pure val, OrderedVals [])
               Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName)-}
-
-  when isRCC (
-    forM_ [(n, theType) | (n, CC.VariableDecl theType _ Nothing _) <- M.toList $ contract'^.CC.storageDefs] $ \(n, theType) -> do
-      case theType of
-        SVMType.Mapping _ _ _-> return ()
-        SVMType.Array _ _-> return ()
-        _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) MS.BDefault)
+              
+  when isRCC (do
+                addCallInfo to contract' (stringToLabel $ labelToString (contract'^.CC.contractName) ++ " constructor") hsh cc M.empty False
+                forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _ _) <- M.toList $ contract'^.CC.storageDefs] $ \(n, e) -> do
+                  v <- expToVar e
+                  setVar (Constant (SReference (AccountPath to $ MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v
+                forM_ [(n, theType) | (n, CC.VariableDecl theType _ Nothing _ _) <- M.toList $ contract'^.CC.storageDefs] $ \(n, theType) -> do
+                  case theType of
+                    SVMType.Mapping _ _ _-> return ()
+                    SVMType.Array _ _-> return ()
+                    _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) MS.BDefault
+                popCallInfo)
   logFunctionCall args to contract functionName f
-
+  
 
 runStatements' :: MonadSM m => [CC.Statement] -> m (Maybe Value)
 runStatements' [] = return Nothing
@@ -1052,11 +1060,12 @@ runStatement s@(CC.SimpleStatement (CC.VariableDefinition entries maybeExpressio
   let singleType = case entries of
                       [e] -> fromMaybe (todo "type inference not implemented" s) $ CC.vardefType e
                       _ -> todo "could not evaluate expression without tuple type" s
+  (_, cc) <- getCurrentCodeCollection
   !value <-
     case maybeExpression of
       Nothing -> do
         ctract <- getCurrentContract
-        createDefaultValue ctract singleType
+        createDefaultValue cc ctract singleType
       Just e -> do
         rhs <- weakGetVar =<< expToVar e
         case (maybeLoc, rhs) of
@@ -1484,6 +1493,9 @@ expToVar' (CC.Binary _ "%=" lhs rhs) = binopAssign rem lhs rhs
 expToVar' (CC.Binary _ "|=" lhs rhs) = binopAssign (.|.) lhs rhs
 expToVar' (CC.Binary _ "&=" lhs rhs) = binopAssign (.&.) lhs rhs
 expToVar' (CC.Binary _ "^=" lhs rhs) = binopAssign xor lhs rhs
+expToVar' (CC.Binary _ ">>=" lhs rhs)= binopAssign (\x i -> x `shiftR` fromInteger i) lhs rhs
+expToVar' (CC.Binary _ "<<=" lhs rhs)= binopAssign (\x i -> x `shiftL` fromInteger i) lhs rhs
+expToVar' (CC.Binary _ ">>>=" lhs rhs)= binopAssign (\x i -> fromInteger ( toInteger ( (fromInteger x) ::Word256) ) `shiftR` fromInteger i ) lhs rhs
 
 expToVar' (CC.MemberAccess _ (CC.Variable _ "Util") "bytes32ToString") = do
   return $ Constant $ SHexDecodeAndTrim
@@ -1505,11 +1517,19 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
       (SEnum enumName, _) -> do
         contract' <- getCurrentContract
         let maybeEnumValues = M.lookup enumName $ contract' ^. CC.enums
-            !enumVals = fromMaybe (missingType "Enum nonexistent type" enumName) maybeEnumValues
-            !num = maybe (missingType "Enum nonexistent member" (enumName, name))
-                         fromIntegral
-                         (name `elemIndex` fst enumVals)
-        return $ Constant $ SEnumVal enumName name num
+        case maybeEnumValues of
+          Nothing -> do
+            cc <- getCurrentCodeCollection
+            let maybeEnumValues' = M.lookup enumName $ (snd cc) ^. CC.flEnums
+                !enumVals' = fromMaybe (missingType "Enum nonexistent type" enumName) maybeEnumValues'
+                !num' = maybe (missingType "Enum nonexistent member" (enumName, name)) fromIntegral (name `elemIndex` fst enumVals')
+            return $ Constant $ SEnumVal enumName name num'
+          Just enumVals -> do
+            let !num = maybe (missingType "Enum nonexistent member" (enumName, name)) fromIntegral (name `elemIndex` fst enumVals)
+            return $ Constant $ SEnumVal enumName name num
+
+
+        
       (SBuiltinVariable "msg", "sender") -> (Constant . ((flip SAccount) False) . accountToNamedAccount chainId . Env.sender) <$> getEnv
       (SBuiltinVariable "msg", "data") -> do contract' <- getCurrentContract
                                              functionName <- getCurrentFunctionName
@@ -1578,7 +1598,9 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
             addr <- accountOnUnspecifiedChain <$> getCurrentAccount
             return $ Constant $ SContractFunction (Just contractName') addr constName
           else case constName `M.lookup` CC._constants cont of
-                  Nothing -> unknownConstant "constant member access" (contractName', constName)
+                  Nothing -> case constName `M.lookup` (cc ^. CC.flConstants) of 
+                    Just (CC.ConstantDecl _ _ constExp _) -> expToVar constExp
+                    Nothing -> unknownConstant "constant member access" (contractName', constName)
                   Just (CC.ConstantDecl _ _ constExp _) -> expToVar constExp
 
       (SBuiltinVariable "block", "timestamp") -> do
@@ -1721,6 +1743,7 @@ expToVar' (CC.Binary _ "^" expr1 expr2) = expToVarInteger expr1 xor expr2 SInteg
 expToVar' (CC.Binary _ "**" expr1 expr2) = expToVarInteger expr1 (^) expr2 SInteger
 expToVar' (CC.Binary _ "<<" expr1 expr2) = expToVarInteger expr1 (\x i -> x `shift` fromInteger i) expr2 SInteger
 expToVar' (CC.Binary _ ">>" expr1 expr2) = expToVarInteger expr1 (\x i -> x `shiftR` fromInteger i) expr2 SInteger
+expToVar' (CC.Binary _ ">>>" expr1 expr2) = expToVarInteger expr1 (\x i -> fromInteger ( toInteger ( (fromInteger x) ::Word256) ) `shiftR` fromInteger i ) expr2 SInteger
 
 expToVar' (CC.Unitary _ "!" expr) = do
   (Constant . SBool . not) <$> (getBool =<< expToVar expr)
@@ -1896,6 +1919,9 @@ expToVar' (CC.FunctionCall _ e args) = do
         argVals <- case args of
                         CC.OrderedArgs as -> OrderedVals <$> mapM (getVar <=< expToVar) as
                         CC.NamedArgs ns -> NamedVals <$> mapM (mapM $ getVar <=< expToVar) ns
+        let argCount = case args of
+                        CC.OrderedArgs as -> length as
+                        CC.NamedArgs ns -> length ns
         case var of
           Constant (SReference (AccountPath address (MS.StoragePath pieces))) -> do
             val' <- getVar $ Constant $ SReference $ AccountPath address $MS.StoragePath $ init pieces
@@ -1928,18 +1954,86 @@ expToVar' (CC.FunctionCall _ e args) = do
             contract' <- getCurrentContract
             address <- getCurrentAccount
             (hsh, cc) <- getCurrentCodeCollection
-
-            res <- runTheCall address contract' funcName hsh cc func argVals ro
-            return . Constant . fromMaybe SNULL $ res
+            if (CC._vmVersion contract' /= "svm3.3")
+              then do
+                res <- runTheCall address contract' funcName hsh cc func argVals ro
+                return . Constant . fromMaybe SNULL $ res
+              else do
+                let matchingFuncOverload = filter checkArgToFunc $ CC.funcOverload func
+                -- when (True) (internalError "IT'S MORBIN TIME" matchingFuncOverload)
+                res <- case matchingFuncOverload of
+                        [] -> runTheCall address contract' funcName hsh cc func argVals ro
+                        _ -> runTheCall address contract' funcName hsh cc (head matchingFuncOverload) argVals ro
+                return . Constant . fromMaybe SNULL $ res
+            where
+              compareArgNameAndTypes :: [(Maybe SolidString, Value, Maybe SolidString, CC.IndexedType)] -> Bool
+              compareArgNameAndTypes argPairs = all (== True) $ fmap testNameAndTypes argPairs
+                where
+                  testNameAndTypes :: (Maybe SolidString, Value, Maybe SolidString, CC.IndexedType) -> Bool
+                  testNameAndTypes (n1, v1, n2, t) = 
+                    if (n1 == n2) 
+                      then do
+                        case (v1, (CC.indexedTypeType t)) of
+                          (SInteger _, SVMType.Int _ _) -> True
+                          (SString _, SVMType.String _) -> True
+                          (SString _, SVMType.Bytes _ _) -> True
+                          (SBool _, SVMType.Bool) -> True
+                          (SAccount _ _, SVMType.Address _) -> True
+                          (SAccount _ _, SVMType.Account _) -> True
+                          (SEnumVal _ _ _, SVMType.UnknownLabel _ _) -> True
+                          (SStruct _ _, SVMType.UnknownLabel _ _) -> True
+                          (SContract _ _, SVMType.UnknownLabel _ _) -> True
+                          (SArray _ _, SVMType.Array _ _) -> True
+                          (SMap _ _, SVMType.Mapping _ _ _) -> True
+                          _ -> False
+                      else False
+              generateArgPairs :: [(Maybe SolidString, CC.IndexedType)] -> [(Maybe SolidString, Value, Maybe SolidString, CC.IndexedType)]
+              generateArgPairs functionArgs = case argVals of
+                  OrderedVals ov -> concatMap (\(v1, (Just n, t)) -> [(Just n, v1, Just n, t)]) (zip ov functionArgs)
+                  NamedVals nv -> concatMap (\((s1, t1), (Just s2, t2)) -> [(Just s1, t1, Just s2, t2)]) (zip nv functionArgs)
+              mapArgs :: CC.FuncF a -> [(String, (SVMType.Type, Value))]
+              mapArgs theFunc = case argVals of
+                OrderedVals vs -> let argMeta = 
+                                        map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t))
+                                        $ CC.funcArgs theFunc
+                                  in zipWith (\(n, t) v -> (n, (t, v))) argMeta vs
+                NamedVals ns ->
+                  let strTypes = M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ CC.funcArgs theFunc
+                      typeAndVal = M.merge (M.dropMissing)
+                                          (M.dropMissing)
+                                          (M.zipWithMatched $ \_k t v -> (t, v))
+                                          strTypes
+                                          $ M.fromList ns
+                      -- These probably don't need to be sorted by argument index, as they are turned into a map
+                      -- when added to the call info.
+                      sortedArgs = map snd . sortWith fst
+                                . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
+                                $ M.toList typeAndVal
+                  in sortedArgs
+              checkArgToFunc :: CC.FuncF a -> Bool
+              checkArgToFunc tf = ((argPairLength) == (length $ CC.funcArgs tf)) 
+                                  && ((argPairLength) == (argCount))
+                                  && (compareArgNameAndTypes argPairing)
+                                  where
+                                    argPairing = generateArgPairs $ CC.funcArgs tf
+                                    -- argPairLength is a one to one mapping of input args to function args
+                                    argPairLength = length $ mapArgs tf
 
           Constant (SStructDef structName) -> do
             contract' <- getCurrentContract
-            let !vals = fromMaybe (missingType "struct constructor not found" structName)
-                     $ M.lookup structName $ contract'^.CC.structs
-            return . Constant . SStruct structName . fmap Constant . M.fromList $
-              case argVals of
-                OrderedVals as -> zip (map (\(a,_,_) -> a) vals) as
-                NamedVals ns -> ns
+            case M.lookup structName $ contract'^.CC.structs of 
+              Just vals -> do
+                return . Constant . SStruct structName . fmap Constant . M.fromList $
+                  case argVals of
+                    OrderedVals as -> zip (map (\(a,_,_) -> a) vals) as
+                    NamedVals ns -> ns
+              Nothing -> do
+                cc <- getCurrentCodeCollection
+                let !vals' = fromMaybe (missingType "struct constructor not found" structName) $ M.lookup structName $ (snd cc) ^. CC.flStructs        
+                return . Constant . SStruct structName . fmap Constant . M.fromList $
+                  case argVals of
+                    OrderedVals as -> zip (map (\(a,_,_) -> a) vals') as
+                    NamedVals ns -> ns
 
           Constant (SContractDef contractName') -> do
             case argVals of
@@ -1996,11 +2090,18 @@ expToVar' (CC.FunctionCall _ e args) = do
             case argVals of
               OrderedVals [SInteger i] -> do
                 c <- getCurrentContract
-                let !theEnum = fromMaybe (missingType "enum constructor" enumName)
-                            $ M.lookup enumName $ c^.CC.enums
-                case fst theEnum !? fromInteger i of
-                  Nothing -> typeError "enum val out of range" argVals
-                  Just enumVal -> pure . Constant . SEnumVal enumName enumVal $ fromInteger i
+                case M.lookup enumName $ c^.CC.enums  of 
+                  Just theEnum -> do
+                    case fst theEnum !? fromInteger i of
+                      Nothing -> typeError "enum val out of range" argVals
+                      Just enumVal -> pure . Constant . SEnumVal enumName enumVal $ fromInteger i
+                  Nothing -> do
+                    (_, cc) <- getCurrentCodeCollection                            
+                    let !theEnum' = fromMaybe (missingType "enum constructor" enumName)
+                                $ M.lookup enumName $ cc ^.CC.flEnums
+                    case fst theEnum' !? fromInteger i of
+                      Nothing -> typeError "enum val out of range" argVals
+                      Just enumVal -> pure . Constant . SEnumVal enumName enumVal $ fromInteger i
               _ -> typeError "called enum constructor with improper args" argVals
 
           Constant (SPush theArray mvar) -> Builtins.push theArray mvar argVals
@@ -2599,7 +2700,8 @@ certificateMap maybeCert cntrct =
       Nothing -> SMap stringToString emptyCertMap
       Just cert -> SMap stringToString (fromMaybe emptyCertMap $ fmap (certMap cert) (subject cert))
     where subject cert = getCertSubject =<< (eitherToMaybe . bsToCert . BC.pack $ cert)
-          certMap cert sub = if (CC._vmVersion cntrct == "svm3.3")
+          rawCert cert = eitherToMaybe . bsToCert . BC.pack $ cert
+          certMap cert sub  = if (CC._vmVersion cntrct == "svm3.3")
                               then M.fromList [ (SString "commonName", Constant . SString $ subCommonName sub)
                                               , (SString "country", Constant . SString $ fromMaybe "" $ subCountry sub)
                                               , (SString "organization", Constant . SString $ subOrg sub)
@@ -2608,6 +2710,7 @@ certificateMap maybeCert cntrct =
                                               , (SString "publicKey", Constant . SString $ BC.unpack $ pubToBytes $ subPub sub)
                                               , (SString "userAddress", Constant . SString $ show $ fromPublicKey $ subPub sub)
                                               , (SString "certString", Constant . SString $ cert)
+                                              , (SString "expirationDate", Constant . SString $ fromMaybe "" $ dateTimeToString . snd . getCertValidity <$> rawCert cert)
                                               , (SString "parent", Constant . SString $ maybe "0" show (getParentUserAddress =<< (eitherToMaybe . bsToCert . BC.pack $ cert)))
                                               ]
                               else M.fromList [ (SString "commonName", Constant . SString $ subCommonName sub)
@@ -2628,6 +2731,7 @@ certificateMap maybeCert cntrct =
                                           , (SString "publicKey", Constant . SString $ "")
                                           , (SString "userAddress", Constant . SString $ "")
                                           , (SString "certString", Constant . SString $ "")
+                                          , (SString "expirationDate", Constant . SString $ "")
                                           , (SString "parent", Constant . SString $ "")
                                           ]
                           else M.fromList [ (SString "commonName", Constant . SString $ "")
@@ -2739,17 +2843,17 @@ runTheConstructors from to hsh cc contractName' argExps = do
 
   addCallInfo to contract' (stringToLabel $ labelToString contractName' ++ " constructor") hsh cc (M.fromList zipped) False
 
-  forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _) <- M.toList $ contract'^.CC.storageDefs] $ \(n, e) -> do
+  forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _ _) <- M.toList $ contract'^.CC.storageDefs] $ \(n, e) -> do
     v <- expToVar e
     setVar (Constant (SReference (AccountPath to $ MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v
 
-  forM_ [(n, theType) | (n, CC.VariableDecl theType _ Nothing _) <- M.toList $ contract'^.CC.storageDefs] $ \(n, theType) -> do
+  forM_ [(n, theType) | (n, CC.VariableDecl theType _ Nothing _ _) <- M.toList $ contract'^.CC.storageDefs] $ \(n, theType) -> do
     case theType of
       SVMType.Mapping _ _ _-> return ()
       SVMType.Array _ _-> return ()
       SVMType.Bool -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) $ MS.BBool False
       _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) MS.BDefault
-
+  
   forM_ (reverse $ contract'^.CC.parents) $ \parent -> do
     let args = CC.OrderedArgs
              . fromMaybe []
@@ -3263,6 +3367,9 @@ solidityExceptionHandler catchBlockMap ex = do
       return res
     (ModifierError s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 24 modifierError
+      return res
+    (ImmutableError s1 s2) -> do
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 25 immutableError
       return res
 
 solidVMExceptionHandler :: (MonadSM m) => (M.Map String [CC.Statement]) -> SolidException -> m (Maybe Value)
