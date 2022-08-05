@@ -31,7 +31,7 @@ import Data.Text.Encoding
 import Data.Time.Clock.POSIX
 import HFlags
 import Numeric
-import Test.Hspec (hspec, Spec, describe, xit, it, fit, pendingWith, anyException, shouldThrow, anyErrorCall, Selector)
+import Test.Hspec (hspec, Spec, describe, fit, it, fit, pendingWith, anyException, shouldThrow, anyErrorCall, Selector)
 import Test.Hspec.Expectations.Lifted
 import Text.Printf
 import Text.RawString.QQ
@@ -3687,7 +3687,7 @@ contract qq{
       [ BString $ BC.pack $  keccak256ToHex $ hash $ UTF8.fromString contract 
       , BString "657f5687fe89bd0bd3cee84e83c306c65458c0b13d13991087f9a7330474f2d8" ]
 
-  xit "can get events from the '.code' function" . runTest $ do
+  fit "can get events from the '.code' function" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|event x(uint v);|]
         contract :: String
@@ -3712,7 +3712,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
---   xit "can get an error if nothing is supplied to the code search" . runTest $ do
+--   fit "can get an error if nothing is supplied to the code search" . runTest $ do
 --     let contract :: String
 --         contract = [r|
 -- pragma solidvm 3.2;
@@ -3731,7 +3731,7 @@ contract qq{
 --     getFields ["codeTest"] `shouldReturn`
 --       [ BString $ UTF8.fromString codeSnippet]
 
-  xit "can get the code for a contract if supplied an empty string" . runTest $ do
+  fit "can get the code for a contract if supplied an empty string" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|contract Test {
   constructor(){}
@@ -3755,7 +3755,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
-  xit "can search for an enum body within a codeCollection" . runTest $ do
+  fit "can search for an enum body within a codeCollection" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|enum FreshJuiceSize{ SMALL, MEDIUM, LARGE }
 |]
@@ -3790,7 +3790,7 @@ contract qq {
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
-  xit "can search for any public variable in a contract initialized value" . runTest $ do
+  fit "can search for any public variable in a contract initialized value" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|uint public testVar = 13*56-3+8/158*8*555*65+65-65-65+59/65-8;
 |]
@@ -3814,7 +3814,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
-  xit "can search for a constant and get its initial code." . runTest $ do
+  fit "can search for a constant and get its initial code." . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|uint constant public testConst = 136546546541654654324765441651684354646468435468;
 |]
@@ -3839,7 +3839,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
-  xit "can get the current contract code without supplying anything to the code" . runTest $ do
+  fit "can get the current contract code without supplying anything to the code" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|
 pragma solidvm 3.2;
@@ -3867,14 +3867,14 @@ contract qq{
   string codeTest;
   constructor() public {
     Test t = new Test();
-    codeTest = account(this).code;
+    codeTest = account(t).code;
   }
 }|]
     runBS contract
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
-  xit "Code won't return anything if the thing is not in the file" . runTest $ do
+  fit "Code won't return anything if the thing is not in the file" . runTest $ do
     let contract :: String
         contract = [r|
 pragma solidvm 3.3;
@@ -3894,7 +3894,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString "" ]
 
-  xit "Can search for the contract in a given file using the search procedure" . runTest $ do
+  fit "Can search for the contract in a given file using the search procedure" . runTest $ do
     let contractqq :: String
         contractqq = [r|contract qq{
   string codeTest;
@@ -3922,7 +3922,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString contractqq]
 
-  xit "can properly add the final } to a contract without a constructor using the code member function" . runTest $ do
+  fit "can properly add the final } to a contract without a constructor using the code member function" . runTest $ do
     let myContract :: String
         myContract = [r|contract Test {
   uint sixtyNine = 69;
@@ -3946,7 +3946,7 @@ contract qq {
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString myContract]
 
-  xit "can properly add the final } to a contract with a constructor but information after the constructor using the code member function" . runTest $ do
+  fit "can properly add the final } to a contract with a constructor but information after the constructor using the code member function" . runTest $ do
     let myContract :: String
         myContract = [r|contract Test {
   uint sixtyNine = 69;
@@ -3980,7 +3980,7 @@ contract qq {
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString myContract]
 
-  xit "Can find a function within a codeCollection" . runTest $ do
+  fit "Can find a function within a codeCollection" . runTest $ do
     let myFunxion :: String
         myFunxion = [r|function myFunction() public returns (uint) {
     uint x = 13;
@@ -4017,7 +4017,7 @@ contract qq {
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString myFunxion]
 
-  xit "Can avoid getting confused if two functions with the same name are in the same codeCollection" . runTest $ do
+  fit "Can avoid getting confused if two functions with the same name are in the same codeCollection" . runTest $ do
     let myFunxion :: String
         myFunxion = [r|function myFunction() public returns (uint) {
     uint x = 13;
@@ -4062,7 +4062,7 @@ contract qq {
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString myFunxion]
 
-  xit "Can get just the contract if empty string is fed to the code function." . runTest $ do
+  fit "Can get just the contract if empty string is fed to the code function." . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|contract Test {
   constructor(){}
@@ -4120,7 +4120,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
-  xit "Can throw an error if more than one item is given to the code member function." $ (runTest (runBS [r|
+  fit "Can throw an error if more than one item is given to the code member function." $ (runTest (runBS [r|
 pragma solidvm 3.3;
 contract Test {
   constructor(){}
@@ -4139,7 +4139,7 @@ contract qq{
   }
 }|])) `shouldThrow` anyTooManyCooks
 
---   xit "Can throw an error if more than one item is given to the code member function." $ (runTest (runBS [r|
+--   fit "Can throw an error if more than one item is given to the code member function." $ (runTest (runBS [r|
 -- pragma solidvm 3.3;
 -- contract Test {
 --   constructor(){}

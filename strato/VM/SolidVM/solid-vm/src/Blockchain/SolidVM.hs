@@ -529,7 +529,7 @@ getCodeAndCollection address' = do
   onTraced $ liftIO $ putStrLn $ "----------------- callee address: " ++ format address'
   if Just address' == maybeAddress
     then do
-    c' <- getCurrentContract
+    c' <- 
     (hsh, cc') <- getCurrentCodeCollection
     return (c', hsh, cc')
     else do
@@ -1929,8 +1929,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                       --Remove all of the items that were found to contain nothing, this should leave just the items that we found
                       in catMaybes [contrAnno, funcAnno, constAnno, storjAnno, enumAnno, eventAnno, structAnno]
             liftIO $ do print ("++++++++++++++++++++++++" :: String)
-                        print argVals
-                        print searchTerms
+                        print anno
                         print ("++++++++++++++++++++++++" :: String)
             --Throw an error if more than a single string is passed in, this can be changed in the future without many 
             -- when ((length argVals) > 1) $ tooManyCooks 1 (length argVals)
