@@ -29,7 +29,7 @@ import           Control.Exception                    (throw)
 import           Control.Lens hiding (assign, from, to, Context)
 import           Control.Applicative
 import           Control.Monad
-import           Control.Monad.Extra                  (fromMaybeM)
+import           Control.Monad.Extra                  (fromMaybeM, findM)
 import qualified Control.Monad.Change.Alter           as A
 import qualified Control.Monad.Change.Modify          as Mod
 import           Control.Monad.IO.Class
@@ -297,7 +297,7 @@ create' creator newAccount ch cc contractName' argExps x509s = do
   onTraced $ liftIO $ putStrLn $ C.red $ "Creating Contract: " ++ show newAccount ++ " of type " ++ labelToString contractName'
   onTraced $ liftIO $ putStrLn $ "Contract uses SolidVM version: " ++ show vmVersion'
 
-  addCallInfo newAccount contract' (stringToLabel $ labelToString contractName' ++ " constructor") ch cc M.empty False
+  addCallInfo newAccount contract' (stringToLabel $ labelToString contractName' ++ " constructor") ch cc M.empty False False
 
   popCallInfo
 
@@ -312,7 +312,7 @@ create' creator newAccount ch cc contractName' argExps x509s = do
 
   onTraced $ liftIO $ putStrLn $ C.green $ "Done Creating Contract: " ++ show newAccount ++ " of type " ++ labelToString contractName'
 
-  addCallInfo newAccount contract' (stringToLabel $ labelToString contractName' ++ " constructor") ch cc M.empty False
+  addCallInfo newAccount contract' (stringToLabel $ labelToString contractName' ++ " constructor") ch cc M.empty False False
   -- blockdataNumber $ BlockHeader . Env
   -- set creator again, in case the caller's cert changed during constructor execution
   (\env -> setCreator (Env.origin env) newAccount contract' (blockDataNumber $ Env.blockHeader env)) =<< getEnv
@@ -840,13 +840,13 @@ callWrapper from to mContract functionName isRCC argExps  = do
             let ro = case mCallInfo of
                        Nothing -> False
                        Just ci -> if fromChain == toChain then readOnly ci else True
-            let f' = (if from == to then id else pushSender from) $ runTheCall to contract functionName hsh cc theFunction args' ro
+            let f' = (if from == to then id else pushSender from) $ runTheCall to contract functionName hsh cc theFunction args' ro False
             return (f', args')
           _ -> do --Maybe the function is actually a getter
             case (M.lookup functionName $ contract^.CC.storageDefs,(isSvm3_2 || isSvm3_3)) of
               (Just _, True) -> do 
                   liftIO $ putStrLn ("callWrapper/getter " ++ labelToString functionName) 
-                  addCallInfo to contract functionName hsh cc M.empty True
+                  addCallInfo to contract functionName hsh cc M.empty True False
                 --TODO- this should only exist if the storage variable is declared "public", 
                 -- right now I just ignore this and allow anything to be called as a getter
                   val <- fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack $ labelToString functionName 
@@ -868,7 +868,7 @@ callWrapper from to mContract functionName isRCC argExps  = do
               Nothing -> unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName)-}
               
   when isRCC (do
-                addCallInfo to contract' (stringToLabel $ labelToString (contract'^.CC.contractName) ++ " constructor") hsh cc M.empty False
+                addCallInfo to contract' (stringToLabel $ labelToString (contract'^.CC.contractName) ++ " constructor") hsh cc M.empty False False
                 forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _ _) <- M.toList $ contract'^.CC.storageDefs] $ \(n, e) -> do
                   v <- expToVar e
                   setVar (Constant (SReference (AccountPath to $ MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v
@@ -1948,7 +1948,6 @@ expToVar' (CC.FunctionCall _ e args) = do
             OrderedVals vs -> Constant <$> callBuiltin name vs o
             NamedVals{} -> invalidArguments (printf "expToVar'/builtinfunction: cannot used namedvals with builtin %s" name) argVals
 
-
           Constant (SFunction funcName func) -> do
             ro <- readOnly <$> getCurrentCallInfo
             contract' <- getCurrentContract
@@ -1956,37 +1955,73 @@ expToVar' (CC.FunctionCall _ e args) = do
             (hsh, cc) <- getCurrentCodeCollection
             if (CC._vmVersion contract' /= "svm3.3")
               then do
-                res <- runTheCall address contract' funcName hsh cc func argVals ro
+                res <- runTheCall address contract' funcName hsh cc func argVals ro False
                 return . Constant . fromMaybe SNULL $ res
               else do
-                let matchingFuncOverload = filter checkArgToFunc $ CC.funcOverload func
                 -- when (True) (internalError "IT'S MORBIN TIME" matchingFuncOverload)
-                res <- case matchingFuncOverload of
-                        [] -> runTheCall address contract' funcName hsh cc func argVals ro
-                        _ -> runTheCall address contract' funcName hsh cc (head matchingFuncOverload) argVals ro
+                res <- do
+                  if (CC.funcIsFree func)
+                    then do
+                      matchingOverload <- findM testMatch $ CC.funcOverload func
+                      doesFunctionMatch <- testMatch func
+                      if (doesFunctionMatch)
+                        then runTheCall address contract' funcName hsh cc func argVals ro True
+                        else case matchingOverload of
+                          Nothing -> runTheCall address contract' funcName hsh cc func argVals ro True
+                          Just mo -> runTheCall address contract' funcName hsh cc mo argVals ro True
+                    else do
+                      matchingOverload <- findM testMatch $ CC.funcOverload func
+                      doesFunctionMatch <- testMatch func
+                      if (doesFunctionMatch)
+                        then runTheCall address contract' funcName hsh cc func argVals ro False
+                        else case matchingOverload of
+                                Nothing ->  case M.lookup funcName $ cc^.CC.flFuncs of
+                                              Just ff -> do
+                                                matchingFreeOverload <- findM testMatch $ CC.funcOverload ff
+                                                doesFreeFunctionMatch <- testMatch ff
+                                                if (doesFreeFunctionMatch)
+                                                  then runTheCall address contract' funcName hsh cc ff argVals ro True
+                                                  else case matchingFreeOverload of
+                                                    Nothing -> runTheCall address contract' funcName hsh cc func argVals ro False
+                                                    Just mo -> runTheCall address contract' funcName hsh cc mo argVals ro True
+                                              Nothing -> runTheCall address contract' funcName hsh cc func argVals ro False
+                                Just mo -> runTheCall address contract' funcName hsh cc mo argVals ro False
                 return . Constant . fromMaybe SNULL $ res
             where
-              compareArgNameAndTypes :: [(Maybe SolidString, Value, Maybe SolidString, CC.IndexedType)] -> Bool
-              compareArgNameAndTypes argPairs = all (== True) $ fmap testNameAndTypes argPairs
-                where
-                  testNameAndTypes :: (Maybe SolidString, Value, Maybe SolidString, CC.IndexedType) -> Bool
-                  testNameAndTypes (n1, v1, n2, t) = 
-                    if (n1 == n2) 
-                      then do
-                        case (v1, (CC.indexedTypeType t)) of
-                          (SInteger _, SVMType.Int _ _) -> True
-                          (SString _, SVMType.String _) -> True
-                          (SString _, SVMType.Bytes _ _) -> True
-                          (SBool _, SVMType.Bool) -> True
-                          (SAccount _ _, SVMType.Address _) -> True
-                          (SAccount _ _, SVMType.Account _) -> True
-                          (SEnumVal _ _ _, SVMType.UnknownLabel _ _) -> True
-                          (SStruct _ _, SVMType.UnknownLabel _ _) -> True
-                          (SContract _ _, SVMType.UnknownLabel _ _) -> True
-                          (SArray _ _, SVMType.Array _ _) -> True
-                          (SMap _ _, SVMType.Mapping _ _ _) -> True
-                          _ -> False
-                      else False
+              testMatch :: MonadSM m => CC.Func -> m Bool
+              testMatch tf = do
+                let argPairing = generateArgPairs $ CC.funcArgs tf
+                    argPairLength = length $ mapArgs tf
+                doArgsMatch <- mapM testNameAndTypes argPairing
+                pure $ ((argPairLength) == (length $ CC.funcArgs tf)) 
+                           && ((argPairLength) == (argCount))
+                           && (all (== True) doArgsMatch)
+              testNameAndTypes :: MonadSM m => (Maybe SolidString, Value, Maybe SolidString, CC.IndexedType) -> m Bool
+              testNameAndTypes (n1, v1, n2, t) = 
+                if (n1 == n2) 
+                  then do
+                    -- These cases might not be all inclusive of all valid combinations.
+                    case (v1, (CC.indexedTypeType t)) of
+                      (SInteger _, SVMType.Int _ _) -> pure $ True
+                      (SString _, SVMType.String _) -> pure $ True
+                      (SString _, SVMType.Bytes _ _) -> pure $ True
+                      (SBool _, SVMType.Bool) -> pure $ True
+                      (SAccount _ _, SVMType.Address _) -> pure $ True
+                      (SAccount _ _, SVMType.Account _) -> pure $ True
+                      (SStruct _ _, SVMType.UnknownLabel _ _) -> pure $ True
+                      (SContract x _, SVMType.UnknownLabel y _) -> pure $ x == y
+                      (SArray x _, SVMType.Array y _) -> pure $ x == y
+                      (SReference addressedPath, _) -> do
+                        refType <- getXabiValueType addressedPath
+                        if (refType == (CC.indexedTypeType t))
+                          then pure $ True
+                          else 
+                            case (refType, (CC.indexedTypeType t)) of
+                              (SVMType.UnknownLabel x _, SVMType.UnknownLabel y _) -> pure $ x == y
+                              (SVMType.Array x _, SVMType.Array y _) -> pure $ x == y 
+                              _ -> pure $ False
+                      _ -> pure $ False
+                  else pure $ False
               generateArgPairs :: [(Maybe SolidString, CC.IndexedType)] -> [(Maybe SolidString, Value, Maybe SolidString, CC.IndexedType)]
               generateArgPairs functionArgs = case argVals of
                   OrderedVals ov -> concatMap (\(v1, (Just n, t)) -> [(Just n, v1, Just n, t)]) (zip ov functionArgs)
@@ -2010,14 +2045,6 @@ expToVar' (CC.FunctionCall _ e args) = do
                                 . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
                                 $ M.toList typeAndVal
                   in sortedArgs
-              checkArgToFunc :: CC.FuncF a -> Bool
-              checkArgToFunc tf = ((argPairLength) == (length $ CC.funcArgs tf)) 
-                                  && ((argPairLength) == (argCount))
-                                  && (compareArgNameAndTypes argPairing)
-                                  where
-                                    argPairing = generateArgPairs $ CC.funcArgs tf
-                                    -- argPairLength is a one to one mapping of input args to function args
-                                    argPairLength = length $ mapArgs tf
 
           Constant (SStructDef structName) -> do
             contract' <- getCurrentContract
@@ -2841,7 +2868,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
           return (n, (t, var))
 
 
-  addCallInfo to contract' (stringToLabel $ labelToString contractName' ++ " constructor") hsh cc (M.fromList zipped) False
+  addCallInfo to contract' (stringToLabel $ labelToString contractName' ++ " constructor") hsh cc (M.fromList zipped) False False
 
   forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _ _) <- M.toList $ contract'^.CC.storageDefs] $ \(n, e) -> do
     v <- expToVar e
@@ -2939,8 +2966,9 @@ runTheCall :: MonadSM m
            -> CC.Func
            -> ValList
            -> Bool
+           -> Bool
            -> m (Maybe Value)
-runTheCall address' contract' funcName hsh cc theFunction argVals ro = do
+runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
   let returns = [(n, (t, defaultValue contract' t)) | (Just n, CC.IndexedType _ t) <- CC.funcVals theFunction]
       theModifierNames = map fst $ (CC.funcModifiers theFunction) 
       svm3_3 = CC._vmVersion contract' == "svm3.3"
@@ -2981,7 +3009,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro = do
           newVar <- liftIO $ fmap Variable $ newIORef v
           return (n, (t, newVar))
 
-      addCallInfo address' contract' funcName hsh cc (M.fromList localVars) ro -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
+      addCallInfo address' contract' funcName hsh cc (M.fromList localVars) ro False -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
 
       let !commands = fromMaybe (missingField "Function call: function has been declared but not defined" funcName) $ CC.funcContents theFunction
       val <- runStatements commands
@@ -3072,7 +3100,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro = do
           newVar <- liftIO $ fmap Variable $ newIORef v
           return (n, (t, newVar))
 
-      addCallInfo address' contract' funcName hsh cc (M.fromList localVars) ro -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
+      addCallInfo address' contract' funcName hsh cc (M.fromList localVars) ro ff -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
 
       let !commands = fromMaybe (missingField "Function call: function has been declared but not defined" funcName) $ CC.funcContents theFunction
       let modContentsList = map (\m -> fromMaybe (missingField "Function call: Modifier has been declared but not defined" m) (CC.modifierContents m)) theModifiers

@@ -80,6 +80,7 @@ data FuncF a = Func
   , funcConstructorCalls :: Map SolidString [(ExpressionF a)]
   , funcModifiers :: [(SolidString, [(ExpressionF a)])]
   , funcContext :: a
+  , funcIsFree :: Bool
   , funcOverload :: [FuncF a]
   } deriving (Eq,Show,Generic, Functor)
 
