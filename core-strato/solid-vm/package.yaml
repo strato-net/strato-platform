@@ -1,0 +1,163 @@
+name: solid-vm
+version: 0.0.4
+build-type: Simple
+author: Jamshid
+maintainer:    jamshidnh@gmail.com
+synopsis: A Haskell version of an Ethereum EVM
+category:      Data Structures
+description:
+    The client described in the Ethereum Yellowpaper
+
+dependencies:
+  - base
+
+library:
+  source-dirs: src/
+  exposed-modules:
+    - Blockchain.SolidVM
+    - Blockchain.SolidVM.Simple
+    - Blockchain.SolidVM.SM
+    - Blockchain.SolidVM.CodeCollectionDB
+    - SolidVM.CodeCollectionTools
+    - SolidVM.Solidity.Detectors
+    - SolidVM.Solidity.Detectors.Contracts.ParentConstructors
+    - SolidVM.Solidity.Detectors.Typechecker
+    - SolidVM.Solidity.Detectors.Types
+    - SolidVM.Solidity.Detectors.Expressions.BooleanLiterals
+    - SolidVM.Solidity.Detectors.Expressions.DivideBeforeMultiply
+    - SolidVM.Solidity.Detectors.Pragmas.IncorrectSolidityVersion
+    - SolidVM.Solidity.Detectors.Functions.ConstantFunctions
+    - SolidVM.Solidity.Detectors.Functions.Unimplemented.Continue
+    - SolidVM.Solidity.Detectors.Functions.Unimplemented.Modifiers
+    - SolidVM.Solidity.Detectors.Statements.StateVariableShadowing
+    - SolidVM.Solidity.Detectors.Statements.UninitializedLocalVariables
+    - SolidVM.Solidity.Detectors.Statements.WriteAfterWrite
+    - SolidVM.Solidity.Detectors.Variables.StateVariables
+    - SolidVM.Solidity.Fuzzer
+    - SolidVM.Solidity.Fuzzer.Types
+    - SolidVM.Solidity.Parse.File
+    - SolidVM.Solidity.Parse.Lexer
+    - SolidVM.Solidity.Parse.Statement
+    - SolidVM.Solidity.Parse.Pragmas
+    - SolidVM.Solidity.Parse.ParserTypes
+    - SolidVM.Solidity.Parse.UnParser
+    - SolidVM.Solidity.Parse.Declarations
+    - SolidVM.Solidity.SourceTools
+  ghc-options: -Wall -O2
+  dependencies:
+  - aeson
+  - aeson-casing
+  - base16-bytestring
+  - binary
+  - blockapps-data
+  - blockapps-datadefs
+  - blockapps-mpdbs
+  - blockapps-util
+  - bytestring
+  - containers
+  - cryptonite
+  - data-default
+  - debugger
+  - deepseq
+  - ethereum-rlp
+  - exceptions
+  - extra
+  - format
+  - generic-random
+  - lens
+  - memory
+  - merkle-patricia-db
+  - monad-alter
+  - mtl
+  - nibblestring
+  - parsec
+  - prometheus-client
+  - QuickCheck
+  - quickcheck-instances
+  - semver-range
+  - servant-server
+  - solid-vm-model
+  - source-tools
+  - strato-model
+  - swagger2
+  - text
+  - time
+  - transformers
+  - unliftio
+  - utf8-string
+  - vector
+  - vm-tools
+
+
+executables:
+  parse-solidvm:
+    source-dirs: exec_src
+    other-modules: []
+    main: Parse.hs
+    dependencies:
+      - parsec
+      - solid-vm
+
+    ghc-options: -Wall -O2 -threaded -rtsopts
+
+  exprs-needed:
+    source-dirs: exec_src
+    other-modules: []
+    main: ExprsNeeded.hs
+    dependencies:
+      - containers
+      - parsec
+      - solid-vm
+      - solid-vm-model
+      - text
+
+tests:
+  solid-vm-spec:
+    source-dirs: tests/
+    main: Main.hs
+    dependencies:
+      - async
+      - base16-bytestring
+      - blockapps-datadefs
+      - blockapps-mpdbs
+      - blockapps-util
+      - bytestring
+      - containers
+      - deepseq
+      - ethereum-rlp
+      - hflags
+      - hspec
+      - hspec-expectations-lifted
+      - HUnit
+      - lens
+      - merkle-patricia-db
+      - monad-alter
+      - parsec
+      - raw-strings-qq
+      - solid-vm
+      - solid-vm-model
+      - source-tools
+      - strato-model
+      - text
+      - time
+      - vm-tools
+      - utf8-string
+
+benchmarks:
+    codebench:
+      source-dirs: bench/
+      main: CodeBench.hs
+      dependencies:
+        - criterion
+        - file-embed
+        - solid-vm
+        - deepseq
+        - binary
+        - parsec
+        - text
+        - solid-vm-model
+        - memory
+        - bytestring
+        - containers
+        - strato-model
+        - utf8-string

@@ -18,6 +18,8 @@ import           Data.Text                            (Text)
 import qualified Data.Text                            as Text
 import           Data.Source
 
+import           Control.DeepSeq
+
 import           GHC.Generics
 
 import           Text.Parsec
@@ -43,7 +45,7 @@ data SourceUnitF a = Pragma a Identifier String
                    | Import a Text.Text
                    | NamedXabi Text.Text (XabiF a, [Text.Text])
                    | DummySourceUnit
-                   deriving (Eq, Show, Generic, Functor)
+                   deriving (Eq, Show, Generic, NFData, Functor)
 
 type SourceUnit = Positioned SourceUnitF
 

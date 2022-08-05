@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveAnyClass #-}
 
 module SolidVM.Model.CodeCollection.Contract (
   ContractF(..),
@@ -20,6 +21,7 @@ module SolidVM.Model.CodeCollection.Contract (
   ) where
 
 import Control.Lens
+import Control.DeepSeq
 import Data.Aeson as A
 import Data.Map (Map)
 import Data.Source
@@ -46,7 +48,7 @@ data ContractF a =
     _modifiers :: Map SolidString (ModifierF a),
     _vmVersion :: String,
     _contractContext :: a
-  } deriving (Show, Generic, Functor)
+  } deriving (Show, Generic, NFData, Functor)
 
 instance ToJSON a => ToJSON (ContractF a)
 instance FromJSON a => FromJSON (ContractF a)
