@@ -33,8 +33,6 @@ import SolidVM.Model.SolidString
 import SolidVM.Model.Type
 import Control.DeepSeq
 
-
-
 data StatementF a =
   IfStatement (ExpressionF a) [StatementF a] (Maybe [StatementF a]) a -- if then else
   | WhileStatement (ExpressionF a) [StatementF a] a
