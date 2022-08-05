@@ -590,6 +590,13 @@ typecheckMember (Static (SVMType.UnknownLabel c) x) n = do
     t -> pure t
 typecheckMember x n = pure . bottom $ ("Unknown member: " <> showType' x <> "." <> labelToText n) <$ context' x
 
+-- codeAccountArgs :: SourceAnnotation Text -> Type'
+-- --Make the default an empty string being inputed, otherwise if it has () at the end then allow for both () and ("something")
+-- codeAccountArgs x = Sum $ (Product [] x) :|
+--                     [ Product [] x
+--                     , Function (Static (SVMType.String Nothing) x) (Static (SVMType.String Nothing) x) x
+--                     , Static (SVMType.String Nothing) x
+--                     ]
 codeAccountArgs :: SourceAnnotation Text -> Type'
 --Make the default an empty string being inputed, otherwise if it has () at the end then allow for both () and ("something")
 codeAccountArgs x = Sum $ (Product [] x) :|
@@ -597,6 +604,21 @@ codeAccountArgs x = Sum $ (Product [] x) :|
                     , Function (Static (SVMType.String Nothing) x) (Static (SVMType.String Nothing) x) x
                     , Static (SVMType.String Nothing) x
                     ]
+-- codeAccountArgs x = Sum $ stringType' x :|
+--                     [ addressType' x
+--                     , accountType' x
+--                     , intType' x
+--                     , contractType' x
+--                     , Product [intType' x, intType' x] x
+--                     , Product [intType' x, stringType' x] x
+--                     , Product [addressType' x, intType' x] x
+--                     , Product [accountType' x, intType' x] x
+--                     , Product [addressType' x, stringType' x] x
+--                     , Product [accountType' x, stringType' x] x
+--                     , Product [intType' x, stringType' x, intType' x] x
+--                     , Product [addressType' x, stringType' x, intType' x] x
+--                     , Product [accountType' x, stringType' x, intType' x] x
+--                     ]
 
 getConstructorType' :: MonadReader R m => SourceAnnotation Text -> SolidString -> m Type'
 getConstructorType' x l = do

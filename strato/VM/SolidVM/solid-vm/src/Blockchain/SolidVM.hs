@@ -1812,16 +1812,33 @@ expToVar' (CC.FunctionCall _ e args) = do
             --convert the code into a string to manipulate
             -- let decodeCD = DT.decodeUtf8 cd'
             --Get the search term from the input
+            -- -- let searchTerms = case argVals of
+            -- --     -- catch only the SStrings
+            -- --     OrderedVals manyTerms -> case manyTerms of 
+            -- --       []  -> pure Nothing
+            -- --       [a] -> Just a
+            -- --       as  -> tooManyCooks 1 (length as)
+            -- --     -- NamedVals [SString arguments] -> pure $ Just arguments
+            -- --     _ -> pure $ Nothing
+            -- -- searchTerm <- case searchTerms of
+            -- --   Just (SString searchTerms) -> pure searchTerms
+            -- --   Nothing -> pure ""
+            -- --   _ -> pure ""
+            -- let searchTerms = case argsVals of
+            --   OrderedVals [Just (SString searchTerms)] -> pure searchTerm
+            --   OrderedVals xs | length xs == 0 = pure ""
+            --                  | length xs == 1 = generalMetaProgrammingError "search term types" xs
+            --                  | length xs > 1  = tooManyCooks 1 (length xs)
+            --   _ -> generalMetaProgrammingError "search term" "Input Mismatch"
+                             
             searchTerms <- case argVals of
                 -- catch only the SStrings
                 OrderedVals [SString arguments] -> pure $ Just arguments
                 -- NamedVals [SString arguments] -> pure $ Just arguments
-                _ -> pure $ Nothing
+                _ -> pure $ Nothing    
             --get only the contract and its collection of sourceAnnotation contained in the ContractF type.
             (contract, _, _) <- getCodeAndCollection address
-            liftIO $ do print ("++++++++++++++++++++++++" :: String)
-                        print searchTerms
-                        print ("++++++++++++++++++++++++" :: String)
+
             --get the position of the searched item if something was wanting to be searched
             let anno :: [(Int, Int, Int, Int)]
                 anno = 
@@ -1911,7 +1928,13 @@ expToVar' (CC.FunctionCall _ e args) = do
                               -- fmap (unparseFunc ()) ((contract ^. CC.functions) M.!? term)
                       --Remove all of the items that were found to contain nothing, this should leave just the items that we found
                       in catMaybes [contrAnno, funcAnno, constAnno, storjAnno, enumAnno, eventAnno, structAnno]
-
+            liftIO $ do print ("++++++++++++++++++++++++" :: String)
+                        print argVals
+                        print searchTerms
+                        print ("++++++++++++++++++++++++" :: String)
+            --Throw an error if more than a single string is passed in, this can be changed in the future without many 
+            -- when ((length argVals) > 1) $ tooManyCooks 1 (length argVals)
+            -- when (length anno > 1) $ tooManyResultsError searchTerms (length anno)
             case anno of 
               [] -> pure . Constant $ SString $ "" --TODO: add warning that nothing was found and the piece of code is redundant
               -- Return the position of the found item
@@ -2005,32 +2028,33 @@ evaluateAccountMember a _ "codehash" = do
     Just (SolidVMCode _ ch') -> return (Constant $ SString . keccak256ToHex $ ch')
     Just cp -> missingCodeCollection "Account is not a SolidVM contract" (format cp)
     Nothing -> missingCodeCollection "Could not resolve code pointer for account" (format realAccount)
--- evaluateAccountMember a _ "code" = do 
---   -- Get the code at the address
---   cid <- case (a ^. namedAccountChainId) of 
---     UnspecifiedChain -> do
---       cid1 <- view accountChainId <$> getCurrentAccount
---       case cid1 of
---         Nothing -> return Nothing
---         Just cid2 -> return $ Just cid2
---     MainChain -> return Nothing
---     ExplicitChain cid -> return $ Just cid
---   let realAccount = namedAccountToAccount cid a
---   -- Retreive and resolve the codehash
---   codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) realAccount
---   resolvedCodeHash <- resolveCodePtr cid codeHash'
---   let ch' = case resolvedCodeHash of
---               Just (SolidVMCode _ ch1') -> ch1' 
---               Just cp -> missingCodeCollection "Account is not a SolidVM contract" (format cp)
---               Nothing -> missingCodeCollection "Could not resolve code pointer for account" (format realAccount)
---   -- Find the code using the codehash
---   cd <- A.lookup (A.Proxy @DBCode) ch'
---   let cd' = case cd of
---               Just (_,bs) -> bs
---               Nothing -> missingCodeCollection "Could not locate SolidVM code collection at account" (format realAccount)
---   let decodeCD = TE.decodeUtf8 cd'
---   -- Format the result  
---   return $ Constant $ SString $ T.unpack decodeCD
+--Get the whole code collection when nothing is supplied to the code function
+evaluateAccountMember a _ "code" = do 
+  -- Get the code at the address
+  cid <- case (a ^. namedAccountChainId) of 
+    UnspecifiedChain -> do
+      cid1 <- view accountChainId <$> getCurrentAccount
+      case cid1 of
+        Nothing -> return Nothing
+        Just cid2 -> return $ Just cid2
+    MainChain -> return Nothing
+    ExplicitChain cid -> return $ Just cid
+  let realAccount = namedAccountToAccount cid a
+  -- Retreive and resolve the codehash
+  codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) realAccount
+  resolvedCodeHash <- resolveCodePtr cid codeHash'
+  let ch' = case resolvedCodeHash of
+              Just (SolidVMCode _ ch1') -> ch1' 
+              Just cp -> missingCodeCollection "Account is not a SolidVM contract" (format cp)
+              Nothing -> missingCodeCollection "Could not resolve code pointer for account" (format realAccount)
+  -- Find the code using the codehash
+  cd <- A.lookup (A.Proxy @DBCode) ch'
+  let cd' = case cd of
+              Just (_,bs) -> bs
+              Nothing -> missingCodeCollection "Could not locate SolidVM code collection at account" (format realAccount)
+  let decodeCD = TE.decodeUtf8 cd'
+  -- Format the result  
+  return $ Constant $ SString $ T.unpack decodeCD
 evaluateAccountMember a _ "balance" = do 
   cid <- case (a ^. namedAccountChainId) of 
     UnspecifiedChain -> do
