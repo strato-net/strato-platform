@@ -71,7 +71,7 @@ solidityLanguage = javaStyle {
      "address", --"send", "balance",
      "enum", "struct", "mapping", "var",
      "function", "returns", "return", "modifier", "revert",
-     "delete", "constant", "storage", "memory", "calldata",
+     "delete", "constant", "storage", "memory", "calldata", "immutable",
      "if", "else", "while", "for", "break", "continue",
      "call", "callcode", "length", "sha3", "ecrecover",
      "suicide", "this",
@@ -88,7 +88,7 @@ solidityLanguage = javaStyle {
   P.reservedOpNames = [
     "!", "&&", "||", "==", "!=",
     "<=", ">=", "<", ">", "&", "|", "^", "~", "+", "*", "-", "/"," %", "**",
-    "+=", "-=", "*=", "/=", "%=", "|=", "&=", "^=", "++", "--",
+    "+=", "-=", "*=", "/=", "%=", "|=", "&=",  ">>=", "<<=", "^=", "++", "--",
     "=>", "="
     ],
   P.caseSensitive = True,

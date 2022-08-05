@@ -185,6 +185,7 @@ contract Certificate {
     address public userAddress;
     address public parent;
     address[] public children;
+
     
     // Store all the fields of a certificate in a Cirrus record
     string commonName;
@@ -195,6 +196,7 @@ contract Certificate {
     string public publicKey;
     string public certificateString;
     bool public isValid;
+    int expirationDate;
 
     constructor(string _certificateString) {
         owner = msg.sender;
@@ -210,10 +212,23 @@ contract Certificate {
         publicKey = parsedCert["publicKey"];
         certificateString = parsedCert["certString"];
         isValid = true;
+        expirationDate = stringToUint(parsedCert["expirationDate"]);
         parent = address(parsedCert["parent"]);
         children = [];
     }
     
+    function stringToUint(string s) constant returns (uint result) {
+        bytes memory b = bytes(s);
+        uint i;
+        result = 0;
+        for (i = 0; i < b.length; i++) {
+            uint c = uint(b[i]);
+            if (c >= 48 && c <= 57) {
+                result = result * 10 + (c - 48);
+            }
+        }
+    }
+
     function addChild(address _child) public {
         children.push(_child);
     }
