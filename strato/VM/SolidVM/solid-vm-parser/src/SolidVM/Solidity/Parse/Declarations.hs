@@ -303,8 +303,9 @@ eventDeclaration = do
   name <- identifier
   logs <- tupleDeclaration
   anon <- option False (reserved "anonymous" >> return True)
-  semi
   end <- getSourcePosition
+  semi
+
   let ctx = SourceAnnotation start end ()
   return
     (
