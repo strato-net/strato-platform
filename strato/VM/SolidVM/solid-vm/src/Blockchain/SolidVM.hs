@@ -529,7 +529,7 @@ getCodeAndCollection address' = do
   onTraced $ liftIO $ putStrLn $ "----------------- callee address: " ++ format address'
   if Just address' == maybeAddress
     then do
-    c' <- 
+    c' <- getCurrentContract
     (hsh, cc') <- getCurrentCodeCollection
     return (c', hsh, cc')
     else do
