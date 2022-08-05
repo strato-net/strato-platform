@@ -7,6 +7,7 @@
 module SolidVM.Model.CodeCollection (
   CodeCollectionF(..),
   CodeCollection,
+  flFuncs,
   contracts,
   getParents,
   flConstants,
@@ -49,6 +50,7 @@ import           SolidVM.Model.SolidString
 data CodeCollectionF a =
   CodeCollection {
     _contracts :: Map SolidString (ContractF a),
+    _flFuncs :: Map SolidString (FuncF a),
     _flConstants ::  Map SolidString (ConstantDeclF a),
     _flEnums :: Map SolidString ([SolidString], a),
     _flStructs :: Map SolidString [(SolidString, FieldType, a)]

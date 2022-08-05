@@ -62,6 +62,7 @@ unparseSourceUnit (NamedXabi name (contract,inherited)) =
   <> concatMap (("\n    " <>) . unparseCtor) (Map.elems $ xabiConstr contract)
   <> concatMap (("\n    " <>) . unparseFunc) (Map.toList $ xabiFuncs contract)
   <> "\n}"
+unparseSourceUnit (FLFunc n a) = unparseFunc (n, a)
 
 unparseVar :: (SolidString, VariableDecl) -> String
 unparseVar (name, (VariableDecl theType isPublic maybeExpression _ _)) =

@@ -53,7 +53,7 @@ data ParseTypeCheckOrSolidVMError = PEx ParseError
                          | TCEx [SourceAnnotation T.Text]
                          | SVMEx (Positioned ((,) SolidException)) deriving (Show)
 
-data SUnitIntermediary = Con Contract | FLC ConstantDecl | FLS Def.Def | FLE Def.Def
+data SUnitIntermediary = Con Contract | FLC ConstantDecl | FLS Def.Def | FLE Def.Def | FLF Func
 
 {-# NOINLINE unsafeCodeMapIORef #-}
 unsafeCodeMapIORef :: IORef (Map Keccak256 CodeCollection)
@@ -85,6 +85,8 @@ compileSourceNoInheritance initCodeMap = do
             ctrct <- first SVMEx
                    $ xabiToContract (textToLabel name) (map textToLabel parents') vmVersion' xabi
             pure $ Just $ (textToLabel name, Con ctrct)
+          FLFunc name fdec -> do
+            pure $ Just $ (name, FLF fdec)
           FLConstant name cnst -> do
             pure $ Just $ (textToLabel name, FLC cnst)
           FLStruct name fls -> do
@@ -93,14 +95,15 @@ compileSourceNoInheritance initCodeMap = do
             pure $ Just $ (textToLabel name, FLE fle)
           _ -> pure Nothing
 --      sUnitSorter :: [(SolidString, SUnitIntermediary)] ->  ([(SolidString, ConstantDecl)], [(SolidString, Contract)], [(SolidString, ([SolidString], a))], [(SolidString, [(SolidString, FieldType, a)])])
-      sUnitSorter = foldr (\(name, sUnit) (cs, cs2, cs3, cs4) -> case sUnit of
-        Con ctrct -> (cs, (name, ctrct):cs2, cs3, cs4)
-        FLC cnst -> ((name, cnst):cs, cs2, cs3, cs4)
-        FLE (Def.Enum vals _ a) -> (cs, cs2, (name, (vals, a)):cs3, cs4)
-        FLS (Def.Struct vals _ a) -> (cs, cs2, cs3, (name, (\(k,v) -> (k,v,a)) <$> vals):cs4) --conversion to match struct form
+      sUnitSorter = foldr (\(name, sUnit) (cs, cs2, cs3, cs4, cs5) -> case sUnit of
+        Con ctrct -> (cs, (name, ctrct):cs2, cs3, cs4, cs5)
+        FLC cnst -> ((name, cnst):cs, cs2, cs3, cs4, cs5)
+        FLE (Def.Enum vals _ a) -> (cs, cs2, (name, (vals, a)):cs3, cs4, cs5)
+        FLS (Def.Struct vals _ a) -> (cs, cs2, cs3, (name, (\(k,v) -> (k,v,a)) <$> vals):cs4, cs5) --conversion to match struct form
+        FLF f -> (cs, cs2, cs3, cs4, (name, f):cs5)
         FLE y -> parseError "FLE non Enum should be impossible"   (show y)
         FLS x -> parseError "FLS non Struct should be impossible" (show x)
-        ) ([], [], [], [])
+        ) ([], [], [], [], [])
       throwDuplicate :: (SolidString, Contract) -> Map SolidString Contract -> Either ParseTypeCheckOrSolidVMError (Map SolidString Contract)
       throwDuplicate (cName, unit) m = case M.lookup cName m of
         Nothing -> pure $ M.insert cName unit m
@@ -108,11 +111,26 @@ compileSourceNoInheritance initCodeMap = do
                  $ newErrorMessage (Message $ "Duplicate unit found: " ++ labelToString cName)
                                    (fromSourcePosition $ _sourceAnnotationStart $ _contractContext unit)
 
+      throwDuplicateFunction :: (SolidString, Func) -> Map SolidString Func -> Either ParseTypeCheckOrSolidVMError (Map SolidString Func)
+      throwDuplicateFunction (fname, func) m = case M.lookup fname m of
+        Nothing -> pure $ M.insert fname func m 
+        Just fdec -> do
+          let oldParamTypes = fmap snd $ funcArgs fdec
+              newParamTypes = fmap snd $ funcArgs func
+              overloadParamTypes = concatMap (\x -> [fmap snd $ funcArgs x]) $ funcOverload fdec
+          if ((oldParamTypes == newParamTypes) || (newParamTypes `elem` overloadParamTypes))
+            then Left . PEx $ newErrorMessage (Message $ "Free function could not be overloaded: " ++ labelToString fname)
+                                              (fromSourcePosition $ _sourceAnnotationStart $ funcContext func)
+            else do
+              pure $ M.insert fname (fdec{funcOverload = funcOverload fdec ++ [func]}) m
+                                           
   allSUnits <- fmap concat . traverse (uncurry getNamedSUnits) $ M.toList initCodeMap
-  let (allConstants, allContracts, allEnums, allStructs) = sUnitSorter allSUnits
+  let (allConstants, allContracts, allEnums, allStructs, allFreeFunctions) = sUnitSorter allSUnits
   deduplicatedContracts <- foldrM throwDuplicate M.empty allContracts
+  deduplicatedFreeFunctions <- foldrM throwDuplicateFunction M.empty (allFreeFunctions :: [(SolidString, Func)])
   pure $ CodeCollection {
     _contracts = deduplicatedContracts,
+    _flFuncs = deduplicatedFreeFunctions,
     _flConstants = M.fromList allConstants,
     _flEnums = M.fromList allEnums,
     _flStructs = M.fromList allStructs
