@@ -19,6 +19,7 @@ module SolidVM.Solidity.Xabi (
   ) where
 
 import           Control.Lens                 (mapped, (&), (?~))
+import           Control.DeepSeq
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
@@ -40,7 +41,7 @@ import           SolidVM.Model.SolidString
 
 data XabiKind = ContractKind
               | InterfaceKind
-              | LibraryKind deriving (Eq, Show, Generic)
+              | LibraryKind deriving (Eq, Show, Generic, NFData)
 
 instance ToJSON XabiKind where
 instance FromJSON XabiKind where
@@ -55,21 +56,55 @@ instance ToSchema XabiKind where
     & mapped.schema.example ?~ toJSON ContractKind
 
 data XabiF a = Xabi
-  { xabiFuncs     :: Map SolidString (FuncF a)
-  , xabiConstr    :: Map SolidString (FuncF a)
-  , xabiVars      :: Map SolidString (VariableDeclF a)
-  , xabiConstants :: Map SolidString (ConstantDeclF a)
-  , xabiTypes     :: Map SolidString SolidVM.Def
-  , xabiModifiers :: Map SolidString (ModifierF a)
-  , xabiEvents    :: Map SolidString (EventF a)
+  { xabiFuncs     :: Map Text (FuncF a)
+  , xabiConstr    :: Map Text (FuncF a)
+  , xabiVars      :: Map Text (VariableDeclF a)
+  , xabiConstants :: Map Text (ConstantDeclF a)
+  , xabiTypes     :: Map Text (SolidVM.DefF a)
+  , xabiModifiers :: Map Text (ModifierF a)
+  , xabiEvents    :: Map Text (EventF a)
   , xabiKind      :: XabiKind
   , xabiUsing     :: Map Text (UsingF a)
   , xabiContext   :: a
-  } deriving (Eq,Show,Generic, Functor)
+  } deriving (Eq,Show, Generic, NFData, Functor)
 
 type Xabi = Positioned XabiF
 
-data UsingF a = Using String a deriving (Eq,Show,Generic, Functor)
+data ModifierF a = Modifier
+  { modifierArgs     :: Map Text SolidVM.IndexedType
+  , modifierSelector :: Text
+  , modifierVals     :: Map Text SolidVM.IndexedType
+  , modifierContents :: Maybe Text
+  , modifierContext  :: a
+  } deriving (Eq,Show,Generic, NFData, Functor)
+
+type Modifier = Positioned ModifierF
+
+instance ToJSON a => ToJSON (ModifierF a) where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+
+instance FromJSON a => FromJSON (ModifierF a) where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+
+instance Arbitrary a => Arbitrary (ModifierF a) where
+  arbitrary = GR.genericArbitrary GR.uniform
+
+instance ToSchema Modifier where
+  declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
+    & mapped.name ?~ "Function Modifier"
+    & mapped.schema.description ?~ "Xabi Function Modifier"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex :: ModifierF ()
+      ex = Modifier
+        { modifierArgs = Map.fromList [("userAddress", SolidVM.IndexedType {indexedTypeIndex = 0, indexedTypeType = SVMType.Int {signed = Just False, bytes = Just 32}})]
+        , modifierSelector = "0adfe412"
+        , modifierVals = Map.fromList [("#0",SolidVM.IndexedType {indexedTypeIndex = 0, indexedTypeType = SVMType.Int {signed = Just False, bytes = Just 32}})]
+        , modifierContents = Nothing
+        , modifierContext = ()
+        }
+
+data UsingF a = Using String a deriving (Eq,Show,Generic, NFData, Functor)
 
 type Using = Positioned UsingF
 
