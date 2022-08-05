@@ -107,6 +107,7 @@ executables:
       - base16-bytestring
       - blockapps-vault-wrapper-server
       - blockapps-vault-wrapper-api
+      - x509-certs
 
 
 
