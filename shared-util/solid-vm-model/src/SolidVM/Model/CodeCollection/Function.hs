@@ -16,6 +16,7 @@ module SolidVM.Model.CodeCollection.Function (
   ) where
 
 import           Control.Lens                 (mapped, (&), (?~))
+import           Control.DeepSeq
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
@@ -31,7 +32,7 @@ import           Test.QuickCheck.Instances    ()
 import           SolidVM.Model.CodeCollection.Statement
 import qualified SolidVM.Model.CodeCollection.VarDef  as SolidVM
 
-data StateMutability = Pure | Constant | View | Payable deriving (Eq, Ord, Show, Generic)
+data StateMutability = Pure | Constant | View | Payable deriving (Eq, Ord, Show, Generic, NFData)
 
 tShow :: StateMutability -> Text
 tShow Pure = "pure"
@@ -77,7 +78,7 @@ data FuncF a = Func
   , funcConstructorCalls :: Map String [(ExpressionF a)]
   , funcModifiers :: Maybe [String]
   , funcContext :: a
-  } deriving (Eq,Show,Generic, Functor)
+  } deriving (Eq,Show, Generic, NFData, Functor)
 
 instance ToJSON a => ToJSON (FuncF a)
 instance FromJSON a => FromJSON (FuncF a)
@@ -88,7 +89,7 @@ data Visibility = Private
                 | Public
                 | Internal
                 | External
-  deriving (Eq,Show,Generic)
+  deriving (Eq,Show,Generic, NFData)
 
 instance ToJSON Visibility
 instance FromJSON Visibility

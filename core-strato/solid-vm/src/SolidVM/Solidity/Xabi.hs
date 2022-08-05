@@ -17,6 +17,7 @@ module SolidVM.Solidity.Xabi (
   ) where
 
 import           Control.Lens                 (mapped, (&), (?~))
+import           Control.DeepSeq
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
@@ -41,7 +42,7 @@ import qualified SolidVM.Model.CodeCollection.VarDef  as SolidVM
 
 data XabiKind = ContractKind
               | InterfaceKind
-              | LibraryKind deriving (Eq, Show, Generic)
+              | LibraryKind deriving (Eq, Show, Generic, NFData)
 
 instance ToJSON XabiKind where
 instance FromJSON XabiKind where
@@ -59,13 +60,13 @@ data XabiF a = Xabi
   , xabiConstr    :: Map Text (FuncF a)
   , xabiVars      :: Map Text (VariableDeclF a)
   , xabiConstants :: Map Text (ConstantDeclF a)
-  , xabiTypes     :: Map Text SolidVM.Def
+  , xabiTypes     :: Map Text (SolidVM.DefF a)
   , xabiModifiers :: Map Text (ModifierF a)
   , xabiEvents    :: Map Text (EventF a)
   , xabiKind      :: XabiKind
   , xabiUsing     :: Map Text (UsingF a)
   , xabiContext   :: a
-  } deriving (Eq,Show,Generic, Functor)
+  } deriving (Eq,Show, Generic, NFData, Functor)
 
 type Xabi = Positioned XabiF
 
@@ -75,7 +76,7 @@ data ModifierF a = Modifier
   , modifierVals     :: Map Text SolidVM.IndexedType
   , modifierContents :: Maybe Text
   , modifierContext  :: a
-  } deriving (Eq,Show,Generic, Functor)
+  } deriving (Eq,Show,Generic, NFData, Functor)
 
 type Modifier = Positioned ModifierF
 
@@ -103,7 +104,7 @@ instance ToSchema Modifier where
         , modifierContext = ()
         }
 
-data UsingF a = Using String a deriving (Eq,Show,Generic, Functor)
+data UsingF a = Using String a deriving (Eq,Show,Generic, NFData, Functor)
 
 type Using = Positioned UsingF
 

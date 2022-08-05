@@ -6,6 +6,7 @@
 module SolidVM.Model.Type where
 
 import           Control.Lens              (mapped, (&), (?~))
+import           Control.DeepSeq
 import           Data.Aeson
 import           Data.Int                  (Int32)
 import           Data.Swagger
@@ -31,7 +32,7 @@ data Type
   | Array { entry:: Type, length :: Maybe Word }
   | Contract {typedef::Text}
   | Mapping {dynamic::Maybe Bool, key::Type, value::Type}
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Show, Generic, NFData)
 
 instance ToJSON Type where
   toJSON = genericToJSON typeAesonOptions{omitNothingFields = True}

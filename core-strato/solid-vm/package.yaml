@@ -151,3 +151,13 @@ benchmarks:
         - criterion
         - file-embed
         - solid-vm
+        - deepseq
+        - binary
+        - parsec
+        - text
+        - solid-vm-model
+        - memory
+        - bytestring
+        - containers
+        - strato-model
+        - utf8-string

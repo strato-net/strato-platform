@@ -6,6 +6,7 @@
 module SolidVM.Model.CodeCollection.VarDef where
 
 import           Control.Lens              (mapped, (&), (?~))
+import           Control.DeepSeq
 import           Data.Aeson
 import qualified Data.HashMap.Lazy         as HashMap
 import           Data.Int                  (Int32)
@@ -23,7 +24,7 @@ typeAesonOptions=defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="ty
 
 
 data IndexedType = IndexedType { indexedTypeIndex::Int32, indexedTypeType::Type }
-                 deriving (Eq, Show, Generic)
+                 deriving (Eq, Show, Generic, NFData)
 
 instance FromJSON IndexedType where
   parseJSON =
@@ -90,7 +91,7 @@ instance ToSchema VarType where
 instance Arbitrary VarType where arbitrary = GR.genericArbitrary GR.uniform
 -}
 data FieldType = FieldType { fieldTypeAtBytes :: Int32, fieldTypeType :: Type }
-               deriving (Eq, Show, Generic)
+               deriving (Eq, Show, Generic, NFData)
 
 instance FromJSON FieldType where
   parseJSON =

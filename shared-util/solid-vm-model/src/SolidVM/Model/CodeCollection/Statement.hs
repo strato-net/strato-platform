@@ -29,6 +29,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
 import GHC.Generics
 import SolidVM.Model.Type
+import Control.DeepSeq
 
 data StatementF a =
   IfStatement (ExpressionF a) [StatementF a] (Maybe [StatementF a]) a -- if then else
@@ -45,7 +46,7 @@ data StatementF a =
   | SimpleStatement (SimpleStatementF a) a
   | RevertStatement (Maybe String) (ArgListF a) a
   | UncheckedStatement [StatementF a] a
-  deriving (Show, Eq, Generic, Functor, ToJSON, FromJSON)
+  deriving (Show, Eq, Generic, Generic1, NFData, Functor, ToJSON, FromJSON)
 
 extractStatement :: StatementF a -> a
 extractStatement (IfStatement _ _ _ a) = a
@@ -65,7 +66,7 @@ extractStatement (UncheckedStatement _ a) = a
 
 type Statement = Positioned StatementF
 
-data Location = Memory | Storage deriving (Show, Eq, Generic)
+data Location = Memory | Storage deriving (Show, Eq, Generic, NFData)
 
 instance ToJSON Location
 instance FromJSON Location
@@ -75,7 +76,7 @@ data VarDefEntryF a = BlankEntry
                                   , _vardefLocation :: Maybe Location
                                   , vardefName :: String
                                   , vardefContext :: a
-                                  } deriving (Show, Eq, Generic, Functor)
+                                  } deriving (Show, Eq, Generic, Generic1, NFData, Functor)
 
 type VarDefEntry = Positioned VarDefEntryF
 
@@ -96,7 +97,7 @@ getVarDefContext BlankEntry = Nothing
 
 data SimpleStatementF a =
   VariableDefinition [VarDefEntryF a] (Maybe (ExpressionF a)) -- Nothing type indicates "var" keyword
-  | ExpressionStatement (ExpressionF a) deriving (Show, Eq, Generic, Functor)
+  | ExpressionStatement (ExpressionF a) deriving (Show, Eq, Generic, Generic1, NFData, Functor)
 
 type SimpleStatement = Positioned SimpleStatementF
 
@@ -108,11 +109,16 @@ instance FromJSON a => FromJSON (SimpleStatementF a)
 --  result := mload(add(source, 32))
 -- }
 -- Anything else is a parse error.
-data InlineAssembly = MloadAdd32 T.Text T.Text deriving (Show, Eq, Generic)
+data InlineAssembly = MloadAdd32 T.Text T.Text deriving (Show, Eq, Generic, NFData)
 
 instance ToJSON InlineAssembly
 instance FromJSON InlineAssembly
 
+-- instance (NFData k, NFData v) => NFData1 (Map.Map k v) where
+--   liftRnf r map = rnf map
+  
+-- instance (NFData1 f, NFData v) => NFData1 (Map.Map T.Text (f v)) where
+--   liftRnf r mapping = mapping `deepseq` (fmap r $!! mapping) `seq` ()
 
 data ExpressionF a =
   PlusPlus a (ExpressionF a)
@@ -131,7 +137,7 @@ data ExpressionF a =
   | ArrayExpression a [(ExpressionF a)]
   | Variable a String 
   | ObjectLiteral a (Map.Map T.Text (ExpressionF a))
-  deriving (Show, Eq, Generic, Functor)
+  deriving (Show, Eq, Generic, Generic1, NFData, Functor)
 
 extractExpression :: ExpressionF a -> a
 extractExpression (PlusPlus a _) = a
@@ -156,14 +162,14 @@ type Expression = Positioned ExpressionF
 instance ToJSON a => ToJSON (ExpressionF a)
 instance FromJSON a => FromJSON (ExpressionF a)
 
-data ArgListF a = OrderedArgs [ExpressionF a] | NamedArgs [(String, (ExpressionF a))] deriving (Show, Eq, Generic, Functor)
+data ArgListF a = OrderedArgs [ExpressionF a] | NamedArgs [(String, (ExpressionF a))] deriving (Show, Eq, Generic, Generic1, NFData,Functor)
 
 type ArgList = Positioned ArgListF
 
 instance ToJSON a => ToJSON (ArgListF a)
 instance FromJSON a => FromJSON (ArgListF a)
 
-data NumberUnit = Wei | Szabo | Finney | Ether deriving (Show, Eq, Generic)
+data NumberUnit = Wei | Szabo | Finney | Ether deriving (Show, Eq, Generic, NFData)
 
 instance ToJSON NumberUnit
 instance FromJSON NumberUnit
