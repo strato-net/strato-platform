@@ -422,8 +422,6 @@ pipeline {
                     usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME'),
                 ]) {
                     script {
-                        sh "rm -rf monitor"
-                        sh "git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/monitor/"
                         lib.runMonitor(NODE_DATA.NODE1, null)
                     }
                 }
@@ -526,7 +524,7 @@ pipeline {
                     }
                 }
                 stage('Sync multinode103') {
-                    agent { label "multinode102" }
+                    agent { label "multinode103" }
                     steps {
                         script {
                             lib.deployStrato(NODE_DATA.NODE3)
@@ -544,7 +542,7 @@ pipeline {
             }
         }
 
-        stage('Wait for Network to Sync with Devnet') {
+        stage('Performance Test - Wait for Network to Sync with Devnet') {
             agent { label "multinode305" }
             steps {
                 script {

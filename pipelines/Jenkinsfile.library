@@ -494,6 +494,9 @@ def runMonitor(nodeData, nodeConfig) {
   ]) {
     sh "rm -rf monitor"
     sh " git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/monitor.git"
+    dir ("monitor") {
+      sh "docker-compose down -vt0"
+    }
     def runCommand = """#!/bin/bash
         sudo \\
         ssl=true \\
@@ -905,9 +908,11 @@ def waitForHealthySync(NODE_MONITOR_HEALTH_URL) {
 def runBeanstalkLoadTest(loadTestBatchSize, loadTestBatchCount) {
   checkUnhealthyContainers()
   sleep(time:5,unit:"SECONDS") // let the updates related to transactions just posted get to the monitor and potentially flip it to unhealthy before we check for the first time
+  waitForHealthyNetwork()
   sh "sudo docker exec beanstalk_backend_1 bash -c \"cp /config/config.yaml config/generated.config.yaml && echo \\\"batchSize: ${loadTestBatchSize}\\\">>config/generated.config.yaml && echo \\\"batchCount: ${loadTestBatchCount}\\\">>config/generated.config.yaml && SERVER=generated yarn test:agreement:load\""
   sleep(time:5,unit:"SECONDS") // we wait some time to make sure nothing crashed yet and before starting monitoring the network health to see when blocks stop being created and network is healthy
   checkUnhealthyContainers()
+  waitForHealthyNetwork() // Important on the larger batchSizes when the network keeps getting new blocks after some time.
   waitForCirrus()
 }
 
@@ -962,5 +967,44 @@ def getContractBlockNumber(NODE_HOST, NODE_PORT, CONTRACT_ADDRESS, SERVICE_TOKEN
   ).trim()
   return BLOCK_NUMBER
  }
+
+def waitForHealthyNetwork() {
+  // TODO: the monitor deployment should be a part of the pipeline
+  // TODO: also check if the number of private chains is same as on another tech node (monitor should provide hooks for that)
+  def secondsForEachAgreement = "10"
+  sh """
+    set -x
+    waitForContinousHealth() {
+      isNowHealthy() {
+        if [ "\$(curl -s https://multinode305.ci.blockapps.net/health | jq .needsAttention)" = "false" ]; then exit 0; else exit 1; fi
+      }
+      if \$(isNowHealthy); then
+        sleep 5
+        if \$(isNowHealthy); then
+          sleep 5
+          if \$(isNowHealthy); then
+            exit 0
+          else exit 1
+          fi
+        else exit 1
+        fi
+      else exit 1
+      fi
+    }
+    counter=0
+    until \$(waitForContinousHealth)
+    do
+      # wait for (batchSize x batchCount x secondsForEachAgreement) seconds:
+      if [ "\$counter" -gt \$(expr ${env.BEANSTALK_LOADTEST_BATCH_SIZE} \\* ${env.BEANSTALK_LOADTEST_BATCH_COUNT} \\* ${secondsForEachAgreement}) ]
+      then
+        echo "STRATO network took too long to become healthy! Apparently something went wrong with load test."
+        exit 73
+      fi
+      echo 'Waiting for network to become healthy...'
+      counter=\$((counter+1))
+      sleep 1
+    done
+  """
+}
 
 return this
