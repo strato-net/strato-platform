@@ -634,8 +634,8 @@ pipeline {
                         ).trim()
                     if (!response.contains("Only the attribute's owner can delete the attribute")) {
                         sh 'exit 1'
-                    lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
                     }
+                    lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
                 }
             }
         }
