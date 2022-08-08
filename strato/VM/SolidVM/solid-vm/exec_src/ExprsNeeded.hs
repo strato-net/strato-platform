@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
-import Control.Exception (throw)
+-- import Control.Exception (throw)
 import qualified Data.Map as M
 import Data.Maybe
 import qualified Data.Set as S
@@ -120,9 +120,9 @@ main = do
         Pragma _ n v -> Just (n, v)
         _ -> Nothing
   let vmVersion' = if (Just ("solidvm","3.3")) `elem` (pragmas <$> parsedFile) then "svm3.3" else (if (Just ("solidvm","3.2")) `elem` (pragmas <$> parsedFile) then "svm3.2" else (if (Just ("solidvm","3.0")) `elem` (pragmas <$> parsedFile) then "svm3.0" else ""))
-      namedContracts = [(textToLabel name, either (throw . fst) id $ xabiToContract (textToLabel name) (map textToLabel parents') vmVersion' xabi)
+      namedContracts = [(textToLabel name, xabiToContract (textToLabel name) (map textToLabel parents') vmVersion' xabi)
                        | NamedXabi name (xabi, parents') <- parsedFile]
-      cc = CodeCollection (M.fromList namedContracts) (M.empty) (M.empty) (M.empty)
+      cc = CodeCollection (M.fromList namedContracts) (M.empty) (M.empty) (M.empty) (M.empty) (M.empty)
       typecheck = if (vmVersion' == "svm3.2" || vmVersion' == "svm3.3") then TC.detector cc else []
       nodes = codeCollectionCrawler cc
   putStrLn (show typecheck) --when (not null typecheck)

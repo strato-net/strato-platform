@@ -6,8 +6,10 @@
 
 module SolidVM.CodeCollectionTools (
   xabiToContract,
+  xabiToSUnitIntermediary,
   applyInheritance,
-  resolveLabels
+  resolveLabels,
+  SUnitIntermediary(..)
   ) where
 
 import Control.Lens
@@ -16,6 +18,7 @@ import qualified Data.Map as M
 import Data.Source
 
 import           Blockchain.SolidVM.Exception
+
 
 import           SolidVM.Model.CodeCollection
 import qualified SolidVM.Model.CodeCollection.Def as Def
@@ -27,16 +30,18 @@ import qualified SolidVM.Solidity.Xabi as Xabi
 
 type SolidEither = Either (Positioned ((,) SolidException))
 
-xabiToContract :: SolidString -> [SolidString] -> String -> Xabi -> SolidEither Contract
-xabiToContract contractName' parents' vmVersion' xabi = do
-  validateXabi xabi
-  constr <- case M.toList $ Xabi.xabiConstr xabi of
-    [] -> Right Nothing
-    [(_, x)] -> Right $ Just x
-    _ -> Left $ ( DuplicateDefinition "multiple constructors in contract" (show contractName') --TODO- figure out if this is allowed in Solidity
-                , Xabi.xabiContext xabi
-                )
-  pure Contract {
+data SUnitIntermediary = Con Contract | FLC ConstantDecl | FLS Def.Def | FLE Def.Def | Lib Library | Intr Interface deriving (Show, Eq)
+
+xabiToContract :: SolidString -> [SolidString] -> String -> Xabi -> Contract
+xabiToContract contractName' parents' vmVersion' xabi = Contract {
+  -- validateXabi xabi
+  -- constr <- case M.toList $ Xabi.xabiConstr xabi of
+  --   [] -> Right Nothing
+  --   [(_, x)] -> Right $ Just x
+  --   _ -> Left $ ( DuplicateDefinition "multiple constructors in contract" (show contractName') --TODO- figure out if this is allowed in Solidity
+  --               , Xabi.xabiContext xabi
+  --               ) 
+  -- This was here forever ^^ but I don't think it was ever even reachable in the first place because we already check if there are multiple constructors in Declarations.hs
   _contractName = contractName',
   _parents = parents',
   _storageDefs = Xabi.xabiVars xabi,
@@ -46,14 +51,46 @@ xabiToContract contractName' parents' vmVersion' xabi = do
   _events = Xabi.xabiEvents xabi,
   _functions = Xabi.xabiFuncs xabi,
   _modifiers = Xabi.xabiModifiers xabi,
-  _constructor = constr,
+  _constructor = case M.toList $ Xabi.xabiConstr xabi of
+    [(_, x)] -> Just x
+    _ -> Nothing, --TODO- This in theory can be reached if there are multiple constructors in the contract. but in practice so long as the check is still in Declarations.hs, this should never happen.
   _vmVersion = vmVersion',
   _contractContext = Xabi.xabiContext xabi
   }
 
+xabiToSUnitIntermediary :: SolidString -> [SolidString] -> String -> Xabi -> SUnitIntermediary 
+xabiToSUnitIntermediary contractName' parents' vmVersion' xabi = do 
+  case Xabi.xabiKind xabi of 
+    Xabi.ContractKind -> Con $ xabiToContract contractName' parents' vmVersion' xabi 
+    Xabi.LibraryKind -> Lib $ Library {
+      _libraryName = contractName',
+      _libraryContext = Xabi.xabiContext xabi,
+      _libFunctions = Xabi.xabiFuncs xabi,
+      _libModifiers = Xabi.xabiModifiers xabi,
+      _libEnums = M.fromList [(name, (vals, a)) | (name, Def.Enum vals _ a) <- M.toList $ Xabi.xabiTypes xabi],
+      _libStructs = M.fromList [(name, (\(k,v) -> (k,v,a)) <$> vals) | (name, Def.Struct vals _ a) <- M.toList $ Xabi.xabiTypes xabi],
+      _libEvents = Xabi.xabiEvents xabi,
+      _libVmVersion = vmVersion'
+      }
+    Xabi.InterfaceKind -> Intr $ Interface {
+      _interfaceName = contractName',
+      _interfaceContext = Xabi.xabiContext xabi,
+      _interFunctions = Xabi.xabiFuncs xabi,
+      _interVmVersion = vmVersion'
+      }
 
-validateXabi :: Xabi -> SolidEither ()
-validateXabi _ = Right ()
+-- getContextFuncOfSUnit :: SUnitIntermediary -> SourceAnnotation ()
+-- getContextFuncOfSUnit (Con c) = _contractContext c
+-- getContextFuncOfSUnit (Lib l) = _libraryContext l
+-- getContextFuncOfSUnit (Intr i) = _interfaceContext i
+-- getContextFuncOfSUnit (FLC c) = constContext c
+-- getContextFuncOfSUnit (FLS c) = Def.context c
+-- getContextFuncOfSUnit (FLE c) = Def.context c
+
+
+
+-- validateXabi :: Xabi -> SolidEither ()
+-- validateXabi _ = Right ()
 
 {-
 validateXabi :: Xabi -> SolidEither ()

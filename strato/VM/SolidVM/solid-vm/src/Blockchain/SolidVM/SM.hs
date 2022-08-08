@@ -462,8 +462,10 @@ getVariableOfName name = do
       , unknownVariable "getVariableOfName" name
       ]
 
+
+-- Used for x = new A() where A is either a contract, struct, or enum. so we can ignore Constants, Interfaces, and Librarys
 getTypeOfName' :: SolidString -> CC.CodeCollection -> Typo
-getTypeOfName' s (CC.CodeCollection ccs _ enms strcts) =
+getTypeOfName' s (CC.CodeCollection ccs _ enms strcts _ _) =
   let lookInContract :: CC.Contract -> [Typo]
       lookInContract (CC.Contract{..}) = catMaybes
         [ fmap StructTypo (fmap (\(a,b,_) -> (a,b)) <$> M.lookup s _structs)
