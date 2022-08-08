@@ -11,6 +11,8 @@
 module BlockApps.X509.Certificate (
   X509Certificate(..),
   X509CertInfoState(..),
+  CertificateChain(..),
+  SignedCertificate,
   Issuer(..),
   Subject(..),
   rootCert,
@@ -27,7 +29,10 @@ module BlockApps.X509.Certificate (
   getCertSubjects,
   getCertIssuer,
   getCertIssuers,
-  getParentUserAddress
+  getParentUserAddress,
+  findNodeCert,
+  x509ToSigneds,
+  signedsToX509,
  ) where
 
 
@@ -54,6 +59,7 @@ import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Char8              as C8
 import qualified Data.ByteString.Base16             as B16
 import qualified Data.ByteString.Short              as BSS
+import           Data.List                          (find)
 
 import           GHC.Generics
 
@@ -89,7 +95,7 @@ instance NFData X509Certificate where
 
 instance Binary X509Certificate where
   put = (put :: C8.ByteString -> Put) <$> certToBytes
-  get = (fromRight (error "The certificate couldn't be decoded") . bsToCert) <$> (get :: Get C8.ByteString)   
+  get = (fromRight (error "The certificate couldn't be decoded") . bsToCert) <$> (get :: Get C8.ByteString)
 
 -- | The information we store in Redis DB. We store the information of the certificate, as well
 -- as the two state values `isValid` and `children`. We keep `userAddress` around for convenience,
@@ -379,7 +385,7 @@ verifyCert :: PublicKey -> X509Certificate -> Bool
 verifyCert pkey (X509Certificate (CertificateChain cs)) = verifyCertChain pkey cs
 
 verifyCertSignedBy :: PublicKey -> X509Certificate -> Bool
-verifyCertSignedBy pkey (X509Certificate (CertificateChain (c:_))) = 
+verifyCertSignedBy pkey (X509Certificate (CertificateChain (c:_))) =
   let signed = getSigned c
       mesgBS = B.pack $ BA.unpack $ hashWith CH.SHA256 (getSignedData c)
   in
@@ -429,3 +435,7 @@ verifyCertM pkey (X509Certificate (CertificateChain cs)) = mapM_ printCertDetail
             Just subject -> do
               liftIO $ putStrLn $ format subject
               liftIO $ putStrLn $ "Subject Address: " ++ (format $ fromPublicKey $ subPub subject)
+
+-- Find a matching pubkey in a list of signed certs
+findNodeCert :: PublicKey -> [SignedCertificate] -> Maybe SignedCertificate
+findNodeCert pk = find (\x ->  unserializeAndUnwrap (certPubKey (signedObject (getSigned x))) == Just pk)

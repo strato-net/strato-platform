@@ -18,7 +18,7 @@ module Blockchain.Strato.RedisBlockDB
     , addChainMember, removeChainMember
     , registerCertificate
     , revokeCertificate
-    , getInitializeCertificateRegistry, initializeCertificateRegistry 
+    , getInitializeCertificateRegistry, initializeCertificateRegistry
     , getChainTxsInBlock, putChainTxsInBlock, addChainTxsInBlock
     , getIPChains, addIPChain, removeIPChain
     , getOrgNameChains, addOrgNameChain, removeOrgNameChain
@@ -52,6 +52,7 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.ExtendedWord  (Word256)
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Secp256k1     (importPublicKey)
 import           Blockchain.Strato.RedisBlockDB.Models as Models
 
 import           Control.Arrow                         ((&&&), (***), second)
@@ -60,7 +61,9 @@ import           Control.Monad.Change.Modify           hiding (get)
 import           Control.Monad
 import           Control.Monad.Trans
 import qualified Data.ByteString.Char8                 as S8
-import           Data.Foldable                         (foldl')
+import           Data.Either                           (fromRight)
+
+import           Data.Foldable                         (foldl', toList)
 import           Data.Functor                          ((<&>))
 import           Data.Functor.Compose
 import qualified Data.Map.Strict                       as M
@@ -187,9 +190,19 @@ addChainMember cId address enode = do
     case res of
         TxSuccess _ -> getCompose $
           Compose (addIPChain (ipAddress enode) cId) *>
-          Compose (addOrgIdChain (unOrgId $ pubKey enode) cId)
+          Compose (addOrgIdChain (unOrgId $ pubKey enode) cId) *>
+          Compose (addressToOrgName address >>= \org -> addOrgNameChain (fromRight (error "addChainMember - to the left, to the left") org) cId)
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addChainMember - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "addChainMember - Error" ++ e)
+    where addressToOrgName :: Address -> Redis (Either Reply (S8.ByteString, S8.ByteString))  -- OrgName, OrgUnit
+          addressToOrgName addr = do 
+            let getCertificate' = maybe (X509Certificate (CertificateChain [])) certificate <$> getCertificate addr     
+                extractDN = (S8.pack . subOrg) &&& (S8.pack . fromJust . subUnit)
+                getCert' certs = signedsToX509 $ toList $ findNodeCert (fromJust $ importPublicKey (unOrgId $ pubKey enode)) certs
+                getCertSubject' sub = fromJust . getCertSubject $ sub
+            cert <- x509ToSigneds <$> getCertificate'
+            
+            return $ Right $ extractDN $ getCertSubject' $ getCert' cert
 
 removeChainMember :: Word256
                   -> Address
@@ -219,10 +232,10 @@ registerCertificate userAddr x509CertInfoState = do
                 Nothing -> pure Nothing
                 Just certInfoState -> pure $ Just certInfoState
         Nothing -> pure Nothing
-        
+
     let parentCertIsValid = fmap isValid certInfoState'
         parentIsValid = fromMaybe False parentCertIsValid
-    
+
     if not status || (status && parentIsValid)
         then do
             res <- multiExec $ set (inNamespace X509Certificates $ toKey userAddr) (toValue x509CertInfoState)
@@ -230,8 +243,8 @@ registerCertificate userAddr x509CertInfoState = do
                 TxSuccess _ -> pure $ Right Ok
                 TxAborted -> pure . Left $ SingleLine (S8.pack $ "registerCertificate - Aborted")
                 TxError e -> pure . Left $ SingleLine (S8.pack $ "registerCertificate - Error" <> e)
-            
-            case certInfoState' of 
+
+            case certInfoState' of
                 Nothing -> pure . Left $ SingleLine (S8.pack "registerCertificate - No Parent")
                 Just certInfoState -> do
                     let newChildren = userAddr : children certInfoState
@@ -243,7 +256,7 @@ registerCertificate userAddr x509CertInfoState = do
                         TxAborted -> pure . Left $ SingleLine (S8.pack "registerCertificate - Aborted adding children")
                         TxError e -> pure . Left $ SingleLine (S8.pack $ "registerCertificate - Error adding children" <> e)
         else pure . Left $ SingleLine (S8.pack "registerCertificate - Parent not valid")
-                    
+
 
 revokeCertificate :: Address -> Redis (Either Reply Status)
 revokeCertificate userAddress = do
@@ -259,7 +272,7 @@ revokeCertificate userAddress = do
                         pure $ fmap (fromMaybe Ok . listToMaybe) (sequenceA res2)
                 TxAborted -> pure . Left $ SingleLine (S8.pack "registerCertificate - Aborted revoking cert")
                 TxError e -> pure . Left $ SingleLine (S8.pack $ "registerCertificate - Error revoking cert" <> e)
-                
+
 initializeCertificateRegistry :: Redis (Either Reply Status)
 initializeCertificateRegistry = do
     status <- getInitializeCertificateRegistry
@@ -381,33 +394,33 @@ removeOrgIdChain ip cId = do
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeOrgIdChain - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeOrgIdChain - Error" ++ e)
 
-getOrgNameChains :: (S8.ByteString, Maybe S8.ByteString)
+getOrgNameChains :: (S8.ByteString, S8.ByteString)
                  -> Redis (S.Set Word256)
 getOrgNameChains org = getInNamespace PrivateOrgNameChains org <&> \case
     Right (Just rchains) -> let RedisOrgNameChains chains = fromValue rchains
                             in chains
     _                    -> S.empty
-    
-addOrgNameChain :: (S8.ByteString, Maybe S8.ByteString)
+
+addOrgNameChain :: (S8.ByteString, S8.ByteString)
                 -> Word256
                 -> Redis (Either Reply Status)
 addOrgNameChain org cId = do
     chains <- getOrgNameChains org
     let chains' = RedisOrgNameChains $ S.insert cId chains
     res <- multiExec $ set (inNamespace PrivateOrgNameChains org) (toValue chains')
-    case res of 
+    case res of
         TxSuccess _ -> pure $ Right Ok
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addOrgNameChain - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "addOrgNameChain - Error" ++ e)
-    
-removeOrgNameChain :: (S8.ByteString, Maybe S8.ByteString)
-                   -> Word256  
+
+removeOrgNameChain :: (S8.ByteString, S8.ByteString)
+                   -> Word256
                    -> Redis (Either Reply Status)
 removeOrgNameChain org cId = do
     chains <- getOrgNameChains org
     let chains' = RedisOrgNameChains $ S.delete cId chains
     res <- multiExec $ set (inNamespace PrivateOrgNameChains org) (toValue chains')
-    case res of 
+    case res of
         TxSuccess _ -> pure $ Right Ok
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeOrgNameChain - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeOrgNameChain - Error" ++ e)

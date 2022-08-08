@@ -61,13 +61,9 @@ instance RedisDBValuable Bool where
 instance RedisDBKeyable S8.ByteString where
     toKey = SB16.encode
 
-instance RedisDBKeyable (S8.ByteString, Maybe S8.ByteString) where
-    toKey (n, u) = SB16.encode $ S8.concat [n, maybeOrgUnit]
-        where
-            maybeOrgUnit = case u of
-                Nothing -> S8.pack ""
-                Just x  -> S8.concat [S8.pack "/", x] 
-
+instance RedisDBKeyable (S8.ByteString, S8.ByteString) where
+    toKey (n, u) = SB16.encode $ S8.concat [n, maybeOrgUnit] 
+        where maybeOrgUnit = if u == S8.empty then S8.empty else S8.concat [S8.pack "/", u]
 instance RedisDBValuable S8.ByteString where
     toValue   = SB16.encode
     fromValue x = case SB16.decode x of

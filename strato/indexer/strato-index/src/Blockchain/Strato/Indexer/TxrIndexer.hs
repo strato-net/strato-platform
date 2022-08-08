@@ -81,6 +81,25 @@ doRemoveMember chainId address = do
   lift $ removeMember chainId address
   void . RBDB.withRedisBlockDB $ RBDB.removeChainMember chainId address
 
+doAddOrgName :: Word256 -> (BS.ByteString, BS.ByteString) -> IContextM ()
+doAddOrgName chainId org = do
+  logF [ "Adding org "
+   , show $ fst org
+   , show $ snd org
+   , formatChainId $ Just chainId
+       ]
+  void . RBDB.withRedisBlockDB $ RBDB.addOrgNameChain org chainId
+  void . withKafkaRetry1s $ writeUnseqEvents [IENewChainOrgName chainId org]
+
+doRemoveOrgName :: Word256 -> (BS.ByteString, BS.ByteString) -> IContextM ()
+doRemoveOrgName chainId org = do
+  logF ["Removing org"
+      , show $ fst org
+      , show $ snd org
+      , formatChainId $ Just chainId
+      ]
+  void . RBDB.withRedisBlockDB $ RBDB.removeOrgNameChain org chainId
+
 doRegisterCertificate :: Address -> X509CertInfoState -> IContextM ()
 doRegisterCertificate userAddress x509CertInfoState = do
   logF [ "Registering X.509 Certificate -- key/userAddress: "
@@ -115,6 +134,8 @@ txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
 
 data TxrResult = AddMember (Either String (Word256, Address, Enode))
                | RemoveMember (Either String (Word256, Address))
+               | AddOrgName (Either String (Word256, (BS.ByteString, BS.ByteString)))
+               | RemoveOrgName (Either String (Word256, (BS.ByteString, BS.ByteString)))
                | RegisterCertificate (Either String (Address, X509CertInfoState))
                | CertificateRevoked (Either String Address)
                | CertificateRegistryInitialized (Either String ())
@@ -155,6 +176,12 @@ indexEventToTxrResults = \case
       (Just chainId, "MemberRemoved", [addressStr]) -> case stringAddress addressStr of
         Nothing -> Just . RemoveMember . Left $ "failed to parse address for MemberRemoved event: " ++ addressStr
         Just address -> Just . RemoveMember $ Right (chainId, address)
+      (Just chainId, "OrganizationAdded", [orgName, orgUnit]) -> 
+        case (orgName, orgUnit) of
+          (n, u) -> Just . AddOrgName $ Right (chainId, (C8.pack n, C8.pack u))
+      (Just chainId, "OrganizationRemoved", [orgName, orgUnit]) ->
+        case (orgName, orgUnit) of  
+          (n, u) -> Just . RemoveOrgName $ Right (chainId, (C8.pack n, C8.pack u))
       (Nothing, "CertificateRegistered", [certString]) ->
         let cert = bsToCert . C8.pack $ certString
             userAddress = fmap (fromPublicKey . subPub) $ getCertSubject =<< eitherToMaybe cert
@@ -181,6 +208,12 @@ txrResultHandler = \case
   RemoveMember e -> case e of
     Right (chainId, address) -> doRemoveMember chainId address
     Left err -> $logErrorS "txrIndexer" $ T.pack err
+  AddOrgName e -> case e of 
+    Right (chainId, (orgName, orgUnit)) -> doAddOrgName chainId (orgName, orgUnit)
+    Left err -> $logErrorS "txtIndexer" $ T.pack err
+  RemoveOrgName e -> case e of 
+    Right (chainId, (orgName, orgUnit)) -> doRemoveOrgName chainId (orgName, orgUnit)
+    Left err -> $logErrorS "txtIndexer" $ T.pack err
   RegisterCertificate e -> case e of
     Right (ua, certInfoState) -> doRegisterCertificate ua certInfoState
     Left err -> $logErrorS "txrIndexer" $ T.pack err

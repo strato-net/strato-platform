@@ -66,7 +66,7 @@ instance Arbitrary IPAddress where
 
 newtype OrgId = OrgId { unOrgId :: B.ByteString } deriving (Show, Read, Eq, Ord, GHCG.Generic, NFData, Binary, Data)
 newtype OrgName = OrgName { unOrgName :: B.ByteString } deriving (Show, Read, Eq, Ord, GHCG.Generic, NFData, Binary, Data)
-newtype OrgUnit = OrgUnit { unOrgUnit :: Maybe B.ByteString } deriving (Show, Read, Eq, Ord, GHCG.Generic, NFData, Binary, Data)
+newtype OrgUnit = OrgUnit { unOrgUnit :: B.ByteString } deriving (Show, Read, Eq, Ord, GHCG.Generic, NFData, Binary, Data)
 
 instance RLPSerializable OrgId where
   rlpEncode (OrgId bs) = rlpEncode bs
