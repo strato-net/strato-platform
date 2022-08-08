@@ -53,7 +53,7 @@ data ParseTypeCheckOrSolidVMError = PEx ParseError
                          | TCEx [SourceAnnotation T.Text]
                          | SVMEx (Positioned ((,) SolidException)) deriving (Show)
 
--- data SUnitIntermediary = Con Contract | FLC ConstantDecl | FLS Def.Def | FLE Def.Def | Lib Library | Intr Interface (Show, Eq)
+-- data SUnitIntermediary = Con Contract | FLC ConstantDecl | FLS Def.Def | FLE Def.Def | Lib Library | Intr Interface | FLF Func (Show, Eq)
 
 {-# NOINLINE unsafeCodeMapIORef #-}
 unsafeCodeMapIORef :: IORef (Map Keccak256 CodeCollection)
@@ -83,6 +83,8 @@ compileSourceNoInheritance initCodeMap = do
         fmap catMaybes . for sourceUnits $ \case
           NamedXabi name (xabi, parents') -> 
             pure $ Just $ (textToLabel name, xabiToSUnitIntermediary (textToLabel name) (map textToLabel parents') vmVersion' xabi)
+          FLFunc name fdec -> do
+            pure $ Just $ (name, FLF fdec)
           FLConstant name cnst -> do
             pure $ Just $ (textToLabel name, FLC cnst)
           FLStruct name fls -> do
@@ -95,34 +97,45 @@ compileSourceNoInheritance initCodeMap = do
        --(cs1, (name, cnst):cs2, cs3, cs4 ,cs5, cs6)
        --(cs, cs2, cs3, (name, (\(k,v) -> (k,v,a)) <$> vals):cs4, cs5, cs6) --conversion to match struct form
               
-      -- throwDuplicate' :: (SolidString, a) -> Map SolidString a -> (a -> SourceAnnotation b) -> Either ParseTypeCheckOrSolidVMError (Map SolidString a)
+      throwDuplicate' :: (SolidString, a) -> Map SolidString a -> (a -> SourceAnnotation b) -> Either ParseTypeCheckOrSolidVMError (Map SolidString a)
       throwDuplicate' (sName, unit) m contextFunc = case M.lookup sName m of
         Nothing -> pure $ M.insert sName unit m
         Just _ ->  Left . PEx
                   $ newErrorMessage (Message $ "Duplicate unit found: " ++ labelToString sName)
                                     (fromSourcePosition $ _sourceAnnotationStart $ contextFunc unit)
+
+      -- TODO for those who dare I am fairly certain this can be done with a curried LiftM7 function                              
       -- throwDuplicate :: (SolidString, SUnitIntermediary) -> ((Map SolidString Contract), (Map SolidString ConstantDecl), (Map SolidString ([SolidString], a)), (Map SolidString [(SolidString, FieldType, a)]), (Map SolidString Library), (Map SolidString Interface))-> Either ParseTypeCheckOrSolidVMError ((Map SolidString Contract), (Map SolidString ConstantDecl), (Map SolidString ([SolidString], a)), (Map SolidString [(SolidString, FieldType, a)]), (Map SolidString Library), (Map SolidString Interface))
-      throwDuplicate (name, sUnit) (cs, cs2, cs3, cs4, cs5, cs6) = case sUnit of
-        Con ctrct                 -> either (Left) (\cMap -> Right (cMap, cs2, cs3, cs4, cs5,cs6)) $ throwDuplicate' (name, ctrct) cs _contractContext
-        FLC cnst                  -> either (Left) (\cMap -> Right (cs, cMap, cs3, cs4, cs5, cs6)) $ throwDuplicate' (name, cnst) cs2 constContext
-        FLE (Def.Enum vals _ a)   -> either (Left) (\cMap -> Right (cs, cs2, cMap, cs4, cs5, cs6)) $ throwDuplicate' (name, (vals, a)) cs3 (\_ -> a)
-        FLS (Def.Struct vals _ a) -> either (Left) (\cMap -> Right (cs, cs2, cs3, cMap, cs5, cs6)) $ throwDuplicate' (name, (\(k,v) -> (k,v,a)) <$> vals) cs4 (\_ -> a)
-        Lib lib                   -> either (Left) (\cMap -> Right (cs, cs2, cs3, cs4, cMap, cs6)) $ throwDuplicate' (name, lib) cs5 _libraryContext
-        Intr intr                 -> either (Left) (\cMap -> Right (cs, cs2, cs3, cs4, cs5, cMap)) $ throwDuplicate' (name, intr) cs6 _interfaceContext
+      throwDuplicate (name, sUnit) cc = case sUnit of 
+        Con ctrct                 -> fmap (\cMap -> cc & contracts .~ cMap )  $ throwDuplicate' (name, ctrct) (cc ^. contracts)  _contractContext
+        FLC cnst                  -> fmap (\cMap -> cc & flConstants .~ cMap) $ throwDuplicate' (name, cnst) (cc ^. flConstants) constContext
+        FLE (Def.Enum vals _ a)   -> fmap (\cMap -> cc & flEnums .~ cMap)     $ throwDuplicate' (name, (vals, a)) (cc ^. flEnums) (const a)
+        FLS (Def.Struct vals _ a) -> fmap (\cMap -> cc & flStructs .~ cMap)   $ throwDuplicate' (name, (\(k,v) -> (k,v,a)) <$> vals) (cc ^. flStructs) (\_ -> a)
+        Lib lib                   -> fmap (\cMap -> cc & librarys .~ cMap)    $ throwDuplicate' (name, lib) (cc ^. librarys) _libraryContext
+        Intr intr                 -> fmap (\cMap -> cc & interfaces .~ cMap)  $ throwDuplicate' (name, intr) (cc ^. interfaces) _interfaceContext
+        FLF func                  -> fmap (\cMap -> cc & flFuncs .~ cMap)     $ throwDuplicateFunction (name, func) (cc ^. flFuncs) -- Thanks Jin! 
         FLE y -> parseError "FLE non Enum should be impossible"   (show y)
         FLS x -> parseError "FLS non Struct should be impossible" (show x)
-      sUnitSorter = foldrM throwDuplicate (M.empty, M.empty, M.empty, M.empty , M.empty, M.empty)
+      sUnitSorter = foldrM throwDuplicate $ CodeCollection M.empty M.empty M.empty M.empty M.empty M.empty M.empty 
 
+      
+
+      throwDuplicateFunction :: (SolidString, Func) -> Map SolidString Func -> Either ParseTypeCheckOrSolidVMError (Map SolidString Func)
+      throwDuplicateFunction (fname, func) m = case M.lookup fname m of
+        Nothing -> pure $ M.insert fname func m 
+        Just fdec -> do
+          let oldParamTypes = fmap snd $ funcArgs fdec
+              newParamTypes = fmap snd $ funcArgs func
+              overloadParamTypes = concatMap (\x -> [fmap snd $ funcArgs x]) $ funcOverload fdec
+          if ((oldParamTypes == newParamTypes) || (newParamTypes `elem` overloadParamTypes))
+            then Left . PEx $ newErrorMessage (Message $ "Free function could not be overloaded: " ++ labelToString fname)
+                                              (fromSourcePosition $ _sourceAnnotationStart $ funcContext func)
+            else do
+              pure $ M.insert fname (fdec{funcOverload = funcOverload fdec ++ [func]}) m
+                                           
   allSUnits <- fmap concat . traverse (uncurry getNamedSUnits) $ M.toList initCodeMap
-  (allContracts, allConstants, allEnums, allStructs, allLibrarys, allInterfaces) <- sUnitSorter allSUnits
-  pure $ CodeCollection {
-    _contracts = allContracts,
-    _flConstants = allConstants,
-    _flEnums = allEnums,
-    _flStructs = allStructs,
-    _librarys = allLibrarys,
-    _interfaces =  allInterfaces
-  }
+  theCC <- sUnitSorter allSUnits
+  pure $ theCC
 
 hasSvm3_2 :: CodeCollection -> Bool
 hasSvm3_2 cc = any (=="svm3.2") vmVers

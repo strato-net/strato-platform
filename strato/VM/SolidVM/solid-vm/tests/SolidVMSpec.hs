@@ -82,6 +82,10 @@ anyUnknownFunc :: Selector HandledException
 anyUnknownFunc (HE UnknownFunction{}) = True
 anyUnknownFunc _ = False
 
+anyUnknownVariableError :: Selector HandledException
+anyUnknownVariableError (HE Blockchain.SolidVM.Exception.UnknownVariable{}) = True
+anyUnknownVariableError _ = False
+
 anyTypeError :: Selector HandledException
 anyTypeError (HE Blockchain.SolidVM.Exception.TypeError{}) = True
 anyTypeError _ = False
@@ -4963,6 +4967,159 @@ contract qq{
 }|]
     getFields ["mynum"] `shouldReturn` [BInteger 9]
 
+  it "can use free functions, free functions can access this" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+
+function sum(uint[] memory arr) pure returns (uint s) {
+  for (uint i = 0; i < arr.length; i++) {
+    s += arr[i];
+  }
+}
+
+function getAccount() returns (address s) {
+  s = account(this);
+}
+
+contract qq{
+  uint myNum;
+  address ctract;
+  uint[] myArr = [1,2,3];
+  constructor() public {
+    myNum = sum(myArr);
+    ctract = getAccount();
+  }
+}|]
+    getFields ["myNum", "ctract"] `shouldReturn` [BInteger 6, bAddress 0xe8279be14e9fe2ad2d8e52e42ca96fb33a813bbe]
+
+  it "free functions cannot access state variables" $ runTest ( do
+    runBS [r|
+pragma solidvm 3.3;
+
+function setNum() {
+  myNum = 4;
+}
+
+contract qq{
+  uint myNum;
+  constructor() public {
+    setNum();
+  }
+}|]) `shouldThrow` anyUnknownVariableError
+
+  it "free functions cannot access internal functions of contracts" $ runTest ( do
+    runBS [r|
+pragma solidvm 3.3;
+
+function callInternal() {
+  setNum(4);
+}
+
+contract qq{
+  uint myNum;
+  constructor() public {
+    callInternal();
+  }
+  function setNum(uint x) internal {
+    myNum = 4;
+  }
+}|])  `shouldThrow` anyUnknownVariableError
+
+  it "contracts will prioritize contract functions over free functions" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+
+function setNum(uint x) returns (uint s) {
+  s = x + 2;
+}
+
+contract qq{
+  uint myNum;
+  constructor() public {
+    myNum = setNum(4);
+  }
+
+  function setNum(uint x) returns (uint) {
+    return x + 3;
+  }
+}|]
+    getFields ["myNum"] `shouldReturn` [BInteger 7]
+
+  it "contracts will prioritize overloaded contract functions over free functions" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+
+function setNum(uint x, uint y) returns (uint s) {
+  s = x + y + 2;
+}
+
+contract qq{
+  uint myNum;
+  constructor() public {
+    myNum = setNum(1, 2);
+  }
+
+  function setNum(uint x) returns (uint) {
+    return x + 3;
+  }
+
+  function setNum(uint x, uint y) returns (uint) {
+    return x + y + 3;
+  }
+
+}|]
+    getFields ["myNum"] `shouldReturn` [BInteger 6]
+
+  it "can overload free functions" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+
+function sum(uint[] memory arr) pure returns (uint s) {
+  for (uint i = 0; i < arr.length; i++) {
+    s += arr[i];
+  }
+}
+
+function sum(uint a, uint b) pure returns (uint c) {
+  c = a + b;
+}
+
+contract qq{
+  uint myNum;
+  uint otherNum;
+  uint[] myArr = [1,2,3];
+  constructor() public {
+    myNum = sum(myArr);
+    otherNum = sum(4, 5);
+  }
+}|]
+    getFields ["myNum", "otherNum"] `shouldReturn` [BInteger 6, BInteger 9]
+
+  it "cannot overload free functions with same types and same number of parameters" $ runTest (do
+    runBS [r|
+pragma solidvm 3.3;
+
+function sum(uint[] memory arr) pure returns (uint s) {
+  for (uint i = 0; i < arr.length; i++) {
+    s += arr[i];
+  }
+}
+
+function sum(uint[] memory arr) pure returns (uint s) {
+  for (uint i = 0; i < arr.length; i++) {
+    s += arr[i];
+  }
+}
+
+contract qq{
+  uint myNum;
+  uint[] myArr = [1,2,3];
+  constructor() public {
+    myNum = sum(myArr);
+  }
+}|]) `shouldThrow` anyParseError
+    
+  
   it "can declare a constant at the file level and use it" . runTest $ do
     runBS [r|
 pragma solidvm 3.3;

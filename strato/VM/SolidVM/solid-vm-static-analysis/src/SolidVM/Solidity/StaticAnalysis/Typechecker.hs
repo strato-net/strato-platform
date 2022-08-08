@@ -987,22 +987,32 @@ getVarTypeByName' name ctx = do
             [ Function fArgs (Static s ctx') ctx' []
             ]
         Just (t, ctx') -> pure $ Static t ctx'
-        Nothing -> case M.lookup name $ _functions c of
-          Just Func{..} ->
-            let fArgs = flip Product ctx $ flip Static ctx . indexedTypeType . snd <$> funcArgs
-                fRets = flip Product ctx $ flip Static ctx . indexedTypeType . snd <$> funcVals
-             in pure $ Function fArgs fRets ctx $ fmap buildOverloads funcOverload
-          Nothing -> do
-            pure $ case M.lookup name $ _contracts cc of
-              Just _->
-                let ctrct = Static (SVMType.Contract name) ctx
-                    lbl = Static (SVMType.UnknownLabel name Nothing) ctx
-                 in Sum $ ctrct :|
-                        [Function (Sum (Static (SVMType.Account False) ctx :| [ctrct, lbl]))
-                           ctrct
-                           ctx
-                           []]
-              Nothing -> bottom $ ("Unknown variable: " <> labelToText name) <$ ctx
+        Nothing -> do
+          case M.lookup name $ _functions c of
+            Just theFunc->
+              let fArgs = flip Product ctx $ flip Static ctx . indexedTypeType . snd <$> funcArgs theFunc
+                  fRets = flip Product ctx $ flip Static ctx . indexedTypeType . snd <$> funcVals theFunc
+                  allFuncOverloads = case M.lookup name $ _flFuncs cc of
+                    Just freeFunc -> (fmap buildOverloads $ funcOverload theFunc) ++ [buildOverloads freeFunc] ++ (fmap buildOverloads $ funcOverload freeFunc)
+                    Nothing -> fmap buildOverloads $ funcOverload theFunc
+              in pure $ Function fArgs fRets ctx allFuncOverloads
+            Nothing -> do
+              pure $ case M.lookup name $ _contracts cc of
+                Just _->
+                  let ctrct = Static (SVMType.Contract name) ctx
+                      lbl = Static (SVMType.UnknownLabel name Nothing) ctx
+                  in Sum $ ctrct :|
+                          [Function (Sum (Static (SVMType.Account False) ctx :| [ctrct, lbl]))
+                            ctrct
+                            ctx
+                            []]
+                Nothing -> do
+                  case M.lookup name $ _flFuncs cc of
+                      Just Func{..} ->
+                        let fArgs = flip Product ctx $ flip Static ctx . indexedTypeType . snd <$> funcArgs
+                            fRets = flip Product ctx $ flip Static ctx . indexedTypeType . snd <$> funcVals
+                        in Function fArgs fRets ctx $ fmap buildOverloads funcOverload
+                      Nothing -> bottom $ ("Unknown variable: " <> labelToText name) <$ ctx
             
   where lookupVar m Nothing = M.lookup name m
         lookupVar _ t       = t

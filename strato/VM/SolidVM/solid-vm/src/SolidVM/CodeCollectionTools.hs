@@ -30,7 +30,7 @@ import qualified SolidVM.Solidity.Xabi as Xabi
 
 type SolidEither = Either (Positioned ((,) SolidException))
 
-data SUnitIntermediary = Con Contract | FLC ConstantDecl | FLS Def.Def | FLE Def.Def | Lib Library | Intr Interface deriving (Show, Eq)
+data SUnitIntermediary = Con Contract | FLC ConstantDecl | FLS Def.Def | FLE Def.Def | Lib Library | Intr Interface | FLF Func deriving (Show, Eq)
 
 xabiToContract :: SolidString -> [SolidString] -> String -> Xabi -> Contract
 xabiToContract contractName' parents' vmVersion' xabi = Contract {
