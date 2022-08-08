@@ -46,7 +46,7 @@ data ContractF a =
     _modifiers :: Map SolidString (ModifierF a),
     _vmVersion :: String,
     _contractContext :: a
-  } deriving (Show, Generic, Functor)
+  } deriving (Show, Generic, Functor, Eq)
 
 instance ToJSON a => ToJSON (ContractF a)
 instance FromJSON a => FromJSON (ContractF a)

@@ -1,6 +1,8 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
+-- {-# LANGUAGE TemplateHaskell #-}
+
 -- |
 -- Module: Declarations
 -- Description: Parsers for top-level Solidity declarations
@@ -58,6 +60,7 @@ solidityContract = do
           <|> (reserved "interface" >> return Xabi.InterfaceKind)
           <|> (reserved "library" >> return Xabi.LibraryKind)
     contractName' <- fmap stringToLabel identifier
+    -- setCurrentKind (Just kind)
     --Throw an error if 'account' is used.
     pragmaVersion' <- getPragmaVersion
     when (isReservedWord pragmaVersion' contractName') $ reservedWordError pragmaVersion' contractName'
@@ -69,8 +72,13 @@ solidityContract = do
         consArgs <- option "" parensCode
         return (name, consArgs)
     pure (kind, contractName', baseConstrs)
-  declarations <-
-    braces (many solidityDeclaration)
+  declarations <- case kind of 
+    Xabi.ContractKind -> do
+      braces (many solidityDeclaration)
+    Xabi.InterfaceKind -> do
+      braces (many solidityInterfaceDeclaration)
+    Xabi.LibraryKind -> do
+      braces (many solidityLibraryDeclaration)
 
   let allFunctions = Map.fromListWithKey parseOverloads [ (stringToLabel n, f) | (n, FuncDeclaration f) <- declarations]
   let ctorList = [(stringToLabel n, c) | (n, ConstructorDeclaration c) <- declarations]
@@ -79,25 +87,25 @@ solidityContract = do
   allCtors <- if length ctorList > 1
                   then fail "multiple constructors defined"
                   else return . Map.fromList $ ctorList
-
+  -- setCurrentKind Nothing
   return $ NamedXabi (labelToText contractName') (
         Xabi { xabiFuncs = allFunctions
-             , xabiConstr = allCtors
+            , xabiConstr = allCtors
 --             , xabiVars = variables declarations
-             , xabiVars = Map.fromList [(stringToLabel n, varDecl) | (n, VariableDeclaration varDecl) <- declarations]
-             , xabiConstants = Map.fromList [(stringToLabel n, constDecl) | (n, ConstantDeclaration constDecl) <- declarations]
-             , xabiTypes =
-               Map.fromList $
-               [ (stringToLabel name, enum) | (name, EnumDeclaration enum) <- declarations]
-               ++ [ (stringToLabel name, struct) | (name, StructDeclaration struct) <- declarations]
-             , xabiModifiers = Map.fromList [(stringToLabel name, modifier) | (name, ModifierDeclaration modifier) <- declarations]
-             , xabiEvents = Map.fromList events
-             , xabiKind = kind
-             , xabiUsing = Map.fromList using
-             , xabiContext = a
-           },
+            , xabiVars = Map.fromList [(stringToLabel n, varDecl) | (n, VariableDeclaration varDecl) <- declarations]
+            , xabiConstants = Map.fromList [(stringToLabel n, constDecl) | (n, ConstantDeclaration constDecl) <- declarations]
+            , xabiTypes =
+              Map.fromList $
+              [ (stringToLabel name, enum) | (name, EnumDeclaration enum) <- declarations]
+              ++ [ (stringToLabel name, struct) | (name, StructDeclaration struct) <- declarations]
+            , xabiModifiers = Map.fromList [(stringToLabel name, modifier) | (name, ModifierDeclaration modifier) <- declarations]
+            , xabiEvents = Map.fromList events
+            , xabiKind = kind
+            , xabiUsing = Map.fromList using
+            , xabiContext = a
+          },
         map (Text.pack . fst) baseConstrs
-      )
+      )       
   where
     parseOverloads _ new old = do
       let oldParamTypes = fmap getVarType $ SolidVM.funcArgs old
@@ -155,10 +163,24 @@ solidityDeclaration =
   structDeclaration <|>
   enumDeclaration <|>
   usingDeclaration <|>
-  functionDeclaration <|>
+  functionDeclaration True True True <|>  -- allowContents allowNonPureOrView allowConstructor
   modifierDeclaration <|>
   eventDeclaration <|>
   variableDeclaration
+
+solidityInterfaceDeclaration :: SolidityParser (String, Declaration)
+solidityInterfaceDeclaration =
+  functionDeclaration False True False <|> --allowContents allowNonPureOrView allowConstructor
+  modifierDeclaration  
+
+solidityLibraryDeclaration :: SolidityParser (String, Declaration)
+solidityLibraryDeclaration =
+  functionDeclaration False False True <|> --allowContents allowNonPureOrView allowConstructor
+  modifierDeclaration <|>
+  structDeclaration <|>
+  enumDeclaration <|>
+  eventDeclaration
+  
 
 {- New types -}
 
@@ -167,6 +189,8 @@ structDeclaration :: SolidityParser (String, Declaration)
 structDeclaration = do
   ~(a, (structName, structFields)) <- withPosition $ do
     reserved "struct"
+    -- a <- getCurrentKind 
+    -- when (a == Just Xabi.InterfaceKind) $ fail "structs can only be defined in contracts and libraries"
     structName <- identifier
     structFields <- braces $ many1 $ do
       (fieldName, VariableDeclaration (SolidVM.VariableDecl decl _ _ _ _)) <- simpleVariableDeclaration
@@ -335,8 +359,8 @@ simpleVariableDeclaration = do
 
 -- | Parses a function definition.
 --
-functionDeclaration :: SolidityParser (String, Declaration)
-functionDeclaration = do
+functionDeclaration :: Bool -> Bool -> Bool -> SolidityParser (String, Declaration)
+functionDeclaration allowContents allowNonPureOrView allowConstructor = do
   ~(a, (functionName, xabi')) <- withPosition $ do
     functionName <- (reserved "function" >> fromMaybe "" <$> optionMaybe identifier)  <|>
                     -- Starting with 0.4.22, constructor() <mods> { <body> } is
@@ -348,22 +372,25 @@ functionDeclaration = do
     -- Throw an error if the function name is part of secondary reservered words.
     pragmaVersion' <- getPragmaVersion
     when (isReservedWord pragmaVersion' functionName) $ reservedWordError pragmaVersion' functionName
-    xabi <- functionXabi 
+    xabi <- functionXabi allowContents allowNonPureOrView
     pure (functionName, xabi)
   cName <- getContractName
+  when (not allowConstructor && cName == functionName) $ fail "Libraries and Interfaces cannot have a constructor"
   let xabi = xabi'{SolidVM.funcContext = a <> SolidVM.funcContext xabi'}
       tipe = if cName == functionName
                 then ConstructorDeclaration 
                 else FuncDeclaration 
   return (functionName, tipe xabi)
 
-functionXabi :: SolidityParser SolidVM.Func
-functionXabi = do
+functionXabi :: Bool -> Bool -> SolidityParser SolidVM.Func
+functionXabi allowContents allowNonPureOrView = do
   start <- getSourcePosition
   functionArgs <- tupleDeclaration
   (functionRet, visibility, mutability, funcConstructorCallsOrModifiers) <- functionModifiers
+  when (not allowNonPureOrView && (mutability == Just SolidVM.Payable || mutability == Nothing)) $ fail "Library functions must be explicitly pure or view"
   end <- getSourcePosition
   contents <- Just <$> statements <|> (reservedOp ";" >> return Nothing)
+  when (not allowContents && (not . null) contents) $ fail "Functions in an interface cannot have contents"
   let nameUnnamed (name,ty) = if Text.null name then (Nothing, ty) else (Just name,ty)
       ctx = SourceAnnotation start end ()
   return SolidVM.Func{

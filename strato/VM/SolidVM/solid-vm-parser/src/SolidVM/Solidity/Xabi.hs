@@ -40,7 +40,7 @@ import           SolidVM.Model.SolidString
 
 data XabiKind = ContractKind
               | InterfaceKind
-              | LibraryKind deriving (Eq, Show, Generic)
+              | LibraryKind deriving (Eq, Show, Enum, Generic)
 
 instance ToJSON XabiKind where
 instance FromJSON XabiKind where

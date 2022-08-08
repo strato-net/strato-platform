@@ -12,7 +12,11 @@ module SolidVM.Model.CodeCollection (
   flConstants,
   flStructs,
   flEnums,  
-  
+  librarys,
+  interfaces,
+
+  module SolidVM.Model.CodeCollection.Interface,
+  module SolidVM.Model.CodeCollection.Library,
   module SolidVM.Model.CodeCollection.Contract,
   --module SolidVM.Model.CodeCollection.Def,
   module SolidVM.Model.CodeCollection.Function,
@@ -36,6 +40,8 @@ import           Blockchain.SolidVM.Exception
 
 import           SolidVM.Model.CodeCollection.ConstantDecl
 import           SolidVM.Model.CodeCollection.Contract
+import           SolidVM.Model.CodeCollection.Library 
+import           SolidVM.Model.CodeCollection.Interface
 --import qualified SolidVM.Model.CodeCollection.Def as Def
 import           SolidVM.Model.CodeCollection.Event
 import           SolidVM.Model.CodeCollection.Function
@@ -51,7 +57,9 @@ data CodeCollectionF a =
     _contracts :: Map SolidString (ContractF a),
     _flConstants ::  Map SolidString (ConstantDeclF a),
     _flEnums :: Map SolidString ([SolidString], a),
-    _flStructs :: Map SolidString [(SolidString, FieldType, a)]
+    _flStructs :: Map SolidString [(SolidString, FieldType, a)],
+    _interfaces :: Map SolidString (InterfaceF a),
+    _librarys :: Map SolidString (LibraryF a) -- pronounced (lie - brahr - is) /lī/ brɑr ˈɛnɛnɛ/
 
   } deriving (Show, Generic, Functor)
 
