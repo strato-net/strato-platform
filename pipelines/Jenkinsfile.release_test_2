@@ -75,6 +75,16 @@ pipeline {
         }
 
         /* RUN UPGRADABILITY SYNC TESTS */
+        /* Deploying Monitor */
+        stage('Upgradability Sync Test - Deploy Monitor') {
+            agent { label "multinode305" }
+            steps {
+                script {
+                    lib.runMonitor(NODE_DATA.NODE1, 'upgrade8Nodes')
+                }
+            }
+        }
+
         /* Clean All Nodes */
         stage('Upgradability Sync Test - Clean all nodes') {
             parallel {
@@ -331,7 +341,7 @@ pipeline {
                 }
             }
         }
-        stage ('Upgradability Sync Test') {
+        stage ('Upgradability Sync Test - Run Beanstalk Load Test') {
             // agent { label "multinode101" } // is default
             steps {
                 script {
@@ -340,14 +350,6 @@ pipeline {
                     }
                     lib.runBeanstalkLoadTest(params.BEANSTALK_LOADTEST_BATCH_SIZE, params.BEANSTALK_LOADTEST_BATCH_COUNT)
                 }
-            }
-        }
-        stage('Upgradability Sync Test - Deploy Monitor') {
-            agent { label "multinode305" }
-            steps {
-                script {
-                    lib.runMonitor(NODE_DATA.NODE1, 'upgrade8Nodes')
-                }                
             }
         }
 
