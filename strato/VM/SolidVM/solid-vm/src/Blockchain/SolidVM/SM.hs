@@ -384,6 +384,7 @@ getVariableOfName name = do
                                                 ,  CC._storageDefs = M.empty
                                                 ,  CC._enums = M.empty
                                                 ,  CC._structs = M.empty
+                                                ,  CC._errors = M.empty
                                                 ,  CC._events = M.empty
                                                 ,  CC._functions = M.empty
                                                 ,  CC._constructor = currentContract x^.CC.constructor

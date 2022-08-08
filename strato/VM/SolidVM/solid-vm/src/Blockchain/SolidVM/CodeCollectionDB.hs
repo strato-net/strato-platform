@@ -53,7 +53,7 @@ data ParseTypeCheckOrSolidVMError = PEx ParseError
                          | TCEx [SourceAnnotation T.Text]
                          | SVMEx (Positioned ((,) SolidException)) deriving (Show)
 
-data SUnitIntermediary = Con Contract | FLC ConstantDecl | FLS Def.Def | FLE Def.Def | FLF Func
+data SUnitIntermediary = Con Contract | FLC ConstantDecl | FLS Def.Def | FLE Def.Def | FLF Func | FLER Def.Def
 
 {-# NOINLINE unsafeCodeMapIORef #-}
 unsafeCodeMapIORef :: IORef (Map Keccak256 CodeCollection)
@@ -93,17 +93,21 @@ compileSourceNoInheritance initCodeMap = do
             pure $ Just $ (textToLabel name, FLS fls)
           FLEnum name fle -> do
             pure $ Just $ (textToLabel name, FLE fle)
+          FLError name args -> do
+            pure $ Just $ (textToLabel name, FLER args)
           _ -> pure Nothing
 --      sUnitSorter :: [(SolidString, SUnitIntermediary)] ->  ([(SolidString, ConstantDecl)], [(SolidString, Contract)], [(SolidString, ([SolidString], a))], [(SolidString, [(SolidString, FieldType, a)])])
-      sUnitSorter = foldr (\(name, sUnit) (cs, cs2, cs3, cs4, cs5) -> case sUnit of
-        Con ctrct -> (cs, (name, ctrct):cs2, cs3, cs4, cs5)
-        FLC cnst -> ((name, cnst):cs, cs2, cs3, cs4, cs5)
-        FLE (Def.Enum vals _ a) -> (cs, cs2, (name, (vals, a)):cs3, cs4, cs5)
-        FLS (Def.Struct vals _ a) -> (cs, cs2, cs3, (name, (\(k,v) -> (k,v,a)) <$> vals):cs4, cs5) --conversion to match struct form
-        FLF f -> (cs, cs2, cs3, cs4, (name, f):cs5)
+      sUnitSorter = foldr (\(name, sUnit) (cs, cs2, cs3, cs4, cs5, cs6) -> case sUnit of
+        Con ctrct -> (cs, (name, ctrct):cs2, cs3, cs4, cs5, cs6)
+        FLC cnst -> ((name, cnst):cs, cs2, cs3, cs4, cs5, cs6)
+        FLE (Def.Enum vals _ a) -> (cs, cs2, (name, (vals, a)):cs3, cs4, cs5 ,cs6)
+        FLS (Def.Struct vals _ a) -> (cs, cs2, cs3, (name, (\(k,v) -> (k,v,a)) <$> vals):cs4, cs5, cs6) --conversion to match struct form
+        FLF f -> (cs, cs2, cs3, cs4, (name, f):cs5, cs6)
+        FLER (Def.Error vals _ a) -> (cs, cs2, cs3, cs4, cs5, (name, (\(k,v) -> (k,v,a)) <$> vals):cs6)
         FLE y -> parseError "FLE non Enum should be impossible"   (show y)
         FLS x -> parseError "FLS non Struct should be impossible" (show x)
-        ) ([], [], [], [], [])
+        FLER x -> parseError "FLER non Error should be impossible" (show x)
+        ) ([], [], [], [], [], [])
       throwDuplicate :: (SolidString, Contract) -> Map SolidString Contract -> Either ParseTypeCheckOrSolidVMError (Map SolidString Contract)
       throwDuplicate (cName, unit) m = case M.lookup cName m of
         Nothing -> pure $ M.insert cName unit m
@@ -125,7 +129,7 @@ compileSourceNoInheritance initCodeMap = do
               pure $ M.insert fname (fdec{funcOverload = funcOverload fdec ++ [func]}) m
                                            
   allSUnits <- fmap concat . traverse (uncurry getNamedSUnits) $ M.toList initCodeMap
-  let (allConstants, allContracts, allEnums, allStructs, allFreeFunctions) = sUnitSorter allSUnits
+  let (allConstants, allContracts, allEnums, allStructs, allFreeFunctions, allCustomErrors) = sUnitSorter allSUnits
   deduplicatedContracts <- foldrM throwDuplicate M.empty allContracts
   deduplicatedFreeFunctions <- foldrM throwDuplicateFunction M.empty (allFreeFunctions :: [(SolidString, Func)])
   pure $ CodeCollection {
@@ -134,7 +138,7 @@ compileSourceNoInheritance initCodeMap = do
     _flConstants = M.fromList allConstants,
     _flEnums = M.fromList allEnums,
     _flStructs = M.fromList allStructs,
-    _flErrors = M.empty
+    _flErrors = M.fromList allCustomErrors
   }
 
 hasSvm3_2 :: CodeCollection -> Bool

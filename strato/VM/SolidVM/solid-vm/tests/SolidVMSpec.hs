@@ -5212,6 +5212,7 @@ contract qq {
   it "can use custom errors" . runTest $ do
     runBS [r|
 pragma solidvm 3.3;
+error flError(string someString);
 
 contract qq {
   error myError(uint);
@@ -5219,3 +5220,29 @@ contract qq {
   }
 }|]
     getFields ["myNum"] `shouldReturn` [BInteger 3]
+
+  it "can use custom errors in try catch blocks the SOLIDVM WAY" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+
+contract qq {
+  string myString;
+  error myError (string message);
+  constructor() {
+    doSomethingFunky();
+  }
+  
+  function throwsError() {
+    throw new myError("lmao pranked");
+  }
+
+  function doSomethingFunky() {
+    try {
+      throwsError();
+    }
+    catch (myError(message)) {
+      myString = message;
+    }
+  }
+}|]
+    getFields ["myString"] `shouldReturn` [BString "lmao pranked"]

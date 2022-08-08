@@ -319,6 +319,12 @@ unparseTypes (name, SolidVM.Struct {fields=fields'}) =
                                            <> " "
                                            <> labelToText fieldName
                                            <> ";"
+unparseTypes (name, SolidVM.Error {params=params'}) =
+  Text.unpack $ "error "
+             <> labelToText name
+             <> " ("
+             <> Text.intercalate ", " (List.map unparseArgs (sortWith (indexedTypeIndex . snd) $ map (\(maybeName, v) -> (fromMaybe "" $ fmap labelToText maybeName , v)) params'))
+             <> ")"
 unparseTypes (_name, _def) = ""
 
 unparseArgs :: (Text, IndexedType) -> Text

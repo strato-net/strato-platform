@@ -78,7 +78,6 @@ solidityContract = do
   let ctorList = [(stringToLabel n, c) | (n, ConstructorDeclaration c) <- declarations]
   let events = [(stringToLabel n, e) | (n, EventDeclaration e) <- declarations]
   let using = [(Text.pack n, u) | (n, UsingDeclaration u) <- declarations]
-  let customErrors = [(stringToLabel n, e) | (n, ErrorDeclaration e) <- declarations]
   allCtors <- if length ctorList > 1
                   then fail "multiple constructors defined"
                   else return . Map.fromList $ ctorList
@@ -93,7 +92,7 @@ solidityContract = do
                Map.fromList $
                [ (stringToLabel name, enum) | (name, EnumDeclaration enum) <- declarations]
                ++ [ (stringToLabel name, struct) | (name, StructDeclaration struct) <- declarations]
-               ++ customErrors
+               ++ [ (stringToLabel n, e) | (n, ErrorDeclaration e) <- declarations]
              , xabiModifiers = Map.fromList [(stringToLabel name, modifier) | (name, ModifierDeclaration modifier) <- declarations]
              , xabiEvents = Map.fromList events
              , xabiKind = kind
@@ -255,6 +254,7 @@ solidityFLError = do
   return $ FLError (Text.pack errorName) (SolidVM.Error {
       SolidVM.params = map (\(k, v) -> (fmap textToLabel k, v)) $
            zipWith (\x i -> fmap (SolidVM.IndexedType i) (nameUnnamed x)) errorArgs [0..]
+    , SolidVM.bytes = 0
     , SolidVM.context = a
   })
 
@@ -386,6 +386,7 @@ errorDeclaration = do
   return (errorName, ErrorDeclaration SolidVM.Error {
       SolidVM.params = map (\(k, v) -> (fmap textToLabel k, v)) $
            zipWith (\x i -> fmap (SolidVM.IndexedType i) (nameUnnamed x)) errorArgs [0..]
+    , SolidVM.bytes = 0
     , SolidVM.context = ctx
   })
 
