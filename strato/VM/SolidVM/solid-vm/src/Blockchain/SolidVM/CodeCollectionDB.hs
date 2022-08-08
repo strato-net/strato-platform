@@ -133,7 +133,8 @@ compileSourceNoInheritance initCodeMap = do
     _flFuncs = deduplicatedFreeFunctions,
     _flConstants = M.fromList allConstants,
     _flEnums = M.fromList allEnums,
-    _flStructs = M.fromList allStructs
+    _flStructs = M.fromList allStructs,
+    _flErrors = M.empty
   }
 
 hasSvm3_2 :: CodeCollection -> Bool

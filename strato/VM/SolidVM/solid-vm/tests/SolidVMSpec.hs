@@ -5209,3 +5209,13 @@ contract qq {
 }|]
     getFields ["result1", "result2", "result3", "result4"] `shouldReturn` [BInteger 3, BInteger 6, BInteger 1, BInteger 12]
 
+  it "can use custom errors" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+
+contract qq {
+  error myError(uint);
+  constructor() {
+  }
+}|]
+    getFields ["myNum"] `shouldReturn` [BInteger 3]

@@ -25,6 +25,7 @@ defAesonOptions :: Options
 defAesonOptions = defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="type"}}
 
 data DefF a = Enum { names::[SolidString], bytes::Word, context :: a}
+            | Error { params :: [(Maybe SolidString, SolidVM.IndexedType)], context :: a }
             | Struct { fields::[(SolidString, SolidVM.FieldType)], bytes::Word, context :: a}
             | Contract { bytes::Word, context :: a}
          deriving (Eq, Show, Generic, Functor)

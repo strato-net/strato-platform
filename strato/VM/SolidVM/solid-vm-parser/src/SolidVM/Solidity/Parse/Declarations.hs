@@ -46,6 +46,7 @@ data SourceUnitF a = Pragma a Identifier String
                    | FLConstant Text.Text SolidVM.ConstantDecl
                    | FLStruct Text.Text SolidVM.Def
                    | FLEnum Text.Text SolidVM.Def
+                   | FLError Text.Text SolidVM.Def
                    | DummySourceUnit
                    deriving (Eq, Show, Generic, Functor)
 
@@ -77,6 +78,7 @@ solidityContract = do
   let ctorList = [(stringToLabel n, c) | (n, ConstructorDeclaration c) <- declarations]
   let events = [(stringToLabel n, e) | (n, EventDeclaration e) <- declarations]
   let using = [(Text.pack n, u) | (n, UsingDeclaration u) <- declarations]
+  let customErrors = [(stringToLabel n, e) | (n, ErrorDeclaration e) <- declarations]
   allCtors <- if length ctorList > 1
                   then fail "multiple constructors defined"
                   else return . Map.fromList $ ctorList
@@ -91,6 +93,7 @@ solidityContract = do
                Map.fromList $
                [ (stringToLabel name, enum) | (name, EnumDeclaration enum) <- declarations]
                ++ [ (stringToLabel name, struct) | (name, StructDeclaration struct) <- declarations]
+               ++ customErrors
              , xabiModifiers = Map.fromList [(stringToLabel name, modifier) | (name, ModifierDeclaration modifier) <- declarations]
              , xabiEvents = Map.fromList events
              , xabiKind = kind
@@ -155,6 +158,7 @@ data Declaration =
   | ConstructorDeclaration SolidVM.Func
   | ModifierDeclaration Xabi.Modifier
   | StructDeclaration SolidVM.Def
+  | ErrorDeclaration SolidVM.Def
   | EnumDeclaration SolidVM.Def
   | UsingDeclaration Xabi.Using
   | EventDeclaration SolidVM.Event
@@ -171,7 +175,8 @@ solidityDeclaration free =
   structDeclaration <|>
   enumDeclaration <|>
   usingDeclaration <|>
-  functionDeclaration free <|>
+  errorDeclaration <|>
+  functionDeclaration free<|>
   modifierDeclaration <|>
   eventDeclaration <|>
   variableDeclaration
@@ -235,6 +240,23 @@ solidityFLEnum = do
     --     SolidVM.context = a
     --     }
     -- )
+
+solidityFLError :: SolidityParser SourceUnit
+solidityFLError = do
+  ~(a, (errorName, errorArgs)) <- withPosition $ do
+    reserved "error"
+    errorName <- identifier
+    pragmaVersion' <- getPragmaVersion
+    when (isReservedWord pragmaVersion' errorName) $ reservedWordError pragmaVersion' errorName
+    errorArgs <- tupleDeclaration
+    semi
+    pure (errorName, errorArgs)
+  let nameUnnamed (name,ty) = if Text.null name then (Nothing, ty) else (Just name,ty)
+  return $ FLError (Text.pack errorName) (SolidVM.Error {
+      SolidVM.params = map (\(k, v) -> (fmap textToLabel k, v)) $
+           zipWith (\x i -> fmap (SolidVM.IndexedType i) (nameUnnamed x)) errorArgs [0..]
+    , SolidVM.context = a
+  })
 
 -- | Parses an enum definition
 enumDeclaration :: SolidityParser (String, Declaration)
@@ -348,6 +370,24 @@ simpleVariableDeclaration = do
   if isConstant
     then return (variableName, ConstantDeclaration $ SolidVM.ConstantDecl variableType isPublic (fromMaybe (parseError "constants must be initialized" variableName) value) ctx)
     else return (variableName, VariableDeclaration $ SolidVM.VariableDecl variableType isPublic value ctx isImmutable)
+
+errorDeclaration :: SolidityParser (String, Declaration)
+errorDeclaration = do
+  start <- getSourcePosition
+  reserved "error"
+  errorName <- identifier
+  pragmaVersion' <- getPragmaVersion
+  when (isReservedWord pragmaVersion' errorName) $ reservedWordError pragmaVersion' errorName
+  errorArgs <- tupleDeclaration
+  end <- getSourcePosition
+  semi
+  let nameUnnamed (name,ty) = if Text.null name then (Nothing, ty) else (Just name,ty)
+      ctx = SourceAnnotation start end ()
+  return (errorName, ErrorDeclaration SolidVM.Error {
+      SolidVM.params = map (\(k, v) -> (fmap textToLabel k, v)) $
+           zipWith (\x i -> fmap (SolidVM.IndexedType i) (nameUnnamed x)) errorArgs [0..]
+    , SolidVM.context = ctx
+  })
 
 -- | Parses a function definition.
 --
@@ -621,5 +661,6 @@ isReservedWord version reservedWord = do
         "transaction_hash" -> True
         "transaction_sender" -> True
         "salt" -> True
+        "error" -> True
         _ -> isReservedWord "3.2" reservedWord
     _ -> False

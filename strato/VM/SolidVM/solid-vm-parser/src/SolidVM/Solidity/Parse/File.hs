@@ -35,7 +35,15 @@ newtype File = File {
 solidityFile :: SolidityParser File
 solidityFile = do
   whiteSpace
-  units <- many (solidityPragma <|> solidityImport <|> solidityFreeFunction <|> solidityContract <|> solidityFLConstant <|> solidityFLStruct <|> solidityFLEnum)
+  units <- many (   solidityPragma 
+                <|> solidityImport 
+                <|> solidityFLError 
+                <|> solidityFreeFunction 
+                <|> solidityContract 
+                <|> solidityFLConstant 
+                <|> solidityFLStruct 
+                <|> solidityFLEnum
+                )
   eof
   return . File $ units
 

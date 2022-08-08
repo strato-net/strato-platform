@@ -39,6 +39,7 @@ unparseSourceUnit (Import _ path) = "import \"" ++ Text.unpack path ++ "\";\n"
 unparseSourceUnit (FLConstant name conDecl) = (("\n    " <>) . unparseConstant) (Text.unpack name, conDecl)
 unparseSourceUnit (FLStruct name decl) = (("\n    " <>) . unparseTypes) (Text.unpack name, decl)
 unparseSourceUnit (FLEnum name decl) = (("\n    " <>) . unparseTypes) (Text.unpack name, decl)
+unparseSourceUnit (FLError name args) = (("\n    " <>) . unparseTypes) (Text.unpack name, args)
 unparseSourceUnit (DummySourceUnit) = "DummySourceUnit"
 unparseSourceUnit (NamedXabi name (contract,inherited)) =
      (case xabiKind contract of
