@@ -41,10 +41,11 @@ data VmInEventBatch = InBatch
   , blocksAndNewChains :: [Either OutputGenesis OutputBlock]
   , bLen               :: {-# UNPACK #-} !Int
   , createBlock        :: !Bool
+  , privateTxs         :: [OutputTx]
   }
 
 newInBatch :: VmInEventBatch
-newInBatch = InBatch [] [] [] 0 [] 0 False
+newInBatch = InBatch [] [] [] 0 [] 0 False []
 
 insertInBatch :: VmInEvent -> VmInEventBatch -> VmInEventBatch
 insertInBatch e b = case e of
@@ -54,7 +55,7 @@ insertInBatch e b = case e of
   VmTx ts t -> b{ txPairs = (ts,t):txPairs b, tLen = tLen b + 1}
   VmBlock ob -> b{ blocksAndNewChains = (Right ob):blocksAndNewChains b, bLen = bLen b + 1}
   VmCreateBlockCommand -> b{ createBlock = True }
-  _ -> b
+  VmPrivateTx otx -> b { privateTxs = otx : privateTxs b }
 
 data VmOutEvent = OutAction Action
                 | OutBlock OutputBlock
