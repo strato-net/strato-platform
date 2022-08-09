@@ -27,7 +27,6 @@ module SolidVM.Model.CodeCollection (
   ) where
 
 import Control.Lens
-import Control.DeepSeq
 import Data.Aeson as A
 import Data.Map (Map)
 import qualified Data.Map as M
