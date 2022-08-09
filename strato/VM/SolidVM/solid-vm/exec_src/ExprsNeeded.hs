@@ -30,7 +30,7 @@ statementCrawler = \case
   Break _ -> ["Break"]
   Continue _ -> ["Continue"]
   ModifierExecutor _ -> ["ModifierExecutor"]
-  Throw _ -> ["Throw"]
+  Throw _ _ -> ["Throw"]
   EmitStatement _ evts _ ->  "EmitStatement":concatMap (expressionCrawler . snd) evts
   RevertStatement _ _ _ -> ["RevertStatement"] -- :concatMap (expressionCrawler) args
   UncheckedStatement blk _ -> ["UncheckedStatement"]

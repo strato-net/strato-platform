@@ -5209,7 +5209,7 @@ contract qq {
 }|]
     getFields ["result1", "result2", "result3", "result4"] `shouldReturn` [BInteger 3, BInteger 6, BInteger 1, BInteger 12]
 
-  it "can use custom errors" . runTest $ do
+  it "can declare custom errors and file level custom errors" . runTest $ do
     runBS [r|
 pragma solidvm 3.3;
 error flError(string someString);
@@ -5219,9 +5219,8 @@ contract qq {
   constructor() {
   }
 }|]
-    getFields ["myNum"] `shouldReturn` [BInteger 3]
 
-  it "can use custom errors in try catch blocks the SOLIDVM WAY" . runTest $ do
+  it "can throw custom errors the SOLIDVM WAY" . runTest $ do
     runBS [r|
 pragma solidvm 3.3;
 
@@ -5229,20 +5228,11 @@ contract qq {
   string myString;
   error myError (string message);
   constructor() {
-    doSomethingFunky();
+    throwsError();
   }
   
   function throwsError() {
-    throw new myError("lmao pranked");
-  }
-
-  function doSomethingFunky() {
-    try {
-      throwsError();
-    }
-    catch (myError(message)) {
-      myString = message;
-    }
+    throw myError("lmao pranked");
   }
 }|]
     getFields ["myString"] `shouldReturn` [BString "lmao pranked"]

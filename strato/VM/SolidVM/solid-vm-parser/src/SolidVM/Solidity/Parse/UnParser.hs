@@ -196,7 +196,7 @@ unparseStatementWith f (Return (Just e) a) = f a $ "return " ++ unparseExpressio
 unparseStatementWith f (Break a) = f a $ "break;"
 unparseStatementWith f (ModifierExecutor a) = f a $ "_;"
 unparseStatementWith f (Continue a) = f a $ "continue;"
-unparseStatementWith f (Throw a) = f a $ "throw;"
+unparseStatementWith f (Throw e a) = f a $ "throw " ++ unparseExpression e ++ ";"
 unparseStatementWith f (Block a) = f a $ "{ }"
 unparseStatementWith f (AssemblyStatement (MloadAdd32 dst src) a) = f a $ printf "assembly { %s := mload(add(%s, 32)) }" dst src
 

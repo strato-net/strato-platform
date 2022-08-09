@@ -43,7 +43,7 @@ data StatementF a =
   | Continue a
   | Break a
   | Return (Maybe (ExpressionF a)) a
-  | Throw a
+  | Throw (ExpressionF a) a
   | ModifierExecutor a
   | EmitStatement String [(Maybe String, (ExpressionF a))] a
   | AssemblyStatement InlineAssembly a
@@ -64,7 +64,7 @@ extractStatement (DoWhileStatement _ _ a) = a
 extractStatement (Continue a) = a
 extractStatement (Break a) = a
 extractStatement (Return _ a) = a
-extractStatement (Throw a) = a
+extractStatement (Throw _ a) = a
 extractStatement (EmitStatement _ _ a) = a
 extractStatement (AssemblyStatement _ a) = a
 extractStatement (SimpleStatement _ a) = a

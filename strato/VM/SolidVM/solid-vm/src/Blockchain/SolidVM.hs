@@ -1248,6 +1248,29 @@ runStatement (CC.Return maybeExpression pos) = do
 --      fmap Just $ getVar =<< expToVar e
     Nothing -> return $ Just SNULL
 
+runStatement (CC.Throw expr _) = do
+  ctract <- getCurrentContract
+  (_, cc) <- getCurrentCodeCollection
+  if (CC._vmVersion ctract /= "svm3.3")
+    then unknownStatement "Throw statements are not supported below pragma solidvm 3.3" expr
+    else do
+      (name, args) <- do
+        case expr of
+          CC.FunctionCall _ (CC.Variable _ n) a -> pure (n, a) 
+          _ -> invalidArguments "Invalid argument for throw." expr
+      errDec <- case M.lookup name $ CC._errors ctract of
+        Just e -> pure $ e 
+        Nothing -> case M.lookup name $ CC._flErrors cc of
+          Just e -> pure $ e 
+          Nothing -> invalidArguments "Invalid error type." name
+      argVals <- case args of
+        CC.OrderedArgs as -> OrderedVals <$> mapM (getVar <=< expToVar) as
+        CC.NamedArgs ns -> NamedVals <$> mapM (mapM $ getVar <=< expToVar) ns 
+      _ <- case argVals of
+        OrderedVals ov -> mapM (\((Just x, (CC.IndexedType _ b), _), z) -> addLocalVariable b x z) $ zip errDec ov
+        NamedVals nv -> mapM (\((Just w, (CC.IndexedType _ b), _), (_, z)) -> addLocalVariable b w z) $ zip errDec nv
+      pure $ Just SNULL
+
 runStatement (CC.AssemblyStatement (CC.MloadAdd32 dst src) pos) = do
   solidVMBreakpoint pos
   srcVar <- expToVar $ CC.Variable pos $ textToLabel src;

@@ -49,6 +49,7 @@ module Blockchain.SolidVM.SM (
   addEvent
   ) where
 
+import           Control.Monad
 import           Control.Applicative ((<|>))
 import           Control.Lens hiding (Context)
 import           Control.Monad.Catch (MonadCatch)

@@ -31,6 +31,7 @@ data Type
   | UnknownLabel SolidString (Maybe SolidString)
   | Struct { bytes::Maybe Int32, typedef::SolidString}
   | Enum { bytes::Maybe Int32, typedef::SolidString, names::Maybe [SolidString]}
+  | Error { bytes::Maybe Int32, typedef::SolidString }
   | Array { entry:: Type, length :: Maybe Word }
   | Contract {typedef::SolidString}
   | Mapping {dynamic::Maybe Bool, key::Type, value::Type}

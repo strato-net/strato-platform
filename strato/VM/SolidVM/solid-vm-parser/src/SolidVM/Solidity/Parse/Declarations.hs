@@ -663,5 +663,6 @@ isReservedWord version reservedWord = do
         "transaction_sender" -> True
         "salt" -> True
         "error" -> True
+        "throw" -> True
         _ -> isReservedWord "3.2" reservedWord
     _ -> False

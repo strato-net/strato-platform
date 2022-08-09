@@ -58,7 +58,8 @@ statementHelper (ModifierExecutor _) = []
 statementHelper (Break _) = []
 statementHelper (Return mExpr _) =
   maybe [] expressionHelper mExpr
-statementHelper (Throw _) = []
+statementHelper (Throw e _) =
+  expressionHelper e
 statementHelper (EmitStatement _ vals _) =
   concatMap (expressionHelper . snd) vals
 statementHelper (RevertStatement _ (OrderedArgs vals) _) =
