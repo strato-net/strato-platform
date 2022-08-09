@@ -3126,7 +3126,23 @@ trimCodeCollection cc sa = final
         enclosed = if (numOpen > numClosed) then 
           body ++ replicate (numOpen - numClosed) '}'
           else body
-        final = enclosed
+        final = if (numOpen == 0) then
+          enclosed
+          else 
+            finalCut 
+            where 
+              goodCut = fst $ splitLast '}' enclosed
+              numClosedFinal = countElem '}' goodCut
+              finalCut = if (numClosedFinal == numOpen) then
+                goodCut
+                else
+                  goodCut ++ replicate (numOpen - numClosedFinal) '}'
+
+splitLast :: Char -> String -> (String, String)
+splitLast char str = let n = findIndex (==char) (reverse str) in
+                case n of
+                  Nothing -> (str, [])
+                  Just m  -> splitAt (length str - m -1) str
 
 countElem :: Eq a => a -> [a] -> Int
 countElem i = length . filter (i==)
