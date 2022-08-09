@@ -25,6 +25,7 @@ data VariableDeclF a = VariableDecl
   , varIsPublic   :: Bool
   , varInitialVal :: Maybe (ExpressionF a)
   , varContext    :: a
+  , isImmutable   :: Bool
   } deriving (Show, Eq, Generic, NFData, Functor)
 
 instance ToJSON a => ToJSON (VariableDeclF a)

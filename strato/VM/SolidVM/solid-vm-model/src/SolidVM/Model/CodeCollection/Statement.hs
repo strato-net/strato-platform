@@ -75,7 +75,7 @@ extractStatement (SolidityTryCatchStatement _ _ _ _ a) = a
 
 type Statement = Positioned StatementF
 
-data Location = Memory | Storage deriving (Show, Eq, Generic, NFData)
+data Location = Memory | Storage | Calldata deriving (Show, Eq, Generic, NFData)
 
 instance ToJSON Location
 instance FromJSON Location

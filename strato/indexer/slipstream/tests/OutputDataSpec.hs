@@ -603,7 +603,8 @@ createDummyContract v =
         varType=t,
         varIsPublic=True,
         varInitialVal=Nothing,
-        varContext=error "varContext undefined"
+        varContext=error "varContext undefined",
+        isImmutable = False
         }
   in
     Contract{

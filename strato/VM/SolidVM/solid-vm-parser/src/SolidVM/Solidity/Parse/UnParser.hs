@@ -36,6 +36,9 @@ unparse (File units) = List.concat $ List.map unparseSourceUnit units
 unparseSourceUnit :: SourceUnit -> String
 unparseSourceUnit (Pragma _ ident contents) = "pragma " ++ ident ++ " " ++ contents ++ ";\n"
 unparseSourceUnit (Import _ path) = "import \"" ++ Text.unpack path ++ "\";\n"
+unparseSourceUnit (FLConstant name conDecl) = (("\n    " <>) . unparseConstant) (Text.unpack name, conDecl)
+unparseSourceUnit (FLStruct name decl) = (("\n    " <>) . unparseTypes) (Text.unpack name, decl)
+unparseSourceUnit (FLEnum name decl) = (("\n    " <>) . unparseTypes) (Text.unpack name, decl)
 unparseSourceUnit (DummySourceUnit) = "DummySourceUnit"
 unparseSourceUnit (NamedXabi name (contract,inherited)) =
      (case xabiKind contract of
@@ -49,6 +52,8 @@ unparseSourceUnit (NamedXabi name (contract,inherited)) =
      )
   <> " {\n"
   <> concatMap (("\n    " <>) . unparseVar) (Map.toList $ xabiVars contract)
+  <> concatMap (("\n    " <>) . unparseConstant) (Map.toList $ xabiConstants contract)
+
 --  <> concatMap (("\n    " <>) . unparseVar) (sortWith (varTypeAtBytes . snd) $ Map.toList $ xabiVars contract)
   <> concatMap (("\n    " <>) . unparseTypes) (Map.toList $ xabiTypes contract)
   <> concatMap (("\n    " <>) . unparseModifier) (Map.toList $ xabiModifiers contract)
@@ -57,9 +62,10 @@ unparseSourceUnit (NamedXabi name (contract,inherited)) =
   <> concatMap (("\n    " <>) . unparseCtor) (Map.elems $ xabiConstr contract)
   <> concatMap (("\n    " <>) . unparseFunc) (Map.toList $ xabiFuncs contract)
   <> "\n}"
+unparseSourceUnit (FLFunc n a) = unparseFunc (n, a)
 
 unparseVar :: (SolidString, VariableDecl) -> String
-unparseVar (name, (VariableDecl theType isPublic maybeExpression _)) =
+unparseVar (name, (VariableDecl theType isPublic maybeExpression _ _)) =
      unparseVarType (theType)
   <> " "
   <> (if isPublic --TODO- I need to expand this to public, private or nothing
@@ -223,6 +229,7 @@ unparseVarDefEntry (VarDefEntry maybeType maybeLoc theName _) =
                       Nothing -> " "
                       Just Memory -> " memory "
                       Just Storage -> " storage "
+                      Just Calldata -> " calldata "
   in typeString ++ locString ++ labelToString theName
 
 

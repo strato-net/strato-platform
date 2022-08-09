@@ -23,7 +23,7 @@ statements :: SolidityParser [Statement]
 statements = braces $ many statement
 
 statement :: SolidityParser Statement
-statement = do
+statement =
   ifStatement
   <|> whileStatement
   <|> (do
@@ -100,7 +100,8 @@ tupleDeclaration' = parens $ commaSep $ do
   partType <- simpleTypeExpression
   optional $ reserved "indexed" <|>
              reserved "storage" <|>
-             reserved "memory"
+             reserved "memory" <|>
+             reserved "calldata"
   partName <- option "" identifier
   return (partName, partType)
 
@@ -175,7 +176,7 @@ revertStatement = try $ do
   ~(a, (i, e)) <- withPosition $ do
     reserved "revert"
     i <- optionMaybe identifier
-    e <- parens $ choice 
+    e <- parens $ choice
       [
         fmap NamedArgs . braces $ commaSep $ do
           fieldName <- fmap stringToLabel identifier
@@ -192,6 +193,7 @@ revertStatement = try $ do
 location :: SolidityParser (Maybe Location)
 location = optionMaybe $ asum [ reserved "memory" >> return Memory
                               , reserved "storage" >> return Storage
+                              , reserved "calldata" >> return Calldata 
                               ]
 
 varDefEntry :: SolidityParser (Maybe Type) -> SolidityParser VarDefEntry
@@ -223,7 +225,7 @@ expression =
     [binary "**"],
     [binary "*", binary "/", binary "%"],
     [binary "+", binary "-"],
-    [binary "<<", binary ">>"],
+    [binary "<<", binary ">>", binary ">>>"],
     [binary "&"],
     [binary "^"],
     [binary "|"],
@@ -238,7 +240,7 @@ expression =
                    pure (e1, e2)
                  pure (\e -> Ternary (extractExpression e <> a) e e1 e2)
              )],
-    [binary "=", binary "|=", binary "^=", binary "&=", binary "<<=", binary ">>=", binary "+=", binary "-=", binary "*=", binary "/=", binary "%="],
+    [binary "=", binary "|=", binary "^=", binary "&=", binary "<<=", binary ">>=", binary ">>>=", binary "+=", binary "-=", binary "*=", binary "/=", binary "%="],
     [binary "&&"],
     [binary "||"]
   ]
@@ -403,7 +405,7 @@ inlineAssembly = do
       match "add"
       parens $ do
         src <- identifier
-        void $ comma
+        void comma
         match "32"
         return src
     return $ MloadAdd32 (T.pack dst) (T.pack src)
