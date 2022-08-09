@@ -120,7 +120,7 @@ data ModifierF a = Modifier
   , modifierSelector :: Text
   , modifierContents :: Maybe [StatementF a]
   , modifierContext  :: a
-  } deriving (Eq,Show,Generic, Functor)
+  } deriving (Eq,Show,Generic, NFData, Functor)
 
 type Modifier = Positioned ModifierF
 

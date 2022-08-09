@@ -105,3 +105,14 @@ benchmarks:
       dependencies:
         - file-embed
         - solid-vm
+        - deepseq
+        - criterion
+        - binary
+        - memory
+        - bytestring
+        - containers
+        - text
+        - parsec
+        - strato-model
+        - solid-vm-parser
+        - solid-vm-model
