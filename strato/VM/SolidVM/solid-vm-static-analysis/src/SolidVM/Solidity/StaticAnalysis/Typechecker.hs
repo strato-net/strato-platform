@@ -539,7 +539,7 @@ typecheckMember (Static (SVMType.UnknownLabel "super" Nothing) x) method = do
   cc <- asks codeCollection
   case getParents ((fmap $ const ()) <$> cc) ((fmap $ const ()) <$> ctract) of
     Left _ -> pure . bottom $ "Contract has missing parents" <$ x
-    Right parents' -> case filter (elem method . M.keys .  _functions) parents' of
+    Right parents' -> case filter (elem method . M.keys . _functions) parents' of
       [] -> pure . bottom $ "cannot use super without a parent contract" <$ x
       ps -> case M.lookup method . _functions $ last ps of
         Nothing -> pure . bottom $ ("super does not have a function called " <> labelToText method) <$ x

@@ -76,6 +76,7 @@ xabiToSUnitIntermediary contractName' parents' vmVersion' xabi = do
       _interfaceName = contractName',
       _interfaceContext = Xabi.xabiContext xabi,
       _interFunctions = Xabi.xabiFuncs xabi,
+      _interEvents = Xabi.xabiEvents xabi,
       _interVmVersion = vmVersion'
       }
 

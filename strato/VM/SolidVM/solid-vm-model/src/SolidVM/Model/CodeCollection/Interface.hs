@@ -8,7 +8,8 @@ module SolidVM.Model.CodeCollection.Interface (
   interfaceName,
   interFunctions,
   interVmVersion,
-  interfaceContext
+  interfaceContext,
+  interEvents
   ) where
 
 import Control.Lens
@@ -19,11 +20,14 @@ import GHC.Generics
 
 import           SolidVM.Model.CodeCollection.Function
 import           SolidVM.Model.SolidString
+import qualified SolidVM.Model.CodeCollection.Event as SolidVM
+
 
 data InterfaceF a =
   Interface {
     _interfaceName :: SolidString,
     _interFunctions :: Map SolidString (FuncF a),
+    _interEvents :: Map SolidString (SolidVM.EventF a),
     _interVmVersion :: String,
     _interfaceContext :: a
   } deriving (Show, Generic, Functor, Eq)

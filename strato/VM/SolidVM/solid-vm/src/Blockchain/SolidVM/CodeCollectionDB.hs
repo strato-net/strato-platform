@@ -92,11 +92,7 @@ compileSourceNoInheritance initCodeMap = do
           FLEnum name fle -> do
             pure $ Just $ (textToLabel name, FLE fle)
           _ -> pure Nothing
-      -- foldrM :: (Foldable t, Monad m) => (a -> b -> m b) -> b -> t a -> m b    
---      sUnitSorter :: [(SolidString, SUnitIntermediary)] ->  ([(SolidString, ConstantDecl)], [(SolidString, Contract)], [(SolidString, ([SolidString], a))], [(SolidString, [(SolidString, FieldType, a)]))
-       --(cs1, (name, cnst):cs2, cs3, cs4 ,cs5, cs6)
-       --(cs, cs2, cs3, (name, (\(k,v) -> (k,v,a)) <$> vals):cs4, cs5, cs6) --conversion to match struct form
-              
+          
       throwDuplicate' :: (SolidString, a) -> Map SolidString a -> (a -> SourceAnnotation b) -> Either ParseTypeCheckOrSolidVMError (Map SolidString a)
       throwDuplicate' (sName, unit) m contextFunc = case M.lookup sName m of
         Nothing -> pure $ M.insert sName unit m
@@ -106,17 +102,18 @@ compileSourceNoInheritance initCodeMap = do
 
       -- TODO for those who dare I am fairly certain this can be done with a curried LiftM7 function                              
       -- throwDuplicate :: (SolidString, SUnitIntermediary) -> ((Map SolidString Contract), (Map SolidString ConstantDecl), (Map SolidString ([SolidString], a)), (Map SolidString [(SolidString, FieldType, a)]), (Map SolidString Library), (Map SolidString Interface))-> Either ParseTypeCheckOrSolidVMError ((Map SolidString Contract), (Map SolidString ConstantDecl), (Map SolidString ([SolidString], a)), (Map SolidString [(SolidString, FieldType, a)]), (Map SolidString Library), (Map SolidString Interface))
+      throwDuplicate :: (SolidString, SUnitIntermediary) ->  CodeCollection -> Either ParseTypeCheckOrSolidVMError CodeCollection
       throwDuplicate (name, sUnit) cc = case sUnit of 
-        Con ctrct                 -> fmap (\cMap -> cc & contracts .~ cMap )  $ throwDuplicate' (name, ctrct) (cc ^. contracts)  _contractContext
+        Con ctrct                 -> fmap (\cMap -> cc & contracts   .~ cMap) $ throwDuplicate' (name, ctrct) (cc ^. contracts)  _contractContext
         FLC cnst                  -> fmap (\cMap -> cc & flConstants .~ cMap) $ throwDuplicate' (name, cnst) (cc ^. flConstants) constContext
-        FLE (Def.Enum vals _ a)   -> fmap (\cMap -> cc & flEnums .~ cMap)     $ throwDuplicate' (name, (vals, a)) (cc ^. flEnums) (const a)
-        FLS (Def.Struct vals _ a) -> fmap (\cMap -> cc & flStructs .~ cMap)   $ throwDuplicate' (name, (\(k,v) -> (k,v,a)) <$> vals) (cc ^. flStructs) (\_ -> a)
-        Lib lib                   -> fmap (\cMap -> cc & librarys .~ cMap)    $ throwDuplicate' (name, lib) (cc ^. librarys) _libraryContext
-        Intr intr                 -> fmap (\cMap -> cc & interfaces .~ cMap)  $ throwDuplicate' (name, intr) (cc ^. interfaces) _interfaceContext
-        FLF func                  -> fmap (\cMap -> cc & flFuncs .~ cMap)     $ throwDuplicateFunction (name, func) (cc ^. flFuncs) -- Thanks Jin! 
+        FLE (Def.Enum vals _ a)   -> fmap (\cMap -> cc & flEnums     .~ cMap) $ throwDuplicate' (name, (vals, a)) (cc ^. flEnums) (const a)
+        FLS (Def.Struct vals _ a) -> fmap (\cMap -> cc & flStructs   .~ cMap) $ throwDuplicate' (name, (\(k,v) -> (k,v,a)) <$> vals) (cc ^. flStructs) (\_ -> a)
+        Lib lib                   -> fmap (\cMap -> cc & librarys    .~ cMap) $ throwDuplicate' (name, lib) (cc ^. librarys) _libraryContext
+        Intr intr                 -> fmap (\cMap -> cc & interfaces  .~ cMap) $ throwDuplicate' (name, intr) (cc ^. interfaces) _interfaceContext
+        FLF func                  -> fmap (\cMap -> cc & flFuncs     .~ cMap) $ throwDuplicateFunction (name, func) (cc ^. flFuncs) -- Thanks Jin! 
         FLE y -> parseError "FLE non Enum should be impossible"   (show y)
         FLS x -> parseError "FLS non Struct should be impossible" (show x)
-      sUnitSorter = foldrM throwDuplicate $ CodeCollection M.empty M.empty M.empty M.empty M.empty M.empty M.empty 
+      sUnitSorter = foldrM throwDuplicate $ CodeCollection M.empty M.empty M.empty M.empty M.empty M.empty M.empty -- the list of all the sUnits goes here
 
       
 

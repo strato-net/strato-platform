@@ -569,6 +569,28 @@ parensCode = parens . fmap concat . many $
 comment :: SolidityParser ()
 comment = oneLineComment <|> multiLineComment
 
+-- | To make a new reserved word with a specific pragma version please add to the following function list, 
+-- | This assumes that only the solidvm pragma name is used. Please change if new pragmaNames are added.
+isReservedWord :: String -> String -> Bool
+isReservedWord version reservedWord = do
+  case version of
+    "3.2" -> do 
+      case reservedWord of
+        "account" -> True
+        _ -> False
+    "3.3" -> do
+      case reservedWord of
+        "block_number" -> True
+        "block_timestamp" -> True
+        "block_hash" -> True
+        "record_id" -> True
+        "transaction_hash" -> True
+        "transaction_sender" -> True
+        "salt" -> True
+        _ -> isReservedWord "3.2" reservedWord
+    _ -> False
+
+
 -- Stolen directly from Text.Parsec.Token because those jerks couldn't be
 -- bothered to export them.
 -- License pertains solely to code beneath this line.
@@ -630,23 +652,3 @@ inCommentSingle
   where
     startEnd   = nub (commentEnd solidityLanguage ++ commentStart solidityLanguage)
 
---To make a new reserved word with a specific pragma version please add to the following function list, 
-  -- This assumes that only the solidvm pragma name is used. Please change if new pragmaNames are added.
-isReservedWord :: String -> String -> Bool
-isReservedWord version reservedWord = do
-  case version of
-    "3.2" -> do 
-      case reservedWord of
-        "account" -> True
-        _ -> False
-    "3.3" -> do
-      case reservedWord of
-        "block_number" -> True
-        "block_timestamp" -> True
-        "block_hash" -> True
-        "record_id" -> True
-        "transaction_hash" -> True
-        "transaction_sender" -> True
-        "salt" -> True
-        _ -> isReservedWord "3.2" reservedWord
-    _ -> False
