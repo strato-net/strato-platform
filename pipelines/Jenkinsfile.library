@@ -950,7 +950,7 @@ def createContractAndGetContractAddress(NODE_HOST, NODE_PORT, SERVICE_TOKEN) {
     -H 'Accept: application/json;charset=utf-8' \
     -H 'Content-Type: application/json' \
     --data-binary '{\"txs\":[{\"payload\":{\"contract\":\"SimpleStorage\",\"src\":\"pragma solidvm 3.0; contract SimpleStorage {\n  uint storedData;\n\n  function SimpleStorage() {\n    storedData = 1;\n  }\n\n  function set(uint x) {\n    storedData = x;\n  }\n\n  function get() constant returns (uint) {\n    return storedData;\n  }\n}\n\",\"args\":{},\"metadata\":{\"VM\":\"SolidVM\",\"history\":\"SimpleStorage\",\"index\":\"SimpleStorage\"}},\"type\":\"CONTRACT\"}]}' \
-    | jq '.[] | .txResult.contractsCreated'"
+    | jq '.[].txResult.contractsCreated'"
   ).trim()
   return CONTRACT_ADDRESS
  }
@@ -963,7 +963,7 @@ def getContractBlockNumber(NODE_HOST, NODE_PORT, CONTRACT_ADDRESS, SERVICE_TOKEN
     -H \"Authorization: Bearer ${SERVICE_TOKEN}\"  \
     -H 'Accept: application/json;charset=utf-8' \
     -H 'Content-Type: application/json;charset=utf-8' \
-    | jq '.[] | .block_number'"
+    | jq '.[].block_number'"
   ).trim()
   return BLOCK_NUMBER
  }
@@ -1005,12 +1005,6 @@ def waitForHealthyNetwork() {
       sleep 1
     done
   """
-}
-
-def removeBeanstalkApp() {
-  dir("beanstalk") {
-    sh 'sudo docker-compose down -v -t 0 --remove-orphans'
-  }
 }
 
 return this
