@@ -15,7 +15,8 @@ module SolidVM.Model.CodeCollection.VariableDecl (
   varType,
   varIsPublic,
   varInitialVal,
-  varContext
+  varContext,
+  isImmutable
   ) where
 
 import           Control.Lens
