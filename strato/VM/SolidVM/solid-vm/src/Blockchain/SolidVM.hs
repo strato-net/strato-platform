@@ -3134,9 +3134,9 @@ trimCodeCollection cc sa = final
               goodCut = fst $ splitLast '}' enclosed
               numClosedFinal = countElem '}' goodCut
               finalCut = if (numClosedFinal == numOpen) then
-                goodCut
+                goodCut ++ "\n"
                 else
-                  goodCut ++ replicate (numOpen - numClosedFinal) '}'
+                  goodCut ++ replicate (numOpen - numClosedFinal) '}' ++ "\n"
 
 splitLast :: Char -> String -> (String, String)
 splitLast char str = let n = findIndex (==char) (reverse str) in

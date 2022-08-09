@@ -3929,7 +3929,8 @@ contract qq{
     let myContract :: String
         myContract = [r|contract Test {
   uint sixtyNine = 69;
-}|]
+}
+|]
         contract :: String
         contract = [r|
 pragma solidvm 3.3;
@@ -3958,7 +3959,8 @@ contract qq {
     weed = 420;
   }
   uint seventyNine = 79;
-}|]
+}
+|]
         contract :: String
         contract = [r|
 pragma solidvm 3.3;
@@ -3992,7 +3994,8 @@ contract qq {
     uint w = z + 13;
     uint u = w + 13;
     return u;
-}|]
+  }
+|]
         contract :: String
         contract = [r|
 pragma solidvm 3.3;
@@ -4029,7 +4032,8 @@ contract qq {
     uint w = z + 13;
     uint u = w + 13;
     return u;
-}|]
+  }
+|]
         contract :: String
         contract = [r|
 pragma solidvm 3.3;
@@ -4060,7 +4064,8 @@ contract qq {
     uint u = w + 26;
     return u;
   }
-}|]
+}
+|]
     runBS contract
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString myFunxion]
@@ -4098,7 +4103,8 @@ contract qq{
     let codeSnippet :: String
         codeSnippet = [r|contract Test {
   constructor(){}
-}|]
+}
+|]
         contract :: String
         contract = [r|
 pragma solidvm 3.3;
