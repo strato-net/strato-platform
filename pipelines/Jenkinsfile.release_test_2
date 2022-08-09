@@ -232,7 +232,7 @@ pipeline {
             // agent { label "multinode101" } // is default
             steps {
                 script {
-                    lib.runAppBootNode(NODE_DATA.NODE1, null, null, null, 'beanstalk')
+                    lib.runAppBootNode(NODE_DATA.NODE1, true, null, null, 'beanstalk')
                 }
             }
         }
@@ -278,7 +278,7 @@ pipeline {
                     agent { label "multinode102" }
                     steps {
                         script {
-                            lib.runAppSecondaryNode(NODE_DATA.NODE2, null, null, null)
+                            lib.runAppSecondaryNode(NODE_DATA.NODE2, true, null, null)
                         }
                     }
                 }
@@ -286,7 +286,7 @@ pipeline {
                     agent { label "multinode103" }
                     steps {
                         script{
-                            lib.runAppSecondaryNode(NODE_DATA.NODE3, null, null, null)
+                            lib.runAppSecondaryNode(NODE_DATA.NODE3, true, null, null)
                         }
                     }
                 }
@@ -294,7 +294,7 @@ pipeline {
                     agent { label "multinode104" }
                     steps {
                         script {
-                            lib.runAppSecondaryNode(NODE_DATA.NODE4, null, null, null)
+                            lib.runAppSecondaryNode(NODE_DATA.NODE4, true, null, null)
                         }
                     }
                 }
@@ -302,7 +302,7 @@ pipeline {
                     agent { label "multinode301" }
                     steps {
                         script {
-                            lib.runAppSecondaryNode(NODE_DATA.NODE5, null, null, null)
+                            lib.runAppSecondaryNode(NODE_DATA.NODE5, true, null, null)
                         }
                     }
                 }
@@ -310,7 +310,7 @@ pipeline {
                 agent { label "multinode302" }
                     steps {
                         script {
-                            lib.runAppSecondaryNode(NODE_DATA.NODE6, null, null, null)
+                            lib.runAppSecondaryNode(NODE_DATA.NODE6, true, null, null)
                         }
                     }
                 }
@@ -318,7 +318,7 @@ pipeline {
                     agent { label "multinode303" }
                     steps {
                         script {
-                            lib.runAppSecondaryNode(NODE_DATA.NODE7, null, null, null)
+                            lib.runAppSecondaryNode(NODE_DATA.NODE7, true, null, null)
                         }
                     }
                 }
@@ -326,7 +326,7 @@ pipeline {
                     agent { label "multinode304" }
                     steps {
                         script {
-                            lib.runAppSecondaryNode(NODE_DATA.NODE8, null, null, null)
+                            lib.runAppSecondaryNode(NODE_DATA.NODE8, true, null, null)
                         }
                     }
                 }
@@ -349,74 +349,6 @@ pipeline {
                         sh 'until [ -f /home/ubuntu/step2 ]; do sleep 5; echo "wait for file /home/ubuntu/step2 to be created by user"; done; echo "File found - continuing."'
                     }
                     lib.runBeanstalkLoadTest(params.BEANSTALK_LOADTEST_BATCH_SIZE, params.BEANSTALK_LOADTEST_BATCH_COUNT)
-                }
-            }
-        }
-        stage ('Upgradability Sync Test - Remove Beanstalk App') {
-            parallel {
-                stage('Remove Beanstalk App app on multinode101') {
-                    // agent { label "multinode101" } // is default
-                    steps {
-                        script {
-                            lib.removeBeanstalkApp()
-                        }
-                    }
-                }
-                stage('Remove Beanstalk App app on multinode102') {
-                    agent { label "multinode102" }
-                    steps {
-                        script {
-                            lib.removeBeanstalkApp()
-                        }
-                    }
-                }
-                stage('Remove Beanstalk App app on multinode103') {
-                    agent { label "multinode103" }
-                    steps {
-                        script{
-                            lib.removeBeanstalkApp()
-                        }
-                    }
-                }
-                stage('Remove Beanstalk App app on multinode104') {
-                    agent { label "multinode104" }
-                    steps {
-                        script {
-                            lib.removeBeanstalkApp()
-                        }
-                    }
-                }
-                stage('Remove Beanstalk App app on multinode301') {
-                    agent { label "multinode301" }
-                    steps {
-                        script {
-                            lib.removeBeanstalkApp()
-                        }
-                    }
-                }
-                stage('Remove Beanstalk App app on multinode302') {
-                agent { label "multinode302" }
-                    steps {
-                        script {
-                            lib.removeBeanstalkApp()
-                        }
-                    }
-                }
-                stage('Remove Beanstalk App app on multinode303') {
-                    agent { label "multinode303" }
-                    steps {
-                        script {
-                            lib.removeBeanstalkApp()
-                        }
-                    }
-                }
-                stage('Remove Beanstalk App app on multinode304') {
-                    agent { label "multinode304" }
-                    steps {
-                        script {
-                            lib.removeBeanstalkApp()
-                        }
-                    }
                 }
             }
         }
@@ -604,7 +536,7 @@ pipeline {
             // agent { label "multinode101" } // is default
             steps {
                 script {
-                    lib.runAppBootNode(NODE_DATA.NODE1, null, null, null, 'beanstalk')
+                    lib.runAppBootNode(NODE_DATA.NODE1, true, null, null, 'beanstalk')
                 }
             }
         }
@@ -615,7 +547,7 @@ pipeline {
                     agent { label "multinode102" }
                     steps {
                         script {
-                            lib.runAppSecondaryNode(NODE_DATA.NODE2, null, null, null)
+                            lib.runAppSecondaryNode(NODE_DATA.NODE2, true, null, null)
                         }
                     }
                 }
@@ -623,7 +555,7 @@ pipeline {
                     agent { label "multinode103" }
                     steps {
                         script{
-                            lib.runAppSecondaryNode(NODE_DATA.NODE3, null, null, null)
+                            lib.runAppSecondaryNode(NODE_DATA.NODE3, true, null, null)
                         }
                     }
                 }
@@ -631,7 +563,7 @@ pipeline {
                     agent { label "multinode104" }
                     steps {
                         script {
-                            lib.runAppSecondaryNode(NODE_DATA.NODE4, null, null, null)
+                            lib.runAppSecondaryNode(NODE_DATA.NODE4, true, null, null)
                         }
                     }
                 }
@@ -639,7 +571,7 @@ pipeline {
                     agent { label "multinode301" }
                     steps {
                         script {
-                            lib.runAppSecondaryNode(NODE_DATA.NODE5, null, null, null)
+                            lib.runAppSecondaryNode(NODE_DATA.NODE5, true, null, null)
                         }
                     }
                 }
@@ -647,7 +579,7 @@ pipeline {
                 agent { label "multinode302" }
                     steps {
                         script {
-                            lib.runAppSecondaryNode(NODE_DATA.NODE6, null, null, null)
+                            lib.runAppSecondaryNode(NODE_DATA.NODE6, true, null, null)
                         }
                     }
                 }
@@ -655,7 +587,7 @@ pipeline {
                     agent { label "multinode303" }
                     steps {
                         script {
-                            lib.runAppSecondaryNode(NODE_DATA.NODE7, null, null, null)
+                            lib.runAppSecondaryNode(NODE_DATA.NODE7, true, null, null)
                         }
                     }
                 }
@@ -663,7 +595,7 @@ pipeline {
                     agent { label "multinode304" }
                     steps {
                         script {
-                            lib.runAppSecondaryNode(NODE_DATA.NODE8, null, null, null)
+                            lib.runAppSecondaryNode(NODE_DATA.NODE8, true, null, null)
                         }
                     }
                 }
