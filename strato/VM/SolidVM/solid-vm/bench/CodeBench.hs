@@ -1,6 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+
 import Control.DeepSeq
 import Criterion.Main
 import Data.Binary
@@ -18,6 +19,7 @@ import SolidVM.Solidity.Parse.Declarations
 import SolidVM.Solidity.Parse.File
 import SolidVM.CodeCollectionTools
 import SolidVM.Model.CodeCollection
+import SolidVM.Solidity.Parse.ParserTypes
 
 instance NFData ParseError where
   rnf = rwhnf
@@ -31,7 +33,7 @@ wingsContract = BC.unpack $(embedFile "bench/wings.sol")
 
 wingsCC :: CodeCollection
 wingsCC =
-  let file = either (error . show) id $ runParser solidityFile "" "" wingsContract
+  let file = either (error . show) id $ runParser solidityFile (ParserState "" "") "" wingsContract
       namedContracts = [(T.unpack name, fromRight (error "Didn't parse xabiToContract!") $ xabiToContract(T.unpack name) (map T.unpack parents') "" xabi)
                         | NamedXabi name (xabi, parents') <- unsourceUnits file]
       
@@ -55,7 +57,7 @@ strSipBench = bench "time spent on (siphash) hashing the wings contract"
 
 parseBench :: Benchmark
 parseBench = bench "time required to parse the contract"
-           $ nf (runParser solidityFile "" "") wingsContract
+           $ nf (runParser solidityFile (ParserState "" "") "") wingsContract
 
 showCCBench :: Benchmark
 showCCBench = bench "time to show the wingsCC"
@@ -75,7 +77,7 @@ sipCCBench = bench "time to siphash the wingsCC"
 
 readCC :: BC.ByteString -> CodeCollection
 readCC bStr =
-  let file = either (error . show) id $ runParser solidityFile "" "" $ BC.unpack bStr
+  let file = either (error . show) id $ runParser solidityFile (ParserState "" "") "" $ BC.unpack bStr
       namedContracts = [(T.unpack name, fromRight (error "Didn't parse xabiToContract!") $ xabiToContract(T.unpack name) (map T.unpack parents') "" xabi)
                         | NamedXabi name (xabi, parents') <- unsourceUnits file]
 
