@@ -262,7 +262,7 @@ contract CertificateRegistry {
     event CertificateRegistryInitialized();
 
     constructor() {
-        require(account(this, "self").chainId == 0, "You must post this contract on the main chain!");
+        // require(account(this, "self").chainId == 0, "You must post this contract on the main chain!");
         
         initialized = false;
     }
