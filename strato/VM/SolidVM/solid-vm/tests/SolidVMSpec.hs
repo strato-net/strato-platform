@@ -31,7 +31,7 @@ import Data.Text.Encoding
 import Data.Time.Clock.POSIX
 import HFlags
 import Numeric
-import Test.Hspec (hspec, Spec, describe, fit, it, fit, pendingWith, anyException, shouldThrow, anyErrorCall, Selector)
+import Test.Hspec (hspec, Spec, describe, fit, it, xit, pendingWith, anyException, shouldThrow, anyErrorCall, Selector)
 import Test.Hspec.Expectations.Lifted
 import Text.Printf
 import Text.RawString.QQ
@@ -3713,7 +3713,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
---   fit "can get an error if nothing is supplied to the code search" . runTest $ do
+--   xit "can get an error if nothing is supplied to the code search" . runTest $ do
 --     let contract :: String
 --         contract = [r|
 -- pragma solidvm 3.2;
@@ -3736,7 +3736,8 @@ contract qq{
     let codeSnippet :: String
         codeSnippet = [r|contract Test {
   constructor(){}
-}|]
+}
+|]
         contract :: String
         contract = [r|
 pragma solidvm 3.3;
@@ -3903,7 +3904,8 @@ contract qq{
     Test t = new Test();
     codeTest = account(this).code("qq");
   }
-}|]
+}
+|]
         collection :: String
         collection = [r|
 pragma solidvm 3.3;
@@ -4067,7 +4069,8 @@ contract qq {
     let codeSnippet :: String
         codeSnippet = [r|contract Test {
   constructor(){}
-}|]
+}
+|]
         contract :: String
         contract = [r|
 pragma solidvm 3.3;

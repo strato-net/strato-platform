@@ -278,8 +278,12 @@ functionXabi = do
   start <- getSourcePosition
   functionArgs <- tupleDeclaration
   (functionRet, visibility, mutability, constructorCalls, modifiers) <- functionModifiers
-  end <- getSourcePosition
+-- This end statment is not in the right spot.
+
   contents <- Just <$> statements <|> (reservedOp ";" >> return Nothing)
+  end <- getSourcePosition
+  -- (contents, end) <- pure (,) <*> (Just <$> statements <|> (reservedOp ";" >> return Nothing)) <*> getSourcePosition
+  -- end <- getSourcePosition
   let nameUnnamed (name,ty) = if Text.null name then (Nothing, ty) else (Just name,ty)
       ctx = SourceAnnotation start end ()
   -- TODO: use Lenses instead?
