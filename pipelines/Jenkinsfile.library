@@ -282,7 +282,7 @@ docker-compose up -d --build
         }
         if (wipeApp) {
           //sh 'sudo docker volume rm beanstalk_config || true'
-          sh 'sudo docker-compose down -v -t 0  --remove-orphans' 
+          sh 'sudo docker-compose down -v -t 0 --remove-orphans'
         }
         sh 'sudo bash run-app.sh'
 
@@ -377,7 +377,7 @@ docker-compose up -d --build
         
         if (wipeApp) {
           //sh 'sudo docker volume rm beanstalk_config || true'
-          sh 'sudo docker-compose down -v -t 0  --remove-orphans'
+          sh 'sudo docker-compose down -v -t 0 --remove-orphans'
         }
 
         // Unstash deploy file:
@@ -495,7 +495,7 @@ def runMonitor(nodeData, nodeConfig) {
     sh "rm -rf monitor"
     sh " git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/monitor.git"
     dir ("monitor") {
-      sh "docker-compose down -vt0"
+      sh 'sudo docker-compose down -v -t 0 --remove-orphans'
     }
     def runCommand = """#!/bin/bash
         sudo \\
@@ -1005,6 +1005,12 @@ def waitForHealthyNetwork() {
       sleep 1
     done
   """
+}
+
+def removeBeanstalkApp() {
+  dir("beanstalk") {
+    sh 'sudo docker-compose down -v -t 0 --remove-orphans'
+  }
 }
 
 return this
