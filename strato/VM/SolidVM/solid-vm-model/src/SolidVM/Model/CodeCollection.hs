@@ -55,7 +55,7 @@ data CodeCollectionF a =
     _flConstants ::  Map SolidString (ConstantDeclF a),
     _flEnums :: Map SolidString ([SolidString], a),
     _flStructs :: Map SolidString [(SolidString, FieldType, a)]
-  } deriving (Show, Generic, Functor)
+  } deriving (Show, Generic, NFData, Functor)
 
 instance ToJSON a => ToJSON (CodeCollectionF a)
 instance FromJSON a => FromJSON (CodeCollectionF a)
