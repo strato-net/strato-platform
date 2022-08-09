@@ -3732,7 +3732,7 @@ contract qq{
 --     getFields ["codeTest"] `shouldReturn`
 --       [ BString $ UTF8.fromString codeSnippet]
 
-  fit "can get the code for a contract if supplied an empty string" . runTest $ do
+  it "can get the code for a contract if supplied an empty string" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|contract Test {
   constructor(){}
@@ -3757,7 +3757,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
-  fit "can search for an enum body within a codeCollection" . runTest $ do
+  it "can search for an enum body within a codeCollection" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|enum FreshJuiceSize{ SMALL, MEDIUM, LARGE }
 |]
@@ -3792,7 +3792,7 @@ contract qq {
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
-  fit "can search for any public variable in a contract initialized value" . runTest $ do
+  it "can search for any public variable in a contract initialized value" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|uint public testVar = 13*56-3+8/158*8*555*65+65-65-65+59/65-8;
 |]
@@ -3816,7 +3816,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
-  fit "can search for a constant and get its initial code." . runTest $ do
+  it "can search for a constant and get its initial code." . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|uint constant public testConst = 136546546541654654324765441651684354646468435468;
 |]
@@ -3841,7 +3841,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
-  fit "can get the current contract code without supplying anything to the code" . runTest $ do
+  it "can get the current contract code without supplying anything to the code" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|
 pragma solidvm 3.2;
@@ -3876,7 +3876,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
-  fit "Code won't return anything if the thing is not in the file" . runTest $ do
+  it "Code won't return anything if the thing is not in the file" . runTest $ do
     let contract :: String
         contract = [r|
 pragma solidvm 3.3;
@@ -3896,7 +3896,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString "" ]
 
-  fit "Can search for the contract in a given file using the search procedure" . runTest $ do
+  it "Can search for the contract in a given file using the search procedure" . runTest $ do
     let contractqq :: String
         contractqq = [r|contract qq{
   string codeTest;
@@ -3925,7 +3925,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString contractqq]
 
-  fit "can properly add the final } to a contract without a constructor using the code member function" . runTest $ do
+  it "can properly add the final } to a contract without a constructor using the code member function" . runTest $ do
     let myContract :: String
         myContract = [r|contract Test {
   uint sixtyNine = 69;
@@ -3950,7 +3950,7 @@ contract qq {
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString myContract]
 
-  fit "can properly add the final } to a contract with a constructor but information after the constructor using the code member function" . runTest $ do
+  it "can properly add the final } to a contract with a constructor but information after the constructor using the code member function" . runTest $ do
     let myContract :: String
         myContract = [r|contract Test {
   uint sixtyNine = 69;
@@ -3985,7 +3985,7 @@ contract qq {
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString myContract]
 
-  fit "Can find a function within a codeCollection" . runTest $ do
+  it "Can find a function within a codeCollection" . runTest $ do
     let myFunxion :: String
         myFunxion = [r|function myFunction() public returns (uint) {
     uint x = 13;
@@ -4023,7 +4023,7 @@ contract qq {
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString myFunxion]
 
-  fit "Can avoid getting confused if two functions with the same name are in the same codeCollection" . runTest $ do
+  it "Can avoid getting confused if two functions with the same name are in the same codeCollection" . runTest $ do
     let myFunxion :: String
         myFunxion = [r|function myFunction() public returns (uint) {
     uint x = 13;
@@ -4070,7 +4070,7 @@ contract qq {
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString myFunxion]
 
-  fit "Can get just the contract if empty string is fed to the code function." . runTest $ do
+  it "Can get just the contract if empty string is fed to the code function." . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|contract Test {
   constructor(){}
@@ -4099,38 +4099,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
-  fit "vvvvvvvvvvvvvvvvvvvvvvvvvvv" . runTest $ do
-    let codeSnippet :: String
-        codeSnippet = [r|contract Test {
-  constructor(){}
-}
-|]
-        contract :: String
-        contract = [r|
-pragma solidvm 3.3;
-contract Test {
-  uint one = 15;
-  uint two = 16;
-  constructor(){}
-}
-
-pragma solidvm 3.3;
-contract qq{
-  string codeTest;
-  constructor() public {
-    Test t = new Test();
-    codeTest = account(t).code("one", "two");
-  }
-
-  function myFunction() public returns (uint) {
-    return 13;
-  }
-}|]
-    runBS contract
-    getFields ["codeTest"] `shouldReturn`
-      [ BString $ UTF8.fromString codeSnippet]
-
-  fit "Can throw an error if more than one item is given to the code member function." $ (runTest (runBS [r|
+  it "Can throw an error if more than one item is given to the code member function." $ (runTest (runBS [r|
 pragma solidvm 3.3;
 contract Test {
   constructor(){}
@@ -4149,7 +4118,7 @@ contract qq{
   }
 }|])) `shouldThrow` anyTooManyCooks
 
---   fit "Can throw an error if more than one item is given to the code member function." $ (runTest (runBS [r|
+--   it "Can throw an error if more than one item is given to the code member function." $ (runTest (runBS [r|
 -- pragma solidvm 3.3;
 -- contract Test {
 --   constructor(){}
