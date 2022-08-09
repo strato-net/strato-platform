@@ -97,6 +97,7 @@ executables:
     dependencies:
       - parsec
       - solid-vm
+      - deepseq
 
     ghc-options: -Wall -O2 -threaded -rtsopts
 
@@ -110,6 +111,7 @@ executables:
       - solid-vm
       - solid-vm-model
       - text
+      - deepseq
 
 tests:
   solid-vm-spec:

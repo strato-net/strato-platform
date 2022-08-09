@@ -51,3 +51,7 @@ stack test -j1 \
       source-tools
 
 stack bench vm-runner
+
+stack bench solid-vm
+
+stack bench solid-vm-model
