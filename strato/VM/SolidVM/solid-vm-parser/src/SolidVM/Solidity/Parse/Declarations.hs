@@ -367,7 +367,7 @@ functionDeclaration free = do
     xabi <- functionXabi free
     pure (functionName, xabi)
   cName <- getContractName
-  let xabi = xabi'{SolidVM.funcContext = a <> SolidVM.funcContext xabi'}
+  let xabi = xabi'{SolidVM._funcContext = a <> SolidVM._funcContext xabi'}
       tipe = if cName == functionName
                 then ConstructorDeclaration 
                 else FuncDeclaration 
@@ -380,21 +380,25 @@ functionXabi free = do
   (functionRet, visibility, freevisibility, mutability, funcConstructorCallsOrModifiers) <- functionModifiers
   end <- getSourcePosition
   contents <- Just <$> statements <|> (reservedOp ";" >> return Nothing)
+  end <- getSourcePosition
+  -- (contents, end) <- pure (,) <*> (Just <$> statements <|> (reservedOp ";" >> return Nothing)) <*> getSourcePosition
+  -- end <- getSourcePosition
   let nameUnnamed (name,ty) = if Text.null name then (Nothing, ty) else (Just name,ty)
       ctx = SourceAnnotation start end ()
+  -- TODO: use Lenses instead?
   return SolidVM.Func{
-        SolidVM.funcArgs = map (\(k, v) -> (fmap textToLabel k, v)) $
+        SolidVM._funcArgs = map (\(k, v) -> (fmap textToLabel k, v)) $
            zipWith (\x i -> fmap (SolidVM.IndexedType i) (nameUnnamed x)) functionArgs [0..]
-      , SolidVM.funcVals = map (\(k, v) -> (fmap textToLabel k, v)) $
+      , SolidVM._funcVals = map (\(k, v) -> (fmap textToLabel k, v)) $
            zipWith (\v i -> fmap (SolidVM.IndexedType i) (nameUnnamed v)) functionRet [0..]
-      , SolidVM.funcContents = contents
-      , SolidVM.funcVisibility = if (free) then Just freevisibility else Just visibility
-      , SolidVM.funcStateMutability = mutability
-      , SolidVM.funcConstructorCalls = Map.fromList funcConstructorCallsOrModifiers
-      , SolidVM.funcModifiers = funcConstructorCallsOrModifiers
-      , SolidVM.funcContext = ctx
-      , SolidVM.funcIsFree = False
-      , SolidVM.funcOverload = []
+      , SolidVM._funcContents = contents
+      , SolidVM._funcVisibility = if (free) then Just freevisibility else Just visibility
+      , SolidVM._funcStateMutability = mutability
+      , SolidVM._funcConstructorCalls = Map.fromList funcConstructorCallsOrModifiers
+      , SolidVM._funcModifiers = funcConstructorCallsOrModifiers
+      , SolidVM._funcContext = ctx
+      , SolidVM._funcIsFree = False
+      , SolidVM._funcOverload = []
       }
 
 eventDeclaration :: SolidityParser (String, Declaration)
@@ -404,16 +408,18 @@ eventDeclaration = do
   name <- identifier
   logs <- tupleDeclaration
   anon <- option False (reserved "anonymous" >> return True)
-  semi
   end <- getSourcePosition
+  semi
+
   let ctx = SourceAnnotation start end ()
   return
     (
       name,
+      --TODO: use lenses?
       EventDeclaration SolidVM.Event{
-          SolidVM.eventAnonymous = anon
-        , SolidVM.eventLogs = zipWith (\i -> fmap (SolidVM.IndexedType i)) [0..] logs
-        , SolidVM.eventContext = ctx
+          SolidVM._eventAnonymous = anon
+        , SolidVM._eventLogs = zipWith (\i -> fmap (SolidVM.IndexedType i)) [0..] logs
+        , SolidVM._eventContext = ctx
 --         objName = name,
 --         objValueType = NoValue,
 --         objArgType = logs,

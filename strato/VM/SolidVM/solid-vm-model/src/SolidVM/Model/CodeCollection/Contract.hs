@@ -1,6 +1,9 @@
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveFunctor      #-}
+{-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE TemplateHaskell    #-}
+{-# LANGUAGE DeriveFoldable     #-}
+{-# LANGUAGE DeriveTraversable  #-}
+
 
 module SolidVM.Model.CodeCollection.Contract (
   ContractF(..),
@@ -33,7 +36,7 @@ import           SolidVM.Model.CodeCollection.VariableDecl
 import           SolidVM.Model.SolidString
 
 data ContractF a =
-  Contract {
+  Contract {     
     _contractName :: SolidString,
     _parents :: [SolidString],
     _constants :: Map SolidString (ConstantDeclF a),
@@ -46,7 +49,7 @@ data ContractF a =
     _modifiers :: Map SolidString (ModifierF a),
     _vmVersion :: String,
     _contractContext :: a
-  } deriving (Show, Generic, Functor)
+  } deriving (Show, Generic, Functor, Foldable, Traversable)
 
 instance ToJSON a => ToJSON (ContractF a)
 instance FromJSON a => FromJSON (ContractF a)

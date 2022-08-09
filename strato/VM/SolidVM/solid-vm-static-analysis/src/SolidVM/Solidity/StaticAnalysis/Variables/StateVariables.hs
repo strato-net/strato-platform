@@ -33,22 +33,22 @@ contractHelper Contract{..} =
       action = traverse functionHelper $ maybeToList _constructor ++ M.elems _functions
       stateVariables' = fst $ execState action emptyState
       findStateAnns name (False, False, a) =
-        [("Unused state variable " <> labelToText name <> ".") <$ varContext a]
-      findStateAnns name (True, False, VariableDecl{..}) | varInitialVal == Nothing = case varType of
+        [("Unused state variable " <> labelToText name <> ".") <$ _varContext a]
+      findStateAnns name (True, False, VariableDecl{..}) | _varInitialVal == Nothing = case _varType of
         SVMType.Struct{} -> []
         SVMType.Array _ Nothing -> []
         SVMType.Mapping{} -> []
-        _ -> [("Uninitialized state variable " <> labelToText name <> ". Consider initializing it to prevent incorrect behavior.") <$ varContext]
-      findStateAnns name (True, False, a) = case varType a of
+        _ -> [("Uninitialized state variable " <> labelToText name <> ". Consider initializing it to prevent incorrect behavior.") <$ _varContext]
+      findStateAnns name (True, False, a) = case _varType a of
         SVMType.Struct{} -> []
         SVMType.Array _ Nothing -> []
         SVMType.Mapping{} -> []
-        _ -> [("State variable " <> labelToText name <> " is never written to. Consider making it a constant.") <$ varContext a]
+        _ -> [("State variable " <> labelToText name <> " is never written to. Consider making it a constant.") <$ _varContext a]
       findStateAnns _ _ = []
    in M.foldMapWithKey findStateAnns stateVariables'
 
 functionHelper :: Func -> SSS [SourceAnnotation Text]
-functionHelper Func{..} = maybe (pure []) statementsHelper funcContents
+functionHelper Func{..} = maybe (pure []) statementsHelper _funcContents
 
 statementsHelper :: [Statement] -> SSS [SourceAnnotation Text]
 statementsHelper ss = do

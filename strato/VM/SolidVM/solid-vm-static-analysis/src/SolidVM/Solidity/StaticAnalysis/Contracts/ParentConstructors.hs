@@ -25,16 +25,16 @@ detector cc@CodeCollection{..} = M.foldMapWithKey (contractHelper cc) _contracts
 contractHelper :: CodeCollection -> SolidString -> Contract -> [SourceAnnotation Text]
 contractHelper cc cName c = fromMaybe [] $ _constructor c <&> \constr ->
   let parentSet = S.fromList $ _parents c
-      constrCalls = funcConstructorCalls constr
+      constrCalls = _funcConstructorCalls constr
    in flip M.foldMapWithKey constrCalls $ \parentName varExprs ->
         if not $ parentName `S.member` parentSet
-          then [("Contract " <> labelToText cName <> " does not inherit from " <> labelToText parentName) <$ funcContext constr]
+          then [("Contract " <> labelToText cName <> " does not inherit from " <> labelToText parentName) <$ _funcContext constr]
           else case M.lookup parentName (_contracts cc) of
-            Nothing -> [("Contract " <> labelToText parentName <> " not found.") <$ funcContext constr]
+            Nothing -> [("Contract " <> labelToText parentName <> " not found.") <$ _funcContext constr]
             Just parent -> case _constructor parent of
-              Nothing -> [(labelToText parentName <> "'s constructor is undefined. Please consider defining its constructor.") <$ funcContext constr]
+              Nothing -> [(labelToText parentName <> "'s constructor is undefined. Please consider defining its constructor.") <$ _funcContext constr]
               Just pConstr ->
-                let pConstrArgs = funcArgs pConstr
+                let pConstrArgs = _funcArgs pConstr
                  in if length pConstrArgs /= length varExprs
-                      then [("The number of arguments in the constructor call to " <> labelToText parentName <> " does not equal the number of arguments in its constructor definition.") <$ funcContext constr]               
+                      then [("The number of arguments in the constructor call to " <> labelToText parentName <> " does not equal the number of arguments in its constructor definition.") <$ _funcContext constr]               
                       else [] -- we'll leave typechecking the arguments for a different detector

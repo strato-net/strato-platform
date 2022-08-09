@@ -95,7 +95,7 @@ simpleStatementCrawler = \case
   VariableDefinition _ mExpr -> maybe [] expressionCrawler mExpr
 
 funcCrawler :: FuncF a -> [T.Text]
-funcCrawler = maybe [] (concatMap statementCrawler) . funcContents
+funcCrawler = maybe [] (concatMap statementCrawler) . _funcContents
 
 contractCrawler :: Contract -> [T.Text]
 contractCrawler Contract{..} = concatMap funcCrawler _functions ++ concatMap funcCrawler _constructor

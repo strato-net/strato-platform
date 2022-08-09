@@ -1,10 +1,13 @@
-{-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE DeriveAnyClass    #-}
-{-# LANGUAGE DeriveFunctor     #-}
-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE DataKinds          #-}
+{-# LANGUAGE DeriveAnyClass     #-}
+{-# LANGUAGE DeriveFunctor      #-}
+{-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE RecordWildCards    #-}
+{-# LANGUAGE TemplateHaskell    #-}
+{-# LANGUAGE DeriveFoldable     #-}
+{-# LANGUAGE DeriveTraversable  #-}
 
 module SolidVM.Model.CodeCollection.Function (
   FuncF(..),
@@ -16,9 +19,20 @@ module SolidVM.Model.CodeCollection.Function (
   tShow,
   tShow',
   tRead
+  tRead,
+  funcArgs,
+  funcVals,
+  funcStateMutability,
+  funcContents,
+  funcVisibility,
+  funcConstructorCalls,
+  funcModifiers,
+  funcContext,
+  funcIsFree,
+  funcOverload
   ) where
 
-import           Control.Lens                 (mapped, (&), (?~))
+import           Control.Lens                 (mapped, (&), (?~), makeLenses)
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
@@ -68,26 +82,27 @@ instance ToSchema StateMutability where
     & mapped.schema.example ?~ toJSON View
 
 data FuncF a = Func
-  { funcArgs :: [(Maybe SolidString, SolidVM.IndexedType)]
-  , funcVals :: [(Maybe SolidString, SolidVM.IndexedType)]
-  , funcStateMutability :: Maybe StateMutability
+  { _funcArgs :: [(Maybe SolidString, SolidVM.IndexedType)]
+  , _funcVals :: [(Maybe SolidString, SolidVM.IndexedType)]
+  , _funcStateMutability :: Maybe StateMutability
 
   -- These Values are only used for parsing and unparsing solidity.
   -- This data will not be stored in the db and will have no
   -- relevance when constructing from the db.
-  , funcContents :: Maybe [StatementF a]
-  , funcVisibility :: Maybe Visibility
-  , funcConstructorCalls :: Map SolidString [(ExpressionF a)]
-  , funcModifiers :: [(SolidString, [(ExpressionF a)])]
-  , funcContext :: a
-  , funcIsFree :: Bool
-  , funcOverload :: [FuncF a]
-  } deriving (Eq,Show,Generic, Functor)
+  , _funcContents :: Maybe [StatementF a]
+  , _funcVisibility :: Maybe Visibility
+  , _funcConstructorCalls :: Map SolidString [(ExpressionF a)]
+  , _funcModifiers :: [(SolidString, [(ExpressionF a)])]
+  , _funcContext :: a
+  , _funcIsFree :: Bool
+  , _funcOverload :: [FuncF a]
+  } deriving (Eq,Show,Generic, Functor, Foldable, Traversable)
+makeLenses ''FuncF
 
 instance ToJSON a => ToJSON (FuncF a)
 instance FromJSON a => FromJSON (FuncF a)
 
-type Func = Positioned FuncF
+type Func = Positioned FuncF 
 
 data Visibility = Private
                 | Public
@@ -117,11 +132,13 @@ instance ToSchema Visibility where
 
 
 data ModifierF a = Modifier
-  { modifierArgs     :: Map Text SolidVM.IndexedType
-  , modifierSelector :: Text
-  , modifierContents :: Maybe [StatementF a]
-  , modifierContext  :: a
-  } deriving (Eq,Show,Generic, Functor)
+  { _modifierArgs     :: Map Text SolidVM.IndexedType
+  , _modifierSelector :: Text
+  , _modifierContents :: Maybe [StatementF a]
+  , _modifierContext  :: a
+  } deriving (Eq,Show,Generic, Functor, Foldable, Traversable)
+
+makeLenses ''ModifierF
 
 type Modifier = Positioned ModifierF
 
@@ -142,3 +159,5 @@ soliditySchemaOptions = SchemaOptions
   , allNullaryToStringTag = True
   , unwrapUnaryRecords = True
   }
+
+makeLenses ''FuncF

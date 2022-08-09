@@ -18,6 +18,7 @@ module Blockchain.CommunicationConduit
     , mkEthP2PEventConduit
     ) where
 
+import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
 import           Control.Monad.IO.Unlift
 import           Control.Monad.State
@@ -46,6 +47,7 @@ import           Blockchain.Constants                  hiding (ethVersion)
 import           Blockchain.Context                    hiding (Inbound, Outbound)
 import           Blockchain.Data.Block
 import           Blockchain.Data.Control               (P2PCNC(..))
+import           Blockchain.Data.PubKey
 import           Blockchain.Data.RLP
 import           Blockchain.Data.Wire                  as W
 import           Blockchain.Display
@@ -58,10 +60,12 @@ import           Blockchain.Options
 import           Blockchain.Participation
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Strato.Model.Address
 import           Blockchain.TimerSource
 import           Blockchain.Strato.Model.Util
 import           Blockchain.Watchdog
 import           BlockApps.X509
+
 
 -- This is a placeholder until the root certs can be held in a proper database
 rootCerts' :: S.Set X509Certificate 
@@ -218,7 +222,12 @@ handleMsgServerConduit :: MonadP2P m
 handleMsgServerConduit myPubkey peer = do
     $logDebugS "handleMsgServerConduit" $ T.pack $ "about to parse message"
     awaitMsg >>= \case
-        Just Hello{} -> do
+        Just clientHello@Hello{} -> do
+            let userAddress' = fromPublicKey (pointToSecPubKey $ nodeId clientHello)
+            -- Lookup in Redis with userAddress, isValid Field
+            clientCertDetails <- lift $ A.select (A.Proxy @X509CertInfoState) userAddress'
+            -- Throw error if the cert is not valid.
+            unless (fromMaybe False (fmap isValid clientCertDetails)) $ throwIO $ InvalidClientCert
             $logInfoS "handshake/Hello{}" "received hello"
             let helloMsg' = Hello {
                 version = 4,

@@ -1,9 +1,11 @@
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE DeriveFunctor              #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE TemplateHaskell            #-}
+
 module Data.Source.Annotation
   ( SourceAnnotation(..)
   , Positioned
@@ -13,6 +15,9 @@ module Data.Source.Annotation
   , withPosition
   , position
   , typeErrorToAnnotation
+  , sourceAnnotationStart
+  , sourceAnnotationEnd
+  , sourceAnnotationAnnotation
   ) where
 
 import           Control.Lens              hiding ((.=))
@@ -34,6 +39,8 @@ data SourceAnnotation a = SourceAnnotation
   , _sourceAnnotationEnd        :: SourcePosition
   , _sourceAnnotationAnnotation :: a
   } deriving (Eq, Generic, Functor, Data)
+
+makeLenses ''SourceAnnotation
 
 instance ToJSON a => ToJSON (SourceAnnotation a) where
   toJSON ann = object [

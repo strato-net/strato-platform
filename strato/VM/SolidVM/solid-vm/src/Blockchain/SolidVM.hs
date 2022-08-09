@@ -51,9 +51,12 @@ import           Data.List
 import qualified Data.Map                             as M
 import qualified Data.Map.Merge.Lazy                  as M
 import           Data.Maybe
+-- import           Data.Monoid
+import           Data.Semigroup
 import qualified Data.Sequence                        as Q
 import qualified Data.Set                             as S
 import           Data.Source
+-- import           Data.Source.Position
 import qualified Data.Text                            as T
 import qualified Data.Text.Encoding                   as TE
 --import qualified Data.List                            as List
@@ -106,7 +109,7 @@ import qualified Text.Colors                          as C
 import           Text.Format
 import           Text.Tools
 
-import qualified Data.Text.Encoding                   as DT
+-- import qualified Data.Text.Encoding                   as DT
 
 import qualified SolidVM.Model.CodeCollection         as CC
 
@@ -118,7 +121,7 @@ import           SolidVM.Model.Value
 import           SolidVM.Solidity.Parse.Statement
 import           SolidVM.Solidity.Parse.Lexer         (stringLiteral)
 import           SolidVM.Solidity.Parse.ParserTypes
-import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpression)
+import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpression)--, unparseFunc)
 
 import           Network.Haskoin.Crypto.BigWord()
 import           UnliftIO                             hiding (assert)
@@ -679,7 +682,7 @@ argsToVals ctract fn args =
           when (length xs /= length orderedTypes) $ invalidArguments "arity mismatch" (xs, orderedTypes)
           OrderedVals <$> zipWithM eval32 orderedTypes xs
         CC.NamedArgs xs -> NamedVals . M.toList <$> do
-          let strTypes = M.mapKeys (fromMaybe "") $ M.fromList $ CC.funcArgs fn
+          let strTypes = M.mapKeys (fromMaybe "") $ M.fromList $ CC._funcArgs fn
           M.mergeA (M.mapMissing $ curry $ invalidArguments "missing argument")
                   (M.mapMissing $ curry $ invalidArguments "extra argument")
                   (M.zipWithAMatched $ \_k t x -> eval32 (CC.indexedTypeType t) x)
@@ -691,7 +694,7 @@ argsToVals ctract fn args =
           when (length xs /= length orderedTypes) $ invalidArguments "arity mismatch" (xs, orderedTypes)
           OrderedVals <$> zipWithM eval orderedTypes xs
         CC.NamedArgs xs -> NamedVals . M.toList <$> do
-          let strTypes = M.mapKeys (fromMaybe "") $ M.fromList $ CC.funcArgs fn
+          let strTypes = M.mapKeys (fromMaybe "") $ M.fromList $ CC._funcArgs fn
           M.mergeA (M.mapMissing $ curry $ invalidArguments "missing argument")
                   (M.mapMissing $ curry $ invalidArguments "extra argument")
                   (M.zipWithAMatched $ \_k t x -> eval (CC.indexedTypeType t) x)
@@ -700,7 +703,7 @@ argsToVals ctract fn args =
 
   where orderedTypes :: [SVMType.Type]
         orderedTypes = map CC.indexedTypeType
-                     . map snd $ CC.funcArgs fn
+                     . map snd $ CC._funcArgs fn
 
         eval :: MonadSM m => SVMType.Type -> CC.Expression -> m Value
         eval t x = do
@@ -1274,7 +1277,7 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
     Nothing ->
       missingType "no corresponding event has been declared for the following emit statement: " (unparseStatement st)
     Just ev -> do
-      if (length exptups) /= (length $ CC.eventLogs ev) then 
+      if (length exptups) /= (length $ CC._eventLogs ev) then 
         invalidArguments "arguments to statement are inconsistent with those declared" (unparseStatement st)
       else do
         let account = currentAccount curInfo
@@ -1290,7 +1293,7 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
                     _                                                    -> pure "")
 
         -- pair up field names with values one-by-one (no type checking tho, lol)
-        let pairs = zip (map (T.unpack . fst) $ CC.eventLogs ev) expStrs
+        let pairs = zip (map (T.unpack . fst) $ CC._eventLogs ev) expStrs
         
         liftIO $ putStrLn $ "Emit Event/versioning ---> we are emitting event " ++ eventName ++ 
               " in contract " ++ (labelToString $ CC._contractName curCnct) ++ " in app " ++ (show parentName) ++ 
@@ -1897,6 +1900,7 @@ expToVar' (CC.FunctionCall _ e args) = do
         _ -> regularFunctionCall Nothing
     _ -> regularFunctionCall Nothing
     where 
+      regularFunctionCall :: MonadSM m => Maybe (m Variable) -> m Variable
       regularFunctionCall mSCI = do 
         var <- case mSCI of
           Just sci -> sci
@@ -2086,6 +2090,159 @@ expToVar' (CC.FunctionCall _ e args) = do
               _ -> return False
             return . Constant $ SBool success
 
+          Constant (SContractItem address' "code") -> do
+            --TODO: allow for finding multiple items in the future (this functionality can be conducted using the multiple code calls, currently)
+            from <- getCurrentAccount
+            let address = namedAccountToAccount (from ^. accountChainId) address'
+            -- Retreive and resolve the codehash
+            codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) address
+            resolvedCodeHash <- resolveCodePtr (from ^. accountChainId) codeHash'
+            let ch' = case resolvedCodeHash of
+                        Just (SolidVMCode _ ch1') -> ch1' 
+                        Just cp -> missingCodeCollection "Account is not a SolidVM contract" (format cp)
+                        Nothing -> missingCodeCollection "Could not resolve code pointer for account" (format address)
+            -- Find and resolve the body of the code using the codehash
+            cd <- A.lookup (A.Proxy @DBCode) ch'
+            let cd' = case cd of
+                        Just (_,bs) -> bs
+                        Nothing -> missingCodeCollection "Could not locate SolidVM code collection at account" (format address)
+            --convert the code into a string to manipulate
+            -- let decodeCD = DT.decodeUtf8 cd'
+            --Get the search term from the input
+            -- -- let searchTerms = case argVals of
+            -- --     -- catch only the SStrings
+            -- --     OrderedVals manyTerms -> case manyTerms of 
+            -- --       []  -> pure Nothing
+            -- --       [a] -> Just a
+            -- --       as  -> tooManyCooks 1 (length as)
+            -- --     -- NamedVals [SString arguments] -> pure $ Just arguments
+            -- --     _ -> pure $ Nothing
+            -- -- searchTerm <- case searchTerms of
+            -- --   Just (SString searchTerms) -> pure searchTerms
+            -- --   Nothing -> pure ""
+            -- --   _ -> pure ""
+            -- let searchTerms = case argsVals of
+            --   OrderedVals [Just (SString searchTerms)] -> pure searchTerm
+            --   OrderedVals xs | length xs == 0 = pure ""
+            --                  | length xs == 1 = generalMetaProgrammingError "search term types" xs
+            --                  | length xs > 1  = tooManyCooks 1 (length xs)
+            --   _ -> generalMetaProgrammingError "search term" "Input Mismatch"
+                             
+            searchTerms <- case argVals of
+                -- catch only the SStrings
+                OrderedVals [SString arguments] -> pure $ Just arguments
+                -- NamedVals [SString arguments] -> pure $ Just arguments
+                _ -> pure $ Nothing    
+            --get only the contract and its collection of sourceAnnotation contained in the ContractF type.
+            (contract, _, _) <- getCodeAndCollection address
+
+            --get the position of the searched item if something was wanting to be searched
+            let anno :: [(Int, Int, Int, Int)]
+                anno = 
+                  case (fromMaybe "" searchTerms) of 
+                    --get the location of just the code of the contract, if nothing is inputted in the contract then focus on just the contract itself
+                    "" -> let val = foldMap mon contract
+                                          where mon sa  = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
+                                                          in (Min (sl, sc), Max(el, ec))
+                              -- tup = case val of
+                              --         Just (Min (sl, sc), Max(el,ec)) -> Just (sl, sc, el, ec)
+                              --         Nothing -> Nothing  
+                              (Min (slt, sct), Max(elt, ect)) = val
+                              (startLine, startCol, endLine, endCol) = (slt, sct, elt, ect)
+                          in [(startLine, startCol, endLine, endCol)]
+                          
+                    term ->
+                    --Search the full contract for the search term, retrieving the sourceAnnotation of the part that was found
+                      -- Check for and get the different parts of the contract
+                      let contrAnno = if ((contract ^. CC.contractName) == term) then 
+                              let val = foldMap mon contract
+                                          where mon sa  = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
+                                                          in Just (Min (sl, sc), Max(el,ec))
+                              in case val of 
+                                Just (Min (sl, sc), Max(el,ec)) -> Just (sl, sc, el, ec)
+                                Nothing -> Nothing 
+                            else Nothing
+                          constAnno =                             
+                            let mConstf = (contract ^. CC.constants) M.!? term
+                                val = case mConstf of
+                                  Just constf -> foldMap mon constf
+                                    where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
+                                                   in Just (Min (sl, sc), Max (el, ec))
+                                  Nothing -> Nothing
+                            in case val of
+                                  Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
+                                  Nothing -> Nothing
+                          storjAnno =                             
+                            let mStorj = (contract ^. CC.storageDefs) M.!? term
+                                val = case mStorj of
+                                  Just storjf -> foldMap mon storjf
+                                    where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
+                                                   in Just (Min (sl, sc), Max (el, ec))
+                                  Nothing -> Nothing
+                            in case val of
+                                  Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
+                                  Nothing -> Nothing
+                          enumAnno =                             
+                            let mEnum = snd <$> ((contract ^. CC.enums) M.!? term)
+                                val = case mEnum of
+                                  Just enumf -> mon enumf
+                                    where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
+                                                   in Just (Min (sl, sc), Max (el, ec))
+                                  Nothing -> Nothing
+                            in case val of
+                                  Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
+                                  Nothing -> Nothing
+                          structAnno = 
+                            let mStruct = (contract ^. CC.structs) M.!? term
+                                val = case mStruct of
+                                  Just structf -> foldMap mon ((\(_,_,s) -> s)  <$> structf)
+                                    where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
+                                                   in Just (Min (sl, sc), Max (el, ec))
+                                  Nothing -> Nothing
+                            in case val of
+                                  Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
+                                  Nothing -> Nothing
+                          eventAnno =                             
+                            let mEvent = (contract ^. CC.events) M.!? term
+                                val = case mEvent of
+                                  Just eventf -> foldMap mon eventf
+                                    where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
+                                                   in Just (Min (sl, sc), Max (el, ec))
+                                  Nothing -> Nothing
+                            in case val of
+                                  Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
+                                  Nothing -> Nothing
+                          funcAnno = 
+                            let mFuncf = (contract ^. CC.functions) M.!? term
+                                val = case mFuncf of
+                                  Just funcf -> foldMap mon funcf
+                                    where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
+                                                   in Just (Min (sl, sc), Max (el, ec))
+                                  Nothing -> Nothing
+                            in case val of
+                                  Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
+                                  Nothing -> Nothing 
+                              -- fmap (unparseFunc ()) ((contract ^. CC.functions) M.!? term)
+                      --Remove all of the items that were found to contain nothing, this should leave just the items that we found
+                      in catMaybes [contrAnno, funcAnno, constAnno, storjAnno, enumAnno, eventAnno, structAnno]
+            liftIO $ do print ("++++++++++++++++++++++++" :: String)
+                        print anno
+                        print ("++++++++++++++++++++++++" :: String)
+            --Throw an error if more than a single string is passed in, this can be changed in the future without many 
+            -- when ((length argVals) > 1) $ tooManyCooks 1 (length argVals)
+            -- when (length anno > 1) $ tooManyResultsError searchTerms (length anno)
+            case anno of 
+              [] -> pure . Constant $ SString $ "" --TODO: add warning that nothing was found and the piece of code is redundant
+              -- Return the position of the found item
+              [a] -> let trim = trimCodeCollection (BC.unpack cd') a
+                         --The unparser adds a ending curly brace to the end of the code, which is refelctected here.
+                         --TODO: Add a final '}' to the end of a function if it is missing. Contracts do not need this
+                         result = trim
+                     in pure . Constant $ SString (result)
+              as -> case searchTerms of
+                      Nothing -> generalMetaProgrammingError "<address>.code(<stuff>)" searchTerms
+                      Just searchTerm -> tooManyResultsError searchTerm (length as)
+
           Constant (SContractItem address' itemName) -> do
             from <- getCurrentAccount
             let address = namedAccountToAccount (from ^. accountChainId) address'
@@ -2238,6 +2395,7 @@ evaluateAccountMember a _ "codehash" = do
     Just (SolidVMCode _ ch') -> return (Constant $ SString . keccak256ToHex $ ch')
     Just cp -> missingCodeCollection "Account is not a SolidVM contract" (format cp)
     Nothing -> missingCodeCollection "Could not resolve code pointer for account" (format realAccount)
+--Get the whole code collection when nothing is supplied to the code function
 evaluateAccountMember a _ "code" = do 
   -- Get the code at the address
   cid <- case (a ^. namedAccountChainId) of 
@@ -2261,7 +2419,7 @@ evaluateAccountMember a _ "code" = do
   let cd' = case cd of
               Just (_,bs) -> bs
               Nothing -> missingCodeCollection "Could not locate SolidVM code collection at account" (format realAccount)
-  let decodeCD = DT.decodeUtf8 cd'
+  let decodeCD = TE.decodeUtf8 cd'
   -- Format the result  
   return $ Constant $ SString $ T.unpack decodeCD
 evaluateAccountMember a _ "balance" = do 
@@ -2803,7 +2961,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
   let !contract' =
           fromMaybe (missingType "contract inherits from nonexistent parent" contractName')
           $ cc^.CC.contracts . at contractName'
-      argPairs = fromMaybe [] . fmap CC.funcArgs $ contract' ^. CC.constructor
+      argPairs = fromMaybe [] . fmap CC._funcArgs $ contract' ^. CC.constructor
       argCount = length argPairs
       argTypeNames = map fst $ sortWith snd $
         [ ((t, fromMaybe "" n), i) |
@@ -2837,7 +2995,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
         let argTypes =
               M.fromList
               $ map (\(k, v) -> (fromMaybe "" $ k, v))
-              $ maybe einval CC.funcArgs $ contract' ^. CC.constructor
+              $ maybe einval CC._funcArgs $ contract' ^. CC.constructor
               
             typeAndVal =
               M.merge
@@ -2869,12 +3027,12 @@ runTheConstructors from to hsh cc contractName' argExps = do
   forM_ (reverse $ contract'^.CC.parents) $ \parent -> do
     let args = CC.OrderedArgs
              . fromMaybe []
-             $ M.lookup parent =<< (fmap CC.funcConstructorCalls $ contract'^.CC.constructor)
+             $ M.lookup parent =<< (fmap CC._funcConstructorCalls $ contract' ^. CC.constructor)
     runTheConstructors from to hsh cc parent args
 
 
   _ <-
-    case contract'^.CC.constructor of
+    case contract' ^. CC.constructor of
       Just theFunction -> do
         if (CC._vmVersion contract' == "svm3.3")
           then do
@@ -2917,6 +3075,14 @@ runTheConstructors from to hsh cc contractName' argExps = do
               Just cms -> pure cms
             _ <- pushSender from $ runStatements commands
             return ()
+        --argVals <- forM argExps evaluate
+        --_ <- call' address contract' theFunction argVals
+        commands <- case CC._funcContents theFunction of
+          Nothing -> missingField "contract constructor has been declared but not defined" contractName'
+          Just cms -> pure cms
+
+        _ <- pushSender from $ runStatements commands
+        return ()
 
       Nothing -> return ()
 
@@ -2953,78 +3119,66 @@ runTheCall :: MonadSM m
            -> Bool
            -> Bool
            -> m (Maybe Value)
-runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
-  let returns = [(n, (t, defaultValue contract' t)) | (Just n, CC.IndexedType _ t) <- CC.funcVals theFunction]
-      theModifierNames = map fst $ (CC.funcModifiers theFunction) 
-      svm3_3 = CC._vmVersion contract' == "svm3.3"
+runTheCall address' contract' funcName hsh cc theFunction argVals ro = do
+  let returns = [(n, (t, defaultValue contract' t)) | (Just n, CC.IndexedType _ t) <- CC._funcVals theFunction]
+      args = case argVals of
+        OrderedVals vs -> let argMeta = 
+                                map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t))
+                                $ CC._funcArgs theFunction
+                          in zipWith (\(n, t) v -> (n, (t, v))) argMeta vs
+        NamedVals ns ->
+          let strTypes = M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ CC._funcArgs theFunction
+              typeAndVal = M.merge (M.mapMissing (curry $ invalidArguments "missing argument"))
+                                   (M.mapMissing (curry $ invalidArguments "extra argument"))
+                                   (M.zipWithMatched $ \_k t v -> (t, v))
+                                   strTypes
+                                   $ M.fromList ns
+              -- These probably don't need to be sorted by argument index, as they are turned into a map
+              -- when added to the call info.
+              sortedArgs = map snd . sortWith fst
+                         . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
+                         $ M.toList typeAndVal
+          in sortedArgs
+      locals = args ++ returns
 
-  if (CC._vmVersion contract' /= "svm3.3")
-    then do
-      _ <- forM theModifierNames $ \name -> do
-        case M.lookup name (contract'^.CC.modifiers) of
-          Just _ -> unknownStatement "modifiers are not supported below pragma solidvm 3.3" name
-          Nothing -> return Nothing
-      let args = case argVals of
-            OrderedVals vs -> let argMeta = 
-                                    map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t))
-                                    $ CC.funcArgs theFunction
-                              in zipWith (\(n, t) v -> (n, (t, v))) argMeta vs
-            NamedVals ns ->
-              let strTypes = M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ CC.funcArgs theFunction
-                  typeAndVal = M.merge (M.mapMissing (curry $ invalidArguments "missing argument"))
-                                      (M.mapMissing (curry $ invalidArguments "extra argument"))
-                                      (M.zipWithMatched $ \_k t v -> (t, v))
-                                      strTypes
-                                      $ M.fromList ns
-                  -- These probably don't need to be sorted by argument index, as they are turned into a map
-                  -- when added to the call info.
-                  sortedArgs = map snd . sortWith fst
-                            . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
-                            $ M.toList typeAndVal
-              in sortedArgs
+  onTraced $ do
+    liftIO $ putStrLn $ "            args: " ++ show (map fst args)
+    when (not $ null returns) $ liftIO $ putStrLn $ "    named return: " ++ show (map fst returns)
 
-          locals = args ++ returns
+  localVars <-
+    forM locals $ \(n, (t, v)) -> do
+      newVar <- liftIO $ fmap Variable $ newIORef v
+      return (n, (t, newVar))
 
-      onTraced $ do
-        liftIO $ putStrLn $ "            args: " ++ show (map fst args)
-        when (not $ null returns) $ liftIO $ putStrLn $ "    named return: " ++ show (map fst returns)
-
-      localVars <-
-        forM locals $ \(n, (t, v)) -> do
-          newVar <- liftIO $ fmap Variable $ newIORef v
-          return (n, (t, newVar))
-
-      addCallInfo address' contract' funcName hsh cc (M.fromList localVars) ro False -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
-
-      let !commands = fromMaybe (missingField "Function call: function has been declared but not defined" funcName) $ CC.funcContents theFunction
-      val <- runStatements commands
-      let findNamedReturns = do
-            case returns of
-              [] -> return Nothing
-              [(name,_)] -> do -- We have to break this up because
-                              -- SolidVM cannot distinguish between
-                              -- a value and single-tupled value
-                currentCallInfo <- getCurrentCallInfo
-                let mReturnVar = M.lookup name $ localVariables currentCallInfo
-                case mReturnVar of
-                  Nothing -> unknownVariable "findNamedReturns" name
-                  Just returnVar -> Just <$> getVar (snd returnVar)
-              xs -> Just . STuple . V.fromList <$> do
-                currentCallInfo <- getCurrentCallInfo
-                for (fst <$> xs) $ \name -> do
-                  let mReturnVar = M.lookup name $ localVariables currentCallInfo
-                  case mReturnVar of
-                    Nothing -> unknownVariable "findNamedReturns" name
-                    Just returnVar -> Constant <$> getVar (snd returnVar)
-
-      val' <- case val of
-                Nothing -> findNamedReturns
-                Just SNULL -> findNamedReturns
-                Just{} -> return val
-      popCallInfo
-      return val' 
-      
-    else do
+  addCallInfo address' contract' funcName hsh cc (M.fromList localVars) ro -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
+--  forM_ locals $ \(n, (_, v)) -> do
+--    liftIO $ putStrLn "need to initialize the storage 2"
+--    initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack n) v
+  let !commands = fromMaybe (missingField "Function call: function has been declared but not defined" funcName) $ CC._funcContents theFunction
+  val <- runStatements commands
+  let findNamedReturns = do
+        case returns of
+          [] -> return Nothing
+          [(name,_)] -> do -- We have to break this up because
+                           -- SolidVM cannot distinguish between
+                           -- a value and single-tupled value
+            currentCallInfo <- getCurrentCallInfo
+            let mReturnVar = M.lookup name $ localVariables currentCallInfo
+            case mReturnVar of
+              Nothing -> unknownVariable "findNamedReturns" name
+              Just returnVar -> Just <$> getVar (snd returnVar)
+          xs -> Just . STuple . V.fromList <$> do
+            currentCallInfo <- getCurrentCallInfo
+            for (fst <$> xs) $ \name -> do
+              let mReturnVar = M.lookup name $ localVariables currentCallInfo
+              case mReturnVar of
+                Nothing -> unknownVariable "findNamedReturns" name
+                Just returnVar -> Constant <$> getVar (snd returnVar)
+  val' <- case val of
+             Nothing -> findNamedReturns
+             Just SNULL -> findNamedReturns
+             Just{} -> return val
+  popCallInfo
 
       theModifiers' <- forM theModifierNames $ \name -> do
         case M.lookup name (contract'^.CC.modifiers) of
@@ -3213,14 +3367,6 @@ encodeVector v = do
         bs <- encodeForReturn val'
         return (headers `B.append` bs, strings)
 
-
-
-
-
-
-
-
-
 {- BEN WILL REFACTOR THIS -}
 solidityExceptionHandler :: MonadSM m => (M.Map String (Maybe (String, SVMType.Type), [CC.Statement])) -> SolidException -> m (Maybe Value)
 solidityExceptionHandler catchBlockMap ex = do
@@ -3383,6 +3529,14 @@ solidityExceptionHandler catchBlockMap ex = do
       return res
     (ImmutableError s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 25 immutableError
+    (TooManyResultsError s1 s2) -> do
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 24 tooManyResultsError
+      return res
+    (TooManyCooks s1 s2) -> do
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 25 tooManyCooks
+      return res
+    (GeneralMetaProgrammingError s1 s2) -> do
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 26 generalMetaProgrammingError
       return res
 
 solidVMExceptionHandler :: (MonadSM m) => (M.Map String [CC.Statement]) -> SolidException -> m (Maybe Value)
@@ -3499,6 +3653,61 @@ solidVMExceptionHandler catchBlockMap ex = case ex of
         Just block -> do
           res <- runStatements block
           return res
+    (TooManyResultsError s1 s2) -> 
+      case M.lookup "TooManyResultsError" catchBlockMap of
+        Nothing -> tooManyResultsError s1 s2
+        Just block -> do
+          res <- runStatements block
+          return res
+    (TooManyCooks s1 s2) ->
+      case M.lookup "TooManyCooks" catchBlockMap of
+        Nothing -> tooManyCooks s1 s2
+        Just block -> do
+          res <- runStatements block
+          return res
+    (GeneralMetaProgrammingError s1 s2) ->
+      case M.lookup "GeneralMetaProgrammingError" catchBlockMap of
+        Nothing -> generalMetaProgrammingError s1 s2
+        Just block -> do
+          res <- runStatements block
+          return res
     
     _ -> error "unhandled solid exception" (show ex)
 
+--If given a list, apply a given function to only the first element of the list.
+mapOnFirst :: (a -> a) -> [a] -> [a]
+mapOnFirst _ [] = []
+mapOnFirst f (x:xs) = f x : xs
+
+--If given a list, apply a given function to only the last item in the list
+mapOnLast :: forall a. (a -> a) -> [a] -> [a]
+mapOnLast f = foldr step []
+  where step :: a -> [a] -> [a]
+        step x [] = [f x]
+        step x xs = x : xs
+
+--If given a SourceAnnotation get the position of (startLine, startColumn, endLine, endColumn)
+getPositionFromSourceAnnotation :: SourceAnnotation a -> (Int, Int, Int, Int)
+getPositionFromSourceAnnotation sa = (sa ^. sourceAnnotationStart ^. sourcePositionLine,
+                                      sa ^. sourceAnnotationStart ^. sourcePositionColumn,
+                                      sa ^. sourceAnnotationEnd ^. sourcePositionLine,
+                                      sa ^. sourceAnnotationEnd ^. sourcePositionColumn)
+
+--If given a string and a SourceAnnotation, trim the string to be within the SourceAnnotation
+trimCodeCollection :: String -> (Int, Int, Int, Int) -> String
+trimCodeCollection cc sa = unlines final
+  where (startLine, startColumn, endLine, endColumn) = sa
+        bandwidth = drop (startLine - 1) (take endLine (lines cc))
+        trimBack = mapOnLast (take endColumn) bandwidth 
+        final = mapOnFirst (drop $ startColumn - 1) trimBack
+
+-- makeSourceAnnotation :: (Int, Int, Int, Int) -> SourceAnnotation a
+-- makeSourceAnnotation (startLine, startColumn, endLine, endColumn) =
+--   let start = SourcePosition startLine startColumn
+--       end = SourcePosition endLine endColumn 
+--   in SourceAnnotation
+--     {
+--       start,
+--       end
+--     }
+  

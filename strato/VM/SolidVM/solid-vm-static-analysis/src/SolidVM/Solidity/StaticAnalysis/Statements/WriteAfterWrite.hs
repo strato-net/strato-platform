@@ -24,7 +24,7 @@ contractHelper :: Contract -> [SourceAnnotation Text]
 contractHelper Contract{..} = concat $ functionHelper <$> maybeToList _constructor ++ M.elems _functions
 
 functionHelper :: Func -> [SourceAnnotation Text]
-functionHelper Func{..} = case funcContents of
+functionHelper Func{..} = case _funcContents of
   Nothing -> []
   Just stmts -> statementsHelper stmts
 

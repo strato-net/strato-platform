@@ -424,9 +424,8 @@ getVariableOfName name = do
       maybeConstant :: Maybe Variable
       maybeConstant = fmap (t "constant constant" . Constant) $ do
         let ctract = currentContract currentCallInfo
-        let constMap = (codeCollection currentCallInfo) ^. CC.flConstants
-        CC.ConstantDecl{..} <- M.lookup name $ (ctract ^. CC.constants) `M.union` constMap
-        return $ coerceType ctract constType $ case constInitialVal of
+        CC.ConstantDecl{..} <- M.lookup name $ ctract ^. CC.constants
+        return $ coerceType ctract _constType $ case _constInitialVal of
                                             CC.NumberLiteral _ x _ -> SInteger x
                                             x -> todo "constant initial val" x
 
@@ -645,7 +644,7 @@ hintFromType = \case
 
 getXabiType' :: B.ByteString -> CallInfo -> Maybe SVMType.Type
 getXabiType' field callInfo = M.lookup (stringToLabel $ BC.unpack field)
-                            . fmap CC.varType
+                            . fmap CC._varType
                             . CC._storageDefs
                             . currentContract
                             $ callInfo
