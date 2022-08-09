@@ -54,6 +54,17 @@ library:
 
 
 executables:
+  parse-solidvm:
+    source-dirs: exec_src
+    other-modules: []
+    main: Parse.hs
+    dependencies:
+      - parsec
+      - solid-vm
+      - deepseq
+
+    ghc-options: -Wall -O2 -threaded -rtsopts
+
   exprs-needed:
     source-dirs: exec_src
     other-modules: []
@@ -66,6 +77,7 @@ executables:
       - solid-vm-parser
       - solid-vm-static-analysis
       - text
+      - deepseq
 
 tests:
   solid-vm-spec:
