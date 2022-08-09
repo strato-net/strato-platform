@@ -1810,28 +1810,7 @@ expToVar' (CC.FunctionCall _ e args) = do
             let cd' = case cd of
                         Just (_,bs) -> bs
                         Nothing -> missingCodeCollection "Could not locate SolidVM code collection at account" (format address)
-            --convert the code into a string to manipulate
-            -- let decodeCD = DT.decodeUtf8 cd'
-            --Get the search term from the input
-            -- -- let searchTerms = case argVals of
-            -- --     -- catch only the SStrings
-            -- --     OrderedVals manyTerms -> case manyTerms of 
-            -- --       []  -> pure Nothing
-            -- --       [a] -> Just a
-            -- --       as  -> tooManyCooks 1 (length as)
-            -- --     -- NamedVals [SString arguments] -> pure $ Just arguments
-            -- --     _ -> pure $ Nothing
-            -- -- searchTerm <- case searchTerms of
-            -- --   Just (SString searchTerms) -> pure searchTerms
-            -- --   Nothing -> pure ""
-            -- --   _ -> pure ""
-            -- let searchTerms = case argsVals of
-            --   OrderedVals [Just (SString searchTerms)] -> pure searchTerm
-            --   OrderedVals xs | length xs == 0 = pure ""
-            --                  | length xs == 1 = generalMetaProgrammingError "search term types" xs
-            --                  | length xs > 1  = tooManyCooks 1 (length xs)
-            --   _ -> generalMetaProgrammingError "search term" "Input Mismatch"
-                             
+                                                     
             searchTerms <- case argVals of
                 -- catch only the SStrings
                 OrderedVals [SString arguments] -> pure $ Just arguments
