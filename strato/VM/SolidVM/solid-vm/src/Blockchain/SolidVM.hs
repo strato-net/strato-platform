@@ -46,6 +46,7 @@ import           Data.ByteString.Internal             (c2w)
 import           Data.Char                            as CHAR
 import           Data.Either.Extra                    (eitherToMaybe)
 import           Data.List
+-- import           Data.List.Utils
 import qualified Data.Map                             as M
 import qualified Data.Map.Merge.Lazy                  as M
 import           Data.Maybe
@@ -3114,11 +3115,23 @@ getPositionFromSourceAnnotation sa = (sa ^. sourceAnnotationStart ^. sourcePosit
 
 --If given a string and a SourceAnnotation, trim the string to be within the SourceAnnotation
 trimCodeCollection :: String -> (Int, Int, Int, Int) -> String
-trimCodeCollection cc sa = unlines final
+trimCodeCollection cc sa = final
   where (startLine, startColumn, endLine, endColumn) = sa
         bandwidth = drop (startLine - 1) (take endLine (lines cc))
         trimBack = mapOnLast (take endColumn) bandwidth 
-        final = mapOnFirst (drop $ startColumn - 1) trimBack
+        trimmedUp = mapOnFirst (drop $ startColumn - 1) trimBack
+        body = unlines trimmedUp
+        numOpen = countElem '{' body
+        numClosed = countElem '}' body
+        enclosed = if (numOpen > numClosed) then 
+          body ++ replicate (numOpen - numClosed) '}'
+          else body
+        final = enclosed
+
+countElem :: Eq a => a -> [a] -> Int
+countElem i = length . filter (i==)
+
+
 
 -- makeSourceAnnotation :: (Int, Int, Int, Int) -> SourceAnnotation a
 -- makeSourceAnnotation (startLine, startColumn, endLine, endColumn) =
