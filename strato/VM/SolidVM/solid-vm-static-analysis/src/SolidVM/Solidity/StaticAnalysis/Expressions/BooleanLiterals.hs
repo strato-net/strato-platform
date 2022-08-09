@@ -31,7 +31,7 @@ statementHelper (IfStatement cond thens mElse _) =
    in concat [cs, ts, es]
 statementHelper (TryCatchStatement statements catches _) =
   let ts = concat $ statementHelper <$> statements
-      cs = concat $ statementHelper <$> (concatMap snd (M.toList catches))
+      cs = concat $ statementHelper <$> (concatMap (snd . snd) (M.toList catches))
    in concat [ts, cs]
 statementHelper (SolidityTryCatchStatement expr _ successStatements catchesMap _) =
   let es = expressionHelper expr

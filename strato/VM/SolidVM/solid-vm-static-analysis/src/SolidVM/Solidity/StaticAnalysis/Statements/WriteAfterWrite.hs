@@ -72,7 +72,7 @@ statementHelper (TryCatchStatement body catches _) = do
   bs <- statementsHelper' body
   sTry <- get
   put $ M.intersection s sTry
-  css <- forM (M.toList catches) $ \(_, cas) -> do
+  css <- forM (M.toList catches) $ \(_, (_, cas)) -> do
     sCatch <- get
     put $ M.intersection s sCatch
     statementsHelper' cas

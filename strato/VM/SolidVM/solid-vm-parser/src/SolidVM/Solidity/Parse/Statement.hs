@@ -113,9 +113,13 @@ tryCatchStatement = do
       s <- statements
       catchs <- many1 $ do
         reserved "catch"
-        ident <- identifier
+        err <- identifier
+        params <- optionMaybe (parens $ commaSep $ do
+            alias <- identifier
+            pure $ alias
+          )
         ss <- statements
-        pure (ident, ss)
+        pure (err, (params, ss))
       pure (s, catchs)
     pure $ TryCatchStatement test1 (Map.fromList test2) a
 

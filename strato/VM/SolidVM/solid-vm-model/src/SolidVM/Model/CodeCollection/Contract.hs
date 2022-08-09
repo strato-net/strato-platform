@@ -41,7 +41,7 @@ data ContractF a =
     _storageDefs :: Map SolidString (VariableDeclF a),
     _enums :: Map SolidString ([SolidString], a),
     _structs :: Map SolidString [(SolidString, SolidVM.FieldType, a)],
-    _errors :: Map SolidString [(Maybe SolidString, SolidVM.IndexedType, a)],
+    _errors :: Map SolidString [(SolidString, SolidVM.IndexedType, a)],
     _events :: Map SolidString (SolidVM.EventF a),
     _functions :: Map SolidString (FuncF a),
     _constructor :: Maybe (FuncF a),

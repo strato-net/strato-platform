@@ -33,7 +33,7 @@ statementHelper vars (IfStatement _ thens mElse _) =
    in concat [ts, es]
 statementHelper vars (TryCatchStatement statements catches _) =
   let ts = concat $ statementHelper vars <$> statements
-      cs = concat $ statementHelper vars <$> (concatMap snd (M.toList catches))
+      cs = concat $ statementHelper vars <$> (concatMap (snd . snd) (M.toList catches))
    in concat [ts, cs]
 statementHelper vars (SolidityTryCatchStatement _ _ successStatements catchesMap _) =
   let ts = concat $ statementHelper vars <$> successStatements

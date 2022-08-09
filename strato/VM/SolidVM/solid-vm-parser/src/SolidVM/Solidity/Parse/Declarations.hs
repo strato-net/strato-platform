@@ -247,13 +247,15 @@ solidityFLError = do
     errorName <- identifier
     pragmaVersion' <- getPragmaVersion
     when (isReservedWord pragmaVersion' errorName) $ reservedWordError pragmaVersion' errorName
-    errorArgs <- tupleDeclaration
+    errorArgs <- parens $ commaSep $ do
+      partType <- simpleTypeExpression
+      partName <- identifier
+      return (Text.pack partName, partType)
     semi
     pure (errorName, errorArgs)
-  let nameUnnamed (name,ty) = if Text.null name then (Nothing, ty) else (Just name,ty)
   return $ FLError (Text.pack errorName) (SolidVM.Error {
-      SolidVM.params = map (\(k, v) -> (fmap textToLabel k, v)) $
-           zipWith (\x i -> fmap (SolidVM.IndexedType i) (nameUnnamed x)) errorArgs [0..]
+      SolidVM.params = map (\(k, v) -> (textToLabel k, v)) $
+           zipWith (\x i -> fmap (SolidVM.IndexedType i) x) errorArgs [0..]
     , SolidVM.bytes = 0
     , SolidVM.context = a
   })
@@ -378,16 +380,17 @@ errorDeclaration = do
   errorName <- identifier
   pragmaVersion' <- getPragmaVersion
   when (isReservedWord pragmaVersion' errorName) $ reservedWordError pragmaVersion' errorName
-  errorArgs <- tupleDeclaration
+  errorArgs <- parens $ commaSep $ do
+      partType <- simpleTypeExpression
+      partName <- identifier
+      return (Text.pack partName, partType)
   end <- getSourcePosition
   semi
-  let nameUnnamed (name,ty) = if Text.null name then (Nothing, ty) else (Just name,ty)
-      ctx = SourceAnnotation start end ()
   return (errorName, ErrorDeclaration SolidVM.Error {
-      SolidVM.params = map (\(k, v) -> (fmap textToLabel k, v)) $
-           zipWith (\x i -> fmap (SolidVM.IndexedType i) (nameUnnamed x)) errorArgs [0..]
+      SolidVM.params = map (\(k, v) -> (textToLabel k, v)) $
+           zipWith (\x i -> fmap (SolidVM.IndexedType i) x) errorArgs [0..]
     , SolidVM.bytes = 0
-    , SolidVM.context = ctx
+    , SolidVM.context = SourceAnnotation start end ()
   })
 
 -- | Parses a function definition.

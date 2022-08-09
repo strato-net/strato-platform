@@ -149,7 +149,7 @@ lookupStruct name = do
   pure $ f <$> str
   where f (t, ft, _) = (t, fieldTypeType ft)
 
-lookupError :: SolidString -> SSS [(Maybe SolidString, Type)]
+lookupError :: SolidString -> SSS [(SolidString, Type)]
 lookupError name = do
   cc <- asks codeCollection
   c <- asks contract
@@ -1071,7 +1071,7 @@ statementHelper (IfStatement cond thens mElse x) = do
   pure $ reduceType' x [cs, ts, es]
 statementHelper (TryCatchStatement tryStatmenets catchMap x) = do
   ts <- statementsHelper' x tryStatmenets
-  es <- statementsHelper' x (concatMap snd (M.toList catchMap))
+  es <- statementsHelper' x (concatMap (snd . snd) (M.toList catchMap))
   pure $ reduceType' x [ts, es]
 statementHelper (SolidityTryCatchStatement expr mtpl successStatements catchMap x) = do
   cs <- tcExpr expr

@@ -5215,12 +5215,12 @@ pragma solidvm 3.3;
 error flError(string someString);
 
 contract qq {
-  error myError(uint);
+  error myError(uint num);
   constructor() {
   }
 }|]
 
-  it "can throw custom errors the SOLIDVM WAY" . runTest $ do
+  it "can throw custom errors" . runTest $ do
     runBS [r|
 pragma solidvm 3.3;
 
@@ -5233,6 +5233,36 @@ contract qq {
   
   function throwsError() {
     throw myError("lmao pranked");
+    myString = "lmao pranked";
   }
 }|]
-    getFields ["myString"] `shouldReturn` [BString "lmao pranked"]
+    getFields ["myString"] `shouldReturn` [BDefault]
+
+  it "can catch custom errors the SOLIDVM WAY" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+
+contract qq {
+  error IsTen(int ten, string message);
+  int val;
+
+  constructor() {
+    setVal(10);
+  }
+
+  function checkTen(int _val) returns (int) {
+     if (_val == 10) {
+        throw IsTen(_val, "Stop trying to make ten happen, its not going to happen"); 
+     }
+     return _val;
+  }
+
+  function setVal(int _val) returns (int) {
+     try {
+        val = checkTen(_val);
+     } catch IsTen(vall, mes) { 
+        val = vall + 1;
+     }
+  }
+}|]
+    getFields ["val"] `shouldReturn` [BInteger 11]

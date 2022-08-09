@@ -80,7 +80,7 @@ statementHelper (IfStatement cond thens mElse _) = do
   pure $ concat [cs, ts, es]
 statementHelper (TryCatchStatement try catchMap _) = do
   ts <- statementsHelper try
-  cs <- statementsHelper (concatMap snd (M.toList catchMap))
+  cs <- statementsHelper (concatMap (snd . snd) (M.toList catchMap))
   pure $ concat [ts, cs]
 statementHelper (SolidityTryCatchStatement expr _ successStatements catchMap _) = do
   cs <- expressionHelper expr

@@ -55,7 +55,7 @@ data CodeCollectionF a =
     _flConstants ::  Map SolidString (ConstantDeclF a),
     _flEnums :: Map SolidString ([SolidString], a),
     _flStructs :: Map SolidString [(SolidString, FieldType, a)],
-    _flErrors :: Map SolidString [(Maybe SolidString, IndexedType, a)]
+    _flErrors :: Map SolidString [(SolidString, IndexedType, a)]
   } deriving (Show, Generic, Functor)
 
 instance ToJSON a => ToJSON (CodeCollectionF a)
