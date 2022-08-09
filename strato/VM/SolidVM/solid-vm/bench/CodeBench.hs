@@ -1,11 +1,12 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 import Control.DeepSeq
 import Criterion.Main
 import Data.Binary
-import Data.Either
+--import Data.Either
 import Data.ByteArray.Hash
 import Data.FileEmbed
 import qualified Data.ByteString.Char8 as BC
@@ -15,9 +16,10 @@ import qualified Data.Text as T
 import Text.Parsec (runParser, ParseError)
 
 import Blockchain.Strato.Model.Keccak256
-import SolidVM.Solidity.Parse.Declarations
+import Blockchain.SolidVM.CodeCollectionDB
+--import SolidVM.Solidity.Parse.Declarations
 import SolidVM.Solidity.Parse.File
-import SolidVM.CodeCollectionTools
+--import SolidVM.CodeCollectionTools
 import SolidVM.Model.CodeCollection
 import SolidVM.Solidity.Parse.ParserTypes
 
@@ -33,11 +35,12 @@ wingsContract = BC.unpack $(embedFile "bench/wings.sol")
 
 wingsCC :: CodeCollection
 wingsCC =
-  let file = either (error . show) id $ runParser solidityFile (ParserState "" "") "" wingsContract
-      namedContracts = [(T.unpack name, fromRight (error "Didn't parse xabiToContract!") $ xabiToContract(T.unpack name) (map T.unpack parents') "" xabi)
-                        | NamedXabi name (xabi, parents') <- unsourceUnits file]
-      
-  in fromRight (error "Didn't parse wingsCC!") . applyInheritance . CodeCollection $ M.fromList namedContracts
+  let srcMap = M.singleton "Wings.sol" $ T.pack wingsContract
+   in either (error . show) id $ compileSource False srcMap -- runParser solidityFile (ParserState "" "") "" wingsContract
+  --    namedContracts = [(T.unpack name, fromRight (error "Didn't parse xabiToContract!") $ xabiToContract(T.unpack name) (map T.unpack parents') "" xabi)
+  --                      | NamedXabi name (xabi, parents') <- unsourceUnits file]
+
+  --in fromRight (error "Didn't parse wingsCC!") . applyInheritance . CodeCollection (M.fromList namedContracts) (M.empty) (M.empty) (M.empty) (M.empty)
 
 strBench :: Benchmark
 strBench = bench "time to pack the wings contract"
@@ -77,12 +80,8 @@ sipCCBench = bench "time to siphash the wingsCC"
 
 readCC :: BC.ByteString -> CodeCollection
 readCC bStr =
-  let file = either (error . show) id $ runParser solidityFile (ParserState "" "") "" $ BC.unpack bStr
-      namedContracts = [(T.unpack name, fromRight (error "Didn't parse xabiToContract!") $ xabiToContract(T.unpack name) (map T.unpack parents') "" xabi)
-                        | NamedXabi name (xabi, parents') <- unsourceUnits file]
-
-  in fromRight (error "Didn't parse wingsCC!") . applyInheritance . CodeCollection $ M.fromList namedContracts
-
+  let srcMap = M.singleton "Wings.sol" $ T.pack $ BC.unpack bStr
+   in either (error . show) id $ compileSource False srcMap
 
 readCCBench :: Benchmark
 readCCBench = bench "time to read the wingsCC"
