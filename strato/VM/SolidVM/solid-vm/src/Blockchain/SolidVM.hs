@@ -1810,15 +1810,15 @@ expToVar' (CC.FunctionCall _ e args) = do
             let cd' = case cd of
                         Just (_,bs) -> bs
                         Nothing -> missingCodeCollection "Could not locate SolidVM code collection at account" (format address)
-
+            -- Collect a potential item to search
             searchTerms <- case argVals of
                 -- catch only the SStrings
                 OrderedVals [SString arguments] -> pure $ Just arguments
                 -- Throw an error if too many arguments are passed
                 OrderedVals as | length as > 1 -> tooManyCooks 1 (length as)
-                -- NamedVals [SString arguments] -> pure $ Just arguments
+                --If nothing was given or something else, then just return the entire code
                 _ -> pure $ Nothing    
-            --get only the contract and its collection of sourceAnnotation contained in the ContractF type.
+            --get only the contract containing useful sourceAnnotation contained in the ContractF type.
             (contract, _, _) <- getCodeAndCollection address
 
             --get the position of the searched item if something was wanting to be searched
@@ -1837,7 +1837,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                           in [(startLine, startCol, endLine, endCol)]
                           
                     term ->
-                    --Search the full contract for the search term, retrieving the sourceAnnotation of the part that was found
+                    --Search the full contract for the search term, retrieving the sourceAnnotation location of the part that was found
                       -- Check for and get the different parts of the contract
                       let contrAnno = if ((contract ^. CC.contractName) == term) then 
                               let val = foldMap mon contract
@@ -1907,18 +1907,13 @@ expToVar' (CC.FunctionCall _ e args) = do
                             in case val of
                                   Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
                                   Nothing -> Nothing 
-                              -- fmap (unparseFunc ()) ((contract ^. CC.functions) M.!? term)
                       --Remove all of the items that were found to contain nothing, this should leave just the items that we found
                       in catMaybes [contrAnno, funcAnno, constAnno, storjAnno, enumAnno, eventAnno, structAnno]
-            --Throw an error if more than a single string is passed in, this can be changed in the future without many 
-            -- when ((length argVals) > 1) $ tooManyCooks 1 (length argVals)
-            -- when (length anno > 1) $ tooManyResultsError searchTerms (length anno)
+
             case anno of 
               [] -> pure . Constant $ SString $ "" --TODO: add warning that nothing was found and the piece of code is redundant
-              -- Return the position of the found item
+              -- Trim up the code to only include the code that was found, and format it if needed.
               [a] -> let trim = trimCodeCollection (BC.unpack cd') a
-                         --The unparser adds a ending curly brace to the end of the code, which is refelctected here.
-                         --TODO: Add a final '}' to the end of a function if it is missing. Contracts do not need this
                          result = trim
                      in pure . Constant $ SString (result)
               as -> case searchTerms of
