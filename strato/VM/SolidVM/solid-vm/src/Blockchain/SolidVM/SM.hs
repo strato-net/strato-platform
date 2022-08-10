@@ -424,10 +424,12 @@ getVariableOfName name = do
       maybeConstant :: Maybe Variable
       maybeConstant = fmap (t "constant constant" . Constant) $ do
         let ctract = currentContract currentCallInfo
-        CC.ConstantDecl{..} <- M.lookup name $ ctract ^. CC.constants
+        let constMap = (codeCollection currentCallInfo) ^. CC.flConstants
+        CC.ConstantDecl{..} <- M.lookup name $ (ctract ^. CC.constants) `M.union` constMap
         return $ coerceType ctract _constType $ case _constInitialVal of
                                             CC.NumberLiteral _ x _ -> SInteger x
                                             x -> todo "constant initial val" x
+
 
       maybeStructDef :: Maybe Variable
       maybeStructDef = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.CC.structs) || name `elem` M.keys (codeCollection currentCallInfo^.CC.flStructs)) $
