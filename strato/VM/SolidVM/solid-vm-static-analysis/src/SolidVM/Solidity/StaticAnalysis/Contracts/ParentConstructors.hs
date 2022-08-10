@@ -28,11 +28,11 @@ contractHelper cc cName c = fromMaybe [] $ _constructor c <&> \constr ->
       constrCalls = _funcConstructorCalls constr
    in flip M.foldMapWithKey constrCalls $ \parentName varExprs ->
         if not $ parentName `S.member` parentSet
-          then [("Contract " <> labelToText cName <> " does not inherit from " <> labelToText parentName) <$ _funcContext constr]
+          then [("Contract " <> labelToText cName <> " does not inherit from " <> labelToText parentName) <$ constr ^. funcContext]
           else case M.lookup parentName (_contracts cc) of
-            Nothing -> [("Contract " <> labelToText parentName <> " not found.") <$ _funcContext constr]
+            Nothing -> [("Contract " <> labelToText parentName <> " not found.") <$ constr ^. funcContext]
             Just parent -> case _constructor parent of
-              Nothing -> [(labelToText parentName <> "'s constructor is undefined. Please consider defining its constructor.") <$ _funcContext constr]
+              Nothing -> [(labelToText parentName <> "'s constructor is undefined. Please consider defining its constructor.") <$ constr ^. funcContext]
               Just pConstr ->
                 let pConstrArgs = _funcArgs pConstr
                  in if length pConstrArgs /= length varExprs

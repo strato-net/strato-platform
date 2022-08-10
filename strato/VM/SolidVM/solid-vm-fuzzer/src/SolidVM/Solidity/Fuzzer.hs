@@ -67,26 +67,26 @@ runFuzzer dSettings compile src = flip (either $ pure . map (FuzzerFailure Nothi
   runLoggingT . evalMemContextM dSettings . flip runReaderT args $
     fmap concat . for (M.toList $ cc ^. contracts) $ \(cName, c) ->
       if not (describePrefix `T.isPrefixOf` labelToText cName) then pure []
-      else case funcArgs <$> c ^. constructor of
-        Just (_:_) -> pure . fmap (\f -> FuzzerFailure Nothing $ "Expected constructor to have zero arguments" <$ funcContext f) . maybeToList $ c ^. constructor
+      else case _funcArgs <$> c ^. constructor of
+        Just (_:_) -> pure . fmap (\f -> FuzzerFailure Nothing $ "Expected constructor to have zero arguments" <$ _funcContext f) . maybeToList $ c ^. constructor
         _ -> fmap concat . for (M.toList $ c ^. functions) $ \(fName, f) ->
           if | testPrefix `T.isPrefixOf` labelToText fName -> (:[]) <$> test cName fName f
              | propertyPrefix `T.isPrefixOf` labelToText fName -> (:[]) <$> prop cName fName f
              | otherwise -> pure []
 
 test :: SolidString -> SolidString -> Func -> FuzzerM FuzzerResult
-test cName fName f = case (funcVisibility f, funcArgs f, funcVals f) of
-  (Just External, [], [(_, IndexedType _ SVMType.Bool)]) -> flip local (runFuzzerOnce $ funcContext f)
+test cName fName f = case (f ^. funcVisibility, f ^. funcArgs, f ^. funcVals) of
+  (Just External, [], [(_, IndexedType _ SVMType.Bool)]) -> flip local (runFuzzerOnce $ f ^. funcContext)
     $ (fuzzerArgsContractName .~ cName)
     . (fuzzerArgsCreateArgs .~ "()")
     . (fuzzerArgsFuncName .~ fName)
     . (fuzzerArgsCallArgs .~ "()")
   (_, [], [(_, IndexedType _ SVMType.Bool)]) ->
-    pure . FuzzerFailure Nothing $ "Test must be marked as external" <$ funcContext f
+    pure . FuzzerFailure Nothing $ "Test must be marked as external" <$ f ^. funcContext
   (_, _, [(_, IndexedType _ SVMType.Bool)]) ->
     pure . FuzzerFailure Nothing $ ("Expected unit test to have zero arguments. To write a property test, prefix the function name with " <> propertyPrefix <> ".") <$ funcContext f
   _ ->
-    pure . FuzzerFailure Nothing $ ("Test must return (bool).") <$ funcContext f
+    pure . FuzzerFailure Nothing $ ("Test must return (bool).") <$ f ^. funcContext
 
 escapeText :: T.Text -> T.Text
 escapeText = T.replace "\"" "\\\""
@@ -118,18 +118,18 @@ prop cName fName f = case (funcVisibility f, funcArgs f, funcVals f) of
     . (fuzzerArgsCreateArgs .~ "()")
     . (fuzzerArgsFuncName .~ fName)
   (_, (_:_), [(_, IndexedType _ SVMType.Bool)]) ->
-    pure . FuzzerFailure Nothing $ "Test must be marked as external" <$ funcContext f
+    pure . FuzzerFailure Nothing $ "Test must be marked as external" <$ f ^. funcContext
   (_, _, [(_, IndexedType _ SVMType.Bool)]) ->
     pure . FuzzerFailure Nothing $ ("Expected property test to have at least one argument. To write a unit test, prefix the function name with " <> testPrefix <> ".") <$ funcContext f
   _ ->
-    pure . FuzzerFailure Nothing $ ("Test must return (bool).") <$ funcContext f
+    pure . FuzzerFailure Nothing $ ("Test must return (bool).") <$ f ^. funcContext
   where
     runProp :: FuzzerM FuzzerResult
     runProp = do
       n <- asks $ fromMaybe defaultFuzzerRuns . view fuzzerArgsMaxRuns
       runPropNTimes n
     runPropNTimes :: Integer -> FuzzerM FuzzerResult
-    runPropNTimes n | n <= 0 = success $ funcContext f
+    runPropNTimes n | n <= 0 = success $ f ^. funcContext
     runPropNTimes n = do
       argString <- liftIO . generateArgString $ indexedTypeType . snd <$> funcArgs f
       $logInfoS "runPropNTimes/generateArgString" argString

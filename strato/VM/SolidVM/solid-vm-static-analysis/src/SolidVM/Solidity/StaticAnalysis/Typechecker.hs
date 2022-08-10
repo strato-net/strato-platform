@@ -9,10 +9,11 @@ module SolidVM.Solidity.StaticAnalysis.Typechecker
 
 import           Control.Applicative ((<|>))
 import           Control.Arrow ((&&&))
+import           Control.Lens      hiding (enum)
 import           Control.Monad.Reader
 import           Control.Monad.Trans.State
 import           Data.Foldable (traverse_)
-import           Data.Functor.Identity (runIdentity)
+-- import           Data.Functor.Identity (runIdentity)
 import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as M
@@ -718,7 +719,7 @@ statementsHelper args ss = do
       x <- asks $ _contractContext . contract
       pure . bottom $ "Cannot use keyword 'return' outside of a function" <$ x
     Just f -> do
-      let x = _funcContext f
+      let x = f ^. funcContext
       ~(ts', s) <- flip runStateT ((Nothing, args) :| []) $ do
         cCalls <- for (M.assocs $ _funcConstructorCalls f) $ \(cName, exprs) -> do
           let constructorArgs = getConstructorType' x cName
