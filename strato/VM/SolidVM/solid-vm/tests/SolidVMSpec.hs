@@ -3812,8 +3812,8 @@ contract qq{
   it "can get the code for a contract if supplied an empty string" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|contract Test {
-  constructor(){}
-}
+  constructor(){
+}}
 |]
         contract :: String
         contract = [r|
@@ -3971,7 +3971,7 @@ contract qq{
 }|]
     runBS contract
     getFields ["codeTest"] `shouldReturn`
-      [ BString "" ]
+      [ BDefault ]
 
   it "Can search for the contract in a given file using the search procedure" . runTest $ do
     let contractqq :: String
@@ -3980,8 +3980,7 @@ contract qq{
   constructor() public {
     Test t = new Test();
     codeTest = account(this).code("qq");
-  }
-}
+}}
 |]
         collection :: String
         collection = [r|
@@ -4071,7 +4070,7 @@ contract qq {
     uint w = z + 13;
     uint u = w + 13;
     return u;
-  }
+}
 |]
         contract :: String
         contract = [r|
@@ -4109,7 +4108,7 @@ contract qq {
     uint w = z + 13;
     uint u = w + 13;
     return u;
-  }
+}
 |]
         contract :: String
         contract = [r|
@@ -4150,8 +4149,8 @@ contract qq {
   it "Can get just the contract if empty string is fed to the code function." . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|contract Test {
-  constructor(){}
-}
+  constructor(){
+}}
 |]
         contract :: String
         contract = [r|
