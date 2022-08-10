@@ -37,7 +37,7 @@ module Blockchain.Strato.RedisBlockDB
     , commonAncestorHelper
     , getWorldBestBlockInfo, updateWorldBestBlockInfo
     , acquireRedlock, releaseRedlock, defaultRedlockTTL
-    , getSyncStatus, putSyncStatus
+    , getSyncStatus, putSyncStatus, getCertificate
     ) where
 
 import           BlockApps.X509.Certificate
