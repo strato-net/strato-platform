@@ -3748,41 +3748,42 @@ contract qq{
 
   it "can get external modifiers using the '.code' function" . runTest $ do
     let codeSnippet :: String
-        codeSnippet = [r|modifier onlyAfter(uint _time) {
-        require(
-            now >= _time,
-            "Function called too early."
-        );
-        _;
-    }
+        codeSnippet = [r|modifier anotherModifier() {
+    require(x == 4 , string.concat('x is not 4 : ', string(x)));
+    _;
+    require(x == 5 , 'x is not 5');
+  }
 |]
         contract :: String
         contract = [r|
 pragma solidvm 3.3;
-contract OwnerContract {    address public owner = msg.sender;
-    uint public creationTime = now;    modifier onlyBy(address _account) {
-        require(
-            msg.sender == _account,
-            "Sender not authorized.
-        );
-        _;
-    }    modifier onlyAfter(uint _time) {
-        require(
-            now >= _time,
-            "Function called too early."
-        );
-        _;
-    }    function disown() public onlyBy(owner) onlyAfter(creationTime + 6 weeks) {
-        delete owner;
-    }
+contract anotherThing {
+  uint x = 3;
+  modifier myModifier() {  
+    require(x == 3 , string.concat('x is not 3 : ', string(x)));
+    x = 4;
+    _;
+    require(x == 5 , 'x is not 5');
+  }
+
+  modifier anotherModifier() {
+    require(x == 4 , string.concat('x is not 4 : ', string(x)));
+    _;
+    require(x == 5 , 'x is not 5');
+  }
+
+  constructor() public myModifier anotherModifier {
+    x = x + 1;
+    return;
+  }
 }
 
 pragma solidvm 3.3;
 contract qq{
   string codeTest;
   constructor() public {
-    OwnerContract oc = new OwnerContract();
-    codeTest = account(oc).code("onlyAfter");
+    anotherThing oc = new anotherThing();
+    codeTest = account(oc).code("anotherModifier");
   }
 }|]
     runBS contract
