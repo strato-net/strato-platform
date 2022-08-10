@@ -2204,8 +2204,19 @@ expToVar' (CC.FunctionCall _ e args) = do
                             in case val of
                                   Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
                                   Nothing -> Nothing 
+                          modAnno = 
+                            let mModf = (contract ^. CC.modifiers) M.!? term
+                                val = case mModf of
+                                  Just funcf -> foldMap mon funcf
+                                    where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
+                                                   in Just (Min (sl, sc), Max (el, ec))
+                                  Nothing -> Nothing
+                            in case val of
+                                  Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
+                                  Nothing -> Nothing
+                          
                       --Remove all of the items that were found to contain nothing, this should leave just the items that we found
-                      in catMaybes [contrAnno, funcAnno, constAnno, storjAnno, enumAnno, eventAnno, structAnno]
+                      in catMaybes [contrAnno, funcAnno, constAnno, storjAnno, enumAnno, eventAnno, structAnno, modAnno]
 
             case anno of 
               [] -> pure . Constant $ SString $ "" --TODO: add warning that nothing was found and the piece of code is redundant
