@@ -123,12 +123,6 @@ data InlineAssembly = MloadAdd32 T.Text T.Text deriving (Show, Eq, Generic, NFDa
 instance ToJSON InlineAssembly
 instance FromJSON InlineAssembly
 
--- instance (NFData k, NFData v) => NFData1 (Map.Map k v) where
---   liftRnf r map = rnf map
-  
--- instance (NFData1 f, NFData v) => NFData1 (Map.Map T.Text (f v)) where
---   liftRnf r mapping = mapping `deepseq` (fmap r $!! mapping) `seq` ()
-
 data ExpressionF a =
   PlusPlus a (ExpressionF a)
   | MinusMinus a (ExpressionF a)
