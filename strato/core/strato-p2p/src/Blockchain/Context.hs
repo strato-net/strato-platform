@@ -100,7 +100,6 @@ import           Blockchain.Stream.VMOutput            ( HasVMOutputsSink(..)
 
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models (RedisBestBlock(..))
-import           BlockApps.X509.Certificate
 import qualified Database.Persist.Sql                  as SQL
 import qualified Database.Redis                        as Redis
 import qualified Network.Kafka                         as K
@@ -252,10 +251,6 @@ instance MonadIO m => A.Selectable Word256 ChainInfo (ReaderT Config m) where
 
 instance MonadIO m => A.Selectable Keccak256 (Private (Word256, OutputTx)) (ReaderT Config m) where
   select _ = fmap (fmap Private) . RBDB.withRedisBlockDB . RBDB.getPrivateTransactions
-
---Allow for getting the X509 certificate of a peer.
-instance MonadIO m => A.Selectable Address X509CertInfoState (ReaderT Config m) where
-  select _ = RBDB.withRedisBlockDB . RBDB.getCertificate
 
 instance MonadIO m => (Keccak256 `A.Alters` OutputBlock) (ReaderT Config m) where
   lookup _     = RBDB.withRedisBlockDB . RBDB.getBlock
@@ -432,7 +427,6 @@ type MonadP2P m = ( MonadIO m
                        , '(Word256, ChainMembers)
                        , '(Word256, ChainInfo)
                        , '(Keccak256, Private (Word256, OutputTx))
-                       , '(Address, X509CertInfoState)
                        ] m
                   , All2 '[A.Alters]
                       '[ '(Keccak256, BlockData)

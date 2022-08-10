@@ -123,4 +123,3 @@ tests:
       - strato-sequencer
       - text
       - unliftio
-      - x509-certs
