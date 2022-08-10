@@ -36,12 +36,8 @@ wingsContract = BC.unpack $(embedFile "bench/wings.sol")
 wingsCC :: CodeCollection
 wingsCC =
   let srcMap = M.singleton "Wings.sol" $ T.pack wingsContract
-   in either (error . show) id $ compileSource False srcMap -- runParser solidityFile (ParserState "" "") "" wingsContract
-  --    namedContracts = [(T.unpack name, fromRight (error "Didn't parse xabiToContract!") $ xabiToContract(T.unpack name) (map T.unpack parents') "" xabi)
-  --                      | NamedXabi name (xabi, parents') <- unsourceUnits file]
-
-  --in fromRight (error "Didn't parse wingsCC!") . applyInheritance . CodeCollection (M.fromList namedContracts) (M.empty) (M.empty) (M.empty) (M.empty)
-
+   in either (error . show) id $ compileSource False srcMap
+   
 strBench :: Benchmark
 strBench = bench "time to pack the wings contract"
          $ nf BC.pack wingsContract
