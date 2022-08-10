@@ -21,8 +21,8 @@ solidityPragma = do
     pragmaName <- identifier
     -- The follow is anything else after the pragmaName.
     rest <- many1 (noneOf ";")
-    --allow for saving the pragma version so it can be used elsewhere
-    setPragmaVersion rest
+    -- Modify the state of the parser to change the pragma version if a new version is found
+    modifyState(\s -> s { pragmaVersion = rest })
     semi
     pure (pragmaName, rest)
   return $ Pragma a pragmaName rest
