@@ -84,7 +84,7 @@ test cName fName f = case (f ^. funcVisibility, f ^. funcArgs, f ^. funcVals) of
   (_, [], [(_, IndexedType _ SVMType.Bool)]) ->
     pure . FuzzerFailure Nothing $ "Test must be marked as external" <$ f ^. funcContext
   (_, _, [(_, IndexedType _ SVMType.Bool)]) ->
-    pure . FuzzerFailure Nothing $ ("Expected unit test to have zero arguments. To write a property test, prefix the function name with " <> propertyPrefix <> ".") <$ funcContext f
+    pure . FuzzerFailure Nothing $ ("Expected unit test to have zero arguments. To write a property test, prefix the function name with " <> propertyPrefix <> ".") <$ _funcContext f
   _ ->
     pure . FuzzerFailure Nothing $ ("Test must return (bool).") <$ f ^. funcContext
 
@@ -113,7 +113,7 @@ generateArgString = fmap (\t -> "(" <> T.intercalate "," t <> ")") . traverse ge
         generateArg (SVMType.Mapping _ _ _) = pure "<mapping>" --haha lol
 
 prop :: SolidString -> SolidString -> Func -> FuzzerM FuzzerResult
-prop cName fName f = case (funcVisibility f, funcArgs f, funcVals f) of
+prop cName fName f = case (_funcVisibility f, _funcArgs f, _funcVals f) of
   (Just External, (_:_), [(_, IndexedType _ SVMType.Bool)]) -> flip local runProp
     $ (fuzzerArgsContractName .~ cName)
     . (fuzzerArgsCreateArgs .~ "()")
@@ -121,7 +121,7 @@ prop cName fName f = case (funcVisibility f, funcArgs f, funcVals f) of
   (_, (_:_), [(_, IndexedType _ SVMType.Bool)]) ->
     pure . FuzzerFailure Nothing $ "Test must be marked as external" <$ f ^. funcContext
   (_, _, [(_, IndexedType _ SVMType.Bool)]) ->
-    pure . FuzzerFailure Nothing $ ("Expected property test to have at least one argument. To write a unit test, prefix the function name with " <> testPrefix <> ".") <$ funcContext f
+    pure . FuzzerFailure Nothing $ ("Expected property test to have at least one argument. To write a unit test, prefix the function name with " <> testPrefix <> ".") <$ _funcContext f
   _ ->
     pure . FuzzerFailure Nothing $ ("Test must return (bool).") <$ f ^. funcContext
   where
@@ -132,9 +132,9 @@ prop cName fName f = case (funcVisibility f, funcArgs f, funcVals f) of
     runPropNTimes :: Integer -> FuzzerM FuzzerResult
     runPropNTimes n | n <= 0 = success $ f ^. funcContext
     runPropNTimes n = do
-      argString <- liftIO . generateArgString $ indexedTypeType . snd <$> funcArgs f
+      argString <- liftIO . generateArgString $ indexedTypeType . snd <$> _funcArgs f
       $logInfoS "runPropNTimes/generateArgString" argString
-      r <- flip local (runFuzzerOnce $ funcContext f) $ fuzzerArgsCallArgs .~ argString
+      r <- flip local (runFuzzerOnce $ _funcContext f) $ fuzzerArgsCallArgs .~ argString
       case r of
         FuzzerSuccess _ -> runPropNTimes $ n - 1
         _ -> pure r
