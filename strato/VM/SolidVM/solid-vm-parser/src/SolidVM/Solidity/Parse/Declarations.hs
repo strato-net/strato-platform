@@ -378,11 +378,8 @@ functionXabi free = do
   start <- getSourcePosition
   functionArgs <- tupleDeclaration
   (functionRet, visibility, freevisibility, mutability, funcConstructorCallsOrModifiers) <- functionModifiers
-  -- end <- getSourcePosition
-  contents <- Just <$> statements <|> (reservedOp ";" >> return Nothing)
   end <- getSourcePosition
-  -- (contents, end) <- pure (,) <*> (Just <$> statements <|> (reservedOp ";" >> return Nothing)) <*> getSourcePosition
-  -- end <- getSourcePosition
+  contents <- Just <$> statements <|> (reservedOp ";" >> return Nothing)
   let nameUnnamed (name,ty) = if Text.null name then (Nothing, ty) else (Just name,ty)
       ctx = SourceAnnotation start end ()
   -- TODO: use Lenses instead?

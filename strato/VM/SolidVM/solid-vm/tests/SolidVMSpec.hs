@@ -4193,7 +4193,7 @@ contract qq{
   function myFunction() public returns (uint) {
     return 13;
   }
-}|])) `shouldThrow` anyTooManyCooks
+}|])) `shouldThrow` anyTypeError
 
 --   it "Can throw an error if more than one item is given to the code member function." $ (runTest (runBS [r|
 -- pragma solidvm 3.3;

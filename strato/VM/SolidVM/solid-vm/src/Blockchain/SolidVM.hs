@@ -110,7 +110,7 @@ import qualified Text.Colors                          as C
 import           Text.Format
 import           Text.Tools
 
--- import qualified Data.Text.Encoding                   as DT
+import qualified Data.Text.Encoding                   as DT
 
 import qualified SolidVM.Model.CodeCollection         as CC
 
@@ -2404,7 +2404,7 @@ evaluateAccountMember a _ "code" = do
   let cd' = case cd of
               Just (_,bs) -> bs
               Nothing -> missingCodeCollection "Could not locate SolidVM code collection at account" (format realAccount)
-  let decodeCD = TE.decodeUtf8 cd'
+  let decodeCD = DT.decodeUtf8 cd'
   -- Format the result  
   return $ Constant $ SString $ T.unpack decodeCD
 evaluateAccountMember a _ "balance" = do 
@@ -3012,12 +3012,12 @@ runTheConstructors from to hsh cc contractName' argExps = do
   forM_ (reverse $ contract'^.CC.parents) $ \parent -> do
     let args = CC.OrderedArgs
              . fromMaybe []
-             $ M.lookup parent =<< (fmap CC._funcConstructorCalls $ contract' ^. CC.constructor)
+             $ M.lookup parent =<< (fmap CC._funcConstructorCalls $ contract'^.CC.constructor)
     runTheConstructors from to hsh cc parent args
 
 
   _ <-
-    case contract' ^. CC.constructor of
+    case contract'^.CC.constructor of
       Just theFunction -> do
         if (CC._vmVersion contract' == "svm3.3")
           then do
@@ -3060,14 +3060,14 @@ runTheConstructors from to hsh cc contractName' argExps = do
               Just cms -> pure cms
             _ <- pushSender from $ runStatements commands
             return ()
-        --argVals <- forM argExps evaluate
-        --_ <- call' address contract' theFunction argVals
-        commands <- case CC._funcContents theFunction of
-          Nothing -> missingField "contract constructor has been declared but not defined" contractName'
-          Just cms -> pure cms
+        -- --argVals <- forM argExps evaluate
+        -- --_ <- call' address contract' theFunction argVals
+        -- commands <- case CC._funcContents theFunction of
+        --   Nothing -> missingField "contract constructor has been declared but not defined" contractName'
+        --   Just cms -> pure cms
 
-        _ <- pushSender from $ runStatements commands
-        return ()
+        -- _ <- pushSender from $ runStatements commands
+        -- return ()
 
       Nothing -> return ()
 

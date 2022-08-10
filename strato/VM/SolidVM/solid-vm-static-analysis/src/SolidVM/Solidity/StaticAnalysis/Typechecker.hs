@@ -619,32 +619,6 @@ typecheckMember (Static (SVMType.UnknownLabel c _) x) n = do
     t -> pure t
 typecheckMember x n = pure . bottom $ ("Unknown member: " <> showType' x <> "." <> labelToText n) <$ context' x
 
--- codeAccountArgs :: SourceAnnotation Text -> Type'
--- --Make the default an empty string being inputed, otherwise if it has () at the end then allow for both () and ("something")
--- codeAccountArgs x = Sum $ (Product [] x) :|
---                     [ Product [] x
---                     , Function (Static (SVMType.String Nothing) x) (Static (SVMType.String Nothing) x) x
---                     , Static (SVMType.String Nothing) x
---                     ]
--- codeAccountArgs :: SourceAnnotation Text -> Type'
--- --Make the default an empty string being inputed, otherwise if it has () at the end then allow for both () and ("something")
--- codeAccountArgs x = Sum $ (Product [] x) :| [ Static (SVMType.String Nothing) x ]
--- codeAccountArgs x = Sum $ stringType' x :|
---                     [ addressType' x
---                     , accountType' x
---                     , intType' x
---                     , contractType' x
---                     , Product [intType' x, intType' x] x
---                     , Product [intType' x, stringType' x] x
---                     , Product [addressType' x, intType' x] x
---                     , Product [accountType' x, intType' x] x
---                     , Product [addressType' x, stringType' x] x
---                     , Product [accountType' x, stringType' x] x
---                     , Product [intType' x, stringType' x, intType' x] x
---                     , Product [addressType' x, stringType' x, intType' x] x
---                     , Product [accountType' x, stringType' x, intType' x] x
---                     ]
-
 getConstructorType' :: MonadReader R m => SourceAnnotation Text -> SolidString -> m Type'
 getConstructorType' x l  = do
   ~CodeCollection{..} <- asks codeCollection
@@ -793,10 +767,10 @@ statementsHelper args ss = do
       x <- asks $ _contractContext . contract
       pure . bottom $ "Cannot use keyword 'return' outside of a function" <$ x
     Just f -> do
-      let x = f ^. funcContext
+      let x = _funcContext f
       ~(ts', s) <- flip runStateT ((Nothing, args) :| []) $ do
         cCalls <- for (M.assocs $ _funcConstructorCalls f) $ \(cName, exprs) -> do
-          let constructorArgs = getConstructorType' x cName
+          let constructorArgs = getConstructorType' x cName 
               givenArgs = flip Product x <$> traverse tcExpr exprs
               givenFunc = (\t-> Function t (Static (SVMType.Contract cName) x) x []) <$> givenArgs
           constructorArgs <~> givenFunc
