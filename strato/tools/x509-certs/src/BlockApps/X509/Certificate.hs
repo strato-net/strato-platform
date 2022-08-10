@@ -21,14 +21,18 @@ module BlockApps.X509.Certificate (
   signedsToX509,
   verifyCert,
   verifyCertAgainstCerts,
+  verifyCertSignedBy,
   verifyBlockApps,
   verifyCertM,
   makeSignedCert,
   getCertSubject,
   getCertSubjects,
+  getCertValidity,
   getCertIssuer,
   getCertIssuers,
-  getParentUserAddress
+  getParentUserAddress,
+  dateTimeToString,
+  getValidity
  ) where
 
 
@@ -66,7 +70,7 @@ import           Data.PEM
 import qualified Data.Text                      as T
 import           Data.X509
 import           Data.Traversable
-import           Time.Types
+import           Data.Hourglass
 import           Time.System
 import qualified Text.Colors       as CL
 import           Text.Format
@@ -90,7 +94,7 @@ instance NFData X509Certificate where
 
 instance Binary X509Certificate where
   put = (put :: C8.ByteString -> Put) <$> certToBytes
-  get = (fromRight (error "The certificate couldn't be decoded") . bsToCert) <$> (get :: Get C8.ByteString)   
+  get = (fromRight (error "The certificate couldn't be decoded") . bsToCert) <$> (get :: Get C8.ByteString)
 
 -- | The information we store in Redis DB. We store the information of the certificate, as well
 -- as the two state values `isValid` and `children`. We keep `userAddress` around for convenience,
@@ -233,20 +237,25 @@ bsToCert bs =
 
 
 
-makeSignedCert :: (MonadIO m, HasVault m) => Maybe X509Certificate -> Issuer -> Subject -> m (X509Certificate)
-makeSignedCert parentCert iss sub = makeCert iss sub >>= signCert >>= return . X509Certificate . CertificateChain . (:(join . maybeToList $ x509ToSigneds <$> parentCert))
+makeSignedCert :: (MonadIO m, HasVault m) => Maybe DateTime -> Maybe X509Certificate -> Issuer -> Subject -> m (X509Certificate)
+makeSignedCert mDateTime parentCert iss sub = makeCert mDateTime iss sub >>= signCert >>= return . X509Certificate . CertificateChain . (:(join . maybeToList $ x509ToSigneds <$> parentCert))
 
 
 signCert :: (MonadIO m, HasVault m) => Certificate -> m (SignedCertificate)
 signCert cert = objectToSignedExactF (ecdsaWithSHA256) cert
 
-makeCert :: MonadIO m => Issuer -> Subject -> m (Certificate)
-makeCert iss sub = do
+makeCert :: MonadIO m => Maybe DateTime -> Issuer -> Subject -> m (Certificate)
+makeCert mDateTime iss sub = do
   serial' <- liftIO $ getEntropy 16
   let fromBytes = B.foldl' (\a b -> a `shiftL` 8 .|. fromIntegral b) 0
       serial = fromBytes serial'
 
-  validity <- liftIO getValidity
+  validity <- case mDateTime of
+    Nothing -> liftIO getValidity
+    Just dateTime -> do
+      (DateTime dt tm') <- liftIO dateCurrent
+      let curDate@(DateTime _ _) = DateTime dt tm'{todNSec = 0}
+      return (curDate, dateTime)
 
 
   return Certificate {
@@ -319,6 +328,9 @@ getValidity = do
       endDate = DateTime dt{dateYear=(dateYear dt) + 1} tm -- all certs are valid for a year
   return (curDate, endDate)
 
+dateTimeToString :: DateTime -> String
+dateTimeToString = show . timeGetElapsed 
+
 getParentUserAddress :: X509Certificate -> Maybe Address
 getParentUserAddress (X509Certificate (CertificateChain (_:c2:_))) = fmap (fromPublicKey . subPub) (getCertSubject (X509Certificate (CertificateChain [c2])))
 getParentUserAddress _ = Nothing
@@ -346,6 +358,14 @@ getCertSubjects certs = for (x509ToSigneds certs) $ \cert -> do
   where extractDn :: SignedCertificate -> DnElement -> Maybe String
         extractDn cert dn = fmap fromASN1CS . getDnElement dn . certSubjectDN $ getCertificate cert
 
+
+getCertValidity :: X509Certificate -> (DateTime, DateTime)
+getCertValidity (X509Certificate (CertificateChain (c:_)))= certValidity cert
+  where (Signed cert _ _) = getSigned c 
+getCertValidity (X509Certificate (_))= error "Cannot get the validity period of an empty certificate" 
+
+--To write this function we need to convert our X509Certificate into a Certificate to use the certValidity function?
+-- using c :: SignedExact Certificate ? location of this function? only mentioned in this file?
 
 getCertIssuer :: X509Certificate -> Maybe Issuer
 getCertIssuer cert = listToMaybe =<< getCertIssuers cert
@@ -378,6 +398,16 @@ verifyCertAgainstCerts certs cert =  any (`verifyCert` cert) pkeys
 
 verifyCert :: PublicKey -> X509Certificate -> Bool
 verifyCert pkey (X509Certificate (CertificateChain cs)) = verifyCertChain pkey cs
+
+verifyCertSignedBy :: PublicKey -> X509Certificate -> Bool
+verifyCertSignedBy pkey (X509Certificate (CertificateChain (c:_))) =
+  let signed = getSigned c
+      mesgBS = B.pack $ BA.unpack $ hashWith CH.SHA256 (getSignedData c)
+  in
+  case importSignature' $ signedSignature signed of
+    Nothing -> False
+    Just sig -> verifySig pkey sig mesgBS
+verifyCertSignedBy _ _ = False ---error ("Cannot verify cert " <> show cs <> " against " <> show pkey)
 
 verifyCertChain :: PublicKey -> [SignedCertificate] -> Bool
 verifyCertChain _ [] = False

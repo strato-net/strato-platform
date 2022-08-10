@@ -16,6 +16,7 @@ module Blockchain.VM.SolidException
   , parseError
   , require
   , assert
+  , modifierError
   , unknownFunction
   , unknownConstant
   , unknownVariable
@@ -29,6 +30,7 @@ module Blockchain.VM.SolidException
   , tooMuchGas
   , paymentError
   , reservedWordError
+  , immutableError
   , tooManyResultsError
   , tooManyCooks
   , generalMetaProgrammingError
@@ -53,6 +55,7 @@ data SolidException = TypeError String String
                     | ArityMismatch String Int Int
                     | ParseError String String
                     | Require (Maybe String)
+                    | ModifierError String String
                     | Assert
                     | UnknownFunction String String
                     | UnknownConstant String String
@@ -67,6 +70,7 @@ data SolidException = TypeError String String
                     | TooMuchGas String String
                     | PaymentError String String
                     | ReservedWordError String String
+                    | ImmutableError String String
                     | TooManyResultsError String Int 
                     | TooManyCooks Int Int
                     | GeneralMetaProgrammingError String String
@@ -84,6 +88,7 @@ showSolidException (MissingField m v) = printf "missing field: %s: %s" m v
 showSolidException (MissingType m v) = printf "missing type: %s: %s" m v
 showSolidException (DuplicateDefinition m v) = printf "duplicate definition: %s: %s" m v
 showSolidException (ParseError m v) = printf "parse error: %s: %s" m v
+showSolidException (ModifierError m v) = printf "modifier error: %s: %s" m v
 showSolidException (Require Nothing) = printf "solidity require failed"
 showSolidException (Require (Just m)) = printf "solidity require failed: %s" m
 showSolidException Assert = printf "solidity assert failed"
@@ -102,6 +107,7 @@ showSolidException (MalformedData a b) = printf "Malformed data: %s: %s" a b
 showSolidException (TooMuchGas a b) = printf "The gas limit is %s, but was given %s instead." a b
 showSolidException (PaymentError a b) = printf "There was an error sending %s wei to the following address: %s" a b
 showSolidException (ReservedWordError a b) = printf "%s is a reserved word in version %s and up." b a
+showSolidException (ImmutableError a b) = printf "%s is an immutable variable in line '%s'" a b
 showSolidException (TooManyResultsError a b) = printf "Too many results returned from input %s: found %d entries (should be 1)." a b
 showSolidException (TooManyCooks a b) = printf "Too many arguments were given, expected %d argument/s, but received %d arguments." a b
 showSolidException (GeneralMetaProgrammingError a b) = printf "There was a problem with the use of '%s', and the given term/s %s" a b
@@ -163,6 +169,9 @@ unknownStatement = toThrower UnknownStatement
 divideByZero :: (Show v) => v -> a
 divideByZero x = throw $ DivideByZero (show x)
 
+modifierError :: (Show v) => String -> v -> a
+modifierError = toThrower ModifierError
+
 missingCodeCollection :: (Show v) => String -> v -> a
 missingCodeCollection = toThrower MissingCodeCollection
 
@@ -187,6 +196,9 @@ paymentError = toThrower PaymentError
 reservedWordError :: (Show v) => String -> v -> a
 reservedWordError = toThrower ReservedWordError
 
+
+immutableError :: (Show v) => String -> v -> a
+immutableError = toThrower ImmutableError
 tooManyResultsError :: String -> Int -> a
 tooManyResultsError word got = throw $ TooManyResultsError word got
 

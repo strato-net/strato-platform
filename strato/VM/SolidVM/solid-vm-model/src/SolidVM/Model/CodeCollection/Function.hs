@@ -14,7 +14,11 @@ module SolidVM.Model.CodeCollection.Function (
   Func,
   StateMutability(..),
   Visibility(..),
+  ModifierF(..),
+  Modifier,
   tShow,
+  tShow',
+  tRead
   tRead,
   funcArgs,
   funcVals,
@@ -23,7 +27,9 @@ module SolidVM.Model.CodeCollection.Function (
   funcVisibility,
   funcConstructorCalls,
   funcModifiers,
-  funcContext
+  funcContext,
+  funcIsFree,
+  funcOverload
   ) where
 
 import           Control.Lens                 (mapped, (&), (?~), makeLenses)
@@ -38,7 +44,6 @@ import qualified Generic.Random               as GR
 import           GHC.Generics
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
-
 import           SolidVM.Model.CodeCollection.Statement
 import qualified SolidVM.Model.CodeCollection.VarDef  as SolidVM
 import           SolidVM.Model.SolidString
@@ -87,9 +92,12 @@ data FuncF a = Func
   , _funcContents :: Maybe [StatementF a]
   , _funcVisibility :: Maybe Visibility
   , _funcConstructorCalls :: Map SolidString [(ExpressionF a)]
-  , _funcModifiers :: Maybe [String]
+  , _funcModifiers :: [(SolidString, [(ExpressionF a)])]
   , _funcContext :: a
-  } deriving (Eq, Show, Generic, Functor, Foldable, Traversable)
+  , _funcIsFree :: Bool
+  , _funcOverload :: [FuncF a]
+  } deriving (Eq,Show,Generic, Functor, Foldable, Traversable)
+makeLenses ''FuncF
 
 instance ToJSON a => ToJSON (FuncF a)
 instance FromJSON a => FromJSON (FuncF a)
@@ -102,7 +110,14 @@ data Visibility = Private
                 | External
   deriving (Eq,Show,Generic)
 
-instance ToJSON Visibility
+tShow' :: Visibility -> Text
+tShow' Private = "private"
+tShow' Public = "public"
+tShow' Internal = "internal"
+tShow' External = "external"
+
+instance ToJSON Visibility where
+  toJSON = String . tShow'
 instance FromJSON Visibility
 instance Arbitrary Visibility where arbitrary = GR.genericArbitrary GR.uniform
 instance ToSchema Visibility where
@@ -113,6 +128,26 @@ instance ToSchema Visibility where
     where
       ex :: Visibility
       ex = Public
+
+
+
+data ModifierF a = Modifier
+  { _modifierArgs     :: Map Text SolidVM.IndexedType
+  , _modifierSelector :: Text
+  , _modifierContents :: Maybe [StatementF a]
+  , _modifierContext  :: a
+  } deriving (Eq,Show,Generic, Functor, Foldable, Traversable)
+
+makeLenses ''ModifierF
+
+type Modifier = Positioned ModifierF
+
+instance ToJSON a => ToJSON (ModifierF a) where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+
+instance FromJSON a => FromJSON (ModifierF a) where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+
 
 --------------------------------------------------------------------------------
 

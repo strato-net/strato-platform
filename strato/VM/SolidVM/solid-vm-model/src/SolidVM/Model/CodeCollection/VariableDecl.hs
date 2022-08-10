@@ -15,7 +15,8 @@ module SolidVM.Model.CodeCollection.VariableDecl (
   varType,
   varIsPublic,
   varInitialVal,
-  varContext
+  varContext,
+  isImmutable
   ) where
 
 import           Control.Lens
@@ -32,7 +33,9 @@ data VariableDeclF a = VariableDecl
   , _varIsPublic   :: Bool
   , _varInitialVal :: Maybe (ExpressionF a)
   , _varContext    :: a
+  , _isImmutable   :: Bool
   } deriving (Show, Eq, Generic, Functor, Foldable, Traversable)
+
 makeLenses ''VariableDeclF
 
 instance ToJSON a => ToJSON (VariableDeclF a)

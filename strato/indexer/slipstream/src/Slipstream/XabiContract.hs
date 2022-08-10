@@ -35,6 +35,7 @@ xabiToPartialContract xabi =
     _events=M.mapKeys textToLabel $ fmap evmEventToEvent $ OLDXABI.xabiEvents xabi,
     _functions=error "_functions undefined",
     _constructor=error "_constructor undefined",
+    _modifiers=error "_modifiers undefined",
     _vmVersion=error "_vmVersion undefined",
     _contractContext=error "_contractContext undefined"
     }
@@ -59,7 +60,7 @@ evmTypeToType (OLDXABI.Bytes x y) = SVMType.Bytes x y
 evmTypeToType OLDXABI.Bool = SVMType.Bool
 evmTypeToType OLDXABI.Address = SVMType.Address False
 evmTypeToType OLDXABI.Account = SVMType.Account False
-evmTypeToType (OLDXABI.UnknownLabel x) = SVMType.UnknownLabel $ stringToLabel x
+evmTypeToType (OLDXABI.UnknownLabel x) = SVMType.UnknownLabel (stringToLabel x) Nothing
 evmTypeToType (OLDXABI.Struct x y) = SVMType.Struct x $ textToLabel y
 evmTypeToType (OLDXABI.Enum x y z) = SVMType.Enum x (textToLabel y) $ fmap (map textToLabel) z
 evmTypeToType (OLDXABI.Array x y) = SVMType.Array (evmTypeToType x) y
@@ -72,7 +73,8 @@ varTypeToVariableDecl x =
   varType=evmTypeToType $ OLDXABI.varTypeType x,
   varIsPublic=False,
   varInitialVal=Nothing,
-  varContext=dummyAnnotation
+  varContext=dummyAnnotation,
+  isImmutable=False
   }
 
 dummyAnnotation :: SourceAnnotation ()

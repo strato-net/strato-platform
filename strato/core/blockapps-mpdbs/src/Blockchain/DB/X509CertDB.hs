@@ -20,6 +20,7 @@ module Blockchain.DB.X509CertDB (
   , pubToBytes
   , bsToPub
   , verifyCert
+  , verifyCertSignedBy
   , verifyBlockApps
   , X509CertDB(..)
   , HasX509CertDB
@@ -30,6 +31,8 @@ module Blockchain.DB.X509CertDB (
   , x509CertDBPut
   , x509CertDBGet
   , getParentUserAddress
+  , getCertValidity
+  , dateTimeToString
   ) where
 
 

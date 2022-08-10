@@ -36,6 +36,10 @@ unparse (File units) = List.concat $ List.map unparseSourceUnit units
 unparseSourceUnit :: SourceUnit -> String
 unparseSourceUnit (Pragma _ ident contents) = "pragma " ++ ident ++ " " ++ contents ++ ";\n"
 unparseSourceUnit (Import _ path) = "import \"" ++ Text.unpack path ++ "\";\n"
+unparseSourceUnit (FLConstant name conDecl) = (("\n    " <>) . unparseConstant) (Text.unpack name, conDecl)
+unparseSourceUnit (FLStruct name decl) = (("\n    " <>) . unparseTypes) (Text.unpack name, decl)
+unparseSourceUnit (FLEnum name decl) = (("\n    " <>) . unparseTypes) (Text.unpack name, decl)
+unparseSourceUnit (DummySourceUnit) = "DummySourceUnit"
 unparseSourceUnit (NamedXabi name (contract,inherited)) =
      (case xabiKind contract of
         ContractKind -> "contract "
@@ -48,6 +52,8 @@ unparseSourceUnit (NamedXabi name (contract,inherited)) =
      )
   <> " {\n"
   <> concatMap (("\n    " <>) . unparseVar) (Map.toList $ xabiVars contract)
+  <> concatMap (("\n    " <>) . unparseConstant) (Map.toList $ xabiConstants contract)
+
 --  <> concatMap (("\n    " <>) . unparseVar) (sortWith (varTypeAtBytes . snd) $ Map.toList $ xabiVars contract)
   <> concatMap (("\n    " <>) . unparseTypes) (Map.toList $ xabiTypes contract)
   <> concatMap (("\n    " <>) . unparseModifier) (Map.toList $ xabiModifiers contract)
@@ -56,9 +62,10 @@ unparseSourceUnit (NamedXabi name (contract,inherited)) =
   <> concatMap (("\n    " <>) . unparseCtor) (Map.elems $ xabiConstr contract)
   <> concatMap (("\n    " <>) . unparseFunc) (Map.toList $ xabiFuncs contract)
   <> "\n}"
+unparseSourceUnit (FLFunc n a) = unparseFunc (n, a)
 
 unparseVar :: (SolidString, VariableDecl) -> String
-unparseVar (name, (VariableDecl theType isPublic maybeExpression _)) =
+unparseVar (name, (VariableDecl theType isPublic maybeExpression _ _)) =
      unparseVarType (theType)
   <> " "
   <> (if isPublic --TODO- I need to expand this to public, private or nothing
@@ -103,7 +110,7 @@ unparseVarType (SVMType.Address _) = "address"
 unparseVarType (SVMType.Account _) = "account"
 unparseVarType (SVMType.Bytes (Just True) _ ) = "bytes"
 unparseVarType (SVMType.Bytes Nothing (Just bytes) ) = "bytes" <> (show bytes)
-unparseVarType (SVMType.UnknownLabel str) = labelToString str
+unparseVarType (SVMType.UnknownLabel str _) = labelToString str
 unparseVarType (SVMType.Enum _ name _) = labelToString name
 unparseVarType (SVMType.Array t (Just n)) = (unparseVarType t) <> "[" <> show n <> "]"
 unparseVarType (SVMType.Array t Nothing) = (unparseVarType t) <> "[]"
@@ -133,9 +140,9 @@ unparseFuncWithoutName Func{..} =
         Just External -> "external "
         _ -> ""
     <> case _funcModifiers of
-        Just [] -> ""
-        Just xs -> Text.pack $ List.intercalate " " xs <> " "
-        _ -> ""
+        [] -> ""
+        xs ->
+          "modifiers " <> (Text.intercalate ", " (map Text.pack (map (\(name, args) -> labelToString name <> Text.unpack ("(" <> Text.intercalate ", " (map Text.pack (map unparseExpression args)) <> ")")) xs))) <> " "
     <> case _funcVals of
         [] -> ""
         vals ->
@@ -186,6 +193,7 @@ unparseStatementWith f (ForStatement v1 v2 v3 s a) = f a $ concat
 unparseStatementWith f (Return Nothing a) = f a $ "return;"
 unparseStatementWith f (Return (Just e) a) = f a $ "return " ++ unparseExpression e ++ ";"
 unparseStatementWith f (Break a) = f a $ "break;"
+unparseStatementWith f (ModifierExecutor a) = f a $ "_;"
 unparseStatementWith f (Continue a) = f a $ "continue;"
 unparseStatementWith f (Throw a) = f a $ "throw;"
 unparseStatementWith f (Block a) = f a $ "{ }"
@@ -221,6 +229,7 @@ unparseVarDefEntry (VarDefEntry maybeType maybeLoc theName _) =
                       Nothing -> " "
                       Just Memory -> " memory "
                       Just Storage -> " storage "
+                      Just Calldata -> " calldata "
   in typeString ++ locString ++ labelToString theName
 
 
@@ -263,7 +272,7 @@ unparseExpression (ArrayExpression _ xs) = "[" ++ List.intercalate "," (map unpa
 unparseExpression (ObjectLiteral _ m) = "{" ++ List.intercalate ",\n" [concat ["\t", labelToString k, ":", unparseExpression v]  | (k, v) <- Map.toList m] ++ "}"
 unparseExpression x = internalError "missing case in call to unparseExpression" $ show x
 
-unparseModifier :: (SolidString, ModifierF a) -> String
+unparseModifier :: Show a => (SolidString, ModifierF a) -> String
 unparseModifier (name, Modifier{..}) = Text.unpack $
      "modifier "
   <> labelToText name
@@ -271,8 +280,8 @@ unparseModifier (name, Modifier{..}) = Text.unpack $
   <> Text.intercalate ", " (List.map unparseArgs (Map.toList modifierArgs))
   <> ") {\n        "
   <> case modifierContents of
-       Just contents -> contents --(Text.concat . Text.lines $ contents)
-       Nothing -> ""
+        Just contents -> Text.pack $ tab . tab $ unlines $ map unparseStatement contents --(Text.concat . Text.lines $ contents)
+        Nothing -> ""
   <> "}"
 
 unparseEvent :: (SolidString, EventF a) -> String
