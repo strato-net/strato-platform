@@ -104,7 +104,7 @@ create _ _ _ _ _ _ _ _ _ _ _ theCode _ _ _ = do
       Just f -> do
         case getGetter f of
           Left e -> error $ "can't run the constructor: " ++ show e
-          Right doit -> doit
+          Right doit -> runSVM doit
 
   return $
     ExecResults

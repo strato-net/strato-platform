@@ -1,7 +1,7 @@
 
 module Blockchain.Compiler where
 
---import Control.Monad
+import Control.Monad.IO.Class
 import Data.Map (Map)
 import qualified Data.Map as Map
 
@@ -50,23 +50,23 @@ convert1 c globals (AST1.Function name args1) =
 --convert1 _ x = error $ "missing case in convert1: " ++ show x
 
 
-compileSingleLine :: AST2.Statement -> IO ()
+compileSingleLine :: AST2.Statement -> AST2.SVM ()
 compileSingleLine (AST2.Assign lExp rExp) = either (\err -> error $ "doggy2: " ++ show err) id $ AST2.assign lExp rExp
 compileSingleLine (AST2.ExpressionStatement e) =
   let getter = either (\err -> error $ "doggy: " ++ show err) id $ AST2.getGetter e
   in do
-    _ <- getter :: IO AST2.Value
+    _ <- getter :: AST2.SVM AST2.Value
     return ()
 
 compile :: AST2.Contract -> Contract
 compile contract =
   let functions' =
         (flip fmap) (AST2.functions contract) $ \f -> 
-        AST2.Function (compileLines $ AST2.code f) [] :: AST2.Function (IO ())
+        AST2.Function (compileLines $ AST2.code f) [] :: AST2.Function (AST2.SVM ())
 
   in Contract $ fmap AST2.AnyFunction functions'
 
-compileLines :: [AST2.Statement] -> IO ()
+compileLines :: [AST2.Statement] -> AST2.SVM ()
 compileLines [] = return ()
 compileLines (x:rest) =
   let firstLine = compileSingleLine x
@@ -87,17 +87,17 @@ getNamedFunction c name _ =
     Nothing -> error $ "Missing case in getNamedFunction: " ++ name
     Just x -> x
 
-incFunc :: Integer -> IO Integer
+incFunc :: Integer -> AST2.SVM Integer
 incFunc x = return $ x + 1
 
-plusFunc :: Integer -> Integer -> IO Integer
+plusFunc :: Integer -> Integer -> AST2.SVM Integer
 plusFunc x y = return $ x + y
 
-lengthFunc :: String -> IO Integer
+lengthFunc :: String -> AST2.SVM Integer
 lengthFunc = return . toInteger . length
 
-concatFunc :: String -> String -> IO String
+concatFunc :: String -> String -> AST2.SVM String
 concatFunc x y = return $ x ++ y
 
-printFunc :: AST2.Value -> IO ()
-printFunc = putStrLn . show
+printFunc :: AST2.Value -> AST2.SVM ()
+printFunc = liftIO . putStrLn . show

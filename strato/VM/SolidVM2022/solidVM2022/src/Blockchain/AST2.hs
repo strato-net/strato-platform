@@ -11,7 +11,21 @@
 module Blockchain.AST2 where
 
 import Control.Monad
+import Control.Monad.Except
 import Data.IORef
+
+
+type SVM a = IO a
+
+runSVM :: SVM a -> IO a
+runSVM = id
+
+{-
+type SVM a = ExceptT String IO a
+
+runSVM :: SVM a -> IO (Either String a)
+runSVM = runExceptT
+-}
 
 data Variable = forall a.(Show a, SolidType Expression a) => Variable (IORef a)
 
@@ -36,19 +50,19 @@ instance Show (Function a) where
 
 data PartiallyAppliedFunction a = PartiallyAppliedFunction a [Expression]
 
-instance NamedType a => SolidType (Function (IO a)) a where
+instance NamedType a => SolidType (Function (SVM a)) a where
   getGetter (Function f []) = return f
   getGetter _ = Left "too many parameters"
   
-instance (Show a) => SolidType (Function (IO a)) Value where
+instance (Show a) => SolidType (Function (SVM a)) Value where
   getGetter (Function f []) = return $ fmap Value f
   getGetter _ = Left "too many parameters"
   
-instance (NamedType a, NamedType b) => SolidType (Function (IO a)) b where
+instance (NamedType a, NamedType b) => SolidType (Function (SVM a)) b where
   getGetter (Function _ []) = Left $ "type mismatch: function returns: " ++ show (typename (undefined :: a)) ++ ", expected: " ++ show (typename (undefined ::b))
   getGetter _ = Left "too many parameters"
   
-instance (NamedType c, SolidType Expression a, SolidType (PartiallyAppliedFunction (IO b)) (IO c)) =>
+instance (NamedType c, SolidType Expression a, SolidType (PartiallyAppliedFunction (SVM b)) (SVM c)) =>
          SolidType (Function (a->b)) c  where
   getGetter (Function f (first:rest)) = do
     firstGetter <- getGetter first
@@ -56,22 +70,22 @@ instance (NamedType c, SolidType Expression a, SolidType (PartiallyAppliedFuncti
     fmap join $ getGetter $ PartiallyAppliedFunction (f <$> firstGetter) rest
   getGetter (Function _ []) = Left "Not enough parameters"
 
-instance (SolidType (PartiallyAppliedFunction (IO b)) c, SolidType Expression a) =>
-         SolidType (PartiallyAppliedFunction (IO (a->b))) c where
+instance (SolidType (PartiallyAppliedFunction (SVM b)) c, SolidType Expression a) =>
+         SolidType (PartiallyAppliedFunction (SVM (a->b))) c where
     getGetter (PartiallyAppliedFunction f (first:rest)) = do
       firstGetter <- getGetter first
       getGetter $ PartiallyAppliedFunction (f <*> firstGetter) rest
     getGetter _ = error "not enough arguments"
 
-instance SolidType (PartiallyAppliedFunction (IO (IO a))) (IO a) where
+instance SolidType (PartiallyAppliedFunction (SVM (SVM a))) (SVM a) where
   getGetter (PartiallyAppliedFunction f []) = return f
   getGetter _ = error "too many arguments"
 
-instance Show a => SolidType (PartiallyAppliedFunction (IO (IO a))) (IO Value) where
+instance Show a => SolidType (PartiallyAppliedFunction (SVM (SVM a))) (SVM Value) where
   getGetter (PartiallyAppliedFunction f []) = return $ fmap (fmap Value) f
   getGetter _ = error "too many arguments"
 
-instance SolidType (PartiallyAppliedFunction (IO (IO a))) (IO b) where
+instance SolidType (PartiallyAppliedFunction (SVM (SVM a))) (SVM b) where
   getGetter (PartiallyAppliedFunction _ []) = Left "can't convert type"
   getGetter _ = error "too many arguments"
 
@@ -113,8 +127,8 @@ instance NamedType Expression where
 instance NamedType (PartiallyAppliedFunction a) where
   typename _ = "PartiallyAppliedFunction"
 
-instance NamedType (IO a) where
-  typename _ = "IO a"
+instance NamedType (SVM a) where
+  typename _ = "SVM a"
 
 instance NamedType () where
   typename _ = "()"
@@ -124,7 +138,7 @@ instance NamedType (Function a) where
 
 
 class (NamedType a, NamedType b) => SolidType a b where
-  getGetter :: a -> Either String (IO b)
+  getGetter :: a -> Either String (SVM b)
 
 instance SolidType Expression Integer where
   getGetter (EInteger v) = Right $ return v
@@ -134,7 +148,7 @@ instance SolidType Expression Integer where
 instance SolidType Expression Value where
   getGetter (EString v) = Right $ return $ Value v
   getGetter (EInteger v) = Right $ return $ Value v
-  getGetter (EVariable (Variable v)) = return $ fmap Value $ readIORef v
+  getGetter (EVariable (Variable v)) = return $ fmap Value $ liftIO $ readIORef v
   getGetter (EFunction f) = getGetter f
   
 instance SolidType Expression String where
@@ -160,10 +174,10 @@ instance SolidType AnyFunction () where
 
 newtype Address = Address Int deriving (Show)
 
-assign :: Expression -> Expression -> Either String (IO ())
+assign :: Expression -> Expression -> Either String (SVM ())
 assign (EVariable (Variable ioRef)) rExp = do
   getter <- getGetter rExp
   return $ do
     value <- getter
-    writeIORef ioRef value
+    liftIO $ writeIORef ioRef value
 assign _ _ = Left "You can't assign a value to a non variable"

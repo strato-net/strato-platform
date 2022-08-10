@@ -8,6 +8,7 @@ dependencies:
 - format
 - ghc
 - lens
+- mtl
 - parsec
 - solid-vm-model
 - solid-vm-parser
