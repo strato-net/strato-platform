@@ -320,7 +320,8 @@ contract CertificateRegistry {
     
     function revokeCert(address userAddress){
         Certificate myCert = certificates[certificatesMap[userAddress]-1];
-        require(isChild(tx.certificate, myCert.userAddress()), "You don't have permission to revoke!");
+        Certificate originCert = certificates[certificatesMap[tx.origin]-1];
+        require(isChild(originCert.certificateString(), myCert.userAddress()), "You don't have permission to revoke!");
 
         int childrenLength = myCert.revoke();
         for (int i = 0; i < childrenLength; i += 1) {
