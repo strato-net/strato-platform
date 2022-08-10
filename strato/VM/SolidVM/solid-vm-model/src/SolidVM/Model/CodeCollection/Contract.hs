@@ -35,6 +35,7 @@ import qualified SolidVM.Model.CodeCollection.VarDef as SolidVM
 import           SolidVM.Model.CodeCollection.VariableDecl
 import           SolidVM.Model.SolidString
 
+--TODO: Please add entry to .code function in SolidVM if you add a new item that contains a source annotation
 data ContractF a =
   Contract {     
     _contractName :: SolidString,
