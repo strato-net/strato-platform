@@ -277,9 +277,9 @@ unparseModifier (name, Modifier{..}) = Text.unpack $
      "modifier "
   <> labelToText name
   <> "("
-  <> Text.intercalate ", " (List.map unparseArgs (Map.toList modifierArgs))
+  <> Text.intercalate ", " (List.map unparseArgs (Map.toList _modifierArgs))
   <> ") {\n        "
-  <> case modifierContents of
+  <> case _modifierContents of
         Just contents -> Text.pack $ tab . tab $ unlines $ map unparseStatement contents --(Text.concat . Text.lines $ contents)
         Nothing -> ""
   <> "}"

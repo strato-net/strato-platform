@@ -115,14 +115,14 @@ compileSourceNoInheritance initCodeMap = do
       throwDuplicateFunction (fname, func) m = case M.lookup fname m of
         Nothing -> pure $ M.insert fname func m 
         Just fdec -> do
-          let oldParamTypes = fmap snd $ funcArgs fdec
-              newParamTypes = fmap snd $ funcArgs func
-              overloadParamTypes = concatMap (\x -> [fmap snd $ funcArgs x]) $ funcOverload fdec
+          let oldParamTypes = fmap snd $ _funcArgs fdec
+              newParamTypes = fmap snd $ _funcArgs func
+              overloadParamTypes = concatMap (\x -> [fmap snd $ _funcArgs x]) $ _funcOverload fdec
           if ((oldParamTypes == newParamTypes) || (newParamTypes `elem` overloadParamTypes))
             then Left . PEx $ newErrorMessage (Message $ "Free function could not be overloaded: " ++ labelToString fname)
-                                              (fromSourcePosition $ _sourceAnnotationStart $ funcContext func)
+                                              (fromSourcePosition $ _sourceAnnotationStart $ _funcContext func)
             else do
-              pure $ M.insert fname (fdec{funcOverload = funcOverload fdec ++ [func]}) m
+              pure $ M.insert fname (fdec{_funcOverload = _funcOverload fdec ++ [func]}) m
                                            
   allSUnits <- fmap concat . traverse (uncurry getNamedSUnits) $ M.toList initCodeMap
   let (allConstants, allContracts, allEnums, allStructs, allFreeFunctions) = sUnitSorter allSUnits

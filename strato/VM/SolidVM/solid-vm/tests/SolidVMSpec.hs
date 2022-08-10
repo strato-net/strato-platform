@@ -3746,6 +3746,49 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
+  it "can get external modifiers using the '.code' function" . runTest $ do
+    let codeSnippet :: String
+        codeSnippet = [r|modifier onlyAfter(uint _time) {
+        require(
+            now >= _time,
+            "Function called too early."
+        );
+        _;
+    }
+|]
+        contract :: String
+        contract = [r|
+pragma solidvm 3.3;
+contract OwnerContract {    address public owner = msg.sender;
+    uint public creationTime = now;    modifier onlyBy(address _account) {
+        require(
+            msg.sender == _account,
+            "Sender not authorized.
+        );
+        _;
+    }    modifier onlyAfter(uint _time) {
+        require(
+            now >= _time,
+            "Function called too early."
+        );
+        _;
+    }    function disown() public onlyBy(owner) onlyAfter(creationTime + 6 weeks) {
+        delete owner;
+    }
+}
+
+pragma solidvm 3.3;
+contract qq{
+  string codeTest;
+  constructor() public {
+    OwnerContract oc = new OwnerContract();
+    codeTest = account(oc).code("onlyAfter");
+  }
+}|]
+    runBS contract
+    getFields ["codeTest"] `shouldReturn`
+      [ BString $ UTF8.fromString codeSnippet]
+
 --   xit "can get an error if nothing is supplied to the code search" . runTest $ do
 --     let contract :: String
 --         contract = [r|

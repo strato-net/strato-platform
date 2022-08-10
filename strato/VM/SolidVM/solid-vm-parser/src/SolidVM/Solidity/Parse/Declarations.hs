@@ -102,13 +102,13 @@ solidityContract = do
   where
     parseOverloads :: SolidVM.Func -> SolidVM.Func -> SolidVM.Func
     parseOverloads new old = do
-      let oldParamTypes = fmap snd $ SolidVM.funcArgs old
-          newParamTypes = fmap snd $ SolidVM.funcArgs new
-          overloadParamTypes = concatMap (\x -> [fmap snd $ SolidVM.funcArgs x]) $ SolidVM.funcOverload old
+      let oldParamTypes = fmap snd $ SolidVM._funcArgs old
+          newParamTypes = fmap snd $ SolidVM._funcArgs new
+          overloadParamTypes = concatMap (\x -> [fmap snd $ SolidVM._funcArgs x]) $ SolidVM._funcOverload old
       if ((oldParamTypes == newParamTypes) || (newParamTypes `elem` overloadParamTypes))
-        then invalidArguments ("Function is already defined with similar params.") $ SolidVM.funcArgs new
+        then invalidArguments ("Function is already defined with similar params.") $ SolidVM._funcArgs new
         else
-          old{SolidVM.funcOverload = SolidVM.funcOverload old ++ [new]}
+          old{SolidVM._funcOverload = SolidVM._funcOverload old ++ [new]}
 
 
 --  where -- constants = byMutability True (repeat 0)
@@ -136,18 +136,18 @@ solidityContract = do
 solidityFreeFunction :: SolidityParser SourceUnit
 solidityFreeFunction = do
   (fname, (FuncDeclaration a)) <- functionDeclaration True
-  when (SolidVM.funcVisibility a /= Just SolidVM.Internal) $ fail "Free functions always have implicit Internal visibility."
+  when (SolidVM._funcVisibility a /= Just SolidVM.Internal) $ fail "Free functions always have implicit Internal visibility."
   return $ FLFunc fname $ SolidVM.Func 
-    { SolidVM.funcArgs = SolidVM.funcArgs a
-    , SolidVM.funcVals = SolidVM.funcVals a
-    , SolidVM.funcStateMutability = SolidVM.funcStateMutability a
-    , SolidVM.funcContents = SolidVM.funcContents a
-    , SolidVM.funcVisibility = SolidVM.funcVisibility a
-    , SolidVM.funcConstructorCalls = SolidVM.funcConstructorCalls a
-    , SolidVM.funcModifiers = SolidVM.funcModifiers a
-    , SolidVM.funcContext = SolidVM.funcContext a
-    , SolidVM.funcIsFree = True
-    , SolidVM.funcOverload = SolidVM.funcOverload a
+    { SolidVM._funcArgs = SolidVM._funcArgs a
+    , SolidVM._funcVals = SolidVM._funcVals a
+    , SolidVM._funcStateMutability = SolidVM._funcStateMutability a
+    , SolidVM._funcContents = SolidVM._funcContents a
+    , SolidVM._funcVisibility = SolidVM._funcVisibility a
+    , SolidVM._funcConstructorCalls = SolidVM._funcConstructorCalls a
+    , SolidVM._funcModifiers = SolidVM._funcModifiers a
+    , SolidVM._funcContext = SolidVM._funcContext a
+    , SolidVM._funcIsFree = True
+    , SolidVM._funcOverload = SolidVM._funcOverload a
     }
 
 data Declaration =
@@ -378,7 +378,7 @@ functionXabi free = do
   start <- getSourcePosition
   functionArgs <- tupleDeclaration
   (functionRet, visibility, freevisibility, mutability, funcConstructorCallsOrModifiers) <- functionModifiers
-  end <- getSourcePosition
+  -- end <- getSourcePosition
   contents <- Just <$> statements <|> (reservedOp ";" >> return Nothing)
   end <- getSourcePosition
   -- (contents, end) <- pure (,) <*> (Just <$> statements <|> (reservedOp ";" >> return Nothing)) <*> getSourcePosition
@@ -449,12 +449,12 @@ modifierDeclaration = do
         (
           name,
           ModifierDeclaration Xabi.Modifier{
-            Xabi.modifierArgs = -- undefined args -- :: Map Text SolidVM.IndexedType
+            Xabi._modifierArgs = -- undefined args -- :: Map Text SolidVM.IndexedType
               Map.fromList $
                 zipWith (\x i -> fmap (SolidVM.IndexedType i) (nameUnnamed x i)) args [0..]
-          , Xabi.modifierSelector = Text.pack name -- ? -- undefined -- :: Text
-          , Xabi.modifierContents = contents -- :: Maybe [Statement]
-          , Xabi.modifierContext = ctx
+          , Xabi._modifierSelector = Text.pack name -- ? -- undefined -- :: Text
+          , Xabi._modifierContents = contents -- :: Maybe [Statement]
+          , Xabi._modifierContext = ctx
           }
         )
 

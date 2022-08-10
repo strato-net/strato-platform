@@ -3164,7 +3164,9 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro = do
              Just SNULL -> findNamedReturns
              Just{} -> return val
   popCallInfo
-
+  return val' 
+      
+  else do
       theModifiers' <- forM theModifierNames $ \name -> do
         case M.lookup name (contract'^.CC.modifiers) of
           Just theModifier -> do
