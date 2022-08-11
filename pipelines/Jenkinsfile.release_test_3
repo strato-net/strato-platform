@@ -122,7 +122,7 @@ pipeline {
             // agent { label "test-multinode101" } // is default
             steps { 
                 script {
-                    rootNodeAddress = lib.deployStratoWithApp(null, NODE_DATA.NODE1, 'beanstalk', true) 
+                    rootNodeAddress = lib.deployStratoWithApp(null, NODE_DATA.NODE1, 'traceharvest', true) 
                 }
             }            
         }
@@ -133,7 +133,7 @@ pipeline {
                     agent { label "test-multinode102" }
                     steps {
                         script {
-                            node2Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE2, 'beanstalk', true)
+                            node2Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE2, 'traceharvest', true)
                         }
                     }
                 }
@@ -141,7 +141,7 @@ pipeline {
                     agent { label "test-multinode103" }
                     steps {
                         script {
-                            node3Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE3, 'beanstalk', true)
+                            node3Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE3, 'traceharvest', true)
                         }
                     }
                 }
@@ -149,7 +149,7 @@ pipeline {
                     agent { label "test-multinode104" }
                     steps {
                         script {
-                            node4Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE4, 'beanstalk', true)
+                            node4Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE4, 'traceharvest', true)
                         }
                     }
                 }
