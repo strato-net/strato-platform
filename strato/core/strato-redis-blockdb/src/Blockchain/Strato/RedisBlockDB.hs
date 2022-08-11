@@ -194,14 +194,13 @@ addChainMember cId address enode = do
           Compose (addressToOrgName address >>= \org -> addOrgNameChain (fromRight (error "addChainMember - to the left, to the left") org) cId)
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addChainMember - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "addChainMember - Error" ++ e)
-    where addressToOrgName :: Address -> Redis (Either Reply (S8.ByteString, S8.ByteString))  -- OrgName, OrgUnit
+    where addressToOrgName :: Address -> Redis (Either () (S8.ByteString, S8.ByteString))  -- OrgName, OrgUnit
           addressToOrgName addr = do 
             let getCertificate' = maybe (X509Certificate (CertificateChain [])) certificate <$> getCertificate addr     
-                extractDN = (S8.pack . subOrg) &&& (S8.pack . fromJust . subUnit)
-                getCert' certs = signedsToX509 $ toList $ findNodeCert (fromJust $ importPublicKey (unOrgId $ pubKey enode)) certs
-                getCertSubject' sub = fromJust . getCertSubject $ sub
+                extractDN       = (S8.pack . subOrg) &&& (S8.pack . fromJust . subUnit)
+                getCertSubject' = fromJust . getCertSubject
+                getCert'        = signedsToX509 . toList . findNodeCert (fromJust $ importPublicKey (unOrgId $ pubKey enode))
             cert <- x509ToSigneds <$> getCertificate'
-            
             return $ Right $ extractDN $ getCertSubject' $ getCert' cert
 
 removeChainMember :: Word256

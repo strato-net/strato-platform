@@ -36,6 +36,8 @@ module Blockchain.Context
     , PeerAddress(..)
     , GenesisBlockHash(..)
     , BestBlockNumber(..)
+    , OrgNameChains(..)
+    , ChainInfo(..)
     , initConfig
     , initContext
     , runContextM

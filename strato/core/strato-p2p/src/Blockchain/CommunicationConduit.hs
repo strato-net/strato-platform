@@ -18,7 +18,9 @@ module Blockchain.CommunicationConduit
     , mkEthP2PEventConduit
     ) where
 
+import           Control.Arrow                         ((&&&))
 import qualified Control.Monad.Change.Modify           as Mod
+import qualified Control.Monad.Change.Alter            as A
 import           Control.Monad.IO.Unlift
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
@@ -33,6 +35,7 @@ import qualified Data.Conduit.List                     as CL
 import           Data.Conduit.TQueue
 import           Data.List.Split
 import           Data.Maybe
+import qualified Data.Map.Strict                       as M
 import qualified Data.Set                              as S
 import qualified Data.Text                             as T
 import           Data.Void
@@ -47,10 +50,12 @@ import           Blockchain.Context                    hiding (Inbound, Outbound
 import           Blockchain.Data.Block
 import           Blockchain.Data.Control               (P2PCNC(..))
 import           Blockchain.Data.RLP
+import           Blockchain.Data.PubKey                (pointToSecPubKey)
 import           Blockchain.Data.Wire                  as W
 import           Blockchain.Display
 import           Blockchain.Event
 import           Blockchain.EventException
+import           Blockchain.Data.Enode
 import           Blockchain.ExtMergeSources
 import           Blockchain.Frame
 import           Blockchain.Metrics
@@ -64,8 +69,8 @@ import           Blockchain.Watchdog
 import           BlockApps.X509
 
 -- This is a placeholder until the root certs can be held in a proper database
-rootCerts' :: S.Set X509Certificate 
-rootCerts' = S.fromList [rootCert] 
+rootCerts' :: S.Set X509Certificate
+rootCerts' = S.fromList [rootCert]
 
 ethVersion :: Int
 ethVersion = 62
@@ -188,6 +193,18 @@ handleMsgClientConduit myId peer = do
                 when (peerGH /= genHash) $ throwIO WrongGenesisBlock
                 when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch networkID' computeNetworkID
                 when (S.difference rcs rootCerts' /= S.empty) $ throwIO RootCertificateMismatch
+
+                -- Approval of client will be satisfied when the chain details arrive
+                -- re-create mapping of (orgName, orgUnit) -> received chain Ids
+                -- great success
+                -- let peerPub' = pointToSecPubKey $ fromMaybe (error "where da pubkey") $ pPeerPubkey peer
+                -- forM_ rcs $ \cs ->         
+                --   when (verifyCert peerPub' cs) $ do
+                --       let subj = (OrgName . BC.pack . subOrg &&& OrgUnit . BC.pack . fromJust . subUnit) . fromJust $ getCertSubject cs -- then send chainID data to node
+                --       cIds <- lift $ S.toList . unOrgNameChains . fromJust <$> A.select (A.Proxy @OrgNameChains) subj
+                --       cInfos <- fmap M.toList . lift $ A.selectMany (A.Proxy @ChainInfo) cIds
+                --       yield . Right $ ChainDetails cInfos
+
                 -- we set to 0 cause we dont necessarily know the number yet
                 lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
                 (BestBlockNumber lastBlockNumber) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
@@ -231,24 +248,38 @@ handleMsgServerConduit myPubkey peer = do
         other -> assertHandshake $ other
     awaitMsg >>= \case
         -- TODO remove distinction between new status messages and old ones once entire protocol is complete
-        Just NewStatus{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash, networkID=networkID', rootCerts=rcs} -> do
+        Just NewStatus{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash , networkID=networkID', rootCerts=rcs} -> do
             $logInfoS "serverHandshake/Status{}" "received status"
-            yield =<< lift (Mod.get (Mod.Proxy @BestBlock) >>= \(BestBlock bHash _ tdiff) -> do
-              (GenesisBlockHash genHash) <- Mod.access (Mod.Proxy @GenesisBlockHash)
+            lift (Mod.get (Mod.Proxy @BestBlock)) >>= \(BestBlock bHash _ tdiff) -> do
+              (GenesisBlockHash genHash) <- lift $ Mod.access (Mod.Proxy @GenesisBlockHash)
               when (genHash /= peerGH) $ throwIO WrongGenesisBlock
               when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch networkID' computeNetworkID
               when (S.difference rcs rootCerts' /= S.empty) $ throwIO RootCertificateMismatch
 
+              -- get the peer's PublicKey
+              -- for every X509 in the set
+              --    verify the the cert with the Public Key
+              --     get the Subject Org Name and Org Unit
+              --     lift the (cIds, chainInfos) associated with it
+              --     send that out the chain details to the peer
+              let peerPub' = pointToSecPubKey $ fromMaybe (error "handleMsgServerConduit - could not derive peer pubkey") $ pPeerPubkey peer
+              forM_ rcs $ \cs ->         
+                when (verifyCert peerPub' cs) $ do
+                    let subj = (OrgName . BC.pack . subOrg &&& OrgUnit . BC.pack . fromJust . subUnit) . fromJust $ getCertSubject cs -- then send chainID data to node
+                    cIds <- lift $ S.toList . unOrgNameChains . fromJust <$> A.select (A.Proxy @OrgNameChains) subj
+                    cInfos <- fmap M.toList . lift $ A.selectMany (A.Proxy @ChainInfo) cIds
+                    yield . Right $ ChainDetails cInfos
+
               -- we set to 0 cause we dont necessarily know the number yet
-              Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
-              return $ Right NewStatus {
+              lift $ Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
+              yield $ Right NewStatus {
                   protocolVersion = fromIntegral ethVersion,
                   networkID = computeNetworkID,
                   totalDifficulty = fromIntegral tdiff,
                   latestHash = bHash,
                   genesisHash = genHash,
                   rootCerts= rootCerts'
-              })
+              }
         Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash, networkID=networkID'} -> do
             $logInfoS "serverHandshake/Status{}" "received status"
             yield =<< lift (Mod.get (Mod.Proxy @BestBlock) >>= \(BestBlock bHash _ tdiff) -> do
