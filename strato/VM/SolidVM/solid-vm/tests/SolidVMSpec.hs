@@ -5209,3 +5209,20 @@ contract qq {
 }|]
     getFields ["result1", "result2", "result3", "result4"] `shouldReturn` [BInteger 3, BInteger 6, BInteger 1, BInteger 12]
 
+
+  it "can use a library function that adds 1 to a number" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+library lib {
+  function addOne(uint x) public pure returns (uint) {
+    return x + 1;
+  }
+}
+contract qq {
+  uint myNum;
+  using lib for L;
+  function a() public returns (uint) {
+    myNum = L.addOne(1);
+  }
+}|]
+    getFields ["myNum"] `shouldReturn` [BInteger 2]

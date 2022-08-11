@@ -26,7 +26,7 @@ import           Data.Aeson.Types
 import           Data.Map.Strict              (Map)
 import           Data.Source
 import           Data.Swagger
-import           Data.Text                    (Text)
+import           Data.Text                    (Text, pack)
 import           GHC.Generics
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
@@ -69,24 +69,28 @@ data XabiF a = Xabi
 
 type Xabi = Positioned XabiF
 
-data UsingF a = Using String a deriving (Eq,Show,Generic, Functor)
+data UsingF a = Using [Text] (Maybe Text) Bool a deriving (Eq,Show,Generic, Functor) -- Using Librarynames (the binded variable or * for insert) isGlobal position
 
 type Using = Positioned UsingF
 
 instance ToJSON a => ToJSON (UsingF a) where
-  toJSON (Using dec ctx) = object
-    [ "using" .= dec
+  toJSON (Using libs mBind isGlobal ctx) = object
+    [ "using" .= libs
+    , "bind" .= mBind
+    , "global" .= isGlobal
     , "context" .= ctx
     ]
 
 instance FromJSON a => FromJSON (UsingF a) where
   parseJSON (Object o) = Using
                      <$> (o .: "using")
+                     <*> (o .: "bind")
+                     <*> (o .: "global")
                      <*> (o .: "context")
   parseJSON o = typeMismatch "SolidVM.Using" o
 
 instance Arbitrary a => Arbitrary (UsingF a) where
-  arbitrary = Using <$> arbitrary <*> arbitrary
+  arbitrary = Using <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
 
 instance ToSchema Using where
   declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
@@ -94,7 +98,7 @@ instance ToSchema Using where
      & mapped.schema.description ?~ "Xabi of a `using` declaration"
      & mapped.schema.example ?~ toJSON sampleUsing
      where sampleUsing :: UsingF ()
-           sampleUsing = Using "for uint[]" ()
+           sampleUsing = Using [pack "MyLib"] Nothing False ()
 
 --------------------------------------------------------------------------------
 

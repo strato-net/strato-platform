@@ -63,6 +63,7 @@ unparseSourceUnit (NamedXabi name (contract,inherited)) =
   <> concatMap (("\n    " <>) . unparseFunc) (Map.toList $ xabiFuncs contract)
   <> "\n}"
 unparseSourceUnit (FLFunc n a) = unparseFunc (n, a)
+unparseSourceUnit (FLUsingDirective directive) = unparseUsing (Text.pack "" , directive)
 
 unparseVar :: (SolidString, VariableDecl) -> String
 unparseVar (name, (VariableDecl theType isPublic maybeExpression _ _)) =
@@ -295,7 +296,7 @@ unparseEvent (name, Event{..}) = Text.unpack $
   <> ";"
 
 unparseUsing :: (Text, UsingF a) -> String
-unparseUsing (name, Using body _) = Text.unpack . mconcat $ ["using ", name, " ", Text.pack body, ";\n"]
+unparseUsing (_, Using identarr mBind isGlobal _) = Text.unpack . mconcat $ ["using ",  Text.pack  (show identarr) , " ",Text.pack (show mBind), if isGlobal then Text.pack " global " else Text.pack " ",  ";\n"]
 
 unparseTypes :: (SolidString, SolidVM.DefF a) -> String
 unparseTypes (name, SolidVM.Enum {names=names'}) =

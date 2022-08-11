@@ -43,6 +43,7 @@ import           Blockchain.VM.SolidException
 
 data SourceUnitF a = Pragma a Identifier String
                    | Import a Text.Text
+                   | FLUsingDirective Xabi.Using  -- ^ UsingDirective Librarynames (the binded variable or * for insert) isGlobal
                    | NamedXabi Text.Text (XabiF a, [Text.Text])
                    | FLFunc String SolidVM.Func
                    | FLConstant Text.Text SolidVM.ConstantDecl
@@ -158,6 +159,25 @@ solidityFreeFunction = do
     , SolidVM.funcOverload = SolidVM.funcOverload a
     }
 
+
+-- | Parses a using direcetive which takes the form of using MyLibrary for * global; or using MyLibrary for ML, or using {MyLibrary, AnotherLibrary, ADifferentLibrary} for * ;
+solidityUsingDirective :: SolidityParser SourceUnit
+solidityUsingDirective = do
+  ~(a, (identArr, bindName, isGlobal)) <- withPosition $ do
+    reserved "using"
+    identArr <- (braces $ sepBy1 identifier (reserved ",")) <|> (identifier >>= (\x -> return [x]))
+    reserved "for"
+    bindName <- do { reserved "*"; return Nothing} <|> (identifier >>= (\x -> return $ Just $ Text.pack $ x)) -- Ahh! Semi-colons in Haskell!? an abomonation of programming style!
+    isGlobal <- option False $ do
+      reserved "global"
+      return True
+    semi
+    return (map Text.pack identArr, bindName, isGlobal)
+  return $ FLUsingDirective $ Xabi.Using identArr bindName isGlobal a
+    
+
+
+
 data Declaration =
   FuncDeclaration SolidVM.Func
   | ConstructorDeclaration SolidVM.Func
@@ -187,11 +207,13 @@ solidityDeclaration free =
 solidityInterfaceDeclaration :: SolidityParser (String, Declaration)
 solidityInterfaceDeclaration =
   functionDeclaration False False True False <|> --freeFunc allowContents allowNonPureOrView allowConstructor
-  modifierDeclaration  
+  modifierDeclaration <|>
+  eventDeclaration 
+
 
 solidityLibraryDeclaration :: SolidityParser (String, Declaration)
 solidityLibraryDeclaration =
-  functionDeclaration False False False True <|> --freeFunc allowContents allowNonPureOrView allowConstructor
+  functionDeclaration False True False True <|> --freeFunc allowContents allowNonPureOrView allowConstructor
   modifierDeclaration <|>
   structDeclaration <|>
   enumDeclaration <|>
@@ -280,17 +302,17 @@ enumDeclaration = do
 
 usingDeclaration :: SolidityParser (String, Declaration)
 usingDeclaration = do
-  ~(a, (usingContract', rest)) <- withPosition $ do
+  ~(a, (identArr, bindName, isGlobal)) <- withPosition $ do
     reserved "using"
-    usingContract' <- identifier
-    rest <- many1 (noneOf ";")
+    identArr <- braces $ sepBy1 identifier (reserved ",") <|> (identifier >>= (\x -> return [x]))
+    reserved "for"
+    bindName <- do { reserved "*"; return Nothing} <|> (identifier >>= (\x -> return $ Just $ Text.pack $ x)) -- Ahh! Semi-colons in Haskell!? an abomonation of programming style!
+    isGlobal <- option False $ do
+      reserved "global"
+      return True
     semi
-    pure (usingContract', rest)
-  return
-    (
-      usingContract',
-      UsingDeclaration (Xabi.Using rest a)
-    )
+    return (map Text.pack identArr, bindName, isGlobal)
+  return $ ("useless String" , UsingDeclaration $ Xabi.Using identArr bindName isGlobal a)
 
 {- Variables -}
 
