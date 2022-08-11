@@ -1155,8 +1155,7 @@ runStatement (CC.TryCatchStatement tryBlock catchBlockMap _) = do
         Left ex -> do
           res1 <- solidVMExceptionHandler catchBlockMap ex
           return res1
-        Right res -> 
-          return res
+        Right res -> return res
 
 runStatement (CC.IfStatement condition code' maybeElseCode pos) = do
   solidVMBreakpoint pos

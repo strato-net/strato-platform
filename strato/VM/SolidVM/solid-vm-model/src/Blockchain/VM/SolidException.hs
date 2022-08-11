@@ -72,7 +72,7 @@ data SolidException = TypeError String String
                     | ImmutableError String String
                     deriving (Eq, Exception, Generic, NFData)
 
-instance Show (SolidException) where
+instance Show SolidException where
   show = showSolidException
 
 showSolidException :: SolidException -> String
@@ -130,7 +130,6 @@ missingField = toThrower MissingField
 customError :: String -> String -> [B.BasicValue] -> a
 customError msg nm vals = throw $ CustomError msg nm vals
 
--- MissingType :: String -> String -> SolidException
 missingType :: (Show v) => String -> v -> a
 missingType = toThrower MissingType
 

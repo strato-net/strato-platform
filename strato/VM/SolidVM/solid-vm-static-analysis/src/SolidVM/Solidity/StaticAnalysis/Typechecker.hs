@@ -1069,7 +1069,6 @@ statementHelper (IfStatement cond thens mElse x) = do
   ts <- statementsHelper' x thens
   es <- statementsHelper' x $ fromMaybe [] mElse
   pure $ reduceType' x [cs, ts, es]
--- [[(("ten",IndexedType {indexedTypeIndex = 0, indexedTypeType = Int {signed = Just True, bytes = Nothing}},(line 5, column 3) - (line 5, column 39): "" ),"vall"),(("message",IndexedType {indexedTypeIndex = 1, indexedTypeType = String {dynamic = Just True}},(line 5, column 3) - (line 5, column 39): "" ),"mes")]]
 statementHelper (TryCatchStatement tryStatmenets catchMap x) = do
   cc <- asks codeCollection
   cntrct <- asks contract

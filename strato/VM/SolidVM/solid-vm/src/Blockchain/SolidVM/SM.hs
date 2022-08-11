@@ -398,7 +398,7 @@ getVariableOfName name = do
       vars = localVariables currentCallInfo
       t s v = ('x':s, v) `seq` v
 
-  -- when (name == "vall") (internalError "M. Night Shyamalan presents" currentCallInfo)
+  -- when (name == "theSixthSense") (internalError "M. Night Shyamalan presents" currentCallInfo)
 
   let maybeLocalValue = fmap snd $ M.lookup name vars
 
