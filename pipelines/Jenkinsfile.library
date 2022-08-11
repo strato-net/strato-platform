@@ -122,7 +122,7 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
         clientID = nodeData.BEANSTALK.OAUTH_CLIENT_ID
         clientSecret = nodeData.BEANSTALK.OAUTH_CLIENT_SECRET
         oauthDiscovery = nodeData.BEANSTALK.OAUTH_DISCOVERY_URL
-      } else if(appName == 'traceharvest'){
+      } else {
         clientID = nodeData.TRACE_HARVEST.OAUTH_CLIENT_ID
         clientSecret = nodeData.TRACE_HARVEST.OAUTH_CLIENT_SECRET
         oauthDiscovery = nodeData.TRACE_HARVEST.OAUTH_DISCOVERY_URL
@@ -139,7 +139,7 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
         OAUTH_CLIENT_ID=${clientID} \\
         OAUTH_CLIENT_SECRET=${clientSecret} \\
         PASSWORD=123 \\
-        networkID=626215449760442664846046757045283926825965623186344308 \\
+        networkID=65621542345237603456243525965623186344308 \\
         ssl=true \\
         sslCertFileType=pem \\
         NODE_HOST="${nodeData.HOST}:${nodeData.PORT}" \\
@@ -168,7 +168,7 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
         returnStdout: true,
         script: "sudo ./strato --get-address"
     ).trim()
-    sh "echo '# Address: ${nodeAddress}' >> run.sh"
+    sh "echo '\n# Address: ${nodeAddress}' >> run.sh"
     
     // Save node's public key into file (for future reference)
     def nodePubKey = sh(
@@ -190,7 +190,12 @@ def runAppBootNode(nodeData, wipeApp = null, refspec = null, postgresViewsPrefix
   ]) {
     
     sh 'sudo rm -rf beanstalk'
-    sh "git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/beanstalk.git -b develop"
+    
+    if(appName == 'traceharvest') {
+        sh "git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/beanstalk.git -b trace-harvest-demo"
+    } else {
+        sh "git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/beanstalk.git -b develop"
+    }
 
     dir('beanstalk') {
       sh 'git fetch'
@@ -247,7 +252,7 @@ export AWS_SQS_URL='https://sqs.us-east-1.amazonaws.com/406773134706/beanstalk-i
 
 docker-compose up -d --build
           """
-        } else if(appName == 'traceharvest'){
+        } else {
           writeFile file: "run-app.sh", text: """#!/bin/bash
 set -e
 

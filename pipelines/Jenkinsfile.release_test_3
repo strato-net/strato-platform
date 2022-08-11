@@ -186,7 +186,7 @@ pipeline {
             // agent { label "multinode101" } // is default
             steps {
                 script {
-                    rootNodeAddress = lib.runAppBootNode(NODE_DATA.NODE1, true, null, null, 'traceharvest')
+                    lib.runAppBootNode(NODE_DATA.NODE1, true, null, null, 'traceharvest')
                 }
             }
         }
@@ -195,10 +195,17 @@ pipeline {
             // agent { label "multinode101" } // is default
             steps {
                 script {
-                    def createChains = sh(
-                        returnStdout: true,
-                        script: "sudo timeout 60s docker exec beanstalk_backend_1 npm run deploy:csv"
-                    ).trim
+                    def successExitCodes = [0, 124]
+                    def exitCode = sh(returnStatus: true, script: "sudo timeout 60s docker exec beanstalk_backend_1 npm run deploy:csv")
+                    if (!successExitCodes.contains(exitCode)) {
+                      echo "failure in csv deployment"
+                      currentBuild.result = 'FAILURE'
+                      sh "exit 1"
+                    }
+                    // def createChains = sh(
+                    //     returnStdout: true,
+                    //     script: "sudo timeout 60s docker exec beanstalk_backend_1 npm run deploy:csv"
+                    // ).trim
                     // sh "createChains=$(sudo docker exec beanstalk_backend_1 npm run deploy:csv)"
                     // sh "export -f createChains"
                     // sh "timeout 60s bash -c createChains"
@@ -210,11 +217,11 @@ pipeline {
             // agent { label "multinode101" } // is default
             steps {
                 script {
-                    def numOfPrivChains = sh(
+                    int numOfPrivChains = sh(
                         returnStdout: true,
                         script: "sudo docker exec strato_postgres_1 psql -U postgres -d `sudo docker exec strato_postgres_1 psql -U postgres -t -c \"select datname from pg_database where datname like '%eth_%';\" | tr -d \"[:space:]\"` -t -c \"select count(*) from chain_info_ref;\" | tr -d -c 0-9"
                     ).trim()
-
+                    echo "${numOfPrivChains}"
                     if(numOfPrivChains == 0) {
                         assert condition : "Build failed to create private chains"
                     }
@@ -227,18 +234,20 @@ pipeline {
             steps {
                 script {
                     node5Address = lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE5, 'traceharvest', false)
-                    node5Pubkey = readFile(file: 'publicKey')
+                    dir('strato-getting-started') {
+                        node5Pubkey = readFile(file: 'publicKey')
+                    }
                 }
             }
         }
 
         stage('Upgrade w/ node chain data - Add new node to private chain') {
-            agent { label "test-multinode101" }
+            // agent { label "multinode101" } // is default
             steps {
                 script {
                     def accessToken = sh(
                         returnStdout: true,
-                        script: "curl -s -X POST 'https://keycloak.blockapps.net/auth/realms/traceharvest-demo-tech/protocol/openid-connect/token' -H 'Content-Type: application/x-www-form-urlencoded' -H 'Authorization: Basic dGhkZW1vLXRlY2g6ZjY3Y2I0MWMtMGFjMC00N2FjLWE1OWYtMmFkZWQxN2IwMzI1' --data-urlencode 'grant_type=password' --data-urlencode 'username=tech1' --data-urlencode 'password=123'"
+                        script: "curl -s -X POST 'https://keycloak.blockapps.net/auth/realms/traceharvest-demo-tech/protocol/openid-connect/token' -H 'Content-Type: application/x-www-form-urlencoded' -H 'Authorization: Basic dGhkZW1vLXRlY2g6ZjY3Y2I0MWMtMGFjMC00N2FjLWE1OWYtMmFkZWQxN2IwMzI1' --data-urlencode 'grant_type=password' --data-urlencode 'username=tech1' --data-urlencode 'password=123' | jq -r .access_token"
                     ).trim()
 
                     def privChainId = sh(
@@ -273,11 +282,11 @@ pipeline {
             agent { label "test-multinode301" }
             steps {
                 script {
-                    def numOfPrivChains = sh(
+                    int numOfPrivChains = sh(
                         returnStdout: true,
                         script: "sudo docker exec strato_postgres_1 psql -U postgres -d `sudo docker exec strato_postgres_1 psql -U postgres -t -c \"select datname from pg_database where datname like '%eth_%';\" | tr -d \"[:space:]\"` -t -c \"select count(*) from chain_info_ref;\" | tr -d -c 0-9"
                     ).trim()
-
+                    echo "${numOfPrivChains}"
                     if(numOfPrivChains == 0) {
                         assert condition : "Build failed to add Node 5 to private chain"
                     }
@@ -300,7 +309,7 @@ pipeline {
                 dir('strato-getting-started') {
                     script {
                         sh 'sudo ./strato --drop-chains'
-                        lib.deployStratoWithApp(null, NODE_DATA.NODE4, 'beanstalk', false)
+                        lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE4, 'traceharvest', false)
                         sh 'until curl --silent localhost:8080; do sleep 1; done'
                         sh 'sudo docker ps'
                         lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
@@ -315,7 +324,7 @@ pipeline {
                 dir('strato-getting-started') {
                     script {
                         sh 'sudo ./strato --drop-chains'
-                        lib.deployStratoWithApp(null, NODE_DATA.NODE3, 'beanstalk', false)
+                        lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE3, 'traceharvest', false)
                         sh 'until curl --silent localhost:8080; do sleep 1; done'
                         sh 'sudo docker ps'
                         lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
@@ -330,7 +339,7 @@ pipeline {
                 dir('strato-getting-started') {
                     script {
                         sh 'sudo ./strato --drop-chains'
-                        lib.deployStratoWithApp(null, NODE_DATA.NODE2, 'beanstalk', false)
+                        lib.deployStratoWithApp(rootNodeAddress, NODE_DATA.NODE2, 'traceharvest', false)
                         sh 'until curl --silent localhost:8080; do sleep 1; done'
                         sh 'sudo docker ps'
                         lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
@@ -340,12 +349,12 @@ pipeline {
         }
 
         stage('Upgrade w/ node chain data - Upgrade Node 1') {
-            agent { label "test-multinode101" }
+            // agent { label "multinode101" } // is default
             steps {
                 dir('strato-getting-started') {
                     script {
-                        sh 'sudo ./strato --drop-chains'
-                        lib.deployStratoWithApp(null, NODE_DATA.NODE1, 'beanstalk', false)
+                        sh 'sudo ./strato --drop-chains -f'
+                        lib.deployStratoWithApp(null, NODE_DATA.NODE1, 'traceharvest', false)
                         sh 'until curl --silent localhost:8080; do sleep 1; done'
                         sh 'sudo docker ps'
                         lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
@@ -355,13 +364,14 @@ pipeline {
         }
 
         stage('Upgrade w/ node chain data - Confirm Chain Sync was Successful') {
+            // agent { label "multinode101" } // is default
             steps {
                 script{
-                    def numOfPrivChains = sh(
+                    int numOfPrivChains = sh(
                         returnStdout: true,
                         script: "sudo docker exec strato_postgres_1 psql -U postgres -d `sudo docker exec strato_postgres_1 psql -U postgres -t -c \"select datname from pg_database where datname like '%eth_%';\" | tr -d \"[:space:]\"` -t -c \"select count(*) from chain_info_ref;\" | tr -d -c 0-9"
                     ).trim()
-
+                    echo "${numOfPrivChains}"
                     if(numOfPrivChains != 1) {
                         assert condition : "Build failed to sync private chains"
                     }
@@ -419,7 +429,7 @@ pipeline {
                 script {
                     def accessToken = sh(
                         returnStdout: true,
-                        script: "curl -s -X POST 'https://keycloak.blockapps.net/auth/realms/traceharvest-demo-tech/protocol/openid-connect/token' -H 'Content-Type: application/x-www-form-urlencoded' -H 'Authorization: Basic dGhkZW1vLXRlY2g6ZjY3Y2I0MWMtMGFjMC00N2FjLWE1OWYtMmFkZWQxN2IwMzI1' --data-urlencode 'grant_type=password' --data-urlencode 'username=tech1' --data-urlencode 'password=1234' | jq -r .access_token"
+                        script: "curl -s -X POST 'https://keycloak.blockapps.net/auth/realms/traceharvest-demo-tech/protocol/openid-connect/token' -H 'Content-Type: application/x-www-form-urlencoded' -H 'Authorization: Basic dGhkZW1vLXRlY2g6ZjY3Y2I0MWMtMGFjMC00N2FjLWE1OWYtMmFkZWQxN2IwMzI1' --data-urlencode 'grant_type=password' --data-urlencode 'username=tech1' --data-urlencode 'password=123' | jq -r .access_token"
                     ).trim()
                     def createUser = sh(
                         returnStdout: true,
@@ -432,7 +442,7 @@ pipeline {
                             -H \"Authorization: Bearer ${accessToken}\"  \
                             -H 'Accept: application/json;charset=utf-8' \
                             -H 'Content-Type: application/json' \
-                            --data-binary '{\"txs\":[{\"payload\":{\"contract\":\"SimpleStorage\",\"src\":\"pragma solidvm 3.0; contract SimpleStorage {\n  uint storedData;\n\n  function SimpleStorage() {\n    storedData = 1;\n  }\n\n  function set(uint x) {\n    storedData = x;\n  }\n\n  function get() constant returns (uint) {\n    return storedData;\n  }\n}\n\",\"args\":{},\"metadata\":{\"VM\":\"SolidVM\",\"history\":\"SimpleStorage\",\"index\":\"SimpleStorage\"}},\"type\":\"CONTRACT\"}]}' | grep Success"
+                            --data-binary '{\"txs\":[{\"payload\":{\"contract\":\"SimpleStorage\",\"src\":\"pragma solidvm 3.0; contract SimpleStorage {  uint storedData;  function SimpleStorage() {    storedData = 1;  }  function set(uint x) {    storedData = x;  }  function get() constant returns (uint) {    return storedData;  }}\",\"args\":{},\"metadata\":{\"VM\":\"SolidVM\",\"history\":\"SimpleStorage\",\"index\":\"SimpleStorage\"}},\"type\":\"CONTRACT\"}]}' | jq -r .[0].status"
                     ).trim()
                     if(txResponse != 'Success') {
                         assert condition : "Build failed to accept new Transaction"
@@ -444,6 +454,7 @@ pipeline {
         }
 
         stage('Add/Remove Node on an Upgraded Network - Vote Out and Remove Node from Network') {
+            // agent { label "multinode101" } // is default
             steps {
                 dir('strato-getting-started') {
                     script{
@@ -494,11 +505,12 @@ pipeline {
         }
 
         stage('Add/Remove Node on an Upgraded Network - Confirm Network Syncs after Voted out Node shuts off') {
+            // agent { label "multinode101" } // is default
             steps {
                 script {
                     def accessToken = sh(
                         returnStdout: true,
-                        script: "curl -s -X POST 'https://keycloak.blockapps.net/auth/realms/traceharvest-demo-tech/protocol/openid-connect/token' -H 'Content-Type: application/x-www-form-urlencoded' -H 'Authorization: Basic dGhkZW1vLXRlY2g6ZjY3Y2I0MWMtMGFjMC00N2FjLWE1OWYtMmFkZWQxN2IwMzI1' --data-urlencode 'grant_type=password' --data-urlencode 'username=tech1' --data-urlencode 'password=1234' | jq -r .access_token"
+                        script: "curl -s -X POST 'https://keycloak.blockapps.net/auth/realms/traceharvest-demo-tech/protocol/openid-connect/token' -H 'Content-Type: application/x-www-form-urlencoded' -H 'Authorization: Basic dGhkZW1vLXRlY2g6ZjY3Y2I0MWMtMGFjMC00N2FjLWE1OWYtMmFkZWQxN2IwMzI1' --data-urlencode 'grant_type=password' --data-urlencode 'username=tech1' --data-urlencode 'password=123' | jq -r .access_token"
                     ).trim()  
                     def txResponse = sh(
                         returnStdout: true,
@@ -507,7 +519,7 @@ pipeline {
                             -H \"Authorization: Bearer ${accessToken}\"  \
                             -H 'Accept: application/json;charset=utf-8' \
                             -H 'Content-Type: application/json' \
-                            --data-binary '{\"txs\":[{\"payload\":{\"contract\":\"SimpleStorage\",\"src\":\"pragma solidvm 3.0; contract SimpleStorage {\n  uint storedData;\n\n  function SimpleStorage() {\n    storedData = 1;\n  }\n\n  function set(uint x) {\n    storedData = x;\n  }\n\n  function get() constant returns (uint) {\n    return storedData;\n  }\n}\n\",\"args\":{},\"metadata\":{\"VM\":\"SolidVM\",\"history\":\"SimpleStorage\",\"index\":\"SimpleStorage\"}},\"type\":\"CONTRACT\"}]}' | grep Success"
+                            --data-binary '{\"txs\":[{\"payload\":{\"contract\":\"SimpleStorage\",\"src\":\"pragma solidvm 3.0; contract SimpleStorage {  uint storedData;  function SimpleStorage() {    storedData = 1;  }  function set(uint x) {    storedData = x;  }  function get() constant returns (uint) {    return storedData;  }}\",\"args\":{},\"metadata\":{\"VM\":\"SolidVM\",\"history\":\"SimpleStorage\",\"index\":\"SimpleStorage\"}},\"type\":\"CONTRACT\"}]}' | jq -r .[0].status"
                     ).trim()
                     if(txResponse != 'Success') {
                         assert condition : "Build failed to accept new Transaction"
@@ -517,7 +529,5 @@ pipeline {
                 }      
             }
         }
-        
-        
     }
 }
