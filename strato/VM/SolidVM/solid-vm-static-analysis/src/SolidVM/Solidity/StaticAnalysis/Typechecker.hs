@@ -519,6 +519,7 @@ typecheckMember (Static (SVMType.Array _ _) x) "length" = pure $ Static (SVMType
 typecheckMember (Static (SVMType.Array t _) x) "push" = pure $ Function (Static t x) (Product [] x) x []
 typecheckMember (Static (SVMType.Array _ _) x) n = pure . bottom $ ("Unknown member of SVMType.Array: " <> labelToText n) <$ x
 typecheckMember (Static (SVMType.Bytes _ _) x) "length" = pure $ Static (SVMType.Int Nothing Nothing) x
+typecheckMember (Static (SVMType.String _) x) "length" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "Util" Nothing) x) "bytes32ToString" = pure $ Function (Static (SVMType.Bytes Nothing (Just 32)) x) (Static (SVMType.String Nothing) x) x []
 typecheckMember (Static (SVMType.UnknownLabel "Util" Nothing) x) "b32" = pure $ Function (Static (SVMType.Bytes Nothing (Just 32)) x) (Static (SVMType.Bytes Nothing (Just 32)) x) x []
 typecheckMember (Static (SVMType.UnknownLabel "string" Nothing) x) "concat" = pure $ Function (stringConcatArgs x) (Static (SVMType.String Nothing) x) x []
@@ -801,11 +802,16 @@ statementsHelper' x stmts = do
       (Just rs, Just (Sum ss)) -> (Just (Sum (NE.cons rs ss)), l) :| rest
       (_, Just ss) -> (Just ss, l) :| rest
   pure anns
-
+-- uint(enum)
+-- uint(int)
+-- uint(string)
+-- uint(string, int)
+-- what kind of type is (string, int)?
 intArgs :: SourceAnnotation Text -> Type'
 intArgs x = Sum $ enumType' x :|
                 [ intType' x
                 , stringType' x
+                , Product [stringType' x, intType' x] x
                 ]
 
 
@@ -906,6 +912,11 @@ payableArgs x = accountType' x
 
 parseCertArgs :: SourceAnnotation Text -> Type'
 parseCertArgs x = stringType' x
+
+-- uint32("oif")
+-- uint64("fi")
+-- uint256()
+-- uint()
 
 getVarType' :: String -> SourceAnnotation Text -> SSS Type'
 getVarType' "this" ctx = pure $ Static (SVMType.Account False) ctx
