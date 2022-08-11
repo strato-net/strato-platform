@@ -268,7 +268,7 @@ export STRATO_NODE_HOST='${nodeData.HOST}:8080'
 export STRATO_LOCAL_IP='172.17.0.1'
 export SSL=true
 export SSL_CERT_TYPE=pem
-export INT_SERVER_URL='https://fake-url
+export INT_SERVER_URL='https://fake-url'
 export INT_SERVER_OAUTH_OPENID_DISCOVERY_URL='https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration'
 export INT_SERVER_OAUTH_CLIENT_ID='dev'
 export INT_SERVER_OAUTH_CLIENT_SECRET='d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f'
@@ -944,13 +944,13 @@ def waitForCirrus() {
 def createContractAndGetContractAddress(NODE_HOST, NODE_PORT, SERVICE_TOKEN) {
  def CONTRACT_ADDRESS = sh(
   returnStdout: true,
-  script: "curl 'https://${NODE_HOST}:${NODE_PORT}/strato/v2.3/transaction?resolve=true' \
-    -X 'POST' \
+  script: "curl -s -X 'POST' \
+    'https://${NODE_HOST}:${NODE_PORT}/strato/v2.3/transaction?resolve=true' \
     -H \"Authorization: Bearer ${SERVICE_TOKEN}\"  \
     -H 'Accept: application/json;charset=utf-8' \
     -H 'Content-Type: application/json' \
-    --data-binary '{\"txs\":[{\"payload\":{\"contract\":\"SimpleStorage\",\"src\":\"pragma solidvm 3.0; contract SimpleStorage {\n  uint storedData;\n\n  function SimpleStorage() {\n    storedData = 1;\n  }\n\n  function set(uint x) {\n    storedData = x;\n  }\n\n  function get() constant returns (uint) {\n    return storedData;\n  }\n}\n\",\"args\":{},\"metadata\":{\"VM\":\"SolidVM\",\"history\":\"SimpleStorage\",\"index\":\"SimpleStorage\"}},\"type\":\"CONTRACT\"}]}' \
-    | jq '.[] | .txResult.contractsCreated'"
+    --data-binary '{\"txs\":[{\"payload\":{\"contract\":\"SimpleStorage\",\"src\":\"pragma solidvm 3.0; contract SimpleStorage {  uint storedData;  function SimpleStorage() {    storedData = 1;  }  function set(uint x) {    storedData = x;  }  function get() constant returns (uint) {    return storedData;  }}\",\"args\":{},\"metadata\":{\"VM\":\"SolidVM\",\"history\":\"SimpleStorage\",\"index\":\"SimpleStorage\"}},\"type\":\"CONTRACT\"}]}' \
+    | jq '.[].txResult.contractsCreated'"
   ).trim()
   return CONTRACT_ADDRESS
  }
@@ -958,12 +958,12 @@ def createContractAndGetContractAddress(NODE_HOST, NODE_PORT, SERVICE_TOKEN) {
 def getContractBlockNumber(NODE_HOST, NODE_PORT, CONTRACT_ADDRESS, SERVICE_TOKEN) {
  def BLOCK_NUMBER = sh(
   returnStdout: true,
-  script: "curl -X 'GET' \
+  script: "curl -s -X 'GET' \
     \"https://${NODE_HOST}:${NODE_PORT}/cirrus/search/SimpleStorage?address=eq.${CONTRACT_ADDRESS}\" \
     -H \"Authorization: Bearer ${SERVICE_TOKEN}\"  \
     -H 'Accept: application/json;charset=utf-8' \
     -H 'Content-Type: application/json;charset=utf-8' \
-    | jq '.[] | .block_number'"
+    | jq -r '.[].block_number'"
   ).trim()
   return BLOCK_NUMBER
  }

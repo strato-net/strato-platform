@@ -11,8 +11,6 @@ pipeline {
             ' - "X.Y.Z" (i.e. "7.5.0") - for specific public release version\n' +
             ' - "branch_name/build_number" (i.e. "develop/206") - for the custom build of STRATO_autobuild multibranch job in Jenkins.'
         )
-        string(name: 'BEANSTALK_LOADTEST_BATCH_SIZE', defaultValue: '25', description: 'Number of agreements in a single batch in load test')
-        string(name: 'BEANSTALK_LOADTEST_BATCH_COUNT', defaultValue: '5', description: 'Number of batches to create in load test')
     }
 
     stages {
