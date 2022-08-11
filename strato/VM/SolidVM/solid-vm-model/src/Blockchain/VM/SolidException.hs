@@ -11,6 +11,7 @@ module Blockchain.VM.SolidException
   , internalError
   , invalidArguments
   , missingField
+  , customError
   , missingType
   , duplicateDefinition
   , parseError
@@ -41,12 +42,13 @@ import Data.Aeson (ToJSON, FromJSON)
 import GHC.Generics
 import Text.Printf (printf)
 
-data SolidException = TypeError String String
+data SolidException a = TypeError String String
                     | InternalError String String
                     | InvalidArguments String String
                     | IndexOutOfBounds String String
                     | TODO String String
                     | MissingField String String
+                    | CustomError String String a
                     | MissingType String String
                     | DuplicateDefinition String String
                     | ArityMismatch String Int Int
@@ -70,10 +72,10 @@ data SolidException = TypeError String String
                     | ImmutableError String String
                     deriving (Eq, Exception, Generic, NFData, ToJSON, FromJSON)
 
-instance Show SolidException where
+instance Show (SolidException a) where
   show = showSolidException
 
-showSolidException :: SolidException -> String
+showSolidException :: SolidException a -> String
 showSolidException (ArityMismatch m got want) = printf "arity mismatch: %s: got %d, want %d" m got want
 showSolidException (InternalError m v) = printf "internal error: %s: %s" m v
 showSolidException (InvalidArguments m v) = printf "invalid arguments: %s: %s" m v
@@ -86,6 +88,7 @@ showSolidException (ModifierError m v) = printf "modifier error: %s: %s" m v
 showSolidException (Require Nothing) = printf "solidity require failed"
 showSolidException (Require (Just m)) = printf "solidity require failed: %s" m
 showSolidException Assert = printf "solidity assert failed"
+showSolidException (CustomError m v _) = printf "custom user error: %s %s" m v
 showSolidException (TODO m v) = printf "Unimplemented feature in SolidVM: %s: %s" m v
 showSolidException (TypeError a b) = printf "type error: %s: %s" a b
 showSolidException (UnknownConstant a b) = printf "unknown constant: %s: %s" a b
@@ -103,7 +106,7 @@ showSolidException (PaymentError a b) = printf "There was an error sending %s we
 showSolidException (ReservedWordError a b) = printf "%s is a reserved word in version %s and up." b a
 showSolidException (ImmutableError a b) = printf "%s is an immutable variable in line '%s'" a b
 
-toThrower :: (Show v) => (String -> String -> SolidException) -> String -> v -> a
+toThrower :: (Show v) => (String -> String -> SolidException a) -> String -> v -> a
 toThrower cont msg = throw . cont msg . show
 
 typeError :: (Show v) => String -> v -> a
@@ -123,6 +126,9 @@ indexOutOfBounds = toThrower IndexOutOfBounds
 
 missingField :: (Show v) => String -> v -> a
 missingField = toThrower MissingField
+
+customError :: (Show v) => String -> v -> a -> b
+customError a = toThrower $ CustomError a
 
 missingType :: (Show v) => String -> v -> a
 missingType = toThrower MissingType

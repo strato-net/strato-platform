@@ -114,6 +114,10 @@ anyDivideByZeroError :: Selector HandledException
 anyDivideByZeroError (HE Blockchain.SolidVM.Exception.DivideByZero{}) = True
 anyDivideByZeroError _ = False
 
+anyCustomError :: Selector HandledException
+anyCustomError (HE Blockchain.SolidVM.Exception.CustomError{}) = True
+anyCustomError _ = False
+
 anyMissingTypeError :: Selector HandledException
 anyMissingTypeError (HE Blockchain.SolidVM.Exception.MissingType{}) = True
 anyMissingTypeError _ = False
@@ -5220,12 +5224,11 @@ contract qq {
   }
 }|]
 
-  it "can throw custom errors" . runTest $ do
+  it "can throw custom errors" $ runTest ( do
     runBS [r|
 pragma solidvm 3.3;
 
 contract qq {
-  string myString;
   error myError (string message);
   constructor() {
     throwsError();
@@ -5233,7 +5236,40 @@ contract qq {
   
   function throwsError() {
     throw myError("lmao pranked");
-    myString = "lmao pranked";
+  }
+}|])  `shouldThrow` anyCustomError
+
+  it "can catch custom errors the SOLIDVM WAY" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+
+contract qq {
+  error IsTen (int ten, string message);
+  int val;
+  string myString;
+
+  constructor() {
+    setVal(10);
+    setString();
+  }
+
+  function checkTen(int _val) returns (int) {
+     if (_val == 10) {
+        throw IsTen(_val, "Stop trying to make ten happen, its not going to happen"); 
+     }
+     return _val;
+  }
+
+  function setString() {
+    myString = "hello";
+  }
+
+  function setVal(int _val) returns (int) {
+     try {
+        val = checkTen(_val);
+     } catch IsTen(vall, mes) { 
+        val = vall + 1;
+     }
   }
 }|]
-    getFields ["myString"] `shouldReturn` [BDefault]
+    getFields ["val"] `shouldReturn` [BInteger 11]

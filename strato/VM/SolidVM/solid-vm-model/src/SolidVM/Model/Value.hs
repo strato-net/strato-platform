@@ -110,6 +110,7 @@ data Value =
   | SBuiltinFunction SolidString (Maybe Value)
   | SBuiltinVariable SolidString
   | SSetterGetter String (Maybe Value)
+  | SError String String
   | SContractDef SolidString
   | SContractItem NamedAccount SolidString
   | SContract SolidString NamedAccount
