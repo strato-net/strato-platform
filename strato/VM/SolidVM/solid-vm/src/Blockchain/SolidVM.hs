@@ -1151,8 +1151,6 @@ runStatement (CC.TryCatchStatement tryBlock catchBlockMap _) = do
       mRes <- EUnsafe.try $ do
         val <- runStatements tryBlock
         pure $ val
-      callInfo <- getCurrentCallInfo
-      when (True) (internalError "stuff" callInfo)
       case mRes of
         Left ex -> do
           res1 <- solidVMExceptionHandler catchBlockMap ex
@@ -1255,7 +1253,6 @@ runStatement (CC.Return maybeExpression pos) = do
 
 runStatement (CC.Throw expr _) = do
   ctract <- getCurrentContract
-  (_, cc) <- getCurrentCodeCollection
   if (CC._vmVersion ctract /= "svm3.3")
     then unknownStatement "Throw statements are not supported below pragma solidvm 3.3" expr
     else do
@@ -1263,18 +1260,13 @@ runStatement (CC.Throw expr _) = do
         case expr of
           CC.FunctionCall _ (CC.Variable _ n) a -> pure (n, a) 
           _ -> invalidArguments "Invalid argument for throw." expr
-      errDec <- case M.lookup name $ CC._errors ctract of
-        Just e -> pure $ e 
-        Nothing -> case M.lookup name $ CC._flErrors cc of
-          Just e -> pure $ e 
-          Nothing -> invalidArguments "Invalid error type." name
       argVals <- case args of
         CC.OrderedArgs as -> OrderedVals <$> mapM (getVar <=< expToVar) as
         CC.NamedArgs ns -> NamedVals <$> mapM (mapM $ getVar <=< expToVar) ns
-      _ <- case argVals of
-        OrderedVals ov -> mapM (\((x, (CC.IndexedType _ b), _), z) -> addLocalVariable b x z) $ zip errDec ov
-        NamedVals nv -> mapM (\((w, (CC.IndexedType _ b), _), (_, z)) -> addLocalVariable b w z) $ zip errDec nv
-      customError "Custom user error thrown" name
+      let listOfVals = case argVals of
+            OrderedVals ov -> map (\x -> toBasic x) ov
+            NamedVals nv -> map (\(_, y) -> toBasic y) nv
+      customError "Custom user error thrown" name listOfVals
 
 runStatement (CC.AssemblyStatement (CC.MloadAdd32 dst src) pos) = do
   solidVMBreakpoint pos
@@ -3123,11 +3115,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
       let (lhs,rhs) = foldr (\(a,b) (c,d) -> (a++c,b++d)) ([],[]) (map (span isNotModExec) modContentsList)
       logVals lhs rhs
       _ <- runStatements' lhs
-      val   <- do
-        res <- runStatements commands
-        case res of 
-          Just (SError msg nm) -> customError msg nm
-          _ -> pure $ res
+      val   <- runStatements commands
       _ <- runStatements' rhs
 
       let findNamedReturns = do
@@ -3532,11 +3520,25 @@ solidVMExceptionHandler catchBlockMap ex = case ex of
         Just (_, block) -> do
           res <- runStatements block
           return res
-    (CustomError s1 s2) -> do
+    (CustomError s1 s2 vals) -> do
       let name = T.unpack $ T.replace "\"" "" $ T.pack s2
       case M.lookup name catchBlockMap of
-        Nothing -> customError s1 name
-        Just (_, block) -> do
+        Nothing -> customError s1 name vals
+        Just (args, block) -> do
+          ctract <- getCurrentContract
+          (_, cc) <- getCurrentCodeCollection
+          let basicToVals = map (\x -> fromBasic x) vals
+              zipped = case M.lookup name $ CC._errors ctract of
+                        Just e -> zip e basicToVals 
+                        Nothing -> case M.lookup name $ CC._flErrors cc of
+                          Just e -> zip e basicToVals 
+                          Nothing -> invalidArguments "Invalid error type." name
+              argsToSolidString = case args of
+                Just a -> map stringToLabel a
+                Nothing -> []
+          _ <- if length args > 0
+                then mapM (\(x, ((_, (CC.IndexedType _ y), _), z)) -> addLocalVariable y x z) $ zip argsToSolidString zipped
+                else pure $ [()]
           res <- runStatements block
           return res
       

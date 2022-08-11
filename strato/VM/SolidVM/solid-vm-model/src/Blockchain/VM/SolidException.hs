@@ -38,17 +38,17 @@ import Control.DeepSeq
 import Control.Exception (throw, throwIO, Exception)
 import Control.Monad (unless, when)
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Data.Aeson (ToJSON, FromJSON)
 import GHC.Generics
 import Text.Printf (printf)
+import qualified SolidVM.Model.Storable as B
 
-data SolidException a = TypeError String String
+data SolidException = TypeError String String
                     | InternalError String String
                     | InvalidArguments String String
                     | IndexOutOfBounds String String
                     | TODO String String
                     | MissingField String String
-                    | CustomError String String a
+                    | CustomError String String [B.BasicValue]
                     | MissingType String String
                     | DuplicateDefinition String String
                     | ArityMismatch String Int Int
@@ -70,12 +70,12 @@ data SolidException a = TypeError String String
                     | PaymentError String String
                     | ReservedWordError String String
                     | ImmutableError String String
-                    deriving (Eq, Exception, Generic, NFData, ToJSON, FromJSON)
+                    deriving (Eq, Exception, Generic, NFData)
 
-instance Show (SolidException a) where
+instance Show (SolidException) where
   show = showSolidException
 
-showSolidException :: SolidException a -> String
+showSolidException :: SolidException -> String
 showSolidException (ArityMismatch m got want) = printf "arity mismatch: %s: got %d, want %d" m got want
 showSolidException (InternalError m v) = printf "internal error: %s: %s" m v
 showSolidException (InvalidArguments m v) = printf "invalid arguments: %s: %s" m v
@@ -106,7 +106,7 @@ showSolidException (PaymentError a b) = printf "There was an error sending %s we
 showSolidException (ReservedWordError a b) = printf "%s is a reserved word in version %s and up." b a
 showSolidException (ImmutableError a b) = printf "%s is an immutable variable in line '%s'" a b
 
-toThrower :: (Show v) => (String -> String -> SolidException a) -> String -> v -> a
+toThrower :: (Show v) => (String -> String -> SolidException) -> String -> v -> a
 toThrower cont msg = throw . cont msg . show
 
 typeError :: (Show v) => String -> v -> a
@@ -127,9 +127,10 @@ indexOutOfBounds = toThrower IndexOutOfBounds
 missingField :: (Show v) => String -> v -> a
 missingField = toThrower MissingField
 
-customError :: (Show v) => String -> v -> a -> b
-customError a = toThrower $ CustomError a
+customError :: String -> String -> [B.BasicValue] -> a
+customError msg nm vals = throw $ CustomError msg nm vals
 
+-- MissingType :: String -> String -> SolidException
 missingType :: (Show v) => String -> v -> a
 missingType = toThrower MissingType
 
