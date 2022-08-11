@@ -122,7 +122,7 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
         clientID = nodeData.BEANSTALK.OAUTH_CLIENT_ID
         clientSecret = nodeData.BEANSTALK.OAUTH_CLIENT_SECRET
         oauthDiscovery = nodeData.BEANSTALK.OAUTH_DISCOVERY_URL
-      } else {
+      } else if(appName == 'traceharvest'){
         clientID = nodeData.TRACE_HARVEST.OAUTH_CLIENT_ID
         clientSecret = nodeData.TRACE_HARVEST.OAUTH_CLIENT_SECRET
         oauthDiscovery = nodeData.TRACE_HARVEST.OAUTH_DISCOVERY_URL
@@ -247,7 +247,7 @@ export AWS_SQS_URL='https://sqs.us-east-1.amazonaws.com/406773134706/beanstalk-i
 
 docker-compose up -d --build
           """
-        } else {
+        } else if(appName == 'traceharvest'){
           writeFile file: "run-app.sh", text: """#!/bin/bash
 set -e
 
