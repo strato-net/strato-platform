@@ -18,6 +18,8 @@ import           Data.Text                            (Text)
 import qualified Data.Text                            as Text
 import           Data.Source
 
+import           Control.DeepSeq
+
 import           GHC.Generics
 
 import           Text.Parsec
@@ -47,7 +49,7 @@ data SourceUnitF a = Pragma a Identifier String
                    | FLStruct Text.Text SolidVM.Def
                    | FLEnum Text.Text SolidVM.Def
                    | DummySourceUnit
-                   deriving (Eq, Show, Generic, Functor)
+                   deriving (Eq, Show, Generic, NFData, Functor)
 
 type SourceUnit = Positioned SourceUnitF
 
