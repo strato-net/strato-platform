@@ -38,6 +38,7 @@ import           Data.Maybe
 import qualified Data.Map.Strict                       as M
 import qualified Data.Set                              as S
 import qualified Data.Text                             as T
+import           Data.Text.Encoding                    (decodeUtf8)
 import           Data.Void
 import           Text.Printf
 import           UnliftIO.Concurrent                   hiding (yield)
@@ -49,6 +50,7 @@ import           Blockchain.Constants                  hiding (ethVersion)
 import           Blockchain.Context                    hiding (Inbound, Outbound)
 import           Blockchain.Data.Block
 import           Blockchain.Data.Control               (P2PCNC(..))
+import           Blockchain.Data.ChainInfo             (UnsignedChainInfo(..))
 import           Blockchain.Data.RLP
 import           Blockchain.Data.PubKey                (pointToSecPubKey)
 import           Blockchain.Data.Wire                  as W
@@ -196,14 +198,15 @@ handleMsgClientConduit myId peer = do
 
                 -- Approval of client will be satisfied when the chain details arrive
                 -- re-create mapping of (orgName, orgUnit) -> received chain Ids
+                -- use chainInfo metadata to map?
                 -- great success
-                -- let peerPub' = pointToSecPubKey $ fromMaybe (error "where da pubkey") $ pPeerPubkey peer
-                -- forM_ rcs $ \cs ->         
-                --   when (verifyCert peerPub' cs) $ do
-                --       let subj = (OrgName . BC.pack . subOrg &&& OrgUnit . BC.pack . fromJust . subUnit) . fromJust $ getCertSubject cs -- then send chainID data to node
-                --       cIds <- lift $ S.toList . unOrgNameChains . fromJust <$> A.select (A.Proxy @OrgNameChains) subj
-                --       cInfos <- fmap M.toList . lift $ A.selectMany (A.Proxy @ChainInfo) cIds
-                --       yield . Right $ ChainDetails cInfos
+                let peerPub' = pointToSecPubKey $ fromMaybe (error "where da pubkey") $ pPeerPubkey peer
+                forM_ rcs $ \cs ->
+                  when (verifyCert peerPub' cs) $ do
+                      let subj = (OrgName . BC.pack . subOrg &&& OrgUnit . BC.pack . fromJust . subUnit) . fromJust $ getCertSubject cs -- then send chainID data to node
+                      cIds <- lift $ S.toList . unOrgNameChains . fromJust <$> A.select (A.Proxy @OrgNameChains) subj
+                      cInfos <- fmap M.toList . lift $ A.selectMany (A.Proxy @ChainInfo) cIds
+                      yield . Right $ ChainDetails cInfos
 
                 -- we set to 0 cause we dont necessarily know the number yet
                 lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
@@ -263,12 +266,16 @@ handleMsgServerConduit myPubkey peer = do
               --     lift the (cIds, chainInfos) associated with it
               --     send that out the chain details to the peer
               let peerPub' = pointToSecPubKey $ fromMaybe (error "handleMsgServerConduit - could not derive peer pubkey") $ pPeerPubkey peer
-              forM_ rcs $ \cs ->         
+              forM_ rcs $ \cs ->
                 when (verifyCert peerPub' cs) $ do
-                    let subj = (OrgName . BC.pack . subOrg &&& OrgUnit . BC.pack . fromJust . subUnit) . fromJust $ getCertSubject cs -- then send chainID data to node
-                    cIds <- lift $ S.toList . unOrgNameChains . fromJust <$> A.select (A.Proxy @OrgNameChains) subj
+                    let subj = (OrgName . BC.pack . subOrg &&& OrgUnit . BC.pack . fromJust . subUnit) . fromJust $ getCertSubject cs
+                        subjConcat :: T.Text
+                        subjConcat = T.pack $ BC.unpack (unOrgName (fst subj)) ++ "/" ++ BC.unpack (unOrgUnit (snd subj)) -- (a, b)
+                        organization = "organization"
+                    cIds   <- lift $ S.toList . unOrgNameChains . fromJust <$> A.select (A.Proxy @OrgNameChains) subj
                     cInfos <- fmap M.toList . lift $ A.selectMany (A.Proxy @ChainInfo) cIds
-                    yield . Right $ ChainDetails cInfos
+                    let cInfosWithMetadata = fmap (\x@ChainInfo{chainInfo=ci} -> x{ chainInfo = ci{chainMetadata = M.insert organization subjConcat $ chainMetadata $ chainInfo x } }) <$> cInfos -- 🤢
+                    yield . Right $ ChainDetails cInfosWithMetadata
 
               -- we set to 0 cause we dont necessarily know the number yet
               lift $ Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
