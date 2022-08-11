@@ -5246,3 +5246,31 @@ contract qq {
 }|]
     getFields ["result1", "result2", "result3", "result4"] `shouldReturn` [BInteger 3, BInteger 6, BInteger 1, BInteger 12]
 
+  it "can declare custom errors and file level custom errors" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+error flError(string someString);
+
+contract qq {
+  error myError(uint num);
+  constructor() {
+  }
+}|]
+
+  it "can throw custom errors" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+
+contract qq {
+  string myString;
+  error myError (string message);
+  constructor() {
+    throwsError();
+  }
+  
+  function throwsError() {
+    throw myError("lmao pranked");
+    myString = "lmao pranked";
+  }
+}|]
+    getFields ["myString"] `shouldReturn` [BDefault]

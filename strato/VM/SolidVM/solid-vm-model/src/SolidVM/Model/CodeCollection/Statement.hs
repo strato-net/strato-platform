@@ -42,7 +42,7 @@ data StatementF a =
   | Continue a
   | Break a
   | Return (Maybe (ExpressionF a)) a
-  | Throw a
+  | Throw (ExpressionF a) a
   | ModifierExecutor a
   | EmitStatement String [(Maybe String, (ExpressionF a))] a
   | AssemblyStatement InlineAssembly a
@@ -50,8 +50,8 @@ data StatementF a =
   | RevertStatement (Maybe String) (ArgListF a) a
   | UncheckedStatement [StatementF a] a
   | SolidityTryCatchStatement (ExpressionF a) (Maybe [(String, Type)]) [StatementF a] (Map.Map String (Maybe (String, Type), [StatementF a])) a
-  | TryCatchStatement [StatementF a] (Map.Map String [StatementF a]) a
-  deriving (Show, Eq, Generic, Generic1, NFData, Functor, ToJSON, FromJSON)
+  | TryCatchStatement [StatementF a] (Map.Map String (Maybe [String], [StatementF a])) a
+  deriving (Show, Eq, Generic, Functor, NFData, ToJSON, FromJSON)
 
 
 extractStatement :: StatementF a -> a
@@ -63,7 +63,7 @@ extractStatement (DoWhileStatement _ _ a) = a
 extractStatement (Continue a) = a
 extractStatement (Break a) = a
 extractStatement (Return _ a) = a
-extractStatement (Throw a) = a
+extractStatement (Throw _ a) = a
 extractStatement (EmitStatement _ _ a) = a
 extractStatement (AssemblyStatement _ a) = a
 extractStatement (SimpleStatement _ a) = a

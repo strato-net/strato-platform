@@ -1248,6 +1248,29 @@ runStatement (CC.Return maybeExpression pos) = do
 --      fmap Just $ getVar =<< expToVar e
     Nothing -> return $ Just SNULL
 
+runStatement (CC.Throw expr _) = do
+  ctract <- getCurrentContract
+  (_, cc) <- getCurrentCodeCollection
+  if (CC._vmVersion ctract /= "svm3.3")
+    then unknownStatement "Throw statements are not supported below pragma solidvm 3.3" expr
+    else do
+      (name, args) <- do
+        case expr of
+          CC.FunctionCall _ (CC.Variable _ n) a -> pure (n, a) 
+          _ -> invalidArguments "Invalid argument for throw." expr
+      errDec <- case M.lookup name $ CC._errors ctract of
+        Just e -> pure $ e 
+        Nothing -> case M.lookup name $ CC._flErrors cc of
+          Just e -> pure $ e 
+          Nothing -> invalidArguments "Invalid error type." name
+      argVals <- case args of
+        CC.OrderedArgs as -> OrderedVals <$> mapM (getVar <=< expToVar) as
+        CC.NamedArgs ns -> NamedVals <$> mapM (mapM $ getVar <=< expToVar) ns 
+      _ <- case argVals of
+        OrderedVals ov -> mapM (\((x, (CC.IndexedType _ b), _), z) -> addLocalVariable b x z) $ zip errDec ov
+        NamedVals nv -> mapM (\((w, (CC.IndexedType _ b), _), (_, z)) -> addLocalVariable b w z) $ zip errDec nv
+      pure $ Just SNULL
+
 runStatement (CC.AssemblyStatement (CC.MloadAdd32 dst src) pos) = do
   solidVMBreakpoint pos
   srcVar <- expToVar $ CC.Variable pos $ textToLabel src;
@@ -3400,30 +3423,30 @@ solidityExceptionHandler catchBlockMap ex = do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 25 immutableError
       return res
 
-solidVMExceptionHandler :: (MonadSM m) => (M.Map String [CC.Statement]) -> SolidException -> m (Maybe Value)
+solidVMExceptionHandler :: (MonadSM m) => (M.Map String (Maybe [String], [CC.Statement])) -> SolidException -> m (Maybe Value)
 solidVMExceptionHandler catchBlockMap ex = case ex of
     (InternalError s1 s2) -> do
       case M.lookup "InternalError" catchBlockMap of
         Nothing -> internalError s1 s2
-        Just block -> do
+        Just (_, block) -> do
           res <- runStatements block
           return res
     (InvalidArguments s1 s2) -> 
       case M.lookup "InvalidArguments" catchBlockMap of
         Nothing -> invalidArguments s1 s2
-        Just block -> do
+        Just (_, block) -> do
           res <- runStatements block
           return res
     (IndexOutOfBounds s1 s2) -> 
       case M.lookup "IndexOutOfBounds" catchBlockMap of
         Nothing -> indexOutOfBounds s1 s2
-        Just block -> do
+        Just (_, block) -> do
           res <- runStatements block
           return res
     (ParseError s1 s2) -> 
       case M.lookup "ParseError" catchBlockMap of
         Nothing -> parseError s1 s2
-        Just block -> do
+        Just (_, block) -> do
           res <- runStatements block
           return res
     (Require s1) -> 
@@ -3431,7 +3454,7 @@ solidVMExceptionHandler catchBlockMap ex = case ex of
         Nothing -> do 
           _ <- require False s1
           return Nothing
-        Just block -> do
+        Just (_, block) -> do
           res <- runStatements block
           return res
     (Assert) -> 
@@ -3439,79 +3462,79 @@ solidVMExceptionHandler catchBlockMap ex = case ex of
         Nothing -> do
           _ <- assert False
           return Nothing
-        Just block -> do
+        Just (_, block) -> do
           res <- runStatements block
           return res
     (UnknownFunction s1 s2) -> 
       case M.lookup "UnknownFunction" catchBlockMap of
         Nothing -> unknownFunction s1 s2
-        Just block -> do
+        Just (_, block) -> do
           res <- runStatements block
           return res
     (UnknownConstant s1 s2) -> 
       case M.lookup "UnknownConstant" catchBlockMap of
         Nothing -> unknownConstant s1 s2
-        Just block -> do
+        Just (_, block) -> do
           res <- runStatements block
           return res
     (UnknownVariable s1 s2) -> 
       case M.lookup "UnknownVariable" catchBlockMap of
         Nothing -> unknownVariable s1 s2
-        Just block -> do
+        Just (_, block) -> do
           res <- runStatements block
           return res
     (UnknownStatement s1 s2) -> 
       case M.lookup "UnknownStatement" catchBlockMap of
         Nothing -> unknownStatement s1 s2
-        Just block -> do
+        Just (_, block) -> do
           res <- runStatements block
           return res
     (DivideByZero s1) -> 
       case M.lookup "DivideByZero" catchBlockMap of
         Nothing -> divideByZero s1
-        Just block -> do
+        Just (_, block) -> do
           res <- runStatements block
           return res
     (MissingCodeCollection s1 s2) -> 
       case M.lookup "MissingCodeCollection" catchBlockMap of
         Nothing -> missingCodeCollection s1 s2
-        Just block -> do
+        Just (_, block) -> do
           res <- runStatements block
           return res
     (InaccessibleChain s1 s2) -> 
       case M.lookup "InaccessibleChain" catchBlockMap of
         Nothing -> inaccessibleChain s1 s2
-        Just block -> do
+        Just (_, block) -> do
           res <- runStatements block
           return res
     (InvalidWrite s1 s2) -> 
       case M.lookup "InvalidWrite" catchBlockMap of
         Nothing -> invalidWrite s1 s2
-        Just block -> do
+        Just (_, block) -> do
           res <- runStatements block
           return res
     (InvalidCertificate s1 s2) -> 
       case M.lookup "InvalidCertificate" catchBlockMap of
         Nothing -> invalidCertificate s1 s2
-        Just block -> do
+        Just (_, block) -> do
           res <- runStatements block
           return res
     (MalformedData s1 s2) -> 
       case M.lookup "MalformedData" catchBlockMap of
         Nothing -> malformedData s1 s2
-        Just block -> do
+        Just (_, block) -> do
           res <- runStatements block
           return res
     (TooMuchGas s1 s2) -> 
       case M.lookup "TooMuchGas" catchBlockMap of
         Nothing -> tooMuchGas s1 s2
-        Just block -> do
+        Just (_, block) -> do
           res <- runStatements block
           return res
     (PaymentError s1 s2) ->
       case M.lookup "PaymentError" catchBlockMap of
         Nothing -> paymentError s1 s2
-        Just block -> do
+        Just (_, block) -> do
           res <- runStatements block
           return res
     

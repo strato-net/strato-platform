@@ -72,7 +72,7 @@ statementHelper (TryCatchStatement body catches _) = do
   bs <- statementsHelper' body
   sTry <- get
   put $ M.intersection s sTry
-  css <- forM (M.toList catches) $ \(_, cas) -> do
+  css <- forM (M.toList catches) $ \(_, (_, cas)) -> do
     sCatch <- get
     put $ M.intersection s sCatch
     statementsHelper' cas
@@ -95,7 +95,8 @@ statementHelper (ModifierExecutor _) = pure []
 statementHelper (Break _) = pure []
 statementHelper (Return mExpr _) =
   maybe (pure []) expressionHelper mExpr
-statementHelper (Throw _) = pure []
+statementHelper (Throw e _) =
+  expressionHelper e
 statementHelper (EmitStatement _ vals _) =
   concat <$> traverse (expressionHelper . snd) vals
 statementHelper (RevertStatement _ (OrderedArgs vals) _) =
