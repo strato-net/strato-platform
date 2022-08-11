@@ -11,11 +11,15 @@ module SolidVM.Model.CodeCollection.Function (
   Func,
   StateMutability(..),
   Visibility(..),
+  ModifierF(..),
+  Modifier,
   tShow,
+  tShow',
   tRead
   ) where
 
 import           Control.Lens                 (mapped, (&), (?~))
+import           Control.DeepSeq
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
@@ -27,12 +31,11 @@ import qualified Generic.Random               as GR
 import           GHC.Generics
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
-
 import           SolidVM.Model.CodeCollection.Statement
 import qualified SolidVM.Model.CodeCollection.VarDef  as SolidVM
 import           SolidVM.Model.SolidString
 
-data StateMutability = Pure | Constant | View | Payable deriving (Eq, Ord, Show, Generic)
+data StateMutability = Pure | Constant | View | Payable deriving (Eq, Ord, Show, Generic, NFData)
 
 tShow :: StateMutability -> Text
 tShow Pure = "pure"
@@ -76,9 +79,11 @@ data FuncF a = Func
   , funcContents :: Maybe [StatementF a]
   , funcVisibility :: Maybe Visibility
   , funcConstructorCalls :: Map SolidString [(ExpressionF a)]
-  , funcModifiers :: Maybe [String]
+  , funcModifiers :: [(SolidString, [(ExpressionF a)])]
   , funcContext :: a
-  } deriving (Eq,Show,Generic, Functor)
+  , funcIsFree :: Bool
+  , funcOverload :: [FuncF a]
+  } deriving (Eq,Show, Generic, NFData, Functor)
 
 instance ToJSON a => ToJSON (FuncF a)
 instance FromJSON a => FromJSON (FuncF a)
@@ -89,9 +94,16 @@ data Visibility = Private
                 | Public
                 | Internal
                 | External
-  deriving (Eq,Show,Generic)
+  deriving (Eq,Show,Generic, NFData)
 
-instance ToJSON Visibility
+tShow' :: Visibility -> Text
+tShow' Private = "private"
+tShow' Public = "public"
+tShow' Internal = "internal"
+tShow' External = "external"
+
+instance ToJSON Visibility where
+  toJSON = String . tShow'
 instance FromJSON Visibility
 instance Arbitrary Visibility where arbitrary = GR.genericArbitrary GR.uniform
 instance ToSchema Visibility where
@@ -102,6 +114,23 @@ instance ToSchema Visibility where
     where
       ex :: Visibility
       ex = Public
+
+
+
+data ModifierF a = Modifier
+  { modifierArgs     :: Map Text SolidVM.IndexedType
+  , modifierSelector :: Text
+  , modifierContents :: Maybe [StatementF a]
+  , modifierContext  :: a
+  } deriving (Eq,Show,Generic, NFData, Functor)
+
+type Modifier = Positioned ModifierF
+
+instance ToJSON a => ToJSON (ModifierF a) where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+
+instance FromJSON a => FromJSON (ModifierF a) where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
 
 
 --------------------------------------------------------------------------------

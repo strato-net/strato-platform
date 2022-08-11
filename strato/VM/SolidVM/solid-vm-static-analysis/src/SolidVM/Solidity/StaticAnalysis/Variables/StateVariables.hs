@@ -78,6 +78,15 @@ statementHelper (IfStatement cond thens mElse _) = do
   ts <- statementsHelper thens
   es <- maybe (pure []) statementsHelper mElse
   pure $ concat [cs, ts, es]
+statementHelper (TryCatchStatement try catchMap _) = do
+  ts <- statementsHelper try
+  cs <- statementsHelper (concatMap (snd . snd) (M.toList catchMap))
+  pure $ concat [ts, cs]
+statementHelper (SolidityTryCatchStatement expr _ successStatements catchMap _) = do
+  cs <- expressionHelper expr
+  ts <- statementsHelper successStatements
+  es <- statementsHelper (concatMap (snd . snd) (M.toList catchMap))
+  pure $ concat [cs, ts, es]
 statementHelper (WhileStatement cond body _) = do
   cs <- expressionHelper cond
   bs <- statementsHelper body
@@ -94,10 +103,12 @@ statementHelper (DoWhileStatement body cond _) = do
   bs <- statementsHelper body
   pure $ concat [bs, cs]
 statementHelper (Continue _) = pure []
+statementHelper (ModifierExecutor _) = pure []
 statementHelper (Break _) = pure []
 statementHelper (Return mExpr _) =
   maybe (pure []) expressionHelper mExpr
-statementHelper (Throw _) = pure []
+statementHelper (Throw e _) =
+  expressionHelper e
 statementHelper (EmitStatement _ vals _) =
   concat <$> traverse (expressionHelper . snd) vals
 statementHelper (RevertStatement _ (OrderedArgs vals) _) =
@@ -139,7 +150,7 @@ expressionHelper (Binary y "+=" (Variable x name) b) = do
   ann <- stateVarWriteHelper name (x <> y)
   bs <- expressionHelper b
   pure $ concat [ann, bs]
-expressionHelper (Binary y "-=" (Variable x name) b) = do
+expressionHelper (Binary y "-=" (Variable x name) b) = do 
   ann <- stateVarWriteHelper name (x <> y)
   bs <- expressionHelper b
   pure $ concat [ann, bs]
@@ -156,6 +167,18 @@ expressionHelper (Binary y "%=" (Variable x name) b) = do
   bs <- expressionHelper b
   pure $ concat [ann, bs]
 expressionHelper (Binary y "|=" (Variable x name) b) = do
+  ann <- stateVarWriteHelper name (x <> y)
+  bs <- expressionHelper b
+  pure $ concat [ann, bs]
+expressionHelper (Binary y ">>>=" (Variable x name) b) = do
+  ann <- stateVarWriteHelper name (x <> y)
+  bs <- expressionHelper b
+  pure $ concat [ann, bs]
+expressionHelper (Binary y ">>=" (Variable x name) b) = do
+  ann <- stateVarWriteHelper name (x <> y)
+  bs <- expressionHelper b
+  pure $ concat [ann, bs]
+expressionHelper (Binary y "<<=" (Variable x name) b) = do
   ann <- stateVarWriteHelper name (x <> y)
   bs <- expressionHelper b
   pure $ concat [ann, bs]

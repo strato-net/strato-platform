@@ -25,14 +25,17 @@ functionHelper Func{..} = case funcContents of
 
 statementHelper :: Statement -> [SourceAnnotation Text]
 statementHelper (IfStatement _ thens mElse _) = concat $ (statementHelper <$> thens) ++ (maybe [] (map statementHelper) mElse)
+statementHelper (TryCatchStatement tryBlock catches _) = concat $ (statementHelper <$> tryBlock) ++ (statementHelper <$> (concatMap (snd . snd) (M.toList catches)))
+statementHelper (SolidityTryCatchStatement _ _ successStatements catchMap _) = concat $ (statementHelper <$> successStatements) ++ (statementHelper <$> (concatMap (snd . snd) (M.toList catchMap)))
 statementHelper (WhileStatement _ body _) = concat $ statementHelper <$> body
 statementHelper (ForStatement _ _ _ body _) = concat $ statementHelper <$> body
 statementHelper (Block _) = []
 statementHelper (DoWhileStatement body _ _) = concat $ statementHelper <$> body
 statementHelper (Continue _) = []
+statementHelper (ModifierExecutor _) = []
 statementHelper (Break _) = []
 statementHelper (Return _ _) = []
-statementHelper (Throw _) = []
+statementHelper (Throw _ _) = []
 statementHelper (EmitStatement _ _ _) = []
 statementHelper (RevertStatement _ _ _) = []
 statementHelper (UncheckedStatement body _) = concat $ statementHelper <$> body

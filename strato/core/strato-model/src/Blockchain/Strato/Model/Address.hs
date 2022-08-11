@@ -15,6 +15,7 @@ module Blockchain.Strato.Model.Address
       formatAddressWithoutColor,
       stringAddress,
       getNewAddress_unsafe,
+      getNewAddressWithSalt_unsafe,
       addressAsNibbleString, addressFromNibbleString,
       addressToHex, addressFromHex,
       unAddress
@@ -57,6 +58,7 @@ import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.Util
 import qualified Data.NibbleString                    as N
 import qualified Data.RLP                             as RLP2
+import qualified LabeledError
 import qualified Text.Colors       as CL
 import           Text.Format
 import           Text.ShortDescription
@@ -181,7 +183,7 @@ instance ToCapture (Capture "contractAddress" Address) where
   toCapture _ = DocCapture "contractAddress" "an Ethereum address"
 
 instance RLP2.RLPEncodable Address where
-  rlpEncode addr = RLP2.rlpEncode . fst . B16.decode . BC.pack $ formatAddressWithoutColor addr
+  rlpEncode addr = RLP2.rlpEncode . LabeledError.b16Decode "RLPEncodable<Address>" . BC.pack $ formatAddressWithoutColor addr
   rlpDecode obj = Address . fromInteger <$> RLP2.rlpDecode obj
 
 instance RLP2.RLPEncodable (Maybe Address) where
@@ -233,6 +235,14 @@ getNewAddress_unsafe a n =
     let theHash = SHA.hash $ rlpSerialize $ RLPArray [rlpEncode a, rlpEncode n]
     in decode $ BL.drop 12 $ encode theHash
 
+-- Construct salted contract addresses using a version of the solidity CREATE2 method:
+-- Original -> new_address = hash(0xFF, sender, salt, bytecode) 
+-- Current  -> new_address = hash(0xFF, sender, salt, contract_name, codecollection_hash)
+getNewAddressWithSalt_unsafe :: Address -> RLPObject -> String -> B.ByteString -> Address
+getNewAddressWithSalt_unsafe a s c h =
+  let theHash = SHA.hash $ rlpSerialize $ RLPArray [rlpEncode (255 :: Integer), rlpEncode a, s, rlpEncode c, rlpEncode h]
+  in decode $ BL.drop 12 $ encode theHash
+
 addressAsNibbleString::Address->N.NibbleString
 addressAsNibbleString (Address s) =
   byteString2NibbleString $ BL.toStrict $ encode s
@@ -248,10 +258,10 @@ addressToHex = B16.encode . BL.toStrict . encode
 
 addressFromHex :: B.ByteString -> Either String Address
 addressFromHex hex = case B16.decode hex of
-                     (h, "") -> case decodeOrFail (BL.fromStrict h) of
+                     Right h -> case decodeOrFail (BL.fromStrict h) of
                                   Right (_, _, a) -> return a
                                   Left (_, _, mesg) -> Left $ "cannot decode address: " ++ mesg
-                     (_, _) -> Left $ "invalid hex address: " ++ show hex
+                     _ -> Left $ "invalid hex address: " ++ show hex
 
 instance Arbitrary Address where
   arbitrary = Address <$> arbitrary

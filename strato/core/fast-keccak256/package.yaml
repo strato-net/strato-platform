@@ -29,4 +29,3 @@ benchmarks:
     source-dirs: bench/
     dependencies:
       - fast-keccak256
-      - criterion

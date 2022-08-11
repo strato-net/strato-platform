@@ -36,7 +36,6 @@ executables:
     - http-types
     - insert-ordered-containers
     - lens
-    - monad-control
     - servant-multipart
     - servant-server
     - servant-swagger

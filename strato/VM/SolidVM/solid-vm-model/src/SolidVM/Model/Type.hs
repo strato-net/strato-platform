@@ -6,6 +6,7 @@
 module SolidVM.Model.Type where
 
 import           Control.Lens              (mapped, (&), (?~))
+import           Control.DeepSeq
 import           Data.Aeson
 import           Data.Int                  (Int32)
 import           Data.Swagger
@@ -24,16 +25,18 @@ data Type
   = Int {signed::Maybe Bool, bytes::Maybe Int32}
   | String {dynamic::Maybe Bool}
   | Bytes {dynamic::Maybe Bool, bytes:: Maybe Int32}
+  | Fixed {signed::Maybe Bool, decimals::Maybe (Int32,Int32)}
   | Bool
   | Address {isPayable :: Bool}
   | Account {isPayable :: Bool}
-  | UnknownLabel SolidString
+  | UnknownLabel SolidString (Maybe SolidString)
   | Struct { bytes::Maybe Int32, typedef::SolidString}
   | Enum { bytes::Maybe Int32, typedef::SolidString, names::Maybe [SolidString]}
+  | Error { bytes::Maybe Int32, typedef::SolidString }
   | Array { entry:: Type, length :: Maybe Word }
   | Contract {typedef::SolidString}
   | Mapping {dynamic::Maybe Bool, key::Type, value::Type}
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Show, Generic, NFData)
 
 instance ToJSON Type where
   toJSON = genericToJSON typeAesonOptions{omitNothingFields = True}

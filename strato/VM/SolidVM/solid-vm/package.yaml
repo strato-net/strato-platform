@@ -2,6 +2,7 @@ name: solid-vm
 
 dependencies:
   - base
+  - blockapps-haskoin
 
 library:
   source-dirs: src/
@@ -22,7 +23,7 @@ library:
   - bytestring
   - common-log
   - containers
-  - cryptonite
+  - cryptohash
   - data-default
   - debugger
   - deepseq
@@ -30,6 +31,7 @@ library:
   - exceptions
   - extra
   - format
+  - labeled-error
   - lens
   - memory
   - merkle-patricia-db
@@ -64,6 +66,7 @@ executables:
       - solid-vm-parser
       - solid-vm-static-analysis
       - text
+      - deepseq
 
 tests:
   solid-vm-spec:
@@ -82,6 +85,7 @@ tests:
       - hflags
       - hspec
       - hspec-expectations-lifted
+      - labeled-error
       - lens
       - merkle-patricia-db
       - monad-alter
@@ -101,6 +105,16 @@ benchmarks:
       source-dirs: bench/
       main: CodeBench.hs
       dependencies:
-        - criterion
         - file-embed
         - solid-vm
+        - deepseq
+        - criterion
+        - binary
+        - memory
+        - bytestring
+        - containers
+        - text
+        - parsec
+        - strato-model
+        - solid-vm-parser
+        - solid-vm-model

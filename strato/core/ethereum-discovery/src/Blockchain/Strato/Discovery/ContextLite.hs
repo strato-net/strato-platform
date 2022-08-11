@@ -72,7 +72,7 @@ initContextLite vaultUrl = do
   mgr <- liftIO $ newManager defaultManagerSettings
   url <- liftIO $ parseBaseUrl vaultUrl
   return ContextLite { liteSQLDB = sqlDB' dbs
-                     , vaultClient = ClientEnv mgr url Nothing
+                     , vaultClient = mkClientEnv mgr url
                      }
 
 addPeer :: HasSQLDB m =>PPeer->m (SQL.Key PPeer)

@@ -33,6 +33,7 @@ library:
   - strato-conf
   - strato-model
   - text
+  - x509-certs
   
 # I am removing this executable because the package `diagrams-html5` has not been upgraded, and
 # won't work with newer stack lts' versions.
@@ -63,7 +64,6 @@ tests:
       - hedis
       - HUnit
       - hspec
-      - hspec-core
       - lens-family
       - seqevents
       - strato-model

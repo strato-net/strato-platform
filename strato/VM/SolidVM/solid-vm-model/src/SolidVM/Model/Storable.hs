@@ -14,7 +14,6 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Internal as BI
 import qualified Data.ByteString.Unsafe as BU
 import qualified Data.ByteString.Char8 as C8
-import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.UTF8   as UTF8
 import           Data.Char
 import           Data.Hashable
@@ -29,6 +28,7 @@ import           Blockchain.SolidVM.Model
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
+import qualified LabeledError
 import           SolidVM.Model.SolidString
 import           Text.Format
 
@@ -168,7 +168,7 @@ parseMapIndex = do
       mChain <- case w82c <$> mColon of
         Just ':' -> do
           _ <- string ":"
-          (MainChain <$ string "main") <|> (ExplicitChain . bytesToWord256 . fst . B16.decode <$> Atto.take 64) <?> "parseMapIndex"
+          (MainChain <$ string "main") <|> (ExplicitChain . bytesToWord256 . LabeledError.b16Decode "parseMapIndex"  <$> Atto.take 64) <?> "parseMapIndex"
         _ -> pure UnspecifiedChain
       IAccount <$> either fail (return . flip NamedAccount mChain) eAddress
     '"' -> do

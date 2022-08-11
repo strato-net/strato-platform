@@ -62,6 +62,7 @@ import qualified Data.Vector                          as V
 import           Data.Word
 
 import qualified GHC.Generics                         as GHCG
+import           LabeledError
 import           Numeric                              (showHex)
 import           Text.Format
 
@@ -91,11 +92,11 @@ instance FromJSON CodeInfo where
     a <- parseJSON a'
     b <- parseJSON b'
     c <- parseJSON c'
-    return (CodeInfo (fst . B16.decode $ C8.pack a) b c)
+    return (CodeInfo (LabeledError.b16Decode "FromJSON<CodeInfo>" $ C8.pack a) b c)
 
   parseJSON (Object o) =
     CodeInfo
-    <$> ((fst . B16.decode . C8.pack) <$> (o .: "code"))
+    <$> ((LabeledError.b16Decode "FromJSON<CodeInfo>" . C8.pack) <$> (o .: "code"))
     <*> o .: "src"
     <*> o .: "name"
 

@@ -30,7 +30,7 @@ import           GHC.Generics
 
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Secp256k1
-
+import qualified LabeledError
 
 
 vaultWrapperSchemaOptions :: SchemaOptions
@@ -72,7 +72,7 @@ instance ToJSON MsgHash where
 instance FromJSON MsgHash where
   parseJSON (Object o) = do 
     hsh <- o .: "msgHash" 
-    return $ MsgHash $ fst $ B16.decode $ C8.pack $ T.unpack hsh
+    return $ MsgHash $ LabeledError.b16Decode "FromJSON<MsgHash>" $ C8.pack $ T.unpack hsh
   parseJSON x = error $ "parseJSON for MsgHash: expected object, got " ++ (show x)
 
 instance ToSchema MsgHash where

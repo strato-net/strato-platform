@@ -5,7 +5,6 @@ module ActionFidelitySpec where
 import Data.Aeson
 import Data.Aeson.QQ
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Base16 as B16
 import Data.Either
 import qualified Data.Map.Strict as M
 import Data.Time.Clock.POSIX
@@ -19,6 +18,8 @@ import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Stream.Action (Action)
 import qualified Blockchain.Stream.Action as Action
+
+import qualified LabeledError
 
 convert :: Action -> Either String Action -- 🤔
 convert = eitherDecode . encode
@@ -62,7 +63,7 @@ spec = describe "Action conversions" $ do
      convert a `shouldSatisfy` isRight
 
    it "should be backwards compatible" $ do
-     let forceHash = unsafeCreateKeccak256FromByteString . fst . B16.decode
+     let forceHash = unsafeCreateKeccak256FromByteString . LabeledError.b16Decode "slipstream/ActionFidelitySpec.hs"
          oldStyle = [aesonQQ| {
          "chainId": null,
          "data": {

@@ -14,7 +14,7 @@ module Handlers.TxLast
 
 import           Data.Int
 import           Data.Maybe
-import qualified Database.Esqueleto as E
+import qualified Database.Esqueleto.Legacy as E
 import           Servant
 import           Servant.Client
 

@@ -29,6 +29,15 @@ statementHelper (IfStatement cond thens mElse _) =
       ts = concat $ statementHelper <$> thens
       es = concat $ maybe [] (map statementHelper) mElse
    in concat [cs, ts, es]
+statementHelper (TryCatchStatement statements catches _) =
+  let ts = concat $ statementHelper <$> statements
+      cs = concat $ statementHelper <$> (concatMap (snd . snd) (M.toList catches))
+   in concat [ts, cs]
+statementHelper (SolidityTryCatchStatement expr _ successStatements catchesMap _) =
+  let es = expressionHelper expr
+      ts = concat $ statementHelper <$> successStatements
+      cs = concat $ statementHelper <$> (concatMap (snd . snd) (M.toList catchesMap))
+   in concat [es, ts, cs]
 statementHelper (WhileStatement cond body _) =
   let cs = expressionHelper cond
       bs = concat $ statementHelper <$> body
@@ -45,11 +54,13 @@ statementHelper (DoWhileStatement body cond _) =
       bs = concat $ statementHelper <$> body
    in concat [bs, cs]
 statementHelper (Continue _) = []
+statementHelper (ModifierExecutor _) = []
 statementHelper (Break _) = []
 statementHelper (Return (Just (BoolLiteral _ _)) _) = []
 statementHelper (Return mExpr _) =
   maybe [] expressionHelper mExpr
-statementHelper (Throw _) = []
+statementHelper (Throw e _) =
+  expressionHelper e
 statementHelper (EmitStatement _ vals _) =
   concatMap (expressionHelper . snd) vals
 statementHelper (RevertStatement _ (OrderedArgs vals) _) =

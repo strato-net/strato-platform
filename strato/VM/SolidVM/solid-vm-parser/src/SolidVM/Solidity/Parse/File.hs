@@ -5,6 +5,7 @@
 -- Description: Parses anything that can appear at the top level of
 --   a Solidity source file
 -- Maintainer: Ryan Reich <ryan@blockapps.net>
+-- Maintainer: Steven Glasford <steven_glasford@blockapps.net>
 --
 -- Currently does contracts and pragmas.  In the future should also handle
 -- imports.
@@ -13,6 +14,7 @@ module SolidVM.Solidity.Parse.File where
 import           Prelude                               hiding (lookup)
 
 import           Control.Monad
+import           Control.DeepSeq
 import           Data.Either.Extra
 import           Data.Maybe
 import           Data.SemVer
@@ -27,18 +29,24 @@ import           SolidVM.Solidity.Parse.Lexer
 import           SolidVM.Solidity.Parse.ParserTypes
 import           SolidVM.Solidity.Parse.Pragmas
 
-
 newtype File = File {
   unsourceUnits :: [SourceUnit]
-} deriving (Show, Generic)
+} deriving (Show, Generic, NFData)
 
 solidityFile :: SolidityParser File
 solidityFile = do
   whiteSpace
-  units <- many (solidityPragma <|> solidityImport <|> solidityContract)
+  units <- many (   solidityPragma 
+                <|> solidityImport 
+                <|> solidityFLError 
+                <|> solidityFreeFunction 
+                <|> solidityContract 
+                <|> solidityFLConstant 
+                <|> solidityFLStruct 
+                <|> solidityFLEnum
+                )
   eof
   return . File $ units
-
 
 decideVersion :: File -> SolcVersion
 decideVersion = maximum . (ZeroPointFour:) . mapMaybe go . unsourceUnits

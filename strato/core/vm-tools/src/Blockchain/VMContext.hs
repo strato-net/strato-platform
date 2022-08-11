@@ -62,6 +62,7 @@ module Blockchain.VMContext
     , execContextM
     , incrementNonce
     , getNewAddress
+    , getNewAddressWithSalt
     , purgeStorageMap
     , getContextBestBlockInfo
     , putContextBestBlockInfo
@@ -121,14 +122,19 @@ import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.DB.X509CertDB
 import           Blockchain.EthConf
+import           Blockchain.Strato.Model.CodePtr()
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models
+import           Blockchain.Data.RLP
 import qualified Blockchain.TxRunResultCache        as TRC
+import           Blockchain.VM.SolidException
 import           Blockchain.VMOptions
+
+import           SolidVM.Model.Value
 
 import           Executable.EVMFlags
 
@@ -539,7 +545,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
       cstate' <- readIORef cstate
       return (a, cstate')
 
-runContextM :: (MonadIO m, MonadUnliftIO m, MonadLogger m)
+runContextM :: (MonadIO m, MonadUnliftIO m, MonadLoggerIO m)
             => Maybe DebugSettings
             -> ReaderT Context (ResourceT m) a
             -> m (a, ContextState)
@@ -602,13 +608,13 @@ runContextM dSettings f = do
       return (a, cstate')
 
 
-evalContextM :: (MonadIO m, MonadUnliftIO m, MonadLogger m)
+evalContextM :: (MonadIO m, MonadUnliftIO m, MonadLoggerIO m)
              => Maybe DebugSettings
              -> ReaderT Context (ResourceT m) a
              -> m a
 evalContextM d f = fst <$> runContextM d f
 
-execContextM :: (MonadIO m, MonadUnliftIO m, MonadLogger m)
+execContextM :: (MonadIO m, MonadUnliftIO m, MonadLoggerIO m)
              => Maybe DebugSettings
              -> ReaderT Context (ResourceT m) a
              -> m ContextState
@@ -623,6 +629,18 @@ getNewAddress account = do
   nonce <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy account
   when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ show (pretty account) ++ ", nonce=" ++ show nonce
   let newAddress = getNewAddress_unsafe (account ^. accountAddress) nonce
+  incrementNonce account
+  return $ (accountAddress .~ newAddress) account
+
+getNewAddressWithSalt :: (MonadIO m, (Account `A.Alters` AddressState) m) => Account -> Value -> String -> Keccak256 -> m Account
+getNewAddressWithSalt account salt cname hsh = do
+  nonce <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy account
+  when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ show (pretty account) ++ ", nonce=" ++ show nonce
+  let rlpEncodedSalt = case salt of
+          (SInteger i) -> rlpEncode i
+          (SString s) -> rlpEncode s
+          _ -> invalidArguments "big major bad" salt
+  let newAddress = getNewAddressWithSalt_unsafe (account ^. accountAddress) rlpEncodedSalt cname $ keccak256ToByteString hsh
   incrementNonce account
   return $ (accountAddress .~ newAddress) account
 

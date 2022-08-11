@@ -27,7 +27,7 @@ import           Text.Format
 stringToPoint::String->Point
 stringToPoint string =
   case B16.decode $ BC.pack string of
-   (val, "") -> bytesToPoint val
+   Right val -> bytesToPoint val
    _         -> error $ "stringToPoint called with malformed string: " ++ string
 
 pointToString :: Point -> String

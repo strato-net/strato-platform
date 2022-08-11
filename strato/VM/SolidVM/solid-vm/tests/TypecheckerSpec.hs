@@ -13,7 +13,7 @@ import           Test.Hspec
 import           Text.RawString.QQ
 
 runTypechecker :: String -> [SourceAnnotation Text]
-runTypechecker c = case compileSourceWithAnnotations (M.fromList [("",T.pack c)]) of
+runTypechecker c = case compileSourceWithAnnotations True (M.fromList [("",T.pack c)]) of
   Left anns -> anns
   Right cc -> Typechecker.detector cc
 
@@ -443,7 +443,8 @@ contract A {
     address b = tx.origin;
     string u = tx.username;
     string o = tx.organization;
-    string g = tx.group;
+    string g = tx.organizationalUnit;
+    string c = tx.certificate;
     uint t = block.timestamp;
     uint n = block.number;
   }
@@ -458,13 +459,14 @@ contract A {
     uint b = tx.origin;
     address u = tx.username;
     bool o = tx.organization;
-    uint g = tx.group;
+    uint g = tx.organizationalUnit;
+    uint c = tx.certificate;
     string t = block.timestamp;
     address n = block.number;
   }
 }
 |]
-     in length anns `shouldBe` 7
+     in length anns `shouldBe` 8
   it "can call super on parent contract functions" $
     let anns = runTypechecker [r|
 contract A {
@@ -663,6 +665,7 @@ contract qq {
 
   it "can use the string.concat(x,y) function and succeeds when the types are strings" $
     let anns = runTypechecker [r|
+pragma solidvm 3.2;
 contract A {
   function f() {
     string x = "hello";
@@ -675,6 +678,7 @@ contract A {
 
   it "can use the string.concat(x,y) function and fails when the types are not strings" $
     let anns = runTypechecker [r|
+pragma solidvm 3.2;
 contract A {
   function f() {
     string x = "hello";
@@ -683,3 +687,193 @@ contract A {
 }
 |]
     in length anns `shouldBe` 1
+
+  it "cannot assign an immutable a new value inside a function" $
+    let anns = runTypechecker [r|
+pragma solidvm 3.2;
+contract A {
+  unint immutable g =2;
+  uint public x = 75;
+  function f() {
+    g = x;
+  } 
+}
+|]
+    in length anns `shouldBe` 2
+  it "cannot incrument an immutable already assigned within the constructor" $
+    let anns = runTypechecker [r|
+pragma solidvm 3.2;
+contract qq {
+  uint g = 2022;
+  uint immutable d=22;
+  constructor() public {
+    d += g;
+  }
+}
+|]
+    in length anns `shouldBe` 1
+  it "can have the receive() function and succeeds when there are no arguments, no return values, and is Payable and External" $
+    let anns = runTypechecker [r|
+contract A {
+  receive() external payable {
+  }
+}
+|]
+    in length anns `shouldBe` 0
+  it "can throw exception when receive() function has arguments" $
+    let anns = runTypechecker [r|
+contract A {
+  receive(uint i) external payable {
+    uint x = i;
+  }
+}
+|]
+    in length anns `shouldBe` 1
+  
+  it "can assign a value to a declared unassigned immutable within the constructor" $
+    let anns = runTypechecker [r|
+pragma solidvm 3.2;
+contract qq {
+  uint g = 2022;
+  uint immutable d;
+  constructor() public {
+    d = g;
+  }
+}
+|]
+    in length anns `shouldBe` 0
+  it "cannot assign an immutable a value after already assinged on contract level" $
+    let anns = runTypechecker [r|
+pragma solidvm 3.2;
+contract qq {
+  uint g = 2022;
+  uint immutable d = 22;
+  constructor() public {
+    d = g;
+  } 
+}|]
+    in length anns `shouldBe` 1
+  it "can throw exception when receive() function has return values" $
+    let anns = runTypechecker [r|
+contract A {
+  receive() external payable returns (uint) {
+    uint x = 5;
+    return x;
+  }
+}
+|]
+    in length anns `shouldBe` 1
+
+  it "can throw exception when receive() function is not external" $
+    let anns = runTypechecker [r|
+contract A {
+  receive() internal payable {
+  }
+}
+|]
+    in length anns `shouldBe` 1
+
+  it "can throw exception when receive() function is not payable" $
+    let anns = runTypechecker [r|
+contract A {
+  receive() external {
+  }
+}
+|]
+    in length anns `shouldBe` 1
+
+  it "cannot assign an immutable after already assinged within a function" $
+    let anns = runTypechecker [r|
+pragma solidvm 3.2;
+contract qq {
+  uint c = 2022;
+  uint immutable x =c;
+  constructor() {
+    alterConstants();
+  }
+  function alterConstants(){
+    x = 13;
+  }
+}|]
+    in length anns `shouldBe` 1
+
+  it "can throw exception when receive() function is decalred with function keyword" $
+    let anns = runTypechecker [r|
+contract A {
+  function receive() external payable {
+  }
+}
+|]
+    in length anns `shouldBe` 1
+
+  it "can have the fallback() function and succeeds when there are no arguments, no return values, and is External" $
+    let anns = runTypechecker [r|
+contract A {
+  fallback() external payable {
+  }
+}
+|]
+    in length anns `shouldBe` 0
+
+  it "can throw exception when fallback() function has arguments" $
+    let anns = runTypechecker [r|
+contract A {
+  fallback(uint i) external payable {
+    uint x = i;
+  }
+}
+|]
+    in length anns `shouldBe` 1
+
+  it "can use an immutable within a function" $
+    let anns = runTypechecker [r|
+pragma solidvm 3.2;
+contract qq {
+  uint c = 2022;
+  uint immutable public x =c;
+  uint r;
+  constructor() {
+    alterConstants();
+  }
+  function alterConstants(){
+    r = x;
+  }
+}
+|]
+    in length anns `shouldBe` 0
+  it "can throw exception when fallback() function has return values" $
+    let anns = runTypechecker [r|
+contract A {
+  fallback() external payable returns (uint) {
+    uint x = 5;
+    return x;
+  }
+}
+|]
+    in length anns `shouldBe` 1
+
+  it "can throw exception when fallback() function is not external" $
+    let anns = runTypechecker [r|
+contract A {
+   fallback() internal payable {
+  }
+}
+|]
+    in length anns `shouldBe` 1
+
+  it "can throw exception when fallback() function is declared with function keyword" $
+    let anns = runTypechecker [r|
+contract A {
+   function fallback() external payable {
+  }
+}
+|]
+    in length anns `shouldBe` 1
+
+
+
+
+
+
+
+

@@ -42,11 +42,11 @@ library:
   - milena
   - milena-tools
   - monad-alter
+  - monad-logger
   - mtl
   - network
   - persistent
   - persistent-postgresql
-  - persistent-template
   - quickcheck-instances
   - regex-compat
   - relapse
@@ -83,12 +83,12 @@ tests:
       - base16-bytestring
       - blockapps-data
       - blockapps-datadefs
-      - blockapps-haskoin
       - bytestring
       - containers
       - ethereum-rlp
       - http-api-data
       - hspec
+      - labeled-error
       - persistent
       - secp256k1-haskell
       - strato-model

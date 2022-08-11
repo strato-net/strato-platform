@@ -15,8 +15,6 @@ module Network.Haskoin.Util
 , decodeToMaybe
 ) where
 
-import Control.Monad (guard)
-
 import Data.Word (Word8)
 import Data.Bits ((.|.), shiftL, shiftR)
 import Data.List (unfoldr)
@@ -27,7 +25,7 @@ import qualified Data.ByteString.Lazy as BL (ByteString, toChunks, fromChunks)
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as C (pack, unpack)
 import qualified Data.ByteString as BS
-    (ByteString, concat, pack, unpack, empty)
+    (ByteString, concat, pack, unpack)
 
 -- ByteString helpers
 
@@ -70,9 +68,10 @@ bsToHex = bsToString . B16.encode
 -- | Decode a base16 (HEX) string from a bytestring. This function can fail
 -- if the string contains invalid HEX characters
 hexToBS :: String -> Maybe BS.ByteString
-hexToBS xs = guard (bad == BS.empty) >> return x
-  where
-    (x, bad) = B16.decode $ stringToBS xs
+hexToBS xs =
+  case B16.decode $ stringToBS xs of
+    Left _ -> Nothing
+    Right v -> Just v
 
 -- Data.Binary helpers
 

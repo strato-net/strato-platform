@@ -24,6 +24,7 @@ module SolidVM.Solidity.Parse.Lexer (
   colon,
   comma,
   braces,
+  symbol,
   solidityLanguage,
   whiteSpace
   ) where
@@ -44,6 +45,7 @@ natural = P.natural solidityLexer
 integer = P.integer solidityLexer
 braces = P.braces solidityLexer
 parens = P.parens solidityLexer
+symbol = P.symbol solidityLexer
 brackets = P.brackets solidityLexer
 comma = P.comma solidityLexer
 commaSep = P.commaSep solidityLexer
@@ -61,7 +63,7 @@ solidityLexer = P.makeTokenParser solidityLanguage
 
 solidityLanguage = javaStyle {
   P.reservedNames = [
-     "pragma", "import", "library", "using",
+     "pragma", "import", "library", "using", -- "salt",
      "contract", "is", "public", "internal", "private", "external", "import", "payable",
      "event", "indexed", "anonymous",
      "bool", "true", "false",
@@ -69,9 +71,9 @@ solidityLanguage = javaStyle {
      "address", --"send", "balance",
      "enum", "struct", "mapping", "var",
      "function", "returns", "return", "modifier", "revert",
-     "delete", "constant", "storage", "memory", "calldata",
+     "delete", "constant", "storage", "memory", "calldata", "immutable",
      "if", "else", "while", "for", "break", "continue",
-     "call", "callcode", "length", "sha3", "sha256", "ripemd160",
+     "call", "callcode", "length", "sha3", "sha256", "ripemd160", "ecrecover",
      "suicide", "this",
      "block", --"coinbase", "difficulty", "gaslimit", "number", "blockhash", "timestamp", "now"
      "msg", --"data", "gas", "sender", "value",
@@ -79,13 +81,14 @@ solidityLanguage = javaStyle {
      "wei", "finney", "szabo", "ether",
      "seconds", "minutes", "hours", "days", "weeks", "years",
      --The following are protected as they are also names for cirrus columns
-     "block_number", "block_timestamp", "block_hash",
-     "record_id", "transaction_hash", "transaction_sender"
-     ],
+    --"block_number", "block_timestamp", "block_hash",
+    --"record_id", "transaction_hash", "transaction_sender"
+     "receive", "fallback"
+    ],
   P.reservedOpNames = [
     "!", "&&", "||", "==", "!=",
     "<=", ">=", "<", ">", "&", "|", "^", "~", "+", "*", "-", "/"," %", "**",
-    "+=", "-=", "*=", "/=", "%=", "|=", "&=", "^=", "++", "--",
+    "+=", "-=", "*=", "/=", "%=", "|=", "&=",  ">>=", "<<=", "^=", "++", "--",
     "=>", "="
     ],
   P.caseSensitive = True,

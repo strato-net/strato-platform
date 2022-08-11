@@ -13,7 +13,6 @@ import           Data.Aeson                      as Ae
 import           Data.Aeson.Diff
 import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Lazy.Char8      as C8
-import qualified Data.ByteString.Base16          as B16
 import qualified Data.ByteString.Short           as BSS
 import qualified Data.HashMap.Strict             as HM
 import           Data.Map.Strict                 (Map)
@@ -43,6 +42,7 @@ import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Data.Json
 import           Blockchain.Data.Transaction
+import qualified LabeledError
 
 import           Test.QuickCheck
 
@@ -288,7 +288,7 @@ stringToAddress :: [Char] -> Address
 stringToAddress x = Address
              $ bytesToWord160
              $ B.unpack
-             $ fst . B16.decode
+             $ LabeledError.b16Decode "stringToAddress"
              $ T.encodeUtf8
              $ T.pack x
 
