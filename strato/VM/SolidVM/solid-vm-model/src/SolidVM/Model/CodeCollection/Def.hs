@@ -9,6 +9,7 @@
 module SolidVM.Model.CodeCollection.Def where
 
 import           Control.Lens                 (mapped, (&), (?~))
+import           Control.DeepSeq
 import           Data.Aeson
 import           Data.Source
 import           Data.Swagger
@@ -28,7 +29,7 @@ data DefF a = Enum { names::[SolidString], bytes::Word, context :: a}
             | Error { params :: [(SolidString, SolidVM.IndexedType)], bytes::Word, context :: a }
             | Struct { fields::[(SolidString, SolidVM.FieldType)], bytes::Word, context :: a}
             | Contract { bytes::Word, context :: a}
-         deriving (Eq, Show, Generic, Functor)
+         deriving (Eq, Show, Generic, NFData, Functor)
 
 type Def = Positioned DefF
 

@@ -31,8 +31,7 @@ import qualified Data.Text as T
 import GHC.Generics
 import SolidVM.Model.SolidString
 import SolidVM.Model.Type
-
-
+import Control.DeepSeq
 
 data StatementF a =
   IfStatement (ExpressionF a) [StatementF a] (Maybe [StatementF a]) a -- if then else
@@ -52,7 +51,7 @@ data StatementF a =
   | UncheckedStatement [StatementF a] a
   | SolidityTryCatchStatement (ExpressionF a) (Maybe [(String, Type)]) [StatementF a] (Map.Map String (Maybe (String, Type), [StatementF a])) a
   | TryCatchStatement [StatementF a] (Map.Map String (Maybe [String], [StatementF a])) a
-  deriving (Show, Eq, Generic, Functor, ToJSON, FromJSON)
+  deriving (Show, Eq, Generic, Functor, NFData, ToJSON, FromJSON)
 
 
 extractStatement :: StatementF a -> a
@@ -76,7 +75,7 @@ extractStatement (SolidityTryCatchStatement _ _ _ _ a) = a
 
 type Statement = Positioned StatementF
 
-data Location = Memory | Storage | Calldata deriving (Show, Eq, Generic)
+data Location = Memory | Storage | Calldata deriving (Show, Eq, Generic, NFData)
 
 instance ToJSON Location
 instance FromJSON Location
@@ -86,7 +85,7 @@ data VarDefEntryF a = BlankEntry
                                   , _vardefLocation :: Maybe Location
                                   , vardefName :: SolidString
                                   , vardefContext :: a
-                                  } deriving (Show, Eq, Generic, Functor)
+                                  } deriving (Show, Eq, Generic, Generic1, NFData, Functor)
 
 type VarDefEntry = Positioned VarDefEntryF
 
@@ -107,7 +106,7 @@ getVarDefContext BlankEntry = Nothing
 
 data SimpleStatementF a =
   VariableDefinition [VarDefEntryF a] (Maybe (ExpressionF a)) -- Nothing type indicates "var" keyword
-  | ExpressionStatement (ExpressionF a) deriving (Show, Eq, Generic, Functor)
+  | ExpressionStatement (ExpressionF a) deriving (Show, Eq, Generic, Generic1, NFData, Functor)
 
 type SimpleStatement = Positioned SimpleStatementF
 
@@ -119,11 +118,10 @@ instance FromJSON a => FromJSON (SimpleStatementF a)
 --  result := mload(add(source, 32))
 -- }
 -- Anything else is a parse error.
-data InlineAssembly = MloadAdd32 T.Text T.Text deriving (Show, Eq, Generic)
+data InlineAssembly = MloadAdd32 T.Text T.Text deriving (Show, Eq, Generic, NFData)
 
 instance ToJSON InlineAssembly
 instance FromJSON InlineAssembly
-
 
 data ExpressionF a =
   PlusPlus a (ExpressionF a)
@@ -142,7 +140,7 @@ data ExpressionF a =
   | ArrayExpression a [(ExpressionF a)]
   | Variable a SolidString 
   | ObjectLiteral a (Map.Map SolidString (ExpressionF a))
-  deriving (Show, Eq, Generic, Functor)
+  deriving (Show, Eq, Generic, Generic1, NFData, Functor)
 
 extractExpression :: ExpressionF a -> a
 extractExpression (PlusPlus a _) = a
@@ -167,14 +165,14 @@ type Expression = Positioned ExpressionF
 instance ToJSON a => ToJSON (ExpressionF a)
 instance FromJSON a => FromJSON (ExpressionF a)
 
-data ArgListF a = OrderedArgs [ExpressionF a] | NamedArgs [(SolidString, (ExpressionF a))] deriving (Show, Eq, Generic, Functor)
+data ArgListF a = OrderedArgs [ExpressionF a] | NamedArgs [(SolidString, (ExpressionF a))] deriving (Show, Eq, Generic, NFData,Functor) --Or String
 
 type ArgList = Positioned ArgListF
 
 instance ToJSON a => ToJSON (ArgListF a)
 instance FromJSON a => FromJSON (ArgListF a)
 
-data NumberUnit = Wei | Szabo | Finney | Ether deriving (Show, Eq, Generic)
+data NumberUnit = Wei | Szabo | Finney | Ether deriving (Show, Eq, Generic, NFData)
 
 instance ToJSON NumberUnit
 instance FromJSON NumberUnit
