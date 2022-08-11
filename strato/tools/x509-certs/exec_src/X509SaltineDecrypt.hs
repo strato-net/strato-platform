@@ -10,12 +10,15 @@ import qualified Crypto.Saltine.Core.SecretBox      as CS
 
 import           Strato.Strato23.Server.Password
 import           Strato.Strato23.Crypto
+import           BlockApps.X509.Keys 
+
 
 data Options = Options {
     salt :: ByteString ,
     nonce :: CS.Nonce ,
     password :: Password,
-    ciphertext :: ByteString
+    ciphertext :: ByteString,
+    privPem :: Bool
 } deriving (Show)
 
 main :: IO ()
@@ -57,6 +60,9 @@ parseOptions = Options
            ( long "ciphertext"
           <> metavar "HEX"
           <> help "The cypher text")
+    <*> switch
+           ( long "privPem"
+          <> help "Is this pem format?")
 
 
 -- $ x509-saltine-decrypt
@@ -67,4 +73,6 @@ entryPoint = putStrLn . maybe "Failed to decrypt the ciphertext!" C8.unpack . en
 
 
 entryPointPure :: Options -> Maybe ByteString
-entryPointPure Options{..} = B16.encode <$> decrypt (getKeyFromPasswordAndSalt password salt) nonce ciphertext
+entryPointPure Options{..}
+    | privPem = privToBytes <$> decryptSecKey (getKeyFromPasswordAndSalt password salt) nonce ciphertext 
+    | otherwise = B16.encode <$> decrypt (getKeyFromPasswordAndSalt password salt) nonce ciphertext
