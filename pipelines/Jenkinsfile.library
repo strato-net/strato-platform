@@ -122,7 +122,7 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
         clientID = nodeData.BEANSTALK.OAUTH_CLIENT_ID
         clientSecret = nodeData.BEANSTALK.OAUTH_CLIENT_SECRET
         oauthDiscovery = nodeData.BEANSTALK.OAUTH_DISCOVERY_URL
-      } else {
+      } else if(appName == 'traceharvest'){
         clientID = nodeData.TRACE_HARVEST.OAUTH_CLIENT_ID
         clientSecret = nodeData.TRACE_HARVEST.OAUTH_CLIENT_SECRET
         oauthDiscovery = nodeData.TRACE_HARVEST.OAUTH_DISCOVERY_URL
@@ -247,7 +247,7 @@ export AWS_SQS_URL='https://sqs.us-east-1.amazonaws.com/406773134706/beanstalk-i
 
 docker-compose up -d --build
           """
-        } else {
+        } else if(appName == 'traceharvest'){
           writeFile file: "run-app.sh", text: """#!/bin/bash
 set -e
 
@@ -268,7 +268,7 @@ export STRATO_NODE_HOST='${nodeData.HOST}:8080'
 export STRATO_LOCAL_IP='172.17.0.1'
 export SSL=true
 export SSL_CERT_TYPE=pem
-export INT_SERVER_URL='https://fake-url
+export INT_SERVER_URL='https://fake-url'
 export INT_SERVER_OAUTH_OPENID_DISCOVERY_URL='https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration'
 export INT_SERVER_OAUTH_CLIENT_ID='dev'
 export INT_SERVER_OAUTH_CLIENT_SECRET='d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f'
