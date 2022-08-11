@@ -51,7 +51,7 @@ data StatementF a =
   | UncheckedStatement [StatementF a] a
   | SolidityTryCatchStatement (ExpressionF a) (Maybe [(String, Type)]) [StatementF a] (Map.Map String (Maybe (String, Type), [StatementF a])) a
   | TryCatchStatement [StatementF a] (Map.Map String (Maybe [String], [StatementF a])) a
-  deriving (Show, Eq, Generic, Functor, ToJSON, FromJSON)
+  deriving (Show, Eq, Generic, Functor, NFData, ToJSON, FromJSON)
 
 
 extractStatement :: StatementF a -> a
