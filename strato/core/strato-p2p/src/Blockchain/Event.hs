@@ -18,7 +18,7 @@ module Blockchain.Event (
   checkPeerIsMember' -- For testing
   ) where
 
-import           Control.Arrow                         ((&&&), second)
+import           Control.Arrow                         ((&&&), (***), second)
 import           Control.Monad
 import           Control.Monad.Change.Alter
 import           Control.Monad.Change.Modify           hiding (get, put, yield, awaitForever)
@@ -39,6 +39,7 @@ import qualified Data.ByteString.Base16                as BC16
 import qualified Data.ByteString.Char8                 as BS8
 import qualified Data.Set                              as S
 import qualified Data.Text                             as T
+import           Data.Text.Encoding                    (encodeUtf8)
 import           Data.These
 import           Data.Time.Clock
 import           MonadUtils
@@ -335,7 +336,7 @@ handleEvents peer = awaitForever $ \case
                , ". Not forwarding to Sequencer."
                ]
         else do
-          $logInfoS "handleEvents/Blockstanbul" . T.pack $ concat 
+          $logInfoS "handleEvents/Blockstanbul" . T.pack $ concat
             [ "First time seeing inbound wire message "
             , format msgHash
             , ". Forwarding to Sequencer."
@@ -348,6 +349,18 @@ handleEvents peer = awaitForever $ \case
 
     MsgEvt (ChainDetails chpairs) -> do
       lift stampActionTimestamp
+      -- check cInfo metadata for "organization -> blockapps/engineering"
+      -- for every ChainInfo
+        -- extract the metadata
+        -- if "organization" is in the mapping, return the org tuple (name, unit)
+        -- store tuple in this node
+      forM_ chpairs $ \(cId, cInfo) -> do
+        let key        = "organization"
+            query      = M.lookup key $ chainMetadata (chainInfo cInfo)
+            qToTuple q = (OrgName . encodeUtf8 *** OrgUnit . encodeUtf8) $ T.breakOn "/" q
+        case query of
+          Just q  -> lift $ insert (Proxy @Word256) (qToTuple q) cId
+          Nothing -> error "no org" -- should just do nothing here, no need to panic
       yieldL . ToUnseq $ IEGenesis . IngestGenesis (Origin.PeerString $ peerString peer) <$> chpairs
 
     -- TODO: Optimize/do security checking (a peer can spam you with random hashes and keep you busy forever)
@@ -409,6 +422,13 @@ handleEvents peer = awaitForever $ \case
           $logInfoS "handleEvents/P2pNewChainMember" $ T.pack $ "Emitting chain details for chain " ++ formatted
           mcInfo <- fmap (fmap ((,) cId)) . lift $ select (Proxy @ChainInfo) cId
           for_ mcInfo $ yieldR . ChainDetails . (:[])
+      P2pNewOrgName cId org -> do
+        let formatted = CL.yellow $ format cId -- slava ukraini
+        let orgFormat = CL.blue $ format org -- need to decode from b16
+        $logInfoS "handleEvents/P2pNewOrgName" $ T.pack $ "New organization associated with chain " ++ formatted ++ " for org " ++ orgFormat
+        -- send chain IDs + orgName/unit to all nodes?
+        -- checkPeerIsMember' PubKey
+
       P2pBlockstanbul msg -> do
         let outbound = Blockstanbul msg
         $logDebugS "handleEvents/P2pBlockstanbul" . T.pack $ "Outgoing mesage: " ++ show outbound

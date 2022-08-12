@@ -54,6 +54,7 @@ module Blockchain.Sequencer.Monad
   , txHashRegistry
   , chainHashRegistry
   , chainIdRegistry
+  , orgNameChainsRegistry
   , getChainsDB
   , getTransactionsDB
   , ldbBatchOps
@@ -95,6 +96,7 @@ import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin
 import           Blockchain.Constants
 import           Blockchain.Data.ChainInfo
+import           Blockchain.Data.Enode
 import           Blockchain.Privacy
 import           Blockchain.Sequencer.CablePackage
 import           Blockchain.Sequencer.DB.DependentBlockDB
@@ -103,7 +105,7 @@ import           Blockchain.Sequencer.DB.GetTransactionsDB
 import           Blockchain.Sequencer.DB.SeenTransactionDB
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Metrics
-import           Blockchain.Strato.Model.ExtendedWord      (Word256)
+import           Blockchain.Strato.Model.ExtendedWord      (Word256, bytesToWord256) -- perhaps temporary
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 import qualified LabeledError
@@ -129,6 +131,7 @@ data SequencerContext = SequencerContext
   , _txHashRegistry      :: !(Map Keccak256 (Modification OutputTx))
   , _chainHashRegistry   :: !(Map Keccak256 (Modification ChainHashEntry))
   , _chainIdRegistry     :: !(Map Word256 (Modification ChainIdEntry))
+  , _orgNameChainsRegistry :: !(Map (OrgName, OrgUnit) (Modification Word256))
   , _getChainsDB         :: !GetChainsDB
   , _getTransactionsDB   :: !GetTransactionsDB
   , _ldbBatchOps         :: !(Q.Seq LDB.BatchOp)
@@ -225,6 +228,10 @@ instance HasNamespace ChainHashEntry where
 instance HasNamespace ChainIdEntry where
   type NSKey ChainIdEntry = Word256
   namespace _ = "ci:"
+
+instance HasNamespace OrgNameChains where
+  type NSKey OrgNameChains = Word256
+  namespace _ = "pnc:"
 
 lookupInLDB :: (Binary a, HasNamespace a, MonadIO m, Mod.Accessible LDB.DB m)
             => Mod.Proxy a -> NSKey a -> m (Maybe a)
@@ -349,6 +356,12 @@ instance (Keccak256 `A.Alters` DependentBlockEntry) SequencerM where
     modify' $ dbeRegistry . at k .~ Nothing
     addLdbBatchOps . (:[]) $ genericBatchDeleteDependentBlockDB k
 
+instance ((OrgName, OrgUnit) `A.Alters` Word256) SequencerM where
+  -- TODO: Just using this to sneak past the compiler... actually completethese these out
+  lookup _ _ = pure (Just $ bytesToWord256 $ C8.pack "deadbeef" )
+  insert _ _ _ = pure ()
+  delete _ _ = pure ()
+
 instance A.Selectable (Maybe Word256) ParentChainId SequencerM where
   select _ = \case
     Nothing -> pure . Just $ ParentChainId Nothing
@@ -454,6 +467,7 @@ runSequencerM c mbc m = do
             , _txHashRegistry      = M.empty
             , _chainHashRegistry   = M.empty
             , _chainIdRegistry     = M.empty
+            , _orgNameChainsRegistry = M.empty
             , _getChainsDB         = emptyGetChainsDB
             , _getTransactionsDB   = emptyGetTransactionsDB
             , _ldbBatchOps         = Q.empty

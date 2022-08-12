@@ -150,6 +150,7 @@ instance MonadIO m => A.Selectable OrgId OrgIdChains (MonadTest m) where
 
 instance MonadIO m => A.Selectable (OrgName, OrgUnit) OrgNameChains (MonadTest m) where
   select _ ip = M.lookup ip <$> use orgNameChainsMap
+
 instance MonadIO m => A.Selectable Keccak256 ChainTxsInBlock (MonadTest m) where
   select _ sha = M.lookup sha <$> use shaChainTxsInBlockMap
 
@@ -267,6 +268,12 @@ instance MonadIO m => (Word256 `A.Alters` ChainIdEntry) (MonadTest m) where
   insert = genericTestInsert $ sequencerContext . chainIdRegistry
   delete = genericTestDelete $ sequencerContext . chainIdRegistry
 
+instance MonadIO m => ((OrgName, OrgUnit) `A.Alters` Word256) (MonadTest m) where
+  lookup = genericTestLookup $ sequencerContext . orgNameChainsRegistry
+  insert = genericTestInsert $ sequencerContext . orgNameChainsRegistry
+  delete = genericTestDelete $ sequencerContext . orgNameChainsRegistry
+  
+
 instance MonadIO m => (Keccak256 `A.Alters` DBDB.DependentBlockEntry) (MonadTest m) where
   lookup _ k = use $ sequencerContext . dbeRegistry . at k
   insert _ k v = sequencerContext . dbeRegistry . at k ?= v
@@ -371,6 +378,7 @@ newSequencerContext bc = do
       , _txHashRegistry      = M.empty
       , _chainHashRegistry   = M.empty
       , _chainIdRegistry     = M.empty
+      , _orgNameChainsRegistry  = M.empty
       , _getChainsDB         = emptyGetChainsDB
       , _getTransactionsDB   = emptyGetTransactionsDB
       , _ldbBatchOps         = Q.empty

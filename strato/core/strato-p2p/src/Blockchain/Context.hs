@@ -60,7 +60,7 @@ import           Conduit
 import           Control.Applicative
 import           Control.Concurrent
 import           Control.Lens                          hiding (Context)
-import           Control.Arrow                         ((&&&))
+import           Control.Arrow                         ((&&&), (***))
 import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
 import           Control.Monad.Reader
@@ -262,6 +262,9 @@ instance MonadIO m => A.Selectable Word256 ChainInfo (ReaderT Config m) where
 instance MonadIO m => A.Selectable Keccak256 (Private (Word256, OutputTx)) (ReaderT Config m) where
   select _ = fmap (fmap Private) . RBDB.withRedisBlockDB . RBDB.getPrivateTransactions
 
+instance MonadIO m => ((OrgName, OrgUnit) `A.Alters` Word256) (ReaderT Config m) where
+  insert _ k v = void . RBDB.withRedisBlockDB $ RBDB.addOrgNameChain ((unOrgName *** unOrgUnit) k) v
+
 instance MonadIO m => (Keccak256 `A.Alters` OutputBlock) (ReaderT Config m) where
   lookup _     = RBDB.withRedisBlockDB . RBDB.getBlock
   insert _ k v = void . RBDB.withRedisBlockDB $ RBDB.insertBlock k v
@@ -442,6 +445,7 @@ type MonadP2P m = ( MonadIO m
                   , All2 '[A.Alters]
                       '[ '(Keccak256, BlockData)
                        , '(Keccak256, OutputBlock)
+                       , '((OrgName, OrgUnit), Word256)
                        , '(Keccak256, Proxy (Inbound WireMessage))
                        , '((T.Text, Keccak256), Proxy (Outbound WireMessage))
                        ] m
