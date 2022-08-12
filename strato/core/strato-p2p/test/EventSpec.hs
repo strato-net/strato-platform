@@ -690,10 +690,10 @@ spec = do
   describe "handleEvents" $ do
     it "should pong a ping" $
       runTestPeer $ do
-        runConduit $ yield (MsgEvt Ping) .| handleEvents testPeer .| sinkList `L.shouldReturn` [Right Pong]
+        runConduit $ yield (MsgEvt Ping) .| handleEvents testPeer False .| sinkList `L.shouldReturn` [Right Pong]
     it "should return empty BlockBodies to empty BlockHeaders" $
       runTestPeer $ do
-        runConduit $ yield (MsgEvt (BlockHeaders [])) .| handleEvents testPeer .| sinkList
+        runConduit $ yield (MsgEvt (BlockHeaders [])) .| handleEvents testPeer False .| sinkList
           `L.shouldReturn` [Right $ GetBlockBodies []]
     it "should forward blockstanbul messages" $ property $ withMaxSuccess 10 $ \wm ->
       let addr = blockstanbulSender wm
@@ -702,7 +702,7 @@ spec = do
         shouldSendToPeer addr `L.shouldReturn` True
         shouldSendToPeer 0xa `L.shouldReturn` True
         runConduit $ yield (MsgEvt (Blockstanbul wm))
-                           .| handleEvents testPeer
+                           .| handleEvents testPeer False
                            .| sinkList
            `L.shouldReturn` [Left $ ToUnseq [IEBlockstanbul wm]]
         -- Now that the peer is known to be addr, we should only send if they are designated
@@ -712,7 +712,7 @@ spec = do
     it "should broadcast blockstanbul messages" $ property $ withMaxSuccess 10 $ \wm ->
       runTestPeer $ do
         runConduit $ yield (NewSeqEvent (P2pBlockstanbul wm))
-                      .| handleEvents testPeer
+                      .| handleEvents testPeer False
                       .| sinkList
             `L.shouldReturn` [Right $ Blockstanbul wm]
         -- We should not mistake internal messages as the peers
@@ -721,7 +721,7 @@ spec = do
     it "should forward a timer to a TXQueue timeout" $ do
       runTestPeer $ do
         runConduit $ yield TimerEvt
-                      .| handleEvents testPeer
+                      .| handleEvents testPeer False
                       .| sinkList
             `L.shouldReturn` [Left TXQueueTimeout]
 

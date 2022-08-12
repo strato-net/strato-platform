@@ -65,6 +65,7 @@ import           Blockchain.EventModel
 import           Blockchain.EventException
 import           Blockchain.Options
 import           Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.MicroTime
@@ -76,6 +77,8 @@ import           Blockchain.Strato.Model.Class
 
 import           Blockapps.Crossmon                    (recordMaxBlockNumber)
 import           Blockchain.Metrics
+
+import           BlockApps.X509
 
 import qualified Text.Colors                           as CL
 import           Text.Format
@@ -119,8 +122,20 @@ yieldR = yield . Right
 yieldL :: Monad m => e -> ConduitT i (Either e a) m ()
 yieldL = yield . Left
 
-handleEvents :: MonadP2P m => PPeer -> ConduitM Event (Either P2PCNC Message) m ()
-handleEvents peer = awaitForever $ \case
+checkPeer :: MonadP2P m => PPeer -> ConduitM a b m ()
+checkPeer peer = do
+  let userAddressM = fromPublicKey . pointToSecPubKey <$> pPeerPubkey peer
+  userAddress' <- liftA2 fromMaybe (throwIO InvalidClientCert) (pure userAddressM)
+  -- Lookup in Redis with userAddress, isValid Field
+  clientCertDetails <- lift $ select (Proxy @X509CertInfoState) userAddress'
+  -- Throw error if the cert is not valid.
+  unless (maybe False isValid clientCertDetails) $ throwIO InvalidClientCert
+
+
+handleEvents :: MonadP2P m => PPeer -> Bool -> ConduitM Event (Either P2PCNC Message) m ()
+handleEvents peer check = awaitForever $ \i -> do
+  when check $ checkPeer peer
+  case i of
     MsgEvt Hello{}  -> error "A hello message appeared after the handshake"
     MsgEvt Status{} -> error "A status message appeared after the handshake"
 -- TODO remove distinction between new status messages and old ones once entire protocol is complete
@@ -196,8 +211,8 @@ handleEvents peer = awaitForever $ \case
               start' = case dir of
                 Forward -> num
                 Reverse -> if num > fromIntegral max'
-                             then num - fromIntegral max'
-                             else 1
+                            then num - fromIntegral max'
+                            else 1
           mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
           let count = (1 + skip') * min mrh (fromIntegral num)
           chain <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockData)) $ take count [start'..]
@@ -217,14 +232,14 @@ handleEvents peer = awaitForever $ \case
             existingParents <- lift $ lookupMany (Proxy @BlockData) parents
             let missingParents  = S.fromList parents S.\\ M.keysSet existingParents
             unless (S.null missingParents) $ do
-                 bestBlock <- lift $ Mod.get (Proxy @BestBlock)
-                 let fetchNumber = numberFromBestBlock bestBlock + 1
-                 $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "blockHeaders :: fetchNumber is " ++ show fetchNumber
-                 let lastParent = if M.null existingParents
+                bestBlock <- lift $ Mod.get (Proxy @BestBlock)
+                let fetchNumber = numberFromBestBlock bestBlock + 1
+                $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "blockHeaders :: fetchNumber is " ++ show fetchNumber
+                let lastParent = if M.null existingParents
                                     then fetchNumber
                                     else head . sort $ blockHeaderBlockNumber <$> M.elems existingParents
-                 $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "missing blocks: " ++ (unlines $ format <$> S.toList missingParents)
-                 syncFetch Reverse lastParent
+                $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "missing blocks: " ++ (unlines $ format <$> S.toList missingParents)
+                syncFetch Reverse lastParent
 
             let headerHashes = map (blockHeaderHash &&& id) headers
                 hashes = map fst headerHashes
@@ -269,9 +284,9 @@ handleEvents peer = awaitForever $ \case
           ptxs <- fmap M.elems . lift $ selectMany (Proxy @(Private (Word256, OutputTx))) pshas
           unless (null ptxs) . yieldR . Transactions $ morphTx  . snd . unPrivate <$> ptxs
         where getUntilMissing :: ( (Keccak256 `Selectable` ChainTxsInBlock) m
-                                 , (Word256 `Selectable` ChainMembers) m
-                                 , (Keccak256 `Alters` OutputBlock) m
-                                 )
+                                , (Word256 `Selectable` ChainMembers) m
+                                , (Keccak256 `Alters` OutputBlock) m
+                                )
                               => [Keccak256] -> DL.DList OutputBlock -> DL.DList Keccak256 -> m ([OutputBlock],[Keccak256])
               getUntilMissing []     bodies pshas = return (DL.toList bodies, DL.toList pshas)
               getUntilMissing (h:hs) bodies pshas = lookup (Proxy @OutputBlock) h >>= \case
@@ -281,10 +296,10 @@ handleEvents peer = awaitForever $ \case
                     mems <- selectMany (Proxy @ChainMembers) $ M.keys cIdTxsMap
                     let whenMissing f = WhenMissing (pure . M.map f) (\_ x -> (pure . Just $ f x))
                         trMems = merge (whenMissing This)
-                                       (whenMissing That)
-                                       (WhenMatched $ \_ x y -> pure . Just $ These x y)
-                                       cIdTxsMap
-                                       mems
+                                      (whenMissing That)
+                                      (WhenMatched $ \_ x y -> pure . Just $ These x y)
+                                      cIdTxsMap
+                                      mems
                         filtered = flip M.filter trMems $
                           mergeTheseWith (const False) (checkPeerIsMember peer) (||)
                         pshas' = M.foldr (DL.append . DL.fromList . these id (const []) const) DL.empty filtered
@@ -330,10 +345,10 @@ handleEvents peer = awaitForever $ \case
       msgExists <- lift $ exists (Proxy @(Proxy (Inbound WireMessage))) msgHash
       if msgExists
         then $logInfoS "handleEvents/Blockstanbul" . T.pack $ concat
-               [ "Already seen inbound wire message "
-               , format msgHash
-               , ". Not forwarding to Sequencer."
-               ]
+              [ "Already seen inbound wire message "
+              , format msgHash
+              , ". Not forwarding to Sequencer."
+              ]
         else do
           $logInfoS "handleEvents/Blockstanbul" . T.pack $ concat 
             [ "First time seeing inbound wire message "
@@ -358,7 +373,7 @@ handleEvents peer = awaitForever $ \case
       ptrs <- fmap (map unPrivate . M.elems) . lift $ selectMany (Proxy @(Private (Word256, OutputTx))) trHashes
       mems <- lift . selectMany (Proxy @ChainMembers) $ map fst ptrs
       let isMember cId = maybe False (checkPeerIsMember peer)
-                       $ M.lookup cId mems
+                      $ M.lookup cId mems
       yieldR . Transactions . map (morphTx . snd) $ filter (isMember . fst) ptrs
 
     MsgEvt (Disconnect _) -> do
@@ -417,11 +432,11 @@ handleEvents peer = awaitForever $ \case
         msgExists <- lift $ exists (Proxy @(Proxy (Outbound WireMessage))) (pPeerIp peer, msgHash)
         if msgExists
           then $logInfoS "handleEvents/P2pBlockstanbul" $ T.concat
-                 [ "Already seen outbound wire message "
-                 , T.pack (format msgHash)
-                 , ". Not forwarding to peer "
-                 , pPeerIp peer
-                 ]
+                [ "Already seen outbound wire message "
+                , T.pack (format msgHash)
+                , ". Not forwarding to peer "
+                , pPeerIp peer
+                ]
           else do
             $logInfoS "handleEvents/P2pBlockstanbul" $ T.concat
               [ "First time seeing outbound wire message "

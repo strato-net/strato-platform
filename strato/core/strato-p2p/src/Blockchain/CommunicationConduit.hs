@@ -213,7 +213,7 @@ handleMsgClientConduit myId peer = do
                 handleGetChainDetails peer S.empty
                 lift stampActionTimestamp
         other -> assertHandshake other
-    handleEvents peer .| filterMC (either (const $ return True) checkOutbound)
+    handleEvents peer False .| filterMC (either (const $ return True) checkOutbound)
 
 handleMsgServerConduit :: MonadP2P m
                        => Point
@@ -275,7 +275,7 @@ handleMsgServerConduit myPubkey peer = do
                   genesisHash = genHash
               })
         other -> assertHandshake other
-    handleEvents peer .| filterMC (either (const $ return True) checkOutbound)
+    handleEvents peer True .| filterMC (either (const $ return True) checkOutbound)
 
 awaitMsg :: (MonadIO m) => ConduitM Event (Either P2PCNC Message) m (Maybe Message)
 awaitMsg = await >>= \case
