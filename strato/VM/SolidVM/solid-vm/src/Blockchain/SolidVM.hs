@@ -928,7 +928,17 @@ runStatement (CC.SimpleStatement (CC.ExpressionStatement (CC.PlusPlus e))) = do
   return Nothing
 -}
 
-
+runStatement (CC.RevertStatement mString theArgs _) = do -- TODO make work with multiple args
+  case mString of 
+    Just x -> do todo "customError Functions to be implemented" x 
+    Nothing -> case theArgs of
+      CC.OrderedArgs xs -> do
+        newList <- forM xs $ \x -> do
+          y <- expToVar x
+          z <- getVar y
+          return z
+        revertError "REVERT" newList
+      CC.NamedArgs xs -> todo "Should handle named args" xs
 
 -- Assignment to an index into an array or mapping
 runStatement st@(CC.SimpleStatement (CC.ExpressionStatement (CC.Binary _ "=" dst@(CC.IndexAccess _ parent (Just indExp)) src)) pos) = do
