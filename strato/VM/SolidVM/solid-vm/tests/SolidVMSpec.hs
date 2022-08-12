@@ -24,8 +24,10 @@ import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.UTF8   as UTF8
 import Data.Coerce
 import qualified Data.Map as M
+import Data.Maybe
 import qualified Data.Set as S
 import qualified Data.Text as T
+import qualified Data.List as L
 import Data.Char
 import Data.Text.Encoding
 import Data.Time.Clock.POSIX
@@ -4967,6 +4969,41 @@ contract qq{
 }|]
     getFields ["mynum"] `shouldReturn` [BInteger 9]
 
+  it "can use msg.data" . runTest $ do
+    runBS [r|
+contract X {
+  function func2(uint _a, string _b, bool _c) pure public returns (string) {
+    return msg.data;
+  }
+}
+
+contract qq {
+  string s;
+  constructor() {
+    X x = new X();
+    s = x.func2(10, "hey", false);
+  }
+}|]
+    getFields ["s"] `shouldReturn` [BString "(10, hey, False)"]
+
+  it "can use msg.sig" . runTest $ do
+    runBS [r|
+contract X {
+  function func2(uint _a, string _b, bool _c) pure public returns (bytes4) {
+    return msg.sig;
+  }
+}
+
+contract qq {
+  bytes4 ss;
+  constructor() {
+    X x = new X();
+    ss = x.func2(10, "hey", false);
+  }
+}|]
+    let calldataHash = fromMaybe emptyHash $ stringKeccak256 "func2(uint,string,bool)"
+    getFields ["ss"] `shouldReturn` [BString $ BC.pack $ L.take 8 $ keccak256ToHex calldataHash ]
+
   it "can use free functions, free functions can access this" . runTest $ do
     runBS [r|
 pragma solidvm 3.3;
@@ -5209,6 +5246,7 @@ contract qq {
 }|]
     getFields ["result1", "result2", "result3", "result4"] `shouldReturn` [BInteger 3, BInteger 6, BInteger 1, BInteger 12]
 
+
   it "uint to string convertion test " . runTest $ do
     runBS [r|
 pragma solidvm 3.3;
@@ -5225,3 +5263,33 @@ contract qq {
   }
 }|]
     getFields ["a", "b", "c", "d"] `shouldReturn` [BInteger 1237655, BInteger 0x18884635, BInteger 0x12124567, BInteger 0x1f3479f6]
+
+  it "can declare custom errors and file level custom errors" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+error flError(string someString);
+
+contract qq {
+  error myError(uint num);
+  constructor() {
+  }
+}|]
+
+  it "can throw custom errors" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+
+contract qq {
+  string myString;
+  error myError (string message);
+  constructor() {
+    throwsError();
+  }
+  
+  function throwsError() {
+    throw myError("lmao pranked");
+    myString = "lmao pranked";
+  }
+}|]
+    getFields ["myString"] `shouldReturn` [BDefault]
+

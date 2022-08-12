@@ -46,6 +46,7 @@ statement =
           _ <- semi
           pure $ EmitStatement i (map ((,) Nothing) e) a
       )
+  <|> throwStatement
   <|> try (do
               ~(a, e) <- (withPosition variableDefinitionStatement) <* semi
               pure $ SimpleStatement e a 
@@ -112,9 +113,13 @@ tryCatchStatement = do
       s <- statements
       catchs <- many1 $ do
         reserved "catch"
-        ident <- identifier
+        err <- identifier
+        params <- optionMaybe (parens $ commaSep $ do
+            alias <- identifier
+            pure $ alias
+          )
         ss <- statements
-        pure (ident, ss)
+        pure (err, (params, ss))
       pure (s, catchs)
     pure $ TryCatchStatement test1 (Map.fromList test2) a
 
@@ -169,6 +174,15 @@ forStatement = do
     s <- statements
     pure (v1, v2, v3, s)
   pure $ ForStatement v1 v2 v3 s a
+
+throwStatement :: SolidityParser Statement
+throwStatement = do
+  ~(a, (errorExp)) <- withPosition $ do
+    reserved "throw"
+    errorExp <- expression
+    _ <- semi
+    pure $ (errorExp)
+  pure $ Throw errorExp a
 
 -- revert("foo") <|> revert({x: y, q: z})
 revertStatement :: SolidityParser Statement

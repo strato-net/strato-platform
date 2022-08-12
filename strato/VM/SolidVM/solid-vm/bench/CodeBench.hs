@@ -1,9 +1,12 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+
 import Control.DeepSeq
 import Criterion.Main
 import Data.Binary
+--import Data.Either
 import Data.ByteArray.Hash
 import Data.FileEmbed
 import qualified Data.ByteString.Char8 as BC
@@ -12,10 +15,13 @@ import qualified Data.Map as M
 import qualified Data.Text as T
 import Text.Parsec (runParser, ParseError)
 
-import Blockchain.Strato.Model.SHA
-import SolidVM.Solidity.Parse.Declarations
+import Blockchain.Strato.Model.Keccak256
+import Blockchain.SolidVM.CodeCollectionDB
+--import SolidVM.Solidity.Parse.Declarations
 import SolidVM.Solidity.Parse.File
-import CodeCollection
+--import SolidVM.CodeCollectionTools
+import SolidVM.Model.CodeCollection
+import SolidVM.Solidity.Parse.ParserTypes
 
 instance NFData ParseError where
   rnf = rwhnf
@@ -29,11 +35,9 @@ wingsContract = BC.unpack $(embedFile "bench/wings.sol")
 
 wingsCC :: CodeCollection
 wingsCC =
-  let file = either (error . show) id $ runParser solidityFile "" ""  wingsContract
-      namedContracts = [(T.unpack name, xabiToContract (T.unpack name) (map T.unpack parents') "" xabi)
-                        | NamedXabi name (xabi, parents') <- unsourceUnits file]
-  in applyInheritance . CodeCollection $ M.fromList namedContracts
-
+  let srcMap = M.singleton "Wings.sol" $ T.pack wingsContract
+   in either (error . show) id $ compileSource False srcMap
+   
 strBench :: Benchmark
 strBench = bench "time to pack the wings contract"
          $ nf BC.pack wingsContract
@@ -52,7 +56,7 @@ strSipBench = bench "time spent on (siphash) hashing the wings contract"
 
 parseBench :: Benchmark
 parseBench = bench "time required to parse the contract"
-           $ nf (runParser solidityFile "" "") wingsContract
+           $ nf (runParser solidityFile (ParserState "" "") "") wingsContract
 
 showCCBench :: Benchmark
 showCCBench = bench "time to show the wingsCC"
@@ -60,33 +64,27 @@ showCCBench = bench "time to show the wingsCC"
 
 hashCCBench :: Benchmark
 hashCCBench = bench "time to keccak the shown wingsCC"
-            $ nf hash (BC.pack $ show wingsCC)
+            $ nf hash (BC.pack . show $ wingsCC)
 
 hashCCShortBench :: Benchmark
 hashCCShortBench = bench "time to keccak the encoded wingsCC"
-                 $ nf hash (BL.toStrict $ encode wingsCC)
+                 $ nf hash (BL.toStrict $ encode wingsContract)
 
 sipCCBench :: Benchmark
 sipCCBench = bench "time to siphash the wingsCC"
            $ nf (sipHash (SipKey 0x8888 0x1432)) (BC.pack $ show wingsCC)
 
 readCC :: BC.ByteString -> CodeCollection
-readCC = read . BC.unpack
+readCC bStr =
+  let srcMap = M.singleton "Wings.sol" $ T.pack $ BC.unpack bStr
+   in either (error . show) id $ compileSource False srcMap
 
 readCCBench :: Benchmark
 readCCBench = bench "time to read the wingsCC"
-            $ nf readCC (BC.pack $ show wingsCC)
-
-encodeCCBench :: Benchmark
-encodeCCBench = bench "time to Data.Binary.encode wingsCC"
-              $ nf encode wingsCC
+            $ nf readCC (BC.pack $ wingsContract)
 
 decodeCC :: BL.ByteString -> CodeCollection
-decodeCC = decode
-
-decodeCCBench :: Benchmark
-decodeCCBench = bench "time to Data.Binary.decode wingsCC"
-              $ nf decodeCC (encode wingsCC)
+decodeCC = readCC . BL.toStrict
 
 main :: IO ()
 main = do
@@ -94,6 +92,5 @@ main = do
                    , parseBench, strBench
                    , hashCCShortBench, hashCCBench, sipCCBench
                    , showCCBench, readCCBench
-                   , encodeCCBench, decodeCCBench
                    ]
-  print (length wingsContract, length (show wingsCC), BL.length (encode wingsCC))
+  print (length wingsContract, length (show wingsCC), BL.length (encode wingsContract))

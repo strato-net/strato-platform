@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -16,6 +17,7 @@ module Data.Source.Annotation
   ) where
 
 import           Control.Lens              hiding ((.=))
+import           Control.DeepSeq
 import           Data.Aeson                as Aeson
 import           Data.Data
 import qualified Data.Map                  as M
@@ -33,7 +35,7 @@ data SourceAnnotation a = SourceAnnotation
   { _sourceAnnotationStart      :: SourcePosition
   , _sourceAnnotationEnd        :: SourcePosition
   , _sourceAnnotationAnnotation :: a
-  } deriving (Eq, Generic, Functor, Data)
+  } deriving (Eq, Generic, Functor, Data, NFData)
 
 instance ToJSON a => ToJSON (SourceAnnotation a) where
   toJSON ann = object [

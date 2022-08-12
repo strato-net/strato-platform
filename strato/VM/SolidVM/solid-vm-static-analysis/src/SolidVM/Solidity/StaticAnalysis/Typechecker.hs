@@ -85,6 +85,7 @@ showType (SVMType.Account _) = "account"
 showType (SVMType.UnknownLabel s _) = "label " <> labelToText s
 showType (SVMType.Struct _ n) = "struct " <> labelToText n
 showType (SVMType.Enum _ n _) = "enum " <> labelToText n
+showType (SVMType.Error _ n) = "error " <> labelToText n
 showType (SVMType.Array t l) = T.concat
                      [ showType t
                      , "["
@@ -147,6 +148,14 @@ lookupStruct name = do
   let str = fromMaybe [] $ msum [(M.lookup name (_structs c))  ,(M.lookup name (_flStructs cc))]
   pure $ f <$> str
   where f (t, ft, _) = (t, fieldTypeType ft)
+
+lookupError :: SolidString -> SSS [(SolidString, Type)]
+lookupError name = do
+  cc <- asks codeCollection
+  c <- asks contract
+  let err = fromMaybe [] $ msum [(M.lookup name (_errors c))  ,(M.lookup name (_flErrors cc))]
+  pure $ f <$> err
+  where f (t, ft, _) = (t, indexedTypeType ft)
 
 lookupContractFunction :: SourceAnnotation Text -> SolidString -> SolidString -> SSS Type'
 lookupContractFunction x cName fName = do
@@ -984,6 +993,8 @@ getVarTypeByName' name ctx = do
                  <|> (const (SVMType.Enum Nothing name Nothing, ctx) <$> M.lookup name (_flEnums cc))
                  <|> (const (SVMType.Struct Nothing name, ctx) <$> M.lookup name (_flStructs cc))
                  <|> (const (SVMType.Struct Nothing name, ctx) <$> M.lookup name (_structs c))
+                 <|> (const (SVMType.Error Nothing name, ctx) <$> M.lookup name (_errors c))
+                 <|> (const (SVMType.Error Nothing name, ctx) <$> M.lookup name (_flErrors cc))
       case mVarDecl of
         Just (e@(SVMType.Enum{}), ctx') -> pure . Sum $
           (Static e ctx') :|
@@ -997,6 +1008,13 @@ getVarTypeByName' name ctx = do
             (Static s ctx') :|
             [ Function fArgs (Static s ctx') ctx' []
             ]
+        Just (e@(SVMType.Error _ err), ctx') -> do
+          args <- fmap snd <$> lookupError err
+          let eArgs = flip Product ctx $ flip Static ctx <$> args
+          pure . Sum $
+            (Static e ctx') :|
+            [ Function eArgs (Static e ctx') ctx' []
+            ] 
         Just (t, ctx') -> pure $ Static t ctx'
         Nothing -> do
           case M.lookup name $ _functions c of
@@ -1064,7 +1082,7 @@ statementHelper (IfStatement cond thens mElse x) = do
   pure $ reduceType' x [cs, ts, es]
 statementHelper (TryCatchStatement tryStatmenets catchMap x) = do
   ts <- statementsHelper' x tryStatmenets
-  es <- statementsHelper' x (concatMap snd (M.toList catchMap))
+  es <- statementsHelper' x (concatMap (snd . snd) (M.toList catchMap))
   pure $ reduceType' x [ts, es]
 statementHelper (SolidityTryCatchStatement expr mtpl successStatements catchMap x) = do
   cs <- tcExpr expr
@@ -1111,7 +1129,9 @@ statementHelper (Return mExpr x) = do
         Just (Sum _) -> (Just t', locals) :| rest
         _ -> (ret, locals) :| rest
       pure t'
-statementHelper (Throw x) = pure $ topType' x
+statementHelper (Throw e x) = do
+  et <- tcExpr e
+  pure $ reduceType' x [et]
 statementHelper (ModifierExecutor x) = pure $ topType' x
 statementHelper (EmitStatement _ vals x) =
   reduceType' x <$> traverse (tcExpr . snd) vals
