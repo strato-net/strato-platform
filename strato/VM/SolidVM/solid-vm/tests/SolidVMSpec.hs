@@ -80,6 +80,10 @@ anyParseError :: Selector HandledException
 anyParseError (HE ParseError{}) = True
 anyParseError _ = False
 
+anyRevertError :: Selector HandledException
+anyRevertError (HE Blockchain.SolidVM.Exception.RevertError{}) = True
+anyRevertError _ = False
+
 anyUnknownFunc :: Selector HandledException
 anyUnknownFunc (HE UnknownFunction{}) = True
 anyUnknownFunc _ = False
@@ -5376,3 +5380,83 @@ contract qq {
      }
   }
 }|]) `shouldThrow` anyTypeError
+
+  it "revert sucessfully when invoked without arguments" $ runTest (do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  
+  uint a;
+  
+  constructor()
+  {
+    a=1;
+    randomFunction(1);
+  }
+
+  function randomFunction(uint checker)
+  {
+    if(a==checker)
+      revert(); 
+  } 
+}|]) `shouldThrow` anyRevertError
+
+  it "revert sucessfully when invoked with arguments" $ runTest (do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  
+  uint a;
+  
+  constructor()
+  {
+    a=1;
+    randomFunction(1);
+  }
+
+  function randomFunction(uint checker)
+  {
+    if(a==checker)
+      revert("logic flag"); 
+  } 
+}|]) `shouldThrow` anyRevertError
+
+  it "Revert customError TODO" $ runTest (do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  
+  uint a;
+  
+  constructor()
+  {
+    a=1;
+    randomFunction(1);
+  }
+
+  function randomFunction(uint checker)
+  {
+    if(a==checker)
+      revert f("ERROR"); 
+  } 
+}|]) `shouldThrow` anyTODO
+
+  it "Revert customError  TODO" $ runTest (do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  
+  uint a;
+  
+  constructor()
+  {
+    a=1;
+    randomFunction(1);
+  }
+
+  function randomFunction(uint checker)
+  {
+    if(a==checker)
+      revert f({x:'a',y:'b'}); 
+  } 
+}|]) `shouldThrow` anyTODO
