@@ -12,6 +12,7 @@ module SolidVM.Model.CodeCollection.ConstantDecl (
   ) where
 
 import           Data.Aeson
+import           Data.Binary
 import           Data.Source
 import           GHC.Generics
 import           Test.QuickCheck.Instances    ()
@@ -29,5 +30,6 @@ data ConstantDeclF a = ConstantDecl
 
 instance ToJSON a => ToJSON (ConstantDeclF a)
 instance FromJSON a => FromJSON (ConstantDeclF a)
+instance Binary a => Binary (ConstantDeclF a)
 
 type ConstantDecl = Positioned ConstantDeclF

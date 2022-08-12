@@ -12,6 +12,7 @@ module SolidVM.Model.CodeCollection.VariableDecl (
   ) where
 
 import           Data.Aeson
+import           Data.Binary
 import           Data.Source
 import           Control.DeepSeq
 import           GHC.Generics
@@ -30,5 +31,6 @@ data VariableDeclF a = VariableDecl
 
 instance ToJSON a => ToJSON (VariableDeclF a)
 instance FromJSON a => FromJSON (VariableDeclF a)
+instance Binary a => Binary (VariableDeclF a)
 
 type VariableDecl = Positioned VariableDeclF

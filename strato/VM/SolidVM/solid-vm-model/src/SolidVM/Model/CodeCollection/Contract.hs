@@ -24,6 +24,7 @@ module SolidVM.Model.CodeCollection.Contract (
 import Control.Lens
 import Control.DeepSeq
 import Data.Aeson as A
+import Data.Binary
 import Data.Map (Map)
 import Data.Source
 import GHC.Generics
@@ -54,6 +55,7 @@ data ContractF a =
 
 instance ToJSON a => ToJSON (ContractF a)
 instance FromJSON a => FromJSON (ContractF a)
+instance Binary a => Binary (ContractF a)
 
 type Contract = Positioned ContractF
 

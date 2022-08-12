@@ -30,6 +30,7 @@ module SolidVM.Model.CodeCollection (
 import Control.Lens
 import Control.DeepSeq
 import Data.Aeson as A
+import Data.Binary
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Source
@@ -62,6 +63,7 @@ data CodeCollectionF a =
 
 instance ToJSON a => ToJSON (CodeCollectionF a)
 instance FromJSON a => FromJSON (CodeCollectionF a)
+instance Binary a => Binary (CodeCollectionF a)
 
 type CodeCollection = Positioned CodeCollectionF
 

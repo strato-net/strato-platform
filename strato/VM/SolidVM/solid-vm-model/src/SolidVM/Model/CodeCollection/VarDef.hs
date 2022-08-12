@@ -8,6 +8,7 @@ module SolidVM.Model.CodeCollection.VarDef where
 import           Control.Lens              (mapped, (&), (?~))
 import           Control.DeepSeq
 import           Data.Aeson
+import           Data.Binary
 import qualified Data.HashMap.Lazy         as HashMap
 import           Data.Int                  (Int32)
 import           Data.Swagger
@@ -25,6 +26,8 @@ typeAesonOptions=defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="ty
 
 data IndexedType = IndexedType { indexedTypeIndex::Int32, indexedTypeType::Type }
                  deriving (Eq, Show, Generic, NFData)
+
+instance Binary IndexedType
 
 instance FromJSON IndexedType where
   parseJSON =
@@ -106,6 +109,8 @@ instance ToJSON FieldType where
       Object theMap = toJSON fieldTypeType
     in
       Object $ HashMap.insert "atBytes" (toJSON fieldTypeAtBytes) theMap
+
+instance Binary FieldType where
 
 instance Arbitrary FieldType where arbitrary = GR.genericArbitrary GR.uniform
 

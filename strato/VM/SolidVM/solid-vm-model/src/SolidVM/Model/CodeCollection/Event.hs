@@ -10,6 +10,7 @@ module SolidVM.Model.CodeCollection.Event
 
 import           Data.Aeson
 import           Data.Aeson.Types
+import           Data.Binary
 import           Control.DeepSeq
 import           Data.Source
 import           Data.Text                    (Text)
@@ -41,6 +42,8 @@ instance FromJSON a => FromJSON (EventF a) where
                      <*> (o .: "logs")
                      <*> (o .: "context")
   parseJSON o = typeMismatch "SolidVM.Event: Expected Object" o
+
+instance Binary a => Binary (EventF a) where
 
 instance Arbitrary a => Arbitrary (EventF a) where
   arbitrary = GR.genericArbitrary GR.uniform

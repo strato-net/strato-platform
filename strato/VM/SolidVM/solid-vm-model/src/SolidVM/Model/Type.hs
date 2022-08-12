@@ -8,6 +8,7 @@ module SolidVM.Model.Type where
 import           Control.Lens              (mapped, (&), (?~))
 import           Control.DeepSeq
 import           Data.Aeson
+import           Data.Binary
 import           Data.Int                  (Int32)
 import           Data.Swagger
 import qualified Generic.Random            as GR
@@ -42,6 +43,7 @@ instance ToJSON Type where
   toJSON = genericToJSON typeAesonOptions{omitNothingFields = True}
 instance FromJSON Type where
   parseJSON = genericParseJSON typeAesonOptions{omitNothingFields = True}
+instance Binary Type
 instance Arbitrary Type where arbitrary = GR.genericArbitrary GR.uniform
 instance ToSchema Type where
   declareNamedSchema proxy = genericDeclareNamedSchemaUnrestricted defaultSchemaOptions proxy

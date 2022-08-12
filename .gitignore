@@ -11,3 +11,5 @@ dryrun.log
 targets.log
 *.cabal
 *~
+strato-vscode/node_modules
+strato-vscode/out

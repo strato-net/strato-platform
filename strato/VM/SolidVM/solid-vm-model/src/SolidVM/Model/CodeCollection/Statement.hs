@@ -24,6 +24,7 @@ module SolidVM.Model.CodeCollection.Statement
   ) where
 
 import Data.Aeson
+import Data.Binary
 import Data.Source
 --import Data.Swagger
 import qualified Data.Map.Strict as Map
@@ -51,7 +52,7 @@ data StatementF a =
   | UncheckedStatement [StatementF a] a
   | SolidityTryCatchStatement (ExpressionF a) (Maybe [(String, Type)]) [StatementF a] (Map.Map String (Maybe (String, Type), [StatementF a])) a
   | TryCatchStatement [StatementF a] (Map.Map String (Maybe [String], [StatementF a])) a
-  deriving (Show, Eq, Generic, Functor, NFData, ToJSON, FromJSON)
+  deriving (Show, Eq, Generic, Functor, NFData, ToJSON, FromJSON, Binary)
 
 
 extractStatement :: StatementF a -> a
@@ -79,6 +80,7 @@ data Location = Memory | Storage | Calldata deriving (Show, Eq, Generic, NFData)
 
 instance ToJSON Location
 instance FromJSON Location
+instance Binary Location
 
 data VarDefEntryF a = BlankEntry
                     | VarDefEntry { vardefType :: Maybe Type
@@ -91,6 +93,7 @@ type VarDefEntry = Positioned VarDefEntryF
 
 instance ToJSON a => ToJSON (VarDefEntryF a)
 instance FromJSON a => FromJSON (VarDefEntryF a)
+instance Binary a => Binary (VarDefEntryF a)
 
 vardefLocation :: VarDefEntryF a -> Maybe Location
 vardefLocation BlankEntry = Nothing
@@ -112,6 +115,7 @@ type SimpleStatement = Positioned SimpleStatementF
 
 instance ToJSON a => ToJSON (SimpleStatementF a)
 instance FromJSON a => FromJSON (SimpleStatementF a)
+instance Binary a => Binary (SimpleStatementF a)
 
 -- Currently, the only supported inline assembly is:
 -- assembly {
@@ -122,6 +126,7 @@ data InlineAssembly = MloadAdd32 T.Text T.Text deriving (Show, Eq, Generic, NFDa
 
 instance ToJSON InlineAssembly
 instance FromJSON InlineAssembly
+instance Binary InlineAssembly
 
 data ExpressionF a =
   PlusPlus a (ExpressionF a)
@@ -164,6 +169,7 @@ type Expression = Positioned ExpressionF
 
 instance ToJSON a => ToJSON (ExpressionF a)
 instance FromJSON a => FromJSON (ExpressionF a)
+instance Binary a => Binary (ExpressionF a)
 
 data ArgListF a = OrderedArgs [ExpressionF a] | NamedArgs [(SolidString, (ExpressionF a))] deriving (Show, Eq, Generic, NFData,Functor) --Or String
 
@@ -171,8 +177,10 @@ type ArgList = Positioned ArgListF
 
 instance ToJSON a => ToJSON (ArgListF a)
 instance FromJSON a => FromJSON (ArgListF a)
+instance Binary a => Binary (ArgListF a)
 
 data NumberUnit = Wei | Szabo | Finney | Ether deriving (Show, Eq, Generic, NFData)
 
 instance ToJSON NumberUnit
 instance FromJSON NumberUnit
+instance Binary NumberUnit

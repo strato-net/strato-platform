@@ -23,6 +23,7 @@ import           Control.DeepSeq
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
+import           Data.Binary
 import           Data.Map.Strict              (Map)
 import           Data.Source
 import           Data.Swagger
@@ -59,6 +60,7 @@ instance FromJSON StateMutability where
           Just sm -> pure sm
           Nothing -> fail $ "invalid StateMutability: " ++ show t
 
+instance Binary StateMutability
 
 instance Arbitrary StateMutability where
   arbitrary = GR.genericArbitrary GR.uniform
@@ -87,6 +89,7 @@ data FuncF a = Func
 
 instance ToJSON a => ToJSON (FuncF a)
 instance FromJSON a => FromJSON (FuncF a)
+instance Binary a => Binary (FuncF a)
 
 type Func = Positioned FuncF
 
@@ -105,6 +108,7 @@ tShow' External = "external"
 instance ToJSON Visibility where
   toJSON = String . tShow'
 instance FromJSON Visibility
+instance Binary Visibility
 instance Arbitrary Visibility where arbitrary = GR.genericArbitrary GR.uniform
 instance ToSchema Visibility where
   declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
@@ -131,6 +135,8 @@ instance ToJSON a => ToJSON (ModifierF a) where
 
 instance FromJSON a => FromJSON (ModifierF a) where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
+
+instance Binary a => Binary (ModifierF a) where
 
 
 --------------------------------------------------------------------------------
