@@ -195,19 +195,6 @@ handleMsgClientConduit myId peer = do
                 when (peerGH /= genHash) $ throwIO WrongGenesisBlock
                 when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch networkID' computeNetworkID
                 when (S.difference rcs rootCerts' /= S.empty) $ throwIO RootCertificateMismatch
-
-                -- Approval of client will be satisfied when the chain details arrive
-                -- re-create mapping of (orgName, orgUnit) -> received chain Ids
-                -- use chainInfo metadata to map?
-                -- great success
-                let peerPub' = pointToSecPubKey $ fromMaybe (error "where da pubkey") $ pPeerPubkey peer
-                forM_ rcs $ \cs ->
-                  when (verifyCert peerPub' cs) $ do
-                      let subj = (OrgName . BC.pack . subOrg &&& OrgUnit . BC.pack . fromJust . subUnit) . fromJust $ getCertSubject cs -- then send chainID data to node
-                      cIds <- lift $ S.toList . unOrgNameChains . fromJust <$> A.select (A.Proxy @OrgNameChains) subj
-                      cInfos <- fmap M.toList . lift $ A.selectMany (A.Proxy @ChainInfo) cIds
-                      yield . Right $ ChainDetails cInfos
-
                 -- we set to 0 cause we dont necessarily know the number yet
                 lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
                 (BestBlockNumber lastBlockNumber) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
@@ -269,8 +256,10 @@ handleMsgServerConduit myPubkey peer = do
               forM_ rcs $ \cs ->
                 when (verifyCert peerPub' cs) $ do
                     let subj = (OrgName . BC.pack . subOrg &&& OrgUnit . BC.pack . fromJust . subUnit) . fromJust $ getCertSubject cs
+                        maybeSubUnit :: BC.ByteString -> BC.ByteString
+                        maybeSubUnit u = if u == BC.empty then BC.pack "" else BC.concat [BC.pack "/", u]
                         subjConcat :: T.Text
-                        subjConcat = T.pack $ BC.unpack (unOrgName (fst subj)) ++ "/" ++ BC.unpack (unOrgUnit (snd subj)) -- (a, b)
+                        subjConcat = T.pack $ BC.unpack $ BC.concat [unOrgName (fst subj), maybeSubUnit (unOrgUnit (snd subj))] -- (a, b)
                         organization = "organization"
                     cIds   <- lift $ S.toList . unOrgNameChains . fromJust <$> A.select (A.Proxy @OrgNameChains) subj
                     cInfos <- fmap M.toList . lift $ A.selectMany (A.Proxy @ChainInfo) cIds
