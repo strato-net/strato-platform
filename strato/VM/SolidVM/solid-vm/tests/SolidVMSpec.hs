@@ -4882,7 +4882,7 @@ contract qq{
   bool myStatus = false;
   constructor() public {
     addToNum({x: 1, y: true});
-    addToNum(0, randomFunc(3));
+    addToNum(0, randomFunc(3));name, value
     addToNum(1, "hi");
   }
 
@@ -4962,3 +4962,61 @@ contract qq{
   }
 }|]
     getFields ["mynum"] `shouldReturn` [BInteger 9]
+  
+  it "can create a user defined type" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+type UFixed256x18 is unint;
+contract qq {
+  uint mynum = 0;
+}|]
+    getFields ["mynum"] `shouldReturn` [BDefault]
+
+  it "can intialize a user defined type" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+type UFixed256x18 is bool;
+type magicInt is int;
+type MysticalString is string;
+contract qq {
+  UFixed256x18 cayley;
+  UFixed256x18 yoneda = UFixed256x18.wrap(true);
+  magicInt galois =  magicInt.wrap(123);
+  int banana = 12;
+  magicInt babyFood =  magicInt.wrap(12); //Delete this when done
+  magicInt adolescentFood =  magicInt.wrap(banana); 
+  magicInt adultFood;
+  MysticalString suffie  =  MysticalString.wrap("123");
+  constructor( ) public {
+    adultFood = babyFood;
+    //magicInt adultFood2 = magicInt.wrap(123);
+    //magicInt adultFood3 = adultFood2; //varByname <$> get
+    magicInt adultFood = magicInt.wrap(12);
+  }
+}|]
+    getFields ["cayley", "yoneda", "galois", "babyFood", "adultFood", "adolescentFood", "banana", "suffie"] `shouldReturn` [BDefault, BBool True, BInteger 123, BInteger 12, BInteger 12, BInteger 12, BInteger 12, BString "123"]
+    --Also I have to set the default. 
+    -- Fuck I have way more work to do on this this week....
+    -- I don't know if this will get done for demo day
+    -- Immutable, constant, binary operator... I basically want all my tickets that are under my power
+
+  it "cannot make this happen" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+type UFixed256x18 is asdasd;
+contract qq {
+  UFixed256x18 cayley = UFixed256x18.wrap("12");
+}|]--shoould throw error
+    getFields ["cayley"] `shouldReturn`[BInteger 12] -- productType' x <$> traverse tcEBInteger 12
+
+
+  it "can make this happen" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+type UFixed256x18 is int;
+contract qq {
+  UFixed256x18 cayley = UFixed256x18.wrap(true);
+  bool rezzy = UFixed256x18.unwrap(cayley);
+}|]
+    getFields ["rezzy"] `shouldReturn` [BInteger 12]
+

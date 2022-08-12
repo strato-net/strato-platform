@@ -38,9 +38,10 @@ import           SolidVM.Solidity.Xabi              (XabiF (..))
 import qualified SolidVM.Solidity.Xabi              as Xabi
 
 import           Blockchain.VM.SolidException
-
+--import Debug.Trace
 data SourceUnitF a = Pragma a Identifier String
                    | Import a Text.Text
+                   | Alias a String String
                    | NamedXabi Text.Text (XabiF a, [Text.Text])
                    | DummySourceUnit
                    deriving (Eq, Show, Generic, Functor)
@@ -265,6 +266,7 @@ simpleVariableDeclaration = do
   if isConstant
     then return (variableName, ConstantDeclaration $ SolidVM.ConstantDecl variableType isPublic (fromMaybe (parseError "constants must be initialized" variableName) value) ctx)
     else return (variableName, VariableDeclaration $ SolidVM.VariableDecl variableType isPublic value ctx isImmutable)
+    --else return $ trace ("WHAT IS SIMPLE DEC DECLARING AS " ++ (show variableType)) (variableName, VariableDeclaration $ SolidVM.VariableDecl variableType isPublic value ctx isImmutable)
 
 -- | Parses a function definition.
 --

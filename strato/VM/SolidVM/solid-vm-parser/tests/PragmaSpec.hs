@@ -33,7 +33,7 @@ dummyAnnotation =
 
 spec :: Spec
 spec = do
-  let pragmaParse = runParser solidityPragma (ParserState "" "") ""
+  let pragmaParse = runParser solidityPragma (ParserState "" "" []) ""
   describe "Pragma" $ do
     it "should fail without an identifier" $
       pragmaParse "pragma;" `shouldSatisfy` isLeft

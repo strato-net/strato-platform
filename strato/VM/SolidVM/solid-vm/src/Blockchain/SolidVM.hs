@@ -120,7 +120,7 @@ import           SolidVM.Solidity.Parse.ParserTypes
 import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpression)
 
 import           UnliftIO                             hiding (assert)
-
+import Debug.Trace
 -- | Copying from Data.List.Extra, since our version of the extra library seems to not contain it.
 -- | A total variant of the list index function `(!!)`.
 --
@@ -197,7 +197,7 @@ instance MonadSM m => Mod.Accessible [SourcePosition] m where
 
 runExpr :: MonadSM m => EvaluationRequest -> m EvaluationResponse
 runExpr exprText = withoutDebugging . withTempCallInfo True $ do -- TODO: allow write access once we figure out how to discard changes
-  let eExpr = runParser expression (ParserState "" "") "" (T.unpack exprText)
+  let eExpr = runParser expression (ParserState "" "" M.empty) "" (T.unpack exprText)
   case eExpr of
     Left pe -> pure . Left . T.pack $ show pe
     Right expr -> do
@@ -262,7 +262,7 @@ create _ _ _ blockData _ sender' origin' _ _ _ newAddress code txHash' chainId' 
 
     let maybeArgString = M.lookup "args" =<< metadata
         argString = maybe "()" T.unpack maybeArgString
-        maybeArgs = runParser parseArgs (ParserState "" "") "" argString
+        maybeArgs = runParser parseArgs (ParserState "" "" M.empty) "" argString
         !args = either (parseError "create arguments") CC.OrderedArgs maybeArgs
 
     (hsh, cc) <- codeCollectionFromSource True initCode
@@ -401,7 +401,7 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' cha
         !funcName = textToLabel $ fromMaybe (missingField "TX is missing a metadata parameter called 'funcName'" $ show metadata) maybeFuncName
         maybeArgString = M.lookup "args" =<< metadata
         !argString = T.unpack $ fromMaybe (missingField "TX is missing metadata parameter called 'args'" $ show metadata) maybeArgString
-        maybeArgs = runParser parseArgs (ParserState "" "") "" argString
+        maybeArgs = runParser parseArgs (ParserState "" "" M.empty) "" argString
         !args = either (parseError "call arguments") CC.OrderedArgs maybeArgs
 
     returnVal <- mapM encodeForReturn =<< callWrapper sender' codeAddress Nothing funcName isRCC args
@@ -657,7 +657,7 @@ argsToValsModifiers ctract md args =
                 return $ SMap valueType $ M.fromList m
                 where --go :: (SolidString, CC.Expression) -> (SolidString, (Value, Variable))
                       go (k, v) = do
-                                let !maybeExp = runParser literal (ParserState "" "") "" (labelToString k)
+                                let !maybeExp = runParser literal (ParserState "" "" M.empty) "" (labelToString k)
                                 case maybeExp of 
                                   Right ex -> do
                                     k' <- eval keyType ex
@@ -727,7 +727,7 @@ argsToVals ctract fn args =
                   m <- mapM go $ M.toList mp
                   return $ SMap valueType $ M.fromList m
                   where go (k, v) = do
-                                  let !maybeExp = runParser literal (ParserState "" "") "" k
+                                  let !maybeExp = runParser literal (ParserState "" "" M.empty) "" k
                                   case maybeExp of 
                                     Right ex -> do
                                       k' <- eval keyType ex
@@ -771,7 +771,7 @@ argsToVals ctract fn args =
                 return $ SMap valueType $ M.fromList m
                 where --go :: (SolidString, CC.Expression) -> (SolidString, (Value, Variable))
                       go (k, v) = do
-                                let !maybeExp = runParser literal (ParserState "" "") "" (labelToString k)
+                                let !maybeExp = runParser literal (ParserState "" "" M.empty) "" (labelToString k)
                                 case maybeExp of 
                                   Right ex -> do
                                     k' <- eval32 keyType ex
@@ -921,7 +921,6 @@ runStatement (CC.SimpleStatement (CC.ExpressionStatement (CC.PlusPlus e))) = do
 -}
 
 
-
 -- Assignment to an index into an array or mapping
 runStatement st@(CC.SimpleStatement (CC.ExpressionStatement (CC.Binary _ "=" dst@(CC.IndexAccess _ parent (Just indExp)) src)) pos) = do
   solidVMBreakpoint pos
@@ -982,10 +981,11 @@ runStatement st@(CC.SimpleStatement (CC.ExpressionStatement (CC.Binary _ "=" (CC
 
 
 runStatement (CC.SimpleStatement (CC.ExpressionStatement (CC.Binary _ "=" dst src)) pos) = do
+    
   solidVMBreakpoint pos
   srcVal <- getVar =<< expToVar src
   dstVar <- expToVar dst
-
+  --when (True) (internalError "RunStatement12345  " srcVal src)
   setVar dstVar srcVal
 
   cntrct <- getCurrentContract
@@ -1434,6 +1434,8 @@ expToVar' (CC.Variable _ "bytes") = do --TODO- remove this hardcoded case
 expToVar' (CC.Variable _ "now") =
   Constant . SInteger . round . utcTimeToPOSIXSeconds . blockDataTimestamp . Env.blockHeader <$> getEnv
 expToVar' (CC.Variable _ name) = do
+  --printABle <- (getVariableOfName name)
+  --when (True) (internalError "a expToVar'" printABle)
   getVariableOfName name
 
 expToVar' (CC.Unitary _ "-" e) = do
@@ -1621,6 +1623,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
           _ -> return . Constant . SReference . apSnoc apt $ MS.Field "length"
 
       (SReference p, itemName) -> return . Constant . SReference $ apSnoc p $ MS.Field $ BC.pack $ labelToString itemName
+      ((SUserDefined alias notSure actualType), "wrap") -> return . Constant $ (SUserDefined alias notSure actualType) -- return $ Constant . SUserDefined alias val actualType
       m -> typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ show m)
 {-
     Variable vref -> do
@@ -1854,7 +1857,7 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
               s <- stringLiteral
               return s
             return $ CC.StringLiteral a str
-      let saltExpression = runParser (stringParser <|> expression) (ParserState "" "") "" (saltText)
+      let saltExpression = runParser (stringParser <|> expression) (ParserState "" "" M.empty) "" (saltText)
       saltValue <- do
         case saltExpression of
           Left pe -> invalidArguments "big bad sad" pe
@@ -1865,6 +1868,57 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
 
 expToVar' (CC.FunctionCall _ e args) = do
   case e of -- FunctionCall Special Case when calling a function via Member Access
+    --TODO make sure variable nam  is a match-- Probably add this at the end
+    (CC.MemberAccess _ (CC.Variable a nam) "wrap") -> do
+      -- Look into contract
+      -- Find all user defined
+      -- See if the names are the same
+      -- Return proper Ss type
+      -- Otherwise do proper wrap function call?
+      -- OH I GET IT NOW. I am suppose to return the value of the assocaited name and wrap?
+      -- Is this possible. I get what it should be..
+      -- Oh I am suppose to use args
+
+      contract'' <- getCurrentContract
+      let userDefinedList =  filter (\ x-> case  CC.varType x of (SVMType.UserDefined nam' _) -> nam' == nam; _ -> False)  ( M.elems (CC._storageDefs contract''))
+      if length userDefinedList  > 0
+        then do 
+          case CC.varType $ head userDefinedList of
+            SVMType.UserDefined g gg -> do
+              --res' <- case head args of (CC.NumberLiteral a b )  --make this a maybe because args could be empty
+              argVals <- case args of
+                        CC.OrderedArgs as -> OrderedVals <$> mapM (getVar <=< expToVar) as
+                        CC.NamedArgs ns -> NamedVals <$> mapM (mapM $ getVar <=< expToVar) ns
+
+              case argVals of
+
+                OrderedVals [SBool vee] -> return $ trace 
+                  ("successy" ++ (show argVals) ++"\n\n]\t\t gggg "
+                  ++  (show (SVMType.UserDefined g gg) )
+                  ++ "\t" ++ (show args))
+                  (Constant $ (SUserDefined nam "Test in Expr"  (SBool vee ) ))
+                OrderedVals [SInteger vee] -> return  (Constant $ (SUserDefined nam "Test in Expr" (SInteger vee) ) )
+                OrderedVals [basic] -> return  (Constant $ (SUserDefined nam "Test in Expr" basic ) )
+                _ ->  return $ trace ( "failure to make love to " ++ (show a)  ) (Constant $ (SUserDefined nam "Test in Expr" (SBool True)))
+ -- return . (Constant $  y); --expToVar' 
+            _ -> return $ trace ( "failure here are the args you probably need to use" ++ (show a)  ) (Constant $ (SUserDefined nam "Test in Expr" (SBool True)))
+        else return $ typeError "use wrap function on a non user defined type" nam
+      -- return $ trace ("\n\n\t\t Expresion inside expToVar\t" ++(show e) ++
+      --   "\n\n\t\t _storageDefs contract''" ++ 
+      --   (show ( filter  (\ x-> case  CC.varType x of
+      --     (SVMType.UserDefined nam' _) -> nam' == nam 
+      --     _ -> False) ( M.elems (CC._storageDefs contract'')) )
+      --     ++ "\n\t\t a" ++ (show a)
+      --     ++"\nWhere is this member access function getting returned? Because I don't have the value"
+      --     )  -- ++
+      --   -- I need to create a function that
+      --   -- Finds weather nam matches as a UserDefined type
+      --   -- To return that type
+      --   -- Otherwise return Nothing
+      --   -- If nothing then do the regular express to var?
+      --   --"\n\n\t\t Namedd ARgs" ++ (show CC.NamedArgs)
+      --   )
+      --   (Constant $ (SUserDefined nam "Test in Expr" (SBool True)))
     (CC.MemberAccess _ (CC.Variable _ "Util") _) -> regularFunctionCall Nothing --Because of the hardcoded Util functions
     (CC.MemberAccess _ expr name) -> do
       var1 <- expToVar expr
@@ -2077,7 +2131,7 @@ expToVar' (CC.FunctionCall _ e args) = do
           -- How can we get a to resolve to a local variable instead of a path?
           -- StorageItem [Field a, Field b] -> todo "reinterpret as a function
 
-          _ -> typeError "cannot call non-function" var
+          _ -> (internalError "really bigg dsdfdsfs" e args) -- typeError "cannot call non-function" var
 
 {-
 SimpleStatement (ExpressionStatement (Binary "=" (Variable "tickets") (FunctionCall (NewExpression (SolidString "Hashmap")) [])))
@@ -2138,16 +2192,20 @@ expToVar' ep@(CC.Binary _ "=" (CC.IndexAccess _ _ Nothing) _) = do
 
 
 
+
+
 expToVar' (CC.Binary _ "=" dst src) = do
   srcVal <- getVar =<< expToVar src
   dstVar <- expToVar dst
 
   setVar dstVar srcVal
-  
+  --when (True)  (internalError "really bigg dsdfdsfs" dst src)
   return $ Constant srcVal
 
 
-expToVar' x = todo "expToVar/unhandled" x
+expToVar' x = do
+  --when (True) (internalError "really bigg dsdfdsfs" x)
+  todo "expToVar/unhandled" x
 
 --------------
 
@@ -2743,13 +2801,13 @@ runTheConstructors from to hsh cc contractName' argExps = do
           (n, CC.IndexedType{CC.indexedTypeType=t, CC.indexedTypeIndex=i}) <- argPairs]
   onTraced $ liftIO $ putStrLn $ box
     ["running constructor: "++labelToString contractName'++"("++intercalate ", " (map (labelToString . snd) argTypeNames)++")"]
-
+  --when (True ) (internalError "addLocalVariable called with an empty stack" (cc))
   argVals <- case argExps of
                   (CC.OrderedArgs []) -> do
-                    when (argCount > 0) $ invalidArguments "not enough arguments provided" argPairs
+                    when (argCount > 0) $ invalidArguments "not enough arguments provided OrderedArgs" argPairs
                     return $ OrderedVals []
                   (CC.NamedArgs []) -> do
-                    when (argCount > 0) $ invalidArguments "not enough arguments provided" argPairs
+                    when (argCount > 0) $ invalidArguments "not enough arguments provided NamedArgs" argPairs
                     return $ NamedVals []
                   _ -> argsToVals contract'
                                   (fromMaybe (invalidArguments ("arguments provided for missing constructor in contract " ++ labelToString contractName') argPairs)
@@ -2832,9 +2890,11 @@ runTheConstructors from to hsh cc contractName' argExps = do
                   _ -> True
             let (lhs,rhs) = foldr (\(a,b) (c,d) -> (a++c,b++d)) ([],[]) (map (span isNotModExec) modContentsList)
             logVals lhs rhs
+            --when (True) (internalError "My print statement (lhs, rhs) 2891  " commands)
             _ <- runStatements' lhs
             _ <- pushSender from $ runStatements commands
             _ <- runStatements' rhs
+            
             return ()
           else do
             let theModifierNames =  map fst $ (CC.funcModifiers theFunction) 
@@ -2849,6 +2909,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
               Nothing -> missingField "contract constructor has been declared but not defined" contractName'
               Just cms -> pure cms
             _ <- pushSender from $ runStatements commands
+            when (True) (internalError "addLocalVariable called with an empty stack123445" (contract'))
             return ()
 
       Nothing -> return ()
@@ -3315,6 +3376,9 @@ solidityExceptionHandler catchBlockMap ex = do
       return res
     (ImmutableError s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 25 immutableError
+      return res
+    (UserDefinedError s1 s2) -> do
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 26 userDefinedError
       return res
 
 solidVMExceptionHandler :: (MonadSM m) => (M.Map String [CC.Statement]) -> SolidException -> m (Maybe Value)

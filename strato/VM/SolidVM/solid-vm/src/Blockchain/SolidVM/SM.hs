@@ -109,6 +109,7 @@ import           SolidVM.Model.Value
 
 import           UnliftIO
 
+
 data CallInfo = CallInfo
   { currentFunctionName :: SolidString
   , currentAccount      :: Account
@@ -402,6 +403,32 @@ getVariableOfName name = do
       maybeEnum = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.CC.enums)) $
         t "enum" $ Constant $ SEnum name
 
+      maybeUserDefined :: Maybe Variable
+      maybeUserDefined = fmap (t "user defined" . Constant) $ do 
+        --let ctract = (length (filter (userDefinedHelper name )  [ CC.varType x | (_, x) <-  M.toList (currentContract currentCallInfo^.CC.storageDefs) ]) > 0)
+        --CC.ConstantDecl{..} <- M.lookup name $ ctract ^. CC.constants
+        let vvv = filter (userDefinedHelper name )  [ CC.varType x | (_, x) <-  M.toList (currentContract currentCallInfo^.CC.storageDefs) ]
+        if length vvv > 0
+          then return $ SolidVM.Model.Value.SUserDefined name "asd" (SInteger 122)
+          else return $ SolidVM.Model.Value.SUserDefined name "asd" (SBool True)
+
+        
+        
+        -- toMaybe (length (filter (userDefinedHelper name )  [ CC.varType x | (_, x) <-  M.toList (currentContract currentCallInfo^.CC.storageDefs) ]) > 0) $
+        -- t "user defined" $ Constant $ SolidVM.Model.Value.SUserDefined name "asd" (SBool True)
+      
+      userDefinedHelper :: String -> SVMType.Type  -> Bool
+      userDefinedHelper nam (SVMType.UserDefined a _)  = if a == nam then True else False
+      userDefinedHelper _ _ = False
+
+
+      --   toMaybe (name `elem` M.keys (currentContract currentCallInfo^.CC.enums)) $
+      --   t "enum" $ Constant $ SEnum name
+      --   if isInUserDefinedTypes name
+      --   then pure "user defined"  $ Constant $ SUserDefined name
+      --   else Nothing
+      -- (name `elem` M.keys (currentContract currentCallInfo^.CC.enums)) $ t "enum" $ Constant $ SEnum name
+
       maybeConstant :: Maybe Variable
       maybeConstant = fmap (t "constant constant" . Constant) $ do
         let ctract = currentContract currentCallInfo
@@ -458,7 +485,8 @@ getVariableOfName name = do
       , maybeContract
       , maybeThis
       , maybeConstant
-      , unknownVariable "getVariableOfName" name
+      , maybeUserDefined
+      , unknownVariable ("getVariableOfName" ++ (show (currentContract currentCallInfo^.CC.storageDefs)) )name
       ]
 
 getTypeOfName' :: SolidString -> CC.CodeCollection -> Typo
@@ -605,6 +633,8 @@ hintFromType = \case
  SVMType.Bytes{} -> return TString
  SVMType.Int{} -> return TInteger
  SVMType.String{} -> return TString
+ (SVMType.UserDefined _ SVMType.Bool{}) -> return TBool
+ (SVMType.UserDefined _ SVMType.Int{}) -> return TString
  SVMType.UnknownLabel s _ -> do
    t' <- getTypeOfName s
    case t' of

@@ -22,6 +22,7 @@ import           GHC.Generics
 import           Text.Parsec
 
 
+import           SolidVM.Solidity.Parse.Alias
 import           SolidVM.Solidity.Parse.Declarations
 import           SolidVM.Solidity.Parse.Imports
 import           SolidVM.Solidity.Parse.Lexer
@@ -35,7 +36,7 @@ newtype File = File {
 solidityFile :: SolidityParser File
 solidityFile = do
   whiteSpace
-  units <- many (solidityPragma <|> solidityImport <|> solidityContract)
+  units <- many (solidityPragma <|>  solidityAlias <|> solidityImport <|> solidityContract)
   eof
   return . File $ units
 

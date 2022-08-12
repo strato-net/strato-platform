@@ -102,6 +102,7 @@ toBasic = \case
   SContract n a -> MS.BContract n a
   SEnumVal k t num -> MS.BEnumVal k t num
   SMappingSentinel -> MS.BMappingSentinel
+  SUserDefined  _ _  x -> toBasic x
   x -> typeError "non basic solidity type cannot be stored atomically: " (show x)
 
 setVar :: MonadSM m => Variable -> Value -> m ()
@@ -111,6 +112,9 @@ setVar (Variable var) val = liftIO $ writeIORef var val
 setVal :: MonadSM m => Value -> Value -> m ()
 -- If val is a simple value, assign it. If it
 -- is deeper, read the subfields and assign to their adjustment
+
+setVal (SUserDefined a _ _) (SUserDefined _ _ _) = 
+  when (True) (internalError "Where are here" (a ))
 
 setVal (SReference dst) (SReference src) = do
   t <- getXabiValueType src
@@ -136,6 +140,7 @@ setVal (SReference dst) (SArray _ fs) = do
     let i' = fromIntegral i
     elementVal <- getVar $ fs V.! i
     setVal (SReference $ dst `apSnoc` MS.ArrayIndex i') elementVal
+
 
 
 setVal (STuple dstVector) (STuple srcVector) = 

@@ -98,6 +98,7 @@ data Value =
   | SString String
   | SBool Bool
   | SAccount NamedAccount Bool --isPayable
+  | SUserDefined SolidString SolidString Value
    -- This is a payable account, which means it can use .transfer() , .send() , .call() , .delegatecall() and .staticcall()
   | SEnum SolidString
   | SEnumVal SolidString SolidString Word32
@@ -111,6 +112,7 @@ data Value =
   | SBuiltinVariable SolidString
   | SSetterGetter String (Maybe Value)
   | SContractDef SolidString
+  -- | SBuiltinTypeF SolidString SolidString CodeCollection 
   | SContractItem NamedAccount SolidString
   | SContract SolidString NamedAccount
   | SContractFunction (Maybe SolidString) NamedAccount SolidString -- contractName, address, functionName

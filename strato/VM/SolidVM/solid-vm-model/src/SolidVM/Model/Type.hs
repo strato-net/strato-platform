@@ -30,6 +30,7 @@ data Type
   | Account {isPayable :: Bool}
   | UnknownLabel SolidString (Maybe SolidString)
   | Struct { bytes::Maybe Int32, typedef::SolidString}
+  | UserDefined { alias ::  SolidString, actual:: Type}
   | Enum { bytes::Maybe Int32, typedef::SolidString, names::Maybe [SolidString]}
   | Array { entry:: Type, length :: Maybe Word }
   | Contract {typedef::SolidString}

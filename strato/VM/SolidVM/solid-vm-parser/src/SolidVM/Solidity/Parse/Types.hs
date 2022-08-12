@@ -17,16 +17,18 @@ import           SolidVM.Solidity.Parse.Lexer
 import           SolidVM.Solidity.Parse.ParserTypes
 
 import qualified SolidVM.Model.Type         as SVMType
-
+--import SolidVM.Solidity.Parse.Lexer (identifier)
+import Debug.Trace
 
 -- | A type expression is either a composite type (arrays and mappings) or
 -- a simple type (builtins and user-defined names)
 simpleTypeExpression :: SolidityParser SVMType.Type
-simpleTypeExpression = try arrayType <|> simpleType <|> mappingType
+simpleTypeExpression = try arrayType <|> simpleType <|> mappingType  -- <|> userType
 
 -- | Parses builtins and user-defined names
 simpleType :: SolidityParser SVMType.Type
 simpleType =
+  --simple  "UFixed256x18" SVMType.Bool <|>
   simple "bool" SVMType.Bool <|>
   simple "address payable" (SVMType.Address True) <|>
   simple "address" (SVMType.Address False) <|>
@@ -54,7 +56,13 @@ simpleType =
       return $ SVMType.UnknownLabel name $ Just salt
     unknownLabelParser = try $ do
       name <- identifier
-      return $ SVMType.UnknownLabel name Nothing
+      isUserDefined <- isInUserDefinedTypes name
+      if isUserDefined
+        then do
+          typ <- getUserDefinedType name 
+          return $ (SVMType.UserDefined name (userTypeHelper' typ ))
+          --return $ trace ("Are you even prinitng anything Userdefined" ++ (show name) ) (SVMType.UserDefined name (userTypeHelper' typ ))
+        else return $ trace ("Are you even prinitng anything Label"  ++ (show name) ) (SVMType.UnknownLabel name Nothing)
     unknownLabelMemberParser = try $ do
       name <- concat <$> sequence[identifier, dot, identifier]
       return $ SVMType.UnknownLabel name Nothing
@@ -142,3 +150,23 @@ mappingType = do
     c <- simpleTypeExpression
     return (d, c)
   return $ SVMType.Mapping (Just True) mapDomT mapCodT
+
+-- userType :: SolidityParser SVMType.Type
+-- userType = do  
+--   return $ trace ("True in isInUserDefinedTypes")  (SVMType.Bool)
+  -- nex <- identifier 
+  -- boolan <- isInUserDefinedTypes nex
+  -- if  boolan
+  --   then return $ trace ("True in isInUserDefinedTypes")  (SVMType.Bool)
+  --   else return $ trace ("False not in  isInUserDefinedTypes") (SVMType.Bool)
+  -- where 
+  --   simple name nameType = do
+  --       reserved name
+  --       return nameType
+
+userTypeHelper' :: Maybe String -> SVMType.Type
+userTypeHelper' (Just "bool")   =  SVMType.Bool
+userTypeHelper' (Just "string") =  SVMType.String $ Just True
+userTypeHelper' (Just "int")    =  (SVMType.Int (Just True) Nothing) 
+userTypeHelper' (Just "uint")   =  (SVMType.Int (Just False) Nothing) 
+userTypeHelper' _             =  SVMType.Bool  --TODO fix this

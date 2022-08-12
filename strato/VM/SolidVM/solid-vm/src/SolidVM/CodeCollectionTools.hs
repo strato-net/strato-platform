@@ -113,6 +113,6 @@ resolveLabelsInDef contractDefs enumDefs structDefs x@VariableDecl{varType=SVMTy
     (_, True, _) -> x{varType=SVMType.Enum Nothing labelName Nothing}
     (_, _, True) -> x{varType=SVMType.Struct Nothing labelName}
     (True, _, _) -> x{varType=SVMType.Contract labelName}
-    _ -> x{varType=SVMType.UnknownLabel labelName Nothing}
+    _ -> x{varType=SVMType.UserDefined labelName (SVMType.UnknownLabel labelName Nothing)}
     -- _ -> error $ "unknown label in call to resolveLabelsInDef: " ++ labelName
 resolveLabelsInDef _ _ _ x = x

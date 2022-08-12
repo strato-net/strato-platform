@@ -115,7 +115,7 @@ main = do
     (fn:_) -> return fn
   contents <- readFile filename
   File parsedFile <- either (die . show) return
-              $ runParser solidityFile (ParserState "" "") "" contents
+              $ runParser solidityFile (ParserState "" "" M.empty) "" contents
   let pragmas = \case
         Pragma _ n v -> Just (n, v)
         _ -> Nothing

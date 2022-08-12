@@ -870,10 +870,135 @@ contract A {
 |]
     in length anns `shouldBe` 1
 
+  
+  it "cannot decalre a user defined to a to the underlying type " $
+    let anns = runTypechecker [r|
+  pragma solidvm 3.3;
+  type UFixed256x18 is int;
+  contract A {
+    UFixed256x18 cayley = 12;
+}
+|]
+    in length anns `shouldBe` 1
+
+  it "Must pass the associated type within the wrap function " $
+    let anns = runTypechecker [r|
+  pragma solidvm 3.3;
+  type UFixed256x18 is int;
+  contract A {
+    UFixed256x18 cayley = UFixed256x18.wrap("12");
+}
+|]
+    in length anns `shouldBe` 1
+
+  it "Must pass the associated type within the wrap function " $
+    let anns = runTypechecker [r|
+  pragma solidvm 3.3;
+  type UFixed256x18 is int;
+  contract A {
+    string helper = "1234"
+    UFixed256x18 cayley = UFixed256x18.wrap(helper);
+}
+|]
+    in length anns `shouldBe` 1
+
+  it "Must pass the associated type within the wrap function " $
+    let anns = runTypechecker [r|
+  pragma solidvm 3.3;
+  type UFixed256x18 is int;
+  contract A {
+    string helper = "1234"
+    UFixed256x18 cayley = UFixed256x18.wrap(helper);
+}
+|]
+    in length anns `shouldBe` 1
+
+  it " Should work" $
+    let anns = runTypechecker [r|
+    pragma solidvm 3.3;
+    
+    type UBool is bool;
+    type MagicInt is int;
+    type MysticalString is string;
+    
+    contract A {
+      UBool cayley;
+      UBool yoneda = UBool.wrap(true);
+    }
+|]
+    in length anns `shouldBe` 0
 
 
+  it " Should work" $
+    let anns = runTypechecker [r|
+    pragma solidvm 3.3;
+    
+    type UBool is bool;
+    type MagicInt is int;
+    type MysticalString is string;
+    
+    contract A {
+      int name =3;
+      string number ="3";
+      MagicInt name = MagicInt.wrap(12); 
+      MysticalString shakeYo = MysticalString.wrap("string");
+      MysticalString shakeYo2 = MysticalString.wrap(name);//Should throw error
+    }
+|]
+    in length anns `shouldBe` 1
 
+  it "Should throw error work" $
+    let anns = runTypechecker [r|
+    pragma solidvm 3.3;
+    type MysticalString is string;
+    
+    contract A {
+      MysticalString shakeYo = MysticalString.wrap("string");
+      MysticalString shakeYo2 = MysticalString.wrap(shakeYo); //Should throw error
+      //MagicInt galois =  MagicInt.wrap(123);
+      //int banana = 12;
+      //MagicInt adolescentFood =  MagicInt.wrap(banana);
+      //MagicInt yoneda = UFixed256x18.wrap(true); // Should throw Error
+    }
+|]
+    in length anns `shouldBe` 1
 
+  fit "should work" $
+    let anns = runTypechecker [r|
+    pragma solidvm 3.3;
+    type MagicInt is int;
+    contract A {
+      int banana = 12;
+      MagicInt adolescentFood =  MagicInt.wrap(banana);
+    }
+|]
+    in length anns `shouldBe` 0
 
+  fit "Can not assign user type to user type" $
+    let anns = runTypechecker [r|
+    pragma solidvm 3.3;
+    type MagicInt is int;
+    type UBool is bool;
+    contract A {
+      int banana = 12;
+      MagicInt adolescentFood =  MagicInt.wrap(banana);
+      MagicInt yoneda         = UBool.wrap(true);
+    }
+|]
+    in length anns `shouldBe` 1
 
-
+  fit " Should work" $
+    let anns = runTypechecker [r|
+  pragma solidvm 3.3;
+  type UBool is bool;
+  type MagicInt is int;
+  type MysticalString is string;
+  contract qq {
+    UBool cayley;
+    MagicInt galois =  MagicInt.wrap(123);
+    MagicInt adultFood;
+    MysticalString suffie  =  MysticalString.wrap("123");
+    UBool cayley = UBool.wrap(false);
+}
+|]
+    in length anns `shouldBe` 0

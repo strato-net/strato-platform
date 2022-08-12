@@ -62,7 +62,7 @@ withAnnotations f = first unwind . f
         unwind (TCEx errs) = errs
 
 parseSource :: T.Text -> T.Text -> Either ParseTypeCheckOrSolidVMError [SourceUnit]
-parseSource fileName src = bimap PEx unsourceUnits $ runParser solidityFile (ParserState "" "") (T.unpack fileName) (T.unpack src)
+parseSource fileName src = bimap PEx unsourceUnits $ runParser solidityFile (ParserState "" "" M.empty) (T.unpack fileName) (T.unpack src)
 
 parseSourceWithAnnotations :: T.Text -> T.Text -> Either [SourceAnnotation T.Text] [SourceUnit]
 parseSourceWithAnnotations = withAnnotations . parseSource
@@ -150,6 +150,7 @@ codeCollectionFromSource typeCheck initCode = do
                  Left (SVMEx (s, _)) -> throw s
                  Left (TCEx xs) -> typeError "Typechecker" (typeErrorToAnnotation xs)
       let codeMap' = M.insert hsh cc codeMap
+       
       recordCacheSize $ M.size codeMap'
       liftIO $ writeIORef unsafeCodeMapIORef codeMap'
       return $ assert (hsh == hsh') (hsh, cc)

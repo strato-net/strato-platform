@@ -36,6 +36,7 @@ unparse (File units) = List.concat $ List.map unparseSourceUnit units
 unparseSourceUnit :: SourceUnit -> String
 unparseSourceUnit (Pragma _ ident contents) = "pragma " ++ ident ++ " " ++ contents ++ ";\n"
 unparseSourceUnit (Import _ path) = "import \"" ++ Text.unpack path ++ "\";\n"
+unparseSourceUnit (Alias _ ident orignal) = "type \"" ++ ident ++" "++ orignal ++ "\";\n"
 unparseSourceUnit (DummySourceUnit) = "DummySourceUnit"
 unparseSourceUnit (NamedXabi name (contract,inherited)) =
      (case xabiKind contract of

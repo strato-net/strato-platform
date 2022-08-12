@@ -2,6 +2,7 @@ name: solid-vm-parser
 
 dependencies:
   - base
+  - containers
 
 library:
   source-dirs: src/
