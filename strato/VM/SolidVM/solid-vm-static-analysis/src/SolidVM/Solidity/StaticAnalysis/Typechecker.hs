@@ -1056,6 +1056,21 @@ statementHelper (IfStatement cond thens mElse x) = do
   es <- statementsHelper' x $ fromMaybe [] mElse
   pure $ reduceType' x [cs, ts, es]
 statementHelper (TryCatchStatement tryStatmenets catchMap x) = do
+  cc <- asks codeCollection
+  cntrct <- asks contract
+  let errorParams = concatMap (\y -> case M.lookup y $ _errors cntrct of
+                                  Just z -> pure $ z
+                                  Nothing -> case M.lookup y $ _flErrors cc of
+                                    Just z -> pure $ z
+                                    Nothing -> []
+                                ) $ M.keys catchMap
+      zipped = map (\(y, Just z) -> zip y z) $ zip errorParams $ map (fst . snd) (M.toList catchMap)
+      paramsToDefs :: [((String, IndexedType, a), String)] -> [Annotated VarDefEntryF]
+      paramsToDefs [] = []
+      paramsToDefs (((_, a, _), b):xs) = (VarDefEntry (Just $ indexedTypeType a) Nothing b x) : (paramsToDefs xs)
+      localVarDefs = concatMap paramsToDefs zipped
+
+  pushLocalVariables localVarDefs
   ts <- statementsHelper' x tryStatmenets
   es <- statementsHelper' x (concatMap snd (M.toList catchMap))
   pure $ reduceType' x [ts, es]
