@@ -85,6 +85,7 @@ showType (SVMType.Account _) = "account"
 showType (SVMType.UnknownLabel s _) = "label " <> labelToText s
 showType (SVMType.Struct _ n) = "struct " <> labelToText n
 showType (SVMType.Enum _ n _) = "enum " <> labelToText n
+showType (SVMType.Error _ n) = "error " <> labelToText n
 showType (SVMType.Array t l) = T.concat
                      [ showType t
                      , "["
@@ -136,15 +137,25 @@ varDefsToType' VarDefEntry{..} _              = bottom $ "Could not match variab
 
 lookupEnum :: SolidString -> SSS [SolidString]
 lookupEnum name = do
+  cc <- asks codeCollection
   c <- asks contract
-  pure . maybe [] fst $ M.lookup name (_enums c)
+  pure . maybe [] fst $ msum [(M.lookup name (_enums c)), (M.lookup name (_flEnums cc))]
 
 lookupStruct :: SolidString -> SSS [(SolidString, Type)]
 lookupStruct name = do
+  cc <- asks codeCollection
   c <- asks contract
-  let str = fromMaybe [] $ M.lookup name (_structs c)
+  let str = fromMaybe [] $ msum [(M.lookup name (_structs c))  ,(M.lookup name (_flStructs cc))]
   pure $ f <$> str
   where f (t, ft, _) = (t, fieldTypeType ft)
+
+lookupError :: SolidString -> SSS [(SolidString, Type)]
+lookupError name = do
+  cc <- asks codeCollection
+  c <- asks contract
+  let err = fromMaybe [] $ msum [(M.lookup name (_errors c))  ,(M.lookup name (_flErrors cc))]
+  pure $ f <$> err
+  where f (t, ft, _) = (t, indexedTypeType ft)
 
 lookupContractFunction :: SourceAnnotation Text -> SolidString -> SolidString -> SSS Type'
 lookupContractFunction x cName fName = do
@@ -650,8 +661,9 @@ contractHelper cc c =
       funcsAndConstr = constr <> _functions c
       varTypes' = reduceType' (_contractContext c) $ varDeclHelper cc c <$> M.elems (_storageDefs c)
       constTypes' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_constants c)
-      funcTypes' = reduceType' (_contractContext c) $ uncurry (functionHelper cc c) <$> M.toList funcsAndConstr 
-   in reduceType' (_contractContext c) [varTypes', constTypes', funcTypes']
+      constTypes'' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_flConstants cc)
+      funcTypes' = reduceType' (_contractContext c) $ uncurry (functionHelper cc c) <$> M.toList funcsAndConstr
+   in reduceType' (_contractContext c) [varTypes', constTypes', funcTypes', constTypes'']
 
 varDeclHelper :: Annotated CodeCollectionF
               -> Annotated ContractF
@@ -962,10 +974,16 @@ getVarTypeByName' name ctx = do
       Nothing -> pure $ Top (S.singleton name) ctx
     Nothing -> do
       c <- asks contract
+      cc <- asks codeCollection
       let mVarDecl = ((varType &&& const ctx) <$> M.lookup name (_storageDefs c))
                  <|> ((constType &&& const ctx) <$> M.lookup name (_constants c))
+                 <|> ((constType &&& const ctx) <$> M.lookup name (_flConstants cc))
                  <|> (const (SVMType.Enum Nothing name Nothing, ctx) <$> M.lookup name (_enums c))
+                 <|> (const (SVMType.Enum Nothing name Nothing, ctx) <$> M.lookup name (_flEnums cc))
+                 <|> (const (SVMType.Struct Nothing name, ctx) <$> M.lookup name (_flStructs cc))
                  <|> (const (SVMType.Struct Nothing name, ctx) <$> M.lookup name (_structs c))
+                 <|> (const (SVMType.Error Nothing name, ctx) <$> M.lookup name (_errors c))
+                 <|> (const (SVMType.Error Nothing name, ctx) <$> M.lookup name (_flErrors cc))
       case mVarDecl of
         Just (e@(SVMType.Enum{}), ctx') -> pure . Sum $
           (Static e ctx') :|
@@ -979,24 +997,40 @@ getVarTypeByName' name ctx = do
             (Static s ctx') :|
             [ Function fArgs (Static s ctx') ctx' []
             ]
+        Just (e@(SVMType.Error _ err), ctx') -> do
+          args <- fmap snd <$> lookupError err
+          let eArgs = flip Product ctx $ flip Static ctx <$> args
+          pure . Sum $
+            (Static e ctx') :|
+            [ Function eArgs (Static e ctx') ctx' []
+            ] 
         Just (t, ctx') -> pure $ Static t ctx'
-        Nothing -> case M.lookup name $ _functions c of
-          Just Func{..} ->
-            let fArgs = flip Product ctx $ flip Static ctx . indexedTypeType . snd <$> funcArgs
-                fRets = flip Product ctx $ flip Static ctx . indexedTypeType . snd <$> funcVals
-             in pure $ Function fArgs fRets ctx $ fmap buildOverloads funcOverload
-          Nothing -> do
-            cc <- asks codeCollection
-            pure $ case M.lookup name $ _contracts cc of
-              Just _->
-                let ctrct = Static (SVMType.Contract name) ctx
-                    lbl = Static (SVMType.UnknownLabel name Nothing) ctx
-                 in Sum $ ctrct :|
-                        [Function (Sum (Static (SVMType.Account False) ctx :| [ctrct, lbl]))
-                           ctrct
-                           ctx
-                           []]
-              Nothing -> bottom $ ("Unknown variable: " <> labelToText name) <$ ctx
+        Nothing -> do
+          case M.lookup name $ _functions c of
+            Just theFunc->
+              let fArgs = flip Product ctx $ flip Static ctx . indexedTypeType . snd <$> funcArgs theFunc
+                  fRets = flip Product ctx $ flip Static ctx . indexedTypeType . snd <$> funcVals theFunc
+                  allFuncOverloads = case M.lookup name $ _flFuncs cc of
+                    Just freeFunc -> (fmap buildOverloads $ funcOverload theFunc) ++ [buildOverloads freeFunc] ++ (fmap buildOverloads $ funcOverload freeFunc)
+                    Nothing -> fmap buildOverloads $ funcOverload theFunc
+              in pure $ Function fArgs fRets ctx allFuncOverloads
+            Nothing -> do
+              pure $ case M.lookup name $ _contracts cc of
+                Just _->
+                  let ctrct = Static (SVMType.Contract name) ctx
+                      lbl = Static (SVMType.UnknownLabel name Nothing) ctx
+                  in Sum $ ctrct :|
+                          [Function (Sum (Static (SVMType.Account False) ctx :| [ctrct, lbl]))
+                            ctrct
+                            ctx
+                            []]
+                Nothing -> do
+                  case M.lookup name $ _flFuncs cc of
+                      Just Func{..} ->
+                        let fArgs = flip Product ctx $ flip Static ctx . indexedTypeType . snd <$> funcArgs
+                            fRets = flip Product ctx $ flip Static ctx . indexedTypeType . snd <$> funcVals
+                        in Function fArgs fRets ctx $ fmap buildOverloads funcOverload
+                      Nothing -> bottom $ ("Unknown variable: " <> labelToText name) <$ ctx
             
   where lookupVar m Nothing = M.lookup name m
         lookupVar _ t       = t
@@ -1036,8 +1070,23 @@ statementHelper (IfStatement cond thens mElse x) = do
   es <- statementsHelper' x $ fromMaybe [] mElse
   pure $ reduceType' x [cs, ts, es]
 statementHelper (TryCatchStatement tryStatmenets catchMap x) = do
+  cc <- asks codeCollection
+  cntrct <- asks contract
+  let errorParams = concatMap (\y -> case M.lookup y $ _errors cntrct of
+                                  Just z -> pure $ z
+                                  Nothing -> case M.lookup y $ _flErrors cc of
+                                    Just z -> pure $ z
+                                    Nothing -> []
+                                ) $ M.keys catchMap
+      zipped = map (\(y, Just z) -> zip y z) $ zip errorParams $ map (fst . snd) (M.toList catchMap)
+      paramsToDefs :: [((String, IndexedType, a), String)] -> [Annotated VarDefEntryF]
+      paramsToDefs [] = []
+      paramsToDefs (((_, a, _), b):xs) = (VarDefEntry (Just $ indexedTypeType a) Nothing b x) : (paramsToDefs xs)
+      localVarDefs = concatMap paramsToDefs zipped
+
+  pushLocalVariables localVarDefs
   ts <- statementsHelper' x tryStatmenets
-  es <- statementsHelper' x (concatMap snd (M.toList catchMap))
+  es <- statementsHelper' x (concatMap (snd . snd) (M.toList catchMap))
   pure $ reduceType' x [ts, es]
 statementHelper (SolidityTryCatchStatement expr mtpl successStatements catchMap x) = do
   cs <- tcExpr expr
@@ -1084,7 +1133,9 @@ statementHelper (Return mExpr x) = do
         Just (Sum _) -> (Just t', locals) :| rest
         _ -> (ret, locals) :| rest
       pure t'
-statementHelper (Throw x) = pure $ topType' x
+statementHelper (Throw e x) = do
+  et <- tcExpr e
+  pure $ reduceType' x [et]
 statementHelper (ModifierExecutor x) = pure $ topType' x
 statementHelper (EmitStatement _ vals x) =
   reduceType' x <$> traverse (tcExpr . snd) vals

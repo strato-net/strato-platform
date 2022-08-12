@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveAnyClass #-}
 
 module SolidVM.Model.CodeCollection.Contract (
   ContractF(..),
@@ -11,6 +12,7 @@ module SolidVM.Model.CodeCollection.Contract (
   storageDefs,
   enums,
   structs,
+  errors,
   events,
   functions,
   modifiers,
@@ -20,6 +22,7 @@ module SolidVM.Model.CodeCollection.Contract (
   ) where
 
 import Control.Lens
+import Control.DeepSeq
 import Data.Aeson as A
 import Data.Map (Map)
 import Data.Source
@@ -40,13 +43,14 @@ data ContractF a =
     _storageDefs :: Map SolidString (VariableDeclF a),
     _enums :: Map SolidString ([SolidString], a),
     _structs :: Map SolidString [(SolidString, SolidVM.FieldType, a)],
+    _errors :: Map SolidString [(SolidString, SolidVM.IndexedType, a)],
     _events :: Map SolidString (SolidVM.EventF a),
     _functions :: Map SolidString (FuncF a),
     _constructor :: Maybe (FuncF a),
     _modifiers :: Map SolidString (ModifierF a),
     _vmVersion :: String,
     _contractContext :: a
-  } deriving (Show, Generic, Functor)
+  } deriving (Show, Generic, NFData, Functor)
 
 instance ToJSON a => ToJSON (ContractF a)
 instance FromJSON a => FromJSON (ContractF a)

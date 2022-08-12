@@ -24,8 +24,10 @@ import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.UTF8   as UTF8
 import Data.Coerce
 import qualified Data.Map as M
+import Data.Maybe
 import qualified Data.Set as S
 import qualified Data.Text as T
+import qualified Data.List as L
 import Data.Char
 import Data.Text.Encoding
 import Data.Time.Clock.POSIX
@@ -82,6 +84,10 @@ anyUnknownFunc :: Selector HandledException
 anyUnknownFunc (HE UnknownFunction{}) = True
 anyUnknownFunc _ = False
 
+anyUnknownVariableError :: Selector HandledException
+anyUnknownVariableError (HE Blockchain.SolidVM.Exception.UnknownVariable{}) = True
+anyUnknownVariableError _ = False
+
 anyTypeError :: Selector HandledException
 anyTypeError (HE Blockchain.SolidVM.Exception.TypeError{}) = True
 anyTypeError _ = False
@@ -109,6 +115,10 @@ anyMissingFieldError _ = False
 anyDivideByZeroError :: Selector HandledException
 anyDivideByZeroError (HE Blockchain.SolidVM.Exception.DivideByZero{}) = True
 anyDivideByZeroError _ = False
+
+anyCustomError :: Selector HandledException
+anyCustomError (HE Blockchain.SolidVM.Exception.CustomError{}) = True
+anyCustomError _ = False
 
 anyMissingTypeError :: Selector HandledException
 anyMissingTypeError (HE Blockchain.SolidVM.Exception.MissingType{}) = True
@@ -5007,8 +5017,252 @@ contract qq{
   }
 }|]
     getFields ["mynum"] `shouldReturn` [BInteger 9]
+
+  it "can use msg.data" . runTest $ do
+    runBS [r|
+contract X {
+  function func2(uint _a, string _b, bool _c) pure public returns (string) {
+    return msg.data;
+  }
+}
+
+contract qq {
+  string s;
+  constructor() {
+    X x = new X();
+    s = x.func2(10, "hey", false);
+  }
+}|]
+    getFields ["s"] `shouldReturn` [BString "(10, hey, False)"]
+
+  it "can use msg.sig" . runTest $ do
+    runBS [r|
+contract X {
+  function func2(uint _a, string _b, bool _c) pure public returns (bytes4) {
+    return msg.sig;
+  }
+}
+
+contract qq {
+  bytes4 ss;
+  constructor() {
+    X x = new X();
+    ss = x.func2(10, "hey", false);
+  }
+}|]
+    let calldataHash = fromMaybe emptyHash $ stringKeccak256 "func2(uint,string,bool)"
+    getFields ["ss"] `shouldReturn` [BString $ BC.pack $ L.take 8 $ keccak256ToHex calldataHash ]
+
+  it "can use free functions, free functions can access this" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+
+function sum(uint[] memory arr) pure returns (uint s) {
+  for (uint i = 0; i < arr.length; i++) {
+    s += arr[i];
+  }
+}
+
+function getAccount() returns (address s) {
+  s = account(this);
+}
+
+contract qq{
+  uint myNum;
+  address ctract;
+  uint[] myArr = [1,2,3];
+  constructor() public {
+    myNum = sum(myArr);
+    ctract = getAccount();
+  }
+}|]
+    getFields ["myNum", "ctract"] `shouldReturn` [BInteger 6, bAddress 0xe8279be14e9fe2ad2d8e52e42ca96fb33a813bbe]
+
+  it "free functions cannot access state variables" $ runTest ( do
+    runBS [r|
+pragma solidvm 3.3;
+
+function setNum() {
+  myNum = 4;
+}
+
+contract qq{
+  uint myNum;
+  constructor() public {
+    setNum();
+  }
+}|]) `shouldThrow` anyUnknownVariableError
+
+  it "free functions cannot access internal functions of contracts" $ runTest ( do
+    runBS [r|
+pragma solidvm 3.3;
+
+function callInternal() {
+  setNum(4);
+}
+
+contract qq{
+  uint myNum;
+  constructor() public {
+    callInternal();
+  }
+  function setNum(uint x) internal {
+    myNum = 4;
+  }
+}|])  `shouldThrow` anyUnknownVariableError
+
+  it "contracts will prioritize contract functions over free functions" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+
+function setNum(uint x) returns (uint s) {
+  s = x + 2;
+}
+
+contract qq{
+  uint myNum;
+  constructor() public {
+    myNum = setNum(4);
+  }
+
+  function setNum(uint x) returns (uint) {
+    return x + 3;
+  }
+}|]
+    getFields ["myNum"] `shouldReturn` [BInteger 7]
+
+  it "contracts will prioritize overloaded contract functions over free functions" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+
+function setNum(uint x, uint y) returns (uint s) {
+  s = x + y + 2;
+}
+
+contract qq{
+  uint myNum;
+  constructor() public {
+    myNum = setNum(1, 2);
+  }
+
+  function setNum(uint x) returns (uint) {
+    return x + 3;
+  }
+
+  function setNum(uint x, uint y) returns (uint) {
+    return x + y + 3;
+  }
+
+}|]
+    getFields ["myNum"] `shouldReturn` [BInteger 6]
+
+  it "can overload free functions" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+
+function sum(uint[] memory arr) pure returns (uint s) {
+  for (uint i = 0; i < arr.length; i++) {
+    s += arr[i];
+  }
+}
+
+function sum(uint a, uint b) pure returns (uint c) {
+  c = a + b;
+}
+
+contract qq{
+  uint myNum;
+  uint otherNum;
+  uint[] myArr = [1,2,3];
+  constructor() public {
+    myNum = sum(myArr);
+    otherNum = sum(4, 5);
+  }
+}|]
+    getFields ["myNum", "otherNum"] `shouldReturn` [BInteger 6, BInteger 9]
+
+  it "cannot overload free functions with same types and same number of parameters" $ runTest (do
+    runBS [r|
+pragma solidvm 3.3;
+
+function sum(uint[] memory arr) pure returns (uint s) {
+  for (uint i = 0; i < arr.length; i++) {
+    s += arr[i];
+  }
+}
+
+function sum(uint[] memory arr) pure returns (uint s) {
+  for (uint i = 0; i < arr.length; i++) {
+    s += arr[i];
+  }
+}
+
+contract qq{
+  uint myNum;
+  uint[] myArr = [1,2,3];
+  constructor() public {
+    myNum = sum(myArr);
+  }
+}|]) `shouldThrow` anyParseError
+    
   
-  fit "should bitshift assign" . runTest $ do
+  it "can declare a constant at the file level and use it" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+uint constant myconst = 5;
+contract qq{
+  uint mynum = myconst;
+  constructor() public {
+    mynum = myconst;
+  }
+}|]
+    getFields ["mynum"] `shouldReturn` [BInteger 5]
+
+
+
+  it "can declare enums at the file level" . runTest $ do
+    runCall "a" "()" [r|
+pragma solidvm 3.3;
+enum Color { red, green, blue }
+contract A {
+    function value() public returns (uint) {
+        return 0xa;
+    }
+}
+
+enum Letter { a, b, c }
+contract B {
+    function value() public returns (uint) {
+        return 0xb;
+    }
+}
+contract qq {
+  function a() public returns (Letter) {
+    return Letter.c;
+  }
+}
+
+|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 2)
+
+  it "can declare structs at the file level" . runTest $ do
+    runCall "a" "()" [r|
+pragma solidvm 3.3;
+
+struct Point {
+  uint x;
+  uint y;
+}
+
+contract qq {
+  function a() public returns (uint) {
+    Point p;
+    p.x = 1;
+    p.y = 2;
+    return p.x;
+  }
+}|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 1)
+
+  it "should bitshift assign" . runTest $ do
     runBS [r|
 pragma solidvm 3.3;
 contract qq {
@@ -5024,7 +5278,7 @@ contract qq {
 }|]
     getFields ["haskell", "solidty", "solid"] `shouldReturn` [BInteger 4, BInteger 1, BInteger (-2)]
 
-  fit "can unsigned bit shift" . runTest $ do
+  it "can unsigned bit shift" . runTest $ do
     runBS [r|
 pragma solidvm 3.3;
 contract qq {
@@ -5040,3 +5294,130 @@ contract qq {
   }
 }|]
     getFields ["result1", "result2", "result3", "result4"] `shouldReturn` [BInteger 3, BInteger 6, BInteger 1, BInteger 12]
+
+  it "can declare custom errors and file level custom errors" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+error flError(string someString);
+
+contract qq {
+  error myError(uint num);
+  constructor() {
+  }
+}|]
+
+  it "can throw custom errors" $ runTest ( do
+    runBS [r|
+pragma solidvm 3.3;
+
+contract qq {
+  error myError (string message);
+  constructor() {
+    throwsError();
+  }
+  
+  function throwsError() {
+    throw myError("lmao pranked");
+  }
+}|])  `shouldThrow` anyCustomError
+
+  it "can catch custom errors the SOLIDVM WAY" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+
+contract qq {
+  error IsTen (int ten, string message);
+  int val;
+  string errorMsg;
+  string myString;
+
+  constructor() {
+    setVal(10);
+    setString();
+  }
+
+  function checkTen(int _val) returns (int) {
+     if (_val == 10) {
+        throw IsTen(_val, "Stop trying to make ten happen, its not going to happen"); 
+     }
+     return _val;
+  }
+
+  function setString() {
+    myString = "hello";
+  }
+
+  function setVal(int _val) returns (int) {
+     try {
+        val = checkTen(_val);
+     } catch IsTen(vall, mes) { 
+        val = vall + 1;
+        errorMsg = mes;
+     }
+  }
+}|]
+    getFields ["val", "myString", "errorMsg"] `shouldReturn` [BInteger 11, BString "hello", BString "Stop trying to make ten happen, its not going to happen"]
+
+  it "can catch custom errors the SOLIDVM WAY, also allows less aliases" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+
+contract qq {
+  error IsTen (int ten, string message);
+  int val;
+
+  constructor() {
+    setVal(10);
+  }
+
+  function checkTen(int _val) returns (int) {
+     if (_val == 10) {
+        throw IsTen(_val, "Stop trying to make ten happen, its not going to happen"); 
+     }
+     return _val;
+  }
+
+  function setVal(int _val) returns (int) {
+     try {
+        val = checkTen(_val);
+     } catch IsTen(vall) { 
+        val = vall + 1;
+     }
+  }
+}|]
+    getFields ["val"] `shouldReturn` [BInteger 11]
+
+  it "can catch custom errors the SOLIDVM WAY and catch too many aliases" $ runTest ( do
+    runBS [r|
+pragma solidvm 3.3;
+
+contract qq {
+  error IsTen (int ten, string message);
+  int val;
+  string myString;
+
+  constructor() {
+    setVal(10);
+    setString();
+  }
+
+  function checkTen(int _val) returns (int) {
+     if (_val == 10) {
+        throw IsTen(_val, "Stop trying to make ten happen, its not going to happen"); 
+     }
+     return _val;
+  }
+
+  function setString() {
+    myString = "hello";
+  }
+
+  function setVal(int _val) returns (int) {
+     try {
+        val = checkTen(_val);
+     } catch IsTen(vall, mes, bad) { 
+        val = vall + 1;
+        myString = bad;
+     }
+  }
+}|]) `shouldThrow` anyTypeError
