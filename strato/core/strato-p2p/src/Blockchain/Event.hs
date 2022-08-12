@@ -359,7 +359,7 @@ handleEvents peer = awaitForever $ \case
             query      = M.lookup key $ chainMetadata (chainInfo cInfo)
             qToTuple q = (OrgName . encodeUtf8 *** OrgUnit . encodeUtf8) $ T.breakOn "/" q
         case query of
-          Just q  -> lift $ insert (Proxy @Word256) (qToTuple q) cId
+          Just q  -> insert (Proxy @Word256) (qToTuple q) cId
           Nothing -> error "no org" -- should just do nothing here, no need to panic
       yieldL . ToUnseq $ IEGenesis . IngestGenesis (Origin.PeerString $ peerString peer) <$> chpairs
 
