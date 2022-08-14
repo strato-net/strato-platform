@@ -46,6 +46,7 @@ import           SolidVM.Model.SolidString
 import           SolidVM.Solidity.Parse.Declarations
 import           SolidVM.Solidity.Parse.File
 import           SolidVM.Solidity.Parse.ParserTypes
+import           SolidVM.Solidity.StaticAnalysis.Optimizer as O
 import           SolidVM.Solidity.StaticAnalysis.Typechecker as TC
 --import           SolidVM.Model.CodeCollection.ConstantDecl
 
@@ -157,7 +158,7 @@ hasSvm3_3 cc = any (=="svm3.3") vmVers
 compileSource :: Bool -> Map T.Text T.Text-> Either ParseTypeCheckOrSolidVMError CodeCollection
 compileSource typeCheck mTT = do
   let applyInheritanceE = first SVMEx . applyInheritance
-  case (applyInheritanceE <=< compileSourceNoInheritance) mTT of
+  O.detector <$> case (applyInheritanceE <=< compileSourceNoInheritance) mTT of
     Right cc -> do if typeCheck && (hasSvm3_2 cc || hasSvm3_3 cc) then typeCheckDetector cc else Right cc
     Left x -> Left x
     where
