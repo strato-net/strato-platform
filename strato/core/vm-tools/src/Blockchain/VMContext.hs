@@ -51,6 +51,7 @@ module Blockchain.VMContext
     , txRunResultsCache
     , debugSettings
     , newX509Certs
+    , ccCacheWindow
     , dbs
     , state
     , contextGet
@@ -190,6 +191,7 @@ data ContextState = ContextState
   , _txRunResultsCache :: TRC.Cache
   , _debugSettings     :: Maybe DebugSettings
   , _newX509Certs      :: M.Map Address X509Certificate
+  , _ccCacheWindow     :: !Integer
   } deriving (Generic, NFData)
 makeLenses ''ContextState
 
@@ -559,6 +561,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
             , _txRunResultsCache = cache
             , _debugSettings     = Nothing
             , _newX509Certs      = M.empty
+            , _ccCacheWindow     = 100 -- arbitrary value because this is a test monad
             }
 
       let ctx = Context
@@ -574,9 +577,10 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
 
 runContextM :: (MonadIO m, MonadUnliftIO m, MonadLoggerIO m)
             => Maybe DebugSettings
+            -> Integer
             -> ReaderT Context (ResourceT m) a
             -> m (a, ContextState)
-runContextM dSettings f = do
+runContextM dSettings ccWindow f = do
     liftIO $ createDirectoryIfMissing False $ dbDir "h"
     runResourceT $ do
       conn <- createPostgresqlPool connStr 20
@@ -628,6 +632,7 @@ runContextM dSettings f = do
             , _txRunResultsCache = cache
             , _debugSettings     = dSettings
             , _newX509Certs      = M.empty
+            , _ccCacheWindow     = ccWindow
             }
 
       let ctx = Context
@@ -641,15 +646,17 @@ runContextM dSettings f = do
 
 evalContextM :: (MonadIO m, MonadUnliftIO m, MonadLoggerIO m)
              => Maybe DebugSettings
+             -> Integer
              -> ReaderT Context (ResourceT m) a
              -> m a
-evalContextM d f = fst <$> runContextM d f
+evalContextM d w f = fst <$> runContextM d w f
 
 execContextM :: (MonadIO m, MonadUnliftIO m, MonadLoggerIO m)
              => Maybe DebugSettings
+             -> Integer
              -> ReaderT Context (ResourceT m) a
              -> m ContextState
-execContextM d f = snd <$> runContextM d f
+execContextM d w f = snd <$> runContextM d w f
 
 incrementNonce :: (Account `A.Alters` AddressState) f => Account -> f ()
 incrementNonce account = A.adjustWithDefault_ Mod.Proxy account $ \addressState ->

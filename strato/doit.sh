@@ -190,7 +190,8 @@ function newnode {
                          --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$evmMinLogLevel --evmCompatible=$evmCompatible \
                          ${networkFlag} --networkID=$networkID \
                          "${tbFlag}" "${breFlag}" "${sebFlag}" "${sechFlag}" "${svdFlag}" "${ctrFlag}" \
-                         --gasOn=$gasOn +RTS "${vmRunnerRTSOPTs:-}" -I2 -N1 &>> logs/vm-runner
+                         --gasOn=$gasOn --ccCacheWindow=$ccCacheWindow \
+                         +RTS "${vmRunnerRTSOPTs:-}" -I2 -N1 &>> logs/vm-runner
   
   echo "Starting strato-api"
   runBackgroundProcess strato-api --gasOn=$gasOn --evmCompatible=$evmCompatible +RTS -N1 >> logs/strato-api 2>&1
@@ -401,6 +402,7 @@ setEnv useSyncMode false
 setEnv minQuorumSize 1
 setEnv maxConn 20
 setEnv difficultyBomb false
+setEnv ccCacheWindow ${ccCacheWindow:-10000}
 
 setEnv sqlDiff ${sqlDiff:-true}
 setEnv svmTrace ${svmTrace:-false}
@@ -416,7 +418,6 @@ setEnv vmDebug ${vmDebug:-false}
 setEnv wsDebug ${wsDebug:-false}
 setEnv debugPort ${debugPort:-8051}
 setEnv debugWSPort ${debugWSPort:-8052}
-
 
 stratoBootnode=${bootnode:+--stratoBootnode=$bootnode}
 [[ -n $bootnode ]] && addBootnodes=true

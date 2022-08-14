@@ -173,8 +173,9 @@ addBlocks unfiltered = do
       when didReplaceBest' $ do
         $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
         nbb@(_,n,_) <- readIORef replacedBest
+        ccCacheWindowSize <- _ccCacheWindow <$> Mod.get (Mod.Proxy @ContextState)
         lastClear <- _lastClearBlock <$> Mod.get (Mod.Proxy @MemDBs)
-        when (n > lastClear + 10000) $ do
+        when (n > lastClear + ccCacheWindowSize) $ do
           Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ do
             lastClearBlock .= n
             codeCollectionMap .= M.empty

@@ -360,6 +360,7 @@ runMemContextMWith cdbs dSettings f = do
         , _txRunResultsCache = cache
         , _debugSettings     = dSettings
         , _newX509Certs      = M.empty
+        , _ccCacheWindow     = 0 -- This monad is all in memory, so we want to minimize duplication
         }
       ctx = MemContext
         { _dbs   = cdbs

@@ -21,7 +21,8 @@ module Blockchain.VMOptions (
   flags_gasOn,
   flags_evmCompatible,
   flags_network,
-  flags_networkID
+  flags_networkID,
+  flags_ccCacheWindow
   ) where
 
 import           Blockchain.Mining
@@ -54,3 +55,4 @@ defineFlag "gasOn" (True::Bool) "Whether to charge for transactions or not"
 defineFlag "evmCompatible" (False::Bool) "Whether to turn off STRATO enhancements or not"
 defineFlag "network" (""::String) "Choose a network to join"
 defineFlag "networkID" (-1::Int) "set a custom network ID for the client"
+defineFlag "ccCacheWindow" (10000::Integer) "The block frequency with which to clear the code collection cache"
