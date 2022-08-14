@@ -59,9 +59,11 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.State
 import           Data.Bifunctor (first)
+import qualified Data.Binary as Binary
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.UTF8  as UTF8
 import           Prelude                            hiding (EQ, GT, LT)
 import qualified Prelude                            as Ordering (Ordering (..))
@@ -83,6 +85,7 @@ import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.CodeDB
+import           Blockchain.DB.CodeCollectionDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.X509CertDB
@@ -150,6 +153,7 @@ data SState = SState
   , _ssNewX509Certs  :: M.Map Address X509Certificate
   , _ssMemDBs       :: MemDBs
   , _action         :: Action
+  , _codeCollections :: M.Map Keccak256 CC.CodeCollection
   }
 makeLenses ''SState
 
@@ -158,6 +162,7 @@ type SM m = StateT SState m
 type MonadSM m = ( (Account `A.Alters` AddressState) m
                  , HasStateDB m
                  , (Keccak256 `A.Alters` DBCode) m
+                 , (Keccak256 `A.Alters` CC.CodeCollection) m
                  , (Keccak256 `A.Alters` BlockSummary) m
                  , HasX509CertDB m
                  , A.Selectable (Maybe Word256) ParentChainId m
@@ -245,6 +250,19 @@ instance (Keccak256 `A.Alters` DBCode) m => (Keccak256 `A.Alters` DBCode) (SM m)
   insert p k = lift . A.insert p k
   delete p   = lift . A.delete p
 
+instance (Keccak256 `A.Alters` DBCodeCollection) m => (Keccak256 `A.Alters` CC.CodeCollection) (SM m) where
+  lookup _ k = use (codeCollections . at k) >>= \case
+    Just cc -> pure $ Just cc
+    Nothing -> do
+      mcc <- lift $ A.lookup (A.Proxy @DBCodeCollection) k
+      pure $ Binary.decode . BL.fromStrict . unDBCodeCollection <$> mcc
+  insert _ k v = do
+    codeCollections . at k ?= v
+    lift . A.insert (A.Proxy @DBCodeCollection) k . DBCodeCollection . BL.toStrict $ Binary.encode v
+  delete _ k = do
+    codeCollections . at k .= Nothing
+    lift $ A.delete (A.Proxy @DBCodeCollection) k
+
 instance (Address `A.Alters` X509Certificate) m => (Address `A.Alters` X509Certificate) (SM m) where
   lookup p   = lift . A.lookup p
   insert p k = lift . A.insert p k
@@ -312,7 +330,8 @@ runSM maybeCode env chainId' f = do
         ssEvents = Q.empty,
         _ssNewX509Certs = M.empty,
         _ssMemDBs = csMemDBs,
-        _action = startingAction maybeCode env chainId'
+        _action = startingAction maybeCode env chainId',
+        _codeCollections = M.empty
         }
 
   eValState <- try $ runStateT f startingState

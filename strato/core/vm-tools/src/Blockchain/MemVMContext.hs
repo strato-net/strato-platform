@@ -44,6 +44,7 @@ import           Blockchain.Data.ChainInfo
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.ChainDB
 import           Blockchain.DB.CodeDB
+import           Blockchain.DB.CodeCollectionDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
 import           Blockchain.DB.StateDB
@@ -65,6 +66,7 @@ import           Blockchain.VMContext               ( CurrentBlockHash(..)
                                                     , stateBlockMap
                                                     , storageTxMap
                                                     , storageBlockMap
+                                                    , codeCollectionMap
                                                     , newX509Certs
                                                     )
 
@@ -74,6 +76,7 @@ data MemContextDBs = MemContextDBs
   { _stateDB        :: M.Map MP.StateRoot MP.NodeData
   , _hashDB         :: M.Map N.NibbleString N.NibbleString
   , _codeDB         :: M.Map Keccak256 DBCode
+  , _codeCollectionDB :: M.Map Keccak256 DBCodeCollection
   , _x509CertDB     :: M.Map Address X509Certificate
   , _blockSummaryDB :: M.Map Keccak256 BlockSummary
   , _blockHashRoot  :: BlockHashRoot
@@ -88,6 +91,7 @@ instance NFData MemContextDBs where
     _stateDB `seq`
     _hashDB `seq`
     rnf _codeDB `seq`
+    rnf _codeCollectionDB `seq`
     rnf _x509CertDB `seq`
     _blockSummaryDB `seq`
     rnf _blockHashRoot `seq`
@@ -263,6 +267,19 @@ instance (Keccak256 `A.Alters` DBCode) MemContextM where
   insert _ k c = dbsModify' $ codeDB . at k ?~ c
   delete _ k   = dbsModify' $ codeDB . at k .~ Nothing
 
+instance (Keccak256 `A.Alters` DBCodeCollection) MemContextM where
+  lookup _ k = do
+    mCC <- gets $ view $ memDBs . codeCollectionMap . at k
+    case mCC of
+      Just cc -> pure $ Just cc
+      Nothing -> dbsGets $ view (codeCollectionDB . at k)
+  insert _ k v = do
+    modify $ memDBs . codeCollectionMap %~ M.insert k v
+    dbsModify' $ codeCollectionDB . at k ?~ v
+  delete _ k = do
+    modify $ memDBs . codeCollectionMap %~ M.delete k
+    dbsModify' $ codeCollectionDB . at k .~ Nothing
+
 instance (Address `A.Alters` X509Certificate) MemContextM where
   lookup _ a   = dbsGets $ view (x509CertDB . at a)
   insert _ a c = dbsModify' $ x509CertDB . at a ?~ c
@@ -308,6 +325,7 @@ runMemContextM = runMemContextMWith cdbs
           { _stateDB        = M.empty
           , _hashDB         = M.empty
           , _codeDB         = M.empty
+          , _codeCollectionDB = M.empty
           , _x509CertDB     = M.empty
           , _blockSummaryDB = M.empty
           , _blockHashRoot  = BlockHashRoot MP.emptyTriePtr
@@ -329,6 +347,8 @@ runMemContextMWith cdbs dSettings f = do
         , _storageBlockMap = M.empty
         , _stateRoots      = M.empty
         , _currentBlock    = Nothing
+        , _lastClearBlock  = 0
+        , _codeCollectionMap = M.empty
         }
       cstate = ContextState
         { _memDBs            = cmemDBs

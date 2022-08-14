@@ -19,6 +19,7 @@ module Data.Source.Annotation
 import           Control.Lens              hiding ((.=))
 import           Control.DeepSeq
 import           Data.Aeson                as Aeson
+import           Data.Binary
 import           Data.Data
 import qualified Data.Map                  as M
 import qualified Data.Text                 as T
@@ -51,6 +52,8 @@ instance FromJSON a => FromJSON (SourceAnnotation a) where
     ann <- o .: "annotation"
     pure $ SourceAnnotation start end ann
   parseJSON o = fail $ "parseJSON SourceAnnotation: expected Object, got " ++ show o
+
+instance Binary a => Binary (SourceAnnotation a) where
 
 instance Arbitrary a => Arbitrary (SourceAnnotation a) where
   arbitrary = SourceAnnotation <$> arbitrary <*> arbitrary <*> arbitrary

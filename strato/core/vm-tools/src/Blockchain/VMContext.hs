@@ -40,6 +40,8 @@ module Blockchain.VMContext
     , storageBlockMap
     , stateRoots
     , currentBlock
+    , lastClearBlock
+    , codeCollectionMap
     , memDBs
     , baggerState
     , bestBlockInfo
@@ -114,6 +116,7 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.BlockSummaryDB
 import           Blockchain.DB.ChainDB
 import           Blockchain.DB.CodeDB
+import           Blockchain.DB.CodeCollectionDB
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
@@ -156,6 +159,7 @@ data ContextDBs = ContextDBs
   { _stateDB        :: MP.StateDB
   , _hashDB         :: HashDB
   , _codeDB         :: CodeDB
+  , _codeCollectionDB :: CodeCollectionDB
   , _x509CertDB     :: X509CertDB
   , _blockSummaryDB :: BlockSummaryDB
   , _kafkaState     :: IORef K.KafkaState
@@ -171,6 +175,8 @@ data MemDBs = MemDBs
   , _storageBlockMap :: M.Map (Account, B.ByteString) B.ByteString
   , _stateRoots      :: M.Map (Keccak256, Maybe Word256) MP.StateRoot
   , _currentBlock    :: Maybe CurrentBlockHash
+  , _lastClearBlock  :: !Integer
+  , _codeCollectionMap :: M.Map Keccak256 DBCodeCollection
   } deriving (Generic, NFData, Show)
 makeLenses ''MemDBs
 
@@ -214,6 +220,7 @@ type VMBase m = ( MonadIO m
                 , (MP.StateRoot `A.Alters` MP.NodeData) m
                 , (Account `A.Alters` AddressState) m
                 , (Keccak256 `A.Alters` DBCode) m
+                , (Keccak256 `A.Alters` DBCodeCollection) m
                 , HasX509CertDB m
                 , Mod.Modifiable (M.Map Address X509Certificate) m
                 , (N.NibbleString `A.Alters` N.NibbleString) m
@@ -253,6 +260,9 @@ getHashDB = view $ dbs . hashDB
 
 getCodeDB :: ContextM CodeDB
 getCodeDB = view $ dbs . codeDB
+
+getCodeCollectionDB :: ContextM CodeCollectionDB
+getCodeCollectionDB = view $ dbs . codeCollectionDB
 
 getX509CertDB :: ContextM X509CertDB
 getX509CertDB = view $ dbs . x509CertDB
@@ -425,6 +435,19 @@ instance (Keccak256 `A.Alters` DBCode) ContextM where
   insert _ = genericInsertCodeDB $ getCodeDB
   delete _ = genericDeleteCodeDB $ getCodeDB
 
+instance (Keccak256 `A.Alters` DBCodeCollection) ContextM where
+  lookup _ k = do
+    mCC <- gets $ view $ memDBs . codeCollectionMap . at k
+    case mCC of
+      Just cc -> pure $ Just cc
+      Nothing -> genericLookupCodeCollectionDB getCodeCollectionDB k
+  insert _ k v = do
+    modify $ memDBs . codeCollectionMap %~ M.insert k v
+    genericInsertCodeCollectionDB getCodeCollectionDB k v
+  delete _ k = do
+    modify $ memDBs . codeCollectionMap %~ M.delete k
+    genericDeleteCodeCollectionDB getCodeCollectionDB k
+
 instance (Address `A.Alters` X509Certificate) ContextM where
   lookup _ = genericLookupX509CertDB $ getX509CertDB
   insert _ = genericInsertX509CertDB $ getX509CertDB
@@ -490,6 +513,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
       sdb <- openDB stateDBPath
       hdb <- openDB hashDBPath
       cdb <- openDB codeDBPath
+      ccdb <- openDB codeCollectionDBPath
       x509db <- openDB x509CertDBPath
       blksumdb <- openDB blockSummaryCacheDBPath
       rPool <- liftIO . Redis.connect $ Redis.defaultConnectInfo {
@@ -506,6 +530,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
             { _stateDB        = MP.StateDB sdb
             , _hashDB         = HashDB hdb
             , _codeDB         = CodeDB cdb
+            , _codeCollectionDB = CodeCollectionDB ccdb
             , _x509CertDB     = X509CertDB x509db
             , _blockSummaryDB = BlockSummaryDB blksumdb
             , _kafkaState     = initialKafkaState
@@ -520,6 +545,8 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
             , _storageBlockMap = M.empty
             , _stateRoots      = M.empty
             , _currentBlock    = Nothing
+            , _lastClearBlock  = 0
+            , _codeCollectionMap = M.empty
             }
 
       cstate <- newIORef $ ContextState
@@ -561,6 +588,7 @@ runContextM dSettings f = do
       sdb <- DB.open (dbDir "h" ++ stateDBPath) ldbOptions
       hdb <- DB.open (dbDir "h" ++ hashDBPath)  ldbOptions
       cdb <- DB.open (dbDir "h" ++ codeDBPath)  ldbOptions
+      ccdb <- DB.open (dbDir "h" ++ codeCollectionDBPath)  ldbOptions
       x509db <- DB.open (dbDir "h" ++ x509CertDBPath) ldbOptions
       blksumdb <- DB.open (dbDir "h" ++ blockSummaryCacheDBPath) ldbOptions
       rPool <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
@@ -571,6 +599,7 @@ runContextM dSettings f = do
             { _stateDB        = MP.StateDB sdb
             , _hashDB         = HashDB hdb
             , _codeDB         = CodeDB cdb
+            , _codeCollectionDB = CodeCollectionDB ccdb
             , _x509CertDB     = X509CertDB x509db
             , _blockSummaryDB = BlockSummaryDB blksumdb
             , _kafkaState     = kafkaStateRef
@@ -585,6 +614,8 @@ runContextM dSettings f = do
             , _storageBlockMap = M.empty
             , _stateRoots      = M.empty
             , _currentBlock    = Nothing
+            , _lastClearBlock  = 0
+            , _codeCollectionMap = M.empty
             }
 
       cstate <- newIORef $ ContextState

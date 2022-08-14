@@ -61,6 +61,9 @@ hashDBPath="/hash/"
 codeDBPath::String
 codeDBPath="/code/"
 
+codeCollectionDBPath::String
+codeCollectionDBPath="/codeCollection/"
+
 x509CertDBPath::String
 x509CertDBPath="/x509Cert/"
 

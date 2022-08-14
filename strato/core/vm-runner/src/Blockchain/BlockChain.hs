@@ -172,7 +172,12 @@ addBlocks unfiltered = do
       ranPrivateTxs' <- readIORef ranPrivateTxs
       when didReplaceBest' $ do
         $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
-        nbb <- readIORef replacedBest
+        nbb@(_,n,_) <- readIORef replacedBest
+        lastClear <- _lastClearBlock <$> Mod.get (Mod.Proxy @MemDBs)
+        when (n > lastClear + 10000) $ do
+          Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ do
+            lastClearBlock .= n
+            codeCollectionMap .= M.empty
         yield . OutIndexEvent $ NewBestBlock nbb
         when flags_sqlDiff $ timeit "calculateAndEmitStateDiffs " timerToUse $
           calculateAndEmitStateDiffs srLog oldHeader

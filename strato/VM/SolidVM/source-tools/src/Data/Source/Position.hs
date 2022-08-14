@@ -20,6 +20,7 @@ module Data.Source.Position
 import Control.DeepSeq (NFData)
 import Control.Lens hiding ((.=))
 import Data.Aeson
+import Data.Binary
 import Data.Data
 import GHC.Generics
 import Test.QuickCheck
@@ -48,6 +49,8 @@ instance FromJSON SourcePosition where
     column <- o .: "column"
     pure $ SourcePosition name line column
   parseJSON o = fail $ "parseJSON SourcePosition: expected Object, got " ++ show o
+
+instance Binary SourcePosition
 
 instance Arbitrary SourcePosition where
   arbitrary = SourcePosition <$> arbitrary <*> arbitrary <*> arbitrary
