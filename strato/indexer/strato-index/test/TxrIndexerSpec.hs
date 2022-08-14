@@ -3,6 +3,7 @@
 module TxrIndexerSpec where
 
 import qualified Data.ByteString.Char8              as C8
+-- import qualified Data.ByteString                    as BS
 import           Data.Either
 
 import           Test.Hspec
@@ -63,3 +64,23 @@ spec = do
                 event = EventDB (Just chainId) "NotSpecial" ["48193"]
             in indexEventToTxrResults (EventDBEntry event)
                 `shouldBe` [PutEventDB event]
+        it "Index EventDBEntry for OrganizationAdded (one argument)" $
+            let cId   = fromInteger 0x42069
+                event = EventDB (Just cId) "OrganizationAdded" ["blockapps"]
+            in indexEventToTxrResults (EventDBEntry event)
+                `shouldBe` [PutEventDB event, AddOrgName $ Right (cId, ("blockapps", Nothing))] 
+        it "Index EventDBEntry for OrganizationAdded (two arguments)" $
+            let cId   = fromInteger 0x22222
+                event = EventDB (Just cId) "OrganizationAdded" ["blockapps", "sales"]
+            in indexEventToTxrResults (EventDBEntry event)
+                `shouldBe` [PutEventDB event, AddOrgName $ Right (cId, ("blockapps", Just "sales"))] 
+        it "Index EventDBEntry for OrganizationRemoved (one argument)" $
+            let cId   = fromInteger 0x33333
+                event = EventDB (Just cId) "OrganizationRemoved" ["blockapps"]
+            in indexEventToTxrResults (EventDBEntry event)
+                `shouldBe` [PutEventDB event, RemoveOrgName $ Right (cId, ("blockapps", Nothing))] 
+        it "Index EventDBEntry for OrganizationRemoved (two arguments)" $
+            let cId   = fromInteger 0x11111
+                event = EventDB (Just cId) "OrganizationRemoved" ["blockapps", "engineering"]
+            in indexEventToTxrResults (EventDBEntry event)
+                `shouldBe` [PutEventDB event, RemoveOrgName $ Right (cId, ("blockapps", Just "engineering"))] 
