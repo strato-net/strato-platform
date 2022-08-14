@@ -194,10 +194,10 @@ addChainMember cId address enode = do
           Compose (addressToOrgName address >>= \org -> addOrgNameChain (fromRight (error "addChainMember - to the left, to the left") org) cId)
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addChainMember - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "addChainMember - Error" ++ e)
-    where addressToOrgName :: Address -> Redis (Either () (S8.ByteString, S8.ByteString))  -- OrgName, OrgUnit
-          addressToOrgName addr = do 
-            let getCertificate' = maybe (X509Certificate (CertificateChain [])) certificate <$> getCertificate addr     
-                extractDN       = (S8.pack . subOrg) &&& (S8.pack . fromJust . subUnit)
+    where addressToOrgName :: Address -> Redis (Either () (S8.ByteString, Maybe S8.ByteString))  -- OrgName, OrgUnit
+          addressToOrgName addr = do
+            let getCertificate' = maybe (X509Certificate (CertificateChain [])) certificate <$> getCertificate addr
+                extractDN dn    = (S8.pack (subOrg dn), (Just . S8.pack) =<< subUnit dn)  --(S8.pack . subOrg) &&& (maybe Nothing S8.pack $ subUnit)
                 getCertSubject' = fromJust . getCertSubject
                 getCert'        = signedsToX509 . toList . findNodeCert (fromJust $ importPublicKey (unOrgId $ pubKey enode))
             cert <- x509ToSigneds <$> getCertificate'
@@ -393,14 +393,14 @@ removeOrgIdChain ip cId = do
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "removeOrgIdChain - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "removeOrgIdChain - Error" ++ e)
 
-getOrgNameChains :: (S8.ByteString, S8.ByteString)
+getOrgNameChains :: (S8.ByteString, Maybe S8.ByteString)
                  -> Redis (S.Set Word256)
 getOrgNameChains org = getInNamespace PrivateOrgNameChains org <&> \case
     Right (Just rchains) -> let RedisOrgNameChains chains = fromValue rchains
                             in chains
     _                    -> S.empty
 
-addOrgNameChain :: (S8.ByteString, S8.ByteString)
+addOrgNameChain :: (S8.ByteString, Maybe S8.ByteString)
                 -> Word256
                 -> Redis (Either Reply Status)
 addOrgNameChain org cId = do
@@ -412,7 +412,7 @@ addOrgNameChain org cId = do
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "addOrgNameChain - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "addOrgNameChain - Error" ++ e)
 
-removeOrgNameChain :: (S8.ByteString, S8.ByteString)
+removeOrgNameChain :: (S8.ByteString, Maybe S8.ByteString)
                    -> Word256
                    -> Redis (Either Reply Status)
 removeOrgNameChain org cId = do

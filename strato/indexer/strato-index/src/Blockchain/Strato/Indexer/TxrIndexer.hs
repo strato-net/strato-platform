@@ -81,26 +81,24 @@ doRemoveMember chainId address = do
   lift $ removeMember chainId address
   void . RBDB.withRedisBlockDB $ RBDB.removeChainMember chainId address
 
-doAddOrgName :: Word256 -> (BS.ByteString, BS.ByteString) -> IContextM ()
+doAddOrgName :: Word256 -> (BS.ByteString, Maybe BS.ByteString) -> IContextM ()
 doAddOrgName chainId org = do
-  logF [ "Adding org "
-       , format $ fst org
-       , "/"
-       , format $ snd org
-       , " from chain "
+  logF [ "Adding chain "
        , formatChainId $ Just chainId
+       , " to org "
+       , C8.unpack $ fst org
+       , maybe "" ((++) "/" . C8.unpack) (snd org)
        ]
   void . RBDB.withRedisBlockDB $ RBDB.addOrgNameChain org chainId
   void . withKafkaRetry1s $ writeUnseqEvents [IENewChainOrgName chainId org]
 
-doRemoveOrgName :: Word256 -> (BS.ByteString, BS.ByteString) -> IContextM ()
+doRemoveOrgName :: Word256 -> (BS.ByteString, Maybe BS.ByteString) -> IContextM ()
 doRemoveOrgName chainId org = do
-  logF ["Removing org "
-       , format $ fst org
-       , "/"
-       , format $ snd org
-       , " from chain "
+  logF [ "Removing chain "
        , formatChainId $ Just chainId
+       , " from org "
+       , C8.unpack $ fst org
+       , maybe "" ((++) "/" . C8.unpack) (snd org)
        ]
   void . RBDB.withRedisBlockDB $ RBDB.removeOrgNameChain org chainId
 
@@ -138,8 +136,8 @@ txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
 
 data TxrResult = AddMember (Either String (Word256, Address, Enode))
                | RemoveMember (Either String (Word256, Address))
-               | AddOrgName (Either String (Word256, (BS.ByteString, BS.ByteString)))
-               | RemoveOrgName (Either String (Word256, (BS.ByteString, BS.ByteString)))
+               | AddOrgName (Either String (Word256, (BS.ByteString, Maybe BS.ByteString)))
+               | RemoveOrgName (Either String (Word256, (BS.ByteString, Maybe BS.ByteString)))
                | RegisterCertificate (Either String (Address, X509CertInfoState))
                | CertificateRevoked (Either String Address)
                | CertificateRegistryInitialized (Either String ())
@@ -181,12 +179,12 @@ indexEventToTxrResults = \case
         Nothing -> Just . RemoveMember . Left $ "failed to parse address for MemberRemoved event: " ++ addressStr
         Just address -> Just . RemoveMember $ Right (chainId, address)
       (Just chainId, "OrganizationAdded", _) -> case eventDBArgs ev of
-        (n:u:_) -> Just . AddOrgName $ Right (chainId, (C8.pack n, C8.pack u))
-        (n:_)   -> Just . AddOrgName $ Right (chainId, (C8.pack n, C8.pack ""))
+        (n:u:_) -> Just . AddOrgName $ Right (chainId, (C8.pack n, Just $ C8.pack u))
+        (n:_)   -> Just . AddOrgName $ Right (chainId, (C8.pack n, Nothing))
         []      -> Just . AddOrgName . Left $ "failed to provide any arguments for OrganizationAdded event"
       (Just chainId, "OrganizationRemoved", _) -> case eventDBArgs ev of
-        (n:u:_) -> Just . RemoveOrgName $ Right (chainId, (C8.pack n, C8.pack u))
-        (n:_)   -> Just . RemoveOrgName $ Right (chainId, (C8.pack n, C8.pack ""))
+        (n:u:_) -> Just . RemoveOrgName $ Right (chainId, (C8.pack n, Just $ C8.pack u))
+        (n:_)   -> Just . RemoveOrgName $ Right (chainId, (C8.pack n, Nothing))
         []      -> Just . RemoveOrgName . Left $ "failed to provide any arguments for OrganizationRemoved event"
       (Nothing, "CertificateRegistered", [certString]) ->
         let cert = bsToCert . C8.pack $ certString
