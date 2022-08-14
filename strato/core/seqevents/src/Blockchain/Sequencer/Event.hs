@@ -196,7 +196,7 @@ instance Format P2pEvent where
   format (P2pGetChain cids)        = "[" ++ (intercalate "," $ map (CL.yellow . format) cids) ++ "]"
   format (P2pGetTx shas)           = "[" ++ (intercalate "," $ map format shas) ++ "]"
   format (P2pNewChainMember c a e) = intercalate ", " [CL.yellow $ format c, format a, show e]
-  -- format (P2pNewOrgName c a e) = intercalate ", " [CL.yellow $ format c, format a, show e]
+  format (P2pNewOrgName c (n, u)) = intercalate ", " [CL.yellow $ format c, format n, C8.unpack $ fromMaybe BS.empty u]
   format (P2pBlockstanbul o)       = format o
   format x                          = show x
 
