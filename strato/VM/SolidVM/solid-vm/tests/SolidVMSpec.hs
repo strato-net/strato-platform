@@ -94,6 +94,10 @@ anyInvalidArgumentsError :: Selector HandledException
 anyInvalidArgumentsError (HE Blockchain.SolidVM.Exception.InvalidArguments{}) = True
 anyInvalidArgumentsError _ = False
 
+anyRequireError :: Selector HandledException
+anyRequireError (HE Blockchain.SolidVM.Exception.Require{}) = True
+anyRequireError _ = False
+
 anyInternalError :: Selector HandledException
 anyInternalError (HE Blockchain.SolidVM.Exception.InternalError{}) = True
 anyInternalError _ = False
@@ -4548,7 +4552,7 @@ contract qq {
     getFields ["x"] `shouldReturn` [BInteger 5]
 
 
-  it "can use a modifier  that takes arguments as part of a function" . runTest $ do
+  it "can use a modifier that takes arguments as part of a function" . runTest $ do
     runCall "a" "()" [r|
 pragma solidvm 3.3;
 contract qq {
@@ -4829,3 +4833,36 @@ contract qq{
   }
 }|]
     getFields ["mynum"] `shouldReturn` [BInteger 9]
+
+  it "can use a modifier with a functions argument as it's argument" $ runTest (do
+    runCall "changeHost" "(0)" [r|
+pragma solidvm 3.3;
+contract qq {
+    // We will use these variables to demonstrate how to use
+    // modifiers.
+    address public  host;
+    uint    public  x = 10;
+    bool    public  locked;
+
+    constructor() public {
+        // Set the transaction sender as the host of the contract.
+        host = msg.sender;
+    }
+
+    modifier onlyHost() {
+        require(msg.sender == host, "Not host");
+        _;
+    }
+
+    //Inputs can be passed to a modifier
+    modifier validAddress(address _addr) {
+        require(_addr != address(0), "Not a valid address");
+        _;
+    }
+
+    function changeHost(address _newHost) public onlyHost validAddress(_newHost) returns (uint) {
+        host = _newHost;
+        return 2;
+    }
+}
+|]) `shouldThrow` anyRequireError
