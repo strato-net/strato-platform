@@ -5199,6 +5199,39 @@ contract qq {
 
 |] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 2)
 
+  it "can use a modifier" . runTest $ do
+    runCall "changeHost" "(0)" [r|
+pragma solidvm 3.3;
+contract qq {
+    // We will use these variables to demonstrate how to use
+    // modifiers.
+    address public  host;
+    uint    public  x = 10;
+    bool    public  locked;
+
+    constructor() public {
+        // Set the transaction sender as the host of the contract.
+        host = msg.sender;
+    }
+
+    modifier onlyHost() {
+        require(msg.sender == host, "Not host");
+        _;
+    }
+
+    //Inputs can be passed to a modifier
+    modifier validAddress(address _addr) {
+        require(_addr != address(0), "Not a valid address");
+        _;
+    }
+
+    function changeHost(address _newHost) public onlyHost validAddress(_newHost) returns (uint) {
+        host = _newHost;
+        return 2;
+    }
+}
+|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 2)
+
   it "can declare structs at the file level" . runTest $ do
     runCall "a" "()" [r|
 pragma solidvm 3.3;
