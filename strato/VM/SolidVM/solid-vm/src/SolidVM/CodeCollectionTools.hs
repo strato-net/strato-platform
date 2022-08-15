@@ -43,6 +43,7 @@ xabiToContract contractName' parents' vmVersion' xabi = do
   _constants = Xabi.xabiConstants xabi,
   _enums = M.fromList [(name, (vals, a)) | (name, Def.Enum vals _ a) <- M.toList $ Xabi.xabiTypes xabi],
   _structs = M.fromList [(name, (\(k,v) -> (k,v,a)) <$> vals) | (name, Def.Struct vals _ a) <- M.toList $ Xabi.xabiTypes xabi],
+  _errors = M.fromList [(name, (\(k,v) -> (k,v,a)) <$> vals) | (name, Def.Error vals _ a) <- M.toList $ Xabi.xabiTypes xabi],
   _events = Xabi.xabiEvents xabi,
   _functions = Xabi.xabiFuncs xabi,
   _modifiers = Xabi.xabiModifiers xabi,

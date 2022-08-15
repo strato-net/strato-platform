@@ -96,6 +96,20 @@ executables:
       - text
       - x509-certs
       - blockapps-datadefs
+  x509-saltine-decrypt:
+    source-dirs: exec_src/
+    main: X509SaltineDecrypt.hs
+    other-modules: []
+    dependencies:
+      - bytestring
+      - optparse-applicative
+      - saltine
+      - base16-bytestring
+      - blockapps-vault-wrapper-server
+      - blockapps-vault-wrapper-api
+      - x509-certs
+
+
 
 tests:
   x509-test:
