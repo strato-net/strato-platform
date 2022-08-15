@@ -1118,7 +1118,7 @@ runStatement (CC.SolidityTryCatchStatement tryExpression returnsDecl statementsF
 
   if (CC._vmVersion ctract /= "svm3.3")
     then unknownStatement "Try/Catch statements are not supported below pragma solidvm 3.3" tryExpression
-    else withTempCallInfo False $ do
+    else do
       mRes <- EUnsafe.try $ do
         expResultVal <- getVar =<< expToVar tryExpression
         return expResultVal
@@ -1150,7 +1150,7 @@ runStatement (CC.TryCatchStatement tryBlock catchBlockMap _) = do
   -- currentCallInfo <- getCurrentCallInfo
   if (CC._vmVersion ctract /= "svm3.3")
     then unknownStatement "Try/Catch statements are not supported below pragma solidvm 3.3" tryBlock
-    else withTempCallInfo False $ do
+    else do
       mRes <- EUnsafe.try $ do
         val <- runStatements tryBlock
         pure $ val
