@@ -168,7 +168,7 @@ def deployStratoWithApp(rootNodeAddress, nodeData, appName, useLatestStratoRelea
         returnStdout: true,
         script: "sudo ./strato --get-address"
     ).trim()
-    sh "echo '\n# Address: ${nodeAddress}' >> run.sh"
+    sh "echo '# Address: ${nodeAddress}' >> run.sh"
     
     // Save node's public key into file (for future reference)
     def nodePubKey = sh(
