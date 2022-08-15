@@ -2794,7 +2794,7 @@ certificateMap maybeCert cntrct =
                                           ]
           stringToString = SVMType.Mapping { SVMType.dynamic = Nothing
                                         , SVMType.key = SVMType.String Nothing
-                                        , SVMType.value = SVMType.String Nothing }
+                                      , SVMType.value = SVMType.String Nothing }
 {-
 data Func = Func
   { funcArgs :: Map Text CC.IndexedType
@@ -3093,6 +3093,9 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
         forM locals $ \(n, (t, v)) -> do
           newVar <- liftIO $ fmap Variable $ newIORef v
           return (n, (t, newVar))
+
+      addCallInfo address' contract' funcName hsh cc (M.fromList localVars1) ro ff -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
+      
       matchedArgvals <- forM theModifiers $ \modi -> do
         let margList = CC.OrderedArgs 
                 . fromMaybe []
@@ -3126,9 +3129,11 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
       --       newVar <- liftIO $ fmap Variable $ newIORef v
       --       myCombinerForEfficiency ((n, (t, newVar)) : xs) ys
 
-      localVars <- myCombinerForEfficiency localVars1 (map (\(x,y) -> (T.unpack x, y)) (concat matchedArgvals))
+      forM_ (map (\(x,y) -> (T.unpack x, y)) (concat matchedArgvals)) $ \(n, (t, v)) -> do
+        addLocalVariable t n v
 
-      addCallInfo address' contract' funcName hsh cc (M.fromList localVars) ro ff -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
+
+
       -- theCallInfo <- getCurrentCallInfo
       -- when (True || (not $ null matchedArgvals)) $ error (show theCallInfo)
       let !commands = fromMaybe (missingField "Function call: function has been declared but not defined" funcName) $ CC.funcContents theFunction

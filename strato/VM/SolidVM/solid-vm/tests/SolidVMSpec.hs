@@ -100,6 +100,10 @@ anyInvalidArgumentsError :: Selector HandledException
 anyInvalidArgumentsError (HE Blockchain.SolidVM.Exception.InvalidArguments{}) = True
 anyInvalidArgumentsError _ = False
 
+anyRequireError :: Selector HandledException
+anyRequireError (HE Blockchain.SolidVM.Exception.Require{}) = True
+anyRequireError _ = False
+
 anyInternalError :: Selector HandledException
 anyInternalError (HE Blockchain.SolidVM.Exception.InternalError{}) = True
 anyInternalError _ = False
@@ -4561,7 +4565,7 @@ contract qq {
     getFields ["x"] `shouldReturn` [BInteger 5]
 
 
-  it "can use a modifier  that takes arguments as part of a function" . runTest $ do
+  it "can use a modifier that takes arguments as part of a function" . runTest $ do
     runCall "a" "()" [r|
 pragma solidvm 3.3;
 contract qq {
@@ -5199,7 +5203,38 @@ contract qq {
 
 |] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 2)
 
-  it "can use a modifier" . runTest $ do
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  it "can use a modifier with a functions argument as it's argument" $ runTest (do
     runCall "changeHost" "(0)" [r|
 pragma solidvm 3.3;
 contract qq {
@@ -5230,7 +5265,7 @@ contract qq {
         return 2;
     }
 }
-|] `shouldReturn` Just (SB.toShort $ B.replicate 31 0x0 <> B.singleton 2)
+|]) `shouldThrow` anyRequireError
 
   it "can declare structs at the file level" . runTest $ do
     runCall "a" "()" [r|
