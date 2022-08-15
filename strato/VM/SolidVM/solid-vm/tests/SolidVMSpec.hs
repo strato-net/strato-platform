@@ -5250,6 +5250,23 @@ contract qq {
 }|]
     getFields ["result1", "result2", "result3", "result4"] `shouldReturn` [BInteger 3, BInteger 6, BInteger 1, BInteger 12]
 
+  it "uint to string convertion test " . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  uint a = 0;
+  uint b = 0;
+  uint c = 0;
+  uint d = 0;
+  constructor() {
+    a = uint("1237655",10);
+    b = uint("18884635",16);
+    c = uint("12124567");
+    d = uint("1f3479f6");
+  }
+}|]
+    getFields ["a", "b", "c", "d"] `shouldReturn` [BInteger 1237655, BInteger 0x18884635, BInteger 0x12124567, BInteger 0x1f3479f6]
+
   it "can declare custom errors and file level custom errors" . runTest $ do
     runBS [r|
 pragma solidvm 3.3;
