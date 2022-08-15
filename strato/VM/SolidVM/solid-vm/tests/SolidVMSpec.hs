@@ -4579,24 +4579,6 @@ contract qq {
   }
 }|] `shouldReturn` Nothing
 
-{-
-  it "can use a modifier that takes in arguments" . runTest $ do
-    runBS [r|
-contract qq {
-  uint x = 3;
-  modifier myModifier(uint _x) {  
-    require(_x == 3 , string.concat('x is not 3 : ', string(_x)));
-    x = 4;
-    _;
-    require(x == 5 , 'x is not 5');
-  }
-  constructor() public myModifier(3) {
-    x = 5;
-    return;
-  }
-}|]
-    getFields ["x"] `shouldReturn` [BInteger 5]
--}
   it "cannot allow negative block number" $ runTest (do
     runBS [r|
 pragma solidvm 3.3;
@@ -4816,6 +4798,21 @@ contract qq{
 }|]
     getFields ["mynum"] `shouldReturn` [BInteger 3]
 
+  it "can use a try catch statment to catch any error the SolidVM Way (trademark pending)" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq{
+  uint mynum = 5;
+  constructor() public {
+    try {
+      mynum = 1 / 0;
+    } catch {
+      mynum = 3;
+    }
+  }
+}|]
+    getFields ["mynum"] `shouldReturn` [BInteger 3]
+
   it "can use a try catch statment to catch a divide by zero error the Solidity Way (trademark very much in effect)" . runTest $ do
     runBS [r| 
 pragma solidvm 3.3;
@@ -4856,6 +4853,50 @@ contract qq {
   }
 }|]
     getFields ["myNum", "otherNum", "errorCount"] `shouldReturn` [BInteger 3, BInteger 12, BInteger 1]
+
+  it "can use a try catch statment to catch a divide by zero error the Solidity Way (trademark very much in effect) in a function" . runTest $ do
+    runCall "tryTheDivide" "()" [r|
+pragma solidvm 3.3;
+contract Divisor {
+  function doTheDivide() public returns (uint) {
+    return (1 / 0);
+  }
+}
+contract qq {
+  Divisor public d;
+  uint public errCount = 0;
+  uint theError = 0;
+  constructor() public {
+    d = new Divisor();
+  }
+  function tryTheDivide() returns (uint, bool) {
+    try d.doTheDivide() returns (uint v) {
+        return (v, true);
+    } catch Error(string memory itsamessage) { 
+        // This is executed in case
+        // revert was called inside doTheDivide()
+        // and a reason string was provided.
+        errCount++;
+        return (0, false);
+    } catch Panic(uint errCode) {
+        // This is executed in case of a panic,
+        // i.e. a serious error like division by zero
+        // or overflow. The error code can be used
+        // to determine the kind of error.
+        errCount++;
+        theError = errCode;
+        return (errCode, false);
+    } catch (bytes bigTest) {
+        // This is executed in case revert() was used.
+        errCount++;
+        return (0, false);
+    }
+  }
+} 
+|] `shouldReturn` (Just "\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\f\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL")
+
+    getFields ["errCount", "theError"] `shouldReturn` [BInteger 1, BInteger 12] 
+
 
   it "allows overloading functions with different number of parameters" . runTest $ do
     runBS [r|
