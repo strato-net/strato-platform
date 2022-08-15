@@ -1119,7 +1119,7 @@ statementHelper (Return mExpr x) = do
         Just (Sum _) -> (Just t', locals) :| rest
         _ -> (ret, locals) :| rest
       pure t'
-statementHelper (Throw x) = pure $ topType' x
+statementHelper (Throw _ x) = pure $ topType' x
 statementHelper (ModifierExecutor x) = pure $ topType' x
 statementHelper (EmitStatement _ vals x) =
   reduceType' x <$> traverse (tcExpr . snd) vals
