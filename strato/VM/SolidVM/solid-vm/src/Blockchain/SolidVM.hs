@@ -63,7 +63,7 @@ import           Debugger
 import           GHC.Exts                             hiding (breakpoint)
 import           Text.Parsec                          (runParser)
 import           Text.Printf
-import           Text.Read (readMaybe)
+import           Text.Read (readMaybe, readEither)
 
 import           Blockchain.Data.Transaction  (whoSignedThisTransactionEcrecover)
 import           Blockchain.Data.AddressStateDB
@@ -2370,12 +2370,24 @@ binopAssign oper lhs rhs = do
 intBuiltin :: [Value] -> Value
 intBuiltin [SEnumVal _ _ enumNum] = SInteger $ fromIntegral enumNum
 intBuiltin [SInteger n] = SInteger n
-intBuiltin [SString hex] =
-  case B16.decode (BC.pack hex) of
-    Right l -> let zeros = 32 - B.length l
-               in SInteger . fromIntegral . bytesToWord256 $ B.replicate zeros 0x0 <> l
-    _ -> typeError "numeric cast - not a hex string" hex
+intBuiltin [SString hex] = integerToValue $ parseBaseInt hex 16 
+intBuiltin [SString hex, SInteger 16] = integerToValue $ parseBaseInt hex 16
+intBuiltin [SString dec, SInteger 10] = integerToValue $ parseBaseInt dec 10
 intBuiltin args = typeError "numeric cast - invalid args" args
+
+integerToValue :: Either String Integer -> Value
+integerToValue (Right n) = SInteger n
+integerToValue (Left err) = typeError err ("" :: String)
+
+parseBaseInt :: String -> Integer -> Either String Integer
+parseBaseInt s n = 
+  case n of
+    10 -> readEither s
+    16 -> case B16.decode (BC.pack s) of
+            Right l -> let zeros = 32 - B.length l
+                       in Right . fromIntegral . bytesToWord256 $ B.replicate zeros 0x0 <> l
+            _ -> Left $ "numeric cast - not a hex string " <> s
+    _ -> Left $ "Cannot convert string " <> s <> " to base " <> show n
 
 castToAncestor :: MonadSM m => NamedAccount -> Integer -> m Value
 castToAncestor a n = do
