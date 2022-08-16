@@ -1,9 +1,11 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 import Control.DeepSeq
+import Control.Lens
 import Criterion.Main
 import Data.Binary
 --import Data.Either
@@ -14,14 +16,21 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.Map as M
 import qualified Data.Text as T
 import Text.Parsec (runParser, ParseError)
-
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.SolidVM.CodeCollectionDB
+import Blockchain.SolidVM.Simple
 --import SolidVM.Solidity.Parse.Declarations
 import SolidVM.Solidity.Parse.File
 --import SolidVM.CodeCollectionTools
 import SolidVM.Model.CodeCollection
 import SolidVM.Solidity.Parse.ParserTypes
+import SolidVM.Solidity.StaticAnalysis.Typechecker
+import Blockchain.Strato.Model.Address
+import BlockApps.Logging
+import Blockchain.MemVMContext
+import HFlags
+import Blockchain.VMOptions() -- for HFlags
+-- import Executable.EVMFlags() -- for HFlags
 
 instance NFData ParseError where
   rnf = rwhnf
@@ -41,6 +50,37 @@ wingsCC =
 strBench :: Benchmark
 strBench = bench "time to pack the wings contract"
          $ nf BC.pack wingsContract
+
+createContract :: Benchmark
+createContract =
+  let txArgs = def & createNewAddress .~ (Account (Address 0xdeadbeef) Nothing)
+                   & createCode .~ (Code $(embedFile "bench/wings.sol"))
+                   & createArgs . argsMetadata ?~ M.empty
+                   & createArgs . argsMetadata . _Just . at "name" ?~ "TicketManager"
+                   & createArgs . argsMetadata . _Just . at "args" ?~ "(0xfeedbeef,0xc001d00d)"
+  in bench "time to create a contract" $ nfIO . runLoggingT . runMemContextM Nothing $ create txArgs
+
+callFunc :: Benchmark 
+callFunc = 
+  let txArgs =
+        def & createNewAddress .~ (Account (Address 0xdeadbeef) Nothing)
+          & createCode .~ (Code $(embedFile "bench/wings.sol"))
+          & createArgs . argsMetadata ?~ M.empty
+          & createArgs . argsMetadata . _Just . at "name" ?~ "TicketManager"
+          & createArgs . argsMetadata . _Just . at "args" ?~ "(0xfeedbeef,0xc001d00d)"
+      txArgs' = 
+        def & callArgs . argsBlockData .~ txArgs ^. createArgs . argsBlockData
+          & callCodeAddress .~ txArgs^.createNewAddress
+          & callArgs . argsMetadata ?~ M.empty
+          & callArgs . argsMetadata . _Just . at "funcName" ?~ "createTicket"
+          & callArgs . argsMetadata . _Just . at "args" ?~ "([\"00\",\"01\",\"02\",\"03\",\"04\",\"05\",\"06\",\"07\",\"08\",\"09\",\"0a\",\"0b\",\"0c\",\"0d\"],[14,15,16,17],[\"18\"],[19])"
+  in bench "time to call a function" $ nfIO . runLoggingT . runMemContextM Nothing $ do
+     _ <- create txArgs
+     call txArgs'
+
+typecheckContracts :: Benchmark
+typecheckContracts =
+  bench "time to typecheck contracts" $ nf detector wingsCC
 
 strUnpackBench :: Benchmark
 strUnpackBench = bench "time unpack the wings contrcat"
@@ -88,9 +128,12 @@ decodeCC = readCC . BL.toStrict
 
 main :: IO ()
 main = do
+  _ <- $initHFlags "solid vm benchmarks"
   defaultMain [strHashBench, strSipBench
                    , parseBench, strBench
                    , hashCCShortBench, hashCCBench, sipCCBench
-                   , showCCBench, readCCBench
+                   , showCCBench, readCCBench 
+                   , createContract, callFunc
+                   , typecheckContracts
                    ]
   print (length wingsContract, length (show wingsCC), BL.length (encode wingsContract))

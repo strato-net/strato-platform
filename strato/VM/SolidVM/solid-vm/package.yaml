@@ -117,4 +117,9 @@ benchmarks:
         - parsec
         - strato-model
         - solid-vm-parser
+        - solid-vm-static-analysis
         - solid-vm-model
+        - lens
+        - common-log
+        - vm-tools
+        - hflags
