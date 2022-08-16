@@ -210,10 +210,11 @@ apply' funcArgTypes funcValTypes overloads args argNames funcArgNames = do
   let reorderedArgs = case argNames of
         Nothing -> args
         Just a -> let zipped = M.fromList $ zip a $ productTypes args
-                  in flip Product (productContext args) $ map (\(Just x) -> case M.lookup x zipped of
-                                                                  Nothing -> error "Argument name does not exist" x
-                                                                  Just y -> y
-                                                              ) funcArgNames
+                      newOrder = map (\(Just x) -> case M.lookup x zipped of
+                                                      Nothing -> error "Argument name does not exist" x
+                                                      Just y -> y
+                                      ) funcArgNames
+                  in flip Product (productContext args) newOrder
   p <- case argNames of
     Nothing -> typecheck funcArgTypes args
     _ -> typecheck funcArgTypes reorderedArgs
