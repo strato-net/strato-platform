@@ -125,6 +125,8 @@ import           SolidVM.Solidity.Parse.Statement
 import           SolidVM.Solidity.Parse.Lexer         (stringLiteral)
 import           SolidVM.Solidity.Parse.ParserTypes
 import           SolidVM.Solidity.Parse.UnParser      hiding (sortWith)
+import           SolidVM.Solidity.Parse.Declarations
+import           SolidVM.Solidity.Xabi              
 
 import           Network.Haskoin.Crypto.BigWord()
 import           UnliftIO                             hiding (assert)
@@ -2119,37 +2121,28 @@ expToVar' (CC.FunctionCall _ e args) = do
                 --If nothing was given or something else, then just return the entire code
                 _ -> pure $ Nothing    
             --get only the contract containing useful sourceAnnotation contained in the ContractF type.
-            (contract, _, _) <- getCodeAndCollection address
-            fullContractDetails <- getContractsDetails address (from ^. accountChainId)
+            (contract, _, cc) <- getCodeAndCollection address
+            contractXabi <- getContractXabi address
 
             --get the unparsed piece of code, save multiple entries (if there are multiple items with the same name add them all)
               --TODO: allow for selecting a specific item if multiples exist by adding a number to the input selecting the 
                 --particular item to return.
             let pieceOfCode :: [String]
-            let pieceOfCode = 
+                pieceOfCode = 
                   case (fromMaybe "" searchTerms) of 
                     --get the location of just the code of the contract, if nothing is inputted in the contract then focus on just the contract itself
-                    "" -> let val = foldMap mon contract
-                                          where mon sa  = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
-                                                          in (Min (sl, sc), Max(el, ec))
-                              -- tup = case val of
-                              --         Just (Min (sl, sc), Max(el,ec)) -> Just (sl, sc, el, ec)
-                              --         Nothing -> Nothing  
-                              (Min (slt, sct), Max(elt, ect)) = val
-                              (startLine, startCol, endLine, endCol) = (slt, sct, elt, ect)
-                          in [(startLine, startCol, endLine, endCol)]
+                    "" -> let parents' = either (throw . fst) id $ CC.getParents cc contract
+                              unparsedString = unparseSourceUnit (NamedXabi (T.pack $ contract ^. CC.contractName) (contractXabi, parents'))
+                          in [unparsedString]
                           
-                    term ->
+                    term -> ["Nothing"]
                     --Search the full contract for the search term, retrieving the sourceAnnotation location of the part that was found
                       -- Check for and get the different parts of the contract
-                      let contrAnno = if ((contract ^. CC.contractName) == term) then 
-                              let val = foldMap mon contract
-                                          where mon sa  = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
-                                                          in Just (Min (sl, sc), Max(el,ec))
-                              in case val of 
-                                Just (Min (sl, sc), Max(el,ec)) -> Just (sl, sc, el, ec)
-                                Nothing -> Nothing 
-                            else Nothing
+                      -- let contractString = if ((contract ^. CC.contractName) == term) then 
+                      --         let parents' = either (throw . fst) id $ CC.getParents cc contract
+                      --             unparsedString = unparseSourceUnit (NamedXabi  (T.pack $ contract ^. CC.contractName) (contractXabi, parents'))
+                      --         in unparsedString
+                      --       else Nothing
                           -- constAnno =                             
                           --   let mConstf = (contract ^. CC.constants) M.!? term
                           --       val = case mConstf of
@@ -2222,7 +2215,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                           --         Nothing -> Nothing
                           
                       --Remove all of the items that were found to contain nothing, this should leave just the items that we found
-                      in catMaybes [contrAnno]--, funcAnno, constAnno, storjAnno, enumAnno, eventAnno, structAnno, modAnno]
+                      -- in catMaybes [contractString]--, funcAnno, constAnno, storjAnno, enumAnno, eventAnno, structAnno, modAnno]
 
             let anno :: [(Int, Int, Int, Int)]
                 anno = 
