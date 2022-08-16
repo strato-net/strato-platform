@@ -113,7 +113,7 @@ tryCatchStatement = do
       s <- statements
       catchs <- many1 $ do
         reserved "catch"
-        err <- identifier
+        err <- option "" identifier
         params <- optionMaybe (parens $ commaSep $ do
             alias <- identifier
             pure $ alias
