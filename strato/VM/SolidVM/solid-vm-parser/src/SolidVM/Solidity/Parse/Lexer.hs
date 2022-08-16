@@ -72,8 +72,6 @@ solidityLanguage = javaStyle {
      "enum", "struct", "mapping", "var",
      "function", "returns", "return", "modifier", "revert",
      "delete", "constant", "storage", "memory", "calldata", "immutable",
-     "if", "else", "while", "for", "break", "continue",
-     "call", "callcode", "length", "sha3", "ecrecover",
      "suicide", "this", 
      "call", "callcode", "length", "sha3",
      "suicide", "this",
