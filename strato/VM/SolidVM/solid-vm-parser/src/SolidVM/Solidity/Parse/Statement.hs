@@ -350,7 +350,8 @@ primaryExpression = do
   let res' a b = withPosition $ b <$ reserved a
       res  a   = res' a a
       
-  (uncurry Variable . fmap stringToLabel <$> res "msg")
+  myHexParser
+    <|> (uncurry Variable . fmap stringToLabel <$> res "msg")
     <|> (uncurry Variable . fmap stringToLabel <$> res "address")
     <|> (uncurry Variable . fmap stringToLabel <$> res "account")
     <|> (uncurry Variable . fmap stringToLabel <$> res "payable")
@@ -366,7 +367,6 @@ primaryExpression = do
     <|> (uncurry BoolLiteral <$> res' "false" False)
     <|> (uncurry BoolLiteral <$> res' "true" True)
     <|> (uncurry NewExpression <$> withPosition (reserved "new" >> simpleTypeExpression))
-    <|> myHexParser
     <|> (uncurry Variable <$> withPosition (stringToLabel <$> identifier))
     <|> (do 
             ~(a, (val, nu)) <- withPosition $ do
