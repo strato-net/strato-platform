@@ -41,7 +41,7 @@ unparseSourceUnit (FLStruct name decl) = (("\n    " <>) . unparseTypes) (Text.un
 unparseSourceUnit (FLEnum name decl) = (("\n    " <>) . unparseTypes) (Text.unpack name, decl)
 unparseSourceUnit (DummySourceUnit) = "DummySourceUnit"
 unparseSourceUnit (NamedXabi name (contract,inherited)) =
-     (case xabiKind contract of
+     (case _xabiKind contract of
         ContractKind -> "contract "
         InterfaceKind -> "interface "
         LibraryKind -> "library ")
@@ -51,16 +51,16 @@ unparseSourceUnit (NamedXabi name (contract,inherited)) =
         xs -> " is " <> Text.unpack (Text.intercalate ", " xs)
      )
   <> " {\n"
-  <> concatMap (("\n    " <>) . unparseVar) (Map.toList $ xabiVars contract)
-  <> concatMap (("\n    " <>) . unparseConstant) (Map.toList $ xabiConstants contract)
+  <> concatMap (("\n    " <>) . unparseVar) (Map.toList $ _xabiVars contract)
+  <> concatMap (("\n    " <>) . unparseConstant) (Map.toList $ _xabiConstants contract)
 
 --  <> concatMap (("\n    " <>) . unparseVar) (sortWith (varTypeAtBytes . snd) $ Map.toList $ xabiVars contract)
-  <> concatMap (("\n    " <>) . unparseTypes) (Map.toList $ xabiTypes contract)
-  <> concatMap (("\n    " <>) . unparseModifier) (Map.toList $ xabiModifiers contract)
-  <> concatMap (("\n    " <>) . unparseEvent) (Map.toList $ xabiEvents contract)
-  <> concatMap (("\n    " <>) . unparseUsing) (Map.toList $ xabiUsing contract)
-  <> concatMap (("\n    " <>) . unparseCtor) (Map.elems $ xabiConstr contract)
-  <> concatMap (("\n    " <>) . unparseFunc) (Map.toList $ xabiFuncs contract)
+  <> concatMap (("\n    " <>) . unparseTypes) (Map.toList $ _xabiTypes contract)
+  <> concatMap (("\n    " <>) . unparseModifier) (Map.toList $ _xabiModifiers contract)
+  <> concatMap (("\n    " <>) . unparseEvent) (Map.toList $ _xabiEvents contract)
+  <> concatMap (("\n    " <>) . unparseUsing) (Map.toList $ _xabiUsing contract)
+  <> concatMap (("\n    " <>) . unparseCtor) (Map.elems $ _xabiConstr contract)
+  <> concatMap (("\n    " <>) . unparseFunc) (Map.toList $ _xabiFuncs contract)
   <> "\n}"
 unparseSourceUnit (FLFunc n a) = unparseFunc (n, a)
 

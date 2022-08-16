@@ -30,25 +30,25 @@ type SolidEither = Either (Positioned ((,) SolidException))
 xabiToContract :: SolidString -> [SolidString] -> String -> Xabi -> SolidEither Contract
 xabiToContract contractName' parents' vmVersion' xabi = do
   validateXabi xabi
-  constr <- case M.toList $ Xabi.xabiConstr xabi of
+  constr <- case M.toList $ Xabi._xabiConstr xabi of
     [] -> Right Nothing
     [(_, x)] -> Right $ Just x
     _ -> Left $ ( DuplicateDefinition "multiple constructors in contract" (show contractName') --TODO- figure out if this is allowed in Solidity
-                , Xabi.xabiContext xabi
+                , Xabi._xabiContext xabi
                 )
   pure Contract {
   _contractName = contractName',
   _parents = parents',
-  _storageDefs = Xabi.xabiVars xabi,
-  _constants = Xabi.xabiConstants xabi,
-  _enums = M.fromList [(name, (vals, a)) | (name, Def.Enum vals _ a) <- M.toList $ Xabi.xabiTypes xabi],
-  _structs = M.fromList [(name, (\(k,v) -> (k,v,a)) <$> vals) | (name, Def.Struct vals _ a) <- M.toList $ Xabi.xabiTypes xabi],
-  _events = Xabi.xabiEvents xabi,
-  _functions = Xabi.xabiFuncs xabi,
-  _modifiers = Xabi.xabiModifiers xabi,
+  _storageDefs = Xabi._xabiVars xabi,
+  _constants = Xabi._xabiConstants xabi,
+  _enums = M.fromList [(name, (vals, a)) | (name, Def.Enum vals _ a) <- M.toList $ Xabi._xabiTypes xabi],
+  _structs = M.fromList [(name, (\(k,v) -> (k,v,a)) <$> vals) | (name, Def.Struct vals _ a) <- M.toList $ Xabi._xabiTypes xabi],
+  _events = Xabi._xabiEvents xabi,
+  _functions = Xabi._xabiFuncs xabi,
+  _modifiers = Xabi._xabiModifiers xabi,
   _constructor = constr,
   _vmVersion = vmVersion',
-  _contractContext = Xabi.xabiContext xabi
+  _contractContext = Xabi._xabiContext xabi
   }
 
 

@@ -82,20 +82,20 @@ solidityContract = do
                   else return . Map.fromList $ ctorList
 
   return $ NamedXabi (labelToText contractName') (
-        Xabi { xabiFuncs = allFunctions
-             , xabiConstr = allCtors
+        Xabi { _xabiFuncs = allFunctions
+             , _xabiConstr = allCtors
 --             , xabiVars = variables declarations
-             , xabiVars = Map.fromList [(stringToLabel n, varDecl) | (n, VariableDeclaration varDecl) <- declarations]
-             , xabiConstants = Map.fromList [(stringToLabel n, constDecl) | (n, ConstantDeclaration constDecl) <- declarations]
-             , xabiTypes =
+             , _xabiVars = Map.fromList [(stringToLabel n, varDecl) | (n, VariableDeclaration varDecl) <- declarations]
+             , _xabiConstants = Map.fromList [(stringToLabel n, constDecl) | (n, ConstantDeclaration constDecl) <- declarations]
+             , _xabiTypes =
                Map.fromList $
                [ (stringToLabel name, enum) | (name, EnumDeclaration enum) <- declarations]
                ++ [ (stringToLabel name, struct) | (name, StructDeclaration struct) <- declarations]
-             , xabiModifiers = Map.fromList [(stringToLabel name, modifier) | (name, ModifierDeclaration modifier) <- declarations]
-             , xabiEvents = Map.fromList events
-             , xabiKind = kind
-             , xabiUsing = Map.fromList using
-             , xabiContext = a
+             , _xabiModifiers = Map.fromList [(stringToLabel name, modifier) | (name, ModifierDeclaration modifier) <- declarations]
+             , _xabiEvents = Map.fromList events
+             , _xabiKind = kind
+             , _xabiUsing = Map.fromList using
+             , _xabiContext = a
            },
         map (Text.pack . fst) baseConstrs
       )
