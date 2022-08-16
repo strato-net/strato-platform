@@ -2930,7 +2930,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro = do
           newVar <- liftIO $ fmap Variable $ newIORef v
           return (n, (t, newVar))
 
-      addCallInfo address' contract' funcName hsh cc (M.fromList localVars1) ro ff -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
+      addCallInfo address' contract' funcName hsh cc (M.fromList localVars1) ro -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
       
       matchedArgvals <- forM theModifiers $ \modi -> do
         let margList = CC.OrderedArgs 
