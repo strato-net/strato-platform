@@ -4915,6 +4915,49 @@ contract qq{
   }
 }|]
     getFields ["myNum", "myString", "myStatus"] `shouldReturn` [BInteger 5, BString "hi", BBool True]
+
+  it "can use randomly ordered named argument function calls" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq{
+  uint myNum = 0;
+  bool myStatus;
+  constructor() public {
+    addToNum({y: true, x: 3});
+  }
+
+  function addToNum (uint x, bool y) {
+    myNum += x;
+    myStatus = y;
+  }
+}|]
+    getFields ["myNum", "myStatus"] `shouldReturn` [BInteger 3, BBool True]
+    
+
+  it "can use randomly ordered named argument function calls with overloading" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq{
+  uint myNum = 0;
+  bool myStatus;
+  string myString;
+  constructor() public {
+    addToNum({y: true, x: 3});
+    addToNum({x: 3, y: "hi"});
+    addToNum({y: " world", x: 3});
+  }
+
+  function addToNum (uint x, string y) {
+    myNum += x;
+    myString += y;
+  }
+
+  function addToNum (uint x, bool y) {
+    myNum += x;
+    myStatus = y;
+  }
+}|]
+    getFields ["myNum", "myStatus", "myString"] `shouldReturn` [BInteger 9, BBool True, BString "hi world"]
     
   it "should catch invalid function overloads" $ runTest (do
     runBS [r|

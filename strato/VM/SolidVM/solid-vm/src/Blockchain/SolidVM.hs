@@ -2009,42 +2009,34 @@ expToVar' (CC.FunctionCall _ e args) = do
             where
               testMatch :: MonadSM m => CC.Func -> m Bool
               testMatch tf = do
-                let argPairing = generateArgPairs $ CC.funcArgs tf
-                    argPairLength = length $ mapArgs tf
-                doArgsMatch <- mapM testNameAndTypes argPairing
-                pure $ ((argPairLength) == (length $ CC.funcArgs tf)) 
-                           && ((argPairLength) == (argCount))
-                           && (all (== True) doArgsMatch)
-              testNameAndTypes :: MonadSM m => (Maybe SolidString, Value, Maybe SolidString, CC.IndexedType) -> m Bool
-              testNameAndTypes (n1, v1, n2, t) = 
-                if (n1 == n2) 
-                  then do
-                    -- These cases might not be all inclusive of all valid combinations.
-                    case (v1, (CC.indexedTypeType t)) of
-                      (SInteger _, SVMType.Int _ _) -> pure $ True
-                      (SString _, SVMType.String _) -> pure $ True
-                      (SString _, SVMType.Bytes _ _) -> pure $ True
-                      (SBool _, SVMType.Bool) -> pure $ True
-                      (SAccount _ _, SVMType.Address _) -> pure $ True
-                      (SAccount _ _, SVMType.Account _) -> pure $ True
-                      (SStruct _ _, SVMType.UnknownLabel _ _) -> pure $ True
-                      (SContract x _, SVMType.UnknownLabel y _) -> pure $ x == y
-                      (SArray x _, SVMType.Array y _) -> pure $ x == y
-                      (SReference addressedPath, _) -> do
-                        refType <- getXabiValueType addressedPath
-                        if (refType == (CC.indexedTypeType t))
-                          then pure $ True
-                          else 
-                            case (refType, (CC.indexedTypeType t)) of
-                              (SVMType.UnknownLabel x _, SVMType.UnknownLabel y _) -> pure $ x == y
-                              (SVMType.Array x _, SVMType.Array y _) -> pure $ x == y 
-                              _ -> pure $ False
-                      _ -> pure $ False
-                  else pure $ False
-              generateArgPairs :: [(Maybe SolidString, CC.IndexedType)] -> [(Maybe SolidString, Value, Maybe SolidString, CC.IndexedType)]
-              generateArgPairs functionArgs = case argVals of
-                  OrderedVals ov -> concatMap (\(v1, (Just n, t)) -> [(Just n, v1, Just n, t)]) (zip ov functionArgs)
-                  NamedVals nv -> concatMap (\((s1, t1), (Just s2, t2)) -> [(Just s1, t1, Just s2, t2)]) (zip nv functionArgs)
+                let argMapping = mapArgs tf
+                doArgsMatch <- mapM testNameAndTypes argMapping
+                pure $ ((length argMapping) == (length $ CC.funcArgs tf)) 
+                       && ((length argMapping) == (argCount))
+                       && (all (== True) doArgsMatch)
+              testNameAndTypes :: MonadSM m => (String, (SVMType.Type, Value)) -> m Bool
+              testNameAndTypes (_, (t, v)) = 
+                -- These cases might not be all inclusive of all valid combinations.
+                case (v, t) of
+                  (SInteger _, SVMType.Int _ _) -> pure $ True
+                  (SString _, SVMType.String _) -> pure $ True
+                  (SString _, SVMType.Bytes _ _) -> pure $ True
+                  (SBool _, SVMType.Bool) -> pure $ True
+                  (SAccount _ _, SVMType.Address _) -> pure $ True
+                  (SAccount _ _, SVMType.Account _) -> pure $ True
+                  (SStruct _ _, SVMType.UnknownLabel _ _) -> pure $ True
+                  (SContract x _, SVMType.UnknownLabel y _) -> pure $ x == y
+                  (SArray x _, SVMType.Array y _) -> pure $ x == y
+                  (SReference addressedPath, _) -> do
+                    refType <- getXabiValueType addressedPath
+                    if (refType == t)
+                      then pure $ True
+                      else 
+                        case (refType, t) of
+                          (SVMType.UnknownLabel x _, SVMType.UnknownLabel y _) -> pure $ x == y
+                          (SVMType.Array x _, SVMType.Array y _) -> pure $ x == y 
+                          _ -> pure $ False
+                  _ -> pure $ False
               mapArgs :: CC.FuncF a -> [(String, (SVMType.Type, Value))]
               mapArgs theFunc = case argVals of
                 OrderedVals vs -> let argMeta = 
@@ -2058,8 +2050,6 @@ expToVar' (CC.FunctionCall _ e args) = do
                                           (M.zipWithMatched $ \_k t v -> (t, v))
                                           strTypes
                                           $ M.fromList ns
-                      -- These probably don't need to be sorted by argument index, as they are turned into a map
-                      -- when added to the call info.
                       sortedArgs = map snd . sortWith fst
                                 . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
                                 $ M.toList typeAndVal
