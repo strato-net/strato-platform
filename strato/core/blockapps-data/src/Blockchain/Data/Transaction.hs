@@ -25,6 +25,7 @@ module Blockchain.Data.Transaction (
   whoSignedThisTransaction,
   transactionHash,
   partialTransactionHash,
+  whoSignedThisTransactionEcrecover,
   getSigVals
   ) where
 
@@ -56,9 +57,10 @@ import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.Secp256k1 as EC
 
 import qualified Crypto.Secp256k1 as SEC
-
+-- import qualified Data.ByteString.Short as B (ShortByteString, toShort, fromShort)
 import           Control.DeepSeq
 import           System.Clock
+-- import Data.ByteString (ByteString)
 
 
 
@@ -267,6 +269,14 @@ whoSignedThisTransaction tx = case tx of
           sig = EC.Signature (SEC.CompactRecSig (intToBSS $ transactionR t) (intToBSS $ transactionS t) ((transactionV t) - 0x1b))
           mesg = keccak256ToByteString $ partialTransactionHash t
 
+whoSignedThisTransactionEcrecover :: Keccak256 -> Integer -> Integer -> Integer -> Maybe Address
+whoSignedThisTransactionEcrecover hsh r s v = fromPublicKey <$> EC.recoverPub sig mesg
+        where
+          intToBSS = BSS.toShort . word256ToBytes . fromInteger
+          newV :: Word8
+          newV = fromInteger v
+          sig = EC.Signature (SEC.CompactRecSig (intToBSS $ r) (intToBSS $ s) ((newV) - 0x1b))
+          mesg = keccak256ToByteString $ hsh
 {-
 whoSignedThisTransaction::Transaction->Maybe Address -- Signatures can be malformed, hence the Maybe
 whoSignedThisTransaction tx = case tx of
