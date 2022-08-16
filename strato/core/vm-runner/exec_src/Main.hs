@@ -15,7 +15,7 @@ import           HFlags
 
 import           BlockApps.Init
 import           BlockApps.Logging
-import           Blockchain.VMOptions(flags_ccCacheWindow) -- HFlags
+import           Blockchain.VMOptions() -- HFlags
 import           Executable.EthereumVM
 import           Executable.EVMFlags() -- HFlags
 import           SolidVM.Solidity.SourceTools
@@ -31,5 +31,5 @@ main = do
       helpers = case snd <$> mDebugger of
         Nothing -> metricsRunner
         Just debuggerRunner -> race_ metricsRunner debuggerRunner
-      runVM = runLoggingT $ ethereumVM debugSettings flags_ccCacheWindow
+      runVM = runLoggingT $ ethereumVM debugSettings
   race_ helpers runVM

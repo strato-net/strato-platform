@@ -236,13 +236,6 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
         Nothing -> $logDebugS "addBlock" $ T.pack $ "Could not locate new chain root after running block. Using emptyTriePtr"
         Just cr -> $logDebugS "addBlock" $ T.pack $ "New chain root after running block: " ++ format cr
 
-    ccCacheWindowSize <- _ccCacheWindow <$> Mod.get (Mod.Proxy @ContextState)
-    lastClear <- _lastClearBlock <$> Mod.get (Mod.Proxy @MemDBs)
-    when (blockDataNumber bd > lastClear + ccCacheWindowSize) $ do
-      Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ do
-        lastClearBlock .= blockDataNumber bd
-        codeCollectionMap .= M.empty
-
     lift $ P.incCounter vmBlocksMined
     lift $ P.incCounter vmBlocksProcessed
     $logInfoS "addBlock" .  T.pack $ "Inserted block became #" ++ show (blockDataNumber $ obBlockData b) ++ " (" ++ format obh ++ ")."

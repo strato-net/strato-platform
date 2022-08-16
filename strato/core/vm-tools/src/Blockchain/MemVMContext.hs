@@ -66,7 +66,6 @@ import           Blockchain.VMContext               ( CurrentBlockHash(..)
                                                     , stateBlockMap
                                                     , storageTxMap
                                                     , storageBlockMap
-                                                    , codeCollectionMap
                                                     , newX509Certs
                                                     )
 
@@ -267,19 +266,6 @@ instance (Keccak256 `A.Alters` DBCode) MemContextM where
   insert _ k c = dbsModify' $ codeDB . at k ?~ c
   delete _ k   = dbsModify' $ codeDB . at k .~ Nothing
 
-instance (Keccak256 `A.Alters` DBCodeCollection) MemContextM where
-  lookup _ k = do
-    mCC <- gets $ view $ memDBs . codeCollectionMap . at k
-    case mCC of
-      Just cc -> pure $ Just cc
-      Nothing -> dbsGets $ view (codeCollectionDB . at k)
-  insert _ k v = do
-    modify $ memDBs . codeCollectionMap %~ M.insert k v
-    dbsModify' $ codeCollectionDB . at k ?~ v
-  delete _ k = do
-    modify $ memDBs . codeCollectionMap %~ M.delete k
-    dbsModify' $ codeCollectionDB . at k .~ Nothing
-
 instance (Address `A.Alters` X509Certificate) MemContextM where
   lookup _ a   = dbsGets $ view (x509CertDB . at a)
   insert _ a c = dbsModify' $ x509CertDB . at a ?~ c
@@ -347,8 +333,6 @@ runMemContextMWith cdbs dSettings f = do
         , _storageBlockMap = M.empty
         , _stateRoots      = M.empty
         , _currentBlock    = Nothing
-        , _lastClearBlock  = 0
-        , _codeCollectionMap = M.empty
         }
       cstate = ContextState
         { _memDBs            = cmemDBs
@@ -360,7 +344,6 @@ runMemContextMWith cdbs dSettings f = do
         , _txRunResultsCache = cache
         , _debugSettings     = dSettings
         , _newX509Certs      = M.empty
-        , _ccCacheWindow     = 0 -- This monad is all in memory, so we want to minimize duplication
         }
       ctx = MemContext
         { _dbs   = cdbs

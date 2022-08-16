@@ -40,8 +40,6 @@ module Blockchain.VMContext
     , storageBlockMap
     , stateRoots
     , currentBlock
-    , lastClearBlock
-    , codeCollectionMap
     , memDBs
     , baggerState
     , bestBlockInfo
@@ -51,7 +49,6 @@ module Blockchain.VMContext
     , txRunResultsCache
     , debugSettings
     , newX509Certs
-    , ccCacheWindow
     , dbs
     , state
     , contextGet
@@ -176,8 +173,6 @@ data MemDBs = MemDBs
   , _storageBlockMap :: M.Map (Account, B.ByteString) B.ByteString
   , _stateRoots      :: M.Map (Keccak256, Maybe Word256) MP.StateRoot
   , _currentBlock    :: Maybe CurrentBlockHash
-  , _lastClearBlock  :: !Integer
-  , _codeCollectionMap :: M.Map Keccak256 DBCodeCollection
   } deriving (Generic, NFData, Show)
 makeLenses ''MemDBs
 
@@ -191,7 +186,6 @@ data ContextState = ContextState
   , _txRunResultsCache :: TRC.Cache
   , _debugSettings     :: Maybe DebugSettings
   , _newX509Certs      :: M.Map Address X509Certificate
-  , _ccCacheWindow     :: !Integer
   } deriving (Generic, NFData)
 makeLenses ''ContextState
 
@@ -438,17 +432,9 @@ instance (Keccak256 `A.Alters` DBCode) ContextM where
   delete _ = genericDeleteCodeDB $ getCodeDB
 
 instance (Keccak256 `A.Alters` DBCodeCollection) ContextM where
-  lookup _ k = do
-    mCC <- gets $ view $ memDBs . codeCollectionMap . at k
-    case mCC of
-      Just cc -> pure $ Just cc
-      Nothing -> genericLookupCodeCollectionDB getCodeCollectionDB k
-  insert _ k v = do
-    modify $ memDBs . codeCollectionMap %~ M.insert k v
-    genericInsertCodeCollectionDB getCodeCollectionDB k v
-  delete _ k = do
-    modify $ memDBs . codeCollectionMap %~ M.delete k
-    genericDeleteCodeCollectionDB getCodeCollectionDB k
+  lookup _ = genericLookupCodeCollectionDB getCodeCollectionDB
+  insert _ = genericInsertCodeCollectionDB getCodeCollectionDB
+  delete _ = genericDeleteCodeCollectionDB getCodeCollectionDB
 
 instance (Address `A.Alters` X509Certificate) ContextM where
   lookup _ = genericLookupX509CertDB $ getX509CertDB
@@ -547,8 +533,6 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
             , _storageBlockMap = M.empty
             , _stateRoots      = M.empty
             , _currentBlock    = Nothing
-            , _lastClearBlock  = 0
-            , _codeCollectionMap = M.empty
             }
 
       cstate <- newIORef $ ContextState
@@ -561,7 +545,6 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
             , _txRunResultsCache = cache
             , _debugSettings     = Nothing
             , _newX509Certs      = M.empty
-            , _ccCacheWindow     = 100 -- arbitrary value because this is a test monad
             }
 
       let ctx = Context
@@ -577,10 +560,9 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
 
 runContextM :: (MonadIO m, MonadUnliftIO m, MonadLoggerIO m)
             => Maybe DebugSettings
-            -> Integer
             -> ReaderT Context (ResourceT m) a
             -> m (a, ContextState)
-runContextM dSettings ccWindow f = do
+runContextM dSettings f = do
     liftIO $ createDirectoryIfMissing False $ dbDir "h"
     runResourceT $ do
       conn <- createPostgresqlPool connStr 20
@@ -618,8 +600,6 @@ runContextM dSettings ccWindow f = do
             , _storageBlockMap = M.empty
             , _stateRoots      = M.empty
             , _currentBlock    = Nothing
-            , _lastClearBlock  = 0
-            , _codeCollectionMap = M.empty
             }
 
       cstate <- newIORef $ ContextState
@@ -632,7 +612,6 @@ runContextM dSettings ccWindow f = do
             , _txRunResultsCache = cache
             , _debugSettings     = dSettings
             , _newX509Certs      = M.empty
-            , _ccCacheWindow     = ccWindow
             }
 
       let ctx = Context

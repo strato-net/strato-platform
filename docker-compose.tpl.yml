@@ -128,7 +128,6 @@ services:
     - blockTime=${blockTime}
     - bootnode=${bootnode}
     - brokenRefundReenable=${brokenRefundReenable}
-    - ccCacheWindow=${ccCacheWindow:-10000}
     - cacheTransactionResults=${cacheTransactionResults}
     - connectionTimeout=${connectionTimeout}
     - debugFail=${debugFail}
