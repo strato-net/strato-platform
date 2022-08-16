@@ -23,6 +23,8 @@ module Blockchain.SolidVM
   , create
   ) where
 
+--Used to retrieve contract xabi and other pieces of code
+import           BlockApps.Bloc22.Server.Contracts
 
 import           Control.DeepSeq                      (force)
 import           Control.Exception                    (throw)
@@ -122,7 +124,7 @@ import           SolidVM.Model.Value
 import           SolidVM.Solidity.Parse.Statement
 import           SolidVM.Solidity.Parse.Lexer         (stringLiteral)
 import           SolidVM.Solidity.Parse.ParserTypes
-import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpression)--, unparseFunc)
+import           SolidVM.Solidity.Parse.UnParser      hiding (sortWith)
 
 import           Network.Haskoin.Crypto.BigWord()
 import           UnliftIO                             hiding (assert)
@@ -2093,6 +2095,7 @@ expToVar' (CC.FunctionCall _ e args) = do
 
           Constant (SContractItem address' "code") -> do
             --TODO: allow for finding multiple items in the future (this functionality can be conducted using the multiple code calls, currently)
+            --Only get the items if they are in the same chain as the current contract, this will prevent leaks from private chains
             from <- getCurrentAccount
             let address = namedAccountToAccount (from ^. accountChainId) address'
             -- Retreive and resolve the codehash
@@ -2117,8 +2120,110 @@ expToVar' (CC.FunctionCall _ e args) = do
                 _ -> pure $ Nothing    
             --get only the contract containing useful sourceAnnotation contained in the ContractF type.
             (contract, _, _) <- getCodeAndCollection address
+            fullContractDetails <- getContractsDetails address (from ^. accountChainId)
 
-            --get the position of the searched item if something was wanting to be searched
+            --get the unparsed piece of code, save multiple entries (if there are multiple items with the same name add them all)
+              --TODO: allow for selecting a specific item if multiples exist by adding a number to the input selecting the 
+                --particular item to return.
+            let pieceOfCode :: [String]
+            let pieceOfCode = 
+                  case (fromMaybe "" searchTerms) of 
+                    --get the location of just the code of the contract, if nothing is inputted in the contract then focus on just the contract itself
+                    "" -> let val = foldMap mon contract
+                                          where mon sa  = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
+                                                          in (Min (sl, sc), Max(el, ec))
+                              -- tup = case val of
+                              --         Just (Min (sl, sc), Max(el,ec)) -> Just (sl, sc, el, ec)
+                              --         Nothing -> Nothing  
+                              (Min (slt, sct), Max(elt, ect)) = val
+                              (startLine, startCol, endLine, endCol) = (slt, sct, elt, ect)
+                          in [(startLine, startCol, endLine, endCol)]
+                          
+                    term ->
+                    --Search the full contract for the search term, retrieving the sourceAnnotation location of the part that was found
+                      -- Check for and get the different parts of the contract
+                      let contrAnno = if ((contract ^. CC.contractName) == term) then 
+                              let val = foldMap mon contract
+                                          where mon sa  = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
+                                                          in Just (Min (sl, sc), Max(el,ec))
+                              in case val of 
+                                Just (Min (sl, sc), Max(el,ec)) -> Just (sl, sc, el, ec)
+                                Nothing -> Nothing 
+                            else Nothing
+                          -- constAnno =                             
+                          --   let mConstf = (contract ^. CC.constants) M.!? term
+                          --       val = case mConstf of
+                          --         Just constf -> foldMap mon constf
+                          --           where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
+                          --                          in Just (Min (sl, sc), Max (el, ec))
+                          --         Nothing -> Nothing
+                          --   in case val of
+                          --         Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
+                          --         Nothing -> Nothing
+                          -- storjAnno =                             
+                          --   let mStorj = (contract ^. CC.storageDefs) M.!? term
+                          --       val = case mStorj of
+                          --         Just storjf -> foldMap mon storjf
+                          --           where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
+                          --                          in Just (Min (sl, sc), Max (el, ec))
+                          --         Nothing -> Nothing
+                          --   in case val of
+                          --         Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
+                          --         Nothing -> Nothing
+                          -- enumAnno =                             
+                          --   let mEnum = snd <$> ((contract ^. CC.enums) M.!? term)
+                          --       val = case mEnum of
+                          --         Just enumf -> mon enumf
+                          --           where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
+                          --                          in Just (Min (sl, sc), Max (el, ec))
+                          --         Nothing -> Nothing
+                          --   in case val of
+                          --         Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
+                          --         Nothing -> Nothing
+                          -- structAnno = 
+                          --   let mStruct = (contract ^. CC.structs) M.!? term
+                          --       val = case mStruct of
+                          --         Just structf -> foldMap mon ((\(_,_,s) -> s)  <$> structf)
+                          --           where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
+                          --                          in Just (Min (sl, sc), Max (el, ec))
+                          --         Nothing -> Nothing
+                          --   in case val of
+                          --         Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
+                          --         Nothing -> Nothing
+                          -- eventAnno =                             
+                          --   let mEvent = (contract ^. CC.events) M.!? term
+                          --       val = case mEvent of
+                          --         Just eventf -> foldMap mon eventf
+                          --           where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
+                          --                          in Just (Min (sl, sc), Max (el, ec))
+                          --         Nothing -> Nothing
+                          --   in case val of
+                          --         Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
+                          --         Nothing -> Nothing
+                          -- funcAnno = 
+                          --   let mFuncf = (contract ^. CC.functions) M.!? term
+                          --       val = case mFuncf of
+                          --         Just funcf -> foldMap mon funcf
+                          --           where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
+                          --                          in Just (Min (sl, sc), Max (el, ec))
+                          --         Nothing -> Nothing
+                          --   in case val of
+                          --         Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
+                          --         Nothing -> Nothing 
+                          -- modAnno = 
+                          --   let mModf = (contract ^. CC.modifiers) M.!? term
+                          --       val = case mModf of
+                          --         Just funcf -> foldMap mon funcf
+                          --           where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
+                          --                          in Just (Min (sl, sc), Max (el, ec))
+                          --         Nothing -> Nothing
+                          --   in case val of
+                          --         Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
+                          --         Nothing -> Nothing
+                          
+                      --Remove all of the items that were found to contain nothing, this should leave just the items that we found
+                      in catMaybes [contrAnno]--, funcAnno, constAnno, storjAnno, enumAnno, eventAnno, structAnno, modAnno]
+
             let anno :: [(Int, Int, Int, Int)]
                 anno = 
                   case (fromMaybe "" searchTerms) of 
