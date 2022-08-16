@@ -73,7 +73,7 @@ solidityLanguage = javaStyle {
      "function", "returns", "return", "modifier", "revert",
      "delete", "constant", "storage", "memory", "calldata", "immutable",
      "if", "else", "while", "for", "break", "continue",
-     "call", "callcode", "length", "sha3", "ecrecover",
+     "call", "callcode", "length", "sha3",
      "suicide", "this",
      "block", --"coinbase", "difficulty", "gaslimit", "number", "blockhash", "timestamp", "now"
      "msg", --"data", "gas", "sender", "value",
