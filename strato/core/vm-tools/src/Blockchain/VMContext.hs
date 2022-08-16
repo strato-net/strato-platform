@@ -625,17 +625,15 @@ runContextM dSettings f = do
 
 evalContextM :: (MonadIO m, MonadUnliftIO m, MonadLoggerIO m)
              => Maybe DebugSettings
-             -> Integer
              -> ReaderT Context (ResourceT m) a
              -> m a
-evalContextM d w f = fst <$> runContextM d w f
+evalContextM d f = fst <$> runContextM d f
 
 execContextM :: (MonadIO m, MonadUnliftIO m, MonadLoggerIO m)
              => Maybe DebugSettings
-             -> Integer
              -> ReaderT Context (ResourceT m) a
              -> m ContextState
-execContextM d w f = snd <$> runContextM d w f
+execContextM d f = snd <$> runContextM d f
 
 incrementNonce :: (Account `A.Alters` AddressState) f => Account -> f ()
 incrementNonce account = A.adjustWithDefault_ Mod.Proxy account $ \addressState ->
