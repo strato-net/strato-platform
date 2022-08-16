@@ -266,6 +266,11 @@ instance (Keccak256 `A.Alters` DBCode) MemContextM where
   insert _ k c = dbsModify' $ codeDB . at k ?~ c
   delete _ k   = dbsModify' $ codeDB . at k .~ Nothing
 
+instance (Keccak256 `A.Alters` DBCodeCollection) MemContextM where
+  lookup _ k = dbsGets $ view (codeCollectionDB . at k)
+  insert _ k v = dbsModify' $ codeCollectionDB . at k ?~ v
+  delete _ k = dbsModify' $ codeCollectionDB . at k .~ Nothing
+
 instance (Address `A.Alters` X509Certificate) MemContextM where
   lookup _ a   = dbsGets $ view (x509CertDB . at a)
   insert _ a c = dbsModify' $ x509CertDB . at a ?~ c
