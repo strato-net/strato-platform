@@ -172,13 +172,7 @@ addBlocks unfiltered = do
       ranPrivateTxs' <- readIORef ranPrivateTxs
       when didReplaceBest' $ do
         $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
-        nbb@(_,n,_) <- readIORef replacedBest
-        ccCacheWindowSize <- _ccCacheWindow <$> Mod.get (Mod.Proxy @ContextState)
-        lastClear <- _lastClearBlock <$> Mod.get (Mod.Proxy @MemDBs)
-        when (n > lastClear + ccCacheWindowSize) $ do
-          Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ do
-            lastClearBlock .= n
-            codeCollectionMap .= M.empty
+        nbb <- readIORef replacedBest
         yield . OutIndexEvent $ NewBestBlock nbb
         when flags_sqlDiff $ timeit "calculateAndEmitStateDiffs " timerToUse $
           calculateAndEmitStateDiffs srLog oldHeader
@@ -241,6 +235,13 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
       case mcr'' of
         Nothing -> $logDebugS "addBlock" $ T.pack $ "Could not locate new chain root after running block. Using emptyTriePtr"
         Just cr -> $logDebugS "addBlock" $ T.pack $ "New chain root after running block: " ++ format cr
+
+    ccCacheWindowSize <- _ccCacheWindow <$> Mod.get (Mod.Proxy @ContextState)
+    lastClear <- _lastClearBlock <$> Mod.get (Mod.Proxy @MemDBs)
+    when (blockDataNumber bd > lastClear + ccCacheWindowSize) $ do
+      Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ do
+        lastClearBlock .= blockDataNumber bd
+        codeCollectionMap .= M.empty
 
     lift $ P.incCounter vmBlocksMined
     lift $ P.incCounter vmBlocksProcessed
