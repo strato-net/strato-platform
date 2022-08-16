@@ -4673,6 +4673,19 @@ contract qq {
   }
 }|]
     getFields ["x","y","z"] `shouldReturn` [BDefault, BDefault, BDefault]
+
+  it "returns owner's address for valid ecrecover call" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+  
+  address addr;
+  constructor() {
+  addr = ecrecover("3a5d3354533658145308bb0d64dbc1508fc09cdfb776fbd3ef69c5733efff993",62426968875534762403852209127290402186903754337050088741962154937967930754218,50195776013273436178497944053297375925820829706569486652594540226567378884053,27);
+  }
+}|]
+    getFields ["addr"] `shouldReturn` [BAccount (NamedAccount 0xe2b74b933b1fbe7f3736ad437b60a7828bcc4b80 UnspecifiedChain)]
+
   it "can use builtin sha256 function" . runTest $ do
     runBS [r|
 pragma solidvm 3.3;
@@ -5294,6 +5307,23 @@ contract qq {
   }
 }|]
     getFields ["result1", "result2", "result3", "result4"] `shouldReturn` [BInteger 3, BInteger 6, BInteger 1, BInteger 12]
+
+  it "uint to string convertion test " . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  uint a = 0;
+  uint b = 0;
+  uint c = 0;
+  uint d = 0;
+  constructor() {
+    a = uint("1237655",10);
+    b = uint("18884635",16);
+    c = uint("12124567");
+    d = uint("1f3479f6");
+  }
+}|]
+    getFields ["a", "b", "c", "d"] `shouldReturn` [BInteger 1237655, BInteger 0x18884635, BInteger 0x12124567, BInteger 0x1f3479f6]
 
   it "can declare custom errors and file level custom errors" . runTest $ do
     runBS [r|
