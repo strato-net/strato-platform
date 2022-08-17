@@ -2193,31 +2193,20 @@ expToVar' (CC.FunctionCall _ e args) = do
                             -- in case val of
                             --       Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
                             --       Nothing -> Nothing
-                          eventString = Nothing                             
-                            -- let mEvent = (contract ^. CC.events) M.!? term
-                            --     val = case mEvent of
-                            --       Just eventf -> foldMap mon eventf
-                            --         where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
-                            --                        in Just (Min (sl, sc), Max (el, ec))
-                            --       Nothing -> Nothing
-                            -- in case val of
-                            --       Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
-                            --       Nothing -> Nothing
+                          eventString = 
+                            case ((contract ^. CC.events) M.!? term) of 
+                              Just eventF -> Just $ unparseEvent (term, eventF)
+                              Nothing -> Nothing                             
+
                           funcString = 
                             case ((contract ^. CC.functions) M.!? term) of 
                               Just funcF -> Just $ unparseFunc (term, funcF)
                               Nothing -> Nothing
 
-                          modString = Nothing
-                            -- let mModf = (contract ^. CC.modifiers) M.!? term
-                            --     val = case mModf of
-                            --       Just funcf -> foldMap mon funcf
-                            --         where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
-                            --                        in Just (Min (sl, sc), Max (el, ec))
-                            --       Nothing -> Nothing
-                            -- in case val of
-                            --       Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
-                            --       Nothing -> Nothing
+                          modString = 
+                            case ((contract ^. CC.modifiers) M.!? term) of
+                              Just modF -> Just $ unparseModifier (term, modF)
+                              Nothing -> Nothing
                           
                       --Remove all of the items that were found to contain nothing, this should leave just the items that we found
                       in catMaybes [contrString, funcString, constString, storjString, enumString, eventString, structString, modString]
