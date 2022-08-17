@@ -59,14 +59,19 @@ setPragmaVersion :: PragmaVersion -> SolidityParser ()
 -- Given a new pragma version replace the old parser State with a new one with an updated pragma version.
 setPragmaVersion p = 
     do ParserState{..} <- getState
-       putState (ParserState contractName p)
+       putState (ParserState contractName p userDefinedTypes)
 
 --Change the contract name of the ParserState with a given input
 setContractName :: ContractName -> SolidityParser ()
 -- Given a new contract name replace the old parser State with a new one with an updated contract name.
 setContractName cn = 
     do ParserState{..} <- getState
-       putState (ParserState cn pragmaVersion)
+       putState (ParserState cn pragmaVersion userDefinedTypes)
+
+addUserDefinedType :: String -> String -> SolidityParser ()
+addUserDefinedType k v =  --putState (ParserState contractName pragmaVersion (M.insert k v userDefinedTypes )) =<< ParserState{..} =<< getState
+    do ParserState{..} <- getState
+       putState (ParserState contractName pragmaVersion (M.insert k v userDefinedTypes )) 
 
 -- Get the contract name from the parser state
 getContractName :: SolidityParser ContractName

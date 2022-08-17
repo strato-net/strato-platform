@@ -1389,7 +1389,9 @@ tcExpr (FunctionCall x (MemberAccess g (Variable wow nam) "wrap") args) =  do
       a <- case args of
          OrderedArgs es -> productType' x <$> traverse tcExpr es
          NamedArgs es -> productType' x <$> traverse (tcExpr . snd) es
-      apply e a
+      case args of
+        NamedArgs es -> apply e a $ Just (fst <$> es)
+        _ -> apply e a Nothing
 
 tcExpr (FunctionCall x (MemberAccess g (Variable wow nam) "unwrap") args) =  do
   c <- asks contract
@@ -1425,7 +1427,9 @@ tcExpr (FunctionCall x (MemberAccess g (Variable wow nam) "unwrap") args) =  do
       a <- case args of
          OrderedArgs es -> productType' x <$> traverse tcExpr es
          NamedArgs es -> productType' x <$> traverse (tcExpr . snd) es
-      apply e a
+      case args of
+        NamedArgs es -> apply e a $ Just (fst <$> es)
+        _ -> apply e a Nothing
 
 tcExpr (FunctionCall x expr args) = do
   e <- tcExpr expr

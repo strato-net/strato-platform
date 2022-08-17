@@ -84,7 +84,7 @@ compileSourceNoInheritance initCodeMap = do
         fmap catMaybes . for sourceUnits $ \case
           NamedXabi name (xabi, parents') -> do
             ctrct <- first SVMEx
-                   $ xabiToContract (textToLabel name) (map textToLabel parents') vmVersion' xabi
+                   $ xabiToContract (textToLabel name) (map textToLabel parents') vmVersion' userDefinedFromFile xabi
             pure $ Just $ (textToLabel name, Con ctrct)
           FLFunc name fdec -> do
             pure $ Just $ (name, FLF fdec)

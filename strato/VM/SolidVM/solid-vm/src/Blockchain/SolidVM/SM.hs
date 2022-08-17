@@ -383,6 +383,7 @@ getVariableOfName name = do
                     then x { currentContract = CC.Contract { CC._contractName = currentContract x^.CC.contractName
                                                 ,  CC._parents = currentContract x^.CC.parents
                                                 ,  CC._constants = M.empty
+                                                ,  CC._userDefined = M.empty
                                                 ,  CC._storageDefs = M.empty
                                                 ,  CC._enums = M.empty
                                                 ,  CC._structs = M.empty
