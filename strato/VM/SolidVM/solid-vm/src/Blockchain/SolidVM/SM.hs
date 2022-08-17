@@ -427,23 +427,18 @@ getVariableOfName name = do
       maybeEnum = toMaybe (name `elem` M.keys (currentContract currentCallInfo ^.CC.enums) || name `elem` M.keys (codeCollection currentCallInfo^.CC.flEnums)) $
         t "enum" $ Constant $ SEnum name
 
-      maybeUserDefined :: Maybe Variable
-      maybeUserDefined = fmap (t "user defined" . Constant) $ do 
-        --let ctract = (length (filter (userDefinedHelper name )  [ CC.varType x | (_, x) <-  M.toList (currentContract currentCallInfo^.CC.storageDefs) ]) > 0)
-        --CC.ConstantDecl{..} <- M.lookup name $ ctract ^. CC.constants
-        let vvv = filter (userDefinedHelper name )  [ CC.varType x | (_, x) <-  M.toList (currentContract currentCallInfo^.CC.storageDefs) ]
-        if length vvv > 0
-          then return $ SolidVM.Model.Value.SUserDefined name "asd" (SInteger 122)
-          else return $ SolidVM.Model.Value.SUserDefined name "asd" (SBool True)
+      -- maybeUserDefined :: Maybe Variable
+      -- maybeUserDefined = fmap (t "user defined" . Constant) $ do 
+      --   --let ctract = (length (filter (userDefinedHelper name )  [ CC.varType x | (_, x) <-  M.toList (currentContract currentCallInfo^.CC.storageDefs) ]) > 0)
+      --   --CC.ConstantDecl{..} <- M.lookup name $ ctract ^. CC.constants
+      --   let vvv = filter (userDefinedHelper name )  [ CC.varType x | (_, x) <-  M.toList (currentContract currentCallInfo^.CC.storageDefs) ]
+      --   if length vvv > 0
+      --     then return $ SolidVM.Model.Value.SUserDefined name "asd" (SInteger 122)
+      --     else return $ SolidVM.Model.Value.SUserDefined name "asd" (SBool True)
 
-        
-        
-        -- toMaybe (length (filter (userDefinedHelper name )  [ CC.varType x | (_, x) <-  M.toList (currentContract currentCallInfo^.CC.storageDefs) ]) > 0) $
-        -- t "user defined" $ Constant $ SolidVM.Model.Value.SUserDefined name "asd" (SBool True)
-      
-      userDefinedHelper :: String -> SVMType.Type  -> Bool
-      userDefinedHelper nam (SVMType.UserDefined a _)  = if a == nam then True else False
-      userDefinedHelper _ _ = False
+      -- userDefinedHelper :: String -> SVMType.Type  -> Bool
+      -- userDefinedHelper nam (SVMType.UserDefined a _)  = if a == nam then True else False
+      -- userDefinedHelper _ _ = False
 
 
       --   toMaybe (name `elem` M.keys (currentContract currentCallInfo^.CC.enums)) $
@@ -511,7 +506,7 @@ getVariableOfName name = do
       , maybeContract
       , maybeThis
       , maybeConstant
-      , maybeUserDefined
+      --, maybeUserDefined
       , unknownVariable ("getVariableOfName" ++ (show (currentContract currentCallInfo^.CC.storageDefs)) )name
       ]
 
