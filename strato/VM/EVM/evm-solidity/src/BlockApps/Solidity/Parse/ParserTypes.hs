@@ -4,9 +4,15 @@
 --   containing the structure of a parsed contract.
 -- Maintainer: Ryan Reich <ryan@blockapps.net>
 -- Maintainer: Steven Glasford <steven_glasford@blockapps.net>
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveGeneric #-}
+
 module BlockApps.Solidity.Parse.ParserTypes where
 
 import           Control.Monad
+import           Control.DeepSeq
+import           GHC.Generics
 import           Data.Either.Extra
 import           Data.Maybe
 import           Data.SemVer
@@ -18,7 +24,7 @@ import           BlockApps.Solidity.Xabi
 data SourceUnit = Pragma Identifier String
                 | Import T.Text
                 | NamedXabi T.Text (Xabi, [T.Text])
-                deriving (Eq, Show)
+                deriving (Eq, Show, Generic, NFData)
 
 newtype File = File {
   unsourceUnits :: [SourceUnit]
