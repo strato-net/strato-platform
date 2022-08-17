@@ -3868,10 +3868,9 @@ contract qq {
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
-  it "can search for any public variable in a contract initialized value" . runTest $ do
+  fit "can search for any public variable in a contract initialized value" . runTest $ do
     let codeSnippet :: String
-        codeSnippet = [r|uint public testVar = 13*56-3+8/158*8*555*65+65-65-65+59/65-8;
-|]
+        codeSnippet = [r|uint public testVar = 13 * 56 - 3 + 8 / 158 * 8 * 555 * 65 + 65 - 65 - 65 + 59 / 65 - 8;|]
         contract :: String
         contract = [r|
 pragma solidvm 3.3;
