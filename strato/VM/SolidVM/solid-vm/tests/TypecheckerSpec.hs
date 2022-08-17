@@ -12,6 +12,7 @@ import qualified SolidVM.Solidity.StaticAnalysis.Typechecker                    
 import           Test.Hspec
 import           Text.RawString.QQ
 
+
 runTypechecker :: String -> [SourceAnnotation Text]
 runTypechecker c = case compileSourceWithAnnotations True (M.fromList [("",T.pack c)]) of
   Left anns -> anns
@@ -913,7 +914,7 @@ contract A {
 |]
     in length anns `shouldBe` 1
 
-  it " Should work" $
+  it "For Demo Day!!!! should work" $
     let anns = runTypechecker [r|
     pragma solidvm 3.3;
     
@@ -924,12 +925,16 @@ contract A {
     contract A {
       UBool cayley;
       UBool yoneda = UBool.wrap(true);
+          //MagicInt adultFood = galois;
+    //UBool cayley;
+    //MysticalString suffie  =  MysticalString.wrap("123");
+    //UBool cayley = UBool.wrap(false);
     }
 |]
     in length anns `shouldBe` 0
 
 
-  it " Should work" $
+  it "typechecker should return 1 bottom for variable of a different underlying type" $
     let anns = runTypechecker [r|
     pragma solidvm 3.3;
     
@@ -939,31 +944,25 @@ contract A {
     
     contract A {
       int name =3;
-      string number ="3";
       MagicInt name = MagicInt.wrap(12); 
       MysticalString shakeYo = MysticalString.wrap("string");
-      MysticalString shakeYo2 = MysticalString.wrap(name);//Should throw error
+      MysticalString shakeYo2 = MysticalString.wrap(name);
     }
 |]
     in length anns `shouldBe` 1
 
-  it "Should throw error work" $
+  it "cannot wrap a user defined type, even if the user defined type is the same type as the wrapping type" $
     let anns = runTypechecker [r|
     pragma solidvm 3.3;
     type MysticalString is string;
-    
     contract A {
       MysticalString shakeYo = MysticalString.wrap("string");
-      MysticalString shakeYo2 = MysticalString.wrap(shakeYo); //Should throw error
-      //MagicInt galois =  MagicInt.wrap(123);
-      //int banana = 12;
-      //MagicInt adolescentFood =  MagicInt.wrap(banana);
-      //MagicInt yoneda = UFixed256x18.wrap(true); // Should throw Error
+      MysticalString shakeYo2 = MysticalString.wrap(shakeYo);
     }
 |]
     in length anns `shouldBe` 1
 
-  fit "should work" $
+  it "can declare a user defined type alias with a variable of the underlying type" $
     let anns = runTypechecker [r|
     pragma solidvm 3.3;
     type MagicInt is int;
@@ -974,7 +973,7 @@ contract A {
 |]
     in length anns `shouldBe` 0
 
-  fit "Can not assign user type to user type" $
+  it "can not assign user type to a different user type" $
     let anns = runTypechecker [r|
     pragma solidvm 3.3;
     type MagicInt is int;
@@ -982,23 +981,57 @@ contract A {
     contract A {
       int banana = 12;
       MagicInt adolescentFood =  MagicInt.wrap(banana);
-      MagicInt yoneda         = UBool.wrap(true);
+      MagicInt yoneda         = UBool.wrap(true); //Error
+      bool shouldThrowError   = UBool.wrap(true); //Error
     }
 |]
-    in length anns `shouldBe` 1
+    in length anns `shouldBe` 2
 
-  fit " Should work" $
+  it "Can use user defined unwrap and unwrap" $
     let anns = runTypechecker [r|
   pragma solidvm 3.3;
   type UBool is bool;
   type MagicInt is int;
   type MysticalString is string;
-  contract qq {
-    UBool cayley;
-    MagicInt galois =  MagicInt.wrap(123);
-    MagicInt adultFood;
-    MysticalString suffie  =  MysticalString.wrap("123");
-    UBool cayley = UBool.wrap(false);
+  contract A {
+    //bool unwrapping
+    UBool galois       =  UBool.wrap(false);
+    bool  mrBool       =  UBool.unwrap(galois);
+    bool  fermet       =  UBool.unwrap(UBool.wrap(true));
+    bool  felixKlein   =  UBool.unwrap(UBool.wrap(mrBool));
+
+    
+    //Int
+    MagicInt cayley   =  MagicInt.wrap(123);
+    int      yoneda   =  MagicInt.unwrap(cayley);
+    int      lagrange =  MagicInt.unwrap(MagicInt.wrap(123));
+    MagicInt gauss    =  MagicInt.wrap(MagicInt.unwrap(MagicInt.wrap(123)));
+    
+    //String
+    MysticalString hilbert  = MysticalString.wrap("vector");
+    string         banach   = MysticalString.unwrap(hilbert);
+    string krull            = MysticalString.unwrap(MysticalString.wrap(string.concat("33",  banach)));
+}
+|]
+    in length anns `shouldBe` 0
+
+  fit "can use user-defined-types wrap and unwrap within fuctions" $
+    let anns = runTypechecker [r|
+  pragma solidvm 3.3;
+  type UBool is bool;
+  type MagicInt is int;
+  type MysticalString is string;
+  contract A {
+    int a = 1;
+    UBool galois3  =  UBool.wrap(false);
+    function f() {
+       UBool galois       =  UBool.wrap(false);
+       UBool galois2       =  UBool.wrap(false);
+       bool  mrBool       =  UBool.unwrap(galois);
+      bool  fermet       =  UBool.unwrap(UBool.wrap(true));
+      bool  felixKlein   =  UBool.unwrap(UBool.wrap(mrBool));
+    }
+
 }
 |]
     in length anns `shouldBe` 0

@@ -157,7 +157,7 @@ solidityDeclaration =
   modifierDeclaration <|>
   eventDeclaration <|>
   variableDeclaration
-
+  
 {- New types -}
 
 -- | Parses a struct definition

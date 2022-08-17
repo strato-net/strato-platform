@@ -234,8 +234,9 @@ stringType' = Static (SVMType.String Nothing)
 boolType' :: SourceAnnotation Text -> Type'
 boolType' = Static SVMType.Bool
 
-userDefinedType' :: SourceAnnotation Text -> Type'
-userDefinedType' = Static SVMType.Bool
+--TODO get the inder-lying type of UserDefinedType
+-- userDefinedType' :: SourceAnnotation Text -> Type'
+-- userDefinedType' x = Static (SVMType.UserDefined "" SVMType.Bool) x
 
 
 addressType' :: SourceAnnotation Text -> Type'
@@ -545,7 +546,7 @@ typecheckMember (Static (SVMType.Array _ _) x) n = pure . bottom $ ("Unknown mem
 typecheckMember (Static (SVMType.Bytes _ _) x) "length" = pure $ Static (SVMType.Int Nothing Nothing) x
 -- typecheckMember (Static (SVMType.UserDefined  _  t) x) "wrap" = pure $ Static (t) x 
 -- typecheckMember (Static (SVMType.UserDefined  _  t) x) "unwrap" = pure $ Static (t) x
-typecheckMember (Static (SVMType.UserDefined _ _)  x) "wrap" = pure $  trace ("\tDO YOU FEEL ME TYTPECHECKMEMEBER") (Static (SVMType.Bool) x) --FIX THIS
+typecheckMember (Static (SVMType.UserDefined a b)  x) "wrap" = pure $  trace ("\tDO YOU FEEL ME TYTPECHECKMEMEBER") (Static (SVMType.UserDefined a b) x) --FIX THIS
 typecheckMember (Static (SVMType.UnknownLabel "Util" Nothing) x) "bytes32ToString" = pure $ Function (Static (SVMType.Bytes Nothing (Just 32)) x) (Static (SVMType.String Nothing) x) x []
 typecheckMember (Static (SVMType.UnknownLabel "Util" Nothing) x) "b32" = pure $ Function (Static (SVMType.Bytes Nothing (Just 32)) x) (Static (SVMType.Bytes Nothing (Just 32)) x) x []
 typecheckMember (Static (SVMType.UnknownLabel "string" Nothing) x) "concat" = pure $ Function (stringConcatArgs x) (Static (SVMType.String Nothing) x) x []
@@ -691,7 +692,7 @@ varDeclHelper cc c VariableDecl{..} = do
 
   let ty = Static varType varContext
    in case varInitialVal of
-        Nothing -> (ty) --trace ("WORKTHING " ++ (show ty)) (ty)
+        Nothing -> (ty)
         Just e ->
           let r = R cc c Nothing "Nothing" []
            in runReader (evalStateT (ty ~> tcExpr e) ((Nothing, M.empty) :| [])) r
@@ -835,7 +836,7 @@ intArgs :: SourceAnnotation Text -> Type'
 intArgs x = Sum $ enumType' x :|
                 [ intType' x
                 , stringType' x
-                , userDefinedType' x
+--                , userDefinedType' x
                 ]
 
 
@@ -845,7 +846,7 @@ stringArgs x = Sum $ stringType' x :|
                    , accountType' x
                    , intType' x
                    , boolType' x
-                   , userDefinedType' x
+--                   , userDefinedType' x
                    ]
 
 addressArgs :: SourceAnnotation Text -> Type'
@@ -994,7 +995,7 @@ getVarType' name ctx = do
   -- TODO make sure there isn't a member access of wrap. Then you want to do something different
   -- Probably Want to change things upstream to catch if the member access is 
   --let varDefy  = trace ("getVarType' \n\t\tname " ++ (show name) ++ "\n\t\tctx "++ (show ctx) ++ "\n\t\t Does it find var by name"++ (show $ varType <$> (M.lookup name (_storageDefs c))) )  (M.lookup name (_storageDefs c))
-  let varDefy = M.lookup name (_storageDefs c)
+  let varDefy =  M.lookup name (_storageDefs c)
   --when (True)  (internalError "WHY THE FUCK IS TRUE BEING PASSED?2 "  ( varDefy))
   case varDefy of
     Just _ -> do
@@ -1020,22 +1021,19 @@ getVarType' name ctx = do
         --when (True)  (internalError "Did not catch any of my vars catchers "  (ls) )
         getVarTypeByName' (stringToLabel name) ctx
 
-  --fromMaybe [] $ M.lookup name (_structs c)
-
-  --when (True)  (internalError "WHY THE FUCK IS TRUE BEING PASSED? "  (show  [ x | x@(_, (SVMType.UserDefined _ _)) <- (M.toList (_storageDefs c)) ]  ))
-  --when (True)  (internalError "WHY THE FUCK IS TRUE BEING PASSED? "  (show c ))--( M.lookup name (_storageDefs c)) ) )
-
-
--- Hmm I want to check if either the tuple name or varType is the same.
---- I am not 100%
---Okay instead of using M.elems we need to get the Key, value pairs, Then look for either key = name or varDef alias = name)
 
 userDefinedHelper :: String -> Type  -> Bool
 userDefinedHelper nam (SVMType.UserDefined a _)  = if a == nam then True else False
 userDefinedHelper _ _ = False
--- varDecMinon :: Annotated VariableDeclF --TODO MOVE THIS IF THIS WORKS
---               -> Type'
--- varDecMinon VariableDecl{..} = Static varType varContext
+
+
+userTypeHelper' :: Maybe String -> SVMType.Type
+userTypeHelper' (Just "bool")   =  SVMType.Bool
+userTypeHelper' (Just "string") =  SVMType.String $ Just True
+userTypeHelper' (Just "int")    =  (SVMType.Int (Just True) Nothing) 
+userTypeHelper' (Just "uint")   =  (SVMType.Int (Just False) Nothing) 
+userTypeHelper' _             =  SVMType.Bool  --TODO fix this
+
 
 
 getVarTypeByName' :: SolidString -> SourceAnnotation Text -> SSS Type'
@@ -1051,12 +1049,14 @@ getVarTypeByName' name ctx = do
     --Nothing -> pure $ bottom $ ("Unknown variable in getVarTypeByName?: " <>  labelToText  (show mVar) <>  labelToText  name ) <$ ctx
     Nothing -> do
       c <- asks contract
-      let mVarDecl = ((varType &&& const ctx) <$> M.lookup name (_storageDefs c))
+     
+      let mVarDecl = trace ("Tequila" ++ "\n\t mVar"++ (show mVar)) (((varType &&& const ctx) <$> M.lookup name (_storageDefs c))
                  <|> ((constType &&& const ctx) <$> M.lookup name (_constants c))
                  <|> (const (SVMType.Enum Nothing name Nothing, ctx) <$> M.lookup name (_enums c))
-                 <|> (const (SVMType.Struct Nothing name, ctx) <$> M.lookup name (_structs c))
+                 <|> (const (SVMType.Struct Nothing name, ctx) <$> M.lookup name (_structs c)))
+      
       case mVarDecl of
-        --Just ( (SVMType.UserDefined _ _), ctx') -> pure $ Static (SVMType.Account False) ctx'
+        --Just ( (SVMType.UserDefined _ _), ctx') -> pure $ Static (SVMType.Bool) ctx'
         Just (e@(SVMType.Enum{}), ctx') -> pure . Sum $
           (Static e ctx') :|
           [ Function (Static e ctx') (Static e ctx') ctx' []
@@ -1187,15 +1187,16 @@ statementHelper (RevertStatement _ (OrderedArgs vals) x) =
 statementHelper (UncheckedStatement body x) =
   statementsHelper' x body
 statementHelper (AssemblyStatement _ x) = pure $ topType' x
-statementHelper (SimpleStatement stmt x) = do
+statementHelper (SimpleStatement stmt x) =
   --when (True)  (internalError "STATEMENT ERROR "  stmt)
+  --let trything  =  trace (" " ++ "stmt") (simpleStatementHelper x stmt)
   simpleStatementHelper x stmt
 
 simpleStatementHelper :: SourceAnnotation Text -> Annotated SimpleStatementF -> SSS Type'
 simpleStatementHelper x (VariableDefinition vdefs mExpr) = do
   --when (True)  (internalError "WTF simplestatementhelper vDefs, expression\t" (vdefs, mExpr) )
   pushLocalVariables vdefs
-  let ts' = foldr varDefsToType' (topType' x) vdefs
+  let ts' = trace ("show this" ++ (show (foldr varDefsToType' (topType' x) vdefs))) (foldr varDefsToType' (topType' x) vdefs)
   ts' ~> maybe (pure $ topType' x) tcExpr mExpr
 simpleStatementHelper _ (ExpressionStatement expr) = do
   --when (True)  (internalError "WTF simplestatementhelper Expression \t" expr)
@@ -1216,6 +1217,15 @@ checkIfImmuteOperationValid (Variable y a)  = do
       then pure . bottom $ "Immutable assignment error at" <$  y
       else tcExpr (Variable y a)
 checkIfImmuteOperationValid a = tcExpr a
+
+
+-- statementsHelper2 :: [Annotated StatementF] -> SSS [SourceAnnotation Text]
+-- statementsHelper2 ss = do
+--   modify $ fmap (M.empty:)
+--   anns <- concat <$> traverse statementsHelper2 ss
+--   modify $ fmap tail
+--   pure anns
+
 
 tcExpr :: Annotated ExpressionF -> SSS Type'
 tcExpr (Binary x "+" a b) =
@@ -1273,7 +1283,6 @@ tcExpr (Binary x ">=" a b) =
 tcExpr (Binary x "<=" a b) =
   intType' x ~> tcExpr a <~> tcExpr b !> pure (boolType' x)
 tcExpr (Binary _ "=" a b) = do
-  --when (True) (internalError "b"  a)
   (checkIfImmuteOperationValid a) <~> tcExpr b
 tcExpr (Binary _ _ a b) =
   (tcExpr a <~> tcExpr b)
@@ -1298,21 +1307,28 @@ tcExpr (MemberAccess _ a fieldName) = do
 
 tcExpr (FunctionCall x (MemberAccess g (Variable wow nam) "wrap") args) =  do
   c <- asks contract
-  --let listOFUserDefinedVars = trace ("(FunctionCall x (MemberAccess g (Variable a nam) ? \n\t" ++ (show x)++ "\n\t g"++ (show g) ++ "\n\t"++(show wow) ++ "\n\t nam "++(show nam) ++ "\n\targs " ++ (show args) ++"\n\t ls1"++ (show ((filter (userDefinedHelper nam )  [ varType xx | xx <- (M.elems (_storageDefs c)) ]) )) ) (filter (userDefinedHelper nam )  [ varType xx | xx <- (M.elems (_storageDefs c)) ])
-  let listOFUserDefinedVars = filter (userDefinedHelper nam )  [ varType xx | xx <- (M.elems (_storageDefs c)) ]
-  --let listOFUserDefinedVars = trace ("tcExpr? " ++ (show nam)) (filter (userDefinedHelper nam )  [ varType xx | xx <- (M.elems (_storageDefs c)) ])
-  if length listOFUserDefinedVars > 0
+  -- let listOFUserDefinedVars = trace ("(FunctionCall x (MemberAccess g (Variable a nam) ? \n\t" 
+  --       ++ (show x)++ "\n\t M.member nam (_userDefined c) "
+  --       ++ (show $ M.member nam (_userDefined c)) 
+  --       ++ "\n\t M.lookup nam (_userDefined c) "
+  --       ++(show $ M.lookup nam (_userDefined c)) 
+  --       ++ "\n\t nam "++(show nam) 
+  --       ++ "\n\targs " 
+  --       ++ (show args) ++"\n\t ls1"
+  --       ++ (show ((filter (userDefinedHelper nam )  [ varType xx | xx <- (M.elems (_storageDefs c)) ]) )) ) (filter (userDefinedHelper nam )  [ varType xx | xx <- (M.elems (_storageDefs c)) ])
+  if M.member nam (_userDefined c) -- length listOFUserDefinedVars >0 --M.member nam (_userDefined c)
     then do
       case args of
-        OrderedArgs es -> do
-          --hipHop <- (tcExpr $ head es) -- Used with the code line directly below. 
-          --let actualTypeOfUserDefinedVar = trace ("We are forsure here?\n\t actualTypeOfUserDefinedVar " ++ (show $ SVMType.actual (head listOFUserDefinedVars))++ "\n\t head of list " ++ (show $ head es)++ "\n\tHIPHOP LOOKS LIKE: " ++   (show hipHop)) SVMType.actual (head listOFUserDefinedVars)
-          let actualTypeOfUserDefinedVar = SVMType.actual (head listOFUserDefinedVars)
-          let check = case actualTypeOfUserDefinedVar  of
-                (SVMType.Int  _ _) ->  intType' x ~>  tcExpr (head es)
-                (SVMType.String  _) -> stringType' x ~>  tcExpr (head es)
-                SVMType.Bool -> boolType' x ~>  tcExpr  (head es)
+        OrderedArgs es -> do --TODO if more than 1 arguement then break?
+          --let actualTypeOfUserDefinedVar = SVMType.actual (head listOFUserDefinedVars)
+          let check = case  M.lookup nam (_userDefined c)  of
+                Just "int" ->  intType' x ~>  tcExpr (head es)
+                Just "string" -> stringType' x ~>  tcExpr (head es)
+                Just "bool" -> boolType' x ~>  tcExpr  (head es)
+                --(FunctionCall _ _ _ ) ->  
                 _ ->  pure . bottom $ "Can only create simple types" <$ x
+          --check2 <- check 
+          let actualTypeOfUserDefinedVar = userTypeHelper' $ M.lookup nam (_userDefined c)
           check !>  (pure $ (Static (SVMType.UserDefined nam actualTypeOfUserDefinedVar) x))
         _ ->  pure . bottom $ "Cannot use object literals within contract definitions" <$ x
     else do  --Case of no user defines
@@ -1322,17 +1338,41 @@ tcExpr (FunctionCall x (MemberAccess g (Variable wow nam) "wrap") args) =  do
          NamedArgs es -> productType' x <$> traverse (tcExpr . snd) es
       apply e a
 
-        --NamedArgs es -> traverse (tcExpr . snd) es--productType' x <$> traverse (tcExpr . snd) es
-  --let listOFUserDefinedVars = trace ("Can I print things from \n\t" ++ (show x)++ "\n\t "++ (show aa) ++ "\n\t(FunctionCall x (MemberAccess g (Variable a nam) ?"++ "\n\targs " ++ (show args)++ "\n\t nam " ++ (show nam) ++"\n\t ls1"++ (show ((filter (userDefinedHelper nam )  [ varType xx | xx <- (M.elems (_storageDefs c)) ]) )) ) (filter (userDefinedHelper nam )  [ varType xx | xx <- (M.elems (_storageDefs c)) ])
-  -- TODO I am pretty sure there is a better way of doing this
-  --I am just looking in storage def, but I also need to be looking somewhere else.  NamedARgs
-  -- if length listOFUserDefinedVars > 0
-  --   then do
-  --     let firstVar =  head listOFUserDefinedVars--TODO throw check if args List < 2, if bigger.... throw error
-  --     case  (SVMType.actual firstVar, (head aa)) of
-  --       ((SVMType.Int  _ _), (SVMType.Int _  _ ))-> pure $ intType' x ~>  (pure $ aa) --(tcExpr <$>  a) --(pure $ intType' x) $ tcExpr <$> args--
-  --       ((SVMType.String  _), _)     -> pure $ stringType' x ~>    (pure $ aa)
-    --else tcExpr (FunctionCall x (MemberAccess g (Variable a nam) "wrap") args) --TODO Turn this into the logic below or its jsut a forever loop   
+tcExpr (FunctionCall x (MemberAccess g (Variable wow nam) "unwrap") args) =  do
+  c <- asks contract
+  -- let listOFUserDefinedVars = trace ("In unwrap (FunctionCall x (MemberAccess g (Variable a nam) ? \n\t" 
+  --       ++ (show x)++ "\n\t g"++ (show g) ++ "\n\t"++(show wow) 
+  --       ++ "\n\t nam "++(show nam) ++ "\n\targs " ++ (show args) 
+  --       ++"\n\t ls1"++ (show ((filter (userDefinedHelper nam )  
+  --       [ varType xx | xx <- (M.elems (_storageDefs c)) ]) )) ) (filter (userDefinedHelper nam )  [ varType xx | xx <- (M.elems (_storageDefs c)) ])
+  if M.member nam (_userDefined c) 
+    then do --TODO Bottom if there are more 
+      case args of
+        OrderedArgs es -> do
+          expressionResult <- (tcExpr (head es))
+          let actualTypeOfUserDefinedVar = trace ("in unwrap " 
+                -- ++ ( show (SVMType.actual (head listOFUserDefinedVars)))
+                ++ "\n\t what is tcExpr (head es)"
+                ++ (show  expressionResult)) (userTypeHelper' $ M.lookup nam (_userDefined c))
+
+
+          let check3  =  (case expressionResult of 
+                (Static (SVMType.UserDefined name actual)  _) -> if nam == name 
+                  then case actual of 
+                    (SVMType.Int  _ _) ->  pure $ (boolType' x)
+                    (SVMType.String  _) -> pure $ (boolType' x)
+                    SVMType.Bool -> pure $ (boolType' x) 
+                    _ ->  pure . bottom $ "Can only create simple types" <$ x
+                  else pure . bottom $ "Can only create simple types" <$ x
+                _ -> pure . bottom $ "Can only create simple types" <$ x)
+          check3 !>  (pure $ (Static (actualTypeOfUserDefinedVar) x))
+        _ ->  pure . bottom $ "Cannot use object literals within contract definitions" <$ x
+    else do  --Case of no user defines
+      e <- tcExpr (MemberAccess g (Variable wow nam) "unwrap")
+      a <- case args of
+         OrderedArgs es -> productType' x <$> traverse tcExpr es
+         NamedArgs es -> productType' x <$> traverse (tcExpr . snd) es
+      apply e a
 
 tcExpr (FunctionCall x expr args) = do
   --when (True) (internalError "typeCheckStatic "  expr )

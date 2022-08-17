@@ -72,6 +72,7 @@ compileSourceNoInheritance initCodeMap = do
   let getNamedContracts :: T.Text -> T.Text -> Either ParseTypeCheckOrSolidVMError [(SolidString, Contract)]
       getNamedContracts fileName src = do
         sourceUnits <- parseSource fileName src
+        let userDefinedFromFile = M.fromList $ map (\(Alias _ alias typ) -> (alias, typ) ) $ filter (\x -> case x of (Alias _ _ _) -> True; _ -> False;) sourceUnits
         let pragmas = \case
               Pragma _ n v -> Just (n, v)
               _ -> Nothing
@@ -79,7 +80,7 @@ compileSourceNoInheritance initCodeMap = do
         fmap catMaybes . for sourceUnits $ \case
           NamedXabi name (xabi, parents') -> do
             ctrct <- first SVMEx
-                   $ xabiToContract (textToLabel name) (map textToLabel parents') vmVersion' xabi
+                   $ xabiToContract (textToLabel name) (map textToLabel parents') vmVersion' userDefinedFromFile xabi
             pure $ Just (textToLabel name, ctrct)
           _ -> pure Nothing
 

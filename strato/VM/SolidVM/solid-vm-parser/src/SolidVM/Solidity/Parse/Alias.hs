@@ -8,7 +8,6 @@ module SolidVM.Solidity.Parse.Alias (solidityAlias) where
 
 import           Text.Parsec 
 import           Data.Source
---import qualified Data.Text   as T
 
 import           SolidVM.Solidity.Parse.Declarations
 import           SolidVM.Solidity.Parse.Lexer
@@ -25,9 +24,6 @@ solidityAlias = do
     rest <- many1 (noneOf ";") --TODO have to not do this, have it check if it is a simple type otherwise throw an error
     semi
     pure (aliasName, rest)
-  --TODO set setAlias to Parser State
+  --Directly make store type rather than string of type?
   addUserDefinedType aliasName rest
-  return (Alias a ""  "") 
-  -- return  $ trace ( "We have successfully made it in Alias and return the Alien\n\t alias name" 
-  --   ++   ( show $ aliasName )
-  --   ++ "\n\t associated type" ++  (show rest)) (Alias a ""  "")
+  return (Alias a aliasName rest) 
