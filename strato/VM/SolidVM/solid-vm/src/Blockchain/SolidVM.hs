@@ -2163,7 +2163,10 @@ expToVar' (CC.FunctionCall _ e args) = do
                             -- in case val of
                             --       Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
                             --       Nothing -> Nothing
-                          storjString = Nothing                            
+                          storjString = 
+                            case ((contract ^. CC.storageDefs) M.!? term) of
+                              Just storjF -> Just $ unparseVar (term, storjF)
+                              Nothing -> Nothing                           
                             -- let mStorj = (contract ^. CC.storageDefs) M.!? term
                             --     val = case mStorj of
                             --       Just storjf -> foldMap mon storjf
