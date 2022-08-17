@@ -3722,8 +3722,8 @@ contract qq{
 
   fit "can get events from the '.code' function" . runTest $ do
     let codeSnippet :: String
-        codeSnippet = [r|event x(uint v);
-|]
+        codeSnippet = [r|event x(
+    uint v);|]
         contract :: String
         contract = [r|
 pragma solidvm 3.3;
@@ -3749,11 +3749,10 @@ contract qq{
   fit "can get external modifiers using the '.code' function" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|modifier anotherModifier() {
-    require(x == 4 , string.concat('x is not 4 : ', string(x)));
-    _;
-    require(x == 5 , 'x is not 5');
-  }
-|]
+        require(x == 4,string.concat("x is not 4 : ",string(x)));
+        _;
+        require(x == 5,"x is not 5");
+        }|]
         contract :: String
         contract = [r|
 pragma solidvm 3.3;
