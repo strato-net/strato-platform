@@ -2176,7 +2176,10 @@ expToVar' (CC.FunctionCall _ e args) = do
                             -- in case val of
                             --       Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
                             --       Nothing -> Nothing
-                          enumString = Nothing                             
+                          enumString = 
+                            case ((contract ^. CC.enums) M.!? term) of
+                              Just enumF -> Just $ unparseEnum (term, enumF)
+                              Nothing -> Nothing                             
                             -- let mEnum = snd <$> ((contract ^. CC.enums) M.!? term)
                             --     val = case mEnum of
                             --       Just enumf -> mon enumf

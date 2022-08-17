@@ -97,6 +97,14 @@ unparseConstant (name, (ConstantDecl theType isPublic expression _)) =
   <> (" = " ++ unparseExpression expression)
   <> ";"
 
+unparseEnum :: (SolidString, [SolidString]) -> String
+unparseEnum (name, values) =
+     "enum "
+  <> labelToString name
+  <> " {"
+  <> (List.intercalate ", " $ List.map labelToString values)
+  <> "}"
+
 unparseVarType :: Type -> String
 unparseVarType (SVMType.Int (Just True) (Just n)) = "int" <> show (8*n)
 unparseVarType (SVMType.Int (Just True) Nothing) = "int"
