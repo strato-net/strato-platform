@@ -14,8 +14,6 @@ module SolidVM.Solidity.Parse.ParserTypes where
 import           Text.Parsec
 --import Debug.Trace
 import qualified Data.Map as M
---import           SolidVM.Solidity.Xabi
-
 
 -- | Source file names; also source file /paths/.
 type FileName = SourceName
@@ -61,25 +59,14 @@ setPragmaVersion :: PragmaVersion -> SolidityParser ()
 -- Given a new pragma version replace the old parser State with a new one with an updated pragma version.
 setPragmaVersion p = 
     do ParserState{..} <- getState
-       putState (ParserState contractName p userDefinedTypes)
+       putState (ParserState contractName p)
 
 --Change the contract name of the ParserState with a given input
 setContractName :: ContractName -> SolidityParser ()
 -- Given a new contract name replace the old parser State with a new one with an updated contract name.
 setContractName cn = 
     do ParserState{..} <- getState
-       putState (ParserState cn pragmaVersion userDefinedTypes)
-
---addUserDefinedType -- add this
---Change the contract name of the ParserState with a given input
-addUserDefinedType :: String -> String -> SolidityParser ()
--- Given a new contract name replace the old parser State with a new one with an updated contract name.
-
-addUserDefinedType k v =  --putState (ParserState contractName pragmaVersion (M.insert k v userDefinedTypes )) =<< ParserState{..} =<< getState
-    do ParserState{..} <- getState
-       putState (ParserState contractName pragmaVersion (M.insert k v userDefinedTypes )) 
-
-
+       putState (ParserState cn pragmaVersion)
 
 -- Get the contract name from the parser state
 getContractName :: SolidityParser ContractName
@@ -100,27 +87,11 @@ getUserDefinedTypes = userDefinedTypes <$> getState
 -- Get the pragmaVersion from the parser state
 isInUserDefinedTypes :: String ->SolidityParser Bool
 isInUserDefinedTypes nam = M.member nam . userDefinedTypes <$> getState
-    -- do
-    -- userDefined <- userDefinedTypes <$> getState
-    -- return $ trace (show userDefined) (M.member nam userDefined)
 
 
 -- Get the pragmaVersion from the parser state
 getUserDefinedType :: String -> SolidityParser (Maybe String)
 getUserDefinedType nam =  M.lookup nam . userDefinedTypes <$> getState 
-     --do
-    -- userDefined <- userDefinedTypes <$> getState
-    -- return $ trace (show userDefined) (M.lookup nam  userDefined)
--- (userDefinedTypes <$> getState) >>= (M.lookup nam )
-    --(M.lookup nam) =<< (userDefinedTypes <$> getState)
-        --userDefined <- userDefinedTypes <$> getState
-        --return $ trace (show userDefined) (M.lookup nam  userDefined)
--- (userDefinedTypes <$> getState) >>= (M.lookup nam )
-    
--- addUserDefinedType :: (String, String) ->SolidityParser Bool
--- addUserDefinedType nam = do
---     userDefined <- userDefinedTypes <$> getState
---     return $ trace (show userDefined) (nam `elem`  (map (\(x, _) -> x )  userDefined ))
 
 
 -- | Not actually used.

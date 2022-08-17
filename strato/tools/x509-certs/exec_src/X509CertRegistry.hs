@@ -196,7 +196,7 @@ contract Certificate {
     string public publicKey;
     string public certificateString;
     bool public isValid;
-    int expirationDate;
+    uint expirationDate;
 
     constructor(string _certificateString) {
         owner = msg.sender;
@@ -212,6 +212,7 @@ contract Certificate {
         publicKey = parsedCert["publicKey"];
         certificateString = parsedCert["certString"];
         isValid = true;
+        expirationDate = uint(parsedCert["expirationDate"],10);
         parent = address(parsedCert["parent"]);
         children = [];
     }

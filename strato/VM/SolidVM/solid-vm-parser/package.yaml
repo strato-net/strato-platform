@@ -32,6 +32,7 @@ library:
   - source-tools
   - swagger2
   - text
+  - deepseq
 
 
 executables:
@@ -42,6 +43,7 @@ executables:
     dependencies:
       - parsec
       - solid-vm-parser
+      - deepseq
     ghc-options: -Wall -O2 -threaded -rtsopts
 
 tests:
@@ -58,3 +60,4 @@ tests:
       - solid-vm-parser
       - source-tools
       - vm-tools
+      - deepseq

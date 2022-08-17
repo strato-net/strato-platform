@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveFunctor     #-}
 {-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE DeriveAnyClass    #-}
 
 module SolidVM.Model.CodeCollection.Event
   (
@@ -9,6 +10,7 @@ module SolidVM.Model.CodeCollection.Event
 
 import           Data.Aeson
 import           Data.Aeson.Types
+import           Control.DeepSeq
 import           Data.Source
 import           Data.Text                    (Text)
 import qualified Generic.Random               as GR
@@ -22,7 +24,7 @@ data EventF a = Event
   { eventAnonymous :: Bool
   , eventLogs :: [(Text, SolidVM.IndexedType)]
   , eventContext :: a
-  } deriving (Eq,Show,Generic, Functor)
+  } deriving (Eq,Show,Generic, NFData, Functor)
 
 type Event = Positioned EventF
 

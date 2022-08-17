@@ -24,7 +24,9 @@ module Blockchain.SolidVM.SetGet (
 -}
   deleteVar,
 
-  
+  toBasic,
+  fromBasic,
+    
   showSM
   ) where
 

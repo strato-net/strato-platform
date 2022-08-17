@@ -11,6 +11,7 @@ module Blockchain.VM.SolidException
   , internalError
   , invalidArguments
   , missingField
+  , customError
   , missingType
   , duplicateDefinition
   , parseError
@@ -38,9 +39,9 @@ import Control.DeepSeq
 import Control.Exception (throw, throwIO, Exception)
 import Control.Monad (unless, when)
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Data.Aeson (ToJSON, FromJSON)
 import GHC.Generics
 import Text.Printf (printf)
+import qualified SolidVM.Model.Storable as B
 
 data SolidException = TypeError String String
                     | InternalError String String
@@ -48,6 +49,7 @@ data SolidException = TypeError String String
                     | IndexOutOfBounds String String
                     | TODO String String
                     | MissingField String String
+                    | CustomError String String [B.BasicValue]
                     | MissingType String String
                     | DuplicateDefinition String String
                     | ArityMismatch String Int Int
@@ -70,7 +72,7 @@ data SolidException = TypeError String String
                     | ReservedWordError String String
                     | ImmutableError String String
                     | UserDefinedError String String
-                    deriving (Eq, Exception, Generic, NFData, ToJSON, FromJSON)
+                    deriving (Eq, Exception, Generic, NFData)
 
 instance Show SolidException where
   show = showSolidException
@@ -88,6 +90,7 @@ showSolidException (ModifierError m v) = printf "modifier error: %s: %s" m v
 showSolidException (Require Nothing) = printf "solidity require failed"
 showSolidException (Require (Just m)) = printf "solidity require failed: %s" m
 showSolidException Assert = printf "solidity assert failed"
+showSolidException (CustomError m v _) = printf "custom user error: %s %s" m v
 showSolidException (TODO m v) = printf "Unimplemented feature in SolidVM: %s: %s" m v
 showSolidException (TypeError a b) = printf "type error: %s: %s" a b
 showSolidException (UnknownConstant a b) = printf "unknown constant: %s: %s" a b
@@ -126,6 +129,9 @@ indexOutOfBounds = toThrower IndexOutOfBounds
 
 missingField :: (Show v) => String -> v -> a
 missingField = toThrower MissingField
+
+customError :: String -> String -> [B.BasicValue] -> a
+customError msg nm vals = throw $ CustomError msg nm vals
 
 missingType :: (Show v) => String -> v -> a
 missingType = toThrower MissingType
