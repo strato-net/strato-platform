@@ -49,6 +49,7 @@ import           Text.Printf
 import           UnliftIO.Exception
 
 import           BlockApps.Logging
+import           BlockApps.X509.Certificate
 import           Blockchain.Blockstanbul               (blockstanbulSender, WireMessage)
 import           Blockchain.Context
 import           Blockchain.Data.Block
@@ -66,6 +67,7 @@ import           Blockchain.EventModel
 import           Blockchain.EventException
 import           Blockchain.Options
 import           Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Strato.Model.Address       (fromPublicKey, Address)
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.MicroTime
@@ -349,18 +351,15 @@ handleEvents peer = awaitForever $ \case
 
     MsgEvt (ChainDetails chpairs) -> do
       lift stampActionTimestamp
-      -- check cInfo metadata for "organization -> blockapps/engineering"
-      -- for every ChainInfo
-        -- extract the metadata
-        -- if "organization" is in the mapping, return the org tuple (name, unit)
-        -- store tuple in this node
+      -- check cInfo metadata for key "organization"
+      -- if in the mapping, return (orgName, orgUnit) and store in Redis
       forM_ chpairs $ \(cId, cInfo) -> do
         let key        = "organization"
             query      = M.lookup key $ chainMetadata (chainInfo cInfo)
-            qToTuple q = (OrgName . encodeUtf8 *** OrgUnit . encodeUtf8) $ T.breakOn "/" q
+            qToTuple q = (OrgName . encodeUtf8 *** OrgUnit . Just . encodeUtf8) $ T.breakOn "/" q
         case query of
-          Just q  -> insert (Proxy @Word256) (qToTuple q) cId
-          Nothing -> error "no org" -- should just do nothing here, no need to panic
+          Just q  -> lift $ insert (Proxy @Word256) (qToTuple q) cId
+          Nothing -> $logInfoS "handleEvents/ChainDetails" $ T.pack "No associated organization found"
       yieldL . ToUnseq $ IEGenesis . IngestGenesis (Origin.PeerString $ peerString peer) <$> chpairs
 
     -- TODO: Optimize/do security checking (a peer can spam you with random hashes and keep you busy forever)
@@ -494,14 +493,28 @@ handleGetChainDetails :: ( MonadIO m
                          , MonadLogger m
                          , (IPAddress `Selectable` IPChains) m
                          , (OrgId `Selectable` OrgIdChains) m
+                         , ((OrgName, OrgUnit) `Selectable` OrgNameChains) m
                          , (Word256 `Selectable` ChainMembers) m
                          , (Word256 `Selectable` ChainInfo) m
+                         , (Address `Selectable` X509CertInfoState) m
                          , Modifiable ActionTimestamp m
                          )
                       => PPeer
                       -> S.Set Word256
                       -> ConduitM Event (Either P2PCNC Message) m ()
 handleGetChainDetails peer cids' = do
+  let orgTupleFromCert crt = maybe
+        (OrgName BS8.empty, OrgUnit Nothing)
+        (OrgName . BS8.pack . subOrg &&& orgUnit' . subUnit)
+        (getCertSubject crt)
+      orgUnit' u = case u of
+          Nothing -> OrgUnit (Just BS8.empty)
+          Just a  -> OrgUnit . Just $ BS8.concat [BS8.pack "/", BS8.pack a]
+  peerX509 <- lift $ select (Proxy @X509CertInfoState) $
+    fromPublicKey . pointToSecPubKey $ fromMaybe (error "handleMsgServerConduit - could not derive peer pubkey") $ pPeerPubkey peer
+  orgNameChains <- case peerX509 of
+    Nothing -> return $ OrgNameChains S.empty
+    Just X509CertInfoState{certificate=crt} -> lift $ fromJust <$> select (Proxy @OrgNameChains) (orgTupleFromCert crt)
   cids <- S.toList <$> if S.null cids'
             then lift $ do
               ipChains <- selectWithDefault (Proxy @IPChains) (peerIPAddress peer)
@@ -512,12 +525,19 @@ handleGetChainDetails peer cids' = do
             else return cids'
   lift stampActionTimestamp
   $logInfoS "handleGetChainDetails" $ T.pack $ "details requested for chainIDs " ++ (intercalate "\n" $ formatChainId . Just <$> cids)
+  
   mems <- lift $ selectMany (Proxy @ChainMembers) cids
+  cInfoOrgs <- fmap M.toList . lift $ selectMany (Proxy @ChainInfo) $ S.toList (unOrgNameChains orgNameChains)
   let filteredPairs = M.keys $ M.filter (checkPeerIsMember peer) mems
-
-  unless (null filteredPairs) $ do
+      cInfosWithMetadata = fmap (\x@ChainInfo{chainInfo=ci} -> x{chainInfo = ci{chainMetadata = M.insert organization (orgToText $ orgTupleFromCert getPeerCert) (chainMetadata ci)}}) <$> cInfoOrgs -- 🤢
+      orgToText s = T.pack $ BS8.unpack $ BS8.concat [unOrgName (fst s), maybe BS8.empty (BS8.append (BS8.pack "/")) (unOrgUnit (snd s))]
+      organization = "organization"
+      getPeerCert = case peerX509 of
+        Nothing -> X509Certificate (CertificateChain [])
+        Just X509CertInfoState{certificate=crt} -> crt
+  unless (null filteredPairs && null cInfoOrgs) $ do
     cInfos <- fmap M.toList . lift $ selectMany (Proxy @ChainInfo) cids
-    for_ cInfos $ yieldR . ChainDetails . (:[])
+    for_ (cInfos ++ cInfosWithMetadata) $ yieldR . ChainDetails . (:[])
     lift stampActionTimestamp
     $logInfoS "handleGetChainDetails" $ T.pack $ "the following ChainIds were returned " ++
       (intercalate "\n" $ formatChainId . Just . fst <$> cInfos)

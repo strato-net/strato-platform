@@ -98,6 +98,7 @@ import           Blockchain.Constants
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Enode
 import           Blockchain.Privacy
+
 import           Blockchain.Sequencer.CablePackage
 import           Blockchain.Sequencer.DB.DependentBlockDB
 import           Blockchain.Sequencer.DB.GetChainsDB
@@ -108,6 +109,7 @@ import           Blockchain.Sequencer.Metrics
 import           Blockchain.Strato.Model.ExtendedWord      (Word256, bytesToWord256) -- perhaps temporary
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
+import           Blockchain.Strato.Model.Address
 import qualified LabeledError
 import           Prometheus
 import           System.Directory                          (createDirectoryIfMissing)
@@ -132,6 +134,7 @@ data SequencerContext = SequencerContext
   , _chainHashRegistry   :: !(Map Keccak256 (Modification ChainHashEntry))
   , _chainIdRegistry     :: !(Map Word256 (Modification ChainIdEntry))
   , _orgNameChainsRegistry :: !(Map (OrgName, OrgUnit) (Modification Word256))
+  , _x509certRegistry    :: !(Map Address (Modification Word256))
   , _getChainsDB         :: !GetChainsDB
   , _getTransactionsDB   :: !GetTransactionsDB
   , _ldbBatchOps         :: !(Q.Seq LDB.BatchOp)
@@ -468,6 +471,7 @@ runSequencerM c mbc m = do
             , _chainHashRegistry   = M.empty
             , _chainIdRegistry     = M.empty
             , _orgNameChainsRegistry = M.empty
+            , _x509certRegistry    = M.empty
             , _getChainsDB         = emptyGetChainsDB
             , _getTransactionsDB   = emptyGetTransactionsDB
             , _ldbBatchOps         = Q.empty

@@ -31,6 +31,7 @@ module Blockchain.Strato.RedisBlockDB
     , getCanonical, getCanonicalHeader, getCanonicalChain, getCanonicalHeaderChain
     , getChildren
     , getGenesisHash
+    , getCertificate
     , putHeader, putHeaders, insertHeader, insertHeaders, deleteHeader, deleteHeaders
     , putBlock, putBlocks, insertBlock, insertBlocks, deleteBlock, deleteBlocks
     , getBestBlockInfo, putBestBlockInfo, forceBestBlockInfo

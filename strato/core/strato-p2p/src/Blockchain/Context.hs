@@ -75,6 +75,7 @@ import           Data.Time.Clock
 import           GHC.Exts                              (Constraint)
 
 import           BlockApps.Logging
+import           BlockApps.X509.Certificate
 
 import           Blockchain.Blockstanbul               (WireMessage)
 import           Blockchain.Data.Block
@@ -262,6 +263,8 @@ instance MonadIO m => A.Selectable Word256 ChainInfo (ReaderT Config m) where
 instance MonadIO m => A.Selectable Keccak256 (Private (Word256, OutputTx)) (ReaderT Config m) where
   select _ = fmap (fmap Private) . RBDB.withRedisBlockDB . RBDB.getPrivateTransactions
 
+instance MonadIO m => A.Selectable Address X509CertInfoState (ReaderT Config m) where
+  select _ = RBDB.withRedisBlockDB . RBDB.getCertificate
 instance MonadIO m => ((OrgName, OrgUnit) `A.Alters` Word256) (ReaderT Config m) where
   insert _ k v = void . RBDB.withRedisBlockDB $ RBDB.addOrgNameChain ((unOrgName *** unOrgUnit) k) v
 
@@ -441,6 +444,7 @@ type MonadP2P m = ( MonadIO m
                        , '(Word256, ChainMembers)
                        , '(Word256, ChainInfo)
                        , '(Keccak256, Private (Word256, OutputTx))
+                       , '(Address, X509CertInfoState)
                        ] m
                   , All2 '[A.Alters]
                       '[ '(Keccak256, BlockData)

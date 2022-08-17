@@ -18,7 +18,6 @@ module Blockchain.CommunicationConduit
     , mkEthP2PEventConduit
     ) where
 
-import           Control.Arrow                         ((&&&))
 import qualified Control.Monad.Change.Modify           as Mod
 import qualified Control.Monad.Change.Alter            as A
 import           Control.Monad.IO.Unlift
@@ -52,7 +51,6 @@ import           Blockchain.Data.Block
 import           Blockchain.Data.Control               (P2PCNC(..))
 import           Blockchain.Data.ChainInfo             (UnsignedChainInfo(..))
 import           Blockchain.Data.RLP
-import           Blockchain.Data.PubKey                (pointToSecPubKey)
 import           Blockchain.Data.Wire                  as W
 import           Blockchain.Display
 import           Blockchain.Event
@@ -245,27 +243,6 @@ handleMsgServerConduit myPubkey peer = do
               when (genHash /= peerGH) $ throwIO WrongGenesisBlock
               when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch networkID' computeNetworkID
               when (S.difference rcs rootCerts' /= S.empty) $ throwIO RootCertificateMismatch
-
-              -- get the peer's PublicKey
-              -- for every X509 in the set
-              --    verify the the cert with the Public Key
-              --     get the Subject Org Name and Org Unit
-              --     lift the (cIds, chainInfos) associated with it
-              --     send that out the chain details to the peer
-              let peerPub' = pointToSecPubKey $ fromMaybe (error "handleMsgServerConduit - could not derive peer pubkey") $ pPeerPubkey peer
-              forM_ rcs $ \cs ->
-                when (verifyCert peerPub' cs) $ do
-                    let subj = (OrgName . BC.pack . subOrg &&& OrgUnit . BC.pack . fromJust . subUnit) . fromJust $ getCertSubject cs
-                        maybeSubUnit :: BC.ByteString -> BC.ByteString
-                        maybeSubUnit u = if u == BC.empty then BC.pack "" else BC.concat [BC.pack "/", u]
-                        subjConcat :: T.Text
-                        subjConcat = T.pack $ BC.unpack $ BC.concat [unOrgName (fst subj), maybeSubUnit (unOrgUnit (snd subj))] -- (a, b)
-                        organization = "organization"
-                    cIds   <- lift $ S.toList . unOrgNameChains . fromJust <$> A.select (A.Proxy @OrgNameChains) subj
-                    cInfos <- fmap M.toList . lift $ A.selectMany (A.Proxy @ChainInfo) cIds
-                    let cInfosWithMetadata = fmap (\x@ChainInfo{chainInfo=ci} -> x{ chainInfo = ci{chainMetadata = M.insert organization subjConcat $ chainMetadata $ chainInfo x } }) <$> cInfos -- 🤢
-                    yield . Right $ ChainDetails cInfosWithMetadata
-
               -- we set to 0 cause we dont necessarily know the number yet
               lift $ Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
               yield $ Right NewStatus {

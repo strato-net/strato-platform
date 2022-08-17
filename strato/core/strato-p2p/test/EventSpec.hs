@@ -35,6 +35,7 @@ import           Data.Text (Text)
 import           Text.Printf
 
 import           BlockApps.Logging
+import           BlockApps.X509.Certificate
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin
 import           Blockchain.Blockstanbul.Messages      (round)
@@ -96,6 +97,7 @@ data TestContext = TestContext
   , _ipAddressIpChainsMap  :: Map IPAddress IPChains
   , _orgIdChainsMap        :: Map OrgId OrgIdChains
   , _orgNameChainsMap      :: Map (OrgName, OrgUnit) OrgNameChains
+  , _x509certMap           :: Map Address X509CertInfoState
   , _shaChainTxsInBlockMap :: Map Keccak256 ChainTxsInBlock
   , _chainMembersMap       :: Map Word256 ChainMembers
   , _chainInfoMap          :: Map Word256 ChainInfo
@@ -150,6 +152,9 @@ instance MonadIO m => A.Selectable OrgId OrgIdChains (MonadTest m) where
 
 instance MonadIO m => A.Selectable (OrgName, OrgUnit) OrgNameChains (MonadTest m) where
   select _ ip = M.lookup ip <$> use orgNameChainsMap
+
+instance MonadIO m => A.Selectable Address X509CertInfoState (MonadTest m) where
+  select _ a = M.lookup a <$> use x509certMap
 
 instance MonadIO m => A.Selectable Keccak256 ChainTxsInBlock (MonadTest m) where
   select _ sha = M.lookup sha <$> use shaChainTxsInBlockMap
@@ -379,6 +384,7 @@ newSequencerContext bc = do
       , _chainHashRegistry   = M.empty
       , _chainIdRegistry     = M.empty
       , _orgNameChainsRegistry  = M.empty
+      , _x509certRegistry    = M.empty
       , _getChainsDB         = emptyGetChainsDB
       , _getTransactionsDB   = emptyGetTransactionsDB
       , _ldbBatchOps         = Q.empty
@@ -406,6 +412,7 @@ testContext wireMessagesRef prv ctx = TestContext
   , _ipAddressIpChainsMap  = M.empty
   , _orgIdChainsMap        = M.empty
   , _orgNameChainsMap      = M.empty
+  , _x509certMap           = M.empty
   , _shaChainTxsInBlockMap = M.empty
   , _chainMembersMap       = M.empty
   , _chainInfoMap          = M.empty
