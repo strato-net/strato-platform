@@ -3720,7 +3720,7 @@ contract qq{
       [ BString $ BC.pack $  keccak256ToHex $ hash $ UTF8.fromString contract 
       , BString "657f5687fe89bd0bd3cee84e83c306c65458c0b13d13991087f9a7330474f2d8" ]
 
-  it "can get events from the '.code' function" . runTest $ do
+  fit "can get events from the '.code' function" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|event x(uint v);
 |]
@@ -3746,7 +3746,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
-  it "can get external modifiers using the '.code' function" . runTest $ do
+  fit "can get external modifiers using the '.code' function" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|modifier anotherModifier() {
     require(x == 4 , string.concat('x is not 4 : ', string(x)));
