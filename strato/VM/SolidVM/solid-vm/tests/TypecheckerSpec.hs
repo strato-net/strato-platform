@@ -871,128 +871,37 @@ contract A {
 |]
     in length anns `shouldBe` 1
 
-  
-  it "cannot decalre a user defined to a to the underlying type " $
+
+  it "must pass the associated type within the wrap function " $
     let anns = runTypechecker [r|
   pragma solidvm 3.3;
-  type UFixed256x18 is int;
-  contract A {
-    UFixed256x18 cayley = 12;
-}
-|]
-    in length anns `shouldBe` 1
-
-  it "Must pass the associated type within the wrap function " $
-    let anns = runTypechecker [r|
-  pragma solidvm 3.3;
-  type UFixed256x18 is int;
-  contract A {
-    UFixed256x18 cayley = UFixed256x18.wrap("12");
-}
-|]
-    in length anns `shouldBe` 1
-
-  it "Must pass the associated type within the wrap function " $
-    let anns = runTypechecker [r|
-  pragma solidvm 3.3;
-  type UFixed256x18 is int;
-  contract A {
-    string helper = "1234"
-    UFixed256x18 cayley = UFixed256x18.wrap(helper);
-}
-|]
-    in length anns `shouldBe` 1
-
-  it "Must pass the associated type within the wrap function " $
-    let anns = runTypechecker [r|
-  pragma solidvm 3.3;
-  type UFixed256x18 is int;
-  contract A {
-    string helper = "1234"
-    UFixed256x18 cayley = UFixed256x18.wrap(helper);
-}
-|]
-    in length anns `shouldBe` 1
-
-  it "For Demo Day!!!! should work" $
-    let anns = runTypechecker [r|
-    pragma solidvm 3.3;
-    
-    type UBool is bool;
-    type MagicInt is int;
-    type MysticalString is string;
-    
-    contract A {
-      UBool cayley;
-      UBool yoneda = UBool.wrap(true);
-          //MagicInt adultFood = galois;
-    //UBool cayley;
-    //MysticalString suffie  =  MysticalString.wrap("123");
-    //UBool cayley = UBool.wrap(false);
-    }
-|]
-    in length anns `shouldBe` 0
-
-
-  it "typechecker should return 1 bottom for variable of a different underlying type" $
-    let anns = runTypechecker [r|
-    pragma solidvm 3.3;
-    
-    type UBool is bool;
-    type MagicInt is int;
-    type MysticalString is string;
-    
-    contract A {
-      int name =3;
-      MagicInt name = MagicInt.wrap(12); 
-      MysticalString shakeYo = MysticalString.wrap("string");
-      MysticalString shakeYo2 = MysticalString.wrap(name);
-    }
-|]
-    in length anns `shouldBe` 1
-
-  it "cannot wrap a user defined type, even if the user defined type is the same type as the wrapping type" $
-    let anns = runTypechecker [r|
-    pragma solidvm 3.3;
-    type MysticalString is string;
-    contract A {
-      MysticalString shakeYo = MysticalString.wrap("string");
-      MysticalString shakeYo2 = MysticalString.wrap(shakeYo);
-    }
-|]
-    in length anns `shouldBe` 1
-
-  it "can declare a user defined type alias with a variable of the underlying type" $
-    let anns = runTypechecker [r|
-    pragma solidvm 3.3;
-    type MagicInt is int;
-    contract A {
-      int banana = 12;
-      MagicInt adolescentFood =  MagicInt.wrap(banana);
-    }
-|]
-    in length anns `shouldBe` 0
-
-  it "can not assign user type to a different user type" $
-    let anns = runTypechecker [r|
-    pragma solidvm 3.3;
-    type MagicInt is int;
-    type UBool is bool;
-    contract A {
-      int banana = 12;
-      MagicInt adolescentFood =  MagicInt.wrap(banana);
-      MagicInt yoneda         = UBool.wrap(true); //Error
-      bool shouldThrowError   = UBool.wrap(true); //Error
-    }
-|]
-    in length anns `shouldBe` 2
-
-  it "Can use user defined unwrap and unwrap" $
-    let anns = runTypechecker [r|
-  pragma solidvm 3.3;
-  type UBool is bool;
   type MagicInt is int;
   type MysticalString is string;
+    type UBool is bool;
+  contract A {
+    int banana              = 12;
+    MagicInt gauss          =  MagicInt.wrap(banana);
+    string helper           = "1234";
+    MagicInt cayley1        = MagicInt.wrap(helper);  //Should Error -- passing string var into int alias wrap function
+    MagicInt cayley2        = MagicInt.wrap("12");   //Should Error  -- passing string literal into int alias wrap function
+    MagicInt cayley3        = 12;                   //Should Error   -- assigning int literal to user defined type
+    MagicInt yoneda         = MagicInt.wrap(12);        
+    MysticalString shakeYo2 = MysticalString.wrap(yoneda); //Should Error -- passing user defined type to alias wrap function
+    MagicInt felixKlein     = MagicInt.wrap(yoneda);      //Should Error  -- passing user defined type to alias wrap function
+    MagicInt mrBool         = UBool.wrap(true);          //Error          -- passing wrong type to alias wrap function
+    bool shouldThrowError   = UBool.wrap(true);         //Error           -- assigning user defined to bool variable
+}
+|]
+    in length anns `shouldBe` 7
+
+
+  it "can use user defined unwrap and unwrap" $
+    let anns = runTypechecker [r|
+  pragma solidvm 3.3;
+  
+  type MagicInt       is int;
+  type MysticalString is string;
+  type UBool          is bool;
   contract A {
     //bool unwrapping
     UBool galois       =  UBool.wrap(false);
@@ -1015,14 +924,13 @@ contract A {
 |]
     in length anns `shouldBe` 0
 
-  fit "can use user-defined-types wrap and unwrap within fuctions" $
+  it "can use user-defined-types wrap and unwrap within fuctions" $
     let anns = runTypechecker [r|
   pragma solidvm 3.3;
   type UBool is bool;
   type MagicInt is int;
   type MysticalString is string;
   contract A {
-    int a = 1;
     UBool galois3  =  UBool.wrap(false);
     function f() {
        UBool galois       =  UBool.wrap(false);

@@ -248,8 +248,8 @@ intType' = Static (SVMType.Int Nothing Nothing)
 stringType' :: SourceAnnotation Text -> Type'
 stringType' = Static (SVMType.String Nothing)
 
--- bytesType' :: SourceAnnotation Text -> Type'
--- bytesType' = Static (SVMType.Bytes Nothing Nothing)
+bytesType' :: SourceAnnotation Text -> Type'
+bytesType' = Static (SVMType.Bytes Nothing Nothing)
 
 boolType' :: SourceAnnotation Text -> Type'
 boolType' = Static SVMType.Bool
@@ -1046,8 +1046,10 @@ userTypeHelper' :: Maybe String -> SVMType.Type
 userTypeHelper' (Just "bool")   =  SVMType.Bool
 userTypeHelper' (Just "string") =  SVMType.String $ Just True
 userTypeHelper' (Just "int")    =  (SVMType.Int (Just True) Nothing) 
-userTypeHelper' (Just "uint")   =  (SVMType.Int (Just False) Nothing) 
-userTypeHelper' _             =  SVMType.Bool  --TODO fix this
+userTypeHelper' (Just "uint")   =  (SVMType.Int (Just False) Nothing)
+userTypeHelper' (Just "bytes")  =  (SVMType.Bytes (Just True) Nothing)
+userTypeHelper' (Just "byte")   =  (SVMType.Bytes Nothing $ Just 1) 
+userTypeHelper' _               =  SVMType.Bool  --TODO fix this
 
 
 
@@ -1356,71 +1358,51 @@ tcExpr (IndexAccess _ a Nothing) = tcExpr a
 tcExpr (MemberAccess _ a fieldName) = do
   t <- tcExpr a
   typecheckMember t fieldName
--- tcExpr (FunctionCall x expr args) = do
 
 tcExpr (FunctionCall x (MemberAccess g (Variable wow nam) "wrap") args) =  do
   c <- asks contract
-  -- let listOFUserDefinedVars = trace ("(FunctionCall x (MemberAccess g (Variable a nam) ? \n\t" 
-  --       ++ (show x)++ "\n\t M.member nam (_userDefined c) "
-  --       ++ (show $ M.member nam (_userDefined c)) 
-  --       ++ "\n\t M.lookup nam (_userDefined c) "
-  --       ++(show $ M.lookup nam (_userDefined c)) 
-  --       ++ "\n\t nam "++(show nam) 
-  --       ++ "\n\targs " 
-  --       ++ (show args) ++"\n\t ls1"
-  --       ++ (show ((filter (userDefinedHelper nam )  [ varType xx | xx <- (M.elems (_storageDefs c)) ]) )) ) (filter (userDefinedHelper nam )  [ varType xx | xx <- (M.elems (_storageDefs c)) ])
-  if M.member nam (_userDefined c) -- length listOFUserDefinedVars >0 --M.member nam (_userDefined c)
+  if M.member nam (_userDefined c) &&  (case args of OrderedArgs es -> length es == 1; _ -> False) -- If this var is a userDefined and only has one arguemnet, otherwise do usualy fuction handleing with MemeberAccess
     then do
       case args of
-        OrderedArgs es -> do --TODO if more than 1 arguement then break?
-          --let actualTypeOfUserDefinedVar = SVMType.actual (head listOFUserDefinedVars)
+        OrderedArgs es -> do
           let check = case  M.lookup nam (_userDefined c)  of
                 Just "int" ->  intType' x ~>  tcExpr (head es)
                 Just "string" -> stringType' x ~>  tcExpr (head es)
                 Just "bool" -> boolType' x ~>  tcExpr  (head es)
-                --(FunctionCall _ _ _ ) ->  
-                _ ->  pure . bottom $ "Can only create simple types" <$ x
-          --check2 <- check 
+                Just "bytes" -> bytesType' x ~>  tcExpr  (head es)
+                _ ->  pure . bottom $ "type not supported for user defined types" <$ x 
           let actualTypeOfUserDefinedVar = userTypeHelper' $ M.lookup nam (_userDefined c)
           check !>  (pure $ (Static (SVMType.UserDefined nam actualTypeOfUserDefinedVar) x))
-        _ ->  pure . bottom $ "Cannot use object literals within contract definitions" <$ x
-    else do  --Case of no user defines
-      e <- tcExpr (MemberAccess g (Variable wow nam) "wrap")
-      a <- case args of
-         OrderedArgs es -> productType' x <$> traverse tcExpr es
-         NamedArgs es -> productType' x <$> traverse (tcExpr . snd) es
-      case args of
-        NamedArgs es -> apply e a $ Just (fst <$> es)
-        _ -> apply e a Nothing
+        _ ->  pure . bottom $ "named arguements not allowed in user defined wrap function" <$ x
+      else do 
+        e <- tcExpr (MemberAccess g (Variable wow nam) "wrap")
+        a <- case args of
+          OrderedArgs es -> productType' x <$> traverse tcExpr es
+          NamedArgs es -> productType' x <$> traverse (tcExpr . snd) es
+        case args of
+          NamedArgs es -> apply e a $ Just (fst <$> es)
+          _ -> apply e a Nothing
 
 tcExpr (FunctionCall x (MemberAccess g (Variable wow nam) "unwrap") args) =  do
   c <- asks contract
-  -- let listOFUserDefinedVars = trace ("In unwrap (FunctionCall x (MemberAccess g (Variable a nam) ? \n\t" 
-  --       ++ (show x)++ "\n\t g"++ (show g) ++ "\n\t"++(show wow) 
-  --       ++ "\n\t nam "++(show nam) ++ "\n\targs " ++ (show args) 
-  --       ++"\n\t ls1"++ (show ((filter (userDefinedHelper nam )  
-  --       [ varType xx | xx <- (M.elems (_storageDefs c)) ]) )) ) (filter (userDefinedHelper nam )  [ varType xx | xx <- (M.elems (_storageDefs c)) ])
-  if M.member nam (_userDefined c) 
-    then do --TODO Bottom if there are more 
+  if (M.member nam $ _userDefined c) &&  (case args of OrderedArgs es -> length es == 1; _ -> False)
+    then do
       case args of
         OrderedArgs es -> do
-          expressionResult <- (tcExpr (head es))
-          let actualTypeOfUserDefinedVar = trace ("in unwrap " 
-                -- ++ ( show (SVMType.actual (head listOFUserDefinedVars)))
-                ++ "\n\t what is tcExpr (head es)"
-                ++ (show  expressionResult)) (userTypeHelper' $ M.lookup nam (_userDefined c))
-
-
-          let check3  =  (case expressionResult of 
+          expressionResult <- tcExpr (head es)
+          let actualTypeOfUserDefinedVar = userTypeHelper' $ M.lookup nam (_userDefined c)
+          let check  =  (case expressionResult of 
                 (Static (SVMType.UserDefined name actual)  _) -> if nam == name 
                   then case actual of 
-                    (SVMType.Int  _ _) ->  pure $ (boolType' x)
-                    (SVMType.String  _) -> pure $ (boolType' x)
+                    (SVMType.Int  _ _) ->  pure $ (intType' x)
+                    (SVMType.String  _) -> pure $ (stringType' x)
                     SVMType.Bool -> pure $ (boolType' x) 
-                    _ ->  pure . bottom $ "Can only create simple types" <$ x
-                  else pure . bottom $ "Can only create simple types" <$ x
-                _ -> pure . bottom $ "Can only create simple types" <$ x)
-          check3 !>  (pure $ (Static (actualTypeOfUserDefinedVar) x))
+                    (SVMType.Bytes _ _ ) -> pure $ (bytesType' x)
+
+                    _ ->  pure . bottom $ "Not supported for casting such type to user defined type" <$ x
+                  else pure . bottom $ "Wrong User defined type" <$ x
+                _ -> pure . bottom $ "Passing a non user defined type inside unwrap function of user defined type" <$ x)
+          check !>  (pure $ (Static (actualTypeOfUserDefinedVar) x))
         _ ->  pure . bottom $ "Cannot use object literals within contract definitions" <$ x
     else do  --Case of no user defines
       e <- tcExpr (MemberAccess g (Variable wow nam) "unwrap")
