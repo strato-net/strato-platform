@@ -24,7 +24,7 @@ module Blockchain.SolidVM
   ) where
 
 --Used to retrieve contract xabi and other pieces of code
-import           BlockApps.Bloc22.Server.Contracts
+-- import           BlockApps.Bloc22.Server.Contracts
 
 import           Control.DeepSeq                      (force)
 import           Control.Exception                    (throw)
@@ -55,7 +55,7 @@ import qualified Data.Map                             as M
 import qualified Data.Map.Merge.Lazy                  as M
 import           Data.Maybe
 -- import           Data.Monoid
-import           Data.Semigroup
+-- import           Data.Semigroup
 import qualified Data.Sequence                        as Q
 import qualified Data.Set                             as S
 import           Data.Source
@@ -125,8 +125,8 @@ import           SolidVM.Solidity.Parse.Statement
 import           SolidVM.Solidity.Parse.Lexer         (stringLiteral)
 import           SolidVM.Solidity.Parse.ParserTypes
 import           SolidVM.Solidity.Parse.UnParser      hiding (sortWith)
-import           SolidVM.Solidity.Parse.Declarations
-import           SolidVM.Solidity.Xabi              
+-- import           SolidVM.Solidity.Parse.Declarations
+-- import           SolidVM.Solidity.Xabi              
 
 import           Network.Haskoin.Crypto.BigWord()
 import           UnliftIO                             hiding (assert)
@@ -2101,17 +2101,17 @@ expToVar' (CC.FunctionCall _ e args) = do
             from <- getCurrentAccount
             let address = namedAccountToAccount (from ^. accountChainId) address'
             -- Retreive and resolve the codehash
-            codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) address
-            resolvedCodeHash <- resolveCodePtr (from ^. accountChainId) codeHash'
-            let ch' = case resolvedCodeHash of
-                        Just (SolidVMCode _ ch1') -> ch1' 
-                        Just cp -> missingCodeCollection "Account is not a SolidVM contract" (format cp)
-                        Nothing -> missingCodeCollection "Could not resolve code pointer for account" (format address)
+            -- codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) address
+            -- resolvedCodeHash <- resolveCodePtr (from ^. accountChainId) codeHash'
+            -- let ch' = case resolvedCodeHash of
+            --             Just (SolidVMCode _ ch1') -> ch1' 
+            --             Just cp -> missingCodeCollection "Account is not a SolidVM contract" (format cp)
+            --             Nothing -> missingCodeCollection "Could not resolve code pointer for account" (format address)
             -- Find and resolve the body of the code using the codehash
-            cd <- A.lookup (A.Proxy @DBCode) ch'
-            let cd' = case cd of
-                        Just (_,bs) -> bs
-                        Nothing -> missingCodeCollection "Could not locate SolidVM code collection at account" (format address)
+            -- cd <- A.lookup (A.Proxy @DBCode) ch'
+            -- let cd' = case cd of
+            --             Just (_,bs) -> bs
+            --             Nothing -> missingCodeCollection "Could not locate SolidVM code collection at account" (format address)
             -- Collect a potential item to search
             searchTerms <- case argVals of
                 -- catch only the SStrings
@@ -2121,210 +2121,116 @@ expToVar' (CC.FunctionCall _ e args) = do
                 --If nothing was given or something else, then just return the entire code
                 _ -> pure $ Nothing    
             --get only the contract containing useful sourceAnnotation contained in the ContractF type.
-            (contract, _, cc) <- getCodeAndCollection address
-            contractXabi <- getContractXabi address
+            (contract, _, _) <- getCodeAndCollection address
+            -- contractXabi <- getContractXabi address
 
-            --get the unparsed piece of code, save multiple entries (if there are multiple items with the same name add them all)
-              --TODO: allow for selecting a specific item if multiples exist by adding a number to the input selecting the 
-                --particular item to return.
-            let pieceOfCode :: [String]
-                pieceOfCode = 
+            let codeSnippets :: [String]
+                codeSnippets = 
                   case (fromMaybe "" searchTerms) of 
                     --get the location of just the code of the contract, if nothing is inputted in the contract then focus on just the contract itself
-                    "" -> let parents' = either (throw . fst) id $ CC.getParents cc contract
-                              unparsedString = unparseSourceUnit (NamedXabi (T.pack $ contract ^. CC.contractName) (contractXabi, parents'))
-                          in [unparsedString]
-                          
-                    term -> ["Nothing"]
-                    --Search the full contract for the search term, retrieving the sourceAnnotation location of the part that was found
-                      -- Check for and get the different parts of the contract
-                      -- let contractString = if ((contract ^. CC.contractName) == term) then 
-                      --         let parents' = either (throw . fst) id $ CC.getParents cc contract
-                      --             unparsedString = unparseSourceUnit (NamedXabi  (T.pack $ contract ^. CC.contractName) (contractXabi, parents'))
-                      --         in unparsedString
-                      --       else Nothing
-                          -- constAnno =                             
-                          --   let mConstf = (contract ^. CC.constants) M.!? term
-                          --       val = case mConstf of
-                          --         Just constf -> foldMap mon constf
-                          --           where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
-                          --                          in Just (Min (sl, sc), Max (el, ec))
-                          --         Nothing -> Nothing
-                          --   in case val of
-                          --         Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
-                          --         Nothing -> Nothing
-                          -- storjAnno =                             
-                          --   let mStorj = (contract ^. CC.storageDefs) M.!? term
-                          --       val = case mStorj of
-                          --         Just storjf -> foldMap mon storjf
-                          --           where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
-                          --                          in Just (Min (sl, sc), Max (el, ec))
-                          --         Nothing -> Nothing
-                          --   in case val of
-                          --         Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
-                          --         Nothing -> Nothing
-                          -- enumAnno =                             
-                          --   let mEnum = snd <$> ((contract ^. CC.enums) M.!? term)
-                          --       val = case mEnum of
-                          --         Just enumf -> mon enumf
-                          --           where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
-                          --                          in Just (Min (sl, sc), Max (el, ec))
-                          --         Nothing -> Nothing
-                          --   in case val of
-                          --         Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
-                          --         Nothing -> Nothing
-                          -- structAnno = 
-                          --   let mStruct = (contract ^. CC.structs) M.!? term
-                          --       val = case mStruct of
-                          --         Just structf -> foldMap mon ((\(_,_,s) -> s)  <$> structf)
-                          --           where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
-                          --                          in Just (Min (sl, sc), Max (el, ec))
-                          --         Nothing -> Nothing
-                          --   in case val of
-                          --         Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
-                          --         Nothing -> Nothing
-                          -- eventAnno =                             
-                          --   let mEvent = (contract ^. CC.events) M.!? term
-                          --       val = case mEvent of
-                          --         Just eventf -> foldMap mon eventf
-                          --           where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
-                          --                          in Just (Min (sl, sc), Max (el, ec))
-                          --         Nothing -> Nothing
-                          --   in case val of
-                          --         Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
-                          --         Nothing -> Nothing
-                          -- funcAnno = 
-                          --   let mFuncf = (contract ^. CC.functions) M.!? term
-                          --       val = case mFuncf of
-                          --         Just funcf -> foldMap mon funcf
-                          --           where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
-                          --                          in Just (Min (sl, sc), Max (el, ec))
-                          --         Nothing -> Nothing
-                          --   in case val of
-                          --         Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
-                          --         Nothing -> Nothing 
-                          -- modAnno = 
-                          --   let mModf = (contract ^. CC.modifiers) M.!? term
-                          --       val = case mModf of
-                          --         Just funcf -> foldMap mon funcf
-                          --           where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
-                          --                          in Just (Min (sl, sc), Max (el, ec))
-                          --         Nothing -> Nothing
-                          --   in case val of
-                          --         Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
-                          --         Nothing -> Nothing
-                          
-                      --Remove all of the items that were found to contain nothing, this should leave just the items that we found
-                      -- in catMaybes [contractString]--, funcAnno, constAnno, storjAnno, enumAnno, eventAnno, structAnno, modAnno]
-
-            let anno :: [(Int, Int, Int, Int)]
-                anno = 
-                  case (fromMaybe "" searchTerms) of 
-                    --get the location of just the code of the contract, if nothing is inputted in the contract then focus on just the contract itself
-                    "" -> let val = foldMap mon contract
-                                          where mon sa  = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
-                                                          in (Min (sl, sc), Max(el, ec))
-                              -- tup = case val of
-                              --         Just (Min (sl, sc), Max(el,ec)) -> Just (sl, sc, el, ec)
-                              --         Nothing -> Nothing  
-                              (Min (slt, sct), Max(elt, ect)) = val
-                              (startLine, startCol, endLine, endCol) = (slt, sct, elt, ect)
-                          in [(startLine, startCol, endLine, endCol)]
+                    "" -> ["[Work in Progress"]
+                    -- "" -> let val = foldMap mon contract
+                    --                       where mon sa  = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
+                    --                                       in (Min (sl, sc), Max(el, ec))
+                    --           -- tup = case val of
+                    --           --         Just (Min (sl, sc), Max(el,ec)) -> Just (sl, sc, el, ec)
+                    --           --         Nothing -> Nothing  
+                    --           (Min (slt, sct), Max(elt, ect)) = val
+                    --           (startLine, startCol, endLine, endCol) = (slt, sct, elt, ect)
+                    --       in [(startLine, startCol, endLine, endCol)]
                           
                     term ->
                     --Search the full contract for the search term, retrieving the sourceAnnotation location of the part that was found
                       -- Check for and get the different parts of the contract
-                      let contrAnno = if ((contract ^. CC.contractName) == term) then 
-                              let val = foldMap mon contract
-                                          where mon sa  = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
-                                                          in Just (Min (sl, sc), Max(el,ec))
-                              in case val of 
-                                Just (Min (sl, sc), Max(el,ec)) -> Just (sl, sc, el, ec)
-                                Nothing -> Nothing 
-                            else Nothing
-                          constAnno =                             
-                            let mConstf = (contract ^. CC.constants) M.!? term
-                                val = case mConstf of
-                                  Just constf -> foldMap mon constf
-                                    where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
-                                                   in Just (Min (sl, sc), Max (el, ec))
-                                  Nothing -> Nothing
-                            in case val of
-                                  Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
-                                  Nothing -> Nothing
-                          storjAnno =                             
-                            let mStorj = (contract ^. CC.storageDefs) M.!? term
-                                val = case mStorj of
-                                  Just storjf -> foldMap mon storjf
-                                    where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
-                                                   in Just (Min (sl, sc), Max (el, ec))
-                                  Nothing -> Nothing
-                            in case val of
-                                  Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
-                                  Nothing -> Nothing
-                          enumAnno =                             
-                            let mEnum = snd <$> ((contract ^. CC.enums) M.!? term)
-                                val = case mEnum of
-                                  Just enumf -> mon enumf
-                                    where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
-                                                   in Just (Min (sl, sc), Max (el, ec))
-                                  Nothing -> Nothing
-                            in case val of
-                                  Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
-                                  Nothing -> Nothing
-                          structAnno = 
-                            let mStruct = (contract ^. CC.structs) M.!? term
-                                val = case mStruct of
-                                  Just structf -> foldMap mon ((\(_,_,s) -> s)  <$> structf)
-                                    where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
-                                                   in Just (Min (sl, sc), Max (el, ec))
-                                  Nothing -> Nothing
-                            in case val of
-                                  Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
-                                  Nothing -> Nothing
-                          eventAnno =                             
-                            let mEvent = (contract ^. CC.events) M.!? term
-                                val = case mEvent of
-                                  Just eventf -> foldMap mon eventf
-                                    where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
-                                                   in Just (Min (sl, sc), Max (el, ec))
-                                  Nothing -> Nothing
-                            in case val of
-                                  Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
-                                  Nothing -> Nothing
-                          funcAnno = 
-                            let mFuncf = (contract ^. CC.functions) M.!? term
-                                val = case mFuncf of
-                                  Just funcf -> foldMap mon funcf
-                                    where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
-                                                   in Just (Min (sl, sc), Max (el, ec))
-                                  Nothing -> Nothing
-                            in case val of
-                                  Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
-                                  Nothing -> Nothing 
-                          modAnno = 
-                            let mModf = (contract ^. CC.modifiers) M.!? term
-                                val = case mModf of
-                                  Just funcf -> foldMap mon funcf
-                                    where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
-                                                   in Just (Min (sl, sc), Max (el, ec))
-                                  Nothing -> Nothing
-                            in case val of
-                                  Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
-                                  Nothing -> Nothing
+                      let contrString = Nothing
+                          -- if ((contract ^. CC.contractName) == term) then 
+                          --     let val = foldMap mon contract
+                          --                 where mon sa  = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
+                          --                                 in Just (Min (sl, sc), Max(el,ec))
+                          --     in case val of 
+                          --       Just (Min (sl, sc), Max(el,ec)) -> Just (sl, sc, el, ec)
+                          --       Nothing -> Nothing 
+                          --   else Nothing
+                          constString =   case ((contract ^. CC.constants) M.!? term) of 
+                              Just constF -> Just $ unparseConstant (term, constF)
+                              Nothing -> Nothing                          
+                            -- let mConstf = (contract ^. CC.constants) M.!? term
+                            --     val = case mConstf of
+                            --       Just constf -> foldMap mon constf
+                            --         where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
+                            --                        in Just (Min (sl, sc), Max (el, ec))
+                            --       Nothing -> Nothing
+                            -- in case val of
+                            --       Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
+                            --       Nothing -> Nothing
+                          storjString = Nothing                            
+                            -- let mStorj = (contract ^. CC.storageDefs) M.!? term
+                            --     val = case mStorj of
+                            --       Just storjf -> foldMap mon storjf
+                            --         where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
+                            --                        in Just (Min (sl, sc), Max (el, ec))
+                            --       Nothing -> Nothing
+                            -- in case val of
+                            --       Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
+                            --       Nothing -> Nothing
+                          enumString = Nothing                             
+                            -- let mEnum = snd <$> ((contract ^. CC.enums) M.!? term)
+                            --     val = case mEnum of
+                            --       Just enumf -> mon enumf
+                            --         where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
+                            --                        in Just (Min (sl, sc), Max (el, ec))
+                            --       Nothing -> Nothing
+                            -- in case val of
+                            --       Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
+                            --       Nothing -> Nothing
+                          structString = Nothing
+                            -- let mStruct = (contract ^. CC.structs) M.!? term
+                            --     val = case mStruct of
+                            --       Just structf -> foldMap mon ((\(_,_,s) -> s)  <$> structf)
+                            --         where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
+                            --                        in Just (Min (sl, sc), Max (el, ec))
+                            --       Nothing -> Nothing
+                            -- in case val of
+                            --       Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
+                            --       Nothing -> Nothing
+                          eventString = Nothing                             
+                            -- let mEvent = (contract ^. CC.events) M.!? term
+                            --     val = case mEvent of
+                            --       Just eventf -> foldMap mon eventf
+                            --         where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
+                            --                        in Just (Min (sl, sc), Max (el, ec))
+                            --       Nothing -> Nothing
+                            -- in case val of
+                            --       Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
+                            --       Nothing -> Nothing
+                          funcString = 
+                            case ((contract ^. CC.functions) M.!? term) of 
+                              Just funcF -> Just $ unparseFunc (term, funcF)
+                              Nothing -> Nothing
+
+                          modString = Nothing
+                            -- let mModf = (contract ^. CC.modifiers) M.!? term
+                            --     val = case mModf of
+                            --       Just funcf -> foldMap mon funcf
+                            --         where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
+                            --                        in Just (Min (sl, sc), Max (el, ec))
+                            --       Nothing -> Nothing
+                            -- in case val of
+                            --       Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
+                            --       Nothing -> Nothing
                           
                       --Remove all of the items that were found to contain nothing, this should leave just the items that we found
-                      in catMaybes [contrAnno, funcAnno, constAnno, storjAnno, enumAnno, eventAnno, structAnno, modAnno]
-
-            case anno of 
-              [] -> pure . Constant $ SString $ "" --TODO: add warning that nothing was found and the piece of code is redundant
-              -- Trim up the code to only include the code that was found, and format it if needed.
-              [a] -> let trim = trimCodeCollection (BC.unpack cd') a
-                         result = trim
-                     in pure . Constant $ SString (result)
-              as -> case searchTerms of
-                      Nothing -> generalMetaProgrammingError "<address>.code(<stuff>)" searchTerms
-                      Just searchTerm -> tooManyResultsError searchTerm (length as)
+                      in catMaybes [contrString, funcString, constString, storjString, enumString, eventString, structString, modString]
+            pure . Constant $ SString (head codeSnippets)
+            -- case codeSnippets of 
+            --   [] -> pure . Constant $ SString $ "" --TODO: add warning that nothing was found and the piece of code is redundant
+            --   -- Trim up the code to only include the code that was found, and format it if needed.
+            --   [a] -> let trim = trimCodeCollection (BC.unpack cd') a
+            --              result = trim
+            --          in pure . Constant $ SString (result)
+            --   as -> case searchTerms of
+            --           Nothing -> generalMetaProgrammingError "<address>.code(<stuff>)" searchTerms
+            --           Just searchTerm -> tooManyResultsError searchTerm (length as)
 
           Constant (SContractItem address' itemName) -> do
             from <- getCurrentAccount
@@ -3766,58 +3672,58 @@ solidVMExceptionHandler catchBlockMap ex = case ex of
     
     _ -> error "unhandled solid exception" (show ex)
 
---If given a list, apply a given function to only the first element of the list.
-mapOnFirst :: (a -> a) -> [a] -> [a]
-mapOnFirst _ [] = []
-mapOnFirst f (x:xs) = f x : xs
+-- --If given a list, apply a given function to only the first element of the list.
+-- mapOnFirst :: (a -> a) -> [a] -> [a]
+-- mapOnFirst _ [] = []
+-- mapOnFirst f (x:xs) = f x : xs
 
---If given a list, apply a given function to only the last item in the list
-mapOnLast :: forall a. (a -> a) -> [a] -> [a]
-mapOnLast f = foldr step []
-  where step :: a -> [a] -> [a]
-        step x [] = [f x]
-        step x xs = x : xs
+-- --If given a list, apply a given function to only the last item in the list
+-- mapOnLast :: forall a. (a -> a) -> [a] -> [a]
+-- mapOnLast f = foldr step []
+--   where step :: a -> [a] -> [a]
+--         step x [] = [f x]
+--         step x xs = x : xs
 
---If given a SourceAnnotation get the position of (startLine, startColumn, endLine, endColumn)
-getPositionFromSourceAnnotation :: SourceAnnotation a -> (Int, Int, Int, Int)
-getPositionFromSourceAnnotation sa = (sa ^. sourceAnnotationStart ^. sourcePositionLine,
-                                      sa ^. sourceAnnotationStart ^. sourcePositionColumn,
-                                      sa ^. sourceAnnotationEnd ^. sourcePositionLine,
-                                      sa ^. sourceAnnotationEnd ^. sourcePositionColumn)
+-- --If given a SourceAnnotation get the position of (startLine, startColumn, endLine, endColumn)
+-- getPositionFromSourceAnnotation :: SourceAnnotation a -> (Int, Int, Int, Int)
+-- getPositionFromSourceAnnotation sa = (sa ^. sourceAnnotationStart ^. sourcePositionLine,
+--                                       sa ^. sourceAnnotationStart ^. sourcePositionColumn,
+--                                       sa ^. sourceAnnotationEnd ^. sourcePositionLine,
+--                                       sa ^. sourceAnnotationEnd ^. sourcePositionColumn)
 
---If given a string and a SourceAnnotation, trim the string to be within the SourceAnnotation
-trimCodeCollection :: String -> (Int, Int, Int, Int) -> String
-trimCodeCollection cc sa = final
-  where (startLine, startColumn, endLine, endColumn) = sa
-        bandwidth = drop (startLine - 1) (take endLine (lines cc))
-        trimBack = mapOnLast (take endColumn) bandwidth 
-        trimmedUp = mapOnFirst (drop $ startColumn - 1) trimBack
-        body = unlines trimmedUp
-        numOpen = countElem '{' body
-        numClosed = countElem '}' body
-        enclosed = if (numOpen > numClosed) then 
-          body ++ replicate (numOpen - numClosed) '}'
-          else body
-        final = if (numOpen == 0) then
-          enclosed
-          else 
-            finalCut 
-            where 
-              goodCut = fst $ splitLast '}' enclosed
-              numClosedFinal = countElem '}' goodCut
-              finalCut = if (numClosedFinal == numOpen) then
-                goodCut ++ "\n"
-                else
-                  goodCut ++ replicate (numOpen - numClosedFinal) '}' ++ "\n"
+-- --If given a string and a SourceAnnotation, trim the string to be within the SourceAnnotation
+-- trimCodeCollection :: String -> (Int, Int, Int, Int) -> String
+-- trimCodeCollection cc sa = final
+--   where (startLine, startColumn, endLine, endColumn) = sa
+--         bandwidth = drop (startLine - 1) (take endLine (lines cc))
+--         trimBack = mapOnLast (take endColumn) bandwidth 
+--         trimmedUp = mapOnFirst (drop $ startColumn - 1) trimBack
+--         body = unlines trimmedUp
+--         numOpen = countElem '{' body
+--         numClosed = countElem '}' body
+--         enclosed = if (numOpen > numClosed) then 
+--           body ++ replicate (numOpen - numClosed) '}'
+--           else body
+--         final = if (numOpen == 0) then
+--           enclosed
+--           else 
+--             finalCut 
+--             where 
+--               goodCut = fst $ splitLast '}' enclosed
+--               numClosedFinal = countElem '}' goodCut
+--               finalCut = if (numClosedFinal == numOpen) then
+--                 goodCut ++ "\n"
+--                 else
+--                   goodCut ++ replicate (numOpen - numClosedFinal) '}' ++ "\n"
 
-splitLast :: Char -> String -> (String, String)
-splitLast char str = let n = findIndex (==char) (reverse str) in
-                case n of
-                  Nothing -> (str, [])
-                  Just m  -> splitAt (length str - m -1) str
+-- splitLast :: Char -> String -> (String, String)
+-- splitLast char str = let n = findIndex (==char) (reverse str) in
+--                 case n of
+--                   Nothing -> (str, [])
+--                   Just m  -> splitAt (length str - m -1) str
 
-countElem :: Eq a => a -> [a] -> Int
-countElem i = length . filter (i==)
+-- countElem :: Eq a => a -> [a] -> Int
+-- countElem i = length . filter (i==)
 
 
 

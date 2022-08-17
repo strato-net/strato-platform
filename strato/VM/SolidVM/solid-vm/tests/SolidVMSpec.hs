@@ -3893,10 +3893,9 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
-  it "can search for a constant and get its initial code." . runTest $ do
+  fit "can search for a constant and get its initial code." . runTest $ do
     let codeSnippet :: String
-        codeSnippet = [r|uint constant public testConst = 136546546541654654324765441651684354646468435468;
-|]
+        codeSnippet = [r|uint public constant testConst = 136546546541654654324765441651684354646468435468;|]
         contract :: String
         contract = [r|
 pragma solidvm 3.3;
@@ -4061,7 +4060,7 @@ contract qq {
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString myContract]
 
-  it "Can find a function within a codeCollection" . runTest $ do
+  fit "Can find a function within a codeCollection" . runTest $ do
     let myFunxion :: String
         myFunxion = [r|function myFunction() public returns (uint) {
     uint x = 13;

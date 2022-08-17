@@ -219,6 +219,12 @@ unparseStatementWith f (SolidityTryCatchStatement expr mtpl tryBlock catchBlockM
   "try " ++ unparseExpression expr ++ " " ++  (show (fromMaybe [] mtpl)) ++ " {\n" ++ tab (unlines $ map (unparseStatementWith f) tryBlock) ++ "\n}" ++ " catch " ++ show (Map.toList catchBlockMap)
 -- unparseStatementWith _ x = internalError "missing case in call to unparseStatementWith" $ show x
 
+
+
+-- unparseContract :: ContractF a -> String
+-- --Use a many statement to go through the list items contained in the ContractF. Making sure everything is able to touched
+-- unparseContract = 
+
 unparseVarDefEntry :: VarDefEntryF a -> String
 unparseVarDefEntry BlankEntry = ""
 unparseVarDefEntry (VarDefEntry maybeType maybeLoc theName _) =
