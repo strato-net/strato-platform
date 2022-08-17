@@ -3833,10 +3833,9 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
-  it "can search for an enum body within a codeCollection" . runTest $ do
+  fit "can search for an enum body within a codeCollection" . runTest $ do
     let codeSnippet :: String
-        codeSnippet = [r|enum FreshJuiceSize{ SMALL, MEDIUM, LARGE }
-|]
+        codeSnippet = [r|enum FreshJuiceSize { SMALL, MEDIUM, LARGE }|]
         contract :: String
         contract = [r|
 pragma solidvm 3.3;

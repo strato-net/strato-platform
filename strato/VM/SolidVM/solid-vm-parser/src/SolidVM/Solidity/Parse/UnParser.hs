@@ -101,9 +101,9 @@ unparseEnum :: (SolidString, [SolidString]) -> String
 unparseEnum (name, values) =
      "enum "
   <> labelToString name
-  <> " {"
+  <> " { "
   <> (List.intercalate ", " $ List.map labelToString values)
-  <> "}"
+  <> " }"
 
 unparseVarType :: Type -> String
 unparseVarType (SVMType.Int (Just True) (Just n)) = "int" <> show (8*n)
