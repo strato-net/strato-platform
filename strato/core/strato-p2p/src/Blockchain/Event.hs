@@ -422,12 +422,28 @@ handleEvents peer = awaitForever $ \case
           mcInfo <- fmap (fmap ((,) cId)) . lift $ select (Proxy @ChainInfo) cId
           for_ mcInfo $ yieldR . ChainDetails . (:[])
       P2pNewOrgName cId org -> do
-        let formatted = CL.yellow $ format cId -- slava ukraini
-        let orgFormat = CL.blue $ format org -- need to decode from b16
-        $logInfoS "handleEvents/P2pNewOrgName" $ T.pack $ "New organization associated with chain " ++ formatted ++ " for org " ++ orgFormat
-        -- send chain IDs + orgName/unit to all nodes?
-        -- checkPeerIsMember' PubKey
+        peerX509 <- lift $ select (Proxy @X509CertInfoState) $
+          fromPublicKey . pointToSecPubKey $ fromMaybe (error "handleEvents/P2pNewOrgName - could not derive peer pubkey") $ pPeerPubkey peer
+        let formatted = CL.yellow $ format cId
+            orgFormat = CL.blue $ format org -- need to decode from b16
+            orgToText s = T.pack $ BS8.unpack $ BS8.concat [unOrgName (fst s), maybe BS8.empty (BS8.append (BS8.pack "/")) (unOrgUnit (snd s))]
+            orgTupleFromCert crt = maybe
+              (OrgName BS8.empty, OrgUnit Nothing)
+              (OrgName . BS8.pack . subOrg &&& orgUnit' . subUnit)
+              (getCertSubject crt)
+            orgUnit' u = case u of
+                Nothing -> OrgUnit (Just BS8.empty)
+                Just a  -> OrgUnit . Just $ BS8.concat [BS8.pack "/", BS8.pack a]
+            organization = "organization"
+            getPeerCert = case peerX509 of
+              Nothing -> X509Certificate (CertificateChain [])
+              Just X509CertInfoState{certificate=crt} -> crt
 
+        $logInfoS "handleEvents/P2pNewOrgName" $ T.pack $ "New organization associated with chain " ++ formatted ++ " for org " ++ orgFormat
+        when (verifyCert (pointToSecPubKey $ fromMaybe (error "handleEvents/P2pNewOrgName - could not derive peer pubkey") $ pPeerPubkey peer) getPeerCert) $ do 
+          cInfo <- fmap M.toList . lift $ selectMany (Proxy @ChainInfo) [cId]
+          let cInfosWithMetadata = fmap (\x@ChainInfo{chainInfo=ci} -> x{chainInfo = ci{chainMetadata = M.insert organization (orgToText $ orgTupleFromCert getPeerCert) (chainMetadata ci)}}) <$> cInfo
+          yieldR $ ChainDetails cInfosWithMetadata
       P2pBlockstanbul msg -> do
         let outbound = Blockstanbul msg
         $logDebugS "handleEvents/P2pBlockstanbul" . T.pack $ "Outgoing mesage: " ++ show outbound
@@ -525,7 +541,7 @@ handleGetChainDetails peer cids' = do
             else return cids'
   lift stampActionTimestamp
   $logInfoS "handleGetChainDetails" $ T.pack $ "details requested for chainIDs " ++ (intercalate "\n" $ formatChainId . Just <$> cids)
-  
+
   mems <- lift $ selectMany (Proxy @ChainMembers) cids
   cInfoOrgs <- fmap M.toList . lift $ selectMany (Proxy @ChainInfo) $ S.toList (unOrgNameChains orgNameChains)
   let filteredPairs = M.keys $ M.filter (checkPeerIsMember peer) mems
