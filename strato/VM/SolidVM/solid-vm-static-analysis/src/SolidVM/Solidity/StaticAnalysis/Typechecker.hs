@@ -1295,6 +1295,7 @@ tcExpr (Ternary x a b c) =
 tcExpr (BoolLiteral x _) = pure $ boolType' x
 tcExpr (NumberLiteral x _ _) = pure $ intType' x
 tcExpr (StringLiteral x _) = pure $ stringType' x
+tcExpr (HexaLiteral x _) = pure $ stringType' x
 tcExpr (TupleExpression x es) =
   productType' x <$> traverse (maybe (pure $ topType' x) tcExpr) es
 tcExpr (ArrayExpression x es) = do

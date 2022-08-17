@@ -358,3 +358,4 @@ expressionHelper (ArrayExpression _ es) = concat <$> traverse expressionHelper e
 expressionHelper (Variable x name) =
   localVarReadHelper name x
 expressionHelper (ObjectLiteral _ _) = pure []
+expressionHelper (HexaLiteral _ _) = pure []

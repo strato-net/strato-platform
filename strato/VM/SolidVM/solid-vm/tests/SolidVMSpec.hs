@@ -1944,6 +1944,49 @@ contract qq {
 }|]
     getFields ["x"] `shouldReturn` [BInteger 887242634]
 
+  it "can use hexadecimal string literals" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  string x;
+  constructor() public {
+    x = hex'AF32';
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BString "\194\175\&2"]
+  
+  it "can use hexadecimal string literals double quotes" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  string x;
+  constructor() public {
+    x = hex"68656c6c6f";
+  }
+}|]
+    getFields ["x"] `shouldReturn` [BString "hello"]
+
+  it "should not allow an odd amount in a string literal" $ runTest (do
+    runCall "func" "()" [r|
+contract qq {
+  string x;
+  function func() public returns (string) {
+    x = hex"AF3";
+  }
+}|]) `shouldThrow` anyParseError
+
+
+  it "parser can accept variable names without consuming hex" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  string hexString;
+  constructor() public {
+    hexString = hex"1234";
+  }
+}|]
+    getFields ["hexString"] `shouldReturn` [BString "\DC24"]
+
   it "can return and used named returns" . runTest $ do
     runBS [r|
 contract qq {
@@ -5013,6 +5056,7 @@ contract qq{
 }|]
     getFields ["myNum", "myStatus", "myString"] `shouldReturn` [BInteger 9, BBool True, BString "hi world"]
     
+    
   it "should catch invalid function overloads" $ runTest (do
     runBS [r|
 pragma solidvm 3.3;
@@ -5030,6 +5074,7 @@ contract qq{
     myNum += a + b;
   }
 }|]) `shouldThrow` anyInvalidArgumentsError
+
 
   it "can pass calldata arguments and use calldata variables" . runTest $ do
     runBS [r|

@@ -17,7 +17,7 @@ import SolidVM.Solidity.Parse.Statement
 -- import SolidVM.Solidity.Parse.Declarations
 -- import SolidVM.Model.CodeCollection.Def as Def
 
-import SolidVM.Solidity.Parse.UnParser
+-- import SolidVM.Solidity.Parse.UnParser
 import SolidVM.Solidity.Parse.ParserTypes 
 
 import           Data.Source.Annotation as SA 
@@ -67,6 +67,8 @@ spec = do
                 , ("x + y", Binary () "+" (Variable () "x") (Variable () "y"))
                 , ("x ** y", Binary () "**" (Variable () "x") (Variable () "y"))
                 , ("x[q]", IndexAccess () (Variable () "x") (Just $ Variable () "q"))
+                , ("hex'4F9A'", HexaLiteral () "4F9A")
+                , ("hex\"4F9A\"", HexaLiteral () "4F9A")
                 , ("x[a][b][c]", IndexAccess () (
                                    IndexAccess () (
                                      IndexAccess ()
@@ -86,8 +88,6 @@ spec = do
     forM_ cases $ \(input, want) -> do
       it ("can parse " ++ input) $ parseExpr input `shouldBe` Right want
 
-    forM_ cases $ \(want, input) -> do
-      it ("can unparse to " ++ want) $ unparseExpression input `shouldBe` want
 
     it "can parse function calls" $ do
       let f = FunctionCall () (Variable () "f")

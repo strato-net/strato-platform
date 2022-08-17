@@ -121,6 +121,7 @@ import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpre
 import           Network.Haskoin.Crypto.BigWord()
 import           UnliftIO                             hiding (assert)
 
+ 
 
 -- | Copying from Data.List.Extra, since our version of the extra library seems to not contain it.
 -- | A total variant of the list index function `(!!)`.
@@ -1453,6 +1454,7 @@ expToVar' (CC.NumberLiteral _ v (Just nu)) = do
     else unknownStatement "Unit suffixes are not supported below pragma solidvm 3.3" (v, nu)
 expToVar' (CC.StringLiteral _ s) = return $ Constant $ SString s
 expToVar' (CC.BoolLiteral _ b) = return $ Constant $ SBool b
+expToVar' (CC.HexaLiteral _ a) = return $ Constant $ SString $ BC.unpack . either (parseError "Couldn't parse hexadecimal literal: ") id . B16.decode $ BC.pack a
 expToVar' (CC.Variable _ "bytes32ToString") = return $ Constant $ SHexDecodeAndTrim
 expToVar' (CC.Variable _ "addressToAsciiString") = return $ Constant SAddressToAscii
 expToVar' (CC.Variable _ "bytes") = do --TODO- remove this hardcoded case
