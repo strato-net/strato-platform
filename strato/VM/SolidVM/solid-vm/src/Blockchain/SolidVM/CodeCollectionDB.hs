@@ -160,9 +160,9 @@ compileSource typeCheck mTT = do
   let applyInheritanceE = first SVMEx . applyInheritance
   case (applyInheritanceE <=< compileSourceNoInheritance) mTT of
     Right cc ->
-      |(typeCheck && hasSvm3_2 cc) = typeCheckDetectorSvm3_2 cc
-      |(typeCheck && hasSvm3_3 cc) = typeCheckDetectorSvm3_3 cc
-      |otherwise = Right cc
+      |(typeCheck && hasSvm3_2 cc) >>= typeCheckDetectorSvm3_2 cc
+      |(typeCheck && hasSvm3_3 cc) >>= typeCheckDetectorSvm3_3 cc
+      |otherwise >>= Right cc
     Left x -> Left x
     where
       typeCheckDetectorSvm3_2 ecc = case TypeChecker.detector ecc of
@@ -172,6 +172,7 @@ compileSource typeCheck mTT = do
         [] -> Right ecc
         xs -> Left $ TCEx xs
 -- do if typeCheck && (hasSvm3_2 cc || hasSvm3_3 cc) then typeCheckDetector cc else Right cc
+-- guards cant be used inside cases?
 
 compileSourceWithAnnotations :: Bool -> Map T.Text T.Text -> Either [SourceAnnotation T.Text] CodeCollection
 compileSourceWithAnnotations typeCheck = withAnnotations (compileSource typeCheck)

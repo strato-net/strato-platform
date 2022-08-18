@@ -5575,7 +5575,8 @@ contract qq {
 
 
     it "Supports pure functions in 3.3" $
-      let anns = ConstantFunctions.detector `forContract` [r|
+      let anns = . runTest $ do
+      runBS[r|
 pragma solidvm 3.3;
 contract C {
     function f(uint a, uint b) public pure returns (uint) {
@@ -5583,12 +5584,13 @@ contract C {
     }
 }
 |]
-      in length anns `shouldBe` 0
+      getAll [[Field "a"], [Field "b"]] `shouldReturn` [] 
 
 
 
     it "Supports pure functions in 3.2" $
-      let anns = TypeChecker.detector `forContract` [r|
+      let anns = . runTest $ do
+      runBS[r|
 pragma solidvm 3.2;
 contract C {
     function f(uint a, uint b) public pure returns (uint) {
@@ -5596,4 +5598,4 @@ contract C {
     }
 }
 |]
-      in length anns `shouldBe` 0
+      getAll [[Field "a"], [Field "b"]] `shouldReturn` [] 

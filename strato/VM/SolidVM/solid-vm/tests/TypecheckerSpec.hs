@@ -871,6 +871,15 @@ contract A {
     in length anns `shouldBe` 1
 
 
+  it "Supports pure functions in 3.3" $
+      let anns = runTypechecker [r|
+contract C {
+    function f(uint a, uint b) public pure returns (uint) {
+        return a * (b + 42);
+    }
+}
+|]
+      in length anns `shouldBe` 0
 
 
 
