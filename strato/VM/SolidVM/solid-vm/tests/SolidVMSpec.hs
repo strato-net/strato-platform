@@ -5572,3 +5572,28 @@ contract qq {
      }
   }
 }|]) `shouldThrow` anyTypeError
+
+
+    it "Supports pure functions in 3.3" $
+      let anns = ConstantFunctions.detector `forContract` [r|
+pragma solidvm 3.3;
+contract C {
+    function f(uint a, uint b) public pure returns (uint) {
+        return a * (b + 42);
+    }
+}
+|]
+      in length anns `shouldBe` 0
+
+
+
+    it "Supports pure functions in 3.2" $
+      let anns = TypeChecker.detector `forContract` [r|
+pragma solidvm 3.2;
+contract C {
+    function f(uint a, uint b) public pure returns (uint) {
+        return a * (b + 42);
+    }
+}
+|]
+      in length anns `shouldBe` 0
