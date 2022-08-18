@@ -5463,7 +5463,7 @@ contract qq {
     if(a==checker)
       revert f("ERROR"); 
   } 
-}|]) `shouldThrow` anyCustomError
+}|]) `shouldThrow` anyTODO
 
   it "Revert customError  TODO" $ runTest (do
     runBS [r|
@@ -5483,4 +5483,4 @@ contract qq {
     if(a==checker)
       revert f({x:'a',y:'b'}); 
   } 
-}|]) `shouldThrow` anyCustomError
+}|]) `shouldThrow` anyTODO
