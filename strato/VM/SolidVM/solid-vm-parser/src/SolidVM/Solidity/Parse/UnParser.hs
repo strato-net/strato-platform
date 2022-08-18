@@ -13,10 +13,12 @@ import qualified Data.Text                  as Text
 import qualified Data.List                  as List
 import           Data.Map                   ()
 import qualified Data.Map                   as Map
+import           Data.Source.Annotation
 import           Text.Printf
 
 import           SolidVM.Model.CodeCollection
 import qualified SolidVM.Model.CodeCollection.Def as SolidVM
+import qualified SolidVM.Model.CodeCollection.VarDef as SolidVM
 import           SolidVM.Model.SolidString
 import           SolidVM.Model.Type (Type)
 import qualified SolidVM.Model.Type as SVMType
@@ -97,13 +99,28 @@ unparseConstant (name, (ConstantDecl theType isPublic expression _)) =
   <> (" = " ++ unparseExpression expression)
   <> ";"
 
+unparseStructs :: SolidString -> [(SolidString, SolidVM.FieldType, SourceAnnotation ())] -> String
+unparseStructs name fields =
+     "struct "
+  <> labelToString name
+  <> " {\n"
+  <> (List.intercalate ";\n" $ List.map unparseStructField fields)
+  <> "\n}"
+
+unparseStructField :: (SolidString, SolidVM.FieldType, SourceAnnotation ()) -> String
+unparseStructField (name, theType, _) =
+     unparseVarType (fieldTypeType theType)
+  <> " "
+  <> labelToString name
+  <> ";"
+
 unparseEnum :: (SolidString, [SolidString]) -> String
 unparseEnum (name, values) =
      "enum "
   <> labelToString name
-  <> " { "
-  <> (List.intercalate ", " $ List.map labelToString values)
-  <> " }"
+  <> " {\n"
+  <> (List.intercalate ",\n" $ List.map labelToString values)
+  <> "\n}"
 
 unparseVarType :: Type -> String
 unparseVarType (SVMType.Int (Just True) (Just n)) = "int" <> show (8*n)
