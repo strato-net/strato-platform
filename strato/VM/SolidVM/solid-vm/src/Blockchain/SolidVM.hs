@@ -1767,12 +1767,18 @@ expToVar' x@(CC.IndexAccess _ parent (Just mIndex)) = do
                                   Just v -> return v
                                   Nothing -> do
                                     let theType =   typeOf theIndex
-                                    let typeArray = [(typeOf ("test"::[Char])), (typeOf (1 :: Integer)), (typeOf (True::Bool))]
+                                    let typeArray = [(typeOf ("test"::[Char])), (typeOf (1 :: Integer)), (typeOf (True::Bool)), (typeOf ((SInteger 2) :: Value))]
                                     let typeNum = theType `elemIndex` typeArray
                                     case typeNum of
                                       Just 0 -> return $ Constant $ SString ""
                                       Just 1 -> return $ Constant $ SInteger 0
                                       Just 2 -> return $ Constant $ SBool False
+                                      Just 3 -> do
+                                        case theIndex of
+                                          (SInteger _) -> return $ Constant $ SInteger 0
+                                          (SString _) -> return $ Constant $ SString ""
+                                          (SBool _) -> return $ Constant $ SBool False
+                                          _ -> internalError "Type of Mapping not allowed" (show theType)
                                       _ -> internalError "Type of Mapping not found" (show theType)
 
         (SReference _, _) -> Constant . SReference <$> expToPath x
