@@ -2142,53 +2142,28 @@ expToVar' (CC.FunctionCall _ e args) = do
                     term ->
                     --Search the full contract for the search term, retrieving the sourceAnnotation location of the part that was found
                       -- Check for and get the different parts of the contract
-                      let contrString = Nothing
-                          -- if ((contract ^. CC.contractName) == term) then 
-                          --     let val = foldMap mon contract
-                          --                 where mon sa  = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
-                          --                                 in Just (Min (sl, sc), Max(el,ec))
-                          --     in case val of 
-                          --       Just (Min (sl, sc), Max(el,ec)) -> Just (sl, sc, el, ec)
-                          --       Nothing -> Nothing 
-                          --   else Nothing
-                          constString =   case ((contract ^. CC.constants) M.!? term) of 
+                      --Not Working
+                      let contrString = 
+                            case ((contract ^. CC.contractName) == term) of
+                              Just contrF -> Just $ unparseContract contrF
+                              Nothing -> Nothing
+
+                          constString =   
+                            case ((contract ^. CC.constants) M.!? term) of 
                               Just constF -> Just $ unparseConstant (term, constF)
                               Nothing -> Nothing                          
-                            -- let mConstf = (contract ^. CC.constants) M.!? term
-                            --     val = case mConstf of
-                            --       Just constf -> foldMap mon constf
-                            --         where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
-                            --                        in Just (Min (sl, sc), Max (el, ec))
-                            --       Nothing -> Nothing
-                            -- in case val of
-                            --       Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
-                            --       Nothing -> Nothing
+
                           storjString = 
                             case ((contract ^. CC.storageDefs) M.!? term) of
                               Just storjF -> Just $ unparseVar (term, storjF)
                               Nothing -> Nothing                           
-                            -- let mStorj = (contract ^. CC.storageDefs) M.!? term
-                            --     val = case mStorj of
-                            --       Just storjf -> foldMap mon storjf
-                            --         where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
-                            --                        in Just (Min (sl, sc), Max (el, ec))
-                            --       Nothing -> Nothing
-                            -- in case val of
-                            --       Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
-                            --       Nothing -> Nothing
+
                           enumString = 
                             case ((contract ^. CC.enums) M.!? term) of
                               Just enumF -> Just $ unparseEnum (term, fst enumF)
                               Nothing -> Nothing                             
-                            -- let mEnum = snd <$> ((contract ^. CC.enums) M.!? term)
-                            --     val = case mEnum of
-                            --       Just enumf -> mon enumf
-                            --         where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
-                            --                        in Just (Min (sl, sc), Max (el, ec))
-                            --       Nothing -> Nothing
-                            -- in case val of
-                            --       Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
-                            --       Nothing -> Nothing
+
+                          --not working yet
                           structString = 
                             case ((contract ^. CC.structs) M.!? term) of
                               Just structF -> Just $ unparseStructs term structF -- $ unparseStructs (term, structF)
