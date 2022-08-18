@@ -3720,6 +3720,38 @@ contract qq{
       [ BString $ BC.pack $  keccak256ToHex $ hash $ UTF8.fromString contract 
       , BString "657f5687fe89bd0bd3cee84e83c306c65458c0b13d13991087f9a7330474f2d8" ]
 
+  fit "can get structs from the '.code' function" . runTest $ do
+    let testCode :: String
+        testCode = [r|struct point {
+    uint x;
+    uint y;
+  }|]
+        codeSnippet :: String
+        codeSnippet = [r|
+pragma solidvm 3.3;
+contract Test {
+  uint bana = 13;
+  uint x = 6;
+  uint y = 7;
+  struct point {
+    uint x;
+    uint y;
+  }
+  constructor () {
+  }
+}
+
+contract qq {
+  string codePiece = "";
+  constructor () {
+    Test t = new Test();
+    codePiece = t.code("point");
+  }
+}|]
+    runBS codeSnippet
+    getFields ["codePiece"] `shouldReturn`
+      [ BString $ UTF8.fromString testCode]
+
   fit "can get events from the '.code' function" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|event x(
