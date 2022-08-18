@@ -7,6 +7,7 @@
 {-# LANGUAGE RecordWildCards #-}
 module SolidVM.Solidity.Parse.UnParser where
 
+import           Control.Lens
 import           Data.Maybe
 import           Data.Text  (Text)
 import qualified Data.Text                  as Text
@@ -19,6 +20,7 @@ import           Text.Printf
 import           SolidVM.Model.CodeCollection
 import qualified SolidVM.Model.CodeCollection.Def as SolidVM
 import qualified SolidVM.Model.CodeCollection.VarDef as SolidVM
+import           SolidVM.Model.CodeCollection.Contract as SolidVM
 import           SolidVM.Model.SolidString
 import           SolidVM.Model.Type (Type)
 import qualified SolidVM.Model.Type as SVMType
@@ -99,8 +101,23 @@ unparseConstant (name, (ConstantDecl theType isPublic expression _)) =
   <> (" = " ++ unparseExpression expression)
   <> ";"
 
-unparseStructs :: SolidString -> [(SolidString, SolidVM.FieldType, SourceAnnotation ())] -> String
-unparseStructs name fields =
+unparseContract :: SolidVM.Contract -> String
+unparseContract contr = 
+  "contract "
+  <> Text.unpack (_contractName contr)
+  <> " {\n"
+  <> (List.intercalate "\n" $ List.map unparseConstant (contr ^. constants))
+  <> (List.intercalate "\n" $ List.map unparseVar (contr ^. storageDefs))
+  <> (List.intercalate "\n" $ List.map unparseEnum (contr ^. enums))
+  <> (List.intercalate "\n" $ List.map unparseStruct (contr ^. structs))
+  <> (List.intercalate "\n" $ List.map unparseEvent (contr ^. events))
+  <> (List.intercalate "\n" $ List.map unparseFunc (contr ^. functions))
+  <> unparseCtor (contr ^. constructor)
+  <> unparseModifier (contr ^. modifiers)
+  <> "\n}"
+
+unparseStruct :: SolidString -> [(SolidString, SolidVM.FieldType, SourceAnnotation ())] -> String
+unparseStruct name fields =
      "struct "
   <> labelToString name
   <> " {\n"
