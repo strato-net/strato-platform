@@ -2189,16 +2189,11 @@ expToVar' (CC.FunctionCall _ e args) = do
                             -- in case val of
                             --       Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
                             --       Nothing -> Nothing
-                          structString = Nothing
-                            -- let mStruct = (contract ^. CC.structs) M.!? term
-                            --     val = case mStruct of
-                            --       Just structf -> foldMap mon ((\(_,_,s) -> s)  <$> structf)
-                            --         where mon sa = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
-                            --                        in Just (Min (sl, sc), Max (el, ec))
-                            --       Nothing -> Nothing
-                            -- in case val of
-                            --       Just (Min (sl, sc), Max (el, ec)) -> Just (sl, sc, el, ec)
-                            --       Nothing -> Nothing
+                          structString = 
+                            case ((contract ^. CC.structs) M.!? term) of
+                              Just structF -> Just $ unparseStructs term structF -- $ unparseStructs (term, structF)
+                              Nothing -> Nothing
+
                           eventString = 
                             case ((contract ^. CC.events) M.!? term) of 
                               Just eventF -> Just $ unparseEvent (term, eventF)
