@@ -930,7 +930,30 @@ runStatement (CC.SimpleStatement (CC.ExpressionStatement (CC.PlusPlus e))) = do
 
 runStatement (CC.RevertStatement mString theArgs _) = do -- TODO make work with multiple args
   case mString of 
-    Just x -> do todo "customError Functions to be implemented" x 
+    Just x -> do
+      -- (hsh,cc) <- getCurrentCodeCollection
+      g <- getCurrentContract
+      err <- case M.lookup mString $ CC._errors g of
+        Just e -> do
+          ag <- case theArgs of
+                CC.OrderedArgs xs -> do
+                    newList <- forM xs $ \x -> do
+                      y <- expToVar x
+                      z <- getVar y
+                      return z
+                    pure $ newList
+                CC.NamedArgs ns -> do
+                    newList <- forM ns $ \x -> do
+                      y <- expToVar x
+                      z <- getVar y
+                      return z
+                    pure $ newList
+          let listOfVals = case ag of
+                CC.OrderedArgs ov -> map (\x -> toBasic x) ov
+                CC.NamedArgs nv -> map (\(_, y) -> toBasic y) nv
+          return $ customError "Reverting based on  Error" mString listOfVals    
+        Nothing -> revertError "REVERT" "Going back to Initial State"
+    
     Nothing -> case theArgs of
       CC.OrderedArgs xs -> do
         newList <- forM xs $ \x -> do
