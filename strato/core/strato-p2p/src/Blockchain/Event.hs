@@ -122,8 +122,8 @@ yieldR = yield . Right
 yieldL :: Monad m => e -> ConduitT i (Either e a) m ()
 yieldL = yield . Left
 
-checkPeer :: MonadP2P m => PPeer -> ConduitM a b m ()
-checkPeer peer = do
+checkPeer :: MonadP2P m => Bool -> PPeer -> ConduitM a b m ()
+checkPeer server peer = do
   let userAddressM = fromPublicKey . pointToSecPubKey <$> pPeerPubkey peer
   liftIO $ putStrLn $ "checkPeer: our userAddressM: " ++ show userAddressM
   case userAddressM of
@@ -133,14 +133,18 @@ checkPeer peer = do
       clientCertDetails <- lift $ select (Proxy @X509CertInfoState) userAddress'
       -- Throw error if the cert is not valid.
       liftIO $ putStrLn $ "checkPeer: our clientCertDetails': " ++ show clientCertDetails
-      unless (maybe False isValid clientCertDetails) $ throwIO InvalidClientCert
+      if server 
+        then unless (maybe False isValid clientCertDetails) $ throwIO InvalidClientCert
+        else do
+          initialized <- lift $ access (Proxy @CertificateRegistryInitialized) 
+          when (not (maybe False isValid clientCertDetails) && initialized) $ throwIO InvalidClientCert
 
 
 handleEvents :: MonadP2P m => PPeer -> Bool -> ConduitM Event (Either P2PCNC Message) m ()
-handleEvents peer check = awaitForever $ \i -> do
+handleEvents peer server = awaitForever $ \i -> do
   liftIO $ putStrLn $ "handleEvents: our peer " ++ show peer
-  liftIO $ putStrLn $ "handleEvents: our check " ++ show check
-  when check $ checkPeer peer
+  liftIO $ putStrLn $ "handleEvents: on server? " ++ show server
+  checkPeer server peer
   case i of
     MsgEvt Hello{}  -> error "A hello message appeared after the handshake"
     MsgEvt Status{} -> error "A status message appeared after the handshake"

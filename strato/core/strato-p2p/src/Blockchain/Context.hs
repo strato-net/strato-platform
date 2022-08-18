@@ -51,6 +51,7 @@ module Blockchain.Context
     , setPeerAddrIfUnset
     , shouldSendToPeer
     , withActivePeer
+    , CertificateRegistryInitialized
     ) where
 
 
@@ -302,6 +303,9 @@ instance ( MonadIO m
 instance MonadIO m => Mod.Accessible BestBlockNumber (ReaderT Config m) where
   access _ = BestBlockNumber <$> liftIO getBestKafkaBlockNumber
 
+instance MonadIO m => Mod.Accessible CertificateRegistryInitialized (ReaderT Config m) where
+  access _ = RBDB.withRedisBlockDB RBDB.getInitializeCertificateRegistry
+
 instance MonadIO m => Mod.Modifiable Context (ReaderT Config m) where
   get _   = readIORef =<< asks configContext
   put _ c = asks configContext >>= flip atomicModifyIORef' (const (c, ()))
@@ -402,6 +406,8 @@ waitOnVault action = do
       waitOnVault action
     Right val -> return val
 
+type CertificateRegistryInitialized = Bool
+
 type MonadP2P m = ( MonadIO m
                   , MonadLogger m
                   , MonadResource m
@@ -419,6 +425,7 @@ type MonadP2P m = ( MonadIO m
                        , ConnectionTimeout
                        , GenesisBlockHash
                        , BestBlockNumber
+                       , CertificateRegistryInitialized
                        ] m
                   , All '[Mod.Modifiable]
                       '[ BestBlock

@@ -105,6 +105,7 @@ data TestContext = TestContext
   , _chainInfoMap          :: Map Word256 ChainInfo
   , _privateTxMap          :: Map Keccak256 (Private (Word256, OutputTx))
   , _x509Map               :: Map Address X509CertInfoState
+  , _x509Initialized       :: CertificateRegistryInitialized
   , _genesisBlockHash      :: GenesisBlockHash
   , _bestBlockNumber       :: BestBlockNumber
   , _stringPPeerMap        :: Map String DataPeer.PPeer
@@ -173,6 +174,9 @@ instance MonadIO m => (Address `A.Alters` X509CertInfoState) (MonadTest m) where
   lookup _ k   = M.lookup k <$> use x509Map
   insert _ k v = x509Map %= M.insert k v
   delete _ k   = x509Map %= M.delete k
+
+instance MonadIO m => Mod.Accessible CertificateRegistryInitialized (MonadTest m) where
+  access _ = use x509Initialized
 
 instance MonadIO m => Mod.Accessible GenesisBlockHash (MonadTest m) where
   access _ = use genesisBlockHash
@@ -414,6 +418,7 @@ testContext wireMessagesRef prv ctx = TestContext
   , _chainInfoMap          = M.empty
   , _privateTxMap          = M.empty
   , _x509Map               = M.empty
+  , _x509Initialized       = False
   , _genesisBlockHash      = GenesisBlockHash zeroHash
   , _bestBlockNumber       = BestBlockNumber 0
   , _stringPPeerMap        = M.empty
