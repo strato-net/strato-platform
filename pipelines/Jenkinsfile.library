@@ -890,6 +890,9 @@ def waitForHealthySync(NODE_MONITOR_HEALTH_URL) {
     echo "Waiting for network nodes to be in-sync and healthy..."
     for (int i = 0; i < 6000; i++) {
       if (sh(returnStatus: true, script: "curl --silent ${NODE_MONITOR_HEALTH_URL} | grep '\"needsAttention\":false'") != 0) {
+        if (sh(returnStatus: true, script: "curl --silent ${NODE_MONITOR_HEALTH_URL} | grep '\"hasSyncingNodes\":true'") != 0 && sh(returnStatus: true, script: "curl --silent ${NODE_MONITOR_HEALTH_URL} | grep '\"isOverallHealthy\":false'") != 0) {
+            sh "sudo docker restart strato_strato_1"
+        }
         sleep 2
       } else {
         // If healthy - check in few seconds again to make sure it wasn't temporary while syncned to the same block number. Monitor should probably be handling this itself in the future before showing network healthy.

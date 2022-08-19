@@ -556,11 +556,48 @@ pipeline {
             }
         }
 
+        // stage('Performance Test - Wait for Network to Sync with Devnet') {
+        //     agent { label "multinode305" }
+        //     steps {
+        //         script {
+        //             lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
+        //         }
+        //     }
+        // }
+
         stage('Performance Test - Wait for Network to Sync with Devnet') {
-            agent { label "multinode305" }
-            steps {
-                script {
-                    lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
+            parallel {
+                stage('Restart multinode101 after sync') {
+                    // agent { label "test-multinode101" } // is default
+                    steps {
+                        script {
+                            lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
+                        }
+                    }
+                }
+                stage('Restart multinode102 after sync') {
+                    agent { label "test-multinode102" }
+                    steps {
+                        script {
+                            lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
+                        }
+                    }
+                }
+                stage('Restart multinode103 after sync') {
+                    agent { label "test-multinode103" }
+                    steps {
+                        script {
+                            lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
+                        }
+                    }
+                }
+                stage('Restart multinode104 after sync') {
+                    agent { label "test-multinode104" }
+                    steps {
+                        script {
+                            lib.waitForHealthySync(NODE_DATA.MONITOR.LOAD_TEST_HEALTH_URL)
+                        }
+                    }
                 }
             }
         }
