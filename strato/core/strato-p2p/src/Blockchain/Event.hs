@@ -78,8 +78,6 @@ import           Blockchain.Strato.Model.Class
 import           Blockapps.Crossmon                    (recordMaxBlockNumber)
 import           Blockchain.Metrics
 
-import           BlockApps.X509
-
 import qualified Text.Colors                           as CL
 import           Text.Format
 import           Text.Tools
@@ -122,30 +120,8 @@ yieldR = yield . Right
 yieldL :: Monad m => e -> ConduitT i (Either e a) m ()
 yieldL = yield . Left
 
-checkPeer :: MonadP2P m => Bool -> PPeer -> ConduitM a b m ()
-checkPeer server peer = do
-  let userAddressM = fromPublicKey . pointToSecPubKey <$> pPeerPubkey peer
-  liftIO $ putStrLn $ "checkPeer: our userAddressM: " ++ show userAddressM
-  case userAddressM of
-    Nothing -> throwIO InvalidClientCert
-    Just userAddress' ->  do
-      liftIO $ putStrLn $ "checkPeer: our userAddress': " ++ show userAddress'
-      clientCertDetails <- lift $ select (Proxy @X509CertInfoState) userAddress'
-      -- Throw error if the cert is not valid.
-      liftIO $ putStrLn $ "checkPeer: our clientCertDetails': " ++ show clientCertDetails
-      if server 
-        then unless (maybe False isValid clientCertDetails) $ throwIO InvalidClientCert
-        else do
-          initialized <- lift $ access (Proxy @CertificateRegistryInitialized) 
-          when (not (maybe False isValid clientCertDetails) && initialized) $ throwIO InvalidClientCert
-
-
-handleEvents :: MonadP2P m => PPeer -> Bool -> ConduitM Event (Either P2PCNC Message) m ()
-handleEvents peer server = awaitForever $ \i -> do
-  liftIO $ putStrLn $ "handleEvents: our peer " ++ show peer
-  liftIO $ putStrLn $ "handleEvents: on server? " ++ show server
-  checkPeer server peer
-  case i of
+handleEvents :: MonadP2P m => PPeer -> ConduitM Event (Either P2PCNC Message) m ()
+handleEvents peer = awaitForever $ \case
     MsgEvt Hello{}  -> error "A hello message appeared after the handshake"
     MsgEvt Status{} -> error "A status message appeared after the handshake"
 -- TODO remove distinction between new status messages and old ones once entire protocol is complete
