@@ -190,7 +190,7 @@ devNull _ _ _ _ = return ()
 runTest :: ContextM a -> IO ()
 runTest f = do
   let timeout = 5000000
-  result <- race (threadDelay timeout) $ runLoggingT (runTestContextM f)
+  result <- race (threadDelay timeout) $ runLoggingT (runTestContextM $ withCurrentBlockHash zeroHash f)
   case result of
     Left{} -> expectationFailure $ printf "test case timed out after %ds" (timeout `div` 1000000)
     Right{} -> return ()
