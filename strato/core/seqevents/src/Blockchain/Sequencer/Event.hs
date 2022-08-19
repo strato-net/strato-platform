@@ -112,6 +112,7 @@ data IngestEvent = IETx Timestamp IngestTx
                  | IENewChainMember Word256 A.Address Enode
                  | IEBlockstanbul PBFT.WireMessage
                  | IEForcedConfigChange PBFT.ForcedConfigChange
+                 | IECertificateRevoked A.Address
                  deriving (Eq, Show, GHCG.Generic, Data)
 
 data IngestEventType = IETTransaction
@@ -120,6 +121,7 @@ data IngestEventType = IETTransaction
                      | IETNewChainMember
                      | IETBlockstanbul
                      | IETForcedConfigChange
+                     | IETCertificateRevoked
                      deriving (Eq, Ord, Show)
 
 iEventType :: IngestEvent -> IngestEventType
@@ -130,6 +132,7 @@ iEventType = \case
   IENewChainMember{}     -> IETNewChainMember
   IEBlockstanbul{}       -> IETBlockstanbul
   IEForcedConfigChange{} -> IETForcedConfigChange
+  IECertificateRevoked{} -> IETCertificateRevoked
 
 instance Format IngestEvent where
   format (IETx ts o) = show ts ++ " " ++ format o
@@ -138,6 +141,7 @@ instance Format IngestEvent where
   format (IENewChainMember c a e) = intercalate ", " [CL.yellow $ format c, format a, show e]
   format (IEBlockstanbul o) = format o
   format (IEForcedConfigChange o) = format o
+  format (IECertificateRevoked ua) = format ua
 
 type Timestamp = Microtime
 
@@ -181,6 +185,7 @@ data P2pEvent =
   -- Ask and push for inclusive ranges of blocks
   | P2pAskForBlocks {askStart :: Integer, askEnd :: Integer, askPeer :: A.Address}
   | P2pPushBlocks {pushStart :: Integer, pushEnd :: Integer, pushPeer :: A.Address}
+  | P2pCertificateRevoked A.Address
   deriving (Eq, Show, GHCG.Generic, Data)
 
 instance Format P2pEvent where
@@ -191,6 +196,7 @@ instance Format P2pEvent where
   format (P2pGetTx shas)           = "[" ++ (intercalate "," $ map format shas) ++ "]"
   format (P2pNewChainMember c a e) = intercalate ", " [CL.yellow $ format c, format a, show e]
   format (P2pBlockstanbul o)       = format o
+  format (P2pCertificateRevoked ua) = format ua
   format x                          = show x
 
 data VmEvent =

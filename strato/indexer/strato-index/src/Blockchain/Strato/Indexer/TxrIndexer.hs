@@ -97,6 +97,7 @@ doRevokeCertificate userAddress = do
         , format userAddress
         ]
   void . RBDB.withRedisBlockDB $ RBDB.revokeCertificate userAddress
+  void . withKafkaRetry1s $ writeUnseqEvents [IECertificateRevoked userAddress]
 
 doCertificateRegistryInitialized :: IContextM ()
 doCertificateRegistryInitialized = do

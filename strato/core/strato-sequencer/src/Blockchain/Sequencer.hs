@@ -629,6 +629,9 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
     IETForcedConfigChange -> do
       record "inevent_type_forced_config_change" "ForcedConfigChanges"
       blockstanbulSend $ map (\(IEForcedConfigChange cc) -> ForcedConfigChange cc) events
+    IETCertificateRevoked -> do
+      record "inevent_type_certificate_revoked" "IngestCertificateRevoked"
+      yieldMany $ map (\(IECertificateRevoked ua) -> ToP2p $ P2pCertificateRevoked ua) events
 
 prettyIBlock :: IngestBlock -> String
 prettyIBlock IngestBlock{ibOrigin=o,ibBlockData=bd,ibReceiptTransactions=txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"

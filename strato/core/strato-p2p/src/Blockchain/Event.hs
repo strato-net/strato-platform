@@ -434,6 +434,11 @@ handleEvents peer server = awaitForever $ \i -> do
           $logInfoS "handleEvents/P2pNewChainMember" $ T.pack $ "Emitting chain details for chain " ++ formatted
           mcInfo <- fmap (fmap ((,) cId)) . lift $ select (Proxy @ChainInfo) cId
           for_ mcInfo $ yieldR . ChainDetails . (:[])
+      P2pCertificateRevoked revokedUserAddress -> do
+        let peer'sUserAddressM = fromPublicKey . pointToSecPubKey <$> pPeerPubkey peer
+        case peer'sUserAddressM of
+          Just pua | pua == revokedUserAddress -> throwIO InvalidClientCert
+          _ -> pure ()
       P2pBlockstanbul msg -> do
         let outbound = Blockstanbul msg
         $logDebugS "handleEvents/P2pBlockstanbul" . T.pack $ "Outgoing mesage: " ++ show outbound
