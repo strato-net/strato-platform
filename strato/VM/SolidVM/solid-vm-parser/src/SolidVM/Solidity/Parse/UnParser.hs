@@ -103,10 +103,10 @@ unparseConstant (name, (ConstantDecl theType isPublic expression _)) =
 
 unparseContract :: SolidVM.Contract -> String
 unparseContract contr = 
-  "contract "
-  <> Text.unpack (_contractName contr)
+     "contract "
+  <> labelToString (contr ^. contractName)
   <> " {\n"
-  <> (List.intercalate "\n" $ List.map unparseConstant (contr ^. constants))
+  <> (List.intercalate "\n" $ List.map unparseConstant (_constants contr, contr ^. constants))
   <> (List.intercalate "\n" $ List.map unparseVar (contr ^. storageDefs))
   <> (List.intercalate "\n" $ List.map unparseEnum (contr ^. enums))
   <> (List.intercalate "\n" $ List.map unparseStruct (contr ^. structs))
@@ -116,8 +116,8 @@ unparseContract contr =
   <> unparseModifier (contr ^. modifiers)
   <> "\n}"
 
-unparseStruct :: SolidString -> [(SolidString, SolidVM.FieldType, SourceAnnotation ())] -> String
-unparseStruct name fields =
+unparseStruct :: (SolidString ,[(SolidString, SolidVM.FieldType, SourceAnnotation ())]) -> String
+unparseStruct (name, fields) =
      "struct "
   <> labelToString name
   <> " {\n"
