@@ -65,7 +65,8 @@ import           Blockchain.VMContext               ( CurrentBlockHash(..)
                                                     , stateBlockMap
                                                     , storageTxMap
                                                     , storageBlockMap
-                                                    , newX509Certs
+                                                    , certTxMap
+                                                    , certBlockMap
                                                     )
 
 import           UnliftIO
@@ -79,6 +80,7 @@ data MemContextDBs = MemContextDBs
   , _blockHashRoot  :: BlockHashRoot
   , _genesisRoot    :: GenesisRoot
   , _bestBlockRoot  :: BestBlockRoot
+  , _certRoot       :: CertRoot
   , _worldBestBlock :: Maybe WorldBestBlock
   } deriving (Generic)
 makeLenses ''MemContextDBs
@@ -212,6 +214,10 @@ instance Mod.Modifiable BestBlockRoot MemContextM where
   get _     = dbsGets $ view bestBlockRoot
   put _ bbr = dbsModify' $ bestBlockRoot .~ bbr
 
+instance Mod.Modifiable CertRoot MemContextM where
+  get _     = dbsGets $ view certRoot
+  put _ bbr = dbsModify' $ certRoot .~ bbr
+
 instance Mod.Modifiable CurrentBlockHash MemContextM where
   get _    = fmap (fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0)) . gets $ view $ memDBs . currentBlock
   put _ bh = modify $ memDBs . currentBlock ?~ bh
@@ -221,6 +227,12 @@ instance HasMemAddressStateDB MemContextM where
   putAddressStateTxDBMap theMap = modify $ memDBs . stateTxMap .~ theMap
   getAddressStateBlockDBMap = gets $ view $ memDBs . stateBlockMap
   putAddressStateBlockDBMap theMap = modify $ memDBs . stateBlockMap .~ theMap
+
+instance HasMemCertDB MemContextM where
+  getCertTxDBMap = gets $ view $ memDBs . certTxMap
+  putCertTxDBMap theMap = modify $ memDBs . certTxMap .~ theMap
+  getCertBlockDBMap = gets $ view $ memDBs . certBlockMap
+  putCertBlockDBMap theMap = modify $ memDBs . certBlockMap .~ theMap
 
 instance (MP.StateRoot `A.Alters` MP.NodeData) MemContextM where
   lookup _ sr    = dbsGets $ view (stateDB . at sr)
@@ -264,13 +276,11 @@ instance (Keccak256 `A.Alters` DBCode) MemContextM where
   delete _ k   = dbsModify' $ codeDB . at k .~ Nothing
 
 instance (Address `A.Alters` X509Certificate) MemContextM where
-  lookup _ a   = dbsGets $ view (x509CertDB . at a)
-  insert _ a c = dbsModify' $ x509CertDB . at a ?~ c
-  delete _ a   = dbsModify' $ x509CertDB . at a .~ Nothing
-
-instance Mod.Modifiable (M.Map Address X509Certificate) MemContextM where
-    get _ = contextGets (^. newX509Certs) 
-    put _ newM = contextModify (set newX509Certs newM)
+  lookup _ k = do
+    mBH <- gets $ view $ memDBs . currentBlock
+    fmap join . for mBH $ \(CurrentBlockHash bh) -> getCertMaybe k bh
+  insert _ = putCert
+  delete _ = deleteCert
 
 instance (N.NibbleString `A.Alters` N.NibbleString) MemContextM where
   lookup _ n1    = dbsGets $ view (hashDB . at n1)
@@ -313,6 +323,7 @@ runMemContextM = runMemContextMWith cdbs
           , _blockHashRoot  = BlockHashRoot MP.emptyTriePtr
           , _genesisRoot    = GenesisRoot MP.emptyTriePtr
           , _bestBlockRoot  = BestBlockRoot MP.emptyTriePtr
+          , _certRoot       = CertRoot MP.emptyTriePtr
           , _worldBestBlock = Nothing
           }
 
@@ -327,6 +338,8 @@ runMemContextMWith cdbs dSettings f = do
         , _stateBlockMap   = M.empty
         , _storageTxMap    = M.empty
         , _storageBlockMap = M.empty
+        , _certTxMap       = M.empty
+        , _certBlockMap    = M.empty
         , _stateRoots      = M.empty
         , _currentBlock    = Nothing
         }
@@ -339,7 +352,6 @@ runMemContextMWith cdbs dSettings f = do
         , _coinbaseQueue     = Q.empty
         , _txRunResultsCache = cache
         , _debugSettings     = dSettings
-        , _newX509Certs      = M.empty
         }
       ctx = MemContext
         { _dbs   = cdbs
