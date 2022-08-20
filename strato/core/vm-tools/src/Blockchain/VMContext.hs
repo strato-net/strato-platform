@@ -269,11 +269,11 @@ gets f = f <$> get
 {-# INLINE gets #-}
 
 put :: ContextState -> ContextM ()
-put c = view state >>= \i -> atomicWriteIORef i c
+put c = view state >>= \i -> atomicModifyIORef' i (const (c, ()))
 {-# INLINE put #-}
 
 modify :: (ContextState -> ContextState) -> ContextM ()
-modify f = view state >>= \i -> atomicModifyIORef i (\a -> (f a, ()))
+modify f = view state >>= \i -> atomicModifyIORef' i (\a -> (f a, ()))
 {-# INLINE modify #-}
 
 modify' :: (ContextState -> ContextState) -> ContextM ()

@@ -121,6 +121,8 @@ ethereumVM d = void . execContextM d $ do
         outBatch <- runConduit $ yield vmInEventBatch
                               .| handleVmEvents
                               .| fold (flip insertOutBatch) newOutBatch
+        
+        loopTimeit "compactContextM" $ compactContextM
         sendOutEvents outBatch
 
         let newOffset = cpOffset + fromIntegral (length seqEvents)
@@ -134,25 +136,29 @@ microtimeCutoff :: Microtime
 microtimeCutoff = secondsToMicrotime flags_mempoolLivenessCutoff
 {-# NOINLINE microtimeCutoff #-}
 
-handleVmEvents :: ConduitT VmInEventBatch VmOutEvent ContextM ()
+handleVmEvents :: (MonadFail m, VMBase m, Bagger.MonadBagger m, MonadMonitor m)
+               => ConduitT VmInEventBatch VmOutEvent m ()
 handleVmEvents = awaitForever $ \InBatch{..} -> do
-  lift $ do
+  rpcResps <- lift $ do
     mapM_ (uncurry3 queuePendingVote) votesToMake
-    mapM_ runJsonRpcCommand rpcCommands
+    bbHash <- maybe Keccak256.zeroHash fst <$> getChainBestBlock Nothing
+    resps <- withCurrentBlockHash bbHash $ traverse runJsonRpcCommand' rpcCommands
     recordSeqEventCount bLen tLen
+    pure resps
+  yieldMany $ uncurry OutJSONRPC <$> rpcResps
 
   numPoolable <- uncurry (*>) . (yieldMany *** pure) =<< lift (processTransactions txPairs)
   yieldMany $ outputPrivateTransactions privateTxs
   processBlocksAndNewChains blocksAndNewChains
 
   mNewBlock <- lift $ do
-    contextModify $ blockRequested ||~ createBlock
+    Mod.modify_ (Mod.Proxy @ContextState) $ pure . (blockRequested ||~ createBlock)
     -- todo: perhaps we shouldnt even add TXs to the mempool, it might make for a VERY large checkpoint
     -- todo: which may fail
     isCaughtUp <- shouldProcessNewTransactions
     bState <- Bagger.getBaggerState
-    pbft <- contextGets _hasBlockstanbul
-    reqd <- contextGets _blockRequested
+    pbft <- _hasBlockstanbul <$> Mod.get (Mod.Proxy @ContextState)
+    reqd <- _blockRequested <$> Mod.get (Mod.Proxy @ContextState)
     hasVotes <- (/= 0) . fst <$> peekPendingVote
     let makeLazyBlocks = lazyBlocks $ quarryConfig ethConf
         pending = B.pending bState
@@ -168,7 +174,7 @@ handleVmEvents = awaitForever $ \InBatch{..} -> do
         "(isCaughtUp, pbft, reqd, hasTxs, makeLazyBlocks, shouldOutputBlocks) = " ++ show
          (isCaughtUp, pbft, reqd, hasTxs, makeLazyBlocks, shouldOutputBlocks)
     when (pbft && shouldOutputBlocks) $
-      contextModify $ blockRequested .~ False
+      Mod.modify_ (Mod.Proxy @ContextState) $ pure . (blockRequested .~ False)
     $logDebugS "evm/loop/newBlock" $ T.pack $ "Queued: " ++ show numPoolable
     $logDebugS "evm/loop/newBlock" $ T.pack $ "Pending: " ++ show (length pending)
     if shouldOutputBlocks
@@ -178,10 +184,6 @@ handleVmEvents = awaitForever $ \InBatch{..} -> do
         pure $ Just newBlock
       else pure Nothing
   traverse_ (yield . OutBlock) mNewBlock
-
-  -- todo: is this the best place to put this?
-  lift $ do
-    loopTimeit "compactContextM" $ compactContextM
 
 spanLeft :: [Either a b] -> ([a], [Either a b])
 spanLeft (Left x:xs') = let (ys,zs) = spanLeft xs' in (x:ys,zs)
@@ -196,17 +198,18 @@ groupEithers [] = []
 groupEithers (Left x:xs) = let (ys,zs) = spanLeft xs in Left (x:ys) : groupEithers zs
 groupEithers (Right x:xs) = let (ys,zs) = spanRight xs in Right (x:ys) : groupEithers zs
 
-processBlocksAndNewChains :: [Either OutputGenesis OutputBlock] -> ConduitT a VmOutEvent ContextM ()
+processBlocksAndNewChains :: (MonadFail m, Bagger.MonadBagger m, MonadMonitor m)
+                          => [Either OutputGenesis OutputBlock]
+                          -> ConduitT a VmOutEvent m ()
 processBlocksAndNewChains blocksAndChains = do
   let grouped = groupEithers blocksAndChains
   for_ grouped $ \case
     Left newChains -> outputNewChains =<< lift (insertNewChains newChains)
     Right blocks -> processBlocks blocks
 
-insertNewChains :: (
-                   )
+insertNewChains :: VMBase m
                 => [OutputGenesis]
-                -> ContextM [(Word256, ChainInfo, Keccak256, [Action])]
+                -> m [(Word256, ChainInfo, Keccak256, [Action])]
 insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
   let (cId, cInfo) = ogGenesisInfo
   $logInfoS "insertNewChains" $ T.pack $ "Inserting Chain ID: " ++ CL.yellow (format cId)
@@ -239,7 +242,7 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
             _ -> return (sr', [])
         Just (cId, cInfo, bHash, mAction) <$ putChainGenesisInfo (Just cId) cBlock sr pChain
 
-outputNewChains :: [(Word256, ChainInfo, Keccak256, [Action])] -> ConduitT a VmOutEvent ContextM ()
+outputNewChains :: VMBase m => [(Word256, ChainInfo, Keccak256, [Action])] -> ConduitT a VmOutEvent m ()
 outputNewChains = traverse_ $ \(cId, cInfo, bHash, actions) -> do
   yield . OutIndexEvent $ NewChainInfo cId cInfo
   yield $ OutToStateDiff cId cInfo bHash
