@@ -15,6 +15,7 @@ library:
   source-dirs: src/
   exposed-modules:
     - Blockchain.BlockChain
+    - Blockchain.Event
     - Executable.EthereumVM
   ghc-options: -Wall -O2
   dependencies:

@@ -100,19 +100,23 @@ tests:
       - QuickCheck
       - base16-bytestring
       - blockapps-datadefs
+      - blockapps-mpdbs
       - blockapps-privacy
       - blockstanbul
       - bytestring
       - conduit
       - containers
       - data-default
+      - debugger
       - ethereum-discovery
       - hflags
       - hspec
       - hspec-expectations-lifted
       - lens
+      - merkle-patricia-db
       - monad-alter
       - mtl
+      - nibblestring
       - ordered-containers
       - seqevents
       - stm-chans
@@ -122,4 +126,6 @@ tests:
       - strato-sequencer
       - text
       - unliftio
+      - vm-runner
+      - vm-tools
   

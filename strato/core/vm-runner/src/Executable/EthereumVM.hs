@@ -8,7 +8,8 @@
 {-# LANGUAGE TypeOperators     #-}
 
 module Executable.EthereumVM (
-  ethereumVM
+  ethereumVM,
+  handleVmEvents
 ) where
 
 import           Conduit
@@ -503,6 +504,7 @@ sendOutEvents OutBatch{..} = do
           }
         _ -> Nothing
   
+  for_ outJSONRPCs $ liftIO . uncurry produceResponse
   for_ outToStateDiffs $ \(cId, cInfo, bHash) ->
     withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo
   traverse_ commitSqlDiffs outStateDiffs

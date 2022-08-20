@@ -4,9 +4,11 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE PackageImports        #-}
 {-# LANGUAGE Rank2Types            #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TupleSections         #-}
 {-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeOperators         #-}
 module EventSpec where
@@ -15,34 +17,42 @@ import           Prelude hiding (round)
 import           Conduit
 import           Control.Concurrent.STM.TMChan
 import           Control.Lens                          hiding (Context, view)
+import qualified Control.Lens                          as Lens
 import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
 import           Control.Monad.Reader
-import           Control.Monad.State
+import qualified Control.Monad.State                   as State
 import qualified Data.ByteString                       as B
 import qualified Data.ByteString.Base16                as B16
 import qualified Data.ByteString.Char8                 as BC
 import           Data.Conduit.TMChan
 import           Data.Conduit.TQueue                   hiding (newTQueueIO)
 import           Data.Default                          (def)
-import           Data.Foldable                         (for_, toList)
+import           Data.Foldable                         (for_, toList, traverse_)
 import           Data.Map.Strict                       (Map)
 import qualified Data.Map.Strict                       as M
+import           Data.Maybe                            (fromMaybe)
+import qualified Data.NibbleString                     as N
 import qualified Data.Set                              as Set
 import qualified Data.Set.Ordered                      as S
 import qualified Data.Sequence                         as Q
 import           Data.Text (Text)
+import           Data.Traversable                      (for)
 import           Text.Printf
 
 import           BlockApps.Logging
+import           Blockchain.Bagger
+import           Blockchain.Bagger.BaggerState
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin
 import           Blockchain.Blockstanbul.Messages      (round)
 import           Blockchain.Blockstanbul.StateMachine
 import           Blockchain.Context                    hiding (actionTimestamp, blockHeaders, remainingBlockHeaders)
+import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.ArbitraryInstances()
 import           Blockchain.Data.Block                 hiding (bestBlockNumber)
 import           Blockchain.Data.BlockDB()
+import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Control
 import qualified Blockchain.Data.DataDefs              as DataDefs
@@ -50,7 +60,16 @@ import           Blockchain.Data.Enode
 import           Blockchain.Data.TransactionDef
 import qualified Blockchain.Data.TXOrigin              as Origin
 import           Blockchain.Data.Wire
-import           Blockchain.Event
+import qualified Blockchain.Database.MerklePatricia    as MP
+import           Blockchain.DB.ChainDB
+import           Blockchain.DB.CodeDB
+import           Blockchain.DB.MemAddressStateDB
+import           Blockchain.DB.RawStorageDB
+import qualified Blockchain.DB.X509CertDB              as X509
+import "strato-p2p" Blockchain.Event
+import qualified "vm-runner" Blockchain.Event          as VMEvent
+import           Blockchain.MemVMContext               hiding (getMemContext, get, gets, put, modify, modify', dbsGet, dbsGets, dbsPut, dbsModify, dbsModify', contextGet, contextGets, contextPut, contextModify, contextModify')
+import           Blockchain.VMContext                  (VMBase, IsBlockstanbul(..), baggerState)
 import           Blockchain.Options                    (AuthorizationMode(..))
 import           Blockchain.Privacy
 import qualified Blockchain.Sequencer                  as Seq
@@ -62,11 +81,16 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Monad
 
 import qualified Blockchain.Strato.Discovery.Data.Peer as DataPeer
+import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
-import           Blockchain.Strato.Model.Keccak256     (Keccak256, zeroHash)
+import           Blockchain.Strato.Model.Keccak256     (Keccak256, zeroHash, unsafeCreateKeccak256FromWord256)
 import           Blockchain.Strato.Model.Secp256k1
+import qualified Blockchain.TxRunResultCache           as TRC
 
+import           Debugger                              (DebugSettings)
+
+import           Executable.EthereumVM
 import           Executable.StratoP2PClient
 import           Executable.StratoP2PServer
 
@@ -90,7 +114,7 @@ data TestContext = TestContext
   , _peerAddr              :: PeerAddress
   , _prvKey                :: PrivateKey
   , _shaBlockDataMap       :: Map Keccak256 DataDefs.BlockData
-  , _worldBestBlock        :: WorldBestBlock
+  , _p2pWorldBestBlock     :: WorldBestBlock
   , _bestBlock             :: BestBlock
   , _canonicalBlockDataMap :: Map Integer (Canonical DataDefs.BlockData)
   , _ipAddressIpChainsMap  :: Map IPAddress IPChains
@@ -106,6 +130,7 @@ data TestContext = TestContext
   , _outboundPbftMessages  :: S.OSet (Text, Keccak256)
   , _unseqEvents           :: [IngestEvent]
   , _sequencerContext      :: SequencerContext
+  , _vmContext             :: MemContext
   }
 
 makeLenses ''TestContext
@@ -114,7 +139,7 @@ type TestContextM = ReaderT (IORef TestContext) (ResourceT (LoggingT IO))
 
 type MonadTest m = ReaderT (IORef TestContext) m
 
-instance {-# OVERLAPPING #-} MonadIO m => MonadState TestContext (MonadTest m) where
+instance {-# OVERLAPPING #-} MonadIO m => State.MonadState TestContext (MonadTest m) where
   state f = ask >>= liftIO . flip atomicModifyIORef' (swap . f)
     where swap ~(a,b) = (b,a)
 
@@ -131,8 +156,8 @@ instance MonadIO m => (Keccak256 `A.Alters` DataDefs.BlockData) (MonadTest m) wh
   delete _ k   = shaBlockDataMap %= M.delete k
 
 instance MonadIO m => Mod.Modifiable WorldBestBlock (MonadTest m) where
-  get _ = use worldBestBlock
-  put _ = assign worldBestBlock
+  get _ = use p2pWorldBestBlock
+  put _ = assign p2pWorldBestBlock
 
 instance MonadIO m => Mod.Modifiable BestBlock (MonadTest m) where
   get _ = use bestBlock
@@ -215,7 +240,7 @@ instance MonadIO m => HasPrivateHashDB (MonadTest m) where
   requestTransaction = insertGetTransactionsDB
 
 
-genericTestLookup :: (MonadState s m, Ord k)
+genericTestLookup :: (State.MonadState s m, Ord k)
                   => Lens' s (Map k (Modification a))
                   -> Mod.Proxy a
                   -> k
@@ -224,7 +249,7 @@ genericTestLookup registry _ k = use (registry . at k) >>= \case
   Just (Modification a) -> pure $ Just a
   _ -> pure Nothing
 
-genericTestInsert :: (MonadState s m, Ord k)
+genericTestInsert :: (State.MonadState s m, Ord k)
                   => Lens' s (Map k (Modification a))
                   -> Mod.Proxy a
                   -> k
@@ -232,7 +257,7 @@ genericTestInsert :: (MonadState s m, Ord k)
                   -> m ()
 genericTestInsert registry _ k a = registry . at k ?= Modification a
 
-genericTestDelete :: (MonadState s m, Ord k)
+genericTestDelete :: (State.MonadState s m, Ord k)
                   => Lens' s (Map k (Modification a))
                   -> Mod.Proxy a
                   -> k
@@ -344,6 +369,214 @@ instance MonadIO m => ((Text, Keccak256) `A.Alters` (A.Proxy (Outbound WireMessa
     assign outboundPbftMessages wms''
   delete _ k = outboundPbftMessages %= S.delete k
 
+getMemContext :: MonadIO m => MonadTest m MemContext
+getMemContext = ask >>= fmap _vmContext . readIORef
+
+get :: MonadIO m => MonadTest m ContextState
+get = _state <$> getMemContext
+{-# INLINE get #-}
+
+gets :: MonadIO m => (ContextState -> a) -> MonadTest m a
+gets f = f <$> get
+{-# INLINE gets #-}
+
+put :: MonadIO m => ContextState -> MonadTest m ()
+put c = ask >>= \i -> atomicModifyIORef' i $ (,()) . (vmContext . state .~ c)
+{-# INLINE put #-}
+
+modify :: MonadIO m => (ContextState -> ContextState) -> MonadTest m ()
+modify f = ask >>= \i -> atomicModifyIORef' i $ (,()) . (vmContext . state %~ f)
+{-# INLINE modify #-}
+
+modify' :: MonadIO m => (ContextState -> ContextState) -> MonadTest m ()
+modify' f = ask >>= \i -> atomicModifyIORef' i $ (,()) . (vmContext . state %~ f)
+{-# INLINE modify' #-}
+
+dbsGet :: MonadIO m => MonadTest m MemContextDBs
+dbsGet = _dbs <$> getMemContext
+{-# INLINE dbsGet #-}
+
+dbsGets :: MonadIO m => (MemContextDBs -> a) -> MonadTest m a
+dbsGets f = f <$> dbsGet
+{-# INLINE dbsGets #-}
+
+dbsPut :: MonadIO m => MemContextDBs -> (MonadTest m) ()
+dbsPut c = ask >>= \i -> atomicModifyIORef' i $ (,()) . (vmContext . dbs .~ c)
+{-# INLINE dbsPut #-}
+
+dbsModify :: MonadIO m => (MemContextDBs -> MemContextDBs) -> MonadTest m ()
+dbsModify f = ask >>= \i -> atomicModifyIORef' i $ (,()) . (vmContext . dbs %~ f)
+{-# INLINE dbsModify #-}
+
+dbsModify' :: MonadIO m => (MemContextDBs -> MemContextDBs) -> MonadTest m ()
+dbsModify' f = ask >>= \i -> atomicModifyIORef' i $ (,()) . (vmContext . dbs %~ f)
+{-# INLINE dbsModify' #-}
+
+contextGet :: MonadIO m => MonadTest m ContextState
+contextGet = get
+{-# INLINE contextGet #-}
+
+contextGets :: MonadIO m => (ContextState -> a) -> MonadTest m a
+contextGets = gets
+{-# INLINE contextGets #-}
+
+contextPut :: MonadIO m => ContextState -> MonadTest m ()
+contextPut = put
+{-# INLINE contextPut #-}
+
+contextModify :: MonadIO m => (ContextState -> ContextState) -> MonadTest m ()
+contextModify = modify
+{-# INLINE contextModify #-}
+
+contextModify' :: MonadIO m => (ContextState -> ContextState) -> MonadTest m ()
+contextModify' = modify'
+{-# INLINE contextModify' #-}
+
+instance MonadIO m => Mod.Modifiable ContextState (MonadTest m) where
+  get _ = get
+  put _ = put
+
+instance MonadIO m => Mod.Accessible MemContext (MonadTest m) where
+  access _ = getMemContext
+
+instance MonadIO m => Mod.Modifiable (Maybe DebugSettings) (MonadTest m) where
+  get _    = gets $ Lens.view debugSettings
+  put _ ds = modify $ debugSettings .~ ds
+
+instance MonadIO m => Mod.Accessible ContextState (MonadTest m) where
+  access _ = get
+
+instance MonadIO m => Mod.Accessible MemDBs (MonadTest m) where
+  access _ = gets $ Lens.view memDBs
+
+instance MonadIO m => Mod.Modifiable MemDBs (MonadTest m) where
+  get _    = gets $ Lens.view memDBs
+  put _ md = modify $ memDBs .~ md
+
+vmBlockHashRootKey :: B.ByteString
+vmBlockHashRootKey = "block_hash_root"
+
+vmGenesisRootKey :: B.ByteString
+vmGenesisRootKey = "genesis_root"
+
+vmBestBlockRootKey :: B.ByteString
+vmBestBlockRootKey = "best_block_root"
+
+instance MonadIO m => Mod.Modifiable BlockHashRoot (MonadTest m) where
+  get _     = dbsGets $ Lens.view blockHashRoot
+  put _ bhr = dbsModify' $ blockHashRoot .~ bhr
+
+instance MonadIO m => Mod.Modifiable GenesisRoot (MonadTest m) where
+  get _    = dbsGets $ Lens.view genesisRoot
+  put _ gr = dbsModify' $ genesisRoot .~ gr
+
+instance MonadIO m => Mod.Modifiable BestBlockRoot (MonadTest m) where
+  get _     = dbsGets $ Lens.view bestBlockRoot
+  put _ bbr = dbsModify' $ bestBlockRoot .~ bbr
+
+instance MonadIO m => Mod.Modifiable X509.CertRoot (MonadTest m) where
+  get _     = dbsGets $ Lens.view certRoot
+  put _ bbr = dbsModify' $ certRoot .~ bbr
+
+instance MonadIO m => Mod.Modifiable CurrentBlockHash (MonadTest m) where
+  get _    = fmap (fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0)) . gets $ Lens.view $ memDBs . currentBlock
+  put _ bh = modify $ memDBs . currentBlock ?~ bh
+
+instance MonadIO m => HasMemAddressStateDB (MonadTest m) where
+  getAddressStateTxDBMap = gets $ Lens.view $ memDBs . stateTxMap
+  putAddressStateTxDBMap theMap = modify $ memDBs . stateTxMap .~ theMap
+  getAddressStateBlockDBMap = gets $ Lens.view $ memDBs . stateBlockMap
+  putAddressStateBlockDBMap theMap = modify $ memDBs . stateBlockMap .~ theMap
+
+instance MonadIO m => X509.HasMemCertDB (MonadTest m) where
+  getCertTxDBMap = gets $ Lens.view $ memDBs . certTxMap
+  putCertTxDBMap theMap = modify $ memDBs . certTxMap .~ theMap
+  getCertBlockDBMap = gets $ Lens.view $ memDBs . certBlockMap
+  putCertBlockDBMap theMap = modify $ memDBs . certBlockMap .~ theMap
+
+instance MonadIO m => (MP.StateRoot `A.Alters` MP.NodeData) (MonadTest m) where
+  lookup _ sr    = dbsGets $ Lens.view (stateDB . at sr)
+  insert _ sr nd = dbsModify' $ stateDB . at sr ?~ nd
+  delete _ sr    = dbsModify' $ stateDB . at sr .~ Nothing
+
+instance MonadIO m => (Account `A.Alters` AddressState) (MonadTest m) where
+  lookup _ = getAddressStateMaybe
+  insert _ = putAddressState
+  delete _ = deleteAddressState
+
+instance MonadIO m => (Maybe Word256 `A.Alters` MP.StateRoot) (MonadTest m) where
+  lookup _ chainId = do
+    mBH <- gets $ Lens.view $ memDBs . currentBlock
+    fmap join . for mBH $ \(CurrentBlockHash bh) -> do
+      mSR <- gets $ Lens.view $ memDBs . stateRoots . at (bh, chainId)
+      case mSR of
+        Just sr -> pure $ Just sr
+        Nothing -> getChainStateRoot chainId bh
+  insert _ chainId sr = do
+    mBH <- gets $ Lens.view $ memDBs . currentBlock
+    case mBH of
+      Nothing -> pure ()
+      Just (CurrentBlockHash bh) -> do
+        modify $ memDBs . stateRoots %~ M.insert (bh, chainId) sr
+        putChainStateRoot chainId bh sr
+  delete _ chainId = do
+    mBH <- gets $ Lens.view $ memDBs . currentBlock
+    case mBH of
+      Nothing -> pure ()
+      Just (CurrentBlockHash bh) -> do
+        modify $ memDBs . stateRoots %~ M.delete (bh, chainId)
+        deleteChainStateRoot chainId bh
+
+instance MonadIO m => (Keccak256 `A.Alters` DBCode) (MonadTest m) where
+  lookup _ k   = dbsGets $ Lens.view (codeDB . at k)
+  insert _ k c = dbsModify' $ codeDB . at k ?~ c
+  delete _ k   = dbsModify' $ codeDB . at k .~ Nothing
+
+instance MonadIO m => (Address `A.Alters` X509.X509Certificate) (MonadTest m) where
+  lookup _ k = do
+    mBH <- gets $ Lens.view $ memDBs . currentBlock
+    fmap join . for mBH $ \(CurrentBlockHash bh) -> X509.getCertMaybe k bh
+  insert _ = X509.putCert
+  delete _ = X509.deleteCert
+
+instance MonadIO m => (N.NibbleString `A.Alters` N.NibbleString) (MonadTest m) where
+  lookup _ n1    = dbsGets $ Lens.view (hashDB . at n1)
+  insert _ n1 n2 = dbsModify' $ hashDB . at n1 ?~ n2
+  delete _ n1    = dbsModify' $ hashDB . at n1 .~ Nothing
+
+instance MonadIO m => HasMemRawStorageDB (MonadTest m) where
+  getMemRawStorageTxDB = gets $ Lens.view $ memDBs . storageTxMap
+  putMemRawStorageTxMap theMap = modify $ memDBs . storageTxMap .~ theMap
+  getMemRawStorageBlockDB = gets $ Lens.view $ memDBs . storageBlockMap
+  putMemRawStorageBlockMap theMap = modify $ memDBs . storageBlockMap .~ theMap
+
+instance MonadIO m => (RawStorageKey `A.Alters` RawStorageValue) (MonadTest m) where
+  lookup _ = genericLookupRawStorageDB
+  insert _ = genericInsertRawStorageDB
+  delete _ = genericDeleteRawStorageDB
+  lookupWithDefault _ = genericLookupWithDefaultRawStorageDB
+
+instance MonadIO m => (Keccak256 `A.Alters` BlockSummary) (MonadTest m) where
+  lookup _ k    = dbsGets $ Lens.view (blockSummaryDB . at k)
+  insert _ k bs = dbsModify' $ blockSummaryDB . at k ?~ bs
+  delete _ k    = dbsModify' $ blockSummaryDB . at k .~ Nothing
+
+instance MonadIO m => Mod.Accessible (Maybe WorldBestBlock) (MonadTest m) where
+  access _ = dbsGets $ Lens.view worldBestBlock
+
+instance MonadIO m => Mod.Accessible IsBlockstanbul (MonadTest m) where
+  access _ = IsBlockstanbul <$> contextGets _hasBlockstanbul
+
+instance MonadIO m => Mod.Modifiable BaggerState (MonadTest m) where
+  get _   = contextGets _baggerState
+  put _ s = contextModify $ baggerState .~ s
+
+instance MonadIO m => Mod.Accessible TRC.Cache (MonadTest m) where
+  access _ = contextGets _txRunResultsCache
+
+instance MonadIO m => (MonadTest m) `Mod.Yields` DataDefs.TransactionResult where
+  yield = const (pure ())
+
 startingCheckpoint :: [Address] -> Checkpoint
 startingCheckpoint as = def{checkpointValidators = as}
 
@@ -378,8 +611,8 @@ newSequencerContext bc = do
 
 -- testContext is useful for testing because it doesn't require
 -- Kafka, postgres, redis, or ethconf.
-testContext :: WMRef -> PrivateKey -> SequencerContext -> TestContext
-testContext wireMessagesRef prv ctx = TestContext
+testContext :: WMRef -> PrivateKey -> SequencerContext -> MemContext -> TestContext
+testContext wireMessagesRef prv seqCtx vmCtx = TestContext
   { _blocks                = []
   , _blockHeaders          = []
   , _remainingBlockHeaders = RemainingBlockHeaders []
@@ -389,7 +622,7 @@ testContext wireMessagesRef prv ctx = TestContext
   , _peerAddr              = PeerAddress Nothing
   , _prvKey                = prv
   , _shaBlockDataMap       = M.empty
-  , _worldBestBlock        = WorldBestBlock (BestBlock zeroHash (-1) 0)
+  , _p2pWorldBestBlock     = WorldBestBlock (BestBlock zeroHash (-1) 0)
   , _bestBlock             = BestBlock zeroHash (-1) 0
   , _canonicalBlockDataMap = M.empty
   , _ipAddressIpChainsMap  = M.empty
@@ -404,7 +637,8 @@ testContext wireMessagesRef prv ctx = TestContext
   , _pbftMessages          = wireMessagesRef
   , _outboundPbftMessages  = S.empty
   , _unseqEvents           = []
-  , _sequencerContext      = ctx
+  , _sequencerContext      = seqCtx
+  , _vmContext             = vmCtx
   }
 
 testPeer :: DataPeer.PPeer
@@ -413,8 +647,11 @@ testPeer = DataPeer.buildPeer (Nothing, "0.0.0.0", 1212)
 runTestPeer :: TestContextM a -> IO ()
 runTestPeer f = do
   seqCtx <- newSequencerContext emptyBlockstanbulContext
+  cache <- TRC.new 64
+  let cstate = def & txRunResultsCache .~ cache
+      vmCtx = MemContext def cstate
   wmr <- newIORef (S.empty)
-  ctx <- newIORef $ testContext wmr undefined seqCtx
+  ctx <- newIORef $ testContext wmr undefined seqCtx vmCtx
   void . runNoLoggingT . runResourceT $ runReaderT f ctx
 
 execTestPeer :: PrivateKey
@@ -432,7 +669,10 @@ execTestPeerOnRound :: Word256
                     -> IO (a, TestContext)
 execTestPeerOnRound n pk wmr as f = do
   seqCtx <- newSequencerContext $ (view . round .~ n) (newBlockstanbulContext (fromPrivateKey pk) as)
-  ctx <- newIORef $ testContext wmr pk seqCtx
+  cache <- TRC.new 64
+  let cstate = def & txRunResultsCache .~ cache
+      vmCtx = MemContext def cstate
+  ctx <- newIORef $ testContext wmr pk seqCtx vmCtx
   a <- runLoggingT . runResourceT $ runReaderT f ctx
   ctx' <- readIORef ctx
   return (a, ctx')
@@ -449,13 +689,15 @@ data P2PPeer m = P2PPeer
   , _p2pPeerPPeer       :: DataPeer.PPeer
   , _p2pPeerWireMessageRef :: WMRef
   , _p2pPeerUnseqSource :: TQueue SeqLoopEvent
-  , _p2pPeerSeqSource   :: TMChan P2pEvent
+  , _p2pPeerSeqP2pSource :: TMChan P2pEvent
+  , _p2pPeerSeqVmSource :: TQueue [VmEvent]
   , _p2pPeerUnseqSink   :: [IngestEvent] -> m ()
   , _p2pPeerName        :: String
   , _p2pPeerSequencer   :: m ()
+  , _p2pPeerVm          :: m ()
   }
 
-createPeer :: Seq.MonadSequencer m
+createPeer :: (Seq.MonadSequencer m , MonadFail m, VMBase m, MonadBagger m)
            => ([IngestEvent] -> m ())
            -> String
            -> String
@@ -464,11 +706,21 @@ createPeer unseqSink name ipAddr = do
   privKey <- newPrivateKey
   wmr <- newIORef (S.empty)
   unseqSource <- newTQueueIO
-  seqSource <- newBroadcastTMChanIO
+  seqP2pSource <- newBroadcastTMChanIO
+  seqVmSource <- newTQueueIO
   let sequencer = runConduit $ sourceTQueue unseqSource
                             .| mapMC (Seq.runSequencerBatch . (:[]))
-                            .| (awaitForever $ yieldMany . Seq._toP2p)
-                            .| sinkTMChan seqSource
+                            .| (awaitForever $ \b -> atomically $ do
+                                  traverse_ (writeTMChan seqP2pSource) $ Seq._toP2p b
+                                  writeTQueue seqVmSource $ Seq._toVm b
+                               )
+  let vm = runConduit $ sourceTQueue seqVmSource
+                     .| (awaitForever $ yield . foldr VMEvent.insertInBatch VMEvent.newInBatch)
+                     .| handleVmEvents
+                     .| (awaitForever $ yield . flip VMEvent.insertOutBatch VMEvent.newOutBatch)
+                     .| (awaitForever $ \b -> atomically $ do
+                          traverse_ (writeTQueue unseqSource) $ UnseqEvent . IEBlock . blockToIngestBlock Origin.Quarry . outputBlockToBlock <$> toList (VMEvent.outBlocks b)
+                        )
       pubkeystr = BC.unpack $ B16.encode $ B.drop 1 $ exportPublicKey False $ derivePublicKey privKey
       ppeer = DataPeer.buildPeer ( Just pubkeystr
                                  , ipAddr
@@ -482,10 +734,12 @@ createPeer unseqSink name ipAddr = do
     ppeer
     wmr
     unseqSource
-    seqSource
+    seqP2pSource
+    seqVmSource
     unseq
     name
     sequencer
+    vm
 
 data P2PConnection m = P2PConnection
   { _serverToClient :: TQueue B.ByteString
@@ -503,8 +757,8 @@ createConnection :: MonadP2P m
 createConnection server client = do
   serverToClient <- newTQueueIO
   clientToServer <- newTQueueIO
-  serverSeqSource <- atomically . dupTMChan $ _p2pPeerSeqSource server
-  clientSeqSource <- atomically . dupTMChan $ _p2pPeerSeqSource client
+  serverSeqSource <- atomically . dupTMChan $ _p2pPeerSeqP2pSource server
+  clientSeqSource <- atomically . dupTMChan $ _p2pPeerSeqP2pSource client
   let runServer = runEthServerConduit (_p2pPeerPPeer client)
                                       (sourceTQueue clientToServer)
                                       (sinkTQueue serverToClient)
@@ -562,7 +816,7 @@ spec = do
       otx <- (\o -> o{otBaseTx = clearChainId (otBaseTx o), otOrigin = Origin.API}) <$> liftIO (generate arbitrary)
       let runForTwoSeconds pk wmr = execTestPeer pk wmr validatorAddresses . timeout 2000000
           run = runConnectionWith runForTwoSeconds connection
-          postTx = threadDelay 500000 >> (atomically $ writeTMChan (_p2pPeerSeqSource server) (P2pTx otx))
+          postTx = threadDelay 500000 >> (atomically $ writeTMChan (_p2pPeerSeqP2pSource server) (P2pTx otx))
       ((_, serverCtx), (_, clientCtx)) <- fst <$> concurrently run postTx
       _unseqEvents serverCtx `shouldBe` []
       let clientTxs = [t | IETx _ (IngestTx _ t) <- _unseqEvents clientCtx]

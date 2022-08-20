@@ -5,6 +5,7 @@ module Blockchain.Options where
 import           Data.ByteString.Internal
 import           HFlags
 
+import           Blockchain.CoreFlags
 import           Blockchain.Participation (ParticipationMode(..))
 import           Blockchain.Strato.Model.Util
 
@@ -15,7 +16,6 @@ data AuthorizationMode = IPOnly | PubkeyOnly | StrongAuth | FlexibleAuth derivin
 
 defineFlag "a:address" ("127.0.0.1" :: String) "Connect to server at address"
 defineFlag "l:listen" (30303 :: Int) "Listen on port"
-defineFlag "testnet" False "connect to testnet"
 defineFlag "sqlPeers" False "Choose peers from the SQL DB, not the config file"
 defineFlag "network" (""::String) "Choose a network to join"
 defineFlag "networkID" (-1::Int) "set a custom network ID for the client"
