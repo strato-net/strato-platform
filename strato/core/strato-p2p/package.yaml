@@ -121,6 +121,7 @@ tests:
       - seqevents
       - stm-chans
       - stm-conduit
+      - strato-index
       - strato-model
       - strato-p2p
       - strato-sequencer

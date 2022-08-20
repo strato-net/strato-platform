@@ -81,6 +81,11 @@ import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Monad
 
 import qualified Blockchain.Strato.Discovery.Data.Peer as DataPeer
+import           Blockchain.Strato.Indexer.ApiIndexer
+import           Blockchain.Strato.Indexer.IContext    (API(..), P2P(..), IndexerException(..))
+import           Blockchain.Strato.Indexer.Model
+import           Blockchain.Strato.Indexer.P2PIndexer
+import           Blockchain.Strato.Indexer.TxrIndexer
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
@@ -577,6 +582,45 @@ instance MonadIO m => Mod.Accessible TRC.Cache (MonadTest m) where
 instance MonadIO m => (MonadTest m) `Mod.Yields` DataDefs.TransactionResult where
   yield = const (pure ())
 
+instance MonadIO m => (Keccak256 `A.Alters` API OutputTx) (MonadTest m) where
+  lookup _ _   = pure Nothing
+  delete _ _   = pure ()
+  insert _ _ _ = pure ()
+
+instance MonadIO m => (Word256 `A.Alters` API ChainInfo) (MonadTest m) where
+  lookup _ _   = pure Nothing
+  delete _ _   = pure ()
+  insert _ _ _ = pure ()
+
+instance MonadIO m => (Keccak256 `A.Alters` API OutputBlock) (MonadTest  m) where
+  lookup _ _   = pure Nothing
+  delete _ _   = pure ()
+  insert _ _ _ = pure ()
+
+instance MonadIO m => (Keccak256 `A.Alters` P2P (Private (Word256, OutputTx))) (MonadTest m) where
+  lookup _ _ = liftIO . throwIO $ Lookup "P2P" "Keccak256" "Private (Word256, OutputTx)"
+  delete _ _ = liftIO . throwIO $ Delete "P2P" "Keccak256" "Private (Word256, OutputTx)"
+  insert _ k (P2P v) = privateTxMap . at k ?= v
+
+instance MonadIO m => (Keccak256 `A.Alters` P2P OutputBlock) (MonadTest m) where
+  lookup _ _ = liftIO . throwIO $ Lookup "P2P" "Keccak256" "OutputBlock"
+  delete _ _ = liftIO . throwIO $ Delete "P2P" "Keccak256" "OutputBlock"
+  insert _ _ _ = pure ()
+
+instance MonadIO m => Mod.Modifiable (P2P BestBlock) (MonadTest m) where
+  get _          = liftIO . throwIO $ Lookup "P2P" "()" "BestBlock"
+  put _ (P2P bb) = bestBlock .= bb
+
+instance MonadIO m => (Word256 `A.Alters` P2P ChainInfo) (MonadTest m) where
+  lookup _ _   = liftIO . throwIO $ Lookup "P2P" "Word256" "ChainInfo"
+  delete _ _   = liftIO . throwIO $ Delete "P2P" "Word256" "ChainInfo"
+  insert _ cId (P2P cInfo) = chainInfoMap . at cId ?= cInfo
+
+instance MonadIO m => (Word256 `A.Alters` P2P ChainMembers) (MonadTest m) where
+  lookup _ _   = liftIO . throwIO $ Lookup "P2P" "Word256" "ChainMembers"
+  delete _ _   = liftIO . throwIO $ Delete "P2P" "Word256" "ChainMembers"
+  insert _ cId (P2P mems) = chainMembersMap . at cId ?= mems
+
 startingCheckpoint :: [Address] -> Checkpoint
 startingCheckpoint as = def{checkpointValidators = as}
 
@@ -689,15 +733,33 @@ data P2PPeer m = P2PPeer
   , _p2pPeerPPeer       :: DataPeer.PPeer
   , _p2pPeerWireMessageRef :: WMRef
   , _p2pPeerUnseqSource :: TQueue SeqLoopEvent
-  , _p2pPeerSeqP2pSource :: TMChan P2pEvent
+  , _p2pPeerSeqP2pSource :: TMChan (Either TxrResult P2pEvent)
   , _p2pPeerSeqVmSource :: TQueue [VmEvent]
+  , _p2pPeerApiIndexSource :: TQueue [IndexEvent]
+  , _p2pPeerP2pIndexSource :: TQueue [IndexEvent]
+  , _p2pPeerTxrIndexSource :: TQueue IndexEvent
   , _p2pPeerUnseqSink   :: [IngestEvent] -> m ()
   , _p2pPeerName        :: String
   , _p2pPeerSequencer   :: m ()
   , _p2pPeerVm          :: m ()
+  , _p2pPeerApiIndexer  :: m ()
+  , _p2pPeerP2pIndexer  :: m ()
+  , _p2pPeerTxrIndexer  :: m ()
   }
 
-createPeer :: (Seq.MonadSequencer m , MonadFail m, VMBase m, MonadBagger m)
+createPeer :: ( Seq.MonadSequencer m 
+              , MonadFail m
+              , VMBase m
+              , MonadBagger m
+              , (Keccak256 `A.Alters` API OutputTx) m
+              , (Word256 `A.Alters` API ChainInfo) m
+              , (Keccak256 `A.Alters` API OutputBlock) m
+              , (Keccak256 `A.Alters` P2P (Private (Word256, OutputTx))) m
+              , (Keccak256 `A.Alters` P2P OutputBlock) m
+              , Mod.Modifiable (P2P BestBlock) m
+              , (Word256 `A.Alters` P2P ChainInfo) m
+              , (Word256 `A.Alters` P2P ChainMembers) m
+              )
            => ([IngestEvent] -> m ())
            -> String
            -> String
@@ -708,10 +770,13 @@ createPeer unseqSink name ipAddr = do
   unseqSource <- newTQueueIO
   seqP2pSource <- newBroadcastTMChanIO
   seqVmSource <- newTQueueIO
+  apiIndexerSource <- newTQueueIO
+  p2pIndexerSource <- newTQueueIO
+  txrIndexerSource <- newTQueueIO
   let sequencer = runConduit $ sourceTQueue unseqSource
                             .| mapMC (Seq.runSequencerBatch . (:[]))
                             .| (awaitForever $ \b -> atomically $ do
-                                  traverse_ (writeTMChan seqP2pSource) $ Seq._toP2p b
+                                  traverse_ (writeTMChan seqP2pSource . Right) $ Seq._toP2p b
                                   writeTQueue seqVmSource $ Seq._toVm b
                                )
   let vm = runConduit $ sourceTQueue seqVmSource
@@ -720,7 +785,27 @@ createPeer unseqSink name ipAddr = do
                      .| (awaitForever $ yield . flip VMEvent.insertOutBatch VMEvent.newOutBatch)
                      .| (awaitForever $ \b -> atomically $ do
                           traverse_ (writeTQueue unseqSource) $ UnseqEvent . IEBlock . blockToIngestBlock Origin.Quarry . outputBlockToBlock <$> toList (VMEvent.outBlocks b)
+                          writeTQueue apiIndexerSource $ toList (VMEvent.outIndexEvents b)
+                          writeTQueue p2pIndexerSource $ toList (VMEvent.outIndexEvents b)
+                          traverse_ (writeTQueue txrIndexerSource) $ toList (VMEvent.outIndexEvents b)
                         )
+      apiIndexer' = runConduit $ sourceTQueue apiIndexerSource
+                              .| (awaitForever $ lift . indexAPI)
+      p2pIndexer' = runConduit $ sourceTQueue p2pIndexerSource
+                              .| (awaitForever $ lift . indexP2P)
+      txrIndexer' = runConduit $ sourceTQueue txrIndexerSource
+                              .| (awaitForever $ yieldMany . indexEventToTxrResults)
+                              .| (awaitForever $ \case
+                                    AddMember _ -> pure () --(Right (cId, addr, enode)) -> pure ()
+                                    RemoveMember _ -> pure () --(Right (cId, addr)) -> pure ()
+                                    RegisterCertificate _ -> pure () --(Right (addr, certState)) -> pure ()
+                                    CertificateRevoked _ -> pure () --(Right addr) -> pure ()
+                                    CertificateRegistryInitialized _ -> pure () --(Right ()) -> pure ()
+                                    TerminateChain _ -> pure ()
+                                    PutLogDB _ -> pure ()
+                                    PutEventDB _ -> pure ()
+                                    PutTxResult _ -> pure ()
+                                 )
       pubkeystr = BC.unpack $ B16.encode $ B.drop 1 $ exportPublicKey False $ derivePublicKey privKey
       ppeer = DataPeer.buildPeer ( Just pubkeystr
                                  , ipAddr
@@ -736,10 +821,16 @@ createPeer unseqSink name ipAddr = do
     unseqSource
     seqP2pSource
     seqVmSource
+    apiIndexerSource
+    p2pIndexerSource
+    txrIndexerSource
     unseq
     name
     sequencer
     vm
+    apiIndexer'
+    p2pIndexer'
+    txrIndexer'
 
 data P2PConnection m = P2PConnection
   { _serverToClient :: TQueue B.ByteString
@@ -762,13 +853,13 @@ createConnection server client = do
   let runServer = runEthServerConduit (_p2pPeerPPeer client)
                                       (sourceTQueue clientToServer)
                                       (sinkTQueue serverToClient)
-                                      (sourceTMChan serverSeqSource)
+                                      (sourceTMChan serverSeqSource .| (awaitForever $ either (const $ pure ()) yield))
                                       (_p2pPeerUnseqSink server)
                                       (_p2pPeerName server ++ " -> " ++ _p2pPeerName client)
       runClient = runEthClientConduit (_p2pPeerPPeer server)
                                       (sourceTQueue serverToClient)
                                       (sinkTQueue clientToServer)
-                                      (sourceTMChan clientSeqSource)
+                                      (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) yield))
                                       (_p2pPeerUnseqSink client)
                                       (_p2pPeerName client ++ " -> " ++ _p2pPeerName server)
   pure $ P2PConnection
@@ -816,7 +907,7 @@ spec = do
       otx <- (\o -> o{otBaseTx = clearChainId (otBaseTx o), otOrigin = Origin.API}) <$> liftIO (generate arbitrary)
       let runForTwoSeconds pk wmr = execTestPeer pk wmr validatorAddresses . timeout 2000000
           run = runConnectionWith runForTwoSeconds connection
-          postTx = threadDelay 500000 >> (atomically $ writeTMChan (_p2pPeerSeqP2pSource server) (P2pTx otx))
+          postTx = threadDelay 500000 >> (atomically $ writeTMChan (_p2pPeerSeqP2pSource server) (Right $ P2pTx otx))
       ((_, serverCtx), (_, clientCtx)) <- fst <$> concurrently run postTx
       _unseqEvents serverCtx `shouldBe` []
       let clientTxs = [t | IETx _ (IngestTx _ t) <- _unseqEvents clientCtx]
