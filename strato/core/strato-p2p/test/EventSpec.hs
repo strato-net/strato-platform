@@ -107,8 +107,6 @@ import           Test.QuickCheck
 import           UnliftIO
 import           UnliftIO.Concurrent                   (threadDelay)
 
-type WMRef = IORef (S.OSet Keccak256)
-
 data TestContext = TestContext
   { _blocks                :: [Block]
   , _blockHeaders          :: [DataDefs.BlockData]
@@ -131,7 +129,7 @@ data TestContext = TestContext
   , _genesisBlockHash      :: GenesisBlockHash
   , _bestBlockNumber       :: BestBlockNumber
   , _stringPPeerMap        :: Map String DataPeer.PPeer
-  , _pbftMessages          :: WMRef
+  , _pbftMessages          :: S.OSet Keccak256
   , _outboundPbftMessages  :: S.OSet (Text, Keccak256)
   , _unseqEvents           :: [IngestEvent]
   , _sequencerContext      :: SequencerContext
@@ -140,13 +138,16 @@ data TestContext = TestContext
 
 makeLenses ''TestContext
 
-type TestContextM = ReaderT (IORef TestContext) (ResourceT (LoggingT IO))
+type TestContextM = ReaderT (TVar TestContext) (ResourceT (LoggingT IO))
 
-type MonadTest m = ReaderT (IORef TestContext) m
+type MonadTest m = ReaderT (TVar TestContext) m
 
 instance {-# OVERLAPPING #-} MonadIO m => State.MonadState TestContext (MonadTest m) where
-  state f = ask >>= liftIO . flip atomicModifyIORef' (swap . f)
-    where swap ~(a,b) = (b,a)
+  state f = ask >>= \ctx -> liftIO . atomically $ do
+    s <- readTVar ctx
+    let (a, s') = f s
+    writeTVar ctx s'
+    pure a
 
 instance MonadIO m => Stacks Block (MonadTest m) where
   takeStack _ n = take n <$> use blocks
@@ -353,14 +354,13 @@ instance MonadIO m => HasVault (MonadTest m) where
 
 instance MonadIO m => (Keccak256 `A.Alters` (A.Proxy (Inbound WireMessage))) (MonadTest m) where
   lookup _  k = do
-    wms <- readIORef =<< use pbftMessages
+    wms <- use pbftMessages
     pure $ if S.member k wms then Just (A.Proxy @(Inbound WireMessage)) else Nothing
-  insert _ k _ = use pbftMessages >>= flip atomicModifyIORef' (\wms ->
+  insert _ k _ = pbftMessages %= (\wms ->
     let s = S.size wms
         wms' = if s >= 2000 then S.delete (head $ toList wms) wms else wms
-        wms'' = wms' S.>| k
-     in (wms'', ()))
-  delete _ k = use pbftMessages >>= flip atomicModifyIORef' (\wms -> (S.delete k wms, ()))
+     in wms' S.>| k)
+  delete _ k = pbftMessages %= S.delete k
 
 instance MonadIO m => ((Text, Keccak256) `A.Alters` (A.Proxy (Outbound WireMessage))) (MonadTest m) where
   lookup _  k = do
@@ -375,7 +375,7 @@ instance MonadIO m => ((Text, Keccak256) `A.Alters` (A.Proxy (Outbound WireMessa
   delete _ k = outboundPbftMessages %= S.delete k
 
 getMemContext :: MonadIO m => MonadTest m MemContext
-getMemContext = ask >>= fmap _vmContext . readIORef
+getMemContext = ask >>= fmap _vmContext . readTVarIO
 
 get :: MonadIO m => MonadTest m ContextState
 get = _state <$> getMemContext
@@ -386,15 +386,15 @@ gets f = f <$> get
 {-# INLINE gets #-}
 
 put :: MonadIO m => ContextState -> MonadTest m ()
-put c = ask >>= \i -> atomicModifyIORef' i $ (,()) . (vmContext . state .~ c)
+put c = ask >>= \i -> atomically . modifyTVar' i $ vmContext . state .~ c
 {-# INLINE put #-}
 
 modify :: MonadIO m => (ContextState -> ContextState) -> MonadTest m ()
-modify f = ask >>= \i -> atomicModifyIORef' i $ (,()) . (vmContext . state %~ f)
+modify f = ask >>= \i -> atomically . modifyTVar' i $ vmContext . state %~ f
 {-# INLINE modify #-}
 
 modify' :: MonadIO m => (ContextState -> ContextState) -> MonadTest m ()
-modify' f = ask >>= \i -> atomicModifyIORef' i $ (,()) . (vmContext . state %~ f)
+modify' f = ask >>= \i -> atomically . modifyTVar' i $ vmContext . state %~ f
 {-# INLINE modify' #-}
 
 dbsGet :: MonadIO m => MonadTest m MemContextDBs
@@ -406,15 +406,15 @@ dbsGets f = f <$> dbsGet
 {-# INLINE dbsGets #-}
 
 dbsPut :: MonadIO m => MemContextDBs -> (MonadTest m) ()
-dbsPut c = ask >>= \i -> atomicModifyIORef' i $ (,()) . (vmContext . dbs .~ c)
+dbsPut c = ask >>= \i -> atomically . modifyTVar' i $ vmContext . dbs .~ c
 {-# INLINE dbsPut #-}
 
 dbsModify :: MonadIO m => (MemContextDBs -> MemContextDBs) -> MonadTest m ()
-dbsModify f = ask >>= \i -> atomicModifyIORef' i $ (,()) . (vmContext . dbs %~ f)
+dbsModify f = ask >>= \i -> atomically . modifyTVar' i $ vmContext . dbs %~ f
 {-# INLINE dbsModify #-}
 
 dbsModify' :: MonadIO m => (MemContextDBs -> MemContextDBs) -> MonadTest m ()
-dbsModify' f = ask >>= \i -> atomicModifyIORef' i $ (,()) . (vmContext . dbs %~ f)
+dbsModify' f = ask >>= \i -> atomically . modifyTVar' i $ vmContext . dbs %~ f
 {-# INLINE dbsModify' #-}
 
 contextGet :: MonadIO m => MonadTest m ContextState
@@ -457,15 +457,6 @@ instance MonadIO m => Mod.Accessible MemDBs (MonadTest m) where
 instance MonadIO m => Mod.Modifiable MemDBs (MonadTest m) where
   get _    = gets $ Lens.view memDBs
   put _ md = modify $ memDBs .~ md
-
-vmBlockHashRootKey :: B.ByteString
-vmBlockHashRootKey = "block_hash_root"
-
-vmGenesisRootKey :: B.ByteString
-vmGenesisRootKey = "genesis_root"
-
-vmBestBlockRootKey :: B.ByteString
-vmBestBlockRootKey = "best_block_root"
 
 instance MonadIO m => Mod.Modifiable BlockHashRoot (MonadTest m) where
   get _     = dbsGets $ Lens.view blockHashRoot
@@ -655,8 +646,8 @@ newSequencerContext bc = do
 
 -- testContext is useful for testing because it doesn't require
 -- Kafka, postgres, redis, or ethconf.
-testContext :: WMRef -> PrivateKey -> SequencerContext -> MemContext -> TestContext
-testContext wireMessagesRef prv seqCtx vmCtx = TestContext
+testContext :: PrivateKey -> SequencerContext -> MemContext -> TestContext
+testContext prv seqCtx vmCtx = TestContext
   { _blocks                = []
   , _blockHeaders          = []
   , _remainingBlockHeaders = RemainingBlockHeaders []
@@ -678,7 +669,7 @@ testContext wireMessagesRef prv seqCtx vmCtx = TestContext
   , _genesisBlockHash      = GenesisBlockHash zeroHash
   , _bestBlockNumber       = BestBlockNumber 0
   , _stringPPeerMap        = M.empty
-  , _pbftMessages          = wireMessagesRef
+  , _pbftMessages          = S.empty
   , _outboundPbftMessages  = S.empty
   , _unseqEvents           = []
   , _sequencerContext      = seqCtx
@@ -694,12 +685,10 @@ runTestPeer f = do
   cache <- TRC.new 64
   let cstate = def & txRunResultsCache .~ cache
       vmCtx = MemContext def cstate
-  wmr <- newIORef (S.empty)
-  ctx <- newIORef $ testContext wmr undefined seqCtx vmCtx
+  ctx <- newTVarIO $ testContext undefined seqCtx vmCtx
   void . runNoLoggingT . runResourceT $ runReaderT f ctx
 
 execTestPeer :: PrivateKey
-             -> WMRef
              -> [Address]
              -> TestContextM a
              -> IO (a, TestContext)
@@ -707,31 +696,29 @@ execTestPeer = execTestPeerOnRound 0
 
 execTestPeerOnRound :: Word256
                     -> PrivateKey
-                    -> WMRef
                     -> [Address]
                     -> TestContextM a
                     -> IO (a, TestContext)
-execTestPeerOnRound n pk wmr as f = do
+execTestPeerOnRound n pk as f = do
   seqCtx <- newSequencerContext $ (view . round .~ n) (newBlockstanbulContext (fromPrivateKey pk) as)
   cache <- TRC.new 64
   let cstate = def & txRunResultsCache .~ cache
       vmCtx = MemContext def cstate
-  ctx <- newIORef $ testContext wmr pk seqCtx vmCtx
+  ctx <- newTVarIO $ testContext pk seqCtx vmCtx
   a <- runLoggingT . runResourceT $ runReaderT f ctx
-  ctx' <- readIORef ctx
+  ctx' <- readTVarIO ctx
   return (a, ctx')
 
 execTestPeerWithContext :: TestContextM a -> TestContext -> IO (a, TestContext)
 execTestPeerWithContext f ctx = do
-  ref <- newIORef ctx
+  ref <- newTVarIO ctx
   a <- runLoggingT . runResourceT $ runReaderT f ref
-  ctx' <- readIORef ref
+  ctx' <- readTVarIO ref
   return (a, ctx')
 
 data P2PPeer m = P2PPeer
   { _p2pPeerPrivKey     :: PrivateKey
   , _p2pPeerPPeer       :: DataPeer.PPeer
-  , _p2pPeerWireMessageRef :: WMRef
   , _p2pPeerUnseqSource :: TQueue SeqLoopEvent
   , _p2pPeerSeqP2pSource :: TMChan (Either TxrResult P2pEvent)
   , _p2pPeerSeqVmSource :: TQueue [VmEvent]
@@ -759,6 +746,7 @@ createPeer :: ( Seq.MonadSequencer m
               , Mod.Modifiable (P2P BestBlock) m
               , (Word256 `A.Alters` P2P ChainInfo) m
               , (Word256 `A.Alters` P2P ChainMembers) m
+              , State.MonadState TestContext m
               )
            => ([IngestEvent] -> m ())
            -> String
@@ -766,7 +754,6 @@ createPeer :: ( Seq.MonadSequencer m
            -> IO (P2PPeer m)
 createPeer unseqSink name ipAddr = do
   privKey <- newPrivateKey
-  wmr <- newIORef (S.empty)
   unseqSource <- newTQueueIO
   seqP2pSource <- newBroadcastTMChanIO
   seqVmSource <- newTQueueIO
@@ -796,8 +783,22 @@ createPeer unseqSink name ipAddr = do
       txrIndexer' = runConduit $ sourceTQueue txrIndexerSource
                               .| (awaitForever $ yieldMany . indexEventToTxrResults)
                               .| (awaitForever $ \case
-                                    AddMember _ -> pure () --(Right (cId, addr, enode)) -> pure ()
-                                    RemoveMember _ -> pure () --(Right (cId, addr)) -> pure ()
+                                    AddMember (Right (cId, addr, enode)) -> do
+                                      chainMembersMap %= (\m -> case M.lookup cId m of
+                                        Nothing -> M.insert cId (ChainMembers $ M.singleton addr enode) m
+                                        Just (ChainMembers cm) -> M.insert cId (ChainMembers $ M.insert addr enode cm) m)
+                                      ipAddressIpChainsMap %= (\m -> case M.lookup (ipAddress enode) m of
+                                        Nothing -> M.insert (ipAddress enode) (IPChains $ Set.singleton cId) m
+                                        Just (IPChains s) -> M.insert (ipAddress enode) (IPChains $ Set.insert cId s) m)
+                                      orgIdChainsMap %= (\m -> case M.lookup (pubKey enode) m of
+                                        Nothing -> M.insert (pubKey enode) (OrgIdChains $ Set.singleton cId) m
+                                        Just (OrgIdChains s) -> M.insert (pubKey enode) (OrgIdChains $ Set.insert cId s) m)
+                                    RemoveMember (Right (cId, addr)) -> do
+                                      mEnode <- join . fmap (M.lookup addr . unChainMembers) <$> use (chainMembersMap . at cId)
+                                      chainMembersMap . at cId . _Just %= ChainMembers . M.delete addr . unChainMembers
+                                      for_ mEnode $ \enode -> do
+                                        ipAddressIpChainsMap . at (ipAddress enode) . _Just %= IPChains . Set.delete cId . unIPChains
+                                        orgIdChainsMap . at (pubKey enode) . _Just %= OrgIdChains . Set.delete cId . unOrgIdChains
                                     RegisterCertificate _ -> pure () --(Right (addr, certState)) -> pure ()
                                     CertificateRevoked _ -> pure () --(Right addr) -> pure ()
                                     CertificateRegistryInitialized _ -> pure () --(Right ()) -> pure ()
@@ -805,6 +806,7 @@ createPeer unseqSink name ipAddr = do
                                     PutLogDB _ -> pure ()
                                     PutEventDB _ -> pure ()
                                     PutTxResult _ -> pure ()
+                                    _ -> pure ()
                                  )
       pubkeystr = BC.unpack $ B16.encode $ B.drop 1 $ exportPublicKey False $ derivePublicKey privKey
       ppeer = DataPeer.buildPeer ( Just pubkeystr
@@ -817,7 +819,6 @@ createPeer unseqSink name ipAddr = do
   pure $ P2PPeer
     privKey
     ppeer
-    wmr
     unseqSource
     seqP2pSource
     seqVmSource
@@ -870,14 +871,14 @@ createConnection server client = do
     runServer
     runClient
 
-runConnectionWith :: (PrivateKey -> WMRef -> m (Maybe SomeException) -> IO b) 
+runConnectionWith :: (PrivateKey -> m (Maybe SomeException) -> IO b) 
                   -> P2PConnection m 
                   -> IO (b, b)
 runConnectionWith f connection =
   let server = _serverP2PPeer connection
       client = _clientP2PPeer connection
-      runServer = f (_p2pPeerPrivKey server) (_p2pPeerWireMessageRef server) $ _runServer connection
-      runClient = f (_p2pPeerPrivKey client) (_p2pPeerWireMessageRef client) $ _runClient connection
+      runServer = f (_p2pPeerPrivKey server) $ _runServer connection
+      runClient = f (_p2pPeerPrivKey client) $ _runClient connection
    in concurrently runServer runClient
 
 makeValidators :: [P2PPeer m] -> [Address]
@@ -905,7 +906,7 @@ spec = do
             ContractCreationTX{} -> tx{transactionChainId = Nothing}
             PrivateHashTX{} -> tx
       otx <- (\o -> o{otBaseTx = clearChainId (otBaseTx o), otOrigin = Origin.API}) <$> liftIO (generate arbitrary)
-      let runForTwoSeconds pk wmr = execTestPeer pk wmr validatorAddresses . timeout 2000000
+      let runForTwoSeconds pk = execTestPeer pk validatorAddresses . timeout 2000000
           run = runConnectionWith runForTwoSeconds connection
           postTx = threadDelay 500000 >> (atomically $ writeTMChan (_p2pPeerSeqP2pSource server) (Right $ P2pTx otx))
       ((_, serverCtx), (_, clientCtx)) <- fst <$> concurrently run postTx
@@ -938,9 +939,9 @@ spec = do
         ]
       let validators' = take 2 peers
           validatorAddresses = makeValidators validators'
-          runForTwoSeconds :: PrivateKey -> WMRef -> TestContextM a -> IO TestContext
-          runForTwoSeconds pk wmr = fmap snd . execTestPeer pk wmr validatorAddresses . timeout 2000000
-          runSequencers = mapConcurrently (\p -> runForTwoSeconds (_p2pPeerPrivKey p) (_p2pPeerWireMessageRef p) (_p2pPeerSequencer p)) peers
+          runForTwoSeconds :: PrivateKey -> TestContextM a -> IO TestContext
+          runForTwoSeconds pk = fmap snd . execTestPeer pk validatorAddresses . timeout 2000000
+          runSequencers = mapConcurrently (\p -> runForTwoSeconds (_p2pPeerPrivKey p) (_p2pPeerSequencer p)) peers
           runConnections = mapConcurrently (runConnectionWith runForTwoSeconds) connections
           postTimeout = do
             threadDelay 1000000
@@ -966,14 +967,14 @@ spec = do
           secondaryValidators = tail validators'
           primaryValidatorAddresses = makeValidators primaryValidators
           validatorAddresses = makeValidators validators'
-          runForTwoSecondsPrimary :: Word256 -> PrivateKey -> WMRef -> TestContextM a -> IO TestContext
-          runForTwoSecondsPrimary n pk wmr = fmap snd . execTestPeerOnRound n pk wmr primaryValidatorAddresses . timeout 2000000
-          runForTwoSecondsSecondary :: Word256 -> PrivateKey -> WMRef -> TestContextM a -> IO TestContext
-          runForTwoSecondsSecondary n pk wmr = fmap snd . execTestPeerOnRound n pk wmr validatorAddresses . timeout 2000000
+          runForTwoSecondsPrimary :: Word256 -> PrivateKey -> TestContextM a -> IO TestContext
+          runForTwoSecondsPrimary n pk = fmap snd . execTestPeerOnRound n pk primaryValidatorAddresses . timeout 2000000
+          runForTwoSecondsSecondary :: Word256 -> PrivateKey -> TestContextM a -> IO TestContext
+          runForTwoSecondsSecondary n pk = fmap snd . execTestPeerOnRound n pk validatorAddresses . timeout 2000000
           runForTwoSecondsWithContext :: TestContext -> TestContextM a -> IO TestContext
           runForTwoSecondsWithContext ctx = fmap snd . flip execTestPeerWithContext ctx . timeout 2000000
-          runSequencersPrimary1 = mapConcurrently (\p -> runForTwoSecondsPrimary 0 (_p2pPeerPrivKey p) (_p2pPeerWireMessageRef p) (_p2pPeerSequencer p)) primaryValidators
-          runSequencersSecondary = mapConcurrently (\p -> runForTwoSecondsSecondary 1000 (_p2pPeerPrivKey p) (_p2pPeerWireMessageRef p) (_p2pPeerSequencer p)) secondaryValidators
+          runSequencersPrimary1 = mapConcurrently (\p -> runForTwoSecondsPrimary 0 (_p2pPeerPrivKey p) (_p2pPeerSequencer p)) primaryValidators
+          runSequencersSecondary = mapConcurrently (\p -> runForTwoSecondsSecondary 1000 (_p2pPeerPrivKey p) (_p2pPeerSequencer p)) secondaryValidators
           runSequencers1 = concurrently runSequencersPrimary1 runSequencersSecondary
           runSequencers2 ctxs = mapConcurrently (\(ctx, p) -> runForTwoSecondsWithContext ((sequencerContext . blockstanbulContext . _Just . validators .~ Set.fromList validatorAddresses) ctx) (_p2pPeerSequencer p)) $ zip ctxs peers
           runConnections = mapConcurrently (runConnectionWith $ runForTwoSecondsSecondary 0) connections
