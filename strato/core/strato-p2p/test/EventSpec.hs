@@ -65,6 +65,7 @@ import           Blockchain.DB.ChainDB
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
+import           Blockchain.DB.StateDB                 (setStateDBStateRoot)
 import qualified Blockchain.DB.X509CertDB              as X509
 import "strato-p2p" Blockchain.Event
 import qualified "vm-runner" Blockchain.Event          as VMEvent
@@ -819,13 +820,12 @@ makeLenses ''P2PPeer
 
 runNode :: P2PPeer -> IO ()
 runNode p =
-  race_
-    (runLoggingT . runResourceT $ flip runReaderT (p ^. p2pTestContext) (p ^. p2pPeerSequencer))
-    --(race_ (runLoggingT . runResourceT $ flip runReaderT (p ^. p2pTestContext) (p ^. p2pPeerSequencer))
-           --(runLoggingT . runResourceT $ flip runReaderT (p ^. p2pTestContext) (p ^. p2pPeerVm)))
-    (race_ 
-      (race_ (runLoggingT . runResourceT $ flip runReaderT (p ^. p2pTestContext) (p ^. p2pPeerApiIndexer))
-             (runLoggingT . runResourceT $ flip runReaderT (p ^. p2pTestContext) (p ^. p2pPeerP2pIndexer)))
+  concurrently_
+    (concurrently_ (runLoggingT . runResourceT $ flip runReaderT (p ^. p2pTestContext) (p ^. p2pPeerSequencer))
+                   (runLoggingT . runResourceT $ flip runReaderT (p ^. p2pTestContext) (p ^. p2pPeerVm)))
+    (concurrently_ 
+      (concurrently_ (runLoggingT . runResourceT $ flip runReaderT (p ^. p2pTestContext) (p ^. p2pPeerApiIndexer))
+                     (runLoggingT . runResourceT $ flip runReaderT (p ^. p2pTestContext) (p ^. p2pPeerP2pIndexer)))
       (runLoggingT . runResourceT $ flip runReaderT (p ^. p2pTestContext) (p ^. p2pPeerTxrIndexer)))
 
 createPeer :: PrivateKey
@@ -852,16 +852,19 @@ createPeer privKey initialValidators unseqSink name ipAddr = do
                                   traverse_ (writeTMChan seqP2pSource . Right) $ Seq._toP2p b
                                   writeTQueue seqVmSource $ Seq._toVm b
                                )
-  let vm = runConduit $ sourceTQueue seqVmSource
-                     .| (awaitForever $ yield . foldr VMEvent.insertInBatch VMEvent.newInBatch)
-                     .| handleVmEvents
-                     .| (awaitForever $ yield . flip VMEvent.insertOutBatch VMEvent.newOutBatch)
-                     .| (awaitForever $ \b -> atomically $ do
-                          traverse_ (writeTQueue unseqSource) $ UnseqEvent . IEBlock . blockToIngestBlock Origin.Quarry . outputBlockToBlock <$> toList (VMEvent.outBlocks b)
-                          writeTQueue apiIndexerSource $ toList (VMEvent.outIndexEvents b)
-                          writeTQueue p2pIndexerSource $ toList (VMEvent.outIndexEvents b)
-                          traverse_ (writeTQueue txrIndexerSource) $ toList (VMEvent.outIndexEvents b)
-                        )
+  let vm = do
+        MP.initializeBlank
+        setStateDBStateRoot Nothing MP.emptyTriePtr
+        runConduit $ sourceTQueue seqVmSource
+                  .| (awaitForever $ yield . foldr VMEvent.insertInBatch VMEvent.newInBatch)
+                  .| handleVmEvents False
+                  .| (awaitForever $ yield . flip VMEvent.insertOutBatch VMEvent.newOutBatch)
+                  .| (awaitForever $ \b -> atomically $ do
+                       traverse_ (writeTQueue unseqSource) $ UnseqEvent . IEBlock . blockToIngestBlock Origin.Quarry . outputBlockToBlock <$> toList (VMEvent.outBlocks b)
+                       writeTQueue apiIndexerSource $ toList (VMEvent.outIndexEvents b)
+                       writeTQueue p2pIndexerSource $ toList (VMEvent.outIndexEvents b)
+                       traverse_ (writeTQueue txrIndexerSource) $ toList (VMEvent.outIndexEvents b)
+                     )
       apiIndexer' = runConduit $ sourceTQueue apiIndexerSource
                               .| (awaitForever $ \evs -> do
                                     $logInfoS "testApiIndexer" . T.pack $ show evs
@@ -1039,9 +1042,9 @@ spec = do
         , (peers !! 1, peers !! 4)
         , (peers !! 1, peers !! 5)
         ]
-      let runForTwoSeconds = void . timeout 5000000
+      let runForTwoSeconds = void . timeout 2000000
           runNodes = mapConcurrently runNode peers
-          runConnections = traverse runConnection connections
+          runConnections = mapConcurrently runConnection connections
           postTimeout = do
             threadDelay 1000000
             for_ validators' (\p -> atomically $ writeTQueue (_p2pPeerUnseqSource p) (TimerFire 0))
@@ -1070,17 +1073,15 @@ spec = do
         , (peers !! 0, peers !! 2)
         , (peers !! 1, peers !! 2)
         ]
-      rnRef2 <- _latestRoundNumber . _sequencerContext <$> readTVarIO ((peers !! 1) ^. p2pTestContext)
-      writeIORef rnRef2 1000
       atomically $ modifyTVar' ((peers !! 1) ^. p2pTestContext)
-                               (sequencerContext . blockstanbulContext . _Just . validators .~ Set.fromList validatorAddresses)
-      rnRef3 <- _latestRoundNumber . _sequencerContext <$> readTVarIO ((peers !! 2) ^. p2pTestContext)
-      writeIORef rnRef3 1000
+                               ( (sequencerContext . blockstanbulContext . _Just . validators .~ Set.fromList validatorAddresses)
+                               . (sequencerContext . blockstanbulContext . _Just . view . round .~ 1000))
       atomically $ modifyTVar' ((peers !! 2) ^. p2pTestContext)
-                               (sequencerContext . blockstanbulContext . _Just . validators .~ Set.fromList validatorAddresses)
-      let runForTwoSeconds = void . timeout 5000000
-          runNodes = traverse runNode peers
-          runConnections = traverse runConnection connections
+                               ( (sequencerContext . blockstanbulContext . _Just . validators .~ Set.fromList validatorAddresses)
+                               . (sequencerContext . blockstanbulContext . _Just . view . round .~ 1000))
+      let runForTwoSeconds = void . timeout 2000000
+          runNodes = mapConcurrently runNode peers
+          runConnections = mapConcurrently runConnection connections
           postTimeoutPrimary1 = do
             threadDelay 1000000
             for_ primaryValidators (\p -> atomically $ writeTQueue (_p2pPeerUnseqSource p) (TimerFire 0))
@@ -1093,7 +1094,7 @@ spec = do
       runForTwoSeconds $ concurrently_ (concurrently_ runNodes runConnections) (concurrently_ postTimeoutPrimary1 postTimeoutSecondary)
       ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
       ifor_ ctxs1 $ \i ctx -> (i, _round . _view <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, if i == 0 then Just (1 :: Word256) else Just 1000)
-      atomically $ modifyTVar' ((peers !! 2) ^. p2pTestContext)
+      atomically $ modifyTVar' ((peers !! 0) ^. p2pTestContext)
                                (sequencerContext . blockstanbulContext . _Just . validators .~ Set.fromList validatorAddresses)
       runForTwoSeconds $ concurrently_ (concurrently_ runNodes runConnections) (concurrently_ postTimeoutPrimary2 postTimeoutSecondary)
       ctxs2 <- atomically $ traverse (readTVar . _p2pTestContext) peers

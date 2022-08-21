@@ -120,7 +120,7 @@ ethereumVM d = void . execContextM d $ do
 
         let vmInEventBatch = foldr insertInBatch newInBatch seqEvents
         outBatch <- runConduit $ yield vmInEventBatch
-                              .| handleVmEvents
+                              .| handleVmEvents flags_useSyncMode
                               .| fold (flip insertOutBatch) newOutBatch
         
         loopTimeit "compactContextM" $ compactContextM
@@ -138,8 +138,8 @@ microtimeCutoff = secondsToMicrotime flags_mempoolLivenessCutoff
 {-# NOINLINE microtimeCutoff #-}
 
 handleVmEvents :: (MonadFail m, VMBase m, Bagger.MonadBagger m, MonadMonitor m)
-               => ConduitT VmInEventBatch VmOutEvent m ()
-handleVmEvents = awaitForever $ \InBatch{..} -> do
+               => Bool -> ConduitT VmInEventBatch VmOutEvent m ()
+handleVmEvents useSyncMode = awaitForever $ \InBatch{..} -> do
   rpcResps <- lift $ do
     mapM_ (uncurry3 queuePendingVote) votesToMake
     bbHash <- maybe Keccak256.zeroHash fst <$> getChainBestBlock Nothing
@@ -156,12 +156,12 @@ handleVmEvents = awaitForever $ \InBatch{..} -> do
     Mod.modify_ (Mod.Proxy @ContextState) $ pure . (blockRequested ||~ createBlock)
     -- todo: perhaps we shouldnt even add TXs to the mempool, it might make for a VERY large checkpoint
     -- todo: which may fail
-    isCaughtUp <- shouldProcessNewTransactions
+    isCaughtUp <- shouldProcessNewTransactions useSyncMode
     bState <- Bagger.getBaggerState
     pbft <- _hasBlockstanbul <$> Mod.get (Mod.Proxy @ContextState)
     reqd <- _blockRequested <$> Mod.get (Mod.Proxy @ContextState)
     hasVotes <- (/= 0) . fst <$> peekPendingVote
-    let makeLazyBlocks = lazyBlocks $ quarryConfig ethConf
+    let makeLazyBlocks = False --lazyBlocks $ quarryConfig ethConf -- TODO?: Remove reference to ethConf
         pending = B.pending bState
         priv = toList . B.privateHashes $ B.miningCache bState
         hasTxs = (numPoolable > 0) || not (M.null pending) || not (null priv)
@@ -428,9 +428,9 @@ shouldProcessNewTransactions :: ( MonadLogger m
                                 , Mod.Accessible (Maybe WorldBestBlock) m
                                 , HasBlockSummaryDB m
                                 )
-                             => m Bool -- todo: probably shouldn't do it by number, but tdiff.
-shouldProcessNewTransactions =
-  if flags_useSyncMode
+                             => Bool -> m Bool -- todo: probably shouldn't do it by number, but tdiff.
+shouldProcessNewTransactions useSyncMode =
+  if useSyncMode
     then do
       worldBestBlock <- fmap unWorldBestBlock <$> Mod.access (Mod.Proxy @(Maybe WorldBestBlock))
       case worldBestBlock of
@@ -446,7 +446,7 @@ shouldProcessNewTransactions =
           $logInfoS "shouldProcessNewTransactions" (T.pack msg)
           return didRunBest  -- todo, verify TDiff etc.
     else do
-      $logInfoS "shouldProcessNewTransactions" "flags_useSyncMode == false, will process all new TXs"
+      $logInfoS "shouldProcessNewTransactions" "useSyncMode == false, will process all new TXs"
       return True
 
 logEventSummaries :: MonadLogger m => [VmEvent] -> m ()
