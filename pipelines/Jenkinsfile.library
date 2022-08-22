@@ -888,10 +888,14 @@ def runMonitor(nodeData, nodeConfig) {
 def waitForHealthySync(NODE_MONITOR_HEALTH_URL) {
   script {
     echo "Waiting for network nodes to be in-sync and healthy..."
+    int counter = 0
     for (int i = 0; i < 6000; i++) {
       if (sh(returnStatus: true, script: "curl --silent ${NODE_MONITOR_HEALTH_URL} | grep '\"needsAttention\":false'") != 0) {
-        if (sh(returnStatus: true, script: "curl --silent ${NODE_MONITOR_HEALTH_URL} | grep '\"hasSyncingNodes\":true'") != 0 && sh(returnStatus: true, script: "curl --silent ${NODE_MONITOR_HEALTH_URL} | grep '\"isOverallHealthy\":false'") != 0) {
+        if (sh(returnStatus: true, script: "curl --silent ${NODE_MONITOR_HEALTH_URL} | grep '\"hasSyncingNodes\":true'") != 0 && sh(returnStatus: true, script: "curl --silent ${NODE_MONITOR_HEALTH_URL} | grep '\"isOverallHealthy\":false'") != 0 && counter == 60) {
             sh "sudo docker restart strato_strato_1"
+        }
+        if(counter != 60) {
+            counter = counter + 1
         }
         sleep 2
       } else {
