@@ -113,7 +113,7 @@ unparseContract contr =
   <> (List.intercalate "\n  " $ List.map unparseEvent (Map.assocs $ contr ^. events))
   <> (List.intercalate "\n  " $ List.map unparseFunc (Map.assocs $ contr ^. functions))
   <> case (contr ^. constructor) of
-    Just funf -> ("\n  " ++ unparseCtor (funf))
+    Just funf -> ("\n  " ++ unparseCtor funf)
     Nothing -> "\n  // no constructor found"
   <> (List.intercalate "\n  " $ List.map unparseModifier (Map.assocs $ contr ^. modifiers))
   <> "\n}"
@@ -124,7 +124,7 @@ unparseStruct (name, fields) =
      "struct "
   <> labelToString name
   <> " {\n"
-  <> (List.intercalate ";\n" $ List.map unparseStructField fields)
+  <> (List.intercalate ";\n  " $ List.map unparseStructField fields)
   <> "\n}"
 
 unparseStructField :: (SolidString, SolidVM.FieldType, SourceAnnotation ()) -> String
@@ -377,9 +377,12 @@ unparseArgs (name, theType) = unparseIndexedType theType <> " " <>  name
 unparseVals :: (Text, IndexedType) -> Text
 unparseVals (name, theType) =
      unparseIndexedType theType
-  <> if Text.head name == '#'
-     then ""
-     else " " <> name
+  <> if ((Text.length name) > 0) then 
+    if Text.head name == '#' then
+      ""
+    else " " <> name
+    else " " <> name 
+
 
 unparseIndexedType :: IndexedType -> Text
 unparseIndexedType = Text.pack . unparseVarType . indexedTypeType
