@@ -48,6 +48,7 @@ import           SolidVM.Solidity.Parse.File
 import           SolidVM.Solidity.Parse.ParserTypes
 import qualified SolidVM.Solidity.StaticAnalysis.Typechecker                            as TypeChecker
 import qualified SolidVM.Solidity.StaticAnalysis.Functions.ConstantFunctions            as ConstantFunctions
+import           SolidVM.Solidity.StaticAnalysis.Optimizer                              as O
 
 
 data ParseTypeCheckOrSolidVMError = PEx ParseError
@@ -158,7 +159,7 @@ hasSvm3_3 cc = any (=="svm3.3") vmVers
 compileSource :: Bool -> Map T.Text T.Text-> Either ParseTypeCheckOrSolidVMError CodeCollection
 compileSource typeCheck mTT = do
   let applyInheritanceE = first SVMEx . applyInheritance
-  case (applyInheritanceE <=< compileSourceNoInheritance) mTT of
+  O.detector <$> case (applyInheritanceE <=< compileSourceNoInheritance) mTT of
     Right cc | typeCheck && hasSvm3_2 cc -> typeCheckDetectorSvm3_2 cc
              | typeCheck && hasSvm3_3 cc -> typeCheckDetectorSvm3_3 cc
              | otherwise                 -> Right cc
@@ -170,11 +171,6 @@ compileSource typeCheck mTT = do
       typeCheckDetectorSvm3_3 ecc = case TypeChecker.detector ecc <> ConstantFunctions.detector ecc of
         [] -> Right ecc
         xs -> Left $ TCEx xs
--- do if typeCheck && (hasSvm3_2 cc || hasSvm3_3 cc) then typeCheckDetector cc else Right cc
--- guards cant be used inside cases?      
-      -- |(typeCheck && hasSvm3_2 cc) >>= typeCheckDetectorSvm3_2 cc
-      -- |(typeCheck && hasSvm3_3 cc) >>= typeCheckDetectorSvm3_3 cc
-      -- |otherwise >>= Right cc
 
 compileSourceWithAnnotations :: Bool -> Map T.Text T.Text -> Either [SourceAnnotation T.Text] CodeCollection
 compileSourceWithAnnotations typeCheck = withAnnotations (compileSource typeCheck)
