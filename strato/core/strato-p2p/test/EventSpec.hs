@@ -90,7 +90,7 @@ import           Blockchain.Strato.Indexer.TxrIndexer
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
-import           Blockchain.Strato.Model.Keccak256     (Keccak256, zeroHash, unsafeCreateKeccak256FromWord256)
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 import qualified Blockchain.TxRunResultCache           as TRC
 
@@ -146,6 +146,7 @@ data TestContext = TestContext
   , _unseqEvents           :: [IngestEvent]
   , _sequencerContext      :: SequencerContext
   , _vmContext             :: MemContext
+  , _apiChainInfoMap       :: Map Word256 ChainInfo
   }
 
 makeLenses ''TestContext
@@ -665,9 +666,9 @@ instance MonadIO m => (Keccak256 `A.Alters` API OutputTx) (MonadTest m) where
   insert _ _ _ = pure ()
 
 instance MonadIO m => (Word256 `A.Alters` API ChainInfo) (MonadTest m) where
-  lookup _ _   = pure Nothing
-  delete _ _   = pure ()
-  insert _ _ _ = pure ()
+  lookup _ k         = fmap API <$> use (apiChainInfoMap . at k)
+  delete _ k         = apiChainInfoMap . at k .= Nothing
+  insert _ k (API v) = apiChainInfoMap . at k ?= v
 
 instance MonadIO m => (Keccak256 `A.Alters` API OutputBlock) (MonadTest  m) where
   lookup _ _   = pure Nothing
@@ -755,6 +756,7 @@ testContext prv seqCtx vmCtx = TestContext
   , _unseqEvents           = []
   , _sequencerContext      = seqCtx
   , _vmContext             = vmCtx
+  , _apiChainInfoMap       = M.empty
   }
 
 testPeer :: DataPeer.PPeer
@@ -828,6 +830,9 @@ runNode p =
                      (runLoggingT . runResourceT $ flip runReaderT (p ^. p2pTestContext) (p ^. p2pPeerP2pIndexer)))
       (runLoggingT . runResourceT $ flip runReaderT (p ^. p2pTestContext) (p ^. p2pPeerTxrIndexer)))
 
+postEvent :: SeqLoopEvent -> P2PPeer -> IO ()
+postEvent e p = atomically $ writeTQueue (_p2pPeerUnseqSource p) e
+
 createPeer :: PrivateKey
            -> [Address]
            -> ([IngestEvent] -> TestContextM ())
@@ -854,7 +859,34 @@ createPeer privKey initialValidators unseqSink name ipAddr = do
                                )
   let vm = do
         MP.initializeBlank
+        let genesisBlock = OutputBlock
+              { obOrigin              = Origin.API
+              , obTotalDifficulty     = 0
+              , obBlockData           = DataDefs.BlockData
+                  zeroHash
+                  zeroHash
+                  (Address 0)
+                  MP.emptyTriePtr
+                  MP.emptyTriePtr
+                  MP.emptyTriePtr
+                  ""
+                  1
+                  0
+                  10000
+                  1
+                  DataPeer.jamshidBirth
+                  ""
+                  12345
+                  zeroHash
+              , obReceiptTransactions = []
+              , obBlockUncles         = []
+              }
+            genHash = rlpHash genesisBlock
         setStateDBStateRoot Nothing MP.emptyTriePtr
+        (BlockHashRoot bhr) <- bootstrapChainDB genHash [(Nothing, MP.emptyTriePtr)]
+        (X509.CertRoot cr) <- X509.bootstrapCertDB genHash
+        Mod.put (Mod.Proxy @BlockHashRoot) $ BlockHashRoot bhr
+        Mod.put (Mod.Proxy @X509.CertRoot) $ X509.CertRoot cr
         runConduit $ sourceTQueue seqVmSource
                   .| (awaitForever $ yield . foldr VMEvent.insertInBatch VMEvent.newInBatch)
                   .| handleVmEvents False
@@ -978,6 +1010,11 @@ runConnection connection = do
       rClient = runLoggingT . runResourceT . flip runReaderT (connection ^. clientP2PPeer . p2pTestContext) $ connection ^. runClient
   concurrently rServer rClient
 
+runNetwork :: [P2PPeer] -> [P2PConnection] -> IO ()
+runNetwork nodes connections =
+  concurrently_ (mapConcurrently runNode nodes)
+                (mapConcurrently runConnection connections)
+
 makeValidators :: [PrivateKey] -> [Address]
 makeValidators = map fromPrivateKey
 
@@ -1043,12 +1080,10 @@ spec = do
         , (peers !! 1, peers !! 5)
         ]
       let runForTwoSeconds = void . timeout 2000000
-          runNodes = mapConcurrently runNode peers
-          runConnections = mapConcurrently runConnection connections
           postTimeout = do
             threadDelay 1000000
-            for_ validators' (\p -> atomically $ writeTQueue (_p2pPeerUnseqSource p) (TimerFire 0))
-      runForTwoSeconds $ concurrently_ (concurrently_ runNodes runConnections) postTimeout
+            for_ validators' $ postEvent (TimerFire 0)
+      runForTwoSeconds $ concurrently_ (runNetwork peers connections) postTimeout
       ctxs <- atomically $ traverse (readTVar . _p2pTestContext) peers
       ifor_ ctxs $ \i ctx -> (i, _round . _view <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 1 :: Maybe Word256)
   
@@ -1080,23 +1115,21 @@ spec = do
                                ( (sequencerContext . blockstanbulContext . _Just . validators .~ Set.fromList validatorAddresses)
                                . (sequencerContext . blockstanbulContext . _Just . view . round .~ 1000))
       let runForTwoSeconds = void . timeout 2000000
-          runNodes = mapConcurrently runNode peers
-          runConnections = mapConcurrently runConnection connections
           postTimeoutPrimary1 = do
             threadDelay 1000000
-            for_ primaryValidators (\p -> atomically $ writeTQueue (_p2pPeerUnseqSource p) (TimerFire 0))
+            for_ primaryValidators $ postEvent (TimerFire 0)
           postTimeoutPrimary2 = do
             threadDelay 1000000
-            for_ primaryValidators (\p -> atomically $ writeTQueue (_p2pPeerUnseqSource p) (TimerFire 1))
+            for_ primaryValidators $ postEvent (TimerFire 1)
           postTimeoutSecondary = do
             threadDelay 1000000
-            for_ secondaryValidators (\p -> atomically $ writeTQueue (_p2pPeerUnseqSource p) (TimerFire 1000))
-      runForTwoSeconds $ concurrently_ (concurrently_ runNodes runConnections) (concurrently_ postTimeoutPrimary1 postTimeoutSecondary)
+            for_ secondaryValidators $ postEvent (TimerFire 1000)
+      runForTwoSeconds $ concurrently_ (runNetwork peers connections) (concurrently_ postTimeoutPrimary1 postTimeoutSecondary)
       ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
       ifor_ ctxs1 $ \i ctx -> (i, _round . _view <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, if i == 0 then Just (1 :: Word256) else Just 1000)
       atomically $ modifyTVar' ((peers !! 0) ^. p2pTestContext)
                                (sequencerContext . blockstanbulContext . _Just . validators .~ Set.fromList validatorAddresses)
-      runForTwoSeconds $ concurrently_ (concurrently_ runNodes runConnections) (concurrently_ postTimeoutPrimary2 postTimeoutSecondary)
+      runForTwoSeconds $ concurrently_ (runNetwork peers connections) (concurrently_ postTimeoutPrimary2 postTimeoutSecondary)
       ctxs2 <- atomically $ traverse (readTVar . _p2pTestContext) peers
       ifor_ ctxs2 $ \i ctx -> (i, _round . _view <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 1001 :: Maybe Word256)
   
@@ -1121,6 +1154,44 @@ spec = do
         -- Now that the peer is known to be addr, we should only send if they are designated
         shouldSendToPeer addr `L.shouldReturn` True
         shouldSendToPeer 0xa `L.shouldReturn` False
+
+    it "Can index a ChainInfo" $ do
+      let unseqSink = (unseqEvents %=) . (++)
+      privKeys <- traverse (const newPrivateKey) [(1 :: Integer)..3]
+      let validators' = makeValidators privKeys
+      peers <- traverse (\(p,(n,i)) -> createPeer p validators' unseqSink n i) $ zip privKeys
+        [ ("node1", "1.2.3.4")
+        , ("node2", "5.6.7.8")
+        , ("node3", "9.10.11.12")
+        ]
+      connections <- traverse (uncurry createConnection)
+        [ (peers !! 0, peers !! 1)
+        , (peers !! 0, peers !! 2)
+        , (peers !! 1, peers !! 2)
+        ]
+      let runForTwoSeconds = void . timeout 2000000
+          src = "contract A {}"
+          contractName = "A"
+          enode = readEnode "enode://abcd@1.2.3.4:30303"
+          chainInfo' = ChainInfo
+            UnsignedChainInfo { chainLabel     = "My test chain!"
+                              , accountInfo    = [ContractNoStorage (Address 0x100) 10000000000 (SolidVMCode contractName $ hash src)]
+                              , codeInfo       = [CodeInfo "" src $ Just contractName]
+                              , members        = M.singleton (validators' !! 0) enode
+                              , parentChain    = Nothing
+                              , creationBlock  = zeroHash
+                              , chainNonce     = 123456789
+                              , chainMetadata  = M.singleton "VM" "SolidVM"
+                              }
+            Nothing
+          chainId = keccak256ToWord256 $ rlpHash chainInfo'
+          postChainInfo = do
+            threadDelay 1000000
+            flip postEvent (peers !! 0) . UnseqEvent . IEGenesis $ IngestGenesis Origin.API (chainId, chainInfo')
+
+      runForTwoSeconds $ concurrently_ (runNetwork peers connections) postChainInfo
+      ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
+      ifor_ ctxs1 $ \i ctx -> (i, ctx ^. apiChainInfoMap . at chainId) `shouldBe` (i, if i == 0 then Just chainInfo' else Nothing)
 
     it "should broadcast blockstanbul messages" $ property $ withMaxSuccess 10 $ \wm ->
       runTestPeer $ do
