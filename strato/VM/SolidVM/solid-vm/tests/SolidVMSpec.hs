@@ -5738,7 +5738,7 @@ contract qq {
 |]
     getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger 5,BDefault] 
 
-  it "warns when reading from contract state in a pure function" . runTest $ do
+  it "doesn't warn when reading from contract state in a pure function" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
 contract qq {
@@ -5750,7 +5750,7 @@ contract qq {
 |]
     getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger 5,BDefault] 
 
-  it "warns when writing to contract state from a pure or view function" . runTest $ do
+  it "doesn't warn when writing to contract state from a pure or view function" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
 contract qq {
@@ -5820,20 +5820,20 @@ contract C is B {
   it "can inherit from multiple contracts" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
-contract qq {
+contract A {
   uint x = 7;
 }
 contract B {
   uint y = 9;
 }
-contract C is qq, B {
+contract qq is A, B {
   function f() {
     x = 8;
     y = 10;
   }
 }
 |]
-    getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger 7,BDefault] 
+    getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger 7,BInteger 9] 
 
   it "can detect when referencing a state variable from a non-inherited contract" $ (runTest $
     runBS [r|
@@ -5849,7 +5849,7 @@ contract B {
 |]) `shouldThrow` anyTypeError  
 
 
-  it "can write pure and view functions" . runTest $ do
+  it "can't write pure and view functions in solidvm 3.2" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
 contract qq {
@@ -5864,7 +5864,7 @@ contract qq {
 |]
     getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger 5,BDefault] 
 
-  it "warns when reading from contract state in a pure function" . runTest $ do
+  it "Can't warn when reading from contract state in a pure function" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
 contract qq {
@@ -5876,7 +5876,7 @@ contract qq {
 |]
     getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger 5,BDefault] 
 
-  it "warns when writing to contract state from a pure or view function" . runTest $ do
+  it "Can't warn when writing to contract state from a pure or view function" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
 contract qq {
@@ -5893,7 +5893,7 @@ contract qq {
 |]
     getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger 5,BDefault] 
 
-  it "warns when using assembly code from a pure or view function" . runTest $ do
+  it "Can't warn when using assembly code from a pure or view function" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
 contract qq {
@@ -5913,7 +5913,7 @@ contract qq {
     getAll [[Field "x"]] `shouldReturn` [BInteger 5] 
 
 
-  it "can resolve state variables inherited from a contract" .runTest $ do
+  it "can't resolve state variables inherited from a contract" .runTest $ do
     runBS [r|
 pragma solidvm 3.2;
 contract qq {
@@ -5927,7 +5927,7 @@ contract B is qq {
 |]
     getAll [[Field "x"]] `shouldReturn` [BInteger 7] 
 
-  it "can resolve state variables from multiple layers of inheritance" . runTest $ do
+  it "Can't resolve state variables from multiple layers of inheritance" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
 contract qq {
@@ -5943,7 +5943,7 @@ contract C is B {
 |]
     getAll [[Field "x"]] `shouldReturn` [BInteger 7] 
 
-  it "can inherit from multiple contracts" . runTest $ do
+  it "Can't inherit from multiple contracts" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
 contract qq {

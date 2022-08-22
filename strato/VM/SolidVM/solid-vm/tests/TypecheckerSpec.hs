@@ -1019,7 +1019,7 @@ contract A {
 }
 |]
        in length anns `shouldBe` 0
-    it "warns when reading from contract state in a pure function" $
+    it "Does not warn when reading from contract state in a pure function" $
       let anns = runTypechecker [r|
 pragma solidvm 3.2;
 contract A {
@@ -1030,7 +1030,7 @@ contract A {
 }
 |]
        in length anns `shouldBe` 0
-    it "warns when writing to contract state from a pure or view function" $
+    it "Does not warn when writing to contract state from a pure or view function" $
       let anns = runTypechecker [r|
 pragma solidvm 3.2;
 contract A {
@@ -1046,7 +1046,7 @@ contract A {
 }
 |]
        in length anns `shouldBe` 0
-    it "warns when using assembly code from a pure or view function" $
+    it "Does not warn when using assembly code from a pure or view function" $
       let anns = runTypechecker [r|
 pragma solidvm 3.2;
 contract A {
@@ -1141,7 +1141,7 @@ contract A {
 }
 |]
        in length anns `shouldBe` 0
-    it "warns when reading from contract state in a pure function" $
+    it "Does not warn when reading from contract state in a pure function" $
       let anns = runTypechecker [r|
 pragma solidvm 3.2;
 contract A {
@@ -1152,7 +1152,7 @@ contract A {
 }
 |]
        in length anns `shouldBe` 0
-    it "warns when writing to contract state from a pure or view function" $
+    it "Does not warn when writing to contract state from a pure or view function" $
       let anns = runTypechecker [r|
 pragma solidvm 3.2;
 contract A {
@@ -1168,7 +1168,7 @@ contract A {
 }
 |]
        in length anns `shouldBe` 0
-    it "warns when using assembly code from a pure or view function" $
+    it "Does not warn when using assembly code from a pure or view function" $
       let anns = runTypechecker [r|
 pragma solidvm 3.2;
 contract A {
