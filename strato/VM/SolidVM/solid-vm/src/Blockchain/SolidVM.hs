@@ -2128,7 +2128,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                 codeSnippets = 
                   case (fromMaybe "" searchTerms) of 
                     --get the location of just the code of the contract, if nothing is inputted in the contract then focus on just the contract itself
-                    "" -> ["[Work in Progress"]
+                    "" -> [unparseContract contract]
                     -- "" -> let val = foldMap mon contract
                     --                       where mon sa  = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
                     --                                       in (Min (sl, sc), Max(el, ec))
@@ -2186,7 +2186,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                           
                       --Remove all of the items that were found to contain nothing, this should leave just the items that we found
                       in catMaybes [contrString, funcString, constString, storjString, enumString, eventString, structString, modString]
-            pure . Constant $ SString (head codeSnippets)
+            pure . Constant $ SString ( unlines codeSnippets)
             -- case codeSnippets of 
             --   [] -> pure . Constant $ SString $ "" --TODO: add warning that nothing was found and the piece of code is redundant
             --   -- Trim up the code to only include the code that was found, and format it if needed.

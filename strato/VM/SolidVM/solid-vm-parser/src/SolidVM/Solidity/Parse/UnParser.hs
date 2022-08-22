@@ -105,17 +105,17 @@ unparseContract :: SolidVM.Contract -> String
 unparseContract contr = 
      "contract "
   <> labelToString (contr ^. contractName)
-  <> " {\n"
-  <> (List.intercalate "\n" $ List.map unparseConstant (Map.assocs $ contr ^. constants)) -- ( contr ^. constants , contr ^. constants))
-  <> (List.intercalate "\n" $ List.map unparseVar (Map.assocs $ contr ^. storageDefs))
-  <> (List.intercalate "\n" $ List.map unparseEnum (fmap (fmap fst) (Map.assocs $ contr ^. enums)))
-  <> (List.intercalate "\n" $ List.map unparseStruct (Map.assocs $ contr ^. structs))
-  <> (List.intercalate "\n" $ List.map unparseEvent (Map.assocs $ contr ^. events))
-  <> (List.intercalate "\n" $ List.map unparseFunc (Map.assocs $ contr ^. functions))
+  <> " {\n  "
+  <> (List.intercalate "\n  " $ List.map unparseConstant (Map.assocs $ contr ^. constants)) -- ( contr ^. constants , contr ^. constants))
+  <> (List.intercalate "\n  " $ List.map unparseVar (Map.assocs $ contr ^. storageDefs))
+  <> (List.intercalate "\n  " $ List.map unparseEnum (fmap (fmap fst) (Map.assocs $ contr ^. enums)))
+  <> (List.intercalate "\n  " $ List.map unparseStruct (Map.assocs $ contr ^. structs))
+  <> (List.intercalate "\n  " $ List.map unparseEvent (Map.assocs $ contr ^. events))
+  <> (List.intercalate "\n  " $ List.map unparseFunc (Map.assocs $ contr ^. functions))
   <> case (contr ^. constructor) of
-    Just funf -> unparseCtor (funf)
-    Nothing -> "// no constructor found"
-  <> (List.intercalate "\n" $ List.map unparseModifier (Map.assocs $ contr ^. modifiers))
+    Just funf -> ("\n  " ++ unparseCtor (funf))
+    Nothing -> "\n  // no constructor found"
+  <> (List.intercalate "\n  " $ List.map unparseModifier (Map.assocs $ contr ^. modifiers))
   <> "\n}"
 
 
@@ -138,8 +138,8 @@ unparseEnum :: (SolidString, [SolidString]) -> String
 unparseEnum (name, values) =
      "enum "
   <> labelToString name
-  <> " {\n"
-  <> (List.intercalate ",\n" $ List.map labelToString values)
+  <> " {\n  "
+  <> (List.intercalate ",\n  " $ List.map labelToString values)
   <> "\n}"
 
 unparseVarType :: Type -> String
@@ -168,11 +168,11 @@ unparseFunc :: (SolidString, Func) -> String
 unparseFunc (name, f) = Text.unpack $ "function " <> labelToText name <> unparseFuncWithoutName f
 
 unparseCtor :: Func -> String
-unparseCtor f = Text.unpack $ "constructor" <> unparseFuncWithoutName f
+unparseCtor f = Text.unpack $ "constructor " <> unparseFuncWithoutName f
 
 unparseFuncWithoutName :: Func -> Text
 unparseFuncWithoutName Func{..} =
-       "("
+       " ("
     <> Text.intercalate ", " (List.map unparseArgs (sortWith (indexedTypeIndex . snd) $ map (\(maybeName, v) -> (fromMaybe "" $ fmap labelToText maybeName , v)) _funcArgs))
     <> ") "
     <> case _funcStateMutability of
@@ -202,7 +202,7 @@ unparseFuncWithoutName Func{..} =
 
 tab :: String -> String
 tab [] = []
-tab ('\n':rest) = "\n    " ++ tab rest
+tab ('\n':rest) = "\n  " ++ tab rest
 tab (x:rest) = x:tab rest
 
 unparseStatement :: Show a => StatementF a -> String
