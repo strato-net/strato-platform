@@ -2145,8 +2145,8 @@ expToVar' (CC.FunctionCall _ e args) = do
                       --Not Working
                       let contrString = 
                             case ((contract ^. CC.contractName) == term) of
-                              Just contrF -> Just $ unparseContract contrF
-                              Nothing -> Nothing
+                              True -> Just $ unparseContract contract
+                              False -> Nothing
 
                           constString =   
                             case ((contract ^. CC.constants) M.!? term) of 
@@ -2166,7 +2166,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                           --not working yet
                           structString = 
                             case ((contract ^. CC.structs) M.!? term) of
-                              Just structF -> Just $ unparseStructs term structF -- $ unparseStructs (term, structF)
+                              Just structF -> Just $ unparseStruct (term, structF) -- $ unparseStructs (term, structF)
                               Nothing -> Nothing
 
                           eventString = 

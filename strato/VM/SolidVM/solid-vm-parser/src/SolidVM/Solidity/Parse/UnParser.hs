@@ -7,7 +7,7 @@
 {-# LANGUAGE RecordWildCards #-}
 module SolidVM.Solidity.Parse.UnParser where
 
-import           Control.Lens
+import           Control.Lens               hiding (op)
 import           Data.Maybe
 import           Data.Text  (Text)
 import qualified Data.Text                  as Text
@@ -106,15 +106,18 @@ unparseContract contr =
      "contract "
   <> labelToString (contr ^. contractName)
   <> " {\n"
-  <> (List.intercalate "\n" $ List.map unparseConstant (_constants contr, contr ^. constants))
-  <> (List.intercalate "\n" $ List.map unparseVar (contr ^. storageDefs))
-  <> (List.intercalate "\n" $ List.map unparseEnum (contr ^. enums))
-  <> (List.intercalate "\n" $ List.map unparseStruct (contr ^. structs))
-  <> (List.intercalate "\n" $ List.map unparseEvent (contr ^. events))
-  <> (List.intercalate "\n" $ List.map unparseFunc (contr ^. functions))
-  <> unparseCtor (contr ^. constructor)
-  <> unparseModifier (contr ^. modifiers)
+  <> (List.intercalate "\n" $ List.map unparseConstant (Map.assocs $ contr ^. constants)) -- ( contr ^. constants , contr ^. constants))
+  <> (List.intercalate "\n" $ List.map unparseVar (Map.assocs $ contr ^. storageDefs))
+  <> (List.intercalate "\n" $ List.map unparseEnum (fmap (fmap fst) (Map.assocs $ contr ^. enums)))
+  <> (List.intercalate "\n" $ List.map unparseStruct (Map.assocs $ contr ^. structs))
+  <> (List.intercalate "\n" $ List.map unparseEvent (Map.assocs $ contr ^. events))
+  <> (List.intercalate "\n" $ List.map unparseFunc (Map.assocs $ contr ^. functions))
+  <> case (contr ^. constructor) of
+    Just funf -> unparseCtor (funf)
+    Nothing -> "// no constructor found"
+  <> (List.intercalate "\n" $ List.map unparseModifier (Map.assocs $ contr ^. modifiers))
   <> "\n}"
+
 
 unparseStruct :: (SolidString ,[(SolidString, SolidVM.FieldType, SourceAnnotation ())]) -> String
 unparseStruct (name, fields) =
