@@ -3827,8 +3827,8 @@ contract qq{
     let codeSnippet :: String
         codeSnippet = [r|contract Test {
   
-  constructor  () public {
-        }
+  constructor () public {
+    }
 }
 |]
         contract :: String
@@ -3997,8 +3997,8 @@ contract qq{
     let contractqq :: String
         contractqq = [r|contract qq {
   string codeTest;
-  constructor  () public {
-        Test t = new Test();
+  constructor () public {
+    Test t = new Test();
     codeTest = account(this).code("qq");
     }
 }
@@ -4054,8 +4054,8 @@ contract qq {
   uint seventyNine = 79;
   uint sixtyNine = 69;
   uint weed = 11;
-  constructor  () public {
-        weed = 420;
+  constructor () public {
+    weed = 420;
     }
 }
 |]
@@ -4085,14 +4085,14 @@ contract qq {
 
   fit "Can find a function within a codeCollection" . runTest $ do
     let myFunxion :: String
-        myFunxion = [r|function myFunction() public returns (uint) {
+        myFunxion = [r|function myFunction () public returns (uint ) {
     uint x = 13;
     uint y = 13;
     uint z = x + y;
     uint w = z + 13;
     uint u = w + 13;
     return u;
-}
+    }
 |]
         contract :: String
         contract = [r|
@@ -4123,14 +4123,14 @@ contract qq {
 
   fit "Can avoid getting confused if two functions with the same name are in the same codeCollection" . runTest $ do
     let myFunxion :: String
-        myFunxion = [r|function myFunction() public returns (uint) {
+        myFunxion = [r|function myFunction () public returns (uint ) {
     uint x = 13;
     uint y = 13;
     uint z = x + y;
     uint w = z + 13;
     uint u = w + 13;
     return u;
-}
+    }
 |]
         contract :: String
         contract = [r|
@@ -4172,8 +4172,8 @@ contract qq {
     let codeSnippet :: String
         codeSnippet = [r|contract Test {
   
-  constructor  () public {
-        }
+  constructor () public {
+    }
 }
 |]
         contract :: String

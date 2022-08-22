@@ -113,7 +113,7 @@ unparseContract contr =
   <> (List.intercalate "\n  " $ List.map unparseEvent (Map.assocs $ contr ^. events))
   <> (List.intercalate "\n  " $ List.map unparseFunc (Map.assocs $ contr ^. functions))
   <> case (contr ^. constructor) of
-    Just funf -> ("\n  " ++ unparseCtor funf)
+    Just funf -> ("\n  " ++ (unparseCtor funf))
     Nothing -> "\n  // no constructor found"
   <> (List.intercalate "\n  " $ List.map unparseModifier (Map.assocs $ contr ^. modifiers))
   <> "\n}"
@@ -168,7 +168,7 @@ unparseFunc :: (SolidString, Func) -> String
 unparseFunc (name, f) = Text.unpack $ "function " <> labelToText name <> unparseFuncWithoutName f
 
 unparseCtor :: Func -> String
-unparseCtor f = Text.unpack $ "constructor " <> unparseFuncWithoutName f
+unparseCtor f = Text.unpack $ "constructor" <> unparseFuncWithoutName f
 
 unparseFuncWithoutName :: Func -> Text
 unparseFuncWithoutName Func{..} =
@@ -194,10 +194,10 @@ unparseFuncWithoutName Func{..} =
               "returns ("
           <> Text.intercalate ", " (List.map unparseVals $ map (\(maybeName, v) -> (fromMaybe "" $ fmap labelToText maybeName , v)) vals)
           <> ") "
-    <> "{\n        "
+    <> "{\n    "
     <> case _funcContents of
         Just contents -> Text.pack $ tab . tab $ unlines $ map unparseStatement contents --(Text.concat . Text.lines $ contents)
-        Nothing -> ""
+        Nothing -> "\n"
     <> "}"
 
 tab :: String -> String
