@@ -5663,10 +5663,10 @@ contract qq {
   it "can resolve state variables inherited from a contract" . runTest $ do
     runBS [r|
 pragma solidvm 3.3;
-contract qq {
+contract A {
   uint x = 7;
 }
-contract B is qq {
+contract qq is A {
   function f() {
     x = 8;
   }
@@ -5677,12 +5677,12 @@ contract B is qq {
   it "can resolve state variables from multiple layers of inheritance" . runTest $ do
     runBS [r|
 pragma solidvm 3.3;
-contract qq {
+contract A {
   uint x = 7;
 }
-contract B is qq {
+contract B is A {
 }
-contract C is B {
+contract qq is B {
   function f() {
     x = 8;
   }
@@ -5693,13 +5693,13 @@ contract C is B {
   it "can inherit from multiple contracts" . runTest $ do
     runBS [r|
 pragma solidvm 3.3;
-contract qq {
+contract A {
   uint x = 7;
 }
 contract B {
   uint y = 9;
 }
-contract C is qq, B {
+contract qq is A, B {
   function f() {
     x = 8;
     y = 10;
@@ -5790,10 +5790,10 @@ contract qq {
   it "can resolve state variables inherited from a contract". runTest $ do
     runBS [r|
 pragma solidvm 3.2;
-contract qq {
+contract A {
   uint x = 7;
 }
-contract B is qq {
+contract qq is A {
   function f() {
     x = 8;
   }
@@ -5804,12 +5804,12 @@ contract B is qq {
   it "can resolve state variables from multiple layers of inheritance" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
-contract qq {
+contract A {
   uint x = 7;
 }
-contract B is qq {
+contract B is A {
 }
-contract C is B {
+contract qq is B {
   function f() {
     x = 8;
   }
@@ -5930,12 +5930,12 @@ contract B is qq {
   it "Can't resolve state variables from multiple layers of inheritance" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
-contract qq {
+contract A {
   uint x = 7;
 }
-contract B is qq {
+contract B is A {
 }
-contract C is B {
+contract qq is B {
   function f() {
     x = 8;
   }
@@ -5946,20 +5946,20 @@ contract C is B {
   it "Can't inherit from multiple contracts" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
-contract qq {
+contract A {
   uint x = 7;
 }
 contract B {
   uint y = 9;
 }
-contract C is qq, B {
+contract qq is A, B {
   function f() {
     x = 8;
     y = 10;
   }
 }
 |]
-    getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger 7,BDefault] 
+    getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger 7,BInteger 9] 
 
   it "can detect when referencing a state variable from a non-inherited contract" $ (runTest $
     runBS [r|
