@@ -123,16 +123,16 @@ unparseStruct :: (SolidString ,[(SolidString, SolidVM.FieldType, SourceAnnotatio
 unparseStruct (name, fields) =
      "struct "
   <> labelToString name
-  <> " {\n"
-  <> (List.intercalate ";\n  " $ List.map unparseStructField fields)
-  <> "\n}"
+  <> " {\n  "
+  <> (List.intercalate "  " $ List.map unparseStructField fields)
+  <> "}"
 
 unparseStructField :: (SolidString, SolidVM.FieldType, SourceAnnotation ()) -> String
 unparseStructField (name, theType, _) =
      unparseVarType (fieldTypeType theType)
   <> " "
   <> labelToString name
-  <> ";"
+  <> ";\n"
 
 unparseEnum :: (SolidString, [SolidString]) -> String
 unparseEnum (name, values) =

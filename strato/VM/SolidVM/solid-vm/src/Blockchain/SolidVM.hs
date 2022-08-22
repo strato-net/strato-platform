@@ -2163,7 +2163,6 @@ expToVar' (CC.FunctionCall _ e args) = do
                               Just enumF -> Just $ unparseEnum (term, fst enumF)
                               Nothing -> Nothing                             
 
-                          --not working yet
                           structString = 
                             case ((contract ^. CC.structs) M.!? term) of
                               Just structF -> Just $ unparseStruct (term, structF) -- $ unparseStructs (term, structF)
