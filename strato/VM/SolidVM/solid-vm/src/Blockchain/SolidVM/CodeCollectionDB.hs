@@ -48,6 +48,8 @@ import           SolidVM.Solidity.Parse.File
 import           SolidVM.Solidity.Parse.ParserTypes
 import qualified SolidVM.Solidity.StaticAnalysis.Typechecker                            as TypeChecker
 import qualified SolidVM.Solidity.StaticAnalysis.Functions.ConstantFunctions            as ConstantFunctions
+import           SolidVM.Solidity.StaticAnalysis.Optimizer as O
+import           SolidVM.Solidity.StaticAnalysis.Typechecker as TC
 --import           SolidVM.Model.CodeCollection.ConstantDecl
 
 data ParseTypeCheckOrSolidVMError = PEx ParseError
