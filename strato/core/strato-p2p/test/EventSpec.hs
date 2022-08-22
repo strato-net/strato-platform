@@ -49,6 +49,7 @@ import           Blockchain.Blockstanbul.Messages      (round)
 import           Blockchain.Blockstanbul.StateMachine
 import           Blockchain.Context                    hiding (actionTimestamp, blockHeaders, remainingBlockHeaders)
 import           Blockchain.Data.AddressStateDB
+import           Blockchain.Data.AlternateTransaction  (UnsignedTransaction(..))
 import           Blockchain.Data.ArbitraryInstances()
 import           Blockchain.Data.Block                 hiding (bestBlockNumber)
 import           Blockchain.Data.BlockDB()
@@ -1132,6 +1133,73 @@ spec = do
       runForTwoSeconds $ concurrently_ (runNetwork peers connections) (concurrently_ postTimeoutPrimary2 postTimeoutSecondary)
       ctxs2 <- atomically $ traverse (readTVar . _p2pTestContext) peers
       ifor_ ctxs2 $ \i ctx -> (i, _round . _view <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 1001 :: Maybe Word256)
+
+    it "can add a new now to a chain" $ do
+      let unseqSink = (unseqEvents %=) . (++)
+      privKeys <- traverse (const newPrivateKey) [(1 :: Integer)..3]
+      let validators' = makeValidators privKeys
+      peers <- traverse (\(p,(n,i)) -> createPeer p validators' unseqSink n i) $ zip privKeys
+        [ ("node1", "1.2.3.4")
+        , ("node2", "5.6.7.8")
+        , ("node3", "9.10.11.12")
+        ]
+      connections <- traverse (uncurry createConnection)
+        [ (peers !! 0, peers !! 1)
+        , (peers !! 0, peers !! 2)
+        , (peers !! 1, peers !! 2)
+        ]
+      let runForTwoSeconds = void . timeout 2000000
+          src = "pragma solidvm 3.2; contract A { event MemberAdded(address addr, string enode); function addMember(address _addr, string _enode) { emit MemberAdded(_addr, _enode); } }"
+          contractName = "A"
+          enode1 = readEnode "enode://abcd@1.2.3.4:30303"
+          enode2 = readEnode "enode://abcd@5.6.7.8:30303"
+          chainInfo' = ChainInfo
+            UnsignedChainInfo { chainLabel     = "My test chain!"
+                              , accountInfo    = [ContractNoStorage (Address 0x100) 10000000000 (SolidVMCode contractName $ hash src)]
+                              , codeInfo       = [CodeInfo "" src $ Just contractName]
+                              , members        = M.singleton (validators' !! 0) enode1
+                              , parentChain    = Nothing
+                              , creationBlock  = zeroHash
+                              , chainNonce     = 123456789
+                              , chainMetadata  = M.singleton "VM" "SolidVM"
+                              }
+            Nothing
+          chainId = keccak256ToWord256 $ rlpHash chainInfo'
+      ts <- liftIO getCurrentMicrotime
+      let args = "(" <> T.pack (formatAddressWithoutColor (validators' !! 1)) <> "," <> T.pack enode2 <> ")"
+          utx' = UnsignedTransaction
+            { unsignedTransactionNonce      = 0
+            , unsignedTransactionGasPrice   = 1
+            , unsignedTransactionGasLimit   = 1000000000
+            , unsignedTransactionTo         = (Address 0x100)
+            , unsignedTransactionValue      = 0
+            , unsignedTransactionInitOrData = Code ""
+            , unsignedTransactionChainId    = Just chainId
+            }
+          (Signature (CompactRecSig r s v)) = signMsg $ rlpHash utx'
+          tx' = MessageTX
+            { transactionNonce     = 0
+            , transactionGasPrice = 1
+            , transactionGasLimit = 1000000000
+            , transactionTo       = (Address 0x100)
+            , transactionValue    = 0
+            , transactionData     = ""
+            , transactionChainId  = Just chainId
+            , transactionR        = r
+            , transactionS        = s
+            , transactionV        = v
+            , transactionMetadata = Just $ M.fromList [("VM","SolidVM"),("funcName","addMember"),("args",args)]
+            }
+          ietx = IETx ts $ IngestTx Origin.API tx'
+          routine = do
+            threadDelay 500000
+            flip postEvent (peers !! 0) . UnseqEvent . IEGenesis $ IngestGenesis Origin.API (chainId, chainInfo')
+            threadDelay 500000
+            flip postEvent (peers !! 0) $ UnseqEvent ietx
+
+      runForTwoSeconds $ concurrently_ (runNetwork peers connections) routine
+      ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
+      ifor_ ctxs1 $ \i ctx -> (i, ctx ^. apiChainInfoMap . at chainId) `shouldBe` (i, if i == 2 then Nothing else Just chainInfo')
   
   describe "handleEvents" $ do
     it "should pong a ping" $
@@ -1154,44 +1222,6 @@ spec = do
         -- Now that the peer is known to be addr, we should only send if they are designated
         shouldSendToPeer addr `L.shouldReturn` True
         shouldSendToPeer 0xa `L.shouldReturn` False
-
-    it "Can index a ChainInfo" $ do
-      let unseqSink = (unseqEvents %=) . (++)
-      privKeys <- traverse (const newPrivateKey) [(1 :: Integer)..3]
-      let validators' = makeValidators privKeys
-      peers <- traverse (\(p,(n,i)) -> createPeer p validators' unseqSink n i) $ zip privKeys
-        [ ("node1", "1.2.3.4")
-        , ("node2", "5.6.7.8")
-        , ("node3", "9.10.11.12")
-        ]
-      connections <- traverse (uncurry createConnection)
-        [ (peers !! 0, peers !! 1)
-        , (peers !! 0, peers !! 2)
-        , (peers !! 1, peers !! 2)
-        ]
-      let runForTwoSeconds = void . timeout 2000000
-          src = "contract A {}"
-          contractName = "A"
-          enode = readEnode "enode://abcd@1.2.3.4:30303"
-          chainInfo' = ChainInfo
-            UnsignedChainInfo { chainLabel     = "My test chain!"
-                              , accountInfo    = [ContractNoStorage (Address 0x100) 10000000000 (SolidVMCode contractName $ hash src)]
-                              , codeInfo       = [CodeInfo "" src $ Just contractName]
-                              , members        = M.singleton (validators' !! 0) enode
-                              , parentChain    = Nothing
-                              , creationBlock  = zeroHash
-                              , chainNonce     = 123456789
-                              , chainMetadata  = M.singleton "VM" "SolidVM"
-                              }
-            Nothing
-          chainId = keccak256ToWord256 $ rlpHash chainInfo'
-          postChainInfo = do
-            threadDelay 1000000
-            flip postEvent (peers !! 0) . UnseqEvent . IEGenesis $ IngestGenesis Origin.API (chainId, chainInfo')
-
-      runForTwoSeconds $ concurrently_ (runNetwork peers connections) postChainInfo
-      ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
-      ifor_ ctxs1 $ \i ctx -> (i, ctx ^. apiChainInfoMap . at chainId) `shouldBe` (i, if i == 0 then Just chainInfo' else Nothing)
 
     it "should broadcast blockstanbul messages" $ property $ withMaxSuccess 10 $ \wm ->
       runTestPeer $ do
