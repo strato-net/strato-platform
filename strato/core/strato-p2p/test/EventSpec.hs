@@ -32,6 +32,7 @@ import qualified Data.Set                              as Set
 import qualified Data.Set.Ordered                      as S
 import qualified Data.Sequence                         as Q
 import           Data.Text (Text)
+import           Data.Maybe
 import           Text.Printf
 
 import           BlockApps.Logging
@@ -277,7 +278,7 @@ instance MonadIO m => ((OrgName, OrgUnit) `A.Alters` Word256) (MonadTest m) wher
   lookup = genericTestLookup $ sequencerContext . orgNameChainsRegistry
   insert = genericTestInsert $ sequencerContext . orgNameChainsRegistry
   delete = genericTestDelete $ sequencerContext . orgNameChainsRegistry
-  
+
 
 instance MonadIO m => (Keccak256 `A.Alters` DBDB.DependentBlockEntry) (MonadTest m) where
   lookup _ k = use $ sequencerContext . dbeRegistry . at k
@@ -327,11 +328,11 @@ instance MonadIO m => HasVault (MonadTest m) where
   sign bs = do
     pk <- use prvKey
     return $ signMsg pk bs
-  
+
   getPub = do
     pk <- use prvKey
     return $ derivePublicKey pk
-  
+
   getShared pub = do
     pk <- use prvKey
     return $ deriveSharedKey pk pub
@@ -369,7 +370,7 @@ newBlockstanbulContext paddr as =
 
 emptyBlockstanbulContext :: BlockstanbulContext
 emptyBlockstanbulContext = newBlockstanbulContext undefined []
-  
+
 newSequencerContext :: MonadIO m => BlockstanbulContext -> m SequencerContext
 newSequencerContext bc = do
   -- loopCh <- atomically newTMChan
@@ -512,7 +513,7 @@ data P2PConnection m = P2PConnection
   , _serverP2PPeer  :: P2PPeer m
   , _clientP2PPeer  :: P2PPeer m
   , _runServer      :: m (Maybe SomeException)
-  , _runClient      :: m (Maybe SomeException) 
+  , _runClient      :: m (Maybe SomeException)
   }
 
 createConnection :: MonadP2P m
@@ -544,8 +545,8 @@ createConnection server client = do
     runServer
     runClient
 
-runConnectionWith :: (PrivateKey -> WMRef -> m (Maybe SomeException) -> IO b) 
-                  -> P2PConnection m 
+runConnectionWith :: (PrivateKey -> WMRef -> m (Maybe SomeException) -> IO b)
+                  -> P2PConnection m
                   -> IO (b, b)
 runConnectionWith f connection =
   let server = _serverP2PPeer connection
@@ -564,7 +565,7 @@ makeValidators = map (fromPrivateKey . _p2pPeerPrivKey)
 --         ips xs = take 4 xs : ips (drop 4 xs)
 --         toIP = L.intersperse '.' . map show
 --         generateThem = toIP <$> ips (galois 1)
-                          
+
 spec :: Spec
 spec = do
   describe "network simulation" $ do
@@ -581,7 +582,7 @@ spec = do
       otx <- (\o -> o{otBaseTx = clearChainId (otBaseTx o), otOrigin = Origin.API}) <$> liftIO (generate arbitrary)
       let runForTwoSeconds pk wmr = execTestPeer pk wmr validatorAddresses . timeout 2000000
           run = runConnectionWith runForTwoSeconds connection
-          postTx = threadDelay 500000 >> (atomically $ writeTMChan (_p2pPeerSeqSource server) (P2pTx otx))
+          postTx = threadDelay 500000 >> atomically (writeTMChan (_p2pPeerSeqSource server) (P2pTx otx))
       ((_, serverCtx), (_, clientCtx)) <- fst <$> concurrently run postTx
       _unseqEvents serverCtx `shouldBe` []
       let clientTxs = [t | IETx _ (IngestTx _ t) <- _unseqEvents clientCtx]
@@ -621,7 +622,7 @@ spec = do
             for_ validators' (\p -> atomically $ writeTQueue (_p2pPeerUnseqSource p) (TimerFire 0))
       ctxs <- fst <$> concurrently runSequencers (concurrently runConnections postTimeout)
       ifor_ ctxs $ \i ctx -> (i, _round . _view <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 1 :: Maybe Word256)
-  
+
 
     it "should update the round number after failing on a divided network first" $ do
       let unseqSink = (unseqEvents %=) . (++)
@@ -664,7 +665,7 @@ spec = do
       ifor_ ctxs1 $ \i ctx -> (i, _round . _view <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, if i == 0 then Just (1 :: Word256) else Just 1000)
       ctxs2 <- fst <$> concurrently (runSequencers2 ctxs1) (concurrently runConnections $ concurrently postTimeoutPrimary2 postTimeoutSecondary)
       ifor_ ctxs2 $ \i ctx -> (i, _round . _view <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 1001 :: Maybe Word256)
-  
+
   describe "handleEvents" $ do
     it "should pong a ping" $
       runTestPeer $ do
@@ -744,3 +745,33 @@ spec = do
       it "should reject a wrong ip and wrong key" $ FlexibleAuth `shouldReject` (key4, ip4)
       it "should accept a matching ip" $ FlexibleAuth `shouldAccept` (key4, ip1)
       it "should accept a matching key" $ FlexibleAuth `shouldAccept` (key2, ip4)
+
+  describe "End to end sync" $ do
+    it "renamed" $ do
+      let unseqSink = (unseqEvents %=) . (++)
+      server <- createPeer unseqSink "server" "1.2.3.4"
+      client <- createPeer unseqSink "client" "5.6.7.8"  -- enode://5.6.7.8:84924028758903278342928494398423847342
+
+      let serverUserAddress = fromPublicKey . derivePublicKey $ _p2pPeerPrivKey server
+          clientUserAddress = fromPublicKey . derivePublicKey $ _p2pPeerPrivKey client
+
+      let validatorAddresses = makeValidators [server, client]
+      connection <- createConnection server client
+
+      let runForTwoSeconds pk wmr = execTestPeer pk wmr validatorAddresses . timeout 2000000
+          run :: IO((Maybe (Maybe SomeException), TestContext),(Maybe (Maybe SomeException), TestContext))
+          run = runConnectionWith runForTwoSeconds connection
+          insertServerCert = A.insert (A.Proxy @X509CertInfoState) serverUserAddress (X509CertInfoState serverUserAddress (error "X509 cert unavailable") True [] "dunder mifflin" "sales")
+          insertClientCert = A.insert (A.Proxy @X509CertInfoState) clientUserAddress (X509CertInfoState clientUserAddress (error "X509 cert unavailable") True [] "dunder mifflin" "sales")
+          setChainInfoMap = A.insert (A.Proxy @ChainInfo) (0x1234 :: Address) (ChainInfo{chainInfo=UnsignedChainInfo{chainLabel="ola", accountInfo=[], codeInfo=[], members=M.singleton serverUserAddress $ fromJust $ DataPeer.pPeerEnode $ _p2pPeerPPeer server, parentChain=Nothing, creationBlock=undefined, chainNonce=0, chainMetadata=M.empty} , chainSignature=Nothing})
+          setChainMembers = A.insert (A.Proxy @ChainMembers) (0x1234 :: Address) (ChainMembers $ M.singleton serverUserAddress $ fromJust $ DataPeer.pPeerEnode $ _p2pPeerPPeer server)
+          setOrgNameChains = A.insert (A.Proxy @OrgNameChains) (OrgName "dunder mifflin", OrgUnit (Just "sales")) (OrgNameChains $ Set.singleton 0x1234)
+          newChain = atomically (writeTMChan (_p2pPeerSeqSource server) (P2pNewChainMember 0x1234 serverUserAddress $ fromJust $ DataPeer.pPeerEnode $ _p2pPeerPPeer server))
+          postIENewChainOrgName = atomically (writeTQueue (_p2pPeerUnseqSource server) $ UnseqEvent $ IENewChainOrgName 0x1234 ("dunder mifflin",Just "sales"))
+          postTx = threadDelay 500000 >> newChain >> setChainInfoMap >> insertServerCert >> insertClientCert >> threadDelay 500000 >> postIENewChainOrgName
+          --postTx = threadDelay 500000 >> insertClientCert
+
+      ((_, serverCtx), (_, clientCtx)) <- fst <$> concurrently run postTx
+      _unseqEvents serverCtx `shouldBe` []
+      let clientTxs = [ci | IEGenesis (IngestGenesis _ (_, ci)) <- _unseqEvents clientCtx]
+      clientTxs `shouldBe` [_]

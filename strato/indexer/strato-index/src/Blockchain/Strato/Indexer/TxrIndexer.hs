@@ -16,7 +16,7 @@ import qualified Data.ByteString.Char8              as C8
 import qualified Data.ByteString.Lazy               as BL
 import           Data.Either.Extra                  (eitherToMaybe)
 import qualified Data.List                          as List
-import           Data.Maybe                         (maybeToList)
+import           Data.Maybe                         (maybeToList, fromMaybe)
 import qualified Data.Text                          as T
 import           Data.Text.Encoding                 (decodeUtf8)
 import           Network.Kafka
@@ -189,11 +189,13 @@ indexEventToTxrResults = \case
       (Nothing, "CertificateRegistered", [certString]) ->
         let cert = bsToCert . C8.pack $ certString
             userAddress = fmap (fromPublicKey . subPub) $ getCertSubject =<< eitherToMaybe cert
+            org = maybe "" subOrg $ getCertSubject =<< eitherToMaybe cert
+            orgUnit = fromMaybe "" $ subUnit =<< getCertSubject =<< eitherToMaybe cert
         in case (cert, userAddress) of
             (Left s, Nothing) -> Just . RegisterCertificate . Left $ "Failed to parse the certString for the CertificateRegistered event: " <> s
             (Left s, Just ua) -> Just . RegisterCertificate . Left $ "Failed to parse the certString for the CertificateRegistered event: " <> s <> "; " <> show ua
             (Right s, Nothing) -> Just . RegisterCertificate . Left $ "Failed to parse the certString's userAddress for the CertificateRegistered event: " <> show s
-            (Right c, Just ua) -> Just . RegisterCertificate . Right $ (ua, X509CertInfoState{userAddress=ua, certificate=c, isValid=True, children=[]})
+            (Right c, Just ua) -> Just . RegisterCertificate . Right $ (ua, X509CertInfoState{userAddress=ua, certificate=c, isValid=True, children=[],orgName=org, orgUnit=orgUnit})
       (Nothing, "CertificateRevoked", [userAddress]) ->
         let userAddress' = stringAddress userAddress
         in case userAddress' of

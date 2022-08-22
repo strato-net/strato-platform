@@ -105,6 +105,8 @@ data X509CertInfoState = X509CertInfoState
   , certificate :: X509Certificate
   , isValid :: Bool         -- ^ Non-revoked = true, revoked = false
   , children :: [Address]   -- ^ The "userAddress" of the children of the certificate
+  , orgName :: String
+  , orgUnit :: String 
   } deriving (Show, Eq, Generic, Binary)
 
 instance Format X509CertInfoState where
