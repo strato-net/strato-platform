@@ -46,7 +46,7 @@ import           SolidVM.Model.SolidString
 import           SolidVM.Solidity.Parse.Declarations
 import           SolidVM.Solidity.Parse.File
 import           SolidVM.Solidity.Parse.ParserTypes
-import qualified SolidVM.Solidity.StaticAnalysis.Typechecker                            as Typechecker
+import qualified SolidVM.Solidity.StaticAnalysis.Typechecker                            as TypeChecker
 import qualified SolidVM.Solidity.StaticAnalysis.Functions.ConstantFunctions            as ConstantFunctions
 --import           SolidVM.Model.CodeCollection.ConstantDecl
 
@@ -159,20 +159,22 @@ compileSource :: Bool -> Map T.Text T.Text-> Either ParseTypeCheckOrSolidVMError
 compileSource typeCheck mTT = do
   let applyInheritanceE = first SVMEx . applyInheritance
   case (applyInheritanceE <=< compileSourceNoInheritance) mTT of
-    Right cc ->
-      |(typeCheck && hasSvm3_2 cc) >>= typeCheckDetectorSvm3_2 cc
-      |(typeCheck && hasSvm3_3 cc) >>= typeCheckDetectorSvm3_3 cc
-      |otherwise >>= Right cc
+    Right cc | typeCheck && hasSvm3_2 cc -> typeCheckDetectorSvm3_2 cc
+             | typeCheck && hasSvm3_3 cc -> typeCheckDetectorSvm3_3 cc
+             | otherwise                 -> Right cc
     Left x -> Left x
     where
       typeCheckDetectorSvm3_2 ecc = case TypeChecker.detector ecc of
         [] -> Right ecc
         xs -> Left $ TCEx xs
-      typeCheckDetectorSvm3_3 ecc = case ConstantFunctions.detector ecc of
+      typeCheckDetectorSvm3_3 ecc = case TypeChecker.detector ecc <> ConstantFunctions.detector ecc of
         [] -> Right ecc
         xs -> Left $ TCEx xs
 -- do if typeCheck && (hasSvm3_2 cc || hasSvm3_3 cc) then typeCheckDetector cc else Right cc
--- guards cant be used inside cases?
+-- guards cant be used inside cases?      
+      -- |(typeCheck && hasSvm3_2 cc) >>= typeCheckDetectorSvm3_2 cc
+      -- |(typeCheck && hasSvm3_3 cc) >>= typeCheckDetectorSvm3_3 cc
+      -- |otherwise >>= Right cc
 
 compileSourceWithAnnotations :: Bool -> Map T.Text T.Text -> Either [SourceAnnotation T.Text] CodeCollection
 compileSourceWithAnnotations typeCheck = withAnnotations (compileSource typeCheck)
