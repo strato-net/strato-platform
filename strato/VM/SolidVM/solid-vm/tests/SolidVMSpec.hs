@@ -5706,7 +5706,7 @@ contract qq is A, B {
   }
 }
 |]
-    getAll [[Field "x"]] `shouldReturn` [BInteger 7] 
+    getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger 7, BInteger 9]
 
   it "error when referencing a state variable from a non-inherited contract" $ (runTest $
     runBS [r|
@@ -5916,10 +5916,10 @@ contract qq {
   it "can't resolve state variables inherited from a contract" .runTest $ do
     runBS [r|
 pragma solidvm 3.2;
-contract qq {
+contract A {
   uint x = 7;
 }
-contract B is qq {
+contract qq is A {
   function f() {
     x = 8;
   }
