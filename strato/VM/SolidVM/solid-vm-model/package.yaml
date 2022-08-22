@@ -61,3 +61,4 @@ benchmarks:
       - ethereum-rlp
       - solid-vm-model
       - strato-model
+      - criterion

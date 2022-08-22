@@ -24,7 +24,9 @@ module Blockchain.SolidVM.SetGet (
 -}
   deleteVar,
 
-  
+  toBasic,
+  fromBasic,
+    
   showSM
   ) where
 
@@ -167,6 +169,8 @@ setVal dst@(SReference addressedPath@(AccountPath addr path)) src = do
   let svm3_0 = CC._vmVersion contract == "svm3.0" || CC._vmVersion contract == "svm3.2" || CC._vmVersion contract == "svm3.3"
   putSolidStorageKeyVal' svm3_0 addr path basicSrc
 
+
+setVal (SInteger dst) (SInteger _) = immutableError "Cannot assign immutable or constants after assigned ->" dst -- typeError "Cannot assign immutables after assigned" ("src = " ++ show src ++ ", dst = " ++ show dst)
 
 setVal (SNULL) _ = return ()
 

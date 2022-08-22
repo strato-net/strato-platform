@@ -139,6 +139,7 @@ handleVmEvents = awaitForever $ \InBatch{..} -> do
     recordSeqEventCount bLen tLen
 
   numPoolable <- uncurry (*>) . (yieldMany *** pure) =<< lift (processTransactions txPairs)
+  yieldMany $ outputPrivateTransactions privateTxs
   processBlocksAndNewChains blocksAndNewChains
 
   mNewBlock <- lift $ do
@@ -297,6 +298,9 @@ getNumPoolable txPairs = do
 
 outputTransactions :: [(Timestamp, OutputTx)] -> [VmOutEvent]
 outputTransactions = map $ OutIndexEvent . uncurry IndexTransaction
+
+outputPrivateTransactions :: [OutputTx] -> [VmOutEvent]
+outputPrivateTransactions = map $ OutIndexEvent . IndexPrivateTx
 
 -- TODO: maybe move this into solid-vm?
 runChainConstructors :: SolidVM.SolidVMBase m => Word256 -> ChainInfo -> m (MP.StateRoot, [Action])

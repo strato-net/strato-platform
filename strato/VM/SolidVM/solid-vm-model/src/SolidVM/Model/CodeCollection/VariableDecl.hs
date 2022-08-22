@@ -13,6 +13,7 @@ module SolidVM.Model.CodeCollection.VariableDecl (
 
 import           Data.Aeson
 import           Data.Source
+import           Control.DeepSeq
 import           GHC.Generics
 import           Test.QuickCheck.Instances    ()
 
@@ -24,7 +25,8 @@ data VariableDeclF a = VariableDecl
   , varIsPublic   :: Bool
   , varInitialVal :: Maybe (ExpressionF a)
   , varContext    :: a
-  } deriving (Show, Eq, Generic, Functor)
+  , isImmutable   :: Bool
+  } deriving (Show, Eq, Generic, NFData, Functor)
 
 instance ToJSON a => ToJSON (VariableDeclF a)
 instance FromJSON a => FromJSON (VariableDeclF a)

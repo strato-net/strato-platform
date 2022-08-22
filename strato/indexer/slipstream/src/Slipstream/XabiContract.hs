@@ -32,6 +32,7 @@ xabiToPartialContract xabi =
     _storageDefs=M.mapKeys textToLabel $ fmap varTypeToVariableDecl $ OLDXABI.xabiVars xabi,
     _enums=error "_enums undefined",
     _structs=error "_structs undefined",
+    _errors=error "_errors undefined",
     _events=M.mapKeys textToLabel $ fmap evmEventToEvent $ OLDXABI.xabiEvents xabi,
     _functions=error "_functions undefined",
     _constructor=error "_constructor undefined",
@@ -73,7 +74,8 @@ varTypeToVariableDecl x =
   varType=evmTypeToType $ OLDXABI.varTypeType x,
   varIsPublic=False,
   varInitialVal=Nothing,
-  varContext=dummyAnnotation
+  varContext=dummyAnnotation,
+  isImmutable=False
   }
 
 dummyAnnotation :: SourceAnnotation ()

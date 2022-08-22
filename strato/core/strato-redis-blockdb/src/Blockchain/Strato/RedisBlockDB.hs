@@ -39,7 +39,7 @@ module Blockchain.Strato.RedisBlockDB
     , commonAncestorHelper
     , getWorldBestBlockInfo, updateWorldBestBlockInfo
     , acquireRedlock, releaseRedlock, defaultRedlockTTL
-    , getSyncStatus, putSyncStatus
+    , getSyncStatus, putSyncStatus, getCertificate
     ) where
 
 import           BlockApps.X509.Certificate
@@ -690,12 +690,16 @@ insertBlock sha b = do
         ptxs    = filter
                     (isJust . txAnchorChain)
                     (obReceiptTransactions b)
+        swapPayload otx = case otPrivatePayload otx of
+                                Nothing -> Nothing
+                                Just p -> Just otx{otBaseTx = p}
+        fullPrivateTxs = catMaybes $ swapPayload <$> ptxs
         uncles  = RedisUncles (morphBlockHeader <$> blockUncleHeaders b)
         inNS'   = flip inNamespace sha
-    unless (null ptxs) $ do
+    unless (null fullPrivateTxs) $ do
       void . addPrivateTransactions $
-        map (txHash &&& ((fromJust . txAnchorChain) &&& id)) ptxs
-      forM_ (partitionWith txAnchorChain ptxs) $ \(cId, ptxs') ->
+        map (txHash &&& ((fromJust . txAnchorChain) &&& id)) fullPrivateTxs
+      forM_ (partitionWith txAnchorChain fullPrivateTxs) $ \(cId, ptxs') ->
                          --  ^-- already filtered on (isJust . txChainId)
         addChainTxsInBlock sha (fromJust cId) $ map txHash ptxs'
     res <- multiExec $ do
