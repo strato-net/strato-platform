@@ -5973,3 +5973,45 @@ contract B {
   }
 }
 |]) `shouldThrow` anyTypeError
+
+
+  it "Supports view functions in 3.3" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+    function f(uint a, uint b) public view returns (uint) {
+        return a * (b + 42);
+    }
+}
+|]
+    getAll [[Field "a"], [Field "b"]] `shouldReturn` [BDefault,BDefault]  
+
+
+  it "View functions unsupported in 3.2" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+    uint x = 10;
+    function f(uint a, uint b) public view returns (uint) {
+        x = 5;
+        return a * (b + 42);
+    }
+}
+|]
+    getAll [[Field "a"], [Field "b"]] `shouldReturn` [BDefault,BDefault]
+
+
+  it "View functions enforced in 3.3" $ (runTest $
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+    uint x = 10;
+    function f(uint a, uint b) public view returns (uint) {
+        x = 5;
+        return a * (b + 42);
+    }
+    constructor () {
+      f(1,2);
+    }
+}
+|]) `shouldThrow` anyTypeError
