@@ -13,7 +13,7 @@ data EventException =
   | WrongGenesisBlock
   | NetworkIDMismatch Integer Integer
   | RootCertificateMismatch
-  | InvalidClientCert
+  | InvalidClientCert String
   | NoPeerPubKey deriving (Show)
 
 instance Exception EventException where

@@ -66,6 +66,8 @@ import           Blockchain.Strato.Model.Util
 import           Blockchain.Watchdog
 import           BlockApps.X509
 
+import           Blockchain.Strato.Model.Secp256k1
+
 
 -- This is a placeholder until the root certs can be held in a proper database
 rootCerts' :: S.Set X509Certificate
@@ -223,14 +225,15 @@ handleMsgServerConduit myPubkey peer = do
     $logDebugS "handleMsgServerConduit" $ T.pack "about to parse message"
     awaitMsg >>= \case
         Just clientHello@Hello{} -> do
+            --- Does the node I'm connecting to have a valid certificate?
             let userAddress' = fromPublicKey (pointToSecPubKey $ nodeId clientHello)
-            $logInfoS "========handshake/Hello{}" . T.pack $ ("our handshaked " ++ show userAddress')
+            $logInfoS "+++++++handshake/Hello{}" . T.pack $ ("our handshaked " ++ show userAddress')
             -- Lookup in Redis with userAddress, isValid Field
             clientCertDetails <- lift $ A.select (A.Proxy @X509CertInfoState) userAddress'
-            $logInfoS "========handshake/Hello{}" . T.pack $ ("our clientCertDetails " ++ show clientCertDetails)
+            $logInfoS "+++++++handshake/Hello{}" . T.pack $ ("our clientCertDetails " ++ show clientCertDetails)
 
             -- Throw error if the cert is not valid.
-            unless (maybe False isValid clientCertDetails) $ throwIO InvalidClientCert
+            unless (maybe False isValid clientCertDetails) $ throwIO $ InvalidClientCert ("+++++++handshake/Hello{}: Invalid cert for client " <> show userAddress')
             $logInfoS "handshake/Hello{}" "received hello"
             let helloMsg' = Hello {
                 version = 4,
@@ -239,6 +242,13 @@ handleMsgServerConduit myPubkey peer = do
                 port = 0,
                 nodeId = myPubkey
             }
+
+            --- Do I have a valid certificate? -- TODO: Fix security implications
+            ourUserAddress <- fromPublicKey <$> getPub
+            ourClientCertDetails <- lift $ A.select (A.Proxy @X509CertInfoState) ourUserAddress
+            unless (maybe False isValid ourClientCertDetails) $ throwIO $ InvalidClientCert ("+++++++handshake/Hello{}: Our cert is in valid " <> show ourUserAddress)
+
+
             yield $ Right helloMsg'
         other -> assertHandshake $ other
     awaitMsg >>= \case

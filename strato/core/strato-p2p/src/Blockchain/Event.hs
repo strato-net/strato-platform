@@ -84,6 +84,8 @@ import           Text.Tools
 
 import           Debug.Trace                           (trace)
 
+import           Blockchain.Strato.Model.Secp256k1
+
 setTitleAndProduceBlocks :: ( MonadLogger m
                             , MonadIO m
                             , Stacks Block m
@@ -412,10 +414,13 @@ handleEvents peer = awaitForever $ \case
           for_ mcInfo $ yieldR . ChainDetails . (:[])
       P2pCertificateRevoked revokedUserAddress -> do
         let peer'sUserAddressM = fromPublicKey . pointToSecPubKey <$> pPeerPubkey peer
-        $logInfoS "========handleEvents/P2pCertificateRevoked" . T.pack $ "Revoked " ++ CL.yellow (format revokedUserAddress)
-        $logInfoS "========handleEvents/P2pCertificateRevoked" . T.pack $ "Our peer " ++ CL.yellow (format peer'sUserAddressM)
+        $logInfoS "+++++++handleEvents/P2pCertificateRevoked" . T.pack $ "Revoked " ++ CL.yellow (format revokedUserAddress)
+        $logInfoS "+++++++handleEvents/P2pCertificateRevoked" . T.pack $ "Our peer " ++ CL.yellow (format peer'sUserAddressM)
+        --- Do I have a valid certificate? -- TODO: Fix security implications
+        ourUserAddress <- fromPublicKey <$> getPub
         case peer'sUserAddressM of
-          Just pua | pua == revokedUserAddress -> throwIO InvalidClientCert
+          Just pua | pua == revokedUserAddress -> throwIO $ InvalidClientCert ("+++++++handleEvents/P2pCertificateRevoked: revoked other client " <> show pua)
+          Just pua | pua == ourUserAddress     -> throwIO $ InvalidClientCert ("+++++++handleEvents/P2pCertificateRevoked: revoked ourself " <> show pua)
           _ -> pure ()
       P2pBlockstanbul msg -> do
         let outbound = Blockstanbul msg
