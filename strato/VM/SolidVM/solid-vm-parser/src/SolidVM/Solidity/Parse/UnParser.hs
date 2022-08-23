@@ -169,14 +169,26 @@ unparseFuncOverload :: SolidString -> [Func] -> String
 unparseFuncOverload name funcs = unlines $ map (unparseFunc . (name,)) funcs
 
 unparseFunc :: (SolidString, Func) -> String
-unparseFunc (name, f) = Text.unpack $ "function " <> labelToText name <> unparseFuncWithoutName f
+unparseFunc (name, f) = 
+  if (length (f ^. funcOverload) > 1) then Text.unpack $ unparseFuncWithOverload name f
+        else 
+          Text.unpack $ "function " <> labelToText name <> " " <> unparseFuncWithoutName f
 
 unparseCtor :: Func -> String
-unparseCtor f = Text.unpack $ "constructor" <> unparseFuncWithoutName f
+unparseCtor f = Text.unpack $ "constructor " <> unparseFuncWithoutName f
 
-unparseFuncWithoutName :: Func -> Text
-unparseFuncWithoutName Func{..} =
-       " ("
+unparseFuncWithOverload :: SolidString -> Func -> Text
+unparseFuncWithOverload name myFunction = unparseFuncDeep name myFunction
+
+unparseFuncWithoutName:: Func -> Text
+unparseFuncWithoutName f = unparseFuncDeep "" f
+
+unparseFuncDeep :: SolidString -> Func -> Text
+unparseFuncDeep deepName Func{..} =
+       (if (deepName == "") then
+          "("
+        else 
+          "function " <> labelToText deepName <> " (")
     <> Text.intercalate ", " (List.map unparseArgs (sortWith (indexedTypeIndex . snd) $ map (\(maybeName, v) -> (fromMaybe "" $ fmap labelToText maybeName , v)) _funcArgs))
     <> ") "
     <> case _funcStateMutability of
@@ -203,6 +215,10 @@ unparseFuncWithoutName Func{..} =
         Just contents -> Text.pack $ tab . tab $ unlines $ map unparseStatement contents --(Text.concat . Text.lines $ contents)
         Nothing -> "\n"
     <> "}"
+    <> case _funcOverload of
+          [] -> Text.pack ""
+          as -> "\n" <> (Text.unlines $ map (unparseFuncDeep deepName) as)
+    -- <> (Text.pack $ show func)
 
 tab :: String -> String
 tab [] = []

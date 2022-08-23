@@ -3753,22 +3753,21 @@ contract qq {
     getFields ["codePiece"] `shouldReturn`
       [ BString $ UTF8.fromString testCode]
 
-  fit "can get overloaded function using the .code parameter" . runTest $ do
+  it "can get overloaded function using the .code parameter" . runTest $ do
     let testCode :: String
-        testCode = [r|  
-function addToNum(uint x, uint y) {
-  myNum += x + y;
-}
+        testCode = [r|function addToNum (uint x, uint y) public {
+    myNum += x + y;
+    }
+function addToNum (uint x, bool y) public {
+    myNum += x;
+    myStatus = y;
+    }
+function addToNum (uint x, string z) public {
+    myNum += x;
+    myString = z;
+    }
 
-function addToNum(uint x, bool y) {
-  myNum += x;
-  myStatus = y;
-}
-
-function addToNum(uint x, string z) {
-  myNum += x;
-  myString = z;
-}|]
+|]
         codeSnippet :: String
         codeSnippet = [r|
 pragma solidvm 3.3;
@@ -3801,7 +3800,7 @@ contract qq{
   string codeTest;
   constructor() public {
     Test t = new Test();
-    codeTest = account(t).code("randomFunc");
+    codeTest = account(t).code("addToNum");
   }
 }|]
     runBS codeSnippet
@@ -4139,7 +4138,7 @@ contract qq {
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString myContract]
 
-  fit "Can find a function within a codeCollection" . runTest $ do
+  it "Can find a function within a codeCollection" . runTest $ do
     let myFunxion :: String
         myFunxion = [r|function myFunction () public returns (uint ) {
     uint x = 13;

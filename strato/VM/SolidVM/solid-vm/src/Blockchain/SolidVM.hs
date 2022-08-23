@@ -2124,22 +2124,12 @@ expToVar' (CC.FunctionCall _ e args) = do
             --get only the contract containing useful sourceAnnotation contained in the ContractF type.
             (contract, _, _) <- getCodeAndCollection address
             -- contractXabi <- getContractXabi address
-
-            liftIO $ putStrLn $ C.blue $ show $ ((contract ^. CC.functions) M.!? (fromMaybe "" searchTerms)) 
+            
             let codeSnippets :: [String]
                 codeSnippets = 
                   case (fromMaybe "" searchTerms) of 
-                    --get the location of just the code of the contract, if nothing is inputted in the contract then focus on just the contract itself
+                    --Unparse just the contract
                     "" -> [unparseContract contract]
-                    -- "" -> let val = foldMap mon contract
-                    --                       where mon sa  = let (sl, sc, el, ec) = getPositionFromSourceAnnotation sa
-                    --                                       in (Min (sl, sc), Max(el, ec))
-                    --           -- tup = case val of
-                    --           --         Just (Min (sl, sc), Max(el,ec)) -> Just (sl, sc, el, ec)
-                    --           --         Nothing -> Nothing  
-                    --           (Min (slt, sct), Max(elt, ect)) = val
-                    --           (startLine, startCol, endLine, endCol) = (slt, sct, elt, ect)
-                    --       in [(startLine, startCol, endLine, endCol)]
                           
                     term ->
                     --Search the full contract for the search term, retrieving the sourceAnnotation location of the part that was found
@@ -2177,14 +2167,14 @@ expToVar' (CC.FunctionCall _ e args) = do
 
                           funcString = 
                             case ((contract ^. CC.functions) M.!? term) of 
-                              Just funcF -> 
-                                case (funcF ^. CC.funcOverload) of 
-                                -- Case where nothing is supplied from the function
-                                [] -> Just "This is temporary"
-                                -- Case with nonoverloaded function
-                                [a] -> Just $ unparseFunc (term, a)
-                                -- Case with overloaded functions
-                                as -> Just $ ("Multiple entries" ++ unparseFuncOverload term as)
+                              Just funcF -> Just $ unparseFunc (term, funcF)
+                                -- case (funcF ^. CC.funcOverload) of 
+                                -- -- Case where nothing is supplied from the function
+                                -- [] -> Nothing
+                                -- -- Case with nonoverloaded function
+                                -- [a] -> 
+                                -- -- Case with overloaded functions
+                                -- as -> Just $ unparseFuncOverload term as
                               Nothing -> Nothing
                           -- funcString = 
                           --   case ((contract ^. CC.functions) M.!? term) of 
