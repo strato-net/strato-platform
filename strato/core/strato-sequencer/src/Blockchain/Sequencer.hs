@@ -631,6 +631,7 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
       blockstanbulSend $ map (\(IEForcedConfigChange cc) -> ForcedConfigChange cc) events
     IETCertificateRevoked -> do
       record "inevent_type_certificate_revoked" "IngestCertificateRevoked"
+      $logInfoS "========We revoked a certificate " . T.pack $ show events
       yieldMany $ map (\(IECertificateRevoked ua) -> ToP2p $ P2pCertificateRevoked ua) events
 
 prettyIBlock :: IngestBlock -> String

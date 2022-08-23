@@ -412,6 +412,8 @@ handleEvents peer = awaitForever $ \case
           for_ mcInfo $ yieldR . ChainDetails . (:[])
       P2pCertificateRevoked revokedUserAddress -> do
         let peer'sUserAddressM = fromPublicKey . pointToSecPubKey <$> pPeerPubkey peer
+        $logInfoS "========handleEvents/P2pCertificateRevoked" . T.pack $ "Revoked " ++ CL.yellow (format revokedUserAddress)
+        $logInfoS "========handleEvents/P2pCertificateRevoked" . T.pack $ "Our peer " ++ CL.yellow (format peer'sUserAddressM)
         case peer'sUserAddressM of
           Just pua | pua == revokedUserAddress -> throwIO InvalidClientCert
           _ -> pure ()

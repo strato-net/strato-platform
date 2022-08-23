@@ -224,8 +224,11 @@ handleMsgServerConduit myPubkey peer = do
     awaitMsg >>= \case
         Just clientHello@Hello{} -> do
             let userAddress' = fromPublicKey (pointToSecPubKey $ nodeId clientHello)
+            $logInfoS "========handshake/Hello{}" . T.pack $ ("our handshaked " ++ show userAddress')
             -- Lookup in Redis with userAddress, isValid Field
             clientCertDetails <- lift $ A.select (A.Proxy @X509CertInfoState) userAddress'
+            $logInfoS "========handshake/Hello{}" . T.pack $ ("our clientCertDetails " ++ show clientCertDetails)
+
             -- Throw error if the cert is not valid.
             unless (maybe False isValid clientCertDetails) $ throwIO InvalidClientCert
             $logInfoS "handshake/Hello{}" "received hello"
