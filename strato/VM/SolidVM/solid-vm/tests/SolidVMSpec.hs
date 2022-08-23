@@ -3753,6 +3753,61 @@ contract qq {
     getFields ["codePiece"] `shouldReturn`
       [ BString $ UTF8.fromString testCode]
 
+  fit "can get overloaded function using the .code parameter" . runTest $ do
+    let testCode :: String
+        testCode = [r|  
+function addToNum(uint x, uint y) {
+  myNum += x + y;
+}
+
+function addToNum(uint x, bool y) {
+  myNum += x;
+  myStatus = y;
+}
+
+function addToNum(uint x, string z) {
+  myNum += x;
+  myString = z;
+}|]
+        codeSnippet :: String
+        codeSnippet = [r|
+pragma solidvm 3.3;
+contract Test {
+  uint myNum = 13;
+  bool myStatus;
+  string myString = "butts";
+
+  function randomFunc(uint x) public returns (uint){
+    return x;
+  }
+
+  function addToNum(uint x, uint y) {
+    myNum += x + y;
+  }
+
+  function addToNum(uint x, bool y) {
+    myNum += x;
+    myStatus = y;
+  }
+
+  function addToNum(uint x, string z) {
+    myNum += x;
+    myString = z;
+  }
+}
+
+pragma solidvm 3.3;
+contract qq{
+  string codeTest;
+  constructor() public {
+    Test t = new Test();
+    codeTest = account(t).code("addToNum");
+  }
+}|]
+    runBS codeSnippet
+    getFields ["codePiece"] `shouldReturn`
+      [ BString $ UTF8.fromString testCode]
+
   it "can get events from the '.code' function" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|event x(

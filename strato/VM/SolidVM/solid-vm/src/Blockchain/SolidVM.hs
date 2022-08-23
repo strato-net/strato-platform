@@ -2124,6 +2124,7 @@ expToVar' (CC.FunctionCall _ e args) = do
             (contract, _, _) <- getCodeAndCollection address
             -- contractXabi <- getContractXabi address
 
+            liftIO $ putStrLn $ show contract
             let codeSnippets :: [String]
                 codeSnippets = 
                   case (fromMaybe "" searchTerms) of 
@@ -2139,7 +2140,23 @@ expToVar' (CC.FunctionCall _ e args) = do
                     --           (startLine, startCol, endLine, endCol) = (slt, sct, elt, ect)
                     --       in [(startLine, startCol, endLine, endCol)]
                           
-                    term ->
+                    term -> do
+                      funcString <- case ((contract ^. CC.functions) M.!? term) of 
+                              Just funcF -> do 
+                                liftIO $ putStrLn $ C.blue $ show funcF
+                                pure $ Just "Functions home."
+                                -- case (funcF ^. CC.funcOverload) of 
+                                -- -- Case where nothing is supplied from the function
+                                -- [] -> Just "This is temporary"
+                                -- -- Case with nonoverloaded function
+                                -- [a] -> Just $ unparseFunc (term, a)
+                                -- -- Case with overloaded functions
+                                -- as -> Just $ ("Multiple entries" ++ unparseFuncOverload term as)
+                              Nothing -> Nothing
+                          -- funcString = 
+                          --   case ((contract ^. CC.functions) M.!? term) of 
+                          --     Just funcF -> Just $ unparseFunc (term, funcF)
+                          --     Nothing -> Nothing
                     --Search the full contract for the search term, retrieving the sourceAnnotation location of the part that was found
                       -- Check for and get the different parts of the contract
                       --Not Working
@@ -2173,10 +2190,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                               Just eventF -> Just $ unparseEvent (term, eventF)
                               Nothing -> Nothing                             
 
-                          funcString = 
-                            case ((contract ^. CC.functions) M.!? term) of 
-                              Just funcF -> Just $ unparseFunc (term, funcF)
-                              Nothing -> Nothing
+
 
                           modString = 
                             case ((contract ^. CC.modifiers) M.!? term) of

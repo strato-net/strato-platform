@@ -5,6 +5,7 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TupleSections #-}
 module SolidVM.Solidity.Parse.UnParser where
 
 import           Control.Lens               hiding (op)
@@ -163,6 +164,9 @@ unparseVarType (SVMType.Mapping _ key val) = "mapping (" <> (unparseVarType key)
 unparseVarType (SVMType.Contract contractName') = labelToString contractName'
 unparseVarType (SVMType.Struct _ n) = "struct " ++ labelToString n
 unparseVarType _ = "TYPE_NOT_IMPLEMENED"
+
+unparseFuncOverload :: SolidString -> [Func] -> String
+unparseFuncOverload name funcs = unlines $ map (unparseFunc . (name,)) funcs
 
 unparseFunc :: (SolidString, Func) -> String
 unparseFunc (name, f) = Text.unpack $ "function " <> labelToText name <> unparseFuncWithoutName f
