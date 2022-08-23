@@ -3801,11 +3801,11 @@ contract qq{
   string codeTest;
   constructor() public {
     Test t = new Test();
-    codeTest = account(t).code("addToNum");
+    codeTest = account(t).code("randomFunc");
   }
 }|]
     runBS codeSnippet
-    getFields ["codePiece"] `shouldReturn`
+    getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString testCode]
 
   it "can get events from the '.code' function" . runTest $ do
@@ -4139,7 +4139,7 @@ contract qq {
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString myContract]
 
-  it "Can find a function within a codeCollection" . runTest $ do
+  fit "Can find a function within a codeCollection" . runTest $ do
     let myFunxion :: String
         myFunxion = [r|function myFunction () public returns (uint ) {
     uint x = 13;
