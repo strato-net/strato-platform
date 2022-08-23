@@ -422,8 +422,9 @@ handleEvents peer = awaitForever $ \case
           mcInfo <- fmap (fmap ((,) cId)) . lift $ select (Proxy @ChainInfo) cId
           for_ mcInfo $ yieldR . ChainDetails . (:[])
       P2pNewOrgName cId org -> do
-        peerX509 <- lift $ select (Proxy @X509CertInfoState) $
-          fromPublicKey . pointToSecPubKey $ fromMaybe (error "handleEvents/P2pNewOrgName - could not derive peer pubkey") $ pPeerPubkey peer
+        peerX509 <- lift $ select (Proxy @X509CertInfoState) $ 
+          fromPublicKey . pointToSecPubKey $ 
+          fromMaybe (error "handleEvents/P2pNewOrgName - could not derive peer pubkey") (pPeerPubkey peer)
         let formatted = CL.yellow $ format cId
             orgFormat = CL.blue $ format org -- need to decode from b16
             orgToText s = T.pack $ BS8.unpack $ BS8.concat [unOrgName (fst s), maybe BS8.empty (BS8.append (BS8.pack "/")) (unOrgUnit (snd s))]
@@ -435,9 +436,9 @@ handleEvents peer = awaitForever $ \case
                 Nothing -> OrgUnit (Just BS8.empty)
                 Just a  -> OrgUnit . Just $ BS8.concat [BS8.pack "/", BS8.pack a]
             organization = "organization"
-            getPeerCert = case peerX509 of
-              Nothing -> X509Certificate (CertificateChain [])
-              Just X509CertInfoState{certificate=crt} -> crt
+        getPeerCert <- case peerX509 of
+          Nothing -> return $ X509Certificate (CertificateChain [])
+          Just X509CertInfoState{certificate=crt} -> return crt
 
         $logInfoS "handleEvents/P2pNewOrgName" $ T.pack $ "New organization associated with chain " ++ formatted ++ " for org " ++ orgFormat
         when (verifyCert (pointToSecPubKey $ fromMaybe (error "handleEvents/P2pNewOrgName - could not derive peer pubkey") $ pPeerPubkey peer) getPeerCert) $ do 
@@ -540,7 +541,7 @@ handleGetChainDetails peer cids' = do
               return $ S.union (unIPChains ipChains) (unOrgIdChains orgIdChains)
             else return cids'
   lift stampActionTimestamp
-  $logInfoS "handleGetChainDetails" $ T.pack $ "details requested for chainIDs " ++ (intercalate "\n" $ formatChainId . Just <$> cids)
+  $logInfoS "handleGetChainDetails" $ T.pack $ "details requested for chainIDs " ++ intercalate "\n" (formatChainId . Just <$> cids <> S.toList (unOrgNameChains orgNameChains))
 
   mems <- lift $ selectMany (Proxy @ChainMembers) cids
   cInfoOrgs <- fmap M.toList . lift $ selectMany (Proxy @ChainInfo) $ S.toList (unOrgNameChains orgNameChains)
