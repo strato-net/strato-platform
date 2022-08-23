@@ -9,7 +9,8 @@
 
 module Executable.EthereumVM (
   ethereumVM,
-  handleVmEvents
+  handleVmEvents,
+  writeBlockSummary
 ) where
 
 import           Conduit

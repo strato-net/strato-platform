@@ -43,13 +43,14 @@ import           Text.Printf
 
 import           BlockApps.Logging
 import           Blockchain.Bagger.BaggerState
+import           Blockchain.Bagger
 import           Blockchain.Blockstanbul
 import           Blockchain.Blockstanbul.HTTPAdmin
 import           Blockchain.Blockstanbul.Messages      (round)
 import           Blockchain.Blockstanbul.StateMachine
 import           Blockchain.Context                    hiding (actionTimestamp, blockHeaders, remainingBlockHeaders)
 import           Blockchain.Data.AddressStateDB
-import           Blockchain.Data.AlternateTransaction  (UnsignedTransaction(..))
+import qualified Blockchain.Data.AlternateTransaction  as U
 import           Blockchain.Data.ArbitraryInstances()
 import           Blockchain.Data.Block                 hiding (bestBlockNumber)
 import           Blockchain.Data.BlockDB()
@@ -58,6 +59,7 @@ import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.Control
 import qualified Blockchain.Data.DataDefs              as DataDefs
 import           Blockchain.Data.Enode
+import           Blockchain.Data.Transaction           (getSigVals)
 import           Blockchain.Data.TransactionDef
 import qualified Blockchain.Data.TXOrigin              as Origin
 import           Blockchain.Data.Wire
@@ -71,7 +73,7 @@ import qualified Blockchain.DB.X509CertDB              as X509
 import "strato-p2p" Blockchain.Event
 import qualified "vm-runner" Blockchain.Event          as VMEvent
 import           Blockchain.MemVMContext               hiding (getMemContext, get, gets, put, modify, modify', dbsGet, dbsGets, dbsPut, dbsModify, dbsModify', contextGet, contextGets, contextPut, contextModify, contextModify')
-import           Blockchain.VMContext                  (IsBlockstanbul(..), baggerState)
+import           Blockchain.VMContext                  (IsBlockstanbul(..), ContextBestBlockInfo(..), baggerState, putContextBestBlockInfo)
 import           Blockchain.Options                    (AuthorizationMode(..))
 import           Blockchain.Privacy
 import qualified Blockchain.Sequencer                  as Seq
@@ -90,9 +92,15 @@ import           Blockchain.Strato.Indexer.P2PIndexer
 import           Blockchain.Strato.Indexer.TxrIndexer
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.Strato.Model.Gas
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.MicroTime
+import           Blockchain.Strato.Model.Nonce
 import           Blockchain.Strato.Model.Secp256k1
+import           Blockchain.Strato.Model.Wei
 import qualified Blockchain.TxRunResultCache           as TRC
 
 import           Debugger                              (DebugSettings)
@@ -146,6 +154,8 @@ data TestContext = TestContext
   , _pbftMessages          :: S.OSet Keccak256
   , _unseqEvents           :: [IngestEvent]
   , _sequencerContext      :: SequencerContext
+  , _blockPeriod           :: BlockPeriod
+  , _roundPeriod           :: RoundPeriod
   , _vmContext             :: MemContext
   , _apiChainInfoMap       :: Map Word256 ChainInfo
   }
@@ -394,10 +404,10 @@ instance MonadIO m => Mod.Accessible (TMChan RoundNumber) (MonadTest m) where
   access _ = pure (error "MonadTest: Accessing (TMChan RoundNumber)")
 
 instance MonadIO m => Mod.Accessible BlockPeriod (MonadTest m) where
-  access _ = pure (error "MonadTest: Accessing BlockPeriod")
+  access _ = use blockPeriod
 
 instance MonadIO m => Mod.Accessible RoundPeriod (MonadTest m) where
-  access _ = pure (error "MonadTest: Accessing RoundPeriod")
+  access _ = use roundPeriod
 
 instance MonadIO m => Mod.Accessible (TQueue CandidateReceived) (MonadTest m) where
   access _ = pure (error "MonadTest: Accessing (TQueue CandidateReceived)")
@@ -756,6 +766,8 @@ testContext prv seqCtx vmCtx = TestContext
   , _pbftMessages          = S.empty
   , _unseqEvents           = []
   , _sequencerContext      = seqCtx
+  , _blockPeriod           = BlockPeriod 0
+  , _roundPeriod           = RoundPeriod 0
   , _vmContext             = vmCtx
   , _apiChainInfoMap       = M.empty
   }
@@ -851,64 +863,73 @@ createPeer privKey initialValidators unseqSink name ipAddr = do
   cache <- TRC.new 64
   let cstate = def & txRunResultsCache .~ cache
       vmCtx = MemContext def cstate
+      genesisBlock = DataDefs.BlockData
+        zeroHash
+        zeroHash
+        (Address 0)
+        MP.emptyTriePtr
+        MP.emptyTriePtr
+        MP.emptyTriePtr
+        ""
+        1
+        0
+        100000000000000000000000000
+        1
+        DataPeer.jamshidBirth
+        ""
+        12345
+        zeroHash
+      genHash = rlpHash genesisBlock
+      genesisOutputBlock = OutputBlock
+        { obOrigin              = Origin.API
+        , obTotalDifficulty     = 0
+        , obBlockData           = genesisBlock
+        , obReceiptTransactions = []
+        , obBlockUncles         = []
+        }
   testContextTVar <- newTVarIO $ testContext privKey seqCtx vmCtx
-  let sequencer = runConduit $ sourceTQueue unseqSource
-                            .| mapMC (Seq.runSequencerBatch . (:[]))
-                            .| (awaitForever $ \b -> atomically $ do
-                                  traverse_ (writeTMChan seqP2pSource . Right) $ Seq._toP2p b
-                                  writeTQueue seqVmSource $ Seq._toVm b
-                               )
+  let sequencer = do
+        DBDB.bootstrapGenesisBlock genHash 1
+        A.insert (A.Proxy @EmittedBlock) genHash alreadyEmittedBlock
+        runConduit $ sourceTQueue unseqSource
+                  .| mapMC (Seq.runSequencerBatch . (:[]))
+                  .| (awaitForever $ \b -> atomically $ do
+                        traverse_ (writeTMChan seqP2pSource . Right) $ Seq._toP2p b
+                        writeTQueue seqVmSource $ Seq._toVm b
+                     )
   let vm = do
         MP.initializeBlank
-        let genesisBlock = OutputBlock
-              { obOrigin              = Origin.API
-              , obTotalDifficulty     = 0
-              , obBlockData           = DataDefs.BlockData
-                  zeroHash
-                  zeroHash
-                  (Address 0)
-                  MP.emptyTriePtr
-                  MP.emptyTriePtr
-                  MP.emptyTriePtr
-                  ""
-                  1
-                  0
-                  10000
-                  1
-                  DataPeer.jamshidBirth
-                  ""
-                  12345
-                  zeroHash
-              , obReceiptTransactions = []
-              , obBlockUncles         = []
-              }
-            genHash = rlpHash genesisBlock
         setStateDBStateRoot Nothing MP.emptyTriePtr
+        writeBlockSummary genesisOutputBlock
         (BlockHashRoot bhr) <- bootstrapChainDB genHash [(Nothing, MP.emptyTriePtr)]
         (X509.CertRoot cr) <- X509.bootstrapCertDB genHash
+        putContextBestBlockInfo $ ContextBestBlockInfo (genHash, genesisBlock, 0, 0, 0)
         Mod.put (Mod.Proxy @BlockHashRoot) $ BlockHashRoot bhr
         Mod.put (Mod.Proxy @X509.CertRoot) $ X509.CertRoot cr
+        processNewBestBlock genHash genesisBlock [] -- bootstrap Bagger with genesis block
         runConduit $ sourceTQueue seqVmSource
                   .| (awaitForever $ yield . foldr VMEvent.insertInBatch VMEvent.newInBatch)
                   .| handleVmEvents False
                   .| (awaitForever $ yield . flip VMEvent.insertOutBatch VMEvent.newOutBatch)
-                  .| (awaitForever $ \b -> atomically $ do
-                       traverse_ (writeTQueue unseqSource) $ UnseqEvent . IEBlock . blockToIngestBlock Origin.Quarry . outputBlockToBlock <$> toList (VMEvent.outBlocks b)
-                       writeTQueue apiIndexerSource $ toList (VMEvent.outIndexEvents b)
-                       writeTQueue p2pIndexerSource $ toList (VMEvent.outIndexEvents b)
-                       traverse_ (writeTQueue txrIndexerSource) $ toList (VMEvent.outIndexEvents b)
+                  .| (awaitForever $ \b -> do
+                        $logInfoS (T.pack name <> "/vm") . T.pack $ show $ toList (VMEvent.outEvents b)
+                        atomically $ do
+                          traverse_ (writeTQueue unseqSource) $ UnseqEvent . IEBlock . blockToIngestBlock Origin.Quarry . outputBlockToBlock <$> toList (VMEvent.outBlocks b)
+                          writeTQueue apiIndexerSource $ toList (VMEvent.outIndexEvents b)
+                          writeTQueue p2pIndexerSource $ toList (VMEvent.outIndexEvents b)
+                          traverse_ (writeTQueue txrIndexerSource) $ toList (EventDBEntry <$> toList (VMEvent.outEvents b))
                      )
       apiIndexer' = runConduit $ sourceTQueue apiIndexerSource
                               .| (awaitForever $ \evs -> do
-                                    $logInfoS "testApiIndexer" . T.pack $ show evs
+                                    $logInfoS (T.pack name <> "/testApiIndexer") . T.pack $ show evs
                                     lift $ indexAPI evs)
       p2pIndexer' = runConduit $ sourceTQueue p2pIndexerSource
                               .| (awaitForever $ \evs -> do
-                                    $logInfoS "testP2pIndexer" . T.pack $ show evs
+                                    $logInfoS (T.pack name <> "/testP2pIndexer") . T.pack $ show evs
                                     lift $ indexP2P evs)
       txrIndexer' = runConduit $ sourceTQueue txrIndexerSource
                               .| (awaitForever $ \ev -> do
-                                    $logInfoS "testTxrIndexer" . T.pack $ show ev
+                                    $logInfoS (T.pack name <> "/testTxrIndexer") . T.pack $ show ev
                                     yieldMany $ indexEventToTxrResults ev)
                               .| (awaitForever $ \case
                                     AddMember (Right (cId, addr, enode)) -> do
@@ -921,6 +942,7 @@ createPeer privKey initialValidators unseqSink name ipAddr = do
                                       orgIdChainsMap %= (\m -> case M.lookup (pubKey enode) m of
                                         Nothing -> M.insert (pubKey enode) (OrgIdChains $ Set.singleton cId) m
                                         Just (OrgIdChains s) -> M.insert (pubKey enode) (OrgIdChains $ Set.insert cId s) m)
+                                      atomically . writeTQueue unseqSource . UnseqEvent $ IENewChainMember cId addr enode
                                     RemoveMember (Right (cId, addr)) -> do
                                       mEnode <- join . fmap (M.lookup addr . unChainMembers) <$> use (chainMembersMap . at cId)
                                       chainMembersMap . at cId . _Just %= ChainMembers . M.delete addr . unChainMembers
@@ -934,7 +956,9 @@ createPeer privKey initialValidators unseqSink name ipAddr = do
                                     PutLogDB _ -> pure ()
                                     PutEventDB _ -> pure ()
                                     PutTxResult _ -> pure ()
-                                    _ -> pure ()
+                                    ev -> do
+                                      $logInfoS (T.pack name <> "/testTxrIndexer") . T.pack $ show ev
+                                      pure ()
                                  )
       pubkeystr = BC.unpack $ B16.encode $ B.drop 1 $ exportPublicKey False $ derivePublicKey privKey
       ppeer = DataPeer.buildPeer ( Just pubkeystr
@@ -1148,14 +1172,16 @@ spec = do
         , (peers !! 0, peers !! 2)
         , (peers !! 1, peers !! 2)
         ]
-      let runForTwoSeconds = void . timeout 2000000
+      let runForThreeSeconds = void . timeout 3000000
           src = "pragma solidvm 3.2; contract A { event MemberAdded(address addr, string enode); function addMember(address _addr, string _enode) { emit MemberAdded(_addr, _enode); } }"
           contractName = "A"
           enode1 = readEnode "enode://abcd@1.2.3.4:30303"
-          enode2 = readEnode "enode://abcd@5.6.7.8:30303"
+          enode2 = "enode://abcd@5.6.7.8:30303"
           chainInfo' = ChainInfo
             UnsignedChainInfo { chainLabel     = "My test chain!"
-                              , accountInfo    = [ContractNoStorage (Address 0x100) 10000000000 (SolidVMCode contractName $ hash src)]
+                              , accountInfo    = [ ContractNoStorage (Address 0x100) 1000000000000000000000 (SolidVMCode contractName $ hash src)
+                                                 , NonContract (validators' !! 0) 1000000000000000000000
+                                                 ]
                               , codeInfo       = [CodeInfo "" src $ Just contractName]
                               , members        = M.singleton (validators' !! 0) enode1
                               , parentChain    = Nothing
@@ -1166,17 +1192,17 @@ spec = do
             Nothing
           chainId = keccak256ToWord256 $ rlpHash chainInfo'
       ts <- liftIO getCurrentMicrotime
-      let args = "(" <> T.pack (formatAddressWithoutColor (validators' !! 1)) <> "," <> T.pack enode2 <> ")"
-          utx' = UnsignedTransaction
-            { unsignedTransactionNonce      = 0
-            , unsignedTransactionGasPrice   = 1
-            , unsignedTransactionGasLimit   = 1000000000
-            , unsignedTransactionTo         = (Address 0x100)
-            , unsignedTransactionValue      = 0
-            , unsignedTransactionInitOrData = Code ""
-            , unsignedTransactionChainId    = Just chainId
+      let args = "(0x" <> T.pack (formatAddressWithoutColor (validators' !! 1)) <> ",\"" <> T.pack enode2 <> "\")"
+          utx' = U.UnsignedTransaction
+            { U.unsignedTransactionNonce      = Nonce 0
+            , U.unsignedTransactionGasPrice   = Wei 1
+            , U.unsignedTransactionGasLimit   = Gas 1000000000
+            , U.unsignedTransactionTo         = Just $ Address 0x100
+            , U.unsignedTransactionValue      = Wei 0
+            , U.unsignedTransactionInitOrData = Code ""
+            , U.unsignedTransactionChainId    = Just $ ChainId chainId
             }
-          (Signature (CompactRecSig r s v)) = signMsg $ rlpHash utx'
+          (r, s, v) = getSigVals . signMsg (privKeys !! 0) $ U.rlpHash utx'
           tx' = MessageTX
             { transactionNonce     = 0
             , transactionGasPrice = 1
@@ -1185,8 +1211,8 @@ spec = do
             , transactionValue    = 0
             , transactionData     = ""
             , transactionChainId  = Just chainId
-            , transactionR        = r
-            , transactionS        = s
+            , transactionR        = fromIntegral r
+            , transactionS        = fromIntegral s
             , transactionV        = v
             , transactionMetadata = Just $ M.fromList [("VM","SolidVM"),("funcName","addMember"),("args",args)]
             }
@@ -1196,8 +1222,9 @@ spec = do
             flip postEvent (peers !! 0) . UnseqEvent . IEGenesis $ IngestGenesis Origin.API (chainId, chainInfo')
             threadDelay 500000
             flip postEvent (peers !! 0) $ UnseqEvent ietx
+            for_ peers $ postEvent (TimerFire 0)
 
-      runForTwoSeconds $ concurrently_ (runNetwork peers connections) routine
+      runForThreeSeconds $ concurrently_ (runNetwork peers connections) routine
       ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
       ifor_ ctxs1 $ \i ctx -> (i, ctx ^. apiChainInfoMap . at chainId) `shouldBe` (i, if i == 2 then Nothing else Just chainInfo')
   
