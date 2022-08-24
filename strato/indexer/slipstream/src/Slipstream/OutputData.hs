@@ -723,21 +723,21 @@ insertEventTableQuery ev =
 
 --This is a temporary function that converts solidity types to a sample value...  I am just using this now to convert table creation from the old way (value based when values come through) to the new way (direct from the types when a CC is registered)
 solidityTypeToSQLType :: VariableDeclF a -> Maybe Text
-solidityTypeToSQLType VariableDecl{varType=SVMType.Bool} = Just "bool"
-solidityTypeToSQLType VariableDecl{varType=SVMType.Int _ _} = Just "decimal"
-solidityTypeToSQLType VariableDecl{varType=SVMType.String _} = Just "text"
-solidityTypeToSQLType VariableDecl{varType=SVMType.Bytes _ _} = Just "text"
-solidityTypeToSQLType VariableDecl{varType=SVMType.Fixed _ _ } = Just "fixed"
-solidityTypeToSQLType VariableDecl{varType=SVMType.Address _} = Just "text"
-solidityTypeToSQLType VariableDecl{varType=SVMType.Account _} = Just "text"
-solidityTypeToSQLType VariableDecl{varType=SVMType.Array _ _} = Nothing -- Just "jsonb"
-solidityTypeToSQLType VariableDecl{varType=SVMType.Mapping _ _ _} = Nothing -- Just "jsonb"
-solidityTypeToSQLType VariableDecl{varType=SVMType.UnknownLabel _ _} = Just "text"
+solidityTypeToSQLType VariableDecl{_varType=SVMType.Bool} = Just "bool"
+solidityTypeToSQLType VariableDecl{_varType=SVMType.Int _ _} = Just "decimal"
+solidityTypeToSQLType VariableDecl{_varType=SVMType.String _} = Just "text"
+solidityTypeToSQLType VariableDecl{_varType=SVMType.Bytes _ _} = Just "text"
+solidityTypeToSQLType VariableDecl{_varType=SVMType.Fixed _ _ } = Just "fixed"
+solidityTypeToSQLType VariableDecl{_varType=SVMType.Address _} = Just "text"
+solidityTypeToSQLType VariableDecl{_varType=SVMType.Account _} = Just "text"
+solidityTypeToSQLType VariableDecl{_varType=SVMType.Array _ _} = Nothing -- Just "jsonb"
+solidityTypeToSQLType VariableDecl{_varType=SVMType.Mapping _ _ _} = Nothing -- Just "jsonb"
+solidityTypeToSQLType VariableDecl{_varType=SVMType.UnknownLabel _ _} = Just "text"
 --solidityTypeToSQLType VariableDecl{varType=SVMType.UnknownLabel x} = Just $ "text references " <> T.pack x <> "(id)"
-solidityTypeToSQLType VariableDecl{varType=SVMType.Struct _ _} = Just "jsonb"
-solidityTypeToSQLType VariableDecl{varType=SVMType.Enum _ _ _} = Just "text"
-solidityTypeToSQLType VariableDecl{varType=SVMType.Contract _} = Just "text"
-solidityTypeToSQLType VariableDecl{varType=SVMType.Error _ _} = Just "text"
+solidityTypeToSQLType VariableDecl{_varType=SVMType.Struct _ _} = Just "jsonb"
+solidityTypeToSQLType VariableDecl{_varType=SVMType.Enum _ _ _} = Just "text"
+solidityTypeToSQLType VariableDecl{_varType=SVMType.Contract _} = Just "text"
+solidityTypeToSQLType VariableDecl{_varType=SVMType.Error _ _} = Just "text"
 --solidityTypeToSQLType x = error $ "undefined type in solidityTypeToSQLType: " ++ show (varType x)
 
 
