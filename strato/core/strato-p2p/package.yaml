@@ -118,6 +118,7 @@ tests:
       - mtl
       - nibblestring
       - ordered-containers
+      - raw-strings-qq
       - secp256k1-haskell
       - seqevents
       - stm-chans

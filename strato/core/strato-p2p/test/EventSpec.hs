@@ -5,6 +5,7 @@
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE PackageImports        #-}
+{-# LANGUAGE QuasiQuotes           #-}
 {-# LANGUAGE Rank2Types            #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
@@ -31,7 +32,7 @@ import           Data.Default
 import           Data.Foldable                         (for_, toList, traverse_)
 import           Data.Map.Strict                       (Map)
 import qualified Data.Map.Strict                       as M
-import           Data.Maybe                            (fromMaybe)
+import           Data.Maybe                            (fromJust, fromMaybe, isJust)
 import qualified Data.NibbleString                     as N
 import qualified Data.Set                              as Set
 import qualified Data.Set.Ordered                      as S
@@ -113,6 +114,7 @@ import           Executable.StratoP2PServer
 import           Test.Hspec
 import qualified Test.Hspec.Expectations.Lifted        as L
 import           Test.QuickCheck
+import           Text.RawString.QQ
 
 import           UnliftIO
 import           UnliftIO.Concurrent                   (threadDelay)
@@ -893,9 +895,19 @@ createPeer privKey initialValidators unseqSink name ipAddr = do
         A.insert (A.Proxy @EmittedBlock) genHash alreadyEmittedBlock
         runConduit $ sourceTQueue unseqSource
                   .| mapMC (Seq.runSequencerBatch . (:[]))
-                  .| (awaitForever $ \b -> atomically $ do
-                        traverse_ (writeTMChan seqP2pSource . Right) $ Seq._toP2p b
-                        writeTQueue seqVmSource $ Seq._toVm b
+                  .| (awaitForever $ \b -> do
+                        chainIds <- lift $ unGetChainsDB <$> Mod.get (Mod.Proxy @GetChainsDB)
+                        txHashes <- lift $ unGetTransactionsDB <$> Mod.get (Mod.Proxy @GetTransactionsDB)
+                        let chainIdsList = toList chainIds
+                            txHashesList = toList txHashes
+                            getChains = if null chainIdsList then [] else [P2pGetChain chainIdsList]
+                            getTxs = if null txHashesList then [] else [P2pGetTx txHashesList]
+                            toP2p' = getChains ++ getTxs ++ Seq._toP2p b
+                        atomically $ do
+                          traverse_ (writeTMChan seqP2pSource . Right) $ toP2p'
+                          writeTQueue seqVmSource $ Seq._toVm b
+                        lift clearGetChainsDB
+                        lift clearGetTransactionsDB
                      )
   let vm = do
         MP.initializeBlank
@@ -1043,6 +1055,42 @@ runNetwork nodes connections =
 makeValidators :: [PrivateKey] -> [Address]
 makeValidators = map fromPrivateKey
 
+mkSignedTx :: PrivateKey -> U.UnsignedTransaction -> Transaction
+mkSignedTx privKey utx =
+  let Nonce n = U.unsignedTransactionNonce utx
+      Gas gl = U.unsignedTransactionGasLimit utx
+      cId = unChainId <$> U.unsignedTransactionChainId utx
+      Wei gp = U.unsignedTransactionGasPrice utx
+      Wei val = U.unsignedTransactionValue utx
+      (r', s', v') = getSigVals . signMsg privKey $ U.rlpHash utx
+   in if isJust $ U.unsignedTransactionTo utx
+        then let Code c = U.unsignedTransactionInitOrData utx
+              in MessageTX
+                   { transactionNonce    = fromIntegral n
+                   , transactionGasPrice = fromIntegral gp
+                   , transactionGasLimit = fromIntegral gl
+                   , transactionTo       = fromJust $ U.unsignedTransactionTo utx
+                   , transactionValue    = fromIntegral val
+                   , transactionData     = c
+                   , transactionChainId  = cId
+                   , transactionR        = fromIntegral r'
+                   , transactionS        = fromIntegral s'
+                   , transactionV        = v'
+                   , transactionMetadata = Just $ M.fromList [("VM","SolidVM")]
+                   }
+        else ContractCreationTX
+                   { transactionNonce    = fromIntegral n
+                   , transactionGasPrice = fromIntegral gp
+                   , transactionGasLimit = fromIntegral gl
+                   , transactionValue    = fromIntegral val
+                   , transactionInit     = U.unsignedTransactionInitOrData utx
+                   , transactionChainId  = cId
+                   , transactionR        = fromIntegral r'
+                   , transactionS        = fromIntegral s'
+                   , transactionV        = v'
+                   , transactionMetadata = Just $ M.fromList [("VM","SolidVM")]
+                   }
+
 -- endlessStreamOfIPAddresses :: [String]
 -- endlessStreamOfIPAddresses = generateThem
 --   where galois x = let y = (7*chx) `mod` 256 in x : galois y
@@ -1158,7 +1206,7 @@ spec = do
       ctxs2 <- atomically $ traverse (readTVar . _p2pTestContext) peers
       ifor_ ctxs2 $ \i ctx -> (i, _round . _view <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 1001 :: Maybe Word256)
 
-    it "can add a new now to a chain" $ do
+    it "can add a new node to a chain" $ do
       let unseqSink = (unseqEvents %=) . (++)
       privKeys <- traverse (const newPrivateKey) [(1 :: Integer)..3]
       let validators' = makeValidators privKeys
@@ -1173,7 +1221,15 @@ spec = do
         , (peers !! 1, peers !! 2)
         ]
       let runForThreeSeconds = void . timeout 3000000
-          src = "pragma solidvm 3.2; contract A { event MemberAdded(address addr, string enode); function addMember(address _addr, string _enode) { emit MemberAdded(_addr, _enode); } }"
+          src = [r|
+pragma solidvm 3.2;
+contract A {
+  event MemberAdded(address addr, string enode);
+  function addMember(address _addr, string _enode) {
+    emit MemberAdded(_addr, _enode);
+  }
+}
+|]
           contractName = "A"
           enode1 = readEnode "enode://abcd@1.2.3.4:30303"
           enode2 = "enode://abcd@5.6.7.8:30303"
@@ -1202,20 +1258,9 @@ spec = do
             , U.unsignedTransactionInitOrData = Code ""
             , U.unsignedTransactionChainId    = Just $ ChainId chainId
             }
-          (r, s, v) = getSigVals . signMsg (privKeys !! 0) $ U.rlpHash utx'
-          tx' = MessageTX
-            { transactionNonce     = 0
-            , transactionGasPrice = 1
-            , transactionGasLimit = 1000000000
-            , transactionTo       = (Address 0x100)
-            , transactionValue    = 0
-            , transactionData     = ""
-            , transactionChainId  = Just chainId
-            , transactionR        = fromIntegral r
-            , transactionS        = fromIntegral s
-            , transactionV        = v
-            , transactionMetadata = Just $ M.fromList [("VM","SolidVM"),("funcName","addMember"),("args",args)]
-            }
+          tx'' = mkSignedTx (privKeys !! 0) utx'
+          txMd = M.fromList [("funcName","addMember"),("args",args)]
+          tx' = tx''{transactionMetadata = M.union txMd <$> transactionMetadata tx''}
           ietx = IETx ts $ IngestTx Origin.API tx'
           routine = do
             threadDelay 500000
@@ -1227,6 +1272,157 @@ spec = do
       runForThreeSeconds $ concurrently_ (runNetwork peers connections) routine
       ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
       ifor_ ctxs1 $ \i ctx -> (i, ctx ^. apiChainInfoMap . at chainId) `shouldBe` (i, if i == 2 then Nothing else Just chainInfo')
+
+    it "can sync a new node to a chain after running multiple transactions on that chain" $ do
+      let unseqSink = (unseqEvents %=) . (++)
+      privKeys <- traverse (const newPrivateKey) [(1 :: Integer)..3]
+      let validators' = makeValidators privKeys
+      peers <- traverse (\(p,(n,i)) -> createPeer p validators' unseqSink n i) $ zip privKeys
+        [ ("node1", "1.2.3.4")
+        , ("node2", "5.6.7.8")
+        , ("node3", "9.10.11.12")
+        ]
+      connections <- traverse (uncurry createConnection)
+        [ (peers !! 0, peers !! 1)
+        , (peers !! 0, peers !! 2)
+        , (peers !! 1, peers !! 2)
+        ]
+      let runForThirtySeconds = void . timeout 30000000
+          src = [r|
+pragma solidvm 3.2;
+contract A {
+  event MemberAdded(address addr, string enode);
+  uint x = 0;
+  function addMember(address _addr, string _enode) {
+    emit MemberAdded(_addr, _enode);
+  }
+
+  function incX() {
+    x++;
+  }
+}
+|]
+          contractName = "A"
+          mainChainSrc = [r|
+pragma solidvm 3.2;
+contract B {
+  uint y;
+
+  constructor() {
+    y = 47;
+  }
+}
+|]
+          mainChainContractName = "B"
+          enode1 = readEnode "enode://abcd@1.2.3.4:30303"
+          enode2 = readEnode "enode://abcd@5.6.7.8:30303"
+          enode3 = "enode://abcd@9.10.11.12:30303"
+          chainInfo' = ChainInfo
+            UnsignedChainInfo { chainLabel     = "My test chain!"
+                              , accountInfo    = [ ContractNoStorage (Address 0x100) 1000000000000000000000 (SolidVMCode contractName $ hash src)
+                                                 , NonContract (validators' !! 0) 1000000000000000000000
+                                                 , NonContract (validators' !! 1) 1000000000000000000000
+                                                 ]
+                              , codeInfo       = [CodeInfo "" src $ Just contractName]
+                              , members        = M.fromList [ (validators' !! 0, enode1)
+                                                            , (validators' !! 1, enode2)
+                                                            ]
+                              , parentChain    = Nothing
+                              , creationBlock  = zeroHash
+                              , chainNonce     = 123456789
+                              , chainMetadata  = M.singleton "VM" "SolidVM"
+                              }
+            Nothing
+          chainId = keccak256ToWord256 $ rlpHash chainInfo'
+      ts <- liftIO getCurrentMicrotime
+      let incXArgs = "()"
+          incXUtx = U.UnsignedTransaction
+            { U.unsignedTransactionNonce      = Nonce 0
+            , U.unsignedTransactionGasPrice   = Wei 1
+            , U.unsignedTransactionGasLimit   = Gas 1000000000
+            , U.unsignedTransactionTo         = Just $ Address 0x100
+            , U.unsignedTransactionValue      = Wei 0
+            , U.unsignedTransactionInitOrData = Code ""
+            , U.unsignedTransactionChainId    = Just $ ChainId chainId
+            }
+          incXUtx0 = incXUtx
+          incXUtx1 = incXUtx{U.unsignedTransactionNonce = Nonce 1}
+          incXUtx2 = incXUtx{U.unsignedTransactionNonce = Nonce 2}
+          incXUtx3 = incXUtx{U.unsignedTransactionNonce = Nonce 3}
+          incXUtx4 = incXUtx{U.unsignedTransactionNonce = Nonce 4}
+          txMd = M.fromList [("funcName","incX"),("args",incXArgs)]
+          addMd t = t{transactionMetadata = M.union txMd <$> transactionMetadata t}
+          incXTx0 = addMd $ mkSignedTx (privKeys !! 0) incXUtx0
+          incXTx1 = addMd $ mkSignedTx (privKeys !! 0) incXUtx1
+          incXTx2 = addMd $ mkSignedTx (privKeys !! 0) incXUtx2
+          incXTx3 = addMd $ mkSignedTx (privKeys !! 0) incXUtx3
+          incXTx4 = addMd $ mkSignedTx (privKeys !! 0) incXUtx4
+      let mainChainArgs = "()"
+          mainChainUtx = U.UnsignedTransaction
+            { U.unsignedTransactionNonce      = Nonce 0
+            , U.unsignedTransactionGasPrice   = Wei 1
+            , U.unsignedTransactionGasLimit   = Gas 1000000000
+            , U.unsignedTransactionTo         = Nothing
+            , U.unsignedTransactionValue      = Wei 0
+            , U.unsignedTransactionInitOrData = Code $ BC.pack mainChainSrc
+            , U.unsignedTransactionChainId    = Nothing
+            }
+          mainChainTxMd = M.fromList [("src", mainChainSrc), ("name", mainChainContractName), ("args", mainChainArgs)]
+          mainChainAddMd t = t{transactionMetadata = M.union mainChainTxMd <$> transactionMetadata t}
+          mkMainChainTx n = let utx = mainChainUtx{U.unsignedTransactionNonce = Nonce n}
+                             in mainChainAddMd $ mkSignedTx (privKeys !! 0) utx
+      let addMemberArgs = "(0x" <> T.pack (formatAddressWithoutColor (validators' !! 2)) <> ",\"" <> T.pack enode3 <> "\")"
+          addMemberUtx = U.UnsignedTransaction
+            { U.unsignedTransactionNonce      = Nonce 5
+            , U.unsignedTransactionGasPrice   = Wei 1
+            , U.unsignedTransactionGasLimit   = Gas 1000000000
+            , U.unsignedTransactionTo         = Just $ Address 0x100
+            , U.unsignedTransactionValue      = Wei 0
+            , U.unsignedTransactionInitOrData = Code ""
+            , U.unsignedTransactionChainId    = Just $ ChainId chainId
+            }
+          addMemberTxMd = M.fromList [("funcName","addMember"),("args",addMemberArgs)]
+          addMemberMd t = t{transactionMetadata = M.union addMemberTxMd <$> transactionMetadata t}
+          addMemberTx = addMemberMd $ mkSignedTx (privKeys !! 0) addMemberUtx
+          toIetx = IETx ts . IngestTx Origin.API
+          routine = do
+            threadDelay 500000
+            flip postEvent (peers !! 0) . UnseqEvent . IEGenesis $ IngestGenesis Origin.API (chainId, chainInfo')
+            threadDelay 500000
+            flip postEvent (peers !! 0) . UnseqEvent $ toIetx incXTx0
+            for_ peers $ postEvent (TimerFire 0)
+            threadDelay 500000
+            flip postEvent (peers !! 0) . UnseqEvent . toIetx $ mkMainChainTx 0
+            threadDelay 500000
+            flip postEvent (peers !! 0) . UnseqEvent . toIetx $ mkMainChainTx 1
+            threadDelay 500000
+            flip postEvent (peers !! 0) . UnseqEvent . toIetx $ mkMainChainTx 2
+            threadDelay 500000
+            flip postEvent (peers !! 0) . UnseqEvent . toIetx $ mkMainChainTx 3
+            threadDelay 500000
+            flip postEvent (peers !! 0) . UnseqEvent . toIetx $ mkMainChainTx 4
+            threadDelay 500000
+            flip postEvent (peers !! 0) . UnseqEvent $ toIetx incXTx1
+            threadDelay 500000
+            flip postEvent (peers !! 0) . UnseqEvent . toIetx $ mkMainChainTx 5
+            threadDelay 500000
+            flip postEvent (peers !! 0) . UnseqEvent $ toIetx incXTx2
+            threadDelay 500000
+            flip postEvent (peers !! 0) . UnseqEvent . toIetx $ mkMainChainTx 6
+            threadDelay 500000
+            flip postEvent (peers !! 0) . UnseqEvent $ toIetx incXTx3
+            threadDelay 500000
+            flip postEvent (peers !! 0) . UnseqEvent . toIetx $ mkMainChainTx 7
+            threadDelay 500000
+            flip postEvent (peers !! 0) . UnseqEvent $ toIetx incXTx4
+            threadDelay 500000
+            flip postEvent (peers !! 0) . UnseqEvent . toIetx $ mkMainChainTx 8
+            threadDelay 500000
+            flip postEvent (peers !! 0) . UnseqEvent $ toIetx addMemberTx
+
+      runForThirtySeconds $ concurrently_ (runNetwork peers connections) routine
+      ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
+      ifor_ ctxs1 $ \i ctx -> (i, ctx ^. apiChainInfoMap . at chainId) `shouldBe` (i, Just chainInfo')
   
   describe "handleEvents" $ do
     it "should pong a ping" $
