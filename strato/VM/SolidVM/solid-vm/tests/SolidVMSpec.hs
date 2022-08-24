@@ -5421,13 +5421,33 @@ contract qq {
   } 
 }|]) `shouldThrow` anyRevertError
 
-  it "Revert customError TODO" $ runTest (do
+  it "revert sucessfully when invoked with namedargs" $ runTest (do
     runBS [r|
 pragma solidvm 3.3;
 contract qq {
   
   uint a;
   
+  constructor()
+  {
+    a=1;
+    randomFunction(1);
+  }
+
+  function randomFunction(uint checker)
+  {
+    if(a==checker)
+      revert({x:"logic flag"}); 
+  } 
+}|]) `shouldThrow` anyRevertError
+
+  it "Revert customError" $ runTest (do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  
+  uint a;
+  error f (string message);
   constructor()
   {
     a=1;
@@ -5439,15 +5459,15 @@ contract qq {
     if(a==checker)
       revert f("ERROR"); 
   } 
-}|]) `shouldThrow` anyTODO
+}|]) `shouldThrow` anyCustomError
 
-  it "Revert customError  TODO" $ runTest (do
+  it "Revert customError  namedargs" $ runTest (do
     runBS [r|
 pragma solidvm 3.3;
 contract qq {
   
   uint a;
-  
+  error f(string x,string y);
   constructor()
   {
     a=1;
@@ -5459,4 +5479,4 @@ contract qq {
     if(a==checker)
       revert f({x:'a',y:'b'}); 
   } 
-}|]) `shouldThrow` anyTODO
+}|]) `shouldThrow` anyCustomError
