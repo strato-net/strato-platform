@@ -8,6 +8,7 @@
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE DeriveFoldable    #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE DeriveAnyClass    #-}
 
 
 {-# OPTIONS -fno-warn-unused-top-binds #-}
@@ -80,11 +81,11 @@ data XabiF a = Xabi
   , _xabiKind      :: XabiKind
   , _xabiUsing     :: Map Text (UsingF a)
   , _xabiContext   :: a
-  } deriving (Eq,Show,Generic, Functor, Traversable, Foldable)
+  } deriving (Eq,Show,Generic, Functor, NFData, Traversable, Foldable)
 
 type Xabi = Positioned XabiF
 
-data UsingF a = Using String a deriving (Eq,Show,Generic, Functor, Traversable, Foldable)
+data UsingF a = Using String a deriving (Eq,Show,Generic, Functor, NFData, Traversable, Foldable)
 
 type Using = Positioned UsingF
 

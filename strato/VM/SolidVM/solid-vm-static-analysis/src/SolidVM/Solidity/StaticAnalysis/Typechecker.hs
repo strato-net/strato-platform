@@ -1068,7 +1068,7 @@ getVarTypeByName' name ctx = do
                                    , functionReturnType = flip Product ctx $ flip Static ctx . indexedTypeType . snd <$> _funcVals overloadFunc
                                    , functionContext = _funcContext overloadFunc
                                    , functionOverloads = []
-                                   , functionArgNames = fst <$> funcArgs overloadFunc
+                                   , functionArgNames = fst <$> _funcArgs overloadFunc
                                    }
 
 setVarType' :: SourceAnnotation Text -> SolidString -> Type -> SSS Type'

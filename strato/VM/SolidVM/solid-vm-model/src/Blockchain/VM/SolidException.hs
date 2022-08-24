@@ -73,6 +73,9 @@ data SolidException = TypeError String String
                     | PaymentError String String
                     | ReservedWordError String String
                     | ImmutableError String String
+                    | TooManyResultsError String Int
+                    | TooManyCooks Int Int
+                    | GeneralMetaProgrammingError String String
                     deriving (Eq, Exception, Generic, NFData)
 
 instance Show SolidException where
@@ -199,9 +202,9 @@ paymentError = toThrower PaymentError
 reservedWordError :: (Show v) => String -> v -> a
 reservedWordError = toThrower ReservedWordError
 
-
 immutableError :: (Show v) => String -> v -> a
 immutableError = toThrower ImmutableError
+
 tooManyResultsError :: String -> Int -> a
 tooManyResultsError word got = throw $ TooManyResultsError word got
 

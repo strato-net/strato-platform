@@ -106,9 +106,21 @@ tShow' :: Visibility -> Text
 tShow' Private = "private"
 tShow' Public = "public"
 tShow' Internal = "internal"
-tShow' External = "external"import           Control.Lens                 (mapped, (&), (?~))
+tShow' External = "external"
+
+instance ToJSON Visibility where
+  toJSON = String . tShow'
+instance FromJSON Visibility
+instance Arbitrary Visibility where arbitrary = GR.genericArbitrary GR.uniform
+instance ToSchema Visibility where
+  declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
+    & mapped.name ?~ "Visibility of a Function"
+    & mapped.schema.description ?~ "SolidVM Function Visibility"
+    & mapped.schema.example ?~ toJSON ex
+    where
       ex :: Visibility
       ex = Public
+
 
 -- Changes to this structure should also have changes in the Unparser :)
 data FuncF a = Func
@@ -125,7 +137,7 @@ data FuncF a = Func
   , _funcContext :: a
   , _funcIsFree :: Bool
   , _funcOverload :: [FuncF a]
-  } deriving (Eq,Show,Generic, Functor, Foldable, Traversable)
+  } deriving (Eq,Show,Generic, Functor, NFData, Foldable, Traversable)
 
 makeLenses ''FuncF
 

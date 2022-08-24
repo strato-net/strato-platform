@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass    #-}
 -- |
 -- Module: Declarations
 -- Description: Parsers for top-level Solidity declarations
@@ -8,6 +9,7 @@
 -- Maintainer: Charles Crain <charles@blockapps.net>
 -- Maintainer: Steven Glasford <steven_glasford@blockapps.net>
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
+
 module SolidVM.Solidity.Parse.Declarations where
 
 import           Control.Monad                     (when)
@@ -609,7 +611,28 @@ comment = oneLineComment <|> multiLineComment
 
 -- This software is provided by the copyright holders "as is" and any express or
 -- implied warranties, including, but not limited to, the implied warranties of
--- merchantability and fitness for a import           Control.Lens                 (mapped, (&), (?~))rsing and unparsing solidity.
+-- merchantability and fitness for a particular purpose are disclaimed. In no
+-- event shall the copyright holders be liable for any direct, indirect,
+-- incidental, special, exemplary, or consequential damages (including, but not
+-- limited to, procurement of substitute goods or services; loss of use, data,
+-- or profits; or business interruption) however caused and on any theory of
+-- liability, whether in contract, strict liability, or tort (including
+-- negligence or otherwise) arising in any way out of the use of this software,
+-- even if advised of the possibility of such damage.
+oneLineComment :: SolidityParser ()
+oneLineComment =
+        do{ try (string (commentLine solidityLanguage))
+          ; skipMany (satisfy (/= '\n'))
+          ; return ()
+          }
+
+multiLineComment :: SolidityParser ()
+multiLineComment =
+  do { try (string (commentStart solidityLanguage))
+     ; inComment
+     }
+
+inComment :: SolidityParser ()
 inComment
   | nestedComments solidityLanguage  = inCommentMulti
   | otherwise                = inCommentSingle
