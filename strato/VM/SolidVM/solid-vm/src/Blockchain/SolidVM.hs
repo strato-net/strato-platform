@@ -23,7 +23,6 @@ module Blockchain.SolidVM
   , create
   ) where
 
-
 import           Control.DeepSeq                      (force)
 import           Control.Exception                    (throw)
 import           Control.Lens hiding (assign, from, to, Context)
@@ -64,9 +63,9 @@ import           Debugger
 import           GHC.Exts                             hiding (breakpoint)
 import           Text.Parsec                          (runParser)
 import           Text.Printf
-import           Text.Read (readMaybe)
+import           Text.Read (readMaybe, readEither)
 
-
+import           Blockchain.Data.Transaction  (whoSignedThisTransactionEcrecover)
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
@@ -109,7 +108,6 @@ import           Text.Tools
 import qualified Data.Text.Encoding                   as DT
 
 import qualified SolidVM.Model.CodeCollection         as CC
-
 import           SolidVM.Model.SolidString
 import qualified SolidVM.Model.Storable as MS
 import qualified SolidVM.Model.Type as SVMType
@@ -123,6 +121,7 @@ import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpre
 import           Network.Haskoin.Crypto.BigWord()
 import           UnliftIO                             hiding (assert)
 
+ 
 
 -- | Copying from Data.List.Extra, since our version of the extra library seems to not contain it.
 -- | A total variant of the list index function `(!!)`.
@@ -1149,6 +1148,8 @@ runStatement s@(CC.SimpleStatement (CC.VariableDefinition entries maybeExpressio
 
 runStatement (CC.SolidityTryCatchStatement tryExpression returnsDecl statementsForSuccess catchBlockMap _) = do
   ctract <- getCurrentContract
+  -- currentCallInfo <- getCurrentCallInfo
+
   if (CC._vmVersion ctract /= "svm3.3")
     then unknownStatement "Try/Catch statements are not supported below pragma solidvm 3.3" tryExpression
     else do
@@ -1180,6 +1181,7 @@ runStatement (CC.SolidityTryCatchStatement tryExpression returnsDecl statementsF
 
 runStatement (CC.TryCatchStatement tryBlock catchBlockMap _) = do 
   ctract <- getCurrentContract
+  -- currentCallInfo <- getCurrentCallInfo
   if (CC._vmVersion ctract /= "svm3.3")
     then unknownStatement "Try/Catch statements are not supported below pragma solidvm 3.3" tryBlock
     else do
@@ -1490,6 +1492,7 @@ expToVar' (CC.NumberLiteral _ v (Just nu)) = do
     else unknownStatement "Unit suffixes are not supported below pragma solidvm 3.3" (v, nu)
 expToVar' (CC.StringLiteral _ s) = return $ Constant $ SString s
 expToVar' (CC.BoolLiteral _ b) = return $ Constant $ SBool b
+expToVar' (CC.HexaLiteral _ a) = return $ Constant $ SString $ BC.unpack . either (parseError "Couldn't parse hexadecimal literal: ") id . B16.decode $ BC.pack a
 expToVar' (CC.Variable _ "bytes32ToString") = return $ Constant $ SHexDecodeAndTrim
 expToVar' (CC.Variable _ "addressToAsciiString") = return $ Constant SAddressToAscii
 expToVar' (CC.Variable _ "bytes") = do --TODO- remove this hardcoded case
@@ -2044,42 +2047,34 @@ expToVar' (CC.FunctionCall _ e args) = do
             where
               testMatch :: MonadSM m => CC.Func -> m Bool
               testMatch tf = do
-                let argPairing = generateArgPairs $ CC.funcArgs tf
-                    argPairLength = length $ mapArgs tf
-                doArgsMatch <- mapM testNameAndTypes argPairing
-                pure $ ((argPairLength) == (length $ CC.funcArgs tf)) 
-                           && ((argPairLength) == (argCount))
-                           && (all (== True) doArgsMatch)
-              testNameAndTypes :: MonadSM m => (Maybe SolidString, Value, Maybe SolidString, CC.IndexedType) -> m Bool
-              testNameAndTypes (n1, v1, n2, t) = 
-                if (n1 == n2) 
-                  then do
-                    -- These cases might not be all inclusive of all valid combinations.
-                    case (v1, (CC.indexedTypeType t)) of
-                      (SInteger _, SVMType.Int _ _) -> pure $ True
-                      (SString _, SVMType.String _) -> pure $ True
-                      (SString _, SVMType.Bytes _ _) -> pure $ True
-                      (SBool _, SVMType.Bool) -> pure $ True
-                      (SAccount _ _, SVMType.Address _) -> pure $ True
-                      (SAccount _ _, SVMType.Account _) -> pure $ True
-                      (SStruct _ _, SVMType.UnknownLabel _ _) -> pure $ True
-                      (SContract x _, SVMType.UnknownLabel y _) -> pure $ x == y
-                      (SArray x _, SVMType.Array y _) -> pure $ x == y
-                      (SReference addressedPath, _) -> do
-                        refType <- getXabiValueType addressedPath
-                        if (refType == (CC.indexedTypeType t))
-                          then pure $ True
-                          else 
-                            case (refType, (CC.indexedTypeType t)) of
-                              (SVMType.UnknownLabel x _, SVMType.UnknownLabel y _) -> pure $ x == y
-                              (SVMType.Array x _, SVMType.Array y _) -> pure $ x == y 
-                              _ -> pure $ False
-                      _ -> pure $ False
-                  else pure $ False
-              generateArgPairs :: [(Maybe SolidString, CC.IndexedType)] -> [(Maybe SolidString, Value, Maybe SolidString, CC.IndexedType)]
-              generateArgPairs functionArgs = case argVals of
-                  OrderedVals ov -> concatMap (\(v1, (Just n, t)) -> [(Just n, v1, Just n, t)]) (zip ov functionArgs)
-                  NamedVals nv -> concatMap (\((s1, t1), (Just s2, t2)) -> [(Just s1, t1, Just s2, t2)]) (zip nv functionArgs)
+                let argMapping = mapArgs tf
+                doArgsMatch <- mapM testNameAndTypes argMapping
+                pure $ ((length argMapping) == (length $ CC.funcArgs tf)) 
+                       && ((length argMapping) == (argCount))
+                       && (all (== True) doArgsMatch)
+              testNameAndTypes :: MonadSM m => (String, (SVMType.Type, Value)) -> m Bool
+              testNameAndTypes (_, (t, v)) = 
+                -- These cases might not be all inclusive of all valid combinations.
+                case (v, t) of
+                  (SInteger _, SVMType.Int _ _) -> pure $ True
+                  (SString _, SVMType.String _) -> pure $ True
+                  (SString _, SVMType.Bytes _ _) -> pure $ True
+                  (SBool _, SVMType.Bool) -> pure $ True
+                  (SAccount _ _, SVMType.Address _) -> pure $ True
+                  (SAccount _ _, SVMType.Account _) -> pure $ True
+                  (SStruct _ _, SVMType.UnknownLabel _ _) -> pure $ True
+                  (SContract x _, SVMType.UnknownLabel y _) -> pure $ x == y
+                  (SArray x _, SVMType.Array y _) -> pure $ x == y
+                  (SReference addressedPath, _) -> do
+                    refType <- getXabiValueType addressedPath
+                    if (refType == t)
+                      then pure $ True
+                      else 
+                        case (refType, t) of
+                          (SVMType.UnknownLabel x _, SVMType.UnknownLabel y _) -> pure $ x == y
+                          (SVMType.Array x _, SVMType.Array y _) -> pure $ x == y 
+                          _ -> pure $ False
+                  _ -> pure $ False
               mapArgs :: CC.FuncF a -> [(String, (SVMType.Type, Value))]
               mapArgs theFunc = case argVals of
                 OrderedVals vs -> let argMeta = 
@@ -2093,8 +2088,6 @@ expToVar' (CC.FunctionCall _ e args) = do
                                           (M.zipWithMatched $ \_k t v -> (t, v))
                                           strTypes
                                           $ M.fromList ns
-                      -- These probably don't need to be sorted by argument index, as they are turned into a map
-                      -- when added to the call info.
                       sortedArgs = map snd . sortWith fst
                                 . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
                                 $ M.toList typeAndVal
@@ -2407,12 +2400,24 @@ binopAssign oper lhs rhs = do
 intBuiltin :: [Value] -> Value
 intBuiltin [SEnumVal _ _ enumNum] = SInteger $ fromIntegral enumNum
 intBuiltin [SInteger n] = SInteger n
-intBuiltin [SString hex] =
-  case B16.decode (BC.pack hex) of
-    Right l -> let zeros = 32 - B.length l
-               in SInteger . fromIntegral . bytesToWord256 $ B.replicate zeros 0x0 <> l
-    _ -> typeError "numeric cast - not a hex string" hex
+intBuiltin [SString hex] = integerToValue $ parseBaseInt hex 16 
+intBuiltin [SString hex, SInteger 16] = integerToValue $ parseBaseInt hex 16
+intBuiltin [SString dec, SInteger 10] = integerToValue $ parseBaseInt dec 10
 intBuiltin args = typeError "numeric cast - invalid args" args
+
+integerToValue :: Either String Integer -> Value
+integerToValue (Right n) = SInteger n
+integerToValue (Left err) = typeError err ("" :: String)
+
+parseBaseInt :: String -> Integer -> Either String Integer
+parseBaseInt s n = 
+  case n of
+    10 -> readEither s
+    16 -> case B16.decode (BC.pack s) of
+            Right l -> let zeros = 32 - B.length l
+                       in Right . fromIntegral . bytesToWord256 $ B.replicate zeros 0x0 <> l
+            _ -> Left $ "numeric cast - not a hex string " <> s
+    _ -> Left $ "Cannot convert string " <> s <> " to base " <> show n
 
 castToAncestor :: MonadSM m => NamedAccount -> Integer -> m Value
 castToAncestor a n = do
@@ -2528,6 +2533,15 @@ callBuiltin "keccak256" args Nothing = do
   case allStrings args of
     False -> invalidArguments "cannot use a non string arguments in keccak256" args
     True ->  return . SString . BC.unpack . keccak256ToByteString . hash . BC.pack $ customConcat args
+callBuiltin "ecrecover" [SString h, SInteger r, SInteger s, SInteger v] _ = do
+  let intHash = intBuiltin [SString h]
+  bytestringHash <- encodeForReturn intHash
+  let theSignerAddress = whoSignedThisTransactionEcrecover (unsafeCreateKeccak256FromByteString bytestringHash) r s v
+  let theZero ::  Integer
+      theZero = 0
+  case theSignerAddress of
+    Nothing -> return . ((flip SAccount) False) . unspecifiedChain $ fromIntegral theZero
+    Just theAddress -> return . ((flip SAccount) False) . unspecifiedChain $ theAddress
 callBuiltin sha256@("sha256") args Nothing = do
   contract' <- getCurrentContract
   if (CC._vmVersion contract' == "svm3.3")
@@ -2826,7 +2840,7 @@ certificateMap maybeCert cntrct =
                                           ]
           stringToString = SVMType.Mapping { SVMType.dynamic = Nothing
                                         , SVMType.key = SVMType.String Nothing
-                                        , SVMType.value = SVMType.String Nothing }
+                                      , SVMType.value = SVMType.String Nothing }
 {-
 data Func = Func
   { funcArgs :: Map Text CC.IndexedType
@@ -3029,7 +3043,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
 
   if (CC._vmVersion contract' /= "svm3.3")
     then do
-      _ <- forM theModifierNames $ \name -> do
+      forM_ theModifierNames $ \name -> do
         case M.lookup name (contract'^.CC.modifiers) of
           Just _ -> unknownStatement "modifiers are not supported below pragma solidvm 3.3" name
           Nothing -> return Nothing
@@ -3101,6 +3115,33 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
             return $ Just theModifier
           Nothing -> if name `elem` contract' ^. CC.parents then return Nothing else (if (svm3_3) then (missingField "modifier not found" name) else return Nothing)
       let !theModifiers = catMaybes theModifiers'
+
+      let args = case argVals of
+            OrderedVals vs -> let argMeta = 
+                                    map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t))
+                                    $ CC.funcArgs theFunction
+                              in zipWith (\(n, t) v -> (n, (t, v))) argMeta vs
+            NamedVals ns ->
+              let strTypes = M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ CC.funcArgs theFunction
+                  typeAndVal = M.merge (M.mapMissing (curry $ invalidArguments "missing argument"))
+                                      (M.mapMissing (curry $ invalidArguments "extra argument"))
+                                      (M.zipWithMatched $ \_k t v -> (t, v))
+                                      strTypes
+                                      $ M.fromList ns
+                  -- These probably don't need to be sorted by argument index, as they are turned into a map
+                  -- when added to the call info.
+                  sortedArgs = map snd . sortWith fst
+                            . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
+                            $ M.toList typeAndVal
+              in sortedArgs
+      let locals = args ++ returns
+      localVars1 <-
+        forM locals $ \(n, (t, v)) -> do
+          newVar <- liftIO $ fmap Variable $ newIORef v
+          return (n, (t, newVar))
+
+      addCallInfo address' contract' funcName hsh cc (M.fromList localVars1) ro ff -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
+      
       matchedArgvals <- forM theModifiers $ \modi -> do
         let margList = CC.OrderedArgs 
                 . fromMaybe []
@@ -3123,39 +3164,24 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
                           . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
                           $ M.toList typeAndVal
             return sortedArgs
-
-      let args = case argVals of
-            OrderedVals vs -> let argMeta = 
-                                    map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t))
-                                    $ CC.funcArgs theFunction
-                              in zipWith (\(n, t) v -> (n, (t, v))) argMeta vs
-            NamedVals ns ->
-              let strTypes = M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ CC.funcArgs theFunction
-                  typeAndVal = M.merge (M.mapMissing (curry $ invalidArguments "missing argument"))
-                                      (M.mapMissing (curry $ invalidArguments "extra argument"))
-                                      (M.zipWithMatched $ \_k t v -> (t, v))
-                                      strTypes
-                                      $ M.fromList ns
-                  -- These probably don't need to be sorted by argument index, as they are turned into a map
-                  -- when added to the call info.
-                  sortedArgs = map snd . sortWith fst
-                            . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
-                            $ M.toList typeAndVal
-              in sortedArgs
-
-          locals = args ++ returns ++ (map (\(x,y) -> (T.unpack x, y)) (concat matchedArgvals)) --modArgsToBeLocals
+       -- ++ (map (\(x,y) -> (T.unpack x, y)) (concat matchedArgvals)) --modArgsToBeLocals
 
       onTraced $ do
         liftIO $ putStrLn $ "            args: " ++ show (map fst args)
         when (not $ null returns) $ liftIO $ putStrLn $ "    named return: " ++ show (map fst returns)
 
-      localVars <-
-        forM locals $ \(n, (t, v)) -> do
-          newVar <- liftIO $ fmap Variable $ newIORef v
-          return (n, (t, newVar))
+      -- let myCombinerForEfficiency xs [] = return xs
+      --     myCombinerForEfficiency xs ((n,(t,v)):ys) = do
+      --       newVar <- liftIO $ fmap Variable $ newIORef v
+      --       myCombinerForEfficiency ((n, (t, newVar)) : xs) ys
 
-      addCallInfo address' contract' funcName hsh cc (M.fromList localVars) ro ff -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
+      forM_ (map (\(x,y) -> (T.unpack x, y)) (concat matchedArgvals)) $ \(n, (t, v)) -> do
+        addLocalVariable t n v
 
+
+
+      -- theCallInfo <- getCurrentCallInfo
+      -- when (True || (not $ null matchedArgvals)) $ error (show theCallInfo)
       let !commands = fromMaybe (missingField "Function call: function has been declared but not defined" funcName) $ CC.funcContents theFunction
       let modContentsList = map (\m -> fromMaybe (missingField "Function call: Modifier has been declared but not defined" m) (CC.modifierContents m)) theModifiers
       let isNotModExec = \case
@@ -3455,124 +3481,145 @@ solidityExceptionHandler catchBlockMap ex = do
       return res
     _ -> error "unhandled solid exception" (show ex)
 
+
+
+solidVMExceptionHelper :: (MonadSM m) => M.Map String (Maybe [String], [CC.Statement]) -> m (Maybe Value) -> m (Maybe Value)
+solidVMExceptionHelper x y = case M.lookup "" x of
+  Nothing -> y
+  Just (_, block) -> do
+    res <- runStatements block
+    return res
+
+
+
 solidVMExceptionHandler :: (MonadSM m) => (M.Map String (Maybe [String], [CC.Statement])) -> SolidException -> m (Maybe Value)
 solidVMExceptionHandler catchBlockMap ex = case ex of
     (InternalError s1 s2) -> do
       case M.lookup "InternalError" catchBlockMap of
-        Nothing -> internalError s1 s2
+        Nothing -> solidVMExceptionHelper catchBlockMap $ internalError s1 s2 
         Just (_, block) -> do
           res <- runStatements block
           return res
     (InvalidArguments s1 s2) -> 
       case M.lookup "InvalidArguments" catchBlockMap of
-        Nothing -> invalidArguments s1 s2
+        Nothing -> solidVMExceptionHelper catchBlockMap $ invalidArguments s1 s2
         Just (_, block) -> do
           res <- runStatements block
           return res
     (IndexOutOfBounds s1 s2) -> 
       case M.lookup "IndexOutOfBounds" catchBlockMap of
-        Nothing -> indexOutOfBounds s1 s2
+        Nothing -> solidVMExceptionHelper catchBlockMap $ indexOutOfBounds s1 s2
         Just (_, block) -> do
           res <- runStatements block
           return res
     (ParseError s1 s2) -> 
       case M.lookup "ParseError" catchBlockMap of
-        Nothing -> parseError s1 s2
+        Nothing -> solidVMExceptionHelper catchBlockMap $ parseError s1 s2
         Just (_, block) -> do
           res <- runStatements block
           return res
     (Require s1) -> 
       case M.lookup "Require" catchBlockMap of
-        Nothing -> do 
-          _ <- require False s1
-          return Nothing
+        Nothing -> do
+          case M.lookup "" catchBlockMap of 
+            Nothing -> do
+              _ <- require False s1
+              return Nothing
+            Just (_, stmts) -> do
+              res' <-  runStatements stmts
+              return res'
         Just (_, block) -> do
           res <- runStatements block
           return res
     (Assert) -> 
       case M.lookup "Assert" catchBlockMap of
         Nothing -> do
-          _ <- assert False
-          return Nothing
+          case M.lookup "" catchBlockMap of 
+            Nothing -> do
+              _ <- assert False
+              return Nothing
+            Just (_, stmts) -> do
+              res' <-  runStatements stmts
+              return res'
         Just (_, block) -> do
           res <- runStatements block
           return res
     (UnknownFunction s1 s2) -> 
       case M.lookup "UnknownFunction" catchBlockMap of
-        Nothing -> unknownFunction s1 s2
+        Nothing -> solidVMExceptionHelper catchBlockMap $ unknownFunction s1 s2
         Just (_, block) -> do
           res <- runStatements block
           return res
     (UnknownConstant s1 s2) -> 
       case M.lookup "UnknownConstant" catchBlockMap of
-        Nothing -> unknownConstant s1 s2
+        Nothing -> solidVMExceptionHelper catchBlockMap $ unknownConstant s1 s2
         Just (_, block) -> do
           res <- runStatements block
           return res
     (UnknownVariable s1 s2) -> 
       case M.lookup "UnknownVariable" catchBlockMap of
-        Nothing -> unknownVariable s1 s2
+        Nothing -> solidVMExceptionHelper catchBlockMap $ unknownVariable s1 s2
         Just (_, block) -> do
           res <- runStatements block
           return res
     (UnknownStatement s1 s2) -> 
       case M.lookup "UnknownStatement" catchBlockMap of
-        Nothing -> unknownStatement s1 s2
+        Nothing -> solidVMExceptionHelper catchBlockMap $ unknownStatement s1 s2
         Just (_, block) -> do
           res <- runStatements block
           return res
     (DivideByZero s1) -> 
       case M.lookup "DivideByZero" catchBlockMap of
-        Nothing -> divideByZero s1
+        Nothing -> solidVMExceptionHelper catchBlockMap $ divideByZero s1
         Just (_, block) -> do
           res <- runStatements block
           return res
     (MissingCodeCollection s1 s2) -> 
       case M.lookup "MissingCodeCollection" catchBlockMap of
-        Nothing -> missingCodeCollection s1 s2
+        Nothing -> solidVMExceptionHelper catchBlockMap $ missingCodeCollection s1 s2
         Just (_, block) -> do
           res <- runStatements block
           return res
     (InaccessibleChain s1 s2) -> 
       case M.lookup "InaccessibleChain" catchBlockMap of
-        Nothing -> inaccessibleChain s1 s2
+        Nothing -> solidVMExceptionHelper catchBlockMap $ inaccessibleChain s1 s2
         Just (_, block) -> do
           res <- runStatements block
           return res
     (InvalidWrite s1 s2) -> 
       case M.lookup "InvalidWrite" catchBlockMap of
-        Nothing -> invalidWrite s1 s2
+        Nothing -> solidVMExceptionHelper catchBlockMap $ invalidWrite s1 s2
         Just (_, block) -> do
           res <- runStatements block
           return res
     (InvalidCertificate s1 s2) -> 
       case M.lookup "InvalidCertificate" catchBlockMap of
-        Nothing -> invalidCertificate s1 s2
+        Nothing -> solidVMExceptionHelper catchBlockMap $ invalidCertificate s1 s2
         Just (_, block) -> do
           res <- runStatements block
           return res
     (MalformedData s1 s2) -> 
       case M.lookup "MalformedData" catchBlockMap of
-        Nothing -> malformedData s1 s2
+        Nothing -> solidVMExceptionHelper catchBlockMap $ malformedData s1 s2
         Just (_, block) -> do
           res <- runStatements block
           return res
     (TooMuchGas s1 s2) -> 
       case M.lookup "TooMuchGas" catchBlockMap of
-        Nothing -> tooMuchGas s1 s2
+        Nothing -> solidVMExceptionHelper catchBlockMap $ tooMuchGas s1 s2
         Just (_, block) -> do
           res <- runStatements block
           return res
     (PaymentError s1 s2) ->
       case M.lookup "PaymentError" catchBlockMap of
-        Nothing -> paymentError s1 s2
+        Nothing -> solidVMExceptionHelper catchBlockMap $ paymentError s1 s2
         Just (_, block) -> do
           res <- runStatements block
           return res
     (CustomError s1 s2 vals) -> do
       let name = T.unpack $ T.replace "\"" "" $ T.pack s2
       case M.lookup name catchBlockMap of
-        Nothing -> customError s1 name vals
+        Nothing -> solidVMExceptionHelper catchBlockMap $ customError s1 name vals
         Just (args, block) -> do
           ctract <- getCurrentContract
           (_, cc) <- getCurrentCodeCollection

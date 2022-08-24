@@ -114,4 +114,5 @@ expressionHelper (TupleExpression _ es) =
 expressionHelper (ArrayExpression _ es) = concat $ expressionHelper <$> es
 expressionHelper (Variable _ _) = []
 expressionHelper (ObjectLiteral _ _) = []
+expressionHelper (HexaLiteral _ _) = []
 

@@ -14,6 +14,7 @@ library:
     - SolidVM.Solidity.StaticAnalysis.Functions.ConstantFunctions
     - SolidVM.Solidity.StaticAnalysis.Functions.Unimplemented.Continue
     - SolidVM.Solidity.StaticAnalysis.Functions.Unimplemented.Modifiers
+    - SolidVM.Solidity.StaticAnalysis.Optimizer
     - SolidVM.Solidity.StaticAnalysis.Statements.StateVariableShadowing
     - SolidVM.Solidity.StaticAnalysis.Statements.UninitializedLocalVariables
     - SolidVM.Solidity.StaticAnalysis.Statements.WriteAfterWrite

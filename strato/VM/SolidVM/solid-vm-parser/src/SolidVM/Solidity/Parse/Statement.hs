@@ -113,7 +113,7 @@ tryCatchStatement = do
       s <- statements
       catchs <- many1 $ do
         reserved "catch"
-        err <- identifier
+        err <- option "" identifier
         params <- optionMaybe (parens $ commaSep $ do
             alias <- identifier
             pure $ alias
@@ -350,7 +350,8 @@ primaryExpression = do
   let res' a b = withPosition $ b <$ reserved a
       res  a   = res' a a
       
-  (uncurry Variable . fmap stringToLabel <$> res "msg")
+  myHexParser
+    <|> (uncurry Variable . fmap stringToLabel <$> res "msg")
     <|> (uncurry Variable . fmap stringToLabel <$> res "address")
     <|> (uncurry Variable . fmap stringToLabel <$> res "account")
     <|> (uncurry Variable . fmap stringToLabel <$> res "payable")
@@ -374,6 +375,15 @@ primaryExpression = do
               pure (val, nu)
             pure $ NumberLiteral a val nu)
     <|> (uncurry StringLiteral <$> withPosition stringLiteral)
+
+myHexParser :: SolidityParser Expression
+myHexParser = try $ do
+  ~(a,val) <- withPosition $ do
+    reservedOp "hex"
+    val' <- (between (symbol "\'") (symbol "\'") $ many1 hexDigit)  <|>  (between (symbol "\"") (symbol "\"") $ many1 hexDigit)               --make this work with double quotes as well
+    when(Prelude.length val' `mod` 2/=0) $ fail "hex digit must be even number"
+    pure val'
+  return $ HexaLiteral a val
 
 scientific :: SolidityParser Integer
 scientific = do 
