@@ -176,7 +176,7 @@ lookupContractFunction x cName fName = do
             ]) <$ x
           Just VariableDecl{..} ->
             if _varIsPublic
-              then pure $ Function (Product [] x) (Static _varType x) x []
+              then pure $ Function (Product [] x) (Static _varType x) x [] []
               else pure . bottom $ (T.concat
                 [ "Contract variable "
                 , labelToText cName
@@ -197,7 +197,7 @@ lookupContractFunction x cName fName = do
           ]) <$ x
         _ -> let fArgs = flip Product x $ flip Static x . indexedTypeType . snd <$> _funcArgs
                  fRets = flip Product x $ flip Static x . indexedTypeType . snd <$> _funcVals
-              in pure $ Function fArgs fRets x []
+              in pure $ Function fArgs fRets x [] []
 
 productType' :: SourceAnnotation Text -> [Type'] -> Type'
 productType' _ [Bottom es] = Bottom es
@@ -567,7 +567,8 @@ typecheckMember (Static (SVMType.UnknownLabel "super" Nothing) x) method = do
         Just Func{..} ->
           let fArgs = flip Product x $ flip Static x . indexedTypeType . snd <$> _funcArgs
               fRets = flip Product x $ flip Static x . indexedTypeType . snd <$> _funcVals
-           in pure $ Function fArgs fRets x []
+              fArgNames = fst <$> _funcArgs
+           in pure $ Function fArgs fRets x [] fArgNames
 typecheckMember (Static e@(SVMType.Enum _ enum mNames) x) n = do
   names <- case mNames of
     Just names -> pure names
@@ -592,6 +593,7 @@ typecheckMember (Static (SVMType.Account _) x) "code" =
                          (Static (SVMType.String Nothing) x)
                          x
                          []
+                         []
                ]
 typecheckMember (Static (SVMType.Account _) x) "codehash" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.Account _) x) "chainId" = pure $ Static (SVMType.Int Nothing Nothing) x
@@ -612,6 +614,7 @@ typecheckMember (Static (SVMType.Contract _) x) "code" =
             :| [Function (Sum $ (Product [] x) :| [ Static (SVMType.String Nothing) x ])
                          (Static (SVMType.String Nothing) x)
                          x
+                         []
                          []
                ]
 -- Sum $ (Product [] x) :| [(Static (SVMType.Bytes Nothing Nothing) x), (Function (Static (SVMType.String Nothing) x) (Static (SVMType.String Nothing) x) x)]
@@ -655,7 +658,7 @@ getConstructorType' x l  = do
       Nothing -> pure $ Function (Product [] x) (Static (SVMType.Contract l) x) x [] []
       Just Func{..} ->
         let fArgs = flip Product x $ flip Static x . indexedTypeType . snd <$> _funcArgs
-         in pure $ Function fArgs (Static (SVMType.Contract l) x) x []
+         in pure $ Function fArgs (Static (SVMType.Contract l) x) x [] []
 
 getTypeErrors :: Type' -> [SourceAnnotation Text]
 getTypeErrors (Bottom ts) = NE.toList ts
@@ -715,7 +718,7 @@ functionHelper :: Annotated CodeCollectionF
                -> Annotated FuncF
                -> Type'
 functionHelper cc c funcName f@Func{..} = case _funcContents of
-  Nothing -> Function (Product [] _funcContext) (Product [] _funcContext) _funcContext []
+  Nothing -> Function (Product [] _funcContext) (Product [] _funcContext) _funcContext [] []
   Just stmts ->
     if funcName == "receive"
       then case (_funcArgs, _funcVals, _funcStateMutability, _funcVisibility) of
@@ -1038,10 +1041,11 @@ getVarTypeByName' name ctx = do
             Just theFunc->
               let fArgs = flip Product ctx $ flip Static ctx . indexedTypeType . snd <$> _funcArgs theFunc
                   fRets = flip Product ctx $ flip Static ctx . indexedTypeType . snd <$> _funcVals theFunc
+                  fArgNames = fst <$> _funcArgs theFunc
                   allFuncOverloads = case M.lookup name $ _flFuncs cc of
                     Just freeFunc -> (fmap buildOverloads $ _funcOverload theFunc) ++ [buildOverloads freeFunc] ++ (fmap buildOverloads $ _funcOverload freeFunc)
                     Nothing -> fmap buildOverloads $ _funcOverload theFunc
-              in pure $ Function fArgs fRets ctx allFuncOverloads
+              in pure $ Function fArgs fRets ctx allFuncOverloads fArgNames
             Nothing -> do
               pure $ case M.lookup name $ _contracts cc of
                 Just _->
