@@ -928,40 +928,42 @@ runStatement (CC.SimpleStatement (CC.ExpressionStatement (CC.PlusPlus e))) = do
   return Nothing
 -}
 
-runStatement (CC.RevertStatement mString theArgs _) = do -- TODO make work with multiple args
-  case mString of 
-    Just x -> do todo "handle custom errors" x
-      -- -- (hsh,cc) <- getCurrentCodeCollection
-      -- g <- getCurrentContract
-      -- err <- case M.lookup mString $ CC._errors g of
-      --   Just e -> do
-      --     ag <- case theArgs of
-      --           CC.OrderedArgs xs -> do
-      --               newList <- forM xs $ \x -> do
-      --                 y <- expToVar x
-      --                 z <- getVar y
-      --                 return z
-      --               pure $ newList
-      --           CC.NamedArgs ns -> do
-      --               newList <- forM ns $ \x -> do
-      --                 y <- expToVar x
-      --                 z <- getVar y
-      --                 return z
-      --               pure $ newList
-      --     let listOfVals = case ag of
-      --           CC.OrderedArgs ov -> map (\x -> toBasic x) ov
-      --           CC.NamedArgs nv -> map (\(_, y) -> toBasic y) nv
-      --     return $ customError "Reverting based on  Error" mString listOfVals    
-      --   Nothing -> revertError "REVERT" "Going back to Initial State"
+
+-- Below defined logic works well for REVERT statement use-cases:
+--    revert();
+
+--    revert(args);
+    --    revert("error message") i.e. OrderedArgs 
+    --    revert({x:"Message"}) i.e. NamedArgs
+
+--    revert customError(args);
+    --    revert customError("error message") i.e. OrderedArgs 
+    --    revert customError({x:"Message"}) i.e. NamedArgs 
+runStatement (CC.RevertStatement mString theArgs _) = do
+  case mString of
+    Just name -> do 
+      g <- getCurrentContract
+      err <- case M.lookup name $ CC._errors g of
+        Just _ -> do
+          argVals <- case theArgs of
+            CC.OrderedArgs as -> OrderedVals <$> mapM (getVar <=< expToVar) as
+            CC.NamedArgs ns -> NamedVals <$> mapM (mapM $ getVar <=< expToVar) ns
+          let listOfVals = case argVals of
+                OrderedVals ov -> map (\x -> toBasic x) ov
+                NamedVals nv -> map (\(_, y) -> toBasic y) nv
+              
+          return $ customError "Reverting based on  Error Method:" name listOfVals
+        Nothing -> do revertError "REVERT: to initial state" name
+      pure $ err
     
-    Nothing -> case theArgs of
-      CC.OrderedArgs xs -> do
-        newList <- forM xs $ \x -> do
-          y <- expToVar x
-          z <- getVar y
-          return z
-        revertError "REVERT" newList
-      CC.NamedArgs xs -> todo "Should handle named args" xs
+    Nothing -> do
+          argVals <- case theArgs of
+            CC.OrderedArgs as -> OrderedVals <$> mapM (getVar <=< expToVar) as
+            CC.NamedArgs ns -> NamedVals <$> mapM (mapM $ getVar <=< expToVar) ns
+          let listOfVals = case argVals of
+                OrderedVals ov -> map (\x -> toBasic x) ov
+                NamedVals nv -> map (\(_, y) -> toBasic y) nv    
+          return $ revertError "REVERT" listOfVals    
 
 -- Assignment to an index into an array or mapping
 runStatement st@(CC.SimpleStatement (CC.ExpressionStatement (CC.Binary _ "=" dst@(CC.IndexAccess _ parent (Just indExp)) src)) pos) = do
