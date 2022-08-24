@@ -1560,14 +1560,14 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
       (SBuiltinVariable "msg", "data") -> do contract' <- getCurrentContract
                                              functionName <- getCurrentFunctionName
                                              callInfo <- getCurrentCallInfo
-                                             let argList = maybe [] CC.funcArgs $ contract' ^. CC.functions . at functionName
+                                             let argList = maybe [] CC._funcArgs $ contract' ^. CC.functions . at functionName
                                                  localVars = localVariables callInfo
                                              argVals <- forM argList (\(n,_) -> getVar . snd $ localVars M.! (fromMaybe "" n))
                                              argsToStr <- fmap (intercalate ", ") $ forM argVals showSM
                                              return . Constant . SString $ "("++argsToStr++")"
       (SBuiltinVariable "msg", "sig") -> do functionName <- getCurrentFunctionName
                                             contract' <- getCurrentContract
-                                            let argList = maybe [] CC.funcArgs $ contract' ^. CC.functions . at functionName
+                                            let argList = maybe [] CC._funcArgs $ contract' ^. CC.functions . at functionName
                                                 argTypesList = map (\(_, CC.IndexedType _ t) -> t) argList
                                                 argString = labelToString functionName++"("++intercalate "," (map unparseVarType argTypesList)++")"
                                                 calldataHash = fromMaybe emptyHash $ stringKeccak256 argString
@@ -2019,7 +2019,7 @@ expToVar' (CC.FunctionCall _ e args) = do
               testMatch tf = do
                 let argMapping = mapArgs tf
                 doArgsMatch <- mapM testNameAndTypes argMapping
-                pure $ ((length argMapping) == (length $ CC.funcArgs tf)) 
+                pure $ ((length argMapping) == (length $ CC._funcArgs tf)) 
                        && ((length argMapping) == (argCount))
                        && (all (== True) doArgsMatch)
               testNameAndTypes :: MonadSM m => (String, (SVMType.Type, Value)) -> m Bool
@@ -3201,10 +3201,10 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
       let args = case argVals of
             OrderedVals vs -> let argMeta = 
                                     map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t))
-                                    $ CC.funcArgs theFunction
+                                    $ CC._funcArgs theFunction
                               in zipWith (\(n, t) v -> (n, (t, v))) argMeta vs
             NamedVals ns ->
-              let strTypes = M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ CC.funcArgs theFunction
+              let strTypes = M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ CC._funcArgs theFunction
                   typeAndVal = M.merge (M.mapMissing (curry $ invalidArguments "missing argument"))
                                       (M.mapMissing (curry $ invalidArguments "extra argument"))
                                       (M.zipWithMatched $ \_k t v -> (t, v))
@@ -3246,27 +3246,6 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
                           . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
                           $ M.toList typeAndVal
             return sortedArgs
-
-      let args = case argVals of
-            OrderedVals vs -> let argMeta = 
-                                    map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t))
-                                    $ CC._funcArgs theFunction
-                              in zipWith (\(n, t) v -> (n, (t, v))) argMeta vs
-            NamedVals ns ->
-              let strTypes = M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ CC._funcArgs theFunction
-                  typeAndVal = M.merge (M.mapMissing (curry $ invalidArguments "missing argument"))
-                                      (M.mapMissing (curry $ invalidArguments "extra argument"))
-                                      (M.zipWithMatched $ \_k t v -> (t, v))
-                                      strTypes
-                                      $ M.fromList ns
-                  -- These probably don't need to be sorted by argument index, as they are turned into a map
-                  -- when added to the call info.
-                  sortedArgs = map snd . sortWith fst
-                            . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
-                            $ M.toList typeAndVal
-              in sortedArgs
-
-          locals = args ++ returns ++ (map (\(x,y) -> (T.unpack x, y)) (concat matchedArgvals)) --modArgsToBeLocals
        -- ++ (map (\(x,y) -> (T.unpack x, y)) (concat matchedArgvals)) --modArgsToBeLocals
 
       onTraced $ do
@@ -3285,8 +3264,8 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
 
       -- theCallInfo <- getCurrentCallInfo
       -- when (True || (not $ null matchedArgvals)) $ error (show theCallInfo)
-      let !commands = fromMaybe (missingField "Function call: function has been declared but not defined" funcName) $ CC.funcContents theFunction
-      let modContentsList = map (\m -> fromMaybe (missingField "Function call: Modifier has been declared but not defined" m) (CC.modifierContents m)) theModifiers
+      let !commands = fromMaybe (missingField "Function call: function has been declared but not defined" funcName) $ CC._funcContents theFunction
+      let modContentsList = map (\m -> fromMaybe (missingField "Function call: Modifier has been declared but not defined" m) (CC._modifierContents m)) theModifiers
       let isNotModExec = \case
                   CC.ModifierExecutor _ -> False
                   _ -> True
@@ -3719,19 +3698,19 @@ solidVMExceptionHandler catchBlockMap ex = case ex of
     (TooManyResultsError s1 s2) -> 
       case M.lookup "TooManyResultsError" catchBlockMap of
         Nothing -> tooManyResultsError s1 s2
-        Just block -> do
+        Just (_, block) -> do
           res <- runStatements block
           return res
     (TooManyCooks s1 s2) ->
       case M.lookup "TooManyCooks" catchBlockMap of
         Nothing -> tooManyCooks s1 s2
-        Just block -> do
+        Just (_, block) -> do
           res <- runStatements block
           return res
     (GeneralMetaProgrammingError s1 s2) ->
       case M.lookup "GeneralMetaProgrammingError" catchBlockMap of
         Nothing -> generalMetaProgrammingError s1 s2
-        Just block -> do
+        Just (_, block) -> do
           res <- runStatements block
           return res
     

@@ -105,8 +105,10 @@ unparseConstant (name, (ConstantDecl theType isPublic expression _)) =
 
 unparseContract :: SolidVM.Contract -> String
 unparseContract contr = 
+-- TODO: need to recursively retrieve all of the parent contracts
      "contract "
   <> labelToString (contr ^. contractName)
+  -- <> if (contr ^. parents )
   <> " {\n  "
   <> (List.intercalate "\n  " $ List.map unparseConstant (Map.assocs $ contr ^. constants)) -- ( contr ^. constants , contr ^. constants))
   <> (List.intercalate "\n  " $ List.map unparseVar (Map.assocs $ contr ^. storageDefs))
