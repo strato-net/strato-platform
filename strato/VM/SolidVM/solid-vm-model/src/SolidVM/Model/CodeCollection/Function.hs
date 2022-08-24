@@ -110,11 +110,12 @@ tShow' External = "external"import           Control.Lens                 (mappe
       ex :: Visibility
       ex = Public
 
+-- Changes to this structure should also have changes in the Unparser :)
 data FuncF a = Func
   { _funcArgs :: [(Maybe SolidString, SolidVM.IndexedType)]
   , _funcVals :: [(Maybe SolidString, SolidVM.IndexedType)]
   , _funcStateMutability :: Maybe StateMutability
-  -- These Values are only used for paimport           Control.Lens                 (mapped, (&), (?~))rsing and unparsing solidity.
+  -- These Values are only used for parsing, not for the actual function
   -- This data will not be stored in the db and will have no
   -- relevance when constructing from the db.
   , _funcContents :: Maybe [StatementF a]

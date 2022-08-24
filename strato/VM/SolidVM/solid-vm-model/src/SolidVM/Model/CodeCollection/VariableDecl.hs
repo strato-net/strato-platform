@@ -29,6 +29,7 @@ import           Test.QuickCheck.Instances    ()
 import           SolidVM.Model.CodeCollection.Statement
 import qualified SolidVM.Model.Type as SVMType hiding (Enum)
 
+-- Changes to this structure should also have changes in the Unparser :)
 data VariableDeclF a = VariableDecl
   { _varType       :: SVMType.Type
   , _varIsPublic   :: Bool

@@ -38,7 +38,7 @@ import qualified SolidVM.Model.CodeCollection.VarDef as SolidVM
 import           SolidVM.Model.CodeCollection.VariableDecl
 import           SolidVM.Model.SolidString
 
---Please add changes to the following list to the unparser
+-- Changes to this structure should also have changes in the Unparser :)
 data ContractF a =
   Contract {     
     _contractName :: SolidString,

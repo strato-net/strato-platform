@@ -36,6 +36,7 @@ import SolidVM.Model.SolidString
 import SolidVM.Model.Type
 import Control.DeepSeq
 
+-- Changes to this structure should also have changes in the Unparser :)
 data StatementF a =
   IfStatement (ExpressionF a) [StatementF a] (Maybe [StatementF a]) a -- if then else
   | WhileStatement (ExpressionF a) [StatementF a] a

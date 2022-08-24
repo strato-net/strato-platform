@@ -29,6 +29,7 @@ import           Control.DeepSeq
 import           SolidVM.Model.CodeCollection.Statement
 import qualified SolidVM.Model.Type as SVMType hiding (Enum)
 
+-- Changes to this structure should also have changes in the Unparser :)
 data ConstantDeclF a = ConstantDecl
   { _constType       :: SVMType.Type
   , _constIsPublic   :: Bool
