@@ -1,6 +1,8 @@
 {-# OPTIONS -fno-warn-redundant-constraints #-} -- todo fixme
 {-# LANGUAGE DeriveGeneric    #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell    #-}
 {-# LANGUAGE TypeOperators    #-}
 module Blockchain.DB.MemAddressStateDB (
   HasMemAddressStateDB(..),
@@ -21,8 +23,10 @@ import qualified Control.Monad.Change.Alter     as A
 import           Control.DeepSeq
 import           Data.Maybe
 import qualified Data.Map                       as M
+import qualified Data.Text                      as T
 import GHC.Generics
 
+import           BlockApps.Logging
 import           Blockchain.Data.AddressStateDB
 import qualified Blockchain.DB.AddressStateDB   as DB
 import           Blockchain.DB.HashDB
@@ -54,28 +58,40 @@ class HasMemAddressStateDB m where
 getAddressState :: (Account `A.Alters` AddressState) m => Account -> m AddressState
 getAddressState account = fromMaybe blankAddressState <$> A.lookup A.Proxy account
 
-getAddressStateMaybe :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m)
+getAddressStateMaybe :: (MonadLogger m, HasMemAddressStateDB m, HasStateDB m, HasHashDB m)
                      => Account -> m (Maybe AddressState)
 getAddressStateMaybe account = do
   theMap <- getAddressStateTxDBMap
   case M.lookup account theMap of
-    Just (ASModification addressState) -> return $ Just addressState
-    Just ASDeleted                     -> return $ Just blankAddressState
+    Just (ASModification addressState) -> do
+      $logInfoS "getAddressStateMaybe" . T.pack $ "Found ASModification in tx map for " ++ format account ++ ": " ++ format addressState
+      return $ Just addressState
+    Just ASDeleted                     -> do
+      $logInfoS "getAddressStateMaybe" . T.pack $ "Found ASDeleted in tx map for " ++ format account
+      return $ Just blankAddressState
     Nothing                            -> do
       theBMap <- getAddressStateBlockDBMap
       case M.lookup account theBMap of
-        Just (ASModification addressState) -> return $ Just addressState
-        Just ASDeleted                     -> return $ Just blankAddressState
-        Nothing                            -> DB.getAddressStateMaybe account
+        Just (ASModification addressState) -> do
+          $logInfoS "getAddressStateMaybe" . T.pack $ "Found ASModification in block map for " ++ format account ++ ": " ++ format addressState
+          return $ Just addressState
+        Just ASDeleted                     -> do
+          $logInfoS "getAddressStateMaybe" . T.pack $ "Found ASDeleted in block map for " ++ format account
+          return $ Just blankAddressState
+        Nothing                            -> do
+          mAddressState <- DB.getAddressStateMaybe account
+          $logInfoS "getAddressStateMaybe" . T.pack $ "Address state for " ++ format account ++ " from database: " ++ format mAddressState
+          pure mAddressState
 
 getAllAddressStates::(HasMemAddressStateDB m, HasHashDB m, HasStateDB m)=>
                      Maybe Word256 -> m [(Account, AddressState)]
 getAllAddressStates = DB.getAllAddressStates
 
-putAddressState :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) =>
+putAddressState :: (MonadLogger m, HasMemAddressStateDB m, HasStateDB m, HasHashDB m) =>
                  Account -> AddressState -> m ()
 putAddressState account newState = do
   theMap <- getAddressStateTxDBMap
+  $logInfoS "putAddressState" . T.pack $ "Putting address state for " ++ format account ++ ": " ++ format newState
   putAddressStateTxDBMap (M.insert account (ASModification newState) theMap)
 
 flushMemAddressStateTxToBlockDB :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) =>

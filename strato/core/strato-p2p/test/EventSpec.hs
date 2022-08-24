@@ -595,7 +595,7 @@ instance MonadIO m => (MP.StateRoot `A.Alters` MP.NodeData) (MonadTest m) where
   insert _ sr nd = dbsModify' $ stateDB . at sr ?~ nd
   delete _ sr    = dbsModify' $ stateDB . at sr .~ Nothing
 
-instance MonadIO m => (Account `A.Alters` AddressState) (MonadTest m) where
+instance (MonadIO m, MonadLogger m) => (Account `A.Alters` AddressState) (MonadTest m) where
   lookup _ = getAddressStateMaybe
   insert _ = putAddressState
   delete _ = deleteAddressState
@@ -646,7 +646,7 @@ instance MonadIO m => HasMemRawStorageDB (MonadTest m) where
   getMemRawStorageBlockDB = gets $ Lens.view $ memDBs . storageBlockMap
   putMemRawStorageBlockMap theMap = modify $ memDBs . storageBlockMap .~ theMap
 
-instance MonadIO m => (RawStorageKey `A.Alters` RawStorageValue) (MonadTest m) where
+instance (MonadIO m, MonadLogger m) => (RawStorageKey `A.Alters` RawStorageValue) (MonadTest m) where
   lookup _ = genericLookupRawStorageDB
   insert _ = genericInsertRawStorageDB
   delete _ = genericDeleteRawStorageDB
@@ -1287,7 +1287,7 @@ contract A {
         , (peers !! 0, peers !! 2)
         , (peers !! 1, peers !! 2)
         ]
-      let runForThirtySeconds = void . timeout 30000000
+      let runForThirtySeconds = void . timeout 60000000
           src = [r|
 pragma solidvm 3.2;
 contract A {
@@ -1386,38 +1386,38 @@ contract B {
           addMemberTx = addMemberMd $ mkSignedTx (privKeys !! 0) addMemberUtx
           toIetx = IETx ts . IngestTx Origin.API
           routine = do
-            threadDelay 500000
+            threadDelay 2000000
             flip postEvent (peers !! 0) . UnseqEvent . IEGenesis $ IngestGenesis Origin.API (chainId, chainInfo')
-            threadDelay 500000
+            threadDelay 2000000
             flip postEvent (peers !! 0) . UnseqEvent $ toIetx incXTx0
             for_ peers $ postEvent (TimerFire 0)
-            threadDelay 500000
+            threadDelay 2000000
             flip postEvent (peers !! 0) . UnseqEvent . toIetx $ mkMainChainTx 0
-            threadDelay 500000
+            threadDelay 2000000
             flip postEvent (peers !! 0) . UnseqEvent . toIetx $ mkMainChainTx 1
-            threadDelay 500000
+            threadDelay 2000000
             flip postEvent (peers !! 0) . UnseqEvent . toIetx $ mkMainChainTx 2
-            threadDelay 500000
+            threadDelay 2000000
             flip postEvent (peers !! 0) . UnseqEvent . toIetx $ mkMainChainTx 3
-            threadDelay 500000
+            threadDelay 2000000
             flip postEvent (peers !! 0) . UnseqEvent . toIetx $ mkMainChainTx 4
-            threadDelay 500000
+            threadDelay 2000000
             flip postEvent (peers !! 0) . UnseqEvent $ toIetx incXTx1
-            threadDelay 500000
+            threadDelay 2000000
             flip postEvent (peers !! 0) . UnseqEvent . toIetx $ mkMainChainTx 5
-            threadDelay 500000
+            threadDelay 2000000
             flip postEvent (peers !! 0) . UnseqEvent $ toIetx incXTx2
-            threadDelay 500000
+            threadDelay 2000000
             flip postEvent (peers !! 0) . UnseqEvent . toIetx $ mkMainChainTx 6
-            threadDelay 500000
+            threadDelay 2000000
             flip postEvent (peers !! 0) . UnseqEvent $ toIetx incXTx3
-            threadDelay 500000
+            threadDelay 2000000
             flip postEvent (peers !! 0) . UnseqEvent . toIetx $ mkMainChainTx 7
-            threadDelay 500000
+            threadDelay 2000000
             flip postEvent (peers !! 0) . UnseqEvent $ toIetx incXTx4
-            threadDelay 500000
+            threadDelay 2000000
             flip postEvent (peers !! 0) . UnseqEvent . toIetx $ mkMainChainTx 8
-            threadDelay 500000
+            threadDelay 2000000
             flip postEvent (peers !! 0) . UnseqEvent $ toIetx addMemberTx
 
       runForThirtySeconds $ concurrently_ (runNetwork peers connections) routine
