@@ -2119,22 +2119,13 @@ expToVar' (CC.FunctionCall _ e args) = do
             return . Constant $ SBool success
 
           Constant (SContractItem address' "code") -> do
-            --TODO: allow for finding multiple items in the future (this functionality can be conducted using the multiple code calls, currently)
+            -- contract' <- getCurrentContract
+            -- --Ensure that this can only be called when the pragma is pragma 3.4
+            -- when (CC._vmVersion contract' == "svm3.4")  
+
             --Only get the items if they are in the same chain as the current contract, this will prevent leaks from private chains
             from <- getCurrentAccount
             let address = namedAccountToAccount (from ^. accountChainId) address'
-            -- Retreive and resolve the codehash
-            -- codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) address
-            -- resolvedCodeHash <- resolveCodePtr (from ^. accountChainId) codeHash'
-            -- let ch' = case resolvedCodeHash of
-            --             Just (SolidVMCode _ ch1') -> ch1' 
-            --             Just cp -> missingCodeCollection "Account is not a SolidVM contract" (format cp)
-            --             Nothing -> missingCodeCollection "Could not resolve code pointer for account" (format address)
-            -- Find and resolve the body of the code using the codehash
-            -- cd <- A.lookup (A.Proxy @DBCode) ch'
-            -- let cd' = case cd of
-            --             Just (_,bs) -> bs
-            --             Nothing -> missingCodeCollection "Could not locate SolidVM code collection at account" (format address)
             -- Collect a potential item to search
             searchTerms <- case argVals of
                 -- catch only the SStrings
@@ -2145,8 +2136,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                 _ -> pure $ Nothing    
             --get only the contract containing useful sourceAnnotation contained in the ContractF type.
             (contract, _, _) <- getCodeAndCollection address
-            -- contractXabi <- getContractXabi address
-            
+
             let codeSnippets :: [String]
                 codeSnippets = 
                   case (fromMaybe "" searchTerms) of 
@@ -2179,7 +2169,7 @@ expToVar' (CC.FunctionCall _ e args) = do
 
                           structString = 
                             case ((contract ^. CC.structs) M.!? term) of
-                              Just structF -> Just $ unparseStruct (term, structF) -- $ unparseStructs (term, structF)
+                              Just structF -> Just $ unparseStruct (term, structF) 
                               Nothing -> Nothing
 
                           eventString = 
@@ -2190,18 +2180,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                           funcString = 
                             case ((contract ^. CC.functions) M.!? term) of 
                               Just funcF -> Just $ unparseFunc (term, funcF)
-                                -- case (funcF ^. CC.funcOverload) of 
-                                -- -- Case where nothing is supplied from the function
-                                -- [] -> Nothing
-                                -- -- Case with nonoverloaded function
-                                -- [a] -> 
-                                -- -- Case with overloaded functions
-                                -- as -> Just $ unparseFuncOverload term as
                               Nothing -> Nothing
-                          -- funcString = 
-                          --   case ((contract ^. CC.functions) M.!? term) of 
-                          --     Just funcF -> Just $ unparseFunc (term, funcF)
-                          --     Nothing -> Nothing
 
                           modString = 
                             case ((contract ^. CC.modifiers) M.!? term) of
@@ -2211,15 +2190,6 @@ expToVar' (CC.FunctionCall _ e args) = do
                       --Remove all of the items that were found to contain nothing, this should leave just the items that we found
                       in catMaybes [contrString, funcString, constString, storjString, enumString, eventString, structString, modString]
             pure . Constant $ SString ( unlines codeSnippets)
-            -- case codeSnippets of 
-            --   [] -> pure . Constant $ SString $ "" --TODO: add warning that nothing was found and the piece of code is redundant
-            --   -- Trim up the code to only include the code that was found, and format it if needed.
-            --   [a] -> let trim = trimCodeCollection (BC.unpack cd') a
-            --              result = trim
-            --          in pure . Constant $ SString (result)
-            --   as -> case searchTerms of
-            --           Nothing -> generalMetaProgrammingError "<address>.code(<stuff>)" searchTerms
-            --           Just searchTerm -> tooManyResultsError searchTerm (length as)
 
           Constant (SContractItem address' itemName) -> do
             from <- getCurrentAccount
