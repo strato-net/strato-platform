@@ -44,6 +44,7 @@ unparseSourceUnit (Import _ path) = "import \"" ++ Text.unpack path ++ "\";\n"
 unparseSourceUnit (FLConstant name conDecl) = (("\n    " <>) . unparseConstant) (Text.unpack name, conDecl)
 unparseSourceUnit (FLStruct name decl) = (("\n    " <>) . unparseTypes) (Text.unpack name, decl)
 unparseSourceUnit (FLEnum name decl) = (("\n    " <>) . unparseTypes) (Text.unpack name, decl)
+unparseSourceUnit (FLError name args) = (("\n    " <>) . unparseTypes) (Text.unpack name, args)
 unparseSourceUnit (DummySourceUnit) = "DummySourceUnit"
 unparseSourceUnit (NamedXabi name (contract,inherited)) =
      (case _xabiKind contract of
@@ -260,7 +261,7 @@ unparseStatementWith f (Return (Just e) a) = f a $ "return " ++ unparseExpressio
 unparseStatementWith f (Break a) = f a $ "break;"
 unparseStatementWith f (ModifierExecutor a) = f a $ "_;"
 unparseStatementWith f (Continue a) = f a $ "continue;"
-unparseStatementWith f (Throw a) = f a $ "throw;"
+unparseStatementWith f (Throw e a) = f a $ "throw " ++ unparseExpression e ++ ";"
 unparseStatementWith f (Block a) = f a $ "{ }"
 unparseStatementWith f (AssemblyStatement (MloadAdd32 dst src) a) = f a $ printf "assembly { %s := mload(add(%s, 32)) }" dst src
 
@@ -279,7 +280,8 @@ unparseStatementWith f (UncheckedStatement code a) = f a $
   "unchecked {\n" ++ tab (unlines $ map (unparseStatementWith f) code) ++ "\n}"
 
 unparseStatementWith f (TryCatchStatement tryBlock catchBlockMap a) = f a $
-  "try {\n" ++ tab (unlines $ map (unparseStatementWith f) tryBlock) ++ "\n}" ++ " catch " ++ (List.intercalate " " (map (\(name, block) -> "catch " ++ name ++ " {\n" ++ tab (unlines $ map (unparseStatementWith f) block) ++ "\n}") (Map.toList catchBlockMap)))
+  "try {\n" ++ tab (unlines $ map (unparseStatementWith f) tryBlock) ++ "\n}" ++ " catch " ++ (List.intercalate " " (map (\(name, (params, block)) -> "catch " ++ name ++ 
+  (show (fromMaybe [] params)) ++ " {\n" ++ tab (unlines $ map (unparseStatementWith f) block) ++ "\n}") (Map.toList catchBlockMap)))
 unparseStatementWith f (SolidityTryCatchStatement expr mtpl tryBlock catchBlockMap a) = f a $
   "try " ++ unparseExpression expr ++ " " ++  (show (fromMaybe [] mtpl)) ++ " {\n" ++ tab (unlines $ map (unparseStatementWith f) tryBlock) ++ "\n}" ++ " catch " ++ show (Map.toList catchBlockMap)
 -- unparseStatementWith _ x = internalError "missing case in call to unparseStatementWith" $ show x
@@ -330,6 +332,7 @@ unparseExpression (NumberLiteral _ x Nothing) = show x
 unparseExpression (BoolLiteral _ False) = "false"
 unparseExpression (BoolLiteral _ True) = "true"
 unparseExpression (StringLiteral _ s) = ('"':) . (++"\"") $ s
+unparseExpression (HexaLiteral _ a) = "hex\"" ++ (labelToString a) ++ "\"" 
 unparseExpression (TupleExpression _ vals) = "(" ++ List.intercalate ", " (map (maybe "" unparseExpression) vals) ++ ")"
 unparseExpression (IndexAccess _ e maybeVal) = unparseExpression e ++ "[" ++ fromMaybe "" (fmap unparseExpression maybeVal) ++ "]"
 unparseExpression (FunctionCall _ e args) =
@@ -389,6 +392,12 @@ unparseTypes (name, SolidVM.Struct {fields=fields'}) =
                                            <> " "
                                            <> labelToText fieldName
                                            <> ";"
+unparseTypes (name, SolidVM.Error {params=params'}) =
+  Text.unpack $ "error "
+             <> labelToText name
+             <> " ("
+             <> Text.intercalate ", " (List.map unparseArgs (sortWith (indexedTypeIndex . snd) $ map (\(n, v) -> (labelToText n , v)) params'))
+             <> ")"
 unparseTypes (_name, _def) = ""
 
 unparseArgs :: (Text, IndexedType) -> Text

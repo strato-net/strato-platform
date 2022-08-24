@@ -34,6 +34,7 @@ import qualified Data.Text as T
 import GHC.Generics
 import SolidVM.Model.SolidString
 import SolidVM.Model.Type
+import Control.DeepSeq
 
 data StatementF a =
   IfStatement (ExpressionF a) [StatementF a] (Maybe [StatementF a]) a -- if then else
@@ -44,7 +45,7 @@ data StatementF a =
   | Continue a
   | Break a
   | Return (Maybe (ExpressionF a)) a
-  | Throw a
+  | Throw (ExpressionF a) a
   | ModifierExecutor a
   | EmitStatement String [(Maybe String, (ExpressionF a))] a
   | AssemblyStatement InlineAssembly a
@@ -52,8 +53,8 @@ data StatementF a =
   | RevertStatement (Maybe String) (ArgListF a) a
   | UncheckedStatement [StatementF a] a
   | SolidityTryCatchStatement (ExpressionF a) (Maybe [(String, Type)]) [StatementF a] (Map.Map String (Maybe (String, Type), [StatementF a])) a
-  | TryCatchStatement [StatementF a] (Map.Map String [StatementF a]) a
-  deriving (Show, Eq, Generic, Functor, ToJSON, FromJSON, Foldable, Traversable)
+  | TryCatchStatement [StatementF a] (Map.Map String (Maybe [String], [StatementF a])) a
+  deriving (Show, Eq, Generic, Functor, NFData, ToJSON, FromJSON, Foldable, Traversable)
 
 
 extractStatement :: StatementF a -> a
@@ -65,7 +66,7 @@ extractStatement (DoWhileStatement _ _ a) = a
 extractStatement (Continue a) = a
 extractStatement (Break a) = a
 extractStatement (Return _ a) = a
-extractStatement (Throw a) = a
+extractStatement (Throw _ a) = a
 extractStatement (EmitStatement _ _ a) = a
 extractStatement (AssemblyStatement _ a) = a
 extractStatement (SimpleStatement _ a) = a
@@ -77,7 +78,7 @@ extractStatement (SolidityTryCatchStatement _ _ _ _ a) = a
 
 type Statement = Positioned StatementF
 
-data Location = Memory | Storage | Calldata deriving (Show, Eq, Generic)
+data Location = Memory | Storage | Calldata deriving (Show, Eq, Generic, NFData)
 
 instance ToJSON Location
 instance FromJSON Location
@@ -87,7 +88,7 @@ data VarDefEntryF a = BlankEntry
                                   , _vardefLocation :: Maybe Location
                                   , vardefName :: SolidString
                                   , vardefContext :: a
-                                  } deriving (Show, Eq, Generic, Functor, Foldable, Traversable)
+                                  } deriving (Show, Eq, Generic, Functor, NFData, Foldable, Traversable)
 
 type VarDefEntry = Positioned VarDefEntryF
 
@@ -108,7 +109,7 @@ getVarDefContext BlankEntry = Nothing
 
 data SimpleStatementF a =
   VariableDefinition [VarDefEntryF a] (Maybe (ExpressionF a)) -- Nothing type indicates "var" keyword
-  | ExpressionStatement (ExpressionF a) deriving (Show, Eq, Generic, Functor, Foldable, Traversable)
+  | ExpressionStatement (ExpressionF a) deriving (Show, Eq, Generic, Functor, NFData, Foldable, Traversable)
 
 type SimpleStatement = Positioned SimpleStatementF
 
@@ -120,11 +121,10 @@ instance FromJSON a => FromJSON (SimpleStatementF a)
 --  result := mload(add(source, 32))
 -- }
 -- Anything else is a parse error.
-data InlineAssembly = MloadAdd32 T.Text T.Text deriving (Show, Eq, Generic)
+data InlineAssembly = MloadAdd32 T.Text T.Text deriving (Show, Eq, Generic, NFData)
 
 instance ToJSON InlineAssembly
 instance FromJSON InlineAssembly
-
 
 data ExpressionF a =
   PlusPlus a (ExpressionF a)
@@ -143,7 +143,9 @@ data ExpressionF a =
   | ArrayExpression a [(ExpressionF a)]
   | Variable a SolidString 
   | ObjectLiteral a (Map.Map SolidString (ExpressionF a))
-  deriving (Show, Eq, Generic, Functor, Foldable, Traversable)
+  | HexaLiteral a SolidString -- if type clash remove ie hex"0F3A"
+  deriving (Show, Eq, Generic, Generic1, NFData, Functor, Foldable, Traversable)
+
 
 extractExpression :: ExpressionF a -> a
 extractExpression (PlusPlus a _) = a
@@ -161,6 +163,7 @@ extractExpression (StringLiteral a _) = a
 extractExpression (TupleExpression a _) = a
 extractExpression (ArrayExpression a _) = a
 extractExpression (Variable a _) = a
+extractExpression (HexaLiteral a _) = a
 extractExpression (ObjectLiteral a _) = a
 
 type Expression = Positioned ExpressionF
@@ -169,14 +172,14 @@ instance ToJSON a => ToJSON (ExpressionF a)
 instance FromJSON a => FromJSON (ExpressionF a)
 
 data ArgListF a = OrderedArgs [ExpressionF a] | NamedArgs [(SolidString, (ExpressionF a))] 
-                  deriving (Show, Eq, Generic, Functor, Foldable, Traversable)
+                  deriving (Show, Eq, Generic, NFData,Functor, Foldable, Traversable) --Or String
 
 type ArgList = Positioned ArgListF
 
 instance ToJSON a => ToJSON (ArgListF a)
 instance FromJSON a => FromJSON (ArgListF a)
 
-data NumberUnit = Wei | Szabo | Finney | Ether deriving (Show, Eq, Generic)
+data NumberUnit = Wei | Szabo | Finney | Ether deriving (Show, Eq, Generic, NFData)
 
 instance ToJSON NumberUnit
 instance FromJSON NumberUnit

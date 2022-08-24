@@ -33,6 +33,7 @@ module SolidVM.Solidity.Xabi (
   ) where
 
 import           Control.Lens                 (makeLenses, mapped, (&), (?~))
+import           Control.DeepSeq
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
@@ -54,7 +55,7 @@ import           SolidVM.Model.SolidString
 
 data XabiKind = ContractKind
               | InterfaceKind
-              | LibraryKind deriving (Eq, Show, Generic)
+              | LibraryKind deriving (Eq, Show, Generic, NFData)
 
 instance ToJSON XabiKind where
 instance FromJSON XabiKind where

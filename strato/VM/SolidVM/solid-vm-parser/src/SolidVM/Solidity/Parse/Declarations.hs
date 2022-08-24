@@ -18,6 +18,8 @@ import           Data.Text                            (Text)
 import qualified Data.Text                            as Text
 import           Data.Source
 
+import           Control.DeepSeq
+
 import           GHC.Generics
 
 import           Text.Parsec
@@ -46,8 +48,9 @@ data SourceUnitF a = Pragma a Identifier String
                    | FLConstant Text.Text SolidVM.ConstantDecl
                    | FLStruct Text.Text SolidVM.Def
                    | FLEnum Text.Text SolidVM.Def
+                   | FLError Text.Text SolidVM.Def
                    | DummySourceUnit
-                   deriving (Eq, Show, Generic, Functor)
+                   deriving (Eq, Show, Generic, NFData, Functor)
 
 type SourceUnit = Positioned SourceUnitF
 
@@ -91,6 +94,7 @@ solidityContract = do
                Map.fromList $
                [ (stringToLabel name, enum) | (name, EnumDeclaration enum) <- declarations]
                ++ [ (stringToLabel name, struct) | (name, StructDeclaration struct) <- declarations]
+               ++ [ (stringToLabel n, e) | (n, ErrorDeclaration e) <- declarations]
              , _xabiModifiers = Map.fromList [(stringToLabel name, modifier) | (name, ModifierDeclaration modifier) <- declarations]
              , _xabiEvents = Map.fromList events
              , _xabiKind = kind
@@ -155,6 +159,7 @@ data Declaration =
   | ConstructorDeclaration SolidVM.Func
   | ModifierDeclaration Xabi.Modifier
   | StructDeclaration SolidVM.Def
+  | ErrorDeclaration SolidVM.Def
   | EnumDeclaration SolidVM.Def
   | UsingDeclaration Xabi.Using
   | EventDeclaration SolidVM.Event
@@ -171,7 +176,8 @@ solidityDeclaration free =
   structDeclaration <|>
   enumDeclaration <|>
   usingDeclaration <|>
-  functionDeclaration free <|>
+  errorDeclaration <|>
+  functionDeclaration free<|>
   modifierDeclaration <|>
   eventDeclaration <|>
   variableDeclaration
@@ -235,6 +241,26 @@ solidityFLEnum = do
     --     SolidVM.context = a
     --     }
     -- )
+
+solidityFLError :: SolidityParser SourceUnit
+solidityFLError = do
+  ~(a, (errorName, errorArgs)) <- withPosition $ do
+    reserved "error"
+    errorName <- identifier
+    pragmaVersion' <- getPragmaVersion
+    when (isReservedWord pragmaVersion' errorName) $ reservedWordError pragmaVersion' errorName
+    errorArgs <- parens $ commaSep $ do
+      partType <- simpleTypeExpression
+      partName <- identifier
+      return (Text.pack partName, partType)
+    semi
+    pure (errorName, errorArgs)
+  return $ FLError (Text.pack errorName) (SolidVM.Error {
+      SolidVM.params = map (\(k, v) -> (textToLabel k, v)) $
+           zipWith (\x i -> fmap (SolidVM.IndexedType i) x) errorArgs [0..]
+    , SolidVM.bytes = 0
+    , SolidVM.context = a
+  })
 
 -- | Parses an enum definition
 enumDeclaration :: SolidityParser (String, Declaration)
@@ -348,6 +374,26 @@ simpleVariableDeclaration = do
   if isConstant
     then return (variableName, ConstantDeclaration $ SolidVM.ConstantDecl variableType isPublic (fromMaybe (parseError "constants must be initialized" variableName) value) ctx)
     else return (variableName, VariableDeclaration $ SolidVM.VariableDecl variableType isPublic value ctx isImmutable)
+
+errorDeclaration :: SolidityParser (String, Declaration)
+errorDeclaration = do
+  start <- getSourcePosition
+  reserved "error"
+  errorName <- identifier
+  pragmaVersion' <- getPragmaVersion
+  when (isReservedWord pragmaVersion' errorName) $ reservedWordError pragmaVersion' errorName
+  errorArgs <- parens $ commaSep $ do
+      partType <- simpleTypeExpression
+      partName <- identifier
+      return (Text.pack partName, partType)
+  end <- getSourcePosition
+  semi
+  return (errorName, ErrorDeclaration SolidVM.Error {
+      SolidVM.params = map (\(k, v) -> (textToLabel k, v)) $
+           zipWith (\x i -> fmap (SolidVM.IndexedType i) x) errorArgs [0..]
+    , SolidVM.bytes = 0
+    , SolidVM.context = SourceAnnotation start end ()
+  })
 
 -- | Parses a function definition.
 --
@@ -626,5 +672,7 @@ isReservedWord version reservedWord = do
         "transaction_hash" -> True
         "transaction_sender" -> True
         "salt" -> True
+        "error" -> True
+        "throw" -> True
         _ -> isReservedWord "3.2" reservedWord
     _ -> False

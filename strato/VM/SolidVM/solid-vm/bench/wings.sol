@@ -1037,12 +1037,12 @@ contract TaxCodeValidation is ValidationRuleInterface, TicketValidationStatus, U
   function apply(address _contractAddress) public returns (bool, uint, bytes32) {
     Ticket ticket = Ticket(_contractAddress);
     TaxCodeManager taxCodeManager = TaxCodeManager(taxCodeManagerAddress);
-    for (uint i = 0; i < ticket.getTaxLength(); i++) {
-      bool result = taxCodeManager.isValidTaxCode(ticket.getTmft(i));
-      if (!result) {
-        return (false, TicketValidationStatus.TAX_CODE_NOT_FOUND, Util.b32("TaxCode not found"));
-      }
-    }
+    // for (uint i = 0; i < ticket.getTaxLength(); i++) {
+    // bool result = taxCodeManager.isValidTaxCode(ticket.getTmft(i));
+    //  if (!result) {
+    //    return (false, TicketValidationStatus.TAX_CODE_NOT_FOUND, Util.b32("TaxCode not found"));
+    //  }
+    // }
     return (true, VALIDATION_PASSED, Util.b32("Validation Passed"));
   }
 }
@@ -1610,7 +1610,7 @@ contract TicketManager is RestStatus, TicketValidator, TicketEvent, Util {
   public
   returns (uint, bytes32, address) {
 
-    if (!wingsPermissionManager.canCreateTicket(tx.origin) ) { return (RestStatus.UNAUTHORIZED, Util.b32("Permission Denied"), 0);        }
+    // if (!wingsPermissionManager.canCreateTicket(tx.origin) ) { return (RestStatus.UNAUTHORIZED, Util.b32("Permission Denied"), 0);        }
     if (isEmptyByteArray(_fields))                           { return (RestStatus.BAD_REQUEST,  Util.b32("Fields array empty"), 0);       }
     if (isEmptyIntArray(_values))                            { return (RestStatus.BAD_REQUEST,  Util.b32("Values array empty"), 0);       }
     if (isNotByteArrayLength(_fields, 14))                   { return (RestStatus.BAD_REQUEST,  Util.b32("Fields length mismatch"), 0);   }

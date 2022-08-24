@@ -30,7 +30,7 @@ statementCrawler = \case
   Break _ -> ["Break"]
   Continue _ -> ["Continue"]
   ModifierExecutor _ -> ["ModifierExecutor"]
-  Throw _ -> ["Throw"]
+  Throw _ _ -> ["Throw"]
   EmitStatement _ evts _ ->  "EmitStatement":concatMap (expressionCrawler . snd) evts
   RevertStatement _ _ _ -> ["RevertStatement"] -- :concatMap (expressionCrawler) args
   UncheckedStatement blk _ -> ["UncheckedStatement"]
@@ -78,6 +78,7 @@ expressionCrawler = \case
     expr <- [cond, thn, els]
     expressionCrawler expr
   BoolLiteral{} -> ["BoolLiteral"]
+  HexaLiteral{} -> ["HexaLiteral"]
   NumberLiteral{} -> ["NumberLiteral"]
   StringLiteral{} -> ["StringLiteral"]
   TupleExpression _ subexprs -> "TupleExpression" : do
@@ -122,7 +123,7 @@ main = do
   let vmVersion' = if (Just ("solidvm","3.3")) `elem` (pragmas <$> parsedFile) then "svm3.3" else (if (Just ("solidvm","3.2")) `elem` (pragmas <$> parsedFile) then "svm3.2" else (if (Just ("solidvm","3.0")) `elem` (pragmas <$> parsedFile) then "svm3.0" else ""))
       namedContracts = [(textToLabel name, either (throw . fst) id $ xabiToContract (textToLabel name) (map textToLabel parents') vmVersion' xabi)
                        | NamedXabi name (xabi, parents') <- parsedFile]
-      cc = CodeCollection (M.fromList namedContracts) (M.empty) (M.empty) (M.empty) (M.empty)
+      cc = CodeCollection (M.fromList namedContracts) (M.empty) (M.empty) (M.empty) (M.empty) (M.empty)
       typecheck = if (vmVersion' == "svm3.2" || vmVersion' == "svm3.3") then TC.detector cc else []
       nodes = codeCollectionCrawler cc
   putStrLn (show typecheck) --when (not null typecheck)

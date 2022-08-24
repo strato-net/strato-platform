@@ -24,6 +24,7 @@ import           Data.Aeson
 import           Data.Source
 import           GHC.Generics
 import           Test.QuickCheck.Instances    ()
+import           Control.DeepSeq
 
 import           SolidVM.Model.CodeCollection.Statement
 import qualified SolidVM.Model.Type as SVMType hiding (Enum)
@@ -33,7 +34,7 @@ data ConstantDeclF a = ConstantDecl
   , _constIsPublic   :: Bool
   , _constInitialVal :: (ExpressionF a)
   , _constContext    :: a
-  } deriving (Show, Eq, Generic, Functor, Foldable, Traversable)
+  } deriving (Show, Eq, Generic, NFData, Functor, Foldable, Traversable)
 
 makeLenses ''ConstantDeclF
 

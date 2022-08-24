@@ -22,6 +22,7 @@ module SolidVM.Model.CodeCollection.VariableDecl (
 import           Control.Lens
 import           Data.Aeson
 import           Data.Source
+import           Control.DeepSeq
 import           GHC.Generics
 import           Test.QuickCheck.Instances    ()
 
@@ -34,7 +35,7 @@ data VariableDeclF a = VariableDecl
   , _varInitialVal :: Maybe (ExpressionF a)
   , _varContext    :: a
   , _isImmutable   :: Bool
-  } deriving (Show, Eq, Generic, Functor, Foldable, Traversable)
+  } deriving (Show, Eq, Generic, Functor, NFData, Foldable, Traversable)
 
 makeLenses ''VariableDeclF
 

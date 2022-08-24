@@ -80,7 +80,7 @@ statementHelper (IfStatement cond thens mElse _) = do
   pure $ concat [cs, ts, es]
 statementHelper (TryCatchStatement try catchMap _) = do
   ts <- statementsHelper try
-  cs <- statementsHelper (concatMap snd (M.toList catchMap))
+  cs <- statementsHelper (concatMap (snd . snd) (M.toList catchMap))
   pure $ concat [ts, cs]
 statementHelper (SolidityTryCatchStatement expr _ successStatements catchMap _) = do
   cs <- expressionHelper expr
@@ -107,7 +107,8 @@ statementHelper (ModifierExecutor _) = pure []
 statementHelper (Break _) = pure []
 statementHelper (Return mExpr _) =
   maybe (pure []) expressionHelper mExpr
-statementHelper (Throw _) = pure []
+statementHelper (Throw e _) =
+  expressionHelper e
 statementHelper (EmitStatement _ vals _) =
   concat <$> traverse (expressionHelper . snd) vals
 statementHelper (RevertStatement _ (OrderedArgs vals) _) =
@@ -222,3 +223,4 @@ expressionHelper (ArrayExpression _ es) = concat <$> traverse expressionHelper e
 expressionHelper (Variable x name) =
   [] <$ stateVarReadHelper name x
 expressionHelper (ObjectLiteral _ _) = pure []
+expressionHelper (HexaLiteral _ _) = pure []

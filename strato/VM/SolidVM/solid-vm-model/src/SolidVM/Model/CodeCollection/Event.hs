@@ -3,6 +3,7 @@
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE DeriveFoldable    #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE DeriveAnyClass    #-}
 
 module SolidVM.Model.CodeCollection.Event
   (
@@ -16,6 +17,7 @@ module SolidVM.Model.CodeCollection.Event
 import           Control.Lens                hiding ((.=))
 import           Data.Aeson
 import           Data.Aeson.Types
+import           Control.DeepSeq
 import           Data.Source
 import           Data.Text                    (Text)
 import qualified Generic.Random               as GR
@@ -25,11 +27,12 @@ import           Test.QuickCheck.Instances    ()
 
 import qualified SolidVM.Model.CodeCollection.VarDef  as SolidVM
 
+--Changes to this structure should make a change to the unparser :)
 data EventF a = Event
   { _eventAnonymous :: Bool
   , _eventLogs :: [(Text, SolidVM.IndexedType)]
   , _eventContext :: a
-  } deriving (Eq,Show,Generic, Functor, Foldable, Traversable)
+  } deriving (Eq,Show,Generic, NFData, Functor, Foldable, Traversable)
 makeLenses ''EventF
 
 type Event = Positioned EventF

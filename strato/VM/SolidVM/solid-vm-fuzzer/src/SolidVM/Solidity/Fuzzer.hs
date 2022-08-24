@@ -111,6 +111,7 @@ generateArgString = fmap (\t -> "(" <> T.intercalate "," t <> ")") . traverse ge
           pure $ "[" <> T.intercalate "," ts <> "]"
         generateArg (SVMType.Contract _) = ("0x" <>) . T.pack . show <$> (generate arbitrary :: IO Account)
         generateArg (SVMType.Mapping _ _ _) = pure "<mapping>" --haha lol
+        generateArg (SVMType.Error _ _) = pure "<error>" -- haha xd
 
 prop :: SolidString -> SolidString -> Func -> FuzzerM FuzzerResult
 prop cName fName f = case (_funcVisibility f, _funcArgs f, _funcVals f) of

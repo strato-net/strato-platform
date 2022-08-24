@@ -49,6 +49,7 @@ module Blockchain.SolidVM.SM (
   addEvent
   ) where
 
+import           Control.Monad
 import           Control.Applicative ((<|>))
 import           Control.Lens hiding (Context)
 import           Control.Monad.Catch (MonadCatch)
@@ -384,6 +385,7 @@ getVariableOfName name = do
                                                 ,  CC._storageDefs = M.empty
                                                 ,  CC._enums = M.empty
                                                 ,  CC._structs = M.empty
+                                                ,  CC._errors = M.empty
                                                 ,  CC._events = M.empty
                                                 ,  CC._functions = M.empty
                                                 ,  CC._constructor = currentContract x^.CC.constructor
@@ -395,6 +397,8 @@ getVariableOfName name = do
                     else x
       vars = localVariables currentCallInfo
       t s v = ('x':s, v) `seq` v
+
+  -- when (name == "theSixthSense") (internalError "M. Night Shyamalan presents" currentCallInfo)
 
   let maybeLocalValue = fmap snd $ M.lookup name vars
 
@@ -484,7 +488,7 @@ getVariableOfName name = do
       ]
 
 getTypeOfName' :: SolidString -> CC.CodeCollection -> Typo
-getTypeOfName' s (CC.CodeCollection ccs _ _ enms strcts) =
+getTypeOfName' s (CC.CodeCollection ccs _ _ enms strcts _) =
   let lookInContract :: CC.Contract -> [Typo]
       lookInContract (CC.Contract{..}) = catMaybes
         [ fmap StructTypo (fmap (\(a,b,_) -> (a,b)) <$> M.lookup s _structs)

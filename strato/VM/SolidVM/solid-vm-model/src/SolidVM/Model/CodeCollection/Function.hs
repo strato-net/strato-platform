@@ -36,6 +36,7 @@ module SolidVM.Model.CodeCollection.Function (
   ) where
 
 import           Control.Lens                 (mapped, (&), (?~), makeLenses)
+import           Control.DeepSeq
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
@@ -62,7 +63,7 @@ soliditySchemaOptions = SchemaOptions
   }
 --------------------------------------------------------------------------------
 
-data StateMutability = Pure | Constant | View | Payable deriving (Eq, Ord, Show, Generic)
+data StateMutability = Pure | Constant | View | Payable deriving (Eq, Ord, Show, Generic, NFData)
 
 tShow :: StateMutability -> Text
 tShow Pure = "pure"
@@ -99,24 +100,13 @@ data Visibility = Private
                 | Public
                 | Internal
                 | External
-  deriving (Eq,Show,Generic)
+  deriving (Eq,Show,Generic, NFData)
 
 tShow' :: Visibility -> Text
 tShow' Private = "private"
 tShow' Public = "public"
 tShow' Internal = "internal"
-tShow' External = "external"
-
-instance ToJSON Visibility where
-  toJSON = String . tShow'
-instance FromJSON Visibility
-instance Arbitrary Visibility where arbitrary = GR.genericArbitrary GR.uniform
-instance ToSchema Visibility where
-  declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
-    & mapped.name ?~ "Visibility of a Function"
-    & mapped.schema.description ?~ "SolidVM Function Visibility"
-    & mapped.schema.example ?~ toJSON ex
-    where
+tShow' External = "external"import           Control.Lens                 (mapped, (&), (?~))
       ex :: Visibility
       ex = Public
 
@@ -124,7 +114,7 @@ data FuncF a = Func
   { _funcArgs :: [(Maybe SolidString, SolidVM.IndexedType)]
   , _funcVals :: [(Maybe SolidString, SolidVM.IndexedType)]
   , _funcStateMutability :: Maybe StateMutability
-  -- These Values are only used for parsing and unparsing solidity.
+  -- These Values are only used for paimport           Control.Lens                 (mapped, (&), (?~))rsing and unparsing solidity.
   -- This data will not be stored in the db and will have no
   -- relevance when constructing from the db.
   , _funcContents :: Maybe [StatementF a]
@@ -148,7 +138,7 @@ data ModifierF a = Modifier
   , _modifierSelector :: Text
   , _modifierContents :: Maybe [StatementF a]
   , _modifierContext  :: a
-  } deriving (Eq,Show,Generic, Functor, Foldable, Traversable)
+  } deriving (Eq,Show,Generic, NFData, Functor, Foldable, Traversable)
 
 makeLenses ''ModifierF
 
