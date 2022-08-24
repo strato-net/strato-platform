@@ -3971,19 +3971,6 @@ contract qq{
 pragma solidvm 3.3;
 contract Test {
   enum FreshJuiceSize{ SMALL, MEDIUM, LARGE }
-  string codeTest;
-  FreshJuiceSize choice;
-  FreshJuiceSize constant defaultChoice = FreshJuiceSize.MEDIUM;
-
-  function setLarge() public {
-    choice = FreshJuiceSize.LARGE;
-  }
-  function getChoice() public view returns (FreshJuiceSize) {
-    return choice;
-  }
-  function getDefaultChoice() public pure returns (uint) {
-    return uint(defaultChoice);
-  }
 }
 
 contract qq {
@@ -3999,7 +3986,7 @@ contract qq {
 
   it "can search for any public variable in a contract initialized value" . runTest $ do
     let codeSnippet :: String
-        codeSnippet = [r|uint public testVar = 13 * 56 - 3 + 8 / 158 * 8 * 555 * 65 + 65 - 65 - 65 + 59 / 65 - 8;
+        codeSnippet = [r|uint public testVar = 1;
 |]
         contract :: String
         contract = [r|
@@ -4011,7 +3998,7 @@ contract Test {
 pragma solidvm 3.3;
 contract qq{
   string codeTest;
-  uint public testVar = 13*56-3+8/158*8*555*65+65-65-65+59/65-8;
+  uint public testVar = 13*56-3+8/158*8*555*65+65-65-65+59/65-8+10-661;
   constructor() public {
     codeTest = account(this).code("testVar");
     testVar = 5;
