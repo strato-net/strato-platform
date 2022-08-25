@@ -247,7 +247,7 @@ contract CertificateRegistry {
 
     event CertificateRegistered(string certificate);
     event CertificateRevoked(address userAddress);
-    event CertificateRegistryInitialized();
+    event CertificateRegistryInitialized());
 
     constructor() {
         require(account(this, "self").chainId == 0, "You must post this contract on the main chain!");
