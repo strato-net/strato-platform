@@ -109,6 +109,7 @@ tests:
       - data-default
       - debugger
       - ethereum-discovery
+      - ethereum-rlp
       - hflags
       - hspec
       - hspec-expectations-lifted
