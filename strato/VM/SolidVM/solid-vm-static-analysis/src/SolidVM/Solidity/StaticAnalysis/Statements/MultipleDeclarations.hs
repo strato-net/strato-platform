@@ -1,13 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-module SolidVM.Solidity.StaticAnalysis.Statements.WriteAfterWrite
+module SolidVM.Solidity.StaticAnalysis.Statements.MultipleDeclarations
   ( detector
   ) where
 
 import           Control.Monad.State
-import           Data.Foldable (for_)
+import           Data.Traversable
 import qualified Data.Map.Strict as M
-import           Data.Maybe      (maybeToList)
+import           Data.Maybe
 import           Data.Source
 import           Data.Text       (Text)
 import           SolidVM.Model.CodeCollection
@@ -16,7 +16,7 @@ import           SolidVM.Solidity.StaticAnalysis.Types
 
 type SSS = State (M.Map SolidString (SourceAnnotation ()))
 
-
+-- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]
 detector :: CompilerDetector
 detector CodeCollection{..} = concat $ contractHelper <$> M.elems _contracts
 
@@ -29,7 +29,7 @@ functionHelper Func{..} = case funcContents of
   Just stmts -> statementsHelper stmts
 
 statementsHelper :: [Statement] -> [SourceAnnotation Text]
-statementsHelper = concat . flip evalState M.empty . traverse statementHelper
+statementsHelper ss = concat . flip evalState M.empty . traverse statementHelper $ ss
 
 statementsHelper' :: [Statement] -> SSS [SourceAnnotation Text]
 statementsHelper' = fmap concat . traverse statementHelper
@@ -108,14 +108,21 @@ statementHelper (UncheckedStatement body _) =
 statementHelper (AssemblyStatement _ _) = pure []
 statementHelper (SimpleStatement stmt _) = simpleStatementHelper stmt
 
-
 simpleStatementHelper :: SimpleStatement -> SSS [SourceAnnotation Text]
 simpleStatementHelper (VariableDefinition vs mExpr) = case mExpr of
   Nothing -> pure []
   Just expr -> do
-    anns <- expressionHelper expr
-    for_ vs $ \VarDefEntry{..} -> modify $ M.insert vardefName vardefContext
-    pure anns
+    anns <- expressionHelper expr                     
+    anns' <- catMaybes <$> for vs handleVarDefEntry   
+    pure $ anns ++ anns'
+      where handleVarDefEntry :: VarDefEntry -> SSS (Maybe (SourceAnnotation Text))
+            handleVarDefEntry BlankEntry = pure Nothing
+            handleVarDefEntry VarDefEntry{..} = do
+              mapping <- get
+              case M.lookup vardefName mapping of
+                Just _ -> pure $ Just $ "Multiple declaration." <$ vardefContext 
+                Nothing -> do modify $ M.insert vardefName vardefContext
+                              pure Nothing
 simpleStatementHelper (ExpressionStatement expr) =
   expressionHelper expr
 
@@ -125,7 +132,7 @@ expressionHelper (Binary y "=" (Variable x name) b) = do
   let ann = case M.lookup name s of
               Just a -> [const "Redundant write." <$> a]
               Nothing -> []
-  modify $ M.insert name (x <> y)
+  modify $ M.insert name (x <> y)   
   bs <- expressionHelper b
   pure $ concat [ann, bs]
 expressionHelper (Binary y "+=" (Variable x name) b) = do
