@@ -1340,7 +1340,7 @@ contract B {
           enode2 = readEnode "enode://abcd@5.6.7.8:30303"
           enode3 = "enode://abcd@9.10.11.12:30303"
           mkChainInfo bHash = ChainInfo
-            UnsignedChainInfo { chainLabel     = "My test chain!"
+            UnsignedChainInfo { chainLabel     = "My parent test chain!"
                               , accountInfo    = [ ContractNoStorage (Address 0x100) 1000000000000000000000 (SolidVMCode contractName $ hash src)
                                                  , NonContract (validators' !! 0) 1000000000000000000000
                                                  , NonContract (validators' !! 1) 1000000000000000000000
@@ -1350,6 +1350,20 @@ contract B {
                                                             , (validators' !! 1, enode2)
                                                             ]
                               , parentChain    = Nothing
+                              , creationBlock  = bHash
+                              , chainNonce     = 123456789
+                              , chainMetadata  = M.singleton "VM" "SolidVM"
+                              }
+            Nothing
+          mkChainInfo2 bHash pChain = ChainInfo
+            UnsignedChainInfo { chainLabel     = "My child test chain!"
+                              , accountInfo    = [ ContractNoStorage (Address 0x100) 1000000000000000000000 (SolidVMCode contractName $ hash src)
+                                                 , NonContract (validators' !! 0) 1000000000000000000000
+                                                 ]
+                              , codeInfo       = [CodeInfo "" src $ Just contractName]
+                              , members        = M.fromList [ (validators' !! 0, enode1)
+                                                            ]
+                              , parentChain    = Just pChain
                               , creationBlock  = bHash
                               , chainNonce     = 123456789
                               , chainMetadata  = M.singleton "VM" "SolidVM"
@@ -1395,6 +1409,8 @@ contract B {
                              in mainChainAddMd $ mkSignedTx (privKeys !! 0) utx
       cIdRef <- newIORef undefined
       cInfoRef <- newIORef undefined
+      cId2Ref <- newIORef undefined
+      cInfo2Ref <- newIORef undefined
       let addMemberArgs = "(0x" <> T.pack (formatAddressWithoutColor (validators' !! 2)) <> ",\"" <> T.pack enode3 <> "\")"
           addMemberUtx chainId = U.UnsignedTransaction
             { U.unsignedTransactionNonce      = Nonce 5
@@ -1429,18 +1445,39 @@ contract B {
             flip postEvent (peers !! 0) . UnseqEvent $ toIetx $ incXTx1 cId
             threadDelay 5000000
             flip postEvent (peers !! 0) . UnseqEvent $ toIetx $ incXTx2 cId
+            bHash2 <- bestBlockHash <$> readIORef bestBlockRef
+            let cInfo2 = mkChainInfo2 bHash2 cId
+                cId2 = mkChainId cInfo2
+            writeIORef cId2Ref cId2
+            writeIORef cInfo2Ref cInfo2
+            flip postEvent (peers !! 0) . UnseqEvent . IEGenesis $ IngestGenesis Origin.API (cId2, cInfo2)
             threadDelay 5000000
             flip postEvent (peers !! 0) . UnseqEvent $ toIetx $ incXTx3 cId
             threadDelay 5000000
+            flip postEvent (peers !! 0) . UnseqEvent $ toIetx $ incXTx0 cId2
+            threadDelay 5000000
+            flip postEvent (peers !! 0) . UnseqEvent $ toIetx $ incXTx1 cId2
+            threadDelay 5000000
+            flip postEvent (peers !! 0) . UnseqEvent $ toIetx $ incXTx2 cId2
+            threadDelay 5000000
             flip postEvent (peers !! 0) . UnseqEvent $ toIetx $ incXTx4 cId
             threadDelay 5000000
+            flip postEvent (peers !! 0) . UnseqEvent $ toIetx $ incXTx3 cId2
+            threadDelay 5000000
+            flip postEvent (peers !! 0) . UnseqEvent $ toIetx $ incXTx4 cId2
+            threadDelay 5000000
             flip postEvent (peers !! 0) . UnseqEvent $ toIetx $ addMemberTx cId
+            threadDelay 5000000
+            flip postEvent (peers !! 0) . UnseqEvent $ toIetx $ addMemberTx cId2
           
-      void . timeout 60000000 $ concurrently_ (runNetwork peers connections) (concurrently_ routine $ mainChainRoutine 0)
+      void . timeout 80000000 $ concurrently_ (runNetwork peers connections) (concurrently_ routine $ mainChainRoutine 0)
       cId <- readIORef cIdRef
       cInfo <- readIORef cInfoRef
       ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
       ifor_ ctxs1 $ \i ctx -> (i, ctx ^. apiChainInfoMap . at cId) `shouldBe` (i, Just cInfo)
+      cId2 <- readIORef cId2Ref
+      cInfo2 <- readIORef cInfo2Ref
+      ifor_ ctxs1 $ \i ctx -> (i, ctx ^. apiChainInfoMap . at cId2) `shouldBe` (i, if i == 1 then Nothing else Just cInfo2)
       --privKey4 <- newPrivateKey
       --peer4 <- createPeer privKey4 validators' unseqSink "node4" "13.14.15.16"
       --let peers' = peers ++ [peer4]
