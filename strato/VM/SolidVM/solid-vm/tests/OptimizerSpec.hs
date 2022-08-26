@@ -61,4 +61,3 @@ spec = describe "Optimizer tests" $ do
     --     |]) in case funcHelper anns of
     --          [SimpleStatement (VariableDefinition _ _ ) _]-> True
     --          _ -> False
-
