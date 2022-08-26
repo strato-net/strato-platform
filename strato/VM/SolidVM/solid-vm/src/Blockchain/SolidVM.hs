@@ -118,7 +118,7 @@ import           SolidVM.Model.Value
 import           SolidVM.Solidity.Parse.Statement
 import           SolidVM.Solidity.Parse.Lexer         (stringLiteral)
 import           SolidVM.Solidity.Parse.ParserTypes
-import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpression)
+import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpression, unparseVarType)
 
 import           Network.Haskoin.Crypto.BigWord()
 import           UnliftIO                             hiding (assert)
@@ -1505,6 +1505,29 @@ expToVar' (CC.MemberAccess _ (CC.Variable _ "Util") "b32") = do --TODO- remove t
 
 expToVar' (CC.MemberAccess _ (CC.Variable _ "string") "concat") = do
   return $ Constant $ SStringConcat 
+
+expToVar' (CC.MemberAccess _ (CC.FunctionCall _ e args) "interfaceId") = do
+  var <- expToVar' e
+  argVals <- case args of
+                  CC.OrderedArgs as -> OrderedVals <$> mapM (getVar <=< expToVar) as
+                  CC.NamedArgs ns -> NamedVals <$> mapM (mapM $ getVar <=< expToVar) ns
+  case var of
+    Constant (SBuiltinFunction "type" _) -> do
+      case argVals of 
+        OrderedVals [SString interfaceName] -> do
+          (_, cc) <- getCurrentCodeCollection
+          interf <- case M.lookup (stringToLabel interfaceName) $ cc^.CC.interfaces of
+            Nothing -> missingType "interface lookup" interfaceName
+            Just inf -> pure inf
+          let funcList = M.toList $ interf ^. CC.interFunctions
+              argList = map (\(n, func) -> (n, CC.funcArgs $ func)) funcList 
+              argTypesList = map (\(n, lst) -> (n, map (\(_, CC.IndexedType _ t) -> t) lst)) argList                
+              argStringList = map (\(nm, lst) -> nm++"("++intercalate "," (map unparseVarType lst)++")" ) argTypesList
+              funcSelectorList = map (\x -> B.unpack $ B.take 4 $ keccak256ToByteString $ fromMaybe emptyHash $ stringKeccak256 x) argStringList
+              interfaceID' = B.pack $ foldl1 (zipWith xor) funcSelectorList
+          return . Constant . SString $ BC.unpack interfaceID'
+        _ -> invalidArguments (printf "expToVar'/ builtin type invalid arguments: ") argVals
+    _ -> typeError "type function" var
 
 expToVar' x@(CC.MemberAccess _ expr name) = do
   var <- expToVar expr
