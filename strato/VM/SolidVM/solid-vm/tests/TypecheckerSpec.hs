@@ -665,6 +665,7 @@ contract qq {
 
   it "can use the string.concat(x,y) function and succeeds when the types are strings" $
     let anns = runTypechecker [r|
+pragma solidvm 3.2;
 contract A {
   function f() {
     string x = "hello";
@@ -677,6 +678,7 @@ contract A {
 
   it "can use the string.concat(x,y) function and fails when the types are not strings" $
     let anns = runTypechecker [r|
+pragma solidvm 3.2;
 contract A {
   function f() {
     string x = "hello";
@@ -686,6 +688,30 @@ contract A {
 |]
     in length anns `shouldBe` 1
 
+  it "cannot assign an immutable a new value inside a function" $
+    let anns = runTypechecker [r|
+pragma solidvm 3.2;
+contract A {
+  unint immutable g =2;
+  uint public x = 75;
+  function f() {
+    g = x;
+  } 
+}
+|]
+    in length anns `shouldBe` 2
+  it "cannot incrument an immutable already assigned within the constructor" $
+    let anns = runTypechecker [r|
+pragma solidvm 3.2;
+contract qq {
+  uint g = 2022;
+  uint immutable d=22;
+  constructor() public {
+    d += g;
+  }
+}
+|]
+    in length anns `shouldBe` 1
   it "can have the receive() function and succeeds when there are no arguments, no return values, and is Payable and External" $
     let anns = runTypechecker [r|
 contract A {
@@ -694,7 +720,6 @@ contract A {
 }
 |]
     in length anns `shouldBe` 0
-
   it "can throw exception when receive() function has arguments" $
     let anns = runTypechecker [r|
 contract A {
@@ -704,7 +729,30 @@ contract A {
 }
 |]
     in length anns `shouldBe` 1
-
+  
+  it "can assign a value to a declared unassigned immutable within the constructor" $
+    let anns = runTypechecker [r|
+pragma solidvm 3.2;
+contract qq {
+  uint g = 2022;
+  uint immutable d;
+  constructor() public {
+    d = g;
+  }
+}
+|]
+    in length anns `shouldBe` 0
+  it "cannot assign an immutable a value after already assinged on contract level" $
+    let anns = runTypechecker [r|
+pragma solidvm 3.2;
+contract qq {
+  uint g = 2022;
+  uint immutable d = 22;
+  constructor() public {
+    d = g;
+  } 
+}|]
+    in length anns `shouldBe` 1
   it "can throw exception when receive() function has return values" $
     let anns = runTypechecker [r|
 contract A {
@@ -734,6 +782,21 @@ contract A {
 |]
     in length anns `shouldBe` 1
 
+  it "cannot assign an immutable after already assinged within a function" $
+    let anns = runTypechecker [r|
+pragma solidvm 3.2;
+contract qq {
+  uint c = 2022;
+  uint immutable x =c;
+  constructor() {
+    alterConstants();
+  }
+  function alterConstants(){
+    x = 13;
+  }
+}|]
+    in length anns `shouldBe` 1
+
   it "can throw exception when receive() function is decalred with function keyword" $
     let anns = runTypechecker [r|
 contract A {
@@ -743,7 +806,6 @@ contract A {
 |]
     in length anns `shouldBe` 1
 
-
   it "can have the fallback() function and succeeds when there are no arguments, no return values, and is External" $
     let anns = runTypechecker [r|
 contract A {
@@ -752,7 +814,6 @@ contract A {
 }
 |]
     in length anns `shouldBe` 0
-
 
   it "can throw exception when fallback() function has arguments" $
     let anns = runTypechecker [r|
@@ -764,6 +825,22 @@ contract A {
 |]
     in length anns `shouldBe` 1
 
+  it "can use an immutable within a function" $
+    let anns = runTypechecker [r|
+pragma solidvm 3.2;
+contract qq {
+  uint c = 2022;
+  uint immutable public x =c;
+  uint r;
+  constructor() {
+    alterConstants();
+  }
+  function alterConstants(){
+    r = x;
+  }
+}
+|]
+    in length anns `shouldBe` 0
   it "can throw exception when fallback() function has return values" $
     let anns = runTypechecker [r|
 contract A {
@@ -794,9 +871,380 @@ contract A {
     in length anns `shouldBe` 1
 
 
+  it "Supports pure functions in 3.3" $
+      let anns = runTypechecker [r|
+contract C {
+    function f(uint a, uint b) public pure returns (uint) {
+        return a * (b + 42);
+    }
+}
+|]
+      in length anns `shouldBe` 0
 
 
+  describe "pure and view modifier for solidvm 3.3" $ do
+    it "can write pure and view functions" $
+      let anns = runTypechecker [r|
+pragma solidvm 3.3;
+contract A {
+  uint x = 5;
+  function f(uint y) pure returns (uint) {
+    return (7 * y) / 6;
+  }
+  function g(uint y) view returns (uint) {
+    return (x * y) / 6;
+  }
+}
+|]
+       in length anns `shouldBe` 0
+    it "error when reading from contract state in a pure function" $
+      let anns = runTypechecker [r|
+pragma solidvm 3.3;
+contract A {
+  uint x = 5;
+  function f(uint y) pure returns (uint) {
+    return (x * y) / 6;
+  }
+}
+|]
+       in length anns `shouldBe` 1
+    it "error when writing to contract state from a pure or view function" $
+      let anns = runTypechecker [r|
+pragma solidvm 3.3;
+contract A {
+  uint x = 5;
+  function f(uint y) pure returns (uint) {
+    x = y;
+    return (7 * y) / 6;
+  }
+  function g(uint y) view returns (uint) {
+    x = y;
+    return (x * y) / 6;
+  }
+}
+|]
+       in length anns `shouldBe` 2
+    it "error when using assembly code from a pure or view function" $
+      let anns = runTypechecker [r|
+pragma solidvm 3.3;
+contract A {
+  uint x = 5;
+  function f(uint y) pure returns (uint) {
+    assembly {
+      x := mload (add (x, 32))
+    }
+  }
+  function g(uint y) view returns (uint) {
+    assembly {
+      x := mload (add (x, 32))
+    }
+  }
+}
+|]
+       in length anns `shouldBe` 2
+
+  describe "Check contract inheritance solidvm 3.3" $ do
+    it "can resolve state variables inherited from a contract" $
+      let anns = runTypechecker [r|
+pragma solidvm 3.3;
+contract A {
+  uint x = 7;
+}
+contract B is A {
+  function f() {
+    x = 8;
+  }
+}
+|]
+       in length anns `shouldBe` 0
+    it "can resolve state variables from multiple layers of inheritance" $
+      let anns = runTypechecker [r|
+pragma solidvm 3.3;
+contract A {
+  uint x = 7;
+}
+contract B is A {
+}
+contract C is B {
+  function f() {
+    x = 8;
+  }
+}
+|]
+       in length anns `shouldBe` 0
+    it "can inherit from multiple contracts" $
+      let anns = runTypechecker [r|
+pragma solidvm 3.3;
+contract A {
+  uint x = 7;
+}
+contract B {
+  uint y = 9;
+}
+contract C is A, B {
+  function f() {
+    x = 8;
+    y = 10;
+  }
+}
+|]
+       in length anns `shouldBe` 0
+    it "error when referencing a state variable from a non-inherited contract" $
+      let anns = runTypechecker [r|
+pragma solidvm 3.3;
+contract A {
+  uint x = 7;
+}
+contract B {
+  function f() {
+    x = 8;
+  }
+}
+|]
+       in length anns `shouldBe` 2
+
+-- start of 3.2 tests
+  describe "pure and view modifier for solidvm 3.2" $ do
+    it "can write pure and view functions" $
+      let anns = runTypechecker [r|
+pragma solidvm 3.2;
+contract A {
+  uint x = 5;
+  function f(uint y) pure returns (uint) {
+    return (7 * y) / 6;
+  }
+  function g(uint y) view returns (uint) {
+    return (x * y) / 6;
+  }
+}
+|]
+       in length anns `shouldBe` 0
+    it "Does not warn when reading from contract state in a pure function" $
+      let anns = runTypechecker [r|
+pragma solidvm 3.2;
+contract A {
+  uint x = 5;
+  function f(uint y) pure returns (uint) {
+    return (x * y) / 6;
+  }
+}
+|]
+       in length anns `shouldBe` 0
+    it "Does not warn when writing to contract state from a pure or view function" $
+      let anns = runTypechecker [r|
+pragma solidvm 3.2;
+contract A {
+  uint x = 5;
+  function f(uint y) pure returns (uint) {
+    x = y;
+    return (7 * y) / 6;
+  }
+  function g(uint y) view returns (uint) {
+    x = y;
+    return (x * y) / 6;
+  }
+}
+|]
+       in length anns `shouldBe` 0
+    it "Does not warn when using assembly code from a pure or view function" $
+      let anns = runTypechecker [r|
+pragma solidvm 3.2;
+contract A {
+  uint x = 5;
+  function f(uint y) pure returns (uint) {
+    assembly {
+      x := mload (add (x, 32))
+    }
+  }
+  function g(uint y) view returns (uint) {
+    assembly {
+      x := mload (add (x, 32))
+    }
+  }
+}
+|]
+       in length anns `shouldBe` 0
+
+  describe "Check contract inheritance solidvm 3.2" $ do
+    it "can resolve state variables inherited from a contract" $
+      let anns = runTypechecker [r|
+pragma solidvm 3.2;
+contract A {
+  uint x = 7;
+}
+contract B is A {
+  function f() {
+    x = 8;
+  }
+}
+|]
+       in length anns `shouldBe` 0
+    it "can resolve state variables from multiple layers of inheritance" $
+      let anns = runTypechecker [r|
+pragma solidvm 3.2;
+contract A {
+  uint x = 7;
+}
+contract B is A {
+}
+contract C is B {
+  function f() {
+    x = 8;
+  }
+}
+|]
+       in length anns `shouldBe` 0
+    it "can inherit from multiple contracts" $
+      let anns = runTypechecker [r|
+pragma solidvm 3.2;
+contract A {
+  uint x = 7;
+}
+contract B {
+  uint y = 9;
+}
+contract C is A, B {
+  function f() {
+    x = 8;
+    y = 10;
+  }
+}
+|]
+       in length anns `shouldBe` 0
+    it "can detect when referencing a state variable from a non-inherited contract" $
+      let anns = runTypechecker [r|
+pragma solidvm 3.2;
+contract A {
+  uint x = 7;
+}
+contract B {
+  function f() {
+    x = 8;
+  }
+}
+|]
+       in length anns `shouldBe` 1
 
 
+  describe "Constant function detectors" $ do
+    it "can write pure and view functions" $
+      let anns = runTypechecker [r|
+pragma solidvm 3.2;
+contract A {
+  uint x = 5;
+  function f(uint y) pure returns (uint) {
+    return (7 * y) / 6;
+  }
+  function g(uint y) view returns (uint) {
+    return (x * y) / 6;
+  }
+}
+|]
+       in length anns `shouldBe` 0
+    it "Does not warn when reading from contract state in a pure function" $
+      let anns = runTypechecker [r|
+pragma solidvm 3.2;
+contract A {
+  uint x = 5;
+  function f(uint y) pure returns (uint) {
+    return (x * y) / 6;
+  }
+}
+|]
+       in length anns `shouldBe` 0
+    it "Does not warn when writing to contract state from a pure or view function" $
+      let anns = runTypechecker [r|
+pragma solidvm 3.2;
+contract A {
+  uint x = 5;
+  function f(uint y) pure returns (uint) {
+    x = y;
+    return (7 * y) / 6;
+  }
+  function g(uint y) view returns (uint) {
+    x = y;
+    return (x * y) / 6;
+  }
+}
+|]
+       in length anns `shouldBe` 0
+    it "Does not warn when using assembly code from a pure or view function" $
+      let anns = runTypechecker [r|
+pragma solidvm 3.2;
+contract A {
+  uint x = 5;
+  function f(uint y) pure returns (uint) {
+    assembly {
+      x := mload (add (x, 32))
+    }
+  }
+  function g(uint y) view returns (uint) {
+    assembly {
+      x := mload (add (x, 32))
+    }
+  }
+}
+|]
+       in length anns `shouldBe` 0
+
+  describe "Missing inheritance detectors" $ do
+    it "can resolve state variables inherited from a contract" $
+      let anns = runTypechecker [r|
+pragma solidvm 3.2;
+contract A {
+  uint x = 7;
+}
+contract B is A {
+  function f() {
+    x = 8;
+  }
+}
+|]
+       in length anns `shouldBe` 0
+    it "can resolve state variables from multiple layers of inheritance" $
+      let anns = runTypechecker [r|
+pragma solidvm 3.2;
+contract A {
+  uint x = 7;
+}
+contract B is A {
+}
+contract C is B {
+  function f() {
+    x = 8;
+  }
+}
+|]
+       in length anns `shouldBe` 0
+    it "can inherit from multiple contracts" $
+      let anns = runTypechecker [r|
+pragma solidvm 3.2;
+contract A {
+  uint x = 7;
+}
+contract B {
+  uint y = 9;
+}
+contract C is A, B {
+  function f() {
+    x = 8;
+    y = 10;
+  }
+}
+|]
+       in length anns `shouldBe` 0
+    it "can detect when referencing a state variable from a non-inherited contract" $
+      let anns = runTypechecker [r|
+pragma solidvm 3.2;
+contract A {
+  uint x = 7;
+}
+contract B {
+  function f() {
+    x = 8;
+  }
+}
+|]
+       in length anns `shouldBe` 1
 
 

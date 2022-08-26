@@ -3,12 +3,18 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE DeriveAnyClass #-}
 
 module SolidVM.Model.CodeCollection (
   CodeCollectionF(..),
   CodeCollection,
+  flFuncs,
   contracts,
   getParents,
+  flConstants,
+  flStructs,
+  flEnums,
+  flErrors,
   
   module SolidVM.Model.CodeCollection.Contract,
   --module SolidVM.Model.CodeCollection.Def,
@@ -22,6 +28,7 @@ module SolidVM.Model.CodeCollection (
   ) where
 
 import Control.Lens
+import Control.DeepSeq
 import Data.Aeson as A
 import Data.Map (Map)
 import qualified Data.Map as M
@@ -42,10 +49,16 @@ import           SolidVM.Model.CodeCollection.VarDef
 import           SolidVM.Model.CodeCollection.VariableDecl
 import           SolidVM.Model.SolidString
 
+
 data CodeCollectionF a =
   CodeCollection {
-    _contracts :: Map SolidString (ContractF a)
-  } deriving (Show, Generic, Functor)
+    _contracts :: Map SolidString (ContractF a),
+    _flFuncs :: Map SolidString (FuncF a),
+    _flConstants ::  Map SolidString (ConstantDeclF a),
+    _flEnums :: Map SolidString ([SolidString], a),
+    _flStructs :: Map SolidString [(SolidString, FieldType, a)],
+    _flErrors :: Map SolidString [(SolidString, IndexedType, a)]
+  } deriving (Show, Generic, NFData, Functor)
 
 instance ToJSON a => ToJSON (CodeCollectionF a)
 instance FromJSON a => FromJSON (CodeCollectionF a)

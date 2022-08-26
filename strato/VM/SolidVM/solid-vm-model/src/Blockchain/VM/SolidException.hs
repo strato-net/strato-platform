@@ -11,6 +11,7 @@ module Blockchain.VM.SolidException
   , internalError
   , invalidArguments
   , missingField
+  , customError
   , missingType
   , duplicateDefinition
   , parseError
@@ -30,15 +31,17 @@ module Blockchain.VM.SolidException
   , tooMuchGas
   , paymentError
   , reservedWordError
+  , revertError
+  , immutableError
   ) where
 
 import Control.DeepSeq
 import Control.Exception (throw, throwIO, Exception)
 import Control.Monad (unless, when)
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Data.Aeson (ToJSON, FromJSON)
 import GHC.Generics
 import Text.Printf (printf)
+import qualified SolidVM.Model.Storable as B
 
 data SolidException = TypeError String String
                     | InternalError String String
@@ -46,6 +49,8 @@ data SolidException = TypeError String String
                     | IndexOutOfBounds String String
                     | TODO String String
                     | MissingField String String
+                    | RevertError String String
+                    | CustomError String String [B.BasicValue]
                     | MissingType String String
                     | DuplicateDefinition String String
                     | ArityMismatch String Int Int
@@ -66,7 +71,8 @@ data SolidException = TypeError String String
                     | TooMuchGas String String
                     | PaymentError String String
                     | ReservedWordError String String
-                    deriving (Eq, Exception, Generic, NFData, ToJSON, FromJSON)
+                    | ImmutableError String String
+                    deriving (Eq, Exception, Generic, NFData)
 
 instance Show SolidException where
   show = showSolidException
@@ -78,12 +84,14 @@ showSolidException (InvalidArguments m v) = printf "invalid arguments: %s: %s" m
 showSolidException (IndexOutOfBounds a b)= printf "index out of bounds: %s: %s" a b
 showSolidException (MissingField m v) = printf "missing field: %s: %s" m v
 showSolidException (MissingType m v) = printf "missing type: %s: %s" m v
+showSolidException (RevertError m v) = printf "revert: %s %s:" m v
 showSolidException (DuplicateDefinition m v) = printf "duplicate definition: %s: %s" m v
 showSolidException (ParseError m v) = printf "parse error: %s: %s" m v
 showSolidException (ModifierError m v) = printf "modifier error: %s: %s" m v
 showSolidException (Require Nothing) = printf "solidity require failed"
 showSolidException (Require (Just m)) = printf "solidity require failed: %s" m
 showSolidException Assert = printf "solidity assert failed"
+showSolidException (CustomError m v _) = printf "custom user error: %s %s" m v
 showSolidException (TODO m v) = printf "Unimplemented feature in SolidVM: %s: %s" m v
 showSolidException (TypeError a b) = printf "type error: %s: %s" a b
 showSolidException (UnknownConstant a b) = printf "unknown constant: %s: %s" a b
@@ -99,6 +107,7 @@ showSolidException (MalformedData a b) = printf "Malformed data: %s: %s" a b
 showSolidException (TooMuchGas a b) = printf "The gas limit is %s, but was given %s instead." a b
 showSolidException (PaymentError a b) = printf "There was an error sending %s wei to the following address: %s" a b
 showSolidException (ReservedWordError a b) = printf "%s is a reserved word in version %s and up." b a
+showSolidException (ImmutableError a b) = printf "%s is an immutable variable in line '%s'" a b
 
 toThrower :: (Show v) => (String -> String -> SolidException) -> String -> v -> a
 toThrower cont msg = throw . cont msg . show
@@ -120,6 +129,12 @@ indexOutOfBounds = toThrower IndexOutOfBounds
 
 missingField :: (Show v) => String -> v -> a
 missingField = toThrower MissingField
+
+revertError :: (Show v) =>  String -> v -> a
+revertError = toThrower RevertError
+
+customError :: String -> String -> [B.BasicValue] -> a
+customError msg nm vals = throw $ CustomError msg nm vals
 
 missingType :: (Show v) => String -> v -> a
 missingType = toThrower MissingType
@@ -183,3 +198,7 @@ paymentError = toThrower PaymentError
 
 reservedWordError :: (Show v) => String -> v -> a
 reservedWordError = toThrower ReservedWordError
+
+
+immutableError :: (Show v) => String -> v -> a
+immutableError = toThrower ImmutableError

@@ -23,7 +23,7 @@ statements :: SolidityParser [Statement]
 statements = braces $ many statement
 
 statement :: SolidityParser Statement
-statement = do
+statement =
   ifStatement
   <|> whileStatement
   <|> (do
@@ -46,6 +46,7 @@ statement = do
           _ <- semi
           pure $ EmitStatement i (map ((,) Nothing) e) a
       )
+  <|> throwStatement
   <|> try (do
               ~(a, e) <- (withPosition variableDefinitionStatement) <* semi
               pure $ SimpleStatement e a 
@@ -100,7 +101,8 @@ tupleDeclaration' = parens $ commaSep $ do
   partType <- simpleTypeExpression
   optional $ reserved "indexed" <|>
              reserved "storage" <|>
-             reserved "memory"
+             reserved "memory" <|>
+             reserved "calldata"
   partName <- option "" identifier
   return (partName, partType)
 
@@ -111,9 +113,13 @@ tryCatchStatement = do
       s <- statements
       catchs <- many1 $ do
         reserved "catch"
-        ident <- identifier
+        err <- option "" identifier
+        params <- optionMaybe (parens $ commaSep $ do
+            alias <- identifier
+            pure $ alias
+          )
         ss <- statements
-        pure (ident, ss)
+        pure (err, (params, ss))
       pure (s, catchs)
     pure $ TryCatchStatement test1 (Map.fromList test2) a
 
@@ -169,13 +175,22 @@ forStatement = do
     pure (v1, v2, v3, s)
   pure $ ForStatement v1 v2 v3 s a
 
+throwStatement :: SolidityParser Statement
+throwStatement = do
+  ~(a, (errorExp)) <- withPosition $ do
+    reserved "throw"
+    errorExp <- expression
+    _ <- semi
+    pure $ (errorExp)
+  pure $ Throw errorExp a
+
 -- revert("foo") <|> revert({x: y, q: z})
 revertStatement :: SolidityParser Statement
 revertStatement = try $ do
   ~(a, (i, e)) <- withPosition $ do
     reserved "revert"
     i <- optionMaybe identifier
-    e <- parens $ choice 
+    e <- parens $ choice
       [
         fmap NamedArgs . braces $ commaSep $ do
           fieldName <- fmap stringToLabel identifier
@@ -192,6 +207,7 @@ revertStatement = try $ do
 location :: SolidityParser (Maybe Location)
 location = optionMaybe $ asum [ reserved "memory" >> return Memory
                               , reserved "storage" >> return Storage
+                              , reserved "calldata" >> return Calldata 
                               ]
 
 varDefEntry :: SolidityParser (Maybe Type) -> SolidityParser VarDefEntry
@@ -223,7 +239,7 @@ expression =
     [binary "**"],
     [binary "*", binary "/", binary "%"],
     [binary "+", binary "-"],
-    [binary "<<", binary ">>"],
+    [binary "<<", binary ">>", binary ">>>"],
     [binary "&"],
     [binary "^"],
     [binary "|"],
@@ -238,7 +254,7 @@ expression =
                    pure (e1, e2)
                  pure (\e -> Ternary (extractExpression e <> a) e e1 e2)
              )],
-    [binary "=", binary "|=", binary "^=", binary "&=", binary "<<=", binary ">>=", binary "+=", binary "-=", binary "*=", binary "/=", binary "%="],
+    [binary "=", binary "|=", binary "^=", binary "&=", binary "<<=", binary ">>=", binary ">>>=", binary "+=", binary "-=", binary "*=", binary "/=", binary "%="],
     [binary "&&"],
     [binary "||"]
   ]
@@ -334,7 +350,8 @@ primaryExpression = do
   let res' a b = withPosition $ b <$ reserved a
       res  a   = res' a a
       
-  (uncurry Variable . fmap stringToLabel <$> res "msg")
+  myHexParser
+    <|> (uncurry Variable . fmap stringToLabel <$> res "msg")
     <|> (uncurry Variable . fmap stringToLabel <$> res "address")
     <|> (uncurry Variable . fmap stringToLabel <$> res "account")
     <|> (uncurry Variable . fmap stringToLabel <$> res "payable")
@@ -358,6 +375,15 @@ primaryExpression = do
               pure (val, nu)
             pure $ NumberLiteral a val nu)
     <|> (uncurry StringLiteral <$> withPosition stringLiteral)
+
+myHexParser :: SolidityParser Expression
+myHexParser = try $ do
+  ~(a,val) <- withPosition $ do
+    reservedOp "hex"
+    val' <- (between (symbol "\'") (symbol "\'") $ many1 hexDigit)  <|>  (between (symbol "\"") (symbol "\"") $ many1 hexDigit)               --make this work with double quotes as well
+    when(Prelude.length val' `mod` 2/=0) $ fail "hex digit must be even number"
+    pure val'
+  return $ HexaLiteral a val
 
 scientific :: SolidityParser Integer
 scientific = do 
@@ -403,7 +429,7 @@ inlineAssembly = do
       match "add"
       parens $ do
         src <- identifier
-        void $ comma
+        void comma
         match "32"
         return src
     return $ MloadAdd32 (T.pack dst) (T.pack src)

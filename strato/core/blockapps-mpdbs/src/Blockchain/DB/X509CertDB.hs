@@ -43,6 +43,8 @@ module Blockchain.DB.X509CertDB
   , verifyCertSignedBy
   , verifyBlockApps
   , getParentUserAddress
+  , getCertValidity
+  , dateTimeToString
   ) where
 
 import           Control.DeepSeq

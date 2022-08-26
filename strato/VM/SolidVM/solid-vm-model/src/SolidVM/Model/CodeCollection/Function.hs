@@ -19,6 +19,7 @@ module SolidVM.Model.CodeCollection.Function (
   ) where
 
 import           Control.Lens                 (mapped, (&), (?~))
+import           Control.DeepSeq
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
@@ -34,7 +35,7 @@ import           SolidVM.Model.CodeCollection.Statement
 import qualified SolidVM.Model.CodeCollection.VarDef  as SolidVM
 import           SolidVM.Model.SolidString
 
-data StateMutability = Pure | Constant | View | Payable deriving (Eq, Ord, Show, Generic)
+data StateMutability = Pure | Constant | View | Payable deriving (Eq, Ord, Show, Generic, NFData)
 
 tShow :: StateMutability -> Text
 tShow Pure = "pure"
@@ -80,7 +81,9 @@ data FuncF a = Func
   , funcConstructorCalls :: Map SolidString [(ExpressionF a)]
   , funcModifiers :: [(SolidString, [(ExpressionF a)])]
   , funcContext :: a
-  } deriving (Eq,Show,Generic, Functor)
+  , funcIsFree :: Bool
+  , funcOverload :: [FuncF a]
+  } deriving (Eq,Show, Generic, NFData, Functor)
 
 instance ToJSON a => ToJSON (FuncF a)
 instance FromJSON a => FromJSON (FuncF a)
@@ -91,7 +94,7 @@ data Visibility = Private
                 | Public
                 | Internal
                 | External
-  deriving (Eq,Show,Generic)
+  deriving (Eq,Show,Generic, NFData)
 
 tShow' :: Visibility -> Text
 tShow' Private = "private"
@@ -119,7 +122,7 @@ data ModifierF a = Modifier
   , modifierSelector :: Text
   , modifierContents :: Maybe [StatementF a]
   , modifierContext  :: a
-  } deriving (Eq,Show,Generic, Functor)
+  } deriving (Eq,Show,Generic, NFData, Functor)
 
 type Modifier = Positioned ModifierF
 
