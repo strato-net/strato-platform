@@ -23,17 +23,37 @@ data EVMCheckpoint = EVMCheckpoint {
     checkpointSHA    :: Keccak256,
     checkpointHead   :: DD.BlockData,
     ctxBestBlockInfo :: ContextBestBlockInfo,
-    ctxChainDBStateRoot :: MP.StateRoot
+    ctxChainDBStateRoot :: MP.StateRoot,
+    ctxCertDBStateRoot :: MP.StateRoot
 } deriving (Read, Show)
 
 instance RLPSerializable EVMCheckpoint where
     rlpDecode (RLPArray [sha, header, bbi]) =
-        EVMCheckpoint (rlpDecode sha) (rlpDecode header) (rlpDecode bbi) (MP.emptyTriePtr)
+        EVMCheckpoint (rlpDecode sha)
+                      (rlpDecode header)
+                      (rlpDecode bbi)
+                      (MP.emptyTriePtr)
+                      (MP.emptyTriePtr)
     rlpDecode (RLPArray [sha, header, bbi, sr]) =
-        EVMCheckpoint (rlpDecode sha) (rlpDecode header) (rlpDecode bbi) (rlpDecode sr)
+        EVMCheckpoint (rlpDecode sha)
+                      (rlpDecode header)
+                      (rlpDecode bbi)
+                      (rlpDecode sr)
+                      (MP.emptyTriePtr)
+    rlpDecode (RLPArray [sha, header, bbi, sr, cr]) =
+        EVMCheckpoint (rlpDecode sha)
+                      (rlpDecode header)
+                      (rlpDecode bbi)
+                      (rlpDecode sr)
+                      (rlpDecode cr)
     rlpDecode _ = error "unexpected RLP object"
-    rlpEncode (EVMCheckpoint sha header bbi sr) =
-        RLPArray [rlpEncode sha, rlpEncode header, rlpEncode bbi, rlpEncode sr]
+    rlpEncode (EVMCheckpoint sha header bbi sr cr) =
+        RLPArray [ rlpEncode sha
+                 , rlpEncode header
+                 , rlpEncode bbi
+                 , rlpEncode sr
+                 , rlpEncode cr
+                 ]
 
 instance RLPSerializable ContextBestBlockInfo where
     rlpDecode (RLPArray [tag, body]) = case rlpDecode tag :: Integer of
@@ -61,7 +81,7 @@ instance RLPSerializable ContextBestBlockInfo where
 
 
 instance Format EVMCheckpoint where -- todo add format instance for ContextBestBlockInfo and show it here as well.
-    format (EVMCheckpoint sha _ _ _) =
+    format (EVMCheckpoint sha _ _ _ _) =
         "EVMCheckpoint " ++ CL.red (short sha)
             where short = take 16 . formatKeccak256WithoutColor
 

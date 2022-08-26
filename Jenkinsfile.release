@@ -26,15 +26,20 @@ pipeline {
               fi
               go get github.com/aktau/github-release
             fi
-
-            git worktree remove --force strato-worktree || true
-            git worktree add strato-worktree develop
-            cd strato-worktree
-            git checkout ${REFSPEC}
-            git worktree list
-            docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes
-            docker ps
           '''
+          sh 'git worktree remove --force strato-worktree || true'
+          sh 'git worktree add strato-worktree develop'
+          sh 'cd strato-worktree'
+          sh 'git checkout ${REFSPEC}'
+          withCredentials([
+              usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')
+          ]) {
+            // To avoid the use of older commit if we ran the job with the same branch name in REFSPEC before:
+            sh 'git pull https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform HEAD'
+          }
+          sh 'git worktree list'
+          sh 'docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes'
+          sh 'docker ps'
         }
       }
     }
