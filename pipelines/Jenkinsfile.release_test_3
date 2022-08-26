@@ -4,8 +4,8 @@ pipeline {
     }
 
     parameters {
-        string(name: 'STRATO_BUILD', defaultValue: 'latest', description: 'The STRATO version to be used for deployment (where to fetch the docker-compose.yml from). \n' +
-            'Default: "latest" (latest public release).\n\n' +
+        string(name: 'STRATO_BUILD', defaultValue: 'develop', description: 'The STRATO version to be used for deployment (where to fetch the docker-compose.yml from). \n' +
+            'Default: "develop" (latest develop).\n\n' +
             'Formats supported:\n' +
             ' - "latest" - for latest public release\n' +
             ' - "X.Y.Z" (i.e. "7.5.0") - for specific public release version\n' +
