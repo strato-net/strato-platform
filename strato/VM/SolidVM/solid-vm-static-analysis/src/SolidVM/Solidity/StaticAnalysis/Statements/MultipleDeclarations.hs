@@ -21,12 +21,27 @@ detector :: CompilerDetector
 detector CodeCollection{..} = concat $ contractHelper <$> M.elems _contracts
 
 contractHelper :: Contract -> [SourceAnnotation Text]
-contractHelper Contract{..} = concat $ functionHelper <$> maybeToList _constructor ++ M.elems _functions
+contractHelper Contract{..} = storageDefsAnns ++ funcsAnns
+  where storageDefsAnns = variableDeclsHelper $ M.assocs _storageDefs
+        funcsAnns = concat $ functionHelper <$> maybeToList _constructor ++ M.elems _functions
+        
 
 functionHelper :: Func -> [SourceAnnotation Text]
 functionHelper Func{..} = case funcContents of
   Nothing -> []
   Just stmts -> statementsHelper stmts
+
+variableDeclsHelper :: [(SolidString, VariableDecl)] -> [SourceAnnotation Text]
+variableDeclsHelper vds = concat . flip evalState M.empty . traverse variableDeclHelper $ vds
+
+-- Nothing ~ [], Just a ~ [a]
+variableDeclHelper :: (SolidString, VariableDecl) -> SSS [SourceAnnotation Text]
+variableDeclHelper (name, VariableDecl{..}) = do
+  s <- get
+  case M.lookup name s of
+    Just _  -> pure ["Multiple declaration." <$ varContext]
+    Nothing -> do modify $ M.insert name varContext
+                  pure []
 
 statementsHelper :: [Statement] -> [SourceAnnotation Text]
 statementsHelper ss = concat . flip evalState M.empty . traverse statementHelper $ ss
@@ -35,8 +50,7 @@ statementsHelper' :: [Statement] -> SSS [SourceAnnotation Text]
 statementsHelper' = fmap concat . traverse statementHelper
 
 statementHelper :: Statement -> SSS [SourceAnnotation Text]
-statementHelper (IfStatement cond thens mElse _) = do
-  cs <- expressionHelper cond
+statementHelper (IfStatement _ thens mElse _) = do
   s <- get
   ts <- statementsHelper' thens
   sThen <- get
@@ -44,29 +58,25 @@ statementHelper (IfStatement cond thens mElse _) = do
   es <- maybe (pure []) statementsHelper' mElse
   sElse <- get
   put $ M.intersection s $ M.intersection sThen sElse
-  pure $ concat [cs, ts, es]
-statementHelper (WhileStatement cond body _) = do
-  cs <- expressionHelper cond
+  pure $ concat [ ts, es]
+statementHelper (WhileStatement _ body _) = do
   s <- get
   bs <- statementsHelper' body
   sWhile <- get
   put $ M.intersection s sWhile
-  pure $ concat [cs, bs]
-statementHelper (ForStatement mInit mCond mPost body _) = do
+  pure $ concat [ bs]
+statementHelper (ForStatement mInit _ _ body _) = do
   is <- maybe (pure []) simpleStatementHelper mInit
-  cs <- maybe (pure []) expressionHelper mCond
-  ps <- maybe (pure []) expressionHelper mPost
   s <- get
   bs <- statementsHelper' body
   sFor <- get
   put $ M.intersection s sFor
-  pure $ concat [is, cs, ps, bs]
+  pure $ concat [is, bs]
 statementHelper (Block _) = pure []
-statementHelper (DoWhileStatement body cond _) = do
-  cs <- expressionHelper cond
+statementHelper (DoWhileStatement body _ _) = do
   bs <- statementsHelper' body
   put M.empty
-  pure $ concat [bs, cs]
+  pure $ concat [bs]
 statementHelper (TryCatchStatement body catches _) = do
   s <- get
   bs <- statementsHelper' body
@@ -77,9 +87,8 @@ statementHelper (TryCatchStatement body catches _) = do
     put $ M.intersection s sCatch
     statementsHelper' cas
   pure $ concat [bs, (concat css)]
-statementHelper (SolidityTryCatchStatement expr _ successStatements catchMap _) = do
+statementHelper (SolidityTryCatchStatement _ _ successStatements catchMap _) = do
   s <- get
-  e <- expressionHelper expr
   sTry <- get
   put $ M.intersection s sTry
   ss <- statementsHelper' successStatements
@@ -89,20 +98,15 @@ statementHelper (SolidityTryCatchStatement expr _ successStatements catchMap _) 
     sCatch' <- get
     put $ M.intersection s sCatch'
     statementsHelper' cas
-  pure $ concat [e, ss, (concat css)]
+  pure $ concat [ss, (concat css)]
 statementHelper (Continue _) = pure []
 statementHelper (ModifierExecutor _) = pure []
 statementHelper (Break _) = pure []
-statementHelper (Return mExpr _) =
-  maybe (pure []) expressionHelper mExpr
-statementHelper (Throw e _) =
-  expressionHelper e
-statementHelper (EmitStatement _ vals _) =
-  concat <$> traverse (expressionHelper . snd) vals
-statementHelper (RevertStatement _ (OrderedArgs vals) _) =
-  concat <$> traverse expressionHelper vals
-statementHelper (RevertStatement _ (NamedArgs vals) _) =
-  concat <$> traverse (expressionHelper . snd) vals  
+statementHelper (Return _ _) = pure []
+statementHelper (Throw _ _) = pure []
+statementHelper (EmitStatement _ _ _) = pure []
+statementHelper (RevertStatement _ (OrderedArgs _) _) = pure []
+statementHelper (RevertStatement _ (NamedArgs _) _) = pure []
 statementHelper (UncheckedStatement body _) =
   statementsHelper' body
 statementHelper (AssemblyStatement _ _) = pure []
@@ -111,96 +115,14 @@ statementHelper (SimpleStatement stmt _) = simpleStatementHelper stmt
 simpleStatementHelper :: SimpleStatement -> SSS [SourceAnnotation Text]
 simpleStatementHelper (VariableDefinition vs mExpr) = case mExpr of
   Nothing -> pure []
-  Just expr -> do
-    anns <- expressionHelper expr                     
-    anns' <- catMaybes <$> for vs handleVarDefEntry   
-    pure $ anns ++ anns'
-      where handleVarDefEntry :: VarDefEntry -> SSS (Maybe (SourceAnnotation Text))
-            handleVarDefEntry BlankEntry = pure Nothing
-            handleVarDefEntry VarDefEntry{..} = do
-              mapping <- get
-              case M.lookup vardefName mapping of
-                Just _ -> pure $ Just $ "Multiple declaration." <$ vardefContext 
-                Nothing -> do modify $ M.insert vardefName vardefContext
-                              pure Nothing
-simpleStatementHelper (ExpressionStatement expr) =
-  expressionHelper expr
+  Just _ -> concat <$> for vs varDefEntryHelper   
+simpleStatementHelper (ExpressionStatement _) = pure []
 
-expressionHelper :: Expression -> SSS [SourceAnnotation Text]
-expressionHelper (Binary y "=" (Variable x name) b) = do
+varDefEntryHelper :: VarDefEntry -> SSS [SourceAnnotation Text]
+varDefEntryHelper BlankEntry = pure []
+varDefEntryHelper VarDefEntry{..} = do
   s <- get
-  let ann = case M.lookup name s of
-              Just a -> [const "Redundant write." <$> a]
-              Nothing -> []
-  modify $ M.insert name (x <> y)   
-  bs <- expressionHelper b
-  pure $ concat [ann, bs]
-expressionHelper (Binary y "+=" (Variable x name) b) = do
-  modify $ M.insert name (x <> y)
-  expressionHelper b
-expressionHelper (Binary y "-=" (Variable x name) b) = do
-  modify $ M.insert name (x <> y)
-  expressionHelper b
-expressionHelper (Binary y "*=" (Variable x name) b) = do
-  modify $ M.insert name (x <> y)
-  expressionHelper b
-expressionHelper (Binary y "/=" (Variable x name) b) = do
-  modify $ M.insert name (x <> y)
-  expressionHelper b
-expressionHelper (Binary y "%=" (Variable x name) b) = do
-  modify $ M.insert name (x <> y)
-  expressionHelper b
-expressionHelper (Binary y "|=" (Variable x name) b) = do
-  modify $ M.insert name (x <> y)
-  expressionHelper b
-expressionHelper (Binary y "&=" (Variable x name) b) = do
-  modify $ M.insert name (x <> y)
-  expressionHelper b
-expressionHelper (Binary y "^=" (Variable x name) b) = do
-  modify $ M.insert name (x <> y)
-  expressionHelper b
-expressionHelper (Binary y ">>>=" (Variable x name) b) = do
-  modify $ M.insert name (x <> y)
-  expressionHelper b
-expressionHelper (Binary y ">>=" (Variable x name) b) = do
-  modify $ M.insert name (x <> y)
-  expressionHelper b
-expressionHelper (Binary y "<<=" (Variable x name) b) = do
-  modify $ M.insert name (x <> y)
-  expressionHelper b
-expressionHelper (Binary _ _ a b) =
-  concat <$> traverse expressionHelper [a, b]
-expressionHelper (PlusPlus _ (Variable x name)) = do
-  modify $ M.insert name x
-  pure []
-expressionHelper (PlusPlus _ e) = expressionHelper e
-expressionHelper (MinusMinus _ (Variable x name)) = do
-  modify $ M.insert name x
-  pure []
-expressionHelper (MinusMinus _ e) = expressionHelper e
-expressionHelper (NewExpression _ _) = pure []
-expressionHelper (IndexAccess _ a b) = do
-  as <- expressionHelper a
-  bs <- maybe (pure []) expressionHelper b
-  pure $ concat [as, bs]
-expressionHelper (MemberAccess _ e _) = expressionHelper e
-expressionHelper (FunctionCall _ e args) = do
-  as <- expressionHelper e
-  bs <- case args of
-          OrderedArgs es -> concat <$> traverse expressionHelper es
-          NamedArgs nes -> concat <$> traverse expressionHelper (snd <$> nes)
-  put M.empty
-  pure $ concat [as, bs]
-expressionHelper (Unitary _ _ a) = expressionHelper a
-expressionHelper (Ternary _ a b c) = concat <$> traverse expressionHelper [a, b, c]
-expressionHelper (BoolLiteral _ _) = pure []
-expressionHelper (NumberLiteral _ _ _) = pure []
-expressionHelper (StringLiteral _ _) = pure []
-expressionHelper (HexaLiteral _ _) = pure []
-expressionHelper (TupleExpression _ es) =
-  concat <$> traverse (maybe (pure []) expressionHelper) es
-expressionHelper (ArrayExpression _ es) = concat <$> traverse expressionHelper es
-expressionHelper (Variable _ name) = do
-  modify $ M.delete name
-  pure []
-expressionHelper (ObjectLiteral _ _) = pure []
+  case M.lookup vardefName s of
+    Just _ -> pure ["Multiple declaration." <$ vardefContext]
+    Nothing -> do modify $ M.insert vardefName vardefContext
+                  pure [] 

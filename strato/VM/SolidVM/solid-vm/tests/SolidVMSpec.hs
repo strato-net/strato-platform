@@ -5973,3 +5973,15 @@ contract B {
   }
 }
 |]) `shouldThrow` anyTypeError
+
+  it "can detect duplicate declarations" $ (runTest $
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  function f(){
+    uint x = 9;
+    uint y = 4;
+    uint x = 7;
+  }
+}
+|]) `shouldThrow` anyTypeError

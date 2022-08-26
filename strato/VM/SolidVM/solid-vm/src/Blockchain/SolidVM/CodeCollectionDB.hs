@@ -49,7 +49,7 @@ import           SolidVM.Solidity.Parse.ParserTypes
 import qualified SolidVM.Solidity.StaticAnalysis.Typechecker                            as TypeChecker
 import qualified SolidVM.Solidity.StaticAnalysis.Functions.ConstantFunctions            as ConstantFunctions
 import           SolidVM.Solidity.StaticAnalysis.Optimizer                              as O
-
+import qualified        SolidVM.Solidity.StaticAnalysis.Statements.MultipleDeclarations as MultipleDeclarations
 
 data ParseTypeCheckOrSolidVMError = PEx ParseError
                          | TCEx [SourceAnnotation T.Text]
@@ -168,7 +168,7 @@ compileSource typeCheck mTT = do
       typeCheckDetectorSvm3_2 ecc = case TypeChecker.detector ecc of
         [] -> Right ecc
         xs -> Left $ TCEx xs
-      typeCheckDetectorSvm3_3 ecc = case TypeChecker.detector ecc <> ConstantFunctions.detector ecc of
+      typeCheckDetectorSvm3_3 ecc = case TypeChecker.detector ecc <> ConstantFunctions.detector ecc <> MultipleDeclarations.detector ecc of
         [] -> Right ecc
         xs -> Left $ TCEx xs
 
