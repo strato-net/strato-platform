@@ -203,6 +203,7 @@ addBlock b@OutputBlock{obBlockData = bd, obBlockUncles = uncles, obReceiptTransa
         Just cr -> $logDebugS "addBlock" $ T.pack $ "Old chain root: " ++ format cr
 
     putBlockHeaderInChainDB bd
+    putBlockHeaderInCertDB bd
 
     when flags_debug $ do
       bhr' <- Mod.get (Proxy @BlockHashRoot)
@@ -251,7 +252,7 @@ addBlockTransactions OutputBlock{obBlockData = bd, obReceiptTransactions = trans
 
   lift $ timeit "flushMemStorageDB" (Just vmBlockInsertionMined) flushMemStorageDB
   lift $ timeit "flushMemAddressStateDB" (Just vmBlockInsertionMined) flushMemAddressStateDB
-  lift $ timeit "flushX509ToLevelDB" (Just vmBlockInsertionMined) flushX509ToLevelDB
+  lift $ timeit "flushMemCertDB" (Just vmBlockInsertionMined) $ flushMemCertDB . unCurrentBlockHash =<< Mod.get (Mod.Proxy @CurrentBlockHash)
 
 addTransactions :: (VMBase m, Bagger.MonadBagger m, MonadMonitor m)
                 => BlockData
@@ -259,27 +260,20 @@ addTransactions :: (VMBase m, Bagger.MonadBagger m, MonadMonitor m)
                 -> ConduitT a VmOutEvent m ()
 addTransactions blockData txs =
  timeit ("addTransactions, " ++ show (length txs) ++ " TXs") (Just vmBlockInsertionMined) $ do
-  trrs <- lift $ go (blockDataGasLimit blockData) txs DL.empty M.empty
+  trrs <- lift $ go (blockDataGasLimit blockData) txs DL.empty
   mapM_ (outputTransactionResult blockData blockHeaderHash) trrs
   yield . OutASM $ foldr (flip M.union) M.empty $ map trrAfterMap trrs
 
   where
-    go _ [] trrs _ = return $ DL.toList trrs
-    go blockGas (t:rest) trrs x509s = do
+    go _ [] trrs = return $ DL.toList trrs
+    go blockGas (t:rest) trrs = do
       let bt = fromMaybe (otBaseTx t) (otPrivatePayload t)
       flushMemAddressStateTxToBlockDB
       flushMemStorageTxDBToBlockDB
+      flushMemCertTxToBlockDB
       beforeMap <- getAddressStateTxDBMap
       let chainId = fromAnchorChain $ otAnchorChain t
-      Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) x509s
-      beforeX509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
       (!deltaT, !result) <- timeIt $ runExceptT $ addTransaction chainId False blockData blockGas t
-      case result of
-          Left _  -> do
-            Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) beforeX509s
-
-          Right execResult -> do
-            Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.union (erNewX509Certs execResult) beforeX509s
 
       afterMap <- getAddressStateTxDBMap
 
@@ -293,21 +287,16 @@ addTransactions blockData txs =
             Left _           -> blockGas
             Right execResult -> blockGas - (transactionGasLimit bt - calculateReturned bt execResult)
 
-      x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-      go remainingBlockGas rest (trrs `DL.snoc` trr) x509s'
+      go remainingBlockGas rest (trrs `DL.snoc` trr)
 
 mineTransactions :: (VMBase m, MonadMonitor m) => Bagger.MineTransactions m
-mineTransactions bd remGas otxs = do
-  res <- mineTransactions' bd remGas DL.empty otxs
-  Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.empty --clear X509 cache to prevent memory leak
-  return res
+mineTransactions bd remGas otxs = mineTransactions' bd remGas DL.empty otxs
   
 mineTransactions' :: (VMBase m, MonadMonitor m) => BlockData -> Integer -> DL.DList TxRunResult -> [OutputTx] -> m Bagger.TxMiningResult
 mineTransactions' _ remGas ran [] = return $ Bagger.TxMiningResult Nothing (DL.toList ran) [] remGas
 mineTransactions' header remGas ran unran@(tx:txs) = do
     let bt = fromMaybe (otBaseTx tx) (otPrivatePayload tx)
     beforeMap <- getAddressStateTxDBMap
-    beforeX509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
     (!time', !result) <- timeIt . runExceptT $ addTransaction Nothing False header remGas tx
     afterMap <- getAddressStateTxDBMap
     P.setGauge vmTxMining (realToFrac time')
@@ -318,11 +307,10 @@ mineTransactions' header remGas ran unran@(tx:txs) = do
           let nextRemGas = remGas - (transactionGasLimit bt-calculateReturned bt execResult)
           flushMemAddressStateTxToBlockDB
           flushMemStorageTxDBToBlockDB
+          flushMemCertTxToBlockDB
 
-          Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.union (erNewX509Certs execResult) beforeX509s
           mineTransactions' header nextRemGas (ran `DL.snoc` trr) txs
-        Left  failure    -> do Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) beforeX509s -- revert changes to X509 map
-                               return $ Bagger.TxMiningResult (Just failure) (DL.toList ran) unran remGas
+        Left  failure    -> return $ Bagger.TxMiningResult (Just failure) (DL.toList ran) unran remGas
 
 
 blockIsHomestead :: Integer -> Bool
@@ -380,9 +368,7 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx{otSigner=t
     lift $ P.incCounter txTypeCounter
     if success
         then do
-            x509s <- lift $ Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
             execResults <- runCodeForTransaction isRunningTests' isHomestead b (fromInteger (transactionGasLimit bt) - intrinsicGas') tAcct t
-            lift $ Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.union (erNewX509Certs execResults) x509s
             s1 <- lift $ addToBalance coinbaseAcct (transactionGasLimit bt * transactionGasPrice bt)
             unless s1 $ error "addToBalance failed even after a check in addBlock"
             lift $ P.incCounter vmTxsProcessed

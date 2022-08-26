@@ -46,6 +46,7 @@ import           Blockchain.DB.ChainDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.ModifyStateDB
 import           Blockchain.DB.StorageDB
+import           Blockchain.DB.X509CertDB           (migrateBlockHeaderCertDB)
 import           Blockchain.Database.MerklePatricia (StateRoot (..))
 import qualified Blockchain.EthConf                 as Conf
 import           Blockchain.Sequencer.Event         (OutputBlock (..), OutputTx (..))
@@ -249,6 +250,7 @@ processNewBestBlock bh bd txShas = do
                                        }
     putBaggerState $ state { B.seen = S.empty, B.miningCache = newMiningCache }
     migrateBlockHeader bd baggerBlockHash
+    migrateBlockHeaderCertDB bd baggerBlockHash
     withBagger $ do
       demoteUnexecutables
       promoteExecutables
