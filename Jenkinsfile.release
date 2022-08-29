@@ -32,9 +32,8 @@ pipeline {
           fi
         '''
         sh 'git worktree remove --force strato-worktree || true'
-        sh 'git worktree add strato-worktree develop'
+        sh "git worktree add strato-worktree ${env.GIT_TAG}"
         dir ('strato-worktree') {
-          sh "git checkout ${env.GIT_TAG}"
           sh 'git worktree list'
           sh 'docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes'
           sh 'docker ps'
@@ -44,15 +43,13 @@ pipeline {
 
     stage('Build') {
       steps {
-        withEnv(["RELEASE_VERSION=${env.RELEASE_VERSION}"]) {
-          dir ('strato-worktree') {
-            sh 'echo ${RELEASE_VERSION} > VERSION'
-            sh 'rm -rf .docker-work'
-            sh 'REPO=public make all'
-            dir ('blockapps-rest') {
-              sh 'yarn install --pure-lockfile'
-              sh 'yarn build'
-            }
+        dir ('strato-worktree') {
+          sh "echo ${env.RELEASE_VERSION} > VERSION"
+          sh 'rm -rf .docker-work'
+          sh 'REPO=public make all'
+          dir ('blockapps-rest') {
+            sh 'yarn install --pure-lockfile'
+            sh 'yarn build'
           }
         }
       }
@@ -162,7 +159,6 @@ pipeline {
             // Push images to Docker Registry
             sh '''#!/bin/bash -le
               set -x
-              RELEASE_VERSION=$(<VERSION)
               docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
               docker-compose --log-level ERROR -f docker-compose.push.yml push 2>&1
             '''
@@ -170,6 +166,7 @@ pipeline {
             // Release to blockapps/strato-getting-started
             sh '''#!/bin/bash -le
               set -x
+              RELEASE_VERSION=$(<VERSION)
               STRATOGS_RELEASE_DETAILS_STABLE="--user blockapps --repo strato-getting-started --tag ${RELEASE_VERSION}"
               github-release delete $STRATOGS_RELEASE_DETAILS_STABLE || true
               github-release release $STRATOGS_RELEASE_DETAILS_STABLE --name "${RELEASE_VERSION}"
@@ -177,21 +174,25 @@ pipeline {
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.yml" --file ./docker-compose.yml
             '''
 
-            // Update VERSION file and merge release code to master
+            // Merge release code to master
             sh 'git checkout VERSION'
+            // Make sure no master branch exists with random/old code, we want code from origin/master
+            sh 'git branch -D master'
             sh 'git checkout master'
-            sh 'git pull https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform master'
             sh "git merge ${env.GIT_TAG}"
-            sh 'echo ${RELEASE_VERSION} > VERSION'
+            sh "echo ${env.RELEASE_VERSION} > VERSION"
             sh 'git add VERSION'
-            sh 'git -c user.name=${GITHUB_USERNAME} -c user.email=\'cd@blockapps\' commit VERSION -m "${RELEASE_VERSION}" --allow-empty'
+            sh "git -c user.name=${GITHUB_USERNAME} -c user.email=\'cd@blockapps\' commit VERSION -m '${env.RELEASE_VERSION}' --allow-empty"
             sh 'git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform master'
-            sh 'git tag ${RELEASE_VERSION}'
+            sh "git tag ${env.RELEASE_VERSION}"
             // The following step requires `cd-blockapps` user to be able to push directly to master
             // (requirement for pull-request reviews should be disabled for `master` branch or cd-blockapps should be the admin and "Include administrators" should be unchecked in branch protection rules)
             // any ideas how to avoid that?
             sh 'git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform --tags'
 
+            // A trick to avoid error: "fatal: 'develop' is already checked out at <...>/jenkins/workspace/RELEASE_STRATO_release_build"
+            sh "(cd ../ && git checkout ${env.GIT_TAG})"
+            
             // Merge VERSION change back to develop
             sh 'git checkout develop'
             sh 'git pull https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform develop'
