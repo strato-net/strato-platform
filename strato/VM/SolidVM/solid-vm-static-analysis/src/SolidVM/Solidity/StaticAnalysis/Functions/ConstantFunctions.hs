@@ -31,6 +31,7 @@ data R = R
 type SSS = StateT [M.Map SolidString (SourceAnnotation ())] (Reader R)
 
 -- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]
+-- detector cc  = []
 detector :: CompilerDetector
 detector cc@CodeCollection{..} = concat $ contractHelper cc <$> M.elems _contracts
 
