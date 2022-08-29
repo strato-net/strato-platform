@@ -800,32 +800,43 @@ expressionType ex = typeError "Cannot deduce a type from" (ex, ex)
   --Using NamedAccount as it is easier and less verbose in the code to convert an Account to a NamedAccount
   --rather than converting NamedAccount to Account
 chainCheck :: NamedAccount -> NamedAccount -> Bool
-chainCheck a b = do
-  --Convert a into an account
-  let acid = case (a ^. namedAccountChainId) of 
-                UnspecifiedChain -> do
-                  cid1 <- view accountChainId <$> getCurrentAccount
-                  case cid1 of
-                    Nothing -> return Nothing
-                    Just cid2 -> return $ Just cid2
-                MainChain -> return Nothing
-                ExplicitChain cid -> return $ Just cid
-      aAccount = namedAccountToAccount acid a
-  --convert b into an account
-      bcid = case (b ^. namedAccountChainId) of 
-                UnspecifiedChain -> do
-                  cid1 <- view accountChainId <$> getCurrentAccount
-                  case cid1 of
-                    Nothing -> return Nothing
-                    Just cid2 -> return $ Just cid2
-                MainChain -> return Nothing
-                ExplicitChain cid -> return $ Just cid
-      bAccount = namedAccountToAccount bcid b
-
-  case (a `isAncestorChainOf` b) of 
+chainCheck a b =   
+  case ((aAccount ^. accountChainId) `isAncestorChainOf` (bAccount ^. accountChainId)) of 
     -- Nothing -> False
     Just True -> True
-    Just False -> False
+    Just False -> inaccessibleChain acid bcid
+  where
+    -- Get the chainId for a
+    acid = case (a ^. namedAccountChainId) of 
+                UnspecifiedChain -> do
+                  cid1 <- view accountChainId <$> getCurrentAccount
+                  case cid1 of
+                    Nothing -> Nothing
+                    Just cid2 -> Just cid2
+                MainChain -> Nothing
+                ExplicitChain cid -> Just cid
+    --Get the ChainId for b
+    bcid = case (b ^. namedAccountChainId) of 
+                UnspecifiedChain -> do
+                  cid1 <- view accountChainId <$> getCurrentAccount
+                  case cid1 of
+                    Nothing -> Nothing
+                    Just cid2 -> Just cid2
+                MainChain ->  Nothing
+                ExplicitChain cid -> Just cid
+    aAccount = namedAccountToAccount acid a
+    bAccount = namedAccountToAccount bcid b
+
+easyNamedAccountToAccount :: NamedAccount -> Account
+easyNamedAccountToAccount namedAccount = Account (namedAccount ^. namedAccountAddress) (cid)
+  where cid = case (namedAccount ^. namedAccountChainId) of 
+                UnspecifiedChain -> do
+                  cid1 <- view accountChainId <$> getCurrentAccount
+                  case cid1 of
+                    Nothing -> Nothing
+                    Just cid2 -> Just cid2
+                MainChain -> Nothing
+                ExplicitChain cid -> Just cid
 
 callWrapper  :: MonadSM m => Account -> Account -> Maybe SolidString -> SolidString -> Bool -> CC.ArgList -> m (Maybe Value)
 callWrapper from to mContract functionName isRCC argExps  = do
@@ -2151,10 +2162,10 @@ expToVar' (CC.FunctionCall _ e args) = do
           Constant (SContractItem address' "code") -> do
             --Only get the items if they are in the same chain as the current contract, this will prevent leaks from private chains
             from <- getCurrentAccount
-            namedFrom <- accountToNamedAccount' from
-
-            when chainCheck from to $ inaccessibleChain from to
-            let address = address'
+            let namedFrom = accountToNamedAccount' from --convert to a namedAccount to verify everything is on the correct chain
+            --check that the from and to are on the same chain`
+            chainCheck namedFrom address'
+            let realAddress = easyNamedAccountToAccount address' --This is also the name of the to account
             -- Collect a potential item to search
             searchTerms <- case argVals of
                 -- catch only the SStrings
@@ -2164,7 +2175,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                 --If nothing was given or something else, then just return the entire code
                 _ -> pure $ Nothing    
             --get only the contract containing useful sourceAnnotation contained in the ContractF type.
-            (contract, _, _) <- getCodeAndCollection address
+            (contract, _, _) <- getCodeAndCollection realAddress
 
             let codeSnippets :: [String]
                 codeSnippets = 
