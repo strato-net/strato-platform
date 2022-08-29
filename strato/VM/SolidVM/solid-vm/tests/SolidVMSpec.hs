@@ -80,6 +80,10 @@ anyParseError :: Selector HandledException
 anyParseError (HE ParseError{}) = True
 anyParseError _ = False
 
+anyRevertError :: Selector HandledException
+anyRevertError (HE Blockchain.SolidVM.Exception.RevertError{}) = True
+anyRevertError _ = False
+
 anyUnknownFunc :: Selector HandledException
 anyUnknownFunc (HE UnknownFunction{}) = True
 anyUnknownFunc _ = False
@@ -5572,3 +5576,545 @@ contract qq {
      }
   }
 }|]) `shouldThrow` anyTypeError
+
+  it "revert sucessfully when invoked without arguments" $ runTest (do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  
+  uint a;
+  
+  constructor()
+  {
+    a=1;
+    randomFunction(1);
+  }
+
+  function randomFunction(uint checker)
+  {
+    if(a==checker)
+      revert(); 
+  } 
+}|]) `shouldThrow` anyRevertError
+
+  it "revert sucessfully when invoked with arguments" $ runTest (do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  
+  uint a;
+  
+  constructor()
+  {
+    a=1;
+    randomFunction(1);
+  }
+
+  function randomFunction(uint checker)
+  {
+    if(a==checker)
+      revert("logic flag"); 
+  } 
+}|]) `shouldThrow` anyRevertError
+
+  it "revert sucessfully when invoked with namedargs" $ runTest (do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  
+  uint a;
+  
+  constructor()
+  {
+    a=1;
+    randomFunction(1);
+  }
+
+  function randomFunction(uint checker)
+  {
+    if(a==checker)
+      revert({x:"logic flag"}); 
+  } 
+}|]) `shouldThrow` anyRevertError
+
+  it "Revert customError" $ runTest (do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  
+  uint a;
+  error f (string message);
+  constructor()
+  {
+    a=1;
+    randomFunction(1);
+  }
+
+  function randomFunction(uint checker)
+  {
+    if(a==checker)
+      revert f("ERROR"); 
+  } 
+}|]) `shouldThrow` anyCustomError
+
+  it "Revert customError  namedargs" $ runTest (do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  
+  uint a;
+  error f(string x,string y);
+  constructor()
+  {
+    a=1;
+    randomFunction(1);
+  }
+
+  function randomFunction(uint checker)
+  {
+    if(a==checker)
+      revert f({x:'a',y:'b'}); 
+  } 
+}|]) `shouldThrow` anyCustomError
+
+  it "Supports pure functions in 3.3" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+    function f(uint a, uint b) public pure returns (uint) {
+        return a * (b + 42);
+    }
+}
+|]
+    getAll [[Field "a"], [Field "b"]] `shouldReturn` [BDefault,BDefault] 
+
+
+
+  it "Supports pure functions in 3.2" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+    function f(uint a, uint b) public pure returns (uint) {
+        return a * (b + 42);
+    }
+}
+|]
+    getAll [[Field "a"], [Field "b"]] `shouldReturn` [BDefault,BDefault] 
+
+
+  it "can write pure and view functions" .runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  uint x = 5;
+  function f(uint y) pure returns (uint) {
+    return (7 * y) / 6;
+  }
+  function g(uint y) view returns (uint) {
+    return (x * y) / 6;
+  }
+}
+|]
+    getAll [[Field "a"], [Field "b"]] `shouldReturn` [BDefault,BDefault] 
+
+  it "error when reading from contract state in a pure function" $ (runTest $
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  uint x = 5;
+  function f(uint y) pure returns (uint) {
+    return (x * y) / 6;
+  }
+}
+|]) `shouldThrow` anyTypeError 
+
+  it "error when writing to contract state from a pure or view function" $ (runTest $
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  uint x = 5;
+  function f(uint y) pure returns (uint) {
+    x = y;
+    return (7 * y) / 6;
+  }
+  function g(uint y) view returns (uint) {
+    x = y;
+    return (x * y) / 6;
+  }
+}
+|]) `shouldThrow` anyTypeError
+
+  it "error when using assembly code from a pure or view function" $ (runTest $
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  uint x = 5;
+  function f(uint y) pure returns (uint) {
+    assembly {
+      x := mload (add (x, 32))
+    }
+  }
+  function g(uint y) view returns (uint) {
+    assembly {
+      x := mload (add (x, 32))
+    }
+  }
+}
+|]) `shouldThrow` anyTypeError
+
+
+  it "can resolve state variables inherited from a contract" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+contract A {
+  uint x = 7;
+}
+contract qq is A {
+  function f() {
+    x = 8;
+  }
+}
+|]
+    getAll [[Field "x"]]`shouldReturn` [BInteger 7] 
+
+  it "can resolve state variables from multiple layers of inheritance" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+contract A {
+  uint x = 7;
+}
+contract B is A {
+}
+contract qq is B {
+  function f() {
+    x = 8;
+  }
+}
+|]
+    getAll [[Field "x"]] `shouldReturn` [BInteger 7] 
+
+  it "can inherit from multiple contracts" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+contract A {
+  uint x = 7;
+}
+contract B {
+  uint y = 9;
+}
+contract qq is A, B {
+  function f() {
+    x = 8;
+    y = 10;
+  }
+}
+|]
+    getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger 7, BInteger 9]
+
+  it "error when referencing a state variable from a non-inherited contract" $ (runTest $
+    runBS [r|
+pragma solidvm 3.3;
+contract A {
+  uint x = 7;
+}
+contract B {
+  function f() {
+    x = 8;
+  }
+}
+|]) `shouldThrow` anyTypeError
+
+-- start of 3.2 tests
+
+  it "can write pure and view functions" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+  uint x = 5;
+  function f(uint y) pure returns (uint) {
+    return (7 * y) / 6;
+  }
+  function g(uint y) view returns (uint) {
+    return (x * y) / 6;
+  }
+}
+|]
+    getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger 5,BDefault] 
+
+  it "doesn't warn when reading from contract state in a pure function" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+  uint x = 5;
+  function f(uint y) pure returns (uint) {
+    return (x * y) / 6;
+  }
+}
+|]
+    getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger 5,BDefault] 
+
+  it "doesn't warn when writing to contract state from a pure or view function" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+  uint x = 5;
+  function f(uint y) pure returns (uint) {
+    x = y;
+    return (7 * y) / 6;
+  }
+  function g(uint y) view returns (uint) {
+    x = y;
+    return (x * y) / 6;
+  }
+}
+|]
+    getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger 5,BDefault] 
+
+  it "warns when using assembly code from a pure or view function" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+  uint x = 5;
+  function f(uint y) pure returns (uint) {
+    assembly {
+      x := mload (add (x, 32))
+    }
+  }
+  function g(uint y) view returns (uint) {
+    assembly {
+      x := mload (add (x, 32))
+    }
+  }
+}
+|]
+    getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger 5,BDefault] 
+
+
+  it "can resolve state variables inherited from a contract". runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract A {
+  uint x = 7;
+}
+contract qq is A {
+  function f() {
+    x = 8;
+  }
+}
+|]
+    getAll [[Field "x"]] `shouldReturn` [BInteger 7] 
+
+  it "can resolve state variables from multiple layers of inheritance" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract A {
+  uint x = 7;
+}
+contract B is A {
+}
+contract qq is B {
+  function f() {
+    x = 8;
+  }
+}
+|]
+    getAll [[Field "x"]] `shouldReturn` [BInteger 7] 
+
+  it "can inherit from multiple contracts" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract A {
+  uint x = 7;
+}
+contract B {
+  uint y = 9;
+}
+contract qq is A, B {
+  function f() {
+    x = 8;
+    y = 10;
+  }
+}
+|]
+    getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger 7,BInteger 9] 
+
+  it "can detect when referencing a state variable from a non-inherited contract" $ (runTest $
+    runBS [r|
+pragma solidvm 3.2;
+contract A {
+  uint x = 7;
+}
+contract B {
+  function f() {
+    x = 8;
+  }
+}
+|]) `shouldThrow` anyTypeError  
+
+
+  it "can't write pure and view functions in solidvm 3.2" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+  uint x = 5;
+  function f(uint y) pure returns (uint) {
+    return (7 * y) / 6;
+  }
+  function g(uint y) view returns (uint) {
+    return (x * y) / 6;
+  }
+}
+|]
+    getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger 5,BDefault] 
+
+  it "Can't warn when reading from contract state in a pure function" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+  uint x = 5;
+  function f(uint y) pure returns (uint) {
+    return (x * y) / 6;
+  }
+}
+|]
+    getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger 5,BDefault] 
+
+  it "Can't warn when writing to contract state from a pure or view function" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+  uint x = 5;
+  function f(uint y) pure returns (uint) {
+    x = y;
+    return (7 * y) / 6;
+  }
+  function g(uint y) view returns (uint) {
+    x = y;
+    return (x * y) / 6;
+  }
+}
+|]
+    getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger 5,BDefault] 
+
+  it "Can't warn when using assembly code from a pure or view function" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+  uint x = 5;
+  function f(uint y) pure returns (uint) {
+    assembly {
+      x := mload (add (x, 32))
+    }
+  }
+  function g(uint y) view returns (uint) {
+    assembly {
+      x := mload (add (x, 32))
+    }
+  }
+}
+|]
+    getAll [[Field "x"]] `shouldReturn` [BInteger 5] 
+
+
+  it "can't resolve state variables inherited from a contract" .runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract A {
+  uint x = 7;
+}
+contract qq is A {
+  function f() {
+    x = 8;
+  }
+}
+|]
+    getAll [[Field "x"]] `shouldReturn` [BInteger 7] 
+
+  it "Can't resolve state variables from multiple layers of inheritance" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract A {
+  uint x = 7;
+}
+contract B is A {
+}
+contract qq is B {
+  function f() {
+    x = 8;
+  }
+}
+|]
+    getAll [[Field "x"]] `shouldReturn` [BInteger 7] 
+
+  it "Can't inherit from multiple contracts" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract A {
+  uint x = 7;
+}
+contract B {
+  uint y = 9;
+}
+contract qq is A, B {
+  function f() {
+    x = 8;
+    y = 10;
+  }
+}
+|]
+    getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger 7,BInteger 9] 
+
+  it "can detect when referencing a state variable from a non-inherited contract" $ (runTest $
+    runBS [r|
+pragma solidvm 3.2;
+contract A {
+  uint x = 7;
+}
+contract B {
+  function f() {
+    x = 8;
+  }
+}
+|]) `shouldThrow` anyTypeError
+
+
+  it "Supports view functions in 3.3" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+    function f(uint a, uint b) public view returns (uint) {
+        return a * (b + 42);
+    }
+}
+|]
+    getAll [[Field "a"], [Field "b"]] `shouldReturn` [BDefault,BDefault]  
+
+
+  it "View functions unsupported in 3.2" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+    uint x = 10;
+    function f(uint a, uint b) public view returns (uint) {
+        x = 5;
+        return a * (b + 42);
+    }
+}
+|]
+    getAll [[Field "a"], [Field "b"]] `shouldReturn` [BDefault,BDefault]
+
+
+  it "View functions enforced in 3.3" $ (runTest $
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+    uint x = 10;
+    function f(uint a, uint b) public view returns (uint) {
+        x = 5;
+        return a * (b + 42);
+    }
+    constructor () {
+      f(1,2);
+    }
+}
+|]) `shouldThrow` anyTypeError
