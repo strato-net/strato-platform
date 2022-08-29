@@ -26,15 +26,15 @@ pipeline {
               fi
               go get github.com/aktau/github-release
             fi
+
+            git worktree remove --force strato-worktree || true
+            git worktree add strato-worktree develop
+            cd strato-worktree
+            git checkout ${REFSPEC}
+            git worktree list
+            docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes
+            docker ps
           '''
-          sh 'git worktree remove --force strato-worktree || true'
-          sh 'git worktree add strato-worktree develop'
-          sh 'cd strato-worktree'
-          sh 'git checkout ${REFSPEC}'
-          sh 'git pull'
-          sh 'git worktree list'
-          sh 'docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes'
-          sh 'docker ps'
         }
       }
     }
