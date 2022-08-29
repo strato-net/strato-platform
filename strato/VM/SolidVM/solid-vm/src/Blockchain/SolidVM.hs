@@ -796,6 +796,13 @@ expressionType (CC.ArrayExpression _ xs) = SVMType.Array (expressionType (head x
 
 expressionType ex = typeError "Cannot deduce a type from" (ex, ex)
 
+-- Throw an error if the two accounts don't belong to the same chain
+chainCheck :: Account -> Account -> Bool
+chainCheck a b =
+  let fromChain = a ^. accountChainId
+      toChain = b ^. accountChainId
+  isAccessibleChain <- toChain `isAncestorChainOf` fromChain
+  unless isAccessibleChain $ inaccessibleChain "Inaccessible chain violation" $ "from: " ++ show from ++ ", to: " ++ show to
 
 callWrapper  :: MonadSM m => Account -> Account -> Maybe SolidString -> SolidString -> Bool -> CC.ArgList -> m (Maybe Value)
 callWrapper from to mContract functionName isRCC argExps  = do
