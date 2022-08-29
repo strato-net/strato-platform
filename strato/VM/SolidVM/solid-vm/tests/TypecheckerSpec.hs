@@ -882,15 +882,6 @@ contract C {
 |]
       in length anns `shouldBe` 0
 
-  type MagicInt       is int;
-  type MysticalString is string;
-  type UBool          is bool;
-  contract A {
-    //bool unwrapping
-    UBool galois       =  UBool.wrap(false);
-    bool  mrBool       =  UBool.unwrap(galois);
-    bool  fermet       =  UBool.unwrap(UBool.wrap(true));
-    bool  felixKlein   =  UBool.unwrap(UBool.wrap(mrBool));
 
   describe "pure and view modifier for solidvm 3.3" $ do
     it "can write pure and view functions" $
