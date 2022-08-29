@@ -804,14 +804,6 @@ makePayload input =
     Left err -> error $ show err
     Right cc -> cc
 
--- Throw an error if the two accounts don't belong to the same chain
-chainCheck :: Account -> Account -> Bool
-chainCheck a b =
-  let fromChain = a ^. accountChainId
-      toChain = b ^. accountChainId
-  isAccessibleChain <- toChain `isAncestorChainOf` fromChain
-  unless isAccessibleChain $ inaccessibleChain "Inaccessible chain violation" $ "from: " ++ show from ++ ", to: " ++ show to
-
 --TODO: Finish the other codes after delegatecall is finished
 -- --Very similar to the original callWrapper function but given a string, try and parse and execute the information
 -- -- This will run payload in the context of a foreign contract
