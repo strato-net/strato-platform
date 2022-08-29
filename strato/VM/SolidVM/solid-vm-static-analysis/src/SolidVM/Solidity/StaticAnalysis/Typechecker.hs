@@ -86,8 +86,7 @@ showType (SVMType.Address _) = "address"
 showType (SVMType.Account _) = "account"
 showType (SVMType.UnknownLabel s _) = "label " <> labelToText s
 showType (SVMType.Struct _ n) = "struct " <> labelToText n
---showType (SVMType.UserDefined _ a) = showType a 
-showType (SVMType.UserDefined _ _) = "False"
+showType (SVMType.UserDefined _ a) = showType a 
 showType (SVMType.Enum _ n _) = "enum " <> labelToText n
 showType (SVMType.Error _ n) = "error " <> labelToText n
 showType (SVMType.Array t l) = T.concat
@@ -521,10 +520,7 @@ typecheckStatic (SVMType.UserDefined a c) b  = Left $ "Type mismatch Test1: "
                             <> showType b
                             <> " do not match."
 
-  -- do
-  -- when (True)  (internalError "typeCheckStatic "  a )
-  -- typecheckStatic a b
-typecheckStatic _ (SVMType.UserDefined _ _)   = Left "Type mismatch Test2: "
+typecheckStatic _ (SVMType.UserDefined _ _)   = Left "Type mismatch"
 typecheckStatic theType (SVMType.Bytes _ _) = Right theType
 typecheckStatic t1 t2 = Left $ "Type mismatch: "
                             <> showType t1

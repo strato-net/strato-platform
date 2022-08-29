@@ -40,7 +40,7 @@ import           SolidVM.Solidity.Xabi              (XabiF (..))
 import qualified SolidVM.Solidity.Xabi              as Xabi
 
 import           Blockchain.VM.SolidException
---import Debug.Trace
+
 data SourceUnitF a = Pragma a Identifier String
                    | Import a Text.Text
                    | Alias a String String

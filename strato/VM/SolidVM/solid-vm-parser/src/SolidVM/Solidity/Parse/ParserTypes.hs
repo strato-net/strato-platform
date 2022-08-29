@@ -29,9 +29,6 @@ type PragmaVersion = Identifier
 -- contracts can also be types.
 type ContractName = Identifier
 
--- | List of (alias, SVM type)
---type UserDefinedTypes = [(String, String)]
-
 type SourceCode = String
 -- | A parser of source code whose state is the name of the current
 -- contract.

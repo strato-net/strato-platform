@@ -12,7 +12,6 @@ import           Data.Source
 import           SolidVM.Solidity.Parse.Declarations
 import           SolidVM.Solidity.Parse.Lexer
 import           SolidVM.Solidity.Parse.ParserTypes
---import Debug.Trace
 
 solidityAlias :: SolidityParser SourceUnit
 solidityAlias = do

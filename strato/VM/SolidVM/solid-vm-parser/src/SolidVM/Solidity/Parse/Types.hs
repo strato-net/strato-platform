@@ -60,7 +60,6 @@ simpleType =
         then do
           typ <- getUserDefinedType name 
           return $ (SVMType.UserDefined name (userTypeHelper' typ ))
-          --return $ trace ("Are you even prinitng anything Userdefined" ++ (show name) ) (SVMType.UserDefined name (userTypeHelper' typ ))
         else return $ trace ("Are you even prinitng anything Label"  ++ (show name) ) (SVMType.UnknownLabel name Nothing)
     unknownLabelMemberParser = try $ do
       name <- concat <$> sequence[identifier, dot, identifier]
@@ -149,19 +148,6 @@ mappingType = do
     c <- simpleTypeExpression
     return (d, c)
   return $ SVMType.Mapping (Just True) mapDomT mapCodT
-
--- userType :: SolidityParser SVMType.Type
--- userType = do  
---   return $ trace ("True in isInUserDefinedTypes")  (SVMType.Bool)
-  -- nex <- identifier 
-  -- boolan <- isInUserDefinedTypes nex
-  -- if  boolan
-  --   then return $ trace ("True in isInUserDefinedTypes")  (SVMType.Bool)
-  --   else return $ trace ("False not in  isInUserDefinedTypes") (SVMType.Bool)
-  -- where 
-  --   simple name nameType = do
-  --       reserved name
-  --       return nameType
 
 userTypeHelper' :: Maybe String -> SVMType.Type
 userTypeHelper' (Just "bool")   =  SVMType.Bool
