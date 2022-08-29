@@ -116,7 +116,7 @@ setVal :: MonadSM m => Value -> Value -> m ()
 -- is deeper, read the subfields and assign to their adjustment
 
 setVal (SUserDefined a _ _) (SUserDefined _ _ _) = 
-  when (True) (internalError "Where are here" (a ))
+  when (True) (internalError "Unimplemented feature user defined types" (a ))
 
 setVal (SReference dst) (SReference src) = do
   t <- getXabiValueType src
