@@ -804,20 +804,25 @@ makePayload input =
     Left err -> error $ show err
     Right cc -> cc
 
---Very similar to the original callWrapper function but given a string, try and parse and execute the information
--- This will run payload in the context of a foreign contract
-genericCallWrapper :: MonadSM m => Account -> Account -> SolidString -> Bool -> CC.ArgList -> m (Maybe Value)
-genericCallWrapper from to payload isRCC args
+--TODO: Finish the other codes after delegatecall is finished
+-- --Very similar to the original callWrapper function but given a string, try and parse and execute the information
+-- -- This will run payload in the context of a foreign contract
+-- genericCallWrapper :: MonadSM m => Account -> Account -> SolidString -> Bool -> CC.ArgList -> m (Maybe Value)
+-- genericCallWrapper from to input isRCC args
+--   --Convert the string payload to a CodeCollection
+--   let payload = makePayload input
 
---Very similar to genericCallWrapper but only touches pure and view functions/variables.
-genericStaticCallWrapper :: MonadSM m => Account -> Account -> SolidString -> Bool -> CC.ArgList -> m (Maybe Value)
-genericStaticCallWrapper from to payload isRCC args
+-- --Very similar to genericCallWrapper but only touches pure and view functions/variables.
+-- genericStaticCallWrapper :: MonadSM m => Account -> Account -> SolidString -> Bool -> CC.ArgList -> m (Maybe Value)
+-- genericStaticCallWrapper from to input isRCC args
+--   let payload = makePayload input
 
 --Very similar to the call function except this runs in the context of the local contract
 genericDelegateCallWrapper :: MonadSM m => Account -> Account -> SolidString -> Bool -> CC.ArgList -> m (Maybe Value)
-genericDelegateCallWrapper from to payload isRcc args
+genericDelegateCallWrapper from to input isRcc args
+  let payload = makePayload input
 
-callWrapper  :: MonadSM m => Account -> Account -> Maybe SolidString -> SolidString -> Bool -> CC.ArgList -> m (Maybe Value)
+callWrapper :: MonadSM m => Account -> Account -> Maybe SolidString -> SolidString -> Bool -> CC.ArgList -> m (Maybe Value)
 callWrapper from to mContract functionName isRCC argExps  = do
   let fromChain = from ^. accountChainId
       toChain = to ^. accountChainId
