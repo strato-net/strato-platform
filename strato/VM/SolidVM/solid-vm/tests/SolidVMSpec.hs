@@ -6087,6 +6087,8 @@ contract qq {
     uint y = 4;
     uint x = 7;
   }
+}
+|]) `shouldThrow` anyTypeError
 
 
   it "Supports view functions in 3.3" . runTest $ do
