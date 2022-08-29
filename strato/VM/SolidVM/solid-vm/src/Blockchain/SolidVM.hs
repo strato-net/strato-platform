@@ -804,6 +804,14 @@ makePayload input =
     Left err -> error $ show err
     Right cc -> cc
 
+-- Throw an error if the two accounts don't belong to the same chain
+chainCheck :: Account -> Account -> Bool
+chainCheck a b =
+  let fromChain = a ^. accountChainId
+      toChain = b ^. accountChainId
+  isAccessibleChain <- toChain `isAncestorChainOf` fromChain
+  unless isAccessibleChain $ inaccessibleChain "Inaccessible chain violation" $ "from: " ++ show from ++ ", to: " ++ show to
+
 --TODO: Finish the other codes after delegatecall is finished
 -- --Very similar to the original callWrapper function but given a string, try and parse and execute the information
 -- -- This will run payload in the context of a foreign contract
@@ -820,7 +828,11 @@ makePayload input =
 --Very similar to the call function except this runs in the context of the local contract
 genericDelegateCallWrapper :: MonadSM m => Account -> Account -> SolidString -> Bool -> CC.ArgList -> m (Maybe Value)
 genericDelegateCallWrapper from to input isRcc args
-  let payload = makePayload input
+  let payload = makePayload input         --Convert the input into the proper CodeCollection 
+  -- Check if both accounts belong to the same chain, throw an error if they are not on the same chain, nothing otherwise
+  chainCheck from to
+  
+
 
 callWrapper :: MonadSM m => Account -> Account -> Maybe SolidString -> SolidString -> Bool -> CC.ArgList -> m (Maybe Value)
 callWrapper from to mContract functionName isRCC argExps  = do
