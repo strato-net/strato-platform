@@ -53,7 +53,7 @@ import           Control.Monad
 import           Control.Applicative ((<|>))
 import           Control.Lens hiding (Context)
 -- import           Control.Monad.Catch (MonadCatch)
-import           Control.Monad (join)
+-- import           Control.Monad (join)
 import           Control.Monad.Catch (MonadCatch)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
