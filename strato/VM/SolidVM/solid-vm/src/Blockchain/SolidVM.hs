@@ -796,13 +796,36 @@ expressionType (CC.ArrayExpression _ xs) = SVMType.Array (expressionType (head x
 
 expressionType ex = typeError "Cannot deduce a type from" (ex, ex)
 
--- Throw an error if the two accounts don't belong to the same chain
-chainCheck :: Account -> Account -> Bool
-chainCheck a b =
-  let fromChain = a ^. accountChainId
-      toChain = b ^. accountChainId
-  isAccessibleChain <- toChain `isAncestorChainOf` fromChain
-  unless isAccessibleChain $ inaccessibleChain "Inaccessible chain violation" $ "from: " ++ show from ++ ", to: " ++ show to
+-- Return false if the two accounts don't have the same chainId
+  --Using NamedAccount as it is easier and less verbose in the code to convert an Account to a NamedAccount
+  --rather than converting NamedAccount to Account
+chainCheck :: NamedAccount -> NamedAccount -> Bool
+chainCheck a b = do
+  --Convert a into an account
+  let acid = case (a ^. namedAccountChainId) of 
+                UnspecifiedChain -> do
+                  cid1 <- view accountChainId <$> getCurrentAccount
+                  case cid1 of
+                    Nothing -> return Nothing
+                    Just cid2 -> return $ Just cid2
+                MainChain -> return Nothing
+                ExplicitChain cid -> return $ Just cid
+      aAccount = namedAccountToAccount acid a
+  --convert b into an account
+      bcid = case (b ^. namedAccountChainId) of 
+                UnspecifiedChain -> do
+                  cid1 <- view accountChainId <$> getCurrentAccount
+                  case cid1 of
+                    Nothing -> return Nothing
+                    Just cid2 -> return $ Just cid2
+                MainChain -> return Nothing
+                ExplicitChain cid -> return $ Just cid
+      bAccount = namedAccountToAccount bcid b
+
+  case (a `isAncestorChainOf` b) of 
+    -- Nothing -> False
+    Just True -> True
+    Just False -> False
 
 callWrapper  :: MonadSM m => Account -> Account -> Maybe SolidString -> SolidString -> Bool -> CC.ArgList -> m (Maybe Value)
 callWrapper from to mContract functionName isRCC argExps  = do
@@ -2126,13 +2149,12 @@ expToVar' (CC.FunctionCall _ e args) = do
             return . Constant $ SBool success
 
           Constant (SContractItem address' "code") -> do
-            -- contract' <- getCurrentContract
-            -- --Ensure that this can only be called when the pragma is pragma 3.4
-            -- when (CC._vmVersion contract' == "svm3.4")  
-
             --Only get the items if they are in the same chain as the current contract, this will prevent leaks from private chains
             from <- getCurrentAccount
-            let address = namedAccountToAccount (from ^. accountChainId) address'
+            namedFrom <- accountToNamedAccount' from
+
+            when chainCheck from to $ inaccessibleChain from to
+            let address = address'
             -- Collect a potential item to search
             searchTerms <- case argVals of
                 -- catch only the SStrings
