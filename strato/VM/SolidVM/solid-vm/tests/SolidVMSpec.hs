@@ -5679,7 +5679,7 @@ contract qq {
     if(a==checker)
       revert f("ERROR"); 
   } 
-}|]) `shouldThrow` anyTODO
+}|]) `shouldThrow` anyCustomError
 
   it "Revert customError  namedargs" $ runTest (do
     runBS [r|
