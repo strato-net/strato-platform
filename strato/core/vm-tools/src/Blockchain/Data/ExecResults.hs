@@ -41,7 +41,8 @@ data ExecResults =
     erAction             :: Maybe Action,
     erException          :: Maybe (Either SolidException VMException),
     erKind               :: CodeKind,
-    erNewX509Certs       :: M.Map Address X509Certificate
+    erNewX509Certs       :: M.Map Address X509Certificate,
+    erPragmas            :: [(String, String)]
     } deriving (Eq, Show, Generic)
 
 instance NFData ExecResults

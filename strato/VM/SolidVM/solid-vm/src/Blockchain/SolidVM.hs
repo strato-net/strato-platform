@@ -345,7 +345,8 @@ create' creator newAccount ch cc contractName' argExps x509s = do
     erAction = Just finalAct,
     erException = Nothing,
     erKind = SolidVM,
-    erNewX509Certs = x509s'
+    erNewX509Certs = x509s',
+    erPragmas = _pragmas cc
     }
 
 {-
