@@ -38,6 +38,8 @@ module Blockchain.VMContext
     , stateBlockMap
     , storageTxMap
     , storageBlockMap
+    , certTxMap
+    , certBlockMap
     , stateRoots
     , currentBlock
     , memDBs
@@ -48,7 +50,6 @@ module Blockchain.VMContext
     , coinbaseQueue
     , txRunResultsCache
     , debugSettings
-    , newX509Certs
     , dbs
     , state
     , contextGet
@@ -169,6 +170,8 @@ data MemDBs = MemDBs
   , _stateBlockMap   :: M.Map Account AddressStateModification
   , _storageTxMap    :: M.Map (Account, B.ByteString) B.ByteString
   , _storageBlockMap :: M.Map (Account, B.ByteString) B.ByteString
+  , _certTxMap       :: M.Map Address CertModification
+  , _certBlockMap    :: M.Map Address CertModification
   , _stateRoots      :: M.Map (Keccak256, Maybe Word256) MP.StateRoot
   , _currentBlock    :: Maybe CurrentBlockHash
   } deriving (Generic, NFData, Show)
@@ -183,7 +186,6 @@ data ContextState = ContextState
   , _coinbaseQueue     :: Q.Seq ((Address,Word64), Address)
   , _txRunResultsCache :: TRC.Cache
   , _debugSettings     :: Maybe DebugSettings
-  , _newX509Certs      :: M.Map Address X509Certificate
   } deriving (Generic, NFData)
 makeLenses ''ContextState
 
@@ -207,15 +209,16 @@ type VMBase m = ( MonadIO m
                 , Mod.Modifiable BlockHashRoot m
                 , Mod.Modifiable GenesisRoot m
                 , Mod.Modifiable BestBlockRoot m
+                , Mod.Modifiable CertRoot m
                 , Mod.Modifiable CurrentBlockHash m
                 , HasMemAddressStateDB m
+                , HasMemCertDB m
                 , A.Selectable (Maybe Word256) ParentChainId m
                 , (Maybe Word256 `A.Alters` MP.StateRoot) m
                 , (MP.StateRoot `A.Alters` MP.NodeData) m
                 , (Account `A.Alters` AddressState) m
                 , (Keccak256 `A.Alters` DBCode) m
                 , HasX509CertDB m
-                , Mod.Modifiable (M.Map Address X509Certificate) m
                 , (N.NibbleString `A.Alters` N.NibbleString) m
                 , HasMemRawStorageDB m
                 , (RawStorageKey `A.Alters` RawStorageValue) m
@@ -253,9 +256,6 @@ getHashDB = view $ dbs . hashDB
 
 getCodeDB :: ContextM CodeDB
 getCodeDB = view $ dbs . codeDB
-
-getX509CertDB :: ContextM X509CertDB
-getX509CertDB = view $ dbs . x509CertDB
 
 getBlockSummaryDB :: ContextM BlockSummaryDB
 getBlockSummaryDB = view $ dbs . blockSummaryDB
@@ -346,6 +346,9 @@ vmGenesisRootKey = "genesis_root"
 vmBestBlockRootKey :: B.ByteString
 vmBestBlockRootKey = "best_block_root"
 
+vmCertRootKey :: B.ByteString
+vmCertRootKey = "cert_root"
+
 instance Mod.Modifiable BlockHashRoot ContextM where
   get _ = do
     db <- getStateDB
@@ -370,6 +373,14 @@ instance Mod.Modifiable BestBlockRoot ContextM where
     db <- getStateDB
     DB.put db def vmBestBlockRootKey sr
 
+instance Mod.Modifiable CertRoot ContextM where
+  get _ = do
+    db <- getStateDB
+    CertRoot . maybe MP.emptyTriePtr MP.StateRoot <$> DB.get db def vmCertRootKey
+  put _ (CertRoot (MP.StateRoot sr)) = do
+    db <- getStateDB
+    DB.put db def vmCertRootKey sr
+
 instance Mod.Modifiable K.KafkaState ContextM where
   get _    = readIORef =<< view (dbs . kafkaState)
   put _ ks = view (dbs . kafkaState) >>= flip writeIORef ks
@@ -383,6 +394,12 @@ instance HasMemAddressStateDB ContextM where
   putAddressStateTxDBMap theMap = modify $ memDBs . stateTxMap .~ theMap
   getAddressStateBlockDBMap = gets $ view $ memDBs . stateBlockMap
   putAddressStateBlockDBMap theMap = modify $ memDBs . stateBlockMap .~ theMap
+
+instance HasMemCertDB ContextM where
+  getCertTxDBMap = gets $ view $ memDBs . certTxMap
+  putCertTxDBMap theMap = modify $ memDBs . certTxMap .~ theMap
+  getCertBlockDBMap = gets $ view $ memDBs . certBlockMap
+  putCertBlockDBMap theMap = modify $ memDBs . certBlockMap .~ theMap
 
 instance (MP.StateRoot `A.Alters` MP.NodeData) ContextM where
   lookup _ = MP.genericLookupDB $ getStateDB
@@ -426,13 +443,11 @@ instance (Keccak256 `A.Alters` DBCode) ContextM where
   delete _ = genericDeleteCodeDB $ getCodeDB
 
 instance (Address `A.Alters` X509Certificate) ContextM where
-  lookup _ = genericLookupX509CertDB $ getX509CertDB
-  insert _ = genericInsertX509CertDB $ getX509CertDB
-  delete _ = genericDeleteX509CertDB $ getX509CertDB
-
-instance Mod.Modifiable (M.Map Address X509Certificate) ContextM where
-    get _ = contextGets (^. newX509Certs) 
-    put _ newM = contextModify (set newX509Certs newM)
+  lookup _ k = do
+    mBH <- gets $ view $ memDBs . currentBlock
+    fmap join . for mBH $ \(CurrentBlockHash bh) -> getCertMaybe k bh
+  insert _ = putCert
+  delete _ = deleteCert
 
 instance (N.NibbleString `A.Alters` N.NibbleString) ContextM where
   lookup _ = genericLookupHashDB $ getHashDB
@@ -518,6 +533,8 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
             , _stateBlockMap   = M.empty
             , _storageTxMap    = M.empty
             , _storageBlockMap = M.empty
+            , _certTxMap       = M.empty
+            , _certBlockMap    = M.empty
             , _stateRoots      = M.empty
             , _currentBlock    = Nothing
             }
@@ -531,7 +548,6 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
             , _coinbaseQueue     = Q.empty
             , _txRunResultsCache = cache
             , _debugSettings     = Nothing
-            , _newX509Certs      = M.empty
             }
 
       let ctx = Context
@@ -583,6 +599,8 @@ runContextM dSettings f = do
             , _stateBlockMap   = M.empty
             , _storageTxMap    = M.empty
             , _storageBlockMap = M.empty
+            , _certTxMap       = M.empty
+            , _certBlockMap    = M.empty
             , _stateRoots      = M.empty
             , _currentBlock    = Nothing
             }
@@ -596,7 +614,6 @@ runContextM dSettings f = do
             , _coinbaseQueue     = Q.empty
             , _txRunResultsCache = cache
             , _debugSettings     = dSettings
-            , _newX509Certs      = M.empty
             }
 
       let ctx = Context

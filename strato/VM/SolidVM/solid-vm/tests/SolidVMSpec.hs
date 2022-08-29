@@ -207,7 +207,7 @@ devNull _ _ _ _ = return ()
 runTest :: ContextM a -> IO ()
 runTest f = do
   let timeout = 5000000
-  result <- race (threadDelay timeout) $ runLoggingT (runTestContextM f)
+  result <- race (threadDelay timeout) $ runLoggingT (runTestContextM $ withCurrentBlockHash zeroHash f)
   case result of
     Left{} -> expectationFailure $ printf "test case timed out after %ds" (timeout `div` 1000000)
     Right{} -> return ()
@@ -6073,6 +6073,19 @@ contract A {
 contract B {
   function f() {
     x = 8;
+  }
+}
+|]) `shouldThrow` anyTypeError
+
+
+  it "can detect duplicate declarations" $ (runTest $
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  function f(){
+    uint x = 9;
+    uint y = 4;
+    uint x = 7;
   }
 }
 |]) `shouldThrow` anyTypeError
