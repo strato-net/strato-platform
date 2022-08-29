@@ -32,7 +32,7 @@ import qualified SolidVM.Model.Type as SVMType
 import           Text.Read (readMaybe)
 --import qualified Text.Colors                          as C
 --import           Control.Monad.IO.Class
-import Debug.Trace
+--import Debug.Trace
 
 emptyAnnotation :: SourceAnnotation Text
 emptyAnnotation = (SourceAnnotation (initialPosition "") (initialPosition "") "")
@@ -1000,40 +1000,23 @@ getVarType' "msg" ctx = pure $ Static (SVMType.UnknownLabel "msg" Nothing) ctx
 getVarType' "tx" ctx = pure $ Static (SVMType.UnknownLabel "tx" Nothing) ctx
 getVarType' "block" ctx = pure $ Static (SVMType.UnknownLabel "block" Nothing) ctx
 getVarType' "super" ctx = pure $ Static (SVMType.UnknownLabel "super" Nothing) ctx
--- getVarType' "UFixed256x18x" ctx = do
---   pure $ Static (SVMType.Bool) ctx
-  --when (True)  (internalError "WHY THE FUCK IS TRUE BEING PASSED? "  ctx )
-  --getVarTypeByName' (stringToLabel "True") ctx
 getVarType' name ctx = do
-
   c <- asks contract
-  -- TODO make sure there isn't a member access of wrap. Then you want to do something different
-  -- Probably Want to change things upstream to catch if the member access is 
-  --let varDefy  = trace ("getVarType' \n\t\tname " ++ (show name) ++ "\n\t\tctx "++ (show ctx) ++ "\n\t\t Does it find var by name"++ (show $ varType <$> (M.lookup name (_storageDefs c))) )  (M.lookup name (_storageDefs c))
   let varDefy =  M.lookup name (_storageDefs c)
-  --when (True)  (internalError "WHY THE FUCK IS TRUE BEING PASSED?2 "  ( varDefy))
   case varDefy of
     Just _ -> do
-      --defySexy <- varDefy
       case  varType <$> varDefy   of
         Just (SVMType.UserDefined ggg b) -> return (Static (SVMType.UserDefined ggg b) ctx)
         _ -> getVarTypeByName' (stringToLabel name) ctx
     Nothing -> do
-      let ls = filter (userDefinedHelper name )  [ varType x | x <- (M.elems (_storageDefs c)) ] --Get list of var types then filter out userDefined types
-      --when (True)  (internalError "WHY THE FUCK IS TRUE BEING PASSED?2 "  (name, (M.elems (_storageDefs c))) )
+      let ls = filter (userDefinedHelper name )  [ varType x | x <- (M.elems (_storageDefs c)) ] 
       if  length ls > 0
         then do
           let ls2 = head (filter (userDefinedHelper name . varType )  [  x | x <- (M.elems (_storageDefs c)) ])
           case varInitialVal ls2 of
-            Just _ -> pure $ trace ("in getVarType' with name as"
-              ++ (show name) ++"\n"
-              ++ (show $ head ls) ++ (show [ varType x | x <- (M.elems (_storageDefs c)) ])  ++(show (M.elems (_storageDefs c)))  )  (Static (head ls)  ctx)
-            _ -> pure $  trace ("in getVarType' with name as"
-              ++ (show name) ++"\n")
-              (Static ( SVMType.actual (head ls) ) ctx)
-      --pure $ trace ((show $ head ls) ++ (show [ varType x | x <- (M.elems (_storageDefs c)) ])  ++(show (M.elems (_storageDefs c)))  ) (Static ( SVMType.actual (head ls) ) ctx)
+            Just _ -> pure $ (Static (head ls)  ctx)
+            _ -> pure $  (Static ( SVMType.actual (head ls) ) ctx)
       else do
-        --when (True)  (internalError "Did not catch any of my vars catchers "  (ls) )
         getVarTypeByName' (stringToLabel name) ctx
 
 
@@ -1265,13 +1248,6 @@ checkIfImmuteOperationValid (Variable y a)  = do
       else tcExpr (Variable y a)
 checkIfImmuteOperationValid a = tcExpr a
 
-
--- statementsHelper2 :: [Annotated StatementF] -> SSS [SourceAnnotation Text]
--- statementsHelper2 ss = do
---   modify $ fmap (M.empty:)
---   anns <- concat <$> traverse statementsHelper2 ss
---   modify $ fmap tail
---   pure anns
 
 
 tcExpr :: Annotated ExpressionF -> SSS Type'

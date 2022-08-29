@@ -28,7 +28,6 @@ simpleTypeExpression = try arrayType <|> simpleType <|> mappingType  -- <|> user
 -- | Parses builtins and user-defined names
 simpleType :: SolidityParser SVMType.Type
 simpleType =
-  --simple  "UFixed256x18" SVMType.Bool <|>
   simple "bool" SVMType.Bool <|>
   simple "address payable" (SVMType.Address True) <|>
   simple "address" (SVMType.Address False) <|>
