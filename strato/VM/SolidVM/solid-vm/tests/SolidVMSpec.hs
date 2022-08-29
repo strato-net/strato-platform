@@ -6562,3 +6562,22 @@ contract qq {
     }
 }
 |]) `shouldThrow` anyTypeError
+
+  it "can import foreign code" . runTest $ do
+    runBS [r|
+pragma solidvm 3.3;
+contract A {
+  uint item1 = 13;
+}
+
+contract B {
+  A apples = new A();
+  apples.code("item1");
+}
+
+contract C {
+  B bananas = new B();
+  string codeTest = bananas.code("");
+}
+|]
+    getAll [[Field "codeTest"]] `shouldReturn` [BDefault]
