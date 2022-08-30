@@ -29,7 +29,9 @@ def cleanOldWorkspaces(Integer olderThanNumDays = 5) {
     sh """
       for f in \$(find ../ -maxdepth 1 -type d -mtime +\$((3*$olderThanNumDays))); do 
         (
-          rm -rf "\$f"
+          if [ "\$f" != "${env.JOB_NAME}" ]; then
+            rm -rf "\$f"
+          fi
         ); 
       done
     """
