@@ -25,6 +25,7 @@ module Blockchain.VM.SolidException
   , divideByZero
   , missingCodeCollection
   , inaccessibleChain
+  , invalidChain
   , invalidWrite
   , invalidCertificate
   , malformedData
@@ -66,6 +67,7 @@ data SolidException = TypeError String String
                     | DivideByZero String 
                     | MissingCodeCollection String String
                     | InaccessibleChain String String
+                    | InvalidChain String
                     | InvalidWrite String String
                     | InvalidCertificate String String
                     | MalformedData String String
@@ -103,6 +105,7 @@ showSolidException (UnknownVariable a b) = printf "unknown variable: %s: %s" a b
 showSolidException (UnknownStatement a b) = printf "unknown statement: %s: %s" a b
 showSolidException (DivideByZero a) = printf "divide by zero error: %s" a
 showSolidException (MissingCodeCollection a b) = printf "missing code collection: %s: %s" a b
+showSolidException (InvalidChain a) = printf "Chain is invalid for address: %s, likely problem with metaprogramming" a
 showSolidException (InaccessibleChain a b) = printf "inaccessible chain: %s: %s" a b
 showSolidException (InvalidWrite a b) = printf "invalid write: %s: %s" a b
 showSolidException (InvalidCertificate a b) = printf "invalid certificate: %s: %s" a b
@@ -183,6 +186,9 @@ missingCodeCollection = toThrower MissingCodeCollection
 
 inaccessibleChain :: (Show v) => String -> v -> a
 inaccessibleChain = toThrower InaccessibleChain
+
+invalidChain :: String -> a
+invalidChain chain = throw $ InvalidChain chain
 
 invalidWrite :: (Show v) => String -> v -> a
 invalidWrite = toThrower InvalidWrite
