@@ -52,7 +52,7 @@ import qualified Data.Map                             as M
 import qualified Data.Map.Merge.Lazy                  as M
 import           Data.Maybe
 -- import           Data.Monoid
--- import           Data.Semigroup
+import           Data.Semigroup
 import qualified Data.Sequence                        as Q
 import qualified Data.Set                             as S
 import           Data.Source
@@ -796,49 +796,37 @@ expressionType (CC.ArrayExpression _ xs) = SVMType.Array (expressionType (head x
 
 expressionType ex = typeError "Cannot deduce a type from" (ex, ex)
 
--- Return false if the two accounts don't have the same chainId
-  --Using NamedAccount as it is easier and less verbose in the code to convert an Account to a NamedAccount
-  --rather than converting NamedAccount to Account
-chainCheck :: NamedAccount -> NamedAccount -> Bool
-chainCheck a b =   
-  case ((aAccount ^. accountChainId) `isAncestorChainOf` (bAccount ^. accountChainId)) of 
-    -- Nothing -> False
-    Just True -> True
-    Just False -> inaccessibleChain acid bcid
+--Check if there is ANY relation between the chains
+  --Check a to b & b to a
+  -- This works as Nothing < Just False < Just True
+biCheckChain :: A.Selectable (Maybe Word256) ParentChainId m => NamedAccount -> NamedAccount -> m (Maybe Bool)
+biCheckChain a b = getMax <$> fMax (a `checkChain` b) .<>. fMax (b `checkChain` a)
   where
-    -- Get the chainId for a
-    acid = case (a ^. namedAccountChainId) of 
-                UnspecifiedChain -> do
-                  cid1 <- view accountChainId <$> getCurrentAccount
-                  case cid1 of
-                    Nothing -> Nothing
-                    Just cid2 -> Just cid2
-                MainChain -> Nothing
-                ExplicitChain cid -> Just cid
-    --Get the ChainId for b
-    bcid = case (b ^. namedAccountChainId) of 
-                UnspecifiedChain -> do
-                  cid1 <- view accountChainId <$> getCurrentAccount
-                  case cid1 of
-                    Nothing -> Nothing
-                    Just cid2 -> Just cid2
-                MainChain ->  Nothing
-                ExplicitChain cid -> Just cid
-    aAccount = namedAccountToAccount acid a
-    bAccount = namedAccountToAccount bcid b
+    (.<>.) = liftA2 (<>)
+    fMax = fmap Max
 
+--Check if there is a relationship between account a to b
+checkChain :: A.Selectable (Maybe Word256) ParentChainId m => NamedAccount -> NamedAccount -> m (Maybe Bool)
+--If both accounts are explicit chains
+checkChain (NamedAccount _ (ExplicitChain c1)) (NamedAccount _ (ExplicitChain c2)) = Just <$> Just c1 `isAncestorChainOf` Just c2
+--If one chain is main chain and the other is explicit
+checkChain (NamedAccount _ MainChain) (NamedAccount _ (ExplicitChain c)) = Just <$> Nothing `isAncestorChainOf` Just c
+checkChain (NamedAccount _ (ExplicitChain c)) (NamedAccount _ MainChain) = Just <$> Just c `isAncestorChainOf` Nothing
+--If both are main chains
+checkChain (NamedAccount _ MainChain) (NamedAccount _ MainChain) = Just <$> Nothing `isAncestorChainOf` Nothing
+--If both chains are unspecified, basically though an error
+checkChain (NamedAccount _ UnspecifiedChain) _ = pure Nothing
+checkChain _ (NamedAccount _ UnspecifiedChain) = pure Nothing
+
+--Convert a namedAccount while filtering out all of the unspecified chains
 easyNamedAccountToAccount :: NamedAccount -> Account
 easyNamedAccountToAccount namedAccount = Account (namedAccount ^. namedAccountAddress) (cid)
   where cid = case (namedAccount ^. namedAccountChainId) of 
-                UnspecifiedChain -> do
-                  cid1 <- view accountChainId <$> getCurrentAccount
-                  case cid1 of
-                    Nothing -> Nothing
-                    Just cid2 -> Just cid2
+                UnspecifiedChain -> invalidChain (show $ namedAccount ^. namedAccountAddress)
                 MainChain -> Nothing
-                ExplicitChain cid -> Just cid
+                ExplicitChain goodCid -> Just goodCid
 
-callWrapper  :: MonadSM m => Account -> Account -> Maybe SolidString -> SolidString -> Bool -> CC.ArgList -> m (Maybe Value)
+callWrapper :: MonadSM m => Account -> Account -> Maybe SolidString -> SolidString -> Bool -> CC.ArgList -> m (Maybe Value)
 callWrapper from to mContract functionName isRCC argExps  = do
   let fromChain = from ^. accountChainId
       toChain = to ^. accountChainId
@@ -2164,7 +2152,8 @@ expToVar' (CC.FunctionCall _ e args) = do
             from <- getCurrentAccount
             let namedFrom = accountToNamedAccount' from --convert to a namedAccount to verify everything is on the correct chain
             --check that the from and to are on the same chain`
-            chainCheck namedFrom address'
+            isRelated <- biCheckChain namedFrom address'
+            unless (fromMaybe False isRelated) $ inaccessibleChain (show from) (show address')
             let realAddress = easyNamedAccountToAccount address' --This is also the name of the to account
             -- Collect a potential item to search
             searchTerms <- case argVals of
@@ -2174,9 +2163,8 @@ expToVar' (CC.FunctionCall _ e args) = do
                 OrderedVals as | length as > 1 -> tooManyCooks 1 (length as)
                 --If nothing was given or something else, then just return the entire code
                 _ -> pure $ Nothing    
-            --get only the contract containing useful sourceAnnotation contained in the ContractF type.
+            --get only the contract containing the sweet succulent ContractF definition
             (contract, _, _) <- getCodeAndCollection realAddress
-
             let codeSnippets :: [String]
                 codeSnippets = 
                   case (fromMaybe "" searchTerms) of 
