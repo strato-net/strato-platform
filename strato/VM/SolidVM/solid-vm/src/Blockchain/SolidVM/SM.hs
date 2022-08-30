@@ -198,6 +198,7 @@ instance Monad m => HasMemCertDB (SM m) where
   putCertBlockDBMap m = modify $ ssMemDBs . certBlockMap .~ m
 
 instance ( (Maybe Word256 `A.Alters` MP.StateRoot) m
+         , MonadLogger m
          , (MP.StateRoot `A.Alters` MP.NodeData) m
          , (N.NibbleString `A.Alters` N.NibbleString) m
          ) => (RawStorageKey `A.Alters` RawStorageValue) (SM m) where
@@ -207,6 +208,7 @@ instance ( (Maybe Word256 `A.Alters` MP.StateRoot) m
   lookupWithDefault _ = genericLookupWithDefaultRawStorageDB
 
 instance ( (Maybe Word256 `A.Alters` MP.StateRoot) m
+         , MonadLogger m
          , (MP.StateRoot `A.Alters` MP.NodeData) m
          , (N.NibbleString `A.Alters` N.NibbleString) m
          ) => (Account `A.Alters` AddressState) (SM m) where

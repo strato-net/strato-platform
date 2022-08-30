@@ -141,6 +141,8 @@ addBlocks unfiltered = do
       timerToUse = Just vmBlockInsertionMined
   unless (null unfiltered) $ yieldMany $ OutIndexEvent . RanBlock <$> unfiltered
   bbi <- getContextBestBlockInfo
+  $logInfoS "addBlocks" $ T.pack ("Unfiltered count: " ++ show (length unfiltered))
+  $logInfoS "addBlocks" $ T.pack ("Filtered count: " ++ show (length filtered))
   case (filtered, bbi) of
     ([], _) -> return ()
     (_, Unspecified) -> return ()
@@ -548,23 +550,23 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx{otHash=theHash} 
       gasUsed = fromInteger $ transactionGasLimit t - gasRemaining
       etherUsed = gasUsed * fromInteger (transactionGasPrice t)
 
-  when flags_createTransactionResults $ do
-    let chainId = txChainId t
-        beforeAddresses = S.fromList [ x | (x, ASModification _) <-  M.toList beforeMap ]
-        beforeDeletes = S.fromList [ x | (x, ASDeleted) <-  M.toList beforeMap ]
-        afterAddresses = S.fromList [ x | (x, ASModification _) <-  M.toList afterMap ]
-        afterDeletes = S.fromList [ x | (x, ASDeleted) <-  M.toList afterMap ]
-        ranBlockHash = hashFunction b
-        mkLogEntry Log{..} = LogDB ranBlockHash theHash chainId (account ^. accountAddress) (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
-        mkEventEntry Event{..} = EventDB chainId evName $ map snd evArgs -- drop the field names, only slipstream needs them
-        (!response, theTrace', theLogs, theEvents) =
-          case result of
-            Left _ -> (BSS.empty, [], [], []) --TODO keep the trace when the run fails
-            Right r ->
-              (fromMaybe BSS.empty $ erReturnVal r, unlines $ reverse $ erTrace r, erLogs r, erEvents r)
+      chainId = txChainId t
+      beforeAddresses = S.fromList [ x | (x, ASModification _) <-  M.toList beforeMap ]
+      beforeDeletes = S.fromList [ x | (x, ASDeleted) <-  M.toList beforeMap ]
+      afterAddresses = S.fromList [ x | (x, ASModification _) <-  M.toList afterMap ]
+      afterDeletes = S.fromList [ x | (x, ASDeleted) <-  M.toList afterMap ]
+      ranBlockHash = hashFunction b
+      mkLogEntry Log{..} = LogDB ranBlockHash theHash chainId (account ^. accountAddress) (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
+      mkEventEntry Event{..} = EventDB chainId evName $ map snd evArgs -- drop the field names, only slipstream needs them
+      (!response, theTrace', theLogs, theEvents) =
+        case result of
+          Left _ -> (BSS.empty, [], [], []) --TODO keep the trace when the run fails
+          Right r ->
+            (fromMaybe BSS.empty $ erReturnVal r, unlines $ reverse $ erTrace r, erLogs r, erEvents r)
 
-    yieldMany $ OutLog . mkLogEntry <$> theLogs
-    yieldMany $ OutEvent . mkEventEntry <$> theEvents
+  yieldMany $ OutLog . mkLogEntry <$> theLogs
+  yieldMany $ OutEvent . mkEventEntry <$> theEvents
+  when flags_createTransactionResults $ do
     yield . OutTXR $
            TransactionResult { transactionResultBlockHash        = ranBlockHash
                              , transactionResultTransactionHash  = theHash
@@ -583,8 +585,8 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx{otHash=theHash} 
                              , transactionResultChainId          = chainId
                              , transactionResultKind             = erKind <$> eitherToMaybe result
                              }
-    when flags_diffPublish $ do
-      traverse_ (yield . OutAction) $ either (const Nothing) erAction result
+  when flags_diffPublish $ do
+    traverse_ (yield . OutAction) $ either (const Nothing) erAction result
 
 multilineLog :: MonadLogger m =>
                 T.Text -> String -> m ()

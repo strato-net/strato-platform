@@ -17,7 +17,23 @@
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 {-# OPTIONS -fno-warn-deprecations #-}
 
-module Blockchain.MemVMContext where
+module Blockchain.MemVMContext
+  ( module Blockchain.MemVMContext
+  , CurrentBlockHash(..)
+  , MemDBs(..)
+  , ContextState(..)
+  , currentBlock
+  , txRunResultsCache
+  , debugSettings
+  , memDBs
+  , stateRoots
+  , stateTxMap
+  , stateBlockMap
+  , storageTxMap
+  , storageBlockMap
+  , certTxMap
+  , certBlockMap
+  ) where
 
 import           Control.DeepSeq
 import           Control.Lens
@@ -26,17 +42,16 @@ import qualified Control.Monad.Change.Modify        as Mod
 import           Control.Monad.IO.Class
 import           Control.Monad.Reader
 import qualified Data.ByteString                    as B
+import           Data.Default
 import qualified Data.Map                           as M
 import           Data.Maybe                         (fromMaybe)
 import qualified Data.NibbleString                  as N
-import qualified Data.Sequence                      as Q
 import           Data.Traversable                   (for)
 import           Debugger
 import           GHC.Generics
 import           Prometheus
 
 import           BlockApps.Logging
-import           Blockchain.Bagger.BaggerState      (defaultBaggerState)
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.Block
 import           Blockchain.Data.BlockSummary
@@ -54,10 +69,10 @@ import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.TxRunResultCache        as TRC
 import           Blockchain.VMContext               ( CurrentBlockHash(..)
-                                                    , ContextBestBlockInfo(..)
                                                     , MemDBs(..)
                                                     , ContextState(..)
                                                     , currentBlock
+                                                    , txRunResultsCache
                                                     , debugSettings
                                                     , memDBs
                                                     , stateRoots
@@ -85,6 +100,20 @@ data MemContextDBs = MemContextDBs
   } deriving (Generic)
 makeLenses ''MemContextDBs
 
+instance Default MemContextDBs where
+  def = MemContextDBs
+          { _stateDB        = M.empty
+          , _hashDB         = M.empty
+          , _codeDB         = M.empty
+          , _x509CertDB     = M.empty
+          , _blockSummaryDB = M.empty
+          , _blockHashRoot  = BlockHashRoot MP.emptyTriePtr
+          , _genesisRoot    = GenesisRoot MP.emptyTriePtr
+          , _bestBlockRoot  = BestBlockRoot MP.emptyTriePtr
+          , _certRoot       = CertRoot MP.emptyTriePtr
+          , _worldBestBlock = Nothing
+          }
+
 instance NFData MemContextDBs where
   rnf MemContextDBs{..} =
     _stateDB `seq`
@@ -103,6 +132,9 @@ data MemContext = MemContext
   , _state :: ContextState
   } deriving (Generic, NFData)
 makeLenses ''MemContext
+
+instance Default MemContext where
+  def = MemContext def def
 
 type MemContextM = ReaderT (IORef MemContext) (LoggingT IO) -- I hope we can get rid of the IO dependency someday
 
@@ -313,19 +345,7 @@ instance MonadMonitor (LoggingT IO) where
 runMemContextM :: Maybe DebugSettings
                -> MemContextM a
                -> LoggingT IO (a, MemContext)
-runMemContextM = runMemContextMWith cdbs
-  where cdbs = MemContextDBs
-          { _stateDB        = M.empty
-          , _hashDB         = M.empty
-          , _codeDB         = M.empty
-          , _x509CertDB     = M.empty
-          , _blockSummaryDB = M.empty
-          , _blockHashRoot  = BlockHashRoot MP.emptyTriePtr
-          , _genesisRoot    = GenesisRoot MP.emptyTriePtr
-          , _bestBlockRoot  = BestBlockRoot MP.emptyTriePtr
-          , _certRoot       = CertRoot MP.emptyTriePtr
-          , _worldBestBlock = Nothing
-          }
+runMemContextM = runMemContextMWith def
 
 runMemContextMWith :: MemContextDBs
                    -> Maybe DebugSettings
@@ -333,30 +353,10 @@ runMemContextMWith :: MemContextDBs
                    -> LoggingT IO (a, MemContext)
 runMemContextMWith cdbs dSettings f = do
   cache <- liftIO $ TRC.new 64
-  let cmemDBs = MemDBs
-        { _stateTxMap      = M.empty
-        , _stateBlockMap   = M.empty
-        , _storageTxMap    = M.empty
-        , _storageBlockMap = M.empty
-        , _certTxMap       = M.empty
-        , _certBlockMap    = M.empty
-        , _stateRoots      = M.empty
-        , _currentBlock    = Nothing
-        }
-      cstate = ContextState
-        { _memDBs            = cmemDBs
-        , _baggerState       = defaultBaggerState
-        , _bestBlockInfo     = Unspecified
-        , _hasBlockstanbul   = False
-        , _blockRequested    = False
-        , _coinbaseQueue     = Q.empty
-        , _txRunResultsCache = cache
-        , _debugSettings     = dSettings
-        }
-      ctx = MemContext
-        { _dbs   = cdbs
-        , _state = cstate
-        }
+  let cstate = def
+             & txRunResultsCache .~ cache
+             & debugSettings .~ dSettings
+      ctx = MemContext cdbs cstate
   ctxRef <- newIORef ctx
   a <- flip runReaderT ctxRef $ do
     MP.initializeBlank

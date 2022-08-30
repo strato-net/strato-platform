@@ -149,6 +149,7 @@ instance (N.NibbleString `A.Alters` N.NibbleString) m => (N.NibbleString `A.Alte
   delete p   = lift . A.delete p
 
 instance ( MonadIO m
+         , MonadLogger m
          , (Maybe Word256 `A.Alters` MP.StateRoot) m
          , (MP.StateRoot `A.Alters` MP.NodeData) m
          , (N.NibbleString `A.Alters` N.NibbleString) m
@@ -193,6 +194,7 @@ instance MonadIO m => HasMemRawStorageDB (VMM m) where
       pure $ s{vmMemDBs=(vmMemDBs s){_storageBlockMap=theMap}}
 
 instance ( MonadIO m
+         , MonadLogger m
          , (Maybe Word256 `A.Alters` MP.StateRoot) m
          , (MP.StateRoot `A.Alters` MP.NodeData) m
          , (N.NibbleString `A.Alters` N.NibbleString) m

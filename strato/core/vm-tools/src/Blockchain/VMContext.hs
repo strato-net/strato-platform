@@ -82,7 +82,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString                    as B
-import           Data.Default                       (def)
+import           Data.Default
 import qualified Data.Map                           as M
 import           Data.Maybe                         (fromMaybe)
 import qualified Data.NibbleString                  as N
@@ -99,8 +99,8 @@ import qualified Network.Kafka                      as K
 import qualified Network.Kafka.Protocol             as K
 import           System.Directory
 import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>), (</>))
-import           Prometheus
 
+import           BlockApps.Init()
 import           BlockApps.Logging
 import           Blockchain.Bagger.BaggerState      (BaggerState, defaultBaggerState)
 import           Blockchain.Blockstanbul.Authentication as Auth
@@ -177,6 +177,18 @@ data MemDBs = MemDBs
   } deriving (Generic, NFData, Show)
 makeLenses ''MemDBs
 
+instance Default MemDBs where
+  def = MemDBs
+    { _stateTxMap      = M.empty
+    , _stateBlockMap   = M.empty
+    , _storageTxMap    = M.empty
+    , _storageBlockMap = M.empty
+    , _certTxMap       = M.empty
+    , _certBlockMap    = M.empty
+    , _stateRoots      = M.empty
+    , _currentBlock    = Nothing
+    }
+
 data ContextState = ContextState
   { _memDBs            :: MemDBs
   , _baggerState       :: !BaggerState
@@ -188,6 +200,18 @@ data ContextState = ContextState
   , _debugSettings     :: Maybe DebugSettings
   } deriving (Generic, NFData)
 makeLenses ''ContextState
+
+instance Default ContextState where
+  def = ContextState
+    { _memDBs            = def
+    , _baggerState       = defaultBaggerState
+    , _bestBlockInfo     = Unspecified
+    , _hasBlockstanbul   = True
+    , _blockRequested    = False
+    , _coinbaseQueue     = Q.empty
+    , _txRunResultsCache = error "Default ContextState: accessing uninitialized txRunResultsCache"
+    , _debugSettings     = Nothing
+    }
 
 data Context = Context
   { _dbs   :: ContextDBs
@@ -269,11 +293,11 @@ gets f = f <$> get
 {-# INLINE gets #-}
 
 put :: ContextState -> ContextM ()
-put c = view state >>= \i -> atomicWriteIORef i c
+put c = view state >>= \i -> atomicModifyIORef' i (const (c, ()))
 {-# INLINE put #-}
 
 modify :: (ContextState -> ContextState) -> ContextM ()
-modify f = view state >>= \i -> atomicModifyIORef i (\a -> (f a, ()))
+modify f = view state >>= \i -> atomicModifyIORef' i (\a -> (f a, ()))
 {-# INLINE modify #-}
 
 modify' :: (ContextState -> ContextState) -> ContextM ()
@@ -483,9 +507,6 @@ instance Mod.Accessible (Maybe WorldBestBlock) ContextM where
     for mRBB $ \(RedisBestBlock sha num diff) ->
       return . WorldBestBlock $ BestBlock sha num diff
 
-instance MonadMonitor (ResourceT (LoggingT IO)) where
-    doIO = liftIO
-
 runTestContextM :: ( MonadIO m
                    , MonadUnliftIO m
                    , HasStateDB (ReaderT Context (ResourceT m))
@@ -594,27 +615,10 @@ runContextM dSettings f = do
             , _sqldb          = conn
             }
 
-      let cmemDBs = MemDBs
-            { _stateTxMap      = M.empty
-            , _stateBlockMap   = M.empty
-            , _storageTxMap    = M.empty
-            , _storageBlockMap = M.empty
-            , _certTxMap       = M.empty
-            , _certBlockMap    = M.empty
-            , _stateRoots      = M.empty
-            , _currentBlock    = Nothing
-            }
-
-      cstate <- newIORef $ ContextState
-            { _memDBs            = cmemDBs
-            , _baggerState       = defaultBaggerState
-            , _bestBlockInfo     = Unspecified
-            , _hasBlockstanbul   = flags_blockstanbul
-            , _blockRequested    = False
-            , _coinbaseQueue     = Q.empty
-            , _txRunResultsCache = cache
-            , _debugSettings     = dSettings
-            }
+      cstate <- newIORef $ def
+                         & txRunResultsCache .~ cache
+                         & debugSettings .~ dSettings
+                         & hasBlockstanbul .~ flags_blockstanbul
 
       let ctx = Context
             { _dbs   = cdbs
