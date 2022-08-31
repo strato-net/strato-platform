@@ -335,7 +335,6 @@ services:
     image: wurstmeister/kafka:1.1.0
     restart: always
     volumes:
-    - /var/run/docker.sock:/var/run/docker.sock
     - kafkadata:/kafka
     logging:
       driver: "json-file"
