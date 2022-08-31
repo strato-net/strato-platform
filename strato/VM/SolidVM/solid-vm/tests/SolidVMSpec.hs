@@ -4639,6 +4639,30 @@ contract qq {
   }
 }|]) `shouldThrow` anyInvalidArgumentsError
 
+  it "return default value for index not present-In-Memory Check" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+
+  bool x;
+  uint y;
+  string z;
+
+  constructor() {
+    mapping(uint=>bool) booleanTest;
+    mapping(uint=>uint) integerTest;
+    mapping(uint=>string) stringTest;
+
+    booleanTest[1] = true;
+    integerTest[1] = 1;
+    stringTest[1] = "testing";
+
+    x = booleanTest[9];
+    y = integerTest[9];
+    z = stringTest[9];
+  }
+}|]
+    getFields ["x","y","z"] `shouldReturn` [BDefault, BDefault, BDefault]
   it "return default value for index not present" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
