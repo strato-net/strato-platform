@@ -27,7 +27,7 @@ contractHelper Contract{..} = storageDefsAnns ++ funcsAnns
         
 
 functionHelper :: Func -> [SourceAnnotation Text]
-functionHelper Func{..} = case funcContents of
+functionHelper Func{..} = case _funcContents of
   Nothing -> []
   Just stmts -> statementsHelper stmts
 
@@ -39,8 +39,8 @@ variableDeclHelper :: (SolidString, VariableDecl) -> SSS [SourceAnnotation Text]
 variableDeclHelper (name, VariableDecl{..}) = do
   s <- get
   case M.lookup name s of
-    Just _  -> pure ["Multiple declaration." <$ varContext]
-    Nothing -> do modify $ M.insert name varContext
+    Just _  -> pure ["Multiple declaration." <$ _varContext]
+    Nothing -> do modify $ M.insert name _varContext
                   pure []
 
 statementsHelper :: [Statement] -> [SourceAnnotation Text]
