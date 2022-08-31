@@ -31,7 +31,7 @@ pipeline {
                                     $class: 'CopyArtifact',
                                     fingerprintArtifacts: true,
                                     flatten: true,
-                                    projectName: "STRATO_autobuild/${AUTOBUILD_JOB_BRANCH_NAME}",
+                                    projectName: "STRATO_autobuild/develop",
                                     selector: [$class: 'StatusBuildSelector'],
                                     filter: "docker-compose.yml",
                                     target: '.',
