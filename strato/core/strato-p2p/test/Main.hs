@@ -2,6 +2,8 @@
 {-# OPTIONS_GHC -fno-warn-overlapping-patterns #-}
 module Main where
 
+import Blockchain.VMOptions()
+import Executable.EVMFlags()
 import HFlags
 import Test.Hspec.Runner
 
