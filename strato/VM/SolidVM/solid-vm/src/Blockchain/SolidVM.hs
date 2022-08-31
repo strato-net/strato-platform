@@ -47,19 +47,14 @@ import           Data.ByteString.Internal             (c2w)
 import           Data.Char                            as CHAR
 import           Data.Either.Extra                    (eitherToMaybe)
 import           Data.List
--- import           Data.List.Utils
 import qualified Data.Map                             as M
 import qualified Data.Map.Merge.Lazy                  as M
 import           Data.Maybe
--- import           Data.Monoid
--- import           Data.Semigroup
 import qualified Data.Sequence                        as Q
 import qualified Data.Set                             as S
 import           Data.Source
--- import           Data.Source.Position
 import qualified Data.Text                            as T
 import qualified Data.Text.Encoding                   as TE
---import qualified Data.List                            as List
 import           Data.Time.Clock.POSIX
 import           Data.Traversable
 import qualified Data.Vector as V
@@ -780,60 +775,6 @@ expressionType (CC.StringLiteral _ _) = SVMType.String $ Just True
 expressionType (CC.ArrayExpression _ xs) = SVMType.Array (expressionType (head xs)) Nothing
 
 expressionType ex = typeError "Cannot deduce a type from" (ex, ex)
-
--- --Enter the needed monad to get the current account value, set the unspecified chain to the current contract's chain Id
--- fixChain :: A.Selectable (Maybe Word256) ParentChainId m => NamedAccount -> Account 
--- fixChain input = namedAccountToAccount cid input
---   where cid = case (input ^. namedAccountChainId) of 
---                 UnspecifiedChain -> do
---                   cid1 <- view accountChainId <$> getCurrentAccount
---                   case cid1 of
---                     Nothing -> Nothing
---                     Just cid2 -> Just cid2
---                 MainChain -> Nothing
---                 ExplicitChain cid -> Just cid
- 
-
---Check if there is ANY relation between the chains
-  --Check a to b & b to a
-  -- This works as Nothing < Just False < Just True
--- biCheckChain :: A.Selectable (Maybe Word256) ParentChainId m => NamedAccount -> NamedAccount -> m (Maybe Bool)
--- biCheckChain a b = getMax <$> fMax (a `checkChain` b) .<>. fMax (b `checkChain` a)
---   where
---     (.<>.) = liftA2 (<>)
---     fMax = fmap Max
-
--- --Check if there is a relationship between account a to b
--- checkChain :: A.Selectable (Maybe Word256) ParentChainId m => Account -> Account`` -> m (Maybe Bool)
--- --If both accounts are explicit chains
--- checkChain (NamedAccount _ (ExplicitChain c1)) (NamedAccount _ (ExplicitChain c2)) = Just <$> Just c1 `isAncestorChainOf` Just c2 --OR c1 == c2
--- --If one chain is main chain and the other is explicit
--- checkChain (NamedAccount _ MainChain) (NamedAccount _ (ExplicitChain c)) = Just <$> Nothing `isAncestorChainOf` Just c
--- checkChain (NamedAccount _ (ExplicitChain c)) (NamedAccount _ MainChain) = Just <$> Just c `isAncestorChainOf` Nothing
--- --If both are main chains
--- checkChain (NamedAccount _ MainChain) (NamedAccount _ MainChain) = Just <$> Nothing `isAncestorChainOf` Nothing
--- --If one chain is an unspecified chain and the other is explicit
--- checkChain (NamedAccount _ UnspecifiedChain) (NamedAccount _ (ExplicitChain _)) = pure Nothing
--- checkChain (NamedAccount _ (ExplicitChain _)) (NamedAccount _ UnspecifiedChain) = pure Nothing
--- --If one chain is unspecified and the other is main chain
--- checkChain (NamedAccount _ MainChain) (NamedAccount _ UnspecifiedChain) = pure Nothing
--- checkChain (NamedAccount _ UnspecifiedChain) (NamedAccount _ MainChain) = pure Nothing
--- --If both are not on any chain then return true (this is largely the case for testing parameters in solidvm)
--- checkChain (NamedAccount _ UnspecifiedChain) (NamedAccount _ UnspecifiedChain) = pure $ Just True
-
--- --Check if there is a relationship between account a to b
--- checkChain :: A.Selectable (Maybe Word256) ParentChainId m => Account -> Account`` -> m (Maybe Bool)
--- --If both accounts are explicit chains
--- checkChain to from = 
---  = Just <$> Just c1 `isAncestorChainOf` Just c2 --OR c1 == c2
-
--- --Convert a namedAccount while filtering out all of the unspecified chains
--- easyNamedAccountToAccount :: NamedAccount -> Account
--- easyNamedAccountToAccount namedAccount = Account (namedAccount ^. namedAccountAddress) (cid)
---   where cid = case (namedAccount ^. namedAccountChainId) of 
---                 UnspecifiedChain -> invalidChain (show $ namedAccount ^. namedAccountAddress)
---                 MainChain -> Nothing
---                 ExplicitChain goodCid -> Just goodCid
 
 callWrapper :: MonadSM m => Account -> Account -> Maybe SolidString -> SolidString -> Bool -> CC.ArgList -> m (Maybe Value)
 callWrapper from to mContract functionName isRCC argExps  = do
@@ -2202,14 +2143,8 @@ expToVar' (CC.FunctionCall _ e args) = do
               ExplicitChain cid -> return $ Just cid
             let toAccount = namedAccountToAccount cid address'
             --check that the from and to are on the same chain`
-            -- case toAccount ^. accountChainId of
-            --   UnspecifiedChain -> liftIO $ putStrLn $ ("++++++++++++++++++++++++++\n" ++ (show (from ^. accountChainId)) ++ "\n++++++++++++++++++++++++++\n" ++ "UNSPECIFIED CHAIN" ++ "\n++++++++++++++++++++++++++\n")
-            --   MainChain -> liftIO $ putStrLn $ ("++++++++++++++++++++++++++\n" ++ (show (from ^. accountChainId)) ++ "\n++++++++++++++++++++++++++\n" ++ ("MAINCHAIN") ++ "\n++++++++++++++++++++++++++\n")
-            --   ExplicitChain cha -> liftIO $ putStrLn $ ("++++++++++++++++++++++++++\n" ++ (show (from ^. accountChainId)) ++ "\n++++++++++++++++++++++++++\n" ++ (show cha) ++ "\n++++++++++++++++++++++++++\n")
             isRelated <- (from ^. accountChainId) `isAncestorChainOf` (toAccount ^. accountChainId)
-            -- when ()
             unless (isRelated) $ inaccessibleChain (show from) (show toAccount <> " " <> show isRelated)
-            -- let realAddress = easyNamedAccountToAccount address' --This is also the name of the to account
             -- Collect a potential item to search
             searchTerms <- case argVals of
                 -- catch only the SStrings
@@ -2225,11 +2160,9 @@ expToVar' (CC.FunctionCall _ e args) = do
                   case (fromMaybe "" searchTerms) of 
                     --Unparse just the contract
                     "" -> [unparseContract contract]
-                          
                     term ->
                     --Search the full contract for the search term, retrieving the sourceAnnotation location of the part that was found
                       -- Check for and get the different parts of the contract
-                      --Not Working
                       let contrString = 
                             case ((contract ^. CC.contractName) == term) of
                               True -> Just $ unparseContract contract
