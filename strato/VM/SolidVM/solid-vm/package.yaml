@@ -53,6 +53,7 @@ library:
   - vm-tools
 
 
+
 executables:
   exprs-needed:
     source-dirs: exec_src
@@ -99,6 +100,8 @@ tests:
       - time
       - vm-tools
       - utf8-string
+      - test-framework
+      - QuickCheck
 
 benchmarks:
     codebench:

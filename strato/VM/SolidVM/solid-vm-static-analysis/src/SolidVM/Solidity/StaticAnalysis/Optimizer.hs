@@ -4,7 +4,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 module SolidVM.Solidity.StaticAnalysis.Optimizer
-  ( detector
+  ( detector,
+    optimizeExpression,
+    varDeclHelper
   ) where
 
 import           Control.Lens
@@ -12,13 +14,13 @@ import           Control.Monad.Reader
 import           Data.Functor.Compose
 import           Data.Maybe (fromMaybe)
 import           SolidVM.Model.CodeCollection
-
+import Debug.Trace
 data R = R ()
 
 detector :: CodeCollection -> CodeCollection
-detector = over (contracts . mapped) contractHelper
-         . over (flFuncs . mapped) functionHelper
-         . over (flConstants . mapped) constDeclHelper
+detector cc = trace ("OG CODE COLLECTION\n\t" ++(show cc)) (over (contracts . mapped) contractHelper cc)
+         -- . over (flFuncs . mapped) functionHelper
+         -- . over (flConstants . mapped) constDeclHelper
 
 contractHelper :: Contract
                -> Contract

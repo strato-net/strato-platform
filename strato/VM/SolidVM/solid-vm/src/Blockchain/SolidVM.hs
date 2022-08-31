@@ -21,6 +21,7 @@ module Blockchain.SolidVM
   ( SolidVMBase
   , call
   , create
+  , expToVar
   ) where
 
 import           Control.DeepSeq                      (force)
