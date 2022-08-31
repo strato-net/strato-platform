@@ -3797,7 +3797,7 @@ contract qq{
   string codeHashTest;
   constructor() public {
     Test t = new Test();
-    codeHashTest = account(t,).codehash;
+    codeHashTest = account(t).codehash;
   }
 }|]
     runBS contract
@@ -3856,7 +3856,7 @@ contract qq{
 --     getFields ["codePiece", "ch", "ci"] `shouldReturn`
 --       [ BString $ UTF8.fromString testCode, BDefault, BDefault]
 
-  fit "can get structs from the '.code' function" . runTest $ do
+  it "can get structs from the '.code' function" . runTest $ do
     let testCode :: String
         testCode = [r|struct point {
   uint x;
@@ -3870,8 +3870,6 @@ contract Test {
   uint bana = 13;
   uint x = 6;
   uint y = 7;
-  string codeTest1;
-  string ci1;
   struct point {
     uint x;
     uint y;
@@ -3882,17 +3880,16 @@ contract Test {
 
 contract qq {
   string codePiece = "";
-  string codeTest2;
-  int ci2;
   constructor () {
-    codePiece = account(this).code("");
+    Test t = new Test();
+    codePiece = account(t).code("point");
   }
 }|]
-    runBSBeef codeSnippet
-    getFields [ "codePiece", "ci2" ] `shouldReturn`
-      [ BString $ UTF8.fromString testCode, BDefault]
+    runBS codeSnippet
+    getFields [ "codePiece" ] `shouldReturn`
+      [ BString $ UTF8.fromString testCode]
 
-  fit "can get overloaded function using the .code parameter" . runTest $ do
+  it "can get overloaded function using the .code parameter" . runTest $ do
     let testCode :: String
         testCode = [r|function addToNum (uint x, uint y) public {
     myNum += x + y;
@@ -3946,7 +3943,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString testCode]
 
-  xit "can get events from the '.code' function" . runTest $ do
+  it "can get events from the '.code' function" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|event x(
     uint v);
@@ -3973,7 +3970,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
-  xit "can get external modifiers using the '.code' function" . runTest $ do
+  it "can get external modifiers using the '.code' function" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|modifier anotherModifier() {
         require(x == 4,string.concat("x is not 4 : ",string(x)));
@@ -4017,7 +4014,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
-  xit "can get the code for a contract if supplied an empty string" . runTest $ do
+  it "can get the code for a contract if supplied an empty string" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|contract Test {
   
@@ -4044,7 +4041,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
-  xit "can search for an enum body within a codeCollection using .code" . runTest $ do
+  it "can search for an enum body within a codeCollection using .code" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|enum FreshJuiceSize {
   SMALL,
@@ -4070,7 +4067,7 @@ contract qq {
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
-  xit "can search for any public variable in a contract initialized value using .code" . runTest $ do
+  it "can search for any public variable in a contract initialized value using .code" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|uint public testVar = 1;
 |]
@@ -4094,7 +4091,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
-  xit "can search for a constant and get its initial code. using .code" . runTest $ do
+  it "can search for a constant and get its initial code. using .code" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|uint public constant testConst = 136546546541654654324765441651684354646468435468;
 |]
@@ -4119,7 +4116,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
-  xit "can get the current contract code without supplying anything to the code using .code" . runTest $ do
+  it "can get the current contract code without supplying anything to the code using .code" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|
 pragma solidvm 3.2;
@@ -4154,7 +4151,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
-  xit "Code won't return anything if the thing is not in the file, using .code" . runTest $ do
+  it "Code won't return anything if the thing is not in the file, using .code" . runTest $ do
     let contract :: String
         contract = [r|
 pragma solidvm 3.3;
@@ -4174,7 +4171,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BDefault ]
 
-  xit "Can search for the contract in a given file using the search procedure using .code" . runTest $ do
+  it "Can search for the contract in a given file using the search procedure using .code" . runTest $ do
     let contractqq :: String
         contractqq = [r|contract qq {
   string codeTest;
@@ -4203,7 +4200,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString contractqq]
 
-  xit "can properly add the final } to a contract without a constructor using the code member function using .code" . runTest $ do
+  it "can properly add the final } to a contract without a constructor using the code member function using .code" . runTest $ do
     let myContract :: String
         myContract = [r|contract Test {
   uint sixtyNine = 69;
@@ -4229,7 +4226,7 @@ contract qq {
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString myContract]
 
-  xit "can properly add the final } to a contract with a constructor but information after the constructor using the code member function using .code" . runTest $ do
+  it "can properly add the final } to a contract with a constructor but information after the constructor using the code member function using .code" . runTest $ do
     let myContract :: String
         myContract = [r|contract Test {
   uint seventyNine = 79;
@@ -4264,7 +4261,7 @@ contract qq {
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString myContract]
 
-  xit "Can find a function within a codeCollection using .code" . runTest $ do
+  it "Can find a function within a codeCollection using .code" . runTest $ do
     let myFunxion :: String
         myFunxion = [r|function myFunction () public returns (uint ) {
     uint x = 13;
@@ -4302,7 +4299,7 @@ contract qq {
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString myFunxion]
 
-  xit "Can avoid getting confused if two functions with the same name are in the same codeCollection using .code" . runTest $ do
+  it "Can avoid getting confused if two functions with the same name are in the same codeCollection using .code" . runTest $ do
     let myFunxion :: String
         myFunxion = [r|function myFunction () public returns (uint ) {
     uint x = 13;
@@ -4349,7 +4346,7 @@ contract qq {
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString myFunxion]
 
-  xit "Can get just the contract if empty string is fed to the code function. using .code" . runTest $ do
+  it "Can get just the contract if empty string is fed to the code function. using .code" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|contract Test {
   
@@ -4380,7 +4377,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
-  xit "Can throw an error if more than one item is given to the code member function, using .code" $ (runTest (runBS [r|
+  it "Can throw an error if more than one item is given to the code member function, using .code" $ (runTest (runBS [r|
 pragma solidvm 3.3;
 contract Test {
   constructor(){}
