@@ -110,6 +110,7 @@ runFromStateRoot mineTransactions remainingGas theBlockHeader txs = do
         Just f@TFChainIdMismatch{} -> recoverable f
         Just f@TFNonceMismatch{} -> error $ "mineTransactions' we messed up: " ++ format f
         Just f@TFCodeCollectionNotFound{} -> recoverable f
+        Just f@TFInvalidPragma{} -> recoverable f
 
 rewardCoinbases :: MonadBagger m => Address -> [DD.BlockData] -> Integer -> m StateRoot -- miner coinbase -> known uncles -> this block number -> stateRoot
 rewardCoinbases us uncles ourNumber = do
@@ -197,6 +198,8 @@ baggerRejectionToTransactionResultBits rejection = case rejection of
         (p s q ++ formatKeccak256WithoutColor hashBetter ++ " being a more lucrative transaction", hashWorse)
     CodeNotFound s q a n OutputTx{otHash=h} ->
         (p s q ++ " code not found at address " ++ format a ++ " with name " ++ n, h)
+    InvalidPragma s q pragma OutputTx{otHash=hsh} ->
+        (p s q ++ " invalid pragma " ++ pragma, hsh)
 
     where p stage queue = "Rejected from mempool at " ++ show stage ++ "/" ++ show queue ++ " due to "
           p' s q        = p s q ++ "low "

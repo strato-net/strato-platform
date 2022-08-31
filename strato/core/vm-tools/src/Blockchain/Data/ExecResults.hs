@@ -78,5 +78,6 @@ errorResults ck remainingGas e =
     , erException = Just e
     , erKind = ck
     , erNewX509Certs = M.empty
+    , erPragmas=[]
     }
 

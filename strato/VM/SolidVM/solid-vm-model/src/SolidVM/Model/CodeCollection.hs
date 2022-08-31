@@ -15,7 +15,7 @@ module SolidVM.Model.CodeCollection (
   flStructs,
   flEnums,
   flErrors,
-  
+  pragmas,  
   module SolidVM.Model.CodeCollection.Contract,
   --module SolidVM.Model.CodeCollection.Def,
   module SolidVM.Model.CodeCollection.Function,

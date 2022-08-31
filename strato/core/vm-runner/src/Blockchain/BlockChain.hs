@@ -320,9 +320,15 @@ mineTransactions' header remGas ran unran@(tx:txs) = do
           flushMemStorageTxDBToBlockDB
 
           Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.union (erNewX509Certs execResult) beforeX509s
-          mineTransactions' header nextRemGas (ran `DL.snoc` trr) txs erPragmas
+          let supportedPragmas = [("svm","3.0"),("svm","3.2"),("svm","3.3")]
+              findInvalidPragmas pragma = if pragma `elem` supportedPragmas then id else (pragma:)
+              invalidPragmasUsed = foldr findInvalidPragmas [] erPragmas
+           in if not $ null invalidPragmasUsed
+                 then return $ Bagger.TxMiningResult (Just $ InvalidPragma ...) ... -- use invalidPragmasUsed here
+                 else mineTransactions' header nextRemGas (ran `DL.snoc` trr) txs
+
         Left  failure    -> do Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) beforeX509s -- revert changes to X509 map
-                               return $ Bagger.TxMiningResult (Just $ InvalidPragma ...) (DL.toList ran) unran remGas
+                               return $ Bagger.TxLeft MiningResult (Just failure) (DL.toList ran) unran remGas
 
 
 blockIsHomestead :: Integer -> Bool
