@@ -2,10 +2,6 @@
 #strato-getting-started-min-version:2.7
 version: "3"
 volumes:
-  blocdata:
-    driver: local
-  dapps:
-    driver: local
   pgdata:
     driver: local
   prometheusdata:
