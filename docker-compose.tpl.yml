@@ -18,11 +18,6 @@ volumes:
     driver: local
   zookeeperdata:
     driver: local
-networks:
-  static:
-    ipam:
-      config:
-        - subnet: 172.20.0.0/16
 services:
   smd:
     depends_on:
@@ -42,11 +37,8 @@ services:
       options:
         max-size: "100m"
         max-file: "3"
-    networks:
-      static:
-        ipv4_address: 172.20.20.1
   apex:
-    depends_on:
+    links:
     - postgres
     - prometheus
     - strato
@@ -72,9 +64,6 @@ services:
       options:
         max-size: "100m"
         max-file: "3"
-    networks:
-      static:
-        ipv4_address: 172.20.20.2
   redis:
     command: [redis-server, --appendonly, "yes"]
     image: redis:3.2
@@ -84,13 +73,10 @@ services:
       options:
         max-size: "100m"
         max-file: "3"
-    networks:
-      static:
-        ipv4_address: 172.20.20.5
     volumes:
       - redisdata:/data
   vault-wrapper:
-    depends_on:
+    links:
     - postgres
     environment:
     - keyStoreCacheTimeout=${keyStoreCacheTimeout:-60}
@@ -108,11 +94,8 @@ services:
       options:
         max-size: "100m"
         max-file: "3"
-    networks:
-      static:
-        ipv4_address: 172.20.20.6
   strato:
-    depends_on:
+    links:
     - kafka
     - postgres
     - redis
@@ -201,13 +184,10 @@ services:
       options:
         max-size: "100m"
         max-file: "3"
-    networks:
-      static:
-        ipv4_address: 172.20.20.7
     volumes:
       - stratodata:/var/lib/strato
   postgrest:
-    depends_on:
+    links:
     - postgres
     environment:
     - blocHost=${blocHost:-strato:3000}
@@ -225,9 +205,6 @@ services:
       options:
         max-size: "100m"
         max-file: "3"
-    networks:
-      static:
-        ipv4_address: 172.20.20.8
   postgres:
     environment:
       - POSTGRES_PASSWORD=${postgres_password:-api}
@@ -246,12 +223,10 @@ services:
       options:
         max-size: "100m"
         max-file: "3"
-    networks:
-      static:
-        ipv4_address: 172.20.20.9
   nginx:
-    depends_on:
+    links:
     - apex
+    - docs
     - postgrest
     - prometheus
     - smd
@@ -288,9 +263,6 @@ services:
       options:
         max-size: "100m"
         max-file: "3"
-    networks:
-      static:
-        ipv4_address: 172.20.20.10
   docs:
     environment:
     - API_URL=/strato-api/eth/v1.2/swagger.json
@@ -301,9 +273,6 @@ services:
       options:
         max-size: "100m"
         max-file: "3"
-    networks:
-      static:
-        ipv4_address: 172.20.20.11
   zookeeper:
     image: wurstmeister/zookeeper:3.4.6
     restart: always
@@ -314,11 +283,8 @@ services:
       options:
         max-size: "100m"
         max-file: "3"
-    networks:
-      static:
-        ipv4_address: 172.20.20.12
   kafka:
-    depends_on:
+    links:
     - zookeeper
     environment:
       KAFKA_ADVERTISED_HOST_NAME: kafka
@@ -341,9 +307,6 @@ services:
       options:
         max-size: "100m"
         max-file: "3"
-    networks:
-      static:
-        ipv4_address: 172.20.20.13
   prometheus:
     build: .
     environment:
@@ -357,6 +320,3 @@ services:
       options:
         max-size: "100m"
         max-file: "3"
-    networks:
-      static:
-        ipv4_address: 172.20.20.14
