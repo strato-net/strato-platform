@@ -31,6 +31,7 @@ module Blockchain.VM.SolidException
   , tooMuchGas
   , paymentError
   , reservedWordError
+  , revertError
   , immutableError
   ) where
 
@@ -48,6 +49,7 @@ data SolidException = TypeError String String
                     | IndexOutOfBounds String String
                     | TODO String String
                     | MissingField String String
+                    | RevertError String String
                     | CustomError String String [B.BasicValue]
                     | MissingType String String
                     | DuplicateDefinition String String
@@ -82,6 +84,7 @@ showSolidException (InvalidArguments m v) = printf "invalid arguments: %s: %s" m
 showSolidException (IndexOutOfBounds a b)= printf "index out of bounds: %s: %s" a b
 showSolidException (MissingField m v) = printf "missing field: %s: %s" m v
 showSolidException (MissingType m v) = printf "missing type: %s: %s" m v
+showSolidException (RevertError m v) = printf "revert: %s %s:" m v
 showSolidException (DuplicateDefinition m v) = printf "duplicate definition: %s: %s" m v
 showSolidException (ParseError m v) = printf "parse error: %s: %s" m v
 showSolidException (ModifierError m v) = printf "modifier error: %s: %s" m v
@@ -126,6 +129,9 @@ indexOutOfBounds = toThrower IndexOutOfBounds
 
 missingField :: (Show v) => String -> v -> a
 missingField = toThrower MissingField
+
+revertError :: (Show v) =>  String -> v -> a
+revertError = toThrower RevertError
 
 customError :: String -> String -> [B.BasicValue] -> a
 customError msg nm vals = throw $ CustomError msg nm vals

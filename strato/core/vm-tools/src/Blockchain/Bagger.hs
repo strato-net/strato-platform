@@ -26,7 +26,6 @@ import           Data.Time.Clock
 import           Data.Time.Clock.POSIX              (posixSecondsToUTCTime, utcTimeToPOSIXSeconds)
 import qualified Data.Set                           as S
 import           Data.Word
-import           Numeric                            (readHex)
 
 import           BlockApps.Logging
 import           Blockchain.Constants
@@ -46,8 +45,8 @@ import           Blockchain.DB.ChainDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.ModifyStateDB
 import           Blockchain.DB.StorageDB
+import           Blockchain.DB.X509CertDB           (migrateBlockHeaderCertDB)
 import           Blockchain.Database.MerklePatricia (StateRoot (..))
-import qualified Blockchain.EthConf                 as Conf
 import           Blockchain.Sequencer.Event         (OutputBlock (..), OutputTx (..))
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
@@ -249,6 +248,7 @@ processNewBestBlock bh bd txShas = do
                                        }
     putBaggerState $ state { B.seen = S.empty, B.miningCache = newMiningCache }
     migrateBlockHeader bd baggerBlockHash
+    migrateBlockHeaderCertDB bd baggerBlockHash
     withBagger $ do
       demoteUnexecutables
       promoteExecutables
@@ -553,9 +553,6 @@ buildFromMiningCache = do
                        , obBlockData = rewardedBlockData
                        }
 
-ourCoinbase :: Address
-ourCoinbase = fromInteger . fst . head . readHex . Conf.coinbaseAddress . Conf.quarryConfig $ Conf.ethConf
-
 buildNextBlockHeader :: DD.BlockData
                      -> Keccak256
                      -> [DD.BlockData]
@@ -574,7 +571,7 @@ buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT co
         in DD.BlockData { DD.blockDataParentHash       = parentHash
                         , DD.blockDataUnclesHash       = V.ommersVerificationValue uncles
                         -- TODO: when `isPBFT`, coinbase and nonce should be set from a queue of pending votes
-                        , DD.blockDataCoinbase         = if isPBFT then coinbaseAddr else ourCoinbase
+                        , DD.blockDataCoinbase         = coinbaseAddr -- TODO?: Removed case for PoW because it relied on ethConf, but should really come from Vault now
                         , DD.blockDataStateRoot        = stateRoot
                         , DD.blockDataTransactionsRoot = V.transactionsVerificationValue (otBaseTx <$> txs)
                         , DD.blockDataReceiptsRoot     = V.receiptsVerificationValue ()

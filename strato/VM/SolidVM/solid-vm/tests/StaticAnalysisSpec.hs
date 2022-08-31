@@ -19,6 +19,7 @@ import qualified SolidVM.Solidity.StaticAnalysis.Statements.UninitializedLocalVa
 import qualified SolidVM.Solidity.StaticAnalysis.Statements.WriteAfterWrite             as WriteAfterWrite
 import           SolidVM.Solidity.StaticAnalysis.Types
 import qualified SolidVM.Solidity.StaticAnalysis.Variables.StateVariables               as StateVariables
+import qualified SolidVM.Solidity.StaticAnalysis.Statements.MultipleDeclarations        as MultipleDeclarations
 import           Test.Hspec
 import           Text.RawString.QQ
 
@@ -539,3 +540,18 @@ contract A {
 }
 |]
        in length anns `shouldBe` 1
+
+
+    it "can detect duplicate declarations" $
+      let anns = MultipleDeclarations.detector `forContract` [r|
+contract A {
+  function hey(){
+    y = 0;
+    x = "hello";
+    uint z = 0;
+    uint m = 1;
+    uint z = 2;
+  }
+}
+|]
+      in length anns `shouldBe` 1

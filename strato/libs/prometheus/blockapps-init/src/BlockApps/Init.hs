@@ -1,16 +1,26 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module BlockApps.Init ( blockappsInit ) where
 
+import BlockApps.Logging (LoggingT)
 import Control.Concurrent
 import Control.Monad
+import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Trans.Resource (ResourceT)
 import Data.List (intercalate)
 import Data.Text hiding (intercalate)
 import Foreign hiding (void)
 import Foreign.C
 import GHC.Environment
+import Prometheus
 import System.IO
 import System.Posix.Signals
 
 import Blockapps.Crossmon
+
+instance MonadMonitor (ResourceT (LoggingT IO)) where
+    doIO = liftIO
 
 foreign import ccall unsafe "execvp"
   c_execvp :: CString -> Ptr CString -> IO CInt

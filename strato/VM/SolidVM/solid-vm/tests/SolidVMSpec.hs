@@ -80,6 +80,10 @@ anyParseError :: Selector HandledException
 anyParseError (HE ParseError{}) = True
 anyParseError _ = False
 
+anyRevertError :: Selector HandledException
+anyRevertError (HE Blockchain.SolidVM.Exception.RevertError{}) = True
+anyRevertError _ = False
+
 anyUnknownFunc :: Selector HandledException
 anyUnknownFunc (HE UnknownFunction{}) = True
 anyUnknownFunc _ = False
@@ -203,7 +207,7 @@ devNull _ _ _ _ = return ()
 runTest :: ContextM a -> IO ()
 runTest f = do
   let timeout = 5000000
-  result <- race (threadDelay timeout) $ runLoggingT (runTestContextM f)
+  result <- race (threadDelay timeout) $ runLoggingT (runTestContextM $ withCurrentBlockHash zeroHash f)
   case result of
     Left{} -> expectationFailure $ printf "test case timed out after %ds" (timeout `div` 1000000)
     Right{} -> return ()
@@ -5573,6 +5577,105 @@ contract qq {
   }
 }|]) `shouldThrow` anyTypeError
 
+  it "revert sucessfully when invoked without arguments" $ runTest (do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  
+  uint a;
+  
+  constructor()
+  {
+    a=1;
+    randomFunction(1);
+  }
+
+  function randomFunction(uint checker)
+  {
+    if(a==checker)
+      revert(); 
+  } 
+}|]) `shouldThrow` anyRevertError
+
+  it "revert sucessfully when invoked with arguments" $ runTest (do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  
+  uint a;
+  
+  constructor()
+  {
+    a=1;
+    randomFunction(1);
+  }
+
+  function randomFunction(uint checker)
+  {
+    if(a==checker)
+      revert("logic flag"); 
+  } 
+}|]) `shouldThrow` anyRevertError
+
+  it "revert sucessfully when invoked with namedargs" $ runTest (do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  
+  uint a;
+  
+  constructor()
+  {
+    a=1;
+    randomFunction(1);
+  }
+
+  function randomFunction(uint checker)
+  {
+    if(a==checker)
+      revert({x:"logic flag"}); 
+  } 
+}|]) `shouldThrow` anyRevertError
+
+  it "Revert customError" $ runTest (do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  
+  uint a;
+  error f (string message);
+  constructor()
+  {
+    a=1;
+    randomFunction(1);
+  }
+
+  function randomFunction(uint checker)
+  {
+    if(a==checker)
+      revert f("ERROR"); 
+  } 
+}|]) `shouldThrow` anyCustomError
+
+  it "Revert customError  namedargs" $ runTest (do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  
+  uint a;
+  error f(string x,string y);
+  constructor()
+  {
+    a=1;
+    randomFunction(1);
+  }
+
+  function randomFunction(uint checker)
+  {
+    if(a==checker)
+      revert f({x:'a',y:'b'}); 
+  } 
+}|]) `shouldThrow` anyCustomError
 
   it "Supports pure functions in 3.3" . runTest $ do
     runBS [r|
@@ -5970,6 +6073,19 @@ contract A {
 contract B {
   function f() {
     x = 8;
+  }
+}
+|]) `shouldThrow` anyTypeError
+
+
+  it "can detect duplicate declarations" $ (runTest $
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  function f(){
+    uint x = 9;
+    uint y = 4;
+    uint x = 7;
   }
 }
 |]) `shouldThrow` anyTypeError
