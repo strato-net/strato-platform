@@ -6141,7 +6141,7 @@ contract qq {
     getAll [[Field "a"], [Field "b"]] `shouldReturn` [BDefault,BDefault]
 
 
-  fit "can get code from other contracts using type function" . runTest $ do
+  it "can get code from other contracts using type function" . runTest $ do
     runBS [r|
 pragma solidvm 3.3;
 
@@ -6166,7 +6166,7 @@ contract C {
       , BString "contract B {\n  string cc = type(qq).creationCode;\n  // no constructor found\n}"
       , BString "C"]
 
-  fit "can detect when referencing a contract not at file level using type function" $ (runTest $
+  it "can detect when referencing a contract not at file level using type function" $ (runTest $
     runBS [r|
 pragma solidvm 3.2;
 contract A {

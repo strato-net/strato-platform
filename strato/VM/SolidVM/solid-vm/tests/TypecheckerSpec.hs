@@ -1271,7 +1271,7 @@ contract C {
 |]
     in length anns `shouldBe` 0
   
-  fit "type(C).name, type(C).creationCode, type(C).runtimeCode only produce strings" $
+  it "type(C).name, type(C).creationCode, type(C).runtimeCode only produce strings" $
     let anns = runTypechecker [r|
 contract A {
   int endofunctor1   = type(A).name;
