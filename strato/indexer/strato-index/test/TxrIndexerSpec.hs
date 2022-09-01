@@ -4,6 +4,7 @@ module TxrIndexerSpec where
 
 import qualified Data.ByteString.Char8              as C8
 import           Data.Either
+import           Data.Maybe
 
 import           Test.Hspec
 
@@ -11,6 +12,7 @@ import           BlockApps.X509.Certificate
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Enode
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Indexer.Model
 import           Blockchain.Strato.Indexer.TxrIndexer
 
