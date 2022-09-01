@@ -16,7 +16,7 @@ import           Data.Maybe (fromMaybe)
 import           SolidVM.Model.CodeCollection
 import           SolidVM.Solidity.Parse.UnParser
 
-import           Blockchain.SolidVM.Exception
+--import           Blockchain.SolidVM.Exception
 
 data R = R
   { codeCollection :: CodeCollection
@@ -224,8 +224,8 @@ optimizeExpression (MemberAccess loc base fieldName) = do
         then case fieldName of 
           "name" -> pure $ (StringLiteral spot nam)
           --"int"  -> pure $ ()--To Implement for another ticket
-          "creationCode" -> pure $ case M.lookup nam (_contracts cc) of Just contract -> (StringLiteral spot (unparseContract  contract)); _ -> (internalError "named arguements do not work with type function" ())  -- OLD FAKE VALUE TO GET GET COMPILE -> (StringLiteral spot "contract qq { int a = 12 }") 
-          "runtimeCode" ->  pure $ case M.lookup nam (_contracts cc) of Just contract -> (StringLiteral spot (unparseContract  contract)); _ -> (internalError "named arguements do not work with type function" ())
+          "creationCode" -> pure $ case M.lookup nam (_contracts cc) of Just contract -> (StringLiteral spot (unparseContract  contract));  _ -> (error " Attaining creation code failed." ())  -- OLD FAKE VALUE TO GET GET COMPILE -> (StringLiteral spot "contract qq { int a = 12 }") 
+          "runtimeCode" -> pure $ (MemberAccess loc base fieldName)  -- pure $ case M.lookup nam (_contracts cc) of Just contract -> (StringLiteral spot (unparseContract  contract)); _ -> (internalError "named arguements do not work with type function" ())
           _ -> (error "Invalid args or unimplemented feature" ()) --TODO should have more specialized error-- Ask someone
         else  pure $ (error "Contract not on file level" ()) --TODO should have more specialized error-- Ask someone
     (FunctionCall _ (Variable _ "type") (NamedArgs _)) -> (error "named arguements do not work with type function" ())
