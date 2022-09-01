@@ -68,7 +68,7 @@ withAnnotations f = first unwind . f
         unwind (TCEx errs) = errs
 
 parseSource :: T.Text -> T.Text -> Either ParseTypeCheckOrSolidVMError [SourceUnit]
-parseSource fileName src = bimap PEx unsourceUnits $ runParser solidityFile (ParserState "" "") (T.unpack fileName) (T.unpack src)
+parseSource fileName src = bimap PEx unsourceUnits $ runParser solidityFile (ParserState "" "" M.empty) (T.unpack fileName) (T.unpack src)
 
 parseSourceWithAnnotations :: T.Text -> T.Text -> Either [SourceAnnotation T.Text] [SourceUnit]
 parseSourceWithAnnotations = withAnnotations . parseSource
@@ -78,6 +78,7 @@ compileSourceNoInheritance initCodeMap = do
   let getNamedSUnits :: T.Text -> T.Text -> Either ParseTypeCheckOrSolidVMError [(SolidString, SUnitIntermediary)]
       getNamedSUnits fileName src = do
         sourceUnits <- parseSource fileName src
+        let userDefinedFromFile = M.fromList $ map (\(Alias _ alias typ) -> (alias, typ) ) $ filter (\x -> case x of (Alias _ _ _) -> True; _ -> False;) sourceUnits
         let pragmas = \case
               Pragma _ n v -> Just (n, v)
               _ -> Nothing
@@ -85,7 +86,7 @@ compileSourceNoInheritance initCodeMap = do
         fmap catMaybes . for sourceUnits $ \case
           NamedXabi name (xabi, parents') -> do
             ctrct <- first SVMEx
-                   $ xabiToContract (textToLabel name) (map textToLabel parents') vmVersion' xabi
+                   $ xabiToContract (textToLabel name) (map textToLabel parents') vmVersion' userDefinedFromFile xabi
             pure $ Just $ (textToLabel name, Con ctrct)
           FLFunc name fdec -> do
             pure $ Just $ (name, FLF fdec)

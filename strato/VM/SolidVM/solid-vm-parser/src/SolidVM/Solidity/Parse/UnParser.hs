@@ -46,6 +46,7 @@ unparseSourceUnit (FLConstant name conDecl) = (("\n    " <>) . unparseConstant) 
 unparseSourceUnit (FLStruct name decl) = (("\n    " <>) . unparseTypes) (Text.unpack name, decl)
 unparseSourceUnit (FLEnum name decl) = (("\n    " <>) . unparseTypes) (Text.unpack name, decl)
 unparseSourceUnit (FLError name args) = (("\n    " <>) . unparseTypes) (Text.unpack name, args)
+unparseSourceUnit (Alias _ ident orignal) = "type \"" ++ ident ++" "++ orignal ++ "\";\n"
 unparseSourceUnit (DummySourceUnit) = "DummySourceUnit"
 unparseSourceUnit (NamedXabi name (contract,inherited)) =
      (case _xabiKind contract of
