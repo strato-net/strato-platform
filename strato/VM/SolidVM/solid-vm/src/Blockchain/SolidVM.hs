@@ -2127,85 +2127,92 @@ expToVar' (CC.FunctionCall _ e args) = do
             return . Constant $ SBool success
 
           Constant (SContractItem address' "code") -> do
-            --Only get the items if they are in the same chain as the current contract, this will prevent leaks from private chains
-            from <- getCurrentAccount
-            -- let namedFrom = accountToNamedAccount' from --convert to a namedAccount to verify everything is on the correct chain
-            --If address' chainId is unset then we set to the current chainId
-              -- Get the code at the address
-            cid <- case (address' ^. namedAccountChainId) of 
-              UnspecifiedChain -> do
-                --Assume that the chainId is the same as the from chainId when it is unset 
-                cid1 <- view accountChainId <$> getCurrentAccount
-                case cid1 of
-                  Nothing -> return Nothing
-                  Just cid2 -> return $ Just cid2
-              MainChain -> return Nothing
-              ExplicitChain cid -> return $ Just cid
-            let toAccount = namedAccountToAccount cid address'
-            --check that the from and to are on the same chain`
-            isRelated <- (from ^. accountChainId) `isAncestorChainOf` (toAccount ^. accountChainId)
-            unless (isRelated) $ inaccessibleChain (show from) (show toAccount <> " " <> show isRelated)
-            -- Collect a potential item to search
-            searchTerms <- case argVals of
-                -- catch only the SStrings
-                OrderedVals [SString arguments] -> pure $ Just arguments
-                -- Throw an error if too many arguments are passed
-                OrderedVals as | length as > 1 -> tooManyCooks 1 (length as)
-                --If nothing was given or something else, then just return the entire code
-                _ -> pure $ Nothing    
-            --get only the contract containing the sweet succulent ContractF definition
-            (contract, _, _) <- getCodeAndCollection toAccount
-            let codeSnippets :: [String]
-                codeSnippets = 
-                  case (fromMaybe "" searchTerms) of 
-                    --Unparse just the contract
-                    "" -> [unparseContract contract]
-                    term ->
-                    --Search the full contract for the search term, retrieving the sourceAnnotation location of the part that was found
-                      -- Check for and get the different parts of the contract
-                      let contrString = 
-                            case ((contract ^. CC.contractName) == term) of
-                              True -> Just $ unparseContract contract
-                              False -> Nothing
+            --Prevent stateroot mismatches as the other .code member is was introduced earlier and this is an extension
+            cntrct <- getCurrentContract
+            if (CC._vmVersion cntrct /= "svm3.3") then do
+              typeError "illegal member access: svm3.3+ required to use advance .code member" ("parsed as " ++ show address' ++ ".code")
+            else do
+              --Only get the items if they are in the same chain as the current contract, this will prevent leaks from private chains
+              from <- getCurrentAccount
+              -- let namedFrom = accountToNamedAccount' from --convert to a namedAccount to verify everything is on the correct chain
+              --If address' chainId is unset then we set to the current chainId
+                -- Get the code at the address
+              cid <- case (address' ^. namedAccountChainId) of 
+                UnspecifiedChain -> do
+                  --Assume that the chainId is the same as the from chainId when it is unset 
+                  cid1 <- view accountChainId <$> getCurrentAccount
+                  case cid1 of
+                    Nothing -> return Nothing
+                    Just cid2 -> return $ Just cid2
+                MainChain -> return Nothing
+                ExplicitChain cid -> return $ Just cid
+              let toAccount = namedAccountToAccount cid address'
+              --check that the from and to are on the same chain`
+              isRelated <- (from ^. accountChainId) `isAncestorChainOf` (toAccount ^. accountChainId)
+              unless (isRelated) $ inaccessibleChain (show from) (show toAccount <> " " <> show isRelated)
+              -- Collect a potential item to search
+              searchTerms <- case argVals of
+                  -- catch only the SStrings
+                  OrderedVals [SString arguments] -> pure $ Just arguments
+                  -- Throw an error if too many arguments are passed
+                  OrderedVals as | length as > 1 -> tooManyCooks 1 (length as)
+                  --If nothing was given or something else, then just return the entire code
+                  _ -> pure $ Nothing    
+              --get only the contract containing the sweet succulent ContractF definition
+              (contract, _, _) <- getCodeAndCollection toAccount
+              --filter out any foreign contracts that are not the correct pragma
+              when (contract ^. CC.vmVersion /= "svm3.3") $ oldForeignPragmaError (show $ contract ^. CC.contractName) (show $ contract ^. CC.vmVersion)
+              let codeSnippets :: [String]
+                  codeSnippets = 
+                    case (fromMaybe "" searchTerms) of 
+                      --Unparse just the contract
+                      "" -> [unparseContract contract]
+                      term ->
+                      --Search the full contract for the search term, retrieving the sourceAnnotation location of the part that was found
+                        -- Check for and get the different parts of the contract
+                        let contrString = 
+                              case ((contract ^. CC.contractName) == term) of
+                                True -> Just $ unparseContract contract
+                                False -> Nothing
 
-                          constString =   
-                            case ((contract ^. CC.constants) M.!? term) of 
-                              Just constF -> Just $ unparseConstant (term, constF)
-                              Nothing -> Nothing                          
+                            constString =   
+                              case ((contract ^. CC.constants) M.!? term) of 
+                                Just constF -> Just $ unparseConstant (term, constF)
+                                Nothing -> Nothing                          
 
-                          storjString = 
-                            case ((contract ^. CC.storageDefs) M.!? term) of
-                              Just storjF -> Just $ unparseVar (term, storjF)
-                              Nothing -> Nothing                           
+                            storjString = 
+                              case ((contract ^. CC.storageDefs) M.!? term) of
+                                Just storjF -> Just $ unparseVar (term, storjF)
+                                Nothing -> Nothing                           
 
-                          enumString = 
-                            case ((contract ^. CC.enums) M.!? term) of
-                              Just enumF -> Just $ unparseEnum (term, fst enumF)
-                              Nothing -> Nothing                             
+                            enumString = 
+                              case ((contract ^. CC.enums) M.!? term) of
+                                Just enumF -> Just $ unparseEnum (term, fst enumF)
+                                Nothing -> Nothing                             
 
-                          structString = 
-                            case ((contract ^. CC.structs) M.!? term) of
-                              Just structF -> Just $ unparseStruct (term, structF) 
-                              Nothing -> Nothing
+                            structString = 
+                              case ((contract ^. CC.structs) M.!? term) of
+                                Just structF -> Just $ unparseStruct (term, structF) 
+                                Nothing -> Nothing
 
-                          eventString = 
-                            case ((contract ^. CC.events) M.!? term) of 
-                              Just eventF -> Just $ unparseEvent (term, eventF)
-                              Nothing -> Nothing                             
+                            eventString = 
+                              case ((contract ^. CC.events) M.!? term) of 
+                                Just eventF -> Just $ unparseEvent (term, eventF)
+                                Nothing -> Nothing                             
 
-                          funcString = 
-                            case ((contract ^. CC.functions) M.!? term) of 
-                              Just funcF -> Just $ unparseFunc (term, funcF)
-                              Nothing -> Nothing
+                            funcString = 
+                              case ((contract ^. CC.functions) M.!? term) of 
+                                Just funcF -> Just $ unparseFunc (term, funcF)
+                                Nothing -> Nothing
 
-                          modString = 
-                            case ((contract ^. CC.modifiers) M.!? term) of
-                              Just modF -> Just $ unparseModifier (term, modF)
-                              Nothing -> Nothing
-                          
-                      --Remove all of the items that were found to contain nothing, this should leave just the items that we found
-                      in catMaybes [contrString, funcString, constString, storjString, enumString, eventString, structString, modString]
-            pure . Constant $ SString ( unlines codeSnippets)
+                            modString = 
+                              case ((contract ^. CC.modifiers) M.!? term) of
+                                Just modF -> Just $ unparseModifier (term, modF)
+                                Nothing -> Nothing
+                            
+                        --Remove all of the items that were found to contain nothing, this should leave just the items that we found
+                        in catMaybes [contrString, funcString, constString, storjString, enumString, eventString, structString, modString]
+              pure . Constant $ SString ( unlines codeSnippets)
 
           Constant (SContractItem address' itemName) -> do
             from <- getCurrentAccount
