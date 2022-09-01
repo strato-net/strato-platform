@@ -2,53 +2,66 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RecordWildCards #-} 
 module SolidVM.Solidity.StaticAnalysis.Optimizer
   ( detector
   ) where
 
-import           Control.Lens
 import           Control.Monad.Reader
+import           Control.Lens
+import           Data.Map as M
 import           Data.Functor.Compose
 import           Data.Maybe (fromMaybe)
+
 import           SolidVM.Model.CodeCollection
+import           SolidVM.Solidity.Parse.UnParser
 
-data R = R ()
+import           Blockchain.SolidVM.Exception
 
-detector :: CodeCollection -> CodeCollection
-detector = over (contracts . mapped) contractHelper
-         . over (flFuncs . mapped) functionHelper
-         . over (flConstants . mapped) constDeclHelper
+data R = R
+  { codeCollection :: CodeCollection
+  }
 
-contractHelper :: Contract
+
+detector ::  CodeCollection -> CodeCollection
+detector cc = (over (contracts . mapped) (contractHelper cc))
+          $ over (flFuncs . mapped) (functionHelper cc)
+          $ over (flConstants . mapped) (constDeclHelper cc) cc 
+
+contractHelper :: CodeCollection 
                -> Contract
-contractHelper = (constructor . _Just %~ functionHelper)
-               . over (functions . mapped) functionHelper
-               . over (storageDefs . mapped) varDeclHelper
-               . over (constants . mapped) constDeclHelper
+               -> Contract
+contractHelper cc = (constructor . _Just %~ (functionHelper cc) )
+               . over (storageDefs . mapped) (varDeclHelper cc)
+               . over (functions . mapped) (functionHelper cc)
+               . over (constants . mapped) (constDeclHelper cc) 
+  
 
-varDeclHelper :: VariableDecl
+varDeclHelper :: CodeCollection
               -> VariableDecl
-varDeclHelper v = v{ varInitialVal = run <$> varInitialVal v }
-  where run e = let r = R ()
-                 in runReader (optimizeExpression e) r
+              -> VariableDecl
+varDeclHelper cc v = v{ varInitialVal = run <$> varInitialVal v }
+  where run e = let r = R (cc)
+          in runReader (optimizeExpression e) r
 
-constDeclHelper :: ConstantDecl
+constDeclHelper :: CodeCollection
                 -> ConstantDecl
-constDeclHelper v = v{ constInitialVal = run $ constInitialVal v }
-  where run e = let r = R ()
+                -> ConstantDecl
+constDeclHelper cc v = v{ constInitialVal = run $ constInitialVal v }
+  where run e = let r = R (cc)
                  in runReader (optimizeExpression e) r
 
-functionHelper :: Func
+functionHelper :: CodeCollection
                -> Func
-functionHelper f = case funcContents f of
+               -> Func
+functionHelper cc f = case funcContents f of
   Nothing -> f
-  Just stmts ->
-    let r = R ()
+  Just stmts -> 
+    let r = R (cc)
      in f{ funcContents = Just $ runReader (optimizeStatements stmts) r }
 
 optimizeStatements :: [Statement] -> Reader R [Statement]
-optimizeStatements [] = pure []
+optimizeStatements [] = pure $  []
 optimizeStatements ((IfStatement cond thens mElse x) : ss) = do
   cond' <- optimizeExpression cond
   case cond' of
@@ -133,8 +146,6 @@ optimizeExpression (Binary x "%" a b) = do
   case (a', b') of
     (NumberLiteral y valA w, NumberLiteral z valB _) -> pure $ NumberLiteral (y <> z) (valA `mod` valB) w
     _ -> pure $ Binary x "%" a' b'
-
-optimizeExpression e = pure e
 -- optimizeExpression (Binary x "|" a b) =
 --   intType' x ~> optimizeExpression a <~> optimizeExpression b
 -- optimizeExpression (Binary x "&" a b) =
@@ -205,9 +216,23 @@ optimizeExpression e = pure e
 --   b' <- optimizeExpression b
 --   typecheckIndex a' b'
 -- optimizeExpression (IndexAccess _ a Nothing) = optimizeExpression a
--- optimizeExpression (MemberAccess _ a fieldName) = do
---   t <- optimizeExpression a
---   typecheckMember t fieldName
+optimizeExpression (MemberAccess loc base fieldName) = do
+  case base of 
+    (FunctionCall spot (Variable _ "type") (OrderedArgs [(Variable _ nam)])) -> do --Note type is a special reserved function
+        cc <- asks codeCollection
+        if (M.member nam (_contracts cc) )
+        then case fieldName of 
+          "name" -> pure $ (StringLiteral spot nam)
+          --"int"  -> pure $ ()--To Implement for another ticket
+          "creationCode" -> pure $ case M.lookup nam (_contracts cc) of Just contract -> (StringLiteral spot (unparseContract  contract)); _ -> (internalError "named arguements do not work with type function" ())  -- OLD FAKE VALUE TO GET GET COMPILE -> (StringLiteral spot "contract qq { int a = 12 }") 
+          "runtimeCode" ->  pure $ case M.lookup nam (_contracts cc) of Just contract -> (StringLiteral spot (unparseContract  contract)); _ -> (internalError "named arguements do not work with type function" ())
+          _ -> (error "Invalid args or unimplemented feature" ()) --TODO should have more specialized error-- Ask someone
+        else  pure $ (error "Contract not on file level" ()) --TODO should have more specialized error-- Ask someone
+    (FunctionCall _ (Variable _ "type") (NamedArgs _)) -> (error "named arguements do not work with type function" ())
+    _  -> --do
+      -- b <- optimizeExpression  base
+      -- t <- optimizeExpression  (b fieldName)
+      pure $ (MemberAccess loc base fieldName) -- TODO implement a memeber Access evaluator
 -- optimizeExpression (FunctionCall x expr args) = do
 --   e <- optimizeExpression expr
 --   a <- case args of
@@ -234,3 +259,4 @@ optimizeExpression e = pure e
 --     _ -> t'
 -- optimizeExpression (Variable x name) = getVarType' (labelToString name) x
 -- optimizeExpression (ObjectLiteral x _) = pure . bottom $ "Cannot use object literals within contract definitions" <$ x
+optimizeExpression e = pure e

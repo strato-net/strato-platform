@@ -1248,3 +1248,35 @@ contract B {
        in length anns `shouldBe` 1
 
 
+  it "can call type(C).name, type(C).creationCode, type(C).runtimeCode" $
+    let anns = runTypechecker [r|
+contract A {
+  string endofunctor1 = type(A).name;
+  string endofunctor2 = type(A).creationCode;
+  string endofunctor3 = type(A).runtimeCode;
+}
+
+contract B {
+  string endofunctor1 = type(A).name;
+  string endofunctor2 = type(A).creationCode;
+  string endofunctor3 = type(A).runtimeCode;
+}
+
+contract C {
+  string endofunctor1 = type(A).name;
+  string endofunctor2 = type(A).creationCode;
+  string endofunctor3 = type(A).runtimeCode;
+}
+
+|]
+    in length anns `shouldBe` 0
+  
+  fit "type(C).name, type(C).creationCode, type(C).runtimeCode only produce strings" $
+    let anns = runTypechecker [r|
+contract A {
+  int endofunctor1   = type(A).name;
+  int endofunctor2   = type(A).creationCode;
+  int groupoid       = type(A).runtimeCode;
+}
+|]
+    in length anns `shouldBe` 3

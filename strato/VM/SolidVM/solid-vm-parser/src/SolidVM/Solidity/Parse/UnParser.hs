@@ -5,18 +5,23 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TupleSections #-}
 module SolidVM.Solidity.Parse.UnParser where
 
+import           Control.Lens               hiding (op)
 import           Data.Maybe
 import           Data.Text  (Text)
 import qualified Data.Text                  as Text
 import qualified Data.List                  as List
 import           Data.Map                   ()
 import qualified Data.Map                   as Map
+import           Data.Source.Annotation
 import           Text.Printf
 
 import           SolidVM.Model.CodeCollection
 import qualified SolidVM.Model.CodeCollection.Def as SolidVM
+import qualified SolidVM.Model.CodeCollection.VarDef as SolidVM
+import           SolidVM.Model.CodeCollection.Contract as SolidVM
 import           SolidVM.Model.SolidString
 import           SolidVM.Model.Type (Type)
 import qualified SolidVM.Model.Type as SVMType
@@ -98,6 +103,49 @@ unparseConstant (name, (ConstantDecl theType isPublic expression _)) =
   <> (" = " ++ unparseExpression expression)
   <> ";"
 
+unparseContract :: SolidVM.Contract -> String
+unparseContract contr = 
+-- TODO: need to recursively retrieve all of the parent contracts
+     "contract "
+  <> labelToString (contr ^. contractName)
+  -- <> if (contr ^. parents )
+  <> " {\n  "
+  <> (List.intercalate "\n  " $ List.map unparseConstant (Map.assocs $ contr ^. constants)) -- ( contr ^. constants , contr ^. constants))
+  <> (List.intercalate "\n  " $ List.map unparseVar (Map.assocs $ contr ^. storageDefs))
+  <> (List.intercalate "\n  " $ List.map unparseEnum (fmap (fmap fst) (Map.assocs $ contr ^. enums)))
+  <> (List.intercalate "\n  " $ List.map unparseStruct (Map.assocs $ contr ^. structs))
+  <> (List.intercalate "\n  " $ List.map unparseEvent (Map.assocs $ contr ^. events))
+  <> (List.intercalate "\n  " $ List.map unparseFunc (Map.assocs $ contr ^. functions))
+  <> case (contr ^. constructor) of
+    Just funf -> ("\n  " ++ (unparseCtor funf))
+    Nothing -> "\n  // no constructor found"
+  <> (List.intercalate "\n  " $ List.map unparseModifier (Map.assocs $ contr ^. modifiers))
+  <> "\n}"
+
+
+unparseStruct :: (SolidString ,[(SolidString, SolidVM.FieldType, SourceAnnotation ())]) -> String
+unparseStruct (name, fields) =
+     "struct "
+  <> labelToString name
+  <> " {\n  "
+  <> (List.intercalate "  " $ List.map unparseStructField fields)
+  <> "}"
+
+unparseStructField :: (SolidString, SolidVM.FieldType, SourceAnnotation ()) -> String
+unparseStructField (name, theType, _) =
+     unparseVarType (fieldTypeType theType)
+  <> " "
+  <> labelToString name
+  <> ";\n"
+
+unparseEnum :: (SolidString, [SolidString]) -> String
+unparseEnum (name, values) =
+     "enum "
+  <> labelToString name
+  <> " {\n  "
+  <> (List.intercalate ",\n  " $ List.map labelToString values)
+  <> "\n}"
+
 unparseVarType :: Type -> String
 unparseVarType (SVMType.Int (Just True) (Just n)) = "int" <> show (8*n)
 unparseVarType (SVMType.Int (Just True) Nothing) = "int"
@@ -120,15 +168,30 @@ unparseVarType (SVMType.Contract contractName') = labelToString contractName'
 unparseVarType (SVMType.Struct _ n) = "struct " ++ labelToString n
 unparseVarType _ = "TYPE_NOT_IMPLEMENED"
 
+unparseFuncOverload :: SolidString -> [Func] -> String
+unparseFuncOverload name funcs = unlines $ map (unparseFunc . (name,)) funcs
+
 unparseFunc :: (SolidString, Func) -> String
-unparseFunc (name, f) = Text.unpack $ "function " <> labelToText name <> unparseFuncWithoutName f
+unparseFunc (name, f) = 
+  if (length (funcOverload f) > 1) then Text.unpack $ unparseFuncWithOverload name f
+        else 
+          Text.unpack $ "function " <> labelToText name <> " " <> unparseFuncWithoutName f
 
 unparseCtor :: Func -> String
-unparseCtor f = Text.unpack $ "constructor" <> unparseFuncWithoutName f
+unparseCtor f = Text.unpack $ "constructor " <> unparseFuncWithoutName f
 
-unparseFuncWithoutName :: Func -> Text
-unparseFuncWithoutName Func{..} =
-       "("
+unparseFuncWithOverload :: SolidString -> Func -> Text
+unparseFuncWithOverload name myFunction = unparseFuncDeep name myFunction
+
+unparseFuncWithoutName:: Func -> Text
+unparseFuncWithoutName f = unparseFuncDeep "" f
+
+unparseFuncDeep :: SolidString -> Func -> Text
+unparseFuncDeep deepName Func{..} =
+       (if (deepName == "") then
+          "("
+        else 
+          "function " <> labelToText deepName <> " (")
     <> Text.intercalate ", " (List.map unparseArgs (sortWith (indexedTypeIndex . snd) $ map (\(maybeName, v) -> (fromMaybe "" $ fmap labelToText maybeName , v)) funcArgs))
     <> ") "
     <> case funcStateMutability of
@@ -150,15 +213,19 @@ unparseFuncWithoutName Func{..} =
               "returns ("
           <> Text.intercalate ", " (List.map unparseVals $ map (\(maybeName, v) -> (fromMaybe "" $ fmap labelToText maybeName , v)) vals)
           <> ") "
-    <> "{\n        "
+    <> "{\n    "
     <> case funcContents of
         Just contents -> Text.pack $ tab . tab $ unlines $ map unparseStatement contents --(Text.concat . Text.lines $ contents)
-        Nothing -> ""
+        Nothing -> "\n"
     <> "}"
+    <> case funcOverload of
+          [] -> Text.pack ""
+          as -> "\n" <> (Text.unlines $ map (unparseFuncDeep deepName) as)
+    -- <> (Text.pack $ show func)
 
 tab :: String -> String
 tab [] = []
-tab ('\n':rest) = "\n    " ++ tab rest
+tab ('\n':rest) = "\n  " ++ tab rest
 tab (x:rest) = x:tab rest
 
 unparseStatement :: Show a => StatementF a -> String
@@ -220,6 +287,12 @@ unparseStatementWith f (TryCatchStatement tryBlock catchBlockMap a) = f a $
 unparseStatementWith f (SolidityTryCatchStatement expr mtpl tryBlock catchBlockMap a) = f a $
   "try " ++ unparseExpression expr ++ " " ++  (show (fromMaybe [] mtpl)) ++ " {\n" ++ tab (unlines $ map (unparseStatementWith f) tryBlock) ++ "\n}" ++ " catch " ++ show (Map.toList catchBlockMap)
 -- unparseStatementWith _ x = internalError "missing case in call to unparseStatementWith" $ show x
+
+
+
+-- unparseContract :: ContractF a -> String
+-- --Use a many statement to go through the list items contained in the ContractF. Making sure everything is able to touched
+-- unparseContract = 
 
 unparseVarDefEntry :: VarDefEntryF a -> String
 unparseVarDefEntry BlankEntry = ""
@@ -335,9 +408,12 @@ unparseArgs (name, theType) = unparseIndexedType theType <> " " <>  name
 unparseVals :: (Text, IndexedType) -> Text
 unparseVals (name, theType) =
      unparseIndexedType theType
-  <> if Text.head name == '#'
-     then ""
-     else " " <> name
+  <> if ((Text.length name) > 0) then 
+    if Text.head name == '#' then
+      ""
+    else " " <> name
+    else " " <> name 
+
 
 unparseIndexedType :: IndexedType -> Text
 unparseIndexedType = Text.pack . unparseVarType . indexedTypeType

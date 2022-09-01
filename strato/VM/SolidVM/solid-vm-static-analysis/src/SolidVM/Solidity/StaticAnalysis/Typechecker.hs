@@ -554,6 +554,12 @@ typecheckMember (Static (SVMType.UnknownLabel "block" Nothing) x) "number" = pur
 typecheckMember (Static (SVMType.UnknownLabel "block" Nothing) x) "coinbase" = pure $ Static (SVMType.Account True) x
 typecheckMember (Static (SVMType.UnknownLabel "block" Nothing) x) "difficulty" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "block" Nothing) x) "gaslimit" = pure $ Static (SVMType.Int Nothing Nothing) x
+typecheckMember (Static (SVMType.UnknownLabel "type" Nothing) x) "name"         = pure $ (Static (SVMType.String Nothing) x)
+typecheckMember (Static (SVMType.UnknownLabel "type" Nothing) x) "creationCode" = pure $ (Static (SVMType.String Nothing) x)
+typecheckMember (Static (SVMType.UnknownLabel "type" Nothing) x) "runtimeCode"  = pure $ (Static (SVMType.String Nothing) x)
+--typecheckMember (Static (SVMType.UnknownLabel "type" Nothing) x) "min"         = pure $  (Static (SVMType.Int Nothing Nothing) x) --Implement for next ticket
+--typecheckMember (Static (SVMType.UnknownLabel "type" Nothing) x) "max"         = pure $  (Static (SVMType.Int Nothing Nothing) x)
+
 typecheckMember (Static (SVMType.UnknownLabel "super" Nothing) x) method = do
   ctract <- asks contract
   cc <- asks codeCollection
@@ -1276,6 +1282,10 @@ tcExpr (IndexAccess _ a Nothing) = tcExpr a
 tcExpr (MemberAccess _ a fieldName) = do
   t <- tcExpr a
   typecheckMember t fieldName
+tcExpr (FunctionCall x (Variable _ "type") args) =
+  pure $ case args  of 
+    (OrderedArgs _) ->  Static (SVMType.UnknownLabel "type" Nothing) x
+    _ -> bottom $ "Improper use of type function" <$ x
 tcExpr (FunctionCall x expr args) = do
   e <- tcExpr expr
   a <- case args of
