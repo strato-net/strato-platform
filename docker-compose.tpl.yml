@@ -34,7 +34,7 @@ services:
         max-size: "100m"
         max-file: "3"
   apex:
-    links:
+    depends_on:
     - postgres
     - prometheus
     - strato
@@ -72,7 +72,7 @@ services:
     volumes:
       - redisdata:/data
   vault-wrapper:
-    links:
+    depends_on:
     - postgres
     environment:
     - keyStoreCacheTimeout=${keyStoreCacheTimeout:-60}
@@ -91,7 +91,7 @@ services:
         max-size: "100m"
         max-file: "3"
   strato:
-    links:
+    depends_on:
     - kafka
     - postgres
     - redis
@@ -183,7 +183,7 @@ services:
     volumes:
       - stratodata:/var/lib/strato
   postgrest:
-    links:
+    depends_on:
     - postgres
     environment:
     - blocHost=${blocHost:-strato:3000}
@@ -220,7 +220,7 @@ services:
         max-size: "100m"
         max-file: "3"
   nginx:
-    links:
+    depends_on:
     - apex
     - docs
     - postgrest
@@ -280,7 +280,7 @@ services:
         max-size: "100m"
         max-file: "3"
   kafka:
-    links:
+    depends_on:
     - zookeeper
     environment:
       KAFKA_ADVERTISED_HOST_NAME: kafka
