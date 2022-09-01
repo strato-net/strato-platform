@@ -96,7 +96,7 @@ strSipBench = bench "time spent on (siphash) hashing the wings contract"
 
 parseBench :: Benchmark
 parseBench = bench "time required to parse the contract"
-           $ nf (runParser solidityFile (ParserState "" "") "") wingsContract
+           $ nf (runParser solidityFile (ParserState "" "" M.empty) "") wingsContract
 
 showCCBench :: Benchmark
 showCCBench = bench "time to show the wingsCC"

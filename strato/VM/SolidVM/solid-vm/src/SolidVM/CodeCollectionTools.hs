@@ -27,8 +27,8 @@ import qualified SolidVM.Solidity.Xabi as Xabi
 
 type SolidEither = Either (Positioned ((,) SolidException))
 
-xabiToContract :: SolidString -> [SolidString] -> String -> Xabi -> SolidEither Contract
-xabiToContract contractName' parents' vmVersion' xabi = do
+xabiToContract :: SolidString -> [SolidString] -> String -> M.Map String String -> Xabi -> SolidEither Contract
+xabiToContract contractName' parents' vmVersion' userDefinedTypes xabi = do
   validateXabi xabi
   constr <- case M.toList $ Xabi.xabiConstr xabi of
     [] -> Right Nothing
@@ -40,6 +40,7 @@ xabiToContract contractName' parents' vmVersion' xabi = do
   _contractName = contractName',
   _parents = parents',
   _storageDefs = Xabi.xabiVars xabi,
+  _userDefined =  userDefinedTypes,
   _constants = Xabi.xabiConstants xabi,
   _enums = M.fromList [(name, (vals, a)) | (name, Def.Enum vals _ a) <- M.toList $ Xabi.xabiTypes xabi],
   _structs = M.fromList [(name, (\(k,v) -> (k,v,a)) <$> vals) | (name, Def.Struct vals _ a) <- M.toList $ Xabi.xabiTypes xabi],
@@ -77,6 +78,7 @@ addInheritedObjects :: CodeCollection -> Contract -> SolidEither Contract
 addInheritedObjects cc c = do
   fu <- toUnionMaker _functions cc c
   sd <- toUnionMaker _storageDefs cc c
+  ud <- toUnionMaker _userDefined cc c
   en <- toUnionMaker _enums cc c
   st <- toUnionMaker _structs cc c
   ev <- toUnionMaker _events cc c
@@ -84,6 +86,7 @@ addInheritedObjects cc c = do
   pure $ c{
   _functions=fu,
   _storageDefs=sd,
+  _userDefined =ud,
   _enums=en,
   _structs=st,
   _events = ev,
@@ -101,19 +104,20 @@ toUnionMaker f cc c = do
 resolveLabels :: CodeCollection -> CodeCollection
 resolveLabels cc = cc{_contracts=fmap (resolveLabelsInContract cc) $ cc^.contracts}
 
-
+--TODO Figured out how to make UserDefined Work with this in the intented way
 resolveLabelsInContract :: CodeCollection -> Contract -> Contract
 resolveLabelsInContract cc c =
-  c{_storageDefs=fmap (resolveLabelsInDef (cc^.contracts) (c^.enums) (c^.structs)) $ c^.storageDefs}
+  c{_storageDefs=fmap (resolveLabelsInDef (cc^.contracts) (c^.userDefined)  (c^.enums) (c^.structs)) $ c^.storageDefs}
 
-resolveLabelsInDef :: Map SolidString Contract -> Map SolidString a -> Map SolidString b -> VariableDecl -> VariableDecl
-resolveLabelsInDef contractDefs enumDefs structDefs x@VariableDecl{varType=SVMType.UnknownLabel labelName _} =
+resolveLabelsInDef :: Map SolidString Contract -> Map String String->  Map SolidString a -> Map SolidString b -> VariableDecl -> VariableDecl
+resolveLabelsInDef contractDefs userDefineDefs enumDefs structDefs x@VariableDecl{varType=SVMType.UnknownLabel labelName _} =
   case (labelName `M.member` contractDefs,
+        labelName `M.member` userDefineDefs,
         labelName `M.member` structDefs,
         labelName `M.member` enumDefs) of
-    (_, True, _) -> x{varType=SVMType.Enum Nothing labelName Nothing}
-    (_, _, True) -> x{varType=SVMType.Struct Nothing labelName}
-    (True, _, _) -> x{varType=SVMType.Contract labelName}
+    (_, _, True, _) -> x{varType=SVMType.Enum Nothing labelName Nothing}
+    (_, _,  _, True) -> x{varType=SVMType.Struct Nothing labelName}
+    (True, _,  _, _) -> x{varType=SVMType.Contract labelName}
     _ -> x{varType=SVMType.UnknownLabel labelName Nothing}
     -- _ -> error $ "unknown label in call to resolveLabelsInDef: " ++ labelName
-resolveLabelsInDef _ _ _ x = x
+resolveLabelsInDef _ _ _ _ x = x
