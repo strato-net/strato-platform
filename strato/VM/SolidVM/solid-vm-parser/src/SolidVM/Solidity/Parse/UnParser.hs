@@ -47,7 +47,7 @@ unparseSourceUnit (FLEnum name decl) = (("\n    " <>) . unparseTypes) (Text.unpa
 unparseSourceUnit (FLError name args) = (("\n    " <>) . unparseTypes) (Text.unpack name, args)
 unparseSourceUnit (DummySourceUnit) = "DummySourceUnit"
 unparseSourceUnit (NamedXabi name (contract,inherited)) =
-     (case _xabiKind contract of
+     (case xabiKind contract of
         ContractKind -> "contract "
         InterfaceKind -> "interface "
         LibraryKind -> "library ")
@@ -57,16 +57,16 @@ unparseSourceUnit (NamedXabi name (contract,inherited)) =
         xs -> " is " <> Text.unpack (Text.intercalate ", " xs)
      )
   <> " {\n"
-  <> concatMap (("\n    " <>) . unparseVar) (Map.toList $ _xabiVars contract)
-  <> concatMap (("\n    " <>) . unparseConstant) (Map.toList $ _xabiConstants contract)
+  <> concatMap (("\n    " <>) . unparseVar) (Map.toList $ xabiVars contract)
+  <> concatMap (("\n    " <>) . unparseConstant) (Map.toList $ xabiConstants contract)
 
 --  <> concatMap (("\n    " <>) . unparseVar) (sortWith (varTypeAtBytes . snd) $ Map.toList $ xabiVars contract)
-  <> concatMap (("\n    " <>) . unparseTypes) (Map.toList $ _xabiTypes contract)
-  <> concatMap (("\n    " <>) . unparseModifier) (Map.toList $ _xabiModifiers contract)
-  <> concatMap (("\n    " <>) . unparseEvent) (Map.toList $ _xabiEvents contract)
-  <> concatMap (("\n    " <>) . unparseUsing) (Map.toList $ _xabiUsing contract)
-  <> concatMap (("\n    " <>) . unparseCtor) (Map.elems $ _xabiConstr contract)
-  <> concatMap (("\n    " <>) . unparseFunc) (Map.toList $ _xabiFuncs contract)
+  <> concatMap (("\n    " <>) . unparseTypes) (Map.toList $ xabiTypes contract)
+  <> concatMap (("\n    " <>) . unparseModifier) (Map.toList $ xabiModifiers contract)
+  <> concatMap (("\n    " <>) . unparseEvent) (Map.toList $ xabiEvents contract)
+  <> concatMap (("\n    " <>) . unparseUsing) (Map.toList $ xabiUsing contract)
+  <> concatMap (("\n    " <>) . unparseCtor) (Map.elems $ xabiConstr contract)
+  <> concatMap (("\n    " <>) . unparseFunc) (Map.toList $ xabiFuncs contract)
   <> "\n}"
 unparseSourceUnit (FLFunc n a) = unparseFunc (n, a)
 
@@ -173,7 +173,7 @@ unparseFuncOverload name funcs = unlines $ map (unparseFunc . (name,)) funcs
 
 unparseFunc :: (SolidString, Func) -> String
 unparseFunc (name, f) = 
-  if (length (f ^. funcOverload) > 1) then Text.unpack $ unparseFuncWithOverload name f
+  if (length (funcOverload f) > 1) then Text.unpack $ unparseFuncWithOverload name f
         else 
           Text.unpack $ "function " <> labelToText name <> " " <> unparseFuncWithoutName f
 
@@ -192,33 +192,33 @@ unparseFuncDeep deepName Func{..} =
           "("
         else 
           "function " <> labelToText deepName <> " (")
-    <> Text.intercalate ", " (List.map unparseArgs (sortWith (indexedTypeIndex . snd) $ map (\(maybeName, v) -> (fromMaybe "" $ fmap labelToText maybeName , v)) _funcArgs))
+    <> Text.intercalate ", " (List.map unparseArgs (sortWith (indexedTypeIndex . snd) $ map (\(maybeName, v) -> (fromMaybe "" $ fmap labelToText maybeName , v)) funcArgs))
     <> ") "
-    <> case _funcStateMutability of
+    <> case funcStateMutability of
         Just sm -> tShow sm <> " "
         Nothing -> ""
-    <> case _funcVisibility of
+    <> case funcVisibility of
         Just Private -> "private "
         Just Public -> "public "
         Just Internal -> "internal "
         Just External -> "external "
         _ -> ""
-    <> case _funcModifiers of
+    <> case funcModifiers of
         [] -> ""
         xs ->
           "modifiers " <> (Text.intercalate ", " (map Text.pack (map (\(name, args) -> labelToString name <> Text.unpack ("(" <> Text.intercalate ", " (map Text.pack (map unparseExpression args)) <> ")")) xs))) <> " "
-    <> case _funcVals of
+    <> case funcVals of
         [] -> ""
         vals ->
               "returns ("
           <> Text.intercalate ", " (List.map unparseVals $ map (\(maybeName, v) -> (fromMaybe "" $ fmap labelToText maybeName , v)) vals)
           <> ") "
     <> "{\n    "
-    <> case _funcContents of
+    <> case funcContents of
         Just contents -> Text.pack $ tab . tab $ unlines $ map unparseStatement contents --(Text.concat . Text.lines $ contents)
         Nothing -> "\n"
     <> "}"
-    <> case _funcOverload of
+    <> case funcOverload of
           [] -> Text.pack ""
           as -> "\n" <> (Text.unlines $ map (unparseFuncDeep deepName) as)
     -- <> (Text.pack $ show func)
@@ -353,9 +353,9 @@ unparseModifier (name, Modifier{..}) = Text.unpack $
      "modifier "
   <> labelToText name
   <> "("
-  <> Text.intercalate ", " (List.map unparseArgs (Map.toList _modifierArgs))
+  <> Text.intercalate ", " (List.map unparseArgs (Map.toList modifierArgs))
   <> ") {\n        "
-  <> case _modifierContents of
+  <> case modifierContents of
         Just contents -> Text.pack $ tab . tab $ unlines $ map unparseStatement contents --(Text.concat . Text.lines $ contents)
         Nothing -> ""
   <> "}"
@@ -365,9 +365,9 @@ unparseEvent (name, Event{..}) = Text.unpack $
      "event "
   <> labelToText name
   <> "(\n    "
-  <> Text.intercalate ",\n    " (List.map unparseArgs _eventLogs)
+  <> Text.intercalate ",\n    " (List.map unparseArgs eventLogs)
   <> ")"
-  <> (if _eventAnonymous then "anonymous" else "")
+  <> (if eventAnonymous then "anonymous" else "")
   <> ";"
 
 unparseUsing :: (Text, UsingF a) -> String
