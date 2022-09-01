@@ -4,7 +4,6 @@ module TxrIndexerSpec where
 
 import qualified Data.ByteString.Char8              as C8
 import           Data.Either
-import           Data.Maybe
 
 import           Test.Hspec
 
@@ -12,7 +11,6 @@ import           BlockApps.X509.Certificate
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Enode
 import           Blockchain.Strato.Model.Account
-import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Indexer.Model
 import           Blockchain.Strato.Indexer.TxrIndexer
 
@@ -47,7 +45,7 @@ spec = do
                     , "N8txKc8G9R27ZYAUuz15zF0="
                     , "-----END CERTIFICATE-----"
                     ]
-                event = EventDB (fromJust $ stringAddress "deadbeef") Nothing "CertificateRegistered" [certString]
+                event = EventDB (Account 0xdeadbeef Nothing) Nothing "CertificateRegistered" [certString]
                 parsedCert = fromRight (error "Couldn't parse certString") $ bsToCert $ C8.pack $ certString
                 addr = fromInteger 0x74f014fef932d2728c6c7e2b4d3b88ac37a7e1d0
             in indexEventToTxrResults (EventDBEntry event)
