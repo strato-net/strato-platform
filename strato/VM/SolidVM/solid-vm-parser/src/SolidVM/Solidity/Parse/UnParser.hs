@@ -2,6 +2,7 @@
 -- Module: UnParser
 -- Description: The Solidity source unparser to render Xabi into a Solidity Source File
 -- Maintainer: Charles Crain <charles@blockapps.net>
+-- Maintainer: Steven Glasford <steven_glasford@blockapps.net>
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -286,7 +287,6 @@ unparseStatementWith f (TryCatchStatement tryBlock catchBlockMap a) = f a $
   (show (fromMaybe [] params)) ++ " {\n" ++ tab (unlines $ map (unparseStatementWith f) block) ++ "\n}") (Map.toList catchBlockMap)))
 unparseStatementWith f (SolidityTryCatchStatement expr mtpl tryBlock catchBlockMap a) = f a $
   "try " ++ unparseExpression expr ++ " " ++  (show (fromMaybe [] mtpl)) ++ " {\n" ++ tab (unlines $ map (unparseStatementWith f) tryBlock) ++ "\n}" ++ " catch " ++ show (Map.toList catchBlockMap)
--- unparseStatementWith _ x = internalError "missing case in call to unparseStatementWith" $ show x
 
 
 
