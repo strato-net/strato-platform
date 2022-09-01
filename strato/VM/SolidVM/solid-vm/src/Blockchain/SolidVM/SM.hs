@@ -52,6 +52,8 @@ module Blockchain.SolidVM.SM (
 import           Control.Monad
 import           Control.Applicative ((<|>))
 import           Control.Lens hiding (Context)
+-- import           Control.Monad.Catch (MonadCatch)
+-- import           Control.Monad (join)
 import           Control.Monad.Catch (MonadCatch)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
@@ -65,6 +67,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.UTF8  as UTF8
+import           Data.Traversable (for)
 import           Prelude                            hiding (EQ, GT, LT)
 import qualified Prelude                            as Ordering (Ordering (..))
 
@@ -150,7 +153,6 @@ data SState = SState
   { env             :: Env.Environment
   , callStack       :: [CallInfo]
   , ssEvents        :: Q.Seq Event
-  , _ssNewX509Certs  :: M.Map Address X509Certificate
   , _ssMemDBs       :: MemDBs
   , _action         :: Action
   , _codeCollections :: M.Map Keccak256 CC.CodeCollection
@@ -169,8 +171,8 @@ type MonadSM m = ( (Account `A.Alters` AddressState) m
                  , HasRawStorageDB m
                  , HasMemAddressStateDB m
                  , HasMemRawStorageDB m
+                 , HasMemCertDB m
                  , Mod.Accessible Env.Environment m
-                 , Mod.Modifiable (M.Map Address X509Certificate) m
                  , Mod.Modifiable MemDBs m
                  , Mod.Modifiable Env.Sender m
                  , Mod.Modifiable [CallInfo] m
@@ -194,7 +196,14 @@ instance Monad m => HasMemRawStorageDB (SM m) where
   getMemRawStorageBlockDB    = gets $ _storageBlockMap . _ssMemDBs
   putMemRawStorageBlockMap m = modify $ ssMemDBs . storageBlockMap .~ m
 
+instance Monad m => HasMemCertDB (SM m) where
+  getCertTxDBMap      = gets $ _certTxMap . _ssMemDBs
+  putCertTxDBMap    m = modify $ ssMemDBs . certTxMap .~ m
+  getCertBlockDBMap   = gets $ _certBlockMap . _ssMemDBs
+  putCertBlockDBMap m = modify $ ssMemDBs . certBlockMap .~ m
+
 instance ( (Maybe Word256 `A.Alters` MP.StateRoot) m
+         , MonadLogger m
          , (MP.StateRoot `A.Alters` MP.NodeData) m
          , (N.NibbleString `A.Alters` N.NibbleString) m
          ) => (RawStorageKey `A.Alters` RawStorageValue) (SM m) where
@@ -204,6 +213,7 @@ instance ( (Maybe Word256 `A.Alters` MP.StateRoot) m
   lookupWithDefault _ = genericLookupWithDefaultRawStorageDB
 
 instance ( (Maybe Word256 `A.Alters` MP.StateRoot) m
+         , MonadLogger m
          , (MP.StateRoot `A.Alters` MP.NodeData) m
          , (N.NibbleString `A.Alters` N.NibbleString) m
          ) => (Account `A.Alters` AddressState) (SM m) where
@@ -263,10 +273,19 @@ instance (Keccak256 `A.Alters` DBCodeCollection) m => (Keccak256 `A.Alters` CC.C
     codeCollections . at k .= Nothing
     lift $ A.delete (A.Proxy @DBCodeCollection) k
 
-instance (Address `A.Alters` X509Certificate) m => (Address `A.Alters` X509Certificate) (SM m) where
-  lookup p   = lift . A.lookup p
-  insert p k = lift . A.insert p k
-  delete p   = lift . A.delete p
+instance Mod.Modifiable CertRoot m => Mod.Modifiable CertRoot (SM m) where
+  get = lift . Mod.get
+  put p = lift . Mod.put p
+
+instance ( (Address `A.Alters` X509Certificate) m
+         , Mod.Modifiable CertRoot m
+         , (MP.StateRoot `A.Alters` MP.NodeData) m
+         ) => (Address `A.Alters` X509Certificate) (SM m) where
+  lookup _ k = do
+    mBH <- gets $ view $ ssMemDBs . currentBlock
+    fmap join . for mBH $ \(CurrentBlockHash bh) -> getCertMaybe k bh
+  insert _ = putCert
+  delete _ = deleteCert
 
 instance (N.NibbleString `A.Alters` N.NibbleString) m => (N.NibbleString `A.Alters` N.NibbleString) (SM m) where
   lookup p   = lift . A.lookup p
@@ -292,10 +311,6 @@ instance Monad m => Mod.Modifiable [CallInfo] (SM m) where
 instance Monad m => Mod.Modifiable MemDBs (SM m) where
   get _    = gets $ _ssMemDBs
   put _ md = modify $ ssMemDBs .~ md
-
-instance Monad m => Mod.Modifiable (M.Map Address X509Certificate) (SM m) where
-  get _ = use ssNewX509Certs
-  put _ = assign ssNewX509Certs
 
 instance Monad m => Mod.Modifiable Action (SM m) where
   get _ = use action
@@ -328,7 +343,6 @@ runSM maybeCode env chainId' f = do
         env = env,
         callStack = [],
         ssEvents = Q.empty,
-        _ssNewX509Certs = M.empty,
         _ssMemDBs = csMemDBs,
         _action = startingAction maybeCode env chainId',
         _codeCollections = M.empty

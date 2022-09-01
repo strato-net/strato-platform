@@ -17,6 +17,7 @@ import           SolidVM.Solidity.StaticAnalysis.Types
 type SSS = State (M.Map SolidString (SourceAnnotation ()))
 
 -- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]
+
 detector :: CompilerDetector
 detector CodeCollection{..} = concat $ contractHelper <$> M.elems _contracts
 
@@ -189,6 +190,7 @@ expressionHelper (Ternary _ a b c) = concat <$> traverse expressionHelper [a, b,
 expressionHelper (BoolLiteral _ _) = pure []
 expressionHelper (NumberLiteral _ _ _) = pure []
 expressionHelper (StringLiteral _ _) = pure []
+expressionHelper (HexaLiteral _ _) = pure []
 expressionHelper (TupleExpression _ es) =
   concat <$> traverse (maybe (pure []) expressionHelper) es
 expressionHelper (ArrayExpression _ es) = concat <$> traverse expressionHelper es

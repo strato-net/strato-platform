@@ -49,8 +49,10 @@ import           SolidVM.Model.SolidString
 import           SolidVM.Solidity.Parse.Declarations
 import           SolidVM.Solidity.Parse.File
 import           SolidVM.Solidity.Parse.ParserTypes
-import           SolidVM.Solidity.StaticAnalysis.Typechecker as TC
---import           SolidVM.Model.CodeCollection.ConstantDecl
+import qualified SolidVM.Solidity.StaticAnalysis.Typechecker                            as TypeChecker
+import qualified SolidVM.Solidity.StaticAnalysis.Functions.ConstantFunctions            as ConstantFunctions
+import           SolidVM.Solidity.StaticAnalysis.Optimizer                              as O
+import qualified        SolidVM.Solidity.StaticAnalysis.Statements.MultipleDeclarations as MultipleDeclarations
 
 type HasCodeCollectionDB m = (Keccak256 `A.Alters` CodeCollection) m
 
@@ -97,24 +99,26 @@ compileSourceNoInheritance initCodeMap = do
           FLError name args -> do
             pure $ Just $ (textToLabel name, FLER args)
           _ -> pure Nothing
---      sUnitSorter :: [(SolidString, SUnitIntermediary)] ->  ([(SolidString, ConstantDecl)], [(SolidString, Contract)], [(SolidString, ([SolidString], a))], [(SolidString, [(SolidString, FieldType, a)])])
-      sUnitSorter = foldr (\(name, sUnit) (cs, cs2, cs3, cs4, cs5, cs6) -> case sUnit of
-        Con ctrct -> (cs, (name, ctrct):cs2, cs3, cs4, cs5, cs6)
-        FLC cnst -> ((name, cnst):cs, cs2, cs3, cs4, cs5, cs6)
-        FLE (Def.Enum vals _ a) -> (cs, cs2, (name, (vals, a)):cs3, cs4, cs5 ,cs6)
-        FLS (Def.Struct vals _ a) -> (cs, cs2, cs3, (name, (\(k,v) -> (k,v,a)) <$> vals):cs4, cs5, cs6) --conversion to match struct form
-        FLF f -> (cs, cs2, cs3, cs4, (name, f):cs5, cs6)
-        FLER (Def.Error vals _ a) -> (cs, cs2, cs3, cs4, cs5, (name, (\(k,v) -> (k,v,a)) <$> vals):cs6)
-        FLE y -> parseError "FLE non Enum should be impossible"   (show y)
-        FLS x -> parseError "FLS non Struct should be impossible" (show x)
-        FLER x -> parseError "FLER non Error should be impossible" (show x)
-        ) ([], [], [], [], [], [])
-      throwDuplicate :: (SolidString, Contract) -> Map SolidString Contract -> Either ParseTypeCheckOrSolidVMError (Map SolidString Contract)
-      throwDuplicate (cName, unit) m = case M.lookup cName m of
-        Nothing -> pure $ M.insert cName unit m
+
+      throwDuplicate' :: (SolidString, a) -> Map SolidString a -> (a -> SourceAnnotation b) -> Either ParseTypeCheckOrSolidVMError (Map SolidString a)
+      throwDuplicate' (sName, unit) m contextFunc = case M.lookup sName m of
+        Nothing -> pure $ M.insert sName unit m
         Just _ ->  Left . PEx
-                 $ newErrorMessage (Message $ "Duplicate unit found: " ++ labelToString cName)
-                                   (fromSourcePosition $ _sourceAnnotationStart $ _contractContext unit)
+                  $ newErrorMessage (Message $ "Duplicate unit found: " ++ labelToString sName)
+                                    (fromSourcePosition $ _sourceAnnotationStart $ contextFunc unit)
+
+      throwDuplicate :: (SolidString, SUnitIntermediary) ->  CodeCollection -> Either ParseTypeCheckOrSolidVMError CodeCollection
+      throwDuplicate (name, sUnit) cc = case sUnit of 
+        Con ctrct                 -> fmap (\cMap -> cc & contracts   .~ cMap) $ throwDuplicate' (name, ctrct) (cc ^. contracts)  _contractContext
+        FLC cnst                  -> fmap (\cMap -> cc & flConstants .~ cMap) $ throwDuplicate' (name, cnst) (cc ^. flConstants) constContext
+        FLE (Def.Enum vals _ a)   -> fmap (\cMap -> cc & flEnums     .~ cMap) $ throwDuplicate' (name, (vals, a)) (cc ^. flEnums) (const a)
+        FLS (Def.Struct vals _ a) -> fmap (\cMap -> cc & flStructs   .~ cMap) $ throwDuplicate' (name, (\(k,v) -> (k,v,a)) <$> vals) (cc ^. flStructs) (\_ -> a)
+        FLF func                  -> fmap (\cMap -> cc & flFuncs     .~ cMap) $ throwDuplicateFunction (name, func) (cc ^. flFuncs) -- Thanks Jin!
+        FLER (Def.Error vals _ a) -> fmap (\cMap -> cc & flErrors    .~ cMap) $ throwDuplicate' (name, (\(k,v) -> (k,v,a)) <$> vals) (cc ^. flErrors) (\_ -> a) 
+        FLE y  -> parseError  "FLE non Enum should be impossible  "  (show y)
+        FLS x  -> parseError  "FLS non Struct should be impossible"  (show x)
+        FLER z -> parseError  "FLER non Error should be impossible"  (show z)
+      sUnitSorter = foldrM throwDuplicate $ CodeCollection M.empty M.empty M.empty M.empty M.empty M.empty -- the list of all the sUnits goes here
 
       throwDuplicateFunction :: (SolidString, Func) -> Map SolidString Func -> Either ParseTypeCheckOrSolidVMError (Map SolidString Func)
       throwDuplicateFunction (fname, func) m = case M.lookup fname m of
@@ -128,19 +132,10 @@ compileSourceNoInheritance initCodeMap = do
                                               (fromSourcePosition $ _sourceAnnotationStart $ funcContext func)
             else do
               pure $ M.insert fname (fdec{funcOverload = funcOverload fdec ++ [func]}) m
-                                           
+
   allSUnits <- fmap concat . traverse (uncurry getNamedSUnits) $ M.toList initCodeMap
-  let (allConstants, allContracts, allEnums, allStructs, allFreeFunctions, allCustomErrors) = sUnitSorter allSUnits
-  deduplicatedContracts <- foldrM throwDuplicate M.empty allContracts
-  deduplicatedFreeFunctions <- foldrM throwDuplicateFunction M.empty (allFreeFunctions :: [(SolidString, Func)])
-  pure $ CodeCollection {
-    _contracts = deduplicatedContracts,
-    _flFuncs = deduplicatedFreeFunctions,
-    _flConstants = M.fromList allConstants,
-    _flEnums = M.fromList allEnums,
-    _flStructs = M.fromList allStructs,
-    _flErrors = M.fromList allCustomErrors
-  }
+  theCC <- sUnitSorter allSUnits
+  pure $ theCC
 
 hasSvm3_2 :: CodeCollection -> Bool
 hasSvm3_2 cc = any (=="svm3.2") vmVers
@@ -158,11 +153,16 @@ hasSvm3_3 cc = any (=="svm3.3") vmVers
 compileSource :: Bool -> Map T.Text T.Text-> Either ParseTypeCheckOrSolidVMError CodeCollection
 compileSource typeCheck mTT = do
   let applyInheritanceE = first SVMEx . applyInheritance
-  case (applyInheritanceE <=< compileSourceNoInheritance) mTT of
-    Right cc -> do if typeCheck && (hasSvm3_2 cc || hasSvm3_3 cc) then typeCheckDetector cc else Right cc
+  O.detector <$> case (applyInheritanceE <=< compileSourceNoInheritance) mTT of
+    Right cc | typeCheck && hasSvm3_2 cc -> typeCheckDetectorSvm3_2 cc
+             | typeCheck && hasSvm3_3 cc -> typeCheckDetectorSvm3_3 cc
+             | otherwise                 -> Right cc
     Left x -> Left x
     where
-      typeCheckDetector ecc = case TC.detector ecc of
+      typeCheckDetectorSvm3_2 ecc = case TypeChecker.detector ecc of
+        [] -> Right ecc
+        xs -> Left $ TCEx xs
+      typeCheckDetectorSvm3_3 ecc = case TypeChecker.detector ecc <> ConstantFunctions.detector ecc <> MultipleDeclarations.detector ecc of
         [] -> Right ecc
         xs -> Left $ TCEx xs
 

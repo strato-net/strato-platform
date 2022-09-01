@@ -117,9 +117,9 @@ instance (Keccak256 `A.Alters` DBCode) SetupDBM where
   delete _ = genericDeleteCodeDB $ asks codeDB
 
 instance (Address `A.Alters` X509Certificate) SetupDBM where
-  lookup _ = genericLookupX509CertDB $ asks x509DB
-  insert _ = genericInsertX509CertDB $ asks x509DB
-  delete _ = genericDeleteX509CertDB $ asks x509DB
+  lookup _ = error "SetupDBM lookup @X509Certificate"
+  insert _ = error "SetupDBM insert @X509Certificate"
+  delete _ = error "SetupDBM delete @X509Certificate"
 
 instance (N.NibbleString `A.Alters` N.NibbleString) SetupDBM where
   lookup _ = genericLookupHashDB $ asks hashDB

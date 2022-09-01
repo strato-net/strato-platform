@@ -4,52 +4,52 @@ pipeline {
   }
   options { disableConcurrentBuilds() }
   parameters {
-    string(name: 'REFSPEC', defaultValue: '0.0.0-rc0', description: 'The strato-platform refspec to build as a release candidate. Use `tags/<tag_name>` to build specific tag or origin/<branch_name> to build the branch.')
+    string(name: 'GIT_TAG', defaultValue: 'tags/0.0.0-rc0', description: 'The strato-platform git tag to build as a release candidate. Use `tags/<tag_name>` format. NOTE: Other Refspec types are not supported.')
     string(name: 'RELEASE_VERSION', defaultValue: '0.0.0', description: 'The version tag for the future release')
   }
   stages {
     stage('Prepare') {
       steps {
-        withEnv([
-          "REFSPEC=${env.REFSPEC}",
-        ]) {
-          sh '''#!/bin/bash -le
-            set -x
+        script {
+          if (!env.GIT_TAG.contains("tags/")) {
+            echo "Unexpected GIT_TAG format: ${env.GIT_TAG}, expected to include 'tags/'. Exit 1."
+            currentBuild.result = 'FAILURE'
+            sh "exit 1"
+          }
+        }
+        sh '''#!/bin/bash -le
+          set -x
 
-            # Install prerequisites if required (assuming VM has docker, docker-compose, git and npm + nodeJS v.6+ by default
-            if [ ! $(command -v github-release) ]; then
-              if [ ! $(command -v go) ]; then
-                wget -qO- https://dl.google.com/go/go1.11.1.linux-amd64.tar.gz | sudo tar -C /usr/local -xz
-                echo "export GOPATH=\$HOME/go" >> ~/.profile
-                echo "export PATH=\$PATH:/usr/local/go/bin:\$HOME/go/bin:" >> ~/.profile
-                . ~/.profile # to reload profile
-              fi
-              go get github.com/aktau/github-release
+          # Install prerequisites if required (assuming VM has docker, docker-compose, git and npm + nodeJS v.6+ by default
+          if [ ! $(command -v github-release) ]; then
+            if [ ! $(command -v go) ]; then
+              wget -qO- https://dl.google.com/go/go1.11.1.linux-amd64.tar.gz | sudo tar -C /usr/local -xz
+              echo "export GOPATH=\$HOME/go" >> ~/.profile
+              echo "export PATH=\$PATH:/usr/local/go/bin:\$HOME/go/bin:" >> ~/.profile
+              . ~/.profile # to reload profile
             fi
-
-            git worktree remove --force strato-worktree || true
-            git worktree add strato-worktree develop
-            cd strato-worktree
-            git checkout ${REFSPEC}
-            git worktree list
-            docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes
-            docker ps
-          '''
+            go get github.com/aktau/github-release
+          fi
+        '''
+        sh 'git worktree remove --force strato-worktree || true'
+        sh "git worktree add strato-worktree ${env.GIT_TAG}"
+        dir ('strato-worktree') {
+          sh 'git worktree list'
+          sh 'docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes'
+          sh 'docker ps'
         }
       }
     }
 
     stage('Build') {
       steps {
-        withEnv(["RELEASE_VERSION=${env.RELEASE_VERSION}"]) {
-          dir ('strato-worktree') {
-            sh 'echo ${RELEASE_VERSION} > VERSION'
-            sh 'rm -rf .docker-work'
-            sh 'REPO=public make all'
-            dir ('blockapps-rest') {
-              sh 'yarn install --pure-lockfile'
-              sh 'yarn build'
-            }
+        dir ('strato-worktree') {
+          sh "echo ${env.RELEASE_VERSION} > VERSION"
+          sh 'rm -rf .docker-work'
+          sh 'REPO=public make all'
+          dir ('blockapps-rest') {
+            sh 'yarn install --pure-lockfile'
+            sh 'yarn build'
           }
         }
       }
@@ -111,56 +111,7 @@ pipeline {
               docker exec -t -e NODE_ENV=test "$APEX_CONTAINER" ./run-tests.sh
             '''
             },
-/*
-            'Track And Trace': {
-              withEnv([
-                  "ADMIN_TOKEN=eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJWY0N4SEpnUjFOdnJ4UWR5QXhQcEI5VEowM205SVRDdWt0b1JfTENVSE1VIn0.eyJqdGkiOiI1ZWE2NTBkNi1lMTM2LTQ5YjEtYTEzYi01MzY5MDM5MDdiNDEiLCJleHAiOjIwMjM5NzQxNDAsIm5iZiI6MCwiaWF0IjoxNTkxOTc0MTQwLCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvc3RyYXRvLWRldmVsIiwiYXVkIjoiYWNjb3VudCIsInN1YiI6IjBjYWFlM2RmLWQ2ZWUtNDkxZC04ODYyLTJlY2ZmM2Y2YTI0MyIsInR5cCI6IkJlYXJlciIsImF6cCI6ImRldi1pbmZpbml0ZSIsImF1dGhfdGltZSI6MTU5MTk3NDE0MCwic2Vzc2lvbl9zdGF0ZSI6IjI3MjEyNjBhLWU1ODItNGJiOS04N2I5LTc0YWQ3YWI5MmMzNyIsImFjciI6IjEiLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsib2ZmbGluZV9hY2Nlc3MiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sInNjb3BlIjoib3BlbmlkIGVtYWlsIHByb2ZpbGUiLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwicHJlZmVycmVkX3VzZXJuYW1lIjoiYWRtaW5pc3RyYXRvckB0dC5hcHAiLCJlbWFpbCI6ImFkbWluaXN0cmF0b3JAdHQuYXBwIn0.s-0MRMAEsG532YLM1k6GaXr3RKFUFpB13vR0WuYP8R1je2cP83hvE7Ll-N8hHbyAy8lumfEgSS6NXVIBCRrm0DEqX-XICOIEEkE6d6H-BPXqKZhfFV_HItfVWbWPDRHsCwvTI2ZAR8rgt19Dd8tWNOUVT_demsi20XYj8H2HuMo9vNMT7AN2wl1qRQPHffEppBrtPAx-PSauQpHm51xPgJSJMJPVhaVMWoM1tL91Ef6TOldZS8y89hReRaxeSZJP9kQWtIMLYe41AWcIKzrteOMBhPwa5e8PFfcDFJjvT6N_ASDtPldsxlNGrceMb0JVMwqmbcoetoE5_lMNKzGTkw",
-                  "MASTER_TOKEN=eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJWY0N4SEpnUjFOdnJ4UWR5QXhQcEI5VEowM205SVRDdWt0b1JfTENVSE1VIn0.eyJqdGkiOiJlYmMzNzJkMy04NzlkLTRjMDQtOWEwMi1iZjcyMGYyNWM5OGQiLCJleHAiOjIwMjM5NzQyMzgsIm5iZiI6MCwiaWF0IjoxNTkxOTc0MjM4LCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvc3RyYXRvLWRldmVsIiwiYXVkIjoiYWNjb3VudCIsInN1YiI6ImM5M2NjMzQxLWYzZGEtNGY0Yy1hZTczLTVkMDIzN2ZmZDVlZCIsInR5cCI6IkJlYXJlciIsImF6cCI6ImRldi1pbmZpbml0ZSIsImF1dGhfdGltZSI6MTU5MTk3NDIzOCwic2Vzc2lvbl9zdGF0ZSI6ImVkNTY2OTQ0LWRlZTgtNDE5YS04M2Y1LTRiYTJjYzlhNjE3NCIsImFjciI6IjEiLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsib2ZmbGluZV9hY2Nlc3MiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sInNjb3BlIjoib3BlbmlkIGVtYWlsIHByb2ZpbGUiLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwicHJlZmVycmVkX3VzZXJuYW1lIjoibWFzdGVyQHR0LmFwcCIsImVtYWlsIjoibWFzdGVyQHR0LmFwcCJ9.wS7tU80jGm3akaaB_iSYw3a2aCJQ44-RfbYsYtAN1wYd6wk1gtaf9leCD0Cks98ItMtf8E7ZHb5yNLTZ6vsxrjhPNkmN0dVbn7Ol9UxJ_qOC4oVXyowESAGVSVZSeZ79PSKz16Mm9KQYacqEEfECnzVE4CN2143lBmWqQT6wjPbzn3-0xz6W7xZfQpuJX6EIYNOPjyheSTpKUpZxCNoFzTy0GRyHrVhnlucTkBTy3Dj-BLM3aDVwHyuSASXnq_qL3TZIG7ksJ4mF1L6XAQGu5p8pFs22XMlz0iXKtYJNfCzmRLoeto85oBcsw4gkh2e0xkOC9FJrDkkIDo8tTUTilQ",
-                  "DISTRIBUTOR_TOKEN=eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJWY0N4SEpnUjFOdnJ4UWR5QXhQcEI5VEowM205SVRDdWt0b1JfTENVSE1VIn0.eyJqdGkiOiI2MjljMGMzOC1kMzg1LTQxMjktYmVlNy1lMTkzZjFhYzFhMzgiLCJleHAiOjIwMjM5NzQyNTIsIm5iZiI6MCwiaWF0IjoxNTkxOTc0MjUyLCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvc3RyYXRvLWRldmVsIiwiYXVkIjoiYWNjb3VudCIsInN1YiI6ImZmODIxNzY1LWI0YjUtNDE2Zi1hMTY3LWM2ZmRhMTJkZjA2YSIsInR5cCI6IkJlYXJlciIsImF6cCI6ImRldi1pbmZpbml0ZSIsImF1dGhfdGltZSI6MTU5MTk3NDI1Miwic2Vzc2lvbl9zdGF0ZSI6Ijc4MWNlZTE3LWFhZTgtNDNjMC1hNjVjLTk0MmI2Y2UwYTMyYSIsImFjciI6IjEiLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsib2ZmbGluZV9hY2Nlc3MiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sInNjb3BlIjoib3BlbmlkIGVtYWlsIHByb2ZpbGUiLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwicHJlZmVycmVkX3VzZXJuYW1lIjoiZGlzdHJpYnV0b3JAdHQuYXBwIiwiZW1haWwiOiJkaXN0cmlidXRvckB0dC5hcHAifQ.nHdFsWfUSuech6fFOlQ9QWpxCxQ4W5IIpO6sICyo6KTm030F91LCyS55R419sA40rOhcUbMml-SGb_ZY1m6avwb4A89jBf0JgLx_iVfwKI4LQC_eQoyLety9e-VVJrRvovJsRrE__D8GTpvGBKOfXdkpmNF4iNSyL3jggFTpT05gv5LEvCQ4yB5kD6f3XoYIN9F1t8IfUMT9MaF8-zGJ1UHXfFnlWPz_ICPn8FJdl-bIObfMlk6YqEXv0SB_Gg9LtcoEUMEmt-vfwL01BXYr__G7LkJmqOXamomZi00Oi824EYCIyeJwSVU7EmqBpUA_EOzMWSR774Vr0sZjpG2vIQ",
-                  "MANUFACTURER_TOKEN=eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJWY0N4SEpnUjFOdnJ4UWR5QXhQcEI5VEowM205SVRDdWt0b1JfTENVSE1VIn0.eyJqdGkiOiJhMGQ1MzkxYS1iNmQ0LTQzNDQtYjJhOS0wNTNhYjNmM2M2YzMiLCJleHAiOjIwMjM5NzQyNjQsIm5iZiI6MCwiaWF0IjoxNTkxOTc0MjY0LCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvc3RyYXRvLWRldmVsIiwiYXVkIjoiYWNjb3VudCIsInN1YiI6ImVjNjVmNDNlLWM4MGUtNDY1My1hODFiLTNmZGE4MmJlOTk1NCIsInR5cCI6IkJlYXJlciIsImF6cCI6ImRldi1pbmZpbml0ZSIsImF1dGhfdGltZSI6MTU5MTk3NDI2NCwic2Vzc2lvbl9zdGF0ZSI6IjliMmUxMzljLTMyOTUtNGYwMy04Nzk4LWVjY2JmNmQ0MzBiZSIsImFjciI6IjEiLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsib2ZmbGluZV9hY2Nlc3MiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sInNjb3BlIjoib3BlbmlkIGVtYWlsIHByb2ZpbGUiLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwicHJlZmVycmVkX3VzZXJuYW1lIjoibWFudWZhY3R1cmVyQHR0LmFwcCIsImVtYWlsIjoibWFudWZhY3R1cmVyQHR0LmFwcCJ9.rakA66et-VRzE6lQis5c71-hG49o3ev0NfXQNuvBHkB8AG1UY5nEi8OxH0V66aMwKwMKWxefBU9BeLr8Kci8c8fDKNq8uM4mO6RN7PrmfJ1AAcgIuC7MNermTegIgb7IApxXo1zhxYUAyVyVCIRjOAy-QdlH36SDIRS3F-pJMDEUd-VKdqYDNFmcWr16-Lf8xvQH2xZVJQ_fsX9mz19RRQnBjYDEK1LHgtcGu7o5Sk5SUEAfBwMfQa6WuMkr9mZAtclGhqKflthafkrWww66BEDsOapwt-1IdWD0n4EM6-7aDCsFiVquRtWElT_O4PEKZN-pkiCoyGSyKR9g0GiU3Q",
-                  "REGULATOR_TOKEN=eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJWY0N4SEpnUjFOdnJ4UWR5QXhQcEI5VEowM205SVRDdWt0b1JfTENVSE1VIn0.eyJqdGkiOiI3MGE4ZjJkYS1jY2RlLTRlNWQtYjEyNi1kOWI3NzBkODIxZGIiLCJleHAiOjIwMjM5NzQyNzQsIm5iZiI6MCwiaWF0IjoxNTkxOTc0Mjc1LCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvc3RyYXRvLWRldmVsIiwiYXVkIjoiYWNjb3VudCIsInN1YiI6IjJjNTE3MjAzLWNhNTEtNDQyNi04M2RlLTNmODdiY2VjZjg4YSIsInR5cCI6IkJlYXJlciIsImF6cCI6ImRldi1pbmZpbml0ZSIsImF1dGhfdGltZSI6MTU5MTk3NDI3NCwic2Vzc2lvbl9zdGF0ZSI6IjZiZTI0OWYwLTMzYWQtNDkwMS1hOGYyLTEzNjRjNWFiYzIyYSIsImFjciI6IjEiLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsib2ZmbGluZV9hY2Nlc3MiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sInNjb3BlIjoib3BlbmlkIGVtYWlsIHByb2ZpbGUiLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwicHJlZmVycmVkX3VzZXJuYW1lIjoicmVndWxhdG9yQHR0LmFwcCIsImVtYWlsIjoicmVndWxhdG9yQHR0LmFwcCJ9.eRpCW0cXzmUERDfYZ6PAvJCnssyZuqTW7vLH-CI4NYxVK9xu8CkWlCw-QlaI2ieBwn0u6nXUR7mEcKbYZQkk8sMATXxpCA_POVaoF7waf3gtyeJyU9dfoCwor5hytAa_LYuFd9FPVA9in9imkaXzUAVD9lqFIuCBv0AW2IOXUF1ELn6snMFej_V84_jGoppN-XSZsaCY2IZxvJFgeKgjsNholp_2n1mu64tzoFyM-SmEcxY6gNZC3f_aLMmYtJY-K4-WBusgSxj8TRoKQe98xPTgr1KmFGHc_1GCUGJFAhEKCHwMOHFf_bT80ai8UC77vF_0zvmgy-I-mJLRh05IDQ",
-                  "RETAILER_TOKEN=eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJWY0N4SEpnUjFOdnJ4UWR5QXhQcEI5VEowM205SVRDdWt0b1JfTENVSE1VIn0.eyJqdGkiOiI4OWVlNDc1Ny1kNzc4LTQ1ZTgtYmI4Zi0yODNmYWIxZjEyNmQiLCJleHAiOjIwMjM5NzQyODUsIm5iZiI6MCwiaWF0IjoxNTkxOTc0Mjg1LCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvc3RyYXRvLWRldmVsIiwiYXVkIjoiYWNjb3VudCIsInN1YiI6ImIzMGI2MjI0LWM0ZDktNDlhZC04Njc0LWYyY2NmNTNmMjYyOSIsInR5cCI6IkJlYXJlciIsImF6cCI6ImRldi1pbmZpbml0ZSIsImF1dGhfdGltZSI6MTU5MTk3NDI4NSwic2Vzc2lvbl9zdGF0ZSI6IjczOTBlYzM2LWJiOGYtNGRmZi1hYTU2LWM2ZjZlOGYwNTBlNSIsImFjciI6IjEiLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsib2ZmbGluZV9hY2Nlc3MiLCJ1bWFfYXV0aG9yaXphdGlvbiJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sInNjb3BlIjoib3BlbmlkIGVtYWlsIHByb2ZpbGUiLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwicHJlZmVycmVkX3VzZXJuYW1lIjoicmV0YWlsZXJAdHQuYXBwIiwiZW1haWwiOiJyZXRhaWxlckB0dC5hcHAifQ.w-tQl7k_G_9gr2xUQt5GurI3q6sQN3upk8QIT4cnpWgO-4fYkCslg4sF7K6StC-yJlp7Ye7B9y1L5jg9EDhClM_fMukycdsN32Fr3-Ac2PaqshJmtwdJb32VXi47Vdokl3nB1S37a7sL6BIdT7yZESC9EYdPSPPvhmlR8hbKJiqVbqPHJZXmkpwXTQKaeGIB0h56AlVxtfTL4av4bn1gj7WbQ1q0CvtnTg390QyuS18n_NHxzrKu6a51X5kAPGo9gt7CjvPKLOuqIMY1kaPqzXgPMcrP4Qxc0zDC2XWCTJJgeDPp_mz4ndKxgUKN9jr3DSJARQt6tpJ7xM7VjOqchg"
-              ]) {
-                
-                sh 'rm -rf track-and-trace'
-                sh 'git clone -b master https://github.com/blockapps/track-and-trace.git'
-                dir ('track-and-trace/server') {
-                  writeFile file: "config/jenkinstest.config.yaml", text: """
-                  apiDebug: false
-                  restVersion: 6
-                  timeout: 120000
-                  dappPath: ./dapp
-                  libPath: blockapps-sol/dist
-                  apiUrl: /api/v1
-                  deployFilename: ./config/jenkinstest.deploy.yaml
-                  
-                  nodes:
-                    - id: 0
-                      url: "http://localhost"
-                      publicKey: "6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0"
-                      port: 30303
-                      oauth:
-                        appTokenCookieName: "tt_session"
-                        scope: "email openid"
-                        appTokenCookieMaxAge: 7776000000 # 90 days: 90 * 24 * 60 * 60 * 1000
-                        openIdDiscoveryUrl: "https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration"
-                        clientId: "dev-infinite"
-                        clientSecret: "091a22ec-3c81-4be4-83fb-d9f82084c3e8"
-                        redirectUri: "http://UNUSED/api/v1/authentication/callback"
-                        logoutRedirectUri: "http://UNUSED"
 
-                  """
-                  // symlink or npm link or yarn link don't work here without sudo - don't wanna mess the file permissions
-                  sh 'cp -r ../../strato-worktree/blockapps-rest blockapps-rest'
-                  sh '''sed -i 's|.*blockapps-rest.*|"blockapps-rest": "file:./blockapps-rest",|' package.json'''
-                  sh 'touch .env'
-                  sh 'yarn build'
-                  sh 'yarn install --pure-lockfile'
-                  sh 'SERVER=jenkinstest yarn test'
-                }
-              }
-            },
-*/
             'STRATO API Tests': {
               withCredentials([
                 usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')
@@ -200,48 +151,56 @@ pipeline {
 
     stage('Release') {
       steps {
-        withEnv(["REFSPEC=${env.REFSPEC}"]) {
-          withCredentials([
-            usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
-            usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')
-          ]) {
+        withCredentials([
+          usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
+          usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')
+        ]) {
+          dir ('strato-worktree') {
+            // Push images to Docker Registry
             sh '''#!/bin/bash -le
               set -x
-              cd strato-worktree
-              RELEASE_VERSION=$(<VERSION)
               docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
               docker-compose --log-level ERROR -f docker-compose.push.yml push 2>&1
+            '''
 
-              # Release to strato-getting-started
+            // Release to blockapps/strato-getting-started
+            sh '''#!/bin/bash -le
+              set -x
+              RELEASE_VERSION=$(<VERSION)
               STRATOGS_RELEASE_DETAILS_STABLE="--user blockapps --repo strato-getting-started --tag ${RELEASE_VERSION}"
               github-release delete $STRATOGS_RELEASE_DETAILS_STABLE || true
               github-release release $STRATOGS_RELEASE_DETAILS_STABLE --name "${RELEASE_VERSION}"
               sleep 5
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.yml" --file ./docker-compose.yml
-
-              # Merge to master and change VERSION
-              git checkout VERSION
-              git checkout master
-              git merge ${REFSPEC}
-              echo ${RELEASE_VERSION} > VERSION
-              git add VERSION
-              git -c user.name=${GITHUB_USERNAME} -c user.email='cd@blockapps' commit VERSION -m "${RELEASE_VERSION}" --allow-empty
-              git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform HEAD
-              git tag ${RELEASE_VERSION}
-              # The following step requires `cd-blockapps` user to be able to push directly to master
-              # (requirement for pull-request reviews should be disabled for `master` branch or cd-blockapps should be the admin and "Include administrators" should be unchecked in branch protection rules)
-              # TODO: any ideas how to avoid that?
-              git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform HEAD --tags
-
-              # Merge VERSION change back to develop
-              git checkout develop
-              git pull https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform HEAD
-              git merge master
-              # The following step requires `cd-blockapps` user to be able to push directly to develop
-              # (requirement for pull-request reviews should be disabled for `develop` branch or cd-blockapps should be the admin and "Include administrators" should be unchecked in branch protection rules)
-              # TODO: any ideas how to avoid that?
-              git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform HEAD
             '''
+
+            // Merge release code to master
+            sh 'git checkout VERSION'
+            // Make sure no master branch exists with random/old code, we want code from origin/master
+            sh 'git branch -D master'
+            sh 'git checkout master'
+            sh "git merge ${env.GIT_TAG}"
+            sh "echo ${env.RELEASE_VERSION} > VERSION"
+            sh 'git add VERSION'
+            sh "git -c user.name=${GITHUB_USERNAME} -c user.email=\'cd@blockapps\' commit VERSION -m '${env.RELEASE_VERSION}' --allow-empty"
+            sh 'git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform master'
+            sh "git tag ${env.RELEASE_VERSION}"
+            // The following step requires `cd-blockapps` user to be able to push directly to master
+            // (requirement for pull-request reviews should be disabled for `master` branch or cd-blockapps should be the admin and "Include administrators" should be unchecked in branch protection rules)
+            // any ideas how to avoid that?
+            sh 'git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform --tags'
+
+            // A trick to avoid error: "fatal: 'develop' is already checked out at <...>/jenkins/workspace/RELEASE_STRATO_release_build"
+            sh "(cd ../ && git checkout ${env.GIT_TAG})"
+            
+            // Merge VERSION change back to develop
+            sh 'git checkout develop'
+            sh 'git pull https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform develop'
+            sh 'git merge master'
+            // The following step requires `cd-blockapps` user to be able to push directly to develop
+            // (requirement for pull-request reviews should be disabled for `develop` branch or cd-blockapps should be the admin and "Include administrators" should be unchecked in branch protection rules)
+            // any ideas how to avoid that?
+            sh 'git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform develop'
           }
         }
       }
