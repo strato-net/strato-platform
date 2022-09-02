@@ -355,7 +355,7 @@ function logRotation {
   done
 }
 
-function prefix_with_() {
+function prefix_with_ {
   local prefix="$1"
   shift
   "$@" > >(sed "s/^/[:$prefix:] /") 2> >(sed "s/^/[:$prefix:][ERR] /" >&2)
