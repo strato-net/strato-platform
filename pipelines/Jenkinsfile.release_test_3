@@ -23,7 +23,19 @@ pipeline {
                     script {
                         if (env.STRATO_BUILD == 'latest') {
                             sh 'sudo ./strato --compose'
-                            }
+                            } else if (env.STRATO_BUILD == 'develop') {
+                            // Fetching artifact from last successful build of STRATO_autobuild multibranch develop job
+                            step([
+                                    $class: 'CopyArtifact',
+                                    fingerprintArtifacts: true,
+                                    flatten: true,
+                                    projectName: "STRATO_autobuild/develop",
+                                    selector: [$class: 'StatusBuildSelector'],
+                                    filter: "docker-compose.yml",
+                                    target: '.',
+                                    optional: false
+                            ])
+                        }
                         else {
                             if (env.STRATO_BUILD.contains(".") && !env.STRATO_BUILD.contains("/")) {
                                 sh "curl -s -L https://github.com/blockapps/strato-getting-started/releases/${env.STRATO_BUILD} | egrep -o '/blockapps/strato-getting-started/releases/download/.*/docker-compose.yml' | wget --base=http://github.com/ -i - -O docker-compose.yml"
