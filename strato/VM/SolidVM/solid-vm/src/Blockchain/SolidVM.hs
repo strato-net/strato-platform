@@ -121,7 +121,6 @@ import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpre
 import           Network.Haskoin.Crypto.BigWord()
 import           UnliftIO                             hiding (assert)
 
-
  
 
 -- | Copying from Data.List.Extra, since our version of the extra library seems to not contain it.
@@ -200,7 +199,7 @@ instance MonadSM m => Mod.Accessible [SourcePosition] m where
 
 runExpr :: MonadSM m => EvaluationRequest -> m EvaluationResponse
 runExpr exprText = withoutDebugging . withTempCallInfo True $ do -- TODO: allow write access once we figure out how to discard changes
-  let eExpr = runParser expression (ParserState "" "") "" (T.unpack exprText)
+  let eExpr = runParser expression (ParserState "" "" M.empty) "" (T.unpack exprText)
   case eExpr of
     Left pe -> pure . Left . T.pack $ show pe
     Right expr -> do
@@ -264,7 +263,7 @@ create _ _ _ blockData _ sender' origin' _ _ _ newAddress code txHash' chainId' 
 
     let maybeArgString = M.lookup "args" =<< metadata
         argString = maybe "()" T.unpack maybeArgString
-        maybeArgs = runParser parseArgs (ParserState "" "") "" argString
+        maybeArgs = runParser parseArgs (ParserState "" "" M.empty) "" argString
         !args = either (parseError "create arguments") CC.OrderedArgs maybeArgs
 
     (hsh, cc) <- codeCollectionFromSource True initCode
@@ -402,7 +401,7 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' cha
         !funcName = textToLabel $ fromMaybe (missingField "TX is missing a metadata parameter called 'funcName'" $ show metadata) maybeFuncName
         maybeArgString = M.lookup "args" =<< metadata
         !argString = T.unpack $ fromMaybe (missingField "TX is missing metadata parameter called 'args'" $ show metadata) maybeArgString
-        maybeArgs = runParser parseArgs (ParserState "" "") "" argString
+        maybeArgs = runParser parseArgs (ParserState "" "" M.empty) "" argString
         !args = either (parseError "call arguments") CC.OrderedArgs maybeArgs
 
     returnVal <- mapM encodeForReturn =<< callWrapper sender' codeAddress Nothing funcName isRCC args
@@ -645,7 +644,7 @@ argsToValsModifiers ctract md args =
                 return $ SMap valueType $ M.fromList m
                 where --go :: (SolidString, CC.Expression) -> (SolidString, (Value, Variable))
                       go (k, v) = do
-                                let !maybeExp = runParser literal (ParserState "" "") "" (labelToString k)
+                                let !maybeExp = runParser literal (ParserState "" "" M.empty) "" (labelToString k)
                                 case maybeExp of 
                                   Right ex -> do
                                     k' <- eval keyType ex
@@ -715,7 +714,7 @@ argsToVals ctract fn args =
                   m <- mapM go $ M.toList mp
                   return $ SMap valueType $ M.fromList m
                   where go (k, v) = do
-                                  let !maybeExp = runParser literal (ParserState "" "") "" k
+                                  let !maybeExp = runParser literal (ParserState "" "" M.empty) "" k
                                   case maybeExp of 
                                     Right ex -> do
                                       k' <- eval keyType ex
@@ -759,7 +758,7 @@ argsToVals ctract fn args =
                 return $ SMap valueType $ M.fromList m
                 where --go :: (SolidString, CC.Expression) -> (SolidString, (Value, Variable))
                       go (k, v) = do
-                                let !maybeExp = runParser literal (ParserState "" "") "" (labelToString k)
+                                let !maybeExp = runParser literal (ParserState "" "" M.empty) "" (labelToString k)
                                 case maybeExp of 
                                   Right ex -> do
                                     k' <- eval32 keyType ex
@@ -1697,6 +1696,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
           _ -> return . Constant . SReference . apSnoc apt $ MS.Field "length"
 
       (SReference p, itemName) -> return . Constant . SReference $ apSnoc p $ MS.Field $ BC.pack $ labelToString itemName
+      ((SUserDefined alias notSure actualType), "wrap") -> return . Constant $ (SUserDefined alias notSure actualType) -- return $ Constant . SUserDefined alias val actualType
       m -> typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ show m)
 {-
     Variable vref -> do
@@ -1935,7 +1935,7 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
               s <- stringLiteral
               return s
             return $ CC.StringLiteral a str
-      let saltExpression = runParser (stringParser <|> expression) (ParserState "" "") "" (saltText)
+      let saltExpression = runParser (stringParser <|> expression) (ParserState "" "" M.empty) "" (saltText)
       saltValue <- do
         case saltExpression of
           Left pe -> invalidArguments "big bad sad" pe
@@ -3460,8 +3460,10 @@ solidityExceptionHandler catchBlockMap ex = do
     (FailedToAttainRunTimCode s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 26 getRunTimeCodeError
       return res
+    (UserDefinedError s1 s2) -> do
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 26 userDefinedError
+      return res
     _ -> error "unhandled solid exception" (show ex)
-
 
 
 

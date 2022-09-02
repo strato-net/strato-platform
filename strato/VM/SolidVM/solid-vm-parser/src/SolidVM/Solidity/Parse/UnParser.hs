@@ -2,6 +2,7 @@
 -- Module: UnParser
 -- Description: The Solidity source unparser to render Xabi into a Solidity Source File
 -- Maintainer: Charles Crain <charles@blockapps.net>
+-- Maintainer: Steven Glasford <steven_glasford@blockapps.net>
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -45,6 +46,7 @@ unparseSourceUnit (FLConstant name conDecl) = (("\n    " <>) . unparseConstant) 
 unparseSourceUnit (FLStruct name decl) = (("\n    " <>) . unparseTypes) (Text.unpack name, decl)
 unparseSourceUnit (FLEnum name decl) = (("\n    " <>) . unparseTypes) (Text.unpack name, decl)
 unparseSourceUnit (FLError name args) = (("\n    " <>) . unparseTypes) (Text.unpack name, args)
+unparseSourceUnit (Alias _ ident orignal) = "type \"" ++ ident ++" "++ orignal ++ "\";\n"
 unparseSourceUnit (DummySourceUnit) = "DummySourceUnit"
 unparseSourceUnit (NamedXabi name (contract,inherited)) =
      (case xabiKind contract of
@@ -186,6 +188,7 @@ unparseFuncWithOverload name myFunction = unparseFuncDeep name myFunction
 unparseFuncWithoutName:: Func -> Text
 unparseFuncWithoutName f = unparseFuncDeep "" f
 
+
 unparseFuncDeep :: SolidString -> Func -> Text
 unparseFuncDeep deepName Func{..} =
        (if (deepName == "") then
@@ -286,7 +289,6 @@ unparseStatementWith f (TryCatchStatement tryBlock catchBlockMap a) = f a $
   (show (fromMaybe [] params)) ++ " {\n" ++ tab (unlines $ map (unparseStatementWith f) block) ++ "\n}") (Map.toList catchBlockMap)))
 unparseStatementWith f (SolidityTryCatchStatement expr mtpl tryBlock catchBlockMap a) = f a $
   "try " ++ unparseExpression expr ++ " " ++  (show (fromMaybe [] mtpl)) ++ " {\n" ++ tab (unlines $ map (unparseStatementWith f) tryBlock) ++ "\n}" ++ " catch " ++ show (Map.toList catchBlockMap)
--- unparseStatementWith _ x = internalError "missing case in call to unparseStatementWith" $ show x
 
 
 

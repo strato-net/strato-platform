@@ -30,6 +30,7 @@ xabiToPartialContract xabi =
     _parents=error "_parents undefined",
     _constants=error "_constants undefined",
     _storageDefs=M.mapKeys textToLabel $ fmap varTypeToVariableDecl $ OLDXABI.xabiVars xabi,
+    _userDefined = error "_userDefined undefined", 
     _enums=error "_enums undefined",
     _structs=error "_structs undefined",
     _errors=error "_errors undefined",

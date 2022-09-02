@@ -113,6 +113,7 @@ import           SolidVM.Model.Value
 
 import           UnliftIO
 
+
 data CallInfo = CallInfo
   { currentFunctionName :: SolidString
   , currentAccount      :: Account
@@ -396,6 +397,7 @@ getVariableOfName name = do
                     then x { currentContract = CC.Contract { CC._contractName = currentContract x^.CC.contractName
                                                 ,  CC._parents = currentContract x^.CC.parents
                                                 ,  CC._constants = M.empty
+                                                ,  CC._userDefined = M.empty
                                                 ,  CC._storageDefs = M.empty
                                                 ,  CC._enums = M.empty
                                                 ,  CC._structs = M.empty
@@ -497,7 +499,8 @@ getVariableOfName name = do
       , maybeContract
       , maybeThis
       , maybeConstant
-      , unknownVariable "getVariableOfName" name
+      --, maybeUserDefined
+      , unknownVariable ("getVariableOfName" ++ (show (currentContract currentCallInfo^.CC.storageDefs)) )name
       ]
 
 getTypeOfName' :: SolidString -> CC.CodeCollection -> Typo
@@ -648,6 +651,8 @@ hintFromType = \case
  SVMType.Bytes{} -> return TString
  SVMType.Int{} -> return TInteger
  SVMType.String{} -> return TString
+ (SVMType.UserDefined _ SVMType.Bool{}) -> return TBool
+ (SVMType.UserDefined _ SVMType.Int{}) -> return TString
  SVMType.UnknownLabel s _ -> do
    t' <- getTypeOfName s
    case t' of
