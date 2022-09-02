@@ -1,7 +1,6 @@
 #!/bin/bash
 
 set -e
-set -x
 
 echo 'export PS1="⛓ \w> "' >> /root/.bashrc
 
@@ -64,8 +63,8 @@ function newnode {
     sleep 10
   fi
 
-  echo "Starting Strato processes. All output is logged to $PWD/logs."
-  runBackgroundProcess logserver --directory "${PWD}/logs" --uri_root=/logs/strato/ &>> logs/logserver
+  echo "Starting STRATO processes..."
+  runBackgroundProcess logserver --directory "${PWD}/logs" --uri_root=/logs/strato/
 
   if $mineBlocks
   then echo "Starting strato-adit"
@@ -74,11 +73,11 @@ function newnode {
         aMiner=Instant
       fi
       export miningThreads=${miningThreads:-1}
-      runBackgroundProcess strato-adit --useSyncMode=$useSyncMode --minQuorumSize=$minQuorumSize --threads=${miningThreads:-1} --aMiner=$aMiner >> logs/strato-adit 2>&1
+      runBackgroundProcess strato-adit --useSyncMode=$useSyncMode --minQuorumSize=$minQuorumSize --threads=${miningThreads:-1} --aMiner=$aMiner
   fi
 
   echo "Starting ethereum-discover"
-  runBackgroundProcess ethereum-discover --vaultWrapperUrl=$vaultWrapperRoot &>> logs/ethereum-discover
+  runBackgroundProcess ethereum-discover --vaultWrapperUrl=$vaultWrapperRoot
 
   actualTimeout="${connectionTimeout:-300}"
   if [ -n "${blockstanbulRoundPeriodS}" ]; then
@@ -119,8 +118,7 @@ function newnode {
      ${pcamFlag} \
      ${pmFlag} \
      ${cacheFlag} \
-     ${networkFlag} \
-     &>> logs/strato-p2p
+     ${networkFlag}
 
   evmMinLogLevel=LevelInfo
   if [ "${evmDebugMode}" = true ] ; then
@@ -162,16 +160,16 @@ function newnode {
     "${bpFlag}" "${rpFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" "${vsFlag}" \
     "${baFlag}" "${scFlag}" "${adFlag}" "${rtFlag}" --minLogLevel=$seqMinLogLevel \
     "${networkFlag}" \
-    "${vwFlag}" +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
+    "${vwFlag}" +RTS "${seqRTSOPTs:-}" -N1
 
   echo "Starting strato-api-indexer"
-  runBackgroundProcess strato-api-indexer +RTS -N1 >> logs/strato-api-indexer 2>&1
+  runBackgroundProcess strato-api-indexer +RTS -N1
 
   echo "Starting strato-p2p-indexer"
-  runBackgroundProcess strato-p2p-indexer +RTS -N1 >> logs/strato-p2p-indexer 2>&1
+  runBackgroundProcess strato-p2p-indexer +RTS -N1
 
   echo "Starting strato-txr-indexer"
-  runBackgroundProcess strato-txr-indexer +RTS -N1 >> logs/strato-txr-indexer 2>&1
+  runBackgroundProcess strato-txr-indexer +RTS -N1
 
   if [ -n "${brokenRefundReenable}" ]; then
     breFlag="--brokenRefundReenable=${brokenRefundReenable}"
@@ -182,10 +180,10 @@ function newnode {
   if [ -n "${seqEventsBatchSize}" ]; then
     sebFlag="--seqEventsBatchSize=${seqEventsBatchSize}"
   fi
-  if [-n "${seqEventsCostHeuristic}" ]; then
+  if [ -n "${seqEventsCostHeuristic}" ]; then
       sechFlag="--seqEventsCostHeuristic=${seqEventsCostHeuristic}"
   fi
-  if [-n "${cacheTransactionResults}"] ; then
+  if [ -n "${cacheTransactionResults}" ] ; then
       ctrFlag="--cacheTransactionResults=${cacheTransactionResults}"
   fi
   echo "Starting vm-runner"
@@ -197,14 +195,14 @@ function newnode {
                          --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$evmMinLogLevel --evmCompatible=$evmCompatible \
                          ${networkFlag} --networkID=$networkID \
                          "${tbFlag}" "${breFlag}" "${sebFlag}" "${sechFlag}" "${svdFlag}" "${ctrFlag}" \
-                         --gasOn=$gasOn +RTS "${vmRunnerRTSOPTs:-}" -I2 -N1 &>> logs/vm-runner
+                         --gasOn=$gasOn +RTS "${vmRunnerRTSOPTs:-}" -I2 -N1
   
   echo "Starting strato-api"
-  runBackgroundProcess strato-api --gasOn=$gasOn --evmCompatible=$evmCompatible +RTS -N1 >> logs/strato-api 2>&1
+  runBackgroundProcess strato-api --gasOn=$gasOn --evmCompatible=$evmCompatible +RTS -N1
 
   if [ "${START_EXPERIMENTAL_STRATO_API}" = true ]; then
       echo "Starting strato-api2"
-      runBackgroundProcess strato-api2 --gasOn=$gasOn +RTS -N1 >> logs/strato-api2 2>&1
+      runBackgroundProcess strato-api2 --gasOn=$gasOn +RTS -N1
   fi
 
   if [ "${evmCompatible}" = true ]; then
@@ -220,57 +218,62 @@ function newnode {
     --kafkahost=${kafkaHost} --kafkaport=${kafkaPort} --minLogLevel=${slipMinLogLevel} --indexEVM=$indexFlag"
 
   if [ "${SLIPSTREAM_OPTIONAL}" = true ]; then
-      $SLIPSTREAM_CMD &>> logs/slipstream &
+    # Running slipstream unsupervised
+    prefix_with_ "slipstream" $SLIPSTREAM_CMD |& tee -a logs/slipstream &
   else
-      runBackgroundProcess $SLIPSTREAM_CMD &>> logs/slipstream
+    runBackgroundProcess $SLIPSTREAM_CMD
   fi
   
   echo "Configuring log rotation..."
   runBackgroundProcess logRotation
 
-  set +x
-  if [ "${PROCESS_MONITORING}" = true ] ; then
-    echo "Monitoring the background processes. Making checks every ${MONITORING_TIMER} sec. If you don't see any error messages below - all processes are healthy..."
-    while sleep ${MONITORING_TIMER}; do
-      # check status for every monitored process
-      for monitored_pid in "${!MONITORED_PIDS[@]}"; do
-        # if process with pid does not exist
-        if ! (ps -p ${monitored_pid} > /dev/null); then
-          DEAD_PROCESS=${MONITORED_PIDS[${monitored_pid}]}
-          echo "Process ${DEAD_PROCESS} with pid ${monitored_pid} crashed - killing all monitored processes but keeping the container running..."
-          # Kill all the rest of monitored processes
-          for pid_to_kill in "${!MONITORED_PIDS[@]}"; do
-            if ps -p ${pid_to_kill} > /dev/null; then
-              echo "Sending SIGTERM to process ${MONITORED_PIDS[${pid_to_kill}]} (pid: ${pid_to_kill})"
-              kill -TERM ${pid_to_kill} || true
-              echo "done"
-            fi
-          done
-          # Allow 10s for cleanup of processes
-          sleep 10
-          for pid_to_kill in "${!MONITORED_PIDS[@]}"; do
-            if ps -p ${pid_to_kill} > /dev/null; then
-              echo "Sending SIGKILL to process ${MONITORED_PID[${pid_to_kill}]} (pid: ${pid_to_kill})"
-              kill -KILL ${pid_to_kill} || true
-              echo "done"
-            fi
-          done
+  prefix_with_ "supervisor" supervisor |& tee -a logs/supervisor
+}
 
-          FILE_NAME="/var/lib/strato/logs/$(echo ${DEAD_PROCESS} | cut -d ' ' -f 1)"
-          echo "Tail of logs for crashed process:"
-          echo "+tail -n 20 ${FILE_NAME}"
-          tail -n 20 $FILE_NAME
-          echo "End of logs."
-          echo "STRATO IS DOWN: Process with pid ${monitored_pid} crashed so all background processes were killed. Check /var/lib/strato/logs/ in the container"
-          # Keep container running idle
-          tail -f /dev/null
-        fi
+function supervisor {
+  set +x
+    if [ "${PROCESS_MONITORING}" = true ] ; then
+      echo "Monitoring the background processes. Making checks every ${MONITORING_TIMER} sec. If you don't see any error messages below - all processes are healthy..."
+      while sleep ${MONITORING_TIMER}; do
+        # check status for every monitored process
+        for monitored_pid in "${!MONITORED_PIDS[@]}"; do
+          # if process with pid does not exist
+          if ! (ps -p ${monitored_pid} > /dev/null); then
+            DEAD_PROCESS=${MONITORED_PIDS[${monitored_pid}]}
+            echo "Process ${DEAD_PROCESS} with pid ${monitored_pid} crashed - killing all monitored processes but keeping the container running..."
+            # Kill all the rest of monitored processes
+            for pid_to_kill in "${!MONITORED_PIDS[@]}"; do
+              if ps -p ${pid_to_kill} > /dev/null; then
+                echo "Sending SIGTERM to process ${MONITORED_PIDS[${pid_to_kill}]} (pid: ${pid_to_kill})"
+                kill -TERM ${pid_to_kill} || true
+                echo "done"
+              fi
+            done
+            # Allow 10s for cleanup of processes
+            sleep 10
+            for pid_to_kill in "${!MONITORED_PIDS[@]}"; do
+              if ps -p ${pid_to_kill} > /dev/null; then
+                echo "Sending SIGKILL to process ${MONITORED_PID[${pid_to_kill}]} (pid: ${pid_to_kill})"
+                kill -KILL ${pid_to_kill} || true
+                echo "done"
+              fi
+            done
+  
+            FILE_NAME="/var/lib/strato/logs/$(echo ${DEAD_PROCESS} | cut -d ' ' -f 1)"
+            echo "Tail of logs for crashed process:"
+            echo "+tail -n 20 ${FILE_NAME}"
+            tail -n 20 $FILE_NAME
+            echo "End of logs."
+            echo "STRATO IS DOWN: Process with pid ${monitored_pid} crashed so all background processes were killed. Check /var/lib/strato/logs/ in the container"
+            # Keep container running idle
+            tail -f /dev/null
+          fi
+        done
       done
-    done
-  else
-    echo "Process monitoring is off. Check the processes status with 'ps -ef' and see /var/lib/strato/logs/ directory in the container for logs"
-    tail -f /dev/null
-  fi
+    else
+      echo "Process monitoring is off. Check the processes status with 'ps -ef' and see /var/lib/strato/logs/ directory in the container for logs"
+      tail -f /dev/null
+    fi
 }
 
 function cleanupDB {
@@ -306,12 +309,12 @@ function doInit {
 
     echo "init event source: $cmd"
     # logging to stdout and log file:
-    $cmd 2>&1 | tee logs/strato-setup
+    prefix_with_ "tabula-rasa" $cmd |& tee -a logs/strato-setup
     if [ ${PIPESTATUS[0]} -ne 0 ]; then
       echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
       tail -f /dev/null
     fi
-    init-worker --kafkahost=$kafkaHost 2>&1 | tee --append logs/strato-setup
+    prefix_with_ "init-worker" init-worker --kafkahost=$kafkaHost |& tee -a logs/strato-setup
     if [ ${PIPESTATUS[0]} -ne 0 ]; then
       echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
       tail -f /dev/null
@@ -321,7 +324,7 @@ function doInit {
 
     echo "strato-setup command: $cmd"
     # logging to stdout and log file:
-    $cmd 2>&1 | tee logs/strato-setup
+    prefix_with_ "strato-setup" $cmd |& tee -a logs/strato-setup
     if [ ${PIPESTATUS[0]} -ne 0 ]; then
       echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
       tail -f /dev/null
@@ -330,7 +333,7 @@ function doInit {
 
   if [ "${USE_OLD_STRATO_API}" != "true" ]; then
       echo "initializing bloc database"
-      strato-api-init
+      prefix_with_ strato-api-init |& tee -a logs/strato-api-init
   fi
 
 
@@ -352,12 +355,21 @@ function logRotation {
   done
 }
 
+function prefix_with_() {
+  local prefix="$1"
+  shift
+  "$@" > >(sed "s/^/[:$prefix:] /") 2> >(sed "s/^/[:$prefix:][ERR] /" >&2)
+}
+
 function runBackgroundProcess {
-  $@ &
-  proc_pid=$!
-  MONITORED_PIDS[${proc_pid}]=$@
-  echo "process pid:: $proc_pid (command: $@)"
-  disown %
+  function _exec_bg {
+    $@ |& tee -a logs/"${1##*/}" &
+    proc_pid=$!
+    MONITORED_PIDS[${proc_pid}]=$@
+    echo "process pid:: $proc_pid (command: $@)"
+    disown %
+  }
+  prefix_with_ "${1##*/}" _exec_bg $@
 }
 
 function rmEthereumH {
