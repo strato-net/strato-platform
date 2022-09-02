@@ -122,8 +122,6 @@ import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpre
 import           Network.Haskoin.Crypto.BigWord()
 import           UnliftIO                             hiding (assert)
 
- 
-
 -- | Copying from Data.List.Extra, since our version of the extra library seems to not contain it.
 -- | A total variant of the list index function `(!!)`.
 --
@@ -200,7 +198,7 @@ instance MonadSM m => Mod.Accessible [SourcePosition] m where
 
 runExpr :: MonadSM m => EvaluationRequest -> m EvaluationResponse
 runExpr exprText = withoutDebugging . withTempCallInfo True $ do -- TODO: allow write access once we figure out how to discard changes
-  let eExpr = runParser expression (ParserState "" "") "" (T.unpack exprText)
+  let eExpr = runParser expression (ParserState "" "" M.empty) "" (T.unpack exprText)
   case eExpr of
     Left pe -> pure . Left . T.pack $ show pe
     Right expr -> do
@@ -243,7 +241,6 @@ create :: SolidVMBase m
 --create isRunningTests' isHomestead preExistingSuicideList b callDepth sender origin
 --       value gasPrice availableGas newAddress initCode txHash chainId metadata =
 create _ _ _ blockData _ sender' origin' _ _ _ newAddress code txHash' chainId' metadata = do
-  x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
   recordCreate
   let env' = Env.Environment {
         Env.blockHeader = blockData,
@@ -265,15 +262,14 @@ create _ _ _ blockData _ sender' origin' _ _ _ newAddress code txHash' chainId' 
 
     let maybeArgString = M.lookup "args" =<< metadata
         argString = maybe "()" T.unpack maybeArgString
-        maybeArgs = runParser parseArgs (ParserState "" "") "" argString
+        maybeArgs = runParser parseArgs (ParserState "" "" M.empty) "" argString
         !args = either (parseError "create arguments") CC.OrderedArgs maybeArgs
 
     (hsh, cc) <- codeCollectionFromSource True initCode
-    create' sender' newAddress hsh cc contractName' args x509s
+    create' sender' newAddress hsh cc contractName' args
 
-create' :: MonadSM m => Account -> Account -> Keccak256 -> CC.CodeCollection -> SolidString -> CC.ArgList -> M.Map Address X509Certificate -> m ExecResults
-create' creator newAccount ch cc contractName' argExps x509s = do
-  Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ x509s
+create' :: MonadSM m => Account -> Account -> Keccak256 -> CC.CodeCollection -> SolidString -> CC.ArgList -> m ExecResults
+create' creator newAccount ch cc contractName' argExps = do
   parentName <- fromMaybeM (return "") $ runMaybeT
      $   pure creator                                               -- Creator's address
      >>= MaybeT . A.lookup (A.Proxy @AddressState)                  -- Address's state
@@ -332,7 +328,7 @@ create' creator newAccount ch cc contractName' argExps x509s = do
 
   finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
   finalAct <- Mod.get (Mod.Proxy @Action)
-  x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
+  x509s' <- getCertTxMap
 
   return ExecResults {
     erRemainingTxGas = 0, --Just use up all the allocated gas for now....
@@ -404,14 +400,14 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ _ origin' txHash' cha
         !funcName = textToLabel $ fromMaybe (missingField "TX is missing a metadata parameter called 'funcName'" $ show metadata) maybeFuncName
         maybeArgString = M.lookup "args" =<< metadata
         !argString = T.unpack $ fromMaybe (missingField "TX is missing metadata parameter called 'args'" $ show metadata) maybeArgString
-        maybeArgs = runParser parseArgs (ParserState "" "") "" argString
+        maybeArgs = runParser parseArgs (ParserState "" "" M.empty) "" argString
         !args = either (parseError "call arguments") CC.OrderedArgs maybeArgs
 
     returnVal <- mapM encodeForReturn =<< callWrapper sender' codeAddress Nothing funcName isRCC args
 
     finalAct <- Mod.get (Mod.Proxy @Action)
     finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
-    x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
+    x509s <- getCertTxMap
 
     return $ ExecResults {
       erRemainingTxGas = 0, --Just use up all the allocated gas for now....
@@ -434,22 +430,12 @@ setCreator :: MonadSM m => Account -> Account -> CC.Contract -> Integer -> m ()
 setCreator creator contract cntrct blockNumber = do
 
   let creatorAddress = _accountAddress creator
-  x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-  maybeCertLevelDB <- x509CertDBGet $ creatorAddress
-  let maybeCertBlockDB = M.lookup creatorAddress x509s'
-      maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
-      _org = fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
-  case maybeCertBlockDB of
-    (Just _) -> onTraced $ liftIO $ putStrLn $ C.green "setCreator/versioning ---> Cache hit for x509 cert"
-
-    Nothing -> onTraced $ liftIO $ putStrLn $ C.red "setCreator/versioning ---> Cache miss for x509 cert - now looking in levelDB"
+  maybeCert <- A.lookup (A.Proxy @X509Certificate) creatorAddress
+  let _org = fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
 
   case maybeCert of
     (Just cert) -> do
       onTraced $ liftIO $ putStrLn $ C.green $ "setCreator/versioning ---> Found cert for " ++ (format creator) ++ ":\n\t" ++ (format $ getCertSubject cert)
-
-      Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.insert creatorAddress cert x509s'
-
     Nothing -> liftIO $ putStrLn $ C.red $ "setCreator/versioning ---> No cert found for " ++ (format creator)
   
   let hasSvm3_0 = CC._vmVersion cntrct == "svm3.0"
@@ -495,10 +481,7 @@ getOrg caller vers = do
       EVMCode _ -> do
       -- caller is a user account, so they are creating the first instance of this app
       -- we will look up their cert in the DB and use it to get the org name for this app
-        x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-        maybeCertLevelDB <- x509CertDBGet $ _accountAddress caller
-        let maybeCertBlockDB = M.lookup (_accountAddress caller) x509s'
-            maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
+        maybeCert <- A.lookup (A.Proxy @X509Certificate) $ caller ^. accountAddress
         let org' = fromMaybe "" $ fmap subOrg $ getCertSubject =<< maybeCert
         liftIO $ putStrLn $ "getOrg/versioning ---> They are a user of org " ++ (show org')
         return org'
@@ -660,7 +643,7 @@ argsToValsModifiers ctract md args =
                 return $ SMap valueType $ M.fromList m
                 where --go :: (SolidString, CC.Expression) -> (SolidString, (Value, Variable))
                       go (k, v) = do
-                                let !maybeExp = runParser literal (ParserState "" "") "" (labelToString k)
+                                let !maybeExp = runParser literal (ParserState "" "" M.empty) "" (labelToString k)
                                 case maybeExp of 
                                   Right ex -> do
                                     k' <- eval keyType ex
@@ -730,7 +713,7 @@ argsToVals ctract fn args =
                   m <- mapM go $ M.toList mp
                   return $ SMap valueType $ M.fromList m
                   where go (k, v) = do
-                                  let !maybeExp = runParser literal (ParserState "" "") "" k
+                                  let !maybeExp = runParser literal (ParserState "" "" M.empty) "" k
                                   case maybeExp of 
                                     Right ex -> do
                                       k' <- eval keyType ex
@@ -774,7 +757,7 @@ argsToVals ctract fn args =
                 return $ SMap valueType $ M.fromList m
                 where --go :: (SolidString, CC.Expression) -> (SolidString, (Value, Variable))
                       go (k, v) = do
-                                let !maybeExp = runParser literal (ParserState "" "") "" (labelToString k)
+                                let !maybeExp = runParser literal (ParserState "" "" M.empty) "" (labelToString k)
                                 case maybeExp of 
                                   Right ex -> do
                                     k' <- eval32 keyType ex
@@ -1605,42 +1588,32 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
                                                 calldataHash = fromMaybe emptyHash $ stringKeccak256 argString
                                             return . Constant . SString $ take 8 $ keccak256ToHex calldataHash 
       (SBuiltinVariable "tx", "origin") -> (Constant . ((flip SAccount) False) . accountToNamedAccount chainId . Env.origin) <$> getEnv
-      (SBuiltinVariable "tx", "username") -> do env' <- getEnv
-                                                x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-                                                maybeCertLevelDB <- x509CertDBGet $ _accountAddress $ Env.origin env'
-                                                let maybeCertBlockDB = M.lookup (_accountAddress $ Env.origin env') x509s
-                                                    maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
-                                                return . Constant . SString . fromMaybe "" . fmap subCommonName $ getCertSubject =<< maybeCert
-      (SBuiltinVariable "tx", "organization") -> do env' <- getEnv
-                                                    x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-                                                    maybeCertLevelDB <- x509CertDBGet $ _accountAddress $ Env.origin env'
-                                                    let maybeCertBlockDB = M.lookup (_accountAddress $ Env.origin env') x509s
-                                                        maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
-                                                    return . Constant . SString . fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
-      (SBuiltinVariable "tx", "group") -> do env' <- getEnv
-                                             x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-                                             maybeCertLevelDB <- x509CertDBGet $ _accountAddress $ Env.origin env'
-                                             let maybeCertBlockDB = M.lookup (_accountAddress $ Env.origin env') x509s
-                                                 maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
-                                             return . Constant . SString . fromMaybe "" $ subUnit =<< getCertSubject =<< maybeCert
-      m@(SBuiltinVariable "tx", "organizationalUnit") -> if (CC._vmVersion contract'' == "svm3.3") 
-                                                            then do 
-                                                              env' <- getEnv
-                                                              x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-                                                              maybeCertLevelDB <- x509CertDBGet $ _accountAddress $ Env.origin env'
-                                                              let maybeCertBlockDB = M.lookup (_accountAddress $ Env.origin env') x509s
-                                                                  maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
-                                                              return . Constant . SString . fromMaybe "" $ subUnit =<< getCertSubject =<< maybeCert
-                                                            else typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ show m)
-      m@(SBuiltinVariable "tx", "certificate") -> if (CC._vmVersion contract'' == "svm3.3")
-                                                    then do 
-                                                      env' <- getEnv
-                                                      x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-                                                      maybeCertLevelDB <- x509CertDBGet $ _accountAddress $ Env.origin env'
-                                                      let maybeCertBlockDB = M.lookup (_accountAddress $ Env.origin env') x509s
-                                                          maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
-                                                      return . Constant . SString . fromMaybe "" $ fmap (BC.unpack . certToBytes) maybeCert
-                                                    else typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ show m)
+      (SBuiltinVariable "tx", "username") -> do
+        env' <- getEnv
+        maybeCert <- A.lookup (A.Proxy @X509Certificate) $ Env.origin env' ^. accountAddress
+        return . Constant . SString . fromMaybe "" . fmap subCommonName $ getCertSubject =<< maybeCert
+      (SBuiltinVariable "tx", "organization") -> do
+        env' <- getEnv
+        maybeCert <- A.lookup (A.Proxy @X509Certificate) $ Env.origin env' ^. accountAddress
+        return . Constant . SString . fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
+      (SBuiltinVariable "tx", "group") -> do
+        env' <- getEnv
+        maybeCert <- A.lookup (A.Proxy @X509Certificate) $ Env.origin env' ^. accountAddress
+        return . Constant . SString . fromMaybe "" $ subUnit =<< getCertSubject =<< maybeCert
+      m@(SBuiltinVariable "tx", "organizationalUnit") ->
+        if (CC._vmVersion contract'' == "svm3.3") 
+          then do 
+            env' <- getEnv
+            maybeCert <- A.lookup (A.Proxy @X509Certificate) $ Env.origin env' ^. accountAddress
+            return . Constant . SString . fromMaybe "" $ subUnit =<< getCertSubject =<< maybeCert
+          else typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ show m)
+      m@(SBuiltinVariable "tx", "certificate") ->
+        if (CC._vmVersion contract'' == "svm3.3")
+          then do 
+            env' <- getEnv
+            maybeCert <- A.lookup (A.Proxy @X509Certificate) $ Env.origin env' ^. accountAddress
+            return . Constant . SString . fromMaybe "" $ fmap (BC.unpack . certToBytes) maybeCert
+          else typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ show m)
       (SStruct _ theMap, fieldName) -> case M.lookup fieldName theMap of
           Nothing -> missingField "struct member access" fieldName
           Just v -> return v
@@ -1716,6 +1689,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
           _ -> return . Constant . SReference . apSnoc apt $ MS.Field "length"
 
       (SReference p, itemName) -> return . Constant . SReference $ apSnoc p $ MS.Field $ BC.pack $ labelToString itemName
+      ((SUserDefined alias notSure actualType), "wrap") -> return . Constant $ (SUserDefined alias notSure actualType) -- return $ Constant . SUserDefined alias val actualType
       m -> typeError ("illegal member access: "  ++ (unparseExpression x)) ("parsed as " ++ show m)
 {-
     Variable vref -> do
@@ -1773,12 +1747,18 @@ expToVar' x@(CC.IndexAccess _ parent (Just mIndex)) = do
                                   Just v -> return v
                                   Nothing -> do
                                     let theType =   typeOf theIndex
-                                    let typeArray = [(typeOf ("test"::[Char])), (typeOf (1 :: Integer)), (typeOf (True::Bool))]
+                                    let typeArray = [(typeOf ("test"::[Char])), (typeOf (1 :: Integer)), (typeOf (True::Bool)), (typeOf ((SInteger 2) :: Value))]
                                     let typeNum = theType `elemIndex` typeArray
                                     case typeNum of
                                       Just 0 -> return $ Constant $ SString ""
                                       Just 1 -> return $ Constant $ SInteger 0
                                       Just 2 -> return $ Constant $ SBool False
+                                      Just 3 -> do
+                                        case theIndex of
+                                          (SInteger _) -> return $ Constant $ SInteger 0
+                                          (SString _) -> return $ Constant $ SString ""
+                                          (SBool _) -> return $ Constant $ SBool False
+                                          _ -> internalError "Type of Mapping not allowed" (show theType)
                                       _ -> internalError "Type of Mapping not found" (show theType)
 
         (SReference _, _) -> Constant . SReference <$> expToPath x
@@ -1920,8 +1900,7 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   creator <- getCurrentAccount
   (hsh, cc) <- getCurrentCodeCollection
   newAddress <- getNewAddress creator
-  x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-  execResults <- create' creator newAddress hsh cc contractName' args x509s'
+  execResults <- create' creator newAddress hsh cc contractName' args
   return $ Constant $ SContract contractName' $ accountOnUnspecifiedChain
     $ fromMaybe (internalError "a call to create did not create an address" execResults)
     $  erNewContractAccount execResults
@@ -1937,8 +1916,7 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
       let contractNameString = labelToString contractName'
       salt <- saltTextToValue saltExpressionText
       newAddress <- getNewAddressWithSalt creator salt contractNameString hsh
-      x509s' <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-      execResults <- create' creator newAddress hsh cc contractName' args x509s'
+      execResults <- create' creator newAddress hsh cc contractName' args
       return $ Constant $ SContract contractName' $ accountOnUnspecifiedChain
         $ fromMaybe (internalError "a call to create did not create an address" execResults)
         $  erNewContractAccount execResults
@@ -1950,7 +1928,7 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
               s <- stringLiteral
               return s
             return $ CC.StringLiteral a str
-      let saltExpression = runParser (stringParser <|> expression) (ParserState "" "") "" (saltText)
+      let saltExpression = runParser (stringParser <|> expression) (ParserState "" "" M.empty) "" (saltText)
       saltValue <- do
         case saltExpression of
           Left pe -> invalidArguments "big bad sad" pe
@@ -2598,9 +2576,8 @@ callBuiltin rc@("registerCert") [(SAccount a _), SString cert] _ = do
                 return SNULL
               Right x509Cert -> do
                 onTraced $ liftIO $ putStrLn $ C.red "WARNING we are unsafely registering a certificate to an arbitrary address"
-                x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
                 let theAddress = _accountAddress $ namedAccountToAccount Nothing a
-                Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.insert theAddress x509Cert x509s
+                A.insert (A.Proxy @X509Certificate) theAddress x509Cert
                 onTraced $ liftIO $ putStrLn $ "    registering cert to address: " ++ format theAddress ++ " as " ++ show (fmap subCommonName $ getCertSubject x509Cert)
                 return SNULL
 
@@ -2638,8 +2615,7 @@ callBuiltin rc'@("registerCert") [SString cert] _ = do
                             let subjectAddress = fromPublicKey $ subPub subject
                             onTraced $ liftIO $ putStrLn $ "    Registering cert to address derived from the subject's public key: " ++ 
                               format subjectAddress ++ " as Common Name:" ++ show (subCommonName subject) ++ "; Organization: " ++ show (subOrg subject)
-                            x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-                            Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.insert subjectAddress x509Cert x509s
+                            A.insert (A.Proxy @X509Certificate) subjectAddress x509Cert
                             return $ SAccount (NamedAccount subjectAddress UnspecifiedChain) False
             typ -> internalError "creatorAddress field has not been set or is not an account type" typ
 
@@ -2681,9 +2657,7 @@ callBuiltin "registerCert" [SString cert, (SContract "Certificate" na)] _ = do
                             SolidVMCode name _ | name /= (labelToString $ CC._contractName curContract) -> pure name
                             _                                                    -> pure "")
                 
-                -- TODO remove leveldb insert
-                x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-                Mod.put (Mod.Proxy @(M.Map Address X509Certificate)) $ M.insert subjectAddress x509Cert x509s
+                A.insert (A.Proxy @X509Certificate) subjectAddress x509Cert
                 
                 addEvent $ Event org parentName (labelToString $ CC._contractName curContract) curAccount "CertificateRegistered" [
                       ("userAddress", show subjectAddress)
@@ -2707,11 +2681,7 @@ callBuiltin "registerCert" [SString cert, (SContract "Certificate" na)] _ = do
 
 callBuiltin "getUserCert" [SAccount a _] _ = do
   curContract <- getCurrentContract
-  -- TODO remove level db check, use redis instead
-  x509s <- Mod.get (Mod.Proxy @(M.Map Address X509Certificate))
-  maybeCertLevelDB <- x509CertDBGet $ _namedAccountAddress a
-  let maybeCertBlockDB = M.lookup (_namedAccountAddress a) x509s
-      maybeCert = maybeCertBlockDB <|> maybeCertLevelDB
+  maybeCert <- A.lookup (A.Proxy @X509Certificate) $ a ^. namedAccountAddress
   return $ certificateMap (fmap (BC.unpack . certToBytes) maybeCert) curContract
 
 -- SolidVM built in function that verifies that the root cert is signed by the key
@@ -3479,6 +3449,9 @@ solidityExceptionHandler catchBlockMap ex = do
       return res
     (ImmutableError s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 25 immutableError
+      return res
+    (UserDefinedError s1 s2) -> do
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 26 userDefinedError
       return res
     _ -> error "unhandled solid exception" (show ex)
 

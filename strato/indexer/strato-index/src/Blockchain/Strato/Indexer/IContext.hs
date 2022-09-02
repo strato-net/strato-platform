@@ -11,6 +11,7 @@
 
 module Blockchain.Strato.Indexer.IContext
     ( IContext(..)
+    , IndexerException(..)
     , API(..)
     , P2P(..)
     , TXR(..)
