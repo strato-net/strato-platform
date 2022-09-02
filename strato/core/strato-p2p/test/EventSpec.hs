@@ -71,6 +71,7 @@ import           Blockchain.DB.ChainDB
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.RawStorageDB
+import           Blockchain.DB.CodeCollectionDB
 import           Blockchain.DB.StateDB                 (setStateDBStateRoot)
 import qualified Blockchain.DB.X509CertDB              as X509
 import "strato-p2p" Blockchain.Event
@@ -279,6 +280,12 @@ instance (Keccak256 `A.Alters` DataDefs.BlockData) m => (Keccak256 `A.Alters` Da
   lookup p k   = lift $ A.lookup p k
   insert p k v = lift $ A.insert p k v
   delete p k   = lift $ A.delete p k
+
+instance (Keccak256 `A.Alters` DBCodeCollection) m => (Keccak256 `A.Alters` DBCodeCollection) (MonadP2PTest m) where
+  lookup p k   = lift $ A.lookup p k
+  insert p k v = lift $ A.insert p k v
+  delete p k   = lift $ A.delete p k
+
 
 instance Mod.Modifiable WorldBestBlock m => Mod.Modifiable WorldBestBlock (MonadP2PTest m) where
   get p   = lift $ Mod.get p
@@ -630,6 +637,11 @@ instance MonadIO m => (Keccak256 `A.Alters` DBCode) (MonadTest m) where
   lookup _ k   = dbsGets $ Lens.view (codeDB . at k)
   insert _ k c = dbsModify' $ codeDB . at k ?~ c
   delete _ k   = dbsModify' $ codeDB . at k .~ Nothing
+
+instance MonadIO m => (Keccak256 `A.Alters` DBCodeCollection)  (MonadTest m) where
+  lookup _ k   = dbsGets $ Lens.view (codeCollectionDB . at k)
+  insert _ k v = dbsModify' $ codeCollectionDB . at k ?~ v
+  delete _ k   = dbsModify' $ codeCollectionDB . at k .~ Nothing
 
 instance MonadIO m => (Address `A.Alters` X509.X509Certificate) (MonadTest m) where
   lookup _ k = do

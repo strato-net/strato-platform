@@ -88,32 +88,33 @@ import           Blockchain.VMContext               ( CurrentBlockHash(..)
 import           UnliftIO
 
 data MemContextDBs = MemContextDBs
-  { _stateDB        :: M.Map MP.StateRoot MP.NodeData
-  , _hashDB         :: M.Map N.NibbleString N.NibbleString
-  , _codeDB         :: M.Map Keccak256 DBCode
+  { _stateDB          :: M.Map MP.StateRoot MP.NodeData
+  , _hashDB           :: M.Map N.NibbleString N.NibbleString
+  , _codeDB           :: M.Map Keccak256 DBCode
   , _codeCollectionDB :: M.Map Keccak256 DBCodeCollection
-  , _x509CertDB     :: M.Map Address X509Certificate
-  , _blockSummaryDB :: M.Map Keccak256 BlockSummary
-  , _blockHashRoot  :: BlockHashRoot
-  , _genesisRoot    :: GenesisRoot
-  , _bestBlockRoot  :: BestBlockRoot
-  , _certRoot       :: CertRoot
-  , _worldBestBlock :: Maybe WorldBestBlock
+  , _x509CertDB       :: M.Map Address X509Certificate
+  , _blockSummaryDB   :: M.Map Keccak256 BlockSummary
+  , _blockHashRoot    :: BlockHashRoot
+  , _genesisRoot      :: GenesisRoot
+  , _bestBlockRoot    :: BestBlockRoot
+  , _certRoot         :: CertRoot
+  , _worldBestBlock   :: Maybe WorldBestBlock
   } deriving (Generic)
 makeLenses ''MemContextDBs
 
 instance Default MemContextDBs where
   def = MemContextDBs
-          { _stateDB        = M.empty
-          , _hashDB         = M.empty
-          , _codeDB         = M.empty
-          , _x509CertDB     = M.empty
-          , _blockSummaryDB = M.empty
-          , _blockHashRoot  = BlockHashRoot MP.emptyTriePtr
-          , _genesisRoot    = GenesisRoot MP.emptyTriePtr
-          , _bestBlockRoot  = BestBlockRoot MP.emptyTriePtr
-          , _certRoot       = CertRoot MP.emptyTriePtr
-          , _worldBestBlock = Nothing
+          { _stateDB          = M.empty
+          , _hashDB           = M.empty
+          , _codeDB           = M.empty
+          , _codeCollectionDB = M.empty
+          , _x509CertDB       = M.empty
+          , _blockSummaryDB   = M.empty
+          , _blockHashRoot    = BlockHashRoot MP.emptyTriePtr
+          , _genesisRoot      = GenesisRoot MP.emptyTriePtr
+          , _bestBlockRoot    = BestBlockRoot MP.emptyTriePtr
+          , _certRoot         = CertRoot MP.emptyTriePtr
+          , _worldBestBlock   = Nothing
           }
 
 instance NFData MemContextDBs where
@@ -355,16 +356,17 @@ runMemContextM :: Maybe DebugSettings
                -> LoggingT IO (a, MemContext)
 runMemContextM = runMemContextMWith cdbs
   where cdbs = MemContextDBs
-          { _stateDB        = M.empty
-          , _hashDB         = M.empty
-          , _codeDB         = M.empty
+          { _stateDB          = M.empty
+          , _hashDB           = M.empty
+          , _codeDB           = M.empty
           , _codeCollectionDB = M.empty
-          , _x509CertDB     = M.empty
-          , _blockSummaryDB = M.empty
-          , _blockHashRoot  = BlockHashRoot MP.emptyTriePtr
-          , _genesisRoot    = GenesisRoot MP.emptyTriePtr
-          , _bestBlockRoot  = BestBlockRoot MP.emptyTriePtr
-          , _worldBestBlock = Nothing
+          , _x509CertDB       = M.empty
+          , _blockSummaryDB   = M.empty
+          , _blockHashRoot    = BlockHashRoot MP.emptyTriePtr
+          , _genesisRoot      = GenesisRoot MP.emptyTriePtr
+          , _bestBlockRoot    = BestBlockRoot MP.emptyTriePtr
+          , _certRoot         = CertRoot MP.emptyTriePtr
+          , _worldBestBlock   = Nothing
           }
 
 

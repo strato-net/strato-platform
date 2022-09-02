@@ -71,6 +71,7 @@ module Blockchain.VMContext
     , peekPendingVote
     , clearPendingVote
     , compactContextM
+    , getX509CertDB
     ) where
 
 import           Control.DeepSeq
