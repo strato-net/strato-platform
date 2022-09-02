@@ -1015,15 +1015,15 @@ getVarType' name ctx = do
   let varDefy =  M.lookup name (_storageDefs c)
   case varDefy of
     Just _ -> do
-      case  varType <$> varDefy   of
+      case _varType <$> varDefy of
         Just (SVMType.UserDefined ggg b) -> return (Static (SVMType.UserDefined ggg b) ctx)
         _ -> getVarTypeByName' (stringToLabel name) ctx
     Nothing -> do
-      let ls = filter (userDefinedHelper name )  [ varType x | x <- (M.elems (_storageDefs c)) ] 
+      let ls = filter (userDefinedHelper name )  [ _varType x | x <- (M.elems (_storageDefs c)) ] 
       if  length ls > 0
         then do
-          let ls2 = head (filter (userDefinedHelper name . varType )  [  x | x <- (M.elems (_storageDefs c)) ])
-          case varInitialVal ls2 of
+          let ls2 = head (filter (userDefinedHelper name . _varType )  [  x | x <- (M.elems (_storageDefs c)) ])
+          case _varInitialVal ls2 of
             Just _ -> pure $ (Static (head ls)  ctx)
             _ -> pure $  (Static ( SVMType.actual (head ls) ) ctx)
       else do
