@@ -183,8 +183,9 @@ contract Certificate {
     address owner;  // The CertificateRegistery Contract
 
     address public userAddress;
-    address parent;
-    address[] children;
+    address public parent;
+    address[] public children;
+
     
     // Store all the fields of a certificate in a Cirrus record
     string commonName;
@@ -193,8 +194,9 @@ contract Certificate {
     string group;
     string organizationalUnit;
     string public publicKey;
-    string certificateString;
+    string public certificateString;
     bool public isValid;
+    uint expirationDate;
 
     constructor(string _certificateString) {
         owner = msg.sender;
@@ -210,36 +212,26 @@ contract Certificate {
         publicKey = parsedCert["publicKey"];
         certificateString = parsedCert["certString"];
         isValid = true;
+        expirationDate = uint(parsedCert["expirationDate"],10);
         parent = address(parsedCert["parent"]);
-        if (parent != address(0x0)){
-            Certificate parentContract = Certificate(parent);
-            parentContract.addChild(this);    
-        }
+        children = [];
     }
     
-    function addChild(address _child){
+    function addChild(address _child) public {
         children.push(_child);
     }
     
-    function isChild(string pCert) returns (bool) {
-        mapping(string => string) parsedCert = parseCert(certificateString);
-        if(parent != address(0x0) && pCert == parsedCert["parent"]){
-            return true;
-        }
-        if(parent != address(0x0)){
-            Certificate parentContract = Certificate(address(parsedCert["parent"]));
-            return parentContract.isChild(pCert);
-        }
-        return false;
+    function revoke() public returns (int){
+        require(msg.sender == owner,"You don't have permission to CALL revoke!");
+
+        isValid = false;
+        return children.length;
     }
     
-    function revoke() {
-        require(msg.sender == owner,"You don't have permission to call revoke!");
-        isValid = false;
-        for (uint i = 0; i < children.length; ++i) {
-           Certificate child = Certificate(children[i]);
-           child.revoke();
-        }
+    function getChild(int index) public returns (address){
+        require(msg.sender == owner,"You don't have permission to get children!");
+        
+        return children[index];
     }
 }
 
@@ -285,13 +277,17 @@ contract CertificateRegistry {
         require(initialized, "You must first initialize with initializeCertificateRegistry!");
         
         mapping(string => string) parsedCert = parseCert(newCertificateString);
-        address parent = address(parsedCert["parent"]);
-        Certificate parentContract = Certificate(parent);
+        address parentUserAddress = address(parsedCert["parent"]);
+        Certificate parentContract = certificates[certificatesMap[parentUserAddress]-1];
         
-        if (parentContract.isValid() && verifyCert(newCertificateString, parentContract.publicKey())){
+        if (parentContract.isValid() && verifyCertSignedBy(newCertificateString, parentContract.publicKey())){
             // Create the new Certificate record
             Certificate c = new Certificate(newCertificateString);
-    
+
+            if (parentUserAddress != address(0x0)){
+                parentContract.addChild(c.userAddress());    
+            }
+
             certificates.push(c);
             certificatesMap[c.userAddress()] = certificates.length;
             
@@ -307,14 +303,32 @@ contract CertificateRegistry {
     }
     
     function getCertByAccount(address _account) returns (Certificate) {
-        return certificates[certificatesMap[_account]];
+        return certificates[certificatesMap[_account]-1];
     }
     
     function revokeCert(address userAddress){
-        Certificate myCert = Certificate(userAddress);
-        if (myCert.isChild(tx.certificate)) {
-            myCert.revoke();
+        Certificate myCert = certificates[certificatesMap[userAddress]-1];
+        require(isChild(tx.certificate, myCert.userAddress()), "You don't have permission to revoke!");
+
+        int childrenLength = myCert.revoke();
+        for (int i = 0; i < childrenLength; i += 1) {
+            revokeCert(myCert.getChild(i));
         }
+        
         emit CertificateRevoked(userAddress);
+    }
+    
+    function isChild(string pCert, address certUserAddress) returns (bool) {
+        Certificate myCert = certificates[certificatesMap[certUserAddress]-1];
+        address parentUserAddress = myCert.parent();
+        if(myCert.parent() != address(0x0) && pCert == certificates[certificatesMap[parentUserAddress]-1].certificateString()){
+            return true;
+        }
+        
+        if(myCert.parent() != address(0x0)){
+            return isChild(pCert, parentUserAddress);
+        }
+        
+        return false;
     }
 }|]

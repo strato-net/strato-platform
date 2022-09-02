@@ -727,6 +727,7 @@ solidityTypeToSQLType VariableDecl{varType=SVMType.Bool} = Just "bool"
 solidityTypeToSQLType VariableDecl{varType=SVMType.Int _ _} = Just "decimal"
 solidityTypeToSQLType VariableDecl{varType=SVMType.String _} = Just "text"
 solidityTypeToSQLType VariableDecl{varType=SVMType.Bytes _ _} = Just "text"
+solidityTypeToSQLType VariableDecl{varType=SVMType.UserDefined _ _} = Just "text"
 solidityTypeToSQLType VariableDecl{varType=SVMType.Fixed _ _ } = Just "fixed"
 solidityTypeToSQLType VariableDecl{varType=SVMType.Address _} = Just "text"
 solidityTypeToSQLType VariableDecl{varType=SVMType.Account _} = Just "text"
@@ -737,6 +738,7 @@ solidityTypeToSQLType VariableDecl{varType=SVMType.UnknownLabel _ _} = Just "tex
 solidityTypeToSQLType VariableDecl{varType=SVMType.Struct _ _} = Just "jsonb"
 solidityTypeToSQLType VariableDecl{varType=SVMType.Enum _ _ _} = Just "text"
 solidityTypeToSQLType VariableDecl{varType=SVMType.Contract _} = Just "text"
+solidityTypeToSQLType VariableDecl{varType=SVMType.Error _ _} = Just "text"
 --solidityTypeToSQLType x = error $ "undefined type in solidityTypeToSQLType: " ++ show (varType x)
 
 

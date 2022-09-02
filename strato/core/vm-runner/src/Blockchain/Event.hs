@@ -28,6 +28,7 @@ import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.StateDiff
 import           Blockchain.Stream.Action           (Action)
+import qualified Data.ByteString                    as B
 import qualified Data.DList                         as DL
 import           Data.Map                           (Map)
 
@@ -41,10 +42,11 @@ data VmInEventBatch = InBatch
   , blocksAndNewChains :: [Either OutputGenesis OutputBlock]
   , bLen               :: {-# UNPACK #-} !Int
   , createBlock        :: !Bool
+  , privateTxs         :: [OutputTx]
   }
 
 newInBatch :: VmInEventBatch
-newInBatch = InBatch [] [] [] 0 [] 0 False
+newInBatch = InBatch [] [] [] 0 [] 0 False []
 
 insertInBatch :: VmInEvent -> VmInEventBatch -> VmInEventBatch
 insertInBatch e b = case e of
@@ -54,7 +56,7 @@ insertInBatch e b = case e of
   VmTx ts t -> b{ txPairs = (ts,t):txPairs b, tLen = tLen b + 1}
   VmBlock ob -> b{ blocksAndNewChains = (Right ob):blocksAndNewChains b, bLen = bLen b + 1}
   VmCreateBlockCommand -> b{ createBlock = True }
-  _ -> b
+  VmPrivateTx otx -> b { privateTxs = otx : privateTxs b }
 
 data VmOutEvent = OutAction Action
                 | OutBlock OutputBlock
@@ -65,6 +67,7 @@ data VmOutEvent = OutAction Action
                 | OutEvent EventDB
                 | OutTXR TransactionResult
                 | OutASM (Map Account AddressStateModification)
+                | OutJSONRPC String B.ByteString
 
 data VmOutEventBatch = OutBatch
   { outActions      :: DL.DList Action
@@ -76,10 +79,12 @@ data VmOutEventBatch = OutBatch
   , outEvents       :: DL.DList EventDB
   , outTXRs         :: DL.DList TransactionResult
   , outASMs         :: DL.DList (Map Account AddressStateModification)
+  , outJSONRPCs     :: DL.DList (String, B.ByteString)
   }
 
 newOutBatch :: VmOutEventBatch
 newOutBatch = OutBatch DL.empty
+                       DL.empty
                        DL.empty
                        DL.empty
                        DL.empty
@@ -100,4 +105,5 @@ insertOutBatch e b = case e of
   OutEvent a           -> b{ outEvents = outEvents b `DL.snoc` a }
   OutTXR a             -> b{ outTXRs = outTXRs b `DL.snoc` a }
   OutASM a             -> b{ outASMs = outASMs b `DL.snoc` a }
+  OutJSONRPC x y       -> b{ outJSONRPCs = outJSONRPCs b `DL.snoc` (x,y) }
 

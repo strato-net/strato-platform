@@ -39,17 +39,23 @@ import           Blockchain.SolidVM.Exception         hiding (assert)
 import           Blockchain.SolidVM.Metrics
 import           Blockchain.Strato.Model.Keccak256
 
+import qualified SolidVM.Model.CodeCollection.Def as Def
 import           SolidVM.CodeCollectionTools
 import           SolidVM.Model.CodeCollection
 import           SolidVM.Model.SolidString
 import           SolidVM.Solidity.Parse.Declarations
 import           SolidVM.Solidity.Parse.File
 import           SolidVM.Solidity.Parse.ParserTypes
-import           SolidVM.Solidity.StaticAnalysis.Typechecker as TC
+import qualified SolidVM.Solidity.StaticAnalysis.Typechecker                            as TypeChecker
+import qualified SolidVM.Solidity.StaticAnalysis.Functions.ConstantFunctions            as ConstantFunctions
+import           SolidVM.Solidity.StaticAnalysis.Optimizer                              as O
+import qualified        SolidVM.Solidity.StaticAnalysis.Statements.MultipleDeclarations as MultipleDeclarations
 
 data ParseTypeCheckOrSolidVMError = PEx ParseError
                          | TCEx [SourceAnnotation T.Text]
-                         | SVMEx (Positioned ((,) SolidException)) deriving (Show) 
+                         | SVMEx (Positioned ((,) SolidException)) deriving (Show)
+
+data SUnitIntermediary = Con Contract | FLC ConstantDecl | FLS Def.Def | FLE Def.Def | FLF Func | FLER Def.Def
 
 {-# NOINLINE unsafeCodeMapIORef #-}
 unsafeCodeMapIORef :: IORef (Map Keccak256 CodeCollection)
@@ -62,39 +68,74 @@ withAnnotations f = first unwind . f
         unwind (TCEx errs) = errs
 
 parseSource :: T.Text -> T.Text -> Either ParseTypeCheckOrSolidVMError [SourceUnit]
-parseSource fileName src = bimap PEx unsourceUnits $ runParser solidityFile (ParserState "" "") (T.unpack fileName) (T.unpack src)
+parseSource fileName src = bimap PEx unsourceUnits $ runParser solidityFile (ParserState "" "" M.empty) (T.unpack fileName) (T.unpack src)
 
 parseSourceWithAnnotations :: T.Text -> T.Text -> Either [SourceAnnotation T.Text] [SourceUnit]
 parseSourceWithAnnotations = withAnnotations . parseSource
 
 compileSourceNoInheritance :: Map T.Text T.Text -> Either ParseTypeCheckOrSolidVMError CodeCollection
 compileSourceNoInheritance initCodeMap = do
-  let getNamedContracts :: T.Text -> T.Text -> Either ParseTypeCheckOrSolidVMError [(SolidString, Contract)]
-      getNamedContracts fileName src = do
+  let getNamedSUnits :: T.Text -> T.Text -> Either ParseTypeCheckOrSolidVMError [(SolidString, SUnitIntermediary)]
+      getNamedSUnits fileName src = do
         sourceUnits <- parseSource fileName src
+        let userDefinedFromFile = M.fromList $ map (\(Alias _ alias typ) -> (alias, typ) ) $ filter (\x -> case x of (Alias _ _ _) -> True; _ -> False;) sourceUnits
         let pragmas = \case
               Pragma _ n v -> Just (n, v)
               _ -> Nothing
-            vmVersion' = if (Just ("solidvm","3.2")) `elem` (pragmas <$> sourceUnits) then "svm3.2" else (if (Just ("solidvm","3.0")) `elem` (pragmas <$> sourceUnits) then "svm3.0" else "")
+            vmVersion' = if (Just ("solidvm","3.3")) `elem` (pragmas <$> sourceUnits) then "svm3.3" else (if (Just ("solidvm","3.2")) `elem` (pragmas <$> sourceUnits) then "svm3.2" else (if (Just ("solidvm","3.0")) `elem` (pragmas <$> sourceUnits) then "svm3.0" else ""))
         fmap catMaybes . for sourceUnits $ \case
           NamedXabi name (xabi, parents') -> do
             ctrct <- first SVMEx
-                   $ xabiToContract (textToLabel name) (map textToLabel parents') vmVersion' xabi
-            pure $ Just (textToLabel name, ctrct)
+                   $ xabiToContract (textToLabel name) (map textToLabel parents') vmVersion' userDefinedFromFile xabi
+            pure $ Just $ (textToLabel name, Con ctrct)
+          FLFunc name fdec -> do
+            pure $ Just $ (name, FLF fdec)
+          FLConstant name cnst -> do
+            pure $ Just $ (textToLabel name, FLC cnst)
+          FLStruct name fls -> do
+            pure $ Just $ (textToLabel name, FLS fls)
+          FLEnum name fle -> do
+            pure $ Just $ (textToLabel name, FLE fle)
+          FLError name args -> do
+            pure $ Just $ (textToLabel name, FLER args)
           _ -> pure Nothing
 
-      throwDuplicate :: (SolidString, Contract) -> Map SolidString Contract -> Either ParseTypeCheckOrSolidVMError (Map SolidString Contract)
-      throwDuplicate (cName, contract) m = case M.lookup cName m of
-        Nothing -> pure $ M.insert cName contract m
+      throwDuplicate' :: (SolidString, a) -> Map SolidString a -> (a -> SourceAnnotation b) -> Either ParseTypeCheckOrSolidVMError (Map SolidString a)
+      throwDuplicate' (sName, unit) m contextFunc = case M.lookup sName m of
+        Nothing -> pure $ M.insert sName unit m
         Just _ ->  Left . PEx
-                 $ newErrorMessage (Message $ "Duplicate contract found: " ++ labelToString cName)
-                                   (fromSourcePosition $ _sourceAnnotationStart $ _contractContext contract)
-                                           
-  allContracts <- fmap concat . traverse (uncurry getNamedContracts) $ M.toList initCodeMap
-  deduplicatedContracts <- foldrM throwDuplicate M.empty (allContracts :: [(SolidString, Contract)])
-  pure $ CodeCollection {
-    _contracts = deduplicatedContracts
-  }
+                  $ newErrorMessage (Message $ "Duplicate unit found: " ++ labelToString sName)
+                                    (fromSourcePosition $ _sourceAnnotationStart $ contextFunc unit)
+
+      throwDuplicate :: (SolidString, SUnitIntermediary) ->  CodeCollection -> Either ParseTypeCheckOrSolidVMError CodeCollection
+      throwDuplicate (name, sUnit) cc = case sUnit of 
+        Con ctrct                 -> fmap (\cMap -> cc & contracts   .~ cMap) $ throwDuplicate' (name, ctrct) (cc ^. contracts)  _contractContext
+        FLC cnst                  -> fmap (\cMap -> cc & flConstants .~ cMap) $ throwDuplicate' (name, cnst) (cc ^. flConstants) constContext
+        FLE (Def.Enum vals _ a)   -> fmap (\cMap -> cc & flEnums     .~ cMap) $ throwDuplicate' (name, (vals, a)) (cc ^. flEnums) (const a)
+        FLS (Def.Struct vals _ a) -> fmap (\cMap -> cc & flStructs   .~ cMap) $ throwDuplicate' (name, (\(k,v) -> (k,v,a)) <$> vals) (cc ^. flStructs) (\_ -> a)
+        FLF func                  -> fmap (\cMap -> cc & flFuncs     .~ cMap) $ throwDuplicateFunction (name, func) (cc ^. flFuncs) -- Thanks Jin!
+        FLER (Def.Error vals _ a) -> fmap (\cMap -> cc & flErrors    .~ cMap) $ throwDuplicate' (name, (\(k,v) -> (k,v,a)) <$> vals) (cc ^. flErrors) (\_ -> a) 
+        FLE y  -> parseError  "FLE non Enum should be impossible  "  (show y)
+        FLS x  -> parseError  "FLS non Struct should be impossible"  (show x)
+        FLER z -> parseError  "FLER non Error should be impossible"  (show z)
+      sUnitSorter = foldrM throwDuplicate $ CodeCollection M.empty M.empty M.empty M.empty M.empty M.empty -- the list of all the sUnits goes here
+
+      throwDuplicateFunction :: (SolidString, Func) -> Map SolidString Func -> Either ParseTypeCheckOrSolidVMError (Map SolidString Func)
+      throwDuplicateFunction (fname, func) m = case M.lookup fname m of
+        Nothing -> pure $ M.insert fname func m 
+        Just fdec -> do
+          let oldParamTypes = fmap snd $ funcArgs fdec
+              newParamTypes = fmap snd $ funcArgs func
+              overloadParamTypes = concatMap (\x -> [fmap snd $ funcArgs x]) $ funcOverload fdec
+          if ((oldParamTypes == newParamTypes) || (newParamTypes `elem` overloadParamTypes))
+            then Left . PEx $ newErrorMessage (Message $ "Free function could not be overloaded: " ++ labelToString fname)
+                                              (fromSourcePosition $ _sourceAnnotationStart $ funcContext func)
+            else do
+              pure $ M.insert fname (fdec{funcOverload = funcOverload fdec ++ [func]}) m
+
+  allSUnits <- fmap concat . traverse (uncurry getNamedSUnits) $ M.toList initCodeMap
+  theCC <- sUnitSorter allSUnits
+  pure $ theCC
 
 hasSvm3_2 :: CodeCollection -> Bool
 hasSvm3_2 cc = any (=="svm3.2") vmVers
@@ -102,22 +143,34 @@ hasSvm3_2 cc = any (=="svm3.2") vmVers
     contractList = map snd $ M.toList (cc ^. contracts )
     vmVers = map (^. vmVersion ) contractList
 
-compileSource :: Map T.Text T.Text -> Either ParseTypeCheckOrSolidVMError CodeCollection
-compileSource mTT = do
+hasSvm3_3 :: CodeCollection -> Bool
+hasSvm3_3 cc = any (=="svm3.3") vmVers
+  where
+    contractList = map snd $ M.toList (cc ^. contracts )
+    vmVers = map (^. vmVersion ) contractList
+    
+--- Don't typecheck in Slipstream!!!
+compileSource :: Bool -> Map T.Text T.Text-> Either ParseTypeCheckOrSolidVMError CodeCollection
+compileSource typeCheck mTT = do
   let applyInheritanceE = first SVMEx . applyInheritance
-  case ((applyInheritanceE <=< compileSourceNoInheritance) mTT) of   
-    Right cc -> if hasSvm3_2 cc then typeCheckDetector cc else Right cc
+  O.detector <$> case (applyInheritanceE <=< compileSourceNoInheritance) mTT of
+    Right cc | typeCheck && hasSvm3_2 cc -> typeCheckDetectorSvm3_2 cc
+             | typeCheck && hasSvm3_3 cc -> typeCheckDetectorSvm3_3 cc
+             | otherwise                 -> Right cc
     Left x -> Left x
-    where 
-      typeCheckDetector ecc = case TC.detector ecc of
+    where
+      typeCheckDetectorSvm3_2 ecc = case TypeChecker.detector ecc of
+        [] -> Right ecc
+        xs -> Left $ TCEx xs
+      typeCheckDetectorSvm3_3 ecc = case TypeChecker.detector ecc <> ConstantFunctions.detector ecc <> MultipleDeclarations.detector ecc of
         [] -> Right ecc
         xs -> Left $ TCEx xs
 
-compileSourceWithAnnotations :: Map T.Text T.Text -> Either [SourceAnnotation T.Text] CodeCollection
-compileSourceWithAnnotations = withAnnotations compileSource 
+compileSourceWithAnnotations :: Bool -> Map T.Text T.Text -> Either [SourceAnnotation T.Text] CodeCollection
+compileSourceWithAnnotations typeCheck = withAnnotations (compileSource typeCheck)
 
-codeCollectionFromSource :: (MonadIO m, HasCodeDB m) => B.ByteString -> m (Keccak256, CodeCollection)
-codeCollectionFromSource initCode = do
+codeCollectionFromSource :: (MonadIO m, HasCodeDB m) => Bool -> B.ByteString -> m (Keccak256, CodeCollection)
+codeCollectionFromSource typeCheck initCode = do
   let initList = case Aeson.decode $ BL.fromStrict initCode of
         Just l -> l
         Nothing -> case Aeson.decode $ BL.fromStrict initCode of
@@ -136,7 +189,7 @@ codeCollectionFromSource initCode = do
     Nothing -> do
       recordCacheEvent StorageWrite
       hsh' <- addCode SolidVM canonicalInitCode
-      let ecc = compileSource initMap
+      let ecc = compileSource typeCheck initMap
           cc = case ecc of
                  Right a -> a
                  Left (PEx p) -> parseError "codeCollectionFromSource" p
@@ -147,8 +200,8 @@ codeCollectionFromSource initCode = do
       liftIO $ writeIORef unsafeCodeMapIORef codeMap'
       return $ assert (hsh == hsh') (hsh, cc)
 
-codeCollectionFromHash :: (MonadIO m, HasCodeDB m) => Keccak256 -> m CodeCollection
-codeCollectionFromHash hsh = do
+codeCollectionFromHash :: (MonadIO m, HasCodeDB m) => Bool -> Keccak256 -> m CodeCollection
+codeCollectionFromHash typeCheck hsh = do
   codeMap <- liftIO $ readIORef unsafeCodeMapIORef
   case M.lookup hsh codeMap of
     Just cc -> do
@@ -162,7 +215,7 @@ codeCollectionFromHash hsh = do
           let initMap = case Aeson.decode $ BL.fromStrict initCode of
                   Just l -> M.fromList l
                   Nothing -> M.singleton T.empty (decodeUtf8 initCode)
-          let ecc = compileSource initMap
+          let ecc = compileSource typeCheck initMap
               cc = case ecc of
                      Right a -> a
                      Left (PEx p) -> parseError "codeCollectionFromHash" p

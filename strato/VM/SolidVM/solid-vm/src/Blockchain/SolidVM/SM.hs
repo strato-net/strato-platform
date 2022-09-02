@@ -49,8 +49,11 @@ module Blockchain.SolidVM.SM (
   addEvent
   ) where
 
+import           Control.Monad
 import           Control.Applicative ((<|>))
 import           Control.Lens hiding (Context)
+-- import           Control.Monad.Catch (MonadCatch)
+-- import           Control.Monad (join)
 import           Control.Monad.Catch (MonadCatch)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
@@ -62,6 +65,7 @@ import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.UTF8  as UTF8
+import           Data.Traversable (for)
 import           Prelude                            hiding (EQ, GT, LT)
 import qualified Prelude                            as Ordering (Ordering (..))
 
@@ -109,6 +113,7 @@ import           SolidVM.Model.Value
 
 import           UnliftIO
 
+
 data CallInfo = CallInfo
   { currentFunctionName :: SolidString
   , currentAccount      :: Account
@@ -119,6 +124,7 @@ data CallInfo = CallInfo
   , readOnly            :: Bool
   , isUncheckedSection  :: Bool -- TODO: Perform overflow/underflow checks for all arithmetic operations and revert if so, use this flag to disable checks
   , currentSourcePos    :: Maybe SourcePosition
+  , isFreeFunction      :: Bool
   } deriving (Show)
 
 {-
@@ -145,7 +151,6 @@ data SState = SState
   { env             :: Env.Environment
   , callStack       :: [CallInfo]
   , ssEvents        :: Q.Seq Event
-  , _ssNewX509Certs  :: M.Map Address X509Certificate
   , _ssMemDBs       :: MemDBs
   , _action         :: Action
   }
@@ -162,8 +167,8 @@ type MonadSM m = ( (Account `A.Alters` AddressState) m
                  , HasRawStorageDB m
                  , HasMemAddressStateDB m
                  , HasMemRawStorageDB m
+                 , HasMemCertDB m
                  , Mod.Accessible Env.Environment m
-                 , Mod.Modifiable (M.Map Address X509Certificate) m
                  , Mod.Modifiable MemDBs m
                  , Mod.Modifiable Env.Sender m
                  , Mod.Modifiable [CallInfo] m
@@ -187,7 +192,14 @@ instance Monad m => HasMemRawStorageDB (SM m) where
   getMemRawStorageBlockDB    = gets $ _storageBlockMap . _ssMemDBs
   putMemRawStorageBlockMap m = modify $ ssMemDBs . storageBlockMap .~ m
 
+instance Monad m => HasMemCertDB (SM m) where
+  getCertTxDBMap      = gets $ _certTxMap . _ssMemDBs
+  putCertTxDBMap    m = modify $ ssMemDBs . certTxMap .~ m
+  getCertBlockDBMap   = gets $ _certBlockMap . _ssMemDBs
+  putCertBlockDBMap m = modify $ ssMemDBs . certBlockMap .~ m
+
 instance ( (Maybe Word256 `A.Alters` MP.StateRoot) m
+         , MonadLogger m
          , (MP.StateRoot `A.Alters` MP.NodeData) m
          , (N.NibbleString `A.Alters` N.NibbleString) m
          ) => (RawStorageKey `A.Alters` RawStorageValue) (SM m) where
@@ -197,6 +209,7 @@ instance ( (Maybe Word256 `A.Alters` MP.StateRoot) m
   lookupWithDefault _ = genericLookupWithDefaultRawStorageDB
 
 instance ( (Maybe Word256 `A.Alters` MP.StateRoot) m
+         , MonadLogger m
          , (MP.StateRoot `A.Alters` MP.NodeData) m
          , (N.NibbleString `A.Alters` N.NibbleString) m
          ) => (Account `A.Alters` AddressState) (SM m) where
@@ -243,10 +256,19 @@ instance (Keccak256 `A.Alters` DBCode) m => (Keccak256 `A.Alters` DBCode) (SM m)
   insert p k = lift . A.insert p k
   delete p   = lift . A.delete p
 
-instance (Address `A.Alters` X509Certificate) m => (Address `A.Alters` X509Certificate) (SM m) where
-  lookup p   = lift . A.lookup p
-  insert p k = lift . A.insert p k
-  delete p   = lift . A.delete p
+instance Mod.Modifiable CertRoot m => Mod.Modifiable CertRoot (SM m) where
+  get = lift . Mod.get
+  put p = lift . Mod.put p
+
+instance ( (Address `A.Alters` X509Certificate) m
+         , Mod.Modifiable CertRoot m
+         , (MP.StateRoot `A.Alters` MP.NodeData) m
+         ) => (Address `A.Alters` X509Certificate) (SM m) where
+  lookup _ k = do
+    mBH <- gets $ view $ ssMemDBs . currentBlock
+    fmap join . for mBH $ \(CurrentBlockHash bh) -> getCertMaybe k bh
+  insert _ = putCert
+  delete _ = deleteCert
 
 instance (N.NibbleString `A.Alters` N.NibbleString) m => (N.NibbleString `A.Alters` N.NibbleString) (SM m) where
   lookup p   = lift . A.lookup p
@@ -272,10 +294,6 @@ instance Monad m => Mod.Modifiable [CallInfo] (SM m) where
 instance Monad m => Mod.Modifiable MemDBs (SM m) where
   get _    = gets $ _ssMemDBs
   put _ md = modify $ ssMemDBs .~ md
-
-instance Monad m => Mod.Modifiable (M.Map Address X509Certificate) (SM m) where
-  get _ = use ssNewX509Certs
-  put _ = assign ssNewX509Certs
 
 instance Monad m => Mod.Modifiable Action (SM m) where
   get _ = use action
@@ -308,7 +326,6 @@ runSM maybeCode env chainId' f = do
         env = env,
         callStack = [],
         ssEvents = Q.empty,
-        _ssNewX509Certs = M.empty,
         _ssMemDBs = csMemDBs,
         _action = startingAction maybeCode env chainId'
         }
@@ -376,14 +393,36 @@ getVariableOfName name = do
   let currentCallInfo =
         case cStack of
           [] -> internalError "getVariableValue called with an empty stack" name
-          (x:_) -> x
+          (x:_) -> if (isFreeFunction x)
+                    then x { currentContract = CC.Contract { CC._contractName = currentContract x^.CC.contractName
+                                                ,  CC._parents = currentContract x^.CC.parents
+                                                ,  CC._constants = M.empty
+                                                ,  CC._userDefined = M.empty
+                                                ,  CC._storageDefs = M.empty
+                                                ,  CC._enums = M.empty
+                                                ,  CC._structs = M.empty
+                                                ,  CC._errors = M.empty
+                                                ,  CC._events = M.empty
+                                                ,  CC._functions = M.empty
+                                                ,  CC._constructor = currentContract x^.CC.constructor
+                                                ,  CC._modifiers = M.empty
+                                                ,  CC._vmVersion = currentContract x^.CC.vmVersion
+                                                ,  CC._contractContext = currentContract x^.CC.contractContext
+                                                } 
+                              }
+                    else x
       vars = localVariables currentCallInfo
       t s v = ('x':s, v) `seq` v
+
+  -- when (name == "theSixthSense") (internalError "M. Night Shyamalan presents" currentCallInfo)
 
   let maybeLocalValue = fmap snd $ M.lookup name vars
 
   let maybeContractFunction :: Maybe Variable
       maybeContractFunction = fmap (t "constant function" . Constant . SFunction name) $ M.lookup name $ currentContract currentCallInfo^.CC.functions
+
+      maybeFreeFunction :: Maybe Variable
+      maybeFreeFunction = fmap (t "free function" . Constant . SFunction name) $ M.lookup name $ codeCollection currentCallInfo^.CC.flFuncs
 
       maybeBuiltinFunction :: Maybe Variable
       maybeBuiltinFunction = toMaybe (name `elem` ["address", "account", "uint", "int", "bool", "byte", "bytes"
@@ -399,19 +438,20 @@ getVariableOfName name = do
         t "builtin variable" $ Constant $ SBuiltinVariable name
 
       maybeEnum :: Maybe Variable
-      maybeEnum = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.CC.enums)) $
+      maybeEnum = toMaybe (name `elem` M.keys (currentContract currentCallInfo ^.CC.enums) || name `elem` M.keys (codeCollection currentCallInfo^.CC.flEnums)) $
         t "enum" $ Constant $ SEnum name
 
       maybeConstant :: Maybe Variable
       maybeConstant = fmap (t "constant constant" . Constant) $ do
         let ctract = currentContract currentCallInfo
-        CC.ConstantDecl{..} <- M.lookup name $ ctract ^. CC.constants
+        let constMap = (codeCollection currentCallInfo) ^. CC.flConstants
+        CC.ConstantDecl{..} <- M.lookup name $ (ctract ^. CC.constants) `M.union` constMap
         return $ coerceType ctract constType $ case constInitialVal of
                                             CC.NumberLiteral _ x _ -> SInteger x
                                             x -> todo "constant initial val" x
 
       maybeStructDef :: Maybe Variable
-      maybeStructDef = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.CC.structs)) $
+      maybeStructDef = toMaybe (name `elem` M.keys (currentContract currentCallInfo^.CC.structs) || name `elem` M.keys (codeCollection currentCallInfo^.CC.flStructs)) $
         t "struct def" $ Constant $ SStructDef name
 
       maybeContract :: Maybe Variable
@@ -451,6 +491,7 @@ getVariableOfName name = do
       [ maybeLocalValue
       , maybeStorageItem
       , maybeContractFunction
+      , maybeFreeFunction
       , maybeBuiltinFunction
       , maybeBuiltinVariable
       , maybeEnum
@@ -458,15 +499,18 @@ getVariableOfName name = do
       , maybeContract
       , maybeThis
       , maybeConstant
-      , unknownVariable "getVariableOfName" name
+      --, maybeUserDefined
+      , unknownVariable ("getVariableOfName" ++ (show (currentContract currentCallInfo^.CC.storageDefs)) )name
       ]
 
 getTypeOfName' :: SolidString -> CC.CodeCollection -> Typo
-getTypeOfName' s (CC.CodeCollection ccs) =
+getTypeOfName' s (CC.CodeCollection ccs _ _ enms strcts _) =
   let lookInContract :: CC.Contract -> [Typo]
       lookInContract (CC.Contract{..}) = catMaybes
         [ fmap StructTypo (fmap (\(a,b,_) -> (a,b)) <$> M.lookup s _structs)
         , fmap EnumTypo (fst <$> M.lookup s _enums)
+        , fmap StructTypo (fmap (\(a,b,_) -> (a,b)) <$> M.lookup s strcts)
+        , fmap EnumTypo (fst <$> M.lookup s enms)
         ]
       ctrs = map ContractTypo $ M.keys ccs
    in case concatMap lookInContract ccs ++ ctrs of
@@ -486,8 +530,9 @@ addCallInfo :: MonadSM m
             -> CC.CodeCollection
             -> Map SolidString (SVMType.Type, Variable)
             -> Bool
+            -> Bool
             -> m ()
-addCallInfo a c fn hsh cc initialLocalVariables ro = do
+addCallInfo a c fn hsh cc initialLocalVariables ro ff = do
   let newCallInfo =
         CallInfo {
           currentFunctionName=fn,
@@ -498,7 +543,8 @@ addCallInfo a c fn hsh cc initialLocalVariables ro = do
           localVariables=initialLocalVariables,
           readOnly=ro,
           isUncheckedSection=False, -- The rationale here is that unchecked sections only apply to the current stack frame
-          currentSourcePos=Nothing
+          currentSourcePos=Nothing,
+          isFreeFunction=ff
         }
 
   Mod.modify_ (Mod.Proxy @[CallInfo]) $ pure . (newCallInfo:)
@@ -605,6 +651,8 @@ hintFromType = \case
  SVMType.Bytes{} -> return TString
  SVMType.Int{} -> return TInteger
  SVMType.String{} -> return TString
+ (SVMType.UserDefined _ SVMType.Bool{}) -> return TBool
+ (SVMType.UserDefined _ SVMType.Int{}) -> return TString
  SVMType.UnknownLabel s _ -> do
    t' <- getTypeOfName s
    case t' of

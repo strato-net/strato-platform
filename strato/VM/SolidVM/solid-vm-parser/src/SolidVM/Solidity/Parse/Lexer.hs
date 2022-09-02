@@ -63,7 +63,7 @@ solidityLexer = P.makeTokenParser solidityLanguage
 
 solidityLanguage = javaStyle {
   P.reservedNames = [
-     "pragma", "import", "library", "using", "salt",
+     "pragma", "import", "library", "using", "type",-- "salt",
      "contract", "is", "public", "internal", "private", "external", "import", "payable",
      "event", "indexed", "anonymous",
      "bool", "true", "false",
@@ -71,24 +71,24 @@ solidityLanguage = javaStyle {
      "address", --"send", "balance",
      "enum", "struct", "mapping", "var",
      "function", "returns", "return", "modifier", "revert",
-     "delete", "constant", "storage", "memory", "calldata",
-     "if", "else", "while", "for", "break", "continue",
-     "call", "callcode", "length", "sha3", "ecrecover",
-     "suicide", "this",
+     "delete", "constant", "storage", "memory", "calldata", "immutable",
+     "if","else","while","for","break","continue",
+     "suicide", "this", 
+     "call", "callcode", "length", "sha3",
      "block", --"coinbase", "difficulty", "gaslimit", "number", "blockhash", "timestamp", "now"
      "msg", --"data", "gas", "sender", "value",
      "tx", --"gasprice", "origin",
      "wei", "finney", "szabo", "ether",
      "seconds", "minutes", "hours", "days", "weeks", "years",
      --The following are protected as they are also names for cirrus columns
-     "block_number", "block_timestamp", "block_hash",
-     "record_id", "transaction_hash", "transaction_sender",
-     "receive"
-     ],
+    --"block_number", "block_timestamp", "block_hash",
+    --"record_id", "transaction_hash", "transaction_sender"
+     "receive", "fallback"
+    ],
   P.reservedOpNames = [
     "!", "&&", "||", "==", "!=",
     "<=", ">=", "<", ">", "&", "|", "^", "~", "+", "*", "-", "/"," %", "**",
-    "+=", "-=", "*=", "/=", "%=", "|=", "&=", "^=", "++", "--",
+    "+=", "-=", "*=", "/=", "%=", "|=", "&=",  ">>=", "<<=", "^=", "++", "--", "hex",
     "=>", "="
     ],
   P.caseSensitive = True,

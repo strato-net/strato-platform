@@ -14,12 +14,12 @@ import qualified SolidVM.Solidity.StaticAnalysis.Expressions.BooleanLiterals    
 import qualified SolidVM.Solidity.StaticAnalysis.Expressions.DivideBeforeMultiply       as DivideBeforeMultiply
 import qualified SolidVM.Solidity.StaticAnalysis.Pragmas.IncorrectSolidityVersion       as IncorrectSolidityVersion
 import qualified SolidVM.Solidity.StaticAnalysis.Functions.ConstantFunctions            as ConstantFunctions
-import qualified SolidVM.Solidity.StaticAnalysis.Functions.Unimplemented.Modifiers      as Modifiers
 import qualified SolidVM.Solidity.StaticAnalysis.Statements.StateVariableShadowing      as StateVariableShadowing
 import qualified SolidVM.Solidity.StaticAnalysis.Statements.UninitializedLocalVariables as UninitializedLocalVariables
 import qualified SolidVM.Solidity.StaticAnalysis.Statements.WriteAfterWrite             as WriteAfterWrite
 import           SolidVM.Solidity.StaticAnalysis.Types
 import qualified SolidVM.Solidity.StaticAnalysis.Variables.StateVariables               as StateVariables
+import qualified SolidVM.Solidity.StaticAnalysis.Statements.MultipleDeclarations        as MultipleDeclarations
 import           Test.Hspec
 import           Text.RawString.QQ
 
@@ -29,7 +29,7 @@ forSource detector c = case parseSourceWithAnnotations "" $ T.pack c of
   Right cc -> detector cc
 
 forContract :: CompilerDetector -> String -> [SourceAnnotation Text]
-forContract detector c = case compileSourceWithAnnotations (M.fromList [("",T.pack c)]) of
+forContract detector c = case compileSourceWithAnnotations True (M.fromList [("",T.pack c)]) of
   Left anns -> anns
   Right cc -> detector cc
 
@@ -333,22 +333,6 @@ contract B {
 |]
        in length anns `shouldBe` 1
 
-  describe "Unimplemented function modifiers" $ do
-    it "warns for the use of custom function modifiers" $
-      let anns = Modifiers.detector `forContract` [r|
-contract A {
-  address owner;
-  modifier onlyOwner() {
-    require(msg.sender == owner, "You are not the owner.");
-    _;
-  }
-
-  function f() onlyOwner {
-  }
-}
-|]
-       in length anns `shouldBe` 1
-
   describe "State variable shadowing" $ do
     it "can create local variables that don't shadow state variable names" $
       let anns = StateVariableShadowing.detector `forContract` [r|
@@ -556,3 +540,18 @@ contract A {
 }
 |]
        in length anns `shouldBe` 1
+
+
+    it "can detect duplicate declarations" $
+      let anns = MultipleDeclarations.detector `forContract` [r|
+contract A {
+  function hey(){
+    y = 0;
+    x = "hello";
+    uint z = 0;
+    uint m = 1;
+    uint z = 2;
+  }
+}
+|]
+      in length anns `shouldBe` 1

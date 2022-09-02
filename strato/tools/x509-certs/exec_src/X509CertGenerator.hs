@@ -13,6 +13,9 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Reader
 
 import qualified Data.Aeson                         as Ae
+import           Data.Maybe
+import           Time.Types
+import           Data.Hourglass
 import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Char8              as C8
 import           Data.Either
@@ -45,6 +48,7 @@ data Options = Options
   , optSubjectInfo   :: Subject
   , optKey           :: PrivateKey
   , optOutputName    :: String
+  , optDateTime      :: Maybe DateTime
   } deriving Show
 
 defaultOptions :: Options
@@ -53,6 +57,7 @@ defaultOptions = Options
   , optSubjectInfo = throw $ userError "Give me a subject JSON file"
   , optKey         = throw $ userError "Give me a private key PEM file"
   , optOutputName  = "OutputCert.pem" 
+  , optDateTime    = Nothing
   }
 
 options :: [OptDescr (Options -> IO Options)]
@@ -88,6 +93,15 @@ options =
             Right pkey -> return opts{optKey = pkey}
        ) "SecKey")
     "The .pem filepath of the private key with which to sign the certificate"
+  , Option ['d'] ["date"]
+    (OptArg
+     (\mDate opts -> case mDate of
+        Nothing -> return opts
+        Just d -> do
+          let date = fromMaybe (error "Date didn't parse! Need e.g. 2014-04-05 ") (timeParse ISO8601_Date d)
+          return opts{optDateTime = Just date}
+     ) "dateTime")
+  "The certificate expiration date"
   , Option ['o'] ["output"]
       (OptArg
        (\mOut opts -> case mOut of 
@@ -136,6 +150,6 @@ main = do
   
   -- generate and write cert
   flip runReaderT optKey $ do
-    cert <- makeSignedCert optIssuerCert issuer optSubjectInfo
+    cert <- makeSignedCert optDateTime optIssuerCert issuer optSubjectInfo
     liftIO $ B.writeFile optOutputName $ certToBytes $ cert
     liftIO $ putStrLn $ "Done. Cert was written to " ++ optOutputName

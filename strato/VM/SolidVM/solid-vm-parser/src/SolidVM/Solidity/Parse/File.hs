@@ -14,6 +14,7 @@ module SolidVM.Solidity.Parse.File where
 import           Prelude                               hiding (lookup)
 
 import           Control.Monad
+import           Control.DeepSeq
 import           Data.Either.Extra
 import           Data.Maybe
 import           Data.SemVer
@@ -22,6 +23,7 @@ import           GHC.Generics
 import           Text.Parsec
 
 
+import           SolidVM.Solidity.Parse.Alias
 import           SolidVM.Solidity.Parse.Declarations
 import           SolidVM.Solidity.Parse.Imports
 import           SolidVM.Solidity.Parse.Lexer
@@ -30,12 +32,21 @@ import           SolidVM.Solidity.Parse.Pragmas
 
 newtype File = File {
   unsourceUnits :: [SourceUnit]
-} deriving (Show, Generic)
+} deriving (Show, Generic, NFData)
 
 solidityFile :: SolidityParser File
 solidityFile = do
   whiteSpace
-  units <- many (solidityPragma <|> solidityImport <|> solidityContract)
+  units <- many (   solidityPragma 
+                <|> solidityImport 
+                <|> solidityFLError
+                <|>  solidityAlias 
+                <|> solidityFreeFunction 
+                <|> solidityContract 
+                <|> solidityFLConstant 
+                <|> solidityFLStruct 
+                <|> solidityFLEnum
+                )
   eof
   return . File $ units
 

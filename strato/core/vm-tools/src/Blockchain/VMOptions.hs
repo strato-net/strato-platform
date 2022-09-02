@@ -52,5 +52,3 @@ defineFlag "cacheTransactionResults" True "Keep transaction results in an LRU ca
 defineEQFlag "miner" [| Instant :: MinerType |] "MINER" "What mining algorithm"
 defineFlag "gasOn" (True::Bool) "Whether to charge for transactions or not"
 defineFlag "evmCompatible" (False::Bool) "Whether to turn off STRATO enhancements or not"
-defineFlag "network" (""::String) "Choose a network to join"
-defineFlag "networkID" (-1::Int) "set a custom network ID for the client"

@@ -603,16 +603,19 @@ createDummyContract v =
         varType=t,
         varIsPublic=True,
         varInitialVal=Nothing,
-        varContext=error "varContext undefined"
+        varContext=error "varContext undefined",
+        isImmutable = False
         }
   in
     Contract{
       _contractName=undefined,
       _parents=undefined,
       _constants=undefined,
+      _userDefined=undefined,
       _storageDefs=M.mapKeys textToLabel $ M.fromList $ map (fmap createVariableDecl) v,
       _enums=undefined,
       _structs=undefined,
+      _errors=undefined,
       _events=undefined,
       _functions=undefined,
       _constructor=undefined,
