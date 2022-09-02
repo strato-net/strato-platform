@@ -34,6 +34,7 @@ module Blockchain.VM.SolidException
   , revertError
   , immutableError
   , getRunTimeCodeError
+  , userDefinedError
   ) where
 
 import Control.DeepSeq
@@ -74,6 +75,7 @@ data SolidException = TypeError String String
                     | ReservedWordError String String
                     | ImmutableError String String
                     | FailedToAttainRunTimCode String String
+                    | UserDefinedError String String
                     deriving (Eq, Exception, Generic, NFData)
 
 instance Show SolidException where
@@ -111,6 +113,7 @@ showSolidException (PaymentError a b) = printf "There was an error sending %s we
 showSolidException (ReservedWordError a b) = printf "%s is a reserved word in version %s and up." b a
 showSolidException (ImmutableError a b) = printf "%s is an immutable variable in line '%s'" a b
 showSolidException (FailedToAttainRunTimCode a b) = printf "%s failed to aquire run time code '%s'" a b
+showSolidException (UserDefinedError a b) = printf "%s is an user defined error in line '%s'" a b
 
 toThrower :: (Show v) => (String -> String -> SolidException) -> String -> v -> a
 toThrower cont msg = throw . cont msg . show
@@ -202,8 +205,12 @@ paymentError = toThrower PaymentError
 reservedWordError :: (Show v) => String -> v -> a
 reservedWordError = toThrower ReservedWordError
 
+
 immutableError :: (Show v) => String -> v -> a
 immutableError = toThrower ImmutableError
+
+userDefinedError :: (Show v) => String -> v -> a
+userDefinedError = toThrower UserDefinedError
 
 getRunTimeCodeError :: (Show v) => String -> v -> a
 getRunTimeCodeError = toThrower FailedToAttainRunTimCode

@@ -159,6 +159,7 @@ LogDB
     deriving Eq Read Show Generic
 
 EventDB
+    contractAddress Account
     chainId Word256 Maybe
     name String
     args [String]
