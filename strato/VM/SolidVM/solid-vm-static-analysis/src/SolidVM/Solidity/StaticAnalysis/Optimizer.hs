@@ -226,13 +226,13 @@ optimizeExpression (MemberAccess loc base fieldName) = do
           --"int"  -> pure $ ()--To Implement for another ticket
           "creationCode" -> pure $ case M.lookup nam (_contracts cc) of Just contract -> (StringLiteral spot (unparseContract  contract));  _ -> (error " Attaining creation code failed." ())  -- OLD FAKE VALUE TO GET GET COMPILE -> (StringLiteral spot "contract qq { int a = 12 }") 
           "runtimeCode" -> pure $ (MemberAccess loc base fieldName)
-          _ -> (error "Invalid args or unimplemented feature" ())
+          _ -> pure $ (MemberAccess loc base fieldName) 
         else  pure $ (error "Contract not on file level" ())
-    (FunctionCall _ (Variable _ "type") (NamedArgs _)) -> (error "named arguements do not work with type function" ())
-    _  -> --do
+    (FunctionCall _ (Variable _ "type") (NamedArgs _)) -> pure $ (MemberAccess loc base fieldName) 
+    _  -> pure $ (MemberAccess loc base fieldName) -- TODO implement a memeber Access evaluator
       -- b <- optimizeExpression  base
       -- t <- optimizeExpression  (b fieldName)
-      pure $ (MemberAccess loc base fieldName) -- TODO implement a memeber Access evaluator
+      
 -- optimizeExpression (FunctionCall x expr args) = do
 --   e <- optimizeExpression expr
 --   a <- case args of

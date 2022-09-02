@@ -160,6 +160,10 @@ anyImmutableError :: Selector HandledException
 anyImmutableError (HE Blockchain.SolidVM.Exception.ImmutableError{}) = True
 anyImmutableError _ = False
 
+failedToAttainRunTimCodeError :: Selector HandledException
+failedToAttainRunTimCodeError (HE Blockchain.SolidVM.Exception.FailedToAttainRunTimCode{}) = True
+failedToAttainRunTimCodeError _ = False
+
 failedRequirementMsg :: String -> Selector HandledException
 failedRequirementMsg str (HE (Require (Just msg))) = str == msg
 failedRequirementMsg _ _ = False

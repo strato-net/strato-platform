@@ -1539,12 +1539,11 @@ expToVar' (CC.Binary _ "^=" lhs rhs) = binopAssign xor lhs rhs
 expToVar' (CC.Binary _ ">>=" lhs rhs)= binopAssign (\x i -> x `shiftR` fromInteger i) lhs rhs
 expToVar' (CC.Binary _ "<<=" lhs rhs)= binopAssign (\x i -> x `shiftL` fromInteger i) lhs rhs
 expToVar' (CC.Binary _ ">>>=" lhs rhs)= binopAssign (\x i -> fromInteger ( toInteger ( (fromInteger x) ::Word256) ) `shiftR` fromInteger i ) lhs rhs
-expToVar' (CC.MemberAccess _ (CC.FunctionCall _ (CC.Variable _ "type") (CC.OrderedArgs [CC.Variable _ name])) "runTimeCode") = do
+expToVar' (CC.MemberAccess _ (CC.FunctionCall x (CC.Variable _ "type") (CC.OrderedArgs [CC.Variable _ name])) "runTimeCode") = do
   (_, cc) <- getCurrentCodeCollection
-  
   return $ Constant $ SString $ case M.lookup name $ cc ^. CC.contracts of-- (_contracts cc) of 
     Just contract -> unparseContract  contract;
-    _ -> (error " Attaining run time code failed." ())
+    _ -> getRunTimeCodeError "Failed to get contract runtime code " x
 
 
 expToVar' (CC.MemberAccess _ (CC.Variable _ "Util") "bytes32ToString") = do
@@ -3458,7 +3457,11 @@ solidityExceptionHandler catchBlockMap ex = do
     (ImmutableError s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 25 immutableError
       return res
+    (FailedToAttainRunTimCode s1 s2) -> do
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 26 getRunTimeCodeError
+      return res
     _ -> error "unhandled solid exception" (show ex)
+
 
 
 

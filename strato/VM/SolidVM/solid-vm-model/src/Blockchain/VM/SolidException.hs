@@ -33,6 +33,7 @@ module Blockchain.VM.SolidException
   , reservedWordError
   , revertError
   , immutableError
+  , getRunTimeCodeError
   ) where
 
 import Control.DeepSeq
@@ -72,6 +73,7 @@ data SolidException = TypeError String String
                     | PaymentError String String
                     | ReservedWordError String String
                     | ImmutableError String String
+                    | FailedToAttainRunTimCode String String
                     deriving (Eq, Exception, Generic, NFData)
 
 instance Show SolidException where
@@ -108,6 +110,7 @@ showSolidException (TooMuchGas a b) = printf "The gas limit is %s, but was given
 showSolidException (PaymentError a b) = printf "There was an error sending %s wei to the following address: %s" a b
 showSolidException (ReservedWordError a b) = printf "%s is a reserved word in version %s and up." b a
 showSolidException (ImmutableError a b) = printf "%s is an immutable variable in line '%s'" a b
+showSolidException (FailedToAttainRunTimCode a b) = printf "%s failed to aquire run time code '%s'" a b
 
 toThrower :: (Show v) => (String -> String -> SolidException) -> String -> v -> a
 toThrower cont msg = throw . cont msg . show
@@ -199,6 +202,8 @@ paymentError = toThrower PaymentError
 reservedWordError :: (Show v) => String -> v -> a
 reservedWordError = toThrower ReservedWordError
 
-
 immutableError :: (Show v) => String -> v -> a
 immutableError = toThrower ImmutableError
+
+getRunTimeCodeError :: (Show v) => String -> v -> a
+getRunTimeCodeError = toThrower FailedToAttainRunTimCode
