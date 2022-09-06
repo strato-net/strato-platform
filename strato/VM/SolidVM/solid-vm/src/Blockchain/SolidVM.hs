@@ -2128,8 +2128,8 @@ expToVar' (CC.FunctionCall _ e args) = do
           Constant (SContractItem address' "code") -> do
             --Prevent stateroot mismatches as the other .code member is was introduced earlier and this is an extension
             cntrct <- getCurrentContract
-            if (CC._vmVersion cntrct /= "svm3.4") then do
-              typeError "illegal member access: svm3.4+ required to use advance .code member" ("parsed as " ++ show address' ++ ".code")
+            if (CC._vmVersion cntrct /= "svm3.3") then do
+              typeError "illegal member access: svm3.3+ required to use advance .code member" ("parsed as " ++ show address' ++ ".code")
             else do
               --Only get the items if they are in the same chain as the current contract, this will prevent leaks from private chains
               from <- getCurrentAccount
@@ -2160,7 +2160,7 @@ expToVar' (CC.FunctionCall _ e args) = do
               --get only the contract containing the sweet succulent ContractF definition
               (contract, _, _) <- getCodeAndCollection toAccount
               --filter out any foreign contracts that are not the correct pragma
-              when (contract ^. CC.vmVersion /= "svm3.4") $ oldForeignPragmaError (show $ contract ^. CC.contractName) (show $ contract ^. CC.vmVersion)
+              when (contract ^. CC.vmVersion /= "svm3.3") $ oldForeignPragmaError (show $ contract ^. CC.contractName) (show $ contract ^. CC.vmVersion)
               let codeSnippets :: [String]
                   codeSnippets = 
                     case (fromMaybe "" searchTerms) of 
