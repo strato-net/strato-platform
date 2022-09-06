@@ -1,8 +1,8 @@
-{-# LANGUAGE DeriveFunctor #-}
+
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE LambdaCase #-}
+
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
+
 module SolidVM.Solidity.StaticAnalysis.Optimizer
   ( detector
   ) where
@@ -11,41 +11,116 @@ import           Control.Lens
 import           Control.Monad.Reader
 import           Data.Functor.Compose
 import           Data.Maybe (fromMaybe)
+import           Data.Map as M
 import           SolidVM.Model.CodeCollection
 
-data R = R ()
+--import           SolidVM.Model.Type (Type)
+import qualified SolidVM.Model.Type as SVMType
+import Debug.Trace
+--import GHC.Stack (ccLabel)
 
-detector :: CodeCollection -> CodeCollection
-detector = over (contracts . mapped) contractHelper
-         . over (flFuncs . mapped) functionHelper
-         . over (flConstants . mapped) constDeclHelper
 
-contractHelper :: Contract
+data R = R
+  { codeCollection :: CodeCollection
+  , contract :: Maybe Contract-- Or Contract?
+  }
+
+
+detector ::  CodeCollection -> CodeCollection
+detector cc = over (contracts . mapped) (contractHelper cc)
+          $ over (flFuncs . mapped) (functionHelper cc  Nothing)
+          $ over (flConstants . mapped) (constDeclHelper cc Nothing) cc
+
+contractHelper :: CodeCollection
                -> Contract
-contractHelper = (constructor . _Just %~ functionHelper)
-               . over (functions . mapped) functionHelper
-               . over (storageDefs . mapped) varDeclHelper
-               . over (constants . mapped) constDeclHelper
+               -> Contract
+contractHelper cc c = (constructor . _Just %~ functionHelper cc (Just c))
+              $ over (storageDefs . mapped) (varDeclHelper   cc (Just c))
+              $ over (functions . mapped)   (functionHelper  cc (Just c))
+              $ over (constants . mapped)   (constDeclHelper cc (Just c)) c
 
-varDeclHelper :: VariableDecl
+
+varDeclHelper :: CodeCollection
+              -> Maybe Contract
               -> VariableDecl
-varDeclHelper v = v{ varInitialVal = run <$> varInitialVal v }
-  where run e = let r = R ()
-                 in runReader (optimizeExpression e) r
+              -> VariableDecl
+varDeclHelper cc c v = case varType v of
+  (SVMType.UserDefined  al actua )-> v{varType = actua  ,varInitialVal = run2 al actua<$> varInitialVal v }
+  _ -> v{ varInitialVal = run <$> varInitialVal v }
+  where run e = let r = R cc c
+          in runReader (optimizeExpression e) r
+        run2 a t e = let r = R cc c
+          in runReader (optimizeExpressionUserDefined a t e) r
 
-constDeclHelper :: ConstantDecl
+
+constDeclHelper :: CodeCollection
+                -> Maybe Contract
                 -> ConstantDecl
-constDeclHelper v = v{ constInitialVal = run $ constInitialVal v }
-  where run e = let r = R ()
+                -> ConstantDecl
+constDeclHelper cc c v = v{ constInitialVal = run $ constInitialVal v }
+  where run e = let r = R cc c-- Todo Make this an actual contract
                  in runReader (optimizeExpression e) r
 
-functionHelper :: Func
+functionHelper :: CodeCollection
+               -> Maybe Contract
                -> Func
-functionHelper f = case funcContents f of
+               -> Func
+functionHelper cc c f = case funcContents f of
   Nothing -> f
   Just stmts ->
-    let r = R ()
+    let r = R cc c
      in f{ funcContents = Just $ runReader (optimizeStatements stmts) r }
+
+
+-- data R = R ()
+
+-- detector :: CodeCollection -> CodeCollection
+-- detector = over (contracts . mapped) contractHelper
+--          . over (flFuncs . mapped) functionHelper
+--          . over (flConstants . mapped) constDeclHelper
+
+-- contractHelper :: Contract
+--                -> Contract
+-- contractHelper = (constructor . _Just %~ functionHelper)
+--                . over (functions . mapped) functionHelper
+--                . over (storageDefs . mapped) varDeclHelper
+--                . over (constants . mapped) constDeclHelper
+
+-- varDeclHelper :: VariableDecl
+--               -> VariableDecl
+-- varDeclHelper v = v{ varInitialVal = run <$> varInitialVal v }
+--   where run e = let r = R ()
+--                   in runReader (optimizeExpression e) r
+
+
+
+-- varDeclHelper :: VariableDecl
+--               -> VariableDecl
+-- varDeclHelper (VariableDecl typ isPub initialVal varCont isImmut) =
+--    (VariableDecl typ isPub initialVal varCont isImmut){ varInitialVal = run <$> initialVal (VariableDecl typ isPub initialVal varCont isImmut) }
+--   where run e = let r = R ()
+--                   in runReader (optimizeExpression e) r
+
+--  
+--   (VariableDecl actual isPub initialVal varCont isImmut){ varInitialVal = run <$> initialVal }
+--   where run e = let r = R ()
+--                  in runReader (optimizeExpression e) r
+
+
+
+-- constDeclHelper :: ConstantDecl
+--                 -> ConstantDecl
+-- constDeclHelper v = v{ constInitialVal = run $ constInitialVal v }
+--   where run e = let r = R ()
+--                  in runReader (optimizeExpression e) r
+
+-- functionHelper :: Func
+--                -> Func
+-- functionHelper f = case funcContents f of
+--   Nothing -> f
+--   Just stmts ->
+--     let r = R ()
+--      in f{ funcContents = Just $ runReader (optimizeStatements stmts) r }
 
 optimizeStatements :: [Statement] -> Reader R [Statement]
 optimizeStatements [] = pure []
@@ -61,53 +136,84 @@ optimizeStatements ((IfStatement cond thens mElse x) : ss) = do
     _ -> do
       thens' <- optimizeStatements thens
       elses' <- traverse optimizeStatements mElse
-      ((IfStatement cond' thens' elses' x):) <$> optimizeStatements ss
+      (IfStatement cond' thens' elses' x:) <$> optimizeStatements ss
 optimizeStatements ((TryCatchStatement tryStatements catchMap x) : ss) = do
   tryStatements' <- optimizeStatements tryStatements
   catchMap' <- getCompose <$> traverse optimizeStatements (Compose catchMap)
-  ((TryCatchStatement tryStatements' catchMap' x):) <$> optimizeStatements ss
+  (TryCatchStatement tryStatements' catchMap' x:) <$> optimizeStatements ss
 optimizeStatements ((SolidityTryCatchStatement expr mtpl successStatements catchMap x) : ss) = do
   expr' <- optimizeExpression expr
   successStatements' <- optimizeStatements successStatements
   catchMap' <- getCompose <$> traverse optimizeStatements (Compose catchMap)
-  ((SolidityTryCatchStatement expr' mtpl successStatements' catchMap' x):) <$> optimizeStatements ss
+  (SolidityTryCatchStatement expr' mtpl successStatements' catchMap' x:) <$> optimizeStatements ss
 optimizeStatements ((WhileStatement cond body x) : ss) = do
   cond' <- optimizeExpression cond
   case cond' of
     BoolLiteral _ False -> optimizeStatements ss
     _ -> do
       body' <- optimizeStatements body
-      ((WhileStatement cond' body' x):) <$> optimizeStatements ss
+      (WhileStatement cond' body' x:) <$> optimizeStatements ss
 optimizeStatements ((ForStatement mInit mCond mPost body x) : ss) = do
   mCond' <- traverse optimizeExpression mCond
   mPost' <- traverse optimizeExpression mPost
   body' <- optimizeStatements body
-  ((ForStatement mInit mCond' mPost' body' x):) <$> optimizeStatements ss
+  (ForStatement mInit mCond' mPost' body' x:) <$> optimizeStatements ss
 optimizeStatements ((Block _) : ss) = optimizeStatements ss
 optimizeStatements ((DoWhileStatement body cond x) : ss) = do
   body' <- optimizeStatements body
   cond' <- optimizeExpression cond
   case cond' of
     BoolLiteral _ False -> (body' ++) <$> optimizeStatements ss
-    _ -> ((DoWhileStatement body' cond' x):) <$> optimizeStatements ss
+    _ -> (DoWhileStatement body' cond' x:) <$> optimizeStatements ss
 optimizeStatements (s@(Continue _) : _) = pure [s]
 optimizeStatements (s@(Break _) : _) = pure [s]
 optimizeStatements (s@(Return _ _) : _) = pure [s]
 optimizeStatements (s@(Throw _ _) : _) = pure [s]
 optimizeStatements (s@(ModifierExecutor _) : ss) = (s:) <$> optimizeStatements ss
-optimizeStatements (s@(EmitStatement _ _ _) : ss) = (s:) <$> optimizeStatements ss
-optimizeStatements (s@(RevertStatement _ _ _) : _) = pure [s]
+optimizeStatements (s@(EmitStatement {}) : ss) = (s:) <$> optimizeStatements ss
+optimizeStatements (s@(RevertStatement {}) : _) = pure [s]
 optimizeStatements (s@(UncheckedStatement _ _) : ss) = (s:) <$> optimizeStatements ss
 optimizeStatements (s@(AssemblyStatement _ _) : ss) = (s:) <$> optimizeStatements ss
 optimizeStatements (s@(SimpleStatement _ _) : ss) = (s:) <$> optimizeStatements ss
 
+
+optimizeExpressionUserDefined :: String -> SVMType.Type -> Expression -> Reader R Expression
+--optimizeExpressionUserDefined aliasName actualType e = do
+optimizeExpressionUserDefined aliasName actualType e = do
+  res <- case e of
+    (FunctionCall _  (MemberAccess _  (Variable _  _ ) "wrap") (OrderedArgs [x])) ->  optimizeExpression x
+    _ -> optimizeExpression e  --- Need to test this more and throw errors about this
+
+  cc <-  asks codeCollection
+
+  let printTHis = trace ("\n\n\t Trace Print in UserDEfined Expression" ++
+        "Ordered args\t" ++show e++
+        "\ncc\t" ++ show (_contracts cc) ++
+        "\nAlais\t" ++ show aliasName ++
+        "\nActual\t" ++ show actualType
+        ) "\n"
+
+  pure $ trace printTHis res
+
+
+
+
+
+
+
+
+
 optimizeExpression :: Expression -> Reader R Expression
 optimizeExpression (Binary x "+" a b) = do
-  a' <- optimizeExpression a
+  a'' <- optimizeExpression a
+  --a' <- optimizeExpression a
+  let printThing  = trace ("\n\n\t" ++ show a'' ++ "\n\n\t") ( optimizeExpression a) --get rid of this
+  a' <- printThing --get ride of this 
   b' <- optimizeExpression b
   case (a', b') of
     (NumberLiteral y valA w, NumberLiteral z valB _) -> pure $ NumberLiteral (y <> z) (valA + valB) w
     (StringLiteral y valA, StringLiteral z valB) -> pure $ StringLiteral (y <> z) (valA <> valB)
+    --(StringLiteral y valA, StringLiteral z valB)
     _ -> pure $ Binary x "+" a' b'
 optimizeExpression (Binary x "-" a b) = do
   a' <- optimizeExpression a
@@ -133,6 +239,17 @@ optimizeExpression (Binary x "%" a b) = do
   case (a', b') of
     (NumberLiteral y valA w, NumberLiteral z valB _) -> pure $ NumberLiteral (y <> z) (valA `mod` valB) w
     _ -> pure $ Binary x "%" a' b'
+optimizeExpression (FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "wrap") args) = do
+  mc <- asks contract
+  case mc of 
+    Just c -> do 
+      let arg = case args of OrderedArgs es ->  es;  _ -> [];
+      if M.member nam (_userDefined  c) &&   length arg == 1
+        then do
+          optimizeExpression $ head arg
+        else pure (FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "wrap") args)
+    Nothing -> do 
+      pure $ (FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "wrap") args)
 
 optimizeExpression e = pure e
 -- optimizeExpression (Binary x "|" a b) =
