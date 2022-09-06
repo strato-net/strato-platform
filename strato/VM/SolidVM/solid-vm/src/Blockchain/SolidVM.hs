@@ -3547,13 +3547,13 @@ solidityExceptionHandler catchBlockMap ex = do
     (UserDefinedError s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 26 userDefinedError
       return res
-    _ -> error "unhandled solid exception" (show ex)
     (InvalidChain s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 27 invalidChain
       return res
     (GeneralMetaProgrammingError s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 28 generalMetaProgrammingError
       return res
+    _ -> error "unhandled solid exception" (show ex)
 
 
 
@@ -3714,7 +3714,6 @@ solidVMExceptionHandler catchBlockMap ex = case ex of
         Just (_, block) -> do
           res <- runStatements block
           return res
-    
     (CustomError s1 s2 vals) -> do
       let name = T.unpack $ T.replace "\"" "" $ T.pack s2
       case M.lookup name catchBlockMap of
