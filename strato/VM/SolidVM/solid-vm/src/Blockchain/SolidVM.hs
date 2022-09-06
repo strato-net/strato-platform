@@ -3544,13 +3544,16 @@ solidityExceptionHandler catchBlockMap ex = do
     (TooManyCooks s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 25 tooManyCooks
       return res
-    (GeneralMetaProgrammingError s1 s2) -> do
-      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 26 generalMetaProgrammingError
-      return res
     (UserDefinedError s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 26 userDefinedError
       return res
     _ -> error "unhandled solid exception" (show ex)
+    (InvalidChain s1 s2) -> do
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 27 invalidChain
+      return res
+    (GeneralMetaProgrammingError s1 s2) -> do
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 28 generalMetaProgrammingError
+      return res
 
 
 
@@ -3702,6 +3705,12 @@ solidVMExceptionHandler catchBlockMap ex = case ex of
     (GeneralMetaProgrammingError s1 s2) ->
       case M.lookup "GeneralMetaProgrammingError" catchBlockMap of
         Nothing -> generalMetaProgrammingError s1 s2
+        Just (_, block) -> do
+          res <- runStatements block
+          return res
+    (InvalidChain s1 s2) ->
+      case M.lookup "InvalidChain" catchBlockMap of
+        Nothing -> invalidChain s1 s2
         Just (_, block) -> do
           res <- runStatements block
           return res
