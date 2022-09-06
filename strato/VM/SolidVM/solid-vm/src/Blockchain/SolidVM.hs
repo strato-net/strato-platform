@@ -824,6 +824,35 @@ genericDelegateCallWrapper from to input isRcc args
   -- Check if both accounts belong to the same chain, throw an error if they are not on the same chain, nothing otherwise
   chainCheck from to
   
+-- get both the payload and any arguments that were also supplied, return (payload, args)
+-- functionType and address are only used for error messages
+superpayload :: String -> Address -> CC.ArgList -> (CodeCollection, CC.ArgList)
+superPayload functionType address input = do
+  case argVals of
+    -- catch only the SStrings
+    OrderedVals [SString arguments] -> pure $ Just arguments
+    -- Throw an error if too many arguments are passed
+    OrderedVals as | length as > 1 -> tooManyCooks 1 (length as)
+    --If nothing was given or something else, then just return the entire code
+    _ -> pure $ noPayload functionType (show address)
+  --Form of string need to parse again
+  notParsedPayload <- head superPayload
+  --form of ArgList
+  arguments <- tail superPayload
+
+  cc <- try (runParser solidityDeclaration input)
+          try (runParser solidityContract input)
+          
+
+          string payload = <address>.code("myFunc");
+          <address>.delegatecall(payload, <arguments>); ====> bool
+          ----insert below-----
+          function myFunc (uint a, uint b) returns (uint) {
+            return a + b;
+          }
+          ----insert above-----
+          myFunc(arg1, arg2)
+
 
 
 callWrapper :: MonadSM m => Account -> Account -> Maybe SolidString -> SolidString -> Bool -> CC.ArgList -> m (Maybe Value)
@@ -2219,6 +2248,19 @@ expToVar' (CC.FunctionCall _ e args) = do
                       --Remove all of the items that were found to contain nothing, this should leave just the items that we found
                       in catMaybes [contrString, funcString, constString, storjString, enumString, eventString, structString, modString]
             pure . Constant $ SString ( unlines codeSnippets)
+
+          -- Isolate the payload and the inputted arguments, send to the actual delegatecaller function
+          Constant (SContractItem address' "delegatecall") -> do
+            (payload, argumentList) <- superPayload argVals
+            return . Constant . SBool $ genericDelegateCallWrapper address' payload argVals
+          
+          Constant (SContractItem address' "staticcall")
+            (payload, argumentList) <- superPayload argVals
+            return . Constant . SBool $ genericStaticCallWrapper address' payload argVals
+
+          Constant (SContractItem address' "call")
+            (payload, argumentList) <- superPayload argVals
+            return . Constant . SBool $ genericCallWrapper address' payload argVals
 
           Constant (SContractItem address' itemName) -> do
             from <- getCurrentAccount
