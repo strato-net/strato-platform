@@ -215,6 +215,7 @@ def runAppBootNode(nodeData, wipeApp = null, refspec = null, postgresViewsPrefix
         echo "publicKey from strato-gs run script: ${publicKey}"
         sh 'rm -f run-app.sh'
         def authCookieName = "beanstalk-dev${nodeData.NUMBER}-auth"
+        sh "sed 's/static/default/g' docker-compose.yml"
         if(appName == 'beanstalk') {
           writeFile file: "run-app.sh", text: """#!/bin/bash
 set -e
@@ -343,6 +344,7 @@ def runAppSecondaryNode(nodeData, wipeApp = null, refspec = null, postgresViewsP
         echo "publicKey from strato-gs run script: ${publicKey}"
         sh 'rm -f run-app.sh'
         def authCookieName = "beanstalk-dev${nodeData.NUMBER}-auth"
+        sh "sed 's/static/default/g' docker-compose.yml"
         writeFile file: "run-app.sh", text: """
 #!/bin/bash
 set -e
