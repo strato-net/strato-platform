@@ -3546,6 +3546,7 @@ solidityExceptionHandler catchBlockMap ex = do
       return res
     (GeneralMetaProgrammingError s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 26 generalMetaProgrammingError
+      return res
     (UserDefinedError s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 26 userDefinedError
       return res
