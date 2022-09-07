@@ -8,16 +8,23 @@ module SolidVM.Solidity.StaticAnalysis.Optimizer
   ) where
 
 import           Control.Lens
+-- import           Control.Applicative ((<|>))
+-- import           Control.Arrow ((&&&))
 import           Control.Monad.Reader
 import           Data.Functor.Compose
 import           Data.Maybe (fromMaybe)
 import           Data.Map as M
 import           SolidVM.Model.CodeCollection
+--import           Data.Source
+
+--import           SolidVM.Solidity.StaticAnalysis.Types
 
 --import           SolidVM.Model.Type (Type)
 import qualified SolidVM.Model.Type as SVMType
 import Debug.Trace
---import GHC.Stack (ccLabel)
+--import SolidVM.Model.SolidString 
+import SolidVM.Model.SolidString (SolidString)
+
 
 
 data R = R
@@ -61,66 +68,43 @@ constDeclHelper cc c v = v{ constInitialVal = run $ constInitialVal v }
   where run e = let r = R cc c-- Todo Make this an actual contract
                  in runReader (optimizeExpression e) r
 
+
+-- Clean This code up
 functionHelper :: CodeCollection
                -> Maybe Contract
                -> Func
                -> Func
-functionHelper cc c f = case funcContents f of
-  Nothing -> f
-  Just stmts ->
-    let r = R cc c
-     in f{ funcContents = Just $ runReader (optimizeStatements stmts) r }
+functionHelper cc mc f = do
 
+  case funcContents f of
+    Nothing -> f
+    Just stmts -> do
+      case mc of 
+        Just c ->  
+          if M.null $ _userDefined c -- Check if there is any user Defined
+            then
+              let r = R cc mc
+              in f{ 
+                funcContents = Just $ runReader (optimizeStatements stmts) r }
+            else
+              let r = R cc mc
+              in functionHelperForUserDefined f{ 
+                funcContents = Just $ runReader (optimizeStatements stmts) r }
+        Nothing -> let r = R cc mc
+              in f{ 
+                funcContents = Just $ runReader (optimizeStatements stmts) r }
 
--- data R = R ()
+-- Throw a if statement before this.
+-- Way smarter way of writing this.
+functionHelperForUserDefined ::  Func -> Func
+functionHelperForUserDefined f = f{ funcArgs =  tForm  $ funcArgs f, funcVals =  tForm  $ funcVals f   }
+  where 
+    tForm :: [(Maybe SolidString, IndexedType)] -> [(Maybe SolidString, IndexedType)]
+    tForm = Prelude.map (\(maybeSoldString, (IndexedType z y) ) -> case (maybeSoldString, y) of
+      (xxxx, (SVMType.UserDefined _ act)) -> (xxxx, (IndexedType z act))
+      (xxxx, _ )-> (xxxx, (IndexedType z y));
+      )
 
--- detector :: CodeCollection -> CodeCollection
--- detector = over (contracts . mapped) contractHelper
---          . over (flFuncs . mapped) functionHelper
---          . over (flConstants . mapped) constDeclHelper
-
--- contractHelper :: Contract
---                -> Contract
--- contractHelper = (constructor . _Just %~ functionHelper)
---                . over (functions . mapped) functionHelper
---                . over (storageDefs . mapped) varDeclHelper
---                . over (constants . mapped) constDeclHelper
-
--- varDeclHelper :: VariableDecl
---               -> VariableDecl
--- varDeclHelper v = v{ varInitialVal = run <$> varInitialVal v }
---   where run e = let r = R ()
---                   in runReader (optimizeExpression e) r
-
-
-
--- varDeclHelper :: VariableDecl
---               -> VariableDecl
--- varDeclHelper (VariableDecl typ isPub initialVal varCont isImmut) =
---    (VariableDecl typ isPub initialVal varCont isImmut){ varInitialVal = run <$> initialVal (VariableDecl typ isPub initialVal varCont isImmut) }
---   where run e = let r = R ()
---                   in runReader (optimizeExpression e) r
-
---  
---   (VariableDecl actual isPub initialVal varCont isImmut){ varInitialVal = run <$> initialVal }
---   where run e = let r = R ()
---                  in runReader (optimizeExpression e) r
-
-
-
--- constDeclHelper :: ConstantDecl
---                 -> ConstantDecl
--- constDeclHelper v = v{ constInitialVal = run $ constInitialVal v }
---   where run e = let r = R ()
---                  in runReader (optimizeExpression e) r
-
--- functionHelper :: Func
---                -> Func
--- functionHelper f = case funcContents f of
---   Nothing -> f
---   Just stmts ->
---     let r = R ()
---      in f{ funcContents = Just $ runReader (optimizeStatements stmts) r }
 
 optimizeStatements :: [Statement] -> Reader R [Statement]
 optimizeStatements [] = pure []
@@ -185,23 +169,56 @@ optimizeExpressionUserDefined aliasName actualType e = do
     _ -> optimizeExpression e  --- Need to test this more and throw errors about this
 
   cc <-  asks codeCollection
-
-  let printTHis = trace ("\n\n\t Trace Print in UserDEfined Expression" ++
-        "Ordered args\t" ++show e++
-        "\ncc\t" ++ show (_contracts cc) ++
-        "\nAlais\t" ++ show aliasName ++
-        "\nActual\t" ++ show actualType
-        ) "\n"
+  c <-  asks contract
+  let printTHis = (case c of 
+        Just rC -> trace ("\n\n\t Trace Print in UserDEfined Expression" ++
+                "Ordered args\t" ++show e++
+                "\ncc\t" ++ show (_contracts cc) ++
+                "\n\n\nfunctions \t" ++ (show (M.lookup "f" $ _functions rC)) ++
+                "\nAlais\t" ++ show aliasName ++
+                "\nActual\t" ++ show actualType
+                ) "\n"
+        _ -> "ehh"
+        )
 
   pure $ trace printTHis res
 
 
+-- As of right now this is just a helper for UserDefined types.
+-- This needs to be altered fore all Types down the road. 
+getVariableByName :: SolidString -> Reader R  (Maybe Expression)--VariableDeclF (SourceAnnotation ()) -- Maybe SVMType.Type 
+getVariableByName name = do
+  mc <- asks contract
+  case mc of 
+    Just c -> do
+      --cc <- asks codeCollection
+      let mVarDecl = (M.lookup name (_storageDefs c))
+                  -- <|> ( M.lookup name (_constants c))
+                  -- <|> ( M.lookup name (_flConstants cc))
+      case mVarDecl of
+        Just (VariableDecl (SVMType.UserDefined  _ _ ) _ vi _  _) ->  pure $   vi --(SVMType.UserDefined  al actua ) 
+        Just (VariableDecl _ _ vi _  _) ->  pure $   vi
+        Nothing ->  pure $  Nothing
+    Nothing ->  pure $  Nothing
+
+-- userDefinedToExpression :: SVMType.UserDefined -> Expression -> Expression
+-- userDefinedToExpression (SVMType.UserDefined  al actua ) ogExpr = 
+--   optExpr <- optimizeExpression ogExpr
+--   case actua of 
 
 
 
+--I probably should come up with an expression maker that turns a UserDefined into a OG type
 
-
-
+--Can throw away
+-- userTypeHelper' :: Maybe String -> ExpressionF
+-- userTypeHelper' (Just "bool")   =  SVMType.Bool
+-- userTypeHelper' (Just "string") =  StringLiteral a String
+-- userTypeHelper' (Just "int")    =  NumberLiteral 
+-- userTypeHelper' (Just "uint")   =  NumberLiteral
+-- userTypeHelper' (Just "bytes")  =  NumberLiteral
+-- userTypeHelper' (Just "byte")   =  NumberLiteral 
+-- userTypeHelper' _               =  SVMType.Bool  --TODO fix this
 
 optimizeExpression :: Expression -> Reader R Expression
 optimizeExpression (Binary x "+" a b) = do
@@ -247,6 +264,27 @@ optimizeExpression (FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "wrap"
       if M.member nam (_userDefined  c) &&   length arg == 1
         then do
           optimizeExpression $ head arg
+        else pure (FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "wrap") args)
+    Nothing -> do 
+      pure $ (FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "wrap") args)
+
+
+optimizeExpression (FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "unwrap") args) = do
+  --Basically an unwrap returns the underlying of the userDefined type.
+  -- That means we need a optimizeExpression that takes a UserDefined
+  mc <- asks contract
+  case mc of 
+    Just c -> do 
+      let arg = case args of OrderedArgs es ->  es;  _ -> [];
+      if M.member nam (_userDefined  c) &&   length arg == 1
+        then do
+          case head arg of 
+            (Variable _ name) -> do
+              mExpr  <- getVariableByName name
+              case mExpr of
+                Just expr -> optimizeExpression expr
+                _ -> pure $ (FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "wrap") args)
+            _ -> optimizeExpression $ head arg
         else pure (FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "wrap") args)
     Nothing -> do 
       pure $ (FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "wrap") args)

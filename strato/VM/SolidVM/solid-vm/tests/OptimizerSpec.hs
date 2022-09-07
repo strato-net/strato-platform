@@ -16,7 +16,7 @@ import           SolidVM.Model.CodeCollection
 import           Blockchain.SolidVM.Exception
 import           Data.Source.Annotation
 
---import Debug.Trace
+import Debug.Trace
 --import           Text.Printf
 
 -- Note that compileSourceWithAnnotations calls compileSource which calls the optimizer.detector
@@ -51,7 +51,58 @@ spec = describe "Optimizer tests" $ do
             }|])  in case (varDeclHelper' $ varDeclHelper anns) of 
                 [(NumberLiteral _ 6 _) ] -> True
                 _ -> False
+    it "Variable  wrap --- then takes the wrap and turns it to." $
+        let anns = trace (show (runOptimizer [r|
+            pragma solidvm 3.3;
+            type Mytype  is int;
+            contract A {
+                Mytype a = Mytype.wrap(2) ;
+            }|]) ++ ("\n\n\t") ) 
+                (runOptimizer [r|
+            pragma solidvm 3.3;
+            type Mytype is int;
+            contract A {
+                Mytype a = Mytype.wrap(2);
+            }|])  in case (varDeclHelper' $ varDeclHelper anns) of 
+                [(NumberLiteral _ 2 _)] -> True
+                _ -> False
+    it "Unwrap Variable by name of Variable " $
+        let anns = trace (show (runOptimizer [r|
+            pragma solidvm 3.3;
+            type Mytype  is int;
+            contract A {
+                Mytype a = Mytype.wrap(2) ;
+                int xxx = Mytype.unwrap(a);
+            }|]) ++ ("\n\n\t") ) 
+                (runOptimizer [r|
+            pragma solidvm 3.3;
+            type Mytype is int;
+            contract A {
+                Mytype a = Mytype.wrap(2);
+                int xxx = Mytype.unwrap(a);
+            }|])  in case (varDeclHelper' $ varDeclHelper anns) of 
+                [(NumberLiteral _ 2 _), (NumberLiteral _ 2 _) ] -> True
+                _ -> False
+    fit "Test 2 " $
+        let anns = trace (show (runOptimizer [r|
+            pragma solidvm 3.3;
+            type Mytype  is int;
+            contract A {
+                Mytype a = Mytype.wrap(2) ;
+                function f(Mytype y) returns (Mytype) { return (y);}
+            }|]) ++ ("\n\n\t") ) 
+                (runOptimizer [r|
+            pragma solidvm 3.3;
+            type Mytype is int;
+            contract A {
+                Mytype a = Mytype.wrap(2);
+                function f(Mytype y) returns (Mytype) { return (y);}
+            }|])  in case (varDeclHelper' $ varDeclHelper anns) of 
+                [(NumberLiteral _ 2 _) ] -> True
+                _ -> False
     
+
+-- VariableDecl {varType = UserDefined {alias = "Mytype", actual = Int {signed = Just True, bytes = Nothing}}, varIsPublic = False, varInitialVal = Nothing, varContext = (line 6, column 17) - (line 6, column 25): () , isImmutable = False})
     --TODO optimize simple statements....             
     -- fit "cannot simplify binary expressions in simple statements" $ 
     --     let anns =  (runOptimizer [r|
