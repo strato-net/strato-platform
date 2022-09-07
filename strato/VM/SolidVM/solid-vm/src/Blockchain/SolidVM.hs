@@ -3468,7 +3468,6 @@ solidityExceptionHandler catchBlockMap ex = do
 
 
 
-
 solidVMExceptionHelper :: (MonadSM m) => M.Map String (Maybe [String], [CC.Statement]) -> m (Maybe Value) -> m (Maybe Value)
 solidVMExceptionHelper x y = case M.lookup "" x of
   Nothing -> y

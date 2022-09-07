@@ -209,8 +209,8 @@ reservedWordError = toThrower ReservedWordError
 immutableError :: (Show v) => String -> v -> a
 immutableError = toThrower ImmutableError
 
-userDefinedError :: (Show v) => String -> v -> a
-userDefinedError = toThrower UserDefinedError
-
 getRunTimeCodeError :: (Show v) => String -> v -> a
 getRunTimeCodeError = toThrower FailedToAttainRunTimCode
+
+userDefinedError :: (Show v) => String -> v -> a
+userDefinedError = toThrower UserDefinedError

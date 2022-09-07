@@ -1292,6 +1292,34 @@ contract B {
     int      lagrange =  MagicInt.unwrap(MagicInt.wrap(123));
     MagicInt gauss    =  MagicInt.wrap(MagicInt.unwrap(MagicInt.wrap(123)));
     
+    //String
+    MysticalString hilbert  = MysticalString.wrap("vector");
+    string         banach   = MysticalString.unwrap(hilbert);
+    string krull            = MysticalString.unwrap(MysticalString.wrap(string.concat("33",  banach)));
+}
+|]
+    in length anns `shouldBe` 0
+
+  it "can use user-defined-types wrap and unwrap within fuctions" $
+    let anns = runTypechecker [r|
+  pragma solidvm 3.3;
+  type UBool is bool;
+  type MagicInt is int;
+  type MysticalString is string;
+  contract A {
+    UBool galois3  =  UBool.wrap(false);
+    function f() {
+       UBool galois       =  UBool.wrap(false);
+       UBool galois2       =  UBool.wrap(false);
+       bool  mrBool       =  UBool.unwrap(galois);
+      bool  fermet       =  UBool.unwrap(UBool.wrap(true));
+      bool  felixKlein   =  UBool.unwrap(UBool.wrap(mrBool));
+    }
+
+}
+|]
+    in length anns `shouldBe` 0
+
   it "can call type(C).name, type(C).creationCode, type(C).runtimeCode" $
     let anns = runTypechecker [r|
 contract A {
@@ -1324,30 +1352,4 @@ contract A {
 }
 |]
     in length anns `shouldBe` 3
-    //String
-    MysticalString hilbert  = MysticalString.wrap("vector");
-    string         banach   = MysticalString.unwrap(hilbert);
-    string krull            = MysticalString.unwrap(MysticalString.wrap(string.concat("33",  banach)));
-}
-|]
-    in length anns `shouldBe` 0
 
-  it "can use user-defined-types wrap and unwrap within fuctions" $
-    let anns = runTypechecker [r|
-  pragma solidvm 3.3;
-  type UBool is bool;
-  type MagicInt is int;
-  type MysticalString is string;
-  contract A {
-    UBool galois3  =  UBool.wrap(false);
-    function f() {
-       UBool galois       =  UBool.wrap(false);
-       UBool galois2       =  UBool.wrap(false);
-       bool  mrBool       =  UBool.unwrap(galois);
-      bool  fermet       =  UBool.unwrap(UBool.wrap(true));
-      bool  felixKlein   =  UBool.unwrap(UBool.wrap(mrBool));
-    }
-
-}
-|]
-    in length anns `shouldBe` 0

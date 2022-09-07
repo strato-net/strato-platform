@@ -181,7 +181,6 @@ unparseFunc (name, f) =
 
 unparseCtor :: Func -> String
 unparseCtor f = Text.unpack $ "constructor " <> unparseFuncWithoutName f
-<<<<<<< HEAD
 
 unparseFuncWithOverload :: SolidString -> Func -> Text
 unparseFuncWithOverload name myFunction = unparseFuncDeep name myFunction
@@ -189,15 +188,6 @@ unparseFuncWithOverload name myFunction = unparseFuncDeep name myFunction
 unparseFuncWithoutName:: Func -> Text
 unparseFuncWithoutName f = unparseFuncDeep "" f
 
-=======
-
-unparseFuncWithOverload :: SolidString -> Func -> Text
-unparseFuncWithOverload name myFunction = unparseFuncDeep name myFunction
-
-unparseFuncWithoutName:: Func -> Text
-unparseFuncWithoutName f = unparseFuncDeep "" f
-
->>>>>>> origin/develop
 unparseFuncDeep :: SolidString -> Func -> Text
 unparseFuncDeep deepName Func{..} =
        (if (deepName == "") then

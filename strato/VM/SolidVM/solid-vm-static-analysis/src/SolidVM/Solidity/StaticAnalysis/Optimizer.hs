@@ -224,10 +224,10 @@ optimizeExpression (MemberAccess loc base fieldName) = do
         then case fieldName of 
           "name" -> pure $ (StringLiteral spot nam)
           --"int"  -> pure $ ()--To Implement for another ticket
-          "creationCode" -> pure $ case M.lookup nam (_contracts cc) of Just contract -> (StringLiteral spot (unparseContract  contract));  _ -> (error " Attaining creation code failed." ())  -- OLD FAKE VALUE TO GET GET COMPILE -> (StringLiteral spot "contract qq { int a = 12 }") 
+          "creationCode" -> pure $ case M.lookup nam (_contracts cc) of Just contract -> (StringLiteral spot (unparseContract  contract));  _ ->  (MemberAccess loc base fieldName); 
           "runtimeCode" -> pure $ (MemberAccess loc base fieldName)
           _ -> pure $ (MemberAccess loc base fieldName) 
-        else  pure $ (error "Contract not on file level" ())
+        else  pure $ (MemberAccess loc base fieldName)
     (FunctionCall _ (Variable _ "type") (NamedArgs _)) -> pure $ (MemberAccess loc base fieldName) 
     _  -> pure $ (MemberAccess loc base fieldName) -- TODO implement a memeber Access evaluator
       -- b <- optimizeExpression  base
