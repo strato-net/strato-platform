@@ -33,7 +33,7 @@ import Data.Text.Encoding
 import Data.Time.Clock.POSIX
 import HFlags
 import Numeric
-import Test.Hspec (hspec, Spec, describe, it, fit, xit, pendingWith, anyException, shouldThrow, anyErrorCall, Selector)
+import Test.Hspec (hspec, Spec, describe, it, xit, fit, pendingWith, anyException, shouldThrow, anyErrorCall, Selector)
 import Test.Hspec.Expectations.Lifted
 import Text.Printf
 import Text.RawString.QQ
@@ -79,6 +79,10 @@ anyTODO _ = False
 anyParseError :: Selector HandledException
 anyParseError (HE ParseError{}) = True
 anyParseError _ = False
+
+anyRevertError :: Selector HandledException
+anyRevertError (HE Blockchain.SolidVM.Exception.RevertError{}) = True
+anyRevertError _ = False
 
 anyUnknownFunc :: Selector HandledException
 anyUnknownFunc (HE UnknownFunction{}) = True
@@ -207,7 +211,7 @@ devNull _ _ _ _ = return ()
 runTest :: ContextM a -> IO ()
 runTest f = do
   let timeout = 5000000
-  result <- race (threadDelay timeout) $ runLoggingT (runTestContextM f)
+  result <- race (threadDelay timeout) $ runLoggingT (runTestContextM $ withCurrentBlockHash zeroHash f)
   case result of
     Left{} -> expectationFailure $ printf "test case timed out after %ds" (timeout `div` 1000000)
     Right{} -> return ()
@@ -221,13 +225,56 @@ runFileArgs args fp = void $ runArgs args =<< liftIO (readFile fp)
 runBS :: String -> ContextM ()
 runBS = void . runBS'
 
+runBSBeef :: String -> ContextM ()
+runBSBeef = void . runBSBeef'
+
 runBS' ::String -> ContextM ExecResults
 runBS' = runArgs "()"
+
+runBSBeef' ::String -> ContextM ExecResults
+runBSBeef' = runArgs "()"
 
 rethrowEx :: ExecResults -> ContextM ()
 rethrowEx ExecResults{erException=Just ex} = either (liftIO . throwIO . HE) (void . return) ex
 rethrowEx _ = return ()
 
+--Adds a contract to the 0xfeedbeef chain
+runArgsWithSenderBeef :: Account -> T.Text -> String -> ContextM ExecResults
+runArgsWithSenderBeef acc args bs = do
+  let code = Code $ UTF8.fromString bs
+      isTest = error "TODO: isTest"
+      isHomestead = error "TODO: isHomestead"
+      suicides = error "TODO: suicides"
+      blockData = BlockData { blockDataParentHash = unsafeCreateKeccak256FromWord256 0x0
+                            , blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0x0
+                            , blockDataCoinbase = Address 0x0
+                            , blockDataStateRoot = ""
+                            , blockDataTransactionsRoot = ""
+                            , blockDataReceiptsRoot = ""
+                            , blockDataLogBloom = ""
+                            , blockDataDifficulty = 900
+                            , blockDataNumber = 8033
+                            , blockDataGasLimit = 1000000
+                            , blockDataGasUsed = 10000
+                            , blockDataExtraData = ""
+                            , blockDataNonce = 22
+                            , blockDataMixHash = unsafeCreateKeccak256FromWord256 0x0
+                            , blockDataTimestamp = posixSecondsToUTCTime 0x4000 }
+      callDepth = 0
+      value = error "TODO: value"
+      gasPrice = error "TODO: gasPrice"
+      availableGas = error "TODO: availableGas"
+      txHash = unsafeCreateKeccak256FromWord256 0x776622233444
+      chainId = Just 0xfeedbeef
+      metadata = Just $ M.fromList [("name",  "qq"), ("args", args)]
+
+  newAddress <- getNewAddress acc
+  er <- SVM.create isTest isHomestead suicides blockData callDepth sender origin
+          value gasPrice availableGas newAddress code txHash chainId metadata
+  rethrowEx er
+  return er
+
+--Adds contract to the "main chain"
 runArgsWithSender :: Account -> T.Text -> String -> ContextM ExecResults
 runArgsWithSender acc args bs = do
   let code = Code $ UTF8.fromString bs
@@ -300,6 +347,9 @@ runArgsWithOrigin orig acc args bs = do
 
 runArgs :: T.Text -> String -> ContextM ExecResults
 runArgs = runArgsWithSender sender
+
+runArgsBeef :: T.Text -> String -> ContextM ExecResults
+runArgsBeef = runArgsWithSenderBeef sender
 
 
 runCall :: T.Text -> T.Text -> String -> ContextM (Maybe SB.ShortByteString)
@@ -3803,7 +3853,7 @@ contract qq {
   }
 }|]
     runBS codeSnippet
-    getFields ["codePiece"] `shouldReturn`
+    getFields [ "codePiece" ] `shouldReturn`
       [ BString $ UTF8.fromString testCode]
 
   it "can get overloaded function using the .code parameter" . runTest $ do
@@ -3958,7 +4008,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
-  it "can search for an enum body within a codeCollection" . runTest $ do
+  it "can search for an enum body within a codeCollection using .code" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|enum FreshJuiceSize {
   SMALL,
@@ -3984,7 +4034,7 @@ contract qq {
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
-  it "can search for any public variable in a contract initialized value" . runTest $ do
+  it "can search for any public variable in a contract initialized value using .code" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|uint public testVar = 1;
 |]
@@ -4008,7 +4058,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
-  it "can search for a constant and get its initial code." . runTest $ do
+  it "can search for a constant and get its initial code. using .code" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|uint public constant testConst = 136546546541654654324765441651684354646468435468;
 |]
@@ -4033,7 +4083,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
-  it "can get the current contract code without supplying anything to the code" . runTest $ do
+  it "can get the current contract code without supplying anything to the code using .code" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|
 pragma solidvm 3.2;
@@ -4068,7 +4118,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
-  it "Code won't return anything if the thing is not in the file" . runTest $ do
+  it "Code won't return anything if the thing is not in the file, using .code" . runTest $ do
     let contract :: String
         contract = [r|
 pragma solidvm 3.3;
@@ -4088,7 +4138,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BDefault ]
 
-  it "Can search for the contract in a given file using the search procedure" . runTest $ do
+  it "Can search for the contract in a given file using the search procedure using .code" . runTest $ do
     let contractqq :: String
         contractqq = [r|contract qq {
   string codeTest;
@@ -4117,7 +4167,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString contractqq]
 
-  it "can properly add the final } to a contract without a constructor using the code member function" . runTest $ do
+  it "can properly add the final } to a contract without a constructor using the code member function using .code" . runTest $ do
     let myContract :: String
         myContract = [r|contract Test {
   uint sixtyNine = 69;
@@ -4143,7 +4193,7 @@ contract qq {
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString myContract]
 
-  it "can properly add the final } to a contract with a constructor but information after the constructor using the code member function" . runTest $ do
+  it "can properly add the final } to a contract with a constructor but information after the constructor using the code member function using .code" . runTest $ do
     let myContract :: String
         myContract = [r|contract Test {
   uint seventyNine = 79;
@@ -4178,7 +4228,7 @@ contract qq {
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString myContract]
 
-  it "Can find a function within a codeCollection" . runTest $ do
+  it "Can find a function within a codeCollection using .code" . runTest $ do
     let myFunxion :: String
         myFunxion = [r|function myFunction () public returns (uint ) {
     uint x = 13;
@@ -4216,7 +4266,7 @@ contract qq {
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString myFunxion]
 
-  it "Can avoid getting confused if two functions with the same name are in the same codeCollection" . runTest $ do
+  it "Can avoid getting confused if two functions with the same name are in the same codeCollection using .code" . runTest $ do
     let myFunxion :: String
         myFunxion = [r|function myFunction () public returns (uint ) {
     uint x = 13;
@@ -4263,7 +4313,7 @@ contract qq {
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString myFunxion]
 
-  it "Can get just the contract if empty string is fed to the code function." . runTest $ do
+  it "Can get just the contract if empty string is fed to the code function. using .code" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|contract Test {
   
@@ -4294,7 +4344,7 @@ contract qq{
     getFields ["codeTest"] `shouldReturn`
       [ BString $ UTF8.fromString codeSnippet]
 
-  it "Can throw an error if more than one item is given to the code member function." $ (runTest (runBS [r|
+  it "Can throw an error if more than one item is given to the code member function, using .code" $ (runTest (runBS [r|
 pragma solidvm 3.3;
 contract Test {
   constructor(){}
@@ -4312,25 +4362,6 @@ contract qq{
     return 13;
   }
 }|])) `shouldThrow` anyTypeError
-
---   it "Can throw an error if more than one item is given to the code member function." $ (runTest (runBS [r|
--- pragma solidvm 3.3;
--- contract Test {
---   constructor(){}
--- }
-
--- pragma solidvm 3.3;
--- contract qq{
---   string codeTest;
---   constructor() public {
---     Test t = new Test();
---     codeTest = account(t).code("one", "two");
---   }
-
---   function myFunction() public returns (uint) {
---     return 13;
---   }
--- }|])) `shouldThrow` anyTooManyCooks
 
   it "can't assign a value to an unallocated index in an array" $ (runTest (runBS [r|
 pragma solidvm 3.0;
@@ -5182,6 +5213,30 @@ contract qq {
   }
 }|]) `shouldThrow` anyInvalidArgumentsError
 
+  it "return default value for index not present-In-Memory Check" . runTest $ do
+    runBS [r|
+pragma solidvm 3.2;
+contract qq {
+
+  bool x;
+  uint y;
+  string z;
+
+  constructor() {
+    mapping(uint=>bool) booleanTest;
+    mapping(uint=>uint) integerTest;
+    mapping(uint=>string) stringTest;
+
+    booleanTest[1] = true;
+    integerTest[1] = 1;
+    stringTest[1] = "testing";
+
+    x = booleanTest[9];
+    y = integerTest[9];
+    z = stringTest[9];
+  }
+}|]
+    getFields ["x","y","z"] `shouldReturn` [BDefault, BDefault, BDefault]
   it "return default value for index not present" . runTest $ do
     runBS [r|
 pragma solidvm 3.2;
@@ -6120,6 +6175,105 @@ contract qq {
   }
 }|]) `shouldThrow` anyTypeError
 
+  it "revert sucessfully when invoked without arguments" $ runTest (do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  
+  uint a;
+  
+  constructor()
+  {
+    a=1;
+    randomFunction(1);
+  }
+
+  function randomFunction(uint checker)
+  {
+    if(a==checker)
+      revert(); 
+  } 
+}|]) `shouldThrow` anyRevertError
+
+  it "revert sucessfully when invoked with arguments" $ runTest (do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  
+  uint a;
+  
+  constructor()
+  {
+    a=1;
+    randomFunction(1);
+  }
+
+  function randomFunction(uint checker)
+  {
+    if(a==checker)
+      revert("logic flag"); 
+  } 
+}|]) `shouldThrow` anyRevertError
+
+  it "revert sucessfully when invoked with namedargs" $ runTest (do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  
+  uint a;
+  
+  constructor()
+  {
+    a=1;
+    randomFunction(1);
+  }
+
+  function randomFunction(uint checker)
+  {
+    if(a==checker)
+      revert({x:"logic flag"}); 
+  } 
+}|]) `shouldThrow` anyRevertError
+
+  it "Revert customError" $ runTest (do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  
+  uint a;
+  error f (string message);
+  constructor()
+  {
+    a=1;
+    randomFunction(1);
+  }
+
+  function randomFunction(uint checker)
+  {
+    if(a==checker)
+      revert f("ERROR"); 
+  } 
+}|]) `shouldThrow` anyCustomError
+
+  it "Revert customError  namedargs" $ runTest (do
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  
+  uint a;
+  error f(string x,string y);
+  constructor()
+  {
+    a=1;
+    randomFunction(1);
+  }
+
+  function randomFunction(uint checker)
+  {
+    if(a==checker)
+      revert f({x:'a',y:'b'}); 
+  } 
+}|]) `shouldThrow` anyCustomError
 
   it "Supports pure functions in 3.3" . runTest $ do
     runBS [r|
@@ -6517,6 +6671,19 @@ contract A {
 contract B {
   function f() {
     x = 8;
+  }
+}
+|]) `shouldThrow` anyTypeError
+
+
+  it "can detect duplicate declarations" $ (runTest $
+    runBS [r|
+pragma solidvm 3.3;
+contract qq {
+  function f(){
+    uint x = 9;
+    uint y = 4;
+    uint x = 7;
   }
 }
 |]) `shouldThrow` anyTypeError

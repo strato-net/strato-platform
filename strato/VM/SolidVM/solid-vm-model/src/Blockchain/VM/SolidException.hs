@@ -25,17 +25,21 @@ module Blockchain.VM.SolidException
   , divideByZero
   , missingCodeCollection
   , inaccessibleChain
+  , invalidChain
   , invalidWrite
   , invalidCertificate
   , malformedData
   , tooMuchGas
   , paymentError
   , reservedWordError
+  , revertError
   , immutableError
   , tooManyResultsError
   , tooManyCooks
   , generalMetaProgrammingError
   , noPayload
+  , oldForeignPragmaError
+  , userDefinedError
   ) where
 
 import Control.DeepSeq
@@ -52,6 +56,7 @@ data SolidException = TypeError String String
                     | IndexOutOfBounds String String
                     | TODO String String
                     | MissingField String String
+                    | RevertError String String
                     | CustomError String String [B.BasicValue]
                     | MissingType String String
                     | DuplicateDefinition String String
@@ -67,6 +72,7 @@ data SolidException = TypeError String String
                     | DivideByZero String 
                     | MissingCodeCollection String String
                     | InaccessibleChain String String
+                    | InvalidChain String String
                     | InvalidWrite String String
                     | InvalidCertificate String String
                     | MalformedData String String
@@ -78,6 +84,8 @@ data SolidException = TypeError String String
                     | TooManyCooks Int Int
                     | GeneralMetaProgrammingError String String
                     | NoPayload String String 
+                    | OldForeignPragmaError String String
+                    | UserDefinedError String String
                     deriving (Eq, Exception, Generic, NFData)
 
 instance Show SolidException where
@@ -90,6 +98,7 @@ showSolidException (InvalidArguments m v) = printf "invalid arguments: %s: %s" m
 showSolidException (IndexOutOfBounds a b)= printf "index out of bounds: %s: %s" a b
 showSolidException (MissingField m v) = printf "missing field: %s: %s" m v
 showSolidException (MissingType m v) = printf "missing type: %s: %s" m v
+showSolidException (RevertError m v) = printf "revert: %s %s:" m v
 showSolidException (DuplicateDefinition m v) = printf "duplicate definition: %s: %s" m v
 showSolidException (ParseError m v) = printf "parse error: %s: %s" m v
 showSolidException (ModifierError m v) = printf "modifier error: %s: %s" m v
@@ -105,6 +114,7 @@ showSolidException (UnknownVariable a b) = printf "unknown variable: %s: %s" a b
 showSolidException (UnknownStatement a b) = printf "unknown statement: %s: %s" a b
 showSolidException (DivideByZero a) = printf "divide by zero error: %s" a
 showSolidException (MissingCodeCollection a b) = printf "missing code collection: %s: %s" a b
+showSolidException (InvalidChain a b) = printf "Chain is invalid for address: %s, likely problem with %s metaprogramming" a b
 showSolidException (InaccessibleChain a b) = printf "inaccessible chain: %s: %s" a b
 showSolidException (InvalidWrite a b) = printf "invalid write: %s: %s" a b
 showSolidException (InvalidCertificate a b) = printf "invalid certificate: %s: %s" a b
@@ -117,6 +127,8 @@ showSolidException (TooManyResultsError a b) = printf "Too many results returned
 showSolidException (TooManyCooks a b) = printf "Too many arguments were given, expected %d argument/s, but received %d arguments." a b
 showSolidException (GeneralMetaProgrammingError a b) = printf "There was a problem with the use of '%s', and the given term/s %s" a b
 showSolidException (NoPayload a b) = printf "There was no payload given to the function '%s' for address the %s" a b
+showSolidException (OldForeignPragmaError a b) = printf "The foreign contract (%s) being called needs an newer pragma in order to use metaprogramming. Foreign contract running: %s" a b
+showSolidException (UserDefinedError a b) = printf "%s is an user defined error in line '%s'" a b
 
 toThrower :: (Show v) => (String -> String -> SolidException) -> String -> v -> a
 toThrower cont msg = throw . cont msg . show
@@ -138,6 +150,9 @@ indexOutOfBounds = toThrower IndexOutOfBounds
 
 missingField :: (Show v) => String -> v -> a
 missingField = toThrower MissingField
+
+revertError :: (Show v) =>  String -> v -> a
+revertError = toThrower RevertError
 
 customError :: String -> String -> [B.BasicValue] -> a
 customError msg nm vals = throw $ CustomError msg nm vals
@@ -187,6 +202,9 @@ missingCodeCollection = toThrower MissingCodeCollection
 inaccessibleChain :: (Show v) => String -> v -> a
 inaccessibleChain = toThrower InaccessibleChain
 
+invalidChain :: (Show v) => String -> v -> a
+invalidChain = toThrower InvalidChain
+
 invalidWrite :: (Show v) => String -> v -> a
 invalidWrite = toThrower InvalidWrite
 
@@ -219,3 +237,9 @@ generalMetaProgrammingError = toThrower GeneralMetaProgrammingError
 
 noPayload :: (show v) => String -> v -> a 
 noPayload = toThrower NoPayload
+
+oldForeignPragmaError :: (Show v) => String -> v -> a
+oldForeignPragmaError = toThrower OldForeignPragmaError
+
+userDefinedError :: (Show v) => String -> v -> a
+userDefinedError = toThrower UserDefinedError

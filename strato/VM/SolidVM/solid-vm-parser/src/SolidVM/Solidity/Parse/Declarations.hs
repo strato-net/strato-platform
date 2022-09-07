@@ -45,6 +45,7 @@ import           Blockchain.VM.SolidException
 
 data SourceUnitF a = Pragma a Identifier String
                    | Import a Text.Text
+                   | Alias a String String
                    | NamedXabi Text.Text (XabiF a, [Text.Text])
                    | FLFunc String SolidVM.Func
                    | FLConstant Text.Text SolidVM.ConstantDecl
@@ -183,7 +184,7 @@ solidityDeclaration free =
   modifierDeclaration <|>
   eventDeclaration <|>
   variableDeclaration
-
+  
 {- New types -}
 
 -- | Parses a struct definition
@@ -376,6 +377,7 @@ simpleVariableDeclaration = do
   if isConstant
     then return (variableName, ConstantDeclaration $ SolidVM.ConstantDecl variableType isPublic (fromMaybe (parseError "constants must be initialized" variableName) value) ctx)
     else return (variableName, VariableDeclaration $ SolidVM.VariableDecl variableType isPublic value ctx isImmutable)
+    --else return $ trace ("WHAT IS SIMPLE DEC DECLARING AS " ++ (show variableType)) (variableName, VariableDeclaration $ SolidVM.VariableDecl variableType isPublic value ctx isImmutable)
 
 errorDeclaration :: SolidityParser (String, Declaration)
 errorDeclaration = do
