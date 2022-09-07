@@ -101,6 +101,7 @@ runFromStateRoot mineTransactions remainingGas theBlockHeader txs = do
       $ mineTransactions theBlockHeader remainingGas txs
     timeit "flushMemStorageDB bagger" (Just vmBlockInsertionMined) flushMemStorageDB
     timeit "flushMemAddressStateDB bagger" (Just vmBlockInsertionMined) flushMemAddressStateDB
+    timeit "flushMemCertDB bagger" (Just vmBlockInsertionMined) $ flushMemCertDB baggerBlockHash
     newStateRoot <- A.lookupWithDefault (A.Proxy @StateRoot) (Nothing :: Maybe Word256)
     let recoverable f = Left (RecoverableFailure (tfToBaggerTxRejection f) ranTxs unranTxs newStateRoot newGas)
     return $ case res of -- currently only get GasLimit errors out of mineTransactions'
@@ -121,6 +122,7 @@ rewardCoinbases us uncles ourNumber = do
         return ()
     flushMemStorageDB
     flushMemAddressStateDB
+    flushMemCertDB baggerBlockHash
     A.lookupWithDefault (A.Proxy @StateRoot) (Nothing :: Maybe Word256)
 
 -- todo batch insert results
