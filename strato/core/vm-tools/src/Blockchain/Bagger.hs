@@ -46,7 +46,7 @@ import           Blockchain.DB.ChainDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.ModifyStateDB
 import           Blockchain.DB.StorageDB
-import           Blockchain.DB.X509CertDB           (migrateBlockHeaderCertDB)
+import           Blockchain.DB.X509CertDB           (migrateBlockHeaderCertDB, flushMemCertDB)
 import           Blockchain.Database.MerklePatricia (StateRoot (..))
 import qualified Blockchain.EthConf                 as Conf
 import           Blockchain.Sequencer.Event         (OutputBlock (..), OutputTx (..))

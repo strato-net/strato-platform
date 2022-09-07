@@ -51,7 +51,7 @@ import           Blockchain.Data.DataDefs              (blockDataExtraData, bloc
 import           Blockchain.Data.GenesisBlock
 import           Blockchain.DB.BlockSummaryDB
 import           Blockchain.DB.ChainDB
-import           Blockchain.DB.X509CertDB              (CertRoot(..), bootstrapCertDB)
+import           Blockchain.DB.X509CertDB              (CertRoot(..), bootstrapCertDB, flushMemCertDB)
 import           Blockchain.EthConf
 import           Blockchain.Event
 import           Blockchain.JsonRpcCommand
