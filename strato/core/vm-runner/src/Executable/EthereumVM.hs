@@ -378,6 +378,7 @@ runChainConstructors cId cInfo = do
 
   flushMemStorageDB
   Mem.flushMemAddressStateDB
+  flushMemCertDB . unCurrentBlockHash =<< Mod.get (Mod.Proxy @CurrentBlockHash)
 
   sr <- A.lookupWithDefault (Proxy @MP.StateRoot) (Just cId)
   return (sr, actions)
