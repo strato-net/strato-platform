@@ -40,25 +40,26 @@ contractHelper cc = (constructor . _Just %~ (functionHelper cc) )
 varDeclHelper :: CodeCollection
               -> VariableDecl
               -> VariableDecl
-varDeclHelper cc v = v{ varInitialVal = run <$> varInitialVal v }
+varDeclHelper cc v = v{ _varInitialVal = run <$> _varInitialVal v }
   where run e = let r = R (cc)
           in runReader (optimizeExpression e) r
 
 constDeclHelper :: CodeCollection
                 -> ConstantDecl
                 -> ConstantDecl
-constDeclHelper cc v = v{ constInitialVal = run $ constInitialVal v }
+constDeclHelper cc v = v{ _constInitialVal = run $ _constInitialVal v }
   where run e = let r = R (cc)
+
                  in runReader (optimizeExpression e) r
 
 functionHelper :: CodeCollection
                -> Func
                -> Func
-functionHelper cc f = case funcContents f of
+functionHelper cc f = case _funcContents f of
   Nothing -> f
-  Just stmts -> 
+  Just stmts ->
     let r = R (cc)
-     in f{ funcContents = Just $ runReader (optimizeStatements stmts) r }
+     in f{ _funcContents = Just $ runReader (optimizeStatements stmts) r }
 
 optimizeStatements :: [Statement] -> Reader R [Statement]
 optimizeStatements [] = pure $  []

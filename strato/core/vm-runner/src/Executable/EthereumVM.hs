@@ -53,7 +53,7 @@ import           Blockchain.Data.DataDefs              (blockDataExtraData, bloc
 import           Blockchain.Data.GenesisBlock
 import           Blockchain.DB.BlockSummaryDB
 import           Blockchain.DB.ChainDB
-import           Blockchain.DB.X509CertDB              (CertRoot(..), bootstrapCertDB)
+import           Blockchain.DB.X509CertDB              (CertRoot(..), bootstrapCertDB, flushMemCertDB)
 import           Blockchain.EthConf
 import           Blockchain.Event
 import           Blockchain.JsonRpcCommand
@@ -383,6 +383,7 @@ runChainConstructors cId cInfo = do
 
   flushMemStorageDB
   Mem.flushMemAddressStateDB
+  flushMemCertDB . unCurrentBlockHash =<< Mod.get (Mod.Proxy @CurrentBlockHash)
 
   sr <- A.lookupWithDefault (Proxy @MP.StateRoot) (Just cId)
   return (sr, actions)

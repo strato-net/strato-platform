@@ -33,13 +33,13 @@ varDeclHelper :: CodeCollection -> [VariableDeclF (SourceAnnotation ())]
 varDeclHelper cc = cc  ^.. contracts . folded . storageDefs .folded
 
 varDeclHelper' :: [VariableDeclF (SourceAnnotation ())] -> [ExpressionF (SourceAnnotation ())]
-varDeclHelper' varArr = (varInitialVal <$>  varArr) ^.. folded . folded
+varDeclHelper' varArr = (_varInitialVal <$>  varArr) ^.. folded . folded
 
 constDeclHelper :: CodeCollection -> [ConstantDeclF (SourceAnnotation ())]
 constDeclHelper cc = cc  ^.. contracts . folded . constants .folded
 
 funcHelper :: CodeCollection -> [StatementF (SourceAnnotation ())]
-funcHelper cc = (funcContents <$> (cc  ^.. contracts . folded . functions . folded) ) ^.. folded . folded .folded
+funcHelper cc = (_funcContents <$> (cc  ^.. contracts . folded . functions . folded) ) ^.. folded . folded .folded
 
 
 spec :: Spec
