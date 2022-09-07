@@ -33,6 +33,7 @@ library:
     - cryptonite
     - http-client
     - lens
+    - monad-alter
     - monad-control
     - mtl
     - opaleye
@@ -48,6 +49,7 @@ library:
     - secp256k1-haskell == 0.2.0
     - servant-server
     - text
+    - x509-certs
 
 
 executables:

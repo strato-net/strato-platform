@@ -37,4 +37,5 @@ library:
   - strato-model
   - swagger2
   - text
+  - x509-certs
 

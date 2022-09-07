@@ -20,6 +20,7 @@ import           Strato.Strato23.Server.Password
 import           Strato.Strato23.Server.Ping
 import           Strato.Strato23.Server.Signature
 import           Strato.Strato23.Server.User
+import           Strato.Strato23.Server.X509
 
 vaultWrapper :: ServerT VaultWrapperAPI VaultM
 vaultWrapper = getPing
@@ -30,6 +31,7 @@ vaultWrapper = getPing
           :<|> postSignature
           :<|> postPassword
           :<|> verifyPassword
+          :<|> signCertificate
 
 serveVaultWrapper :: VaultWrapperEnv -> Server VaultWrapperAPI
 serveVaultWrapper env = hoistServer serverProxy (enterVaultWrapper env) vaultWrapper

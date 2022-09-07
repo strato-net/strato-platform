@@ -3,9 +3,10 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric      #-}
--- {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 
 module BlockApps.X509.Certificate (
@@ -23,6 +24,7 @@ module BlockApps.X509.Certificate (
   verifyBlockApps,
   verifyCertM,
   makeSignedCert,
+  makeSignedCertWithPrivate,
   getCertSubject,
   getCertSubjects,
   getCertValidity,
@@ -40,6 +42,8 @@ import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.Address
 import           BlockApps.X509.Keys
 import           Control.DeepSeq
+import qualified Control.Lens                       as Lens
+import           Control.Lens.Operators             hiding ((.=))
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Crypto.Random.Entropy
@@ -59,6 +63,9 @@ import qualified Data.ByteString.Base16             as B16
 import qualified Data.ByteString.Short              as BSS
 
 import           GHC.Generics
+
+import           Data.Swagger                       hiding (Format, get, put, format) -- as Swag
+import           Data.Swagger.Internal.Schema
 
 import qualified Data.Set                           as S
 import           Data.Functor
@@ -130,7 +137,7 @@ data Subject = Subject
   , subUnit       :: Maybe String
   , subCountry    :: Maybe String
   , subPub        :: PublicKey
-  } deriving (Show, Eq)
+  } deriving (Show, Eq, Generic)
 
 instance Format Subject where
   format = CL.blue . show
@@ -159,6 +166,19 @@ instance FromJSON Subject where
 
   parseJSON x = fail $ "could not decode JSON subject info: " ++ show x
 
+instance ToSchema Subject where
+  declareNamedSchema proxy = genericDeclareNamedSchema defaultSchemaOptions proxy
+    & Lens.mapped.name ?~ "Subject for a X.509 certificate"
+    & Lens.mapped.schema.example ?~ toJSON ex
+    where
+      ex :: Subject
+      ex = Subject
+        { subCommonName = "John Smith"
+        , subOrg        = "BlockApps Inc."
+        , subUnit       = Just "Engineering"
+        , subCountry    = Just "USA"
+        , subPub        = fromMaybe undefined $ importPublicKey "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEGOKeu5dSCBFHVQuy/q1A8BeTb99G83tD\nVecvHHne6sKfmBZN1AIjhpHGKO22vBfdq3dMn/QBqb2TdR9w3WvMXQ==\n-----END PUBLIC KEY-----\n"
+        }
 
 instance RLPSerializable X509Certificate where
   rlpEncode = RLPString . certToBytes
@@ -180,6 +200,9 @@ instance FromJSON X509Certificate where
     let errDump err = fail $ "failed to JSON parse cert " ++ (show str) ++ " because " ++ err
     in either (errDump) pure $ bsToCert $ C8.pack $ T.unpack str
   parseJSON x = fail $ "parseJSON for SignedCertificate expects a String, but was given " ++ show x
+
+instance ToSchema X509Certificate where
+  declareNamedSchema = const . pure $ named "X509Certificate bytestring" binarySchema
 
 ----------------------------------------------------------------------------------------------
 ---------------------------------------- ROOT CERT -------------------------------------------
@@ -238,6 +261,12 @@ bsToCert bs =
 makeSignedCert :: (MonadIO m, HasVault m) => Maybe DateTime -> Maybe X509Certificate -> Issuer -> Subject -> m (X509Certificate)
 makeSignedCert mDateTime parentCert iss sub = makeCert mDateTime iss sub >>= signCert >>= return . X509Certificate . CertificateChain . (:(join . maybeToList $ x509ToSigneds <$> parentCert))
 
+makeSignedCertWithPrivate :: MonadIO m => Maybe DateTime -> Maybe X509Certificate -> Issuer -> Subject -> PrivateKey -> m X509Certificate
+makeSignedCertWithPrivate mDateTime parentCert iss sub priv = do
+  cert <- makeCert mDateTime iss sub
+  let (signed,_) = objectToSignedExact ((\(a,b) -> (a,b,())) . ecdsaWithSHA256Private priv) cert
+  pure . X509Certificate . CertificateChain . (:(join . maybeToList $ x509ToSigneds <$> parentCert)) $ signed
+
 
 signCert :: (MonadIO m, HasVault m) => Certificate -> m (SignedCertificate)
 signCert cert = objectToSignedExactF (ecdsaWithSHA256) cert
@@ -287,7 +316,16 @@ ecdsaWithSHA256 mesg' = do
       sig = SEC.convertRecSig sig' -- Drop the 'v' because the ASN1 protocol does not support recoverable signatures
   return (SEC.exportSig sig, SignatureALG HashSHA256 PubKeyALG_EC)
 
-
+-- This version uses an explicit private key.
+-- AVOID if you can use ecdsaWithSHA256 instead. This is to work with vault's /signCert monad.
+ecdsaWithSHA256Private :: PrivateKey -> B.ByteString -> (B.ByteString, SignatureALG)
+ecdsaWithSHA256Private priv mesg' =
+  let mesgBS = B.pack $ BA.unpack $ hashWith CH.SHA256 mesg'
+      Signature (SEC.CompactRecSig r s v) = signMsg priv mesgBS
+      sig'' = SEC.CompactRecSig s r v
+      sig' = fromMaybe (error "could not read a sig we just made") (SEC.importCompactRecSig sig'')
+      sig = SEC.convertRecSig sig'
+  in (SEC.exportSig sig, SignatureALG HashSHA256 PubKeyALG_EC)
 
 toASN1CS :: String -> ASN1CharacterString
 toASN1CS = asn1CharacterString UTF8

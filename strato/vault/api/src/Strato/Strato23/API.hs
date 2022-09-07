@@ -9,6 +9,7 @@ module Strato.Strato23.API
   , module Strato.Strato23.API.Signature
   , module Strato.Strato23.API.Types
   , module Strato.Strato23.API.Users
+  , module Strato.Strato23.API.X509
   ) where
 
 import           Servant
@@ -18,6 +19,7 @@ import           Strato.Strato23.API.Ping
 import           Strato.Strato23.API.Signature
 import           Strato.Strato23.API.Types
 import           Strato.Strato23.API.Users
+import           Strato.Strato23.API.X509
 
 
 type VaultWrapperAPI = GetPing
@@ -28,3 +30,4 @@ type VaultWrapperAPI = GetPing
                   :<|> PostSignature
                   :<|> PostPassword
                   :<|> VerifyPassword
+                  :<|> SignCertificate

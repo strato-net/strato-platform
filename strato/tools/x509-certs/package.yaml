@@ -30,6 +30,7 @@ library:
   - deepseq
   - ethereum-rlp
   - hourglass
+  - lens
   - memory
   - pem
   - text
@@ -37,6 +38,7 @@ library:
   - transformers
   - secp256k1-haskell
   - strato-model
+  - swagger2
   - x509
   - x509-validation
   - deepseq
@@ -102,11 +104,12 @@ executables:
     other-modules: []
     dependencies:
       - bytestring
+      - cryptonite
       - optparse-applicative
       - saltine
+      - strato-model
       - base16-bytestring
-      - blockapps-vault-wrapper-server
-      - blockapps-vault-wrapper-api
+      - text
       - x509-certs
 
 
