@@ -133,6 +133,12 @@ instance (Monad m, HasMemRawStorageDB m) => HasMemRawStorageDB (ConduitT i o m) 
   getMemRawStorageBlockDB  = lift getMemRawStorageBlockDB
   putMemRawStorageBlockMap = lift. putMemRawStorageBlockMap
 
+instance (Monad m, HasMemCertDB m) => HasMemCertDB (ConduitT i o m) where
+  getCertTxDBMap    = lift getCertTxDBMap
+  putCertTxDBMap    = lift . putCertTxDBMap
+  getCertBlockDBMap = lift getCertBlockDBMap
+  putCertBlockDBMap = lift . putCertBlockDBMap 
+
 -- todo: lovely!
 
 addBlocks :: (MonadFail m, VMBase m, Bagger.MonadBagger m, MonadMonitor m) => [OutputBlock] -> ConduitT a VmOutEvent m ()
@@ -724,12 +730,14 @@ completeDiff :: ( MonadLogger m
                 , Mod.Modifiable MemDBs m
                 , Mod.Modifiable CurrentBlockHash m
                 , Mod.Modifiable BestBlockRoot m
+                , Mod.Modifiable CertRoot m
                 , HasMemAddressStateDB m
                 , (MP.StateRoot `A.Alters` MP.NodeData) m
                 , (Account `A.Alters` AddressState) m
                 , (Maybe Word256 `A.Alters` MP.StateRoot) m
                 , HasMemRawStorageDB m
                 , (RawStorageKey `A.Alters` RawStorageValue) m
+                , HasMemCertDB m
                 )
              => ToDiff -> m SD.StateDiff
 completeDiff (src, dst, hsh, num) = withCurrentBlockHash hsh $ do
