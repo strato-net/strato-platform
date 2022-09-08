@@ -317,7 +317,7 @@ ecdsaWithSHA256 mesg' = do
   return (SEC.exportSig sig, SignatureALG HashSHA256 PubKeyALG_EC)
 
 -- This version uses an explicit private key.
--- AVOID if you can use ecdsaWithSHA256 instead. This is to work with vault's /signCert monad.
+-- AVOID if you can use ecdsaWithSHA256 instead. That is to work with vault's /signCert monad.
 ecdsaWithSHA256Private :: PrivateKey -> B.ByteString -> (B.ByteString, SignatureALG)
 ecdsaWithSHA256Private priv mesg' =
   let mesgBS = B.pack $ BA.unpack $ hashWith CH.SHA256 mesg'

@@ -11,11 +11,11 @@ module Strato.Strato23.API.X509 where
 
 import           Data.Text
 import           Servant
+import           Strato.Strato23.API.Types
 import           BlockApps.X509.Certificate
 
 
-type SignCertificate = "sign-certificate"
+type CreateCertificate = "createCert"
               :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" Text
-              :> ReqBody '[JSON] (Subject, Maybe X509Certificate)
-            --   :> ReqBody '[JSON] Subject
-              :> Post '[JSON] X509Certificate
+              :> ReqBody '[JSON] CreateCertEndpoint
+              :> Get '[JSON] X509Certificate

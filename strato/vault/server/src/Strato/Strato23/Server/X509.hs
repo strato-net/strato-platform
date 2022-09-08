@@ -9,6 +9,7 @@ import           Control.Monad.Reader                  (asks)
 import qualified Data.Cache                            as Cache
 import           Data.Text                             (Text)
 import           BlockApps.X509.Certificate
+import           Strato.Strato23.API.Types
 import           Strato.Strato23.Monad
 import           Strato.Strato23.Crypto
 import           Strato.Strato23.Database.Queries      (getUserKeyQuery)
@@ -16,13 +17,11 @@ import           UnliftIO
 
 
 
-signCertificate 
+createCertificate 
   :: Text                     -- ^ The user name of the issuer of the new certificate
-  -> ( Subject                -- ^ The subject of the new certificate
-     , Maybe X509Certificate  -- ^ The issuer's certificate
-     ) 
+  -> CreateCertEndpoint         -- ^ The subject of the new certificate and the issuer's certificate
   -> VaultM X509Certificate   -- ^ The new X.509 certificate. N.B. This doesn't register the cert
-signCertificate userName (subject, mParentCert) = do
+createCertificate userName CreateCertEndpoint{..} = do
   cache <- asks keyStoreCache
   cachedPk <- liftIO $ Cache.lookup cache userName
   (_,nonce,pKey,_) <- case cachedPk of
@@ -38,11 +37,11 @@ signCertificate userName (subject, mParentCert) = do
       pure (a,b,c,d)
   -- mIssuer will be the issuer of the new certificate. The issuer is equal to the subject
   -- of the parent certificate.
-  let mIssuer = fmap subjectToIssuer $ getCertSubject =<< mParentCert
+  let mIssuer = fmap subjectToIssuer $ getCertSubject =<< parentCertificate
   withSecretKey $ \key -> case decryptSecKey key nonce pKey of
     Nothing -> vaultWrapperError IncorrectPasswordError
     Just prvKey ->
-        case (mParentCert, mIssuer) of
+        case (parentCertificate, mIssuer) of
             (Just parentCert, Just issuer) -> do
                 cert <- liftIO $ makeSignedCertWithPrivate Nothing (Just $ parentCert) issuer subject prvKey
                 pure cert
