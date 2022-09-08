@@ -19,7 +19,7 @@ solidityAlias = do
   if pragmaVersion' == "3.4"
     then do
       ~(a, (aliasName, rest)) <- withPosition $ do
-        reserved "type"
+        symbol "type"
         aliasName <- identifier
         reserved "is"
         rest <- many1 (noneOf ";") --TODO have to not do this, have it check if it is a simple type otherwise throw an error

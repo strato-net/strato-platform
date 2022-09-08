@@ -690,6 +690,5 @@ isReservedWord version reservedWord = do
       case reservedWord of
         "error" -> True
         "throw" -> True
-        "type" -> True
         _ -> isReservedWord "3.3" reservedWord
     _ -> False
