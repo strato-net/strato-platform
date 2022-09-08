@@ -34,6 +34,7 @@ module Blockchain.VM.SolidException
   , reservedWordError
   , revertError
   , immutableError
+  , getRunTimeCodeError
   , tooManyResultsError
   , tooManyCooks
   , generalMetaProgrammingError
@@ -79,6 +80,7 @@ data SolidException = TypeError String String
                     | PaymentError String String
                     | ReservedWordError String String
                     | ImmutableError String String
+                    | FailedToAttainRunTimCode String String
                     | TooManyResultsError String Int
                     | TooManyCooks Int Int
                     | GeneralMetaProgrammingError String String
@@ -121,6 +123,7 @@ showSolidException (TooMuchGas a b) = printf "The gas limit is %s, but was given
 showSolidException (PaymentError a b) = printf "There was an error sending %s wei to the following address: %s" a b
 showSolidException (ReservedWordError a b) = printf "%s is a reserved word in version %s and up." b a
 showSolidException (ImmutableError a b) = printf "%s is an immutable variable in line '%s'" a b
+showSolidException (FailedToAttainRunTimCode a b) = printf "%s failed to aquire run time code '%s'" a b
 showSolidException (TooManyResultsError a b) = printf "Too many results returned from input %s: found %d entries (should be 1)." a b
 showSolidException (TooManyCooks a b) = printf "Too many arguments were given, expected %d argument/s, but received %d arguments." a b
 showSolidException (GeneralMetaProgrammingError a b) = printf "There was a problem with the use of '%s', and the given term/s %s" a b
@@ -222,6 +225,9 @@ reservedWordError = toThrower ReservedWordError
 
 immutableError :: (Show v) => String -> v -> a
 immutableError = toThrower ImmutableError
+
+getRunTimeCodeError :: (Show v) => String -> v -> a
+getRunTimeCodeError = toThrower FailedToAttainRunTimCode
 
 tooManyResultsError :: String -> Int -> a
 tooManyResultsError word got = throw $ TooManyResultsError word got

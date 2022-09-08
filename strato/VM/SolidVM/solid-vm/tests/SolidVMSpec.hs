@@ -164,6 +164,10 @@ anyImmutableError :: Selector HandledException
 anyImmutableError (HE Blockchain.SolidVM.Exception.ImmutableError{}) = True
 anyImmutableError _ = False
 
+failedToAttainRunTimCodeError :: Selector HandledException
+failedToAttainRunTimCodeError (HE Blockchain.SolidVM.Exception.FailedToAttainRunTimCode{}) = True
+failedToAttainRunTimCodeError _ = False
+
 failedRequirementMsg :: String -> Selector HandledException
 failedRequirementMsg str (HE (Require (Just msg))) = str == msg
 failedRequirementMsg _ _ = False
@@ -6715,17 +6719,35 @@ contract qq {
     getAll [[Field "a"], [Field "b"]] `shouldReturn` [BDefault,BDefault]
 
 
-  it "View functions enforced in 3.3" $ (runTest $
+  it "can get code from other contracts using type function" . runTest $ do
     runBS [r|
 pragma solidvm 3.3;
+
 contract qq {
-    uint x = 10;
-    function f(uint a, uint b) public view returns (uint) {
-        x = 5;
-        return a * (b + 42);
-    }
-    constructor () {
-      f(1,2);
-    }
+  string  bb = type(qq).creationCode;
+  string  dd = type(C).name;
+  string  cc = type(B).creationCode;
 }
-|]) `shouldThrow` anyTypeError
+
+contract B {
+  string  cc = type(qq).creationCode;
+
+}
+
+contract C {
+  int b = 123;
+}
+
+|]
+    getFields ["bb", "cc", "dd"] `shouldReturn` 
+      [ BString "contract qq {\n  string bb = type(qq).creationCode;\n  string cc = type(B).creationCode;\n  string dd = type(C).name;\n  // no constructor found\n}"
+      , BString "contract B {\n  string cc = type(qq).creationCode;\n  // no constructor found\n}"
+      , BString "C"]
+
+  it "can detect when referencing a contract not at file level using type function" $ (runTest $
+    runBS [r|
+pragma solidvm 3.2;
+contract A {
+  uint x = type(B).name;
+
+}|]) `shouldThrow` anyTypeError

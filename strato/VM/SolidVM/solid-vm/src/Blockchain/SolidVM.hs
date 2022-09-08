@@ -115,10 +115,13 @@ import           SolidVM.Model.Value
 import           SolidVM.Solidity.Parse.Statement
 import           SolidVM.Solidity.Parse.Lexer         (stringLiteral)
 import           SolidVM.Solidity.Parse.ParserTypes
+--import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpression, unparseVarType, unparseContract)
 import           SolidVM.Solidity.Parse.UnParser      hiding (sortWith)
-
 import           Network.Haskoin.Crypto.BigWord()
 import           UnliftIO                             hiding (assert)
+
+
+ 
 
 -- | Copying from Data.List.Extra, since our version of the extra library seems to not contain it.
 -- | A total variant of the list index function `(!!)`.
@@ -1534,6 +1537,12 @@ expToVar' (CC.Binary _ "^=" lhs rhs) = binopAssign xor lhs rhs
 expToVar' (CC.Binary _ ">>=" lhs rhs)= binopAssign (\x i -> x `shiftR` fromInteger i) lhs rhs
 expToVar' (CC.Binary _ "<<=" lhs rhs)= binopAssign (\x i -> x `shiftL` fromInteger i) lhs rhs
 expToVar' (CC.Binary _ ">>>=" lhs rhs)= binopAssign (\x i -> fromInteger ( toInteger ( (fromInteger x) ::Word256) ) `shiftR` fromInteger i ) lhs rhs
+expToVar' (CC.MemberAccess _ (CC.FunctionCall x (CC.Variable _ "type") (CC.OrderedArgs [CC.Variable _ name])) "runTimeCode") = do
+  (_, cc) <- getCurrentCodeCollection
+  return $ Constant $ SString $ case M.lookup name $ cc ^. CC.contracts of-- (_contracts cc) of 
+    Just contract -> unparseContract  contract;
+    _ -> getRunTimeCodeError "Failed to get contract runtime code " x
+
 
 expToVar' (CC.MemberAccess _ (CC.Variable _ "Util") "bytes32ToString") = do
   return $ Constant $ SHexDecodeAndTrim
@@ -3375,6 +3384,14 @@ encodeVector v = do
         bs <- encodeForReturn val'
         return (headers `B.append` bs, strings)
 
+
+
+
+
+
+
+
+
 {- BEN WILL REFACTOR THIS -}
 solidityExceptionHandler :: MonadSM m => (M.Map String (Maybe (String, SVMType.Type), [CC.Statement])) -> SolidException -> m (Maybe Value)
 solidityExceptionHandler catchBlockMap ex = do
@@ -3537,6 +3554,9 @@ solidityExceptionHandler catchBlockMap ex = do
       return res
     (ImmutableError s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 25 immutableError
+      return res
+    (FailedToAttainRunTimCode s1 s2) -> do
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 26 getRunTimeCodeError
       return res
     (TooManyResultsError s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 24 tooManyResultsError
