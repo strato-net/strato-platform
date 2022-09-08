@@ -198,8 +198,8 @@ baggerRejectionToTransactionResultBits rejection = case rejection of
         (p s q ++ formatKeccak256WithoutColor hashBetter ++ " being a more lucrative transaction", hashWorse)
     CodeNotFound s q a n OutputTx{otHash=h} ->
         (p s q ++ " code not found at address " ++ format a ++ " with name " ++ n, h)
-    InvalidPragma s q pragma OutputTx{otHash=hsh} ->
-        (p s q ++ " invalid pragma " ++ pragma, hsh)
+    InvalidPragma s q erPragmas OutputTx{otHash=hsh} ->
+        (p s q ++ " invalid pragma " ++ show erPragmas, hsh)
 
     where p stage queue = "Rejected from mempool at " ++ show stage ++ "/" ++ show queue ++ " due to "
           p' s q        = p s q ++ "low "

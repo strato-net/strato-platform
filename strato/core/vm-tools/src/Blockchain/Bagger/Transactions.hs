@@ -48,7 +48,7 @@ data TransactionFailureCause = TFInsufficientFunds Integer Integer OutputTx -- t
                              | TFNonceMismatch Integer Integer OutputTx -- expectedNonce, actualNonce
                              | TFChainIdMismatch (Maybe Word256) (Maybe Word256) OutputTx -- expectedChainId, actualChainId
                              | TFCodeCollectionNotFound Account String OutputTx
-                             | TFInvalidPragma String OutputTx
+                             | TFInvalidPragma [(String, String)] OutputTx
                              deriving (Eq, Read, Show, Generic)
 
 instance NFData TransactionFailureCause
@@ -72,7 +72,7 @@ data TxRejection = WrongChainId   BaggerStage BaggerTxQueue OutputTx -- only pub
                  | GasLimitTooLow BaggerStage BaggerTxQueue Integer OutputTx -- queue should probably only be Validation, integer is intrinsic gas
                  | LessLucrative  BaggerStage BaggerTxQueue OutputTx OutputTx -- newTx, oldTx
                  | CodeNotFound   BaggerStage BaggerTxQueue Account String OutputTx
-                 | InvalidPragma  BaggerStage BaggerTxQueue String OutputTx
+                 | InvalidPragma  BaggerStage BaggerTxQueue [(String,String)] OutputTx
                  deriving (Eq, Read, Show)
 
 rejectedTx :: TxRejection -> OutputTx
@@ -118,11 +118,10 @@ instance Format TxRejection where
         "\n\ttarget address " ++ format address ++
         "\n\tcontract name " ++ name ++
         "\n" ++ format o
-    format (InvalidPragma stage queue prag o@OutputTx{otHash=hash}) =
-        "InvalidPragma at stage " ++ show stage ++ " in queue " ++ show queue ++" prag " ++ show prag ++
+    format (InvalidPragma stage queue erPragmas' o@OutputTx{otHash=hash}) =
+        "InvalidPragma at stage " ++ show stage ++ " in queue " ++ show queue ++" prag " ++ show erPragmas' ++
         "\n\ttx hash " ++ format hash ++
         "\n" ++ format o
-        
 
 txRejectionToAPIFailureCause :: TxRejection -> TransactionResultStatus
 txRejectionToAPIFailureCause (WrongChainId   stage queue tx) =
@@ -137,8 +136,8 @@ txRejectionToAPIFailureCause (LessLucrative  stage queue newTx _) =
     Failure (show stage) (Just $ show queue) TrumpedByMoreLucrative Nothing Nothing (Just $ "trumped by " ++ formatKeccak256WithoutColor (otHash newTx))
 txRejectionToAPIFailureCause (CodeNotFound  stage queue address name _) =
     Failure (show stage) (Just $ show queue) MissingCode Nothing Nothing (Just $ "code not found at address " ++ format address ++ " with name " ++ name)
-txRejectionToAPIFailureCause (InvalidPragma stage queue prag tx) =
-    Failure (show stage) (Just $ show queue) InvalidPragmaType Nothing Nothing (Just $ "invalid pragma " ++ prag ++ " in tx " ++ format (otBaseTx tx))
+txRejectionToAPIFailureCause (InvalidPragma stage queue erPragmas' tx) =
+    Failure (show stage) (Just $ show queue) InvalidPragmaType Nothing Nothing (Just $ "invalid pragma " ++ show erPragmas'  ++ " in tx " ++ format (otBaseTx tx))
 
 tfToBaggerTxRejection :: TransactionFailureCause -> TxRejection
 tfToBaggerTxRejection (TFInsufficientFunds cost balance tx) = BalanceTooLow Execution Queued cost balance tx
@@ -147,7 +146,7 @@ tfToBaggerTxRejection TFBlockGasLimitExceeded{} = error "please dont do that (ca
 tfToBaggerTxRejection (TFNonceMismatch expected _ tx) = NonceTooLow Execution Queued expected tx
 tfToBaggerTxRejection (TFChainIdMismatch _ _ tx) = WrongChainId Validation Queued tx
 tfToBaggerTxRejection (TFCodeCollectionNotFound addr name tx) = CodeNotFound Validation Queued addr name tx
-tfToBaggerTxRejection (TFInvalidPragma prag tx) = InvalidPragma Validation Queued prag tx
+tfToBaggerTxRejection (TFInvalidPragma erPragmas' tx) = InvalidPragma Validation Queued erPragmas' tx
 
 instance Format TransactionFailureCause where
     format (TFInsufficientFunds cost bal _) = "Insufficient funds: cost " ++ show cost ++ " > balance " ++ show bal
@@ -156,4 +155,4 @@ instance Format TransactionFailureCause where
     format (TFNonceMismatch expected actual _) = "Nonce mismatch: expecting " ++ show expected ++ ", actual " ++ show actual
     format (TFChainIdMismatch expected actual _) = "Chain ID mismatch: expecting " ++ TD.formatChainId expected ++ ", actual " ++ TD.formatChainId actual
     format (TFCodeCollectionNotFound addr name _) = "Code collection not found at address " ++ format addr ++ " with name " ++ name
-    format (TFInvalidPragma prag _) = "Invalid pragma: " ++ show prag
+    format (TFInvalidPragma erPragmas' _) = "Invalid pragma: " ++ show erPragmas'
