@@ -15,14 +15,17 @@ import           SolidVM.Solidity.Parse.ParserTypes
 
 solidityAlias :: SolidityParser SourceUnit
 solidityAlias = do
-  ~(a, (aliasName, rest)) <- withPosition $ do
-    reserved "type"
-    
-    aliasName <- identifier
-    reserved "is"
-    rest <- many1 (noneOf ";") --TODO have to not do this, have it check if it is a simple type otherwise throw an error
-    semi
-    pure (aliasName, rest)
-  --Directly make store type rather than string of type?
-  addUserDefinedType aliasName rest
-  return (Alias a aliasName rest) 
+  pragmaVersion' <- getPragmaVersion
+  if pragmaVersion' == "3.4"
+    then do
+      ~(a, (aliasName, rest)) <- withPosition $ do
+        reserved "type"
+        aliasName <- identifier
+        reserved "is"
+        rest <- many1 (noneOf ";") --TODO have to not do this, have it check if it is a simple type otherwise throw an error
+        semi
+        pure (aliasName, rest)
+      --Directly make store type rather than string of type?
+      addUserDefinedType aliasName rest
+      return (Alias a aliasName rest) 
+    else fail "User defined type aliases are not supported below pragma solidvm 3.4"

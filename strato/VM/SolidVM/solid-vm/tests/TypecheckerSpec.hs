@@ -818,6 +818,7 @@ contract A {
 
   it "can throw exception when fallback() function has arguments" $
     let anns = runTypechecker [r|
+pragma solidvm 3.4;
 contract A {
   fallback(uint i) external payable {
     uint x = i;
@@ -844,6 +845,7 @@ contract qq {
     in length anns `shouldBe` 0
   it "can throw exception when fallback() function has return values" $
     let anns = runTypechecker [r|
+pragma solidvm 3.4;
 contract A {
   fallback() external payable returns (uint) {
     uint x = 5;
@@ -855,6 +857,7 @@ contract A {
 
   it "can throw exception when fallback() function is not external" $
     let anns = runTypechecker [r|
+pragma solidvm 3.4;
 contract A {
    fallback() internal payable {
   }
@@ -1250,7 +1253,7 @@ contract B {
 
   it "must pass the associated type within the wrap function " $
     let anns = runTypechecker [r|
-  pragma solidvm 3.3;
+  pragma solidvm 3.4;
   type MagicInt is int;
   type MysticalString is string;
     type UBool is bool;
@@ -1273,7 +1276,7 @@ contract B {
 
   it "can use user defined unwrap and unwrap" $
     let anns = runTypechecker [r|
-  pragma solidvm 3.3;
+  pragma solidvm 3.4;
   
   type MagicInt       is int;
   type MysticalString is string;
@@ -1302,7 +1305,7 @@ contract B {
 
   it "can use user-defined-types wrap and unwrap within fuctions" $
     let anns = runTypechecker [r|
-  pragma solidvm 3.3;
+  pragma solidvm 3.4;
   type UBool is bool;
   type MagicInt is int;
   type MysticalString is string;

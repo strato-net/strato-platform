@@ -46,6 +46,7 @@ spec :: Spec
 spec = describe "Optimizer tests" $ do
     it "can replace binary expression with number literal for state variables" $
         let anns = (runOptimizer [r|
+            pragma solidvm 3.4;
             contract A {
                 int b = 2 + 2 + 2;
             }|])  in case (varDeclHelper' $ varDeclHelper anns) of 

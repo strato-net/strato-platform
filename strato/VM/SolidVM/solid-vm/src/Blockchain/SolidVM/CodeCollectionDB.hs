@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE MultiWayIf #-}
 module Blockchain.SolidVM.CodeCollectionDB
   ( ParseTypeCheckOrSolidVMError(..)
   , parseSource
@@ -82,7 +83,12 @@ compileSourceNoInheritance initCodeMap = do
         let pragmas = \case
               Pragma _ n v -> Just (n, v)
               _ -> Nothing
-            vmVersion' = if (Just ("solidvm","3.3")) `elem` (pragmas <$> sourceUnits) then "svm3.3" else (if (Just ("solidvm","3.2")) `elem` (pragmas <$> sourceUnits) then "svm3.2" else (if (Just ("solidvm","3.0")) `elem` (pragmas <$> sourceUnits) then "svm3.0" else ""))
+            curPragmas = pragmas <$> sourceUnits
+            vmVersion' = if | (Just ("solidvm", "3.4")) `elem` curPragmas -> "svm3.4"
+                            | (Just ("solidvm", "3.3")) `elem` curPragmas -> "svm3.3"
+                            | (Just ("solidvm", "3.2")) `elem` curPragmas -> "svm3.2"
+                            | (Just ("solidvm", "3.0")) `elem` curPragmas -> "svm3.0"
+                            | otherwise -> ""
         fmap catMaybes . for sourceUnits $ \case
           NamedXabi name (xabi, parents') -> do
             ctrct <- first SVMEx
@@ -148,14 +154,23 @@ hasSvm3_3 cc = any (=="svm3.3") vmVers
   where
     contractList = map snd $ M.toList (cc ^. contracts )
     vmVers = map (^. vmVersion ) contractList
+
+hasSvm3_4 :: CodeCollection -> Bool
+hasSvm3_4 cc = any (=="svm3.4") vmVers
+  where
+    contractList = map snd $ M.toList (cc ^. contracts )
+    vmVers = map (^. vmVersion ) contractList
+
+
     
 --- Don't typecheck in Slipstream!!!
 compileSource :: Bool -> Map T.Text T.Text-> Either ParseTypeCheckOrSolidVMError CodeCollection
 compileSource typeCheck mTT = do
   let applyInheritanceE = first SVMEx . applyInheritance
-  O.detector <$> case (applyInheritanceE <=< compileSourceNoInheritance) mTT of
+  case (applyInheritanceE <=< compileSourceNoInheritance) mTT of
     Right cc | typeCheck && hasSvm3_2 cc -> typeCheckDetectorSvm3_2 cc
              | typeCheck && hasSvm3_3 cc -> typeCheckDetectorSvm3_3 cc
+             | typeCheck && hasSvm3_4 cc -> O.detector <$> typeCheckDetectorSvm3_3 cc
              | otherwise                 -> Right cc
     Left x -> Left x
     where

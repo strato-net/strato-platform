@@ -247,23 +247,26 @@ solidityFLEnum = do
 
 solidityFLError :: SolidityParser SourceUnit
 solidityFLError = do
-  ~(a, (errorName, errorArgs)) <- withPosition $ do
-    reserved "error"
-    errorName <- identifier
-    pragmaVersion' <- getPragmaVersion
-    when (isReservedWord pragmaVersion' errorName) $ reservedWordError pragmaVersion' errorName
-    errorArgs <- parens $ commaSep $ do
-      partType <- simpleTypeExpression
-      partName <- identifier
-      return (Text.pack partName, partType)
-    semi
-    pure (errorName, errorArgs)
-  return $ FLError (Text.pack errorName) (SolidVM.Error {
-      SolidVM.params = map (\(k, v) -> (textToLabel k, v)) $
-           zipWith (\x i -> fmap (SolidVM.IndexedType i) x) errorArgs [0..]
-    , SolidVM.bytes = 0
-    , SolidVM.context = a
-  })
+  pragmaVersion' <- getPragmaVersion
+  if pragmaVersion' == "3.4"
+    then do
+      ~(a, (errorName, errorArgs)) <- withPosition $ do
+        reserved "error"
+        errorName <- identifier
+        when (isReservedWord pragmaVersion' errorName) $ reservedWordError pragmaVersion' errorName
+        errorArgs <- parens $ commaSep $ do
+          partType <- simpleTypeExpression
+          partName <- identifier
+          return (Text.pack partName, partType)
+        semi
+        pure (errorName, errorArgs)
+      return $ FLError (Text.pack errorName) (SolidVM.Error {
+          SolidVM.params = map (\(k, v) -> (textToLabel k, v)) $
+              zipWith (\x i -> fmap (SolidVM.IndexedType i) x) errorArgs [0..]
+        , SolidVM.bytes = 0
+        , SolidVM.context = a
+      })
+    else fail "Custom error types are not supported below pragma solidvm 3.4"
 
 -- | Parses an enum definition
 enumDeclaration :: SolidityParser (String, Declaration)
@@ -325,27 +328,30 @@ public keywords =
 
 solidityFLConstant :: SolidityParser SourceUnit
 solidityFLConstant = do
-  start <- getSourcePosition
-  variableType <- simpleTypeExpression
-  -- We have to remember which variables are "public", because they
-  -- generate accessor functions
-  keywords <- many stateVariableKeyword
-  let isConstant = KConstant `elem` keywords
-  isPublic <- public keywords
-  -- check to see if the "account" variable is being used
-  variableName <- identifier
   pragmaVersion' <- getPragmaVersion
-  when (isReservedWord pragmaVersion' variableName) $ reservedWordError pragmaVersion' variableName
-  value <- optionMaybe $ do
-    reservedOp "="
-    expression
-  end <- getSourcePosition
-  semi
-  let ctx = SourceAnnotation start end ()
+  if pragmaVersion' == "3.4"
+    then do
+      start <- getSourcePosition
+      variableType <- simpleTypeExpression
+      -- We have to remember which variables are "public", because they
+      -- generate accessor functions
+      keywords <- many stateVariableKeyword
+      let isConstant = KConstant `elem` keywords
+      isPublic <- public keywords
+      -- check to see if the "account" variable is being used
+      variableName <- identifier
+      when (isReservedWord pragmaVersion' variableName) $ reservedWordError pragmaVersion' variableName
+      value <- optionMaybe $ do
+        reservedOp "="
+        expression
+      end <- getSourcePosition
+      semi
+      let ctx = SourceAnnotation start end ()
 
-  if isConstant
-    then return $ FLConstant (labelToText variableName) (SolidVM.ConstantDecl variableType isPublic (fromMaybe (parseError "constants must be initialized" variableName) value) ctx)
-    else fail "only constants can be declared in the top level"
+      if isConstant
+        then return $ FLConstant (labelToText variableName) (SolidVM.ConstantDecl variableType isPublic (fromMaybe (parseError "constants must be initialized" variableName) value) ctx)
+        else fail "only constants can be declared in the top level"
+    else fail "File level constants are not supported below pragma solidvm 3.4"
 
 
 
@@ -381,23 +387,26 @@ simpleVariableDeclaration = do
 
 errorDeclaration :: SolidityParser (String, Declaration)
 errorDeclaration = do
-  start <- getSourcePosition
-  reserved "error"
-  errorName <- identifier
   pragmaVersion' <- getPragmaVersion
-  when (isReservedWord pragmaVersion' errorName) $ reservedWordError pragmaVersion' errorName
-  errorArgs <- parens $ commaSep $ do
-      partType <- simpleTypeExpression
-      partName <- identifier
-      return (Text.pack partName, partType)
-  end <- getSourcePosition
-  semi
-  return (errorName, ErrorDeclaration SolidVM.Error {
-      SolidVM.params = map (\(k, v) -> (textToLabel k, v)) $
-           zipWith (\x i -> fmap (SolidVM.IndexedType i) x) errorArgs [0..]
-    , SolidVM.bytes = 0
-    , SolidVM.context = SourceAnnotation start end ()
-  })
+  if pragmaVersion' == "3.4"
+    then do
+      start <- getSourcePosition
+      reserved "error"
+      errorName <- identifier
+      when (isReservedWord pragmaVersion' errorName) $ reservedWordError pragmaVersion' errorName
+      errorArgs <- parens $ commaSep $ do
+          partType <- simpleTypeExpression
+          partName <- identifier
+          return (Text.pack partName, partType)
+      end <- getSourcePosition
+      semi
+      return (errorName, ErrorDeclaration SolidVM.Error {
+          SolidVM.params = map (\(k, v) -> (textToLabel k, v)) $
+              zipWith (\x i -> fmap (SolidVM.IndexedType i) x) errorArgs [0..]
+        , SolidVM.bytes = 0
+        , SolidVM.context = SourceAnnotation start end ()
+      })
+    else fail "Custom error types are not supported below pragma solidvm 3.4"
 
 -- | Parses a function definition.
 --
@@ -484,7 +493,7 @@ modifierDeclaration = do
   start <- getSourcePosition
   reserved "modifier"
   name <- identifier
-  if pragmaVersion' /= "3.3"
+  if (pragmaVersion' /= "3.3" && pragmaVersion' /= "3.4")
     then unknownStatement "modifiers are not supported below pragma solidvm 3.3" name
     else do
       args <- option [] tupleDeclaration
@@ -676,7 +685,11 @@ isReservedWord version reservedWord = do
         "transaction_hash" -> True
         "transaction_sender" -> True
         "salt" -> True
+        _ -> isReservedWord "3.2" reservedWord
+    "3.4" -> do
+      case reservedWord of
         "error" -> True
         "throw" -> True
-        _ -> isReservedWord "3.2" reservedWord
+        "type" -> True
+        _ -> isReservedWord "3.3" reservedWord
     _ -> False
