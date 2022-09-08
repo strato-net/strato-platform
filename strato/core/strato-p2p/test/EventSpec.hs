@@ -44,6 +44,7 @@ import           Data.Traversable                      (for)
 import           Text.Printf
 
 import           BlockApps.Logging
+import           BlockApps.X509
 import           Blockchain.Bagger.BaggerState
 import           Blockchain.Bagger
 import           Blockchain.Blockstanbul
@@ -720,6 +721,14 @@ instance MonadIO m => (Word256 `A.Alters` P2P ChainMembers) (MonadTest m) where
   lookup _ _   = liftIO . throwIO $ Lookup "P2P" "Word256" "ChainMembers"
   delete _ _   = liftIO . throwIO $ Delete "P2P" "Word256" "ChainMembers"
   insert _ cId (P2P mems) = chainMembersMap . at cId ?= mems
+
+-- a simple ReaderT to keep the private key
+type CertGenM = ReaderT PrivateKey IO
+
+instance HasVault CertGenM where
+  getPub = error "we never call getPub with this tool"
+  getShared _ = error "we never call getShared with this tool"
+  sign bs = ask >>= return . flip signMsg bs 
 
 startingCheckpoint :: [Address] -> Checkpoint
 startingCheckpoint as = def{checkpointValidators = as}
@@ -1487,6 +1496,99 @@ contract B {
       --  , (peers' !! 2, peers' !! 3)
       --  ]
       --let connections' = connections ++ connections4
+
+    fit "can register a cert on the main chain" $ do
+      let unseqSink = (unseqEvents %=) . (++)
+      privKeys <- traverse (const newPrivateKey) [(1 :: Integer)..2]
+      let validators' = makeValidators privKeys
+      peers <- traverse (\(p,(n,i)) -> createPeer p validators' unseqSink n i) $ zip privKeys
+        [ ("node1", "1.2.3.4")
+        , ("node2", "5.6.7.8")
+        ]
+      connections <- traverse (uncurry createConnection)
+        [ (peers !! 0, peers !! 1)
+        ]
+      let mainChainSrc = [r|
+pragma solidvm 3.0;
+
+contract RegisterCert {
+
+  constructor(address _user, string _cert) {
+    registerCert(_user, _cert);
+  }
+}
+|]
+          mainChainContractName = "RegisterCert"
+      let innocentSrc = [r|
+pragma solidvm 3.0;
+
+contract Innocent {
+  uint x;
+  constructor() {
+    x = 6;
+  }
+}
+|]
+          innocentContractName = "Innocent"
+      ts <- liftIO getCurrentMicrotime
+      let issuer = Issuer
+            { issCommonName = "Dustin Norwood"
+            , issOrg        = "BlockApps"
+            , issUnit       = Just "Engineering"
+            , issCountry    = Just "US"
+            }
+          subject = Subject
+            { subCommonName = "Dustin Norwood"
+            , subOrg        = "BlockApps"
+            , subUnit       = Just "Engineering"
+            , subCountry    = Just "US"
+            , subPub        = derivePublicKey $ privKeys !! 0
+            }
+      cert <- fmap (T.pack . BC.unpack . certToBytes) . flip runReaderT (privKeys !! 0) $ makeSignedCert Nothing Nothing issuer subject
+      let mainChainArgs = "(0x" <> T.pack (formatAddressWithoutColor (validators' !! 0)) <> ", \"" <> cert <> "\")"
+          mainChainUtx = U.UnsignedTransaction
+            { U.unsignedTransactionNonce      = Nonce 0
+            , U.unsignedTransactionGasPrice   = Wei 1
+            , U.unsignedTransactionGasLimit   = Gas 1000000000
+            , U.unsignedTransactionTo         = Nothing
+            , U.unsignedTransactionValue      = Wei 0
+            , U.unsignedTransactionInitOrData = Code $ BC.pack mainChainSrc
+            , U.unsignedTransactionChainId    = Nothing
+            }
+          mainChainTxMd = M.fromList [("src", mainChainSrc), ("name", mainChainContractName), ("args", mainChainArgs)]
+          mainChainAddMd t = t{transactionMetadata = M.union mainChainTxMd <$> transactionMetadata t}
+          mkMainChainTx n = let utx = mainChainUtx{U.unsignedTransactionNonce = Nonce n}
+                             in mainChainAddMd $ mkSignedTx (privKeys !! 0) utx
+      let innocentArgs = "()"
+          innocentUtx = U.UnsignedTransaction
+            { U.unsignedTransactionNonce      = Nonce 0
+            , U.unsignedTransactionGasPrice   = Wei 1
+            , U.unsignedTransactionGasLimit   = Gas 1000000000
+            , U.unsignedTransactionTo         = Nothing
+            , U.unsignedTransactionValue      = Wei 0
+            , U.unsignedTransactionInitOrData = Code $ BC.pack innocentSrc
+            , U.unsignedTransactionChainId    = Nothing
+            }
+          innocentTxMd = M.fromList [("src", innocentSrc), ("name", innocentContractName), ("args", innocentArgs)]
+          innocentAddMd t = t{transactionMetadata = M.union innocentTxMd <$> transactionMetadata t}
+          mkInnocentTx n = let utx = innocentUtx{U.unsignedTransactionNonce = Nonce n}
+                             in innocentAddMd $ mkSignedTx (privKeys !! 0) utx
+          toIetx = IETx ts . IngestTx Origin.API
+          mainChainRoutine n = do
+            threadDelay 200000
+            flip postEvent (peers !! 0) . UnseqEvent . toIetx $ mkInnocentTx n
+            flip postEvent (peers !! 0) . UnseqEvent . toIetx . mkMainChainTx $ n + 1
+            mainChainRoutine $ n + 2
+          routine = do
+            threadDelay 200000
+            for_ peers $ postEvent (TimerFire 0)
+            threadDelay 200000
+            for_ peers $ postEvent (TimerFire 1)
+            mainChainRoutine 0
+          
+      void . timeout 2000000 $ concurrently_ (runNetwork peers connections) routine
+      _ <- atomically $ traverse (readTVar . _p2pTestContext) peers
+      True `shouldBe` True
   
   describe "handleEvents" $ do
     it "should pong a ping" $
