@@ -17,6 +17,7 @@ import           SolidVM.Solidity.StaticAnalysis.Types
 type SSS = State (M.Map SolidString (SourceAnnotation ()))
 
 -- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]
+
 detector :: CompilerDetector
 detector CodeCollection{..} = concat $ contractHelper <$> M.elems _contracts
 
@@ -24,7 +25,7 @@ contractHelper :: Contract -> [SourceAnnotation Text]
 contractHelper Contract{..} = concat $ functionHelper <$> maybeToList _constructor ++ M.elems _functions
 
 functionHelper :: Func -> [SourceAnnotation Text]
-functionHelper Func{..} = case funcContents of
+functionHelper Func{..} = case _funcContents of
   Nothing -> []
   Just stmts -> statementsHelper stmts
 

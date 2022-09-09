@@ -12,6 +12,7 @@ import qualified SolidVM.Solidity.StaticAnalysis.Typechecker                    
 import           Test.Hspec
 import           Text.RawString.QQ
 
+
 runTypechecker :: String -> [SourceAnnotation Text]
 runTypechecker c = case compileSourceWithAnnotations True (M.fromList [("",T.pack c)]) of
   Left anns -> anns
@@ -1247,4 +1248,108 @@ contract B {
 |]
        in length anns `shouldBe` 1
 
+  it "must pass the associated type within the wrap function " $
+    let anns = runTypechecker [r|
+  pragma solidvm 3.3;
+  type MagicInt is int;
+  type MysticalString is string;
+    type UBool is bool;
+  contract A {
+    int banana              = 12;
+    MagicInt gauss          =  MagicInt.wrap(banana);
+    string helper           = "1234";
+    MagicInt cayley1        = MagicInt.wrap(helper);  //Should Error -- passing string var into int alias wrap function
+    MagicInt cayley2        = MagicInt.wrap("12");   //Should Error  -- passing string literal into int alias wrap function
+    MagicInt cayley3        = 12;                   //Should Error   -- assigning int literal to user defined type
+    MagicInt yoneda         = MagicInt.wrap(12);        
+    MysticalString shakeYo2 = MysticalString.wrap(yoneda); //Should Error -- passing user defined type to alias wrap function
+    MagicInt felixKlein     = MagicInt.wrap(yoneda);      //Should Error  -- passing user defined type to alias wrap function
+    MagicInt mrBool         = UBool.wrap(true);          //Error          -- passing wrong type to alias wrap function
+    bool shouldThrowError   = UBool.wrap(true);         //Error           -- assigning user defined to bool variable
+}
+|]
+    in length anns `shouldBe` 7
+
+
+  it "can use user defined unwrap and unwrap" $
+    let anns = runTypechecker [r|
+  pragma solidvm 3.3;
+  
+  type MagicInt       is int;
+  type MysticalString is string;
+  type UBool          is bool;
+  contract A {
+    //bool unwrapping
+    UBool galois       =  UBool.wrap(false);
+    bool  mrBool       =  UBool.unwrap(galois);
+    bool  fermet       =  UBool.unwrap(UBool.wrap(true));
+    bool  felixKlein   =  UBool.unwrap(UBool.wrap(mrBool));
+
+    
+    //Int
+    MagicInt cayley   =  MagicInt.wrap(123);
+    int      yoneda   =  MagicInt.unwrap(cayley);
+    int      lagrange =  MagicInt.unwrap(MagicInt.wrap(123));
+    MagicInt gauss    =  MagicInt.wrap(MagicInt.unwrap(MagicInt.wrap(123)));
+    
+    //String
+    MysticalString hilbert  = MysticalString.wrap("vector");
+    string         banach   = MysticalString.unwrap(hilbert);
+    string krull            = MysticalString.unwrap(MysticalString.wrap(string.concat("33",  banach)));
+}
+|]
+    in length anns `shouldBe` 0
+
+  it "can use user-defined-types wrap and unwrap within fuctions" $
+    let anns = runTypechecker [r|
+  pragma solidvm 3.3;
+  type UBool is bool;
+  type MagicInt is int;
+  type MysticalString is string;
+  contract A {
+    UBool galois3  =  UBool.wrap(false);
+    function f() {
+       UBool galois       =  UBool.wrap(false);
+       UBool galois2       =  UBool.wrap(false);
+       bool  mrBool       =  UBool.unwrap(galois);
+      bool  fermet       =  UBool.unwrap(UBool.wrap(true));
+      bool  felixKlein   =  UBool.unwrap(UBool.wrap(mrBool));
+    }
+
+}
+|]
+    in length anns `shouldBe` 0
+
+  it "can call type(C).name, type(C).creationCode, type(C).runtimeCode" $
+    let anns = runTypechecker [r|
+contract A {
+  string endofunctor1 = type(A).name;
+  string endofunctor2 = type(A).creationCode;
+  string endofunctor3 = type(A).runtimeCode;
+}
+
+contract B {
+  string endofunctor1 = type(A).name;
+  string endofunctor2 = type(A).creationCode;
+  string endofunctor3 = type(A).runtimeCode;
+}
+
+contract C {
+  string endofunctor1 = type(A).name;
+  string endofunctor2 = type(A).creationCode;
+  string endofunctor3 = type(A).runtimeCode;
+}
+
+|]
+    in length anns `shouldBe` 0
+  
+  it "type(C).name, type(C).creationCode, type(C).runtimeCode only produce strings" $
+    let anns = runTypechecker [r|
+contract A {
+  int endofunctor1   = type(A).name;
+  int endofunctor2   = type(A).creationCode;
+  int groupoid       = type(A).runtimeCode;
+}
+|]
+    in length anns `shouldBe` 3
 

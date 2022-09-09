@@ -49,7 +49,7 @@ import           Blockchain.Data.Control               (P2PCNC(..))
 import           Blockchain.Data.RLP
 import           Blockchain.Data.Wire                  as W
 import           Blockchain.Display
-import           Blockchain.Event
+import           Blockchain.EventP2P
 import           Blockchain.EventException
 import           Blockchain.ExtMergeSources
 import           Blockchain.Frame

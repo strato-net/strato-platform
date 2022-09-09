@@ -15,7 +15,7 @@ import           Data.ByteString      (ByteString)
 import qualified Data.Text            as T
 
 import           BlockApps.Logging
-import           Blockchain.Event
+import           Blockchain.EventP2P
 import           Blockchain.P2PRPC
 import           Blockchain.P2PUtil
 

@@ -49,7 +49,7 @@ import           SolidVM.Solidity.Parse.ParserTypes
 import qualified SolidVM.Solidity.StaticAnalysis.Typechecker                            as TypeChecker
 import qualified SolidVM.Solidity.StaticAnalysis.Functions.ConstantFunctions            as ConstantFunctions
 import           SolidVM.Solidity.StaticAnalysis.Optimizer                              as O
-
+import qualified        SolidVM.Solidity.StaticAnalysis.Statements.MultipleDeclarations as MultipleDeclarations
 
 data ParseTypeCheckOrSolidVMError = PEx ParseError
                          | TCEx [SourceAnnotation T.Text]
@@ -68,7 +68,7 @@ withAnnotations f = first unwind . f
         unwind (TCEx errs) = errs
 
 parseSource :: T.Text -> T.Text -> Either ParseTypeCheckOrSolidVMError [SourceUnit]
-parseSource fileName src = bimap PEx unsourceUnits $ runParser solidityFile (ParserState "" "") (T.unpack fileName) (T.unpack src)
+parseSource fileName src = bimap PEx unsourceUnits $ runParser solidityFile (ParserState "" "" M.empty) (T.unpack fileName) (T.unpack src)
 
 parseSourceWithAnnotations :: T.Text -> T.Text -> Either [SourceAnnotation T.Text] [SourceUnit]
 parseSourceWithAnnotations = withAnnotations . parseSource
@@ -78,14 +78,19 @@ compileSourceNoInheritance initCodeMap = do
   let getNamedSUnits :: T.Text -> T.Text -> Either ParseTypeCheckOrSolidVMError [(SolidString, SUnitIntermediary)]
       getNamedSUnits fileName src = do
         sourceUnits <- parseSource fileName src
+<<<<<<< HEAD
         let pragmas' = \case
+=======
+        let userDefinedFromFile = M.fromList $ map (\(Alias _ alias typ) -> (alias, typ) ) $ filter (\x -> case x of (Alias _ _ _) -> True; _ -> False;) sourceUnits
+        let pragmas = \case
+>>>>>>> develop
               Pragma _ n v -> Just (n, v)
               _ -> Nothing
             vmVersion' = if (Just ("solidvm","3.3")) `elem` (pragmas' <$> sourceUnits) then "svm3.3" else (if (Just ("solidvm","3.2")) `elem` (pragmas' <$> sourceUnits) then "svm3.2" else (if (Just ("solidvm","3.0")) `elem` (pragmas' <$> sourceUnits) then "svm3.0" else ""))
         fmap catMaybes . for sourceUnits $ \case
           NamedXabi name (xabi, parents') -> do
             ctrct <- first SVMEx
-                   $ xabiToContract (textToLabel name) (map textToLabel parents') vmVersion' xabi
+                   $ xabiToContract (textToLabel name) (map textToLabel parents') vmVersion' userDefinedFromFile xabi
             pure $ Just $ (textToLabel name, Con ctrct)
           FLFunc name fdec -> do
             pure $ Just $ (name, FLF fdec)
@@ -100,6 +105,7 @@ compileSourceNoInheritance initCodeMap = do
           Pragma _ n v -> do 
             pure $ Just $ (" ", Prag (n,v))
           _ -> pure Nothing
+<<<<<<< HEAD
 --      sUnitSorter :: [(SolidString, SUnitIntermediary)] ->  ([(SolidString, ConstantDecl)], [(SolidString, Contract)], [(SolidString, ([SolidString], a))], [(SolidString, [(SolidString, FieldType, a)])])
       sUnitSorter = foldr (\(name, sUnit) (cs, cs2, cs3, cs4, cs5, cs6, cs7) -> case sUnit of
         Con ctrct -> (cs, (name, ctrct):cs2, cs3, cs4, cs5, cs6, cs7)
@@ -116,24 +122,44 @@ compileSourceNoInheritance initCodeMap = do
       throwDuplicate :: (SolidString, Contract) -> Map SolidString Contract -> Either ParseTypeCheckOrSolidVMError (Map SolidString Contract)
       throwDuplicate (cName, unit) m = case M.lookup cName m of
         Nothing -> pure $ M.insert cName unit m
+=======
+
+      throwDuplicate' :: (SolidString, a) -> Map SolidString a -> (a -> SourceAnnotation b) -> Either ParseTypeCheckOrSolidVMError (Map SolidString a)
+      throwDuplicate' (sName, unit) m contextFunc = case M.lookup sName m of
+        Nothing -> pure $ M.insert sName unit m
+>>>>>>> develop
         Just _ ->  Left . PEx
-                 $ newErrorMessage (Message $ "Duplicate unit found: " ++ labelToString cName)
-                                   (fromSourcePosition $ _sourceAnnotationStart $ _contractContext unit)
+                  $ newErrorMessage (Message $ "Duplicate unit found: " ++ labelToString sName)
+                                    (fromSourcePosition $ _sourceAnnotationStart $ contextFunc unit)
+
+      throwDuplicate :: (SolidString, SUnitIntermediary) ->  CodeCollection -> Either ParseTypeCheckOrSolidVMError CodeCollection
+      throwDuplicate (name, sUnit) cc = case sUnit of 
+        Con ctrct                 -> fmap (\cMap -> cc & contracts   .~ cMap) $ throwDuplicate' (name, ctrct) (cc ^. contracts)  _contractContext
+        FLC cnst                  -> fmap (\cMap -> cc & flConstants .~ cMap) $ throwDuplicate' (name, cnst) (cc ^. flConstants) _constContext
+        FLE (Def.Enum vals _ a)   -> fmap (\cMap -> cc & flEnums     .~ cMap) $ throwDuplicate' (name, (vals, a)) (cc ^. flEnums) (const a)
+        FLS (Def.Struct vals _ a) -> fmap (\cMap -> cc & flStructs   .~ cMap) $ throwDuplicate' (name, (\(k,v) -> (k,v,a)) <$> vals) (cc ^. flStructs) (\_ -> a)
+        FLF func                  -> fmap (\cMap -> cc & flFuncs     .~ cMap) $ throwDuplicateFunction (name, func) (cc ^. flFuncs) -- Thanks Jin!
+        FLER (Def.Error vals _ a) -> fmap (\cMap -> cc & flErrors    .~ cMap) $ throwDuplicate' (name, (\(k,v) -> (k,v,a)) <$> vals) (cc ^. flErrors) (\_ -> a) 
+        FLE y  -> parseError  "FLE non Enum should be impossible  "  (show y)
+        FLS x  -> parseError  "FLS non Struct should be impossible"  (show x)
+        FLER z -> parseError  "FLER non Error should be impossible"  (show z)
+      sUnitSorter = foldrM throwDuplicate $ CodeCollection M.empty M.empty M.empty M.empty M.empty M.empty -- the list of all the sUnits goes here
 
       throwDuplicateFunction :: (SolidString, Func) -> Map SolidString Func -> Either ParseTypeCheckOrSolidVMError (Map SolidString Func)
       throwDuplicateFunction (fname, func) m = case M.lookup fname m of
         Nothing -> pure $ M.insert fname func m 
         Just fdec -> do
-          let oldParamTypes = fmap snd $ funcArgs fdec
-              newParamTypes = fmap snd $ funcArgs func
-              overloadParamTypes = concatMap (\x -> [fmap snd $ funcArgs x]) $ funcOverload fdec
+          let oldParamTypes = fmap snd $ _funcArgs fdec
+              newParamTypes = fmap snd $ _funcArgs func
+              overloadParamTypes = concatMap (\x -> [fmap snd $ _funcArgs x]) $ _funcOverload fdec
           if ((oldParamTypes == newParamTypes) || (newParamTypes `elem` overloadParamTypes))
             then Left . PEx $ newErrorMessage (Message $ "Free function could not be overloaded: " ++ labelToString fname)
-                                              (fromSourcePosition $ _sourceAnnotationStart $ funcContext func)
+                                              (fromSourcePosition $ _sourceAnnotationStart $ _funcContext func)
             else do
-              pure $ M.insert fname (fdec{funcOverload = funcOverload fdec ++ [func]}) m
+              pure $ M.insert fname (fdec{_funcOverload = _funcOverload fdec ++ [func]}) m
                                            
   allSUnits <- fmap concat . traverse (uncurry getNamedSUnits) $ M.toList initCodeMap
+<<<<<<< HEAD
   let (allConstants, allContracts, allEnums, allStructs, allFreeFunctions, allCustomErrors, allPragmas) = sUnitSorter allSUnits
   deduplicatedContracts <- foldrM throwDuplicate M.empty allContracts
   deduplicatedFreeFunctions <- foldrM throwDuplicateFunction M.empty (allFreeFunctions :: [(SolidString, Func)])
@@ -147,6 +173,10 @@ compileSourceNoInheritance initCodeMap = do
     _pragmas =  allPragmas
     
   }
+=======
+  theCC <- sUnitSorter allSUnits
+  pure $ theCC
+>>>>>>> develop
 
 hasSvm3_2 :: CodeCollection -> Bool
 hasSvm3_2 cc = any (=="svm3.2") vmVers
@@ -173,7 +203,7 @@ compileSource typeCheck mTT = do
       typeCheckDetectorSvm3_2 ecc = case TypeChecker.detector ecc of
         [] -> Right ecc
         xs -> Left $ TCEx xs
-      typeCheckDetectorSvm3_3 ecc = case TypeChecker.detector ecc <> ConstantFunctions.detector ecc of
+      typeCheckDetectorSvm3_3 ecc = case TypeChecker.detector ecc <> ConstantFunctions.detector ecc <> MultipleDeclarations.detector ecc of
         [] -> Right ecc
         xs -> Left $ TCEx xs
 

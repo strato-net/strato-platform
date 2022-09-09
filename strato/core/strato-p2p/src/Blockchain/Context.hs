@@ -165,7 +165,6 @@ withPeerAddress f = PeerAddress . f . unPeerAddress
 
 data Context = Context
   { contextKafkaState     :: K.KafkaState
-  , vmTrace               :: [String]
   , blockHeaders          :: [BlockData]
   , remainingBlockHeaders :: RemainingBlockHeaders
   , actionTimestamp       :: ActionTimestamp
@@ -496,7 +495,6 @@ initContext = Context
   , contextKafkaState = mkConfiguredKafkaState "strato-p2p"
   , blockHeaders = []
   , remainingBlockHeaders = RemainingBlockHeaders []
-  , vmTrace=[]
   , _blockstanbulPeerAddr = PeerAddress Nothing
   , _outboundWireMessages = S.empty
   }

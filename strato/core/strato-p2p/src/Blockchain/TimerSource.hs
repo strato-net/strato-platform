@@ -11,7 +11,7 @@ import           Control.Monad.IO.Class
 import           Data.Conduit
 
 import           BlockApps.Logging
-import           Blockchain.Event
+import           Blockchain.EventP2P
 
 timerSource :: (MonadLogger m, MonadIO m)
             => ConduitM () Event m ()

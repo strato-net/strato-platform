@@ -23,6 +23,7 @@ import           GHC.Generics
 import           Text.Parsec
 
 
+import           SolidVM.Solidity.Parse.Alias
 import           SolidVM.Solidity.Parse.Declarations
 import           SolidVM.Solidity.Parse.Imports
 import           SolidVM.Solidity.Parse.Lexer
@@ -38,7 +39,8 @@ solidityFile = do
   whiteSpace
   units <- many (   solidityPragma 
                 <|> solidityImport 
-                <|> solidityFLError 
+                <|> solidityFLError
+                <|>  solidityAlias 
                 <|> solidityFreeFunction 
                 <|> solidityContract 
                 <|> solidityFLConstant 

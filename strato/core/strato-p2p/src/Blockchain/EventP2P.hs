@@ -11,7 +11,7 @@
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE TypeOperators       #-}
 
-module Blockchain.Event (
+module Blockchain.EventP2P (
   module Blockchain.EventModel,
   handleEvents,
   handleGetChainDetails,
