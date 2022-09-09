@@ -67,25 +67,16 @@ functionHelper :: CodeCollection
                -> Maybe Contract
                -> Func
                -> Func
-functionHelper cc mc f = do
+functionHelper cc mc f = 
   case funcContents f of
     Nothing -> f
-    Just stmts -> do
-      case mc of
-        Just c ->
-          if M.null $ _userDefined c -- Check if there is any user Defined
-            then
-              let r = R cc mc
-              in f{
-                funcContents = Just $ runReader (optimizeStatements stmts) r }
-            else
-              let r = R cc mc
-              in functionHelperForUserDefined f{
-                funcContents = Just $ runReader (optimizeStatements stmts) r }
-        Nothing -> let r = R cc mc
-              in f{
-                funcContents = Just $ runReader (optimizeStatements stmts) r }
-
+    Just stmts -> 
+      if ((Just True) ==)  $ M.null <$>  (_userDefined <$> mc) 
+        then  let r = R cc mc
+              in f{ funcContents = Just $ runReader (optimizeStatements stmts) r }
+        else  let r = R cc mc
+              in functionHelperForUserDefined f{ funcContents = Just $ runReader (optimizeStatements stmts) r }
+    
 
 functionHelperForUserDefined ::  Func -> Func
 functionHelperForUserDefined f = f{ funcArgs =  tForm  $ funcArgs f, funcVals =  tForm  $ funcVals f   }
