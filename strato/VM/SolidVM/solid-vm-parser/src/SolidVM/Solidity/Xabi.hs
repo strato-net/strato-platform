@@ -5,6 +5,11 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE DeriveFoldable    #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE DeriveAnyClass    #-}
+
 
 {-# OPTIONS -fno-warn-unused-top-binds #-}
 
@@ -15,10 +20,20 @@ module SolidVM.Solidity.Xabi (
   ModifierF(..),
   Modifier,
   UsingF(..),
-  Using
+  Using,
+  xabiFuncs,
+  xabiConstr,
+  xabiVars,
+  xabiConstants,
+  xabiTypes,
+  xabiModifiers,
+  xabiEvents,
+  xabiKind,
+  xabiUsing,
+  xabiContext
   ) where
 
-import           Control.Lens                 (mapped, (&), (?~))
+import           Control.Lens                 (makeLenses, mapped, (&), (?~))
 import           Control.DeepSeq
 import           Data.Aeson
 import           Data.Aeson.Casing
@@ -56,21 +71,21 @@ instance ToSchema XabiKind where
     & mapped.schema.example ?~ toJSON ContractKind
 
 data XabiF a = Xabi
-  { xabiFuncs     :: Map SolidString (FuncF a)
-  , xabiConstr    :: Map SolidString (FuncF a)
-  , xabiVars      :: Map SolidString (VariableDeclF a)
-  , xabiConstants :: Map SolidString (ConstantDeclF a)
-  , xabiTypes     :: Map SolidString (SolidVM.DefF a)
-  , xabiModifiers :: Map SolidString (ModifierF a)
-  , xabiEvents    :: Map SolidString (EventF a)
-  , xabiKind      :: XabiKind
-  , xabiUsing     :: Map Text (UsingF a)
-  , xabiContext   :: a
-  } deriving (Eq,Show, Generic, NFData, Functor)
+  { _xabiFuncs     :: Map SolidString (FuncF a)
+  , _xabiConstr    :: Map SolidString (FuncF a)
+  , _xabiVars      :: Map SolidString (VariableDeclF a)
+  , _xabiConstants :: Map SolidString (ConstantDeclF a)
+  , _xabiTypes     :: Map SolidString SolidVM.Def
+  , _xabiModifiers :: Map SolidString (ModifierF a)
+  , _xabiEvents    :: Map SolidString (EventF a)
+  , _xabiKind      :: XabiKind
+  , _xabiUsing     :: Map Text (UsingF a)
+  , _xabiContext   :: a
+  } deriving (Eq,Show,Generic, Functor, NFData, Traversable, Foldable)
 
 type Xabi = Positioned XabiF
 
-data UsingF a = Using String a deriving (Eq,Show,Generic, NFData, Functor)
+data UsingF a = Using String a deriving (Eq,Show,Generic, Functor, NFData, Traversable, Foldable)
 
 type Using = Positioned UsingF
 
@@ -107,3 +122,5 @@ soliditySchemaOptions = SchemaOptions
   , allNullaryToStringTag = True
   , unwrapUnaryRecords = True
   }
+
+makeLenses ''XabiF
