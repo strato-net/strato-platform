@@ -16,7 +16,7 @@ import           Data.Map as M
 import           SolidVM.Model.CodeCollection
 import qualified SolidVM.Model.Type as SVMType
 import           SolidVM.Model.SolidString (SolidString)
-
+import           SolidVM.Solidity.Parse.UnParser
 
 
 data R = R
@@ -230,6 +230,22 @@ optimizeExpression (FunctionCall x1  (MemberAccess x2  (Variable x3  nam) "unwra
 -- optimizeExpression (Variable x name ) = do
 --   var <- getVariableByName name
 --   case var  of Just y -> optimizeExpression y; Nothing -> pure $ (Variable x name )
+
+optimizeExpression (MemberAccess loc base fieldName) = do
+  case base of 
+    (FunctionCall spot (Variable _ "type") (OrderedArgs [(Variable _ nam)])) -> do --Note type is a special reserved function
+        cc <- asks codeCollection
+        if (M.member nam (_contracts cc) )
+        then case fieldName of 
+          "name" -> pure $ (StringLiteral spot nam)
+          --"int"  -> pure $ ()--To Implement for another ticket
+          "creationCode" -> pure $ case M.lookup nam (_contracts cc) of Just contrct -> (StringLiteral spot (unparseContract  contrct));  _ ->  (MemberAccess loc base fieldName); 
+          "runtimeCode" -> pure $ (MemberAccess loc base fieldName)
+          _ -> pure $ (MemberAccess loc base fieldName) 
+        else  pure $ (MemberAccess loc base fieldName)
+    (FunctionCall _ (Variable _ "type") (NamedArgs _)) -> pure $ (MemberAccess loc base fieldName) 
+    _  -> pure $ (MemberAccess loc base fieldName) -- TODO implement a memeber Access evaluator
+
 
 optimizeExpression e = pure e
 -- optimizeExpression (Binary x "|" a b) =
