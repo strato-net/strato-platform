@@ -190,7 +190,7 @@ indexEventToTxrResults = \case
         let cert = bsToCert . C8.pack $ certString
             userAddress = fmap (fromPublicKey . subPub) $ getCertSubject =<< eitherToMaybe cert
             org = maybe "" subOrg $ getCertSubject =<< eitherToMaybe cert
-            orgUnit = fromMaybe "" $ subUnit =<< getCertSubject =<< eitherToMaybe cert
+            orgUnit = fromMaybe Nothing $ Just . subUnit =<< getCertSubject =<< eitherToMaybe cert
         in case (cert, userAddress) of
             (Left s, Nothing) -> Just . RegisterCertificate . Left $ "Failed to parse the certString for the CertificateRegistered event: " <> s
             (Left s, Just ua) -> Just . RegisterCertificate . Left $ "Failed to parse the certString for the CertificateRegistered event: " <> s <> "; " <> show ua
