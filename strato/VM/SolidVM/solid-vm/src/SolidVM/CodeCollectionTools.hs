@@ -30,27 +30,27 @@ type SolidEither = Either (Positioned ((,) SolidException))
 xabiToContract :: SolidString -> [SolidString] -> String -> M.Map String String -> Xabi -> SolidEither Contract
 xabiToContract contractName' parents' vmVersion' userDefinedTypes xabi = do
   validateXabi xabi
-  constr <- case M.toList $ Xabi.xabiConstr xabi of
+  constr <- case M.toList $ Xabi._xabiConstr xabi of
     [] -> Right Nothing
     [(_, x)] -> Right $ Just x
     _ -> Left $ ( DuplicateDefinition "multiple constructors in contract" (show contractName') --TODO- figure out if this is allowed in Solidity
-                , Xabi.xabiContext xabi
+                , Xabi._xabiContext xabi
                 )
   pure Contract {
   _contractName = contractName',
   _parents = parents',
-  _storageDefs = Xabi.xabiVars xabi,
+  _storageDefs = Xabi._xabiVars xabi,
   _userDefined =  userDefinedTypes,
-  _constants = Xabi.xabiConstants xabi,
-  _enums = M.fromList [(name, (vals, a)) | (name, Def.Enum vals _ a) <- M.toList $ Xabi.xabiTypes xabi],
-  _structs = M.fromList [(name, (\(k,v) -> (k,v,a)) <$> vals) | (name, Def.Struct vals _ a) <- M.toList $ Xabi.xabiTypes xabi],
-  _errors = M.fromList [(name, (\(k,v) -> (k,v,a)) <$> vals) | (name, Def.Error vals _ a) <- M.toList $ Xabi.xabiTypes xabi],
-  _events = Xabi.xabiEvents xabi,
-  _functions = Xabi.xabiFuncs xabi,
-  _modifiers = Xabi.xabiModifiers xabi,
+  _constants = Xabi._xabiConstants xabi,
+  _enums = M.fromList [(name, (vals, a)) | (name, Def.Enum vals _ a) <- M.toList $ Xabi._xabiTypes xabi],
+  _structs = M.fromList [(name, (\(k,v) -> (k,v,a)) <$> vals) | (name, Def.Struct vals _ a) <- M.toList $ Xabi._xabiTypes xabi],
+  _errors = M.fromList [(name, (\(k,v) -> (k,v,a)) <$> vals) | (name, Def.Error vals _ a) <- M.toList $ Xabi._xabiTypes xabi],
+  _events = Xabi._xabiEvents xabi,
+  _functions = Xabi._xabiFuncs xabi,
+  _modifiers = Xabi._xabiModifiers xabi,
   _constructor = constr,
   _vmVersion = vmVersion',
-  _contractContext = Xabi.xabiContext xabi
+  _contractContext = Xabi._xabiContext xabi
   }
 
 
@@ -110,14 +110,14 @@ resolveLabelsInContract cc c =
   c{_storageDefs=fmap (resolveLabelsInDef (cc^.contracts) (c^.userDefined)  (c^.enums) (c^.structs)) $ c^.storageDefs}
 
 resolveLabelsInDef :: Map SolidString Contract -> Map String String->  Map SolidString a -> Map SolidString b -> VariableDecl -> VariableDecl
-resolveLabelsInDef contractDefs userDefineDefs enumDefs structDefs x@VariableDecl{varType=SVMType.UnknownLabel labelName _} =
+resolveLabelsInDef contractDefs userDefineDefs enumDefs structDefs x@VariableDecl{_varType=SVMType.UnknownLabel labelName _} =
   case (labelName `M.member` contractDefs,
         labelName `M.member` userDefineDefs,
         labelName `M.member` structDefs,
         labelName `M.member` enumDefs) of
-    (_, _, True, _) -> x{varType=SVMType.Enum Nothing labelName Nothing}
-    (_, _,  _, True) -> x{varType=SVMType.Struct Nothing labelName}
-    (True, _,  _, _) -> x{varType=SVMType.Contract labelName}
-    _ -> x{varType=SVMType.UnknownLabel labelName Nothing}
+    (_, _, True, _) -> x{_varType=SVMType.Enum Nothing labelName Nothing}
+    (_, _,  _, True) -> x{_varType=SVMType.Struct Nothing labelName}
+    (True, _,  _, _) -> x{_varType=SVMType.Contract labelName}
+    _ -> x{_varType=SVMType.UnknownLabel labelName Nothing}
     -- _ -> error $ "unknown label in call to resolveLabelsInDef: " ++ labelName
 resolveLabelsInDef _ _ _ _ x = x

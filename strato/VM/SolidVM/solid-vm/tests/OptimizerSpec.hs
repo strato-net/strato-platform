@@ -34,13 +34,13 @@ varDeclHelper :: CodeCollection -> [VariableDeclF (SourceAnnotation ())]
 varDeclHelper cc = cc  ^.. contracts . folded . storageDefs .folded
 
 varDeclHelper' :: [VariableDeclF (SourceAnnotation ())] -> [ExpressionF (SourceAnnotation ())]
-varDeclHelper' varArr = (varInitialVal <$>  varArr) ^.. folded . folded
+varDeclHelper' varArr = (_varInitialVal <$>  varArr) ^.. folded . folded
 
 constDeclHelper :: CodeCollection -> [ConstantDeclF (SourceAnnotation ())]
 constDeclHelper cc = cc  ^.. contracts . folded . constants .folded
 
 funcHelper :: CodeCollection -> [StatementF (SourceAnnotation ())]
-funcHelper cc = (funcContents <$> (cc  ^.. contracts . folded . functions . folded) ) ^.. folded . folded .folded
+funcHelper cc = (_funcContents <$> (cc  ^.. contracts . folded . functions . folded) ) ^.. folded . folded .folded
 
 getFuncs :: CodeCollection -> [M.Map SolidVM.Model.SolidString.SolidString (FuncF (SourceAnnotation ()))]-- [FuncF (SourceAnnotation ())]
 getFuncs cc  = (cc  ^.. contracts . folded . functions )
@@ -86,7 +86,7 @@ spec = describe "Optimizer tests" $ do
                 Mytype a = Mytype.wrap(2);
                 function f(Mytype y) returns (Mytype) { return (y);}
             }|] in case
-             concat $ (funcArgs <$> getFuncByName"f" anns) ++ (funcArgs <$> getFuncByName"f" anns)
+             concat $ (_funcArgs <$> getFuncByName"f" anns) ++ (_funcArgs <$> getFuncByName"f" anns)
              of
                 [(Just _, (IndexedType  0  ( SVMType.Int (Just True)  Nothing) ) ), (Just _, (IndexedType  0  ( SVMType.Int (Just True)  Nothing) ) )] -> True
                 _ -> False

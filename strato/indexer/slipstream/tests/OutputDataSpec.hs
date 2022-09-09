@@ -600,11 +600,11 @@ spec = do
 createDummyContract :: [(Text, SVMType.Type)] -> Contract
 createDummyContract v = 
   let createVariableDecl t = VariableDecl{
-        varType=t,
-        varIsPublic=True,
-        varInitialVal=Nothing,
-        varContext=error "varContext undefined",
-        isImmutable = False
+        _varType=t,
+        _varIsPublic=True,
+        _varInitialVal=Nothing,
+        _varContext=error "varContext undefined",
+        _isImmutable = False
         }
   in
     Contract{
