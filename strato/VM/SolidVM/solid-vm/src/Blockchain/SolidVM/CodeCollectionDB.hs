@@ -79,11 +79,17 @@ compileSourceNoInheritance initCodeMap = do
       getNamedSUnits fileName src = do
         sourceUnits <- parseSource fileName src
 <<<<<<< HEAD
+<<<<<<< HEAD
         let pragmas' = \case
 =======
         let userDefinedFromFile = M.fromList $ map (\(Alias _ alias typ) -> (alias, typ) ) $ filter (\x -> case x of (Alias _ _ _) -> True; _ -> False;) sourceUnits
         let pragmas = \case
 >>>>>>> develop
+=======
+
+        let pragmas' = \case
+
+>>>>>>> d44827bb4bca0e6760a524513594bb02696aaa21
               Pragma _ n v -> Just (n, v)
               _ -> Nothing
             vmVersion' = if (Just ("solidvm","3.3")) `elem` (pragmas' <$> sourceUnits) then "svm3.3" else (if (Just ("solidvm","3.2")) `elem` (pragmas' <$> sourceUnits) then "svm3.2" else (if (Just ("solidvm","3.0")) `elem` (pragmas' <$> sourceUnits) then "svm3.0" else ""))
@@ -106,6 +112,10 @@ compileSourceNoInheritance initCodeMap = do
             pure $ Just $ (" ", Prag (n,v))
           _ -> pure Nothing
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+
+>>>>>>> d44827bb4bca0e6760a524513594bb02696aaa21
 --      sUnitSorter :: [(SolidString, SUnitIntermediary)] ->  ([(SolidString, ConstantDecl)], [(SolidString, Contract)], [(SolidString, ([SolidString], a))], [(SolidString, [(SolidString, FieldType, a)])])
       sUnitSorter = foldr (\(name, sUnit) (cs, cs2, cs3, cs4, cs5, cs6, cs7) -> case sUnit of
         Con ctrct -> (cs, (name, ctrct):cs2, cs3, cs4, cs5, cs6, cs7)
@@ -122,12 +132,16 @@ compileSourceNoInheritance initCodeMap = do
       throwDuplicate :: (SolidString, Contract) -> Map SolidString Contract -> Either ParseTypeCheckOrSolidVMError (Map SolidString Contract)
       throwDuplicate (cName, unit) m = case M.lookup cName m of
         Nothing -> pure $ M.insert cName unit m
+<<<<<<< HEAD
 =======
 
       throwDuplicate' :: (SolidString, a) -> Map SolidString a -> (a -> SourceAnnotation b) -> Either ParseTypeCheckOrSolidVMError (Map SolidString a)
       throwDuplicate' (sName, unit) m contextFunc = case M.lookup sName m of
         Nothing -> pure $ M.insert sName unit m
 >>>>>>> develop
+=======
+
+>>>>>>> d44827bb4bca0e6760a524513594bb02696aaa21
         Just _ ->  Left . PEx
                   $ newErrorMessage (Message $ "Duplicate unit found: " ++ labelToString sName)
                                     (fromSourcePosition $ _sourceAnnotationStart $ contextFunc unit)
@@ -160,6 +174,10 @@ compileSourceNoInheritance initCodeMap = do
                                            
   allSUnits <- fmap concat . traverse (uncurry getNamedSUnits) $ M.toList initCodeMap
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+
+>>>>>>> d44827bb4bca0e6760a524513594bb02696aaa21
   let (allConstants, allContracts, allEnums, allStructs, allFreeFunctions, allCustomErrors, allPragmas) = sUnitSorter allSUnits
   deduplicatedContracts <- foldrM throwDuplicate M.empty allContracts
   deduplicatedFreeFunctions <- foldrM throwDuplicateFunction M.empty (allFreeFunctions :: [(SolidString, Func)])
@@ -173,10 +191,14 @@ compileSourceNoInheritance initCodeMap = do
     _pragmas =  allPragmas
     
   }
+<<<<<<< HEAD
 =======
   theCC <- sUnitSorter allSUnits
   pure $ theCC
 >>>>>>> develop
+=======
+
+>>>>>>> d44827bb4bca0e6760a524513594bb02696aaa21
 
 hasSvm3_2 :: CodeCollection -> Bool
 hasSvm3_2 cc = any (=="svm3.2") vmVers
