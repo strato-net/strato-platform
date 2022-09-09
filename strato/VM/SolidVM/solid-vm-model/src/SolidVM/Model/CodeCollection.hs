@@ -60,6 +60,7 @@ data CodeCollectionF a =
     _flErrors :: Map SolidString [(SolidString, IndexedType, a)]
   } deriving (Show, Generic, NFData, Functor)
 
+
 instance ToJSON a => ToJSON (CodeCollectionF a)
 instance FromJSON a => FromJSON (CodeCollectionF a)
 
@@ -68,6 +69,13 @@ type CodeCollection = Positioned CodeCollectionF
 makeLenses ''CodeCollectionF
 
 type SolidEither = Either (Positioned ((,) SolidException))
+
+-- This type is used in the call member functions and dictates the methods in which a the call works
+newtype CodeType =  ContractF 
+                  | FuncF
+                  | StatmentF  
+  deriving (Show, Generic, NFData, Functor)
+
 
 getParents :: CodeCollection -> Contract -> SolidEither [Contract]
 getParents cc c =
