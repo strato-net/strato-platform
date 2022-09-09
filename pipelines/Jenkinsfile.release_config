@@ -4,6 +4,8 @@ withCredentials([
         usernamePassword(credentialsId: 'trace-harvest-demo-tech-keycloak-client', passwordVariable: 'TRACE_HARVEST_DEMO_KEYCLOAK_CLIENT_SECRET', usernameVariable: 'TRACE_HARVEST_DEMO_KEYCLOAK_CLIENT_ID')
 ]) {
   NODE_DATA = [
+        BEANSTALK_LOADTEST_BATCH_SIZE: 25,
+        BEANSTALK_LOADTEST_BATCH_COUNT: 5,
         MONITOR: [
             DEVNET_SYNC_HEALTH_URL: 'https://multinode101.ci.blockapps.net/health',
             LOAD_TEST_HEALTH_URL: 'https://multinode305.ci.blockapps.net/health'

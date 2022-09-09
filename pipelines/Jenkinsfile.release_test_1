@@ -11,8 +11,6 @@ pipeline {
             ' - "X.Y.Z" (i.e. "7.5.0") - for specific public release version\n' +
             ' - "branch_name/build_number" (i.e. "develop/206") - for the custom build of STRATO_autobuild multibranch job in Jenkins.'
         )
-        string(name: 'BEANSTALK_LOADTEST_BATCH_SIZE', defaultValue: '25', description: 'Number of agreements in a single batch in load test')
-        string(name: 'BEANSTALK_LOADTEST_BATCH_COUNT', defaultValue: '5', description: 'Number of batches to create in load test')
     }
 
     stages {
@@ -366,7 +364,7 @@ pipeline {
                     if (params.DEBUG_MODE) {
                         sh 'until [ -f /home/ubuntu/step2 ]; do sleep 5; echo "wait for file /home/ubuntu/step2 to be created by user"; done; echo "File found - continuing."'
                     }
-                    lib.runBeanstalkLoadTest(params.BEANSTALK_LOADTEST_BATCH_SIZE, params.BEANSTALK_LOADTEST_BATCH_COUNT)
+                    lib.runBeanstalkLoadTest(NODE_DATA.BEANSTALK_LOADTEST_BATCH_SIZE, NODE_DATA.BEANSTALK_LOADTEST_BATCH_COUNT)
                 }
             }
         }
