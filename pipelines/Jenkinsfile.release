@@ -182,7 +182,7 @@ pipeline {
             sh "git merge ${env.GIT_TAG}"
             sh "echo ${env.RELEASE_VERSION} > VERSION"
             sh 'git add VERSION'
-            sh "git -c user.name=${GITHUB_USERNAME} -c user.email=\'cd@blockapps\' commit VERSION -m '${env.RELEASE_VERSION}' --allow-empty"
+            sh "git -c user.name=${GITHUB_USERNAME} -c user.email=\'cd@blockapps\' commit VERSION -m 'Update latest release version to ${env.RELEASE_VERSION}' --allow-empty"
             sh 'git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform master'
             sh "git tag ${env.RELEASE_VERSION}"
             // The following step requires `cd-blockapps` user to be able to push directly to master
