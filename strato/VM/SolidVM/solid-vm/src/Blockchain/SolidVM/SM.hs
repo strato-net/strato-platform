@@ -51,6 +51,7 @@ module Blockchain.SolidVM.SM (
 
 import           Control.Applicative ((<|>))
 import           Control.Lens hiding (Context)
+import           Control.Monad (join)
 import           Control.Monad.Catch (MonadCatch)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
