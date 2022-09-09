@@ -44,6 +44,7 @@ import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Util       (byteString2Integer)
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
+import           Blockchain.Strato.Model.Account
 
 import           System.IO.Unsafe                   (unsafePerformIO)
 import           Text.Format
@@ -81,26 +82,26 @@ doRemoveMember chainId address = do
   lift $ removeMember chainId address
   void . RBDB.withRedisBlockDB $ RBDB.removeChainMember chainId address
 
-doRegisterCertificate :: Address -> X509CertInfoState -> IContextM ()
-doRegisterCertificate userAddress x509CertInfoState = do
+doRegisterCertificate :: Account -> Address -> X509CertInfoState -> IContextM ()
+doRegisterCertificate contractAddress userAddress x509CertInfoState = do
   logF [ "Registering X.509 Certificate -- key/userAddress: "
        , format userAddress
        , "; value/x509CertInfoState: "
        , format x509CertInfoState
        ]
-  void . RBDB.withRedisBlockDB $ RBDB.registerCertificate userAddress x509CertInfoState
+  void . RBDB.withRedisBlockDB $ RBDB.registerCertificate contractAddress userAddress x509CertInfoState
 
-doRevokeCertificate :: Address -> IContextM ()
-doRevokeCertificate userAddress = do
+doRevokeCertificate :: Account -> Address -> IContextM ()
+doRevokeCertificate contractAddress userAddress = do
   logF [ "Revoking X.509 Certificate -- key/userAddress: "
         , format userAddress
         ]
-  void . RBDB.withRedisBlockDB $ RBDB.revokeCertificate userAddress
+  void . RBDB.withRedisBlockDB $ RBDB.revokeCertificate contractAddress userAddress
 
-doCertificateRegistryInitialized :: IContextM ()
-doCertificateRegistryInitialized = do
+doCertificateRegistryInitialized :: Account -> IContextM ()
+doCertificateRegistryInitialized contractAddress = do
   logF [ "Initializing Certificate Registry"]
-  void . RBDB.withRedisBlockDB $ RBDB.initializeCertificateRegistry
+  void . RBDB.withRedisBlockDB $ RBDB.initializeCertificateRegistry contractAddress
 
 txrIndexer :: LoggingT IO ()
 txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
@@ -115,9 +116,9 @@ txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
 
 data TxrResult = AddMember (Either String (Word256, Address, Enode))
                | RemoveMember (Either String (Word256, Address))
-               | RegisterCertificate (Either String (Address, X509CertInfoState))
-               | CertificateRevoked (Either String Address)
-               | CertificateRegistryInitialized (Either String ())
+               | RegisterCertificate (Either String (Account, Address, X509CertInfoState))
+               | CertificateRevoked (Either String (Account, Address))
+               | CertificateRegistryInitialized (Either String Account)
                | TerminateChain (Either String Word256)
                | PutLogDB LogDB
                | PutEventDB EventDB
@@ -162,13 +163,13 @@ indexEventToTxrResults = \case
             (Left s, Nothing) -> Just . RegisterCertificate . Left $ "Failed to parse the certString for the CertificateRegistered event: " <> s
             (Left s, Just ua) -> Just . RegisterCertificate . Left $ "Failed to parse the certString for the CertificateRegistered event: " <> s <> "; " <> show ua
             (Right s, Nothing) -> Just . RegisterCertificate . Left $ "Failed to parse the certString's userAddress for the CertificateRegistered event: " <> show s
-            (Right c, Just ua) -> Just . RegisterCertificate . Right $ (ua, X509CertInfoState{userAddress=ua, certificate=c, isValid=True, children=[]})
+            (Right c, Just ua) -> Just . RegisterCertificate . Right $ (eventDBContractAddress ev, ua, X509CertInfoState{userAddress=ua, certificate=c, isValid=True, children=[]})
       (Nothing, "CertificateRevoked", [userAddress]) ->
         let userAddress' = stringAddress userAddress
         in case userAddress' of
             Nothing -> Just . CertificateRevoked . Left $ "Failed to parse the certString for the CertificateRevoked event: " <> userAddress
-            Just ua -> Just . CertificateRevoked . Right $ ua
-      (Nothing, "CertificateRegistryInitialized", []) -> Just . CertificateRegistryInitialized . Right $ ()
+            Just ua -> Just . CertificateRevoked . Right $ (eventDBContractAddress ev, ua)
+      (Nothing, "CertificateRegistryInitialized", []) -> Just . CertificateRegistryInitialized . Right $ (eventDBContractAddress ev)
       _ -> Nothing
   TxResult r -> [PutTxResult r]
   _ -> []
@@ -182,13 +183,13 @@ txrResultHandler = \case
     Right (chainId, address) -> doRemoveMember chainId address
     Left err -> $logErrorS "txrIndexer" $ T.pack err
   RegisterCertificate e -> case e of
-    Right (ua, certInfoState) -> doRegisterCertificate ua certInfoState
+    Right (contractAddress, ua, certInfoState) -> doRegisterCertificate contractAddress ua certInfoState
     Left err -> $logErrorS "txrIndexer" $ T.pack err
   CertificateRevoked e -> case e of
-    Right userAddress -> doRevokeCertificate userAddress
+    Right (contractAddress, userAddress) -> doRevokeCertificate contractAddress userAddress
     Left err -> $logErrorS "txrIndexer" $ T.pack err
   CertificateRegistryInitialized e -> case e of
-    Right _ -> doCertificateRegistryInitialized
+    Right contractAddress -> doCertificateRegistryInitialized contractAddress
     Left err  -> $logErrorS "txrIndexer whaaat?" $ T.pack err
   TerminateChain e -> case e of
     Right chainId -> lift $ terminateChain chainId

@@ -6,7 +6,10 @@ dependencies:
 library:
   source-dirs: src
   dependencies:
+  - common-log
   - cross-monitoring
+  - prometheus-client
+  - resourcet
   - text
   - unix
 

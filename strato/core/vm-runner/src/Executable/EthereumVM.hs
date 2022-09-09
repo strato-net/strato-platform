@@ -8,7 +8,9 @@
 {-# LANGUAGE TypeOperators     #-}
 
 module Executable.EthereumVM (
-  ethereumVM
+  ethereumVM,
+  handleVmEvents,
+  writeBlockSummary
 ) where
 
 import           Conduit
@@ -51,6 +53,7 @@ import           Blockchain.Data.DataDefs              (blockDataExtraData, bloc
 import           Blockchain.Data.GenesisBlock
 import           Blockchain.DB.BlockSummaryDB
 import           Blockchain.DB.ChainDB
+import           Blockchain.DB.X509CertDB              (CertRoot(..), bootstrapCertDB, flushMemCertDB)
 import           Blockchain.EthConf
 import           Blockchain.Event
 import           Blockchain.JsonRpcCommand
@@ -98,11 +101,12 @@ ethereumVM d = void . execContextM d $ do
     $logInfoS "difficultyBomb" $ T.pack $ "Difficulty bomb is " ++ show flags_difficultyBomb -- remove me once we figure out how to print args at startup
 
     Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
-    (cpOffsetStart, EVMCheckpoint cpHash cpHead cpBBI cpSR) <- getCheckpoint
-    $logInfoLS "ethereumVM/getCheckpoint" (cpHash, cpBBI, cpSR)
+    (cpOffsetStart, EVMCheckpoint cpHash cpHead cpBBI cpSR cpCR) <- getCheckpoint
+    $logInfoLS "ethereumVM/getCheckpoint" (cpHash, cpBBI, cpSR, cpCR)
 
     putContextBestBlockInfo cpBBI
     Mod.put Proxy $ BlockHashRoot cpSR
+    Mod.put Proxy $ CertRoot cpCR
 
     Bagger.processNewBestBlock cpHash cpHead [] -- bootstrap Bagger with genesis block
 
@@ -117,41 +121,48 @@ ethereumVM d = void . execContextM d $ do
 
         let vmInEventBatch = foldr insertInBatch newInBatch seqEvents
         outBatch <- runConduit $ yield vmInEventBatch
-                              .| handleVmEvents
+                              .| handleVmEvents flags_useSyncMode
                               .| fold (flip insertOutBatch) newOutBatch
+        
+        loopTimeit "compactContextM" $ compactContextM
         sendOutEvents outBatch
 
         let newOffset = cpOffset + fromIntegral (length seqEvents)
         baggerData <- uncurry EVMCheckpoint <$> Bagger.getCheckpointableState
         checkpointData <- baggerData <$> getContextBestBlockInfo
         withChainroot <- checkpointData . unBlockHashRoot <$> Mod.get Proxy
-        setCheckpoint newOffset withChainroot
+        withCertroot <- withChainroot . unCertRoot <$> Mod.get Proxy
+        setCheckpoint newOffset withCertroot
 
 microtimeCutoff :: Microtime
 microtimeCutoff = secondsToMicrotime flags_mempoolLivenessCutoff
 {-# NOINLINE microtimeCutoff #-}
 
-handleVmEvents :: ConduitT VmInEventBatch VmOutEvent ContextM ()
-handleVmEvents = awaitForever $ \InBatch{..} -> do
-  lift $ do
+handleVmEvents :: (MonadFail m, VMBase m, Bagger.MonadBagger m, MonadMonitor m)
+               => Bool -> ConduitT VmInEventBatch VmOutEvent m ()
+handleVmEvents useSyncMode = awaitForever $ \InBatch{..} -> do
+  rpcResps <- lift $ do
     mapM_ (uncurry3 queuePendingVote) votesToMake
-    mapM_ runJsonRpcCommand rpcCommands
+    bbHash <- maybe Keccak256.zeroHash fst <$> getChainBestBlock Nothing
+    resps <- withCurrentBlockHash bbHash $ traverse runJsonRpcCommand' rpcCommands
     recordSeqEventCount bLen tLen
+    pure resps
+  yieldMany $ uncurry OutJSONRPC <$> rpcResps
 
   numPoolable <- uncurry (*>) . (yieldMany *** pure) =<< lift (processTransactions txPairs)
   yieldMany $ outputPrivateTransactions privateTxs
   processBlocksAndNewChains blocksAndNewChains
 
   mNewBlock <- lift $ do
-    contextModify $ blockRequested ||~ createBlock
+    Mod.modify_ (Mod.Proxy @ContextState) $ pure . (blockRequested ||~ createBlock)
     -- todo: perhaps we shouldnt even add TXs to the mempool, it might make for a VERY large checkpoint
     -- todo: which may fail
-    isCaughtUp <- shouldProcessNewTransactions
+    isCaughtUp <- shouldProcessNewTransactions useSyncMode
     bState <- Bagger.getBaggerState
-    pbft <- contextGets _hasBlockstanbul
-    reqd <- contextGets _blockRequested
+    pbft <- _hasBlockstanbul <$> Mod.get (Mod.Proxy @ContextState)
+    reqd <- _blockRequested <$> Mod.get (Mod.Proxy @ContextState)
     hasVotes <- (/= 0) . fst <$> peekPendingVote
-    let makeLazyBlocks = lazyBlocks $ quarryConfig ethConf
+    let makeLazyBlocks = False --lazyBlocks $ quarryConfig ethConf -- TODO?: Remove reference to ethConf
         pending = B.pending bState
         priv = toList . B.privateHashes $ B.miningCache bState
         hasTxs = (numPoolable > 0) || not (M.null pending) || not (null priv)
@@ -165,7 +176,7 @@ handleVmEvents = awaitForever $ \InBatch{..} -> do
         "(isCaughtUp, pbft, reqd, hasTxs, makeLazyBlocks, shouldOutputBlocks) = " ++ show
          (isCaughtUp, pbft, reqd, hasTxs, makeLazyBlocks, shouldOutputBlocks)
     when (pbft && shouldOutputBlocks) $
-      contextModify $ blockRequested .~ False
+      Mod.modify_ (Mod.Proxy @ContextState) $ pure . (blockRequested .~ False)
     $logDebugS "evm/loop/newBlock" $ T.pack $ "Queued: " ++ show numPoolable
     $logDebugS "evm/loop/newBlock" $ T.pack $ "Pending: " ++ show (length pending)
     if shouldOutputBlocks
@@ -175,10 +186,6 @@ handleVmEvents = awaitForever $ \InBatch{..} -> do
         pure $ Just newBlock
       else pure Nothing
   traverse_ (yield . OutBlock) mNewBlock
-
-  -- todo: is this the best place to put this?
-  lift $ do
-    loopTimeit "compactContextM" $ compactContextM
 
 spanLeft :: [Either a b] -> ([a], [Either a b])
 spanLeft (Left x:xs') = let (ys,zs) = spanLeft xs' in (x:ys,zs)
@@ -193,17 +200,18 @@ groupEithers [] = []
 groupEithers (Left x:xs) = let (ys,zs) = spanLeft xs in Left (x:ys) : groupEithers zs
 groupEithers (Right x:xs) = let (ys,zs) = spanRight xs in Right (x:ys) : groupEithers zs
 
-processBlocksAndNewChains :: [Either OutputGenesis OutputBlock] -> ConduitT a VmOutEvent ContextM ()
+processBlocksAndNewChains :: (MonadFail m, Bagger.MonadBagger m, MonadMonitor m)
+                          => [Either OutputGenesis OutputBlock]
+                          -> ConduitT a VmOutEvent m ()
 processBlocksAndNewChains blocksAndChains = do
   let grouped = groupEithers blocksAndChains
   for_ grouped $ \case
     Left newChains -> outputNewChains =<< lift (insertNewChains newChains)
     Right blocks -> processBlocks blocks
 
-insertNewChains :: (
-                   )
+insertNewChains :: VMBase m
                 => [OutputGenesis]
-                -> ContextM [(Word256, ChainInfo, Keccak256, [Action])]
+                -> m [(Word256, ChainInfo, Keccak256, [Action])]
 insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
   let (cId, cInfo) = ogGenesisInfo
   $logInfoS "insertNewChains" $ T.pack $ "Inserting Chain ID: " ++ CL.yellow (format cId)
@@ -236,7 +244,7 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis{..} -> do
             _ -> return (sr', [])
         Just (cId, cInfo, bHash, mAction) <$ putChainGenesisInfo (Just cId) cBlock sr pChain
 
-outputNewChains :: [(Word256, ChainInfo, Keccak256, [Action])] -> ConduitT a VmOutEvent ContextM ()
+outputNewChains :: VMBase m => [(Word256, ChainInfo, Keccak256, [Action])] -> ConduitT a VmOutEvent m ()
 outputNewChains = traverse_ $ \(cId, cInfo, bHash, actions) -> do
   yield . OutIndexEvent $ NewChainInfo cId cInfo
   yield $ OutToStateDiff cId cInfo bHash
@@ -375,6 +383,7 @@ runChainConstructors cId cInfo = do
 
   flushMemStorageDB
   Mem.flushMemAddressStateDB
+  flushMemCertDB . unCurrentBlockHash =<< Mod.get (Mod.Proxy @CurrentBlockHash)
 
   sr <- A.lookupWithDefault (Proxy @MP.StateRoot) (Just cId)
   return (sr, actions)
@@ -382,15 +391,19 @@ runChainConstructors cId cInfo = do
 initializeCheckpointAndBlockSummary :: ( HasBlockSummaryDB m
                                        , Mod.Modifiable BlockHashRoot m
                                        , Mod.Modifiable GenesisRoot m
+                                       , Mod.Modifiable CertRoot m
                                        , (MP.StateRoot `A.Alters` MP.NodeData) m
                                        )
                                     => OutputBlock
                                     -> m EVMCheckpoint
 initializeCheckpointAndBlockSummary block = do
-  let evmc@(EVMCheckpoint sha _ _ sr) = outputBlockToEvmCheckpoint block
+  let evmc@(EVMCheckpoint sha _ _ sr _) = outputBlockToEvmCheckpoint block
   writeBlockSummary block
   (BlockHashRoot bhr) <- bootstrapChainDB sha [(Nothing, sr)]
-  return evmc{ctxChainDBStateRoot = bhr}
+  (CertRoot cr) <- bootstrapCertDB sha
+  return evmc{ ctxChainDBStateRoot = bhr
+             , ctxCertDBStateRoot = cr
+             }
 
 outputBlockToEvmCheckpoint :: OutputBlock -> EVMCheckpoint
 outputBlockToEvmCheckpoint block =
@@ -402,7 +415,7 @@ outputBlockToEvmCheckpoint block =
       uncL   = length (obBlockUncles block)
       cbbi   = ContextBestBlockInfo (sha, header, td, txL, uncL)
       sr     = blockDataStateRoot header
-   in EVMCheckpoint sha header cbbi sr
+   in EVMCheckpoint sha header cbbi sr MP.emptyTriePtr
 
 writeBlockSummary :: HasBlockSummaryDB m => OutputBlock -> m ()
 writeBlockSummary block =
@@ -417,9 +430,9 @@ shouldProcessNewTransactions :: ( MonadLogger m
                                 , Mod.Accessible (Maybe WorldBestBlock) m
                                 , HasBlockSummaryDB m
                                 )
-                             => m Bool -- todo: probably shouldn't do it by number, but tdiff.
-shouldProcessNewTransactions =
-  if flags_useSyncMode
+                             => Bool -> m Bool -- todo: probably shouldn't do it by number, but tdiff.
+shouldProcessNewTransactions useSyncMode =
+  if useSyncMode
     then do
       worldBestBlock <- fmap unWorldBestBlock <$> Mod.access (Mod.Proxy @(Maybe WorldBestBlock))
       case worldBestBlock of
@@ -435,7 +448,7 @@ shouldProcessNewTransactions =
           $logInfoS "shouldProcessNewTransactions" (T.pack msg)
           return didRunBest  -- todo, verify TDiff etc.
     else do
-      $logInfoS "shouldProcessNewTransactions" "flags_useSyncMode == false, will process all new TXs"
+      $logInfoS "shouldProcessNewTransactions" "useSyncMode == false, will process all new TXs"
       return True
 
 logEventSummaries :: MonadLogger m => [VmEvent] -> m ()
@@ -493,6 +506,7 @@ sendOutEvents OutBatch{..} = do
           }
         _ -> Nothing
   
+  for_ outJSONRPCs $ liftIO . uncurry produceResponse
   for_ outToStateDiffs $ \(cId, cInfo, bHash) ->
     withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo
   traverse_ commitSqlDiffs outStateDiffs

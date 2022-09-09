@@ -25,6 +25,7 @@ module Blockchain.VM.SolidException
   , divideByZero
   , missingCodeCollection
   , inaccessibleChain
+  , invalidChain
   , invalidWrite
   , invalidCertificate
   , malformedData
@@ -33,6 +34,12 @@ module Blockchain.VM.SolidException
   , reservedWordError
   , revertError
   , immutableError
+  , getRunTimeCodeError
+  , tooManyResultsError
+  , tooManyCooks
+  , generalMetaProgrammingError
+  , oldForeignPragmaError
+  , userDefinedError
   ) where
 
 import Control.DeepSeq
@@ -65,6 +72,7 @@ data SolidException = TypeError String String
                     | DivideByZero String 
                     | MissingCodeCollection String String
                     | InaccessibleChain String String
+                    | InvalidChain String String
                     | InvalidWrite String String
                     | InvalidCertificate String String
                     | MalformedData String String
@@ -72,6 +80,12 @@ data SolidException = TypeError String String
                     | PaymentError String String
                     | ReservedWordError String String
                     | ImmutableError String String
+                    | FailedToAttainRunTimCode String String
+                    | TooManyResultsError String Int
+                    | TooManyCooks Int Int
+                    | GeneralMetaProgrammingError String String
+                    | OldForeignPragmaError String String
+                    | UserDefinedError String String
                     deriving (Eq, Exception, Generic, NFData)
 
 instance Show SolidException where
@@ -100,6 +114,7 @@ showSolidException (UnknownVariable a b) = printf "unknown variable: %s: %s" a b
 showSolidException (UnknownStatement a b) = printf "unknown statement: %s: %s" a b
 showSolidException (DivideByZero a) = printf "divide by zero error: %s" a
 showSolidException (MissingCodeCollection a b) = printf "missing code collection: %s: %s" a b
+showSolidException (InvalidChain a b) = printf "Chain is invalid for address: %s, likely problem with %s metaprogramming" a b
 showSolidException (InaccessibleChain a b) = printf "inaccessible chain: %s: %s" a b
 showSolidException (InvalidWrite a b) = printf "invalid write: %s: %s" a b
 showSolidException (InvalidCertificate a b) = printf "invalid certificate: %s: %s" a b
@@ -108,6 +123,12 @@ showSolidException (TooMuchGas a b) = printf "The gas limit is %s, but was given
 showSolidException (PaymentError a b) = printf "There was an error sending %s wei to the following address: %s" a b
 showSolidException (ReservedWordError a b) = printf "%s is a reserved word in version %s and up." b a
 showSolidException (ImmutableError a b) = printf "%s is an immutable variable in line '%s'" a b
+showSolidException (FailedToAttainRunTimCode a b) = printf "%s failed to aquire run time code '%s'" a b
+showSolidException (TooManyResultsError a b) = printf "Too many results returned from input %s: found %d entries (should be 1)." a b
+showSolidException (TooManyCooks a b) = printf "Too many arguments were given, expected %d argument/s, but received %d arguments." a b
+showSolidException (GeneralMetaProgrammingError a b) = printf "There was a problem with the use of '%s', and the given term/s %s" a b
+showSolidException (OldForeignPragmaError a b) = printf "The foreign contract (%s) being called needs an newer pragma in order to use metaprogramming. Foreign contract running: %s" a b
+showSolidException (UserDefinedError a b) = printf "%s is an user defined error in line '%s'" a b
 
 toThrower :: (Show v) => (String -> String -> SolidException) -> String -> v -> a
 toThrower cont msg = throw . cont msg . show
@@ -181,6 +202,9 @@ missingCodeCollection = toThrower MissingCodeCollection
 inaccessibleChain :: (Show v) => String -> v -> a
 inaccessibleChain = toThrower InaccessibleChain
 
+invalidChain :: (Show v) => String -> v -> a
+invalidChain = toThrower InvalidChain
+
 invalidWrite :: (Show v) => String -> v -> a
 invalidWrite = toThrower InvalidWrite
 
@@ -199,6 +223,23 @@ paymentError = toThrower PaymentError
 reservedWordError :: (Show v) => String -> v -> a
 reservedWordError = toThrower ReservedWordError
 
-
 immutableError :: (Show v) => String -> v -> a
 immutableError = toThrower ImmutableError
+
+getRunTimeCodeError :: (Show v) => String -> v -> a
+getRunTimeCodeError = toThrower FailedToAttainRunTimCode
+
+tooManyResultsError :: String -> Int -> a
+tooManyResultsError word got = throw $ TooManyResultsError word got
+
+tooManyCooks :: Int -> Int -> a
+tooManyCooks expected got = throw $ TooManyCooks expected got
+
+generalMetaProgrammingError :: (Show v) => String -> v -> a
+generalMetaProgrammingError = toThrower GeneralMetaProgrammingError
+
+oldForeignPragmaError :: (Show v) => String -> v -> a
+oldForeignPragmaError = toThrower OldForeignPragmaError
+
+userDefinedError :: (Show v) => String -> v -> a
+userDefinedError = toThrower UserDefinedError
