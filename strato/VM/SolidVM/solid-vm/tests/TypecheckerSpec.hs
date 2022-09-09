@@ -1248,8 +1248,10 @@ contract B {
 |]
        in length anns `shouldBe` 1
 
-  it "must pass the associated type within the wrap function " $
-    let anns = runTypechecker [r|
+
+  describe "User Defined Value Types" $ do
+    it "must pass the associated type within the wrap function " $ 
+        let anns = runTypechecker [r|
   pragma solidvm 3.3;
   type MagicInt is int;
   type MysticalString is string;
@@ -1267,12 +1269,10 @@ contract B {
     MagicInt mrBool         = UBool.wrap(true);          //Error          -- passing wrong type to alias wrap function
     bool shouldThrowError   = UBool.wrap(true);         //Error           -- assigning user defined to bool variable
 }
-|]
-    in length anns `shouldBe` 7
+|] in length anns `shouldBe` 7
 
-
-  it "can use user defined unwrap and unwrap" $
-    let anns = runTypechecker [r|
+    it "can use user defined unwrap and unwrap" $
+      let anns = runTypechecker [r|
   pragma solidvm 3.3;
   
   type MagicInt       is int;
@@ -1297,11 +1297,10 @@ contract B {
     string         banach   = MysticalString.unwrap(hilbert);
     string krull            = MysticalString.unwrap(MysticalString.wrap(string.concat("33",  banach)));
 }
-|]
-    in length anns `shouldBe` 0
+|] in length anns `shouldBe` 0
 
-  it "can use user-defined-types wrap and unwrap within fuctions" $
-    let anns = runTypechecker [r|
+    it "can use user-defined-types wrap and unwrap within fuctions" $
+      let anns = runTypechecker [r|
   pragma solidvm 3.3;
   type UBool is bool;
   type MagicInt is int;
@@ -1317,5 +1316,4 @@ contract B {
     }
 
 }
-|]
-    in length anns `shouldBe` 0
+|] in length anns `shouldBe` 0
