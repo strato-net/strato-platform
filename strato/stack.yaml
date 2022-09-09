@@ -114,10 +114,6 @@ extra-lib-dirs:
 
 allow-newer: true
 allow-different-user: true
-<<<<<<< HEAD
-=======
-
->>>>>>> develop
 ghc-options:
   "$locals": -Wall -Werror -fwarn-redundant-constraints
 

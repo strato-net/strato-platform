@@ -78,21 +78,15 @@ compileSourceNoInheritance initCodeMap = do
   let getNamedSUnits :: T.Text -> T.Text -> Either ParseTypeCheckOrSolidVMError [(SolidString, SUnitIntermediary)]
       getNamedSUnits fileName src = do
         sourceUnits <- parseSource fileName src
-<<<<<<< HEAD
-<<<<<<< HEAD
-        let pragmas' = \case
-=======
-        let userDefinedFromFile = M.fromList $ map (\(Alias _ alias typ) -> (alias, typ) ) $ filter (\x -> case x of (Alias _ _ _) -> True; _ -> False;) sourceUnits
-        let pragmas = \case
->>>>>>> develop
-=======
 
         let pragmas' = \case
-
->>>>>>> d44827bb4bca0e6760a524513594bb02696aaa21
               Pragma _ n v -> Just (n, v)
               _ -> Nothing
             vmVersion' = if (Just ("solidvm","3.3")) `elem` (pragmas' <$> sourceUnits) then "svm3.3" else (if (Just ("solidvm","3.2")) `elem` (pragmas' <$> sourceUnits) then "svm3.2" else (if (Just ("solidvm","3.0")) `elem` (pragmas' <$> sourceUnits) then "svm3.0" else ""))
+      
+
+        let userDefinedFromFile = M.fromList $ map (\(Alias _ alias typ) -> (alias, typ) ) $ filter (\x -> case x of (Alias _ _ _) -> True; _ -> False) 
+     
         fmap catMaybes . for sourceUnits $ \case
           NamedXabi name (xabi, parents') -> do
             ctrct <- first SVMEx
@@ -111,13 +105,10 @@ compileSourceNoInheritance initCodeMap = do
           Pragma _ n v -> do 
             pure $ Just $ (" ", Prag (n,v))
           _ -> pure Nothing
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
 
->>>>>>> d44827bb4bca0e6760a524513594bb02696aaa21
+--DELETE!
 --      sUnitSorter :: [(SolidString, SUnitIntermediary)] ->  ([(SolidString, ConstantDecl)], [(SolidString, Contract)], [(SolidString, ([SolidString], a))], [(SolidString, [(SolidString, FieldType, a)])])
-      sUnitSorter = foldr (\(name, sUnit) (cs, cs2, cs3, cs4, cs5, cs6, cs7) -> case sUnit of
+   {-    sUnitSorter = foldr (\(name, sUnit) (cs, cs2, cs3, cs4, cs5, cs6, cs7) -> case sUnit of
         Con ctrct -> (cs, (name, ctrct):cs2, cs3, cs4, cs5, cs6, cs7)
         FLC cnst -> ((name, cnst):cs, cs2, cs3, cs4, cs5, cs6, cs7)
         FLE (Def.Enum vals _ a) -> (cs, cs2, (name, (vals, a)):cs3, cs4, cs5 ,cs6,cs7)
@@ -131,17 +122,12 @@ compileSourceNoInheritance initCodeMap = do
         ) ([], [], [], [], [], [], [])
       throwDuplicate :: (SolidString, Contract) -> Map SolidString Contract -> Either ParseTypeCheckOrSolidVMError (Map SolidString Contract)
       throwDuplicate (cName, unit) m = case M.lookup cName m of
-        Nothing -> pure $ M.insert cName unit m
-<<<<<<< HEAD
-=======
-
+        Nothing -> pure $ M.insert cName unit m -}
+---- DELETE END!
       throwDuplicate' :: (SolidString, a) -> Map SolidString a -> (a -> SourceAnnotation b) -> Either ParseTypeCheckOrSolidVMError (Map SolidString a)
       throwDuplicate' (sName, unit) m contextFunc = case M.lookup sName m of
         Nothing -> pure $ M.insert sName unit m
->>>>>>> develop
-=======
 
->>>>>>> d44827bb4bca0e6760a524513594bb02696aaa21
         Just _ ->  Left . PEx
                   $ newErrorMessage (Message $ "Duplicate unit found: " ++ labelToString sName)
                                     (fromSourcePosition $ _sourceAnnotationStart $ contextFunc unit)
@@ -153,11 +139,13 @@ compileSourceNoInheritance initCodeMap = do
         FLE (Def.Enum vals _ a)   -> fmap (\cMap -> cc & flEnums     .~ cMap) $ throwDuplicate' (name, (vals, a)) (cc ^. flEnums) (const a)
         FLS (Def.Struct vals _ a) -> fmap (\cMap -> cc & flStructs   .~ cMap) $ throwDuplicate' (name, (\(k,v) -> (k,v,a)) <$> vals) (cc ^. flStructs) (\_ -> a)
         FLF func                  -> fmap (\cMap -> cc & flFuncs     .~ cMap) $ throwDuplicateFunction (name, func) (cc ^. flFuncs) -- Thanks Jin!
-        FLER (Def.Error vals _ a) -> fmap (\cMap -> cc & flErrors    .~ cMap) $ throwDuplicate' (name, (\(k,v) -> (k,v,a)) <$> vals) (cc ^. flErrors) (\_ -> a) 
+        FLER (Def.Error vals _ a) -> fmap (\cMap -> cc & flErrors    .~ cMap) $ throwDuplicate' (name, (\(k,v) -> (k,v,a)) <$> vals) (cc ^. flErrors) (\_ -> a)
+        --not map type
+        Prag (n,v)                -> (pragmas) $ throwDuplicate' (name, (n,v)) (cc ^. pragmas) --
         FLE y  -> parseError  "FLE non Enum should be impossible  "  (show y)
         FLS x  -> parseError  "FLS non Struct should be impossible"  (show x)
         FLER z -> parseError  "FLER non Error should be impossible"  (show z)
-      sUnitSorter = foldrM throwDuplicate $ CodeCollection M.empty M.empty M.empty M.empty M.empty M.empty -- the list of all the sUnits goes here
+      sUnitSorter = foldrM throwDuplicate $ CodeCollection M.empty M.empty M.empty M.empty M.empty M.empty [] -- the list of all the sUnits goes here
 
       throwDuplicateFunction :: (SolidString, Func) -> Map SolidString Func -> Either ParseTypeCheckOrSolidVMError (Map SolidString Func)
       throwDuplicateFunction (fname, func) m = case M.lookup fname m of
@@ -173,11 +161,6 @@ compileSourceNoInheritance initCodeMap = do
               pure $ M.insert fname (fdec{_funcOverload = _funcOverload fdec ++ [func]}) m
                                            
   allSUnits <- fmap concat . traverse (uncurry getNamedSUnits) $ M.toList initCodeMap
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-
->>>>>>> d44827bb4bca0e6760a524513594bb02696aaa21
   let (allConstants, allContracts, allEnums, allStructs, allFreeFunctions, allCustomErrors, allPragmas) = sUnitSorter allSUnits
   deduplicatedContracts <- foldrM throwDuplicate M.empty allContracts
   deduplicatedFreeFunctions <- foldrM throwDuplicateFunction M.empty (allFreeFunctions :: [(SolidString, Func)])
@@ -191,14 +174,10 @@ compileSourceNoInheritance initCodeMap = do
     _pragmas =  allPragmas
     
   }
-<<<<<<< HEAD
-=======
+
   theCC <- sUnitSorter allSUnits
   pure $ theCC
->>>>>>> develop
-=======
 
->>>>>>> d44827bb4bca0e6760a524513594bb02696aaa21
 
 hasSvm3_2 :: CodeCollection -> Bool
 hasSvm3_2 cc = any (=="svm3.2") vmVers
