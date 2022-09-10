@@ -44,7 +44,6 @@ import           Data.Traversable                      (for)
 import           Text.Printf
 
 import           BlockApps.Logging
--- import           BlockApps.X509
 import           Blockchain.Bagger.BaggerState
 import           Blockchain.Bagger
 import           Blockchain.Blockstanbul
@@ -721,14 +720,6 @@ instance MonadIO m => (Word256 `A.Alters` P2P ChainMembers) (MonadTest m) where
   lookup _ _   = liftIO . throwIO $ Lookup "P2P" "Word256" "ChainMembers"
   delete _ _   = liftIO . throwIO $ Delete "P2P" "Word256" "ChainMembers"
   insert _ cId (P2P mems) = chainMembersMap . at cId ?= mems
-
--- a simple ReaderT to keep the private key
-type CertGenM = ReaderT PrivateKey IO
-
-instance HasVault CertGenM where
-  getPub = error "we never call getPub with this tool"
-  getShared _ = error "we never call getShared with this tool"
-  sign bs = ask >>= return . flip signMsg bs 
 
 startingCheckpoint :: [Address] -> Checkpoint
 startingCheckpoint as = def{checkpointValidators = as}
@@ -1500,7 +1491,7 @@ contract B {
       --  ]
       --let connections' = connections ++ connections4
 
-    fit "can register and unregister a cert on the main chain" $ do
+    it "can register and unregister a cert on the main chain" $ do
       let unseqSink = (unseqEvents %=) . (++)
       privKeys <- traverse (const newPrivateKey) [(1 :: Integer)..2]
       let globalAdmin = privKeys !! 0
